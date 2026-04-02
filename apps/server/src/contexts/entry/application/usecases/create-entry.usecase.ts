@@ -1,6 +1,8 @@
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import type { BaseEntry } from '../../domain/models/entry';
+import { Entry, type EntryProps } from '../../domain/models/entry';
+import { EntrySnapshot } from '../../domain/models/entry-snapshot';
+import { EntryValidationError } from '../errors/entry.errors';
 
 interface CreateEntryInput {
   content: string;
@@ -14,28 +16,33 @@ export class CreateEntryUsecase {
   constructor(
     private entryRepo: EntryRepositoryGateway,
     private snapshotRepo: EntrySnapshotRepositoryGateway,
+    private generateId: () => string,
   ) {}
 
-  async execute(userId: string, input: CreateEntryInput): Promise<BaseEntry> {
-    const now = new Date().toISOString();
-    const entry: BaseEntry = {
-      id: crypto.randomUUID(),
-      userId,
-      content: input.content,
-      mediaUrls: input.mediaUrls,
-      createdAt: now,
-      updatedAt: now,
-    };
+  async execute(userId: string, input: CreateEntryInput): Promise<EntryProps> {
+    const entryResult = Entry.create(
+      { userId, content: input.content, mediaUrls: input.mediaUrls },
+      this.generateId,
+    );
+    if (!entryResult.success) {
+      throw new EntryValidationError(entryResult.error.message);
+    }
+    const entry = entryResult.value;
+
+    const snapshot = EntrySnapshot.create(
+      {
+        entryId: entry.id,
+        content: input.content,
+        editorType: input.editorType,
+        editorVersion: input.editorVersion,
+        extension: input.extension,
+      },
+      this.generateId,
+    );
 
     await this.entryRepo.save(entry);
-    await this.snapshotRepo.append({
-      entryId: entry.id,
-      content: input.content,
-      editorType: input.editorType,
-      editorVersion: input.editorVersion,
-      extension: input.extension,
-    });
+    await this.snapshotRepo.append(snapshot);
 
-    return entry;
+    return entry.toProps();
   }
 }

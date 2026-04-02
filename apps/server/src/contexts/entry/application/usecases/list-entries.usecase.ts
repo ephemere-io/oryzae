@@ -1,5 +1,5 @@
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
-import type { BaseEntry } from '../../domain/models/entry';
+import type { EntryProps } from '../../domain/models/entry';
 
 export class ListEntriesUsecase {
   constructor(private entryRepo: EntryRepositoryGateway) {}
@@ -8,7 +8,8 @@ export class ListEntriesUsecase {
     userId: string,
     cursor?: string,
     limit?: number,
-  ): Promise<BaseEntry[]> {
-    return this.entryRepo.listByUserId(userId, cursor, limit);
+  ): Promise<EntryProps[]> {
+    const entries = await this.entryRepo.listByUserId(userId, cursor, limit);
+    return entries.map((entry) => entry.toProps());
   }
 }

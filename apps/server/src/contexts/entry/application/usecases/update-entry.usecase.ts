@@ -1,7 +1,11 @@
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import type { BaseEntry } from '../../domain/models/entry';
-import { EntryNotFoundError } from '../errors/entry.errors';
+import type { EntryProps } from '../../domain/models/entry';
+import { EntrySnapshot } from '../../domain/models/entry-snapshot';
+import {
+  EntryNotFoundError,
+  EntryValidationError,
+} from '../errors/entry.errors';
 
 interface UpdateEntryInput {
   content: string;
@@ -15,31 +19,39 @@ export class UpdateEntryUsecase {
   constructor(
     private entryRepo: EntryRepositoryGateway,
     private snapshotRepo: EntrySnapshotRepositoryGateway,
+    private generateId: () => string,
   ) {}
 
   async execute(
     entryId: string,
     input: UpdateEntryInput,
-  ): Promise<BaseEntry> {
+  ): Promise<EntryProps> {
     const existing = await this.entryRepo.findById(entryId);
     if (!existing) throw new EntryNotFoundError(entryId);
 
-    const updated: BaseEntry = {
-      ...existing,
-      content: input.content,
-      mediaUrls: input.mediaUrls,
-      updatedAt: new Date().toISOString(),
-    };
+    const updatedResult = existing.withContent(
+      input.content,
+      input.mediaUrls,
+    );
+    if (!updatedResult.success) {
+      throw new EntryValidationError(updatedResult.error.message);
+    }
+    const updated = updatedResult.value;
+
+    const snapshot = EntrySnapshot.create(
+      {
+        entryId,
+        content: input.content,
+        editorType: input.editorType,
+        editorVersion: input.editorVersion,
+        extension: input.extension,
+      },
+      this.generateId,
+    );
 
     await this.entryRepo.save(updated);
-    await this.snapshotRepo.append({
-      entryId,
-      content: input.content,
-      editorType: input.editorType,
-      editorVersion: input.editorVersion,
-      extension: input.extension,
-    });
+    await this.snapshotRepo.append(snapshot);
 
-    return updated;
+    return updated.toProps();
   }
 }

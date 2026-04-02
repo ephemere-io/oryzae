@@ -25,6 +25,8 @@ const createEntrySchema = z.object({
 
 const updateEntrySchema = createEntrySchema;
 
+const generateId = () => crypto.randomUUID();
+
 export const entries = new Hono<Env>();
 
 entries.post('/', async (c) => {
@@ -32,7 +34,7 @@ entries.post('/', async (c) => {
   const supabase = c.get('supabase');
   const entryRepo = new SupabaseEntryRepository(supabase);
   const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
-  const usecase = new CreateEntryUsecase(entryRepo, snapshotRepo);
+  const usecase = new CreateEntryUsecase(entryRepo, snapshotRepo, generateId);
 
   const entry = await usecase.execute(c.get('userId'), body);
   return c.json(entry, 201);
@@ -69,7 +71,7 @@ entries.put('/:id', async (c) => {
   const supabase = c.get('supabase');
   const entryRepo = new SupabaseEntryRepository(supabase);
   const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
-  const usecase = new UpdateEntryUsecase(entryRepo, snapshotRepo);
+  const usecase = new UpdateEntryUsecase(entryRepo, snapshotRepo, generateId);
 
   const result = await usecase.execute(c.req.param('id'), body);
   return c.json(result);

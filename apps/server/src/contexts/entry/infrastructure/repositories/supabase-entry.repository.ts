@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
-import type { BaseEntry } from '../../domain/models/entry';
+import { Entry } from '../../domain/models/entry';
 
 export class SupabaseEntryRepository implements EntryRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
 
-  async findById(id: string): Promise<BaseEntry | null> {
+  async findById(id: string): Promise<Entry | null> {
     const { data, error } = await this.supabase
       .from('entries')
       .select('*')
@@ -20,7 +20,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     userId: string,
     cursor?: string,
     limit = 20,
-  ): Promise<BaseEntry[]> {
+  ): Promise<Entry[]> {
     let query = this.supabase
       .from('entries')
       .select('*')
@@ -37,14 +37,15 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row) => this.toDomain(row));
   }
 
-  async save(entry: BaseEntry): Promise<void> {
+  async save(entry: Entry): Promise<void> {
+    const props = entry.toProps();
     const { error } = await this.supabase.from('entries').upsert({
-      id: entry.id,
-      user_id: entry.userId,
-      content: entry.content,
-      media_urls: entry.mediaUrls,
-      created_at: entry.createdAt,
-      updated_at: entry.updatedAt,
+      id: props.id,
+      user_id: props.userId,
+      content: props.content,
+      media_urls: props.mediaUrls,
+      created_at: props.createdAt,
+      updated_at: props.updatedAt,
     });
     if (error) throw error;
   }
@@ -57,14 +58,14 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     if (error) throw error;
   }
 
-  private toDomain(row: Record<string, unknown>): BaseEntry {
-    return {
+  private toDomain(row: Record<string, unknown>): Entry {
+    return Entry.fromProps({
       id: row.id as string,
       userId: row.user_id as string,
       content: row.content as string,
       mediaUrls: (row.media_urls as string[]) ?? [],
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
-    };
+    });
   }
 }

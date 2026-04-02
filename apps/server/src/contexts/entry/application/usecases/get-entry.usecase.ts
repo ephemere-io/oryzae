@@ -1,11 +1,11 @@
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import type { BaseEntry } from '../../domain/models/entry';
-import type { EntrySnapshot } from '../../domain/models/entry-snapshot';
+import type { EntryProps } from '../../domain/models/entry';
+import type { EntrySnapshotProps } from '../../domain/models/entry-snapshot';
 
 interface GetEntryResult {
-  entry: BaseEntry;
-  latestSnapshot: EntrySnapshot | null;
+  entry: EntryProps;
+  latestSnapshot: EntrySnapshotProps | null;
 }
 
 export class GetEntryUsecase {
@@ -20,6 +20,9 @@ export class GetEntryUsecase {
 
     const latestSnapshot =
       await this.snapshotRepo.findLatestByEntryId(entryId);
-    return { entry, latestSnapshot };
+    return {
+      entry: entry.toProps(),
+      latestSnapshot: latestSnapshot?.toProps() ?? null,
+    };
   }
 }

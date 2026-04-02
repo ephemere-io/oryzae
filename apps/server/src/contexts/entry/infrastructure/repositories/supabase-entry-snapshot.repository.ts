@@ -1,29 +1,27 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import type { EntrySnapshot } from '../../domain/models/entry-snapshot';
+import { EntrySnapshot } from '../../domain/models/entry-snapshot';
 
 export class SupabaseEntrySnapshotRepository
   implements EntrySnapshotRepositoryGateway
 {
   constructor(private supabase: SupabaseClient) {}
 
-  async append(
-    snapshot: Omit<EntrySnapshot, 'id' | 'createdAt'>,
-  ): Promise<EntrySnapshot> {
-    const { data, error } = await this.supabase
+  async append(snapshot: EntrySnapshot): Promise<void> {
+    const props = snapshot.toProps();
+    const { error } = await this.supabase
       .from('entry_snapshots')
       .insert({
-        entry_id: snapshot.entryId,
-        content: snapshot.content,
-        editor_type: snapshot.editorType,
-        editor_version: snapshot.editorVersion,
-        extension: snapshot.extension,
-      })
-      .select()
-      .single();
+        id: props.id,
+        entry_id: props.entryId,
+        content: props.content,
+        editor_type: props.editorType,
+        editor_version: props.editorVersion,
+        extension: props.extension,
+        created_at: props.createdAt,
+      });
 
     if (error) throw error;
-    return this.toDomain(data);
   }
 
   async findLatestByEntryId(
@@ -43,7 +41,7 @@ export class SupabaseEntrySnapshotRepository
   }
 
   private toDomain(row: Record<string, unknown>): EntrySnapshot {
-    return {
+    return EntrySnapshot.fromProps({
       id: row.id as string,
       entryId: row.entry_id as string,
       content: row.content as string,
@@ -51,6 +49,6 @@ export class SupabaseEntrySnapshotRepository
       editorVersion: row.editor_version as string,
       extension: (row.extension as Record<string, unknown>) ?? {},
       createdAt: row.created_at as string,
-    };
+    });
   }
 }

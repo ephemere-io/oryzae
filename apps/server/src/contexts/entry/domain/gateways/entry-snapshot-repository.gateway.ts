@@ -4,9 +4,7 @@ export interface EntrySnapshotRepositoryGateway {
   /**
    * entry_snapshots に1行追記（immutable append-only）。
    */
-  append(
-    snapshot: Omit<EntrySnapshot, 'id' | 'createdAt'>,
-  ): Promise<EntrySnapshot>;
+  append(snapshot: EntrySnapshot): Promise<void>;
 
   /**
    * entry_snapshots から最新の1行を取得。
