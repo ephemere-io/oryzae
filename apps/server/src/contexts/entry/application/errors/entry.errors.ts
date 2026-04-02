@@ -1,6 +1,13 @@
-export class EntryNotFoundError extends Error {
+import { NotFoundError, ValidationError } from '../../../shared/application/errors/application.errors';
+
+export class EntryNotFoundError extends NotFoundError {
   constructor(entryId: string) {
     super(`Entry not found: ${entryId}`);
-    this.name = 'EntryNotFoundError';
+  }
+}
+
+export class EntryValidationError extends ValidationError {
+  constructor(message: string) {
+    super(message);
   }
 }

@@ -1,12 +1,12 @@
-import type { BaseEntry } from '../models/entry';
+import type { Entry } from '../models/entry';
 
 export interface EntryRepositoryGateway {
-  findById(id: string): Promise<BaseEntry | null>;
+  findById(id: string): Promise<Entry | null>;
   listByUserId(
     userId: string,
     cursor?: string,
     limit?: number,
-  ): Promise<BaseEntry[]>;
-  save(entry: BaseEntry): Promise<void>;
+  ): Promise<Entry[]>;
+  save(entry: Entry): Promise<void>;
   delete(id: string): Promise<void>;
 }
