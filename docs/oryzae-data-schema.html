@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oryzae Data Schema</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', 'Noto Sans JP', sans-serif;
+    background: #faf9f6; color: #2d2d2d;
+    padding: 48px; line-height: 1.7;
+  }
+  h1 {
+    font-size: 22px; font-weight: 500; letter-spacing: 0.08em;
+    color: #8b2020; margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: 13px; color: #999; margin-bottom: 40px; letter-spacing: 0.05em;
+  }
+  .schema-section { margin-bottom: 40px; }
+  .table-title {
+    font-size: 14px; font-weight: 600; color: #d97706;
+    letter-spacing: 0.1em; margin-bottom: 4px;
+  }
+  .table-desc {
+    font-size: 12px; color: #888; margin-bottom: 12px;
+  }
+  table {
+    width: 100%; border-collapse: collapse;
+    background: #fff; border-radius: 8px; overflow: hidden;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  }
+  th {
+    background: #f5f0e8; text-align: left;
+    padding: 10px 16px; font-size: 11px; font-weight: 600;
+    color: #6b5c3e; letter-spacing: 0.1em; text-transform: uppercase;
+    border-bottom: 2px solid #e8dcc8;
+  }
+  td {
+    padding: 10px 16px; font-size: 13px; border-bottom: 1px solid #f0ede6;
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  .col-name { font-weight: 600; color: #2d2d2d; font-family: 'SF Mono', 'Consolas', monospace; font-size: 12px; }
+  .col-type { color: #d97706; font-family: 'SF Mono', 'Consolas', monospace; font-size: 11px; }
+  .col-pk { color: #8b2020; font-size: 10px; font-weight: 600; }
+  .col-fk { color: #4a9e8e; font-size: 10px; font-weight: 600; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; margin-left: 4px; }
+  .badge-pk { background: #fde8e8; color: #8b2020; }
+  .badge-fk { background: #e0f5f0; color: #2a7a6a; }
+  .badge-unique { background: #fef3cd; color: #856404; }
+  .badge-default { background: #e8ecf0; color: #555; }
+  .relation-diagram {
+    margin: 32px 0 48px;
+    padding: 24px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  }
+  .relation-diagram svg { width: 100%; height: auto; }
+  .helper-section { margin-top: 40px; }
+  .helper-table td:first-child {
+    font-family: 'SF Mono', 'Consolas', monospace; font-size: 12px; color: #4a9e8e; white-space: nowrap;
+  }
+  .storage-note {
+    margin-top: 12px; padding: 12px 16px;
+    background: #f8f5ef; border-left: 3px solid #d97706;
+    border-radius: 0 6px 6px 0; font-size: 12px; color: #6b5c3e;
+  }
+  .storage-note strong { color: #d97706; }
+  .section-divider {
+    margin: 48px 0 32px;
+    border: none; border-top: 1px solid #e8dcc8;
+  }
+  .section-heading {
+    font-size: 16px; font-weight: 500; color: #6b5c3e;
+    letter-spacing: 0.06em; margin-bottom: 24px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Oryzae データスキーマ</h1>
+<p class="subtitle">board-jar-integration テーブル定義一覧 — 2026-03-27 更新</p>
+
+<!-- ER Diagram -->
+<div class="relation-diagram">
+  <svg viewBox="0 0 960 380" xmlns="http://www.w3.org/2000/svg">
+    <!-- Entry -->
+    <rect x="10" y="10" width="110" height="50" rx="6" fill="#fff" stroke="#7c5cbf" stroke-width="1.5"/>
+    <text x="65" y="40" text-anchor="middle" font-size="11" font-weight="600" fill="#7c5cbf">Entry</text>
+
+    <!-- Question -->
+    <rect x="10" y="100" width="130" height="50" rx="6" fill="#fff" stroke="#8b2020" stroke-width="1.5"/>
+    <text x="75" y="130" text-anchor="middle" font-size="11" font-weight="600" fill="#8b2020">Question</text>
+
+    <!-- EntryQuestionLink -->
+    <rect x="180" y="10" width="170" height="50" rx="6" fill="#fff" stroke="#999" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <text x="265" y="40" text-anchor="middle" font-size="11" font-weight="600" fill="#999">EntryQuestionLink</text>
+
+    <!-- QuestionTransaction -->
+    <rect x="220" y="100" width="170" height="50" rx="6" fill="#fff" stroke="#d97706" stroke-width="1.5"/>
+    <text x="305" y="130" text-anchor="middle" font-size="11" font-weight="600" fill="#d97706">QuestionTransaction</text>
+
+    <!-- FermentationResult -->
+    <rect x="10" y="200" width="170" height="50" rx="6" fill="#fff" stroke="#4a9e8e" stroke-width="1.5"/>
+    <text x="95" y="230" text-anchor="middle" font-size="11" font-weight="600" fill="#4a9e8e">FermentationResult</text>
+
+    <!-- AnalysisWorksheet -->
+    <rect x="250" y="200" width="160" height="50" rx="6" fill="#fff" stroke="#6b5c3e" stroke-width="1.5"/>
+    <text x="330" y="230" text-anchor="middle" font-size="11" font-weight="600" fill="#6b5c3e">AnalysisWorksheet</text>
+
+    <!-- CategoryRelation -->
+    <rect x="470" y="200" width="140" height="50" rx="6" fill="#fff" stroke="#6b5c3e" stroke-width="1.5"/>
+    <text x="540" y="230" text-anchor="middle" font-size="11" font-weight="600" fill="#6b5c3e">CategoryRelation</text>
+
+    <!-- ExtractedSnippet -->
+    <rect x="250" y="310" width="140" height="50" rx="6" fill="#fff" stroke="#6b5c3e" stroke-width="1.5"/>
+    <text x="320" y="340" text-anchor="middle" font-size="11" font-weight="600" fill="#6b5c3e">ExtractedSnippet</text>
+
+    <!-- Letter -->
+    <rect x="440" y="310" width="100" height="50" rx="6" fill="#fff" stroke="#6b5c3e" stroke-width="1.5"/>
+    <text x="490" y="340" text-anchor="middle" font-size="11" font-weight="600" fill="#6b5c3e">Letter</text>
+
+    <!-- Keyword -->
+    <rect x="590" y="310" width="110" height="50" rx="6" fill="#fff" stroke="#6b5c3e" stroke-width="1.5"/>
+    <text x="645" y="340" text-anchor="middle" font-size="11" font-weight="600" fill="#6b5c3e">Keyword</text>
+
+    <!-- Arrows -->
+    <!-- Entry → EntryQuestionLink -->
+    <line x1="120" y1="35" x2="180" y2="35" stroke="#999" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrow-grey)"/>
+    <text x="150" y="28" text-anchor="middle" font-size="9" fill="#999">1:N</text>
+
+    <!-- Question → EntryQuestionLink -->
+    <line x1="75" y1="100" x2="220" y2="60" stroke="#999" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrow-grey)"/>
+    <text x="170" y="72" text-anchor="middle" font-size="9" fill="#999">1:N</text>
+
+    <!-- Question → QuestionTransaction -->
+    <line x1="140" y1="125" x2="220" y2="125" stroke="#d97706" stroke-width="1.2" marker-end="url(#arrow-d)"/>
+    <text x="180" y="118" text-anchor="middle" font-size="9" fill="#999">1:N</text>
+
+    <!-- Question → FermentationResult -->
+    <line x1="75" y1="150" x2="75" y2="200" stroke="#4a9e8e" stroke-width="1.2" marker-end="url(#arrow-g)"/>
+    <text x="85" y="178" font-size="9" fill="#999">1:N</text>
+
+    <!-- FermentationResult → AnalysisWorksheet -->
+    <line x1="180" y1="225" x2="250" y2="225" stroke="#6b5c3e" stroke-width="1.2" marker-end="url(#arrow-b)"/>
+    <text x="215" y="218" text-anchor="middle" font-size="9" fill="#999">1:N</text>
+
+    <!-- FermentationResult → CategoryRelation -->
+    <line x1="180" y1="235" x2="470" y2="225" stroke="#6b5c3e" stroke-width="1" marker-end="url(#arrow-b)"/>
+
+    <!-- FermentationResult → ExtractedSnippet -->
+    <line x1="95" y1="250" x2="280" y2="310" stroke="#6b5c3e" stroke-width="1" marker-end="url(#arrow-b)"/>
+
+    <!-- FermentationResult → Letter -->
+    <line x1="120" y1="250" x2="470" y2="310" stroke="#6b5c3e" stroke-width="1" marker-end="url(#arrow-b)"/>
+
+    <!-- FermentationResult → Keyword -->
+    <line x1="150" y1="250" x2="620" y2="310" stroke="#6b5c3e" stroke-width="1" marker-end="url(#arrow-b)"/>
+
+    <!-- Storage labels -->
+    <rect x="760" y="5" width="185" height="60" rx="6" fill="#f8f5ef" stroke="#e8dcc8" stroke-width="1"/>
+    <text x="852" y="22" text-anchor="middle" font-size="9" font-weight="600" fill="#d97706">ストレージ</text>
+    <text x="852" y="36" text-anchor="middle" font-size="9" fill="#6b5c3e">Entry → IndexedDB</text>
+    <text x="852" y="50" text-anchor="middle" font-size="9" fill="#6b5c3e">Question 系 → localStorage</text>
+    <text x="852" y="64" text-anchor="middle" font-size="9" fill="#6b5c3e">発酵系 → インメモリ (静的)</text>
+
+    <!-- Arrow markers -->
+    <defs>
+      <marker id="arrow-d" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="#d97706" stroke-width="1"/>
+      </marker>
+      <marker id="arrow-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="#4a9e8e" stroke-width="1"/>
+      </marker>
+      <marker id="arrow-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="#6b5c3e" stroke-width="1"/>
+      </marker>
+      <marker id="arrow-grey" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="#999" stroke-width="1"/>
+      </marker>
+    </defs>
+  </svg>
+</div>
+
+
+<hr class="section-divider">
+<div class="section-heading">コアモデル</div>
+
+<!-- 1. Entry -->
+<div class="schema-section">
+  <div class="table-title">1. Entry（エントリ）</div>
+  <div class="table-desc">ユーザーが書く日記・テキストエントリ。IndexedDB（oryzae_board / entries）に永続化される。問いと N:M で紐づく。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（genId() で生成）</td></tr>
+    <tr><td class="col-name">title</td><td class="col-type">string</td><td>NOT NULL</td><td>エントリのタイトル</td></tr>
+    <tr><td class="col-name">toi</td><td class="col-type">string</td><td></td><td>書き出し時の「問い」テキスト（ToiManager 経由）</td></tr>
+    <tr><td class="col-name">content</td><td class="col-type">text</td><td></td><td>エントリのプレーンテキスト本文</td></tr>
+    <tr><td class="col-name">contentHTML</td><td class="col-type">text</td><td></td><td>エントリの HTML 本文（Quill エディタ出力）</td></tr>
+    <tr><td class="col-name">createdAt</td><td class="col-type">datetime</td><td>NOT NULL</td><td>作成日時（ISO 8601）</td></tr>
+    <tr><td class="col-name">updatedAt</td><td class="col-type">datetime</td><td>NOT NULL <span class="badge badge-unique">INDEX</span></td><td>更新日時（一覧のソートキー）</td></tr>
+    <tr><td class="col-name">writingMode</td><td class="col-type">string</td><td></td><td>執筆時の縦書き/横書きモード</td></tr>
+    <tr><td class="col-name">font</td><td class="col-type">string</td><td></td><td>使用フォント名</td></tr>
+    <tr><td class="col-name">meta</td><td class="col-type">object</td><td></td><td>メタデータ（後述）</td></tr>
+  </table>
+  <div class="storage-note">
+    <strong>meta オブジェクトの主要フィールド：</strong>
+    openedAt, darkMode, userFontSize, timeInscriptionEnabled, timeInscriptionMode, eraserTraceEnabled, erasureTraces, ghostEnabled, ghostMode, ghostSize, ghostScatter, ghostBlurStart, ghostBlurEnd, ghostDuration — および MetadataTracker が記録する執筆統計（WPM サンプル、文字数推移など）。
+  </div>
+</div>
+
+<!-- 2. Question -->
+<div class="schema-section">
+  <div class="table-title">2. Question（問い）</div>
+  <div class="table-desc">ユーザーが設定する問い。最大3つまで。問いの文面は QuestionTransaction で版管理される。アーカイブ・Oryzae提案フラグを持つ。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "q1"、新規は "q" + Date.now()）</td></tr>
+    <tr><td class="col-name">user_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → User</span></td><td>所有ユーザー</td></tr>
+    <tr><td class="col-name">created_at</td><td class="col-type">datetime</td><td>NOT NULL</td><td>作成日時</td></tr>
+    <tr><td class="col-name">updated_at</td><td class="col-type">datetime</td><td>NOT NULL</td><td>最終更新日時（アーカイブ・復活操作でも更新）</td></tr>
+    <tr><td class="col-name">is_archived</td><td class="col-type">boolean</td><td><span class="badge badge-default">DEFAULT false</span></td><td>アーカイブ済みかどうか。true の場合、jar 画面に非表示</td></tr>
+    <tr><td class="col-name">is_validated_by_user</td><td class="col-type">boolean</td><td><span class="badge badge-default">DEFAULT true</span></td><td>ユーザーが承認済みか。Oryzae 提案で未承認の場合 false</td></tr>
+    <tr><td class="col-name">is_proposed_by_oryzae</td><td class="col-type">boolean</td><td><span class="badge badge-default">DEFAULT false</span></td><td>Oryzae（発酵プロセス）によって提案された問いか</td></tr>
+  </table>
+  <div class="storage-note">
+    <strong>アクティブな問い</strong> = <code>is_archived === false</code> かつ <code>is_validated_by_user !== false</code>。<br>
+    jar 画面・エディタドロップダウンには <code>getActiveQuestions()</code> でフィルタした問いのみ表示される。
+  </div>
+</div>
+
+<!-- 3. QuestionTransaction -->
+<div class="schema-section">
+  <div class="table-title">3. QuestionTransaction（問いトランザクション）</div>
+  <div class="table-desc">問いの文面の版管理。ユーザー編集・発酵プロセスによる提案のたびに新バージョンが追加される。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "qt1"、新規は "qt" + Date.now()）</td></tr>
+    <tr><td class="col-name">question_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → Question</span></td><td>対応する問い</td></tr>
+    <tr><td class="col-name">string</td><td class="col-type">text</td><td>NOT NULL</td><td>問いの文面（最大64文字）</td></tr>
+    <tr><td class="col-name">question_version</td><td class="col-type">integer</td><td><span class="badge badge-unique">UNIQUE (question_id, ver)</span></td><td>バージョン番号（1始まり、単調増加）</td></tr>
+    <tr><td class="col-name">created_at</td><td class="col-type">datetime</td><td>NOT NULL</td><td>作成日時</td></tr>
+    <tr><td class="col-name">updated_at</td><td class="col-type">datetime</td><td>NOT NULL</td><td>更新日時</td></tr>
+    <tr><td class="col-name">is_validated_by_user</td><td class="col-type">boolean</td><td><span class="badge badge-default">DEFAULT true</span></td><td>ユーザーが承認済みか</td></tr>
+    <tr><td class="col-name">is_proposed_by_oryzae</td><td class="col-type">boolean</td><td><span class="badge badge-default">DEFAULT false</span></td><td>Oryzae による提案トランザクションか</td></tr>
+  </table>
+  <div class="storage-note">
+    <strong>最新文面の取得ロジック：</strong><code>getQuestionString()</code> は <code>is_validated_by_user !== false</code> のトランザクションのうち最大バージョンの <code>string</code> を返す。<br>
+    <strong>タイムライン表示：</strong>全バージョン履歴が問いの変遷タイムラインに時系列で可視化される。
+  </div>
+</div>
+
+<!-- 4. EntryQuestionLink -->
+<div class="schema-section">
+  <div class="table-title">4. EntryQuestionLink（エントリ-問い紐付け）</div>
+  <div class="table-desc">エントリと問いの多対多の関連付け。エディタ画面で問いをエントリにリンクする際に使用。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">entry_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → Entry</span> <span class="badge badge-unique">UNIQUE (entry, question)</span></td><td>エントリの ID</td></tr>
+    <tr><td class="col-name">question_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → Question</span></td><td>問いの ID</td></tr>
+  </table>
+</div>
+
+<hr class="section-divider">
+<div class="section-heading">発酵プロセスモデル</div>
+
+<!-- 5. FermentationResult -->
+<div class="schema-section">
+  <div class="table-title">5. FermentationResult（発酵結果）</div>
+  <div class="table-desc">問いに対する一定期間の発酵分析結果。AnalysisWorksheet・Snippet・Letter・Keyword の親レコード。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "fr1"）</td></tr>
+    <tr><td class="col-name">question_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → Question</span></td><td>対応する問い</td></tr>
+    <tr><td class="col-name">target_period</td><td class="col-type">string</td><td>NOT NULL</td><td>分析対象期間（例: "2025-11-30〜2025-12-06"）</td></tr>
+    <tr><td class="col-name">created_at</td><td class="col-type">datetime</td><td>NOT NULL</td><td>発酵完了日時</td></tr>
+  </table>
+</div>
+
+<!-- 6. AnalysisWorksheet -->
+<div class="schema-section">
+  <div class="table-title">6. AnalysisWorksheet（分析ワークシート）</div>
+  <div class="table-desc">M-GTA に基づく概念分析。1回の発酵結果に複数の概念（ワークシート）が紐づく。UIには直接表示しないがデータとして保持。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "aw1"）</td></tr>
+    <tr><td class="col-name">fermentation_result_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → FermentationResult</span></td><td>対応する発酵結果</td></tr>
+    <tr><td class="col-name">concept_name</td><td class="col-type">text</td><td>NOT NULL</td><td>概念名（例: "夢における一時的な邂逅と離別"）</td></tr>
+    <tr><td class="col-name">definition</td><td class="col-type">text</td><td>NOT NULL</td><td>概念の定義</td></tr>
+    <tr><td class="col-name">examples</td><td class="col-type">text</td><td></td><td>具体例（番号付きテキスト）</td></tr>
+    <tr><td class="col-name">theoretical_memo</td><td class="col-type">text</td><td></td><td>理論的メモ</td></tr>
+  </table>
+</div>
+
+<!-- 7. CategoryRelation -->
+<div class="schema-section">
+  <div class="table-title">7. CategoryRelation（カテゴリ関係）</div>
+  <div class="table-desc">複数の概念（AnalysisWorksheet）をまとめる上位カテゴリとストーリーライン。UIには直接表示しないがデータとして保持。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "cat1"）</td></tr>
+    <tr><td class="col-name">fermentation_result_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → FermentationResult</span></td><td>対応する発酵結果</td></tr>
+    <tr><td class="col-name">category_name</td><td class="col-type">text</td><td>NOT NULL</td><td>カテゴリ名（例: "生死の境界の溶解"）</td></tr>
+    <tr><td class="col-name">related_concepts</td><td class="col-type">array&lt;string&gt;</td><td></td><td>関連する AnalysisWorksheet の ID 配列</td></tr>
+    <tr><td class="col-name">storyline</td><td class="col-type">text</td><td></td><td>カテゴリのストーリーライン</td></tr>
+  </table>
+</div>
+
+<!-- 8. ExtractedSnippet -->
+<div class="schema-section">
+  <div class="table-title">8. ExtractedSnippet（抽出スニペット）</div>
+  <div class="table-desc">発酵プロセスで抽出されたユーザーのエントリからの引用断片。jar 画面の円内にカードとして表示。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "snip1"）</td></tr>
+    <tr><td class="col-name">fermentation_result_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → FermentationResult</span></td><td>対応する発酵結果</td></tr>
+    <tr><td class="col-name">snippet_type</td><td class="col-type">enum</td><td></td><td>種別: "new_perspective" / "deepen" / "core"</td></tr>
+    <tr><td class="col-name">original_text</td><td class="col-type">text</td><td>NOT NULL</td><td>抽出された原文テキスト</td></tr>
+    <tr><td class="col-name">source_date</td><td class="col-type">string</td><td></td><td>出典日付（例: "12/4"）</td></tr>
+    <tr><td class="col-name">selection_reason</td><td class="col-type">text</td><td></td><td>選出理由の説明</td></tr>
+  </table>
+</div>
+
+<!-- 9. Letter -->
+<div class="schema-section">
+  <div class="table-title">9. Letter（手紙）</div>
+  <div class="table-desc">Lab（分析AI）がユーザーに宛てて書く手紙。1回の発酵結果に対して1通。jar 画面で手紙アイコンとして表示。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "letter1"）</td></tr>
+    <tr><td class="col-name">fermentation_result_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → FermentationResult</span> <span class="badge badge-unique">UNIQUE</span></td><td>対応する発酵結果（1:1）</td></tr>
+    <tr><td class="col-name">body_text</td><td class="col-type">text</td><td>NOT NULL</td><td>手紙の本文</td></tr>
+  </table>
+</div>
+
+<!-- 10. Keyword -->
+<div class="schema-section">
+  <div class="table-title">10. Keyword（キーワード）</div>
+  <div class="table-desc">Yeast（生成AI）がエントリから抽出・生成したキーワード。jar 画面の円内にタグとして表示。</div>
+  <table>
+    <tr><th>カラム名</th><th>型</th><th>制約</th><th>説明</th></tr>
+    <tr><td class="col-name">id</td><td class="col-type">string</td><td><span class="badge badge-pk">PK</span></td><td>一意識別子（例: "kw1"）</td></tr>
+    <tr><td class="col-name">fermentation_result_id</td><td class="col-type">string</td><td><span class="badge badge-fk">FK → FermentationResult</span></td><td>対応する発酵結果</td></tr>
+    <tr><td class="col-name">keyword</td><td class="col-type">text</td><td>NOT NULL</td><td>キーワード文字列（例: "沈黙の忠実さ"）</td></tr>
+    <tr><td class="col-name">description</td><td class="col-type">text</td><td></td><td>キーワードの説明文</td></tr>
+  </table>
+</div>
+
+<hr class="section-divider">
+<div class="section-heading">永続化</div>
+
+<div class="schema-section">
+  <table>
+    <tr><th>データ</th><th>ストレージ</th><th>キー / DB名</th><th>備考</th></tr>
+    <tr><td class="col-name">Entry</td><td>IndexedDB</td><td><code>oryzae_board</code> / store: <code>entries</code></td><td>keyPath: "id"、index: "updatedAt"</td></tr>
+    <tr><td class="col-name">Question, QuestionTransaction, EntryQuestionLink</td><td>localStorage</td><td><code>oryzae_data</code></td><td>JSON シリアライズ。saveToStorage() / loadFromStorage() で管理</td></tr>
+    <tr><td class="col-name">FermentationResult 以下の発酵系テーブル</td><td>インメモリ（静的）</td><td>—</td><td>oryzae-data.js にハードコードされたサンプルデータ。将来的にはサーバーサイドから取得予定</td></tr>
+  </table>
+</div>
+
+<hr class="section-divider">
+<div class="section-heading">ヘルパーメソッド一覧</div>
+
+<!-- Helper Methods -->
+<div class="schema-section helper-section">
+  <div class="table-desc">OryzaeData オブジェクトに定義されたデータアクセスメソッド</div>
+  <table class="helper-table">
+    <tr><th>メソッド</th><th>引数</th><th>戻り値</th><th>説明</th></tr>
+    <tr><td class="col-name">getQuestionString()</td><td>questionId</td><td>string | null</td><td>問いの最新バージョン（validated のみ）の文面を取得</td></tr>
+    <tr><td class="col-name">getActiveQuestions()</td><td>—</td><td>array</td><td>アクティブな問い一覧（非アーカイブ・承認済み）</td></tr>
+    <tr><td class="col-name">getTransactionsForQuestion()</td><td>questionId</td><td>array</td><td>問いの全トランザクションをバージョン昇順で取得</td></tr>
+    <tr><td class="col-name">getLatestTransaction()</td><td>questionId</td><td>object | null</td><td>問いの最新承認済みトランザクションを取得</td></tr>
+    <tr><td class="col-name">getAllQuestions()</td><td>—</td><td>array</td><td>全アクティブ問い（current_string 付き）を取得</td></tr>
+    <tr><td class="col-name">getAllQuestionsIncludingArchived()</td><td>—</td><td>array</td><td>アーカイブ含む全問い（タイムライン用）</td></tr>
+    <tr><td class="col-name">addQuestion()</td><td>questionString</td><td>object</td><td>新しい問いを追加（Question + Transaction を生成）</td></tr>
+    <tr><td class="col-name">updateQuestion()</td><td>questionId, newString</td><td>object</td><td>問いの文面を更新（新トランザクションを生成、version+1）</td></tr>
+    <tr><td class="col-name">archiveQuestion()</td><td>questionId</td><td>void</td><td>問いをアーカイブ（is_archived = true）</td></tr>
+    <tr><td class="col-name">unarchiveQuestion()</td><td>questionId</td><td>void</td><td>問いを復活（is_archived = false）</td></tr>
+    <tr><td class="col-name">getFermentationForQuestion()</td><td>questionId</td><td>object | null</td><td>問いに対応する発酵結果を取得</td></tr>
+    <tr><td class="col-name">getSnippetsForFermentation()</td><td>fermentationResultId</td><td>array</td><td>発酵結果の抽出スニペット一覧を取得</td></tr>
+    <tr><td class="col-name">getKeywordsForFermentation()</td><td>fermentationResultId</td><td>array</td><td>発酵結果のキーワード一覧を取得</td></tr>
+    <tr><td class="col-name">getLetterForFermentation()</td><td>fermentationResultId</td><td>object | null</td><td>発酵結果の手紙を取得</td></tr>
+    <tr><td class="col-name">getWorksheetsForFermentation()</td><td>fermentationResultId</td><td>array</td><td>発酵結果の分析ワークシート一覧を取得</td></tr>
+    <tr><td class="col-name">getCategoriesForFermentation()</td><td>fermentationResultId</td><td>array</td><td>発酵結果のカテゴリ関係一覧を取得</td></tr>
+    <tr><td class="col-name">linkQuestionToEntry()</td><td>entryId, questionId</td><td>void</td><td>エントリに問いを紐付け</td></tr>
+    <tr><td class="col-name">unlinkQuestionFromEntry()</td><td>entryId, questionId</td><td>void</td><td>エントリから問いの紐付けを解除</td></tr>
+    <tr><td class="col-name">getQuestionsForEntry()</td><td>entryId</td><td>array</td><td>エントリに紐づく問い一覧を取得</td></tr>
+    <tr><td class="col-name">saveToStorage()</td><td>—</td><td>void</td><td>Question 系データを localStorage に保存</td></tr>
+    <tr><td class="col-name">loadFromStorage()</td><td>—</td><td>void</td><td>localStorage から Question 系データを復元</td></tr>
+  </table>
+</div>
+
+</body>
+</html>
