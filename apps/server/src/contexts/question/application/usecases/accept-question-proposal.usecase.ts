@@ -1,11 +1,11 @@
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import type { QuestionProps } from '../../domain/models/question';
+import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
+import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway.js';
+import type { QuestionProps } from '../../domain/models/question.js';
 import {
   QuestionLimitExceededError,
   QuestionNotFoundError,
   QuestionNotPendingError,
-} from '../errors/question.errors';
+} from '../errors/question.errors.js';
 
 export class AcceptQuestionProposalUsecase {
   constructor(

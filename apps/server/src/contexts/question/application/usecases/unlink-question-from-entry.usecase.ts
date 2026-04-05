@@ -1,4 +1,4 @@
-import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway';
+import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway.js';
 
 export class UnlinkQuestionFromEntryUsecase {
   constructor(private linkRepo: EntryQuestionLinkRepositoryGateway) {}

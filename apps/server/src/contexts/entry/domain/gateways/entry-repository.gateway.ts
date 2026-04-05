@@ -1,4 +1,4 @@
-import type { Entry } from '../models/entry';
+import type { Entry } from '../models/entry.js';
 
 export interface EntryRepositoryGateway {
   findById(id: string): Promise<Entry | null>;

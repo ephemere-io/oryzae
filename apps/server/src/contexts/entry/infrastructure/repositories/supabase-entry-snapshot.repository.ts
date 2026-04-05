@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import { EntrySnapshot } from '../../domain/models/entry-snapshot';
+import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway.js';
+import { EntrySnapshot } from '../../domain/models/entry-snapshot.js';
 
 export class SupabaseEntrySnapshotRepository implements EntrySnapshotRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}

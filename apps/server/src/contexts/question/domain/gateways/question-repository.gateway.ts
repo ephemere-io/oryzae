@@ -1,4 +1,4 @@
-import type { Question } from '../models/question';
+import type { Question } from '../models/question.js';
 
 export interface QuestionRepositoryGateway {
   findById(id: string): Promise<Question | null>;

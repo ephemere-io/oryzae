@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import { QuestionTransaction } from '../../domain/models/question-transaction';
+import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway.js';
+import { QuestionTransaction } from '../../domain/models/question-transaction.js';
 
 export class SupabaseQuestionTransactionRepository implements QuestionTransactionRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}

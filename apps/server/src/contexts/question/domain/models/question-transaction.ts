@@ -1,4 +1,4 @@
-import { err, ok, type Result } from '../../../shared/domain/types/result';
+import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
 type QuestionTransactionError =
   | { type: 'EMPTY_STRING'; message: string }
