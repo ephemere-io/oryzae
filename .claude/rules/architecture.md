@@ -5,23 +5,12 @@ paths:
 
 # サーバーアーキテクチャルール
 
-設計の正は `docs/OryzaeArchitecture.md` を参照すること。以下は要点のみ。
+設計の正は以下の docs/ を参照:
+- **`docs/backend-architecture-guide.md`** — レイヤー依存、ドメインモデルパターン、エラーハンドリング
+- **`docs/entry-backend-guide.md`** — Entry コンテキスト固有の実装ガイド
+- **`docs/question-backend-guide.md`** — Question コンテキスト固有の実装ガイド
 
-## レイヤー依存方向（絶対ルール）
-
-```
-presentation → application → domain ← infrastructure
-```
-
-- domain は自分自身以外を import しない（shared/domain のみ例外）
-- application は domain のみ import する（infrastructure を直接参照しない）
-- infrastructure は domain の gateways + models のみ import する
-- presentation は application + infrastructure を import する（DI 組み立てのみ）
-
-## ドメインモデルパターン
-
-private constructor + create/fromProps/withXxx/toProps。詳細は `docs/OryzaeArchitecture.md` セクション5。
-
-## エラーの流れ
-
-domain: Result<T,E> を返す → application: throw に変換 → presentation: HTTP に変換。詳細は `docs/OryzaeArchitecture.md` セクション6。
+要点:
+- `presentation → application → domain ← infrastructure`
+- domain は何にも依存しない。Result<T,E> で返す。throw 禁止
+- ドメインモデルはリッチクラス（private constructor + create/fromProps/withXxx/toProps）
