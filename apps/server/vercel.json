@@ -1,3 +1,4 @@
 {
-  "installCommand": "pnpm install --filter @oryzae/server..."
+  "installCommand": "pnpm install --filter @oryzae/server...",
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
 }
