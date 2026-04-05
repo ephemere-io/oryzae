@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Bash(git push:*)",
+            "prompt": "Push 前のコードレビュー。git diff main...HEAD の差分を確認し、以下を検証してください:\n1. .claude/rules/ のルール違反がないか（as キャスト禁止、hooks テスト必須、feature 隔離）\n2. 明らかなバグや型安全性の問題がないか\n3. 不要なファイル（.DS_Store, console.log 等）が含まれていないか\n\n問題がなければ何も出力せず通過。問題があれば具体的に指摘してください。",
+            "timeout": 120,
+            "statusMessage": "Push 前コードレビュー実行中..."
+          }
+        ]
+      }
+    ]
+  }
+}
