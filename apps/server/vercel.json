@@ -1,3 +1,10 @@
 {
-  "installCommand": "pnpm install --filter @oryzae/server..."
+  "buildCommand": "pnpm run build",
+  "installCommand": "pnpm install --filter @oryzae/server...",
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "dist/**"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
 }
