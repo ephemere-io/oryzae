@@ -14,3 +14,4 @@ paths:
 - `presentation → application → domain ← infrastructure`
 - domain は何にも依存しない。Result<T,E> で返す。throw 禁止
 - ドメインモデルはリッチクラス（private constructor + create/fromProps/withXxx/toProps）
+- **domain/models と domain/services にはテストが必須**。テストなしのコードはレビューを通さない

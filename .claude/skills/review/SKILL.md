@@ -39,7 +39,14 @@ allowed-tools: "Bash(git,pnpm) Read Glob Grep Agent"
 - **E. ユースケース**: 1 ファイル = 1 ユースケース、コンストラクタ DI、toProps でレスポンス
 - **F. プレゼンテーション**: Zod バリデーション、DI がルートファイル内で完結
 - **G. 命名規則**: ファイル命名規則に従っているか
-- **H. テスト**: domain service にテストがあるか、Result の両ケースをカバー
+- **H. テスト（必須）**: 以下を全て満たしているか確認する
+  - domain/models/ の各ファイルに対応する `.test.ts` が存在するか（**必須**）
+  - domain/services/ の各ファイルに対応する `.test.ts` が存在するか（**必須**）
+  - create() のバリデーション境界値（成功・各エラーパターン）をテストしているか
+  - Result<T,E> の success / error 両方のケースをカバーしているか
+  - withXxx() のイミュータブル性（元インスタンスが変更されないこと）をテストしているか
+  - fromProps → toProps のラウンドトリップをテストしているか
+  - テストファイルがない domain model/service がある場合は **❌ 要修正** として報告する
 - **I. コード品質**: 未使用 export、any 型、console.log
 
 ### 4. ツールによる自動検証
