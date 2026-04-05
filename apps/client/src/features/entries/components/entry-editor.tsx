@@ -167,7 +167,7 @@ export function EntryEditor({
           <button
             type="button"
             onClick={() => setSettingsOpen(!settingsOpen)}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             title="設定"
           >
             <svg
@@ -193,7 +193,7 @@ export function EntryEditor({
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             title="フルスクリーン"
           >
             <svg
@@ -290,7 +290,7 @@ export function EntryEditor({
           <button
             type="button"
             onClick={() => router.push('/entries/new')}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             title="新規エントリ"
           >
             <svg
@@ -312,7 +312,7 @@ export function EntryEditor({
             type="button"
             onClick={handleSave}
             disabled={saving || !content.trim()}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
             title="保存"
           >
             <svg
@@ -333,7 +333,7 @@ export function EntryEditor({
           <button
             type="button"
             onClick={() => router.push('/entries')}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             title="一覧"
           >
             <svg
@@ -353,11 +353,12 @@ export function EntryEditor({
           </button>
         </div>
 
+        {/* Center: mic */}
         <button
           type="button"
           disabled
-          className="rounded-md p-1.5 text-zinc-300 dark:text-zinc-700"
-          title="音声入力（準備中）"
+          className="rounded-md p-1.5 text-[var(--date-color)] opacity-40"
+          title="音声入力"
         >
           <svg
             aria-hidden="true"
@@ -365,13 +366,28 @@ export function EntryEditor({
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
-            strokeWidth={1.5}
+            strokeWidth={2}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z"
-            />
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+          </svg>
+        </button>
+
+        {/* Right: stats */}
+        <button
+          type="button"
+          className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+          title="執筆統計"
+        >
+          <svg
+            aria-hidden="true"
+            className="h-5 w-5"
+            fill="currentColor"
+            stroke="none"
+            viewBox="0 0 24 24"
+          >
+            <rect x="4" y="14" width="4" height="7" />
+            <rect x="10" y="10" width="4" height="11" />
+            <rect x="16" y="3" width="4" height="18" />
           </svg>
         </button>
       </div>
