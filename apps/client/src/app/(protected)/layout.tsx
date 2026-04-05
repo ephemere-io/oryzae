@@ -39,6 +39,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
   return (
     <main
       className="flex flex-1 flex-col overflow-auto transition-[margin-left] duration-200 ease-linear"
+      // @type-assertion-allowed: CSS custom properties require CSSProperties cast
       style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
     >
       {/* Top bar with sidebar trigger */}

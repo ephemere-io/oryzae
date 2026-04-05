@@ -192,6 +192,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                   { value: 'pressureBleed', label: '圧力にじみ' },
                 ]}
                 value={settings.timeInscriptionMode}
+                // @type-assertion-allowed: radio group onChange returns string, needs cast to union type
                 onChange={(v) => onChange({ timeInscriptionMode: v as TimeInscriptionMode })}
               />
             )}
@@ -236,6 +237,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                     { value: 'dust', label: '塵（キー毎）' },
                   ]}
                   value={settings.ghostMode}
+                  // @type-assertion-allowed: radio group onChange returns string, needs cast to union type
                   onChange={(v) => onChange({ ghostMode: v as GhostMode })}
                 />
                 <div className="mt-2 flex flex-col gap-0.5">
