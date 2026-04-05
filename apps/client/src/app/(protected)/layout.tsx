@@ -4,7 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/lib/sidebar-context';
+import {
+  COLLAPSED_WIDTH,
+  EXPANDED_WIDTH,
+  SidebarProvider,
+  useSidebar,
+} from '@/lib/sidebar-context';
 
 function SidebarTrigger() {
   const { toggle } = useSidebar();
@@ -72,9 +77,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   if (!auth) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <ProtectedContent>{children}</ProtectedContent>
-    </div>
+    <SidebarProvider>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <ProtectedContent>{children}</ProtectedContent>
+      </div>
+    </SidebarProvider>
   );
 }

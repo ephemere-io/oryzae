@@ -35,5 +35,5 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [toggle]);
 
-  return <SidebarContext value={{ expanded, toggle }}>{children}</SidebarContext>;
+  return <SidebarContext.Provider value={{ expanded, toggle }}>{children}</SidebarContext.Provider>;
 }
