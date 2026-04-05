@@ -30,6 +30,8 @@ export class SupabaseEntryQuestionLinkRepository implements EntryQuestionLinkRep
       .eq('entry_id', entryId);
 
     if (error) throw error;
-    return (data ?? []).map((row) => (row as Record<string, unknown>).question_id as string);
+    return (data ?? []).map(
+      (row: Record<string, unknown>) => (row as Record<string, unknown>).question_id as string,
+    );
   }
 }

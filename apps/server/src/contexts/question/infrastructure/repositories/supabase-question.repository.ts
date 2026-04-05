@@ -22,7 +22,7 @@ export class SupabaseQuestionRepository implements QuestionRepositoryGateway {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return (data ?? []).map((row) => this.toDomain(row));
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
   async listAllByUserId(userId: string): Promise<Question[]> {
@@ -33,7 +33,7 @@ export class SupabaseQuestionRepository implements QuestionRepositoryGateway {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data ?? []).map((row) => this.toDomain(row));
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
   async listPendingByUserId(userId: string): Promise<Question[]> {
@@ -45,7 +45,7 @@ export class SupabaseQuestionRepository implements QuestionRepositoryGateway {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data ?? []).map((row) => this.toDomain(row));
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
   async countActiveByUserId(userId: string): Promise<number> {
