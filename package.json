@@ -16,7 +16,7 @@
     "pre-push": "pnpm lint && pnpm typecheck"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx,json}": "biome check --write"
+    "!(.claude/**)*.{js,ts,jsx,tsx,json}": "biome check --write"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
