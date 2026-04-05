@@ -49,7 +49,7 @@ Feature-Sliced Architecture:
 
 - `--no-verify` 禁止
 - `any` 型禁止
-- `as` キャスト禁止（型ガードを使う）
+- `as` キャスト禁止（CI で検出。例外は `// @type-assertion-allowed: <理由>` を前行に記載）
 
 ## Design Docs (SSoT)
 
