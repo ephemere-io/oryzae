@@ -6,4 +6,6 @@ dist/
 .turbo/
 .mcp.json
 .next/
-docs/reference-ui/
+.playwright-mcp/
+*.png
+.DS_Store
