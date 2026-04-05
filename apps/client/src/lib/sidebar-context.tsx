@@ -1,13 +1,9 @@
 'use client';
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-export const COLLAPSED_WIDTH = 56; // px (w-14)
-export const EXPANDED_WIDTH = 200; // px
-
-// ── Context ────────────────────────────────────────────────────────────────────
+export const COLLAPSED_WIDTH = 56;
+export const EXPANDED_WIDTH = 200;
 
 interface SidebarContextValue {
   expanded: boolean;
@@ -25,7 +21,19 @@ export function useSidebar() {
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false);
-  const toggle = () => setExpanded((prev) => !prev);
+  const toggle = useCallback(() => setExpanded((prev) => !prev), []);
+
+  // Keyboard shortcut: Cmd+B / Ctrl+B
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        toggle();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [toggle]);
 
   return <SidebarContext value={{ expanded, toggle }}>{children}</SidebarContext>;
 }

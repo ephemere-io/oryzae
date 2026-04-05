@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { COLLAPSED_WIDTH, EXPANDED_WIDTH, SidebarContext } from '@/lib/sidebar-context';
+import { COLLAPSED_WIDTH, EXPANDED_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 
 interface NavItem {
   href: string;
@@ -66,7 +66,7 @@ export function Sidebar() {
   const width = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
 
   return (
-    <SidebarContext.Provider value={{ expanded, toggle }}>
+    <SidebarProvider>
       <nav
         data-state={expanded ? 'expanded' : 'collapsed'}
         className="group flex h-full shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg)] py-4 transition-[width] duration-200 ease-linear"
@@ -173,6 +173,6 @@ export function Sidebar() {
           )}
         </button>
       </nav>
-    </SidebarContext.Provider>
+    </SidebarProvider>
   );
 }
