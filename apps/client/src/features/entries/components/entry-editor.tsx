@@ -15,6 +15,7 @@ import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
 import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
+import { useVoiceDynamics } from '@/features/entries/hooks/use-voice-dynamics';
 import type { ApiClient } from '@/lib/api';
 
 interface AuthState {
@@ -82,6 +83,7 @@ export function EntryEditor({
     editorRef,
     settings.timeInscriptionEnabled && settings.timeInscriptionMode === 'pressureBleed',
   );
+  useVoiceDynamics(editorRef, settings.voiceEnabled);
 
   useEffect(() => {
     const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
