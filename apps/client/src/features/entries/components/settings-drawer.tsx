@@ -1,9 +1,13 @@
 'use client';
 
+export type WritingMode = 'vertical' | 'horizontal';
+export type FontFamily = 'serif' | 'sans';
 export type TimeInscriptionMode = 'fontSize' | 'fontWeight' | 'pressureBleed';
 export type GhostMode = 'block' | 'dust';
 
 export interface EditorSettings {
+  writingMode: WritingMode;
+  fontFamily: FontFamily;
   fontSize: number;
   timeInscriptionEnabled: boolean;
   timeInscriptionMode: TimeInscriptionMode;
@@ -20,6 +24,8 @@ export interface EditorSettings {
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
+  writingMode: 'vertical',
+  fontFamily: 'serif',
   fontSize: 32,
   timeInscriptionEnabled: false,
   timeInscriptionMode: 'fontSize',
