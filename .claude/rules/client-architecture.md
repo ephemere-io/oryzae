@@ -1,3 +1,9 @@
+---
+paths:
+  - "apps/client/src/**/*.ts"
+  - "apps/client/src/**/*.tsx"
+---
+
 # クライアントアーキテクチャルール
 
 設計の正は **`docs/client-architecture-guide.md`** を参照。
