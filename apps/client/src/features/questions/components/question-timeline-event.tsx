@@ -52,7 +52,7 @@ export function QuestionTimelineEvent({
 
   return (
     <div
-      className={`ml-6 rounded-lg border-l-4 ${config.borderColor} bg-zinc-50 px-5 py-4 dark:bg-zinc-900/50`}
+      className={`ml-6 rounded-lg border-l-4 ${config.borderColor} bg-[rgba(200,180,140,0.08)] px-5 py-4`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1.5">

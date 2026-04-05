@@ -13,7 +13,7 @@ export function EditorStatusBar({ status, charCount }: EditorStatusBarProps) {
   }[status];
 
   return (
-    <div className="flex items-center justify-between border-t border-zinc-200 px-4 py-1.5 text-xs text-zinc-400 dark:border-zinc-800">
+    <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-1.5 text-xs text-[var(--date-color)]">
       <div className="flex items-center gap-2">
         <span
           className={`inline-block h-1.5 w-1.5 rounded-full ${

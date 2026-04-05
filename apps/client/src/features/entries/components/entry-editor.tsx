@@ -160,9 +160,9 @@ export function EntryEditor({
   const charCount = content.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-zinc-950">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Top toolbar */}
-      <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -235,7 +235,7 @@ export function EntryEditor({
       </div>
 
       {/* Question linker */}
-      <div className="border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+      <div className="border-b border-[var(--border-subtle)] px-4 py-2">
         <QuestionLinker
           activeQuestions={activeQuestions}
           linkedQuestionIds={linkedIds}
@@ -285,7 +285,7 @@ export function EntryEditor({
       </div>
 
       {/* Bottom toolbar */}
-      <div className="flex items-center justify-between border-t border-zinc-200 px-4 py-2 dark:border-zinc-800">
+      <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-2">
         <div className="flex items-center gap-2">
           <button
             type="button"

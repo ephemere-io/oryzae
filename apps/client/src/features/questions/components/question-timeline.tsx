@@ -67,7 +67,7 @@ export function QuestionTimeline({
       </div>
 
       <div className="relative pl-4">
-        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-zinc-200 dark:bg-zinc-700" />
+        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-[rgba(200,180,140,0.15)]" />
 
         {[...groups.entries()].map(([dateLabel, items]) => (
           <div key={dateLabel} className="mb-8">
