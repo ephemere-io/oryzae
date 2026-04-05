@@ -1,49 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { QuestionCard } from '@/components/questions/question-card';
-import { useAuth } from '@/hooks/use-auth';
-
-interface QuestionItem {
-  id: string;
-  currentText: string;
-  isArchived: boolean;
-  isProposedByOryzae: boolean;
-  isValidatedByUser: boolean;
-}
+import { useState } from 'react';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { QuestionCard } from '@/features/questions/components/question-card';
+import { useQuestions } from '@/features/questions/hooks/use-questions';
 
 export default function QuestionsPage() {
   const { api, loading: authLoading } = useAuth();
-  const [questions, setQuestions] = useState<QuestionItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { questions, loading, createQuestion, fetchQuestions } = useQuestions(api, authLoading);
   const [newQuestion, setNewQuestion] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const fetchQuestions = useCallback(async () => {
-    if (!api) return;
-    setLoading(true);
-    const res = await api.api.v1.questions.all.$get();
-    if (res.ok) {
-      const data = (await res.json()) as QuestionItem[];
-      setQuestions(data);
-    }
-    setLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    if (!authLoading && api) {
-      fetchQuestions();
-    }
-  }, [authLoading, api, fetchQuestions]);
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!api || !newQuestion.trim()) return;
+    if (!newQuestion.trim()) return;
     setCreating(true);
-    await api.api.v1.questions.$post({ json: { string: newQuestion } });
+    await createQuestion(newQuestion);
     setNewQuestion('');
     setCreating(false);
-    fetchQuestions();
   }
 
   const active = questions.filter((q) => !q.isArchived && q.isValidatedByUser);
@@ -83,7 +57,7 @@ export default function QuestionsPage() {
                 <QuestionCard
                   key={q.id}
                   id={q.id}
-                  text={q.currentText}
+                  text={q.currentText ?? ''}
                   isArchived={q.isArchived}
                   isProposedByOryzae={q.isProposedByOryzae}
                   isValidatedByUser={q.isValidatedByUser}
@@ -103,7 +77,7 @@ export default function QuestionsPage() {
                 <QuestionCard
                   key={q.id}
                   id={q.id}
-                  text={q.currentText}
+                  text={q.currentText ?? ''}
                   isArchived={q.isArchived}
                   isProposedByOryzae={q.isProposedByOryzae}
                   isValidatedByUser={q.isValidatedByUser}
@@ -121,7 +95,7 @@ export default function QuestionsPage() {
                 <QuestionCard
                   key={q.id}
                   id={q.id}
-                  text={q.currentText}
+                  text={q.currentText ?? ''}
                   isArchived={q.isArchived}
                   isProposedByOryzae={q.isProposedByOryzae}
                   isValidatedByUser={q.isValidatedByUser}

@@ -2,66 +2,31 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useSaveEntry } from '@/features/entries/hooks/use-entry';
+import type { ApiClient } from '@/lib/api';
+
+interface AuthState {
+  accessToken: string;
+}
 
 interface EntryEditorProps {
   entryId?: string;
   initialContent?: string;
+  api: ApiClient | null;
+  auth: AuthState | null;
 }
 
-export function EntryEditor({ entryId, initialContent = '' }: EntryEditorProps) {
+export function EntryEditor({ entryId, initialContent = '', api, auth }: EntryEditorProps) {
   const [content, setContent] = useState(initialContent);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const { api, auth } = useAuth();
+  const { save, saving, error } = useSaveEntry(api, auth);
   const router = useRouter();
 
   async function handleSave() {
-    if (!api || !auth || !content.trim()) return;
-    setSaving(true);
-    setError('');
-
-    const body = {
-      content,
-      mediaUrls: [] as string[],
-      editorType: 'plaintext',
-      editorVersion: '1.0.0',
-      extension: {},
-    };
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${auth.accessToken}`,
-    };
-
-    if (entryId) {
-      const url = api.api.v1.entries[':id'].$url({ param: { id: entryId } });
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        setError('保存に失敗しました');
-        setSaving(false);
-        return;
-      }
-    } else {
-      const url = api.api.v1.entries.$url();
-      const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        setError('作成に失敗しました');
-        setSaving(false);
-        return;
-      }
+    const ok = await save(content, entryId);
+    if (ok) {
+      router.push('/entries');
+      router.refresh();
     }
-
-    router.push('/entries');
-    router.refresh();
   }
 
   return (

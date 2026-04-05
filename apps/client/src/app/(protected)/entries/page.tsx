@@ -1,7 +1,12 @@
+'use client';
+
 import Link from 'next/link';
-import { EntryList } from '@/components/entries/entry-list';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { EntryList } from '@/features/entries/components/entry-list';
 
 export default function EntriesPage() {
+  const { api, loading } = useAuth();
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -13,7 +18,7 @@ export default function EntriesPage() {
           新規作成
         </Link>
       </div>
-      <EntryList />
+      <EntryList api={api} authLoading={loading} />
     </div>
   );
 }
