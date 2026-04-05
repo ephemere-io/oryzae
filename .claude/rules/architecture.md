@@ -14,9 +14,14 @@ paths:
 - `presentation → application → domain ← infrastructure`
 - domain は何にも依存しない。Result<T,E> で返す。throw 禁止
 - ドメインモデルはリッチクラス（private constructor + create/fromProps/withXxx/toProps）
-- **domain/models と domain/services のテストは必須**:
+- **テストは各レイヤーで必須**:
+  - **domain (models, services)**: 全ロジックにユニットテスト必須
+    - create() のバリデーション境界値、withXxx() のイミュータブル性、fromProps/toProps ラウンドトリップ
+  - **application (usecases)**: 極力全ての usecase にユニットテスト必須
+    - gateway を `vi.fn()` の手動スタブでモック。モッククラスやモックライブラリは使わない
+    - 正常系の戻り値 + gateway 呼び出し引数を検証
+    - 異常系は `rejects.toThrow(ApplicationError)` で検証
+  - **infrastructure (repositories)**: インテグレーションテストを書く
+    - 実際の DB に対して実行。環境がなければ `describe.skipIf` でスキップ
   - 新規ファイル作成時、対応する `.test.ts` を同時に作成すること
-  - create() のバリデーション境界値（成功・各エラー）をテストすること
-  - withXxx() のイミュータブル性をテストすること
-  - fromProps → toProps のラウンドトリップをテストすること
   - テストなしで作業を完了してはならない
