@@ -17,8 +17,8 @@ app.route('/api/v1/auth', authRoutes);
 
 // Protected routes
 app.use('/api/v1/*', authMiddleware);
-app.route('/api/v1/entries.js', entries);
-app.route('/api/v1/questions.js', questions);
-app.route('/api/v1/entries/:entryId/questions.js', entryQuestions);
+app.route('/api/v1/entries', entries);
+app.route('/api/v1/questions', questions);
+app.route('/api/v1/entries/:entryId/questions', entryQuestions);
 
 export default app;
