@@ -1,9 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway';
 
-export class SupabaseEntryQuestionLinkRepository
-  implements EntryQuestionLinkRepositoryGateway
-{
+export class SupabaseEntryQuestionLinkRepository implements EntryQuestionLinkRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
 
   async link(entryId: string, questionId: string): Promise<void> {
@@ -32,8 +30,6 @@ export class SupabaseEntryQuestionLinkRepository
       .eq('entry_id', entryId);
 
     if (error) throw error;
-    return (data ?? []).map(
-      (row) => (row as Record<string, unknown>).question_id as string,
-    );
+    return (data ?? []).map((row) => (row as Record<string, unknown>).question_id as string);
   }
 }

@@ -2,7 +2,31 @@
   "name": "oryzae",
   "private": true,
   "packageManager": "pnpm@10.26.2",
+  "scripts": {
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "pnpm --filter @oryzae/server typecheck",
+    "test": "pnpm --filter @oryzae/server test",
+    "knip": "knip",
+    "dep-cruise": "pnpm --filter @oryzae/server dep-cruise",
+    "postinstall": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged",
+    "pre-push": "pnpm lint && pnpm typecheck"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx,json}": "biome check --write"
+  },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
+    "knip": "^6.3.0",
+    "lint-staged": "^16.4.0",
+    "simple-git-hooks": "^2.13.1"
   }
 }

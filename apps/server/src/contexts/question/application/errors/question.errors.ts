@@ -9,11 +9,7 @@ export class QuestionNotFoundError extends NotFoundError {
   }
 }
 
-export class QuestionValidationError extends ValidationError {
-  constructor(message: string) {
-    super(message);
-  }
-}
+export class QuestionValidationError extends ValidationError {}
 
 export class QuestionLimitExceededError extends ValidationError {
   constructor() {

@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { resolveExtension } from './snapshot-restoration.service';
+import { describe, expect, it } from 'vitest';
 import { EntrySnapshot } from '../models/entry-snapshot';
+import { resolveExtension } from './snapshot-restoration.service';
 
 describe('resolveExtension', () => {
   const baseSnapshot = EntrySnapshot.fromProps({

@@ -18,8 +18,7 @@ export class GetEntryUsecase {
     const entry = await this.entryRepo.findById(entryId);
     if (!entry) return null;
 
-    const latestSnapshot =
-      await this.snapshotRepo.findLatestByEntryId(entryId);
+    const latestSnapshot = await this.snapshotRepo.findLatestByEntryId(entryId);
     return {
       entry: entry.toProps(),
       latestSnapshot: latestSnapshot?.toProps() ?? null,

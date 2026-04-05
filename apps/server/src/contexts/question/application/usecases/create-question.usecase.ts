@@ -2,10 +2,7 @@ import type { QuestionRepositoryGateway } from '../../domain/gateways/question-r
 import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
 import { Question, type QuestionProps } from '../../domain/models/question';
 import { QuestionTransaction } from '../../domain/models/question-transaction';
-import {
-  QuestionLimitExceededError,
-  QuestionValidationError,
-} from '../errors/question.errors';
+import { QuestionLimitExceededError, QuestionValidationError } from '../errors/question.errors';
 
 interface CreateQuestionInput {
   string: string;
@@ -25,10 +22,7 @@ export class CreateQuestionUsecase {
     const activeCount = await this.questionRepo.countActiveByUserId(userId);
     if (activeCount >= 3) throw new QuestionLimitExceededError();
 
-    const question = Question.create(
-      { userId, isProposedByOryzae: false },
-      this.generateId,
-    );
+    const question = Question.create({ userId, isProposedByOryzae: false }, this.generateId);
 
     const txResult = QuestionTransaction.create(
       {
