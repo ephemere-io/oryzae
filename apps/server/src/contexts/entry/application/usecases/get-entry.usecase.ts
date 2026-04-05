@@ -1,7 +1,7 @@
-import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
-import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import type { EntryProps } from '../../domain/models/entry';
-import type { EntrySnapshotProps } from '../../domain/models/entry-snapshot';
+import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
+import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway.js';
+import type { EntryProps } from '../../domain/models/entry.js';
+import type { EntrySnapshotProps } from '../../domain/models/entry-snapshot.js';
 
 interface GetEntryResult {
   entry: EntryProps;

@@ -1,6 +1,6 @@
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { QuestionProps } from '../../domain/models/question';
-import { QuestionNotFoundError } from '../errors/question.errors';
+import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
+import type { QuestionProps } from '../../domain/models/question.js';
+import { QuestionNotFoundError } from '../errors/question.errors.js';
 
 export class ArchiveQuestionUsecase {
   constructor(private questionRepo: QuestionRepositoryGateway) {}

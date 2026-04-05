@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway';
+import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway.js';
 
 export class SupabaseEntryQuestionLinkRepository implements EntryQuestionLinkRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}

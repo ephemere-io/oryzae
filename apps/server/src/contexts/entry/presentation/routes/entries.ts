@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { CreateEntryUsecase } from '../../application/usecases/create-entry.usecase';
-import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase';
-import { GetEntryUsecase } from '../../application/usecases/get-entry.usecase';
-import { ListEntriesUsecase } from '../../application/usecases/list-entries.usecase';
-import { UpdateEntryUsecase } from '../../application/usecases/update-entry.usecase';
-import { SupabaseEntryRepository } from '../../infrastructure/repositories/supabase-entry.repository';
-import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository';
+import { CreateEntryUsecase } from '../../application/usecases/create-entry.usecase.js';
+import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase.js';
+import { GetEntryUsecase } from '../../application/usecases/get-entry.usecase.js';
+import { ListEntriesUsecase } from '../../application/usecases/list-entries.usecase.js';
+import { UpdateEntryUsecase } from '../../application/usecases/update-entry.usecase.js';
+import { SupabaseEntryRepository } from '../../infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository.js';
 
 type Env = {
   Variables: {

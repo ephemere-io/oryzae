@@ -1,7 +1,7 @@
-import type { EntryRepositoryGateway } from '../../../entry/domain/gateways/entry-repository.gateway';
-import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway';
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import { QuestionNotFoundError } from '../errors/question.errors';
+import type { EntryRepositoryGateway } from '../../../entry/domain/gateways/entry-repository.gateway.js';
+import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway.js';
+import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
+import { QuestionNotFoundError } from '../errors/question.errors.js';
 
 export class LinkQuestionToEntryUsecase {
   constructor(

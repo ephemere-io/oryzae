@@ -1,7 +1,7 @@
-import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway';
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import type { QuestionProps } from '../../domain/models/question';
+import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway.js';
+import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
+import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway.js';
+import type { QuestionProps } from '../../domain/models/question.js';
 
 export class ListEntryQuestionsUsecase {
   constructor(

@@ -1,4 +1,4 @@
-import type { QuestionTransaction } from '../models/question-transaction';
+import type { QuestionTransaction } from '../models/question-transaction.js';
 
 /**
  * validated な transaction のうち question_version 最大のものを返す。

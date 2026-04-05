@@ -1,5 +1,5 @@
-import { err, ok, type Result } from '../../../shared/domain/types/result';
-import type { EntrySnapshot } from '../models/entry-snapshot';
+import { err, ok, type Result } from '../../../shared/domain/types/result.js';
+import type { EntrySnapshot } from '../models/entry-snapshot.js';
 
 type SnapshotRestorationError = 'no-snapshot' | 'editor-mismatch';
 

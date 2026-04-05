@@ -1,6 +1,6 @@
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import { QuestionNotFoundError, QuestionNotPendingError } from '../errors/question.errors';
+import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
+import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway.js';
+import { QuestionNotFoundError, QuestionNotPendingError } from '../errors/question.errors.js';
 
 export class RejectQuestionProposalUsecase {
   constructor(

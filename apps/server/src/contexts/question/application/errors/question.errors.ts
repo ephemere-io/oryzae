@@ -1,7 +1,7 @@
 import {
   NotFoundError,
   ValidationError,
-} from '../../../shared/application/errors/application.errors';
+} from '../../../shared/application/errors/application.errors.js';
 
 export class QuestionNotFoundError extends NotFoundError {
   constructor(questionId: string) {

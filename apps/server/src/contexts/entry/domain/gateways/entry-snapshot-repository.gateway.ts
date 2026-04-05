@@ -1,4 +1,4 @@
-import type { EntrySnapshot } from '../models/entry-snapshot';
+import type { EntrySnapshot } from '../models/entry-snapshot.js';
 
 export interface EntrySnapshotRepositoryGateway {
   /**

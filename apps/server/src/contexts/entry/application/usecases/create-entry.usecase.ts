@@ -1,8 +1,8 @@
-import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
-import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import { Entry, type EntryProps } from '../../domain/models/entry';
-import { EntrySnapshot } from '../../domain/models/entry-snapshot';
-import { EntryValidationError } from '../errors/entry.errors';
+import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
+import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway.js';
+import { Entry, type EntryProps } from '../../domain/models/entry.js';
+import { EntrySnapshot } from '../../domain/models/entry-snapshot.js';
+import { EntryValidationError } from '../errors/entry.errors.js';
 
 interface CreateEntryInput {
   content: string;
