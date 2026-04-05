@@ -10,6 +10,7 @@ import {
   SettingsDrawer,
 } from '@/features/entries/components/settings-drawer';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
+import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
 import type { ApiClient } from '@/lib/api';
 
 interface AuthState {
@@ -65,6 +66,10 @@ export function EntryEditor({
   const [dateStr, setDateStr] = useState(() => formatDate(new Date()));
   const { save, saving, error } = useSaveEntry(api, auth);
   const router = useRouter();
+  const editorRef = useRef<HTMLDivElement>(null);
+  const ghostLayerRef = useRef<HTMLDivElement>(null);
+
+  useGhostEffect(editorRef, ghostLayerRef, settings);
 
   useEffect(() => {
     const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
@@ -78,6 +83,9 @@ export function EntryEditor({
   const initialContentStable = initialContent;
   useEffect(() => {
     setContent(initialContentStable);
+    if (editorRef.current && initialContentStable) {
+      editorRef.current.textContent = initialContentStable;
+    }
   }, [initialContentStable]);
 
   const prevLinkedRef = useRef(initialLinkedIds);
@@ -237,17 +245,28 @@ export function EntryEditor({
         </div>
       )}
 
-      {/* Editor area */}
-      <textarea
-        value={content}
-        onChange={(e) => {
-          setContent(e.target.value);
-          if (status === 'saved') setStatus('editing');
-        }}
-        placeholder="今日のことを書いてみましょう..."
-        className="flex-1 resize-none bg-transparent px-6 py-6 leading-relaxed focus:outline-none"
-        style={{ fontSize: `${settings.fontSize}px` }}
+      {/* Ghost layer — must be above editor (z-50) */}
+      <div
+        ref={ghostLayerRef}
+        className="pointer-events-none fixed inset-0 z-[51] overflow-hidden"
       />
+
+      {/* Editor area */}
+      <div className="relative flex-1 overflow-auto">
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={() => {
+            const text = editorRef.current?.textContent ?? '';
+            setContent(text);
+            if (status === 'saved') setStatus('editing');
+          }}
+          data-placeholder="今日のことを書いてみましょう..."
+          className="min-h-full whitespace-pre-wrap bg-transparent px-6 py-6 leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)]"
+          style={{ fontSize: `${settings.fontSize}px` }}
+        />
+      </div>
 
       {/* Bottom toolbar */}
       <div className="flex items-center justify-between border-t border-zinc-200 px-4 py-2 dark:border-zinc-800">
