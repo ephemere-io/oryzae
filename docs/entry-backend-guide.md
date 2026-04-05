@@ -1,144 +1,53 @@
-# Entry バックエンドガイド
+# Entry コンテキスト ドメイン知識
 
-Entry（ジャーナルエントリ）コンテキストの実装ガイド。
-横断的なルールは `docs/backend-architecture-guide.md` を参照。
-
----
-
-## ディレクトリ構成
-
-```
-apps/server/src/contexts/entry/
-├── presentation/routes/
-│   └── entries.ts                    # API ルート + DI 組み立て
-├── application/
-│   ├── usecases/
-│   │   ├── create-entry.usecase.ts
-│   │   ├── update-entry.usecase.ts
-│   │   ├── get-entry.usecase.ts
-│   │   ├── list-entries.usecase.ts
-│   │   └── delete-entry.usecase.ts
-│   └── errors/
-│       └── entry.errors.ts
-├── domain/
-│   ├── models/
-│   │   ├── entry.ts                  # Entry class
-│   │   └── entry-snapshot.ts         # EntrySnapshot class
-│   ├── services/
-│   │   └── snapshot-restoration.service.ts
-│   └── gateways/
-│       ├── entry-repository.gateway.ts
-│       └── entry-snapshot-repository.gateway.ts
-└── infrastructure/repositories/
-    ├── supabase-entry.repository.ts
-    └── supabase-entry-snapshot.repository.ts
-```
+Entry（ジャーナルエントリ）のビジネスルールと設計判断。
+横断的なアーキテクチャルールは `docs/backend-architecture-guide.md` を参照。
 
 ---
 
-## ドメインモデル
+## ドメイン概念
 
-### Entry
+### Entry（エントリ）
 
-ジャーナルエントリの最新状態。mutable（updatedAt が変わる）。
+ユーザーが書く日記テキスト。サーバーが理解し、AI 分析・検索に使う「基礎データ」。
 
-```typescript
-class Entry {
-  readonly id, userId, content, mediaUrls, createdAt, updatedAt
+- content はプレーンテキスト。エディタ固有のリッチテキストは含まない
+- mediaUrls はメディアの URI 群。メタデータ（キャプション等）はエディタ固有
+- mutable: 編集のたびに content と updatedAt が更新される
+- バリデーション: content は空文字禁止・上限あり
 
-  static create(params, generateId): Result<Entry, EntryError>
-  // バリデーション: content 空文字禁止、100,000文字上限
+### EntrySnapshot（スナップショット）
 
-  static fromProps(props): Entry
-  withContent(content, mediaUrls): Result<Entry, EntryError>
-  toProps(): EntryProps
-}
-```
+保存のたびに 1 行追記される **immutable な履歴**。Entry と 1:N の関係。
 
-### EntrySnapshot
+- `extension` は **opaque JSON** — サーバーは中身を解釈しない。保存して返すだけ
+- `editorType` + `editorVersion` でどのエディタが書いたかを識別する
+- エディタ固有のスキーマ管理はクライアント側の責務（サーバーは opaque として扱う）
 
-保存のたびに追記される immutable な履歴。`extension` は opaque JSON（エディタ固有データ）。
+### エディタスイッチの判定ロジック
 
-```typescript
-class EntrySnapshot {
-  readonly id, entryId, content, editorType, editorVersion, extension, createdAt
+最新 snapshot の `editorType` が要求と一致すれば `extension` を復元可能。不一致なら新規セッション開始。
 
-  static create(params, generateId): EntrySnapshot  // バリデーション不要
-  static fromProps(props): EntrySnapshot
-  toProps(): EntrySnapshotProps
-}
-```
-
-### ドメインサービス
-
-`resolveExtension(latestSnapshot, requestedEditorType)`: エディタスイッチ時の extension 復元判定。最新 snapshot の editorType が一致すれば extension を返す。
+**なぜこの設計か**: エディタごとにスキーマが異なるため、サーバー側で全エディタの型を管理するのは非現実的。opaque JSON として保存し、クライアントが `editorVersion` を見てマイグレーションすることで、エディタの追加・更新にサーバー変更が不要になる。
 
 ---
 
-## Gateway IF
+## ビジネスルール
 
-```typescript
-interface EntryRepositoryGateway {
-  findById(id: string): Promise<Entry | null>
-  listByUserId(userId: string, cursor?: string, limit?: number): Promise<Entry[]>
-  save(entry: Entry): Promise<void>
-  delete(id: string): Promise<void>
-}
-
-interface EntrySnapshotRepositoryGateway {
-  append(snapshot: EntrySnapshot): Promise<void>
-  findLatestByEntryId(entryId: string): Promise<EntrySnapshot | null>
-}
-```
+- エントリの作成時に、Entry レコードと初回 Snapshot を同時に作成する
+- エントリの更新時に、Entry レコードの更新と Snapshot の追記を同時に行う
+- エントリの削除は cascade で Snapshot も削除される（DB レベル）
+- 一覧取得はカーソルベースページネーション（作成日降順）
+- 全操作は認証済みユーザーのみ。RLS で他ユーザーのデータにアクセス不可
 
 ---
 
-## API エンドポイント
+## 設計判断の記録（ADR）
 
-```
-POST   /api/v1/entries              新規作成
-GET    /api/v1/entries              一覧取得（カーソルページネーション）
-GET    /api/v1/entries/:id          詳細取得（最新 snapshot 含む）
-PUT    /api/v1/entries/:id          編集保存（entries 更新 + snapshot 追記）
-DELETE /api/v1/entries/:id          削除（cascade で snapshots も削除）
-```
+### ADR-001: Base Entry と Editor Extension の型分離
 
-認証: `Authorization: Bearer <access_token>`
+**決定**: サーバーが理解する「基礎データ」（content, mediaUrls）と、エディタ固有の「拡張データ」（extension）を明確に分離する。
 
----
+**理由**: 複数エディタ（TypeTrace, Minimal 等）をサポートするため。エディタ追加時にサーバー側のスキーマ変更を不要にする。
 
-## DB スキーマ
-
-```sql
-create table public.entries (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  content text not null,
-  media_urls text[] default '{}',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table public.entry_snapshots (
-  id uuid primary key default gen_random_uuid(),
-  entry_id uuid not null references public.entries(id) on delete cascade,
-  content text not null,
-  editor_type text not null,
-  editor_version text not null,
-  extension jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
-```
-
-RLS: `user_id = auth.uid()` / `entry_id IN (SELECT id FROM entries WHERE user_id = auth.uid())`
-
----
-
-## 変更ポイント早見表
-
-| やりたいこと | 変更するファイル |
-| --- | --- |
-| Entry のフィールド追加 | `domain/models/entry.ts` → `EntryProps` + class |
-| 新しいユースケース追加 | `application/usecases/` に新ファイル |
-| API エンドポイント追加 | `presentation/routes/entries.ts` |
-| DB カラム追加 | `supabase/migrations/` + repository の toDomain/toProps |
+**詳細**: `docs/archive/EditorAPIInterfaceDesign.md` に初期設計の Case 1-6 を記録。
