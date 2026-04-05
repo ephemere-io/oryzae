@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "src/**"
+      "includeFiles": "dist/**"
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
