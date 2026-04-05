@@ -9,6 +9,7 @@ import {
   type EditorSettings,
   SettingsDrawer,
 } from '@/features/entries/components/settings-drawer';
+import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
 import type { ApiClient } from '@/lib/api';
@@ -70,6 +71,7 @@ export function EntryEditor({
   const ghostLayerRef = useRef<HTMLDivElement>(null);
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
+  useAmpEffect(settings.ampEnabled);
 
   useEffect(() => {
     const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
