@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/features/auth/components/sidebar';
 import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import {
@@ -71,6 +72,8 @@ export function EntryEditor({
   const [dateStr, setDateStr] = useState(() => formatDate(new Date()));
   const { save, saving, error } = useSaveEntry(api, auth);
   const router = useRouter();
+  const { expanded: sidebarExpanded } = useSidebar();
+  const sidebarWidth = sidebarExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
   const editorRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,7 +163,10 @@ export function EntryEditor({
   const charCount = content.length;
 
   return (
-    <div className="fixed top-0 right-0 bottom-0 left-14 z-50 flex flex-col bg-[var(--bg)]">
+    <div
+      className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-[var(--bg)] transition-[left] duration-200 ease-linear"
+      style={{ left: sidebarWidth }}
+    >
       {/* Top toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
         <div className="flex items-center gap-2">
@@ -262,7 +268,8 @@ export function EntryEditor({
       {/* Ghost layer — must be above editor (z-50) */}
       <div
         ref={ghostLayerRef}
-        className="pointer-events-none fixed top-0 right-0 bottom-0 left-14 z-[51] overflow-hidden"
+        className="pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden transition-[left] duration-200 ease-linear"
+        style={{ left: sidebarWidth }}
       />
 
       {/* Editor area */}

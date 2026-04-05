@@ -2,7 +2,29 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+
+// ── Context ──────────────────────────────────────────────────────────────────
+
+interface SidebarContextValue {
+  expanded: boolean;
+  toggle: () => void;
+}
+
+const SidebarContext = createContext<SidebarContextValue>({
+  expanded: false,
+  toggle: () => {},
+});
+
+export function useSidebar() {
+  return useContext(SidebarContext);
+}
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const COLLAPSED_WIDTH = 56; // px (w-14)
+const EXPANDED_WIDTH = 200; // px
 
 interface NavItem {
   href: string;
@@ -34,90 +56,166 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+// ── Component ────────────────────────────────────────────────────────────────
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const [expanded, setExpanded] = useState(false);
+
+  const toggle = useCallback(() => setExpanded((v) => !v), []);
+
+  // Keyboard shortcut: Cmd+B / Ctrl+B
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        toggle();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [toggle]);
 
   function handleLogout() {
     logout();
     router.push('/login');
   }
 
-  return (
-    <nav className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-r border-[var(--border-subtle)] bg-[var(--bg)] px-0 py-4">
-      {/* Logo */}
-      <div
-        className="mb-4 text-[9px] font-semibold tracking-[0.15em] text-[var(--accent)]"
-        style={{
-          writingMode: 'vertical-rl',
-          textOrientation: 'mixed',
-          fontFamily: 'Inter, sans-serif',
-        }}
-      >
-        ORYZAE
-      </div>
+  const width = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
 
-      {/* Nav items */}
-      {NAV_ITEMS.map((item) => {
-        const isActive =
-          item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            title={item.label}
-            className={`group relative flex h-9 w-9 items-center justify-center rounded-lg transition-all ${
-              isActive
-                ? 'bg-[var(--accent-light)] text-[var(--accent)]'
-                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-            }`}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-[18px] w-[18px]"
-            >
-              <path d={item.iconPath} />
-            </svg>
+  return (
+    <SidebarContext.Provider value={{ expanded, toggle }}>
+      <nav
+        data-state={expanded ? 'expanded' : 'collapsed'}
+        className="group flex h-full shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg)] py-4 transition-[width] duration-200 ease-linear"
+        style={{ width }}
+      >
+        {/* Logo + toggle */}
+        <button
+          type="button"
+          onClick={toggle}
+          className="mb-4 flex items-center justify-center self-center"
+          title={expanded ? 'サイドバーを閉じる (⌘B)' : 'サイドバーを開く (⌘B)'}
+        >
+          {expanded ? (
             <span
-              className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.12em] text-[var(--date-color)] opacity-0 transition-opacity group-hover:opacity-100"
+              className="text-xs font-semibold tracking-[0.2em] text-[var(--accent)]"
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
-              {item.label}
+              ORYZAE
             </span>
-          </Link>
-        );
-      })}
+          ) : (
+            <span
+              className="text-[9px] font-semibold tracking-[0.15em] text-[var(--accent)]"
+              style={{
+                writingMode: 'vertical-rl',
+                textOrientation: 'mixed',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              ORYZAE
+            </span>
+          )}
+        </button>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+        {/* Nav items */}
+        <div className="flex flex-col gap-1 px-2">
+          {NAV_ITEMS.map((item) => {
+            const isActive =
+              item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                className={`flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
+                  isActive
+                    ? 'bg-[var(--accent-light)] text-[var(--accent)]'
+                    : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+                }`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px] shrink-0"
+                >
+                  <path d={item.iconPath} />
+                </svg>
+                {expanded && (
+                  <span
+                    className="truncate text-[11px] font-medium uppercase tracking-[0.08em]"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  >
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
 
-      {/* Logout */}
-      <button
-        type="button"
-        onClick={handleLogout}
-        title="ログアウト"
-        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)]"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-[18px] w-[18px]"
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Collapse toggle (chevron) */}
+        <button
+          type="button"
+          onClick={toggle}
+          className="mx-auto mb-2 flex h-7 w-7 items-center justify-center rounded-full text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)]"
+          title={expanded ? '折りたたむ' : '展開する'}
         >
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-        </svg>
-      </button>
-    </nav>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+
+        {/* Logout */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="ログアウト"
+          className={`flex items-center gap-3 self-center rounded-full px-2.5 py-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)] ${expanded ? 'self-stretch mx-2 rounded-lg' : ''}`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-[18px] w-[18px] shrink-0"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+          </svg>
+          {expanded && (
+            <span
+              className="text-[11px] font-medium uppercase tracking-[0.08em]"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              ログアウト
+            </span>
+          )}
+        </button>
+      </nav>
+    </SidebarContext.Provider>
   );
 }
+
+export { COLLAPSED_WIDTH, EXPANDED_WIDTH };

@@ -2,8 +2,31 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Sidebar } from '@/features/auth/components/sidebar';
+import {
+  COLLAPSED_WIDTH,
+  EXPANDED_WIDTH,
+  Sidebar,
+  useSidebar,
+} from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+
+function ProtectedContent({ children }: { children: React.ReactNode }) {
+  const { expanded } = useSidebar();
+  const sidebarWidth = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
+
+  return (
+    <main
+      className="flex-1 overflow-auto transition-[margin-left] duration-200 ease-linear"
+      style={
+        {
+          '--sidebar-width': `${sidebarWidth}px`,
+        } as React.CSSProperties
+      }
+    >
+      <div className="mx-auto w-full max-w-4xl px-4 py-6">{children}</div>
+    </main>
+  );
+}
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, loading } = useAuth();
@@ -28,9 +51,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="mx-auto w-full max-w-4xl px-4 py-6">{children}</div>
-      </main>
+      <ProtectedContent>{children}</ProtectedContent>
     </div>
   );
 }
