@@ -61,9 +61,11 @@ export function QuestionTimeline({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="mb-6 text-center">
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">問いの変遷</h2>
-        <p className="mt-1 text-sm text-zinc-500">あなたの問いが生まれ、育ち、変化してきた記録</p>
+      <div className="mb-8 text-center">
+        <h2 className="text-2xl font-bold text-[var(--fg)]">問いの変遷</h2>
+        <p className="mt-2 text-sm text-[var(--date-color)]">
+          あなたの問いが生まれ、育ち、変化してきた記録
+        </p>
       </div>
 
       <div className="relative pl-4">
@@ -72,8 +74,8 @@ export function QuestionTimeline({
         {[...groups.entries()].map(([dateLabel, items]) => (
           <div key={dateLabel} className="mb-8">
             <div className="relative mb-3 flex items-center">
-              <div className="absolute left-1.5 h-3 w-3 rounded-full bg-zinc-900 dark:bg-zinc-300" />
-              <span className="ml-8 text-sm font-medium text-zinc-500">{dateLabel}</span>
+              <div className="absolute left-2 h-2.5 w-2.5 rounded-full bg-[var(--fg)]" />
+              <span className="ml-8 text-sm text-[var(--date-color)]">{dateLabel}</span>
             </div>
 
             <div className="flex flex-col gap-3">
