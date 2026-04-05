@@ -28,5 +28,11 @@ pnpm knip                                   # デッドコード検出
 
 設計判断の正はすべて `docs/` 配下にある。
 
-- **`docs/OryzaeArchitecture.md`** — サーバーアーキテクチャ（正）
-- `docs/archive/` — 過去の設計指示書・初期要件
+| ドキュメント | 内容 |
+| --- | --- |
+| `docs/backend-architecture-guide.md` | レイヤー依存、ドメインモデル、エラー処理、命名規則 |
+| `docs/backend-testing-guide.md` | テスト戦略、ガードレール、CI |
+| `docs/entry-backend-guide.md` | Entry コンテキスト実装ガイド |
+| `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
+| `docs/infra-guide.md` | Vercel + Supabase デプロイ |
+| `docs/archive/` | 過去の設計指示書 |
