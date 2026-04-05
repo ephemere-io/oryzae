@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { COLLAPSED_WIDTH, EXPANDED_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
+import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/lib/sidebar-context';
 
 interface NavItem {
   href: string;
@@ -36,27 +35,11 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-// ── Component ────────────────────────────────────────────────────────────────
-
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
-  const [expanded, setExpanded] = useState(false);
-
-  const toggle = useCallback(() => setExpanded((v) => !v), []);
-
-  // Keyboard shortcut: Cmd+B / Ctrl+B
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
-        e.preventDefault();
-        toggle();
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [toggle]);
+  const { expanded } = useSidebar();
 
   function handleLogout() {
     logout();
@@ -66,113 +49,106 @@ export function Sidebar() {
   const width = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
 
   return (
-    <SidebarProvider>
-      <nav
-        data-state={expanded ? 'expanded' : 'collapsed'}
-        className="group flex h-full shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg)] py-4 transition-[width] duration-200 ease-linear"
-        style={{ width }}
-      >
-        {/* Logo + toggle */}
-        <button
-          type="button"
-          onClick={toggle}
-          className="mb-4 flex items-center justify-center self-center"
-          title={expanded ? 'サイドバーを閉じる (⌘B)' : 'サイドバーを開く (⌘B)'}
-        >
-          {expanded ? (
-            <span
-              className="text-xs font-semibold tracking-[0.2em] text-[var(--accent)]"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              ORYZAE
-            </span>
-          ) : (
-            <span
-              className="text-[9px] font-semibold tracking-[0.15em] text-[var(--accent)]"
-              style={{
-                writingMode: 'vertical-rl',
-                textOrientation: 'mixed',
-                fontFamily: 'Inter, sans-serif',
-              }}
-            >
-              ORYZAE
-            </span>
-          )}
-        </button>
-
-        {/* Nav items */}
-        <div className="flex flex-col gap-1 px-2">
-          {NAV_ITEMS.map((item) => {
-            const isActive =
-              item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.label}
-                className={`flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
-                  isActive
-                    ? 'bg-[var(--accent-light)] text-[var(--accent)]'
-                    : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-[18px] w-[18px] shrink-0"
-                >
-                  <path d={item.iconPath} />
-                </svg>
-                {expanded && (
-                  <span
-                    className="truncate text-[11px] font-medium uppercase tracking-[0.08em]"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
-                  >
-                    {item.label}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Logout */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          title="ログアウト"
-          className={`flex items-center gap-3 self-center rounded-full px-2.5 py-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)] ${expanded ? 'self-stretch mx-2 rounded-lg' : ''}`}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-[18px] w-[18px] shrink-0"
+    <nav
+      data-state={expanded ? 'expanded' : 'collapsed'}
+      className="group flex h-full shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg)] py-4 transition-[width] duration-200 ease-linear"
+      style={{ width }}
+    >
+      {/* Logo */}
+      <div className="mb-4 flex items-center justify-center">
+        {expanded ? (
+          <span
+            className="text-xs font-semibold tracking-[0.2em] text-[var(--accent)]"
+            style={{ fontFamily: 'Inter, sans-serif' }}
           >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-          </svg>
-          {expanded && (
-            <span
-              className="text-[11px] font-medium uppercase tracking-[0.08em]"
-              style={{ fontFamily: 'Inter, sans-serif' }}
+            ORYZAE
+          </span>
+        ) : (
+          <span
+            className="text-[9px] font-semibold tracking-[0.15em] text-[var(--accent)]"
+            style={{
+              writingMode: 'vertical-rl',
+              textOrientation: 'mixed',
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            ORYZAE
+          </span>
+        )}
+      </div>
+
+      {/* Nav items */}
+      <div className="flex flex-col gap-1 px-2">
+        {NAV_ITEMS.map((item) => {
+          const isActive =
+            item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
+                isActive
+                  ? 'bg-[var(--accent-light)] text-[var(--accent)]'
+                  : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+              }`}
             >
-              ログアウト
-            </span>
-          )}
-        </button>
-      </nav>
-    </SidebarProvider>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[18px] w-[18px] shrink-0"
+              >
+                <path d={item.iconPath} />
+              </svg>
+              {expanded && (
+                <span
+                  className="truncate text-[11px] font-medium uppercase tracking-[0.08em]"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  {item.label}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Logout */}
+      <button
+        type="button"
+        onClick={handleLogout}
+        title="ログアウト"
+        className={`flex items-center gap-3 self-center rounded-full px-2.5 py-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)] ${expanded ? 'mx-2 self-stretch rounded-lg' : ''}`}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-[18px] w-[18px] shrink-0"
+        >
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+        </svg>
+        {expanded && (
+          <span
+            className="text-[11px] font-medium uppercase tracking-[0.08em]"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            ログアウト
+          </span>
+        )}
+      </button>
+    </nav>
   );
 }
