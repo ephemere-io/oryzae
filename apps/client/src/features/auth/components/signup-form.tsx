@@ -3,22 +3,22 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 
-export function LoginForm() {
+export function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
+  const { signup } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const err = await login(email, password);
+    const err = await signup(email, password);
     if (err) {
       setError(err);
       setLoading(false);
@@ -31,7 +31,7 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold text-center">Oryzae</h1>
-      <p className="text-sm text-center text-zinc-500">ログインして続ける</p>
+      <p className="text-sm text-center text-zinc-500">アカウントを作成</p>
 
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>}
 
@@ -63,13 +63,13 @@ export function LoginForm() {
         disabled={loading}
         className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
       >
-        {loading ? 'ログイン中...' : 'ログイン'}
+        {loading ? '作成中...' : 'サインアップ'}
       </button>
 
       <p className="text-sm text-center text-zinc-500">
-        アカウントをお持ちでない方は{' '}
-        <Link href="/signup" className="font-medium text-zinc-900 dark:text-zinc-100">
-          サインアップ
+        すでにアカウントをお持ちの方は{' '}
+        <Link href="/login" className="font-medium text-zinc-900 dark:text-zinc-100">
+          ログイン
         </Link>
       </p>
     </form>
