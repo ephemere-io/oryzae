@@ -9,6 +9,7 @@ paths:
 - **`docs/backend-architecture-guide.md`** — レイヤー依存、ドメインモデルパターン、エラーハンドリング
 - **`docs/entry-backend-guide.md`** — Entry コンテキスト固有の実装ガイド
 - **`docs/question-backend-guide.md`** — Question コンテキスト固有の実装ガイド
+- **`docs/shared-package-guide.md`** — `@oryzae/shared` の使用ルール
 
 要点:
 - `presentation → application → domain ← infrastructure`

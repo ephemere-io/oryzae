@@ -8,7 +8,9 @@
       "vitest": true
     },
     "apps/client": {
-      "next": true
+      "next": true,
+      "vitest": true,
+      "ignoreDependencies": ["@testing-library/dom", "@testing-library/react"]
     },
     "packages/shared": {
       "project": ["src/**/*.ts"]
