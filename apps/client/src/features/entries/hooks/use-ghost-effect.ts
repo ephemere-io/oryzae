@@ -179,6 +179,7 @@ export function useGhostEffect(
     const mode = settings.ghostMode;
 
     function onInput(e: Event) {
+      // @type-assertion-allowed: input event is InputEvent but TS types it as Event
       const ie = e as InputEvent;
       if (composingRef.current) return;
       if (mode === 'block') {
@@ -197,6 +198,7 @@ export function useGhostEffect(
     }
 
     function onBeforeInput(e: Event) {
+      // @type-assertion-allowed: beforeinput event is InputEvent but TS types it as Event
       const ie = e as InputEvent;
       if (mode === 'block' && ie.inputType?.startsWith('delete')) flush();
     }
@@ -208,6 +210,7 @@ export function useGhostEffect(
 
     function onCompositionEnd(e: Event) {
       composingRef.current = false;
+      // @type-assertion-allowed: compositionend event is CompositionEvent but TS types it as Event
       const text = (e as CompositionEvent).data;
       if (!text) return;
       requestAnimationFrame(() => {

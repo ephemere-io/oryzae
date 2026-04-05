@@ -163,6 +163,7 @@ export function useTimeInscription(
     function onCompositionEnd(e: Event) {
       if (compStartRef.current == null) return;
       const duration = Date.now() - compStartRef.current;
+      // @type-assertion-allowed: compositionend event is CompositionEvent but TS types it as Event
       const text = (e as CompositionEvent).data;
       compStartRef.current = null;
       if (!text) return;
@@ -171,6 +172,7 @@ export function useTimeInscription(
     }
 
     function onInput(e: Event) {
+      // @type-assertion-allowed: input event is InputEvent but TS types it as Event
       const ie = e as InputEvent;
       if (compStartRef.current != null) return; // composing
       if (ie.inputType === 'insertText' && ie.data) {
@@ -184,6 +186,7 @@ export function useTimeInscription(
     }
 
     function onBeforeInput(e: Event) {
+      // @type-assertion-allowed: beforeinput event is InputEvent but TS types it as Event
       const ie = e as InputEvent;
       if (ie.inputType?.startsWith('delete')) {
         flush();

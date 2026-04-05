@@ -52,6 +52,7 @@ type SpeechRecognitionLike = {
 };
 
 function getSpeechRecognitionConstructor(): (new () => SpeechRecognitionLike) | null {
+  // @type-assertion-allowed: Web Speech API (SpeechRecognition) is not in standard TS DOM types
   const w = window as unknown as Record<string, unknown>;
   return (w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null) as
     | (new () => SpeechRecognitionLike)

@@ -80,6 +80,7 @@ function generateSmudge(char: string, seed: number, fontSize: number): HTMLCanva
 
 function lastTextNode(el: Node | null): Text | null {
   if (!el) return null;
+  // @type-assertion-allowed: nodeType check guarantees Text node but TS DOM types lack narrowing
   if (el.nodeType === Node.TEXT_NODE) return el as Text;
   for (let i = el.childNodes.length - 1; i >= 0; i--) {
     const r = lastTextNode(el.childNodes[i]);
@@ -209,6 +210,7 @@ export function useEraserTrace(
     }
 
     function onBeforeInput(e: Event) {
+      // @type-assertion-allowed: beforeinput event is InputEvent but TS types it as Event
       const ie = e as InputEvent;
       const tp = ie.inputType;
       if (tp !== 'deleteContentBackward' && tp !== 'deleteContentForward' && tp !== 'deleteByCut')
