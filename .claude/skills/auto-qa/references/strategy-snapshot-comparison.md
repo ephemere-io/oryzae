@@ -18,11 +18,10 @@
 ```
 git stash
 git checkout main
-pnpm --filter @oryzae/server dev
-pnpm --filter @oryzae/client dev
+pnpm --filter @oryzae/shared build && pnpm --filter @oryzae/server build && pnpm --filter @oryzae/client dev
 ```
 
-localhost が起動したら:
+localhost:3001 が起動したら:
 1. ログインして対象ページへ遷移
 2. take_snapshot filePath=/tmp/baseline-{testname}.txt
 3. take_screenshot filePath=/tmp/baseline-{testname}.png
@@ -32,8 +31,7 @@ localhost が起動したら:
 ```
 git checkout <pr-branch>
 git stash pop
-pnpm --filter @oryzae/server dev
-pnpm --filter @oryzae/client dev
+pnpm --filter @oryzae/shared build && pnpm --filter @oryzae/server build && pnpm --filter @oryzae/client dev
 ```
 
 同一ページで:

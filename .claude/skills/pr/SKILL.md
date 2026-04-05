@@ -19,7 +19,7 @@ allowed-tools: "Bash(git,gh,pnpm) Read Glob Grep"
    pnpm lint               # Biome lint
    pnpm test               # テスト
    pnpm knip               # デッドコード検出
-   pnpm dep-cruise         # DDD レイヤー依存チェック
+   pnpm dep-cruise         # アーキテクチャ依存チェック（server DDD + client feature隔離）
    ```
 
 3. **変更内容を確認**
