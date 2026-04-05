@@ -1,5 +1,3 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
-
 export interface ApiClient {
   baseUrl: string;
   headers: Record<string, string>;
@@ -15,10 +13,10 @@ export function createApiClient(accessToken?: string): ApiClient {
   }
 
   return {
-    baseUrl: BASE_URL,
+    baseUrl: '',
     headers,
     fetch(path: string, init?: RequestInit) {
-      return fetch(`${BASE_URL}${path}`, {
+      return fetch(path, {
         ...init,
         headers: { ...headers, ...init?.headers },
       });
