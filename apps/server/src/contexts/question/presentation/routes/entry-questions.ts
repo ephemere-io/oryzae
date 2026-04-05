@@ -14,40 +14,37 @@ type Env = {
   };
 };
 
-export const entryQuestions = new Hono<Env>();
+export const entryQuestions = new Hono<Env>()
+  .get('/', async (c) => {
+    const supabase = c.get('supabase');
+    const linkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
+    const qRepo = new SupabaseQuestionRepository(supabase);
+    const txRepo = new SupabaseQuestionTransactionRepository(supabase);
+    const usecase = new ListEntryQuestionsUsecase(linkRepo, qRepo, txRepo);
 
-entryQuestions.get('/', async (c) => {
-  const supabase = c.get('supabase');
-  const linkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
-  const qRepo = new SupabaseQuestionRepository(supabase);
-  const txRepo = new SupabaseQuestionTransactionRepository(supabase);
-  const usecase = new ListEntryQuestionsUsecase(linkRepo, qRepo, txRepo);
+    const entryId = c.req.param('entryId')!;
+    const result = await usecase.execute(entryId);
+    return c.json(result);
+  })
+  .post('/:questionId', async (c) => {
+    const supabase = c.get('supabase');
+    const linkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
+    const qRepo = new SupabaseQuestionRepository(supabase);
+    const entryRepo = new SupabaseEntryRepository(supabase);
+    const usecase = new LinkQuestionToEntryUsecase(linkRepo, qRepo, entryRepo);
 
-  const entryId = c.req.param('entryId')!;
-  const result = await usecase.execute(entryId);
-  return c.json(result);
-});
+    const entryId = c.req.param('entryId')!;
+    const questionId = c.req.param('questionId')!;
+    await usecase.execute(entryId, questionId);
+    return c.json({ ok: true }, 201);
+  })
+  .delete('/:questionId', async (c) => {
+    const supabase = c.get('supabase');
+    const linkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
+    const usecase = new UnlinkQuestionFromEntryUsecase(linkRepo);
 
-entryQuestions.post('/:questionId', async (c) => {
-  const supabase = c.get('supabase');
-  const linkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
-  const qRepo = new SupabaseQuestionRepository(supabase);
-  const entryRepo = new SupabaseEntryRepository(supabase);
-  const usecase = new LinkQuestionToEntryUsecase(linkRepo, qRepo, entryRepo);
-
-  const entryId = c.req.param('entryId')!;
-  const questionId = c.req.param('questionId')!;
-  await usecase.execute(entryId, questionId);
-  return c.json({ ok: true }, 201);
-});
-
-entryQuestions.delete('/:questionId', async (c) => {
-  const supabase = c.get('supabase');
-  const linkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
-  const usecase = new UnlinkQuestionFromEntryUsecase(linkRepo);
-
-  const entryId = c.req.param('entryId')!;
-  const questionId = c.req.param('questionId')!;
-  await usecase.execute(entryId, questionId);
-  return c.json({ ok: true });
-});
+    const entryId = c.req.param('entryId')!;
+    const questionId = c.req.param('questionId')!;
+    await usecase.execute(entryId, questionId);
+    return c.json({ ok: true });
+  });

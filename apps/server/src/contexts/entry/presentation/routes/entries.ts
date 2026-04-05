@@ -1,5 +1,5 @@
+import { createEntrySchema } from '@oryzae/shared';
 import { Hono } from 'hono';
-import { z } from 'zod';
 import { CreateEntryUsecase } from '../../application/usecases/create-entry.usecase.js';
 import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase.js';
 import { GetEntryUsecase } from '../../application/usecases/get-entry.usecase.js';
@@ -15,69 +15,58 @@ type Env = {
   };
 };
 
-const createEntrySchema = z.object({
-  content: z.string(),
-  mediaUrls: z.array(z.string()).default([]),
-  editorType: z.string(),
-  editorVersion: z.string(),
-  extension: z.record(z.unknown()).default({}),
-});
-
-const updateEntrySchema = createEntrySchema;
-
 const generateId = () => crypto.randomUUID();
 
-export const entries = new Hono<Env>();
+export const entries = new Hono<Env>()
+  .post('/', async (c) => {
+    const body = createEntrySchema.parse(await c.req.json());
+    const supabase = c.get('supabase');
+    const entryRepo = new SupabaseEntryRepository(supabase);
+    const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
+    const usecase = new CreateEntryUsecase(entryRepo, snapshotRepo, generateId);
 
-entries.post('/', async (c) => {
-  const body = createEntrySchema.parse(await c.req.json());
-  const supabase = c.get('supabase');
-  const entryRepo = new SupabaseEntryRepository(supabase);
-  const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
-  const usecase = new CreateEntryUsecase(entryRepo, snapshotRepo, generateId);
+    const entry = await usecase.execute(c.get('userId'), body);
+    return c.json(entry, 201);
+  })
+  .get('/', async (c) => {
+    const cursor = c.req.query('cursor');
+    const limit = c.req.query('limit');
+    const supabase = c.get('supabase');
+    const entryRepo = new SupabaseEntryRepository(supabase);
+    const usecase = new ListEntriesUsecase(entryRepo);
 
-  const entry = await usecase.execute(c.get('userId'), body);
-  return c.json(entry, 201);
-});
+    const result = await usecase.execute(
+      c.get('userId'),
+      cursor,
+      limit ? Number(limit) : undefined,
+    );
+    return c.json(result);
+  })
+  .get('/:id', async (c) => {
+    const supabase = c.get('supabase');
+    const entryRepo = new SupabaseEntryRepository(supabase);
+    const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
+    const usecase = new GetEntryUsecase(entryRepo, snapshotRepo);
 
-entries.get('/', async (c) => {
-  const cursor = c.req.query('cursor');
-  const limit = c.req.query('limit');
-  const supabase = c.get('supabase');
-  const entryRepo = new SupabaseEntryRepository(supabase);
-  const usecase = new ListEntriesUsecase(entryRepo);
+    const result = await usecase.execute(c.req.param('id'));
+    if (!result) return c.json({ error: 'Not found' }, 404);
+    return c.json(result);
+  })
+  .put('/:id', async (c) => {
+    const body = createEntrySchema.parse(await c.req.json());
+    const supabase = c.get('supabase');
+    const entryRepo = new SupabaseEntryRepository(supabase);
+    const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
+    const usecase = new UpdateEntryUsecase(entryRepo, snapshotRepo, generateId);
 
-  const result = await usecase.execute(c.get('userId'), cursor, limit ? Number(limit) : undefined);
-  return c.json(result);
-});
+    const result = await usecase.execute(c.req.param('id'), body);
+    return c.json(result);
+  })
+  .delete('/:id', async (c) => {
+    const supabase = c.get('supabase');
+    const entryRepo = new SupabaseEntryRepository(supabase);
+    const usecase = new DeleteEntryUsecase(entryRepo);
 
-entries.get('/:id', async (c) => {
-  const supabase = c.get('supabase');
-  const entryRepo = new SupabaseEntryRepository(supabase);
-  const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
-  const usecase = new GetEntryUsecase(entryRepo, snapshotRepo);
-
-  const result = await usecase.execute(c.req.param('id'));
-  if (!result) return c.json({ error: 'Not found' }, 404);
-  return c.json(result);
-});
-
-entries.put('/:id', async (c) => {
-  const body = updateEntrySchema.parse(await c.req.json());
-  const supabase = c.get('supabase');
-  const entryRepo = new SupabaseEntryRepository(supabase);
-  const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
-  const usecase = new UpdateEntryUsecase(entryRepo, snapshotRepo, generateId);
-
-  const result = await usecase.execute(c.req.param('id'), body);
-  return c.json(result);
-});
-
-entries.delete('/:id', async (c) => {
-  const supabase = c.get('supabase');
-  const entryRepo = new SupabaseEntryRepository(supabase);
-  const usecase = new DeleteEntryUsecase(entryRepo);
-
-  await usecase.execute(c.req.param('id'));
-  return c.json({ ok: true });
-});
+    await usecase.execute(c.req.param('id'));
+    return c.json({ ok: true });
+  });
