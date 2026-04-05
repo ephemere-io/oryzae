@@ -102,6 +102,15 @@ module.exports = {
       to: { path: '^src/contexts/shared/(infrastructure|presentation|application)' },
     },
 
+    // === Domain must not import @oryzae/shared ===
+    {
+      name: 'domain-no-shared-package',
+      comment: 'domain must not import @oryzae/shared (it depends on zod, domain must be pure)',
+      severity: 'error',
+      from: { path: '^src/contexts/[^/]+/domain' },
+      to: { path: '@oryzae/shared' },
+    },
+
     // === No circular dependencies ===
     {
       name: 'no-circular',
