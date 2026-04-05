@@ -11,7 +11,8 @@ description: >
 
 # Auto QA Skill
 
-localhost:3001（フロントエンド）+ localhost:3000（バックエンド）に対し、Chrome DevTools MCP で自動QAを実行する。
+localhost:3001 に対し、Chrome DevTools MCP で自動QAを実行する。
+Hono API は Next.js Route Handler に内蔵されているため、localhost:3001 のみでフロントエンドと API の両方が動作する。
 自然言語の指示・PR URL・明示的テストケースのいずれからでも実行可能。
 
 ## このスキルの構造
@@ -142,4 +143,4 @@ YYYY-MM-DD | テスト対象 | 戦略 | 結果(PASS/FAIL/BLOCKED数) | 発見事
 - **"Element with uid X no longer exists"**: 再度 `take_snapshot` で最新uid取得
 - **`navigate_page` タイムアウト**: `take_snapshot` で確認（読み込み済みの場合あり）
 - **セッション切れ**: Phase 2 の認証を再実行
-- **localhost 未起動**: `pnpm --filter @oryzae/server dev` と `pnpm --filter @oryzae/client dev` を起動
+- **localhost 未起動**: `pnpm --filter @oryzae/shared build && pnpm --filter @oryzae/server build && pnpm --filter @oryzae/client dev` で起動

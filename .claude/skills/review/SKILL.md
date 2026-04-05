@@ -1,6 +1,6 @@
 ---
 name: review
-description: "現在の変更に対して設計レビューを行う。PR 作成前やコード変更後に使う。アーキテクチャ違反、レイヤー依存、ドメインモデルパターン、エラーハンドリング、命名規則、テスト有無を検査する。コードレビュー、設計レビュー、品質チェックを求められた時にも使う。"
+description: "現在の変更に対して設計レビューを行う。PR 作成前やコード変更後に使う。アーキテクチャ違反、レイヤー依存、型安全性、テスト有無を検査する。コードレビュー、設計レビュー、品質チェックを求められた時にも使う。"
 disable-model-invocation: true
 allowed-tools: "Bash(git,pnpm) Read Glob Grep Agent"
 ---
@@ -22,41 +22,56 @@ allowed-tools: "Bash(git,pnpm) Read Glob Grep Agent"
 
 変更対象に応じて以下のガイドラインを読み込む:
 
-- `apps/server/` 配下の変更 → **`docs/backend-architecture-guide.md`** を読む
-- `apps/server/src/contexts/entry/` 配下 → 追加で **`docs/entry-backend-guide.md`** を読む
-- `apps/server/src/contexts/question/` 配下 → 追加で **`docs/question-backend-guide.md`** を読む
-- テスト・ガードレール関連 → **`docs/backend-testing-guide.md`** を読む
-- デプロイ・インフラ関連 → **`docs/infra-guide.md`** を読む
+**サーバー（`apps/server/`）:**
+- **`docs/backend-architecture-guide.md`** — レイヤー依存、ドメインモデル、エラーハンドリング
+- **`docs/entry-backend-guide.md`** — Entry コンテキスト
+- **`docs/question-backend-guide.md`** — Question コンテキスト
+- **`docs/backend-testing-guide.md`** — テスト戦略
+
+**クライアント（`apps/client/`）:**
+- **`docs/client-architecture-guide.md`** — Feature-Sliced 構造、データフェッチング、型安全性
+- **`docs/client-testing-guide.md`** — フロントエンドテスト戦略
+
+**共有・インフラ:**
+- **`docs/shared-package-guide.md`** — `@oryzae/shared` の使用ルール
+- **`docs/infra-guide.md`** — Vercel デプロイ
 
 ### 3. レビュー実施
 
-ガイドラインに照らして以下の観点でレビューする:
+#### サーバー（`apps/server/` 配下の変更）
 
 - **A. レイヤー依存**: domain → 他層の依存がないか、application → infrastructure がないか
 - **B. ドメインモデル**: リッチクラスパターン（create/fromProps/withXxx/toProps）に従っているか
 - **C. エラーハンドリング**: domain は Result、application は throw、presentation は errorHandler
 - **D. ゲートウェイ**: IF が class インスタンスを受け渡し、infrastructure が toProps/fromProps で変換
-- **E. ユースケース**: 1 ファイル = 1 ユースケース、コンストラクタ DI、toProps でレスポンス
+- **E. ユースケース**: 1 ファイル = 1 ユースケース、コンストラクタ DI
 - **F. プレゼンテーション**: Zod バリデーション、DI がルートファイル内で完結
-- **G. 命名規則**: ファイル命名規則に従っているか
-- **H. テスト（必須）**: 以下を全て満たしているか確認する
-  - domain/models/ の各ファイルに対応する `.test.ts` が存在するか（**必須**）
-  - domain/services/ の各ファイルに対応する `.test.ts` が存在するか（**必須**）
-  - create() のバリデーション境界値（成功・各エラーパターン）をテストしているか
-  - Result<T,E> の success / error 両方のケースをカバーしているか
-  - withXxx() のイミュータブル性（元インスタンスが変更されないこと）をテストしているか
-  - fromProps → toProps のラウンドトリップをテストしているか
-  - テストファイルがない domain model/service がある場合は **❌ 要修正** として報告する
-- **I. コード品質**: 未使用 export、any 型、console.log
+- **G. テスト（必須）**: domain/models, domain/services の全ファイルにテストが存在するか
+- **H. `@oryzae/shared`**: domain 層から import していないか
+
+#### クライアント（`apps/client/` 配下の変更）
+
+- **I. Feature 隔離**: features/X → features/Y の依存がないか
+- **J. データフェッチング**: API 呼び出しが hooks に集約されているか（コンポーネントから直接呼んでいないか）
+- **K. 型安全性**: `as` キャストがないか（あれば `// @type-assertion-allowed` コメント付きか）、`any` がないか
+- **L. hooks テスト（必須）**: `features/*/hooks/` の新規・変更ファイルに対応テストがあるか
+- **M. インポート**: `lib/` が `features/` や `app/` に依存していないか
+- **N. app/ の責務**: page.tsx や layout.tsx が直接 API を呼んでいないか
+
+#### 共通
+
+- **O. 命名規則**: ファイル命名規則に従っているか
+- **P. コード品質**: 未使用 export、`any` 型、`console.log`
+- **Q. `--no-verify`**: 使用されていないか
 
 ### 4. ツールによる自動検証
 
 ```bash
-pnpm dep-cruise   # レイヤー依存違反
-pnpm knip         # 未使用コード
-pnpm lint         # Biome lint
 pnpm typecheck    # 型チェック
-pnpm test         # テスト
+pnpm lint         # Biome lint
+pnpm test         # テスト（server 85 + client 19）
+pnpm dep-cruise   # レイヤー依存違反 + feature 隔離
+pnpm knip         # 未使用コード
 ```
 
 ### 5. 結果報告
@@ -69,5 +84,5 @@ pnpm test         # テスト
 ### ❌ 要修正 — [ファイル名:行番号] 問題 + 理由 + 修正案
 
 ### 🔧 自動検証結果
-- dep-cruise / knip / lint / typecheck / test: ✅ or ❌
+- typecheck / lint / test / dep-cruise / knip: ✅ or ❌
 ```
