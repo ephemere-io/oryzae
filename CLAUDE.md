@@ -2,46 +2,41 @@
 
 ジャーナリング支援アプリのバックエンド。
 
-## Quick Commands
+設計・実装で迷ったら以下を思想の拠り所にすること:
+- [video-processor](https://github.com/team-mirai-volunteer/video-processor/tree/develop) — 参考実装（DDD + レイヤードアーキテクチャ）
+- [超並列LLMコーディングのハーネスエンジニアリング](https://note.com/jujunjun110/n/n66306cab294a) — ガードレール・並列開発の設計思想
+
+## Commands
 
 ```bash
-pnpm install              # 依存インストール
-pnpm --filter @oryzae/server dev        # 開発サーバー起動
-pnpm --filter @oryzae/server typecheck  # 型チェック
-pnpm --filter @oryzae/server test       # テスト実行
+pnpm install                                # 依存インストール
+pnpm --filter @oryzae/server dev            # 開発サーバー起動
+pnpm typecheck                              # 型チェック
+pnpm test                                   # テスト実行
+pnpm lint                                   # Biome lint
+pnpm dep-cruise                             # DDD レイヤー依存チェック
+pnpm knip                                   # デッドコード検出
 ```
 
 ## Architecture
 
-レイヤードアーキテクチャ: `presentation → application → domain ← infrastructure`
+`presentation → application → domain ← infrastructure`
 
 - domain は何にも依存しない（最内層）
-- infrastructure は domain の gateway IF を実装する（依存性逆転）
 - ドメインモデルはリッチクラス（private constructor + create/fromProps/withXxx/toProps）
-- `--no-verify` は原則禁止
+- domain: Result<T,E> で返す（throw 禁止）→ application: throw に変換
+- 1 ユースケース = 1 ファイル
+- `--no-verify` 禁止
 
-## Directory
+## Design Docs (SSoT)
 
-```
-apps/server/src/contexts/
-  entry/           # エントリ管理コンテキスト
-    presentation/  # HTTP ↔ ユースケース変換 + DI 組み立て
-    application/   # ユースケース（1ファイル = 1ユースケース）
-    domain/        # ビジネスルール（models, services, gateways）
-    infrastructure/ # Supabase 実装
-  shared/          # コンテキスト間共有
-    domain/types/  # Result<T, E> 型
-    application/errors/ # ApplicationError 基底クラス
-```
+設計判断の正はすべて `docs/` 配下にある。
 
-## Error Handling
-
-- domain 層: `Result<T, E>` 型（`{ success, value/error }`）で戻り値表現（throw 禁止）
-- application 層: Result を受け取り、失敗なら `ApplicationError` 継承クラスを throw
-- infrastructure 層: 外部エラーをそのまま throw
-- presentation 層: `errorHandler` で `ApplicationError.statusCode` → HTTP レスポンスに変換
-
-## Design Docs
-
-- `OryzaeArchitecture.md` — サーバーアーキテクチャ（正）
-- `EditorAPIInterfaceDesign.md` — 型設計（Base Entry / Editor Extension）
+| ドキュメント | 内容 |
+| --- | --- |
+| `docs/backend-architecture-guide.md` | レイヤー依存、ドメインモデル、エラー処理、命名規則 |
+| `docs/backend-testing-guide.md` | テスト戦略、ガードレール、CI |
+| `docs/entry-backend-guide.md` | Entry コンテキスト実装ガイド |
+| `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
+| `docs/infra-guide.md` | Vercel + Supabase デプロイ |
+| `docs/archive/` | 過去の設計指示書 |

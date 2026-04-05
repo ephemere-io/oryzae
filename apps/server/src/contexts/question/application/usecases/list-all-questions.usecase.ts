@@ -8,14 +8,11 @@ export class ListAllQuestionsUsecase {
     private transactionRepo: QuestionTransactionRepositoryGateway,
   ) {}
 
-  async execute(
-    userId: string,
-  ): Promise<Array<QuestionProps & { currentText: string | null }>> {
+  async execute(userId: string): Promise<Array<QuestionProps & { currentText: string | null }>> {
     const questions = await this.questionRepo.listAllByUserId(userId);
     const results = [];
     for (const q of questions) {
-      const tx =
-        await this.transactionRepo.findLatestValidatedByQuestionId(q.id);
+      const tx = await this.transactionRepo.findLatestValidatedByQuestionId(q.id);
       results.push({ ...q.toProps(), currentText: tx?.string ?? null });
     }
     return results;

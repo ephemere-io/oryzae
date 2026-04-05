@@ -1,9 +1,6 @@
 import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
 import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import {
-  QuestionNotFoundError,
-  QuestionNotPendingError,
-} from '../errors/question.errors';
+import { QuestionNotFoundError, QuestionNotPendingError } from '../errors/question.errors';
 
 export class RejectQuestionProposalUsecase {
   constructor(
@@ -22,8 +19,7 @@ export class RejectQuestionProposalUsecase {
     }
 
     // Text update proposal — delete only the unvalidated transaction
-    const unvalidatedTx =
-      await this.transactionRepo.findLatestUnvalidatedByQuestionId(questionId);
+    const unvalidatedTx = await this.transactionRepo.findLatestUnvalidatedByQuestionId(questionId);
     if (!unvalidatedTx) throw new QuestionNotPendingError(questionId);
 
     await this.transactionRepo.delete(unvalidatedTx.id);

@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
+import { entries } from './contexts/entry/presentation/routes/entries';
+import { entryQuestions } from './contexts/question/presentation/routes/entry-questions';
+import { questions } from './contexts/question/presentation/routes/questions';
 import { authMiddleware } from './contexts/shared/presentation/middleware/auth';
 import { errorHandler } from './contexts/shared/presentation/middleware/error-handler';
-import { entries } from './contexts/entry/presentation/routes/entries';
-import { questions } from './contexts/question/presentation/routes/questions';
-import { entryQuestions } from './contexts/question/presentation/routes/entry-questions';
 import { authRoutes } from './contexts/shared/presentation/routes/auth';
 
 const app = new Hono();

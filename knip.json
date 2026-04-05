@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "apps/server": {
+      "entry": ["api/index.ts"],
+      "project": ["src/**/*.ts", "api/**/*.ts"],
+      "ignore": ["src/contexts/shared/infrastructure/supabase-client.ts"],
+      "vitest": true
+    }
+  }
+}

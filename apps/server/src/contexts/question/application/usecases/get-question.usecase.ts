@@ -19,10 +19,8 @@ export class GetQuestionUsecase {
     const question = await this.questionRepo.findById(questionId);
     if (!question) return null;
 
-    const transactions =
-      await this.transactionRepo.listByQuestionId(questionId);
-    const latestValidated =
-      await this.transactionRepo.findLatestValidatedByQuestionId(questionId);
+    const transactions = await this.transactionRepo.listByQuestionId(questionId);
+    const latestValidated = await this.transactionRepo.findLatestValidatedByQuestionId(questionId);
 
     return {
       question: question.toProps(),

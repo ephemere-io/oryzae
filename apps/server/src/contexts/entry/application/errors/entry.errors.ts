@@ -1,4 +1,7 @@
-import { NotFoundError, ValidationError } from '../../../shared/application/errors/application.errors';
+import {
+  NotFoundError,
+  ValidationError,
+} from '../../../shared/application/errors/application.errors';
 
 export class EntryNotFoundError extends NotFoundError {
   constructor(entryId: string) {
@@ -6,8 +9,4 @@ export class EntryNotFoundError extends NotFoundError {
   }
 }
 
-export class EntryValidationError extends ValidationError {
-  constructor(message: string) {
-    super(message);
-  }
-}
+export class EntryValidationError extends ValidationError {}

@@ -2,14 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
 import { QuestionTransaction } from '../../domain/models/question-transaction';
 
-export class SupabaseQuestionTransactionRepository
-  implements QuestionTransactionRepositoryGateway
-{
+export class SupabaseQuestionTransactionRepository implements QuestionTransactionRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
 
-  async listByQuestionId(
-    questionId: string,
-  ): Promise<QuestionTransaction[]> {
+  async listByQuestionId(questionId: string): Promise<QuestionTransaction[]> {
     const { data, error } = await this.supabase
       .from('question_transactions')
       .select('*')
@@ -20,9 +16,7 @@ export class SupabaseQuestionTransactionRepository
     return (data ?? []).map((row) => this.toDomain(row));
   }
 
-  async findLatestByQuestionId(
-    questionId: string,
-  ): Promise<QuestionTransaction | null> {
+  async findLatestByQuestionId(questionId: string): Promise<QuestionTransaction | null> {
     const { data, error } = await this.supabase
       .from('question_transactions')
       .select('*')
@@ -36,9 +30,7 @@ export class SupabaseQuestionTransactionRepository
     return this.toDomain(data);
   }
 
-  async findLatestValidatedByQuestionId(
-    questionId: string,
-  ): Promise<QuestionTransaction | null> {
+  async findLatestValidatedByQuestionId(questionId: string): Promise<QuestionTransaction | null> {
     const { data, error } = await this.supabase
       .from('question_transactions')
       .select('*')
@@ -53,9 +45,7 @@ export class SupabaseQuestionTransactionRepository
     return this.toDomain(data);
   }
 
-  async findLatestUnvalidatedByQuestionId(
-    questionId: string,
-  ): Promise<QuestionTransaction | null> {
+  async findLatestUnvalidatedByQuestionId(questionId: string): Promise<QuestionTransaction | null> {
     const { data, error } = await this.supabase
       .from('question_transactions')
       .select('*')
@@ -72,45 +62,38 @@ export class SupabaseQuestionTransactionRepository
 
   async append(transaction: QuestionTransaction): Promise<void> {
     const props = transaction.toProps();
-    const { error } = await this.supabase
-      .from('question_transactions')
-      .insert({
-        id: props.id,
-        question_id: props.questionId,
-        string: props.string,
-        question_version: props.questionVersion,
-        is_validated_by_user: props.isValidatedByUser,
-        is_proposed_by_oryzae: props.isProposedByOryzae,
-        created_at: props.createdAt,
-        updated_at: props.updatedAt,
-      });
+    const { error } = await this.supabase.from('question_transactions').insert({
+      id: props.id,
+      question_id: props.questionId,
+      string: props.string,
+      question_version: props.questionVersion,
+      is_validated_by_user: props.isValidatedByUser,
+      is_proposed_by_oryzae: props.isProposedByOryzae,
+      created_at: props.createdAt,
+      updated_at: props.updatedAt,
+    });
 
     if (error) throw error;
   }
 
   async save(transaction: QuestionTransaction): Promise<void> {
     const props = transaction.toProps();
-    const { error } = await this.supabase
-      .from('question_transactions')
-      .upsert({
-        id: props.id,
-        question_id: props.questionId,
-        string: props.string,
-        question_version: props.questionVersion,
-        is_validated_by_user: props.isValidatedByUser,
-        is_proposed_by_oryzae: props.isProposedByOryzae,
-        created_at: props.createdAt,
-        updated_at: props.updatedAt,
-      });
+    const { error } = await this.supabase.from('question_transactions').upsert({
+      id: props.id,
+      question_id: props.questionId,
+      string: props.string,
+      question_version: props.questionVersion,
+      is_validated_by_user: props.isValidatedByUser,
+      is_proposed_by_oryzae: props.isProposedByOryzae,
+      created_at: props.createdAt,
+      updated_at: props.updatedAt,
+    });
 
     if (error) throw error;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('question_transactions')
-      .delete()
-      .eq('id', id);
+    const { error } = await this.supabase.from('question_transactions').delete().eq('id', id);
     if (error) throw error;
   }
 
