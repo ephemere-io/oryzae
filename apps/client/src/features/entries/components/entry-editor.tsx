@@ -160,7 +160,7 @@ export function EntryEditor({
   const charCount = content.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="fixed top-0 right-0 bottom-0 left-14 z-50 flex flex-col bg-[var(--bg)]">
       {/* Top toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
         <div className="flex items-center gap-2">
@@ -262,7 +262,7 @@ export function EntryEditor({
       {/* Ghost layer — must be above editor (z-50) */}
       <div
         ref={ghostLayerRef}
-        className="pointer-events-none fixed inset-0 z-[51] overflow-hidden"
+        className="pointer-events-none fixed top-0 right-0 bottom-0 left-14 z-[51] overflow-hidden"
       />
 
       {/* Editor area */}

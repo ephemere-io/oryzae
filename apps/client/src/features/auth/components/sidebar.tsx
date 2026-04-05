@@ -45,7 +45,7 @@ export function Sidebar() {
   }
 
   return (
-    <nav className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-r border-[var(--border-subtle)] bg-background px-0 py-4">
+    <nav className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-r border-[var(--border-subtle)] bg-[var(--bg)] px-0 py-4">
       {/* Logo */}
       <div
         className="mb-4 text-[9px] font-semibold tracking-[0.15em] text-[var(--accent)]"
@@ -70,7 +70,7 @@ export function Sidebar() {
             className={`group relative flex h-9 w-9 items-center justify-center rounded-lg transition-all ${
               isActive
                 ? 'bg-[var(--accent-light)] text-[var(--accent)]'
-                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-foreground'
+                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
             }`}
           >
             <svg

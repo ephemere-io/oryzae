@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f9f8f4;
-  --foreground: #2d2d2d;
+  --bg: #f9f8f4;
+  --fg: #2d2d2d;
   --accent: #4a9e8e;
   --accent-light: rgba(74, 158, 142, 0.08);
   --border-subtle: rgba(0, 0, 0, 0.05);
@@ -10,19 +10,10 @@
   --date-color: #999;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-accent: var(--accent);
-  --color-accent-light: var(--accent-light);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1a1a1a;
-    --foreground: #cccccc;
+    --bg: #1a1a1a;
+    --fg: #cccccc;
     --accent: #5ab8a6;
     --accent-light: rgba(90, 184, 166, 0.1);
     --border-subtle: rgba(255, 255, 255, 0.06);
@@ -32,8 +23,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--fg);
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
 }
 
