@@ -174,7 +174,7 @@ export function EntryEditor({
             type="button"
             onClick={() => setSettingsOpen(!settingsOpen)}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            title="設定"
+            data-tooltip="設定"
           >
             <svg
               aria-hidden="true"
@@ -200,7 +200,7 @@ export function EntryEditor({
             type="button"
             onClick={toggleFullscreen}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            title="フルスクリーン"
+            data-tooltip="フルスクリーン"
           >
             <svg
               aria-hidden="true"
@@ -225,7 +225,7 @@ export function EntryEditor({
           type="button"
           onClick={() => router.push('/entries')}
           className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-          title="一覧に戻る"
+          data-tooltip="一覧に戻る"
         >
           <svg
             aria-hidden="true"
@@ -298,7 +298,7 @@ export function EntryEditor({
             type="button"
             onClick={() => router.push('/entries/new')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            title="新規エントリ"
+            data-tooltip="新規エントリ"
           >
             <svg
               aria-hidden="true"
@@ -320,7 +320,7 @@ export function EntryEditor({
             onClick={handleSave}
             disabled={saving || !content.trim()}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            title="保存"
+            data-tooltip="保存"
           >
             <svg
               aria-hidden="true"
@@ -341,7 +341,7 @@ export function EntryEditor({
             type="button"
             onClick={() => router.push('/entries')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            title="一覧"
+            data-tooltip="一覧"
           >
             <svg
               aria-hidden="true"
@@ -365,7 +365,7 @@ export function EntryEditor({
           type="button"
           disabled
           className="rounded-md p-1.5 text-[var(--date-color)] opacity-40"
-          title="音声入力"
+          data-tooltip="音声入力"
         >
           <svg
             aria-hidden="true"
@@ -383,7 +383,7 @@ export function EntryEditor({
         <button
           type="button"
           className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-          title="執筆統計"
+          data-tooltip="執筆統計"
         >
           <svg
             aria-hidden="true"
