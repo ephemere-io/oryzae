@@ -91,7 +91,7 @@ authRoutes.post('/refresh', async (c) => {
   });
 });
 
-// GET /auth/me (requires Authorization header)
+// GET /auth/me
 authRoutes.get('/me', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {

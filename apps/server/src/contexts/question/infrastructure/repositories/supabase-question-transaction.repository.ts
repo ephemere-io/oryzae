@@ -13,7 +13,7 @@ export class SupabaseQuestionTransactionRepository implements QuestionTransactio
       .order('question_version', { ascending: true });
 
     if (error) throw error;
-    return (data ?? []).map((row) => this.toDomain(row));
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
   async findLatestByQuestionId(questionId: string): Promise<QuestionTransaction | null> {

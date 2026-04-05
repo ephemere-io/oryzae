@@ -26,7 +26,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
 
     const { data, error } = await query;
     if (error) throw error;
-    return (data ?? []).map((row) => this.toDomain(row));
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
   async save(entry: Entry): Promise<void> {
