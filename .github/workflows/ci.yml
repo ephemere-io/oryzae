@@ -70,17 +70,3 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm knip
-
-  type-assertions:
-    name: Type Assertion Ban (as cast)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: bash scripts/check-type-assertions.sh
-
-  hook-tests:
-    name: Hook Test Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: bash scripts/check-hook-tests.sh

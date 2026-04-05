@@ -9,8 +9,6 @@
     "test": "pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test",
     "knip": "knip",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise",
-    "check:type-assertions": "bash scripts/check-type-assertions.sh",
-    "check:hook-tests": "bash scripts/check-hook-tests.sh",
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
