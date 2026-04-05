@@ -5,7 +5,10 @@
   "type": "module",
   "main": "./dist/app.js",
   "exports": {
-    ".": "./dist/app.js"
+    ".": {
+      "types": "./src/app.ts",
+      "default": "./dist/app.js"
+    }
   },
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts",
