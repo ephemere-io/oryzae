@@ -261,6 +261,7 @@ export function usePressureBleed(
 
     function onInput(e: Event) {
       if (composingRef.current) return;
+      // @type-assertion-allowed: beforeinput event is InputEvent but TS types it as Event
       const ie = e as InputEvent;
       if (ie.inputType === 'insertText' && ie.data && directKeyRef.current) {
         directCharRef.current = ie.data;
@@ -275,6 +276,7 @@ export function usePressureBleed(
 
     function onCompositionEnd(e: Event) {
       composingRef.current = false;
+      // @type-assertion-allowed: compositionend event is CompositionEvent but TS types it as Event
       const text = (e as CompositionEvent).data;
       if (!text) {
         imePauseLogRef.current = [];
