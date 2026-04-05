@@ -39,7 +39,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
-  const { expanded } = useSidebar();
+  const { expanded, toggle } = useSidebar();
 
   function handleLogout() {
     logout();
@@ -49,106 +49,133 @@ export function Sidebar() {
   const width = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
 
   return (
-    <nav
-      data-state={expanded ? 'expanded' : 'collapsed'}
-      className="group flex h-full shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg)] py-4 transition-[width] duration-200 ease-linear"
-      style={{ width }}
-    >
-      {/* Logo */}
-      <div className="mb-4 flex items-center justify-center">
-        {expanded ? (
-          <span
-            className="text-xs font-semibold tracking-[0.2em] text-[var(--accent)]"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            ORYZAE
-          </span>
-        ) : (
-          <span
-            className="text-[9px] font-semibold tracking-[0.15em] text-[var(--accent)]"
-            style={{
-              writingMode: 'vertical-rl',
-              textOrientation: 'mixed',
-              fontFamily: 'Inter, sans-serif',
-            }}
-          >
-            ORYZAE
-          </span>
-        )}
-      </div>
-
-      {/* Nav items */}
-      <div className="flex flex-col gap-1 px-2">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={item.label}
-              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
-                isActive
-                  ? 'bg-[var(--accent-light)] text-[var(--accent)]'
-                  : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-              }`}
+    <div className="relative flex h-full shrink-0" style={{ width }}>
+      <nav
+        data-state={expanded ? 'expanded' : 'collapsed'}
+        className="flex h-full w-full flex-col bg-[var(--bg)] py-4 transition-[width] duration-200 ease-linear"
+      >
+        {/* Logo */}
+        <div className="mb-4 flex items-center justify-center">
+          {expanded ? (
+            <span
+              className="text-xs font-semibold tracking-[0.2em] text-[var(--accent)]"
+              style={{ fontFamily: 'Inter, sans-serif' }}
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[18px] w-[18px] shrink-0"
+              ORYZAE
+            </span>
+          ) : (
+            <span
+              className="text-[9px] font-semibold tracking-[0.15em] text-[var(--accent)]"
+              style={{
+                writingMode: 'vertical-rl',
+                textOrientation: 'mixed',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              ORYZAE
+            </span>
+          )}
+        </div>
+
+        {/* Nav items */}
+        <div className="flex flex-col gap-1 px-2">
+          {NAV_ITEMS.map((item) => {
+            const isActive =
+              item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                className={`flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
+                  isActive
+                    ? 'bg-[var(--accent-light)] text-[var(--accent)]'
+                    : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+                }`}
               >
-                <path d={item.iconPath} />
-              </svg>
-              {expanded && (
-                <span
-                  className="truncate text-[11px] font-medium uppercase tracking-[0.08em]"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px] shrink-0"
                 >
-                  {item.label}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </div>
+                  <path d={item.iconPath} />
+                </svg>
+                {expanded && (
+                  <span
+                    className="truncate text-[11px] font-medium uppercase tracking-[0.08em]"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  >
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+        {/* Spacer */}
+        <div className="flex-1" />
 
-      {/* Logout */}
+        {/* Logout */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="ログアウト"
+          className={`flex items-center gap-3 self-center rounded-full px-2.5 py-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)] ${expanded ? 'mx-2 self-stretch rounded-lg' : ''}`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-[18px] w-[18px] shrink-0"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+          </svg>
+          {expanded && (
+            <span
+              className="text-[11px] font-medium uppercase tracking-[0.08em]"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              ログアウト
+            </span>
+          )}
+        </button>
+      </nav>
+
+      {/* Border handle — click to toggle, hover shows chevron cursor */}
       <button
         type="button"
-        onClick={handleLogout}
-        title="ログアウト"
-        className={`flex items-center gap-3 self-center rounded-full px-2.5 py-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)] ${expanded ? 'mx-2 self-stretch rounded-lg' : ''}`}
+        onClick={toggle}
+        aria-label={expanded ? 'サイドバーを閉じる' : 'サイドバーを開く'}
+        className="group/handle absolute top-0 right-0 z-10 flex h-full w-2 translate-x-1/2 cursor-col-resize items-center justify-center"
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-[18px] w-[18px] shrink-0"
-        >
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-        </svg>
-        {expanded && (
-          <span
-            className="text-[11px] font-medium uppercase tracking-[0.08em]"
-            style={{ fontFamily: 'Inter, sans-serif' }}
+        {/* Visible border line */}
+        <div className="h-full w-px bg-[var(--border-subtle)] transition-colors group-hover/handle:bg-[var(--accent)]" />
+        {/* Chevron indicator on hover */}
+        <div className="absolute flex h-6 w-4 items-center justify-center rounded-full bg-[var(--bg)] opacity-0 shadow-sm transition-opacity group-hover/handle:opacity-100">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`h-3 w-3 ${expanded ? 'rotate-180' : ''}`}
           >
-            ログアウト
-          </span>
-        )}
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </div>
       </button>
-    </nav>
+    </div>
   );
 }
