@@ -1,95 +1,74 @@
 # バックエンドテスト・ガードレールガイド
 
-テスト戦略と品質ガードレールの定義。
+テスト戦略と品質ガードレールの原則。
 
 ---
 
-## テスト戦略（4段階）
+## テスト戦略
 
-| レイヤー | テスト種別 | 方針 | コマンド |
-| --- | --- | --- | --- |
-| domain/models, domain/services | ユニットテスト | 全ロジック必須。外部依存なし | `pnpm test` |
-| application/usecases | ユニットテスト | gateway をモックして処理フロー検証 | `pnpm test` |
-| infrastructure/repositories | インテグレーションテスト | 実際の Supabase に対して実行 | `pnpm test` |
-| presentation/routes | E2E テスト | Hono テストクライアントで結合テスト | `pnpm test` |
+### レイヤーごとのテスト方針
 
-### テストファイル配置
+| レイヤー | テスト種別 | 方針 |
+| --- | --- | --- |
+| domain (models, services) | ユニットテスト | 全ロジック必須。外部依存なし |
+| application (usecases) | ユニットテスト | gateway をモックして処理フロー検証 |
+| infrastructure (repositories) | インテグレーションテスト | 実際の DB に対して実行 |
+| presentation (routes) | E2E テスト | テストクライアントで結合テスト |
 
-ソースと同一ディレクトリに `*.test.ts` として配置する。
+**なぜこの分け方か**: domain と application は外部依存がないため高速に実行でき、頻繁に回せる。infrastructure は実 DB が必要なため実行コストが高いが、ORM/クエリの正しさは単体テストでは検証できない。
 
-```
-domain/services/
-  snapshot-restoration.service.ts
-  snapshot-restoration.service.test.ts      ← ここ
-```
-
-### テスト作成ルール
+### テスト作成の原則
 
 - Result<T, E> の success / error 両方のケースをカバーする
 - ドメインモデルの create() でバリデーション境界値をテストする
 - テストデータは最小限にし、テスト対象に直接関係するフィールドだけ設定する
+- テストファイルはソースと同一ディレクトリに `*.test.ts` として配置する
 
 ---
 
 ## ガードレールスタック
 
-### Git フック（品質チェックの3段構え）
+### 原則
 
-| タイミング | チェック | ツール |
+「LLM に頼むより道具に強制する」 — CLAUDE.md に「lint しろ」と書くのと、Hook が lint を実行するのでは、「ほぼ毎回」と「例外なく毎回」の差がある。
+
+### 3段構えの品質チェック
+
+| タイミング | チェック | なぜこのタイミングか |
 | --- | --- | --- |
-| pre-commit | 変更ファイルのみフォーマット + lint | lint-staged + Biome |
-| pre-push | 全体 lint + typecheck | Biome + TypeScript |
-| CI | lint + typecheck + test + dep-cruise + knip | 全ツール |
+| pre-commit | 変更ファイルのフォーマット + lint | コミットごとにコードスタイルを統一 |
+| pre-push | 全体 lint + typecheck | push 前に型エラーを防ぐ |
+| CI | lint + typecheck + test + dep-cruise + knip | PR マージ前に全品質を保証 |
 
 **`--no-verify` は原則禁止。** フック失敗時は必ず修正する。
 
-### CI（GitHub Actions）
+### 自動検証ツール
 
-PR と main push で5つのジョブを並列実行:
-
-| ジョブ | コマンド | 検証内容 |
+| ツール | 検証内容 | なぜ必要か |
 | --- | --- | --- |
-| lint | `pnpm lint` | Biome フォーマット + lint |
-| typecheck | `pnpm typecheck` | TypeScript 型チェック |
-| test | `pnpm test` | Vitest テスト |
-| dependency-check | `pnpm dep-cruise` | DDD レイヤー依存違反 |
-| knip | `pnpm knip` | 未使用 export / ファイル |
+| Biome | フォーマット + lint | コードスタイル統一、未使用 import 検出 |
+| TypeScript `--noEmit` | 型チェック | 型安全性の保証 |
+| Vitest | テスト | ロジックの正しさ |
+| dependency-cruiser | DDD レイヤー依存 | アーキテクチャ違反の機械的検出 |
+| Knip | デッドコード | 未使用 export・ファイルの蓄積防止 |
 
-### dependency-cruiser（DDD レイヤー強制）
-
-`apps/server/.dependency-cruiser.cjs` で以下を禁止:
+### dependency-cruiser の禁止ルール
 
 ```
-domain/ → infrastructure/        ❌
-domain/ → presentation/          ❌
-domain/ → application/           ❌
-application/ → infrastructure/   ❌（gateway IF 経由のみ）
-presentation/ → infrastructure/  ⚠️ DI 組み立てのみ
-コンテキスト間の直接依存          ❌（shared/ 経由のみ）
-循環依存                          ❌
+domain → 他層                    ❌ domain の純粋性を守る
+application → infrastructure     ❌ gateway IF 経由のみ
+コンテキスト間の直接依存          ❌ shared 経由のみ
+循環依存                          ❌ 依存グラフの健全性
 ```
 
 ---
 
 ## コーディング規約
 
-| 項目 | ルール |
-| --- | --- |
-| フォーマッタ | Biome（シングルクォート、セミコロン、2スペースインデント） |
-| 1 ユースケース | 1 ファイル |
-| `any` 型 | 禁止（`unknown` + 型の絞り込みを使う） |
-| `console.log` | 本番コード禁止 |
-| main への直接 push | 禁止 |
-
----
-
-## コマンド一覧
-
-```bash
-pnpm test               # テスト実行
-pnpm typecheck           # 型チェック
-pnpm lint               # Biome lint
-pnpm lint:fix           # Biome 自動修正
-pnpm dep-cruise         # DDD レイヤー依存チェック
-pnpm knip               # デッドコード検出
-```
+| 項目 | ルール | なぜ |
+| --- | --- | --- |
+| フォーマッタ | Biome（シングルクォート、セミコロン、2スペース） | Biome で自動統一 |
+| 1 ユースケース = 1 ファイル | ファイル名がユースケース名と一致 | 見通しの良さ、並列開発の容易さ |
+| `any` 型禁止 | `unknown` + 型の絞り込みを使う | 型安全性 |
+| `console.log` 禁止 | 適切なエラーハンドリング | 本番環境での情報漏洩防止 |
+| main への直接 push 禁止 | PR 経由のみ | レビュー・CI を必ず通す |
