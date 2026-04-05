@@ -53,16 +53,4 @@ Feature-Sliced Architecture:
 
 ## Design Docs (SSoT)
 
-設計判断の正はすべて `docs/` 配下にある。
-
-| ドキュメント | 内容 |
-| --- | --- |
-| `docs/backend-architecture-guide.md` | レイヤー依存、ドメインモデル、エラー処理、命名規則 |
-| `docs/backend-testing-guide.md` | テスト戦略、ガードレール、CI |
-| `docs/entry-backend-guide.md` | Entry コンテキスト実装ガイド |
-| `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
-| `docs/client-architecture-guide.md` | Feature-Sliced 構造、インポートルール、データフェッチング |
-| `docs/client-testing-guide.md` | フロントエンドテスト戦略、ガードレール |
-| `docs/shared-package-guide.md` | @oryzae/shared の使用ルール |
-| `docs/infra-guide.md` | Vercel + Supabase デプロイ |
-| `docs/archive/` | 過去の設計指示書 |
+設計判断の正はすべて `docs/` 配下にある。実装前に必ず該当ドキュメントを確認すること。一覧は `README.md` を参照。
