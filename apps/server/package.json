@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
+    "@oryzae/shared": "workspace:*",
     "@supabase/supabase-js": "^2.49.0",
     "hono": "^4.7.0",
     "zod": "^3.24.0"

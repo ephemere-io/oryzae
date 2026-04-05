@@ -1,0 +1,2 @@
+export const MAX_CONTENT_LENGTH = 100_000;
+export const MAX_QUESTION_STRING_LENGTH = 64;
