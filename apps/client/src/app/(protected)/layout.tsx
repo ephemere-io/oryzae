@@ -11,47 +11,16 @@ import {
   useSidebar,
 } from '@/lib/sidebar-context';
 
-function SidebarTrigger() {
-  const { toggle } = useSidebar();
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-      title="サイドバーを切替 (⌘B)"
-    >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-4 w-4"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path d="M9 3v18" />
-      </svg>
-    </button>
-  );
-}
-
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
   const sidebarWidth = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
 
   return (
     <main
-      className="flex flex-1 flex-col overflow-auto transition-[margin-left] duration-200 ease-linear"
-      // @type-assertion-allowed: CSS custom properties require CSSProperties cast
+      className="flex-1 overflow-auto transition-[margin-left] duration-200 ease-linear"
       style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
     >
-      {/* Top bar with sidebar trigger */}
-      <div className="flex items-center px-4 py-2">
-        <SidebarTrigger />
-      </div>
-      <div className="mx-auto w-full max-w-4xl flex-1 px-4 pb-6">{children}</div>
+      <div className="mx-auto w-full max-w-4xl px-4 py-6">{children}</div>
     </main>
   );
 }
