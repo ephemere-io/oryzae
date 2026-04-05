@@ -1,7 +1,8 @@
 {
+  "buildCommand": "",
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "dist/**"
+      "includeFiles": "src/**"
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
