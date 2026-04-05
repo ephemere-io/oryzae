@@ -1,4 +1,5 @@
 {
+  "buildCommand": "",
   "installCommand": "pnpm install --filter @oryzae/server...",
   "functions": {
     "api/**/*.js": {
