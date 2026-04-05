@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Question } from './question';
+import { Question } from '@/contexts/question/domain/models/question';
 
 const generateId = () => 'q-id';
 

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import { Question } from '../../domain/models/question';
-import { QuestionTransaction } from '../../domain/models/question-transaction';
-import { AcceptQuestionProposalUsecase } from './accept-question-proposal.usecase';
+import { AcceptQuestionProposalUsecase } from '@/contexts/question/application/usecases/accept-question-proposal.usecase';
+import type { QuestionRepositoryGateway } from '@/contexts/question/domain/gateways/question-repository.gateway';
+import type { QuestionTransactionRepositoryGateway } from '@/contexts/question/domain/gateways/question-transaction-repository.gateway';
+import { Question } from '@/contexts/question/domain/models/question';
+import { QuestionTransaction } from '@/contexts/question/domain/models/question-transaction';
 
 describe('AcceptQuestionProposalUsecase', () => {
   let questionRepo: QuestionRepositoryGateway;

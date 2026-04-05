@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { QuestionTransaction } from './question-transaction';
+import { QuestionTransaction } from '@/contexts/question/domain/models/question-transaction';
 
 const generateId = () => 'qt-id';
 
