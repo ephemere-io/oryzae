@@ -2,29 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-
-// ── Context ──────────────────────────────────────────────────────────────────
-
-interface SidebarContextValue {
-  expanded: boolean;
-  toggle: () => void;
-}
-
-const SidebarContext = createContext<SidebarContextValue>({
-  expanded: false,
-  toggle: () => {},
-});
-
-export function useSidebar() {
-  return useContext(SidebarContext);
-}
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const COLLAPSED_WIDTH = 56; // px (w-14)
-const EXPANDED_WIDTH = 200; // px
+import { COLLAPSED_WIDTH, EXPANDED_WIDTH, SidebarContext } from '@/lib/sidebar-context';
 
 interface NavItem {
   href: string;
@@ -164,27 +144,6 @@ export function Sidebar() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Collapse toggle (chevron) */}
-        <button
-          type="button"
-          onClick={toggle}
-          className="mx-auto mb-2 flex h-7 w-7 items-center justify-center rounded-full text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--accent)]"
-          title={expanded ? '折りたたむ' : '展開する'}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
-
         {/* Logout */}
         <button
           type="button"
@@ -217,5 +176,3 @@ export function Sidebar() {
     </SidebarContext.Provider>
   );
 }
-
-export { COLLAPSED_WIDTH, EXPANDED_WIDTH };
