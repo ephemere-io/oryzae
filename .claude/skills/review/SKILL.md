@@ -20,70 +20,65 @@ allowed-tools: "Bash(git,pnpm) Read Glob Grep Agent"
 
 ### 2. ガイドラインの参照
 
-変更対象のパスに応じて、以下のリファレンスを読み込む:
+変更対象に応じてアーキテクチャドキュメント（SSoT）を読み込む:
 
-- `apps/server/src/contexts/` 配下の変更 → `references/server-architecture.md` を読む
-- 新しい Bounded Context の追加 → `docs/OryzaeArchitecture.md` の「将来のコンテキスト拡張」セクションを確認
+- `apps/server/` 配下の変更 → **`docs/OryzaeArchitecture.md`** を読む
+  - セクション3: レイヤードアーキテクチャ（依存方向、各層の責務）
+  - セクション4: ディレクトリ構成、ファイル命名規則
+  - セクション5: ドメインモデルパターン（create/fromProps/withXxx/toProps）
+  - セクション6: エラーハンドリング（Result → throw → HTTP 変換）
+  - セクション9: ガードレール（テスト方針、コーディング規約）
+- 新しい Bounded Context の追加 → セクション12: 将来のコンテキスト拡張
 
 ### 3. レビュー実施
 
-以下の **全観点** でレビューする。該当しない観点はスキップしてよい。
+`docs/OryzaeArchitecture.md` の各セクションに照らし、以下の観点でレビューする。
 
-#### A. レイヤー依存（最重要）
+#### A. レイヤー依存（セクション3.1, 3.4 参照）
 - domain → application/infrastructure/presentation への依存がないか
 - application → infrastructure への直接依存がないか
 - コンテキスト間の直接依存がないか（shared 経由のみ許容）
-- `pnpm dep-cruise` を実行し、違反がないことを確認
 
-#### B. ドメインモデル
+#### B. ドメインモデル（セクション5 参照）
 - private constructor + create/fromProps/withXxx/toProps パターンに従っているか
-- domain 層で throw していないか（Result<T, E> 型で返すこと）
-- generateId が外部から注入されているか（domain 内で crypto.randomUUID() を直接呼ばない）
+- domain 層で throw していないか（Result<T, E> で返す）
+- generateId が外部から注入されているか
 - 全フィールドが readonly か
 - エラー型がモデルごとの判別共用体 `{ type: string; message: string }` か
 
-#### C. エラーハンドリング
-- domain: `ok()`/`err()` で Result を返しているか
-- application: `result.success` を検査し、失敗時に `ApplicationError` 継承クラスを throw しているか
-- presentation: `errorHandler` で HTTP レスポンスに変換しているか
-- エラークラスに `statusCode` があるか
+#### C. エラーハンドリング（セクション6 参照）
+- domain: ok()/err() で Result を返しているか
+- application: result.success を検査し ApplicationError 継承クラスを throw しているか
+- エラークラスに statusCode があるか
 
-#### D. ゲートウェイと依存性逆転
+#### D. ゲートウェイと依存性逆転（セクション5 参照）
 - gateway IF が domain/gateways/ にあるか
 - gateway IF が class インスタンスを受け渡ししているか（Props ではなく）
-- infrastructure が gateway IF を `implements` しているか
-- repository に `toDomain()` メソッドで DB → class 変換があるか
-- repository で `toProps()` を使って class → DB 変換しているか
+- infrastructure が toProps()/fromProps() で変換しているか
 
-#### E. ユースケース
+#### E. ユースケース（セクション3.2 参照）
 - 1 ユースケース = 1 ファイルか
-- コンストラクタで gateway IF を受け取っているか
-- `generateId` をコンストラクタで受け取っているか（必要な場合）
-- レスポンスが `toProps()` でプレーンオブジェクトに変換されているか
+- コンストラクタで gateway IF + generateId を受け取っているか
+- レスポンスが toProps() でプレーンオブジェクトに変換されているか
 
-#### F. プレゼンテーション層
+#### F. プレゼンテーション層（セクション3.2 参照）
 - Zod でリクエストバリデーションしているか
-- DI 組み立て（new Repository, new Usecase）がルートファイル内で完結しているか
+- DI 組み立てがルートファイル内で完結しているか
 - ビジネスロジックがルートファイルに漏れていないか
 
-#### G. 命名規則
-- `{動詞}-{対象}.usecase.ts`、`{モデル名}.ts`、`{対象}.service.ts` 等に従っているか
-- ファイル名とクラス名が一致しているか
+#### G. 命名規則（セクション4 参照）
+- ファイル命名規則に従っているか
 
-#### H. テスト
-- domain service に対するユニットテストがあるか
-- テストファイルがソースと同一ディレクトリに配置されているか（`*.test.ts`）
-- テストが Result 型の success/error 両方のケースをカバーしているか
+#### H. テスト（セクション9.2 参照）
+- domain service にユニットテストがあるか
+- Result の success/error 両方のケースをカバーしているか
 
-#### I. コード品質
-- 未使用の export がないか（`pnpm knip` で確認）
-- `any` 型を使っていないか
-- `console.log` が本番コードに残っていないか
-- `--no-verify` を使っていないか
+#### I. コード品質（セクション9 参照）
+- 未使用の export がないか
+- any 型を使っていないか
+- console.log が残っていないか
 
 ### 4. ツールによる自動検証
-
-手動レビューに加え、以下を実行する:
 
 ```bash
 pnpm dep-cruise   # レイヤー依存違反
@@ -94,8 +89,6 @@ pnpm test         # テスト
 ```
 
 ### 5. 結果報告
-
-以下のフォーマットで報告する。重大な問題がない場合は「設計上の問題は見つかりませんでした」と報告する。
 
 ```
 ## レビュー結果
@@ -110,8 +103,8 @@ pnpm test         # テスト
 - [ファイル名:行番号] 問題の説明 + 理由 + 修正案
 
 ### 🔧 自動検証結果
-- dep-cruise: ✅ / ❌（違反内容）
-- knip: ✅ / ❌（未使用コード一覧）
+- dep-cruise: ✅ / ❌
+- knip: ✅ / ❌
 - lint: ✅ / ❌
 - typecheck: ✅ / ❌
 - test: ✅ / ❌

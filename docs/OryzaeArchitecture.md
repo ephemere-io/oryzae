@@ -3,8 +3,8 @@
 ジャーナリング支援アプリ「オリゼー」のサーバーサイドアーキテクチャ。
 本ドキュメントがサーバー設計の **唯一の正** である。
 
-現在のスコープは **entry（ジャーナルエントリ）** に限定する。
-型設計の詳細は `EditorAPIInterfaceDesign.md` を正とする。
+現在のスコープは **entry（ジャーナルエントリ）** と **question（問い）** 。
+型設計の詳細は `docs/archive/EditorAPIInterfaceDesign.md` を参照。
 
 設計思想は [video-processor](https://github.com/team-mirai-volunteer/video-processor/tree/develop) のレイヤードアーキテクチャに基づく。
 参考記事: [超並列LLMコーディングのハーネスエンジニアリング](https://note.com/jujunjun110/n/n66306cab294a)
@@ -544,8 +544,9 @@ contexts/
 
 | ドキュメント | 内容 |
 | --- | --- |
-| `EditorAPIInterfaceDesign.md` | Base Entry / Editor Extension の型分離, DB 設計, 運用例 (Case 1-6) |
-| `CLAUDE.md` | クイックコマンド, ディレクトリ概要, コーディング規約 |
+| `docs/archive/EditorAPIInterfaceDesign.md` | Base Entry / Editor Extension の型分離, DB 設計, 運用例 (Case 1-6) |
+| `docs/archive/question_proposal.md` | 問いモデルの仕様（初期要件） |
+| `docs/archive/oryzae-data-schema.html` | 全テーブルスキーマ（初期設計） |
 
 | 外部リソース | 内容 |
 | --- | --- |

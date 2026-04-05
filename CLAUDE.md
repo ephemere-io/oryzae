@@ -24,21 +24,9 @@ pnpm knip                                   # デッドコード検出
 - 1 ユースケース = 1 ファイル
 - `--no-verify` 禁止
 
-## Directory
+## Design Docs (SSoT)
 
-```
-apps/server/src/contexts/
-  {context}/         # entry, question, ...
-    presentation/    # Hono routes + DI
-    application/     # usecases + errors
-    domain/          # models, services, gateways
-    infrastructure/  # Supabase 実装
-  shared/            # Result型, ApplicationError, auth middleware
-```
+設計判断の正はすべて `docs/` 配下にある。
 
-## Docs
-
-- `docs/OryzaeArchitecture.md` — サーバーアーキテクチャ（正）
-- `docs/EditorAPIInterfaceDesign.md` — 型設計
-- `.claude/rules/architecture.md` — レイヤー依存ルール詳細
-- `.claude/rules/quality.md` — 品質ルール
+- **`docs/OryzaeArchitecture.md`** — サーバーアーキテクチャ（正）
+- `docs/archive/` — 過去の設計指示書・初期要件
