@@ -5,7 +5,7 @@
   "scripts": {
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "typecheck": "pnpm --filter @oryzae/server typecheck",
+    "typecheck": "pnpm --filter @oryzae/server typecheck && pnpm --filter @oryzae/shared typecheck && pnpm --filter @oryzae/client typecheck",
     "test": "pnpm --filter @oryzae/server test",
     "knip": "knip",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise",

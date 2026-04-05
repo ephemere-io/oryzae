@@ -5,3 +5,4 @@ dist/
 *.tsbuildinfo
 .turbo/
 .mcp.json
+.next/

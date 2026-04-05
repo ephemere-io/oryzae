@@ -6,6 +6,13 @@
       "project": ["src/**/*.ts"],
       "ignore": ["src/contexts/shared/infrastructure/supabase-client.ts"],
       "vitest": true
+    },
+    "apps/client": {
+      "next": true
+    },
+    "packages/shared": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
     }
   }
 }
