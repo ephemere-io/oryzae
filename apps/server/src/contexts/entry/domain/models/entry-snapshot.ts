@@ -8,7 +8,7 @@ export interface EntrySnapshotProps {
   createdAt: string;
 }
 
-export interface CreateEntrySnapshotParams {
+interface CreateEntrySnapshotParams {
   entryId: string;
   content: string;
   editorType: string;
@@ -35,10 +35,7 @@ export class EntrySnapshot {
     this.createdAt = props.createdAt;
   }
 
-  static create(
-    params: CreateEntrySnapshotParams,
-    generateId: () => string,
-  ): EntrySnapshot {
+  static create(params: CreateEntrySnapshotParams, generateId: () => string): EntrySnapshot {
     return new EntrySnapshot({
       id: generateId(),
       entryId: params.entryId,

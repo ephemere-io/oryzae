@@ -1,6 +1,6 @@
+import type { EntryRepositoryGateway } from '../../../entry/domain/gateways/entry-repository.gateway';
 import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway';
 import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { EntryRepositoryGateway } from '../../../entry/domain/gateways/entry-repository.gateway';
 import { QuestionNotFoundError } from '../errors/question.errors';
 
 export class LinkQuestionToEntryUsecase {

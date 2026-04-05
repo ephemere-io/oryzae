@@ -1,5 +1,5 @@
-import type { Context, Next } from 'hono';
 import { createClient } from '@supabase/supabase-js';
+import type { Context, Next } from 'hono';
 
 export async function authMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');

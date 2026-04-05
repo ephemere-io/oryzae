@@ -2,10 +2,7 @@ import type { EntryRepositoryGateway } from '../../domain/gateways/entry-reposit
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
 import type { EntryProps } from '../../domain/models/entry';
 import { EntrySnapshot } from '../../domain/models/entry-snapshot';
-import {
-  EntryNotFoundError,
-  EntryValidationError,
-} from '../errors/entry.errors';
+import { EntryNotFoundError, EntryValidationError } from '../errors/entry.errors';
 
 interface UpdateEntryInput {
   content: string;
@@ -22,17 +19,11 @@ export class UpdateEntryUsecase {
     private generateId: () => string,
   ) {}
 
-  async execute(
-    entryId: string,
-    input: UpdateEntryInput,
-  ): Promise<EntryProps> {
+  async execute(entryId: string, input: UpdateEntryInput): Promise<EntryProps> {
     const existing = await this.entryRepo.findById(entryId);
     if (!existing) throw new EntryNotFoundError(entryId);
 
-    const updatedResult = existing.withContent(
-      input.content,
-      input.mediaUrls,
-    );
+    const updatedResult = existing.withContent(input.content, input.mediaUrls);
     if (!updatedResult.success) {
       throw new EntryValidationError(updatedResult.error.message);
     }

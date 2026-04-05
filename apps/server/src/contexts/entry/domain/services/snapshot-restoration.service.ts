@@ -1,7 +1,7 @@
+import { err, ok, type Result } from '../../../shared/domain/types/result';
 import type { EntrySnapshot } from '../models/entry-snapshot';
-import { type Result, ok, err } from '../../../shared/domain/types/result';
 
-export type SnapshotRestorationError = 'no-snapshot' | 'editor-mismatch';
+type SnapshotRestorationError = 'no-snapshot' | 'editor-mismatch';
 
 /**
  * エディタスイッチ時の extension 復元判定。

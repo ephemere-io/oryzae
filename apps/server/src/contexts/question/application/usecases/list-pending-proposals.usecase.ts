@@ -19,11 +19,9 @@ export class ListPendingProposalsUsecase {
     const results: PendingProposal[] = [];
 
     // New question proposals (question itself is unvalidated)
-    const pendingQuestions =
-      await this.questionRepo.listPendingByUserId(userId);
+    const pendingQuestions = await this.questionRepo.listPendingByUserId(userId);
     for (const q of pendingQuestions) {
-      const tx =
-        await this.transactionRepo.findLatestByQuestionId(q.id);
+      const tx = await this.transactionRepo.findLatestByQuestionId(q.id);
       if (tx) {
         results.push({
           question: q.toProps(),
@@ -35,14 +33,11 @@ export class ListPendingProposalsUsecase {
     }
 
     // Text update proposals (question is validated, but has unvalidated transaction)
-    const activeQuestions =
-      await this.questionRepo.listActiveByUserId(userId);
+    const activeQuestions = await this.questionRepo.listActiveByUserId(userId);
     for (const q of activeQuestions) {
-      const unvalidatedTx =
-        await this.transactionRepo.findLatestUnvalidatedByQuestionId(q.id);
+      const unvalidatedTx = await this.transactionRepo.findLatestUnvalidatedByQuestionId(q.id);
       if (unvalidatedTx) {
-        const currentTx =
-          await this.transactionRepo.findLatestValidatedByQuestionId(q.id);
+        const currentTx = await this.transactionRepo.findLatestValidatedByQuestionId(q.id);
         results.push({
           question: q.toProps(),
           proposedText: unvalidatedTx.string,

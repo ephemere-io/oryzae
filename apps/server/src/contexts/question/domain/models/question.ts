@@ -8,7 +8,7 @@ export interface QuestionProps {
   updatedAt: string;
 }
 
-export interface CreateQuestionParams {
+interface CreateQuestionParams {
   userId: string;
   isProposedByOryzae: boolean;
 }
@@ -32,10 +32,7 @@ export class Question {
     this.updatedAt = props.updatedAt;
   }
 
-  static create(
-    params: CreateQuestionParams,
-    generateId: () => string,
-  ): Question {
+  static create(params: CreateQuestionParams, generateId: () => string): Question {
     const now = new Date().toISOString();
     return new Question({
       id: generateId(),

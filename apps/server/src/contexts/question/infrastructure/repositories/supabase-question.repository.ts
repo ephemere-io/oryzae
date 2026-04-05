@@ -6,11 +6,7 @@ export class SupabaseQuestionRepository implements QuestionRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
 
   async findById(id: string): Promise<Question | null> {
-    const { data, error } = await this.supabase
-      .from('questions')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data, error } = await this.supabase.from('questions').select('*').eq('id', id).single();
 
     if (error || !data) return null;
     return this.toDomain(data);
@@ -79,10 +75,7 @@ export class SupabaseQuestionRepository implements QuestionRepositoryGateway {
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('questions')
-      .delete()
-      .eq('id', id);
+    const { error } = await this.supabase.from('questions').delete().eq('id', id);
     if (error) throw error;
   }
 

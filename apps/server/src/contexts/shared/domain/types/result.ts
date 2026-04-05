@@ -1,6 +1,4 @@
-export type Result<T, E> =
-  | { success: true; value: T }
-  | { success: false; error: E };
+export type Result<T, E> = { success: true; value: T } | { success: false; error: E };
 
 export function ok<T, E>(value: T): Result<T, E> {
   return { success: true, value };

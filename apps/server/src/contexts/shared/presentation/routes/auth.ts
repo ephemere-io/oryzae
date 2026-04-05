@@ -1,6 +1,6 @@
+import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { createClient } from '@supabase/supabase-js';
 
 const authRoutes = new Hono();
 
@@ -71,9 +71,7 @@ authRoutes.post('/login', async (c) => {
 
 // POST /auth/refresh
 authRoutes.post('/refresh', async (c) => {
-  const { refreshToken } = z
-    .object({ refreshToken: z.string() })
-    .parse(await c.req.json());
+  const { refreshToken } = z.object({ refreshToken: z.string() }).parse(await c.req.json());
   const supabase = getSupabaseAuthClient();
 
   const { data, error } = await supabase.auth.refreshSession({
