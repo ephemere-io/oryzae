@@ -8,8 +8,6 @@ export const createEntrySchema = z.object({
   extension: z.record(z.unknown()).default({}),
 });
 
-export const updateEntrySchema = createEntrySchema;
-
 export const questionStringSchema = z.object({
   string: z.string().min(1).max(64),
 });

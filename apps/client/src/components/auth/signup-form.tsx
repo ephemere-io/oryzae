@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 
 export function SignupForm() {
   const [email, setEmail] = useState('');
@@ -11,23 +11,21 @@ export function SignupForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const { signup } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({ email, password });
-
-    if (error) {
-      setError(error.message);
+    const err = await signup(email, password);
+    if (err) {
+      setError(err);
       setLoading(false);
       return;
     }
 
     router.push('/entries');
-    router.refresh();
   }
 
   return (

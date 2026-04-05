@@ -1,4 +1,4 @@
-import { createEntrySchema, updateEntrySchema } from '@oryzae/shared';
+import { createEntrySchema } from '@oryzae/shared';
 import { Hono } from 'hono';
 import { CreateEntryUsecase } from '../../application/usecases/create-entry.usecase.js';
 import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase.js';
@@ -53,7 +53,7 @@ export const entries = new Hono<Env>()
     return c.json(result);
   })
   .put('/:id', async (c) => {
-    const body = updateEntrySchema.parse(await c.req.json());
+    const body = createEntrySchema.parse(await c.req.json());
     const supabase = c.get('supabase');
     const entryRepo = new SupabaseEntryRepository(supabase);
     const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);

@@ -1,15 +1,19 @@
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+'use client';
 
-export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { getAccessToken } from '@/lib/auth';
 
-  if (user) {
-    redirect('/entries');
-  } else {
-    redirect('/login');
-  }
+export default function HomePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      router.replace('/entries');
+    } else {
+      router.replace('/login');
+    }
+  }, [router]);
+
+  return null;
 }

@@ -11,7 +11,6 @@
       "next": true
     },
     "packages/shared": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     }
   }

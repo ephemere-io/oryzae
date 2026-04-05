@@ -1,16 +1,29 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Header } from '@/components/layout/header';
-import { createClient } from '@/lib/supabase/server';
+import { useAuth } from '@/hooks/use-auth';
 
-export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const { auth, loading } = useAuth();
+  const router = useRouter();
 
-  if (!user) {
-    redirect('/login');
+  useEffect(() => {
+    if (!loading && !auth) {
+      router.push('/login');
+    }
+  }, [loading, auth, router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-full items-center justify-center">
+        <p className="text-sm text-zinc-500">読み込み中...</p>
+      </div>
+    );
   }
+
+  if (!auth) return null;
 
   return (
     <>

@@ -13,11 +13,11 @@ export function EntryEditor({ entryId, initialContent = '' }: EntryEditorProps) 
   const [content, setContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { api, session } = useAuth();
+  const { api, auth } = useAuth();
   const router = useRouter();
 
   async function handleSave() {
-    if (!api || !session || !content.trim()) return;
+    if (!api || !auth || !content.trim()) return;
     setSaving(true);
     setError('');
 
@@ -31,7 +31,7 @@ export function EntryEditor({ entryId, initialContent = '' }: EntryEditorProps) 
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${auth.accessToken}`,
     };
 
     if (entryId) {
