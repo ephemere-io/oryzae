@@ -2,6 +2,10 @@
 
 ジャーナリング支援アプリのバックエンド。
 
+設計・実装で迷ったら以下を思想の拠り所にすること:
+- [video-processor](https://github.com/team-mirai-volunteer/video-processor/tree/develop) — 参考実装（DDD + レイヤードアーキテクチャ）
+- [超並列LLMコーディングのハーネスエンジニアリング](https://note.com/jujunjun110/n/n66306cab294a) — ガードレール・並列開発の設計思想
+
 ## Commands
 
 ```bash
