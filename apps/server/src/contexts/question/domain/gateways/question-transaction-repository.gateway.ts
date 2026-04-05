@@ -1,4 +1,4 @@
-import type { QuestionTransaction } from '../models/question-transaction';
+import type { QuestionTransaction } from '../models/question-transaction.js';
 
 export interface QuestionTransactionRepositoryGateway {
   listByQuestionId(questionId: string): Promise<QuestionTransaction[]>;

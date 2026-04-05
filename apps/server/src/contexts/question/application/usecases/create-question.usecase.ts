@@ -1,8 +1,8 @@
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import { Question, type QuestionProps } from '../../domain/models/question';
-import { QuestionTransaction } from '../../domain/models/question-transaction';
-import { QuestionLimitExceededError, QuestionValidationError } from '../errors/question.errors';
+import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
+import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway.js';
+import { Question, type QuestionProps } from '../../domain/models/question.js';
+import { QuestionTransaction } from '../../domain/models/question-transaction.js';
+import { QuestionLimitExceededError, QuestionValidationError } from '../errors/question.errors.js';
 
 interface CreateQuestionInput {
   string: string;

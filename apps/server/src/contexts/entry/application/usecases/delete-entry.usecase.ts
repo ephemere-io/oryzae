@@ -1,5 +1,5 @@
-import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
-import { EntryNotFoundError } from '../errors/entry.errors';
+import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
+import { EntryNotFoundError } from '../errors/entry.errors.js';
 
 export class DeleteEntryUsecase {
   constructor(private entryRepo: EntryRepositoryGateway) {}

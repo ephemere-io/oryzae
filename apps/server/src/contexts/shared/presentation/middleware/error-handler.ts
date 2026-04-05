@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { ApplicationError } from '../../application/errors/application.errors';
+import { ApplicationError } from '../../application/errors/application.errors.js';
 
 export function errorHandler(err: Error, c: Context) {
   if (err instanceof ApplicationError) {
