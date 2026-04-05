@@ -2,13 +2,35 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import {
-  COLLAPSED_WIDTH,
-  EXPANDED_WIDTH,
-  Sidebar,
-  useSidebar,
-} from '@/features/auth/components/sidebar';
+import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/lib/sidebar-context';
+
+function SidebarTrigger() {
+  const { toggle } = useSidebar();
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+      title="サイドバーを切替 (⌘B)"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M9 3v18" />
+      </svg>
+    </button>
+  );
+}
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
@@ -16,14 +38,14 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
   return (
     <main
-      className="flex-1 overflow-auto transition-[margin-left] duration-200 ease-linear"
-      style={
-        {
-          '--sidebar-width': `${sidebarWidth}px`,
-        } as React.CSSProperties
-      }
+      className="flex flex-1 flex-col overflow-auto transition-[margin-left] duration-200 ease-linear"
+      style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
     >
-      <div className="mx-auto w-full max-w-4xl px-4 py-6">{children}</div>
+      {/* Top bar with sidebar trigger */}
+      <div className="flex items-center px-4 py-2">
+        <SidebarTrigger />
+      </div>
+      <div className="mx-auto w-full max-w-4xl flex-1 px-4 pb-6">{children}</div>
     </main>
   );
 }
