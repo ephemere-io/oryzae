@@ -1,35 +1,35 @@
-# Quality Rules
+# 品質ルール
 
-## Before Committing
+## コミット前チェック
 
-Run all checks. Fix failures — do not skip with `--no-verify`.
+全チェックを実行し、失敗したら修正する。`--no-verify` で回避しない。
 
 ```bash
-pnpm typecheck    # TypeScript
-pnpm lint         # Biome
-pnpm test         # Vitest
-pnpm dep-cruise   # DDD layer check
+pnpm typecheck    # TypeScript 型チェック
+pnpm lint         # Biome lint
+pnpm test         # Vitest テスト
+pnpm dep-cruise   # DDD レイヤー依存チェック
 ```
 
-## Code Style
+## コードスタイル
 
-- Biome handles formatting (single quotes, semicolons, 2-space indent)
-- Do not add comments to obvious code
-- Do not add docstrings unless the logic is non-obvious
-- 1 usecase = 1 file
+- Biome がフォーマットを担当（シングルクォート、セミコロン、2スペースインデント）
+- 自明なコードにコメントを付けない
+- ロジックが非自明な場合のみ docstring を付ける
+- 1 ユースケース = 1 ファイル
 
-## Testing
+## テスト方針
 
-| Layer | Type | Required |
-|-------|------|----------|
-| domain/models, domain/services | Unit test | Yes |
-| application/usecases | Unit test (mocked gateways) | When complex |
-| infrastructure | Integration test | When feasible |
-| presentation | E2E | When feasible |
+| レイヤー | テスト種別 | 必須度 |
+|---------|----------|-------|
+| domain/models, domain/services | ユニットテスト | 必須 |
+| application/usecases | ユニットテスト（gateway モック） | 複雑なロジック時 |
+| infrastructure | インテグレーションテスト | 可能な場合 |
+| presentation | E2E テスト | 可能な場合 |
 
-## Prohibited
+## 禁止事項
 
-- `--no-verify` on git commands
-- `any` type (use `unknown` + type narrowing)
-- `console.log` in production code (use proper error handling)
-- Direct push to main
+- `--no-verify` の使用
+- `any` 型の使用（`unknown` + 型の絞り込みを使う）
+- 本番コードでの `console.log`（適切なエラーハンドリングを使う）
+- main への直接 push

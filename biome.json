@@ -33,7 +33,8 @@
       "!**/.next",
       "!**/coverage",
       "!**/pnpm-lock.yaml",
-      "!**/docs"
+      "!**/docs",
+      "!**/.claude"
     ]
   }
 }
