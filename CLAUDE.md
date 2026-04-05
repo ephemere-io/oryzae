@@ -32,12 +32,12 @@ pnpm knip                                   # デッドコード検出
 
 ### Frontend (`apps/client`)
 
-Feature-Sliced Architecture:
+Feature-Sliced Architecture + Hono 内蔵:
 
-- `app/` — Next.js ページ（薄いラッパー、API 呼び出し禁止）
-- `features/` — 機能スライス（components, hooks, types）
-- `components/ui/` — 汎用 UI（feature 依存禁止）
-- `lib/` — 横断ユーティリティ
+- `app/` — Next.js ページ + API Route Handler（Hono を内蔵）
+- `features/` — 機能スライス（components, hooks）
+- `lib/` — 横断ユーティリティ（API クライアント、トークン管理）
+- API は同一オリジン（`/api/v1/*` → Hono `app.fetch()`）
 
 ### Shared (`packages/shared`)
 
@@ -49,7 +49,7 @@ Feature-Sliced Architecture:
 
 - `--no-verify` 禁止
 - `any` 型禁止
-- `as` キャスト禁止（型ガードを使う）
+- `as` キャスト原則禁止（ブラウザ API 型不足は例外、理由をコメント）
 
 ## Design Docs (SSoT)
 

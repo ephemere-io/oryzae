@@ -5,35 +5,28 @@
 
 ## ディレクトリ構造
 
-- `app/` — Next.js App Router ページ。薄いラッパーのみ。**API 呼び出し禁止**
-- `features/X/` — 機能スライス。components, hooks, types を含む
-- `components/ui/` — 汎用 UI コンポーネント。feature 依存禁止
-- `lib/` — 横断的ユーティリティ（API クライアント等）
+- `app/` — Next.js App Router ページ + API Route Handler
+- `app/api/[...path]/` — Hono アプリへのリクエスト転送（変更しない）
+- `features/X/` — 機能スライス。components, hooks を含む
+- `lib/` — 横断的ユーティリティ（API クライアント、トークン管理等）
 
 ## インポートルール（dependency-cruiser で機械的に検証）
 
 - `features/X` → `features/Y` **禁止**（機能間の直接依存禁止）
-- `components/ui` → `features/`, `app/` **禁止**
-- `lib/` → `features/`, `app/`, `components/` **禁止**
-- `app/` からは `features/`, `components/ui/`, `lib/` のみインポート可
+- `lib/` → `features/`, `app/` **禁止**
+- `app/` からは `features/`, `lib/` のみインポート可
 
 ## データフェッチング
 
 - API 呼び出しは `features/X/hooks/` の Custom Hook に集約する
-- コンポーネントから直接 `api.api.v1...` を呼ばない
-- hooks は `{ data, error, loading }` パターンで返す
-- `fetch()` を直接使わない。`createApiClient()` の Hono RPC クライアントを使う
+- コンポーネントから直接 API を呼ばない
+- `lib/api.ts` の `createApiClient()` を使う（同一オリジン、ベース URL 不要）
 
 ## 型安全性
 
-- レスポンスの **`as` キャストは禁止**。Hono RPC の型推論を活用する
-- 型が合わない場合は型ガードを書く
+- **`as` キャストは原則禁止**。型が合わない場合は型ガードを書く
+- **例外**: ブラウザ API の型不足（Web Speech API, InputEvent, CompositionEvent 等）は `as` を許可。理由をコメントに記載する
 - `any` 型は使用禁止（`unknown` + 型ガードで対処）
-
-## バリデーション
-
-- `@oryzae/shared` の Zod スキーマをクライアントでも使う（SSoT）
-- HTML5 バリデーション属性だけに依存しない
 
 ## テスト
 
