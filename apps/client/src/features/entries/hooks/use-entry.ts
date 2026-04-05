@@ -21,7 +21,7 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
   useEffect(() => {
     if (authLoading || !api) return;
 
-    api.api.v1.entries[':id'].$get({ param: { id } }).then(async (res) => {
+    api.fetch(`/api/v1/entries/${id}`).then(async (res) => {
       if (res.ok) {
         const data = await res.json();
         if ('entry' in data && data.entry != null) {
@@ -41,80 +41,48 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
   return { entry, loading };
 }
 
-export function useSaveEntry(api: ApiClient | null, auth: AuthState | null) {
+export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const save = useCallback(
-    async (content: string, entryId?: string): Promise<boolean> => {
-      if (!api || !auth || !content.trim()) return false;
+    async (content: string, entryId?: string): Promise<string | null> => {
+      if (!api || !content.trim()) return null;
       setSaving(true);
       setError('');
 
-      const emptyMediaUrls: string[] = [];
-      const body = {
+      const body = JSON.stringify({
         content,
-        mediaUrls: emptyMediaUrls,
+        mediaUrls: [],
         editorType: 'plaintext',
         editorVersion: '1.0.0',
         extension: {},
-      };
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${auth.accessToken}`,
-      };
+      });
 
       if (entryId) {
-        const url = api.api.v1.entries[':id'].$url({
-          param: { id: entryId },
-        });
-        const res = await fetch(url, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(body),
-        });
+        const res = await api.fetch(`/api/v1/entries/${entryId}`, { method: 'PUT', body });
         if (!res.ok) {
           setError('保存に失敗しました');
           setSaving(false);
-          return false;
+          return null;
         }
-      } else {
-        const url = api.api.v1.entries.$url();
-        const res = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          setError('作成に失敗しました');
-          setSaving(false);
-          return false;
-        }
+        setSaving(false);
+        return entryId;
       }
 
+      const res = await api.fetch('/api/v1/entries', { method: 'POST', body });
+      if (!res.ok) {
+        setError('作成に失敗しました');
+        setSaving(false);
+        return null;
+      }
+
+      const data = (await res.json()) as { id: string };
       setSaving(false);
-      return true;
-    },
-    [api, auth],
-  );
-
-  return { save, saving, error };
-}
-
-export function useDeleteEntry(api: ApiClient | null) {
-  const [deleting, setDeleting] = useState(false);
-
-  const remove = useCallback(
-    async (id: string): Promise<boolean> => {
-      if (!api) return false;
-      setDeleting(true);
-      await api.api.v1.entries[':id'].$delete({ param: { id } });
-      setDeleting(false);
-      return true;
+      return data.id;
     },
     [api],
   );
 
-  return { remove, deleting };
+  return { save, saving, error };
 }

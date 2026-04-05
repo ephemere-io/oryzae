@@ -6,3 +6,4 @@ dist/
 .turbo/
 .mcp.json
 .next/
+docs/reference-ui/

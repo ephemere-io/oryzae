@@ -2,14 +2,25 @@
 
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { EntryEditor } from '@/features/entries/components/entry-editor';
+import { useActiveQuestions } from '@/features/entry-questions/hooks/use-entry-questions';
 
 export default function NewEntryPage() {
-  const { api, auth } = useAuth();
+  const { api, auth, loading } = useAuth();
+  const activeQuestions = useActiveQuestions(api, loading);
+
+  async function handleLinkQuestion(entryId: string, questionId: string) {
+    if (!api) return;
+    await api.fetch(`/api/v1/entries/${entryId}/questions/${questionId}`, {
+      method: 'POST',
+    });
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold">新しいエントリ</h1>
-      <EntryEditor api={api} auth={auth} />
-    </div>
+    <EntryEditor
+      api={api}
+      auth={auth}
+      activeQuestions={activeQuestions}
+      onLinkQuestion={handleLinkQuestion}
+    />
   );
 }

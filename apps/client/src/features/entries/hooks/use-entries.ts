@@ -25,10 +25,10 @@ export function useEntries(api: ApiClient | null, authLoading: boolean) {
       if (!api) return;
       setLoading(true);
 
-      const query: Record<string, string> = { limit: String(PAGE_SIZE) };
-      if (nextCursor) query.cursor = nextCursor;
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+      if (nextCursor) params.set('cursor', nextCursor);
 
-      const res = await api.api.v1.entries.$get({ query });
+      const res = await api.fetch(`/api/v1/entries?${params}`);
 
       if (res.ok) {
         const data = await res.json();
