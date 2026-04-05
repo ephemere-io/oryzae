@@ -221,23 +221,62 @@ export function EntryEditor({
 
         <span className="text-xs text-zinc-400">{dateStr}</span>
 
-        <button
-          type="button"
-          onClick={() => router.push('/entries')}
-          className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-          data-tooltip="一覧に戻る"
-        >
-          <svg
-            aria-hidden="true"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
+        <div className="flex items-center gap-2">
+          {/* Writing direction toggle */}
+          <button
+            type="button"
+            onClick={() =>
+              updateSettings({
+                writingMode: settings.writingMode === 'vertical' ? 'horizontal' : 'vertical',
+              })
+            }
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip={settings.writingMode === 'vertical' ? '横書きに切替' : '縦書きに切替'}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-          </svg>
-        </button>
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+            >
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="18" x2="20" y2="18" />
+            </svg>
+          </button>
+          {/* Font toggle */}
+          <button
+            type="button"
+            onClick={() =>
+              updateSettings({
+                fontFamily: settings.fontFamily === 'serif' ? 'sans' : 'serif',
+              })
+            }
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip={settings.fontFamily === 'serif' ? 'ゴシックに切替' : '明朝に切替'}
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="currentColor"
+              stroke="none"
+              viewBox="0 0 24 24"
+            >
+              <text
+                x="12"
+                y="17"
+                textAnchor="middle"
+                fontSize="16"
+                fontWeight="600"
+                fontFamily="serif"
+              >
+                T
+              </text>
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Question linker */}
@@ -287,7 +326,15 @@ export function EntryEditor({
           }}
           data-placeholder="今日のことを書いてみましょう..."
           className="min-h-full whitespace-pre-wrap bg-transparent px-6 py-6 leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)]"
-          style={{ fontSize: `${settings.fontSize}px` }}
+          style={{
+            fontSize: `${settings.fontSize}px`,
+            writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
+            textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
+            fontFamily:
+              settings.fontFamily === 'serif'
+                ? "'Noto Serif JP', serif"
+                : "'Noto Sans JP', sans-serif",
+          }}
         />
       </div>
 
