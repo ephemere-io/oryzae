@@ -42,7 +42,8 @@
       "!**/coverage",
       "!**/pnpm-lock.yaml",
       "!**/docs",
-      "!**/.claude"
+      "!**/.claude",
+      "!**/next-env.d.ts"
     ]
   }
 }

@@ -20,8 +20,8 @@ export function useAuth() {
     if (token) {
       const client = createApiClient(token);
       setApi(client);
-      client.api.v1.auth.me
-        .$get()
+      client
+        .fetch('/api/v1/auth/me')
         .then(async (res) => {
           if (res.ok) {
             const data = (await res.json()) as { user: { id: string; email: string } };
@@ -38,8 +38,9 @@ export function useAuth() {
 
   async function login(email: string, password: string): Promise<string | null> {
     const client = createApiClient();
-    const res = await client.api.v1.auth.login.$post({
-      json: { email, password },
+    const res = await client.fetch('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
       const data = (await res.json()) as { error: string };
@@ -61,8 +62,9 @@ export function useAuth() {
 
   async function signup(email: string, password: string): Promise<string | null> {
     const client = createApiClient();
-    const res = await client.api.v1.auth.signup.$post({
-      json: { email, password },
+    const res = await client.fetch('/api/v1/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
       const data = (await res.json()) as { error: string };
