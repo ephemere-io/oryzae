@@ -13,6 +13,7 @@ import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
+import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
 import type { ApiClient } from '@/lib/api';
 
@@ -77,6 +78,10 @@ export function EntryEditor({
   useAmpEffect(settings.ampEnabled);
   useTimeInscription(editorRef, settings);
   useEraserTrace(editorRef, traceCanvasRef, settings.eraserTraceEnabled, settings.fontSize);
+  usePressureBleed(
+    editorRef,
+    settings.timeInscriptionEnabled && settings.timeInscriptionMode === 'pressureBleed',
+  );
 
   useEffect(() => {
     const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
