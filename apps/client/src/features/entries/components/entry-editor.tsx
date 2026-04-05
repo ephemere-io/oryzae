@@ -12,6 +12,7 @@ import {
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
+import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
 import type { ApiClient } from '@/lib/api';
 
 interface AuthState {
@@ -72,6 +73,7 @@ export function EntryEditor({
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
+  useTimeInscription(editorRef, settings);
 
   useEffect(() => {
     const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
