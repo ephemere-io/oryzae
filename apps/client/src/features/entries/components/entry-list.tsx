@@ -13,13 +13,13 @@ export function EntryList({ api, authLoading }: EntryListProps) {
   const { entries, loading, hasMore, loadMore } = useEntries(api, authLoading);
 
   if (authLoading || (loading && entries.length === 0)) {
-    return <p className="text-sm text-zinc-500">読み込み中...</p>;
+    return <p className="text-center text-sm text-[var(--date-color)]">読み込み中...</p>;
   }
 
   if (entries.length === 0) {
     return (
-      <p className="text-sm text-zinc-500">
-        まだエントリがありません。最初のエントリを書いてみましょう。
+      <p className="py-12 text-center text-sm text-[var(--date-color)]">
+        エントリーはまだありません
       </p>
     );
   }
@@ -39,7 +39,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
           type="button"
           onClick={loadMore}
           disabled={loading}
-          className="self-center rounded-md border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          className="self-center rounded-full border border-[var(--border-subtle)] px-5 py-1.5 text-sm text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.06)] disabled:opacity-50"
         >
           {loading ? '読み込み中...' : 'もっと見る'}
         </button>
