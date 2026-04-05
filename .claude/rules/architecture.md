@@ -14,4 +14,9 @@ paths:
 - `presentation → application → domain ← infrastructure`
 - domain は何にも依存しない。Result<T,E> で返す。throw 禁止
 - ドメインモデルはリッチクラス（private constructor + create/fromProps/withXxx/toProps）
-- **domain/models と domain/services にはテストが必須**。テストなしのコードはレビューを通さない
+- **domain/models と domain/services のテストは必須**:
+  - 新規ファイル作成時、対応する `.test.ts` を同時に作成すること
+  - create() のバリデーション境界値（成功・各エラー）をテストすること
+  - withXxx() のイミュータブル性をテストすること
+  - fromProps → toProps のラウンドトリップをテストすること
+  - テストなしで作業を完了してはならない
