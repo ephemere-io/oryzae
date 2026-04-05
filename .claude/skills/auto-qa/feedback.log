@@ -1,0 +1,3 @@
+# Auto QA Skill フィードバックログ
+# Phase 5 で自動追記される。各行のフォーマット:
+# YYYY-MM-DD | テスト対象 | 戦略 | 結果(PASS/FAIL/BLOCKED数) | 発見事項
