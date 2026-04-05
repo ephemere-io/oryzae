@@ -2,7 +2,7 @@
   "buildCommand": "",
   "installCommand": "pnpm install --filter @oryzae/server...",
   "functions": {
-    "api/**/*.ts": {
+    "api/**/*.js": {
       "includeFiles": "src/**"
     }
   },
