@@ -60,8 +60,8 @@ export function QuestionTimelineEvent({
             <span className={`inline-block h-2.5 w-2.5 rounded-full ${config.dotColor}`} />
             <span className={`text-xs font-bold ${config.textColor}`}>{config.label}</span>
           </div>
-          <p className="text-base text-zinc-900 dark:text-zinc-100">→ {text}</p>
-          <p className="text-xs text-zinc-400">{config.attribution}</p>
+          <p className="text-base text-[var(--fg)]">→ {text}</p>
+          <p className="text-xs text-[var(--date-color)]">{config.attribution}</p>
         </div>
 
         <div className="flex shrink-0 gap-2 pt-1">
