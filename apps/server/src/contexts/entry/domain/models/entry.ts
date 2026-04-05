@@ -1,10 +1,6 @@
-import {
-  type Result,
-  ok,
-  err,
-} from '../../../shared/domain/types/result';
+import { err, ok, type Result } from '../../../shared/domain/types/result';
 
-export type EntryError =
+type EntryError =
   | { type: 'EMPTY_CONTENT'; message: string }
   | { type: 'CONTENT_TOO_LONG'; message: string };
 
@@ -17,7 +13,7 @@ export interface EntryProps {
   updatedAt: string;
 }
 
-export interface CreateEntryParams {
+interface CreateEntryParams {
   userId: string;
   content: string;
   mediaUrls: string[];
@@ -42,10 +38,7 @@ export class Entry {
     this.updatedAt = props.updatedAt;
   }
 
-  static create(
-    params: CreateEntryParams,
-    generateId: () => string,
-  ): Result<Entry, EntryError> {
+  static create(params: CreateEntryParams, generateId: () => string): Result<Entry, EntryError> {
     const validationError = Entry.validateContent(params.content);
     if (validationError) return err(validationError);
 
@@ -66,10 +59,7 @@ export class Entry {
     return new Entry(props);
   }
 
-  withContent(
-    content: string,
-    mediaUrls: string[],
-  ): Result<Entry, EntryError> {
+  withContent(content: string, mediaUrls: string[]): Result<Entry, EntryError> {
     const validationError = Entry.validateContent(content);
     if (validationError) return err(validationError);
 
@@ -94,9 +84,7 @@ export class Entry {
     };
   }
 
-  private static validateContent(
-    content: string,
-  ): EntryError | null {
+  private static validateContent(content: string): EntryError | null {
     if (content.trim().length === 0) {
       return { type: 'EMPTY_CONTENT', message: 'Content must not be empty' };
     }

@@ -1,10 +1,6 @@
-import {
-  type Result,
-  ok,
-  err,
-} from '../../../shared/domain/types/result';
+import { err, ok, type Result } from '../../../shared/domain/types/result';
 
-export type QuestionTransactionError =
+type QuestionTransactionError =
   | { type: 'EMPTY_STRING'; message: string }
   | { type: 'STRING_TOO_LONG'; message: string };
 
@@ -19,7 +15,7 @@ export interface QuestionTransactionProps {
   updatedAt: string;
 }
 
-export interface CreateQuestionTransactionParams {
+interface CreateQuestionTransactionParams {
   questionId: string;
   string: string;
   questionVersion: number;
@@ -96,9 +92,7 @@ export class QuestionTransaction {
     };
   }
 
-  private static validateString(
-    str: string,
-  ): QuestionTransactionError | null {
+  private static validateString(str: string): QuestionTransactionError | null {
     if (str.trim().length === 0) {
       return { type: 'EMPTY_STRING', message: 'Question text must not be empty' };
     }

@@ -2,10 +2,7 @@ import type { QuestionRepositoryGateway } from '../../domain/gateways/question-r
 import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
 import type { QuestionProps } from '../../domain/models/question';
 import { QuestionTransaction } from '../../domain/models/question-transaction';
-import {
-  QuestionNotFoundError,
-  QuestionValidationError,
-} from '../errors/question.errors';
+import { QuestionNotFoundError, QuestionValidationError } from '../errors/question.errors';
 
 interface EditQuestionInput {
   string: string;
@@ -25,8 +22,7 @@ export class EditQuestionUsecase {
     const question = await this.questionRepo.findById(questionId);
     if (!question) throw new QuestionNotFoundError(questionId);
 
-    const latest =
-      await this.transactionRepo.findLatestByQuestionId(questionId);
+    const latest = await this.transactionRepo.findLatestByQuestionId(questionId);
     const nextVersion = latest ? latest.questionVersion + 1 : 1;
 
     const txResult = QuestionTransaction.create(

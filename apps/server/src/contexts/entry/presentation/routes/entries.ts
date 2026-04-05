@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CreateEntryUsecase } from '../../application/usecases/create-entry.usecase';
+import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase';
 import { GetEntryUsecase } from '../../application/usecases/get-entry.usecase';
 import { ListEntriesUsecase } from '../../application/usecases/list-entries.usecase';
 import { UpdateEntryUsecase } from '../../application/usecases/update-entry.usecase';
-import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase';
 import { SupabaseEntryRepository } from '../../infrastructure/repositories/supabase-entry.repository';
 import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository';
 
@@ -47,11 +47,7 @@ entries.get('/', async (c) => {
   const entryRepo = new SupabaseEntryRepository(supabase);
   const usecase = new ListEntriesUsecase(entryRepo);
 
-  const result = await usecase.execute(
-    c.get('userId'),
-    cursor,
-    limit ? Number(limit) : undefined,
-  );
+  const result = await usecase.execute(c.get('userId'), cursor, limit ? Number(limit) : undefined);
   return c.json(result);
 });
 

@@ -6,21 +6,13 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
 
   async findById(id: string): Promise<Entry | null> {
-    const { data, error } = await this.supabase
-      .from('entries')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data, error } = await this.supabase.from('entries').select('*').eq('id', id).single();
 
     if (error || !data) return null;
     return this.toDomain(data);
   }
 
-  async listByUserId(
-    userId: string,
-    cursor?: string,
-    limit = 20,
-  ): Promise<Entry[]> {
+  async listByUserId(userId: string, cursor?: string, limit = 20): Promise<Entry[]> {
     let query = this.supabase
       .from('entries')
       .select('*')
@@ -51,10 +43,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('entries')
-      .delete()
-      .eq('id', id);
+    const { error } = await this.supabase.from('entries').delete().eq('id', id);
     if (error) throw error;
   }
 
