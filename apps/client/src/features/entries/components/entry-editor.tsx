@@ -4,6 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
+import {
+  DEFAULT_SETTINGS,
+  type EditorSettings,
+  SettingsDrawer,
+} from '@/features/entries/components/settings-drawer';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import type { ApiClient } from '@/lib/api';
 
@@ -49,8 +54,12 @@ export function EntryEditor({
   onUnlinkQuestion,
 }: EntryEditorProps) {
   const [content, setContent] = useState(initialContent);
-  const [fontSize, setFontSize] = useState(18);
+  const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  function updateSettings(patch: Partial<EditorSettings>) {
+    setSettings((prev) => ({ ...prev, ...patch }));
+  }
   const [status, setStatus] = useState<'editing' | 'saved' | 'saving'>('editing');
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   const [dateStr, setDateStr] = useState(() => formatDate(new Date()));
@@ -213,26 +222,13 @@ export function EntryEditor({
         />
       </div>
 
-      {/* Settings panel (collapsible) */}
-      {settingsOpen && (
-        <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <div className="flex items-center gap-3">
-            <label htmlFor="editor-font-size" className="text-xs text-zinc-500">
-              文字サイズ
-            </label>
-            <input
-              id="editor-font-size"
-              type="range"
-              min={14}
-              max={36}
-              value={fontSize}
-              onChange={(e) => setFontSize(Number(e.target.value))}
-              className="flex-1"
-            />
-            <span className="text-xs text-zinc-400">{fontSize}px</span>
-          </div>
-        </div>
-      )}
+      {/* Settings drawer */}
+      <SettingsDrawer
+        open={settingsOpen}
+        settings={settings}
+        onChange={updateSettings}
+        onClose={() => setSettingsOpen(false)}
+      />
 
       {/* Error display */}
       {error && (
@@ -250,7 +246,7 @@ export function EntryEditor({
         }}
         placeholder="今日のことを書いてみましょう..."
         className="flex-1 resize-none bg-transparent px-6 py-6 leading-relaxed focus:outline-none"
-        style={{ fontSize: `${fontSize}px` }}
+        style={{ fontSize: `${settings.fontSize}px` }}
       />
 
       {/* Bottom toolbar */}
