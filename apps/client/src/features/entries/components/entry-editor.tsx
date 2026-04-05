@@ -11,6 +11,7 @@ import {
 } from '@/features/entries/components/settings-drawer';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
+import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
 import type { ApiClient } from '@/lib/api';
@@ -70,10 +71,12 @@ export function EntryEditor({
   const router = useRouter();
   const editorRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
+  const traceCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
   useTimeInscription(editorRef, settings);
+  useEraserTrace(editorRef, traceCanvasRef, settings.eraserTraceEnabled, settings.fontSize);
 
   useEffect(() => {
     const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
@@ -257,6 +260,8 @@ export function EntryEditor({
 
       {/* Editor area */}
       <div className="relative flex-1 overflow-auto">
+        {/* Eraser trace canvas */}
+        <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
         <div
           ref={editorRef}
           contentEditable
