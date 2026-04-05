@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Header } from '@/components/layout/header';
-import { useAuth } from '@/hooks/use-auth';
+import { Header } from '@/features/auth/components/header';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, loading } = useAuth();
