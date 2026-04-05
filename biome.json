@@ -13,6 +13,9 @@
         "noUnusedImports": "error",
         "noUnusedVariables": "error"
       },
+      "suspicious": {
+        "noExplicitAny": "error"
+      },
       "style": {
         "noNonNullAssertion": "off"
       }
