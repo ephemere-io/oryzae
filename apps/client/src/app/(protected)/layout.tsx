@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Header } from '@/features/auth/components/header';
+import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +18,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   if (loading) {
     return (
       <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-zinc-500">読み込み中...</p>
+        <p className="text-sm text-[var(--date-color)]">読み込み中...</p>
       </div>
     );
   }
@@ -26,9 +26,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   if (!auth) return null;
 
   return (
-    <>
-      <Header />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">{children}</main>
-    </>
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <main className="flex-1 overflow-auto">
+        <div className="mx-auto w-full max-w-4xl px-4 py-6">{children}</div>
+      </main>
+    </div>
   );
 }
