@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/features/auth/components/sidebar';
 import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import {
@@ -18,6 +17,7 @@ import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
 import { useVoiceDynamics } from '@/features/entries/hooks/use-voice-dynamics';
 import type { ApiClient } from '@/lib/api';
+import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/lib/sidebar-context';
 
 interface AuthState {
   accessToken: string;
