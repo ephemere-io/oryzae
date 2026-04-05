@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway';
-import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway';
-import { CreateQuestionUsecase } from './create-question.usecase';
+import { CreateQuestionUsecase } from '@/contexts/question/application/usecases/create-question.usecase';
+import type { QuestionRepositoryGateway } from '@/contexts/question/domain/gateways/question-repository.gateway';
+import type { QuestionTransactionRepositoryGateway } from '@/contexts/question/domain/gateways/question-transaction-repository.gateway';
 
 describe('CreateQuestionUsecase', () => {
   let questionRepo: QuestionRepositoryGateway;

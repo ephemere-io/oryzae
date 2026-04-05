@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { QuestionTransaction } from '../models/question-transaction';
-import { resolveCurrentText } from './current-question-text.service';
+import { QuestionTransaction } from '@/contexts/question/domain/models/question-transaction';
+import { resolveCurrentText } from '@/contexts/question/domain/services/current-question-text.service';
 
 describe('resolveCurrentText', () => {
   const makeTx = (version: number, validated: boolean) =>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EntrySnapshot } from './entry-snapshot';
+import { EntrySnapshot } from '@/contexts/entry/domain/models/entry-snapshot';
 
 const generateId = () => 'snap-id';
 

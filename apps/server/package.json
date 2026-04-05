@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run test/contexts",
+    "test:integration": "vitest run test/integration",
+    "test:all": "vitest run",
     "test:watch": "vitest",
     "dep-cruise": "depcruise src --config .dependency-cruiser.cjs"
   },

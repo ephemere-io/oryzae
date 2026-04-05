@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway';
-import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway';
-import { Entry } from '../../domain/models/entry';
-import { UpdateEntryUsecase } from './update-entry.usecase';
+import { UpdateEntryUsecase } from '@/contexts/entry/application/usecases/update-entry.usecase';
+import type { EntryRepositoryGateway } from '@/contexts/entry/domain/gateways/entry-repository.gateway';
+import type { EntrySnapshotRepositoryGateway } from '@/contexts/entry/domain/gateways/entry-snapshot-repository.gateway';
+import { Entry } from '@/contexts/entry/domain/models/entry';
 
 describe('UpdateEntryUsecase', () => {
   let entryRepo: EntryRepositoryGateway;
