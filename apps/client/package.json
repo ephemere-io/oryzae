@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run test/",
     "test:watch": "vitest",
-    "dep-cruise": "depcruise src --config .dependency-cruiser.cjs"
+    "dep-cruise": "depcruise src --config .dependency-cruiser.cjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@oryzae/server": "workspace:*",
@@ -18,6 +20,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/react": "^16.0.0",
