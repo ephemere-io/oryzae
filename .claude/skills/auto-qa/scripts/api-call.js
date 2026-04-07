@@ -5,7 +5,7 @@
 // 認証トークンは localStorage から自動取得する。
 async (method, path, bodyJson) => {
   const token = localStorage.getItem('oryzae_access_token');
-  const baseUrl = 'http://localhost:3000';
+  const baseUrl = '';
   const headers = {
     'Content-Type': 'application/json',
   };

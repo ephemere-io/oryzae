@@ -17,15 +17,15 @@
 
 ```bash
 pnpm install
+cp apps/server/.env.example apps/server/.env  # Supabase のキーを設定
 
-# Backend (port 3000)
-pnpm --filter @oryzae/server dev
-
-# Frontend (port 3001)
+# shared → server をビルドしてから client を起動
+pnpm --filter @oryzae/shared build
+pnpm --filter @oryzae/server build
 pnpm --filter @oryzae/client dev
 ```
 
-各アプリの環境変数設定が必要です。`apps/server/.env.example` を参考に `.env` を作成してください。
+`http://localhost:3000` でフロントエンドと API の両方にアクセスできます。Hono API は Next.js Route Handler に内蔵されているため、サーバーを別途起動する必要はありません。
 
 ## Quality Checks
 

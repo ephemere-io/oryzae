@@ -11,8 +11,8 @@ description: >
 
 # Auto QA Skill
 
-localhost:3001 に対し、Chrome DevTools MCP で自動QAを実行する。
-Hono API は Next.js Route Handler に内蔵されているため、localhost:3001 のみでフロントエンドと API の両方が動作する。
+localhost:3000 に対し、Chrome DevTools MCP で自動QAを実行する。
+Hono API は Next.js Route Handler に内蔵されているため、localhost:3000 のみでフロントエンドと API の両方が動作する。
 自然言語の指示・PR URL・明示的テストケースのいずれからでも実行可能。
 
 ## このスキルの構造
@@ -70,7 +70,7 @@ Hono API は Next.js Route Handler に内蔵されているため、localhost:30
 
 ### ログイン
 
-1. `navigate_page` → `http://localhost:3001/login`
+1. `navigate_page` → `http://localhost:3000/login`
 2. テストアカウントのメール・パスワードをユーザーに確認し、`fill` + `click` でログイン
 3. `/entries` への遷移を確認
 
