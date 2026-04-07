@@ -33,7 +33,15 @@ paths:
 
 ## テスト（絶対ルール）
 
+### hooks テスト（vitest）
 - `src/features/*/hooks/` にファイルを作成・変更したら、対応するテストを `test/features/*/hooks/` に**同時に**作成すること
 - テストファイルの命名: `use-auth.ts` → `test/features/auth/hooks/use-auth.test.ts`
 - モックは `vi.fn()` の手動スタブ（モックライブラリ不使用）
+
+### E2E テスト（Playwright）
+- 新しいページや主要な機能を追加したら、対応する E2E テストを `e2e/` に追加すること
+- テストは features と1:1対応: `e2e/auth.spec.ts`, `e2e/entries.spec.ts`, `e2e/questions.spec.ts`
+- ログイン済み状態が必要なテストは `e2e/fixtures/auth.ts` のフィクスチャを使う
+
+### 共通
 - **テストなしで作業を完了してはならない**
