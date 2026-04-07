@@ -8,6 +8,7 @@ import {
   useActiveQuestions,
   useEntryQuestions,
 } from '@/features/entry-questions/hooks/use-entry-questions';
+import { useTriggerFermentation } from '@/features/fermentation/hooks/use-trigger-fermentation';
 
 export default function EntryDetailPage() {
   const params = useParams<{ id: string }>();
@@ -15,11 +16,12 @@ export default function EntryDetailPage() {
   const { entry, loading: entryLoading } = useEntry(params.id, api, authLoading);
   const activeQuestions = useActiveQuestions(api, authLoading);
   const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, params.id);
+  const triggerFermentation = useTriggerFermentation(api);
 
   if (entryLoading || authLoading) {
     return (
       <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-zinc-500">読み込み中...</p>
+        <p className="text-sm text-[var(--date-color)]">読み込み中...</p>
       </div>
     );
   }
@@ -27,7 +29,7 @@ export default function EntryDetailPage() {
   if (!entry) {
     return (
       <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-zinc-500">エントリが見つかりません</p>
+        <p className="text-sm text-[var(--date-color)]">エントリが見つかりません</p>
       </div>
     );
   }
@@ -42,6 +44,7 @@ export default function EntryDetailPage() {
       initialLinkedIds={linkedQuestions.map((q) => q.id)}
       onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
       onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
+      onSaveComplete={triggerFermentation}
     />
   );
 }
