@@ -24,6 +24,14 @@ const ie = e as InputEvent;
 
 Git hooks をスキップしてはならない。hook が失敗したら原因を修正する。
 
+### スクリーンショット・MCP 出力ファイルの保存先
+
+Chrome DevTools MCP や Playwright MCP でスクリーンショットを撮る場合は、**必ず `.tmp/` ディレクトリに保存する**。プロジェクトルートにファイルを散らかさないこと。
+
+```
+take_screenshot filePath=.tmp/screenshots/{名前}.png
+```
+
 ## コミット前チェック
 
 ```bash

@@ -21,7 +21,7 @@ git checkout main
 pnpm --filter @oryzae/shared build && pnpm --filter @oryzae/server build && pnpm --filter @oryzae/client dev
 ```
 
-localhost:3001 が起動したら:
+localhost:3000 が起動したら:
 1. ログインして対象ページへ遷移
 2. take_snapshot filePath=/tmp/baseline-{testname}.txt
 3. take_screenshot filePath=/tmp/baseline-{testname}.png

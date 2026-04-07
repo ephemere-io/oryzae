@@ -4,11 +4,10 @@ dist/
 .env.local
 *.tsbuildinfo
 .turbo/
-.mcp.json
 .next/
 .playwright-mcp/
 test-results/
 playwright-report/
 *.png
 .DS_Store
-docs/reference-ui/
+.tmp/
