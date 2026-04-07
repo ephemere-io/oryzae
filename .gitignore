@@ -11,4 +11,3 @@ playwright-report/
 *.png
 .DS_Store
 .tmp/
-docs/reference-ui/

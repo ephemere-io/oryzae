@@ -15,12 +15,12 @@
 
 ```
 navigate_page で対象ページへ:
-- ログイン: http://localhost:3001/login
-- サインアップ: http://localhost:3001/signup
-- エントリ一覧: http://localhost:3001/entries
-- 新規エントリ: http://localhost:3001/entries/new
-- エントリ編集: http://localhost:3001/entries/{id}
-- 質問管理: http://localhost:3001/questions
+- ログイン: http://localhost:3000/login
+- サインアップ: http://localhost:3000/signup
+- エントリ一覧: http://localhost:3000/entries
+- 新規エントリ: http://localhost:3000/entries/new
+- エントリ編集: http://localhost:3000/entries/{id}
+- 質問管理: http://localhost:3000/questions
 ```
 
 ### 2. スナップショット取得と検証

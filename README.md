@@ -25,7 +25,7 @@ pnpm --filter @oryzae/server build
 pnpm --filter @oryzae/client dev
 ```
 
-`http://localhost:3001` でフロントエンドと API の両方にアクセスできます。Hono API は Next.js Route Handler に内蔵されているため、サーバーを別途起動する必要はありません。
+`http://localhost:3000` でフロントエンドと API の両方にアクセスできます。Hono API は Next.js Route Handler に内蔵されているため、サーバーを別途起動する必要はありません。
 
 ## Quality Checks
 

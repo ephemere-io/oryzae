@@ -10,8 +10,7 @@
 
 ```bash
 pnpm install                                # 依存インストール
-pnpm --filter @oryzae/server dev            # バックエンド起動 (port 3000)
-pnpm --filter @oryzae/client dev            # フロントエンド起動 (port 3001)
+pnpm --filter @oryzae/client dev            # 起動 (port 3000, API 内蔵)
 pnpm typecheck                              # 型チェック（server + shared + client）
 pnpm test                                   # テスト実行（server + client）
 pnpm lint                                   # Biome lint
