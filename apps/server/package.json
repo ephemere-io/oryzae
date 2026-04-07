@@ -22,9 +22,11 @@
     "dep-cruise": "depcruise src --config .dependency-cruiser.cjs"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.67",
     "@hono/node-server": "^1.14.0",
     "@oryzae/shared": "workspace:*",
     "@supabase/supabase-js": "^2.49.0",
+    "ai": "^6.0.149",
     "hono": "^4.7.0",
     "zod": "^3.24.0"
   },
