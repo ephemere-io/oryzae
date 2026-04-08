@@ -1,4 +1,4 @@
-export interface LetterProps {
+interface LetterProps {
   id: string;
   fermentationResultId: string;
   bodyText: string;

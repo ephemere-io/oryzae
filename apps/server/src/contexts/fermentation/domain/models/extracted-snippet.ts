@@ -1,10 +1,10 @@
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
-export type SnippetType = 'new_perspective' | 'deepen' | 'core';
+type SnippetType = 'new_perspective' | 'deepen' | 'core';
 
 type SnippetError = { type: 'INVALID_SNIPPET_TYPE'; message: string };
 
-export interface ExtractedSnippetProps {
+interface ExtractedSnippetProps {
   id: string;
   fermentationResultId: string;
   snippetType: SnippetType;

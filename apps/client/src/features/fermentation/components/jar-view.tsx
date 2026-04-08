@@ -163,6 +163,8 @@ export function JarView({ api, authLoading, questions }: JarViewProps) {
       <svg
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-[1]"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
         style={{ opacity: zoomedId ? 0 : 1, transition: 'opacity 0.5s' }}
       >
         {questions.slice(0, 3).map((q, i) => {
@@ -174,10 +176,10 @@ export function JarView({ api, authLoading, questions }: JarViewProps) {
           return (
             <path
               key={q.id}
-              d={`M 50% 45% Q ${cpX}% ${cpY}% ${endX}% ${endY}%`}
+              d={`M 50 45 Q ${cpX} ${cpY} ${endX} ${endY}`}
               stroke="#d97706"
-              strokeWidth="1"
-              strokeDasharray="4 4"
+              strokeWidth="0.3"
+              strokeDasharray="1.5 1.5"
               opacity="0.25"
               fill="none"
             />
