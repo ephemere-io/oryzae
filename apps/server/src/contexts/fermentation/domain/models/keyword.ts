@@ -1,4 +1,4 @@
-export interface KeywordProps {
+interface KeywordProps {
   id: string;
   fermentationResultId: string;
   keyword: string;

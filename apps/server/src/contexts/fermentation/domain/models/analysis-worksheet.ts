@@ -1,4 +1,4 @@
-export interface AnalysisWorksheetProps {
+interface AnalysisWorksheetProps {
   id: string;
   fermentationResultId: string;
   worksheetMarkdown: string;
