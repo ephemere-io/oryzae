@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { JarView } from '@/features/fermentation/components/jar-view';
+import { useQuestions } from '@/features/questions/hooks/use-questions';
 
 interface QuestionData {
   id: string;
@@ -11,20 +12,47 @@ interface QuestionData {
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
+  const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api, authLoading);
   const [questions, setQuestions] = useState<QuestionData[]>([]);
 
+  const fetchActiveQuestions = useCallback(async () => {
+    if (!api) return;
+    const res = await api.fetch('/api/v1/questions');
+    if (res.ok) {
+      setQuestions(await res.json());
+    }
+  }, [api]);
+
   useEffect(() => {
-    if (authLoading || !api) return;
-    api.fetch('/api/v1/questions').then(async (res) => {
-      if (res.ok) {
-        setQuestions(await res.json());
-      }
-    });
-  }, [api, authLoading]);
+    if (authLoading) return;
+    fetchActiveQuestions();
+  }, [authLoading, fetchActiveQuestions]);
+
+  async function handleAddQuestion(text: string) {
+    await createQuestion(text);
+    await fetchActiveQuestions();
+  }
+
+  async function handleEditQuestion(id: string, text: string) {
+    await editQuestion(id, text);
+    await fetchActiveQuestions();
+  }
+
+  async function handleArchiveQuestion(id: string) {
+    await archiveQuestion(id);
+    await fetchActiveQuestions();
+  }
 
   return (
-    <div className="-mx-4 -my-6 h-[calc(100vh-0px)]">
-      <JarView api={api} authLoading={authLoading} questions={questions} />
+    <div className="absolute inset-0">
+      <JarView
+        api={api}
+        authLoading={authLoading}
+        questions={questions}
+        onAddQuestion={handleAddQuestion}
+        onEditQuestion={handleEditQuestion}
+        onArchiveQuestion={handleArchiveQuestion}
+      />
     </div>
   );
 }
