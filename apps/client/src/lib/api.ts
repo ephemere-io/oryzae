@@ -18,12 +18,16 @@ export function createApiClient(accessToken?: string): ApiClient {
     fetch(path: string, init?: RequestInit) {
       // If body is FormData, let browser set Content-Type with boundary
       const isFormData = init?.body instanceof FormData;
-      const mergedHeaders = isFormData
-        ? { Authorization: headers.Authorization ?? '', ...init?.headers }
-        : { ...headers, ...init?.headers };
+      if (isFormData) {
+        const h: Record<string, string> = {};
+        if (headers.Authorization) {
+          h.Authorization = headers.Authorization;
+        }
+        return fetch(path, { ...init, headers: h });
+      }
       return fetch(path, {
         ...init,
-        headers: mergedHeaders,
+        headers: { ...headers, ...init?.headers },
       });
     },
   };

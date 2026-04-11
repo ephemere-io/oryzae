@@ -3,7 +3,7 @@ import type { BoardPhotoRepositoryGateway } from '../../domain/gateways/board-ph
 import type { BoardStorageGateway } from '../../domain/gateways/board-storage.gateway.js';
 import { BoardCard } from '../../domain/models/board-card.js';
 import { BoardPhoto } from '../../domain/models/board-photo.js';
-import { BoardCardValidationError, BoardSnippetValidationError } from '../errors/board.errors.js';
+import { BoardCardValidationError, BoardPhotoValidationError } from '../errors/board.errors.js';
 
 interface CreateBoardPhotoInput {
   file: ArrayBuffer;
@@ -52,7 +52,7 @@ export class CreateBoardPhotoUsecase {
       this.generateId,
     );
     if (!photoResult.success) {
-      throw new BoardSnippetValidationError(photoResult.error.message);
+      throw new BoardPhotoValidationError(photoResult.error.message);
     }
     const photo = photoResult.value;
 
