@@ -12,6 +12,7 @@ export interface FermentationResultProps {
   targetPeriod: string;
   status: FermentationStatus;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface CreateParams {
@@ -31,6 +32,7 @@ export class FermentationResult {
   readonly targetPeriod: string;
   readonly status: FermentationStatus;
   readonly createdAt: string;
+  readonly updatedAt: string;
 
   private constructor(props: FermentationResultProps) {
     this.id = props.id;
@@ -40,6 +42,7 @@ export class FermentationResult {
     this.targetPeriod = props.targetPeriod;
     this.status = props.status;
     this.createdAt = props.createdAt;
+    this.updatedAt = props.updatedAt;
   }
 
   static create(
@@ -58,6 +61,7 @@ export class FermentationResult {
         targetPeriod: params.targetPeriod,
         status: 'pending',
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       }),
     );
   }
@@ -82,6 +86,7 @@ export class FermentationResult {
       targetPeriod: this.targetPeriod,
       status: this.status,
       createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
     };
   }
 }

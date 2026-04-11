@@ -4,6 +4,7 @@ interface AnalysisWorksheetProps {
   worksheetMarkdown: string;
   resultDiagramMarkdown: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export class AnalysisWorksheet {
@@ -12,6 +13,7 @@ export class AnalysisWorksheet {
   readonly worksheetMarkdown: string;
   readonly resultDiagramMarkdown: string;
   readonly createdAt: string;
+  readonly updatedAt: string;
 
   private constructor(props: AnalysisWorksheetProps) {
     this.id = props.id;
@@ -19,6 +21,7 @@ export class AnalysisWorksheet {
     this.worksheetMarkdown = props.worksheetMarkdown;
     this.resultDiagramMarkdown = props.resultDiagramMarkdown;
     this.createdAt = props.createdAt;
+    this.updatedAt = props.updatedAt;
   }
 
   static create(
@@ -33,6 +36,7 @@ export class AnalysisWorksheet {
       worksheetMarkdown,
       resultDiagramMarkdown,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -47,6 +51,7 @@ export class AnalysisWorksheet {
       worksheetMarkdown: this.worksheetMarkdown,
       resultDiagramMarkdown: this.resultDiagramMarkdown,
       createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
     };
   }
 }
