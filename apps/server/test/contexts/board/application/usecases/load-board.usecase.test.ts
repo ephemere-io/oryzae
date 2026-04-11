@@ -32,6 +32,7 @@ beforeEach(() => {
   };
   entryRepo = {
     findById: vi.fn().mockResolvedValue(null),
+    findByIds: vi.fn().mockResolvedValue([]),
     listByUserId: vi.fn().mockResolvedValue([]),
     listByUserIdAndDate: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
@@ -70,7 +71,7 @@ describe('LoadBoardUsecase', () => {
     vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([card]);
     vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue(['entry-1']);
     vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
-    vi.mocked(entryRepo.findById).mockResolvedValue(entry);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
 
     const result = await usecase.execute('user-1', '2026-04-11');
 
@@ -96,7 +97,7 @@ describe('LoadBoardUsecase', () => {
     });
 
     vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
-    vi.mocked(entryRepo.findById).mockResolvedValue(entry);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
 
     const result = await usecase.execute('user-1', '2026-04-11');
 

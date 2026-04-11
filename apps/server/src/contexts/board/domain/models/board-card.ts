@@ -7,6 +7,14 @@ const MIN_SIZE = 120;
 type CardType = (typeof VALID_CARD_TYPES)[number];
 type ViewType = (typeof VALID_VIEW_TYPES)[number];
 
+function isCardType(value: string): value is CardType {
+  return value === 'entry' || value === 'snippet';
+}
+
+function isViewType(value: string): value is ViewType {
+  return value === 'daily' || value === 'weekly';
+}
+
 type BoardCardError =
   | { type: 'INVALID_CARD_TYPE'; message: string }
   | { type: 'INVALID_VIEW_TYPE'; message: string }
@@ -81,13 +89,14 @@ export class BoardCard {
     params: CreateBoardCardParams,
     generateId: () => string,
   ): Result<BoardCard, BoardCardError> {
-    if (!VALID_CARD_TYPES.includes(params.cardType as CardType)) {
+    const { cardType, viewType } = params;
+    if (!isCardType(cardType)) {
       return err({
         type: 'INVALID_CARD_TYPE',
         message: `Card type must be one of: ${VALID_CARD_TYPES.join(', ')}`,
       });
     }
-    if (!VALID_VIEW_TYPES.includes(params.viewType as ViewType)) {
+    if (!isViewType(viewType)) {
       return err({
         type: 'INVALID_VIEW_TYPE',
         message: `View type must be one of: ${VALID_VIEW_TYPES.join(', ')}`,
@@ -104,10 +113,10 @@ export class BoardCard {
       new BoardCard({
         id: generateId(),
         userId: params.userId,
-        cardType: params.cardType as CardType,
+        cardType,
         refId: params.refId,
         dateKey: params.dateKey,
-        viewType: params.viewType as ViewType,
+        viewType,
         x: params.x,
         y: params.y,
         rotation: params.rotation,

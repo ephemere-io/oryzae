@@ -77,14 +77,15 @@ export function BoardCard({
         zIndex: card.zIndex,
         cursor: 'grab',
         borderRadius: 2,
-        backgroundColor: 'var(--bg)',
+        backgroundColor: card.cardType === 'snippet' ? 'var(--card-snippet, #FFFBE0)' : 'var(--bg)',
         border: '1px solid var(--border-subtle)',
-        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04)',
-        outline: isSelected ? '1.5px solid var(--accent)' : 'none',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)',
+        outline: isSelected ? '1.5px solid rgba(74,158,142,0.5)' : 'none',
         outlineOffset: isSelected ? 4 : 0,
         overflow: 'hidden',
         userSelect: 'none',
         touchAction: 'none',
+        animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
       }}
       onPointerDown={handlePointerDown}
     >

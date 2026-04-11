@@ -36,6 +36,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .eq('card_type', cardType);
 
     if (error) throw error;
+    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
     return (data ?? []).map((row: Record<string, unknown>) => row.ref_id as string);
   }
 
@@ -112,6 +113,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
     if (error) throw error;
   }
 
+  // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
   private toDomain(row: Record<string, unknown>): BoardCard {
     return BoardCard.fromProps({
       id: row.id as string,

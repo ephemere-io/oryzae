@@ -66,9 +66,8 @@ export function BoardView({ api }: BoardViewProps) {
       if (didDrag()) return;
       if (card.cardType === 'entry') {
         router.push(`/entries/${card.refId}`);
-      } else if (card.cardType === 'snippet') {
-        const content = card.content as { text: string };
-        setSnippetDialog({ open: true, snippetId: card.refId, initialText: content.text });
+      } else if (card.cardType === 'snippet' && 'text' in card.content) {
+        setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
       }
     },
     [router, didDrag],
@@ -87,8 +86,10 @@ export function BoardView({ api }: BoardViewProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
         const tag = (e.target as HTMLElement).tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
         if ((e.target as HTMLElement).isContentEditable) return;
         if (selectedId) {
           e.preventDefault();

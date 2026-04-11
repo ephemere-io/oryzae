@@ -106,16 +106,16 @@ export class LoadBoardUsecase {
     const entryRefIds = cards.filter((c) => c.cardType === 'entry').map((c) => c.refId);
     const snippetRefIds = cards.filter((c) => c.cardType === 'snippet').map((c) => c.refId);
 
-    // Fetch entry content
+    // Fetch entry content (batch)
     const entryMap = new Map<string, EntryContent>();
-    for (const refId of entryRefIds) {
-      const entry = await this.entryRepo.findById(refId);
-      if (entry) {
+    if (entryRefIds.length > 0) {
+      const entries = await this.entryRepo.findByIds(entryRefIds);
+      for (const entry of entries) {
         const content = entry.content;
-        const lines = content.split('\n').filter((l) => l.trim().length > 0);
-        entryMap.set(refId, {
-          title: lines[0]?.substring(0, 100) ?? '',
-          preview: content.substring(0, 100),
+        const firstLine = content.split('\n').find((l) => l.trim().length > 0);
+        entryMap.set(entry.id, {
+          title: firstLine?.substring(0, 100) ?? '',
+          preview: content.substring(0, 200),
           createdAt: entry.createdAt,
         });
       }

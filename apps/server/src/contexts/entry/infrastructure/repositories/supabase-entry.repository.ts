@@ -12,6 +12,13 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return this.toDomain(data);
   }
 
+  async findByIds(ids: string[]): Promise<Entry[]> {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.supabase.from('entries').select('*').in('id', ids);
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
   async listByUserId(userId: string, cursor?: string, limit = 20): Promise<Entry[]> {
     let query = this.supabase
       .from('entries')

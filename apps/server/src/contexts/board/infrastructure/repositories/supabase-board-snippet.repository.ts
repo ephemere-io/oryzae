@@ -54,6 +54,7 @@ export class SupabaseBoardSnippetRepository implements BoardSnippetRepositoryGat
     if (error) throw error;
   }
 
+  // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
   private toDomain(row: Record<string, unknown>): BoardSnippet {
     return BoardSnippet.fromProps({
       id: row.id as string,
