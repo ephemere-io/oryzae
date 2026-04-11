@@ -9,6 +9,7 @@
   --toolbar-hover: rgba(0, 0, 0, 0.04);
   --date-color: #999;
   --card-snippet: #fffbe0;
+  --card-photo: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,6 +22,7 @@
     --toolbar-hover: rgba(255, 255, 255, 0.06);
     --date-color: #666;
     --card-snippet: #3a3520;
+    --card-photo: #2a2a2a;
   }
 }
 

@@ -7,6 +7,7 @@ import { BoardCardValidationError, BoardSnippetValidationError } from '../errors
 interface CreateBoardSnippetInput {
   text: string;
   dateKey: string;
+  viewType?: 'daily' | 'weekly';
 }
 
 interface CreateBoardSnippetResponse {
@@ -51,7 +52,7 @@ export class CreateBoardSnippetUsecase {
         cardType: 'snippet',
         refId: snippet.id,
         dateKey: input.dateKey,
-        viewType: 'daily',
+        viewType: input.viewType ?? 'daily',
         x,
         y,
         rotation,
