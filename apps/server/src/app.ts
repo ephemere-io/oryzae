@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { board } from './contexts/board/presentation/routes/board.js';
 import { entries } from './contexts/entry/presentation/routes/entries.js';
 import { fermentations } from './contexts/fermentation/presentation/routes/fermentations.js';
 import { entryQuestions } from './contexts/question/presentation/routes/entry-questions.js';
@@ -12,6 +13,7 @@ const app = new Hono()
   .get('/health', (c) => c.json({ status: 'ok' }))
   .route('/api/v1/auth', authRoutes)
   .use('/api/v1/*', authMiddleware)
+  .route('/api/v1/board', board)
   .route('/api/v1/entries', entries)
   .route('/api/v1/questions', questions)
   .route('/api/v1/entries/:entryId/questions', entryQuestions)

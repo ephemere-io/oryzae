@@ -8,6 +8,7 @@ interface FooterEntry {
 }
 
 const FOOTER_ENTRIES: FooterEntry[] = [
+  { match: (p) => p === '/board', label: 'BOARD' },
   { match: (p) => p === '/jar', label: 'FERMENTING' },
   { match: (p) => p === '/entries/new' || p.startsWith('/entries/'), label: 'EDITOR' },
   { match: (p) => p === '/entries', label: 'LIST' },

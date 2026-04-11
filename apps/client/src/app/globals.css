@@ -8,6 +8,7 @@
   --border-subtle: rgba(0, 0, 0, 0.05);
   --toolbar-hover: rgba(0, 0, 0, 0.04);
   --date-color: #999;
+  --card-snippet: #fffbe0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +20,7 @@
     --border-subtle: rgba(255, 255, 255, 0.06);
     --toolbar-hover: rgba(255, 255, 255, 0.06);
     --date-color: #666;
+    --card-snippet: #3a3520;
   }
 }
 
@@ -71,4 +73,34 @@ body {
 [data-tooltip-pos="bottom"]::after {
   top: calc(100% + 6px);
   bottom: auto;
+}
+
+/* Board card animations — uses scale() instead of transform to avoid
+   overriding the inline rotate() on cards */
+@keyframes popIn {
+  0% {
+    scale: 0.8;
+    translate: 0 20px;
+    opacity: 0;
+  }
+  100% {
+    scale: 1;
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+
+@keyframes itemRemove {
+  0% {
+    scale: 1;
+    opacity: 1;
+  }
+  40% {
+    scale: 1.06;
+    opacity: 0.6;
+  }
+  100% {
+    scale: 0.7;
+    opacity: 0;
+  }
 }
