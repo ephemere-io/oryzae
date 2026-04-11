@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@oryzae/shared'],
+  transpilePackages: ['@oryzae/shared', '@oryzae/server'],
   turbopack: {},
 };
 
