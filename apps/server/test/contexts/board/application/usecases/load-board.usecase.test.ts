@@ -35,10 +35,29 @@ beforeEach(() => {
     findByIds: vi.fn().mockResolvedValue([]),
     listByUserId: vi.fn().mockResolvedValue([]),
     listByUserIdAndDate: vi.fn().mockResolvedValue([]),
+    listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
   };
-  usecase = new LoadBoardUsecase(boardCardRepo, boardSnippetRepo, entryRepo, generateId);
+  const boardPhotoRepo = {
+    findById: vi.fn().mockResolvedValue(null),
+    findByIds: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+  const boardStorage = {
+    upload: vi.fn().mockResolvedValue('path'),
+    getPublicUrl: vi.fn().mockReturnValue('https://example.com/photo.jpg'),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+  usecase = new LoadBoardUsecase(
+    boardCardRepo,
+    boardSnippetRepo,
+    boardPhotoRepo,
+    boardStorage,
+    entryRepo,
+    generateId,
+  );
 });
 
 describe('LoadBoardUsecase', () => {
@@ -158,5 +177,26 @@ describe('LoadBoardUsecase', () => {
 
     expect(result.cards).toHaveLength(1);
     expect(result.cards[0].content).toEqual({ text: '重要な気づき' });
+  });
+
+  it('weekly モードで listByUserIdAndWeek を使ってエントリを取得する', async () => {
+    const entry = Entry.fromProps({
+      id: 'entry-week',
+      userId: 'user-1',
+      content: '週間エントリ',
+      mediaUrls: [],
+      createdAt: '2026-04-08T10:00:00Z',
+      updatedAt: '2026-04-08T10:00:00Z',
+    });
+
+    vi.mocked(entryRepo.listByUserIdAndWeek).mockResolvedValue([entry]);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
+
+    const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
+
+    expect(entryRepo.listByUserIdAndWeek).toHaveBeenCalledWith('user-1', '2026-04-11');
+    expect(entryRepo.listByUserIdAndDate).not.toHaveBeenCalled();
+    expect(result.viewType).toBe('weekly');
+    expect(result.cards).toHaveLength(1);
   });
 });
