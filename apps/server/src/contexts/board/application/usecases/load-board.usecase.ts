@@ -1,6 +1,8 @@
 import type { EntryRepositoryGateway } from '../../../entry/domain/gateways/entry-repository.gateway.js';
 import type { BoardCardRepositoryGateway } from '../../domain/gateways/board-card-repository.gateway.js';
+import type { BoardPhotoRepositoryGateway } from '../../domain/gateways/board-photo-repository.gateway.js';
 import type { BoardSnippetRepositoryGateway } from '../../domain/gateways/board-snippet-repository.gateway.js';
+import type { BoardStorageGateway } from '../../domain/gateways/board-storage.gateway.js';
 import { BoardCard } from '../../domain/models/board-card.js';
 
 interface EntryContent {
@@ -13,9 +15,14 @@ interface SnippetContent {
   text: string;
 }
 
+interface PhotoContent {
+  imageUrl: string;
+  caption: string;
+}
+
 interface CardResponse {
   id: string;
-  cardType: 'entry' | 'snippet';
+  cardType: 'entry' | 'snippet' | 'photo';
   refId: string;
   x: number;
   y: number;
@@ -23,7 +30,7 @@ interface CardResponse {
   width: number;
   height: number;
   zIndex: number;
-  content: EntryContent | SnippetContent;
+  content: EntryContent | SnippetContent | PhotoContent;
 }
 
 interface LoadBoardResponse {
@@ -43,13 +50,17 @@ export class LoadBoardUsecase {
   constructor(
     private boardCardRepo: BoardCardRepositoryGateway,
     private boardSnippetRepo: BoardSnippetRepositoryGateway,
+    private boardPhotoRepo: BoardPhotoRepositoryGateway,
+    private boardStorage: BoardStorageGateway,
     private entryRepo: EntryRepositoryGateway,
     private generateId: () => string,
   ) {}
 
-  async execute(userId: string, dateKey: string): Promise<LoadBoardResponse> {
-    const viewType = 'daily';
-
+  async execute(
+    userId: string,
+    dateKey: string,
+    viewType: 'daily' | 'weekly' = 'daily',
+  ): Promise<LoadBoardResponse> {
     // 1. Load existing cards
     const existingCards = await this.boardCardRepo.findByDateAndView(userId, dateKey, viewType);
 
@@ -62,7 +73,10 @@ export class LoadBoardUsecase {
     );
     const existingRefIdSet = new Set(existingEntryRefIds);
 
-    const entries = await this.entryRepo.listByUserIdAndDate(userId, dateKey);
+    const entries =
+      viewType === 'weekly'
+        ? await this.entryRepo.listByUserIdAndWeek(userId, dateKey)
+        : await this.entryRepo.listByUserIdAndDate(userId, dateKey);
     const newCards: BoardCard[] = [];
 
     for (const entry of entries) {
@@ -105,6 +119,7 @@ export class LoadBoardUsecase {
     // Collect refIds by type
     const entryRefIds = cards.filter((c) => c.cardType === 'entry').map((c) => c.refId);
     const snippetRefIds = cards.filter((c) => c.cardType === 'snippet').map((c) => c.refId);
+    const photoRefIds = cards.filter((c) => c.cardType === 'photo').map((c) => c.refId);
 
     // Fetch entry content (batch)
     const entryMap = new Map<string, EntryContent>();
@@ -130,13 +145,27 @@ export class LoadBoardUsecase {
       }
     }
 
+    // Fetch photo content
+    const photoMap = new Map<string, PhotoContent>();
+    if (photoRefIds.length > 0) {
+      const photos = await this.boardPhotoRepo.findByIds(photoRefIds);
+      for (const photo of photos) {
+        photoMap.set(photo.id, {
+          imageUrl: this.boardStorage.getPublicUrl(photo.storagePath),
+          caption: photo.caption,
+        });
+      }
+    }
+
     return cards
       .map((card) => {
-        let content: EntryContent | SnippetContent | undefined;
+        let content: EntryContent | SnippetContent | PhotoContent | undefined;
         if (card.cardType === 'entry') {
           content = entryMap.get(card.refId);
         } else if (card.cardType === 'snippet') {
           content = snippetMap.get(card.refId);
+        } else if (card.cardType === 'photo') {
+          content = photoMap.get(card.refId);
         }
         if (!content) return null;
 

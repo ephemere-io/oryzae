@@ -35,10 +35,29 @@ beforeEach(() => {
     findByIds: vi.fn().mockResolvedValue([]),
     listByUserId: vi.fn().mockResolvedValue([]),
     listByUserIdAndDate: vi.fn().mockResolvedValue([]),
+    listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
   };
-  usecase = new LoadBoardUsecase(boardCardRepo, boardSnippetRepo, entryRepo, generateId);
+  const boardPhotoRepo = {
+    findById: vi.fn().mockResolvedValue(null),
+    findByIds: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+  const boardStorage = {
+    upload: vi.fn().mockResolvedValue('path'),
+    getPublicUrl: vi.fn().mockReturnValue('https://example.com/photo.jpg'),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+  usecase = new LoadBoardUsecase(
+    boardCardRepo,
+    boardSnippetRepo,
+    boardPhotoRepo,
+    boardStorage,
+    entryRepo,
+    generateId,
+  );
 });
 
 describe('LoadBoardUsecase', () => {

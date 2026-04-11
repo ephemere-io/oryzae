@@ -16,9 +16,14 @@ export function createApiClient(accessToken?: string): ApiClient {
     baseUrl: '',
     headers,
     fetch(path: string, init?: RequestInit) {
+      // If body is FormData, let browser set Content-Type with boundary
+      const isFormData = init?.body instanceof FormData;
+      const mergedHeaders = isFormData
+        ? { Authorization: headers.Authorization ?? '', ...init?.headers }
+        : { ...headers, ...init?.headers };
       return fetch(path, {
         ...init,
-        headers: { ...headers, ...init?.headers },
+        headers: mergedHeaders,
       });
     },
   };

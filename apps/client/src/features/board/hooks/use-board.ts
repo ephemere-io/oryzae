@@ -13,9 +13,14 @@ interface SnippetContent {
   text: string;
 }
 
+interface PhotoContent {
+  imageUrl: string;
+  caption: string;
+}
+
 export interface BoardCardData {
   id: string;
-  cardType: 'entry' | 'snippet';
+  cardType: 'entry' | 'snippet' | 'photo';
   refId: string;
   x: number;
   y: number;
@@ -23,7 +28,8 @@ export interface BoardCardData {
   width: number;
   height: number;
   zIndex: number;
-  content: EntryContent | SnippetContent;
+  content: EntryContent | SnippetContent | PhotoContent;
+  removing?: boolean;
 }
 
 interface BoardData {
@@ -32,20 +38,24 @@ interface BoardData {
   cards: BoardCardData[];
 }
 
-export function useBoard(api: ApiClient | null, dateKey: string) {
+export function useBoard(
+  api: ApiClient | null,
+  dateKey: string,
+  viewType: 'daily' | 'weekly' = 'daily',
+) {
   const [cards, setCards] = useState<BoardCardData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchBoard = useCallback(async () => {
     if (!api) return;
     setLoading(true);
-    const res = await api.fetch(`/api/v1/board?dateKey=${dateKey}`);
+    const res = await api.fetch(`/api/v1/board?dateKey=${dateKey}&viewType=${viewType}`);
     if (res.ok) {
       const data: BoardData = await res.json();
       setCards(data.cards);
     }
     setLoading(false);
-  }, [api, dateKey]);
+  }, [api, dateKey, viewType]);
 
   useEffect(() => {
     fetchBoard();
@@ -86,14 +96,40 @@ export function useBoard(api: ApiClient | null, dateKey: string) {
   const deleteCard = useCallback(
     async (cardId: string, cardType: string, refId: string) => {
       if (!api) return;
+      // 1. Mark card as removing (triggers animation)
+      setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, removing: true } : c)));
+      // 2. API call
       if (cardType === 'snippet') {
-        await api.fetch(`/api/v1/board/snippets/${refId}`, { method: 'DELETE' });
+        api.fetch(`/api/v1/board/snippets/${refId}`, { method: 'DELETE' });
+      } else if (cardType === 'photo') {
+        api.fetch(`/api/v1/board/photos/${refId}`, { method: 'DELETE' });
       } else {
-        await api.fetch(`/api/v1/board/cards/${cardId}`, { method: 'DELETE' });
+        api.fetch(`/api/v1/board/cards/${cardId}`, { method: 'DELETE' });
       }
-      setCards((prev) => prev.filter((c) => c.id !== cardId));
+      // 3. Remove from state after animation (280ms)
+      setTimeout(() => {
+        setCards((prev) => prev.filter((c) => c.id !== cardId));
+      }, 280);
     },
     [api],
+  );
+
+  const createPhoto = useCallback(
+    async (file: File, caption: string) => {
+      if (!api) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('caption', caption);
+      formData.append('dateKey', dateKey);
+      const res = await api.fetch('/api/v1/board/photos', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        await fetchBoard();
+      }
+    },
+    [api, dateKey, fetchBoard],
   );
 
   return {
@@ -103,6 +139,7 @@ export function useBoard(api: ApiClient | null, dateKey: string) {
     refresh: fetchBoard,
     createSnippet,
     updateSnippet,
+    createPhoto,
     deleteCard,
   };
 }
