@@ -11,6 +11,8 @@ interface ExtractedSnippetProps {
   originalText: string;
   sourceDate: string;
   selectionReason: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const VALID_TYPES: SnippetType[] = ['new_perspective', 'deepen', 'core'];
@@ -22,6 +24,8 @@ export class ExtractedSnippet {
   readonly originalText: string;
   readonly sourceDate: string;
   readonly selectionReason: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 
   private constructor(props: ExtractedSnippetProps) {
     this.id = props.id;
@@ -30,16 +34,21 @@ export class ExtractedSnippet {
     this.originalText = props.originalText;
     this.sourceDate = props.sourceDate;
     this.selectionReason = props.selectionReason;
+    this.createdAt = props.createdAt;
+    this.updatedAt = props.updatedAt;
   }
 
   static create(
-    params: Omit<ExtractedSnippetProps, 'id'>,
+    params: Omit<ExtractedSnippetProps, 'id' | 'createdAt' | 'updatedAt'>,
     generateId: () => string,
   ): Result<ExtractedSnippet, SnippetError> {
     if (!VALID_TYPES.includes(params.snippetType)) {
       return err({ type: 'INVALID_SNIPPET_TYPE', message: `Invalid type: ${params.snippetType}` });
     }
-    return ok(new ExtractedSnippet({ id: generateId(), ...params }));
+    const now = new Date().toISOString();
+    return ok(
+      new ExtractedSnippet({ id: generateId(), ...params, createdAt: now, updatedAt: now }),
+    );
   }
 
   static fromProps(props: ExtractedSnippetProps): ExtractedSnippet {
@@ -54,6 +63,8 @@ export class ExtractedSnippet {
       originalText: this.originalText,
       sourceDate: this.sourceDate,
       selectionReason: this.selectionReason,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
     };
   }
 }
