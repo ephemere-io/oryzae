@@ -17,6 +17,23 @@ alter table board_cards drop constraint board_cards_card_type_check;
 alter table board_cards add constraint board_cards_card_type_check
   check (card_type in ('entry', 'snippet', 'photo'));
 
--- Storage bucket for board photos (created via Supabase dashboard/CLI)
--- Supabase MCP cannot create storage buckets, so this must be done manually:
--- INSERT INTO storage.buckets (id, name, public) VALUES ('board-photos', 'board-photos', true);
+-- Storage bucket for board photos
+insert into storage.buckets (id, name, public)
+  values ('board-photos', 'board-photos', true)
+  on conflict (id) do nothing;
+
+-- Storage RLS policies: users can upload/read/delete their own photos
+create policy "board_photos_upload" on storage.objects
+  for insert with check (
+    bucket_id = 'board-photos'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "board_photos_read" on storage.objects
+  for select using (bucket_id = 'board-photos');
+
+create policy "board_photos_delete" on storage.objects
+  for delete using (
+    bucket_id = 'board-photos'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
