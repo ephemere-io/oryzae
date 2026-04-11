@@ -1,0 +1,169 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import type { ApiClient } from '@/lib/api';
+import type { BoardCardData } from '../hooks/use-board';
+import { useBoard } from '../hooks/use-board';
+import { useBoardInteraction } from '../hooks/use-board-interaction';
+import { useBoardSave } from '../hooks/use-board-save';
+import { BoardCard } from './board-card';
+import { BoardControls } from './board-controls';
+import { BoardDateNav } from './board-date-nav';
+import { SnippetDialog } from './snippet-dialog';
+
+interface BoardViewProps {
+  api: ApiClient;
+}
+
+function todayKey(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function BoardView({ api }: BoardViewProps) {
+  const router = useRouter();
+  const [dateKey, setDateKey] = useState(todayKey);
+  const [snippetDialog, setSnippetDialog] = useState<{
+    open: boolean;
+    snippetId?: string;
+    initialText?: string;
+  }>({ open: false });
+
+  const { cards, setCards, loading, createSnippet, updateSnippet, deleteCard } = useBoard(
+    api,
+    dateKey,
+  );
+  const { savePositions } = useBoardSave(api);
+
+  const handleCardsChange = useCallback(
+    (newCards: BoardCardData[]) => {
+      setCards(newCards);
+    },
+    [setCards],
+  );
+
+  const handleInteractionEnd = useCallback(() => {
+    savePositions(cards);
+  }, [cards, savePositions]);
+
+  const {
+    selectedId,
+    startDrag,
+    startRotate,
+    startResize,
+    onPointerMove,
+    onPointerUp,
+    deselect,
+    didDrag,
+  } = useBoardInteraction(cards, handleCardsChange, handleInteractionEnd);
+
+  const handleCardClick = useCallback(
+    (card: BoardCardData) => {
+      if (didDrag()) return;
+      if (card.cardType === 'entry') {
+        router.push(`/entries/${card.refId}`);
+      } else if (card.cardType === 'snippet' && 'text' in card.content) {
+        setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
+      }
+    },
+    [router, didDrag],
+  );
+
+  const handleDeleteCard = useCallback(
+    (cardId: string) => {
+      const card = cards.find((c) => c.id === cardId);
+      if (!card) return;
+      deleteCard(cardId, card.cardType, card.refId);
+    },
+    [cards, deleteCard],
+  );
+
+  // Keyboard handling for Delete/Backspace
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
+        if ((e.target as HTMLElement).isContentEditable) return;
+        if (selectedId) {
+          e.preventDefault();
+          handleDeleteCard(selectedId);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, handleDeleteCard]);
+
+  return (
+    <div
+      role="application"
+      aria-label="Board canvas"
+      className="relative h-full w-full overflow-auto"
+      style={{ backgroundColor: 'var(--bg)' }}
+      onPointerMove={(e) => onPointerMove(e.clientX, e.clientY)}
+      onPointerUp={onPointerUp}
+      onClick={deselect}
+      onKeyDown={() => {}}
+    >
+      {/* Grid background */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+          opacity: 0.6,
+        }}
+      />
+
+      <BoardDateNav dateKey={dateKey} onDateChange={setDateKey} />
+      <BoardControls onAddSnippet={() => setSnippetDialog({ open: true })} />
+
+      {/* Canvas */}
+      <div className="relative min-h-full" style={{ minWidth: 1200, minHeight: 900 }}>
+        {loading && (
+          <div
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs"
+            style={{ color: 'var(--date-color)' }}
+          >
+            Loading...
+          </div>
+        )}
+
+        {cards.map((card) => (
+          <BoardCard
+            key={card.id}
+            card={card}
+            isSelected={selectedId === card.id}
+            onPointerDown={startDrag}
+            onRotateStart={startRotate}
+            onResizeStart={startResize}
+            onDelete={handleDeleteCard}
+            onClick={handleCardClick}
+          />
+        ))}
+      </div>
+
+      {/* Snippet dialog */}
+      <SnippetDialog
+        open={snippetDialog.open}
+        initialText={snippetDialog.initialText}
+        onSubmit={(text) => {
+          if (snippetDialog.snippetId) {
+            updateSnippet(snippetDialog.snippetId, text);
+          } else {
+            createSnippet(text);
+          }
+        }}
+        onClose={() => setSnippetDialog({ open: false })}
+      />
+    </div>
+  );
+}
