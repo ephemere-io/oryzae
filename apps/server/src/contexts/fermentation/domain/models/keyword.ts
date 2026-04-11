@@ -3,6 +3,8 @@ interface KeywordProps {
   fermentationResultId: string;
   keyword: string;
   description: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export class Keyword {
@@ -10,12 +12,16 @@ export class Keyword {
   readonly fermentationResultId: string;
   readonly keyword: string;
   readonly description: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 
   private constructor(props: KeywordProps) {
     this.id = props.id;
     this.fermentationResultId = props.fermentationResultId;
     this.keyword = props.keyword;
     this.description = props.description;
+    this.createdAt = props.createdAt;
+    this.updatedAt = props.updatedAt;
   }
 
   static create(
@@ -24,7 +30,15 @@ export class Keyword {
     description: string,
     generateId: () => string,
   ): Keyword {
-    return new Keyword({ id: generateId(), fermentationResultId, keyword, description });
+    const now = new Date().toISOString();
+    return new Keyword({
+      id: generateId(),
+      fermentationResultId,
+      keyword,
+      description,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   static fromProps(props: KeywordProps): Keyword {
@@ -37,6 +51,8 @@ export class Keyword {
       fermentationResultId: this.fermentationResultId,
       keyword: this.keyword,
       description: this.description,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
     };
   }
 }

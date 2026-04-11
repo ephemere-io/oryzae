@@ -22,6 +22,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       target_period: props.targetPeriod,
       status: props.status,
       created_at: props.createdAt,
+      updated_at: props.updatedAt,
     });
     if (error) throw new Error(`Failed to save fermentation result: ${error.message}`);
   }
@@ -30,7 +31,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
     const props = result.toProps();
     const { error } = await this.supabase
       .from('fermentation_results')
-      .update({ status: props.status })
+      .update({ status: props.status, updated_at: new Date().toISOString() })
       .eq('id', props.id);
     if (error) throw new Error(`Failed to update fermentation result: ${error.message}`);
   }
@@ -50,6 +51,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       targetPeriod: data.target_period,
       status: data.status,
       createdAt: data.created_at,
+      updatedAt: data.updated_at,
     });
   }
 
@@ -75,6 +77,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
           worksheetMarkdown: worksheetRes.data.worksheet_markdown,
           resultDiagramMarkdown: worksheetRes.data.result_diagram_markdown,
           createdAt: worksheetRes.data.created_at,
+          updatedAt: worksheetRes.data.updated_at,
         })
       : null;
 
@@ -86,6 +89,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         originalText: row.original_text,
         sourceDate: row.source_date,
         selectionReason: row.selection_reason,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
       }),
     );
 
@@ -94,6 +99,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
           id: letterRes.data.id,
           fermentationResultId: letterRes.data.fermentation_result_id,
           bodyText: letterRes.data.body_text,
+          createdAt: letterRes.data.created_at,
+          updatedAt: letterRes.data.updated_at,
         })
       : null;
 
@@ -103,6 +110,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         fermentationResultId: row.fermentation_result_id,
         keyword: row.keyword,
         description: row.description,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
       }),
     );
 
@@ -125,6 +134,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         targetPeriod: row.target_period,
         status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
         createdAt: row.created_at,
+        updatedAt: row.updated_at,
       }),
     );
   }
@@ -137,6 +147,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       worksheet_markdown: props.worksheetMarkdown,
       result_diagram_markdown: props.resultDiagramMarkdown,
       created_at: props.createdAt,
+      updated_at: props.updatedAt,
     });
     if (error) throw new Error(`Failed to save worksheet: ${error.message}`);
   }
@@ -152,6 +163,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         original_text: p.originalText,
         source_date: p.sourceDate,
         selection_reason: p.selectionReason,
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
       };
     });
     const { error } = await this.supabase.from('extracted_snippets').insert(rows);
@@ -164,6 +177,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       id: props.id,
       fermentation_result_id: props.fermentationResultId,
       body_text: props.bodyText,
+      created_at: props.createdAt,
+      updated_at: props.updatedAt,
     });
     if (error) throw new Error(`Failed to save letter: ${error.message}`);
   }
@@ -177,6 +192,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         fermentation_result_id: p.fermentationResultId,
         keyword: p.keyword,
         description: p.description,
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
       };
     });
     const { error } = await this.supabase.from('keywords').insert(rows);
