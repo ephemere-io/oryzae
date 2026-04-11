@@ -66,13 +66,13 @@ export function useBoard(
       if (!api) return;
       const res = await api.fetch('/api/v1/board/snippets', {
         method: 'POST',
-        body: JSON.stringify({ text, dateKey }),
+        body: JSON.stringify({ text, dateKey, viewType }),
       });
       if (res.ok) {
         await fetchBoard();
       }
     },
-    [api, dateKey, fetchBoard],
+    [api, dateKey, viewType, fetchBoard],
   );
 
   const updateSnippet = useCallback(
@@ -121,6 +121,7 @@ export function useBoard(
       formData.append('file', file);
       formData.append('caption', caption);
       formData.append('dateKey', dateKey);
+      formData.append('viewType', viewType);
       const res = await api.fetch('/api/v1/board/photos', {
         method: 'POST',
         body: formData,
@@ -129,7 +130,7 @@ export function useBoard(
         await fetchBoard();
       }
     },
-    [api, dateKey, fetchBoard],
+    [api, dateKey, viewType, fetchBoard],
   );
 
   return {

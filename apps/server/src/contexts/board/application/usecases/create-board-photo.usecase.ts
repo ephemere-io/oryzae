@@ -11,6 +11,7 @@ interface CreateBoardPhotoInput {
   contentType: string;
   caption: string;
   dateKey: string;
+  viewType?: 'daily' | 'weekly';
 }
 
 interface CreateBoardPhotoResponse {
@@ -67,7 +68,7 @@ export class CreateBoardPhotoUsecase {
         cardType: 'photo',
         refId: photo.id,
         dateKey: input.dateKey,
-        viewType: 'daily',
+        viewType: input.viewType ?? 'daily',
         x,
         y,
         rotation,

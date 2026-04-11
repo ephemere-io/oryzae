@@ -120,6 +120,7 @@ export const board = new Hono<Env>()
 
     const caption = typeof body.caption === 'string' ? body.caption : '';
     const dateKey = typeof body.dateKey === 'string' ? body.dateKey : '';
+    const viewType = body.viewType === 'weekly' ? 'weekly' : 'daily';
     if (!dateKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return c.json({ error: 'Invalid dateKey' }, 400);
     }
@@ -148,6 +149,7 @@ export const board = new Hono<Env>()
       contentType: file.type,
       caption,
       dateKey,
+      viewType,
     });
     return c.json(result, 201);
   })

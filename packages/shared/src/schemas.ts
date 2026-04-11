@@ -39,6 +39,7 @@ export const boardCardUpdateSchema = z.object({
 export const boardSnippetCreateSchema = z.object({
   text: z.string().min(1).max(50),
   dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  viewType: z.enum(['daily', 'weekly']).optional(),
 });
 
 export const boardSnippetUpdateSchema = z.object({
