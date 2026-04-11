@@ -94,6 +94,52 @@ module.exports = {
       to: { path: '^src/contexts/question/presentation' },
     },
 
+    // === Board context isolation ===
+    {
+      name: 'board-context-isolation',
+      comment:
+        'board context may import entry domain (gateway IFs for cross-context reads)',
+      severity: 'error',
+      from: { path: '^src/contexts/board/(domain|application|infrastructure)' },
+      to: {
+        path: '^src/contexts/',
+        pathNot: ['^src/contexts/board', '^src/contexts/shared', '^src/contexts/entry/domain'],
+      },
+    },
+
+    // === DDD layer rules for board ===
+    {
+      name: 'board-domain-isolation',
+      comment: 'board domain must not depend on other layers',
+      severity: 'error',
+      from: { path: '^src/contexts/board/domain' },
+      to: { path: '^src/contexts/board/(application|infrastructure|presentation)' },
+    },
+    {
+      name: 'board-application-no-infra',
+      severity: 'error',
+      from: { path: '^src/contexts/board/application' },
+      to: { path: '^src/contexts/board/infrastructure' },
+    },
+    {
+      name: 'board-application-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/board/application' },
+      to: { path: '^src/contexts/board/presentation' },
+    },
+    {
+      name: 'board-infra-no-application',
+      severity: 'error',
+      from: { path: '^src/contexts/board/infrastructure' },
+      to: { path: '^src/contexts/board/application' },
+    },
+    {
+      name: 'board-infra-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/board/infrastructure' },
+      to: { path: '^src/contexts/board/presentation' },
+    },
+
     // === Shared domain isolation ===
     {
       name: 'shared-domain-isolation',

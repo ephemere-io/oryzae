@@ -29,6 +29,24 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
+  async listByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]> {
+    const startOfDay = `${dateKey}T00:00:00.000Z`;
+    const nextDay = new Date(`${dateKey}T00:00:00.000Z`);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    const endOfDay = nextDay.toISOString();
+
+    const { data, error } = await this.supabase
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('created_at', startOfDay)
+      .lt('created_at', endOfDay)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
   async save(entry: Entry): Promise<void> {
     const props = entry.toProps();
     const { error } = await this.supabase.from('entries').upsert({

@@ -14,6 +14,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
+    href: '/board',
+    label: 'Board',
+    match: '/board',
+    iconPath:
+      'M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM14 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5ZM4 15a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4ZM14 15a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-4Z',
+  },
+  {
     href: '/jar',
     label: 'Jar',
     match: '/jar',
