@@ -328,6 +328,12 @@ export function EntryEditor({
             setContent(text);
             if (status === 'saved') setStatus('editing');
           }}
+          onPaste={(e) => {
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            if (!text) return;
+            document.execCommand('insertText', false, text);
+          }}
           data-placeholder="今日のことを書いてみましょう..."
           className="min-h-full whitespace-pre-wrap bg-transparent px-6 py-6 leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)]"
           style={{
