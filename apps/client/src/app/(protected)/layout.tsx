@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import {
@@ -17,10 +18,11 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
   return (
     <main
-      className="flex-1 overflow-auto transition-[margin-left] duration-200 ease-linear"
+      className="flex flex-1 flex-col overflow-hidden transition-[margin-left] duration-200 ease-linear"
       style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
     >
-      <div className="mx-auto w-full max-w-4xl px-4 py-6">{children}</div>
+      <div className="relative flex-1 overflow-auto">{children}</div>
+      <PageFooter />
     </main>
   );
 }
