@@ -3,6 +3,7 @@ import {
   boardQuerySchema,
   boardSnippetCreateSchema,
   boardSnippetUpdateSchema,
+  MAX_PHOTO_CAPTION_LENGTH,
 } from '@oryzae/shared';
 import { Hono } from 'hono';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
@@ -122,8 +123,11 @@ export const board = new Hono<Env>()
     if (!dateKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return c.json({ error: 'Invalid dateKey' }, 400);
     }
-    if (caption.length > 20) {
-      return c.json({ error: 'Caption must be 20 characters or less' }, 400);
+    if (caption.length > MAX_PHOTO_CAPTION_LENGTH) {
+      return c.json(
+        { error: `Caption must be ${MAX_PHOTO_CAPTION_LENGTH} characters or less` },
+        400,
+      );
     }
 
     const supabase = c.get('supabase');

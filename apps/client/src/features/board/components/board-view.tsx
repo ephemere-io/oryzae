@@ -36,6 +36,7 @@ export function BoardView({ api }: BoardViewProps) {
   }>({ open: false });
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
+  const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
 
   const { cards, setCards, loading, createSnippet, updateSnippet, createPhoto, deleteCard } =
     useBoard(api, dateKey, viewType);
@@ -71,6 +72,8 @@ export function BoardView({ api }: BoardViewProps) {
         router.push(`/entries/${card.refId}`);
       } else if (card.cardType === 'snippet' && 'text' in card.content) {
         setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
+      } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
+        setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
       }
     },
     [router, didDrag],
@@ -188,6 +191,39 @@ export function BoardView({ api }: BoardViewProps) {
         onSubmit={(file, caption) => createPhoto(file, caption)}
         onClose={() => setPhotoDialogOpen(false)}
       />
+
+      {/* Photo lightbox */}
+      {lightbox && (
+        <div
+          role="dialog"
+          aria-label="Photo lightbox"
+          className="fixed inset-0 z-[2000] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+          onClick={() => setLightbox(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setLightbox(null);
+          }}
+        >
+          <div className="flex max-h-[80vh] max-w-[80vw] flex-col items-center">
+            <img
+              src={lightbox.imageUrl}
+              alt={lightbox.caption}
+              className="max-h-[75vh] max-w-full object-contain"
+            />
+            {lightbox.caption && (
+              <p className="mt-3 text-center text-sm italic text-white/70">{lightbox.caption}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            aria-label="Close lightbox"
+            onClick={() => setLightbox(null)}
+            className="absolute right-6 top-6 text-2xl text-white/70 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }

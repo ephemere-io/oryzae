@@ -11,7 +11,9 @@ interface PhotoDialogProps {
 function resizeImage(file: File, maxWidth: number, quality: number): Promise<Blob> {
   return new Promise((resolve) => {
     const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
       const canvas = document.createElement('canvas');
       let { width, height } = img;
       if (width > maxWidth) {
@@ -24,7 +26,7 @@ function resizeImage(file: File, maxWidth: number, quality: number): Promise<Blo
       ctx?.drawImage(img, 0, 0, width, height);
       canvas.toBlob((blob) => resolve(blob ?? file), 'image/jpeg', quality);
     };
-    img.src = URL.createObjectURL(file);
+    img.src = objectUrl;
   });
 }
 
@@ -39,6 +41,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (preview) URL.revokeObjectURL(preview);
     setSelectedFile(file);
     setPreview(URL.createObjectURL(file));
   };
@@ -50,6 +53,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
     const resized = await resizeImage(selectedFile, 800, 0.7);
     const resizedFile = new File([resized], selectedFile.name, { type: 'image/jpeg' });
     onSubmit(resizedFile, caption.trim());
+    if (preview) URL.revokeObjectURL(preview);
     setCaption('');
     setPreview(null);
     setSelectedFile(null);
@@ -57,6 +61,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
   };
 
   const handleClose = () => {
+    if (preview) URL.revokeObjectURL(preview);
     setCaption('');
     setPreview(null);
     setSelectedFile(null);

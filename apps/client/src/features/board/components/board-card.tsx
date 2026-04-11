@@ -86,7 +86,12 @@ export function BoardCard({
         zIndex: isDragging ? 1000 : card.zIndex,
         cursor: isDragging ? 'grabbing' : 'grab',
         borderRadius: 2,
-        backgroundColor: card.cardType === 'snippet' ? 'var(--card-snippet, #FFFBE0)' : 'var(--bg)',
+        backgroundColor:
+          card.cardType === 'snippet'
+            ? 'var(--card-snippet, #FFFBE0)'
+            : card.cardType === 'photo'
+              ? 'var(--card-photo, #ffffff)'
+              : 'var(--bg)',
         border: '1px solid var(--border-subtle)',
         boxShadow: isDragging
           ? '0 20px 40px rgba(0,0,0,0.15)'
@@ -107,7 +112,13 @@ export function BoardCard({
       {/* Invisible click target */}
       <button
         type="button"
-        aria-label={card.cardType === 'entry' ? 'Open entry' : 'Edit snippet'}
+        aria-label={
+          card.cardType === 'entry'
+            ? 'Open entry'
+            : card.cardType === 'photo'
+              ? 'View photo'
+              : 'Edit snippet'
+        }
         className="absolute inset-0 z-[1] cursor-grab bg-transparent"
         style={{ border: 'none', outline: 'none' }}
         onClick={(e) => {
