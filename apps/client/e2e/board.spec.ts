@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures/auth';
 
 test.describe('ボード画面', () => {
-  test.beforeEach(async ({ authenticated, page }) => {
+  test.beforeEach(async ({ authenticated: _, page }) => {
     await page.goto('/board');
     await page.waitForSelector('[role="application"]');
   });
