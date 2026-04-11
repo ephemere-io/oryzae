@@ -38,6 +38,7 @@ interface EntryEditorProps {
   onLinkQuestion?: (entryId: string, questionId: string) => Promise<void>;
   onUnlinkQuestion?: (entryId: string, questionId: string) => Promise<void>;
   onSaveComplete?: (entryId: string, content: string) => void;
+  onSaveTransition?: (text: string, editorEl: HTMLElement) => Promise<void>;
 }
 
 function formatDate(date: Date): string {
@@ -61,6 +62,7 @@ export function EntryEditor({
   onLinkQuestion,
   onUnlinkQuestion,
   onSaveComplete,
+  onSaveTransition,
 }: EntryEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
@@ -126,11 +128,14 @@ export function EntryEditor({
       setTimeout(() => setStatus('editing'), 2000);
       // Fire-and-forget: trigger fermentation analysis
       onSaveComplete?.(savedId, content);
-      if (!entryId) {
+      // Trigger save→jar transition animation
+      if (onSaveTransition && editorRef.current && content.trim()) {
+        await onSaveTransition(content, editorRef.current);
+      } else if (!entryId) {
         router.push(`/entries/${savedId}`);
       }
     }
-  }, [content, entryId, save, linkedIds, onLinkQuestion, router, onSaveComplete]);
+  }, [content, entryId, save, linkedIds, onLinkQuestion, router, onSaveComplete, onSaveTransition]);
 
   const handleLink = useCallback(
     async (questionId: string) => {
