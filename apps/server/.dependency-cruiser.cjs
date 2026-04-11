@@ -97,8 +97,7 @@ module.exports = {
     // === Board context isolation ===
     {
       name: 'board-context-isolation',
-      comment:
-        'board context may import entry domain (gateway IFs for cross-context reads)',
+      comment: 'board context may import entry domain (gateway IFs for cross-context reads)',
       severity: 'error',
       from: { path: '^src/contexts/board/(domain|application|infrastructure)' },
       to: {
