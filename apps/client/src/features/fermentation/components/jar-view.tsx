@@ -145,6 +145,7 @@ export function JarView({
   const [editingQuestion, setEditingQuestion] = useState<QuestionData | null>(null);
   const [editText, setEditText] = useState('');
   const editInputRef = useRef<HTMLTextAreaElement>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleElementClick = useCallback(
     (
@@ -542,20 +543,24 @@ export function JarView({
               {onArchiveQuestion && (
                 <button
                   type="button"
+                  disabled={submitting}
                   onClick={async () => {
+                    setSubmitting(true);
                     await onArchiveQuestion(editingQuestion.id);
+                    setSubmitting(false);
                     setEditingQuestion(null);
                   }}
-                  className="mr-auto rounded-full border border-[#dc2626] bg-transparent px-5 py-2 text-[11px] text-[#dc2626] transition-all hover:bg-[#dc2626] hover:text-white"
+                  className="mr-auto rounded-full border border-[#dc2626] bg-transparent px-5 py-2 text-[11px] text-[#dc2626] transition-all hover:bg-[#dc2626] hover:text-white disabled:opacity-50"
                   style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
                 >
-                  アーカイブ
+                  {submitting ? '処理中...' : 'アーカイブ'}
                 </button>
               )}
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => setEditingQuestion(null)}
-                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)]"
+                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)] disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
                 キャンセル
@@ -563,15 +568,18 @@ export function JarView({
               {onEditQuestion && (
                 <button
                   type="button"
+                  disabled={submitting || !editText.trim()}
                   onClick={async () => {
                     if (!editText.trim()) return;
+                    setSubmitting(true);
                     await onEditQuestion(editingQuestion.id, editText.trim());
+                    setSubmitting(false);
                     setEditingQuestion(null);
                   }}
-                  className="rounded-full bg-[var(--text)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85"
+                  className="rounded-full bg-[var(--text)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
                   style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
                 >
-                  更新する
+                  {submitting ? '更新中...' : '更新する'}
                 </button>
               )}
             </div>
@@ -609,27 +617,31 @@ export function JarView({
             <div className="mt-4 flex justify-end gap-2.5">
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => {
                   setShowAddModal(false);
                   setNewQuestionText('');
                 }}
-                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)]"
+                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)] disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
                 キャンセル
               </button>
               <button
                 type="button"
+                disabled={submitting || !newQuestionText.trim()}
                 onClick={async () => {
                   if (!newQuestionText.trim() || !onAddQuestion) return;
+                  setSubmitting(true);
                   await onAddQuestion(newQuestionText.trim());
+                  setSubmitting(false);
                   setNewQuestionText('');
                   setShowAddModal(false);
                 }}
-                className="rounded-full bg-[var(--text)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85"
+                className="rounded-full bg-[var(--text)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
-                追加する
+                {submitting ? '追加中...' : '追加する'}
               </button>
             </div>
           </div>
