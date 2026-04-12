@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { UserAvatar } from '@/features/auth/components/user-avatar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
@@ -52,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { auth, logout } = useAuth();
   const { expanded, toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
 
@@ -135,6 +136,16 @@ export function Sidebar() {
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* User avatar */}
+        {auth && (
+          <UserAvatar
+            avatarUrl={auth.user.avatarUrl}
+            name={auth.user.name}
+            email={auth.user.email}
+            expanded={expanded}
+          />
+        )}
 
         {/* Dark mode toggle */}
         <button

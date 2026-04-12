@@ -83,23 +83,20 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
-        className="w-80 rounded-lg p-6 shadow-lg"
-        style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border-subtle)' }}
+        className="w-[90%] max-w-[400px] rounded-xl text-center shadow-lg"
+        style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
-        <h3
-          className="mb-4 text-xs font-semibold uppercase tracking-wider"
-          style={{ color: 'var(--accent)', fontFamily: 'Inter, sans-serif' }}
-        >
-          Add Photo
+        <h3 className="mb-4 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
+          写真を追加
         </h3>
 
         {/* Preview / File picker */}
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="mb-3 flex w-full items-center justify-center rounded border-2 border-dashed"
+          className="mb-4 flex w-full items-center justify-center rounded-lg border-2 border-dashed"
           style={{
-            height: 160,
+            aspectRatio: '1',
             borderColor: 'var(--border-subtle)',
             backgroundColor: 'var(--toolbar-hover)',
             overflow: 'hidden',
@@ -113,7 +110,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
             />
           ) : (
             <span className="text-xs" style={{ color: 'var(--date-color)' }}>
-              クリックして画像を選択
+              クリックして写真を選択
             </span>
           )}
         </button>
@@ -130,36 +127,35 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           maxLength={20}
-          placeholder="キャプション（任意）"
-          className="mb-3 w-full rounded border px-3 py-2 text-sm outline-none"
+          placeholder="キャプション（20文字以内）"
+          className="mb-4 w-full rounded-md border px-3 py-2.5 text-left text-sm outline-none"
           style={{
             backgroundColor: 'var(--bg)',
             borderColor: 'var(--border-subtle)',
             color: 'var(--fg)',
           }}
         />
-        <div className="flex items-center justify-between">
-          <span className="text-[10px]" style={{ color: 'var(--date-color)' }}>
-            {caption.length}/20
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="rounded px-3 py-1 text-xs"
-              style={{ color: 'var(--date-color)' }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!selectedFile}
-              className="rounded px-3 py-1 text-xs text-white disabled:opacity-40"
-              style={{ backgroundColor: 'var(--accent)' }}
-            >
-              Add
-            </button>
-          </div>
+        <div className="flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-md border px-4 py-2 text-xs"
+            style={{
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--fg)',
+              backgroundColor: 'var(--bg)',
+            }}
+          >
+            キャンセル
+          </button>
+          <button
+            type="submit"
+            disabled={!selectedFile}
+            className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
+            style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
+          >
+            追加
+          </button>
         </div>
       </form>
     </div>

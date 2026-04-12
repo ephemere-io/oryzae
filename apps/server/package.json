@@ -22,11 +22,13 @@
     "dep-cruise": "depcruise src --config .dependency-cruiser.cjs"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.0",
+    "@hono/node-server": "^1.19.13",
     "@oryzae/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.49.0",
-    "ai": "^6.0.149",
-    "hono": "^4.7.0",
+    "@supabase/supabase-js": "^2.103.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.37.0",
+    "ai": "^6.0.158",
+    "hono": "^4.12.12",
     "zod": "^3.24.0"
   },
   "devDependencies": {

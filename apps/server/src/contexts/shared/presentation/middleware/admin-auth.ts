@@ -39,5 +39,12 @@ export async function adminAuthMiddleware(c: Context, next: Next) {
   c.set('adminUserId', user.id);
   c.set('adminSupabase', getSupabaseClient());
 
+  const mod = '@sentry/nextjs';
+  import(/* webpackIgnore: true */ mod)
+    .then((Sentry: { setUser: (user: { id: string }) => void }) => {
+      Sentry.setUser({ id: user.id });
+    })
+    .catch(() => {});
+
   await next();
 }

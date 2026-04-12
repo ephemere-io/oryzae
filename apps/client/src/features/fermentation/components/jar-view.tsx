@@ -103,27 +103,23 @@ function QuestionCircleWithData({
   const isHidden = zoomedId !== null && !isZoomed;
 
   return (
-    <div
-      className={`transition-opacity duration-500 ${isHidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
-      style={{ animation: 'fadeIn 0.5s ease-out forwards' }}
-    >
-      <QuestionCircle
-        questionId={question.id}
-        questionText={question.currentText ?? ''}
-        detail={detail}
-        zoomed={isZoomed}
-        onClick={() => onZoom(question.id)}
-        onElementClick={(type, data) => onElementClick(question.currentText ?? '', type, data)}
-        style={
-          isZoomed
-            ? {}
-            : {
-                top: position.top,
-                left: position.left,
-              }
-        }
-      />
-    </div>
+    <QuestionCircle
+      questionId={question.id}
+      questionText={question.currentText ?? ''}
+      detail={detail}
+      zoomed={isZoomed}
+      hidden={isHidden}
+      onClick={() => onZoom(question.id)}
+      onElementClick={(type, data) => onElementClick(question.currentText ?? '', type, data)}
+      style={
+        isZoomed
+          ? {}
+          : {
+              top: position.top,
+              left: position.left,
+            }
+      }
+    />
   );
 }
 
@@ -490,7 +486,7 @@ export function JarView({
                 }}
                 className="rounded-full px-4 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-all hover:-translate-y-0.5"
                 style={{
-                  background: 'linear-gradient(135deg, var(--text), rgba(140,133,126,0.9))',
+                  background: 'linear-gradient(135deg, var(--fg), rgba(140,133,126,0.9))',
                   color: 'var(--bg)',
                   fontFamily: "'Noto Serif JP', serif",
                   border: '1px solid rgba(255,255,255,0.15)',
@@ -531,7 +527,7 @@ export function JarView({
             onKeyDown={(e) => e.stopPropagation()}
           >
             <h3
-              className="mb-4 text-sm text-[var(--text)]"
+              className="mb-4 text-sm text-[var(--fg)]"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
             >
               問いを編集
@@ -542,7 +538,7 @@ export function JarView({
               onChange={(e) => setEditText(e.target.value)}
               maxLength={64}
               rows={3}
-              className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-transparent p-3 text-[13px] text-[var(--text)] outline-none"
+              className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-transparent p-3 text-[13px] text-[var(--fg)] outline-none"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
             />
             <div className="mt-1 text-right text-[10px] text-[var(--date-color)]">
@@ -585,7 +581,7 @@ export function JarView({
                     setSubmitting(false);
                     setEditingQuestion(null);
                   }}
-                  className="rounded-full bg-[var(--text)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
+                  className="rounded-full bg-[var(--fg)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
                   style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
                 >
                   {submitting ? '更新中...' : '更新する'}
@@ -609,7 +605,7 @@ export function JarView({
             onKeyDown={(e) => e.stopPropagation()}
           >
             <h3
-              className="mb-4 text-sm text-[var(--text)]"
+              className="mb-4 text-sm text-[var(--fg)]"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
             >
               新しい問いを追加
@@ -620,7 +616,7 @@ export function JarView({
               onChange={(e) => setNewQuestionText(e.target.value)}
               placeholder="あなたの問いを入力してください"
               rows={3}
-              className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-transparent p-3 text-[13px] text-[var(--text)] outline-none"
+              className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-transparent p-3 text-[13px] text-[var(--fg)] outline-none"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
             />
             <div className="mt-4 flex justify-end gap-2.5">
@@ -647,7 +643,7 @@ export function JarView({
                   setNewQuestionText('');
                   setShowAddModal(false);
                 }}
-                className="rounded-full bg-[var(--text)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
+                className="rounded-full bg-[var(--fg)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
                 {submitting ? '追加中...' : '追加する'}
