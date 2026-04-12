@@ -64,14 +64,11 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Row 1: Date range + Refresh */}
+    <div className="space-y-4">
+      {/* Row 1: Title + date selector + refresh */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Oryzae の全体統計</p>
-          </div>
+          <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
           <DateRangeSelector
             preset={preset}
             dateFrom={dateFrom}
@@ -80,15 +77,14 @@ export default function DashboardPage() {
             onCustomChange={setCustomRange}
           />
         </div>
-        <Button variant="outline" size="sm" onClick={refreshAll} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          更新
+        <Button variant="ghost" size="icon-sm" onClick={refreshAll} disabled={loading}>
+          <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
       {/* Errors */}
       {errors.length > 0 && (
-        <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive space-y-1">
+        <div className="rounded-md bg-destructive/10 px-4 py-2.5 text-xs text-destructive space-y-0.5">
           {errors.map((err) => (
             <p key={err}>{err}</p>
           ))}
@@ -98,20 +94,20 @@ export default function DashboardPage() {
       {/* Row 2: Failure alerts (full width) */}
       <FailureAlerts groups={groups} retryFermentation={retryFermentation} />
 
-      {/* Row 3: Health sparklines (half) + Cost summary (half) */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Row 3: Health sparklines (2 cards) + cost summary (1 card) — 3 columns */}
+      <div className="grid gap-4 lg:grid-cols-3">
         <HealthSparklines days={days} />
         <CostSummaryCard summary={summary} />
       </div>
 
-      {/* Row 4: User activity (1/3) + Stats cards (2/3) */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Row 4: User activity (1/4) + stats grid (3/4) */}
+      <div className="grid gap-4 lg:grid-cols-4">
         <UserActivityCard activeWriters={activeWriters} totalUsers={totalUsers} />
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           {stats ? (
             <StatsCards stats={stats} />
           ) : statsLoading ? (
-            <p className="text-sm text-muted-foreground">読み込み中...</p>
+            <p className="text-xs text-muted-foreground">Loading...</p>
           ) : null}
         </div>
       </div>

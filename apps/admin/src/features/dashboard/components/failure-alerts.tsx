@@ -1,16 +1,21 @@
 'use client';
 
-import { AlertTriangle, CheckCircle, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { FailureGroup } from '../hooks/use-failure-alerts';
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+function formatRelativeTime(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}d ago`;
 }
 
 function truncate(text: string, maxLen: number): string {
@@ -35,14 +40,13 @@ function RetryButton({
 
   return (
     <Button
-      variant="outline"
-      size="sm"
+      variant="ghost"
+      size="icon-xs"
       onClick={handleRetry}
       disabled={retrying}
-      className="shrink-0"
+      className="shrink-0 text-muted-foreground hover:text-foreground"
     >
-      <RotateCcw className={`mr-1 h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
-      Retry
+      <RotateCcw className={`size-3 ${retrying ? 'animate-spin' : ''}`} />
     </Button>
   );
 }
@@ -54,53 +58,47 @@ export function FailureAlerts({
   groups: FailureGroup[];
   retryFermentation: (id: string) => Promise<boolean>;
 }) {
+  const totalFailures = groups.reduce((sum, g) => sum + g.failures.length, 0);
   const hasFailures = groups.length > 0;
 
+  if (!hasFailures) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-card px-4 py-2.5">
+        <span className="size-1.5 rounded-full bg-green-500" />
+        <span className="text-xs text-muted-foreground">All clear</span>
+      </div>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-500" />
-        <CardTitle className="text-sm font-medium">要対応</CardTitle>
-        {!hasFailures && (
-          <Badge variant="outline" className="ml-2 border-green-600 text-green-500">
-            <CheckCircle className="mr-1 h-3 w-3" />
-            問題なし
-          </Badge>
-        )}
-      </CardHeader>
-      {hasFailures && (
-        <CardContent className="space-y-4">
-          {groups.map((group) => (
-            <div key={group.userId} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Avatar size="sm">
-                  <AvatarFallback>{group.email.charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium">{group.email}</span>
-                <Badge variant="destructive" className="ml-auto">
-                  {group.failures.length}
-                </Badge>
-              </div>
-              <div className="ml-8 space-y-1.5">
-                {group.failures.map((f) => (
-                  <div
-                    key={f.fermentationId}
-                    className="flex items-center gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm"
-                  >
-                    <span className="flex-1 truncate text-muted-foreground" title={f.errorMessage}>
-                      {truncate(f.errorMessage, 60)}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {formatDate(f.createdAt)}
-                    </span>
-                    <RetryButton fermentationId={f.fermentationId} onRetry={retryFermentation} />
-                  </div>
-                ))}
-              </div>
+    <div className="rounded-lg border border-border/50 bg-card">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          要対応
+        </span>
+        <span className="inline-flex items-center justify-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+          {totalFailures}
+        </span>
+      </div>
+      <div className="divide-y divide-border/30">
+        {groups.flatMap((group) =>
+          group.failures.map((f) => (
+            <div key={f.fermentationId} className="flex items-center gap-3 px-4 py-2">
+              <span className="size-1.5 shrink-0 rounded-full bg-red-500" />
+              <span className="shrink-0 text-xs text-muted-foreground w-36 truncate">
+                {group.email}
+              </span>
+              <span className="flex-1 truncate text-sm text-foreground/80" title={f.errorMessage}>
+                {truncate(f.errorMessage, 80)}
+              </span>
+              <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+                {formatRelativeTime(f.createdAt)}
+              </span>
+              <RetryButton fermentationId={f.fermentationId} onRetry={retryFermentation} />
             </div>
-          ))}
-        </CardContent>
-      )}
-    </Card>
+          )),
+        )}
+      </div>
+    </div>
   );
 }

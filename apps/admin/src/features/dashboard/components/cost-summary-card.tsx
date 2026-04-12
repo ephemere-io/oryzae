@@ -1,7 +1,5 @@
 'use client';
 
-import { ArrowDown, ArrowUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { CostSummary } from '../hooks/use-cost-summary';
 
 function formatCost(value: number): string {
@@ -11,42 +9,32 @@ function formatCost(value: number): string {
 export function CostSummaryCard({ summary }: { summary: CostSummary | null }) {
   if (!summary) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">今月のコスト</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">データがありません</p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col justify-between rounded-lg border border-border/50 bg-card p-4">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">Monthly Cost</span>
+        <div className="text-3xl font-semibold tracking-tight mt-0.5 text-muted-foreground">--</div>
+      </div>
     );
   }
 
   const delta = summary.currentMonthCost - summary.lastMonthCost;
-  const isLess = delta <= 0;
+  const isDown = delta <= 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground">今月のコスト</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="text-2xl font-bold">{formatCost(summary.currentMonthCost)}</div>
-        <div className="flex items-center gap-1 text-sm">
-          {isLess ? (
-            <ArrowDown className="h-4 w-4 text-green-500" />
-          ) : (
-            <ArrowUp className="h-4 w-4 text-red-500" />
-          )}
-          <span className={isLess ? 'text-green-500' : 'text-red-500'}>
-            {formatCost(Math.abs(delta))}
-          </span>
-          <span className="text-muted-foreground">vs 先月</span>
+    <div className="flex flex-col justify-between rounded-lg border border-border/50 bg-card p-4">
+      <div>
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">Monthly Cost</span>
+        <div className="text-3xl font-semibold tracking-tight mt-0.5">
+          {formatCost(summary.currentMonthCost)}
         </div>
-        <p className="text-xs text-muted-foreground">
-          月末予測: {formatCost(summary.projectedCost)}
+      </div>
+      <div className="mt-2 space-y-0.5">
+        <span className={`text-xs ${isDown ? 'text-green-500' : 'text-red-500'}`}>
+          {isDown ? '\u2193' : '\u2191'} {formatCost(Math.abs(delta))} vs last month
+        </span>
+        <p className="text-[10px] text-muted-foreground">
+          Projected: {formatCost(summary.projectedCost)}
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

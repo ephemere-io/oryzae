@@ -3,30 +3,49 @@
 import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { DateRangeSelector } from '@/components/ui/date-range-selector';
 import { FermentationTable } from '@/features/fermentations/components/fermentation-table';
 import { useFermentations } from '@/features/fermentations/hooks/use-fermentations';
+import { useDateRange } from '@/lib/use-date-range';
 
 export default function FermentationsPage() {
   const [page, setPage] = useState(1);
+  const { preset, dateFrom, dateTo, selectPreset, setCustomRange } = useDateRange('30d');
   const { data, pagination, loading, error, refresh, retryFermentation } = useFermentations({
     page,
+    dateFrom,
+    dateTo,
   });
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
+  const completed = data.filter((i) => i.status === 'completed').length;
+  const failed = data.filter((i) => i.status === 'failed').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Fermentations</h1>
-          <p className="text-sm text-muted-foreground">
-            全発酵プロセスのモニタリング（{pagination.total} 件）
-          </p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-medium">Fermentations</h1>
+          <span className="text-sm text-muted-foreground">
+            {pagination.total} total
+            <span className="mx-1.5 text-border">|</span>
+            {completed} completed
+            <span className="mx-1.5 text-border">|</span>
+            {failed} failed
+          </span>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          更新
-        </Button>
+        <div className="flex items-center gap-2">
+          <DateRangeSelector
+            preset={preset}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onPresetChange={selectPreset}
+            onCustomChange={setCustomRange}
+          />
+          <Button variant="ghost" size="icon-xs" onClick={refresh} disabled={loading}>
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -36,27 +55,27 @@ export default function FermentationsPage() {
       )}
 
       {loading && data.length === 0 ? (
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : (
         <>
           <FermentationTable items={data} onRetry={retryFermentation} />
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 pt-2">
               <Button
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="xs"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
               >
                 Previous
               </Button>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-xs text-muted-foreground font-mono">
                 {page} / {totalPages}
               </span>
               <Button
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="xs"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
