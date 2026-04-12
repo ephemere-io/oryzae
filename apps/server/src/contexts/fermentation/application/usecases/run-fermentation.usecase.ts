@@ -48,11 +48,18 @@ export class RunFermentationUsecase {
 
     try {
       // 3. Run LLM analysis
-      const output = await this.llmGateway.analyze({
+      const { output, generationId } = await this.llmGateway.analyze({
         question: params.questionText,
         entryContent: params.entryContent,
         targetPeriod,
+        userId: params.userId,
       });
+
+      // 3.5. Save generation ID for cost tracking
+      if (generationId) {
+        const withGen = fermentationResult.withGenerationId(generationId);
+        await this.fermentationRepo.update(withGen);
+      }
 
       // 4. Save all results
       const worksheet = AnalysisWorksheet.create(

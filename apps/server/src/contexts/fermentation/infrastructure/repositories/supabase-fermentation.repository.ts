@@ -31,7 +31,11 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
     const props = result.toProps();
     const { error } = await this.supabase
       .from('fermentation_results')
-      .update({ status: props.status, updated_at: new Date().toISOString() })
+      .update({
+        status: props.status,
+        generation_id: props.generationId,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', props.id);
     if (error) throw new Error(`Failed to update fermentation result: ${error.message}`);
   }
@@ -50,6 +54,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       entryId: data.entry_id,
       targetPeriod: data.target_period,
       status: data.status,
+      generationId: data.generation_id ?? null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     });
@@ -133,6 +138,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         entryId: row.entry_id,
         targetPeriod: row.target_period,
         status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
+        generationId: row.generation_id ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }),

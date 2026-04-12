@@ -22,11 +22,15 @@ function mockRepo(): FermentationRepositoryGateway {
 function mockLlm(): LlmAnalysisGateway {
   return {
     analyze: vi.fn().mockResolvedValue({
-      worksheetMarkdown: '### Worksheet',
-      resultDiagramMarkdown: '### Diagram',
-      snippets: [{ type: 'core', text: 'test text', sourceDate: '12/1', reason: 'test reason' }],
-      letterBody: 'Dear user...',
-      keywords: [{ keyword: 'test', description: 'a test keyword' }],
+      output: {
+        worksheetMarkdown: '### Worksheet',
+        resultDiagramMarkdown: '### Diagram',
+        snippets: [{ type: 'core', text: 'test text', sourceDate: '12/1', reason: 'test reason' }],
+        letterBody: 'Dear user...',
+        keywords: [{ keyword: 'test', description: 'a test keyword' }],
+      },
+      usage: { inputTokens: 100, outputTokens: 200 },
+      generationId: 'gen_test123',
     }),
   };
 }
@@ -47,7 +51,7 @@ describe('RunFermentationUsecase', () => {
 
     expect(result.id).toBe('test-id');
     expect(repo.save).toHaveBeenCalledOnce();
-    expect(repo.update).toHaveBeenCalledTimes(2); // processing + completed
+    expect(repo.update).toHaveBeenCalledTimes(3); // processing + generationId + completed
     expect(llm.analyze).toHaveBeenCalledOnce();
     expect(repo.saveWorksheet).toHaveBeenCalledOnce();
     expect(repo.saveSnippets).toHaveBeenCalledOnce();
