@@ -12,6 +12,7 @@ export interface FermentationItem {
   target_period: string;
   status: string;
   generation_id: string | null;
+  error_message: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,7 +22,18 @@ interface FermentationsResponse {
   pagination: { page: number; limit: number; total: number };
 }
 
-export function useFermentations(page = 1, limit = 30) {
+interface UseFermentationsParams {
+  page?: number;
+  limit?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export function useFermentations(params?: UseFermentationsParams) {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 30;
+  const dateFrom = params?.dateFrom;
+  const dateTo = params?.dateTo;
   const [data, setData] = useState<FermentationItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 30, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -35,7 +47,13 @@ export function useFermentations(page = 1, limit = 30) {
     setError(null);
 
     const api = createApiClient(token);
-    const res = await api.fetch(`/api/v1/admin/fermentations?page=${page}&limit=${limit}`);
+    const searchParams = new URLSearchParams();
+    searchParams.set('page', String(page));
+    searchParams.set('limit', String(limit));
+    if (dateFrom) searchParams.set('date_from', dateFrom);
+    if (dateTo) searchParams.set('date_to', dateTo);
+
+    const res = await api.fetch(`/api/v1/admin/fermentations?${searchParams.toString()}`);
     if (res.ok) {
       const body = (await res.json()) as FermentationsResponse;
       setData(body.data);
@@ -44,11 +62,27 @@ export function useFermentations(page = 1, limit = 30) {
       setError('発酵データの取得に失敗しました');
     }
     setLoading(false);
-  }, [page, limit]);
+  }, [page, limit, dateFrom, dateTo]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  return { data, pagination, loading, error, refresh: fetchData };
+  const retryFermentation = useCallback(
+    async (id: string): Promise<boolean> => {
+      const token = getAccessToken();
+      if (!token) return false;
+
+      const api = createApiClient(token);
+      const res = await api.fetch(`/api/v1/admin/fermentations/${id}/retry`, { method: 'POST' });
+      if (res.ok) {
+        await fetchData();
+        return true;
+      }
+      return false;
+    },
+    [fetchData],
+  );
+
+  return { data, pagination, loading, error, refresh: fetchData, retryFermentation };
 }

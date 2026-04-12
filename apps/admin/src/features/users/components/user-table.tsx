@@ -1,8 +1,6 @@
 'use client';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -32,67 +30,80 @@ function isActive(user: AdminUser): boolean {
   return user.entryCount > 0 || user.fermentationTotal > 0;
 }
 
-export function UserTable({ users }: { users: AdminUser[] }) {
+export function UserTable({
+  users,
+  onUserClick,
+}: {
+  users: AdminUser[];
+  onUserClick?: (userId: string) => void;
+}) {
   return (
-    <Card>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>User</TableHead>
-            <TableHead>Registered</TableHead>
-            <TableHead>Last Login</TableHead>
-            <TableHead className="text-right">Entries</TableHead>
-            <TableHead className="text-right">Questions</TableHead>
-            <TableHead className="text-right">Fermentations</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-xs">{getInitials(user.email)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">{user.email}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{user.id.slice(0, 8)}</p>
-                  </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>User</TableHead>
+          <TableHead>Registered</TableHead>
+          <TableHead>Last Login</TableHead>
+          <TableHead className="text-right">Entries</TableHead>
+          <TableHead className="text-right">Questions</TableHead>
+          <TableHead className="text-right">Fermentations</TableHead>
+          <TableHead>Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {users.map((user) => (
+          <TableRow
+            key={user.id}
+            className={onUserClick ? 'cursor-pointer' : undefined}
+            onClick={onUserClick ? () => onUserClick(user.id) : undefined}
+          >
+            <TableCell>
+              <div className="flex items-center gap-3">
+                <Avatar className="h-7 w-7">
+                  <AvatarFallback className="text-[10px]">{getInitials(user.email)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm">{user.email}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono">
+                    {user.id.slice(0, 8)}
+                  </p>
                 </div>
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-sm">
-                {formatDate(user.createdAt)}
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-sm">
-                {formatDate(user.lastSignInAt)}
-              </TableCell>
-              <TableCell className="text-right font-mono">{user.entryCount}</TableCell>
-              <TableCell className="text-right font-mono">{user.questionCount}</TableCell>
-              <TableCell className="text-right">
-                <span className="font-mono">{user.fermentationTotal}</span>
-                {user.fermentationFailed > 0 && (
-                  <span className="ml-1 text-xs text-destructive">
-                    ({user.fermentationFailed} failed)
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                <Badge variant={isActive(user) ? 'default' : 'secondary'}>
-                  {isActive(user) ? 'Active' : 'Inactive'}
-                </Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-          {users.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                ユーザーがいません
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </Card>
+              </div>
+            </TableCell>
+            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+              {formatDate(user.createdAt)}
+            </TableCell>
+            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+              {formatDate(user.lastSignInAt)}
+            </TableCell>
+            <TableCell className="text-right font-mono text-sm">{user.entryCount}</TableCell>
+            <TableCell className="text-right font-mono text-sm">{user.questionCount}</TableCell>
+            <TableCell className="text-right">
+              <span className="font-mono text-sm">{user.fermentationTotal}</span>
+              {user.fermentationFailed > 0 && (
+                <span className="ml-1 text-[11px] text-red-500">
+                  ({user.fermentationFailed} failed)
+                </span>
+              )}
+            </TableCell>
+            <TableCell>
+              <span className="inline-flex items-center gap-1.5 text-sm">
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${isActive(user) ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
+                />
+                {isActive(user) ? 'Active' : 'Inactive'}
+              </span>
+            </TableCell>
+          </TableRow>
+        ))}
+        {users.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              No users
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
   );
 }

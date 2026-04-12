@@ -13,13 +13,12 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-sm text-muted-foreground">PostHog 行動メトリクス（過去7日間）</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-medium">Analytics</h1>
+          <span className="text-sm text-muted-foreground">Past 7 days</span>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          更新
+        <Button variant="ghost" size="icon-xs" onClick={refresh} disabled={loading}>
+          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
@@ -30,7 +29,7 @@ export default function AnalyticsPage() {
       )}
 
       {loading && !overview ? (
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : (
         <>
           {overview && <AnalyticsOverviewCards overview={overview} />}
@@ -38,7 +37,7 @@ export default function AnalyticsPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <DailyChart data={daily} />
             <div>
-              <h2 className="text-lg font-semibold mb-3">ページ別アクセス</h2>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Pages</p>
               <PageViewsTable items={pages} />
             </div>
           </div>
