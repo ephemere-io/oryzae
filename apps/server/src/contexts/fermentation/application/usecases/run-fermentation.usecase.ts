@@ -55,10 +55,11 @@ export class RunFermentationUsecase {
         userId: params.userId,
       });
 
-      // 3.5. Save generation ID for cost tracking
+      // 3.5. Track generation ID for cost tracking
+      let currentResult = fermentationResult;
       if (generationId) {
-        const withGen = fermentationResult.withGenerationId(generationId);
-        await this.fermentationRepo.update(withGen);
+        currentResult = fermentationResult.withGenerationId(generationId);
+        await this.fermentationRepo.update(currentResult);
       }
 
       // 4. Save all results
@@ -95,12 +96,12 @@ export class RunFermentationUsecase {
       await this.fermentationRepo.saveKeywords(keywords);
 
       // 5. Mark completed
-      const completedResult = fermentationResult.withStatus('completed');
+      const completedResult = currentResult.withStatus('completed');
       if (completedResult.success) {
         await this.fermentationRepo.update(completedResult.value);
       }
 
-      return { id: fermentationResult.id };
+      return { id: currentResult.id };
     } catch (error) {
       // Mark failed
       const failedResult = fermentationResult.withStatus('failed');

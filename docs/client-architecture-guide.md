@@ -57,17 +57,19 @@ apps/{client,admin}/src/
 | **app/** | ルーティング、レイアウト、Route Handler、features の組み合わせ | API 呼び出しの詳細、状態管理ロジック |
 | **app/api/[...path]/** | Hono アプリへのリクエスト転送 | ビジネスロジック（サーバー側に委譲） |
 | **features/{feature}/** | 機能固有のUI・ロジック・型の全て | 他の feature の内部実装 |
-| **lib/** | API クライアント設定、共通ユーティリティ | feature, app の存在 |
+| **components/ui/** | 汎用 UI コンポーネント（shadcn 等） | feature, app の存在 |
+| **lib/** | API クライアント設定、共通ユーティリティ | feature, app, components の存在 |
 
 ---
 
 ## インポートルール（絶対ルール）
 
-| From ＼ To | app/ | features/X | features/Y | lib/ | @oryzae/shared |
-| --- | --- | --- | --- | --- | --- |
-| **app/** | self | YES | YES | YES | YES |
-| **features/X** | NO | self | **NO** | YES | YES |
-| **lib/** | NO | **NO** | **NO** | self | YES |
+| From ＼ To | app/ | features/X | features/Y | components/ui/ | lib/ | @oryzae/shared |
+| --- | --- | --- | --- | --- | --- | --- |
+| **app/** | self | YES | YES | YES | YES | YES |
+| **features/X** | NO | self | **NO** | YES | YES | YES |
+| **components/ui/** | NO | **NO** | **NO** | self | YES | YES |
+| **lib/** | NO | **NO** | **NO** | NO | self | YES |
 
 ### 重要な禁止事項
 

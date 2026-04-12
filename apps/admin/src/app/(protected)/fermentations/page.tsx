@@ -3,12 +3,12 @@
 import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { CostTable } from '@/features/cost-tracking/components/cost-table';
-import { useCostData } from '@/features/cost-tracking/hooks/use-cost-data';
+import { FermentationTable } from '@/features/fermentations/components/fermentation-table';
+import { useFermentations } from '@/features/fermentations/hooks/use-fermentations';
 
-export default function CostsPage() {
+export default function FermentationsPage() {
   const [page, setPage] = useState(1);
-  const { data, pagination, loading, error, refresh } = useCostData(page);
+  const { data, pagination, loading, error, refresh } = useFermentations(page);
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
 
@@ -16,8 +16,10 @@ export default function CostsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Cost Tracking</h1>
-          <p className="text-sm text-muted-foreground">Vercel AI Gateway per-request コスト</p>
+          <h1 className="text-2xl font-bold tracking-tight">Fermentations</h1>
+          <p className="text-sm text-muted-foreground">
+            全発酵プロセスのモニタリング（{pagination.total} 件）
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -35,7 +37,7 @@ export default function CostsPage() {
         <p className="text-sm text-muted-foreground">読み込み中...</p>
       ) : (
         <>
-          <CostTable items={data} />
+          <FermentationTable items={data} />
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
