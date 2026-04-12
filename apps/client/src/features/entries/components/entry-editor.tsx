@@ -396,8 +396,11 @@ export function EntryEditor({
             document.execCommand('insertText', false, text);
           }}
           data-placeholder="今日のことを書いてみましょう..."
-          className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'h-full w-full px-[15%] py-[10%]' : 'min-h-full px-[15%] py-6'}`}
+          className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'absolute inset-0' : 'min-h-full px-[15%] py-6'}`}
           style={{
+            ...(settings.writingMode === 'vertical'
+              ? { left: '15%', top: '10%', width: '70%', height: '80%', position: 'absolute' }
+              : {}),
             fontSize: `${settings.fontSize}px`,
             writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
             textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
