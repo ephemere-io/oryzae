@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { adminAnalytics } from '@/contexts/shared/presentation/routes/admin-analytics.js';
+import { adminAnalytics } from '@/contexts/analytics/presentation/routes/admin-analytics.js';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
