@@ -11,17 +11,15 @@
   --card-snippet: #fffbe0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1a1a1a;
-    --fg: #cccccc;
-    --accent: #5ab8a6;
-    --accent-light: rgba(90, 184, 166, 0.1);
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --toolbar-hover: rgba(255, 255, 255, 0.06);
-    --date-color: #666;
-    --card-snippet: #3a3520;
-  }
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --fg: #cccccc;
+  --accent: #5ab8a6;
+  --accent-light: rgba(90, 184, 166, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --toolbar-hover: rgba(255, 255, 255, 0.06);
+  --date-color: #666;
+  --card-snippet: #3a3520;
 }
 
 body {

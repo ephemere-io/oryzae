@@ -11,6 +11,7 @@ import {
   SidebarProvider,
   useSidebar,
 } from '@/lib/sidebar-context';
+import { ThemeProvider } from '@/lib/theme-context';
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
@@ -48,11 +49,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   if (!auth) return null;
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <ProtectedContent>{children}</ProtectedContent>
-      </div>
-    </SidebarProvider>
+    <ThemeProvider>
+      <SidebarProvider>
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar />
+          <ProtectedContent>{children}</ProtectedContent>
+        </div>
+      </SidebarProvider>
+    </ThemeProvider>
   );
 }
