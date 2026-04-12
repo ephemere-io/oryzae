@@ -6,6 +6,18 @@ import { Suspense, useEffect, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { setTokens } from '@/lib/auth';
 
+function parseHashParams(hash: string): Record<string, string> {
+  const params: Record<string, string> = {};
+  const stripped = hash.startsWith('#') ? hash.slice(1) : hash;
+  for (const pair of stripped.split('&')) {
+    const [key, value] = pair.split('=');
+    if (key && value) {
+      params[decodeURIComponent(key)] = decodeURIComponent(value);
+    }
+  }
+  return params;
+}
+
 function CallbackHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -13,31 +25,56 @@ function CallbackHandler() {
 
   useEffect(() => {
     async function handleCallback() {
+      // Supabase PKCE flow: code in query params
       const code = searchParams.get('code');
-      if (!code) {
-        setError('認証コードが見つかりません');
+      if (code) {
+        const client = createApiClient();
+        const res = await client.fetch('/api/v1/auth/oauth/callback', {
+          method: 'POST',
+          body: JSON.stringify({ code }),
+        });
+
+        if (!res.ok) {
+          setError('認証に失敗しました。もう一度お試しください。');
+          return;
+        }
+
+        const data = (await res.json()) as {
+          user: { id: string; email: string };
+          session: { accessToken: string; refreshToken: string };
+        };
+
+        setTokens(data.session.accessToken, data.session.refreshToken);
+        posthog.identify(data.user.id, { email: data.user.email });
+        router.push('/entries');
         return;
       }
 
-      const client = createApiClient();
-      const res = await client.fetch('/api/v1/auth/oauth/callback', {
-        method: 'POST',
-        body: JSON.stringify({ code }),
-      });
+      // Supabase implicit flow: tokens in URL hash fragment
+      const hash = window.location.hash;
+      if (hash) {
+        const params = parseHashParams(hash);
+        const accessToken = params.access_token;
+        const refreshToken = params.refresh_token;
 
-      if (!res.ok) {
-        setError('認証に失敗しました。もう一度お試しください。');
-        return;
+        if (accessToken && refreshToken) {
+          setTokens(accessToken, refreshToken);
+
+          // Verify token and get user info
+          const client = createApiClient(accessToken);
+          const meRes = await client.fetch('/api/v1/auth/me');
+
+          if (meRes.ok) {
+            const data = (await meRes.json()) as { user: { id: string; email: string } };
+            posthog.identify(data.user.id, { email: data.user.email });
+          }
+
+          router.push('/entries');
+          return;
+        }
       }
 
-      const data = (await res.json()) as {
-        user: { id: string; email: string };
-        session: { accessToken: string; refreshToken: string };
-      };
-
-      setTokens(data.session.accessToken, data.session.refreshToken);
-      posthog.identify(data.user.id, { email: data.user.email });
-      router.push('/entries');
+      setError('認証コードが見つかりません');
     }
 
     handleCallback();
