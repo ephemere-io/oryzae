@@ -1,6 +1,6 @@
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
-const VALID_CARD_TYPES = ['entry', 'snippet'] as const;
+const VALID_CARD_TYPES = ['entry', 'snippet', 'photo'] as const;
 const VALID_VIEW_TYPES = ['daily', 'weekly'] as const;
 const MIN_SIZE = 120;
 
@@ -8,7 +8,7 @@ type CardType = (typeof VALID_CARD_TYPES)[number];
 type ViewType = (typeof VALID_VIEW_TYPES)[number];
 
 function isCardType(value: string): value is CardType {
-  return value === 'entry' || value === 'snippet';
+  return value === 'entry' || value === 'snippet' || value === 'photo';
 }
 
 function isViewType(value: string): value is ViewType {
