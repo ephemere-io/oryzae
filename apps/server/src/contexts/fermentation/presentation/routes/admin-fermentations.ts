@@ -15,18 +15,26 @@ export const adminFermentations = new Hono<Env>()
 
     const { data, error } = await supabase
       .from('fermentation_results')
-      .select('user_id, estimated_cost_usd')
-      .not('estimated_cost_usd', 'is', null);
+      .select('user_id, generation_id')
+      .not('generation_id', 'is', null);
 
     if (error) return c.json({ error: error.message }, 500);
 
-    const userCosts = new Map<string, { count: number; totalCost: number }>();
-    for (const row of data ?? []) {
-      const current = userCosts.get(row.user_id) ?? { count: 0, totalCost: 0 };
-      current.count++;
-      current.totalCost += Number(row.estimated_cost_usd);
-      userCosts.set(row.user_id, current);
-    }
+    const costsByUser = new Map<string, { count: number; totalCost: number }>();
+    await Promise.all(
+      (data ?? []).map(async (row) => {
+        try {
+          const info = await gateway.getGenerationInfo({ id: row.generation_id });
+          const cost = typeof info?.totalCost === 'number' ? info.totalCost : 0;
+          const current = costsByUser.get(row.user_id) ?? { count: 0, totalCost: 0 };
+          current.count++;
+          current.totalCost += cost;
+          costsByUser.set(row.user_id, current);
+        } catch {
+          // skip failed lookups
+        }
+      }),
+    );
 
     const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const emailMap = new Map<string, string>();
@@ -34,7 +42,7 @@ export const adminFermentations = new Hono<Env>()
       emailMap.set(u.id, u.email ?? '');
     }
 
-    const items = Array.from(userCosts.entries())
+    const items = Array.from(costsByUser.entries())
       .map(([userId, stats]) => ({
         userId,
         email: emailMap.get(userId) ?? '',

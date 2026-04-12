@@ -88,9 +88,7 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
     });
 
     // @type-assertion-allowed: providerMetadata の gateway 型は AI SDK の型定義に含まれない
-    const meta = providerMetadata as
-      | { gateway?: { generationId?: string; cost?: number } }
-      | undefined;
+    const meta = providerMetadata as { gateway?: { generationId?: string } } | undefined;
 
     return {
       output: object,
@@ -99,7 +97,6 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
         outputTokens: usage.outputTokens ?? 0,
       },
       generationId: meta?.gateway?.generationId,
-      estimatedCostUsd: meta?.gateway?.cost,
     };
   }
 }
