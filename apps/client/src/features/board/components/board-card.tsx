@@ -11,7 +11,13 @@ interface BoardCardProps {
   isSelected: boolean;
   isDragging: boolean;
   onPointerDown: (cardId: string, x: number, y: number) => void;
-  onRotateStart: (cardId: string, centerX: number, centerY: number) => void;
+  onRotateStart: (
+    cardId: string,
+    centerX: number,
+    centerY: number,
+    pointerX: number,
+    pointerY: number,
+  ) => void;
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
   onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
@@ -58,7 +64,13 @@ export function BoardCard({
       e.stopPropagation();
       if (!cardRef.current) return;
       const rect = cardRef.current.getBoundingClientRect();
-      onRotateStart(card.id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+      onRotateStart(
+        card.id,
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+        e.clientX,
+        e.clientY,
+      );
     },
     [card.id, onRotateStart],
   );
@@ -98,7 +110,7 @@ export function BoardCard({
           : '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)',
         outline: isSelected ? '1.5px solid rgba(74,158,142,0.5)' : 'none',
         outlineOffset: isSelected ? 4 : 0,
-        overflow: 'hidden',
+        overflow: isSelected ? 'visible' : 'hidden',
         userSelect: 'none',
         touchAction: 'none',
         animation: card.removing
@@ -108,8 +120,9 @@ export function BoardCard({
         transition: 'box-shadow 0.2s ease',
       }}
       onPointerDown={handlePointerDown}
+      onClick={(e) => e.stopPropagation()}
     >
-      {/* Invisible click target */}
+      {/* Invisible double-click target */}
       <button
         type="button"
         aria-label={
@@ -121,7 +134,7 @@ export function BoardCard({
         }
         className="absolute inset-0 z-[1] cursor-grab bg-transparent"
         style={{ border: 'none', outline: 'none' }}
-        onClick={(e) => {
+        onDoubleClick={(e) => {
           e.stopPropagation();
           onClick(card);
         }}
@@ -184,13 +197,13 @@ export function BoardCard({
             onKeyDown={(e) => e.stopPropagation()}
             className="absolute left-1/2 flex items-center justify-center rounded-full"
             style={{
-              bottom: -32,
+              bottom: -36,
               transform: 'translateX(-50%)',
-              width: 24,
-              height: 24,
+              width: 28,
+              height: 28,
               backgroundColor: 'var(--bg)',
-              border: '1.5px solid var(--accent)',
-              opacity: 0.8,
+              border: '2px solid var(--accent)',
+              opacity: 1,
               cursor: 'crosshair',
               zIndex: 10,
             }}
@@ -209,19 +222,20 @@ export function BoardCard({
           </div>
 
           {/* Resize handles */}
-          {(['se', 'sw', 'ne', 'nw'] as const).map((corner) => {
+          {(['se', 'sw', 'nw'] as const).map((corner) => {
             const style: React.CSSProperties = {
               position: 'absolute',
-              width: 10,
-              height: 10,
+              width: 18,
+              height: 18,
               backgroundColor: 'var(--bg)',
-              border: '1px solid var(--accent)',
+              border: '1.5px solid var(--accent)',
+              borderRadius: 2,
               zIndex: 10,
             };
-            if (corner.includes('s')) style.bottom = -6;
-            if (corner.includes('n')) style.top = -6;
-            if (corner.includes('e')) style.right = -6;
-            if (corner.includes('w')) style.left = -6;
+            if (corner.includes('s')) style.bottom = -10;
+            if (corner.includes('n')) style.top = -10;
+            if (corner.includes('e')) style.right = -10;
+            if (corner.includes('w')) style.left = -10;
             style.cursor = `${corner}-resize`;
 
             return <div key={corner} onPointerDown={handleResizeDown(corner)} style={style} />;

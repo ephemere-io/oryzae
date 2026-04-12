@@ -20,6 +20,8 @@ interface RotateState {
   cardId: string;
   centerX: number;
   centerY: number;
+  startAngle: number;
+  cardStartRotation: number;
 }
 
 interface ResizeState {
@@ -76,9 +78,22 @@ export function useBoardInteraction(
     [cards],
   );
 
-  const startRotate = useCallback((cardId: string, centerX: number, centerY: number) => {
-    stateRef.current = { type: 'rotate', cardId, centerX, centerY };
-  }, []);
+  const startRotate = useCallback(
+    (cardId: string, centerX: number, centerY: number, pointerX: number, pointerY: number) => {
+      const card = cards.find((c) => c.id === cardId);
+      if (!card) return;
+      const startAngle = Math.atan2(pointerY - centerY, pointerX - centerX) * (180 / Math.PI);
+      stateRef.current = {
+        type: 'rotate',
+        cardId,
+        centerX,
+        centerY,
+        startAngle,
+        cardStartRotation: card.rotation,
+      };
+    },
+    [cards],
+  );
 
   const startResize = useCallback(
     (cardId: string, corner: ResizeCorner, pointerX: number, pointerY: number) => {
@@ -116,10 +131,11 @@ export function useBoardInteraction(
           y: state.cardStartY + dy,
         });
       } else if (state.type === 'rotate') {
-        const angle =
+        const currentAngle =
           Math.atan2(pointerY - state.centerY, pointerX - state.centerX) * (180 / Math.PI);
-        const rounded = Math.round(angle * 10) / 10;
-        updateCard(state.cardId, { rotation: rounded });
+        const delta = currentAngle - state.startAngle;
+        const rotation = Math.round((state.cardStartRotation + delta) * 10) / 10;
+        updateCard(state.cardId, { rotation });
       } else if (state.type === 'resize') {
         const dx = pointerX - state.startX;
         const dy = pointerY - state.startY;
