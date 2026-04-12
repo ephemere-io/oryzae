@@ -33,5 +33,12 @@ export async function authMiddleware(c: Context, next: Next) {
   c.set('userId', user.id);
   c.set('supabase', supabase);
 
+  const mod = '@sentry/nextjs';
+  import(/* webpackIgnore: true */ mod)
+    .then((Sentry: { setUser: (user: { id: string }) => void }) => {
+      Sentry.setUser({ id: user.id });
+    })
+    .catch(() => {});
+
   await next();
 }
