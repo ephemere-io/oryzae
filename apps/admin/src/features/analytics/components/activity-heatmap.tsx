@@ -105,20 +105,20 @@ export function ActivityHeatmap({ data }: { data: DailyMetric[] }) {
 
   if (data.length === 0) {
     return (
-      <div>
-        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+      <div className="space-y-3">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Activity Heatmap
-        </p>
+        </h3>
         <p className="text-sm text-muted-foreground text-center py-4">No data</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+    <div className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         Activity Heatmap
-      </p>
+      </h3>
       <div className="overflow-x-auto">
         <div className="min-w-fit">
           {/* Day-of-week labels + grid */}

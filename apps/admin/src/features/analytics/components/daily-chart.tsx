@@ -12,8 +12,10 @@ export function DailyChart({ data }: { data: DailyMetric[] }) {
   const barHeight = 140;
 
   return (
-    <div>
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Daily Pageviews</p>
+    <div className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Daily Pageviews
+      </h3>
       {data.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-4">No data</p>
       ) : (

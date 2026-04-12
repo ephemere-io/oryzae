@@ -21,11 +21,11 @@ function formatDate(iso: string): string {
 
 export function UserEntryList({ entries }: { entries: UserEntry[] }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+    <div className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         Entries
         <span className="ml-1.5 text-foreground">{entries.length}</span>
-      </p>
+      </h3>
       <Table>
         <TableHeader>
           <TableRow>
