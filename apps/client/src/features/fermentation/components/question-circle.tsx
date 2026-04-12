@@ -124,6 +124,10 @@ export function QuestionCircle({
           from { transform: translate(-50%, -50%) rotate(0deg); }
           to { transform: translate(-50%, -50%) rotate(360deg); }
         }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
       `}</style>
 
       {/* Circle glow */}
@@ -208,7 +212,11 @@ export function QuestionCircle({
         }}
       >
         {hasData ? (
-          <>
+          <div
+            style={{
+              animation: 'fadeIn 0.5s ease-out forwards',
+            }}
+          >
             {/* Keywords with attached microbe */}
             {detail.keywords.slice(0, 5).map((kw, i) => {
               const pos = KEYWORD_POSITIONS[i] ?? { top: 35 + i * 12, left: 20 + i * 15 };
@@ -435,7 +443,7 @@ export function QuestionCircle({
                 </div>
               </div>
             )}
-          </>
+          </div>
         ) : (
           /* Empty state: floating microbes */
           EMPTY_MICROBE_POSITIONS.map((p, i) => {
