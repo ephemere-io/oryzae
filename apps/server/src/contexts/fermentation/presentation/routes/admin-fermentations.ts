@@ -10,6 +10,41 @@ type Env = {
 };
 
 export const adminFermentations = new Hono<Env>()
+  .get('/costs/by-user', async (c) => {
+    const supabase = c.get('adminSupabase');
+
+    const { data, error } = await supabase
+      .from('fermentation_results')
+      .select('user_id, estimated_cost_usd')
+      .not('estimated_cost_usd', 'is', null);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    const userCosts = new Map<string, { count: number; totalCost: number }>();
+    for (const row of data ?? []) {
+      const current = userCosts.get(row.user_id) ?? { count: 0, totalCost: 0 };
+      current.count++;
+      current.totalCost += Number(row.estimated_cost_usd);
+      userCosts.set(row.user_id, current);
+    }
+
+    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const emailMap = new Map<string, string>();
+    for (const u of usersData?.users ?? []) {
+      emailMap.set(u.id, u.email ?? '');
+    }
+
+    const items = Array.from(userCosts.entries())
+      .map(([userId, stats]) => ({
+        userId,
+        email: emailMap.get(userId) ?? '',
+        fermentationCount: stats.count,
+        totalCostUsd: Math.round(stats.totalCost * 1000000) / 1000000,
+      }))
+      .sort((a, b) => b.totalCostUsd - a.totalCostUsd);
+
+    return c.json({ data: items });
+  })
   .get('/', async (c) => {
     const supabase = c.get('adminSupabase');
     const page = Number(c.req.query('page') ?? '1');

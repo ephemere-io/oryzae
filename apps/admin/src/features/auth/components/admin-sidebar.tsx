@@ -1,6 +1,14 @@
 'use client';
 
-import { BarChart3, DollarSign, FlaskConical, LayoutDashboard, LogOut, Users } from 'lucide-react';
+import {
+  Activity,
+  BarChart3,
+  DollarSign,
+  FlaskConical,
+  LayoutDashboard,
+  LogOut,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -13,6 +21,7 @@ const NAV_ITEMS = [
   { href: '/users', label: 'Users', icon: Users },
   { href: '/fermentations', label: 'Fermentations', icon: FlaskConical },
   { href: '/costs', label: 'Costs', icon: DollarSign },
+  { href: '/analytics', label: 'Analytics', icon: Activity },
 ];
 
 export function AdminSidebar() {

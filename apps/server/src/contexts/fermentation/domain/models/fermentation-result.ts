@@ -12,6 +12,7 @@ export interface FermentationResultProps {
   targetPeriod: string;
   status: FermentationStatus;
   generationId: string | null;
+  estimatedCostUsd: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,6 +34,7 @@ export class FermentationResult {
   readonly targetPeriod: string;
   readonly status: FermentationStatus;
   readonly generationId: string | null;
+  readonly estimatedCostUsd: number | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 
@@ -44,6 +46,7 @@ export class FermentationResult {
     this.targetPeriod = props.targetPeriod;
     this.status = props.status;
     this.generationId = props.generationId;
+    this.estimatedCostUsd = props.estimatedCostUsd;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -64,6 +67,7 @@ export class FermentationResult {
         targetPeriod: params.targetPeriod,
         status: 'pending',
         generationId: null,
+        estimatedCostUsd: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }),
@@ -85,6 +89,10 @@ export class FermentationResult {
     return new FermentationResult({ ...this.toProps(), generationId });
   }
 
+  withEstimatedCost(estimatedCostUsd: number): FermentationResult {
+    return new FermentationResult({ ...this.toProps(), estimatedCostUsd });
+  }
+
   toProps(): FermentationResultProps {
     return {
       id: this.id,
@@ -94,6 +102,7 @@ export class FermentationResult {
       targetPeriod: this.targetPeriod,
       status: this.status,
       generationId: this.generationId,
+      estimatedCostUsd: this.estimatedCostUsd,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
