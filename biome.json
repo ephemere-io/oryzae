@@ -47,8 +47,7 @@
       "!**/pnpm-lock.yaml",
       "!**/docs",
       "!**/.claude",
-      "!**/next-env.d.ts",
-      "!**/.mcp.json"
+      "!**/next-env.d.ts"
     ]
   }
 }

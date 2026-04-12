@@ -12,4 +12,3 @@ playwright-report/
 .DS_Store
 .tmp/
 .claude/worktrees/
-.mcp.json
