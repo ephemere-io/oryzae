@@ -2,9 +2,7 @@
 
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -46,10 +44,16 @@ function formatDuration(ms: number | null): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-function stateVariant(state: string): 'default' | 'destructive' | 'secondary' {
-  if (state === 'READY') return 'default';
-  if (state === 'ERROR') return 'destructive';
-  return 'secondary';
+function StateDot({ state }: { state: string }) {
+  const color =
+    state === 'READY'
+      ? 'bg-green-500'
+      : state === 'ERROR'
+        ? 'bg-red-500'
+        : state === 'BUILDING'
+          ? 'bg-yellow-500'
+          : 'bg-muted-foreground';
+  return <span className={`inline-block size-1.5 rounded-full ${color}`} />;
 }
 
 export default function DeploysPage() {
@@ -78,82 +82,87 @@ export default function DeploysPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Vercel Deploys</h1>
-          <p className="text-sm text-muted-foreground">直近のデプロイ一覧</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-medium">Vercel Deploys</h1>
+          <span className="text-sm text-muted-foreground">Recent deployments</span>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            更新
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-xs" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <a href="https://vercel.com" target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="sm">
-              Vercel <ExternalLink className="ml-1 h-3 w-3" />
+            <Button variant="ghost" size="icon-xs">
+              <ExternalLink className="h-3 w-3" />
             </Button>
           </a>
         </div>
       </div>
 
       {!configured && (
-        <div className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
-          VERCEL_TOKEN が未設定です。サーバーの環境変数を設定してください。
-        </div>
+        <p className="text-sm text-muted-foreground py-8 text-center">
+          VERCEL_TOKEN is not configured
+        </p>
       )}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>日時</TableHead>
-                <TableHead>状態</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>コミット</TableHead>
-                <TableHead className="text-right">ビルド時間</TableHead>
-                <TableHead />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-6" />
+              <TableHead>Date</TableHead>
+              <TableHead>Target</TableHead>
+              <TableHead>Commit</TableHead>
+              <TableHead className="text-right">Build</TableHead>
+              <TableHead className="w-6" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {deploys.map((d) => (
+              <TableRow key={d.id}>
+                <TableCell>
+                  <StateDot state={d.state} />
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {formatDate(d.createdAt)}
+                </TableCell>
+                <TableCell className="text-xs">
+                  {d.target === 'production' ? (
+                    <span className="text-green-400">prod</span>
+                  ) : (
+                    <span className="text-muted-foreground">preview</span>
+                  )}
+                </TableCell>
+                <TableCell className="max-w-xs truncate text-sm">
+                  {d.commitMessage || '-'}
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs tabular-nums">
+                  {formatDuration(d.buildDurationMs)}
+                </TableCell>
+                <TableCell>
+                  {d.inspectorUrl && (
+                    <a
+                      href={d.inspectorUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deploys.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="whitespace-nowrap">{formatDate(d.createdAt)}</TableCell>
-                  <TableCell>
-                    <Badge variant={stateVariant(d.state)}>{d.state}</Badge>
-                  </TableCell>
-                  <TableCell className="text-xs">{d.target || '-'}</TableCell>
-                  <TableCell className="max-w-xs truncate text-sm">
-                    {d.commitMessage || '-'}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatDuration(d.buildDurationMs)}
-                  </TableCell>
-                  <TableCell>
-                    {d.inspectorUrl && (
-                      <a
-                        href={d.inspectorUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {deploys.length === 0 && configured && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    デプロイデータがありません
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+            ))}
+            {deploys.length === 0 && configured && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  No deployments
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       )}
     </div>
   );

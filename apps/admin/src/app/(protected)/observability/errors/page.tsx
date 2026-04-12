@@ -2,9 +2,7 @@
 
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -37,10 +35,16 @@ function formatDate(iso: string): string {
   });
 }
 
-function levelVariant(level: string): 'default' | 'destructive' | 'secondary' {
-  if (level === 'error' || level === 'fatal') return 'destructive';
-  if (level === 'warning') return 'default';
-  return 'secondary';
+function LevelDot({ level }: { level: string }) {
+  const color =
+    level === 'fatal'
+      ? 'bg-red-500'
+      : level === 'error'
+        ? 'bg-red-400'
+        : level === 'warning'
+          ? 'bg-yellow-500'
+          : 'bg-muted-foreground';
+  return <span className={`inline-block size-1.5 rounded-full ${color}`} />;
 }
 
 export default function ErrorsPage() {
@@ -69,78 +73,79 @@ export default function ErrorsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Sentry Errors</h1>
-          <p className="text-sm text-muted-foreground">未解決エラー一覧</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-medium">Sentry Errors</h1>
+          <span className="text-sm text-muted-foreground">Unresolved issues</span>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            更新
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-xs" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <a href="https://oryzae.sentry.io" target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="sm">
-              Sentry <ExternalLink className="ml-1 h-3 w-3" />
+            <Button variant="ghost" size="icon-xs">
+              <ExternalLink className="h-3 w-3" />
             </Button>
           </a>
         </div>
       </div>
 
       {!configured && (
-        <div className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
-          SENTRY_AUTH_TOKEN が未設定です。サーバーの環境変数を設定してください。
-        </div>
+        <p className="text-sm text-muted-foreground py-8 text-center">
+          SENTRY_AUTH_TOKEN is not configured
+        </p>
       )}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Error</TableHead>
-                <TableHead>Level</TableHead>
-                <TableHead className="text-right">発生回数</TableHead>
-                <TableHead className="text-right">影響ユーザー</TableHead>
-                <TableHead>最終発生</TableHead>
-                <TableHead />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-6" />
+              <TableHead>Error</TableHead>
+              <TableHead className="text-right">Events</TableHead>
+              <TableHead className="text-right">Users</TableHead>
+              <TableHead>Last seen</TableHead>
+              <TableHead className="w-6" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {issues.map((issue) => (
+              <TableRow key={issue.shortId}>
+                <TableCell>
+                  <LevelDot level={issue.level} />
+                </TableCell>
+                <TableCell className="max-w-md truncate text-sm font-medium">
+                  {issue.title}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {issue.count.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">{issue.userCount}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {formatDate(issue.lastSeen)}
+                </TableCell>
+                <TableCell>
+                  <a
+                    href={issue.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {issues.map((issue) => (
-                <TableRow key={issue.shortId}>
-                  <TableCell className="max-w-xs truncate font-medium">{issue.title}</TableCell>
-                  <TableCell>
-                    <Badge variant={levelVariant(issue.level)}>{issue.level}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {issue.count.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">{issue.userCount}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatDate(issue.lastSeen)}</TableCell>
-                  <TableCell>
-                    <a
-                      href={issue.permalink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {issues.length === 0 && configured && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    未解決エラーはありません
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+            ))}
+            {issues.length === 0 && configured && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  No unresolved errors
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       )}
     </div>
   );

@@ -11,10 +11,9 @@ export default function ObservabilityPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Observability</h1>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          更新
+        <h1 className="text-xl font-medium">Observability</h1>
+        <Button variant="ghost" size="icon-xs" onClick={refresh} disabled={loading}>
+          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
@@ -25,7 +24,7 @@ export default function ObservabilityPage() {
       )}
 
       {loading && !data ? (
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : data ? (
         <ObservabilityCards data={data} />
       ) : null}
