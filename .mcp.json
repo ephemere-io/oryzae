@@ -25,6 +25,14 @@
     "posthog": {
       "type": "http",
       "url": "https://mcp.posthog.com/mcp"
+    },
+    "sentry": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@sentry/mcp-server"],
+      "env": {
+        "SENTRY_AUTH_TOKEN": "${SENTRY_AUTH_TOKEN}"
+      }
     }
   }
 }
