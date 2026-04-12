@@ -14,7 +14,12 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`;
 }
 
-export function UserCostTable({ items }: { items: UserCostSummary[] }) {
+interface UserCostTableProps {
+  items: UserCostSummary[];
+  onUserClick?: (userId: string) => void;
+}
+
+export function UserCostTable({ items, onUserClick }: UserCostTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -27,7 +32,11 @@ export function UserCostTable({ items }: { items: UserCostSummary[] }) {
       </TableHeader>
       <TableBody>
         {items.map((item) => (
-          <TableRow key={item.userId}>
+          <TableRow
+            key={item.userId}
+            className={onUserClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
+            onClick={onUserClick ? () => onUserClick(item.userId) : undefined}
+          >
             <TableCell className="text-sm">{item.email || item.userId.slice(0, 8)}</TableCell>
             <TableCell className="text-right font-mono text-sm">{item.fermentationCount}</TableCell>
             <TableCell className="text-right font-mono text-sm">

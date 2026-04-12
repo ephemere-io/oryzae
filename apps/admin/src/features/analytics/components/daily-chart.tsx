@@ -9,6 +9,7 @@ function formatDateLabel(iso: string): string {
 
 export function DailyChart({ data }: { data: DailyMetric[] }) {
   const maxPageviews = Math.max(...data.map((d) => d.pageviews), 1);
+  const barHeight = 140;
 
   return (
     <div>
@@ -16,26 +17,44 @@ export function DailyChart({ data }: { data: DailyMetric[] }) {
       {data.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-4">No data</p>
       ) : (
-        <div className="space-y-1.5">
-          {data.map((d) => (
-            <div key={d.date} className="flex items-center gap-3 text-sm">
-              <span className="w-10 text-right text-xs text-muted-foreground font-mono shrink-0">
-                {formatDateLabel(d.date)}
-              </span>
-              <div className="flex-1 h-4 bg-muted/50 rounded-sm overflow-hidden">
+        <div className="flex items-end gap-[2px] overflow-x-auto pb-1">
+          {data.map((d) => {
+            const pctPageviews = (d.pageviews / maxPageviews) * 100;
+            const pctUsers = (d.uniqueUsers / maxPageviews) * 100;
+            return (
+              <div
+                key={d.date}
+                className="flex flex-col items-center flex-1 min-w-[24px] max-w-[48px] group"
+              >
+                {/* Pageview count above bar */}
+                <span className="text-[10px] font-mono text-muted-foreground mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {d.pageviews}
+                </span>
+                {/* Bar container */}
                 <div
-                  className="h-full bg-primary/80 rounded-sm transition-all"
-                  style={{ width: `${(d.pageviews / maxPageviews) * 100}%` }}
-                />
+                  className="relative w-full rounded-t-sm bg-muted/30 overflow-hidden"
+                  style={{ height: `${barHeight}px` }}
+                >
+                  {/* Pageviews bar */}
+                  <div
+                    className="absolute bottom-0 left-0 right-0 bg-primary/70 rounded-t-sm transition-all"
+                    style={{ height: `${pctPageviews}%` }}
+                  />
+                  {/* Unique users overlay bar */}
+                  <div
+                    className="absolute bottom-0 left-1/4 right-1/4 bg-primary rounded-t-sm transition-all"
+                    style={{ height: `${pctUsers}%` }}
+                  />
+                </div>
+                {/* Date label below */}
+                <span className="text-[10px] font-mono text-muted-foreground mt-1 whitespace-nowrap">
+                  {formatDateLabel(d.date)}
+                </span>
+                {/* Unique users count */}
+                <span className="text-[9px] text-muted-foreground/70">{d.uniqueUsers}u</span>
               </div>
-              <span className="w-12 text-right font-mono text-xs shrink-0">
-                {d.pageviews.toLocaleString()}
-              </span>
-              <span className="w-8 text-right text-[11px] text-muted-foreground shrink-0">
-                {d.uniqueUsers}u
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

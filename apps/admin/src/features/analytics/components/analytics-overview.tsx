@@ -30,7 +30,7 @@ function Metric({ label, value, sub }: MetricProps) {
 export function AnalyticsOverviewCards({ overview }: { overview: AnalyticsOverview }) {
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
-      <Metric label="Pageviews" value={overview.totalPageviews} sub="Past 7 days" />
+      <Metric label="Pageviews" value={overview.totalPageviews} sub="Selected period" />
       <Metric label="Sessions" value={overview.totalSessions} sub="Unique sessions" />
       <Metric label="Avg Duration" value={formatDuration(overview.avgSessionDurationSeconds)} />
       <Metric label="Entry Views" value={overview.entryPageViews} sub="/entries" />
