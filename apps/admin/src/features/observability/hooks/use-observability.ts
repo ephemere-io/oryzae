@@ -4,22 +4,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
-export interface ToolMetric {
-  label: string;
-  value: string;
-}
-
-export interface ToolSummary {
-  id: string;
-  name: string;
-  tagline: string;
-  href: string | null;
-  externalUrl: string;
-  metric: ToolMetric | null;
-}
-
-interface SummaryResponse {
-  tools: ToolSummary[];
+export interface ObservabilitySummary {
+  posthog: { totalPageviews: number; totalSessions: number } | null;
+  sentry: { unresolvedCount: number | null };
+  gateway: {
+    monthlySpend: number | null;
+    monthlyRequests: number | null;
+    creditBalance: string | null;
+    creditUsed: string | null;
+  };
+  upstash: { totalKeys: number | null };
+  vercel: { latestDeployState: string | null };
 }
 
 interface AnalyticsOverview {
@@ -27,8 +22,20 @@ interface AnalyticsOverview {
   totalSessions: number;
 }
 
+interface SummaryApiResponse {
+  sentry: { unresolvedCount: number | null };
+  gateway: {
+    monthlySpend: number | null;
+    monthlyRequests: number | null;
+    creditBalance: string | null;
+    creditUsed: string | null;
+  };
+  upstash: { totalKeys: number | null };
+  vercel: { latestDeployState: string | null };
+}
+
 export function useObservability() {
-  const [tools, setTools] = useState<ToolSummary[]>([]);
+  const [data, setData] = useState<ObservabilitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,20 +58,14 @@ export function useObservability() {
       return;
     }
 
-    const summary = (await summaryRes.json()) as SummaryResponse;
-
+    const summary = (await summaryRes.json()) as SummaryApiResponse;
+    let posthog: ObservabilitySummary['posthog'] = null;
     if (analyticsRes.ok) {
-      const analytics = (await analyticsRes.json()) as AnalyticsOverview;
-      const posthog = summary.tools.find((t) => t.id === 'posthog');
-      if (posthog) {
-        posthog.metric = {
-          label: '今週の PV',
-          value: analytics.totalPageviews.toLocaleString(),
-        };
-      }
+      const a = (await analyticsRes.json()) as AnalyticsOverview;
+      posthog = { totalPageviews: a.totalPageviews, totalSessions: a.totalSessions };
     }
 
-    setTools(summary.tools);
+    setData({ posthog, ...summary });
     setLoading(false);
   }, []);
 
@@ -72,5 +73,5 @@ export function useObservability() {
     fetchData();
   }, [fetchData]);
 
-  return { tools, loading, error, refresh: fetchData };
+  return { data, loading, error, refresh: fetchData };
 }

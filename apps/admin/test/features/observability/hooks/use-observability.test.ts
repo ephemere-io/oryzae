@@ -19,18 +19,12 @@ describe('useObservability', () => {
     localStorage.setItem('oryzae_admin_access_token', 'test-token');
   });
 
-  it('fetches summary and merges PostHog metrics from analytics API', async () => {
+  it('fetches summary and merges PostHog data', async () => {
     const summaryBody = {
-      tools: [
-        {
-          id: 'posthog',
-          name: 'PostHog',
-          tagline: 'ユーザー行動分析',
-          href: '/analytics',
-          externalUrl: 'https://us.posthog.com/project/378500',
-          metric: null,
-        },
-      ],
+      sentry: { unresolvedCount: 3 },
+      gateway: { monthlySpend: 1.5, monthlyRequests: 10, creditBalance: '8.5', creditUsed: '1.5' },
+      upstash: { totalKeys: 42 },
+      vercel: { latestDeployState: 'READY' },
     };
     const analyticsBody = { totalPageviews: 1234, totalSessions: 42 };
 
@@ -44,15 +38,16 @@ describe('useObservability', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.tools).toHaveLength(1);
-    expect(result.current.tools[0].metric?.value).toBe('1,234');
+    expect(result.current.data?.posthog?.totalPageviews).toBe(1234);
+    expect(result.current.data?.sentry.unresolvedCount).toBe(3);
+    expect(result.current.data?.gateway.monthlySpend).toBe(1.5);
     expect(result.current.error).toBeNull();
   });
 
-  it('sets error when summary fetch fails', async () => {
+  it('sets error when summary fails', async () => {
     mockFetch
       .mockResolvedValueOnce(mockResponse(false, {}))
-      .mockResolvedValueOnce(mockResponse(true, { totalPageviews: 0, totalSessions: 0 }));
+      .mockResolvedValueOnce(mockResponse(true, {}));
 
     const { result } = renderHook(() => useObservability());
 
@@ -63,10 +58,10 @@ describe('useObservability', () => {
     expect(result.current.error).toBe('監視データの取得に失敗しました');
   });
 
-  it('does nothing when no token is stored', async () => {
+  it('does nothing when no token', async () => {
     localStorage.clear();
     const { result } = renderHook(() => useObservability());
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(result.current.tools).toEqual([]);
+    expect(result.current.data).toBeNull();
   });
 });
