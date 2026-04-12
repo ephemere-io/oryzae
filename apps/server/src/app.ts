@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { adminAnalytics } from './contexts/analytics/presentation/routes/admin-analytics.js';
 import { board } from './contexts/board/presentation/routes/board.js';
 import { entries } from './contexts/entry/presentation/routes/entries.js';
 import { adminFermentations } from './contexts/fermentation/presentation/routes/admin-fermentations.js';
@@ -9,8 +10,8 @@ import { adminAuthMiddleware } from './contexts/shared/presentation/middleware/a
 import { authMiddleware } from './contexts/shared/presentation/middleware/auth.js';
 import { errorHandler } from './contexts/shared/presentation/middleware/error-handler.js';
 import { adminDashboard } from './contexts/shared/presentation/routes/admin-dashboard.js';
-import { adminUsers } from './contexts/shared/presentation/routes/admin-users.js';
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
+import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
 
 const app = new Hono()
   .onError(errorHandler)
@@ -20,6 +21,7 @@ const app = new Hono()
   .route('/api/v1/admin/dashboard', adminDashboard)
   .route('/api/v1/admin/users', adminUsers)
   .route('/api/v1/admin/fermentations', adminFermentations)
+  .route('/api/v1/admin/analytics', adminAnalytics)
   .use('/api/v1/*', authMiddleware)
   .route('/api/v1/board', board)
   .route('/api/v1/entries', entries)

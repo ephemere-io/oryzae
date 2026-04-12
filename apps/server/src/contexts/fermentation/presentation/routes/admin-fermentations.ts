@@ -10,6 +10,49 @@ type Env = {
 };
 
 export const adminFermentations = new Hono<Env>()
+  .get('/costs/by-user', async (c) => {
+    const supabase = c.get('adminSupabase');
+
+    const { data, error } = await supabase
+      .from('fermentation_results')
+      .select('user_id, generation_id')
+      .not('generation_id', 'is', null);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    const costsByUser = new Map<string, { count: number; totalCost: number }>();
+    await Promise.all(
+      (data ?? []).map(async (row) => {
+        try {
+          const info = await gateway.getGenerationInfo({ id: row.generation_id });
+          const cost = typeof info?.totalCost === 'number' ? info.totalCost : 0;
+          const current = costsByUser.get(row.user_id) ?? { count: 0, totalCost: 0 };
+          current.count++;
+          current.totalCost += cost;
+          costsByUser.set(row.user_id, current);
+        } catch {
+          // skip failed lookups
+        }
+      }),
+    );
+
+    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const emailMap = new Map<string, string>();
+    for (const u of usersData?.users ?? []) {
+      emailMap.set(u.id, u.email ?? '');
+    }
+
+    const items = Array.from(costsByUser.entries())
+      .map(([userId, stats]) => ({
+        userId,
+        email: emailMap.get(userId) ?? '',
+        fermentationCount: stats.count,
+        totalCostUsd: Math.round(stats.totalCost * 1000000) / 1000000,
+      }))
+      .sort((a, b) => b.totalCostUsd - a.totalCostUsd);
+
+    return c.json({ data: items });
+  })
   .get('/', async (c) => {
     const supabase = c.get('adminSupabase');
     const page = Number(c.req.query('page') ?? '1');

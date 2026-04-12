@@ -6,6 +6,7 @@ dist/
 .turbo/
 .next/
 .playwright-mcp/
+.mcp.json
 test-results/
 playwright-report/
 *.png
