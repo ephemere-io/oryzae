@@ -49,7 +49,7 @@ describe('useBoard', () => {
 
     expect(result.current.cards).toHaveLength(1);
     expect(result.current.cards[0].id).toBe('c-1');
-    expect(apiFetch).toHaveBeenCalledWith('/api/v1/board?dateKey=2026-04-11');
+    expect(apiFetch).toHaveBeenCalledWith('/api/v1/board?dateKey=2026-04-11&viewType=daily');
   });
 
   it('api が null の場合はフェッチしない', () => {

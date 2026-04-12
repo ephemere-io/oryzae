@@ -45,6 +45,7 @@ export function useBoardInteraction(
   onInteractionEnd: () => void,
 ) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const stateRef = useRef<InteractionState>(null);
   const didDragRef = useRef(false);
   const zCounterRef = useRef(cards.length > 0 ? Math.max(...cards.map((c) => c.zIndex)) + 1 : 100);
@@ -109,6 +110,7 @@ export function useBoardInteraction(
         const dy = pointerY - state.startY;
         if (!didDragRef.current && Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
         didDragRef.current = true;
+        setDraggingId(state.cardId);
         updateCard(state.cardId, {
           x: state.cardStartX + dx,
           y: state.cardStartY + dy,
@@ -160,6 +162,7 @@ export function useBoardInteraction(
       onInteractionEnd();
     }
     stateRef.current = null;
+    setDraggingId(null);
   }, [updateCard, onInteractionEnd]);
 
   const deselect = useCallback(() => {
@@ -175,6 +178,7 @@ export function useBoardInteraction(
   return {
     selectedId,
     setSelectedId,
+    draggingId,
     startDrag,
     startRotate,
     startResize,

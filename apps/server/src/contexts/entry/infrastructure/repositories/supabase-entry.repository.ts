@@ -54,6 +54,27 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
+  async listByUserIdAndWeek(userId: string, dateKey: string): Promise<Entry[]> {
+    // Calculate Monday of the week containing dateKey
+    const d = new Date(`${dateKey}T00:00:00.000Z`);
+    const day = d.getUTCDay();
+    const monday = new Date(d);
+    monday.setUTCDate(d.getUTCDate() - ((day + 6) % 7));
+    const nextMonday = new Date(monday);
+    nextMonday.setUTCDate(monday.getUTCDate() + 7);
+
+    const { data, error } = await this.supabase
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('created_at', monday.toISOString())
+      .lt('created_at', nextMonday.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
   async save(entry: Entry): Promise<void> {
     const props = entry.toProps();
     const { error } = await this.supabase.from('entries').upsert({

@@ -3,11 +3,13 @@
 import { useCallback, useRef } from 'react';
 import type { BoardCardData } from '../hooks/use-board';
 import { EntryCardContent } from './entry-card-content';
+import { PhotoCardContent } from './photo-card-content';
 import { SnippetCardContent } from './snippet-card-content';
 
 interface BoardCardProps {
   card: BoardCardData;
   isSelected: boolean;
+  isDragging: boolean;
   onPointerDown: (cardId: string, x: number, y: number) => void;
   onRotateStart: (cardId: string, centerX: number, centerY: number) => void;
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
@@ -25,9 +27,16 @@ function isSnippetContent(content: BoardCardData['content']): content is { text:
   return 'text' in content;
 }
 
+function isPhotoContent(
+  content: BoardCardData['content'],
+): content is { imageUrl: string; caption: string } {
+  return 'imageUrl' in content;
+}
+
 export function BoardCard({
   card,
   isSelected,
+  isDragging,
   onPointerDown,
   onRotateStart,
   onResizeStart,
@@ -74,25 +83,42 @@ export function BoardCard({
         width: card.width,
         height: card.height,
         transform: `rotate(${card.rotation}deg)`,
-        zIndex: card.zIndex,
-        cursor: 'grab',
+        zIndex: isDragging ? 1000 : card.zIndex,
+        cursor: isDragging ? 'grabbing' : 'grab',
         borderRadius: 2,
-        backgroundColor: card.cardType === 'snippet' ? 'var(--card-snippet, #FFFBE0)' : 'var(--bg)',
+        backgroundColor:
+          card.cardType === 'snippet'
+            ? 'var(--card-snippet, #FFFBE0)'
+            : card.cardType === 'photo'
+              ? 'var(--card-photo, #ffffff)'
+              : 'var(--bg)',
         border: '1px solid var(--border-subtle)',
-        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)',
+        boxShadow: isDragging
+          ? '0 20px 40px rgba(0,0,0,0.15)'
+          : '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)',
         outline: isSelected ? '1.5px solid rgba(74,158,142,0.5)' : 'none',
         outlineOffset: isSelected ? 4 : 0,
         overflow: 'hidden',
         userSelect: 'none',
         touchAction: 'none',
-        animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+        animation: card.removing
+          ? 'itemRemove 0.28s ease forwards'
+          : 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+        pointerEvents: card.removing ? 'none' : 'auto',
+        transition: 'box-shadow 0.2s ease',
       }}
       onPointerDown={handlePointerDown}
     >
       {/* Invisible click target */}
       <button
         type="button"
-        aria-label={card.cardType === 'entry' ? 'Open entry' : 'Edit snippet'}
+        aria-label={
+          card.cardType === 'entry'
+            ? 'Open entry'
+            : card.cardType === 'photo'
+              ? 'View photo'
+              : 'Edit snippet'
+        }
         className="absolute inset-0 z-[1] cursor-grab bg-transparent"
         style={{ border: 'none', outline: 'none' }}
         onClick={(e) => {
@@ -105,6 +131,9 @@ export function BoardCard({
       )}
       {card.cardType === 'snippet' && isSnippetContent(card.content) && (
         <SnippetCardContent content={card.content} />
+      )}
+      {card.cardType === 'photo' && isPhotoContent(card.content) && (
+        <PhotoCardContent content={card.content} />
       )}
 
       {/* Handles - visible only when selected */}

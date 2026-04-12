@@ -118,7 +118,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
     return BoardCard.fromProps({
       id: row.id as string,
       userId: row.user_id as string,
-      cardType: row.card_type as 'entry' | 'snippet',
+      cardType: row.card_type as 'entry' | 'snippet' | 'photo',
       refId: row.ref_id as string,
       dateKey: row.date_key as string,
       viewType: row.view_type as 'daily' | 'weekly',
