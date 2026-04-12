@@ -1,32 +1,6 @@
 'use client';
 
-import { Clock, Eye, FileText, FlaskConical, Users } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { AnalyticsOverview } from '../hooks/use-analytics';
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ReactNode;
-}
-
-function StatCard({ title, value, subtitle, icon }: StatCardProps) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">
-          {typeof value === 'number' ? value.toLocaleString() : value}
-        </div>
-        {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
-      </CardContent>
-    </Card>
-  );
-}
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -35,38 +9,32 @@ function formatDuration(seconds: number): string {
   return `${minutes}m ${secs}s`;
 }
 
+interface MetricProps {
+  label: string;
+  value: string | number;
+  sub?: string;
+}
+
+function Metric({ label, value, sub }: MetricProps) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
+      <p className="text-2xl font-medium tabular-nums">
+        {typeof value === 'number' ? value.toLocaleString() : value}
+      </p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
 export function AnalyticsOverviewCards({ overview }: { overview: AnalyticsOverview }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <StatCard
-        title="Total Pageviews"
-        value={overview.totalPageviews}
-        subtitle="過去7日間"
-        icon={<Eye className="h-4 w-4 text-muted-foreground" />}
-      />
-      <StatCard
-        title="Sessions"
-        value={overview.totalSessions}
-        subtitle="ユニークセッション数"
-        icon={<Users className="h-4 w-4 text-muted-foreground" />}
-      />
-      <StatCard
-        title="Avg Session Duration"
-        value={formatDuration(overview.avgSessionDurationSeconds)}
-        icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-      />
-      <StatCard
-        title="Entry Page Views"
-        value={overview.entryPageViews}
-        subtitle="/entries ページ"
-        icon={<FileText className="h-4 w-4 text-muted-foreground" />}
-      />
-      <StatCard
-        title="Jar Page Views"
-        value={overview.jarPageViews}
-        subtitle="/jar ページ"
-        icon={<FlaskConical className="h-4 w-4 text-muted-foreground" />}
-      />
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+      <Metric label="Pageviews" value={overview.totalPageviews} sub="Past 7 days" />
+      <Metric label="Sessions" value={overview.totalSessions} sub="Unique sessions" />
+      <Metric label="Avg Duration" value={formatDuration(overview.avgSessionDurationSeconds)} />
+      <Metric label="Entry Views" value={overview.entryPageViews} sub="/entries" />
+      <Metric label="Jar Views" value={overview.jarPageViews} sub="/jar" />
     </div>
   );
 }

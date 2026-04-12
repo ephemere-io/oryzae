@@ -1,18 +1,8 @@
 'use client';
 
-import {
-  Activity,
-  BarChart3,
-  DollarSign,
-  FlaskConical,
-  LayoutDashboard,
-  LogOut,
-  Users,
-} from 'lucide-react';
+import { Activity, DollarSign, FlaskConical, LayoutDashboard, LogOut, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useAdminAuth } from '../hooks/use-admin-auth';
 
@@ -35,15 +25,15 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="flex w-60 flex-col border-r border-border bg-sidebar">
-      <div className="flex items-center gap-2 px-6 py-5">
-        <BarChart3 className="h-5 w-5 text-primary" />
-        <span className="text-sm font-semibold tracking-wide">Oryzae Admin</span>
+    <aside className="flex w-56 flex-col border-r border-[#1f1f24] bg-[#09090b]">
+      {/* Logo */}
+      <div className="flex items-center gap-2 px-5 py-4">
+        <span className="text-[13px] text-[#71717a]">&#9670;</span>
+        <span className="text-[13px] font-semibold tracking-wide text-[#ececef]">Oryzae</span>
       </div>
 
-      <Separator />
-
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      {/* Nav */}
+      <nav className="flex-1 space-y-0.5 px-2.5 pt-2">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -51,32 +41,33 @@ export function AdminSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                  ? 'bg-white/5 font-medium text-white'
+                  : 'text-[#71717a] hover:bg-white/[0.03] hover:text-[#a1a1aa]',
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-3.5 w-3.5" />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <Separator />
-
-      <div className="px-3 py-4 space-y-2">
-        {auth && <p className="truncate px-3 text-xs text-muted-foreground">{auth.user.email}</p>}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleLogout}
-          className="w-full justify-start gap-3 text-muted-foreground"
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Button>
+      {/* Bottom section */}
+      <div className="border-t border-[#1f1f24] px-2.5 py-3">
+        <div className="flex items-center justify-between gap-2 px-1">
+          {auth && (
+            <p className="truncate font-mono text-[11px] text-[#52525b]">{auth.user.email}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="shrink-0 rounded-md p-1 text-[#52525b] transition-colors hover:bg-white/[0.03] hover:text-[#a1a1aa]"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </aside>
   );

@@ -8,6 +8,10 @@ import { UserCostTable } from '@/features/cost-tracking/components/user-cost-tab
 import { useCostData } from '@/features/cost-tracking/hooks/use-cost-data';
 import { useUserCostSummary } from '@/features/cost-tracking/hooks/use-user-cost-summary';
 
+function formatCost(cost: number): string {
+  return `$${cost.toFixed(4)}`;
+}
+
 export default function CostsPage() {
   const [page, setPage] = useState(1);
   const { data, pagination, loading, error, refresh } = useCostData({ page });
@@ -19,6 +23,7 @@ export default function CostsPage() {
   } = useUserCostSummary();
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
+  const grandTotal = userCosts.reduce((sum, item) => sum + item.totalCostUsd, 0);
 
   function handleRefresh() {
     refresh();
@@ -28,20 +33,19 @@ export default function CostsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Cost Tracking</h1>
-          <p className="text-sm text-muted-foreground">Vercel AI Gateway per-request コスト</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-medium">Cost Tracking</h1>
+          <span className="text-sm text-muted-foreground">
+            Total: <span className="font-mono text-foreground">{formatCost(grandTotal)}</span>
+          </span>
         </div>
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon-xs"
           onClick={handleRefresh}
           disabled={loading || userCostsLoading}
         >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${loading || userCostsLoading ? 'animate-spin' : ''}`}
-          />
-          更新
+          <RefreshCw className={`h-3 w-3 ${loading || userCostsLoading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
@@ -52,38 +56,42 @@ export default function CostsPage() {
       )}
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">ユーザー別集計</h2>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          Per User
+        </h2>
         {userCostsLoading && userCosts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
         ) : (
           <UserCostTable items={userCosts} />
         )}
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">リクエスト別詳細</h2>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          Request Log
+        </h2>
         {loading && data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
         ) : (
           <>
             <CostTable items={data} />
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-4">
+              <div className="flex items-center justify-center gap-2 pt-2">
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
                 >
                   Previous
                 </Button>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground font-mono">
                   {page} / {totalPages}
                 </span>
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
                 >

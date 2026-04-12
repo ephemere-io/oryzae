@@ -1,7 +1,5 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
 interface UserActivityCardProps {
   activeWriters: number;
   totalUsers: number;
@@ -11,24 +9,24 @@ export function UserActivityCard({ activeWriters, totalUsers }: UserActivityCard
   const ratio = totalUsers > 0 ? (activeWriters / totalUsers) * 100 : 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          ユーザー動向（7日間）
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+    <div className="flex flex-col justify-between rounded-lg border border-border/50 bg-card p-4">
+      <div>
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+          Active Writers (7d)
+        </span>
+        <div className="text-3xl font-semibold tracking-tight mt-0.5">
+          {activeWriters}
+          <span className="text-lg font-normal text-muted-foreground">/{totalUsers}</span>
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
           <div
-            className="h-full rounded-full bg-primary transition-all"
+            className="h-full rounded-full bg-green-500 transition-all"
             style={{ width: `${ratio}%` }}
           />
         </div>
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{activeWriters}</span> / {totalUsers}{' '}
-          ユーザーが書いた
-        </p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

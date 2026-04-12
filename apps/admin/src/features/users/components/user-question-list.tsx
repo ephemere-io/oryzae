@@ -1,7 +1,5 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -14,10 +12,11 @@ import type { UserQuestion } from '../hooks/use-user-detail';
 
 export function UserQuestionList({ questions }: { questions: UserQuestion[] }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Questions ({questions.length})</CardTitle>
-      </CardHeader>
+    <div>
+      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+        Questions
+        <span className="ml-1.5 text-foreground">{questions.length}</span>
+      </p>
       <Table>
         <TableHeader>
           <TableRow>
@@ -30,21 +29,24 @@ export function UserQuestionList({ questions }: { questions: UserQuestion[] }) {
             <TableRow key={question.id}>
               <TableCell className="text-sm max-w-xs truncate">{question.text || '-'}</TableCell>
               <TableCell>
-                <Badge variant={question.isArchived ? 'secondary' : 'default'}>
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${question.isArchived ? 'bg-muted-foreground/40' : 'bg-green-500'}`}
+                  />
                   {question.isArchived ? 'Archived' : 'Active'}
-                </Badge>
+                </span>
               </TableCell>
             </TableRow>
           ))}
           {questions.length === 0 && (
             <TableRow>
-              <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={2} className="text-center text-muted-foreground py-6">
                 No questions
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
-    </Card>
+    </div>
   );
 }

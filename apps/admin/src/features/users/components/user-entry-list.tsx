@@ -1,6 +1,5 @@
 'use client';
 
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -13,7 +12,6 @@ import type { UserEntry } from '../hooks/use-user-detail';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -23,33 +21,34 @@ function formatDate(iso: string): string {
 
 export function UserEntryList({ entries }: { entries: UserEntry[] }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Entries ({entries.length})</CardTitle>
-      </CardHeader>
+    <div>
+      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+        Entries
+        <span className="ml-1.5 text-foreground">{entries.length}</span>
+      </p>
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Date</TableHead>
-            <TableHead className="text-right">Character Count</TableHead>
+            <TableHead className="text-right">Characters</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {entries.map((entry) => (
             <TableRow key={entry.id}>
-              <TableCell className="text-sm">{formatDate(entry.createdAt)}</TableCell>
-              <TableCell className="text-right font-mono">{entry.characterCount}</TableCell>
+              <TableCell className="font-mono text-xs">{formatDate(entry.createdAt)}</TableCell>
+              <TableCell className="text-right font-mono text-sm">{entry.characterCount}</TableCell>
             </TableRow>
           ))}
           {entries.length === 0 && (
             <TableRow>
-              <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={2} className="text-center text-muted-foreground py-6">
                 No entries
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
-    </Card>
+    </div>
   );
 }

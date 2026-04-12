@@ -17,15 +17,15 @@ export default function UserDetailPage() {
   const { data, loading, error } = useUserDetail(userId);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>;
   }
 
   if (error || !data) {
     return (
       <div className="space-y-4">
         <Link href="/users">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+          <Button variant="ghost" size="xs">
+            <ArrowLeft className="mr-1 h-3 w-3" />
             Users
           </Button>
         </Link>
@@ -39,13 +39,15 @@ export default function UserDetailPage() {
   return (
     <div className="space-y-6">
       <Link href="/users">
-        <Button variant="ghost" size="sm">
-          <ArrowLeft className="mr-2 h-4 w-4" />
+        <Button variant="ghost" size="xs">
+          <ArrowLeft className="mr-1 h-3 w-3" />
           Users
         </Button>
       </Link>
 
       <UserProfileHeader profile={data.profile} />
+
+      <WritingHeatmap entryDates={data.entryDates} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
@@ -56,8 +58,6 @@ export default function UserDetailPage() {
           <UserFermentationHistory fermentations={data.fermentations} />
         </div>
       </div>
-
-      <WritingHeatmap entryDates={data.entryDates} />
     </div>
   );
 }

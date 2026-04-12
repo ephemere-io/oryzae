@@ -1,10 +1,8 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -17,7 +15,6 @@ import type { UserFermentation } from '../hooks/use-user-detail';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -25,17 +22,11 @@ function formatDate(iso: string): string {
   });
 }
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  switch (status) {
-    case 'completed':
-      return 'default';
-    case 'failed':
-      return 'destructive';
-    case 'processing':
-      return 'outline';
-    default:
-      return 'secondary';
-  }
+function statusDotColor(status: string): string {
+  if (status === 'completed') return 'bg-green-500';
+  if (status === 'failed') return 'bg-red-500';
+  if (status === 'processing') return 'bg-yellow-500';
+  return 'bg-muted-foreground/40';
 }
 
 function RetryButton({
@@ -57,9 +48,8 @@ function RetryButton({
   };
 
   return (
-    <Button variant="outline" size="xs" onClick={handleRetry} disabled={retrying}>
-      <RefreshCw className={`h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
-      Retry
+    <Button variant="ghost" size="icon-xs" onClick={handleRetry} disabled={retrying}>
+      <RotateCcw className={`h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
     </Button>
   );
 }
@@ -72,27 +62,38 @@ export function UserFermentationHistory({
   onRetry?: (id: string) => Promise<boolean>;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Fermentations ({fermentations.length})</CardTitle>
-      </CardHeader>
+    <div>
+      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+        Fermentations
+        <span className="ml-1.5 text-foreground">{fermentations.length}</span>
+      </p>
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Date</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Error</TableHead>
-            {onRetry && <TableHead />}
+            {onRetry && <TableHead className="w-[36px]" />}
           </TableRow>
         </TableHeader>
         <TableBody>
           {fermentations.map((f) => (
             <TableRow key={f.id}>
-              <TableCell className="text-sm whitespace-nowrap">{formatDate(f.createdAt)}</TableCell>
-              <TableCell>
-                <Badge variant={statusVariant(f.status)}>{f.status}</Badge>
+              <TableCell className="font-mono text-xs whitespace-nowrap">
+                {formatDate(f.createdAt)}
               </TableCell>
-              <TableCell className="text-sm max-w-xs truncate" title={f.errorMessage ?? undefined}>
+              <TableCell>
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${statusDotColor(f.status)}`}
+                  />
+                  {f.status}
+                </span>
+              </TableCell>
+              <TableCell
+                className="text-[11px] text-muted-foreground max-w-[200px] truncate"
+                title={f.errorMessage ?? undefined}
+              >
                 {f.errorMessage ?? '-'}
               </TableCell>
               {onRetry && (
@@ -106,7 +107,7 @@ export function UserFermentationHistory({
             <TableRow>
               <TableCell
                 colSpan={onRetry ? 4 : 3}
-                className="text-center text-muted-foreground py-8"
+                className="text-center text-muted-foreground py-6"
               >
                 No fermentations
               </TableCell>
@@ -114,6 +115,6 @@ export function UserFermentationHistory({
           )}
         </TableBody>
       </Table>
-    </Card>
+    </div>
   );
 }
