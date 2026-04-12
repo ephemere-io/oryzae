@@ -26,14 +26,14 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/react": "^16.0.0",
-    "@types/node": "^20",
+    "@types/node": "^20.19.39",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dependency-cruiser": "^17.3.10",
-    "jsdom": "^26.0.0",
+    "jsdom": "^26.1.0",
     "postcss": "^8",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vitest": "^3.1.0"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
