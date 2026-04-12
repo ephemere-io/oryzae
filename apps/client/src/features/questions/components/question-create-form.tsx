@@ -27,12 +27,12 @@ export function QuestionCreateForm({ onSubmit }: QuestionCreateFormProps) {
         onChange={(e) => setText(e.target.value)}
         placeholder="新しい問いを追加..."
         maxLength={64}
-        className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900"
+        className="flex-1 rounded-full border border-[var(--border-subtle)] bg-transparent px-4 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--date-color)] focus:border-[var(--accent)] focus:outline-none"
       />
       <button
         type="submit"
         disabled={creating || !text.trim()}
-        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        className="rounded-full border border-[var(--accent)] px-5 py-2 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white disabled:opacity-50"
       >
         {creating ? '追加中...' : '追加'}
       </button>
