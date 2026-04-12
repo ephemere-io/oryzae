@@ -32,7 +32,13 @@ function isActive(user: AdminUser): boolean {
   return user.entryCount > 0 || user.fermentationTotal > 0;
 }
 
-export function UserTable({ users }: { users: AdminUser[] }) {
+export function UserTable({
+  users,
+  onUserClick,
+}: {
+  users: AdminUser[];
+  onUserClick?: (userId: string) => void;
+}) {
   return (
     <Card>
       <Table>
@@ -49,7 +55,11 @@ export function UserTable({ users }: { users: AdminUser[] }) {
         </TableHeader>
         <TableBody>
           {users.map((user) => (
-            <TableRow key={user.id}>
+            <TableRow
+              key={user.id}
+              className={onUserClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
+              onClick={onUserClick ? () => onUserClick(user.id) : undefined}
+            >
               <TableCell>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">

@@ -1,11 +1,13 @@
 'use client';
 
 import { RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { UserTable } from '@/features/users/components/user-table';
 import { useUsers } from '@/features/users/hooks/use-users';
 
 export default function UsersPage() {
+  const router = useRouter();
   const { users, loading, error, refresh } = useUsers();
 
   return (
@@ -32,7 +34,7 @@ export default function UsersPage() {
       {loading && users.length === 0 ? (
         <p className="text-sm text-muted-foreground">読み込み中...</p>
       ) : (
-        <UserTable users={users} />
+        <UserTable users={users} onUserClick={(id) => router.push(`/users/${id}`)} />
       )}
     </div>
   );

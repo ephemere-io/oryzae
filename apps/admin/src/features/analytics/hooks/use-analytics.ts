@@ -31,7 +31,14 @@ interface DailyResponse {
   data: DailyMetric[];
 }
 
-export function useAnalytics(dateFrom = '-7d') {
+interface UseAnalyticsParams {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export function useAnalytics(params?: UseAnalyticsParams) {
+  const dateFrom = params?.dateFrom ?? '-7d';
+  const dateTo = params?.dateTo;
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
   const [pages, setPages] = useState<PageViewItem[]>([]);
   const [daily, setDaily] = useState<DailyMetric[]>([]);
@@ -46,7 +53,10 @@ export function useAnalytics(dateFrom = '-7d') {
     setError(null);
 
     const api = createApiClient(token);
-    const query = `date_from=${encodeURIComponent(dateFrom)}`;
+    const searchParams = new URLSearchParams();
+    searchParams.set('date_from', dateFrom);
+    if (dateTo) searchParams.set('date_to', dateTo);
+    const query = searchParams.toString();
 
     const [overviewRes, pagesRes, dailyRes] = await Promise.all([
       api.fetch(`/api/v1/admin/analytics/overview?${query}`),
@@ -64,7 +74,7 @@ export function useAnalytics(dateFrom = '-7d') {
       setError('分析データの取得に失敗しました');
     }
     setLoading(false);
-  }, [dateFrom]);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     fetchAll();

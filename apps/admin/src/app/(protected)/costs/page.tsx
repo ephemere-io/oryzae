@@ -10,7 +10,7 @@ import { useUserCostSummary } from '@/features/cost-tracking/hooks/use-user-cost
 
 export default function CostsPage() {
   const [page, setPage] = useState(1);
-  const { data, pagination, loading, error, refresh } = useCostData(page);
+  const { data, pagination, loading, error, refresh } = useCostData({ page });
   const {
     data: userCosts,
     loading: userCostsLoading,

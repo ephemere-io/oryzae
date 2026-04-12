@@ -8,7 +8,9 @@ import { useFermentations } from '@/features/fermentations/hooks/use-fermentatio
 
 export default function FermentationsPage() {
   const [page, setPage] = useState(1);
-  const { data, pagination, loading, error, refresh } = useFermentations(page);
+  const { data, pagination, loading, error, refresh, retryFermentation } = useFermentations({
+    page,
+  });
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
 
@@ -37,7 +39,7 @@ export default function FermentationsPage() {
         <p className="text-sm text-muted-foreground">読み込み中...</p>
       ) : (
         <>
-          <FermentationTable items={data} />
+          <FermentationTable items={data} onRetry={retryFermentation} />
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
