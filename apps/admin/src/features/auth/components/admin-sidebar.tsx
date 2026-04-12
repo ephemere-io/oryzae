@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   DollarSign,
+  Eye,
   FlaskConical,
   LayoutDashboard,
   LogOut,
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { href: '/fermentations', label: 'Fermentations', icon: FlaskConical },
   { href: '/costs', label: 'Costs', icon: DollarSign },
   { href: '/analytics', label: 'Analytics', icon: Activity },
+  { href: '/observability', label: 'Observability', icon: Eye },
 ];
 
 export function AdminSidebar() {
