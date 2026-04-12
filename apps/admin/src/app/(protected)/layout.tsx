@@ -18,7 +18,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   if (loading) {
     return (
       <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-[var(--muted)]">読み込み中...</p>
+        <p className="text-sm text-muted-foreground">読み込み中...</p>
       </div>
     );
   }
@@ -28,7 +28,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen overflow-hidden">
       <AdminSidebar />
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+      <main className="flex-1 overflow-auto p-8">{children}</main>
     </div>
   );
 }

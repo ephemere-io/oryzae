@@ -2,6 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAdminAuth } from '../hooks/use-admin-auth';
 
 export function AdminLoginForm() {
@@ -27,48 +31,49 @@ export function AdminLoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 p-8">
-        <h1 className="text-2xl font-semibold text-center">Oryzae Admin</h1>
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Oryzae Admin</CardTitle>
+          <CardDescription>管理者アカウントでログイン</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
 
-        {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
+            <div className="space-y-2">
+              <Label htmlFor="email">メールアドレス</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="admin@example.com"
+              />
+            </div>
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-[var(--muted)] mb-1">
-            メールアドレス
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full rounded border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">パスワード</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-[var(--muted)] mb-1">
-            パスワード
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full rounded border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {submitting ? 'ログイン中...' : 'ログイン'}
-        </button>
-      </form>
+            <Button type="submit" disabled={submitting} className="w-full">
+              {submitting ? 'ログイン中...' : 'ログイン'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
