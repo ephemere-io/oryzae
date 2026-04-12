@@ -9,11 +9,13 @@
     },
     "apps/client": {
       "next": true,
-      "vitest": true
+      "vitest": true,
+      "entry": ["sentry.*.config.ts"]
     },
     "apps/admin": {
       "next": true,
-      "vitest": true
+      "vitest": true,
+      "entry": ["sentry.*.config.ts"]
     },
     "packages/shared": {
       "project": ["src/**/*.ts"]
