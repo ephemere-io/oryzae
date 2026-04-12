@@ -1,9 +1,8 @@
-import { anthropic } from '@ai-sdk/anthropic';
-import { generateObject } from 'ai';
+import { gateway, generateObject } from 'ai';
 import { z } from 'zod';
 import type {
-  FermentationOutput,
   LlmAnalysisGateway,
+  LlmAnalysisResult,
 } from '../../domain/gateways/llm-analysis.gateway.js';
 
 const fermentationSchema = z.object({
@@ -73,14 +72,31 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
     question: string;
     entryContent: string;
     targetPeriod: string;
-  }): Promise<FermentationOutput> {
-    const { object } = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+    userId: string;
+  }): Promise<LlmAnalysisResult> {
+    const { object, usage, providerMetadata } = await generateObject({
+      model: gateway('anthropic/claude-sonnet-4-20250514'),
       prompt: buildPrompt(params),
       schema: fermentationSchema,
       maxOutputTokens: 16000,
+      providerOptions: {
+        gateway: {
+          user: params.userId,
+          tags: ['fermentation'],
+        },
+      },
     });
 
-    return object;
+    // @type-assertion-allowed: providerMetadata の gateway 型は AI SDK の型定義に含まれない
+    const meta = providerMetadata as { gateway?: { generationId?: string } } | undefined;
+
+    return {
+      output: object,
+      usage: {
+        inputTokens: usage.inputTokens ?? 0,
+        outputTokens: usage.outputTokens ?? 0,
+      },
+      generationId: meta?.gateway?.generationId,
+    };
   }
 }

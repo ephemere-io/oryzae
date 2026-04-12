@@ -1,6 +1,7 @@
 # フロントエンドテスト・ガードレールガイド
 
-フロントエンド（Next.js クライアント）のテスト戦略と品質ガードレールの原則。
+フロントエンド（`apps/client` および `apps/admin`）のテスト戦略と品質ガードレールの原則。
+両アプリに同一のルールが適用される。
 
 ---
 
@@ -36,20 +37,20 @@
 ## テストファイル配置
 
 ```
-apps/client/
+apps/{client,admin}/
 ├── src/features/
 │   ├── auth/
 │   │   └── hooks/useAuth.ts
-│   └── entry/
-│       └── hooks/useEntries.ts
+│   └── {feature}/
+│       └── hooks/use-{name}.ts
 └── test/features/          ← src/features/ のミラー構造
     ├── auth/
     │   └── hooks/useAuth.test.ts
-    └── entry/
-        └── hooks/useEntries.test.ts
+    └── {feature}/
+        └── hooks/use-{name}.test.ts
 ```
 
-- テストファイルは `apps/client/test/features/` 配下に、`src/features/` のディレクトリ構造をミラーして配置する
+- テストファイルは `test/features/` 配下に、`src/features/` のディレクトリ構造をミラーして配置する
 - インポートは `@/` エイリアスを使用する（例: `import { useAuth } from '@/features/auth/hooks/useAuth'`）
 
 **なぜソースと分離するか**: テストコードをビルド対象から明確に除外し、`src/` の見通しを良く保つため。ミラー構造により対応関係は一目でわかる。

@@ -1,7 +1,7 @@
-# クライアントアーキテクチャガイド
+# フロントエンドアーキテクチャガイド
 
 Oryzae フロントエンドの横断的なアーキテクチャルール。
-全クライアントコードに適用される。
+`apps/client`（ユーザー向け）と `apps/admin`（管理画面）の両方に適用される。
 
 設計思想は Feature-Sliced Architecture に基づき、機能単位でコードを分割・隔離する。
 
@@ -33,10 +33,9 @@ Feature-Sliced Architecture は、機能（feature）を単位としてコード
 ## ディレクトリ構造
 
 ```
-apps/client/src/
+apps/{client,admin}/src/
 ├── app/                    — Next.js App Router。薄いラッパーのみ
 │   ├── api/[...path]/      — Route Handler: Hono アプリへのリクエスト転送（変更しない）
-│   ├── health/             — Route Handler: ヘルスチェックエンドポイント
 │   ├── layout.tsx          — ルートレイアウト
 │   ├── page.tsx            — トップページ
 │   └── {route}/
@@ -47,6 +46,7 @@ apps/client/src/
 │       ├── components/     — 機能固有 UI コンポーネント
 │       ├── hooks/          — API 呼び出し・状態管理（Custom Hook）
 │       └── types.ts        — 機能固有の型定義
+├── components/ui/          — 汎用 UI コンポーネント（feature 依存禁止）
 └── lib/                    — 横断ユーティリティ（API クライアント設定、定数等）
 ```
 

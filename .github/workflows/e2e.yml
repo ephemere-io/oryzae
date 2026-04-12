@@ -6,8 +6,8 @@ on:
   workflow_dispatch:        # 手動実行も可能
 
 jobs:
-  e2e:
-    name: Playwright E2E
+  e2e-client:
+    name: Playwright E2E (Client)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -38,6 +38,43 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-client
           path: apps/client/test-results/
+          retention-days: 7
+
+  e2e-admin:
+    name: Playwright E2E (Admin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @oryzae/admin exec playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: pnpm --filter @oryzae/admin exec playwright test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-admin
+          path: apps/admin/test-results/
           retention-days: 7

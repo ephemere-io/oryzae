@@ -4,9 +4,15 @@ paths:
   - "apps/client/src/**/*.tsx"
   - "apps/client/test/**/*.ts"
   - "apps/client/test/**/*.tsx"
+  - "apps/admin/src/**/*.ts"
+  - "apps/admin/src/**/*.tsx"
+  - "apps/admin/test/**/*.ts"
+  - "apps/admin/test/**/*.tsx"
 ---
 
-# クライアントアーキテクチャルール
+# フロントエンドアーキテクチャルール
+
+`apps/client`（ユーザー向け）と `apps/admin`（管理画面）の両方に適用される。
 
 設計の正は **`docs/client-architecture-guide.md`** を参照。
 テスト戦略の正は **`docs/client-testing-guide.md`** を参照。

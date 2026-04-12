@@ -5,10 +5,10 @@
   "scripts": {
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "typecheck": "pnpm --filter @oryzae/server typecheck && pnpm --filter @oryzae/shared typecheck && pnpm --filter @oryzae/client typecheck",
-    "test": "pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test",
+    "typecheck": "pnpm --filter @oryzae/server typecheck && pnpm --filter @oryzae/shared typecheck && pnpm --filter @oryzae/client typecheck && pnpm --filter @oryzae/admin typecheck",
+    "test": "pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test && pnpm --filter @oryzae/admin test",
     "knip": "knip",
-    "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise",
+    "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise && pnpm --filter @oryzae/admin dep-cruise",
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
