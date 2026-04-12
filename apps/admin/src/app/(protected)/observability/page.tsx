@@ -11,12 +11,7 @@ export default function ObservabilityPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Observability</h1>
-          <p className="text-sm text-muted-foreground">
-            監視ツールの設定状態とダッシュボードリンク
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Observability</h1>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           更新
