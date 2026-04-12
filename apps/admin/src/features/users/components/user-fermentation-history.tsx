@@ -62,11 +62,11 @@ export function UserFermentationHistory({
   onRetry?: (id: string) => Promise<boolean>;
 }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+    <div className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         Fermentations
         <span className="ml-1.5 text-foreground">{fermentations.length}</span>
-      </p>
+      </h3>
       <Table>
         <TableHeader>
           <TableRow>

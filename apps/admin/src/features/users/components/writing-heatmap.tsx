@@ -86,10 +86,10 @@ export function WritingHeatmap({ entryDates }: { entryDates: EntryDate[] }) {
   }, [entryDates]);
 
   return (
-    <div>
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+    <div className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         Writing Activity
-      </p>
+      </h3>
       <div className="overflow-x-auto">
         <div className="min-w-fit">
           {/* Month labels */}
