@@ -6,8 +6,10 @@ dist/
 .turbo/
 .next/
 .playwright-mcp/
+.mcp.json
 test-results/
 playwright-report/
 *.png
 .DS_Store
 .tmp/
+.claude/worktrees/

@@ -21,7 +21,12 @@ describe('useAuth', () => {
 
   it('login returns null on success and stores tokens', async () => {
     const session = { accessToken: 'at', refreshToken: 'rt' };
-    const user = { id: 'u1', email: 'a@b.com' };
+    const user = {
+      id: 'u1',
+      email: 'a@b.com',
+      avatarUrl: 'https://example.com/avatar.jpg',
+      name: 'Test User',
+    };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
     const { result } = renderHook(() => useAuth());
@@ -53,7 +58,7 @@ describe('useAuth', () => {
 
   it('signup returns null on success and stores tokens', async () => {
     const session = { accessToken: 'at2', refreshToken: 'rt2' };
-    const user = { id: 'u2', email: 'b@c.com' };
+    const user = { id: 'u2', email: 'b@c.com', avatarUrl: null, name: null };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
     const { result } = renderHook(() => useAuth());
@@ -85,7 +90,12 @@ describe('useAuth', () => {
 
   it('logout clears tokens and resets state', async () => {
     const session = { accessToken: 'at', refreshToken: 'rt' };
-    const user = { id: 'u1', email: 'a@b.com' };
+    const user = {
+      id: 'u1',
+      email: 'a@b.com',
+      avatarUrl: 'https://example.com/avatar.jpg',
+      name: 'Test User',
+    };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
     const { result } = renderHook(() => useAuth());
@@ -109,7 +119,16 @@ describe('useAuth', () => {
   it('initial load with valid token sets auth state', async () => {
     localStorage.setItem('oryzae_access_token', 'existing-token');
 
-    mockFetch.mockResolvedValueOnce(mockResponse(true, { user: { id: 'u1', email: 'a@b.com' } }));
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        user: {
+          id: 'u1',
+          email: 'a@b.com',
+          avatarUrl: 'https://example.com/avatar.jpg',
+          name: 'Test User',
+        },
+      }),
+    );
 
     const { result } = renderHook(() => useAuth());
 

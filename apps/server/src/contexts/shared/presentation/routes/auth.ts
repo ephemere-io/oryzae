@@ -10,6 +10,25 @@ function getSupabaseAuthClient() {
   return createClient(url, anonKey);
 }
 
+function extractUserProfile(user: {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const meta = user.user_metadata ?? {};
+  return {
+    id: user.id,
+    email: user.email,
+    avatarUrl: typeof meta.avatar_url === 'string' ? meta.avatar_url : null,
+    name:
+      typeof meta.full_name === 'string'
+        ? meta.full_name
+        : typeof meta.name === 'string'
+          ? meta.name
+          : null,
+  };
+}
+
 export const authRoutes = new Hono()
   .post('/signup', async (c) => {
     const body = credentialsSchema.parse(await c.req.json());
@@ -26,7 +45,9 @@ export const authRoutes = new Hono()
 
     return c.json(
       {
-        user: { id: data.user?.id, email: data.user?.email },
+        user: data.user
+          ? extractUserProfile(data.user)
+          : { id: undefined, email: undefined, avatarUrl: null, name: null },
         session: data.session
           ? {
               accessToken: data.session.access_token,
@@ -52,7 +73,7 @@ export const authRoutes = new Hono()
     }
 
     return c.json({
-      user: { id: data.user.id, email: data.user.email },
+      user: extractUserProfile(data.user),
       session: {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
@@ -80,6 +101,78 @@ export const authRoutes = new Hono()
       },
     });
   })
+  .post('/oauth/google', async (c) => {
+    const { redirectTo } = z.object({ redirectTo: z.string().url() }).parse(await c.req.json());
+    const supabase = getSupabaseAuthClient();
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+    });
+
+    if (error) {
+      return c.json({ error: error.message }, 400);
+    }
+
+    return c.json({ url: data.url });
+  })
+  .post('/oauth/callback', async (c) => {
+    const { code } = z.object({ code: z.string() }).parse(await c.req.json());
+    const supabase = getSupabaseAuthClient();
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      return c.json({ error: error.message }, 400);
+    }
+
+    return c.json({
+      user: extractUserProfile(data.user),
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
+      },
+    });
+  })
+  .post('/reset-password', async (c) => {
+    const { email, redirectTo } = z
+      .object({ email: z.string().email(), redirectTo: z.string().url() })
+      .parse(await c.req.json());
+    const supabase = getSupabaseAuthClient();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+    if (error) {
+      return c.json({ error: error.message }, 400);
+    }
+
+    return c.json({ message: 'Password reset email sent' });
+  })
+  .post('/update-password', async (c) => {
+    const { accessToken, password } = z
+      .object({ accessToken: z.string(), password: z.string().min(6) })
+      .parse(await c.req.json());
+
+    const url = process.env.SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    if (!url || !anonKey) return c.json({ error: 'Server config error' }, 500);
+
+    const supabase = createClient(url, anonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      return c.json({ error: error.message }, 400);
+    }
+
+    return c.json({ message: 'Password updated' });
+  })
   .get('/me', async (c) => {
     const authHeader = c.req.header('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -103,5 +196,5 @@ export const authRoutes = new Hono()
       return c.json({ error: 'Invalid token' }, 401);
     }
 
-    return c.json({ user: { id: user.id, email: user.email } });
+    return c.json({ user: extractUserProfile(user) });
   });
