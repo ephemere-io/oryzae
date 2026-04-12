@@ -17,7 +17,9 @@ let usecase: LoadBoardUsecase;
 beforeEach(() => {
   boardCardRepo = {
     findByDateAndView: vi.fn().mockResolvedValue([]),
+    findDailyCardsByDateRange: vi.fn().mockResolvedValue([]),
     findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
+    findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
     saveMany: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -198,5 +200,41 @@ describe('LoadBoardUsecase', () => {
     expect(entryRepo.listByUserIdAndDate).not.toHaveBeenCalled();
     expect(result.viewType).toBe('weekly');
     expect(result.cards).toHaveLength(1);
+  });
+
+  it('weekly モードで daily のスニペット・写真カードも含める', async () => {
+    const dailySnippetCard = BoardCard.fromProps({
+      id: 'card-ds1',
+      userId: 'user-1',
+      cardType: 'snippet',
+      refId: 'snippet-d1',
+      dateKey: '2026-04-09',
+      viewType: 'daily',
+      x: 100,
+      y: 200,
+      rotation: 0,
+      width: 262,
+      height: 120,
+      zIndex: 0,
+      createdAt: '2026-04-09T00:00:00Z',
+      updatedAt: '2026-04-09T00:00:00Z',
+    });
+    const snippet = BoardSnippet.fromProps({
+      id: 'snippet-d1',
+      userId: 'user-1',
+      text: 'dailyで作ったスニペット',
+      createdAt: '2026-04-09T00:00:00Z',
+      updatedAt: '2026-04-09T00:00:00Z',
+    });
+
+    vi.mocked(boardCardRepo.findDailyCardsByDateRange).mockResolvedValue([dailySnippetCard]);
+    vi.mocked(boardSnippetRepo.findByIds).mockResolvedValue([snippet]);
+
+    const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
+
+    expect(boardCardRepo.findDailyCardsByDateRange).toHaveBeenCalled();
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].cardType).toBe('snippet');
+    expect(result.cards[0].content).toEqual({ text: 'dailyで作ったスニペット' });
   });
 });
