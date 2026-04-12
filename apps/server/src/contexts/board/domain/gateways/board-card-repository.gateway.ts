@@ -12,10 +12,21 @@ export interface CardPositionUpdate {
 
 export interface BoardCardRepositoryGateway {
   findByDateAndView(userId: string, dateKey: string, viewType: string): Promise<BoardCard[]>;
+  findDailyCardsByDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<BoardCard[]>;
   findRefIdsByDateAndView(
     userId: string,
     dateKey: string,
     viewType: string,
+    cardType: string,
+  ): Promise<string[]>;
+  findRefIdsByDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
     cardType: string,
   ): Promise<string[]>;
   saveMany(cards: BoardCard[]): Promise<void>;
