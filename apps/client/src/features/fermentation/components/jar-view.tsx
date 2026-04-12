@@ -105,6 +105,7 @@ function QuestionCircleWithData({
   return (
     <div
       className={`transition-opacity duration-500 ${isHidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+      style={{ animation: 'fadeIn 0.5s ease-out forwards' }}
     >
       <QuestionCircle
         questionId={question.id}
@@ -246,7 +247,11 @@ export function JarView({
         className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
         viewBox="0 0 1000 500"
         preserveAspectRatio="none"
-        style={{ opacity: zoomedId ? 0 : 1, transition: 'opacity 0.5s ease' }}
+        style={{
+          opacity: zoomedId ? 0 : 1,
+          transition: 'opacity 0.5s ease',
+          animation: 'fadeIn 0.5s ease-out forwards',
+        }}
       >
         {questions.slice(0, 3).map((q, i) => {
           const pos = CIRCLE_POSITIONS[i];
@@ -294,6 +299,7 @@ export function JarView({
           transform: 'translate(-50%, -55%)',
           width: '420px',
           height: '520px',
+          animation: 'fadeIn 0.5s ease-out forwards',
         }}
       >
         {/* Jar glow */}
@@ -456,7 +462,10 @@ export function JarView({
 
       {/* Question list (bottom center) */}
       {!zoomedId && (
-        <div className="absolute bottom-12 left-1/2 z-[30] flex -translate-x-1/2 flex-col items-center gap-2.5">
+        <div
+          className="absolute bottom-12 left-1/2 z-[30] flex -translate-x-1/2 flex-col items-center gap-2.5"
+          style={{ animation: 'fadeIn 0.5s ease-out forwards' }}
+        >
           <div
             className="h-6 w-px"
             style={{
