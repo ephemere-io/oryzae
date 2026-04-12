@@ -20,6 +20,7 @@ beforeEach(() => {
     findDailyCardsByDateRange: vi.fn().mockResolvedValue([]),
     findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
     findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
+    findSoftDeletedRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
     saveMany: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -202,7 +203,7 @@ describe('LoadBoardUsecase', () => {
     expect(result.cards).toHaveLength(1);
   });
 
-  it('weekly モードで daily のスニペット・写真カードも含める', async () => {
+  it('weekly モードで daily のスニペット・写真カードも含める（weekly コピーを作成）', async () => {
     const dailySnippetCard = BoardCard.fromProps({
       id: 'card-ds1',
       userId: 'user-1',
@@ -233,8 +234,107 @@ describe('LoadBoardUsecase', () => {
     const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
 
     expect(boardCardRepo.findDailyCardsByDateRange).toHaveBeenCalled();
+    // Weekly copies are persisted so positions are independent per view
+    expect(boardCardRepo.saveMany).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          refId: 'snippet-d1',
+          viewType: 'weekly',
+          dateKey: '2026-04-11',
+        }),
+      ]),
+    );
     expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].id).toBe('generated-id');
     expect(result.cards[0].cardType).toBe('snippet');
     expect(result.cards[0].content).toEqual({ text: 'dailyで作ったスニペット' });
+  });
+
+  it('weekly コピーは daily の位置を初期値として持つが独立したカードになる', async () => {
+    const dailyEntryCard = BoardCard.fromProps({
+      id: 'card-daily-1',
+      userId: 'user-1',
+      cardType: 'entry',
+      refId: 'entry-1',
+      dateKey: '2026-04-09',
+      viewType: 'daily',
+      x: 300,
+      y: 400,
+      rotation: 5,
+      width: 340,
+      height: 280,
+      zIndex: 0,
+      createdAt: '2026-04-09T00:00:00Z',
+      updatedAt: '2026-04-09T00:00:00Z',
+    });
+    const entry = Entry.fromProps({
+      id: 'entry-1',
+      userId: 'user-1',
+      content: 'テスト',
+      mediaUrls: [],
+      createdAt: '2026-04-09T10:00:00Z',
+      updatedAt: '2026-04-09T10:00:00Z',
+    });
+
+    vi.mocked(boardCardRepo.findDailyCardsByDateRange).mockResolvedValue([dailyEntryCard]);
+    vi.mocked(boardCardRepo.findRefIdsByDateRange).mockResolvedValue(['entry-1']);
+    vi.mocked(entryRepo.listByUserIdAndWeek).mockResolvedValue([entry]);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
+
+    const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
+
+    // The weekly copy should have the daily card's position as initial values
+    const savedCards = vi.mocked(boardCardRepo.saveMany).mock.calls[0]?.[0] ?? [];
+    const weeklyCopy = savedCards.find(
+      (c: BoardCard) => c.refId === 'entry-1' && c.viewType === 'weekly',
+    );
+    expect(weeklyCopy).toBeDefined();
+    expect(weeklyCopy?.x).toBe(300);
+    expect(weeklyCopy?.y).toBe(400);
+    expect(weeklyCopy?.rotation).toBe(5);
+    // The weekly copy has a different ID than the daily card
+    expect(weeklyCopy?.id).not.toBe('card-daily-1');
+    expect(result.cards).toHaveLength(1);
+  });
+
+  it('weekly で削除済みカードの daily 版がマージされない', async () => {
+    const dailyEntryCard = BoardCard.fromProps({
+      id: 'card-daily-e1',
+      userId: 'user-1',
+      cardType: 'entry',
+      refId: 'entry-deleted',
+      dateKey: '2026-04-09',
+      viewType: 'daily',
+      x: 100,
+      y: 200,
+      rotation: 0,
+      width: 340,
+      height: 280,
+      zIndex: 0,
+      createdAt: '2026-04-09T00:00:00Z',
+      updatedAt: '2026-04-09T00:00:00Z',
+    });
+    const entry = Entry.fromProps({
+      id: 'entry-deleted',
+      userId: 'user-1',
+      content: '削除したエントリ',
+      mediaUrls: [],
+      createdAt: '2026-04-09T10:00:00Z',
+      updatedAt: '2026-04-09T10:00:00Z',
+    });
+
+    vi.mocked(boardCardRepo.findDailyCardsByDateRange).mockResolvedValue([dailyEntryCard]);
+    vi.mocked(boardCardRepo.findSoftDeletedRefIdsByDateAndView).mockResolvedValue([
+      'entry-deleted',
+    ]);
+    vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue(['entry-deleted']);
+    vi.mocked(boardCardRepo.findRefIdsByDateRange).mockResolvedValue(['entry-deleted']);
+    vi.mocked(entryRepo.listByUserIdAndWeek).mockResolvedValue([entry]);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([]);
+
+    const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
+
+    expect(result.cards).toHaveLength(0);
+    expect(boardCardRepo.saveMany).not.toHaveBeenCalled();
   });
 });

@@ -52,32 +52,43 @@ export function QuestionTimelineEvent({
 
   return (
     <div
-      className={`ml-6 rounded-lg border-l-4 ${config.borderColor} bg-[rgba(200,180,140,0.08)] px-5 py-4`}
+      className={`rounded-[10px] border-l-[3px] ${config.borderColor} bg-[rgba(200,180,140,0.08)] px-5 py-3.5`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
+          {/* Event type label */}
           <div className="flex items-center gap-2">
-            <span className={`inline-block h-2.5 w-2.5 rounded-full ${config.dotColor}`} />
-            <span className={`text-xs font-bold ${config.textColor}`}>{config.label}</span>
+            <span className={`inline-block h-2 w-2 rounded-full ${config.dotColor}`} />
+            <span className={`text-[11px] font-bold ${config.textColor}`}>{config.label}</span>
           </div>
-          <p className="text-base text-[var(--fg)]">→ {text}</p>
-          <p className="text-xs text-[var(--date-color)]">{config.attribution}</p>
+
+          {/* Question text */}
+          <p
+            className="text-[14px] leading-[1.7] text-[var(--fg)]"
+            style={{ fontFamily: "'Noto Serif JP', serif" }}
+          >
+            → {text}
+          </p>
+
+          {/* Attribution */}
+          <p className="text-[11px] text-[var(--date-color)]">{config.attribution}</p>
         </div>
 
+        {/* Action buttons - subtle styling */}
         <div className="flex shrink-0 gap-2 pt-1">
           {eventType === 'proposed' ? (
             <>
               <button
                 type="button"
                 onClick={() => onAccept(id)}
-                className="rounded-md bg-emerald-600 px-3 py-1 text-xs text-white hover:bg-emerald-700"
+                className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] text-white transition-colors hover:bg-emerald-700"
               >
                 承認
               </button>
               <button
                 type="button"
                 onClick={() => onReject(id)}
-                className="rounded-md border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
               >
                 却下
               </button>
@@ -86,7 +97,7 @@ export function QuestionTimelineEvent({
             <button
               type="button"
               onClick={() => onUnarchive(id)}
-              className="rounded-md border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
             >
               復元
             </button>
@@ -94,7 +105,7 @@ export function QuestionTimelineEvent({
             <button
               type="button"
               onClick={() => onArchive(id)}
-              className="rounded-md border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
             >
               アーカイブ
             </button>
