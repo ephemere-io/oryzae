@@ -11,7 +11,13 @@ interface BoardCardProps {
   isSelected: boolean;
   isDragging: boolean;
   onPointerDown: (cardId: string, x: number, y: number) => void;
-  onRotateStart: (cardId: string, centerX: number, centerY: number) => void;
+  onRotateStart: (
+    cardId: string,
+    centerX: number,
+    centerY: number,
+    pointerX: number,
+    pointerY: number,
+  ) => void;
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
   onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
@@ -58,7 +64,13 @@ export function BoardCard({
       e.stopPropagation();
       if (!cardRef.current) return;
       const rect = cardRef.current.getBoundingClientRect();
-      onRotateStart(card.id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+      onRotateStart(
+        card.id,
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+        e.clientX,
+        e.clientY,
+      );
     },
     [card.id, onRotateStart],
   );
