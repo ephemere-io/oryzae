@@ -2,14 +2,13 @@
 
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ObservabilitySummary } from '../hooks/use-observability';
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-muted px-3 py-2">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-lg font-bold">{value}</div>
+    <div className="mt-3">
+      <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
+      <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
     </div>
   );
 }
@@ -28,18 +27,16 @@ function ToolCard({
   children?: React.ReactNode;
 }) {
   const card = (
-    <Card className="transition-colors hover:bg-muted/50">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-base">{name}</CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">{tagline}</p>
-          </div>
-          {!href && <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />}
+    <div className="rounded-lg border border-border/50 bg-card p-4 transition-colors hover:border-border">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{name}</span>
+          <span className="text-xs text-muted-foreground">{tagline}</span>
         </div>
-      </CardHeader>
-      {children && <CardContent className="pt-0">{children}</CardContent>}
-    </Card>
+        {!href && <ExternalLink className="h-3 w-3 text-muted-foreground" />}
+      </div>
+      {children}
+    </div>
   );
 
   if (href) {
@@ -53,74 +50,92 @@ function ToolCard({
 }
 
 function formatCost(cost: number): string {
-  return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
 }
 
 export function ObservabilityCards({ data }: { data: ObservabilitySummary }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <ToolCard
         name="PostHog"
-        tagline="ユーザー行動分析"
+        tagline="Analytics"
         href="/analytics"
         externalUrl="https://us.posthog.com/project/378500"
       >
         {data.posthog && typeof data.posthog.totalPageviews === 'number' && (
-          <div className="flex gap-2">
-            <Metric label="今週の PV" value={data.posthog.totalPageviews.toLocaleString()} />
-            <Metric label="セッション" value={(data.posthog.totalSessions ?? 0).toLocaleString()} />
+          <div className="mt-3 flex gap-6">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">PV</p>
+              <p className="text-xl font-semibold tabular-nums">
+                {data.posthog.totalPageviews.toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Sessions</p>
+              <p className="text-xl font-semibold tabular-nums">
+                {(data.posthog.totalSessions ?? 0).toLocaleString()}
+              </p>
+            </div>
           </div>
         )}
       </ToolCard>
 
       <ToolCard
         name="Sentry"
-        tagline="エラー監視"
+        tagline="Errors"
         href="/observability/errors"
         externalUrl="https://oryzae.sentry.io"
       >
         {data.sentry.unresolvedCount !== null && (
-          <Metric label="未解決エラー" value={`${data.sentry.unresolvedCount} 件`} />
+          <Metric label="Unresolved" value={`${data.sentry.unresolvedCount}`} />
         )}
       </ToolCard>
 
       <ToolCard
-        name="Vercel AI Gateway"
-        tagline="LLM コスト追跡"
+        name="AI Gateway"
+        tagline="LLM Cost"
         href="/observability/spend"
         externalUrl="https://vercel.com"
       >
-        <div className="flex gap-2 flex-wrap">
-          {data.gateway.monthlySpend !== null && (
-            <Metric label="今月のコスト" value={formatCost(data.gateway.monthlySpend)} />
-          )}
-          {data.gateway.monthlyRequests !== null && (
-            <Metric label="リクエスト数" value={`${data.gateway.monthlyRequests}`} />
-          )}
+        <div className="mt-3 flex gap-6">
           {data.gateway.creditBalance !== null && (
-            <Metric label="残高" value={`$${Number(data.gateway.creditBalance).toFixed(2)}`} />
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Balance</p>
+              <p className="text-xl font-semibold tabular-nums">
+                {formatCost(Number(data.gateway.creditBalance))}
+              </p>
+            </div>
+          )}
+          {data.gateway.monthlyRequests !== null && data.gateway.monthlyRequests > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">This month</p>
+              <p className="text-xl font-semibold tabular-nums">
+                {data.gateway.monthlyRequests} req
+              </p>
+            </div>
           )}
         </div>
       </ToolCard>
 
-      <ToolCard
-        name="Upstash Redis"
-        tagline="API レート制限"
-        externalUrl="https://console.upstash.com"
-      >
+      <ToolCard name="Upstash" tagline="Rate Limiting" externalUrl="https://console.upstash.com">
         {data.upstash.totalKeys !== null && (
-          <Metric label="Redis キー数" value={`${data.upstash.totalKeys}`} />
+          <Metric label="Redis Keys" value={`${data.upstash.totalKeys}`} />
         )}
       </ToolCard>
 
       <ToolCard
         name="Vercel"
-        tagline="デプロイ・ホスティング"
+        tagline="Deploys"
         href="/observability/deploys"
         externalUrl="https://vercel.com"
       >
         {data.vercel.latestDeployState && (
-          <Metric label="最新デプロイ" value={data.vercel.latestDeployState} />
+          <div className="mt-3 flex items-center gap-2">
+            <span
+              className={`size-1.5 rounded-full ${data.vercel.latestDeployState === 'READY' ? 'bg-green-500' : data.vercel.latestDeployState === 'ERROR' ? 'bg-red-500' : 'bg-yellow-500'}`}
+            />
+            <span className="text-sm">{data.vercel.latestDeployState}</span>
+          </div>
         )}
       </ToolCard>
     </div>

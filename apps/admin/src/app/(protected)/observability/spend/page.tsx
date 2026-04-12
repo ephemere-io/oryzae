@@ -3,7 +3,6 @@
 import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -72,133 +71,118 @@ export default function SpendPage() {
   const maxCost = Math.max(...(data?.daily.map((d) => d.totalCost) ?? [0]), 0.001);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">AI Gateway Spend</h1>
-          <p className="text-sm text-muted-foreground">過去30日間の LLM コスト</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-medium">AI Gateway Spend</h1>
+          <span className="text-sm text-muted-foreground">Past 30 days</span>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          更新
+        <Button variant="ghost" size="icon-xs" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
       {loading && !data ? (
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : data ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  30日間コスト
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCost(totalCost)}</div>
-                <p className="text-xs text-muted-foreground">{totalRequests} リクエスト</p>
-              </CardContent>
-            </Card>
+          {/* Summary cards */}
+          <div className="grid gap-4 grid-cols-3">
+            <div className="rounded-lg border border-border/50 bg-card p-4">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">30d cost</p>
+              <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
+                {formatCost(totalCost)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{totalRequests} requests</p>
+            </div>
             {data.credits && (
               <>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      クレジット残高
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ${Number(data.credits.balance).toFixed(2)}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      累計使用額
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ${Number(data.credits.totalUsed).toFixed(2)}
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="rounded-lg border border-border/50 bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Balance</p>
+                  <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
+                    ${Number(data.credits.balance).toFixed(2)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-card p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Total used
+                  </p>
+                  <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
+                    ${Number(data.credits.totalUsed).toFixed(2)}
+                  </p>
+                </div>
               </>
             )}
           </div>
 
+          {/* Daily chart */}
           <div>
-            <h2 className="text-lg font-semibold mb-3">日別コスト</h2>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-1">
-                  {data.daily.map((d) => (
-                    <div key={d.date} className="flex items-center gap-3 text-sm">
-                      <span className="w-12 text-right text-muted-foreground shrink-0">
-                        {formatDate(d.date)}
-                      </span>
-                      <div className="flex-1 h-5 bg-muted rounded-sm overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-sm"
-                          style={{ width: `${(d.totalCost / maxCost) * 100}%` }}
-                        />
-                      </div>
-                      <span className="w-20 text-right font-mono shrink-0">
-                        {formatCost(d.totalCost)}
-                      </span>
-                      <span className="w-8 text-right text-muted-foreground shrink-0">
-                        {d.requestCount}
-                      </span>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+              Daily cost
+            </p>
+            {data.daily.length > 0 ? (
+              <div className="space-y-1">
+                {data.daily.map((d) => (
+                  <div key={d.date} className="flex items-center gap-3 text-sm">
+                    <span className="w-10 text-right text-xs text-muted-foreground shrink-0">
+                      {formatDate(d.date)}
+                    </span>
+                    <div className="flex-1 h-4 bg-muted/30 rounded-sm overflow-hidden">
+                      <div
+                        className="h-full bg-primary/60 rounded-sm"
+                        style={{ width: `${(d.totalCost / maxCost) * 100}%` }}
+                      />
                     </div>
-                  ))}
-                  {data.daily.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      データがありません
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    <span className="w-16 text-right font-mono text-xs tabular-nums shrink-0">
+                      {formatCost(d.totalCost)}
+                    </span>
+                    <span className="w-6 text-right text-xs text-muted-foreground shrink-0">
+                      {d.requestCount}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No data</p>
+            )}
           </div>
 
+          {/* By user */}
           {data.byUser.length > 0 && (
             <div>
-              <h2 className="text-lg font-semibold mb-3">ユーザー別コスト</h2>
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead className="text-right">リクエスト</TableHead>
-                      <TableHead className="text-right">Input</TableHead>
-                      <TableHead className="text-right">Output</TableHead>
-                      <TableHead className="text-right">コスト</TableHead>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">By user</p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead className="text-right">Requests</TableHead>
+                    <TableHead className="text-right">Input</TableHead>
+                    <TableHead className="text-right">Output</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.byUser.map((u) => (
+                    <TableRow key={u.userId}>
+                      <TableCell className="font-mono text-xs">
+                        {u.userId.slice(0, 12)}...
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {u.requestCount}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                        {u.inputTokens.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                        {u.outputTokens.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatCost(u.totalCost)}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.byUser.map((u) => (
-                      <TableRow key={u.userId}>
-                        <TableCell className="font-mono text-xs">
-                          {u.userId.slice(0, 12)}...
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{u.requestCount}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {u.inputTokens.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {u.outputTokens.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatCost(u.totalCost)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </>
