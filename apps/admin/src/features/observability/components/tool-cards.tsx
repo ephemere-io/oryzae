@@ -65,10 +65,10 @@ export function ObservabilityCards({ data }: { data: ObservabilitySummary }) {
         href="/analytics"
         externalUrl="https://us.posthog.com/project/378500"
       >
-        {data.posthog && (
+        {data.posthog && typeof data.posthog.totalPageviews === 'number' && (
           <div className="flex gap-2">
             <Metric label="今週の PV" value={data.posthog.totalPageviews.toLocaleString()} />
-            <Metric label="セッション" value={data.posthog.totalSessions.toLocaleString()} />
+            <Metric label="セッション" value={(data.posthog.totalSessions ?? 0).toLocaleString()} />
           </div>
         )}
       </ToolCard>
