@@ -10,6 +10,25 @@ function getSupabaseAuthClient() {
   return createClient(url, anonKey);
 }
 
+function extractUserProfile(user: {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const meta = user.user_metadata ?? {};
+  return {
+    id: user.id,
+    email: user.email,
+    avatarUrl: typeof meta.avatar_url === 'string' ? meta.avatar_url : null,
+    name:
+      typeof meta.full_name === 'string'
+        ? meta.full_name
+        : typeof meta.name === 'string'
+          ? meta.name
+          : null,
+  };
+}
+
 export const authRoutes = new Hono()
   .post('/signup', async (c) => {
     const body = credentialsSchema.parse(await c.req.json());
@@ -26,7 +45,9 @@ export const authRoutes = new Hono()
 
     return c.json(
       {
-        user: { id: data.user?.id, email: data.user?.email },
+        user: data.user
+          ? extractUserProfile(data.user)
+          : { id: undefined, email: undefined, avatarUrl: null, name: null },
         session: data.session
           ? {
               accessToken: data.session.access_token,
@@ -52,7 +73,7 @@ export const authRoutes = new Hono()
     }
 
     return c.json({
-      user: { id: data.user.id, email: data.user.email },
+      user: extractUserProfile(data.user),
       session: {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
@@ -109,7 +130,7 @@ export const authRoutes = new Hono()
     }
 
     return c.json({
-      user: { id: data.user.id, email: data.user.email },
+      user: extractUserProfile(data.user),
       session: {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
@@ -175,5 +196,5 @@ export const authRoutes = new Hono()
       return c.json({ error: 'Invalid token' }, 401);
     }
 
-    return c.json({ user: { id: user.id, email: user.email } });
+    return c.json({ user: extractUserProfile(user) });
   });
