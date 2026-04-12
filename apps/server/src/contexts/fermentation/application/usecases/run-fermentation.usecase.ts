@@ -103,13 +103,15 @@ export class RunFermentationUsecase {
 
       return { id: currentResult.id };
     } catch (error) {
-      // Mark failed
-      const failedResult = fermentationResult.withStatus('failed');
+      // Mark failed with error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const withError = fermentationResult.withErrorMessage(errorMessage);
+      const failedResult = withError.withStatus('failed');
       if (failedResult.success) {
         await this.fermentationRepo.update(failedResult.value);
       }
       if (error instanceof LlmAnalysisError) throw error;
-      throw new LlmAnalysisError(error instanceof Error ? error.message : 'Unknown error');
+      throw new LlmAnalysisError(errorMessage);
     }
   }
 }
