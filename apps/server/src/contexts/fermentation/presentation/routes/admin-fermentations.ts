@@ -90,6 +90,115 @@ export const adminFermentations = new Hono<Env>()
       pagination: { page, limit, total: count ?? 0 },
     });
   })
+  .get('/:id', async (c) => {
+    const supabase = c.get('adminSupabase');
+    const id = c.req.param('id');
+
+    // 1. Fetch the fermentation result
+    const { data: fermentation, error: fetchError } = await supabase
+      .from('fermentation_results')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !fermentation) {
+      return c.json({ error: 'Fermentation result not found' }, 404);
+    }
+
+    // 2. Fetch related data in parallel
+    const [worksheetRes, snippetsRes, letterRes, keywordsRes] = await Promise.all([
+      supabase.from('analysis_worksheets').select('*').eq('fermentation_result_id', id).single(),
+      supabase.from('extracted_snippets').select('*').eq('fermentation_result_id', id),
+      supabase.from('letters').select('*').eq('fermentation_result_id', id).single(),
+      supabase.from('keywords').select('*').eq('fermentation_result_id', id),
+    ]);
+
+    // 3. Fetch cost info if generation_id exists
+    let cost: unknown = null;
+    if (fermentation.generation_id) {
+      try {
+        cost = await gateway.getGenerationInfo({ id: fermentation.generation_id });
+      } catch {
+        // skip failed cost lookups
+      }
+    }
+
+    // 4. Fetch user email
+    const { data: userData } = await supabase.auth.admin.getUserById(fermentation.user_id);
+    const userEmail = userData?.user?.email ?? '';
+
+    // 5. Fetch question text
+    const { data: transactions } = await supabase
+      .from('question_transactions')
+      .select('string')
+      .eq('question_id', fermentation.question_id)
+      .eq('is_validated_by_user', true)
+      .order('question_version', { ascending: false })
+      .limit(1);
+    const questionText = transactions?.[0]?.string ?? '';
+
+    // 6. Build response
+    const worksheet = worksheetRes.data
+      ? {
+          id: worksheetRes.data.id,
+          fermentationResultId: worksheetRes.data.fermentation_result_id,
+          worksheetMarkdown: worksheetRes.data.worksheet_markdown,
+          resultDiagramMarkdown: worksheetRes.data.result_diagram_markdown,
+          createdAt: worksheetRes.data.created_at,
+          updatedAt: worksheetRes.data.updated_at,
+        }
+      : null;
+
+    const snippets = (snippetsRes.data ?? []).map((row: Record<string, string>) => ({
+      id: row.id,
+      fermentationResultId: row.fermentation_result_id,
+      snippetType: row.snippet_type,
+      originalText: row.original_text,
+      sourceDate: row.source_date,
+      selectionReason: row.selection_reason,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
+    const letter = letterRes.data
+      ? {
+          id: letterRes.data.id,
+          fermentationResultId: letterRes.data.fermentation_result_id,
+          bodyText: letterRes.data.body_text,
+          createdAt: letterRes.data.created_at,
+          updatedAt: letterRes.data.updated_at,
+        }
+      : null;
+
+    const keywords = (keywordsRes.data ?? []).map((row: Record<string, string>) => ({
+      id: row.id,
+      fermentationResultId: row.fermentation_result_id,
+      keyword: row.keyword,
+      description: row.description,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+
+    return c.json({
+      id: fermentation.id,
+      userId: fermentation.user_id,
+      questionId: fermentation.question_id,
+      entryId: fermentation.entry_id,
+      targetPeriod: fermentation.target_period,
+      status: fermentation.status,
+      generationId: fermentation.generation_id ?? null,
+      errorMessage: fermentation.error_message ?? null,
+      createdAt: fermentation.created_at,
+      updatedAt: fermentation.updated_at,
+      userEmail,
+      questionText,
+      cost,
+      worksheet,
+      snippets,
+      letter,
+      keywords,
+    });
+  })
   .get('/:id/cost', async (c) => {
     const supabase = c.get('adminSupabase');
     const id = c.req.param('id');

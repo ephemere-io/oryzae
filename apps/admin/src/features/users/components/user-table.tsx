@@ -54,7 +54,7 @@ export function UserTable({
         {users.map((user) => (
           <TableRow
             key={user.id}
-            className={onUserClick ? 'cursor-pointer' : undefined}
+            className={onUserClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
             onClick={onUserClick ? () => onUserClick(user.id) : undefined}
           >
             <TableCell>

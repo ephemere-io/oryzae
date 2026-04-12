@@ -1,6 +1,7 @@
 'use client';
 
 import { RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DateRangeSelector } from '@/components/ui/date-range-selector';
@@ -9,6 +10,7 @@ import { useFermentations } from '@/features/fermentations/hooks/use-fermentatio
 import { useDateRange } from '@/lib/use-date-range';
 
 export default function FermentationsPage() {
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const { preset, dateFrom, dateTo, selectPreset, setCustomRange } = useDateRange('30d');
   const { data, pagination, loading, error, refresh, retryFermentation } = useFermentations({
@@ -58,7 +60,11 @@ export default function FermentationsPage() {
         <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : (
         <>
-          <FermentationTable items={data} onRetry={retryFermentation} />
+          <FermentationTable
+            items={data}
+            onRetry={retryFermentation}
+            onRowClick={(id) => router.push(`/fermentations/${id}`)}
+          />
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 pt-2">

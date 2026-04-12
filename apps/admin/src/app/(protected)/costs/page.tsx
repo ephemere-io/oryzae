@@ -1,6 +1,7 @@
 'use client';
 
 import { RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CostTable } from '@/features/cost-tracking/components/cost-table';
@@ -13,6 +14,7 @@ function formatCost(cost: number): string {
 }
 
 export default function CostsPage() {
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const { data, pagination, loading, error, refresh } = useCostData({ page });
   const {
@@ -62,7 +64,7 @@ export default function CostsPage() {
         {userCostsLoading && userCosts.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
         ) : (
-          <UserCostTable items={userCosts} />
+          <UserCostTable items={userCosts} onUserClick={(id) => router.push(`/users/${id}`)} />
         )}
       </div>
 
@@ -74,7 +76,7 @@ export default function CostsPage() {
           <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
         ) : (
           <>
-            <CostTable items={data} />
+            <CostTable items={data} onRowClick={(id) => router.push(`/fermentations/${id}`)} />
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 pt-2">

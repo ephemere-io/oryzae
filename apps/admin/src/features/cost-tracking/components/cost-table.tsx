@@ -30,7 +30,12 @@ function statusDotColor(status: string): string {
   return 'bg-muted-foreground/40';
 }
 
-export function CostTable({ items }: { items: CostItem[] }) {
+interface CostTableProps {
+  items: CostItem[];
+  onRowClick?: (id: string) => void;
+}
+
+export function CostTable({ items, onRowClick }: CostTableProps) {
   return (
     <Table>
       <TableHeader>
@@ -46,7 +51,11 @@ export function CostTable({ items }: { items: CostItem[] }) {
       </TableHeader>
       <TableBody>
         {items.map((item) => (
-          <TableRow key={item.id}>
+          <TableRow
+            key={item.id}
+            className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
+            onClick={onRowClick ? () => onRowClick(item.id) : undefined}
+          >
             <TableCell className="whitespace-nowrap font-mono text-xs">
               {formatDate(item.created_at)}
             </TableCell>

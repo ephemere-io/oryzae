@@ -32,9 +32,10 @@ function statusDotColor(status: string): string {
 interface FermentationTableProps {
   items: FermentationItem[];
   onRetry?: (id: string) => Promise<boolean>;
+  onRowClick?: (id: string) => void;
 }
 
-export function FermentationTable({ items, onRetry }: FermentationTableProps) {
+export function FermentationTable({ items, onRetry, onRowClick }: FermentationTableProps) {
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const handleRetry = async (id: string) => {
@@ -59,7 +60,11 @@ export function FermentationTable({ items, onRetry }: FermentationTableProps) {
       </TableHeader>
       <TableBody>
         {items.map((item) => (
-          <TableRow key={item.id}>
+          <TableRow
+            key={item.id}
+            className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
+            onClick={onRowClick ? () => onRowClick(item.id) : undefined}
+          >
             <TableCell className="whitespace-nowrap font-mono text-xs">
               {formatDate(item.created_at)}
             </TableCell>
@@ -98,7 +103,10 @@ export function FermentationTable({ items, onRetry }: FermentationTableProps) {
                   variant="ghost"
                   size="icon-xs"
                   disabled={retryingId === item.id}
-                  onClick={() => handleRetry(item.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRetry(item.id);
+                  }}
                 >
                   <RotateCcw
                     className={`h-3 w-3 ${retryingId === item.id ? 'animate-spin' : ''}`}
