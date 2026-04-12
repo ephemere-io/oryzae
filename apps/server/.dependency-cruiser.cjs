@@ -139,6 +139,27 @@ module.exports = {
       to: { path: '^src/contexts/board/presentation' },
     },
 
+    // === User context isolation ===
+    {
+      name: 'user-context-isolation',
+      comment: 'user context must not import from other contexts (except shared)',
+      severity: 'error',
+      from: { path: '^src/contexts/user' },
+      to: { path: '^src/contexts/', pathNot: ['^src/contexts/user', '^src/contexts/shared'] },
+    },
+
+    // === Analytics context isolation ===
+    {
+      name: 'analytics-context-isolation',
+      comment: 'analytics context must not import from other contexts (except shared)',
+      severity: 'error',
+      from: { path: '^src/contexts/analytics' },
+      to: {
+        path: '^src/contexts/',
+        pathNot: ['^src/contexts/analytics', '^src/contexts/shared'],
+      },
+    },
+
     // === Shared domain isolation ===
     {
       name: 'shared-domain-isolation',

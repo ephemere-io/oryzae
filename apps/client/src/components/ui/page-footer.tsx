@@ -13,6 +13,7 @@ const FOOTER_ENTRIES: FooterEntry[] = [
   { match: (p) => p === '/entries/new' || p.startsWith('/entries/'), label: 'EDITOR' },
   { match: (p) => p === '/entries', label: 'LIST' },
   { match: (p) => p === '/questions', label: '問い一覧' },
+  { match: (p) => p === '/account', label: 'ACCOUNT' },
 ];
 
 function resolveLabel(pathname: string): string {

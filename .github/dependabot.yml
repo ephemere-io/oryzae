@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # Root — pnpm monorepo の lockfile はルートで管理されるため、
+  # ルートのみを対象にする。個別ディレクトリを指定すると lockfile が競合する。
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 10
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
