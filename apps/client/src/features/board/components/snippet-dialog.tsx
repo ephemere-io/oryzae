@@ -46,13 +46,10 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
-        className="w-80 rounded-lg p-6 shadow-lg"
-        style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--border-subtle)' }}
+        className="w-[90%] max-w-[400px] rounded-xl shadow-lg"
+        style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
-        <h3
-          className="mb-4 text-xs font-semibold uppercase tracking-wider"
-          style={{ color: 'var(--accent)', fontFamily: 'Inter, sans-serif' }}
-        >
+        <h3 className="mb-4 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
           {initialText ? 'スニペットを編集' : 'スニペットを作成'}
         </h3>
         <textarea
@@ -62,35 +59,38 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
           maxLength={50}
           rows={3}
           placeholder="テキストを入力..."
-          className="mb-3 w-full resize-none rounded border px-3 py-2 text-sm outline-none"
+          className="mb-2 w-full resize-none rounded-md border px-3 py-2.5 text-sm outline-none"
           style={{
+            height: 80,
             backgroundColor: 'var(--bg)',
-            borderColor: 'var(--accent)',
+            borderColor: 'var(--border-subtle)',
             color: 'var(--fg)',
           }}
         />
-        <div className="flex items-center justify-between">
-          <span className="text-[10px]" style={{ color: 'var(--date-color)' }}>
-            {text.length}/50
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded px-3 py-1 text-xs"
-              style={{ color: 'var(--date-color)' }}
-            >
-              キャンセル
-            </button>
-            <button
-              type="submit"
-              disabled={text.trim().length === 0}
-              className="rounded px-3 py-1 text-xs text-white disabled:opacity-40"
-              style={{ backgroundColor: 'var(--accent)' }}
-            >
-              {initialText ? '更新' : '作成'}
-            </button>
-          </div>
+        <div className="mb-4 text-right text-[11px]" style={{ color: 'var(--date-color)' }}>
+          {text.length}/50
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border px-4 py-2 text-xs"
+            style={{
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--fg)',
+              backgroundColor: 'var(--bg)',
+            }}
+          >
+            キャンセル
+          </button>
+          <button
+            type="submit"
+            disabled={text.trim().length === 0}
+            className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
+            style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
+          >
+            {initialText ? '更新' : '作成'}
+          </button>
         </div>
       </form>
     </div>
