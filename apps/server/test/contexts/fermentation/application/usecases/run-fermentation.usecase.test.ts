@@ -31,6 +31,7 @@ function mockLlm(): LlmAnalysisGateway {
       },
       usage: { inputTokens: 100, outputTokens: 200 },
       generationId: 'gen_test123',
+      estimatedCostUsd: 0.042,
     }),
   };
 }
@@ -57,6 +58,27 @@ describe('RunFermentationUsecase', () => {
     expect(repo.saveSnippets).toHaveBeenCalledOnce();
     expect(repo.saveLetter).toHaveBeenCalledOnce();
     expect(repo.saveKeywords).toHaveBeenCalledOnce();
+  });
+
+  it('persists estimated cost when provided', async () => {
+    const repo = mockRepo();
+    const llm = mockLlm();
+    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+
+    await usecase.execute({
+      userId: 'u1',
+      questionId: 'q1',
+      questionText: 'test',
+      entryId: 'e1',
+      entryContent: 'test content',
+    });
+
+    // The update call for generationId + cost should include estimatedCostUsd
+    const updateCalls = vi.mocked(repo.update).mock.calls;
+    // Second call is generationId + cost update
+    const costUpdateArg = updateCalls[1][0];
+    expect(costUpdateArg.estimatedCostUsd).toBe(0.042);
+    expect(costUpdateArg.generationId).toBe('gen_test123');
   });
 
   it('marks result as failed when LLM throws', async () => {

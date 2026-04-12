@@ -92,4 +92,40 @@ describe('FermentationResult', () => {
     const restored = FermentationResult.fromProps(withGen.toProps());
     expect(restored.generationId).toBe('gen_xyz');
   });
+
+  it('creates with null estimatedCostUsd', () => {
+    const result = FermentationResult.create(
+      { userId: 'u1', questionId: 'q1', entryId: 'e1', targetPeriod: '2025-12-01' },
+      generateId,
+    );
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.estimatedCostUsd).toBeNull();
+    }
+  });
+
+  it('sets estimatedCostUsd with withEstimatedCost', () => {
+    const result = FermentationResult.create(
+      { userId: 'u1', questionId: 'q1', entryId: 'e1', targetPeriod: '2025-12-01' },
+      generateId,
+    );
+    if (!result.success) return;
+
+    const withCost = result.value.withEstimatedCost(0.042);
+    expect(withCost.estimatedCostUsd).toBe(0.042);
+    expect(withCost.id).toBe(result.value.id);
+    expect(withCost.status).toBe('pending');
+  });
+
+  it('preserves estimatedCostUsd through toProps/fromProps roundtrip', () => {
+    const result = FermentationResult.create(
+      { userId: 'u1', questionId: 'q1', entryId: 'e1', targetPeriod: '2025-12-01' },
+      generateId,
+    );
+    if (!result.success) return;
+
+    const withCost = result.value.withEstimatedCost(0.05);
+    const restored = FermentationResult.fromProps(withCost.toProps());
+    expect(restored.estimatedCostUsd).toBe(0.05);
+  });
 });

@@ -20,6 +20,7 @@ export interface LlmAnalysisResult {
   output: FermentationOutput;
   usage: LlmUsage;
   generationId: string | undefined;
+  estimatedCostUsd: number | undefined;
 }
 
 export interface LlmAnalysisGateway {
