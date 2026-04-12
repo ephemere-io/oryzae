@@ -22,8 +22,8 @@ interface CreateBoardSnippetResponse {
   zIndex: number;
 }
 
-const DEFAULT_WIDTH = 260;
-const DEFAULT_HEIGHT = 150;
+const DEFAULT_WIDTH = 262;
+const DEFAULT_HEIGHT = 120;
 
 export class CreateBoardSnippetUsecase {
   constructor(
