@@ -3,7 +3,7 @@
 import posthog from 'posthog-js';
 import { useEffect, useState } from 'react';
 import { type ApiClient, createApiClient } from '@/lib/api';
-import { clearTokens, getAccessToken, setTokens } from '@/lib/auth';
+import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/auth';
 
 interface AuthState {
   accessToken: string;
@@ -17,25 +17,69 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (token) {
+    async function restoreSession() {
+      const token = getAccessToken();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       const client = createApiClient(token);
-      setApi(client);
-      client
-        .fetch('/api/v1/auth/me')
-        .then(async (res) => {
-          if (res.ok) {
-            const data = (await res.json()) as { user: { id: string; email: string } };
-            setAuth({ accessToken: token, refreshToken: '', user: data.user });
-            posthog.identify(data.user.id, { email: data.user.email });
-          } else {
-            clearTokens();
-          }
-        })
-        .finally(() => setLoading(false));
-    } else {
+      const meRes = await client.fetch('/api/v1/auth/me');
+
+      if (meRes.ok) {
+        const data = (await meRes.json()) as { user: { id: string; email: string } };
+        setAuth({ accessToken: token, refreshToken: getRefreshToken() ?? '', user: data.user });
+        setApi(client);
+        posthog.identify(data.user.id, { email: data.user.email });
+        setLoading(false);
+        return;
+      }
+
+      // Access token expired — try refresh
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        clearTokens();
+        setLoading(false);
+        return;
+      }
+
+      const refreshRes = await createApiClient().fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!refreshRes.ok) {
+        clearTokens();
+        setLoading(false);
+        return;
+      }
+
+      const refreshData = (await refreshRes.json()) as {
+        session: { accessToken: string; refreshToken: string };
+      };
+      setTokens(refreshData.session.accessToken, refreshData.session.refreshToken);
+
+      const newClient = createApiClient(refreshData.session.accessToken);
+      const retryRes = await newClient.fetch('/api/v1/auth/me');
+
+      if (retryRes.ok) {
+        const userData = (await retryRes.json()) as { user: { id: string; email: string } };
+        setAuth({
+          accessToken: refreshData.session.accessToken,
+          refreshToken: refreshData.session.refreshToken,
+          user: userData.user,
+        });
+        setApi(newClient);
+        posthog.identify(userData.user.id, { email: userData.user.email });
+      } else {
+        clearTokens();
+      }
+
       setLoading(false);
     }
+
+    restoreSession();
   }, []);
 
   async function login(email: string, password: string): Promise<string | null> {
