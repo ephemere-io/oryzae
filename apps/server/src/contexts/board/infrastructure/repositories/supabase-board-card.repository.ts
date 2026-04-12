@@ -15,6 +15,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .eq('user_id', userId)
       .eq('date_key', dateKey)
       .eq('view_type', viewType)
+      .eq('is_deleted', false)
       .order('z_index', { ascending: true });
 
     if (error) throw error;
@@ -31,6 +32,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .select('*')
       .eq('user_id', userId)
       .eq('view_type', 'daily')
+      .eq('is_deleted', false)
       .gte('date_key', startDate)
       .lte('date_key', endDate)
       .order('z_index', { ascending: true });
@@ -72,6 +74,24 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .eq('date_key', dateKey)
       .eq('view_type', viewType)
       .eq('card_type', cardType);
+
+    if (error) throw error;
+    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    return (data ?? []).map((row: Record<string, unknown>) => row.ref_id as string);
+  }
+
+  async findSoftDeletedRefIdsByDateAndView(
+    userId: string,
+    dateKey: string,
+    viewType: string,
+  ): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('ref_id')
+      .eq('user_id', userId)
+      .eq('date_key', dateKey)
+      .eq('view_type', viewType)
+      .eq('is_deleted', true);
 
     if (error) throw error;
     // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
@@ -134,15 +154,17 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
   }
 
   async delete(id: string, userId: string): Promise<void> {
+    // Soft-delete: mark as deleted so auto-populate doesn't re-create
     const { error } = await this.supabase
       .from('board_cards')
-      .delete()
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('user_id', userId);
     if (error) throw error;
   }
 
   async deleteByRefId(refId: string, userId: string): Promise<void> {
+    // Hard-delete: used when underlying data (snippet/photo) is also deleted
     const { error } = await this.supabase
       .from('board_cards')
       .delete()
