@@ -13,7 +13,14 @@ export interface DashboardStats {
   fermentationsWithCostTracking: number;
 }
 
-export function useDashboardStats() {
+interface UseDashboardStatsParams {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export function useDashboardStats(params?: UseDashboardStatsParams) {
+  const dateFrom = params?.dateFrom;
+  const dateTo = params?.dateTo;
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +33,13 @@ export function useDashboardStats() {
     setError(null);
 
     const api = createApiClient(token);
-    const res = await api.fetch('/api/v1/admin/dashboard/stats');
+    const searchParams = new URLSearchParams();
+    if (dateFrom) searchParams.set('date_from', dateFrom);
+    if (dateTo) searchParams.set('date_to', dateTo);
+    const qs = searchParams.toString();
+    const url = `/api/v1/admin/dashboard/stats${qs ? `?${qs}` : ''}`;
+
+    const res = await api.fetch(url);
     if (res.ok) {
       const data = (await res.json()) as DashboardStats;
       setStats(data);
@@ -34,7 +47,7 @@ export function useDashboardStats() {
       setError('統計情報の取得に失敗しました');
     }
     setLoading(false);
-  }, []);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     fetchStats();
