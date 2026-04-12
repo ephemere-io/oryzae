@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
+import { PostHogGateway } from '../../infrastructure/posthog.gateway.js';
 
 type Env = {
   Variables: {
@@ -8,143 +9,64 @@ type Env = {
   };
 };
 
-interface PostHogTrendResult {
-  data: number[];
-  days: string[];
-  label: string;
-}
+const analytics = new PostHogGateway();
 
-interface PostHogTrendResponse {
-  result: PostHogTrendResult[];
-}
-
-interface PostHogQueryResponse {
-  results: unknown[][];
-}
-
-function isPostHogTrendResponse(data: unknown): data is PostHogTrendResponse {
-  if (typeof data !== 'object' || data === null) return false;
-  return 'result' in data && Array.isArray((data as PostHogTrendResponse).result);
-}
-
-function isPostHogQueryResponse(data: unknown): data is PostHogQueryResponse {
-  if (typeof data !== 'object' || data === null) return false;
-  return 'results' in data && Array.isArray((data as PostHogQueryResponse).results);
-}
-
-const POSTHOG_PROJECT_ID = '378500';
-const POSTHOG_HOST = 'https://us.i.posthog.com';
-
-async function posthogFetch<T>(
-  path: string,
-  body: unknown,
-  guard: (data: unknown) => data is T,
-): Promise<T | null> {
-  const apiKey = process.env.POSTHOG_PERSONAL_API_KEY;
-  if (!apiKey) return null;
-
-  const res = await fetch(`${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) return null;
-  const data: unknown = await res.json();
-  if (!guard(data)) return null;
-  return data;
+function sumData(data: number[]): number {
+  return data.reduce((s, v) => s + v, 0);
 }
 
 export const adminAnalytics = new Hono<Env>()
   .get('/overview', async (c) => {
     const dateFrom = c.req.query('date_from') ?? '-7d';
+    const pageviewEvent = [{ id: '$pageview', math: 'total' }];
 
-    const [pvRes, entryPvRes, jarPvRes, sessionRes] = await Promise.all([
-      posthogFetch(
-        '/insights/trend/',
-        {
-          events: [{ id: '$pageview', math: 'total' }],
-          date_from: dateFrom,
-        },
-        isPostHogTrendResponse,
-      ),
-      posthogFetch(
-        '/insights/trend/',
-        {
-          events: [{ id: '$pageview', math: 'total' }],
-          date_from: dateFrom,
-          properties: [{ key: '$current_url', value: '/entries', operator: 'icontains' }],
-        },
-        isPostHogTrendResponse,
-      ),
-      posthogFetch(
-        '/insights/trend/',
-        {
-          events: [{ id: '$pageview', math: 'total' }],
-          date_from: dateFrom,
-          properties: [{ key: '$current_url', value: '/jar', operator: 'icontains' }],
-        },
-        isPostHogTrendResponse,
-      ),
-      posthogFetch(
-        '/query/',
-        {
-          query: {
-            kind: 'HogQLQuery',
-            query: `SELECT
-              count(DISTINCT $session_id) as sessions,
-              avg(dateDiff('second', min_timestamp, max_timestamp)) as avg_duration
-            FROM (
-              SELECT $session_id, min(timestamp) as min_timestamp, max(timestamp) as max_timestamp
-              FROM events
-              WHERE timestamp >= now() - toIntervalDay(7) AND $session_id IS NOT NULL
-              GROUP BY $session_id
-            )`,
-          },
-        },
-        isPostHogQueryResponse,
-      ),
+    const [pvResults, entryPvResults, jarPvResults, sessionRows] = await Promise.all([
+      analytics.queryTrend({ dateFrom, events: pageviewEvent }),
+      analytics.queryTrend({
+        dateFrom,
+        events: pageviewEvent,
+        properties: [{ key: '$current_url', value: '/entries', operator: 'icontains' }],
+      }),
+      analytics.queryTrend({
+        dateFrom,
+        events: pageviewEvent,
+        properties: [{ key: '$current_url', value: '/jar', operator: 'icontains' }],
+      }),
+      analytics.queryHogQL(`SELECT
+        count(DISTINCT $session_id) as sessions,
+        avg(dateDiff('second', min_timestamp, max_timestamp)) as avg_duration
+      FROM (
+        SELECT $session_id, min(timestamp) as min_timestamp, max(timestamp) as max_timestamp
+        FROM events
+        WHERE timestamp >= now() - toIntervalDay(7) AND $session_id IS NOT NULL
+        GROUP BY $session_id
+      )`),
     ]);
 
-    const totalPageviews = pvRes?.result[0]?.data.reduce((s: number, v: number) => s + v, 0) ?? 0;
-    const entryPageViews =
-      entryPvRes?.result[0]?.data.reduce((s: number, v: number) => s + v, 0) ?? 0;
-    const jarPageViews = jarPvRes?.result[0]?.data.reduce((s: number, v: number) => s + v, 0) ?? 0;
-
-    const sessionRow = sessionRes?.results[0];
+    const sessionRow = sessionRows[0];
     const totalSessions = typeof sessionRow?.[0] === 'number' ? sessionRow[0] : 0;
-    const avgSessionDurationSeconds = typeof sessionRow?.[1] === 'number' ? sessionRow[1] : 0;
+    const avgDuration = typeof sessionRow?.[1] === 'number' ? sessionRow[1] : 0;
 
     return c.json({
-      totalPageviews,
+      totalPageviews: sumData(pvResults[0]?.data ?? []),
       totalSessions,
-      avgSessionDurationSeconds: Math.round(avgSessionDurationSeconds),
-      entryPageViews,
-      jarPageViews,
+      avgSessionDurationSeconds: Math.round(avgDuration),
+      entryPageViews: sumData(entryPvResults[0]?.data ?? []),
+      jarPageViews: sumData(jarPvResults[0]?.data ?? []),
     });
   })
   .get('/pages', async (c) => {
     const dateFrom = c.req.query('date_from') ?? '-7d';
 
-    const res = await posthogFetch(
-      '/insights/trend/',
-      {
-        events: [{ id: '$pageview', math: 'total' }],
-        date_from: dateFrom,
-        breakdown: '$pathname',
-        breakdown_type: 'event',
-      },
-      isPostHogTrendResponse,
-    );
+    const results = await analytics.queryTrend({
+      dateFrom,
+      events: [{ id: '$pageview', math: 'total' }],
+      breakdown: '$pathname',
+      breakdownType: 'event',
+    });
 
-    const pages = (res?.result ?? [])
-      .map((r) => ({
-        path: r.label,
-        views: r.data.reduce((s: number, v: number) => s + v, 0),
-      }))
+    const pages = results
+      .map((r) => ({ path: r.label, views: sumData(r.data) }))
       .sort((a, b) => b.views - a.views)
       .slice(0, 20);
 
@@ -153,35 +75,27 @@ export const adminAnalytics = new Hono<Env>()
   .get('/daily', async (c) => {
     const dateFrom = c.req.query('date_from') ?? '-7d';
 
-    const [pvRes, sessionRes] = await Promise.all([
-      posthogFetch(
-        '/insights/trend/',
-        {
-          events: [{ id: '$pageview', math: 'total' }],
-          date_from: dateFrom,
-          interval: 'day',
-        },
-        isPostHogTrendResponse,
-      ),
-      posthogFetch(
-        '/insights/trend/',
-        {
-          events: [{ id: '$pageview', math: 'dau' }],
-          date_from: dateFrom,
-          interval: 'day',
-        },
-        isPostHogTrendResponse,
-      ),
+    const [pvResults, dauResults] = await Promise.all([
+      analytics.queryTrend({
+        dateFrom,
+        events: [{ id: '$pageview', math: 'total' }],
+        interval: 'day',
+      }),
+      analytics.queryTrend({
+        dateFrom,
+        events: [{ id: '$pageview', math: 'dau' }],
+        interval: 'day',
+      }),
     ]);
 
-    const pvData = pvRes?.result[0];
-    const sessionData = sessionRes?.result[0];
-
+    const pvData = pvResults[0];
+    const dauData = dauResults[0];
     const days = pvData?.days ?? [];
+
     const daily = days.map((date, i) => ({
       date,
       pageviews: pvData?.data[i] ?? 0,
-      uniqueUsers: sessionData?.data[i] ?? 0,
+      uniqueUsers: dauData?.data[i] ?? 0,
     }));
 
     return c.json({ data: daily });
