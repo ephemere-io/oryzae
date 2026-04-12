@@ -1,5 +1,6 @@
 'use client';
 
+import posthog from 'posthog-js';
 import { useEffect, useState } from 'react';
 import { type ApiClient, createApiClient } from '@/lib/api';
 import { clearTokens, getAccessToken, setTokens } from '@/lib/auth';
@@ -26,6 +27,7 @@ export function useAuth() {
           if (res.ok) {
             const data = (await res.json()) as { user: { id: string; email: string } };
             setAuth({ accessToken: token, refreshToken: '', user: data.user });
+            posthog.identify(data.user.id, { email: data.user.email });
           } else {
             clearTokens();
           }
@@ -57,6 +59,7 @@ export function useAuth() {
       user: data.user,
     });
     setApi(createApiClient(data.session.accessToken));
+    posthog.identify(data.user.id, { email: data.user.email });
     return null;
   }
 
@@ -90,6 +93,7 @@ export function useAuth() {
     clearTokens();
     setAuth(null);
     setApi(null);
+    posthog.reset();
   }
 
   return { auth, api, loading, login, signup, logout };

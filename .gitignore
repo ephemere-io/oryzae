@@ -11,3 +11,4 @@ playwright-report/
 *.png
 .DS_Store
 .tmp/
+.claude/worktrees/

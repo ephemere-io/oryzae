@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { PostHogProvider } from '@/components/posthog-provider';
 import './globals.css';
 
 const geistSans = Geist({
@@ -30,7 +31,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--fg)]">{children}</body>
+      <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--fg)]">
+        <PostHogProvider>{children}</PostHogProvider>
+      </body>
     </html>
   );
 }

@@ -23,13 +23,16 @@ paths:
 - `app/` — Next.js App Router ページ + API Route Handler
 - `app/api/[...path]/` — Hono アプリへのリクエスト転送（変更しない）
 - `features/X/` — 機能スライス。components, hooks を含む
+- `components/ui/` — 汎用 UI コンポーネント（shadcn 等。feature 依存禁止）
 - `lib/` — 横断的ユーティリティ（API クライアント、トークン管理等）
 
 ## インポートルール（dependency-cruiser で機械的に検証）
 
 - `features/X` → `features/Y` **禁止**（機能間の直接依存禁止）
-- `lib/` → `features/`, `app/` **禁止**
-- `app/` からは `features/`, `lib/` のみインポート可
+- `components/` → `features/`, `app/` **禁止**（汎用UIはfeatureを知らない）
+- `lib/` → `features/`, `app/`, `components/` **禁止**
+- `app/` からは `features/`, `components/`, `lib/` のみインポート可
+- `features/X` からは `components/`, `lib/` のみインポート可
 
 ## データフェッチング
 

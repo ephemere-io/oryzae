@@ -8,6 +8,8 @@ export interface DashboardStats {
   totalUsers: number;
   totalEntries: number;
   totalFermentations: number;
+  completedFermentations: number;
+  failedFermentations: number;
   fermentationsWithCostTracking: number;
 }
 
