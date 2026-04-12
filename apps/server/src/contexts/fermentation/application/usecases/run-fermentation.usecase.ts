@@ -48,22 +48,17 @@ export class RunFermentationUsecase {
 
     try {
       // 3. Run LLM analysis
-      const { output, generationId, estimatedCostUsd } = await this.llmGateway.analyze({
+      const { output, generationId } = await this.llmGateway.analyze({
         question: params.questionText,
         entryContent: params.entryContent,
         targetPeriod,
         userId: params.userId,
       });
 
-      // 3.5. Track generation ID and cost
+      // 3.5. Track generation ID for cost tracking
       let currentResult = fermentationResult;
       if (generationId) {
         currentResult = fermentationResult.withGenerationId(generationId);
-      }
-      if (estimatedCostUsd !== undefined) {
-        currentResult = currentResult.withEstimatedCost(estimatedCostUsd);
-      }
-      if (generationId || estimatedCostUsd !== undefined) {
         await this.fermentationRepo.update(currentResult);
       }
 

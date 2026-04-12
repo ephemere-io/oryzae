@@ -21,7 +21,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       entry_id: props.entryId,
       target_period: props.targetPeriod,
       status: props.status,
-      estimated_cost_usd: props.estimatedCostUsd,
       created_at: props.createdAt,
       updated_at: props.updatedAt,
     });
@@ -35,7 +34,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .update({
         status: props.status,
         generation_id: props.generationId,
-        estimated_cost_usd: props.estimatedCostUsd,
         updated_at: new Date().toISOString(),
       })
       .eq('id', props.id);
@@ -57,7 +55,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       targetPeriod: data.target_period,
       status: data.status,
       generationId: data.generation_id ?? null,
-      estimatedCostUsd: data.estimated_cost_usd ?? null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     });
@@ -142,7 +139,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         targetPeriod: row.target_period,
         status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
         generationId: row.generation_id ?? null,
-        estimatedCostUsd: row.estimated_cost_usd ? Number(row.estimated_cost_usd) : null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }),
