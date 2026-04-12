@@ -2,11 +2,11 @@
 
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ToolCards } from '@/features/observability/components/tool-cards';
+import { ObservabilityCards } from '@/features/observability/components/tool-cards';
 import { useObservability } from '@/features/observability/hooks/use-observability';
 
 export default function ObservabilityPage() {
-  const { tools, loading, error, refresh } = useObservability();
+  const { data, loading, error, refresh } = useObservability();
 
   return (
     <div className="space-y-6">
@@ -24,11 +24,11 @@ export default function ObservabilityPage() {
         </div>
       )}
 
-      {loading && tools.length === 0 ? (
+      {loading && !data ? (
         <p className="text-sm text-muted-foreground">読み込み中...</p>
-      ) : (
-        <ToolCards tools={tools} />
-      )}
+      ) : data ? (
+        <ObservabilityCards data={data} />
+      ) : null}
     </div>
   );
 }
