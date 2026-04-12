@@ -210,6 +210,7 @@ export function usePressureBleed(
   const lastImeTimeRef = useRef(0);
   const directKeyRef = useRef<{ key: string; downAt: number } | null>(null);
   const directCharRef = useRef<string | null>(null);
+  const holdingRef = useRef(false);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -221,13 +222,13 @@ export function usePressureBleed(
       const isControl = e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter';
 
       if (e.repeat && !isMod && !isControl) {
-        // Long-press detected — wrap last char with live intensity
+        // Long-press detected — block repeat and wrap last char with bleed
         e.preventDefault();
+        holdingRef.current = true;
         if (directCharRef.current) {
           const holdMs = Date.now() - (directKeyRef.current?.downAt ?? Date.now());
           const ch = directCharRef.current;
           directCharRef.current = null;
-          directKeyRef.current = null;
           requestAnimationFrame(() => wrapWithBleed(ch, [holdMs], HOLD_THRESHOLD_MS));
         }
         return;
@@ -246,6 +247,7 @@ export function usePressureBleed(
     }
 
     function onKeyUp(e: KeyboardEvent) {
+      holdingRef.current = false;
       if (directKeyRef.current?.key === e.key && directCharRef.current) {
         const holdMs = Date.now() - directKeyRef.current.downAt;
         const ch = directCharRef.current;
@@ -256,6 +258,13 @@ export function usePressureBleed(
         }
       } else if (directKeyRef.current?.key === e.key) {
         directKeyRef.current = null;
+      }
+    }
+
+    function onBeforeInput(e: Event) {
+      // Block character insertion during key hold (repeat) to prevent duplicate chars
+      if (holdingRef.current) {
+        e.preventDefault();
       }
     }
 
@@ -299,6 +308,7 @@ export function usePressureBleed(
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('keyup', onKeyUp, true);
     editor.addEventListener('input', onInput);
+    editor.addEventListener('beforeinput', onBeforeInput);
     editor.addEventListener('compositionstart', onCompositionStart);
     editor.addEventListener('compositionend', onCompositionEnd);
 
@@ -306,6 +316,7 @@ export function usePressureBleed(
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
       editor.removeEventListener('input', onInput);
+      editor.removeEventListener('beforeinput', onBeforeInput);
       editor.removeEventListener('compositionstart', onCompositionStart);
       editor.removeEventListener('compositionend', onCompositionEnd);
     };

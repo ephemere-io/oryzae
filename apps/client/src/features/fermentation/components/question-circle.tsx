@@ -8,6 +8,7 @@ interface QuestionCircleProps {
   questionText: string;
   detail: FermentationDetail | null;
   zoomed: boolean;
+  hidden?: boolean;
   onClick: () => void;
   onElementClick: (type: 'keyword' | 'snippet' | 'letter', data: Record<string, string>) => void;
   style?: React.CSSProperties;
@@ -86,6 +87,7 @@ export function QuestionCircle({
   questionText,
   detail,
   zoomed,
+  hidden = false,
   onClick,
   onElementClick,
   style,
@@ -107,13 +109,14 @@ export function QuestionCircle({
               if (e.key === 'Enter') onClick();
             }
       }
-      className={`absolute transition-all duration-[600ms] ${zoomed ? 'z-[55]' : 'z-[3] cursor-pointer'}`}
+      className={`absolute transition-all duration-[600ms] ${zoomed ? 'z-[55]' : 'z-[3] cursor-pointer'} ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
       style={{
         ...style,
         width: zoomed ? 'min(50vw, 75vh, 500px)' : `${size}px`,
         height: zoomed ? 'min(50vw, 75vh, 500px)' : `${size}px`,
         transform: zoomed ? 'translate(-50%, -50%)' : 'translate(-50%, -50%)',
         ...(zoomed ? { top: '50%', left: '50%' } : {}),
+        animation: 'fadeIn 0.5s ease-out forwards',
         // @ts-expect-error: CSS custom property for element scaling
         '--el-scale': zoomed ? '1.1' : '0.65',
       }}
@@ -247,7 +250,7 @@ export function QuestionCircle({
                       position: 'relative',
                       zIndex: 10,
                       background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
-                      color: 'var(--text)',
+                      color: 'var(--fg)',
                       fontFamily: "'Noto Serif JP', serif",
                       fontSize: zoomed ? '13px' : '11px',
                       letterSpacing: '0.15em',
@@ -316,7 +319,7 @@ export function QuestionCircle({
                     <p
                       style={{
                         fontSize: zoomed ? '11px' : '9px',
-                        color: 'var(--text)',
+                        color: 'var(--fg)',
                         lineHeight: 1.6,
                         fontFamily: "'Noto Sans JP', sans-serif",
                         fontWeight: 500,
