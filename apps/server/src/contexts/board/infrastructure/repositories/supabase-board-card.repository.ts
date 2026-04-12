@@ -21,6 +21,44 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
+  async findDailyCardsByDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<BoardCard[]> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('view_type', 'daily')
+      .gte('date_key', startDate)
+      .lte('date_key', endDate)
+      .order('z_index', { ascending: true });
+
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
+  async findRefIdsByDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
+    cardType: string,
+  ): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('ref_id')
+      .eq('user_id', userId)
+      .eq('view_type', 'daily')
+      .eq('card_type', cardType)
+      .gte('date_key', startDate)
+      .lte('date_key', endDate);
+
+    if (error) throw error;
+    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    return (data ?? []).map((row: Record<string, unknown>) => row.ref_id as string);
+  }
+
   async findRefIdsByDateAndView(
     userId: string,
     dateKey: string,

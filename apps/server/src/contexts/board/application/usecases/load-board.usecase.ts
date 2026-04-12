@@ -62,15 +62,49 @@ export class LoadBoardUsecase {
     viewType: 'daily' | 'weekly' = 'daily',
   ): Promise<LoadBoardResponse> {
     // 1. Load existing cards
-    const existingCards = await this.boardCardRepo.findByDateAndView(userId, dateKey, viewType);
+    let existingCards = await this.boardCardRepo.findByDateAndView(userId, dateKey, viewType);
+
+    // For weekly view, also include daily cards from the same week
+    if (viewType === 'weekly') {
+      const { startDate, endDate } = LoadBoardUsecase.weekRange(dateKey);
+      const dailyCards = await this.boardCardRepo.findDailyCardsByDateRange(
+        userId,
+        startDate,
+        endDate,
+      );
+      // Merge, avoiding duplicates by refId+cardType
+      const existingKeys = new Set(existingCards.map((c) => `${c.cardType}:${c.refId}`));
+      const uniqueDailyCards = dailyCards.filter(
+        (c) => !existingKeys.has(`${c.cardType}:${c.refId}`),
+      );
+      existingCards = [...existingCards, ...uniqueDailyCards];
+    }
 
     // 2. Auto-populate entries that don't have cards yet
-    const existingEntryRefIds = await this.boardCardRepo.findRefIdsByDateAndView(
-      userId,
-      dateKey,
-      viewType,
-      'entry',
-    );
+    let existingEntryRefIds: string[];
+    if (viewType === 'weekly') {
+      const { startDate, endDate } = LoadBoardUsecase.weekRange(dateKey);
+      const weeklyRefIds = await this.boardCardRepo.findRefIdsByDateAndView(
+        userId,
+        dateKey,
+        viewType,
+        'entry',
+      );
+      const dailyRefIds = await this.boardCardRepo.findRefIdsByDateRange(
+        userId,
+        startDate,
+        endDate,
+        'entry',
+      );
+      existingEntryRefIds = [...new Set([...weeklyRefIds, ...dailyRefIds])];
+    } else {
+      existingEntryRefIds = await this.boardCardRepo.findRefIdsByDateAndView(
+        userId,
+        dateKey,
+        viewType,
+        'entry',
+      );
+    }
     const existingRefIdSet = new Set(existingEntryRefIds);
 
     const entries =
@@ -183,5 +217,24 @@ export class LoadBoardUsecase {
         };
       })
       .filter((c): c is CardResponse => c !== null);
+  }
+
+  private static weekRange(dateKey: string): { startDate: string; endDate: string } {
+    const d = new Date(`${dateKey}T00:00:00`);
+    const day = d.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + mondayOffset);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const fmt = (dt: Date) => {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+
+    return { startDate: fmt(monday), endDate: fmt(sunday) };
   }
 }
