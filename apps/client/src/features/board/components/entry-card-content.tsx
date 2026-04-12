@@ -22,10 +22,7 @@ export function EntryCardContent({ content }: EntryCardContentProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden p-6">
       {/* Header with border separator */}
-      <div
-        className="mb-2 flex items-center justify-between pb-2"
-        style={{ borderBottom: '1px solid var(--border-subtle)' }}
-      >
+      <div className="mb-2 flex items-center justify-between pb-2">
         <span
           className="text-[9px] uppercase tracking-[0.2em]"
           style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}

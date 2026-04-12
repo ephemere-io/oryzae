@@ -11,7 +11,7 @@ interface SnippetDialogProps {
 
 export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: SnippetDialogProps) {
   const [text, setText] = useState(initialText);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -53,19 +53,19 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
           className="mb-4 text-xs font-semibold uppercase tracking-wider"
           style={{ color: 'var(--accent)', fontFamily: 'Inter, sans-serif' }}
         >
-          {initialText ? 'Edit Snippet' : '✦ New Snippet'}
+          {initialText ? 'スニペットを編集' : 'スニペットを作成'}
         </h3>
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={50}
-          placeholder="スニペットを入力..."
-          className="mb-3 w-full rounded border px-3 py-2 text-sm outline-none"
+          rows={3}
+          placeholder="テキストを入力..."
+          className="mb-3 w-full resize-none rounded border px-3 py-2 text-sm outline-none"
           style={{
             backgroundColor: 'var(--bg)',
-            borderColor: 'var(--border-subtle)',
+            borderColor: 'var(--accent)',
             color: 'var(--fg)',
           }}
         />
@@ -80,7 +80,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
               className="rounded px-3 py-1 text-xs"
               style={{ color: 'var(--date-color)' }}
             >
-              Cancel
+              キャンセル
             </button>
             <button
               type="submit"
@@ -88,7 +88,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
               className="rounded px-3 py-1 text-xs text-white disabled:opacity-40"
               style={{ backgroundColor: 'var(--accent)' }}
             >
-              {initialText ? 'Update' : 'Add'}
+              {initialText ? '更新' : '作成'}
             </button>
           </div>
         </div>

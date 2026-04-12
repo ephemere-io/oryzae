@@ -90,7 +90,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           className="mb-4 text-xs font-semibold uppercase tracking-wider"
           style={{ color: 'var(--accent)', fontFamily: 'Inter, sans-serif' }}
         >
-          Add Photo
+          写真を追加
         </h3>
 
         {/* Preview / File picker */}
@@ -113,7 +113,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
             />
           ) : (
             <span className="text-xs" style={{ color: 'var(--date-color)' }}>
-              クリックして画像を選択
+              クリックして写真を選択
             </span>
           )}
         </button>
@@ -130,7 +130,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           maxLength={20}
-          placeholder="キャプション（任意）"
+          placeholder="キャプション（20文字以内）"
           className="mb-3 w-full rounded border px-3 py-2 text-sm outline-none"
           style={{
             backgroundColor: 'var(--bg)',
@@ -149,7 +149,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
               className="rounded px-3 py-1 text-xs"
               style={{ color: 'var(--date-color)' }}
             >
-              Cancel
+              キャンセル
             </button>
             <button
               type="submit"
@@ -157,7 +157,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
               className="rounded px-3 py-1 text-xs text-white disabled:opacity-40"
               style={{ backgroundColor: 'var(--accent)' }}
             >
-              Add
+              追加
             </button>
           </div>
         </div>
