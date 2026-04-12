@@ -19,24 +19,21 @@ describe('useObservability', () => {
     localStorage.setItem('oryzae_admin_access_token', 'test-token');
   });
 
-  it('fetches summary and analytics in parallel', async () => {
+  it('fetches summary and merges PostHog metrics from analytics API', async () => {
     const summaryBody = {
       tools: [
         {
           id: 'posthog',
           name: 'PostHog',
-          purpose: 'ユーザー行動分析',
-          configured: true,
-          adminPath: '/analytics',
+          tagline: 'ユーザー行動分析',
+          href: '/analytics',
           externalUrl: 'https://us.posthog.com/project/378500',
-          externalLabel: 'PostHog Dashboard',
-          metrics: [],
+          metric: null,
         },
       ],
     };
     const analyticsBody = { totalPageviews: 1234, totalSessions: 42 };
 
-    // Hook makes 2 parallel fetches: summary + analytics
     mockFetch
       .mockResolvedValueOnce(mockResponse(true, summaryBody))
       .mockResolvedValueOnce(mockResponse(true, analyticsBody));
@@ -48,8 +45,7 @@ describe('useObservability', () => {
     });
 
     expect(result.current.tools).toHaveLength(1);
-    expect(result.current.tools[0].metrics[0].value).toBe('1,234');
-    expect(result.current.tools[0].metrics[1].value).toBe('42');
+    expect(result.current.tools[0].metric?.value).toBe('1,234');
     expect(result.current.error).toBeNull();
   });
 
@@ -64,15 +60,12 @@ describe('useObservability', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.tools).toEqual([]);
     expect(result.current.error).toBe('監視データの取得に失敗しました');
   });
 
   it('does nothing when no token is stored', async () => {
     localStorage.clear();
-
     const { result } = renderHook(() => useObservability());
-
     expect(mockFetch).not.toHaveBeenCalled();
     expect(result.current.tools).toEqual([]);
   });

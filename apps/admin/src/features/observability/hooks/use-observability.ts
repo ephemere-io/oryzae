@@ -12,12 +12,10 @@ export interface ToolMetric {
 export interface ToolSummary {
   id: string;
   name: string;
-  purpose: string;
-  configured: boolean;
-  adminPath: string | null;
+  tagline: string;
+  href: string | null;
   externalUrl: string;
-  externalLabel: string;
-  metrics: ToolMetric[];
+  metric: ToolMetric | null;
 }
 
 interface SummaryResponse {
@@ -42,7 +40,6 @@ export function useObservability() {
     setError(null);
 
     const api = createApiClient(token);
-
     const [summaryRes, analyticsRes] = await Promise.all([
       api.fetch('/api/v1/admin/observability/summary'),
       api.fetch('/api/v1/admin/analytics/overview?date_from=-7d'),
@@ -56,15 +53,14 @@ export function useObservability() {
 
     const summary = (await summaryRes.json()) as SummaryResponse;
 
-    // Merge PostHog metrics from analytics API
     if (analyticsRes.ok) {
       const analytics = (await analyticsRes.json()) as AnalyticsOverview;
       const posthog = summary.tools.find((t) => t.id === 'posthog');
       if (posthog) {
-        posthog.metrics = [
-          { label: '今週の PV', value: analytics.totalPageviews.toLocaleString() },
-          { label: 'セッション', value: analytics.totalSessions.toLocaleString() },
-        ];
+        posthog.metric = {
+          label: '今週の PV',
+          value: analytics.totalPageviews.toLocaleString(),
+        };
       }
     }
 
