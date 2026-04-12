@@ -8,7 +8,7 @@ import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/a
 interface AuthState {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email: string };
+  user: { id: string; email: string; avatarUrl: string | null; name: string | null };
 }
 
 export function useAuth() {
@@ -28,7 +28,9 @@ export function useAuth() {
       const meRes = await client.fetch('/api/v1/auth/me');
 
       if (meRes.ok) {
-        const data = (await meRes.json()) as { user: { id: string; email: string } };
+        const data = (await meRes.json()) as {
+          user: { id: string; email: string; avatarUrl: string | null; name: string | null };
+        };
         setAuth({ accessToken: token, refreshToken: getRefreshToken() ?? '', user: data.user });
         setApi(client);
         posthog.identify(data.user.id, { email: data.user.email });
@@ -64,7 +66,9 @@ export function useAuth() {
       const retryRes = await newClient.fetch('/api/v1/auth/me');
 
       if (retryRes.ok) {
-        const userData = (await retryRes.json()) as { user: { id: string; email: string } };
+        const userData = (await retryRes.json()) as {
+          user: { id: string; email: string; avatarUrl: string | null; name: string | null };
+        };
         setAuth({
           accessToken: refreshData.session.accessToken,
           refreshToken: refreshData.session.refreshToken,
@@ -93,7 +97,7 @@ export function useAuth() {
       return data.error;
     }
     const data = (await res.json()) as {
-      user: { id: string; email: string };
+      user: { id: string; email: string; avatarUrl: string | null; name: string | null };
       session: { accessToken: string; refreshToken: string };
     };
     setTokens(data.session.accessToken, data.session.refreshToken);
@@ -118,7 +122,7 @@ export function useAuth() {
       return data.error;
     }
     const data = (await res.json()) as {
-      user: { id: string; email: string };
+      user: { id: string; email: string; avatarUrl: string | null; name: string | null };
       session: { accessToken: string; refreshToken: string } | null;
     };
     if (data.session) {
