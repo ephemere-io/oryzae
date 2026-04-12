@@ -18,10 +18,7 @@
 
 ```bash
 pnpm install
-cp apps/server/.env.example apps/server/.env
-cp apps/client/.env.example apps/client/.env
-cp apps/admin/.env.example apps/admin/.env
-# 各 .env に Supabase などのキーを設定
+cp .env.example .env  # ルートの .env にキーを設定（各アプリはシンボリックリンクで共有）
 
 # shared → server をビルドしてから起動
 pnpm --filter @oryzae/shared build
