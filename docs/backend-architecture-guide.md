@@ -171,20 +171,6 @@ Phase C: 統合（直列）
 
 ---
 
-## Bounded Context 一覧
-
-| コンテキスト | 責務 | 備考 |
-| --- | --- | --- |
-| **entry** | 日記エントリの CRUD | |
-| **question** | 問いの CRUD・提案・リンク | entry domain を参照可 |
-| **fermentation** | M-GTA 発酵分析の実行・結果管理 | Vercel AI Gateway 連携 |
-| **board** | ボード（空間キャンバス）の管理 | entry domain を参照可 |
-| **user** | ユーザー情報・活動統計の提供 | 現在は presentation のみ |
-| **analytics** | プロダクト利用行動の分析 | PostHog API 連携 |
-| **shared** | 横断的関心事（認証、Result型、エラー基盤、集計ビュー） | 他コンテキストへの依存禁止 |
-
----
-
 ## 関連ドキュメント
 
 | ドキュメント | 内容 |
