@@ -340,7 +340,7 @@ export function EntryEditor({
             document.execCommand('insertText', false, text);
           }}
           data-placeholder="今日のことを書いてみましょう..."
-          className="min-h-full whitespace-pre-wrap bg-transparent px-6 py-6 leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)]"
+          className={`whitespace-pre-wrap bg-transparent px-6 py-6 leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'h-full w-full' : 'min-h-full'}`}
           style={{
             fontSize: `${settings.fontSize}px`,
             writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
