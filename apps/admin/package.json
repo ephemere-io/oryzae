@@ -31,7 +31,7 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/react": "^16.0.0",
-    "@types/node": "^20",
+    "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dependency-cruiser": "^17.3.10",
