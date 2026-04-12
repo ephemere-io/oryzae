@@ -1,68 +1,9 @@
 version: 2
 updates:
-  # Root (devDependencies: biome, knip, lint-staged, simple-git-hooks)
+  # Root — pnpm monorepo の lockfile はルートで管理されるため、
+  # ルートのみを対象にする。個別ディレクトリを指定すると lockfile が競合する。
   - package-ecosystem: "npm"
     directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Tokyo"
-    groups:
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
-    open-pull-requests-limit: 10
-
-  # apps/client
-  - package-ecosystem: "npm"
-    directory: "/apps/client"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Tokyo"
-    groups:
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
-    open-pull-requests-limit: 10
-
-  # apps/server
-  - package-ecosystem: "npm"
-    directory: "/apps/server"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Tokyo"
-    groups:
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
-    open-pull-requests-limit: 10
-
-  # apps/admin
-  - package-ecosystem: "npm"
-    directory: "/apps/admin"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Tokyo"
-    groups:
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
-    open-pull-requests-limit: 10
-
-  # packages/shared
-  - package-ecosystem: "npm"
-    directory: "/packages/shared"
     schedule:
       interval: "weekly"
       day: "monday"
