@@ -19,21 +19,27 @@ describe('useObservability', () => {
     localStorage.setItem('oryzae_admin_access_token', 'test-token');
   });
 
-  it('fetches tool status on mount', async () => {
-    const responseBody = {
+  it('fetches summary and analytics in parallel', async () => {
+    const summaryBody = {
       tools: [
         {
           id: 'posthog',
           name: 'PostHog',
-          concern: 'ユーザー行動',
+          purpose: 'ユーザー行動分析',
           configured: true,
           adminPath: '/analytics',
           externalUrl: 'https://us.posthog.com/project/378500',
-          description: 'PV・セッション',
+          externalLabel: 'PostHog Dashboard',
+          metrics: [],
         },
       ],
     };
-    mockFetch.mockResolvedValueOnce(mockResponse(true, responseBody));
+    const analyticsBody = { totalPageviews: 1234, totalSessions: 42 };
+
+    // Hook makes 2 parallel fetches: summary + analytics
+    mockFetch
+      .mockResolvedValueOnce(mockResponse(true, summaryBody))
+      .mockResolvedValueOnce(mockResponse(true, analyticsBody));
 
     const { result } = renderHook(() => useObservability());
 
@@ -42,12 +48,15 @@ describe('useObservability', () => {
     });
 
     expect(result.current.tools).toHaveLength(1);
-    expect(result.current.tools[0].configured).toBe(true);
+    expect(result.current.tools[0].metrics[0].value).toBe('1,234');
+    expect(result.current.tools[0].metrics[1].value).toBe('42');
     expect(result.current.error).toBeNull();
   });
 
-  it('sets error on fetch failure', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(false, {}));
+  it('sets error when summary fetch fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce(mockResponse(false, {}))
+      .mockResolvedValueOnce(mockResponse(true, { totalPageviews: 0, totalSessions: 0 }));
 
     const { result } = renderHook(() => useObservability());
 
@@ -56,7 +65,7 @@ describe('useObservability', () => {
     });
 
     expect(result.current.tools).toEqual([]);
-    expect(result.current.error).toBe('ツール状態の取得に失敗しました');
+    expect(result.current.error).toBe('監視データの取得に失敗しました');
   });
 
   it('does nothing when no token is stored', async () => {
