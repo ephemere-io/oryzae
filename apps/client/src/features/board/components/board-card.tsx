@@ -108,8 +108,9 @@ export function BoardCard({
         transition: 'box-shadow 0.2s ease',
       }}
       onPointerDown={handlePointerDown}
+      onClick={(e) => e.stopPropagation()}
     >
-      {/* Invisible click target */}
+      {/* Invisible double-click target */}
       <button
         type="button"
         aria-label={
@@ -121,7 +122,7 @@ export function BoardCard({
         }
         className="absolute inset-0 z-[1] cursor-grab bg-transparent"
         style={{ border: 'none', outline: 'none' }}
-        onClick={(e) => {
+        onDoubleClick={(e) => {
           e.stopPropagation();
           onClick(card);
         }}
@@ -184,13 +185,13 @@ export function BoardCard({
             onKeyDown={(e) => e.stopPropagation()}
             className="absolute left-1/2 flex items-center justify-center rounded-full"
             style={{
-              bottom: -32,
+              bottom: -36,
               transform: 'translateX(-50%)',
-              width: 24,
-              height: 24,
+              width: 28,
+              height: 28,
               backgroundColor: 'var(--bg)',
-              border: '1.5px solid var(--accent)',
-              opacity: 0.8,
+              border: '2px solid var(--accent)',
+              opacity: 1,
               cursor: 'crosshair',
               zIndex: 10,
             }}
@@ -212,16 +213,17 @@ export function BoardCard({
           {(['se', 'sw', 'ne', 'nw'] as const).map((corner) => {
             const style: React.CSSProperties = {
               position: 'absolute',
-              width: 10,
-              height: 10,
+              width: 18,
+              height: 18,
               backgroundColor: 'var(--bg)',
-              border: '1px solid var(--accent)',
+              border: '1.5px solid var(--accent)',
+              borderRadius: 2,
               zIndex: 10,
             };
-            if (corner.includes('s')) style.bottom = -6;
-            if (corner.includes('n')) style.top = -6;
-            if (corner.includes('e')) style.right = -6;
-            if (corner.includes('w')) style.left = -6;
+            if (corner.includes('s')) style.bottom = -10;
+            if (corner.includes('n')) style.top = -10;
+            if (corner.includes('e')) style.right = -10;
+            if (corner.includes('w')) style.left = -10;
             style.cursor = `${corner}-resize`;
 
             return <div key={corner} onPointerDown={handleResizeDown(corner)} style={style} />;

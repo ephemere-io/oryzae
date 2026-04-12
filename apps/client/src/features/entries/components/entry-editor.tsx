@@ -4,11 +4,13 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
+import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
 import {
   DEFAULT_SETTINGS,
   type EditorSettings,
   SettingsDrawer,
 } from '@/features/entries/components/settings-drawer';
+import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
@@ -67,6 +69,9 @@ export function EntryEditor({
   const [content, setContent] = useState(initialContent);
   const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
 
   function updateSettings(patch: Partial<EditorSettings>) {
     setSettings((prev) => ({ ...prev, ...patch }));
@@ -90,7 +95,7 @@ export function EntryEditor({
     editorRef,
     settings.timeInscriptionEnabled && settings.timeInscriptionMode === 'pressureBleed',
   );
-  useVoiceDynamics(editorRef, settings.voiceEnabled);
+  useVoiceDynamics(editorRef, voiceActive);
 
   useEffect(() => {
     const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
@@ -115,27 +120,50 @@ export function EntryEditor({
     setLinkedIds(new Set(initialLinkedIds));
   }
 
-  const handleSave = useCallback(async () => {
-    const savedId = await save(content, entryId);
-    if (savedId) {
-      setStatus('saved');
-      // Link new questions for newly created entries
-      if (!entryId && onLinkQuestion) {
-        for (const qId of linkedIds) {
-          await onLinkQuestion(savedId, qId);
+  const handleSaveWithTitle = useCallback(
+    async (titleOrContent: string) => {
+      // For new entries, prepend title as first line if not already there
+      let finalContent = content;
+      if (!entryId && titleOrContent !== content) {
+        const firstLine = content.split('\n')[0] ?? '';
+        if (firstLine.trim() !== titleOrContent.trim()) {
+          finalContent = `${titleOrContent}\n${content}`;
         }
       }
-      setTimeout(() => setStatus('editing'), 2000);
-      // Fire-and-forget: trigger fermentation analysis
-      onSaveComplete?.(savedId, content);
-      // Trigger save→jar transition animation
-      if (onSaveTransition && editorRef.current && content.trim()) {
-        await onSaveTransition(content, editorRef.current);
-      } else if (!entryId) {
-        router.push(`/entries/${savedId}`);
+
+      const savedId = await save(finalContent, entryId);
+      if (savedId) {
+        setSaveModalOpen(false);
+        setStatus('saved');
+        // Link new questions for newly created entries
+        if (!entryId && onLinkQuestion) {
+          for (const qId of linkedIds) {
+            await onLinkQuestion(savedId, qId);
+          }
+        }
+        setTimeout(() => setStatus('editing'), 2000);
+        // Fire-and-forget: trigger fermentation analysis
+        onSaveComplete?.(savedId, finalContent);
+        // Trigger save→jar transition animation
+        if (onSaveTransition && editorRef.current && finalContent.trim()) {
+          await onSaveTransition(finalContent, editorRef.current);
+        } else if (!entryId) {
+          router.push(`/entries/${savedId}`);
+        }
       }
+    },
+    [content, entryId, save, linkedIds, onLinkQuestion, router, onSaveComplete, onSaveTransition],
+  );
+
+  const handleSaveClick = useCallback(() => {
+    if (!content.trim()) return;
+    // For new entries, show title modal; for existing entries, save directly
+    if (!entryId) {
+      setSaveModalOpen(true);
+    } else {
+      handleSaveWithTitle(content);
     }
-  }, [content, entryId, save, linkedIds, onLinkQuestion, router, onSaveComplete, onSaveTransition]);
+  }, [content, entryId, handleSaveWithTitle]);
 
   const handleLink = useCallback(
     async (questionId: string) => {
@@ -170,6 +198,7 @@ export function EntryEditor({
   }
 
   const charCount = content.length;
+  const firstLine = content.split('\n')[0]?.substring(0, 100) ?? '';
 
   return (
     <div
@@ -324,6 +353,33 @@ export function EntryEditor({
       <div className="relative flex-1 overflow-auto">
         {/* Eraser trace canvas */}
         <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
+
+        {/* Title display (right side in vertical mode) */}
+        {settings.writingMode === 'vertical' && firstLine && (
+          <div
+            className="pointer-events-none absolute z-[2] select-none"
+            style={{
+              right: '3%',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              writingMode: 'vertical-rl',
+              textOrientation: 'mixed',
+              fontSize: '1.4em',
+              letterSpacing: '0.15em',
+              color: 'var(--date-color)',
+              opacity: 0.35,
+              maxHeight: '70%',
+              overflow: 'hidden',
+              fontFamily:
+                settings.fontFamily === 'serif'
+                  ? "'Noto Serif JP', serif"
+                  : "'Noto Sans JP', sans-serif",
+            }}
+          >
+            {firstLine}
+          </div>
+        )}
+
         <div
           ref={editorRef}
           contentEditable
@@ -340,7 +396,7 @@ export function EntryEditor({
             document.execCommand('insertText', false, text);
           }}
           data-placeholder="今日のことを書いてみましょう..."
-          className={`whitespace-pre-wrap bg-transparent px-6 py-6 leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'h-full w-full' : 'min-h-full'}`}
+          className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'h-full w-full px-[15%] py-[10%]' : 'min-h-full px-[15%] py-6'}`}
           style={{
             fontSize: `${settings.fontSize}px`,
             writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
@@ -379,7 +435,7 @@ export function EntryEditor({
           </button>
           <button
             type="button"
-            onClick={handleSave}
+            onClick={handleSaveClick}
             disabled={saving || !content.trim()}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
             data-tooltip="保存"
@@ -425,13 +481,17 @@ export function EntryEditor({
         {/* Center: mic */}
         <button
           type="button"
-          disabled
-          className="rounded-md p-1.5 text-[var(--date-color)] opacity-40"
-          data-tooltip="音声入力"
+          onClick={() => setVoiceActive((v) => !v)}
+          className={`rounded-md p-1.5 transition-all ${
+            voiceActive
+              ? 'text-red-500'
+              : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+          }`}
+          data-tooltip={voiceActive ? '音声入力停止' : '音声入力'}
         >
           <svg
             aria-hidden="true"
-            className="h-5 w-5"
+            className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -444,6 +504,7 @@ export function EntryEditor({
         {/* Right: stats */}
         <button
           type="button"
+          onClick={() => setStatsOpen((v) => !v)}
           className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
           data-tooltip="執筆統計"
         >
@@ -461,8 +522,25 @@ export function EntryEditor({
         </button>
       </div>
 
+      {/* Stats popup */}
+      <StatsPopup
+        open={statsOpen}
+        charCount={charCount}
+        content={content}
+        onClose={() => setStatsOpen(false)}
+      />
+
       {/* Status bar */}
       <EditorStatusBar status={status} charCount={charCount} />
+
+      {/* Save title modal */}
+      <SaveTitleModal
+        open={saveModalOpen}
+        initialTitle={firstLine}
+        saving={saving}
+        onSave={handleSaveWithTitle}
+        onClose={() => setSaveModalOpen(false)}
+      />
     </div>
   );
 }
