@@ -11,10 +11,22 @@ export interface FermentationOutput {
   keywords: { keyword: string; description: string }[];
 }
 
+export interface LlmUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface LlmAnalysisResult {
+  output: FermentationOutput;
+  usage: LlmUsage;
+  generationId: string | undefined;
+}
+
 export interface LlmAnalysisGateway {
   analyze(params: {
     question: string;
     entryContent: string;
     targetPeriod: string;
-  }): Promise<FermentationOutput>;
+    userId: string;
+  }): Promise<LlmAnalysisResult>;
 }

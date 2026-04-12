@@ -3,15 +3,17 @@
   "ignore": [".claude/**", "docs/**"],
   "workspaces": {
     "apps/server": {
-      "entry": ["src/app.ts"],
       "project": ["src/**/*.ts"],
       "ignore": ["src/contexts/shared/infrastructure/supabase-client.ts"],
       "vitest": true
     },
     "apps/client": {
       "next": true,
-      "vitest": true,
-      "ignoreDependencies": ["@testing-library/dom", "@testing-library/react"]
+      "vitest": true
+    },
+    "apps/admin": {
+      "next": true,
+      "vitest": true
     },
     "packages/shared": {
       "project": ["src/**/*.ts"]

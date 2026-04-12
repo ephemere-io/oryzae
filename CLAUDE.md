@@ -10,11 +10,12 @@
 
 ```bash
 pnpm install                                # 依存インストール
-pnpm --filter @oryzae/client dev            # 起動 (port 3000, API 内蔵)
-pnpm typecheck                              # 型チェック（server + shared + client）
-pnpm test                                   # テスト実行（server + client）
+pnpm --filter @oryzae/client dev            # クライアント起動 (port 3000, API 内蔵)
+pnpm --filter @oryzae/admin dev             # 管理画面起動 (port 3001, API 内蔵)
+pnpm typecheck                              # 型チェック（server + shared + client + admin）
+pnpm test                                   # テスト実行（server + client + admin）
 pnpm lint                                   # Biome lint
-pnpm dep-cruise                             # アーキテクチャ依存チェック（server + client）
+pnpm dep-cruise                             # アーキテクチャ依存チェック（server + client + admin）
 pnpm knip                                   # デッドコード検出
 ```
 
@@ -29,14 +30,17 @@ pnpm knip                                   # デッドコード検出
 - domain: Result<T,E> で返す（throw 禁止）→ application: throw に変換
 - 1 ユースケース = 1 ファイル
 
-### Frontend (`apps/client`)
+### Frontend (`apps/client`, `apps/admin`)
 
-Feature-Sliced Architecture:
+両アプリとも同じ Feature-Sliced Architecture を採用:
 
 - `app/` — Next.js ページ（薄いラッパー、API 呼び出し禁止）
 - `features/` — 機能スライス（components, hooks, types）
 - `components/ui/` — 汎用 UI（feature 依存禁止）
 - `lib/` — 横断ユーティリティ
+
+`apps/client` はユーザー向け（port 3000）、`apps/admin` は管理画面（port 3001）。
+ガードレール・テスト戦略・アーキテクチャルールは完全に同一。
 
 ### Shared (`packages/shared`)
 
