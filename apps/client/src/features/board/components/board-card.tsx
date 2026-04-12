@@ -222,7 +222,7 @@ export function BoardCard({
           </div>
 
           {/* Resize handles */}
-          {(['se', 'sw', 'ne', 'nw'] as const).map((corner) => {
+          {(['se', 'sw', 'nw'] as const).map((corner) => {
             const style: React.CSSProperties = {
               position: 'absolute',
               width: 18,
