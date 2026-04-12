@@ -19,9 +19,9 @@ const MONTH_LABELS = [
 ];
 
 function getColorClass(count: number): string {
-  if (count === 0) return 'bg-white/[0.04]';
-  if (count === 1) return 'bg-green-800';
-  if (count <= 3) return 'bg-green-600';
+  if (count === 0) return 'bg-muted';
+  if (count === 1) return 'bg-green-700 dark:bg-green-800';
+  if (count <= 3) return 'bg-green-500 dark:bg-green-600';
   return 'bg-green-400';
 }
 
@@ -143,7 +143,7 @@ export function WritingHeatmap({ entryDates }: { entryDates: EntryDate[] }) {
       {/* Legend */}
       <div className="flex items-center gap-1 mt-3 text-[10px] text-muted-foreground">
         <span>Less</span>
-        <div className="rounded-sm w-3 h-3 bg-white/[0.04]" />
+        <div className="rounded-sm w-3 h-3 bg-muted" />
         <div className="rounded-sm w-3 h-3 bg-green-800" />
         <div className="rounded-sm w-3 h-3 bg-green-600" />
         <div className="rounded-sm w-3 h-3 bg-green-400" />

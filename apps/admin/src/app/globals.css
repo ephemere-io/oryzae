@@ -36,12 +36,51 @@
   --radius-xl: calc(var(--radius) * 1.4);
 }
 
-/* ── Vercel / Linear-inspired dark theme ── */
+/* ── Light theme (default) ── */
 
 :root {
   --radius: 0.5rem;
 
-  /* Base surfaces — near-black with brightness steps */
+  --background: #fafafa;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #ef4444;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #a1a1aa;
+
+  --sidebar: #fafafa;
+  --sidebar-foreground: #71717a;
+  --sidebar-primary: #18181b;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #a1a1aa;
+
+  --success: #16a34a;
+  --warning: #ca8a04;
+}
+
+/* ── Dark theme ── */
+
+.dark {
   --background: #09090b;
   --foreground: #ececef;
   --card: #0f0f12;
@@ -49,29 +88,23 @@
   --popover: #0f0f12;
   --popover-foreground: #ececef;
 
-  /* Primary — near-white on near-black */
   --primary: #ececef;
   --primary-foreground: #09090b;
 
-  /* Secondary / muted */
   --secondary: #141418;
   --secondary-foreground: #a1a1aa;
   --muted: #141418;
   --muted-foreground: #71717a;
 
-  /* Accent */
   --accent: #141418;
   --accent-foreground: #ececef;
 
-  /* Destructive */
   --destructive: #ef4444;
 
-  /* Borders & inputs — very subtle */
   --border: #1f1f24;
   --input: #1f1f24;
   --ring: #3f3f46;
 
-  /* Sidebar */
   --sidebar: #09090b;
   --sidebar-foreground: #a1a1aa;
   --sidebar-primary: #ececef;
@@ -81,7 +114,6 @@
   --sidebar-border: #1f1f24;
   --sidebar-ring: #3f3f46;
 
-  /* Semantic */
   --success: #22c55e;
   --warning: #eab308;
 }
@@ -106,7 +138,7 @@ th {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1f1f24 transparent;
+  scrollbar-color: var(--border) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -119,10 +151,10 @@ th {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1f1f24;
+  background: var(--border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: var(--ring);
 }
