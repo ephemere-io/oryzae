@@ -3,6 +3,7 @@ import { adminAnalytics } from './contexts/analytics/presentation/routes/admin-a
 import { board } from './contexts/board/presentation/routes/board.js';
 import { entries } from './contexts/entry/presentation/routes/entries.js';
 import { adminFermentations } from './contexts/fermentation/presentation/routes/admin-fermentations.js';
+import { cronFermentation } from './contexts/fermentation/presentation/routes/cron-fermentation.js';
 import { fermentations } from './contexts/fermentation/presentation/routes/fermentations.js';
 import { entryQuestions } from './contexts/question/presentation/routes/entry-questions.js';
 import { questions } from './contexts/question/presentation/routes/questions.js';
@@ -22,6 +23,7 @@ import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
 const app = new Hono()
   .onError(errorHandler)
   .get('/health', (c) => c.json({ status: 'ok' }))
+  .route('/api/v1/cron/fermentation', cronFermentation)
   .use('/api/v1/auth/*', rateLimitAuth())
   .route('/api/v1/auth', authRoutes)
   .use('/api/v1/admin/*', adminAuthMiddleware)
