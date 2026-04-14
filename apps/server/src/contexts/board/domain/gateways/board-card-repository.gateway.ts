@@ -29,6 +29,11 @@ export interface BoardCardRepositoryGateway {
     endDate: string,
     cardType: string,
   ): Promise<string[]>;
+  findSoftDeletedRefIdsByDateAndView(
+    userId: string,
+    dateKey: string,
+    viewType: string,
+  ): Promise<string[]>;
   saveMany(cards: BoardCard[]): Promise<void>;
   updatePositions(cards: CardPositionUpdate[]): Promise<void>;
   delete(id: string, userId: string): Promise<void>;

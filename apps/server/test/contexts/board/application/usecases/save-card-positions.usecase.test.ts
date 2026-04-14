@@ -10,6 +10,9 @@ beforeEach(() => {
   boardCardRepo = {
     findByDateAndView: vi.fn().mockResolvedValue([]),
     findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
+    findDailyCardsByDateRange: vi.fn().mockResolvedValue([]),
+    findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
+    findSoftDeletedRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
     saveMany: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),

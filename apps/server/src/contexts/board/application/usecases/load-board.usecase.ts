@@ -72,12 +72,45 @@ export class LoadBoardUsecase {
         startDate,
         endDate,
       );
-      // Merge, avoiding duplicates by refId+cardType
+      // Exclude daily cards whose refIds were soft-deleted in weekly view
+      const deletedWeeklyRefIds = await this.boardCardRepo.findSoftDeletedRefIdsByDateAndView(
+        userId,
+        dateKey,
+        viewType,
+      );
+      const deletedWeeklySet = new Set(deletedWeeklyRefIds);
+      // Merge, avoiding duplicates by refId+cardType and excluding soft-deleted weekly cards
       const existingKeys = new Set(existingCards.map((c) => `${c.cardType}:${c.refId}`));
       const uniqueDailyCards = dailyCards.filter(
-        (c) => !existingKeys.has(`${c.cardType}:${c.refId}`),
+        (c) => !existingKeys.has(`${c.cardType}:${c.refId}`) && !deletedWeeklySet.has(c.refId),
       );
-      existingCards = [...existingCards, ...uniqueDailyCards];
+      // Create weekly copies of daily cards so positions are independent per view
+      const weeklyCopies: BoardCard[] = [];
+      for (const dailyCard of uniqueDailyCards) {
+        const result = BoardCard.create(
+          {
+            userId,
+            cardType: dailyCard.cardType,
+            refId: dailyCard.refId,
+            dateKey,
+            viewType: 'weekly',
+            x: dailyCard.x,
+            y: dailyCard.y,
+            rotation: dailyCard.rotation,
+            width: dailyCard.width,
+            height: dailyCard.height,
+            zIndex: existingCards.length + weeklyCopies.length,
+          },
+          this.generateId,
+        );
+        if (result.success) {
+          weeklyCopies.push(result.value);
+        }
+      }
+      if (weeklyCopies.length > 0) {
+        await this.boardCardRepo.saveMany(weeklyCopies);
+      }
+      existingCards = [...existingCards, ...weeklyCopies];
     }
 
     // 2. Auto-populate entries that don't have cards yet
