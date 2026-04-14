@@ -1,37 +1,26 @@
 'use client';
 
-import {
-  AlertTriangle,
-  CheckCircle,
-  DollarSign,
-  FileText,
-  FlaskConical,
-  Users,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DashboardStats } from '../hooks/use-dashboard-stats';
 
 interface StatCardProps {
-  title: string;
+  label: string;
   value: string | number;
   subtitle?: string;
-  icon: React.ReactNode;
+  warning?: boolean;
 }
 
-function StatCard({ title, value, subtitle, icon }: StatCardProps) {
+function StatCard({ label, value, subtitle, warning }: StatCardProps) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">
-          {typeof value === 'number' ? value.toLocaleString() : value}
-        </div>
-        {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
-      </CardContent>
-    </Card>
+    <div className="rounded-lg border border-border/50 bg-card p-4">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
+        {warning && <span className="size-1.5 rounded-full bg-red-500" />}
+      </div>
+      <div className="text-3xl font-semibold tracking-tight mt-0.5">
+        {typeof value === 'number' ? value.toLocaleString() : value}
+      </div>
+      {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+    </div>
   );
 }
 
@@ -42,40 +31,24 @@ export function StatsCards({ stats }: { stats: DashboardStats }) {
       : 0;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 grid-cols-3">
+      <StatCard label="Users" value={stats.totalUsers} />
+      <StatCard label="Entries" value={stats.totalEntries} />
       <StatCard
-        title="Users"
-        value={stats.totalUsers}
-        icon={<Users className="h-4 w-4 text-muted-foreground" />}
-      />
-      <StatCard
-        title="Entries"
-        value={stats.totalEntries}
-        icon={<FileText className="h-4 w-4 text-muted-foreground" />}
-      />
-      <StatCard
-        title="Fermentations"
+        label="Fermentations"
         value={stats.totalFermentations}
-        subtitle={`${stats.completedFermentations} completed / ${stats.failedFermentations} failed`}
-        icon={<FlaskConical className="h-4 w-4 text-muted-foreground" />}
+        subtitle={`${stats.completedFermentations} done / ${stats.failedFermentations} failed`}
       />
       <StatCard
-        title="Success Rate"
+        label="Success Rate"
         value={`${successRate}%`}
-        subtitle={successRate < 80 ? 'Below target (80%)' : 'Healthy'}
-        icon={
-          successRate < 80 ? (
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          ) : (
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          )
-        }
+        subtitle={successRate < 80 ? 'Below target (80%)' : undefined}
+        warning={successRate < 80}
       />
       <StatCard
-        title="Cost Tracked"
+        label="Cost Tracked"
         value={stats.fermentationsWithCostTracking}
-        subtitle="Fermentations with Gateway data"
-        icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+        subtitle="With Gateway data"
       />
     </div>
   );
