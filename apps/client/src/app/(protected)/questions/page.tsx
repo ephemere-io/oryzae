@@ -19,10 +19,10 @@ export default function QuestionsPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex-1">
-        <div className="flex flex-col gap-6">
-          <QuestionCreateForm onSubmit={createQuestion} />
+      <div className="mx-auto w-full max-w-[800px] flex-1 px-6 pt-6 pb-20">
+        <QuestionCreateForm onSubmit={createQuestion} />
 
+        <div className="mt-6">
           {loading ? (
             <p className="text-sm text-[var(--date-color)]">読み込み中...</p>
           ) : (
@@ -36,14 +36,6 @@ export default function QuestionsPage() {
           )}
         </div>
       </div>
-
-      {/* Footer matching reference UI */}
-      <footer className="sticky bottom-0 flex items-center justify-between border-t border-[var(--border-subtle)] bg-[var(--bg)] px-4 py-1.5 text-xs text-[var(--date-color)]">
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--date-color)] opacity-30" />
-          <span>問い一覧</span>
-        </div>
-      </footer>
     </div>
   );
 }
