@@ -1,6 +1,5 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { DailyMetric } from '../hooks/use-analytics';
 
 function formatDateLabel(iso: string): string {
@@ -10,39 +9,56 @@ function formatDateLabel(iso: string): string {
 
 export function DailyChart({ data }: { data: DailyMetric[] }) {
   const maxPageviews = Math.max(...data.map((d) => d.pageviews), 1);
+  const barHeight = 140;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground">Daily Pageviews</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">データがありません</p>
-        ) : (
-          <div className="space-y-2">
-            {data.map((d) => (
-              <div key={d.date} className="flex items-center gap-3 text-sm">
-                <span className="w-12 text-right text-muted-foreground shrink-0">
-                  {formatDateLabel(d.date)}
+    <div className="space-y-3">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Daily Pageviews
+      </h3>
+      {data.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">No data</p>
+      ) : (
+        <div className="flex items-end gap-[2px] overflow-x-auto pb-1">
+          {data.map((d) => {
+            const pctPageviews = (d.pageviews / maxPageviews) * 100;
+            const pctUsers = (d.uniqueUsers / maxPageviews) * 100;
+            return (
+              <div
+                key={d.date}
+                className="flex flex-col items-center flex-1 min-w-[24px] max-w-[48px] group"
+              >
+                {/* Pageview count above bar */}
+                <span className="text-[10px] font-mono text-muted-foreground mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {d.pageviews}
                 </span>
-                <div className="flex-1 h-6 bg-muted rounded-sm overflow-hidden">
+                {/* Bar container */}
+                <div
+                  className="relative w-full rounded-t-sm bg-muted/30 overflow-hidden"
+                  style={{ height: `${barHeight}px` }}
+                >
+                  {/* Pageviews bar */}
                   <div
-                    className="h-full bg-primary rounded-sm transition-all"
-                    style={{ width: `${(d.pageviews / maxPageviews) * 100}%` }}
+                    className="absolute bottom-0 left-0 right-0 bg-primary/70 rounded-t-sm transition-all"
+                    style={{ height: `${pctPageviews}%` }}
+                  />
+                  {/* Unique users overlay bar */}
+                  <div
+                    className="absolute bottom-0 left-1/4 right-1/4 bg-primary rounded-t-sm transition-all"
+                    style={{ height: `${pctUsers}%` }}
                   />
                 </div>
-                <span className="w-16 text-right font-mono shrink-0">
-                  {d.pageviews.toLocaleString()}
+                {/* Date label below */}
+                <span className="text-[10px] font-mono text-muted-foreground mt-1 whitespace-nowrap">
+                  {formatDateLabel(d.date)}
                 </span>
-                <span className="w-12 text-right text-muted-foreground shrink-0">
-                  {d.uniqueUsers} u
-                </span>
+                {/* Unique users count */}
+                <span className="text-[9px] text-muted-foreground/70">{d.uniqueUsers}u</span>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

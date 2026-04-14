@@ -65,7 +65,7 @@ describe('useCostData', () => {
       mockResponse(true, { data: [], pagination: { page: 2, limit: 10, total: 0 } }),
     );
 
-    renderHook(() => useCostData(2, 10));
+    renderHook(() => useCostData({ page: 2, limit: 10 }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledOnce();
