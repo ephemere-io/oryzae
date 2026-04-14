@@ -33,9 +33,10 @@ function buildRows(data: ObservabilitySummary): ToolRow[] {
       id: 'posthog',
       name: 'PostHog',
       category: 'Analytics',
-      metric: data.posthog
-        ? `${formatMetric(data.posthog.totalPageviews)} PV / ${formatMetric(data.posthog.totalSessions)} sessions`
-        : '-',
+      metric:
+        data.posthog && typeof data.posthog.totalPageviews === 'number'
+          ? `${formatMetric(data.posthog.totalPageviews)} PV / ${formatMetric(data.posthog.totalSessions)} sessions`
+          : '-',
       href: '/analytics',
       externalUrl: 'https://us.posthog.com/project/378500',
     },
