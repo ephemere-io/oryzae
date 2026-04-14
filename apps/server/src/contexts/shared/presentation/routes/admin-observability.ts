@@ -19,7 +19,7 @@ async function getSentryCount(): Promise<number | null> {
   try {
     const res = await fetch(
       `https://sentry.io/api/0/projects/${org}/${project}/issues/?query=is:unresolved&limit=100`,
-      { headers: { Authorization: `Bearer ${authToken}` } },
+      { headers: { Authorization: `Bearer ${authToken}` }, signal: AbortSignal.timeout(5000) },
     );
     if (!res.ok) return null;
     const body: unknown = await res.json();
@@ -65,6 +65,7 @@ async function getVercelLatestDeploy(): Promise<string | null> {
   try {
     const res = await fetch('https://api.vercel.com/v6/deployments?limit=1&target=production', {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
     const body: unknown = await res.json();
@@ -83,6 +84,7 @@ async function getUpstashKeyCount(): Promise<number | null> {
   try {
     const res = await fetch(`${url}/dbsize`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
     const body: unknown = await res.json();
@@ -138,7 +140,7 @@ export const adminObservability = new Hono<Env>()
     try {
       const res = await fetch(
         `https://sentry.io/api/0/projects/${org}/${project}/issues/?query=is:unresolved&limit=25&sort=date`,
-        { headers: { Authorization: `Bearer ${authToken}` } },
+        { headers: { Authorization: `Bearer ${authToken}` }, signal: AbortSignal.timeout(5000) },
       );
       if (!res.ok) return c.json({ issues: [], configured: true });
 
@@ -231,6 +233,7 @@ export const adminObservability = new Hono<Env>()
     try {
       const res = await fetch('https://api.vercel.com/v6/deployments?limit=20', {
         headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return c.json({ deploys: [], configured: true });
 
