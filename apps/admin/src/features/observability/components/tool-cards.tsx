@@ -1,143 +1,118 @@
 'use client';
 
 import { ExternalLink } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { ObservabilitySummary } from '../hooks/use-observability';
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mt-3">
-      <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
-      <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-    </div>
-  );
+function formatMetric(value: number | string | null, suffix = ''): string {
+  if (value === null) return '-';
+  if (typeof value === 'number') return `${value.toLocaleString()}${suffix}`;
+  return value;
 }
 
-function ToolCard({
-  name,
-  tagline,
-  href,
-  externalUrl,
-  children,
-}: {
+interface ToolRow {
+  id: string;
   name: string;
-  tagline: string;
-  href?: string;
+  category: string;
+  metric: string;
+  href: string | null;
   externalUrl: string;
-  children?: React.ReactNode;
-}) {
-  const card = (
-    <div className="rounded-lg border border-border/50 bg-card p-4 transition-colors hover:border-border">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{name}</span>
-          <span className="text-xs text-muted-foreground">{tagline}</span>
-        </div>
-        {!href && <ExternalLink className="h-3 w-3 text-muted-foreground" />}
-      </div>
-      {children}
-    </div>
-  );
+}
 
-  if (href) {
-    return <Link href={href}>{card}</Link>;
+function buildRows(data: ObservabilitySummary): ToolRow[] {
+  return [
+    {
+      id: 'posthog',
+      name: 'PostHog',
+      category: 'Analytics',
+      metric:
+        data.posthog && typeof data.posthog.totalPageviews === 'number'
+          ? `${formatMetric(data.posthog.totalPageviews)} PV / ${formatMetric(data.posthog.totalSessions)} sessions`
+          : '-',
+      href: '/analytics',
+      externalUrl: 'https://us.posthog.com/project/378500',
+    },
+    {
+      id: 'sentry',
+      name: 'Sentry',
+      category: 'Errors',
+      metric:
+        data.sentry.unresolvedCount !== null ? `${data.sentry.unresolvedCount} unresolved` : '-',
+      href: '/observability/errors',
+      externalUrl: 'https://oryzae.sentry.io',
+    },
+    {
+      id: 'gateway',
+      name: 'AI Gateway',
+      category: 'LLM Cost',
+      metric:
+        data.gateway.creditBalance !== null
+          ? `$${Number(data.gateway.creditBalance).toFixed(2)} balance`
+          : '-',
+      href: '/observability/spend',
+      externalUrl: 'https://vercel.com',
+    },
+    {
+      id: 'upstash',
+      name: 'Upstash',
+      category: 'Rate Limiting',
+      metric: data.upstash.totalKeys !== null ? `${data.upstash.totalKeys} keys` : '-',
+      href: null,
+      externalUrl: 'https://console.upstash.com',
+    },
+    {
+      id: 'vercel',
+      name: 'Vercel',
+      category: 'Deploys',
+      metric: data.vercel.latestDeployState ?? '-',
+      href: '/observability/deploys',
+      externalUrl: 'https://vercel.com',
+    },
+  ];
+}
+
+export function ObservabilityTable({ data }: { data: ObservabilitySummary }) {
+  const router = useRouter();
+  const rows = buildRows(data);
+
+  function handleRowClick(row: ToolRow) {
+    if (row.href) {
+      router.push(row.href);
+    } else {
+      window.open(row.externalUrl, '_blank');
+    }
   }
+
   return (
-    <a href={externalUrl} target="_blank" rel="noopener noreferrer">
-      {card}
-    </a>
-  );
-}
-
-function formatCost(cost: number): string {
-  return `$${cost.toFixed(2)}`;
-}
-
-export function ObservabilityCards({ data }: { data: ObservabilitySummary }) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <ToolCard
-        name="PostHog"
-        tagline="Analytics"
-        href="/analytics"
-        externalUrl="https://us.posthog.com/project/378500"
-      >
-        {data.posthog && typeof data.posthog.totalPageviews === 'number' && (
-          <div className="mt-3 flex gap-6">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">PV</p>
-              <p className="text-xl font-semibold tabular-nums">
-                {data.posthog.totalPageviews.toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Sessions</p>
-              <p className="text-xl font-semibold tabular-nums">
-                {(data.posthog.totalSessions ?? 0).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        )}
-      </ToolCard>
-
-      <ToolCard
-        name="Sentry"
-        tagline="Errors"
-        href="/observability/errors"
-        externalUrl="https://oryzae.sentry.io"
-      >
-        {data.sentry.unresolvedCount !== null && (
-          <Metric label="Unresolved" value={`${data.sentry.unresolvedCount}`} />
-        )}
-      </ToolCard>
-
-      <ToolCard
-        name="AI Gateway"
-        tagline="LLM Cost"
-        href="/observability/spend"
-        externalUrl="https://vercel.com"
-      >
-        <div className="mt-3 flex gap-6">
-          {data.gateway.creditBalance !== null && (
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Balance</p>
-              <p className="text-xl font-semibold tabular-nums">
-                {formatCost(Number(data.gateway.creditBalance))}
-              </p>
-            </div>
-          )}
-          {data.gateway.monthlyRequests !== null && data.gateway.monthlyRequests > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">This month</p>
-              <p className="text-xl font-semibold tabular-nums">
-                {data.gateway.monthlyRequests} req
-              </p>
-            </div>
-          )}
-        </div>
-      </ToolCard>
-
-      <ToolCard name="Upstash" tagline="Rate Limiting" externalUrl="https://console.upstash.com">
-        {data.upstash.totalKeys !== null && (
-          <Metric label="Redis Keys" value={`${data.upstash.totalKeys}`} />
-        )}
-      </ToolCard>
-
-      <ToolCard
-        name="Vercel"
-        tagline="Deploys"
-        href="/observability/deploys"
-        externalUrl="https://vercel.com"
-      >
-        {data.vercel.latestDeployState && (
-          <div className="mt-3 flex items-center gap-2">
-            <span
-              className={`size-1.5 rounded-full ${data.vercel.latestDeployState === 'READY' ? 'bg-green-500' : data.vercel.latestDeployState === 'ERROR' ? 'bg-red-500' : 'bg-yellow-500'}`}
-            />
-            <span className="text-sm">{data.vercel.latestDeployState}</span>
-          </div>
-        )}
-      </ToolCard>
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Tool</TableHead>
+          <TableHead>Category</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="w-8" />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.id} className="cursor-pointer" onClick={() => handleRowClick(row)}>
+            <TableCell className="font-medium text-sm">{row.name}</TableCell>
+            <TableCell className="text-xs text-muted-foreground">{row.category}</TableCell>
+            <TableCell className="font-mono text-sm">{row.metric}</TableCell>
+            <TableCell>
+              {!row.href && <ExternalLink className="h-3 w-3 text-muted-foreground" />}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

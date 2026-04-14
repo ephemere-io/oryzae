@@ -1,6 +1,7 @@
 'use client';
 
 import { ExternalLink, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -71,11 +72,18 @@ export default function ErrorsPage() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          <Link
+            href="/observability"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Observability
+          </Link>
+          <span className="text-muted-foreground">/</span>
           <h1 className="text-xl font-medium">Sentry Errors</h1>
-          <span className="text-sm text-muted-foreground">Unresolved issues</span>
+          <span className="text-sm text-muted-foreground">{issues.length} unresolved</span>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon-xs" onClick={fetchData} disabled={loading}>
