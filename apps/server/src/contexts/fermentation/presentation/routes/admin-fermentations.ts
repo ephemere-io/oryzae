@@ -90,6 +90,67 @@ export const adminFermentations = new Hono<Env>()
       pagination: { page, limit, total: count ?? 0 },
     });
   })
+  .get('/costs', async (c) => {
+    const supabase = c.get('adminSupabase');
+    const page = Number(c.req.query('page') ?? '1');
+    const limit = Number(c.req.query('limit') ?? '10');
+    const offset = (page - 1) * limit;
+    const dateFrom = c.req.query('date_from');
+    const dateTo = c.req.query('date_to');
+
+    let costsQuery = supabase
+      .from('fermentation_results')
+      .select('id, user_id, status, generation_id, created_at', { count: 'exact' })
+      .not('generation_id', 'is', null);
+    if (dateFrom) costsQuery = costsQuery.gte('created_at', dateFrom);
+    if (dateTo) costsQuery = costsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
+
+    const { data, error, count } = await costsQuery
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    const items = await Promise.all(
+      (data ?? []).map(async (row) => {
+        try {
+          const info = await gateway.getGenerationInfo({ id: row.generation_id });
+          return { ...row, cost: info };
+        } catch {
+          return { ...row, cost: null };
+        }
+      }),
+    );
+
+    return c.json({
+      data: items,
+      pagination: { page, limit, total: count ?? 0 },
+    });
+  })
+  .get('/:id/cost', async (c) => {
+    const supabase = c.get('adminSupabase');
+    const id = c.req.param('id');
+
+    const { data, error } = await supabase
+      .from('fermentation_results')
+      .select('generation_id')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return c.json({ error: 'Fermentation result not found' }, 404);
+
+    if (!data.generation_id) {
+      return c.json({ error: 'No generation ID available for cost tracking' }, 404);
+    }
+
+    const info = await gateway.getGenerationInfo({ id: data.generation_id });
+
+    return c.json({
+      fermentationResultId: id,
+      generationId: data.generation_id,
+      cost: info,
+    });
+  })
   .get('/:id', async (c) => {
     const supabase = c.get('adminSupabase');
     const id = c.req.param('id');
@@ -197,67 +258,6 @@ export const adminFermentations = new Hono<Env>()
       snippets,
       letter,
       keywords,
-    });
-  })
-  .get('/:id/cost', async (c) => {
-    const supabase = c.get('adminSupabase');
-    const id = c.req.param('id');
-
-    const { data, error } = await supabase
-      .from('fermentation_results')
-      .select('generation_id')
-      .eq('id', id)
-      .single();
-
-    if (error || !data) return c.json({ error: 'Fermentation result not found' }, 404);
-
-    if (!data.generation_id) {
-      return c.json({ error: 'No generation ID available for cost tracking' }, 404);
-    }
-
-    const info = await gateway.getGenerationInfo({ id: data.generation_id });
-
-    return c.json({
-      fermentationResultId: id,
-      generationId: data.generation_id,
-      cost: info,
-    });
-  })
-  .get('/costs', async (c) => {
-    const supabase = c.get('adminSupabase');
-    const page = Number(c.req.query('page') ?? '1');
-    const limit = Number(c.req.query('limit') ?? '10');
-    const offset = (page - 1) * limit;
-    const dateFrom = c.req.query('date_from');
-    const dateTo = c.req.query('date_to');
-
-    let costsQuery = supabase
-      .from('fermentation_results')
-      .select('id, user_id, status, generation_id, created_at', { count: 'exact' })
-      .not('generation_id', 'is', null);
-    if (dateFrom) costsQuery = costsQuery.gte('created_at', dateFrom);
-    if (dateTo) costsQuery = costsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
-
-    const { data, error, count } = await costsQuery
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) return c.json({ error: error.message }, 500);
-
-    const items = await Promise.all(
-      (data ?? []).map(async (row) => {
-        try {
-          const info = await gateway.getGenerationInfo({ id: row.generation_id });
-          return { ...row, cost: info };
-        } catch {
-          return { ...row, cost: null };
-        }
-      }),
-    );
-
-    return c.json({
-      data: items,
-      pagination: { page, limit, total: count ?? 0 },
     });
   })
   .post('/:id/retry', async (c) => {
