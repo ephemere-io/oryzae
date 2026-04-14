@@ -15,7 +15,8 @@
     "apps/admin": {
       "next": true,
       "vitest": true,
-      "entry": ["sentry.*.config.ts"]
+      "entry": ["sentry.*.config.ts"],
+      "ignore": ["public/theme-init.js"]
     },
     "packages/shared": {
       "project": ["src/**/*.ts"]
