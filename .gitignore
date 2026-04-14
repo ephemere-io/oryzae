@@ -1,12 +1,12 @@
 node_modules/
 dist/
 .env
+!.env.example
 .env.local
 *.tsbuildinfo
 .turbo/
 .next/
 .playwright-mcp/
-.mcp.json
 test-results/
 playwright-report/
 *.png
