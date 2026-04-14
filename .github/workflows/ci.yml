@@ -16,6 +16,10 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+      - run: pnpm --version
+      - run: head -5 pnpm-lock.yaml
+      - run: wc -l pnpm-lock.yaml
+      - run: tail -3 pnpm-lock.yaml | cat -A
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
 
