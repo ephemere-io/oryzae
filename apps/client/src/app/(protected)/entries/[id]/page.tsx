@@ -10,7 +10,6 @@ import {
   useActiveQuestions,
   useEntryQuestions,
 } from '@/features/entry-questions/hooks/use-entry-questions';
-import { useTriggerFermentation } from '@/features/fermentation/hooks/use-trigger-fermentation';
 
 export default function EntryDetailPage() {
   const params = useParams<{ id: string }>();
@@ -18,7 +17,6 @@ export default function EntryDetailPage() {
   const { entry, loading: entryLoading } = useEntry(params.id, api, authLoading);
   const activeQuestions = useActiveQuestions(api, authLoading);
   const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, params.id);
-  const triggerFermentation = useTriggerFermentation(api);
   const runTransition = useSaveTransition();
   const router = useRouter();
 
@@ -56,7 +54,6 @@ export default function EntryDetailPage() {
       initialLinkedIds={linkedQuestions.map((q) => q.id)}
       onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
       onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
-      onSaveComplete={triggerFermentation}
       onSaveTransition={handleSaveTransition}
     />
   );
