@@ -1,6 +1,7 @@
 'use client';
 
 import { RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -71,9 +72,16 @@ export default function SpendPage() {
   const maxCost = Math.max(...(data?.daily.map((d) => d.totalCost) ?? [0]), 0.001);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          <Link
+            href="/observability"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Observability
+          </Link>
+          <span className="text-muted-foreground">/</span>
           <h1 className="text-xl font-medium">AI Gateway Spend</h1>
           <span className="text-sm text-muted-foreground">Past 30 days</span>
         </div>
@@ -86,7 +94,6 @@ export default function SpendPage() {
         <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : data ? (
         <>
-          {/* Summary cards */}
           <div className="grid gap-4 grid-cols-3">
             <div className="rounded-lg border border-border/50 bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">30d cost</p>
@@ -115,7 +122,6 @@ export default function SpendPage() {
             )}
           </div>
 
-          {/* Daily chart */}
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
               Daily cost
@@ -147,7 +153,6 @@ export default function SpendPage() {
             )}
           </div>
 
-          {/* By user */}
           {data.byUser.length > 0 && (
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">By user</p>

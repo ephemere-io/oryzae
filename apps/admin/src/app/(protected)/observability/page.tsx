@@ -2,16 +2,19 @@
 
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ObservabilityCards } from '@/features/observability/components/tool-cards';
+import { ObservabilityTable } from '@/features/observability/components/tool-cards';
 import { useObservability } from '@/features/observability/hooks/use-observability';
 
 export default function ObservabilityPage() {
   const { data, loading, error, refresh } = useObservability();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-medium">Observability</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-medium">Observability</h1>
+          <span className="text-sm text-muted-foreground">5 tools</span>
+        </div>
         <Button variant="ghost" size="icon-xs" onClick={refresh} disabled={loading}>
           <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
         </Button>
@@ -26,7 +29,7 @@ export default function ObservabilityPage() {
       {loading && !data ? (
         <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : data ? (
-        <ObservabilityCards data={data} />
+        <ObservabilityTable data={data} />
       ) : null}
     </div>
   );
