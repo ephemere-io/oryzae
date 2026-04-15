@@ -13,3 +13,4 @@ playwright-report/
 .DS_Store
 .tmp/
 .claude/worktrees/
+.vercel

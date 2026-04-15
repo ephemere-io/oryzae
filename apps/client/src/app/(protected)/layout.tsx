@@ -5,31 +5,12 @@ import { useEffect } from 'react';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import {
-  COLLAPSED_WIDTH,
-  EXPANDED_WIDTH,
-  SidebarProvider,
-  useSidebar,
-} from '@/lib/sidebar-context';
+import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
-
-function ProtectedContent({ children }: { children: React.ReactNode }) {
-  const { expanded } = useSidebar();
-  const sidebarWidth = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
-
-  return (
-    <main
-      className="flex flex-1 flex-col overflow-hidden transition-[margin-left] duration-200 ease-linear"
-      style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
-    >
-      <div className="relative flex-1 overflow-auto">{children}</div>
-      <PageFooter />
-    </main>
-  );
-}
+import { UnreadProvider } from '@/lib/unread-context';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const { auth, loading } = useAuth();
+  const { auth, api, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -51,10 +32,23 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <ThemeProvider>
       <SidebarProvider>
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <ProtectedContent>{children}</ProtectedContent>
-        </div>
+        <UnreadProvider api={api} authLoading={loading}>
+          <div className="flex h-screen overflow-hidden">
+            <Sidebar />
+            <main
+              className="flex flex-1 flex-col overflow-hidden"
+              style={
+                {
+                  marginLeft: SIDEBAR_WIDTH,
+                  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
+                } as React.CSSProperties
+              }
+            >
+              <div className="relative flex-1 overflow-auto">{children}</div>
+              <PageFooter />
+            </main>
+          </div>
+        </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>
   );
