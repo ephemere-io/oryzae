@@ -519,7 +519,7 @@ export function EntryEditor({
                 textOrientation: 'mixed',
                 fontSize: '1.4em',
                 letterSpacing: '0.15em',
-                color: 'var(--date-color)',
+                color: 'var(--fg)',
                 opacity: 0.35,
                 maxHeight: '70%',
                 overflow: 'hidden',
