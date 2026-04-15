@@ -12,5 +12,6 @@ playwright-report/
 *.png
 .DS_Store
 .tmp/
+screenshots/
 .claude/worktrees/
 .vercel
