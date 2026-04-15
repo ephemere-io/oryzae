@@ -61,6 +61,10 @@ export class CreateBoardPhotoUsecase {
     const x = Math.floor(Math.random() * 741) + 60;
     const y = Math.floor(Math.random() * 541) + 60;
     const rotation = Math.round((Math.random() * 10 - 5) * 10) / 10;
+    const vt = input.viewType ?? 'daily';
+
+    // New cards should appear on top of existing ones
+    const maxZ = await this.boardCardRepo.findMaxZIndex(userId, input.dateKey, vt);
 
     const cardResult = BoardCard.create(
       {
@@ -68,13 +72,13 @@ export class CreateBoardPhotoUsecase {
         cardType: 'photo',
         refId: photo.id,
         dateKey: input.dateKey,
-        viewType: input.viewType ?? 'daily',
+        viewType: vt,
         x,
         y,
         rotation,
         width: DEFAULT_WIDTH,
         height: DEFAULT_HEIGHT,
-        zIndex: 0,
+        zIndex: maxZ + 1,
       },
       this.generateId,
     );

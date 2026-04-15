@@ -34,6 +34,7 @@ export interface BoardCardRepositoryGateway {
     dateKey: string,
     viewType: string,
   ): Promise<string[]>;
+  findMaxZIndex(userId: string, dateKey: string, viewType: string): Promise<number>;
   saveMany(cards: BoardCard[]): Promise<void>;
   updatePositions(cards: CardPositionUpdate[]): Promise<void>;
   delete(id: string, userId: string): Promise<void>;

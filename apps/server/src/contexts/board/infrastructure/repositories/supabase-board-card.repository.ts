@@ -98,6 +98,22 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => row.ref_id as string);
   }
 
+  async findMaxZIndex(userId: string, dateKey: string, viewType: string): Promise<number> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('z_index')
+      .eq('user_id', userId)
+      .eq('date_key', dateKey)
+      .eq('view_type', viewType)
+      .eq('is_deleted', false)
+      .order('z_index', { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) return -1;
+    return (data[0] as Record<string, unknown>).z_index as number;
+  }
+
   async saveMany(cards: BoardCard[]): Promise<void> {
     if (cards.length === 0) return;
 

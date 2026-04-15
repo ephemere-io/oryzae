@@ -28,6 +28,7 @@ export interface BoardCardData {
   width: number;
   height: number;
   zIndex: number;
+  createdAt: string;
   content: EntryContent | SnippetContent | PhotoContent;
   removing?: boolean;
 }
@@ -36,6 +37,39 @@ interface BoardData {
   dateKey: string;
   viewType: string;
   cards: BoardCardData[];
+}
+
+/**
+ * Apply default z-ordering by creation time (newer on top).
+ * Cards whose z-index was bumped by user interaction (drag) are preserved.
+ *
+ * Auto-assigned z-indexes are sequential (0..N-1).
+ * User-dragged cards get z-index >= N (via zCounterRef in use-board-interaction).
+ * We re-sort only the auto-assigned group by createdAt, keeping user-modified cards on top.
+ */
+function applyDefaultZOrder(cards: BoardCardData[]): BoardCardData[] {
+  if (cards.length <= 1) return cards;
+
+  const total = cards.length;
+  const autoCards: BoardCardData[] = [];
+  const userCards: BoardCardData[] = [];
+
+  for (const card of cards) {
+    if (card.zIndex >= total) {
+      userCards.push(card);
+    } else {
+      autoCards.push(card);
+    }
+  }
+
+  // Sort auto-assigned cards by createdAt ASC (newer = higher z-index = on top)
+  autoCards.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  // Reassign z-indexes for auto cards: 0, 1, 2, ...
+  const result = autoCards.map((card, i) => ({ ...card, zIndex: i }));
+
+  // Append user-modified cards (keep their z-index)
+  return [...result, ...userCards];
 }
 
 export function useBoard(
@@ -52,7 +86,7 @@ export function useBoard(
     const res = await api.fetch(`/api/v1/board?dateKey=${dateKey}&viewType=${viewType}`);
     if (res.ok) {
       const data: BoardData = await res.json();
-      setCards(data.cards);
+      setCards(applyDefaultZOrder(data.cards));
     }
     setLoading(false);
   }, [api, dateKey, viewType]);
