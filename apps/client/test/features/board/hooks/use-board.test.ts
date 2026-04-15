@@ -34,6 +34,7 @@ describe('useBoard', () => {
           width: 340,
           height: 280,
           zIndex: 0,
+          createdAt: '2026-04-11T00:00:00Z',
           content: { title: 'Test', preview: 'Preview', createdAt: '2026-04-11T00:00:00Z' },
         },
       ],
@@ -86,6 +87,7 @@ describe('useBoard', () => {
           width: 340,
           height: 280,
           zIndex: 0,
+          createdAt: '2026-04-12T00:00:00Z',
           content: { title: 'T', preview: 'P', createdAt: '2026-04-12T00:00:00Z' },
         },
       ],
@@ -105,5 +107,96 @@ describe('useBoard', () => {
 
     await waitFor(() => expect(result.current.cards).toHaveLength(1));
     expect(result.current.cards[0].id).toBe('c-2');
+  });
+
+  it('デフォルトでは作成日時が新しいカードほど高い zIndex を持つ', async () => {
+    const boardData = {
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      cards: [
+        {
+          id: 'c-old',
+          cardType: 'entry',
+          refId: 'e-1',
+          x: 100,
+          y: 100,
+          rotation: 0,
+          width: 340,
+          height: 280,
+          zIndex: 1,
+          createdAt: '2026-04-11T08:00:00Z',
+          content: { title: 'Old', preview: 'Old entry', createdAt: '2026-04-11T08:00:00Z' },
+        },
+        {
+          id: 'c-new',
+          cardType: 'snippet',
+          refId: 's-1',
+          x: 200,
+          y: 200,
+          rotation: 0,
+          width: 260,
+          height: 120,
+          zIndex: 0,
+          createdAt: '2026-04-11T14:00:00Z',
+          content: { text: 'Newer snippet' },
+        },
+      ],
+    };
+    apiFetch.mockResolvedValueOnce(mockResponse(true, boardData));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const oldCard = result.current.cards.find((c) => c.id === 'c-old');
+    const newCard = result.current.cards.find((c) => c.id === 'c-new');
+    expect(newCard!.zIndex).toBeGreaterThan(oldCard!.zIndex);
+  });
+
+  it('ユーザー操作で変更された zIndex はデフォルトソートより優先される', async () => {
+    const boardData = {
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      cards: [
+        {
+          id: 'c-old-dragged',
+          cardType: 'entry',
+          refId: 'e-1',
+          x: 100,
+          y: 100,
+          rotation: 0,
+          width: 340,
+          height: 280,
+          zIndex: 10,
+          createdAt: '2026-04-11T08:00:00Z',
+          content: { title: 'Old but dragged', preview: 'P', createdAt: '2026-04-11T08:00:00Z' },
+        },
+        {
+          id: 'c-new',
+          cardType: 'snippet',
+          refId: 's-1',
+          x: 200,
+          y: 200,
+          rotation: 0,
+          width: 260,
+          height: 120,
+          zIndex: 1,
+          createdAt: '2026-04-11T14:00:00Z',
+          content: { text: 'Newer snippet' },
+        },
+      ],
+    };
+    apiFetch.mockResolvedValueOnce(mockResponse(true, boardData));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const draggedCard = result.current.cards.find((c) => c.id === 'c-old-dragged');
+    const newCard = result.current.cards.find((c) => c.id === 'c-new');
+    // The dragged card has zIndex 10 (>= totalCards=2), so it's user-modified and stays on top
+    expect(draggedCard!.zIndex).toBeGreaterThan(newCard!.zIndex);
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useMemo } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { EntryEditor } from '@/features/entries/components/entry-editor';
 import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
@@ -12,6 +12,13 @@ export default function NewEntryPage() {
   const activeQuestions = useActiveQuestions(api, loading);
   const runTransition = useSaveTransition();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Pre-link question from query param (e.g. /entries/new?questionId=xxx)
+  const initialLinkedIds = useMemo(() => {
+    const qId = searchParams.get('questionId');
+    return qId ? [qId] : [];
+  }, [searchParams]);
 
   async function handleLinkQuestion(entryId: string, questionId: string) {
     if (!api) return;
@@ -33,6 +40,7 @@ export default function NewEntryPage() {
       api={api}
       auth={auth}
       activeQuestions={activeQuestions}
+      initialLinkedIds={initialLinkedIds}
       onLinkQuestion={handleLinkQuestion}
       onSaveTransition={handleSaveTransition}
     />

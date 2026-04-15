@@ -93,6 +93,7 @@ function QuestionCircleWithData({
   zoomedId: string | null;
   onZoom: (id: string | null) => void;
   onElementClick: (
+    questionId: string,
     questionText: string,
     type: 'keyword' | 'snippet' | 'letter',
     data: Record<string, string>,
@@ -110,7 +111,9 @@ function QuestionCircleWithData({
       zoomed={isZoomed}
       hidden={isHidden}
       onClick={() => onZoom(question.id)}
-      onElementClick={(type, data) => onElementClick(question.currentText ?? '', type, data)}
+      onElementClick={(type, data) =>
+        onElementClick(question.id, question.currentText ?? '', type, data)
+      }
       style={
         isZoomed
           ? {}
@@ -136,6 +139,7 @@ export function JarView({
   const [detailType, setDetailType] = useState<'keyword' | 'snippet' | 'letter' | null>(null);
   const [detailData, setDetailData] = useState<Record<string, string> | null>(null);
   const [detailQuestion, setDetailQuestion] = useState('');
+  const [detailQuestionId, setDetailQuestionId] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newQuestionText, setNewQuestionText] = useState('');
   const addInputRef = useRef<HTMLTextAreaElement>(null);
@@ -146,10 +150,12 @@ export function JarView({
 
   const handleElementClick = useCallback(
     (
+      questionId: string,
       questionText: string,
       type: 'keyword' | 'snippet' | 'letter',
       data: Record<string, string>,
     ) => {
+      setDetailQuestionId(questionId);
       setDetailQuestion(questionText);
       setDetailType(type);
       setDetailData(data);
@@ -657,6 +663,7 @@ export function JarView({
       <DetailPane
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
+        questionId={detailQuestionId}
         questionText={detailQuestion}
         type={detailType}
         data={detailData}

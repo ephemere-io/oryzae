@@ -1,8 +1,11 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 interface DetailPaneProps {
   open: boolean;
   onClose: () => void;
+  questionId: string;
   questionText: string;
   type: 'keyword' | 'snippet' | 'letter' | null;
   data: {
@@ -21,10 +24,23 @@ const HEADERS: Record<string, string> = {
   letter: 'Lab からの手紙',
 };
 
-export function DetailPane({ open, onClose, questionText, type, data }: DetailPaneProps) {
+export function DetailPane({
+  open,
+  onClose,
+  questionId,
+  questionText,
+  type,
+  data,
+}: DetailPaneProps) {
+  const router = useRouter();
+
+  function handleWriteEntry() {
+    router.push(`/entries/new?questionId=${questionId}`);
+  }
+
   return (
     <div
-      className="fixed top-0 z-[60] h-full w-[400px] border-l border-[rgba(139,115,85,0.2)] bg-[#faf8f5] transition-[right] duration-700"
+      className="fixed top-0 z-[60] flex h-full w-[400px] flex-col border-l border-[rgba(139,115,85,0.2)] bg-[#faf8f5] transition-[right] duration-700"
       style={{
         right: open ? 0 : -400,
         backdropFilter: 'blur(12px)',
@@ -41,15 +57,17 @@ export function DetailPane({ open, onClose, questionText, type, data }: DetailPa
       </button>
 
       {/* Question */}
-      <div className="px-8 pt-8 pb-3 text-sm font-medium text-[#4a3f35]">{questionText}</div>
+      <div className="shrink-0 px-8 pt-8 pb-3 text-sm font-medium text-[#4a3f35]">
+        {questionText}
+      </div>
 
       {/* Header */}
-      <div className="border-b border-[rgba(139,115,85,0.1)] px-8 pb-5 text-[22px] font-medium text-[#4a3f35]">
+      <div className="shrink-0 border-b border-[rgba(139,115,85,0.1)] px-8 pb-5 text-[22px] font-medium text-[#4a3f35]">
         {type ? HEADERS[type] : ''}
       </div>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 text-sm leading-[2.0] text-[#4a3f35]">
+      {/* Body — scrollable */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6 text-sm leading-[2.0] text-[#4a3f35]">
         {type === 'keyword' && data && (
           <>
             <h3 className="mb-3 text-lg font-medium text-[var(--accent)]">{data.keyword}</h3>
@@ -69,9 +87,10 @@ export function DetailPane({ open, onClose, questionText, type, data }: DetailPa
       </div>
 
       {/* Footer */}
-      <div className="border-t border-[rgba(139,115,85,0.1)] px-8 py-6">
+      <div className="shrink-0 border-t border-[rgba(139,115,85,0.1)] px-8 py-6">
         <button
           type="button"
+          onClick={handleWriteEntry}
           className="w-full rounded-lg border border-[var(--accent)] px-4 py-3 text-sm text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white"
         >
           この問いのエントリを書く

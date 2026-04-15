@@ -32,12 +32,12 @@ export function QuestionLinker({
   }
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 overflow-x-auto">
+      <div className="flex shrink-0 items-center gap-1.5">
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="w-56 rounded-full border border-zinc-300 bg-transparent px-4 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700"
+          className="w-44 rounded-full border border-zinc-300 bg-transparent px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700"
         >
           <option value="">問いを紐づける…</option>
           {available.map((q) => (
@@ -50,24 +50,24 @@ export function QuestionLinker({
           type="button"
           onClick={handleLink}
           disabled={!selected}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-emerald-500 text-sm text-emerald-500 hover:bg-emerald-50 disabled:opacity-30 dark:hover:bg-emerald-950"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-emerald-500 text-xs text-emerald-500 hover:bg-emerald-50 disabled:opacity-30 dark:hover:bg-emerald-950"
         >
           +
         </button>
       </div>
 
       {linked.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1">
           {linked.map((q) => (
             <span
               key={q.id}
-              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+              className="inline-flex max-w-[140px] shrink-0 items-center gap-0.5 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
             >
-              {q.currentText}
+              <span className="truncate">{q.currentText}</span>
               <button
                 type="button"
                 onClick={() => onUnlink(q.id)}
-                className="ml-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                className="ml-0.5 shrink-0 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
               >
                 &times;
               </button>

@@ -30,6 +30,7 @@ interface CardResponse {
   width: number;
   height: number;
   zIndex: number;
+  createdAt: string;
   content: EntryContent | SnippetContent | PhotoContent;
 }
 
@@ -140,10 +141,14 @@ export class LoadBoardUsecase {
     }
     const existingRefIdSet = new Set(existingEntryRefIds);
 
-    const entries =
+    const entriesRaw =
       viewType === 'weekly'
         ? await this.entryRepo.listByUserIdAndWeek(userId, dateKey)
         : await this.entryRepo.listByUserIdAndDate(userId, dateKey);
+    // Sort by createdAt ASC so newer entries get higher z-index (appear on top)
+    const entries = entriesRaw.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
     const newCards: BoardCard[] = [];
 
     for (const entry of entries) {
@@ -246,6 +251,7 @@ export class LoadBoardUsecase {
           width: card.width,
           height: card.height,
           zIndex: card.zIndex,
+          createdAt: card.createdAt,
           content,
         };
       })
