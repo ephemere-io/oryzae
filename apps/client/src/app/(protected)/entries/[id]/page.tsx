@@ -48,6 +48,8 @@ export default function EntryDetailPage() {
     <EntryEditor
       entryId={entry.id}
       initialContent={entry.content}
+      createdAt={entry.createdAt}
+      updatedAt={entry.updatedAt}
       api={api}
       auth={auth}
       activeQuestions={activeQuestions}

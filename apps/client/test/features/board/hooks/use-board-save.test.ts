@@ -35,6 +35,7 @@ describe('useBoardSave', () => {
         width: 340,
         height: 280,
         zIndex: 0,
+        createdAt: '2026-04-11T00:00:00Z',
         content: { title: '', preview: '', createdAt: '' },
       },
     ];
@@ -73,6 +74,7 @@ describe('useBoardSave', () => {
         width: 340,
         height: 280,
         zIndex: 0,
+        createdAt: '2026-04-11T00:00:00Z',
         content: { title: '', preview: '', createdAt: '' },
       },
     ];
@@ -87,6 +89,7 @@ describe('useBoardSave', () => {
         width: 340,
         height: 280,
         zIndex: 1,
+        createdAt: '2026-04-11T00:00:00Z',
         content: { title: '', preview: '', createdAt: '' },
       },
     ];

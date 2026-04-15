@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { JarView } from '@/features/fermentation/components/jar-view';
 import { useQuestions } from '@/features/questions/hooks/use-questions';
+import { useUnread } from '@/lib/unread-context';
 
 interface QuestionData {
   id: string;
@@ -13,6 +14,7 @@ interface QuestionData {
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
   const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api, authLoading);
+  const { markSeen } = useUnread();
   const [questions, setQuestions] = useState<QuestionData[]>([]);
 
   const fetchActiveQuestions = useCallback(async () => {
@@ -22,6 +24,11 @@ export default function JarPage() {
       setQuestions(await res.json());
     }
   }, [api]);
+
+  // Mark fermentation results as seen when visiting jar page
+  useEffect(() => {
+    markSeen();
+  }, [markSeen]);
 
   useEffect(() => {
     if (authLoading) return;

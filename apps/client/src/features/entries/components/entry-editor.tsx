@@ -10,7 +10,9 @@ import {
   type EditorSettings,
   SettingsDrawer,
 } from '@/features/entries/components/settings-drawer';
+import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/entries/components/stats-popup';
+import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
@@ -19,7 +21,7 @@ import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
 import { useVoiceDynamics } from '@/features/entries/hooks/use-voice-dynamics';
 import type { ApiClient } from '@/lib/api';
-import { COLLAPSED_WIDTH, EXPANDED_WIDTH, useSidebar } from '@/lib/sidebar-context';
+import { SIDEBAR_WIDTH } from '@/lib/sidebar-context';
 
 interface AuthState {
   accessToken: string;
@@ -33,6 +35,9 @@ interface QuestionOption {
 interface EntryEditorProps {
   entryId?: string;
   initialContent?: string;
+  initialTitle?: string;
+  createdAt?: string;
+  updatedAt?: string;
   api: ApiClient | null;
   auth: AuthState | null;
   activeQuestions?: QuestionOption[];
@@ -43,20 +48,34 @@ interface EntryEditorProps {
   onSaveTransition?: (text: string, editorEl: HTMLElement) => Promise<void>;
 }
 
-function formatDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  const days = ['日', '月', '火', '水', '木', '金', '土'];
-  const dayName = days[date.getDay()];
+function formatTime(date: Date): string {
   const hh = String(date.getHours()).padStart(2, '0');
   const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${y}.${m}.${d} — ${dayName}曜日 ${hh}:${mm} · ${hh}:${mm}`;
+  return `${hh}:${mm}`;
+}
+
+function formatDateStr(created: Date, updated: Date): string {
+  const y = created.getFullYear();
+  const m = created.getMonth() + 1;
+  const d = created.getDate();
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const dayName = days[created.getDay()];
+  return `${y}.${m}.${d} — ${dayName}曜日 ${formatTime(created)} · ${formatTime(updated)}`;
+}
+
+/** Extract title (first line) and body from stored content */
+function splitTitleBody(raw: string): { title: string; body: string } {
+  const idx = raw.indexOf('\n');
+  if (idx === -1) return { title: '', body: raw };
+  return { title: raw.substring(0, idx), body: raw.substring(idx + 1) };
 }
 
 export function EntryEditor({
   entryId,
   initialContent = '',
+  initialTitle,
+  createdAt: createdAtIso,
+  updatedAt: updatedAtIso,
   api,
   auth,
   activeQuestions = [],
@@ -66,26 +85,40 @@ export function EntryEditor({
   onSaveComplete,
   onSaveTransition,
 }: EntryEditorProps) {
-  const [content, setContent] = useState(initialContent);
+  // For existing entries, split first line as title
+  const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
+  const [title, setTitle] = useState(initialTitle ?? parsed.title);
+  const [content, setContent] = useState(entryId ? parsed.body : initialContent);
+  const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
   const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [titleEditModalOpen, setTitleEditModalOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
+  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
+  const [fadeLeft, setFadeLeft] = useState(false);
+  const [fadeRight, setFadeRight] = useState(false);
 
   function updateSettings(patch: Partial<EditorSettings>) {
     setSettings((prev) => ({ ...prev, ...patch }));
   }
   const [status, setStatus] = useState<'editing' | 'saved' | 'saving'>('editing');
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
-  const [dateStr, setDateStr] = useState(() => formatDate(new Date()));
+  const [dateStr, setDateStr] = useState(() => {
+    const now = new Date();
+    const created = createdAtIso ? new Date(createdAtIso) : now;
+    const updated = updatedAtIso ? new Date(updatedAtIso) : now;
+    return formatDateStr(created, updated);
+  });
   const { save, saving, error } = useSaveEntry(api, auth);
   const router = useRouter();
-  const { expanded: sidebarExpanded } = useSidebar();
-  const sidebarWidth = sidebarExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
+  const sidebarWidth = SIDEBAR_WIDTH;
   const editorRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const hasUnsavedChanges = content !== savedContent;
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
@@ -98,21 +131,79 @@ export function EntryEditor({
   useVoiceDynamics(editorRef, voiceActive);
 
   useEffect(() => {
-    const timer = setInterval(() => setDateStr(formatDate(new Date())), 60_000);
-    return () => clearInterval(timer);
-  }, []);
+    // For new entries (no createdAt), update the clock every minute
+    if (!createdAtIso) {
+      const timer = setInterval(() => {
+        const now = new Date();
+        setDateStr(formatDateStr(now, now));
+      }, 60_000);
+      return () => clearInterval(timer);
+    }
+  }, [createdAtIso]);
 
   useEffect(() => {
     if (saving) setStatus('saving');
   }, [saving]);
 
+  // Track scroll position of editor to show/hide fade overlays
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el || settings.writingMode !== 'vertical') {
+      setFadeLeft(false);
+      setFadeRight(false);
+      return;
+    }
+    function updateFade() {
+      if (!el) return;
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      // vertical-rl: scrollLeft is 0 at start (rightmost), negative when scrolled left
+      const maxScroll = scrollWidth - clientWidth;
+      // vertical-rl: scrollLeft=0 at start (rightmost/beginning), goes negative when scrolled left
+      // Right fade (beginning clipped): show when scrolled away from start
+      setFadeRight(Math.abs(scrollLeft) > 5);
+      // Left fade (end clipped): show when not scrolled all the way to the left
+      setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
+    }
+    updateFade();
+    el.addEventListener('scroll', updateFade);
+    // Also update on content change via ResizeObserver
+    const ro = new ResizeObserver(updateFade);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', updateFade);
+      ro.disconnect();
+    };
+  }, [settings.writingMode]);
+
+  // Warn before browser close with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsavedChanges]);
+
   const initialContentStable = initialContent;
   useEffect(() => {
-    setContent(initialContentStable);
-    if (editorRef.current && initialContentStable) {
-      editorRef.current.textContent = initialContentStable;
+    if (entryId) {
+      const p = splitTitleBody(initialContentStable);
+      setTitle(p.title);
+      setContent(p.body);
+      setSavedContent(p.body);
+      if (editorRef.current && p.body) {
+        editorRef.current.textContent = p.body;
+      }
+    } else {
+      setContent(initialContentStable);
+      setSavedContent(initialContentStable);
+      if (editorRef.current && initialContentStable) {
+        editorRef.current.textContent = initialContentStable;
+      }
     }
-  }, [initialContentStable]);
+  }, [initialContentStable, entryId]);
 
   const prevLinkedRef = useRef(initialLinkedIds);
   if (initialLinkedIds.join(',') !== prevLinkedRef.current.join(',')) {
@@ -121,20 +212,20 @@ export function EntryEditor({
   }
 
   const handleSaveWithTitle = useCallback(
-    async (titleOrContent: string) => {
-      // For new entries, prepend title as first line if not already there
-      let finalContent = content;
-      if (!entryId && titleOrContent !== content) {
-        const firstLine = content.split('\n')[0] ?? '';
-        if (firstLine.trim() !== titleOrContent.trim()) {
-          finalContent = `${titleOrContent}\n${content}`;
-        }
-      }
+    async (newTitle: string) => {
+      // Combine title + body into content for storage
+      const finalContent = newTitle.trim() ? `${newTitle.trim()}\n${content}` : content;
 
       const savedId = await save(finalContent, entryId);
       if (savedId) {
+        setTitle(newTitle.trim());
+        setSavedContent(content);
         setSaveModalOpen(false);
+        setTitleEditModalOpen(false);
         setStatus('saved');
+        // Update the date display with new updated_at
+        const created = createdAtIso ? new Date(createdAtIso) : new Date();
+        setDateStr(formatDateStr(created, new Date()));
         // Link new questions for newly created entries
         if (!entryId && onLinkQuestion) {
           for (const qId of linkedIds) {
@@ -142,28 +233,61 @@ export function EntryEditor({
           }
         }
         setTimeout(() => setStatus('editing'), 2000);
-        // Fire-and-forget: trigger fermentation analysis
         onSaveComplete?.(savedId, finalContent);
-        // Trigger save→jar transition animation
-        if (onSaveTransition && editorRef.current && finalContent.trim()) {
+        // Trigger save→jar transition animation only when content has changed
+        if (onSaveTransition && editorRef.current && finalContent.trim() && hasUnsavedChanges) {
           await onSaveTransition(finalContent, editorRef.current);
         } else if (!entryId) {
           router.push(`/entries/${savedId}`);
         }
       }
     },
-    [content, entryId, save, linkedIds, onLinkQuestion, router, onSaveComplete, onSaveTransition],
+    [
+      content,
+      entryId,
+      save,
+      linkedIds,
+      onLinkQuestion,
+      router,
+      onSaveComplete,
+      onSaveTransition,
+      hasUnsavedChanges,
+      createdAtIso,
+    ],
   );
 
   const handleSaveClick = useCallback(() => {
     if (!content.trim()) return;
-    // For new entries, show title modal; for existing entries, save directly
+    // Always show title modal for new entries; for existing, save directly
     if (!entryId) {
       setSaveModalOpen(true);
     } else {
-      handleSaveWithTitle(content);
+      handleSaveWithTitle(title);
     }
-  }, [content, entryId, handleSaveWithTitle]);
+  }, [content, entryId, handleSaveWithTitle, title]);
+
+  /** Navigate with unsaved-changes guard */
+  const guardedNavigate = useCallback(
+    (path: string) => {
+      if (hasUnsavedChanges) {
+        setPendingNavPath(path);
+      } else {
+        router.push(path);
+      }
+    },
+    [hasUnsavedChanges, router],
+  );
+
+  const handleUnsavedSave = useCallback(() => {
+    // Save first, then navigate
+    setSaveModalOpen(true);
+  }, []);
+
+  const handleUnsavedDiscard = useCallback(() => {
+    const path = pendingNavPath;
+    setPendingNavPath(null);
+    if (path) router.push(path);
+  }, [pendingNavPath, router]);
 
   const handleLink = useCallback(
     async (questionId: string) => {
@@ -198,7 +322,6 @@ export function EntryEditor({
   }
 
   const charCount = content.length;
-  const firstLine = content.split('\n')[0]?.substring(0, 100) ?? '';
 
   return (
     <div
@@ -257,6 +380,7 @@ export function EntryEditor({
           </button>
         </div>
 
+        {/* Date display — always show date in toolbar */}
         <span className="text-xs text-zinc-400">{dateStr}</span>
 
         <div className="flex items-center gap-2">
@@ -349,67 +473,104 @@ export function EntryEditor({
         style={{ left: sidebarWidth }}
       />
 
-      {/* Editor area */}
-      <div className="relative flex-1 overflow-auto">
-        {/* Eraser trace canvas */}
-        <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
-
-        {/* Title display (right side in vertical mode) */}
-        {settings.writingMode === 'vertical' && firstLine && (
+      {/* Editor area — outer wrapper (no overflow) holds fade overlays; inner div scrolls */}
+      <div className="relative flex-1">
+        {/* Fade overlays for vertical mode — appear only when content is clipped */}
+        {settings.writingMode === 'vertical' && fadeLeft && (
           <div
-            className="pointer-events-none absolute z-[2] select-none"
+            className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
             style={{
-              right: '3%',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              writingMode: 'vertical-rl',
-              textOrientation: 'mixed',
-              fontSize: '1.4em',
-              letterSpacing: '0.15em',
-              color: 'var(--date-color)',
-              opacity: 0.35,
-              maxHeight: '70%',
-              overflow: 'hidden',
+              left: 0,
+              width: '18%',
+              background: 'linear-gradient(to right, var(--bg), transparent)',
+            }}
+          />
+        )}
+        {settings.writingMode === 'vertical' && fadeRight && (
+          <div
+            className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
+            style={{
+              right: '15%',
+              width: '12%',
+              background: 'linear-gradient(to left, var(--bg), transparent)',
+            }}
+          />
+        )}
+        <div
+          className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
+        >
+          {/* Snippet selection toolbar */}
+          <SnippetToolbar editorRef={editorRef} api={api} />
+
+          {/* Eraser trace canvas */}
+          <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
+
+          {/* Title display (right side in vertical mode) — only when title is set */}
+          {settings.writingMode === 'vertical' && title && (
+            <button
+              type="button"
+              onClick={() => setTitleEditModalOpen(true)}
+              className="absolute z-[2] cursor-pointer border-none bg-transparent"
+              style={{
+                right: '8%',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                writingMode: 'vertical-rl',
+                textOrientation: 'mixed',
+                fontSize: '1.4em',
+                letterSpacing: '0.15em',
+                color: 'var(--fg)',
+                opacity: 0.35,
+                maxHeight: '70%',
+                overflow: 'hidden',
+                fontFamily:
+                  settings.fontFamily === 'serif'
+                    ? "'Noto Serif JP', serif"
+                    : "'Noto Sans JP', sans-serif",
+              }}
+            >
+              {title}
+            </button>
+          )}
+
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={() => {
+              const text = editorRef.current?.textContent ?? '';
+              setContent(text);
+              if (status === 'saved') setStatus('editing');
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const text = e.clipboardData.getData('text/plain');
+              if (!text) return;
+              document.execCommand('insertText', false, text);
+            }}
+            data-placeholder="今日は何を感じましたか？"
+            className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'absolute inset-0' : 'min-h-full px-[15%] py-6'}`}
+            style={{
+              ...(settings.writingMode === 'vertical'
+                ? {
+                    left: '6%',
+                    top: '4%',
+                    width: '79%',
+                    height: '92%',
+                    position: 'absolute',
+                    overflowX: 'auto',
+                  }
+                : {}),
+              fontSize: `${settings.fontSize}px`,
+              writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
+              textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
               fontFamily:
                 settings.fontFamily === 'serif'
                   ? "'Noto Serif JP', serif"
                   : "'Noto Sans JP', sans-serif",
             }}
-          >
-            {firstLine}
-          </div>
-        )}
-
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={() => {
-            const text = editorRef.current?.textContent ?? '';
-            setContent(text);
-            if (status === 'saved') setStatus('editing');
-          }}
-          onPaste={(e) => {
-            e.preventDefault();
-            const text = e.clipboardData.getData('text/plain');
-            if (!text) return;
-            document.execCommand('insertText', false, text);
-          }}
-          data-placeholder="今日のことを書いてみましょう..."
-          className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'absolute inset-0' : 'min-h-full px-[15%] py-6'}`}
-          style={{
-            ...(settings.writingMode === 'vertical'
-              ? { left: '15%', top: '10%', width: '70%', height: '80%', position: 'absolute' }
-              : {}),
-            fontSize: `${settings.fontSize}px`,
-            writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
-            textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
-            fontFamily:
-              settings.fontFamily === 'serif'
-                ? "'Noto Serif JP', serif"
-                : "'Noto Sans JP', sans-serif",
-          }}
-        />
+          />
+        </div>
       </div>
 
       {/* Bottom toolbar */}
@@ -417,7 +578,7 @@ export function EntryEditor({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => router.push('/entries/new')}
+            onClick={() => guardedNavigate('/entries/new')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip="新規エントリ"
           >
@@ -460,7 +621,7 @@ export function EntryEditor({
           </button>
           <button
             type="button"
-            onClick={() => router.push('/entries')}
+            onClick={() => guardedNavigate('/entries')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip="一覧"
           >
@@ -536,13 +697,41 @@ export function EntryEditor({
       {/* Status bar */}
       <EditorStatusBar status={status} charCount={charCount} />
 
-      {/* Save title modal */}
+      {/* Save title modal (new entry first save) */}
       <SaveTitleModal
         open={saveModalOpen}
-        initialTitle={firstLine}
+        initialTitle=""
+        saving={saving}
+        onSave={(t) => {
+          handleSaveWithTitle(t);
+          // After saving, if there was a pending navigation, execute it
+          if (pendingNavPath) {
+            const path = pendingNavPath;
+            setPendingNavPath(null);
+            setTimeout(() => router.push(path), 300);
+          }
+        }}
+        onClose={() => {
+          setSaveModalOpen(false);
+          setPendingNavPath(null);
+        }}
+      />
+
+      {/* Title edit modal (existing entry) */}
+      <SaveTitleModal
+        open={titleEditModalOpen}
+        initialTitle={title}
         saving={saving}
         onSave={handleSaveWithTitle}
-        onClose={() => setSaveModalOpen(false)}
+        onClose={() => setTitleEditModalOpen(false)}
+      />
+
+      {/* Unsaved changes modal */}
+      <UnsavedChangesModal
+        open={pendingNavPath !== null && !saveModalOpen}
+        onSave={handleUnsavedSave}
+        onDiscard={handleUnsavedDiscard}
+        onClose={() => setPendingNavPath(null)}
       />
     </div>
   );
