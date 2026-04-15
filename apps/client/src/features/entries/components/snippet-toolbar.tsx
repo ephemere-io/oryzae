@@ -49,12 +49,11 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
 
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    const editorRect = editor.closest('[class*="relative"]')?.getBoundingClientRect();
-    if (!editorRect) return;
 
+    // Use viewport coordinates with fixed positioning to escape stacking context
     setPosition({
-      top: rect.top - editorRect.top - 10,
-      left: rect.left - editorRect.left + rect.width / 2,
+      top: rect.top - 10,
+      left: rect.left + rect.width / 2,
     });
     setVisible(true);
   }, [editorRef]);
@@ -98,7 +97,7 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
   return (
     <div
       ref={toolbarRef}
-      className="pointer-events-auto absolute z-[2000] pb-3"
+      className="pointer-events-auto fixed z-[9999] pb-3"
       style={{
         top: position.top,
         left: position.left,
