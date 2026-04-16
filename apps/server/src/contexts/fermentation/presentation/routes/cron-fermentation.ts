@@ -6,6 +6,7 @@ import { getSupabaseClient } from '../../../shared/infrastructure/supabase-clien
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
+import { getFermentationTargetDateKey } from './cron-target-date.js';
 
 const generateId = () => crypto.randomUUID();
 
@@ -55,11 +56,8 @@ export const cronFermentation = new Hono()
       listActiveUserIds,
     );
 
-    // Use "today" in JST (UTC+9) since the cron fires at 3 AM JST
-    const now = new Date();
-    const jstOffset = 9 * 60 * 60 * 1000;
-    const jstDate = new Date(now.getTime() + jstOffset);
-    const dateKey = jstDate.toISOString().slice(0, 10);
+    // Cron は JST 03:00 に発火するため、対象は「直前に閉じた一日」= JST での前日
+    const dateKey = getFermentationTargetDateKey(new Date());
 
     const result = await usecase.execute(dateKey);
 
