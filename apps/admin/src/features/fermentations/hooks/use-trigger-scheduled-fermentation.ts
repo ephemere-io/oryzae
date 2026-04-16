@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
-export interface TriggerScheduledFermentationResult {
+interface TriggerScheduledFermentationResult {
   dateKey: string;
   totalUsers: number;
   totalFermentations: number;
