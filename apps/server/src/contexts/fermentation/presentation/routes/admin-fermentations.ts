@@ -1,9 +1,22 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { gateway } from 'ai';
 import { Hono } from 'hono';
+import { z } from 'zod';
+import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
+import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
+import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
+import { getFermentationTargetDateKey } from './cron-target-date.js';
+
+const triggerScheduledSchema = z.object({
+  dateKey: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'dateKey must be in YYYY-MM-DD format')
+    .optional(),
+});
 
 type Env = {
   Variables: {
@@ -259,6 +272,39 @@ export const adminFermentations = new Hono<Env>()
       letter,
       keywords,
     });
+  })
+  .post('/trigger-scheduled', async (c) => {
+    const supabase = c.get('adminSupabase');
+    const body = triggerScheduledSchema.parse(await c.req.json().catch(() => ({})));
+
+    // 省略時は cron と同じ「JST 前日」
+    const dateKey = body.dateKey ?? getFermentationTargetDateKey(new Date());
+
+    const entryRepo = new SupabaseEntryRepository(supabase);
+    const questionRepo = new SupabaseQuestionRepository(supabase);
+    const questionTransactionRepo = new SupabaseQuestionTransactionRepository(supabase);
+    const fermentationRepo = new SupabaseFermentationRepository(supabase);
+    const llmGateway = new VercelAiAnalysisGateway();
+
+    const listActiveUserIds = async (): Promise<string[]> => {
+      const { data, error } = await supabase.from('entries').select('user_id').limit(1000);
+      if (error) throw error;
+      return [...new Set((data ?? []).map((row: { user_id: string }) => row.user_id))];
+    };
+
+    const usecase = new ScheduledFermentationUsecase(
+      entryRepo,
+      questionRepo,
+      questionTransactionRepo,
+      fermentationRepo,
+      llmGateway,
+      () => crypto.randomUUID(),
+      listActiveUserIds,
+    );
+
+    const result = await usecase.execute(dateKey);
+
+    return c.json({ dateKey, ...result });
   })
   .post('/:id/retry', async (c) => {
     const supabase = c.get('adminSupabase');
