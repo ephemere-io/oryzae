@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DateRangeSelector } from '@/components/ui/date-range-selector';
 import { FermentationTable } from '@/features/fermentations/components/fermentation-table';
+import { TriggerScheduledFermentationPanel } from '@/features/fermentations/components/trigger-scheduled-fermentation-panel';
 import { useFermentations } from '@/features/fermentations/hooks/use-fermentations';
 import { useDateRange } from '@/lib/use-date-range';
 
@@ -49,6 +50,8 @@ export default function FermentationsPage() {
           </Button>
         </div>
       </div>
+
+      <TriggerScheduledFermentationPanel onCompleted={refresh} />
 
       {error && (
         <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
