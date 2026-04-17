@@ -2,6 +2,8 @@
 
 import {
   Activity,
+  ChevronsLeft,
+  ChevronsRight,
   DollarSign,
   Eye,
   FlaskConical,
@@ -13,6 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useTheme } from '@/lib/use-theme';
 import { cn } from '@/lib/utils';
 import { useAdminAuth } from '../hooks/use-admin-auth';
@@ -31,6 +34,7 @@ export function AdminSidebar() {
   const router = useRouter();
   const { auth, logout } = useAdminAuth();
   const { theme, toggle } = useTheme();
+  const [collapsed, setCollapsed] = useState(false);
 
   function handleLogout() {
     logout();
@@ -38,12 +42,22 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="flex w-56 flex-col border-r border-sidebar-border bg-sidebar">
+    <aside
+      className={cn(
+        'flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200',
+        collapsed ? 'w-14' : 'w-56',
+      )}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-2 px-5 py-4">
-        <span className="text-[13px] text-muted-foreground">&#9670;</span>
-        <span className="text-[13px] font-semibold tracking-wide text-foreground">Oryzae</span>
-      </div>
+      <Link
+        href="/dashboard"
+        className="flex items-center gap-2 px-5 py-4 transition-colors hover:bg-sidebar-accent/50"
+      >
+        <span className="shrink-0 text-[13px] text-muted-foreground">&#9670;</span>
+        {!collapsed && (
+          <span className="text-[13px] font-semibold tracking-wide text-foreground">Oryzae</span>
+        )}
+      </Link>
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-2.5 pt-2">
@@ -53,6 +67,7 @@ export function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
                 'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
                 isActive
@@ -60,8 +75,8 @@ export function AdminSidebar() {
                   : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
               )}
             >
-              <item.icon className="h-3.5 w-3.5" />
-              {item.label}
+              <item.icon className="h-3.5 w-3.5 shrink-0" />
+              {!collapsed && item.label}
             </Link>
           );
         })}
@@ -69,13 +84,27 @@ export function AdminSidebar() {
 
       {/* Bottom section */}
       <div className="border-t border-sidebar-border px-2.5 py-3">
-        <div className="flex items-center justify-between gap-2 px-1">
-          {auth && (
+        <div
+          className={cn('flex items-center gap-2 px-1', collapsed ? 'flex-col' : 'justify-between')}
+        >
+          {auth && !collapsed && (
             <p className="truncate font-mono text-[11px] text-muted-foreground">
               {auth.user.email}
             </p>
           )}
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className={cn('flex shrink-0 items-center gap-0.5', collapsed && 'flex-col')}>
+            <button
+              type="button"
+              onClick={() => setCollapsed(!collapsed)}
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              title={collapsed ? 'サイドバーを展開' : 'サイドバーを折りたたむ'}
+            >
+              {collapsed ? (
+                <ChevronsRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronsLeft className="h-3.5 w-3.5" />
+              )}
+            </button>
             <button
               type="button"
               onClick={toggle}
@@ -92,6 +121,7 @@ export function AdminSidebar() {
               type="button"
               onClick={handleLogout}
               className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              title="ログアウト"
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>
