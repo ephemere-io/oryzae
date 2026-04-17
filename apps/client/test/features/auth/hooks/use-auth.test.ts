@@ -65,7 +65,7 @@ describe('useAuth', () => {
 
     let signupResult: string | null = null;
     await act(async () => {
-      signupResult = await result.current.signup('b@c.com', 'pass');
+      signupResult = await result.current.signup('testuser', 'b@c.com', 'pass');
     });
 
     expect(signupResult).toBeNull();
@@ -81,7 +81,7 @@ describe('useAuth', () => {
 
     let signupResult: string | null = null;
     await act(async () => {
-      signupResult = await result.current.signup('b@c.com', 'pass');
+      signupResult = await result.current.signup('testuser', 'b@c.com', 'pass');
     });
 
     expect(signupResult).toBe('Email taken');
