@@ -1,10 +1,13 @@
 'use client';
 
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -30,28 +33,114 @@ function isActive(user: AdminUser): boolean {
   return user.entryCount > 0 || user.fermentationTotal > 0;
 }
 
-export function UserTable({
-  users,
-  onUserClick,
-}: {
+type SortKey = 'email' | 'createdAt' | 'entryCount' | 'questionCount' | 'fermentationTotal';
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-30" />;
+  return dir === 'asc' ? (
+    <ArrowUp className="ml-1 inline h-3 w-3" />
+  ) : (
+    <ArrowDown className="ml-1 inline h-3 w-3" />
+  );
+}
+
+interface UserTableProps {
   users: AdminUser[];
   onUserClick?: (userId: string) => void;
-}) {
+  searchQuery?: string;
+  statusFilter?: 'all' | 'active' | 'inactive';
+}
+
+export function UserTable({ users, onUserClick, searchQuery, statusFilter }: UserTableProps) {
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  }
+
+  const filtered = useMemo(() => {
+    let result = users;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((u) => u.email.toLowerCase().includes(q) || u.id.includes(q));
+    }
+
+    if (statusFilter === 'active') {
+      result = result.filter(isActive);
+    } else if (statusFilter === 'inactive') {
+      result = result.filter((u) => !isActive(u));
+    }
+
+    return [...result].sort((a, b) => {
+      const mul = sortDir === 'asc' ? 1 : -1;
+      switch (sortKey) {
+        case 'email':
+          return mul * a.email.localeCompare(b.email);
+        case 'createdAt':
+          return mul * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        case 'entryCount':
+          return mul * (a.entryCount - b.entryCount);
+        case 'questionCount':
+          return mul * (a.questionCount - b.questionCount);
+        case 'fermentationTotal':
+          return mul * (a.fermentationTotal - b.fermentationTotal);
+        default:
+          return 0;
+      }
+    });
+  }, [users, searchQuery, statusFilter, sortKey, sortDir]);
+
+  const totalEntries = filtered.reduce((sum, u) => sum + u.entryCount, 0);
+  const totalQuestions = filtered.reduce((sum, u) => sum + u.questionCount, 0);
+  const totalFermentations = filtered.reduce((sum, u) => sum + u.fermentationTotal, 0);
+
+  function SortableHead({
+    label,
+    sortKeyName,
+    className,
+  }: {
+    label: string;
+    sortKeyName: SortKey;
+    className?: string;
+  }) {
+    return (
+      <TableHead
+        className={`cursor-pointer select-none ${className ?? ''}`}
+        onClick={() => handleSort(sortKeyName)}
+      >
+        {label}
+        <SortIcon active={sortKey === sortKeyName} dir={sortDir} />
+      </TableHead>
+    );
+  }
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>User</TableHead>
-          <TableHead>Registered</TableHead>
+          <SortableHead label="User" sortKeyName="email" />
+          <SortableHead label="Registered" sortKeyName="createdAt" />
           <TableHead>Last Login</TableHead>
-          <TableHead className="text-right">Entries</TableHead>
-          <TableHead className="text-right">Questions</TableHead>
-          <TableHead className="text-right">Fermentations</TableHead>
+          <SortableHead label="Entries" sortKeyName="entryCount" className="text-right" />
+          <SortableHead label="Questions" sortKeyName="questionCount" className="text-right" />
+          <SortableHead
+            label="Fermentations"
+            sortKeyName="fermentationTotal"
+            className="text-right"
+          />
           <TableHead>Status</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map((user) => (
+        {filtered.map((user) => (
           <TableRow
             key={user.id}
             className={onUserClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
@@ -96,7 +185,7 @@ export function UserTable({
             </TableCell>
           </TableRow>
         ))}
-        {users.length === 0 && (
+        {filtered.length === 0 && (
           <TableRow>
             <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
               No users
@@ -104,6 +193,25 @@ export function UserTable({
           </TableRow>
         )}
       </TableBody>
+      {filtered.length > 0 && (
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={3} className="text-xs font-medium">
+              Total ({filtered.length} users)
+            </TableCell>
+            <TableCell className="text-right font-mono text-xs font-medium">
+              {totalEntries}
+            </TableCell>
+            <TableCell className="text-right font-mono text-xs font-medium">
+              {totalQuestions}
+            </TableCell>
+            <TableCell className="text-right font-mono text-xs font-medium">
+              {totalFermentations}
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        </TableFooter>
+      )}
     </Table>
   );
 }

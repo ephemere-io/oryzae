@@ -1,10 +1,18 @@
 'use client';
 
-import { RefreshCw, Search, X } from 'lucide-react';
+import { Play, RefreshCw, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DateRangeSelector } from '@/components/ui/date-range-selector';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { FermentationTable } from '@/features/fermentations/components/fermentation-table';
 import { TriggerScheduledFermentationPanel } from '@/features/fermentations/components/trigger-scheduled-fermentation-panel';
 import { useFermentations } from '@/features/fermentations/hooks/use-fermentations';
@@ -152,6 +160,23 @@ export default function FermentationsPage() {
             onPresetChange={selectPreset}
             onCustomChange={setCustomRange}
           />
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="xs">
+                <Play className="mr-1 h-3 w-3" />
+                手動発火
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>手動で発酵プロセスを発火</DialogTitle>
+                <DialogDescription>
+                  指定日 (JST) のエントリに対して ScheduledFermentation を実行します
+                </DialogDescription>
+              </DialogHeader>
+              <TriggerScheduledFermentationPanel onCompleted={refresh} />
+            </DialogContent>
+          </Dialog>
           <Button variant="ghost" size="icon-xs" onClick={refresh} disabled={loading}>
             <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
           </Button>
@@ -183,8 +208,6 @@ export default function FermentationsPage() {
           ))}
         </div>
       </div>
-
-      <TriggerScheduledFermentationPanel onCompleted={refresh} />
 
       {error && (
         <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
