@@ -7,6 +7,7 @@ import { getAccessToken } from '@/lib/auth';
 export interface FermentationItem {
   id: string;
   user_id: string;
+  user_email: string;
   question_id: string;
   entry_id: string;
   target_period: string;
