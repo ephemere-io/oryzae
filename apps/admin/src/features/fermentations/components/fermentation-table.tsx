@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ArrowUpDown, RotateCcw } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, PlayCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -168,14 +168,15 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
                 <Button
                   variant="ghost"
                   size="icon-xs"
+                  title="再実行"
                   disabled={retryingId === item.id}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRetry(item.id);
                   }}
                 >
-                  <RotateCcw
-                    className={`h-3 w-3 ${retryingId === item.id ? 'animate-spin' : ''}`}
+                  <PlayCircle
+                    className={`h-3.5 w-3.5 ${retryingId === item.id ? 'animate-pulse' : ''}`}
                   />
                 </Button>
               )}
