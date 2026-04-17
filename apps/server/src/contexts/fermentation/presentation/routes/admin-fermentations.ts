@@ -83,8 +83,18 @@ export const adminFermentations = new Hono<Env>()
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
 
-    const userId = c.req.query('user_id');
+    const userParam = c.req.query('user_id');
     const status = c.req.query('status');
+
+    // Resolve email to user ID if needed
+    let resolvedUserId = userParam;
+    if (userParam && userParam.includes('@')) {
+      const { data: usersLookup } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const matchedUser = (usersLookup?.users ?? []).find(
+        (u) => u.email?.toLowerCase() === userParam.toLowerCase(),
+      );
+      resolvedUserId = matchedUser?.id ?? 'no-match';
+    }
 
     let listQuery = supabase
       .from('fermentation_results')
@@ -92,7 +102,7 @@ export const adminFermentations = new Hono<Env>()
         'id, user_id, question_id, entry_id, target_period, status, generation_id, error_message, created_at, updated_at',
         { count: 'exact' },
       );
-    if (userId) listQuery = listQuery.eq('user_id', userId);
+    if (resolvedUserId) listQuery = listQuery.eq('user_id', resolvedUserId);
     if (status) listQuery = listQuery.eq('status', status);
     if (dateFrom) listQuery = listQuery.gte('created_at', dateFrom);
     if (dateTo) listQuery = listQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
