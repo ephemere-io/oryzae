@@ -19,9 +19,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
   }, [loading, auth, router]);
 
-  if (loading) return null;
-
-  if (!auth) return null;
+  // Not authenticated and not loading → redirect in progress
+  if (!loading && !auth) return null;
 
   return (
     <ThemeProvider>
@@ -38,7 +37,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                 } as React.CSSProperties
               }
             >
-              <div className="relative flex-1 overflow-auto">{children}</div>
+              <div className="relative flex-1 overflow-auto">{loading ? null : children}</div>
               <PageFooter />
             </main>
           </div>
