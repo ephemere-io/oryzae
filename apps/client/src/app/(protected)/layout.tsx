@@ -19,13 +19,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
   }, [loading, auth, router]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-[var(--date-color)]">読み込み中...</p>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!auth) return null;
 
