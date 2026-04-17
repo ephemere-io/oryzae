@@ -98,8 +98,20 @@ export const adminFermentations = new Hono<Env>()
 
     if (error) return c.json({ error: error.message }, 500);
 
+    // Resolve user emails
+    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const emailMap = new Map<string, string>();
+    for (const u of usersData?.users ?? []) {
+      emailMap.set(u.id, u.email ?? '');
+    }
+
+    const items = (data ?? []).map((row) => ({
+      ...row,
+      user_email: emailMap.get(row.user_id) ?? '',
+    }));
+
     return c.json({
-      data: data ?? [],
+      data: items,
       pagination: { page, limit, total: count ?? 0 },
     });
   })
@@ -253,6 +265,11 @@ export const adminFermentations = new Hono<Env>()
       updatedAt: row.updated_at,
     }));
 
+    // Mask content if viewing another user's fermentation
+    const adminUserId = c.get('adminUserId');
+    const isOwner = fermentation.user_id === adminUserId;
+    const MASKED = '[masked]';
+
     return c.json({
       id: fermentation.id,
       userId: fermentation.user_id,
@@ -265,12 +282,27 @@ export const adminFermentations = new Hono<Env>()
       createdAt: fermentation.created_at,
       updatedAt: fermentation.updated_at,
       userEmail,
-      questionText,
+      questionText: isOwner ? questionText : MASKED,
       cost,
-      worksheet,
-      snippets,
-      letter,
-      keywords,
+      masked: !isOwner,
+      worksheet: isOwner
+        ? worksheet
+        : worksheet
+          ? {
+              ...worksheet,
+              worksheetMarkdown: MASKED,
+              resultDiagramMarkdown: MASKED,
+            }
+          : null,
+      snippets: isOwner
+        ? snippets
+        : snippets.map((s) => ({
+            ...s,
+            originalText: MASKED,
+            selectionReason: MASKED,
+          })),
+      letter: isOwner ? letter : letter ? { ...letter, bodyText: MASKED } : null,
+      keywords: isOwner ? keywords : keywords.map((k) => ({ ...k, description: MASKED })),
     });
   })
   .post('/trigger-scheduled', async (c) => {
