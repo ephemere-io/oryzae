@@ -43,5 +43,4 @@ const app = new Hono()
   .route('/api/v1/entries/:entryId/questions', entryQuestions)
   .route('/api/v1/fermentations', fermentations);
 
-export type AppType = typeof app;
 export default app;

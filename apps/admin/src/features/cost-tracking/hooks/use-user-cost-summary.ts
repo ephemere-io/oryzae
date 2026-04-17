@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
-export interface UserCostSummary {
+interface UserCostSummary {
   userId: string;
   email: string;
   fermentationCount: number;
