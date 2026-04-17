@@ -68,8 +68,8 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
             <TableCell className="whitespace-nowrap font-mono text-xs">
               {formatDate(item.created_at)}
             </TableCell>
-            <TableCell className="font-mono text-xs text-muted-foreground">
-              {item.user_id.slice(0, 8)}
+            <TableCell className="text-xs text-muted-foreground">
+              {item.user_email || item.user_id.slice(0, 8)}
             </TableCell>
             <TableCell className="text-sm">{item.target_period}</TableCell>
             <TableCell>
