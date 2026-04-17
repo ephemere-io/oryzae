@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -31,31 +33,106 @@ function statusDotColor(status: string): string {
   return 'bg-muted-foreground/40';
 }
 
+type SortKey =
+  | 'created_at'
+  | 'user_email'
+  | 'status'
+  | 'promptTokens'
+  | 'completionTokens'
+  | 'totalCost'
+  | 'latency';
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-30" />;
+  return dir === 'asc' ? (
+    <ArrowUp className="ml-1 inline h-3 w-3" />
+  ) : (
+    <ArrowDown className="ml-1 inline h-3 w-3" />
+  );
+}
+
 interface CostTableProps {
   items: CostItem[];
   onRowClick?: (id: string) => void;
 }
 
 export function CostTable({ items, onRowClick }: CostTableProps) {
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  }
+
+  const sorted = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const mul = sortDir === 'asc' ? 1 : -1;
+      switch (sortKey) {
+        case 'created_at':
+          return mul * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        case 'user_email':
+          return mul * (a.user_email || '').localeCompare(b.user_email || '');
+        case 'status':
+          return mul * a.status.localeCompare(b.status);
+        case 'promptTokens':
+          return mul * ((a.cost?.promptTokens ?? 0) - (b.cost?.promptTokens ?? 0));
+        case 'completionTokens':
+          return mul * ((a.cost?.completionTokens ?? 0) - (b.cost?.completionTokens ?? 0));
+        case 'totalCost':
+          return mul * ((a.cost?.totalCost ?? 0) - (b.cost?.totalCost ?? 0));
+        case 'latency':
+          return mul * ((a.cost?.latency ?? 0) - (b.cost?.latency ?? 0));
+        default:
+          return 0;
+      }
+    });
+  }, [items, sortKey, sortDir]);
+
   const totalCost = items.reduce((sum, item) => sum + (item.cost?.totalCost ?? 0), 0);
   const totalInput = items.reduce((sum, item) => sum + (item.cost?.promptTokens ?? 0), 0);
   const totalOutput = items.reduce((sum, item) => sum + (item.cost?.completionTokens ?? 0), 0);
+
+  function SortableHead({
+    label,
+    sortKeyName,
+    className,
+  }: {
+    label: string;
+    sortKeyName: SortKey;
+    className?: string;
+  }) {
+    return (
+      <TableHead
+        className={`cursor-pointer select-none ${className ?? ''}`}
+        onClick={() => handleSort(sortKeyName)}
+      >
+        {label}
+        <SortIcon active={sortKey === sortKeyName} dir={sortDir} />
+      </TableHead>
+    );
+  }
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>User</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">Input</TableHead>
-          <TableHead className="text-right">Output</TableHead>
-          <TableHead className="text-right">Cost</TableHead>
-          <TableHead className="text-right">Latency</TableHead>
+          <SortableHead label="Date" sortKeyName="created_at" />
+          <SortableHead label="User" sortKeyName="user_email" />
+          <SortableHead label="Status" sortKeyName="status" />
+          <SortableHead label="Input" sortKeyName="promptTokens" className="text-right" />
+          <SortableHead label="Output" sortKeyName="completionTokens" className="text-right" />
+          <SortableHead label="Cost" sortKeyName="totalCost" className="text-right" />
+          <SortableHead label="Latency" sortKeyName="latency" className="text-right" />
         </TableRow>
       </TableHeader>
       <TableBody>
-        {items.map((item) => (
+        {sorted.map((item) => (
           <TableRow
             key={item.id}
             className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
