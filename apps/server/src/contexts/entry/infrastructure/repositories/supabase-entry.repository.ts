@@ -75,6 +75,29 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
+  async searchByUserId(
+    userId: string,
+    query: string,
+    cursor?: string,
+    limit = 20,
+  ): Promise<Entry[]> {
+    let q = this.supabase
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .ilike('content', `%${query}%`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (cursor) {
+      q = q.lt('created_at', cursor);
+    }
+
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
   async save(entry: Entry): Promise<void> {
     const props = entry.toProps();
     const { error } = await this.supabase.from('entries').upsert({
