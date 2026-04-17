@@ -8,7 +8,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
 
 export function LoginForm() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export function LoginForm() {
     setError('');
     setLoading(true);
 
-    const err = await login(email, password);
+    const err = await login(identifier, password);
     if (err) {
       setError(translateAuthError(err));
       setLoading(false);
@@ -46,12 +46,13 @@ export function LoginForm() {
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>}
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">メールアドレス</span>
+        <span className="text-sm font-medium">ニックネームまたはメールアドレス</span>
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           required
+          placeholder="nickname or email@example.com"
           className="rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900"
         />
       </label>

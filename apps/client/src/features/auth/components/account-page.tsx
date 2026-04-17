@@ -4,13 +4,14 @@ interface AccountPageProps {
   user: {
     id: string;
     email: string;
+    nickname: string | null;
     avatarUrl: string | null;
     name: string | null;
   };
 }
 
 export function AccountPage({ user }: AccountPageProps) {
-  const displayName = user.name ?? user.email.split('@')[0];
+  const displayName = user.nickname ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
 
   return (
