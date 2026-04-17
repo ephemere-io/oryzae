@@ -42,6 +42,15 @@ export const profileUpdateSchema = z.object({
   avatarUrl: z.string().nullable().optional(),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(6),
+});
+
+export const changeEmailSchema = z.object({
+  newEmail: z.string().email(),
+});
+
 // Board schemas
 export const boardQuerySchema = z.object({
   dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

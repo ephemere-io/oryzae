@@ -14,6 +14,7 @@ interface AuthState {
     nickname: string | null;
     avatarUrl: string | null;
     name: string | null;
+    providers: string[];
   };
 }
 
@@ -41,6 +42,7 @@ export function useAuth() {
             nickname: string | null;
             avatarUrl: string | null;
             name: string | null;
+            providers: string[];
           };
         };
         setAuth({ accessToken: token, refreshToken: getRefreshToken() ?? '', user: data.user });
@@ -85,6 +87,7 @@ export function useAuth() {
             nickname: string | null;
             avatarUrl: string | null;
             name: string | null;
+            providers: string[];
           };
         };
         setAuth({
@@ -121,6 +124,7 @@ export function useAuth() {
         nickname: string | null;
         avatarUrl: string | null;
         name: string | null;
+        providers: string[];
       };
       session: { accessToken: string; refreshToken: string };
     };
@@ -152,6 +156,7 @@ export function useAuth() {
         nickname: string | null;
         avatarUrl: string | null;
         name: string | null;
+        providers: string[];
       };
       session: { accessToken: string; refreshToken: string } | null;
     };
