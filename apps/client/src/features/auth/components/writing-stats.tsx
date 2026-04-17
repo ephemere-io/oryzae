@@ -6,12 +6,12 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   return (
     <div className="rounded-lg p-4" style={{ border: '1px solid var(--border-subtle)' }}>
       <p
-        className="text-[10px] font-medium uppercase tracking-[0.1em]"
+        className="text-xs font-medium uppercase tracking-[0.1em]"
         style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
       >
         {label}
       </p>
-      <p className="mt-1 text-2xl font-bold" style={{ color: 'var(--fg)' }}>
+      <p className="mt-1 text-lg font-bold" style={{ color: 'var(--fg)' }}>
         {typeof value === 'number' ? value.toLocaleString() : value}
       </p>
       {sub && (
@@ -35,7 +35,7 @@ export function WritingStats() {
   return (
     <div className="flex flex-col gap-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <StatCard label="連続記録" value={`${stats.streak}日`} />
         <StatCard label="累計エントリ" value={stats.totalEntries} />
         <StatCard label="累計文字数" value={stats.totalChars} />
@@ -47,7 +47,7 @@ export function WritingStats() {
       {/* Monthly trend */}
       <div>
         <p
-          className="mb-3 text-[10px] font-medium uppercase tracking-[0.1em]"
+          className="mb-3 text-xs font-medium uppercase tracking-[0.1em]"
           style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
         >
           月別推移
@@ -83,7 +83,7 @@ export function WritingStats() {
       {stats.entriesByQuestion.length > 0 && (
         <div>
           <p
-            className="mb-3 text-[10px] font-medium uppercase tracking-[0.1em]"
+            className="mb-3 text-xs font-medium uppercase tracking-[0.1em]"
             style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
           >
             問い別エントリ数

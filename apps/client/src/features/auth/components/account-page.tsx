@@ -19,7 +19,7 @@ interface AccountPageProps {
   onLogout: () => void;
 }
 
-const labelClass = 'mb-1 text-[10px] font-medium uppercase tracking-[0.1em]';
+const labelClass = 'mb-1 text-xs font-medium uppercase tracking-[0.1em]';
 const labelStyle = { color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' };
 const inputClass = 'w-full rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1';
 const inputStyle = {
@@ -49,7 +49,7 @@ function SectionNav() {
           key={s.id}
           type="button"
           onClick={() => handleClick(s.id)}
-          className="text-[10px] font-medium uppercase tracking-[0.1em] transition-colors hover:text-[var(--accent)]"
+          className="text-xs font-medium uppercase tracking-[0.1em] transition-colors hover:text-[var(--accent)]"
           style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
         >
           {s.label}
@@ -484,7 +484,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-md px-6 py-12">
+    <div className="mx-auto max-w-2xl px-6 py-12">
       {/* Page title */}
       <h1 className={sectionHeadingClass} style={sectionHeadingStyle}>
         Account
