@@ -50,7 +50,7 @@ function EditableField({
   return (
     <div>
       <p
-        className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em]"
+        className="mb-1 text-xs font-medium uppercase tracking-[0.1em]"
         style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
       >
         {label}
@@ -147,7 +147,7 @@ export function AccountPage({ user }: AccountPageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-md px-6 py-12">
+    <div className="mx-auto max-w-2xl px-6 py-12">
       <h1
         className="mb-8 text-xs font-semibold uppercase tracking-[0.2em]"
         style={{ color: 'var(--accent)', fontFamily: 'Inter, sans-serif' }}
@@ -204,7 +204,7 @@ export function AccountPage({ user }: AccountPageProps) {
         />
         <div>
           <p
-            className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em]"
+            className="mb-1 text-xs font-medium uppercase tracking-[0.1em]"
             style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
           >
             ユーザーID
