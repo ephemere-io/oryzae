@@ -113,7 +113,7 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
   }) {
     return (
       <TableHead
-        className={`cursor-pointer select-none ${className ?? ''}`}
+        className={`cursor-pointer select-none hover:bg-muted/60 transition-colors ${className ?? ''}`}
         onClick={() => handleSort(sortKeyName)}
       >
         {label}
