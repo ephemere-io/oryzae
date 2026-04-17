@@ -81,7 +81,7 @@ export function useAdminAuth() {
     const client = createApiClient();
     const res = await client.fetch('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier: email, password }),
     });
     if (!res.ok) {
       const data = (await res.json()) as { error: string };
