@@ -125,9 +125,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
         )}
       </div>
 
-      {authLoading || (loading && entries.length === 0) ? (
-        <p className="text-center text-sm text-[var(--date-color)]">読み込み中...</p>
-      ) : entries.length === 0 ? (
+      {authLoading || (loading && entries.length === 0) ? null : entries.length === 0 ? (
         <p className="py-12 text-center text-sm text-[var(--date-color)]">
           {isSearching ? '検索結果はありません' : 'エントリーはまだありません'}
         </p>

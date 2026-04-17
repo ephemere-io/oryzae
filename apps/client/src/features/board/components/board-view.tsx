@@ -139,14 +139,7 @@ export function BoardView({ api }: BoardViewProps) {
 
       {/* Canvas */}
       <div className="relative min-h-full" style={{ minWidth: 1200, minHeight: 900 }}>
-        {loading && (
-          <div
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs"
-            style={{ color: 'var(--date-color)' }}
-          >
-            Loading...
-          </div>
-        )}
+        {loading && cards.length === 0 && null}
 
         {cards.map((card) => (
           <BoardCard
