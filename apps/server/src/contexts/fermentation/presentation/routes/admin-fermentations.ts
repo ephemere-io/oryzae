@@ -83,8 +83,18 @@ export const adminFermentations = new Hono<Env>()
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
 
-    const userId = c.req.query('user_id');
+    const userParam = c.req.query('user_id');
     const status = c.req.query('status');
+
+    // Resolve email to user ID if needed
+    let resolvedUserId = userParam;
+    if (userParam && userParam.includes('@')) {
+      const { data: usersLookup } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const matchedUser = (usersLookup?.users ?? []).find(
+        (u) => u.email?.toLowerCase() === userParam.toLowerCase(),
+      );
+      resolvedUserId = matchedUser?.id ?? 'no-match';
+    }
 
     let listQuery = supabase
       .from('fermentation_results')
@@ -92,7 +102,7 @@ export const adminFermentations = new Hono<Env>()
         'id, user_id, question_id, entry_id, target_period, status, generation_id, error_message, created_at, updated_at',
         { count: 'exact' },
       );
-    if (userId) listQuery = listQuery.eq('user_id', userId);
+    if (resolvedUserId) listQuery = listQuery.eq('user_id', resolvedUserId);
     if (status) listQuery = listQuery.eq('status', status);
     if (dateFrom) listQuery = listQuery.gte('created_at', dateFrom);
     if (dateTo) listQuery = listQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
@@ -123,15 +133,27 @@ export const adminFermentations = new Hono<Env>()
   .get('/costs', async (c) => {
     const supabase = c.get('adminSupabase');
     const page = Number(c.req.query('page') ?? '1');
-    const limit = Number(c.req.query('limit') ?? '10');
+    const limit = Number(c.req.query('limit') ?? '30');
     const offset = (page - 1) * limit;
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
+    const userParam = c.req.query('user_id');
+
+    // Resolve email to user ID if needed
+    let resolvedUserId = userParam;
+    if (userParam && userParam.includes('@')) {
+      const { data: usersLookup } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const matchedUser = (usersLookup?.users ?? []).find(
+        (u) => u.email?.toLowerCase() === userParam.toLowerCase(),
+      );
+      resolvedUserId = matchedUser?.id ?? 'no-match';
+    }
 
     let costsQuery = supabase
       .from('fermentation_results')
       .select('id, user_id, status, generation_id, created_at', { count: 'exact' })
       .not('generation_id', 'is', null);
+    if (resolvedUserId) costsQuery = costsQuery.eq('user_id', resolvedUserId);
     if (dateFrom) costsQuery = costsQuery.gte('created_at', dateFrom);
     if (dateTo) costsQuery = costsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
 
@@ -141,13 +163,20 @@ export const adminFermentations = new Hono<Env>()
 
     if (error) return c.json({ error: error.message }, 500);
 
+    // Resolve user emails
+    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const emailMap = new Map<string, string>();
+    for (const u of usersData?.users ?? []) {
+      emailMap.set(u.id, u.email ?? '');
+    }
+
     const items = await Promise.all(
       (data ?? []).map(async (row) => {
         try {
           const info = await gateway.getGenerationInfo({ id: row.generation_id });
-          return { ...row, cost: info };
+          return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost: info };
         } catch {
-          return { ...row, cost: null };
+          return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost: null };
         }
       }),
     );
