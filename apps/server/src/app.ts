@@ -19,6 +19,7 @@ import { adminDashboard } from './contexts/shared/presentation/routes/admin-dash
 import { adminObservability } from './contexts/shared/presentation/routes/admin-observability.js';
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
+import { userStats } from './contexts/user/presentation/routes/user-stats.js';
 
 const app = new Hono()
   .onError(errorHandler)
@@ -35,6 +36,7 @@ const app = new Hono()
   .use('/api/v1/*', authMiddleware)
   .use('/api/v1/fermentations', rateLimitFermentation())
   .use('/api/v1/*', rateLimitGeneral())
+  .route('/api/v1/users/me', userStats)
   .route('/api/v1/board', board)
   .route('/api/v1/entries', entries)
   .route('/api/v1/questions', questions)

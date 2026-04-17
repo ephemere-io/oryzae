@@ -14,5 +14,8 @@ export {
   boardSnippetUpdateSchema,
   createEntrySchema,
   credentialsSchema,
+  loginSchema,
+  profileUpdateSchema,
   questionStringSchema,
+  signupSchema,
 } from './schemas.js';

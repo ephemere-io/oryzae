@@ -17,6 +17,31 @@ export const credentialsSchema = z.object({
   password: z.string().min(6),
 });
 
+export const signupSchema = z.object({
+  nickname: z
+    .string()
+    .min(2, 'ニックネームは2文字以上')
+    .max(30, 'ニックネームは30文字以下')
+    .regex(/^[a-zA-Z0-9_-]+$/, '英数字、ハイフン、アンダースコアのみ使用可能'),
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export const loginSchema = z.object({
+  identifier: z.string().min(1),
+  password: z.string().min(1),
+});
+
+export const profileUpdateSchema = z.object({
+  nickname: z
+    .string()
+    .min(2)
+    .max(30)
+    .regex(/^[a-zA-Z0-9_-]+$/)
+    .optional(),
+  avatarUrl: z.string().nullable().optional(),
+});
+
 // Board schemas
 export const boardQuerySchema = z.object({
   dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
