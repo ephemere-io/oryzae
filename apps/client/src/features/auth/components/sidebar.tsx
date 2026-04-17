@@ -45,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { auth, logout } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const { unreadCount } = useUnread();
 
@@ -190,6 +190,32 @@ export function Sidebar() {
           </svg>
         )}
       </button>
+
+      {/* Account avatar */}
+      <Link
+        href="/account"
+        title="アカウント"
+        className="group mb-2 flex h-12 w-12 items-center justify-center rounded-[20px] transition-all duration-300 hover:bg-[rgba(140,133,126,0.1)]"
+      >
+        {auth?.user.avatarUrl ? (
+          // biome-ignore lint/performance/noImgElement: external avatar URL from OAuth
+          <img
+            src={auth.user.avatarUrl}
+            alt=""
+            className="h-7 w-7 rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-white"
+            style={{ backgroundColor: auth ? 'var(--accent)' : '#ccc' }}
+          >
+            {auth?.user.nickname?.charAt(0).toUpperCase() ??
+              auth?.user.email?.charAt(0).toUpperCase() ??
+              '?'}
+          </span>
+        )}
+      </Link>
 
       {/* Logout */}
       <button
