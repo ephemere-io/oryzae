@@ -1,4 +1,10 @@
-import { loginSchema, profileUpdateSchema, signupSchema } from '@oryzae/shared';
+import {
+  changeEmailSchema,
+  changePasswordSchema,
+  loginSchema,
+  profileUpdateSchema,
+  signupSchema,
+} from '@oryzae/shared';
 import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -18,6 +24,12 @@ function createUserSupabase(authHeader: string) {
   return createClient(url, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
+}
+
+function getProviders(user: { app_metadata?: Record<string, unknown> }): string[] {
+  const providers = user.app_metadata?.providers;
+  // @type-assertion-allowed: Supabase types app_metadata values as unknown
+  return Array.isArray(providers) ? (providers as string[]) : [];
 }
 
 export const authRoutes = new Hono()
@@ -58,7 +70,13 @@ export const authRoutes = new Hono()
     return c.json(
       {
         user: data.user
-          ? { id: data.user.id, email: data.user.email, nickname: body.nickname, avatarUrl: null }
+          ? {
+              id: data.user.id,
+              email: data.user.email,
+              nickname: body.nickname,
+              avatarUrl: null,
+              providers: getProviders(data.user),
+            }
           : null,
         session: data.session
           ? {
@@ -122,6 +140,7 @@ export const authRoutes = new Hono()
         email: data.user.email,
         nickname: profile?.nickname ?? null,
         avatarUrl: profile?.avatar_url ?? null,
+        providers: getProviders(data.user),
       },
       session: {
         accessToken: data.session.access_token,
@@ -203,7 +222,13 @@ export const authRoutes = new Hono()
       });
 
       return c.json({
-        user: { id: data.user.id, email: data.user.email, nickname, avatarUrl },
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          nickname,
+          avatarUrl,
+          providers: getProviders(data.user),
+        },
         session: {
           accessToken: data.session.access_token,
           refreshToken: data.session.refresh_token,
@@ -218,6 +243,7 @@ export const authRoutes = new Hono()
         email: data.user.email,
         nickname: profile.nickname,
         avatarUrl: profile.avatar_url,
+        providers: getProviders(data.user),
       },
       session: {
         accessToken: data.session.access_token,
@@ -284,8 +310,75 @@ export const authRoutes = new Hono()
         email: user.email,
         nickname: profile?.nickname ?? null,
         avatarUrl: profile?.avatar_url ?? null,
+        providers: getProviders(user),
       },
     });
+  })
+  .post('/change-password', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Missing token' }, 401);
+    }
+
+    const supabase = createUserSupabase(authHeader);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user?.email) {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
+
+    const body = changePasswordSchema.parse(await c.req.json());
+
+    // Verify current password
+    const authClient = getSupabaseAuthClient();
+    const { error: signInError } = await authClient.auth.signInWithPassword({
+      email: user.email,
+      password: body.currentPassword,
+    });
+
+    if (signInError) {
+      return c.json({ error: '現在のパスワードが正しくありません' }, 400);
+    }
+
+    // Update password
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: body.newPassword,
+    });
+
+    if (updateError) {
+      return c.json({ error: updateError.message }, 400);
+    }
+
+    return c.json({ message: 'Password updated' });
+  })
+  .post('/change-email', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Missing token' }, 401);
+    }
+
+    const supabase = createUserSupabase(authHeader);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
+
+    const body = changeEmailSchema.parse(await c.req.json());
+
+    const { error } = await supabase.auth.updateUser({ email: body.newEmail });
+
+    if (error) {
+      return c.json({ error: error.message }, 400);
+    }
+
+    return c.json({ message: '確認メールを送信しました' });
   })
   .patch('/profile', async (c) => {
     const authHeader = c.req.header('Authorization');
