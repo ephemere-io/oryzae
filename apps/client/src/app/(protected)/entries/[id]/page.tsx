@@ -28,13 +28,7 @@ export default function EntryDetailPage() {
     [runTransition, router],
   );
 
-  if (entryLoading || authLoading) {
-    return (
-      <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-[var(--date-color)]">読み込み中...</p>
-      </div>
-    );
-  }
+  if (entryLoading || authLoading) return null;
 
   if (!entry) {
     return (
