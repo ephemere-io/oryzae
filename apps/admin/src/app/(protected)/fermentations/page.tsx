@@ -2,23 +2,106 @@
 
 import { RefreshCw, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DateRangeSelector } from '@/components/ui/date-range-selector';
 import { FermentationTable } from '@/features/fermentations/components/fermentation-table';
 import { TriggerScheduledFermentationPanel } from '@/features/fermentations/components/trigger-scheduled-fermentation-panel';
 import { useFermentations } from '@/features/fermentations/hooks/use-fermentations';
+import { useUsers } from '@/features/users/hooks/use-users';
 import { useDateRange } from '@/lib/use-date-range';
 
 const STATUS_OPTIONS = ['all', 'completed', 'failed', 'processing', 'pending'] as const;
 
+function UserSearchCombobox({
+  users,
+  onSelect,
+  onClear,
+  selectedLabel,
+}: {
+  users: { id: string; email: string }[];
+  onSelect: (userId: string, label: string) => void;
+  onClear: () => void;
+  selectedLabel: string;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!query) return [];
+    const q = query.toLowerCase();
+    return users.filter((u) => u.email.toLowerCase().includes(q) || u.id.includes(q)).slice(0, 8);
+  }, [users, query]);
+
+  function handleSelect(user: { id: string; email: string }) {
+    onSelect(user.id, user.email);
+    setQuery('');
+    setOpen(false);
+  }
+
+  if (selectedLabel) {
+    return (
+      <div className="flex h-7 items-center gap-1.5 rounded-md border border-border bg-transparent px-2 text-xs">
+        <Search className="h-3 w-3 text-muted-foreground" />
+        <span className="max-w-48 truncate">{selectedLabel}</span>
+        <button
+          type="button"
+          onClick={onClear}
+          className="ml-1 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => query && setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="ユーザーを検索..."
+        className="h-7 w-56 rounded-md border border-border bg-transparent pl-7 pr-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-border bg-background shadow-lg">
+          {filtered.map((user) => (
+            <button
+              key={user.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleSelect(user)}
+              className="flex w-full flex-col px-3 py-1.5 text-left text-xs hover:bg-muted"
+            >
+              <span className="truncate">{user.email}</span>
+              <span className="truncate font-mono text-[10px] text-muted-foreground">
+                {user.id.slice(0, 12)}...
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FermentationsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
-  const [userFilter, setUserFilter] = useState('');
   const [appliedUser, setAppliedUser] = useState('');
+  const [appliedUserLabel, setAppliedUserLabel] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const { preset, dateFrom, dateTo, selectPreset, setCustomRange } = useDateRange('30d');
+  const { users } = useUsers();
   const { data, pagination, loading, error, refresh, retryFermentation } = useFermentations({
     page,
     dateFrom,
@@ -31,14 +114,15 @@ export default function FermentationsPage() {
   const completed = data.filter((i) => i.status === 'completed').length;
   const failed = data.filter((i) => i.status === 'failed').length;
 
-  function handleUserSearch() {
-    setAppliedUser(userFilter.trim());
+  function handleUserSelect(userId: string, label: string) {
+    setAppliedUser(userId);
+    setAppliedUserLabel(label);
     setPage(1);
   }
 
   function clearUserFilter() {
-    setUserFilter('');
     setAppliedUser('');
+    setAppliedUserLabel('');
     setPage(1);
   }
 
@@ -76,26 +160,12 @@ export default function FermentationsPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <div className="relative flex items-center">
-          <Search className="absolute left-2 h-3 w-3 text-muted-foreground" />
-          <input
-            type="text"
-            value={userFilter}
-            onChange={(e) => setUserFilter(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleUserSearch()}
-            placeholder="User ID or email..."
-            className="h-7 w-56 rounded-md border border-border bg-transparent pl-7 pr-7 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          {appliedUser && (
-            <button
-              type="button"
-              onClick={clearUserFilter}
-              className="absolute right-1.5 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+        <UserSearchCombobox
+          users={users}
+          onSelect={handleUserSelect}
+          onClear={clearUserFilter}
+          selectedLabel={appliedUserLabel}
+        />
         <div className="flex items-center gap-0.5">
           {STATUS_OPTIONS.map((s) => (
             <button
