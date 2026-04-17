@@ -30,35 +30,6 @@ const inputStyle = {
 const sectionHeadingClass = 'mb-6 text-xs font-semibold uppercase tracking-[0.2em]';
 const sectionHeadingStyle = { color: 'var(--accent)', fontFamily: 'Inter, sans-serif' };
 
-const SECTIONS = [
-  { id: 'profile', label: 'プロフィール' },
-  { id: 'security', label: 'セキュリティ' },
-  { id: 'stats', label: '統計' },
-  { id: 'settings', label: '設定' },
-];
-
-function SectionNav() {
-  function handleClick(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-  }
-
-  return (
-    <nav className="mb-10 flex flex-wrap gap-4">
-      {SECTIONS.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          onClick={() => handleClick(s.id)}
-          className="text-xs font-medium uppercase tracking-[0.1em] transition-colors hover:text-[var(--accent)]"
-          style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
-        >
-          {s.label}
-        </button>
-      ))}
-    </nav>
-  );
-}
-
 function EditableField({
   label,
   value,
@@ -491,7 +462,6 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
       </h1>
 
       {/* Section index nav */}
-      <SectionNav />
 
       {/* ── Profile ── */}
       <section id="profile">
