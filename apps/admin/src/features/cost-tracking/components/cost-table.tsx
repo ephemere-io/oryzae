@@ -4,6 +4,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -36,6 +37,10 @@ interface CostTableProps {
 }
 
 export function CostTable({ items, onRowClick }: CostTableProps) {
+  const totalCost = items.reduce((sum, item) => sum + (item.cost?.totalCost ?? 0), 0);
+  const totalInput = items.reduce((sum, item) => sum + (item.cost?.promptTokens ?? 0), 0);
+  const totalOutput = items.reduce((sum, item) => sum + (item.cost?.completionTokens ?? 0), 0);
+
   return (
     <Table>
       <TableHeader>
@@ -59,8 +64,8 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
             <TableCell className="whitespace-nowrap font-mono text-xs">
               {formatDate(item.created_at)}
             </TableCell>
-            <TableCell className="font-mono text-xs text-muted-foreground">
-              {item.user_id.slice(0, 8)}
+            <TableCell className="text-xs text-muted-foreground">
+              {item.user_email || item.user_id.slice(0, 8)}
             </TableCell>
             <TableCell>
               <span className="inline-flex items-center gap-1.5 text-sm">
@@ -92,6 +97,25 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
           </TableRow>
         )}
       </TableBody>
+      {items.length > 0 && (
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={3} className="text-xs font-medium">
+              Page Total ({items.length} requests)
+            </TableCell>
+            <TableCell className="text-right font-mono text-xs font-medium">
+              {totalInput.toLocaleString()}
+            </TableCell>
+            <TableCell className="text-right font-mono text-xs font-medium">
+              {totalOutput.toLocaleString()}
+            </TableCell>
+            <TableCell className="text-right font-mono text-sm font-medium">
+              {formatCost(totalCost)}
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        </TableFooter>
+      )}
     </Table>
   );
 }
