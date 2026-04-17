@@ -26,13 +26,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 export function WritingStats() {
   const { stats, loading } = useUserStats();
 
-  if (loading) {
-    return (
-      <p className="py-8 text-center text-sm" style={{ color: 'var(--date-color)' }}>
-        読み込み中...
-      </p>
-    );
-  }
+  if (loading) return null;
 
   if (!stats) return null;
 

@@ -169,13 +169,7 @@ export function JarView({
     setZoomedId(null);
   }
 
-  if (authLoading) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-[var(--date-color)]">
-        読み込み中...
-      </div>
-    );
-  }
+  if (authLoading) return null;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[var(--bg)]">
