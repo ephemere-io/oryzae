@@ -24,8 +24,10 @@ describe('useAuth', () => {
     const user = {
       id: 'u1',
       email: 'a@b.com',
+      nickname: 'testuser',
       avatarUrl: 'https://example.com/avatar.jpg',
       name: 'Test User',
+      providers: ['email'],
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
@@ -58,7 +60,14 @@ describe('useAuth', () => {
 
   it('signup returns null on success and stores tokens', async () => {
     const session = { accessToken: 'at2', refreshToken: 'rt2' };
-    const user = { id: 'u2', email: 'b@c.com', avatarUrl: null, name: null };
+    const user = {
+      id: 'u2',
+      email: 'b@c.com',
+      nickname: 'newuser',
+      avatarUrl: null,
+      name: null,
+      providers: ['email'],
+    };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
     const { result } = renderHook(() => useAuth());
@@ -93,8 +102,10 @@ describe('useAuth', () => {
     const user = {
       id: 'u1',
       email: 'a@b.com',
+      nickname: 'testuser',
       avatarUrl: 'https://example.com/avatar.jpg',
       name: 'Test User',
+      providers: ['email'],
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
@@ -124,8 +135,10 @@ describe('useAuth', () => {
         user: {
           id: 'u1',
           email: 'a@b.com',
+          nickname: 'testuser',
           avatarUrl: 'https://example.com/avatar.jpg',
           name: 'Test User',
+          providers: ['email'],
         },
       }),
     );
