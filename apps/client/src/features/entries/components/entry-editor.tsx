@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
+import { LeaveConfirmModal } from '@/features/entries/components/leave-confirm-modal';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
 import {
@@ -14,6 +15,7 @@ import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
+import { useBrowserNavGuard } from '@/features/entries/hooks/use-browser-nav-guard';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
@@ -119,6 +121,11 @@ export function EntryEditor({
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const hasUnsavedChanges = content !== savedContent;
+  const {
+    open: leaveConfirmOpen,
+    cancel: cancelLeaveConfirm,
+    confirm: confirmLeaveConfirm,
+  } = useBrowserNavGuard(hasUnsavedChanges);
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
@@ -732,6 +739,13 @@ export function EntryEditor({
         onSave={handleUnsavedSave}
         onDiscard={handleUnsavedDiscard}
         onClose={() => setPendingNavPath(null)}
+      />
+
+      {/* Browser back/forward confirmation */}
+      <LeaveConfirmModal
+        open={leaveConfirmOpen}
+        onCancel={cancelLeaveConfirm}
+        onConfirm={confirmLeaveConfirm}
       />
     </div>
   );
