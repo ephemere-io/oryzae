@@ -70,6 +70,30 @@ function splitTitleBody(raw: string): { title: string; body: string } {
   return { title: raw.substring(0, idx), body: raw.substring(idx + 1) };
 }
 
+/** True when the collapsed caret in `el` is at text offset 0. */
+function isCaretAtStart(el: HTMLElement): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return false;
+  if (!el.contains(range.startContainer)) return false;
+  const pre = range.cloneRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(range.startContainer, range.startOffset);
+  return pre.toString().length === 0;
+}
+
+/** Focus `el` and place the caret at the end of its text content. */
+function focusAtEnd(el: HTMLElement): void {
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
 export function EntryEditor({
   entryId,
   initialContent = '',
@@ -88,12 +112,12 @@ export function EntryEditor({
   // For existing entries, split first line as title
   const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
+  const [savedTitle, setSavedTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
   const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [titleEditModalOpen, setTitleEditModalOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
@@ -115,10 +139,11 @@ export function EntryEditor({
   const router = useRouter();
   const sidebarWidth = SIDEBAR_WIDTH;
   const editorRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const hasUnsavedChanges = content !== savedContent;
+  const hasUnsavedChanges = content !== savedContent || title !== savedTitle;
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
@@ -191,10 +216,14 @@ export function EntryEditor({
     if (entryId) {
       const p = splitTitleBody(initialContentStable);
       setTitle(p.title);
+      setSavedTitle(p.title);
       setContent(p.body);
       setSavedContent(p.body);
       if (editorRef.current && p.body) {
         editorRef.current.textContent = p.body;
+      }
+      if (titleRef.current) {
+        titleRef.current.textContent = p.title;
       }
     } else {
       setContent(initialContentStable);
@@ -218,10 +247,14 @@ export function EntryEditor({
 
       const savedId = await save(finalContent, entryId);
       if (savedId) {
-        setTitle(newTitle.trim());
+        const trimmed = newTitle.trim();
+        setTitle(trimmed);
+        setSavedTitle(trimmed);
+        if (titleRef.current && titleRef.current.textContent !== trimmed) {
+          titleRef.current.textContent = trimmed;
+        }
         setSavedContent(content);
         setSaveModalOpen(false);
-        setTitleEditModalOpen(false);
         setStatus('saved');
         // Update the date display with new updated_at
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
@@ -258,8 +291,8 @@ export function EntryEditor({
 
   const handleSaveClick = useCallback(() => {
     if (!content.trim()) return;
-    // Always show title modal for new entries; for existing, save directly
-    if (!entryId) {
+    // New entries without an inline title still prompt via modal; otherwise save directly
+    if (!entryId && !title.trim()) {
       setSaveModalOpen(true);
     } else {
       handleSaveWithTitle(title);
@@ -505,22 +538,35 @@ export function EntryEditor({
           {/* Eraser trace canvas */}
           <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
 
-          {/* Title display (right side in vertical mode) — only when title is set */}
-          {settings.writingMode === 'vertical' && title && (
-            <button
-              type="button"
-              onClick={() => setTitleEditModalOpen(true)}
-              className="absolute z-[2] cursor-pointer border-none bg-transparent"
+          {/* Title: inline editable in vertical mode. Click or right-arrow from body start to focus. */}
+          {settings.writingMode === 'vertical' && (
+            <div
+              ref={titleRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={() => {
+                const t = titleRef.current?.textContent ?? '';
+                setTitle(t);
+                if (status === 'saved') setStatus('editing');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  editorRef.current?.focus();
+                }
+              }}
+              data-placeholder="タイトル"
+              className="absolute z-[2] cursor-text whitespace-nowrap opacity-35 transition-opacity focus:opacity-80 focus:outline-none empty:before:text-[var(--fg)] empty:before:content-[attr(data-placeholder)]"
               style={{
                 right: '8%',
                 top: '50%',
                 transform: 'translateY(-50%)',
+                minHeight: '3em',
                 writingMode: 'vertical-rl',
                 textOrientation: 'mixed',
                 fontSize: '1.4em',
                 letterSpacing: '0.15em',
                 color: 'var(--fg)',
-                opacity: 0.35,
                 maxHeight: '70%',
                 overflow: 'hidden',
                 fontFamily:
@@ -528,9 +574,7 @@ export function EntryEditor({
                     ? "'Noto Serif JP', serif"
                     : "'Noto Sans JP', sans-serif",
               }}
-            >
-              {title}
-            </button>
+            />
           )}
 
           <div
@@ -541,6 +585,19 @@ export function EntryEditor({
               const text = editorRef.current?.textContent ?? '';
               setContent(text);
               if (status === 'saved') setStatus('editing');
+            }}
+            onKeyDown={(e) => {
+              // In vertical mode: right arrow at body start jumps to the title (which sits to the right)
+              if (
+                e.key === 'ArrowRight' &&
+                settings.writingMode === 'vertical' &&
+                editorRef.current &&
+                titleRef.current &&
+                isCaretAtStart(editorRef.current)
+              ) {
+                e.preventDefault();
+                focusAtEnd(titleRef.current);
+              }
             }}
             onPaste={(e) => {
               e.preventDefault();
@@ -715,15 +772,6 @@ export function EntryEditor({
           setSaveModalOpen(false);
           setPendingNavPath(null);
         }}
-      />
-
-      {/* Title edit modal (existing entry) */}
-      <SaveTitleModal
-        open={titleEditModalOpen}
-        initialTitle={title}
-        saving={saving}
-        onSave={handleSaveWithTitle}
-        onClose={() => setTitleEditModalOpen(false)}
       />
 
       {/* Unsaved changes modal */}
