@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 
 interface PhotoDialogProps {
   open: boolean;
-  onSubmit: (file: File, caption: string) => void;
+  onSubmit: (file: File, caption: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -34,6 +34,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
   const [caption, setCaption] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
@@ -48,19 +49,25 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) return;
+    if (!selectedFile || uploading) return;
 
-    const resized = await resizeImage(selectedFile, 800, 0.7);
-    const resizedFile = new File([resized], selectedFile.name, { type: 'image/jpeg' });
-    onSubmit(resizedFile, caption.trim());
-    if (preview) URL.revokeObjectURL(preview);
-    setCaption('');
-    setPreview(null);
-    setSelectedFile(null);
-    onClose();
+    setUploading(true);
+    try {
+      const resized = await resizeImage(selectedFile, 800, 0.7);
+      const resizedFile = new File([resized], selectedFile.name, { type: 'image/jpeg' });
+      await onSubmit(resizedFile, caption.trim());
+      if (preview) URL.revokeObjectURL(preview);
+      setCaption('');
+      setPreview(null);
+      setSelectedFile(null);
+      onClose();
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleClose = () => {
+    if (uploading) return;
     if (preview) URL.revokeObjectURL(preview);
     setCaption('');
     setPreview(null);
@@ -94,7 +101,8 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="mb-4 flex w-full items-center justify-center rounded-lg border-2 border-dashed"
+          disabled={uploading}
+          className="relative mb-4 flex w-full items-center justify-center rounded-lg border-2 border-dashed"
           style={{
             aspectRatio: '1',
             borderColor: 'var(--border-subtle)',
@@ -113,6 +121,17 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
               クリックして写真を選択
             </span>
           )}
+          {uploading && (
+            <div
+              role="status"
+              aria-label="アップロード中"
+              className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+              style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+            >
+              <span className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              <span className="text-xs text-white">アップロード中…</span>
+            </div>
+          )}
         </button>
         <input
           ref={fileRef}
@@ -127,8 +146,9 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           maxLength={20}
+          disabled={uploading}
           placeholder="キャプション（20文字以内）"
-          className="mb-4 w-full rounded-md border px-3 py-2.5 text-left text-sm outline-none"
+          className="mb-4 w-full rounded-md border px-3 py-2.5 text-left text-sm outline-none disabled:opacity-50"
           style={{
             backgroundColor: 'var(--bg)',
             borderColor: 'var(--border-subtle)',
@@ -139,7 +159,8 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-md border px-4 py-2 text-xs"
+            disabled={uploading}
+            className="rounded-md border px-4 py-2 text-xs disabled:opacity-40"
             style={{
               borderColor: 'var(--border-subtle)',
               color: 'var(--fg)',
@@ -150,11 +171,11 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           </button>
           <button
             type="submit"
-            disabled={!selectedFile}
+            disabled={!selectedFile || uploading}
             className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
-            追加
+            {uploading ? 'アップロード中…' : '追加'}
           </button>
         </div>
       </form>
