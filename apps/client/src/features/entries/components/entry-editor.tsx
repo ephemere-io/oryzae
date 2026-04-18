@@ -5,15 +5,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
-import {
-  DEFAULT_SETTINGS,
-  type EditorSettings,
-  SettingsDrawer,
-} from '@/features/entries/components/settings-drawer';
+import { SettingsDrawer } from '@/features/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
+import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
@@ -90,7 +87,7 @@ export function EntryEditor({
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
-  const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
+  const [settings, updateSettings] = useEditorSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [titleEditModalOpen, setTitleEditModalOpen] = useState(false);
@@ -100,9 +97,6 @@ export function EntryEditor({
   const [fadeLeft, setFadeLeft] = useState(false);
   const [fadeRight, setFadeRight] = useState(false);
 
-  function updateSettings(patch: Partial<EditorSettings>) {
-    setSettings((prev) => ({ ...prev, ...patch }));
-  }
   const [status, setStatus] = useState<'editing' | 'saved' | 'saving'>('editing');
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   const [dateStr, setDateStr] = useState(() => {
@@ -549,7 +543,7 @@ export function EntryEditor({
               document.execCommand('insertText', false, text);
             }}
             data-placeholder="今日は何を感じましたか？"
-            className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'absolute inset-0' : 'min-h-full px-[15%] py-6'}`}
+            className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'absolute inset-0' : 'min-h-full px-[15%] py-6'}`}
             style={{
               ...(settings.writingMode === 'vertical'
                 ? {
@@ -562,6 +556,7 @@ export function EntryEditor({
                   }
                 : {}),
               fontSize: `${settings.fontSize}px`,
+              lineHeight: settings.lineHeight,
               writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
               textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
               fontFamily:
