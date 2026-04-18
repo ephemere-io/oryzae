@@ -18,6 +18,7 @@ import {
 import { adminDashboard } from './contexts/shared/presentation/routes/admin-dashboard.js';
 import { adminObservability } from './contexts/shared/presentation/routes/admin-observability.js';
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
+import { cronCostAlert } from './contexts/shared/presentation/routes/cron-cost-alert.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
 import { userStats } from './contexts/user/presentation/routes/user-stats.js';
 
@@ -25,6 +26,7 @@ const app = new Hono()
   .onError(errorHandler)
   .get('/health', (c) => c.json({ status: 'ok' }))
   .route('/api/v1/cron/fermentation', cronFermentation)
+  .route('/api/v1/cron/cost-alert', cronCostAlert)
   .use('/api/v1/auth/*', rateLimitAuth())
   .route('/api/v1/auth', authRoutes)
   .use('/api/v1/admin/*', adminAuthMiddleware)
