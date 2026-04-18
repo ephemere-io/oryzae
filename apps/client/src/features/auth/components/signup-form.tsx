@@ -14,8 +14,9 @@ export function SignupForm() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const router = useRouter();
-  const { signup } = useAuth();
+  const { signup, auth } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,7 +36,34 @@ export function SignupForm() {
       return;
     }
 
-    router.push('/entries');
+    // If session was returned (email confirmation disabled), go to entries
+    if (auth) {
+      router.push('/entries');
+      return;
+    }
+
+    // Otherwise show email confirmation message
+    setEmailSent(true);
+    setLoading(false);
+  }
+
+  if (emailSent) {
+    return (
+      <div className="flex flex-col gap-4 text-center">
+        <h1 className="text-2xl font-bold">Oryzae</h1>
+        <p className="text-sm text-zinc-500">確認メールを送信しました</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <span className="font-medium">{email}</span>{' '}
+          に確認メールを送信しました。メール内のリンクをクリックして、アカウントを有効化してください。
+        </p>
+        <Link
+          href="/login"
+          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          ログインに戻る
+        </Link>
+      </div>
+    );
   }
 
   return (
