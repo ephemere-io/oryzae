@@ -129,7 +129,7 @@ export function BoardView({ api }: BoardViewProps) {
         }}
       />
 
-      <BoardDateNav dateKey={dateKey} onDateChange={setDateKey} />
+      <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
       <BoardControls
         viewType={viewType}
         onViewTypeChange={setViewType}
