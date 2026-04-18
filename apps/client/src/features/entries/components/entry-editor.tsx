@@ -93,7 +93,8 @@ export function EntryEditor({
   const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [titleEditModalOpen, setTitleEditModalOpen] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
   const [statsOpen, setStatsOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
@@ -117,6 +118,7 @@ export function EntryEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const hasUnsavedChanges = content !== savedContent;
 
@@ -221,7 +223,7 @@ export function EntryEditor({
         setTitle(newTitle.trim());
         setSavedContent(content);
         setSaveModalOpen(false);
-        setTitleEditModalOpen(false);
+        setIsEditingTitle(false);
         setStatus('saved');
         // Update the date display with new updated_at
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
@@ -258,13 +260,47 @@ export function EntryEditor({
 
   const handleSaveClick = useCallback(() => {
     if (!content.trim()) return;
-    // Always show title modal for new entries; for existing, save directly
-    if (!entryId) {
+    // New entries: if title is empty, force input via modal; otherwise save directly
+    if (!entryId && !title.trim()) {
       setSaveModalOpen(true);
     } else {
       handleSaveWithTitle(title);
     }
   }, [content, entryId, handleSaveWithTitle, title]);
+
+  const startTitleEdit = useCallback(() => {
+    setDraftTitle(title);
+    setIsEditingTitle(true);
+  }, [title]);
+
+  const cancelTitleEdit = useCallback(() => {
+    setIsEditingTitle(false);
+    setDraftTitle('');
+  }, []);
+
+  const commitTitleEdit = useCallback(() => {
+    const trimmed = draftTitle.trim();
+    if (entryId) {
+      if (trimmed !== title) {
+        handleSaveWithTitle(trimmed);
+      } else {
+        setIsEditingTitle(false);
+      }
+    } else {
+      setTitle(trimmed);
+      setIsEditingTitle(false);
+    }
+  }, [draftTitle, entryId, handleSaveWithTitle, title]);
+
+  useEffect(() => {
+    if (isEditingTitle) {
+      const t = setTimeout(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [isEditingTitle]);
 
   /** Navigate with unsaved-changes guard */
   const guardedNavigate = useCallback(
@@ -380,8 +416,40 @@ export function EntryEditor({
           </button>
         </div>
 
-        {/* Date display — always show date in toolbar */}
-        <span className="text-xs text-zinc-400">{dateStr}</span>
+        {/* Date + title display (title sits directly under the date) */}
+        <div className="flex min-w-0 flex-col items-center gap-0.5">
+          <span className="text-xs text-zinc-400">{dateStr}</span>
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitTitleEdit();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelTitleEdit();
+                }
+              }}
+              onBlur={commitTitleEdit}
+              maxLength={100}
+              placeholder="タイトルを入力..."
+              className="w-[240px] max-w-full border-none bg-transparent text-center text-sm text-[var(--fg)] outline-none"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={startTitleEdit}
+              className="max-w-full cursor-pointer truncate border-none bg-transparent text-sm transition-colors hover:text-[var(--fg)]"
+              style={{ color: title ? 'var(--fg)' : 'var(--date-color)' }}
+            >
+              {title || 'タイトルを追加'}
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           {/* Writing direction toggle */}
@@ -504,34 +572,6 @@ export function EntryEditor({
 
           {/* Eraser trace canvas */}
           <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
-
-          {/* Title display (right side in vertical mode) — only when title is set */}
-          {settings.writingMode === 'vertical' && title && (
-            <button
-              type="button"
-              onClick={() => setTitleEditModalOpen(true)}
-              className="absolute z-[2] cursor-pointer border-none bg-transparent"
-              style={{
-                right: '8%',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                writingMode: 'vertical-rl',
-                textOrientation: 'mixed',
-                fontSize: '1.4em',
-                letterSpacing: '0.15em',
-                color: 'var(--fg)',
-                opacity: 0.35,
-                maxHeight: '70%',
-                overflow: 'hidden',
-                fontFamily:
-                  settings.fontFamily === 'serif'
-                    ? "'Noto Serif JP', serif"
-                    : "'Noto Sans JP', sans-serif",
-              }}
-            >
-              {title}
-            </button>
-          )}
 
           <div
             ref={editorRef}
@@ -715,15 +755,6 @@ export function EntryEditor({
           setSaveModalOpen(false);
           setPendingNavPath(null);
         }}
-      />
-
-      {/* Title edit modal (existing entry) */}
-      <SaveTitleModal
-        open={titleEditModalOpen}
-        initialTitle={title}
-        saving={saving}
-        onSave={handleSaveWithTitle}
-        onClose={() => setTitleEditModalOpen(false)}
       />
 
       {/* Unsaved changes modal */}
