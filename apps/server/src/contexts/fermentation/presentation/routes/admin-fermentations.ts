@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
+import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
@@ -369,6 +370,27 @@ export const adminFermentations = new Hono<Env>()
     );
 
     const result = await usecase.execute(dateKey);
+
+    // Notify Discord if there were failures
+    if (result.failed > 0) {
+      notifyDiscord({
+        title: 'スケジュール発酵 — 失敗あり',
+        color: COLORS.WARNING,
+        fields: [
+          { name: '対象日', value: dateKey, inline: true },
+          { name: '成功', value: String(result.succeeded), inline: true },
+          { name: '失敗', value: String(result.failed), inline: true },
+          {
+            name: 'エラー詳細',
+            value:
+              result.errors
+                .slice(0, 3)
+                .map((e) => `${e.userId.slice(0, 8)}: ${e.error.slice(0, 80)}`)
+                .join('\n') || '-',
+          },
+        ],
+      });
+    }
 
     return c.json({ dateKey, ...result });
   })

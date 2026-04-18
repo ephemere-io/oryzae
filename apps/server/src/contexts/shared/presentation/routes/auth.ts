@@ -8,6 +8,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 
 function getSupabaseAuthClient() {
@@ -64,6 +65,16 @@ export const authRoutes = new Hono()
       await serviceSupabase.from('profiles').insert({
         id: data.user.id,
         nickname: body.nickname,
+      });
+
+      // Notify Discord (fire-and-forget)
+      notifyDiscord({
+        title: '新規ユーザー登録',
+        color: COLORS.SUCCESS,
+        fields: [
+          { name: 'ニックネーム', value: body.nickname, inline: true },
+          { name: 'メール', value: body.email, inline: true },
+        ],
       });
     }
 
