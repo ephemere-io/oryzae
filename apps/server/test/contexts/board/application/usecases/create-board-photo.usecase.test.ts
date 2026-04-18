@@ -58,6 +58,14 @@ describe('CreateBoardPhotoUsecase', () => {
     expect(result.caption).toBe('朝の風景');
   });
 
+  it('デフォルトで縦長（キャプション領域を含む）のカードを作成する', async () => {
+    const result = await usecase.execute('user-1', validInput);
+
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(250);
+    expect(result.height).toBeGreaterThan(result.width);
+  });
+
   it('21文字超の caption で BoardPhotoValidationError を投げる', async () => {
     await expect(
       usecase.execute('user-1', { ...validInput, caption: 'a'.repeat(21) }),
