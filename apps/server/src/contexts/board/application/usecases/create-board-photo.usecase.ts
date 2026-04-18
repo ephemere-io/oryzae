@@ -28,7 +28,7 @@ interface CreateBoardPhotoResponse {
 }
 
 const DEFAULT_WIDTH = 200;
-const DEFAULT_HEIGHT = 200;
+const DEFAULT_HEIGHT = 250;
 
 export class CreateBoardPhotoUsecase {
   constructor(
