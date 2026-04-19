@@ -18,12 +18,15 @@ import {
 import { adminDashboard } from './contexts/shared/presentation/routes/admin-dashboard.js';
 import { adminObservability } from './contexts/shared/presentation/routes/admin-observability.js';
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
+import { cronCostAlert } from './contexts/shared/presentation/routes/cron-cost-alert.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
+import { userStats } from './contexts/user/presentation/routes/user-stats.js';
 
 const app = new Hono()
   .onError(errorHandler)
   .get('/health', (c) => c.json({ status: 'ok' }))
   .route('/api/v1/cron/fermentation', cronFermentation)
+  .route('/api/v1/cron/cost-alert', cronCostAlert)
   .use('/api/v1/auth/*', rateLimitAuth())
   .route('/api/v1/auth', authRoutes)
   .use('/api/v1/admin/*', adminAuthMiddleware)
@@ -35,11 +38,11 @@ const app = new Hono()
   .use('/api/v1/*', authMiddleware)
   .use('/api/v1/fermentations', rateLimitFermentation())
   .use('/api/v1/*', rateLimitGeneral())
+  .route('/api/v1/users/me', userStats)
   .route('/api/v1/board', board)
   .route('/api/v1/entries', entries)
   .route('/api/v1/questions', questions)
   .route('/api/v1/entries/:entryId/questions', entryQuestions)
   .route('/api/v1/fermentations', fermentations);
 
-export type AppType = typeof app;
 export default app;

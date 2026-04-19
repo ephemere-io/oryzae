@@ -9,6 +9,7 @@ export interface EntryProps {
   userId: string;
   content: string;
   mediaUrls: string[];
+  fermentationEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -17,6 +18,7 @@ interface CreateEntryParams {
   userId: string;
   content: string;
   mediaUrls: string[];
+  fermentationEnabled: boolean;
 }
 
 const MAX_CONTENT_LENGTH = 100_000;
@@ -26,6 +28,7 @@ export class Entry {
   readonly userId: string;
   readonly content: string;
   readonly mediaUrls: string[];
+  readonly fermentationEnabled: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
 
@@ -34,6 +37,7 @@ export class Entry {
     this.userId = props.userId;
     this.content = props.content;
     this.mediaUrls = props.mediaUrls;
+    this.fermentationEnabled = props.fermentationEnabled;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -49,6 +53,7 @@ export class Entry {
         userId: params.userId,
         content: params.content,
         mediaUrls: params.mediaUrls,
+        fermentationEnabled: params.fermentationEnabled,
         createdAt: now,
         updatedAt: now,
       }),
@@ -73,12 +78,21 @@ export class Entry {
     );
   }
 
+  withFermentationEnabled(fermentationEnabled: boolean): Entry {
+    return new Entry({
+      ...this.toProps(),
+      fermentationEnabled,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   toProps(): EntryProps {
     return {
       id: this.id,
       userId: this.userId,
       content: this.content,
       mediaUrls: this.mediaUrls,
+      fermentationEnabled: this.fermentationEnabled,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

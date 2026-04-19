@@ -58,6 +58,50 @@ describe('CreateBoardPhotoUsecase', () => {
     expect(result.caption).toBe('朝の風景');
   });
 
+  it('画像寸法未指定時はデフォルトの縦長カードを作成する', async () => {
+    const result = await usecase.execute('user-1', validInput);
+
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(250);
+  });
+
+  it('横長画像のアスペクト比を保持したカード寸法になる', async () => {
+    const result = await usecase.execute('user-1', {
+      ...validInput,
+      imageWidth: 1600,
+      imageHeight: 800,
+    });
+
+    // 176 / 2 + 68 = 156, min 120 を満たす
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(156);
+  });
+
+  it('縦長画像のアスペクト比を保持し、高さ上限で幅を縮小する', async () => {
+    const result = await usecase.execute('user-1', {
+      ...validInput,
+      imageWidth: 400,
+      imageHeight: 1600,
+    });
+
+    // aspectRatio 0.25 → imgH = 176/0.25 = 704 → cap 360, imgH = 292, imgW = 73, cardW = 97
+    // MIN 120 でクランプ
+    expect(result.height).toBe(360);
+    expect(result.width).toBe(120);
+  });
+
+  it('正方形画像では幅 200 を保ち高さがアスペクト比に合う', async () => {
+    const result = await usecase.execute('user-1', {
+      ...validInput,
+      imageWidth: 1000,
+      imageHeight: 1000,
+    });
+
+    // 176 + 68 = 244
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(244);
+  });
+
   it('21文字超の caption で BoardPhotoValidationError を投げる', async () => {
     await expect(
       usecase.execute('user-1', { ...validInput, caption: 'a'.repeat(21) }),
