@@ -8,16 +8,13 @@ import {
 } from '@/features/entries/components/editor-status-bar';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
-import {
-  DEFAULT_SETTINGS,
-  type EditorSettings,
-  SettingsDrawer,
-} from '@/features/entries/components/settings-drawer';
+import { SettingsDrawer } from '@/features/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useAutosaveEntry } from '@/features/entries/hooks/use-autosave-entry';
+import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
@@ -94,7 +91,7 @@ export function EntryEditor({
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
-  const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
+  const [settings, updateSettings] = useEditorSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');
@@ -105,10 +102,6 @@ export function EntryEditor({
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [fadeRight, setFadeRight] = useState(false);
-
-  function updateSettings(patch: Partial<EditorSettings>) {
-    setSettings((prev) => ({ ...prev, ...patch }));
-  }
   const [status, setStatus] = useState<EditorStatus>('editing');
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
