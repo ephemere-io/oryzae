@@ -117,49 +117,58 @@ export const adminDashboard = new Hono<Env>()
   })
   .get('/trends', async (c) => {
     const supabase = c.get('adminSupabase');
+    const dateFromParam = c.req.query('date_from');
+    const dateToParam = c.req.query('date_to');
 
-    const days: {
-      date: string;
-      totalFermentations: number;
-      completedFermentations: number;
-      activeWriters: number;
-    }[] = [];
+    // Determine date range
+    const endDate = dateToParam ? new Date(dateToParam) : new Date();
+    const startDate = dateFromParam
+      ? new Date(dateFromParam)
+      : new Date(endDate.getTime() - 6 * 24 * 60 * 60 * 1000);
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
-      const dayStart = `${dateStr}T00:00:00.000Z`;
-      const dayEnd = `${dateStr}T23:59:59.999Z`;
-
-      const [totalRes, completedRes, writersRes] = await Promise.all([
-        supabase
-          .from('fermentation_results')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', dayStart)
-          .lte('created_at', dayEnd),
-        supabase
-          .from('fermentation_results')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'completed')
-          .gte('created_at', dayStart)
-          .lte('created_at', dayEnd),
-        supabase
-          .from('entries')
-          .select('user_id')
-          .gte('created_at', dayStart)
-          .lte('created_at', dayEnd),
-      ]);
-
-      const uniqueWriters = new Set((writersRes.data ?? []).map((r) => r.user_id));
-
-      days.push({
-        date: dateStr,
-        totalFermentations: totalRes.count ?? 0,
-        completedFermentations: completedRes.count ?? 0,
-        activeWriters: uniqueWriters.size,
-      });
+    // Build list of dates
+    const dates: string[] = [];
+    const cursor = new Date(startDate);
+    while (cursor <= endDate) {
+      dates.push(cursor.toISOString().slice(0, 10));
+      cursor.setDate(cursor.getDate() + 1);
     }
+
+    // Fetch all data in the range at once (much faster than per-day queries)
+    const rangeStart = `${dates[0]}T00:00:00.000Z`;
+    const rangeEnd = `${dates[dates.length - 1]}T23:59:59.999Z`;
+
+    const [fermRes, entriesRes] = await Promise.all([
+      supabase
+        .from('fermentation_results')
+        .select('status, created_at')
+        .gte('created_at', rangeStart)
+        .lte('created_at', rangeEnd),
+      supabase
+        .from('entries')
+        .select('user_id, created_at')
+        .gte('created_at', rangeStart)
+        .lte('created_at', rangeEnd),
+    ]);
+
+    const fermentations = fermRes.data ?? [];
+    const entries = entriesRes.data ?? [];
+
+    // Group by date
+    const days = dates.map((dateStr) => {
+      const dayFerms = fermentations.filter((f) => f.created_at.slice(0, 10) === dateStr);
+      const dayEntries = entries.filter((e) => e.created_at.slice(0, 10) === dateStr);
+      const total = dayFerms.length;
+      const completed = dayFerms.filter((f) => f.status === 'completed').length;
+      const uniqueWriters = new Set(dayEntries.map((e) => e.user_id));
+
+      return {
+        date: dateStr,
+        totalFermentations: total,
+        completedFermentations: completed,
+        activeWriters: uniqueWriters.size,
+      };
+    });
 
     return c.json({ days });
   })

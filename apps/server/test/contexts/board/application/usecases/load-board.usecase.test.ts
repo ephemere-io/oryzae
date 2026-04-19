@@ -39,6 +39,7 @@ beforeEach(() => {
     findByIds: vi.fn().mockResolvedValue([]),
     listByUserId: vi.fn().mockResolvedValue([]),
     listByUserIdAndDate: vi.fn().mockResolvedValue([]),
+    listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
     listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -87,6 +88,7 @@ describe('LoadBoardUsecase', () => {
       userId: 'user-1',
       content: 'タイトル\n本文テキスト',
       mediaUrls: [],
+      fermentationEnabled: false,
       createdAt: '2026-04-11T10:00:00Z',
       updatedAt: '2026-04-11T10:00:00Z',
     });
@@ -115,6 +117,7 @@ describe('LoadBoardUsecase', () => {
       userId: 'user-1',
       content: '新しいエントリ',
       mediaUrls: [],
+      fermentationEnabled: false,
       createdAt: '2026-04-11T10:00:00Z',
       updatedAt: '2026-04-11T10:00:00Z',
     });
@@ -137,6 +140,7 @@ describe('LoadBoardUsecase', () => {
       userId: 'user-1',
       content: '既存',
       mediaUrls: [],
+      fermentationEnabled: false,
       createdAt: '2026-04-11T10:00:00Z',
       updatedAt: '2026-04-11T10:00:00Z',
     });
@@ -189,6 +193,7 @@ describe('LoadBoardUsecase', () => {
       userId: 'user-1',
       content: '週間エントリ',
       mediaUrls: [],
+      fermentationEnabled: false,
       createdAt: '2026-04-08T10:00:00Z',
       updatedAt: '2026-04-08T10:00:00Z',
     });
@@ -273,6 +278,7 @@ describe('LoadBoardUsecase', () => {
       userId: 'user-1',
       content: 'テスト',
       mediaUrls: [],
+      fermentationEnabled: false,
       createdAt: '2026-04-09T10:00:00Z',
       updatedAt: '2026-04-09T10:00:00Z',
     });
@@ -320,6 +326,7 @@ describe('LoadBoardUsecase', () => {
       userId: 'user-1',
       content: '削除したエントリ',
       mediaUrls: [],
+      fermentationEnabled: false,
       createdAt: '2026-04-09T10:00:00Z',
       updatedAt: '2026-04-09T10:00:00Z',
     });
