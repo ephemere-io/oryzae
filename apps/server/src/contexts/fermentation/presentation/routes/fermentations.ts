@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
@@ -30,15 +31,32 @@ export const fermentations = new Hono<Env>()
     const llmGateway = new VercelAiAnalysisGateway();
     const usecase = new RunFermentationUsecase(repo, llmGateway, generateId);
 
-    const result = await usecase.execute({
-      userId: c.get('userId'),
-      questionId: body.questionId,
-      questionText: body.questionText,
-      entryId: body.entryId,
-      entryContent: body.entryContent,
-    });
+    try {
+      const result = await usecase.execute({
+        userId: c.get('userId'),
+        questionId: body.questionId,
+        questionText: body.questionText,
+        entryId: body.entryId,
+        entryContent: body.entryContent,
+      });
 
-    return c.json(result, 201);
+      return c.json(result, 201);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Notify Discord about fermentation failure (fire-and-forget)
+      notifyDiscord({
+        title: '発酵プロセス失敗',
+        color: COLORS.ERROR,
+        fields: [
+          { name: 'User', value: c.get('userId').slice(0, 8), inline: true },
+          { name: 'Question', value: body.questionId.slice(0, 8), inline: true },
+          { name: 'Error', value: errorMessage.slice(0, 200) },
+        ],
+      });
+
+      throw error;
+    }
   })
   .get('/', async (c) => {
     const questionId = c.req.query('questionId');
