@@ -24,10 +24,13 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [saving, setSaving] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  // IME 変換中は selectionchange を無視する（候補テキストが選択範囲扱いになり誤発火するため）
+  const composingRef = useRef(false);
 
   const tooLong = selectedText.length > MAX_SNIPPET_LENGTH;
 
   const handleSelection = useCallback(() => {
+    if (composingRef.current) return;
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -61,13 +64,25 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
   useEffect(() => {
     document.addEventListener('selectionchange', handleSelection);
     const editor = editorRef.current;
+    function handleCompositionStart() {
+      composingRef.current = true;
+      setVisible(false);
+      setSelectedText('');
+    }
+    function handleCompositionEnd() {
+      composingRef.current = false;
+    }
     if (editor) {
       editor.addEventListener('mouseup', handleSelection);
+      editor.addEventListener('compositionstart', handleCompositionStart);
+      editor.addEventListener('compositionend', handleCompositionEnd);
     }
     return () => {
       document.removeEventListener('selectionchange', handleSelection);
       if (editor) {
         editor.removeEventListener('mouseup', handleSelection);
+        editor.removeEventListener('compositionstart', handleCompositionStart);
+        editor.removeEventListener('compositionend', handleCompositionEnd);
       }
     };
   }, [handleSelection, editorRef]);
