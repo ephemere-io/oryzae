@@ -22,7 +22,7 @@ export default function DashboardPage() {
     loading: statsLoading,
     error: statsError,
     refresh: refreshStats,
-  } = useDashboardStats();
+  } = useDashboardStats({ dateFrom, dateTo });
   const {
     groups,
     loading: failuresLoading,
@@ -94,22 +94,20 @@ export default function DashboardPage() {
       {/* Row 2: Failure alerts (full width) */}
       <FailureAlerts groups={groups} retryFermentation={retryFermentation} />
 
-      {/* Row 3: Health sparklines (2 cards) + cost summary (1 card) — 3 columns */}
+      {/* Row 3: Charts — 3 columns */}
       <div className="grid gap-4 lg:grid-cols-3">
         <HealthSparklines days={days} />
-        <CostSummaryCard summary={summary} />
       </div>
 
-      {/* Row 4: User activity (1/4) + stats grid (3/4) */}
-      <div className="grid gap-4 lg:grid-cols-4">
+      {/* Row 4: Summary cards */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        {stats ? (
+          <StatsCards stats={stats} />
+        ) : statsLoading ? (
+          <p className="text-xs text-muted-foreground">Loading...</p>
+        ) : null}
+        <CostSummaryCard summary={summary} />
         <UserActivityCard activeWriters={activeWriters} totalUsers={totalUsers} />
-        <div className="lg:col-span-3">
-          {stats ? (
-            <StatsCards stats={stats} />
-          ) : statsLoading ? (
-            <p className="text-xs text-muted-foreground">Loading...</p>
-          ) : null}
-        </div>
       </div>
     </div>
   );

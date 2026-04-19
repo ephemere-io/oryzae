@@ -2,7 +2,7 @@ import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@oryzae/server'],
+  transpilePackages: ['@oryzae/shared', '@oryzae/server'],
   turbopack: {},
 };
 

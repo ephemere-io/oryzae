@@ -13,6 +13,7 @@ describe('DeleteEntryUsecase', () => {
     userId: 'user-1',
     content: 'Hello',
     mediaUrls: [],
+    fermentationEnabled: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
@@ -20,7 +21,11 @@ describe('DeleteEntryUsecase', () => {
   beforeEach(() => {
     entryRepo = {
       findById: vi.fn().mockResolvedValue(null),
+      findByIds: vi.fn().mockResolvedValue([]),
       listByUserId: vi.fn().mockResolvedValue([]),
+      listByUserIdAndDate: vi.fn().mockResolvedValue([]),
+      listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
+      listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     };
