@@ -9,6 +9,7 @@ export interface EditorSettings {
   writingMode: WritingMode;
   fontFamily: FontFamily;
   fontSize: number;
+  lineHeight: number;
   timeInscriptionEnabled: boolean;
   timeInscriptionMode: TimeInscriptionMode;
   eraserTraceEnabled: boolean;
@@ -27,6 +28,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   writingMode: 'vertical',
   fontFamily: 'serif',
   fontSize: 32,
+  lineHeight: 1.625,
   timeInscriptionEnabled: false,
   timeInscriptionMode: 'fontSize',
   eraserTraceEnabled: false,
@@ -173,6 +175,16 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
               max={48}
               display={`${settings.fontSize}px`}
               onChange={(v) => onChange({ fontSize: v })}
+            />
+            <Slider
+              id="line-height"
+              label="行間サイズ"
+              value={settings.lineHeight}
+              min={1.0}
+              max={2.5}
+              step={0.05}
+              display={settings.lineHeight.toFixed(2)}
+              onChange={(v) => onChange({ lineHeight: v })}
             />
           </div>
 
