@@ -106,4 +106,76 @@ describe('useEntries', () => {
     expect(result.current.hasMore).toBe(false);
     expect(apiFetch.mock.calls[1][0]).toContain('cursor=e19');
   });
+
+  it('sends q param when search is provided', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        {
+          id: '1',
+          userId: 'u1',
+          content: '天気が良い',
+          mediaUrls: [],
+          createdAt: '',
+          updatedAt: '',
+        },
+      ]),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntries(api, false, '天気'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(apiFetch.mock.calls[0][0]).toContain('q=%E5%A4%A9%E6%B0%97');
+    expect(result.current.entries).toHaveLength(1);
+  });
+
+  it('resets entries when search changes', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '1', userId: 'u1', content: 'first', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result, rerender } = renderHook(({ search }) => useEntries(api, false, search), {
+      initialProps: { search: 'first' },
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries).toHaveLength(1);
+
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '2', userId: 'u1', content: 'second', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+
+    rerender({ search: 'second' });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries).toHaveLength(1);
+    expect(result.current.entries[0].id).toBe('2');
+  });
+
+  it('does not send q param when search is empty', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, []));
+    const api = createMockApi(apiFetch);
+
+    renderHook(() => useEntries(api, false, ''));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    expect(apiFetch.mock.calls[0][0]).not.toContain('q=');
+  });
 });

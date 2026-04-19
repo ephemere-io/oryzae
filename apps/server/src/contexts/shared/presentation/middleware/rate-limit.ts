@@ -57,6 +57,12 @@ function getIdentifier(c: Context, useIp: boolean): string {
 
 function createRateLimitMiddleware(tier: RateLimitTier, useIp: boolean): MiddlewareHandler {
   return async (c: Context, next: Next) => {
+    // Skip rate limiting in local development to avoid DX friction.
+    if (process.env.NODE_ENV !== 'production') {
+      await next();
+      return;
+    }
+
     const limiter = getLimiter(tier);
     if (!limiter) {
       await next();
