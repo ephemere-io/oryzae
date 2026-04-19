@@ -10,6 +10,10 @@ const FONT_SIZE_STORAGE_KEY = 'oryzae-editor-font-size';
 const FONT_SIZE_MIN = 14;
 const FONT_SIZE_MAX = 48;
 
+const LINE_HEIGHT_STORAGE_KEY = 'oryzae-editor-line-height';
+const LINE_HEIGHT_MIN = 1.0;
+const LINE_HEIGHT_MAX = 2.5;
+
 function readStoredFontSize(): number | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -33,10 +37,36 @@ function writeStoredFontSize(value: number): void {
   }
 }
 
+function readStoredLineHeight(): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LINE_HEIGHT_STORAGE_KEY);
+    if (raw === null) return null;
+    const n = Number.parseFloat(raw);
+    if (!Number.isFinite(n)) return null;
+    if (n < LINE_HEIGHT_MIN || n > LINE_HEIGHT_MAX) return null;
+    return n;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLineHeight(value: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LINE_HEIGHT_STORAGE_KEY, String(value));
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
+
 function getInitialSettings(): EditorSettings {
-  const stored = readStoredFontSize();
-  if (stored === null) return DEFAULT_SETTINGS;
-  return { ...DEFAULT_SETTINGS, fontSize: stored };
+  const next: EditorSettings = { ...DEFAULT_SETTINGS };
+  const fontSize = readStoredFontSize();
+  if (fontSize !== null) next.fontSize = fontSize;
+  const lineHeight = readStoredLineHeight();
+  if (lineHeight !== null) next.lineHeight = lineHeight;
+  return next;
 }
 
 export function useEditorSettings(): [EditorSettings, (patch: Partial<EditorSettings>) => void] {
@@ -45,6 +75,9 @@ export function useEditorSettings(): [EditorSettings, (patch: Partial<EditorSett
   const updateSettings = useCallback((patch: Partial<EditorSettings>) => {
     if (typeof patch.fontSize === 'number') {
       writeStoredFontSize(patch.fontSize);
+    }
+    if (typeof patch.lineHeight === 'number') {
+      writeStoredLineHeight(patch.lineHeight);
     }
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
