@@ -7,6 +7,7 @@ export interface EntryRepositoryGateway {
   listByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]>;
   listFermentationEnabledByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]>;
   listByUserIdAndWeek(userId: string, dateKey: string): Promise<Entry[]>;
+  searchByUserId(userId: string, query: string, cursor?: string, limit?: number): Promise<Entry[]>;
   save(entry: Entry): Promise<void>;
   delete(id: string): Promise<void>;
 }
