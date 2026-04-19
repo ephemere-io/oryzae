@@ -1,14 +1,37 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 interface EntryCardProps {
   id: string;
   content: string;
   createdAt: string;
+  searchQuery?: string;
 }
 
-export function EntryCard({ id, content, createdAt }: EntryCardProps) {
+function highlightText(text: string, query: string): ReactNode {
+  if (!query) return text;
+
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  const parts = text.split(regex);
+
+  if (parts.length === 1) return text;
+
+  return parts.map((part, i) => {
+    const key = `${part}-${i}`;
+    return regex.test(part) ? (
+      <mark key={key} className="bg-[rgba(200,180,100,0.3)] text-[var(--fg)]">
+        {part}
+      </mark>
+    ) : (
+      <span key={key}>{part}</span>
+    );
+  });
+}
+
+export function EntryCard({ id, content, createdAt, searchQuery }: EntryCardProps) {
   const lines = content.split('\n').filter((l) => l.trim().length > 0);
   const title = lines[0]?.substring(0, 100) ?? '';
   const preview =
@@ -37,7 +60,7 @@ export function EntryCard({ id, content, createdAt }: EntryCardProps) {
         className="mb-1.5 text-[15px] font-medium text-[var(--fg)]"
         style={{ fontFamily: "'Noto Serif JP', serif" }}
       >
-        {title}
+        {searchQuery ? highlightText(title, searchQuery) : title}
       </h3>
 
       {/* Preview */}
@@ -51,7 +74,7 @@ export function EntryCard({ id, content, createdAt }: EntryCardProps) {
             overflow: 'hidden',
           }}
         >
-          {preview}
+          {searchQuery ? highlightText(preview, searchQuery) : preview}
         </p>
       )}
 

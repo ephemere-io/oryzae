@@ -48,6 +48,22 @@ describe('useFermentations', () => {
     expect(result.current.data[0].status).toBe('completed');
   });
 
+  it('passes userId and status filters to API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, { data: [], pagination: { page: 1, limit: 30, total: 0 } }),
+    );
+
+    renderHook(() => useFermentations({ userId: 'u123', status: 'failed' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    const calledUrl = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain('user_id=u123');
+    expect(calledUrl).toContain('status=failed');
+  });
+
   it('sets error on fetch failure', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(false, {}));
 
