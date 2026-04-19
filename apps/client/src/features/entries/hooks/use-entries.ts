@@ -66,5 +66,9 @@ export function useEntries(api: ApiClient | null, authLoading: boolean, search?:
     fetchEntries(cursor);
   }, [fetchEntries, cursor]);
 
-  return { entries, loading, hasMore, loadMore };
+  const removeEntry = useCallback((id: string) => {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+  }, []);
+
+  return { entries, loading, hasMore, loadMore, removeEntry };
 }
