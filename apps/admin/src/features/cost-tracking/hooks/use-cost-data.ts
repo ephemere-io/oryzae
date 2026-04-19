@@ -7,6 +7,7 @@ import { getAccessToken } from '@/lib/auth';
 export interface CostItem {
   id: string;
   user_id: string;
+  user_email: string;
   status: string;
   generation_id: string | null;
   created_at: string;
@@ -28,15 +29,17 @@ interface UseCostDataParams {
   limit?: number;
   dateFrom?: string;
   dateTo?: string;
+  userId?: string;
 }
 
 export function useCostData(params?: UseCostDataParams) {
   const page = params?.page ?? 1;
-  const limit = params?.limit ?? 20;
+  const limit = params?.limit ?? 30;
   const dateFrom = params?.dateFrom;
   const dateTo = params?.dateTo;
+  const userId = params?.userId;
   const [data, setData] = useState<CostItem[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 30, total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +56,7 @@ export function useCostData(params?: UseCostDataParams) {
     searchParams.set('limit', String(limit));
     if (dateFrom) searchParams.set('date_from', dateFrom);
     if (dateTo) searchParams.set('date_to', dateTo);
+    if (userId) searchParams.set('user_id', userId);
 
     const res = await api.fetch(`/api/v1/admin/fermentations/costs?${searchParams.toString()}`);
     if (res.ok) {
@@ -63,7 +67,7 @@ export function useCostData(params?: UseCostDataParams) {
       setError('コストデータの取得に失敗しました');
     }
     setLoading(false);
-  }, [page, limit, dateFrom, dateTo]);
+  }, [page, limit, dateFrom, dateTo, userId]);
 
   useEffect(() => {
     fetchCosts();

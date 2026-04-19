@@ -10,6 +10,7 @@ interface UpdateEntryInput {
   editorType: string;
   editorVersion: string;
   extension: Record<string, unknown>;
+  fermentationEnabled?: boolean;
 }
 
 export class UpdateEntryUsecase {
@@ -23,11 +24,14 @@ export class UpdateEntryUsecase {
     const existing = await this.entryRepo.findById(entryId);
     if (!existing) throw new EntryNotFoundError(entryId);
 
-    const updatedResult = existing.withContent(input.content, input.mediaUrls);
-    if (!updatedResult.success) {
-      throw new EntryValidationError(updatedResult.error.message);
+    const contentUpdatedResult = existing.withContent(input.content, input.mediaUrls);
+    if (!contentUpdatedResult.success) {
+      throw new EntryValidationError(contentUpdatedResult.error.message);
     }
-    const updated = updatedResult.value;
+    const updated =
+      input.fermentationEnabled === undefined
+        ? contentUpdatedResult.value
+        : contentUpdatedResult.value.withFermentationEnabled(input.fermentationEnabled);
 
     const snapshot = EntrySnapshot.create(
       {

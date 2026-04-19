@@ -7,6 +7,7 @@ import { getAccessToken } from '@/lib/auth';
 export interface FermentationItem {
   id: string;
   user_id: string;
+  user_email: string;
   question_id: string;
   entry_id: string;
   target_period: string;
@@ -27,6 +28,8 @@ interface UseFermentationsParams {
   limit?: number;
   dateFrom?: string;
   dateTo?: string;
+  userId?: string;
+  status?: string;
 }
 
 export function useFermentations(params?: UseFermentationsParams) {
@@ -34,6 +37,8 @@ export function useFermentations(params?: UseFermentationsParams) {
   const limit = params?.limit ?? 30;
   const dateFrom = params?.dateFrom;
   const dateTo = params?.dateTo;
+  const userId = params?.userId;
+  const status = params?.status;
   const [data, setData] = useState<FermentationItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 30, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -52,6 +57,8 @@ export function useFermentations(params?: UseFermentationsParams) {
     searchParams.set('limit', String(limit));
     if (dateFrom) searchParams.set('date_from', dateFrom);
     if (dateTo) searchParams.set('date_to', dateTo);
+    if (userId) searchParams.set('user_id', userId);
+    if (status) searchParams.set('status', status);
 
     const res = await api.fetch(`/api/v1/admin/fermentations?${searchParams.toString()}`);
     if (res.ok) {
@@ -62,7 +69,7 @@ export function useFermentations(params?: UseFermentationsParams) {
       setError('発酵データの取得に失敗しました');
     }
     setLoading(false);
-  }, [page, limit, dateFrom, dateTo]);
+  }, [page, limit, dateFrom, dateTo, userId, status]);
 
   useEffect(() => {
     fetchData();
