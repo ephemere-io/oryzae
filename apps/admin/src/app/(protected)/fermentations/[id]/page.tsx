@@ -47,6 +47,12 @@ export default function FermentationDetailPage() {
 
       <FermentationDetailHeader data={data} onRetry={retryFermentation} />
 
+      {data.masked && (
+        <div className="rounded-md border border-border/50 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          他のユーザーのジャーナリング内容はプライバシー保護のためマスクされています
+        </div>
+      )}
+
       {data.worksheet && <FermentationWorksheet worksheet={data.worksheet} />}
 
       <FermentationSnippets snippets={data.snippets} />
