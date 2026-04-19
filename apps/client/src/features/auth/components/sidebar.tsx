@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
 import { useUnread } from '@/lib/unread-context';
 
@@ -47,10 +48,13 @@ export function Sidebar() {
   const { auth } = useAuth();
   const { theme } = useTheme();
   const { unreadCount } = useUnread();
+  const { hidden } = useSidebarVisibility();
 
   return (
     <nav
-      className="fixed left-0 top-0 bottom-0 z-30 flex w-20 flex-col items-center py-10 transition-all duration-500"
+      className={`fixed left-0 top-0 bottom-0 z-30 flex w-20 flex-col items-center py-10 transition-all duration-500 ${
+        hidden ? 'pointer-events-none opacity-0' : 'opacity-100'
+      }`}
       style={{
         background: theme === 'dark' ? 'rgba(8, 8, 14, 0.8)' : 'rgba(253, 251, 247, 0.4)',
         backdropFilter: 'blur(12px)',

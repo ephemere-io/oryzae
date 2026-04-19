@@ -14,6 +14,8 @@ const LINE_HEIGHT_STORAGE_KEY = 'oryzae-editor-line-height';
 const LINE_HEIGHT_MIN = 1.0;
 const LINE_HEIGHT_MAX = 2.5;
 
+const FOCUS_MODE_STORAGE_KEY = 'oryzae-editor-focus-mode';
+
 function readStoredFontSize(): number | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -60,12 +62,35 @@ function writeStoredLineHeight(value: number): void {
   }
 }
 
+function readStoredFocusMode(): boolean | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredFocusMode(value: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FOCUS_MODE_STORAGE_KEY, String(value));
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
+
 function getInitialSettings(): EditorSettings {
   const next: EditorSettings = { ...DEFAULT_SETTINGS };
   const fontSize = readStoredFontSize();
   if (fontSize !== null) next.fontSize = fontSize;
   const lineHeight = readStoredLineHeight();
   if (lineHeight !== null) next.lineHeight = lineHeight;
+  const focusMode = readStoredFocusMode();
+  if (focusMode !== null) next.focusModeEnabled = focusMode;
   return next;
 }
 
@@ -78,6 +103,9 @@ export function useEditorSettings(): [EditorSettings, (patch: Partial<EditorSett
     }
     if (typeof patch.lineHeight === 'number') {
       writeStoredLineHeight(patch.lineHeight);
+    }
+    if (typeof patch.focusModeEnabled === 'boolean') {
+      writeStoredFocusMode(patch.focusModeEnabled);
     }
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
