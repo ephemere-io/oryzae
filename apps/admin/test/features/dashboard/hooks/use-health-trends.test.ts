@@ -13,9 +13,26 @@ function mockResponse(ok: boolean, body: unknown): Response {
   } as Response; // @type-assertion-allowed: テスト用の最小限 Response スタブ
 }
 
-const sampleDays = [
-  { date: '2026-04-06', successRate: 95, activeWriters: 10 },
-  { date: '2026-04-07', successRate: 80, activeWriters: 8 },
+const sampleResponseDays = [
+  { date: '2026-04-06', totalFermentations: 20, completedFermentations: 19, activeWriters: 10 },
+  { date: '2026-04-07', totalFermentations: 10, completedFermentations: 8, activeWriters: 8 },
+];
+
+const expectedDays = [
+  {
+    date: '2026-04-06',
+    totalFermentations: 20,
+    completedFermentations: 19,
+    activeWriters: 10,
+    successRate: 95,
+  },
+  {
+    date: '2026-04-07',
+    totalFermentations: 10,
+    completedFermentations: 8,
+    activeWriters: 8,
+    successRate: 80,
+  },
 ];
 
 describe('useHealthTrends', () => {
@@ -25,7 +42,7 @@ describe('useHealthTrends', () => {
   });
 
   it('fetches trend data on mount', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleDays));
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { days: sampleResponseDays }));
 
     const { result } = renderHook(() => useHealthTrends());
 
@@ -33,12 +50,12 @@ describe('useHealthTrends', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.days).toEqual(sampleDays);
+    expect(result.current.days).toEqual(expectedDays);
     expect(result.current.error).toBeNull();
   });
 
   it('passes dateFrom and dateTo as query parameters', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleDays));
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { days: sampleResponseDays }));
 
     renderHook(() => useHealthTrends('2026-04-01', '2026-04-12'));
 
@@ -47,8 +64,8 @@ describe('useHealthTrends', () => {
     });
 
     const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('dateFrom=2026-04-01');
-    expect(calledUrl).toContain('dateTo=2026-04-12');
+    expect(calledUrl).toContain('date_from=2026-04-01');
+    expect(calledUrl).toContain('date_to=2026-04-12');
   });
 
   it('sets error on fetch failure', async () => {
