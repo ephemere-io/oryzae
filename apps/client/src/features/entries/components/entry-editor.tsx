@@ -23,7 +23,10 @@ import { useFocusMode } from '@/features/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
 import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
-import { useVoiceDynamics } from '@/features/entries/hooks/use-voice-dynamics';
+import {
+  useVoiceDynamics,
+  type VoiceUnavailableReason,
+} from '@/features/entries/hooks/use-voice-dynamics';
 import type { ApiClient } from '@/lib/api';
 import { SIDEBAR_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
 
@@ -65,6 +68,20 @@ function formatDateStr(created: Date, updated: Date): string {
   const days = ['日', '月', '火', '水', '木', '金', '土'];
   const dayName = days[created.getDay()];
   return `${y}.${m}.${d} — ${dayName}曜日 ${formatTime(created)} · ${formatTime(updated)}`;
+}
+
+function voiceStatusMessage(reason: VoiceUnavailableReason | null): string {
+  switch (reason) {
+    case 'network':
+    case 'service-not-allowed':
+      return '音声認識が利用できません（Chrome で開き直してください）';
+    case 'not-allowed':
+      return 'マイクの利用が許可されていません';
+    case 'unsupported':
+      return 'このブラウザは音声入力に対応していません';
+    default:
+      return '';
+  }
 }
 
 /** Extract title (first line) and body from stored content */
@@ -160,7 +177,13 @@ export function EntryEditor({
     editorRef,
     settings.timeInscriptionEnabled && settings.timeInscriptionMode === 'pressureBleed',
   );
-  useVoiceDynamics(editorRef, voiceActive);
+  const voiceState = useVoiceDynamics(editorRef, voiceActive);
+
+  useEffect(() => {
+    if (voiceState.unavailable && voiceActive) {
+      setVoiceActive(false);
+    }
+  }, [voiceState.unavailable, voiceActive]);
 
   useEffect(() => {
     // For new entries (no createdAt), update the clock every minute
@@ -607,6 +630,15 @@ export function EntryEditor({
         </div>
 
         <div className="flex items-center gap-2">
+          {voiceState.unavailable && (
+            <span
+              className="text-xs text-red-500"
+              role="status"
+              data-testid="voice-unavailable-notice"
+            >
+              {voiceStatusMessage(voiceState.reason)}
+            </span>
+          )}
           {/* Voice input */}
           <button
             type="button"
