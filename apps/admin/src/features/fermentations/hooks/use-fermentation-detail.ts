@@ -55,6 +55,7 @@ export interface FermentationDetailResponse {
   userEmail: string;
   questionText: string;
   cost: unknown;
+  masked: boolean;
   worksheet: WorksheetData | null;
   snippets: SnippetData[];
   letter: LetterData | null;

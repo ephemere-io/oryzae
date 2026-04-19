@@ -111,6 +111,7 @@ export function useGhostEffect(
       const fs = settings.fontSize;
       const sizePct = settings.ghostSize / 100;
       const scatterPct = settings.ghostScatter / 100;
+      const isVertical = settings.writingMode === 'vertical';
 
       Object.assign(el.style, {
         position: 'absolute',
@@ -119,6 +120,8 @@ export function useGhostEffect(
         fontFamily: 'inherit',
         willChange: 'opacity, transform, filter',
         color: 'rgba(0,0,0,0.22)',
+        writingMode: isVertical ? 'vertical-rl' : 'horizontal-tb',
+        textOrientation: isVertical ? 'mixed' : 'initial',
       });
 
       if (type === 'block') {
@@ -129,9 +132,14 @@ export function useGhostEffect(
         const scatter = fs * 6 * scatterPct;
         const rx = (Math.random() - 0.5) * scatter;
         const ry = (Math.random() - 0.5) * scatter;
-        const tw = text.length * gfs * 0.55;
-        el.style.left = `${pos.x - tw * 0.6 + rx}px`;
-        el.style.top = `${pos.y - gfs * 0.65 + ry}px`;
+        const textExtent = text.length * gfs * 0.55;
+        if (isVertical) {
+          el.style.top = `${pos.y - textExtent * 0.6 + ry}px`;
+          el.style.left = `${pos.x - gfs * 0.65 + rx}px`;
+        } else {
+          el.style.left = `${pos.x - textExtent * 0.6 + rx}px`;
+          el.style.top = `${pos.y - gfs * 0.65 + ry}px`;
+        }
       } else {
         const gfs = fs * 2.5 * sizePct;
         el.style.fontSize = `${gfs}px`;
@@ -139,8 +147,13 @@ export function useGhostEffect(
         const scatter = fs * 3 * scatterPct;
         const rx = (Math.random() - 0.5) * scatter;
         const ry = (Math.random() - 0.5) * scatter;
-        el.style.left = `${pos.x - gfs * 0.35 + rx}px`;
-        el.style.top = `${pos.y - gfs * 0.55 + ry}px`;
+        if (isVertical) {
+          el.style.left = `${pos.x - gfs * 0.55 + rx}px`;
+          el.style.top = `${pos.y - gfs * 0.35 + ry}px`;
+        } else {
+          el.style.left = `${pos.x - gfs * 0.35 + rx}px`;
+          el.style.top = `${pos.y - gfs * 0.55 + ry}px`;
+        }
       }
 
       layer.appendChild(el);
