@@ -19,12 +19,13 @@ import { useBrowserNavGuard } from '@/features/entries/hooks/use-browser-nav-gua
 import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
+import { useFocusMode } from '@/features/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
 import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
 import { useVoiceDynamics } from '@/features/entries/hooks/use-voice-dynamics';
 import type { ApiClient } from '@/lib/api';
-import { SIDEBAR_WIDTH } from '@/lib/sidebar-context';
+import { SIDEBAR_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
 
 interface AuthState {
   accessToken: string;
@@ -128,6 +129,28 @@ export function EntryEditor({
     cancel: cancelLeaveConfirm,
     confirm: confirmLeaveConfirm,
   } = useBrowserNavGuard(hasUnsavedChanges);
+
+  const anyOverlayOpen =
+    settingsOpen ||
+    saveModalOpen ||
+    isEditingTitle ||
+    statsOpen ||
+    pendingNavPath !== null ||
+    leaveConfirmOpen;
+  const uiVisible = useFocusMode({
+    enabled: settings.focusModeEnabled,
+    forceVisible: anyOverlayOpen,
+    editorRef,
+  });
+  const fadeClass = `transition-opacity duration-300 ${
+    uiVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+  }`;
+
+  const { setHidden: setSidebarHidden } = useSidebarVisibility();
+  useEffect(() => {
+    setSidebarHidden(!uiVisible);
+    return () => setSidebarHidden(false);
+  }, [uiVisible, setSidebarHidden]);
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
@@ -432,7 +455,9 @@ export function EntryEditor({
       style={{ left: sidebarWidth }}
     >
       {/* Top toolbar */}
-      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
+      <div
+        className={`flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}
+      >
         <div className="flex items-center gap-2">
           {/* New entry */}
           <button
@@ -711,7 +736,7 @@ export function EntryEditor({
       </div>
 
       {/* Question linker */}
-      <div className="border-b border-[var(--border-subtle)] px-4 py-2">
+      <div className={`border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}>
         <QuestionLinker
           activeQuestions={activeQuestions}
           linkedQuestionIds={linkedIds}
@@ -803,7 +828,7 @@ export function EntryEditor({
                     left: '6%',
                     top: '4%',
                     width: '79%',
-                    height: '92%',
+                    height: '86%',
                     position: 'absolute',
                     overflowX: 'auto',
                   }
@@ -830,7 +855,9 @@ export function EntryEditor({
       />
 
       {/* Status bar */}
-      <EditorStatusBar status={status} charCount={charCount} />
+      <div className={fadeClass}>
+        <EditorStatusBar status={status} charCount={charCount} />
+      </div>
 
       {/* Save title modal — shared between 保存する and 漬け込む */}
       <SaveTitleModal
