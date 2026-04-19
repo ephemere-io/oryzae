@@ -18,23 +18,6 @@ const sampleResponseDays = [
   { date: '2026-04-07', totalFermentations: 10, completedFermentations: 8, activeWriters: 8 },
 ];
 
-const expectedDays = [
-  {
-    date: '2026-04-06',
-    totalFermentations: 20,
-    completedFermentations: 19,
-    activeWriters: 10,
-    successRate: 95,
-  },
-  {
-    date: '2026-04-07',
-    totalFermentations: 10,
-    completedFermentations: 8,
-    activeWriters: 8,
-    successRate: 80,
-  },
-];
-
 describe('useHealthTrends', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,11 +33,26 @@ describe('useHealthTrends', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.days).toEqual(expectedDays);
+    expect(result.current.days).toEqual([
+      {
+        date: '2026-04-06',
+        totalFermentations: 20,
+        completedFermentations: 19,
+        activeWriters: 10,
+        successRate: 95,
+      },
+      {
+        date: '2026-04-07',
+        totalFermentations: 10,
+        completedFermentations: 8,
+        activeWriters: 8,
+        successRate: 80,
+      },
+    ]);
     expect(result.current.error).toBeNull();
   });
 
-  it('passes dateFrom and dateTo as query parameters', async () => {
+  it('passes date_from and date_to as query parameters', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(true, { days: sampleResponseDays }));
 
     renderHook(() => useHealthTrends('2026-04-01', '2026-04-12'));

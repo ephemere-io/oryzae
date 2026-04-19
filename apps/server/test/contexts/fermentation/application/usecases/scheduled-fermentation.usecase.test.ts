@@ -4,6 +4,7 @@ import { Entry } from '@/contexts/entry/domain/models/entry.js';
 import { ScheduledFermentationUsecase } from '@/contexts/fermentation/application/usecases/scheduled-fermentation.usecase.js';
 import type { FermentationRepositoryGateway } from '@/contexts/fermentation/domain/gateways/fermentation-repository.gateway.js';
 import type { LlmAnalysisGateway } from '@/contexts/fermentation/domain/gateways/llm-analysis.gateway.js';
+import type { EntryQuestionLinkRepositoryGateway } from '@/contexts/question/domain/gateways/entry-question-link-repository.gateway.js';
 import type { QuestionRepositoryGateway } from '@/contexts/question/domain/gateways/question-repository.gateway.js';
 import type { QuestionTransactionRepositoryGateway } from '@/contexts/question/domain/gateways/question-transaction-repository.gateway.js';
 import { Question } from '@/contexts/question/domain/models/question.js';
@@ -85,6 +86,15 @@ function mockQuestionTransactionRepo(): QuestionTransactionRepositoryGateway {
   };
 }
 
+function mockLinkRepo(): EntryQuestionLinkRepositoryGateway {
+  return {
+    link: vi.fn(),
+    unlink: vi.fn(),
+    listQuestionIdsByEntryId: vi.fn(),
+    listEntryIdsByQuestionId: vi.fn().mockResolvedValue([]),
+  };
+}
+
 function mockFermentationRepo(): FermentationRepositoryGateway {
   return {
     save: vi.fn(),
@@ -127,6 +137,7 @@ describe('ScheduledFermentationUsecase', () => {
       entryRepo,
       questionRepo,
       mockQuestionTransactionRepo(),
+      mockLinkRepo(),
       mockFermentationRepo(),
       mockLlm(),
       generateId,
@@ -154,6 +165,9 @@ describe('ScheduledFermentationUsecase', () => {
     const qtRepo = mockQuestionTransactionRepo();
     vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockResolvedValue(transaction);
 
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
     const fermentationRepo = mockFermentationRepo();
     const llm = mockLlm();
 
@@ -161,6 +175,7 @@ describe('ScheduledFermentationUsecase', () => {
       entryRepo,
       questionRepo,
       qtRepo,
+      linkRepo,
       fermentationRepo,
       llm,
       generateId,
@@ -188,6 +203,7 @@ describe('ScheduledFermentationUsecase', () => {
       entryRepo,
       questionRepo,
       mockQuestionTransactionRepo(),
+      mockLinkRepo(),
       mockFermentationRepo(),
       mockLlm(),
       generateId,
@@ -213,12 +229,16 @@ describe('ScheduledFermentationUsecase', () => {
     const qtRepo = mockQuestionTransactionRepo();
     // findLatestValidatedByQuestionId returns null (default mock)
 
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
     const llm = mockLlm();
 
     const usecase = new ScheduledFermentationUsecase(
       entryRepo,
       questionRepo,
       qtRepo,
+      linkRepo,
       mockFermentationRepo(),
       llm,
       generateId,
@@ -252,6 +272,9 @@ describe('ScheduledFermentationUsecase', () => {
       return t2;
     });
 
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
     const fermentationRepo = mockFermentationRepo();
     // Make save fail on first call (simulating RunFermentationUsecase failure)
     let callCount = 0;
@@ -266,6 +289,7 @@ describe('ScheduledFermentationUsecase', () => {
       entryRepo,
       questionRepo,
       qtRepo,
+      linkRepo,
       fermentationRepo,
       llm,
       generateId,
@@ -286,6 +310,7 @@ describe('ScheduledFermentationUsecase', () => {
       mockEntryRepo(),
       mockQuestionRepo(),
       mockQuestionTransactionRepo(),
+      mockLinkRepo(),
       mockFermentationRepo(),
       mockLlm(),
       generateId,
@@ -315,6 +340,9 @@ describe('ScheduledFermentationUsecase', () => {
     const qtRepo = mockQuestionTransactionRepo();
     vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockResolvedValue(transaction);
 
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1', 'e2']);
+
     const llm = mockLlm();
     const fermentationRepo = mockFermentationRepo();
 
@@ -322,6 +350,7 @@ describe('ScheduledFermentationUsecase', () => {
       entryRepo,
       questionRepo,
       qtRepo,
+      linkRepo,
       fermentationRepo,
       llm,
       generateId,
@@ -337,5 +366,95 @@ describe('ScheduledFermentationUsecase', () => {
         entryContent: expect.stringContaining('---'),
       }),
     );
+  });
+
+  it('only includes entries linked to each question (does not leak other-question entries)', async () => {
+    const e1 = makeEntry('user-1', 'e1');
+    const e2 = makeEntry('user-1', 'e2');
+    const q1 = makeQuestion('user-1', 'q1');
+    const q2 = makeQuestion('user-1', 'q2');
+    const t1 = makeQuestionTransaction('q1', 'Q1');
+    const t2 = makeQuestionTransaction('q2', 'Q2');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([e1, e2]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([q1, q2]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockImplementation(async (id) =>
+      id === 'q1' ? t1 : t2,
+    );
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockImplementation(async (id) =>
+      id === 'q1' ? ['e1'] : ['e2'],
+    );
+
+    const llm = mockLlm();
+
+    const usecase = new ScheduledFermentationUsecase(
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      mockFermentationRepo(),
+      llm,
+      generateId,
+      vi.fn().mockResolvedValue(['user-1']),
+    );
+
+    const result = await usecase.execute(dateKey);
+
+    expect(result.totalFermentations).toBe(2);
+    expect(result.succeeded).toBe(2);
+    expect(llm.analyze).toHaveBeenCalledTimes(2);
+    expect(llm.analyze).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ question: 'Q1', entryContent: 'Entry content for e1' }),
+    );
+    expect(llm.analyze).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ question: 'Q2', entryContent: 'Entry content for e2' }),
+    );
+  });
+
+  it('skips a question when no entries of the day are linked to it', async () => {
+    const entry = makeEntry('user-1', 'e1');
+    const question = makeQuestion('user-1', 'q1');
+    const transaction = makeQuestionTransaction('q1', 'Q');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([entry]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockResolvedValue(transaction);
+
+    const linkRepo = mockLinkRepo();
+    // Question is linked to a different entry not written today
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['other-entry']);
+
+    const llm = mockLlm();
+
+    const usecase = new ScheduledFermentationUsecase(
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      mockFermentationRepo(),
+      llm,
+      generateId,
+      vi.fn().mockResolvedValue(['user-1']),
+    );
+
+    const result = await usecase.execute(dateKey);
+
+    expect(result.totalUsers).toBe(1);
+    expect(result.totalFermentations).toBe(0);
+    expect(llm.analyze).not.toHaveBeenCalled();
   });
 });
