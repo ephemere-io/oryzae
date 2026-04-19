@@ -10,6 +10,7 @@ interface CreateEntryInput {
   editorType: string;
   editorVersion: string;
   extension: Record<string, unknown>;
+  fermentationEnabled?: boolean;
 }
 
 export class CreateEntryUsecase {
@@ -21,7 +22,12 @@ export class CreateEntryUsecase {
 
   async execute(userId: string, input: CreateEntryInput): Promise<EntryProps> {
     const entryResult = Entry.create(
-      { userId, content: input.content, mediaUrls: input.mediaUrls },
+      {
+        userId,
+        content: input.content,
+        mediaUrls: input.mediaUrls,
+        fermentationEnabled: input.fermentationEnabled ?? false,
+      },
       this.generateId,
     );
     if (!entryResult.success) {

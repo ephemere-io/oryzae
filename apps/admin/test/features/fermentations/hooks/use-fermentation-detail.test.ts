@@ -28,6 +28,7 @@ const mockData: FermentationDetailResponse = {
   userEmail: 'test@example.com',
   questionText: 'What motivates you?',
   cost: { totalCost: 0.001234 },
+  masked: false,
   worksheet: {
     id: 'w1',
     fermentationResultId: 'f1',

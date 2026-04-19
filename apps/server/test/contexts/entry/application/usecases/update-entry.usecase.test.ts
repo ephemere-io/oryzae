@@ -14,6 +14,7 @@ describe('UpdateEntryUsecase', () => {
     userId: 'user-1',
     content: 'original',
     mediaUrls: [],
+    fermentationEnabled: false,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   });
@@ -21,7 +22,11 @@ describe('UpdateEntryUsecase', () => {
   beforeEach(() => {
     entryRepo = {
       findById: vi.fn().mockResolvedValue(existingEntry),
+      findByIds: vi.fn().mockResolvedValue([]),
       listByUserId: vi.fn().mockResolvedValue([]),
+      listByUserIdAndDate: vi.fn().mockResolvedValue([]),
+      listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
+      listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     };
@@ -43,8 +48,45 @@ describe('UpdateEntryUsecase', () => {
 
     expect(result.content).toBe('updated');
     expect(result.mediaUrls).toEqual(['url1']);
+    expect(result.fermentationEnabled).toBe(false);
     expect(entryRepo.save).toHaveBeenCalledTimes(1);
     expect(snapshotRepo.append).toHaveBeenCalledTimes(1);
+  });
+
+  it('fermentationEnabled 未指定時は既存値を保持する', async () => {
+    const pickled = Entry.fromProps({
+      id: 'entry-1',
+      userId: 'user-1',
+      content: 'original',
+      mediaUrls: [],
+      fermentationEnabled: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    vi.mocked(entryRepo.findById).mockResolvedValue(pickled);
+
+    const result = await usecase.execute('entry-1', {
+      content: 'updated',
+      mediaUrls: [],
+      editorType: 'minimal',
+      editorVersion: '1.0.0',
+      extension: {},
+    });
+
+    expect(result.fermentationEnabled).toBe(true);
+  });
+
+  it('fermentationEnabled=true 指定時は true に更新する', async () => {
+    const result = await usecase.execute('entry-1', {
+      content: 'updated',
+      mediaUrls: [],
+      editorType: 'minimal',
+      editorVersion: '1.0.0',
+      extension: {},
+      fermentationEnabled: true,
+    });
+
+    expect(result.fermentationEnabled).toBe(true);
   });
 
   it('存在しない Entry なら EntryNotFoundError を throw する', async () => {
