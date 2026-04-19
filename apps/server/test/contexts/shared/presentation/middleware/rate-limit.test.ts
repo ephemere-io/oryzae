@@ -23,6 +23,7 @@ vi.mock('@upstash/redis', () => ({
 
 describe('rate-limit middleware', () => {
   beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://test.upstash.io');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token');
   });
@@ -30,6 +31,26 @@ describe('rate-limit middleware', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+  });
+
+  describe('when NODE_ENV is not production', () => {
+    it('skips rate limiting entirely', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      mockLimit.mockResolvedValue({
+        success: false,
+        limit: 10,
+        remaining: 0,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono().use('/*', rateLimitAuth()).get('/test', (c) => c.json({ ok: true }));
+
+      const res = await app.request('/test', {
+        headers: { 'x-real-ip': '1.2.3.4' },
+      });
+      expect(res.status).toBe(200);
+      expect(mockLimit).not.toHaveBeenCalled();
+    });
   });
 
   describe('when Upstash env vars are not set', () => {
