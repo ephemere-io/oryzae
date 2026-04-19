@@ -4,6 +4,7 @@ import { CreateEntryUsecase } from '../../application/usecases/create-entry.usec
 import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase.js';
 import { GetEntryUsecase } from '../../application/usecases/get-entry.usecase.js';
 import { ListEntriesUsecase } from '../../application/usecases/list-entries.usecase.js';
+import { SearchEntriesUsecase } from '../../application/usecases/search-entries.usecase.js';
 import { UpdateEntryUsecase } from '../../application/usecases/update-entry.usecase.js';
 import { SupabaseEntryRepository } from '../../infrastructure/repositories/supabase-entry.repository.js';
 import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository.js';
@@ -31,15 +32,19 @@ export const entries = new Hono<Env>()
   .get('/', async (c) => {
     const cursor = c.req.query('cursor');
     const limit = c.req.query('limit');
+    const q = c.req.query('q');
     const supabase = c.get('supabase');
     const entryRepo = new SupabaseEntryRepository(supabase);
-    const usecase = new ListEntriesUsecase(entryRepo);
+    const parsedLimit = limit ? Number(limit) : undefined;
 
-    const result = await usecase.execute(
-      c.get('userId'),
-      cursor,
-      limit ? Number(limit) : undefined,
-    );
+    if (q) {
+      const searchUsecase = new SearchEntriesUsecase(entryRepo);
+      const result = await searchUsecase.execute(c.get('userId'), q, cursor, parsedLimit);
+      return c.json(result);
+    }
+
+    const listUsecase = new ListEntriesUsecase(entryRepo);
+    const result = await listUsecase.execute(c.get('userId'), cursor, parsedLimit);
     return c.json(result);
   })
   .get('/:id', async (c) => {

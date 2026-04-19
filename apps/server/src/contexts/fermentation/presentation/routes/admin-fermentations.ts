@@ -3,8 +3,10 @@ import { gateway } from 'ai';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
+import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
@@ -83,12 +85,27 @@ export const adminFermentations = new Hono<Env>()
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
 
+    const userParam = c.req.query('user_id');
+    const status = c.req.query('status');
+
+    // Resolve email to user ID if needed
+    let resolvedUserId = userParam;
+    if (userParam && userParam.includes('@')) {
+      const { data: usersLookup } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const matchedUser = (usersLookup?.users ?? []).find(
+        (u) => u.email?.toLowerCase() === userParam.toLowerCase(),
+      );
+      resolvedUserId = matchedUser?.id ?? 'no-match';
+    }
+
     let listQuery = supabase
       .from('fermentation_results')
       .select(
         'id, user_id, question_id, entry_id, target_period, status, generation_id, error_message, created_at, updated_at',
         { count: 'exact' },
       );
+    if (resolvedUserId) listQuery = listQuery.eq('user_id', resolvedUserId);
+    if (status) listQuery = listQuery.eq('status', status);
     if (dateFrom) listQuery = listQuery.gte('created_at', dateFrom);
     if (dateTo) listQuery = listQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
 
@@ -98,23 +115,47 @@ export const adminFermentations = new Hono<Env>()
 
     if (error) return c.json({ error: error.message }, 500);
 
+    // Resolve user emails
+    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const emailMap = new Map<string, string>();
+    for (const u of usersData?.users ?? []) {
+      emailMap.set(u.id, u.email ?? '');
+    }
+
+    const items = (data ?? []).map((row) => ({
+      ...row,
+      user_email: emailMap.get(row.user_id) ?? '',
+    }));
+
     return c.json({
-      data: data ?? [],
+      data: items,
       pagination: { page, limit, total: count ?? 0 },
     });
   })
   .get('/costs', async (c) => {
     const supabase = c.get('adminSupabase');
     const page = Number(c.req.query('page') ?? '1');
-    const limit = Number(c.req.query('limit') ?? '10');
+    const limit = Number(c.req.query('limit') ?? '30');
     const offset = (page - 1) * limit;
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
+    const userParam = c.req.query('user_id');
+
+    // Resolve email to user ID if needed
+    let resolvedUserId = userParam;
+    if (userParam && userParam.includes('@')) {
+      const { data: usersLookup } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const matchedUser = (usersLookup?.users ?? []).find(
+        (u) => u.email?.toLowerCase() === userParam.toLowerCase(),
+      );
+      resolvedUserId = matchedUser?.id ?? 'no-match';
+    }
 
     let costsQuery = supabase
       .from('fermentation_results')
       .select('id, user_id, status, generation_id, created_at', { count: 'exact' })
       .not('generation_id', 'is', null);
+    if (resolvedUserId) costsQuery = costsQuery.eq('user_id', resolvedUserId);
     if (dateFrom) costsQuery = costsQuery.gte('created_at', dateFrom);
     if (dateTo) costsQuery = costsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
 
@@ -124,13 +165,20 @@ export const adminFermentations = new Hono<Env>()
 
     if (error) return c.json({ error: error.message }, 500);
 
+    // Resolve user emails
+    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const emailMap = new Map<string, string>();
+    for (const u of usersData?.users ?? []) {
+      emailMap.set(u.id, u.email ?? '');
+    }
+
     const items = await Promise.all(
       (data ?? []).map(async (row) => {
         try {
           const info = await gateway.getGenerationInfo({ id: row.generation_id });
-          return { ...row, cost: info };
+          return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost: info };
         } catch {
-          return { ...row, cost: null };
+          return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost: null };
         }
       }),
     );
@@ -253,6 +301,11 @@ export const adminFermentations = new Hono<Env>()
       updatedAt: row.updated_at,
     }));
 
+    // Mask content if viewing another user's fermentation
+    const adminUserId = c.get('adminUserId');
+    const isOwner = fermentation.user_id === adminUserId;
+    const MASKED = '[masked]';
+
     return c.json({
       id: fermentation.id,
       userId: fermentation.user_id,
@@ -265,12 +318,27 @@ export const adminFermentations = new Hono<Env>()
       createdAt: fermentation.created_at,
       updatedAt: fermentation.updated_at,
       userEmail,
-      questionText,
+      questionText: isOwner ? questionText : MASKED,
       cost,
-      worksheet,
-      snippets,
-      letter,
-      keywords,
+      masked: !isOwner,
+      worksheet: isOwner
+        ? worksheet
+        : worksheet
+          ? {
+              ...worksheet,
+              worksheetMarkdown: MASKED,
+              resultDiagramMarkdown: MASKED,
+            }
+          : null,
+      snippets: isOwner
+        ? snippets
+        : snippets.map((s) => ({
+            ...s,
+            originalText: MASKED,
+            selectionReason: MASKED,
+          })),
+      letter: isOwner ? letter : letter ? { ...letter, bodyText: MASKED } : null,
+      keywords: isOwner ? keywords : keywords.map((k) => ({ ...k, description: MASKED })),
     });
   })
   .post('/trigger-scheduled', async (c) => {
@@ -283,6 +351,7 @@ export const adminFermentations = new Hono<Env>()
     const entryRepo = new SupabaseEntryRepository(supabase);
     const questionRepo = new SupabaseQuestionRepository(supabase);
     const questionTransactionRepo = new SupabaseQuestionTransactionRepository(supabase);
+    const entryQuestionLinkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
     const fermentationRepo = new SupabaseFermentationRepository(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
 
@@ -296,6 +365,7 @@ export const adminFermentations = new Hono<Env>()
       entryRepo,
       questionRepo,
       questionTransactionRepo,
+      entryQuestionLinkRepo,
       fermentationRepo,
       llmGateway,
       () => crypto.randomUUID(),
@@ -303,6 +373,27 @@ export const adminFermentations = new Hono<Env>()
     );
 
     const result = await usecase.execute(dateKey);
+
+    // Notify Discord if there were failures
+    if (result.failed > 0) {
+      notifyDiscord({
+        title: 'スケジュール発酵 — 失敗あり',
+        color: COLORS.WARNING,
+        fields: [
+          { name: '対象日', value: dateKey, inline: true },
+          { name: '成功', value: String(result.succeeded), inline: true },
+          { name: '失敗', value: String(result.failed), inline: true },
+          {
+            name: 'エラー詳細',
+            value:
+              result.errors
+                .slice(0, 3)
+                .map((e) => `${e.userId.slice(0, 8)}: ${e.error.slice(0, 80)}`)
+                .join('\n') || '-',
+          },
+        ],
+      });
+    }
 
     return c.json({ dateKey, ...result });
   })

@@ -1,7 +1,15 @@
-import { credentialsSchema } from '@oryzae/shared';
+import {
+  changeEmailSchema,
+  changePasswordSchema,
+  loginSchema,
+  profileUpdateSchema,
+  signupSchema,
+} from '@oryzae/shared';
 import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
+import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 
 function getSupabaseAuthClient() {
   const url = process.env.SUPABASE_URL;
@@ -10,30 +18,39 @@ function getSupabaseAuthClient() {
   return createClient(url, anonKey);
 }
 
-function extractUserProfile(user: {
-  id: string;
-  email?: string;
-  user_metadata?: Record<string, unknown>;
-}) {
-  const meta = user.user_metadata ?? {};
-  return {
-    id: user.id,
-    email: user.email,
-    avatarUrl: typeof meta.avatar_url === 'string' ? meta.avatar_url : null,
-    name:
-      typeof meta.full_name === 'string'
-        ? meta.full_name
-        : typeof meta.name === 'string'
-          ? meta.name
-          : null,
-  };
+function createUserSupabase(authHeader: string) {
+  const url = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anonKey) throw new Error('Supabase env vars not set');
+  return createClient(url, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+}
+
+function getProviders(user: { app_metadata?: Record<string, unknown> }): string[] {
+  const providers = user.app_metadata?.providers;
+  // @type-assertion-allowed: Supabase types app_metadata values as unknown
+  return Array.isArray(providers) ? (providers as string[]) : [];
 }
 
 export const authRoutes = new Hono()
   .post('/signup', async (c) => {
-    const body = credentialsSchema.parse(await c.req.json());
-    const supabase = getSupabaseAuthClient();
+    const body = signupSchema.parse(await c.req.json());
+    const serviceSupabase = getSupabaseClient();
 
+    // Check nickname uniqueness
+    const { data: existing } = await serviceSupabase
+      .from('profiles')
+      .select('id')
+      .ilike('nickname', body.nickname)
+      .single();
+
+    if (existing) {
+      return c.json({ error: 'このニックネームは既に使用されています' }, 400);
+    }
+
+    // Create auth user
+    const supabase = getSupabaseAuthClient();
     const { data, error } = await supabase.auth.signUp({
       email: body.email,
       password: body.password,
@@ -43,11 +60,35 @@ export const authRoutes = new Hono()
       return c.json({ error: error.message }, 400);
     }
 
+    // Create profile
+    if (data.user) {
+      await serviceSupabase.from('profiles').insert({
+        id: data.user.id,
+        nickname: body.nickname,
+      });
+
+      // Notify Discord (fire-and-forget)
+      notifyDiscord({
+        title: '新規ユーザー登録',
+        color: COLORS.SUCCESS,
+        fields: [
+          { name: 'ニックネーム', value: body.nickname, inline: true },
+          { name: 'メール', value: body.email, inline: true },
+        ],
+      });
+    }
+
     return c.json(
       {
         user: data.user
-          ? extractUserProfile(data.user)
-          : { id: undefined, email: undefined, avatarUrl: null, name: null },
+          ? {
+              id: data.user.id,
+              email: data.user.email,
+              nickname: body.nickname,
+              avatarUrl: null,
+              providers: getProviders(data.user),
+            }
+          : null,
         session: data.session
           ? {
               accessToken: data.session.access_token,
@@ -60,11 +101,35 @@ export const authRoutes = new Hono()
     );
   })
   .post('/login', async (c) => {
-    const body = credentialsSchema.parse(await c.req.json());
-    const supabase = getSupabaseAuthClient();
+    const body = loginSchema.parse(await c.req.json());
+    const isEmail = body.identifier.includes('@');
 
+    let email = body.identifier;
+
+    // Resolve nickname to email
+    if (!isEmail) {
+      const serviceSupabase = getSupabaseClient();
+      const { data: profile } = await serviceSupabase
+        .from('profiles')
+        .select('id')
+        .ilike('nickname', body.identifier)
+        .single();
+
+      if (!profile) {
+        return c.json({ error: 'ニックネームが見つかりません' }, 401);
+      }
+
+      // Get email from auth.users via admin API
+      const { data: userData } = await serviceSupabase.auth.admin.getUserById(profile.id);
+      if (!userData?.user?.email) {
+        return c.json({ error: 'ユーザー情報の取得に失敗しました' }, 401);
+      }
+      email = userData.user.email;
+    }
+
+    const supabase = getSupabaseAuthClient();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: body.email,
+      email,
       password: body.password,
     });
 
@@ -72,8 +137,22 @@ export const authRoutes = new Hono()
       return c.json({ error: error.message }, 401);
     }
 
+    // Fetch profile
+    const serviceSupabase = getSupabaseClient();
+    const { data: profile } = await serviceSupabase
+      .from('profiles')
+      .select('nickname, avatar_url')
+      .eq('id', data.user.id)
+      .single();
+
     return c.json({
-      user: extractUserProfile(data.user),
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        nickname: profile?.nickname ?? null,
+        avatarUrl: profile?.avatar_url ?? null,
+        providers: getProviders(data.user),
+      },
       session: {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
@@ -95,9 +174,10 @@ export const authRoutes = new Hono()
 
     return c.json({
       session: {
-        accessToken: data.session!.access_token,
-        refreshToken: data.session!.refresh_token,
-        expiresAt: data.session!.expires_at,
+        // @type-assertion-allowed: session is guaranteed non-null after successful refresh
+        accessToken: (data.session as NonNullable<typeof data.session>).access_token,
+        refreshToken: (data.session as NonNullable<typeof data.session>).refresh_token,
+        expiresAt: (data.session as NonNullable<typeof data.session>).expires_at,
       },
     });
   })
@@ -129,8 +209,53 @@ export const authRoutes = new Hono()
       return c.json({ error: error.message }, 400);
     }
 
+    // Ensure profile exists for OAuth users
+    const serviceSupabase = getSupabaseClient();
+    const { data: profile } = await serviceSupabase
+      .from('profiles')
+      .select('nickname, avatar_url')
+      .eq('id', data.user.id)
+      .single();
+
+    if (!profile) {
+      // Auto-create profile for OAuth users
+      const meta = data.user.user_metadata ?? {};
+      const nickname =
+        typeof meta.full_name === 'string'
+          ? meta.full_name.replace(/\s+/g, '_').slice(0, 30)
+          : `user_${data.user.id.slice(0, 8)}`;
+      const avatarUrl = typeof meta.avatar_url === 'string' ? meta.avatar_url : null;
+
+      await serviceSupabase.from('profiles').insert({
+        id: data.user.id,
+        nickname,
+        avatar_url: avatarUrl,
+      });
+
+      return c.json({
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          nickname,
+          avatarUrl,
+          providers: getProviders(data.user),
+        },
+        session: {
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+          expiresAt: data.session.expires_at,
+        },
+      });
+    }
+
     return c.json({
-      user: extractUserProfile(data.user),
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        nickname: profile.nickname,
+        avatarUrl: profile.avatar_url,
+        providers: getProviders(data.user),
+      },
       session: {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
@@ -157,14 +282,7 @@ export const authRoutes = new Hono()
       .object({ accessToken: z.string(), password: z.string().min(6) })
       .parse(await c.req.json());
 
-    const url = process.env.SUPABASE_URL;
-    const anonKey = process.env.SUPABASE_ANON_KEY;
-    if (!url || !anonKey) return c.json({ error: 'Server config error' }, 500);
-
-    const supabase = createClient(url, anonKey, {
-      global: { headers: { Authorization: `Bearer ${accessToken}` } },
-    });
-
+    const supabase = createUserSupabase(`Bearer ${accessToken}`);
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -179,14 +297,7 @@ export const authRoutes = new Hono()
       return c.json({ error: 'Missing token' }, 401);
     }
 
-    const url = process.env.SUPABASE_URL;
-    const anonKey = process.env.SUPABASE_ANON_KEY;
-    if (!url || !anonKey) return c.json({ error: 'Server config error' }, 500);
-
-    const supabase = createClient(url, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
+    const supabase = createUserSupabase(authHeader);
     const {
       data: { user },
       error,
@@ -196,5 +307,158 @@ export const authRoutes = new Hono()
       return c.json({ error: 'Invalid token' }, 401);
     }
 
-    return c.json({ user: extractUserProfile(user) });
+    // Fetch profile
+    const serviceSupabase = getSupabaseClient();
+    const { data: profile } = await serviceSupabase
+      .from('profiles')
+      .select('nickname, avatar_url')
+      .eq('id', user.id)
+      .single();
+
+    return c.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        nickname: profile?.nickname ?? null,
+        avatarUrl: profile?.avatar_url ?? null,
+        providers: getProviders(user),
+      },
+    });
+  })
+  .post('/change-password', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Missing token' }, 401);
+    }
+
+    const supabase = createUserSupabase(authHeader);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user?.email) {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
+
+    const body = changePasswordSchema.parse(await c.req.json());
+
+    // Verify current password
+    const authClient = getSupabaseAuthClient();
+    const { error: signInError } = await authClient.auth.signInWithPassword({
+      email: user.email,
+      password: body.currentPassword,
+    });
+
+    if (signInError) {
+      return c.json({ error: '現在のパスワードが正しくありません' }, 400);
+    }
+
+    // Update password
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: body.newPassword,
+    });
+
+    if (updateError) {
+      return c.json({ error: updateError.message }, 400);
+    }
+
+    return c.json({ message: 'Password updated' });
+  })
+  .post('/change-email', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Missing token' }, 401);
+    }
+
+    const supabase = createUserSupabase(authHeader);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
+
+    const body = changeEmailSchema.parse(await c.req.json());
+
+    const { error } = await supabase.auth.updateUser({ email: body.newEmail });
+
+    if (error) {
+      return c.json({ error: error.message }, 400);
+    }
+
+    return c.json({ message: '確認メールを送信しました' });
+  })
+  .patch('/profile', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Missing token' }, 401);
+    }
+
+    const supabase = createUserSupabase(authHeader);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
+
+    const body = profileUpdateSchema.parse(await c.req.json());
+    const serviceSupabase = getSupabaseClient();
+
+    // Check nickname uniqueness if changing
+    if (body.nickname) {
+      const { data: existing } = await serviceSupabase
+        .from('profiles')
+        .select('id')
+        .ilike('nickname', body.nickname)
+        .neq('id', user.id)
+        .single();
+
+      if (existing) {
+        return c.json({ error: 'このニックネームは既に使用されています' }, 400);
+      }
+    }
+
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (body.nickname) updateData.nickname = body.nickname;
+    if (body.avatarUrl !== undefined) updateData.avatar_url = body.avatarUrl;
+
+    const { error } = await serviceSupabase.from('profiles').update(updateData).eq('id', user.id);
+
+    if (error) {
+      return c.json({ error: error.message }, 500);
+    }
+
+    const { data: profile } = await serviceSupabase
+      .from('profiles')
+      .select('nickname, avatar_url')
+      .eq('id', user.id)
+      .single();
+
+    return c.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        nickname: profile?.nickname ?? null,
+        avatarUrl: profile?.avatar_url ?? null,
+      },
+    });
+  })
+  .get('/nickname/check', async (c) => {
+    const nickname = c.req.query('nickname');
+    if (!nickname) return c.json({ available: false }, 400);
+
+    const serviceSupabase = getSupabaseClient();
+    const { data } = await serviceSupabase
+      .from('profiles')
+      .select('id')
+      .ilike('nickname', nickname)
+      .single();
+
+    return c.json({ available: !data });
   });
