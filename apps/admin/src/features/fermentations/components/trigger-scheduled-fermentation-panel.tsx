@@ -38,35 +38,27 @@ export function TriggerScheduledFermentationPanel({ onCompleted }: Props) {
   };
 
   return (
-    <div className="rounded-md border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium">手動で発酵プロセスを発火</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            指定日 (JST) のエントリに対して ScheduledFermentation を実行します
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={dateKey}
-            onChange={(e) => {
-              setDateKey(e.target.value);
-              setConfirming(false);
-            }}
-            disabled={loading}
-            className="w-auto h-8 text-xs"
-          />
-          <Button
-            variant={confirming ? 'destructive' : 'default'}
-            size="sm"
-            onClick={handleRun}
-            disabled={loading || !dateKey}
-          >
-            <Play className={`h-3 w-3 mr-1.5 ${loading ? 'animate-pulse' : ''}`} />
-            {loading ? '実行中...' : confirming ? '本当に実行する' : '実行'}
-          </Button>
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Input
+          type="date"
+          value={dateKey}
+          onChange={(e) => {
+            setDateKey(e.target.value);
+            setConfirming(false);
+          }}
+          disabled={loading}
+          className="w-auto h-8 text-xs"
+        />
+        <Button
+          variant={confirming ? 'destructive' : 'default'}
+          size="sm"
+          onClick={handleRun}
+          disabled={loading || !dateKey}
+        >
+          <Play className={`h-3 w-3 mr-1.5 ${loading ? 'animate-pulse' : ''}`} />
+          {loading ? '実行中...' : confirming ? '本当に実行する' : '実行'}
+        </Button>
       </div>
 
       {error && (

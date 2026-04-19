@@ -23,9 +23,7 @@ export default function QuestionsPage() {
         <QuestionCreateForm onSubmit={createQuestion} />
 
         <div className="mt-6">
-          {loading ? (
-            <p className="text-sm text-[var(--date-color)]">読み込み中...</p>
-          ) : (
+          {loading ? null : (
             <QuestionTimeline
               questions={questions}
               onArchive={archiveQuestion}
