@@ -166,6 +166,30 @@ describe('useEntries', () => {
     expect(result.current.entries[0].id).toBe('2');
   });
 
+  it('removeEntry drops the matching entry from state', async () => {
+    const entries = [
+      { id: '1', userId: 'u1', content: 'a', mediaUrls: [], createdAt: '', updatedAt: '' },
+      { id: '2', userId: 'u1', content: 'b', mediaUrls: [], createdAt: '', updatedAt: '' },
+    ];
+    apiFetch.mockResolvedValueOnce(mockResponse(true, entries));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntries(api, false));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries).toHaveLength(2);
+
+    act(() => {
+      result.current.removeEntry('1');
+    });
+
+    expect(result.current.entries).toHaveLength(1);
+    expect(result.current.entries[0].id).toBe('2');
+  });
+
   it('does not send q param when search is empty', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, []));
     const api = createMockApi(apiFetch);

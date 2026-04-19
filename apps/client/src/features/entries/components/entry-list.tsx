@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useDebounce } from '@/features/entries/hooks/use-debounce';
+import { useDeleteEntry } from '@/features/entries/hooks/use-delete-entry';
 import { useEntries } from '@/features/entries/hooks/use-entries';
 import type { ApiClient } from '@/lib/api';
+import { DeleteConfirmModal } from './delete-confirm-modal';
 import { EntryCard } from './entry-card';
 
 interface EntryListProps {
@@ -70,9 +72,29 @@ export function EntryList({ api, authLoading }: EntryListProps) {
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
   const search = debouncedSearch.trim() || undefined;
-  const { entries, loading, hasMore, loadMore } = useEntries(api, authLoading, search);
+  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(api, authLoading, search);
+  const { deleteEntry, deleting } = useDeleteEntry(api);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const isSearching = !!search;
+
+  const handleDeleteClick = useCallback((id: string) => {
+    setPendingDeleteId(id);
+  }, []);
+
+  const handleDeleteCancel = useCallback(() => {
+    if (deleting) return;
+    setPendingDeleteId(null);
+  }, [deleting]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!pendingDeleteId) return;
+    const ok = await deleteEntry(pendingDeleteId);
+    if (ok) {
+      removeEntry(pendingDeleteId);
+      setPendingDeleteId(null);
+    }
+  }, [deleteEntry, pendingDeleteId, removeEntry]);
 
   return (
     <div className="flex flex-col">
@@ -140,6 +162,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
               content={entry.content}
               createdAt={entry.createdAt}
               searchQuery={search}
+              onDeleteClick={handleDeleteClick}
             />
           ))}
         </div>
@@ -161,6 +184,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
                     id={entry.id}
                     content={entry.content}
                     createdAt={entry.createdAt}
+                    onDeleteClick={handleDeleteClick}
                   />
                 ))}
               </div>
@@ -179,6 +203,13 @@ export function EntryList({ api, authLoading }: EntryListProps) {
           {loading ? '読み込み中...' : 'もっと見る'}
         </button>
       )}
+
+      <DeleteConfirmModal
+        open={pendingDeleteId !== null}
+        deleting={deleting}
+        onCancel={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }
