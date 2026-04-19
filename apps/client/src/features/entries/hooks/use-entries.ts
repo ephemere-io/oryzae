@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 
 interface Entry {
@@ -14,11 +14,12 @@ interface Entry {
 
 const PAGE_SIZE = 20;
 
-export function useEntries(api: ApiClient | null, authLoading: boolean) {
+export function useEntries(api: ApiClient | null, authLoading: boolean, search?: string) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(true);
+  const prevSearchRef = useRef(search);
 
   const fetchEntries = useCallback(
     async (nextCursor?: string) => {
@@ -27,6 +28,7 @@ export function useEntries(api: ApiClient | null, authLoading: boolean) {
 
       const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
       if (nextCursor) params.set('cursor', nextCursor);
+      if (search) params.set('q', search);
 
       const res = await api.fetch(`/api/v1/entries?${params}`);
 
@@ -42,8 +44,17 @@ export function useEntries(api: ApiClient | null, authLoading: boolean) {
 
       setLoading(false);
     },
-    [api],
+    [api, search],
   );
+
+  useEffect(() => {
+    if (prevSearchRef.current !== search) {
+      prevSearchRef.current = search;
+      setEntries([]);
+      setCursor(undefined);
+      setHasMore(true);
+    }
+  }, [search]);
 
   useEffect(() => {
     if (!authLoading && api) {
