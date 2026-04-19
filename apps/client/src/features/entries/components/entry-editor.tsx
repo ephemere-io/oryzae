@@ -6,6 +6,7 @@ import {
   type EditorStatus,
   EditorStatusBar,
 } from '@/features/entries/components/editor-status-bar';
+import { LeaveConfirmModal } from '@/features/entries/components/leave-confirm-modal';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
 import { SettingsDrawer } from '@/features/entries/components/settings-drawer';
@@ -14,6 +15,7 @@ import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
 import { useAutosaveEntry } from '@/features/entries/hooks/use-autosave-entry';
+import { useBrowserNavGuard } from '@/features/entries/hooks/use-browser-nav-guard';
 import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
@@ -119,6 +121,11 @@ export function EntryEditor({
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const hasUnsavedChanges = content !== savedContent;
+  const {
+    open: leaveConfirmOpen,
+    cancel: cancelLeaveConfirm,
+    confirm: confirmLeaveConfirm,
+  } = useBrowserNavGuard(hasUnsavedChanges);
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
@@ -725,6 +732,12 @@ export function EntryEditor({
               const text = e.clipboardData.getData('text/plain');
               if (!text) return;
               document.execCommand('insertText', false, text);
+              // execCommand の input イベントが React の onInput にバブルしない
+              // 場合があるため、paste 後に明示的に state を同期する（autosave が
+              // content 変化を検知できるようにするため）
+              const updated = editorRef.current?.textContent ?? '';
+              setContent(updated);
+              if (status === 'saved') setStatus('editing');
             }}
             data-placeholder="今日は何を感じましたか？"
             className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
@@ -798,6 +811,13 @@ export function EntryEditor({
         onSave={handleUnsavedSave}
         onDiscard={handleUnsavedDiscard}
         onClose={() => setPendingNavPath(null)}
+      />
+
+      {/* Browser back/forward confirmation */}
+      <LeaveConfirmModal
+        open={leaveConfirmOpen}
+        onCancel={cancelLeaveConfirm}
+        onConfirm={confirmLeaveConfirm}
       />
     </div>
   );
