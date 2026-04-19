@@ -43,7 +43,7 @@ export class ScheduledFermentationUsecase {
     const usersWithEntries: UserWithEntries[] = [];
 
     for (const userId of userIds) {
-      const entries = await this.entryRepo.listByUserIdAndDate(userId, dateKey);
+      const entries = await this.entryRepo.listFermentationEnabledByUserIdAndDate(userId, dateKey);
       if (entries.length > 0) {
         usersWithEntries.push({
           userId,
@@ -66,7 +66,7 @@ export class ScheduledFermentationUsecase {
       if (activeQuestions.length === 0) continue;
 
       // Get all entries for the day to combine content
-      const entries = await this.entryRepo.listByUserIdAndDate(userId, dateKey);
+      const entries = await this.entryRepo.listFermentationEnabledByUserIdAndDate(userId, dateKey);
       const combinedContent = entries.map((e) => e.toProps().content).join('\n\n---\n\n');
 
       // Use the first entry as the representative entry ID

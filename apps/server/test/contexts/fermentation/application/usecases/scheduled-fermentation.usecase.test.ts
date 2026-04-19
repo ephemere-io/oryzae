@@ -17,6 +17,7 @@ function makeEntry(userId: string, id: string): Entry {
     userId,
     content: `Entry content for ${id}`,
     mediaUrls: [],
+    fermentationEnabled: true,
     createdAt: '2026-04-13T10:00:00.000Z',
     updatedAt: '2026-04-13T10:00:00.000Z',
   });
@@ -53,6 +54,7 @@ function mockEntryRepo(): EntryRepositoryGateway {
     findByIds: vi.fn(),
     listByUserId: vi.fn(),
     listByUserIdAndDate: vi.fn().mockResolvedValue([]),
+    listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
     listByUserIdAndWeek: vi.fn(),
     save: vi.fn(),
     delete: vi.fn(),
@@ -116,7 +118,7 @@ function mockLlm(): LlmAnalysisGateway {
 describe('ScheduledFermentationUsecase', () => {
   const dateKey = '2026-04-13';
 
-  it('skips users with no entries on the target date', async () => {
+  it('skips users with no fermentation-enabled entries on the target date', async () => {
     const entryRepo = mockEntryRepo();
     const questionRepo = mockQuestionRepo();
     const listActiveUserIds = vi.fn().mockResolvedValue(['user-1', 'user-2']);
@@ -138,13 +140,13 @@ describe('ScheduledFermentationUsecase', () => {
     expect(questionRepo.listActiveByUserId).not.toHaveBeenCalled();
   });
 
-  it('runs fermentation for users with entries and active questions', async () => {
+  it('runs fermentation for users with fermentation-enabled entries and active questions', async () => {
     const entry = makeEntry('user-1', 'e1');
     const question = makeQuestion('user-1', 'q1');
     const transaction = makeQuestionTransaction('q1', 'What is love?');
 
     const entryRepo = mockEntryRepo();
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([entry]);
 
     const questionRepo = mockQuestionRepo();
     vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);
@@ -174,12 +176,36 @@ describe('ScheduledFermentationUsecase', () => {
     expect(llm.analyze).toHaveBeenCalledOnce();
   });
 
+  it('fermentation_enabled=false のエントリしかない場合はスキップする', async () => {
+    // Repository's filtered method returns empty array
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([makeQuestion('user-1', 'q1')]);
+
+    const usecase = new ScheduledFermentationUsecase(
+      entryRepo,
+      questionRepo,
+      mockQuestionTransactionRepo(),
+      mockFermentationRepo(),
+      mockLlm(),
+      generateId,
+      vi.fn().mockResolvedValue(['user-1']),
+    );
+
+    const result = await usecase.execute(dateKey);
+
+    expect(result.totalUsers).toBe(0);
+    expect(questionRepo.listActiveByUserId).not.toHaveBeenCalled();
+  });
+
   it('skips questions without validated transaction text', async () => {
     const entry = makeEntry('user-1', 'e1');
     const question = makeQuestion('user-1', 'q1');
 
     const entryRepo = mockEntryRepo();
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([entry]);
 
     const questionRepo = mockQuestionRepo();
     vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);
@@ -215,7 +241,7 @@ describe('ScheduledFermentationUsecase', () => {
     const t2 = makeQuestionTransaction('q2', 'Question 2');
 
     const entryRepo = mockEntryRepo();
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([entry]);
 
     const questionRepo = mockQuestionRepo();
     vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([q1, q2]);
@@ -281,7 +307,7 @@ describe('ScheduledFermentationUsecase', () => {
     const transaction = makeQuestionTransaction('q1', 'My question');
 
     const entryRepo = mockEntryRepo();
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([e1, e2]);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([e1, e2]);
 
     const questionRepo = mockQuestionRepo();
     vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);

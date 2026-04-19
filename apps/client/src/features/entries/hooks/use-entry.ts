@@ -41,23 +41,31 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
   return { entry, loading };
 }
 
+interface SaveOptions {
+  fermentationEnabled?: boolean;
+}
+
 export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const save = useCallback(
-    async (content: string, entryId?: string): Promise<string | null> => {
+    async (content: string, entryId?: string, options?: SaveOptions): Promise<string | null> => {
       if (!api || !content.trim()) return null;
       setSaving(true);
       setError('');
 
-      const body = JSON.stringify({
+      const payload: Record<string, unknown> = {
         content,
         mediaUrls: [],
         editorType: 'plaintext',
         editorVersion: '1.0.0',
         extension: {},
-      });
+      };
+      if (options?.fermentationEnabled !== undefined) {
+        payload.fermentationEnabled = options.fermentationEnabled;
+      }
+      const body = JSON.stringify(payload);
 
       if (entryId) {
         const res = await api.fetch(`/api/v1/entries/${entryId}`, { method: 'PUT', body });
