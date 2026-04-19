@@ -1,82 +1,85 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   DEFAULT_SETTINGS,
   type EditorSettings,
 } from '@/features/entries/components/settings-drawer';
 
-const STORAGE_KEY = 'oryzae-editor-settings';
+const FONT_SIZE_STORAGE_KEY = 'oryzae-editor-font-size';
+const FONT_SIZE_MIN = 14;
+const FONT_SIZE_MAX = 48;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+const LINE_HEIGHT_STORAGE_KEY = 'oryzae-editor-line-height';
+const LINE_HEIGHT_MIN = 1.0;
+const LINE_HEIGHT_MAX = 2.5;
 
-function parseSettings(raw: Record<string, unknown>): EditorSettings {
-  const d = DEFAULT_SETTINGS;
-  return {
-    writingMode:
-      raw.writingMode === 'vertical' || raw.writingMode === 'horizontal'
-        ? raw.writingMode
-        : d.writingMode,
-    fontFamily:
-      raw.fontFamily === 'serif' || raw.fontFamily === 'sans' ? raw.fontFamily : d.fontFamily,
-    fontSize: typeof raw.fontSize === 'number' ? raw.fontSize : d.fontSize,
-    lineHeight: typeof raw.lineHeight === 'number' ? raw.lineHeight : d.lineHeight,
-    timeInscriptionEnabled:
-      typeof raw.timeInscriptionEnabled === 'boolean'
-        ? raw.timeInscriptionEnabled
-        : d.timeInscriptionEnabled,
-    timeInscriptionMode:
-      raw.timeInscriptionMode === 'fontSize' ||
-      raw.timeInscriptionMode === 'fontWeight' ||
-      raw.timeInscriptionMode === 'pressureBleed'
-        ? raw.timeInscriptionMode
-        : d.timeInscriptionMode,
-    eraserTraceEnabled:
-      typeof raw.eraserTraceEnabled === 'boolean' ? raw.eraserTraceEnabled : d.eraserTraceEnabled,
-    ampEnabled: typeof raw.ampEnabled === 'boolean' ? raw.ampEnabled : d.ampEnabled,
-    voiceEnabled: typeof raw.voiceEnabled === 'boolean' ? raw.voiceEnabled : d.voiceEnabled,
-    ghostEnabled: typeof raw.ghostEnabled === 'boolean' ? raw.ghostEnabled : d.ghostEnabled,
-    ghostMode: raw.ghostMode === 'block' || raw.ghostMode === 'dust' ? raw.ghostMode : d.ghostMode,
-    ghostSize: typeof raw.ghostSize === 'number' ? raw.ghostSize : d.ghostSize,
-    ghostScatter: typeof raw.ghostScatter === 'number' ? raw.ghostScatter : d.ghostScatter,
-    ghostBlurStart: typeof raw.ghostBlurStart === 'number' ? raw.ghostBlurStart : d.ghostBlurStart,
-    ghostBlurEnd: typeof raw.ghostBlurEnd === 'number' ? raw.ghostBlurEnd : d.ghostBlurEnd,
-    ghostDuration: typeof raw.ghostDuration === 'number' ? raw.ghostDuration : d.ghostDuration,
-  };
-}
-
-function loadInitial(): EditorSettings {
-  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+function readStoredFontSize(): number | null {
+  if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) return DEFAULT_SETTINGS;
-    return parseSettings(parsed);
+    const raw = window.localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+    if (raw === null) return null;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n)) return null;
+    if (n < FONT_SIZE_MIN || n > FONT_SIZE_MAX) return null;
+    return n;
   } catch {
-    return DEFAULT_SETTINGS;
+    return null;
   }
 }
 
-export function useEditorSettings(): [EditorSettings, (patch: Partial<EditorSettings>) => void] {
-  const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
+function writeStoredFontSize(value: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(value));
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
 
-  useEffect(() => {
-    setSettings(loadInitial());
-  }, []);
+function readStoredLineHeight(): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LINE_HEIGHT_STORAGE_KEY);
+    if (raw === null) return null;
+    const n = Number.parseFloat(raw);
+    if (!Number.isFinite(n)) return null;
+    if (n < LINE_HEIGHT_MIN || n > LINE_HEIGHT_MAX) return null;
+    return n;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLineHeight(value: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LINE_HEIGHT_STORAGE_KEY, String(value));
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
+
+function getInitialSettings(): EditorSettings {
+  const next: EditorSettings = { ...DEFAULT_SETTINGS };
+  const fontSize = readStoredFontSize();
+  if (fontSize !== null) next.fontSize = fontSize;
+  const lineHeight = readStoredLineHeight();
+  if (lineHeight !== null) next.lineHeight = lineHeight;
+  return next;
+}
+
+export function useEditorSettings(): [EditorSettings, (patch: Partial<EditorSettings>) => void] {
+  const [settings, setSettings] = useState<EditorSettings>(getInitialSettings);
 
   const updateSettings = useCallback((patch: Partial<EditorSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // storage unavailable (private mode, quota) — keep in-memory only
-      }
-      return next;
-    });
+    if (typeof patch.fontSize === 'number') {
+      writeStoredFontSize(patch.fontSize);
+    }
+    if (typeof patch.lineHeight === 'number') {
+      writeStoredLineHeight(patch.lineHeight);
+    }
+    setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
 
   return [settings, updateSettings];

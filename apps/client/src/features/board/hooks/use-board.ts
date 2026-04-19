@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 
 interface EntryContent {
@@ -79,13 +79,17 @@ export function useBoard(
 ) {
   const [cards, setCards] = useState<BoardCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const requestIdRef = useRef(0);
 
   const fetchBoard = useCallback(async () => {
     if (!api) return;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     const res = await api.fetch(`/api/v1/board?dateKey=${dateKey}&viewType=${viewType}`);
+    if (requestId !== requestIdRef.current) return;
     if (res.ok) {
       const data: BoardData = await res.json();
+      if (requestId !== requestIdRef.current) return;
       setCards(applyDefaultZOrder(data.cards));
     }
     setLoading(false);
@@ -149,13 +153,17 @@ export function useBoard(
   );
 
   const createPhoto = useCallback(
-    async (file: File, caption: string) => {
+    async (file: File, caption: string, imageWidth?: number, imageHeight?: number) => {
       if (!api) return;
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caption', caption);
       formData.append('dateKey', dateKey);
       formData.append('viewType', viewType);
+      if (imageWidth && imageHeight) {
+        formData.append('imageWidth', String(imageWidth));
+        formData.append('imageHeight', String(imageHeight));
+      }
       const res = await api.fetch('/api/v1/board/photos', {
         method: 'POST',
         body: formData,
