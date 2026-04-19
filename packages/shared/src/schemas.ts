@@ -6,6 +6,7 @@ export const createEntrySchema = z.object({
   editorType: z.string(),
   editorVersion: z.string(),
   extension: z.record(z.unknown()).default({}),
+  fermentationEnabled: z.boolean().optional(),
 });
 
 export const questionStringSchema = z.object({
