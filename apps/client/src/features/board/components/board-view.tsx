@@ -207,7 +207,9 @@ export function BoardView({ api }: BoardViewProps) {
       {/* Photo dialog */}
       <PhotoDialog
         open={photoDialogOpen}
-        onSubmit={(file, caption) => createPhoto(file, caption)}
+        onSubmit={(file, caption, imageWidth, imageHeight) =>
+          createPhoto(file, caption, imageWidth, imageHeight)
+        }
         onClose={() => setPhotoDialogOpen(false)}
       />
 

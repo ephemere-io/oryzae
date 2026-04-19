@@ -12,6 +12,8 @@ interface CreateBoardPhotoInput {
   caption: string;
   dateKey: string;
   viewType?: 'daily' | 'weekly';
+  imageWidth?: number;
+  imageHeight?: number;
 }
 
 interface CreateBoardPhotoResponse {
@@ -27,8 +29,37 @@ interface CreateBoardPhotoResponse {
   zIndex: number;
 }
 
-const DEFAULT_WIDTH = 200;
+const CARD_WIDTH = 200;
+const CONTENT_WIDTH = 176;
+const CAPTION_OFFSET = 68;
+const MAX_CARD_HEIGHT = 360;
+const MIN_CARD_SIZE = 120;
 const DEFAULT_HEIGHT = 250;
+
+function computeCardDimensions(
+  imageWidth?: number,
+  imageHeight?: number,
+): { width: number; height: number } {
+  if (!imageWidth || !imageHeight || imageWidth <= 0 || imageHeight <= 0) {
+    return { width: CARD_WIDTH, height: DEFAULT_HEIGHT };
+  }
+  const aspectRatio = imageWidth / imageHeight;
+  let imgH = CONTENT_WIDTH / aspectRatio;
+  let cardW = CARD_WIDTH;
+  let cardH = imgH + CAPTION_OFFSET;
+
+  if (cardH > MAX_CARD_HEIGHT) {
+    cardH = MAX_CARD_HEIGHT;
+    imgH = cardH - CAPTION_OFFSET;
+    const imgW = imgH * aspectRatio;
+    cardW = imgW + 24;
+  }
+
+  return {
+    width: Math.max(Math.round(cardW), MIN_CARD_SIZE),
+    height: Math.max(Math.round(cardH), MIN_CARD_SIZE),
+  };
+}
 
 export class CreateBoardPhotoUsecase {
   constructor(
@@ -66,6 +97,8 @@ export class CreateBoardPhotoUsecase {
     // New cards should appear on top of existing ones
     const maxZ = await this.boardCardRepo.findMaxZIndex(userId, input.dateKey, vt);
 
+    const { width, height } = computeCardDimensions(input.imageWidth, input.imageHeight);
+
     const cardResult = BoardCard.create(
       {
         userId,
@@ -76,8 +109,8 @@ export class CreateBoardPhotoUsecase {
         x,
         y,
         rotation,
-        width: DEFAULT_WIDTH,
-        height: DEFAULT_HEIGHT,
+        width,
+        height,
         zIndex: maxZ + 1,
       },
       this.generateId,
