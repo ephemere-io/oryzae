@@ -8,6 +8,8 @@ interface SaveTitleModalProps {
   saving: boolean;
   onSave: (title: string) => void;
   onClose: () => void;
+  heading?: string;
+  submitLabel?: string;
 }
 
 export function SaveTitleModal({
@@ -16,6 +18,8 @@ export function SaveTitleModal({
   saving,
   onSave,
   onClose,
+  heading = 'エントリを保存',
+  submitLabel = '保存',
 }: SaveTitleModalProps) {
   const [title, setTitle] = useState(initialTitle);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,7 +60,7 @@ export function SaveTitleModal({
         style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
         <h3 className="mb-4 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-          エントリを保存
+          {heading}
         </h3>
         <label
           className="mb-1.5 block text-xs"
@@ -99,7 +103,7 @@ export function SaveTitleModal({
             className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
-            {saving ? '保存中...' : '保存'}
+            {saving ? '保存中...' : submitLabel}
           </button>
         </div>
       </form>

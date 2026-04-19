@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/fermentation",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/cost-alert",
+      "schedule": "0 1 * * *"
     }
   ]
 }

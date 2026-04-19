@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
@@ -31,6 +32,7 @@ export const cronFermentation = new Hono()
     const entryRepo = new SupabaseEntryRepository(supabase);
     const questionRepo = new SupabaseQuestionRepository(supabase);
     const questionTransactionRepo = new SupabaseQuestionTransactionRepository(supabase);
+    const entryQuestionLinkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
     const fermentationRepo = new SupabaseFermentationRepository(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
 
@@ -50,6 +52,7 @@ export const cronFermentation = new Hono()
       entryRepo,
       questionRepo,
       questionTransactionRepo,
+      entryQuestionLinkRepo,
       fermentationRepo,
       llmGateway,
       generateId,
