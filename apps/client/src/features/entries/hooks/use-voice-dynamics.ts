@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * 音量内包エフェクト
@@ -9,6 +9,17 @@ import { useEffect, useRef } from 'react';
  * 声の大きさに応じてテキストのフォントサイズが変化する (1.0em〜4.5em)。
  * 認識中のテキストはリアルタイムで音量に追従し、確定時にピーク音量でロック。
  */
+
+export type VoiceUnavailableReason =
+  | 'unsupported' // SpeechRecognition コンストラクタが存在しない
+  | 'network' // 認識バックエンド（Chrome は Google サーバー）に到達できない (Brave 等でブロック)
+  | 'not-allowed' // マイク権限拒否
+  | 'service-not-allowed'; // OS / ブラウザが認識サービスを無効化
+
+export type VoiceDynamicsState = {
+  unavailable: boolean;
+  reason: VoiceUnavailableReason | null;
+};
 
 function mapVolumeToSize(rms: number): number {
   const effective = Math.max(0, rms - 0.01);
@@ -38,7 +49,6 @@ function insertNodeAtCursor(editor: HTMLElement, node: Node) {
   sel.addRange(range);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Web Speech API types are not in standard TS lib
 type SpeechRecognitionLike = {
   start(): void;
   stop(): void;
@@ -59,10 +69,12 @@ function getSpeechRecognitionConstructor(): (new () => SpeechRecognitionLike) | 
     | null;
 }
 
+const FATAL_ERROR_CODES = new Set<string>(['network', 'not-allowed', 'service-not-allowed']);
+
 export function useVoiceDynamics(
   editorRef: React.RefObject<HTMLDivElement | null>,
   enabled: boolean,
-) {
+): VoiceDynamicsState {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -72,12 +84,17 @@ export function useVoiceDynamics(
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const [state, setState] = useState<VoiceDynamicsState>({ unavailable: false, reason: null });
 
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor || !enabled) return;
 
+    // 前回の unavailable 判定は enabled トグルごとにリセット（ユーザーが再試行できるように）
+    setState({ unavailable: false, reason: null });
+
     let dataArray: Float32Array<ArrayBuffer> | null = null;
+    let fatalError = false;
 
     function ensureInterim() {
       if (!interimRef.current?.parentNode) {
@@ -137,7 +154,9 @@ export function useVoiceDynamics(
         const ctx = new AudioContext();
         if (ctx.state === 'suspended') await ctx.resume();
         audioCtxRef.current = ctx;
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: 'default' },
+        });
         streamRef.current = stream;
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 512;
@@ -146,14 +165,21 @@ export function useVoiceDynamics(
         source.connect(analyser);
         dataArray = new Float32Array(analyser.frequencyBinCount);
         audioLoop();
-      } catch {
-        // Microphone access denied
+      } catch (err) {
+        const name = err instanceof Error ? err.name : '';
+        if (name === 'NotAllowedError' || name === 'SecurityError') {
+          fatalError = true;
+          setState({ unavailable: true, reason: 'not-allowed' });
+        }
       }
     }
 
     function startSpeech() {
       const SR = getSpeechRecognitionConstructor();
-      if (!SR) return;
+      if (!SR) {
+        setState({ unavailable: true, reason: 'unsupported' });
+        return;
+      }
 
       const recognition = new SR();
       recognition.continuous = false;
@@ -165,7 +191,6 @@ export function useVoiceDynamics(
         ensureInterim();
       };
 
-      // biome-ignore lint/suspicious/noExplicitAny: Web Speech API event types
       recognition.onresult = (e: Record<string, unknown>) => {
         const results = e.results as { isFinal: boolean; 0: { transcript: string } }[];
         const resultIndex = (e.resultIndex as number) ?? 0;
@@ -187,18 +212,24 @@ export function useVoiceDynamics(
         }
       };
 
-      recognition.onerror = () => {
-        // Ignore no-speech / aborted errors
+      recognition.onerror = (e: Record<string, unknown>) => {
+        const code = typeof e.error === 'string' ? e.error : '';
+        if (FATAL_ERROR_CODES.has(code)) {
+          // Brave などで認識バックエンドに到達できない場合、再試行ループを止めて UI 側に通知
+          fatalError = true;
+          setState({ unavailable: true, reason: code as VoiceUnavailableReason });
+        }
       };
 
       recognition.onend = () => {
+        if (fatalError) return;
         if (enabledRef.current && recognitionRef.current) {
           setTimeout(() => {
-            if (enabledRef.current && recognitionRef.current) {
+            if (enabledRef.current && recognitionRef.current && !fatalError) {
               try {
                 recognitionRef.current.start();
               } catch {
-                // ignore
+                // ignore restart failures (InvalidStateError 等)
               }
             }
           }, 50);
@@ -208,7 +239,7 @@ export function useVoiceDynamics(
       try {
         recognition.start();
       } catch {
-        // ignore
+        // ignore; onerror will fire if there's a real problem
       }
     }
 
@@ -242,4 +273,6 @@ export function useVoiceDynamics(
       }
     };
   }, [editorRef, enabled]);
+
+  return state;
 }
