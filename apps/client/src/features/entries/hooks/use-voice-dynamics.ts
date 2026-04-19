@@ -69,7 +69,9 @@ function getSpeechRecognitionConstructor(): (new () => SpeechRecognitionLike) | 
     | null;
 }
 
-const FATAL_ERROR_CODES = new Set<string>(['network', 'not-allowed', 'service-not-allowed']);
+function isFatalErrorCode(s: string): s is VoiceUnavailableReason {
+  return s === 'network' || s === 'not-allowed' || s === 'service-not-allowed';
+}
 
 export function useVoiceDynamics(
   editorRef: React.RefObject<HTMLDivElement | null>,
@@ -214,10 +216,10 @@ export function useVoiceDynamics(
 
       recognition.onerror = (e: Record<string, unknown>) => {
         const code = typeof e.error === 'string' ? e.error : '';
-        if (FATAL_ERROR_CODES.has(code)) {
+        if (isFatalErrorCode(code)) {
           // Brave などで認識バックエンドに到達できない場合、再試行ループを止めて UI 側に通知
           fatalError = true;
-          setState({ unavailable: true, reason: code as VoiceUnavailableReason });
+          setState({ unavailable: true, reason: code });
         }
       };
 
