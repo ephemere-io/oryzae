@@ -42,6 +42,16 @@ export function BoardView({ api }: BoardViewProps) {
     useBoard(api, dateKey, viewType);
   const { savePositions } = useBoardSave(api);
 
+  const [showLoader, setShowLoader] = useState(false);
+  useEffect(() => {
+    if (!loading) {
+      setShowLoader(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoader(true), 250);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   const handleCardsChange = useCallback(
     (newCards: BoardCardData[]) => {
       setCards(newCards);
@@ -129,7 +139,7 @@ export function BoardView({ api }: BoardViewProps) {
         }}
       />
 
-      <BoardDateNav dateKey={dateKey} onDateChange={setDateKey} />
+      <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
       <BoardControls
         viewType={viewType}
         onViewTypeChange={setViewType}
@@ -139,12 +149,21 @@ export function BoardView({ api }: BoardViewProps) {
 
       {/* Canvas */}
       <div className="relative min-h-full" style={{ minWidth: 1200, minHeight: 900 }}>
-        {loading && (
+        {showLoader && (
           <div
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs"
-            style={{ color: 'var(--date-color)' }}
+            className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
+            style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
           >
             Loading...
+          </div>
+        )}
+
+        {!loading && cards.filter((c) => !c.removing).length === 0 && (
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
+            style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
+          >
+            この期間のデータはありません
           </div>
         )}
 

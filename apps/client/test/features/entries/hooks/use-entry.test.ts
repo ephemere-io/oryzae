@@ -111,4 +111,36 @@ describe('useSaveEntry', () => {
       expect.objectContaining({ method: 'PUT' }),
     );
   });
+
+  it('fermentationEnabled 未指定時はペイロードに含めない', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }));
+
+    await act(async () => {
+      await result.current.save('content');
+    });
+
+    const call = apiFetch.mock.calls[0];
+    const bodyStr: string = call[1].body;
+    const body = JSON.parse(bodyStr) as Record<string, unknown>;
+    expect(body.fermentationEnabled).toBeUndefined();
+  });
+
+  it('fermentationEnabled=true を指定するとペイロードに含まれる', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }));
+
+    await act(async () => {
+      await result.current.save('content', undefined, { fermentationEnabled: true });
+    });
+
+    const call = apiFetch.mock.calls[0];
+    const bodyStr: string = call[1].body;
+    const body = JSON.parse(bodyStr) as Record<string, unknown>;
+    expect(body.fermentationEnabled).toBe(true);
+  });
 });
