@@ -2,7 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
+import {
+  type EditorStatus,
+  EditorStatusBar,
+} from '@/features/entries/components/editor-status-bar';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
 import {
@@ -14,6 +17,7 @@ import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
+import { useAutosaveEntry } from '@/features/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
@@ -93,7 +97,9 @@ export function EntryEditor({
   const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');
   const [titleEditModalOpen, setTitleEditModalOpen] = useState(false);
+  const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   const [statsOpen, setStatsOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
@@ -103,7 +109,8 @@ export function EntryEditor({
   function updateSettings(patch: Partial<EditorSettings>) {
     setSettings((prev) => ({ ...prev, ...patch }));
   }
-  const [status, setStatus] = useState<'editing' | 'saved' | 'saving'>('editing');
+  const [status, setStatus] = useState<EditorStatus>('editing');
+  const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   const [dateStr, setDateStr] = useState(() => {
     const now = new Date();
@@ -142,7 +149,7 @@ export function EntryEditor({
   }, [createdAtIso]);
 
   useEffect(() => {
-    if (saving) setStatus('saving');
+    if (saving) setStatus(isAutosavingRef.current ? 'autosaving' : 'saving');
   }, [saving]);
 
   // Track scroll position of editor to show/hide fade overlays
@@ -212,38 +219,50 @@ export function EntryEditor({
   }
 
   const handleSaveWithTitle = useCallback(
-    async (newTitle: string) => {
+    async (newTitle: string, options: { fermentationEnabled?: boolean } = {}) => {
       // Combine title + body into content for storage
       const finalContent = newTitle.trim() ? `${newTitle.trim()}\n${content}` : content;
+      const targetId = currentEntryId ?? entryId;
+      const isNew = !targetId;
 
-      const savedId = await save(finalContent, entryId);
+      const savedId = await save(
+        finalContent,
+        targetId,
+        options.fermentationEnabled !== undefined
+          ? { fermentationEnabled: options.fermentationEnabled }
+          : undefined,
+      );
       if (savedId) {
         setTitle(newTitle.trim());
         setSavedContent(content);
+        setCurrentEntryId(savedId);
         setSaveModalOpen(false);
         setTitleEditModalOpen(false);
         setStatus('saved');
-        // Update the date display with new updated_at
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
         setDateStr(formatDateStr(created, new Date()));
-        // Link new questions for newly created entries
-        if (!entryId && onLinkQuestion) {
+        if (isNew && onLinkQuestion) {
           for (const qId of linkedIds) {
             await onLinkQuestion(savedId, qId);
           }
         }
         setTimeout(() => setStatus('editing'), 2000);
         onSaveComplete?.(savedId, finalContent);
-        // Trigger save→jar transition animation only when content has changed
-        if (onSaveTransition && editorRef.current && finalContent.trim() && hasUnsavedChanges) {
+        if (
+          options.fermentationEnabled &&
+          onSaveTransition &&
+          editorRef.current &&
+          finalContent.trim()
+        ) {
           await onSaveTransition(finalContent, editorRef.current);
-        } else if (!entryId) {
+        } else if (isNew) {
           router.push(`/entries/${savedId}`);
         }
       }
     },
     [
       content,
+      currentEntryId,
       entryId,
       save,
       linkedIds,
@@ -251,20 +270,52 @@ export function EntryEditor({
       router,
       onSaveComplete,
       onSaveTransition,
-      hasUnsavedChanges,
       createdAtIso,
     ],
   );
 
   const handleSaveClick = useCallback(() => {
     if (!content.trim()) return;
-    // Always show title modal for new entries; for existing, save directly
-    if (!entryId) {
-      setSaveModalOpen(true);
-    } else {
-      handleSaveWithTitle(title);
-    }
-  }, [content, entryId, handleSaveWithTitle, title]);
+    setSaveModalMode('save');
+    setSaveModalOpen(true);
+  }, [content]);
+
+  const handlePickleClick = useCallback(() => {
+    if (!content.trim()) return;
+    setSaveModalMode('pickle');
+    setSaveModalOpen(true);
+  }, [content]);
+
+  const handleAutosaved = useCallback(
+    (newId: string, savedBody: string) => {
+      // Track the id locally so subsequent autosaves PUT instead of POST.
+      // URL stays the same — the 新規エントリ button and browser refresh
+      // continue to behave as if the user is still composing.
+      if (currentEntryId !== newId) setCurrentEntryId(newId);
+      setSavedContent(savedBody);
+      setStatus('saved');
+      isAutosavingRef.current = false;
+      setTimeout(() => setStatus('editing'), 2000);
+    },
+    [currentEntryId],
+  );
+
+  const autoSave = useCallback(
+    (contentToSave: string, id?: string) => {
+      isAutosavingRef.current = true;
+      return save(contentToSave, id);
+    },
+    [save],
+  );
+
+  useAutosaveEntry({
+    title,
+    body: content,
+    entryId: currentEntryId,
+    enabled: !!api,
+    save: autoSave,
+    onSaved: handleAutosaved,
+  });
 
   /** Navigate with unsaved-changes guard */
   const guardedNavigate = useCallback(
@@ -279,7 +330,7 @@ export function EntryEditor({
   );
 
   const handleUnsavedSave = useCallback(() => {
-    // Save first, then navigate
+    setSaveModalMode('save');
     setSaveModalOpen(true);
   }, []);
 
@@ -602,7 +653,7 @@ export function EntryEditor({
             onClick={handleSaveClick}
             disabled={saving || !content.trim()}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip="保存"
+            data-tooltip="保存する"
           >
             <svg
               aria-hidden="true"
@@ -617,6 +668,29 @@ export function EntryEditor({
                 strokeLinejoin="round"
                 d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
               />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={handlePickleClick}
+            disabled={saving || !content.trim()}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
+            data-tooltip="漬け込む"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 4.5h12M7.5 4.5v-2a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v2M5 8.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-11Z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 11v5M12 11v5M15 11v5" />
             </svg>
           </button>
           <button
@@ -697,14 +771,15 @@ export function EntryEditor({
       {/* Status bar */}
       <EditorStatusBar status={status} charCount={charCount} />
 
-      {/* Save title modal (new entry first save) */}
+      {/* Save title modal — shared between 保存する and 漬け込む */}
       <SaveTitleModal
         open={saveModalOpen}
-        initialTitle=""
+        initialTitle={title}
         saving={saving}
+        heading={saveModalMode === 'pickle' ? 'エントリを瓶に漬け込む' : 'エントリを保存'}
+        submitLabel={saveModalMode === 'pickle' ? '漬け込む' : '保存'}
         onSave={(t) => {
-          handleSaveWithTitle(t);
-          // After saving, if there was a pending navigation, execute it
+          handleSaveWithTitle(t, saveModalMode === 'pickle' ? { fermentationEnabled: true } : {});
           if (pendingNavPath) {
             const path = pendingNavPath;
             setPendingNavPath(null);
