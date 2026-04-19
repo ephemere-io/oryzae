@@ -54,6 +54,25 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
+  async listFermentationEnabledByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]> {
+    const startOfDay = `${dateKey}T00:00:00.000Z`;
+    const nextDay = new Date(`${dateKey}T00:00:00.000Z`);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    const endOfDay = nextDay.toISOString();
+
+    const { data, error } = await this.supabase
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('fermentation_enabled', true)
+      .gte('created_at', startOfDay)
+      .lt('created_at', endOfDay)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
   async listByUserIdAndWeek(userId: string, dateKey: string): Promise<Entry[]> {
     // Calculate Monday of the week containing dateKey
     const d = new Date(`${dateKey}T00:00:00.000Z`);
@@ -82,6 +101,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       user_id: props.userId,
       content: props.content,
       media_urls: props.mediaUrls,
+      fermentation_enabled: props.fermentationEnabled,
       created_at: props.createdAt,
       updated_at: props.updatedAt,
     });
@@ -99,6 +119,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       userId: row.user_id as string,
       content: row.content as string,
       mediaUrls: (row.media_urls as string[]) ?? [],
+      fermentationEnabled: (row.fermentation_enabled as boolean) ?? false,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     });
