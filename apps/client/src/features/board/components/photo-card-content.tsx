@@ -17,14 +17,18 @@ export function PhotoCardContent({ content }: PhotoCardContentProps) {
         alt={content.caption || 'Board photo'}
         style={{
           width: '100%',
-          aspectRatio: '1',
-          objectFit: 'cover',
+          flex: '1 1 auto',
+          minHeight: 0,
+          objectFit: 'contain',
           display: 'block',
           backgroundColor: 'var(--toolbar-hover)',
         }}
       />
       {content.caption && (
-        <p className="mt-2 text-center text-xs italic" style={{ color: 'var(--date-color)' }}>
+        <p
+          className="mt-2 shrink-0 text-center text-xs italic"
+          style={{ color: 'var(--date-color)' }}
+        >
           {content.caption}
         </p>
       )}

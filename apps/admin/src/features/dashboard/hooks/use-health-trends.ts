@@ -6,6 +6,8 @@ import { getAccessToken } from '@/lib/auth';
 
 export interface TrendDay {
   date: string;
+  totalFermentations: number;
+  completedFermentations: number;
   successRate: number;
   activeWriters: number;
 }
@@ -23,17 +25,28 @@ export function useHealthTrends(dateFrom?: string, dateTo?: string) {
     setError(null);
 
     const params = new URLSearchParams();
-    if (dateFrom) params.set('dateFrom', dateFrom);
-    if (dateTo) params.set('dateTo', dateTo);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
     const qs = params.toString();
 
     const api = createApiClient(token);
     const res = await api.fetch(`/api/v1/admin/dashboard/trends${qs ? `?${qs}` : ''}`);
     if (res.ok) {
-      const data: unknown = await res.json();
-      if (Array.isArray(data)) {
-        setDays(data as TrendDay[]); // @type-assertion-allowed: APIレスポンスの型をバリデーション後にキャスト
-      }
+      const body = (await res.json()) as {
+        days: {
+          date: string;
+          totalFermentations: number;
+          completedFermentations: number;
+          activeWriters: number;
+        }[];
+      };
+      setDays(
+        (body.days ?? []).map((d) => ({
+          ...d,
+          successRate:
+            d.totalFermentations > 0 ? (d.completedFermentations / d.totalFermentations) * 100 : 0,
+        })),
+      );
     } else {
       setError('トレンドデータの取得に失敗しました');
     }

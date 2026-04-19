@@ -1,6 +1,6 @@
 'use client';
 
-import { RotateCcw } from 'lucide-react';
+import { PlayCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { FermentationDetailResponse } from '../hooks/use-fermentation-detail';
@@ -56,7 +56,7 @@ export function FermentationDetailHeader({ data, onRetry }: FermentationDetailHe
         </span>
         {data.status === 'failed' && onRetry && (
           <Button variant="ghost" size="xs" disabled={retrying} onClick={handleRetry}>
-            <RotateCcw className={`h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
+            <PlayCircle className={`h-3.5 w-3.5 ${retrying ? 'animate-pulse' : ''}`} />
             Retry
           </Button>
         )}

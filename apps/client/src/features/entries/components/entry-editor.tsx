@@ -2,18 +2,21 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { EditorStatusBar } from '@/features/entries/components/editor-status-bar';
+import {
+  type EditorStatus,
+  EditorStatusBar,
+} from '@/features/entries/components/editor-status-bar';
+import { LeaveConfirmModal } from '@/features/entries/components/leave-confirm-modal';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
-import {
-  DEFAULT_SETTINGS,
-  type EditorSettings,
-  SettingsDrawer,
-} from '@/features/entries/components/settings-drawer';
+import { SettingsDrawer } from '@/features/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
+import { useAutosaveEntry } from '@/features/entries/hooks/use-autosave-entry';
+import { useBrowserNavGuard } from '@/features/entries/hooks/use-browser-nav-guard';
+import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
@@ -90,21 +93,20 @@ export function EntryEditor({
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
-  const [settings, setSettings] = useState<EditorSettings>(DEFAULT_SETTINGS);
+  const [settings, updateSettings] = useEditorSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
+  const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   const [statsOpen, setStatsOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [fadeRight, setFadeRight] = useState(false);
-
-  function updateSettings(patch: Partial<EditorSettings>) {
-    setSettings((prev) => ({ ...prev, ...patch }));
-  }
-  const [status, setStatus] = useState<'editing' | 'saved' | 'saving'>('editing');
+  const [status, setStatus] = useState<EditorStatus>('editing');
+  const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   const [dateStr, setDateStr] = useState(() => {
     const now = new Date();
@@ -121,6 +123,11 @@ export function EntryEditor({
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const hasUnsavedChanges = content !== savedContent;
+  const {
+    open: leaveConfirmOpen,
+    cancel: cancelLeaveConfirm,
+    confirm: confirmLeaveConfirm,
+  } = useBrowserNavGuard(hasUnsavedChanges);
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
@@ -144,7 +151,7 @@ export function EntryEditor({
   }, [createdAtIso]);
 
   useEffect(() => {
-    if (saving) setStatus('saving');
+    if (saving) setStatus(isAutosavingRef.current ? 'autosaving' : 'saving');
   }, [saving]);
 
   // Track scroll position of editor to show/hide fade overlays
@@ -214,38 +221,50 @@ export function EntryEditor({
   }
 
   const handleSaveWithTitle = useCallback(
-    async (newTitle: string) => {
+    async (newTitle: string, options: { fermentationEnabled?: boolean } = {}) => {
       // Combine title + body into content for storage
       const finalContent = newTitle.trim() ? `${newTitle.trim()}\n${content}` : content;
+      const targetId = currentEntryId ?? entryId;
+      const isNew = !targetId;
 
-      const savedId = await save(finalContent, entryId);
+      const savedId = await save(
+        finalContent,
+        targetId,
+        options.fermentationEnabled !== undefined
+          ? { fermentationEnabled: options.fermentationEnabled }
+          : undefined,
+      );
       if (savedId) {
         setTitle(newTitle.trim());
         setSavedContent(content);
+        setCurrentEntryId(savedId);
         setSaveModalOpen(false);
         setIsEditingTitle(false);
         setStatus('saved');
-        // Update the date display with new updated_at
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
         setDateStr(formatDateStr(created, new Date()));
-        // Link new questions for newly created entries
-        if (!entryId && onLinkQuestion) {
+        if (isNew && onLinkQuestion) {
           for (const qId of linkedIds) {
             await onLinkQuestion(savedId, qId);
           }
         }
         setTimeout(() => setStatus('editing'), 2000);
         onSaveComplete?.(savedId, finalContent);
-        // Trigger save→jar transition animation only when content has changed
-        if (onSaveTransition && editorRef.current && finalContent.trim() && hasUnsavedChanges) {
+        if (
+          options.fermentationEnabled &&
+          onSaveTransition &&
+          editorRef.current &&
+          finalContent.trim()
+        ) {
           await onSaveTransition(finalContent, editorRef.current);
-        } else if (!entryId) {
+        } else if (isNew) {
           router.push(`/entries/${savedId}`);
         }
       }
     },
     [
       content,
+      currentEntryId,
       entryId,
       save,
       linkedIds,
@@ -253,20 +272,27 @@ export function EntryEditor({
       router,
       onSaveComplete,
       onSaveTransition,
-      hasUnsavedChanges,
       createdAtIso,
     ],
   );
 
   const handleSaveClick = useCallback(() => {
     if (!content.trim()) return;
-    // New entries: if title is empty, force input via modal; otherwise save directly
+    // For new entries with no inline title yet, prompt via modal; otherwise save directly.
     if (!entryId && !title.trim()) {
+      setSaveModalMode('save');
       setSaveModalOpen(true);
     } else {
       handleSaveWithTitle(title);
     }
   }, [content, entryId, handleSaveWithTitle, title]);
+
+  // 漬け込む is an irreversible deliberate action — always open the modal for confirmation.
+  const handlePickleClick = useCallback(() => {
+    if (!content.trim()) return;
+    setSaveModalMode('pickle');
+    setSaveModalOpen(true);
+  }, [content]);
 
   const startTitleEdit = useCallback(() => {
     setDraftTitle(title);
@@ -280,7 +306,8 @@ export function EntryEditor({
 
   const commitTitleEdit = useCallback(() => {
     const trimmed = draftTitle.trim();
-    if (entryId) {
+    const targetId = currentEntryId ?? entryId;
+    if (targetId) {
       if (trimmed !== title) {
         handleSaveWithTitle(trimmed);
       } else {
@@ -290,7 +317,7 @@ export function EntryEditor({
       setTitle(trimmed);
       setIsEditingTitle(false);
     }
-  }, [draftTitle, entryId, handleSaveWithTitle, title]);
+  }, [draftTitle, currentEntryId, entryId, handleSaveWithTitle, title]);
 
   useEffect(() => {
     if (isEditingTitle) {
@@ -301,6 +328,37 @@ export function EntryEditor({
       return () => clearTimeout(t);
     }
   }, [isEditingTitle]);
+
+  const handleAutosaved = useCallback(
+    (newId: string, savedBody: string) => {
+      // Track the id locally so subsequent autosaves PUT instead of POST.
+      // URL stays the same — the 新規エントリ button and browser refresh
+      // continue to behave as if the user is still composing.
+      if (currentEntryId !== newId) setCurrentEntryId(newId);
+      setSavedContent(savedBody);
+      setStatus('saved');
+      isAutosavingRef.current = false;
+      setTimeout(() => setStatus('editing'), 2000);
+    },
+    [currentEntryId],
+  );
+
+  const autoSave = useCallback(
+    (contentToSave: string, id?: string) => {
+      isAutosavingRef.current = true;
+      return save(contentToSave, id);
+    },
+    [save],
+  );
+
+  useAutosaveEntry({
+    title,
+    body: content,
+    entryId: currentEntryId,
+    enabled: !!api,
+    save: autoSave,
+    onSaved: handleAutosaved,
+  });
 
   /** Navigate with unsaved-changes guard */
   const guardedNavigate = useCallback(
@@ -315,9 +373,18 @@ export function EntryEditor({
   );
 
   const handleUnsavedSave = useCallback(() => {
-    // Save first, then navigate
-    setSaveModalOpen(true);
-  }, []);
+    if (!entryId && !title.trim()) {
+      setSaveModalMode('save');
+      setSaveModalOpen(true);
+    } else {
+      handleSaveWithTitle(title);
+      if (pendingNavPath) {
+        const path = pendingNavPath;
+        setPendingNavPath(null);
+        setTimeout(() => router.push(path), 300);
+      }
+    }
+  }, [entryId, handleSaveWithTitle, pendingNavPath, router, title]);
 
   const handleUnsavedDiscard = useCallback(() => {
     const path = pendingNavPath;
@@ -367,11 +434,12 @@ export function EntryEditor({
       {/* Top toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
         <div className="flex items-center gap-2">
+          {/* New entry */}
           <button
             type="button"
-            onClick={() => setSettingsOpen(!settingsOpen)}
+            onClick={() => guardedNavigate('/entries/new')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="設定"
+            data-tooltip="新規エントリ"
           >
             <svg
               aria-hidden="true"
@@ -384,20 +452,17 @@ export function EntryEditor({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
               />
             </svg>
           </button>
+          {/* Save */}
           <button
             type="button"
-            onClick={toggleFullscreen}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="フルスクリーン"
+            onClick={handleSaveClick}
+            disabled={saving || !content.trim()}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
+            data-tooltip="保存する"
           >
             <svg
               aria-hidden="true"
@@ -410,13 +475,78 @@ export function EntryEditor({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
               />
+            </svg>
+          </button>
+          {/* Pickle */}
+          <button
+            type="button"
+            onClick={handlePickleClick}
+            disabled={saving || !content.trim()}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
+            data-tooltip="漬け込む"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 4.5h12M7.5 4.5v-2a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v2M5 8.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-11Z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 11v5M12 11v5M15 11v5" />
+            </svg>
+          </button>
+          {/* List */}
+          <button
+            type="button"
+            onClick={() => guardedNavigate('/entries')}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip="一覧"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
+              />
+            </svg>
+          </button>
+          {/* Stats */}
+          <button
+            type="button"
+            onClick={() => setStatsOpen((v) => !v)}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip="執筆統計"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="currentColor"
+              stroke="none"
+              viewBox="0 0 24 24"
+            >
+              <rect x="4" y="14" width="4" height="7" />
+              <rect x="10" y="10" width="4" height="11" />
+              <rect x="16" y="3" width="4" height="18" />
             </svg>
           </button>
         </div>
 
-        {/* Date + title display (title sits directly under the date) */}
+        {/* Date + inline title (title sits directly under the date) */}
         <div className="flex min-w-0 flex-col items-center gap-0.5">
           <span className="text-xs text-zinc-400">{dateStr}</span>
           {isEditingTitle ? (
@@ -452,6 +582,55 @@ export function EntryEditor({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Voice input */}
+          <button
+            type="button"
+            onClick={() => setVoiceActive((v) => !v)}
+            className={`rounded-md p-1.5 transition-all ${
+              voiceActive
+                ? 'text-red-500'
+                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+            }`}
+            data-tooltip={voiceActive ? '音声入力停止' : '音声入力'}
+          >
+            <svg
+              aria-hidden="true"
+              className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+            >
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+            </svg>
+          </button>
+          {/* Settings */}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip="設定"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+              />
+            </svg>
+          </button>
           {/* Writing direction toggle */}
           <button
             type="button"
@@ -504,6 +683,28 @@ export function EntryEditor({
               >
                 T
               </text>
+            </svg>
+          </button>
+          {/* Fullscreen */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip="フルスクリーン"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+              />
             </svg>
           </button>
         </div>
@@ -587,9 +788,15 @@ export function EntryEditor({
               const text = e.clipboardData.getData('text/plain');
               if (!text) return;
               document.execCommand('insertText', false, text);
+              // execCommand の input イベントが React の onInput にバブルしない
+              // 場合があるため、paste 後に明示的に state を同期する（autosave が
+              // content 変化を検知できるようにするため）
+              const updated = editorRef.current?.textContent ?? '';
+              setContent(updated);
+              if (status === 'saved') setStatus('editing');
             }}
             data-placeholder="今日は何を感じましたか？"
-            className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'absolute inset-0' : 'min-h-full px-[15%] py-6'}`}
+            className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
             style={{
               ...(settings.writingMode === 'vertical'
                 ? {
@@ -602,6 +809,7 @@ export function EntryEditor({
                   }
                 : {}),
               fontSize: `${settings.fontSize}px`,
+              lineHeight: settings.lineHeight,
               writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
               textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
               fontFamily:
@@ -611,119 +819,6 @@ export function EntryEditor({
             }}
           />
         </div>
-      </div>
-
-      {/* Bottom toolbar */}
-      <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => guardedNavigate('/entries/new')}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="新規エントリ"
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveClick}
-            disabled={saving || !content.trim()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip="保存"
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => guardedNavigate('/entries')}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="一覧"
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Center: mic */}
-        <button
-          type="button"
-          onClick={() => setVoiceActive((v) => !v)}
-          className={`rounded-md p-1.5 transition-all ${
-            voiceActive
-              ? 'text-red-500'
-              : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-          }`}
-          data-tooltip={voiceActive ? '音声入力停止' : '音声入力'}
-        >
-          <svg
-            aria-hidden="true"
-            className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-          >
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
-          </svg>
-        </button>
-
-        {/* Right: stats */}
-        <button
-          type="button"
-          onClick={() => setStatsOpen((v) => !v)}
-          className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-          data-tooltip="執筆統計"
-        >
-          <svg
-            aria-hidden="true"
-            className="h-5 w-5"
-            fill="currentColor"
-            stroke="none"
-            viewBox="0 0 24 24"
-          >
-            <rect x="4" y="14" width="4" height="7" />
-            <rect x="10" y="10" width="4" height="11" />
-            <rect x="16" y="3" width="4" height="18" />
-          </svg>
-        </button>
       </div>
 
       {/* Stats popup */}
@@ -737,14 +832,15 @@ export function EntryEditor({
       {/* Status bar */}
       <EditorStatusBar status={status} charCount={charCount} />
 
-      {/* Save title modal (new entry first save) */}
+      {/* Save title modal — shared between 保存する and 漬け込む */}
       <SaveTitleModal
         open={saveModalOpen}
-        initialTitle=""
+        initialTitle={title}
         saving={saving}
+        heading={saveModalMode === 'pickle' ? 'エントリを瓶に漬け込む' : 'エントリを保存'}
+        submitLabel={saveModalMode === 'pickle' ? '漬け込む' : '保存'}
         onSave={(t) => {
-          handleSaveWithTitle(t);
-          // After saving, if there was a pending navigation, execute it
+          handleSaveWithTitle(t, saveModalMode === 'pickle' ? { fermentationEnabled: true } : {});
           if (pendingNavPath) {
             const path = pendingNavPath;
             setPendingNavPath(null);
@@ -763,6 +859,13 @@ export function EntryEditor({
         onSave={handleUnsavedSave}
         onDiscard={handleUnsavedDiscard}
         onClose={() => setPendingNavPath(null)}
+      />
+
+      {/* Browser back/forward confirmation */}
+      <LeaveConfirmModal
+        open={leaveConfirmOpen}
+        onCancel={cancelLeaveConfirm}
+        onConfirm={confirmLeaveConfirm}
       />
     </div>
   );

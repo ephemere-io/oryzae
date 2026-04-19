@@ -15,21 +15,15 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
   }, [loading, auth, router]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
-      </div>
-    );
-  }
-
-  if (!auth) return null;
+  if (!auth && !loading) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AdminSidebar />
       <main className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-[1400px]">{children}</div>
+        <div className="mx-auto max-w-[1400px]">
+          {loading ? <p className="py-8 text-sm text-muted-foreground">読み込み中...</p> : children}
+        </div>
       </main>
     </div>
   );

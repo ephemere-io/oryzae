@@ -154,6 +154,74 @@ describe('useBoard', () => {
     expect(newCard!.zIndex).toBeGreaterThan(oldCard!.zIndex);
   });
 
+  it('dateKey を高速に切り替えても、古いリクエストの結果で新しい日付の状態を上書きしない', async () => {
+    const stale = {
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      cards: [
+        {
+          id: 'stale-card',
+          cardType: 'entry',
+          refId: 'e-stale',
+          x: 0,
+          y: 0,
+          rotation: 0,
+          width: 340,
+          height: 280,
+          zIndex: 0,
+          createdAt: '2026-04-11T00:00:00Z',
+          content: { title: 'Stale', preview: 'P', createdAt: '2026-04-11T00:00:00Z' },
+        },
+      ],
+    };
+    const fresh = {
+      dateKey: '2026-04-12',
+      viewType: 'daily',
+      cards: [
+        {
+          id: 'fresh-card',
+          cardType: 'entry',
+          refId: 'e-fresh',
+          x: 0,
+          y: 0,
+          rotation: 0,
+          width: 340,
+          height: 280,
+          zIndex: 0,
+          createdAt: '2026-04-12T00:00:00Z',
+          content: { title: 'Fresh', preview: 'P', createdAt: '2026-04-12T00:00:00Z' },
+        },
+      ],
+    };
+
+    let resolveStale!: (r: Response) => void;
+    const stalePending = new Promise<Response>((res) => {
+      resolveStale = res;
+    });
+    apiFetch.mockReturnValueOnce(stalePending);
+    apiFetch.mockResolvedValueOnce(mockResponse(true, fresh));
+    const api = createMockApi(apiFetch);
+
+    const { result, rerender } = renderHook(({ dateKey }) => useBoard(api, dateKey), {
+      initialProps: { dateKey: '2026-04-11' },
+    });
+
+    // Switch date before the first request resolves.
+    rerender({ dateKey: '2026-04-12' });
+
+    await waitFor(() => {
+      expect(result.current.cards).toHaveLength(1);
+      expect(result.current.cards[0].id).toBe('fresh-card');
+    });
+
+    // Now let the stale request resolve — it must NOT overwrite the fresh state.
+    resolveStale(mockResponse(true, stale));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(result.current.cards).toHaveLength(1);
+    expect(result.current.cards[0].id).toBe('fresh-card');
+  });
+
   it('ユーザー操作で変更された zIndex はデフォルトソートより優先される', async () => {
     const boardData = {
       dateKey: '2026-04-11',
