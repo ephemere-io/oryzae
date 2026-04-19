@@ -10,6 +10,7 @@ export interface EditorSettings {
   fontFamily: FontFamily;
   fontSize: number;
   lineHeight: number;
+  focusModeEnabled: boolean;
   timeInscriptionEnabled: boolean;
   timeInscriptionMode: TimeInscriptionMode;
   eraserTraceEnabled: boolean;
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   fontFamily: 'serif',
   fontSize: 32,
   lineHeight: 1.625,
+  focusModeEnabled: true,
   timeInscriptionEnabled: false,
   timeInscriptionMode: 'fontSize',
   eraserTraceEnabled: false,
@@ -185,6 +187,12 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
               step={0.05}
               display={settings.lineHeight.toFixed(2)}
               onChange={(v) => onChange({ lineHeight: v })}
+            />
+            <Toggle
+              id="focus-mode"
+              label="フォーカスモード"
+              checked={settings.focusModeEnabled}
+              onChange={(v) => onChange({ focusModeEnabled: v })}
             />
           </div>
 

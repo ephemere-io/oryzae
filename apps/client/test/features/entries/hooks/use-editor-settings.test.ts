@@ -5,6 +5,7 @@ import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings'
 
 const FONT_SIZE_KEY = 'oryzae-editor-font-size';
 const LINE_HEIGHT_KEY = 'oryzae-editor-line-height';
+const FOCUS_MODE_KEY = 'oryzae-editor-focus-mode';
 
 describe('useEditorSettings', () => {
   beforeEach(() => {
@@ -95,6 +96,34 @@ describe('useEditorSettings', () => {
     expect(result.current[0].writingMode).toBe('horizontal');
     expect(window.localStorage.getItem(FONT_SIZE_KEY)).toBeNull();
     expect(window.localStorage.getItem(LINE_HEIGHT_KEY)).toBeNull();
+    expect(window.localStorage.getItem(FOCUS_MODE_KEY)).toBeNull();
+  });
+
+  it('initializes focusModeEnabled from localStorage when stored (false)', () => {
+    window.localStorage.setItem(FOCUS_MODE_KEY, 'false');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].focusModeEnabled).toBe(false);
+  });
+
+  it('initializes focusModeEnabled from localStorage when stored (true)', () => {
+    window.localStorage.setItem(FOCUS_MODE_KEY, 'true');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].focusModeEnabled).toBe(true);
+  });
+
+  it('defaults focusModeEnabled to true when storage value is invalid', () => {
+    window.localStorage.setItem(FOCUS_MODE_KEY, 'maybe');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].focusModeEnabled).toBe(DEFAULT_SETTINGS.focusModeEnabled);
+  });
+
+  it('persists focusModeEnabled to localStorage when updated', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    act(() => {
+      result.current[1]({ focusModeEnabled: false });
+    });
+    expect(result.current[0].focusModeEnabled).toBe(false);
+    expect(window.localStorage.getItem(FOCUS_MODE_KEY)).toBe('false');
   });
 
   it('applies multi-field patches and persists fontSize + lineHeight', () => {
