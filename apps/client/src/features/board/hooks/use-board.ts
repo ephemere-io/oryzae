@@ -153,13 +153,17 @@ export function useBoard(
   );
 
   const createPhoto = useCallback(
-    async (file: File, caption: string) => {
+    async (file: File, caption: string, imageWidth?: number, imageHeight?: number) => {
       if (!api) return;
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caption', caption);
       formData.append('dateKey', dateKey);
       formData.append('viewType', viewType);
+      if (imageWidth && imageHeight) {
+        formData.append('imageWidth', String(imageWidth));
+        formData.append('imageHeight', String(imageHeight));
+      }
       const res = await api.fetch('/api/v1/board/photos', {
         method: 'POST',
         body: formData,
