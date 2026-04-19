@@ -732,6 +732,12 @@ export function EntryEditor({
               const text = e.clipboardData.getData('text/plain');
               if (!text) return;
               document.execCommand('insertText', false, text);
+              // execCommand の input イベントが React の onInput にバブルしない
+              // 場合があるため、paste 後に明示的に state を同期する（autosave が
+              // content 変化を検知できるようにするため）
+              const updated = editorRef.current?.textContent ?? '';
+              setContent(updated);
+              if (status === 'saved') setStatus('editing');
             }}
             data-placeholder="今日は何を感じましたか？"
             className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
