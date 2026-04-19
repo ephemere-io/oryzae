@@ -727,7 +727,7 @@ export function EntryEditor({
               document.execCommand('insertText', false, text);
             }}
             data-placeholder="今日は何を感じましたか？"
-            className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? 'absolute inset-0' : 'min-h-full px-[15%] py-6'}`}
+            className={`whitespace-pre-wrap bg-transparent leading-relaxed focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
             style={{
               ...(settings.writingMode === 'vertical'
                 ? {
