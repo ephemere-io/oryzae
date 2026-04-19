@@ -16,7 +16,7 @@ export type VoiceUnavailableReason =
   | 'not-allowed' // マイク権限拒否
   | 'service-not-allowed'; // OS / ブラウザが認識サービスを無効化
 
-export type VoiceDynamicsState = {
+type VoiceDynamicsState = {
   unavailable: boolean;
   reason: VoiceUnavailableReason | null;
 };
