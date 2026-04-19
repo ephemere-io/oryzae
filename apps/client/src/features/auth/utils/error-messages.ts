@@ -12,6 +12,10 @@ const ERROR_MAP: Record<string, string> = {
   'New password should be different from the old password':
     '新しいパスワードは現在のパスワードと異なるものにしてください',
   'Auth session missing!': 'セッションが切れました。もう一度ログインしてください',
+  'A user with this email address has already been registered':
+    'このメールアドレスは既に登録されています',
+  'Email address not confirmed': 'メールアドレスの確認が完了していません',
+  'Same password': '新しいパスワードは現在のパスワードと異なるものにしてください',
 };
 
 export function translateAuthError(message: string): string {
