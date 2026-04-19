@@ -34,4 +34,16 @@ export class SupabaseEntryQuestionLinkRepository implements EntryQuestionLinkRep
       (row: Record<string, unknown>) => (row as Record<string, unknown>).question_id as string,
     );
   }
+
+  async listEntryIdsByQuestionId(questionId: string): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('entry_question_links')
+      .select('entry_id')
+      .eq('question_id', questionId);
+
+    if (error) throw error;
+    return (data ?? []).map(
+      (row: Record<string, unknown>) => (row as Record<string, unknown>).entry_id as string,
+    );
+  }
 }
