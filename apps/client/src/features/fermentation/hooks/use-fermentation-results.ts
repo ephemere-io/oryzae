@@ -31,7 +31,6 @@ interface Worksheet {
 export interface FermentationDetail {
   id: string;
   questionId: string;
-  entryId: string;
   targetPeriod: string;
   status: string;
   worksheet: Worksheet | null;
@@ -43,7 +42,6 @@ export interface FermentationDetail {
 interface FermentationSummary {
   id: string;
   questionId: string;
-  entryId: string;
   status: string;
   createdAt: string;
 }

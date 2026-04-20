@@ -74,16 +74,17 @@ export class ScheduledFermentationUsecase {
         if (!latestTransaction) continue;
 
         const questionText = latestTransaction.toProps().string;
-        const combinedContent = questionEntries.map((e) => e.toProps().content).join('\n\n---\n\n');
-        const entryId = questionEntries[0].toProps().id;
+        const runEntries = questionEntries.map((e) => {
+          const props = e.toProps();
+          return { id: props.id, content: props.content };
+        });
 
         try {
           await runUsecase.execute({
             userId,
             questionId: question.id,
             questionText,
-            entryId,
-            entryContent: combinedContent,
+            entries: runEntries,
           });
           result.succeeded++;
         } catch (error) {

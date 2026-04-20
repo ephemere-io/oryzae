@@ -101,7 +101,7 @@ export const adminFermentations = new Hono<Env>()
     let listQuery = supabase
       .from('fermentation_results')
       .select(
-        'id, user_id, question_id, entry_id, target_period, status, generation_id, error_message, created_at, updated_at',
+        'id, user_id, question_id, target_period, status, generation_id, error_message, created_at, updated_at',
         { count: 'exact' },
       );
     if (resolvedUserId) listQuery = listQuery.eq('user_id', resolvedUserId);
@@ -228,12 +228,54 @@ export const adminFermentations = new Hono<Env>()
     }
 
     // 2. Fetch related data in parallel
-    const [worksheetRes, snippetsRes, letterRes, keywordsRes] = await Promise.all([
+    const [worksheetRes, snippetsRes, letterRes, keywordsRes, scannedRes] = await Promise.all([
       supabase.from('analysis_worksheets').select('*').eq('fermentation_result_id', id).single(),
       supabase.from('extracted_snippets').select('*').eq('fermentation_result_id', id),
       supabase.from('letters').select('*').eq('fermentation_result_id', id).single(),
       supabase.from('keywords').select('*').eq('fermentation_result_id', id),
+      supabase
+        .from('fermentation_scanned_entries')
+        .select('entry_id, created_at')
+        .eq('fermentation_result_id', id)
+        .order('created_at', { ascending: true }),
     ]);
+
+    // 2.5. Fetch entry details for scanned entries
+    const scannedEntryIds = (scannedRes.data ?? []).map(
+      (row: { entry_id: string }) => row.entry_id,
+    );
+    let scannedEntries: Array<{
+      id: string;
+      content: string;
+      createdAt: string;
+      updatedAt: string;
+    }> = [];
+    if (scannedEntryIds.length > 0) {
+      const { data: entryRows } = await supabase
+        .from('entries')
+        .select('id, content, created_at, updated_at')
+        .in('id', scannedEntryIds);
+      const entryMap = new Map(
+        (entryRows ?? []).map(
+          (row: { id: string; content: string; created_at: string; updated_at: string }) => [
+            row.id,
+            row,
+          ],
+        ),
+      );
+      scannedEntries = scannedEntryIds.flatMap((entryId) => {
+        const row = entryMap.get(entryId);
+        if (!row) return [];
+        return [
+          {
+            id: row.id,
+            content: row.content,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        ];
+      });
+    }
 
     // 3. Fetch cost info if generation_id exists
     let cost: unknown = null;
@@ -310,7 +352,6 @@ export const adminFermentations = new Hono<Env>()
       id: fermentation.id,
       userId: fermentation.user_id,
       questionId: fermentation.question_id,
-      entryId: fermentation.entry_id,
       targetPeriod: fermentation.target_period,
       status: fermentation.status,
       generationId: fermentation.generation_id ?? null,
@@ -339,6 +380,9 @@ export const adminFermentations = new Hono<Env>()
           })),
       letter: isOwner ? letter : letter ? { ...letter, bodyText: MASKED } : null,
       keywords: isOwner ? keywords : keywords.map((k) => ({ ...k, description: MASKED })),
+      scannedEntries: isOwner
+        ? scannedEntries
+        : scannedEntries.map((e) => ({ ...e, content: MASKED })),
     });
   })
   .post('/trigger-scheduled', async (c) => {
@@ -404,7 +448,7 @@ export const adminFermentations = new Hono<Env>()
     // 1. Look up the failed fermentation
     const { data: fermentation, error: fetchError } = await supabase
       .from('fermentation_results')
-      .select('id, user_id, question_id, entry_id, status')
+      .select('id, user_id, question_id, status')
       .eq('id', id)
       .single();
 
@@ -429,14 +473,28 @@ export const adminFermentations = new Hono<Env>()
       return c.json({ error: 'Question text not found' }, 404);
     }
 
-    // 3. Fetch entry content
-    const { data: entry } = await supabase
-      .from('entries')
-      .select('content')
-      .eq('id', fermentation.entry_id)
-      .single();
+    // 3. Fetch scanned entries (preserves what the original run saw)
+    const { data: scannedRows } = await supabase
+      .from('fermentation_scanned_entries')
+      .select('entry_id, created_at')
+      .eq('fermentation_result_id', id)
+      .order('created_at', { ascending: true });
+    const scannedEntryIds = (scannedRows ?? []).map((row: { entry_id: string }) => row.entry_id);
+    if (scannedEntryIds.length === 0) {
+      return c.json({ error: 'No scanned entries found for this fermentation' }, 404);
+    }
 
-    if (!entry?.content) {
+    const { data: entryRows } = await supabase
+      .from('entries')
+      .select('id, content')
+      .in('id', scannedEntryIds);
+    const entryMap = new Map(
+      (entryRows ?? []).map((row: { id: string; content: string }) => [row.id, row.content]),
+    );
+    const entries = scannedEntryIds
+      .map((entryId) => ({ id: entryId, content: entryMap.get(entryId) ?? '' }))
+      .filter((e) => e.content);
+    if (entries.length === 0) {
       return c.json({ error: 'Entry content not found' }, 404);
     }
 
@@ -449,8 +507,7 @@ export const adminFermentations = new Hono<Env>()
       userId: fermentation.user_id,
       questionId: fermentation.question_id,
       questionText,
-      entryId: fermentation.entry_id,
-      entryContent: entry.content,
+      entries,
     });
 
     return c.json({ id: result.id }, 201);

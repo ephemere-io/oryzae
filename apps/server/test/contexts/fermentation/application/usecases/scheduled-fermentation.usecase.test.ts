@@ -102,6 +102,8 @@ function mockFermentationRepo(): FermentationRepositoryGateway {
     findById: vi.fn(),
     findByIdWithDetails: vi.fn(),
     listByQuestionId: vi.fn(),
+    saveScannedEntries: vi.fn(),
+    listScannedEntryIds: vi.fn().mockResolvedValue([]),
     saveWorksheet: vi.fn(),
     saveSnippets: vi.fn(),
     saveLetter: vi.fn(),
@@ -325,7 +327,7 @@ describe('ScheduledFermentationUsecase', () => {
     expect(result.failed).toBe(0);
   });
 
-  it('combines multiple entries content with separator', async () => {
+  it('combines multiple entries content with separator and records all scanned entry ids', async () => {
     const e1 = makeEntry('user-1', 'e1');
     const e2 = makeEntry('user-1', 'e2');
     const question = makeQuestion('user-1', 'q1');
@@ -366,6 +368,8 @@ describe('ScheduledFermentationUsecase', () => {
         entryContent: expect.stringContaining('---'),
       }),
     );
+    // All scanned entry ids should be recorded (not just the first)
+    expect(fermentationRepo.saveScannedEntries).toHaveBeenCalledWith('test-id', ['e1', 'e2']);
   });
 
   it('only includes entries linked to each question (does not leak other-question entries)', async () => {
