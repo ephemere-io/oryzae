@@ -7,6 +7,11 @@ import { Keyword } from '../../domain/models/keyword.js';
 import { Letter } from '../../domain/models/letter.js';
 import { LlmAnalysisError } from '../errors/fermentation.errors.js';
 
+interface RunFermentationEntry {
+  id: string;
+  content: string;
+}
+
 export class RunFermentationUsecase {
   constructor(
     private fermentationRepo: FermentationRepositoryGateway,
@@ -18,9 +23,12 @@ export class RunFermentationUsecase {
     userId: string;
     questionId: string;
     questionText: string;
-    entryId: string;
-    entryContent: string;
+    entries: RunFermentationEntry[];
   }): Promise<{ id: string }> {
+    if (params.entries.length === 0) {
+      throw new LlmAnalysisError('At least one entry is required');
+    }
+
     const today = new Date().toISOString().slice(0, 10);
     const targetPeriod = today;
 
@@ -29,7 +37,6 @@ export class RunFermentationUsecase {
       {
         userId: params.userId,
         questionId: params.questionId,
-        entryId: params.entryId,
         targetPeriod,
       },
       this.generateId,
@@ -40,17 +47,25 @@ export class RunFermentationUsecase {
     const fermentationResult = createResult.value;
     await this.fermentationRepo.save(fermentationResult);
 
+    // 1.5. Record which entries were scanned (before LLM so it's preserved even on failure)
+    await this.fermentationRepo.saveScannedEntries(
+      fermentationResult.id,
+      params.entries.map((e) => e.id),
+    );
+
     // 2. Update to processing
     const processingResult = fermentationResult.withStatus('processing');
     if (processingResult.success) {
       await this.fermentationRepo.update(processingResult.value);
     }
 
+    const combinedContent = params.entries.map((e) => e.content).join('\n\n---\n\n');
+
     try {
       // 3. Run LLM analysis
       const { output, generationId } = await this.llmGateway.analyze({
         question: params.questionText,
-        entryContent: params.entryContent,
+        entryContent: combinedContent,
         targetPeriod,
         userId: params.userId,
       });

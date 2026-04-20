@@ -8,7 +8,6 @@ export interface FermentationResultProps {
   id: string;
   userId: string;
   questionId: string;
-  entryId: string;
   targetPeriod: string;
   status: FermentationStatus;
   generationId: string | null;
@@ -20,7 +19,6 @@ export interface FermentationResultProps {
 interface CreateParams {
   userId: string;
   questionId: string;
-  entryId: string;
   targetPeriod: string;
 }
 
@@ -30,7 +28,6 @@ export class FermentationResult {
   readonly id: string;
   readonly userId: string;
   readonly questionId: string;
-  readonly entryId: string;
   readonly targetPeriod: string;
   readonly status: FermentationStatus;
   readonly generationId: string | null;
@@ -42,7 +39,6 @@ export class FermentationResult {
     this.id = props.id;
     this.userId = props.userId;
     this.questionId = props.questionId;
-    this.entryId = props.entryId;
     this.targetPeriod = props.targetPeriod;
     this.status = props.status;
     this.generationId = props.generationId;
@@ -63,7 +59,6 @@ export class FermentationResult {
         id: generateId(),
         userId: params.userId,
         questionId: params.questionId,
-        entryId: params.entryId,
         targetPeriod: params.targetPeriod,
         status: 'pending',
         generationId: null,
@@ -98,7 +93,6 @@ export class FermentationResult {
       id: this.id,
       userId: this.userId,
       questionId: this.questionId,
-      entryId: this.entryId,
       targetPeriod: this.targetPeriod,
       status: this.status,
       generationId: this.generationId,

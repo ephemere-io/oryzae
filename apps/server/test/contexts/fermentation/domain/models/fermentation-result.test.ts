@@ -9,7 +9,6 @@ describe('FermentationResult', () => {
       {
         userId: 'u1',
         questionId: 'q1',
-        entryId: 'e1',
         targetPeriod: '2025-12-01',
       },
       generateId,
@@ -29,7 +28,6 @@ describe('FermentationResult', () => {
       {
         userId: 'u1',
         questionId: 'q1',
-        entryId: 'e1',
         targetPeriod: '  ',
       },
       generateId,
@@ -40,7 +38,7 @@ describe('FermentationResult', () => {
 
   it('transitions status with withStatus', () => {
     const result = FermentationResult.create(
-      { userId: 'u1', questionId: 'q1', entryId: 'e1', targetPeriod: '2025-12-01' },
+      { userId: 'u1', questionId: 'q1', targetPeriod: '2025-12-01' },
       generateId,
     );
     expect(result.success).toBe(true);
@@ -56,7 +54,7 @@ describe('FermentationResult', () => {
 
   it('roundtrips through toProps/fromProps', () => {
     const result = FermentationResult.create(
-      { userId: 'u1', questionId: 'q1', entryId: 'e1', targetPeriod: '2025-12-01' },
+      { userId: 'u1', questionId: 'q1', targetPeriod: '2025-12-01' },
       generateId,
     );
     expect(result.success).toBe(true);
@@ -69,7 +67,7 @@ describe('FermentationResult', () => {
 
   it('sets generationId with withGenerationId', () => {
     const result = FermentationResult.create(
-      { userId: 'u1', questionId: 'q1', entryId: 'e1', targetPeriod: '2025-12-01' },
+      { userId: 'u1', questionId: 'q1', targetPeriod: '2025-12-01' },
       generateId,
     );
     expect(result.success).toBe(true);
@@ -83,7 +81,7 @@ describe('FermentationResult', () => {
 
   it('preserves generationId through toProps/fromProps roundtrip', () => {
     const result = FermentationResult.create(
-      { userId: 'u1', questionId: 'q1', entryId: 'e1', targetPeriod: '2025-12-01' },
+      { userId: 'u1', questionId: 'q1', targetPeriod: '2025-12-01' },
       generateId,
     );
     if (!result.success) return;

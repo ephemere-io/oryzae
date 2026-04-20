@@ -10,6 +10,7 @@ export interface FermentationResultWithDetails {
   snippets: ExtractedSnippet[];
   letter: Letter | null;
   keywords: Keyword[];
+  scannedEntryIds: string[];
 }
 
 export interface FermentationRepositoryGateway {
@@ -19,6 +20,8 @@ export interface FermentationRepositoryGateway {
   findByIdWithDetails(id: string): Promise<FermentationResultWithDetails | null>;
   listByQuestionId(questionId: string): Promise<FermentationResult[]>;
 
+  saveScannedEntries(fermentationResultId: string, entryIds: string[]): Promise<void>;
+  listScannedEntryIds(fermentationResultId: string): Promise<string[]>;
   saveWorksheet(worksheet: AnalysisWorksheet): Promise<void>;
   saveSnippets(snippets: ExtractedSnippet[]): Promise<void>;
   saveLetter(letter: Letter): Promise<void>;
