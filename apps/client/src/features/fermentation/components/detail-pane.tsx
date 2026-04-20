@@ -21,7 +21,7 @@ interface DetailPaneProps {
 const HEADERS: Record<string, string> = {
   keyword: 'Yeast が生成したキーワード',
   snippet: 'Oryzae が切り取った文章',
-  letter: 'Lab からの手紙',
+  letter: 'L.A.B.による観察記録',
 };
 
 export function DetailPane({
