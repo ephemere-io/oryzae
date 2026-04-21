@@ -142,6 +142,7 @@ describe('ScheduledFermentationUsecase', () => {
       mockLlm(),
       generateId,
       listActiveUserIds,
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -180,6 +181,7 @@ describe('ScheduledFermentationUsecase', () => {
       llm,
       generateId,
       vi.fn().mockResolvedValue(['user-1']),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -208,6 +210,7 @@ describe('ScheduledFermentationUsecase', () => {
       mockLlm(),
       generateId,
       vi.fn().mockResolvedValue(['user-1']),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -243,6 +246,7 @@ describe('ScheduledFermentationUsecase', () => {
       llm,
       generateId,
       vi.fn().mockResolvedValue(['user-1']),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -294,6 +298,7 @@ describe('ScheduledFermentationUsecase', () => {
       llm,
       generateId,
       vi.fn().mockResolvedValue(['user-1']),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -315,6 +320,7 @@ describe('ScheduledFermentationUsecase', () => {
       mockLlm(),
       generateId,
       vi.fn().mockResolvedValue([]),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -355,6 +361,7 @@ describe('ScheduledFermentationUsecase', () => {
       llm,
       generateId,
       vi.fn().mockResolvedValue(['user-1']),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     await usecase.execute(dateKey);
@@ -403,6 +410,7 @@ describe('ScheduledFermentationUsecase', () => {
       llm,
       generateId,
       vi.fn().mockResolvedValue(['user-1']),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -449,6 +457,7 @@ describe('ScheduledFermentationUsecase', () => {
       llm,
       generateId,
       vi.fn().mockResolvedValue(['user-1']),
+      vi.fn().mockResolvedValue(undefined),
     );
 
     const result = await usecase.execute(dateKey);
@@ -456,5 +465,122 @@ describe('ScheduledFermentationUsecase', () => {
     expect(result.totalUsers).toBe(1);
     expect(result.totalFermentations).toBe(0);
     expect(llm.analyze).not.toHaveBeenCalled();
+  });
+
+  it('calls digest once per user with all successful question titles', async () => {
+    const entry = makeEntry('user-1', 'e1');
+    const q1 = makeQuestion('user-1', 'q1');
+    const q2 = makeQuestion('user-1', 'q2');
+    const t1 = makeQuestionTransaction('q1', 'Q1 title');
+    const t2 = makeQuestionTransaction('q2', 'Q2 title');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([entry]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([q1, q2]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockImplementation(async (id) =>
+      id === 'q1' ? t1 : t2,
+    );
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
+    const sendDigest = vi.fn().mockResolvedValue(undefined);
+
+    const usecase = new ScheduledFermentationUsecase(
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      mockFermentationRepo(),
+      mockLlm(),
+      generateId,
+      vi.fn().mockResolvedValue(['user-1']),
+      sendDigest,
+    );
+
+    await usecase.execute(dateKey);
+
+    expect(sendDigest).toHaveBeenCalledOnce();
+    expect(sendDigest).toHaveBeenCalledWith('user-1', ['Q1 title', 'Q2 title']);
+  });
+
+  it('does not call digest for users with zero successful fermentations', async () => {
+    const entry = makeEntry('user-1', 'e1');
+    const question = makeQuestion('user-1', 'q1');
+    const transaction = makeQuestionTransaction('q1', 'Q');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([entry]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockResolvedValue(transaction);
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
+    const fermentationRepo = mockFermentationRepo();
+    vi.mocked(fermentationRepo.save).mockRejectedValue(new Error('boom'));
+
+    const sendDigest = vi.fn().mockResolvedValue(undefined);
+
+    const usecase = new ScheduledFermentationUsecase(
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      fermentationRepo,
+      mockLlm(),
+      generateId,
+      vi.fn().mockResolvedValue(['user-1']),
+      sendDigest,
+    );
+
+    await usecase.execute(dateKey);
+
+    expect(sendDigest).not.toHaveBeenCalled();
+  });
+
+  it('does not let digest failure break the scheduled run', async () => {
+    const entry = makeEntry('user-1', 'e1');
+    const question = makeQuestion('user-1', 'q1');
+    const transaction = makeQuestionTransaction('q1', 'Q');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdAndDate).mockResolvedValue([entry]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockResolvedValue(transaction);
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
+    const sendDigest = vi.fn().mockRejectedValue(new Error('email down'));
+
+    const usecase = new ScheduledFermentationUsecase(
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      mockFermentationRepo(),
+      mockLlm(),
+      generateId,
+      vi.fn().mockResolvedValue(['user-1']),
+      sendDigest,
+    );
+
+    const result = await usecase.execute(dateKey);
+
+    expect(result.succeeded).toBe(1);
+    expect(sendDigest).toHaveBeenCalledOnce();
   });
 });

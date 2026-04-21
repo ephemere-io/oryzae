@@ -9,6 +9,9 @@ import { SupabaseQuestionTransactionRepository } from '../../../question/infrast
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
+import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
+import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
+import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { getFermentationTargetDateKey } from './cron-target-date.js';
@@ -361,6 +364,11 @@ export const adminFermentations = new Hono<Env>()
       return [...new Set((data ?? []).map((row: { user_id: string }) => row.user_id))];
     };
 
+    const digestUsecase = new SendFermentationDigestUsecase(
+      new ResendEmailNotifier(),
+      createSupabaseVerifiedEmailResolver(supabase),
+    );
+
     const usecase = new ScheduledFermentationUsecase(
       entryRepo,
       questionRepo,
@@ -370,6 +378,7 @@ export const adminFermentations = new Hono<Env>()
       llmGateway,
       () => crypto.randomUUID(),
       listActiveUserIds,
+      (userId, titles) => digestUsecase.execute({ userId, questionTitles: titles }),
     );
 
     const result = await usecase.execute(dateKey);
@@ -452,6 +461,17 @@ export const adminFermentations = new Hono<Env>()
       entryId: fermentation.entry_id,
       entryContent: entry.content,
     });
+
+    // 5. Send digest email (fire-and-forget)
+    const digestUsecase = new SendFermentationDigestUsecase(
+      new ResendEmailNotifier(),
+      createSupabaseVerifiedEmailResolver(supabase),
+    );
+    digestUsecase
+      .execute({ userId: fermentation.user_id, questionTitles: [questionText] })
+      .catch(() => {
+        // Notification failure must not break retry response.
+      });
 
     return c.json({ id: result.id }, 201);
   });

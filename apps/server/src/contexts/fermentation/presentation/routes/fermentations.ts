@@ -1,9 +1,13 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
+import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
+import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
+import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
+import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 
@@ -39,6 +43,17 @@ export const fermentations = new Hono<Env>()
         entryId: body.entryId,
         entryContent: body.entryContent,
       });
+
+      // Send digest email (fire-and-forget). Uses service-role client for auth.admin lookup.
+      const digestUsecase = new SendFermentationDigestUsecase(
+        new ResendEmailNotifier(),
+        createSupabaseVerifiedEmailResolver(getSupabaseClient()),
+      );
+      digestUsecase
+        .execute({ userId: c.get('userId'), questionTitles: [body.questionText] })
+        .catch(() => {
+          // Notification failure must not break the API response.
+        });
 
       return c.json(result, 201);
     } catch (error) {
