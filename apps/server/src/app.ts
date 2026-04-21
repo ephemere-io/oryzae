@@ -12,7 +12,6 @@ import { authMiddleware } from './contexts/shared/presentation/middleware/auth.j
 import { errorHandler } from './contexts/shared/presentation/middleware/error-handler.js';
 import {
   rateLimitAuth,
-  rateLimitFermentation,
   rateLimitGeneral,
 } from './contexts/shared/presentation/middleware/rate-limit.js';
 import { adminDashboard } from './contexts/shared/presentation/routes/admin-dashboard.js';
@@ -36,7 +35,6 @@ const app = new Hono()
   .route('/api/v1/admin/analytics', adminAnalytics)
   .route('/api/v1/admin/observability', adminObservability)
   .use('/api/v1/*', authMiddleware)
-  .use('/api/v1/fermentations', rateLimitFermentation())
   .use('/api/v1/*', rateLimitGeneral())
   .route('/api/v1/users/me', userStats)
   .route('/api/v1/board', board)
