@@ -5,6 +5,9 @@ import { SupabaseQuestionRepository } from '../../../question/infrastructure/rep
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
+import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
+import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
+import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { getFermentationTargetDateKey } from './cron-target-date.js';
@@ -48,6 +51,11 @@ export const cronFermentation = new Hono()
       return uniqueUserIds;
     };
 
+    const digestUsecase = new SendFermentationDigestUsecase(
+      new ResendEmailNotifier(),
+      createSupabaseVerifiedEmailResolver(supabase),
+    );
+
     const usecase = new ScheduledFermentationUsecase(
       entryRepo,
       questionRepo,
@@ -57,6 +65,7 @@ export const cronFermentation = new Hono()
       llmGateway,
       generateId,
       listActiveUserIds,
+      (userId, titles) => digestUsecase.execute({ userId, questionTitles: titles }),
     );
 
     // Cron は JST 03:00 に発火するため、対象は「直前に閉じた一日」= JST での前日
