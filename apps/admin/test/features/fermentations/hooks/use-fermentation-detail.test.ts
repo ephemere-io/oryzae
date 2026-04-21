@@ -18,7 +18,6 @@ const mockData: FermentationDetailResponse = {
   id: 'f1',
   userId: 'u1',
   questionId: 'q1',
-  entryId: 'e1',
   targetPeriod: '2026-04-11',
   status: 'completed',
   generationId: 'gen-1',
@@ -64,6 +63,14 @@ const mockData: FermentationDetailResponse = {
       description: 'What drives you',
       createdAt: '2026-04-11T10:00:00Z',
       updatedAt: '2026-04-11T10:00:00Z',
+    },
+  ],
+  scannedEntries: [
+    {
+      id: 'e1',
+      content: 'Today I thought about motivation.',
+      createdAt: '2026-04-11T09:00:00Z',
+      updatedAt: '2026-04-11T09:00:00Z',
     },
   ],
 };

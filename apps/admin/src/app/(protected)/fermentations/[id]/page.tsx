@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { FermentationDetailHeader } from '@/features/fermentations/components/fermentation-detail-header';
 import { FermentationKeywords } from '@/features/fermentations/components/fermentation-keywords';
 import { FermentationLetter } from '@/features/fermentations/components/fermentation-letter';
+import { FermentationScannedEntries } from '@/features/fermentations/components/fermentation-scanned-entries';
 import { FermentationSnippets } from '@/features/fermentations/components/fermentation-snippets';
 import { FermentationWorksheet } from '@/features/fermentations/components/fermentation-worksheet';
 import { useFermentationDetail } from '@/features/fermentations/hooks/use-fermentation-detail';
@@ -52,6 +53,8 @@ export default function FermentationDetailPage() {
           他のユーザーのジャーナリング内容はプライバシー保護のためマスクされています
         </div>
       )}
+
+      <FermentationScannedEntries entries={data.scannedEntries} />
 
       {data.worksheet && <FermentationWorksheet worksheet={data.worksheet} />}
 
