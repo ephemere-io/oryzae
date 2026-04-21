@@ -41,11 +41,17 @@ export interface KeywordData {
   updatedAt: string;
 }
 
+export interface ScannedEntryData {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FermentationDetailResponse {
   id: string;
   userId: string;
   questionId: string;
-  entryId: string;
   targetPeriod: string;
   status: string;
   generationId: string | null;
@@ -60,6 +66,7 @@ export interface FermentationDetailResponse {
   snippets: SnippetData[];
   letter: LetterData | null;
   keywords: KeywordData[];
+  scannedEntries: ScannedEntryData[];
 }
 
 export function useFermentationDetail(id: string) {

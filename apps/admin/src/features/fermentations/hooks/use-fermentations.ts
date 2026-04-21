@@ -9,7 +9,6 @@ export interface FermentationItem {
   user_id: string;
   user_email: string;
   question_id: string;
-  entry_id: string;
   target_period: string;
   status: string;
   generation_id: string | null;

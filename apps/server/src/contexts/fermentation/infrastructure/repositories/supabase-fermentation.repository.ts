@@ -18,7 +18,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       id: props.id,
       user_id: props.userId,
       question_id: props.questionId,
-      entry_id: props.entryId,
       target_period: props.targetPeriod,
       status: props.status,
       error_message: props.errorMessage,
@@ -53,7 +52,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       id: data.id,
       userId: data.user_id,
       questionId: data.question_id,
-      entryId: data.entry_id,
       targetPeriod: data.target_period,
       status: data.status,
       generationId: data.generation_id ?? null,
@@ -67,7 +65,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
     const result = await this.findById(id);
     if (!result) return null;
 
-    const [worksheetRes, snippetsRes, letterRes, keywordsRes] = await Promise.all([
+    const [worksheetRes, snippetsRes, letterRes, keywordsRes, scannedEntryIds] = await Promise.all([
       this.supabase
         .from('analysis_worksheets')
         .select('*')
@@ -76,6 +74,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       this.supabase.from('extracted_snippets').select('*').eq('fermentation_result_id', id),
       this.supabase.from('letters').select('*').eq('fermentation_result_id', id).single(),
       this.supabase.from('keywords').select('*').eq('fermentation_result_id', id),
+      this.listScannedEntryIds(id),
     ]);
 
     const worksheet = worksheetRes.data
@@ -123,7 +122,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       }),
     );
 
-    return { result, worksheet, snippets, letter, keywords };
+    return { result, worksheet, snippets, letter, keywords, scannedEntryIds };
   }
 
   async listByQuestionId(questionId: string): Promise<FermentationResult[]> {
@@ -138,7 +137,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         id: row.id,
         userId: row.user_id,
         questionId: row.question_id,
-        entryId: row.entry_id,
         targetPeriod: row.target_period,
         status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
         generationId: row.generation_id ?? null,
@@ -147,6 +145,28 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         updatedAt: row.updated_at,
       }),
     );
+  }
+
+  async saveScannedEntries(fermentationResultId: string, entryIds: string[]): Promise<void> {
+    if (entryIds.length === 0) return;
+    const rows = entryIds.map((entryId) => ({
+      fermentation_result_id: fermentationResultId,
+      entry_id: entryId,
+    }));
+    const { error } = await this.supabase
+      .from('fermentation_scanned_entries')
+      .upsert(rows, { onConflict: 'fermentation_result_id,entry_id' });
+    if (error) throw new Error(`Failed to save scanned entries: ${error.message}`);
+  }
+
+  async listScannedEntryIds(fermentationResultId: string): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('fermentation_scanned_entries')
+      .select('entry_id, created_at')
+      .eq('fermentation_result_id', fermentationResultId)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`Failed to list scanned entries: ${error.message}`);
+    return (data ?? []).map((row: { entry_id: string }) => row.entry_id);
   }
 
   async saveWorksheet(worksheet: AnalysisWorksheet): Promise<void> {

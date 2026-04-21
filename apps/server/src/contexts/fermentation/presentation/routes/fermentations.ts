@@ -40,8 +40,7 @@ export const fermentations = new Hono<Env>()
         userId: c.get('userId'),
         questionId: body.questionId,
         questionText: body.questionText,
-        entryId: body.entryId,
-        entryContent: body.entryContent,
+        entries: [{ id: body.entryId, content: body.entryContent }],
       });
 
       // Send digest email (fire-and-forget). Uses service-role client for auth.admin lookup.

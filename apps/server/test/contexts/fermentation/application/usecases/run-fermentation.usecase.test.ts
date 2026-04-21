@@ -12,6 +12,8 @@ function mockRepo(): FermentationRepositoryGateway {
     findById: vi.fn(),
     findByIdWithDetails: vi.fn(),
     listByQuestionId: vi.fn(),
+    saveScannedEntries: vi.fn(),
+    listScannedEntryIds: vi.fn().mockResolvedValue([]),
     saveWorksheet: vi.fn(),
     saveSnippets: vi.fn(),
     saveLetter: vi.fn(),
@@ -45,18 +47,51 @@ describe('RunFermentationUsecase', () => {
       userId: 'u1',
       questionId: 'q1',
       questionText: 'What is love?',
-      entryId: 'e1',
-      entryContent: 'Today I thought about love.',
+      entries: [{ id: 'e1', content: 'Today I thought about love.' }],
     });
 
     expect(result.id).toBe('test-id');
     expect(repo.save).toHaveBeenCalledOnce();
+    expect(repo.saveScannedEntries).toHaveBeenCalledWith('test-id', ['e1']);
     expect(repo.update).toHaveBeenCalledTimes(3); // processing + generationId + completed
     expect(llm.analyze).toHaveBeenCalledOnce();
     expect(repo.saveWorksheet).toHaveBeenCalledOnce();
     expect(repo.saveSnippets).toHaveBeenCalledOnce();
     expect(repo.saveLetter).toHaveBeenCalledOnce();
     expect(repo.saveKeywords).toHaveBeenCalledOnce();
+  });
+
+  it('saves all scanned entry ids when multiple entries are provided', async () => {
+    const repo = mockRepo();
+    const llm = mockLlm();
+    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+
+    await usecase.execute({
+      userId: 'u1',
+      questionId: 'q1',
+      questionText: 'Q',
+      entries: [
+        { id: 'e1', content: 'content 1' },
+        { id: 'e2', content: 'content 2' },
+      ],
+    });
+
+    expect(repo.saveScannedEntries).toHaveBeenCalledWith('test-id', ['e1', 'e2']);
+    expect(llm.analyze).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entryContent: 'content 1\n\n---\n\ncontent 2',
+      }),
+    );
+  });
+
+  it('rejects execution when no entries are provided', async () => {
+    const repo = mockRepo();
+    const usecase = new RunFermentationUsecase(repo, mockLlm(), generateId);
+
+    await expect(
+      usecase.execute({ userId: 'u1', questionId: 'q1', questionText: 'Q', entries: [] }),
+    ).rejects.toThrow('LLM analysis failed');
+    expect(repo.save).not.toHaveBeenCalled();
   });
 
   it('marks result as failed when LLM throws', async () => {
@@ -71,12 +106,13 @@ describe('RunFermentationUsecase', () => {
         userId: 'u1',
         questionId: 'q1',
         questionText: 'test',
-        entryId: 'e1',
-        entryContent: 'test',
+        entries: [{ id: 'e1', content: 'test' }],
       }),
     ).rejects.toThrow('LLM analysis failed');
 
     // save (pending) + update (processing) + update (failed)
     expect(repo.update).toHaveBeenCalledTimes(2);
+    // scanned entries are recorded before LLM runs, so they persist on failure
+    expect(repo.saveScannedEntries).toHaveBeenCalledWith('test-id', ['e1']);
   });
 });
