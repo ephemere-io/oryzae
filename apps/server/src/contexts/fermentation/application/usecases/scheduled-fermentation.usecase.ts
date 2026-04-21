@@ -25,6 +25,7 @@ export class ScheduledFermentationUsecase {
     private llmGateway: LlmAnalysisGateway,
     private generateId: () => string,
     private listActiveUserIds: () => Promise<string[]>,
+    private sendDigest: (userId: string, questionTitles: string[]) => Promise<void>,
   ) {}
 
   async execute(dateKey: string): Promise<ScheduledFermentationResult> {
@@ -56,6 +57,8 @@ export class ScheduledFermentationUsecase {
       this.generateId,
     );
 
+    const successfulTitlesByUser = new Map<string, string[]>();
+
     for (const { userId, entries } of usersWithEntries) {
       const activeQuestions = await this.questionRepo.listActiveByUserId(userId);
       if (activeQuestions.length === 0) continue;
@@ -86,6 +89,9 @@ export class ScheduledFermentationUsecase {
             entryContent: combinedContent,
           });
           result.succeeded++;
+          const titles = successfulTitlesByUser.get(userId) ?? [];
+          titles.push(questionText);
+          successfulTitlesByUser.set(userId, titles);
         } catch (error) {
           result.failed++;
           result.errors.push({
@@ -94,6 +100,15 @@ export class ScheduledFermentationUsecase {
             error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
+      }
+    }
+
+    // 3. Send one digest email per user for their successful fermentations.
+    for (const [userId, titles] of successfulTitlesByUser) {
+      try {
+        await this.sendDigest(userId, titles);
+      } catch {
+        // Notification failure must not break the scheduled job.
       }
     }
 
