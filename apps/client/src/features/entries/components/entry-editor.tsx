@@ -836,7 +836,10 @@ export function EntryEditor({
             contentEditable
             suppressContentEditableWarning
             onInput={() => {
-              const text = editorRef.current?.textContent ?? '';
+              // innerText を使う理由: contentEditable で Enter キー押下時に
+              // ブラウザが挿入する <br> や <div> を改行として読み取るため。
+              // textContent はこれらを無視し、改行が保存されない。
+              const text = editorRef.current?.innerText ?? '';
               setContent(text);
               if (status === 'saved') setStatus('editing');
             }}
@@ -848,7 +851,7 @@ export function EntryEditor({
               // execCommand の input イベントが React の onInput にバブルしない
               // 場合があるため、paste 後に明示的に state を同期する（autosave が
               // content 変化を検知できるようにするため）
-              const updated = editorRef.current?.textContent ?? '';
+              const updated = editorRef.current?.innerText ?? '';
               setContent(updated);
               if (status === 'saved') setStatus('editing');
             }}
