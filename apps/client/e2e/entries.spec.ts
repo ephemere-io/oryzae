@@ -30,4 +30,32 @@ test.describe('エントリ管理', () => {
       await expect(page.locator('textarea, [contenteditable="true"]')).toBeVisible();
     }
   });
+
+  // regression: #219 — Enter キーで入れた改行が保存・再表示時に失われる
+  test('改行を含むエントリを保存して再読込しても改行が反映される', async ({ page }) => {
+    await page.goto('/entries/new');
+    const editor = page.locator('[contenteditable="true"]').first();
+    await editor.click();
+    await page.keyboard.type('1行目');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('2行目');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('3行目');
+
+    await page.click('button[data-tooltip="保存する"]');
+    await page.fill('input[placeholder="タイトルを入力..."]', 'newline-regression-219');
+    await page.click('button:has-text("保存"):not([data-tooltip])');
+
+    await page.waitForURL(/\/entries\/[^/]+$/);
+    await page.reload();
+
+    const reopened = page.locator('[contenteditable="true"]').first();
+    await expect(reopened).toBeVisible();
+    const text = await reopened.innerText();
+    expect(text).toContain('1行目');
+    expect(text).toContain('2行目');
+    expect(text).toContain('3行目');
+    // 改行が保たれていれば、行数は 3 行以上になる
+    expect(text.split('\n').filter((l) => l.trim().length > 0).length).toBeGreaterThanOrEqual(3);
+  });
 });
