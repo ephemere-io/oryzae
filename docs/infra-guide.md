@@ -14,7 +14,7 @@ Browser → Next.js (same origin) → Hono (internal app.fetch()) → Supabase C
 
 | アプリ | URL | Vercel プロジェクト | 用途 |
 |---|---|---|---|
-| client | https://oryzae.vercel.app | oryzae | ユーザー向け |
+| client | https://oryzae-client.vercel.app | oryzae-client | ユーザー向け |
 | admin | https://oryzae-admin.vercel.app | oryzae-admin | 管理画面・Observability |
 
 ### なぜこの構成か

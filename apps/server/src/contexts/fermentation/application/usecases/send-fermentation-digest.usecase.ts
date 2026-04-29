@@ -1,7 +1,7 @@
 import type { EmailNotifier } from '../../domain/gateways/email-notifier.gateway.js';
 
 const SUBJECT = 'あなたの瓶の発酵が進みました';
-const JAR_URL = 'https://oryzae.vercel.app/jar';
+const JAR_URL = 'https://oryzae-client.vercel.app/jar';
 
 export class SendFermentationDigestUsecase {
   constructor(
