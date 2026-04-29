@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
+import { rateLimitFermentation } from '../../../shared/presentation/middleware/rate-limit.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
@@ -28,7 +29,7 @@ const runFermentationSchema = z.object({
 const generateId = () => crypto.randomUUID();
 
 export const fermentations = new Hono<Env>()
-  .post('/', async (c) => {
+  .post('/', rateLimitFermentation(), async (c) => {
     const body = runFermentationSchema.parse(await c.req.json());
     const supabase = c.get('supabase');
     const repo = new SupabaseFermentationRepository(supabase);
