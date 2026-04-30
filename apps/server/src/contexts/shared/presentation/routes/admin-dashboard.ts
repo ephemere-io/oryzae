@@ -69,7 +69,7 @@ export const adminDashboard = new Hono<Env>()
 
     const { data, error } = await supabase
       .from('fermentation_results')
-      .select('id, user_id, question_id, entry_id, error_message, created_at')
+      .select('id, user_id, question_id, error_message, created_at')
       .eq('status', 'failed')
       .gt('created_at', since);
 
@@ -83,7 +83,6 @@ export const adminDashboard = new Hono<Env>()
       {
         id: string;
         questionId: string;
-        entryId: string;
         errorMessage: string | null;
         createdAt: string;
       }[]
@@ -93,7 +92,6 @@ export const adminDashboard = new Hono<Env>()
       list.push({
         id: row.id,
         questionId: row.question_id,
-        entryId: row.entry_id,
         errorMessage: row.error_message,
         createdAt: row.created_at,
       });
