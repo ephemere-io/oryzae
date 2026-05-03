@@ -15,15 +15,17 @@ export const adminDashboard = new Hono<Env>()
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
 
-    const applyDateFilter = <
-      T extends { gte: (col: string, val: string) => T; lte: (col: string, val: string) => T },
-    >(
-      query: T,
-    ): T => {
-      let q = query;
+    type DateFilterable = {
+      gte: (col: string, val: string) => DateFilterable;
+      lte: (col: string, val: string) => DateFilterable;
+    };
+    const applyDateFilter = <T>(query: T): T => {
+      // @type-assertion-allowed: Supabase 2.105 で `T extends { gte/lte... }` の generic 制約が型インスタンス化深度を超えて TS2589 を起こす。runtime は同じ method chain なので、generic を緩めて中で DateFilterable に narrow する。
+      let q = query as unknown as DateFilterable;
       if (dateFrom) q = q.gte('created_at', dateFrom);
       if (dateTo) q = q.lte('created_at', `${dateTo}T23:59:59.999Z`);
-      return q;
+      // @type-assertion-allowed: 上の理由と同じく、型を元の builder 型に戻す。runtime では同じオブジェクトの chain。
+      return q as unknown as T;
     };
 
     const [usersRes, entriesRes, allFermRes, completedRes, failedRes, costTrackedRes] =
