@@ -75,6 +75,12 @@ export function SaveTitleModal({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            // IME 変換確定の Enter で保存されないようにする
+            if (e.key === 'Enter' && e.nativeEvent.isComposing) {
+              e.preventDefault();
+            }
+          }}
           maxLength={100}
           placeholder="タイトルを入力..."
           className="mb-4 w-full rounded-md border px-3 py-2.5 text-sm outline-none"
