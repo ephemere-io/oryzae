@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
-export interface FailureItem {
+interface FailureItem {
   id: string;
   errorMessage: string | null;
   createdAt: string;
