@@ -1,4 +1,4 @@
-export interface FermentationOutput {
+interface FermentationOutput {
   worksheetMarkdown: string;
   resultDiagramMarkdown: string;
   snippets: {
@@ -11,7 +11,7 @@ export interface FermentationOutput {
   keywords: { keyword: string; description: string }[];
 }
 
-export interface LlmUsage {
+interface LlmUsage {
   inputTokens: number;
   outputTokens: number;
 }
