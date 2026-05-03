@@ -5,15 +5,14 @@ import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
 export interface FailureItem {
-  fermentationId: string;
-  errorMessage: string;
+  id: string;
+  errorMessage: string | null;
   createdAt: string;
 }
 
 export interface FailureGroup {
   userId: string;
   email: string;
-  avatarUrl: string | null;
   failures: FailureItem[];
 }
 
@@ -33,8 +32,11 @@ export function useFailureAlerts() {
     const res = await api.fetch('/api/v1/admin/dashboard/failures-24h');
     if (res.ok) {
       const data: unknown = await res.json();
-      if (Array.isArray(data)) {
-        setGroups(data as FailureGroup[]); // @type-assertion-allowed: APIレスポンスの型をバリデーション後にキャスト
+      if (typeof data === 'object' && data !== null && 'groups' in data) {
+        const groupsRaw = (data as { groups: unknown }).groups; // @type-assertion-allowed: in 演算子で存在確認後
+        if (Array.isArray(groupsRaw)) {
+          setGroups(groupsRaw as FailureGroup[]); // @type-assertion-allowed: API レスポンスの shape
+        }
       }
     } else {
       setError('障害情報の取得に失敗しました');
