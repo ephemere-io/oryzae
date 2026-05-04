@@ -9,6 +9,9 @@ interface SnippetToolbarProps {
 }
 
 const MAX_SNIPPET_LENGTH = 50;
+const SAVED_DISPLAY_MS = 1200;
+
+type Status = 'idle' | 'saving' | 'saved';
 
 function getTodayKey(): string {
   const now = new Date();
@@ -22,15 +25,24 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
   const [visible, setVisible] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<Status>('idle');
   const toolbarRef = useRef<HTMLDivElement>(null);
   // IME 変換中は selectionchange を無視する（候補テキストが選択範囲扱いになり誤発火するため）
   const composingRef = useRef(false);
+  // 「保存しました」表示中は selectionchange 経由の hide を抑制する
+  const statusRef = useRef<Status>('idle');
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const tooLong = selectedText.length > MAX_SNIPPET_LENGTH;
+  const isBusy = status !== 'idle';
 
   const handleSelection = useCallback(() => {
     if (composingRef.current) return;
+    if (statusRef.current === 'saved') return;
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -87,10 +99,16 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
     };
   }, [handleSelection, editorRef]);
 
-  const handleSnippetCreate = useCallback(async () => {
-    if (!api || !selectedText || tooLong || saving) return;
+  useEffect(() => {
+    return () => {
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+    };
+  }, []);
 
-    setSaving(true);
+  const handleSnippetCreate = useCallback(async () => {
+    if (!api || !selectedText || tooLong || isBusy) return;
+
+    setStatus('saving');
     try {
       await api.fetch('/api/v1/board/snippets', {
         method: 'POST',
@@ -100,14 +118,24 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
         }),
       });
       window.getSelection()?.removeAllRanges();
-      setVisible(false);
-      setSelectedText('');
-    } finally {
-      setSaving(false);
+      setStatus('saved');
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+      savedTimeoutRef.current = setTimeout(() => {
+        setVisible(false);
+        setSelectedText('');
+        setStatus('idle');
+      }, SAVED_DISPLAY_MS);
+    } catch (err) {
+      setStatus('idle');
+      throw err;
     }
-  }, [api, selectedText, tooLong, saving]);
+  }, [api, selectedText, tooLong, isBusy]);
 
   if (!visible) return null;
+
+  const buttonLabel =
+    status === 'saving' ? '保存中…' : status === 'saved' ? '保存しました' : 'スニペット化';
+  const buttonIcon = status === 'saved' ? '✓' : '✦';
 
   return (
     <div
@@ -125,16 +153,17 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
         <button
           type="button"
           onClick={handleSnippetCreate}
-          disabled={tooLong || saving}
+          disabled={tooLong || isBusy}
           className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider shadow-md transition-all disabled:opacity-50"
           style={{
             backgroundColor: 'var(--bg)',
             borderColor: 'var(--accent)',
             color: 'var(--accent)',
             cursor: tooLong ? 'not-allowed' : 'pointer',
+            opacity: status === 'saved' ? 1 : undefined,
           }}
           onMouseEnter={(e) => {
-            if (!tooLong) {
+            if (!tooLong && !isBusy) {
               e.currentTarget.style.backgroundColor = 'var(--accent)';
               e.currentTarget.style.color = 'white';
             }
@@ -144,8 +173,8 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
             e.currentTarget.style.color = 'var(--accent)';
           }}
         >
-          <span style={{ fontSize: '10px' }}>✦</span>
-          {saving ? '保存中…' : 'スニペット化'}
+          <span style={{ fontSize: '10px' }}>{buttonIcon}</span>
+          {buttonLabel}
         </button>
         {tooLong && (
           <span className="rounded bg-zinc-800 px-2 py-1 text-[10px] text-white shadow">
