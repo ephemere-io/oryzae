@@ -1,9 +1,9 @@
 'use client';
 
-export type WritingMode = 'vertical' | 'horizontal';
-export type FontFamily = 'serif' | 'sans';
+type WritingMode = 'vertical' | 'horizontal';
+type FontFamily = 'serif' | 'sans';
 export type TimeInscriptionMode = 'fontSize' | 'fontWeight' | 'pressureBleed';
-export type GhostMode = 'block' | 'dust';
+type GhostMode = 'block' | 'dust';
 
 export interface EditorSettings {
   writingMode: WritingMode;

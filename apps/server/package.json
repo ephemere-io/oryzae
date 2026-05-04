@@ -24,16 +24,16 @@
   "dependencies": {
     "@hono/node-server": "^1.19.13",
     "@oryzae/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.103.0",
+    "@supabase/supabase-js": "^2.105.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
-    "ai": "^6.0.158",
-    "hono": "^4.12.12",
+    "ai": "^6.0.174",
+    "hono": "^4.12.16",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",
-    "dependency-cruiser": "^17.3.10",
+    "dependency-cruiser": "^17.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

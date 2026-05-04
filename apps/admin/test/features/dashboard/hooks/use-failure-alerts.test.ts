@@ -17,10 +17,9 @@ const sampleGroups = [
   {
     userId: 'u1',
     email: 'test@example.com',
-    avatarUrl: null,
     failures: [
       {
-        fermentationId: 'f1',
+        id: 'f1',
         errorMessage: 'Something went wrong',
         createdAt: '2026-04-12T10:00:00Z',
       },
@@ -35,7 +34,7 @@ describe('useFailureAlerts', () => {
   });
 
   it('fetches failure groups on mount', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleGroups));
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { groups: sampleGroups }));
 
     const { result } = renderHook(() => useFailureAlerts());
 
@@ -44,6 +43,19 @@ describe('useFailureAlerts', () => {
     });
 
     expect(result.current.groups).toEqual(sampleGroups);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('handles empty groups response', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { groups: [] }));
+
+    const { result } = renderHook(() => useFailureAlerts());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.groups).toEqual([]);
     expect(result.current.error).toBeNull();
   });
 
@@ -70,7 +82,7 @@ describe('useFailureAlerts', () => {
   });
 
   it('retryFermentation calls POST and refreshes', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleGroups));
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { groups: sampleGroups }));
 
     const { result } = renderHook(() => useFailureAlerts());
 
@@ -80,7 +92,7 @@ describe('useFailureAlerts', () => {
 
     // Mock the retry POST and the subsequent refresh GET
     mockFetch.mockResolvedValueOnce(mockResponse(true, { ok: true }));
-    mockFetch.mockResolvedValueOnce(mockResponse(true, []));
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { groups: [] }));
 
     let retryResult: boolean;
     await act(async () => {
@@ -95,7 +107,7 @@ describe('useFailureAlerts', () => {
   });
 
   it('retryFermentation returns false on failure', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleGroups));
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { groups: sampleGroups }));
 
     const { result } = renderHook(() => useFailureAlerts());
 
