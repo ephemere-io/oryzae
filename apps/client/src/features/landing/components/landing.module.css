@@ -58,12 +58,12 @@ html[lang="ja"] .landingRoot {
   max-width: 100%;
 }
 
-.landingRoot a {
+.landingRoot a:not(.cta) {
   color: inherit;
   text-decoration: none;
 }
 
-.landingRoot a:hover {
+.landingRoot a:not(.cta):hover {
   color: var(--lp-olive);
 }
 
