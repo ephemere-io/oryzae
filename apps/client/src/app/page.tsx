@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { LandingPage } from '@/features/landing/components/landing-page';
 import { getAccessToken, setTokens } from '@/lib/auth';
 
 function parseHashParams(hash: string): Record<string, string> {
@@ -18,6 +19,7 @@ function parseHashParams(hash: string): Record<string, string> {
 
 export default function HomePage() {
   const router = useRouter();
+  const [showLanding, setShowLanding] = useState(false);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -30,17 +32,18 @@ export default function HomePage() {
 
       if (accessToken && refreshToken) {
         setTokens(accessToken, refreshToken);
-        router.replace('/entries');
+        router.replace('/jar');
         return;
       }
     }
 
     if (getAccessToken()) {
-      router.replace('/entries');
+      router.replace('/jar');
     } else {
-      router.replace('/login');
+      setShowLanding(true);
     }
   }, [router]);
 
-  return null;
+  if (!showLanding) return null;
+  return <LandingPage />;
 }
