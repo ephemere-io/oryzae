@@ -83,18 +83,21 @@ export function FailureAlerts({
       <div className="divide-y divide-border/30">
         {groups.flatMap((group) =>
           group.failures.map((f) => (
-            <div key={f.fermentationId} className="flex items-center gap-3 px-4 py-2">
+            <div key={f.id} className="flex items-center gap-3 px-4 py-2">
               <span className="size-1.5 shrink-0 rounded-full bg-red-500" />
               <span className="shrink-0 text-xs text-muted-foreground w-36 truncate">
                 {group.email}
               </span>
-              <span className="flex-1 truncate text-sm text-foreground/80" title={f.errorMessage}>
-                {truncate(f.errorMessage, 80)}
+              <span
+                className="flex-1 truncate text-sm text-foreground/80"
+                title={f.errorMessage ?? ''}
+              >
+                {truncate(f.errorMessage ?? '不明なエラー', 80)}
               </span>
               <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
                 {formatRelativeTime(f.createdAt)}
               </span>
-              <RetryButton fermentationId={f.fermentationId} onRetry={retryFermentation} />
+              <RetryButton fermentationId={f.id} onRetry={retryFermentation} />
             </div>
           )),
         )}
