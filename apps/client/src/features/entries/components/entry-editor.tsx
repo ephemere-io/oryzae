@@ -122,7 +122,6 @@ export function EntryEditor({
   const [voiceActive, setVoiceActive] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
-  const [fadeRight, setFadeRight] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
@@ -200,28 +199,23 @@ export function EntryEditor({
     if (saving) setStatus(isAutosavingRef.current ? 'autosaving' : 'saving');
   }, [saving]);
 
-  // Track scroll position of editor to show/hide fade overlays
+  // Track scroll position of editor to show/hide end-side fade overlay
   useEffect(() => {
     const el = editorRef.current;
     if (!el || settings.writingMode !== 'vertical') {
       setFadeLeft(false);
-      setFadeRight(false);
       return;
     }
     function updateFade() {
       if (!el) return;
       const { scrollLeft, scrollWidth, clientWidth } = el;
-      // vertical-rl: scrollLeft is 0 at start (rightmost), negative when scrolled left
       const maxScroll = scrollWidth - clientWidth;
       // vertical-rl: scrollLeft=0 at start (rightmost/beginning), goes negative when scrolled left
-      // Right fade (beginning clipped): show when scrolled away from start
-      setFadeRight(Math.abs(scrollLeft) > 5);
-      // Left fade (end clipped): show when not scrolled all the way to the left
+      // End-side fade: show when not scrolled all the way to the end
       setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
     }
     updateFade();
     el.addEventListener('scroll', updateFade);
-    // Also update on content change via ResizeObserver
     const ro = new ResizeObserver(updateFade);
     ro.observe(el);
     return () => {
@@ -604,6 +598,8 @@ export function EntryEditor({
               value={draftTitle}
               onChange={(e) => setDraftTitle(e.target.value)}
               onKeyDown={(e) => {
+                // IME 変換確定の Enter / Escape は無視する（日本語入力途中で確定されてしまう不具合の対策）
+                if (e.nativeEvent.isComposing) return;
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   commitTitleEdit();
@@ -799,9 +795,9 @@ export function EntryEditor({
         style={{ left: sidebarWidth }}
       />
 
-      {/* Editor area — outer wrapper (no overflow) holds fade overlays; inner div scrolls */}
+      {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
       <div className="relative flex-1">
-        {/* Fade overlays for vertical mode — appear only when content is clipped */}
+        {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
         {settings.writingMode === 'vertical' && fadeLeft && (
           <div
             className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
@@ -809,16 +805,6 @@ export function EntryEditor({
               left: 0,
               width: '18%',
               background: 'linear-gradient(to right, var(--bg), transparent)',
-            }}
-          />
-        )}
-        {settings.writingMode === 'vertical' && fadeRight && (
-          <div
-            className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
-            style={{
-              right: '15%',
-              width: '12%',
-              background: 'linear-gradient(to left, var(--bg), transparent)',
             }}
           />
         )}
@@ -836,7 +822,10 @@ export function EntryEditor({
             contentEditable
             suppressContentEditableWarning
             onInput={() => {
-              const text = editorRef.current?.textContent ?? '';
+              // innerText を使う理由: contentEditable で Enter キー押下時に
+              // ブラウザが挿入する <br> や <div> を改行として読み取るため。
+              // textContent はこれらを無視し、改行が保存されない。
+              const text = editorRef.current?.innerText ?? '';
               setContent(text);
               if (status === 'saved') setStatus('editing');
             }}
@@ -848,7 +837,7 @@ export function EntryEditor({
               // execCommand の input イベントが React の onInput にバブルしない
               // 場合があるため、paste 後に明示的に state を同期する（autosave が
               // content 変化を検知できるようにするため）
-              const updated = editorRef.current?.textContent ?? '';
+              const updated = editorRef.current?.innerText ?? '';
               setContent(updated);
               if (status === 'saved') setStatus('editing');
             }}
