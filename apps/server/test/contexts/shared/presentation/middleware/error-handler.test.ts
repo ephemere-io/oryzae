@@ -41,15 +41,16 @@ describe('errorHandler', () => {
     const app = createApp();
     await app.request('/unhandled');
 
-    // Wait for the async dynamic import to resolve
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Something went wrong' }),
-      expect.objectContaining({
-        extra: { method: 'GET', path: '/unhandled' },
-      }),
-    );
+    // errorHandler は dynamic import を fire-and-forget で実行するため、
+    // 解決を待つ。waitFor のポーリングで決定的にブロックする。
+    await vi.waitFor(() => {
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Something went wrong' }),
+        expect.objectContaining({
+          extra: { method: 'GET', path: '/unhandled' },
+        }),
+      );
+    });
   });
 
   it('does not call Sentry for ApplicationError', async () => {
@@ -57,7 +58,9 @@ describe('errorHandler', () => {
     const app = createApp();
     await app.request('/app-error');
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // ApplicationError は dynamic import を起動しないので、十分な余裕を取って
+    // 他テスト由来の遅延した呼び出しが漏れていないことを確認する。
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
