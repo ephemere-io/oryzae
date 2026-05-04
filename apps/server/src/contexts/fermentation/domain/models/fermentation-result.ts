@@ -1,6 +1,6 @@
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
-export type FermentationStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type FermentationStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 type FermentationResultError = { type: 'INVALID_STATUS'; message: string };
 

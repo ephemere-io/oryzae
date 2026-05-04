@@ -22,7 +22,7 @@ function StatCard({ label, value, subtitle }: StatCardProps) {
 
 export function StatsCards({ stats }: { stats: DashboardStats }) {
   return (
-    <div className="grid gap-4 grid-cols-3">
+    <>
       <StatCard label="Users" value={stats.totalUsers} />
       <StatCard label="Entries" value={stats.totalEntries} />
       <StatCard
@@ -30,6 +30,6 @@ export function StatsCards({ stats }: { stats: DashboardStats }) {
         value={stats.totalFermentations}
         subtitle={`${stats.completedFermentations} done / ${stats.failedFermentations} failed`}
       />
-    </div>
+    </>
   );
 }
