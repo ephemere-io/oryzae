@@ -32,13 +32,13 @@ export default function HomePage() {
 
       if (accessToken && refreshToken) {
         setTokens(accessToken, refreshToken);
-        router.replace('/jar');
+        router.replace('/entries/new');
         return;
       }
     }
 
     if (getAccessToken()) {
-      router.replace('/jar');
+      router.replace('/entries/new');
     } else {
       setShowLanding(true);
     }
