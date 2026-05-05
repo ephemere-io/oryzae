@@ -432,6 +432,46 @@
       "subheading": "A record of how your questions have been born, grown, and shifted"
     }
   },
+  "onboarding": {
+    "dialog_label": "Welcome to Oryzae",
+    "skip": "Skip",
+    "step_concept": {
+      "eyebrow": "01 — Welcome",
+      "title_l1": "Oryzae is a journal",
+      "title_l2": "that grows your questions.",
+      "body": "Plant a question on your mind, then water it with daily entries. Over time, an AI ferments what you've written and returns it as new insight.",
+      "body_2": "It works a little differently from a regular diary — let's walk through the four places that make it tick.",
+      "next": "Get started"
+    },
+    "step_question": {
+      "eyebrow": "02 — Question",
+      "title": "Plant your first question.",
+      "body": "Try shaping what you're most preoccupied with into a short question. \"Why…\", \"How might I…\" — a sentence whose answer you don't have yet is plenty. You can edit it any time.",
+      "placeholder": "e.g. Why am I bad at hurrying?",
+      "hint": "It will be stored in the Jar — fermentation starts here.",
+      "next": "Continue with this question"
+    },
+    "step_editor": {
+      "eyebrow": "03 — Editor",
+      "title_l1": "Collect words",
+      "title_l2": "as you write entries.",
+      "body_before_em": "The editor is a quiet place to write. Put down whatever's on your mind. Select a sentence to lift it out as a ",
+      "body_em": "snippet",
+      "body_after_em": " — you can lay them out side by side later on the Board.",
+      "list_autosave": "Auto-saves as you type",
+      "list_snippet": "Selection creates a snippet",
+      "list_link": "Link entries to relevant questions",
+      "next": "Next"
+    },
+    "step_ferment": {
+      "eyebrow": "04 — Jar & Fermentation",
+      "title": "Let your questions rest in the Jar.",
+      "body": "The entries you collect settle into the Jar and ferment on a schedule. The AI re-reads your words, finds patterns and shifts in your questions, and offers them back gently — that's the rhythm of Oryzae.",
+      "recap_label": "Your first question",
+      "recap_quote": "“{question}”",
+      "next": "Begin with Oryzae"
+    }
+  },
   "landing": {
     "nav": {
       "concept": "Concept",

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { ConceptIllo, EditorIllo, JarIllo, QuestionIllo } from './illustrations';
 
 interface FooterBarProps {
@@ -12,6 +13,7 @@ interface FooterBarProps {
 }
 
 function FooterBar({ step, onNext, onSkip, nextLabel, nextDisabled, finishing }: FooterBarProps) {
+  const t = useTranslations('onboarding');
   return (
     <div className="ob-footer">
       <div
@@ -32,7 +34,7 @@ function FooterBar({ step, onNext, onSkip, nextLabel, nextDisabled, finishing }:
       <div className="ob-footer-actions">
         {!finishing && (
           <button type="button" className="ob-btn" onClick={onSkip}>
-            スキップ
+            {t('skip')}
           </button>
         )}
         <button
@@ -54,26 +56,26 @@ interface StepProps {
 }
 
 export function StepConcept({ onNext, onSkip }: StepProps) {
+  const t = useTranslations('onboarding.step_concept');
   return (
     <>
       <div className="ob-card-inner">
         <div className="ob-illo-wrap">
           <ConceptIllo />
         </div>
-        <div className="ob-eyebrow">01 — Welcome</div>
+        <div className="ob-eyebrow">{t('eyebrow')}</div>
         <h1 className="ob-title">
-          Oryzaeは、
+          {t('title_l1')}
           <br />
-          問いを育てるジャーナル。
+          {t('title_l2')}
         </h1>
         <p className="ob-body">
-          頭に浮かんだ問いを蒔き、日々のエントリで水をやる。
-          時間が経つと、AIが書き溜めたものを発酵させ、 新しい気づきとして返してくれる。
+          {t('body')}
           <br />
-          ふつうの日記とは少し違う、4つの場所を順に見てみましょう。
+          {t('body_2')}
         </p>
       </div>
-      <FooterBar step={0} onNext={onNext} onSkip={onSkip} nextLabel="はじめる" />
+      <FooterBar step={0} onNext={onNext} onSkip={onSkip} nextLabel={t('next')} />
     </>
   );
 }
@@ -84,6 +86,7 @@ interface StepQuestionProps extends StepProps {
 }
 
 export function StepQuestion({ onNext, onSkip, draft, setDraft }: StepQuestionProps) {
+  const t = useTranslations('onboarding.step_question');
   const valid = draft.trim().length > 0 && draft.trim().length <= 64;
   return (
     <>
@@ -91,18 +94,15 @@ export function StepQuestion({ onNext, onSkip, draft, setDraft }: StepQuestionPr
         <div className="ob-illo-wrap">
           <QuestionIllo />
         </div>
-        <div className="ob-eyebrow">02 — Question</div>
-        <h1 className="ob-title">最初の「問い」を蒔く。</h1>
-        <p className="ob-body">
-          あなたが今いちばん考えていることを、短い問いの形にしてみてください。
-          「なぜ──」「どうすれば──」、答えのまだない一文で構いません。 後からいつでも編集できます。
-        </p>
+        <div className="ob-eyebrow">{t('eyebrow')}</div>
+        <h1 className="ob-title">{t('title')}</h1>
+        <p className="ob-body">{t('body')}</p>
         <div className="ob-input-row">
           <input
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="例: なぜ自分は急ぐのが苦手なのだろう"
+            placeholder={t('placeholder')}
             maxLength={64}
             className="ob-input"
             // biome-ignore lint/a11y/noAutofocus: onboarding modal expects immediate focus on the input
@@ -110,13 +110,13 @@ export function StepQuestion({ onNext, onSkip, draft, setDraft }: StepQuestionPr
           />
           <span className="ob-input-count">{draft.length}/64</span>
         </div>
-        <p className="ob-hint">あとで Jar に保管され、ここから発酵が始まります。</p>
+        <p className="ob-hint">{t('hint')}</p>
       </div>
       <FooterBar
         step={1}
         onNext={() => valid && onNext()}
         onSkip={onSkip}
-        nextLabel="この問いで進む"
+        nextLabel={t('next')}
         nextDisabled={!valid}
       />
     </>
@@ -124,38 +124,40 @@ export function StepQuestion({ onNext, onSkip, draft, setDraft }: StepQuestionPr
 }
 
 export function StepEditor({ onNext, onSkip }: StepProps) {
+  const t = useTranslations('onboarding.step_editor');
   return (
     <>
       <div className="ob-card-inner">
         <div className="ob-illo-wrap">
           <EditorIllo />
         </div>
-        <div className="ob-eyebrow">03 — Editor</div>
+        <div className="ob-eyebrow">{t('eyebrow')}</div>
         <h1 className="ob-title">
-          エントリを書きながら、
+          {t('title_l1')}
           <br />
-          言葉を集める。
+          {t('title_l2')}
         </h1>
         <p className="ob-body">
-          エディタは静かな書き場所です。普段思ったことをそのまま書いてください。 一文を選択すると{' '}
-          <em className="ob-em">スニペット</em> として切り出せ、 後で Board に並べて見渡せます。
+          {t('body_before_em')}
+          <em className="ob-em">{t('body_em')}</em>
+          {t('body_after_em')}
         </p>
         <ul className="ob-list">
           <li>
             <span className="ob-list-dot" style={{ background: '#8EA89C' }} />
-            自動保存される
+            {t('list_autosave')}
           </li>
           <li>
             <span className="ob-list-dot" style={{ background: '#9C9658' }} />
-            選択でスニペット作成
+            {t('list_snippet')}
           </li>
           <li>
             <span className="ob-list-dot" style={{ background: '#D4714E' }} />
-            関連する問いに紐づけ
+            {t('list_link')}
           </li>
         </ul>
       </div>
-      <FooterBar step={2} onNext={onNext} onSkip={onSkip} nextLabel="次へ" />
+      <FooterBar step={2} onNext={onNext} onSkip={onSkip} nextLabel={t('next')} />
     </>
   );
 }
@@ -167,6 +169,7 @@ interface StepFermentProps {
 }
 
 export function StepFerment({ onDone, onSkip, draft }: StepFermentProps) {
+  const t = useTranslations('onboarding.step_ferment');
   const trimmed = draft.trim();
   return (
     <>
@@ -174,21 +177,17 @@ export function StepFerment({ onDone, onSkip, draft }: StepFermentProps) {
         <div className="ob-illo-wrap">
           <JarIllo />
         </div>
-        <div className="ob-eyebrow">04 — Jar &amp; Fermentation</div>
-        <h1 className="ob-title">Jarで、問いをじっくり寝かせる。</h1>
-        <p className="ob-body">
-          書き溜めたエントリは Jar に蓄えられ、定期的に発酵されます。
-          AIがあなたの言葉を読み返し、共通点や問いの変化を見つけて
-          そっと差し出してくれる──それがOryzaeのリズムです。
-        </p>
+        <div className="ob-eyebrow">{t('eyebrow')}</div>
+        <h1 className="ob-title">{t('title')}</h1>
+        <p className="ob-body">{t('body')}</p>
         {trimmed && (
           <div className="ob-recap">
-            <span className="ob-recap-label">あなたの最初の問い</span>
-            <span className="ob-recap-text">「{trimmed}」</span>
+            <span className="ob-recap-label">{t('recap_label')}</span>
+            <span className="ob-recap-text">{t('recap_quote', { question: trimmed })}</span>
           </div>
         )}
       </div>
-      <FooterBar step={3} onNext={onDone} onSkip={onSkip} nextLabel="Oryzaeをはじめる" finishing />
+      <FooterBar step={3} onNext={onDone} onSkip={onSkip} nextLabel={t('next')} finishing />
     </>
   );
 }
