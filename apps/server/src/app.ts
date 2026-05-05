@@ -19,7 +19,7 @@ import { adminObservability } from './contexts/shared/presentation/routes/admin-
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
 import { cronCostAlert } from './contexts/shared/presentation/routes/cron-cost-alert.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
-import { userStats } from './contexts/user/presentation/routes/user-stats.js';
+import { userMe } from './contexts/user/presentation/routes/user-me.js';
 
 const app = new Hono()
   .onError(errorHandler)
@@ -36,7 +36,7 @@ const app = new Hono()
   .route('/api/v1/admin/observability', adminObservability)
   .use('/api/v1/*', authMiddleware)
   .use('/api/v1/*', rateLimitGeneral())
-  .route('/api/v1/users/me', userStats)
+  .route('/api/v1/users/me', userMe)
   .route('/api/v1/board', board)
   .route('/api/v1/entries', entries)
   .route('/api/v1/questions', questions)

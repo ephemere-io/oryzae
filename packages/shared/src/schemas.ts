@@ -52,6 +52,10 @@ export const changeEmailSchema = z.object({
   newEmail: z.string().email(),
 });
 
+export const completeOnboardingSchema = z.object({
+  completed: z.literal(true),
+});
+
 // Board schemas
 export const boardQuerySchema = z.object({
   dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
