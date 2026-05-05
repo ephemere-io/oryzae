@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import posthog from 'posthog-js';
 import { Suspense, useEffect, useState } from 'react';
 import { createApiClient } from '@/lib/api';
@@ -19,6 +20,7 @@ function parseHashParams(hash: string): Record<string, string> {
 }
 
 function CallbackHandler() {
+  const t = useTranslations('auth.callback');
   const searchParams = useSearchParams();
   const router = useRouter();
   const [error, setError] = useState('');
@@ -35,7 +37,7 @@ function CallbackHandler() {
         });
 
         if (!res.ok) {
-          setError('認証に失敗しました。もう一度お試しください。');
+          setError(t('error_auth_failed'));
           return;
         }
 
@@ -74,29 +76,34 @@ function CallbackHandler() {
         }
       }
 
-      setError('認証コードが見つかりません');
+      setError(t('error_no_code'));
     }
 
     handleCallback();
-  }, [searchParams, router]);
+  }, [searchParams, router, t]);
 
   if (error) {
     return (
       <div className="flex flex-col gap-4 text-center">
         <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>
         <a href="/login" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          ログインに戻る
+          {t('back_to_login')}
         </a>
       </div>
     );
   }
 
-  return <p className="text-sm text-center text-zinc-500">認証中...</p>;
+  return <p className="text-sm text-center text-zinc-500">{t('authenticating')}</p>;
+}
+
+function CallbackFallback() {
+  const t = useTranslations('auth.callback');
+  return <p className="text-sm text-center text-zinc-500">{t('loading')}</p>;
 }
 
 export default function CallbackPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-center text-zinc-500">読み込み中...</p>}>
+    <Suspense fallback={<CallbackFallback />}>
       <CallbackHandler />
     </Suspense>
   );

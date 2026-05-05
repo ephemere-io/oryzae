@@ -28,4 +28,22 @@ test.describe('ランディングページ', () => {
     await firstFaqButton.click();
     await expect(firstFaqButton).toHaveAttribute('aria-expanded', 'true');
   });
+
+  test('landing で切り替えた言語が /login にも反映される (cookie 共有)', async ({
+    page,
+    context,
+  }) => {
+    await context.addCookies([
+      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
+    ]);
+    await page.goto('/');
+    await page.locator('button:has-text("English")').click();
+    await expect(page.locator('h1')).toContainText('ferment');
+
+    const cookies = await context.cookies();
+    expect(cookies.find((c) => c.name === 'NEXT_LOCALE')?.value).toBe('en');
+
+    await page.goto('/login');
+    await expect(page.locator('text=Log in to continue')).toBeVisible();
+  });
 });

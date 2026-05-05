@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDeleteEntry } from '@/features/entries/hooks/use-delete-entry';
 import type { ApiClient } from '@/lib/api';
+import { I18nWrapper } from '../../../helpers/i18n-wrapper';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return {
@@ -31,7 +32,7 @@ describe('useDeleteEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { ok: true }));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useDeleteEntry(api));
+    const { result } = renderHook(() => useDeleteEntry(api), { wrapper: I18nWrapper });
 
     let ok: boolean | undefined;
     await act(async () => {
@@ -50,7 +51,7 @@ describe('useDeleteEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useDeleteEntry(api));
+    const { result } = renderHook(() => useDeleteEntry(api), { wrapper: I18nWrapper });
 
     let ok: boolean | undefined;
     await act(async () => {
@@ -62,7 +63,7 @@ describe('useDeleteEntry', () => {
   });
 
   it('returns false when api is null', async () => {
-    const { result } = renderHook(() => useDeleteEntry(null));
+    const { result } = renderHook(() => useDeleteEntry(null), { wrapper: I18nWrapper });
 
     let ok: boolean | undefined;
     await act(async () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
 
 interface LeaveConfirmModalProps {
@@ -9,6 +10,7 @@ interface LeaveConfirmModalProps {
 }
 
 export function LeaveConfirmModal({ open, onCancel, onConfirm }: LeaveConfirmModalProps) {
+  const t = useTranslations('entries.leave_modal');
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export function LeaveConfirmModal({ open, onCancel, onConfirm }: LeaveConfirmMod
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="離脱確認ダイアログ"
+      aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
       onClick={onCancel}
@@ -36,10 +38,10 @@ export function LeaveConfirmModal({ open, onCancel, onConfirm }: LeaveConfirmMod
         style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
         <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-          本当に離れますか？
+          {t('heading')}
         </h3>
         <p className="mb-6 text-xs" style={{ color: 'var(--date-color)' }}>
-          未保存の変更は失われます。
+          {t('body')}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -53,7 +55,7 @@ export function LeaveConfirmModal({ open, onCancel, onConfirm }: LeaveConfirmMod
               backgroundColor: 'var(--bg)',
             }}
           >
-            キャンセル
+            {t('cancel')}
           </button>
           <button
             type="button"
@@ -61,7 +63,7 @@ export function LeaveConfirmModal({ open, onCancel, onConfirm }: LeaveConfirmMod
             className="rounded-md border px-4 py-2 text-xs text-white"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
-            OK
+            {t('confirm')}
           </button>
         </div>
       </div>

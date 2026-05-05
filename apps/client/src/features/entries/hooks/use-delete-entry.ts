@@ -1,9 +1,11 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 
 export function useDeleteEntry(api: ApiClient | null) {
+  const t = useTranslations('entries.delete_hook');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
@@ -15,7 +17,7 @@ export function useDeleteEntry(api: ApiClient | null) {
 
       const res = await api.fetch(`/api/v1/entries/${entryId}`, { method: 'DELETE' });
       if (!res.ok) {
-        setError('削除に失敗しました');
+        setError(t('error'));
         setDeleting(false);
         return false;
       }
@@ -23,7 +25,7 @@ export function useDeleteEntry(api: ApiClient | null) {
       setDeleting(false);
       return true;
     },
-    [api],
+    [api, t],
   );
 
   return { deleteEntry, deleting, error };

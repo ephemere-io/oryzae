@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 interface QuestionOption {
@@ -20,6 +21,7 @@ export function QuestionLinker({
   onLink,
   onUnlink,
 }: QuestionLinkerProps) {
+  const t = useTranslations('entries.question_linker');
   const [selected, setSelected] = useState('');
 
   const available = activeQuestions.filter((q) => !linkedQuestionIds.has(q.id));
@@ -39,7 +41,7 @@ export function QuestionLinker({
           onChange={(e) => setSelected(e.target.value)}
           className="w-44 rounded-full border border-zinc-300 bg-transparent px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700"
         >
-          <option value="">問いを紐づける…</option>
+          <option value="">{t('placeholder')}</option>
           {available.map((q) => (
             <option key={q.id} value={q.id}>
               {q.currentText}

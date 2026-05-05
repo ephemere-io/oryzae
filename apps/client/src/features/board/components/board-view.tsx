@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 import type { BoardCardData } from '../hooks/use-board';
@@ -26,6 +27,7 @@ function todayKey(): string {
 }
 
 export function BoardView({ api }: BoardViewProps) {
+  const t = useTranslations('board');
   const router = useRouter();
   const [dateKey, setDateKey] = useState(todayKey);
   const [viewType, setViewType] = useState<'daily' | 'weekly'>('daily');
@@ -120,7 +122,7 @@ export function BoardView({ api }: BoardViewProps) {
   return (
     <div
       role="application"
-      aria-label="Board canvas"
+      aria-label={t('canvas.aria_label')}
       className="relative h-full w-full overflow-auto"
       style={{ backgroundColor: 'var(--bg)' }}
       onPointerMove={(e) => onPointerMove(e.clientX, e.clientY)}
@@ -163,7 +165,7 @@ export function BoardView({ api }: BoardViewProps) {
             className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
             style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
           >
-            この期間のデータはありません
+            {t('empty')}
           </div>
         )}
 
@@ -217,7 +219,7 @@ export function BoardView({ api }: BoardViewProps) {
       {lightbox && (
         <div
           role="dialog"
-          aria-label="Photo lightbox"
+          aria-label={t('lightbox.aria_label')}
           className="fixed inset-0 z-[2000] flex items-center justify-center"
           style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
           onClick={() => setLightbox(null)}
@@ -237,7 +239,7 @@ export function BoardView({ api }: BoardViewProps) {
           </div>
           <button
             type="button"
-            aria-label="Close lightbox"
+            aria-label={t('lightbox.close_aria')}
             onClick={() => setLightbox(null)}
             className="absolute right-6 top-6 text-2xl text-white/70 hover:text-white"
           >

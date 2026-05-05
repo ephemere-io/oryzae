@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 
@@ -46,6 +47,7 @@ interface SaveOptions {
 }
 
 export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
+  const t = useTranslations('entries.save_hook');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -70,7 +72,7 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
       if (entryId) {
         const res = await api.fetch(`/api/v1/entries/${entryId}`, { method: 'PUT', body });
         if (!res.ok) {
-          setError('保存に失敗しました');
+          setError(t('error_save'));
           setSaving(false);
           return null;
         }
@@ -80,7 +82,7 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
 
       const res = await api.fetch('/api/v1/entries', { method: 'POST', body });
       if (!res.ok) {
-        setError('作成に失敗しました');
+        setError(t('error_create'));
         setSaving(false);
         return null;
       }
@@ -89,7 +91,7 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
       setSaving(false);
       return data.id;
     },
-    [api],
+    [api, t],
   );
 
   return { save, saving, error };

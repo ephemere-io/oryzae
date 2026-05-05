@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
 
 interface PhotoDialogProps {
@@ -57,6 +58,7 @@ function readImageDimensions(file: File): Promise<{ width: number; height: numbe
 }
 
 export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
+  const t = useTranslations('board.photo_dialog');
   const [caption, setCaption] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -116,7 +118,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
   return (
     <div
       role="dialog"
-      aria-label="Photo upload dialog"
+      aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
       onClick={handleClose}
@@ -132,7 +134,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
         style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
         <h3 className="mb-4 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-          写真を追加
+          {t('heading')}
         </h3>
 
         {/* Preview / File picker */}
@@ -158,18 +160,18 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
             />
           ) : (
             <span className="text-xs" style={{ color: 'var(--date-color)' }}>
-              クリックして写真を選択
+              {t('click_to_select')}
             </span>
           )}
           {uploading && (
             <div
               role="status"
-              aria-label="アップロード中"
+              aria-label={t('uploading_aria')}
               className="absolute inset-0 flex flex-col items-center justify-center gap-2"
               style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
             >
               <span className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              <span className="text-xs text-white">アップロード中…</span>
+              <span className="text-xs text-white">{t('uploading')}</span>
             </div>
           )}
         </button>
@@ -187,7 +189,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           onChange={(e) => setCaption(e.target.value)}
           maxLength={20}
           disabled={uploading}
-          placeholder="キャプション（20文字以内）"
+          placeholder={t('caption_placeholder')}
           className="mb-4 w-full rounded-md border px-3 py-2.5 text-left text-sm outline-none disabled:opacity-50"
           style={{
             backgroundColor: 'var(--bg)',
@@ -207,7 +209,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
               backgroundColor: 'var(--bg)',
             }}
           >
-            キャンセル
+            {t('cancel')}
           </button>
           <button
             type="submit"
@@ -215,7 +217,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
             className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
-            {uploading ? 'アップロード中…' : '追加'}
+            {uploading ? t('uploading_button') : t('submit')}
           </button>
         </div>
       </form>

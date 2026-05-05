@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 type EventType = 'active' | 'proposed' | 'archived';
 
 interface QuestionTimelineEventProps {
@@ -12,30 +14,24 @@ interface QuestionTimelineEventProps {
   onReject: (id: string) => void;
 }
 
-const EVENT_CONFIG: Record<
+const EVENT_STYLES: Record<
   EventType,
-  { label: string; dotColor: string; borderColor: string; textColor: string; attribution: string }
+  { dotColor: string; borderColor: string; textColor: string }
 > = {
   active: {
-    label: '作成',
     dotColor: 'bg-amber-600',
     borderColor: 'border-l-amber-600',
     textColor: 'text-amber-600',
-    attribution: 'ユーザーが作成',
   },
   proposed: {
-    label: '提案',
     dotColor: 'bg-emerald-600',
     borderColor: 'border-l-emerald-600',
     textColor: 'text-emerald-600',
-    attribution: 'Oryzae が提案',
   },
   archived: {
-    label: 'アーカイブ',
     dotColor: 'bg-red-800',
     borderColor: 'border-l-red-800',
     textColor: 'text-red-800',
-    attribution: 'ユーザーがアーカイブ',
   },
 };
 
@@ -48,18 +44,33 @@ export function QuestionTimelineEvent({
   onAccept,
   onReject,
 }: QuestionTimelineEventProps) {
-  const config = EVENT_CONFIG[eventType];
+  const t = useTranslations('questions.event');
+  const styles = EVENT_STYLES[eventType];
+
+  const label =
+    eventType === 'active'
+      ? t('label_active')
+      : eventType === 'proposed'
+        ? t('label_proposed')
+        : t('label_archived');
+
+  const attribution =
+    eventType === 'active'
+      ? t('attribution_active')
+      : eventType === 'proposed'
+        ? t('attribution_proposed')
+        : t('attribution_archived');
 
   return (
     <div
-      className={`rounded-[10px] border-l-[3px] ${config.borderColor} bg-[rgba(200,180,140,0.08)] px-5 py-3.5`}
+      className={`rounded-[10px] border-l-[3px] ${styles.borderColor} bg-[rgba(200,180,140,0.08)] px-5 py-3.5`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           {/* Event type label */}
           <div className="flex items-center gap-2">
-            <span className={`inline-block h-2 w-2 rounded-full ${config.dotColor}`} />
-            <span className={`text-[11px] font-bold ${config.textColor}`}>{config.label}</span>
+            <span className={`inline-block h-2 w-2 rounded-full ${styles.dotColor}`} />
+            <span className={`text-[11px] font-bold ${styles.textColor}`}>{label}</span>
           </div>
 
           {/* Question text */}
@@ -71,7 +82,7 @@ export function QuestionTimelineEvent({
           </p>
 
           {/* Attribution */}
-          <p className="text-[11px] text-[var(--date-color)]">{config.attribution}</p>
+          <p className="text-[11px] text-[var(--date-color)]">{attribution}</p>
         </div>
 
         {/* Action buttons - subtle styling */}
@@ -83,14 +94,14 @@ export function QuestionTimelineEvent({
                 onClick={() => onAccept(id)}
                 className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] text-white transition-colors hover:bg-emerald-700"
               >
-                承認
+                {t('accept')}
               </button>
               <button
                 type="button"
                 onClick={() => onReject(id)}
                 className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
               >
-                却下
+                {t('reject')}
               </button>
             </>
           ) : eventType === 'archived' ? (
@@ -99,7 +110,7 @@ export function QuestionTimelineEvent({
               onClick={() => onUnarchive(id)}
               className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
             >
-              復元
+              {t('unarchive')}
             </button>
           ) : (
             <button
@@ -107,7 +118,7 @@ export function QuestionTimelineEvent({
               onClick={() => onArchive(id)}
               className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
             >
-              アーカイブ
+              {t('archive')}
             </button>
           )}
         </div>

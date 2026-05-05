@@ -1,7 +1,45 @@
 'use client';
 
 import * as Sentry from '@sentry/nextjs';
+import { NextIntlClientProvider, useTranslations } from 'next-intl';
 import { useEffect } from 'react';
+import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type Locale } from '@/i18n/config';
+import enMessages from '@/i18n/messages/en.json';
+import jaMessages from '@/i18n/messages/ja.json';
+
+const MESSAGES: Record<Locale, typeof jaMessages> = {
+  ja: jaMessages,
+  en: enMessages,
+};
+
+function readLocaleFromCookie(): Locale {
+  if (typeof document === 'undefined') return DEFAULT_LOCALE;
+  const match = document.cookie.split('; ').find((row) => row.startsWith(`${LOCALE_COOKIE}=`));
+  if (!match) return DEFAULT_LOCALE;
+  const value = decodeURIComponent(match.split('=')[1] ?? '');
+  return isLocale(value) ? value : DEFAULT_LOCALE;
+}
+
+function GlobalErrorContent({ reset }: { reset: () => void }) {
+  const t = useTranslations('app.global_error');
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        gap: '1rem',
+      }}
+    >
+      <h2>{t('heading')}</h2>
+      <button type="button" onClick={() => reset()}>
+        {t('retry')}
+      </button>
+    </div>
+  );
+}
 
 export default function GlobalError({
   error,
@@ -14,24 +52,15 @@ export default function GlobalError({
     Sentry.captureException(error);
   }, [error]);
 
+  const locale = readLocaleFromCookie();
+  const messages = MESSAGES[locale];
+
   return (
-    <html lang="ja">
+    <html lang={locale}>
       <body>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            gap: '1rem',
-          }}
-        >
-          <h2>エラーが発生しました</h2>
-          <button type="button" onClick={() => reset()}>
-            もう一度試す
-          </button>
-        </div>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <GlobalErrorContent reset={reset} />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

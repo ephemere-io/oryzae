@@ -1,26 +1,25 @@
-const ERROR_MAP: Record<string, string> = {
-  'Invalid login credentials': 'メールアドレスまたはパスワードが正しくありません',
-  'Email not confirmed': 'メールアドレスが確認されていません。確認メールをご確認ください',
-  'User already registered': 'このメールアドレスは既に登録されています',
-  'Password should be at least 6 characters': 'パスワードは6文字以上で入力してください',
-  'Email rate limit exceeded': 'しばらく時間をおいてから再度お試しください',
-  'For security purposes, you can only request this after':
-    'セキュリティのため、しばらく時間をおいてから再度お試しください',
-  'Unable to validate email address: invalid format': 'メールアドレスの形式が正しくありません',
-  'Signup requires a valid password': '有効なパスワードを入力してください',
-  'User not found': 'ユーザーが見つかりません',
-  'New password should be different from the old password':
-    '新しいパスワードは現在のパスワードと異なるものにしてください',
-  'Auth session missing!': 'セッションが切れました。もう一度ログインしてください',
-  'A user with this email address has already been registered':
-    'このメールアドレスは既に登録されています',
-  'Email address not confirmed': 'メールアドレスの確認が完了していません',
-  'Same password': '新しいパスワードは現在のパスワードと異なるものにしてください',
+type Translator = (key: string) => string;
+
+const ERROR_KEY_MAP: Record<string, string> = {
+  'Invalid login credentials': 'invalid_credentials',
+  'Email not confirmed': 'email_not_confirmed',
+  'User already registered': 'user_already_registered',
+  'Password should be at least 6 characters': 'password_too_short',
+  'Email rate limit exceeded': 'rate_limit',
+  'For security purposes, you can only request this after': 'security_wait',
+  'Unable to validate email address: invalid format': 'invalid_email_format',
+  'Signup requires a valid password': 'invalid_password',
+  'User not found': 'user_not_found',
+  'New password should be different from the old password': 'same_password_new',
+  'Auth session missing!': 'session_missing',
+  'A user with this email address has already been registered': 'user_already_registered_2',
+  'Email address not confirmed': 'email_not_confirmed_2',
+  'Same password': 'same_password',
 };
 
-export function translateAuthError(message: string): string {
-  for (const [key, value] of Object.entries(ERROR_MAP)) {
-    if (message.includes(key)) return value;
+export function translateAuthError(message: string, t: Translator): string {
+  for (const [supabaseKey, i18nKey] of Object.entries(ERROR_KEY_MAP)) {
+    if (message.includes(supabaseKey)) return t(i18nKey);
   }
   return message;
 }

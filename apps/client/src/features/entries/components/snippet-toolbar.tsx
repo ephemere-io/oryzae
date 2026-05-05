@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 
@@ -22,6 +23,7 @@ function getTodayKey(): string {
 }
 
 export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
+  const t = useTranslations('editor.snippet_toolbar');
   const [visible, setVisible] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -134,7 +136,7 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
   if (!visible) return null;
 
   const buttonLabel =
-    status === 'saving' ? '保存中…' : status === 'saved' ? '保存しました' : 'スニペット化';
+    status === 'saving' ? t('saving') : status === 'saved' ? t('saved') : t('create');
   const buttonIcon = status === 'saved' ? '✓' : '✦';
 
   return (
@@ -178,7 +180,7 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
         </button>
         {tooLong && (
           <span className="rounded bg-zinc-800 px-2 py-1 text-[10px] text-white shadow">
-            50文字以内
+            {t('too_long')}
           </span>
         )}
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { EntryEditor } from '@/features/entries/components/entry-editor';
@@ -12,6 +13,7 @@ import {
 } from '@/features/entry-questions/hooks/use-entry-questions';
 
 export default function EntryDetailPage() {
+  const t = useTranslations('entries.detail');
   const params = useParams<{ id: string }>();
   const { api, auth, loading: authLoading } = useAuth();
   const { entry, loading: entryLoading } = useEntry(params.id, api, authLoading);
@@ -33,7 +35,7 @@ export default function EntryDetailPage() {
   if (!entry) {
     return (
       <div className="flex min-h-full items-center justify-center">
-        <p className="text-sm text-[var(--date-color)]">エントリが見つかりません</p>
+        <p className="text-sm text-[var(--date-color)]">{t('not_found')}</p>
       </div>
     );
   }
