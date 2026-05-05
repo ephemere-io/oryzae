@@ -7,6 +7,7 @@ import {
   type EditorStatus,
   EditorStatusBar,
 } from '@/features/entries/components/editor-status-bar';
+import { formatEntryDate } from '@/features/entries/components/format-entry-date';
 import { LeaveConfirmModal } from '@/features/entries/components/leave-confirm-modal';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
@@ -54,30 +55,6 @@ interface EntryEditorProps {
   onUnlinkQuestion?: (entryId: string, questionId: string) => Promise<void>;
   onSaveComplete?: (entryId: string, content: string) => void;
   onSaveTransition?: (text: string, editorEl: HTMLElement) => Promise<void>;
-}
-
-function formatTime(date: Date): string {
-  const hh = String(date.getHours()).padStart(2, '0');
-  const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
-const DAY_KEYS = [
-  'date.day_sun',
-  'date.day_mon',
-  'date.day_tue',
-  'date.day_wed',
-  'date.day_thu',
-  'date.day_fri',
-  'date.day_sat',
-] as const;
-
-function formatDateStr(created: Date, updated: Date, t: (key: string) => string): string {
-  const y = created.getFullYear();
-  const m = created.getMonth() + 1;
-  const d = created.getDate();
-  const dayName = t(DAY_KEYS[created.getDay()]);
-  return `${y}.${m}.${d} — ${dayName} ${formatTime(created)} · ${formatTime(updated)}`;
 }
 
 function voiceStatusMessage(
@@ -143,7 +120,7 @@ export function EntryEditor({
     const now = new Date();
     const created = createdAtIso ? new Date(createdAtIso) : now;
     const updated = updatedAtIso ? new Date(updatedAtIso) : now;
-    return formatDateStr(created, updated, t);
+    return formatEntryDate(created, updated, t);
   });
   const { save, saving, error } = useSaveEntry(api, auth);
   const router = useRouter();
@@ -203,7 +180,7 @@ export function EntryEditor({
     if (!createdAtIso) {
       const timer = setInterval(() => {
         const now = new Date();
-        setDateStr(formatDateStr(now, now, t));
+        setDateStr(formatEntryDate(now, now, t));
       }, 60_000);
       return () => clearInterval(timer);
     }
@@ -296,7 +273,7 @@ export function EntryEditor({
         setIsEditingTitle(false);
         setStatus('saved');
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
-        setDateStr(formatDateStr(created, new Date(), t));
+        setDateStr(formatEntryDate(created, new Date(), t));
         if (isNew && onLinkQuestion) {
           for (const qId of linkedIds) {
             await onLinkQuestion(savedId, qId);
