@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import '../styles/onboarding.css';
 import type { OnboardingResult } from '../types';
@@ -11,6 +12,7 @@ interface OnboardingFlowProps {
 }
 
 export function OnboardingFlow({ onComplete, initialStep = 0 }: OnboardingFlowProps) {
+  const t = useTranslations('onboarding');
   const [step, setStep] = useState(initialStep);
   const [draft, setDraft] = useState('');
   const [open, setOpen] = useState(true);
@@ -29,7 +31,7 @@ export function OnboardingFlow({ onComplete, initialStep = 0 }: OnboardingFlowPr
   if (!open) return null;
 
   return (
-    <div className="ob-stage" role="dialog" aria-modal="true" aria-label="Oryzaeの紹介">
+    <div className="ob-stage" role="dialog" aria-modal="true" aria-label={t('dialog_label')}>
       <div className="ob-card" key={step}>
         {step === 0 && <StepConcept onNext={() => setStep(1)} onSkip={() => finish('skip')} />}
         {step === 1 && (
