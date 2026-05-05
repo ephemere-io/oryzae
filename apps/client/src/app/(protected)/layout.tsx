@@ -1,12 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
+import type { OnboardingResult } from '@/features/onboarding/types';
 import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
@@ -15,6 +16,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const { auth, api, loading } = useAuth();
   const { shouldShow, complete } = useOnboarding(api);
   const router = useRouter();
+
+  const handleOnboardingComplete = useCallback(
+    async (result: OnboardingResult) => {
+      await complete(result);
+      router.push('/entries/new');
+    },
+    [complete, router],
+  );
 
   useEffect(() => {
     if (!loading && !auth) {
@@ -43,7 +52,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               <div className="relative flex-1 overflow-auto">{loading ? null : children}</div>
               <PageFooter />
             </main>
-            {shouldShow && <OnboardingFlow onComplete={complete} />}
+            {shouldShow && <OnboardingFlow onComplete={handleOnboardingComplete} />}
           </div>
         </UnreadProvider>
       </SidebarProvider>
