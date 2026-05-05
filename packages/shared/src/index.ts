@@ -14,6 +14,7 @@ export {
   boardSnippetUpdateSchema,
   changeEmailSchema,
   changePasswordSchema,
+  completeOnboardingSchema,
   createEntrySchema,
   credentialsSchema,
   loginSchema,

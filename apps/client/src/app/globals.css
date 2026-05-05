@@ -10,6 +10,26 @@
   --date-color: #999;
   --card-snippet: #fffbe0;
   --card-photo: #ffffff;
+
+  /* Onboarding tokens */
+  --ob-sage: #8ea89c;
+  --ob-sage-soft: rgba(142, 168, 156, 0.16);
+  --ob-paper: #f7f2e5;
+  --ob-paper-deep: #f2ede0;
+  --ob-ink-soft: #4a4541;
+  --ob-ink-mute: #8c857e;
+  --ob-ink-faint: #b8b0a6;
+  --ob-stroke: #7a7440;
+  --ob-koji: #9c9658;
+  --ob-jar-warm: #d4714e;
+  --ob-jar-warm-soft: rgba(212, 113, 78, 0.12);
+  --ob-overlay: rgba(46, 50, 46, 0.42);
+  --ob-card-bg: #fdfbf7;
+  --ob-card-border: rgba(122, 116, 64, 0.18);
+  --ob-shadow-card:
+    0 30px 80px -30px rgba(74, 70, 50, 0.35), 0 8px 24px -12px rgba(74, 70, 50, 0.18);
+  --ob-font-serif: "Noto Serif JP", "Hiragino Mincho ProN", serif;
+  --ob-font-sans: "Inter", "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
 }
 
 [data-theme="dark"] {
@@ -22,6 +42,12 @@
   --date-color: #666;
   --card-snippet: #3a3520;
   --card-photo: #2a2a2a;
+
+  --ob-card-bg: #1f1d1a;
+  --ob-card-border: rgba(255, 255, 255, 0.08);
+  --ob-overlay: rgba(8, 10, 8, 0.6);
+  --ob-ink-soft: #d8d2c9;
+  --ob-ink-mute: #98918a;
 }
 
 body {
