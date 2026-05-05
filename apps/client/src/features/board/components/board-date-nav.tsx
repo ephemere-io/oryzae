@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 interface BoardDateNavProps {
   dateKey: string;
   viewType: 'daily' | 'weekly';
@@ -13,9 +15,8 @@ function toDateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function formatDailyLabel(dateKey: string): string {
+function formatDailyLabel(dateKey: string, days: readonly string[]): string {
   const d = new Date(`${dateKey}T00:00:00`);
-  const days = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
   return `${dateKey.replace(/-/g, '.')} — ${days[d.getDay()]}`;
 }
 
@@ -43,8 +44,19 @@ function shiftDate(dateKey: string, offset: number): string {
 }
 
 export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavProps) {
+  const t = useTranslations('board');
+  const days = [
+    t('date.day_sun'),
+    t('date.day_mon'),
+    t('date.day_tue'),
+    t('date.day_wed'),
+    t('date.day_thu'),
+    t('date.day_fri'),
+    t('date.day_sat'),
+  ];
   const offset = viewType === 'weekly' ? 7 : 1;
-  const label = viewType === 'weekly' ? formatWeeklyLabel(dateKey) : formatDailyLabel(dateKey);
+  const label =
+    viewType === 'weekly' ? formatWeeklyLabel(dateKey) : formatDailyLabel(dateKey, days);
   return (
     <div
       className="absolute left-6 top-5 z-10 flex items-center gap-3"

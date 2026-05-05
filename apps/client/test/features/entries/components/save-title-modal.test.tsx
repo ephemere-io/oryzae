@@ -1,19 +1,23 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { describe, expect, it, vi } from 'vitest';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
+import jaMessages from '@/i18n/messages/ja.json';
 
 describe('SaveTitleModal', () => {
   function setup() {
     const onSave = vi.fn();
     const onClose = vi.fn();
     render(
-      <SaveTitleModal
-        open
-        initialTitle="default-title"
-        saving={false}
-        onSave={onSave}
-        onClose={onClose}
-      />,
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SaveTitleModal
+          open
+          initialTitle="default-title"
+          saving={false}
+          onSave={onSave}
+          onClose={onClose}
+        />
+      </NextIntlClientProvider>,
     );
     return { onSave, onClose };
   }

@@ -70,3 +70,4 @@ supabase/
 | `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
+| `docs/i18n-guide.md` | apps/client の日英バイリンガル運用（next-intl + Google Sheets SSoT） |

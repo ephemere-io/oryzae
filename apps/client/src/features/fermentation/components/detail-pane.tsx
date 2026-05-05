@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 interface DetailPaneProps {
   open: boolean;
@@ -18,12 +19,6 @@ interface DetailPaneProps {
   } | null;
 }
 
-const HEADERS: Record<string, string> = {
-  keyword: 'Yeast が生成したキーワード',
-  snippet: 'Oryzae が切り取った文章',
-  letter: 'L.A.B.による観察記録',
-};
-
 export function DetailPane({
   open,
   onClose,
@@ -33,6 +28,13 @@ export function DetailPane({
   data,
 }: DetailPaneProps) {
   const router = useRouter();
+  const t = useTranslations('fermentation');
+
+  const headers: Record<'keyword' | 'snippet' | 'letter', string> = {
+    keyword: t('detail.header_keyword'),
+    snippet: t('detail.header_snippet'),
+    letter: t('detail.header_letter'),
+  };
 
   function handleWriteEntry() {
     router.push(`/entries/new?questionId=${questionId}`);
@@ -63,7 +65,7 @@ export function DetailPane({
 
       {/* Header */}
       <div className="shrink-0 border-b border-[rgba(139,115,85,0.1)] px-8 pb-5 text-[22px] font-medium text-[#4a3f35]">
-        {type ? HEADERS[type] : ''}
+        {type ? headers[type] : ''}
       </div>
 
       {/* Body — scrollable */}
@@ -79,7 +81,9 @@ export function DetailPane({
             <blockquote className="mb-4 text-base font-medium leading-relaxed">
               「{data.originalText}」
             </blockquote>
-            <p className="mb-4 text-xs text-[var(--date-color)]">出典: {data.sourceDate}</p>
+            <p className="mb-4 text-xs text-[var(--date-color)]">
+              <span>{t('detail.snippet_source_prefix')}</span> {data.sourceDate}
+            </p>
             <p>{data.selectionReason}</p>
           </>
         )}
@@ -93,7 +97,7 @@ export function DetailPane({
           onClick={handleWriteEntry}
           className="w-full rounded-lg border border-[var(--accent)] px-4 py-3 text-sm text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white"
         >
-          この問いのエントリを書く
+          {t('detail.write_entry')}
         </button>
       </div>
     </div>

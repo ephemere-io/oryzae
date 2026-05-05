@@ -1,11 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { useState, useTransition } from 'react';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { setLocaleAction } from '@/lib/i18n-actions';
 import { useTheme } from '@/lib/theme-context';
 import { WritingStats } from './writing-stats';
+
+const LOCALE_LABELS: Record<string, string> = { ja: '日本語', en: 'English' };
 
 interface AccountPageProps {
   user: {
@@ -41,6 +45,7 @@ function EditableField({
   onSave: (val: string) => Promise<string | null>;
   type?: string;
 }) {
+  const t = useTranslations('account');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -83,7 +88,7 @@ function EditableField({
             className="text-xs font-medium"
             style={{ color: 'var(--accent)' }}
           >
-            {saving ? '...' : '保存'}
+            {saving ? '...' : t('field.save')}
           </button>
           <button
             type="button"
@@ -95,7 +100,7 @@ function EditableField({
             className="text-xs"
             style={{ color: 'var(--date-color)' }}
           >
-            取消
+            {t('field.cancel')}
           </button>
         </div>
       ) : (
@@ -109,7 +114,7 @@ function EditableField({
             className="text-xs"
             style={{ color: 'var(--date-color)' }}
           >
-            編集
+            {t('field.edit')}
           </button>
         </div>
       )}
@@ -119,6 +124,8 @@ function EditableField({
 }
 
 function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly: boolean }) {
+  const t = useTranslations('account');
+  const tErr = useTranslations('auth.error');
   const [editing, setEditing] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [saving, setSaving] = useState(false);
@@ -132,7 +139,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
 
     const token = getAccessToken();
     if (!token) {
-      setError('ログインが必要です');
+      setError(t('email.error_login_required'));
       setSaving(false);
       return;
     }
@@ -145,7 +152,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
 
     if (!res.ok) {
       const data = (await res.json()) as { error: string };
-      setError(translateAuthError(data.error));
+      setError(translateAuthError(data.error, tErr));
       setSaving(false);
       return;
     }
@@ -157,7 +164,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
   return (
     <div>
       <p className={labelClass} style={labelStyle}>
-        メールアドレス
+        {t('email.label')}
       </p>
       {isOAuthOnly ? (
         <div>
@@ -165,7 +172,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
             {email}
           </p>
           <p className="mt-1 text-xs" style={{ color: 'var(--date-color)' }}>
-            Google アカウントに紐づいたメールアドレスです
+            {t('email.oauth_only_note')}
           </p>
         </div>
       ) : success ? (
@@ -174,7 +181,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
             {email}
           </p>
           <p className="mt-1 text-xs" style={{ color: 'var(--accent)' }}>
-            確認メールを送信しました。新しいメールアドレスに届いたメールのリンクをクリックしてください。
+            {t('email.confirmation_sent')}
           </p>
         </div>
       ) : editing ? (
@@ -184,7 +191,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             required
-            placeholder="新しいメールアドレス"
+            placeholder={t('email.placeholder_new')}
             className={inputClass}
             style={inputStyle}
           />
@@ -196,7 +203,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
               className="text-xs font-medium"
               style={{ color: 'var(--accent)' }}
             >
-              {saving ? '...' : '送信'}
+              {saving ? '...' : t('email.submit')}
             </button>
             <button
               type="button"
@@ -208,7 +215,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
               className="text-xs"
               style={{ color: 'var(--date-color)' }}
             >
-              取消
+              {t('email.cancel')}
             </button>
           </div>
         </form>
@@ -223,7 +230,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
             className="text-xs"
             style={{ color: 'var(--date-color)' }}
           >
-            変更
+            {t('email.change')}
           </button>
         </div>
       )}
@@ -232,6 +239,8 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
 }
 
 function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
+  const t = useTranslations('account');
+  const tErr = useTranslations('auth.error');
   const [editing, setEditing] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -256,7 +265,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
     setError(null);
 
     if (newPassword !== confirmPassword) {
-      setError('新しいパスワードが一致しません');
+      setError(t('password.error_mismatch'));
       return;
     }
 
@@ -264,7 +273,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
 
     const token = getAccessToken();
     if (!token) {
-      setError('ログインが必要です');
+      setError(t('password.error_login_required'));
       setSaving(false);
       return;
     }
@@ -277,7 +286,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
 
     if (!res.ok) {
       const data = (await res.json()) as { error: string };
-      setError(translateAuthError(data.error));
+      setError(translateAuthError(data.error, tErr));
       setSaving(false);
       return;
     }
@@ -290,11 +299,11 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
   return (
     <div>
       <p className={labelClass} style={labelStyle}>
-        パスワード
+        {t('password.label')}
       </p>
       {success ? (
         <p className="text-xs" style={{ color: 'var(--accent)' }}>
-          パスワードを更新しました
+          {t('password.updated')}
         </p>
       ) : editing ? (
         <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -303,7 +312,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             required
-            placeholder="現在のパスワード"
+            placeholder={t('password.placeholder_current')}
             className={inputClass}
             style={inputStyle}
           />
@@ -313,7 +322,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
             onChange={(e) => setNewPassword(e.target.value)}
             required
             minLength={6}
-            placeholder="新しいパスワード（6文字以上）"
+            placeholder={t('password.placeholder_new')}
             className={inputClass}
             style={inputStyle}
           />
@@ -323,7 +332,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             minLength={6}
-            placeholder="新しいパスワード（確認）"
+            placeholder={t('password.placeholder_confirm')}
             className={inputClass}
             style={inputStyle}
           />
@@ -335,7 +344,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
               className="text-xs font-medium"
               style={{ color: 'var(--accent)' }}
             >
-              {saving ? '...' : '更新'}
+              {saving ? '...' : t('password.update')}
             </button>
             <button
               type="button"
@@ -343,7 +352,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
               className="text-xs"
               style={{ color: 'var(--date-color)' }}
             >
-              取消
+              {t('password.cancel')}
             </button>
           </div>
         </form>
@@ -358,7 +367,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
             className="text-xs"
             style={{ color: 'var(--date-color)' }}
           >
-            変更
+            {t('password.change')}
           </button>
         </div>
       )}
@@ -367,16 +376,17 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
 }
 
 function ThemeToggleSection() {
+  const t = useTranslations('account');
   const { theme, toggle } = useTheme();
 
   return (
     <div className="flex items-center justify-between">
       <div>
         <p className={labelClass} style={labelStyle}>
-          テーマ
+          {t('theme.label')}
         </p>
         <p className="text-sm" style={{ color: 'var(--fg)' }}>
-          {theme === 'light' ? 'ライトモード' : 'ダークモード'}
+          {theme === 'light' ? t('theme.light') : t('theme.dark')}
         </p>
       </div>
       <button
@@ -423,7 +433,42 @@ function ThemeToggleSection() {
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
           </svg>
         )}
-        切り替え
+        {t('theme.toggle')}
+      </button>
+    </div>
+  );
+}
+
+function LanguageSection() {
+  const t = useTranslations('account');
+  const locale = useLocale();
+  const [isPending, startTransition] = useTransition();
+
+  function toggle() {
+    const next = locale === 'ja' ? 'en' : 'ja';
+    startTransition(() => {
+      setLocaleAction(next);
+    });
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className={labelClass} style={labelStyle}>
+          {t('language.label')}
+        </p>
+        <p className="text-sm" style={{ color: 'var(--fg)' }}>
+          {LOCALE_LABELS[locale] ?? locale}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={isPending}
+        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+        style={{ color: 'var(--accent)', border: '1px solid var(--border-subtle)' }}
+      >
+        {locale === 'ja' ? 'EN' : 'JA'}
       </button>
     </div>
   );
@@ -434,13 +479,14 @@ function Divider() {
 }
 
 export function AccountPage({ user, onLogout }: AccountPageProps) {
+  const t = useTranslations('account');
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
   const isOAuthOnly = user.providers.length > 0 && !user.providers.includes('email');
 
   async function updateProfile(field: string, value: string): Promise<string | null> {
     const token = getAccessToken();
-    if (!token) return 'ログインが必要です';
+    if (!token) return t('profile.error_login_required');
 
     const api = createApiClient(token);
     const res = await api.fetch('/api/v1/auth/profile', {
@@ -466,7 +512,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
       {/* ── Profile ── */}
       <section id="profile">
         <h2 className={sectionHeadingClass} style={sectionHeadingStyle}>
-          プロフィール
+          {t('section.profile')}
         </h2>
 
         <div className="mb-6 flex items-center gap-4">
@@ -498,13 +544,13 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
 
         <div className="flex flex-col gap-5">
           <EditableField
-            label="ニックネーム"
+            label={t('field.nickname')}
             value={user.nickname ?? ''}
             onSave={(val) => updateProfile('nickname', val)}
           />
           <div>
             <p className={labelClass} style={labelStyle}>
-              ユーザーID
+              {t('field.user_id')}
             </p>
             <p className="font-mono text-xs" style={{ color: 'var(--date-color)' }}>
               {user.id}
@@ -518,7 +564,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
       {/* ── Security ── */}
       <section id="security">
         <h2 className={sectionHeadingClass} style={sectionHeadingStyle}>
-          セキュリティ
+          {t('section.security')}
         </h2>
         <div className="flex flex-col gap-5">
           <EmailChangeSection email={user.email} isOAuthOnly={isOAuthOnly} />
@@ -531,7 +577,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
       {/* ── Stats ── */}
       <section id="stats">
         <h2 className={sectionHeadingClass} style={sectionHeadingStyle}>
-          統計
+          {t('section.stats')}
         </h2>
         <WritingStats />
       </section>
@@ -541,21 +587,22 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
       {/* ── Settings ── */}
       <section id="settings">
         <h2 className={sectionHeadingClass} style={sectionHeadingStyle}>
-          設定
+          {t('section.settings')}
         </h2>
         <div className="flex flex-col gap-6">
           <ThemeToggleSection />
+          <LanguageSection />
 
           <div>
             <p className={labelClass} style={labelStyle}>
-              ログアウト
+              {t('logout.label')}
             </p>
             <button
               type="button"
               onClick={onLogout}
               className="mt-1 text-sm font-medium text-red-500 transition-colors hover:text-red-600"
             >
-              ログアウトする
+              {t('logout.button')}
             </button>
           </div>
         </div>

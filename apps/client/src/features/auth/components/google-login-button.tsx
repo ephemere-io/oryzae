@@ -1,9 +1,11 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { createApiClient } from '@/lib/api';
 
 export function GoogleLoginButton() {
+  const t = useTranslations('auth.google_login');
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
@@ -53,7 +55,7 @@ export function GoogleLoginButton() {
           fill="#EA4335"
         />
       </svg>
-      {loading ? '接続中...' : 'Google でログイン'}
+      {loading ? t('connecting') : t('button')}
     </button>
   );
 }

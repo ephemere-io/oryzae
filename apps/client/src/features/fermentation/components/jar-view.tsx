@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { DetailPane } from '@/features/fermentation/components/detail-pane';
 import { QuestionCircle } from '@/features/fermentation/components/question-circle';
 import { useFermentationForQuestion } from '@/features/fermentation/hooks/use-fermentation-results';
@@ -26,26 +27,36 @@ const CIRCLE_POSITIONS = [
   { top: '46%', left: '14%' }, // center-left
 ];
 
-/* Text particles floating inside the jar */
-const TEXT_PARTICLE_WORDS = ['発酵', '記憶', '静寂', '光', '闇', '朝', '麹', '息'];
-const FILLER_WORDS = [
-  '米',
-  '水',
-  '土壌',
-  '醸す',
-  '問い',
-  '時間',
-  '沈殿',
-  '風',
-  '季節',
-  '菌',
-  '熱',
-  '繁殖',
-  '心',
-  '秋',
-  '瀬',
-];
-const ALL_WORDS = [...TEXT_PARTICLE_WORDS, ...FILLER_WORDS];
+/* Translation keys for text particles floating inside the jar.
+ * Order is significant — used as deterministic seed for layout (top/left/blur/etc.). */
+const PARTICLE_WORD_KEYS = [
+  'jar.particle_fermentation',
+  'jar.particle_memory',
+  'jar.particle_silence',
+  'jar.particle_light',
+  'jar.particle_dark',
+  'jar.particle_morning',
+  'jar.particle_koji',
+  'jar.particle_breath',
+] as const;
+const FILLER_WORD_KEYS = [
+  'jar.filler_rice',
+  'jar.filler_water',
+  'jar.filler_soil',
+  'jar.filler_brew',
+  'jar.filler_question',
+  'jar.filler_time',
+  'jar.filler_sediment',
+  'jar.filler_wind',
+  'jar.filler_season',
+  'jar.filler_microbe',
+  'jar.filler_heat',
+  'jar.filler_propagate',
+  'jar.filler_heart',
+  'jar.filler_autumn',
+  'jar.filler_shallows',
+] as const;
+const ALL_WORD_KEYS = [...PARTICLE_WORD_KEYS, ...FILLER_WORD_KEYS];
 const FLOAT_CLASSES = ['j2-float-1', 'j2-float-2', 'j2-float-3'];
 const BLUR_LEVELS = [0.6, 0.8, 1.2, 1.8, 2.2, 2.5, 3.5, 4];
 const FONT_SIZES = [11, 12, 14, 16, 18, 22, 26];
@@ -134,6 +145,7 @@ export function JarView({
   onEditQuestion,
   onArchiveQuestion,
 }: JarViewProps) {
+  const t = useTranslations('fermentation');
   const [zoomedId, setZoomedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailType, setDetailType] = useState<'keyword' | 'snippet' | 'letter' | null>(null);
@@ -147,6 +159,8 @@ export function JarView({
   const [editText, setEditText] = useState('');
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const allWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
 
   const handleElementClick = useCallback(
     (
@@ -233,7 +247,7 @@ export function JarView({
           type="button"
           onClick={closeZoom}
           className="absolute inset-0 z-[4] bg-[rgba(0,0,0,0.3)]"
-          aria-label="ズームを閉じる"
+          aria-label={t('jar.zoom_close_aria')}
         />
       )}
 
@@ -394,7 +408,7 @@ export function JarView({
             clipPath: `path('${JAR_PATH}')`,
           }}
         >
-          {ALL_WORDS.map((word, i) => {
+          {allWords.map((word, i) => {
             const top = 18 + ((i * 37) % 65);
             const left = 22 + ((i * 53) % 60);
             const blur = BLUR_LEVELS[i % BLUR_LEVELS.length];
@@ -402,7 +416,7 @@ export function JarView({
             const opacity = 0.3 + (i % 5) * 0.12;
             return (
               <span
-                key={word}
+                key={ALL_WORD_KEYS[i]}
                 className={`${FLOAT_CLASSES[i % 3]} pointer-events-none select-none`}
                 style={{
                   position: 'absolute',
@@ -472,7 +486,7 @@ export function JarView({
             className="text-[10px] tracking-[0.3em] text-[var(--date-color)]"
             style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
           >
-            現在の問い
+            {t('jar.current_questions')}
           </span>
           <div className="flex flex-wrap justify-center gap-2.5">
             {questions.slice(0, 3).map((q) => (
@@ -508,7 +522,7 @@ export function JarView({
               className="rounded-full border border-dashed border-[var(--date-color)] px-3 py-1 text-[10px] tracking-[0.1em] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)]"
               style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
             >
-              ＋ 問いを追加する
+              {t('jar.add_question')}
             </button>
           )}
         </div>
@@ -530,7 +544,7 @@ export function JarView({
               className="mb-4 text-sm text-[var(--fg)]"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
             >
-              問いを編集
+              {t('jar.edit_heading')}
             </h3>
             <textarea
               ref={editInputRef}
@@ -558,7 +572,7 @@ export function JarView({
                   className="mr-auto rounded-full border border-[#dc2626] bg-transparent px-5 py-2 text-[11px] text-[#dc2626] transition-all hover:bg-[#dc2626] hover:text-white disabled:opacity-50"
                   style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
                 >
-                  {submitting ? '処理中...' : 'アーカイブ'}
+                  {submitting ? t('jar.processing') : t('jar.archive')}
                 </button>
               )}
               <button
@@ -568,7 +582,7 @@ export function JarView({
                 className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)] disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
-                キャンセル
+                {t('jar.cancel_edit')}
               </button>
               {onEditQuestion && (
                 <button
@@ -584,7 +598,7 @@ export function JarView({
                   className="rounded-full bg-[var(--fg)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
                   style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
                 >
-                  {submitting ? '更新中...' : '更新する'}
+                  {submitting ? t('jar.updating') : t('jar.update')}
                 </button>
               )}
             </div>
@@ -608,13 +622,13 @@ export function JarView({
               className="mb-4 text-sm text-[var(--fg)]"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
             >
-              新しい問いを追加
+              {t('jar.add_heading')}
             </h3>
             <textarea
               ref={addInputRef}
               value={newQuestionText}
               onChange={(e) => setNewQuestionText(e.target.value)}
-              placeholder="あなたの問いを入力してください"
+              placeholder={t('jar.add_placeholder')}
               rows={3}
               className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-transparent p-3 text-[13px] text-[var(--fg)] outline-none"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
@@ -630,7 +644,7 @@ export function JarView({
                 className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)] disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
-                キャンセル
+                {t('jar.cancel_add')}
               </button>
               <button
                 type="button"
@@ -646,7 +660,7 @@ export function JarView({
                 className="rounded-full bg-[var(--fg)] px-5 py-2 text-[11px] text-[var(--bg)] transition-opacity hover:opacity-85 disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
-                {submitting ? '追加中...' : '追加する'}
+                {submitting ? t('jar.adding') : t('jar.add_submit')}
               </button>
             </div>
           </div>

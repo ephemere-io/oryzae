@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
 
 interface DeleteConfirmModalProps {
@@ -15,6 +16,7 @@ export function DeleteConfirmModal({
   onCancel,
   onConfirm,
 }: DeleteConfirmModalProps) {
+  const t = useTranslations('entries.delete_modal');
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export function DeleteConfirmModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="削除確認ダイアログ"
+      aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
       onClick={onCancel}
@@ -42,10 +44,10 @@ export function DeleteConfirmModal({
         style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
         <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-          本当に削除しますか？
+          {t('heading')}
         </h3>
         <p className="mb-6 text-xs" style={{ color: 'var(--date-color)' }}>
-          このエントリーは完全に削除され、元に戻すことはできません。
+          {t('body')}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -60,7 +62,7 @@ export function DeleteConfirmModal({
               backgroundColor: 'var(--bg)',
             }}
           >
-            キャンセル
+            {t('cancel')}
           </button>
           <button
             type="button"
@@ -69,7 +71,7 @@ export function DeleteConfirmModal({
             className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-50"
             style={{ backgroundColor: '#c0392b', borderColor: '#c0392b' }}
           >
-            {deleting ? '削除中...' : '削除する'}
+            {deleting ? t('deleting') : t('confirm')}
           </button>
         </div>
       </div>

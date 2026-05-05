@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 interface EntryKebabMenuProps {
@@ -7,6 +8,7 @@ interface EntryKebabMenuProps {
 }
 
 export function EntryKebabMenu({ onDeleteClick }: EntryKebabMenuProps) {
+  const t = useTranslations('entries.kebab');
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +36,7 @@ export function EntryKebabMenu({ onDeleteClick }: EntryKebabMenuProps) {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        aria-label="メニューを開く"
+        aria-label={t('aria_open')}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {
@@ -77,7 +79,7 @@ export function EntryKebabMenu({ onDeleteClick }: EntryKebabMenuProps) {
             className="block w-full px-4 py-2 text-left text-xs transition-colors hover:bg-[rgba(200,180,140,0.08)]"
             style={{ color: 'var(--fg)' }}
           >
-            削除
+            {t('delete')}
           </button>
         </div>
       )}

@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 interface UnsavedChangesModalProps {
   open: boolean;
   onSave: () => void;
@@ -13,6 +15,7 @@ export function UnsavedChangesModal({
   onDiscard,
   onClose,
 }: UnsavedChangesModalProps) {
+  const t = useTranslations('entries.unsaved_modal');
   if (!open) return null;
 
   return (
@@ -33,10 +36,10 @@ export function UnsavedChangesModal({
         style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
         <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-          未保存の変更があります
+          {t('heading')}
         </h3>
         <p className="mb-6 text-xs" style={{ color: 'var(--date-color)' }}>
-          保存せずに移動すると変更内容が失われます。
+          {t('body')}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -49,7 +52,7 @@ export function UnsavedChangesModal({
               backgroundColor: 'var(--bg)',
             }}
           >
-            保存しない
+            {t('discard')}
           </button>
           <button
             type="button"
@@ -57,7 +60,7 @@ export function UnsavedChangesModal({
             className="rounded-md border px-4 py-2 text-xs text-white"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
-            保存する
+            {t('save')}
           </button>
         </div>
       </div>

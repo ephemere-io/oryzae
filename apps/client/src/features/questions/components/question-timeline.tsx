@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import {
   deriveEventType,
   QuestionTimelineEvent,
@@ -49,12 +50,13 @@ export function QuestionTimeline({
   onAccept,
   onReject,
 }: QuestionTimelineProps) {
+  const t = useTranslations('questions.timeline');
   const groups = groupByDate(questions);
 
   if (questions.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-[var(--date-color)]">
-        <p className="text-sm">問いはまだありません</p>
+        <p className="text-sm">{t('empty')}</p>
       </div>
     );
   }
@@ -67,10 +69,10 @@ export function QuestionTimeline({
           className="text-[22px] font-bold tracking-[0.12em] text-[var(--fg)]"
           style={{ fontFamily: "'Noto Serif JP', serif" }}
         >
-          問いの変遷
+          {t('heading')}
         </h2>
         <p className="mt-3 text-[13px] tracking-[0.08em] text-[var(--date-color)]">
-          あなたの問いが生まれ、育ち、変化してきた記録
+          {t('subheading')}
         </p>
       </div>
 
