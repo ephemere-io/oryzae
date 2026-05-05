@@ -1,0 +1,593 @@
+{
+  "auth": {
+    "callback": {
+      "error_auth_failed": "Authentication failed. Please try again.",
+      "error_no_code": "Authentication code not found",
+      "back_to_login": "Back to login",
+      "authenticating": "Authenticating...",
+      "loading": "Loading..."
+    },
+    "forgot_password": {
+      "sent_heading": "Check your email",
+      "sent_body": "A password reset link has been sent to this address. Click the link in the email to set a new password.",
+      "back_to_login": "Back to login",
+      "heading": "Reset your password",
+      "subheading": "Enter your registered email address and we will send you a password reset link.",
+      "email_label": "Email",
+      "submit_loading": "Sending...",
+      "submit": "Send reset link",
+      "back_to_login_2": "Back to login"
+    },
+    "google_login": {
+      "connecting": "Connecting...",
+      "button": "Sign in with Google"
+    },
+    "login": {
+      "subheading": "Log in to continue",
+      "divider_or": "or",
+      "identifier_label": "Nickname or email",
+      "password_label": "Password",
+      "forgot_link": "Forgot your password?",
+      "submit_loading": "Logging in...",
+      "submit": "Log in",
+      "no_account_prefix": "Don't have an account?",
+      "signup_link": "Sign up"
+    },
+    "reset_password": {
+      "invalid_link": "Invalid reset link. Please request a new password reset.",
+      "back_link": "Back to password reset",
+      "error_mismatch": "Passwords do not match",
+      "heading": "New password",
+      "subheading": "Enter your new password.",
+      "password_label": "New password",
+      "confirm_label": "Confirm password",
+      "submit_loading": "Updating...",
+      "submit": "Update password",
+      "loading": "Loading..."
+    },
+    "signup": {
+      "error_password_mismatch": "Passwords do not match",
+      "email_sent_subheading": "Confirmation email sent",
+      "email_sent_body": "A confirmation email has been sent to this address. Click the link in the email to activate your account.",
+      "back_to_login": "Back to login",
+      "subheading": "Create your account",
+      "divider_or": "or",
+      "nickname_label": "Nickname (login ID)",
+      "nickname_help": "Letters, numbers, hyphens, and underscores only",
+      "email_label": "Email",
+      "password_label": "Password",
+      "confirm_label": "Confirm password",
+      "submit_loading": "Creating...",
+      "submit": "Sign up",
+      "have_account_prefix": "Already have an account?",
+      "login_link": "Log in"
+    },
+    "error": {
+      "invalid_credentials": "Incorrect email or password",
+      "email_not_confirmed": "Email not confirmed. Please check your inbox for the confirmation email.",
+      "user_already_registered": "This email is already registered",
+      "password_too_short": "Password must be at least 6 characters",
+      "rate_limit": "Please wait a moment and try again",
+      "security_wait": "For security reasons, please wait a moment and try again",
+      "invalid_email_format": "Invalid email format",
+      "invalid_password": "Please enter a valid password",
+      "user_not_found": "User not found",
+      "same_password_new": "New password must be different from your current password",
+      "session_missing": "Your session has expired. Please log in again.",
+      "user_already_registered_2": "This email is already registered",
+      "email_not_confirmed_2": "Email address not confirmed",
+      "same_password": "New password must be different from your current password"
+    }
+  },
+  "entries": {
+    "detail": {
+      "not_found": "Entry not found"
+    },
+    "delete_modal": {
+      "aria_label": "Delete confirmation dialog",
+      "heading": "Delete this entry?",
+      "body": "This entry will be permanently deleted and cannot be recovered.",
+      "cancel": "Cancel",
+      "deleting": "Deleting...",
+      "confirm": "Delete"
+    },
+    "card": {
+      "char_count_label": "Characters:"
+    },
+    "kebab": {
+      "aria_open": "Open menu",
+      "delete": "Delete"
+    },
+    "list": {
+      "search_placeholder": "Search entries...",
+      "search_aria": "Search",
+      "clear_search_aria": "Clear search",
+      "no_results": "No results found",
+      "no_entries": "No entries yet",
+      "month_format": "{month}/{year}",
+      "results_count": "{count} results",
+      "week_label": "Week {n}",
+      "load_more_loading": "Loading...",
+      "load_more": "Load more"
+    },
+    "leave_modal": {
+      "aria_label": "Leave confirmation dialog",
+      "heading": "Leave this page?",
+      "body": "Unsaved changes will be lost.",
+      "cancel": "Cancel",
+      "confirm": "OK"
+    },
+    "question_linker": {
+      "placeholder": "Link a question…"
+    },
+    "unsaved_modal": {
+      "heading": "You have unsaved changes",
+      "body": "If you leave without saving, your changes will be lost.",
+      "discard": "Discard",
+      "save": "Save"
+    },
+    "delete_hook": {
+      "error": "Failed to delete"
+    },
+    "save_hook": {
+      "error_save": "Failed to save",
+      "error_create": "Failed to create"
+    }
+  },
+  "app": {
+    "global_error": {
+      "heading": "Something went wrong",
+      "retry": "Try again"
+    },
+    "metadata": {
+      "description": "A journaling companion app"
+    }
+  },
+  "footer": {
+    "label": {
+      "questions": "Questions"
+    }
+  },
+  "account": {
+    "field": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "nickname": "Nickname",
+      "user_id": "User ID"
+    },
+    "email": {
+      "error_login_required": "Please log in to continue",
+      "label": "Email",
+      "oauth_only_note": "This email is linked to your Google account",
+      "confirmation_sent": "A confirmation email has been sent. Click the link delivered to your new email address to complete the change.",
+      "placeholder_new": "New email address",
+      "submit": "Send",
+      "cancel": "Cancel",
+      "change": "Change"
+    },
+    "password": {
+      "error_mismatch": "New passwords do not match",
+      "error_login_required": "Please log in to continue",
+      "label": "Password",
+      "updated": "Password updated",
+      "placeholder_current": "Current password",
+      "placeholder_new": "New password (min. 6 characters)",
+      "placeholder_confirm": "Confirm new password",
+      "update": "Update",
+      "cancel": "Cancel",
+      "change": "Change"
+    },
+    "theme": {
+      "label": "Theme",
+      "light": "Light mode",
+      "dark": "Dark mode",
+      "toggle": "Toggle"
+    },
+    "profile": {
+      "error_login_required": "Please log in to continue"
+    },
+    "section": {
+      "profile": "Profile",
+      "security": "Security",
+      "stats": "Stats",
+      "settings": "Settings"
+    },
+    "logout": {
+      "label": "Log out",
+      "button": "Log out"
+    },
+    "language": {
+      "label": "Language"
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "account": "Account"
+    }
+  },
+  "stats": {
+    "label": {
+      "streak": "Streak",
+      "total_entries": "Total entries",
+      "total_chars": "Total characters",
+      "total_fermentations": "Fermentations",
+      "weekly_chars": "Characters this week",
+      "monthly_chars": "Characters this month",
+      "untitled": "(untitled)"
+    },
+    "value": {
+      "streak_days": "days"
+    },
+    "section": {
+      "monthly_trend": "Monthly trend",
+      "entries_by_question": "Entries by question"
+    },
+    "error": {
+      "fetch_failed": "Failed to load stats"
+    }
+  },
+  "board": {
+    "date": {
+      "day_sun": "Sunday",
+      "day_mon": "Monday",
+      "day_tue": "Tuesday",
+      "day_wed": "Wednesday",
+      "day_thu": "Thursday",
+      "day_fri": "Friday",
+      "day_sat": "Saturday"
+    },
+    "canvas": {
+      "aria_label": "Board canvas"
+    },
+    "empty": "Nothing here for this period",
+    "lightbox": {
+      "aria_label": "Photo lightbox",
+      "close_aria": "Close lightbox"
+    },
+    "photo_dialog": {
+      "aria_label": "Photo upload dialog",
+      "heading": "Add a photo",
+      "click_to_select": "Click to select a photo",
+      "uploading_aria": "Uploading",
+      "uploading": "Uploading…",
+      "caption_placeholder": "Caption (max. 20 characters)",
+      "cancel": "Cancel",
+      "uploading_button": "Uploading…",
+      "submit": "Add"
+    },
+    "snippet_dialog": {
+      "aria_label": "Snippet dialog",
+      "heading_edit": "Edit snippet",
+      "heading_create": "Create snippet",
+      "placeholder": "Enter text...",
+      "cancel": "Cancel",
+      "update": "Update",
+      "create": "Create"
+    }
+  },
+  "editor": {
+    "status": {
+      "editing": "Editing",
+      "saved": "Saved",
+      "saving": "Saving...",
+      "autosaving": "Auto-saving entry..."
+    },
+    "voice": {
+      "error_network": "Voice recognition is unavailable (please reopen in Chrome)",
+      "error_not_allowed": "Microphone access is not allowed",
+      "error_unsupported": "This browser does not support voice input"
+    },
+    "toolbar": {
+      "new_entry": "New entry",
+      "save": "Save",
+      "pickle": "Pickle",
+      "list": "List",
+      "stats": "Writing stats",
+      "voice_stop": "Stop voice input",
+      "voice": "Voice input",
+      "settings": "Settings",
+      "writing_horizontal": "Switch to horizontal",
+      "writing_vertical": "Switch to vertical",
+      "font_sans": "Switch to gothic (sans)",
+      "font_serif": "Switch to mincho (serif)",
+      "fullscreen": "Fullscreen"
+    },
+    "title": {
+      "placeholder": "Enter a title...",
+      "add": "Add a title"
+    },
+    "placeholder": "What did you feel today?",
+    "save_modal": {
+      "heading_pickle": "Pickle this entry into the Jar",
+      "heading_save": "Save entry",
+      "submit_pickle": "Pickle",
+      "submit_save": "Save",
+      "aria_label": "Save entry dialog",
+      "default_heading": "Save entry",
+      "default_submit": "Save",
+      "title_label": "Title",
+      "title_placeholder": "Enter a title...",
+      "cancel": "Cancel",
+      "saving": "Saving..."
+    },
+    "settings": {
+      "close_aria": "Close settings",
+      "section_basic": "Basics",
+      "font_size": "Font size",
+      "line_height": "Line height",
+      "focus_mode": "Focus mode",
+      "section_effects": "Effects",
+      "time_inscription": "Time inscription",
+      "ti_font_size": "Font size",
+      "ti_font_weight": "Font weight",
+      "ti_pressure_bleed": "Pressure bleed",
+      "eraser_trace": "Eraser trace",
+      "amp": "Keystroke amplification (ASMR)",
+      "voice": "Voice inscription",
+      "ghost": "Ghost",
+      "ghost_block": "Block (on commit)",
+      "ghost_dust": "Dust (per key)",
+      "ghost_size": "Size",
+      "ghost_scatter": "Scatter",
+      "ghost_blur_start": "Initial blur",
+      "ghost_blur_end": "Final blur",
+      "ghost_duration": "Duration"
+    },
+    "snippet_toolbar": {
+      "saving": "Saving…",
+      "saved": "Saved",
+      "create": "Make snippet",
+      "too_long": "Max. 50 characters"
+    },
+    "stats": {
+      "aria_label": "Writing stats",
+      "reading_time_under_minute": "Under 1 min",
+      "reading_time_minutes": "About {n} min",
+      "heading": "Writing stats",
+      "label_chars": "Characters",
+      "label_lines": "Lines",
+      "label_paragraphs": "Paragraphs",
+      "label_reading_time": "Reading time"
+    },
+    "date": {
+      "day_sun": "Sunday",
+      "day_mon": "Monday",
+      "day_tue": "Tuesday",
+      "day_wed": "Wednesday",
+      "day_thu": "Thursday",
+      "day_fri": "Friday",
+      "day_sat": "Saturday"
+    }
+  },
+  "fermentation": {
+    "detail": {
+      "header_keyword": "Keywords from Yeast",
+      "header_snippet": "Snippets cut by Oryzae",
+      "header_letter": "Observations from L.A.B.",
+      "snippet_source_prefix": "Source:",
+      "write_entry": "Write an entry for this question"
+    },
+    "jar": {
+      "zoom_close_aria": "Close zoom",
+      "particle_fermentation": "ferment",
+      "particle_memory": "memory",
+      "particle_silence": "silence",
+      "particle_light": "light",
+      "particle_dark": "dark",
+      "particle_morning": "morning",
+      "particle_koji": "koji",
+      "particle_breath": "breath",
+      "filler_rice": "rice",
+      "filler_water": "water",
+      "filler_soil": "soil",
+      "filler_brew": "brew",
+      "filler_question": "question",
+      "filler_time": "time",
+      "filler_sediment": "sediment",
+      "filler_wind": "wind",
+      "filler_season": "season",
+      "filler_microbe": "microbe",
+      "filler_heat": "heat",
+      "filler_propagate": "propagate",
+      "filler_heart": "heart",
+      "filler_autumn": "autumn",
+      "filler_shallows": "shallows",
+      "current_questions": "Your question",
+      "add_question": "＋ Add a question",
+      "edit_heading": "Edit question",
+      "processing": "Processing...",
+      "archive": "Archive",
+      "cancel_edit": "Cancel",
+      "updating": "Updating...",
+      "update": "Update",
+      "add_heading": "Add a new question",
+      "add_placeholder": "Enter your question",
+      "cancel_add": "Cancel",
+      "adding": "Adding...",
+      "add_submit": "Add"
+    }
+  },
+  "questions": {
+    "create_form": {
+      "placeholder": "Add a new question...",
+      "creating": "Adding...",
+      "submit": "Add"
+    },
+    "event": {
+      "label_active": "Created",
+      "attribution_active": "Created by you",
+      "label_proposed": "Proposed",
+      "attribution_proposed": "Proposed by Oryzae",
+      "label_archived": "Archived",
+      "attribution_archived": "Archived by you",
+      "accept": "Accept",
+      "reject": "Reject",
+      "unarchive": "Restore",
+      "archive": "Archive"
+    },
+    "timeline": {
+      "empty": "No questions yet",
+      "heading": "Lineage of your questions",
+      "subheading": "A record of how your questions have been born, grown, and shifted"
+    }
+  },
+  "landing": {
+    "nav": {
+      "concept": "Concept",
+      "process": "Three microbes",
+      "preview": "The app",
+      "philosophy": "Philosophy",
+      "faq": "FAQ",
+      "cta": "Open the app"
+    },
+    "hero": {
+      "eyebrow": "AN ASPERGILLUS FOR WORDS.",
+      "title": {
+        "l1": "Let your writing",
+        "l2": "ferment."
+      },
+      "lead": "Oryzae is a writing app inspired by koji mold — Aspergillus oryzae. Set a question that matters to you, write into it for a week, and the system decomposes your text, surfaces a few essential snippets, and returns a single short letter. Slow self-dialogue, made on purpose.",
+      "cta": {
+        "primary": "Open the app",
+        "secondary": "Read the concept"
+      },
+      "foot": "Vertical or horizontal writing, in Japanese, English, and beyond.",
+      "chip": {
+        "1": "autonomy of the dead",
+        "2": "fermentative time",
+        "3": "the mediator",
+        "4": "an ethics of forgetting"
+      },
+      "snippet": {
+        "1": "As a nukadoko slowly absorbs the household it lives in, an AI may also change its character…"
+      },
+      "question": "YOUR QUESTION"
+    },
+    "concept": {
+      "kicker": "CONCEPT",
+      "title": "Brew your question while you write.",
+      "lead": "",
+      "p1": {
+        "title": "Set a question",
+        "body": "Capture, in one sentence, the question that matters most right now. Everything else ferments around it."
+      },
+      "p2": {
+        "title": "Write daily",
+        "body": "On a quiet vertical page, write whatever comes — typos, detours and all. The trace of your hand stays."
+      },
+      "p3": {
+        "title": "A letter arrives",
+        "body": "Each week, a short letter and a few keywords distilled from your own words come back. Read them, then begin again."
+      }
+    },
+    "process": {
+      "kicker": "THREE MICROBES",
+      "title": {
+        "l1": "Koji · Lactic · Yeast",
+        "l2": "— three stages of fermentation"
+      },
+      "lead": "Inside Oryzae, three microbes — like the inhabitants of a nukadoko — each take a different role, and together brew a week of your words.",
+      "koji": {
+        "role": "Decomposition — 分解",
+        "body": "",
+        "output": "Output: an analysis worksheet, a result diagram, snippets that illuminate the question."
+      },
+      "lactic": {
+        "role": "A letter — 手紙",
+        "body": "Working from the worksheet and the snippets, this stage traces how your thinking has moved this week — not as a summary, but as a roughly 500-character poetic note in vocabulary deliberately offset from your own.",
+        "output": "Output: a single 500-character letter."
+      },
+      "yeast": {
+        "role": "Widening — キーワード",
+        "body": "Three to five short phrases — \"the autonomy of the dead\", \"the dead activated by the living\" — that step a little back from your question and widen the imaginative space around it.",
+        "output": "Output: 3–5 keywords."
+      }
+    },
+    "preview": {
+      "kicker": "THE APP",
+      "title": "Three places to write.",
+      "lead": "Oryzae separates the writing, the looking, and the receiving. Daily hands belong to the Editor. The weekly view belongs to the Jar.",
+      "editor": {
+        "title": "Add a title",
+        "prompt": "What did you feel today?",
+        "status": "editing",
+        "caption": "Editor — a quiet vertical page, tuned for Japanese IME, generous with whitespace."
+      },
+      "jar": {
+        "chip": {
+          "1": "reflective distance",
+          "2": "cognitive sanctuary",
+          "3": "a spiritual proxy",
+          "4": "dative relations"
+        },
+        "label": "YOUR QUESTION · What is a design that lets nature inhabit the body?",
+        "caption": ""
+      },
+      "letter": {
+        "from": "— from Oryzae · Letter, week 18",
+        "body": "You have walked, this week, around the question of how the dead and the living might continue to live together. In a dream, the figure of Y arrives in ordinary clothes, then shrinks — quietly — back into the shape of a foetus and disappears. It is loss, and it is also a return to origin, a faint outline of a circular view of life and death. Across the week you begin to notice that an analytical posture may not be the right one toward what matters most. Forgetting, perhaps, is one form of living-with.",
+        "caption": "Letter — a 500-character letter, weekly. Not a summary; a small ember to keep you writing."
+      }
+    },
+    "philosophy": {
+      "kicker": "PHILOSOPHY",
+      "title": "A tool worth outgrowing."
+    },
+    "philo": {
+      "1": {
+        "title": "Embodied writing",
+        "body": ""
+      },
+      "2": {
+        "title": "Without immediacy",
+        "body": "AI replies are deliberately delayed — once a week, like a letter. The exchange shifts from information processing to a quiet kind of relationship."
+      },
+      "3": {
+        "title": "Fermentative time",
+        "body": "Not an answer, a brewing. As a nukadoko takes on the flavour of the household it lives in, your thinking absorbs your own time and microbiome and slowly ripens."
+      },
+      "4": {
+        "title": "Tech you can outgrow",
+        "body": "The point is not dependence. Oryzae is meant to support, then quietly fall away as your own self-dialogue gets stronger."
+      },
+      "lineage": {
+        "label": "LINEAGE",
+        "body": "Oryzae carries forward what we learned from Pickles (2020–), a journaling tool for self-dialogue. The wider research context lives at ephemere.io."
+      }
+    },
+    "faq": {
+      "1": {
+        "q": "How is this different from Pickles?",
+        "a": "Pickles was a place to write the journal itself. Oryzae sets a question at the centre and adds the time around the writing — a fermentation process that returns your own words to you in a different shape."
+      },
+      "2": {
+        "q": "Do I have to write vertically?",
+        "a": "No. Vertical writing is the default, but you can switch to horizontal in one click. The font flips between mincho (serif) and gothic (sans) too."
+      },
+      "3": {
+        "q": "What does the AI read?",
+        "a": "Only the question you set, and the entries you tied to it during that week. Anything not tied to a question stays out of the fermentation."
+      },
+      "4": {
+        "q": "Can I write in languages other than Japanese?",
+        "a": "Yes — multilingual input is supported, including English. Vertical writing is tuned for Japanese and Chinese."
+      },
+      "5": {
+        "q": "What stage is the project at?",
+        "a": "Oryzae is a research preview. The shape of the app and its behaviour will continue to shift alongside the research."
+      },
+      "kicker": "QUESTIONS",
+      "title": "Frequent questions"
+    },
+    "outro": {
+      "l1": "One question is enough",
+      "l2": "to change a week.",
+      "cta": "Open Oryzae"
+    },
+    "foot": {
+      "tag": "Aspergillus oryzae for words."
+    },
+    "title": "Oryzae — Let your writing ferment."
+  }
+}

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const t = useTranslations('sidebar');
   const pathname = usePathname();
   const { auth } = useAuth();
   const { theme } = useTheme();
@@ -148,7 +150,7 @@ export function Sidebar() {
       {/* Account avatar */}
       <Link
         href="/account"
-        title="アカウント"
+        title={t('nav.account')}
         className="group mb-2 flex h-12 w-12 items-center justify-center rounded-[20px] transition-all duration-300 hover:bg-[rgba(140,133,126,0.1)]"
       >
         {auth?.user.avatarUrl ? (

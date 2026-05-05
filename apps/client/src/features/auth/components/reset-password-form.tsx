@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
 import { createApiClient } from '@/lib/api';
 
 function ResetPasswordHandler() {
+  const t = useTranslations('auth.reset_password');
+  const tErr = useTranslations('auth.error');
   const searchParams = useSearchParams();
   const router = useRouter();
   const [password, setPassword] = useState('');
@@ -19,14 +22,12 @@ function ResetPasswordHandler() {
   if (!accessToken) {
     return (
       <div className="flex flex-col gap-4 text-center">
-        <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">
-          無効なリセットリンクです。もう一度パスワードリセットをお試しください。
-        </p>
+        <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{t('invalid_link')}</p>
         <Link
           href="/forgot-password"
           className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
         >
-          パスワードリセットに戻る
+          {t('back_link')}
         </Link>
       </div>
     );
@@ -37,7 +38,7 @@ function ResetPasswordHandler() {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('パスワードが一致しません');
+      setError(t('error_mismatch'));
       return;
     }
 
@@ -51,7 +52,7 @@ function ResetPasswordHandler() {
 
     if (!res.ok) {
       const data = (await res.json()) as { error: string };
-      setError(translateAuthError(data.error));
+      setError(translateAuthError(data.error, tErr));
       setLoading(false);
       return;
     }
@@ -61,13 +62,13 @@ function ResetPasswordHandler() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-center">新しいパスワード</h1>
-      <p className="text-sm text-center text-zinc-500">新しいパスワードを入力してください。</p>
+      <h1 className="text-2xl font-bold text-center">{t('heading')}</h1>
+      <p className="text-sm text-center text-zinc-500">{t('subheading')}</p>
 
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>}
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">新しいパスワード</span>
+        <span className="text-sm font-medium">{t('password_label')}</span>
         <input
           type="password"
           value={password}
@@ -79,7 +80,7 @@ function ResetPasswordHandler() {
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">パスワード確認</span>
+        <span className="text-sm font-medium">{t('confirm_label')}</span>
         <input
           type="password"
           value={confirmPassword}
@@ -95,15 +96,20 @@ function ResetPasswordHandler() {
         disabled={loading}
         className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
       >
-        {loading ? '更新中...' : 'パスワードを更新'}
+        {loading ? t('submit_loading') : t('submit')}
       </button>
     </form>
   );
 }
 
+function ResetPasswordFallback() {
+  const t = useTranslations('auth.reset_password');
+  return <p className="text-sm text-center text-zinc-500">{t('loading')}</p>;
+}
+
 export function ResetPasswordForm() {
   return (
-    <Suspense fallback={<p className="text-sm text-center text-zinc-500">読み込み中...</p>}>
+    <Suspense fallback={<ResetPasswordFallback />}>
       <ResetPasswordHandler />
     </Suspense>
   );

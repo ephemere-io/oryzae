@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 interface SnippetDialogProps {
@@ -10,6 +11,7 @@ interface SnippetDialogProps {
 }
 
 export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: SnippetDialogProps) {
+  const t = useTranslations('board.snippet_dialog');
   const [text, setText] = useState(initialText);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -34,7 +36,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
   return (
     <div
       role="dialog"
-      aria-label="Snippet dialog"
+      aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
       onClick={onClose}
@@ -50,7 +52,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
         style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
         <h3 className="mb-4 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-          {initialText ? 'スニペットを編集' : 'スニペットを作成'}
+          {initialText ? t('heading_edit') : t('heading_create')}
         </h3>
         <textarea
           ref={inputRef}
@@ -58,7 +60,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
           onChange={(e) => setText(e.target.value)}
           maxLength={50}
           rows={3}
-          placeholder="テキストを入力..."
+          placeholder={t('placeholder')}
           className="mb-2 w-full resize-none rounded-md border px-3 py-2.5 text-sm outline-none"
           style={{
             height: 80,
@@ -81,7 +83,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
               backgroundColor: 'var(--bg)',
             }}
           >
-            キャンセル
+            {t('cancel')}
           </button>
           <button
             type="submit"
@@ -89,7 +91,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
             className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
-            {initialText ? '更新' : '作成'}
+            {initialText ? t('update') : t('create')}
           </button>
         </div>
       </form>

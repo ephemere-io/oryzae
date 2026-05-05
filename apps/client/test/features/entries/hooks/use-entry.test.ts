@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEntry, useSaveEntry } from '@/features/entries/hooks/use-entry';
 import type { ApiClient } from '@/lib/api';
+import { I18nWrapper } from '../../../helpers/i18n-wrapper';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return {
@@ -32,7 +33,7 @@ describe('useEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { entry }));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntry('e1', api, false));
+    const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -46,7 +47,7 @@ describe('useEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntry('e1', api, false));
+    const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -68,7 +69,9 @@ describe('useSaveEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }));
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
 
     let saveResult: string | null = null;
     await act(async () => {
@@ -83,7 +86,9 @@ describe('useSaveEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }));
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
 
     let saveResult: string | null = null;
     await act(async () => {
@@ -98,7 +103,9 @@ describe('useSaveEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, {}));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }));
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
 
     let saveResult: string | null = null;
     await act(async () => {
@@ -116,7 +123,9 @@ describe('useSaveEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }));
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
 
     await act(async () => {
       await result.current.save('content');
@@ -132,7 +141,9 @@ describe('useSaveEntry', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }));
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
 
     await act(async () => {
       await result.current.save('content', undefined, { fermentationEnabled: true });

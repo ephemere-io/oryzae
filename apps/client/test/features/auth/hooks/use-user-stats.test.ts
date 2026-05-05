@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useUserStats } from '@/features/auth/hooks/use-user-stats';
+import { I18nWrapper } from '../../../helpers/i18n-wrapper';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -32,7 +33,7 @@ describe('useUserStats', () => {
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, statsBody));
 
-    const { result } = renderHook(() => useUserStats());
+    const { result } = renderHook(() => useUserStats(), { wrapper: I18nWrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -46,7 +47,7 @@ describe('useUserStats', () => {
   it('sets error on failure', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(false, {}));
 
-    const { result } = renderHook(() => useUserStats());
+    const { result } = renderHook(() => useUserStats(), { wrapper: I18nWrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

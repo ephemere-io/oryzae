@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useLandingI18n } from '../hooks/use-landing-i18n';
-import type { LandingLang } from '../types';
+import { useLocale, useTranslations } from 'next-intl';
+import { useEffect, useTransition } from 'react';
+import type { Locale } from '@/i18n/config';
+import { setLocaleAction } from '@/lib/i18n-actions';
 import styles from './landing.module.css';
 import { LandingFaqItem } from './landing-faq-item';
 
@@ -10,11 +12,16 @@ const APP_HREF = '/login';
 const LOGO_SRC = '/landing/logo/P3_mark_color.svg';
 
 export function LandingPage() {
-  const { lang, setLang, t } = useLandingI18n();
+  const t = useTranslations('landing');
+  const locale = useLocale();
+
+  useEffect(() => {
+    document.title = t('title');
+  }, [t]);
 
   return (
     <div className={styles.landingRoot}>
-      <SiteHeader lang={lang} setLang={setLang} t={t} />
+      <SiteHeader lang={locale as Locale} t={t} />
       <main id="top">
         <Hero t={t} />
         <Concept t={t} />
@@ -32,12 +39,19 @@ export function LandingPage() {
 type T = (key: string) => string;
 
 interface HeaderProps {
-  lang: LandingLang;
-  setLang: (lang: LandingLang) => void;
+  lang: Locale;
   t: T;
 }
 
-function SiteHeader({ lang, setLang, t }: HeaderProps) {
+function SiteHeader({ lang, t }: HeaderProps) {
+  const [isPending, startTransition] = useTransition();
+  const setLang = (next: Locale) => {
+    if (next === lang) return;
+    startTransition(() => {
+      setLocaleAction(next);
+    });
+  };
+
   return (
     <header className={styles.siteHeader}>
       <a className={styles.brand} href="#top" aria-label="Oryzae">
@@ -60,6 +74,7 @@ function SiteHeader({ lang, setLang, t }: HeaderProps) {
             className={styles.langBtn}
             aria-pressed={lang === 'ja'}
             onClick={() => setLang('ja')}
+            disabled={isPending}
           >
             日本語
           </button>
@@ -68,6 +83,7 @@ function SiteHeader({ lang, setLang, t }: HeaderProps) {
             className={styles.langBtn}
             aria-pressed={lang === 'en'}
             onClick={() => setLang('en')}
+            disabled={isPending}
           >
             English
           </button>

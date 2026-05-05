@@ -28,7 +28,7 @@ test.describe('認証フロー', () => {
     await page.goto('/signup');
     await expect(page.locator('h1')).toHaveText('Oryzae');
     await expect(page.locator('text=アカウントを作成')).toBeVisible();
-    await expect(page.locator('text=ログイン')).toBeVisible();
+    await expect(page.locator('a:has-text("ログイン")')).toBeVisible();
   });
 
   test('ログインとサインアップ間のリンク遷移', async ({ page }) => {
@@ -38,5 +38,46 @@ test.describe('認証フロー', () => {
 
     await page.click('a:has-text("ログイン")');
     await expect(page).toHaveURL(/\/login/);
+  });
+});
+
+test.describe('言語切替', () => {
+  test('/login の言語切替ボタンで英訳が表示され cookie が保存される', async ({ page, context }) => {
+    await context.addCookies([
+      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
+    ]);
+    await page.goto('/login');
+    await expect(page.locator('text=ログインして続ける')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Toggle language' }).click();
+    await expect(page.locator('text=Log in to continue')).toBeVisible();
+
+    const cookies = await context.cookies();
+    expect(cookies.find((c) => c.name === 'NEXT_LOCALE')?.value).toBe('en');
+  });
+
+  test('言語切替が認証ページ間 (/login → /signup) で保持される', async ({ page, context }) => {
+    await context.addCookies([
+      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
+    ]);
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Toggle language' }).click();
+    await expect(page.locator('text=Log in to continue')).toBeVisible();
+
+    await page.goto('/signup');
+    await expect(page.locator('text=Create your account')).toBeVisible();
+  });
+
+  test('/login で切り替えた言語が landing にも反映される', async ({ page, context }) => {
+    await context.addCookies([
+      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
+    ]);
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Toggle language' }).click();
+    await expect(page.locator('text=Log in to continue')).toBeVisible();
+
+    await page.goto('/');
+    await expect(page.locator('h1')).toContainText('ferment');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 });

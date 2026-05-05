@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 export type EditorStatus = 'editing' | 'saved' | 'saving' | 'autosaving';
 
 interface EditorStatusBarProps {
@@ -8,12 +10,8 @@ interface EditorStatusBarProps {
 }
 
 export function EditorStatusBar({ status, charCount }: EditorStatusBarProps) {
-  const statusLabel = {
-    editing: '編集中',
-    saved: '保存済み',
-    saving: '保存中...',
-    autosaving: 'エントリーを自動保存中...',
-  }[status];
+  const t = useTranslations('editor.status');
+  const statusLabel = t(status);
 
   const isInFlight = status === 'saving' || status === 'autosaving';
 
