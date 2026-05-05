@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { useDebounce } from '@/features/entries/hooks/use-debounce';
 import { useDeleteEntry } from '@/features/entries/hooks/use-delete-entry';
@@ -27,48 +28,58 @@ function getISOWeekNumber(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
+interface MonthKey {
+  year: number;
+  month: number;
+}
+
 interface MonthGroup {
-  label: string;
+  key: string;
+  year: number;
+  month: number;
   weeks: WeekGroup[];
 }
 
 interface WeekGroup {
-  label: string;
+  weekNum: number;
   entries: EntryItem[];
 }
 
 function groupEntries(entries: EntryItem[]): MonthGroup[] {
-  const months = new Map<string, Map<number, EntryItem[]>>();
+  const months = new Map<string, { key: MonthKey; weeks: Map<number, EntryItem[]> }>();
 
   for (const entry of entries) {
     const d = new Date(entry.createdAt);
-    const monthKey = `${d.getFullYear()}年${d.getMonth() + 1}月`;
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const monthKey = `${year}-${month}`;
     const weekNum = getISOWeekNumber(d);
 
     if (!months.has(monthKey)) {
-      months.set(monthKey, new Map());
+      months.set(monthKey, { key: { year, month }, weeks: new Map() });
     }
-    const weekMap = months.get(monthKey);
-    if (weekMap) {
-      if (!weekMap.has(weekNum)) {
-        weekMap.set(weekNum, []);
+    const monthEntry = months.get(monthKey);
+    if (monthEntry) {
+      if (!monthEntry.weeks.has(weekNum)) {
+        monthEntry.weeks.set(weekNum, []);
       }
-      weekMap.get(weekNum)?.push(entry);
+      monthEntry.weeks.get(weekNum)?.push(entry);
     }
   }
 
   const result: MonthGroup[] = [];
-  for (const [monthLabel, weekMap] of months) {
-    const weeks: WeekGroup[] = [];
-    for (const [weekNum, items] of weekMap) {
-      weeks.push({ label: `第${weekNum}週`, entries: items });
+  for (const [key, { key: monthKey, weeks }] of months) {
+    const weekGroups: WeekGroup[] = [];
+    for (const [weekNum, items] of weeks) {
+      weekGroups.push({ weekNum, entries: items });
     }
-    result.push({ label: monthLabel, weeks });
+    result.push({ key, year: monthKey.year, month: monthKey.month, weeks: weekGroups });
   }
   return result;
 }
 
 export function EntryList({ api, authLoading }: EntryListProps) {
+  const t = useTranslations('entries.list');
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
   const search = debouncedSearch.trim() || undefined;
@@ -102,7 +113,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
       <div className="relative mb-4">
         <input
           type="text"
-          placeholder="エントリーを検索..."
+          placeholder={t('search_placeholder')}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] px-4 py-2.5 pl-10 text-sm text-[var(--fg)] placeholder:text-[var(--date-color)] focus:border-[var(--accent)] focus:outline-none"
@@ -112,7 +123,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
-          aria-label="検索"
+          aria-label={t('search_aria')}
           role="img"
         >
           <path
@@ -133,7 +144,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
-              aria-label="検索をクリア"
+              aria-label={t('clear_search_aria')}
               role="img"
             >
               <path
@@ -149,12 +160,14 @@ export function EntryList({ api, authLoading }: EntryListProps) {
 
       {authLoading || (loading && entries.length === 0) ? null : entries.length === 0 ? (
         <p className="py-12 text-center text-sm text-[var(--date-color)]">
-          {isSearching ? '検索結果はありません' : 'エントリーはまだありません'}
+          {isSearching ? t('no_results') : t('no_entries')}
         </p>
       ) : isSearching ? (
         /* Flat list for search results (no month/week grouping) */
         <div className="flex flex-col">
-          <div className="pb-2 text-xs text-[var(--date-color)]">{entries.length}件の結果</div>
+          <div className="pb-2 text-xs text-[var(--date-color)]">
+            {t('results_count', { count: entries.length })}
+          </div>
           {entries.map((entry) => (
             <EntryCard
               key={entry.id}
@@ -169,14 +182,16 @@ export function EntryList({ api, authLoading }: EntryListProps) {
       ) : (
         /* Grouped list for normal browsing */
         groupEntries(entries).map((month) => (
-          <div key={month.label}>
+          <div key={month.key}>
             <div className="border-b border-[var(--border-subtle)] pb-2 pt-6 text-sm font-medium text-[var(--fg)]">
-              {month.label}
+              {t('month_format', { year: month.year, month: month.month })}
             </div>
 
             {month.weeks.map((week) => (
-              <div key={week.label}>
-                <div className="pt-4 pb-2 text-xs text-[var(--date-color)]">{week.label}</div>
+              <div key={week.weekNum}>
+                <div className="pt-4 pb-2 text-xs text-[var(--date-color)]">
+                  {t('week_label', { n: week.weekNum })}
+                </div>
 
                 {week.entries.map((entry) => (
                   <EntryCard
@@ -200,7 +215,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
           disabled={loading}
           className="mt-6 self-center rounded-full border border-[var(--border-subtle)] px-5 py-1.5 text-sm text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.06)] disabled:opacity-50"
         >
-          {loading ? '読み込み中...' : 'もっと見る'}
+          {loading ? t('load_more_loading') : t('load_more')}
         </button>
       )}
 

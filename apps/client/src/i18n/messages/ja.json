@@ -1,0 +1,593 @@
+{
+  "auth": {
+    "callback": {
+      "error_auth_failed": "認証に失敗しました。もう一度お試しください。",
+      "error_no_code": "認証コードが見つかりません",
+      "back_to_login": "ログインに戻る",
+      "authenticating": "認証中...",
+      "loading": "読み込み中..."
+    },
+    "forgot_password": {
+      "sent_heading": "メールを確認してください",
+      "sent_body": "にパスワードリセットリンクを送信しました。メール内のリンクをクリックして、新しいパスワードを設定してください。",
+      "back_to_login": "ログインに戻る",
+      "heading": "パスワードをリセット",
+      "subheading": "登録済みのメールアドレスを入力してください。パスワードリセットリンクをお送りします。",
+      "email_label": "メールアドレス",
+      "submit_loading": "送信中...",
+      "submit": "リセットリンクを送信",
+      "back_to_login_2": "ログインに戻る"
+    },
+    "google_login": {
+      "connecting": "接続中...",
+      "button": "Google でログイン"
+    },
+    "login": {
+      "subheading": "ログインして続ける",
+      "divider_or": "または",
+      "identifier_label": "ニックネームまたはメールアドレス",
+      "password_label": "パスワード",
+      "forgot_link": "パスワードを忘れた方",
+      "submit_loading": "ログイン中...",
+      "submit": "ログイン",
+      "no_account_prefix": "アカウントをお持ちでない方は",
+      "signup_link": "サインアップ"
+    },
+    "reset_password": {
+      "invalid_link": "無効なリセットリンクです。もう一度パスワードリセットをお試しください。",
+      "back_link": "パスワードリセットに戻る",
+      "error_mismatch": "パスワードが一致しません",
+      "heading": "新しいパスワード",
+      "subheading": "新しいパスワードを入力してください。",
+      "password_label": "新しいパスワード",
+      "confirm_label": "パスワード確認",
+      "submit_loading": "更新中...",
+      "submit": "パスワードを更新",
+      "loading": "読み込み中..."
+    },
+    "signup": {
+      "error_password_mismatch": "パスワードが一致しません",
+      "email_sent_subheading": "確認メールを送信しました",
+      "email_sent_body": "に確認メールを送信しました。メール内のリンクをクリックして、アカウントを有効化してください。",
+      "back_to_login": "ログインに戻る",
+      "subheading": "アカウントを作成",
+      "divider_or": "または",
+      "nickname_label": "ニックネーム（ログインID）",
+      "nickname_help": "英数字、ハイフン、アンダースコアのみ",
+      "email_label": "メールアドレス",
+      "password_label": "パスワード",
+      "confirm_label": "パスワード確認",
+      "submit_loading": "作成中...",
+      "submit": "サインアップ",
+      "have_account_prefix": "すでにアカウントをお持ちの方は",
+      "login_link": "ログイン"
+    },
+    "error": {
+      "invalid_credentials": "メールアドレスまたはパスワードが正しくありません",
+      "email_not_confirmed": "メールアドレスが確認されていません。確認メールをご確認ください",
+      "user_already_registered": "このメールアドレスは既に登録されています",
+      "password_too_short": "パスワードは6文字以上で入力してください",
+      "rate_limit": "しばらく時間をおいてから再度お試しください",
+      "security_wait": "セキュリティのため、しばらく時間をおいてから再度お試しください",
+      "invalid_email_format": "メールアドレスの形式が正しくありません",
+      "invalid_password": "有効なパスワードを入力してください",
+      "user_not_found": "ユーザーが見つかりません",
+      "same_password_new": "新しいパスワードは現在のパスワードと異なるものにしてください",
+      "session_missing": "セッションが切れました。もう一度ログインしてください",
+      "user_already_registered_2": "このメールアドレスは既に登録されています",
+      "email_not_confirmed_2": "メールアドレスの確認が完了していません",
+      "same_password": "新しいパスワードは現在のパスワードと異なるものにしてください"
+    }
+  },
+  "entries": {
+    "detail": {
+      "not_found": "エントリが見つかりません"
+    },
+    "delete_modal": {
+      "aria_label": "削除確認ダイアログ",
+      "heading": "本当に削除しますか？",
+      "body": "このエントリーは完全に削除され、元に戻すことはできません。",
+      "cancel": "キャンセル",
+      "deleting": "削除中...",
+      "confirm": "削除する"
+    },
+    "card": {
+      "char_count_label": "文字数:"
+    },
+    "kebab": {
+      "aria_open": "メニューを開く",
+      "delete": "削除"
+    },
+    "list": {
+      "search_placeholder": "エントリーを検索...",
+      "search_aria": "検索",
+      "clear_search_aria": "検索をクリア",
+      "no_results": "検索結果はありません",
+      "no_entries": "エントリーはまだありません",
+      "month_format": "{year}年{month}月",
+      "results_count": "{count}件の結果",
+      "week_label": "第{n}週",
+      "load_more_loading": "読み込み中...",
+      "load_more": "もっと見る"
+    },
+    "leave_modal": {
+      "aria_label": "離脱確認ダイアログ",
+      "heading": "本当に離れますか？",
+      "body": "未保存の変更は失われます。",
+      "cancel": "キャンセル",
+      "confirm": "OK"
+    },
+    "question_linker": {
+      "placeholder": "問いを紐づける…"
+    },
+    "unsaved_modal": {
+      "heading": "未保存の変更があります",
+      "body": "保存せずに移動すると変更内容が失われます。",
+      "discard": "保存しない",
+      "save": "保存する"
+    },
+    "delete_hook": {
+      "error": "削除に失敗しました"
+    },
+    "save_hook": {
+      "error_save": "保存に失敗しました",
+      "error_create": "作成に失敗しました"
+    }
+  },
+  "app": {
+    "global_error": {
+      "heading": "エラーが発生しました",
+      "retry": "もう一度試す"
+    },
+    "metadata": {
+      "description": "ジャーナリング支援アプリ"
+    }
+  },
+  "footer": {
+    "label": {
+      "questions": "問い一覧"
+    }
+  },
+  "account": {
+    "field": {
+      "save": "保存",
+      "cancel": "取消",
+      "edit": "編集",
+      "nickname": "ニックネーム",
+      "user_id": "ユーザーID"
+    },
+    "email": {
+      "error_login_required": "ログインが必要です",
+      "label": "メールアドレス",
+      "oauth_only_note": "Google アカウントに紐づいたメールアドレスです",
+      "confirmation_sent": "確認メールを送信しました。新しいメールアドレスに届いたメールのリンクをクリックしてください。",
+      "placeholder_new": "新しいメールアドレス",
+      "submit": "送信",
+      "cancel": "取消",
+      "change": "変更"
+    },
+    "password": {
+      "error_mismatch": "新しいパスワードが一致しません",
+      "error_login_required": "ログインが必要です",
+      "label": "パスワード",
+      "updated": "パスワードを更新しました",
+      "placeholder_current": "現在のパスワード",
+      "placeholder_new": "新しいパスワード（6文字以上）",
+      "placeholder_confirm": "新しいパスワード（確認）",
+      "update": "更新",
+      "cancel": "取消",
+      "change": "変更"
+    },
+    "theme": {
+      "label": "テーマ",
+      "light": "ライトモード",
+      "dark": "ダークモード",
+      "toggle": "切り替え"
+    },
+    "profile": {
+      "error_login_required": "ログインが必要です"
+    },
+    "section": {
+      "profile": "プロフィール",
+      "security": "セキュリティ",
+      "stats": "統計",
+      "settings": "設定"
+    },
+    "logout": {
+      "label": "ログアウト",
+      "button": "ログアウトする"
+    },
+    "language": {
+      "label": "言語"
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "account": "アカウント"
+    }
+  },
+  "stats": {
+    "label": {
+      "streak": "連続記録",
+      "total_entries": "累計エントリ",
+      "total_chars": "累計文字数",
+      "total_fermentations": "発酵回数",
+      "weekly_chars": "今週の文字数",
+      "monthly_chars": "今月の文字数",
+      "untitled": "(無題)"
+    },
+    "value": {
+      "streak_days": "日"
+    },
+    "section": {
+      "monthly_trend": "月別推移",
+      "entries_by_question": "問い別エントリ数"
+    },
+    "error": {
+      "fetch_failed": "統計データの取得に失敗しました"
+    }
+  },
+  "board": {
+    "date": {
+      "day_sun": "日曜日",
+      "day_mon": "月曜日",
+      "day_tue": "火曜日",
+      "day_wed": "水曜日",
+      "day_thu": "木曜日",
+      "day_fri": "金曜日",
+      "day_sat": "土曜日"
+    },
+    "canvas": {
+      "aria_label": "Board canvas"
+    },
+    "empty": "この期間のデータはありません",
+    "lightbox": {
+      "aria_label": "Photo lightbox",
+      "close_aria": "Close lightbox"
+    },
+    "photo_dialog": {
+      "aria_label": "Photo upload dialog",
+      "heading": "写真を追加",
+      "click_to_select": "クリックして写真を選択",
+      "uploading_aria": "アップロード中",
+      "uploading": "アップロード中…",
+      "caption_placeholder": "キャプション（20文字以内）",
+      "cancel": "キャンセル",
+      "uploading_button": "アップロード中…",
+      "submit": "追加"
+    },
+    "snippet_dialog": {
+      "aria_label": "Snippet dialog",
+      "heading_edit": "スニペットを編集",
+      "heading_create": "スニペットを作成",
+      "placeholder": "テキストを入力...",
+      "cancel": "キャンセル",
+      "update": "更新",
+      "create": "作成"
+    }
+  },
+  "editor": {
+    "status": {
+      "editing": "編集中",
+      "saved": "保存済み",
+      "saving": "保存中...",
+      "autosaving": "エントリーを自動保存中..."
+    },
+    "voice": {
+      "error_network": "音声認識が利用できません（Chrome で開き直してください）",
+      "error_not_allowed": "マイクの利用が許可されていません",
+      "error_unsupported": "このブラウザは音声入力に対応していません"
+    },
+    "toolbar": {
+      "new_entry": "新規エントリ",
+      "save": "保存する",
+      "pickle": "漬け込む",
+      "list": "一覧",
+      "stats": "執筆統計",
+      "voice_stop": "音声入力停止",
+      "voice": "音声入力",
+      "settings": "設定",
+      "writing_horizontal": "横書きに切替",
+      "writing_vertical": "縦書きに切替",
+      "font_sans": "ゴシックに切替",
+      "font_serif": "明朝に切替",
+      "fullscreen": "フルスクリーン"
+    },
+    "title": {
+      "placeholder": "タイトルを入力...",
+      "add": "タイトルを追加"
+    },
+    "placeholder": "今日は何を感じましたか？",
+    "save_modal": {
+      "heading_pickle": "エントリを瓶に漬け込む",
+      "heading_save": "エントリを保存",
+      "submit_pickle": "漬け込む",
+      "submit_save": "保存",
+      "aria_label": "Save entry dialog",
+      "default_heading": "エントリを保存",
+      "default_submit": "保存",
+      "title_label": "タイトル",
+      "title_placeholder": "タイトルを入力...",
+      "cancel": "キャンセル",
+      "saving": "保存中..."
+    },
+    "settings": {
+      "close_aria": "設定を閉じる",
+      "section_basic": "基本設定",
+      "font_size": "文字サイズ",
+      "line_height": "行間サイズ",
+      "focus_mode": "フォーカスモード",
+      "section_effects": "エフェクト",
+      "time_inscription": "時間内包",
+      "ti_font_size": "文字サイズ",
+      "ti_font_weight": "文字太さ",
+      "ti_pressure_bleed": "圧力にじみ",
+      "eraser_trace": "消し跡",
+      "amp": "打鍵音増幅（ASMR）",
+      "voice": "音量内包",
+      "ghost": "ゴースト",
+      "ghost_block": "塊（コミット時）",
+      "ghost_dust": "塵（キー毎）",
+      "ghost_size": "サイズ",
+      "ghost_scatter": "散乱",
+      "ghost_blur_start": "初期ブラー",
+      "ghost_blur_end": "最終ブラー",
+      "ghost_duration": "持続時間"
+    },
+    "snippet_toolbar": {
+      "saving": "保存中…",
+      "saved": "保存しました",
+      "create": "スニペット化",
+      "too_long": "50文字以内"
+    },
+    "stats": {
+      "aria_label": "執筆統計",
+      "reading_time_under_minute": "1分未満",
+      "reading_time_minutes": "約{n}分",
+      "heading": "執筆統計",
+      "label_chars": "文字数",
+      "label_lines": "行数",
+      "label_paragraphs": "段落数",
+      "label_reading_time": "読了時間"
+    },
+    "date": {
+      "day_sun": "日曜日",
+      "day_mon": "月曜日",
+      "day_tue": "火曜日",
+      "day_wed": "水曜日",
+      "day_thu": "木曜日",
+      "day_fri": "金曜日",
+      "day_sat": "土曜日"
+    }
+  },
+  "fermentation": {
+    "detail": {
+      "header_keyword": "Yeast が生成したキーワード",
+      "header_snippet": "Oryzae が切り取った文章",
+      "header_letter": "L.A.B.による観察記録",
+      "snippet_source_prefix": "出典:",
+      "write_entry": "この問いのエントリを書く"
+    },
+    "jar": {
+      "zoom_close_aria": "ズームを閉じる",
+      "particle_fermentation": "発酵",
+      "particle_memory": "記憶",
+      "particle_silence": "静寂",
+      "particle_light": "光",
+      "particle_dark": "闇",
+      "particle_morning": "朝",
+      "particle_koji": "麹",
+      "particle_breath": "息",
+      "filler_rice": "米",
+      "filler_water": "水",
+      "filler_soil": "土壌",
+      "filler_brew": "醸す",
+      "filler_question": "問い",
+      "filler_time": "時間",
+      "filler_sediment": "沈殿",
+      "filler_wind": "風",
+      "filler_season": "季節",
+      "filler_microbe": "菌",
+      "filler_heat": "熱",
+      "filler_propagate": "繁殖",
+      "filler_heart": "心",
+      "filler_autumn": "秋",
+      "filler_shallows": "瀬",
+      "current_questions": "現在の問い",
+      "add_question": "＋ 問いを追加する",
+      "edit_heading": "問いを編集",
+      "processing": "処理中...",
+      "archive": "アーカイブ",
+      "cancel_edit": "キャンセル",
+      "updating": "更新中...",
+      "update": "更新する",
+      "add_heading": "新しい問いを追加",
+      "add_placeholder": "あなたの問いを入力してください",
+      "cancel_add": "キャンセル",
+      "adding": "追加中...",
+      "add_submit": "追加する"
+    }
+  },
+  "questions": {
+    "create_form": {
+      "placeholder": "新しい問いを追加...",
+      "creating": "追加中...",
+      "submit": "追加"
+    },
+    "event": {
+      "label_active": "作成",
+      "attribution_active": "ユーザーが作成",
+      "label_proposed": "提案",
+      "attribution_proposed": "Oryzae が提案",
+      "label_archived": "アーカイブ",
+      "attribution_archived": "ユーザーがアーカイブ",
+      "accept": "承認",
+      "reject": "却下",
+      "unarchive": "復元",
+      "archive": "アーカイブ"
+    },
+    "timeline": {
+      "empty": "問いはまだありません",
+      "heading": "問いの変遷",
+      "subheading": "あなたの問いが生まれ、育ち、変化してきた記録"
+    }
+  },
+  "landing": {
+    "nav": {
+      "concept": "コンセプト",
+      "process": "発酵の三段",
+      "preview": "アプリ",
+      "philosophy": "思想",
+      "faq": "FAQ",
+      "cta": "アプリを試す"
+    },
+    "hero": {
+      "eyebrow": "AN ASPERGILLUS FOR WORDS.",
+      "title": {
+        "l1": "書くことを、",
+        "l2": "発酵させる。"
+      },
+      "lead": "Oryzaeは、日々の言葉を醸成し、あなたの問いを深める執筆の場です。コウジカビが澱粉を糖に変えるように、書かれた文章を分解し、問いの核となる切片と、ひと通の手紙を返します。",
+      "cta": {
+        "primary": "アプリを試す",
+        "secondary": "コンセプトを読む"
+      },
+      "foot": "縦書き・横書きいずれにも対応。日本語と英語で書き、考える人のための場。",
+      "chip": {
+        "1": "死者の自律性",
+        "2": "発酵的時間",
+        "3": "媒介者",
+        "4": "忘却の倫理"
+      },
+      "snippet": {
+        "1": "「ぬか床が徐々に人の影響を吸収するように、AIもまた変化していく…」"
+      },
+      "question": "現在の問い"
+    },
+    "concept": {
+      "kicker": "CONCEPT",
+      "title": "問いを、書きながら醸成する。",
+      "lead": "Oryzaeは「問い」を中心に据えた執筆アプリです。あなたが今いちばん考えたい問いをひとつ立て、その問いに沿って一週間日記を書く。週末、コウジカビ・乳酸菌・酵母の三段階を経てAIが文章を分解し、ふたたびあなたへ手渡します。要約ではなく、思考を進めるためのささやかなインスピレーションとして。",
+      "p1": {
+        "title": "問いを立てる",
+        "body": "いま気になっていることを一文の問いとして書き留める。これが発酵の中核となる。"
+      },
+      "p2": {
+        "title": "日々書く",
+        "body": "縦書きの白い紙に、思いついたことをそのまま綴る。誤字も、寄り道も、書いた跡として残る。"
+      },
+      "p3": {
+        "title": "手紙が届く",
+        "body": "週ごとに、あなた自身の言葉から醸成された手紙とキーワードが返ってくる。読むのは、また書きはじめるため。"
+      }
+    },
+    "process": {
+      "kicker": "THREE MICROBES",
+      "title": {
+        "l1": "コウジカビ・乳酸菌・酵母",
+        "l2": "— 発酵の三段"
+      },
+      "lead": "Oryzaeの内部では、糠床のような三つの微生物がそれぞれ別の役割を担い、あなたの一週間の言葉を醸成する。",
+      "koji": {
+        "role": "分解 — Decomposition",
+        "body": "一週間ぶんの日記を、立てた問いに照らして読み解く。修正版グラウンデッド・セオリー・アプローチを参照しながら、原文から問いの核に触れる切片を抽出する。",
+        "output": "出力：分析ワークシート、結果図、問いを照らす切片"
+      },
+      "lactic": {
+        "role": "手紙 — A letter",
+        "body": "切片とワークシートを参照して、問いをめぐる思考の変化を整理する。要約ではなく、書き手の語彙からあえてずらした言葉で、500字ほどの詩的なコメントが綴られる。",
+        "output": "出力：500字の手紙"
+      },
+      "yeast": {
+        "role": "キーワード — Widening",
+        "body": "問いに囚われすぎないよう、視点を少し引いた角度から差し出すための語が3〜5つ生成される。「死者の自律性」「生者による死者の活性」のような短いフレーズが、想像の余白を広げる。",
+        "output": "出力：3〜5のキーワード"
+      }
+    },
+    "preview": {
+      "kicker": "THE APP",
+      "title": "三つの場所で書く。",
+      "lead": "Oryzaeのアプリは、書く・眺める・受け取るを別々の場所として用意している。日々の手は「Editor」へ。一週間ごとの俯瞰は「Jar」へ。",
+      "editor": {
+        "title": "タイトルを追加",
+        "prompt": "今日は何を感じましたか？",
+        "status": "編集中",
+        "caption": "Editor — 縦書きの白い紙、日本語IMEに最適化された静かな執筆面。"
+      },
+      "jar": {
+        "chip": {
+          "1": "却像的距離感",
+          "2": "認知的聖域",
+          "3": "霊的代行者",
+          "4": "与格的関係"
+        },
+        "label": "現在の問い · 自然環境を身に宿すためのデザインとは？",
+        "caption": "Jar — 一週間の言葉が問いを軸に星座となって浮かび上がる眺め。"
+      },
+      "letter": {
+        "from": "— Oryzae より、第18週の手紙",
+        "body": "あなたは「死者と生者はどのように共生し続けられるのか」という問いの周りを、一週間ゆっくりと歩いていた。夢のなかで現れたYは、しゅるしゅると胎児にまで縮みながら去ったという。それは喪失の場面であると同時に、起源への回帰であり、円環としての生死観をかすかに照らしている。書き手はこの一週間、分析ではない仕方で大切な存在に向き合うことの必要に気づきはじめている。忘却もまた、共生のひとつのかたちかもしれない、と。",
+        "caption": "Letter — 週ごとに届く、500字の手紙。要約ではなく、書き続けるためのちいさな種火。"
+      }
+    },
+    "philosophy": {
+      "kicker": "PHILOSOPHY",
+      "title": "道具は、卒業されるためにある。"
+    },
+    "philo": {
+      "1": {
+        "title": "身体性の回復",
+        "body": "縦書きと余白、明朝体。デジタルの整理整頓よりも、たしかに自分が書いたという手の感覚を優先する。"
+      },
+      "2": {
+        "title": "即時性の排除",
+        "body": "AIの返答はあえて遅らせる。週に一度、手紙のように届くことで、やりとりは情報処理から関係性に変わる。"
+      },
+      "3": {
+        "title": "発酵的時間",
+        "body": "即答ではなく、醸成。ぬか床が家ごとに固有の味になるように、思考もまた書き手の時間と微生物叢を吸って熟していく。"
+      },
+      "4": {
+        "title": "卒業できるテクノロジー",
+        "body": "最終的にはツールに依存せず、自律的に自己と対話できるようになることを支援する。Oryzaeはそのための補助輪。"
+      },
+      "lineage": {
+        "label": "系譜",
+        "body": "Oryzaeは、ジャーナリングを通じた自己対話のためのアプリ「Pickles」(2020–) の知見を引き継いでいます。研究の文脈は ephemere.io をご覧ください。"
+      }
+    },
+    "faq": {
+      "1": {
+        "q": "Picklesとの違いは？",
+        "a": "Picklesは日記そのものを書く場でした。Oryzaeは「問い」を中心に据え、書かれた言葉を発酵プロセスにかけて返すという、書く前後の時間まで含めて設計し直したものです。"
+      },
+      "2": {
+        "q": "縦書きは必須ですか？",
+        "a": "いいえ。縦書きをデフォルトとしていますが、ワンクリックで横書きに切り替えられます。フォントも明朝とゴシックを選べます。"
+      },
+      "3": {
+        "q": "AIは何を読みますか？",
+        "a": "あなたが立てた「問い」と、その週に書いたエントリーのみです。問いに紐づけなかったエントリーは発酵に含まれません。"
+      },
+      "4": {
+        "q": "日本語以外でも書けますか？",
+        "a": "英語をはじめとする多言語に対応しています。縦書きは日本語・中国語に最適化されています。"
+      },
+      "5": {
+        "q": "いまどの段階ですか？",
+        "a": "Oryzaeはリサーチ・プレビュー段階のプロジェクトです。仕様や挙動は研究の進行に伴って変化します。"
+      },
+      "kicker": "QUESTIONS",
+      "title": "よくある問い"
+    },
+    "outro": {
+      "l1": "問いはひとつあれば、",
+      "l2": "一週間が変わる。",
+      "cta": "Oryzaeを開く"
+    },
+    "foot": {
+      "tag": "Aspergillus oryzae for words."
+    },
+    "title": "Oryzae — 書くことを、発酵させる。"
+  }
+}

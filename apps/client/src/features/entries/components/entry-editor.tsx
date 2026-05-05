@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type EditorStatus,
@@ -61,24 +62,36 @@ function formatTime(date: Date): string {
   return `${hh}:${mm}`;
 }
 
-function formatDateStr(created: Date, updated: Date): string {
+const DAY_KEYS = [
+  'date.day_sun',
+  'date.day_mon',
+  'date.day_tue',
+  'date.day_wed',
+  'date.day_thu',
+  'date.day_fri',
+  'date.day_sat',
+] as const;
+
+function formatDateStr(created: Date, updated: Date, t: (key: string) => string): string {
   const y = created.getFullYear();
   const m = created.getMonth() + 1;
   const d = created.getDate();
-  const days = ['日', '月', '火', '水', '木', '金', '土'];
-  const dayName = days[created.getDay()];
-  return `${y}.${m}.${d} — ${dayName}曜日 ${formatTime(created)} · ${formatTime(updated)}`;
+  const dayName = t(DAY_KEYS[created.getDay()]);
+  return `${y}.${m}.${d} — ${dayName} ${formatTime(created)} · ${formatTime(updated)}`;
 }
 
-function voiceStatusMessage(reason: VoiceUnavailableReason | null): string {
+function voiceStatusMessage(
+  reason: VoiceUnavailableReason | null,
+  t: (key: string) => string,
+): string {
   switch (reason) {
     case 'network':
     case 'service-not-allowed':
-      return '音声認識が利用できません（Chrome で開き直してください）';
+      return t('voice.error_network');
     case 'not-allowed':
-      return 'マイクの利用が許可されていません';
+      return t('voice.error_not_allowed');
     case 'unsupported':
-      return 'このブラウザは音声入力に対応していません';
+      return t('voice.error_unsupported');
     default:
       return '';
   }
@@ -106,6 +119,7 @@ export function EntryEditor({
   onSaveComplete,
   onSaveTransition,
 }: EntryEditorProps) {
+  const t = useTranslations('editor');
   // For existing entries, split first line as title
   const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
@@ -129,7 +143,7 @@ export function EntryEditor({
     const now = new Date();
     const created = createdAtIso ? new Date(createdAtIso) : now;
     const updated = updatedAtIso ? new Date(updatedAtIso) : now;
-    return formatDateStr(created, updated);
+    return formatDateStr(created, updated, t);
   });
   const { save, saving, error } = useSaveEntry(api, auth);
   const router = useRouter();
@@ -189,11 +203,11 @@ export function EntryEditor({
     if (!createdAtIso) {
       const timer = setInterval(() => {
         const now = new Date();
-        setDateStr(formatDateStr(now, now));
+        setDateStr(formatDateStr(now, now, t));
       }, 60_000);
       return () => clearInterval(timer);
     }
-  }, [createdAtIso]);
+  }, [createdAtIso, t]);
 
   useEffect(() => {
     if (saving) setStatus(isAutosavingRef.current ? 'autosaving' : 'saving');
@@ -282,7 +296,7 @@ export function EntryEditor({
         setIsEditingTitle(false);
         setStatus('saved');
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
-        setDateStr(formatDateStr(created, new Date()));
+        setDateStr(formatDateStr(created, new Date(), t));
         if (isNew && onLinkQuestion) {
           for (const qId of linkedIds) {
             await onLinkQuestion(savedId, qId);
@@ -313,6 +327,7 @@ export function EntryEditor({
       onSaveComplete,
       onSaveTransition,
       createdAtIso,
+      t,
     ],
   );
 
@@ -481,7 +496,7 @@ export function EntryEditor({
             type="button"
             onClick={() => guardedNavigate('/entries/new')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="新規エントリ"
+            data-tooltip={t('toolbar.new_entry')}
           >
             <svg
               aria-hidden="true"
@@ -504,7 +519,7 @@ export function EntryEditor({
             onClick={handleSaveClick}
             disabled={saving || !content.trim()}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip="保存する"
+            data-tooltip={t('toolbar.save')}
           >
             <svg
               aria-hidden="true"
@@ -527,7 +542,7 @@ export function EntryEditor({
             onClick={handlePickleClick}
             disabled={saving || !content.trim()}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip="漬け込む"
+            data-tooltip={t('toolbar.pickle')}
           >
             <svg
               aria-hidden="true"
@@ -550,7 +565,7 @@ export function EntryEditor({
             type="button"
             onClick={() => guardedNavigate('/entries')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="一覧"
+            data-tooltip={t('toolbar.list')}
           >
             <svg
               aria-hidden="true"
@@ -572,7 +587,7 @@ export function EntryEditor({
             type="button"
             onClick={() => setStatsOpen((v) => !v)}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="執筆統計"
+            data-tooltip={t('toolbar.stats')}
           >
             <svg
               aria-hidden="true"
@@ -610,7 +625,7 @@ export function EntryEditor({
               }}
               onBlur={commitTitleEdit}
               maxLength={100}
-              placeholder="タイトルを入力..."
+              placeholder={t('title.placeholder')}
               className="w-[240px] max-w-full border-none bg-transparent text-center text-sm text-[var(--fg)] outline-none"
             />
           ) : (
@@ -620,7 +635,7 @@ export function EntryEditor({
               className="max-w-full cursor-pointer truncate border-none bg-transparent text-sm transition-colors hover:text-[var(--fg)]"
               style={{ color: title ? 'var(--fg)' : 'var(--date-color)' }}
             >
-              {title || 'タイトルを追加'}
+              {title || t('title.add')}
             </button>
           )}
         </div>
@@ -632,7 +647,7 @@ export function EntryEditor({
               role="status"
               data-testid="voice-unavailable-notice"
             >
-              {voiceStatusMessage(voiceState.reason)}
+              {voiceStatusMessage(voiceState.reason, t)}
             </span>
           )}
           {/* Voice input */}
@@ -644,7 +659,7 @@ export function EntryEditor({
                 ? 'text-red-500'
                 : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
             }`}
-            data-tooltip={voiceActive ? '音声入力停止' : '音声入力'}
+            data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
           >
             <svg
               aria-hidden="true"
@@ -662,7 +677,7 @@ export function EntryEditor({
             type="button"
             onClick={() => setSettingsOpen(!settingsOpen)}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="設定"
+            data-tooltip={t('toolbar.settings')}
           >
             <svg
               aria-hidden="true"
@@ -693,7 +708,11 @@ export function EntryEditor({
               })
             }
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={settings.writingMode === 'vertical' ? '横書きに切替' : '縦書きに切替'}
+            data-tooltip={
+              settings.writingMode === 'vertical'
+                ? t('toolbar.writing_horizontal')
+                : t('toolbar.writing_vertical')
+            }
           >
             <svg
               aria-hidden="true"
@@ -717,7 +736,9 @@ export function EntryEditor({
               })
             }
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={settings.fontFamily === 'serif' ? 'ゴシックに切替' : '明朝に切替'}
+            data-tooltip={
+              settings.fontFamily === 'serif' ? t('toolbar.font_sans') : t('toolbar.font_serif')
+            }
           >
             <svg
               aria-hidden="true"
@@ -743,7 +764,7 @@ export function EntryEditor({
             type="button"
             onClick={toggleFullscreen}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip="フルスクリーン"
+            data-tooltip={t('toolbar.fullscreen')}
           >
             <svg
               aria-hidden="true"
@@ -841,7 +862,7 @@ export function EntryEditor({
               setContent(updated);
               if (status === 'saved') setStatus('editing');
             }}
-            data-placeholder="今日は何を感じましたか？"
+            data-placeholder={t('placeholder')}
             className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
             style={{
               ...(settings.writingMode === 'vertical'
@@ -885,8 +906,12 @@ export function EntryEditor({
         open={saveModalOpen}
         initialTitle={title}
         saving={saving}
-        heading={saveModalMode === 'pickle' ? 'エントリを瓶に漬け込む' : 'エントリを保存'}
-        submitLabel={saveModalMode === 'pickle' ? '漬け込む' : '保存'}
+        heading={
+          saveModalMode === 'pickle' ? t('save_modal.heading_pickle') : t('save_modal.heading_save')
+        }
+        submitLabel={
+          saveModalMode === 'pickle' ? t('save_modal.submit_pickle') : t('save_modal.submit_save')
+        }
         onSave={(t) => {
           handleSaveWithTitle(t, saveModalMode === 'pickle' ? { fermentationEnabled: true } : {});
           if (pendingNavPath) {

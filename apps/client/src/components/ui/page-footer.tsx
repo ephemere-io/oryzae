@@ -1,23 +1,26 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 interface FooterEntry {
   match: (pathname: string) => boolean;
   label: string;
 }
 
-const FOOTER_ENTRIES: FooterEntry[] = [
-  { match: (p) => p === '/board', label: 'BOARD' },
-  { match: (p) => p === '/jar', label: 'FERMENTING' },
-  { match: (p) => p === '/entries/new' || p.startsWith('/entries/'), label: 'EDITOR' },
-  { match: (p) => p === '/entries', label: 'LIST' },
-  { match: (p) => p === '/questions', label: '問い一覧' },
-  { match: (p) => p === '/account', label: 'ACCOUNT' },
-];
+function buildEntries(questionsLabel: string): FooterEntry[] {
+  return [
+    { match: (p) => p === '/board', label: 'BOARD' },
+    { match: (p) => p === '/jar', label: 'FERMENTING' },
+    { match: (p) => p === '/entries/new' || p.startsWith('/entries/'), label: 'EDITOR' },
+    { match: (p) => p === '/entries', label: 'LIST' },
+    { match: (p) => p === '/questions', label: questionsLabel },
+    { match: (p) => p === '/account', label: 'ACCOUNT' },
+  ];
+}
 
-function resolveLabel(pathname: string): string {
-  for (const entry of FOOTER_ENTRIES) {
+function resolveLabel(pathname: string, entries: FooterEntry[]): string {
+  for (const entry of entries) {
     if (entry.match(pathname)) return entry.label;
   }
   return 'ORYZAE';
@@ -31,7 +34,9 @@ function resolveLabel(pathname: string): string {
  */
 export function PageFooter() {
   const pathname = usePathname();
-  const label = resolveLabel(pathname);
+  const t = useTranslations('footer.label');
+  const entries = buildEntries(t('questions'));
+  const label = resolveLabel(pathname, entries);
 
   return (
     <footer

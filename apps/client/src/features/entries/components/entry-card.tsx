@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { EntryKebabMenu } from './entry-kebab-menu';
 
@@ -34,6 +35,7 @@ function highlightText(text: string, query: string): ReactNode {
 }
 
 export function EntryCard({ id, content, createdAt, searchQuery, onDeleteClick }: EntryCardProps) {
+  const t = useTranslations('entries.card');
   const lines = content.split('\n').filter((l) => l.trim().length > 0);
   const title = lines[0]?.substring(0, 100) ?? '';
   const preview =
@@ -85,7 +87,7 @@ export function EntryCard({ id, content, createdAt, searchQuery, onDeleteClick }
           className="text-[10px] tracking-[0.05em] text-[var(--date-color)]"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
-          文字数: {charCount}
+          {t('char_count_label')} {charCount}
         </div>
       </Link>
       {onDeleteClick && (

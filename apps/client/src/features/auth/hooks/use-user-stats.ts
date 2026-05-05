@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
@@ -16,6 +17,7 @@ interface UserStats {
 }
 
 export function useUserStats() {
+  const t = useTranslations('stats.error');
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +34,10 @@ export function useUserStats() {
     if (res.ok) {
       setStats((await res.json()) as UserStats);
     } else {
-      setError('統計データの取得に失敗しました');
+      setError(t('fetch_failed'));
     }
     setLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchStats();

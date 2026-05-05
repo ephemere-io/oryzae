@@ -9,6 +9,7 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://localhost:3000',
+    locale: 'ja-JP',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

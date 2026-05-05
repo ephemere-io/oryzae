@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 interface SaveTitleModalProps {
@@ -18,9 +19,12 @@ export function SaveTitleModal({
   saving,
   onSave,
   onClose,
-  heading = 'エントリを保存',
-  submitLabel = '保存',
+  heading,
+  submitLabel,
 }: SaveTitleModalProps) {
+  const t = useTranslations('editor.save_modal');
+  const resolvedHeading = heading ?? t('default_heading');
+  const resolvedSubmitLabel = submitLabel ?? t('default_submit');
   const [title, setTitle] = useState(initialTitle);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +48,7 @@ export function SaveTitleModal({
   return (
     <div
       role="dialog"
-      aria-label="Save entry dialog"
+      aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
       onClick={onClose}
@@ -60,14 +64,14 @@ export function SaveTitleModal({
         style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
       >
         <h3 className="mb-4 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-          {heading}
+          {resolvedHeading}
         </h3>
         <label
           className="mb-1.5 block text-xs"
           style={{ color: 'var(--date-color)' }}
           htmlFor="entry-title"
         >
-          タイトル
+          {t('title_label')}
         </label>
         <input
           ref={inputRef}
@@ -82,7 +86,7 @@ export function SaveTitleModal({
             }
           }}
           maxLength={100}
-          placeholder="タイトルを入力..."
+          placeholder={t('title_placeholder')}
           className="mb-4 w-full rounded-md border px-3 py-2.5 text-sm outline-none"
           style={{
             backgroundColor: 'var(--bg)',
@@ -101,7 +105,7 @@ export function SaveTitleModal({
               backgroundColor: 'var(--bg)',
             }}
           >
-            キャンセル
+            {t('cancel')}
           </button>
           <button
             type="submit"
@@ -109,7 +113,7 @@ export function SaveTitleModal({
             className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
-            {saving ? '保存中...' : submitLabel}
+            {saving ? t('saving') : resolvedSubmitLabel}
           </button>
         </div>
       </form>

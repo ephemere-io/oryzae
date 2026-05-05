@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { PostHogProvider } from '@/components/posthog-provider';
 import './globals.css';
 
@@ -13,19 +15,25 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
-  title: 'Oryzae',
-  description: 'ジャーナリング支援アプリ',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('app.metadata');
+  return {
+    title: 'Oryzae',
+    description: t('description'),
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
     <html
-      lang="ja"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
@@ -36,7 +44,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--fg)]">
-        <PostHogProvider>{children}</PostHogProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <PostHogProvider>{children}</PostHogProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

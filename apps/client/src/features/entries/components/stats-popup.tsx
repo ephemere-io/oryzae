@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 interface StatsPopupProps {
   open: boolean;
   charCount: number;
@@ -10,12 +12,6 @@ interface StatsPopupProps {
 function countLines(text: string): number {
   if (!text) return 0;
   return text.split('\n').filter((l) => l.trim().length > 0).length;
-}
-
-function estimateReadingTime(charCount: number): string {
-  const minutes = charCount / 500;
-  if (minutes < 1) return '1分未満';
-  return `約${Math.ceil(minutes)}分`;
 }
 
 function countParagraphs(text: string): number {
@@ -49,11 +45,16 @@ function StatCard({ label, value }: StatCardProps) {
 }
 
 export function StatsPopup({ open, charCount, content, onClose }: StatsPopupProps) {
+  const t = useTranslations('editor.stats');
   if (!open) return null;
 
   const lines = countLines(content);
   const paragraphs = countParagraphs(content);
-  const readingTime = estimateReadingTime(charCount);
+  const minutes = charCount / 500;
+  const readingTime =
+    minutes < 1
+      ? t('reading_time_under_minute')
+      : t('reading_time_minutes', { n: Math.ceil(minutes) });
 
   return (
     <>
@@ -70,7 +71,7 @@ export function StatsPopup({ open, charCount, content, onClose }: StatsPopupProp
       {/* Dialog */}
       <div
         role="dialog"
-        aria-label="執筆統計"
+        aria-label={t('aria_label')}
         className="fixed z-[301] w-[90%] max-w-[520px] overflow-y-auto rounded-xl shadow-lg"
         style={{
           top: '50%',
@@ -83,7 +84,7 @@ export function StatsPopup({ open, charCount, content, onClose }: StatsPopupProp
       >
         <div className="mb-5 flex items-center justify-between">
           <h3 className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>
-            執筆統計
+            {t('heading')}
           </h3>
           <button
             type="button"
@@ -95,10 +96,10 @@ export function StatsPopup({ open, charCount, content, onClose }: StatsPopupProp
           </button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="文字数" value={charCount.toLocaleString()} />
-          <StatCard label="行数" value={lines} />
-          <StatCard label="段落数" value={paragraphs} />
-          <StatCard label="読了時間" value={readingTime} />
+          <StatCard label={t('label_chars')} value={charCount.toLocaleString()} />
+          <StatCard label={t('label_lines')} value={lines} />
+          <StatCard label={t('label_paragraphs')} value={paragraphs} />
+          <StatCard label={t('label_reading_time')} value={readingTime} />
         </div>
       </div>
     </>

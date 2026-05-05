@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 type WritingMode = 'vertical' | 'horizontal';
 type FontFamily = 'serif' | 'sans';
 export type TimeInscriptionMode = 'fontSize' | 'fontWeight' | 'pressureBleed';
@@ -152,6 +154,7 @@ function RadioGroup({
 }
 
 export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDrawerProps) {
+  const t = useTranslations('editor.settings');
   if (!open) return null;
 
   return (
@@ -160,7 +163,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
         type="button"
         className="fixed inset-0 z-[60] bg-black/20"
         onClick={onClose}
-        aria-label="設定を閉じる"
+        aria-label={t('close_aria')}
       />
       <div className="fixed top-0 left-0 z-[61] h-full w-80 overflow-y-auto border-r border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
         <div className="p-5">
@@ -168,10 +171,12 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
 
           {/* 基本設定 */}
           <div className="mb-5">
-            <div className="mb-2 text-xs font-semibold tracking-wider text-zinc-400">基本設定</div>
+            <div className="mb-2 text-xs font-semibold tracking-wider text-zinc-400">
+              {t('section_basic')}
+            </div>
             <Slider
               id="font-size"
-              label="文字サイズ"
+              label={t('font_size')}
               value={settings.fontSize}
               min={14}
               max={48}
@@ -180,7 +185,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
             />
             <Slider
               id="line-height"
-              label="行間サイズ"
+              label={t('line_height')}
               value={settings.lineHeight}
               min={1.0}
               max={2.5}
@@ -190,7 +195,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
             />
             <Toggle
               id="focus-mode"
-              label="フォーカスモード"
+              label={t('focus_mode')}
               checked={settings.focusModeEnabled}
               onChange={(v) => onChange({ focusModeEnabled: v })}
             />
@@ -199,13 +204,13 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
           {/* エフェクト */}
           <div>
             <div className="mb-2 text-xs font-semibold tracking-wider text-zinc-400">
-              エフェクト
+              {t('section_effects')}
             </div>
 
             {/* 時間内包 */}
             <Toggle
               id="time-inscription"
-              label="時間内包"
+              label={t('time_inscription')}
               checked={settings.timeInscriptionEnabled}
               onChange={(v) => onChange({ timeInscriptionEnabled: v })}
             />
@@ -213,9 +218,9 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
               <RadioGroup
                 name="ti-mode"
                 options={[
-                  { value: 'fontSize', label: '文字サイズ' },
-                  { value: 'fontWeight', label: '文字太さ' },
-                  { value: 'pressureBleed', label: '圧力にじみ' },
+                  { value: 'fontSize', label: t('ti_font_size') },
+                  { value: 'fontWeight', label: t('ti_font_weight') },
+                  { value: 'pressureBleed', label: t('ti_pressure_bleed') },
                 ]}
                 value={settings.timeInscriptionMode}
                 // @type-assertion-allowed: radio group onChange returns string, needs cast to union type
@@ -226,7 +231,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
             {/* 消し跡 */}
             <Toggle
               id="eraser-trace"
-              label="消し跡"
+              label={t('eraser_trace')}
               checked={settings.eraserTraceEnabled}
               onChange={(v) => onChange({ eraserTraceEnabled: v })}
             />
@@ -234,7 +239,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
             {/* 打鍵音増幅 */}
             <Toggle
               id="amp"
-              label="打鍵音増幅（ASMR）"
+              label={t('amp')}
               checked={settings.ampEnabled}
               onChange={(v) => onChange({ ampEnabled: v })}
             />
@@ -242,7 +247,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
             {/* 音量内包 */}
             <Toggle
               id="voice"
-              label="音量内包"
+              label={t('voice')}
               checked={settings.voiceEnabled}
               onChange={(v) => onChange({ voiceEnabled: v })}
             />
@@ -250,7 +255,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
             {/* ゴースト */}
             <Toggle
               id="ghost"
-              label="ゴースト"
+              label={t('ghost')}
               checked={settings.ghostEnabled}
               onChange={(v) => onChange({ ghostEnabled: v })}
             />
@@ -259,8 +264,8 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                 <RadioGroup
                   name="ghost-mode"
                   options={[
-                    { value: 'block', label: '塊（コミット時）' },
-                    { value: 'dust', label: '塵（キー毎）' },
+                    { value: 'block', label: t('ghost_block') },
+                    { value: 'dust', label: t('ghost_dust') },
                   ]}
                   value={settings.ghostMode}
                   // @type-assertion-allowed: radio group onChange returns string, needs cast to union type
@@ -269,7 +274,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                 <div className="mt-2 flex flex-col gap-0.5">
                   <Slider
                     id="ghost-size"
-                    label="サイズ"
+                    label={t('ghost_size')}
                     value={settings.ghostSize}
                     min={20}
                     max={200}
@@ -278,7 +283,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                   />
                   <Slider
                     id="ghost-scatter"
-                    label="散乱"
+                    label={t('ghost_scatter')}
                     value={settings.ghostScatter}
                     min={0}
                     max={100}
@@ -287,7 +292,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                   />
                   <Slider
                     id="ghost-blur-start"
-                    label="初期ブラー"
+                    label={t('ghost_blur_start')}
                     value={settings.ghostBlurStart}
                     min={0}
                     max={20}
@@ -297,7 +302,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                   />
                   <Slider
                     id="ghost-blur-end"
-                    label="最終ブラー"
+                    label={t('ghost_blur_end')}
                     value={settings.ghostBlurEnd}
                     min={2}
                     max={40}
@@ -307,7 +312,7 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                   />
                   <Slider
                     id="ghost-duration"
-                    label="持続時間"
+                    label={t('ghost_duration')}
                     value={settings.ghostDuration}
                     min={30}
                     max={250}
