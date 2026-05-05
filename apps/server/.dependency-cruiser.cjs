@@ -148,6 +148,39 @@ module.exports = {
       to: { path: '^src/contexts/', pathNot: ['^src/contexts/user', '^src/contexts/shared'] },
     },
 
+    // === DDD layer rules for user ===
+    {
+      name: 'user-domain-isolation',
+      comment: 'user domain must not depend on other layers',
+      severity: 'error',
+      from: { path: '^src/contexts/user/domain' },
+      to: { path: '^src/contexts/user/(application|infrastructure|presentation)' },
+    },
+    {
+      name: 'user-application-no-infra',
+      severity: 'error',
+      from: { path: '^src/contexts/user/application' },
+      to: { path: '^src/contexts/user/infrastructure' },
+    },
+    {
+      name: 'user-application-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/user/application' },
+      to: { path: '^src/contexts/user/presentation' },
+    },
+    {
+      name: 'user-infra-no-application',
+      severity: 'error',
+      from: { path: '^src/contexts/user/infrastructure' },
+      to: { path: '^src/contexts/user/application' },
+    },
+    {
+      name: 'user-infra-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/user/infrastructure' },
+      to: { path: '^src/contexts/user/presentation' },
+    },
+
     // === Analytics context isolation ===
     {
       name: 'analytics-context-isolation',
