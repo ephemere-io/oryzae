@@ -552,13 +552,30 @@
     },
     "preview": {
       "kicker": "THE APP",
-      "title": "Three places to write.",
-      "lead": "Oryzae separates the writing, the looking, and the receiving. Daily hands belong to the Editor. The weekly view belongs to the Jar.",
+      "title": "Open the places.",
+      "lead": "Write daily in the Editor. Arrange your week on the Board. Look back on it from above in the Jar. At week's end, a Letter arrives. Four places, one slow practice.",
       "editor": {
         "title": "Add a title",
         "prompt": "What did you feel today?",
         "status": "editing",
-        "caption": "Editor — a quiet vertical page, tuned for Japanese IME, generous with whitespace."
+        "effect": "EFFECT · GHOST",
+        "caption": "Editor — a quiet vertical page. Optional typing effects — drifting, ghosting, fading characters — bring a small body to keystrokes."
+      },
+      "board": {
+        "toggle": {
+          "daily": "DAILY",
+          "weekly": "WEEKLY"
+        },
+        "snippet": {
+          "1": "Forgetting, perhaps, is one form of living-with.",
+          "2": "On nukadoko, people, and the way time mixes in."
+        },
+        "entry": {
+          "title": "A design that feels the mountain",
+          "meta": "765 chars · 04-20"
+        },
+        "label": "7 cards · 5 entries · 2 snippets · 3 photos",
+        "caption": "Board — A daily and weekly canvas where entries, snippets and photos sit beside each other. Memories begin to settle through relations, not through time."
       },
       "jar": {
         "chip": {

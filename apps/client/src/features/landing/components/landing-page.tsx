@@ -303,43 +303,64 @@ function Process({ t }: { t: T }) {
 
         <article className={styles.microbe}>
           <div className={styles.microbeMark} aria-hidden="true">
+            {/* Lactobacillus — rod-shaped bacterium cluster */}
             <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect
-                x="20"
-                y="32"
-                width="60"
-                height="40"
-                rx="3"
-                fill="#FFFBE0"
-                stroke="#7A7440"
-                strokeWidth="1.5"
-                strokeOpacity="0.6"
-              />
-              <path
-                d="M 20 34 L 50 56 L 80 34"
-                fill="none"
-                stroke="#7A7440"
-                strokeWidth="1.5"
-                strokeOpacity="0.6"
-              />
-              <line
-                x1="32"
-                y1="60"
-                x2="68"
-                y2="60"
-                stroke="#7A7440"
-                strokeOpacity="0.4"
-                strokeWidth="1"
-              />
-              <line
-                x1="32"
-                y1="65"
-                x2="58"
-                y2="65"
-                stroke="#7A7440"
-                strokeOpacity="0.4"
-                strokeWidth="1"
-              />
+              <g transform="rotate(18 30 38)">
+                <rect
+                  x="14"
+                  y="34"
+                  width="34"
+                  height="8.5"
+                  rx="4.25"
+                  fill="#F4EFDD"
+                  stroke="#7A7440"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.6"
+                />
+                <ellipse cx="31" cy="38.25" rx="11" ry="1.6" fill="#9C9658" opacity="0.55" />
+              </g>
+              <g transform="rotate(-14 66 47)">
+                <rect
+                  x="48"
+                  y="43"
+                  width="36"
+                  height="8.5"
+                  rx="4.25"
+                  fill="#F4EFDD"
+                  stroke="#7A7440"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.6"
+                />
+                <ellipse cx="66" cy="47.25" rx="12.5" ry="1.6" fill="#9C9658" opacity="0.55" />
+              </g>
+              <g transform="rotate(-28 35 65)">
+                <rect
+                  x="20"
+                  y="61"
+                  width="30"
+                  height="8"
+                  rx="4"
+                  fill="#F4EFDD"
+                  stroke="#7A7440"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.6"
+                />
+                <ellipse cx="35" cy="65" rx="10" ry="1.5" fill="#9C9658" opacity="0.55" />
+              </g>
+              <g transform="rotate(8 65 71)">
+                <rect
+                  x="51"
+                  y="67"
+                  width="28"
+                  height="7.5"
+                  rx="3.75"
+                  fill="#F4EFDD"
+                  stroke="#7A7440"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.6"
+                />
+                <ellipse cx="65" cy="70.75" rx="9" ry="1.4" fill="#9C9658" opacity="0.55" />
+              </g>
             </svg>
           </div>
           <p className={styles.microbeStep}>02</p>
@@ -393,7 +414,7 @@ function Preview({ t }: { t: T }) {
       </div>
 
       <div className={styles.previews}>
-        <figure className={styles.previewCard}>
+        <figure className={`${styles.previewCard} ${styles.previewEditor}`}>
           <div className={styles.windowEl}>
             <div className={styles.windowRail}>
               <div className={styles.railBrand}>ORYZAE</div>
@@ -412,17 +433,199 @@ function Preview({ t }: { t: T }) {
               </div>
               <div className={styles.verticalPane}>
                 <p className={styles.verticalText}>{t('preview.editor.prompt')}</p>
+                <span className={`${styles.ghostChar} ${styles.ghostChar1}`} aria-hidden="true">
+                  は
+                </span>
+                <span className={`${styles.ghostChar} ${styles.ghostChar2}`} aria-hidden="true">
+                  じ
+                </span>
+                <span className={`${styles.ghostChar} ${styles.ghostChar3}`} aria-hidden="true">
+                  め
+                </span>
               </div>
               <div className={styles.windowFoot}>
-                <span>{t('preview.editor.status')}</span>
-                <span>0 CHARS</span>
+                <span className={styles.footStatus}>{t('preview.editor.status')}</span>
+                <span className={styles.footEffect}>
+                  <span className={styles.effectDot} aria-hidden="true" />
+                  <span>{t('preview.editor.effect')}</span>
+                </span>
+                <span className={styles.footCount}>0 CHARS</span>
               </div>
             </div>
           </div>
           <figcaption>{t('preview.editor.caption')}</figcaption>
         </figure>
 
-        <figure className={styles.previewCard}>
+        <figure className={`${styles.previewCard} ${styles.previewBoard}`}>
+          <div className={styles.windowEl}>
+            <div className={`${styles.windowRail} ${styles.railMini}`}>
+              <div className={styles.railIcons}>
+                <div className={styles.railIcon} />
+                <div className={`${styles.railIcon} ${styles.railIconActive}`} />
+                <div className={styles.railIcon} />
+                <div className={styles.railIcon} />
+              </div>
+            </div>
+            <div className={`${styles.windowBody} ${styles.windowBodyBoard}`}>
+              <div className={styles.boardToolbar}>
+                <span className={styles.boardDate}>2026.5.3 — 日曜日</span>
+                <div className={styles.boardToggle}>
+                  <span className={`${styles.btPill} ${styles.btPillActive}`}>
+                    {t('preview.board.toggle.daily')}
+                  </span>
+                  <span className={styles.btPill}>{t('preview.board.toggle.weekly')}</span>
+                </div>
+              </div>
+              <div className={styles.boardCanvas} aria-hidden="true">
+                <svg
+                  className={styles.boardGrid}
+                  viewBox="0 0 400 280"
+                  xmlns="http://www.w3.org/2000/svg"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <defs>
+                    <pattern
+                      id="lpDotgrid"
+                      x="0"
+                      y="0"
+                      width="14"
+                      height="14"
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <circle cx="1" cy="1" r="0.5" fill="#7A7440" fillOpacity="0.18" />
+                    </pattern>
+                  </defs>
+                  <rect width="400" height="280" fill="url(#lpDotgrid)" />
+                </svg>
+
+                <div className={`${styles.bcard} ${styles.bcardPhoto} ${styles.bp1}`}>
+                  <svg
+                    viewBox="0 0 60 44"
+                    preserveAspectRatio="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <defs>
+                      <linearGradient id="lpPhoto1" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="#F4E8C9" />
+                        <stop offset="0.55" stopColor="#D9C994" />
+                        <stop offset="1" stopColor="#9C9658" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="60" height="44" fill="url(#lpPhoto1)" />
+                    <circle cx="46" cy="14" r="4" fill="#F2EDE0" opacity="0.85" />
+                    <path
+                      d="M 0 32 L 14 26 L 28 30 L 42 24 L 60 30 L 60 44 L 0 44 Z"
+                      fill="#5C4F3F"
+                      opacity="0.35"
+                    />
+                  </svg>
+                </div>
+
+                <div className={`${styles.bcard} ${styles.bcardSnippet} ${styles.bs1}`}>
+                  <span className={styles.bsQuote}>“</span>
+                  <span className={styles.bsText}>{t('preview.board.snippet.1')}</span>
+                </div>
+
+                <div className={`${styles.bcard} ${styles.bcardEntry} ${styles.be1}`}>
+                  <span className={styles.beTitle}>{t('preview.board.entry.title')}</span>
+                  <span className={styles.beLine} />
+                  <span className={styles.beLine} />
+                  <span className={`${styles.beLine} ${styles.beLineShort}`} />
+                  <span className={styles.beMeta}>{t('preview.board.entry.meta')}</span>
+                </div>
+
+                <div className={`${styles.bcard} ${styles.bcardPhoto} ${styles.bp2}`}>
+                  <svg
+                    viewBox="0 0 60 44"
+                    preserveAspectRatio="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <defs>
+                      <linearGradient id="lpPhoto2" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stopColor="#E2DCBE" />
+                        <stop offset="1" stopColor="#7A7440" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="60" height="44" fill="url(#lpPhoto2)" />
+                    <path
+                      d="M 8 38 Q 18 18 28 28 Q 36 36 48 22 L 48 44 L 8 44 Z"
+                      fill="#5C4F3F"
+                      opacity="0.4"
+                    />
+                  </svg>
+                </div>
+
+                <div className={`${styles.bcard} ${styles.bcardSnippet} ${styles.bs2}`}>
+                  <span className={styles.bsQuote}>“</span>
+                  <span className={styles.bsText}>{t('preview.board.snippet.2')}</span>
+                </div>
+
+                <div className={`${styles.bcard} ${styles.bcardPhoto} ${styles.bp3}`}>
+                  <svg
+                    viewBox="0 0 60 44"
+                    preserveAspectRatio="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <defs>
+                      <linearGradient id="lpPhoto3" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="#FBF6E5" />
+                        <stop offset="1" stopColor="#C8B989" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="60" height="44" fill="url(#lpPhoto3)" />
+                    <circle cx="30" cy="22" r="9" fill="#E8B838" opacity="0.55" />
+                  </svg>
+                </div>
+
+                <svg
+                  className={styles.boardThreads}
+                  viewBox="0 0 400 280"
+                  preserveAspectRatio="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <line
+                    x1="80"
+                    y1="60"
+                    x2="200"
+                    y2="120"
+                    stroke="#7A7440"
+                    strokeOpacity="0.2"
+                    strokeDasharray="2 3"
+                  />
+                  <line
+                    x1="200"
+                    y1="120"
+                    x2="320"
+                    y2="80"
+                    stroke="#7A7440"
+                    strokeOpacity="0.2"
+                    strokeDasharray="2 3"
+                  />
+                  <line
+                    x1="200"
+                    y1="120"
+                    x2="120"
+                    y2="200"
+                    stroke="#7A7440"
+                    strokeOpacity="0.2"
+                    strokeDasharray="2 3"
+                  />
+                </svg>
+              </div>
+              <div className={styles.boardFoot}>
+                <span>{t('preview.board.label')}</span>
+              </div>
+            </div>
+          </div>
+          <figcaption>{t('preview.board.caption')}</figcaption>
+        </figure>
+
+        <figure className={`${styles.previewCard} ${styles.previewJar}`}>
           <div className={styles.windowEl}>
             <div className={`${styles.windowRail} ${styles.railMini}`}>
               <div className={styles.railIcons}>
