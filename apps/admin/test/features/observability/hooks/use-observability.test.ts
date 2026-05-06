@@ -23,6 +23,7 @@ describe('useObservability', () => {
     const summaryBody = {
       sentry: { unresolvedCount: 3 },
       gateway: { monthlySpend: 1.5, monthlyRequests: 10, creditBalance: '8.5', creditUsed: '1.5' },
+      resend: { sentCount7d: 12, bouncedCount7d: 1 },
       upstash: { totalKeys: 42 },
       vercel: { latestDeployState: 'READY' },
     };
@@ -41,6 +42,8 @@ describe('useObservability', () => {
     expect(result.current.data?.posthog?.totalPageviews).toBe(1234);
     expect(result.current.data?.sentry.unresolvedCount).toBe(3);
     expect(result.current.data?.gateway.monthlySpend).toBe(1.5);
+    expect(result.current.data?.resend.sentCount7d).toBe(12);
+    expect(result.current.data?.resend.bouncedCount7d).toBe(1);
     expect(result.current.error).toBeNull();
   });
 
