@@ -9,16 +9,21 @@ import { useActiveQuestions } from '@/features/entry-questions/hooks/use-entry-q
 
 export default function NewEntryPage() {
   const { api, auth, loading } = useAuth();
-  const activeQuestions = useActiveQuestions(api, loading);
   const runTransition = useSaveTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const questionIdParam = searchParams.get('questionId');
+
+  // Passing questionIdParam as refetchKey ensures the active-questions list refreshes
+  // when this page is already mounted and the URL changes (e.g. onboarding adds a question
+  // and redirects with ?questionId=...).
+  const activeQuestions = useActiveQuestions(api, loading, questionIdParam ?? undefined);
 
   // Pre-link question from query param (e.g. /entries/new?questionId=xxx)
-  const initialLinkedIds = useMemo(() => {
-    const qId = searchParams.get('questionId');
-    return qId ? [qId] : [];
-  }, [searchParams]);
+  const initialLinkedIds = useMemo(
+    () => (questionIdParam ? [questionIdParam] : []),
+    [questionIdParam],
+  );
 
   async function handleLinkQuestion(entryId: string, questionId: string) {
     if (!api) return;

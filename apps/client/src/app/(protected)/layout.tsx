@@ -19,8 +19,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   const handleOnboardingComplete = useCallback(
     async (result: OnboardingResult) => {
-      await complete(result);
-      router.push('/entries/new');
+      const { questionId } = await complete(result);
+      // Pass questionId so it pre-links AND triggers a refetch even when
+      // /entries/new is already mounted (post-login redirect lands here first).
+      const target = questionId ? `/entries/new?questionId=${questionId}` : '/entries/new';
+      router.push(target);
     },
     [complete, router],
   );
