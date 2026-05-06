@@ -97,6 +97,58 @@ describe('useAuth', () => {
     expect(result.current.auth).toBeNull();
   });
 
+  it('signup forwards locale to the API so confirmation emails match user language', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        user: {
+          id: 'u3',
+          email: 'c@d.com',
+          nickname: 'enuser',
+          avatarUrl: null,
+          name: null,
+          providers: ['email'],
+        },
+        session: null,
+      }),
+    );
+
+    const { result } = renderHook(() => useAuth());
+
+    await act(async () => {
+      await result.current.signup('enuser', 'c@d.com', 'pass', 'en');
+    });
+
+    const [, init] = mockFetch.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.locale).toBe('en');
+  });
+
+  it('signup omits locale when caller does not provide one', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        user: {
+          id: 'u4',
+          email: 'd@e.com',
+          nickname: 'defaultuser',
+          avatarUrl: null,
+          name: null,
+          providers: ['email'],
+        },
+        session: null,
+      }),
+    );
+
+    const { result } = renderHook(() => useAuth());
+
+    await act(async () => {
+      await result.current.signup('defaultuser', 'd@e.com', 'pass');
+    });
+
+    const [, init] = mockFetch.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.locale).toBeUndefined();
+  });
+
   it('logout clears tokens and resets state', async () => {
     const session = { accessToken: 'at', refreshToken: 'rt' };
     const user = {

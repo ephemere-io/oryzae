@@ -7,6 +7,12 @@
       "authenticating": "Authenticating...",
       "loading": "Loading..."
     },
+    "confirm": {
+      "processing": "Confirming...",
+      "error_invalid_link": "This link is invalid. Please try again.",
+      "error_failed": "Confirmation failed. The link may have expired.",
+      "back_to_login": "Back to login"
+    },
     "forgot_password": {
       "sent_heading": "Check your email",
       "sent_body": "A password reset link has been sent to this address. Click the link in the email to set a new password.",

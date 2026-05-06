@@ -1,23 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
 import { createApiClient } from '@/lib/api';
+import { getAccessToken } from '@/lib/auth';
 
 function ResetPasswordHandler() {
   const t = useTranslations('auth.reset_password');
   const tErr = useTranslations('auth.error');
-  const searchParams = useSearchParams();
   const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // /auth/confirm で verifyOtp 完了 → セッションが localStorage に保存済みの想定。
+  // SSR では localStorage を参照できないので useEffect で取得して状態に反映する。
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [tokenChecked, setTokenChecked] = useState(false);
 
-  const accessToken = searchParams.get('access_token');
+  useEffect(() => {
+    setAccessToken(getAccessToken());
+    setTokenChecked(true);
+  }, []);
+
+  if (!tokenChecked) {
+    return <p className="text-sm text-center text-zinc-500">{t('loading')}</p>;
+  }
 
   if (!accessToken) {
     return (

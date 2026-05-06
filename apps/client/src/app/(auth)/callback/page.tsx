@@ -27,13 +27,17 @@ function CallbackHandler() {
 
   useEffect(() => {
     async function handleCallback() {
-      // Supabase PKCE flow: code in query params
+      // Supabase PKCE flow: code in query params.
+      // locale はサインアップフォーム / GoogleLoginButton から redirectTo 経由で運ばれてきた値。
+      // 初回 OAuth サインインで user_metadata.locale を保存するために、サーバーへ伝搬する。
       const code = searchParams.get('code');
       if (code) {
+        const localeParam = searchParams.get('locale');
+        const locale = localeParam === 'ja' || localeParam === 'en' ? localeParam : undefined;
         const client = createApiClient();
         const res = await client.fetch('/api/v1/auth/oauth/callback', {
           method: 'POST',
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, locale }),
         });
 
         if (!res.ok) {

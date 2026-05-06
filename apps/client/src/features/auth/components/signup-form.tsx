@@ -2,15 +2,21 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/auth/components/google-login-button';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
 
+function isSupportedLocale(value: string): value is 'ja' | 'en' {
+  return value === 'ja' || value === 'en';
+}
+
 export function SignupForm() {
   const t = useTranslations('auth.signup');
   const tErr = useTranslations('auth.error');
+  const localeRaw = useLocale();
+  const locale = isSupportedLocale(localeRaw) ? localeRaw : 'ja';
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,7 +38,7 @@ export function SignupForm() {
 
     setLoading(true);
 
-    const err = await signup(nickname, email, password);
+    const err = await signup(nickname, email, password, locale);
     if (err) {
       setError(translateAuthError(err, tErr));
       setLoading(false);
