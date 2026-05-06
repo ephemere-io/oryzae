@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type EditorStatus,
@@ -97,12 +97,13 @@ export function EntryEditor({
   onSaveTransition,
 }: EntryEditorProps) {
   const t = useTranslations('editor');
+  const locale = useLocale();
   // For existing entries, split first line as title
   const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
-  const [settings, updateSettings] = useEditorSettings();
+  const [settings, updateSettings] = useEditorSettings(locale);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');

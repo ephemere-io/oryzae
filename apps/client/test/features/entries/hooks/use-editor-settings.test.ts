@@ -21,6 +21,24 @@ describe('useEditorSettings', () => {
     expect(result.current[0]).toEqual(DEFAULT_SETTINGS);
   });
 
+  it('defaults writingMode to vertical for ja locale', () => {
+    const { result } = renderHook(() => useEditorSettings('ja'));
+    expect(result.current[0].writingMode).toBe('vertical');
+  });
+
+  it('defaults writingMode to horizontal for en locale (issue #269)', () => {
+    const { result } = renderHook(() => useEditorSettings('en'));
+    expect(result.current[0].writingMode).toBe('horizontal');
+    // 他のフィールドは DEFAULT_SETTINGS のまま
+    expect(result.current[0].fontSize).toBe(DEFAULT_SETTINGS.fontSize);
+    expect(result.current[0].lineHeight).toBe(DEFAULT_SETTINGS.lineHeight);
+  });
+
+  it('falls back to DEFAULT_SETTINGS.writingMode when locale is undefined', () => {
+    const { result } = renderHook(() => useEditorSettings(undefined));
+    expect(result.current[0].writingMode).toBe(DEFAULT_SETTINGS.writingMode);
+  });
+
   it('initializes fontSize from localStorage when stored', () => {
     window.localStorage.setItem(FONT_SIZE_KEY, '16');
     const { result } = renderHook(() => useEditorSettings());
