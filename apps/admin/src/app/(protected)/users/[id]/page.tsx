@@ -6,15 +6,22 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { UserEntryList } from '@/features/users/components/user-entry-list';
 import { UserFermentationHistory } from '@/features/users/components/user-fermentation-history';
+import { UserFermentationReadiness } from '@/features/users/components/user-fermentation-readiness';
 import { UserProfileHeader } from '@/features/users/components/user-profile-header';
 import { UserQuestionList } from '@/features/users/components/user-question-list';
 import { WritingHeatmap } from '@/features/users/components/writing-heatmap';
+import { useFermentationReadiness } from '@/features/users/hooks/use-fermentation-readiness';
 import { useUserDetail } from '@/features/users/hooks/use-user-detail';
 
 export default function UserDetailPage() {
   const params = useParams();
   const userId = typeof params.id === 'string' ? params.id : '';
   const { data, loading, error } = useUserDetail(userId);
+  const {
+    data: readiness,
+    loading: readinessLoading,
+    error: readinessError,
+  } = useFermentationReadiness(userId);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>;
@@ -46,6 +53,12 @@ export default function UserDetailPage() {
       </Link>
 
       <UserProfileHeader profile={data.profile} />
+
+      <UserFermentationReadiness
+        readiness={readiness}
+        loading={readinessLoading}
+        error={readinessError}
+      />
 
       <WritingHeatmap entryDates={data.entryDates} />
 

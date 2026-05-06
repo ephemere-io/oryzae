@@ -7,21 +7,32 @@ import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastru
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
+import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
+import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
 import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
 import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
-import { getFermentationTargetDateKey } from './cron-target-date.js';
+import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
 
+// issue #268 以降、発火条件は時刻ベース (lastRunAt + ランダム X 時間 + 文字数閾値) で
+// 評価される。dateKey は手動トリガーの「シミュレート時刻」として残し、JST midnight of
+// (dateKey + 1日) に発火した場合の挙動を再現する。省略時は現時刻。
 const triggerScheduledSchema = z.object({
   dateKey: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'dateKey must be in YYYY-MM-DD format')
     .optional(),
 });
+
+function dateKeyToSimulatedNow(dateKey: string): Date {
+  // JST 03:00 (= UTC 18:00) に cron が「JST 前日」を処理する旧仕様を再現:
+  // dateKey = "2026-04-13" のとき、シミュレート時刻 = 2026-04-13T18:00:00Z (JST 04-14 03:00)。
+  return new Date(`${dateKey}T18:00:00.000Z`);
+}
 
 type Env = {
   Variables: {
@@ -392,14 +403,15 @@ export const adminFermentations = new Hono<Env>()
     const supabase = c.get('adminSupabase');
     const body = triggerScheduledSchema.parse(await c.req.json().catch(() => ({})));
 
-    // 省略時は cron と同じ「JST 前日」
-    const dateKey = body.dateKey ?? getFermentationTargetDateKey(new Date());
+    const now = body.dateKey ? dateKeyToSimulatedNow(body.dateKey) : new Date();
 
     const entryRepo = new SupabaseEntryRepository(supabase);
     const questionRepo = new SupabaseQuestionRepository(supabase);
     const questionTransactionRepo = new SupabaseQuestionTransactionRepository(supabase);
     const entryQuestionLinkRepo = new SupabaseEntryQuestionLinkRepository(supabase);
     const fermentationRepo = new SupabaseFermentationRepository(supabase);
+    const userStateRepo = new SupabaseUserFermentationStateRepository(supabase);
+    const localeResolver = new SupabaseUserLocaleResolver(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
 
     const listActiveUserIds = async (): Promise<string[]> => {
@@ -419,13 +431,15 @@ export const adminFermentations = new Hono<Env>()
       questionTransactionRepo,
       entryQuestionLinkRepo,
       fermentationRepo,
+      userStateRepo,
+      localeResolver,
       llmGateway,
       () => crypto.randomUUID(),
       listActiveUserIds,
       (userId, titles) => digestUsecase.execute({ userId, questionTitles: titles }),
     );
 
-    const result = await usecase.execute(dateKey);
+    const result = await usecase.execute(now);
 
     // Notify Discord if there were failures
     if (result.failed > 0) {
@@ -433,7 +447,8 @@ export const adminFermentations = new Hono<Env>()
         title: 'スケジュール発酵 — 失敗あり',
         color: COLORS.WARNING,
         fields: [
-          { name: '対象日', value: dateKey, inline: true },
+          { name: '評価時刻', value: now.toISOString(), inline: true },
+          { name: '対象ユーザー', value: String(result.totalUsers), inline: true },
           { name: '成功', value: String(result.succeeded), inline: true },
           { name: '失敗', value: String(result.failed), inline: true },
           {
@@ -448,7 +463,21 @@ export const adminFermentations = new Hono<Env>()
       });
     }
 
-    return c.json({ dateKey, ...result });
+    return c.json({ now: now.toISOString(), ...result });
+  })
+  .get('/readiness/:userId', async (c) => {
+    // issue #268: admin ダッシュボードでユーザーの発火条件をその時点で表示する。
+    const supabase = c.get('adminSupabase');
+    const userId = c.req.param('userId');
+
+    const usecase = new GetFermentationReadinessUsecase(
+      new SupabaseEntryRepository(supabase),
+      new SupabaseUserFermentationStateRepository(supabase),
+      new SupabaseUserLocaleResolver(supabase),
+    );
+
+    const readiness = await usecase.execute(userId);
+    return c.json(readiness);
   })
   .post('/:id/retry', async (c) => {
     const supabase = c.get('adminSupabase');
