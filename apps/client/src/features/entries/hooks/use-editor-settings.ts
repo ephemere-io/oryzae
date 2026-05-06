@@ -83,8 +83,11 @@ function writeStoredFocusMode(value: boolean): void {
   }
 }
 
-function getInitialSettings(): EditorSettings {
+function getInitialSettings(locale: string | undefined): EditorSettings {
   const next: EditorSettings = { ...DEFAULT_SETTINGS };
+  // 英語ロケールでサインアップ／利用しているユーザーは横書きをデフォルトにする (issue #269)
+  // 縦書きは日本語ジャーナリングを念頭にした既定値で、英語話者には不自然なため。
+  if (locale === 'en') next.writingMode = 'horizontal';
   const fontSize = readStoredFontSize();
   if (fontSize !== null) next.fontSize = fontSize;
   const lineHeight = readStoredLineHeight();
@@ -94,8 +97,10 @@ function getInitialSettings(): EditorSettings {
   return next;
 }
 
-export function useEditorSettings(): [EditorSettings, (patch: Partial<EditorSettings>) => void] {
-  const [settings, setSettings] = useState<EditorSettings>(getInitialSettings);
+export function useEditorSettings(
+  locale?: string,
+): [EditorSettings, (patch: Partial<EditorSettings>) => void] {
+  const [settings, setSettings] = useState<EditorSettings>(() => getInitialSettings(locale));
 
   const updateSettings = useCallback((patch: Partial<EditorSettings>) => {
     if (typeof patch.fontSize === 'number') {
