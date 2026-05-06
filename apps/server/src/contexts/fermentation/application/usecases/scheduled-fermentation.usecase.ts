@@ -5,16 +5,33 @@ import type { QuestionRepositoryGateway } from '../../../question/domain/gateway
 import type { QuestionTransactionRepositoryGateway } from '../../../question/domain/gateways/question-transaction-repository.gateway.js';
 import type { FermentationRepositoryGateway } from '../../domain/gateways/fermentation-repository.gateway.js';
 import type { LlmAnalysisGateway } from '../../domain/gateways/llm-analysis.gateway.js';
+import type { UserFermentationStateRepositoryGateway } from '../../domain/gateways/user-fermentation-state-repository.gateway.js';
+import type { UserLocaleResolverGateway } from '../../domain/gateways/user-locale-resolver.gateway.js';
+import { UserFermentationState } from '../../domain/models/user-fermentation-state.js';
+import {
+  evaluateEligibility,
+  rollRandomHours,
+} from '../../domain/services/fermentation-eligibility.service.js';
 import { RunFermentationUsecase } from './run-fermentation.usecase.js';
 
 interface ScheduledFermentationResult {
   totalUsers: number;
+  eligibleUsers: number;
   totalFermentations: number;
   succeeded: number;
   failed: number;
   errors: Array<{ userId: string; questionId: string; error: string }>;
 }
 
+// 発酵プロセス自動発火 (issue #268)。
+// 一日一回、cron から呼ばれる。各ユーザーごとに以下を実施する:
+//   1. ロケール解決 (Supabase Auth user_metadata.locale → 'ja' or 'en')
+//   2. user_fermentation_state を読む (新規使用者は initial())
+//   3. 文字数を集計 (lastRunAt 以降、または全期間)
+//   4. evaluateEligibility() で eligible 判定 + readinessScore 計算
+//   5. readinessScore と charsSinceLast を毎回 DB に upsert (admin/UI 反映用)
+//   6. eligible なら fermentation_enabled=true のエントリで紐付く問いごとに発酵実行
+//   7. 1問でも実行されたら次回 X 時間 (24-168h) を再ロールして state を更新
 export class ScheduledFermentationUsecase {
   constructor(
     private entryRepo: EntryRepositoryGateway,
@@ -22,35 +39,29 @@ export class ScheduledFermentationUsecase {
     private questionTransactionRepo: QuestionTransactionRepositoryGateway,
     private entryQuestionLinkRepo: EntryQuestionLinkRepositoryGateway,
     private fermentationRepo: FermentationRepositoryGateway,
+    private userStateRepo: UserFermentationStateRepositoryGateway,
+    private localeResolver: UserLocaleResolverGateway,
     private llmGateway: LlmAnalysisGateway,
     private generateId: () => string,
     private listActiveUserIds: () => Promise<string[]>,
     private sendDigest: (userId: string, questionTitles: string[]) => Promise<void>,
+    // 次回 X 時間生成器。テストでは固定値を注入して決定論的にする。
+    private rollHours: () => number = rollRandomHours,
   ) {}
 
-  async execute(dateKey: string): Promise<ScheduledFermentationResult> {
+  async execute(now: Date = new Date()): Promise<ScheduledFermentationResult> {
     const result: ScheduledFermentationResult = {
       totalUsers: 0,
+      eligibleUsers: 0,
       totalFermentations: 0,
       succeeded: 0,
       failed: 0,
       errors: [],
     };
 
-    // 1. Find users who wrote entries on the given date
     const userIds = await this.listActiveUserIds();
-    const usersWithEntries: Array<{ userId: string; entries: Entry[] }> = [];
+    result.totalUsers = userIds.length;
 
-    for (const userId of userIds) {
-      const entries = await this.entryRepo.listFermentationEnabledByUserIdAndDate(userId, dateKey);
-      if (entries.length > 0) {
-        usersWithEntries.push({ userId, entries });
-      }
-    }
-
-    result.totalUsers = usersWithEntries.length;
-
-    // 2. For each user, run fermentation per active question using only entries linked to that question
     const runUsecase = new RunFermentationUsecase(
       this.fermentationRepo,
       this.llmGateway,
@@ -59,15 +70,52 @@ export class ScheduledFermentationUsecase {
 
     const successfulTitlesByUser = new Map<string, string[]>();
 
-    for (const { userId, entries } of usersWithEntries) {
+    for (const userId of userIds) {
+      // 1. ロケール解決 (失敗時は 'ja')
+      const language = await this.localeResolver.resolve(userId);
+
+      // 2. 既存 state を取得 (新規なら null)
+      const existing = await this.userStateRepo.findByUserId(userId);
+      const state = existing ?? UserFermentationState.initial(userId, now);
+      const sinceIso = existing?.lastRunAt ?? null;
+
+      // 3. 文字数集計
+      const totalChars = await this.entryRepo.countCharsByUserIdSince(userId, sinceIso);
+
+      // 4. eligible 判定 + readiness 計算
+      const evaluation = evaluateEligibility({
+        state: existing,
+        totalChars,
+        language,
+        now,
+      });
+
+      // 5. 毎回 readiness を DB に反映 (eligible でなくても admin/UI に必要)
+      const readinessUpdate = state.withReadiness(totalChars, evaluation.readinessScore, now);
+      const stateWithReadiness = readinessUpdate.success ? readinessUpdate.value : state;
+      await this.userStateRepo.upsert(stateWithReadiness);
+
+      if (!evaluation.eligible) continue;
+
+      // 6. 発火対象のエントリを取得 (lastRunAt 以降の fermentation_enabled=true)
+      const fermentationEnabledEntries = await this.entryRepo.listFermentationEnabledByUserIdSince(
+        userId,
+        sinceIso,
+      );
+      if (fermentationEnabledEntries.length === 0) continue;
+
       const activeQuestions = await this.questionRepo.listActiveByUserId(userId);
       if (activeQuestions.length === 0) continue;
+
+      let firedAtLeastOne = false;
 
       for (const question of activeQuestions) {
         const linkedEntryIds = new Set(
           await this.entryQuestionLinkRepo.listEntryIdsByQuestionId(question.id),
         );
-        const questionEntries = entries.filter((e) => linkedEntryIds.has(e.toProps().id));
+        const questionEntries = fermentationEnabledEntries.filter((e: Entry) =>
+          linkedEntryIds.has(e.toProps().id),
+        );
         if (questionEntries.length === 0) continue;
 
         result.totalFermentations++;
@@ -90,11 +138,13 @@ export class ScheduledFermentationUsecase {
             entries: runEntries,
           });
           result.succeeded++;
+          firedAtLeastOne = true;
           const titles = successfulTitlesByUser.get(userId) ?? [];
           titles.push(questionText);
           successfulTitlesByUser.set(userId, titles);
         } catch (error) {
           result.failed++;
+          firedAtLeastOne = true;
           result.errors.push({
             userId,
             questionId: question.id,
@@ -102,9 +152,19 @@ export class ScheduledFermentationUsecase {
           });
         }
       }
+
+      // 7. 1問でも発火していたら次回 X 時間を再ロールして state を更新。
+      // 発火しなかった (= eligible だが fermentation_enabled エントリ or 紐付け問いが
+      // 無かった) ユーザーは lastRunAt を進めず、再度書いたタイミングで判定される。
+      if (firedAtLeastOne) {
+        result.eligibleUsers++;
+        const fired = stateWithReadiness.withFired(this.rollHours(), now);
+        if (fired.success) {
+          await this.userStateRepo.upsert(fired.value);
+        }
+      }
     }
 
-    // 3. Send one digest email per user for their successful fermentations.
     for (const [userId, titles] of successfulTitlesByUser) {
       try {
         await this.sendDigest(userId, titles);

@@ -73,6 +73,40 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
+  async listFermentationEnabledByUserIdSince(
+    userId: string,
+    sinceIso: string | null,
+  ): Promise<Entry[]> {
+    let query = this.supabase
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('fermentation_enabled', true)
+      .order('created_at', { ascending: true });
+
+    if (sinceIso) {
+      query = query.gt('created_at', sinceIso);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
+  async countCharsByUserIdSince(userId: string, sinceIso: string | null): Promise<number> {
+    let query = this.supabase.from('entries').select('content').eq('user_id', userId);
+    if (sinceIso) query = query.gt('created_at', sinceIso);
+    const { data, error } = await query;
+    if (error) throw error;
+    // grapheme ではなくコードポイント単位でカウントする (日本語1000字/英語500字の閾値は
+    // どちらも「文字」=コードポイント解釈で issue 仕様に十分近い)。サロゲートペアは
+    // [...str].length で正しく1扱いされる。
+    return (data ?? []).reduce(
+      (sum, row: { content: string | null }) => sum + (row.content ? [...row.content].length : 0),
+      0,
+    );
+  }
+
   async listByUserIdAndWeek(userId: string, dateKey: string): Promise<Entry[]> {
     // Calculate Monday of the week containing dateKey
     const d = new Date(`${dateKey}T00:00:00.000Z`);
