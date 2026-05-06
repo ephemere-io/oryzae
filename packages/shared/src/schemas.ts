@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+/**
+ * メール文面などサーバー側で使うユーザーのロケール。
+ * クライアントの next-intl `useLocale()` 値を Supabase の user_metadata に保存して、
+ * 確認メール・再設定メールなどのテンプレートで言語分岐に使う。
+ */
+export const localeSchema = z.enum(['ja', 'en']);
+export type LocaleCode = z.infer<typeof localeSchema>;
+
 export const createEntrySchema = z.object({
   content: z.string(),
   mediaUrls: z.array(z.string()).default([]),
@@ -26,6 +34,38 @@ export const signupSchema = z.object({
     .regex(/^[a-zA-Z0-9_-]+$/, '英数字、ハイフン、アンダースコアのみ使用可能'),
   email: z.string().email(),
   password: z.string().min(6),
+  locale: localeSchema.optional(),
+});
+
+export const oauthInitSchema = z.object({
+  redirectTo: z.string().url(),
+  locale: localeSchema.optional(),
+});
+
+export const oauthCallbackSchema = z.object({
+  code: z.string(),
+  locale: localeSchema.optional(),
+});
+
+/**
+ * Supabase Auth のメール確認系トークンタイプ。
+ * Microsoft (Outlook) は差出人ドメインとリンク先ドメインが乖離していると
+ * メールをサイレントに破棄する。{{ .ConfirmationURL }} だと supabase.co を
+ * 指してしまうため、{{ .TokenHash }} + 自社ドメイン経由の verifyOtp フローに
+ * 切り替え、リンクドメインを oryzae.ephemere.io に揃えている。
+ */
+export const emailOtpTypeSchema = z.enum([
+  'signup',
+  'invite',
+  'magiclink',
+  'recovery',
+  'email_change',
+]);
+export type EmailOtpType = z.infer<typeof emailOtpTypeSchema>;
+
+export const verifyOtpSchema = z.object({
+  tokenHash: z.string().min(1),
+  type: emailOtpTypeSchema,
 });
 
 export const loginSchema = z.object({
