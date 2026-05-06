@@ -5,6 +5,7 @@ import { ExtractedSnippet } from '../../domain/models/extracted-snippet.js';
 import { FermentationResult } from '../../domain/models/fermentation-result.js';
 import { Keyword } from '../../domain/models/keyword.js';
 import { Letter } from '../../domain/models/letter.js';
+import type { FermentationLanguage } from '../../domain/services/fermentation-eligibility.service.js';
 import { LlmAnalysisError } from '../errors/fermentation.errors.js';
 
 interface RunFermentationEntry {
@@ -24,10 +25,14 @@ export class RunFermentationUsecase {
     questionId: string;
     questionText: string;
     entries: RunFermentationEntry[];
+    // 出力言語 (issue #279)。呼び出し側で UserLocaleResolver を使って解決する。
+    // 未指定時のデフォルトは 'ja' (Oryzae のメインターゲット)。
+    language?: FermentationLanguage;
   }): Promise<{ id: string }> {
     if (params.entries.length === 0) {
       throw new LlmAnalysisError('At least one entry is required');
     }
+    const language: FermentationLanguage = params.language ?? 'ja';
 
     const today = new Date().toISOString().slice(0, 10);
     const targetPeriod = today;
@@ -68,6 +73,7 @@ export class RunFermentationUsecase {
         entryContent: combinedContent,
         targetPeriod,
         userId: params.userId,
+        language,
       });
 
       // 3.5. Track generation ID for cost tracking

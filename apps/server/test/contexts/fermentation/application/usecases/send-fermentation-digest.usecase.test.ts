@@ -101,4 +101,61 @@ describe('SendFermentationDigestUsecase', () => {
       'Qについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\nhttps://oryzae-client.vercel.app/jar',
     );
   });
+
+  describe('issue #279: language switching', () => {
+    it('uses English subject and single-title body when language="en"', async () => {
+      const notifier = mockNotifier();
+      const usecase = new SendFermentationDigestUsecase(
+        notifier,
+        vi.fn().mockResolvedValue('user@example.com'),
+      );
+
+      await usecase.execute({
+        userId: 'u1',
+        questionTitles: ['Why do I work?'],
+        language: 'en',
+      });
+
+      expect(notifier.send).toHaveBeenCalledWith({
+        to: 'user@example.com',
+        subject: 'Your jar has fermented further',
+        bodyText:
+          'Oryzae\'s microbes have responded to what you wrote about "Why do I work?".\nhttps://oryzae-client.vercel.app/jar',
+      });
+    });
+
+    it('uses English bullet-list body for multiple titles when language="en"', async () => {
+      const notifier = mockNotifier();
+      const usecase = new SendFermentationDigestUsecase(
+        notifier,
+        vi.fn().mockResolvedValue('user@example.com'),
+      );
+
+      await usecase.execute({
+        userId: 'u1',
+        questionTitles: ['Why do I work?', 'Who am I to my friends?'],
+        language: 'en',
+      });
+
+      const call = vi.mocked(notifier.send).mock.calls[0][0];
+      expect(call.subject).toBe('Your jar has fermented further');
+      expect(call.bodyText).toBe(
+        "Oryzae's microbes have responded to what you wrote about the following questions:\n\n- Why do I work?\n- Who am I to my friends?\n\nhttps://oryzae-client.vercel.app/jar",
+      );
+    });
+
+    it('falls back to Japanese when language is omitted', async () => {
+      const notifier = mockNotifier();
+      const usecase = new SendFermentationDigestUsecase(
+        notifier,
+        vi.fn().mockResolvedValue('user@example.com'),
+      );
+
+      await usecase.execute({ userId: 'u1', questionTitles: ['なぜ働くのか'] });
+
+      const call = vi.mocked(notifier.send).mock.calls[0][0];
+      expect(call.subject).toBe('あなたの瓶の発酵が進みました');
+      expect(call.bodyText).toContain('Oryzaeの菌たちが反応を生成しました');
+    });
+  });
 });
