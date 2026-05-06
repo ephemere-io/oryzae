@@ -7,6 +7,7 @@ import { GetFermentationResultUsecase } from '../../application/usecases/get-fer
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
+import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
 import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
 import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
@@ -36,12 +37,18 @@ export const fermentations = new Hono<Env>()
     const llmGateway = new VercelAiAnalysisGateway();
     const usecase = new RunFermentationUsecase(repo, llmGateway, generateId);
 
+    // issue #279: ユーザーのロケールを解決して LLM プロンプトと digest 文言を切り替える。
+    // auth.admin.getUserById は service-role 必須なので getSupabaseClient() を使う。
+    const localeResolver = new SupabaseUserLocaleResolver(getSupabaseClient());
+    const language = await localeResolver.resolve(c.get('userId'));
+
     try {
       const result = await usecase.execute({
         userId: c.get('userId'),
         questionId: body.questionId,
         questionText: body.questionText,
         entries: [{ id: body.entryId, content: body.entryContent }],
+        language,
       });
 
       // Send digest email (fire-and-forget). Uses service-role client for auth.admin lookup.
@@ -50,7 +57,7 @@ export const fermentations = new Hono<Env>()
         createSupabaseVerifiedEmailResolver(getSupabaseClient()),
       );
       digestUsecase
-        .execute({ userId: c.get('userId'), questionTitles: [body.questionText] })
+        .execute({ userId: c.get('userId'), questionTitles: [body.questionText], language })
         .catch(() => {
           // Notification failure must not break the API response.
         });

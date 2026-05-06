@@ -436,7 +436,8 @@ export const adminFermentations = new Hono<Env>()
       llmGateway,
       () => crypto.randomUUID(),
       listActiveUserIds,
-      (userId, titles) => digestUsecase.execute({ userId, questionTitles: titles }),
+      (userId, titles, language) =>
+        digestUsecase.execute({ userId, questionTitles: titles, language }),
     );
 
     const result = await usecase.execute(now);
@@ -541,11 +542,16 @@ export const adminFermentations = new Hono<Env>()
     const llmGateway = new VercelAiAnalysisGateway();
     const usecase = new RunFermentationUsecase(repo, llmGateway, () => crypto.randomUUID());
 
+    // issue #279: 元 fermentation の所有者ロケールで再実行する。
+    const localeResolver = new SupabaseUserLocaleResolver(supabase);
+    const language = await localeResolver.resolve(fermentation.user_id);
+
     const result = await usecase.execute({
       userId: fermentation.user_id,
       questionId: fermentation.question_id,
       questionText,
       entries,
+      language,
     });
 
     // 5. Send digest email (fire-and-forget)
@@ -554,7 +560,7 @@ export const adminFermentations = new Hono<Env>()
       createSupabaseVerifiedEmailResolver(supabase),
     );
     digestUsecase
-      .execute({ userId: fermentation.user_id, questionTitles: [questionText] })
+      .execute({ userId: fermentation.user_id, questionTitles: [questionText], language })
       .catch(() => {
         // Notification failure must not break retry response.
       });

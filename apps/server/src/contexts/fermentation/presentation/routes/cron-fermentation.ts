@@ -70,7 +70,8 @@ export const cronFermentation = new Hono()
       llmGateway,
       generateId,
       listActiveUserIds,
-      (userId, titles) => digestUsecase.execute({ userId, questionTitles: titles }),
+      (userId, titles, language) =>
+        digestUsecase.execute({ userId, questionTitles: titles, language }),
     );
 
     // issue #268 以降、発火条件はユーザー単位の状態 (lastRunAt + 文字数 + ランダム X 時間)
