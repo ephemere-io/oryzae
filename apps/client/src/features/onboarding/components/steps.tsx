@@ -138,9 +138,8 @@ export function StepEditor({ onNext, onSkip }: StepProps) {
           {t('title_l2')}
         </h1>
         <p className="ob-body">
-          {t('body_before_em')}
-          <em className="ob-em">{t('body_em')}</em>
-          {t('body_after_em')}
+          {/* CSV/Spreadsheet は前後 whitespace を保持しないため、ここで明示的に挿入する */}
+          {t('body_before_em')} <em className="ob-em">{t('body_em')}</em> {t('body_after_em')}
         </p>
         <ul className="ob-list">
           <li>

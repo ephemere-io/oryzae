@@ -7,12 +7,6 @@
       "authenticating": "Authenticating...",
       "loading": "Loading..."
     },
-    "confirm": {
-      "processing": "Confirming...",
-      "error_invalid_link": "This link is invalid. Please try again.",
-      "error_failed": "Confirmation failed. The link may have expired.",
-      "back_to_login": "Back to login"
-    },
     "forgot_password": {
       "sent_heading": "Check your email",
       "sent_body": "A password reset link has been sent to this address. Click the link in the email to set a new password.",
@@ -83,6 +77,12 @@
       "user_already_registered_2": "This email is already registered",
       "email_not_confirmed_2": "Email address not confirmed",
       "same_password": "New password must be different from your current password"
+    },
+    "confirm": {
+      "processing": "Confirming...",
+      "error_invalid_link": "This link is invalid. Please try again.",
+      "error_failed": "Confirmation failed. The link may have expired.",
+      "back_to_login": "Back to login"
     }
   },
   "entries": {
@@ -438,46 +438,6 @@
       "subheading": "A record of how your questions have been born, grown, and shifted"
     }
   },
-  "onboarding": {
-    "dialog_label": "Welcome to Oryzae",
-    "skip": "Skip",
-    "step_concept": {
-      "eyebrow": "01 — Welcome",
-      "title_l1": "Oryzae is a journal",
-      "title_l2": "that grows your questions.",
-      "body": "Plant a question on your mind, then water it with daily entries. Over time, an AI ferments what you've written and returns it as new insight.",
-      "body_2": "It works a little differently from a regular diary — let's walk through the four places that make it tick.",
-      "next": "Get started"
-    },
-    "step_question": {
-      "eyebrow": "02 — Question",
-      "title": "Plant your first question.",
-      "body": "Try shaping what you're most preoccupied with into a short question. \"Why…\", \"How might I…\" — a sentence whose answer you don't have yet is plenty. You can edit it any time.",
-      "placeholder": "e.g. Why am I bad at hurrying?",
-      "hint": "It will be stored in the Jar — fermentation starts here.",
-      "next": "Continue with this question"
-    },
-    "step_editor": {
-      "eyebrow": "03 — Editor",
-      "title_l1": "Collect words",
-      "title_l2": "as you write entries.",
-      "body_before_em": "The editor is a quiet place to write. Put down whatever's on your mind. Select a sentence to lift it out as a ",
-      "body_em": "snippet",
-      "body_after_em": " — you can lay them out side by side later on the Board.",
-      "list_autosave": "Auto-saves as you type",
-      "list_snippet": "Selection creates a snippet",
-      "list_link": "Link entries to relevant questions",
-      "next": "Next"
-    },
-    "step_ferment": {
-      "eyebrow": "04 — Jar & Fermentation",
-      "title": "Let your questions rest in the Jar.",
-      "body": "The entries you collect settle into the Jar and ferment on a schedule. The AI re-reads your words, finds patterns and shifts in your questions, and offers them back gently — that's the rhythm of Oryzae.",
-      "recap_label": "Your first question",
-      "recap_quote": "“{question}”",
-      "next": "Begin with Oryzae"
-    }
-  },
   "landing": {
     "nav": {
       "concept": "Concept",
@@ -552,13 +512,14 @@
     },
     "preview": {
       "kicker": "THE APP",
-      "title": "Three places to write.",
-      "lead": "Oryzae separates the writing, the looking, and the receiving. Daily hands belong to the Editor. The weekly view belongs to the Jar.",
+      "title": "Open the places.",
+      "lead": "Write daily in the Editor. Arrange your week on the Board. Look back on it from above in the Jar. At week's end, a Letter arrives. Four places, one slow practice.",
       "editor": {
         "title": "Add a title",
         "prompt": "What did you feel today?",
         "status": "editing",
-        "caption": "Editor — a quiet vertical page, tuned for Japanese IME, generous with whitespace."
+        "caption": "Editor — a quiet vertical page. Optional typing effects — drifting, ghosting, fading characters — bring a small body to keystrokes.",
+        "effect": "EFFECT · GHOST"
       },
       "jar": {
         "chip": {
@@ -574,6 +535,22 @@
         "from": "— from Oryzae · Letter, week 18",
         "body": "You have walked, this week, around the question of how the dead and the living might continue to live together. In a dream, the figure of Y arrives in ordinary clothes, then shrinks — quietly — back into the shape of a foetus and disappears. It is loss, and it is also a return to origin, a faint outline of a circular view of life and death. Across the week you begin to notice that an analytical posture may not be the right one toward what matters most. Forgetting, perhaps, is one form of living-with.",
         "caption": "Letter — a 500-character letter, weekly. Not a summary; a small ember to keep you writing."
+      },
+      "board": {
+        "toggle": {
+          "daily": "DAILY",
+          "weekly": "WEEKLY"
+        },
+        "snippet": {
+          "1": "Forgetting, perhaps, is one form of living-with.",
+          "2": "On nukadoko, people, and the way time mixes in."
+        },
+        "entry": {
+          "title": "A design that feels the mountain",
+          "meta": "765 chars · 04-20"
+        },
+        "label": "7 cards · 5 entries · 2 snippets · 3 photos",
+        "caption": "Board — A daily and weekly canvas where entries, snippets and photos sit beside each other. Memories begin to settle through relations, not through time."
       }
     },
     "philosophy": {
@@ -635,5 +612,45 @@
       "tag": "Aspergillus oryzae for words."
     },
     "title": "Oryzae — Let your writing ferment."
+  },
+  "onboarding": {
+    "dialog_label": "Welcome to Oryzae",
+    "skip": "Skip",
+    "step_concept": {
+      "eyebrow": "01 — Welcome",
+      "title_l1": "Oryzae is a journal",
+      "title_l2": "that grows your questions.",
+      "body": "Plant a question on your mind, then water it with daily entries. Over time, an AI ferments what you've written and returns it as new insight.",
+      "body_2": "It works a little differently from a regular diary — let's walk through the four places that make it tick.",
+      "next": "Get started"
+    },
+    "step_question": {
+      "eyebrow": "02 — Question",
+      "title": "Plant your first question.",
+      "body": "Try shaping what you're most preoccupied with into a short question. \"Why…\", \"How might I…\" — a sentence whose answer you don't have yet is plenty. You can edit it any time.",
+      "placeholder": "e.g. Why am I bad at hurrying?",
+      "hint": "It will be stored in the Jar — fermentation starts here.",
+      "next": "Continue with this question"
+    },
+    "step_editor": {
+      "eyebrow": "03 — Editor",
+      "title_l1": "Collect words",
+      "title_l2": "as you write entries.",
+      "body_before_em": "The editor is a quiet place to write. Put down whatever's on your mind. Select a sentence to lift it out as a",
+      "body_em": "snippet",
+      "body_after_em": "— you can lay them out side by side later on the Board.",
+      "list_autosave": "Auto-saves as you type",
+      "list_snippet": "Selection creates a snippet",
+      "list_link": "Link entries to relevant questions",
+      "next": "Next"
+    },
+    "step_ferment": {
+      "eyebrow": "04 — Jar & Fermentation",
+      "title": "Let your questions rest in the Jar.",
+      "body": "The entries you collect settle into the Jar and ferment on a schedule. The AI re-reads your words, finds patterns and shifts in your questions, and offers them back gently — that's the rhythm of Oryzae.",
+      "recap_label": "Your first question",
+      "recap_quote": "{question}",
+      "next": "Begin with Oryzae"
+    }
   }
 }
