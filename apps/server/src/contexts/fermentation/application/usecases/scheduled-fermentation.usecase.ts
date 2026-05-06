@@ -10,6 +10,7 @@ import type { UserLocaleResolverGateway } from '../../domain/gateways/user-local
 import { UserFermentationState } from '../../domain/models/user-fermentation-state.js';
 import {
   evaluateEligibility,
+  type FermentationLanguage,
   rollRandomHours,
 } from '../../domain/services/fermentation-eligibility.service.js';
 import { RunFermentationUsecase } from './run-fermentation.usecase.js';
@@ -44,7 +45,13 @@ export class ScheduledFermentationUsecase {
     private llmGateway: LlmAnalysisGateway,
     private generateId: () => string,
     private listActiveUserIds: () => Promise<string[]>,
-    private sendDigest: (userId: string, questionTitles: string[]) => Promise<void>,
+    // issue #279: digest メールも language に応じて文言を切り替えるため、
+    // ここで解決済みの language を呼び出し側に渡す。
+    private sendDigest: (
+      userId: string,
+      questionTitles: string[],
+      language: FermentationLanguage,
+    ) => Promise<void>,
     // 次回 X 時間生成器。テストでは固定値を注入して決定論的にする。
     private rollHours: () => number = rollRandomHours,
   ) {}
@@ -69,10 +76,12 @@ export class ScheduledFermentationUsecase {
     );
 
     const successfulTitlesByUser = new Map<string, string[]>();
+    const languageByUser = new Map<string, FermentationLanguage>();
 
     for (const userId of userIds) {
       // 1. ロケール解決 (失敗時は 'ja')
       const language = await this.localeResolver.resolve(userId);
+      languageByUser.set(userId, language);
 
       // 2. 既存 state を取得 (新規なら null)
       const existing = await this.userStateRepo.findByUserId(userId);
@@ -136,6 +145,7 @@ export class ScheduledFermentationUsecase {
             questionId: question.id,
             questionText,
             entries: runEntries,
+            language,
           });
           result.succeeded++;
           firedAtLeastOne = true;
@@ -167,7 +177,8 @@ export class ScheduledFermentationUsecase {
 
     for (const [userId, titles] of successfulTitlesByUser) {
       try {
-        await this.sendDigest(userId, titles);
+        const lang = languageByUser.get(userId) ?? 'ja';
+        await this.sendDigest(userId, titles, lang);
       } catch {
         // Notification failure must not break the scheduled job.
       }
