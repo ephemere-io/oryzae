@@ -4,7 +4,7 @@ const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? 'yukiagatsuma@gmail.com';
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'Test123456';
 
 test.describe('認証フロー', () => {
-  test('ログインして /entries にリダイレクト', async ({ page }) => {
+  test('ログインして /entries/new にリダイレクト', async ({ page }) => {
     await page.goto('/login');
 
     await expect(page.locator('h1')).toHaveText('Oryzae');
@@ -14,8 +14,8 @@ test.describe('認証フロー', () => {
     await page.fill('input[type="password"]', TEST_PASSWORD);
     await page.click('button:has-text("ログイン")');
 
-    await page.waitForURL('**/entries**');
-    await expect(page).toHaveURL(/\/entries/);
+    await page.waitForURL('**/entries/new**');
+    await expect(page).toHaveURL(/\/entries\/new/);
   });
 
   test('未認証で /entries にアクセスすると /login にリダイレクト', async ({ page }) => {

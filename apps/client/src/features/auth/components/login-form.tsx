@@ -30,7 +30,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push('/entries');
+    router.push('/entries/new');
   }
 
   return (
