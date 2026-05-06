@@ -61,6 +61,17 @@ function buildRows(data: ObservabilitySummary): ToolRow[] {
       externalUrl: 'https://vercel.com',
     },
     {
+      id: 'resend',
+      name: 'Resend',
+      category: 'Email',
+      metric:
+        data.resend.sentCount7d !== null
+          ? `${formatMetric(data.resend.sentCount7d)} sent / ${formatMetric(data.resend.bouncedCount7d)} bounced (7d)`
+          : '-',
+      href: null,
+      externalUrl: 'https://resend.com/emails',
+    },
+    {
       id: 'upstash',
       name: 'Upstash',
       category: 'Rate Limiting',

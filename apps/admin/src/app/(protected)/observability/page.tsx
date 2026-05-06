@@ -13,7 +13,7 @@ export default function ObservabilityPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-medium">Observability</h1>
-          <span className="text-sm text-muted-foreground">5 tools</span>
+          <span className="text-sm text-muted-foreground">6 tools</span>
         </div>
         <Button variant="ghost" size="icon-xs" onClick={refresh} disabled={loading}>
           <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
