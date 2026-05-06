@@ -25,6 +25,8 @@ describe('DeleteEntryUsecase', () => {
       listByUserId: vi.fn().mockResolvedValue([]),
       listByUserIdAndDate: vi.fn().mockResolvedValue([]),
       listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
+      listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
+      countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
       listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
