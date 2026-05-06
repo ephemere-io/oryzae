@@ -1,3 +1,5 @@
+import type { FermentationLanguage } from '../services/fermentation-eligibility.service.js';
+
 interface FermentationOutput {
   worksheetMarkdown: string;
   resultDiagramMarkdown: string;
@@ -28,5 +30,8 @@ export interface LlmAnalysisGateway {
     entryContent: string;
     targetPeriod: string;
     userId: string;
+    // 出力言語 (issue #279)。M-GTA 分析の system prompt と output schema description を切り替える。
+    // 解決失敗時は呼び出し側で 'ja' に倒すこと (#268 の方針を踏襲)。
+    language: FermentationLanguage;
   }): Promise<LlmAnalysisResult>;
 }

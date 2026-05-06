@@ -61,6 +61,37 @@ describe('RunFermentationUsecase', () => {
     expect(repo.saveKeywords).toHaveBeenCalledOnce();
   });
 
+  it('defaults language to "ja" when not specified (issue #279)', async () => {
+    const repo = mockRepo();
+    const llm = mockLlm();
+    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+
+    await usecase.execute({
+      userId: 'u1',
+      questionId: 'q1',
+      questionText: 'Q',
+      entries: [{ id: 'e1', content: 'c' }],
+    });
+
+    expect(llm.analyze).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }));
+  });
+
+  it('forwards language="en" to the LLM gateway (issue #279)', async () => {
+    const repo = mockRepo();
+    const llm = mockLlm();
+    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+
+    await usecase.execute({
+      userId: 'u1',
+      questionId: 'q1',
+      questionText: 'Q',
+      entries: [{ id: 'e1', content: 'c' }],
+      language: 'en',
+    });
+
+    expect(llm.analyze).toHaveBeenCalledWith(expect.objectContaining({ language: 'en' }));
+  });
+
   it('saves all scanned entry ids when multiple entries are provided', async () => {
     const repo = mockRepo();
     const llm = mockLlm();

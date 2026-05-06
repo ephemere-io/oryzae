@@ -517,7 +517,80 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
     await usecase.execute(NOW);
 
     expect(sendDigest).toHaveBeenCalledOnce();
-    expect(sendDigest).toHaveBeenCalledWith('user-1', ['Q1 title', 'Q2 title']);
+    expect(sendDigest).toHaveBeenCalledWith('user-1', ['Q1 title', 'Q2 title'], 'ja');
+  });
+
+  it('issue #279: 解決した language が LLM gateway と digest 双方に伝播する', async () => {
+    const entry = makeEntry('user-1', 'e1');
+    const question = makeQuestion('user-1', 'q1');
+    const transaction = makeQuestionTransaction('q1', 'Q en');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.countCharsByUserIdSince).mockResolvedValue(2000);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdSince).mockResolvedValue([entry]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockResolvedValue(transaction);
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
+    const llm = mockLlm();
+    const sendDigest = vi.fn().mockResolvedValue(undefined);
+    const localeResolver = mockLocaleResolver('en');
+
+    const usecase = buildUsecase({
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      llm,
+      sendDigest,
+      localeResolver,
+      userIds: ['user-1'],
+    });
+
+    await usecase.execute(NOW);
+
+    expect(llm.analyze).toHaveBeenCalledWith(expect.objectContaining({ language: 'en' }));
+    expect(sendDigest).toHaveBeenCalledWith('user-1', ['Q en'], 'en');
+  });
+
+  it('issue #279: ja ロケールはデフォルトとして LLM gateway に伝播する', async () => {
+    const entry = makeEntry('user-1', 'e1');
+    const question = makeQuestion('user-1', 'q1');
+    const transaction = makeQuestionTransaction('q1', 'Q ja');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.countCharsByUserIdSince).mockResolvedValue(2000);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdSince).mockResolvedValue([entry]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([question]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockResolvedValue(transaction);
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
+
+    const llm = mockLlm();
+
+    const usecase = buildUsecase({
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      llm,
+      userIds: ['user-1'],
+    });
+
+    await usecase.execute(NOW);
+
+    expect(llm.analyze).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }));
   });
 
   it('digest 失敗が cron 全体を壊さない', async () => {
