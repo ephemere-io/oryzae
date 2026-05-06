@@ -48,7 +48,7 @@ function CallbackHandler() {
 
         setTokens(data.session.accessToken, data.session.refreshToken);
         posthog.identify(data.user.id, { email: data.user.email });
-        router.push('/entries');
+        router.push('/entries/new');
         return;
       }
 
@@ -71,7 +71,7 @@ function CallbackHandler() {
             posthog.identify(data.user.id, { email: data.user.email });
           }
 
-          router.push('/entries');
+          router.push('/entries/new');
           return;
         }
       }
