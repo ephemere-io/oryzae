@@ -77,6 +77,36 @@ async function getVercelLatestDeploy(): Promise<string | null> {
   }
 }
 
+async function getResendStats(): Promise<{ sentCount: number; bouncedCount: number } | null> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch('https://api.resend.com/emails?limit=100', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const body: unknown = await res.json();
+    if (typeof body !== 'object' || body === null || !('data' in body)) return null;
+    const data = (body as { data: { created_at?: string; last_event?: string }[] }).data;
+    if (!Array.isArray(data)) return null;
+
+    const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    let sentCount = 0;
+    let bouncedCount = 0;
+    for (const email of data) {
+      if (!email.created_at) continue;
+      const ts = new Date(email.created_at).getTime();
+      if (Number.isNaN(ts) || ts < sevenDaysAgoMs) continue;
+      sentCount++;
+      if (email.last_event === 'bounced') bouncedCount++;
+    }
+    return { sentCount, bouncedCount };
+  } catch {
+    return null;
+  }
+}
+
 async function getUpstashKeyCount(): Promise<number | null> {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -99,13 +129,14 @@ async function getUpstashKeyCount(): Promise<number | null> {
 
 export const adminObservability = new Hono<Env>()
   .get('/summary', async (c) => {
-    const [sentryCount, gatewaySpend, gatewayCredits, vercelDeploy, upstashKeys] =
+    const [sentryCount, gatewaySpend, gatewayCredits, vercelDeploy, upstashKeys, resendStats] =
       await Promise.all([
         getSentryCount(),
         getGatewaySpend(),
         getGatewayCredits(),
         getVercelLatestDeploy(),
         getUpstashKeyCount(),
+        getResendStats(),
       ]);
 
     return c.json({
@@ -118,6 +149,10 @@ export const adminObservability = new Hono<Env>()
         monthlyRequests: gatewaySpend?.requestCount ?? null,
         creditBalance: gatewayCredits?.balance ?? null,
         creditUsed: gatewayCredits?.totalUsed ?? null,
+      },
+      resend: {
+        sentCount7d: resendStats?.sentCount ?? null,
+        bouncedCount7d: resendStats?.bouncedCount ?? null,
       },
       upstash: {
         totalKeys: upstashKeys,

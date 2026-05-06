@@ -13,6 +13,7 @@ export interface ObservabilitySummary {
     creditBalance: string | null;
     creditUsed: string | null;
   };
+  resend: { sentCount7d: number | null; bouncedCount7d: number | null };
   upstash: { totalKeys: number | null };
   vercel: { latestDeployState: string | null };
 }
@@ -30,6 +31,7 @@ interface SummaryApiResponse {
     creditBalance: string | null;
     creditUsed: string | null;
   };
+  resend: { sentCount7d: number | null; bouncedCount7d: number | null };
   upstash: { totalKeys: number | null };
   vercel: { latestDeployState: string | null };
 }
