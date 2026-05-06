@@ -1,9 +1,17 @@
 import type { Metadata } from 'next';
+import { BRAND_NAME } from '@/lib/brand';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Oryzae Admin',
+  // icons / apple-icon は app/ 配下のファイル規約で自動付与される。
+  // admin は社内向けなので OGP は設定しない（クロール対象外）。
+  title: {
+    default: BRAND_NAME,
+    template: `%s — ${BRAND_NAME}`,
+  },
   description: 'Oryzae 管理画面',
+  applicationName: BRAND_NAME,
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { PostHogProvider } from '@/components/posthog-provider';
+import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 import './globals.css';
 
 const geistSans = Geist({
@@ -17,9 +18,30 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('app.metadata');
+  const locale = await getLocale();
+  const description = t('description');
   return {
-    title: 'Oryzae',
-    description: t('description'),
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: BRAND_NAME,
+      template: `%s — ${BRAND_NAME}`,
+    },
+    description,
+    applicationName: BRAND_NAME,
+    // icons / opengraph-image / apple-icon は app/ 配下のファイル規約で自動付与される。
+    openGraph: {
+      type: 'website',
+      siteName: BRAND_NAME,
+      title: BRAND_NAME,
+      description,
+      url: '/',
+      locale,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: BRAND_NAME,
+      description,
+    },
   };
 }
 
