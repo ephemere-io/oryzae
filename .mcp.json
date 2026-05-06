@@ -33,6 +33,15 @@
       "env": {
         "SENTRY_AUTH_TOKEN": "${SENTRY_AUTH_TOKEN}"
       }
+    },
+    "google-sheets": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-google-sheets@latest"],
+      "env": {
+        "CREDENTIALS_PATH": "${HOME}/.config/oryzae/google-sheets-credentials.json",
+        "TOKEN_PATH": "${HOME}/.config/oryzae/google-sheets-token.json"
+      }
     }
   }
 }

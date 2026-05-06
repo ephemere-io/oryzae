@@ -28,7 +28,26 @@ useTranslations('namespace') in components
 2. **同期**: ローカルで `pnpm i18n:sync`（Google Sheets の公開エクスポートURLからCSVを取得して `messages/*.json` を再生成）
 3. **commit & push**: `messages/*.json` の差分を含めてコミット
 
-新規キーをコードから先行追加したい場合:
+### Claude Code から直接編集する（google-sheets MCP）
+
+`.mcp.json` に登録済の `google-sheets` MCP（`xing5/mcp-google-sheets`、OAuth 認証）経由で、Claude Code から直接スプレッドシートにキーを追加できる:
+
+```
+Claude: # 「landing.faq.6 を追加して」
+→ mcp__google-sheets__add_rows でスプレッドシートに行追加
+→ pnpm i18n:sync で messages/*.json 再生成
+→ git add → commit → push → PR
+```
+
+#### 初回セットアップ（ユーザーが 1 回だけ）
+
+1. GCP プロジェクトで OAuth 2.0 Desktop Client を作成、JSON を `~/.config/oryzae/google-sheets-credentials.json` として保存（パーミッション 600）
+2. OAuth 同意画面のテストユーザーに自分の Google アカウントを追加
+3. oryzae-i18n スプレッドシートに当該アカウントの編集権限を付与
+4. Claude Code を再起動 → MCP がロードされる
+5. 初回ツールコール時にブラウザが開き Google サインイン → トークンが `~/.config/oryzae/google-sheets-token.json` にキャッシュされる（以降は自動）
+
+**新規キーをコードから先行追加したい場合（MCP 不使用）:**
 1. `messages/ja.json` と `messages/en.json` に手で追記（後で Spreadsheet にも反映）
 2. または、Spreadsheet に先に行を足してから `pnpm i18n:sync`
 
