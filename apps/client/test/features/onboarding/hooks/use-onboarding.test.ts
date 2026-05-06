@@ -62,7 +62,7 @@ describe('useOnboarding', () => {
     const api = createApiStub();
     api.fetch
       .mockResolvedValueOnce(mockResponse(true, { onboardingCompleted: false }))
-      .mockResolvedValueOnce(mockResponse(true, {}))
+      .mockResolvedValueOnce(mockResponse(true, { id: 'new-q-id' }))
       .mockResolvedValueOnce(mockResponse(true, { onboardingCompleted: true }));
 
     const { result } = renderHook(() => useOnboarding(api));
@@ -70,8 +70,9 @@ describe('useOnboarding', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    let completeResult: { questionId: string | null } | undefined;
     await act(async () => {
-      await result.current.complete({ skipped: false, firstQuestion: 'なぜ?' });
+      completeResult = await result.current.complete({ skipped: false, firstQuestion: 'なぜ?' });
     });
 
     expect(api.fetch).toHaveBeenNthCalledWith(2, '/api/v1/questions', {
@@ -83,6 +84,7 @@ describe('useOnboarding', () => {
       body: JSON.stringify({ completed: true }),
     });
     expect(result.current.shouldShow).toBe(false);
+    expect(completeResult).toEqual({ questionId: 'new-q-id' });
   });
 
   it('complete は firstQuestion が null のとき POST /questions を呼ばない', async () => {
@@ -96,12 +98,38 @@ describe('useOnboarding', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    let completeResult: { questionId: string | null } | undefined;
     await act(async () => {
-      await result.current.complete({ skipped: true, firstQuestion: null });
+      completeResult = await result.current.complete({ skipped: true, firstQuestion: null });
     });
 
     expect(api.fetch).toHaveBeenCalledTimes(2);
     expect(api.fetch).toHaveBeenNthCalledWith(2, '/api/v1/users/me/onboarding', {
+      method: 'PATCH',
+      body: JSON.stringify({ completed: true }),
+    });
+    expect(completeResult).toEqual({ questionId: null });
+  });
+
+  it('complete は POST /questions が失敗した場合でも PATCH を続行し questionId は null', async () => {
+    const api = createApiStub();
+    api.fetch
+      .mockResolvedValueOnce(mockResponse(true, { onboardingCompleted: false }))
+      .mockResolvedValueOnce(mockResponse(false, { error: 'boom' }))
+      .mockResolvedValueOnce(mockResponse(true, {}));
+
+    const { result } = renderHook(() => useOnboarding(api));
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    let completeResult: { questionId: string | null } | undefined;
+    await act(async () => {
+      completeResult = await result.current.complete({ skipped: false, firstQuestion: 'なぜ?' });
+    });
+
+    expect(completeResult).toEqual({ questionId: null });
+    expect(api.fetch).toHaveBeenNthCalledWith(3, '/api/v1/users/me/onboarding', {
       method: 'PATCH',
       body: JSON.stringify({ completed: true }),
     });
