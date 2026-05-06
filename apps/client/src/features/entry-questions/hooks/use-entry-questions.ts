@@ -8,19 +8,40 @@ interface LinkedQuestion {
   currentText: string | null;
 }
 
-export function useActiveQuestions(api: ApiClient | null, authLoading: boolean) {
+/**
+ * @param refetchKey Optional value that, when changed, forces a re-fetch.
+ *   Used by NewEntryPage to refresh after onboarding adds a new question
+ *   while the page is already mounted (URL changes but the page does not remount).
+ */
+export function useActiveQuestions(
+  api: ApiClient | null,
+  authLoading: boolean,
+  refetchKey?: string,
+) {
   const [activeQuestions, setActiveQuestions] = useState<LinkedQuestion[]>([]);
 
   useEffect(() => {
     if (authLoading || !api) return;
+    let cancelled = false;
 
-    api.fetch('/api/v1/questions').then(async (res) => {
+    // refetchKey is appended as a no-op query so that changing it (e.g. ?questionId=...)
+    // both forces this effect to re-run AND defeats any incidental HTTP cache.
+    const url = refetchKey
+      ? `/api/v1/questions?refetchKey=${encodeURIComponent(refetchKey)}`
+      : '/api/v1/questions';
+
+    api.fetch(url).then(async (res) => {
+      if (cancelled) return;
       if (res.ok) {
         const data: LinkedQuestion[] = await res.json();
-        setActiveQuestions(data);
+        if (!cancelled) setActiveQuestions(data);
       }
     });
-  }, [api, authLoading]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, authLoading, refetchKey]);
 
   return activeQuestions;
 }

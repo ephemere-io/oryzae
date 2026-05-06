@@ -4,10 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 import type { OnboardingResult } from '../types';
 
+interface OnboardingCompleteResult {
+  /** ID of the question created during onboarding, or null if none */
+  questionId: string | null;
+}
+
 interface UseOnboardingResult {
   shouldShow: boolean;
   loading: boolean;
-  complete: (result: OnboardingResult) => Promise<void>;
+  complete: (result: OnboardingResult) => Promise<OnboardingCompleteResult>;
 }
 
 export function useOnboarding(api: ApiClient | null): UseOnboardingResult {
@@ -37,14 +42,19 @@ export function useOnboarding(api: ApiClient | null): UseOnboardingResult {
   }, [api]);
 
   const complete = useCallback(
-    async (result: OnboardingResult) => {
-      if (!api) return;
+    async (result: OnboardingResult): Promise<OnboardingCompleteResult> => {
+      if (!api) return { questionId: null };
 
+      let questionId: string | null = null;
       if (result.firstQuestion) {
-        await api.fetch('/api/v1/questions', {
+        const res = await api.fetch('/api/v1/questions', {
           method: 'POST',
           body: JSON.stringify({ string: result.firstQuestion }),
         });
+        if (res.ok) {
+          const data = (await res.json()) as { id?: string };
+          questionId = data.id ?? null;
+        }
       }
 
       await api.fetch('/api/v1/users/me/onboarding', {
@@ -53,6 +63,7 @@ export function useOnboarding(api: ApiClient | null): UseOnboardingResult {
       });
 
       setShouldShow(false);
+      return { questionId };
     },
     [api],
   );
