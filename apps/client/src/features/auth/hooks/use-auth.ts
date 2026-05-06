@@ -139,11 +139,16 @@ export function useAuth() {
     return null;
   }
 
-  async function signup(nickname: string, email: string, password: string): Promise<string | null> {
+  async function signup(
+    nickname: string,
+    email: string,
+    password: string,
+    locale?: 'ja' | 'en',
+  ): Promise<string | null> {
     const client = createApiClient();
     const res = await client.fetch('/api/v1/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ nickname, email, password }),
+      body: JSON.stringify({ nickname, email, password, locale }),
     });
     if (!res.ok) {
       const data = (await res.json()) as { error: string };

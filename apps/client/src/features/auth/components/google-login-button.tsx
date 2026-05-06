@@ -1,11 +1,17 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { createApiClient } from '@/lib/api';
 
+function isSupportedLocale(value: string): value is 'ja' | 'en' {
+  return value === 'ja' || value === 'en';
+}
+
 export function GoogleLoginButton() {
   const t = useTranslations('auth.google_login');
+  const localeRaw = useLocale();
+  const locale = isSupportedLocale(localeRaw) ? localeRaw : 'ja';
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
@@ -15,7 +21,7 @@ export function GoogleLoginButton() {
       const client = createApiClient();
       const res = await client.fetch('/api/v1/auth/oauth/google', {
         method: 'POST',
-        body: JSON.stringify({ redirectTo: callbackUrl }),
+        body: JSON.stringify({ redirectTo: callbackUrl, locale }),
       });
 
       if (!res.ok) {

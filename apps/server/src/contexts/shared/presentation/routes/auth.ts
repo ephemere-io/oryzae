@@ -1,9 +1,13 @@
 import {
   changeEmailSchema,
   changePasswordSchema,
+  type LocaleCode,
   loginSchema,
+  oauthCallbackSchema,
+  oauthInitSchema,
   profileUpdateSchema,
   signupSchema,
+  verifyOtpSchema,
 } from '@oryzae/shared';
 import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
@@ -33,6 +37,16 @@ function getProviders(user: { app_metadata?: Record<string, unknown> }): string[
   return Array.isArray(providers) ? (providers as string[]) : [];
 }
 
+/**
+ * URL に query を追加（既存の query は保持）。
+ * OAuth リダイレクト URL に locale を埋め込んでクライアントへ伝搬するために使う。
+ */
+function appendQuery(url: string, key: string, value: string): string {
+  const u = new URL(url);
+  u.searchParams.set(key, value);
+  return u.toString();
+}
+
 export const authRoutes = new Hono()
   .post('/signup', async (c) => {
     const body = signupSchema.parse(await c.req.json());
@@ -49,11 +63,16 @@ export const authRoutes = new Hono()
       return c.json({ error: 'このニックネームは既に使用されています' }, 400);
     }
 
-    // Create auth user
+    // Create auth user.
+    // locale は Supabase 確認メールテンプレートの `{{ .Data.locale }}` で参照される。
     const supabase = getSupabaseAuthClient();
+    const locale: LocaleCode = body.locale ?? 'ja';
     const { data, error } = await supabase.auth.signUp({
       email: body.email,
       password: body.password,
+      options: {
+        data: { locale },
+      },
     });
 
     if (error) {
@@ -182,8 +201,14 @@ export const authRoutes = new Hono()
     });
   })
   .post('/oauth/google', async (c) => {
-    const { redirectTo } = z.object({ redirectTo: z.string().url() }).parse(await c.req.json());
+    const body = oauthInitSchema.parse(await c.req.json());
     const supabase = getSupabaseAuthClient();
+
+    // OAuth 初期化時点ではユーザー未作成のため、locale は redirectTo に乗せて
+    // /oauth/callback で受け取り直し、user_metadata に保存する。
+    const redirectTo = body.locale
+      ? appendQuery(body.redirectTo, 'locale', body.locale)
+      : body.redirectTo;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -200,7 +225,8 @@ export const authRoutes = new Hono()
     return c.json({ url: data.url });
   })
   .post('/oauth/callback', async (c) => {
-    const { code } = z.object({ code: z.string() }).parse(await c.req.json());
+    const body = oauthCallbackSchema.parse(await c.req.json());
+    const { code } = body;
     const supabase = getSupabaseAuthClient();
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
@@ -211,6 +237,16 @@ export const authRoutes = new Hono()
 
     // Ensure profile exists for OAuth users
     const serviceSupabase = getSupabaseClient();
+
+    // 初回 OAuth サインイン時は user_metadata.locale が未設定。
+    // コールバック URL から渡された locale を保存して、以後のメール（change-email 等）が
+    // ユーザー言語で送信されるようにする。
+    if (body.locale && !data.user.user_metadata?.locale) {
+      await serviceSupabase.auth.admin.updateUserById(data.user.id, {
+        user_metadata: { ...data.user.user_metadata, locale: body.locale },
+      });
+    }
+
     const { data: profile } = await serviceSupabase
       .from('profiles')
       .select('nickname, avatar_url')
@@ -254,6 +290,45 @@ export const authRoutes = new Hono()
         email: data.user.email,
         nickname: profile.nickname,
         avatarUrl: profile.avatar_url,
+        providers: getProviders(data.user),
+      },
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
+      },
+    });
+  })
+  .post('/verify-otp', async (c) => {
+    // メールテンプレ内 `{{ .TokenHash }}` を自社ドメイン /auth/confirm に渡し、
+    // クライアントから本エンドポイント経由で Supabase の verifyOtp を呼ぶ。
+    // これによりメール内リンクが supabase.co を一切経由しなくなり、
+    // Microsoft (Outlook) のサイレント破棄を回避する。
+    const body = verifyOtpSchema.parse(await c.req.json());
+    const supabase = getSupabaseAuthClient();
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: body.tokenHash,
+      type: body.type,
+    });
+
+    if (error || !data.user || !data.session) {
+      return c.json({ error: error?.message ?? 'Verification failed' }, 400);
+    }
+
+    const serviceSupabase = getSupabaseClient();
+    const { data: profile } = await serviceSupabase
+      .from('profiles')
+      .select('nickname, avatar_url')
+      .eq('id', data.user.id)
+      .single();
+
+    return c.json({
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        nickname: profile?.nickname ?? null,
+        avatarUrl: profile?.avatar_url ?? null,
         providers: getProviders(data.user),
       },
       session: {
