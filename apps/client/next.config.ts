@@ -7,6 +7,13 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   transpilePackages: ['@oryzae/shared', '@oryzae/server'],
   turbopack: {},
+  // Static legal pages read their bodies from `src/content/legal/*.md` at
+  // request time. Next.js' file-trace can't detect dynamic `process.cwd()`
+  // reads, so include the directory explicitly so the files ship with the
+  // deployment.
+  outputFileTracingIncludes: {
+    '/privacy': ['./src/content/legal/**/*.md'],
+  },
 };
 
 export default withSentryConfig(withNextIntl(nextConfig), {
