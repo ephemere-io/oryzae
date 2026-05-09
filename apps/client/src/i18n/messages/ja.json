@@ -205,6 +205,9 @@
     },
     "language": {
       "label": "言語"
+    },
+    "links": {
+      "privacy": "プライバシーポリシー"
     }
   },
   "sidebar": {
@@ -651,6 +654,12 @@
       "recap_label": "あなたの最初の問い",
       "recap_quote": "「{question}」",
       "next": "Oryzaeをはじめる"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "title": "プライバシーポリシー",
+      "back_home": "トップへ戻る"
     }
   }
 }

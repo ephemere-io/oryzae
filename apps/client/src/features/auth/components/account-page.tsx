@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
@@ -592,6 +593,14 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
         <div className="flex flex-col gap-6">
           <ThemeToggleSection />
           <LanguageSection />
+
+          <Link
+            href="/privacy"
+            className="text-sm underline-offset-2 transition-colors hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            {t('links.privacy')} →
+          </Link>
 
           <div>
             <p className={labelClass} style={labelStyle}>

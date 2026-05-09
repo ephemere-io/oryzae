@@ -205,6 +205,9 @@
     },
     "language": {
       "label": "Language"
+    },
+    "links": {
+      "privacy": "Privacy Policy"
     }
   },
   "sidebar": {
@@ -649,8 +652,14 @@
       "title": "Let your questions rest in the Jar.",
       "body": "The entries you collect settle into the Jar and ferment on a schedule. The AI re-reads your words, finds patterns and shifts in your questions, and offers them back gently — that's the rhythm of Oryzae.",
       "recap_label": "Your first question",
-      "recap_quote": "{question}",
+      "recap_quote": "\"{question}\"",
       "next": "Begin with Oryzae"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "title": "Privacy Policy",
+      "back_home": "Back to home"
     }
   }
 }
