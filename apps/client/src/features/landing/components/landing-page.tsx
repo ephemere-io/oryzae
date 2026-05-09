@@ -827,6 +827,7 @@ function SiteFooter({ t }: { t: T }) {
           <a href="#preview">{t('nav.preview')}</a>
           <a href="#philosophy">{t('nav.philosophy')}</a>
           <a href="#faq">{t('nav.faq')}</a>
+          <Link href="/support">{t('nav.support')}</Link>
         </nav>
         <div className={styles.footMeta}>
           <p>© 2026 Ephemere</p>

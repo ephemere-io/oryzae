@@ -474,6 +474,24 @@ function LanguageSection() {
   );
 }
 
+function HelpLinkSection() {
+  const t = useTranslations('account.help');
+  return (
+    <div>
+      <p className={labelClass} style={labelStyle}>
+        {t('label')}
+      </p>
+      <a
+        href="/support"
+        className="mt-1 inline-block text-sm font-medium transition-colors"
+        style={{ color: 'var(--accent)' }}
+      >
+        {t('link_text')}
+      </a>
+    </div>
+  );
+}
+
 function Divider() {
   return <div className="my-8 h-px" style={{ backgroundColor: 'var(--border-subtle)' }} />;
 }
@@ -592,6 +610,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
         <div className="flex flex-col gap-6">
           <ThemeToggleSection />
           <LanguageSection />
+          <HelpLinkSection />
 
           <div>
             <p className={labelClass} style={labelStyle}>
