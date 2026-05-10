@@ -442,8 +442,8 @@ export const adminFermentations = new Hono<Env>()
 
     const result = await usecase.execute(now);
 
-    // Notify Discord if there were failures
-    if (result.failed > 0) {
+    // Notify Discord if there were failures (issue #288: メール失敗もカバー)
+    if (result.failed > 0 || result.emailFailures.length > 0) {
       notifyDiscord({
         title: 'スケジュール発酵 — 失敗あり',
         color: COLORS.WARNING,
@@ -451,11 +451,20 @@ export const adminFermentations = new Hono<Env>()
           { name: '評価時刻', value: now.toISOString(), inline: true },
           { name: '対象ユーザー', value: String(result.totalUsers), inline: true },
           { name: '成功', value: String(result.succeeded), inline: true },
-          { name: '失敗', value: String(result.failed), inline: true },
+          { name: '発酵失敗', value: String(result.failed), inline: true },
+          { name: 'メール失敗', value: String(result.emailFailures.length), inline: true },
           {
-            name: 'エラー詳細',
+            name: '発酵エラー詳細',
             value:
               result.errors
+                .slice(0, 3)
+                .map((e) => `${e.userId.slice(0, 8)}: ${e.error.slice(0, 80)}`)
+                .join('\n') || '-',
+          },
+          {
+            name: 'メールエラー詳細',
+            value:
+              result.emailFailures
                 .slice(0, 3)
                 .map((e) => `${e.userId.slice(0, 8)}: ${e.error.slice(0, 80)}`)
                 .join('\n') || '-',
@@ -561,8 +570,13 @@ export const adminFermentations = new Hono<Env>()
     );
     digestUsecase
       .execute({ userId: fermentation.user_id, questionTitles: [questionText], language })
-      .catch(() => {
-        // Notification failure must not break retry response.
+      .catch((error: unknown) => {
+        // Notification failure must not break retry response (issue #288: ただしログは残す)。
+        console.error('[admin-fermentations] retry digest email failed', {
+          userId: fermentation.user_id,
+          fermentationId: fermentation.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
 
     return c.json({ id: result.id }, 201);
