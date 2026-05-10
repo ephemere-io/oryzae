@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
@@ -474,24 +475,6 @@ function LanguageSection() {
   );
 }
 
-function HelpLinkSection() {
-  const t = useTranslations('account.help');
-  return (
-    <div>
-      <p className={labelClass} style={labelStyle}>
-        {t('label')}
-      </p>
-      <a
-        href="/support"
-        className="mt-1 inline-block text-sm font-medium transition-colors"
-        style={{ color: 'var(--accent)' }}
-      >
-        {t('link_text')}
-      </a>
-    </div>
-  );
-}
-
 function Divider() {
   return <div className="my-8 h-px" style={{ backgroundColor: 'var(--border-subtle)' }} />;
 }
@@ -610,7 +593,22 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
         <div className="flex flex-col gap-6">
           <ThemeToggleSection />
           <LanguageSection />
-          <HelpLinkSection />
+
+          <Link
+            href="/support"
+            className="text-sm underline-offset-2 transition-colors hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            {t('links.support')} →
+          </Link>
+
+          <Link
+            href="/privacy"
+            className="text-sm underline-offset-2 transition-colors hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            {t('links.privacy')} →
+          </Link>
 
           <div>
             <p className={labelClass} style={labelStyle}>

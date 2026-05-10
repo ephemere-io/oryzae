@@ -206,9 +206,9 @@
     "language": {
       "label": "言語"
     },
-    "help": {
-      "label": "ヘルプ",
-      "link_text": "使い方とよくある質問"
+    "links": {
+      "privacy": "プライバシーポリシー",
+      "support": "ヘルプ・サポート"
     }
   },
   "sidebar": {
@@ -657,5 +657,15 @@
       "recap_quote": "「{question}」",
       "next": "Oryzaeをはじめる"
     }
+  },
+  "legal": {
+    "privacy": {
+      "title": "プライバシーポリシー",
+      "back_home": "トップへ戻る"
+    }
+  },
+  "support": {
+    "title": "サポート",
+    "back_home": "トップへ戻る"
   }
 }
