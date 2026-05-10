@@ -2,19 +2,18 @@
 
 Last updated: May 9, 2026
 
-Oryzae ("the Service") is a journaling app provided by Ephemere ("we", "us"). This policy explains, in plain language, what information we handle when you use the Service.
+Oryzae ("the Service") is a journaling app provided by Ferment Media Research ("we", "us"). This policy explains, in plain language, what information we handle when you use the Service.
 
 ## 1. What this policy says, in short
 
 - We store the entries you write, your email address, your nickname, and similar account-related information.
 - We use that information only to operate the Service and to run the AI "fermentation" feature.
 - We do not sell your data to third parties for advertising.
-- The AI fermentation only processes entries that you have explicitly tied to a question. Other entries are never sent to the AI.
 - You can ask us to delete your data or send you a copy of it. Contact details are at the bottom of this page.
 
 ## 2. Who we are
 
-- Operator: Ephemere
+- Operator: Ferment Media Research
 - Contact: oryzae@ephemere.io
 - Service URL: https://oryzae.ephemere.io
 
@@ -68,8 +67,7 @@ We use the information we hold for the following purposes only.
 
 Fermentation, the heart of the Service, sends text to an external AI model (Claude, by Anthropic) for processing. We apply the following rules to that processing.
 
-- The AI only receives **entries that you have explicitly tied to a particular question**, plus the question itself.
-- Entries that you have not tied to a question are never sent to the AI.
+- The AI receives your entries and the questions.
 - We use a commercial API so that the data we send is not used to train the AI provider's models.
 - The output (keywords, letter) is stored in our database under your account.
 
@@ -125,7 +123,7 @@ If you disable cookies in your browser, some features (such as staying signed in
 
 ## 10. Children
 
-The Service is not intended for children under 13. Please do not use the Service if you are under 13.
+The Service is not intended for children under 18. Please do not use the Service if you are under 18.
 
 ## 11. Security
 
