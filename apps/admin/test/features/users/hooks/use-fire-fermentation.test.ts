@@ -111,6 +111,31 @@ describe('useFireFermentation', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('forwards forceUnverified=true and stores emailReason from the response (issue #290 follow-up)', async () => {
+    const body = {
+      fired: [{ fermentationResultId: 'fr-1', questionId: 'q1', questionText: 'Q' }],
+      emailSent: false,
+      emailReason: 'no-verified-email',
+    };
+    mockFetch.mockResolvedValueOnce(mockResponse({ ok: true, status: 201, body }));
+
+    const { result } = renderHook(() => useFireFermentation());
+
+    await act(async () => {
+      await result.current.fire({ userId: 'u1', forceUnverified: true });
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/admin/fermentations/fire',
+      expect.objectContaining({
+        body: JSON.stringify({ userId: 'u1', forceUnverified: true }),
+      }),
+    );
+    await waitFor(() => {
+      expect(result.current.result).toEqual(body);
+    });
+  });
+
   it('returns false when access token is missing', async () => {
     localStorage.removeItem('oryzae_admin_access_token');
     const { result } = renderHook(() => useFireFermentation());

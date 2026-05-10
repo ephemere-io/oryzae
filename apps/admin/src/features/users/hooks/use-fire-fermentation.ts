@@ -6,6 +6,10 @@ import { getAccessToken } from '@/lib/auth';
 
 // issue #290: admin デバッグ用に特定ユーザー / 問いを強制発火する。
 // レスポンスは server 側 fireFermentationSchema + FireFermentationUsecase の出力に対応。
+//
+// emailReason は #290 フォローで追加: 「emailSent: true なのに実際は届かない」
+// ことを防ぐための診断情報。'no-verified-email' / 'no-api-key' / 'disabled' /
+// 'no-titles' / 'skipped-by-request' のいずれか (server 側 DigestSendResult)。
 interface FireFermentationResponse {
   fired: Array<{
     fermentationResultId: string;
@@ -13,6 +17,7 @@ interface FireFermentationResponse {
     questionText: string;
   }>;
   emailSent: boolean;
+  emailReason?: string;
   emailFailure?: { error: string };
 }
 
@@ -21,6 +26,10 @@ interface FireFermentationParams {
   questionId?: string;
   language?: 'ja' | 'en';
   skipEmail?: boolean;
+  // issue #290 フォロー: email_confirmed_at が null のユーザーにも送る
+  // (admin が自分の test アカウントに送りたい場面用)。通常フローでは未検証
+  // メールにはスパム防止のため送らないが、デバッグ用にバイパスを許す。
+  forceUnverified?: boolean;
 }
 
 export function useFireFermentation() {

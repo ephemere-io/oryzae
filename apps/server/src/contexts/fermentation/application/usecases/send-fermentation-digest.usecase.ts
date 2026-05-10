@@ -1,6 +1,19 @@
 import type { EmailNotifier } from '../../domain/gateways/email-notifier.gateway.js';
 import type { FermentationLanguage } from '../../domain/services/fermentation-eligibility.service.js';
 
+// issue #290 フォロー: 「emailSent=true なのに実際は送られていない」事故を
+// 防ぐため、execute() は「送った / なぜ送らなかったか」を返す。
+// 呼び出し側 (cron / admin /fire / retry) はこの情報をログ・レスポンスに使う。
+//
+// reason の意味:
+// - 'no-titles': dedupe 後に問いタイトルが 0 件 (普通は呼び出し側で防ぐ)
+// - 'no-verified-email': 解決した email が null (Supabase Auth で email_confirmed_at 未設定 等)
+// - 'disabled': EMAIL_ENABLED=false (dev 環境向け)
+// - 'no-api-key': RESEND_API_KEY 未設定 (本番環境ミス検知用)
+type DigestSendResult =
+  | { sent: true }
+  | { sent: false; reason: 'no-titles' | 'no-verified-email' | 'disabled' | 'no-api-key' };
+
 const JAR_URL = 'https://oryzae-client.vercel.app/jar';
 
 // issue #279: ユーザー言語に合わせて subject / body を切り替える。
@@ -43,11 +56,11 @@ export class SendFermentationDigestUsecase {
     questionTitles: string[];
     // 未指定時は 'ja' (#268 と同じデフォルト)。
     language?: FermentationLanguage;
-  }): Promise<void> {
+  }): Promise<DigestSendResult> {
     const uniqueTitles = Array.from(
       new Set(params.questionTitles.map((t) => t.trim()).filter((t) => t.length > 0)),
     );
-    if (uniqueTitles.length === 0) return;
+    if (uniqueTitles.length === 0) return { sent: false, reason: 'no-titles' };
 
     const email = await this.resolveVerifiedEmail(params.userId);
     if (!email) {
@@ -57,13 +70,13 @@ export class SendFermentationDigestUsecase {
         userId: params.userId,
         titleCount: uniqueTitles.length,
       });
-      return;
+      return { sent: false, reason: 'no-verified-email' };
     }
 
     const language: FermentationLanguage = params.language ?? 'ja';
     const copy = COPY[language];
     const bodyText =
       uniqueTitles.length === 1 ? copy.singleBody(uniqueTitles[0]) : copy.multiBody(uniqueTitles);
-    await this.emailNotifier.send({ to: email, subject: copy.subject, bodyText });
+    return await this.emailNotifier.send({ to: email, subject: copy.subject, bodyText });
   }
 }
