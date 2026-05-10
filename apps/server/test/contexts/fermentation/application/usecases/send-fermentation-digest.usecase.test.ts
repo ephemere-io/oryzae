@@ -18,15 +18,21 @@ describe('SendFermentationDigestUsecase', () => {
     expect(notifier.send).not.toHaveBeenCalled();
   });
 
-  it('no-ops when resolver returns null (unverified or missing email)', async () => {
+  it('no-ops + warns when resolver returns null (unverified / missing email, issue #288)', async () => {
     const notifier = mockNotifier();
     const resolve = vi.fn().mockResolvedValue(null);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const usecase = new SendFermentationDigestUsecase(notifier, resolve);
 
     await usecase.execute({ userId: 'u1', questionTitles: ['Q1'] });
 
     expect(resolve).toHaveBeenCalledWith('u1');
     expect(notifier.send).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[SendFermentationDigestUsecase] skipped — verified email not found',
+      expect.objectContaining({ userId: 'u1', titleCount: 1 }),
+    );
+    warnSpy.mockRestore();
   });
 
   it('sends single-title body in the original issue wording', async () => {
