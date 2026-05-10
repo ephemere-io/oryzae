@@ -17,6 +17,12 @@ describe('Question', () => {
       expect(q.isValidatedByUser).toBe(false);
       expect(q.isProposedByOryzae).toBe(true);
     });
+
+    it('新規作成時の jar 位置は null（フォールバック位置を使う）', () => {
+      const q = Question.create({ userId: 'u-1', isProposedByOryzae: false }, generateId);
+      expect(q.jarX).toBeNull();
+      expect(q.jarY).toBeNull();
+    });
   });
 
   describe('isActive', () => {
@@ -27,6 +33,8 @@ describe('Question', () => {
         isArchived: false,
         isValidatedByUser: true,
         isProposedByOryzae: false,
+        jarX: null,
+        jarY: null,
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       });
@@ -40,6 +48,8 @@ describe('Question', () => {
         isArchived: true,
         isValidatedByUser: true,
         isProposedByOryzae: false,
+        jarX: null,
+        jarY: null,
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       });
@@ -53,6 +63,8 @@ describe('Question', () => {
         isArchived: false,
         isValidatedByUser: false,
         isProposedByOryzae: true,
+        jarX: null,
+        jarY: null,
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       });
@@ -67,6 +79,8 @@ describe('Question', () => {
       isArchived: false,
       isValidatedByUser: false,
       isProposedByOryzae: true,
+      jarX: null,
+      jarY: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
@@ -90,6 +104,33 @@ describe('Question', () => {
     });
   });
 
+  describe('withJarPosition', () => {
+    const base = Question.fromProps({
+      id: 'q-1',
+      userId: 'u-1',
+      isArchived: false,
+      isValidatedByUser: true,
+      isProposedByOryzae: false,
+      jarX: null,
+      jarY: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+
+    it('jar 位置を反映した新インスタンスを返す（元は不変）', () => {
+      const moved = base.withJarPosition(42.5, 17.25);
+      expect(moved.jarX).toBe(42.5);
+      expect(moved.jarY).toBe(17.25);
+      expect(base.jarX).toBeNull();
+      expect(base.jarY).toBeNull();
+    });
+
+    it('updatedAt を更新する', () => {
+      const moved = base.withJarPosition(10, 10);
+      expect(moved.updatedAt).not.toBe(base.updatedAt);
+    });
+  });
+
   describe('fromProps / toProps', () => {
     it('Props から復元し、同じ Props に変換できる', () => {
       const props = {
@@ -98,6 +139,8 @@ describe('Question', () => {
         isArchived: true,
         isValidatedByUser: false,
         isProposedByOryzae: true,
+        jarX: 33.3,
+        jarY: 66.6,
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-02T00:00:00Z',
       };
