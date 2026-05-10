@@ -16,7 +16,10 @@ import type {
 export class ResendEmailNotifier implements EmailNotifier {
   async send(params: SendEmailParams): Promise<NotifierSendResult> {
     const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.EMAIL_FROM ?? 'Oryzae <noreply@oryzae.ephemere.io>';
+    // Resend 送信専用サブドメインは `mail.oryzae.ephemere.io` (Route53 で
+    // 明示的にメール送信用と分離してある)。アプリ本体の `oryzae.ephemere.io`
+    // とは別概念なので混同しないこと。
+    const from = process.env.EMAIL_FROM ?? 'Oryzae <noreply@mail.oryzae.ephemere.io>';
     const enabled = process.env.EMAIL_ENABLED !== 'false';
 
     // EMAIL_ENABLED=false は dev 環境向けの意図的なオフ。
