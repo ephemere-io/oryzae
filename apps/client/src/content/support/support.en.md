@@ -12,7 +12,7 @@ A quiet, vertical (or horizontal) page for daily writing. Optional typing effect
 
 ### Jar
 
-Where your question lives, together with the entries linked to it. Both the place fermentation prepares in, and a way to look at the week from above.
+Where your question lives, together with the entries linked to it. Both the place fermentation prepares in, and a way to look at the current state of your question from above.
 
 ### Board
 
@@ -28,7 +28,7 @@ A typical week with Oryzae looks roughly like this.
 
 ### 1. Set a question
 
-Create one from the header or the Jar. It doesn't have to be polished — "Why…", "How might I…", a sentence whose answer you don't yet have, is plenty. You can edit it any time.
+Create one from the header or the Jar. It doesn't have to be polished — "Why…", "How might I…", a sentence whose answer you don't yet have, is plenty. End it with a "?". You can edit the question any time.
 
 ### 2. Write entries
 
@@ -36,7 +36,7 @@ Write in the editor whenever you like. Titles are optional. Entries auto-save ev
 
 ### 3. Tie an entry to your question (pickle it)
 
-On save, choose "pickle" to link the entry to your current question. Entries that aren't tied to a question stay out of the Jar — and out of fermentation.
+On save, choose "pickle" and the text drops into the fermentation jar, becoming a candidate for the fermentation process.
 
 ### 4. Wait for fermentation
 
@@ -44,7 +44,7 @@ On the weekend, the week's entries that are tied to your question pass through t
 
 ### 5. Read the letter and keywords
 
-When fermentation completes, you can open a 500-character letter and 3–5 keywords from the Jar. Not a summary — a comment written deliberately a little off from your own vocabulary, to keep your thinking moving.
+When fermentation completes, you can open from the Jar a 500-character letter, 3–5 keywords, and snippets extracted from your original text. These aren't "right answers" or summaries — they're prompts for you to keep writing yourself.
 
 ### 6. Look back from the Board
 
@@ -56,7 +56,7 @@ The editor is the heart of Oryzae. A few small features take care of the act of 
 
 ### Vertical / horizontal
 
-Switch between vertical and horizontal writing from the toolbar at any time. Default is vertical, tuned for Japanese and Chinese.
+Switch between vertical and horizontal writing from the toolbar at any time. In Japanese, the default is vertical.
 
 ### Mincho / Gothic
 
@@ -95,9 +95,9 @@ Small effects that bring a touch of body to the act of writing. Each one can be 
 | Focus mode | Dims everything except the paragraph the cursor is in. | Sinking into a single paragraph at a time. |
 | Time Inscription | Encodes per-key dwell time and speed into character size, weight, and pressure bleed. | Leaving rhythm and emphasis on the page itself. |
 | Eraser Trace | Deleted characters fade out gradually instead of disappearing instantly. | Looking back at the path of revision. |
-| AMP / ASMR | Picks up keystroke sounds via the mic and re-amplifies them through filters and a compressor. | Days when you simply love the sound of writing. Mic permission required. |
+| AMP / ASMR | Picks up keystroke sounds via the mic and re-amplifies them through filters and a compressor. | When you want to lose yourself in the act of writing. Mic permission required. |
 | Voice Dynamics | Reflects the volume of your voice, picked up by the mic, into character weight and size. | Speaking aloud while you write or think. Mic permission required. |
-| Ghost | Characters leave a soft afterimage that blurs and fades. Two modes: block (on commit) and dust (per key). | Watching the rhythm of writing itself. |
+| Ghost | Characters leave a soft afterimage that blurs and fades. Two modes: block (on commit) and dust (per key). | When you want to savour the rhythm of writing visually. |
 
 Size, scatter, blur, and duration can all be tuned from the settings panel.
 
@@ -137,19 +137,19 @@ It is sent to Oryzae's server over SSL and stored in an encrypted database (Supa
 
 ### What does the AI read?
 
-Only the question you set, and the entries you have tied to that question. Drafts and casual notes that aren't tied to a question stay out of fermentation.
+Only the entries you wrote and chose to "pickle". Drafts and casual notes that you didn't pickle stay out of fermentation.
 
 ### When does fermentation happen?
 
-Roughly on the weekend, against the entries linked to your question that week. Fermentation may be skipped depending on entry volume and a small time gate.
+Roughly every few days, once enough new text has accumulated. It won't run while you aren't writing.
 
 ### How do I delete an entry?
 
-Open the entry from the list and choose delete from the menu. Even if it was linked to a question, deleting it removes it from fermentation as well.
+Open the entry from the list and choose delete from the menu. Deleting it removes it from fermentation as well.
 
 ### How many questions can I have?
 
-You can keep several questions in the Jar at once. We recommend choosing one as the "current question" and tying entries to that, so the fermentation has a clear focus.
+You can keep up to three questions in the Jar at once. That said, we recommend tying each entry to a single question.
 
 ### Do I have to write vertically?
 
@@ -157,7 +157,7 @@ No. Vertical is the default, but you can switch to horizontal from the toolbar a
 
 ### Can I write in languages other than Japanese?
 
-Yes — multilingual input is supported, including English. Fermentation responds in the language you write in. Vertical writing is tuned for Japanese and Chinese.
+For now, only Japanese and English are supported.
 
 ### Voice input or mic-based effects don't work
 
@@ -165,7 +165,7 @@ Voice input, AMP / ASMR, and Voice Dynamics all need microphone access. We recom
 
 ### Can I use Oryzae on my phone?
 
-You can read and jot down short notes, but Oryzae is designed for sitting down and writing on a desktop. To get the most out of vertical writing, the effects, and the stats, desktop Chrome is recommended.
+Oryzae isn't currently optimised for smartphones. Desktop Chrome or Safari is recommended.
 
 ### Is there a paid plan?
 
