@@ -14,7 +14,10 @@ type DigestSendResult =
   | { sent: true }
   | { sent: false; reason: 'no-titles' | 'no-verified-email' | 'disabled' | 'no-api-key' };
 
-const JAR_URL = 'https://oryzae-client.vercel.app/jar';
+// メール内リンクは本番ドメイン (LP / アプリ本体) を指す。preview / dev で
+// 送信したメールでも、受信者は常に本番に着地する想定 (vercel.app の preview
+// URL は受信者にとって意味がないため)。
+const JAR_URL = 'https://oryzae.ephemere.io/jar';
 
 // issue #279: ユーザー言語に合わせて subject / body を切り替える。
 const COPY: Record<
