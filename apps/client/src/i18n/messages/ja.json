@@ -207,7 +207,8 @@
       "label": "言語"
     },
     "links": {
-      "privacy": "プライバシーポリシー"
+      "privacy": "プライバシーポリシー",
+      "support": "ヘルプ・サポート"
     }
   },
   "sidebar": {
@@ -448,6 +449,7 @@
       "preview": "アプリ",
       "philosophy": "思想",
       "faq": "FAQ",
+      "support": "ヘルプ",
       "cta": "アプリを試す"
     },
     "hero": {
@@ -661,5 +663,9 @@
       "title": "プライバシーポリシー",
       "back_home": "トップへ戻る"
     }
+  },
+  "support": {
+    "title": "サポート",
+    "back_home": "トップへ戻る"
   }
 }

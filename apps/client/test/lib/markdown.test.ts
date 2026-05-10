@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  type InlineNode,
-  type MdNode,
-  parseInline,
-  parseMarkdown,
-} from '@/features/legal/lib/markdown';
+import { type InlineNode, type MdNode, parseInline, parseMarkdown } from '@/lib/markdown';
 
 /** Drop the `id` field for shape-only assertions. */
 function stripIds(node: InlineNode): unknown {
