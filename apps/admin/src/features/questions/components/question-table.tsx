@@ -39,7 +39,43 @@ function userLabel(item: QuestionItem): string {
   return item.user_email || item.user_id.slice(0, 8);
 }
 
-type SortKey = 'user' | 'text' | 'created_at' | 'updated_at' | 'readiness';
+// readiness 系セル (charScore / timeScore / readiness) の共通レンダラ。
+// バー + score + 内訳テキストを縦に積み、tooltip に詳細を入れる。
+function ScoreCell({
+  score,
+  primary,
+  detail,
+  title,
+}: {
+  score: number;
+  primary: string;
+  detail: string;
+  title: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5" title={title}>
+      <div className="flex items-center gap-1.5">
+        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full ${readinessBarColor(score)}`}
+            style={{ width: `${Math.round(score * 100)}%` }}
+          />
+        </div>
+        <span className="font-mono text-xs">{primary}</span>
+      </div>
+      <span className="font-mono text-[10px] text-muted-foreground">{detail}</span>
+    </div>
+  );
+}
+
+type SortKey =
+  | 'user'
+  | 'text'
+  | 'created_at'
+  | 'updated_at'
+  | 'charScore'
+  | 'timeScore'
+  | 'readiness';
 type SortDir = 'asc' | 'desc';
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -80,6 +116,10 @@ export function QuestionTable({ items }: QuestionTableProps) {
           return mul * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         case 'updated_at':
           return mul * (new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+        case 'charScore':
+          return mul * (a.readiness.charScore - b.readiness.charScore);
+        case 'timeScore':
+          return mul * (a.readiness.timeScore - b.readiness.timeScore);
         case 'readiness':
           return mul * (a.readiness.score - b.readiness.score);
         default:
@@ -116,7 +156,9 @@ export function QuestionTable({ items }: QuestionTableProps) {
           <SortableHead label="問い" sortKeyName="text" />
           <SortableHead label="Created" sortKeyName="created_at" className="w-[140px]" />
           <SortableHead label="Updated" sortKeyName="updated_at" className="w-[140px]" />
-          <SortableHead label="Readiness" sortKeyName="readiness" className="w-[180px]" />
+          <SortableHead label="Char" sortKeyName="charScore" className="w-[130px]" />
+          <SortableHead label="Time" sortKeyName="timeScore" className="w-[130px]" />
+          <SortableHead label="Readiness" sortKeyName="readiness" className="w-[150px]" />
           <TableHead className="w-[60px]">Flags</TableHead>
         </TableRow>
       </TableHeader>
@@ -148,25 +190,45 @@ export function QuestionTable({ items }: QuestionTableProps) {
               {formatDate(item.updated_at)}
             </TableCell>
             <TableCell>
-              <div
-                className="flex items-center gap-2"
+              <ScoreCell
+                score={item.readiness.charScore}
+                primary={formatReadiness(item.readiness.charScore)}
+                detail={`${item.readiness.charsCurrent} / ${item.readiness.threshold} chars`}
                 title={
-                  `score=${formatReadiness(item.readiness.score)} ` +
-                  `chars=${item.readiness.charsCurrent}/${item.readiness.threshold} ` +
-                  `(${formatReadiness(item.readiness.charScore)}) ` +
-                  (item.readiness.hoursElapsed != null && item.readiness.hoursRequired != null
-                    ? `time=${item.readiness.hoursElapsed.toFixed(1)}h/${item.readiness.hoursRequired}h ` +
-                      `(${formatReadiness(item.readiness.timeScore)})`
-                    : 'never fermented')
+                  `charScore = ${formatReadiness(item.readiness.charScore)} ` +
+                  `(${item.readiness.charsCurrent} / ${item.readiness.threshold} chars, ` +
+                  `lang=${item.readiness.language})`
                 }
-              >
-                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full ${readinessBarColor(item.readiness.score)}`}
-                    style={{ width: `${Math.round(item.readiness.score * 100)}%` }}
-                  />
-                </div>
-                <span className="font-mono text-xs">{formatReadiness(item.readiness.score)}</span>
+              />
+            </TableCell>
+            <TableCell>
+              <ScoreCell
+                score={item.readiness.timeScore}
+                primary={formatReadiness(item.readiness.timeScore)}
+                detail={
+                  item.readiness.hoursElapsed != null && item.readiness.hoursRequired != null
+                    ? `${item.readiness.hoursElapsed.toFixed(1)}h / ${item.readiness.hoursRequired}h`
+                    : 'never fermented'
+                }
+                title={
+                  item.readiness.hoursElapsed != null && item.readiness.hoursRequired != null
+                    ? `timeScore = ${formatReadiness(item.readiness.timeScore)} ` +
+                      `(elapsed ${item.readiness.hoursElapsed.toFixed(2)}h / required ${item.readiness.hoursRequired}h)`
+                    : 'この問いはまだ発酵されていない (timeScore=1.0)'
+                }
+              />
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-2">
+                <ScoreCell
+                  score={item.readiness.score}
+                  primary={formatReadiness(item.readiness.score)}
+                  detail="min(char, time)"
+                  title={
+                    `readiness = min(charScore, timeScore) = ${formatReadiness(item.readiness.score)}\n` +
+                    `eligible = ${item.readiness.eligible}`
+                  }
+                />
                 {item.readiness.eligible && (
                   <span title="eligible for fermentation">
                     <Sparkles className="h-3 w-3 text-green-600" />
@@ -197,7 +259,7 @@ export function QuestionTable({ items }: QuestionTableProps) {
         ))}
         {items.length === 0 && (
           <TableRow>
-            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+            <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
               No questions
             </TableCell>
           </TableRow>
