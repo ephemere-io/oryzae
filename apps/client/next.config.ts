@@ -7,6 +7,10 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   transpilePackages: ['@oryzae/shared', '@oryzae/server'],
   turbopack: {},
+  // /support 用 MD は server component から fs で読むため、デプロイ成果物に含める
+  outputFileTracingIncludes: {
+    '/support': ['./content/support/*.md'],
+  },
 };
 
 export default withSentryConfig(withNextIntl(nextConfig), {

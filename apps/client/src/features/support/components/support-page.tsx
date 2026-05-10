@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { useTransition } from 'react';
 import type { Locale } from '@/i18n/config';
 import { setLocaleAction } from '@/lib/i18n-actions';
+import { makeT, type SupportContent } from '../lib/content-types';
 import styles from './support.module.css';
 import { SupportFaqItem } from './support-faq-item';
 
@@ -59,8 +60,12 @@ const FAQ_INDICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 const PLACES = ['place_editor', 'place_jar', 'place_board', 'place_letter'] as const;
 
-export function SupportPage() {
-  const t = useTranslations('support');
+interface SupportPageProps {
+  content: SupportContent;
+}
+
+export function SupportPage({ content }: SupportPageProps) {
+  const t = makeT(content);
   const locale = useLocale();
 
   return (
