@@ -80,6 +80,62 @@ export function evaluateEligibility(input: EligibilityInput): EligibilityResult 
   };
 }
 
+// 問い単位 readiness 評価 (issue #287)。
+//
+// admin dashboard 用。fermentation_results は question_id ごとに記録されるので、
+// 「この問いについて」の charScore / timeScore を直接スコープして評価できる。
+//   charScore = (この問いに紐づくエントリの文字数, この問いの直近成功発酵以降) / 言語別閾値
+//   timeScore = (この問いの直近成功発酵からの経過時間) / nextRandomHours
+//   readiness = min(charScore, timeScore)
+// 未発酵 (lastRunAt == null) の場合は新規使用者と同じく時間ゲートを免除し、
+// timeScore = 1, readiness = charScore とする。
+// nextRandomHours はユーザー単位の値 (UserFermentationState 由来) をそのまま渡す。
+// 不在 (旧データ) なら MIN にフォールバックする。
+interface QuestionEligibilityInput {
+  // この問いについての直近の成功発酵時刻。null なら未発酵。
+  lastRunAt: string | null;
+  // この問いに紐づくエントリの文字数。lastRunAt 以降 (null なら全期間)。
+  charsSinceLastRun: number;
+  // ユーザー単位 nextRandomHours。null は MIN(24h) で評価。
+  nextRandomHours: number | null;
+  language: FermentationLanguage;
+  now: Date;
+}
+
+export function evaluateQuestionEligibility(input: QuestionEligibilityInput): EligibilityResult {
+  const threshold = FERMENTATION_CHAR_THRESHOLDS[input.language];
+  const charScore = clamp01(input.charsSinceLastRun / threshold);
+
+  if (input.lastRunAt === null) {
+    return {
+      eligible: charScore >= 1,
+      readinessScore: charScore,
+      charScore,
+      timeScore: 1,
+      threshold,
+      charsCurrent: input.charsSinceLastRun,
+      hoursElapsed: null,
+      hoursRequired: null,
+    };
+  }
+
+  const lastRunAt = new Date(input.lastRunAt);
+  const hoursRequired = input.nextRandomHours ?? FERMENTATION_RANDOM_HOURS_MIN;
+  const hoursElapsed = (input.now.getTime() - lastRunAt.getTime()) / (60 * 60 * 1000);
+  const timeScore = clamp01(hoursElapsed / hoursRequired);
+  const readinessScore = Math.min(charScore, timeScore);
+  return {
+    eligible: charScore >= 1 && timeScore >= 1,
+    readinessScore,
+    charScore,
+    timeScore,
+    threshold,
+    charsCurrent: input.charsSinceLastRun,
+    hoursElapsed,
+    hoursRequired,
+  };
+}
+
 // 発酵成功時に呼び、次回までの X 時間 (24-168h, inclusive) を整数で返す。
 export function rollRandomHours(rng: () => number = Math.random): number {
   const range = FERMENTATION_RANDOM_HOURS_MAX - FERMENTATION_RANDOM_HOURS_MIN + 1;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { UserFermentationState } from '@/contexts/fermentation/domain/models/user-fermentation-state';
 import {
   evaluateEligibility,
+  evaluateQuestionEligibility,
   FERMENTATION_RANDOM_HOURS_MAX,
   FERMENTATION_RANDOM_HOURS_MIN,
   rollRandomHours,
@@ -102,6 +103,137 @@ describe('evaluateEligibility', () => {
         updatedAt: lastRunAt.toISOString(),
       });
       const r = evaluateEligibility({ state, totalChars: 1500, language: 'ja', now: NOW });
+      expect(r.hoursRequired).toBe(FERMENTATION_RANDOM_HOURS_MIN);
+      expect(r.eligible).toBe(true);
+    });
+  });
+});
+
+describe('evaluateQuestionEligibility', () => {
+  describe('未発酵の問い (lastRunAt == null)', () => {
+    it('閾値未満なら eligible=false、charScore は比率', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: null,
+        charsSinceLastRun: 500,
+        nextRandomHours: 48,
+        language: 'ja',
+        now: NOW,
+      });
+      expect(r.eligible).toBe(false);
+      expect(r.charScore).toBe(0.5);
+      expect(r.timeScore).toBe(1);
+      expect(r.readinessScore).toBe(0.5);
+      expect(r.threshold).toBe(1000);
+      expect(r.hoursElapsed).toBeNull();
+      expect(r.hoursRequired).toBeNull();
+    });
+
+    it('閾値ちょうどで eligible=true', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: null,
+        charsSinceLastRun: 1000,
+        nextRandomHours: 48,
+        language: 'ja',
+        now: NOW,
+      });
+      expect(r.eligible).toBe(true);
+      expect(r.charScore).toBe(1);
+      expect(r.readinessScore).toBe(1);
+    });
+
+    it('英語ロケールは閾値 500', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: null,
+        charsSinceLastRun: 500,
+        nextRandomHours: null,
+        language: 'en',
+        now: NOW,
+      });
+      expect(r.threshold).toBe(500);
+      expect(r.eligible).toBe(true);
+    });
+
+    it('閾値超過でも readiness は 1 にクランプ', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: null,
+        charsSinceLastRun: 5000,
+        nextRandomHours: null,
+        language: 'ja',
+        now: NOW,
+      });
+      expect(r.readinessScore).toBe(1);
+    });
+  });
+
+  describe('発酵済みの問い (lastRunAt あり)', () => {
+    function lastRunHoursAgo(hours: number): string {
+      return new Date(NOW.getTime() - hours * 60 * 60 * 1000).toISOString();
+    }
+
+    it('文字数も時間も足りないと eligible=false', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: lastRunHoursAgo(10),
+        charsSinceLastRun: 200,
+        nextRandomHours: 48,
+        language: 'ja',
+        now: NOW,
+      });
+      expect(r.eligible).toBe(false);
+      expect(r.charScore).toBeCloseTo(0.2);
+      expect(r.timeScore).toBeCloseTo(10 / 48);
+      expect(r.readinessScore).toBeCloseTo(Math.min(0.2, 10 / 48));
+    });
+
+    it('文字数だけ満たし時間が不足なら eligible=false (readiness=timeScore)', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: lastRunHoursAgo(20),
+        charsSinceLastRun: 2000,
+        nextRandomHours: 48,
+        language: 'ja',
+        now: NOW,
+      });
+      expect(r.eligible).toBe(false);
+      expect(r.charScore).toBe(1);
+      expect(r.timeScore).toBeCloseTo(20 / 48);
+      expect(r.readinessScore).toBeCloseTo(20 / 48);
+    });
+
+    it('時間だけ満たし文字数が不足なら eligible=false (readiness=charScore)', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: lastRunHoursAgo(72),
+        charsSinceLastRun: 500,
+        nextRandomHours: 48,
+        language: 'ja',
+        now: NOW,
+      });
+      expect(r.eligible).toBe(false);
+      expect(r.charScore).toBe(0.5);
+      expect(r.timeScore).toBe(1);
+      expect(r.readinessScore).toBe(0.5);
+    });
+
+    it('両方満たすと eligible=true、readiness=1', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: lastRunHoursAgo(72),
+        charsSinceLastRun: 1500,
+        nextRandomHours: 48,
+        language: 'ja',
+        now: NOW,
+      });
+      expect(r.eligible).toBe(true);
+      expect(r.readinessScore).toBe(1);
+      expect(r.hoursElapsed).toBeCloseTo(72);
+      expect(r.hoursRequired).toBe(48);
+    });
+
+    it('nextRandomHours が null のときは MIN(24h) で評価する', () => {
+      const r = evaluateQuestionEligibility({
+        lastRunAt: lastRunHoursAgo(24),
+        charsSinceLastRun: 1500,
+        nextRandomHours: null,
+        language: 'ja',
+        now: NOW,
+      });
       expect(r.hoursRequired).toBe(FERMENTATION_RANDOM_HOURS_MIN);
       expect(r.eligible).toBe(true);
     });
