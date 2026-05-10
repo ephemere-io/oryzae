@@ -50,7 +50,15 @@ export class SendFermentationDigestUsecase {
     if (uniqueTitles.length === 0) return;
 
     const email = await this.resolveVerifiedEmail(params.userId);
-    if (!email) return;
+    if (!email) {
+      // 未検証メール / メール未登録ユーザーはサイレントスキップで構わないが、
+      // サポート問い合わせで切り分けられるよう warn だけ残す (issue #288)。
+      console.warn('[SendFermentationDigestUsecase] skipped — verified email not found', {
+        userId: params.userId,
+        titleCount: uniqueTitles.length,
+      });
+      return;
+    }
 
     const language: FermentationLanguage = params.language ?? 'ja';
     const copy = COPY[language];

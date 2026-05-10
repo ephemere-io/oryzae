@@ -593,7 +593,7 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
     expect(llm.analyze).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }));
   });
 
-  it('digest 失敗が cron 全体を壊さない', async () => {
+  it('digest 失敗が cron 全体を壊さず、emailFailures に集計される (issue #288)', async () => {
     const entry = makeEntry('user-1', 'e1');
     const question = makeQuestion('user-1', 'q1');
     const transaction = makeQuestionTransaction('q1', 'Q');
@@ -612,6 +612,7 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
     vi.mocked(linkRepo.listEntryIdsByQuestionId).mockResolvedValue(['e1']);
 
     const sendDigest = vi.fn().mockRejectedValue(new Error('email down'));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const usecase = buildUsecase({
       entryRepo,
@@ -626,6 +627,13 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
 
     expect(result.succeeded).toBe(1);
     expect(sendDigest).toHaveBeenCalledOnce();
+    // 旧実装ではメール失敗が黙殺されて結果から消えていた (issue #288)
+    expect(result.emailFailures).toEqual([{ userId: 'user-1', error: 'email down' }]);
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[ScheduledFermentationUsecase] digest email failed',
+      expect.objectContaining({ userId: 'user-1', error: 'email down' }),
+    );
+    errorSpy.mockRestore();
   });
 
   it('アクティブユーザーがいない場合、副作用なし', async () => {
