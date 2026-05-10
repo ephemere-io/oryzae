@@ -595,6 +595,14 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
           <LanguageSection />
 
           <Link
+            href="/support"
+            className="text-sm underline-offset-2 transition-colors hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            {t('links.support')} →
+          </Link>
+
+          <Link
             href="/privacy"
             className="text-sm underline-offset-2 transition-colors hover:underline"
             style={{ color: 'var(--accent)' }}

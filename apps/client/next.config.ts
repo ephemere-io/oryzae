@@ -7,12 +7,13 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   transpilePackages: ['@oryzae/shared', '@oryzae/server'],
   turbopack: {},
-  // Static legal pages read their bodies from `src/content/legal/*.md` at
+  // Static MD-backed pages read their bodies from `src/content/**/*.md` at
   // request time. Next.js' file-trace can't detect dynamic `process.cwd()`
-  // reads, so include the directory explicitly so the files ship with the
+  // reads, so include the directories explicitly so the files ship with the
   // deployment.
   outputFileTracingIncludes: {
     '/privacy': ['./src/content/legal/**/*.md'],
+    '/support': ['./src/content/support/**/*.md'],
   },
 };
 

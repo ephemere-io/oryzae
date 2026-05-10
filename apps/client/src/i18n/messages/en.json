@@ -207,7 +207,8 @@
       "label": "Language"
     },
     "links": {
-      "privacy": "Privacy Policy"
+      "privacy": "Privacy Policy",
+      "support": "Help & Support"
     }
   },
   "sidebar": {
@@ -448,6 +449,7 @@
       "preview": "The app",
       "philosophy": "Philosophy",
       "faq": "FAQ",
+      "support": "Help",
       "cta": "Open the app"
     },
     "hero": {
@@ -661,5 +663,9 @@
       "title": "Privacy Policy",
       "back_home": "Back to home"
     }
+  },
+  "support": {
+    "title": "Support",
+    "back_home": "Back home"
   }
 }

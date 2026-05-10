@@ -1,17 +1,17 @@
 import Link from 'next/link';
-import { MarkdownView } from '@/features/legal/components/markdown-view';
-import type { MdNode } from '@/features/legal/lib/markdown';
+import { MarkdownView } from '@/components/ui/markdown-view';
+import type { MdNode } from '@/lib/markdown';
 
-interface LegalPageProps {
+interface MarkdownPageProps {
   nodes: MdNode[];
   homeLabel: string;
 }
 
 /**
- * Layout shell for static legal pages (privacy policy, etc.).
+ * Layout shell for static markdown-backed pages (privacy policy, support, etc.).
  * Public — does not assume the user is signed in.
  */
-export function LegalPage({ nodes, homeLabel }: LegalPageProps) {
+export function MarkdownPage({ nodes, homeLabel }: MarkdownPageProps) {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <nav className="mb-10">

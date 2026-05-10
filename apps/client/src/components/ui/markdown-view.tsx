@@ -1,4 +1,4 @@
-import type { InlineNode, MdNode } from '@/features/legal/lib/markdown';
+import type { InlineNode, MdNode } from '@/lib/markdown';
 
 const headingClass: Record<1 | 2 | 3, string> = {
   1: 'mb-8 text-2xl font-semibold tracking-tight',
