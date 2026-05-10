@@ -5,6 +5,7 @@ import { entries } from './contexts/entry/presentation/routes/entries.js';
 import { adminFermentations } from './contexts/fermentation/presentation/routes/admin-fermentations.js';
 import { cronFermentation } from './contexts/fermentation/presentation/routes/cron-fermentation.js';
 import { fermentations } from './contexts/fermentation/presentation/routes/fermentations.js';
+import { adminQuestions } from './contexts/question/presentation/routes/admin-questions.js';
 import { entryQuestions } from './contexts/question/presentation/routes/entry-questions.js';
 import { questions } from './contexts/question/presentation/routes/questions.js';
 import { adminAuthMiddleware } from './contexts/shared/presentation/middleware/admin-auth.js';
@@ -32,6 +33,7 @@ const app = new Hono()
   .route('/api/v1/admin/dashboard', adminDashboard)
   .route('/api/v1/admin/users', adminUsers)
   .route('/api/v1/admin/fermentations', adminFermentations)
+  .route('/api/v1/admin/questions', adminQuestions)
   .route('/api/v1/admin/analytics', adminAnalytics)
   .route('/api/v1/admin/observability', adminObservability)
   .use('/api/v1/*', authMiddleware)

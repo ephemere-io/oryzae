@@ -5,6 +5,7 @@ import {
   DollarSign,
   Eye,
   FlaskConical,
+  HelpCircle,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -21,6 +22,7 @@ import { useAdminAuth } from '../hooks/use-admin-auth';
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/users', label: 'Users', icon: Users },
+  { href: '/questions', label: 'Questions', icon: HelpCircle },
   { href: '/fermentations', label: 'Fermentations', icon: FlaskConical },
   { href: '/costs', label: 'Costs', icon: DollarSign },
   { href: '/analytics', label: 'Analytics', icon: Activity },
