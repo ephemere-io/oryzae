@@ -124,3 +124,26 @@ export const boardSnippetCreateSchema = z.object({
 export const boardSnippetUpdateSchema = z.object({
   text: z.string().min(1).max(50),
 });
+
+/**
+ * Jar 画面のドラッグ&ドロップ位置保存。
+ * - questions: 円本体（jar 全体に対する % 位置）
+ * - keywords / snippets / letters: 円の中の要素（QuestionCircle に対する % 位置）
+ *
+ * 各座標は 0–100 のパーセンテージ（クライアントでクランプ済みの想定）。
+ */
+const jarPositionItemSchema = z.object({
+  id: z.string().uuid(),
+  jarX: z.number().min(0).max(100),
+  jarY: z.number().min(0).max(100),
+});
+
+export const jarLayoutUpdateSchema = z.object({
+  questions: z.array(jarPositionItemSchema).default([]),
+  keywords: z.array(jarPositionItemSchema).default([]),
+  snippets: z.array(jarPositionItemSchema).default([]),
+  letters: z.array(jarPositionItemSchema).default([]),
+});
+
+export type JarLayoutUpdate = z.infer<typeof jarLayoutUpdateSchema>;
+export type JarPositionItem = z.infer<typeof jarPositionItemSchema>;
