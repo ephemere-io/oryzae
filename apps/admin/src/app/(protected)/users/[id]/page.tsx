@@ -25,11 +25,14 @@ export default function UserDetailPage() {
     refresh: refreshReadiness,
   } = useFermentationReadiness(userId);
 
-  if (loading) {
-    return <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>;
-  }
-
-  if (error || !data) {
+  // 初回ロードのみ全画面 Loading / Error を出す。
+  // refresh (例: FireFermentationPanel が onCompleted で呼ぶ) 中はページごと
+  // アンマウントすると panel の result state が消えてしまうため、データが既に
+  // あるときは stale-while-revalidate でそのまま描画を続ける (issue #290 フォロー)。
+  if (!data) {
+    if (loading) {
+      return <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>;
+    }
     return (
       <div className="space-y-4">
         <Link href="/users">
