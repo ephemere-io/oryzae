@@ -1,7 +1,21 @@
 'use client';
 
-import { useMemo } from 'react';
+import { type MouseEvent, type PointerEvent, useMemo, useRef } from 'react';
+import { DraggableJarElement } from '@/features/fermentation/components/draggable-jar-element';
 import type { FermentationDetail } from '@/features/fermentation/hooks/use-fermentation-results';
+
+interface Pos {
+  jarX: number;
+  jarY: number;
+}
+
+interface CirclePointerHandlers {
+  onPointerDown: (e: PointerEvent<HTMLElement>) => void;
+  onPointerMove: (e: PointerEvent<HTMLElement>) => void;
+  onPointerUp: (e: PointerEvent<HTMLElement>) => void;
+  onPointerCancel: (e: PointerEvent<HTMLElement>) => void;
+  onClick: (e: MouseEvent<HTMLElement>) => void;
+}
 
 interface QuestionCircleProps {
   questionId: string;
@@ -9,8 +23,31 @@ interface QuestionCircleProps {
   detail: FermentationDetail | null;
   zoomed: boolean;
   hidden?: boolean;
-  onClick: () => void;
+  /** User-edited positions for inner elements; if absent we fall back to detail.{kw,sn,lt}.jarX/Y. */
+  innerOverrides: {
+    keywords: Record<string, Pos>;
+    snippets: Record<string, Pos>;
+    letters: Record<string, Pos>;
+  };
   onElementClick: (type: 'keyword' | 'snippet' | 'letter', data: Record<string, string>) => void;
+  onInnerDragMove: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
+  onInnerDragEnd: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
+  /** Pointer handlers from the parent's useJarDrag for the circle wrapper itself. */
+  circlePointerHandlers: CirclePointerHandlers;
+  /** Keyboard activation (Enter on a focused unzoomed circle). Same effect as a tap. */
+  onActivate: () => void;
+  /** True while the circle is being dragged — disables the zoom transition for snappy follow. */
+  isDraggingCircle: boolean;
   style?: React.CSSProperties;
 }
 
@@ -23,20 +60,20 @@ const MICROBE_SVGS = {
 };
 const MICROBE_TYPES: Array<'koji' | 'yeast' | 'lab'> = ['koji', 'yeast', 'lab'];
 
-/* ── Positions for content elements ── */
-const KEYWORD_POSITIONS = [
-  { top: 20, left: 55 },
-  { top: 38, left: 18 },
-  { top: 55, left: 65 },
-  { top: 72, left: 28 },
-  { top: 45, left: 45 },
+/* ── Fallback positions for content elements (used when no DB or override value exists) ── */
+const KEYWORD_FALLBACK_POSITIONS = [
+  { x: 55, y: 20 },
+  { x: 18, y: 38 },
+  { x: 65, y: 55 },
+  { x: 28, y: 72 },
+  { x: 45, y: 45 },
 ];
-const SNIPPET_POSITIONS = [
-  { top: 30, left: 35 },
-  { top: 60, left: 15 },
-  { top: 50, left: 75 },
+const SNIPPET_FALLBACK_POSITIONS = [
+  { x: 35, y: 30 },
+  { x: 15, y: 60 },
+  { x: 75, y: 50 },
 ];
-const LETTER_POSITION = { top: 72, left: 52 };
+const LETTER_FALLBACK_POSITION = { x: 52, y: 72 };
 const FLOAT_CLASSES = ['j2-float-1', 'j2-float-2', 'j2-float-3'];
 
 /* ── Empty state microbe positions ── */
@@ -48,6 +85,23 @@ const EMPTY_MICROBE_POSITIONS = [
   { top: 70, left: 38, size: 28 },
   { top: 40, left: 70, size: 20 },
 ];
+
+interface JarStored {
+  jarX: number | null;
+  jarY: number | null;
+}
+
+function resolveInnerPos(
+  override: Pos | undefined,
+  stored: JarStored,
+  fallback: { x: number; y: number },
+): Pos {
+  if (override) return override;
+  if (stored.jarX != null && stored.jarY != null) {
+    return { jarX: stored.jarX, jarY: stored.jarY };
+  }
+  return { jarX: fallback.x, jarY: fallback.y };
+}
 
 /** Seeded random number generator (same as reference) */
 function seededRandom(seed: string): () => number {
@@ -88,28 +142,38 @@ export function QuestionCircle({
   detail,
   zoomed,
   hidden = false,
-  onClick,
+  innerOverrides,
   onElementClick,
+  onInnerDragMove,
+  onInnerDragEnd,
+  circlePointerHandlers,
+  onActivate,
+  isDraggingCircle,
   style,
 }: QuestionCircleProps) {
   const hasData = detail && detail.status === 'completed';
   const size = 280;
+  const circleRef = useRef<HTMLDivElement | null>(null);
 
   const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);
 
   return (
     <div
-      onClick={zoomed ? undefined : onClick}
+      ref={circleRef}
+      {...circlePointerHandlers}
       role={zoomed ? undefined : 'button'}
       tabIndex={zoomed ? undefined : 0}
       onKeyDown={
         zoomed
           ? undefined
           : (e) => {
-              if (e.key === 'Enter') onClick();
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onActivate();
+              }
             }
       }
-      className={`absolute transition-all duration-[600ms] ${zoomed ? 'z-[55]' : 'z-[3] cursor-pointer'} ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+      className={`absolute ${zoomed ? 'z-[55]' : 'z-[3]'} ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
       style={{
         ...style,
         width: zoomed ? 'min(50vw, 75vh, 500px)' : `${size}px`,
@@ -117,6 +181,11 @@ export function QuestionCircle({
         transform: zoomed ? 'translate(-50%, -50%)' : 'translate(-50%, -50%)',
         ...(zoomed ? { top: '50%', left: '50%' } : {}),
         animation: 'fadeIn 0.5s ease-out forwards',
+        // Suppress the zoom/move transition during drag so the circle follows the cursor.
+        transition: isDraggingCircle ? 'none' : 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+        cursor: zoomed ? 'default' : isDraggingCircle ? 'grabbing' : 'grab',
+        touchAction: zoomed ? undefined : 'none',
+        userSelect: 'none',
         // @ts-expect-error: CSS custom property for element scaling
         '--el-scale': zoomed ? '1.1' : '0.65',
       }}
@@ -222,29 +291,31 @@ export function QuestionCircle({
           >
             {/* Keywords with attached microbe */}
             {detail.keywords.slice(0, 5).map((kw, i) => {
-              const pos = KEYWORD_POSITIONS[i] ?? { top: 35 + i * 12, left: 20 + i * 15 };
+              const fallback = KEYWORD_FALLBACK_POSITIONS[i] ?? { x: 20 + i * 15, y: 35 + i * 12 };
+              const pos = resolveInnerPos(innerOverrides.keywords[kw.id], kw, fallback);
               const mType = MICROBE_TYPES[i % 3];
               return (
-                <div
+                <DraggableJarElement
                   key={kw.id}
+                  containerRef={circleRef}
+                  enabled={zoomed}
+                  x={pos.jarX}
+                  y={pos.jarY}
+                  onClickWithoutDrag={() =>
+                    onElementClick('keyword', {
+                      keyword: kw.keyword,
+                      description: kw.description,
+                    })
+                  }
+                  onDragMove={(x, y) => onInnerDragMove('keyword', kw.id, x, y)}
+                  onDragEnd={(x, y) => onInnerDragEnd('keyword', kw.id, x, y)}
                   className={FLOAT_CLASSES[i % 3]}
                   style={{
-                    position: 'absolute',
-                    top: `${pos.top}%`,
-                    left: `${pos.left}%`,
                     transform: 'scale(var(--el-scale))',
                     transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
                   <div
-                    onClick={(e) => {
-                      if (!zoomed) return;
-                      e.stopPropagation();
-                      onElementClick('keyword', {
-                        keyword: kw.keyword,
-                        description: kw.description,
-                      });
-                    }}
                     className={zoomed ? 'cursor-pointer' : ''}
                     style={{
                       position: 'relative',
@@ -269,38 +340,40 @@ export function QuestionCircle({
                       dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[mType] }}
                     />
                   </div>
-                </div>
+                </DraggableJarElement>
               );
             })}
 
             {/* Snippets with attached microbe */}
             {detail.snippets.slice(0, 3).map((s, i) => {
-              const pos = SNIPPET_POSITIONS[i] ?? { top: 40 + i * 18, left: 25 + i * 20 };
+              const fallback = SNIPPET_FALLBACK_POSITIONS[i] ?? { x: 25 + i * 20, y: 40 + i * 18 };
+              const pos = resolveInnerPos(innerOverrides.snippets[s.id], s, fallback);
               const mType = MICROBE_TYPES[(i + 1) % 3];
               const displayText =
                 s.originalText.length > 60 ? `${s.originalText.substring(0, 60)}…` : s.originalText;
               return (
-                <div
+                <DraggableJarElement
                   key={s.id}
+                  containerRef={circleRef}
+                  enabled={zoomed}
+                  x={pos.jarX}
+                  y={pos.jarY}
+                  onClickWithoutDrag={() =>
+                    onElementClick('snippet', {
+                      originalText: s.originalText,
+                      sourceDate: s.sourceDate,
+                      selectionReason: s.selectionReason,
+                    })
+                  }
+                  onDragMove={(x, y) => onInnerDragMove('snippet', s.id, x, y)}
+                  onDragEnd={(x, y) => onInnerDragEnd('snippet', s.id, x, y)}
                   className={FLOAT_CLASSES[(i + 1) % 3]}
                   style={{
-                    position: 'absolute',
-                    top: `${pos.top}%`,
-                    left: `${pos.left}%`,
                     transform: 'scale(var(--el-scale))',
                     transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
                   <div
-                    onClick={(e) => {
-                      if (!zoomed) return;
-                      e.stopPropagation();
-                      onElementClick('snippet', {
-                        originalText: s.originalText,
-                        sourceDate: s.sourceDate,
-                        selectionReason: s.selectionReason,
-                      });
-                    }}
                     className={zoomed ? 'cursor-pointer' : ''}
                     style={{
                       position: 'relative',
@@ -349,103 +422,114 @@ export function QuestionCircle({
                       dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[mType] }}
                     />
                   </div>
-                </div>
+                </DraggableJarElement>
               );
             })}
 
             {/* Letter with attached microbe */}
-            {detail.letter && (
-              <div
-                className="j2-float-2"
-                style={{
-                  position: 'absolute',
-                  top: `${LETTER_POSITION.top}%`,
-                  left: `${LETTER_POSITION.left}%`,
-                  transform: 'scale(var(--el-scale))',
-                  transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                }}
-              >
-                <div
-                  onClick={(e) => {
-                    if (!zoomed) return;
-                    e.stopPropagation();
-                    onElementClick('letter', { bodyText: detail.letter!.bodyText });
-                  }}
-                  className={zoomed ? 'cursor-pointer' : ''}
-                  style={{
-                    position: 'relative',
-                    zIndex: 20,
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, white, #FDFBF7)',
-                    boxShadow: '0 4px 12px rgba(140,133,126,0.15)',
-                    border: '1px solid rgba(140,133,126,0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.3s',
-                  }}
-                >
-                  <svg
-                    aria-hidden="true"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    style={{ color: '#7A3B3F' }}
-                  >
-                    <path
-                      d="M1 4L8 9L15 4"
-                      stroke="currentColor"
-                      strokeWidth="1.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M1 4V12H15V4"
-                      stroke="currentColor"
-                      strokeWidth="1.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M5 8L1 12"
-                      stroke="currentColor"
-                      strokeWidth="0.8"
-                      strokeLinecap="round"
-                      opacity="0.6"
-                    />
-                    <path
-                      d="M11 8L15 12"
-                      stroke="currentColor"
-                      strokeWidth="0.8"
-                      strokeLinecap="round"
-                      opacity="0.6"
-                    />
-                  </svg>
-                  {/* Dot indicator */}
-                  <div
+            {detail.letter &&
+              (() => {
+                const letter = detail.letter;
+                const pos = resolveInnerPos(
+                  innerOverrides.letters[letter.id],
+                  letter,
+                  LETTER_FALLBACK_POSITION,
+                );
+                return (
+                  <DraggableJarElement
+                    key={letter.id}
+                    containerRef={circleRef}
+                    enabled={zoomed}
+                    x={pos.jarX}
+                    y={pos.jarY}
+                    onClickWithoutDrag={() =>
+                      onElementClick('letter', { bodyText: letter.bodyText })
+                    }
+                    onDragMove={(x, y) => onInnerDragMove('letter', letter.id, x, y)}
+                    onDragEnd={(x, y) => onInnerDragEnd('letter', letter.id, x, y)}
+                    className="j2-float-2"
                     style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: '#E2C28E',
-                      border: '1px solid white',
+                      transform: 'scale(var(--el-scale))',
+                      transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
-                  />
-                  <span
-                    className="pointer-events-none absolute -top-2.5 -right-3 block h-[18px] w-[18px] opacity-60"
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
-                    dangerouslySetInnerHTML={{ __html: MICROBE_SVGS.lab }}
-                  />
-                </div>
-              </div>
-            )}
+                  >
+                    <div
+                      className={zoomed ? 'cursor-pointer' : ''}
+                      style={{
+                        position: 'relative',
+                        zIndex: 20,
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, white, #FDFBF7)',
+                        boxShadow: '0 4px 12px rgba(140,133,126,0.15)',
+                        border: '1px solid rgba(140,133,126,0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.3s',
+                      }}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        style={{ color: '#7A3B3F' }}
+                      >
+                        <path
+                          d="M1 4L8 9L15 4"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M1 4V12H15V4"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M5 8L1 12"
+                          stroke="currentColor"
+                          strokeWidth="0.8"
+                          strokeLinecap="round"
+                          opacity="0.6"
+                        />
+                        <path
+                          d="M11 8L15 12"
+                          stroke="currentColor"
+                          strokeWidth="0.8"
+                          strokeLinecap="round"
+                          opacity="0.6"
+                        />
+                      </svg>
+                      {/* Dot indicator */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-6px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: '#E2C28E',
+                          border: '1px solid white',
+                        }}
+                      />
+                      <span
+                        className="pointer-events-none absolute -top-2.5 -right-3 block h-[18px] w-[18px] opacity-60"
+                        // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
+                        dangerouslySetInnerHTML={{ __html: MICROBE_SVGS.lab }}
+                      />
+                    </div>
+                  </DraggableJarElement>
+                );
+              })()}
           </div>
         ) : (
           /* Empty state: floating microbes */

@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
 
-interface Snippet {
+/** Jar-view position fields: 0-100 percentages of the QuestionCircle. null → fall back. */
+interface JarPositioned {
+  jarX: number | null;
+  jarY: number | null;
+}
+
+interface Snippet extends JarPositioned {
   id: string;
   snippetType: 'new_perspective' | 'deepen' | 'core';
   originalText: string;
@@ -11,13 +17,13 @@ interface Snippet {
   selectionReason: string;
 }
 
-interface KeywordItem {
+interface KeywordItem extends JarPositioned {
   id: string;
   keyword: string;
   description: string;
 }
 
-interface LetterItem {
+interface LetterItem extends JarPositioned {
   id: string;
   bodyText: string;
 }

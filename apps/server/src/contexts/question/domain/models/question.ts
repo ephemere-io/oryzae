@@ -4,6 +4,9 @@ export interface QuestionProps {
   isArchived: boolean;
   isValidatedByUser: boolean;
   isProposedByOryzae: boolean;
+  /** Jar view position (0-100, percentage of viewport). null → fall back to hardcoded position. */
+  jarX: number | null;
+  jarY: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,6 +22,8 @@ export class Question {
   readonly isArchived: boolean;
   readonly isValidatedByUser: boolean;
   readonly isProposedByOryzae: boolean;
+  readonly jarX: number | null;
+  readonly jarY: number | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 
@@ -28,6 +33,8 @@ export class Question {
     this.isArchived = props.isArchived;
     this.isValidatedByUser = props.isValidatedByUser;
     this.isProposedByOryzae = props.isProposedByOryzae;
+    this.jarX = props.jarX;
+    this.jarY = props.jarY;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -40,6 +47,8 @@ export class Question {
       isArchived: false,
       isValidatedByUser: !params.isProposedByOryzae,
       isProposedByOryzae: params.isProposedByOryzae,
+      jarX: null,
+      jarY: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -77,6 +86,20 @@ export class Question {
     });
   }
 
+  /**
+   * Persist a new Jar view position. Coordinates are 0-100 percentages.
+   * The constructor accepts arbitrary numbers; callers (usecase / Zod schema)
+   * are responsible for clamping to a valid range.
+   */
+  withJarPosition(jarX: number, jarY: number): Question {
+    return new Question({
+      ...this.toProps(),
+      jarX,
+      jarY,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   toProps(): QuestionProps {
     return {
       id: this.id,
@@ -84,6 +107,8 @@ export class Question {
       isArchived: this.isArchived,
       isValidatedByUser: this.isValidatedByUser,
       isProposedByOryzae: this.isProposedByOryzae,
+      jarX: this.jarX,
+      jarY: this.jarY,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

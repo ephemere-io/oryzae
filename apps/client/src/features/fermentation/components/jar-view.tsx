@@ -5,11 +5,19 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { DetailPane } from '@/features/fermentation/components/detail-pane';
 import { QuestionCircle } from '@/features/fermentation/components/question-circle';
 import { useFermentationForQuestion } from '@/features/fermentation/hooks/use-fermentation-results';
+import { useJarDrag } from '@/features/fermentation/hooks/use-jar-drag';
+import {
+  type JarLayout,
+  useJarLayoutSave,
+} from '@/features/fermentation/hooks/use-jar-layout-save';
 import type { ApiClient } from '@/lib/api';
 
 interface QuestionData {
   id: string;
   currentText: string | null;
+  /** Jar view position (0-100, percent of the JarView viewport). null → fall back. */
+  jarX: number | null;
+  jarY: number | null;
 }
 
 interface JarViewProps {
@@ -21,11 +29,44 @@ interface JarViewProps {
   onArchiveQuestion?: (id: string) => Promise<void>;
 }
 
-const CIRCLE_POSITIONS = [
-  { top: '22%', left: '80%' }, // top-right
-  { top: '72%', left: '72%' }, // bottom center-right
-  { top: '46%', left: '14%' }, // center-left
+/**
+ * Fallback positions for the up-to-3 question circles, used when the user has never
+ * dragged a circle and the DB has no jar_x/jar_y for that question. Coordinates are
+ * percentages of the JarView container.
+ */
+const CIRCLE_FALLBACK_POSITIONS: Array<{ x: number; y: number }> = [
+  { x: 80, y: 22 }, // top-right
+  { x: 72, y: 72 }, // bottom center-right
+  { x: 14, y: 46 }, // center-left
 ];
+
+interface Pos {
+  jarX: number;
+  jarY: number;
+}
+
+interface JarLayoutOverrides {
+  questions: Record<string, Pos>;
+  keywords: Record<string, Pos>;
+  snippets: Record<string, Pos>;
+  letters: Record<string, Pos>;
+}
+
+const EMPTY_OVERRIDES: JarLayoutOverrides = {
+  questions: {},
+  keywords: {},
+  snippets: {},
+  letters: {},
+};
+
+function overridesToPayload(overrides: JarLayoutOverrides): JarLayout {
+  return {
+    questions: Object.entries(overrides.questions).map(([id, p]) => ({ id, ...p })),
+    keywords: Object.entries(overrides.keywords).map(([id, p]) => ({ id, ...p })),
+    snippets: Object.entries(overrides.snippets).map(([id, p]) => ({ id, ...p })),
+    letters: Object.entries(overrides.letters).map(([id, p]) => ({ id, ...p })),
+  };
+}
 
 /* Translation keys for text particles floating inside the jar.
  * Order is significant — used as deterministic seed for layout (top/left/blur/etc.). */
@@ -90,18 +131,45 @@ const MICROBE_SVGS = {
 const JAR_PATH =
   'M190,100 C190,60 290,60 290,100 C290,130 270,140 270,170 C270,270 410,330 410,480 C410,580 70,580 70,480 C70,330 210,270 210,170 C210,140 190,130 190,100 Z';
 
+interface CirclePosArgs {
+  question: QuestionData;
+  index: number;
+  override: Pos | undefined;
+}
+
+function resolveCirclePos({ question, index, override }: CirclePosArgs): Pos {
+  if (override) return override;
+  if (question.jarX != null && question.jarY != null) {
+    return { jarX: question.jarX, jarY: question.jarY };
+  }
+  const fallback = CIRCLE_FALLBACK_POSITIONS[index] ?? CIRCLE_FALLBACK_POSITIONS[0];
+  return { jarX: fallback.x, jarY: fallback.y };
+}
+
 function QuestionCircleWithData({
   question,
   api,
   position,
   zoomedId,
+  jarContainerRef,
+  innerOverrides,
   onZoom,
   onElementClick,
+  onCircleMove,
+  onCircleDragEnd,
+  onInnerMove,
+  onInnerDragEnd,
 }: {
   question: QuestionData;
   api: ApiClient | null;
-  position: { top: string; left: string };
+  position: Pos;
   zoomedId: string | null;
+  jarContainerRef: React.RefObject<HTMLElement | null>;
+  innerOverrides: {
+    keywords: Record<string, Pos>;
+    snippets: Record<string, Pos>;
+    letters: Record<string, Pos>;
+  };
   onZoom: (id: string | null) => void;
   onElementClick: (
     questionId: string,
@@ -109,10 +177,26 @@ function QuestionCircleWithData({
     type: 'keyword' | 'snippet' | 'letter',
     data: Record<string, string>,
   ) => void;
+  onCircleMove: (id: string, pos: Pos) => void;
+  onCircleDragEnd: (id: string, pos: Pos) => void;
+  onInnerMove: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
+  onInnerDragEnd: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
 }) {
   const { detail } = useFermentationForQuestion(api, question.id);
   const isZoomed = zoomedId === question.id;
   const isHidden = zoomedId !== null && !isZoomed;
+
+  // Drag the circle around the jar viewport. Disabled while *any* circle is zoomed —
+  // including this one (the zoomed circle is fixed-positioned to the centre).
+  const { isDragging, pointerHandlers } = useJarDrag({
+    containerRef: jarContainerRef,
+    enabled: zoomedId === null,
+    x: position.jarX,
+    y: position.jarY,
+    onClickWithoutDrag: () => onZoom(question.id),
+    onDragMove: (x, y) => onCircleMove(question.id, { jarX: x, jarY: y }),
+    onDragEnd: (x, y) => onCircleDragEnd(question.id, { jarX: x, jarY: y }),
+  });
 
   return (
     <QuestionCircle
@@ -121,16 +205,21 @@ function QuestionCircleWithData({
       detail={detail}
       zoomed={isZoomed}
       hidden={isHidden}
-      onClick={() => onZoom(question.id)}
+      innerOverrides={innerOverrides}
       onElementClick={(type, data) =>
         onElementClick(question.id, question.currentText ?? '', type, data)
       }
+      onInnerDragMove={(type, id, x, y) => onInnerMove(type, id, { jarX: x, jarY: y })}
+      onInnerDragEnd={(type, id, x, y) => onInnerDragEnd(type, id, { jarX: x, jarY: y })}
+      circlePointerHandlers={pointerHandlers}
+      onActivate={() => onZoom(question.id)}
+      isDraggingCircle={isDragging}
       style={
         isZoomed
           ? {}
           : {
-              top: position.top,
-              left: position.left,
+              top: `${position.jarY}%`,
+              left: `${position.jarX}%`,
             }
       }
     />
@@ -160,6 +249,59 @@ export function JarView({
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Ref attached to the JarView root — used by the circle drag to convert pointer pixels to %.
+  const jarContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Drag-state overrides layer over the API data: empty after page load, fills as the user drags.
+  const [overrides, setOverrides] = useState<JarLayoutOverrides>(EMPTY_OVERRIDES);
+
+  const { saveLayout } = useJarLayoutSave(api);
+
+  const handleCircleMove = useCallback((id: string, pos: Pos) => {
+    setOverrides((prev) => ({
+      ...prev,
+      questions: { ...prev.questions, [id]: pos },
+    }));
+  }, []);
+
+  const handleCircleDragEnd = useCallback(
+    (id: string, pos: Pos) => {
+      setOverrides((prev) => {
+        const next = {
+          ...prev,
+          questions: { ...prev.questions, [id]: pos },
+        };
+        saveLayout(overridesToPayload(next));
+        return next;
+      });
+    },
+    [saveLayout],
+  );
+
+  const handleInnerDragMove = useCallback(
+    (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => {
+      setOverrides((prev) => ({
+        ...prev,
+        [`${type}s`]: { ...prev[`${type}s` as 'keywords' | 'snippets' | 'letters'], [id]: pos },
+      }));
+    },
+    [],
+  );
+
+  const handleInnerDragEnd = useCallback(
+    (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => {
+      setOverrides((prev) => {
+        const next = {
+          ...prev,
+          [`${type}s`]: { ...prev[`${type}s` as 'keywords' | 'snippets' | 'letters'], [id]: pos },
+        };
+        saveLayout(overridesToPayload(next));
+        return next;
+      });
+    },
+    [saveLayout],
+  );
+
   const allWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
 
   const handleElementClick = useCallback(
@@ -185,8 +327,13 @@ export function JarView({
 
   if (authLoading) return null;
 
+  const visibleQuestions = questions.slice(0, 3);
+  const resolvedCirclePositions = visibleQuestions.map((q, i) =>
+    resolveCirclePos({ question: q, index: i, override: overrides.questions[q.id] }),
+  );
+
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[var(--bg)]">
+    <div ref={jarContainerRef} className="relative h-full w-full overflow-hidden bg-[var(--bg)]">
       {/* Keyframes */}
       <style>{`
         @keyframes j2-float-1 {
@@ -263,10 +410,10 @@ export function JarView({
           animation: 'fadeIn 0.5s ease-out forwards',
         }}
       >
-        {questions.slice(0, 3).map((q, i) => {
-          const pos = CIRCLE_POSITIONS[i];
-          const endX = (Number.parseFloat(pos.left) / 100) * 1000;
-          const endY = (Number.parseFloat(pos.top) / 100) * 500;
+        {visibleQuestions.map((q, i) => {
+          const pos = resolvedCirclePositions[i];
+          const endX = (pos.jarX / 100) * 1000;
+          const endY = (pos.jarY / 100) * 500;
           const jarX = 500;
           const jarY = 210;
           const cpX = (jarX + endX) / 2 + (i === 0 ? 50 : i === 1 ? 25 : -50);
@@ -455,20 +602,27 @@ export function JarView({
       </div>
 
       {/* Question circles */}
-      {questions.slice(0, 3).map((q, i) => {
-        const pos = CIRCLE_POSITIONS[i];
-        return (
-          <QuestionCircleWithData
-            key={q.id}
-            question={q}
-            api={api}
-            position={{ top: pos.top, left: pos.left }}
-            zoomedId={zoomedId}
-            onZoom={setZoomedId}
-            onElementClick={handleElementClick}
-          />
-        );
-      })}
+      {visibleQuestions.map((q, i) => (
+        <QuestionCircleWithData
+          key={q.id}
+          question={q}
+          api={api}
+          position={resolvedCirclePositions[i]}
+          zoomedId={zoomedId}
+          jarContainerRef={jarContainerRef}
+          innerOverrides={{
+            keywords: overrides.keywords,
+            snippets: overrides.snippets,
+            letters: overrides.letters,
+          }}
+          onZoom={setZoomedId}
+          onElementClick={handleElementClick}
+          onCircleMove={handleCircleMove}
+          onCircleDragEnd={handleCircleDragEnd}
+          onInnerMove={handleInnerDragMove}
+          onInnerDragEnd={handleInnerDragEnd}
+        />
+      ))}
 
       {/* Question list (bottom center) */}
       {!zoomedId && (
@@ -489,7 +643,7 @@ export function JarView({
             {t('jar.current_questions')}
           </span>
           <div className="flex flex-wrap justify-center gap-2.5">
-            {questions.slice(0, 3).map((q) => (
+            {visibleQuestions.map((q) => (
               <button
                 key={q.id}
                 type="button"

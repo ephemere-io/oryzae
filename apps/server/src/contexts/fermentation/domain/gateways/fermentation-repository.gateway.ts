@@ -13,6 +13,12 @@ export interface FermentationResultWithDetails {
   scannedEntryIds: string[];
 }
 
+export interface JarPositionUpdate {
+  id: string;
+  jarX: number;
+  jarY: number;
+}
+
 export interface FermentationRepositoryGateway {
   save(result: FermentationResult): Promise<void>;
   update(result: FermentationResult): Promise<void>;
@@ -26,4 +32,12 @@ export interface FermentationRepositoryGateway {
   saveSnippets(snippets: ExtractedSnippet[]): Promise<void>;
   saveLetter(letter: Letter): Promise<void>;
   saveKeywords(keywords: Keyword[]): Promise<void>;
+
+  /**
+   * Batch-update Jar view positions on the inner elements of a circle.
+   * Cross-user writes are blocked by RLS (subquery joins on fermentation_results.user_id).
+   */
+  updateKeywordJarPositions(updates: JarPositionUpdate[]): Promise<void>;
+  updateSnippetJarPositions(updates: JarPositionUpdate[]): Promise<void>;
+  updateLetterJarPositions(updates: JarPositionUpdate[]): Promise<void>;
 }

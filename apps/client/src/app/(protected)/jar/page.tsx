@@ -9,6 +9,9 @@ import { useUnread } from '@/lib/unread-context';
 interface QuestionData {
   id: string;
   currentText: string | null;
+  /** Jar view position (0-100, percent of the JarView viewport). null → fall back. */
+  jarX: number | null;
+  jarY: number | null;
 }
 
 export default function JarPage() {

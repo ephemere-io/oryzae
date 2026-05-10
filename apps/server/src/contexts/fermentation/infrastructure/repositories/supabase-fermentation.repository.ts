@@ -2,12 +2,17 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   FermentationRepositoryGateway,
   FermentationResultWithDetails,
+  JarPositionUpdate,
 } from '../../domain/gateways/fermentation-repository.gateway.js';
 import { AnalysisWorksheet } from '../../domain/models/analysis-worksheet.js';
 import { ExtractedSnippet } from '../../domain/models/extracted-snippet.js';
 import { FermentationResult } from '../../domain/models/fermentation-result.js';
 import { Keyword } from '../../domain/models/keyword.js';
 import { Letter } from '../../domain/models/letter.js';
+
+function readJarCoord(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
 
 export class SupabaseFermentationRepository implements FermentationRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
@@ -88,16 +93,18 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         })
       : null;
 
-    const snippets = (snippetsRes.data ?? []).map((row: Record<string, string>) =>
+    const snippets = (snippetsRes.data ?? []).map((row: Record<string, unknown>) =>
       ExtractedSnippet.fromProps({
-        id: row.id,
-        fermentationResultId: row.fermentation_result_id,
+        id: row.id as string,
+        fermentationResultId: row.fermentation_result_id as string,
         snippetType: row.snippet_type as 'new_perspective' | 'deepen' | 'core',
-        originalText: row.original_text,
-        sourceDate: row.source_date,
-        selectionReason: row.selection_reason,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        originalText: row.original_text as string,
+        sourceDate: row.source_date as string,
+        selectionReason: row.selection_reason as string,
+        jarX: readJarCoord(row.jar_x),
+        jarY: readJarCoord(row.jar_y),
+        createdAt: row.created_at as string,
+        updatedAt: row.updated_at as string,
       }),
     );
 
@@ -106,19 +113,23 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
           id: letterRes.data.id,
           fermentationResultId: letterRes.data.fermentation_result_id,
           bodyText: letterRes.data.body_text,
+          jarX: readJarCoord(letterRes.data.jar_x),
+          jarY: readJarCoord(letterRes.data.jar_y),
           createdAt: letterRes.data.created_at,
           updatedAt: letterRes.data.updated_at,
         })
       : null;
 
-    const keywords = (keywordsRes.data ?? []).map((row: Record<string, string>) =>
+    const keywords = (keywordsRes.data ?? []).map((row: Record<string, unknown>) =>
       Keyword.fromProps({
-        id: row.id,
-        fermentationResultId: row.fermentation_result_id,
-        keyword: row.keyword,
-        description: row.description,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        id: row.id as string,
+        fermentationResultId: row.fermentation_result_id as string,
+        keyword: row.keyword as string,
+        description: row.description as string,
+        jarX: readJarCoord(row.jar_x),
+        jarY: readJarCoord(row.jar_y),
+        createdAt: row.created_at as string,
+        updatedAt: row.updated_at as string,
       }),
     );
 
@@ -193,6 +204,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         original_text: p.originalText,
         source_date: p.sourceDate,
         selection_reason: p.selectionReason,
+        jar_x: p.jarX,
+        jar_y: p.jarY,
         created_at: p.createdAt,
         updated_at: p.updatedAt,
       };
@@ -207,6 +220,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       id: props.id,
       fermentation_result_id: props.fermentationResultId,
       body_text: props.bodyText,
+      jar_x: props.jarX,
+      jar_y: props.jarY,
       created_at: props.createdAt,
       updated_at: props.updatedAt,
     });
@@ -222,11 +237,45 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         fermentation_result_id: p.fermentationResultId,
         keyword: p.keyword,
         description: p.description,
+        jar_x: p.jarX,
+        jar_y: p.jarY,
         created_at: p.createdAt,
         updated_at: p.updatedAt,
       };
     });
     const { error } = await this.supabase.from('keywords').insert(rows);
     if (error) throw new Error(`Failed to save keywords: ${error.message}`);
+  }
+
+  async updateKeywordJarPositions(updates: JarPositionUpdate[]): Promise<void> {
+    await this.batchUpdateJarPositions('keywords', updates);
+  }
+
+  async updateSnippetJarPositions(updates: JarPositionUpdate[]): Promise<void> {
+    await this.batchUpdateJarPositions('extracted_snippets', updates);
+  }
+
+  async updateLetterJarPositions(updates: JarPositionUpdate[]): Promise<void> {
+    await this.batchUpdateJarPositions('letters', updates);
+  }
+
+  private async batchUpdateJarPositions(
+    table: 'keywords' | 'extracted_snippets' | 'letters',
+    updates: JarPositionUpdate[],
+  ): Promise<void> {
+    if (updates.length === 0) return;
+    const now = new Date().toISOString();
+    const results = await Promise.all(
+      updates.map((u) =>
+        this.supabase
+          .from(table)
+          .update({ jar_x: u.jarX, jar_y: u.jarY, updated_at: now })
+          .eq('id', u.id),
+      ),
+    );
+    for (const res of results) {
+      if (res.error)
+        throw new Error(`Failed to update ${table} jar positions: ${res.error.message}`);
+    }
   }
 }

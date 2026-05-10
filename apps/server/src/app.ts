@@ -5,6 +5,7 @@ import { entries } from './contexts/entry/presentation/routes/entries.js';
 import { adminFermentations } from './contexts/fermentation/presentation/routes/admin-fermentations.js';
 import { cronFermentation } from './contexts/fermentation/presentation/routes/cron-fermentation.js';
 import { fermentations } from './contexts/fermentation/presentation/routes/fermentations.js';
+import { jarLayout } from './contexts/fermentation/presentation/routes/jar-layout.js';
 import { adminQuestions } from './contexts/question/presentation/routes/admin-questions.js';
 import { entryQuestions } from './contexts/question/presentation/routes/entry-questions.js';
 import { questions } from './contexts/question/presentation/routes/questions.js';
@@ -43,6 +44,7 @@ const app = new Hono()
   .route('/api/v1/entries', entries)
   .route('/api/v1/questions', questions)
   .route('/api/v1/entries/:entryId/questions', entryQuestions)
-  .route('/api/v1/fermentations', fermentations);
+  .route('/api/v1/fermentations', fermentations)
+  .route('/api/v1/jar/layout', jarLayout);
 
 export default app;

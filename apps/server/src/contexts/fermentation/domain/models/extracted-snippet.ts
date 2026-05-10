@@ -11,6 +11,9 @@ interface ExtractedSnippetProps {
   originalText: string;
   sourceDate: string;
   selectionReason: string;
+  /** Jar view position (0-100, percentage of the QuestionCircle). null → fall back. */
+  jarX: number | null;
+  jarY: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +27,8 @@ export class ExtractedSnippet {
   readonly originalText: string;
   readonly sourceDate: string;
   readonly selectionReason: string;
+  readonly jarX: number | null;
+  readonly jarY: number | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 
@@ -34,12 +39,14 @@ export class ExtractedSnippet {
     this.originalText = props.originalText;
     this.sourceDate = props.sourceDate;
     this.selectionReason = props.selectionReason;
+    this.jarX = props.jarX;
+    this.jarY = props.jarY;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
 
   static create(
-    params: Omit<ExtractedSnippetProps, 'id' | 'createdAt' | 'updatedAt'>,
+    params: Omit<ExtractedSnippetProps, 'id' | 'jarX' | 'jarY' | 'createdAt' | 'updatedAt'>,
     generateId: () => string,
   ): Result<ExtractedSnippet, SnippetError> {
     if (!VALID_TYPES.includes(params.snippetType)) {
@@ -47,12 +54,28 @@ export class ExtractedSnippet {
     }
     const now = new Date().toISOString();
     return ok(
-      new ExtractedSnippet({ id: generateId(), ...params, createdAt: now, updatedAt: now }),
+      new ExtractedSnippet({
+        id: generateId(),
+        ...params,
+        jarX: null,
+        jarY: null,
+        createdAt: now,
+        updatedAt: now,
+      }),
     );
   }
 
   static fromProps(props: ExtractedSnippetProps): ExtractedSnippet {
     return new ExtractedSnippet(props);
+  }
+
+  withJarPosition(jarX: number, jarY: number): ExtractedSnippet {
+    return new ExtractedSnippet({
+      ...this.toProps(),
+      jarX,
+      jarY,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   toProps(): ExtractedSnippetProps {
@@ -63,6 +86,8 @@ export class ExtractedSnippet {
       originalText: this.originalText,
       sourceDate: this.sourceDate,
       selectionReason: this.selectionReason,
+      jarX: this.jarX,
+      jarY: this.jarY,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
