@@ -77,7 +77,7 @@ describe('SendFermentationDigestUsecase', () => {
       to: 'user@example.com',
       subject: 'あなたの瓶の発酵が進みました',
       bodyText:
-        'なぜ働くのかについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\nhttps://oryzae-client.vercel.app/jar',
+        'なぜ働くのかについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\nhttps://oryzae.ephemere.io/jar',
     });
   });
 
@@ -96,7 +96,7 @@ describe('SendFermentationDigestUsecase', () => {
     expect(notifier.send).toHaveBeenCalledOnce();
     const call = vi.mocked(notifier.send).mock.calls[0][0];
     expect(call.bodyText).toBe(
-      '以下の問いについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\n\n・問い A\n・問い B\n\nhttps://oryzae-client.vercel.app/jar',
+      '以下の問いについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\n\n・問い A\n・問い B\n\nhttps://oryzae.ephemere.io/jar',
     );
   });
 
@@ -132,7 +132,7 @@ describe('SendFermentationDigestUsecase', () => {
 
     const call = vi.mocked(notifier.send).mock.calls[0][0];
     expect(call.bodyText).toBe(
-      'Qについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\nhttps://oryzae-client.vercel.app/jar',
+      'Qについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\nhttps://oryzae.ephemere.io/jar',
     );
   });
 
@@ -154,7 +154,7 @@ describe('SendFermentationDigestUsecase', () => {
         to: 'user@example.com',
         subject: 'Your jar has fermented further',
         bodyText:
-          'Oryzae\'s microbes have responded to what you wrote about "Why do I work?".\nhttps://oryzae-client.vercel.app/jar',
+          'Oryzae\'s microbes have responded to what you wrote about "Why do I work?".\nhttps://oryzae.ephemere.io/jar',
       });
     });
 
@@ -174,7 +174,7 @@ describe('SendFermentationDigestUsecase', () => {
       const call = vi.mocked(notifier.send).mock.calls[0][0];
       expect(call.subject).toBe('Your jar has fermented further');
       expect(call.bodyText).toBe(
-        "Oryzae's microbes have responded to what you wrote about the following questions:\n\n- Why do I work?\n- Who am I to my friends?\n\nhttps://oryzae-client.vercel.app/jar",
+        "Oryzae's microbes have responded to what you wrote about the following questions:\n\n- Why do I work?\n- Who am I to my friends?\n\nhttps://oryzae.ephemere.io/jar",
       );
     });
 
