@@ -14,7 +14,10 @@ import { ScheduledFermentationUsecase } from '../../application/usecases/schedul
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
 import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
 import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
-import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
+import {
+  createSupabaseAnyEmailResolver,
+  createSupabaseVerifiedEmailResolver,
+} from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
@@ -37,6 +40,10 @@ const fireFermentationSchema = z.object({
   language: z.enum(['ja', 'en']).optional(),
   // true ならメール送信を抑制 (LLM 出力の検証だけしたい場面用)
   skipEmail: z.boolean().optional(),
+  // true なら email_confirmed_at が null のユーザーにも送る (admin デバッグ専用)。
+  // 通常フローでは未検証メールにはスパム防止のため送らない設計だが、
+  // 自分の test アカウントに対して動作確認したい場面で必要。
+  forceUnverified: z.boolean().optional(),
 });
 
 function dateKeyToSimulatedNow(dateKey: string): Date {
@@ -518,20 +525,34 @@ export const adminFermentations = new Hono<Env>()
     }
 
     // メール送信は呼び出し側 (このルート) の責務。skipEmail=true ならスキップ。
+    // issue #290 フォロー: digestUsecase の戻り値を使って「送ったか / なぜ送ら
+    // なかったか」を正直にレスポンスする (旧実装は execute() が void で return
+    // しても emailSent=true を立てていて、未検証メールユーザーで誤検出を起こす)。
     let emailSent = false;
+    let emailReason: string | undefined;
     let emailFailure: { error: string } | undefined;
-    if (!body.skipEmail) {
-      const digestUsecase = new SendFermentationDigestUsecase(
-        new ResendEmailNotifier(),
-        createSupabaseVerifiedEmailResolver(supabase),
-      );
+    if (body.skipEmail) {
+      emailReason = 'skipped-by-request';
+    } else {
+      const resolver = body.forceUnverified
+        ? createSupabaseAnyEmailResolver(supabase)
+        : createSupabaseVerifiedEmailResolver(supabase);
+      const digestUsecase = new SendFermentationDigestUsecase(new ResendEmailNotifier(), resolver);
       try {
-        await digestUsecase.execute({
+        const result = await digestUsecase.execute({
           userId: body.userId,
           questionTitles: fired.map((f) => f.questionText),
           language,
         });
-        emailSent = true;
+        emailSent = result.sent;
+        if (!result.sent) {
+          emailReason = result.reason;
+          console.warn('[admin-fermentations] /fire email not sent', {
+            userId: body.userId,
+            reason: result.reason,
+            forceUnverified: body.forceUnverified ?? false,
+          });
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         emailFailure = { error: message };
@@ -543,7 +564,7 @@ export const adminFermentations = new Hono<Env>()
       }
     }
 
-    return c.json({ fired, emailSent, emailFailure }, 201);
+    return c.json({ fired, emailSent, emailReason, emailFailure }, 201);
   })
   .get('/readiness/:userId', async (c) => {
     // issue #268: admin ダッシュボードでユーザーの発火条件をその時点で表示する。
