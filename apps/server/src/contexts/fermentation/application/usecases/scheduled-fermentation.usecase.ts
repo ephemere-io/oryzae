@@ -22,6 +22,8 @@ interface ScheduledFermentationResult {
   succeeded: number;
   failed: number;
   errors: Array<{ userId: string; questionId: string; error: string }>;
+  // issue #288: メール送信失敗を上位 (admin / Discord 通知) に伝えるため集計する。
+  emailFailures: Array<{ userId: string; error: string }>;
 }
 
 // 発酵プロセス自動発火 (issue #268)。
@@ -64,6 +66,7 @@ export class ScheduledFermentationUsecase {
       succeeded: 0,
       failed: 0,
       errors: [],
+      emailFailures: [],
     };
 
     const userIds = await this.listActiveUserIds();
@@ -176,11 +179,20 @@ export class ScheduledFermentationUsecase {
     }
 
     for (const [userId, titles] of successfulTitlesByUser) {
+      const lang = languageByUser.get(userId) ?? 'ja';
       try {
-        const lang = languageByUser.get(userId) ?? 'ja';
         await this.sendDigest(userId, titles, lang);
-      } catch {
-        // Notification failure must not break the scheduled job.
+      } catch (error) {
+        // 設計思想: メール送信失敗は発酵ジョブ全体を止めない (issue #268)。
+        // ただし黙殺せず、result に集計してログを出して上位の Discord 通知 / admin
+        // 監視で発見できるようにする (issue #288)。
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[ScheduledFermentationUsecase] digest email failed', {
+          userId,
+          titleCount: titles.length,
+          error: message,
+        });
+        result.emailFailures.push({ userId, error: message });
       }
     }
 
