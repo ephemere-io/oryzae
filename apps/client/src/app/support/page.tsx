@@ -1,15 +1,20 @@
 import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
+import { getLocale } from 'next-intl/server';
 import { SupportPage } from '@/features/support/components/support-page';
+import { loadSupportContent } from '@/features/support/lib/load-content';
+import type { Locale } from '@/i18n/config';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('support.metadata');
+  const locale = (await getLocale()) as Locale;
+  const content = loadSupportContent(locale);
   return {
-    title: t('title'),
-    description: t('description'),
+    title: content['metadata.title'],
+    description: content['metadata.description'],
   };
 }
 
-export default function Page() {
-  return <SupportPage />;
+export default async function Page() {
+  const locale = (await getLocale()) as Locale;
+  const content = loadSupportContent(locale);
+  return <SupportPage content={content} />;
 }
