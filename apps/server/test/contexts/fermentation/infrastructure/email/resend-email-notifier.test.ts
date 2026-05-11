@@ -31,8 +31,9 @@ describe('ResendEmailNotifier (issue #288: failure observability)', () => {
     fetchSpy.mockResolvedValueOnce(new Response('{}', { status: 200 }));
 
     const notifier = new ResendEmailNotifier();
-    await notifier.send(PARAMS);
+    const result = await notifier.send(PARAMS);
 
+    expect(result).toEqual({ sent: true });
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe('https://api.resend.com/emails');
@@ -80,25 +81,27 @@ describe('ResendEmailNotifier (issue #288: failure observability)', () => {
     expect(payload).toMatchObject({ to: 'user@example.com', error: 'ECONNRESET' });
   });
 
-  it('skips silently (no fetch, no log) when EMAIL_ENABLED=false (dev opt-out)', async () => {
+  it('returns { sent: false, reason: "disabled" } when EMAIL_ENABLED=false (dev opt-out)', async () => {
     process.env.RESEND_API_KEY = 'rk_test';
     process.env.EMAIL_ENABLED = 'false';
 
     const notifier = new ResendEmailNotifier();
-    await notifier.send(PARAMS);
+    const result = await notifier.send(PARAMS);
 
+    expect(result).toEqual({ sent: false, reason: 'disabled' });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('warns and skips (no throw) when RESEND_API_KEY is missing', async () => {
+  it('returns { sent: false, reason: "no-api-key" } and warns when RESEND_API_KEY is missing', async () => {
     delete process.env.RESEND_API_KEY;
     delete process.env.EMAIL_ENABLED;
 
     const notifier = new ResendEmailNotifier();
-    await notifier.send(PARAMS);
+    const result = await notifier.send(PARAMS);
 
+    expect(result).toEqual({ sent: false, reason: 'no-api-key' });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledOnce();
     expect(warnSpy.mock.calls[0][0]).toContain('RESEND_API_KEY not set');
