@@ -60,7 +60,10 @@
       "submit_loading": "作成中...",
       "submit": "サインアップ",
       "have_account_prefix": "すでにアカウントをお持ちの方は",
-      "login_link": "ログイン"
+      "login_link": "ログイン",
+      "capacity_remaining": "登録枠は残り {remaining} / {max} 名です",
+      "capacity_full_title": "現在の登録枠は満了しました",
+      "capacity_full_body": "Research Preview として、登録は {max} 名までに限定しています。順次追加予定です。"
     },
     "error": {
       "invalid_credentials": "メールアドレスまたはパスワードが正しくありません",
@@ -76,7 +79,8 @@
       "session_missing": "セッションが切れました。もう一度ログインしてください",
       "user_already_registered_2": "このメールアドレスは既に登録されています",
       "email_not_confirmed_2": "メールアドレスの確認が完了していません",
-      "same_password": "新しいパスワードは現在のパスワードと異なるものにしてください"
+      "same_password": "新しいパスワードは現在のパスワードと異なるものにしてください",
+      "capacity_reached": "登録枠が満了したため、現在新規登録できません"
     },
     "confirm": {
       "processing": "確認中...",
@@ -147,6 +151,10 @@
     },
     "metadata": {
       "description": "ジャーナリング支援アプリ"
+    },
+    "desktop_only": {
+      "heading": "デスクトップ専用です",
+      "body": "Oryzaeは現在、デスクトップブラウザ専用となっていてスマートフォンからはアクセスできません。スマートフォン版画面が準備できるまでは、デスクトップからお使いください。"
     }
   },
   "footer": {
@@ -449,8 +457,8 @@
       "preview": "アプリ",
       "philosophy": "思想",
       "faq": "FAQ",
-      "support": "ヘルプ",
-      "cta": "アプリを試す"
+      "cta": "アプリを試す",
+      "support": "ヘルプ"
     },
     "hero": {
       "eyebrow": "AN ASPERGILLUS FOR WORDS.",
@@ -461,7 +469,8 @@
       "lead": "Oryzaeは、日々の言葉を醸成し、あなたの問いを深める執筆の場です。コウジカビが澱粉を糖に変えるように、書かれた文章を分解し、問いの核となる切片と、ひと通の手紙を返します。",
       "cta": {
         "primary": "アプリを試す",
-        "secondary": "コンセプトを読む"
+        "secondary": "コンセプトを読む",
+        "full": "受付終了"
       },
       "foot": "縦書き・横書きいずれにも対応。日本語と英語で書き、考える人のための場。",
       "chip": {
@@ -473,7 +482,9 @@
       "snippet": {
         "1": "「ぬか床が徐々に人の影響を吸収するように、AIもまた変化していく…」"
       },
-      "question": "現在の問い"
+      "question": "現在の問い",
+      "capacity_badge": "Research Preview · 残り {remaining} / {max} 枠",
+      "capacity_full_badge": "Research Preview · 受付終了"
     },
     "concept": {
       "kicker": "CONCEPT",
@@ -601,22 +612,9 @@
         "q": "日本語以外でも書けますか？",
         "a": "英語をはじめとする多言語に対応しています。縦書きは日本語・中国語に最適化されています。"
       },
-      "5": {
-        "q": "いまどの段階ですか？",
-        "a": "Oryzaeはリサーチ・プレビュー段階のプロジェクトです。仕様や挙動は研究の進行に伴って変化します。"
-      },
       "kicker": "QUESTIONS",
       "title": "よくある問い"
-    },
-    "outro": {
-      "l1": "問いはひとつあれば、",
-      "l2": "一週間が変わる。",
-      "cta": "Oryzaeを開く"
-    },
-    "foot": {
-      "tag": "Aspergillus oryzae for words."
-    },
-    "title": "Oryzae — 書くことを、発酵させる。"
+    }
   },
   "onboarding": {
     "dialog_label": "Oryzaeの紹介",
