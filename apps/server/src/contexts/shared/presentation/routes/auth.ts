@@ -181,6 +181,22 @@ export const authRoutes = new Hono()
       .single();
 
     if (!profile) {
+      // Issue #300: Research Preview の登録枠チェック (OAuth 経由の新規ユーザーも対象)
+      // shared 層からは user/application 層を import できないため、必要最小限の
+      // 件数取得と env 解決をここに inline で書く。policy 本体のテストは
+      // apps/server/test/contexts/user/domain/policies/ にある。
+      const { count } = await serviceSupabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true });
+      const rawMax = process.env.MAX_USER_COUNT;
+      const parsedMax = rawMax ? Number.parseInt(rawMax, 10) : Number.NaN;
+      const limit = Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : 100;
+      if ((count ?? 0) >= limit) {
+        // たった今 exchangeCodeForSession で作成された auth.users を削除して整合性を保つ
+        await serviceSupabase.auth.admin.deleteUser(data.user.id);
+        return c.json({ error: 'capacity_reached', limit }, 409);
+      }
+
       // Auto-create profile for OAuth users
       const meta = data.user.user_metadata ?? {};
       const nickname =
