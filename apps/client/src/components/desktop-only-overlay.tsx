@@ -1,10 +1,15 @@
-import { getTranslations } from 'next-intl/server';
+'use client';
+
+import { useTranslations } from 'next-intl';
 import { APP_ICON_SVG, BRAND_NAME, svgDataUri } from '@/lib/brand';
 
 /**
  * スマートフォンでアクセスされたときに全画面を覆う暫定オーバーレイ。
  * スマホ専用画面が用意できるまでの措置 (Issue #299)。
  *
+ * - 適用範囲: 認証フロー (`(auth)`) と認証後の画面 (`(protected)`) のみ。
+ *   ランディングページや /privacy /support などの静的ページはスマホでも見せたいので、
+ *   ルート layout には置かず、認証 / 保護ルートの layout 内で個別にマウントする。
  * - CSS メディアクエリのみで制御。JS による UA 判定は行わない。
  * - 判定式: `(max-width: 767px) AND (pointer: coarse)`
  *   - 画面幅 < md (768px) かつ
@@ -12,11 +17,11 @@ import { APP_ICON_SVG, BRAND_NAME, svgDataUri } from '@/lib/brand';
  * - 両方の AND を取ることで、PC でブラウザサイドバー (Brave 等) を開いて
  *   viewport が 768px を下回ったケースや、PC で高ズーム率にしたケースを除外する。
  *   PC のマウスは `pointer: fine` なので、たとえ幅が狭くてもオーバーレイは出ない。
- * - 全ルートで効くように `app/layout.tsx` の body 直下に置く。
- * - サーバーコンポーネントとして翻訳を取り、SSR で確定するためフリッカーは発生しない。
+ * - `(protected)/layout.tsx` がクライアントコンポーネントなので、本コンポーネントも
+ *   クライアントコンポーネントとして `useTranslations` (sync) で翻訳を解決する。
  */
-export async function DesktopOnlyOverlay() {
-  const t = await getTranslations('app.desktop_only');
+export function DesktopOnlyOverlay() {
+  const t = useTranslations('app.desktop_only');
 
   return (
     <div
