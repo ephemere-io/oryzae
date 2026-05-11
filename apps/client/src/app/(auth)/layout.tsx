@@ -1,3 +1,4 @@
+import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -9,6 +10,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         {children}
       </div>
+      {/* スマホ専用画面が用意できるまでの暫定処置 (Issue #299) — 認証フローはスマホ非対応 */}
+      <DesktopOnlyOverlay />
     </div>
   );
 }
