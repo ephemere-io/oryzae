@@ -18,6 +18,39 @@ type DigestSendResult =
 // 送信したメールでも、受信者は常に本番に着地する想定 (vercel.app の preview
 // URL は受信者にとって意味がないため)。
 const JAR_URL = 'https://oryzae.ephemere.io/jar';
+const SUPPORT_URL = 'https://oryzae.ephemere.io/support';
+const PRIVACY_URL = 'https://oryzae.ephemere.io/privacy';
+const CONTACT_EMAIL = 'oryzae@ephemere.io';
+
+// 自動送信メールの体裁を整えるフッター。本文末尾の URL から区切り線で視覚的
+// に分け、自動配信である旨 + サポート / プライバシー / 連絡先 / 運営者を
+// 1 ブロックで提示する (issue #290 フォロー)。
+const FOOTER_JA = [
+  '',
+  '',
+  '———',
+  'このメールは Oryzae の発酵プロセス完了時に自動配信しています。',
+  '',
+  `ヘルプ・FAQ: ${SUPPORT_URL}`,
+  `プライバシーポリシー: ${PRIVACY_URL}`,
+  `お問い合わせ: ${CONTACT_EMAIL}`,
+  '',
+  '— Oryzae / Ferment Media Research',
+].join('\n');
+
+const FOOTER_EN = [
+  '',
+  '',
+  '———',
+  'This is an automatic notification from Oryzae,',
+  'sent when the fermentation process completes.',
+  '',
+  `Help & FAQ: ${SUPPORT_URL}`,
+  `Privacy: ${PRIVACY_URL}`,
+  `Contact: ${CONTACT_EMAIL}`,
+  '',
+  '— Oryzae / Ferment Media Research',
+].join('\n');
 
 // issue #279: ユーザー言語に合わせて subject / body を切り替える。
 const COPY: Record<
@@ -29,21 +62,21 @@ const COPY: Record<
   }
 > = {
   ja: {
-    subject: '瓶のなかで、ことばが醸されました',
+    subject: '[Oryzae] 瓶のなかで、ことばが醸されました',
     singleBody: (title) =>
-      `あなたが「${title}」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\n${JAR_URL}`,
+      `あなたが「${title}」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\n${JAR_URL}${FOOTER_JA}`,
     multiBody: (titles) => {
       const list = titles.map((t) => `・${t}`).join('\n');
-      return `あなたが綴った以下の問いをめぐるテキストが、瓶のなかで応答へと醸されました。\n\n${list}\n\n気が向いたときに、瓶を覗いてみてください。\n${JAR_URL}`;
+      return `あなたが綴った以下の問いをめぐるテキストが、瓶のなかで応答へと醸されました。\n\n${list}\n\n気が向いたときに、瓶を覗いてみてください。\n${JAR_URL}${FOOTER_JA}`;
     },
   },
   en: {
-    subject: 'Something has fermented in your jar',
+    subject: '[Oryzae] Something has fermented in your jar',
     singleBody: (title) =>
-      `The microbes in your jar have slowly read what you wrote about "${title}", and fermented it into a response.\n\nLook in whenever you have a moment.\n${JAR_URL}`,
+      `The microbes in your jar have slowly read what you wrote about "${title}", and fermented it into a response.\n\nLook in whenever you have a moment.\n${JAR_URL}${FOOTER_EN}`,
     multiBody: (titles) => {
       const list = titles.map((t) => `- ${t}`).join('\n');
-      return `The microbes in your jar have fermented what you wrote around the following questions into responses:\n\n${list}\n\nLook in whenever you have a moment.\n${JAR_URL}`;
+      return `The microbes in your jar have fermented what you wrote around the following questions into responses:\n\n${list}\n\nLook in whenever you have a moment.\n${JAR_URL}${FOOTER_EN}`;
     },
   },
 };

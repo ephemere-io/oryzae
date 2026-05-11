@@ -6,6 +6,23 @@ function mockNotifier(): EmailNotifier {
   return { send: vi.fn().mockResolvedValue({ sent: true }) };
 }
 
+// Production と同じフッターを assertion で使う。実装が変わったら exact-match
+// で検出されるよう、ここは production と独立にハードコードしておく。
+const FOOTER_JA =
+  '\n\n———\nこのメールは Oryzae の発酵プロセス完了時に自動配信しています。\n\n' +
+  'ヘルプ・FAQ: https://oryzae.ephemere.io/support\n' +
+  'プライバシーポリシー: https://oryzae.ephemere.io/privacy\n' +
+  'お問い合わせ: oryzae@ephemere.io\n\n' +
+  '— Oryzae / Ferment Media Research';
+
+const FOOTER_EN =
+  '\n\n———\nThis is an automatic notification from Oryzae,\n' +
+  'sent when the fermentation process completes.\n\n' +
+  'Help & FAQ: https://oryzae.ephemere.io/support\n' +
+  'Privacy: https://oryzae.ephemere.io/privacy\n' +
+  'Contact: oryzae@ephemere.io\n\n' +
+  '— Oryzae / Ferment Media Research';
+
 describe('SendFermentationDigestUsecase', () => {
   it('returns { sent: false, reason: "no-titles" } when there are no question titles', async () => {
     const notifier = mockNotifier();
@@ -75,9 +92,10 @@ describe('SendFermentationDigestUsecase', () => {
     expect(notifier.send).toHaveBeenCalledOnce();
     expect(notifier.send).toHaveBeenCalledWith({
       to: 'user@example.com',
-      subject: '瓶のなかで、ことばが醸されました',
+      subject: '[Oryzae] 瓶のなかで、ことばが醸されました',
       bodyText:
-        'あなたが「なぜ働くのか」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar',
+        'あなたが「なぜ働くのか」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar' +
+        FOOTER_JA,
     });
   });
 
@@ -96,7 +114,8 @@ describe('SendFermentationDigestUsecase', () => {
     expect(notifier.send).toHaveBeenCalledOnce();
     const call = vi.mocked(notifier.send).mock.calls[0][0];
     expect(call.bodyText).toBe(
-      'あなたが綴った以下の問いをめぐるテキストが、瓶のなかで応答へと醸されました。\n\n・問い A\n・問い B\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar',
+      'あなたが綴った以下の問いをめぐるテキストが、瓶のなかで応答へと醸されました。\n\n・問い A\n・問い B\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar' +
+        FOOTER_JA,
     );
   });
 
@@ -132,7 +151,8 @@ describe('SendFermentationDigestUsecase', () => {
 
     const call = vi.mocked(notifier.send).mock.calls[0][0];
     expect(call.bodyText).toBe(
-      'あなたが「Q」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar',
+      'あなたが「Q」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar' +
+        FOOTER_JA,
     );
   });
 
@@ -152,9 +172,10 @@ describe('SendFermentationDigestUsecase', () => {
 
       expect(notifier.send).toHaveBeenCalledWith({
         to: 'user@example.com',
-        subject: 'Something has fermented in your jar',
+        subject: '[Oryzae] Something has fermented in your jar',
         bodyText:
-          'The microbes in your jar have slowly read what you wrote about "Why do I work?", and fermented it into a response.\n\nLook in whenever you have a moment.\nhttps://oryzae.ephemere.io/jar',
+          'The microbes in your jar have slowly read what you wrote about "Why do I work?", and fermented it into a response.\n\nLook in whenever you have a moment.\nhttps://oryzae.ephemere.io/jar' +
+          FOOTER_EN,
       });
     });
 
@@ -172,9 +193,10 @@ describe('SendFermentationDigestUsecase', () => {
       });
 
       const call = vi.mocked(notifier.send).mock.calls[0][0];
-      expect(call.subject).toBe('Something has fermented in your jar');
+      expect(call.subject).toBe('[Oryzae] Something has fermented in your jar');
       expect(call.bodyText).toBe(
-        'The microbes in your jar have fermented what you wrote around the following questions into responses:\n\n- Why do I work?\n- Who am I to my friends?\n\nLook in whenever you have a moment.\nhttps://oryzae.ephemere.io/jar',
+        'The microbes in your jar have fermented what you wrote around the following questions into responses:\n\n- Why do I work?\n- Who am I to my friends?\n\nLook in whenever you have a moment.\nhttps://oryzae.ephemere.io/jar' +
+          FOOTER_EN,
       );
     });
 
@@ -188,7 +210,7 @@ describe('SendFermentationDigestUsecase', () => {
       await usecase.execute({ userId: 'u1', questionTitles: ['なぜ働くのか'] });
 
       const call = vi.mocked(notifier.send).mock.calls[0][0];
-      expect(call.subject).toBe('瓶のなかで、ことばが醸されました');
+      expect(call.subject).toBe('[Oryzae] 瓶のなかで、ことばが醸されました');
       expect(call.bodyText).toContain('Oryzaeの菌たちがゆっくり読みほどき');
     });
   });
