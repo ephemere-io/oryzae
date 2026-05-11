@@ -29,21 +29,21 @@ const COPY: Record<
   }
 > = {
   ja: {
-    subject: 'あなたの瓶の発酵が進みました',
+    subject: '瓶のなかで、ことばが醸されました',
     singleBody: (title) =>
-      `${title}についてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\n${JAR_URL}`,
+      `あなたが「${title}」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\n${JAR_URL}`,
     multiBody: (titles) => {
       const list = titles.map((t) => `・${t}`).join('\n');
-      return `以下の問いについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\n\n${list}\n\n${JAR_URL}`;
+      return `あなたが綴った以下の問いをめぐるテキストが、瓶のなかで応答へと醸されました。\n\n${list}\n\n気が向いたときに、瓶を覗いてみてください。\n${JAR_URL}`;
     },
   },
   en: {
-    subject: 'Your jar has fermented further',
+    subject: 'Something has fermented in your jar',
     singleBody: (title) =>
-      `Oryzae's microbes have responded to what you wrote about "${title}".\n${JAR_URL}`,
+      `The microbes in your jar have slowly read what you wrote about "${title}", and fermented it into a response.\n\nLook in whenever you have a moment.\n${JAR_URL}`,
     multiBody: (titles) => {
       const list = titles.map((t) => `- ${t}`).join('\n');
-      return `Oryzae's microbes have responded to what you wrote about the following questions:\n\n${list}\n\n${JAR_URL}`;
+      return `The microbes in your jar have fermented what you wrote around the following questions into responses:\n\n${list}\n\nLook in whenever you have a moment.\n${JAR_URL}`;
     },
   },
 };
