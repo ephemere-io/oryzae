@@ -7,13 +7,17 @@ import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastru
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
+import { FireFermentationUsecase } from '../../application/usecases/fire-fermentation.usecase.js';
 import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
 import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
 import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
-import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
+import {
+  createSupabaseAnyEmailResolver,
+  createSupabaseVerifiedEmailResolver,
+} from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
@@ -26,6 +30,20 @@ const triggerScheduledSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'dateKey must be in YYYY-MM-DD format')
     .optional(),
+});
+
+// issue #290: admin デバッグ用に、特定ユーザー (+ 任意で特定問い) を強制発火する。
+const fireFermentationSchema = z.object({
+  userId: z.string().min(1),
+  questionId: z.string().min(1).optional(),
+  // 省略時はサーバー側でユーザーの user_metadata.locale を解決する
+  language: z.enum(['ja', 'en']).optional(),
+  // true ならメール送信を抑制 (LLM 出力の検証だけしたい場面用)
+  skipEmail: z.boolean().optional(),
+  // true なら email_confirmed_at が null のユーザーにも送る (admin デバッグ専用)。
+  // 通常フローでは未検証メールにはスパム防止のため送らない設計だが、
+  // 自分の test アカウントに対して動作確認したい場面で必要。
+  forceUnverified: z.boolean().optional(),
 });
 
 function dateKeyToSimulatedNow(dateKey: string): Date {
@@ -474,6 +492,79 @@ export const adminFermentations = new Hono<Env>()
     }
 
     return c.json({ now: now.toISOString(), ...result });
+  })
+  .post('/fire', async (c) => {
+    // issue #290: 特定ユーザー / 特定問いに対する発酵強制発火 (admin デバッグ用)。
+    // 条件ゲートをバイパスし、user_fermentation_state は更新しない。
+    const supabase = c.get('adminSupabase');
+    const body = fireFermentationSchema.parse(await c.req.json());
+
+    const localeResolver = new SupabaseUserLocaleResolver(supabase);
+    const language = body.language ?? (await localeResolver.resolve(body.userId));
+
+    const usecase = new FireFermentationUsecase(
+      new SupabaseEntryRepository(supabase),
+      new SupabaseQuestionRepository(supabase),
+      new SupabaseQuestionTransactionRepository(supabase),
+      new SupabaseEntryQuestionLinkRepository(supabase),
+      new SupabaseFermentationRepository(supabase),
+      new VercelAiAnalysisGateway(),
+      () => crypto.randomUUID(),
+    );
+
+    let fired: Awaited<ReturnType<typeof usecase.execute>>['fired'];
+    try {
+      ({ fired } = await usecase.execute({
+        userId: body.userId,
+        questionId: body.questionId,
+        language,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return c.json({ error: message }, 400);
+    }
+
+    // メール送信は呼び出し側 (このルート) の責務。skipEmail=true ならスキップ。
+    // issue #290 フォロー: digestUsecase の戻り値を使って「送ったか / なぜ送ら
+    // なかったか」を正直にレスポンスする (旧実装は execute() が void で return
+    // しても emailSent=true を立てていて、未検証メールユーザーで誤検出を起こす)。
+    let emailSent = false;
+    let emailReason: string | undefined;
+    let emailFailure: { error: string } | undefined;
+    if (body.skipEmail) {
+      emailReason = 'skipped-by-request';
+    } else {
+      const resolver = body.forceUnverified
+        ? createSupabaseAnyEmailResolver(supabase)
+        : createSupabaseVerifiedEmailResolver(supabase);
+      const digestUsecase = new SendFermentationDigestUsecase(new ResendEmailNotifier(), resolver);
+      try {
+        const result = await digestUsecase.execute({
+          userId: body.userId,
+          questionTitles: fired.map((f) => f.questionText),
+          language,
+        });
+        emailSent = result.sent;
+        if (!result.sent) {
+          emailReason = result.reason;
+          console.warn('[admin-fermentations] /fire email not sent', {
+            userId: body.userId,
+            reason: result.reason,
+            forceUnverified: body.forceUnverified ?? false,
+          });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        emailFailure = { error: message };
+        console.error('[admin-fermentations] /fire digest email failed', {
+          userId: body.userId,
+          firedCount: fired.length,
+          error: message,
+        });
+      }
+    }
+
+    return c.json({ fired, emailSent, emailReason, emailFailure }, 201);
   })
   .get('/readiness/:userId', async (c) => {
     // issue #268: admin ダッシュボードでユーザーの発火条件をその時点で表示する。

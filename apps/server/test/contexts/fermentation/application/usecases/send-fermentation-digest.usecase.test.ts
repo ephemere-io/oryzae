@@ -3,29 +3,48 @@ import { SendFermentationDigestUsecase } from '@/contexts/fermentation/applicati
 import type { EmailNotifier } from '@/contexts/fermentation/domain/gateways/email-notifier.gateway.js';
 
 function mockNotifier(): EmailNotifier {
-  return { send: vi.fn().mockResolvedValue(undefined) };
+  return { send: vi.fn().mockResolvedValue({ sent: true }) };
 }
 
+// Production と同じフッターを assertion で使う。実装が変わったら exact-match
+// で検出されるよう、ここは production と独立にハードコードしておく。
+const FOOTER_JA =
+  '\n\n———\nこのメールは Oryzae の発酵プロセス完了時に自動配信しています。\n\n' +
+  'ヘルプ・FAQ: https://oryzae.ephemere.io/support\n' +
+  'プライバシーポリシー: https://oryzae.ephemere.io/privacy\n' +
+  'お問い合わせ: oryzae@ephemere.io\n\n' +
+  '— Oryzae / Ferment Media Research';
+
+const FOOTER_EN =
+  '\n\n———\nThis is an automatic notification from Oryzae,\n' +
+  'sent when the fermentation process completes.\n\n' +
+  'Help & FAQ: https://oryzae.ephemere.io/support\n' +
+  'Privacy: https://oryzae.ephemere.io/privacy\n' +
+  'Contact: oryzae@ephemere.io\n\n' +
+  '— Oryzae / Ferment Media Research';
+
 describe('SendFermentationDigestUsecase', () => {
-  it('no-ops when there are no question titles', async () => {
+  it('returns { sent: false, reason: "no-titles" } when there are no question titles', async () => {
     const notifier = mockNotifier();
     const resolve = vi.fn().mockResolvedValue('user@example.com');
     const usecase = new SendFermentationDigestUsecase(notifier, resolve);
 
-    await usecase.execute({ userId: 'u1', questionTitles: [] });
+    const result = await usecase.execute({ userId: 'u1', questionTitles: [] });
 
+    expect(result).toEqual({ sent: false, reason: 'no-titles' });
     expect(resolve).not.toHaveBeenCalled();
     expect(notifier.send).not.toHaveBeenCalled();
   });
 
-  it('no-ops + warns when resolver returns null (unverified / missing email, issue #288)', async () => {
+  it('returns "no-verified-email" + warns when resolver returns null (issue #288 / #290)', async () => {
     const notifier = mockNotifier();
     const resolve = vi.fn().mockResolvedValue(null);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const usecase = new SendFermentationDigestUsecase(notifier, resolve);
 
-    await usecase.execute({ userId: 'u1', questionTitles: ['Q1'] });
+    const result = await usecase.execute({ userId: 'u1', questionTitles: ['Q1'] });
 
+    expect(result).toEqual({ sent: false, reason: 'no-verified-email' });
     expect(resolve).toHaveBeenCalledWith('u1');
     expect(notifier.send).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
@@ -33,6 +52,32 @@ describe('SendFermentationDigestUsecase', () => {
       expect.objectContaining({ userId: 'u1', titleCount: 1 }),
     );
     warnSpy.mockRestore();
+  });
+
+  it('forwards the notifier result (e.g. { sent: false, reason: "no-api-key" }) verbatim', async () => {
+    const notifier: EmailNotifier = {
+      send: vi.fn().mockResolvedValue({ sent: false, reason: 'no-api-key' }),
+    };
+    const usecase = new SendFermentationDigestUsecase(
+      notifier,
+      vi.fn().mockResolvedValue('user@example.com'),
+    );
+
+    const result = await usecase.execute({ userId: 'u1', questionTitles: ['Q'] });
+
+    expect(result).toEqual({ sent: false, reason: 'no-api-key' });
+  });
+
+  it('returns { sent: true } when the notifier successfully sends', async () => {
+    const notifier = mockNotifier();
+    const usecase = new SendFermentationDigestUsecase(
+      notifier,
+      vi.fn().mockResolvedValue('user@example.com'),
+    );
+
+    const result = await usecase.execute({ userId: 'u1', questionTitles: ['Q'] });
+
+    expect(result).toEqual({ sent: true });
   });
 
   it('sends single-title body in the original issue wording', async () => {
@@ -47,9 +92,10 @@ describe('SendFermentationDigestUsecase', () => {
     expect(notifier.send).toHaveBeenCalledOnce();
     expect(notifier.send).toHaveBeenCalledWith({
       to: 'user@example.com',
-      subject: 'あなたの瓶の発酵が進みました',
+      subject: '[Oryzae] 瓶のなかで、ことばが醸されました',
       bodyText:
-        'なぜ働くのかについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\nhttps://oryzae-client.vercel.app/jar',
+        'あなたが「なぜ働くのか」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar' +
+        FOOTER_JA,
     });
   });
 
@@ -68,7 +114,8 @@ describe('SendFermentationDigestUsecase', () => {
     expect(notifier.send).toHaveBeenCalledOnce();
     const call = vi.mocked(notifier.send).mock.calls[0][0];
     expect(call.bodyText).toBe(
-      '以下の問いについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\n\n・問い A\n・問い B\n\nhttps://oryzae-client.vercel.app/jar',
+      'あなたが綴った以下の問いをめぐるテキストが、瓶のなかで応答へと醸されました。\n\n・問い A\n・問い B\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar' +
+        FOOTER_JA,
     );
   });
 
@@ -104,7 +151,8 @@ describe('SendFermentationDigestUsecase', () => {
 
     const call = vi.mocked(notifier.send).mock.calls[0][0];
     expect(call.bodyText).toBe(
-      'Qについてあなたが書いたテキストに、Oryzaeの菌たちが反応を生成しました。\nhttps://oryzae-client.vercel.app/jar',
+      'あなたが「Q」について綴ったテキストを、Oryzaeの菌たちがゆっくり読みほどき、ひとつの応答へと醸しました。\n\n気が向いたときに、瓶を覗いてみてください。\nhttps://oryzae.ephemere.io/jar' +
+        FOOTER_JA,
     );
   });
 
@@ -124,9 +172,10 @@ describe('SendFermentationDigestUsecase', () => {
 
       expect(notifier.send).toHaveBeenCalledWith({
         to: 'user@example.com',
-        subject: 'Your jar has fermented further',
+        subject: '[Oryzae] Something has fermented in your jar',
         bodyText:
-          'Oryzae\'s microbes have responded to what you wrote about "Why do I work?".\nhttps://oryzae-client.vercel.app/jar',
+          'The microbes in your jar have slowly read what you wrote about "Why do I work?", and fermented it into a response.\n\nLook in whenever you have a moment.\nhttps://oryzae.ephemere.io/jar' +
+          FOOTER_EN,
       });
     });
 
@@ -144,9 +193,10 @@ describe('SendFermentationDigestUsecase', () => {
       });
 
       const call = vi.mocked(notifier.send).mock.calls[0][0];
-      expect(call.subject).toBe('Your jar has fermented further');
+      expect(call.subject).toBe('[Oryzae] Something has fermented in your jar');
       expect(call.bodyText).toBe(
-        "Oryzae's microbes have responded to what you wrote about the following questions:\n\n- Why do I work?\n- Who am I to my friends?\n\nhttps://oryzae-client.vercel.app/jar",
+        'The microbes in your jar have fermented what you wrote around the following questions into responses:\n\n- Why do I work?\n- Who am I to my friends?\n\nLook in whenever you have a moment.\nhttps://oryzae.ephemere.io/jar' +
+          FOOTER_EN,
       );
     });
 
@@ -160,8 +210,8 @@ describe('SendFermentationDigestUsecase', () => {
       await usecase.execute({ userId: 'u1', questionTitles: ['なぜ働くのか'] });
 
       const call = vi.mocked(notifier.send).mock.calls[0][0];
-      expect(call.subject).toBe('あなたの瓶の発酵が進みました');
-      expect(call.bodyText).toContain('Oryzaeの菌たちが反応を生成しました');
+      expect(call.subject).toBe('[Oryzae] 瓶のなかで、ことばが醸されました');
+      expect(call.bodyText).toContain('Oryzaeの菌たちがゆっくり読みほどき');
     });
   });
 });

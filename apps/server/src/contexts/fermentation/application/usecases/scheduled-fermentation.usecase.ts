@@ -49,11 +49,13 @@ export class ScheduledFermentationUsecase {
     private listActiveUserIds: () => Promise<string[]>,
     // issue #279: digest メールも language に応じて文言を切り替えるため、
     // ここで解決済みの language を呼び出し側に渡す。
+    // 戻り値はスケジューラーでは使わないため Promise<unknown> で受ける
+    // (issue #290 フォローで execute() が DigestSendResult を返すようになった)。
     private sendDigest: (
       userId: string,
       questionTitles: string[],
       language: FermentationLanguage,
-    ) => Promise<void>,
+    ) => Promise<unknown>,
     // 次回 X 時間生成器。テストでは固定値を注入して決定論的にする。
     private rollHours: () => number = rollRandomHours,
   ) {}
