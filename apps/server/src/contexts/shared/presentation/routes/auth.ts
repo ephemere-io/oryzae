@@ -1,18 +1,15 @@
 import {
   changeEmailSchema,
   changePasswordSchema,
-  type LocaleCode,
   loginSchema,
   oauthCallbackSchema,
   oauthInitSchema,
   profileUpdateSchema,
-  signupSchema,
   verifyOtpSchema,
 } from '@oryzae/shared';
 import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 
 function getSupabaseAuthClient() {
@@ -48,77 +45,7 @@ function appendQuery(url: string, key: string, value: string): string {
 }
 
 export const authRoutes = new Hono()
-  .post('/signup', async (c) => {
-    const body = signupSchema.parse(await c.req.json());
-    const serviceSupabase = getSupabaseClient();
-
-    // Check nickname uniqueness
-    const { data: existing } = await serviceSupabase
-      .from('profiles')
-      .select('id')
-      .ilike('nickname', body.nickname)
-      .single();
-
-    if (existing) {
-      return c.json({ error: 'このニックネームは既に使用されています' }, 400);
-    }
-
-    // Create auth user.
-    // locale は Supabase 確認メールテンプレートの `{{ .Data.locale }}` で参照される。
-    const supabase = getSupabaseAuthClient();
-    const locale: LocaleCode = body.locale ?? 'ja';
-    const { data, error } = await supabase.auth.signUp({
-      email: body.email,
-      password: body.password,
-      options: {
-        data: { locale },
-      },
-    });
-
-    if (error) {
-      return c.json({ error: error.message }, 400);
-    }
-
-    // Create profile
-    if (data.user) {
-      await serviceSupabase.from('profiles').insert({
-        id: data.user.id,
-        nickname: body.nickname,
-      });
-
-      // Notify Discord (fire-and-forget)
-      notifyDiscord({
-        title: '新規ユーザー登録',
-        color: COLORS.SUCCESS,
-        fields: [
-          { name: 'ニックネーム', value: body.nickname, inline: true },
-          { name: 'メール', value: body.email, inline: true },
-        ],
-      });
-    }
-
-    return c.json(
-      {
-        user: data.user
-          ? {
-              id: data.user.id,
-              email: data.user.email,
-              nickname: body.nickname,
-              avatarUrl: null,
-              providers: getProviders(data.user),
-            }
-          : null,
-        session: data.session
-          ? {
-              accessToken: data.session.access_token,
-              refreshToken: data.session.refresh_token,
-              expiresAt: data.session.expires_at,
-            }
-          : null,
-      },
-      201,
-    );
-  })
+  // POST /signup と GET /signup-availability は user context (signupRoutes) に切り出し済み
   .post('/login', async (c) => {
     const body = loginSchema.parse(await c.req.json());
     const isEmail = body.identifier.includes('@');

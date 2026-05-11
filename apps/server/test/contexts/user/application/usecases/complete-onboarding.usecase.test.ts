@@ -21,6 +21,7 @@ describe('CompleteOnboardingUsecase', () => {
     profileRepo = {
       findById: vi.fn().mockResolvedValue(null),
       save: vi.fn().mockResolvedValue(undefined),
+      count: vi.fn().mockResolvedValue(0),
     };
     usecase = new CompleteOnboardingUsecase(profileRepo);
   });
