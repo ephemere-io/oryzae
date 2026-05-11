@@ -2,6 +2,10 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import jaMessages from '@/i18n/messages/ja.json';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 // `getTranslations` は next-intl/server から提供される async API。
 // jsdom 環境では next/headers などに依存して動かないので、ja メッセージから直接引くようスタブする。
 vi.mock('next-intl/server', () => ({
@@ -10,8 +14,8 @@ vi.mock('next-intl/server', () => ({
       const parts = `${namespace}.${key}`.split('.');
       let cur: unknown = jaMessages;
       for (const part of parts) {
-        if (typeof cur !== 'object' || cur === null) return '';
-        cur = (cur as Record<string, unknown>)[part];
+        if (!isRecord(cur)) return '';
+        cur = cur[part];
       }
       return typeof cur === 'string' ? cur : '';
     };
@@ -35,11 +39,14 @@ describe('DesktopOnlyOverlay', () => {
     ).toBeDefined();
   });
 
-  it('md:hidden クラスで md 以上では非表示になる (Tailwind 命名規約の保証)', async () => {
+  it('画面幅 < 768px かつ pointer:coarse のときだけ flex 表示になる', async () => {
     const ui = await DesktopOnlyOverlay();
     const { container } = render(ui);
     const root = container.firstElementChild;
-    expect(root?.className).toContain('md:hidden');
+    // デフォルトは hidden、media query 一致時のみ flex 表示。
+    // PC (pointer: fine) でブラウザサイドバー等によって幅が 768px を下回るケースを除外するための判定式。
+    expect(root?.className).toContain('hidden');
+    expect(root?.className).toContain('[@media(max-width:767px)_and_(pointer:coarse)]:flex');
   });
 
   it('alert role を持ち aria-live が指定されている', async () => {
