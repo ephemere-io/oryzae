@@ -21,6 +21,7 @@ function parseHashParams(hash: string): Record<string, string> {
 
 function CallbackHandler() {
   const t = useTranslations('auth.callback');
+  const tErr = useTranslations('auth.error');
   const searchParams = useSearchParams();
   const router = useRouter();
   const [error, setError] = useState('');
@@ -41,6 +42,13 @@ function CallbackHandler() {
         });
 
         if (!res.ok) {
+          // Issue #300: Research Preview 登録枠が満了している場合、サーバーは
+          // 409 + { error: 'capacity_reached' } を返す（OAuth 新規ユーザーのみ）
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          if (res.status === 409 && body.error === 'capacity_reached') {
+            setError(tErr('capacity_reached'));
+            return;
+          }
           setError(t('error_auth_failed'));
           return;
         }
@@ -84,7 +92,7 @@ function CallbackHandler() {
     }
 
     handleCallback();
-  }, [searchParams, router, t]);
+  }, [searchParams, router, t, tErr]);
 
   if (error) {
     return (

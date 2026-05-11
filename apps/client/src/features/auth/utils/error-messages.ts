@@ -15,6 +15,7 @@ const ERROR_KEY_MAP: Record<string, string> = {
   'A user with this email address has already been registered': 'user_already_registered_2',
   'Email address not confirmed': 'email_not_confirmed_2',
   'Same password': 'same_password',
+  capacity_reached: 'capacity_reached',
 };
 
 export function translateAuthError(message: string, t: Translator): string {

@@ -21,6 +21,7 @@ import { adminObservability } from './contexts/shared/presentation/routes/admin-
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
 import { cronCostAlert } from './contexts/shared/presentation/routes/cron-cost-alert.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
+import { signupRoutes } from './contexts/user/presentation/routes/signup.js';
 import { userMe } from './contexts/user/presentation/routes/user-me.js';
 
 const app = new Hono()
@@ -29,6 +30,8 @@ const app = new Hono()
   .route('/api/v1/cron/fermentation', cronFermentation)
   .route('/api/v1/cron/cost-alert', cronCostAlert)
   .use('/api/v1/auth/*', rateLimitAuth())
+  // signupRoutes (POST /signup, GET /signup/availability) — Issue #300
+  .route('/api/v1/auth/signup', signupRoutes)
   .route('/api/v1/auth', authRoutes)
   .use('/api/v1/admin/*', adminAuthMiddleware)
   .route('/api/v1/admin/dashboard', adminDashboard)

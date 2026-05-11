@@ -30,6 +30,14 @@ export class SupabaseUserProfileRepository implements UserProfileRepositoryGatew
     if (error) throw error;
   }
 
+  async count(): Promise<number> {
+    const { count, error } = await this.supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true });
+    if (error) throw error;
+    return count ?? 0;
+  }
+
   private toDomain(row: Record<string, unknown>): UserProfile {
     // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
     return UserProfile.fromProps({
