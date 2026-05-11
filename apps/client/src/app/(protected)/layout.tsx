@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
+import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -56,6 +57,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               <PageFooter />
             </main>
             {shouldShow && <OnboardingFlow onComplete={handleOnboardingComplete} />}
+            {/* スマホ専用画面が用意できるまでの暫定処置 (Issue #299) — 保護下のページはスマホ非対応 */}
+            <DesktopOnlyOverlay />
           </div>
         </UnreadProvider>
       </SidebarProvider>
