@@ -147,6 +147,10 @@
     },
     "metadata": {
       "description": "ジャーナリング支援アプリ"
+    },
+    "desktop_only": {
+      "heading": "デスクトップ専用です",
+      "body": "Oryzaeは現在、デスクトップブラウザ専用となっていてスマートフォンからはアクセスできません。スマートフォン版画面が準備できるまでは、デスクトップからお使いください。"
     }
   },
   "footer": {
@@ -449,8 +453,8 @@
       "preview": "アプリ",
       "philosophy": "思想",
       "faq": "FAQ",
-      "support": "ヘルプ",
-      "cta": "アプリを試す"
+      "cta": "アプリを試す",
+      "support": "ヘルプ"
     },
     "hero": {
       "eyebrow": "AN ASPERGILLUS FOR WORDS.",

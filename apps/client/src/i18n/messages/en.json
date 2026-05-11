@@ -147,6 +147,10 @@
     },
     "metadata": {
       "description": "A journaling companion app"
+    },
+    "desktop_only": {
+      "heading": "Desktop only",
+      "body": "Oryzae is currently desktop-only and cannot be accessed from a smartphone. Until the mobile version is ready, please use it from a desktop browser."
     }
   },
   "footer": {
@@ -449,8 +453,8 @@
       "preview": "The app",
       "philosophy": "Philosophy",
       "faq": "FAQ",
-      "support": "Help",
-      "cta": "Open the app"
+      "cta": "Open the app",
+      "support": "Help"
     },
     "hero": {
       "eyebrow": "AN ASPERGILLUS FOR WORDS.",

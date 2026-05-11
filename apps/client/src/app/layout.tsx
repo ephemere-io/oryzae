@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
+import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PostHogProvider } from '@/components/posthog-provider';
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 import './globals.css';
@@ -68,6 +69,8 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--fg)]">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <PostHogProvider>{children}</PostHogProvider>
+          {/* スマホ専用画面が用意できるまでの暫定処置 (Issue #299) */}
+          <DesktopOnlyOverlay />
         </NextIntlClientProvider>
       </body>
     </html>
