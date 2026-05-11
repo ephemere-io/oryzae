@@ -180,6 +180,39 @@ html[lang="ja"] .landingRoot {
   color: var(--lp-ink);
   border: 1px solid var(--lp-line-strong);
 }
+.ctaDisabled {
+  background: var(--lp-paper-2);
+  color: var(--lp-line-strong);
+  border-color: var(--lp-line-strong);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.ctaDisabled:hover {
+  background: var(--lp-paper-2);
+  color: var(--lp-line-strong);
+  border-color: var(--lp-line-strong);
+  transform: none;
+}
+.heroCapacityBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--lp-sans);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  margin-bottom: 14px;
+  background: var(--lp-paper-2);
+  color: var(--lp-olive);
+  border: 1px solid var(--lp-line-strong);
+  border-radius: 999px;
+  white-space: nowrap;
+  width: fit-content;
+}
+.heroCapacityBadgeFull {
+  color: var(--lp-ink);
+  background: transparent;
+}
 .ctaGhost:hover {
   background: var(--lp-paper-2);
   color: var(--lp-ink);

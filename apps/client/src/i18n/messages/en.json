@@ -60,7 +60,10 @@
       "submit_loading": "Creating...",
       "submit": "Sign up",
       "have_account_prefix": "Already have an account?",
-      "login_link": "Log in"
+      "login_link": "Log in",
+      "capacity_remaining": "{remaining} of {max} spots remaining",
+      "capacity_full_title": "Sign-ups are currently full",
+      "capacity_full_body": "Research Preview is limited to {max} accounts. We'll add more capacity soon."
     },
     "error": {
       "invalid_credentials": "Incorrect email or password",
@@ -76,7 +79,8 @@
       "session_missing": "Your session has expired. Please log in again.",
       "user_already_registered_2": "This email is already registered",
       "email_not_confirmed_2": "Email address not confirmed",
-      "same_password": "New password must be different from your current password"
+      "same_password": "New password must be different from your current password",
+      "capacity_reached": "Sign-ups are temporarily closed (cap reached)"
     },
     "confirm": {
       "processing": "Confirming...",
@@ -465,7 +469,8 @@
       "lead": "Oryzae is a writing app inspired by koji mold — Aspergillus oryzae. Set a question that matters to you, write into it for a week, and the system decomposes your text, surfaces a few essential snippets, and returns a single short letter. Slow self-dialogue, made on purpose.",
       "cta": {
         "primary": "Open the app",
-        "secondary": "Read the concept"
+        "secondary": "Read the concept",
+        "full": "Sign-ups closed"
       },
       "foot": "Vertical or horizontal writing, in Japanese, English, and beyond.",
       "chip": {
@@ -477,7 +482,9 @@
       "snippet": {
         "1": "As a nukadoko slowly absorbs the household it lives in, an AI may also change its character…"
       },
-      "question": "YOUR QUESTION"
+      "question": "YOUR QUESTION",
+      "capacity_badge": "Research Preview · {remaining} of {max} spots left",
+      "capacity_full_badge": "Research Preview · sign-ups closed"
     },
     "concept": {
       "kicker": "CONCEPT",
@@ -605,22 +612,9 @@
         "q": "Can I write in languages other than Japanese?",
         "a": "Yes — multilingual input is supported, including English. Vertical writing is tuned for Japanese and Chinese."
       },
-      "5": {
-        "q": "What stage is the project at?",
-        "a": "Oryzae is a research preview. The shape of the app and its behaviour will continue to shift alongside the research."
-      },
       "kicker": "QUESTIONS",
       "title": "Frequent questions"
-    },
-    "outro": {
-      "l1": "One question is enough",
-      "l2": "to change a week.",
-      "cta": "Open Oryzae"
-    },
-    "foot": {
-      "tag": "Aspergillus oryzae for words."
-    },
-    "title": "Oryzae — Let your writing ferment."
+    }
   },
   "onboarding": {
     "dialog_label": "Welcome to Oryzae",

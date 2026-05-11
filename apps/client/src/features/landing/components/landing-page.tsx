@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useTransition } from 'react';
 import type { Locale } from '@/i18n/config';
 import { setLocaleAction } from '@/lib/i18n-actions';
+import { useSignupAvailability } from '@/lib/use-signup-availability';
 import styles from './landing.module.css';
 import { LandingFaqItem } from './landing-faq-item';
 
@@ -97,6 +98,11 @@ function SiteHeader({ lang, t }: HeaderProps) {
 }
 
 function Hero({ t }: { t: T }) {
+  // Issue #300: Research Preview の登録枠表示。サーバーが落ちている等で取得失敗時はバッジ非表示。
+  const tHero = useTranslations('landing.hero');
+  const { availability } = useSignupAvailability();
+  const capacityFull = availability?.capacityReached === true;
+
   return (
     <section className={styles.hero}>
       <div className={styles.heroGrid}>
@@ -107,10 +113,28 @@ function Hero({ t }: { t: T }) {
             <span>{t('hero.title.l2')}</span>
           </h1>
           <p className={styles.heroLead}>{t('hero.lead')}</p>
+          {availability && (
+            <p
+              className={`${styles.heroCapacityBadge} ${capacityFull ? styles.heroCapacityBadgeFull : ''}`}
+            >
+              {capacityFull
+                ? tHero('capacity_full_badge')
+                : tHero('capacity_badge', {
+                    remaining: availability.remaining,
+                    max: availability.limit,
+                  })}
+            </p>
+          )}
           <div className={styles.heroActions}>
-            <Link className={styles.cta} href={APP_HREF}>
-              {t('hero.cta.primary')}
-            </Link>
+            {capacityFull ? (
+              <button type="button" className={`${styles.cta} ${styles.ctaDisabled}`} disabled>
+                {tHero('cta.full')}
+              </button>
+            ) : (
+              <Link className={styles.cta} href={APP_HREF}>
+                {t('hero.cta.primary')}
+              </Link>
+            )}
             <a className={`${styles.cta} ${styles.ctaGhost}`} href="#concept">
               {t('hero.cta.secondary')}
             </a>
