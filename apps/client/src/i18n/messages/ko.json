@@ -1,0 +1,681 @@
+{
+  "auth": {
+    "callback": {
+      "error_auth_failed": "인증에 실패했습니다. 다시 시도해 주세요.",
+      "error_no_code": "인증 코드를 찾을 수 없습니다",
+      "back_to_login": "로그인으로 돌아가기",
+      "authenticating": "인증 중...",
+      "loading": "불러오는 중..."
+    },
+    "forgot_password": {
+      "sent_heading": "메일을 확인해 주세요",
+      "sent_body": "으로 비밀번호 재설정 링크를 보냈습니다. 메일 안의 링크를 클릭해 새 비밀번호를 설정해 주세요.",
+      "back_to_login": "로그인으로 돌아가기",
+      "heading": "비밀번호 재설정",
+      "subheading": "등록된 이메일 주소를 입력해 주세요. 비밀번호 재설정 링크를 보내드립니다.",
+      "email_label": "이메일",
+      "submit_loading": "보내는 중...",
+      "submit": "재설정 링크 보내기",
+      "back_to_login_2": "로그인으로 돌아가기"
+    },
+    "google_login": {
+      "connecting": "연결 중...",
+      "button": "Google로 로그인"
+    },
+    "login": {
+      "subheading": "로그인하여 계속하기",
+      "divider_or": "또는",
+      "identifier_label": "닉네임 또는 이메일",
+      "password_label": "비밀번호",
+      "forgot_link": "비밀번호를 잊으셨나요?",
+      "submit_loading": "로그인 중...",
+      "submit": "로그인",
+      "no_account_prefix": "계정이 없으신가요?",
+      "signup_link": "회원가입"
+    },
+    "reset_password": {
+      "invalid_link": "유효하지 않은 재설정 링크입니다. 다시 비밀번호 재설정을 시도해 주세요.",
+      "back_link": "비밀번호 재설정으로 돌아가기",
+      "error_mismatch": "비밀번호가 일치하지 않습니다",
+      "heading": "새 비밀번호",
+      "subheading": "새 비밀번호를 입력해 주세요.",
+      "password_label": "새 비밀번호",
+      "confirm_label": "비밀번호 확인",
+      "submit_loading": "변경 중...",
+      "submit": "비밀번호 변경",
+      "loading": "불러오는 중..."
+    },
+    "signup": {
+      "error_password_mismatch": "비밀번호가 일치하지 않습니다",
+      "email_sent_subheading": "확인 메일을 보냈습니다",
+      "email_sent_body": "으로 확인 메일을 보냈습니다. 메일 안의 링크를 클릭해 계정을 활성화해 주세요.",
+      "back_to_login": "로그인으로 돌아가기",
+      "subheading": "계정 만들기",
+      "divider_or": "또는",
+      "nickname_label": "닉네임 (로그인 ID)",
+      "nickname_help": "영문, 숫자, 하이픈, 언더스코어만 사용 가능",
+      "email_label": "이메일",
+      "password_label": "비밀번호",
+      "confirm_label": "비밀번호 확인",
+      "submit_loading": "만드는 중...",
+      "submit": "회원가입",
+      "have_account_prefix": "이미 계정이 있으신가요?",
+      "login_link": "로그인",
+      "capacity_remaining": "등록 가능 자리: {remaining} / {max}명 남음",
+      "capacity_full_title": "현재 등록이 마감되었습니다",
+      "capacity_full_body": "Research Preview로서 등록은 {max}명으로 제한하고 있습니다. 순차적으로 확대할 예정입니다."
+    },
+    "error": {
+      "invalid_credentials": "이메일 또는 비밀번호가 올바르지 않습니다",
+      "email_not_confirmed": "이메일이 확인되지 않았습니다. 확인 메일을 확인해 주세요",
+      "user_already_registered": "이미 등록된 이메일입니다",
+      "password_too_short": "비밀번호는 6자 이상으로 입력해 주세요",
+      "rate_limit": "잠시 후 다시 시도해 주세요",
+      "security_wait": "보안을 위해 잠시 후 다시 시도해 주세요",
+      "invalid_email_format": "이메일 형식이 올바르지 않습니다",
+      "invalid_password": "유효한 비밀번호를 입력해 주세요",
+      "user_not_found": "사용자를 찾을 수 없습니다",
+      "same_password_new": "새 비밀번호는 현재 비밀번호와 달라야 합니다",
+      "session_missing": "세션이 만료되었습니다. 다시 로그인해 주세요",
+      "user_already_registered_2": "이미 등록된 이메일입니다",
+      "email_not_confirmed_2": "이메일 확인이 완료되지 않았습니다",
+      "same_password": "새 비밀번호는 현재 비밀번호와 달라야 합니다",
+      "capacity_reached": "등록 자리가 가득 차서 지금은 가입할 수 없습니다"
+    },
+    "confirm": {
+      "processing": "확인 중...",
+      "error_invalid_link": "링크가 유효하지 않습니다. 다시 시도해 주세요.",
+      "error_failed": "확인에 실패했습니다. 링크의 유효 기간이 지났을 수 있습니다.",
+      "back_to_login": "로그인으로 돌아가기"
+    }
+  },
+  "entries": {
+    "detail": {
+      "not_found": "항목을 찾을 수 없습니다"
+    },
+    "delete_modal": {
+      "aria_label": "삭제 확인 대화상자",
+      "heading": "정말 삭제할까요?",
+      "body": "이 항목은 완전히 삭제되며 복구할 수 없습니다.",
+      "cancel": "취소",
+      "deleting": "삭제 중...",
+      "confirm": "삭제"
+    },
+    "card": {
+      "char_count_label": "글자 수:"
+    },
+    "kebab": {
+      "aria_open": "메뉴 열기",
+      "delete": "삭제"
+    },
+    "list": {
+      "search_placeholder": "항목 검색...",
+      "search_aria": "검색",
+      "clear_search_aria": "검색 지우기",
+      "no_results": "검색 결과가 없습니다",
+      "no_entries": "아직 항목이 없습니다",
+      "month_format": "{year}년 {month}월",
+      "results_count": "{count}건의 결과",
+      "week_label": "{n}주차",
+      "load_more_loading": "불러오는 중...",
+      "load_more": "더 보기"
+    },
+    "leave_modal": {
+      "aria_label": "이탈 확인 대화상자",
+      "heading": "정말 떠나시겠어요?",
+      "body": "저장되지 않은 변경사항이 사라집니다.",
+      "cancel": "취소",
+      "confirm": "OK"
+    },
+    "question_linker": {
+      "placeholder": "질문과 연결…"
+    },
+    "unsaved_modal": {
+      "heading": "저장되지 않은 변경사항이 있습니다",
+      "body": "저장하지 않고 이동하면 변경사항이 사라집니다.",
+      "discard": "저장 안 함",
+      "save": "저장"
+    },
+    "delete_hook": {
+      "error": "삭제하지 못했습니다"
+    },
+    "save_hook": {
+      "error_save": "저장하지 못했습니다",
+      "error_create": "만들지 못했습니다"
+    }
+  },
+  "app": {
+    "global_error": {
+      "heading": "오류가 발생했습니다",
+      "retry": "다시 시도"
+    },
+    "metadata": {
+      "description": "저널링 도우미 앱"
+    },
+    "desktop_only": {
+      "heading": "데스크톱 전용입니다",
+      "body": "Oryzae는 현재 데스크톱 브라우저 전용으로, 스마트폰에서는 이용할 수 없습니다. 모바일 화면이 준비될 때까지는 데스크톱에서 이용해 주세요."
+    }
+  },
+  "footer": {
+    "label": {
+      "questions": "질문 목록"
+    }
+  },
+  "account": {
+    "field": {
+      "save": "저장",
+      "cancel": "취소",
+      "edit": "편집",
+      "nickname": "닉네임",
+      "user_id": "사용자 ID"
+    },
+    "email": {
+      "error_login_required": "로그인이 필요합니다",
+      "label": "이메일",
+      "oauth_only_note": "Google 계정에 연결된 이메일입니다",
+      "confirmation_sent": "확인 메일을 보냈습니다. 새 이메일 주소로 도착한 메일의 링크를 클릭해 주세요.",
+      "placeholder_new": "새 이메일 주소",
+      "submit": "보내기",
+      "cancel": "취소",
+      "change": "변경"
+    },
+    "password": {
+      "error_mismatch": "새 비밀번호가 일치하지 않습니다",
+      "error_login_required": "로그인이 필요합니다",
+      "label": "비밀번호",
+      "updated": "비밀번호를 변경했습니다",
+      "placeholder_current": "현재 비밀번호",
+      "placeholder_new": "새 비밀번호 (6자 이상)",
+      "placeholder_confirm": "새 비밀번호 (확인)",
+      "update": "변경",
+      "cancel": "취소",
+      "change": "변경"
+    },
+    "theme": {
+      "label": "테마",
+      "light": "라이트 모드",
+      "dark": "다크 모드",
+      "toggle": "전환"
+    },
+    "profile": {
+      "error_login_required": "로그인이 필요합니다"
+    },
+    "section": {
+      "profile": "프로필",
+      "security": "보안",
+      "stats": "통계",
+      "settings": "설정"
+    },
+    "logout": {
+      "label": "로그아웃",
+      "button": "로그아웃하기"
+    },
+    "language": {
+      "label": "언어"
+    },
+    "links": {
+      "privacy": "개인정보 보호정책",
+      "support": "도움말 및 지원"
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "account": "계정"
+    }
+  },
+  "stats": {
+    "label": {
+      "streak": "연속 기록",
+      "total_entries": "누적 항목",
+      "total_chars": "누적 글자 수",
+      "total_fermentations": "발효 횟수",
+      "weekly_chars": "이번 주 글자 수",
+      "monthly_chars": "이번 달 글자 수",
+      "untitled": "(제목 없음)"
+    },
+    "value": {
+      "streak_days": "일"
+    },
+    "section": {
+      "monthly_trend": "월별 추이",
+      "entries_by_question": "질문별 항목 수"
+    },
+    "error": {
+      "fetch_failed": "통계 데이터를 불러오지 못했습니다"
+    }
+  },
+  "board": {
+    "date": {
+      "day_sun": "일요일",
+      "day_mon": "월요일",
+      "day_tue": "화요일",
+      "day_wed": "수요일",
+      "day_thu": "목요일",
+      "day_fri": "금요일",
+      "day_sat": "토요일"
+    },
+    "canvas": {
+      "aria_label": "보드 캔버스"
+    },
+    "empty": "이 기간에는 내용이 없습니다",
+    "lightbox": {
+      "aria_label": "사진 라이트박스",
+      "close_aria": "라이트박스 닫기"
+    },
+    "photo_dialog": {
+      "aria_label": "사진 업로드 대화상자",
+      "heading": "사진 추가",
+      "click_to_select": "클릭하여 사진 선택",
+      "uploading_aria": "업로드 중",
+      "uploading": "업로드 중…",
+      "caption_placeholder": "캡션 (20자 이내)",
+      "cancel": "취소",
+      "uploading_button": "업로드 중…",
+      "submit": "추가"
+    },
+    "snippet_dialog": {
+      "aria_label": "스니펫 대화상자",
+      "heading_edit": "스니펫 편집",
+      "heading_create": "스니펫 만들기",
+      "placeholder": "텍스트를 입력하세요...",
+      "cancel": "취소",
+      "update": "변경",
+      "create": "만들기"
+    }
+  },
+  "editor": {
+    "status": {
+      "editing": "편집 중",
+      "saved": "저장됨",
+      "saving": "저장 중...",
+      "autosaving": "항목을 자동 저장 중..."
+    },
+    "voice": {
+      "error_network": "음성 인식을 사용할 수 없습니다 (Chrome에서 다시 열어 주세요)",
+      "error_not_allowed": "마이크 사용이 허용되지 않았습니다",
+      "error_unsupported": "이 브라우저는 음성 입력을 지원하지 않습니다"
+    },
+    "toolbar": {
+      "new_entry": "새 항목",
+      "save": "저장",
+      "pickle": "담그기",
+      "list": "목록",
+      "stats": "글쓰기 통계",
+      "voice_stop": "음성 입력 중지",
+      "voice": "음성 입력",
+      "settings": "설정",
+      "writing_horizontal": "가로쓰기로 전환",
+      "writing_vertical": "세로쓰기로 전환",
+      "font_sans": "고딕체로 전환",
+      "font_serif": "명조체로 전환",
+      "fullscreen": "전체 화면"
+    },
+    "title": {
+      "placeholder": "제목을 입력하세요...",
+      "add": "제목 추가"
+    },
+    "placeholder": "오늘은 무엇을 느꼈나요?",
+    "save_modal": {
+      "heading_pickle": "이 항목을 항아리에 담그기",
+      "heading_save": "항목 저장",
+      "submit_pickle": "담그기",
+      "submit_save": "저장",
+      "aria_label": "항목 저장 대화상자",
+      "default_heading": "항목 저장",
+      "default_submit": "저장",
+      "title_label": "제목",
+      "title_placeholder": "제목을 입력하세요...",
+      "cancel": "취소",
+      "saving": "저장 중..."
+    },
+    "settings": {
+      "close_aria": "설정 닫기",
+      "section_basic": "기본 설정",
+      "font_size": "글자 크기",
+      "line_height": "줄 간격",
+      "focus_mode": "집중 모드",
+      "section_effects": "이펙트",
+      "time_inscription": "시간 각인",
+      "ti_font_size": "글자 크기",
+      "ti_font_weight": "글자 굵기",
+      "ti_pressure_bleed": "압력 번짐",
+      "eraser_trace": "지운 흔적",
+      "amp": "타건음 증폭 (ASMR)",
+      "voice": "음량 각인",
+      "ghost": "고스트",
+      "ghost_block": "덩어리 (커밋 시)",
+      "ghost_dust": "먼지 (키 입력마다)",
+      "ghost_size": "크기",
+      "ghost_scatter": "흩어짐",
+      "ghost_blur_start": "초기 블러",
+      "ghost_blur_end": "최종 블러",
+      "ghost_duration": "지속 시간"
+    },
+    "snippet_toolbar": {
+      "saving": "저장 중…",
+      "saved": "저장했습니다",
+      "create": "스니펫 만들기",
+      "too_long": "50자 이내"
+    },
+    "stats": {
+      "aria_label": "글쓰기 통계",
+      "reading_time_under_minute": "1분 미만",
+      "reading_time_minutes": "약 {n}분",
+      "heading": "글쓰기 통계",
+      "label_chars": "글자 수",
+      "label_lines": "줄 수",
+      "label_paragraphs": "단락 수",
+      "label_reading_time": "읽는 시간"
+    },
+    "date": {
+      "day_sun": "일요일",
+      "day_mon": "월요일",
+      "day_tue": "화요일",
+      "day_wed": "수요일",
+      "day_thu": "목요일",
+      "day_fri": "금요일",
+      "day_sat": "토요일"
+    }
+  },
+  "fermentation": {
+    "detail": {
+      "header_keyword": "Yeast가 만든 키워드",
+      "header_snippet": "Oryzae가 골라낸 문장",
+      "header_letter": "L.A.B.의 관찰 기록",
+      "snippet_source_prefix": "출처:",
+      "write_entry": "이 질문으로 항목 쓰기"
+    },
+    "jar": {
+      "zoom_close_aria": "확대 닫기",
+      "particle_fermentation": "발효",
+      "particle_memory": "기억",
+      "particle_silence": "정적",
+      "particle_light": "빛",
+      "particle_dark": "어둠",
+      "particle_morning": "아침",
+      "particle_koji": "누룩",
+      "particle_breath": "숨결",
+      "filler_rice": "쌀",
+      "filler_water": "물",
+      "filler_soil": "토양",
+      "filler_brew": "빚다",
+      "filler_question": "질문",
+      "filler_time": "시간",
+      "filler_sediment": "침전",
+      "filler_wind": "바람",
+      "filler_season": "계절",
+      "filler_microbe": "균",
+      "filler_heat": "열",
+      "filler_propagate": "번식",
+      "filler_heart": "마음",
+      "filler_autumn": "가을",
+      "filler_shallows": "여울",
+      "current_questions": "지금의 질문",
+      "add_question": "＋ 질문 추가하기",
+      "edit_heading": "질문 편집",
+      "processing": "처리 중...",
+      "archive": "보관",
+      "cancel_edit": "취소",
+      "updating": "변경 중...",
+      "update": "변경하기",
+      "add_heading": "새 질문 추가",
+      "add_placeholder": "질문을 입력해 주세요",
+      "cancel_add": "취소",
+      "adding": "추가하는 중...",
+      "add_submit": "추가하기"
+    }
+  },
+  "questions": {
+    "create_form": {
+      "placeholder": "새 질문 추가...",
+      "creating": "추가하는 중...",
+      "submit": "추가"
+    },
+    "event": {
+      "label_active": "생성",
+      "attribution_active": "내가 만듦",
+      "label_proposed": "제안",
+      "attribution_proposed": "Oryzae가 제안함",
+      "label_archived": "보관됨",
+      "attribution_archived": "내가 보관함",
+      "accept": "수락",
+      "reject": "거절",
+      "unarchive": "복원",
+      "archive": "보관"
+    },
+    "timeline": {
+      "empty": "아직 질문이 없습니다",
+      "heading": "질문의 변천",
+      "subheading": "당신의 질문이 태어나고, 자라고, 변해 온 기록"
+    }
+  },
+  "landing": {
+    "nav": {
+      "concept": "컨셉",
+      "process": "발효의 세 단계",
+      "preview": "앱",
+      "philosophy": "철학",
+      "faq": "FAQ",
+      "cta": "앱 열기",
+      "support": "도움말"
+    },
+    "hero": {
+      "eyebrow": "AN ASPERGILLUS FOR WORDS.",
+      "title": {
+        "l1": "글쓰기를,",
+        "l2": "발효시키다."
+      },
+      "lead": "Oryzae는 매일의 말을 빚어내고, 당신의 질문을 깊게 만드는 글쓰기 공간입니다. 누룩곰팡이가 전분을 당으로 바꾸듯, 써내려간 문장을 분해해 질문의 핵심에 닿는 조각과 한 통의 편지로 되돌려 드립니다.",
+      "cta": {
+        "primary": "앱 열기",
+        "secondary": "컨셉 읽기",
+        "full": "접수 마감"
+      },
+      "foot": "세로쓰기와 가로쓰기 모두 지원. 일본어와 영어로 쓰고 사유하는 이들을 위한 자리.",
+      "chip": {
+        "1": "죽은 자의 자율성",
+        "2": "발효의 시간",
+        "3": "매개자",
+        "4": "잊음의 윤리"
+      },
+      "snippet": {
+        "1": "\"누카도코가 머무는 집의 영향을 천천히 흡수하듯, AI도 그렇게 변해 갈지 모른다…\""
+      },
+      "question": "YOUR QUESTION",
+      "capacity_badge": "Research Preview · {remaining} / {max}자리 남음",
+      "capacity_full_badge": "Research Preview · 접수 마감"
+    },
+    "concept": {
+      "kicker": "CONCEPT",
+      "title": "글을 쓰며 질문을 빚다.",
+      "lead": "Oryzae는 '질문'을 한가운데에 두는 글쓰기 앱입니다. 지금 가장 생각하고 싶은 질문을 하나 세우고, 일주일 동안 그 질문을 따라 일기를 씁니다. 주말이 되면, 누룩곰팡이·유산균·효모의 세 단계를 거쳐 AI가 글을 분해하고 다시 당신에게 건넵니다. 요약이 아니라, 사유를 한 걸음 더 나아가게 할 작은 영감으로.",
+      "p1": {
+        "title": "질문 세우기",
+        "body": "지금 마음에 걸리는 무언가를 한 문장의 질문으로 옮겨 적기. 모든 것이 그 둘레에서 발효를 시작합니다."
+      },
+      "p2": {
+        "title": "매일 쓰기",
+        "body": "세로쓰기의 흰 종이에 떠오른 그대로를 적습니다. 오자도, 곁길도, 손으로 쓴 흔적으로 남습니다."
+      },
+      "p3": {
+        "title": "편지가 도착하기",
+        "body": "일주일에 한 번, 당신의 말로부터 빚어진 짧은 편지와 키워드가 돌아옵니다. 다시 쓰기 시작하기 위해 읽는 글입니다."
+      }
+    },
+    "process": {
+      "kicker": "THREE MICROBES",
+      "title": {
+        "l1": "누룩곰팡이 · 유산균 · 효모",
+        "l2": "— 발효의 세 단계"
+      },
+      "lead": "Oryzae 내부에서는 누카도코의 미생물들처럼 세 가지 균이 저마다의 역할을 맡아, 당신이 일주일 동안 써낸 말들을 함께 빚어냅니다.",
+      "koji": {
+        "role": "분해 — Decomposition",
+        "body": "당신이 세운 질문에 비추어 일주일치 일기를 읽어 냅니다. 수정판 근거이론 접근을 참고하며, 원문에서 질문의 핵심에 닿는 조각을 뽑아 올립니다.",
+        "output": "출력: 분석 워크시트, 결과 도식, 질문을 비추는 조각들"
+      },
+      "lactic": {
+        "role": "편지 — A letter",
+        "body": "조각과 워크시트를 참조해, 질문을 둘러싼 사유의 움직임을 정리합니다. 요약이 아니라, 글쓴이의 어휘에서 일부러 비껴난 말로, 500자 남짓의 시적인 글이 쓰입니다.",
+        "output": "출력: 500자 분량의 편지 한 통"
+      },
+      "yeast": {
+        "role": "키워드 — Widening",
+        "body": "질문에 갇히지 않도록, 한 발 물러선 시선에서 건네는 3〜5개의 단어가 만들어집니다. \"죽은 자의 자율성\", \"산 자에 의해 활성화되는 죽은 자\"처럼 짧은 구절이 상상의 여백을 넓혀 줍니다.",
+        "output": "출력: 3〜5개의 키워드"
+      }
+    },
+    "preview": {
+      "kicker": "THE APP",
+      "title": "자리를 열다.",
+      "lead": "Editor에서 매일 쓰고, Board에서 늘어놓고, Jar에서 일주일을 굽어봅니다. 주말에는 Letter가 당신에게 도착합니다. 쓰기·정리·바라보기·받기를 각각의 자리로.",
+      "editor": {
+        "title": "제목 추가",
+        "prompt": "오늘은 무엇을 느꼈나요?",
+        "status": "editing",
+        "caption": "Editor — 세로쓰기의 흰 종이. 타이핑마다 글자가 흔들리고, 남고, 사라지는 작은 이펙트를 글쓰는 동작 자체에 더할 수 있습니다.",
+        "effect": "EFFECT · GHOST"
+      },
+      "jar": {
+        "chip": {
+          "1": "성찰의 거리감",
+          "2": "인지의 성소",
+          "3": "영적 대리자",
+          "4": "여격 관계"
+        },
+        "label": "YOUR QUESTION · 자연을 몸에 깃들게 하는 디자인이란?",
+        "caption": "Jar — 일주일의 말들이 질문을 축으로 별자리처럼 떠오르는 풍경."
+      },
+      "letter": {
+        "from": "— Oryzae로부터 · 18주차의 편지",
+        "body": "당신은 이번 한 주, \"죽은 자와 산 자는 어떻게 함께 살아갈 수 있는가\"라는 질문 둘레를 천천히 거닐었습니다. 꿈에 나타난 Y는 점점 태아의 모습으로 줄어들며 사라졌다고 합니다. 그것은 상실의 장면인 동시에 기원으로의 회귀이며, 원환으로서의 생사관을 어슴푸레 비춥니다. 이번 주, 글쓴이는 가장 소중한 존재 앞에서는 분석이 아닌 방식이 필요하다는 사실을 알아차리기 시작합니다. 잊는 것 또한 함께 사는 하나의 모양일지 모른다고.",
+        "caption": "Letter — 매주 도착하는 500자의 편지. 요약이 아니라, 계속 쓰기 위한 작은 불씨."
+      },
+      "board": {
+        "toggle": {
+          "daily": "DAILY",
+          "weekly": "WEEKLY"
+        },
+        "snippet": {
+          "1": "잊는 것 또한 함께 사는 하나의 모양일지 모른다.",
+          "2": "누카도코, 사람, 그리고 시간이 섞이는 방식에 관해."
+        },
+        "entry": {
+          "title": "산을 느끼는 디자인",
+          "meta": "765자 · 04-20"
+        },
+        "label": "7장 · 항목 5・스니펫 2・사진 3",
+        "caption": "Board — 매일의 말과 조각과 사진을 책상에 늘어놓고 정돈하는 자리. 기억은 시간 축이 아니라 관계 안에서 모양을 갖추기 시작합니다."
+      }
+    },
+    "philosophy": {
+      "kicker": "PHILOSOPHY",
+      "title": "졸업하기 위한 도구."
+    },
+    "philo": {
+      "1": {
+        "title": "신체성의 회복",
+        "body": "세로쓰기와 여백, 명조체. 디지털의 정돈보다, 분명히 내가 썼다는 손의 감각을 먼저 둡니다."
+      },
+      "2": {
+        "title": "즉시성의 배제",
+        "body": "AI의 응답은 일부러 늦춥니다. 일주일에 한 번 편지처럼 도착함으로써, 주고받음은 정보 처리에서 관계로 옮겨 갑니다."
+      },
+      "3": {
+        "title": "발효의 시간",
+        "body": "즉답이 아니라 빚어내기. 누카도코가 집마다 고유한 맛이 되듯, 사유 또한 글쓴이의 시간과 미생물 무리를 머금으며 천천히 익어 갑니다."
+      },
+      "4": {
+        "title": "졸업할 수 있는 기술",
+        "body": "궁극에는 도구에 기대지 않고도 스스로와 대화할 수 있게 되는 것. Oryzae는 그 길의 보조 바퀴일 뿐입니다."
+      },
+      "lineage": {
+        "label": "계보",
+        "body": "Oryzae는 저널링을 통한 자기 대화를 위한 앱 \"Pickles\" (2020–)의 지견을 이어받습니다. 연구의 맥락은 ephemere.io에서 살펴봐 주세요."
+      }
+    },
+    "faq": {
+      "1": {
+        "q": "Pickles와 무엇이 다른가요?",
+        "a": "Pickles는 일기 그 자체를 쓰는 자리였습니다. Oryzae는 '질문'을 한가운데에 두고, 써낸 말을 발효의 과정에 통과시켜 되돌리며, 쓰기 앞뒤의 시간까지 새롭게 설계한 도구입니다."
+      },
+      "2": {
+        "q": "꼭 세로쓰기로 써야 하나요?",
+        "a": "아니요. 세로쓰기는 기본 설정이지만, 클릭 한 번으로 가로쓰기로 바꿀 수 있습니다. 글꼴도 명조와 고딕 사이에서 고를 수 있습니다."
+      },
+      "3": {
+        "q": "AI는 무엇을 읽나요?",
+        "a": "당신이 세운 '질문'과, 그 주에 그 질문에 연결한 일기뿐입니다. 질문에 연결하지 않은 일기는 발효에 포함되지 않습니다."
+      },
+      "4": {
+        "q": "일본어 외 다른 언어로도 쓸 수 있나요?",
+        "a": "영어를 비롯한 여러 언어를 지원합니다. 세로쓰기는 일본어·중국어에 맞추어 다듬어져 있습니다."
+      },
+      "5": {
+        "q": "제가 쓴 글은 어떻게 다뤄지나요?",
+        "a": "당신이 쓴 일기와 '질문'은 서버에 암호화되어 저장되며, 본인과 발효 과정만이 읽습니다. 제3자와 공유되지 않습니다. 자세한 내용은 개인정보 보호정책을 확인해 주세요."
+      },
+      "kicker": "QUESTIONS",
+      "title": "자주 묻는 질문"
+    },
+    "outro": {
+      "l1": "질문을 세우고,",
+      "l2": "쓰기 시작합니다.",
+      "cta": "쓰기 시작하기"
+    },
+    "foot": {
+      "tag": "말을 천천히 빚는다."
+    }
+  },
+  "onboarding": {
+    "dialog_label": "Oryzae 소개",
+    "skip": "건너뛰기",
+    "step_concept": {
+      "eyebrow": "01 — Welcome",
+      "title_l1": "Oryzae는",
+      "title_l2": "질문을 길러내는 저널.",
+      "body": "머릿속에 떠오른 질문을 심고, 매일의 항목으로 물을 줍니다. 시간이 지나면, AI가 당신이 써 둔 글을 발효시켜 새로운 깨달음으로 돌려줍니다.",
+      "body_2": "보통의 일기와 조금 다른, 네 개의 자리를 차례로 살펴봅시다.",
+      "next": "시작하기"
+    },
+    "step_question": {
+      "eyebrow": "02 — Question",
+      "title": "첫 '질문'을 심어 보세요.",
+      "body": "지금 가장 마음에 걸리는 것을 짧은 질문의 형태로 적어 보세요. \"왜──\", \"어떻게 하면──\"처럼, 아직 답이 없는 한 문장이면 충분합니다. 언제든 다시 고칠 수 있습니다.",
+      "placeholder": "예: 나는 왜 서두르는 것이 서툴까",
+      "hint": "이후 Jar에 보관되며, 여기서부터 발효가 시작됩니다.",
+      "next": "이 질문으로 진행"
+    },
+    "step_editor": {
+      "eyebrow": "03 — Editor",
+      "title_l1": "항목을 쓰며,",
+      "title_l2": "말을 모아 갑니다.",
+      "body_before_em": "에디터는 조용한 글쓰기 자리입니다. 평소 떠오른 생각을 그대로 적어 보세요. 한 문장을 선택하면",
+      "body_em": "스니펫",
+      "body_after_em": "으로 잘라낼 수 있고, 나중에 Board에 늘어놓고 한눈에 살펴볼 수 있습니다.",
+      "list_autosave": "입력하면 자동 저장",
+      "list_snippet": "선택하면 스니펫 생성",
+      "list_link": "관련 질문에 연결",
+      "next": "다음"
+    },
+    "step_ferment": {
+      "eyebrow": "04 — Jar & Fermentation",
+      "title": "Jar에서 질문을 천천히 재웁니다.",
+      "body": "모아 둔 항목들은 Jar에 쌓이고, 일정한 주기로 발효됩니다. AI가 당신의 말을 다시 읽으며 공통점과 질문의 변화를 찾아 가만히 건네줍니다 — 그것이 Oryzae의 리듬입니다.",
+      "recap_label": "당신의 첫 질문",
+      "recap_quote": "\"{question}\"",
+      "next": "Oryzae 시작하기"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "title": "개인정보 보호정책",
+      "back_home": "홈으로 돌아가기"
+    }
+  },
+  "support": {
+    "title": "지원",
+    "back_home": "홈으로 돌아가기"
+  }
+}

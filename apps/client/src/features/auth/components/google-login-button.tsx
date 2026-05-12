@@ -4,8 +4,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { createApiClient } from '@/lib/api';
 
-function isSupportedLocale(value: string): value is 'ja' | 'en' {
-  return value === 'ja' || value === 'en';
+function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
+  return value === 'ja' || value === 'en' || value === 'zh' || value === 'ko';
 }
 
 export function GoogleLoginButton() {

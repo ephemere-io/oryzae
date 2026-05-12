@@ -4,8 +4,12 @@ import { z } from 'zod';
  * メール文面などサーバー側で使うユーザーのロケール。
  * クライアントの next-intl `useLocale()` 値を Supabase の user_metadata に保存して、
  * 確認メール・再設定メールなどのテンプレートで言語分岐に使う。
+ *
+ * UI は 4 言語 (ja/en/zh/ko) をサポート。発酵レター等の LLM プロンプトは
+ * 現状 ja/en のみ対応のため、サーバー側 (SupabaseUserLocaleResolver) で
+ * zh/ko → en にフォールバックする。Issue #308 参照。
  */
-export const localeSchema = z.enum(['ja', 'en']);
+export const localeSchema = z.enum(['ja', 'en', 'zh', 'ko']);
 export type LocaleCode = z.infer<typeof localeSchema>;
 
 export const createEntrySchema = z.object({

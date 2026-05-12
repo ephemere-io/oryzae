@@ -10,9 +10,11 @@ import {
 import { describe, expect, it } from 'vitest';
 
 describe('localeSchema', () => {
-  it('accepts ja and en', () => {
+  it('accepts all supported UI locales (ja/en/zh/ko)', () => {
     expect(localeSchema.parse('ja')).toBe('ja');
     expect(localeSchema.parse('en')).toBe('en');
+    expect(localeSchema.parse('zh')).toBe('zh');
+    expect(localeSchema.parse('ko')).toBe('ko');
   });
 
   it('rejects unsupported locales', () => {
@@ -29,9 +31,11 @@ describe('signupSchema locale field', () => {
     expect(parsed.locale).toBeUndefined();
   });
 
-  it('accepts ja/en locale', () => {
+  it('accepts all supported locales', () => {
     expect(signupSchema.parse({ ...base, locale: 'ja' }).locale).toBe('ja');
     expect(signupSchema.parse({ ...base, locale: 'en' }).locale).toBe('en');
+    expect(signupSchema.parse({ ...base, locale: 'zh' }).locale).toBe('zh');
+    expect(signupSchema.parse({ ...base, locale: 'ko' }).locale).toBe('ko');
   });
 
   it('rejects unsupported locale', () => {
@@ -64,9 +68,11 @@ describe('oauthFinalizeSchema', () => {
     expect(oauthFinalizeSchema.parse({}).locale).toBeUndefined();
   });
 
-  it('accepts ja/en locale', () => {
+  it('accepts all supported locales', () => {
     expect(oauthFinalizeSchema.parse({ locale: 'ja' }).locale).toBe('ja');
     expect(oauthFinalizeSchema.parse({ locale: 'en' }).locale).toBe('en');
+    expect(oauthFinalizeSchema.parse({ locale: 'zh' }).locale).toBe('zh');
+    expect(oauthFinalizeSchema.parse({ locale: 'ko' }).locale).toBe('ko');
   });
 
   it('rejects unsupported locale', () => {

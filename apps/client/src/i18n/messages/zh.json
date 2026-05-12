@@ -1,0 +1,681 @@
+{
+  "auth": {
+    "callback": {
+      "error_auth_failed": "认证失败。请重试。",
+      "error_no_code": "未找到认证码",
+      "back_to_login": "返回登录",
+      "authenticating": "认证中...",
+      "loading": "加载中..."
+    },
+    "forgot_password": {
+      "sent_heading": "请查收邮件",
+      "sent_body": "已向此邮箱发送密码重置链接。请点击邮件中的链接来设置新密码。",
+      "back_to_login": "返回登录",
+      "heading": "重置密码",
+      "subheading": "请输入您注册时的邮箱地址。我们将向您发送密码重置链接。",
+      "email_label": "电子邮件",
+      "submit_loading": "发送中...",
+      "submit": "发送重置链接",
+      "back_to_login_2": "返回登录"
+    },
+    "google_login": {
+      "connecting": "连接中...",
+      "button": "使用 Google 登录"
+    },
+    "login": {
+      "subheading": "登录以继续",
+      "divider_or": "或",
+      "identifier_label": "昵称或邮箱",
+      "password_label": "密码",
+      "forgot_link": "忘记密码？",
+      "submit_loading": "登录中...",
+      "submit": "登录",
+      "no_account_prefix": "还没有账户？",
+      "signup_link": "注册"
+    },
+    "reset_password": {
+      "invalid_link": "无效的重置链接。请重新申请密码重置。",
+      "back_link": "返回密码重置",
+      "error_mismatch": "密码不匹配",
+      "heading": "设置新密码",
+      "subheading": "请输入新密码。",
+      "password_label": "新密码",
+      "confirm_label": "确认密码",
+      "submit_loading": "更新中...",
+      "submit": "更新密码",
+      "loading": "加载中..."
+    },
+    "signup": {
+      "error_password_mismatch": "密码不匹配",
+      "email_sent_subheading": "已发送确认邮件",
+      "email_sent_body": "已向此邮箱发送确认邮件。请点击邮件中的链接来激活账户。",
+      "back_to_login": "返回登录",
+      "subheading": "创建账户",
+      "divider_or": "或",
+      "nickname_label": "昵称（登录 ID）",
+      "nickname_help": "仅限字母、数字、连字符与下划线",
+      "email_label": "电子邮件",
+      "password_label": "密码",
+      "confirm_label": "确认密码",
+      "submit_loading": "创建中...",
+      "submit": "注册",
+      "have_account_prefix": "已有账户？",
+      "login_link": "登录",
+      "capacity_remaining": "注册名额剩余 {remaining} / {max} 名",
+      "capacity_full_title": "当前注册名额已满",
+      "capacity_full_body": "作为 Research Preview，注册名额限定为 {max} 名。我们将陆续增加。"
+    },
+    "error": {
+      "invalid_credentials": "邮箱或密码不正确",
+      "email_not_confirmed": "邮箱尚未确认。请查收确认邮件。",
+      "user_already_registered": "此邮箱已注册",
+      "password_too_short": "密码至少需要 6 个字符",
+      "rate_limit": "请稍后再试",
+      "security_wait": "出于安全考虑，请稍后再试",
+      "invalid_email_format": "邮箱格式不正确",
+      "invalid_password": "请输入有效的密码",
+      "user_not_found": "未找到该用户",
+      "same_password_new": "新密码不能与当前密码相同",
+      "session_missing": "会话已过期。请重新登录",
+      "user_already_registered_2": "此邮箱已注册",
+      "email_not_confirmed_2": "邮箱确认未完成",
+      "same_password": "新密码不能与当前密码相同",
+      "capacity_reached": "注册名额已满，目前无法新建账户"
+    },
+    "confirm": {
+      "processing": "确认中...",
+      "error_invalid_link": "链接无效。请重试。",
+      "error_failed": "确认失败。链接可能已过期。",
+      "back_to_login": "返回登录"
+    }
+  },
+  "entries": {
+    "detail": {
+      "not_found": "未找到该日记"
+    },
+    "delete_modal": {
+      "aria_label": "删除确认对话框",
+      "heading": "确定要删除吗？",
+      "body": "该日记将被永久删除，无法恢复。",
+      "cancel": "取消",
+      "deleting": "删除中...",
+      "confirm": "删除"
+    },
+    "card": {
+      "char_count_label": "字数:"
+    },
+    "kebab": {
+      "aria_open": "打开菜单",
+      "delete": "删除"
+    },
+    "list": {
+      "search_placeholder": "搜索日记...",
+      "search_aria": "搜索",
+      "clear_search_aria": "清除搜索",
+      "no_results": "没有搜索结果",
+      "no_entries": "还没有任何日记",
+      "month_format": "{year} 年 {month} 月",
+      "results_count": "{count} 条结果",
+      "week_label": "第 {n} 周",
+      "load_more_loading": "加载中...",
+      "load_more": "加载更多"
+    },
+    "leave_modal": {
+      "aria_label": "离开确认对话框",
+      "heading": "确定要离开吗？",
+      "body": "未保存的更改将丢失。",
+      "cancel": "取消",
+      "confirm": "OK"
+    },
+    "question_linker": {
+      "placeholder": "关联提问…"
+    },
+    "unsaved_modal": {
+      "heading": "有未保存的更改",
+      "body": "不保存就离开会丢失改动内容。",
+      "discard": "不保存",
+      "save": "保存"
+    },
+    "delete_hook": {
+      "error": "删除失败"
+    },
+    "save_hook": {
+      "error_save": "保存失败",
+      "error_create": "创建失败"
+    }
+  },
+  "app": {
+    "global_error": {
+      "heading": "发生错误",
+      "retry": "重试"
+    },
+    "metadata": {
+      "description": "辅助日记书写的应用"
+    },
+    "desktop_only": {
+      "heading": "仅支持桌面",
+      "body": "Oryzae 目前仅支持桌面浏览器访问，无法从智能手机使用。在移动版准备好之前，请使用桌面浏览器。"
+    }
+  },
+  "footer": {
+    "label": {
+      "questions": "提问一览"
+    }
+  },
+  "account": {
+    "field": {
+      "save": "保存",
+      "cancel": "取消",
+      "edit": "编辑",
+      "nickname": "昵称",
+      "user_id": "用户 ID"
+    },
+    "email": {
+      "error_login_required": "请先登录",
+      "label": "电子邮件",
+      "oauth_only_note": "此邮箱已与 Google 账户绑定",
+      "confirmation_sent": "已发送确认邮件。请点击新邮箱中收到的链接完成变更。",
+      "placeholder_new": "新邮箱地址",
+      "submit": "发送",
+      "cancel": "取消",
+      "change": "变更"
+    },
+    "password": {
+      "error_mismatch": "新密码不匹配",
+      "error_login_required": "请先登录",
+      "label": "密码",
+      "updated": "密码已更新",
+      "placeholder_current": "当前密码",
+      "placeholder_new": "新密码（至少 6 个字符）",
+      "placeholder_confirm": "确认新密码",
+      "update": "更新",
+      "cancel": "取消",
+      "change": "变更"
+    },
+    "theme": {
+      "label": "主题",
+      "light": "浅色模式",
+      "dark": "深色模式",
+      "toggle": "切换"
+    },
+    "profile": {
+      "error_login_required": "请先登录"
+    },
+    "section": {
+      "profile": "个人资料",
+      "security": "安全",
+      "stats": "统计",
+      "settings": "设置"
+    },
+    "logout": {
+      "label": "退出登录",
+      "button": "退出登录"
+    },
+    "language": {
+      "label": "语言"
+    },
+    "links": {
+      "privacy": "隐私政策",
+      "support": "帮助与支持"
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "account": "账户"
+    }
+  },
+  "stats": {
+    "label": {
+      "streak": "连续记录",
+      "total_entries": "累计日记",
+      "total_chars": "累计字数",
+      "total_fermentations": "发酵次数",
+      "weekly_chars": "本周字数",
+      "monthly_chars": "本月字数",
+      "untitled": "(无标题)"
+    },
+    "value": {
+      "streak_days": "天"
+    },
+    "section": {
+      "monthly_trend": "月度趋势",
+      "entries_by_question": "按提问统计"
+    },
+    "error": {
+      "fetch_failed": "加载统计数据失败"
+    }
+  },
+  "board": {
+    "date": {
+      "day_sun": "星期日",
+      "day_mon": "星期一",
+      "day_tue": "星期二",
+      "day_wed": "星期三",
+      "day_thu": "星期四",
+      "day_fri": "星期五",
+      "day_sat": "星期六"
+    },
+    "canvas": {
+      "aria_label": "看板画布"
+    },
+    "empty": "此期间暂无内容",
+    "lightbox": {
+      "aria_label": "照片灯箱",
+      "close_aria": "关闭灯箱"
+    },
+    "photo_dialog": {
+      "aria_label": "照片上传对话框",
+      "heading": "添加照片",
+      "click_to_select": "点击选择照片",
+      "uploading_aria": "上传中",
+      "uploading": "上传中…",
+      "caption_placeholder": "说明（20 字以内）",
+      "cancel": "取消",
+      "uploading_button": "上传中…",
+      "submit": "添加"
+    },
+    "snippet_dialog": {
+      "aria_label": "摘录对话框",
+      "heading_edit": "编辑摘录",
+      "heading_create": "创建摘录",
+      "placeholder": "请输入文本...",
+      "cancel": "取消",
+      "update": "更新",
+      "create": "创建"
+    }
+  },
+  "editor": {
+    "status": {
+      "editing": "编辑中",
+      "saved": "已保存",
+      "saving": "保存中...",
+      "autosaving": "日记自动保存中..."
+    },
+    "voice": {
+      "error_network": "无法使用语音识别（请在 Chrome 中重新打开）",
+      "error_not_allowed": "未授权使用麦克风",
+      "error_unsupported": "此浏览器不支持语音输入"
+    },
+    "toolbar": {
+      "new_entry": "新建日记",
+      "save": "保存",
+      "pickle": "入瓮",
+      "list": "列表",
+      "stats": "写作统计",
+      "voice_stop": "停止语音输入",
+      "voice": "语音输入",
+      "settings": "设置",
+      "writing_horizontal": "切换为横排",
+      "writing_vertical": "切换为竖排",
+      "font_sans": "切换为黑体",
+      "font_serif": "切换为宋体",
+      "fullscreen": "全屏"
+    },
+    "title": {
+      "placeholder": "请输入标题...",
+      "add": "添加标题"
+    },
+    "placeholder": "今天有什么感受？",
+    "save_modal": {
+      "heading_pickle": "将日记放入瓮中发酵",
+      "heading_save": "保存日记",
+      "submit_pickle": "入瓮",
+      "submit_save": "保存",
+      "aria_label": "保存日记对话框",
+      "default_heading": "保存日记",
+      "default_submit": "保存",
+      "title_label": "标题",
+      "title_placeholder": "请输入标题...",
+      "cancel": "取消",
+      "saving": "保存中..."
+    },
+    "settings": {
+      "close_aria": "关闭设置",
+      "section_basic": "基本设置",
+      "font_size": "字号",
+      "line_height": "行间距",
+      "focus_mode": "专注模式",
+      "section_effects": "效果",
+      "time_inscription": "时间内置",
+      "ti_font_size": "字号",
+      "ti_font_weight": "字重",
+      "ti_pressure_bleed": "压力晕染",
+      "eraser_trace": "擦除痕迹",
+      "amp": "打字声放大（ASMR）",
+      "voice": "音量内置",
+      "ghost": "幽影",
+      "ghost_block": "成块（提交时）",
+      "ghost_dust": "粒尘（每键）",
+      "ghost_size": "大小",
+      "ghost_scatter": "散布",
+      "ghost_blur_start": "初始模糊",
+      "ghost_blur_end": "最终模糊",
+      "ghost_duration": "持续时间"
+    },
+    "snippet_toolbar": {
+      "saving": "保存中…",
+      "saved": "已保存",
+      "create": "做成摘录",
+      "too_long": "不超过 50 字"
+    },
+    "stats": {
+      "aria_label": "写作统计",
+      "reading_time_under_minute": "不到 1 分钟",
+      "reading_time_minutes": "约 {n} 分钟",
+      "heading": "写作统计",
+      "label_chars": "字数",
+      "label_lines": "行数",
+      "label_paragraphs": "段落数",
+      "label_reading_time": "阅读时间"
+    },
+    "date": {
+      "day_sun": "星期日",
+      "day_mon": "星期一",
+      "day_tue": "星期二",
+      "day_wed": "星期三",
+      "day_thu": "星期四",
+      "day_fri": "星期五",
+      "day_sat": "星期六"
+    }
+  },
+  "fermentation": {
+    "detail": {
+      "header_keyword": "Yeast 生成的关键词",
+      "header_snippet": "Oryzae 摘选的句子",
+      "header_letter": "L.A.B. 的观察记录",
+      "snippet_source_prefix": "出处:",
+      "write_entry": "为这个提问写日记"
+    },
+    "jar": {
+      "zoom_close_aria": "关闭放大",
+      "particle_fermentation": "发酵",
+      "particle_memory": "记忆",
+      "particle_silence": "静寂",
+      "particle_light": "光",
+      "particle_dark": "暗",
+      "particle_morning": "早晨",
+      "particle_koji": "麹",
+      "particle_breath": "气息",
+      "filler_rice": "米",
+      "filler_water": "水",
+      "filler_soil": "土壤",
+      "filler_brew": "酿造",
+      "filler_question": "提问",
+      "filler_time": "时间",
+      "filler_sediment": "沉淀",
+      "filler_wind": "风",
+      "filler_season": "季节",
+      "filler_microbe": "菌",
+      "filler_heat": "热",
+      "filler_propagate": "繁殖",
+      "filler_heart": "心",
+      "filler_autumn": "秋",
+      "filler_shallows": "浅滩",
+      "current_questions": "当前提问",
+      "add_question": "＋ 添加一个提问",
+      "edit_heading": "编辑提问",
+      "processing": "处理中...",
+      "archive": "归档",
+      "cancel_edit": "取消",
+      "updating": "更新中...",
+      "update": "更新",
+      "add_heading": "添加新的提问",
+      "add_placeholder": "请输入你的提问",
+      "cancel_add": "取消",
+      "adding": "添加中...",
+      "add_submit": "添加"
+    }
+  },
+  "questions": {
+    "create_form": {
+      "placeholder": "添加新提问...",
+      "creating": "添加中...",
+      "submit": "添加"
+    },
+    "event": {
+      "label_active": "已创建",
+      "attribution_active": "由你创建",
+      "label_proposed": "已提议",
+      "attribution_proposed": "由 Oryzae 提议",
+      "label_archived": "已归档",
+      "attribution_archived": "由你归档",
+      "accept": "接受",
+      "reject": "拒绝",
+      "unarchive": "恢复",
+      "archive": "归档"
+    },
+    "timeline": {
+      "empty": "还没有提问",
+      "heading": "提问的演变",
+      "subheading": "记录你的提问诞生、成长与变化的轨迹"
+    }
+  },
+  "landing": {
+    "nav": {
+      "concept": "理念",
+      "process": "发酵的三段",
+      "preview": "应用",
+      "philosophy": "思想",
+      "faq": "FAQ",
+      "cta": "试用应用",
+      "support": "帮助"
+    },
+    "hero": {
+      "eyebrow": "AN ASPERGILLUS FOR WORDS.",
+      "title": {
+        "l1": "让书写，",
+        "l2": "慢慢发酵。"
+      },
+      "lead": "Oryzae 是一个酝酿日常文字、深化你的提问的写作场所。如同麹菌将淀粉转化为糖一般，它分解你写下的文字，把触及提问核心的句段，连同一封短信交还给你。",
+      "cta": {
+        "primary": "试用应用",
+        "secondary": "阅读理念",
+        "full": "报名截止"
+      },
+      "foot": "支持竖排与横排。为以日语、英语书写、思考的人而设的场所。",
+      "chip": {
+        "1": "死者的自律性",
+        "2": "发酵的时间",
+        "3": "媒介者",
+        "4": "遗忘的伦理"
+      },
+      "snippet": {
+        "1": "「正如糠床渐渐吸收居所之人的气息，AI 也会随之变化…」"
+      },
+      "question": "当前提问",
+      "capacity_badge": "Research Preview · 剩余 {remaining} / {max} 个名额",
+      "capacity_full_badge": "Research Preview · 报名截止"
+    },
+    "concept": {
+      "kicker": "CONCEPT",
+      "title": "一边书写，一边酝酿提问。",
+      "lead": "Oryzae 是以「提问」为核心的写作应用。立下你此刻最想思考的一个提问，沿着这个提问写一周日记。周末，AI 经过麹菌、乳酸菌、酵母三段过程分解你的文字，再次交回到你手中。不是摘要，而是为推动思考的微小灵感。",
+      "p1": {
+        "title": "立下提问",
+        "body": "将此刻挂心的事化为一句提问。这便是发酵的核心。"
+      },
+      "p2": {
+        "title": "日日书写",
+        "body": "在竖排的白纸上写下浮现的念头。错字、岔路，皆作为书写的痕迹留存。"
+      },
+      "p3": {
+        "title": "收到一封信",
+        "body": "每周，由你自己的文字酝酿而成的信件与关键词回到你身边。读完，是为再次提笔。"
+      }
+    },
+    "process": {
+      "kicker": "THREE MICROBES",
+      "title": {
+        "l1": "麹菌・乳酸菌・酵母",
+        "l2": "— 发酵的三段"
+      },
+      "lead": "在 Oryzae 内部，如糠床中的三种微生物各司其职，将你这一周的文字慢慢发酵。",
+      "koji": {
+        "role": "分解 — Decomposition",
+        "body": "对照你立下的提问，研读一周的日记。在改良版扎根理论的指引下，从原文中提取触及提问核心的片段。",
+        "output": "输出：分析工作表、结果图、照亮提问的片段"
+      },
+      "lactic": {
+        "role": "信件 — A letter",
+        "body": "参照片段与工作表，整理围绕提问的思考变化。不是摘要，而是有意偏离书写者词汇的、约 500 字的诗意短笺。",
+        "output": "输出：500 字的信件一封"
+      },
+      "yeast": {
+        "role": "关键词 — Widening",
+        "body": "为了不被提问困住，从稍稍后退的角度生成 3〜5 个关键词。「死者的自律性」「由生者激活的死者」这般短语，能拓宽想象的余地。",
+        "output": "输出：3〜5 个关键词"
+      }
+    },
+    "preview": {
+      "kicker": "THE APP",
+      "title": "打开，每一个场所。",
+      "lead": "在 Editor 中日日书写，在 Board 上铺排，在 Jar 中俯瞰一周。周末，Letter 翩然而至。书写、整理、眺望、领受——分别成为各自的场所。",
+      "editor": {
+        "title": "添加标题",
+        "prompt": "今天有什么感受？",
+        "status": "编辑中",
+        "caption": "Editor — 竖排的白纸。每一次敲键，都能为书写本身添上摇曳、留痕、消逝的小小效果。",
+        "effect": "效果 · 幽影"
+      },
+      "jar": {
+        "chip": {
+          "1": "反思的距离感",
+          "2": "认知的圣域",
+          "3": "灵性的代理者",
+          "4": "与格的关系"
+        },
+        "label": "当前提问 · 何为让自然栖身于身体的设计？",
+        "caption": "Jar — 一周的文字以提问为轴，化作星座般浮现的眺望。"
+      },
+      "letter": {
+        "from": "— 来自 Oryzae · 第 18 周的信",
+        "body": "这一周，你慢慢地围绕着「死者与生者如何持续共生」这个提问行走。梦中出现的 Y，据说一边瑟瑟缩为胎儿一边离去。那既是失落的场景，也是向起点的回归，依稀照见生死作为圆环的视角。书写者在这一周开始察觉，对最珍视的存在，或许需要的并非分析的姿态。也许遗忘亦是共生的一种形态。",
+        "caption": "Letter — 每周送达的 500 字短信。不是摘要，而是为继续书写而留下的一星余火。"
+      },
+      "board": {
+        "toggle": {
+          "daily": "DAILY",
+          "weekly": "WEEKLY"
+        },
+        "snippet": {
+          "1": "遗忘，或许也是共生的一种形态。",
+          "2": "关于糠床、人、与时间的混合方式。"
+        },
+        "entry": {
+          "title": "感受山的设计",
+          "meta": "765 字 · 04-20"
+        },
+        "label": "7 张 · 日记 5・摘录 2・照片 3",
+        "caption": "Board — 把日常的文字、片段与照片摊在桌上整理。记忆开始不在时间轴上，而是在关系之中显形。"
+      }
+    },
+    "philosophy": {
+      "kicker": "PHILOSOPHY",
+      "title": "工具，是为了被毕业而存在的。"
+    },
+    "philo": {
+      "1": {
+        "title": "身体性的回归",
+        "body": "竖排、留白、宋体。比起数字化的整洁，更优先确认「这是我亲手写下」的手感。"
+      },
+      "2": {
+        "title": "拒绝即时性",
+        "body": "AI 的回应有意延迟。每周一次，如同信件抵达，使交流从信息处理转为关系。"
+      },
+      "3": {
+        "title": "发酵的时间",
+        "body": "不是即答，而是酝酿。如同糠床因家而异，思考也吸入书写者的时间与微生物群，慢慢成熟。"
+      },
+      "4": {
+        "title": "可被毕业的科技",
+        "body": "最终是为了不再依赖工具，能自主地与自我对话。Oryzae 只是为此存在的辅助轮。"
+      },
+      "lineage": {
+        "label": "谱系",
+        "body": "Oryzae 承接了为日记式自我对话而设的应用「Pickles」(2020–) 的研究成果。详细的研究脉络请参见 ephemere.io。"
+      }
+    },
+    "faq": {
+      "1": {
+        "q": "与 Pickles 有何不同？",
+        "a": "Pickles 是书写日记本身的场所。Oryzae 则以「提问」为核心，将写下的文字置于发酵过程中再返还，把书写前后的时间也一并重新设计了。"
+      },
+      "2": {
+        "q": "竖排是必须的吗？",
+        "a": "不是的。竖排是默认设置，但可一键切换为横排。字体也可在宋体与黑体之间切换。"
+      },
+      "3": {
+        "q": "AI 会读什么？",
+        "a": "只读取你立下的「提问」与该周与之关联的日记。未与提问关联的日记不会进入发酵过程。"
+      },
+      "4": {
+        "q": "可以用日语以外的语言书写吗？",
+        "a": "支持包括英语在内的多种语言。竖排为日语与中文做了优化。"
+      },
+      "5": {
+        "q": "我写下的内容是如何处理的？",
+        "a": "你写下的日记与「提问」会以加密形式存储在服务器上，仅由你本人与发酵流程读取。我们不会与第三方共享。详情请参见隐私政策。"
+      },
+      "kicker": "QUESTIONS",
+      "title": "常见的提问"
+    },
+    "outro": {
+      "l1": "立下提问，",
+      "l2": "开始书写。",
+      "cta": "开始书写"
+    },
+    "foot": {
+      "tag": "慢慢酝酿言语。"
+    }
+  },
+  "onboarding": {
+    "dialog_label": "Oryzae 介绍",
+    "skip": "跳过",
+    "step_concept": {
+      "eyebrow": "01 — Welcome",
+      "title_l1": "Oryzae 是",
+      "title_l2": "培育提问的日记。",
+      "body": "将脑海中浮现的提问播下种子，用每日的日记来浇水。时间一过，AI 会发酵你写下的内容，再以新的觉察返还给你。",
+      "body_2": "它和普通日记略有不同，让我们依次看看构成它的四个场所。",
+      "next": "开始"
+    },
+    "step_question": {
+      "eyebrow": "02 — Question",
+      "title": "播下第一个「提问」。",
+      "body": "请把此刻最在意的事化为一句简短的提问。「为什么──」「怎样才能──」，一句尚无答案的话即可。之后随时可以编辑。",
+      "placeholder": "例: 我为什么不擅长着急",
+      "hint": "它会被存进 Jar，发酵从这里开始。",
+      "next": "用这个提问继续"
+    },
+    "step_editor": {
+      "eyebrow": "03 — Editor",
+      "title_l1": "一边写日记，",
+      "title_l2": "一边收集词句。",
+      "body_before_em": "Editor 是一个安静的书写之处。把平日所想的，直接写下来。选中一句话即可作为",
+      "body_em": "摘录",
+      "body_after_em": "切出，之后可在 Board 上铺排回望。",
+      "list_autosave": "输入即自动保存",
+      "list_snippet": "选中即生成摘录",
+      "list_link": "关联到相关的提问",
+      "next": "下一步"
+    },
+    "step_ferment": {
+      "eyebrow": "04 — Jar & Fermentation",
+      "title": "在 Jar 中，让提问慢慢沉睡。",
+      "body": "你积累的日记会沉淀进 Jar，按周期发酵。AI 重读你的文字，发现其中的共通点与提问的变化，悄悄递还给你——这就是 Oryzae 的节奏。",
+      "recap_label": "你的第一个提问",
+      "recap_quote": "「{question}」",
+      "next": "开始使用 Oryzae"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "title": "隐私政策",
+      "back_home": "返回首页"
+    }
+  },
+  "support": {
+    "title": "支持",
+    "back_home": "返回首页"
+  }
+}
