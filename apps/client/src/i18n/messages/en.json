@@ -612,8 +612,20 @@
         "q": "Can I write in languages other than Japanese?",
         "a": "Yes — multilingual input is supported, including English. Vertical writing is tuned for Japanese and Chinese."
       },
+      "5": {
+        "q": "How is my writing handled?",
+        "a": "Your entries and questions are stored encrypted on our servers, readable only by you and the fermentation process. They are never shared with third parties. See our Privacy Policy for details."
+      },
       "kicker": "QUESTIONS",
       "title": "Frequent questions"
+    },
+    "outro": {
+      "l1": "Set a question,",
+      "l2": "and begin to write.",
+      "cta": "Begin writing"
+    },
+    "foot": {
+      "tag": "Brewing words, slowly."
     }
   },
   "onboarding": {
