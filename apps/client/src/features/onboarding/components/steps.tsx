@@ -6,14 +6,11 @@ import { ConceptIllo, EditorIllo, JarIllo, QuestionIllo } from './illustrations'
 interface FooterBarProps {
   step: number;
   onNext: () => void;
-  onSkip: () => void;
   nextLabel: string;
   nextDisabled?: boolean;
-  finishing?: boolean;
 }
 
-function FooterBar({ step, onNext, onSkip, nextLabel, nextDisabled, finishing }: FooterBarProps) {
-  const t = useTranslations('onboarding');
+function FooterBar({ step, onNext, nextLabel, nextDisabled }: FooterBarProps) {
   return (
     <div className="ob-footer">
       <div
@@ -32,11 +29,6 @@ function FooterBar({ step, onNext, onSkip, nextLabel, nextDisabled, finishing }:
         ))}
       </div>
       <div className="ob-footer-actions">
-        {!finishing && (
-          <button type="button" className="ob-btn" onClick={onSkip}>
-            {t('skip')}
-          </button>
-        )}
         <button
           type="button"
           className="ob-btn ob-btn-primary"
@@ -52,10 +44,9 @@ function FooterBar({ step, onNext, onSkip, nextLabel, nextDisabled, finishing }:
 
 interface StepProps {
   onNext: () => void;
-  onSkip: () => void;
 }
 
-export function StepConcept({ onNext, onSkip }: StepProps) {
+export function StepConcept({ onNext }: StepProps) {
   const t = useTranslations('onboarding.step_concept');
   return (
     <>
@@ -75,7 +66,7 @@ export function StepConcept({ onNext, onSkip }: StepProps) {
           {t('body_2')}
         </p>
       </div>
-      <FooterBar step={0} onNext={onNext} onSkip={onSkip} nextLabel={t('next')} />
+      <FooterBar step={0} onNext={onNext} nextLabel={t('next')} />
     </>
   );
 }
@@ -85,7 +76,7 @@ interface StepQuestionProps extends StepProps {
   setDraft: (value: string) => void;
 }
 
-export function StepQuestion({ onNext, onSkip, draft, setDraft }: StepQuestionProps) {
+export function StepQuestion({ onNext, draft, setDraft }: StepQuestionProps) {
   const t = useTranslations('onboarding.step_question');
   const valid = draft.trim().length > 0 && draft.trim().length <= 64;
   return (
@@ -115,7 +106,6 @@ export function StepQuestion({ onNext, onSkip, draft, setDraft }: StepQuestionPr
       <FooterBar
         step={1}
         onNext={() => valid && onNext()}
-        onSkip={onSkip}
         nextLabel={t('next')}
         nextDisabled={!valid}
       />
@@ -123,7 +113,7 @@ export function StepQuestion({ onNext, onSkip, draft, setDraft }: StepQuestionPr
   );
 }
 
-export function StepEditor({ onNext, onSkip }: StepProps) {
+export function StepEditor({ onNext }: StepProps) {
   const t = useTranslations('onboarding.step_editor');
   return (
     <>
@@ -156,18 +146,17 @@ export function StepEditor({ onNext, onSkip }: StepProps) {
           </li>
         </ul>
       </div>
-      <FooterBar step={2} onNext={onNext} onSkip={onSkip} nextLabel={t('next')} />
+      <FooterBar step={2} onNext={onNext} nextLabel={t('next')} />
     </>
   );
 }
 
 interface StepFermentProps {
   onDone: () => void;
-  onSkip: () => void;
   draft: string;
 }
 
-export function StepFerment({ onDone, onSkip, draft }: StepFermentProps) {
+export function StepFerment({ onDone, draft }: StepFermentProps) {
   const t = useTranslations('onboarding.step_ferment');
   const trimmed = draft.trim();
   return (
@@ -186,7 +175,7 @@ export function StepFerment({ onDone, onSkip, draft }: StepFermentProps) {
           </div>
         )}
       </div>
-      <FooterBar step={3} onNext={onDone} onSkip={onSkip} nextLabel={t('next')} finishing />
+      <FooterBar step={3} onNext={onDone} nextLabel={t('next')} />
     </>
   );
 }

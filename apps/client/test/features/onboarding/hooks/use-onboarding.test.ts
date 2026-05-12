@@ -72,7 +72,7 @@ describe('useOnboarding', () => {
 
     let completeResult: { questionId: string | null } | undefined;
     await act(async () => {
-      completeResult = await result.current.complete({ skipped: false, firstQuestion: 'なぜ?' });
+      completeResult = await result.current.complete({ firstQuestion: 'なぜ?' });
     });
 
     expect(api.fetch).toHaveBeenNthCalledWith(2, '/api/v1/questions', {
@@ -100,7 +100,7 @@ describe('useOnboarding', () => {
 
     let completeResult: { questionId: string | null } | undefined;
     await act(async () => {
-      completeResult = await result.current.complete({ skipped: true, firstQuestion: null });
+      completeResult = await result.current.complete({ firstQuestion: null });
     });
 
     expect(api.fetch).toHaveBeenCalledTimes(2);
@@ -125,7 +125,7 @@ describe('useOnboarding', () => {
 
     let completeResult: { questionId: string | null } | undefined;
     await act(async () => {
-      completeResult = await result.current.complete({ skipped: false, firstQuestion: 'なぜ?' });
+      completeResult = await result.current.complete({ firstQuestion: 'なぜ?' });
     });
 
     expect(completeResult).toEqual({ questionId: null });
