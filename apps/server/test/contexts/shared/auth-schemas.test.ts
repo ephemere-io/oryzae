@@ -2,6 +2,7 @@ import {
   emailOtpTypeSchema,
   localeSchema,
   oauthCallbackSchema,
+  oauthFinalizeSchema,
   oauthInitSchema,
   signupSchema,
   verifyOtpSchema,
@@ -55,6 +56,21 @@ describe('oauthCallbackSchema', () => {
     const parsed = oauthCallbackSchema.parse({ code: 'abc', locale: 'ja' });
     expect(parsed.code).toBe('abc');
     expect(parsed.locale).toBe('ja');
+  });
+});
+
+describe('oauthFinalizeSchema', () => {
+  it('accepts empty body (locale optional)', () => {
+    expect(oauthFinalizeSchema.parse({}).locale).toBeUndefined();
+  });
+
+  it('accepts ja/en locale', () => {
+    expect(oauthFinalizeSchema.parse({ locale: 'ja' }).locale).toBe('ja');
+    expect(oauthFinalizeSchema.parse({ locale: 'en' }).locale).toBe('en');
+  });
+
+  it('rejects unsupported locale', () => {
+    expect(() => oauthFinalizeSchema.parse({ locale: 'fr' })).toThrow();
   });
 });
 

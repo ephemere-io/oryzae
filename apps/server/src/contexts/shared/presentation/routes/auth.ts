@@ -3,6 +3,7 @@ import {
   changePasswordSchema,
   loginSchema,
   oauthCallbackSchema,
+  oauthFinalizeSchema,
   oauthInitSchema,
   profileUpdateSchema,
   verifyOtpSchema,
@@ -11,6 +12,10 @@ import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
+import {
+  ensureOAuthProfile,
+  resolveMaxUserCountForOAuth,
+} from '../helpers/ensure-oauth-profile.js';
 
 function getSupabaseAuthClient() {
   const url = process.env.SUPABASE_URL;
@@ -152,17 +157,19 @@ export const authRoutes = new Hono()
     return c.json({ url: data.url });
   })
   .post('/oauth/callback', async (c) => {
+    // PKCE flow 用エンドポイント。`?code=` がクエリにある場合のクライアントが叩く。
+    // Issue #307: Supabase JS のデフォルトが implicit flow のため通常はここを通らず、
+    // implicit flow 用の `/oauth/finalize` を経由する。両者は ensureOAuthProfile で
+    // profile 作成ロジックを共有する。
     const body = oauthCallbackSchema.parse(await c.req.json());
-    const { code } = body;
     const supabase = getSupabaseAuthClient();
 
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(body.code);
 
     if (error) {
       return c.json({ error: error.message }, 400);
     }
 
-    // Ensure profile exists for OAuth users
     const serviceSupabase = getSupabaseClient();
 
     // 初回 OAuth サインイン時は user_metadata.locale が未設定。
@@ -174,71 +181,74 @@ export const authRoutes = new Hono()
       });
     }
 
-    const { data: profile } = await serviceSupabase
-      .from('profiles')
-      .select('nickname, avatar_url')
-      .eq('id', data.user.id)
-      .single();
-
-    if (!profile) {
-      // Issue #300: Research Preview の登録枠チェック (OAuth 経由の新規ユーザーも対象)
-      // shared 層からは user/application 層を import できないため、必要最小限の
-      // 件数取得と env 解決をここに inline で書く。policy 本体のテストは
-      // apps/server/test/contexts/user/domain/policies/ にある。
-      const { count } = await serviceSupabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true });
-      const rawMax = process.env.MAX_USER_COUNT;
-      const parsedMax = rawMax ? Number.parseInt(rawMax, 10) : Number.NaN;
-      const limit = Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : 100;
-      if ((count ?? 0) >= limit) {
-        // たった今 exchangeCodeForSession で作成された auth.users を削除して整合性を保つ
-        await serviceSupabase.auth.admin.deleteUser(data.user.id);
-        return c.json({ error: 'capacity_reached', limit }, 409);
-      }
-
-      // Auto-create profile for OAuth users
-      const meta = data.user.user_metadata ?? {};
-      const nickname =
-        typeof meta.full_name === 'string'
-          ? meta.full_name.replace(/\s+/g, '_').slice(0, 30)
-          : `user_${data.user.id.slice(0, 8)}`;
-      const avatarUrl = typeof meta.avatar_url === 'string' ? meta.avatar_url : null;
-
-      await serviceSupabase.from('profiles').insert({
-        id: data.user.id,
-        nickname,
-        avatar_url: avatarUrl,
-      });
-
-      return c.json({
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          nickname,
-          avatarUrl,
-          providers: getProviders(data.user),
-        },
-        session: {
-          accessToken: data.session.access_token,
-          refreshToken: data.session.refresh_token,
-          expiresAt: data.session.expires_at,
-        },
-      });
+    const result = await ensureOAuthProfile(
+      serviceSupabase,
+      data.user,
+      resolveMaxUserCountForOAuth(),
+    );
+    if (result.status === 'capacity_reached') {
+      return c.json({ error: 'capacity_reached', limit: result.limit }, 409);
     }
 
     return c.json({
       user: {
         id: data.user.id,
         email: data.user.email,
-        nickname: profile.nickname,
-        avatarUrl: profile.avatar_url,
+        nickname: result.profile.nickname,
+        avatarUrl: result.profile.avatarUrl,
         providers: getProviders(data.user),
       },
       session: {
         accessToken: data.session.access_token,
         refreshToken: data.session.refresh_token,
         expiresAt: data.session.expires_at,
+      },
+    });
+  })
+  .post('/oauth/finalize', async (c) => {
+    // Issue #307: implicit OAuth flow 仕上げエンドポイント。
+    //
+    // Supabase JS の `signInWithOAuth` がデフォルトで implicit flow を使うため、
+    // Google からの redirect は `?code=` ではなく `#access_token=...` でトークンを返す。
+    // クライアントはそのトークンで Bearer 認証してここを叩き、サーバ側で
+    // profile 作成 + 登録枠チェックを行う（/oauth/callback と同じ責務）。
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Missing token' }, 401);
+    }
+
+    const supabase = createUserSupabase(authHeader);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return c.json({ error: 'Invalid token' }, 401);
+    }
+
+    const body = oauthFinalizeSchema.parse(await c.req.json().catch(() => ({})));
+
+    const serviceSupabase = getSupabaseClient();
+
+    if (body.locale && !user.user_metadata?.locale) {
+      await serviceSupabase.auth.admin.updateUserById(user.id, {
+        user_metadata: { ...user.user_metadata, locale: body.locale },
+      });
+    }
+
+    const result = await ensureOAuthProfile(serviceSupabase, user, resolveMaxUserCountForOAuth());
+    if (result.status === 'capacity_reached') {
+      return c.json({ error: 'capacity_reached', limit: result.limit }, 409);
+    }
+
+    return c.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        nickname: result.profile.nickname,
+        avatarUrl: result.profile.avatarUrl,
+        providers: getProviders(user),
       },
     });
   })
