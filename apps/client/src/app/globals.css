@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Tailwind v4 の `dark:` バリアントを `[data-theme="dark"]` に束ねる。
+ * 既定だと `prefers-color-scheme: dark` を見るため、ThemeProvider が data-theme を
+ * 制御している本アプリと判定がズレ、auth ページ等で背景は light なのに input/links だけ
+ * dark スタイルが当たって読めなくなる事象が起きる (Issue #303)。 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --bg: #f9f8f4;
   --fg: #2d2d2d;
