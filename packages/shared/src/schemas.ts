@@ -52,6 +52,18 @@ export const oauthCallbackSchema = z.object({
 });
 
 /**
+ * Implicit OAuth flow の仕上げ用ペイロード。
+ *
+ * Supabase の `flowType: 'implicit'` (デフォルト) では Google からの redirect が
+ * URL fragment にトークンを返す。クライアントはそのトークンで Bearer 認証して
+ * このエンドポイントを叩き、サーバ側で profile 作成と Research Preview 登録枠
+ * チェックを行う。詳細は Issue #307。
+ */
+export const oauthFinalizeSchema = z.object({
+  locale: localeSchema.optional(),
+});
+
+/**
  * Supabase Auth のメール確認系トークンタイプ。
  * Microsoft (Outlook) は差出人ドメインとリンク先ドメインが乖離していると
  * メールをサイレントに破棄する。{{ .ConfirmationURL }} だと supabase.co を
