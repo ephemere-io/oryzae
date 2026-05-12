@@ -64,7 +64,11 @@ function CallbackHandler() {
         return;
       }
 
-      // Supabase implicit flow: tokens in URL hash fragment
+      // Supabase implicit flow: tokens in URL hash fragment.
+      // Issue #307: Supabase JS のデフォルトが implicit flow のため、Google SSO 新規ユーザーは
+      // この分岐を通る。`/oauth/finalize` を叩いて profile 作成と登録枠チェックを行う
+      // （PKCE 側の `/oauth/callback` と同じ責務）。これを呼ばないと profile が永久に作られず、
+      // onboarding モーダルも出ない。
       const hash = window.location.hash;
       if (hash) {
         const params = parseHashParams(hash);
@@ -74,14 +78,26 @@ function CallbackHandler() {
         if (accessToken && refreshToken) {
           setTokens(accessToken, refreshToken);
 
-          // Verify token and get user info
+          const localeParam = searchParams.get('locale');
+          const locale = localeParam === 'ja' || localeParam === 'en' ? localeParam : undefined;
           const client = createApiClient(accessToken);
-          const meRes = await client.fetch('/api/v1/auth/me');
+          const finalizeRes = await client.fetch('/api/v1/auth/oauth/finalize', {
+            method: 'POST',
+            body: JSON.stringify({ locale }),
+          });
 
-          if (meRes.ok) {
-            const data = (await meRes.json()) as { user: { id: string; email: string } };
-            posthog.identify(data.user.id, { email: data.user.email });
+          if (!finalizeRes.ok) {
+            const body = (await finalizeRes.json().catch(() => ({}))) as { error?: string };
+            if (finalizeRes.status === 409 && body.error === 'capacity_reached') {
+              setError(tErr('capacity_reached'));
+              return;
+            }
+            setError(t('error_auth_failed'));
+            return;
           }
+
+          const data = (await finalizeRes.json()) as { user: { id: string; email: string } };
+          posthog.identify(data.user.id, { email: data.user.email });
 
           router.push('/entries/new');
           return;
