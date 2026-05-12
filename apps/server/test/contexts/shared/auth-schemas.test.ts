@@ -68,9 +68,11 @@ describe('oauthFinalizeSchema', () => {
     expect(oauthFinalizeSchema.parse({}).locale).toBeUndefined();
   });
 
-  it('accepts ja/en locale', () => {
+  it('accepts all supported locales', () => {
     expect(oauthFinalizeSchema.parse({ locale: 'ja' }).locale).toBe('ja');
     expect(oauthFinalizeSchema.parse({ locale: 'en' }).locale).toBe('en');
+    expect(oauthFinalizeSchema.parse({ locale: 'zh' }).locale).toBe('zh');
+    expect(oauthFinalizeSchema.parse({ locale: 'ko' }).locale).toBe('ko');
   });
 
   it('rejects unsupported locale', () => {
