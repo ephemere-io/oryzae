@@ -26,6 +26,7 @@ export {
   localeSchema,
   loginSchema,
   oauthCallbackSchema,
+  oauthFinalizeSchema,
   oauthInitSchema,
   profileUpdateSchema,
   questionStringSchema,
