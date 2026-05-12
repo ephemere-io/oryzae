@@ -9,8 +9,8 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
 import { useSignupAvailability } from '@/lib/use-signup-availability';
 
-function isSupportedLocale(value: string): value is 'ja' | 'en' {
-  return value === 'ja' || value === 'en';
+function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
+  return value === 'ja' || value === 'en' || value === 'zh' || value === 'ko';
 }
 
 export function SignupForm() {

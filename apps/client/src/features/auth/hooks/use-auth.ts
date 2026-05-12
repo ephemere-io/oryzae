@@ -143,7 +143,7 @@ export function useAuth() {
     nickname: string,
     email: string,
     password: string,
-    locale?: 'ja' | 'en',
+    locale?: 'ja' | 'en' | 'zh' | 'ko',
   ): Promise<string | null> {
     const client = createApiClient();
     const res = await client.fetch('/api/v1/auth/signup', {

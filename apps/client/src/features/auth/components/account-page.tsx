@@ -4,13 +4,16 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
+import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 import { setLocaleAction } from '@/lib/i18n-actions';
 import { useTheme } from '@/lib/theme-context';
 import { WritingStats } from './writing-stats';
 
-const LOCALE_LABELS: Record<string, string> = { ja: '日本語', en: 'English' };
+const LOCALE_LABELS: Record<string, string> = Object.fromEntries(
+  LOCALE_OPTIONS.map((o) => [o.locale, o.label]),
+);
 
 interface AccountPageProps {
   user: {
@@ -445,8 +448,9 @@ function LanguageSection() {
   const locale = useLocale();
   const [isPending, startTransition] = useTransition();
 
-  function toggle() {
-    const next = locale === 'ja' ? 'en' : 'ja';
+  function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const next = event.target.value;
+    if (!isLocale(next) || next === locale) return;
     startTransition(() => {
       setLocaleAction(next);
     });
@@ -462,15 +466,20 @@ function LanguageSection() {
           {LOCALE_LABELS[locale] ?? locale}
         </p>
       </div>
-      <button
-        type="button"
-        onClick={toggle}
+      <select
+        value={locale}
+        onChange={handleChange}
         disabled={isPending}
-        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+        aria-label={t('language.label')}
+        className="rounded-lg bg-transparent px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
         style={{ color: 'var(--accent)', border: '1px solid var(--border-subtle)' }}
       >
-        {locale === 'ja' ? 'EN' : 'JA'}
-      </button>
+        {LOCALE_OPTIONS.map((option) => (
+          <option key={option.locale} value={option.locale}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

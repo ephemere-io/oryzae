@@ -6,10 +6,14 @@ import { useEffect } from 'react';
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type Locale } from '@/i18n/config';
 import enMessages from '@/i18n/messages/en.json';
 import jaMessages from '@/i18n/messages/ja.json';
+import koMessages from '@/i18n/messages/ko.json';
+import zhMessages from '@/i18n/messages/zh.json';
 
 const MESSAGES: Record<Locale, typeof jaMessages> = {
   ja: jaMessages,
   en: enMessages,
+  zh: zhMessages,
+  ko: koMessages,
 };
 
 function readLocaleFromCookie(): Locale {

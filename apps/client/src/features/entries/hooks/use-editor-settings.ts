@@ -87,7 +87,8 @@ function getInitialSettings(locale: string | undefined): EditorSettings {
   const next: EditorSettings = { ...DEFAULT_SETTINGS };
   // 英語ロケールでサインアップ／利用しているユーザーは横書きをデフォルトにする (issue #269)
   // 縦書きは日本語ジャーナリングを念頭にした既定値で、英語話者には不自然なため。
-  if (locale === 'en') next.writingMode = 'horizontal';
+  // 韓国語 (ko) も横書き既定。中国語 (zh) は縦書きが伝統的に成立するため日本語と同じ既定 (issue #308)。
+  if (locale === 'en' || locale === 'ko') next.writingMode = 'horizontal';
   const fontSize = readStoredFontSize();
   if (fontSize !== null) next.fontSize = fontSize;
   const lineHeight = readStoredLineHeight();

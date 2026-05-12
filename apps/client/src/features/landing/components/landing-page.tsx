@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useTransition } from 'react';
-import type { Locale } from '@/i18n/config';
+import { LOCALE_OPTIONS, type Locale } from '@/i18n/config';
 import { setLocaleAction } from '@/lib/i18n-actions';
 import { useSignupAvailability } from '@/lib/use-signup-availability';
 import styles from './landing.module.css';
@@ -70,24 +70,18 @@ function SiteHeader({ lang, t }: HeaderProps) {
       <div className={styles.headerActions}>
         {/* biome-ignore lint/a11y/useSemanticElements: pill-style toggle, fieldset would force legend/border styling */}
         <div className={styles.langToggle} role="group" aria-label="Language">
-          <button
-            type="button"
-            className={styles.langBtn}
-            aria-pressed={lang === 'ja'}
-            onClick={() => setLang('ja')}
-            disabled={isPending}
-          >
-            日本語
-          </button>
-          <button
-            type="button"
-            className={styles.langBtn}
-            aria-pressed={lang === 'en'}
-            onClick={() => setLang('en')}
-            disabled={isPending}
-          >
-            English
-          </button>
+          {LOCALE_OPTIONS.map((option) => (
+            <button
+              key={option.locale}
+              type="button"
+              className={styles.langBtn}
+              aria-pressed={lang === option.locale}
+              onClick={() => setLang(option.locale)}
+              disabled={isPending}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
         <Link className={`${styles.cta} ${styles.ctaSmall}`} href={APP_HREF}>
           {t('nav.cta')}
