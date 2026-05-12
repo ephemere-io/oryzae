@@ -6,7 +6,7 @@
 //   2. --csv=<path> CLI flag (local CSV)
 //   3. ../../.tmp/i18n-inventory.csv relative to this script (fallback for dev)
 //
-// CSV columns: key,ja,en,file,line,context
+// CSV columns: key,ja,en,zh,ko,file,line,context
 // Keys are dot-separated paths (e.g. "auth.callback.error_auth_failed").
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -104,13 +104,17 @@ async function main() {
     key: header.indexOf('key'),
     ja: header.indexOf('ja'),
     en: header.indexOf('en'),
+    zh: header.indexOf('zh'),
+    ko: header.indexOf('ko'),
   };
-  if (idx.key === -1 || idx.ja === -1 || idx.en === -1) {
-    throw new Error(`CSV header must include key/ja/en. Got: ${header.join(',')}`);
+  if (idx.key === -1 || idx.ja === -1 || idx.en === -1 || idx.zh === -1 || idx.ko === -1) {
+    throw new Error(`CSV header must include key/ja/en/zh/ko. Got: ${header.join(',')}`);
   }
 
   const ja = {};
   const en = {};
+  const zh = {};
+  const ko = {};
   let count = 0;
   const seenKeys = new Set();
   const dupes = [];
@@ -124,14 +128,18 @@ async function main() {
     seenKeys.add(key);
     setNested(ja, key, row[idx.ja] ?? '');
     setNested(en, key, row[idx.en] ?? '');
+    setNested(zh, key, row[idx.zh] ?? '');
+    setNested(ko, key, row[idx.ko] ?? '');
     count++;
   }
 
   mkdirSync(MESSAGES_DIR, { recursive: true });
   writeFileSync(resolve(MESSAGES_DIR, 'ja.json'), `${JSON.stringify(ja, null, 2)}\n`);
   writeFileSync(resolve(MESSAGES_DIR, 'en.json'), `${JSON.stringify(en, null, 2)}\n`);
+  writeFileSync(resolve(MESSAGES_DIR, 'zh.json'), `${JSON.stringify(zh, null, 2)}\n`);
+  writeFileSync(resolve(MESSAGES_DIR, 'ko.json'), `${JSON.stringify(ko, null, 2)}\n`);
 
-  console.log(`Wrote ${count} keys to ${MESSAGES_DIR}/ja.json and en.json`);
+  console.log(`Wrote ${count} keys to ${MESSAGES_DIR}/{ja,en,zh,ko}.json`);
   if (dupes.length > 0) {
     console.warn(
       `Warning: ${dupes.length} duplicate keys (last wins): ${dupes.slice(0, 5).join(', ')}${dupes.length > 5 ? '...' : ''}`,
