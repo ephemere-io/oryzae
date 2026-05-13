@@ -107,4 +107,19 @@ describe('QuestionRequiredModal (Issue #314)', () => {
     if (!(submit instanceof HTMLButtonElement)) throw new Error('expected button');
     expect(submit.disabled).toBe(true);
   });
+
+  it('allowCreate=false なら「新しく書く」タブが描画されない', () => {
+    renderModal({ allowCreate: false });
+    expect(
+      screen.queryByRole('button', { name: jaMessages.editor.question_required.tab_create }),
+    ).toBeNull();
+    // create_label もマウントされていないこと（pick モードに固定）
+    expect(screen.queryByLabelText(jaMessages.editor.question_required.create_label)).toBeNull();
+  });
+
+  it('allowCreate=false かつ既存問いゼロ件のときも pick モードのまま (UI として何も書けない)', () => {
+    renderModal({ allowCreate: false, activeQuestions: [] });
+    // create モードに自動切替しない
+    expect(screen.queryByLabelText(jaMessages.editor.question_required.create_label)).toBeNull();
+  });
 });

@@ -27,6 +27,12 @@ interface QuestionRequiredModalProps {
   onDismiss?: () => void;
   /** Body message variant — "open" (just opened the page) vs "save_attempt" (tried to pickle). */
   variant?: 'open' | 'save_attempt';
+  /**
+   * When false (default true), hide the "create a new question" tab entirely. Used by
+   * entries/new to enforce the server-side 3-active-questions cap on the client UX:
+   * if the user already has 3, the only path forward is to pick one of them.
+   */
+  allowCreate?: boolean;
 }
 
 /**
@@ -42,6 +48,7 @@ export function QuestionRequiredModal({
   dismissable = false,
   onDismiss,
   variant = 'open',
+  allowCreate = true,
 }: QuestionRequiredModalProps) {
   const t = useTranslations('editor.question_required');
   const [selected, setSelected] = useState<string>('');
@@ -56,9 +63,14 @@ export function QuestionRequiredModal({
     setSelected('');
     setDraft('');
     setSubmitting(false);
-    // If no questions exist yet, jump straight to "create" mode.
-    setMode(activeQuestions.length === 0 ? 'create' : 'pick');
-  }, [open, activeQuestions.length]);
+    // If creation is disabled (e.g. user already has 3 active questions), stay in pick.
+    // Otherwise default to "create" when no questions exist, else "pick".
+    if (!allowCreate) {
+      setMode('pick');
+    } else {
+      setMode(activeQuestions.length === 0 ? 'create' : 'pick');
+    }
+  }, [open, activeQuestions.length, allowCreate]);
 
   useEffect(() => {
     if (open && mode === 'create') {
@@ -119,7 +131,7 @@ export function QuestionRequiredModal({
           {variant === 'save_attempt' ? t('body_save_attempt') : t('body_open')}
         </p>
 
-        {activeQuestions.length > 0 && (
+        {activeQuestions.length > 0 && allowCreate && (
           <div className="mb-4">
             <div className="mb-2 flex items-center gap-3 text-xs">
               <button

@@ -48,6 +48,10 @@ export function useActiveQuestions(
 
 export function useEntryQuestions(api: ApiClient | null, entryId: string | undefined) {
   const [linkedQuestions, setLinkedQuestions] = useState<LinkedQuestion[]>([]);
+  // Distinguishes "no questions yet" from "fetch hasn't completed yet" — callers that
+  // act on emptiness (e.g. the Issue #314 question-required modal) need to wait until
+  // the request settles or they'll briefly see a false positive.
+  const [loaded, setLoaded] = useState(false);
 
   const fetchLinked = useCallback(async () => {
     if (!api || !entryId) return;
@@ -56,6 +60,7 @@ export function useEntryQuestions(api: ApiClient | null, entryId: string | undef
       const data: LinkedQuestion[] = await res.json();
       setLinkedQuestions(data);
     }
+    setLoaded(true);
   }, [api, entryId]);
 
   useEffect(() => {
@@ -84,5 +89,5 @@ export function useEntryQuestions(api: ApiClient | null, entryId: string | undef
     [api, entryId, fetchLinked],
   );
 
-  return { linkedQuestions, linkQuestion, unlinkQuestion };
+  return { linkedQuestions, linkQuestion, unlinkQuestion, loaded };
 }
