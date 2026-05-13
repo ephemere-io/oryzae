@@ -329,6 +329,19 @@
       "cancel": "Cancel",
       "saving": "Saving..."
     },
+    "question_required": {
+      "aria_label": "Pick a question for this entry",
+      "heading": "What's the question for this entry?",
+      "body_open": "In Oryzae, every entry ferments inside a jar together with a question. Pick one to begin.",
+      "body_save_attempt": "An entry needs a linked question before it can be pickled. Pick an existing question or write a new one.",
+      "tab_pick": "Pick",
+      "tab_create": "Write a new one",
+      "create_label": "New question",
+      "create_placeholder": "e.g. What moved me today?",
+      "submit": "Write with this question",
+      "submitting": "Linking...",
+      "cancel": "Cancel"
+    },
     "settings": {
       "close_aria": "Close settings",
       "section_basic": "Basics",

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -10,6 +10,7 @@ import {
 import { formatEntryDate } from '@/features/entries/components/format-entry-date';
 import { LeaveConfirmModal } from '@/features/entries/components/leave-confirm-modal';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
+import { QuestionRequiredModal } from '@/features/entries/components/question-required-modal';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
 import { SettingsDrawer } from '@/features/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
@@ -55,6 +56,14 @@ interface EntryEditorProps {
   onUnlinkQuestion?: (entryId: string, questionId: string) => Promise<void>;
   onSaveComplete?: (entryId: string, content: string) => void;
   onSaveTransition?: (text: string, editorEl: HTMLElement) => Promise<void>;
+  /**
+   * Issue #314: when true, surface the question-required modal on mount if no question is
+   * linked. `entry/new` opens with a non-dismissable prompt; `entry/[id]` opens with a
+   * dismissable one so legacy entries (created before this rule existed) don't trap the user.
+   */
+  forceQuestionPrompt?: boolean;
+  /** Issue #314: callable to create a brand-new question + link it; required when forceQuestionPrompt=true. */
+  onCreateQuestion?: (text: string) => Promise<QuestionOption | null>;
 }
 
 function voiceStatusMessage(
@@ -95,6 +104,8 @@ export function EntryEditor({
   onUnlinkQuestion,
   onSaveComplete,
   onSaveTransition,
+  forceQuestionPrompt = false,
+  onCreateQuestion,
 }: EntryEditorProps) {
   const t = useTranslations('editor');
   const locale = useLocale();
@@ -106,7 +117,8 @@ export function EntryEditor({
   const [settings, updateSettings] = useEditorSettings(locale);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');
+  const [questionModalOpen, setQuestionModalOpen] = useState(false);
+  const [questionModalVariant, setQuestionModalVariant] = useState<'open' | 'save_attempt'>('open');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
@@ -117,6 +129,21 @@ export function EntryEditor({
   const [status, setStatus] = useState<EditorStatus>('editing');
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
+  // Tracks which IDs are already persisted server-side. For an existing entry the
+  // caller has loaded the real link list. For a new entry (no entryId yet) the
+  // entry itself doesn't exist on the server, so nothing can be "already linked" —
+  // initialLinkedIds in that case is the onboarding ?questionId= hand-off and must
+  // still be POSTed once the entry is created.
+  const serverLinkedIdsRef = useRef<Set<string>>(entryId ? new Set(initialLinkedIds) : new Set());
+  const linkedIdsRef = useRef<Set<string>>(linkedIds);
+  linkedIdsRef.current = linkedIds;
+  const hasLinkedQuestion = linkedIds.size > 0;
+  // Active question options can be augmented by the modal (new question created inline).
+  const [extraQuestions, setExtraQuestions] = useState<QuestionOption[]>([]);
+  const mergedActiveQuestions = useMemo(() => {
+    const seen = new Set(activeQuestions.map((q) => q.id));
+    return [...activeQuestions, ...extraQuestions.filter((q) => !seen.has(q.id))];
+  }, [activeQuestions, extraQuestions]);
   const [dateStr, setDateStr] = useState(() => {
     const now = new Date();
     const created = createdAtIso ? new Date(createdAtIso) : now;
@@ -141,6 +168,7 @@ export function EntryEditor({
   const anyOverlayOpen =
     settingsOpen ||
     saveModalOpen ||
+    questionModalOpen ||
     isEditingTitle ||
     statsOpen ||
     pendingNavPath !== null ||
@@ -250,22 +278,36 @@ export function EntryEditor({
   if (initialLinkedIds.join(',') !== prevLinkedRef.current.join(',')) {
     prevLinkedRef.current = initialLinkedIds;
     setLinkedIds(new Set(initialLinkedIds));
+    // For an existing entry, the new value reflects the server state.
+    // For a new entry, anything passed in is still local-only (no entry exists yet).
+    serverLinkedIdsRef.current = entryId ? new Set(initialLinkedIds) : new Set();
   }
 
+  // Issue #314: open the question-required modal once on mount when forced and not yet linked.
+  // We deliberately do not list `linkedIds` so the modal only opens once per page load —
+  // after the user dismisses/links, autosave + pickle will re-prompt on demand if needed.
+  const initialPromptShownRef = useRef(false);
+  useEffect(() => {
+    if (initialPromptShownRef.current) return;
+    if (!forceQuestionPrompt) return;
+    if (hasLinkedQuestion) return;
+    initialPromptShownRef.current = true;
+    setQuestionModalVariant('open');
+    setQuestionModalOpen(true);
+  }, [forceQuestionPrompt, hasLinkedQuestion]);
+
+  /**
+   * Issue #314: every manual save IS a pickle (fermentationEnabled=true).
+   * Persists any pending question links on first save and (when run from the
+   * pickle button) runs the jar transition + redirects to /jar.
+   */
   const handleSaveWithTitle = useCallback(
-    async (newTitle: string, options: { fermentationEnabled?: boolean } = {}) => {
-      // Combine title + body into content for storage
+    async (newTitle: string, options: { runTransition?: boolean } = {}) => {
       const finalContent = newTitle.trim() ? `${newTitle.trim()}\n${content}` : content;
       const targetId = currentEntryId ?? entryId;
       const isNew = !targetId;
 
-      const savedId = await save(
-        finalContent,
-        targetId,
-        options.fermentationEnabled !== undefined
-          ? { fermentationEnabled: options.fermentationEnabled }
-          : undefined,
-      );
+      const savedId = await save(finalContent, targetId, { fermentationEnabled: true });
       if (savedId) {
         setTitle(newTitle.trim());
         setSavedContent(content);
@@ -275,19 +317,18 @@ export function EntryEditor({
         setStatus('saved');
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
         setDateStr(formatEntryDate(created, new Date(), t));
-        if (isNew && onLinkQuestion) {
-          for (const qId of linkedIds) {
-            await onLinkQuestion(savedId, qId);
+        if (onLinkQuestion) {
+          // Persist any links that haven't yet been pushed to the server.
+          for (const qId of linkedIdsRef.current) {
+            if (!serverLinkedIdsRef.current.has(qId)) {
+              await onLinkQuestion(savedId, qId);
+              serverLinkedIdsRef.current.add(qId);
+            }
           }
         }
         setTimeout(() => setStatus('editing'), 2000);
         onSaveComplete?.(savedId, finalContent);
-        if (
-          options.fermentationEnabled &&
-          onSaveTransition &&
-          editorRef.current &&
-          finalContent.trim()
-        ) {
+        if (options.runTransition && onSaveTransition && editorRef.current && finalContent.trim()) {
           await onSaveTransition(finalContent, editorRef.current);
         } else if (isNew) {
           router.push(`/entries/${savedId}`);
@@ -299,7 +340,6 @@ export function EntryEditor({
       currentEntryId,
       entryId,
       save,
-      linkedIds,
       onLinkQuestion,
       router,
       onSaveComplete,
@@ -309,21 +349,18 @@ export function EntryEditor({
     ],
   );
 
-  const handleSaveClick = useCallback(() => {
-    if (!content.trim()) return;
-    // For new entries with no inline title yet, prompt via modal; otherwise save directly.
-    if (!entryId && !title.trim()) {
-      setSaveModalMode('save');
-      setSaveModalOpen(true);
-    } else {
-      handleSaveWithTitle(title);
-    }
-  }, [content, entryId, handleSaveWithTitle, title]);
-
-  // 漬け込む is an irreversible deliberate action — always open the modal for confirmation.
+  /**
+   * 漬け込む is the only manual save (Issue #314).
+   *  - Requires at least one linked question; otherwise re-prompts via the question modal.
+   *  - Opens the title-confirmation modal for the deliberate "this is going into the jar" UX.
+   */
   const handlePickleClick = useCallback(() => {
     if (!content.trim()) return;
-    setSaveModalMode('pickle');
+    if (linkedIdsRef.current.size === 0) {
+      setQuestionModalVariant('save_attempt');
+      setQuestionModalOpen(true);
+      return;
+    }
     setSaveModalOpen(true);
   }, [content]);
 
@@ -363,32 +400,48 @@ export function EntryEditor({
   }, [isEditingTitle]);
 
   const handleAutosaved = useCallback(
-    (newId: string, savedBody: string) => {
+    async (newId: string, savedBody: string) => {
       // Track the id locally so subsequent autosaves PUT instead of POST.
       // URL stays the same — the 新規エントリ button and browser refresh
       // continue to behave as if the user is still composing.
-      if (currentEntryId !== newId) setCurrentEntryId(newId);
+      const wasNew = !currentEntryId;
+      if (wasNew) setCurrentEntryId(newId);
       setSavedContent(savedBody);
       setStatus('saved');
       isAutosavingRef.current = false;
       setTimeout(() => setStatus('editing'), 2000);
+      // Issue #314: persist question links pending since the modal was answered before
+      // the entry existed on the server. Same dedupe rule as handleSaveWithTitle.
+      if (onLinkQuestion) {
+        for (const qId of linkedIdsRef.current) {
+          if (!serverLinkedIdsRef.current.has(qId)) {
+            await onLinkQuestion(newId, qId);
+            serverLinkedIdsRef.current.add(qId);
+          }
+        }
+      }
     },
-    [currentEntryId],
+    [currentEntryId, onLinkQuestion],
   );
 
   const autoSave = useCallback(
     (contentToSave: string, id?: string) => {
       isAutosavingRef.current = true;
-      return save(contentToSave, id);
+      // Issue #314: every save (auto or manual) marks the entry as fermentation-enabled,
+      // so it joins the fermentation rotation as soon as a question is linked.
+      return save(contentToSave, id, { fermentationEnabled: true });
     },
     [save],
   );
 
+  // Issue #314: only autosave once a question is linked. Without a question, the
+  // entry would land in the DB outside the fermentation flow, which contradicts the
+  // new "all saved entries ferment" guarantee.
   useAutosaveEntry({
     title,
     body: content,
     entryId: currentEntryId,
-    enabled: !!api,
+    enabled: !!api && hasLinkedQuestion,
     save: autoSave,
     onSaved: handleAutosaved,
   });
@@ -406,8 +459,15 @@ export function EntryEditor({
   );
 
   const handleUnsavedSave = useCallback(() => {
+    // Issue #314: leaving the page with unsaved changes still requires a linked question
+    // (otherwise the entry can't be saved at all). Surface the modal instead of silently
+    // dropping the user back to the navigation target.
+    if (linkedIdsRef.current.size === 0) {
+      setQuestionModalVariant('save_attempt');
+      setQuestionModalOpen(true);
+      return;
+    }
     if (!entryId && !title.trim()) {
-      setSaveModalMode('save');
       setSaveModalOpen(true);
     } else {
       handleSaveWithTitle(title);
@@ -447,6 +507,37 @@ export function EntryEditor({
       }
     },
     [entryId, onUnlinkQuestion],
+  );
+
+  // Issue #314 — question-required modal callbacks
+  const handleQuestionModalSelect = useCallback(
+    async (questionId: string) => {
+      setLinkedIds((prev) => new Set(prev).add(questionId));
+      if (currentEntryId && onLinkQuestion) {
+        await onLinkQuestion(currentEntryId, questionId);
+        serverLinkedIdsRef.current.add(questionId);
+      }
+      setQuestionModalOpen(false);
+    },
+    [currentEntryId, onLinkQuestion],
+  );
+
+  const handleQuestionModalCreate = useCallback(
+    async (text: string) => {
+      if (!onCreateQuestion) return;
+      const created = await onCreateQuestion(text);
+      if (!created) return;
+      setExtraQuestions((prev) =>
+        prev.some((q) => q.id === created.id) ? prev : [...prev, created],
+      );
+      setLinkedIds((prev) => new Set(prev).add(created.id));
+      if (currentEntryId && onLinkQuestion) {
+        await onLinkQuestion(currentEntryId, created.id);
+        serverLinkedIdsRef.current.add(created.id);
+      }
+      setQuestionModalOpen(false);
+    },
+    [currentEntryId, onCreateQuestion, onLinkQuestion],
   );
 
   function toggleFullscreen() {
@@ -491,30 +582,7 @@ export function EntryEditor({
               />
             </svg>
           </button>
-          {/* Save */}
-          <button
-            type="button"
-            onClick={handleSaveClick}
-            disabled={saving || !content.trim()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip={t('toolbar.save')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
-              />
-            </svg>
-          </button>
-          {/* Pickle */}
+          {/* Pickle (the only manual save — Issue #314) */}
           <button
             type="button"
             onClick={handlePickleClick}
@@ -765,7 +833,7 @@ export function EntryEditor({
       {/* Question linker */}
       <div className={`border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}>
         <QuestionLinker
-          activeQuestions={activeQuestions}
+          activeQuestions={mergedActiveQuestions}
           linkedQuestionIds={linkedIds}
           onLink={handleLink}
           onUnlink={handleUnlink}
@@ -879,19 +947,15 @@ export function EntryEditor({
         <EditorStatusBar status={status} charCount={charCount} />
       </div>
 
-      {/* Save title modal — shared between 保存する and 漬け込む */}
+      {/* Save title modal — always pickling (Issue #314 unified save = pickle) */}
       <SaveTitleModal
         open={saveModalOpen}
         initialTitle={title}
         saving={saving}
-        heading={
-          saveModalMode === 'pickle' ? t('save_modal.heading_pickle') : t('save_modal.heading_save')
-        }
-        submitLabel={
-          saveModalMode === 'pickle' ? t('save_modal.submit_pickle') : t('save_modal.submit_save')
-        }
+        heading={t('save_modal.heading_pickle')}
+        submitLabel={t('save_modal.submit_pickle')}
         onSave={(t) => {
-          handleSaveWithTitle(t, saveModalMode === 'pickle' ? { fermentationEnabled: true } : {});
+          handleSaveWithTitle(t, { runTransition: true });
           if (pendingNavPath) {
             const path = pendingNavPath;
             setPendingNavPath(null);
@@ -902,6 +966,17 @@ export function EntryEditor({
           setSaveModalOpen(false);
           setPendingNavPath(null);
         }}
+      />
+
+      {/* Issue #314 — question-required modal (forced on open / on pickle without question) */}
+      <QuestionRequiredModal
+        open={questionModalOpen}
+        activeQuestions={mergedActiveQuestions}
+        onSelect={handleQuestionModalSelect}
+        onCreate={handleQuestionModalCreate}
+        dismissable={questionModalVariant === 'open' && !!entryId}
+        onDismiss={() => setQuestionModalOpen(false)}
+        variant={questionModalVariant}
       />
 
       {/* Unsaved changes modal */}

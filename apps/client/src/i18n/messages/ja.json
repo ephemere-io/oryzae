@@ -329,6 +329,19 @@
       "cancel": "キャンセル",
       "saving": "保存中..."
     },
+    "question_required": {
+      "aria_label": "問いを紐づけるダイアログ",
+      "heading": "このエントリの問いは？",
+      "body_open": "Oryzae では、書いた言葉は「問い」と一緒に瓶に漬け込むことで発酵します。まずは問いを一つ選んでください。",
+      "body_save_attempt": "問いが紐づいていないと漬け込めません。問いを選ぶか、新しく書き起こしてください。",
+      "tab_pick": "選ぶ",
+      "tab_create": "新しく書く",
+      "create_label": "新しい問い",
+      "create_placeholder": "例：今日、何に心が動いた？",
+      "submit": "この問いで書く",
+      "submitting": "紐づけ中...",
+      "cancel": "キャンセル"
+    },
     "settings": {
       "close_aria": "設定を閉じる",
       "section_basic": "基本設定",

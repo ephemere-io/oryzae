@@ -32,6 +32,21 @@ export default function NewEntryPage() {
     });
   }
 
+  /**
+   * Issue #314: inline question creation from the question-required modal.
+   * Returns the created option so EntryEditor can show + link it without a full refetch.
+   */
+  async function handleCreateQuestion(text: string) {
+    if (!api) return null;
+    const res = await api.fetch('/api/v1/questions', {
+      method: 'POST',
+      body: JSON.stringify({ string: text }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { id: string };
+    return { id: data.id, currentText: text };
+  }
+
   const handleSaveTransition = useCallback(
     async (text: string, editorEl: HTMLElement) => {
       await runTransition(text, editorEl);
@@ -47,7 +62,11 @@ export default function NewEntryPage() {
       activeQuestions={activeQuestions}
       initialLinkedIds={initialLinkedIds}
       onLinkQuestion={handleLinkQuestion}
+      onCreateQuestion={handleCreateQuestion}
       onSaveTransition={handleSaveTransition}
+      // Issue #314: every time entry/new opens with no preselected question, force the
+      // question prompt. The onboarding hand-off uses ?questionId=... and skips the modal.
+      forceQuestionPrompt={initialLinkedIds.length === 0}
     />
   );
 }
