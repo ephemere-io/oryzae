@@ -329,6 +329,19 @@
       "cancel": "取消",
       "saving": "保存中..."
     },
+    "question_required": {
+      "aria_label": "为此日记选择一个问题",
+      "heading": "这篇日记的问题是？",
+      "body_open": "在 Oryzae 中，每篇日记都与一个「问题」一同放入瓮中发酵。请先选择一个问题。",
+      "body_save_attempt": "尚未关联问题，无法入瓮。请选择一个已有的问题，或新写一个。",
+      "tab_pick": "选择",
+      "tab_create": "新写一个",
+      "create_label": "新的问题",
+      "create_placeholder": "例：今天什么打动了我？",
+      "submit": "以此问题书写",
+      "submitting": "关联中...",
+      "cancel": "取消"
+    },
     "settings": {
       "close_aria": "关闭设置",
       "section_basic": "基本设置",
