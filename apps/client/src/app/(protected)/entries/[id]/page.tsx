@@ -18,7 +18,12 @@ export default function EntryDetailPage() {
   const { api, auth, loading: authLoading } = useAuth();
   const { entry, loading: entryLoading } = useEntry(params.id, api, authLoading);
   const activeQuestions = useActiveQuestions(api, authLoading);
-  const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, params.id);
+  const {
+    linkedQuestions,
+    linkQuestion,
+    unlinkQuestion,
+    loaded: linkedQuestionsLoaded,
+  } = useEntryQuestions(api, params.id);
   const runTransition = useSaveTransition();
   const router = useRouter();
 
@@ -71,7 +76,9 @@ export default function EntryDetailPage() {
       onSaveTransition={handleSaveTransition}
       // Issue #314: legacy entries created before the question-required rule may have
       // no linked question. Prompt the user (dismissable variant) so they aren't blocked.
-      forceQuestionPrompt={linkedQuestions.length === 0}
+      // Only force after the fetch has resolved — otherwise the modal flashes for entries
+      // that turn out to already have a question linked.
+      forceQuestionPrompt={linkedQuestionsLoaded && linkedQuestions.length === 0}
     />
   );
 }

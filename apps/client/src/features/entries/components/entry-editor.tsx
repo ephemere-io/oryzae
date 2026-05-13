@@ -977,6 +977,10 @@ export function EntryEditor({
         dismissable={questionModalVariant === 'open' && !!entryId}
         onDismiss={() => setQuestionModalOpen(false)}
         variant={questionModalVariant}
+        // Server caps active questions at 3 (QuestionLimitExceeded). Hide the
+        // "create new" tab once the user is at the cap so the UI matches the
+        // server-side constraint.
+        allowCreate={mergedActiveQuestions.length < 3}
       />
 
       {/* Unsaved changes modal */}
