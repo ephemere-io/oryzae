@@ -18,7 +18,12 @@ export default function EntryDetailPage() {
   const { api, auth, loading: authLoading } = useAuth();
   const { entry, loading: entryLoading } = useEntry(params.id, api, authLoading);
   const activeQuestions = useActiveQuestions(api, authLoading);
-  const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, params.id);
+  const {
+    linkedQuestions,
+    linkQuestion,
+    unlinkQuestion,
+    loaded: linkedQuestionsLoaded,
+  } = useEntryQuestions(api, params.id);
   const runTransition = useSaveTransition();
   const router = useRouter();
 
@@ -28,6 +33,21 @@ export default function EntryDetailPage() {
       router.push('/jar');
     },
     [runTransition, router],
+  );
+
+  // Issue #314: inline question creation from the question-required modal.
+  const handleCreateQuestion = useCallback(
+    async (text: string) => {
+      if (!api) return null;
+      const res = await api.fetch('/api/v1/questions', {
+        method: 'POST',
+        body: JSON.stringify({ string: text }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { id: string };
+      return { id: data.id, currentText: text };
+    },
+    [api],
   );
 
   if (entryLoading || authLoading) return null;
@@ -52,7 +72,13 @@ export default function EntryDetailPage() {
       initialLinkedIds={linkedQuestions.map((q) => q.id)}
       onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
       onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
+      onCreateQuestion={handleCreateQuestion}
       onSaveTransition={handleSaveTransition}
+      // Issue #314: legacy entries created before the question-required rule may have
+      // no linked question. Prompt the user (dismissable variant) so they aren't blocked.
+      // Only force after the fetch has resolved — otherwise the modal flashes for entries
+      // that turn out to already have a question linked.
+      forceQuestionPrompt={linkedQuestionsLoaded && linkedQuestions.length === 0}
     />
   );
 }

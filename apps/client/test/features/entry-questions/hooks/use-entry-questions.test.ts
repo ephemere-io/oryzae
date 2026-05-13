@@ -1,6 +1,9 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useActiveQuestions } from '@/features/entry-questions/hooks/use-entry-questions';
+import {
+  useActiveQuestions,
+  useEntryQuestions,
+} from '@/features/entry-questions/hooks/use-entry-questions';
 import type { ApiClient } from '@/lib/api';
 
 function mockResponse(ok: boolean, body: unknown): Response {
@@ -77,5 +80,35 @@ describe('useActiveQuestions', () => {
       expect(result.current).toHaveLength(1);
     });
     expect(result.current[0].id).toBe('q1');
+  });
+});
+
+describe('useEntryQuestions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('初期状態は loaded=false。fetch 解決後に loaded=true になる (Issue #314)', async () => {
+    const api = createApiStub();
+    api.fetch.mockResolvedValueOnce(
+      mockResponse(true, [{ id: 'q1', currentText: '紐付け済みの問い' }]),
+    );
+
+    const { result } = renderHook(() => useEntryQuestions(api, 'entry-1'));
+
+    expect(result.current.loaded).toBe(false);
+    expect(result.current.linkedQuestions).toEqual([]);
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true);
+    });
+    expect(result.current.linkedQuestions).toHaveLength(1);
+  });
+
+  it('entryId が無いときは fetch せず loaded のまま false', () => {
+    const api = createApiStub();
+    const { result } = renderHook(() => useEntryQuestions(api, undefined));
+    expect(api.fetch).not.toHaveBeenCalled();
+    expect(result.current.loaded).toBe(false);
   });
 });
