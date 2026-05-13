@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { EntryEditor } from '@/features/entries/components/entry-editor';
 import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
 import { useActiveQuestions } from '@/features/entry-questions/hooks/use-entry-questions';
+import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
 
 export default function NewEntryPage() {
   const { api, auth, loading } = useAuth();
@@ -18,6 +19,11 @@ export default function NewEntryPage() {
   // when this page is already mounted and the URL changes (e.g. onboarding adds a question
   // and redirects with ?questionId=...).
   const activeQuestions = useActiveQuestions(api, loading, questionIdParam ?? undefined);
+  // Issue #314 follow-up: when a brand-new user lands here from the email confirmation
+  // link, the protected layout shows the onboarding modal alongside this page. We must
+  // not surface the question-required modal in that case — onboarding will provide
+  // the first question itself, and stacking two modals confuses the user.
+  const { shouldShow: onboardingActive, loading: onboardingLoading } = useOnboarding(api);
 
   // Pre-link question from query param (e.g. /entries/new?questionId=xxx)
   const initialLinkedIds = useMemo(
@@ -66,7 +72,10 @@ export default function NewEntryPage() {
       onSaveTransition={handleSaveTransition}
       // Issue #314: every time entry/new opens with no preselected question, force the
       // question prompt. The onboarding hand-off uses ?questionId=... and skips the modal.
-      forceQuestionPrompt={initialLinkedIds.length === 0}
+      // Also suppress while onboarding is still active (or its status is still being
+      // fetched) — onboarding handles the first question and we don't want to stack
+      // modals on the very first session.
+      forceQuestionPrompt={initialLinkedIds.length === 0 && !onboardingLoading && !onboardingActive}
     />
   );
 }
