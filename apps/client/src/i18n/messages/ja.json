@@ -102,7 +102,8 @@
       "confirm": "削除する"
     },
     "card": {
-      "char_count_label": "文字数:"
+      "char_count_label": "文字数:",
+      "linked_question_label": "問い:"
     },
     "kebab": {
       "aria_open": "メニューを開く",
@@ -673,7 +674,6 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
-      "title": "最初の「問い」を蒔く。",
       "body": "あなたが今いちばん考えていることを、短い問いの形にしてみてください。「なぜ──」「どうすれば──」、答えのまだない一文で構いません。後からいつでも編集できます。",
       "placeholder": "例: なぜ自分は急ぐのが苦手なのだろう",
       "hint": "あとで Jar に保管され、ここから発酵が始まります。",

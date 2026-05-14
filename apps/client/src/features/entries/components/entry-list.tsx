@@ -18,6 +18,7 @@ interface EntryItem {
   id: string;
   content: string;
   createdAt: string;
+  linkedQuestions: Array<{ id: string; currentText: string | null }>;
 }
 
 function getISOWeekNumber(date: Date): number {
@@ -174,6 +175,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
               id={entry.id}
               content={entry.content}
               createdAt={entry.createdAt}
+              linkedQuestions={entry.linkedQuestions}
               searchQuery={search}
               onDeleteClick={handleDeleteClick}
             />
@@ -199,6 +201,7 @@ export function EntryList({ api, authLoading }: EntryListProps) {
                     id={entry.id}
                     content={entry.content}
                     createdAt={entry.createdAt}
+                    linkedQuestions={entry.linkedQuestions}
                     onDeleteClick={handleDeleteClick}
                   />
                 ))}
