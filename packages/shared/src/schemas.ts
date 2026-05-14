@@ -39,6 +39,14 @@ export const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   locale: localeSchema.optional(),
+  /**
+   * Supabase の確認メールに埋め込む redirect 先 (`{{ .RedirectTo }}`)。
+   * Vercel preview など本番外の環境からサインアップしたとき、ダッシュボード設定の
+   * Site URL ではなく、実際にサインアップフォームが置かれていた origin に
+   * 戻ってきて確認フローを完了させるためにクライアントから明示的に送る。
+   * 通常 `${window.location.origin}/auth/confirm` を渡す。
+   */
+  emailRedirectTo: z.string().url().optional(),
 });
 
 export const oauthInitSchema = z.object({

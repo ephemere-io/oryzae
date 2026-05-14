@@ -66,6 +66,10 @@ export const signupRoutes = new Hono()
 
     // Create auth user.
     // locale は Supabase 確認メールテンプレートの `{{ .Data.locale }}` で参照される。
+    // emailRedirectTo は確認メール内の `{{ .RedirectTo }}` に展開され、Vercel preview など
+    // 本番外の環境からのサインアップでも確認リンクが当該環境に戻れるようにする。
+    // (ダッシュボード側で "Additional Redirect URLs" にプレビュー URL の許可、
+    // テンプレートで {{ .SiteURL }} ではなく {{ .RedirectTo }} を使う設定が必要)
     const supabase = getSupabaseAuthClient();
     const locale: LocaleCode = body.locale ?? 'ja';
     const { data, error } = await supabase.auth.signUp({
@@ -73,6 +77,7 @@ export const signupRoutes = new Hono()
       password: body.password,
       options: {
         data: { locale },
+        ...(body.emailRedirectTo ? { emailRedirectTo: body.emailRedirectTo } : {}),
       },
     });
 
