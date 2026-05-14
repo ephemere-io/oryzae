@@ -146,9 +146,14 @@ export function useAuth() {
     locale?: 'ja' | 'en' | 'zh' | 'ko',
   ): Promise<string | null> {
     const client = createApiClient();
+    // Supabase の確認メールに埋め込む redirect 先を、フォームが置かれている origin に
+    // 揃える。Vercel preview ではこれを送らないとダッシュボード設定の本番 Site URL に
+    // 戻ってしまい、preview 環境での新規サインアップ動作確認ができない。
+    const emailRedirectTo =
+      typeof window !== 'undefined' ? `${window.location.origin}/auth/confirm` : undefined;
     const res = await client.fetch('/api/v1/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ nickname, email, password, locale }),
+      body: JSON.stringify({ nickname, email, password, locale, emailRedirectTo }),
     });
     if (!res.ok) {
       const data = (await res.json()) as { error: string };
