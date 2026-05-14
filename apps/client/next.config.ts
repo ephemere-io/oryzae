@@ -15,6 +15,28 @@ const nextConfig: NextConfig = {
     '/privacy': ['./src/content/legal/**/*.md'],
     '/support': ['./src/content/support/**/*.md'],
   },
+  // PostHog reverse proxy: 広告ブロッカーが posthog.com 系ドメインを既定で遮断する
+  // ため (#225)、自ドメインの `/ingest/*` 経由でリクエストを中継する。
+  // 公式ガイド: https://posthog.com/docs/advanced/proxy/nextjs
+  async rewrites() {
+    return [
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/:path*',
+        destination: 'https://us.i.posthog.com/:path*',
+      },
+      {
+        source: '/ingest/decide',
+        destination: 'https://us.i.posthog.com/decide',
+      },
+    ];
+  },
+  // PostHog の rewrite 先 (`/ingest/...`) で末尾スラッシュリダイレクトが起きると
+  // CORS/プリフライトが壊れるため無効化する。
+  skipTrailingSlashRedirect: true,
 };
 
 export default withSentryConfig(withNextIntl(nextConfig), {
