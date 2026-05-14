@@ -7,6 +7,7 @@ import { ListEntriesUsecase } from '../../application/usecases/list-entries.usec
 import { SearchEntriesUsecase } from '../../application/usecases/search-entries.usecase.js';
 import { UpdateEntryUsecase } from '../../application/usecases/update-entry.usecase.js';
 import { SupabaseEntryRepository } from '../../infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseEntryLinkedQuestionsViewRepository } from '../../infrastructure/repositories/supabase-entry-linked-questions-view.repository.js';
 import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository.js';
 
 type Env = {
@@ -37,14 +38,21 @@ export const entries = new Hono<Env>()
     const entryRepo = new SupabaseEntryRepository(supabase);
     const parsedLimit = limit ? Number(limit) : undefined;
 
-    if (q) {
-      const searchUsecase = new SearchEntriesUsecase(entryRepo);
-      const result = await searchUsecase.execute(c.get('userId'), q, cursor, parsedLimit);
-      return c.json(result);
-    }
+    const entries = q
+      ? await new SearchEntriesUsecase(entryRepo).execute(c.get('userId'), q, cursor, parsedLimit)
+      : await new ListEntriesUsecase(entryRepo).execute(c.get('userId'), cursor, parsedLimit);
 
-    const listUsecase = new ListEntriesUsecase(entryRepo);
-    const result = await listUsecase.execute(c.get('userId'), cursor, parsedLimit);
+    // Issue #323: 一覧に紐づく問いを表示。entry-context-isolation を守るため
+    // question テーブルへの問い合わせは entry/infrastructure の view repository が
+    // 直接 supabase から読み出す (user-me が UserActivityStatsRepository で取る
+    // のと同じ Bounded Context の妥協パターン)。
+    const linkedQuestionsView = new SupabaseEntryLinkedQuestionsViewRepository(supabase);
+    const linkedByEntry = await linkedQuestionsView.listByEntryIds(entries.map((e) => e.id));
+
+    const result = entries.map((entry) => ({
+      ...entry,
+      linkedQuestions: linkedByEntry[entry.id] ?? [],
+    }));
     return c.json(result);
   })
   .get('/:id', async (c) => {

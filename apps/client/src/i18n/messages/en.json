@@ -102,7 +102,8 @@
       "confirm": "Delete"
     },
     "card": {
-      "char_count_label": "Characters:"
+      "char_count_label": "Characters:",
+      "linked_question_label": "Question:"
     },
     "kebab": {
       "aria_open": "Open menu",
@@ -673,7 +674,6 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
-      "title": "Plant your first question.",
       "body": "Try shaping what you're most preoccupied with into a short question. \"Why…\", \"How might I…\" — a sentence whose answer you don't have yet is plenty. You can edit it any time.",
       "placeholder": "e.g. Why am I bad at hurrying?",
       "hint": "It will be stored in the Jar — fermentation starts here.",

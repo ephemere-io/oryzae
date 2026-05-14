@@ -102,7 +102,8 @@
       "confirm": "删除"
     },
     "card": {
-      "char_count_label": "字数:"
+      "char_count_label": "字数:",
+      "linked_question_label": "提问:"
     },
     "kebab": {
       "aria_open": "打开菜单",
@@ -673,7 +674,6 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
-      "title": "播下第一个「提问」。",
       "body": "请把此刻最在意的事化为一句简短的提问。「为什么──」「怎样才能──」，一句尚无答案的话即可。之后随时可以编辑。",
       "placeholder": "例: 我为什么不擅长着急",
       "hint": "它会被存进 Jar，发酵从这里开始。",
