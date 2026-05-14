@@ -27,6 +27,7 @@ import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useFocusMode } from '@/features/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
+import { useLinkQuestionSync } from '@/features/entries/hooks/use-link-question-sync';
 import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
 import { useUserMe } from '@/features/entries/hooks/use-user-me';
@@ -128,6 +129,12 @@ export function EntryEditor({
   const [status, setStatus] = useState<EditorStatus>('editing');
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
+  // Issue #319: autosave で初回エントリが作られた際に、ローカルで紐づけ済みの
+  // questionId を DB に永続化する flush ヘルパー。
+  const { flushPending: flushPendingLinks } = useLinkQuestionSync({
+    linkedIds,
+    link: onLinkQuestion,
+  });
   const [dateStr, setDateStr] = useState(() => {
     const now = new Date();
     const created = createdAtIso ? new Date(createdAtIso) : now;
@@ -468,17 +475,25 @@ export function EntryEditor({
   }, [isEditingTitle]);
 
   const handleAutosaved = useCallback(
-    (newId: string, savedBody: string) => {
+    async (newId: string, savedBody: string) => {
       // Track the id locally so subsequent autosaves PUT instead of POST.
       // URL stays the same — the 新規エントリ button and browser refresh
       // continue to behave as if the user is still composing.
-      if (currentEntryId !== newId) setCurrentEntryId(newId);
+      const wasNew = currentEntryId !== newId;
+      if (wasNew) setCurrentEntryId(newId);
       setSavedContent(savedBody);
       setStatus('saved');
       isAutosavingRef.current = false;
       setTimeout(() => setStatus('editing'), 2000);
+
+      // Issue #319: autosave が手動保存より先にエントリを作成すると、
+      // handleSaveWithTitle の `isNew` 分岐がスキップされ question link が
+      // DB に永続化されないバグを修正。サーバー側 link は upsert で冪等。
+      if (wasNew) {
+        await flushPendingLinks(newId);
+      }
     },
-    [currentEntryId],
+    [currentEntryId, flushPendingLinks],
   );
 
   const autoSave = useCallback(
@@ -533,11 +548,14 @@ export function EntryEditor({
   const handleLink = useCallback(
     async (questionId: string) => {
       setLinkedIds((prev) => new Set(prev).add(questionId));
-      if (entryId && onLinkQuestion) {
-        await onLinkQuestion(entryId, questionId);
+      // Issue #319: autosave 後は currentEntryId が確定するので、
+      // それを優先して使う（entryId は props で新規ページでは undefined）。
+      const targetId = currentEntryId ?? entryId;
+      if (targetId && onLinkQuestion) {
+        await onLinkQuestion(targetId, questionId);
       }
     },
-    [entryId, onLinkQuestion],
+    [currentEntryId, entryId, onLinkQuestion],
   );
 
   const handleUnlink = useCallback(
@@ -547,11 +565,13 @@ export function EntryEditor({
         next.delete(questionId);
         return next;
       });
-      if (entryId && onUnlinkQuestion) {
-        await onUnlinkQuestion(entryId, questionId);
+      // Issue #319: handleLink と同じく autosave 後は currentEntryId を優先.
+      const targetId = currentEntryId ?? entryId;
+      if (targetId && onUnlinkQuestion) {
+        await onUnlinkQuestion(targetId, questionId);
       }
     },
-    [entryId, onUnlinkQuestion],
+    [currentEntryId, entryId, onUnlinkQuestion],
   );
 
   function toggleFullscreen() {
