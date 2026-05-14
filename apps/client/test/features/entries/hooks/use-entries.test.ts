@@ -202,4 +202,52 @@ describe('useEntries', () => {
 
     expect(apiFetch.mock.calls[0][0]).not.toContain('q=');
   });
+
+  it('Issue #323: サーバー返却の linkedQuestions を Entry にそのまま載せる', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        {
+          id: '1',
+          userId: 'u1',
+          content: 'today',
+          mediaUrls: [],
+          createdAt: '',
+          updatedAt: '',
+          linkedQuestions: [
+            { id: 'q1', currentText: '今日学んだことは？' },
+            { id: 'q2', currentText: null },
+          ],
+        },
+      ]),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntries(api, false));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries[0].linkedQuestions).toEqual([
+      { id: 'q1', currentText: '今日学んだことは？' },
+      { id: 'q2', currentText: null },
+    ]);
+  });
+
+  it('Issue #323: linkedQuestions 欠落時は空配列にフォールバックする', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '1', userId: 'u1', content: 'x', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntries(api, false));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries[0].linkedQuestions).toEqual([]);
+  });
 });
