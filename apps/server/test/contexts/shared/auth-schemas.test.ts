@@ -41,6 +41,22 @@ describe('signupSchema locale field', () => {
   it('rejects unsupported locale', () => {
     expect(() => signupSchema.parse({ ...base, locale: 'de' })).toThrow();
   });
+
+  it('emailRedirectTo を受け付ける (Vercel preview などからの origin 上書き用)', () => {
+    const parsed = signupSchema.parse({
+      ...base,
+      emailRedirectTo: 'https://oryzae-preview.vercel.app/auth/confirm',
+    });
+    expect(parsed.emailRedirectTo).toBe('https://oryzae-preview.vercel.app/auth/confirm');
+  });
+
+  it('emailRedirectTo は省略可 (本番では Supabase 側 Site URL に委ねる)', () => {
+    expect(signupSchema.parse(base).emailRedirectTo).toBeUndefined();
+  });
+
+  it('emailRedirectTo は URL でない場合は reject', () => {
+    expect(() => signupSchema.parse({ ...base, emailRedirectTo: 'not-a-url' })).toThrow();
+  });
 });
 
 describe('oauthInitSchema', () => {
