@@ -1,7 +1,10 @@
 import { completeOnboardingSchema } from '@oryzae/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
+import { UserProfileNotFoundError } from '../../application/errors/user.errors.js';
 import { CompleteOnboardingUsecase } from '../../application/usecases/complete-onboarding.usecase.js';
+import { GetUserMeUsecase } from '../../application/usecases/get-user-me.usecase.js';
+import { SupabaseUserActivityStatsRepository } from '../../infrastructure/repositories/supabase-user-activity-stats.repository.js';
 import { SupabaseUserProfileRepository } from '../../infrastructure/repositories/supabase-user-profile.repository.js';
 
 type Env = {
@@ -15,20 +18,20 @@ export const userMe = new Hono<Env>()
   .get('/', async (c) => {
     const userId = c.get('userId');
     const supabase = c.get('supabase');
-    const profileRepo = new SupabaseUserProfileRepository(supabase);
+    const usecase = new GetUserMeUsecase(
+      new SupabaseUserProfileRepository(supabase),
+      new SupabaseUserActivityStatsRepository(supabase),
+    );
 
-    const profile = await profileRepo.findById(userId);
-    if (!profile) {
-      return c.json({ error: 'Profile not found' }, 404);
+    try {
+      const view = await usecase.execute(userId);
+      return c.json(view);
+    } catch (e) {
+      if (e instanceof UserProfileNotFoundError) {
+        return c.json({ error: 'Profile not found' }, 404);
+      }
+      throw e;
     }
-
-    const props = profile.toProps();
-    return c.json({
-      id: props.id,
-      nickname: props.nickname,
-      avatarUrl: props.avatarUrl,
-      onboardingCompleted: props.onboardingCompleted,
-    });
   })
   .patch('/onboarding', async (c) => {
     completeOnboardingSchema.parse(await c.req.json());

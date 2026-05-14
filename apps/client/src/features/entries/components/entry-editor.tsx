@@ -9,7 +9,11 @@ import {
 } from '@/features/entries/components/editor-status-bar';
 import { formatEntryDate } from '@/features/entries/components/format-entry-date';
 import { LeaveConfirmModal } from '@/features/entries/components/leave-confirm-modal';
+import { LinkQuestionNudgeModal } from '@/features/entries/components/link-question-nudge-modal';
+import { PickleConfirmModal } from '@/features/entries/components/pickle-confirm-modal';
+import { PickleNudgeModal } from '@/features/entries/components/pickle-nudge-modal';
 import { QuestionLinker } from '@/features/entries/components/question-linker';
+import { QuestionSelectModal } from '@/features/entries/components/question-select-modal';
 import { SaveTitleModal } from '@/features/entries/components/save-title-modal';
 import { SettingsDrawer } from '@/features/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
@@ -25,6 +29,7 @@ import { useFocusMode } from '@/features/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
 import { usePressureBleed } from '@/features/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/entries/hooks/use-time-inscription';
+import { useUserMe } from '@/features/entries/hooks/use-user-me';
 import {
   useVoiceDynamics,
   type VoiceUnavailableReason,
@@ -107,6 +112,12 @@ export function EntryEditor({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');
+  // Issue #316: pickle 時のモーダル分岐 (タイトル有無 × 問い有無)
+  const [pickleConfirmOpen, setPickleConfirmOpen] = useState(false);
+  const [questionSelectOpen, setQuestionSelectOpen] = useState(false);
+  // Issue #316: 保存成功直後に出すガイドモーダル
+  const [pickleNudgeOpen, setPickleNudgeOpen] = useState(false);
+  const [linkQuestionNudgeOpen, setLinkQuestionNudgeOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
@@ -124,6 +135,8 @@ export function EntryEditor({
     return formatEntryDate(created, updated, t);
   });
   const { save, saving, error } = useSaveEntry(api, auth);
+  // Issue #316: 保存成功直後のナッジ表示判定に使う
+  const userMe = useUserMe(api);
   const router = useRouter();
   const sidebarWidth = SIDEBAR_WIDTH;
   const editorRef = useRef<HTMLDivElement>(null);
@@ -141,6 +154,10 @@ export function EntryEditor({
   const anyOverlayOpen =
     settingsOpen ||
     saveModalOpen ||
+    pickleConfirmOpen ||
+    questionSelectOpen ||
+    pickleNudgeOpen ||
+    linkQuestionNudgeOpen ||
     isEditingTitle ||
     statsOpen ||
     pendingNavPath !== null ||
@@ -258,6 +275,12 @@ export function EntryEditor({
       const finalContent = newTitle.trim() ? `${newTitle.trim()}\n${content}` : content;
       const targetId = currentEntryId ?? entryId;
       const isNew = !targetId;
+      // Issue #316: ナッジ判定用に、保存"前"のフラグスナップショットを取る
+      const prevHasPickled = userMe.data?.hasPickled ?? null;
+      const prevHasLinked = userMe.data?.hasLinkedQuestion ?? null;
+      const onboardingCompleted = userMe.data?.onboardingCompleted ?? false;
+      const linkedCountBeforeSave = linkedIds.size;
+      const justPickled = options.fermentationEnabled === true;
 
       const savedId = await save(
         finalContent,
@@ -271,6 +294,8 @@ export function EntryEditor({
         setSavedContent(content);
         setCurrentEntryId(savedId);
         setSaveModalOpen(false);
+        setPickleConfirmOpen(false);
+        setQuestionSelectOpen(false);
         setIsEditingTitle(false);
         setStatus('saved');
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
@@ -282,6 +307,29 @@ export function EntryEditor({
         }
         setTimeout(() => setStatus('editing'), 2000);
         onSaveComplete?.(savedId, finalContent);
+
+        // Issue #316: ガイドモーダル判定 (オンボーディング完了後のみ)。
+        // 漬け込み遷移が走るケース (= 漬け込み成功) はナッジ不要、遷移先で完結。
+        if (onboardingCompleted && !justPickled) {
+          if (
+            prevHasPickled === false &&
+            linkedCountBeforeSave > 0 &&
+            !sessionStorage.getItem('oryzae:nudge:pickle:shown')
+          ) {
+            sessionStorage.setItem('oryzae:nudge:pickle:shown', '1');
+            setPickleNudgeOpen(true);
+          } else if (
+            prevHasLinked === false &&
+            linkedCountBeforeSave === 0 &&
+            !sessionStorage.getItem('oryzae:nudge:link:shown')
+          ) {
+            sessionStorage.setItem('oryzae:nudge:link:shown', '1');
+            setLinkQuestionNudgeOpen(true);
+          }
+        }
+        // 状態が変わった可能性があるので user-me を refetch (次回判定の精度向上)
+        userMe.refresh();
+
         if (
           options.fermentationEnabled &&
           onSaveTransition &&
@@ -306,6 +354,7 @@ export function EntryEditor({
       onSaveTransition,
       createdAtIso,
       t,
+      userMe,
     ],
   );
 
@@ -320,12 +369,68 @@ export function EntryEditor({
     }
   }, [content, entryId, handleSaveWithTitle, title]);
 
-  // 漬け込む is an irreversible deliberate action — always open the modal for confirmation.
+  // Issue #316: 漬け込む を押した時、エントリの状態 (タイトル有無 × 問い有無) で
+  // 表示するモーダルを 4 通りに分岐する:
+  //   - title あり × 問いあり → PickleConfirmModal (確認のみ)
+  //   - title なし × 問いあり → 既存 SaveTitleModal (タイトル編集付き)
+  //   - title あり × 問いなし → QuestionSelectModal (問い選択 → pickle)
+  //   - title なし × 問いなし → QuestionSelectModal (問い選択、本文先頭行を title として採用)
   const handlePickleClick = useCallback(() => {
     if (!content.trim()) return;
-    setSaveModalMode('pickle');
-    setSaveModalOpen(true);
-  }, [content]);
+    const hasTitle = title.trim().length > 0;
+    const hasQuestion = linkedIds.size > 0;
+
+    if (hasQuestion && hasTitle) {
+      setPickleConfirmOpen(true);
+    } else if (hasQuestion && !hasTitle) {
+      setSaveModalMode('pickle');
+      setSaveModalOpen(true);
+    } else {
+      // hasQuestion === false (title 有無に関わらず) → まず問いを決めてもらう
+      setQuestionSelectOpen(true);
+    }
+  }, [content, title, linkedIds]);
+
+  // タイトルあり×問いありケース: 漬け込み確認モーダルからの実行
+  const handlePickleConfirm = useCallback(() => {
+    handleSaveWithTitle(title, { fermentationEnabled: true });
+  }, [handleSaveWithTitle, title]);
+
+  // タイトルあり/なし × 問いなしケース: 問いを選択 (or 新規作成) してから漬け込む
+  const handleQuestionSelectAndPickle = useCallback(
+    async (args: { existingId: string | null; newQuestionText: string | null }) => {
+      let questionId = args.existingId;
+      // 新規問い作成 (POST /api/v1/questions)
+      if (!questionId && args.newQuestionText && api) {
+        const res = await api.fetch('/api/v1/questions', {
+          method: 'POST',
+          body: JSON.stringify({ string: args.newQuestionText }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { id?: string };
+          questionId = data.id ?? null;
+        }
+      }
+      if (!questionId) return;
+
+      // ローカル state に追加 (新規エントリの場合は handleSaveWithTitle 内で
+      // server side のリンクが行われる)
+      const nextLinked = new Set(linkedIds);
+      nextLinked.add(questionId);
+      setLinkedIds(nextLinked);
+
+      // 既存エントリの場合は即座にサーバ側でリンクする
+      const targetId = currentEntryId ?? entryId;
+      if (targetId && onLinkQuestion) {
+        await onLinkQuestion(targetId, questionId);
+      }
+
+      setQuestionSelectOpen(false);
+      // 漬け込みを実行 (タイトル未設定なら本文先頭行が title として後から解釈される)
+      handleSaveWithTitle(title, { fermentationEnabled: true });
+    },
+    [api, linkedIds, currentEntryId, entryId, onLinkQuestion, handleSaveWithTitle, title],
+  );
 
   const startTitleEdit = useCallback(() => {
     setDraftTitle(title);
@@ -917,6 +1022,37 @@ export function EntryEditor({
         open={leaveConfirmOpen}
         onCancel={cancelLeaveConfirm}
         onConfirm={confirmLeaveConfirm}
+      />
+
+      {/* Issue #316: タイトルあり × 問いあり 用の漬け込み確認モーダル */}
+      <PickleConfirmModal
+        open={pickleConfirmOpen}
+        saving={saving}
+        title={title}
+        linkedQuestionTexts={activeQuestions
+          .filter((q) => linkedIds.has(q.id) && q.currentText)
+          .map((q) => q.currentText as string)}
+        onConfirm={handlePickleConfirm}
+        onClose={() => setPickleConfirmOpen(false)}
+      />
+
+      {/* Issue #316: 問い未紐付エントリを漬け込む際の問い選択モーダル */}
+      <QuestionSelectModal
+        open={questionSelectOpen}
+        saving={saving}
+        activeQuestions={activeQuestions}
+        linkedQuestionIds={linkedIds}
+        onConfirm={handleQuestionSelectAndPickle}
+        onClose={() => setQuestionSelectOpen(false)}
+      />
+
+      {/* Issue #316: 保存後ガイド (まだ漬け込んでいない使用者向け) */}
+      <PickleNudgeModal open={pickleNudgeOpen} onClose={() => setPickleNudgeOpen(false)} />
+
+      {/* Issue #316: 保存後ガイド (まだ問いを紐付けていない使用者向け) */}
+      <LinkQuestionNudgeModal
+        open={linkQuestionNudgeOpen}
+        onClose={() => setLinkQuestionNudgeOpen(false)}
       />
     </div>
   );
