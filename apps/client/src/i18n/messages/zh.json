@@ -329,38 +329,6 @@
       "cancel": "取消",
       "saving": "保存中..."
     },
-    "pickle_confirm_modal": {
-      "aria_label": "入瓮确认对话框",
-      "heading": "将此条目放入瓮中",
-      "body": "将「{title}」送入发酵过程。入瓮之后仍可编辑内容与关联。",
-      "cancel": "取消",
-      "confirm": "入瓮",
-      "saving": "入瓮中..."
-    },
-    "question_select_modal": {
-      "aria_label": "问题选择对话框",
-      "heading": "为此条目关联一个问题",
-      "body": "要入瓮并发酵，需要给条目关联一个问题。请从已有问题中选择，或在此输入新问题。",
-      "mode_pick": "选已有",
-      "mode_create": "新建",
-      "pick_placeholder": "请选择问题...",
-      "create_placeholder": "写一个问题（例：今天的小发现是？）",
-      "cancel": "取消",
-      "confirm": "关联并入瓮",
-      "saving": "入瓮中..."
-    },
-    "pickle_nudge_modal": {
-      "aria_label": "入瓮引导",
-      "heading": "试试将其入瓮？",
-      "body": "已关联问题的条目，入瓮后会进入发酵过程。随时按入瓮按钮（瓶子图标）即可尝试。",
-      "dismiss": "知道了"
-    },
-    "link_question_nudge_modal": {
-      "aria_label": "问题关联引导",
-      "heading": "试试关联一个问题？",
-      "body": "将问题关联到条目后，就可以入瓮并进入发酵过程。可在编辑器顶部的问题关联器选择已有问题，或新建一个。",
-      "dismiss": "知道了"
-    },
     "settings": {
       "close_aria": "关闭设置",
       "section_basic": "基本设置",
@@ -408,6 +376,38 @@
       "day_thu": "星期四",
       "day_fri": "星期五",
       "day_sat": "星期六"
+    },
+    "pickle_confirm_modal": {
+      "aria_label": "入瓮确认对话框",
+      "heading": "将此条目放入瓮中",
+      "body": "将「{title}」送入发酵过程。入瓮之后仍可编辑内容与关联。",
+      "cancel": "取消",
+      "confirm": "入瓮",
+      "saving": "入瓮中..."
+    },
+    "question_select_modal": {
+      "aria_label": "问题选择对话框",
+      "heading": "为此条目关联一个问题",
+      "body": "要入瓮并发酵，需要给条目关联一个问题。请从已有问题中选择，或在此输入新问题。",
+      "mode_pick": "选已有",
+      "mode_create": "新建",
+      "pick_placeholder": "请选择问题...",
+      "create_placeholder": "写一个问题（例：今天的小发现是？）",
+      "cancel": "取消",
+      "confirm": "关联并入瓮",
+      "saving": "入瓮中..."
+    },
+    "pickle_nudge_modal": {
+      "aria_label": "入瓮引导",
+      "heading": "试试将其入瓮？",
+      "body": "已关联问题的条目，入瓮后会进入发酵过程。随时按入瓮按钮（瓶子图标）即可尝试。",
+      "dismiss": "知道了"
+    },
+    "link_question_nudge_modal": {
+      "aria_label": "问题关联引导",
+      "heading": "试试关联一个问题？",
+      "body": "将问题关联到条目后，就可以入瓮并进入发酵过程。可在编辑器顶部的问题关联器选择已有问题，或新建一个。",
+      "dismiss": "知道了"
     }
   },
   "fermentation": {

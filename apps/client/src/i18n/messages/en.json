@@ -329,38 +329,6 @@
       "cancel": "Cancel",
       "saving": "Saving..."
     },
-    "pickle_confirm_modal": {
-      "aria_label": "Pickle confirmation dialog",
-      "heading": "Pickle this entry into the Jar",
-      "body": "Send \"{title}\" to the fermentation process. You can still edit the content and links afterwards.",
-      "cancel": "Cancel",
-      "confirm": "Pickle",
-      "saving": "Pickling..."
-    },
-    "question_select_modal": {
-      "aria_label": "Question selection dialog",
-      "heading": "Link a question to this entry",
-      "body": "To pickle and ferment, an entry must be linked to one question. Pick an existing question or write a new one here.",
-      "mode_pick": "Pick existing",
-      "mode_create": "Write new",
-      "pick_placeholder": "Choose a question...",
-      "create_placeholder": "Write a question (e.g. What did I notice today?)",
-      "cancel": "Cancel",
-      "confirm": "Link and pickle",
-      "saving": "Pickling..."
-    },
-    "pickle_nudge_modal": {
-      "aria_label": "Pickling guidance",
-      "heading": "Try pickling this entry",
-      "body": "Entries linked to a question can move into the fermentation process when you pickle them. Press the pickle button (jar icon) anytime to try.",
-      "dismiss": "Got it"
-    },
-    "link_question_nudge_modal": {
-      "aria_label": "Question linking guidance",
-      "heading": "Try linking a question",
-      "body": "Linking a question to an entry lets you pickle it and start the fermentation process. Pick an existing question from the linker above or create a new one.",
-      "dismiss": "Got it"
-    },
     "settings": {
       "close_aria": "Close settings",
       "section_basic": "Basics",
@@ -408,6 +376,38 @@
       "day_thu": "Thursday",
       "day_fri": "Friday",
       "day_sat": "Saturday"
+    },
+    "pickle_confirm_modal": {
+      "aria_label": "Pickle confirmation dialog",
+      "heading": "Pickle this entry into the Jar",
+      "body": "Send \"{title}\" to the fermentation process. You can still edit the content and links afterwards.",
+      "cancel": "Cancel",
+      "confirm": "Pickle",
+      "saving": "Pickling..."
+    },
+    "question_select_modal": {
+      "aria_label": "Question selection dialog",
+      "heading": "Link a question to this entry",
+      "body": "To pickle and ferment, an entry must be linked to one question. Pick an existing question or write a new one here.",
+      "mode_pick": "Pick existing",
+      "mode_create": "Write new",
+      "pick_placeholder": "Choose a question...",
+      "create_placeholder": "Write a question (e.g. What did I notice today?)",
+      "cancel": "Cancel",
+      "confirm": "Link and pickle",
+      "saving": "Pickling..."
+    },
+    "pickle_nudge_modal": {
+      "aria_label": "Pickling guidance",
+      "heading": "Try pickling this entry",
+      "body": "Entries linked to a question can move into the fermentation process when you pickle them. Press the pickle button (jar icon) anytime to try.",
+      "dismiss": "Got it"
+    },
+    "link_question_nudge_modal": {
+      "aria_label": "Question linking guidance",
+      "heading": "Try linking a question",
+      "body": "Linking a question to an entry lets you pickle it and start the fermentation process. Pick an existing question from the linker above or create a new one.",
+      "dismiss": "Got it"
     }
   },
   "fermentation": {
