@@ -329,38 +329,6 @@
       "cancel": "キャンセル",
       "saving": "保存中..."
     },
-    "pickle_confirm_modal": {
-      "aria_label": "漬け込み確認ダイアログ",
-      "heading": "このエントリを瓶に漬け込む",
-      "body": "「{title}」を発酵プロセスに送ります。漬け込み後も内容と紐付けは編集できます。",
-      "cancel": "キャンセル",
-      "confirm": "漬け込む",
-      "saving": "漬け込み中..."
-    },
-    "question_select_modal": {
-      "aria_label": "問い選択ダイアログ",
-      "heading": "このエントリに問いを紐付ける",
-      "body": "漬け込んで発酵させるには、エントリに問いを 1 つ紐付ける必要があります。既存の問いを選ぶか、新しい問いをその場で書いてください。",
-      "mode_pick": "既存の問いから選ぶ",
-      "mode_create": "新しく書く",
-      "pick_placeholder": "問いを選択...",
-      "create_placeholder": "問いを書く (例: 今日の小さな発見は？)",
-      "cancel": "キャンセル",
-      "confirm": "紐付けて漬け込む",
-      "saving": "漬け込み中..."
-    },
-    "pickle_nudge_modal": {
-      "aria_label": "漬け込みのご案内",
-      "heading": "漬け込んでみませんか",
-      "body": "問いの紐付いたエントリは、漬け込むことで発酵プロセスに進みます。漬け込みボタン (瓶のアイコン) を押すといつでも試せます。",
-      "dismiss": "わかりました"
-    },
-    "link_question_nudge_modal": {
-      "aria_label": "問い紐付けのご案内",
-      "heading": "問いを紐付けてみませんか",
-      "body": "エントリに問いを紐付けると、漬け込んで発酵プロセスに進められるようになります。エディタ上部の問いリンカーから既存の問いを選ぶか、新しく作れます。",
-      "dismiss": "わかりました"
-    },
     "settings": {
       "close_aria": "設定を閉じる",
       "section_basic": "基本設定",
@@ -408,6 +376,38 @@
       "day_thu": "木曜日",
       "day_fri": "金曜日",
       "day_sat": "土曜日"
+    },
+    "pickle_confirm_modal": {
+      "aria_label": "漬け込み確認ダイアログ",
+      "heading": "このエントリを瓶に漬け込む",
+      "body": "「{title}」を発酵プロセスに送ります。漬け込み後も内容と紐付けは編集できます。",
+      "cancel": "キャンセル",
+      "confirm": "漬け込む",
+      "saving": "漬け込み中..."
+    },
+    "question_select_modal": {
+      "aria_label": "問い選択ダイアログ",
+      "heading": "このエントリに問いを紐付ける",
+      "body": "漬け込んで発酵させるには、エントリに問いを 1 つ紐付ける必要があります。既存の問いを選ぶか、新しい問いをその場で書いてください。",
+      "mode_pick": "既存の問いから選ぶ",
+      "mode_create": "新しく書く",
+      "pick_placeholder": "問いを選択...",
+      "create_placeholder": "問いを書く (例: 今日の小さな発見は？)",
+      "cancel": "キャンセル",
+      "confirm": "紐付けて漬け込む",
+      "saving": "漬け込み中..."
+    },
+    "pickle_nudge_modal": {
+      "aria_label": "漬け込みのご案内",
+      "heading": "漬け込んでみませんか",
+      "body": "問いの紐付いたエントリは、漬け込むことで発酵プロセスに進みます。漬け込みボタン (瓶のアイコン) を押すといつでも試せます。",
+      "dismiss": "わかりました"
+    },
+    "link_question_nudge_modal": {
+      "aria_label": "問い紐付けのご案内",
+      "heading": "問いを紐付けてみませんか",
+      "body": "エントリに問いを紐付けると、漬け込んで発酵プロセスに進められるようになります。エディタ上部の問いリンカーから既存の問いを選ぶか、新しく作れます。",
+      "dismiss": "わかりました"
     }
   },
   "fermentation": {
