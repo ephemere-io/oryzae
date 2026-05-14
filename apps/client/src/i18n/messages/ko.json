@@ -102,7 +102,8 @@
       "confirm": "삭제"
     },
     "card": {
-      "char_count_label": "글자 수:"
+      "char_count_label": "글자 수:",
+      "linked_question_label": "질문:"
     },
     "kebab": {
       "aria_open": "메뉴 열기",
@@ -673,7 +674,6 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
-      "title": "첫 '질문'을 심어 보세요.",
       "body": "지금 가장 마음에 걸리는 것을 짧은 질문의 형태로 적어 보세요. \"왜──\", \"어떻게 하면──\"처럼, 아직 답이 없는 한 문장이면 충분합니다. 언제든 다시 고칠 수 있습니다.",
       "placeholder": "예: 나는 왜 서두르는 것이 서툴까",
       "hint": "이후 Jar에 보관되며, 여기서부터 발효가 시작됩니다.",

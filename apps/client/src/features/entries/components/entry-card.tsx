@@ -5,10 +5,16 @@ import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { EntryKebabMenu } from './entry-kebab-menu';
 
+interface LinkedQuestion {
+  id: string;
+  currentText: string | null;
+}
+
 interface EntryCardProps {
   id: string;
   content: string;
   createdAt: string;
+  linkedQuestions?: LinkedQuestion[];
   searchQuery?: string;
   onDeleteClick?: (id: string) => void;
 }
@@ -34,7 +40,14 @@ function highlightText(text: string, query: string): ReactNode {
   });
 }
 
-export function EntryCard({ id, content, createdAt, searchQuery, onDeleteClick }: EntryCardProps) {
+export function EntryCard({
+  id,
+  content,
+  createdAt,
+  linkedQuestions,
+  searchQuery,
+  onDeleteClick,
+}: EntryCardProps) {
   const t = useTranslations('entries.card');
   const lines = content.split('\n').filter((l) => l.trim().length > 0);
   const title = lines[0]?.substring(0, 100) ?? '';
@@ -44,6 +57,13 @@ export function EntryCard({ id, content, createdAt, searchQuery, onDeleteClick }
 
   const date = new Date(createdAt);
   const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  // Issue #323: 日付の右に、紐づく問いの全文をインライン表示する。
+  // - currentText が null の問い (まだ validated transaction が無い) は省略
+  // - 複数件あれば日本語区切り「／」で連結 (UI 全体の漢字寄りトーンに合わせる)
+  const questionText = (linkedQuestions ?? [])
+    .map((q) => q.currentText)
+    .filter((text): text is string => !!text && text.length > 0)
+    .join(' / ');
 
   return (
     <div
@@ -51,12 +71,21 @@ export function EntryCard({ id, content, createdAt, searchQuery, onDeleteClick }
       style={{ margin: '0 -12px' }}
     >
       <Link href={`/entries/${id}`} className="block" style={{ padding: '16px 44px 16px 12px' }}>
-        {/* Date */}
+        {/* Date + linked question(s) */}
         <div
-          className="mb-1 text-[10px] tracking-[0.1em] text-[var(--date-color)]"
+          className="mb-1 flex flex-wrap items-baseline gap-x-2 text-[10px] tracking-[0.1em] text-[var(--date-color)]"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
-          {dateStr}
+          <span className="shrink-0">{dateStr}</span>
+          {questionText && (
+            <span
+              className="min-w-0 break-words text-[11px] tracking-normal text-[var(--fg)] opacity-80"
+              style={{ fontFamily: "'Noto Serif JP', serif" }}
+            >
+              <span className="opacity-60">{t('linked_question_label')} </span>
+              {questionText}
+            </span>
+          )}
         </div>
 
         {/* Title */}
