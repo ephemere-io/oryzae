@@ -329,38 +329,6 @@
       "cancel": "취소",
       "saving": "저장 중..."
     },
-    "pickle_confirm_modal": {
-      "aria_label": "담그기 확인 대화상자",
-      "heading": "이 항목을 항아리에 담그기",
-      "body": "「{title}」을(를) 발효 과정으로 보냅니다. 담근 후에도 내용과 연결을 편집할 수 있습니다.",
-      "cancel": "취소",
-      "confirm": "담그기",
-      "saving": "담그는 중..."
-    },
-    "question_select_modal": {
-      "aria_label": "질문 선택 대화상자",
-      "heading": "이 항목에 질문 연결",
-      "body": "담가서 발효시키려면 항목에 질문을 하나 연결해야 합니다. 기존 질문을 고르거나 새로 작성하세요.",
-      "mode_pick": "기존에서 선택",
-      "mode_create": "새로 작성",
-      "pick_placeholder": "질문 선택...",
-      "create_placeholder": "질문을 작성하세요 (예: 오늘 작은 발견은?)",
-      "cancel": "취소",
-      "confirm": "연결 후 담그기",
-      "saving": "담그는 중..."
-    },
-    "pickle_nudge_modal": {
-      "aria_label": "담그기 안내",
-      "heading": "담가 보시겠어요?",
-      "body": "질문이 연결된 항목은 담그면 발효 과정으로 진입합니다. 항아리 아이콘 버튼으로 언제든 시도해 보세요.",
-      "dismiss": "알겠습니다"
-    },
-    "link_question_nudge_modal": {
-      "aria_label": "질문 연결 안내",
-      "heading": "질문을 연결해 보시겠어요?",
-      "body": "항목에 질문을 연결하면 담가서 발효 과정으로 보낼 수 있습니다. 에디터 상단 질문 링커에서 기존 질문을 선택하거나 새로 만드세요.",
-      "dismiss": "알겠습니다"
-    },
     "settings": {
       "close_aria": "설정 닫기",
       "section_basic": "기본 설정",
@@ -408,6 +376,38 @@
       "day_thu": "목요일",
       "day_fri": "금요일",
       "day_sat": "토요일"
+    },
+    "pickle_confirm_modal": {
+      "aria_label": "담그기 확인 대화상자",
+      "heading": "이 항목을 항아리에 담그기",
+      "body": "「{title}」을(를) 발효 과정으로 보냅니다. 담근 후에도 내용과 연결을 편집할 수 있습니다.",
+      "cancel": "취소",
+      "confirm": "담그기",
+      "saving": "담그는 중..."
+    },
+    "question_select_modal": {
+      "aria_label": "질문 선택 대화상자",
+      "heading": "이 항목에 질문 연결",
+      "body": "담가서 발효시키려면 항목에 질문을 하나 연결해야 합니다. 기존 질문을 고르거나 새로 작성하세요.",
+      "mode_pick": "기존에서 선택",
+      "mode_create": "새로 작성",
+      "pick_placeholder": "질문 선택...",
+      "create_placeholder": "질문을 작성하세요 (예: 오늘 작은 발견은?)",
+      "cancel": "취소",
+      "confirm": "연결 후 담그기",
+      "saving": "담그는 중..."
+    },
+    "pickle_nudge_modal": {
+      "aria_label": "담그기 안내",
+      "heading": "담가 보시겠어요?",
+      "body": "질문이 연결된 항목은 담그면 발효 과정으로 진입합니다. 항아리 아이콘 버튼으로 언제든 시도해 보세요.",
+      "dismiss": "알겠습니다"
+    },
+    "link_question_nudge_modal": {
+      "aria_label": "질문 연결 안내",
+      "heading": "질문을 연결해 보시겠어요?",
+      "body": "항목에 질문을 연결하면 담가서 발효 과정으로 보낼 수 있습니다. 에디터 상단 질문 링커에서 기존 질문을 선택하거나 새로 만드세요.",
+      "dismiss": "알겠습니다"
     }
   },
   "fermentation": {
