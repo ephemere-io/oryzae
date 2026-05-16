@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
+import { DeleteUserAdminUsecase } from '../../application/usecases/delete-user-admin.usecase.js';
+import { SupabaseDeleteUserDataRepository } from '../../infrastructure/repositories/supabase-delete-user-data.repository.js';
 
 type Env = {
   Variables: {
@@ -170,4 +172,18 @@ export const adminUsers = new Hono<Env>()
       ),
       entryDates: Array.from(dateCountMap.entries()).map(([date, count]) => ({ date, count })),
     });
+  })
+  // Issue #326: テストアカウントとその関連データを一括削除する。
+  // Supabase Dashboard の Auth → Users 削除が "Database error deleting user" で
+  // 失敗するケースに対応するため、CASCADE に頼らず public.* と storage を明示的に
+  // 消してから auth.users を消す。
+  .delete('/:id', async (c) => {
+    const supabase = c.get('adminSupabase');
+    const adminUserId = c.get('adminUserId');
+    const targetUserId = c.req.param('id');
+
+    const usecase = new DeleteUserAdminUsecase(new SupabaseDeleteUserDataRepository(supabase));
+    const result = await usecase.execute({ targetUserId, requesterUserId: adminUserId });
+
+    return c.json({ deleted: result });
   });
