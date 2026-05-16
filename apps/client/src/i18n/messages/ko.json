@@ -119,7 +119,10 @@
       "results_count": "{count}건의 결과",
       "week_label": "{n}주차",
       "load_more_loading": "불러오는 중...",
-      "load_more": "더 보기"
+      "load_more": "더 보기",
+      "filter_by_question_label": "질문으로 필터",
+      "filter_all_questions": "모든 질문",
+      "filter_clear_aria": "필터 지우기"
     },
     "leave_modal": {
       "aria_label": "이탈 확인 대화상자",
@@ -485,7 +488,11 @@
       "add_placeholder": "질문을 입력해 주세요",
       "cancel_add": "취소",
       "adding": "추가하는 중...",
-      "add_submit": "추가하기"
+      "add_submit": "추가하기",
+      "pickle_success_modal": {
+        "body": "당신의 글과 질문이 발효 항아리에 절여졌습니다. 발효가 진행되는 것을 기대하며 일기를 계속 써 주세요.",
+        "dismiss": "알겠습니다"
+      }
     }
   },
   "questions": {

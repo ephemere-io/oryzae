@@ -119,7 +119,10 @@
       "results_count": "{count} results",
       "week_label": "Week {n}",
       "load_more_loading": "Loading...",
-      "load_more": "Load more"
+      "load_more": "Load more",
+      "filter_by_question_label": "Filter by question",
+      "filter_all_questions": "All questions",
+      "filter_clear_aria": "Clear filter"
     },
     "leave_modal": {
       "aria_label": "Leave confirmation dialog",
@@ -485,7 +488,11 @@
       "add_placeholder": "Enter your question",
       "cancel_add": "Cancel",
       "adding": "Adding...",
-      "add_submit": "Add"
+      "add_submit": "Add",
+      "pickle_success_modal": {
+        "body": "Your text and question have been pickled in the jar. Keep writing in your journal while you look forward to the fermentation progressing.",
+        "dismiss": "Got it"
+      }
     }
   },
   "questions": {
