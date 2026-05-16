@@ -34,13 +34,26 @@ export const entries = new Hono<Env>()
     const cursor = c.req.query('cursor');
     const limit = c.req.query('limit');
     const q = c.req.query('q');
+    // Issue #331: 指定された問いに紐づく entry のみで絞り込む
+    const questionId = c.req.query('questionId');
     const supabase = c.get('supabase');
     const entryRepo = new SupabaseEntryRepository(supabase);
     const parsedLimit = limit ? Number(limit) : undefined;
 
     const entries = q
-      ? await new SearchEntriesUsecase(entryRepo).execute(c.get('userId'), q, cursor, parsedLimit)
-      : await new ListEntriesUsecase(entryRepo).execute(c.get('userId'), cursor, parsedLimit);
+      ? await new SearchEntriesUsecase(entryRepo).execute(
+          c.get('userId'),
+          q,
+          cursor,
+          parsedLimit,
+          questionId,
+        )
+      : await new ListEntriesUsecase(entryRepo).execute(
+          c.get('userId'),
+          cursor,
+          parsedLimit,
+          questionId,
+        );
 
     // Issue #323: 一覧に紐づく問いを表示。entry-context-isolation を守るため
     // question テーブルへの問い合わせは entry/infrastructure の view repository が
