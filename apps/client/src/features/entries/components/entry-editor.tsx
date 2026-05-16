@@ -1025,8 +1025,8 @@ export function EntryEditor({
           {/* Snippet selection toolbar */}
           <SnippetToolbar editorRef={editorRef} api={api} />
 
-          {/* Eraser trace canvas */}
-          <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
+          {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
+          <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
 
           <div
             ref={editorRef}
