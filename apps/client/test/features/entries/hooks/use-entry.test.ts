@@ -29,7 +29,13 @@ describe('useEntry', () => {
   });
 
   it('fetches entry by id', async () => {
-    const entry = { id: 'e1', content: 'hello', createdAt: '2024-01-01', updatedAt: '2024-01-01' };
+    const entry = {
+      id: 'e1',
+      content: 'hello',
+      effects: null,
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    };
     apiFetch.mockResolvedValueOnce(mockResponse(true, { entry }));
     const api = createMockApi(apiFetch);
 
