@@ -1,9 +1,13 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
+import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { rateLimitFermentation } from '../../../shared/presentation/middleware/rate-limit.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
+import { GetUserAggregatedReadinessUsecase } from '../../application/usecases/get-user-aggregated-readiness.usecase.js';
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
@@ -12,6 +16,7 @@ import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-not
 import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
+import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
 
 type Env = {
   Variables: {
@@ -90,6 +95,26 @@ export const fermentations = new Hono<Env>()
 
     const results = await usecase.execute(questionId);
     return c.json(results);
+  })
+  .get('/readiness', async (c) => {
+    // issue #278: Jar アニメーション用の集計 readiness を返す。
+    // PR #291 以降は問い単位で readiness を持つため、active な問いそれぞれの readiness を
+    // 計算し、その合計を発酵瓶全体の readiness として扱う (上限 = 問い数, 現状最大 3.0)。
+    // next_eligible_at は意図的に返さない (受け入れ基準: ユーザーには「いつ来るか分からない」体験を維持)。
+    const supabase = c.get('supabase');
+    const userId = c.get('userId');
+
+    const usecase = new GetUserAggregatedReadinessUsecase(
+      new SupabaseQuestionRepository(supabase),
+      new SupabaseEntryQuestionLinkRepository(supabase),
+      new SupabaseEntryRepository(supabase),
+      new SupabaseFermentationRepository(supabase),
+      new SupabaseUserFermentationStateRepository(supabase),
+      new SupabaseUserLocaleResolver(getSupabaseClient()),
+    );
+
+    const readiness = await usecase.execute(userId);
+    return c.json(readiness);
   })
   .get('/:id', async (c) => {
     const supabase = c.get('supabase');
