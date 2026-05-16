@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { DeleteUserPanel } from '@/features/users/components/delete-user-panel';
 import { FireFermentationPanel } from '@/features/users/components/fire-fermentation-panel';
 import { UserEntryList } from '@/features/users/components/user-entry-list';
 import { UserFermentationHistory } from '@/features/users/components/user-fermentation-history';
@@ -88,6 +89,8 @@ export default function UserDetailPage() {
           <UserFermentationHistory fermentations={data.fermentations} />
         </div>
       </div>
+
+      <DeleteUserPanel userId={userId} email={data.profile.email} />
     </div>
   );
 }
