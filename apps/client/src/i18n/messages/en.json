@@ -310,7 +310,9 @@
       "writing_vertical": "Switch to vertical",
       "font_sans": "Switch to gothic (sans)",
       "font_serif": "Switch to mincho (serif)",
-      "fullscreen": "Fullscreen"
+      "fullscreen": "Fullscreen",
+      "fermentation_overlay_show": "Show fermentation result",
+      "fermentation_overlay_hide": "Hide fermentation result"
     },
     "title": {
       "placeholder": "Enter a title...",
@@ -351,7 +353,12 @@
       "ghost_scatter": "Scatter",
       "ghost_blur_start": "Initial blur",
       "ghost_blur_end": "Final blur",
-      "ghost_duration": "Duration"
+      "ghost_duration": "Duration",
+      "section_fermentation_overlay": "Fermentation overlay",
+      "fermentation_overlay_description": "When you link a question to a new entry, the latest fermentation result for that question can float over the editor. Choose how this should behave.",
+      "fermentation_overlay_ask": "Ask before showing",
+      "fermentation_overlay_always": "Always show fermentation result on entry screen",
+      "fermentation_overlay_never": "Never show fermentation result on entry screen"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
@@ -409,6 +416,28 @@
       "heading": "Try linking a question",
       "body": "Linking a question to an entry lets you pickle it and start the fermentation process. Pick an existing question from the linker above or create a new one.",
       "dismiss": "Got it"
+    },
+    "fermentation_overlay": {
+      "prompt": {
+        "aria_label": "Fermentation result display confirmation",
+        "close_aria": "Close modal",
+        "heading": "Show this question's fermentation result?",
+        "body": "The question you linked has a past fermentation result. We can float its snippets, keywords, and letter over the editor as reference while you write.",
+        "remember_label": "Remember this choice; don't ask next time (changeable in settings)",
+        "show": "Show",
+        "hide": "Don't show"
+      },
+      "detail": {
+        "header_keyword": "Keyword",
+        "header_snippet": "Snippet",
+        "header_letter": "Letter",
+        "close_aria": "Close details",
+        "snippet_source_prefix": "From:"
+      },
+      "aria_keyword": "Open fermentation keyword \"{keyword}\"",
+      "aria_snippet": "Open fermentation snippet",
+      "aria_letter": "Open letter from the fermentation process",
+      "letter_badge": "Letter from the fermentation process"
     }
   },
   "fermentation": {

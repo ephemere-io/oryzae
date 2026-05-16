@@ -7,6 +7,8 @@ import {
   type EditorStatus,
   EditorStatusBar,
 } from '@/features/entries/components/editor-status-bar';
+import { FermentationDisplayPromptModal } from '@/features/entries/components/fermentation-display-prompt-modal';
+import { FermentationOverlay } from '@/features/entries/components/fermentation-overlay';
 import { formatEntryDate } from '@/features/entries/components/format-entry-date';
 import { LeaveConfirmModal } from '@/features/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/entries/components/link-question-nudge-modal';
@@ -24,6 +26,7 @@ import { useAutosaveEntry } from '@/features/entries/hooks/use-autosave-entry';
 import { useBrowserNavGuard } from '@/features/entries/hooks/use-browser-nav-guard';
 import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings';
 import { useSaveEntry } from '@/features/entries/hooks/use-entry';
+import { useEntryFermentationDetail } from '@/features/entries/hooks/use-entry-fermentation-detail';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useFocusMode } from '@/features/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/entries/hooks/use-ghost-effect';
@@ -135,6 +138,50 @@ export function EntryEditor({
     linkedIds,
     link: onLinkQuestion,
   });
+
+  // Issue #329: 新規エントリで紐付けた問いに発酵結果がある場合のオーバーレイ表示制御。
+  // 既存エントリでは表示しない (執筆中の判断材料として使うため新規限定)。
+  const isNewEntry = !entryId;
+  const firstLinkedQuestionId = isNewEntry ? Array.from(linkedIds)[0] : undefined;
+  const { detail: fermentationOverlayDetail } = useEntryFermentationDetail(
+    api,
+    firstLinkedQuestionId,
+  );
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayPromptOpen, setOverlayPromptOpen] = useState(false);
+  const promptedForQuestionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!fermentationOverlayDetail) {
+      setOverlayVisible(false);
+      setOverlayPromptOpen(false);
+      promptedForQuestionRef.current = null;
+      return;
+    }
+    if (promptedForQuestionRef.current === fermentationOverlayDetail.questionId) return;
+    promptedForQuestionRef.current = fermentationOverlayDetail.questionId;
+    if (settings.fermentationOverlayPreference === 'always') {
+      setOverlayVisible(true);
+      setOverlayPromptOpen(false);
+    } else if (settings.fermentationOverlayPreference === 'never') {
+      setOverlayVisible(false);
+      setOverlayPromptOpen(false);
+    } else {
+      setOverlayPromptOpen(true);
+    }
+  }, [fermentationOverlayDetail, settings.fermentationOverlayPreference]);
+  const handleOverlayPromptChoose = useCallback(
+    (display: boolean, remember: boolean) => {
+      setOverlayVisible(display);
+      setOverlayPromptOpen(false);
+      if (remember) {
+        updateSettings({ fermentationOverlayPreference: display ? 'always' : 'never' });
+      }
+    },
+    [updateSettings],
+  );
+  const toggleOverlay = useCallback(() => {
+    setOverlayVisible((v) => !v);
+  }, []);
   const [dateStr, setDateStr] = useState(() => {
     const now = new Date();
     const created = createdAtIso ? new Date(createdAtIso) : now;
@@ -168,7 +215,8 @@ export function EntryEditor({
     isEditingTitle ||
     statsOpen ||
     pendingNavPath !== null ||
-    leaveConfirmOpen;
+    leaveConfirmOpen ||
+    overlayPromptOpen;
   const uiVisible = useFocusMode({
     enabled: settings.focusModeEnabled,
     forceVisible: anyOverlayOpen,
@@ -775,6 +823,40 @@ export function EntryEditor({
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
             </svg>
           </button>
+          {/* Issue #329: Fermentation overlay toggle — visible when a completed result exists */}
+          {fermentationOverlayDetail && (
+            <button
+              type="button"
+              onClick={toggleOverlay}
+              aria-pressed={overlayVisible}
+              className={`rounded-md p-1.5 transition-all hover:bg-[var(--toolbar-hover)] ${
+                overlayVisible
+                  ? 'text-emerald-600'
+                  : 'text-[var(--date-color)] hover:text-[var(--fg)]'
+              }`}
+              data-tooltip={
+                overlayVisible
+                  ? t('toolbar.fermentation_overlay_hide')
+                  : t('toolbar.fermentation_overlay_show')
+              }
+              data-testid="fermentation-overlay-toggle"
+            >
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 3.75v3.75M15 3.75v3.75M7.5 7.5h9a1.5 1.5 0 0 1 1.5 1.5v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V9a1.5 1.5 0 0 1 1.5-1.5Zm1.5 5.25h6m-6 3h4.5"
+                />
+              </svg>
+            </button>
+          )}
           {/* Settings */}
           <button
             type="button"
@@ -921,6 +1003,11 @@ export function EntryEditor({
 
       {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
       <div className="relative flex-1">
+        {/* Issue #329: 発酵オーバーレイ。エディタ領域に重ねて表示。pointer-events は子要素のみで
+            受け取るため、執筆エリアの入力を妨げない。 */}
+        {overlayVisible && fermentationOverlayDetail && (
+          <FermentationOverlay detail={fermentationOverlayDetail} />
+        )}
         {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
         {settings.writingMode === 'vertical' && fadeLeft && (
           <div
@@ -1073,6 +1160,13 @@ export function EntryEditor({
       <LinkQuestionNudgeModal
         open={linkQuestionNudgeOpen}
         onClose={() => setLinkQuestionNudgeOpen(false)}
+      />
+
+      {/* Issue #329: 発酵結果フローティング表示の確認モーダル */}
+      <FermentationDisplayPromptModal
+        open={overlayPromptOpen}
+        onChoose={handleOverlayPromptChoose}
+        onClose={() => setOverlayPromptOpen(false)}
       />
     </div>
   );
