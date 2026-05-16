@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import {
   DEFAULT_SETTINGS,
   type EditorSettings,
+  type FermentationOverlayPreference,
 } from '@/features/entries/components/settings-drawer';
 
 const FONT_SIZE_STORAGE_KEY = 'oryzae-editor-font-size';
@@ -15,6 +16,8 @@ const LINE_HEIGHT_MIN = 1.0;
 const LINE_HEIGHT_MAX = 2.5;
 
 const FOCUS_MODE_STORAGE_KEY = 'oryzae-editor-focus-mode';
+
+const FERMENTATION_OVERLAY_PREFERENCE_KEY = 'oryzae-editor-fermentation-overlay-preference';
 
 function readStoredFontSize(): number | null {
   if (typeof window === 'undefined') return null;
@@ -83,6 +86,26 @@ function writeStoredFocusMode(value: boolean): void {
   }
 }
 
+function readStoredFermentationOverlayPreference(): FermentationOverlayPreference | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(FERMENTATION_OVERLAY_PREFERENCE_KEY);
+    if (raw === 'ask' || raw === 'always' || raw === 'never') return raw;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredFermentationOverlayPreference(value: FermentationOverlayPreference): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FERMENTATION_OVERLAY_PREFERENCE_KEY, value);
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
+
 function getInitialSettings(locale: string | undefined): EditorSettings {
   const next: EditorSettings = { ...DEFAULT_SETTINGS };
   // 英語ロケールでサインアップ／利用しているユーザーは横書きをデフォルトにする (issue #269)
@@ -95,6 +118,8 @@ function getInitialSettings(locale: string | undefined): EditorSettings {
   if (lineHeight !== null) next.lineHeight = lineHeight;
   const focusMode = readStoredFocusMode();
   if (focusMode !== null) next.focusModeEnabled = focusMode;
+  const overlayPref = readStoredFermentationOverlayPreference();
+  if (overlayPref !== null) next.fermentationOverlayPreference = overlayPref;
   return next;
 }
 
@@ -112,6 +137,13 @@ export function useEditorSettings(
     }
     if (typeof patch.focusModeEnabled === 'boolean') {
       writeStoredFocusMode(patch.focusModeEnabled);
+    }
+    if (
+      patch.fermentationOverlayPreference === 'ask' ||
+      patch.fermentationOverlayPreference === 'always' ||
+      patch.fermentationOverlayPreference === 'never'
+    ) {
+      writeStoredFermentationOverlayPreference(patch.fermentationOverlayPreference);
     }
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);

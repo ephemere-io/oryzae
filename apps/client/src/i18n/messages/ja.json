@@ -310,7 +310,9 @@
       "writing_vertical": "縦書きに切替",
       "font_sans": "ゴシックに切替",
       "font_serif": "明朝に切替",
-      "fullscreen": "フルスクリーン"
+      "fullscreen": "フルスクリーン",
+      "fermentation_overlay_show": "発酵結果を表示する",
+      "fermentation_overlay_hide": "発酵結果を非表示にする"
     },
     "title": {
       "placeholder": "タイトルを入力...",
@@ -351,7 +353,12 @@
       "ghost_scatter": "散乱",
       "ghost_blur_start": "初期ブラー",
       "ghost_blur_end": "最終ブラー",
-      "ghost_duration": "持続時間"
+      "ghost_duration": "持続時間",
+      "section_fermentation_overlay": "発酵オーバーレイ",
+      "fermentation_overlay_description": "新規エントリで問いを紐付けたとき、その問いの最新の発酵結果をエディタ上に重ねて表示できます。表示／非表示の挙動を選んでください。",
+      "fermentation_overlay_ask": "表示前に毎回確認する",
+      "fermentation_overlay_always": "エントリ画面で発酵プロセスを常に表示する",
+      "fermentation_overlay_never": "エントリ画面で発酵プロセスを常に表示しない"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
@@ -409,6 +416,28 @@
       "heading": "問いを紐付けてみませんか",
       "body": "エントリに問いを紐付けると、漬け込んで発酵プロセスに進められるようになります。エディタ上部の問いリンカーから既存の問いを選ぶか、新しく作れます。",
       "dismiss": "わかりました"
+    },
+    "fermentation_overlay": {
+      "prompt": {
+        "aria_label": "発酵結果の表示確認",
+        "close_aria": "モーダルを閉じる",
+        "heading": "この問いの発酵結果を表示しますか？",
+        "body": "紐付けた問いには、過去に行われた発酵プロセスの結果があります。執筆の参考になるよう、エディタ上にスニペット・キーワード・手紙を重ねて表示できます。",
+        "remember_label": "この選択を保存し、次回からは確認しない（設定画面で変更可能）",
+        "show": "表示する",
+        "hide": "表示しない"
+      },
+      "detail": {
+        "header_keyword": "キーワード",
+        "header_snippet": "スニペット",
+        "header_letter": "手紙",
+        "close_aria": "詳細を閉じる",
+        "snippet_source_prefix": "出典:"
+      },
+      "aria_keyword": "発酵キーワード「{keyword}」を開く",
+      "aria_snippet": "発酵スニペットを開く",
+      "aria_letter": "発酵プロセスからの手紙を開く",
+      "letter_badge": "発酵プロセスからの手紙"
     }
   },
   "fermentation": {

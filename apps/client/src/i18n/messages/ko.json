@@ -310,7 +310,9 @@
       "writing_vertical": "세로쓰기로 전환",
       "font_sans": "고딕체로 전환",
       "font_serif": "명조체로 전환",
-      "fullscreen": "전체 화면"
+      "fullscreen": "전체 화면",
+      "fermentation_overlay_show": "발효 결과 표시",
+      "fermentation_overlay_hide": "발효 결과 숨기기"
     },
     "title": {
       "placeholder": "제목을 입력하세요...",
@@ -351,7 +353,12 @@
       "ghost_scatter": "흩어짐",
       "ghost_blur_start": "초기 블러",
       "ghost_blur_end": "최종 블러",
-      "ghost_duration": "지속 시간"
+      "ghost_duration": "지속 시간",
+      "section_fermentation_overlay": "발효 오버레이",
+      "fermentation_overlay_description": "새 항목에 질문을 연결하면 해당 질문의 최신 발효 결과를 에디터 위에 띄울 수 있습니다. 기본 동작을 선택하세요.",
+      "fermentation_overlay_ask": "표시 전 매번 확인",
+      "fermentation_overlay_always": "항목 화면에서 항상 발효 결과 표시",
+      "fermentation_overlay_never": "항목 화면에서 항상 발효 결과 숨기기"
     },
     "snippet_toolbar": {
       "saving": "저장 중…",
@@ -409,6 +416,28 @@
       "heading": "질문을 연결해 보시겠어요?",
       "body": "항목에 질문을 연결하면 담가서 발효 과정으로 보낼 수 있습니다. 에디터 상단 질문 링커에서 기존 질문을 선택하거나 새로 만드세요.",
       "dismiss": "알겠습니다"
+    },
+    "fermentation_overlay": {
+      "prompt": {
+        "aria_label": "발효 결과 표시 확인",
+        "close_aria": "모달 닫기",
+        "heading": "이 질문의 발효 결과를 표시하시겠습니까?",
+        "body": "연결한 질문에는 과거 발효 결과가 있습니다. 글을 쓰는 동안 참고할 수 있도록 발췌・키워드・편지를 에디터 위에 띄워 보여드릴 수 있습니다.",
+        "remember_label": "이 선택을 저장하고 다음부터 묻지 않기 (설정에서 변경 가능)",
+        "show": "표시",
+        "hide": "표시 안 함"
+      },
+      "detail": {
+        "header_keyword": "키워드",
+        "header_snippet": "발췌",
+        "header_letter": "편지",
+        "close_aria": "상세 닫기",
+        "snippet_source_prefix": "출처:"
+      },
+      "aria_keyword": "발효 키워드 \"{keyword}\" 열기",
+      "aria_snippet": "발효 발췌 열기",
+      "aria_letter": "발효 과정의 편지 열기",
+      "letter_badge": "발효 과정의 편지"
     }
   },
   "fermentation": {
