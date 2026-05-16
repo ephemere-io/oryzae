@@ -24,6 +24,14 @@ interface JarViewProps {
   api: ApiClient | null;
   authLoading: boolean;
   questions: QuestionData[];
+  /**
+   * 発酵瓶全体の集計 readiness (issue #278)。問い単位 readiness の合計。
+   * - 0.0–1.0: 育ちつつある瓶 (液体が満ちていく)
+   * - 1.0–2.0: 中身の微生物が活性化
+   * - 2.0–3.0: ぶくぶくと激しく泡立つ
+   * 値そのものは UI に出さない (受け入れ基準: ユーザーに「いつ来るか分からない」体験を維持)。
+   */
+  readiness?: number;
   onAddQuestion?: (text: string) => Promise<void>;
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
@@ -226,10 +234,31 @@ function QuestionCircleWithData({
   );
 }
 
+/**
+ * readiness (0..3) を 3 段階の演出指標に分解する。
+ * - fillNorm: 0..1。液体充填や微生物の visibility の主軸。readiness 1.0 で飽和。
+ * - activityNorm: 0..1。readiness 1→2 の区間。微生物アニメ速度・粒子量の主軸。
+ * - bubbleNorm: 0..1。readiness 2→3 の区間。泡演出の主軸。
+ * 値そのものは UI に出さない (受け入れ基準)。
+ */
+function deriveReadinessLevels(readiness: number): {
+  fillNorm: number;
+  activityNorm: number;
+  bubbleNorm: number;
+} {
+  const safe = Number.isFinite(readiness) && readiness > 0 ? readiness : 0;
+  return {
+    fillNorm: Math.min(1, safe),
+    activityNorm: Math.min(1, Math.max(0, safe - 1)),
+    bubbleNorm: Math.min(1, Math.max(0, safe - 2)),
+  };
+}
+
 export function JarView({
   api,
   authLoading,
   questions,
+  readiness = 0,
   onAddQuestion,
   onEditQuestion,
   onArchiveQuestion,
@@ -304,6 +333,31 @@ export function JarView({
 
   const allWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
 
+  const { fillNorm, activityNorm, bubbleNorm } = useMemo(
+    () => deriveReadinessLevels(readiness),
+    [readiness],
+  );
+
+  // 微生物アニメ速度: activityNorm が上がるほど周期が短くなる。
+  // 既存 base 8/12/10 秒 → 最大で 1/2.5 倍速 (= 4 倍速まで届かないように抑える)。
+  const microbeAnimSpeed = 1 + activityNorm * 1.5 + bubbleNorm * 1.0;
+  // 微生物のうち何体まで表示するか: fillNorm が低いと数も少なく見える。
+  const visibleMicrobeCount = Math.max(
+    1,
+    Math.round(JAR_MICROBES.length * (0.35 + fillNorm * 0.65)),
+  );
+  // 粒子 (テキスト) の opacity をマスターブースト。fillNorm に追従。
+  const particleBoost = 0.6 + fillNorm * 0.6;
+  // 液体充填の不透明度。空でも気配は残し、満ちると視認性を上げる。
+  const liquidOpacity = 0.25 + fillNorm * 0.45;
+  // 液体グラデの基底色相: bubble 域に入ると活性化の演出として黄み寄りに振る。
+  const liquidWarmth = bubbleNorm; // 0..1, グラデ stop の色補間に使う
+  // 液体パスの bottom-anchor scaleY: fillNorm が低いと底に沈み、満ちると本来のサイズ。
+  // SVG transform-origin はパス座標系に合わせて (240, 580) ≈ ジャー底中央。
+  const liquidScaleY = 0.55 + fillNorm * 0.45;
+  // 泡: bubbleNorm > 0 のときだけ描画。最大 10 個。
+  const bubbleCount = Math.round(bubbleNorm * 10);
+
   const handleElementClick = useCallback(
     (
       questionId: string,
@@ -367,6 +421,12 @@ export function JarView({
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        @keyframes j2-bubble-rise {
+          0% { transform: translateY(0) scale(0.6); opacity: 0; }
+          15% { opacity: var(--bubble-peak-opacity, 0.7); }
+          100% { transform: translateY(-280px) scale(1.1); opacity: 0; }
+        }
+        .j2-bubble { animation: j2-bubble-rise linear infinite; }
       `}</style>
 
       {/* Background grid pattern */}
@@ -486,12 +546,17 @@ export function JarView({
             stroke="rgba(255,255,255,0.8)"
             strokeWidth="1.5"
           />
-          {/* Fermentation liquid */}
+          {/* Fermentation liquid — readiness で充填高と warmth を制御 (issue #278) */}
           <path
             d="M78,450 C78,350 180,310 200,240 C220,240 270,310 402,450 C410,580 70,580 78,450 Z"
             fill="url(#j2-fermentGradient)"
-            opacity="0.6"
+            opacity={liquidOpacity}
             filter="url(#blurLiquid)"
+            style={{
+              transformOrigin: '240px 580px',
+              transform: `scaleY(${liquidScaleY})`,
+              transition: 'opacity 0.8s ease, transform 0.8s ease',
+            }}
           />
           {/* Highlight stroke (left) */}
           <path
@@ -528,9 +593,15 @@ export function JarView({
           </g>
           <defs>
             <linearGradient id="j2-fermentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              {/* readiness が bubbleNorm 域に入ると下部 stop を黄み寄りに振り、発酵活性を示唆 */}
               <stop offset="0%" stopColor="rgba(226,194,142,0.1)" />
               <stop offset="50%" stopColor="rgba(142,168,156,0.2)" />
-              <stop offset="100%" stopColor="rgba(226,194,142,0.4)" />
+              <stop
+                offset="100%"
+                stopColor={`rgba(${Math.round(226 + liquidWarmth * 20)},${Math.round(
+                  194 - liquidWarmth * 20,
+                )},${Math.round(142 - liquidWarmth * 40)},${0.4 + liquidWarmth * 0.2})`}
+              />
             </linearGradient>
             <linearGradient id="j2-highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
@@ -560,7 +631,9 @@ export function JarView({
             const left = 22 + ((i * 53) % 60);
             const blur = BLUR_LEVELS[i % BLUR_LEVELS.length];
             const fontSize = FONT_SIZES[i % FONT_SIZES.length];
-            const opacity = 0.3 + (i % 5) * 0.12;
+            const baseOpacity = 0.3 + (i % 5) * 0.12;
+            // particleBoost: fillNorm に追従して粒子の可視性をブースト。空っぽのときは存在感を抑える。
+            const opacity = Math.min(1, baseOpacity * particleBoost);
             return (
               <span
                 key={ALL_WORD_KEYS[i]}
@@ -575,29 +648,66 @@ export function JarView({
                   letterSpacing: '0.15em',
                   fontFamily: "'Noto Serif JP', serif",
                   color: 'var(--date-color)',
+                  transition: 'opacity 0.8s ease',
                 }}
               >
                 {word}
               </span>
             );
           })}
-          {JAR_MICROBES.map((m, i) => (
-            <div
-              key={`microbe-${m.type}-${m.top}-${m.left}`}
-              className={m.anim}
-              style={{
-                position: 'absolute',
-                top: m.top,
-                left: m.left,
-                width: `${m.size}px`,
-                height: `${m.size}px`,
-                opacity: m.opacity,
-                pointerEvents: 'none',
-              }}
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
-              dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[m.type] }}
-            />
-          ))}
+          {JAR_MICROBES.map((m, i) => {
+            // 微生物は readiness に応じて段階的に可視化される (visibleMicrobeCount で gating)。
+            // activityNorm/bubbleNorm が上がるとアニメ周期が短くなり「動きが活性化」する印象に。
+            const visible = i < visibleMicrobeCount;
+            return (
+              <div
+                key={`microbe-${m.type}-${m.top}-${m.left}`}
+                className={m.anim}
+                style={{
+                  position: 'absolute',
+                  top: m.top,
+                  left: m.left,
+                  width: `${m.size}px`,
+                  height: `${m.size}px`,
+                  opacity: visible ? Math.min(1, m.opacity * (0.6 + fillNorm * 0.8)) : 0,
+                  pointerEvents: 'none',
+                  animationDuration: `${(m.anim === 'j2-float-2' ? 12 : m.anim === 'j2-float-3' ? 10 : 8) / microbeAnimSpeed}s`,
+                  transition: 'opacity 0.8s ease',
+                }}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
+                dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[m.type] }}
+              />
+            );
+          })}
+          {/* 泡: bubbleNorm > 0 のときだけ描画。readiness 2.0→3.0 で本数と速さが増す。 */}
+          {bubbleCount > 0 &&
+            Array.from({ length: bubbleCount }).map((_, i) => {
+              const left = 25 + ((i * 41) % 50);
+              const size = 4 + (i % 4) * 2;
+              const delay = (i * 0.3) % 2.5;
+              const duration = 3 + ((i * 7) % 4) - bubbleNorm * 1.5;
+              return (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: 配列は readiness 由来で安定
+                  key={`bubble-${i}`}
+                  className="j2-bubble"
+                  style={{
+                    position: 'absolute',
+                    bottom: '8%',
+                    left: `${left}%`,
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    borderRadius: '50%',
+                    background:
+                      'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(226,194,142,0.5) 60%, transparent 75%)',
+                    opacity: 0.55 + bubbleNorm * 0.3,
+                    animationDelay: `${delay}s`,
+                    animationDuration: `${Math.max(1.5, duration)}s`,
+                    pointerEvents: 'none',
+                  }}
+                />
+              );
+            })}
         </div>
       </div>
 
