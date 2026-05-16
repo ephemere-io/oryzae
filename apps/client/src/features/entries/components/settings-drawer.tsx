@@ -7,6 +7,13 @@ type FontFamily = 'serif' | 'sans';
 export type TimeInscriptionMode = 'fontSize' | 'fontWeight' | 'pressureBleed';
 type GhostMode = 'block' | 'dust';
 
+/**
+ * Issue #329: 新規エントリで問いを紐付けたとき、その問いの発酵結果をエディタ上に
+ * フローティング表示するかどうかの既定挙動。'ask' は毎回モーダルで確認、
+ * 'always' は自動表示、'never' は表示しない。
+ */
+export type FermentationOverlayPreference = 'ask' | 'always' | 'never';
+
 export interface EditorSettings {
   writingMode: WritingMode;
   fontFamily: FontFamily;
@@ -25,6 +32,7 @@ export interface EditorSettings {
   ghostBlurStart: number;
   ghostBlurEnd: number;
   ghostDuration: number;
+  fermentationOverlayPreference: FermentationOverlayPreference;
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
@@ -45,6 +53,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   ghostBlurStart: 4,
   ghostBlurEnd: 14,
   ghostDuration: 100,
+  fermentationOverlayPreference: 'ask',
 };
 
 interface SettingsDrawerProps {
@@ -322,6 +331,30 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
                 </div>
               </div>
             )}
+          </div>
+
+          {/* 発酵オーバーレイ (Issue #329) */}
+          <div className="mt-5">
+            <div className="mb-2 text-xs font-semibold tracking-wider text-zinc-400">
+              {t('section_fermentation_overlay')}
+            </div>
+            <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+              {t('fermentation_overlay_description')}
+            </p>
+            <RadioGroup
+              name="fermentation-overlay-preference"
+              options={[
+                { value: 'ask', label: t('fermentation_overlay_ask') },
+                { value: 'always', label: t('fermentation_overlay_always') },
+                { value: 'never', label: t('fermentation_overlay_never') },
+              ]}
+              value={settings.fermentationOverlayPreference}
+              onChange={(v) => {
+                if (v === 'ask' || v === 'always' || v === 'never') {
+                  onChange({ fermentationOverlayPreference: v });
+                }
+              }}
+            />
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings'
 const FONT_SIZE_KEY = 'oryzae-editor-font-size';
 const LINE_HEIGHT_KEY = 'oryzae-editor-line-height';
 const FOCUS_MODE_KEY = 'oryzae-editor-focus-mode';
+const FERMENTATION_OVERLAY_KEY = 'oryzae-editor-fermentation-overlay-preference';
 
 describe('useEditorSettings', () => {
   beforeEach(() => {
@@ -154,5 +155,50 @@ describe('useEditorSettings', () => {
     expect(result.current[0].writingMode).toBe('horizontal');
     expect(window.localStorage.getItem(FONT_SIZE_KEY)).toBe('24');
     expect(window.localStorage.getItem(LINE_HEIGHT_KEY)).toBe('1.8');
+  });
+
+  // --- Issue #329: fermentationOverlayPreference ---
+
+  it('fermentationOverlayPreference のデフォルトは "ask"', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].fermentationOverlayPreference).toBe('ask');
+  });
+
+  it('localStorage に保存された "always" を初期化時に読み込む', () => {
+    window.localStorage.setItem(FERMENTATION_OVERLAY_KEY, 'always');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].fermentationOverlayPreference).toBe('always');
+  });
+
+  it('localStorage に保存された "never" を初期化時に読み込む', () => {
+    window.localStorage.setItem(FERMENTATION_OVERLAY_KEY, 'never');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].fermentationOverlayPreference).toBe('never');
+  });
+
+  it('不正な fermentationOverlayPreference は無視されデフォルトに戻る', () => {
+    window.localStorage.setItem(FERMENTATION_OVERLAY_KEY, 'invalid');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].fermentationOverlayPreference).toBe('ask');
+  });
+
+  it('fermentationOverlayPreference を更新すると localStorage に永続化される', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    act(() => {
+      result.current[1]({ fermentationOverlayPreference: 'always' });
+    });
+    expect(result.current[0].fermentationOverlayPreference).toBe('always');
+    expect(window.localStorage.getItem(FERMENTATION_OVERLAY_KEY)).toBe('always');
+  });
+
+  it('fermentationOverlayPreference は再マウント越しに保持される', () => {
+    const first = renderHook(() => useEditorSettings());
+    act(() => {
+      first.result.current[1]({ fermentationOverlayPreference: 'never' });
+    });
+    first.unmount();
+
+    const second = renderHook(() => useEditorSettings());
+    expect(second.result.current[0].fermentationOverlayPreference).toBe('never');
   });
 });

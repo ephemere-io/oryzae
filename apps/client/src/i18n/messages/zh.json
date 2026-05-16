@@ -310,7 +310,9 @@
       "writing_vertical": "切换为竖排",
       "font_sans": "切换为黑体",
       "font_serif": "切换为宋体",
-      "fullscreen": "全屏"
+      "fullscreen": "全屏",
+      "fermentation_overlay_show": "显示发酵结果",
+      "fermentation_overlay_hide": "隐藏发酵结果"
     },
     "title": {
       "placeholder": "请输入标题...",
@@ -351,7 +353,12 @@
       "ghost_scatter": "散布",
       "ghost_blur_start": "初始模糊",
       "ghost_blur_end": "最终模糊",
-      "ghost_duration": "持续时间"
+      "ghost_duration": "持续时间",
+      "section_fermentation_overlay": "发酵叠加",
+      "fermentation_overlay_description": "为新条目关联问题时，可以在编辑器上浮动显示该问题的最新发酵结果。请选择默认行为。",
+      "fermentation_overlay_ask": "每次询问后再显示",
+      "fermentation_overlay_always": "在条目编辑界面始终显示发酵结果",
+      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
@@ -409,6 +416,28 @@
       "heading": "试试关联一个问题？",
       "body": "将问题关联到条目后，就可以入瓮并进入发酵过程。可在编辑器顶部的问题关联器选择已有问题，或新建一个。",
       "dismiss": "知道了"
+    },
+    "fermentation_overlay": {
+      "prompt": {
+        "aria_label": "发酵结果显示确认",
+        "close_aria": "关闭对话框",
+        "heading": "显示该问题的发酵结果吗？",
+        "body": "你关联的提问已有过往的发酵结果。我们可以将片段、关键词与信件作为参考浮动展示在编辑器上方。",
+        "remember_label": "记住此选择，下次不再询问（可在设置中更改）",
+        "show": "显示",
+        "hide": "不显示"
+      },
+      "detail": {
+        "header_keyword": "关键词",
+        "header_snippet": "片段",
+        "header_letter": "信件",
+        "close_aria": "关闭详情",
+        "snippet_source_prefix": "出处:"
+      },
+      "aria_keyword": "打开发酵关键词\"{keyword}\"",
+      "aria_snippet": "打开发酵片段",
+      "aria_letter": "打开发酵过程的信件",
+      "letter_badge": "来自发酵过程的信件"
     }
   },
   "fermentation": {
