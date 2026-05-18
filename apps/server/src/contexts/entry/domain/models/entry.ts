@@ -1,9 +1,47 @@
-import type { EditorEffectsState } from '@oryzae/shared';
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
 type EntryError =
   | { type: 'EMPTY_CONTENT'; message: string }
   | { type: 'CONTENT_TOO_LONG'; message: string };
+
+/**
+ * Editor visual effects state — persisted with the entry.
+ *
+ * Defined locally in the domain (rather than imported from `@oryzae/shared`)
+ * because the domain layer must stay zod-free per `domain-no-shared-package`.
+ * Shared owns the matching zod schema for boundary validation; structural
+ * typing makes the two definitions interchangeable.
+ *
+ * Forward-compat: unknown `kind` values are ignored on apply (client-side),
+ * so it's safe to extend the discriminated union without bumping version.
+ */
+export interface EditorEffectsState {
+  version: 1;
+  eraserTraces?: EraserTracePayload[];
+  textSpans?: TextSpanMark[];
+}
+
+interface EraserTracePayload {
+  rx: number;
+  ry: number;
+  w: number;
+  h: number;
+  chars: string[];
+  intensity: number;
+  seed: number;
+}
+
+type TextSpanMark =
+  | {
+      kind: 'time';
+      start: number;
+      end: number;
+      mode: 'fontSize' | 'fontWeight';
+      t: number;
+      duration: number;
+    }
+  | { kind: 'pressure'; start: number; end: number; intensity: number; seed: number }
+  | { kind: 'voice'; start: number; end: number; fontSizeEm: number };
 
 export interface EntryProps {
   id: string;
