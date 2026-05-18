@@ -15,7 +15,7 @@ type EntryError =
  * Forward-compat: unknown `kind` values are ignored on apply (client-side),
  * so it's safe to extend the discriminated union without bumping version.
  */
-export interface EditorEffectsState {
+interface EditorEffectsState {
   version: 1;
   eraserTraces?: EraserTracePayload[];
   textSpans?: TextSpanMark[];
