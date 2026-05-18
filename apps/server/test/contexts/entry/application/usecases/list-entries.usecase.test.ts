@@ -37,6 +37,7 @@ describe('ListEntriesUsecase', () => {
       listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
       countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
       listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
+      searchByUserId: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     };
@@ -52,7 +53,7 @@ describe('ListEntriesUsecase', () => {
     const result = await usecase.execute('user-1');
 
     expect(result).toEqual([entryProps1, entryProps2]);
-    expect(entryRepo.listByUserId).toHaveBeenCalledWith('user-1', undefined, undefined);
+    expect(entryRepo.listByUserId).toHaveBeenCalledWith('user-1', undefined, undefined, undefined);
   });
 
   it('Entry が存在しない場合は空配列を返す', async () => {
@@ -68,6 +69,15 @@ describe('ListEntriesUsecase', () => {
 
     await usecase.execute('user-1', 'entry-1', 10);
 
-    expect(entryRepo.listByUserId).toHaveBeenCalledWith('user-1', 'entry-1', 10);
+    expect(entryRepo.listByUserId).toHaveBeenCalledWith('user-1', 'entry-1', 10, undefined);
+  });
+
+  // Issue #331
+  it('questionId を repo に渡す', async () => {
+    vi.mocked(entryRepo.listByUserId).mockResolvedValue([Entry.fromProps(entryProps1)]);
+
+    await usecase.execute('user-1', undefined, undefined, 'q-1');
+
+    expect(entryRepo.listByUserId).toHaveBeenCalledWith('user-1', undefined, undefined, 'q-1');
   });
 });

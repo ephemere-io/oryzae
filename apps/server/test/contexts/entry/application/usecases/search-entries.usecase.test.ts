@@ -31,6 +31,9 @@ describe('SearchEntriesUsecase', () => {
       findByIds: vi.fn().mockResolvedValue([]),
       listByUserId: vi.fn().mockResolvedValue([]),
       listByUserIdAndDate: vi.fn().mockResolvedValue([]),
+      listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
+      listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
+      countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
       listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
       searchByUserId: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
@@ -48,7 +51,13 @@ describe('SearchEntriesUsecase', () => {
     const result = await usecase.execute('user-1', '天気');
 
     expect(result).toEqual([entryProps1, entryProps2]);
-    expect(entryRepo.searchByUserId).toHaveBeenCalledWith('user-1', '天気', undefined, undefined);
+    expect(entryRepo.searchByUserId).toHaveBeenCalledWith(
+      'user-1',
+      '天気',
+      undefined,
+      undefined,
+      undefined,
+    );
   });
 
   it('一致するエントリがない場合は空配列を返す', async () => {
@@ -69,6 +78,22 @@ describe('SearchEntriesUsecase', () => {
       '天気',
       '2026-01-01T00:00:00.000Z',
       10,
+      undefined,
+    );
+  });
+
+  // Issue #331
+  it('questionId を repo に渡す', async () => {
+    vi.mocked(entryRepo.searchByUserId).mockResolvedValue([Entry.fromProps(entryProps1)]);
+
+    await usecase.execute('user-1', '天気', undefined, undefined, 'q-1');
+
+    expect(entryRepo.searchByUserId).toHaveBeenCalledWith(
+      'user-1',
+      '天気',
+      undefined,
+      undefined,
+      'q-1',
     );
   });
 });
