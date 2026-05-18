@@ -1,3 +1,4 @@
+import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
 import { Entry } from '../../domain/models/entry.js';
@@ -159,6 +160,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       content: props.content,
       media_urls: props.mediaUrls,
       fermentation_enabled: props.fermentationEnabled,
+      effects: props.effects ?? {},
       created_at: props.createdAt,
       updated_at: props.updatedAt,
     });
@@ -177,8 +179,19 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       content: row.content as string,
       mediaUrls: (row.media_urls as string[]) ?? [],
       fermentationEnabled: (row.fermentation_enabled as boolean) ?? false,
+      effects: parseEffects(row.effects),
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     });
   }
+}
+
+// Parse the `effects` JSONB column. Older rows have `{}` (default), which we
+// treat as "no effects" (null). Unknown shapes are also coerced to null so a
+// malformed row doesn't break entry reads.
+function parseEffects(raw: unknown): EditorEffectsState | null {
+  if (!raw || typeof raw !== 'object') return null;
+  if (Object.keys(raw as object).length === 0) return null;
+  const parsed = editorEffectsStateSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 }

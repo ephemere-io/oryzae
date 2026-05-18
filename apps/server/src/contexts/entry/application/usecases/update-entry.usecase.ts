@@ -1,3 +1,4 @@
+import type { EditorEffectsState } from '@oryzae/shared';
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway.js';
 import type { EntryProps } from '../../domain/models/entry.js';
@@ -11,6 +12,8 @@ interface UpdateEntryInput {
   editorVersion: string;
   extension: Record<string, unknown>;
   fermentationEnabled?: boolean;
+  // undefined → 既存値を維持 / null → 明示的にクリア / object → 差し替え
+  effects?: EditorEffectsState | null;
 }
 
 export class UpdateEntryUsecase {
@@ -24,7 +27,11 @@ export class UpdateEntryUsecase {
     const existing = await this.entryRepo.findById(entryId);
     if (!existing) throw new EntryNotFoundError(entryId);
 
-    const contentUpdatedResult = existing.withContent(input.content, input.mediaUrls);
+    const contentUpdatedResult = existing.withContent(
+      input.content,
+      input.mediaUrls,
+      input.effects,
+    );
     if (!contentUpdatedResult.success) {
       throw new EntryValidationError(contentUpdatedResult.error.message);
     }
