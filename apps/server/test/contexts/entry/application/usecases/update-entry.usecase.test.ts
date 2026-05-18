@@ -15,6 +15,7 @@ describe('UpdateEntryUsecase', () => {
     content: 'original',
     mediaUrls: [],
     fermentationEnabled: false,
+    effects: null,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   });
@@ -62,6 +63,7 @@ describe('UpdateEntryUsecase', () => {
       content: 'original',
       mediaUrls: [],
       fermentationEnabled: true,
+      effects: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
@@ -105,6 +107,68 @@ describe('UpdateEntryUsecase', () => {
     ).rejects.toThrow('Entry not found');
 
     expect(entryRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('effects を渡すと差し替わる', async () => {
+    const result = await usecase.execute('entry-1', {
+      content: 'updated',
+      mediaUrls: [],
+      editorType: 'minimal',
+      editorVersion: '1.0.0',
+      extension: {},
+      effects: {
+        version: 1,
+        eraserTraces: [{ rx: 0, ry: 0, w: 1, h: 1, chars: ['x'], intensity: 0.1, seed: 1 }],
+      },
+    });
+    expect(result.effects?.eraserTraces).toHaveLength(1);
+  });
+
+  it('effects 未指定なら既存の effects を維持する', async () => {
+    const withEffects = Entry.fromProps({
+      id: 'entry-1',
+      userId: 'user-1',
+      content: 'original',
+      mediaUrls: [],
+      fermentationEnabled: false,
+      effects: { version: 1, textSpans: [] },
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    vi.mocked(entryRepo.findById).mockResolvedValue(withEffects);
+
+    const result = await usecase.execute('entry-1', {
+      content: 'updated',
+      mediaUrls: [],
+      editorType: 'minimal',
+      editorVersion: '1.0.0',
+      extension: {},
+    });
+    expect(result.effects).toEqual({ version: 1, textSpans: [] });
+  });
+
+  it('effects=null 指定で既存 effects をクリアできる', async () => {
+    const withEffects = Entry.fromProps({
+      id: 'entry-1',
+      userId: 'user-1',
+      content: 'original',
+      mediaUrls: [],
+      fermentationEnabled: false,
+      effects: { version: 1, textSpans: [] },
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    vi.mocked(entryRepo.findById).mockResolvedValue(withEffects);
+
+    const result = await usecase.execute('entry-1', {
+      content: 'updated',
+      mediaUrls: [],
+      editorType: 'minimal',
+      editorVersion: '1.0.0',
+      extension: {},
+      effects: null,
+    });
+    expect(result.effects).toBeNull();
   });
 
   it('content が空文字なら EntryValidationError を throw する', async () => {

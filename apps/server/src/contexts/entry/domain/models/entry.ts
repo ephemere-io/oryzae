@@ -1,3 +1,4 @@
+import type { EditorEffectsState } from '@oryzae/shared';
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
 type EntryError =
@@ -10,6 +11,7 @@ export interface EntryProps {
   content: string;
   mediaUrls: string[];
   fermentationEnabled: boolean;
+  effects: EditorEffectsState | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,6 +21,7 @@ interface CreateEntryParams {
   content: string;
   mediaUrls: string[];
   fermentationEnabled: boolean;
+  effects?: EditorEffectsState | null;
 }
 
 const MAX_CONTENT_LENGTH = 100_000;
@@ -29,6 +32,7 @@ export class Entry {
   readonly content: string;
   readonly mediaUrls: string[];
   readonly fermentationEnabled: boolean;
+  readonly effects: EditorEffectsState | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 
@@ -38,6 +42,7 @@ export class Entry {
     this.content = props.content;
     this.mediaUrls = props.mediaUrls;
     this.fermentationEnabled = props.fermentationEnabled;
+    this.effects = props.effects;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -54,6 +59,7 @@ export class Entry {
         content: params.content,
         mediaUrls: params.mediaUrls,
         fermentationEnabled: params.fermentationEnabled,
+        effects: params.effects ?? null,
         createdAt: now,
         updatedAt: now,
       }),
@@ -64,7 +70,11 @@ export class Entry {
     return new Entry(props);
   }
 
-  withContent(content: string, mediaUrls: string[]): Result<Entry, EntryError> {
+  withContent(
+    content: string,
+    mediaUrls: string[],
+    effects?: EditorEffectsState | null,
+  ): Result<Entry, EntryError> {
     const validationError = Entry.validateContent(content);
     if (validationError) return err(validationError);
 
@@ -73,6 +83,7 @@ export class Entry {
         ...this.toProps(),
         content,
         mediaUrls,
+        effects: effects === undefined ? this.effects : effects,
         updatedAt: new Date().toISOString(),
       }),
     );
@@ -93,6 +104,7 @@ export class Entry {
       content: this.content,
       mediaUrls: this.mediaUrls,
       fermentationEnabled: this.fermentationEnabled,
+      effects: this.effects,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

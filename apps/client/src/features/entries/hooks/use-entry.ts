@@ -1,5 +1,6 @@
 'use client';
 
+import type { EditorEffectsState } from '@oryzae/shared';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
@@ -7,6 +8,7 @@ import type { ApiClient } from '@/lib/api';
 interface EntryDetail {
   id: string;
   content: string;
+  effects: EditorEffectsState | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +32,7 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
           setEntry({
             id: e.id,
             content: e.content,
+            effects: e.effects ?? null,
             createdAt: e.createdAt,
             updatedAt: e.updatedAt,
           });
@@ -44,6 +47,8 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
 
 interface SaveOptions {
   fermentationEnabled?: boolean;
+  // undefined → 既存を維持 / null → クリア / state → 差し替え
+  effects?: EditorEffectsState | null;
 }
 
 export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
@@ -66,6 +71,9 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
       };
       if (options?.fermentationEnabled !== undefined) {
         payload.fermentationEnabled = options.fermentationEnabled;
+      }
+      if (options?.effects !== undefined) {
+        payload.effects = options.effects;
       }
       const body = JSON.stringify(payload);
 
