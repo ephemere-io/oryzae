@@ -2,38 +2,18 @@ import { gateway } from 'ai';
 import { Hono } from 'hono';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
+import { createCronAuthMiddleware } from '../middleware/cron-auth.js';
 
 const DAILY_COST_THRESHOLD_USD = 1.0;
 
 export const cronCostAlert = new Hono()
-  .use('*', async (c, next) => {
-    const authHeader = c.req.header('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret) {
-      console.error('[cron-cost-alert] CRON_SECRET not configured');
-      await notifyDiscord({
-        title: 'コスト cron: CRON_SECRET 未設定',
-        description: 'Vercel 環境変数 CRON_SECRET が未設定のためコスト集計 cron が実行できません。',
-        color: COLORS.ERROR,
-      });
-      return c.json({ error: 'CRON_SECRET not configured' }, 500);
-    }
-
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      console.error('[cron-cost-alert] Unauthorized request', {
-        hasAuthHeader: Boolean(authHeader),
-      });
-      await notifyDiscord({
-        title: 'コスト cron: 認証失敗',
-        description: 'Authorization header が CRON_SECRET と一致しません。',
-        color: COLORS.ERROR,
-      });
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    await next();
-  })
+  .use(
+    '*',
+    createCronAuthMiddleware({
+      routeName: 'cron-cost-alert',
+      discordTitlePrefix: 'コスト cron',
+    }),
+  )
   .post('/', async (c) => {
     try {
       const supabase = getSupabaseClient();

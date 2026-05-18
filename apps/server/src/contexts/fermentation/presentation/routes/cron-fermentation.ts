@@ -5,6 +5,7 @@ import { SupabaseQuestionRepository } from '../../../question/infrastructure/rep
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
+import { createCronAuthMiddleware } from '../../../shared/presentation/middleware/cron-auth.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
 import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
@@ -17,34 +18,13 @@ import { SupabaseUserFermentationStateRepository } from '../../infrastructure/re
 const generateId = () => crypto.randomUUID();
 
 export const cronFermentation = new Hono()
-  .use('*', async (c, next) => {
-    const authHeader = c.req.header('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret) {
-      console.error('[cron-fermentation] CRON_SECRET not configured');
-      await notifyDiscord({
-        title: '発酵 cron: CRON_SECRET 未設定',
-        description: 'Vercel 環境変数 CRON_SECRET が未設定のため発酵 cron が実行できません。',
-        color: COLORS.ERROR,
-      });
-      return c.json({ error: 'CRON_SECRET not configured' }, 500);
-    }
-
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      console.error('[cron-fermentation] Unauthorized request', {
-        hasAuthHeader: Boolean(authHeader),
-      });
-      await notifyDiscord({
-        title: '発酵 cron: 認証失敗',
-        description: 'Authorization header が CRON_SECRET と一致しません。',
-        color: COLORS.ERROR,
-      });
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    await next();
-  })
+  .use(
+    '*',
+    createCronAuthMiddleware({
+      routeName: 'cron-fermentation',
+      discordTitlePrefix: '発酵 cron',
+    }),
+  )
   .post('/', async (c) => {
     const supabase = getSupabaseClient();
 
