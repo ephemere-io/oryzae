@@ -261,11 +261,17 @@ export function EntryEditor({
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
   useTimeInscription(editorRef, settings);
+  // 消し跡の文字フォントは編集中のフォントと揃える (Issue #332)。
+  // settings.fontFamily は "serif" | "sans" の論理値なので、エディタ本体と同じ
+  // 具体的なフォントスタック文字列に解決して渡す。
+  const eraserFontFamily =
+    settings.fontFamily === 'serif' ? "'Noto Serif JP', serif" : "'Noto Sans JP', sans-serif";
   const { getTracesSnapshot } = useEraserTrace(
     editorRef,
     traceCanvasRef,
     settings.eraserTraceEnabled,
     settings.fontSize,
+    eraserFontFamily,
     effectiveInitialEffects?.eraserTraces,
   );
   usePressureBleed(

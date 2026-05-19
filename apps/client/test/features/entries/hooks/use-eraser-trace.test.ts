@@ -140,7 +140,7 @@ describe('useEraserTrace', () => {
         scrollTop: 0,
       });
 
-      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16));
+      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif'));
 
       expect(canvas.style.left).toBe('42px');
       expect(canvas.style.top).toBe('16px');
@@ -162,7 +162,7 @@ describe('useEraserTrace', () => {
       });
       stubCharRange(400, 80);
 
-      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16));
+      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif'));
 
       dispatchBackspaceDelete(editor);
       await new Promise((r) => setTimeout(r, 30));
@@ -187,7 +187,7 @@ describe('useEraserTrace', () => {
       });
       stubCharRange(400, 80);
 
-      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16));
+      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif'));
 
       dispatchBackspaceDelete(editor);
       await new Promise((r) => setTimeout(r, 30));
@@ -218,7 +218,9 @@ describe('useEraserTrace', () => {
       const addSpy = vi.spyOn(editor, 'addEventListener');
       const removeSpy = vi.spyOn(editor, 'removeEventListener');
 
-      const { unmount } = renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16));
+      const { unmount } = renderHook(() =>
+        useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif'),
+      );
 
       expect(addSpy.mock.calls.map((c) => c[0])).toContain('scroll');
       unmount();
@@ -239,7 +241,7 @@ describe('useEraserTrace', () => {
       });
       const addSpy = vi.spyOn(editor, 'addEventListener');
 
-      renderHook(() => useEraserTrace(editorRef, canvasRef, false, 16));
+      renderHook(() => useEraserTrace(editorRef, canvasRef, false, 16, 'sans-serif'));
 
       expect(addSpy.mock.calls.map((c) => c[0])).not.toContain('beforeinput');
     });
@@ -260,7 +262,7 @@ describe('useEraserTrace', () => {
       });
       const initial = [{ rx: 10, ry: 20, w: 16, h: 20, chars: ['a'], intensity: 0.1, seed: 1 }];
 
-      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16, initial));
+      renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif', initial));
       await new Promise((r) => setTimeout(r, 30));
 
       expect(drawImage).toHaveBeenCalled();
@@ -280,7 +282,9 @@ describe('useEraserTrace', () => {
       });
       const initial = [{ rx: 5, ry: 6, w: 1, h: 1, chars: ['x'], intensity: 0.07, seed: 0 }];
 
-      const { result } = renderHook(() => useEraserTrace(editorRef, canvasRef, true, 16, initial));
+      const { result } = renderHook(() =>
+        useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif', initial),
+      );
 
       const snap = result.current.getTracesSnapshot();
       expect(snap).toEqual(initial);
@@ -306,7 +310,7 @@ describe('useEraserTrace', () => {
       ];
 
       const { result, rerender } = renderHook(
-        ({ traces }) => useEraserTrace(editorRef, canvasRef, true, 16, traces),
+        ({ traces }) => useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif', traces),
         { initialProps: { traces: first } },
       );
 
@@ -330,7 +334,7 @@ describe('useEraserTrace', () => {
       const initial = [{ rx: 1, ry: 1, w: 1, h: 1, chars: ['a'], intensity: 0.07, seed: 0 }];
 
       const { result, rerender } = renderHook(
-        ({ traces }) => useEraserTrace(editorRef, canvasRef, true, 16, traces),
+        ({ traces }) => useEraserTrace(editorRef, canvasRef, true, 16, 'sans-serif', traces),
         { initialProps: { traces: initial } },
       );
 
