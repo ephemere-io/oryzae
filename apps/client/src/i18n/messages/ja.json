@@ -119,7 +119,10 @@
       "results_count": "{count}件の結果",
       "week_label": "第{n}週",
       "load_more_loading": "読み込み中...",
-      "load_more": "もっと見る"
+      "load_more": "もっと見る",
+      "filter_by_question_label": "問いで絞り込む",
+      "filter_all_questions": "すべての問い",
+      "filter_clear_aria": "フィルタを解除"
     },
     "leave_modal": {
       "aria_label": "離脱確認ダイアログ",
@@ -485,7 +488,13 @@
       "add_placeholder": "あなたの問いを入力してください",
       "cancel_add": "キャンセル",
       "adding": "追加中...",
-      "add_submit": "追加する"
+      "add_submit": "追加する",
+      "pickle_success_modal": {
+        "body": "あなたのテキストと問いが発酵瓶に漬け込まれました。発酵が進むのを楽しみに待ちながら、ジャーナルを続けてください。",
+        "dismiss": "わかりました",
+        "aria_label": "漬け込み完了のお知らせ",
+        "heading": "発酵瓶に漬け込まれました"
+      }
     }
   },
   "questions": {

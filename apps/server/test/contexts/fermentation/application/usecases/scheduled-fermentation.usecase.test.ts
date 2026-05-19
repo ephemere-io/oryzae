@@ -159,6 +159,7 @@ interface BuildArgs {
   userIds?: string[];
   sendDigest?: ReturnType<typeof vi.fn>;
   rollHours?: () => number;
+  concurrency?: number;
 }
 
 function buildUsecase(args: BuildArgs = {}) {
@@ -175,6 +176,7 @@ function buildUsecase(args: BuildArgs = {}) {
     vi.fn().mockResolvedValue(args.userIds ?? []),
     args.sendDigest ?? vi.fn().mockResolvedValue(undefined),
     args.rollHours ?? (() => 48),
+    args.concurrency,
   );
 }
 
@@ -647,5 +649,73 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
     expect(result.totalUsers).toBe(0);
     expect(result.totalFermentations).toBe(0);
     expect(userStateRepo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('issue #341: ユーザーを concurrency 上限まで並列実行する', async () => {
+    // 並列化前は for-of シリアル実行で Vercel 300s タイムアウト多発。
+    // concurrency=2 で 3 ユーザー走らせ、analyze が同時に最大 2 回 in-flight
+    // になることを確認する (シリアル時は常に 1)。
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.countCharsByUserIdSince).mockResolvedValue(2000);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdSince).mockImplementation(async (userId) => [
+      makeEntry(userId, `${userId}-e1`),
+    ]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockImplementation(async (userId) => [
+      makeQuestion(userId, `${userId}-q1`),
+    ]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockImplementation(async (questionId) =>
+      makeQuestionTransaction(questionId, `Q for ${questionId}`),
+    );
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockImplementation(async (questionId) => {
+      const userPart = questionId.replace('-q1', '');
+      return [`${userPart}-e1`];
+    });
+
+    let inflight = 0;
+    let maxInflight = 0;
+    const llm: LlmAnalysisGateway = {
+      analyze: vi.fn().mockImplementation(async () => {
+        inflight++;
+        maxInflight = Math.max(maxInflight, inflight);
+        // 数回イベントループを譲って他の worker が in-flight に到達できるようにする
+        await new Promise((r) => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
+        inflight--;
+        return {
+          output: {
+            worksheetMarkdown: 'W',
+            resultDiagramMarkdown: 'D',
+            snippets: [{ type: 'core' as const, text: 's', sourceDate: '5/4', reason: 'r' }],
+            letterBody: 'L',
+            keywords: [{ keyword: 'k', description: 'd' }],
+          },
+          usage: { inputTokens: 1, outputTokens: 1 },
+          generationId: 'gen_concurrency',
+        };
+      }),
+    };
+
+    const usecase = buildUsecase({
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      llm,
+      userIds: ['user-1', 'user-2', 'user-3'],
+      concurrency: 2,
+    });
+
+    const result = await usecase.execute(NOW);
+
+    expect(result.succeeded).toBe(3);
+    expect(llm.analyze).toHaveBeenCalledTimes(3);
+    expect(maxInflight).toBe(2);
+    expect(inflight).toBe(0); // 全て resolve 済
   });
 });

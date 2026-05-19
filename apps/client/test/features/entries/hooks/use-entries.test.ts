@@ -234,6 +234,67 @@ describe('useEntries', () => {
     ]);
   });
 
+  it('Issue #331: questionId が与えられたら URL に含める', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, []));
+    const api = createMockApi(apiFetch);
+
+    renderHook(() => useEntries(api, false, undefined, 'q-123'));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    expect(apiFetch.mock.calls[0][0]).toContain('questionId=q-123');
+  });
+
+  it('Issue #331: questionId が未指定なら URL に含めない', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, []));
+    const api = createMockApi(apiFetch);
+
+    renderHook(() => useEntries(api, false));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    expect(apiFetch.mock.calls[0][0]).not.toContain('questionId=');
+  });
+
+  it('Issue #331: questionId が変わったらエントリと cursor をリセットする', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '1', userId: 'u1', content: 'q1 entry', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result, rerender } = renderHook(
+      ({ qid }: { qid?: string }) => useEntries(api, false, undefined, qid),
+      { initialProps: { qid: 'q-a' } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries).toHaveLength(1);
+
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '2', userId: 'u1', content: 'q2 entry', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+
+    rerender({ qid: 'q-b' });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries).toHaveLength(1);
+    expect(result.current.entries[0].id).toBe('2');
+  });
+
   it('Issue #323: linkedQuestions 欠落時は空配列にフォールバックする', async () => {
     apiFetch.mockResolvedValueOnce(
       mockResponse(true, [
