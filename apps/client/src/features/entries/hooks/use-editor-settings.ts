@@ -19,6 +19,35 @@ const FOCUS_MODE_STORAGE_KEY = 'oryzae-editor-focus-mode';
 
 const FERMENTATION_OVERLAY_PREFERENCE_KEY = 'oryzae-editor-fermentation-overlay-preference';
 
+/**
+ * 上の 4 つのキー以外の設定（フォント・各種エフェクトのトグルとサブオプション）
+ * は単一の JSON BLOB として保存する。Issue #332 で「一度セットしたエフェクト設定が
+ * エディタを開き直すとリセットされる」という指摘を受けて追加。後方互換のため
+ * 既存 4 キーは温存し、それ以外だけ extras にまとめている。
+ *
+ * 保存形式: `Partial<EditorSettings>`（書き込み時に差分マージ）。
+ * 不明なキー・型不一致は読み込み時に黙ってドロップする。
+ */
+const EXTRAS_STORAGE_KEY = 'oryzae-editor-settings-extras';
+
+const EXTRAS_KEYS = [
+  'fontFamily',
+  'timeInscriptionEnabled',
+  'timeInscriptionMode',
+  'eraserTraceEnabled',
+  'ampEnabled',
+  'voiceEnabled',
+  'ghostEnabled',
+  'ghostMode',
+  'ghostSize',
+  'ghostScatter',
+  'ghostBlurStart',
+  'ghostBlurEnd',
+  'ghostDuration',
+] as const satisfies ReadonlyArray<keyof EditorSettings>;
+type ExtrasKey = (typeof EXTRAS_KEYS)[number];
+type ExtrasPatch = Partial<Pick<EditorSettings, ExtrasKey>>;
+
 function readStoredFontSize(): number | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -106,6 +135,59 @@ function writeStoredFermentationOverlayPreference(value: FermentationOverlayPref
   }
 }
 
+function readStoredExtras(): ExtrasPatch | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(EXTRAS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const out: ExtrasPatch = {};
+    for (const key of EXTRAS_KEYS) {
+      const v = parsed[key];
+      if (key === 'fontFamily') {
+        if (v === 'serif' || v === 'sans') out[key] = v;
+      } else if (key === 'timeInscriptionMode') {
+        if (v === 'fontSize' || v === 'fontWeight' || v === 'pressureBleed') out[key] = v;
+      } else if (key === 'ghostMode') {
+        if (v === 'block' || v === 'dust') out[key] = v;
+      } else if (
+        key === 'timeInscriptionEnabled' ||
+        key === 'eraserTraceEnabled' ||
+        key === 'ampEnabled' ||
+        key === 'voiceEnabled' ||
+        key === 'ghostEnabled'
+      ) {
+        if (typeof v === 'boolean') out[key] = v;
+      } else {
+        // numeric: ghostSize / ghostScatter / ghostBlurStart / ghostBlurEnd / ghostDuration
+        if (typeof v === 'number' && Number.isFinite(v)) out[key] = v;
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function mergeStoredExtras(patch: Partial<EditorSettings>): void {
+  if (typeof window === 'undefined') return;
+  const extras: ExtrasPatch = {};
+  for (const key of EXTRAS_KEYS) {
+    if (key in patch) {
+      // @type-assertion-allowed: Pick<> indexed assignment; runtime type matches by construction
+      (extras as Record<string, unknown>)[key] = patch[key];
+    }
+  }
+  if (Object.keys(extras).length === 0) return;
+  try {
+    const existing = readStoredExtras() ?? {};
+    window.localStorage.setItem(EXTRAS_STORAGE_KEY, JSON.stringify({ ...existing, ...extras }));
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
+
 function getInitialSettings(locale: string | undefined): EditorSettings {
   const next: EditorSettings = { ...DEFAULT_SETTINGS };
   // 英語ロケールでサインアップ／利用しているユーザーは横書きをデフォルトにする (issue #269)
@@ -120,6 +202,8 @@ function getInitialSettings(locale: string | undefined): EditorSettings {
   if (focusMode !== null) next.focusModeEnabled = focusMode;
   const overlayPref = readStoredFermentationOverlayPreference();
   if (overlayPref !== null) next.fermentationOverlayPreference = overlayPref;
+  const extras = readStoredExtras();
+  if (extras) Object.assign(next, extras);
   return next;
 }
 
@@ -145,6 +229,7 @@ export function useEditorSettings(
     ) {
       writeStoredFermentationOverlayPreference(patch.fermentationOverlayPreference);
     }
+    mergeStoredExtras(patch);
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
 
