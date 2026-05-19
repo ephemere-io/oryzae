@@ -16,15 +16,15 @@
   "dependencies": {
     "@oryzae/server": "workspace:*",
     "@oryzae/shared": "workspace:*",
-    "@sentry/nextjs": "^10.51.0",
-    "next": "16.2.4",
-    "next-intl": "^4.11.0",
-    "posthog-js": "^1.372.6",
-    "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "@sentry/nextjs": "^10.53.1",
+    "next": "16.2.6",
+    "next-intl": "^4.12.0",
+    "posthog-js": "^1.374.2",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/react": "^16.0.0",
