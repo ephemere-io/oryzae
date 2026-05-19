@@ -12,6 +12,57 @@ import { z } from 'zod';
 export const localeSchema = z.enum(['ja', 'en', 'zh', 'ko']);
 export type LocaleCode = z.infer<typeof localeSchema>;
 
+/**
+ * Editor visual effects state — persisted per-entry so traces re-appear on reload.
+ * See `docs/editor-effects-persistence.md` for the design rationale.
+ *
+ * `version` lets us evolve the shape without breaking old clients: unknown
+ * versions / kinds are ignored on apply so older clients gracefully degrade.
+ */
+const eraserTraceSchema = z.object({
+  rx: z.number(),
+  ry: z.number(),
+  w: z.number(),
+  h: z.number(),
+  chars: z.array(z.string()),
+  intensity: z.number(),
+  seed: z.number(),
+});
+
+const textSpanMarkSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('time'),
+    start: z.number().int().nonnegative(),
+    end: z.number().int().nonnegative(),
+    mode: z.enum(['fontSize', 'fontWeight']),
+    t: z.number(),
+    duration: z.number(),
+  }),
+  z.object({
+    kind: z.literal('pressure'),
+    start: z.number().int().nonnegative(),
+    end: z.number().int().nonnegative(),
+    intensity: z.number(),
+    seed: z.number(),
+  }),
+  z.object({
+    kind: z.literal('voice'),
+    start: z.number().int().nonnegative(),
+    end: z.number().int().nonnegative(),
+    fontSizeEm: z.number(),
+  }),
+]);
+
+export const editorEffectsStateSchema = z.object({
+  version: z.literal(1),
+  eraserTraces: z.array(eraserTraceSchema).optional(),
+  textSpans: z.array(textSpanMarkSchema).optional(),
+});
+
+export type EditorEffectsState = z.infer<typeof editorEffectsStateSchema>;
+export type EraserTracePayload = z.infer<typeof eraserTraceSchema>;
+export type TextSpanMark = z.infer<typeof textSpanMarkSchema>;
+
 export const createEntrySchema = z.object({
   content: z.string(),
   mediaUrls: z.array(z.string()).default([]),
@@ -19,6 +70,8 @@ export const createEntrySchema = z.object({
   editorVersion: z.string(),
   extension: z.record(z.unknown()).default({}),
   fermentationEnabled: z.boolean().optional(),
+  // undefined → 既存値を維持 / null → 明示的にクリア / object → 差し替え
+  effects: editorEffectsStateSchema.nullable().optional(),
 });
 
 export const questionStringSchema = z.object({

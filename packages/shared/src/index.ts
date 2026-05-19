@@ -17,7 +17,10 @@ export {
   completeOnboardingSchema,
   createEntrySchema,
   credentialsSchema,
+  type EditorEffectsState,
   type EmailOtpType,
+  type EraserTracePayload,
+  editorEffectsStateSchema,
   emailOtpTypeSchema,
   type JarLayoutUpdate,
   type JarPositionItem,
@@ -31,5 +34,6 @@ export {
   profileUpdateSchema,
   questionStringSchema,
   signupSchema,
+  type TextSpanMark,
   verifyOtpSchema,
 } from './schemas.js';

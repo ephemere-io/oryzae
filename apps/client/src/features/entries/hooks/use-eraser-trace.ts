@@ -125,16 +125,33 @@ function charRangeBefore(sel: Selection): Range | null {
   return null;
 }
 
+/**
+ * 戻り値 `getTracesSnapshot` で現在の trace 配列のコピーを取得できる。
+ * エディタの保存時にこのスナップショットを extract に渡すことで、消し跡を永続化する。
+ */
+interface UseEraserTraceResult {
+  getTracesSnapshot: () => Trace[];
+}
+
 export function useEraserTrace(
   editorRef: React.RefObject<HTMLDivElement | null>,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   enabled: boolean,
   fontSize: number,
-) {
+  initialTraces?: Trace[],
+): UseEraserTraceResult {
   const tracesRef = useRef<Trace[]>([]);
   const pendingRef = useRef<PendingDel | null>(null);
   const smudgeCacheRef = useRef(new Map<string, HTMLCanvasElement>());
   const redrawQueuedRef = useRef(false);
+  // Hydrate persisted traces once on mount and whenever a fresh batch comes in
+  // (e.g. entry switch). We seed only when the incoming reference changes —
+  // typing-time mutations stay in tracesRef.
+  const lastInitialRef = useRef<Trace[] | undefined>(undefined);
+  if (initialTraces !== lastInitialRef.current) {
+    lastInitialRef.current = initialTraces;
+    tracesRef.current = initialTraces ? initialTraces.map((t) => ({ ...t })) : [];
+  }
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -275,6 +292,9 @@ export function useEraserTrace(
     editor.addEventListener('scroll', requestRedraw);
     window.addEventListener('resize', resizeCanvas);
 
+    // Render any hydrated traces immediately so the canvas paints on mount.
+    if (tracesRef.current.length > 0) requestRedraw();
+
     return () => {
       editor.removeEventListener('beforeinput', onBeforeInput);
       editor.removeEventListener('input', onInput);
@@ -283,4 +303,8 @@ export function useEraserTrace(
       smudgeCacheRef.current.clear();
     };
   }, [editorRef, canvasRef, enabled, fontSize]);
+
+  return {
+    getTracesSnapshot: () => tracesRef.current.map((t) => ({ ...t })),
+  };
 }

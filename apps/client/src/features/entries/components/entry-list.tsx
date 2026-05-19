@@ -9,9 +9,21 @@ import type { ApiClient } from '@/lib/api';
 import { DeleteConfirmModal } from './delete-confirm-modal';
 import { EntryCard } from './entry-card';
 
+/**
+ * Issue #331: 問いフィルタ用に表示する選択肢。
+ * `currentText` は表示用、`id` は filter キー。
+ * 親 (entries page) で `useQuestions` の結果から
+ * 非アーカイブかつ currentText を持つものに絞ったうえで渡す。
+ */
+export interface FilterableQuestion {
+  id: string;
+  currentText: string;
+}
+
 interface EntryListProps {
   api: ApiClient | null;
   authLoading: boolean;
+  availableQuestions?: FilterableQuestion[];
 }
 
 interface EntryItem {
@@ -79,16 +91,25 @@ function groupEntries(entries: EntryItem[]): MonthGroup[] {
   return result;
 }
 
-export function EntryList({ api, authLoading }: EntryListProps) {
+export function EntryList({ api, authLoading, availableQuestions = [] }: EntryListProps) {
   const t = useTranslations('entries.list');
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
   const search = debouncedSearch.trim() || undefined;
-  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(api, authLoading, search);
+  // Issue #331: 問いで絞り込むフィルタ。空文字 = フィルタ無し
+  const [questionFilter, setQuestionFilter] = useState<string>('');
+  const questionId = questionFilter || undefined;
+  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(
+    api,
+    authLoading,
+    search,
+    questionId,
+  );
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const isSearching = !!search;
+  const isFiltering = !!questionId;
 
   const handleDeleteClick = useCallback((id: string) => {
     setPendingDeleteId(id);
@@ -110,6 +131,55 @@ export function EntryList({ api, authLoading }: EntryListProps) {
 
   return (
     <div className="flex flex-col">
+      {/* Issue #331: 問いで絞り込むフィルタ (単一選択・解除可) */}
+      {availableQuestions.length > 0 && (
+        <div className="relative mb-3 flex items-center gap-2">
+          <label
+            htmlFor="entries-question-filter"
+            className="shrink-0 text-xs uppercase tracking-[0.1em] text-[var(--date-color)]"
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            {t('filter_by_question_label')}
+          </label>
+          <select
+            id="entries-question-filter"
+            value={questionFilter}
+            onChange={(e) => setQuestionFilter(e.target.value)}
+            className="min-w-0 flex-1 truncate rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 pr-8 text-sm text-[var(--fg)] focus:border-[var(--accent)] focus:outline-none"
+          >
+            <option value="">{t('filter_all_questions')}</option>
+            {availableQuestions.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.currentText}
+              </option>
+            ))}
+          </select>
+          {isFiltering && (
+            <button
+              type="button"
+              onClick={() => setQuestionFilter('')}
+              className="shrink-0 text-[var(--date-color)] hover:text-[var(--fg)]"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-label={t('filter_clear_aria')}
+                role="img"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Search bar */}
       <div className="relative mb-4">
         <input
