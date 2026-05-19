@@ -125,13 +125,25 @@ function markFromElement(el: HTMLElement, start: number, end: number): TextSpanM
     if (!Number.isFinite(intensity) || !Number.isFinite(seed)) return null;
     return { kind: 'pressure', start, end, intensity, seed };
   }
-  if (mode === 'fontSize' || mode === 'fontWeight') {
-    const t = Number.parseFloat(el.dataset.t ?? '');
-    const duration = Number.parseFloat(el.dataset.duration ?? '');
-    if (!Number.isFinite(t) || !Number.isFinite(duration)) return null;
-    return { kind: 'time', start, end, mode, t, duration };
+  if (mode === 'fontSize') {
+    // Read the *resolved* font size that the time-inscription hook wrote, so
+    // restoration is independent of the editor's current `settings.fontSize`.
+    const fontSize = parsePx(el.style.fontSize);
+    if (fontSize == null) return null;
+    return { kind: 'time', start, end, mode: 'fontSize', fontSize };
+  }
+  if (mode === 'fontWeight') {
+    const fontWeight = Number.parseInt(el.style.fontWeight, 10);
+    if (!Number.isFinite(fontWeight)) return null;
+    return { kind: 'time', start, end, mode: 'fontWeight', fontWeight };
   }
   return null;
+}
+
+function parsePx(input: string): number | null {
+  if (!input.endsWith('px')) return null;
+  const n = Number.parseFloat(input.slice(0, -2));
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function parseEm(input: string): number | null {
@@ -242,14 +254,11 @@ function decorateSpan(span: HTMLSpanElement, mark: TextSpanMark): void {
   }
   span.className = EBLOCK_CLASS;
   if (mark.kind === 'time') {
-    span.dataset.t = mark.t.toFixed(4);
-    span.dataset.duration = String(mark.duration);
     span.dataset.mode = mark.mode;
     if (mark.mode === 'fontWeight') {
-      span.style.fontWeight = String(Math.round(300 + (700 - 300) * mark.t));
+      span.style.fontWeight = String(mark.fontWeight);
     } else {
-      const scale = 0.8 + (1.35 - 0.8) * mark.t;
-      span.style.fontSize = `${(16 * scale).toFixed(1)}px`;
+      span.style.fontSize = `${mark.fontSize}px`;
     }
     return;
   }

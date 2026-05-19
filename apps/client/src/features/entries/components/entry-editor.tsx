@@ -599,11 +599,19 @@ export function EntryEditor({
   );
 
   const autoSave = useCallback(
-    (contentToSave: string, id?: string) => {
+    async (contentToSave: string, id?: string) => {
       isAutosavingRef.current = true;
-      return save(contentToSave, id);
+      // Issue #332: 自動保存でも effects を必ず同梱する。これがないと、ユーザーが
+      // 明示的に保存ボタンを押さずに離脱した場合に消し跡や時間内包の痕跡が
+      // 永続化されない (autosave だけで離脱するユーザのケース)。
+      const effects = editorRef.current
+        ? extractEditorEffects(editorRef.current, getTracesSnapshot())
+        : null;
+      const savedId = await save(contentToSave, id, { effects });
+      if (savedId) saveCachedEffects(savedId, effects);
+      return savedId;
     },
-    [save],
+    [save, getTracesSnapshot],
   );
 
   useAutosaveEntry({

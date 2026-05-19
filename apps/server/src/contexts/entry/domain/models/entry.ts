@@ -32,14 +32,8 @@ interface EraserTracePayload {
 }
 
 type TextSpanMark =
-  | {
-      kind: 'time';
-      start: number;
-      end: number;
-      mode: 'fontSize' | 'fontWeight';
-      t: number;
-      duration: number;
-    }
+  | { kind: 'time'; start: number; end: number; mode: 'fontSize'; fontSize: number }
+  | { kind: 'time'; start: number; end: number; mode: 'fontWeight'; fontWeight: number }
   | { kind: 'pressure'; start: number; end: number; intensity: number; seed: number }
   | { kind: 'voice'; start: number; end: number; fontSizeEm: number };
 
