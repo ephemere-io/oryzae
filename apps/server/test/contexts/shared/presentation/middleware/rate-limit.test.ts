@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  isStrictAuthPath,
   rateLimitAuth,
   rateLimitFermentation,
   rateLimitGeneral,
@@ -111,12 +113,12 @@ describe('rate-limit middleware', () => {
     });
   });
 
-  describe('rateLimitAuth', () => {
-    it('uses IP address as identifier', async () => {
+  describe('rateLimitAuth (strict — brute-force-prone paths)', () => {
+    it('uses IP address as identifier for /auth/login', async () => {
       mockLimit.mockResolvedValue({
         success: true,
-        limit: 10,
-        remaining: 9,
+        limit: 20,
+        remaining: 19,
         reset: Date.now() + 60000,
       });
 
@@ -126,10 +128,173 @@ describe('rate-limit middleware', () => {
 
       const res = await app.request('/auth/login', {
         method: 'POST',
-        headers: { 'x-real-ip': '5.6.7.8' },
+        headers: {
+          'x-real-ip': '5.6.7.8',
+          // Token must be ignored on strict paths so IP-based brute-force
+          // protection cannot be bypassed by rotating tokens.
+          Authorization: 'Bearer should-be-ignored',
+        },
       });
       expect(res.status).toBe(200);
       expect(mockLimit).toHaveBeenCalledWith('5.6.7.8');
+    });
+
+    it('uses IP for /auth/signup and /auth/signup/availability', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 20,
+        remaining: 19,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitAuth())
+        .post('/auth/signup', (c) => c.json({ ok: true }))
+        .get('/auth/signup/availability', (c) => c.json({ ok: true }));
+
+      await app.request('/auth/signup', {
+        method: 'POST',
+        headers: { 'x-real-ip': '9.9.9.9' },
+      });
+      await app.request('/auth/signup/availability?nickname=foo', {
+        headers: { 'x-real-ip': '9.9.9.9' },
+      });
+
+      expect(mockLimit).toHaveBeenNthCalledWith(1, '9.9.9.9');
+      expect(mockLimit).toHaveBeenNthCalledWith(2, '9.9.9.9');
+    });
+
+    it('uses IP for /auth/oauth/* paths', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 20,
+        remaining: 19,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitAuth())
+        .post('/auth/oauth/google', (c) => c.json({ ok: true }));
+
+      await app.request('/auth/oauth/google', {
+        method: 'POST',
+        headers: { 'x-real-ip': '1.1.1.1' },
+      });
+      expect(mockLimit).toHaveBeenCalledWith('1.1.1.1');
+    });
+
+    it('works under a /api/v1 mount prefix (production routing)', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 20,
+        remaining: 19,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitAuth())
+        .post('/api/v1/auth/login', (c) => c.json({ ok: true }));
+
+      await app.request('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'x-real-ip': '3.3.3.3' },
+      });
+      expect(mockLimit).toHaveBeenCalledWith('3.3.3.3');
+    });
+  });
+
+  describe('rateLimitAuth (lenient — per-token post-auth paths)', () => {
+    it('uses hashed Bearer token as identifier for /auth/me', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: Date.now() + 60000,
+      });
+
+      const token = 'eyJabc.def.ghi';
+      const expectedHash = createHash('sha256').update(token).digest('hex').slice(0, 32);
+
+      const app = new Hono()
+        .use('/*', rateLimitAuth())
+        .get('/auth/me', (c) => c.json({ ok: true }));
+
+      const res = await app.request('/auth/me', {
+        headers: {
+          'x-real-ip': '7.7.7.7',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      expect(res.status).toBe(200);
+      expect(mockLimit).toHaveBeenCalledWith(`token:${expectedHash}`);
+    });
+
+    it('isolates per-token counters so shared-NAT users do not collide', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitAuth())
+        .post('/auth/refresh', (c) => c.json({ ok: true }));
+
+      // Two users behind the same NAT IP but with distinct tokens must hash
+      // to distinct identifiers.
+      await app.request('/auth/refresh', {
+        method: 'POST',
+        headers: { 'x-real-ip': '10.0.0.1', Authorization: 'Bearer user-a-token' },
+      });
+      await app.request('/auth/refresh', {
+        method: 'POST',
+        headers: { 'x-real-ip': '10.0.0.1', Authorization: 'Bearer user-b-token' },
+      });
+
+      const idA = mockLimit.mock.calls[0]?.[0];
+      const idB = mockLimit.mock.calls[1]?.[0];
+      expect(idA).not.toEqual(idB);
+      expect(idA).toMatch(/^token:/);
+      expect(idB).toMatch(/^token:/);
+    });
+
+    it('falls back to IP when no Bearer token is present', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 120,
+        remaining: 119,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitAuth())
+        .post('/auth/refresh', (c) => c.json({ ok: true }));
+
+      await app.request('/auth/refresh', {
+        method: 'POST',
+        headers: { 'x-real-ip': '4.4.4.4' },
+      });
+      expect(mockLimit).toHaveBeenCalledWith('4.4.4.4');
+    });
+
+    it('returns 429 with the lenient tier limit in the header', async () => {
+      mockLimit.mockResolvedValue({
+        success: false,
+        limit: 120,
+        remaining: 0,
+        reset: Date.now() + 30000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitAuth())
+        .get('/auth/me', (c) => c.json({ ok: true }));
+
+      const res = await app.request('/auth/me', {
+        headers: { Authorization: 'Bearer t', 'x-real-ip': '1.2.3.4' },
+      });
+      expect(res.status).toBe(429);
+      expect(res.headers.get('X-RateLimit-Limit')).toBe('120');
     });
   });
 
@@ -151,6 +316,47 @@ describe('rate-limit middleware', () => {
         headers: { 'x-real-ip': '1.2.3.4' },
       });
       expect(res.status).toBe(429);
+    });
+  });
+
+  describe('isStrictAuthPath', () => {
+    const strict = [
+      '/auth/login',
+      '/auth/signup',
+      '/auth/signup/availability',
+      '/auth/verify-otp',
+      '/auth/reset-password',
+      '/auth/oauth/google',
+      '/auth/oauth/callback',
+      '/auth/oauth/finalize',
+      '/api/v1/auth/login',
+      '/api/v1/auth/signup',
+      '/api/v1/auth/oauth/google',
+    ];
+    const lenient = [
+      '/auth/me',
+      '/auth/refresh',
+      '/auth/change-password',
+      '/auth/change-email',
+      '/auth/profile',
+      '/auth/update-password',
+      '/auth/nickname/check',
+      '/api/v1/auth/me',
+      '/api/v1/auth/refresh',
+      '/api/v1/auth/change-password',
+    ];
+
+    it.each(strict)('classifies %s as strict', (path) => {
+      expect(isStrictAuthPath(path)).toBe(true);
+    });
+
+    it.each(lenient)('classifies %s as lenient', (path) => {
+      expect(isStrictAuthPath(path)).toBe(false);
+    });
+
+    it('returns false when /auth/ segment is absent', () => {
+      expect(isStrictAuthPath('/api/v1/users/me')).toBe(false);
+      expect(isStrictAuthPath('/')).toBe(false);
     });
   });
 });
