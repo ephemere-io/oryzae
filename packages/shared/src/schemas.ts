@@ -70,7 +70,8 @@ export const createEntrySchema = z.object({
   editorVersion: z.string(),
   extension: z.record(z.unknown()).default({}),
   fermentationEnabled: z.boolean().optional(),
-  effects: editorEffectsStateSchema.optional(),
+  // undefined → 既存値を維持 / null → 明示的にクリア / object → 差し替え
+  effects: editorEffectsStateSchema.nullable().optional(),
 });
 
 export const questionStringSchema = z.object({
