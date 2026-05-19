@@ -29,14 +29,30 @@ const eraserTraceSchema = z.object({
   seed: z.number(),
 });
 
-const textSpanMarkSchema = z.discriminatedUnion('kind', [
+/**
+ * `time` variant stores the **resolved** font size (px) or font weight that the
+ * span was rendered with. We don't keep the `t` normalization because the
+ * effective size depends on `settings.fontSize` at composition time — re-deriving
+ * from `t` alone on restore would shrink/grow the text whenever the editor's
+ * base font size differs from the assumed default.
+ *
+ * Two `kind: 'time'` variants prevent us from using `z.discriminatedUnion('kind')`.
+ * `z.union` works — slightly slower parse for a small schema, fine here.
+ */
+const textSpanMarkSchema = z.union([
   z.object({
     kind: z.literal('time'),
     start: z.number().int().nonnegative(),
     end: z.number().int().nonnegative(),
-    mode: z.enum(['fontSize', 'fontWeight']),
-    t: z.number(),
-    duration: z.number(),
+    mode: z.literal('fontSize'),
+    fontSize: z.number().positive(),
+  }),
+  z.object({
+    kind: z.literal('time'),
+    start: z.number().int().nonnegative(),
+    end: z.number().int().nonnegative(),
+    mode: z.literal('fontWeight'),
+    fontWeight: z.number().int().positive(),
   }),
   z.object({
     kind: z.literal('pressure'),

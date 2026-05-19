@@ -81,13 +81,13 @@ describe('CreateEntryUsecase', () => {
       extension: {},
       effects: {
         version: 1,
-        textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', t: 0.5, duration: 200 }],
+        textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', fontSize: 18 }],
       },
     });
 
     expect(result.effects).toEqual({
       version: 1,
-      textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', t: 0.5, duration: 200 }],
+      textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', fontSize: 18 }],
     });
   });
 
