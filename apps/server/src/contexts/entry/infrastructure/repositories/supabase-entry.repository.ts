@@ -1,3 +1,4 @@
+import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
 import { Entry } from '../../domain/models/entry.js';
@@ -19,7 +20,31 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
-  async listByUserId(userId: string, cursor?: string, limit = 20): Promise<Entry[]> {
+  async listByUserId(
+    userId: string,
+    cursor?: string,
+    limit = 20,
+    questionId?: string,
+  ): Promise<Entry[]> {
+    // Issue #331: 問いで絞り込む場合は先に entry_question_links から
+    // 対象 entry_id 一覧を引いて IN フィルタにかける (PostgREST inner-join より
+    // 結果の安定性を優先した二段クエリ。view repository と同じ判断)。
+    if (questionId !== undefined) {
+      const entryIds = await this.fetchEntryIdsByQuestion(questionId);
+      if (entryIds.length === 0) return [];
+      let query = this.supabase
+        .from('entries')
+        .select('*')
+        .eq('user_id', userId)
+        .in('id', entryIds)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (cursor) query = query.lt('created_at', cursor);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+    }
+
     let query = this.supabase
       .from('entries')
       .select('*')
@@ -133,7 +158,15 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     query: string,
     cursor?: string,
     limit = 20,
+    questionId?: string,
   ): Promise<Entry[]> {
+    // Issue #331: 問い絞り込みと検索の同時利用
+    let entryIdsFilter: string[] | undefined;
+    if (questionId !== undefined) {
+      entryIdsFilter = await this.fetchEntryIdsByQuestion(questionId);
+      if (entryIdsFilter.length === 0) return [];
+    }
+
     let q = this.supabase
       .from('entries')
       .select('*')
@@ -142,6 +175,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       .order('created_at', { ascending: false })
       .limit(limit);
 
+    if (entryIdsFilter) q = q.in('id', entryIdsFilter);
     if (cursor) {
       q = q.lt('created_at', cursor);
     }
@@ -149,6 +183,15 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+  }
+
+  private async fetchEntryIdsByQuestion(questionId: string): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('entry_question_links')
+      .select('entry_id')
+      .eq('question_id', questionId);
+    if (error) throw error;
+    return ((data ?? []) as Array<{ entry_id: string }>).map((r) => r.entry_id);
   }
 
   async save(entry: Entry): Promise<void> {
@@ -159,6 +202,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       content: props.content,
       media_urls: props.mediaUrls,
       fermentation_enabled: props.fermentationEnabled,
+      effects: props.effects ?? {},
       created_at: props.createdAt,
       updated_at: props.updatedAt,
     });
@@ -177,8 +221,19 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       content: row.content as string,
       mediaUrls: (row.media_urls as string[]) ?? [],
       fermentationEnabled: (row.fermentation_enabled as boolean) ?? false,
+      effects: parseEffects(row.effects),
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     });
   }
+}
+
+// Parse the `effects` JSONB column. Older rows have `{}` (default), which we
+// treat as "no effects" (null). Unknown shapes are also coerced to null so a
+// malformed row doesn't break entry reads.
+function parseEffects(raw: unknown): EditorEffectsState | null {
+  if (!raw || typeof raw !== 'object') return null;
+  if (Object.keys(raw as object).length === 0) return null;
+  const parsed = editorEffectsStateSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 }

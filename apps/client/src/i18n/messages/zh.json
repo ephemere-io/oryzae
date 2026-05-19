@@ -119,7 +119,10 @@
       "results_count": "{count} 条结果",
       "week_label": "第 {n} 周",
       "load_more_loading": "加载中...",
-      "load_more": "加载更多"
+      "load_more": "加载更多",
+      "filter_by_question_label": "按问题筛选",
+      "filter_all_questions": "所有问题",
+      "filter_clear_aria": "清除筛选"
     },
     "leave_modal": {
       "aria_label": "离开确认对话框",
@@ -485,7 +488,13 @@
       "add_placeholder": "请输入你的提问",
       "cancel_add": "取消",
       "adding": "添加中...",
-      "add_submit": "添加"
+      "add_submit": "添加",
+      "pickle_success_modal": {
+        "body": "您的文字与问题已被腌入发酵瓶。请一边期待发酵的进展，一边继续书写您的日记。",
+        "dismiss": "知道了",
+        "aria_label": "腌制完成通知",
+        "heading": "已腌入发酵瓶"
+      }
     }
   },
   "questions": {

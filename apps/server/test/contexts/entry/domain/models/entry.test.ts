@@ -83,6 +83,7 @@ describe('Entry', () => {
         content: 'test',
         mediaUrls: ['url1'],
         fermentationEnabled: true,
+        effects: null,
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       };
@@ -98,6 +99,7 @@ describe('Entry', () => {
       content: 'original',
       mediaUrls: [],
       fermentationEnabled: false,
+      effects: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
@@ -131,6 +133,7 @@ describe('Entry', () => {
       content: 'original',
       mediaUrls: [],
       fermentationEnabled: false,
+      effects: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
@@ -145,6 +148,83 @@ describe('Entry', () => {
     it('元の Entry は変更されない（イミュータブル）', () => {
       entry.withFermentationEnabled(true);
       expect(entry.fermentationEnabled).toBe(false);
+    });
+  });
+
+  describe('effects (editor visual effects)', () => {
+    const baseProps = {
+      id: 'e-1',
+      userId: 'u-1',
+      content: 'original',
+      mediaUrls: [],
+      fermentationEnabled: false,
+      effects: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    it('create で effects を渡すと保持される', () => {
+      const result = Entry.create(
+        {
+          userId: 'u',
+          content: 'x',
+          mediaUrls: [],
+          fermentationEnabled: false,
+          effects: { version: 1, textSpans: [], eraserTraces: [] },
+        },
+        generateId,
+      );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.value.effects).toEqual({ version: 1, textSpans: [], eraserTraces: [] });
+      }
+    });
+
+    it('create で effects を省略すると null になる', () => {
+      const result = Entry.create(
+        { userId: 'u', content: 'x', mediaUrls: [], fermentationEnabled: false },
+        generateId,
+      );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.value.effects).toBeNull();
+      }
+    });
+
+    it('withContent に effects を渡すと差し替わる', () => {
+      const entry = Entry.fromProps(baseProps);
+      const next = entry.withContent('new', [], {
+        version: 1,
+        eraserTraces: [{ rx: 1, ry: 2, w: 3, h: 4, chars: ['a'], intensity: 0.1, seed: 7 }],
+      });
+      expect(next.success).toBe(true);
+      if (next.success) {
+        expect(next.value.effects?.eraserTraces).toHaveLength(1);
+      }
+    });
+
+    it('withContent で effects を省略すると既存値を維持する', () => {
+      const entry = Entry.fromProps({
+        ...baseProps,
+        effects: { version: 1, textSpans: [] },
+      });
+      const next = entry.withContent('new', []);
+      expect(next.success).toBe(true);
+      if (next.success) {
+        expect(next.value.effects).toEqual({ version: 1, textSpans: [] });
+      }
+    });
+
+    it('withContent で effects に null を渡すとクリアできる', () => {
+      const entry = Entry.fromProps({
+        ...baseProps,
+        effects: { version: 1, textSpans: [] },
+      });
+      const next = entry.withContent('new', [], null);
+      expect(next.success).toBe(true);
+      if (next.success) {
+        expect(next.value.effects).toBeNull();
+      }
     });
   });
 });
