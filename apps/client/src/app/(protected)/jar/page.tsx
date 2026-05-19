@@ -25,6 +25,14 @@ export default function JarPage() {
   // 質問構成変化を即座に演出に乗せる。
   const { readiness, refresh: refreshReadiness } = useFermentationReadiness(api, authLoading);
 
+  // issue #278 デバッグ用: readiness 値の遷移を console に出す。UI に数値を露出しない
+  // 設計上、開発者が瓶の演出と数値の対応を確認するための唯一の経路。
+  useEffect(() => {
+    if (readiness) {
+      console.log('[jar] fermentation readiness', readiness);
+    }
+  }, [readiness]);
+
   const fetchActiveQuestions = useCallback(async () => {
     if (!api) return;
     const res = await api.fetch('/api/v1/questions');
