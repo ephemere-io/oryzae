@@ -1,3 +1,4 @@
+import type { EditorEffectsState } from '@oryzae/shared';
 import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway.js';
 import { Entry, type EntryProps } from '../../domain/models/entry.js';
@@ -11,6 +12,7 @@ interface CreateEntryInput {
   editorVersion: string;
   extension: Record<string, unknown>;
   fermentationEnabled?: boolean;
+  effects?: EditorEffectsState | null;
 }
 
 export class CreateEntryUsecase {
@@ -27,6 +29,7 @@ export class CreateEntryUsecase {
         content: input.content,
         mediaUrls: input.mediaUrls,
         fermentationEnabled: input.fermentationEnabled ?? false,
+        effects: input.effects ?? null,
       },
       this.generateId,
     );

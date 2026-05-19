@@ -35,7 +35,7 @@ export default function NewEntryPage() {
   const handleSaveTransition = useCallback(
     async (text: string, editorEl: HTMLElement) => {
       await runTransition(text, editorEl);
-      router.push('/jar');
+      router.push('/jar?justPickled=1');
     },
     [runTransition, router],
   );

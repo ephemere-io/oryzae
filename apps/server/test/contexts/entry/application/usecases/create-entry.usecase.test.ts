@@ -72,6 +72,36 @@ describe('CreateEntryUsecase', () => {
     expect(result.fermentationEnabled).toBe(false);
   });
 
+  it('effects を渡すと Entry に保存される', async () => {
+    const result = await usecase.execute('user-1', {
+      content: 'Hello',
+      mediaUrls: [],
+      editorType: 'typetrace',
+      editorVersion: '1.0.0',
+      extension: {},
+      effects: {
+        version: 1,
+        textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', t: 0.5, duration: 200 }],
+      },
+    });
+
+    expect(result.effects).toEqual({
+      version: 1,
+      textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', t: 0.5, duration: 200 }],
+    });
+  });
+
+  it('effects 未指定なら null', async () => {
+    const result = await usecase.execute('user-1', {
+      content: 'Hello',
+      mediaUrls: [],
+      editorType: 'typetrace',
+      editorVersion: '1.0.0',
+      extension: {},
+    });
+    expect(result.effects).toBeNull();
+  });
+
   it('content が空文字なら EntryValidationError を throw する', async () => {
     await expect(
       usecase.execute('user-1', {
