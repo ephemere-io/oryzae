@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@oryzae/server": "workspace:*",
+    "@oryzae/shared": "workspace:*",
     "@sentry/nextjs": "^10.51.0",
     "next": "16.2.4",
     "next-intl": "^4.11.0",

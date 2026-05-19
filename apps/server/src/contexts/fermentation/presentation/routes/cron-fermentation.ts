@@ -3,7 +3,9 @@ import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositor
 import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
+import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
+import { createCronAuthMiddleware } from '../../../shared/presentation/middleware/cron-auth.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
 import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
@@ -16,20 +18,13 @@ import { SupabaseUserFermentationStateRepository } from '../../infrastructure/re
 const generateId = () => crypto.randomUUID();
 
 export const cronFermentation = new Hono()
-  .use('*', async (c, next) => {
-    const authHeader = c.req.header('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret) {
-      return c.json({ error: 'CRON_SECRET not configured' }, 500);
-    }
-
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    await next();
-  })
+  .use(
+    '*',
+    createCronAuthMiddleware({
+      routeName: 'cron-fermentation',
+      discordTitlePrefix: '発酵 cron',
+    }),
+  )
   .post('/', async (c) => {
     const supabase = getSupabaseClient();
 
@@ -76,10 +71,37 @@ export const cronFermentation = new Hono()
 
     // issue #268 以降、発火条件はユーザー単位の状態 (lastRunAt + 文字数 + ランダム X 時間)
     // で決まるため、cron は「現時刻」を渡すだけで良い (旧来の dateKey は不要)。
-    const result = await usecase.execute(new Date());
+    try {
+      const result = await usecase.execute(new Date());
 
-    return c.json({
-      message: 'Scheduled fermentation completed',
-      ...result,
-    });
+      const hasFailures =
+        result.failed > 0 || result.errors.length > 0 || result.emailFailures.length > 0;
+
+      await notifyDiscord({
+        title: hasFailures ? '発酵 cron: 完了（一部失敗）' : '発酵 cron: 完了',
+        color: hasFailures ? COLORS.WARNING : COLORS.SUCCESS,
+        fields: [
+          { name: 'totalUsers', value: String(result.totalUsers), inline: true },
+          { name: 'eligibleUsers', value: String(result.eligibleUsers), inline: true },
+          { name: 'totalFermentations', value: String(result.totalFermentations), inline: true },
+          { name: 'succeeded', value: String(result.succeeded), inline: true },
+          { name: 'failed', value: String(result.failed), inline: true },
+          { name: 'emailFailures', value: String(result.emailFailures.length), inline: true },
+        ],
+      });
+
+      return c.json({
+        message: 'Scheduled fermentation completed',
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[cron-fermentation] execution failed', { error: message });
+      await notifyDiscord({
+        title: '発酵 cron: 実行中にエラー',
+        description: message,
+        color: COLORS.ERROR,
+      });
+      return c.json({ error: 'Internal Server Error', message }, 500);
+    }
   });
