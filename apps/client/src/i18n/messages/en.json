@@ -491,7 +491,9 @@
       "add_submit": "Add",
       "pickle_success_modal": {
         "body": "Your text and question have been pickled in the jar. Keep writing in your journal while you look forward to the fermentation progressing.",
-        "dismiss": "Got it"
+        "dismiss": "Got it",
+        "aria_label": "Pickling complete notification",
+        "heading": "Pickled in the jar"
       }
     }
   },

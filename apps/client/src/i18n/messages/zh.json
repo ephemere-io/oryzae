@@ -491,7 +491,9 @@
       "add_submit": "添加",
       "pickle_success_modal": {
         "body": "您的文字与问题已被腌入发酵瓶。请一边期待发酵的进展，一边继续书写您的日记。",
-        "dismiss": "知道了"
+        "dismiss": "知道了",
+        "aria_label": "腌制完成通知",
+        "heading": "已腌入发酵瓶"
       }
     }
   },
