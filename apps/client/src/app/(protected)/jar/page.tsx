@@ -26,6 +26,9 @@ export default function JarPage() {
   // 問い追加/編集/archive 後にも refresh して、エントリ追加直後の反映と
   // 質問構成変化を即座に演出に乗せる。
   const { readiness, refresh: refreshReadiness } = useFermentationReadiness(api, authLoading);
+  // issue #278 デバッグ用: スライダーで readiness を手動上書きできる。
+  // null のとき API 値を使い、数値が入っていればそれを JarView に渡す。本番 deploy 前に外す。
+  const [debugReadinessOverride, setDebugReadinessOverride] = useState<number | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const justPickled = searchParams.get('justPickled') === '1';
@@ -89,18 +92,47 @@ export default function JarPage() {
     await refreshReadiness();
   }
 
+  const effectiveReadiness = debugReadinessOverride ?? readiness?.totalReadiness ?? 0;
+
   return (
     <div className="absolute inset-0">
       <JarView
         api={api}
         authLoading={authLoading}
         questions={questions}
-        readiness={readiness?.totalReadiness ?? 0}
+        readiness={effectiveReadiness}
         onAddQuestion={handleAddQuestion}
         onEditQuestion={handleEditQuestion}
         onArchiveQuestion={handleArchiveQuestion}
       />
       <PickleSuccessModal open={pickleSuccessOpen} onClose={() => setPickleSuccessOpen(false)} />
+      {/* issue #278 デバッグ用: readiness を 0.0–3.0 で手動上書き。本番 deploy 前に削除する。 */}
+      <div
+        className="absolute top-3 right-3 z-[200] flex flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)]/90 px-3 py-2 text-[11px] text-[var(--fg)] shadow-md backdrop-blur"
+        style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span>debug: readiness</span>
+          <span className="tabular-nums">{effectiveReadiness.toFixed(2)}</span>
+        </div>
+        <input
+          aria-label="readiness override slider"
+          type="range"
+          min={0}
+          max={3}
+          step={0.05}
+          value={debugReadinessOverride ?? readiness?.totalReadiness ?? 0}
+          onChange={(e) => setDebugReadinessOverride(Number(e.target.value))}
+          className="w-48"
+        />
+        <button
+          type="button"
+          onClick={() => setDebugReadinessOverride(null)}
+          className="self-end text-[10px] text-[var(--date-color)] underline hover:text-[var(--fg)]"
+        >
+          reset (API 値に戻す)
+        </button>
+      </div>
     </div>
   );
 }
