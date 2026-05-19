@@ -338,9 +338,9 @@ export function JarView({
     [readiness],
   );
 
-  // 微生物アニメ速度: activityNorm が上がるほど周期が短くなる。
-  // 既存 base 8/12/10 秒 → 最大で 1/2.5 倍速 (= 4 倍速まで届かないように抑える)。
-  const microbeAnimSpeed = 1 + activityNorm * 1.5 + bubbleNorm * 1.0;
+  // 微生物アニメ速度: activityNorm/bubbleNorm が上がるほど周期が短くなる。
+  // 既存 base 8/12/10 秒 → 3.0 で 4 倍速付近まで上昇させる。
+  const microbeAnimSpeed = 1 + activityNorm * 1.5 + bubbleNorm * 1.5;
   // 微生物のうち何体まで表示するか: fillNorm が低いと数も少なく見える。
   const visibleMicrobeCount = Math.max(
     1,
@@ -348,15 +348,18 @@ export function JarView({
   );
   // 粒子 (テキスト) の opacity をマスターブースト。fillNorm に追従。
   const particleBoost = 0.6 + fillNorm * 0.6;
-  // 液体充填の不透明度。空でも気配は残し、満ちると視認性を上げる。
-  const liquidOpacity = 0.25 + fillNorm * 0.45;
-  // 液体グラデの基底色相: bubble 域に入ると活性化の演出として黄み寄りに振る。
-  const liquidWarmth = bubbleNorm; // 0..1, グラデ stop の色補間に使う
+  // 液体充填の不透明度。0.1 でも瓶底の色がしっかり見える視認性を確保し、満ちるとさらに濃くなる。
+  // 0.1: ~0.49 / 1.0: ~0.85 / 2.0: ~0.95 / 3.0: 1.0 (clamp)
+  const liquidOpacity = Math.min(1, 0.45 + fillNorm * 0.4 + (activityNorm + bubbleNorm) * 0.1);
+  // 液体グラデの基底色相: readiness 全域でじわじわ濃く・黄み寄りに振る (旧: bubble 域のみ)。
+  // 0.1: 0.04 / 1.0: 0.4 / 2.0: 0.8 / 3.0: 1.0 (clamp)
+  const liquidWarmth = Math.min(1, readiness / 2.5);
   // 液体パスの bottom-anchor scaleY: fillNorm が低いと底に沈み、満ちると本来のサイズ。
   // SVG transform-origin はパス座標系に合わせて (240, 580) ≈ ジャー底中央。
   const liquidScaleY = 0.55 + fillNorm * 0.45;
-  // 泡: bubbleNorm > 0 のときだけ描画。最大 10 個。
-  const bubbleCount = Math.round(bubbleNorm * 10);
+  // 泡: readiness > 0 で最低 1 個出し、3.0 で最大 14 個まで激しく立ち上がる。
+  // 0.1: 1 / 0.5: 2 / 1.0: 5 / 2.0: 9 / 3.0: 14
+  const bubbleCount = readiness > 0 ? Math.max(1, Math.round((readiness / 3) * 14)) : 0;
 
   const handleElementClick = useCallback(
     (
@@ -593,14 +596,25 @@ export function JarView({
           </g>
           <defs>
             <linearGradient id="j2-fermentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              {/* readiness が bubbleNorm 域に入ると下部 stop を黄み寄りに振り、発酵活性を示唆 */}
-              <stop offset="0%" stopColor="rgba(226,194,142,0.1)" />
-              <stop offset="50%" stopColor="rgba(142,168,156,0.2)" />
+              {/* readiness 全域でグラデ stop を徐々に濃く・黄み寄りに振る。
+                  3.0 では全 stop が濃いキャラメル色になり「ぶくぶくと激しい発酵」を示唆。 */}
+              <stop
+                offset="0%"
+                stopColor={`rgba(${Math.round(226 + liquidWarmth * 10)},${Math.round(
+                  194 - liquidWarmth * 10,
+                )},${Math.round(142 - liquidWarmth * 20)},${0.1 + liquidWarmth * 0.25})`}
+              />
+              <stop
+                offset="50%"
+                stopColor={`rgba(${Math.round(180 + liquidWarmth * 30)},${Math.round(
+                  168 - liquidWarmth * 30,
+                )},${Math.round(156 - liquidWarmth * 50)},${0.2 + liquidWarmth * 0.35})`}
+              />
               <stop
                 offset="100%"
-                stopColor={`rgba(${Math.round(226 + liquidWarmth * 20)},${Math.round(
-                  194 - liquidWarmth * 20,
-                )},${Math.round(142 - liquidWarmth * 40)},${0.4 + liquidWarmth * 0.2})`}
+                stopColor={`rgba(${Math.round(226 + liquidWarmth * 30)},${Math.round(
+                  194 - liquidWarmth * 40,
+                )},${Math.round(142 - liquidWarmth * 60)},${0.45 + liquidWarmth * 0.4})`}
               />
             </linearGradient>
             <linearGradient id="j2-highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -683,9 +697,11 @@ export function JarView({
           {bubbleCount > 0 &&
             Array.from({ length: bubbleCount }).map((_, i) => {
               const left = 25 + ((i * 41) % 50);
-              const size = 4 + (i % 4) * 2;
+              // 3.0 域では泡が大きく激しく立ち昇る (base 4-10px → +bubbleNorm で最大 +4px)
+              const size = 4 + (i % 4) * 2 + bubbleNorm * 4;
               const delay = (i * 0.3) % 2.5;
-              const duration = 3 + ((i * 7) % 4) - bubbleNorm * 1.5;
+              // 3.0 域では周期も短くなる (base 3-6s → bubbleNorm 1.0 で -2.5s)
+              const duration = 3 + ((i * 7) % 4) - bubbleNorm * 2.5;
               return (
                 <div
                   // biome-ignore lint/suspicious/noArrayIndexKey: 配列は readiness 由来で安定
@@ -700,9 +716,10 @@ export function JarView({
                     borderRadius: '50%',
                     background:
                       'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(226,194,142,0.5) 60%, transparent 75%)',
-                    opacity: 0.55 + bubbleNorm * 0.3,
+                    // 低 readiness でも泡が見えるよう floor を上げ、3.0 でほぼ不透明にする
+                    opacity: Math.min(1, 0.6 + Math.min(1, readiness / 3) * 0.4),
                     animationDelay: `${delay}s`,
-                    animationDuration: `${Math.max(1.5, duration)}s`,
+                    animationDuration: `${Math.max(1.2, duration)}s`,
                     pointerEvents: 'none',
                   }}
                 />
