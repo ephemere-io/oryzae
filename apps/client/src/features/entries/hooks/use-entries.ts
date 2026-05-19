@@ -47,12 +47,18 @@ function normalizeEntry(raw: unknown): Entry {
   };
 }
 
-export function useEntries(api: ApiClient | null, authLoading: boolean, search?: string) {
+export function useEntries(
+  api: ApiClient | null,
+  authLoading: boolean,
+  search?: string,
+  questionId?: string,
+) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(true);
   const prevSearchRef = useRef(search);
+  const prevQuestionIdRef = useRef(questionId);
 
   const fetchEntries = useCallback(
     async (nextCursor?: string) => {
@@ -62,6 +68,7 @@ export function useEntries(api: ApiClient | null, authLoading: boolean, search?:
       const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
       if (nextCursor) params.set('cursor', nextCursor);
       if (search) params.set('q', search);
+      if (questionId) params.set('questionId', questionId);
 
       const res = await api.fetch(`/api/v1/entries?${params}`);
 
@@ -77,17 +84,19 @@ export function useEntries(api: ApiClient | null, authLoading: boolean, search?:
 
       setLoading(false);
     },
-    [api, search],
+    [api, search, questionId],
   );
 
   useEffect(() => {
-    if (prevSearchRef.current !== search) {
+    // Issue #331: 検索キーワードまたは問いフィルタが切り替わったらカーソルとリストをリセット
+    if (prevSearchRef.current !== search || prevQuestionIdRef.current !== questionId) {
       prevSearchRef.current = search;
+      prevQuestionIdRef.current = questionId;
       setEntries([]);
       setCursor(undefined);
       setHasMore(true);
     }
-  }, [search]);
+  }, [search, questionId]);
 
   useEffect(() => {
     if (!authLoading && api) {

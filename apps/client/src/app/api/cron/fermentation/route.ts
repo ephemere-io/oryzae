@@ -1,6 +1,7 @@
 import app from '@oryzae/server';
 
-export const maxDuration = 300;
+// Vercel Pro + Fluid Compute の上限 (800s)。並列化と併用してタイムアウトを回避する。
+export const maxDuration = 800;
 
 export async function GET(req: Request) {
   // Vercel Cron sends GET with Authorization: Bearer <CRON_SECRET>

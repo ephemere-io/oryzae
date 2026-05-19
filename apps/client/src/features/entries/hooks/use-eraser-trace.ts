@@ -8,6 +8,10 @@ import { useEffect, useRef } from 'react';
  * 文字を削除すると、その位置に薄いブラーのかかった「残像」が Canvas 上に描画される。
  * 同じ位置で繰り返し削除すると intensity が増す (BASE 0.07 → MAX 0.22)。
  * 各残像はシード付きランダムのスケッチ線で装飾される。
+ *
+ * rx/ry はエディタのコンテンツ座標系（scrollLeft/Top を加算した値）で保持し、
+ * 描画時に現在のスクロール量を差し引く。これにより縦書きの横スクロールでも
+ * 消し跡がテキストと一緒に動く（Issue #313）。
  */
 
 interface Trace {
@@ -121,16 +125,33 @@ function charRangeBefore(sel: Selection): Range | null {
   return null;
 }
 
+/**
+ * 戻り値 `getTracesSnapshot` で現在の trace 配列のコピーを取得できる。
+ * エディタの保存時にこのスナップショットを extract に渡すことで、消し跡を永続化する。
+ */
+interface UseEraserTraceResult {
+  getTracesSnapshot: () => Trace[];
+}
+
 export function useEraserTrace(
   editorRef: React.RefObject<HTMLDivElement | null>,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   enabled: boolean,
   fontSize: number,
-) {
+  initialTraces?: Trace[],
+): UseEraserTraceResult {
   const tracesRef = useRef<Trace[]>([]);
   const pendingRef = useRef<PendingDel | null>(null);
   const smudgeCacheRef = useRef(new Map<string, HTMLCanvasElement>());
   const redrawQueuedRef = useRef(false);
+  // Hydrate persisted traces once on mount and whenever a fresh batch comes in
+  // (e.g. entry switch). We seed only when the incoming reference changes —
+  // typing-time mutations stay in tracesRef.
+  const lastInitialRef = useRef<Trace[] | undefined>(undefined);
+  if (initialTraces !== lastInitialRef.current) {
+    lastInitialRef.current = initialTraces;
+    tracesRef.current = initialTraces ? initialTraces.map((t) => ({ ...t })) : [];
+  }
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -144,15 +165,20 @@ export function useEraserTrace(
       return;
     }
 
-    // Resize canvas to match editor
+    // Resize canvas to match editor — overlay exactly on the editor's box (not
+    // the scroll parent), so vertical-mode (editor at offsetLeft > 0) renders
+    // smudges aligned with the text.
     function resizeCanvas() {
       if (!canvas || !editor) return;
       const dpr = window.devicePixelRatio || 1;
-      const rect = editor.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      const w = editor.offsetWidth;
+      const h = editor.offsetHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      canvas.style.left = `${editor.offsetLeft}px`;
+      canvas.style.top = `${editor.offsetTop}px`;
     }
     resizeCanvas();
 
@@ -167,7 +193,7 @@ export function useEraserTrace(
 
     function draw() {
       redrawQueuedRef.current = false;
-      if (!canvas) return;
+      if (!canvas || !editor) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       const dpr = window.devicePixelRatio || 1;
@@ -179,13 +205,20 @@ export function useEraserTrace(
       const traces = tracesRef.current;
       if (traces.length === 0) return;
 
+      // Canvas overlays the editor box exactly. Convert from content-space
+      // (rx/ry are stored with editor.scrollLeft/Top added) to canvas-local
+      // coords by subtracting the current scroll offset.
+      const scrollLeft = editor.scrollLeft;
+      const scrollTop = editor.scrollTop;
       const sz = Math.ceil(fontSize * 1.4) + 12;
       for (const t of traces) {
-        if (t.rx < -sz || t.ry < -sz || t.rx > cw + sz || t.ry > ch + sz) continue;
+        const dx = t.rx - scrollLeft;
+        const dy = t.ry - scrollTop;
+        if (dx < -sz || dy < -sz || dx > cw + sz || dy > ch + sz) continue;
         for (const c of t.chars) {
           const smudge = getSmudge(c, t.seed);
           ctx.globalAlpha = t.intensity;
-          ctx.drawImage(smudge, t.rx + t.w / 2 - sz / 2, t.ry + t.h / 2 - sz / 2, sz, sz);
+          ctx.drawImage(smudge, dx + t.w / 2 - sz / 2, dy + t.h / 2 - sz / 2, sz, sz);
         }
       }
       ctx.globalAlpha = 1;
@@ -201,9 +234,11 @@ export function useEraserTrace(
       const rect = charRange.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return null;
       const editorRect = editor!.getBoundingClientRect();
+      // Store in editor's content coordinate system so scrolling doesn't
+      // detach the smudge from the text it was generated from.
       return {
-        rx: rect.left - editorRect.left,
-        ry: rect.top - editorRect.top,
+        rx: rect.left - editorRect.left + editor!.scrollLeft,
+        ry: rect.top - editorRect.top + editor!.scrollTop,
         w: rect.width,
         h: rect.height,
       };
@@ -257,6 +292,9 @@ export function useEraserTrace(
     editor.addEventListener('scroll', requestRedraw);
     window.addEventListener('resize', resizeCanvas);
 
+    // Render any hydrated traces immediately so the canvas paints on mount.
+    if (tracesRef.current.length > 0) requestRedraw();
+
     return () => {
       editor.removeEventListener('beforeinput', onBeforeInput);
       editor.removeEventListener('input', onInput);
@@ -265,4 +303,8 @@ export function useEraserTrace(
       smudgeCacheRef.current.clear();
     };
   }, [editorRef, canvasRef, enabled, fontSize]);
+
+  return {
+    getTracesSnapshot: () => tracesRef.current.map((t) => ({ ...t })),
+  };
 }

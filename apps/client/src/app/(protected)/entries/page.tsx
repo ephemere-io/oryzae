@@ -1,11 +1,27 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { EntryList } from '@/features/entries/components/entry-list';
+import { EntryList, type FilterableQuestion } from '@/features/entries/components/entry-list';
+import { useQuestions } from '@/features/questions/hooks/use-questions';
 
 export default function EntriesPage() {
   const { api, loading } = useAuth();
+  // Issue #331: 一覧の問いフィルタ用に問い一覧を取得。
+  // features 間直接依存禁止のため、ページ層で取得して EntryList に props で渡す。
+  const { questions } = useQuestions(api, loading);
+
+  const availableQuestions: FilterableQuestion[] = useMemo(
+    () =>
+      questions.flatMap((q) => {
+        if (q.isArchived) return [];
+        const text = q.currentText;
+        if (text === null || text.length === 0) return [];
+        return [{ id: q.id, currentText: text }];
+      }),
+    [questions],
+  );
 
   return (
     <div className="flex min-h-full flex-col">
@@ -27,7 +43,7 @@ export default function EntriesPage() {
           </Link>
         </div>
 
-        <EntryList api={api} authLoading={loading} />
+        <EntryList api={api} authLoading={loading} availableQuestions={availableQuestions} />
       </div>
     </div>
   );

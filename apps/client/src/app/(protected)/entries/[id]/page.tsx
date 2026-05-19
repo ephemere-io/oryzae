@@ -44,6 +44,7 @@ export default function EntryDetailPage() {
     <EntryEditor
       entryId={entry.id}
       initialContent={entry.content}
+      initialEffects={entry.effects}
       createdAt={entry.createdAt}
       updatedAt={entry.updatedAt}
       api={api}

@@ -9,8 +9,9 @@ export class SearchEntriesUsecase {
     query: string,
     cursor?: string,
     limit?: number,
+    questionId?: string,
   ): Promise<EntryProps[]> {
-    const entries = await this.entryRepo.searchByUserId(userId, query, cursor, limit);
+    const entries = await this.entryRepo.searchByUserId(userId, query, cursor, limit, questionId);
     return entries.map((entry) => entry.toProps());
   }
 }

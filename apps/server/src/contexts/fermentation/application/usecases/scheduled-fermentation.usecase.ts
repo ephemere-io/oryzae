@@ -35,6 +35,12 @@ interface ScheduledFermentationResult {
 //   5. readinessScore と charsSinceLast を毎回 DB に upsert (admin/UI 反映用)
 //   6. eligible なら fermentation_enabled=true のエントリで紐付く問いごとに発酵実行
 //   7. 1問でも実行されたら次回 X 時間 (24-168h) を再ロールして state を更新
+//
+// 並列化 (issue #341): ユーザー処理を worker-pool で並列実行。
+// LLM 1 呼び出しが数十秒かかるため、シリアルだと Vercel の 300s タイムアウトを
+// 超えることが判明 (実害発生)。AI Gateway のレート制限と DB 同時接続を考慮し
+// デフォルト同時実行 4 とした。質問単位のループは内側でシリアルのまま (各ユーザー
+// 内の質問数は通常 1-3 で支配的でない)。
 export class ScheduledFermentationUsecase {
   constructor(
     private entryRepo: EntryRepositoryGateway,
@@ -58,6 +64,8 @@ export class ScheduledFermentationUsecase {
     ) => Promise<unknown>,
     // 次回 X 時間生成器。テストでは固定値を注入して決定論的にする。
     private rollHours: () => number = rollRandomHours,
+    // ユーザー並列実行数。テストでは 1 を渡して順序を決定論的にできる。
+    private concurrency: number = 4,
   ) {}
 
   async execute(now: Date = new Date()): Promise<ScheduledFermentationResult> {
@@ -83,7 +91,9 @@ export class ScheduledFermentationUsecase {
     const successfulTitlesByUser = new Map<string, string[]>();
     const languageByUser = new Map<string, FermentationLanguage>();
 
-    for (const userId of userIds) {
+    // 1 ユーザー分の処理。共有 state (result/Map) を mutate するが、JS シングル
+    // スレッドかつ await 境界での mutate のみのため worker 間競合は起きない。
+    const processUser = async (userId: string): Promise<void> => {
       // 1. ロケール解決 (失敗時は 'ja')
       const language = await this.localeResolver.resolve(userId);
       languageByUser.set(userId, language);
@@ -109,17 +119,17 @@ export class ScheduledFermentationUsecase {
       const stateWithReadiness = readinessUpdate.success ? readinessUpdate.value : state;
       await this.userStateRepo.upsert(stateWithReadiness);
 
-      if (!evaluation.eligible) continue;
+      if (!evaluation.eligible) return;
 
       // 6. 発火対象のエントリを取得 (lastRunAt 以降の fermentation_enabled=true)
       const fermentationEnabledEntries = await this.entryRepo.listFermentationEnabledByUserIdSince(
         userId,
         sinceIso,
       );
-      if (fermentationEnabledEntries.length === 0) continue;
+      if (fermentationEnabledEntries.length === 0) return;
 
       const activeQuestions = await this.questionRepo.listActiveByUserId(userId);
-      if (activeQuestions.length === 0) continue;
+      if (activeQuestions.length === 0) return;
 
       let firedAtLeastOne = false;
 
@@ -178,7 +188,21 @@ export class ScheduledFermentationUsecase {
           await this.userStateRepo.upsert(fired.value);
         }
       }
-    }
+    };
+
+    // worker-pool でユーザーを並列処理 (issue #341)。
+    // queue.shift() を奪い合う方式で外部 dep なし。各 worker は順次次のユーザーを
+    // 取りに行くため、処理時間のばらつきがあっても遊休が出にくい。
+    const queue = [...userIds];
+    const workerCount = Math.min(this.concurrency, queue.length);
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const userId = queue.shift();
+        if (!userId) return;
+        await processUser(userId);
+      }
+    });
+    await Promise.all(workers);
 
     for (const [userId, titles] of successfulTitlesByUser) {
       const lang = languageByUser.get(userId) ?? 'ja';

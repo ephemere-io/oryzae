@@ -1,5 +1,6 @@
 'use client';
 
+import type { EditorEffectsState } from '@oryzae/shared';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -38,6 +39,14 @@ import {
   useVoiceDynamics,
   type VoiceUnavailableReason,
 } from '@/features/entries/hooks/use-voice-dynamics';
+import {
+  loadCachedEffects,
+  saveCachedEffects,
+} from '@/features/entries/utils/editor-effects-cache';
+import {
+  applyTextSpansToEditor,
+  extractEditorEffects,
+} from '@/features/entries/utils/editor-effects-codec';
 import type { ApiClient } from '@/lib/api';
 import { SIDEBAR_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
 
@@ -54,6 +63,12 @@ interface EntryEditorProps {
   entryId?: string;
   initialContent?: string;
   initialTitle?: string;
+  /**
+   * Persisted visual effects loaded from the server (or warm cache).
+   * Drives initial canvas traces + DOM eblock/v-block restoration.
+   * Issue #332 — see docs/editor-effects-persistence.md.
+   */
+  initialEffects?: EditorEffectsState | null;
   createdAt?: string;
   updatedAt?: string;
   api: ApiClient | null;
@@ -94,6 +109,7 @@ export function EntryEditor({
   entryId,
   initialContent = '',
   initialTitle,
+  initialEffects = null,
   createdAt: createdAtIso,
   updatedAt: updatedAtIso,
   api,
@@ -232,10 +248,26 @@ export function EntryEditor({
     return () => setSidebarHidden(false);
   }, [uiVisible, setSidebarHidden]);
 
+  // Resolve persisted effects. The server value (passed via prop) is SSoT;
+  // the localStorage cache only fills the gap until the server reply arrives —
+  // and is updated immediately on each save so subsequent reloads feel instant.
+  const cachedInitialEffects = useRef<EditorEffectsState | null>(null);
+  if (cachedInitialEffects.current === null) {
+    cachedInitialEffects.current = loadCachedEffects(entryId);
+  }
+  const effectiveInitialEffects: EditorEffectsState | null =
+    initialEffects ?? cachedInitialEffects.current ?? null;
+
   useGhostEffect(editorRef, ghostLayerRef, settings);
   useAmpEffect(settings.ampEnabled);
   useTimeInscription(editorRef, settings);
-  useEraserTrace(editorRef, traceCanvasRef, settings.eraserTraceEnabled, settings.fontSize);
+  const { getTracesSnapshot } = useEraserTrace(
+    editorRef,
+    traceCanvasRef,
+    settings.eraserTraceEnabled,
+    settings.fontSize,
+    effectiveInitialEffects?.eraserTraces,
+  );
   usePressureBleed(
     editorRef,
     settings.timeInscriptionEnabled && settings.timeInscriptionMode === 'pressureBleed',
@@ -300,6 +332,7 @@ export function EntryEditor({
   }, [hasUnsavedChanges]);
 
   const initialContentStable = initialContent;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: effectiveInitialEffects is hydrated once per entry-switch; we intentionally don't rerun on its identity changing during the editing session
   useEffect(() => {
     if (entryId) {
       const p = splitTitleBody(initialContentStable);
@@ -308,6 +341,9 @@ export function EntryEditor({
       setSavedContent(p.body);
       if (editorRef.current && p.body) {
         editorRef.current.textContent = p.body;
+        if (effectiveInitialEffects?.textSpans?.length) {
+          applyTextSpansToEditor(editorRef.current, effectiveInitialEffects.textSpans);
+        }
       }
     } else {
       setContent(initialContentStable);
@@ -337,14 +373,31 @@ export function EntryEditor({
       const linkedCountBeforeSave = linkedIds.size;
       const justPickled = options.fermentationEnabled === true;
 
+      // Issue #332: スナップショットを取って effects を save payload に同梱する。
+      // editor DOM が存在しなければ null（既存値を維持）を送る。
+      const effectsSnapshot = editorRef.current
+        ? extractEditorEffects(editorRef.current, getTracesSnapshot())
+        : null;
+
+      const saveOptions: {
+        fermentationEnabled?: boolean;
+        effects?: EditorEffectsState | null;
+      } = {};
+      if (options.fermentationEnabled !== undefined) {
+        saveOptions.fermentationEnabled = options.fermentationEnabled;
+      }
+      if (editorRef.current) {
+        saveOptions.effects = effectsSnapshot;
+      }
+
       const savedId = await save(
         finalContent,
         targetId,
-        options.fermentationEnabled !== undefined
-          ? { fermentationEnabled: options.fermentationEnabled }
-          : undefined,
+        Object.keys(saveOptions).length > 0 ? saveOptions : undefined,
       );
       if (savedId) {
+        // localStorage warm cache を即時更新（次回オープン時の遅延ゼロ表示用）
+        saveCachedEffects(savedId, effectsSnapshot);
         setTitle(newTitle.trim());
         setSavedContent(content);
         setCurrentEntryId(savedId);
@@ -410,6 +463,7 @@ export function EntryEditor({
       createdAtIso,
       t,
       userMe,
+      getTracesSnapshot,
     ],
   );
 
@@ -1025,8 +1079,8 @@ export function EntryEditor({
           {/* Snippet selection toolbar */}
           <SnippetToolbar editorRef={editorRef} api={api} />
 
-          {/* Eraser trace canvas */}
-          <canvas ref={traceCanvasRef} className="pointer-events-none absolute inset-0 z-[1]" />
+          {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
+          <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
 
           <div
             ref={editorRef}
