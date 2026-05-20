@@ -75,20 +75,35 @@ interface ScanState {
 
 function scanTextSpans(editor: HTMLElement): TextSpanMark[] {
   const state: ScanState = { cursor: 0, marks: [] };
-  walkScan(editor, state);
+  walkScan(editor, null, state);
   return state.marks;
 }
 
-function walkScan(node: Node, state: ScanState): void {
+/**
+ * `ancestor` は「現在の text node に対する effective eblock/v-block 祖先」。
+ * CSS の inline style は最も内側が勝つので、ネストした eblock がある場合は
+ * 一番内側 (最後に walkScan で更新された) の祖先の属性が描画上有効。
+ * use-time-inscription が連続入力時に新しい span をカーソル位置の親 (= 既存の
+ * eblock) の中に挿入してしまい、深い nest が生まれることがある (既存の挙動)
+ * — 永続化側はこの構造をそのままシリアライズする必要がある。
+ */
+function walkScan(node: Node, ancestor: HTMLElement | null, state: ScanState): void {
   const children = node.childNodes;
   for (let i = 0; i < children.length; i++) {
-    visitScan(children[i], state);
+    visitScan(children[i], ancestor, state);
   }
 }
 
-function visitScan(node: Node, state: ScanState): void {
+function visitScan(node: Node, ancestor: HTMLElement | null, state: ScanState): void {
   if (node.nodeType === Node.TEXT_NODE) {
-    state.cursor += (node.textContent ?? '').length;
+    const text = node.textContent ?? '';
+    if (ancestor && text.length > 0) {
+      const start = state.cursor;
+      const end = start + text.length;
+      const mark = markFromElement(ancestor, start, end);
+      if (mark) state.marks.push(mark);
+    }
+    state.cursor += text.length;
     return;
   }
   if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -101,15 +116,12 @@ function visitScan(node: Node, state: ScanState): void {
     state.cursor += 1;
   }
   if (isEffectSpan(el)) {
-    const text = el.textContent ?? '';
-    const start = state.cursor;
-    const end = start + text.length;
-    const mark = markFromElement(el, start, end);
-    if (mark) state.marks.push(mark);
-    state.cursor = end;
+    // Recurse with `el` as the new effective ancestor — its inline style wins
+    // for any direct text descendants (until a further-nested eblock overrides).
+    walkScan(el, el, state);
     return;
   }
-  walkScan(el, state);
+  walkScan(el, ancestor, state);
 }
 
 function markFromElement(el: HTMLElement, start: number, end: number): TextSpanMark | null {
