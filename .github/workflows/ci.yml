@@ -43,6 +43,9 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # `@oryzae/shared` の `main` は `dist/index.js`。client 側で runtime に
+      # value import (zod schema 等) する場合、build 済みでないと vitest が解決できない。
+      - run: pnpm --filter @oryzae/shared build
       - run: pnpm test
 
   dependency-check:
