@@ -36,4 +36,34 @@ describe('editor-effects-cache', () => {
     window.localStorage.setItem('oryzae-entry-effects:e-1', 'not-json');
     expect(loadCachedEffects('e-1')).toBeNull();
   });
+
+  it('drops cache that does not match the current schema (e.g. legacy {t, duration} time variant)', () => {
+    // Old shape from before Issue #332 v2 — must NOT be returned because apply
+    // would write `style.fontSize = "undefinedpx"` and the text would render at
+    // the inherited (smaller) size.
+    window.localStorage.setItem(
+      'oryzae-entry-effects:e-old',
+      JSON.stringify({
+        version: 1,
+        textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', t: 0.5, duration: 200 }],
+      }),
+    );
+    expect(loadCachedEffects('e-old')).toBeNull();
+    // …and the stale entry is purged so it doesn't keep failing on every load.
+    expect(window.localStorage.getItem('oryzae-entry-effects:e-old')).toBeNull();
+  });
+
+  it('returns the parsed effects when the cache matches the schema', () => {
+    window.localStorage.setItem(
+      'oryzae-entry-effects:e-new',
+      JSON.stringify({
+        version: 1,
+        textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', fontSize: 24 }],
+      }),
+    );
+    expect(loadCachedEffects('e-new')).toEqual({
+      version: 1,
+      textSpans: [{ kind: 'time', start: 0, end: 1, mode: 'fontSize', fontSize: 24 }],
+    });
+  });
 });

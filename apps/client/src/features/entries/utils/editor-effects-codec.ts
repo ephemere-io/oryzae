@@ -255,10 +255,19 @@ function decorateSpan(span: HTMLSpanElement, mark: TextSpanMark): void {
   span.className = EBLOCK_CLASS;
   if (mark.kind === 'time') {
     span.dataset.mode = mark.mode;
+    // Defensive: only write the inline style if the resolved value is a
+    // valid positive number. Prevents `style.fontSize = "undefinedpx"`
+    // (invalid CSS → silently dropped → span inherits parent's font size,
+    // appearing smaller than at composition time) if a malformed mark
+    // somehow slipped past the schema.
     if (mark.mode === 'fontWeight') {
-      span.style.fontWeight = String(mark.fontWeight);
+      if (typeof mark.fontWeight === 'number' && mark.fontWeight > 0) {
+        span.style.fontWeight = String(mark.fontWeight);
+      }
     } else {
-      span.style.fontSize = `${mark.fontSize}px`;
+      if (typeof mark.fontSize === 'number' && mark.fontSize > 0) {
+        span.style.fontSize = `${mark.fontSize}px`;
+      }
     }
     return;
   }
