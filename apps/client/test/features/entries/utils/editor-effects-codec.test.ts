@@ -75,6 +75,34 @@ describe('editor-effects-codec', () => {
       ]);
     });
 
+    it('emits a mark per text run for nested eblocks (innermost wins, like CSS cascade)', () => {
+      // use-time-inscription's nested-span quirk: continuous typing inside an existing
+      // eblock creates a deeper nest. Visually each text run renders at the *innermost*
+      // ancestor's fontSize. The codec must preserve that per-run sizing.
+      editor.innerHTML =
+        '<span class="eblock" data-mode="fontSize" style="font-size: 40px">' +
+        'A' +
+        '<span class="eblock" data-mode="fontSize" style="font-size: 26px">B</span>' +
+        'C' +
+        '</span>';
+      const state = extractEditorEffects(editor, undefined);
+      expect(state?.textSpans).toEqual([
+        { kind: 'time', start: 0, end: 1, mode: 'fontSize', fontSize: 40 }, // 'A' under outer
+        { kind: 'time', start: 1, end: 2, mode: 'fontSize', fontSize: 26 }, // 'B' under inner
+        { kind: 'time', start: 2, end: 3, mode: 'fontSize', fontSize: 40 }, // 'C' back under outer
+      ]);
+    });
+
+    it('drops marks for naked text outside any eblock', () => {
+      editor.innerHTML =
+        'naked<span class="eblock" data-mode="fontSize" style="font-size: 20px">wrapped</span>more';
+      const state = extractEditorEffects(editor, undefined);
+      // Only the wrapped run gets a mark; naked text contributes to cursor only.
+      expect(state?.textSpans).toEqual([
+        { kind: 'time', start: 5, end: 12, mode: 'fontSize', fontSize: 20 },
+      ]);
+    });
+
     it('includes eraserTraces snapshot when provided', () => {
       const traces = [{ rx: 1, ry: 2, w: 3, h: 4, chars: ['a'], intensity: 0.1, seed: 9 }];
       editor.textContent = 'text';
