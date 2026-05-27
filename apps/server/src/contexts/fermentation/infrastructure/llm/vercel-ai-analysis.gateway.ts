@@ -1,4 +1,5 @@
-import { gateway, generateObject } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { generateObject } from 'ai';
 import { z } from 'zod';
 import type {
   LlmAnalysisGateway,
@@ -185,8 +186,8 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
     userId: string;
     language: FermentationLanguage;
   }): Promise<LlmAnalysisResult> {
-    const { object, usage, providerMetadata } = await generateObject({
-      model: gateway('anthropic/claude-sonnet-4-20250514'),
+    const { object, usage } = await generateObject({
+      model: anthropic('claude-sonnet-4-20250514'),
       prompt: buildPrompt(
         {
           question: params.question,
@@ -197,16 +198,7 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
       ),
       schema: buildSchema(params.language),
       maxOutputTokens: 16000,
-      providerOptions: {
-        gateway: {
-          user: params.userId,
-          tags: ['fermentation', `lang:${params.language}`],
-        },
-      },
     });
-
-    // @type-assertion-allowed: providerMetadata の gateway 型は AI SDK の型定義に含まれない
-    const meta = providerMetadata as { gateway?: { generationId?: string } } | undefined;
 
     return {
       output: object,
@@ -214,7 +206,8 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,
       },
-      generationId: meta?.gateway?.generationId,
+      // issue #352: Anthropic API 直叩きに変更したため Vercel AI Gateway の generation_id は発行されない。
+      generationId: undefined,
     };
   }
 }
