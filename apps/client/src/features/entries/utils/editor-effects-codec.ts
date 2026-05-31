@@ -75,20 +75,35 @@ interface ScanState {
 
 function scanTextSpans(editor: HTMLElement): TextSpanMark[] {
   const state: ScanState = { cursor: 0, marks: [] };
-  walkScan(editor, state);
+  walkScan(editor, null, state);
   return state.marks;
 }
 
-function walkScan(node: Node, state: ScanState): void {
+/**
+ * `ancestor` は「現在の text node に対する effective eblock/v-block 祖先」。
+ * CSS の inline style は最も内側が勝つので、ネストした eblock がある場合は
+ * 一番内側 (最後に walkScan で更新された) の祖先の属性が描画上有効。
+ * use-time-inscription が連続入力時に新しい span をカーソル位置の親 (= 既存の
+ * eblock) の中に挿入してしまい、深い nest が生まれることがある (既存の挙動)
+ * — 永続化側はこの構造をそのままシリアライズする必要がある。
+ */
+function walkScan(node: Node, ancestor: HTMLElement | null, state: ScanState): void {
   const children = node.childNodes;
   for (let i = 0; i < children.length; i++) {
-    visitScan(children[i], state);
+    visitScan(children[i], ancestor, state);
   }
 }
 
-function visitScan(node: Node, state: ScanState): void {
+function visitScan(node: Node, ancestor: HTMLElement | null, state: ScanState): void {
   if (node.nodeType === Node.TEXT_NODE) {
-    state.cursor += (node.textContent ?? '').length;
+    const text = node.textContent ?? '';
+    if (ancestor && text.length > 0) {
+      const start = state.cursor;
+      const end = start + text.length;
+      const mark = markFromElement(ancestor, start, end);
+      if (mark) state.marks.push(mark);
+    }
+    state.cursor += text.length;
     return;
   }
   if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -101,15 +116,12 @@ function visitScan(node: Node, state: ScanState): void {
     state.cursor += 1;
   }
   if (isEffectSpan(el)) {
-    const text = el.textContent ?? '';
-    const start = state.cursor;
-    const end = start + text.length;
-    const mark = markFromElement(el, start, end);
-    if (mark) state.marks.push(mark);
-    state.cursor = end;
+    // Recurse with `el` as the new effective ancestor — its inline style wins
+    // for any direct text descendants (until a further-nested eblock overrides).
+    walkScan(el, el, state);
     return;
   }
-  walkScan(el, state);
+  walkScan(el, ancestor, state);
 }
 
 function markFromElement(el: HTMLElement, start: number, end: number): TextSpanMark | null {
@@ -125,13 +137,25 @@ function markFromElement(el: HTMLElement, start: number, end: number): TextSpanM
     if (!Number.isFinite(intensity) || !Number.isFinite(seed)) return null;
     return { kind: 'pressure', start, end, intensity, seed };
   }
-  if (mode === 'fontSize' || mode === 'fontWeight') {
-    const t = Number.parseFloat(el.dataset.t ?? '');
-    const duration = Number.parseFloat(el.dataset.duration ?? '');
-    if (!Number.isFinite(t) || !Number.isFinite(duration)) return null;
-    return { kind: 'time', start, end, mode, t, duration };
+  if (mode === 'fontSize') {
+    // Read the *resolved* font size that the time-inscription hook wrote, so
+    // restoration is independent of the editor's current `settings.fontSize`.
+    const fontSize = parsePx(el.style.fontSize);
+    if (fontSize == null) return null;
+    return { kind: 'time', start, end, mode: 'fontSize', fontSize };
+  }
+  if (mode === 'fontWeight') {
+    const fontWeight = Number.parseInt(el.style.fontWeight, 10);
+    if (!Number.isFinite(fontWeight)) return null;
+    return { kind: 'time', start, end, mode: 'fontWeight', fontWeight };
   }
   return null;
+}
+
+function parsePx(input: string): number | null {
+  if (!input.endsWith('px')) return null;
+  const n = Number.parseFloat(input.slice(0, -2));
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function parseEm(input: string): number | null {
@@ -242,14 +266,20 @@ function decorateSpan(span: HTMLSpanElement, mark: TextSpanMark): void {
   }
   span.className = EBLOCK_CLASS;
   if (mark.kind === 'time') {
-    span.dataset.t = mark.t.toFixed(4);
-    span.dataset.duration = String(mark.duration);
     span.dataset.mode = mark.mode;
+    // Defensive: only write the inline style if the resolved value is a
+    // valid positive number. Prevents `style.fontSize = "undefinedpx"`
+    // (invalid CSS → silently dropped → span inherits parent's font size,
+    // appearing smaller than at composition time) if a malformed mark
+    // somehow slipped past the schema.
     if (mark.mode === 'fontWeight') {
-      span.style.fontWeight = String(Math.round(300 + (700 - 300) * mark.t));
+      if (typeof mark.fontWeight === 'number' && mark.fontWeight > 0) {
+        span.style.fontWeight = String(mark.fontWeight);
+      }
     } else {
-      const scale = 0.8 + (1.35 - 0.8) * mark.t;
-      span.style.fontSize = `${(16 * scale).toFixed(1)}px`;
+      if (typeof mark.fontSize === 'number' && mark.fontSize > 0) {
+        span.style.fontSize = `${mark.fontSize}px`;
+      }
     }
     return;
   }

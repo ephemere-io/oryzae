@@ -45,7 +45,12 @@ function seededRng(seed: number) {
   };
 }
 
-function generateSmudge(char: string, seed: number, fontSize: number): HTMLCanvasElement {
+function generateSmudge(
+  char: string,
+  seed: number,
+  fontSize: number,
+  fontFamily: string,
+): HTMLCanvasElement {
   const pad = 6;
   const sz = Math.ceil(fontSize * 1.4) + pad * 2;
   const c = document.createElement('canvas');
@@ -55,7 +60,7 @@ function generateSmudge(char: string, seed: number, fontSize: number): HTMLCanva
   if (!cx) return c;
 
   cx.filter = 'blur(3px)';
-  cx.font = `${fontSize}px sans-serif`;
+  cx.font = `${fontSize}px ${fontFamily}`;
   cx.fillStyle = 'rgba(140,140,140,1)';
   cx.textBaseline = 'middle';
   cx.textAlign = 'center';
@@ -138,6 +143,7 @@ export function useEraserTrace(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   enabled: boolean,
   fontSize: number,
+  fontFamily: string,
   initialTraces?: Trace[],
 ): UseEraserTraceResult {
   const tracesRef = useRef<Trace[]>([]);
@@ -183,10 +189,11 @@ export function useEraserTrace(
     resizeCanvas();
 
     function getSmudge(char: string, seed: number): HTMLCanvasElement {
-      const key = `${char}_${seed}`;
+      // fontFamily is part of the cache key so switching serif↔sans regenerates.
+      const key = `${char}_${seed}_${fontFamily}`;
       const cached = smudgeCacheRef.current.get(key);
       if (cached) return cached;
-      const s = generateSmudge(char, seed, fontSize);
+      const s = generateSmudge(char, seed, fontSize, fontFamily);
       smudgeCacheRef.current.set(key, s);
       return s;
     }
@@ -302,7 +309,7 @@ export function useEraserTrace(
       window.removeEventListener('resize', resizeCanvas);
       smudgeCacheRef.current.clear();
     };
-  }, [editorRef, canvasRef, enabled, fontSize]);
+  }, [editorRef, canvasRef, enabled, fontSize, fontFamily]);
 
   return {
     getTracesSnapshot: () => tracesRef.current.map((t) => ({ ...t })),

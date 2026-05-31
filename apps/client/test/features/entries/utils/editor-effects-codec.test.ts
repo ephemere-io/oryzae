@@ -25,12 +25,23 @@ describe('editor-effects-codec', () => {
     });
 
     it('extracts a fontSize eblock span at the right character offset', () => {
+      // The hook writes the resolved px size; we save what we see.
       editor.innerHTML =
-        'ab<span class="eblock" data-mode="fontSize" data-t="0.5000" data-duration="200">c</span>de';
+        'ab<span class="eblock" data-mode="fontSize" style="font-size: 20px">c</span>de';
 
       const state = extractEditorEffects(editor, undefined);
       expect(state?.textSpans).toEqual([
-        { kind: 'time', start: 2, end: 3, mode: 'fontSize', t: 0.5, duration: 200 },
+        { kind: 'time', start: 2, end: 3, mode: 'fontSize', fontSize: 20 },
+      ]);
+    });
+
+    it('extracts a fontWeight eblock span', () => {
+      editor.innerHTML =
+        'ab<span class="eblock" data-mode="fontWeight" style="font-weight: 500">c</span>de';
+
+      const state = extractEditorEffects(editor, undefined);
+      expect(state?.textSpans).toEqual([
+        { kind: 'time', start: 2, end: 3, mode: 'fontWeight', fontWeight: 500 },
       ]);
     });
 
@@ -54,13 +65,41 @@ describe('editor-effects-codec', () => {
     it('counts <br> as one newline and <div> boundaries as newlines', () => {
       // mimic what contentEditable produces: text + <div>more</div>
       editor.innerHTML =
-        'a<br>b<div>c<span class="eblock" data-mode="fontSize" data-t="0.1" data-duration="100">d</span></div>';
+        'a<br>b<div>c<span class="eblock" data-mode="fontSize" style="font-size: 14px">d</span></div>';
 
       const state = extractEditorEffects(editor, undefined);
       // 'a' (0) + '\n' from <br> (1) + 'b' (2) + '\n' from <div> boundary (3) + 'c' (4)
       // span 'd' starts at 5
       expect(state?.textSpans).toEqual([
-        { kind: 'time', start: 5, end: 6, mode: 'fontSize', t: 0.1, duration: 100 },
+        { kind: 'time', start: 5, end: 6, mode: 'fontSize', fontSize: 14 },
+      ]);
+    });
+
+    it('emits a mark per text run for nested eblocks (innermost wins, like CSS cascade)', () => {
+      // use-time-inscription's nested-span quirk: continuous typing inside an existing
+      // eblock creates a deeper nest. Visually each text run renders at the *innermost*
+      // ancestor's fontSize. The codec must preserve that per-run sizing.
+      editor.innerHTML =
+        '<span class="eblock" data-mode="fontSize" style="font-size: 40px">' +
+        'A' +
+        '<span class="eblock" data-mode="fontSize" style="font-size: 26px">B</span>' +
+        'C' +
+        '</span>';
+      const state = extractEditorEffects(editor, undefined);
+      expect(state?.textSpans).toEqual([
+        { kind: 'time', start: 0, end: 1, mode: 'fontSize', fontSize: 40 }, // 'A' under outer
+        { kind: 'time', start: 1, end: 2, mode: 'fontSize', fontSize: 26 }, // 'B' under inner
+        { kind: 'time', start: 2, end: 3, mode: 'fontSize', fontSize: 40 }, // 'C' back under outer
+      ]);
+    });
+
+    it('drops marks for naked text outside any eblock', () => {
+      editor.innerHTML =
+        'naked<span class="eblock" data-mode="fontSize" style="font-size: 20px">wrapped</span>more';
+      const state = extractEditorEffects(editor, undefined);
+      // Only the wrapped run gets a mark; naked text contributes to cursor only.
+      expect(state?.textSpans).toEqual([
+        { kind: 'time', start: 5, end: 12, mode: 'fontSize', fontSize: 20 },
       ]);
     });
 
@@ -79,13 +118,26 @@ describe('editor-effects-codec', () => {
       editor.textContent = 'abcde';
 
       applyTextSpansToEditor(editor, [
-        { kind: 'time', start: 2, end: 3, mode: 'fontSize', t: 0.5, duration: 200 },
+        { kind: 'time', start: 2, end: 3, mode: 'fontSize', fontSize: 24 },
       ]);
 
-      const span = editor.querySelector('span.eblock');
+      const span = editor.querySelector('span.eblock') as HTMLElement | null;
       expect(span?.textContent).toBe('c');
       expect(span?.getAttribute('data-mode')).toBe('fontSize');
-      expect(span?.getAttribute('data-t')).toBe('0.5000');
+      expect(span?.style.fontSize).toBe('24px');
+    });
+
+    it('wraps with a fontWeight eblock span', () => {
+      editor.textContent = 'abcde';
+
+      applyTextSpansToEditor(editor, [
+        { kind: 'time', start: 2, end: 3, mode: 'fontWeight', fontWeight: 600 },
+      ]);
+
+      const span = editor.querySelector('span.eblock') as HTMLElement | null;
+      expect(span?.textContent).toBe('c');
+      expect(span?.getAttribute('data-mode')).toBe('fontWeight');
+      expect(span?.style.fontWeight).toBe('600');
     });
 
     it('wraps a voice span', () => {
@@ -101,7 +153,7 @@ describe('editor-effects-codec', () => {
     it('applies multiple non-overlapping spans in order', () => {
       editor.textContent = '123456';
       applyTextSpansToEditor(editor, [
-        { kind: 'time', start: 0, end: 1, mode: 'fontSize', t: 0.3, duration: 100 },
+        { kind: 'time', start: 0, end: 1, mode: 'fontSize', fontSize: 18 },
         { kind: 'pressure', start: 4, end: 5, intensity: 0.5, seed: 7 },
       ]);
       const spans = editor.querySelectorAll('span.eblock');
@@ -110,16 +162,25 @@ describe('editor-effects-codec', () => {
       expect(spans[1].textContent).toBe('5');
     });
 
-    it('round-trips extract → apply → extract', () => {
+    it('round-trips extract → apply → extract — fontSize survives the editor base size', () => {
+      // The span was rendered at 22.4px (e.g. baseFontSize=16 × scale=1.4 at write time).
       editor.innerHTML =
-        'ab<span class="eblock" data-mode="fontSize" data-t="0.7500" data-duration="500">c</span><span class="eblock" data-mode="pressureBleed" data-intensity="0.6200" data-seed="42">d</span>e';
+        'ab<span class="eblock" data-mode="fontSize" style="font-size: 22.4px">c</span><span class="eblock" data-mode="pressureBleed" data-intensity="0.6200" data-seed="42">d</span>e';
       const state = extractEditorEffects(editor, undefined);
       expect(state?.textSpans).toHaveLength(2);
 
-      // Now re-create from plain text + state
+      // Restore into an editor with a *different* base font size — the span
+      // must still render at 22.4px (regression test for Issue #332 v2 where
+      // we previously hardcoded 16 as the base).
       const rebuilt = document.createElement('div');
+      rebuilt.style.fontSize = '14px';
       rebuilt.textContent = 'abcde';
       applyTextSpansToEditor(rebuilt, state?.textSpans ?? []);
+
+      const restoredFontSize = rebuilt.querySelector<HTMLElement>(
+        'span.eblock[data-mode="fontSize"]',
+      )?.style.fontSize;
+      expect(restoredFontSize).toBe('22.4px');
 
       const round2 = extractEditorEffects(rebuilt, undefined);
       expect(round2?.textSpans).toEqual(state?.textSpans);
@@ -128,7 +189,7 @@ describe('editor-effects-codec', () => {
     it('silently skips invalid (start >= end) marks', () => {
       editor.textContent = 'abc';
       applyTextSpansToEditor(editor, [
-        { kind: 'time', start: 2, end: 2, mode: 'fontSize', t: 0.5, duration: 100 },
+        { kind: 'time', start: 2, end: 2, mode: 'fontSize', fontSize: 16 },
       ]);
       expect(editor.querySelector('span.eblock')).toBeNull();
     });
