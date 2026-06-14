@@ -41,12 +41,16 @@ packages/
     src/verifiers/               schema / invariants / dom-contract / a11y
     src/harness/                 handle(window.__verify) / Dashboard / UnitPage / ReplayPage
 apps/client/                    （admin も同型）
-  src/lib/verify/register.ts     全 *.verify を import ＋ ビルトイン verifier 登録（バレル）
-  src/features/<x>/*.verify.tsx  各 feature のユニット定義（co-located）
+  src/app/verify/register.ts     全 *.verify を import ＋ ビルトイン verifier 登録（バレル）
   src/app/verify/                ダッシュボード/孤立マウント/replay の薄いルート（dev限定）
   scripts/record-verify.mjs      replay をヘッドレスで録画して .webm を出す（Playwright）
+  src/features/<x>/*.verify.tsx  各 feature のユニット定義（co-located）
   test/verify.matrix.test.ts     CIゲート（全ユニット×fixture を実行・probe必須を強制）
 ```
+
+> 登録バレルを `lib/` ではなく `app/verify/` に置くのは、dep-cruise の `lib-independence`
+> ルール（`lib/` は `features/` を import 不可）のため。feature の spec を集約する以上、
+> features を合成できる `app/` 層に置く。
 
 **エンジン＝道具、`*.verify.tsx`＝中身**。エンジンは1回書いて `client`/`admin`/将来の別リポジトリが使い回す。これが低コスト横展開の本体。
 
