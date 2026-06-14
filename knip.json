@@ -20,6 +20,9 @@
     },
     "packages/shared": {
       "project": ["src/**/*.ts"]
+    },
+    "packages/verify": {
+      "project": ["src/**/*.{ts,tsx}"]
     }
   }
 }
