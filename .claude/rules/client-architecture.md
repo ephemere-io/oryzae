@@ -20,31 +20,48 @@ paths:
 
 ## ディレクトリ構造
 
-- `app/` — Next.js App Router ページ + API Route Handler
+- `app/` — Next.js App Router ページ + API Route Handler。端末判定もここ（URL に端末を出さない）
 - `app/api/[...path]/` — Hono アプリへのリクエスト転送（変更しない）
-- `features/X/` — 機能スライス。components, hooks を含む
+- `features/` — 機能スライス
+  - **`apps/client`**: ドメイン × reach。`features/{shared,pc,sp}/{domain}/`
+    - `shared/{domain}/` — UIを持たない共有ロジック（データ hook `use-*`・型）。両端末が使う
+    - `pc/{domain}/` / `sp/{domain}/` — 端末別 UI（components, hooks）
+  - **`apps/admin`**: reach 軸なし。従来どおり `features/{domain}/`
 - `components/ui/` — 汎用 UI コンポーネント（shadcn 等。feature 依存禁止）
-- `lib/` — 横断的ユーティリティ（API クライアント、トークン管理等）
+- `lib/` — 基盤ユーティリティのみ（API クライアント・認証・分析等）。**ドメイン非依存・`use-*` のドメイン hook を置かない**
+
+## 置き場の決定木（迷ったら上から）
+
+1. ドメインを知らない汎用 UI → `components/ui/`
+2. ドメインを知らない基盤 util（createApiClient・認証・分析・theme・debounce・markdown・定数）→ `lib/`
+3. ドメイン固有 → ドメインを選び reach で分ける：両端末・UIなし → `features/shared/{domain}/` ／ PC UI → `features/pc/{domain}/` ／ SP UI → `features/sp/{domain}/`
 
 ## インポートルール（dependency-cruiser で機械的に検証）
 
-- `features/X` → `features/Y` **禁止**（機能間の直接依存禁止）
-- `components/` → `features/`, `app/` **禁止**（汎用UIはfeatureを知らない）
-- `lib/` → `features/`, `app/`, `components/` **禁止**
+`apps/client`（reach 軸あり）:
+
+- `features/pc/*` ⇎ `features/sp/*` **禁止**（端末をまたぐ依存禁止）
+- `features/{pc,sp,shared}/X`（ドメイン X）→ **他ドメイン禁止**。唯一の例外は **`features/shared/{同ドメイン}` への import 可**
+- `features/shared/*` → `features/pc`, `features/sp` **禁止**（共有層は端末固有 UI を知らない）
+- `components/` → `features/`, `app/` **禁止**
+- `lib/` → `features/`, `app/`, `components/` **禁止**（ドメイン hook も置かない）
 - `app/` からは `features/`, `components/`, `lib/` のみインポート可
-- `features/X` からは `components/`, `lib/` のみインポート可
+
+`apps/admin`（reach 軸なし）: 従来どおり `features/X` → `features/Y` **禁止**。
 
 ## データフェッチング
 
-- API 呼び出しは `features/X/hooks/` の Custom Hook に集約する
+- API 呼び出しは **`features/shared/{domain}/hooks/`** の Custom Hook に集約する（PC/SP 共通）
+- 端末固有 UI（`pc` / `sp`）はこの共有 hook を import して使う
 - コンポーネントから直接 API を呼ばない
 - `lib/api.ts` の `createApiClient()` を使う
 
 ## テスト（絶対ルール）
 
 ### hooks テスト（vitest）
-- `src/features/*/hooks/` にファイルを作成・変更したら、対応するテストを `test/features/*/hooks/` に**同時に**作成すること
-- テストファイルの命名: `use-auth.ts` → `test/features/auth/hooks/use-auth.test.ts`
+- `src/features/**/hooks/` にファイルを作成・変更したら、対応するテストを `test/features/` に **reach 構造をミラー**して**同時に**作成すること
+- 命名（client）: `src/features/shared/auth/hooks/use-auth.ts` → `test/features/shared/auth/hooks/use-auth.test.ts`
+- 共有データ hook のテストは PC/SP で重複させず `test/features/shared/{domain}` に1か所
 - モックは `vi.fn()` の手動スタブ（モックライブラリ不使用）
 
 ### E2E テスト（Playwright）

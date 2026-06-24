@@ -63,7 +63,7 @@ supabase/
 |---|---|
 | `docs/backend-architecture-guide.md` | DDD レイヤー依存、ドメインモデル、エラー処理 |
 | `docs/backend-testing-guide.md` | バックエンドテスト戦略、ガードレール |
-| `docs/client-architecture-guide.md` | Feature-Sliced 構造、インポートルール |
+| `docs/client-architecture-guide.md` | Feature-Sliced 構造（ドメイン × reach: shared/pc/sp）、インポートルール、端末出し分け |
 | `docs/client-testing-guide.md` | フロントエンドテスト戦略 |
 | `docs/shared-package-guide.md` | `@oryzae/shared` の使用ルール |
 | `docs/entry-backend-guide.md` | Entry コンテキスト実装ガイド |
