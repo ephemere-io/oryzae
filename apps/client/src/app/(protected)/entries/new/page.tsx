@@ -6,9 +6,12 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { EntryEditor } from '@/features/entries/components/entry-editor';
 import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
 import { useActiveQuestions } from '@/features/entry-questions/hooks/use-entry-questions';
+import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
+import { useDevice } from '@/lib/use-device';
 
 export default function NewEntryPage() {
   const { api, auth, loading } = useAuth();
+  const device = useDevice();
   const runTransition = useSaveTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,6 +42,10 @@ export default function NewEntryPage() {
     },
     [runTransition, router],
   );
+
+  // 端末で出し分け（URL は /entries/new のまま）。判定前(null)は何も描画しない。
+  if (device === null) return null;
+  if (device === 'sp') return <SpEntryEditor api={api} />;
 
   return (
     <EntryEditor
