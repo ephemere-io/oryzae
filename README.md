@@ -55,6 +55,22 @@ supabase/
   migrations/     # DB migration SQL files
 ```
 
+### Backend structure (`apps/server`)
+
+`apps/server` は **境界づけられたコンテキスト × DDD レイヤード**。依存は内向き（`presentation → application → domain ← infrastructure`、domain は何にも依存しない）。
+
+```
+apps/server/src/
+  contexts/                # 境界づけられたコンテキスト
+    {context}/             # 1 コンテキスト = 4 レイヤー
+      presentation/        #   HTTP(Hono) ルート・入出力
+      application/         #   ユースケース（1 ファイル = 1 ユースケース）
+      domain/              #   ドメインモデル（最内層・何にも依存しない）
+      infrastructure/      #   DB・外部アクセス（domain の実装）
+```
+
+配置・依存ルールの詳細は `docs/backend-architecture-guide.md`（SSoT）を参照。
+
 ### Frontend structure (`apps/client`)
 
 `apps/client` は機能を **ドメイン × reach（shared/pc/sp）** で薄切りする（device はフロントだけの軸）。
