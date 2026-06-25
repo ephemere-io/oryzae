@@ -55,6 +55,30 @@ supabase/
   migrations/     # DB migration SQL files
 ```
 
+### Frontend structure (`apps/client`)
+
+`apps/client` は機能を **ドメイン × reach（shared/pc/sp）** で薄切りする（device はフロントだけの軸）。
+
+```
+apps/client/src/
+  app/                     # ルーティング（端末非依存・薄いラッパー）
+    (auth)/ (protected)/   #   認証境界。(protected)/layout.tsx で端末(PC/SP)を出し分け
+    api/[...path]/         #   Hono への転送（変更しない）
+  features/                # 機能スライス: ドメイン × reach
+    shared/{domain}/       #   端末非依存の共有ロジック（両端末が使う）
+      hooks/               #     データ取得・保存（use-*）
+      types.ts             #     ドメイン共有型
+    pc/{domain}/           #   PC 体験
+      components/  hooks/   #     PC 固有の UI・操作・演出
+    sp/{domain}/           #   SP 体験
+      components/  hooks/   #     SP 固有の UI（縦長・片手・音声）
+  components/ui/           # 汎用 UI（feature 非依存）
+  lib/                     # 基盤ユーティリティ（ドメイン非依存）
+```
+
+`apps/admin` は単一体験のため reach を持たず `features/{domain}` で薄切りする。
+配置の決定木・インポートルールなど詳細は `docs/client-architecture-guide.md`（SSoT）を参照。
+
 ## Design Docs
 
 設計判断の正はすべて `docs/` 配下にあります。
