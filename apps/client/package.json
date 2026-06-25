@@ -16,26 +16,26 @@
   "dependencies": {
     "@oryzae/server": "workspace:*",
     "@oryzae/shared": "workspace:*",
-    "@sentry/nextjs": "^10.51.0",
-    "next": "16.2.4",
-    "next-intl": "^4.11.0",
-    "posthog-js": "^1.372.6",
-    "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "@sentry/nextjs": "^10.61.0",
+    "next": "16.2.7",
+    "next-intl": "^4.13.0",
+    "posthog-js": "^1.393.5",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
-    "@tailwindcss/postcss": "^4",
-    "@testing-library/dom": "^10.0.0",
-    "@testing-library/react": "^16.0.0",
-    "@types/node": "^20.19.39",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "dependency-cruiser": "^17.4.0",
-    "jsdom": "^26.1.0",
-    "postcss": "^8",
-    "tailwindcss": "^4",
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/postcss": "^4.3.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.9.4",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "dependency-cruiser": "^17.4.3",
+    "jsdom": "^29.1.1",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.1",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.6"
   }
 }
