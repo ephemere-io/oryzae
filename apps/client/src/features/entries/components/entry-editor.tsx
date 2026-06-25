@@ -23,10 +23,8 @@ import { SnippetToolbar } from '@/features/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/entries/components/stats-popup';
 import { UnsavedChangesModal } from '@/features/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/entries/hooks/use-amp-effect';
-import { useAutosaveEntry } from '@/features/entries/hooks/use-autosave-entry';
 import { useBrowserNavGuard } from '@/features/entries/hooks/use-browser-nav-guard';
 import { useEditorSettings } from '@/features/entries/hooks/use-editor-settings';
-import { useSaveEntry } from '@/features/entries/hooks/use-entry';
 import { useEntryFermentationDetail } from '@/features/entries/hooks/use-entry-fermentation-detail';
 import { useEraserTrace } from '@/features/entries/hooks/use-eraser-trace';
 import { useFocusMode } from '@/features/entries/hooks/use-focus-mode';
@@ -47,6 +45,8 @@ import {
   applyTextSpansToEditor,
   extractEditorEffects,
 } from '@/features/entries/utils/editor-effects-codec';
+import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
+import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import type { ApiClient } from '@/lib/api';
 import { SIDEBAR_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
 

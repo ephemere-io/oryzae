@@ -5,12 +5,12 @@ import { useTranslations } from 'next-intl';
 import { useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { EntryEditor } from '@/features/entries/components/entry-editor';
-import { useEntry } from '@/features/entries/hooks/use-entry';
 import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
 import {
   useActiveQuestions,
   useEntryQuestions,
 } from '@/features/entry-questions/hooks/use-entry-questions';
+import { useEntry } from '@/features/shared/entries/hooks/use-entry';
 
 export default function EntryDetailPage() {
   const t = useTranslations('entries.detail');

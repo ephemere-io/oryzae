@@ -1,8 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useEntry, useSaveEntry } from '@/features/entries/hooks/use-entry';
+import { useEntry, useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import type { ApiClient } from '@/lib/api';
-import { I18nWrapper } from '../../../helpers/i18n-wrapper';
+import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return {

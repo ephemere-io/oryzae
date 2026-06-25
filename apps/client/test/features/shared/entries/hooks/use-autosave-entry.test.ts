@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAutosaveEntry } from '@/features/entries/hooks/use-autosave-entry';
+import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 
 describe('useAutosaveEntry', () => {
   beforeEach(() => {
