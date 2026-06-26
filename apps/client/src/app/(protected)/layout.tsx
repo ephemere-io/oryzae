@@ -53,7 +53,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                 } as React.CSSProperties
               }
             >
-              <div className="relative flex-1 overflow-auto">{loading ? null : children}</div>
+              {/* Issue #362: 認証チェック中に全画面を空白にせず、各ページが
+                  スケルトンを即描画できるよう children を常に描画する。
+                  未認証時は上の useEffect が /login へリダイレクトする。 */}
+              <div className="relative flex-1 overflow-auto">{children}</div>
               <PageFooter />
             </main>
             {shouldShow && <OnboardingFlow onComplete={handleOnboardingComplete} />}
