@@ -45,7 +45,7 @@ export default function NewEntryPage() {
 
   // 端末で出し分け（URL は /entries/new のまま）。判定前(null)は何も描画しない。
   if (device === null) return null;
-  if (device === 'sp') return <SpEntryEditor api={api} />;
+  if (device === 'sp') return <SpEntryEditor api={api} initialQuestionId={questionIdParam} />;
 
   return (
     <EntryEditor

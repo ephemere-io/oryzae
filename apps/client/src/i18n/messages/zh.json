@@ -764,6 +764,18 @@
       "pickle": "放入瓶中",
       "pickling": "放入中…",
       "pickled": "已放入瓶中 ✓"
+    },
+    "nav": {
+      "write": "书写",
+      "jar": "瓶"
+    },
+    "jar": {
+      "title": "瓶中收到的信",
+      "empty": "还没有收到信",
+      "untitled": "无标题提问",
+      "close": "关闭",
+      "letter_empty": "此结果还没有信",
+      "reply": "写回信"
     }
   }
 }

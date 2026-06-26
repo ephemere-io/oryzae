@@ -764,6 +764,18 @@
       "pickle": "Pickle",
       "pickling": "Pickling…",
       "pickled": "Pickled ✓"
+    },
+    "nav": {
+      "write": "Write",
+      "jar": "Jar"
+    },
+    "jar": {
+      "title": "Letters in the jar",
+      "empty": "No letters have arrived yet",
+      "untitled": "Untitled question",
+      "close": "Close",
+      "letter_empty": "No letter for this result yet",
+      "reply": "Write a reply"
     }
   }
 }
