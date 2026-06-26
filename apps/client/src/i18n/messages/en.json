@@ -747,5 +747,23 @@
   "support": {
     "title": "Support",
     "back_home": "Back home"
+  },
+  "sp": {
+    "editor": {
+      "title_placeholder": "Title (optional)",
+      "body_placeholder": "Write what you feel, just as it is.",
+      "status_editing": "Editing",
+      "status_saving": "Saving…",
+      "status_saved": "Saved",
+      "question": "Question",
+      "question_selected": "Question: {label}",
+      "question_untitled": "Untitled question",
+      "question_sheet_title": "Choose a question",
+      "question_empty": "No questions yet (you can create them on desktop)",
+      "close": "Close",
+      "pickle": "Pickle",
+      "pickling": "Pickling…",
+      "pickled": "Pickled ✓"
+    }
   }
 }

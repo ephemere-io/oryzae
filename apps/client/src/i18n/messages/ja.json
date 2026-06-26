@@ -747,5 +747,23 @@
   "support": {
     "title": "サポート",
     "back_home": "トップへ戻る"
+  },
+  "sp": {
+    "editor": {
+      "title_placeholder": "タイトル（任意）",
+      "body_placeholder": "いま感じていることを、そのまま。",
+      "status_editing": "編集中",
+      "status_saving": "保存中…",
+      "status_saved": "保存済み",
+      "question": "問い",
+      "question_selected": "問い: {label}",
+      "question_untitled": "無題の問い",
+      "question_sheet_title": "問いを選ぶ",
+      "question_empty": "立てている問いがありません（問いは PC で立てられます）",
+      "close": "閉じる",
+      "pickle": "瓶に漬ける",
+      "pickling": "漬けています…",
+      "pickled": "瓶に漬けました ✓"
+    }
   }
 }

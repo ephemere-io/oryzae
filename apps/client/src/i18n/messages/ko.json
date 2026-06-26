@@ -747,5 +747,23 @@
   "support": {
     "title": "지원",
     "back_home": "홈으로 돌아가기"
+  },
+  "sp": {
+    "editor": {
+      "title_placeholder": "제목 (선택)",
+      "body_placeholder": "지금 느끼는 것을 그대로.",
+      "status_editing": "편집 중",
+      "status_saving": "저장 중…",
+      "status_saved": "저장됨",
+      "question": "질문",
+      "question_selected": "질문: {label}",
+      "question_untitled": "제목 없는 질문",
+      "question_sheet_title": "질문 선택",
+      "question_empty": "세운 질문이 없습니다 (질문은 PC에서 만들 수 있어요)",
+      "close": "닫기",
+      "pickle": "병에 담그기",
+      "pickling": "담그는 중…",
+      "pickled": "병에 담갔어요 ✓"
+    }
   }
 }
