@@ -71,6 +71,19 @@ export function VerifyDashboard() {
               .join('  /  ')}
           </span>
         )}
+        <a
+          href="/verify/replay"
+          style={{
+            marginLeft: 'auto',
+            fontSize: 13,
+            padding: '6px 12px',
+            borderRadius: 6,
+            border: '1px solid #d1d5db',
+            textDecoration: 'none',
+          }}
+        >
+          ▶ Replay（全fixtureをライブ再生）
+        </a>
       </div>
 
       {manifest.map((unit) => (

@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "dep-cruise": "depcruise src --config .dependency-cruiser.cjs",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "verify:record": "node scripts/record-verify.mjs"
   },
   "dependencies": {
     "@oryzae/server": "workspace:*",

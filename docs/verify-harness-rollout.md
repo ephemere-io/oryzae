@@ -6,7 +6,7 @@
 
 ## 0. これは何か / なぜやるか
 
-CLAUDE.md が思想の拠り所として挙げている「[超並列LLMコーディングのハーネスエンジニアリング](https://note.com/jujunjun110/n/n66306cab294a)」を、**フロントエンドUIに対して具体実装したもの**。
+CLAUDE.md が思想の拠り所として挙げる「[超並列LLMコーディングのハーネスエンジニアリング](https://note.com/jujunjun110/n/n66306cab294a)」と**同じ思想（ガードレール／自己検証）を、記事が扱っていないフロントエンドUIの実行時検証へ拡張・応用したもの**。（記事のハーネスは CLAUDE.md＋slash command / dependency-cruiser / レイヤー別テスト / git hook / `/review` という静的解析・バックエンド寄りの層が中心で、フロント UI の「描画後の実行時状態」の検証には触れていない。本ハーネスはその空白を埋める。）
 
 複数エージェントが長時間自律で開発する時代の大前提は、**エージェントがアプリの状態を実行時に観測・検証できること**。そのために各コンポーネントが自分の状態を機械可読な「DOM契約（`data-verify-*`）」として公表し、その契約に対して fixture（状態）と invariant（不変条件）を宣言する。
 
@@ -39,11 +39,12 @@ packages/
   verify/   ← @oryzae/verify     エンジン（移植・全アプリ/将来プロジェクトで再利用）
     src/core/                    contract / types / registry / runner
     src/verifiers/               schema / invariants / dom-contract / a11y
-    src/harness/                 handle(window.__verify) / Dashboard / UnitPage
+    src/harness/                 handle(window.__verify) / Dashboard / UnitPage / ReplayPage
 apps/client/                    （admin も同型）
   src/lib/verify/register.ts     全 *.verify を import ＋ ビルトイン verifier 登録（バレル）
   src/features/<x>/*.verify.tsx  各 feature のユニット定義（co-located）
-  src/app/verify/                ダッシュボード/孤立マウントの薄いルート（dev限定）
+  src/app/verify/                ダッシュボード/孤立マウント/replay の薄いルート（dev限定）
+  scripts/record-verify.mjs      replay をヘッドレスで録画して .webm を出す（Playwright）
   test/verify.matrix.test.ts     CIゲート（全ユニット×fixture を実行・probe必須を強制）
 ```
 
@@ -113,8 +114,9 @@ registerUnit({
 
 ### 人間QA — `apps/client/src/app/verify/`（dev限定）
 
-- `app/verify/page.tsx` … ダッシュボード（「Run all」→ verdict グリッド）
+- `app/verify/page.tsx` … ダッシュボード（「Run all」→ verdict グリッド・`/verify/replay` への導線）
 - `app/verify/[unit]/[fixture]/page.tsx` … そのユニットだけを孤立マウント
+- `app/verify/replay/page.tsx` … replay（全ユニット×fixture をライブ順送り再生・§4.1）
 
 FSA 規約に従い `app/` は薄いラッパーにし、UI 本体は `@oryzae/verify` の harness コンポーネントを使う。**本番ビルドに出さない**よう `process.env.NODE_ENV !== 'production'` でガードする。
 
@@ -128,6 +130,31 @@ window.__verify.manifest();                  // 全ユニット×fixtureを列�
 // ハンドル無しでもDOM直読み可:
 document.querySelector('[data-verify-unit="EntryCard"]').dataset;
 ```
+
+### 4.1 Replay（ライブ再生 ＋ 録画デモ） — `/verify/replay`（dev限定）
+
+> ⚠ これは**「記録済み検証結果の再生」ではない**。毎回その場で**ライブ再実行**する。
+
+登録済みの全ユニット×fixture を、ステージに1つずつマウント → verifier 実行 → verdict 表示 → 次へ、と目に見える形で順送りする画面。`act` のある fixture は「描画 → クリック/入力（ハイライト付き）→ 検証」まで演出付きで再生する。`runFixture` は CI ゲート（`verify.matrix.test.ts`）と同じ経路なので、**緑なら本当に緑**。
+
+- **「全green を毎回確認できる」緑ゲート自体は CI の matrix が既に担保**している（`pnpm test`）。replay の固有価値は別で、**(1) 人が見て分かるデモ**と **(2) コミット/PR 添付できる動画成果物**。
+- クエリ: `?dwell=<ms>`（各 fixture 保持）・`?chrome=0`（操作UIを隠す）・`?auto=0`（停止で開始）・`?key=<ms>`（タイプ速度）・`?unit=<UnitId>`（**1ユニットだけ再生** = 録画を1 feature に絞る）。
+- キーボード: Space=一時停止/再開 ・ →=スキップ ・ Esc=停止して集計。
+- `window.__verify_replay = { playing, idx, total, done, results }` を公開（外部レコーダの開始/終了検知用）。
+
+**録画**（committable な .webm を作る）:
+
+```bash
+# 別ターミナルで dev サーバ起動（/verify は dev 限定）
+pnpm --filter @oryzae/client dev
+# Playwright で replay を録画（全ユニット）
+pnpm --filter @oryzae/client verify:record
+# 1 feature だけ録画（例: PoC の LandingFaqItem → 全green デモ）
+pnpm --filter @oryzae/client verify:record --unit LandingFaqItem
+# → apps/client/recordings/replay-<unit>-<ts>.webm（recordings/ は .gitignore）
+```
+
+意図的に壊した probe（`EXPECTED_FAIL`、例 `ExampleProgress::inconsistent`）は replay でも赤❌として正しく映る。「全green の録画」が欲しいときは `?unit=` で**全PASSになるユニットに絞る**こと（全ユニット録画はゲートのデモ＝赤を含むのが正しい姿）。
 
 ## 5. CIで「probe必須」を強制する
 
