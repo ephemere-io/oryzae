@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useActiveQuestions } from '@/features/entry-questions/hooks/use-entry-questions';
+import { useActiveQuestions } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { ApiClient } from '@/lib/api';
 
 function mockResponse(ok: boolean, body: unknown): Response {
