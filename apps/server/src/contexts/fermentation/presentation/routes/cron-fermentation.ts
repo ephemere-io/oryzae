@@ -14,6 +14,7 @@ import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
+import { summarizeFailureReasons } from '../summarize-failure-reasons.js';
 
 const generateId = () => crypto.randomUUID();
 
@@ -74,20 +75,35 @@ export const cronFermentation = new Hono()
     try {
       const result = await usecase.execute(new Date());
 
-      const hasFailures =
-        result.failed > 0 || result.errors.length > 0 || result.emailFailures.length > 0;
+      // 発酵そのものの失敗 (LLM エラー等) は ERROR、メール送信失敗だけなら WARNING。
+      // 「failed: N」だけでは原因が分からず retire 障害が 12 日埋もれたため、
+      // errors を集約した「失敗理由」を必ず添える (summarizeFailureReasons で
+      // 同一理由を畳み、Discord の field 上限内に収める)。
+      const hasFermentationFailures = result.failed > 0 || result.errors.length > 0;
+      const hasFailures = hasFermentationFailures || result.emailFailures.length > 0;
+
+      const fields = [
+        { name: 'totalUsers', value: String(result.totalUsers), inline: true },
+        { name: 'eligibleUsers', value: String(result.eligibleUsers), inline: true },
+        { name: 'totalFermentations', value: String(result.totalFermentations), inline: true },
+        { name: 'succeeded', value: String(result.succeeded), inline: true },
+        { name: 'failed', value: String(result.failed), inline: true },
+        { name: 'emailFailures', value: String(result.emailFailures.length), inline: true },
+      ];
+
+      const failureReasons = summarizeFailureReasons(result.errors);
+      if (failureReasons) {
+        fields.push({ name: '失敗理由', value: failureReasons, inline: false });
+      }
 
       await notifyDiscord({
         title: hasFailures ? '発酵 cron: 完了（一部失敗）' : '発酵 cron: 完了',
-        color: hasFailures ? COLORS.WARNING : COLORS.SUCCESS,
-        fields: [
-          { name: 'totalUsers', value: String(result.totalUsers), inline: true },
-          { name: 'eligibleUsers', value: String(result.eligibleUsers), inline: true },
-          { name: 'totalFermentations', value: String(result.totalFermentations), inline: true },
-          { name: 'succeeded', value: String(result.succeeded), inline: true },
-          { name: 'failed', value: String(result.failed), inline: true },
-          { name: 'emailFailures', value: String(result.emailFailures.length), inline: true },
-        ],
+        color: hasFermentationFailures
+          ? COLORS.ERROR
+          : hasFailures
+            ? COLORS.WARNING
+            : COLORS.SUCCESS,
+        fields,
       });
 
       return c.json({
