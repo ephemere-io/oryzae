@@ -26,6 +26,8 @@ export function SpEntryEditor({ api }: SpEntryEditorProps) {
   const [body, setBody] = useState('');
   const [entryId, setEntryId] = useState<string | undefined>(undefined);
   const [lastSavedBody, setLastSavedBody] = useState('');
+  const [pickling, setPickling] = useState(false);
+  const [pickled, setPickled] = useState(false);
 
   useAutosaveEntry({
     title,
@@ -48,6 +50,15 @@ export function SpEntryEditor({ api }: SpEntryEditorProps) {
         ? '編集中'
         : '保存済み';
 
+  async function handlePickle() {
+    if (!entryId || pickling || pickled) return;
+    setPickling(true);
+    const content = title.trim() ? `${title.trim()}\n${body}` : body;
+    const saved = await save(content, entryId, { fermentationEnabled: true });
+    setPickling(false);
+    if (saved) setPickled(true);
+  }
+
   return (
     <div className="flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]">
       <input
@@ -64,10 +75,23 @@ export function SpEntryEditor({ api }: SpEntryEditorProps) {
         placeholder="いま感じていることを、そのまま。"
         className="w-full flex-1 resize-none bg-transparent px-5 pb-4 text-lg leading-relaxed outline-none placeholder:opacity-40"
       />
-      <footer className="flex items-center justify-between border-t border-[color-mix(in_srgb,var(--fg)_12%,transparent)] px-5 py-3 text-xs opacity-60">
-        <span aria-live="polite">{status}</span>
-        {/* 右側は 3b(瓶に漬ける) / 3c(問い) で埋める */}
-        <span />
+      <footer className="flex items-center justify-between border-t border-[color-mix(in_srgb,var(--fg)_12%,transparent)] px-5 py-3 text-xs">
+        <span aria-live="polite" className="opacity-60">
+          {status}
+        </span>
+        {/* 右側: 保存後に「瓶に漬ける」(3b)。問い紐づけ(3c)は後続 */}
+        {entryId ? (
+          <button
+            type="button"
+            onClick={handlePickle}
+            disabled={pickling || pickled}
+            className="rounded-full border border-[color-mix(in_srgb,var(--fg)_24%,transparent)] px-3 py-1 disabled:opacity-50"
+          >
+            {pickled ? '瓶に漬けました ✓' : pickling ? '漬けています…' : '瓶に漬ける'}
+          </button>
+        ) : (
+          <span />
+        )}
       </footer>
     </div>
   );
