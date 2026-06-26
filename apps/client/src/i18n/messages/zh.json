@@ -747,5 +747,23 @@
   "support": {
     "title": "支持",
     "back_home": "返回首页"
+  },
+  "sp": {
+    "editor": {
+      "title_placeholder": "标题（可选）",
+      "body_placeholder": "把此刻的感受，如实写下。",
+      "status_editing": "编辑中",
+      "status_saving": "保存中…",
+      "status_saved": "已保存",
+      "question": "提问",
+      "question_selected": "提问：{label}",
+      "question_untitled": "无标题提问",
+      "question_sheet_title": "选择提问",
+      "question_empty": "还没有设立提问（可在电脑端创建）",
+      "close": "关闭",
+      "pickle": "放入瓶中",
+      "pickling": "放入中…",
+      "pickled": "已放入瓶中 ✓"
+    }
   }
 }
