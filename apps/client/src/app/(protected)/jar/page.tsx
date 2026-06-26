@@ -6,7 +6,9 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { JarView } from '@/features/fermentation/components/jar-view';
 import { PickleSuccessModal } from '@/features/fermentation/components/pickle-success-modal';
 import { useQuestions } from '@/features/questions/hooks/use-questions';
+import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { useUnread } from '@/lib/unread-context';
+import { useDevice } from '@/lib/use-device';
 
 interface QuestionData {
   id: string;
@@ -18,6 +20,7 @@ interface QuestionData {
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
+  const device = useDevice();
   const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api, authLoading);
   const { markSeen } = useUnread();
   const [questions, setQuestions] = useState<QuestionData[]>([]);
@@ -72,6 +75,10 @@ export default function JarPage() {
     await archiveQuestion(id);
     await fetchActiveQuestions();
   }
+
+  // 端末で出し分け（URL は /jar のまま）。判定前(null)は何も描画しない。
+  if (device === null) return null;
+  if (device === 'sp') return <SpJar api={api} />;
 
   return (
     <div className="absolute inset-0">

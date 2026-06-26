@@ -12,6 +12,8 @@ import type { ApiClient } from '@/lib/api';
 
 interface SpEntryEditorProps {
   api: ApiClient | null;
+  /** 手紙への返事など、URL の questionId を初期紐づけする（内省ループの接続）。 */
+  initialQuestionId?: string | null;
 }
 
 /**
@@ -23,7 +25,7 @@ interface SpEntryEditorProps {
  * 離脱ガードは持たない。下部バーに 小さなステータス・問い紐づけ・保存後の「瓶に漬ける」。
  * TODO(#363): 瓶に漬けた後の sp/jar（手紙画面）への遷移（当該スライス実装後）。
  */
-export function SpEntryEditor({ api }: SpEntryEditorProps) {
+export function SpEntryEditor({ api, initialQuestionId = null }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
   const { save, saving } = useSaveEntry(api, null);
   const activeQuestions = useActiveQuestions(api, false);
@@ -33,7 +35,7 @@ export function SpEntryEditor({ api }: SpEntryEditorProps) {
   const [lastSavedBody, setLastSavedBody] = useState('');
   const [pickling, setPickling] = useState(false);
   const [pickled, setPickled] = useState(false);
-  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(initialQuestionId);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const { linkQuestion } = useEntryQuestions(api, entryId);

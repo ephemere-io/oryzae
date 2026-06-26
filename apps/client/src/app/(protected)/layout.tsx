@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
+import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { useAuth } from '@/features/auth/hooks/use-auth';
@@ -51,6 +52,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）
             <div className="flex h-screen flex-col overflow-hidden">
               <main className="relative flex-1 overflow-auto">{content}</main>
+              <SpBottomNav />
             </div>
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">

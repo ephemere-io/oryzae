@@ -764,6 +764,18 @@
       "pickle": "병에 담그기",
       "pickling": "담그는 중…",
       "pickled": "병에 담갔어요 ✓"
+    },
+    "nav": {
+      "write": "쓰기",
+      "jar": "병"
+    },
+    "jar": {
+      "title": "병에 도착한 편지",
+      "empty": "아직 편지가 없습니다",
+      "untitled": "제목 없는 질문",
+      "close": "닫기",
+      "letter_empty": "이 결과에는 아직 편지가 없습니다",
+      "reply": "답장 쓰기"
     }
   }
 }
