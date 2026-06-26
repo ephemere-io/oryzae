@@ -7,7 +7,7 @@ import { QuestionTimeline } from '@/features/questions/components/question-timel
 import { useQuestions } from '@/features/questions/hooks/use-questions';
 
 export default function QuestionsPage() {
-  const { api, loading: authLoading } = useAuth();
+  const { api } = useAuth();
   const {
     questions,
     loading,
@@ -16,7 +16,7 @@ export default function QuestionsPage() {
     unarchiveQuestion,
     acceptQuestion,
     rejectQuestion,
-  } = useQuestions(api, authLoading);
+  } = useQuestions(api);
 
   return (
     <div className="flex min-h-full flex-col">

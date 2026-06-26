@@ -13,7 +13,7 @@ interface QuestionItem {
   updatedAt: string;
 }
 
-export function useQuestions(api: ApiClient | null, authLoading: boolean) {
+export function useQuestions(api: ApiClient | null) {
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,11 +28,14 @@ export function useQuestions(api: ApiClient | null, authLoading: boolean) {
     setLoading(false);
   }, [api]);
 
+  // Issue #362: auth/me の完了（authLoading）を待たず、api が用意でき次第すぐ取得する。
+  // api は useAuth が stored token から楽観的に即生成する。失効時は createApiClient が
+  // 401→refresh→retry で自己修復する。
   useEffect(() => {
-    if (!authLoading && api) {
+    if (api) {
       fetchQuestions();
     }
-  }, [authLoading, api, fetchQuestions]);
+  }, [api, fetchQuestions]);
 
   const createQuestion = useCallback(
     async (text: string) => {

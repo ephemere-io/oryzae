@@ -100,12 +100,7 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
   // Issue #331: 問いで絞り込むフィルタ。空文字 = フィルタ無し
   const [questionFilter, setQuestionFilter] = useState<string>('');
   const questionId = questionFilter || undefined;
-  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(
-    api,
-    authLoading,
-    search,
-    questionId,
-  );
+  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(api, search, questionId);
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
