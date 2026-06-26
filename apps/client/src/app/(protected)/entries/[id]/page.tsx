@@ -6,11 +6,11 @@ import { useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { EntryEditor } from '@/features/entries/components/entry-editor';
 import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
+import { useEntry } from '@/features/shared/entries/hooks/use-entry';
 import {
   useActiveQuestions,
   useEntryQuestions,
-} from '@/features/entry-questions/hooks/use-entry-questions';
-import { useEntry } from '@/features/shared/entries/hooks/use-entry';
+} from '@/features/shared/entry-questions/hooks/use-entry-questions';
 
 export default function EntryDetailPage() {
   const t = useTranslations('entries.detail');
