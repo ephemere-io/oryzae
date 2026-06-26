@@ -1,5 +1,7 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
+  "regions": ["hnd1"],
   "installCommand": "pnpm install --filter @oryzae/client...",
   "buildCommand": "pnpm --filter @oryzae/shared build && pnpm --filter @oryzae/server build && pnpm --filter @oryzae/client build",
   "crons": [
