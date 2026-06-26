@@ -187,7 +187,7 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
     language: FermentationLanguage;
   }): Promise<LlmAnalysisResult> {
     const { object, usage } = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: anthropic('claude-sonnet-4-6'),
       prompt: buildPrompt(
         {
           question: params.question,
