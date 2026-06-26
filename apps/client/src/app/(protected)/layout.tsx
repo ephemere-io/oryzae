@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/auth/components/sidebar';
@@ -17,6 +17,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const { auth, api, loading } = useAuth();
   const { shouldShow, complete } = useOnboarding(api);
   const router = useRouter();
+
+  // Issue #362: 保護下の children はクライアント専用に描画する。
+  // SSR では描画しない（mounted=false）ことで、エディタ等の時刻依存レンダリングが
+  // サーバー↔クライアントで食い違うハイドレーション不一致(React #418)を防ぐ。
+  // それでも auth/me の完了は待たない（マウント直後＝~1s で描画）ため、
+  // 旧来の「認証完了まで全画面空白(~3s)」は解消したまま。
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleOnboardingComplete = useCallback(
     async (result: OnboardingResult) => {
@@ -53,10 +63,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                 } as React.CSSProperties
               }
             >
-              {/* Issue #362: 認証チェック中に全画面を空白にせず、各ページが
-                  スケルトンを即描画できるよう children を常に描画する。
-                  未認証時は上の useEffect が /login へリダイレクトする。 */}
-              <div className="relative flex-1 overflow-auto">{children}</div>
+              {/* Issue #362: 認証チェック完了を待たずマウント直後に children を描画
+                  （各ページがスケルトンを即出せる）。ただし SSR では描画せず
+                  ハイドレーション不一致を避ける。未認証時は上の useEffect が /login へ。 */}
+              <div className="relative flex-1 overflow-auto">{mounted ? children : null}</div>
               <PageFooter />
             </main>
             {shouldShow && <OnboardingFlow onComplete={handleOnboardingComplete} />}
