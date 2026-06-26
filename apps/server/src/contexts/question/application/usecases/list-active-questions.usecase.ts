@@ -10,11 +10,14 @@ export class ListActiveQuestionsUsecase {
 
   async execute(userId: string): Promise<Array<QuestionProps & { currentText: string | null }>> {
     const questions = await this.questionRepo.listActiveByUserId(userId);
-    const results = [];
-    for (const q of questions) {
-      const tx = await this.transactionRepo.findLatestValidatedByQuestionId(q.id);
-      results.push({ ...q.toProps(), currentText: tx?.string ?? null });
-    }
-    return results;
+    // Issue #362: 問いごとに findLatestValidatedByQuestionId を逐次呼ぶと N+1 になるため、
+    // 最新 validated transaction を1クエリでまとめて取得する。
+    const latestByQuestionId = await this.transactionRepo.findLatestValidatedByQuestionIds(
+      questions.map((q) => q.id),
+    );
+    return questions.map((q) => ({
+      ...q.toProps(),
+      currentText: latestByQuestionId.get(q.id)?.string ?? null,
+    }));
   }
 }
