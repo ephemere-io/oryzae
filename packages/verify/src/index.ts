@@ -32,5 +32,6 @@ export type {
 } from './core/types';
 export { VerifyDashboard } from './harness/Dashboard';
 export { installVerifyHandle, setCurrentResult } from './harness/handle';
+export { type ReplayPageProps, VerifyReplayPage } from './harness/ReplayPage';
 export { VerifyUnitPage } from './harness/UnitPage';
 export { registerBuiltinVerifiers } from './verifiers';
