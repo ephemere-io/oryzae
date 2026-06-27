@@ -12,6 +12,17 @@
             "statusMessage": "Push 前コードレビュー実行中..."
           }
         ]
+      },
+      {
+        "matcher": "mcp__supabase__apply_migration|mcp__supabase__execute_sql",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-supabase-migrations.sh",
+            "timeout": 30,
+            "statusMessage": "Supabase migration ガード確認中..."
+          }
+        ]
       }
     ],
     "Stop": [
