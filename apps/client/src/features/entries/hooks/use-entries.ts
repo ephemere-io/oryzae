@@ -50,6 +50,8 @@ function normalizeEntry(raw: unknown): Entry {
 export function useEntries(api: ApiClient | null, search?: string, questionId?: string) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  // Issue #357: 取得失敗を握りつぶさず error ステートとして surface する（UI が ErrorState を出せる）。
+  const [error, setError] = useState<boolean>(false);
   const [cursor, setCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(true);
   const prevSearchRef = useRef(search);
@@ -59,22 +61,29 @@ export function useEntries(api: ApiClient | null, search?: string, questionId?: 
     async (nextCursor?: string) => {
       if (!api) return;
       setLoading(true);
+      setError(false);
 
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-      if (nextCursor) params.set('cursor', nextCursor);
-      if (search) params.set('q', search);
-      if (questionId) params.set('questionId', questionId);
+      try {
+        const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+        if (nextCursor) params.set('cursor', nextCursor);
+        if (search) params.set('q', search);
+        if (questionId) params.set('questionId', questionId);
 
-      const res = await api.fetch(`/api/v1/entries?${params}`);
+        const res = await api.fetch(`/api/v1/entries?${params}`);
 
-      if (res.ok) {
-        const data = await res.json();
-        const items: Entry[] = (Array.isArray(data) ? data : []).map(normalizeEntry);
-        setEntries((prev) => (nextCursor ? [...prev, ...items] : items));
-        setHasMore(items.length === PAGE_SIZE);
-        if (items.length > 0) {
-          setCursor(items[items.length - 1].id);
+        if (res.ok) {
+          const data = await res.json();
+          const items: Entry[] = (Array.isArray(data) ? data : []).map(normalizeEntry);
+          setEntries((prev) => (nextCursor ? [...prev, ...items] : items));
+          setHasMore(items.length === PAGE_SIZE);
+          if (items.length > 0) {
+            setCursor(items[items.length - 1].id);
+          }
+        } else {
+          setError(true);
         }
+      } catch {
+        setError(true);
       }
 
       setLoading(false);
@@ -108,5 +117,9 @@ export function useEntries(api: ApiClient | null, search?: string, questionId?: 
     setEntries((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
-  return { entries, loading, hasMore, loadMore, removeEntry };
+  const retry = useCallback(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  return { entries, loading, error, hasMore, loadMore, removeEntry, retry };
 }

@@ -59,6 +59,19 @@ describe('useQuestions', () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
+  it('取得失敗時は error=true になる (Issue #357)', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useQuestions(api));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.error).toBe(true);
+    expect(result.current.questions).toHaveLength(0);
+  });
+
   it('createQuestion calls API and refreshes list', async () => {
     const initialQuestions = [
       {

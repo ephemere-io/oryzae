@@ -100,9 +100,6 @@ export class ScheduledFermentationUsecase {
       this.generateId,
     );
 
-    const successfulTitlesByUser = new Map<string, string[]>();
-    const languageByUser = new Map<string, FermentationLanguage>();
-
     // 失敗即時通知の dedup / cap 状態 (run スコープ)。check→reserve は同期的なので
     // worker 並列でも二重通知しない (mutate は await 境界の手前のみ)。
     const notifiedReasons = new Set<string>();
@@ -113,7 +110,9 @@ export class ScheduledFermentationUsecase {
     const processUser = async (userId: string): Promise<void> => {
       // 1. ロケール解決 (失敗時は 'ja')
       const language = await this.localeResolver.resolve(userId);
-      languageByUser.set(userId, language);
+
+      // このユーザーで発酵に成功した問いタイトル。処理直後の digest 送信に使う。
+      const successfulTitles: string[] = [];
 
       // 2. 既存 state を取得 (新規なら null)
       const existing = await this.userStateRepo.findByUserId(userId);
@@ -181,9 +180,7 @@ export class ScheduledFermentationUsecase {
           });
           result.succeeded++;
           firedAtLeastOne = true;
-          const titles = successfulTitlesByUser.get(userId) ?? [];
-          titles.push(questionText);
-          successfulTitlesByUser.set(userId, titles);
+          successfulTitles.push(questionText);
         } catch (error) {
           result.failed++;
           firedAtLeastOne = true;
@@ -216,6 +213,25 @@ export class ScheduledFermentationUsecase {
           await this.userStateRepo.upsert(fired.value);
         }
       }
+
+      // issue #384: digest はこのユーザーの処理直後に送る。
+      // 以前は全ユーザーの sweep 完了後に末尾で一括送信していたが、cron が重く
+      // 末尾フェーズに到達する前に Vercel に kill されると、成功した全ユーザーの
+      // digest メールが 1 通も飛ばなかった (user-facing バグ)。逐次送信なら kill 前に
+      // 処理済みのユーザーには確実に届く。失敗は握りつぶさず emailFailures に集計。
+      if (successfulTitles.length > 0) {
+        try {
+          await this.sendDigest(userId, successfulTitles, language);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          console.error('[ScheduledFermentationUsecase] digest email failed', {
+            userId,
+            titleCount: successfulTitles.length,
+            error: message,
+          });
+          result.emailFailures.push({ userId, error: message });
+        }
+      }
     };
 
     // worker-pool でユーザーを並列処理 (issue #341)。
@@ -231,24 +247,6 @@ export class ScheduledFermentationUsecase {
       }
     });
     await Promise.all(workers);
-
-    for (const [userId, titles] of successfulTitlesByUser) {
-      const lang = languageByUser.get(userId) ?? 'ja';
-      try {
-        await this.sendDigest(userId, titles, lang);
-      } catch (error) {
-        // 設計思想: メール送信失敗は発酵ジョブ全体を止めない (issue #268)。
-        // ただし黙殺せず、result に集計してログを出して上位の Discord 通知 / admin
-        // 監視で発見できるようにする (issue #288)。
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[ScheduledFermentationUsecase] digest email failed', {
-          userId,
-          titleCount: titles.length,
-          error: message,
-        });
-        result.emailFailures.push({ userId, error: message });
-      }
-    }
 
     return result;
   }
