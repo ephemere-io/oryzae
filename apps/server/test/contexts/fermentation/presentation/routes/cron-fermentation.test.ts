@@ -254,6 +254,42 @@ describe('cronFermentation', () => {
       expect(embed.color).toBe(COLORS.SUCCESS);
     });
 
+    it('keeps the run SUCCESS when retries were only skipped (benign deletions)', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 2,
+        attempted: 0,
+        skipped: 2, // entry/question deleted — not a failure
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      expect(embed.color).toBe(COLORS.SUCCESS);
+      expect(embed.title).toBe('発酵 cron: 完了');
+      // skip 件数は summary には出す。
+      const retryField = embed.fields.find((f: { name: string }) => f.name === 'リトライ');
+      expect(retryField?.value).toContain('skip:2');
+    });
+
+    it('marks the run as failed (WARNING) when retries were truncated', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 40,
+        attempted: 30,
+        succeeded: 30,
+        truncated: 10, // dropped — one-shot window means these never retry
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      // truncated は取りこぼしなので可視化する（発酵自体は失敗していないので WARNING）。
+      expect(embed.color).toBe(COLORS.WARNING);
+    });
+
     it('marks the run as failed (ERROR) when a retry fails', async () => {
       mockExecute.mockResolvedValue(successResult);
       mockRetryExecute.mockResolvedValue({

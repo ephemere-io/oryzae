@@ -124,9 +124,10 @@ export const cronFermentation = new Hono()
       // errors を集約した「失敗理由」を必ず添える (summarizeFailureReasons で
       // 同一理由を畳み、Discord の field 上限内に収める)。
       // issue #353: リトライ段の失敗・取りこぼし(truncated)・retryError も失敗扱いに含める。
+      // skipped は「ユーザーがエントリ/問いを消した」等の良性ケースなので色付けには含めない
+      // （含めると削除があっただけで「一部失敗」アラートが鳴る）。件数は summary には出す。
       const retryHasFailures =
-        retry !== null &&
-        (retry.failed > 0 || retry.errors.length > 0 || retry.truncated > 0 || retry.skipped > 0);
+        retry !== null && (retry.failed > 0 || retry.errors.length > 0 || retry.truncated > 0);
       const hasFermentationFailures =
         result.failed > 0 ||
         result.errors.length > 0 ||
