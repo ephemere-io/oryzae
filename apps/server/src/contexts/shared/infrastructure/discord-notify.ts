@@ -30,14 +30,29 @@ export async function notifyDiscord(embed: DiscordEmbed): Promise<void> {
   if (!url) return;
 
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         embeds: [{ ...embed, timestamp: embed.timestamp ?? new Date().toISOString() }],
       }),
     });
-  } catch {
-    // Silently ignore — notification failure should never break the app
+
+    // issue #384: 送信失敗を握りつぶすと「通知が来ない」原因を追えない（cron は 200 で
+    // 完了しているのに完了通知が出ない、等）。アプリは止めないが、res.ok を確認して
+    // 失敗時はステータスと本文先頭をログに出し、可観測にする（Vercel ログで追える）。
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[notifyDiscord] webhook responded with non-OK status', {
+        status: res.status,
+        title: embed.title,
+        body: body.slice(0, 500),
+      });
+    }
+  } catch (error) {
+    // 送信失敗はアプリを止めない。ただし黙殺せずログに残す（dev で URL 未設定の場合は
+    // 上の early-return で到達しないため、ここに来るのは実際のネットワーク等のエラー）。
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[notifyDiscord] webhook request failed', { title: embed.title, error: message });
   }
 }
