@@ -646,13 +646,33 @@ export const adminFermentations = new Hono<Env>()
     const localeResolver = new SupabaseUserLocaleResolver(supabase);
     const language = await localeResolver.resolve(fermentation.user_id);
 
-    const result = await usecase.execute({
-      userId: fermentation.user_id,
-      questionId: fermentation.question_id,
-      questionText,
-      entries,
-      language,
-    });
+    let result: { id: string };
+    try {
+      result = await usecase.execute({
+        userId: fermentation.user_id,
+        questionId: fermentation.question_id,
+        questionText,
+        entries,
+        language,
+      });
+    } catch (error) {
+      // 失敗時も Discord に通知 (cron / 手動発火と同じ方針)。notifyDiscord は内部で
+      // 例外を握り潰すため await しても throw しない。Vercel serverless では 500 を
+      // 返した後にインスタンスが freeze して送信中の fetch が切れることがあるので、
+      // 再 throw の前に await して送信完了を保証する。
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await notifyDiscord({
+        title: '発酵 retry 失敗',
+        color: COLORS.ERROR,
+        fields: [
+          { name: 'User', value: fermentation.user_id.slice(0, 8), inline: true },
+          { name: 'Question', value: fermentation.question_id.slice(0, 8), inline: true },
+          { name: 'FermentationId', value: fermentation.id.slice(0, 8), inline: true },
+          { name: 'Error', value: errorMessage.slice(0, 200) },
+        ],
+      });
+      throw error;
+    }
 
     // 5. Send digest email (fire-and-forget)
     const digestUsecase = new SendFermentationDigestUsecase(

@@ -26,6 +26,12 @@ interface ScheduledFermentationResult {
   emailFailures: Array<{ userId: string; error: string }>;
 }
 
+// 失敗即時通知の 1 run あたり上限。発酵 cron は重く、末尾の summary 通知に到達する前に
+// Vercel に kill されることがある (失敗が無通知で埋もれる原因)。そこで失敗の瞬間に
+// 通知するが、(a) 同一理由は 1 回 (dedup) + (b) この上限で打ち切る。理由文字列に
+// request-id 等が混ざって dedup が効かない場合でもスパムしないための保険。
+const MAX_FAILURE_NOTIFICATIONS = 5;
+
 // 発酵プロセス自動発火 (issue #268)。
 // 一日一回、cron から呼ばれる。各ユーザーごとに以下を実施する:
 //   1. ロケール解決 (Supabase Auth user_metadata.locale → 'ja' or 'en')
@@ -62,6 +68,12 @@ export class ScheduledFermentationUsecase {
       questionTitles: string[],
       language: FermentationLanguage,
     ) => Promise<unknown>,
+    // 失敗の瞬間に呼ばれる通知コールバック (route 側で Discord に配線)。dedup + 上限は
+    // この usecase 内で管理する。未注入なら no-op (テスト・admin 手動トリガー等)。
+    private notifyFailure: (
+      reason: string,
+      sample: { userId: string; questionId: string },
+    ) => Promise<void> = async () => {},
     // 次回 X 時間生成器。テストでは固定値を注入して決定論的にする。
     private rollHours: () => number = rollRandomHours,
     // ユーザー並列実行数。テストでは 1 を渡して順序を決定論的にできる。
@@ -90,6 +102,11 @@ export class ScheduledFermentationUsecase {
 
     const successfulTitlesByUser = new Map<string, string[]>();
     const languageByUser = new Map<string, FermentationLanguage>();
+
+    // 失敗即時通知の dedup / cap 状態 (run スコープ)。check→reserve は同期的なので
+    // worker 並列でも二重通知しない (mutate は await 境界の手前のみ)。
+    const notifiedReasons = new Set<string>();
+    let failureNotifyCount = 0;
 
     // 1 ユーザー分の処理。共有 state (result/Map) を mutate するが、JS シングル
     // スレッドかつ await 境界での mutate のみのため worker 間競合は起きない。
@@ -170,11 +187,22 @@ export class ScheduledFermentationUsecase {
         } catch (error) {
           result.failed++;
           firedAtLeastOne = true;
-          result.errors.push({
-            userId,
-            questionId: question.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
+          const reason = error instanceof Error ? error.message : 'Unknown error';
+          result.errors.push({ userId, questionId: question.id, error: reason });
+
+          // 失敗の瞬間に通知 (末尾 summary は cron が時間切れだと出ないため)。
+          // dedup (同一理由は1回) + cap (1 run 最大 MAX_FAILURE_NOTIFICATIONS 件)。
+          // reserve は同期的に行い、その後 await して kill 前に送り切る。
+          const reasonKey = reason.replace(/\s+/g, ' ').trim();
+          if (!notifiedReasons.has(reasonKey) && failureNotifyCount < MAX_FAILURE_NOTIFICATIONS) {
+            notifiedReasons.add(reasonKey);
+            failureNotifyCount++;
+            try {
+              await this.notifyFailure(reason, { userId, questionId: question.id });
+            } catch {
+              // 通知失敗は発酵ジョブを止めない。
+            }
+          }
         }
       }
 
