@@ -122,7 +122,9 @@
       "load_more": "もっと見る",
       "filter_by_question_label": "問いで絞り込む",
       "filter_all_questions": "すべての問い",
-      "filter_clear_aria": "フィルタを解除"
+      "filter_clear_aria": "フィルタを解除",
+      "error_message": "エントリーの読み込みに失敗しました",
+      "retry": "再読み込み"
     },
     "leave_modal": {
       "aria_label": "離脱確認ダイアログ",
@@ -518,7 +520,9 @@
     "timeline": {
       "empty": "問いはまだありません",
       "heading": "問いの変遷",
-      "subheading": "あなたの問いが生まれ、育ち、変化してきた記録"
+      "subheading": "あなたの問いが生まれ、育ち、変化してきた記録",
+      "error_message": "問いの読み込みに失敗しました",
+      "retry": "再読み込み"
     }
   },
   "landing": {

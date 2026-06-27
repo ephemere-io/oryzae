@@ -122,7 +122,9 @@
       "load_more": "加载更多",
       "filter_by_question_label": "按问题筛选",
       "filter_all_questions": "所有问题",
-      "filter_clear_aria": "清除筛选"
+      "filter_clear_aria": "清除筛选",
+      "error_message": "加载日记失败",
+      "retry": "重试"
     },
     "leave_modal": {
       "aria_label": "离开确认对话框",
@@ -518,7 +520,9 @@
     "timeline": {
       "empty": "还没有提问",
       "heading": "提问的演变",
-      "subheading": "记录你的提问诞生、成长与变化的轨迹"
+      "subheading": "记录你的提问诞生、成长与变化的轨迹",
+      "error_message": "加载问题失败",
+      "retry": "重试"
     }
   },
   "landing": {
