@@ -10,7 +10,7 @@ export default function EntriesPage() {
   const { api, loading } = useAuth();
   // Issue #331: 一覧の問いフィルタ用に問い一覧を取得。
   // features 間直接依存禁止のため、ページ層で取得して EntryList に props で渡す。
-  const { questions } = useQuestions(api, loading);
+  const { questions } = useQuestions(api);
 
   const availableQuestions: FilterableQuestion[] = useMemo(
     () =>

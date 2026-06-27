@@ -45,6 +45,30 @@ export class SupabaseQuestionTransactionRepository implements QuestionTransactio
     return this.toDomain(data);
   }
 
+  async findLatestValidatedByQuestionIds(
+    questionIds: string[],
+  ): Promise<Map<string, QuestionTransaction>> {
+    const result = new Map<string, QuestionTransaction>();
+    if (questionIds.length === 0) return result;
+
+    const { data, error } = await this.supabase
+      .from('question_transactions')
+      .select('*')
+      .in('question_id', questionIds)
+      .eq('is_validated_by_user', true)
+      .order('question_version', { ascending: false });
+
+    if (error) throw error;
+
+    // question_version 降順で並んでいるため、各 question_id について最初に現れた行が最新。
+    for (const row of data ?? []) {
+      const tx = this.toDomain(row);
+      const questionId = tx.toProps().questionId;
+      if (!result.has(questionId)) result.set(questionId, tx);
+    }
+    return result;
+  }
+
   async findLatestUnvalidatedByQuestionId(questionId: string): Promise<QuestionTransaction | null> {
     const { data, error } = await this.supabase
       .from('question_transactions')

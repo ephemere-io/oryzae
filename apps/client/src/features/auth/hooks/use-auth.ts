@@ -2,7 +2,7 @@
 
 import posthog from 'posthog-js';
 import { useEffect, useState } from 'react';
-import { type ApiClient, createApiClient } from '@/lib/api';
+import { type ApiClient, createApiClient, tryRefreshToken } from '@/lib/api';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/auth';
 
 interface AuthState {
@@ -31,7 +31,12 @@ export function useAuth() {
         return;
       }
 
+      // Issue #362: api を即セット（楽観的）。auth/me 検証の完了を待たず
+      // データ取得を並行開始できるようにする。失効していても下の refresh で
+      // 復旧し、データ取得側も createApiClient の 401→refresh→retry で自己修復する。
       const client = createApiClient(token);
+      setApi(client);
+
       const meRes = await client.fetch('/api/v1/auth/me');
 
       if (meRes.ok) {
@@ -46,37 +51,25 @@ export function useAuth() {
           };
         };
         setAuth({ accessToken: token, refreshToken: getRefreshToken() ?? '', user: data.user });
-        setApi(client);
         posthog.identify(data.user.id, { email: data.user.email });
         setLoading(false);
         return;
       }
 
-      // Access token expired — try refresh
-      const refreshToken = getRefreshToken();
-      if (!refreshToken) {
+      // Access token expired — refresh は lib/api の共有シングルトン経由で
+      // 1本に集約する（楽観取得で並発する 401 と二重リフレッシュしない）。
+      const newToken = await tryRefreshToken();
+      if (!newToken) {
+        // refresh token が無い/失効。トークンを破棄して未認証状態にする
+        // （tryRefreshToken はリクエスト失敗時のみ clear するため、ここで冪等に補う）。
         clearTokens();
+        setApi(null);
         setLoading(false);
         return;
       }
 
-      const refreshRes = await createApiClient().fetch('/api/v1/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      if (!refreshRes.ok) {
-        clearTokens();
-        setLoading(false);
-        return;
-      }
-
-      const refreshData = (await refreshRes.json()) as {
-        session: { accessToken: string; refreshToken: string };
-      };
-      setTokens(refreshData.session.accessToken, refreshData.session.refreshToken);
-
-      const newClient = createApiClient(refreshData.session.accessToken);
+      const newClient = createApiClient(newToken);
+      setApi(newClient);
       const retryRes = await newClient.fetch('/api/v1/auth/me');
 
       if (retryRes.ok) {
@@ -91,14 +84,14 @@ export function useAuth() {
           };
         };
         setAuth({
-          accessToken: refreshData.session.accessToken,
-          refreshToken: refreshData.session.refreshToken,
+          accessToken: newToken,
+          refreshToken: getRefreshToken() ?? '',
           user: userData.user,
         });
-        setApi(newClient);
         posthog.identify(userData.user.id, { email: userData.user.email });
       } else {
         clearTokens();
+        setApi(null);
       }
 
       setLoading(false);
