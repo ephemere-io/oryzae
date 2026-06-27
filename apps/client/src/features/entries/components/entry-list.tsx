@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/features/entries/hooks/use-debounce';
 import { useDeleteEntry } from '@/features/entries/hooks/use-delete-entry';
 import { useEntries } from '@/features/entries/hooks/use-entries';
@@ -99,12 +100,7 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
   // Issue #331: 問いで絞り込むフィルタ。空文字 = フィルタ無し
   const [questionFilter, setQuestionFilter] = useState<string>('');
   const questionId = questionFilter || undefined;
-  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(
-    api,
-    authLoading,
-    search,
-    questionId,
-  );
+  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(api, search, questionId);
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -229,7 +225,9 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
         )}
       </div>
 
-      {authLoading || (loading && entries.length === 0) ? null : entries.length === 0 ? (
+      {authLoading || (loading && entries.length === 0) ? (
+        <EntryListSkeleton />
+      ) : entries.length === 0 ? (
         <p className="py-12 text-center text-sm text-[var(--date-color)]">
           {isSearching ? t('no_results') : t('no_entries')}
         </p>
@@ -298,6 +296,21 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
         onCancel={handleDeleteCancel}
         onConfirm={handleDeleteConfirm}
       />
+    </div>
+  );
+}
+
+/** Issue #362: 一覧データ取得待ちの間に表示するスケルトン（空白の代わり）。 */
+function EntryListSkeleton() {
+  return (
+    <div className="flex flex-col gap-8 pt-6" data-testid="entry-list-skeleton">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex flex-col gap-2">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-4/5" />
+        </div>
+      ))}
     </div>
   );
 }
