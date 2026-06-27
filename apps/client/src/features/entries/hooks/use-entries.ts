@@ -47,12 +47,7 @@ function normalizeEntry(raw: unknown): Entry {
   };
 }
 
-export function useEntries(
-  api: ApiClient | null,
-  authLoading: boolean,
-  search?: string,
-  questionId?: string,
-) {
+export function useEntries(api: ApiClient | null, search?: string, questionId?: string) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<string | undefined>();
@@ -98,11 +93,12 @@ export function useEntries(
     }
   }, [search, questionId]);
 
+  // Issue #362: auth/me 完了を待たず、api が用意でき次第すぐ取得する（体感ロード短縮）。
   useEffect(() => {
-    if (!authLoading && api) {
+    if (api) {
       fetchEntries();
     }
-  }, [authLoading, api, fetchEntries]);
+  }, [api, fetchEntries]);
 
   const loadMore = useCallback(() => {
     fetchEntries(cursor);
