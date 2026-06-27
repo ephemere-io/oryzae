@@ -43,6 +43,20 @@ describe('SpEntryEditor', () => {
     expect(screen.queryByRole('button', { name: '瓶に漬ける' })).toBeNull();
   });
 
+  it('既存エントリを開くとタイトル・本文が埋まる（編集）', () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor
+          api={createMockApi(apiFetch)}
+          initialEntryId="e1"
+          initialContent={'既存タイトル\n既存の本文'}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByDisplayValue('既存タイトル')).toBeTruthy();
+    expect(screen.getByDisplayValue('既存の本文')).toBeTruthy();
+  });
+
   it('問いシートに active questions を表示し、選ぶとチップに反映する', async () => {
     apiFetch.mockImplementation((url: string) =>
       Promise.resolve(

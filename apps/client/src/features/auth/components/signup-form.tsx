@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/auth/components/google-login-button';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
 import { useAuth } from '@/features/shared/auth/hooks/use-auth';
-import { useSignupAvailability } from '@/lib/use-signup-availability';
+import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
 
 function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
   return value === 'ja' || value === 'en' || value === 'zh' || value === 'ko';

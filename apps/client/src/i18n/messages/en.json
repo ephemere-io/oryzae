@@ -782,8 +782,7 @@
     "list": {
       "title": "Entries",
       "empty": "No entries yet",
-      "untitled": "Untitled",
-      "close": "Close"
+      "untitled": "Untitled"
     }
   }
 }

@@ -782,8 +782,7 @@
     "list": {
       "title": "エントリ一覧",
       "empty": "まだエントリがありません",
-      "untitled": "無題",
-      "close": "閉じる"
+      "untitled": "無題"
     }
   }
 }

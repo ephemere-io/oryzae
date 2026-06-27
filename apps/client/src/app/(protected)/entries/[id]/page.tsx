@@ -12,6 +12,7 @@ import {
   useActiveQuestions,
   useEntryQuestions,
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
+import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
 
 export default function EntryDetailPage() {
   const t = useTranslations('entries.detail');
@@ -43,6 +44,7 @@ export default function EntryDetailPage() {
 
   return (
     <DeviceView
+      sp={<SpEntryEditor api={api} initialEntryId={entry.id} initialContent={entry.content} />}
       pc={
         <EntryEditor
           entryId={entry.id}

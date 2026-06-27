@@ -782,8 +782,7 @@
     "list": {
       "title": "엔트리 목록",
       "empty": "아직 엔트리가 없습니다",
-      "untitled": "무제",
-      "close": "닫기"
+      "untitled": "무제"
     }
   }
 }
