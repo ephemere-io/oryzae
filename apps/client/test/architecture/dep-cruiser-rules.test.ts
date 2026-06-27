@@ -7,11 +7,13 @@ import { describe, expect, it } from 'vitest';
 interface DepRule {
   name: string;
   severity: string;
+  module?: { path?: string };
   from?: { path?: string; pathNot?: string | string[] };
   to?: { path?: string; pathNot?: string | string[] };
 }
 interface DepConfig {
   forbidden: DepRule[];
+  required?: DepRule[];
 }
 
 const require = createRequire(import.meta.url);
@@ -59,5 +61,12 @@ describe('dep-cruiser guardrails (reach architecture)', () => {
     expect(pathNotList(rule('feature-isolation-flat')).some((p) => p.includes('shared'))).toBe(
       true,
     );
+  });
+
+  it('seam 強制: 保護 page は DeviceView を required している', () => {
+    const req = (config.required ?? []).find((r) => r.name === 'protected-pages-use-device-view');
+    expect(req?.severity).toBe('error');
+    expect(req?.module?.path).toContain('protected');
+    expect(req?.to?.path).toContain('device-view');
   });
 });
