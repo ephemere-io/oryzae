@@ -10,8 +10,7 @@ dist/
 test-results/
 playwright-report/
 recordings/
-verify-report.md
-verify-report.json
+verify-demo.gif
 *.png
 .DS_Store
 .tmp/
