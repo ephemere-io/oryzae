@@ -2,13 +2,13 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/features/auth/hooks/use-auth';
+import { DeviceView } from '@/components/device-view';
 import { JarView } from '@/features/pc/fermentation/components/jar-view';
 import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle-success-modal';
 import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { useUnread } from '@/lib/unread-context';
-import { useDevice } from '@/lib/use-device';
 
 interface QuestionData {
   id: string;
@@ -20,7 +20,6 @@ interface QuestionData {
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
-  const device = useDevice();
   const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api, authLoading);
   const { markSeen } = useUnread();
   const [questions, setQuestions] = useState<QuestionData[]>([]);
@@ -76,21 +75,26 @@ export default function JarPage() {
     await fetchActiveQuestions();
   }
 
-  // 端末で出し分け（URL は /jar のまま）。判定前(null)は何も描画しない。
-  if (device === null) return null;
-  if (device === 'sp') return <SpJar api={api} />;
-
+  // 端末で出し分け（URL は /jar のまま）。DeviceView が判定前/未対応を安全に処理。
   return (
-    <div className="absolute inset-0">
-      <JarView
-        api={api}
-        authLoading={authLoading}
-        questions={questions}
-        onAddQuestion={handleAddQuestion}
-        onEditQuestion={handleEditQuestion}
-        onArchiveQuestion={handleArchiveQuestion}
-      />
-      <PickleSuccessModal open={pickleSuccessOpen} onClose={() => setPickleSuccessOpen(false)} />
-    </div>
+    <DeviceView
+      sp={<SpJar api={api} />}
+      pc={
+        <div className="absolute inset-0">
+          <JarView
+            api={api}
+            authLoading={authLoading}
+            questions={questions}
+            onAddQuestion={handleAddQuestion}
+            onEditQuestion={handleEditQuestion}
+            onArchiveQuestion={handleArchiveQuestion}
+          />
+          <PickleSuccessModal
+            open={pickleSuccessOpen}
+            onClose={() => setPickleSuccessOpen(false)}
+          />
+        </div>
+      }
+    />
   );
 }

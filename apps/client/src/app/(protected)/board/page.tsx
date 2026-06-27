@@ -1,7 +1,7 @@
 'use client';
 
-import { useAuth } from '@/features/auth/hooks/use-auth';
 import { BoardView } from '@/features/pc/board/components/board-view';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 
 export default function BoardPage() {
   const { api, loading: authLoading } = useAuth();
