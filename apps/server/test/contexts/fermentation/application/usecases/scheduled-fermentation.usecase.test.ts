@@ -158,6 +158,7 @@ interface BuildArgs {
   llm?: LlmAnalysisGateway;
   userIds?: string[];
   sendDigest?: ReturnType<typeof vi.fn>;
+  notifyFailure?: ReturnType<typeof vi.fn>;
   rollHours?: () => number;
   concurrency?: number;
 }
@@ -175,6 +176,7 @@ function buildUsecase(args: BuildArgs = {}) {
     generateId,
     vi.fn().mockResolvedValue(args.userIds ?? []),
     args.sendDigest ?? vi.fn().mockResolvedValue(undefined),
+    args.notifyFailure ?? vi.fn().mockResolvedValue(undefined),
     args.rollHours ?? (() => 48),
     args.concurrency,
   );
@@ -717,5 +719,105 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
     expect(llm.analyze).toHaveBeenCalledTimes(3);
     expect(maxInflight).toBe(2);
     expect(inflight).toBe(0); // 全て resolve 済
+  });
+
+  it('失敗即時通知: 同一理由は dedup され 1 回だけ通知される (retire シナリオ)', async () => {
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.countCharsByUserIdSince).mockResolvedValue(2000);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdSince).mockImplementation(async (userId) => [
+      makeEntry(userId, `${userId}-e1`),
+    ]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockImplementation(async (userId) => [
+      makeQuestion(userId, `${userId}-q1`),
+    ]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockImplementation(async (questionId) =>
+      makeQuestionTransaction(questionId, `Q for ${questionId}`),
+    );
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockImplementation(async (questionId) => [
+      `${questionId.replace('-q1', '')}-e1`,
+    ]);
+
+    const llm: LlmAnalysisGateway = {
+      analyze: vi.fn().mockRejectedValue(new Error('model: claude-sonnet-4-20250514')),
+    };
+
+    const notifyFailure = vi.fn().mockResolvedValue(undefined);
+
+    const usecase = buildUsecase({
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      llm,
+      notifyFailure,
+      userIds: ['user-1', 'user-2', 'user-3', 'user-4', 'user-5', 'user-6'],
+      concurrency: 1,
+    });
+
+    const result = await usecase.execute(NOW);
+
+    expect(result.failed).toBe(6);
+    expect(notifyFailure).toHaveBeenCalledTimes(1);
+    // RunFermentationUsecase が LlmAnalysisError でラップするため理由は接頭辞付き。
+    expect(notifyFailure).toHaveBeenCalledWith(
+      'LLM analysis failed: model: claude-sonnet-4-20250514',
+      expect.objectContaining({ userId: expect.any(String), questionId: expect.any(String) }),
+    );
+  });
+
+  it('失敗即時通知: 理由が全て異なっても 1 run の通知数は上限で打ち切られる', async () => {
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.countCharsByUserIdSince).mockResolvedValue(2000);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdSince).mockImplementation(async (userId) => [
+      makeEntry(userId, `${userId}-e1`),
+    ]);
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockImplementation(async (userId) => [
+      makeQuestion(userId, `${userId}-q1`),
+    ]);
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockImplementation(async (questionId) =>
+      makeQuestionTransaction(questionId, `Q for ${questionId}`),
+    );
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockImplementation(async (questionId) => [
+      `${questionId.replace('-q1', '')}-e1`,
+    ]);
+
+    let n = 0;
+    const llm: LlmAnalysisGateway = {
+      analyze: vi.fn().mockImplementation(async () => {
+        n++;
+        throw new Error(`unique error ${n}`);
+      }),
+    };
+
+    const notifyFailure = vi.fn().mockResolvedValue(undefined);
+
+    const usecase = buildUsecase({
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      llm,
+      notifyFailure,
+      userIds: ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7'],
+      concurrency: 1,
+    });
+
+    const result = await usecase.execute(NOW);
+
+    expect(result.failed).toBe(7);
+    // 全て理由が異なるが 1 run 上限 (MAX_FAILURE_NOTIFICATIONS=5) で打ち切られる。
+    expect(notifyFailure).toHaveBeenCalledTimes(5);
   });
 });
