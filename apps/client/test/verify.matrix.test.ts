@@ -13,8 +13,8 @@
 
 import { allUnits, runUnit } from '@oryzae/verify';
 import { describe, expect, it } from 'vitest';
-import '@/lib/verify/register';
 import { EXPECTED_FAIL } from './verify-expected-fail';
+import '@/app/verify/register';
 
 // runner は act 外で意図的に描画・観測するため、React の act 警告を抑止する。
 Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', false);
