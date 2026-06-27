@@ -68,6 +68,20 @@ export const cronFermentation = new Hono()
       listActiveUserIds,
       (userId, titles, language) =>
         digestUsecase.execute({ userId, questionTitles: titles, language }),
+      // 失敗の瞬間に即通知。末尾の summary は処理が重く Vercel に kill されると
+      // 出ないことがあるため、失敗を取りこぼさない経路を別に持つ (dedup + 上限は
+      // usecase 側で管理)。
+      async (reason, sample) => {
+        await notifyDiscord({
+          title: '発酵 cron: 失敗発生',
+          color: COLORS.ERROR,
+          fields: [
+            { name: 'User', value: sample.userId.slice(0, 8), inline: true },
+            { name: 'Question', value: sample.questionId.slice(0, 8), inline: true },
+            { name: '理由', value: reason.slice(0, 1000) || '(理由不明)' },
+          ],
+        });
+      },
     );
 
     // issue #268 以降、発火条件はユーザー単位の状態 (lastRunAt + 文字数 + ランダム X 時間)
