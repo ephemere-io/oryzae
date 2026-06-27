@@ -111,6 +111,9 @@ importers:
       '@oryzae/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@oryzae/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@sentry/nextjs':
         specifier: ^10.61.0
         version: 10.61.0(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.1))(next@16.2.7(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(webpack@5.106.1(lightningcss@1.32.0)(postcss@8.5.15))
@@ -222,6 +225,28 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/verify:
+    dependencies:
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.17)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.7(react@19.2.7)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
