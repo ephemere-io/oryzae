@@ -27,7 +27,7 @@ interface SpEntryEditorProps {
  */
 export function SpEntryEditor({ api, initialQuestionId = null }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
-  const { save, saving } = useSaveEntry(api, null);
+  const { save, saving, error } = useSaveEntry(api, null);
   const activeQuestions = useActiveQuestions(api, false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -101,8 +101,8 @@ export function SpEntryEditor({ api, initialQuestionId = null }: SpEntryEditorPr
       />
 
       <footer className="flex items-center justify-between gap-3 border-t border-[color-mix(in_srgb,var(--fg)_12%,transparent)] px-5 py-3 text-xs">
-        <span aria-live="polite" className="opacity-60">
-          {statusText}
+        <span aria-live="polite" className={error ? 'text-[#a65b2e]' : 'opacity-60'}>
+          {error || statusText}
         </span>
         <div className="flex items-center gap-2">
           <button

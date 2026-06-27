@@ -15,7 +15,8 @@ export function SpBottomNav() {
   const { unreadCount } = useUnread();
 
   const tabs = [
-    { href: '/entries/new', label: t('write'), active: pathname.startsWith('/entries'), badge: 0 },
+    { href: '/entries/new', label: t('write'), active: pathname === '/entries/new', badge: 0 },
+    { href: '/entries', label: t('list'), active: pathname === '/entries', badge: 0 },
     { href: '/jar', label: t('jar'), active: pathname.startsWith('/jar'), badge: unreadCount },
   ];
 

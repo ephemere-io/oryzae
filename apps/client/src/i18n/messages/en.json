@@ -767,7 +767,8 @@
     },
     "nav": {
       "write": "Write",
-      "jar": "Jar"
+      "jar": "Jar",
+      "list": "List"
     },
     "jar": {
       "title": "Letters in the jar",
@@ -777,6 +778,12 @@
       "letter_empty": "No letter for this result yet",
       "reply": "Write a reply"
     },
-    "unsupported": "This screen isn't available on mobile yet. Please use a desktop."
+    "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
+    "list": {
+      "title": "Entries",
+      "empty": "No entries yet",
+      "untitled": "Untitled",
+      "close": "Close"
+    }
   }
 }
