@@ -41,12 +41,16 @@ packages/
     src/verifiers/               schema / invariants / dom-contract / a11y
     src/harness/                 handle(window.__verify) / Dashboard / UnitPage / ReplayPage
 apps/client/                    （admin も同型）
-  src/lib/verify/register.ts     全 *.verify を import ＋ ビルトイン verifier 登録（バレル）
-  src/features/<x>/*.verify.tsx  各 feature のユニット定義（co-located）
+  src/app/verify/register.ts     全 *.verify を import ＋ ビルトイン verifier 登録（バレル）
   src/app/verify/                ダッシュボード/孤立マウント/replay の薄いルート（dev限定）
   scripts/record-verify.mjs      replay をヘッドレスで録画して .webm を出す（Playwright）
+  src/features/<x>/*.verify.tsx  各 feature のユニット定義（co-located）
   test/verify.matrix.test.ts     CIゲート（全ユニット×fixture を実行・probe必須を強制）
 ```
+
+> 登録バレルを `lib/` ではなく `app/verify/` に置くのは、dep-cruise の `lib-independence`
+> ルール（`lib/` は `features/` を import 不可）のため。feature の spec を集約する以上、
+> features を合成できる `app/` 層に置く。
 
 **エンジン＝道具、`*.verify.tsx`＝中身**。エンジンは1回書いて `client`/`admin`/将来の別リポジトリが使い回す。これが低コスト横展開の本体。
 
@@ -136,6 +140,10 @@ document.querySelector('[data-verify-unit="EntryCard"]').dataset;
 > ⚠ これは**「記録済み検証結果の再生」ではない**。毎回その場で**ライブ再実行**する。
 
 登録済みの全ユニット×fixture を、ステージに1つずつマウント → verifier 実行 → verdict 表示 → 次へ、と目に見える形で順送りする画面。`act` のある fixture は「描画 → クリック/入力（ハイライト付き）→ 検証」まで演出付きで再生する。`runFixture` は CI ゲート（`verify.matrix.test.ts`）と同じ経路なので、**緑なら本当に緑**。
+
+実際の挙動（`/verify/replay?unit=LandingFaqItem` をライブ再実行・3/3 PASS）:
+
+![LandingFaqItem replay demo](./verify/replay-landing-faq-item.gif)
 
 - **「全green を毎回確認できる」緑ゲート自体は CI の matrix が既に担保**している（`pnpm test`）。replay の固有価値は別で、**(1) 人が見て分かるデモ**と **(2) コミット/PR 添付できる動画成果物**。
 - クエリ: `?dwell=<ms>`（各 fixture 保持）・`?chrome=0`（操作UIを隠す）・`?auto=0`（停止で開始）・`?key=<ms>`（タイプ速度）・`?unit=<UnitId>`（**1ユニットだけ再生** = 録画を1 feature に絞る）。
