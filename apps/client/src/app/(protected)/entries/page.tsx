@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { EntryList, type FilterableQuestion } from '@/features/entries/components/entry-list';
-import { useQuestions } from '@/features/questions/hooks/use-questions';
+import { EntryList, type FilterableQuestion } from '@/features/pc/entries/components/entry-list';
+import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
 
 export default function EntriesPage() {
   const { api, loading } = useAuth();

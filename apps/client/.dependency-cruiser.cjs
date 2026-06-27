@@ -1,15 +1,14 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
-    // === Feature isolation (transitional: flat features, pre reach-migration) ===
-    // apps/client は features を「ドメイン × reach(shared/pc/sp)」で薄切りする
-    // (docs/client-architecture-guide.md)。reach 化が完了するまでは、まだ移行して
-    // いないフラットな features/{domain} が残る。その相互依存はこれまで通り禁止し続け、
-    // ただし features/shared への import だけは許可する（共有層への押し上げのため）。
+    // === Feature isolation (device-agnostic flat features) ===
+    // reach(pc/sp) は「端末で体験が変わる機能」だけに適用する。端末非依存の機能
+    // (auth / landing / onboarding 等) は features/{domain} のフラットなまま置く。
+    // それらの相互依存は従来どおり禁止し、features/shared への import だけ許可する。
     {
       name: 'feature-isolation-flat',
       comment:
-        'Legacy flat features must not import other flat features (features/shared is allowed)',
+        'Device-agnostic flat features must not import other flat features (features/shared is allowed)',
       severity: 'error',
       from: { path: '^src/features/([^/]+)', pathNot: '^src/features/(pc|sp|shared)/' },
       to: { path: '^src/features/', pathNot: ['^src/features/$1', '^src/features/shared/'] },

@@ -26,6 +26,7 @@ paths:
   - **`apps/client`**: ドメイン × reach。`features/{shared,pc,sp}/{domain}/`
     - `shared/{domain}/` — UIを持たない共有ロジック（データ hook `use-*`・型）。両端末が使う
     - `pc/{domain}/` / `sp/{domain}/` — 端末別 UI（components, hooks）
+    - reach は「端末で体験が変わる機能」だけ。端末非依存の機能（`auth`/`landing`/`onboarding` 等）は `features/{domain}/` のフラットなまま（pc/sp に分けない）
   - **`apps/admin`**: reach 軸なし。従来どおり `features/{domain}/`
 - `components/ui/` — 汎用 UI コンポーネント（shadcn 等。feature 依存禁止）
 - `lib/` — 基盤ユーティリティのみ（API クライアント・認証・分析等）。**ドメイン非依存・`use-*` のドメイン hook を置かない**

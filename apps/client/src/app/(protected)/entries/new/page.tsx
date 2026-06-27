@@ -3,8 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { EntryEditor } from '@/features/entries/components/entry-editor';
-import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
+import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
+import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useActiveQuestions } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
 import { useDevice } from '@/lib/use-device';
