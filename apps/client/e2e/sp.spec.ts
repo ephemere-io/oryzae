@@ -80,6 +80,34 @@ test.describe('SP 体験 (#363)', () => {
     expect(text.split('\n').filter((l) => l.trim().length > 0).length).toBeGreaterThanOrEqual(3);
   });
 
+  test('アカウントでニックネームを編集して保存できる（PATCH 成功）', async ({
+    page,
+    authenticated,
+  }) => {
+    void authenticated;
+    await forceSp(page);
+
+    await page.goto('/account');
+    await expect(page.getByText('プロフィール')).toBeVisible();
+
+    await page.getByRole('button', { name: '編集' }).click();
+    const input = page.getByRole('textbox');
+    const original = await input.inputValue();
+
+    // nickname スキーマは /^[a-zA-Z0-9_-]+$/。有効な値で変更 → 表示が新値に更新＝
+    // res.ok（保存成功）。失敗なら編集モードのまま。
+    const edited = `${original}2`;
+    await input.fill(edited);
+    await page.getByRole('button', { name: '保存' }).click();
+    await expect(page.getByText(edited)).toBeVisible({ timeout: 10_000 });
+
+    // 元に戻す（テストアカウントを汚さない）
+    await page.getByRole('button', { name: '編集' }).click();
+    await page.getByRole('textbox').fill(original);
+    await page.getByRole('button', { name: '保存' }).click();
+    await expect(page.getByRole('textbox')).toBeHidden({ timeout: 10_000 });
+  });
+
   test('アカウント画面からログアウトできる', async ({ page, authenticated }) => {
     void authenticated;
     await forceSp(page);
