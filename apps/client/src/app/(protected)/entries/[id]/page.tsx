@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback } from 'react';
+import { DeviceView } from '@/components/device-view';
 import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useAuth } from '@/features/shared/auth/hooks/use-auth';
@@ -41,19 +42,23 @@ export default function EntryDetailPage() {
   }
 
   return (
-    <EntryEditor
-      entryId={entry.id}
-      initialContent={entry.content}
-      initialEffects={entry.effects}
-      createdAt={entry.createdAt}
-      updatedAt={entry.updatedAt}
-      api={api}
-      auth={auth}
-      activeQuestions={activeQuestions}
-      initialLinkedIds={linkedQuestions.map((q) => q.id)}
-      onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
-      onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
-      onSaveTransition={handleSaveTransition}
+    <DeviceView
+      pc={
+        <EntryEditor
+          entryId={entry.id}
+          initialContent={entry.content}
+          initialEffects={entry.effects}
+          createdAt={entry.createdAt}
+          updatedAt={entry.updatedAt}
+          api={api}
+          auth={auth}
+          activeQuestions={activeQuestions}
+          initialLinkedIds={linkedQuestions.map((q) => q.id)}
+          onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
+          onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
+          onSaveTransition={handleSaveTransition}
+        />
+      }
     />
   );
 }

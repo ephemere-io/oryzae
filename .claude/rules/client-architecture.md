@@ -50,6 +50,15 @@ paths:
 
 `apps/admin`（reach 軸なし）: 従来どおり `features/X` → `features/Y` **禁止**。
 
+## feature 追加手順（迷ったらこの順。各ステップは dep-cruiser/テストで機械検証される）
+
+1. **置き場を決定木で決める**（reach: shared / pc / sp / flat）
+2. `features/{reach}/{domain}/` に作る（pc/sp は `components`・`hooks`、shared は `hooks`・型）
+3. **データ取得・保存は `features/shared/{domain}/hooks` に**置き、pc/sp はそれを import（直接 API を叩かない）。端末非依存の hook（例 `use-auth`）も shared に置けば pc/sp 双方から使える
+4. 画面を出すなら **page は必ず `<DeviceView pc={…} sp={…} />`**（`components/device-view`）で出し分ける。SP 変種が無ければ `pc` だけでよい（SP は安全な「未対応」表示にフォールバック）。← `protected-pages-use-device-view` で必須化
+5. **hook を作ったら同時にテスト**を `test/features/{reach}/{domain}/hooks/` に（reach ミラー）
+6. `pnpm dep-cruise && pnpm typecheck && pnpm test` で確認（配置・seam・依存違反を機械検出）
+
 ## データフェッチング
 
 - API 呼び出しは **`features/shared/{domain}/hooks/`** の Custom Hook に集約する（PC/SP 共通）
