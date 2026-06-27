@@ -3,9 +3,9 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { JarView } from '@/features/fermentation/components/jar-view';
-import { PickleSuccessModal } from '@/features/fermentation/components/pickle-success-modal';
-import { useQuestions } from '@/features/questions/hooks/use-questions';
+import { JarView } from '@/features/pc/fermentation/components/jar-view';
+import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle-success-modal';
+import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { useUnread } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';

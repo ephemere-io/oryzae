@@ -70,6 +70,8 @@ apps/client/src/
 `{domain}` は `entries` / `fermentation` / `questions` / `board` など。
 同じドメインの `shared` / `pc` / `sp` は 1:1:1 で対応する（例: `entries` の取得 hook は `shared/entries`、PC エディタは `pc/entries`、SP エディタは `sp/entries`）。
 
+**reach は「端末で体験が変わる機能」だけに適用する。** 端末非依存の機能（`auth` / `landing` / `onboarding` など、両端末・公開ページで同じものを使う）は `features/{domain}/` のフラットなまま置く（pc/sp に分けない）。フラット機能どうしの直接 import は禁止、`features/shared` への import のみ可（dep-cruiser の `feature-isolation-flat`）。端末非依存のロジックを pc/sp 双方から使いたくなったら `features/shared/{domain}` へ押し上げる。
+
 ### apps/admin（reach 軸なし・単一体験）
 
 ```

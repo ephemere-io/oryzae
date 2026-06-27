@@ -4,8 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { EntryEditor } from '@/features/entries/components/entry-editor';
-import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
+import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
+import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useEntry } from '@/features/shared/entries/hooks/use-entry';
 import {
   useActiveQuestions,

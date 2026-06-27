@@ -88,10 +88,12 @@ apps/client/src/
       components/  hooks/   #     PC 固有の UI・操作・演出
     sp/{domain}/           #   SP 体験
       components/  hooks/   #     SP 固有の UI（縦長・片手・音声）
+  features/{domain}/        # 端末非依存の機能はフラット（auth / landing / onboarding）
   components/ui/           # 汎用 UI（feature 非依存）
   lib/                     # 基盤ユーティリティ（ドメイン非依存）
 ```
 
+reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末非依存の機能はフラットに置く。
 `apps/admin` は単一体験のため reach を持たず `features/{domain}` で薄切りする。
 配置の決定木・インポートルールなど詳細は `docs/client-architecture-guide.md`（SSoT）を参照。
 
