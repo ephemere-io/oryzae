@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/features/entries/hooks/use-debounce';
 import { useDeleteEntry } from '@/features/entries/hooks/use-delete-entry';
@@ -100,7 +102,11 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
   // Issue #331: 問いで絞り込むフィルタ。空文字 = フィルタ無し
   const [questionFilter, setQuestionFilter] = useState<string>('');
   const questionId = questionFilter || undefined;
-  const { entries, loading, hasMore, loadMore, removeEntry } = useEntries(api, search, questionId);
+  const { entries, loading, error, hasMore, loadMore, removeEntry, retry } = useEntries(
+    api,
+    search,
+    questionId,
+  );
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -227,10 +233,10 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
 
       {authLoading || (loading && entries.length === 0) ? (
         <EntryListSkeleton />
+      ) : error && entries.length === 0 ? (
+        <ErrorState message={t('error_message')} onRetry={retry} retryLabel={t('retry')} />
       ) : entries.length === 0 ? (
-        <p className="py-12 text-center text-sm text-[var(--date-color)]">
-          {isSearching ? t('no_results') : t('no_entries')}
-        </p>
+        <EmptyState message={isSearching ? t('no_results') : t('no_entries')} />
       ) : isSearching ? (
         /* Flat list for search results (no month/week grouping) */
         <div className="flex flex-col">

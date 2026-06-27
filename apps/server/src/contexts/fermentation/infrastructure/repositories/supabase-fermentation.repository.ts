@@ -39,6 +39,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .update({
         status: props.status,
         generation_id: props.generationId,
+        input_tokens: props.inputTokens,
+        output_tokens: props.outputTokens,
         error_message: props.errorMessage,
         updated_at: new Date().toISOString(),
       })
@@ -60,6 +62,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       targetPeriod: data.target_period,
       status: data.status,
       generationId: data.generation_id ?? null,
+      inputTokens: data.input_tokens ?? null,
+      outputTokens: data.output_tokens ?? null,
       errorMessage: data.error_message ?? null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
@@ -151,6 +155,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         targetPeriod: row.target_period,
         status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
         generationId: row.generation_id ?? null,
+        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
+        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
         errorMessage: row.error_message ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,

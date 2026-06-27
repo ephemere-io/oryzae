@@ -68,7 +68,7 @@ export class RunFermentationUsecase {
 
     try {
       // 3. Run LLM analysis
-      const { output, generationId } = await this.llmGateway.analyze({
+      const { output, usage, generationId } = await this.llmGateway.analyze({
         question: params.questionText,
         entryContent: combinedContent,
         targetPeriod,
@@ -76,12 +76,15 @@ export class RunFermentationUsecase {
         language,
       });
 
-      // 3.5. Track generation ID for cost tracking
+      // 3.5. Track generation ID + token usage for cost tracking.
+      // issue #352 で Anthropic 直叩きに切替え generationId は出なくなったが、usage は
+      // 取得できる。トークンを保存して価格表からコストを算出する (claude-pricing.ts)。
       let currentResult = fermentationResult;
       if (generationId) {
-        currentResult = fermentationResult.withGenerationId(generationId);
-        await this.fermentationRepo.update(currentResult);
+        currentResult = currentResult.withGenerationId(generationId);
       }
+      currentResult = currentResult.withUsage(usage.inputTokens, usage.outputTokens);
+      await this.fermentationRepo.update(currentResult);
 
       // 4. Save all results
       const worksheet = AnalysisWorksheet.create(

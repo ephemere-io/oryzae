@@ -89,7 +89,7 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
 
   const completed = items.filter((i) => i.status === 'completed').length;
   const failed = items.filter((i) => i.status === 'failed').length;
-  const tracked = items.filter((i) => i.generation_id).length;
+  const totalCost = items.reduce((sum, i) => sum + (i.cost?.totalCost ?? 0), 0);
 
   function SortableHead({
     label,
@@ -158,10 +158,12 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
                 <span className="text-[11px] text-muted-foreground/50">-</span>
               )}
             </TableCell>
-            <TableCell>
-              {item.generation_id ? (
-                <span className="text-xs text-muted-foreground">Tracked</span>
-              ) : null}
+            <TableCell className="whitespace-nowrap font-mono text-xs">
+              {item.cost ? (
+                `$${item.cost.totalCost.toFixed(6)}`
+              ) : (
+                <span className="text-[11px] text-muted-foreground/50">-</span>
+              )}
             </TableCell>
             <TableCell>
               {item.status === 'failed' && onRetry && (
@@ -201,7 +203,9 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
               {completed} completed / {failed} failed
             </TableCell>
             <TableCell />
-            <TableCell className="text-xs font-medium">{tracked} tracked</TableCell>
+            <TableCell className="text-xs font-medium font-mono">
+              {totalCost > 0 ? `$${totalCost.toFixed(6)}` : '-'}
+            </TableCell>
             <TableCell />
           </TableRow>
         </TableFooter>
