@@ -70,3 +70,51 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm knip
+
+  # 検証ハーネスの結果を PR に sticky コメントとして貼る「ビュー」。
+  # ゲートではない（合否は Test ジョブの matrix が担保）。常に緑で、毎 PR に可視化を出す。
+  verify-report:
+    name: Verify Report (PR comment)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate verify report
+        continue-on-error: true
+        run: pnpm --filter @oryzae/client exec vitest run test/verify-report.test.ts
+      - name: Post sticky PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const marker = '<!-- verify-report -->';
+            let report = '_verify レポートを生成できませんでした（生成ステップのログを確認）。_';
+            try {
+              report = fs.readFileSync('apps/client/verify-report.md', 'utf8');
+            } catch {}
+            const sha = (context.payload.pull_request?.head?.sha ?? context.sha).slice(0, 7);
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\n${report}\n\n<sub>🤖 verify matrix（jsdom）から自動生成 — CI ゲート・\`/verify\` と同じコード経路 · ${sha} · [run](${runUrl})</sub>`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
