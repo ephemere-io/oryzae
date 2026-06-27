@@ -1,12 +1,13 @@
 'use client';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { QuestionCreateForm } from '@/features/questions/components/question-create-form';
 import { QuestionTimeline } from '@/features/questions/components/question-timeline';
 import { useQuestions } from '@/features/questions/hooks/use-questions';
 
 export default function QuestionsPage() {
-  const { api, loading: authLoading } = useAuth();
+  const { api } = useAuth();
   const {
     questions,
     loading,
@@ -15,7 +16,7 @@ export default function QuestionsPage() {
     unarchiveQuestion,
     acceptQuestion,
     rejectQuestion,
-  } = useQuestions(api, authLoading);
+  } = useQuestions(api);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -23,7 +24,13 @@ export default function QuestionsPage() {
         <QuestionCreateForm onSubmit={createQuestion} />
 
         <div className="mt-6">
-          {loading ? null : (
+          {loading ? (
+            <div className="flex flex-col gap-4" data-testid="questions-skeleton">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
+          ) : (
             <QuestionTimeline
               questions={questions}
               onArchive={archiveQuestion}

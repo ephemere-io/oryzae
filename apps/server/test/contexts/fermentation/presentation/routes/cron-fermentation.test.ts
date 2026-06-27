@@ -117,7 +117,7 @@ describe('cronFermentation', () => {
     );
   });
 
-  it('notifies Discord WARNING when there are failures', async () => {
+  it('notifies Discord ERROR with the failure reason when fermentations fail', async () => {
     mockExecute.mockResolvedValue({
       ...successResult,
       succeeded: 2,
@@ -132,8 +132,33 @@ describe('cronFermentation', () => {
 
     expect(res.status).toBe(200);
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '発酵 cron: 完了（一部失敗）', color: COLORS.WARNING }),
+      expect.objectContaining({ title: '発酵 cron: 完了（一部失敗）', color: COLORS.ERROR }),
     );
+    // 失敗理由フィールドが添付されていること。
+    const embed = mockNotifyDiscord.mock.calls[0][0];
+    const reasonField = embed.fields.find((f: { name: string }) => f.name === '失敗理由');
+    expect(reasonField?.value).toBe('boom');
+  });
+
+  it('collapses identical failure reasons into one `N× ` line (retire scenario)', async () => {
+    mockExecute.mockResolvedValue({
+      ...successResult,
+      succeeded: 0,
+      failed: 3,
+      errors: [
+        { userId: 'u1', questionId: 'q1', error: 'model: claude-sonnet-4-20250514' },
+        { userId: 'u2', questionId: 'q2', error: 'model: claude-sonnet-4-20250514' },
+        { userId: 'u3', questionId: 'q3', error: 'model: claude-sonnet-4-20250514' },
+      ],
+    });
+
+    await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+    const embed = mockNotifyDiscord.mock.calls[0][0];
+    const reasonField = embed.fields.find((f: { name: string }) => f.name === '失敗理由');
+    expect(reasonField?.value).toBe('3× model: claude-sonnet-4-20250514');
+    expect(reasonField?.value.length).toBeLessThanOrEqual(1024);
+    expect(embed.color).toBe(COLORS.ERROR);
   });
 
   it('notifies Discord WARNING when only email failures occurred', async () => {
