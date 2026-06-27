@@ -49,9 +49,7 @@
       "!**/.claude",
       "!**/next-env.d.ts",
       "!**/test-results",
-      "!**/playwright-report",
-      "!**/verify-report.md",
-      "!**/verify-report.json"
+      "!**/playwright-report"
     ]
   }
 }
