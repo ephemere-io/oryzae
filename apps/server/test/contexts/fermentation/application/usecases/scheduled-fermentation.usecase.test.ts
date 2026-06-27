@@ -526,6 +526,62 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
     expect(sendDigest).toHaveBeenCalledWith('user-1', ['Q1 title', 'Q2 title'], 'ja');
   });
 
+  it('issue #384: digest はユーザー処理直後に逐次送信される（末尾一括ではない）', async () => {
+    // 2 ユーザーを concurrency 1 で順次処理し、user-1 の digest が user-2 の処理開始
+    // より前に送られることを確認する。末尾一括送信だと cron が kill された際に
+    // 成功した全ユーザーの digest が 1 通も飛ばない（issue #384 の user-facing バグ）。
+    const order: string[] = [];
+
+    const entry1 = makeEntry('user-1', 'e1');
+    const entry2 = makeEntry('user-2', 'e2');
+
+    const entryRepo = mockEntryRepo();
+    vi.mocked(entryRepo.countCharsByUserIdSince).mockResolvedValue(2000);
+    vi.mocked(entryRepo.listFermentationEnabledByUserIdSince).mockImplementation(async (userId) =>
+      userId === 'user-1' ? [entry1] : [entry2],
+    );
+
+    const questionRepo = mockQuestionRepo();
+    vi.mocked(questionRepo.listActiveByUserId).mockImplementation(async (userId) =>
+      userId === 'user-1' ? [makeQuestion('user-1', 'q1')] : [makeQuestion('user-2', 'q2')],
+    );
+
+    const qtRepo = mockQuestionTransactionRepo();
+    vi.mocked(qtRepo.findLatestValidatedByQuestionId).mockImplementation(async (id) =>
+      makeQuestionTransaction(id, `title-${id}`),
+    );
+
+    const linkRepo = mockLinkRepo();
+    vi.mocked(linkRepo.listEntryIdsByQuestionId).mockImplementation(async (questionId) =>
+      questionId === 'q1' ? ['e1'] : ['e2'],
+    );
+
+    const localeResolver: UserLocaleResolverGateway = {
+      resolve: vi.fn().mockImplementation(async (userId: string) => {
+        order.push(`start:${userId}`);
+        return 'ja';
+      }),
+    };
+    const sendDigest = vi.fn().mockImplementation(async (userId: string) => {
+      order.push(`digest:${userId}`);
+    });
+
+    const usecase = buildUsecase({
+      entryRepo,
+      questionRepo,
+      qtRepo,
+      linkRepo,
+      localeResolver,
+      sendDigest,
+      userIds: ['user-1', 'user-2'],
+      concurrency: 1,
+    });
+
+    await usecase.execute(NOW);
+
+    expect(order).toEqual(['start:user-1', 'digest:user-1', 'start:user-2', 'digest:user-2']);
+  });
+
   it('issue #279: 解決した language が LLM gateway と digest 双方に伝播する', async () => {
     const entry = makeEntry('user-1', 'e1');
     const question = makeQuestion('user-1', 'q1');
