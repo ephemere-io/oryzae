@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
 import { useUnread } from '@/lib/unread-context';

@@ -776,6 +776,7 @@
       "close": "Close",
       "letter_empty": "No letter for this result yet",
       "reply": "Write a reply"
-    }
+    },
+    "unsupported": "This screen isn't available on mobile yet. Please use a desktop."
   }
 }

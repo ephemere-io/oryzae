@@ -1,9 +1,9 @@
 'use client';
 
-import { useAuth } from '@/features/auth/hooks/use-auth';
 import { QuestionCreateForm } from '@/features/pc/questions/components/question-create-form';
 import { QuestionTimeline } from '@/features/pc/questions/components/question-timeline';
 import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 
 export default function QuestionsPage() {
   const { api, loading: authLoading } = useAuth();

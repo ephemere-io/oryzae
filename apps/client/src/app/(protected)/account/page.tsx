@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { AccountPage } from '@/features/auth/components/account-page';
-import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 
 export default function AccountRoute() {
   const { auth, loading, logout } = useAuth();

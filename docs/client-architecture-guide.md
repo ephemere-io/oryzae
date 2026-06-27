@@ -98,12 +98,16 @@ apps/admin/src/
 
 1. **ドメインを知らない汎用 UI か？**（ボタン・モーダルの土台など）→ `components/ui/`
 2. **ドメインを知らない基盤ユーティリティか？**（`createApiClient`・認証・分析・theme/context・`debounce`・`markdown`・定数）→ `lib/`
-3. **ドメイン固有** → ドメイン（entries / fermentation / …）を選び、reach で分ける：
-   - 両端末が使う・**UI を持たない**（データ hook・型）→ `features/shared/{domain}/`
-   - **PC** の画面・操作 → `features/pc/{domain}/`
-   - **SP** の画面・操作 → `features/sp/{domain}/`
+3. **ドメイン固有** → ドメインを選び、判定軸＝**「端末ごとに別 UI を持つか」**で分ける：
+   - 両端末が同じものを使う・**UI を持たない**（データ hook・型）→ `features/shared/{domain}/`
+     （例: `use-auth` は両端末が使う認証 hook なので `features/shared/auth`）
+   - **PC 固有**の画面・操作・演出 → `features/pc/{domain}/`
+   - **SP 固有**の画面・操作 → `features/sp/{domain}/`
+   - 機能まるごと**端末非依存**（両端末/公開で同じ画面。例: `auth` の UI・`landing`・`onboarding`）→ `features/{domain}/`（フラット）
 
-> `lib/` には `use-*` のドメイン hook を置かない。`lib/` は端末・ドメインの両方を知らない基盤専用。
+> `lib/` には `use-*` のドメイン hook を置かない。`lib/` は端末・ドメインの両方を知らない基盤専用（`createApiClient`・トークン保存・分析・context 等）。
+>
+> **残る1点の判断**: 新しいトップレベル機能を pc/sp に置くか flat に置くかは「端末ごとに別 UI を持つか／両端末で同じ・公開・UI なしか」という**プロダクト判断**が最後に残る。決定木は配置をほぼ一意化するが、この性質判断だけは機械化できない。
 
 ---
 
@@ -147,11 +151,12 @@ apps/admin/src/
 
 ### 機械強制（dep-cruiser）
 
-上記は `apps/client/.dependency-cruiser.cjs` で機械強制する。reach 軸の導入に伴い、最低限こう更新する:
-- `features/pc/*` ⇎ `features/sp/*` を相互禁止
-- `features/{pc,sp,shared}` 内の**別ドメイン**間 import を禁止（ただし `→ features/shared` は許可）
-- `features/shared → features/{pc,sp}` を禁止
-- `lib/` からドメイン hook を排除（基盤のみ）
+上記は `apps/client/.dependency-cruiser.cjs` で機械強制している:
+- `features/pc/*` ⇎ `features/sp/*` 相互禁止 ＋ `pc`/`sp` 内の別ドメイン禁止（`→ features/shared` のみ許可）= `reach-slice-isolation`
+- `features/shared → features/{pc,sp}` 禁止 = `reach-shared-purity`
+- 端末非依存フラット機能どうしの import 禁止（`→ features/shared` のみ許可）= `feature-isolation-flat`
+
+**ガードレールが腐らないための番人テスト**: `test/architecture/dep-cruiser-rules.test.ts`（主要ルールの存在・形を検証）と `test/architecture/shared-no-ui.test.ts`（`features/shared` に `.tsx` を入れない）。これらが落ちたら強制が弱体化したサイン。
 
 `apps/admin/.dependency-cruiser.cjs` は reach 軸を持たないため従来どおり（`features/X → features/Y` 禁止）。
 
@@ -160,9 +165,10 @@ apps/admin/src/
 ## 端末の出し分け（device seam）
 
 - **URL に端末を出さない。** PC もスマホも同じ URL（例 `/entries`）を使う。リンクが端末をまたいでも壊れない
-- 端末の判定と PC/SP シェルの選択は **`app/(protected)/layout.tsx` の1か所**に閉じる。各 `page.tsx` は端末に応じた feature（`pc/*` または `sp/*`）を組み立てる
-- 端末判定は middleware の UA 判定を基本とし、誤判定に備えて手動切替（"PC版/スマホ版を見る"）を併設する
-- スマホ全画面ブロックの暫定処置（`DesktopOnlyOverlay`）は、この seam の導入で廃止する
+- 端末判定は middleware の UA 判定（`device` cookie）を基本とし、誤判定に備えた手動切替（`device-pref` cookie）を優先。クライアントは `useDevice()` で読む
+- シェル（サイドバー / SP ボトムナビ）の選択は **`app/(protected)/layout.tsx` の1か所**
+- **page は必ず `<DeviceView pc={…} sp={…} />`（`components/device-view`）で出し分ける。これが唯一の seam プリミティブ。** `sp` を渡し忘れても PC を SP シェルに描画せず「未対応」表示にフォールバックする（安全既定）。新しい保護ルートを足すときも DeviceView を使えば SP 考慮を忘れても壊れない
+- スマホ全画面ブロック `DesktopOnlyOverlay` は `(auth)` と `(protected)` の SP では撤去（モバイルでログイン〜利用が可能）。PC の狭幅×touch 保護として `(protected)` の PC ブランチにのみ残置
 
 ---
 
