@@ -14,6 +14,17 @@ interface SpEntryEditorProps {
   api: ApiClient | null;
   /** 手紙への返事など、URL の questionId を初期紐づけする（内省ループの接続）。 */
   initialQuestionId?: string | null;
+  /** 既存エントリを編集するとき。新規作成時は undefined。 */
+  initialEntryId?: string;
+  /** 既存エントリの本文（先頭行=タイトル）。新規は空。 */
+  initialContent?: string;
+}
+
+/** content の先頭行をタイトル、残りを本文に分ける（エディタの保存形式）。 */
+function splitTitleBody(raw: string): { title: string; body: string } {
+  const idx = raw.indexOf('\n');
+  if (idx === -1) return { title: '', body: raw };
+  return { title: raw.slice(0, idx), body: raw.slice(idx + 1) };
 }
 
 /**
@@ -25,14 +36,23 @@ interface SpEntryEditorProps {
  * 離脱ガードは持たない。下部バーに 小さなステータス・問い紐づけ・保存後の「瓶に漬ける」。
  * TODO(#363): 瓶に漬けた後の sp/jar（手紙画面）への遷移（当該スライス実装後）。
  */
-export function SpEntryEditor({ api, initialQuestionId = null }: SpEntryEditorProps) {
+export function SpEntryEditor({
+  api,
+  initialQuestionId = null,
+  initialEntryId,
+  initialContent = '',
+}: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
   const { save, saving, error } = useSaveEntry(api, null);
   const activeQuestions = useActiveQuestions(api, false);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [entryId, setEntryId] = useState<string | undefined>(undefined);
-  const [lastSavedBody, setLastSavedBody] = useState('');
+  // 既存エントリ編集なら content を タイトル/本文 に割って初期化（autosave は entryId 有りで更新）。
+  const parsed = initialEntryId
+    ? splitTitleBody(initialContent)
+    : { title: '', body: initialContent };
+  const [title, setTitle] = useState(parsed.title);
+  const [body, setBody] = useState(parsed.body);
+  const [entryId, setEntryId] = useState<string | undefined>(initialEntryId);
+  const [lastSavedBody, setLastSavedBody] = useState(parsed.body);
   const [pickling, setPickling] = useState(false);
   const [pickled, setPickled] = useState(false);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(initialQuestionId);

@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useTransition } from 'react';
+import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
 import { LOCALE_OPTIONS, type Locale } from '@/i18n/config';
 import { setLocaleAction } from '@/lib/i18n-actions';
-import { useSignupAvailability } from '@/lib/use-signup-availability';
 import styles from './landing.module.css';
 import { LandingFaqItem } from './landing-faq-item';
 

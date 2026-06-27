@@ -782,8 +782,7 @@
     "list": {
       "title": "条目列表",
       "empty": "还没有条目",
-      "untitled": "无标题",
-      "close": "关闭"
+      "untitled": "无标题"
     }
   }
 }

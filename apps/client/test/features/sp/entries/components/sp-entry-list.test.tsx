@@ -5,6 +5,9 @@ import { SpEntryList } from '@/features/sp/entries/components/sp-entry-list';
 import jaMessages from '@/i18n/messages/ja.json';
 import type { ApiClient } from '@/lib/api';
 
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return { baseUrl: '', headers: {}, fetch: fetchImpl };
 }
@@ -52,12 +55,10 @@ describe('SpEntryList', () => {
     expect(await screen.findByText('まだエントリがありません')).toBeTruthy();
   });
 
-  it('タップで本文を全画面表示する', async () => {
-    const fetchImpl = vi.fn(() =>
-      Promise.resolve(jsonResponse([entry('e1', 'タイトル\nここに本文がある')])),
-    );
+  it('タップで詳細(/entries/[id])へ遷移する', async () => {
+    const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse([entry('e1', 'タイトル\n本文')])));
     renderList(createMockApi(fetchImpl));
     fireEvent.click(await screen.findByText('タイトル'));
-    expect(await screen.findByText(/ここに本文がある/)).toBeTruthy();
+    expect(push).toHaveBeenCalledWith('/entries/e1');
   });
 });
