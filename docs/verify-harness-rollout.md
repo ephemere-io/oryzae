@@ -199,6 +199,7 @@ CLAUDE.md の共通ルールに従い、移植コードは以下を厳守（CI�
 
 ## 9. 将来の拡張（今回は対象外）
 
+- **全コンポーネント移植（A）**: 全 client feature コンポーネントをカバーし、毎 PR で自動検証・可視化する全面適用の実行計画は [`verify-harness-full-migration-plan.md`](./verify-harness-full-migration-plan.md)。**着手は Issue #363（device-first 再編）が main にマージされてから**（feature の置き場が移動するため）。
 - **バックエンド（Hono DDD）**: 同じ「契約＋不変条件＋probe」を、`packages/shared` の Zod を契約に、domain 層の不変条件を invariant に対応させて段階展開（ハーネス階層の②）
 - **別プロジェクト**: `@oryzae/verify` を publish すれば、他リポジトリは `*.verify.tsx` を書くだけ
 - **視覚回帰 / perf / i18n**: verifier を1ファイル追加して登録するだけ（コンポーネント無改変）
