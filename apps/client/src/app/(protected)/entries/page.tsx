@@ -6,6 +6,7 @@ import { DeviceView } from '@/components/device-view';
 import { EntryList, type FilterableQuestion } from '@/features/pc/entries/components/entry-list';
 import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
 import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { SpEntryList } from '@/features/sp/entries/components/sp-entry-list';
 
 export default function EntriesPage() {
   const { api, loading } = useAuth();
@@ -26,6 +27,7 @@ export default function EntriesPage() {
 
   return (
     <DeviceView
+      sp={<SpEntryList api={api} />}
       pc={
         <div className="flex min-h-full flex-col">
           <div className="mx-auto w-full max-w-[680px] flex-1 px-6 pt-10 pb-20">
