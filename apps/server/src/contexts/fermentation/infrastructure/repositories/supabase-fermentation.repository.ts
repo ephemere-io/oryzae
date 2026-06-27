@@ -164,6 +164,44 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
     );
   }
 
+  async listRetryable(sinceIso: string, beforeIso: string): Promise<FermentationResult[]> {
+    const { data, error } = await this.supabase
+      .from('fermentation_results')
+      .select('*')
+      // 'completed' 以外（明示失敗 + kill で宙ぶらりん）を未完了として拾う。
+      .in('status', ['pending', 'processing', 'failed'])
+      .gte('created_at', sinceIso)
+      .lt('created_at', beforeIso)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`Failed to list retryable fermentations: ${error.message}`);
+    return (data ?? []).map((row: Record<string, string>) =>
+      FermentationResult.fromProps({
+        id: row.id,
+        userId: row.user_id,
+        questionId: row.question_id,
+        targetPeriod: row.target_period,
+        status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
+        generationId: row.generation_id ?? null,
+        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
+        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
+        errorMessage: row.error_message ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }),
+    );
+  }
+
+  async clearOutputs(fermentationResultId: string): Promise<void> {
+    // 行を再利用してリトライする前に、過去試行の部分出力を消す（重複防止）。
+    for (const table of ['analysis_worksheets', 'extracted_snippets', 'letters', 'keywords']) {
+      const { error } = await this.supabase
+        .from(table)
+        .delete()
+        .eq('fermentation_result_id', fermentationResultId);
+      if (error) throw new Error(`Failed to clear ${table}: ${error.message}`);
+    }
+  }
+
   async saveScannedEntries(fermentationResultId: string, entryIds: string[]): Promise<void> {
     if (entryIds.length === 0) return;
     const rows = entryIds.map((entryId) => ({

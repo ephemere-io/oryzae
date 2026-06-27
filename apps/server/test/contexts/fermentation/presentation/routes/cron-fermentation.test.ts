@@ -29,6 +29,28 @@ vi.mock('@/contexts/fermentation/application/usecases/scheduled-fermentation.use
   })),
 }));
 
+// issue #353: リトライ usecase も差し替える（既定はクリーンな no-op）。
+const mockRetryExecute = vi.fn();
+vi.mock(
+  '@/contexts/fermentation/application/usecases/retry-failed-fermentations.usecase.js',
+  () => ({
+    RetryFailedFermentationsUsecase: vi.fn().mockImplementation(() => ({
+      execute: (now: Date) => mockRetryExecute(now),
+    })),
+  }),
+);
+
+const emptyRetryResult = {
+  totalCandidates: 0,
+  truncated: 0,
+  attempted: 0,
+  succeeded: 0,
+  failed: 0,
+  skipped: 0,
+  errors: [],
+  emailFailures: [],
+};
+
 import { cronFermentation } from '@/contexts/fermentation/presentation/routes/cron-fermentation.js';
 
 function createApp() {
@@ -52,6 +74,8 @@ describe('cronFermentation', () => {
   beforeEach(() => {
     mockNotifyDiscord.mockClear();
     mockExecute.mockReset();
+    mockRetryExecute.mockReset();
+    mockRetryExecute.mockResolvedValue(emptyRetryResult);
     vi.stubEnv('CRON_SECRET', SECRET);
   });
 
@@ -197,5 +221,76 @@ describe('cronFermentation', () => {
     );
 
     errorSpy.mockRestore();
+  });
+
+  // issue #353: sweep 後のリトライ段。
+  describe('retry phase (issue #353)', () => {
+    it('runs the retry usecase with the same `now` as the sweep', async () => {
+      mockExecute.mockResolvedValue(successResult);
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      expect(mockRetryExecute).toHaveBeenCalledOnce();
+      // sweep とリトライへ渡る Date が同一インスタンスであること。
+      expect(mockRetryExecute.mock.calls[0][0]).toBe(mockExecute.mock.calls[0][0]);
+    });
+
+    it('adds a retry summary field when there were candidates', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 2,
+        attempted: 2,
+        succeeded: 2,
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      const retryField = embed.fields.find((f: { name: string }) => f.name === 'リトライ');
+      expect(retryField?.value).toContain('候補:2');
+      expect(retryField?.value).toContain('成功:2');
+      // リトライが全て成功なら全体は SUCCESS のまま。
+      expect(embed.color).toBe(COLORS.SUCCESS);
+    });
+
+    it('marks the run as failed (ERROR) when a retry fails', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 1,
+        attempted: 1,
+        failed: 1,
+        errors: [{ userId: 'u1', fermentationResultId: 'f1', error: 'still failing' }],
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      expect(embed.title).toBe('発酵 cron: 完了（一部失敗）');
+      expect(embed.color).toBe(COLORS.ERROR);
+      const reasonField = embed.fields.find((f: { name: string }) => f.name === 'リトライ失敗理由');
+      expect(reasonField?.value).toBe('still failing');
+    });
+
+    it('does not fail the whole cron when the retry phase throws', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockRejectedValue(new Error('retry list query failed'));
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      // sweep は成功しているので 200。リトライエラーは summary に添えるだけ。
+      expect(res.status).toBe(200);
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      expect(embed.color).toBe(COLORS.ERROR);
+      const errField = embed.fields.find((f: { name: string }) => f.name === 'リトライ実行エラー');
+      expect(errField?.value).toBe('retry list query failed');
+      expect(errorSpy).toHaveBeenCalledWith('[cron-fermentation] retry phase failed', {
+        error: 'retry list query failed',
+      });
+
+      errorSpy.mockRestore();
+    });
   });
 });
