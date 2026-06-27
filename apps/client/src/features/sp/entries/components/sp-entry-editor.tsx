@@ -34,7 +34,7 @@ function splitTitleBody(raw: string): { title: string; body: string } {
  *
  * 仕様（インタビューで確定）: 演出/音声入力/スニペット/設定/文字数/発酵オーバーレイ/
  * 離脱ガードは持たない。下部バーに 小さなステータス・問い紐づけ・保存後の「瓶に漬ける」。
- * TODO(#363): 瓶に漬けた後の sp/jar（手紙画面）への遷移（当該スライス実装後）。
+ * 瓶に漬けた後の自動遷移は持たない（インタビューで不要と確定）。
  */
 export function SpEntryEditor({
   api,

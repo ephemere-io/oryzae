@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useUnread } from '@/lib/unread-context';
 
 /**
- * SP シェルの最小ボトムナビ（Issue #363）。書く / 瓶 の2タブ。
+ * SP シェルの最小ボトムナビ（Issue #363）。書く / 一覧 / 瓶 / アカウント の4タブ。
  * 瓶には未読（届いた手紙）バッジを出す。device=sp の (protected) シェルでのみ使う。
  */
 export function SpBottomNav() {
@@ -18,6 +18,12 @@ export function SpBottomNav() {
     { href: '/entries/new', label: t('write'), active: pathname === '/entries/new', badge: 0 },
     { href: '/entries', label: t('list'), active: pathname === '/entries', badge: 0 },
     { href: '/jar', label: t('jar'), active: pathname.startsWith('/jar'), badge: unreadCount },
+    {
+      href: '/account',
+      label: t('account'),
+      active: pathname.startsWith('/account'),
+      badge: 0,
+    },
   ];
 
   return (

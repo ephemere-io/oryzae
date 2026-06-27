@@ -768,7 +768,8 @@
     "nav": {
       "write": "Write",
       "jar": "Jar",
-      "list": "List"
+      "list": "List",
+      "account": "Account"
     },
     "jar": {
       "title": "Letters in the jar",

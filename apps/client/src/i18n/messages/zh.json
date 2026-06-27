@@ -768,7 +768,8 @@
     "nav": {
       "write": "书写",
       "jar": "瓶",
-      "list": "列表"
+      "list": "列表",
+      "account": "账户"
     },
     "jar": {
       "title": "瓶中收到的信",
