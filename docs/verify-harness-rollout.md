@@ -141,6 +141,10 @@ document.querySelector('[data-verify-unit="EntryCard"]').dataset;
 
 登録済みの全ユニット×fixture を、ステージに1つずつマウント → verifier 実行 → verdict 表示 → 次へ、と目に見える形で順送りする画面。`act` のある fixture は「描画 → クリック/入力（ハイライト付き）→ 検証」まで演出付きで再生する。`runFixture` は CI ゲート（`verify.matrix.test.ts`）と同じ経路なので、**緑なら本当に緑**。
 
+実際の挙動（`/verify/replay?unit=LandingFaqItem` をライブ再実行・3/3 PASS）:
+
+![LandingFaqItem replay demo](./verify/replay-landing-faq-item.gif)
+
 - **「全green を毎回確認できる」緑ゲート自体は CI の matrix が既に担保**している（`pnpm test`）。replay の固有価値は別で、**(1) 人が見て分かるデモ**と **(2) コミット/PR 添付できる動画成果物**。
 - クエリ: `?dwell=<ms>`（各 fixture 保持）・`?chrome=0`（操作UIを隠す）・`?auto=0`（停止で開始）・`?key=<ms>`（タイプ速度）・`?unit=<UnitId>`（**1ユニットだけ再生** = 録画を1 feature に絞る）。
 - キーボード: Space=一時停止/再開 ・ →=スキップ ・ Esc=停止して集計。
