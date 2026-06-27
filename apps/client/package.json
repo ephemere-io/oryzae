@@ -11,11 +11,13 @@
     "test:watch": "vitest",
     "dep-cruise": "depcruise src --config .dependency-cruiser.cjs",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "verify:record": "node scripts/record-verify.mjs"
   },
   "dependencies": {
     "@oryzae/server": "workspace:*",
     "@oryzae/shared": "workspace:*",
+    "@oryzae/verify": "workspace:*",
     "@sentry/nextjs": "^10.61.0",
     "next": "16.2.7",
     "next-intl": "^4.13.0",

@@ -9,6 +9,7 @@ dist/
 .playwright-mcp/
 test-results/
 playwright-report/
+recordings/
 *.png
 .DS_Store
 .tmp/
