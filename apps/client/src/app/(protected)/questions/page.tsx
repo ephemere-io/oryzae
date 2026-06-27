@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { QuestionCreateForm } from '@/features/questions/components/question-create-form';
@@ -7,15 +9,18 @@ import { QuestionTimeline } from '@/features/questions/components/question-timel
 import { useQuestions } from '@/features/questions/hooks/use-questions';
 
 export default function QuestionsPage() {
+  const t = useTranslations('questions.timeline');
   const { api } = useAuth();
   const {
     questions,
     loading,
+    error,
     createQuestion,
     archiveQuestion,
     unarchiveQuestion,
     acceptQuestion,
     rejectQuestion,
+    fetchQuestions,
   } = useQuestions(api);
 
   return (
@@ -30,6 +35,12 @@ export default function QuestionsPage() {
                 <Skeleton key={i} className="h-14 w-full" />
               ))}
             </div>
+          ) : error && questions.length === 0 ? (
+            <ErrorState
+              message={t('error_message')}
+              onRetry={fetchQuestions}
+              retryLabel={t('retry')}
+            />
           ) : (
             <QuestionTimeline
               questions={questions}

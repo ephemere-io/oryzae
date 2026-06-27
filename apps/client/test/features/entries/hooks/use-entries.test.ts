@@ -51,6 +51,34 @@ describe('useEntries', () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
+  it('取得失敗時は error=true になり、retry 成功で解消する (Issue #357)', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntries(api));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.error).toBe(true);
+    expect(result.current.entries).toHaveLength(0);
+
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '1', userId: 'u1', content: 'ok', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+
+    await act(async () => {
+      result.current.retry();
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toBe(false);
+    });
+    expect(result.current.entries).toHaveLength(1);
+  });
+
   it('returns empty array when no entries', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, []));
     const api = createMockApi(apiFetch);
