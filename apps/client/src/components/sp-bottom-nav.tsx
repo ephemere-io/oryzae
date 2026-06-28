@@ -103,7 +103,10 @@ export function SpBottomNav() {
     <nav
       className="relative flex flex-none items-center justify-around px-1"
       style={{
-        height: 64,
+        // ホームインジケータ分を下パディングで確保（viewport-fit=cover で env が効く）。
+        // タブ自体は 64px の領域に収め、その下に safe-area を空ける。
+        height: 'calc(64px + env(safe-area-inset-bottom))',
+        paddingBottom: 'env(safe-area-inset-bottom)',
         borderTop: '1px solid var(--border-subtle)',
         background: 'color-mix(in srgb, var(--bg) 92%, transparent)',
         backdropFilter: 'blur(10px)',
