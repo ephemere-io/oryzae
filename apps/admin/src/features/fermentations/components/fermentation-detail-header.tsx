@@ -36,15 +36,23 @@ interface FermentationDetailHeaderProps {
   onRetry?: () => Promise<boolean>;
 }
 
+type RetryState = 'idle' | 'retrying' | 'success' | 'error';
+
 export function FermentationDetailHeader({ data, onRetry }: FermentationDetailHeaderProps) {
-  const [retrying, setRetrying] = useState(false);
+  const [retryState, setRetryState] = useState<RetryState>('idle');
   const costStr = formatCost(data.cost);
 
+  // retry は LLM 再生成を同期実行するため数十秒かかる。無反応に見えないよう、
+  // 実行中 / 成功 / 失敗を明示する (特に失敗時は従来何も表示されなかった)。
   const handleRetry = async () => {
     if (!onRetry) return;
-    setRetrying(true);
-    await onRetry();
-    setRetrying(false);
+    setRetryState('retrying');
+    try {
+      const ok = await onRetry();
+      setRetryState(ok ? 'success' : 'error');
+    } catch {
+      setRetryState('error');
+    }
   };
 
   return (
@@ -55,10 +63,26 @@ export function FermentationDetailHeader({ data, onRetry }: FermentationDetailHe
           {data.status}
         </span>
         {data.status === 'failed' && onRetry && (
-          <Button variant="ghost" size="xs" disabled={retrying} onClick={handleRetry}>
-            <PlayCircle className={`h-3.5 w-3.5 ${retrying ? 'animate-pulse' : ''}`} />
-            Retry
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={retryState === 'retrying'}
+            onClick={handleRetry}
+          >
+            <PlayCircle
+              className={`h-3.5 w-3.5 ${retryState === 'retrying' ? 'animate-pulse' : ''}`}
+            />
+            {retryState === 'retrying' ? '再生成中…' : 'Retry'}
           </Button>
+        )}
+        {retryState === 'retrying' && (
+          <span className="text-xs text-muted-foreground">LLM で再生成中… 数十秒かかります</span>
+        )}
+        {retryState === 'success' && <span className="text-xs text-green-600">再生成しました</span>}
+        {retryState === 'error' && (
+          <span className="text-xs text-destructive">
+            再生成に失敗しました。時間をおいて再試行してください
+          </span>
         )}
       </div>
 

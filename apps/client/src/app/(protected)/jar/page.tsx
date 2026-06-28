@@ -20,7 +20,7 @@ interface QuestionData {
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
-  const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api, authLoading);
+  const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api);
   const { markSeen } = useUnread();
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const router = useRouter();

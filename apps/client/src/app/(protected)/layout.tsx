@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
@@ -20,6 +20,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const { shouldShow, complete } = useOnboarding(api);
   const device = useDevice();
   const router = useRouter();
+
+  // Issue #362: 保護下の children はクライアント専用に描画する。
+  // SSR では描画しない（mounted=false）ことで、エディタ等の時刻依存レンダリングが
+  // サーバー↔クライアントで食い違うハイドレーション不一致(React #418)を防ぐ。
+  // それでも auth/me の完了は待たない（マウント直後＝~1s で描画）ため、
+  // 旧来の「認証完了まで全画面空白(~3s)」は解消したまま。
+  // （device も mount 後に確定するため、シェルの出し分けと同じタイミング。）
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleOnboardingComplete = useCallback(
     async (result: OnboardingResult) => {
@@ -41,13 +52,15 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;
 
-  const content = loading ? null : children;
+  // Issue #362: 認証完了を待たず children を描画（ページ側がスケルトンを即出す）。
+  const content = mounted ? children : null;
 
   return (
     <ThemeProvider>
       <SidebarProvider>
         <UnreadProvider api={api} authLoading={loading}>
-          {/* device 判定が済むまで（null）はシェルを出さない＝サイドバーのちらつき防止 */}
+          {/* device 判定が済むまで（null）はシェルを出さない＝サイドバーのちらつき防止。
+              device は mount 後に確定するため、これ自体が children のクライアント専用描画を担保する。 */}
           {device === 'sp' ? (
             // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）
             <div className="flex h-screen flex-col overflow-hidden">

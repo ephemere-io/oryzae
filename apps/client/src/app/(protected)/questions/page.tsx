@@ -1,6 +1,9 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { DeviceView } from '@/components/device-view';
+import { ErrorState } from '@/components/ui/error-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { QuestionCreateForm } from '@/features/pc/questions/components/question-create-form';
 import { QuestionTimeline } from '@/features/pc/questions/components/question-timeline';
 import { useAuth } from '@/features/shared/auth/hooks/use-auth';
@@ -8,17 +11,20 @@ import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
 
 export default function QuestionsPage() {
-  const { api, loading: authLoading } = useAuth();
+  const t = useTranslations('questions.timeline');
+  const { api } = useAuth();
   const {
     questions,
     loading,
+    error,
     createQuestion,
     editQuestion,
     archiveQuestion,
     unarchiveQuestion,
     acceptQuestion,
     rejectQuestion,
-  } = useQuestions(api, authLoading);
+    fetchQuestions,
+  } = useQuestions(api);
 
   return (
     <DeviceView
@@ -39,7 +45,19 @@ export default function QuestionsPage() {
             <QuestionCreateForm onSubmit={createQuestion} />
 
             <div className="mt-6">
-              {loading ? null : (
+              {loading ? (
+                <div className="flex flex-col gap-4" data-testid="questions-skeleton">
+                  {[0, 1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : error && questions.length === 0 ? (
+                <ErrorState
+                  message={t('error_message')}
+                  onRetry={fetchQuestions}
+                  retryLabel={t('retry')}
+                />
+              ) : (
                 <QuestionTimeline
                   questions={questions}
                   onArchive={archiveQuestion}
