@@ -13,6 +13,7 @@
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
 import '@/features/landing/components/landing-faq-item.verify';
+import '@/features/pc/entries/components/editor-status-bar.verify';
 // リファレンス用の自己完結サンプル（削除可）
 import '@/lib/verify/example-progress.verify';
 
