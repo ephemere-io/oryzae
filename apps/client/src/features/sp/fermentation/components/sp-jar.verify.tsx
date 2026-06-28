@@ -12,9 +12,9 @@
  * useUnread() は UnreadContext の default 値（markSeen=no-op）で provider 無しでもクラッシュしない。
  * i18n（sp.jar）依存のため withVerifyProviders（NextIntlClientProvider）で包む。
  *
- * 公表する契約は実際に変化する状態のみ: loading / letterCount / open。受信箱の N+1
- * （/questions → per-question /fermentations → setLetters）は microtask チェーンが長いので、
- * データ駆動 fixture は act で wait してから契約を読む。
+ * 公表する契約は実際に変化する状態のみ: loading / letterCount / open。受信箱は /questions と
+ * バルク /fermentations（questionId なし・#363 で N+1 解消）を並行取得して setLetters するため
+ * microtask チェーンが残る。データ駆動 fixture は act で wait してから契約を読む。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -49,8 +49,9 @@ const filledApi: ApiClient = {
   baseUrl: '',
   headers: {},
   fetch: (path) => {
+    // 詳細(/fermentations/:id) を先に判定 → バルク一覧(/fermentations, questionId なし) → questions。
     if (path.includes('/fermentations/')) return jsonResponse(detailJson);
-    if (path.includes('/fermentations?')) return jsonResponse(summaryJson);
+    if (path.includes('/fermentations')) return jsonResponse(summaryJson);
     return jsonResponse(questionsJson);
   },
 };
