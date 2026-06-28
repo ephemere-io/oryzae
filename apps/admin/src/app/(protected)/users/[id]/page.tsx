@@ -37,7 +37,7 @@ export default function UserDetailPage() {
     return (
       <div className="space-y-4">
         <Link href="/users">
-          <Button variant="ghost" size="xs">
+          <Button variant="ghost" size="xs" className="-ml-1.5">
             <ArrowLeft className="mr-1 h-3 w-3" />
             Users
           </Button>
@@ -51,12 +51,14 @@ export default function UserDetailPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      <Link href="/users">
-        <Button variant="ghost" size="xs" className="px-0 hover:bg-transparent">
-          <ArrowLeft className="mr-1 h-3 w-3" />
-          Users
-        </Button>
-      </Link>
+      <div className="pb-3">
+        <Link href="/users">
+          <Button variant="ghost" size="xs" className="-ml-1.5">
+            <ArrowLeft className="mr-1 h-3 w-3" />
+            Users
+          </Button>
+        </Link>
+      </div>
 
       <UserProfileHeader profile={data.profile} />
 

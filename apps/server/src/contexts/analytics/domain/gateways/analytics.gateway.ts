@@ -7,6 +7,7 @@ export interface TrendResult {
 export interface AnalyticsGateway {
   queryTrend(params: {
     dateFrom: string;
+    dateTo?: string;
     events: { id: string; math: string }[];
     properties?: { key: string; value: string; operator: string }[];
     breakdown?: string;

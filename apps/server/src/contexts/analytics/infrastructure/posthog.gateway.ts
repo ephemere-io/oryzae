@@ -29,6 +29,7 @@ export class PostHogGateway implements AnalyticsGateway {
 
   async queryTrend(params: {
     dateFrom: string;
+    dateTo?: string;
     events: { id: string; math: string }[];
     properties?: { key: string; value: string; operator: string }[];
     breakdown?: string;
@@ -39,6 +40,7 @@ export class PostHogGateway implements AnalyticsGateway {
       events: params.events,
       date_from: params.dateFrom,
     };
+    if (params.dateTo) body.date_to = params.dateTo;
     if (params.properties) body.properties = params.properties;
     if (params.breakdown) body.breakdown = params.breakdown;
     if (params.breakdownType) body.breakdown_type = params.breakdownType;
