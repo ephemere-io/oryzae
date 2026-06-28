@@ -106,7 +106,7 @@ export function SpEntryEditor({
   return (
     <div
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
-      style={{ fontFamily: 'var(--ob-font-serif, serif)' }}
+      style={{ fontFamily: 'var(--ob-font-serif)' }}
     >
       {/* 保存ステータス（上部・常設）。指摘: 自動保存できたか分かるように。 */}
       <header className="flex items-center justify-end px-5 pt-3 pb-1" style={{ minHeight: 28 }}>
@@ -114,7 +114,7 @@ export function SpEntryEditor({
           aria-live="polite"
           className="flex items-center gap-1.5 text-xs"
           style={{
-            color: error ? 'var(--ob-jar-warm, #d4714e)' : 'var(--accent)',
+            color: error ? 'var(--ob-jar-warm)' : 'var(--accent)',
             opacity: statusText || error ? 1 : 0,
           }}
         >
@@ -146,9 +146,9 @@ export function SpEntryEditor({
           style={
             selectedQuestion
               ? {
-                  background: 'var(--accent-light, rgba(74,158,142,0.1))',
+                  background: 'var(--accent-light)',
                   color: 'var(--accent)',
-                  border: '1px solid rgba(74,158,142,0.2)',
+                  border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
                 }
               : { color: 'var(--date-color)', border: '1px dashed var(--border-subtle)' }
           }
@@ -175,14 +175,14 @@ export function SpEntryEditor({
         <div
           className="mx-4 mb-4 rounded-2xl p-4"
           style={{
-            background: 'linear-gradient(135deg, rgba(212,113,78,0.08), rgba(74,158,142,0.06))',
-            border: '1px solid rgba(212,113,78,0.18)',
+            background: 'linear-gradient(135deg, var(--ob-jar-warm-soft), var(--accent-light))',
+            border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 20%, transparent)',
           }}
         >
           <div className="flex items-center gap-3">
             <svg
               className="h-8 w-8 shrink-0"
-              style={{ color: 'var(--ob-jar-warm, #d4714e)' }}
+              style={{ color: 'var(--ob-jar-warm)' }}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -204,8 +204,8 @@ export function SpEntryEditor({
               disabled={pickling || pickled}
               className="shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold text-white disabled:opacity-50"
               style={{
-                background: 'var(--ob-jar-warm, #d4714e)',
-                fontFamily: 'var(--ob-font-sans, sans-serif)',
+                background: 'var(--ob-jar-warm)',
+                fontFamily: 'var(--ob-font-sans)',
               }}
             >
               {pickling ? t('pickling') : pickled ? '✓' : t('ferment_action')}

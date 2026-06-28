@@ -74,7 +74,7 @@ export function SpEntryList({ api }: SpEntryListProps) {
             <path d="M5 20c0-3.3 3.1-5 7-5s7 1.7 7 5" strokeLinecap="round" />
           </svg>
         </Link>
-        <span className="text-lg font-medium" style={{ fontFamily: 'var(--ob-font-serif, serif)' }}>
+        <span className="text-lg font-medium" style={{ fontFamily: 'var(--ob-font-serif)' }}>
           {t('title')}
         </span>
       </header>
@@ -170,7 +170,7 @@ export function SpEntryList({ api }: SpEntryListProps) {
                 >
                   <span
                     className="block truncate text-[15px] font-medium"
-                    style={{ fontFamily: 'var(--ob-font-serif, serif)' }}
+                    style={{ fontFamily: 'var(--ob-font-serif)' }}
                   >
                     {title}
                   </span>

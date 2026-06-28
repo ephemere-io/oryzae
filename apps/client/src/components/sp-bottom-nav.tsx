@@ -66,7 +66,7 @@ export function SpBottomNav() {
         borderTop: '1px solid var(--border-subtle)',
         background: 'color-mix(in srgb, var(--bg) 92%, transparent)',
         backdropFilter: 'blur(10px)',
-        fontFamily: 'var(--ob-font-sans, sans-serif)',
+        fontFamily: 'var(--ob-font-sans)',
       }}
     >
       <Link
@@ -88,8 +88,8 @@ export function SpBottomNav() {
           height: 52,
           marginTop: -22,
           borderRadius: 18,
-          background: 'linear-gradient(150deg, var(--ob-jar-warm, #d4714e), #c2683f)',
-          boxShadow: '0 8px 20px -6px rgba(212,113,78,0.6)',
+          background: 'var(--ob-jar-warm)',
+          boxShadow: '0 8px 20px -6px color-mix(in srgb, var(--ob-jar-warm) 55%, transparent)',
           border: '3px solid var(--bg)',
         }}
       >
@@ -125,7 +125,7 @@ export function SpBottomNav() {
               height: 15,
               padding: '0 3px',
               borderRadius: 8,
-              background: 'var(--ob-jar-warm, #d4714e)',
+              background: 'var(--ob-jar-warm)',
             }}
           >
             {unreadCount}
