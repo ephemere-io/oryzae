@@ -30,6 +30,20 @@ import '@/features/pc/entries/components/save-title-modal.verify';
 import '@/features/pc/entries/components/settings-drawer.verify';
 import '@/features/pc/entries/components/stats-popup.verify';
 import '@/features/pc/entries/components/unsaved-changes-modal.verify';
+import '@/features/pc/board/components/board-card.verify';
+import '@/features/pc/board/components/board-controls.verify';
+import '@/features/pc/board/components/board-date-nav.verify';
+import '@/features/pc/board/components/entry-card-content.verify';
+import '@/features/pc/board/components/photo-card-content.verify';
+import '@/features/pc/board/components/photo-dialog.verify';
+import '@/features/pc/board/components/snippet-card-content.verify';
+import '@/features/pc/board/components/snippet-dialog.verify';
+import '@/features/pc/fermentation/components/draggable-jar-element.verify';
+import '@/features/pc/fermentation/components/pickle-success-modal.verify';
+import '@/features/pc/fermentation/components/question-circle.verify';
+import '@/features/pc/questions/components/question-create-form.verify';
+import '@/features/pc/questions/components/question-timeline-event.verify';
+import '@/features/pc/questions/components/question-timeline.verify';
 // リファレンス用の自己完結サンプル（削除可）
 import '@/lib/verify/example-progress.verify';
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
@@ -22,12 +23,21 @@ export function QuestionCreateForm({ onSubmit }: QuestionCreateFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form
+      onSubmit={handleSubmit}
+      className="flex gap-2"
+      {...verifyAttrs({
+        unit: 'QuestionCreateForm',
+        empty: text.trim().length === 0,
+        creating,
+      })}
+    >
       <input
         type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={t('create_form.placeholder')}
+        aria-label={t('create_form.placeholder')}
         maxLength={64}
         className="flex-1 rounded-full border border-[var(--border-subtle)] bg-transparent px-4 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--date-color)] focus:border-[var(--accent)] focus:outline-none"
       />

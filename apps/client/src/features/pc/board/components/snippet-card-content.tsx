@@ -1,5 +1,7 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
+
 interface SnippetContent {
   text: string;
 }
@@ -10,7 +12,14 @@ interface SnippetCardContentProps {
 
 export function SnippetCardContent({ content }: SnippetCardContentProps) {
   return (
-    <div className="flex h-full flex-col p-6">
+    <div
+      className="flex h-full flex-col p-6"
+      {...verifyAttrs({
+        unit: 'SnippetCardContent',
+        textLen: content.text.length,
+        empty: content.text.length === 0,
+      })}
+    >
       <div className="mb-2 flex items-center gap-2">
         <span
           className="inline-block h-1 w-1 rounded-full"

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { BRAND_MARK_SVG, svgDataUri } from '@/lib/brand';
@@ -28,6 +29,7 @@ export function PickleSuccessModal({ open, onClose }: PickleSuccessModalProps) {
       aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+      {...verifyAttrs({ unit: 'PickleSuccessModal', open })}
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();

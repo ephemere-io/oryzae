@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
@@ -24,6 +25,9 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
 
   if (!open) return null;
 
+  const mode = initialText ? 'edit' : 'create';
+  const empty = text.trim().length === 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = text.trim();
@@ -39,6 +43,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
       aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+      {...verifyAttrs({ unit: 'SnippetDialog', mode, empty })}
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();
@@ -60,6 +65,7 @@ export function SnippetDialog({ open, initialText = '', onSubmit, onClose }: Sni
           onChange={(e) => setText(e.target.value)}
           maxLength={50}
           rows={3}
+          aria-label={t('placeholder')}
           placeholder={t('placeholder')}
           className="mb-2 w-full resize-none rounded-md border px-3 py-2.5 text-sm outline-none"
           style={{
