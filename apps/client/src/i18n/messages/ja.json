@@ -782,7 +782,12 @@
       "untitled": "無題の問い",
       "close": "閉じる",
       "letter_empty": "この結果にはまだ手紙がありません",
-      "reply": "返事を書く"
+      "reply": "返事を書く",
+      "section_letter": "手紙",
+      "section_keywords": "言葉",
+      "section_snippets": "抜粋",
+      "unread": "未読",
+      "read": "既読"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {

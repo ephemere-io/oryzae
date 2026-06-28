@@ -782,7 +782,12 @@
       "untitled": "Untitled question",
       "close": "Close",
       "letter_empty": "No letter for this result yet",
-      "reply": "Write a reply"
+      "reply": "Write a reply",
+      "section_letter": "Letter",
+      "section_keywords": "Words",
+      "section_snippets": "Excerpts",
+      "unread": "Unread",
+      "read": "Read"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
