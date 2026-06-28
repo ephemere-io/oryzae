@@ -181,47 +181,55 @@ export function SpEntryEditor({
         style={{ lineHeight: 2 }}
       />
 
-      {/* 発酵させる CTA（保存済み＝entryId 確定後のみ）。指摘: pickle の意味が不明瞭。 */}
+      {/* 発酵させる CTA（保存済み＝entryId 確定後のみ）。
+          バナー全体を1つの大きなボタンにして、シンプルで押しやすく（指摘対応）。 */}
       {entryId ? (
-        <div
-          className="mx-4 mb-4 rounded-2xl p-4"
-          style={{
-            background: 'linear-gradient(135deg, var(--ob-jar-warm-soft), var(--accent-light))',
-            border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 20%, transparent)',
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <svg
-              className="h-8 w-8 shrink-0"
-              style={{ color: 'var(--ob-jar-warm)' }}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              aria-hidden="true"
-            >
-              <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
-              <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
-            </svg>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium">
-                {pickled ? t('pickled') : t('ferment_title')}
-              </div>
-              <div className="mt-0.5 text-xs leading-snug opacity-60">{t('ferment_sub')}</div>
-            </div>
-            <button
-              type="button"
-              onClick={handlePickle}
-              disabled={pickling || pickled}
-              className="shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold text-white disabled:opacity-50"
-              style={{
-                background: 'var(--ob-jar-warm)',
-                fontFamily: 'var(--ob-font-sans)',
-              }}
-            >
-              {pickling ? t('pickling') : pickled ? '✓' : t('ferment_action')}
-            </button>
-          </div>
+        <div className="mx-4 mb-4">
+          <button
+            type="button"
+            onClick={handlePickle}
+            disabled={pickling || pickled}
+            aria-label={t('ferment_title')}
+            className="flex w-full items-center justify-center gap-2.5 rounded-2xl px-5 py-4 text-white transition-opacity disabled:cursor-default"
+            style={{
+              background: pickled
+                ? 'color-mix(in srgb, var(--ob-jar-warm) 45%, var(--bg))'
+                : 'var(--ob-jar-warm)',
+              boxShadow:
+                pickling || pickled
+                  ? 'none'
+                  : '0 8px 20px -8px color-mix(in srgb, var(--ob-jar-warm) 60%, transparent)',
+              fontFamily: 'var(--ob-font-sans)',
+            }}
+          >
+            {pickling ? (
+              <span
+                className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                aria-hidden="true"
+              />
+            ) : (
+              <svg
+                className="h-5 w-5 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z"
+                  strokeLinejoin="round"
+                />
+                <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+              </svg>
+            )}
+            <span className="text-[15px] font-bold">
+              {pickling ? t('pickling') : pickled ? t('pickled') : t('ferment_title')}
+            </span>
+          </button>
+          {!pickled ? (
+            <p className="mt-2 text-center text-xs leading-snug opacity-55">{t('ferment_sub')}</p>
+          ) : null}
         </div>
       ) : null}
 
