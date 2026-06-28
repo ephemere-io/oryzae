@@ -10,6 +10,47 @@ type Env = {
   };
 };
 
+// 現在期間と「直前の同じ長さの期間」を解決する（リテンション比較用）。
+// date_from/date_to は YYYY-MM-DD（セレクタ）。未指定時は直近7日 / now にフォールバック。
+export function resolveActivityPeriods(
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  now: Date,
+): { currentStart: string; currentEnd: string; previousStart: string; previousEnd: string } {
+  const currentStart = dateFrom
+    ? new Date(`${dateFrom}T00:00:00.000Z`)
+    : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const currentEnd = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : now;
+  // 期間長（最低1日）。直前期間は [currentStart - 期間長, currentStart) とする。
+  const periodMs = Math.max(currentEnd.getTime() - currentStart.getTime(), 24 * 60 * 60 * 1000);
+  const previousEnd = new Date(currentStart.getTime() - 1);
+  const previousStart = new Date(currentStart.getTime() - periodMs);
+  return {
+    currentStart: currentStart.toISOString(),
+    currentEnd: currentEnd.toISOString(),
+    previousStart: previousStart.toISOString(),
+    previousEnd: previousEnd.toISOString(),
+  };
+}
+
+// 現在/直前期間の投稿者から、アクティブ数・直前アクティブ数・継続(両方に出現)数を数える。
+export function countReturning(
+  currentUserIds: string[],
+  previousUserIds: string[],
+): { activeWriters: number; previousActiveUsers: number; returningUsers: number } {
+  const current = new Set(currentUserIds);
+  const previous = new Set(previousUserIds);
+  let returning = 0;
+  for (const id of current) {
+    if (previous.has(id)) returning++;
+  }
+  return {
+    activeWriters: current.size,
+    previousActiveUsers: previous.size,
+    returningUsers: returning,
+  };
+}
+
 export const adminDashboard = new Hono<Env>()
   .get('/stats', async (c) => {
     const supabase = c.get('adminSupabase');
@@ -252,23 +293,34 @@ export const adminDashboard = new Hono<Env>()
     const supabase = c.get('adminSupabase');
 
     // 期間セレクタ (date_from/date_to) を尊重する。未指定時のみ直近7日にフォールバック。
-    // 以前はここが 7日固定で、期間を切り替えても値が変わらなかった。
+    // 直前の同じ長さの期間も取り、継続(リテンション)ユーザーを算出する。
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
-    const from = dateFrom ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const periods = resolveActivityPeriods(dateFrom, dateTo, new Date());
 
-    let writersQuery = supabase.from('entries').select('user_id').gte('created_at', from);
-    if (dateTo) writersQuery = writersQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
-
-    const [writersRes, usersRes] = await Promise.all([
-      writersQuery,
+    const [currentRes, previousRes, usersRes] = await Promise.all([
+      supabase
+        .from('entries')
+        .select('user_id')
+        .gte('created_at', periods.currentStart)
+        .lte('created_at', periods.currentEnd),
+      supabase
+        .from('entries')
+        .select('user_id')
+        .gte('created_at', periods.previousStart)
+        .lte('created_at', periods.previousEnd),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
 
-    const uniqueWriters = new Set((writersRes.data ?? []).map((r) => r.user_id));
+    const counts = countReturning(
+      (currentRes.data ?? []).map((r) => r.user_id),
+      (previousRes.data ?? []).map((r) => r.user_id),
+    );
 
     return c.json({
-      activeWriters: uniqueWriters.size,
+      activeWriters: counts.activeWriters,
       totalUsers: usersRes.data?.users?.length ?? 0,
+      returningUsers: counts.returningUsers,
+      previousActiveUsers: counts.previousActiveUsers,
     });
   });

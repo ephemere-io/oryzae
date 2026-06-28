@@ -33,6 +33,39 @@ describe('useUserActivity', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('parses retention fields (returning / previous active)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        activeWriters: 10,
+        totalUsers: 30,
+        returningUsers: 3,
+        previousActiveUsers: 6,
+      }),
+    );
+
+    const { result } = renderHook(() => useUserActivity('2026-06-21', '2026-06-27'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.returningUsers).toBe(3);
+    expect(result.current.previousActiveUsers).toBe(6);
+  });
+
+  it('defaults retention fields to 0 when absent (old server response)', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { activeWriters: 5, totalUsers: 20 }));
+
+    const { result } = renderHook(() => useUserActivity());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.returningUsers).toBe(0);
+    expect(result.current.previousActiveUsers).toBe(0);
+  });
+
   it('passes date_from and date_to as query parameters', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(true, { activeWriters: 3, totalUsers: 10 }));
 
