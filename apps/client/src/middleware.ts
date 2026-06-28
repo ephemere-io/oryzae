@@ -17,6 +17,16 @@ export function middleware(req: NextRequest) {
   requestHeaders.set('x-device', resolvedDevice);
   const res = NextResponse.next({ request: { headers: requestHeaders } });
 
+  // Issue #363: バックグラウンド復帰時のホワイトアウト対策（bfcache 有効化）。
+  // 本番(Vercel)の動的ページは既定で `Cache-Control: ...no-store...` を返し、no-store が
+  // bfcache を無効化する（本番で notRestoredReasons=response-cache-control-no-store を実測）。
+  // no-store だと iOS はバックグラウンドのタブを凍結できず破棄し、復帰時に白画面のまま
+  // 手動リロードが必要になる。no-store を外し no-cache（毎回再検証）に保つことで bfcache
+  // 適格にする。保護ページは全て client 描画で SSR 出力（HTML/RSC）に私的データを含まない
+  // ため、no-store を外しても露出はない。API(/api)・静的資産(_next)は matcher 対象外。
+  // ※ next dev では Next がレンダリング後に上書きし効かない。本番の挙動はプレビューで検証する。
+  res.headers.set('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');
+
   // 言語: ?lang= を cookie に固定（既存挙動）
   const lang = req.nextUrl.searchParams.get('lang');
   if (lang && isLocale(lang) && req.cookies.get(LOCALE_COOKIE)?.value !== lang) {
