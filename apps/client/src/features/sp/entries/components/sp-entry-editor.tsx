@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
+import { type EntryDraft, useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
 import {
   useActiveQuestions,
   useEntryQuestions,
@@ -19,6 +20,11 @@ interface SpEntryEditorProps {
   initialEntryId?: string;
   /** 既存エントリの本文（先頭行=タイトル）。新規は空。 */
   initialContent?: string;
+  /**
+   * 書きかけドラフトの退避/復元を有効にするか（既定 true）。
+   * 孤立検証（verify）では localStorage が fixture をまたいで漏れるため false にする。
+   */
+  persistDraft?: boolean;
 }
 
 /** content の先頭行をタイトル、残りを本文に分ける（エディタの保存形式）。 */
@@ -42,22 +48,47 @@ export function SpEntryEditor({
   initialQuestionId = null,
   initialEntryId,
   initialContent = '',
+  persistDraft = true,
 }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
   const { save, saving, error } = useSaveEntry(api, null);
   const activeQuestions = useActiveQuestions(api, false);
+  const { load: loadDraft, save: saveDraft, clear: clearDraft } = useEntryDraft();
+
+  // ドラフト退避/復元は「素の新規フロー」だけで行う（既存編集・問い返信は対象外）。
+  const draftEnabled = persistDraft && !initialEntryId && !initialQuestionId;
+  // マウント時に一度だけ、新鮮なドラフトがあれば書きかけを復元する（+ 押し直しでの再開）。
+  const [restored] = useState<EntryDraft | null>(() => (draftEnabled ? loadDraft() : null));
+
   // 既存エントリ編集なら content を タイトル/本文 に割って初期化（autosave は entryId 有りで更新）。
-  const parsed = initialEntryId
+  const init = initialEntryId
     ? splitTitleBody(initialContent)
-    : { title: '', body: initialContent };
-  const [title, setTitle] = useState(parsed.title);
-  const [body, setBody] = useState(parsed.body);
-  const [entryId, setEntryId] = useState<string | undefined>(initialEntryId);
-  const [lastSavedBody, setLastSavedBody] = useState(parsed.body);
+    : restored
+      ? { title: restored.title, body: restored.body }
+      : { title: '', body: initialContent };
+  const resolvedEntryId = initialEntryId ?? restored?.entryId;
+  const [title, setTitle] = useState(init.title);
+  const [body, setBody] = useState(init.body);
+  const [entryId, setEntryId] = useState<string | undefined>(resolvedEntryId);
+  // サーバ保存済み（entryId あり）なら保存済み表示、未保存の復元ドラフトは「編集中」表示にする。
+  const [lastSavedBody, setLastSavedBody] = useState(resolvedEntryId ? init.body : '');
   const [pickling, setPickling] = useState(false);
   const [pickled, setPickled] = useState(false);
-  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(initialQuestionId);
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(
+    initialQuestionId ?? restored?.questionId ?? null,
+  );
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // 書きかけ（タイトル/本文/問い/entryId）を localStorage に退避する。内容が空になればクリア。
+  // 発酵（瓶に納める）後は確定とみなして退避しない。
+  useEffect(() => {
+    if (!draftEnabled || pickled) return;
+    if (!title.trim() && !body.trim()) {
+      clearDraft();
+      return;
+    }
+    saveDraft({ entryId, title, body, questionId: selectedQuestionId });
+  }, [draftEnabled, pickled, title, body, entryId, selectedQuestionId, saveDraft, clearDraft]);
 
   const { linkQuestion } = useEntryQuestions(api, entryId);
 
@@ -101,7 +132,10 @@ export function SpEntryEditor({
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
     const saved = await save(content, entryId, { fermentationEnabled: true });
     setPickling(false);
-    if (saved) setPickled(true);
+    if (saved) {
+      setPickled(true);
+      clearDraft(); // 発酵させたら確定。書きかけドラフトは破棄する。
+    }
   }
 
   return (
