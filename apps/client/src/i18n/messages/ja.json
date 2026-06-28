@@ -802,7 +802,10 @@
       "search": "本文・タイトルを検索",
       "search_clear": "検索をクリア",
       "all": "すべて",
-      "empty_filtered": "該当するエントリーがありません"
+      "empty_filtered": "該当するエントリーがありません",
+      "sort_label": "並び替え",
+      "sort_newest": "新しい順",
+      "sort_oldest": "古い順"
     },
     "questions": {
       "title": "問い",

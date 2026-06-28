@@ -802,7 +802,10 @@
       "search": "본문·제목 검색",
       "search_clear": "검색 지우기",
       "all": "전체",
-      "empty_filtered": "해당하는 항목이 없습니다"
+      "empty_filtered": "해당하는 항목이 없습니다",
+      "sort_label": "정렬",
+      "sort_newest": "최신순",
+      "sort_oldest": "오래된순"
     },
     "questions": {
       "title": "질문",

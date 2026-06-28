@@ -2,7 +2,7 @@
  * SpEntryList の検証スペック（A 移植・SP 版エントリ一覧）。
  *
  * データ取得は2フックに集約される: useActiveQuestions(api, false)（問いチップ）と
- * useEntries(api, search?, questionId?)（一覧）。どちらも api を引数に取り、`api=null` で
+ * useEntries(api, search?, questionId?, order?)（一覧）。どちらも api を引数に取り、`api=null` で
  * effect が early-return する。ただし useEntries は loading の初期値が true で、api 無しでは
  * 解決しないため loading=true のまま一覧/空表示の分岐に到達しない。よって:
  *  - loading 状態は `api=null` で純レンダリングできる（fetch ゼロ）。
@@ -13,7 +13,8 @@
  * クラッシュしない（タップの router.push も副作用ゼロ）。i18n（sp.list）依存も同 provider
  * の NextIntlClientProvider で満たす。
  *
- * 公表する契約は実際に変化する状態のみ: loading / count / hasQuestions。filtering は
+ * 公表する契約は実際に変化する状態のみ: loading / count / hasQuestions / order。order は
+ * ソートトグル（新しい順⇄古い順）でユーザーが切り替えられる状態なので契約に載せる。filtering は
  * 検索/問いフィルタが孤立検証で常に未設定（debounce 非依存・チップ未クリック）になり定数の
  * ため契約に載せない。検索の 300ms デバウンスには依存しない（初回 fetch は api 変化で発火し
  * debounce を通らない。検索 probe は searchInput 同期反映で出るクリアボタンの有無だけを観測する）。
@@ -125,6 +126,17 @@ registerUnit<Props>({
         await ctx.wait(16);
       },
     },
+    {
+      id: 'sort-toggled',
+      probe: true,
+      description: 'Probe: ソートトグルを押すと並び順が newest→oldest に切り替わる',
+      props: { api: populatedApi },
+      act: async (ctx) => {
+        await ctx.wait(50);
+        ctx.click('#sp-entries-sort-toggle');
+        await ctx.wait(50);
+      },
+    },
   ],
   invariants: [
     {
@@ -193,6 +205,38 @@ registerUnit<Props>({
       check: ({ root }) =>
         Boolean(root.querySelector('button[aria-label="検索をクリア"]')) ||
         '検索入力後にクリアボタンが現れていない',
+    },
+    {
+      id: 'order-default-newest',
+      description: 'ソート未操作の初期状態は order=newest（新しい順）',
+      onlyFixtures: ['loading', 'empty', 'populated'],
+      check: ({ contract }) =>
+        contract.order === 'newest' ||
+        `初期 order は 'newest' のはずだが contract.order="${contract.order}"`,
+    },
+    {
+      id: 'sort-label-matches-order',
+      description:
+        'ソートトグルのラベルは現在の order を反映する（newest→新しい順 / oldest→古い順）',
+      check: ({ root, contract }) => {
+        const label = root.querySelector('#sp-entries-sort-toggle')?.textContent ?? '';
+        if (contract.order === 'newest')
+          return label.includes('新しい順') || `order=newest だがラベル="${label}"`;
+        if (contract.order === 'oldest')
+          return label.includes('古い順') || `order=oldest だがラベル="${label}"`;
+        return `未知の order="${contract.order}"`;
+      },
+    },
+    {
+      id: 'sort-toggle-flips-to-oldest',
+      description: 'トグル押下後は order=oldest になりラベルが「古い順」に変わる',
+      onlyFixtures: ['sort-toggled'],
+      check: ({ root, contract }) => {
+        if (contract.order !== 'oldest')
+          return `トグル後 order='oldest' のはずだが "${contract.order}"`;
+        const label = root.querySelector('#sp-entries-sort-toggle')?.textContent ?? '';
+        return label.includes('古い順') || 'トグル後にラベルが「古い順」になっていない';
+      },
     },
   ],
 });
