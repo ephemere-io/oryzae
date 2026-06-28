@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DeviceView } from '@/components/device-view';
 import { JarView } from '@/features/pc/fermentation/components/jar-view';
 import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle-success-modal';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
+import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 
 interface QuestionData {
