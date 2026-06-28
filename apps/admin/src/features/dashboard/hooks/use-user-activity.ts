@@ -18,8 +18,8 @@ export function useUserActivity(dateFrom?: string, dateTo?: string) {
     setError(null);
 
     const params = new URLSearchParams();
-    if (dateFrom) params.set('dateFrom', dateFrom);
-    if (dateTo) params.set('dateTo', dateTo);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
     const qs = params.toString();
 
     const api = createApiClient(token);

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { gateway } from 'ai';
 import { Hono } from 'hono';
+import { computeCostFromTokens } from '../../infrastructure/claude-pricing.js';
 
 type Env = {
   Variables: {
@@ -188,48 +189,54 @@ export const adminDashboard = new Hono<Env>()
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const daysElapsed = now.getDate();
 
+    // issue #352 で generation_id が出なくなったため、トークン保存分 (input_tokens/
+    // output_tokens) から価格算出する。旧 generation_id レコードは gateway フォールバック。
+    // (/costs エンドポイントと同じ方式。これをやらないと monthly cost が常に $0.00 になる)
     const [currentMonthRows, lastMonthRows] = await Promise.all([
       supabase
         .from('fermentation_results')
-        .select('generation_id')
-        .not('generation_id', 'is', null)
+        .select('generation_id, input_tokens, output_tokens')
+        .or('input_tokens.not.is.null,generation_id.not.is.null')
         .gte('created_at', currentMonthStart)
         .lte('created_at', currentMonthEnd),
       supabase
         .from('fermentation_results')
-        .select('generation_id')
-        .not('generation_id', 'is', null)
+        .select('generation_id, input_tokens, output_tokens')
+        .or('input_tokens.not.is.null,generation_id.not.is.null')
         .gte('created_at', lastMonthStart)
         .lte('created_at', lastMonthEnd),
     ]);
 
-    const sumCosts = async (rows: { generation_id: string }[]): Promise<number> => {
+    const sumCosts = async (
+      rows: {
+        generation_id: string | null;
+        input_tokens: number | null;
+        output_tokens: number | null;
+      }[],
+    ): Promise<number> => {
       let total = 0;
       await Promise.all(
         rows.map(async (row) => {
-          try {
-            const info = await gateway.getGenerationInfo({ id: row.generation_id });
-            if (typeof info?.totalCost === 'number') {
-              total += info.totalCost;
+          const tokenCost = computeCostFromTokens(row.input_tokens, row.output_tokens);
+          if (tokenCost) {
+            total += tokenCost.totalCost;
+            return;
+          }
+          if (row.generation_id) {
+            try {
+              const info = await gateway.getGenerationInfo({ id: row.generation_id });
+              if (typeof info?.totalCost === 'number') total += info.totalCost;
+            } catch {
+              // skip failed lookups
             }
-          } catch {
-            // skip failed lookups
           }
         }),
       );
       return total;
     };
 
-    const currentMonthCost = await sumCosts(
-      (currentMonthRows.data ?? []).filter(
-        (r): r is { generation_id: string } => r.generation_id !== null,
-      ),
-    );
-    const lastMonthCost = await sumCosts(
-      (lastMonthRows.data ?? []).filter(
-        (r): r is { generation_id: string } => r.generation_id !== null,
-      ),
-    );
+    const currentMonthCost = await sumCosts(currentMonthRows.data ?? []);
+    const lastMonthCost = await sumCosts(lastMonthRows.data ?? []);
 
     const projectedCost = daysElapsed > 0 ? (currentMonthCost / daysElapsed) * daysInMonth : 0;
 
@@ -244,10 +251,17 @@ export const adminDashboard = new Hono<Env>()
   .get('/user-activity', async (c) => {
     const supabase = c.get('adminSupabase');
 
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // 期間セレクタ (date_from/date_to) を尊重する。未指定時のみ直近7日にフォールバック。
+    // 以前はここが 7日固定で、期間を切り替えても値が変わらなかった。
+    const dateFrom = c.req.query('date_from');
+    const dateTo = c.req.query('date_to');
+    const from = dateFrom ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    let writersQuery = supabase.from('entries').select('user_id').gte('created_at', from);
+    if (dateTo) writersQuery = writersQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
 
     const [writersRes, usersRes] = await Promise.all([
-      supabase.from('entries').select('user_id').gt('created_at', sevenDaysAgo),
+      writersQuery,
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
 

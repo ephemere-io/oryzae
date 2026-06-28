@@ -138,9 +138,7 @@ function ActiveWritersChart({ days }: { days: TrendDay[] }) {
   return (
     <div className="rounded-lg border border-border/50 bg-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">
-          Active Writers
-        </span>
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">Active Users</span>
         <span className="text-2xl font-semibold tracking-tight">{currentValue}</span>
       </div>
       <div className="h-[140px]">
@@ -166,7 +164,7 @@ function ActiveWritersChart({ days }: { days: TrendDay[] }) {
               stroke="hsl(var(--primary))"
               strokeWidth={2}
               dot={{ r: 3 }}
-              name="Writers"
+              name="Users"
             />
           </LineChart>
         </ResponsiveContainer>

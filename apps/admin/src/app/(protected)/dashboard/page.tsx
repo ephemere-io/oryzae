@@ -50,6 +50,9 @@ export default function DashboardPage() {
     refresh: refreshActivity,
   } = useUserActivity(dateFrom, dateTo);
 
+  // Active Users カードに表示する期間ラベル（セレクタ連動）。custom は実日付。
+  const periodLabel = preset === 'custom' ? `${dateFrom}〜${dateTo}` : preset;
+
   const loading =
     statsLoading || failuresLoading || trendsLoading || costLoading || activityLoading;
 
@@ -107,7 +110,11 @@ export default function DashboardPage() {
           <p className="text-xs text-muted-foreground">Loading...</p>
         ) : null}
         <CostSummaryCard summary={summary} />
-        <UserActivityCard activeWriters={activeWriters} totalUsers={totalUsers} />
+        <UserActivityCard
+          activeWriters={activeWriters}
+          totalUsers={totalUsers}
+          periodLabel={periodLabel}
+        />
       </div>
     </div>
   );
