@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
@@ -82,6 +83,14 @@ export function QuestionSelectModal({
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();
       }}
+      {...verifyAttrs({
+        unit: 'QuestionSelectModal',
+        open,
+        saving,
+        mode,
+        availableCount: available.length,
+        canConfirm,
+      })}
     >
       <form
         onClick={(e) => e.stopPropagation()}
@@ -124,6 +133,7 @@ export function QuestionSelectModal({
 
         {mode === 'pick' && available.length > 0 ? (
           <select
+            aria-label={t('pick_placeholder')}
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
             className="mb-4 w-full rounded-md border px-3 py-2.5 text-sm outline-none"
@@ -144,6 +154,7 @@ export function QuestionSelectModal({
           <input
             ref={newTextRef}
             type="text"
+            aria-label={t('create_placeholder')}
             value={newText}
             onChange={(e) => setNewText(e.target.value)}
             onKeyDown={(e) => {

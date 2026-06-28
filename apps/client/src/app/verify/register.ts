@@ -13,7 +13,23 @@
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
 import '@/features/landing/components/landing-faq-item.verify';
+import '@/features/pc/entries/components/delete-confirm-modal.verify';
 import '@/features/pc/entries/components/editor-status-bar.verify';
+import '@/features/pc/entries/components/entry-card.verify';
+import '@/features/pc/entries/components/entry-kebab-menu.verify';
+import '@/features/pc/entries/components/fermentation-display-prompt-modal.verify';
+import '@/features/pc/entries/components/fermentation-overlay-detail-pane.verify';
+import '@/features/pc/entries/components/fermentation-overlay.verify';
+import '@/features/pc/entries/components/leave-confirm-modal.verify';
+import '@/features/pc/entries/components/link-question-nudge-modal.verify';
+import '@/features/pc/entries/components/pickle-confirm-modal.verify';
+import '@/features/pc/entries/components/pickle-nudge-modal.verify';
+import '@/features/pc/entries/components/question-linker.verify';
+import '@/features/pc/entries/components/question-select-modal.verify';
+import '@/features/pc/entries/components/save-title-modal.verify';
+import '@/features/pc/entries/components/settings-drawer.verify';
+import '@/features/pc/entries/components/stats-popup.verify';
+import '@/features/pc/entries/components/unsaved-changes-modal.verify';
 // リファレンス用の自己完結サンプル（削除可）
 import '@/lib/verify/example-progress.verify';
 

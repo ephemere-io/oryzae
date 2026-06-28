@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 type WritingMode = 'vertical' | 'horizontal';
@@ -174,7 +175,15 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
         onClick={onClose}
         aria-label={t('close_aria')}
       />
-      <div className="fixed top-0 left-0 z-[61] h-full w-80 overflow-y-auto border-r border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
+      <div
+        className="fixed top-0 left-0 z-[61] h-full w-80 overflow-y-auto border-r border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-950"
+        {...verifyAttrs({
+          unit: 'SettingsDrawer',
+          timeInscriptionEnabled: settings.timeInscriptionEnabled,
+          ghostEnabled: settings.ghostEnabled,
+          fermentationOverlayPreference: settings.fermentationOverlayPreference,
+        })}
+      >
         <div className="p-5">
           <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-zinc-100">Settings</h2>
 

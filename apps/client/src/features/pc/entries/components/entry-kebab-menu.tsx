@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
@@ -33,7 +34,7 @@ export function EntryKebabMenu({ onDeleteClick }: EntryKebabMenuProps) {
   }, [open]);
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative" {...verifyAttrs({ unit: 'EntryKebabMenu', open })}>
       <button
         type="button"
         aria-label={t('aria_open')}
