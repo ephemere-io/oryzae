@@ -26,6 +26,12 @@ interface ScheduledFermentationResult {
   emailFailures: Array<{ userId: string; error: string }>;
 }
 
+// 失敗即時通知の 1 run あたり上限。発酵 cron は重く、末尾の summary 通知に到達する前に
+// Vercel に kill されることがある (失敗が無通知で埋もれる原因)。そこで失敗の瞬間に
+// 通知するが、(a) 同一理由は 1 回 (dedup) + (b) この上限で打ち切る。理由文字列に
+// request-id 等が混ざって dedup が効かない場合でもスパムしないための保険。
+const MAX_FAILURE_NOTIFICATIONS = 5;
+
 // 発酵プロセス自動発火 (issue #268)。
 // 一日一回、cron から呼ばれる。各ユーザーごとに以下を実施する:
 //   1. ロケール解決 (Supabase Auth user_metadata.locale → 'ja' or 'en')
@@ -62,6 +68,12 @@ export class ScheduledFermentationUsecase {
       questionTitles: string[],
       language: FermentationLanguage,
     ) => Promise<unknown>,
+    // 失敗の瞬間に呼ばれる通知コールバック (route 側で Discord に配線)。dedup + 上限は
+    // この usecase 内で管理する。未注入なら no-op (テスト・admin 手動トリガー等)。
+    private notifyFailure: (
+      reason: string,
+      sample: { userId: string; questionId: string },
+    ) => Promise<void> = async () => {},
     // 次回 X 時間生成器。テストでは固定値を注入して決定論的にする。
     private rollHours: () => number = rollRandomHours,
     // ユーザー並列実行数。テストでは 1 を渡して順序を決定論的にできる。
@@ -88,15 +100,19 @@ export class ScheduledFermentationUsecase {
       this.generateId,
     );
 
-    const successfulTitlesByUser = new Map<string, string[]>();
-    const languageByUser = new Map<string, FermentationLanguage>();
+    // 失敗即時通知の dedup / cap 状態 (run スコープ)。check→reserve は同期的なので
+    // worker 並列でも二重通知しない (mutate は await 境界の手前のみ)。
+    const notifiedReasons = new Set<string>();
+    let failureNotifyCount = 0;
 
     // 1 ユーザー分の処理。共有 state (result/Map) を mutate するが、JS シングル
     // スレッドかつ await 境界での mutate のみのため worker 間競合は起きない。
     const processUser = async (userId: string): Promise<void> => {
       // 1. ロケール解決 (失敗時は 'ja')
       const language = await this.localeResolver.resolve(userId);
-      languageByUser.set(userId, language);
+
+      // このユーザーで発酵に成功した問いタイトル。処理直後の digest 送信に使う。
+      const successfulTitles: string[] = [];
 
       // 2. 既存 state を取得 (新規なら null)
       const existing = await this.userStateRepo.findByUserId(userId);
@@ -164,17 +180,26 @@ export class ScheduledFermentationUsecase {
           });
           result.succeeded++;
           firedAtLeastOne = true;
-          const titles = successfulTitlesByUser.get(userId) ?? [];
-          titles.push(questionText);
-          successfulTitlesByUser.set(userId, titles);
+          successfulTitles.push(questionText);
         } catch (error) {
           result.failed++;
           firedAtLeastOne = true;
-          result.errors.push({
-            userId,
-            questionId: question.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
+          const reason = error instanceof Error ? error.message : 'Unknown error';
+          result.errors.push({ userId, questionId: question.id, error: reason });
+
+          // 失敗の瞬間に通知 (末尾 summary は cron が時間切れだと出ないため)。
+          // dedup (同一理由は1回) + cap (1 run 最大 MAX_FAILURE_NOTIFICATIONS 件)。
+          // reserve は同期的に行い、その後 await して kill 前に送り切る。
+          const reasonKey = reason.replace(/\s+/g, ' ').trim();
+          if (!notifiedReasons.has(reasonKey) && failureNotifyCount < MAX_FAILURE_NOTIFICATIONS) {
+            notifiedReasons.add(reasonKey);
+            failureNotifyCount++;
+            try {
+              await this.notifyFailure(reason, { userId, questionId: question.id });
+            } catch {
+              // 通知失敗は発酵ジョブを止めない。
+            }
+          }
         }
       }
 
@@ -186,6 +211,25 @@ export class ScheduledFermentationUsecase {
         const fired = stateWithReadiness.withFired(this.rollHours(), now);
         if (fired.success) {
           await this.userStateRepo.upsert(fired.value);
+        }
+      }
+
+      // issue #384: digest はこのユーザーの処理直後に送る。
+      // 以前は全ユーザーの sweep 完了後に末尾で一括送信していたが、cron が重く
+      // 末尾フェーズに到達する前に Vercel に kill されると、成功した全ユーザーの
+      // digest メールが 1 通も飛ばなかった (user-facing バグ)。逐次送信なら kill 前に
+      // 処理済みのユーザーには確実に届く。失敗は握りつぶさず emailFailures に集計。
+      if (successfulTitles.length > 0) {
+        try {
+          await this.sendDigest(userId, successfulTitles, language);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          console.error('[ScheduledFermentationUsecase] digest email failed', {
+            userId,
+            titleCount: successfulTitles.length,
+            error: message,
+          });
+          result.emailFailures.push({ userId, error: message });
         }
       }
     };
@@ -203,24 +247,6 @@ export class ScheduledFermentationUsecase {
       }
     });
     await Promise.all(workers);
-
-    for (const [userId, titles] of successfulTitlesByUser) {
-      const lang = languageByUser.get(userId) ?? 'ja';
-      try {
-        await this.sendDigest(userId, titles, lang);
-      } catch (error) {
-        // 設計思想: メール送信失敗は発酵ジョブ全体を止めない (issue #268)。
-        // ただし黙殺せず、result に集計してログを出して上位の Discord 通知 / admin
-        // 監視で発見できるようにする (issue #288)。
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[ScheduledFermentationUsecase] digest email failed', {
-          userId,
-          titleCount: titles.length,
-          error: message,
-        });
-        result.emailFailures.push({ userId, error: message });
-      }
-    }
 
     return result;
   }

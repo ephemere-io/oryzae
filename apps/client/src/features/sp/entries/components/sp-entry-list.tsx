@@ -46,7 +46,8 @@ export function SpEntryList({ api }: SpEntryListProps) {
   }, [searchInput]);
 
   const activeQuestions = useActiveQuestions(api, false);
-  const { entries, loading } = useEntries(api, false, search, questionId);
+  // Issue #362: useEntries は optimistic 化で authLoading 引数を撤去済み（api, search?, questionId?）。
+  const { entries, loading } = useEntries(api, search, questionId);
 
   const isFiltering = !!search || !!questionId;
 

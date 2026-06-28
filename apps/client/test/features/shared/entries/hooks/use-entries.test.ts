@@ -34,7 +34,7 @@ describe('useEntries', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, entries));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntries(api, false));
+    const { result } = renderHook(() => useEntries(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -45,19 +45,45 @@ describe('useEntries', () => {
     expect(apiFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not fetch when authLoading is true', async () => {
-    const api = createMockApi(apiFetch);
-
-    renderHook(() => useEntries(api, true));
+  it('does not fetch when api is null (Issue #362: api ゲート)', async () => {
+    renderHook(() => useEntries(null));
 
     expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it('取得失敗時は error=true になり、retry 成功で解消する (Issue #357)', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntries(api));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.error).toBe(true);
+    expect(result.current.entries).toHaveLength(0);
+
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '1', userId: 'u1', content: 'ok', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+
+    await act(async () => {
+      result.current.retry();
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toBe(false);
+    });
+    expect(result.current.entries).toHaveLength(1);
   });
 
   it('returns empty array when no entries', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, []));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntries(api, false));
+    const { result } = renderHook(() => useEntries(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -83,7 +109,7 @@ describe('useEntries', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, page1));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntries(api, false));
+    const { result } = renderHook(() => useEntries(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -122,7 +148,7 @@ describe('useEntries', () => {
     );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntries(api, false, '天気'));
+    const { result } = renderHook(() => useEntries(api, '天気'));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -140,7 +166,7 @@ describe('useEntries', () => {
     );
     const api = createMockApi(apiFetch);
 
-    const { result, rerender } = renderHook(({ search }) => useEntries(api, false, search), {
+    const { result, rerender } = renderHook(({ search }) => useEntries(api, search), {
       initialProps: { search: 'first' },
     });
 
@@ -174,7 +200,7 @@ describe('useEntries', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, entries));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntries(api, false));
+    const { result } = renderHook(() => useEntries(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -194,7 +220,7 @@ describe('useEntries', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, []));
     const api = createMockApi(apiFetch);
 
-    renderHook(() => useEntries(api, false, ''));
+    renderHook(() => useEntries(api, ''));
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledTimes(1);
@@ -222,7 +248,7 @@ describe('useEntries', () => {
     );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntries(api, false));
+    const { result } = renderHook(() => useEntries(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -238,7 +264,7 @@ describe('useEntries', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, []));
     const api = createMockApi(apiFetch);
 
-    renderHook(() => useEntries(api, false, undefined, 'q-123'));
+    renderHook(() => useEntries(api, undefined, 'q-123'));
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledTimes(1);
@@ -251,7 +277,7 @@ describe('useEntries', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, []));
     const api = createMockApi(apiFetch);
 
-    renderHook(() => useEntries(api, false));
+    renderHook(() => useEntries(api));
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledTimes(1);
@@ -269,7 +295,7 @@ describe('useEntries', () => {
     const api = createMockApi(apiFetch);
 
     const { result, rerender } = renderHook(
-      ({ qid }: { qid?: string }) => useEntries(api, false, undefined, qid),
+      ({ qid }: { qid?: string }) => useEntries(api, undefined, qid),
       { initialProps: { qid: 'q-a' } },
     );
 
@@ -303,7 +329,7 @@ describe('useEntries', () => {
     );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntries(api, false));
+    const { result } = renderHook(() => useEntries(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

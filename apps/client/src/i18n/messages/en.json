@@ -122,7 +122,9 @@
       "load_more": "Load more",
       "filter_by_question_label": "Filter by question",
       "filter_all_questions": "All questions",
-      "filter_clear_aria": "Clear filter"
+      "filter_clear_aria": "Clear filter",
+      "error_message": "Failed to load entries",
+      "retry": "Retry"
     },
     "leave_modal": {
       "aria_label": "Leave confirmation dialog",
@@ -518,7 +520,9 @@
     "timeline": {
       "empty": "No questions yet",
       "heading": "Lineage of your questions",
-      "subheading": "A record of how your questions have been born, grown, and shifted"
+      "subheading": "A record of how your questions have been born, grown, and shifted",
+      "error_message": "Failed to load questions",
+      "retry": "Retry"
     }
   },
   "landing": {

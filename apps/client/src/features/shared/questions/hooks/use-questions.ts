@@ -13,26 +13,38 @@ interface QuestionItem {
   updatedAt: string;
 }
 
-export function useQuestions(api: ApiClient | null, authLoading: boolean) {
+export function useQuestions(api: ApiClient | null) {
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Issue #357: 取得失敗を error ステートとして surface する。
+  const [error, setError] = useState<boolean>(false);
 
   const fetchQuestions = useCallback(async () => {
     if (!api) return;
     setLoading(true);
-    const res = await api.fetch('/api/v1/questions/all');
-    if (res.ok) {
-      const data: QuestionItem[] = await res.json();
-      setQuestions(data);
+    setError(false);
+    try {
+      const res = await api.fetch('/api/v1/questions/all');
+      if (res.ok) {
+        const data: QuestionItem[] = await res.json();
+        setQuestions(data);
+      } else {
+        setError(true);
+      }
+    } catch {
+      setError(true);
     }
     setLoading(false);
   }, [api]);
 
+  // Issue #362: auth/me の完了（authLoading）を待たず、api が用意でき次第すぐ取得する。
+  // api は useAuth が stored token から楽観的に即生成する。失効時は createApiClient が
+  // 401→refresh→retry で自己修復する。
   useEffect(() => {
-    if (!authLoading && api) {
+    if (api) {
       fetchQuestions();
     }
-  }, [authLoading, api, fetchQuestions]);
+  }, [api, fetchQuestions]);
 
   const createQuestion = useCallback(
     async (text: string) => {
@@ -97,6 +109,7 @@ export function useQuestions(api: ApiClient | null, authLoading: boolean) {
   return {
     questions,
     loading,
+    error,
     createQuestion,
     editQuestion,
     archiveQuestion,

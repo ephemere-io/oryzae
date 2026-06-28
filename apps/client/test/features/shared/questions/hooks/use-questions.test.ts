@@ -42,7 +42,7 @@ describe('useQuestions', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, questions));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useQuestions(api, false));
+    const { result } = renderHook(() => useQuestions(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -53,12 +53,23 @@ describe('useQuestions', () => {
     expect(apiFetch).toHaveBeenCalledWith('/api/v1/questions/all');
   });
 
-  it('does not fetch when authLoading is true', async () => {
-    const api = createMockApi(apiFetch);
-
-    renderHook(() => useQuestions(api, true));
+  it('does not fetch when api is null (Issue #362: api ゲート)', async () => {
+    renderHook(() => useQuestions(null));
 
     expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it('取得失敗時は error=true になる (Issue #357)', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useQuestions(api));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.error).toBe(true);
+    expect(result.current.questions).toHaveLength(0);
   });
 
   it('createQuestion calls API and refreshes list', async () => {
@@ -90,7 +101,7 @@ describe('useQuestions', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, initialQuestions));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useQuestions(api, false));
+    const { result } = renderHook(() => useQuestions(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

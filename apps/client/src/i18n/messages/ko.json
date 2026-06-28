@@ -122,7 +122,9 @@
       "load_more": "더 보기",
       "filter_by_question_label": "질문으로 필터",
       "filter_all_questions": "모든 질문",
-      "filter_clear_aria": "필터 지우기"
+      "filter_clear_aria": "필터 지우기",
+      "error_message": "항목을 불러오지 못했습니다",
+      "retry": "다시 시도"
     },
     "leave_modal": {
       "aria_label": "이탈 확인 대화상자",
@@ -518,7 +520,9 @@
     "timeline": {
       "empty": "아직 질문이 없습니다",
       "heading": "질문의 변천",
-      "subheading": "당신의 질문이 태어나고, 자라고, 변해 온 기록"
+      "subheading": "당신의 질문이 태어나고, 자라고, 변해 온 기록",
+      "error_message": "질문을 불러오지 못했습니다",
+      "retry": "다시 시도"
     }
   },
   "landing": {
