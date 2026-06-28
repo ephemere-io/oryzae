@@ -759,7 +759,7 @@
       "question_selected": "提问：{label}",
       "question_untitled": "无标题提问",
       "question_sheet_title": "选择提问",
-      "question_empty": "还没有设立提问（可在电脑端创建）",
+      "question_empty": "还没有提问",
       "close": "关闭",
       "pickle": "放入瓶中",
       "pickling": "封入中…",
@@ -773,7 +773,8 @@
       "write": "书写",
       "jar": "瓶",
       "list": "列表",
-      "account": "账户"
+      "account": "账户",
+      "questions": "提问"
     },
     "jar": {
       "title": "瓶中收到的信",
@@ -793,6 +794,22 @@
       "search_clear": "清除搜索",
       "all": "全部",
       "empty_filtered": "没有匹配的条目"
+    },
+    "questions": {
+      "title": "提问",
+      "intro": "培育、改写或结束你正在面对的提问。",
+      "untitled": "无标题提问",
+      "proposed": "Oryzae 的建议",
+      "accept": "接受",
+      "reject": "搁置",
+      "empty": "还没有提问",
+      "add": "提出新的提问",
+      "sheet_add": "新的提问",
+      "sheet_edit": "编辑提问",
+      "placeholder": "写下提问",
+      "delete": "结束这个提问",
+      "cancel": "取消",
+      "save": "保存"
     }
   }
 }

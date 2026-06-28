@@ -759,7 +759,7 @@
       "question_selected": "問い: {label}",
       "question_untitled": "無題の問い",
       "question_sheet_title": "問いを選ぶ",
-      "question_empty": "立てている問いがありません（問いは PC で立てられます）",
+      "question_empty": "立てている問いがありません",
       "close": "閉じる",
       "pickle": "瓶に漬ける",
       "pickling": "納めています…",
@@ -773,7 +773,8 @@
       "write": "書く",
       "jar": "瓶",
       "list": "一覧",
-      "account": "アカウント"
+      "account": "アカウント",
+      "questions": "問い"
     },
     "jar": {
       "title": "瓶に届いた手紙",
@@ -793,6 +794,22 @@
       "search_clear": "検索をクリア",
       "all": "すべて",
       "empty_filtered": "該当するエントリーがありません"
+    },
+    "questions": {
+      "title": "問い",
+      "intro": "いま向き合っている問いを、育て、書き換え、終えられます。",
+      "untitled": "無題の問い",
+      "proposed": "Oryzae からの提案",
+      "accept": "受け入れる",
+      "reject": "見送る",
+      "empty": "まだ問いがありません",
+      "add": "新しい問いを立てる",
+      "sheet_add": "新しい問い",
+      "sheet_edit": "問いを編集",
+      "placeholder": "問いを書く",
+      "delete": "この問いを終える",
+      "cancel": "キャンセル",
+      "save": "保存"
     }
   }
 }

@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useUnread } from '@/lib/unread-context';
 
-/** 一覧アイコン（横線）。 */
 function ListIcon() {
   return (
     <svg
@@ -23,7 +22,29 @@ function ListIcon() {
   );
 }
 
-/** 瓶アイコン。 */
+function QuestionIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <title>questions</title>
+      <circle cx="12" cy="12" r="9" />
+      <path
+        d="M9.4 9.4a2.6 2.6 0 0 1 4.6 1.6c0 1.7-2.4 2-2.4 3.4"
+        strokeLinecap="round"
+        strokeOpacity=".7"
+      />
+      <circle cx="12" cy="17" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
 function JarIcon() {
   return (
     <svg
@@ -44,23 +65,43 @@ function JarIcon() {
   );
 }
 
+function AccountIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <title>account</title>
+      <circle cx="12" cy="8" r="3.4" />
+      <path d="M5 20c0-3.5 3.1-5.3 7-5.3s7 1.8 7 5.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /**
- * SP シェルのボトムナビ（Issue #363）。指摘「メニューが機械的すぎる」への対応で
- * 均等なテキスト4タブをやめ、左右2タブ（エントリー / 瓶）＋中央に「書く」を昇格した
- * FAB、という片手で押しやすい構成にした。アカウントは各画面のアバターから開く。
- * device=sp の (protected) シェルでのみ使う。
+ * SP シェルのボトムナビ（Issue #363）。SP のデフォルトメニュー＝
+ * エントリー / 問い / 書く(中央FAB) / 瓶 / アカウント の5つ。
+ * 瓶には未読（届いた手紙）バッジ。device=sp の (protected) シェルでのみ使う。
  */
 export function SpBottomNav() {
   const t = useTranslations('sp.nav');
   const pathname = usePathname();
   const { unreadCount } = useUnread();
 
+  const tabStyle = (on: boolean) => ({ color: on ? 'var(--accent)' : 'var(--date-color)' });
   const onList = pathname === '/entries';
+  const onQuestions = pathname.startsWith('/questions');
   const onJar = pathname.startsWith('/jar');
+  const onAccount = pathname.startsWith('/account');
 
   return (
     <nav
-      className="relative flex flex-none items-center justify-around px-2"
+      className="relative flex flex-none items-center justify-around px-1"
       style={{
         height: 64,
         borderTop: '1px solid var(--border-subtle)',
@@ -71,12 +112,22 @@ export function SpBottomNav() {
     >
       <Link
         href="/entries"
-        className="flex w-16 flex-col items-center gap-0.5 text-[10px]"
-        style={{ color: onList ? 'var(--accent)' : 'var(--date-color)' }}
+        className="flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onList)}
         aria-current={onList ? 'page' : undefined}
       >
         <ListIcon />
         {t('list')}
+      </Link>
+
+      <Link
+        href="/questions"
+        className="flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onQuestions)}
+        aria-current={onQuestions ? 'page' : undefined}
+      >
+        <QuestionIcon />
+        {t('questions')}
       </Link>
 
       <Link
@@ -109,8 +160,8 @@ export function SpBottomNav() {
 
       <Link
         href="/jar"
-        className="relative flex w-16 flex-col items-center gap-0.5 text-[10px]"
-        style={{ color: onJar ? 'var(--accent)' : 'var(--date-color)' }}
+        className="relative flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onJar)}
         aria-current={onJar ? 'page' : undefined}
       >
         <JarIcon />
@@ -120,7 +171,7 @@ export function SpBottomNav() {
             className="absolute flex items-center justify-center text-[9px] font-bold text-white"
             style={{
               top: -3,
-              right: 8,
+              right: 6,
               minWidth: 15,
               height: 15,
               padding: '0 3px',
@@ -131,6 +182,16 @@ export function SpBottomNav() {
             {unreadCount}
           </span>
         ) : null}
+      </Link>
+
+      <Link
+        href="/account"
+        className="flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onAccount)}
+        aria-current={onAccount ? 'page' : undefined}
+      >
+        <AccountIcon />
+        {t('account')}
       </Link>
     </nav>
   );

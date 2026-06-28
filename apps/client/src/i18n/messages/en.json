@@ -759,7 +759,7 @@
       "question_selected": "Question: {label}",
       "question_untitled": "Untitled question",
       "question_sheet_title": "Choose a question",
-      "question_empty": "No questions yet (you can create them on desktop)",
+      "question_empty": "No questions yet",
       "close": "Close",
       "pickle": "Pickle",
       "pickling": "Sealing…",
@@ -773,7 +773,8 @@
       "write": "Write",
       "jar": "Jar",
       "list": "List",
-      "account": "Account"
+      "account": "Account",
+      "questions": "Questions"
     },
     "jar": {
       "title": "Letters in the jar",
@@ -793,6 +794,22 @@
       "search_clear": "Clear search",
       "all": "All",
       "empty_filtered": "No matching entries"
+    },
+    "questions": {
+      "title": "Questions",
+      "intro": "Grow, reword, or retire the questions you are sitting with.",
+      "untitled": "Untitled question",
+      "proposed": "Suggested by Oryzae",
+      "accept": "Accept",
+      "reject": "Dismiss",
+      "empty": "No questions yet",
+      "add": "Pose a new question",
+      "sheet_add": "New question",
+      "sheet_edit": "Edit question",
+      "placeholder": "Write a question",
+      "delete": "Retire this question",
+      "cancel": "Cancel",
+      "save": "Save"
     }
   }
 }

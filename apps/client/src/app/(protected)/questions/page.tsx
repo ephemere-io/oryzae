@@ -3,8 +3,9 @@
 import { DeviceView } from '@/components/device-view';
 import { QuestionCreateForm } from '@/features/pc/questions/components/question-create-form';
 import { QuestionTimeline } from '@/features/pc/questions/components/question-timeline';
-import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
 import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
+import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
 
 export default function QuestionsPage() {
   const { api, loading: authLoading } = useAuth();
@@ -12,6 +13,7 @@ export default function QuestionsPage() {
     questions,
     loading,
     createQuestion,
+    editQuestion,
     archiveQuestion,
     unarchiveQuestion,
     acceptQuestion,
@@ -20,6 +22,17 @@ export default function QuestionsPage() {
 
   return (
     <DeviceView
+      sp={
+        <SpQuestions
+          questions={questions}
+          loading={loading}
+          createQuestion={createQuestion}
+          editQuestion={editQuestion}
+          archiveQuestion={archiveQuestion}
+          acceptQuestion={acceptQuestion}
+          rejectQuestion={rejectQuestion}
+        />
+      }
       pc={
         <div className="flex min-h-full flex-col">
           <div className="mx-auto w-full max-w-[800px] flex-1 px-6 pt-6 pb-20">

@@ -759,7 +759,7 @@
       "question_selected": "질문: {label}",
       "question_untitled": "제목 없는 질문",
       "question_sheet_title": "질문 선택",
-      "question_empty": "세운 질문이 없습니다 (질문은 PC에서 만들 수 있어요)",
+      "question_empty": "세운 질문이 없습니다",
       "close": "닫기",
       "pickle": "병에 담그기",
       "pickling": "담는 중…",
@@ -773,7 +773,8 @@
       "write": "쓰기",
       "jar": "병",
       "list": "목록",
-      "account": "계정"
+      "account": "계정",
+      "questions": "질문"
     },
     "jar": {
       "title": "병에 도착한 편지",
@@ -793,6 +794,22 @@
       "search_clear": "검색 지우기",
       "all": "전체",
       "empty_filtered": "해당하는 항목이 없습니다"
+    },
+    "questions": {
+      "title": "질문",
+      "intro": "지금 마주한 질문을 키우고, 고쳐 쓰고, 끝낼 수 있습니다.",
+      "untitled": "제목 없는 질문",
+      "proposed": "Oryzae의 제안",
+      "accept": "받아들이기",
+      "reject": "보류",
+      "empty": "아직 질문이 없습니다",
+      "add": "새 질문 세우기",
+      "sheet_add": "새 질문",
+      "sheet_edit": "질문 편집",
+      "placeholder": "질문 쓰기",
+      "delete": "이 질문 끝내기",
+      "cancel": "취소",
+      "save": "저장"
     }
   }
 }
