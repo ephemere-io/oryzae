@@ -447,6 +447,7 @@
   },
   "fermentation": {
     "detail": {
+      "close_aria": "상세 닫기",
       "header_keyword": "Yeast가 만든 키워드",
       "header_snippet": "Oryzae가 골라낸 문장",
       "header_letter": "L.A.B.의 관찰 기록",
