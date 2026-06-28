@@ -62,8 +62,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           {/* device 判定が済むまで（null）はシェルを出さない＝サイドバーのちらつき防止。
               device は mount 後に確定するため、これ自体が children のクライアント専用描画を担保する。 */}
           {device === 'sp' ? (
-            // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）
-            <div className="flex h-screen flex-col overflow-hidden">
+            // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
+            // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
+            // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
+            <div className="flex h-[100dvh] flex-col overflow-hidden">
               <main className="relative flex-1 overflow-auto">{content}</main>
               <SpBottomNav />
             </div>
