@@ -762,8 +762,12 @@
       "question_empty": "No questions yet (you can create them on desktop)",
       "close": "Close",
       "pickle": "Pickle",
-      "pickling": "Pickling…",
-      "pickled": "Pickled ✓"
+      "pickling": "Sealing…",
+      "pickled": "Fermentation started ✓",
+      "question_link": "Link a question",
+      "ferment_title": "Seal in the jar to ferment",
+      "ferment_sub": "Give it time — a letter from the AI will arrive",
+      "ferment_action": "Seal"
     },
     "nav": {
       "write": "Write",
@@ -783,7 +787,12 @@
     "list": {
       "title": "Entries",
       "empty": "No entries yet",
-      "untitled": "Untitled"
+      "untitled": "Untitled",
+      "account": "Account",
+      "search": "Search entries",
+      "search_clear": "Clear search",
+      "all": "All",
+      "empty_filtered": "No matching entries"
     }
   }
 }

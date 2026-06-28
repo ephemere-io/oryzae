@@ -762,8 +762,12 @@
       "question_empty": "还没有设立提问（可在电脑端创建）",
       "close": "关闭",
       "pickle": "放入瓶中",
-      "pickling": "放入中…",
-      "pickled": "已放入瓶中 ✓"
+      "pickling": "封入中…",
+      "pickled": "已开始发酵 ✓",
+      "question_link": "关联提问",
+      "ferment_title": "封入瓶中发酵",
+      "ferment_sub": "静待片刻，AI 的来信将会送达",
+      "ferment_action": "封入"
     },
     "nav": {
       "write": "书写",
@@ -781,9 +785,14 @@
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
-      "title": "条目列表",
+      "title": "条目",
       "empty": "还没有条目",
-      "untitled": "无标题"
+      "untitled": "无标题",
+      "account": "账户",
+      "search": "搜索正文·标题",
+      "search_clear": "清除搜索",
+      "all": "全部",
+      "empty_filtered": "没有匹配的条目"
     }
   }
 }

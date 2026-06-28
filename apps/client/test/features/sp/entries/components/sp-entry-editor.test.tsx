@@ -38,9 +38,9 @@ describe('SpEntryEditor', () => {
     expect(screen.getByPlaceholderText('いま感じていることを、そのまま。')).toBeTruthy();
   });
 
-  it('保存前は「瓶に漬ける」を出さない（entryId 未確定）', () => {
+  it('保存前は発酵 CTA（納める）を出さない（entryId 未確定）', () => {
     renderEditor(createMockApi(apiFetch));
-    expect(screen.queryByRole('button', { name: '瓶に漬ける' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '納める' })).toBeNull();
   });
 
   it('既存エントリを開くとタイトル・本文が埋まる（編集）', () => {
@@ -71,9 +71,8 @@ describe('SpEntryEditor', () => {
     const questionItem = await screen.findByRole('button', { name: 'なぜ書くのか' });
     fireEvent.click(questionItem);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /問い: なぜ書くのか/ })).toBeTruthy(),
-    );
+    // 選択後、チップに「◦ なぜ書くのか」と反映される（シートは閉じる）
+    await waitFor(() => expect(screen.getByRole('button', { name: /なぜ書くのか/ })).toBeTruthy());
   });
 
   it('問いが無いときは空状態を表示する', async () => {
