@@ -22,7 +22,7 @@ interface UserPayload {
   user: AuthState['user'];
 }
 
-interface AuthContextValue {
+export interface AuthContextValue {
   auth: AuthState | null;
   api: ApiClient | null;
   loading: boolean;
@@ -36,7 +36,9 @@ interface AuthContextValue {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+// AuthContext は検証ハーネス(withVerifyProviders)が mock 値を供給するため export する。
+// 実コードは必ず useAuth 経由で読む（直接 import しない）。
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
  * 認証は **アプリ全体で1インスタンス**にする（root layout に Provider を置く）。
