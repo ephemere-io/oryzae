@@ -33,7 +33,7 @@ describe('useUserActivity', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('passes dateFrom and dateTo as query parameters', async () => {
+  it('passes date_from and date_to as query parameters', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(true, { activeWriters: 3, totalUsers: 10 }));
 
     renderHook(() => useUserActivity('2026-04-01', '2026-04-12'));
@@ -42,9 +42,11 @@ describe('useUserActivity', () => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
+    // サーバー側 (/user-activity) は date_from/date_to (snake_case) を読む。
+    // 以前 camelCase で送っていたため期間が常に無視され 7日固定になっていた回帰の防止。
     const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('dateFrom=2026-04-01');
-    expect(calledUrl).toContain('dateTo=2026-04-12');
+    expect(calledUrl).toContain('date_from=2026-04-01');
+    expect(calledUrl).toContain('date_to=2026-04-12');
   });
 
   it('sets error on fetch failure', async () => {

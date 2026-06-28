@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeCostFromTokens } from '@/contexts/fermentation/infrastructure/llm/claude-pricing.js';
+import { computeCostFromTokens } from '@/contexts/shared/infrastructure/claude-pricing.js';
 
 describe('computeCostFromTokens', () => {
   it('両方 null/undefined なら null (コスト不明)', () => {
