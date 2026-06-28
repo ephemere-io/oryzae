@@ -27,7 +27,7 @@ export default function EntriesPage() {
 
   return (
     <DeviceView
-      sp={<SpEntryList api={api} />}
+      sp={<SpEntryList api={api} availableQuestions={availableQuestions} />}
       pc={
         <div className="flex min-h-full flex-col">
           <div className="mx-auto w-full max-w-[680px] flex-1 px-6 pt-10 pb-20">
