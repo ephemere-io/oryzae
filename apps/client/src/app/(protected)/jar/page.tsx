@@ -2,10 +2,12 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/features/auth/hooks/use-auth';
-import { JarView } from '@/features/fermentation/components/jar-view';
-import { PickleSuccessModal } from '@/features/fermentation/components/pickle-success-modal';
-import { useQuestions } from '@/features/questions/hooks/use-questions';
+import { DeviceView } from '@/components/device-view';
+import { JarView } from '@/features/pc/fermentation/components/jar-view';
+import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle-success-modal';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
+import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { useUnread } from '@/lib/unread-context';
 
 interface QuestionData {
@@ -73,17 +75,26 @@ export default function JarPage() {
     await fetchActiveQuestions();
   }
 
+  // 端末で出し分け（URL は /jar のまま）。DeviceView が判定前/未対応を安全に処理。
   return (
-    <div className="absolute inset-0">
-      <JarView
-        api={api}
-        authLoading={authLoading}
-        questions={questions}
-        onAddQuestion={handleAddQuestion}
-        onEditQuestion={handleEditQuestion}
-        onArchiveQuestion={handleArchiveQuestion}
-      />
-      <PickleSuccessModal open={pickleSuccessOpen} onClose={() => setPickleSuccessOpen(false)} />
-    </div>
+    <DeviceView
+      sp={<SpJar api={api} />}
+      pc={
+        <div className="absolute inset-0">
+          <JarView
+            api={api}
+            authLoading={authLoading}
+            questions={questions}
+            onAddQuestion={handleAddQuestion}
+            onEditQuestion={handleEditQuestion}
+            onArchiveQuestion={handleArchiveQuestion}
+          />
+          <PickleSuccessModal
+            open={pickleSuccessOpen}
+            onClose={() => setPickleSuccessOpen(false)}
+          />
+        </div>
+      }
+    />
   );
 }

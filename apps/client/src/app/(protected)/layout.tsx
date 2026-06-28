@@ -3,19 +3,22 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
+import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/auth/components/sidebar';
-import { useAuth } from '@/features/auth/hooks/use-auth';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/onboarding/types';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
+import { useDevice } from '@/lib/use-device';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
   const { shouldShow, complete } = useOnboarding(api);
+  const device = useDevice();
   const router = useRouter();
 
   // Issue #362: 保護下の children はクライアント専用に描画する。
@@ -23,6 +26,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // サーバー↔クライアントで食い違うハイドレーション不一致(React #418)を防ぐ。
   // それでも auth/me の完了は待たない（マウント直後＝~1s で描画）ため、
   // 旧来の「認証完了まで全画面空白(~3s)」は解消したまま。
+  // （device も mount 後に確定するため、シェルの出し分けと同じタイミング。）
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -48,31 +52,43 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;
 
+  // Issue #362: 認証完了を待たず children を描画（ページ側がスケルトンを即出す）。
+  const content = mounted ? children : null;
+
   return (
     <ThemeProvider>
       <SidebarProvider>
         <UnreadProvider api={api} authLoading={loading}>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main
-              className="flex flex-1 flex-col overflow-hidden"
-              style={
-                {
-                  marginLeft: SIDEBAR_WIDTH,
-                  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-                } as React.CSSProperties
-              }
-            >
-              {/* Issue #362: 認証チェック完了を待たずマウント直後に children を描画
-                  （各ページがスケルトンを即出せる）。ただし SSR では描画せず
-                  ハイドレーション不一致を避ける。未認証時は上の useEffect が /login へ。 */}
-              <div className="relative flex-1 overflow-auto">{mounted ? children : null}</div>
-              <PageFooter />
-            </main>
-            {shouldShow && <OnboardingFlow onComplete={handleOnboardingComplete} />}
-            {/* スマホ専用画面が用意できるまでの暫定処置 (Issue #299) — 保護下のページはスマホ非対応 */}
-            <DesktopOnlyOverlay />
-          </div>
+          {/* device 判定が済むまで（null）はシェルを出さない＝サイドバーのちらつき防止。
+              device は mount 後に確定するため、これ自体が children のクライアント専用描画を担保する。 */}
+          {device === 'sp' ? (
+            // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）
+            <div className="flex h-screen flex-col overflow-hidden">
+              <main className="relative flex-1 overflow-auto">{content}</main>
+              <SpBottomNav />
+            </div>
+          ) : device === 'pc' ? (
+            <div className="flex h-screen overflow-hidden">
+              <Sidebar />
+              <main
+                className="flex flex-1 flex-col overflow-hidden"
+                style={
+                  {
+                    marginLeft: SIDEBAR_WIDTH,
+                    '--sidebar-width': `${SIDEBAR_WIDTH}px`,
+                  } as React.CSSProperties
+                }
+              >
+                <div className="relative flex-1 overflow-auto">{content}</div>
+                <PageFooter />
+              </main>
+              {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
+              <DesktopOnlyOverlay />
+            </div>
+          ) : null}
+          {device !== null && shouldShow && (
+            <OnboardingFlow onComplete={handleOnboardingComplete} />
+          )}
         </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>

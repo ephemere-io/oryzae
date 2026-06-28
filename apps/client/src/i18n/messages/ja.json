@@ -751,5 +751,74 @@
   "support": {
     "title": "サポート",
     "back_home": "トップへ戻る"
+  },
+  "sp": {
+    "editor": {
+      "title_placeholder": "タイトル（任意）",
+      "body_placeholder": "いま感じていることを、そのまま。",
+      "status_editing": "編集中",
+      "status_saving": "保存中…",
+      "status_saved": "保存しました",
+      "question": "問い",
+      "question_selected": "問い: {label}",
+      "question_untitled": "無題の問い",
+      "question_sheet_title": "問いを選ぶ",
+      "question_empty": "立てている問いがありません",
+      "close": "閉じる",
+      "pickle": "瓶に漬ける",
+      "pickling": "納めています…",
+      "pickled": "発酵を始めました ✓",
+      "question_link": "問いを結ぶ",
+      "ferment_title": "瓶に納めて発酵させる",
+      "ferment_sub": "時間をおくと、AI からの手紙が届きます",
+      "ferment_action": "納める"
+    },
+    "nav": {
+      "write": "書く",
+      "jar": "瓶",
+      "list": "一覧",
+      "account": "アカウント",
+      "questions": "問い"
+    },
+    "jar": {
+      "title": "瓶に届いた手紙",
+      "empty": "まだ手紙は届いていません",
+      "untitled": "無題の問い",
+      "close": "閉じる",
+      "letter_empty": "この結果にはまだ手紙がありません",
+      "reply": "返事を書く",
+      "section_letter": "手紙",
+      "section_keywords": "言葉",
+      "section_snippets": "抜粋",
+      "unread": "未読",
+      "read": "既読"
+    },
+    "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
+    "list": {
+      "title": "エントリー",
+      "empty": "まだエントリがありません",
+      "untitled": "無題",
+      "account": "アカウント",
+      "search": "本文・タイトルを検索",
+      "search_clear": "検索をクリア",
+      "all": "すべて",
+      "empty_filtered": "該当するエントリーがありません"
+    },
+    "questions": {
+      "title": "問い",
+      "intro": "いま向き合っている問いを、育て、書き換え、終えられます。",
+      "untitled": "無題の問い",
+      "proposed": "Oryzae からの提案",
+      "accept": "受け入れる",
+      "reject": "見送る",
+      "empty": "まだ問いがありません",
+      "add": "新しい問いを立てる",
+      "sheet_add": "新しい問い",
+      "sheet_edit": "問いを編集",
+      "placeholder": "問いを書く",
+      "delete": "この問いを終える",
+      "cancel": "キャンセル",
+      "save": "保存"
+    }
   }
 }

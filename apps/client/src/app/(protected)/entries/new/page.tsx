@@ -2,10 +2,12 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
-import { useAuth } from '@/features/auth/hooks/use-auth';
-import { EntryEditor } from '@/features/entries/components/entry-editor';
-import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
-import { useActiveQuestions } from '@/features/entry-questions/hooks/use-entry-questions';
+import { DeviceView } from '@/components/device-view';
+import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
+import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useActiveQuestions } from '@/features/shared/entry-questions/hooks/use-entry-questions';
+import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
 
 export default function NewEntryPage() {
   const { api, auth, loading } = useAuth();
@@ -40,14 +42,20 @@ export default function NewEntryPage() {
     [runTransition, router],
   );
 
+  // 端末で出し分け（URL は /entries/new のまま）。DeviceView が判定前/未対応を安全に処理。
   return (
-    <EntryEditor
-      api={api}
-      auth={auth}
-      activeQuestions={activeQuestions}
-      initialLinkedIds={initialLinkedIds}
-      onLinkQuestion={handleLinkQuestion}
-      onSaveTransition={handleSaveTransition}
+    <DeviceView
+      sp={<SpEntryEditor api={api} initialQuestionId={questionIdParam} />}
+      pc={
+        <EntryEditor
+          api={api}
+          auth={auth}
+          activeQuestions={activeQuestions}
+          initialLinkedIds={initialLinkedIds}
+          onLinkQuestion={handleLinkQuestion}
+          onSaveTransition={handleSaveTransition}
+        />
+      }
     />
   );
 }
