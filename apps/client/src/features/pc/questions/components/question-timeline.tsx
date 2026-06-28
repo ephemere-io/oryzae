@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import {
   deriveEventType,
@@ -55,14 +56,20 @@ export function QuestionTimeline({
 
   if (questions.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-12 text-[var(--date-color)]">
+      <div
+        className="flex flex-col items-center gap-2 py-12 text-[var(--date-color)]"
+        {...verifyAttrs({ unit: 'QuestionTimeline', count: 0, empty: true })}
+      >
         <p className="text-sm">{t('empty')}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className="flex flex-col gap-2"
+      {...verifyAttrs({ unit: 'QuestionTimeline', count: questions.length, empty: false })}
+    >
       {/* Header */}
       <div className="mb-12 text-center">
         <h2

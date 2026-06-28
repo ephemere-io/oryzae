@@ -1,5 +1,7 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
+
 interface PhotoContent {
   imageUrl: string;
   caption: string;
@@ -11,7 +13,14 @@ interface PhotoCardContentProps {
 
 export function PhotoCardContent({ content }: PhotoCardContentProps) {
   return (
-    <div className="flex h-full flex-col" style={{ padding: '12px 12px 32px' }}>
+    <div
+      className="flex h-full flex-col"
+      style={{ padding: '12px 12px 32px' }}
+      {...verifyAttrs({
+        unit: 'PhotoCardContent',
+        hasCaption: Boolean(content.caption),
+      })}
+    >
       <img
         src={content.imageUrl}
         alt={content.caption || 'Board photo'}
