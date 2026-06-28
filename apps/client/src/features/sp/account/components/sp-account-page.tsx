@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
@@ -40,7 +41,10 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
   const initials = displayName.charAt(0).toUpperCase();
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-[var(--bg)] text-[var(--fg)]">
+    <div
+      {...verifyAttrs({ unit: 'SpAccountPage', hasAvatar: Boolean(user.avatarUrl) })}
+      className="flex h-full flex-col overflow-auto bg-[var(--bg)] text-[var(--fg)]"
+    >
       <header className="px-5 pt-6 pb-2 text-lg font-medium">{t('section.profile')}</header>
 
       {/* ── Profile ── */}
@@ -160,6 +164,7 @@ function NicknameField({ initialValue }: { initialValue: string }) {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            aria-label={t('field.nickname')}
             className="flex-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-2 py-1.5 text-sm outline-none"
           />
           <button

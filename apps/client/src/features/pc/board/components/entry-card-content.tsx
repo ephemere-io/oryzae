@@ -1,5 +1,7 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
+
 interface EntryContent {
   title: string;
   preview: string;
@@ -19,15 +21,24 @@ function formatEntryDate(dateStr: string): string {
 }
 
 export function EntryCardContent({ content }: EntryCardContentProps) {
+  const formattedDate = formatEntryDate(content.createdAt);
   return (
-    <div className="flex h-full flex-col overflow-hidden p-6">
+    <div
+      className="flex h-full flex-col overflow-hidden p-6"
+      {...verifyAttrs({
+        unit: 'EntryCardContent',
+        hasTitle: Boolean(content.title),
+        createdAt: content.createdAt,
+        formattedDate,
+      })}
+    >
       {/* Header with border separator */}
       <div className="mb-2 flex items-center justify-between pb-2">
         <span
           className="text-[9px] uppercase tracking-[0.2em]"
           style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
         >
-          Entry {formatEntryDate(content.createdAt)}
+          Entry {formattedDate}
         </span>
         <span
           className="inline-block h-1 w-1 rounded-full"

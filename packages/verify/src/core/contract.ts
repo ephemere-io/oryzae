@@ -17,7 +17,10 @@ export function verifyAttrs(
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(attrs)) {
     if (value === null || value === undefined) continue;
-    out[`${VERIFY_PREFIX}${key}`] = String(value);
+    // camelCase → kebab。DOM は属性名を小文字化するので、camelCase のままだと
+    // data-verify-inFlight → data-verify-inflight に潰れて読み戻せない。kebab で往復させる。
+    const kebab = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+    out[`${VERIFY_PREFIX}${kebab}`] = String(value);
   }
   return out;
 }
@@ -39,7 +42,10 @@ function collect(el: HTMLElement): Record<string, string> {
   const out: Record<string, string> = {};
   for (const attr of Array.from(el.attributes)) {
     if (attr.name.startsWith(VERIFY_PREFIX)) {
-      out[attr.name.slice(VERIFY_PREFIX.length)] = attr.value;
+      // kebab → camelCase（verifyAttrs の逆変換）。data-verify-in-flight → inFlight。
+      const raw = attr.name.slice(VERIFY_PREFIX.length);
+      const camel = raw.replace(/-([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+      out[camel] = attr.value;
     }
   }
   return out;

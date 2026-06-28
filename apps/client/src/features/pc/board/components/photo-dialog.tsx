@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
 
@@ -68,6 +69,8 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
 
   if (!open) return null;
 
+  const canSubmit = Boolean(selectedFile) && !uploading;
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -117,6 +120,12 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
 
   return (
     <div
+      {...verifyAttrs({
+        unit: 'PhotoDialog',
+        uploading,
+        hasPreview: Boolean(preview),
+        canSubmit,
+      })}
       role="dialog"
       aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
@@ -179,6 +188,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           ref={fileRef}
           type="file"
           accept="image/*"
+          aria-label={t('click_to_select')}
           onChange={handleFileChange}
           className="hidden"
         />
@@ -189,6 +199,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           onChange={(e) => setCaption(e.target.value)}
           maxLength={20}
           disabled={uploading}
+          aria-label={t('caption_placeholder')}
           placeholder={t('caption_placeholder')}
           className="mb-4 w-full rounded-md border px-3 py-2.5 text-left text-sm outline-none disabled:opacity-50"
           style={{

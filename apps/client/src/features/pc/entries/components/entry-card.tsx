@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
@@ -69,6 +70,13 @@ export function EntryCard({
     <div
       className="group relative border-b border-[var(--border-subtle)] transition-colors hover:rounded hover:bg-[rgba(200,180,140,0.04)]"
       style={{ margin: '0 -12px' }}
+      {...verifyAttrs({
+        unit: 'EntryCard',
+        charCount,
+        hasQuestions: questionText.length > 0,
+        deletable: Boolean(onDeleteClick),
+        hasSearch: Boolean(searchQuery),
+      })}
     >
       <Link href={`/entries/${id}`} className="block" style={{ padding: '16px 44px 16px 12px' }}>
         {/* Date + linked question(s) */}

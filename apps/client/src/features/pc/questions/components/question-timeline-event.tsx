@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 type EventType = 'active' | 'proposed' | 'archived';
@@ -64,6 +65,7 @@ export function QuestionTimelineEvent({
   return (
     <div
       className={`rounded-[10px] border-l-[3px] ${styles.borderColor} bg-[rgba(200,180,140,0.08)] px-5 py-3.5`}
+      {...verifyAttrs({ unit: 'QuestionTimelineEvent', eventType })}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">

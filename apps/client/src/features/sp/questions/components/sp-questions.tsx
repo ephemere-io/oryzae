@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
@@ -79,6 +80,15 @@ export function SpQuestions({
 
   return (
     <div
+      {...verifyAttrs({
+        unit: 'SpQuestions',
+        loading,
+        sheetMode: sheet ? sheet.mode : 'none',
+        submitting,
+        draftEmpty: !draft.trim(),
+        proposedCount: proposed.length,
+        activeCount: active.length,
+      })}
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
       style={{ fontFamily: 'var(--ob-font-serif)' }}
     >
@@ -205,6 +215,7 @@ export function SpQuestions({
             <textarea
               // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件
               autoFocus
+              aria-label={t('placeholder')}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               maxLength={64}

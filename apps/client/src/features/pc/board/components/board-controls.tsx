@@ -1,5 +1,7 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
+
 interface BoardControlsProps {
   viewType: 'daily' | 'weekly';
   onViewTypeChange: (viewType: 'daily' | 'weekly') => void;
@@ -20,6 +22,7 @@ export function BoardControls({
     <div
       className="absolute right-6 top-5 z-10 flex items-center gap-2"
       style={{ fontFamily: 'Inter, sans-serif' }}
+      {...verifyAttrs({ unit: 'BoardControls', viewType })}
     >
       <button
         type="button"

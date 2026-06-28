@@ -185,3 +185,41 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
             }
+
+  # 「見た目の実装にはテストを」を CI で強制する硬いゲート。
+  # PR で *新規追加* された client の feature コンポーネントに、隣接 *.verify.tsx が無く、
+  # かつ `// verify-exempt: <理由>` も無ければ落とす。リネーム(#363 のような移設)は -M で除外。
+  # 既存の未カバー部品は「新規追加」ではないので素通り（段階導入を壊さない）。
+  verify-coverage-gate:
+    name: Verify Coverage Gate (new components need *.verify)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Require *.verify.tsx (or // verify-exempt) for newly-added components
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          MERGE_BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          NEW=$(git diff --diff-filter=A -M --name-only "$MERGE_BASE" HEAD -- 'apps/client/src/features' \
+            | grep -E 'src/features/.*/components/.*\.tsx$' \
+            | grep -vE '\.(verify|test)\.tsx$' || true)
+          fail=0
+          for f in $NEW; do
+            sib="${f%.tsx}.verify.tsx"
+            if [ -f "$sib" ]; then
+              echo "✓ $f"
+            elif grep -q "verify-exempt" "$f"; then
+              echo "→ exempt: $f"
+            else
+              echo "::error file=$f::新規コンポーネントに $sib がありません。検証スペックを追加するか、コンポーネント先頭に '// verify-exempt: <理由>' を記載してください（docs/verify-harness-rollout.md §3）。"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "Verify coverage gate failed."
+            exit 1
+          fi
+          echo "Verify coverage gate passed."

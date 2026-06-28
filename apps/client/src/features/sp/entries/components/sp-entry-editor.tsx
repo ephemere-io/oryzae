@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
@@ -107,6 +108,14 @@ export function SpEntryEditor({
     <div
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
       style={{ fontFamily: 'var(--ob-font-serif)' }}
+      {...verifyAttrs({
+        unit: 'SpEntryEditor',
+        hasBody,
+        dirty,
+        hasEntry: !!entryId,
+        sheetOpen,
+        pickling,
+      })}
     >
       {/* 保存ステータス（上部・常設）。指摘: 自動保存できたか分かるように。 */}
       <header className="flex items-center justify-end px-5 pt-3 pb-1" style={{ minHeight: 28 }}>
@@ -134,6 +143,7 @@ export function SpEntryEditor({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder={t('title_placeholder')}
+        aria-label={t('title_placeholder')}
         className="w-full bg-transparent px-5 pt-2 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
       />
 
@@ -166,6 +176,7 @@ export function SpEntryEditor({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder={t('body_placeholder')}
+        aria-label={t('body_placeholder')}
         className="mt-6 w-full flex-1 resize-none bg-transparent px-5 pb-4 text-base outline-none placeholder:opacity-30"
         style={{ lineHeight: 2 }}
       />
