@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { useAuth } from '@/features/auth/hooks/use-auth';
-import { EntryList, type FilterableQuestion } from '@/features/entries/components/entry-list';
-import { useQuestions } from '@/features/questions/hooks/use-questions';
+import { DeviceView } from '@/components/device-view';
+import { EntryList, type FilterableQuestion } from '@/features/pc/entries/components/entry-list';
+import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
+import { SpEntryList } from '@/features/sp/entries/components/sp-entry-list';
 
 export default function EntriesPage() {
   const { api, loading } = useAuth();
@@ -24,27 +26,32 @@ export default function EntriesPage() {
   );
 
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="mx-auto w-full max-w-[680px] flex-1 px-6 pt-10 pb-20">
-        {/* Header: ALL ENTRIES left, + NEW ENTRY right */}
-        <div className="mb-8 flex items-center justify-between">
-          <h2
-            className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--date-color)]"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            All Entries
-          </h2>
-          <Link
-            href="/entries/new"
-            className="rounded-full border border-[var(--accent)] bg-transparent px-5 py-2 text-xs font-medium uppercase tracking-[0.1em] text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white"
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            + New Entry
-          </Link>
-        </div>
+    <DeviceView
+      sp={<SpEntryList api={api} />}
+      pc={
+        <div className="flex min-h-full flex-col">
+          <div className="mx-auto w-full max-w-[680px] flex-1 px-6 pt-10 pb-20">
+            {/* Header: ALL ENTRIES left, + NEW ENTRY right */}
+            <div className="mb-8 flex items-center justify-between">
+              <h2
+                className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--date-color)]"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                All Entries
+              </h2>
+              <Link
+                href="/entries/new"
+                className="rounded-full border border-[var(--accent)] bg-transparent px-5 py-2 text-xs font-medium uppercase tracking-[0.1em] text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                + New Entry
+              </Link>
+            </div>
 
-        <EntryList api={api} authLoading={loading} availableQuestions={availableQuestions} />
-      </div>
-    </div>
+            <EntryList api={api} authLoading={loading} availableQuestions={availableQuestions} />
+          </div>
+        </div>
+      }
+    />
   );
 }

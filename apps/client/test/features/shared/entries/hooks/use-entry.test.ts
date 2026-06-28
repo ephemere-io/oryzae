@@ -1,0 +1,163 @@
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useEntry, useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
+import type { ApiClient } from '@/lib/api';
+import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
+
+function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
+  return {
+    baseUrl: '',
+    headers: {},
+    fetch: fetchImpl,
+  };
+}
+
+function mockResponse(ok: boolean, body: unknown): Response {
+  return {
+    ok,
+    json: () => Promise.resolve(body),
+    status: ok ? 200 : 400,
+  } as Response;
+}
+
+describe('useEntry', () => {
+  let apiFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiFetch = vi.fn();
+  });
+
+  it('fetches entry by id', async () => {
+    const entry = {
+      id: 'e1',
+      content: 'hello',
+      effects: null,
+      createdAt: '2024-01-01',
+      updatedAt: '2024-01-01',
+    };
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { entry }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entry).toEqual(entry);
+    expect(apiFetch).toHaveBeenCalledWith('/api/v1/entries/e1');
+  });
+
+  it('sets loading to false after fetch', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entry).toBeNull();
+  });
+});
+
+describe('useSaveEntry', () => {
+  let apiFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiFetch = vi.fn();
+  });
+
+  it('returns entry id on successful create', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
+
+    let saveResult: string | null = null;
+    await act(async () => {
+      saveResult = await result.current.save('my content');
+    });
+
+    expect(saveResult).toBe('new-id');
+    expect(result.current.error).toBe('');
+  });
+
+  it('returns null and sets error on failure', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
+
+    let saveResult: string | null = null;
+    await act(async () => {
+      saveResult = await result.current.save('my content');
+    });
+
+    expect(saveResult).toBeNull();
+    expect(result.current.error).toBe('作成に失敗しました');
+  });
+
+  it('returns entry id on successful update', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
+
+    let saveResult: string | null = null;
+    await act(async () => {
+      saveResult = await result.current.save('updated content', 'existing-id');
+    });
+
+    expect(saveResult).toBe('existing-id');
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/v1/entries/existing-id',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('fermentationEnabled 未指定時はペイロードに含めない', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
+
+    await act(async () => {
+      await result.current.save('content');
+    });
+
+    const call = apiFetch.mock.calls[0];
+    const bodyStr: string = call[1].body;
+    const body = JSON.parse(bodyStr) as Record<string, unknown>;
+    expect(body.fermentationEnabled).toBeUndefined();
+  });
+
+  it('fermentationEnabled=true を指定するとペイロードに含まれる', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
+
+    await act(async () => {
+      await result.current.save('content', undefined, { fermentationEnabled: true });
+    });
+
+    const call = apiFetch.mock.calls[0];
+    const bodyStr: string = call[1].body;
+    const body = JSON.parse(bodyStr) as Record<string, unknown>;
+    expect(body.fermentationEnabled).toBe(true);
+  });
+});
