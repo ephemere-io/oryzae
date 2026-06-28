@@ -94,16 +94,25 @@ describe('useEntries', () => {
   });
 
   it('supports cursor-based pagination (loadMore)', async () => {
+    // カーソルは最後の entry の createdAt を渡す（サーバーの created_at 比較に対応）。
+    // id ではなく createdAt なので、各 entry に実在しうる日時を持たせる。
     const page1 = Array.from({ length: 20 }, (_, i) => ({
       id: `e${i}`,
       userId: 'u1',
       content: `entry ${i}`,
       mediaUrls: [],
-      createdAt: '',
+      createdAt: `2026-01-${String(i + 1).padStart(2, '0')}`,
       updatedAt: '',
     }));
     const page2 = [
-      { id: 'e20', userId: 'u1', content: 'entry 20', mediaUrls: [], createdAt: '', updatedAt: '' },
+      {
+        id: 'e20',
+        userId: 'u1',
+        content: 'entry 20',
+        mediaUrls: [],
+        createdAt: '2026-01-21',
+        updatedAt: '',
+      },
     ];
 
     apiFetch.mockResolvedValueOnce(mockResponse(true, page1));
@@ -130,7 +139,8 @@ describe('useEntries', () => {
 
     expect(result.current.entries).toHaveLength(21);
     expect(result.current.hasMore).toBe(false);
-    expect(apiFetch.mock.calls[1][0]).toContain('cursor=e19');
+    // 旧バグ: cursor=e19（id）。修正後は最後の entry の createdAt を渡す。
+    expect(apiFetch.mock.calls[1][0]).toContain('cursor=2026-01-20');
   });
 
   it('sends q param when search is provided', async () => {
@@ -319,6 +329,85 @@ describe('useEntries', () => {
 
     expect(result.current.entries).toHaveLength(1);
     expect(result.current.entries[0].id).toBe('2');
+  });
+
+  it('ソート: order 未指定なら order=newest を送る（既定）', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, []));
+    const api = createMockApi(apiFetch);
+
+    renderHook(() => useEntries(api));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    expect(apiFetch.mock.calls[0][0]).toContain('order=newest');
+  });
+
+  it('ソート: order=oldest を指定したら URL に含める', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, []));
+    const api = createMockApi(apiFetch);
+
+    renderHook(() => useEntries(api, undefined, undefined, 'oldest'));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledTimes(1);
+    });
+
+    expect(apiFetch.mock.calls[0][0]).toContain('order=oldest');
+  });
+
+  it('ソート: order が変わったらエントリと cursor をリセットして取り直す', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        {
+          id: '1',
+          userId: 'u1',
+          content: 'newest first',
+          mediaUrls: [],
+          createdAt: '2026-01-02',
+          updatedAt: '',
+        },
+      ]),
+    );
+    const api = createMockApi(apiFetch);
+
+    // initialProps を union 型で明示し、renderHook の Props 推論を 'newest'|'oldest' に広げる
+    // （リテラル narrowing で rerender('oldest') が型エラーになるのを防ぐ）。
+    const initialProps: { order: 'newest' | 'oldest' } = { order: 'newest' };
+    const { result, rerender } = renderHook(
+      ({ order }) => useEntries(api, undefined, undefined, order),
+      { initialProps },
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries[0].id).toBe('1');
+
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        {
+          id: '2',
+          userId: 'u1',
+          content: 'oldest first',
+          mediaUrls: [],
+          createdAt: '2026-01-01',
+          updatedAt: '',
+        },
+      ]),
+    );
+
+    rerender({ order: 'oldest' });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entries).toHaveLength(1);
+    expect(result.current.entries[0].id).toBe('2');
+    expect(apiFetch.mock.calls[1][0]).toContain('order=oldest');
   });
 
   it('Issue #323: linkedQuestions 欠落時は空配列にフォールバックする', async () => {
