@@ -24,6 +24,7 @@ interface Props {
   initialQuestionId?: string | null;
   initialEntryId?: string;
   initialContent?: string;
+  persistDraft?: boolean;
 }
 
 // 解決しない fetch を持つ ApiClient（pickle 中状態を保持する。as 不要で型を満たす）。
@@ -43,12 +44,12 @@ registerUnit<Props>({
     {
       id: 'empty',
       description: '新規・本文空（保存ステータスは非表示、発酵 CTA も出ない）',
-      props: { api: null },
+      props: { api: null, persistDraft: false },
     },
     {
       id: 'editing',
       description: '本文を入力すると編集中（dirty=true・hasBody=true）になる',
-      props: { api: null },
+      props: { api: null, persistDraft: false },
       act: async (ctx) => {
         await ctx.type('textarea', 'いま感じていること');
         await ctx.wait(16);
@@ -61,12 +62,13 @@ registerUnit<Props>({
         api: null,
         initialEntryId: 'entry-1',
         initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
       },
     },
     {
       id: 'sheet-open',
       description: '問いチップを押すと問い選択シートが開く（sheetOpen=true）',
-      props: { api: null },
+      props: { api: null, persistDraft: false },
       act: async (ctx) => {
         await ctx.click('button');
         await ctx.wait(16);
@@ -76,7 +78,7 @@ registerUnit<Props>({
       id: 'whitespace-only',
       probe: true,
       description: 'Probe: 空白だけの本文は hasBody=false 扱い（保存ステータスを出さない）',
-      props: { api: null },
+      props: { api: null, persistDraft: false },
       act: async (ctx) => {
         await ctx.type('textarea', '     ');
         await ctx.wait(16);
@@ -90,6 +92,7 @@ registerUnit<Props>({
         api: neverResolveApi,
         initialEntryId: 'entry-1',
         initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
       },
       act: async (ctx) => {
         await ctx.click('.mx-4 button');
