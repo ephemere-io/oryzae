@@ -771,7 +771,8 @@
       "pickled": "已开始发酵 ✓",
       "question_link": "关联提问",
       "ferment_title": "封入瓶中发酵",
-      "ferment_sub": "静待片刻，AI 的来信将会送达"
+      "ferment_sub": "静待片刻，AI 的来信将会送达",
+      "delete": "删除"
     },
     "nav": {
       "write": "书写",
@@ -805,7 +806,8 @@
       "empty_filtered": "没有匹配的条目",
       "sort_label": "排序",
       "sort_newest": "最新优先",
-      "sort_oldest": "最早优先"
+      "sort_oldest": "最早优先",
+      "delete": "删除"
     },
     "questions": {
       "title": "提问",

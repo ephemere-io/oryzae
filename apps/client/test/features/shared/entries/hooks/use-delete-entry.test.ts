@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useDeleteEntry } from '@/features/pc/entries/hooks/use-delete-entry';
+import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import type { ApiClient } from '@/lib/api';
 import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
 
