@@ -25,7 +25,7 @@ export default function FermentationDetailPage() {
     return (
       <div className="space-y-4">
         <Link href="/fermentations">
-          <Button variant="ghost" size="xs">
+          <Button variant="ghost" size="xs" className="-ml-1.5">
             <ArrowLeft className="mr-1 h-3 w-3" />
             Fermentations
           </Button>
@@ -39,12 +39,14 @@ export default function FermentationDetailPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      <Link href="/fermentations">
-        <Button variant="ghost" size="xs" className="px-0 hover:bg-transparent">
-          <ArrowLeft className="mr-1 h-3 w-3" />
-          Fermentations
-        </Button>
-      </Link>
+      <div className="pb-3">
+        <Link href="/fermentations">
+          <Button variant="ghost" size="xs" className="-ml-1.5">
+            <ArrowLeft className="mr-1 h-3 w-3" />
+            Fermentations
+          </Button>
+        </Link>
+      </div>
 
       <FermentationDetailHeader data={data} onRetry={retryFermentation} />
 

@@ -6,6 +6,7 @@ import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositor
 import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
+import { computeCostFromTokens } from '../../../shared/infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { FireFermentationUsecase } from '../../application/usecases/fire-fermentation.usecase.js';
 import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
@@ -18,7 +19,6 @@ import {
   createSupabaseAnyEmailResolver,
   createSupabaseVerifiedEmailResolver,
 } from '../../infrastructure/email/supabase-verified-email-resolver.js';
-import { computeCostFromTokens } from '../../infrastructure/llm/claude-pricing.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
