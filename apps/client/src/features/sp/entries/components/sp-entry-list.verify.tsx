@@ -137,6 +137,17 @@ registerUnit<Props>({
         await ctx.wait(50);
       },
     },
+    {
+      id: 'delete-open',
+      probe: true,
+      description: 'Probe: 行の ⋯（削除）を押すと削除確認シートが開く（deleteOpen=true）',
+      props: { api: populatedApi },
+      act: async (ctx) => {
+        await ctx.wait(50);
+        ctx.click('button[aria-label="削除"]');
+        await ctx.wait(16);
+      },
+    },
   ],
   invariants: [
     {
@@ -236,6 +247,38 @@ registerUnit<Props>({
           return `トグル後 order='oldest' のはずだが "${contract.order}"`;
         const label = root.querySelector('#sp-entries-sort-toggle')?.textContent ?? '';
         return label.includes('古い順') || 'トグル後にラベルが「古い順」になっていない';
+      },
+    },
+    {
+      id: 'delete-sheet-iff-open',
+      description: '削除確認シート（fixed オーバーレイ）は deleteOpen=true のときだけ描画される',
+      check: ({ root, contract }) => {
+        const hasSheet = Boolean(root.querySelector('.fixed'));
+        const expectOpen = contract.deleteOpen === 'true';
+        return (
+          hasSheet === expectOpen ||
+          `delete sheet present=${hasSheet} だが contract.deleteOpen="${contract.deleteOpen}"`
+        );
+      },
+    },
+    {
+      id: 'delete-closed-by-default',
+      description: '通常状態（ソート/検索など）では削除シートは閉じている',
+      onlyFixtures: ['loading', 'empty', 'populated', 'search-typed', 'sort-toggled'],
+      check: ({ contract }) =>
+        contract.deleteOpen === 'false' ||
+        `初期は deleteOpen=false のはずだが "${contract.deleteOpen}"`,
+    },
+    {
+      id: 'delete-open-after-kebab',
+      description: '行の ⋯ を押すと deleteOpen=true になり確認シートが現れる',
+      onlyFixtures: ['delete-open'],
+      check: ({ root, contract }) => {
+        const hasSheet = Boolean(root.querySelector('.fixed'));
+        return (
+          (contract.deleteOpen === 'true' && hasSheet) ||
+          `⋯ 押下後 deleteOpen=true & シート表示のはずだが deleteOpen=${contract.deleteOpen}, sheet=${hasSheet}`
+        );
       },
     },
   ],

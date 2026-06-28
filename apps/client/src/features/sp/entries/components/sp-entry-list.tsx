@@ -4,8 +4,10 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { type EntryListOrder, useEntries } from '@/features/shared/entries/hooks/use-entries';
 import type { ApiClient } from '@/lib/api';
+import { SpConfirmSheet } from './sp-confirm-sheet';
 
 interface SpEntryListProps {
   api: ApiClient | null;
@@ -34,6 +36,7 @@ function formatDate(iso: string): string {
  */
 export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) {
   const t = useTranslations('sp.list');
+  const tDelete = useTranslations('entries.delete_modal');
   const router = useRouter();
 
   const [searchInput, setSearchInput] = useState('');
@@ -41,6 +44,8 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
   const [questionFilter, setQuestionFilter] = useState('');
   const questionId = questionFilter || undefined;
   const [order, setOrder] = useState<EntryListOrder>('newest');
+  // 削除対象（行の ⋯ で選んだエントリ）。null なら確認シートは閉じている。
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // 入力を 300ms デバウンスして検索する（PC の useDebounce 相当を内製）。
   useEffect(() => {
@@ -50,9 +55,18 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
 
   const activeQuestions = availableQuestions;
   // Issue #362: useEntries は optimistic 化で authLoading 引数を撤去済み（api, search?, questionId?）。
-  const { entries, loading } = useEntries(api, search, questionId, order);
+  const { entries, loading, removeEntry } = useEntries(api, search, questionId, order);
+  const { deleteEntry, deleting } = useDeleteEntry(api);
 
   const isFiltering = !!search || !!questionId;
+
+  // 確認シートで「削除する」→ API 削除が成功したら一覧から楽観的に取り除く。
+  async function handleDelete() {
+    if (!deleteId) return;
+    const ok = await deleteEntry(deleteId);
+    if (ok) removeEntry(deleteId);
+    setDeleteId(null);
+  }
 
   return (
     <div
@@ -63,6 +77,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
         count: entries.length,
         hasQuestions: activeQuestions.length > 0,
         order,
+        deleteOpen: deleteId !== null,
       })}
     >
       <header className="flex items-center justify-between px-5 pt-6 pb-3">
@@ -181,11 +196,15 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
             const title = firstLine(entry.content) || t('untitled');
             const q = entry.linkedQuestions[0];
             return (
-              <li key={entry.id}>
+              <li
+                key={entry.id}
+                className="flex items-center gap-1 border-b border-[color-mix(in_srgb,var(--fg)_6%,transparent)]"
+              >
+                {/* タップで詳細へ。削除ボタンと入れ子にならないよう行を flex に分割。 */}
                 <button
                   type="button"
                   onClick={() => router.push(`/entries/${entry.id}`)}
-                  className="w-full border-b border-[color-mix(in_srgb,var(--fg)_6%,transparent)] py-4 text-left"
+                  className="min-w-0 flex-1 py-4 text-left"
                 >
                   <span
                     className="block truncate text-[15px] font-medium"
@@ -202,11 +221,43 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
                     ) : null}
                   </span>
                 </button>
+                {/* 行の削除トリガー（⋯）→ 確認シートを開く */}
+                <button
+                  type="button"
+                  onClick={() => setDeleteId(entry.id)}
+                  aria-label={t('delete')}
+                  className="shrink-0 p-2 text-[var(--date-color)]"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <title>more</title>
+                    <circle cx="12" cy="5" r="1.6" />
+                    <circle cx="12" cy="12" r="1.6" />
+                    <circle cx="12" cy="19" r="1.6" />
+                  </svg>
+                </button>
               </li>
             );
           })}
         </ul>
       )}
+
+      <SpConfirmSheet
+        open={deleteId !== null}
+        title={tDelete('heading')}
+        message={tDelete('body')}
+        confirmLabel={tDelete('confirm')}
+        cancelLabel={tDelete('cancel')}
+        destructive
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }
