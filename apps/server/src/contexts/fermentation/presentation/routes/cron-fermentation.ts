@@ -6,6 +6,10 @@ import { SupabaseQuestionTransactionRepository } from '../../../question/infrast
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { createCronAuthMiddleware } from '../../../shared/presentation/middleware/cron-auth.js';
+import {
+  type RetryFailedFermentationsResult,
+  RetryFailedFermentationsUsecase,
+} from '../../application/usecases/retry-failed-fermentations.usecase.js';
 import { ScheduledFermentationUsecase } from '../../application/usecases/scheduled-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
 import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
@@ -84,17 +88,56 @@ export const cronFermentation = new Hono()
       },
     );
 
+    // issue #353: sweep 後に「前回 cron で完了しなかった発酵」を1回だけリトライする。
+    const retryUsecase = new RetryFailedFermentationsUsecase(
+      fermentationRepo,
+      entryRepo,
+      questionTransactionRepo,
+      localeResolver,
+      llmGateway,
+      generateId,
+      (userId, titles, language) =>
+        digestUsecase.execute({ userId, questionTitles: titles, language }),
+    );
+
     // issue #268 以降、発火条件はユーザー単位の状態 (lastRunAt + 文字数 + ランダム X 時間)
     // で決まるため、cron は「現時刻」を渡すだけで良い (旧来の dateKey は不要)。
+    // issue #353: sweep とリトライで同じ now を共有する。リトライの「今 run 除外」窓
+    // (beforeIso=now) が sweep 後にずれて自分の失敗を拾わないようにするため。
+    const now = new Date();
     try {
-      const result = await usecase.execute(new Date());
+      const result = await usecase.execute(now);
+
+      // sweep 直後に未完了分をリトライ。リトライ段の失敗は sweep の結果を握り潰さない
+      // よう個別に握り、summary に retryError として添える。
+      let retry: RetryFailedFermentationsResult | null = null;
+      let retryError: string | null = null;
+      try {
+        retry = await retryUsecase.execute(now);
+      } catch (error) {
+        retryError = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[cron-fermentation] retry phase failed', { error: retryError });
+      }
 
       // 発酵そのものの失敗 (LLM エラー等) は ERROR、メール送信失敗だけなら WARNING。
       // 「failed: N」だけでは原因が分からず retire 障害が 12 日埋もれたため、
       // errors を集約した「失敗理由」を必ず添える (summarizeFailureReasons で
       // 同一理由を畳み、Discord の field 上限内に収める)。
-      const hasFermentationFailures = result.failed > 0 || result.errors.length > 0;
-      const hasFailures = hasFermentationFailures || result.emailFailures.length > 0;
+      // issue #353: リトライ段の失敗・取りこぼし(truncated)・retryError も失敗扱いに含める。
+      // skipped は「ユーザーがエントリ/問いを消した」等の良性ケースなので色付けには含めない
+      // （含めると削除があっただけで「一部失敗」アラートが鳴る）。件数は summary には出す。
+      const retryHasFailures =
+        retry !== null && (retry.failed > 0 || retry.errors.length > 0 || retry.truncated > 0);
+      const hasFermentationFailures =
+        result.failed > 0 ||
+        result.errors.length > 0 ||
+        retryError !== null ||
+        (retry !== null && (retry.failed > 0 || retry.errors.length > 0));
+      const hasFailures =
+        hasFermentationFailures ||
+        result.emailFailures.length > 0 ||
+        retryHasFailures ||
+        (retry !== null && retry.emailFailures.length > 0);
 
       const fields = [
         { name: 'totalUsers', value: String(result.totalUsers), inline: true },
@@ -110,6 +153,27 @@ export const cronFermentation = new Hono()
         fields.push({ name: '失敗理由', value: failureReasons, inline: false });
       }
 
+      // issue #353: リトライ段の結果を summary に添える。候補が無い日はノイズになるので
+      // 候補があった日 or retryError があった日のみ出す。
+      if (retry !== null && retry.totalCandidates > 0) {
+        fields.push({
+          name: 'リトライ',
+          value: `候補:${retry.totalCandidates} 成功:${retry.succeeded} 失敗:${retry.failed} skip:${retry.skipped} 打切:${retry.truncated}`,
+          inline: false,
+        });
+        const retryFailureReasons = summarizeFailureReasons(retry.errors);
+        if (retryFailureReasons) {
+          fields.push({ name: 'リトライ失敗理由', value: retryFailureReasons, inline: false });
+        }
+      }
+      if (retryError) {
+        fields.push({
+          name: 'リトライ実行エラー',
+          value: retryError.slice(0, 1000),
+          inline: false,
+        });
+      }
+
       await notifyDiscord({
         title: hasFailures ? '発酵 cron: 完了（一部失敗）' : '発酵 cron: 完了',
         color: hasFermentationFailures
@@ -123,6 +187,8 @@ export const cronFermentation = new Hono()
       return c.json({
         message: 'Scheduled fermentation completed',
         ...result,
+        retry: retry ?? undefined,
+        retryError: retryError ?? undefined,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
