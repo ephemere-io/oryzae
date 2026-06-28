@@ -1,9 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { headers } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { PostHogProvider } from '@/components/posthog-provider';
+import { AuthProvider } from '@/lib/auth-context';
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
+import { type Device, isDevice } from '@/lib/device';
+import { DeviceProvider } from '@/lib/use-device';
 import './globals.css';
 
 const geistSans = Geist({
@@ -61,6 +65,9 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
   const messages = await getMessages();
+  // middleware が解決した端末（device-pref ?? UA）。初回訪問でも SSR で端末別に描画できる。
+  const xDevice = (await headers()).get('x-device');
+  const device: Device = isDevice(xDevice) ? xDevice : 'pc';
 
   return (
     <html
@@ -76,7 +83,11 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--fg)]">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <PostHogProvider>{children}</PostHogProvider>
+          <PostHogProvider>
+            <AuthProvider>
+              <DeviceProvider initialDevice={device}>{children}</DeviceProvider>
+            </AuthProvider>
+          </PostHogProvider>
         </NextIntlClientProvider>
       </body>
     </html>

@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { AuthProvider, useAuth } from '@/lib/auth-context';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -31,7 +31,7 @@ describe('useAuth', () => {
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     let loginResult: string | null = null;
     await act(async () => {
@@ -47,7 +47,7 @@ describe('useAuth', () => {
   it('login returns error string on failure', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(false, { error: 'Invalid credentials' }));
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     let loginResult: string | null = null;
     await act(async () => {
@@ -70,7 +70,7 @@ describe('useAuth', () => {
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     let signupResult: string | null = null;
     await act(async () => {
@@ -86,7 +86,7 @@ describe('useAuth', () => {
   it('signup returns error string on failure', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(false, { error: 'Email taken' }));
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     let signupResult: string | null = null;
     await act(async () => {
@@ -112,7 +112,7 @@ describe('useAuth', () => {
       }),
     );
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     await act(async () => {
       await result.current.signup('enuser', 'c@d.com', 'pass', 'en');
@@ -138,7 +138,7 @@ describe('useAuth', () => {
       }),
     );
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     await act(async () => {
       await result.current.signup('defaultuser', 'd@e.com', 'pass');
@@ -161,7 +161,7 @@ describe('useAuth', () => {
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, { user, session }));
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     await act(async () => {
       await result.current.login('a@b.com', 'pass');
@@ -195,7 +195,7 @@ describe('useAuth', () => {
       }),
     );
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -210,7 +210,7 @@ describe('useAuth', () => {
 
     mockFetch.mockResolvedValueOnce(mockResponse(false, {}));
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

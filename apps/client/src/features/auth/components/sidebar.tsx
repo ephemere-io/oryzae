@@ -4,7 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useAuth } from '@/lib/auth-context';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
 import { useUnread } from '@/lib/unread-context';

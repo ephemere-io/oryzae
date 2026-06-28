@@ -19,3 +19,11 @@ export function detectDeviceFromUA(userAgent: string | null): Device {
   if (!userAgent) return 'pc';
   return /Mobile|Android|iPhone|iPod|Windows Phone/i.test(userAgent) ? 'sp' : 'pc';
 }
+
+/**
+ * 端末の最終解決。手動切替(device-pref)が妥当ならそれを優先し、無ければ UA 判定。
+ * middleware から呼ぶ純関数として切り出し、precedence をユニットテスト可能にする。
+ */
+export function resolveDevice(pref: string | undefined | null, userAgent: string | null): Device {
+  return isDevice(pref) ? pref : detectDeviceFromUA(userAgent);
+}
