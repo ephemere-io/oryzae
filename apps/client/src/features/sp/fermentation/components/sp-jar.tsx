@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
@@ -48,6 +49,12 @@ export function SpJar({ api }: SpJarProps) {
     <div
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
       style={{ fontFamily: 'var(--ob-font-serif)' }}
+      {...verifyAttrs({
+        unit: 'SpJar',
+        loading,
+        letterCount: letters.length,
+        open: open !== null,
+      })}
     >
       <header className="px-5 pt-6 pb-3 text-lg font-medium">{t('title')}</header>
 

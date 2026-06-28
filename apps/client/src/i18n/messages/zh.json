@@ -447,6 +447,7 @@
   },
   "fermentation": {
     "detail": {
+      "close_aria": "关闭详情",
       "header_keyword": "Yeast 生成的关键词",
       "header_snippet": "Oryzae 摘选的句子",
       "header_letter": "L.A.B. 的观察记录",

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
@@ -332,8 +333,21 @@ export function JarView({
     resolveCirclePos({ question: q, index: i, override: overrides.questions[q.id] }),
   );
 
+  const addAvailable = !zoomedId && questions.length < 3 && Boolean(onAddQuestion);
+
   return (
-    <div ref={jarContainerRef} className="relative h-full w-full overflow-hidden bg-[var(--bg)]">
+    <div
+      ref={jarContainerRef}
+      {...verifyAttrs({
+        unit: 'JarView',
+        questionCount: visibleQuestions.length,
+        zoomed: zoomedId !== null,
+        editOpen: editingQuestion !== null,
+        addOpen: showAddModal,
+        addAvailable,
+      })}
+      className="relative h-full w-full overflow-hidden bg-[var(--bg)]"
+    >
       {/* Keyframes */}
       <style>{`
         @keyframes j2-float-1 {
@@ -666,7 +680,7 @@ export function JarView({
               </button>
             ))}
           </div>
-          {questions.length < 3 && onAddQuestion && (
+          {addAvailable && (
             <button
               type="button"
               onClick={() => {
@@ -704,6 +718,7 @@ export function JarView({
               ref={editInputRef}
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
+              aria-label={t('jar.edit_heading')}
               maxLength={64}
               rows={3}
               className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-transparent p-3 text-[13px] text-[var(--fg)] outline-none"
@@ -782,6 +797,7 @@ export function JarView({
               ref={addInputRef}
               value={newQuestionText}
               onChange={(e) => setNewQuestionText(e.target.value)}
+              aria-label={t('jar.add_heading')}
               placeholder={t('jar.add_placeholder')}
               rows={3}
               className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-transparent p-3 text-[13px] text-[var(--fg)] outline-none"

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
@@ -121,6 +122,12 @@ export function BoardView({ api }: BoardViewProps) {
 
   return (
     <div
+      {...verifyAttrs({
+        unit: 'BoardView',
+        viewType,
+        snippetOpen: snippetDialog.open,
+        photoOpen: photoDialogOpen,
+      })}
       role="application"
       aria-label={t('canvas.aria_label')}
       className="relative h-full w-full overflow-auto"

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -42,6 +43,12 @@ export function DetailPane({
 
   return (
     <div
+      {...verifyAttrs({
+        unit: 'DetailPane',
+        open,
+        type: type ?? 'none',
+        hasData: Boolean(data),
+      })}
       className="fixed top-0 z-[60] flex h-full w-[400px] flex-col border-l border-[rgba(139,115,85,0.2)] bg-[#faf8f5] transition-[right] duration-700"
       style={{
         right: open ? 0 : -400,
@@ -53,6 +60,7 @@ export function DetailPane({
       <button
         type="button"
         onClick={onClose}
+        aria-label={t('detail.close_aria')}
         className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full text-lg text-[#6b5c4a] hover:bg-[rgba(139,115,85,0.1)]"
       >
         ×
