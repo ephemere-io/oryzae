@@ -71,7 +71,18 @@ export function useAnalytics(params?: UseAnalyticsParams) {
       const dailyBody = (await dailyRes.json()) as DailyResponse;
       setDaily(dailyBody.data);
     } else {
-      setError('分析データの取得に失敗しました');
+      // サーバーが返す具体的なエラー（PostHog 未設定 / 取得失敗 (HTTP xxx) 等）を優先表示。
+      // 以前は失敗が握りつぶされ「全部 0」に見えていたため、原因が分かるようにする。
+      const failed = [overviewRes, pagesRes, dailyRes].find((r) => !r.ok);
+      const body: unknown = failed ? await failed.json().catch(() => null) : null;
+      const message =
+        body !== null &&
+        typeof body === 'object' &&
+        'error' in body &&
+        typeof body.error === 'string'
+          ? body.error
+          : '分析データの取得に失敗しました';
+      setError(message);
     }
     setLoading(false);
   }, [dateFrom, dateTo]);
