@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ShellSkeleton } from '@/components/ui/shell-skeleton';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
@@ -94,21 +94,5 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>
-  );
-}
-
-/**
- * mount 前（SSR 含む）に出す汎用スケルトン。ヘッダ風の1本＋カード数枚で、一覧/エディタ
- * どちらの画面でも破綻しない最小の「枠」。空白を見せないことが目的（Issue #362/#363）。
- */
-function ShellSkeleton() {
-  return (
-    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4 px-5 pt-8">
-      <Skeleton className="h-6 w-32" />
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
-    </div>
   );
 }
