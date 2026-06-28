@@ -11,9 +11,11 @@ test.describe('ナビゲーション', () => {
     await expect(page).toHaveURL(/\/entries/);
   });
 
-  test('サイドバーから質問ページに遷移', async ({ page }) => {
-    await page.click('a[href="/questions"]');
-    await expect(page).toHaveURL(/\/questions/);
+  // PC サイドバーは Jar/Board/List/Editor/Account（問いは瓶の中で管理）。
+  // 旧「サイドバー→質問」は存在しないため、実在する Board リンクで遷移を検証する。
+  test('サイドバーからボードに遷移', async ({ page }) => {
+    await page.click('a[href="/board"]');
+    await expect(page).toHaveURL(/\/board/);
   });
 
   test('サイドバーからエディタに遷移', async ({ page }) => {

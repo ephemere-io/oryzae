@@ -10,9 +10,11 @@ test.describe('認証フロー', () => {
     await expect(page.locator('h1')).toHaveText('Oryzae');
     await expect(page.locator('text=ログインして続ける')).toBeVisible();
 
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button:has-text("ログイン")');
+    // ユーザー欄は nickname/email 兼用で type="text"。ログインは「Google でログイン」と
+    // 部分一致するため exact で特定する。
+    await page.getByPlaceholder('nickname or email@example.com').fill(TEST_EMAIL);
+    await page.locator('input[type="password"]').fill(TEST_PASSWORD);
+    await page.getByRole('button', { name: 'ログイン', exact: true }).click();
 
     await page.waitForURL('**/entries/new**');
     await expect(page).toHaveURL(/\/entries\/new/);
@@ -49,7 +51,7 @@ test.describe('言語切替', () => {
     await page.goto('/login');
     await expect(page.locator('text=ログインして続ける')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Toggle language' }).click();
+    await page.getByRole('combobox', { name: 'Language' }).selectOption('en');
     await expect(page.locator('text=Log in to continue')).toBeVisible();
 
     const cookies = await context.cookies();
@@ -61,7 +63,7 @@ test.describe('言語切替', () => {
       { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
     ]);
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Toggle language' }).click();
+    await page.getByRole('combobox', { name: 'Language' }).selectOption('en');
     await expect(page.locator('text=Log in to continue')).toBeVisible();
 
     await page.goto('/signup');
@@ -73,7 +75,7 @@ test.describe('言語切替', () => {
       { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
     ]);
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Toggle language' }).click();
+    await page.getByRole('combobox', { name: 'Language' }).selectOption('en');
     await expect(page.locator('text=Log in to continue')).toBeVisible();
 
     await page.goto('/');

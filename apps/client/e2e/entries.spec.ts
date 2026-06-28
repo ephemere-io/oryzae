@@ -6,20 +6,22 @@ test.describe('エントリ管理', () => {
   });
 
   test('エントリ一覧が表示される', async ({ page }) => {
-    await expect(page.locator('text=エントリ')).toBeVisible();
+    await page.goto('/entries');
+    // PC 一覧のヘッダは "All Entries" ＋ "+ New Entry"。安定要素で判定する。
+    await expect(page.getByRole('link', { name: /New Entry/i })).toBeVisible();
   });
 
   test('新規エントリを作成できる', async ({ page }) => {
-    await page.click('a:has-text("新規"), button:has-text("新規"), a[href="/entries/new"]');
-    await page.waitForURL('**/entries/new**');
+    await page.goto('/entries/new');
+    const editor = page.locator('[contenteditable="true"]').first();
+    await editor.click();
+    const unique = `E2E作成テスト-${Date.now()}`;
+    await editor.pressSequentially(unique);
 
-    const editor = page.locator('textarea, [contenteditable="true"]');
-    await expect(editor).toBeVisible();
-
-    await editor.fill('Playwright E2E テスト用エントリ');
-    await page.click('button:has-text("保存"), button:has-text("作成")');
-
-    await page.waitForURL(/\/entries/);
+    // PC エディタは自動保存（debounce 後に作成）。一覧に出ることで作成成功を確認する。
+    await page.waitForTimeout(4000);
+    await page.goto('/entries');
+    await expect(page.getByText(unique)).toBeVisible({ timeout: 10000 });
   });
 
   test('エントリ一覧から詳細に遷移できる', async ({ page }) => {
@@ -36,26 +38,31 @@ test.describe('エントリ管理', () => {
     await page.goto('/entries/new');
     const editor = page.locator('[contenteditable="true"]').first();
     await editor.click();
+    // 先頭行はタイトルとして解釈される（一覧で見つける用のマーカー）。本文の改行を検証
+    // するため、タイトルの後に3行の本文を入れる。
+    const marker = `newline-219-${Date.now()}`;
+    await page.keyboard.type(marker);
+    await page.keyboard.press('Enter');
     await page.keyboard.type('1行目');
     await page.keyboard.press('Enter');
     await page.keyboard.type('2行目');
     await page.keyboard.press('Enter');
     await page.keyboard.type('3行目');
 
-    await page.click('button[data-tooltip="保存する"]');
-    await page.fill('input[placeholder="タイトルを入力..."]', 'newline-regression-219');
-    await page.click('button:has-text("保存"):not([data-tooltip])');
-
+    // 自動保存（debounce 後に作成）を待ち、一覧から開き直す。
+    await page.waitForTimeout(4000);
+    await page.goto('/entries');
+    await page.locator('[href*="/entries/"]', { hasText: marker }).first().click();
     await page.waitForURL(/\/entries\/[^/]+$/);
-    await page.reload();
 
     const reopened = page.locator('[contenteditable="true"]').first();
     await expect(reopened).toBeVisible();
+    // 本文（先頭行=タイトルを除いた残り）に改行が保たれているか
     const text = await reopened.innerText();
     expect(text).toContain('1行目');
     expect(text).toContain('2行目');
     expect(text).toContain('3行目');
-    // 改行が保たれていれば、行数は 3 行以上になる
+    // 改行が保たれていれば本文は3行以上
     expect(text.split('\n').filter((l) => l.trim().length > 0).length).toBeGreaterThanOrEqual(3);
   });
 });
