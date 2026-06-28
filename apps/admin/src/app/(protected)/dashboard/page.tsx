@@ -6,6 +6,7 @@ import { DateRangeSelector } from '@/components/ui/date-range-selector';
 import { CostSummaryCard } from '@/features/dashboard/components/cost-summary-card';
 import { FailureAlerts } from '@/features/dashboard/components/failure-alerts';
 import { HealthSparklines } from '@/features/dashboard/components/health-sparklines';
+import { HealthStatusBanner } from '@/features/dashboard/components/health-status-banner';
 import { StatsCards } from '@/features/dashboard/components/stats-cards';
 import { UserActivityCard } from '@/features/dashboard/components/user-activity-card';
 import { useCostSummary } from '@/features/dashboard/hooks/use-cost-summary';
@@ -53,6 +54,9 @@ export default function DashboardPage() {
   // Active Users カードに表示する期間ラベル（セレクタ連動）。custom は実日付。
   const periodLabel = preset === 'custom' ? `${dateFrom}〜${dateTo}` : preset;
 
+  // 24h 要対応（失敗）件数。健全性バナーと FailureAlerts の両方で使う。
+  const failureCount = groups.reduce((sum, g) => sum + g.failures.length, 0);
+
   const loading =
     statsLoading || failuresLoading || trendsLoading || costLoading || activityLoading;
 
@@ -94,28 +98,52 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Row 2: Failure alerts (full width) */}
-      <FailureAlerts groups={groups} retryFermentation={retryFermentation} />
+      {/* At-a-glance health across the 3 axes: 健全性 / 要対応 / コスト / 活性 */}
+      <HealthStatusBanner
+        stats={stats}
+        failureCount={failureCount}
+        summary={summary}
+        activeWriters={activeWriters}
+        totalUsers={totalUsers}
+      />
 
-      {/* Row 3: Charts — 3 columns */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <HealthSparklines days={days} />
-      </div>
+      {/* 障害の早期検知 — 要対応の詳細（異常があれば retry できる） */}
+      <section className="space-y-2">
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          要対応 / 障害
+        </h2>
+        <FailureAlerts groups={groups} retryFermentation={retryFermentation} />
+      </section>
 
-      {/* Row 4: Summary cards */}
-      <div className="grid gap-4 lg:grid-cols-5">
-        {stats ? (
-          <StatsCards stats={stats} />
-        ) : statsLoading ? (
-          <p className="text-xs text-muted-foreground">Loading...</p>
-        ) : null}
-        <CostSummaryCard summary={summary} />
-        <UserActivityCard
-          activeWriters={activeWriters}
-          totalUsers={totalUsers}
-          periodLabel={periodLabel}
-        />
-      </div>
+      {/* トレンド — 期間内の推移 */}
+      <section className="space-y-2">
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          トレンド
+        </h2>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <HealthSparklines days={days} />
+        </div>
+      </section>
+
+      {/* サマリ — 規模・コスト・活性の詳細 */}
+      <section className="space-y-2">
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          サマリ
+        </h2>
+        <div className="grid gap-4 lg:grid-cols-5">
+          {stats ? (
+            <StatsCards stats={stats} />
+          ) : statsLoading ? (
+            <p className="text-xs text-muted-foreground">Loading...</p>
+          ) : null}
+          <CostSummaryCard summary={summary} />
+          <UserActivityCard
+            activeWriters={activeWriters}
+            totalUsers={totalUsers}
+            periodLabel={periodLabel}
+          />
+        </div>
+      </section>
     </div>
   );
 }
