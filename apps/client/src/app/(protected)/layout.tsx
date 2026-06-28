@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Sidebar } from '@/features/auth/components/sidebar';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
@@ -21,12 +22,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const device = useDevice();
   const router = useRouter();
 
-  // Issue #362: 保護下の children はクライアント専用に描画する。
-  // SSR では描画しない（mounted=false）ことで、エディタ等の時刻依存レンダリングが
-  // サーバー↔クライアントで食い違うハイドレーション不一致(React #418)を防ぐ。
-  // それでも auth/me の完了は待たない（マウント直後＝~1s で描画）ため、
-  // 旧来の「認証完了まで全画面空白(~3s)」は解消したまま。
-  // （device も mount 後に確定するため、シェルの出し分けと同じタイミング。）
+  // Issue #362/#363: 保護下の children はクライアント専用に描画する（mounted ゲート）。
+  // エディタ等の時刻依存・認証依存レンダリングが SSR↔client で食い違う不一致(React #418)
+  // を防ぐため。一方 device はサーバー(x-device)で確定済みなので **シェルとスケルトンは
+  // SSR で即描画**できる（children だけ mount 後）。これで FCP が空白でなくなる。
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -52,15 +51,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;
 
-  // Issue #362: 認証完了を待たず children を描画（ページ側がスケルトンを即出す）。
-  const content = mounted ? children : null;
+  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せる
+  // 汎用スケルトンを描画し、FCP を「空白」でなく「枠」にする（体感ロードを短縮）。
+  const content = mounted ? children : <ShellSkeleton />;
 
   return (
     <ThemeProvider>
       <SidebarProvider>
         <UnreadProvider api={api} authLoading={loading}>
-          {/* device 判定が済むまで（null）はシェルを出さない＝サイドバーのちらつき防止。
-              device は mount 後に確定するため、これ自体が children のクライアント専用描画を担保する。 */}
+          {/* device はサーバー(x-device)で確定済み＝first render から端末別シェルを SSR 描画。
+              null フォールバックは Provider 外などの保険（通常は到達しない）。 */}
           {device === 'sp' ? (
             // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
             // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
@@ -94,5 +94,21 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>
+  );
+}
+
+/**
+ * mount 前（SSR 含む）に出す汎用スケルトン。ヘッダ風の1本＋カード数枚で、一覧/エディタ
+ * どちらの画面でも破綻しない最小の「枠」。空白を見せないことが目的（Issue #362/#363）。
+ */
+function ShellSkeleton() {
+  return (
+    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4 px-5 pt-8">
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-20 w-full" />
+    </div>
   );
 }
