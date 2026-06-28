@@ -18,8 +18,45 @@ interface AuthState {
   };
 }
 
-interface UserPayload {
-  user: AuthState['user'];
+type User = AuthState['user'];
+
+interface Session {
+  accessToken: string;
+  refreshToken: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** API レスポンス(res.json() は型なし)から user を検証して narrow する（`as` を使わない）。 */
+function parseUser(json: unknown): User | null {
+  if (!isRecord(json) || !isRecord(json.user)) return null;
+  const u = json.user;
+  if (typeof u.id !== 'string' || typeof u.email !== 'string') return null;
+  return {
+    id: u.id,
+    email: u.email,
+    nickname: typeof u.nickname === 'string' ? u.nickname : null,
+    avatarUrl: typeof u.avatarUrl === 'string' ? u.avatarUrl : null,
+    name: typeof u.name === 'string' ? u.name : null,
+    providers: Array.isArray(u.providers)
+      ? u.providers.filter((p): p is string => typeof p === 'string')
+      : [],
+  };
+}
+
+/** ログイン/サインアップ応答の session を検証。確認メール待ち等で無ければ null。 */
+function parseSession(json: unknown): Session | null {
+  if (!isRecord(json) || !isRecord(json.session)) return null;
+  const s = json.session;
+  if (typeof s.accessToken !== 'string' || typeof s.refreshToken !== 'string') return null;
+  return { accessToken: s.accessToken, refreshToken: s.refreshToken };
+}
+
+/** エラー応答から error 文字列を取り出す（無ければ汎用文言）。 */
+function parseErrorMessage(json: unknown): string {
+  return isRecord(json) && typeof json.error === 'string' ? json.error : 'Unknown error';
 }
 
 export interface AuthContextValue {
@@ -68,11 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const meRes = await client.fetch('/api/v1/auth/me');
 
       if (meRes.ok) {
-        const data = (await meRes.json()) as UserPayload;
-        setAuth({ accessToken: token, refreshToken: getRefreshToken() ?? '', user: data.user });
-        posthog.identify(data.user.id, { email: data.user.email });
-        setLoading(false);
-        return;
+        const user = parseUser(await meRes.json());
+        if (user) {
+          setAuth({ accessToken: token, refreshToken: getRefreshToken() ?? '', user });
+          posthog.identify(user.id, { email: user.email });
+          setLoading(false);
+          return;
+        }
+        // 200 だが想定外の body → 下の refresh パスへフォールバック。
       }
 
       // Access token expired — refresh は lib/api の共有シングルトン経由で
@@ -89,14 +129,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setApi(newClient);
       const retryRes = await newClient.fetch('/api/v1/auth/me');
 
-      if (retryRes.ok) {
-        const userData = (await retryRes.json()) as UserPayload;
+      const user = retryRes.ok ? parseUser(await retryRes.json()) : null;
+      if (user) {
         setAuth({
           accessToken: newToken,
           refreshToken: getRefreshToken() ?? '',
-          user: userData.user,
+          user,
         });
-        posthog.identify(userData.user.id, { email: userData.user.email });
+        posthog.identify(user.id, { email: user.email });
       } else {
         clearTokens();
         setApi(null);
@@ -116,20 +156,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ identifier, password }),
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error: string };
-        return data.error;
+        return parseErrorMessage(await res.json());
       }
-      const data = (await res.json()) as UserPayload & {
-        session: { accessToken: string; refreshToken: string };
-      };
-      setTokens(data.session.accessToken, data.session.refreshToken);
+      const json = await res.json();
+      const user = parseUser(json);
+      const session = parseSession(json);
+      if (!user || !session) return 'Unknown error';
+      setTokens(session.accessToken, session.refreshToken);
       setAuth({
-        accessToken: data.session.accessToken,
-        refreshToken: data.session.refreshToken,
-        user: data.user,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        user,
       });
-      setApi(createApiClient(data.session.accessToken));
-      posthog.identify(data.user.id, { email: data.user.email });
+      setApi(createApiClient(session.accessToken));
+      posthog.identify(user.id, { email: user.email });
       return null;
     },
     [],
@@ -153,20 +193,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ nickname, email, password, locale, emailRedirectTo }),
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error: string };
-        return data.error;
+        return parseErrorMessage(await res.json());
       }
-      const data = (await res.json()) as UserPayload & {
-        session: { accessToken: string; refreshToken: string } | null;
-      };
-      if (data.session) {
-        setTokens(data.session.accessToken, data.session.refreshToken);
+      const json = await res.json();
+      const user = parseUser(json);
+      const session = parseSession(json); // 確認メール待ちでは null
+      if (user && session) {
+        setTokens(session.accessToken, session.refreshToken);
         setAuth({
-          accessToken: data.session.accessToken,
-          refreshToken: data.session.refreshToken,
-          user: data.user,
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          user,
         });
-        setApi(createApiClient(data.session.accessToken));
+        setApi(createApiClient(session.accessToken));
       }
       return null;
     },
