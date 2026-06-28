@@ -447,6 +447,7 @@
   },
   "fermentation": {
     "detail": {
+      "close_aria": "詳細を閉じる",
       "header_keyword": "Yeast が生成したキーワード",
       "header_snippet": "Oryzae が切り取った文章",
       "header_letter": "L.A.B.による観察記録",

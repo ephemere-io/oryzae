@@ -32,6 +32,9 @@ export async function runFixture(
   opts: RunOptions = {},
 ): Promise<VerifyResult> {
   const started = now();
+  // fixture 間の隔離: 直前のユニットが書いた localStorage/sessionStorage を持ち越さない。
+  // （例: あるユニットが access token を書くと、別ユニットの「未ログイン」probe を汚染する。）
+  resetStorage();
   const base = {
     unitId: unit.id,
     fixtureId: fixture.id,
@@ -170,6 +173,16 @@ function ms(since: number): number {
 
 function tick(): Promise<void> {
   return new Promise((r) => setTimeout(r, 0));
+}
+
+/** fixture 間の状態リーク防止に Web Storage をクリアする（存在する環境でのみ）。 */
+function resetStorage(): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.clear();
+    if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+  } catch {
+    /* storage 非対応環境では何もしない */
+  }
 }
 
 export function makeActContext(root: HTMLElement): ActContext {
