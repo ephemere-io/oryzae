@@ -38,7 +38,7 @@ describe('SpJar', () => {
     const fetchImpl = vi.fn((url: string) => {
       if (url === '/api/v1/questions')
         return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url.startsWith('/api/v1/fermentations?'))
+      if (url === '/api/v1/fermentations')
         return Promise.resolve(jsonResponse(completedFermentation));
       return Promise.resolve(jsonResponse({}));
     });
@@ -56,7 +56,7 @@ describe('SpJar', () => {
     const fetchImpl = vi.fn((url: string) => {
       if (url === '/api/v1/questions')
         return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url.startsWith('/api/v1/fermentations?'))
+      if (url === '/api/v1/fermentations')
         return Promise.resolve(jsonResponse(completedFermentation));
       if (url === '/api/v1/fermentations/f1')
         return Promise.resolve(jsonResponse({ letter: { bodyText: '過去のあなたより。' } }));
@@ -74,7 +74,7 @@ describe('SpJar', () => {
     const fetchImpl = vi.fn((url: string) => {
       if (url === '/api/v1/questions')
         return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url.startsWith('/api/v1/fermentations?'))
+      if (url === '/api/v1/fermentations')
         return Promise.resolve(jsonResponse(completedFermentation));
       if (url === '/api/v1/fermentations/f1')
         return Promise.resolve(

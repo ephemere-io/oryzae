@@ -6,13 +6,13 @@ import { useCallback } from 'react';
 import { DeviceView } from '@/components/device-view';
 import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 import { useEntry } from '@/features/shared/entries/hooks/use-entry';
 import {
   useActiveQuestions,
   useEntryQuestions,
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
+import { useAuth } from '@/lib/auth-context';
 
 export default function EntryDetailPage() {
   const t = useTranslations('entries.detail');

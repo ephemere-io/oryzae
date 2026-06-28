@@ -164,6 +164,30 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
     );
   }
 
+  async listByUserId(userId: string): Promise<FermentationResult[]> {
+    const { data, error } = await this.supabase
+      .from('fermentation_results')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
+    return (data ?? []).map((row: Record<string, string>) =>
+      FermentationResult.fromProps({
+        id: row.id,
+        userId: row.user_id,
+        questionId: row.question_id,
+        targetPeriod: row.target_period,
+        status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
+        generationId: row.generation_id ?? null,
+        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
+        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
+        errorMessage: row.error_message ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }),
+    );
+  }
+
   async listRetryable(sinceIso: string, beforeIso: string): Promise<FermentationResult[]> {
     const { data, error } = await this.supabase
       .from('fermentation_results')

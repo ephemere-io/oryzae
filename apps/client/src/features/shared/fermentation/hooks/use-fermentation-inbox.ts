@@ -62,9 +62,10 @@ function byCreatedAtDesc(a: { createdAt: string }, b: { createdAt: string }): nu
 }
 
 /**
- * SP の受信箱: 全問いを走査し、完了した発酵があるものを「届いた手紙」として新着順に返す。
- * バルクエンドポイントが無いため unread-context と同じ N+1（questions → per-question
- * fermentations）で集約する。手紙本文は重いので一覧では取らず、開いた時に useFermentationLetter で取得。
+ * SP の受信箱: 完了した発酵を「届いた手紙」として問いごとに最新1件、新着順に返す。
+ * Issue #363 perf: 問い一覧と全発酵をそれぞれ1回ずつ取得（並行）して集約する。
+ * 旧来は /questions → 問いごとに /fermentations の N+1 だった。手紙本文は重いので一覧では
+ * 取らず、開いた時に useFermentationDetail で取得。
  */
 export function useFermentationInbox(api: ApiClient | null, authLoading: boolean) {
   const [letters, setLetters] = useState<InboxLetter[]>([]);
@@ -73,32 +74,41 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
   const fetchInbox = useCallback(async () => {
     if (!api || authLoading) return;
     setLoading(true);
-    const qRes = await api.fetch('/api/v1/questions');
-    if (!qRes.ok) {
+    const [qRes, fRes] = await Promise.all([
+      api.fetch('/api/v1/questions'),
+      api.fetch('/api/v1/fermentations'),
+    ]);
+    if (!qRes.ok || !fRes.ok) {
       setLoading(false);
       return;
     }
     const questions: QuestionLite[] = await qRes.json();
+    const fermentations: FermentationSummary[] = await fRes.json();
     const lastSeen = getLastSeenAt();
 
-    const perQuestion = await Promise.all(
-      questions.map(async (q): Promise<InboxLetter | null> => {
-        const res = await api.fetch(`/api/v1/fermentations?questionId=${q.id}`);
-        if (!res.ok) return null;
-        const data: FermentationSummary[] = await res.json();
-        const latest = data.filter((r) => r.status === 'completed').sort(byCreatedAtDesc)[0];
-        if (!latest) return null;
-        return {
+    // 完了発酵を問いごとに最新1件へ畳む。
+    const latestByQuestion = new Map<string, FermentationSummary>();
+    for (const f of fermentations) {
+      if (f.status !== 'completed') continue;
+      const cur = latestByQuestion.get(f.questionId);
+      if (!cur || f.createdAt > cur.createdAt) latestByQuestion.set(f.questionId, f);
+    }
+
+    const inbox = questions.flatMap((q): InboxLetter[] => {
+      const latest = latestByQuestion.get(q.id);
+      if (!latest) return [];
+      return [
+        {
           questionId: q.id,
           questionText: q.currentText,
           fermentationId: latest.id,
           createdAt: latest.createdAt,
           unread: latest.createdAt > lastSeen,
-        };
-      }),
-    );
+        },
+      ];
+    });
 
-    setLetters(perQuestion.filter((x): x is InboxLetter => x !== null).sort(byCreatedAtDesc));
+    setLetters(inbox.sort(byCreatedAtDesc));
     setLoading(false);
   }, [api, authLoading]);
 

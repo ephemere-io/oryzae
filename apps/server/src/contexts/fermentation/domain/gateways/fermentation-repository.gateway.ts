@@ -27,6 +27,13 @@ export interface FermentationRepositoryGateway {
   listByQuestionId(questionId: string): Promise<FermentationResult[]>;
 
   /**
+   * issue #363 perf: ユーザーの全発酵結果を1クエリで取得する。瓶の未読バッジ・受信箱が
+   * 従来「/questions → 問いごとに /fermentations」と N+1 で集約していたのを1回に集約する
+   * ためのバルク取得。user_id で明示的に絞る（RLS と二重で安全側）。
+   */
+  listByUserId(userId: string): Promise<FermentationResult[]>;
+
+  /**
    * issue #353: 完了しなかった発酵を次回 cron でリトライするため、created_at が
    * [sinceIso, beforeIso) の範囲にある「未完了」の結果を取得する。
    *

@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
-import { useActiveQuestions } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { ApiClient } from '@/lib/api';
 
 interface SpEntryListProps {
   api: ApiClient | null;
+  /** 問いフィルタ用の選択肢。page の useQuestions から渡す（重複 fetch を避ける）。 */
+  availableQuestions?: { id: string; currentText: string | null }[];
 }
 
 /** content の先頭行をタイトル代わりに使う（エディタの保存形式: 先頭行=タイトル）。 */
@@ -31,7 +32,7 @@ function formatDate(iso: string): string {
  * タップで詳細（/entries/[id]）へ遷移し、SP エディタで読み＋編集する。
  * アカウント等への移動はボトムナビから。
  */
-export function SpEntryList({ api }: SpEntryListProps) {
+export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) {
   const t = useTranslations('sp.list');
   const router = useRouter();
 
@@ -46,7 +47,7 @@ export function SpEntryList({ api }: SpEntryListProps) {
     return () => clearTimeout(id);
   }, [searchInput]);
 
-  const activeQuestions = useActiveQuestions(api, false);
+  const activeQuestions = availableQuestions;
   // Issue #362: useEntries は optimistic 化で authLoading 引数を撤去済み（api, search?, questionId?）。
   const { entries, loading } = useEntries(api, search, questionId);
 
