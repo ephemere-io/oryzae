@@ -47,6 +47,25 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description,
     applicationName: BRAND_NAME,
+    keywords: [
+      'ジャーナリング',
+      '日記',
+      '問い',
+      '内省',
+      '振り返り',
+      '発酵',
+      'AI',
+      'journaling',
+      'reflection',
+      'journal app',
+    ],
+    authors: [{ name: 'Ephemere', url: 'https://ephemere.io' }],
+    creator: 'Ephemere',
+    publisher: 'Ephemere',
+    category: 'productivity',
+    formatDetection: { telephone: false, email: false, address: false },
+    // 公開ページの既定 canonical（各公開ページで上書き）。保護/認証は middleware で noindex。
+    alternates: { canonical: '/' },
     // PWA: manifest（app/manifest.ts）と iOS スタンドアロン設定。
     manifest: '/manifest.webmanifest',
     appleWebApp: {
