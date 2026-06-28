@@ -98,6 +98,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       : null;
 
     const snippets = (snippetsRes.data ?? []).map((row: Record<string, unknown>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       ExtractedSnippet.fromProps({
         id: row.id as string,
         fermentationResultId: row.fermentation_result_id as string,
@@ -125,6 +126,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       : null;
 
     const keywords = (keywordsRes.data ?? []).map((row: Record<string, unknown>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       Keyword.fromProps({
         id: row.id as string,
         fermentationResultId: row.fermentation_result_id as string,
@@ -148,6 +150,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
     return (data ?? []).map((row: Record<string, string>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       FermentationResult.fromProps({
         id: row.id,
         userId: row.user_id,
@@ -172,6 +175,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
     return (data ?? []).map((row: Record<string, string>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       FermentationResult.fromProps({
         id: row.id,
         userId: row.user_id,
@@ -199,6 +203,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .order('created_at', { ascending: true });
     if (error) throw new Error(`Failed to list retryable fermentations: ${error.message}`);
     return (data ?? []).map((row: Record<string, string>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       FermentationResult.fromProps({
         id: row.id,
         userId: row.user_id,
