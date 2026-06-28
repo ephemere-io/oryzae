@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -132,7 +133,16 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
   }, [deleteEntry, pendingDeleteId, removeEntry]);
 
   return (
-    <div className="flex flex-col">
+    <div
+      className="flex flex-col"
+      {...verifyAttrs({
+        unit: 'EntryList',
+        loading: authLoading || (loading && entries.length === 0),
+        count: entries.length,
+        hasQuestions: availableQuestions.length > 0,
+        error: error && entries.length === 0,
+      })}
+    >
       {/* Issue #331: 問いで絞り込むフィルタ (単一選択・解除可) */}
       {availableQuestions.length > 0 && (
         <div className="relative mb-3 flex items-center gap-2">
@@ -160,6 +170,7 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
             <button
               type="button"
               onClick={() => setQuestionFilter('')}
+              aria-label={t('filter_clear_aria')}
               className="shrink-0 text-[var(--date-color)] hover:text-[var(--fg)]"
             >
               <svg
@@ -187,6 +198,7 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
         <input
           type="text"
           placeholder={t('search_placeholder')}
+          aria-label={t('search_placeholder')}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] px-4 py-2.5 pl-10 text-sm text-[var(--fg)] placeholder:text-[var(--date-color)] focus:border-[var(--accent)] focus:outline-none"
@@ -210,6 +222,7 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
           <button
             type="button"
             onClick={() => setSearchInput('')}
+            aria-label={t('clear_search_aria')}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--date-color)] hover:text-[var(--fg)]"
           >
             <svg

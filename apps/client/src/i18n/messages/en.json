@@ -447,6 +447,7 @@
   },
   "fermentation": {
     "detail": {
+      "close_aria": "Close detail",
       "header_keyword": "Keywords from Yeast",
       "header_snippet": "Snippets cut by Oryzae",
       "header_letter": "Observations from L.A.B.",

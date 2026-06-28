@@ -22,6 +22,7 @@ function getTodayKey(): string {
   return `${y}-${m}-${d}`;
 }
 
+// verify-exempt: 描画が外部 editorRef への実テキスト選択に依存する。visible=false の間は null を返し（DOM契約要素が出ない）、visible は handleSelection 経由でのみ true になるが、それには window.getSelection()/getRangeAt(0)/getBoundingClientRect() が必要で jsdom では再現不可。editorRef は本体外のため孤立描画では選択対象が存在せず、act も click/type/wait のみで selectionchange/Range を作れない。唯一の回避策（Range/Selection の monkeypatch）は register 経由で実ブラウザの /verify dashboard・matrix 双方に読み込まれグローバル汚染するため不可。
 export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
   const t = useTranslations('editor.snippet_toolbar');
   const [visible, setVisible] = useState(false);

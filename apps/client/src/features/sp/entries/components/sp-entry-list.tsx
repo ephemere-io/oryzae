@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
@@ -52,7 +53,15 @@ export function SpEntryList({ api }: SpEntryListProps) {
   const isFiltering = !!search || !!questionId;
 
   return (
-    <div className="flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]">
+    <div
+      className="flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
+      {...verifyAttrs({
+        unit: 'SpEntryList',
+        loading,
+        count: entries.length,
+        hasQuestions: activeQuestions.length > 0,
+      })}
+    >
       <header className="px-5 pt-6 pb-3">
         <span className="text-lg font-medium" style={{ fontFamily: 'var(--ob-font-serif)' }}>
           {t('title')}
@@ -85,6 +94,7 @@ export function SpEntryList({ api }: SpEntryListProps) {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder={t('search')}
+            aria-label={t('search')}
             className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--date-color)]"
           />
           {searchInput ? (
