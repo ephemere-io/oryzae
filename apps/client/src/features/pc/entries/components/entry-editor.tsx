@@ -1,6 +1,7 @@
 'use client';
 
 import type { EditorEffectsState } from '@oryzae/shared';
+import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -312,11 +313,16 @@ export function EntryEditor({
     }
     updateFade();
     el.addEventListener('scroll', updateFade);
-    const ro = new ResizeObserver(updateFade);
-    ro.observe(el);
+    // ResizeObserver はブラウザでは常に存在するが、SSR/テスト(jsdom)には無いため防御する。
+    // 既存の getSpeechRecognitionConstructor / AudioContext と同じく、未定義環境では no-op。
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateFade);
+      ro.observe(el);
+    }
     return () => {
       el.removeEventListener('scroll', updateFade);
-      ro.disconnect();
+      ro?.disconnect();
     };
   }, [settings.writingMode]);
 
@@ -690,6 +696,15 @@ export function EntryEditor({
     <div
       className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-[var(--bg)] transition-[left] duration-200 ease-linear"
       style={{ left: sidebarWidth }}
+      {...verifyAttrs({
+        unit: 'EntryEditor',
+        hasEntry: !!entryId,
+        hasBody: content.trim().length > 0,
+        settingsOpen,
+        statsOpen,
+        saveModalOpen,
+        questionSelectOpen,
+      })}
     >
       {/* Top toolbar */}
       <div
@@ -702,6 +717,7 @@ export function EntryEditor({
             onClick={() => guardedNavigate('/entries/new')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip={t('toolbar.new_entry')}
+            aria-label={t('toolbar.new_entry')}
           >
             <svg
               aria-hidden="true"
@@ -725,6 +741,7 @@ export function EntryEditor({
             disabled={saving || !content.trim()}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
             data-tooltip={t('toolbar.save')}
+            aria-label={t('toolbar.save')}
           >
             <svg
               aria-hidden="true"
@@ -748,6 +765,7 @@ export function EntryEditor({
             disabled={saving || !content.trim()}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
             data-tooltip={t('toolbar.pickle')}
+            aria-label={t('toolbar.pickle')}
           >
             <svg
               aria-hidden="true"
@@ -771,6 +789,7 @@ export function EntryEditor({
             onClick={() => guardedNavigate('/entries')}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip={t('toolbar.list')}
+            aria-label={t('toolbar.list')}
           >
             <svg
               aria-hidden="true"
@@ -793,6 +812,7 @@ export function EntryEditor({
             onClick={() => setStatsOpen((v) => !v)}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip={t('toolbar.stats')}
+            aria-label={t('toolbar.stats')}
           >
             <svg
               aria-hidden="true"
@@ -831,6 +851,7 @@ export function EntryEditor({
               onBlur={commitTitleEdit}
               maxLength={100}
               placeholder={t('title.placeholder')}
+              aria-label={t('title.placeholder')}
               className="w-[240px] max-w-full border-none bg-transparent text-center text-sm text-[var(--fg)] outline-none"
             />
           ) : (
@@ -865,6 +886,7 @@ export function EntryEditor({
                 : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
             }`}
             data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
+            aria-label={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
           >
             <svg
               aria-hidden="true"
@@ -893,6 +915,11 @@ export function EntryEditor({
                   ? t('toolbar.fermentation_overlay_hide')
                   : t('toolbar.fermentation_overlay_show')
               }
+              aria-label={
+                overlayVisible
+                  ? t('toolbar.fermentation_overlay_hide')
+                  : t('toolbar.fermentation_overlay_show')
+              }
               data-testid="fermentation-overlay-toggle"
             >
               <svg
@@ -917,6 +944,7 @@ export function EntryEditor({
             onClick={() => setSettingsOpen(!settingsOpen)}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip={t('toolbar.settings')}
+            aria-label={t('toolbar.settings')}
           >
             <svg
               aria-hidden="true"
@@ -952,6 +980,11 @@ export function EntryEditor({
                 ? t('toolbar.writing_horizontal')
                 : t('toolbar.writing_vertical')
             }
+            aria-label={
+              settings.writingMode === 'vertical'
+                ? t('toolbar.writing_horizontal')
+                : t('toolbar.writing_vertical')
+            }
           >
             <svg
               aria-hidden="true"
@@ -976,6 +1009,9 @@ export function EntryEditor({
             }
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip={
+              settings.fontFamily === 'serif' ? t('toolbar.font_sans') : t('toolbar.font_serif')
+            }
+            aria-label={
               settings.fontFamily === 'serif' ? t('toolbar.font_sans') : t('toolbar.font_serif')
             }
           >
@@ -1004,6 +1040,7 @@ export function EntryEditor({
             onClick={toggleFullscreen}
             className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
             data-tooltip={t('toolbar.fullscreen')}
+            aria-label={t('toolbar.fullscreen')}
           >
             <svg
               aria-hidden="true"

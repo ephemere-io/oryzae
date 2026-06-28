@@ -8,6 +8,7 @@ function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
   return value === 'ja' || value === 'en' || value === 'zh' || value === 'ko';
 }
 
+// verify-exempt: props/api seam が無く、唯一の可変状態 loading と OAuth リダイレクト副作用が click 経由でしか到達できない（createApiClient 内製で fetch seam 無し・window.location.href 遷移は jsdom で孤立検証不可）。静的 render は contract が定数 unit のみで意味ある probe を作れない。
 export function GoogleLoginButton() {
   const t = useTranslations('auth.google_login');
   const localeRaw = useLocale();

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -52,7 +53,11 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4"
+      {...verifyAttrs({ unit: 'ForgotPasswordForm', hasEmail: Boolean(email) })}
+    >
       <h1 className="text-2xl font-bold text-center">{t('heading')}</h1>
       <p className="text-sm text-center text-zinc-500">{t('subheading')}</p>
 

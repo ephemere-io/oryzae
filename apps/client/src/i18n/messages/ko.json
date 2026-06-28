@@ -447,6 +447,7 @@
   },
   "fermentation": {
     "detail": {
+      "close_aria": "상세 닫기",
       "header_keyword": "Yeast가 만든 키워드",
       "header_snippet": "Oryzae가 골라낸 문장",
       "header_letter": "L.A.B.의 관찰 기록",
@@ -770,8 +771,7 @@
       "pickled": "발효를 시작했습니다 ✓",
       "question_link": "질문 연결",
       "ferment_title": "항아리에 담아 발효시키기",
-      "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다",
-      "ferment_action": "담기"
+      "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다"
     },
     "nav": {
       "write": "쓰기",
