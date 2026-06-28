@@ -48,27 +48,15 @@ export function UnreadProvider({
     let cancelled = false;
 
     async function check() {
-      // First get active questions
-      const qRes = await api!.fetch('/api/v1/questions');
-      if (!qRes.ok || cancelled) return;
-      const questions: { id: string }[] = await qRes.json();
-      if (questions.length === 0) return;
+      // Issue #363 perf: 全発酵をバルク取得（questionId 省略）して未読を数える。
+      // 旧来は /questions → 問いごとに /fermentations の N+1 だった。
+      const res = await api!.fetch('/api/v1/fermentations');
+      if (!res.ok || cancelled) return;
+      const data: FermentationSummary[] = await res.json();
 
       const lastSeen = getLastSeenAt();
-      let count = 0;
+      const count = data.filter((r) => r.status === 'completed' && r.createdAt > lastSeen).length;
 
-      const promises = questions.map(async (q) => {
-        const res = await api!.fetch(`/api/v1/fermentations?questionId=${q.id}`);
-        if (!res.ok) return;
-        const data: FermentationSummary[] = await res.json();
-        for (const r of data) {
-          if (r.status === 'completed' && r.createdAt > lastSeen) {
-            count++;
-          }
-        }
-      });
-
-      await Promise.all(promises);
       if (!cancelled) setUnreadCount(count);
     }
 

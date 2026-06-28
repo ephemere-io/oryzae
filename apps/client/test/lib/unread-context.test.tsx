@@ -37,27 +37,28 @@ describe('useUnread', () => {
     localStorage.clear();
   });
 
-  it('returns 0 when there are no questions', async () => {
-    const api = createMockApi({ '/api/v1/questions': [] });
+  it('returns 0 when there are no fermentations', async () => {
+    const api = createMockApi({ '/api/v1/fermentations': [] });
     const { result } = renderHook(() => useUnread(), {
       wrapper: createWrapper(api),
     });
 
     await waitFor(() => {
-      expect(api.fetch).toHaveBeenCalledWith('/api/v1/questions');
+      expect(api.fetch).toHaveBeenCalledWith('/api/v1/fermentations');
     });
+    // Issue #363 perf: 未読集計は /fermentations のバルク1回のみ（/questions は叩かない）。
+    expect(api.fetch).not.toHaveBeenCalledWith('/api/v1/questions');
     expect(result.current.unreadCount).toBe(0);
   });
 
-  it('counts completed fermentations newer than lastSeenAt', async () => {
+  it('counts completed fermentations newer than lastSeenAt (across questions)', async () => {
     // Set lastSeenAt to a past date
     localStorage.setItem(STORAGE_KEY, '2025-01-01T00:00:00.000Z');
 
     const api = createMockApi({
-      '/api/v1/questions': [{ id: 'q1' }],
-      '/api/v1/fermentations?questionId=q1': [
+      '/api/v1/fermentations': [
         { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2025-06-01T00:00:00.000Z' },
-        { id: 'f2', questionId: 'q1', status: 'completed', createdAt: '2025-06-02T00:00:00.000Z' },
+        { id: 'f2', questionId: 'q2', status: 'completed', createdAt: '2025-06-02T00:00:00.000Z' },
         { id: 'f3', questionId: 'q1', status: 'pending', createdAt: '2025-06-03T00:00:00.000Z' },
       ],
     });
@@ -75,8 +76,7 @@ describe('useUnread', () => {
     localStorage.setItem(STORAGE_KEY, '2025-07-01T00:00:00.000Z');
 
     const api = createMockApi({
-      '/api/v1/questions': [{ id: 'q1' }],
-      '/api/v1/fermentations?questionId=q1': [
+      '/api/v1/fermentations': [
         { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2025-06-01T00:00:00.000Z' },
       ],
     });
@@ -86,7 +86,7 @@ describe('useUnread', () => {
     });
 
     await waitFor(() => {
-      expect(api.fetch).toHaveBeenCalledWith('/api/v1/fermentations?questionId=q1');
+      expect(api.fetch).toHaveBeenCalledWith('/api/v1/fermentations');
     });
     expect(result.current.unreadCount).toBe(0);
   });
@@ -95,8 +95,7 @@ describe('useUnread', () => {
     localStorage.setItem(STORAGE_KEY, '2025-01-01T00:00:00.000Z');
 
     const api = createMockApi({
-      '/api/v1/questions': [{ id: 'q1' }],
-      '/api/v1/fermentations?questionId=q1': [
+      '/api/v1/fermentations': [
         { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2025-06-01T00:00:00.000Z' },
       ],
     });
@@ -118,7 +117,7 @@ describe('useUnread', () => {
   });
 
   it('does not fetch when authLoading is true', () => {
-    const api = createMockApi({ '/api/v1/questions': [] });
+    const api = createMockApi({ '/api/v1/fermentations': [] });
     renderHook(() => useUnread(), {
       wrapper: createWrapper(api, true),
     });
