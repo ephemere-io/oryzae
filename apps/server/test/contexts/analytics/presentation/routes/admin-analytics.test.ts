@@ -9,10 +9,20 @@ function createApp() {
   return new Hono().route('/analytics', adminAnalytics);
 }
 
-function mockPostHogResponse(body: unknown): Response {
+// HogQL Query API (/query/) は { results: unknown[][] } を返す。
+function hogqlOk(results: unknown[][]): Response {
   return {
     ok: true,
-    json: () => Promise.resolve(body),
+    status: 200,
+    json: () => Promise.resolve({ results }),
+  } as Response; // @type-assertion-allowed: テスト用の最小限 Response スタブ
+}
+
+function hogqlFail(status: number): Response {
+  return {
+    ok: false,
+    status,
+    text: () => Promise.resolve('error detail'),
   } as Response; // @type-assertion-allowed: テスト用の最小限 Response スタブ
 }
 
@@ -22,33 +32,12 @@ describe('admin-analytics route', () => {
     vi.stubEnv('POSTHOG_PERSONAL_API_KEY', 'phx_test_key');
   });
 
-  it('GET /overview returns analytics overview', async () => {
-    const trendResponse = {
-      result: [
-        {
-          data: [10, 20, 30],
-          days: ['2026-04-10', '2026-04-11', '2026-04-12'],
-          label: '$pageview',
-        },
-      ],
-    };
-    const sessionResponse = {
-      results: [[42, 180]],
-    };
-
-    // 4 parallel calls: total PV, entry PV, jar PV, session query
+  it('GET /overview aggregates pageviews and sessions via HogQL', async () => {
     mockFetch
-      .mockResolvedValueOnce(mockPostHogResponse(trendResponse))
-      .mockResolvedValueOnce(
-        mockPostHogResponse({ result: [{ data: [5, 10, 15], days: [], label: '' }] }),
-      )
-      .mockResolvedValueOnce(
-        mockPostHogResponse({ result: [{ data: [2, 3, 4], days: [], label: '' }] }),
-      )
-      .mockResolvedValueOnce(mockPostHogResponse(sessionResponse));
+      .mockResolvedValueOnce(hogqlOk([[60, 30, 9]])) // total_pv / entry_pv / jar_pv
+      .mockResolvedValueOnce(hogqlOk([[42, 180]])); // sessions / avg_duration
 
-    const app = createApp();
-    const res = await app.request('/analytics/overview');
+    const res = await createApp().request('/analytics/overview');
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -59,59 +48,74 @@ describe('admin-analytics route', () => {
     expect(body.avgSessionDurationSeconds).toBe(180);
   });
 
-  it('GET /pages returns page breakdown', async () => {
+  it('GET /pages returns sorted page breakdown', async () => {
     mockFetch.mockResolvedValueOnce(
-      mockPostHogResponse({
-        result: [
-          { data: [30], days: ['2026-04-12'], label: '/entries' },
-          { data: [10], days: ['2026-04-12'], label: '/jar' },
-        ],
-      }),
+      hogqlOk([
+        ['/entries', 30],
+        ['/jar', 10],
+      ]),
     );
 
-    const app = createApp();
-    const res = await app.request('/analytics/pages');
+    const res = await createApp().request('/analytics/pages');
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data).toHaveLength(2);
-    expect(body.data[0].path).toBe('/entries');
-    expect(body.data[0].views).toBe(30);
+    expect(body.data[0]).toEqual({ path: '/entries', views: 30 });
   });
 
-  it('GET /daily returns daily time series', async () => {
-    mockFetch
-      .mockResolvedValueOnce(
-        mockPostHogResponse({
-          result: [{ data: [10, 20], days: ['2026-04-11', '2026-04-12'], label: '$pageview' }],
-        }),
-      )
-      .mockResolvedValueOnce(
-        mockPostHogResponse({
-          result: [{ data: [5, 8], days: ['2026-04-11', '2026-04-12'], label: '$pageview' }],
-        }),
-      );
+  it('GET /daily returns daily series for the selected range', async () => {
+    mockFetch.mockResolvedValueOnce(
+      hogqlOk([
+        ['2026-04-11', 10, 5],
+        ['2026-04-12', 20, 8],
+      ]),
+    );
 
-    const app = createApp();
-    const res = await app.request('/analytics/daily');
+    const res = await createApp().request(
+      '/analytics/daily?date_from=2026-04-11&date_to=2026-04-12',
+    );
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data).toHaveLength(2);
-    expect(body.data[0].pageviews).toBe(10);
-    expect(body.data[0].uniqueUsers).toBe(5);
+    expect(body.data).toEqual([
+      { date: '2026-04-11', pageviews: 10, uniqueUsers: 5 },
+      { date: '2026-04-12', pageviews: 20, uniqueUsers: 8 },
+    ]);
   });
 
-  it('returns zeros when PostHog API key is not set', async () => {
+  it('GET /daily fills days without events as zero', async () => {
+    mockFetch.mockResolvedValueOnce(hogqlOk([['2026-04-12', 20, 8]]));
+
+    const res = await createApp().request(
+      '/analytics/daily?date_from=2026-04-11&date_to=2026-04-12',
+    );
+
+    const body = await res.json();
+    expect(body.data).toEqual([
+      { date: '2026-04-11', pageviews: 0, uniqueUsers: 0 },
+      { date: '2026-04-12', pageviews: 20, uniqueUsers: 8 },
+    ]);
+  });
+
+  it('returns 503 when PostHog API key is not set (no silent zeros)', async () => {
     vi.stubEnv('POSTHOG_PERSONAL_API_KEY', '');
 
-    const app = createApp();
-    const res = await app.request('/analytics/overview');
+    const res = await createApp().request('/analytics/overview');
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
     const body = await res.json();
-    expect(body.totalPageviews).toBe(0);
-    expect(body.totalSessions).toBe(0);
+    expect(body.error).toContain('未設定');
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 when PostHog responds with an error (e.g. legacy endpoint 403)', async () => {
+    mockFetch.mockResolvedValue(hogqlFail(403));
+
+    const res = await createApp().request('/analytics/overview');
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toContain('403');
   });
 });
