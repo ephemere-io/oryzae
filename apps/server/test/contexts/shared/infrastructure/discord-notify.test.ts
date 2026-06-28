@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { notifyDiscord } from '@/contexts/shared/infrastructure/discord-notify.js';
 
-function mockRes(ok: boolean, status: number, body = ''): Response {
-  // @type-assertion-allowed: テスト用の最小限 Response スタブ
-  return { ok, status, text: async () => body } as Response;
+function mockRes(status: number, body = ''): Response {
+  // 本物の Response を使う（status から ok が決まり、text() も使える）→ as キャスト不要。
+  return new Response(body || null, { status });
 }
 
 /**
@@ -34,14 +34,14 @@ describe('notifyDiscord (issue #384: 可観測化)', () => {
   });
 
   it('成功(2xx)時はエラーログを出さない', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockRes(true, 204));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockRes(200));
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await notifyDiscord({ title: 't' });
     expect(errSpy).not.toHaveBeenCalled();
   });
 
   it('非OK(4xx)時はステータス・本文付きでログするが throw しない', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockRes(false, 400, 'Invalid embed'));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockRes(400, 'Invalid embed'));
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await expect(notifyDiscord({ title: '発酵 cron: 完了' })).resolves.toBeUndefined();
