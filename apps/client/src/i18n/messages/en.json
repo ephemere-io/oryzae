@@ -771,7 +771,8 @@
       "pickled": "Fermentation started ✓",
       "question_link": "Link a question",
       "ferment_title": "Seal in the jar to ferment",
-      "ferment_sub": "Give it time — a letter from the AI will arrive"
+      "ferment_sub": "Give it time — a letter from the AI will arrive",
+      "delete": "Delete"
     },
     "nav": {
       "write": "Write",
@@ -805,7 +806,8 @@
       "empty_filtered": "No matching entries",
       "sort_label": "Sort order",
       "sort_newest": "Newest",
-      "sort_oldest": "Oldest"
+      "sort_oldest": "Oldest",
+      "delete": "Delete"
     },
     "questions": {
       "title": "Questions",

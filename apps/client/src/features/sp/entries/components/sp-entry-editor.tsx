@@ -1,9 +1,11 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
+import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { type EntryDraft, useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
 import {
@@ -11,6 +13,7 @@ import {
   useEntryQuestions,
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { ApiClient } from '@/lib/api';
+import { SpConfirmSheet } from './sp-confirm-sheet';
 
 interface SpEntryEditorProps {
   api: ApiClient | null;
@@ -51,6 +54,9 @@ export function SpEntryEditor({
   persistDraft = true,
 }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
+  const tDelete = useTranslations('entries.delete_modal');
+  const router = useRouter();
+  const { deleteEntry, deleting } = useDeleteEntry(api);
   const { save, saving, error } = useSaveEntry(api, null);
   const activeQuestions = useActiveQuestions(api, false);
   const { load: loadDraft, save: saveDraft, clear: clearDraft } = useEntryDraft();
@@ -78,6 +84,7 @@ export function SpEntryEditor({
     initialQuestionId ?? restored?.questionId ?? null,
   );
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // 書きかけ（タイトル/本文/問い/entryId）を localStorage に退避する。内容が空になればクリア。
   // 発酵（瓶に納める）後は確定とみなして退避しない。
@@ -138,6 +145,18 @@ export function SpEntryEditor({
     }
   }
 
+  // 確認シートで「削除する」→ API 削除が成功したら一覧へ戻る（フル遷移は不要・SPA で十分）。
+  async function handleDelete() {
+    if (!entryId) return;
+    const ok = await deleteEntry(entryId);
+    if (ok) {
+      clearDraft();
+      router.push('/entries');
+    } else {
+      setDeleteOpen(false);
+    }
+  }
+
   return (
     <div
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
@@ -149,10 +168,32 @@ export function SpEntryEditor({
         hasEntry: !!entryId,
         sheetOpen,
         pickling,
+        deleteOpen,
       })}
     >
-      {/* 保存ステータス（上部・常設）。指摘: 自動保存できたか分かるように。 */}
-      <header className="flex items-center justify-end px-5 pt-3 pb-1" style={{ minHeight: 28 }}>
+      {/* 保存ステータス（右・常設）＋ 既存エントリの削除トリガー（左・⋯）。 */}
+      <header
+        className="flex items-center justify-between px-5 pt-3 pb-1"
+        style={{ minHeight: 28 }}
+      >
+        {/* 既存エントリだけ削除できる（新規は削除対象が無いので出さない）。 */}
+        {entryId ? (
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            aria-label={t('delete')}
+            className="-ml-2 p-2 text-[var(--date-color)]"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <title>more</title>
+              <circle cx="12" cy="5" r="1.6" />
+              <circle cx="12" cy="12" r="1.6" />
+              <circle cx="12" cy="19" r="1.6" />
+            </svg>
+          </button>
+        ) : (
+          <span aria-hidden="true" />
+        )}
         <span
           aria-live="polite"
           className="flex items-center gap-1.5 text-xs"
@@ -306,6 +347,18 @@ export function SpEntryEditor({
           </div>
         </div>
       ) : null}
+
+      <SpConfirmSheet
+        open={deleteOpen}
+        title={tDelete('heading')}
+        message={tDelete('body')}
+        confirmLabel={tDelete('confirm')}
+        cancelLabel={tDelete('cancel')}
+        destructive
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteOpen(false)}
+      />
     </div>
   );
 }

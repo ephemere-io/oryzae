@@ -99,6 +99,21 @@ registerUnit<Props>({
         await ctx.wait(16);
       },
     },
+    {
+      id: 'delete-open',
+      probe: true,
+      description: 'Probe: 既存エントリで ⋯（削除）を押すと削除確認シートが開く（deleteOpen=true）',
+      props: {
+        api: null,
+        initialEntryId: 'entry-1',
+        initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
+      },
+      act: async (ctx) => {
+        ctx.click('button[aria-label="削除"]');
+        await ctx.wait(16);
+      },
+    },
   ],
   invariants: [
     {
@@ -184,6 +199,42 @@ registerUnit<Props>({
         return (
           (contract.pickling === 'true' && btn?.disabled === true) ||
           `expected pickling=true & disabled, got pickling=${contract.pickling}, disabled=${btn?.disabled}`
+        );
+      },
+    },
+    {
+      id: 'delete-trigger-iff-hasentry',
+      description: '削除トリガー（⋯ aria-label=削除）は hasEntry=true のときだけ描画される',
+      check: ({ root, contract }) => {
+        const hasTrigger = Boolean(root.querySelector('button[aria-label="削除"]'));
+        const expectEntry = contract.hasEntry === 'true';
+        return (
+          hasTrigger === expectEntry ||
+          `削除トリガー present=${hasTrigger} だが contract.hasEntry="${contract.hasEntry}"`
+        );
+      },
+    },
+    {
+      id: 'delete-sheet-iff-open',
+      description: '削除確認シート（fixed オーバーレイ）は deleteOpen=true のときだけ描画される',
+      check: ({ root, contract }) => {
+        const hasSheet = Boolean(root.querySelector('.fixed'));
+        const expectOpen = contract.deleteOpen === 'true';
+        return (
+          hasSheet === expectOpen ||
+          `delete sheet present=${hasSheet} だが contract.deleteOpen="${contract.deleteOpen}"`
+        );
+      },
+    },
+    {
+      id: 'delete-open-after-trigger',
+      description: '既存エントリで ⋯ を押すと deleteOpen=true になり確認シートが現れる',
+      onlyFixtures: ['delete-open'],
+      check: ({ root, contract }) => {
+        const hasSheet = Boolean(root.querySelector('.fixed'));
+        return (
+          (contract.deleteOpen === 'true' && hasSheet) ||
+          `⋯ 押下後 deleteOpen=true & シート表示のはずだが deleteOpen=${contract.deleteOpen}, sheet=${hasSheet}`
         );
       },
     },

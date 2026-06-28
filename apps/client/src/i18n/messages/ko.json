@@ -771,7 +771,8 @@
       "pickled": "발효를 시작했습니다 ✓",
       "question_link": "질문 연결",
       "ferment_title": "항아리에 담아 발효시키기",
-      "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다"
+      "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다",
+      "delete": "삭제"
     },
     "nav": {
       "write": "쓰기",
@@ -805,7 +806,8 @@
       "empty_filtered": "해당하는 항목이 없습니다",
       "sort_label": "정렬",
       "sort_newest": "최신순",
-      "sort_oldest": "오래된순"
+      "sort_oldest": "오래된순",
+      "delete": "삭제"
     },
     "questions": {
       "title": "질문",
