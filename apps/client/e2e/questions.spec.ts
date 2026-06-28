@@ -8,7 +8,8 @@ test.describe('質問管理', () => {
   test('質問ページに遷移できる', async ({ page }) => {
     await page.goto('/questions');
     await page.waitForURL('**/questions**');
-    await expect(page.locator('text=質問')).toBeVisible();
+    // PC の問い画面は「問いの変遷」見出し（用語は「質問」→「問い」）。
+    await expect(page.getByText('問いの変遷')).toBeVisible();
   });
 
   test('新しい質問を作成できる', async ({ page }) => {
