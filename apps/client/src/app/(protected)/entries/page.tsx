@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { DeviceView } from '@/components/device-view';
 import { EntryList, type FilterableQuestion } from '@/features/pc/entries/components/entry-list';
-import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
 import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpEntryList } from '@/features/sp/entries/components/sp-entry-list';
 
 export default function EntriesPage() {

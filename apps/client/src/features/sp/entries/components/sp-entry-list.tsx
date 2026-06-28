@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
@@ -29,7 +28,7 @@ function formatDate(iso: string): string {
 /**
  * SP 版エントリ一覧（Issue #363）。PC 同等に検索・問いで絞り込みを備える。
  * タップで詳細（/entries/[id]）へ遷移し、SP エディタで読み＋編集する。
- * 左上アバターからアカウント（ボトムナビにアカウントを置かない構成のため）。
+ * アカウント等への移動はボトムナビから。
  */
 export function SpEntryList({ api }: SpEntryListProps) {
   const t = useTranslations('sp.list');
@@ -53,27 +52,7 @@ export function SpEntryList({ api }: SpEntryListProps) {
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]">
-      <header className="flex items-center gap-3 px-5 pt-5 pb-3">
-        <Link
-          href="/account"
-          aria-label={t('account')}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
-          style={{ background: 'var(--accent)' }}
-        >
-          <svg
-            width="17"
-            height="17"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            aria-hidden="true"
-          >
-            <title>account</title>
-            <circle cx="12" cy="8" r="3.2" />
-            <path d="M5 20c0-3.3 3.1-5 7-5s7 1.7 7 5" strokeLinecap="round" />
-          </svg>
-        </Link>
+      <header className="px-5 pt-6 pb-3">
         <span className="text-lg font-medium" style={{ fontFamily: 'var(--ob-font-serif)' }}>
           {t('title')}
         </span>

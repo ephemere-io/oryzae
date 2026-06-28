@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useQuestions } from '@/features/pc/questions/hooks/use-questions';
+import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import type { ApiClient } from '@/lib/api';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
