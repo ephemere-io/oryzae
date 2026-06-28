@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>オフライン — Oryzae</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 32px;
+        text-align: center;
+        background: #f2ede0;
+        color: #5c4f3f;
+        font-family:
+          'Noto Sans JP', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1a1a1a;
+          color: #cccccc;
+        }
+      }
+      svg {
+        width: 88px;
+        height: 88px;
+      }
+      h1 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      p {
+        font-size: 0.9rem;
+        line-height: 1.7;
+        opacity: 0.7;
+        margin: 0;
+        max-width: 18rem;
+      }
+      button {
+        margin-top: 4px;
+        padding: 10px 22px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #fff;
+        background: #7a7440;
+        border: none;
+        border-radius: 9999px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path
+        d="M 86 36 L 86 78 C 86 88, 50 100, 42 138 C 36 172, 64 196, 100 196 C 136 196, 164 172, 158 138 C 150 100, 114 88, 114 78 L 114 36 Z"
+        fill="none"
+        stroke="#7A7440"
+        stroke-width="3.5"
+      />
+      <ellipse cx="100" cy="36" rx="14" ry="3.5" fill="none" stroke="#7A7440" stroke-width="3.5" />
+      <g fill="#9C9658">
+        <circle cx="100" cy="96" r="9.5" />
+        <circle cx="100" cy="118" r="7.5" />
+        <circle cx="78" cy="108" r="7.5" />
+        <circle cx="122" cy="108" r="7.5" />
+      </g>
+    </svg>
+    <h1>オフラインです</h1>
+    <p>インターネットに接続できませんでした。接続を確認して、もう一度お試しください。</p>
+    <button type="button" onclick="location.reload()">再読み込み</button>
+  </body>
+</html>

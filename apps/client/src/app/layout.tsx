@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { PostHogProvider } from '@/components/posthog-provider';
+import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import { AuthProvider } from '@/lib/auth-context';
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 import { type Device, isDevice } from '@/lib/device';
@@ -27,6 +28,11 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  // スタンドアロン（PWA）時のステータスバー色をアプリの背景に合わせる。
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f9f8f4' },
+    { media: '(prefers-color-scheme: dark)', color: '#1a1a1a' },
+  ],
 };
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -41,6 +47,17 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description,
     applicationName: BRAND_NAME,
+    // PWA: manifest（app/manifest.ts）と iOS スタンドアロン設定。
+    manifest: '/manifest.webmanifest',
+    appleWebApp: {
+      capable: true,
+      title: BRAND_NAME,
+      statusBarStyle: 'default',
+    },
+    other: {
+      // Android Chrome の全画面スタンドアロン用（apple-* は appleWebApp が付与する）。
+      'mobile-web-app-capable': 'yes',
+    },
     // icons / opengraph-image / apple-icon は app/ 配下のファイル規約で自動付与される。
     openGraph: {
       type: 'website',
@@ -89,6 +106,7 @@ export default async function RootLayout({
             </AuthProvider>
           </PostHogProvider>
         </NextIntlClientProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
