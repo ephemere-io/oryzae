@@ -34,10 +34,10 @@ test.describe('SP 体験 (#363)', () => {
     await expect(body).toBeVisible();
     await expect(body).not.toHaveValue('');
 
-    // 編集（10文字以上の差分で autosave がトリガ）→「保存済み」になる
+    // 編集（10文字以上の差分で autosave がトリガ）→「保存しました」になる
     const current = await body.inputValue();
     await body.fill(`${current} 【e2e-autosave-check】`);
-    await expect(page.getByText('保存済み')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('保存しました')).toBeVisible({ timeout: 10_000 });
 
     // 再読込しても編集が永続している（backend に保存された）
     await page.reload();
@@ -63,7 +63,7 @@ test.describe('SP 体験 (#363)', () => {
     await page.keyboard.press('Enter');
     await page.keyboard.type('3行目');
 
-    await expect(page.getByText('保存済み')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('保存しました')).toBeVisible({ timeout: 10_000 });
 
     // 一覧から開き直す（先頭行=タイトルが一覧の見出しになる）
     await page.goto('/entries');
