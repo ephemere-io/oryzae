@@ -5,6 +5,7 @@ import { getSupabaseClient } from '../../../shared/infrastructure/supabase-clien
 import { rateLimitFermentation } from '../../../shared/presentation/middleware/rate-limit.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
+import { ListFermentationResultsByUserUsecase } from '../../application/usecases/list-fermentation-results-by-user.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
 import { SendFermentationDigestUsecase } from '../../application/usecases/send-fermentation-digest.usecase.js';
 import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-user-locale-resolver.js';
@@ -81,13 +82,19 @@ export const fermentations = new Hono<Env>()
     }
   })
   .get('/', async (c) => {
-    const questionId = c.req.query('questionId');
-    if (!questionId) return c.json({ error: 'questionId is required' }, 400);
-
     const supabase = c.get('supabase');
     const repo = new SupabaseFermentationRepository(supabase);
-    const usecase = new ListFermentationResultsUsecase(repo);
 
+    // issue #363 perf: questionId 省略時はユーザーの全発酵結果を1回で返す（瓶の未読バッジ・
+    // 受信箱の N+1 を解消）。questionId 指定時は従来どおり問い単位で返す。
+    const questionId = c.req.query('questionId');
+    if (!questionId) {
+      const usecase = new ListFermentationResultsByUserUsecase(repo);
+      const results = await usecase.execute(c.get('userId'));
+      return c.json(results);
+    }
+
+    const usecase = new ListFermentationResultsUsecase(repo);
     const results = await usecase.execute(questionId);
     return c.json(results);
   })
