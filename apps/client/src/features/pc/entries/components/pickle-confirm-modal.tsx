@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 interface PickleConfirmModalProps {
@@ -32,6 +33,11 @@ export function PickleConfirmModal({
 
   return (
     <div
+      {...verifyAttrs({
+        unit: 'PickleConfirmModal',
+        saving,
+        linkedCount: linkedQuestionTexts.length,
+      })}
       role="dialog"
       aria-modal="true"
       aria-label={t('aria_label')}

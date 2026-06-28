@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 interface StatsPopupProps {
@@ -70,6 +71,12 @@ export function StatsPopup({ open, charCount, content, onClose }: StatsPopupProp
       />
       {/* Dialog */}
       <div
+        {...verifyAttrs({
+          unit: 'StatsPopup',
+          charCount,
+          lines,
+          paragraphs,
+        })}
         role="dialog"
         aria-label={t('aria_label')}
         className="fixed z-[301] w-[90%] max-w-[520px] overflow-y-auto rounded-xl shadow-lg"

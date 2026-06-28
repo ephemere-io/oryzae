@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
@@ -38,6 +39,7 @@ export function FermentationDisplayPromptModal({
         aria-modal="true"
         aria-label={t('aria_label')}
         className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-[71] w-[min(440px,92vw)] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg)] p-6 shadow-2xl"
+        {...verifyAttrs({ unit: 'FermentationDisplayPromptModal', open, remember })}
       >
         <h2 className="mb-2 text-lg font-bold text-[var(--fg)]">{t('heading')}</h2>
         <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-300">{t('body')}</p>

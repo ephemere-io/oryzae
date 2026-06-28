@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { type CSSProperties, type ReactNode, useCallback, useRef, useState } from 'react';
 import {
@@ -137,6 +138,10 @@ export function FermentationOverlay({ detail }: FermentationOverlayProps) {
     setPositions((prev) => ({ ...prev, letter: { x, y } }));
   }, []);
 
+  // Rendered (slice-capped) counts so the DOM publishes what is actually mounted.
+  const keywordCount = Math.min(detail.keywords.length, 5);
+  const snippetCount = Math.min(detail.snippets.length, 3);
+
   return (
     <>
       <style>{`
@@ -165,6 +170,14 @@ export function FermentationOverlay({ detail }: FermentationOverlayProps) {
         aria-hidden="false"
         className="pointer-events-none absolute inset-0 z-[5] overflow-visible"
         data-testid="fermentation-overlay"
+        {...verifyAttrs({
+          unit: 'FermentationOverlay',
+          keywordCount,
+          snippetCount,
+          hasLetter: detail.letter !== null,
+          detailOpen,
+          detailType,
+        })}
       >
         {detail.keywords.slice(0, 5).map((kw, i) => {
           const pos =

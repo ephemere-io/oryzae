@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 interface UnsavedChangesModalProps {
@@ -24,6 +25,7 @@ export function UnsavedChangesModal({
       aria-label="Unsaved changes dialog"
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+      {...verifyAttrs({ unit: 'UnsavedChangesModal', open })}
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();

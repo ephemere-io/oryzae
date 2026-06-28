@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
@@ -34,9 +35,17 @@ export function QuestionLinker({
   }
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto">
+    <div
+      className="flex items-center gap-2 overflow-x-auto"
+      {...verifyAttrs({
+        unit: 'QuestionLinker',
+        availableCount: available.length,
+        linkedCount: linked.length,
+      })}
+    >
       <div className="flex shrink-0 items-center gap-1.5">
         <select
+          aria-label={t('placeholder')}
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           className="w-44 rounded-full border border-zinc-300 bg-transparent px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700"
