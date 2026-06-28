@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { ConceptIllo, EditorIllo, JarIllo, QuestionIllo } from './illustrations';
 
@@ -81,7 +82,7 @@ export function StepQuestion({ onNext, draft, setDraft }: StepQuestionProps) {
   const valid = draft.trim().length > 0 && draft.trim().length <= 64;
   return (
     <>
-      <div className="ob-card-inner">
+      <div className="ob-card-inner" {...verifyAttrs({ unit: 'StepQuestion', valid })}>
         <div className="ob-illo-wrap">
           <QuestionIllo />
         </div>
@@ -94,6 +95,7 @@ export function StepQuestion({ onNext, draft, setDraft }: StepQuestionProps) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={t('placeholder')}
+            aria-label={t('placeholder')}
             maxLength={64}
             className="ob-input"
             // biome-ignore lint/a11y/noAutofocus: onboarding modal expects immediate focus on the input

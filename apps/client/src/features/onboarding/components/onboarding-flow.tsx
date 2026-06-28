@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import '../styles/onboarding.css';
@@ -26,7 +27,13 @@ export function OnboardingFlow({ onComplete, initialStep = 0 }: OnboardingFlowPr
   if (!open) return null;
 
   return (
-    <div className="ob-stage" role="dialog" aria-modal="true" aria-label={t('dialog_label')}>
+    <div
+      className="ob-stage"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('dialog_label')}
+      {...verifyAttrs({ unit: 'OnboardingFlow', step, hasDraft: draft.trim().length > 0 })}
+    >
       <div className="ob-card" key={step}>
         {step === 0 && <StepConcept onNext={() => setStep(1)} />}
         {step === 1 && <StepQuestion draft={draft} setDraft={setDraft} onNext={() => setStep(2)} />}

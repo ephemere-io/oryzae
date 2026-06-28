@@ -44,6 +44,12 @@ import '@/features/pc/fermentation/components/question-circle.verify';
 import '@/features/pc/questions/components/question-create-form.verify';
 import '@/features/pc/questions/components/question-timeline-event.verify';
 import '@/features/pc/questions/components/question-timeline.verify';
+import '@/features/sp/account/components/sp-account-page.verify';
+import '@/features/sp/entries/components/sp-entry-editor.verify';
+import '@/features/sp/questions/components/sp-questions.verify';
+import '@/features/onboarding/components/illustrations.verify';
+import '@/features/onboarding/components/onboarding-flow.verify';
+import '@/features/onboarding/components/steps.verify';
 // リファレンス用の自己完結サンプル（削除可）
 import '@/lib/verify/example-progress.verify';
 
