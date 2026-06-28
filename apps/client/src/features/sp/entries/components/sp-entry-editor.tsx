@@ -83,16 +83,16 @@ export function SpEntryEditor({
   }, [entryId, selectedQuestionId, linkQuestion]);
 
   const dirty = body !== lastSavedBody;
+  const hasBody = !!body.trim();
   const statusText = saving
     ? t('status_saving')
-    : !body.trim()
+    : !hasBody
       ? ''
       : dirty
         ? t('status_editing')
         : t('status_saved');
 
   const selectedQuestion = activeQuestions.find((q) => q.id === selectedQuestionId);
-  const pickleLabel = pickled ? t('pickled') : pickling ? t('pickling') : t('pickle');
 
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
@@ -104,50 +104,115 @@ export function SpEntryEditor({
   }
 
   return (
-    <div className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]">
+    <div
+      className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
+      style={{ fontFamily: 'var(--ob-font-serif, serif)' }}
+    >
+      {/* 保存ステータス（上部・常設）。指摘: 自動保存できたか分かるように。 */}
+      <header className="flex items-center justify-end px-5 pt-3 pb-1" style={{ minHeight: 28 }}>
+        <span
+          aria-live="polite"
+          className="flex items-center gap-1.5 text-xs"
+          style={{
+            color: error ? 'var(--ob-jar-warm, #d4714e)' : 'var(--accent)',
+            opacity: statusText || error ? 1 : 0,
+          }}
+        >
+          {saving ? (
+            <span
+              className="inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
+              aria-hidden="true"
+            />
+          ) : statusText && !error ? (
+            <span aria-hidden="true">✓</span>
+          ) : null}
+          {error || statusText || ' '}
+        </span>
+      </header>
+
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder={t('title_placeholder')}
-        className="w-full bg-transparent px-5 pt-5 pb-2 text-base font-medium outline-none placeholder:opacity-30"
+        className="w-full bg-transparent px-5 pt-2 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
       />
+
+      {/* 問いを結ぶチップ */}
+      <div className="px-5 pt-4">
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="max-w-full truncate rounded-full px-3 py-1.5 text-xs"
+          style={
+            selectedQuestion
+              ? {
+                  background: 'var(--accent-light, rgba(74,158,142,0.1))',
+                  color: 'var(--accent)',
+                  border: '1px solid rgba(74,158,142,0.2)',
+                }
+              : { color: 'var(--date-color)', border: '1px dashed var(--border-subtle)' }
+          }
+        >
+          {selectedQuestion
+            ? `◦ ${selectedQuestion.currentText ?? t('question_untitled')}`
+            : `+ ${t('question_link')}`}
+        </button>
+      </div>
+
+      {/* 本文（タイトルから広い余白＋ゆったり行間）。指摘: 余白が欲しい。 */}
       <textarea
         // biome-ignore lint/a11y/noAutofocus: 縦長フォーカスエディタは開いた瞬間に書き始められることが要件
         autoFocus
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder={t('body_placeholder')}
-        className="w-full flex-1 resize-none bg-transparent px-5 pb-4 text-lg leading-relaxed outline-none placeholder:opacity-40"
+        className="mt-6 w-full flex-1 resize-none bg-transparent px-5 pb-4 text-base outline-none placeholder:opacity-30"
+        style={{ lineHeight: 2 }}
       />
 
-      <footer className="flex items-center justify-between gap-3 border-t border-[color-mix(in_srgb,var(--fg)_12%,transparent)] px-5 py-3 text-xs">
-        <span aria-live="polite" className={error ? 'text-[#a65b2e]' : 'opacity-60'}>
-          {error || statusText}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSheetOpen(true)}
-            className="max-w-[42vw] truncate rounded-full border border-[color-mix(in_srgb,var(--fg)_24%,transparent)] px-3 py-1"
-          >
-            {selectedQuestion
-              ? t('question_selected', {
-                  label: selectedQuestion.currentText ?? t('question_untitled'),
-                })
-              : `${t('question')} ▾`}
-          </button>
-          {entryId ? (
+      {/* 発酵させる CTA（保存済み＝entryId 確定後のみ）。指摘: pickle の意味が不明瞭。 */}
+      {entryId ? (
+        <div
+          className="mx-4 mb-4 rounded-2xl p-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(212,113,78,0.08), rgba(74,158,142,0.06))',
+            border: '1px solid rgba(212,113,78,0.18)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-8 w-8 shrink-0"
+              style={{ color: 'var(--ob-jar-warm, #d4714e)' }}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
+              <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+            </svg>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium">
+                {pickled ? t('pickled') : t('ferment_title')}
+              </div>
+              <div className="mt-0.5 text-xs leading-snug opacity-60">{t('ferment_sub')}</div>
+            </div>
             <button
               type="button"
               onClick={handlePickle}
               disabled={pickling || pickled}
-              className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--fg)_24%,transparent)] px-3 py-1 disabled:opacity-50"
+              className="shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold text-white disabled:opacity-50"
+              style={{
+                background: 'var(--ob-jar-warm, #d4714e)',
+                fontFamily: 'var(--ob-font-sans, sans-serif)',
+              }}
             >
-              {pickleLabel}
+              {pickling ? t('pickling') : pickled ? '✓' : t('ferment_action')}
             </button>
-          ) : null}
+          </div>
         </div>
-      </footer>
+      ) : null}
 
       {sheetOpen ? (
         <div className="absolute inset-0 z-10 flex flex-col justify-end">

@@ -754,7 +754,7 @@
       "body_placeholder": "いま感じていることを、そのまま。",
       "status_editing": "編集中",
       "status_saving": "保存中…",
-      "status_saved": "保存済み",
+      "status_saved": "保存しました",
       "question": "問い",
       "question_selected": "問い: {label}",
       "question_untitled": "無題の問い",
@@ -762,8 +762,12 @@
       "question_empty": "立てている問いがありません（問いは PC で立てられます）",
       "close": "閉じる",
       "pickle": "瓶に漬ける",
-      "pickling": "漬けています…",
-      "pickled": "瓶に漬けました ✓"
+      "pickling": "納めています…",
+      "pickled": "発酵を始めました ✓",
+      "question_link": "問いを結ぶ",
+      "ferment_title": "瓶に納めて発酵させる",
+      "ferment_sub": "時間をおくと、AI からの手紙が届きます",
+      "ferment_action": "納める"
     },
     "nav": {
       "write": "書く",
@@ -781,9 +785,14 @@
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
-      "title": "エントリ一覧",
+      "title": "エントリー",
       "empty": "まだエントリがありません",
-      "untitled": "無題"
+      "untitled": "無題",
+      "account": "アカウント",
+      "search": "本文・タイトルを検索",
+      "search_clear": "検索をクリア",
+      "all": "すべて",
+      "empty_filtered": "該当するエントリーがありません"
     }
   }
 }
