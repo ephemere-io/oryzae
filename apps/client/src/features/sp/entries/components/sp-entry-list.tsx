@@ -4,7 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { useEntries } from '@/features/shared/entries/hooks/use-entries';
+import { type EntryListOrder, useEntries } from '@/features/shared/entries/hooks/use-entries';
 import type { ApiClient } from '@/lib/api';
 
 interface SpEntryListProps {
@@ -40,6 +40,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
   const [search, setSearch] = useState<string | undefined>();
   const [questionFilter, setQuestionFilter] = useState('');
   const questionId = questionFilter || undefined;
+  const [order, setOrder] = useState<EntryListOrder>('newest');
 
   // 入力を 300ms デバウンスして検索する（PC の useDebounce 相当を内製）。
   useEffect(() => {
@@ -49,7 +50,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
 
   const activeQuestions = availableQuestions;
   // Issue #362: useEntries は optimistic 化で authLoading 引数を撤去済み（api, search?, questionId?）。
-  const { entries, loading } = useEntries(api, search, questionId);
+  const { entries, loading } = useEntries(api, search, questionId, order);
 
   const isFiltering = !!search || !!questionId;
 
@@ -61,12 +62,39 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
         loading,
         count: entries.length,
         hasQuestions: activeQuestions.length > 0,
+        order,
       })}
     >
-      <header className="px-5 pt-6 pb-3">
+      <header className="flex items-center justify-between px-5 pt-6 pb-3">
         <span className="text-lg font-medium" style={{ fontFamily: 'var(--ob-font-serif)' }}>
           {t('title')}
         </span>
+        {/* 作成日のソート順トグル（新しい順 ⇄ 古い順）。サーバー側 created_at 並び替えに対応。 */}
+        <button
+          type="button"
+          id="sp-entries-sort-toggle"
+          onClick={() => setOrder((o) => (o === 'newest' ? 'oldest' : 'newest'))}
+          aria-label={t('sort_label')}
+          className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--date-color)]"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <title>sort</title>
+            <path
+              d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0-3 3m3-3 3 3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {order === 'newest' ? t('sort_newest') : t('sort_oldest')}
+        </button>
       </header>
 
       {/* 検索 */}

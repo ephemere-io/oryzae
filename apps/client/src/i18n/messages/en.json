@@ -802,7 +802,10 @@
       "search": "Search entries",
       "search_clear": "Clear search",
       "all": "All",
-      "empty_filtered": "No matching entries"
+      "empty_filtered": "No matching entries",
+      "sort_label": "Sort order",
+      "sort_newest": "Newest",
+      "sort_oldest": "Oldest"
     },
     "questions": {
       "title": "Questions",

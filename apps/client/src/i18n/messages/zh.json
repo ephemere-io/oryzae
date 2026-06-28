@@ -802,7 +802,10 @@
       "search": "搜索正文·标题",
       "search_clear": "清除搜索",
       "all": "全部",
-      "empty_filtered": "没有匹配的条目"
+      "empty_filtered": "没有匹配的条目",
+      "sort_label": "排序",
+      "sort_newest": "最新优先",
+      "sort_oldest": "最早优先"
     },
     "questions": {
       "title": "提问",

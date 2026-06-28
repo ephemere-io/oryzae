@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Build messages/{ja,en}.json from the i18n CSV.
+// Build messages/{ja,en,zh,ko}.json from the i18n CSV.
 //
 // Source priority:
 //   1. ORYZAE_I18N_CSV_URL env var (remote CSV URL)
@@ -8,6 +8,11 @@
 //
 // CSV columns: key,ja,en,zh,ko,file,line,context
 // Keys are dot-separated paths (e.g. "auth.callback.error_auth_failed").
+//
+// 非破壊マージ: 既存 JSON を土台にし、その上から CSV(Google Sheet)の値を上書きする。
+// これにより「CSV にまだ無いがコード側で直接追加したキー」(例: sp.list.sort_*)を
+// sync で消さない。Sheet が正のキーは CSV 値で上書きされるため、シート移行後は自然に一致する。
+// CSV に無く JSON にだけあるキーは「preserved」として警告に出し、後で棚卸しできるようにする。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -64,6 +69,31 @@ function parseCsv(text) {
   return rows;
 }
 
+/** 既存メッセージ JSON を読む。無い/壊れている場合は空オブジェクト（初回生成を許容）。 */
+function loadExistingJson(file) {
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** ネストしたメッセージオブジェクトをドット区切りのリーフキー一覧に平坦化する。 */
+function flattenKeys(obj, prefix = '') {
+  const keys = [];
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    const full = prefix ? `${prefix}.${k}` : k;
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      keys.push(...flattenKeys(v, full));
+    } else {
+      keys.push(full);
+    }
+  }
+  return keys;
+}
+
 function setNested(target, dottedKey, value) {
   const parts = dottedKey.split('.');
   let cur = target;
@@ -111,10 +141,13 @@ async function main() {
     throw new Error(`CSV header must include key/ja/en/zh/ko. Got: ${header.join(',')}`);
   }
 
-  const ja = {};
-  const en = {};
-  const zh = {};
-  const ko = {};
+  // 既存 JSON を土台にして CSV 値を上書きする（非破壊マージ）。
+  const ja = loadExistingJson(resolve(MESSAGES_DIR, 'ja.json'));
+  const en = loadExistingJson(resolve(MESSAGES_DIR, 'en.json'));
+  const zh = loadExistingJson(resolve(MESSAGES_DIR, 'zh.json'));
+  const ko = loadExistingJson(resolve(MESSAGES_DIR, 'ko.json'));
+  // CSV に載らず JSON にだけ残るキーを後で炙り出すための基準（ja を代表に取る）。
+  const existingKeys = new Set(flattenKeys(ja));
   let count = 0;
   const seenKeys = new Set();
   const dupes = [];
@@ -139,7 +172,15 @@ async function main() {
   writeFileSync(resolve(MESSAGES_DIR, 'zh.json'), `${JSON.stringify(zh, null, 2)}\n`);
   writeFileSync(resolve(MESSAGES_DIR, 'ko.json'), `${JSON.stringify(ko, null, 2)}\n`);
 
-  console.log(`Wrote ${count} keys to ${MESSAGES_DIR}/{ja,en,zh,ko}.json`);
+  console.log(`Wrote ${count} keys from CSV to ${MESSAGES_DIR}/{ja,en,zh,ko}.json`);
+  const preserved = [...existingKeys].filter((k) => !seenKeys.has(k));
+  if (preserved.length > 0) {
+    console.warn(
+      `Preserved ${preserved.length} key(s) present in JSON but not in CSV ` +
+        `(code-defined; reconcile into the sheet later): ` +
+        `${preserved.slice(0, 10).join(', ')}${preserved.length > 10 ? '…' : ''}`,
+    );
+  }
   if (dupes.length > 0) {
     console.warn(
       `Warning: ${dupes.length} duplicate keys (last wins): ${dupes.slice(0, 5).join(', ')}${dupes.length > 5 ? '...' : ''}`,

@@ -21,6 +21,9 @@ interface Entry {
 
 const PAGE_SIZE = 20;
 
+/** 一覧の作成日ソート順。'newest'=新しい順(既定) / 'oldest'=古い順。 */
+export type EntryListOrder = 'newest' | 'oldest';
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
 }
@@ -47,7 +50,12 @@ function normalizeEntry(raw: unknown): Entry {
   };
 }
 
-export function useEntries(api: ApiClient | null, search?: string, questionId?: string) {
+export function useEntries(
+  api: ApiClient | null,
+  search?: string,
+  questionId?: string,
+  order: EntryListOrder = 'newest',
+) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   // Issue #357: 取得失敗を握りつぶさず error ステートとして surface する（UI が ErrorState を出せる）。
@@ -56,6 +64,7 @@ export function useEntries(api: ApiClient | null, search?: string, questionId?: 
   const [hasMore, setHasMore] = useState(true);
   const prevSearchRef = useRef(search);
   const prevQuestionIdRef = useRef(questionId);
+  const prevOrderRef = useRef(order);
 
   const fetchEntries = useCallback(
     async (nextCursor?: string) => {
@@ -68,6 +77,7 @@ export function useEntries(api: ApiClient | null, search?: string, questionId?: 
         if (nextCursor) params.set('cursor', nextCursor);
         if (search) params.set('q', search);
         if (questionId) params.set('questionId', questionId);
+        params.set('order', order);
 
         const res = await api.fetch(`/api/v1/entries?${params}`);
 
@@ -77,7 +87,9 @@ export function useEntries(api: ApiClient | null, search?: string, questionId?: 
           setEntries((prev) => (nextCursor ? [...prev, ...items] : items));
           setHasMore(items.length === PAGE_SIZE);
           if (items.length > 0) {
-            setCursor(items[items.length - 1].id);
+            // カーソルはサーバーの created_at 比較（.lt/.gt）に合わせて作成日時を渡す。
+            // id を渡すと比較対象がずれて load-more が壊れる（過去バグ）。
+            setCursor(items[items.length - 1].createdAt);
           }
         } else {
           setError(true);
@@ -88,19 +100,25 @@ export function useEntries(api: ApiClient | null, search?: string, questionId?: 
 
       setLoading(false);
     },
-    [api, search, questionId],
+    [api, search, questionId, order],
   );
 
   useEffect(() => {
-    // Issue #331: 検索キーワードまたは問いフィルタが切り替わったらカーソルとリストをリセット
-    if (prevSearchRef.current !== search || prevQuestionIdRef.current !== questionId) {
+    // Issue #331: 検索キーワード・問いフィルタ・ソート順のいずれかが切り替わったら
+    // カーソルとリストをリセットして先頭から取り直す。
+    if (
+      prevSearchRef.current !== search ||
+      prevQuestionIdRef.current !== questionId ||
+      prevOrderRef.current !== order
+    ) {
       prevSearchRef.current = search;
       prevQuestionIdRef.current = questionId;
+      prevOrderRef.current = order;
       setEntries([]);
       setCursor(undefined);
       setHasMore(true);
     }
-  }, [search, questionId]);
+  }, [search, questionId, order]);
 
   // Issue #362: auth/me 完了を待たず、api が用意でき次第すぐ取得する（体感ロード短縮）。
   useEffect(() => {
