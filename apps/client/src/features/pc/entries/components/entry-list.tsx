@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/features/pc/entries/hooks/use-debounce';
-import { useDeleteEntry } from '@/features/pc/entries/hooks/use-delete-entry';
+import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import type { ApiClient } from '@/lib/api';
 import { DeleteConfirmModal } from './delete-confirm-modal';

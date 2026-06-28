@@ -5,6 +5,11 @@ import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor'
 import jaMessages from '@/i18n/messages/ja.json';
 import type { ApiClient } from '@/lib/api';
 
+// 削除後の一覧遷移で useRouter を使う（#363 SP 削除フロー）。jsdom には Next ランタイムが
+// 無いので no-op の router をモックする。
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return { baseUrl: '', headers: {}, fetch: fetchImpl };
 }
