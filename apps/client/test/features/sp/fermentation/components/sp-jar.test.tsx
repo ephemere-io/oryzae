@@ -69,4 +69,28 @@ describe('SpJar', () => {
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
     expect(screen.getByRole('button', { name: '返事を書く' })).toBeTruthy();
   });
+
+  it('手紙を開くと言葉(keywords)と抜粋(snippets)も表示する', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      if (url.startsWith('/api/v1/fermentations?'))
+        return Promise.resolve(jsonResponse(completedFermentation));
+      if (url === '/api/v1/fermentations/f1')
+        return Promise.resolve(
+          jsonResponse({
+            letter: { bodyText: '過去のあなたより。' },
+            keywords: [{ id: 'k1', keyword: '余白', description: '...' }],
+            snippets: [{ id: 's1', originalText: 'うまく言えない', sourceDate: '2024-02-01' }],
+          }),
+        );
+      return Promise.resolve(jsonResponse({}));
+    });
+    renderJar(createMockApi(fetchImpl));
+
+    fireEvent.click(await screen.findByText('なぜ続けるのか'));
+
+    expect(await screen.findByText('余白')).toBeTruthy();
+    expect(screen.getByText('「うまく言えない」')).toBeTruthy();
+  });
 });

@@ -24,8 +24,29 @@ interface FermentationSummary {
   createdAt: string;
 }
 
-interface FermentationDetailLetter {
-  letter: { bodyText: string } | null;
+/** 瓶の発酵が生んだ出力。手紙(letter)・言葉(keywords)・抜粋(snippets)。 */
+interface FermentationKeyword {
+  id: string;
+  keyword: string;
+  description: string;
+}
+
+interface FermentationSnippet {
+  id: string;
+  originalText: string;
+  sourceDate: string;
+}
+
+interface FermentationDetail {
+  bodyText: string | null;
+  keywords: FermentationKeyword[];
+  snippets: FermentationSnippet[];
+}
+
+interface RawFermentationDetail {
+  letter?: { bodyText?: string } | null;
+  keywords?: FermentationKeyword[];
+  snippets?: FermentationSnippet[];
 }
 
 // unread-context と同じ localStorage キーを共有（瓶を見た時刻）
@@ -88,14 +109,17 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
   return { letters, loading, refetch: fetchInbox };
 }
 
-/** 手紙本文を取得する。開いた発酵の詳細から letter.bodyText を読む。 */
-export function useFermentationLetter(api: ApiClient | null, fermentationId: string | null) {
-  const [bodyText, setBodyText] = useState<string | null>(null);
+/**
+ * 開いた発酵の詳細（手紙・言葉・抜粋）を取得する。指摘「瓶は手紙以外の出力も
+ * 確認できるべき」への対応で、PC 同様 keywords/snippets も読む。
+ */
+export function useFermentationDetail(api: ApiClient | null, fermentationId: string | null) {
+  const [detail, setDetail] = useState<FermentationDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!api || !fermentationId) {
-      setBodyText(null);
+      setDetail(null);
       return;
     }
     let cancelled = false;
@@ -103,8 +127,12 @@ export function useFermentationLetter(api: ApiClient | null, fermentationId: str
     api.fetch(`/api/v1/fermentations/${fermentationId}`).then(async (res) => {
       if (cancelled) return;
       if (res.ok) {
-        const detail: FermentationDetailLetter = await res.json();
-        setBodyText(detail.letter?.bodyText ?? null);
+        const raw: RawFermentationDetail = await res.json();
+        setDetail({
+          bodyText: raw.letter?.bodyText ?? null,
+          keywords: Array.isArray(raw.keywords) ? raw.keywords : [],
+          snippets: Array.isArray(raw.snippets) ? raw.snippets : [],
+        });
       }
       setLoading(false);
     });
@@ -113,5 +141,5 @@ export function useFermentationLetter(api: ApiClient | null, fermentationId: str
     };
   }, [api, fermentationId]);
 
-  return { bodyText, loading };
+  return { detail, loading };
 }

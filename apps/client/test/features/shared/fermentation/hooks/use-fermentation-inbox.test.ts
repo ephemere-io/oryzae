@@ -1,8 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  useFermentationDetail,
   useFermentationInbox,
-  useFermentationLetter,
 } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import type { ApiClient } from '@/lib/api';
 
@@ -65,30 +65,41 @@ describe('useFermentationInbox', () => {
   });
 });
 
-describe('useFermentationLetter', () => {
+describe('useFermentationDetail', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('発酵詳細から手紙本文を取り出す', async () => {
+  it('発酵詳細から手紙・言葉・抜粋を取り出す', async () => {
     const fetchImpl = vi.fn(() =>
-      Promise.resolve(jsonResponse({ letter: { bodyText: 'こんにちは、過去の自分より' } })),
+      Promise.resolve(
+        jsonResponse({
+          letter: { bodyText: 'こんにちは、過去の自分より' },
+          keywords: [{ id: 'k1', keyword: '余白', description: '...' }],
+          snippets: [{ id: 's1', originalText: 'うまく言えない', sourceDate: '2024-02-01' }],
+        }),
+      ),
     );
     const api = createMockApi(fetchImpl);
-    const { result } = renderHook(() => useFermentationLetter(api, 'f1'));
-    await waitFor(() => expect(result.current.bodyText).toBe('こんにちは、過去の自分より'));
+    const { result } = renderHook(() => useFermentationDetail(api, 'f1'));
+    await waitFor(() => expect(result.current.detail?.bodyText).toBe('こんにちは、過去の自分より'));
+    expect(result.current.detail?.keywords).toHaveLength(1);
+    expect(result.current.detail?.keywords[0].keyword).toBe('余白');
+    expect(result.current.detail?.snippets).toHaveLength(1);
   });
 
-  it('letter が無ければ null', async () => {
+  it('letter / keywords / snippets が無ければ空で返す', async () => {
     const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse({ letter: null })));
     const api = createMockApi(fetchImpl);
-    const { result } = renderHook(() => useFermentationLetter(api, 'f1'));
+    const { result } = renderHook(() => useFermentationDetail(api, 'f1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.bodyText).toBeNull();
+    expect(result.current.detail?.bodyText).toBeNull();
+    expect(result.current.detail?.keywords).toEqual([]);
+    expect(result.current.detail?.snippets).toEqual([]);
   });
 
   it('fermentationId が null なら fetch しない', () => {
     const fetchImpl = vi.fn();
     const api = createMockApi(fetchImpl);
-    renderHook(() => useFermentationLetter(api, null));
+    renderHook(() => useFermentationDetail(api, null));
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
