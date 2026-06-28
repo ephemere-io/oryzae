@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
 import { LOCALE_OPTIONS, type Locale } from '@/i18n/config';
 import { setLocaleAction } from '@/lib/i18n-actions';
@@ -17,9 +17,8 @@ export function LandingPage() {
   const t = useTranslations('landing');
   const locale = useLocale();
 
-  useEffect(() => {
-    document.title = t('title');
-  }, [t]);
+  // ページタイトル/メタは app/page.tsx の generateMetadata で SSR 付与する
+  // （旧来の document.title 上書きは欠損キー参照かつ SEO 上 SSR されないため撤去）。
 
   return (
     <div className={styles.landingRoot}>
