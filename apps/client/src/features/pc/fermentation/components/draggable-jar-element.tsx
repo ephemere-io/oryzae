@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
 
@@ -56,6 +57,7 @@ export function DraggableJarElement({
   return (
     <div
       {...pointerHandlers}
+      {...verifyAttrs({ unit: 'DraggableJarElement', enabled, x, y })}
       className={className}
       style={{
         ...style,

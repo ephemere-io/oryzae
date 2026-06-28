@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
 
@@ -26,6 +27,7 @@ export function LeaveConfirmModal({ open, onCancel, onConfirm }: LeaveConfirmMod
       aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+      {...verifyAttrs({ unit: 'LeaveConfirmModal', open })}
       onClick={onCancel}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onCancel();

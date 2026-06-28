@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
@@ -51,6 +52,12 @@ export function SaveTitleModal({
       aria-label={t('aria_label')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+      {...verifyAttrs({
+        unit: 'SaveTitleModal',
+        open,
+        saving,
+        initialTitle,
+      })}
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();

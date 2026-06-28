@@ -82,7 +82,13 @@ function accessibleName(el: HTMLElement): string {
 
 function inputLabel(el: HTMLInputElement, root: HTMLElement): boolean {
   if (el.getAttribute('aria-label') || el.getAttribute('aria-labelledby')) return true;
-  if (el.id && root.querySelector(`label[for="${CSS.escape(el.id)}"]`)) return true;
+  // `label[for=<id>]` を探す。CSS.escape は jsdom で未実装のことがあるため使わず、
+  // for 属性を直接比較する（壊れない・ブラウザでも同じ判定）。
+  if (el.id) {
+    for (const label of Array.from(root.querySelectorAll('label[for]'))) {
+      if (label.getAttribute('for') === el.id) return true;
+    }
+  }
   if (el.closest('label')) return true;
   return false;
 }

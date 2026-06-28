@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 export type EditorStatus = 'editing' | 'saved' | 'saving' | 'autosaving';
@@ -14,9 +15,19 @@ export function EditorStatusBar({ status, charCount }: EditorStatusBarProps) {
   const statusLabel = t(status);
 
   const isInFlight = status === 'saving' || status === 'autosaving';
+  const fillPct = Math.min(100, (charCount / 2000) * 100);
 
   return (
-    <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-1.5 text-xs text-[var(--date-color)]">
+    <div
+      className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-1.5 text-xs text-[var(--date-color)]"
+      {...verifyAttrs({
+        unit: 'EditorStatusBar',
+        status,
+        charCount,
+        inFlight: isInFlight,
+        fillPct,
+      })}
+    >
       <div className="flex items-center gap-2">
         <span
           className={`inline-block h-1.5 w-1.5 rounded-full ${
@@ -29,7 +40,7 @@ export function EditorStatusBar({ status, charCount }: EditorStatusBarProps) {
         <div className="h-1 w-24 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
           <div
             className="h-full rounded-full bg-zinc-400 transition-all duration-300"
-            style={{ width: `${Math.min(100, (charCount / 2000) * 100)}%` }}
+            style={{ width: `${fillPct}%` }}
           />
         </div>
       </div>

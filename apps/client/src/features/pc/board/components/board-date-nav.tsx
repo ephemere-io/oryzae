@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 interface BoardDateNavProps {
@@ -59,6 +60,7 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
     viewType === 'weekly' ? formatWeeklyLabel(dateKey) : formatDailyLabel(dateKey, days);
   return (
     <div
+      {...verifyAttrs({ unit: 'BoardDateNav', viewType, dateKey, label })}
       className="absolute left-6 top-5 z-10 flex items-center gap-3"
       style={{ fontFamily: 'Inter, sans-serif' }}
     >

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { type MouseEvent, type PointerEvent, useMemo, useRef } from 'react';
 import { DraggableJarElement } from '@/features/pc/fermentation/components/draggable-jar-element';
 import type { FermentationDetail } from '@/features/pc/fermentation/hooks/use-fermentation-results';
@@ -157,12 +158,32 @@ export function QuestionCircle({
 
   const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);
 
+  // Rendered (capped) counts — matches the .slice() limits below so the DOM contract
+  // never claims more elements than are actually drawn.
+  const keywordCount = hasData ? Math.min(detail.keywords.length, 5) : 0;
+  const snippetCount = hasData ? Math.min(detail.snippets.length, 3) : 0;
+  const hasLetter = Boolean(hasData && detail.letter);
+
   return (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label と role="button" は同じ !zoomed 条件で付与され、ズーム時は両方 undefined（generic role には付かない）。Biome は条件付き role を静的解決できず誤検出する。
     <div
       ref={circleRef}
       {...circlePointerHandlers}
+      {...verifyAttrs({
+        unit: 'QuestionCircle',
+        zoomed,
+        hidden,
+        hasData: Boolean(hasData),
+        keywordCount,
+        snippetCount,
+        hasLetter,
+      })}
       role={zoomed ? undefined : 'button'}
       tabIndex={zoomed ? undefined : 0}
+      // Non-zoomed circle is an interactive button but its only text (the rotating
+      // ring) is aria-hidden, so give it an accessible name. Tied to the same !zoomed
+      // condition as role/tabIndex/onKeyDown (zoomed = non-interactive, no name needed).
+      aria-label={zoomed ? undefined : questionText}
       onKeyDown={
         zoomed
           ? undefined

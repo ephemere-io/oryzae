@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 export type FermentationOverlayDetailType = 'keyword' | 'snippet' | 'letter';
@@ -48,6 +49,12 @@ export function FermentationOverlayDetailPane({
         fontFamily: "'Noto Serif JP', serif",
       }}
       aria-hidden={!open}
+      {...verifyAttrs({
+        unit: 'FermentationOverlayDetailPane',
+        open,
+        type: type ?? 'none',
+        hasData: Boolean(data),
+      })}
     >
       <button
         type="button"

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useRef } from 'react';
 import type { BoardCardData } from '../hooks/use-board';
 import { EntryCardContent } from './entry-card-content';
@@ -88,6 +89,14 @@ export function BoardCard({
       ref={cardRef}
       data-card-id={card.id}
       className="board-card"
+      {...verifyAttrs({
+        unit: 'BoardCard',
+        cardType: card.cardType,
+        selected: isSelected,
+        dragging: isDragging,
+        rotation: card.rotation,
+        removing: Boolean(card.removing),
+      })}
       style={{
         position: 'absolute',
         left: card.x,
