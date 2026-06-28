@@ -46,6 +46,8 @@ export default function DashboardPage() {
   const {
     activeWriters,
     totalUsers,
+    returningUsers,
+    previousActiveUsers,
     loading: activityLoading,
     error: activityError,
     refresh: refreshActivity,
@@ -140,6 +142,8 @@ export default function DashboardPage() {
           <UserActivityCard
             activeWriters={activeWriters}
             totalUsers={totalUsers}
+            returningUsers={returningUsers}
+            previousActiveUsers={previousActiveUsers}
             periodLabel={periodLabel}
           />
         </div>
