@@ -9,7 +9,7 @@ import { Sidebar } from '@/features/auth/components/sidebar';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/onboarding/types';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useAuth } from '@/lib/auth-context';
 import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';

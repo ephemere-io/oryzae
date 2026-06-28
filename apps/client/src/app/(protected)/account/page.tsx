@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { DeviceView } from '@/components/device-view';
 import { AccountPage } from '@/features/auth/components/account-page';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 import { SpAccountPage } from '@/features/sp/account/components/sp-account-page';
+import { useAuth } from '@/lib/auth-context';
 
 export default function AccountRoute() {
   const { auth, loading, logout } = useAuth();

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { PostHogProvider } from '@/components/posthog-provider';
+import { AuthProvider } from '@/lib/auth-context';
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 import './globals.css';
 
@@ -76,7 +77,9 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--fg)]">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <PostHogProvider>{children}</PostHogProvider>
+          <PostHogProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </PostHogProvider>
         </NextIntlClientProvider>
       </body>
     </html>

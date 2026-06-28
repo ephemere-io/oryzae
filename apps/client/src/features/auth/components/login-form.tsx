@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/auth/components/google-login-button';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
+import { useAuth } from '@/lib/auth-context';
 
 export function LoginForm() {
   const t = useTranslations('auth.login');

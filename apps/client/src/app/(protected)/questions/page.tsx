@@ -6,9 +6,9 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QuestionCreateForm } from '@/features/pc/questions/components/question-create-form';
 import { QuestionTimeline } from '@/features/pc/questions/components/question-timeline';
-import { useAuth } from '@/features/shared/auth/hooks/use-auth';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
+import { useAuth } from '@/lib/auth-context';
 
 export default function QuestionsPage() {
   const t = useTranslations('questions.timeline');
