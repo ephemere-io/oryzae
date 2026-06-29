@@ -194,7 +194,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
           {isFiltering ? t('empty_filtered') : t('empty')}
         </div>
       ) : (
-        <ul className="mt-1 flex-1 overflow-auto px-5">
+        <ul className="sp-rise mt-1 flex-1 overflow-auto px-5">
           {entries.map((entry) => {
             const title = firstLine(entry.content) || t('untitled');
             const q = entry.linkedQuestions[0];

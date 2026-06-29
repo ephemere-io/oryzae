@@ -64,7 +64,7 @@ export function SpJar({ api }: SpJarProps) {
       ) : letters.length === 0 ? (
         <div className="px-5 py-12 text-center text-sm opacity-50">{t('empty')}</div>
       ) : (
-        <ul className="flex-1 overflow-auto px-5">
+        <ul className="sp-rise flex-1 overflow-auto px-5">
           {letters.map((letter) => (
             <li key={letter.fermentationId}>
               <button
@@ -92,7 +92,7 @@ export function SpJar({ api }: SpJarProps) {
       )}
 
       {open ? (
-        <div className="absolute inset-0 z-10 flex flex-col bg-[var(--bg)]">
+        <div className="sp-rise absolute inset-0 z-10 flex flex-col bg-[var(--bg)]">
           <header
             className="flex items-center justify-between gap-3 px-5 py-4 text-xs"
             style={{ color: 'var(--date-color)' }}
