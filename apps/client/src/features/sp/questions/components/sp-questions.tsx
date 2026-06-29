@@ -99,7 +99,7 @@ export function SpQuestions({
       {loading ? (
         <ListSkeleton />
       ) : (
-        <div className="flex-1 overflow-auto px-5 pb-4">
+        <div className="sp-rise flex-1 overflow-auto px-5 pb-4">
           {/* Oryzae からの提案 */}
           {proposed.length > 0 ? (
             <div className="mb-4">
