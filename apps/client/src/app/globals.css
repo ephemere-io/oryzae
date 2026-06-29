@@ -136,3 +136,60 @@ body {
     opacity: 0;
   }
 }
+
+/* SP のふんわり出現アニメーション（Issue #363）。カクッと現れる感じを消すための、
+   気づくか気づかないか程度の控えめなフェード＋わずかな上昇。transform/opacity のみで
+   GPU 合成に乗せ、reduce 設定では完全に無効化する。 */
+@keyframes spRise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* コンテンツ出現（一覧・詳細など）。短く・ease-out で settle させる。 */
+.sp-rise {
+  animation: spRise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ボトムシートのパネル：下から少しだけスライドしてフェード。 */
+.sp-sheet {
+  animation: spSheetUp 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* オーバーレイ／背景のフェード。 */
+.sp-fade {
+  animation: spFade 0.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-rise,
+  .sp-sheet,
+  .sp-fade {
+    animation: none;
+  }
+}

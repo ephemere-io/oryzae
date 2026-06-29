@@ -259,7 +259,7 @@ export function SpEntryEditor({
       {/* 発酵させる CTA（保存済み＝entryId 確定後のみ）。
           バナー全体を1つの大きなボタンにして、シンプルで押しやすく（指摘対応）。 */}
       {entryId ? (
-        <div className="mx-4 mb-4">
+        <div className="sp-rise mx-4 mb-4">
           <button
             type="button"
             onClick={handlePickle}
@@ -314,9 +314,9 @@ export function SpEntryEditor({
             type="button"
             aria-label={t('close')}
             onClick={() => setSheetOpen(false)}
-            className="flex-1 bg-black/30"
+            className="sp-fade flex-1 bg-black/30"
           />
-          <div className="max-h-[60%] overflow-auto rounded-t-2xl bg-[var(--bg)] pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
+          <div className="sp-sheet max-h-[60%] overflow-auto rounded-t-2xl bg-[var(--bg)] pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
             <div className="px-5 py-4 text-sm font-medium opacity-70">
               {t('question_sheet_title')}
             </div>
