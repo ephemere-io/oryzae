@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { ListSkeleton } from '@/components/ui/list-skeleton';
 
 interface QuestionItem {
   id: string;
@@ -95,7 +96,9 @@ export function SpQuestions({
       <header className="px-5 pt-6 pb-1 text-lg font-medium">{t('title')}</header>
       <p className="px-5 pb-2 text-xs leading-relaxed text-[var(--date-color)]">{t('intro')}</p>
 
-      {loading ? null : (
+      {loading ? (
+        <ListSkeleton />
+      ) : (
         <div className="flex-1 overflow-auto px-5 pb-4">
           {/* Oryzae からの提案 */}
           {proposed.length > 0 ? (

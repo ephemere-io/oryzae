@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { ListSkeleton } from '@/components/ui/list-skeleton';
 import {
   type InboxLetter,
   useFermentationDetail,
@@ -58,7 +59,9 @@ export function SpJar({ api }: SpJarProps) {
     >
       <header className="px-5 pt-6 pb-3 text-lg font-medium">{t('title')}</header>
 
-      {loading ? null : letters.length === 0 ? (
+      {loading ? (
+        <ListSkeleton />
+      ) : letters.length === 0 ? (
         <div className="px-5 py-12 text-center text-sm opacity-50">{t('empty')}</div>
       ) : (
         <ul className="flex-1 overflow-auto px-5">
