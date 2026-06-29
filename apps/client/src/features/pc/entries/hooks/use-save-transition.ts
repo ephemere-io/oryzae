@@ -46,10 +46,6 @@ export function useSaveTransition() {
       overlay.innerHTML = '';
       overlay.classList.remove('phase-scatter', 'phase-condense', 'phase-float');
       overlay.classList.add('active');
-      // 遷移カーテンの初期化（前回実行が残した不透明背景・スタイルをリセット）。
-      overlay.style.background = '';
-      overlay.style.opacity = '';
-      overlay.style.transition = '';
 
       // ── Inject CSS (once) ──
       if (!document.getElementById('save-transition-styles')) {
@@ -167,14 +163,10 @@ export function useSaveTransition() {
 
       // ── Animation timeline ──
 
-      // Phase 1 (0s): Scatter。同時に背景を ~1s かけて不透明化する（遷移カーテン）。
-      // 行き先(/jar)へのナビ(t=1.5s)で出る loading.tsx・一覧スケルトンが透明オーバーレイ越しに
-      // 見えてアニメを途切れさせる #363 の回帰を、ナビ発火前(~1s)に覆い切ることで防ぐ。
+      // Phase 1 (0s): Scatter
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           overlay.classList.add('phase-scatter');
-          overlay.style.transition = 'background-color 1s ease';
-          overlay.style.background = 'var(--bg)';
         });
       });
 
@@ -209,7 +201,6 @@ export function useSaveTransition() {
           overlay.classList.remove('active', 'phase-scatter', 'phase-condense', 'phase-float');
           overlay.style.opacity = '';
           overlay.style.transition = '';
-          overlay.style.background = '';
           overlay.innerHTML = '';
           runningRef.current = false;
         }, 1500);
