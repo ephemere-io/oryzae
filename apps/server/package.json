@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.4",
-    "dependency-cruiser": "^17.4.3",
+    "dependency-cruiser": "^18.0.0",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.6"
