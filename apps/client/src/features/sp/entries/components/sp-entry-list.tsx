@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
+import { ListSkeleton } from '@/components/ui/list-skeleton';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { type EntryListOrder, useEntries } from '@/features/shared/entries/hooks/use-entries';
 import type { ApiClient } from '@/lib/api';
@@ -186,7 +187,9 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
         </div>
       ) : null}
 
-      {loading ? null : entries.length === 0 ? (
+      {loading ? (
+        <ListSkeleton />
+      ) : entries.length === 0 ? (
         <div className="px-5 py-12 text-center text-sm opacity-50">
           {isFiltering ? t('empty_filtered') : t('empty')}
         </div>
