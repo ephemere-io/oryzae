@@ -14,8 +14,10 @@ import { useDevice } from '@/lib/use-device';
  * 端末でスケルトンの枠を出し分ける（PC/SP でページの実レイアウトが異なるため）。
  * 旧実装は SP 形（全幅・左 px-5）固定だったので、PC では中央寄せの本体と位置がズレ、
  * 本体読込時にスケルトンと全く違う位置へ DOM がジャンプしていた。
- *  - PC: 一覧ページと同じ中央枠（max-w-[680px] px-6 pt-10）＋ヘッダ行＋カード型行。
- *        ページ mount 後に出る EntryListSkeleton と枠・行の形を揃え、継ぎ目をなくす。
+ *  - PC: 一覧ページと同じ中央枠（max-w-[680px] px-6 pt-10）＋ヘッダ行＋フィルタ/検索
+ *        プレースホルダ＋カード型行。ページ mount 後に出る EntryList のスケルトン段階
+ *        （ヘッダ→問いフィルタ→検索→EntryListSkeleton）と枠・縦順・行の形を揃え、
+ *        横位置だけでなく縦位置も継ぎ目なくする。
  *        （questions は max-w-[800px]・board/jar は全幅キャンバスのため厳密一致はしないが、
  *          いずれも中央寄せ近似で旧実装より良く、報告されたのは一覧のズレ。）
  *  - SP: 全画面・全幅の一覧スケルトン（各 SP 画面と同形）。
@@ -40,7 +42,15 @@ export default function Loading() {
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-8 w-28 rounded-full" />
           </div>
-          {/* カード型行（EntryListSkeleton と同形: 日付行＋本文2行・gap-8） */}
+          {/* 問いフィルタ行（EntryList: ラベル＋select, mb-3）。本体 mount 後に
+              フィルタ＋検索が挿入されると下のカード行が縦にずれるのを防ぐ。 */}
+          <div className="mb-3 flex items-center gap-2">
+            <Skeleton className="h-3 w-12 shrink-0" />
+            <Skeleton className="h-10 flex-1 rounded-lg" />
+          </div>
+          {/* 検索バー（EntryList: search input, mb-4・常時表示） */}
+          <Skeleton className="mb-4 h-[42px] w-full rounded-lg" />
+          {/* カード型行（EntryListSkeleton と同形: 日付行＋本文2行・gap-8 pt-6） */}
           <div className="flex flex-col gap-8 pt-6">
             {PC_ROW_KEYS.map((k) => (
               <div key={k} className="flex flex-col gap-2">
