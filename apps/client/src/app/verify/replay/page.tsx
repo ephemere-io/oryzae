@@ -15,7 +15,8 @@ function num(v: string | string[] | undefined): number | undefined {
 }
 
 /**
- * Replay 画面（dev/preview 限定。本番では 404）。
+ * Replay 画面（dev/preview 限定。真の本番のみ 404）。
+ * Vercel は preview も production も NODE_ENV=production のため、VERCEL_ENV で切り分ける。
  * クエリ（dwell/pre/key/chrome/auto/unit）を解釈して props で ReplayPage に渡す。
  */
 export default async function VerifyReplayRoute({
@@ -23,7 +24,7 @@ export default async function VerifyReplayRoute({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  if (process.env.NODE_ENV === 'production') notFound();
+  if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV !== 'preview') notFound();
   const sp = await searchParams;
   return (
     <ReplayClient
