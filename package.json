@@ -2,6 +2,9 @@
   "name": "oryzae",
   "private": true,
   "packageManager": "pnpm@10.26.2",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "lint": "biome check apps/ packages/",
     "lint:fix": "biome check --write apps/ packages/",
