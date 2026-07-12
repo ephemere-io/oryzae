@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -88,6 +89,9 @@ function AccountIcon() {
  * エントリー / 問い / 書く(中央FAB) / 瓶 / アカウント の5つ。
  * 瓶には未読（届いた手紙）バッジ。device=sp の (protected) シェルでのみ使う。
  */
+// verify-exempt: usePathname（能動タブ）と useUnread（バッジ）依存で、孤立検証には
+// フィクスチャ毎の PathnameContext 差し替え＋Unread 供給が要る。能動状態・バッジは
+// ブラウザゴールデン（実 router/実 unread）で担保する。DOM 契約は verifyAttrs で公表。
 export function SpBottomNav() {
   const t = useTranslations('sp.nav');
   const pathname = usePathname();
@@ -98,9 +102,19 @@ export function SpBottomNav() {
   const onQuestions = pathname.startsWith('/questions');
   const onJar = pathname.startsWith('/jar');
   const onAccount = pathname.startsWith('/account');
+  const activeTab = onList
+    ? 'list'
+    : onQuestions
+      ? 'questions'
+      : onJar
+        ? 'jar'
+        : onAccount
+          ? 'account'
+          : 'none';
 
   return (
     <nav
+      {...verifyAttrs({ unit: 'SpBottomNav', activeTab, unreadCount, tabCount: 5 })}
       className="relative flex flex-none items-center justify-around px-1"
       style={{
         // ホームインジケータ分を下パディングで確保（viewport-fit=cover で env が効く）。
