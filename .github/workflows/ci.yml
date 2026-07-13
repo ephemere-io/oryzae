@@ -84,7 +84,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Sticky comment with preview /verify links
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const marker = '<!-- verify-demo -->';
