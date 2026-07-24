@@ -75,6 +75,18 @@ describe('useFermentationReadiness', () => {
     expect(result.current.readiness).toBeNull();
   });
 
+  it('形状が不正なレスポンスは型ガードで弾かれ readiness は null のまま', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { totalReadiness: 'oops', language: 'fr' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useFermentationReadiness(api, false));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.readiness).toBeNull();
+  });
+
   it('refresh() で再取得できる', async () => {
     apiFetch
       .mockResolvedValueOnce(
