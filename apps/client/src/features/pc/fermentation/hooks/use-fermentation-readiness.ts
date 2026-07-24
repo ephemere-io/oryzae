@@ -18,6 +18,21 @@ interface FermentationReadinessResponse {
   language: 'ja' | 'en';
 }
 
+// API レスポンスは unknown として受け取り、型ガードで絞り込む（`as` キャスト禁止）。
+// 形状が不正なら null 扱いにして UI を壊さない。
+function isFermentationReadinessResponse(value: unknown): value is FermentationReadinessResponse {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'totalReadiness' in value &&
+    typeof value.totalReadiness === 'number' &&
+    'questionCount' in value &&
+    typeof value.questionCount === 'number' &&
+    'language' in value &&
+    (value.language === 'ja' || value.language === 'en')
+  );
+}
+
 interface UseFermentationReadinessResult {
   readiness: FermentationReadinessResponse | null;
   loading: boolean;
@@ -36,8 +51,10 @@ export function useFermentationReadiness(
     setLoading(true);
     const res = await api.fetch('/api/v1/fermentations/readiness');
     if (res.ok) {
-      const json = (await res.json()) as FermentationReadinessResponse;
-      setReadiness(json);
+      const json: unknown = await res.json();
+      if (isFermentationReadinessResponse(json)) {
+        setReadiness(json);
+      }
     }
     setLoading(false);
   }, [api]);
