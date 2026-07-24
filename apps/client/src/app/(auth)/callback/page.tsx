@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import posthog from 'posthog-js';
 import { Suspense, useEffect, useState } from 'react';
@@ -23,7 +23,6 @@ function CallbackHandler() {
   const t = useTranslations('auth.callback');
   const tErr = useTranslations('auth.error');
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -60,7 +59,10 @@ function CallbackHandler() {
 
         setTokens(data.session.accessToken, data.session.refreshToken);
         posthog.identify(data.user.id, { email: data.user.email });
-        router.push('/entries/new');
+        // OAuth 完了はフルページ遷移で確定させる。router.push（アプリ内遷移）だと root の
+        // AuthProvider が再マウントされず restoreSession が再実行されないため、ここで保存した
+        // トークンを認証コンテキストが読めず /login に弾かれる（#363 S1 Context 化の回帰修正）。
+        window.location.assign('/entries/new');
         return;
       }
 
@@ -99,7 +101,10 @@ function CallbackHandler() {
           const data = (await finalizeRes.json()) as { user: { id: string; email: string } };
           posthog.identify(data.user.id, { email: data.user.email });
 
-          router.push('/entries/new');
+          // OAuth 完了はフルページ遷移で確定させる。router.push（アプリ内遷移）だと root の
+          // AuthProvider が再マウントされず restoreSession が再実行されないため、ここで保存した
+          // トークンを認証コンテキストが読めず /login に弾かれる（#363 S1 Context 化の回帰修正）。
+          window.location.assign('/entries/new');
           return;
         }
       }
@@ -108,7 +113,7 @@ function CallbackHandler() {
     }
 
     handleCallback();
-  }, [searchParams, router, t, tErr]);
+  }, [searchParams, t, tErr]);
 
   if (error) {
     return (

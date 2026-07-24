@@ -5,7 +5,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@oryzae/shared', '@oryzae/server'],
+  transpilePackages: ['@oryzae/shared', '@oryzae/server', '@oryzae/verify'],
   turbopack: {},
   // Static MD-backed pages read their bodies from `src/content/**/*.md` at
   // request time. Next.js' file-trace can't detect dynamic `process.cwd()`

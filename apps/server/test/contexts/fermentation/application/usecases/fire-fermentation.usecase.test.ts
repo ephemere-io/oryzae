@@ -127,6 +127,7 @@ function mockLlm(): LlmAnalysisGateway {
         letterBody: 'letter',
         keywords: [],
       },
+      usage: { inputTokens: 100, outputTokens: 200 },
       generationId: 'gen-1',
     }),
   };
@@ -287,6 +288,7 @@ describe('FireFermentationUsecase (issue #290: admin debug fire)', () => {
         letterBody: 'letter',
         keywords: [],
       },
+      usage: { inputTokens: 100, outputTokens: 200 },
       generationId: null,
     });
 

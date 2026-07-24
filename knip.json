@@ -10,7 +10,8 @@
     "apps/client": {
       "next": true,
       "vitest": true,
-      "entry": ["sentry.*.config.ts"]
+      "entry": ["sentry.*.config.ts"],
+      "ignore": ["public/sw.js"]
     },
     "apps/admin": {
       "next": true,
@@ -20,6 +21,9 @@
     },
     "packages/shared": {
       "project": ["src/**/*.ts"]
+    },
+    "packages/verify": {
+      "project": ["src/**/*.{ts,tsx}"]
     }
   }
 }

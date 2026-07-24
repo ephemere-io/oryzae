@@ -6,6 +6,7 @@ import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositor
 import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
+import { computeCostFromTokens } from '../../../shared/infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { FireFermentationUsecase } from '../../application/usecases/fire-fermentation.usecase.js';
 import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
@@ -67,8 +68,8 @@ export const adminFermentations = new Hono<Env>()
 
     let byUserQuery = supabase
       .from('fermentation_results')
-      .select('user_id, generation_id')
-      .not('generation_id', 'is', null);
+      .select('user_id, generation_id, input_tokens, output_tokens')
+      .or('input_tokens.not.is.null,generation_id.not.is.null');
     if (dateFrom) byUserQuery = byUserQuery.gte('created_at', dateFrom);
     if (dateTo) byUserQuery = byUserQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
 
@@ -79,16 +80,23 @@ export const adminFermentations = new Hono<Env>()
     const costsByUser = new Map<string, { count: number; totalCost: number }>();
     await Promise.all(
       (data ?? []).map(async (row) => {
-        try {
-          const info = await gateway.getGenerationInfo({ id: row.generation_id });
-          const cost = typeof info?.totalCost === 'number' ? info.totalCost : 0;
-          const current = costsByUser.get(row.user_id) ?? { count: 0, totalCost: 0 };
-          current.count++;
-          current.totalCost += cost;
-          costsByUser.set(row.user_id, current);
-        } catch {
-          // skip failed lookups
+        let costUsd = 0;
+        const tokenCost = computeCostFromTokens(row.input_tokens, row.output_tokens);
+        if (tokenCost) {
+          costUsd = tokenCost.totalCost;
+        } else if (row.generation_id) {
+          // 旧 generation_id 方式 (トークン未保存) は gateway にフォールバック。
+          try {
+            const info = await gateway.getGenerationInfo({ id: row.generation_id });
+            costUsd = typeof info?.totalCost === 'number' ? info.totalCost : 0;
+          } catch {
+            costUsd = 0;
+          }
         }
+        const current = costsByUser.get(row.user_id) ?? { count: 0, totalCost: 0 };
+        current.count++;
+        current.totalCost += costUsd;
+        costsByUser.set(row.user_id, current);
       }),
     );
 
@@ -133,7 +141,7 @@ export const adminFermentations = new Hono<Env>()
     let listQuery = supabase
       .from('fermentation_results')
       .select(
-        'id, user_id, question_id, target_period, status, generation_id, error_message, created_at, updated_at',
+        'id, user_id, question_id, target_period, status, generation_id, input_tokens, output_tokens, error_message, created_at, updated_at',
         { count: 'exact' },
       );
     if (resolvedUserId) listQuery = listQuery.eq('user_id', resolvedUserId);
@@ -157,6 +165,7 @@ export const adminFermentations = new Hono<Env>()
     const items = (data ?? []).map((row) => ({
       ...row,
       user_email: emailMap.get(row.user_id) ?? '',
+      cost: computeCostFromTokens(row.input_tokens, row.output_tokens),
     }));
 
     return c.json({
@@ -183,10 +192,15 @@ export const adminFermentations = new Hono<Env>()
       resolvedUserId = matchedUser?.id ?? 'no-match';
     }
 
+    // トークン保存済み (新方式) か generation_id あり (旧方式) のレコードを対象にする。
+    // #352 以降は generation_id が NULL なので、旧フィルタ (generation_id NOT NULL) だと
+    // 新しい発酵が一切出てこなかった。
     let costsQuery = supabase
       .from('fermentation_results')
-      .select('id, user_id, status, generation_id, created_at', { count: 'exact' })
-      .not('generation_id', 'is', null);
+      .select('id, user_id, status, generation_id, input_tokens, output_tokens, created_at', {
+        count: 'exact',
+      })
+      .or('input_tokens.not.is.null,generation_id.not.is.null');
     if (resolvedUserId) costsQuery = costsQuery.eq('user_id', resolvedUserId);
     if (dateFrom) costsQuery = costsQuery.gte('created_at', dateFrom);
     if (dateTo) costsQuery = costsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
@@ -206,12 +220,16 @@ export const adminFermentations = new Hono<Env>()
 
     const items = await Promise.all(
       (data ?? []).map(async (row) => {
-        try {
-          const info = await gateway.getGenerationInfo({ id: row.generation_id });
-          return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost: info };
-        } catch {
-          return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost: null };
+        let cost: unknown = computeCostFromTokens(row.input_tokens, row.output_tokens);
+        // 旧 generation_id 方式のレコード (トークン未保存) は gateway にフォールバック。
+        if (cost === null && row.generation_id) {
+          try {
+            cost = await gateway.getGenerationInfo({ id: row.generation_id });
+          } catch {
+            cost = null;
+          }
         }
+        return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost };
       }),
     );
 
@@ -226,22 +244,28 @@ export const adminFermentations = new Hono<Env>()
 
     const { data, error } = await supabase
       .from('fermentation_results')
-      .select('generation_id')
+      .select('generation_id, input_tokens, output_tokens')
       .eq('id', id)
       .single();
 
     if (error || !data) return c.json({ error: 'Fermentation result not found' }, 404);
 
-    if (!data.generation_id) {
-      return c.json({ error: 'No generation ID available for cost tracking' }, 404);
+    let cost: unknown = computeCostFromTokens(data.input_tokens, data.output_tokens);
+    if (cost === null && data.generation_id) {
+      try {
+        cost = await gateway.getGenerationInfo({ id: data.generation_id });
+      } catch {
+        cost = null;
+      }
     }
-
-    const info = await gateway.getGenerationInfo({ id: data.generation_id });
+    if (cost === null) {
+      return c.json({ error: 'No cost data available for this fermentation' }, 404);
+    }
 
     return c.json({
       fermentationResultId: id,
       generationId: data.generation_id,
-      cost: info,
+      cost,
     });
   })
   .get('/:id', async (c) => {
@@ -309,9 +333,12 @@ export const adminFermentations = new Hono<Env>()
       });
     }
 
-    // 3. Fetch cost info if generation_id exists
-    let cost: unknown = null;
-    if (fermentation.generation_id) {
+    // 3. Compute cost from saved token usage; fall back to gateway for legacy records.
+    let cost: unknown = computeCostFromTokens(
+      fermentation.input_tokens,
+      fermentation.output_tokens,
+    );
+    if (cost === null && fermentation.generation_id) {
       try {
         cost = await gateway.getGenerationInfo({ id: fermentation.generation_id });
       } catch {
@@ -646,13 +673,33 @@ export const adminFermentations = new Hono<Env>()
     const localeResolver = new SupabaseUserLocaleResolver(supabase);
     const language = await localeResolver.resolve(fermentation.user_id);
 
-    const result = await usecase.execute({
-      userId: fermentation.user_id,
-      questionId: fermentation.question_id,
-      questionText,
-      entries,
-      language,
-    });
+    let result: { id: string };
+    try {
+      result = await usecase.execute({
+        userId: fermentation.user_id,
+        questionId: fermentation.question_id,
+        questionText,
+        entries,
+        language,
+      });
+    } catch (error) {
+      // 失敗時も Discord に通知 (cron / 手動発火と同じ方針)。notifyDiscord は内部で
+      // 例外を握り潰すため await しても throw しない。Vercel serverless では 500 を
+      // 返した後にインスタンスが freeze して送信中の fetch が切れることがあるので、
+      // 再 throw の前に await して送信完了を保証する。
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await notifyDiscord({
+        title: '発酵 retry 失敗',
+        color: COLORS.ERROR,
+        fields: [
+          { name: 'User', value: fermentation.user_id.slice(0, 8), inline: true },
+          { name: 'Question', value: fermentation.question_id.slice(0, 8), inline: true },
+          { name: 'FermentationId', value: fermentation.id.slice(0, 8), inline: true },
+          { name: 'Error', value: errorMessage.slice(0, 200) },
+        ],
+      });
+      throw error;
+    }
 
     // 5. Send digest email (fire-and-forget)
     const digestUsecase = new SendFermentationDigestUsecase(

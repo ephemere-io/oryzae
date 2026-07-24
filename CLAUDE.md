@@ -32,15 +32,18 @@ pnpm knip                                   # デッドコード検出
 
 ### Frontend (`apps/client`, `apps/admin`)
 
-両アプリとも同じ Feature-Sliced Architecture を採用:
+両アプリとも Feature-Sliced Architecture を採用:
 
-- `app/` — Next.js ページ（薄いラッパー、API 呼び出し禁止）
-- `features/` — 機能スライス（components, hooks, types）
+- `app/` — Next.js ページ（薄いラッパー、API 呼び出し禁止、端末判定）
+- `features/` — 機能スライス
+  - `apps/client` は **ドメイン × reach**: `features/{shared,pc,sp}/{domain}`（shared=UIなし共有hook/型、pc/sp=端末別UI）
+  - `apps/admin` は単一体験で `features/{domain}`（reach 軸なし）
 - `components/ui/` — 汎用 UI（feature 依存禁止）
-- `lib/` — 横断ユーティリティ
+- `lib/` — 基盤ユーティリティのみ（ドメイン非依存。`use-*` のドメイン hook を置かない）
 
 `apps/client` はユーザー向け（port 3000）、`apps/admin` は管理画面（port 3001）。
-ガードレール・テスト戦略・アーキテクチャルールは完全に同一。
+device（端末）はフロントだけの軸で `apps/client` のみ reach を持つ。backend・`packages/shared` は端末非依存。
+ガードレール・テスト戦略は共通。詳細は `docs/client-architecture-guide.md`。
 
 ### Shared (`packages/shared`)
 

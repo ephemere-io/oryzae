@@ -6,6 +6,12 @@ export default defineConfig({
     environment: 'jsdom',
     root: '.',
     passWithNoTests: true,
+    // ソース提供の workspace パッケージ（TSX）を vitest 側でも変換させる。
+    server: {
+      deps: {
+        inline: [/@oryzae\/verify/],
+      },
+    },
   },
   resolve: {
     alias: {

@@ -7,6 +7,8 @@ import { getAccessToken } from '@/lib/auth';
 export function useUserActivity(dateFrom?: string, dateTo?: string) {
   const [activeWriters, setActiveWriters] = useState(0);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [returningUsers, setReturningUsers] = useState(0);
+  const [previousActiveUsers, setPreviousActiveUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,8 +20,8 @@ export function useUserActivity(dateFrom?: string, dateTo?: string) {
     setError(null);
 
     const params = new URLSearchParams();
-    if (dateFrom) params.set('dateFrom', dateFrom);
-    if (dateTo) params.set('dateTo', dateTo);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
     const qs = params.toString();
 
     const api = createApiClient(token);
@@ -32,9 +34,16 @@ export function useUserActivity(dateFrom?: string, dateTo?: string) {
         'activeWriters' in data &&
         'totalUsers' in data
       ) {
-        const parsed = data as { activeWriters: number; totalUsers: number }; // @type-assertion-allowed: 型ガード後のキャスト
+        const parsed = data as {
+          activeWriters: number;
+          totalUsers: number;
+          returningUsers?: number;
+          previousActiveUsers?: number;
+        }; // @type-assertion-allowed: 型ガード後のキャスト
         setActiveWriters(parsed.activeWriters);
         setTotalUsers(parsed.totalUsers);
+        setReturningUsers(parsed.returningUsers ?? 0);
+        setPreviousActiveUsers(parsed.previousActiveUsers ?? 0);
       }
     } else {
       setError('ユーザーアクティビティの取得に失敗しました');
@@ -46,5 +55,13 @@ export function useUserActivity(dateFrom?: string, dateTo?: string) {
     fetchActivity();
   }, [fetchActivity]);
 
-  return { activeWriters, totalUsers, loading, error, refresh: fetchActivity };
+  return {
+    activeWriters,
+    totalUsers,
+    returningUsers,
+    previousActiveUsers,
+    loading,
+    error,
+    refresh: fetchActivity,
+  };
 }

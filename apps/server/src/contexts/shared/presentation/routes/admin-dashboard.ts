@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { gateway } from 'ai';
 import { Hono } from 'hono';
+import { computeCostFromTokens } from '../../infrastructure/claude-pricing.js';
 
 type Env = {
   Variables: {
@@ -8,6 +9,47 @@ type Env = {
     adminSupabase: SupabaseClient;
   };
 };
+
+// 現在期間と「直前の同じ長さの期間」を解決する（リテンション比較用）。
+// date_from/date_to は YYYY-MM-DD（セレクタ）。未指定時は直近7日 / now にフォールバック。
+export function resolveActivityPeriods(
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  now: Date,
+): { currentStart: string; currentEnd: string; previousStart: string; previousEnd: string } {
+  const currentStart = dateFrom
+    ? new Date(`${dateFrom}T00:00:00.000Z`)
+    : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const currentEnd = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : now;
+  // 期間長（最低1日）。直前期間は [currentStart - 期間長, currentStart) とする。
+  const periodMs = Math.max(currentEnd.getTime() - currentStart.getTime(), 24 * 60 * 60 * 1000);
+  const previousEnd = new Date(currentStart.getTime() - 1);
+  const previousStart = new Date(currentStart.getTime() - periodMs);
+  return {
+    currentStart: currentStart.toISOString(),
+    currentEnd: currentEnd.toISOString(),
+    previousStart: previousStart.toISOString(),
+    previousEnd: previousEnd.toISOString(),
+  };
+}
+
+// 現在/直前期間の投稿者から、アクティブ数・直前アクティブ数・継続(両方に出現)数を数える。
+export function countReturning(
+  currentUserIds: string[],
+  previousUserIds: string[],
+): { activeWriters: number; previousActiveUsers: number; returningUsers: number } {
+  const current = new Set(currentUserIds);
+  const previous = new Set(previousUserIds);
+  let returning = 0;
+  for (const id of current) {
+    if (previous.has(id)) returning++;
+  }
+  return {
+    activeWriters: current.size,
+    previousActiveUsers: previous.size,
+    returningUsers: returning,
+  };
+}
 
 export const adminDashboard = new Hono<Env>()
   .get('/stats', async (c) => {
@@ -188,48 +230,54 @@ export const adminDashboard = new Hono<Env>()
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const daysElapsed = now.getDate();
 
+    // issue #352 で generation_id が出なくなったため、トークン保存分 (input_tokens/
+    // output_tokens) から価格算出する。旧 generation_id レコードは gateway フォールバック。
+    // (/costs エンドポイントと同じ方式。これをやらないと monthly cost が常に $0.00 になる)
     const [currentMonthRows, lastMonthRows] = await Promise.all([
       supabase
         .from('fermentation_results')
-        .select('generation_id')
-        .not('generation_id', 'is', null)
+        .select('generation_id, input_tokens, output_tokens')
+        .or('input_tokens.not.is.null,generation_id.not.is.null')
         .gte('created_at', currentMonthStart)
         .lte('created_at', currentMonthEnd),
       supabase
         .from('fermentation_results')
-        .select('generation_id')
-        .not('generation_id', 'is', null)
+        .select('generation_id, input_tokens, output_tokens')
+        .or('input_tokens.not.is.null,generation_id.not.is.null')
         .gte('created_at', lastMonthStart)
         .lte('created_at', lastMonthEnd),
     ]);
 
-    const sumCosts = async (rows: { generation_id: string }[]): Promise<number> => {
+    const sumCosts = async (
+      rows: {
+        generation_id: string | null;
+        input_tokens: number | null;
+        output_tokens: number | null;
+      }[],
+    ): Promise<number> => {
       let total = 0;
       await Promise.all(
         rows.map(async (row) => {
-          try {
-            const info = await gateway.getGenerationInfo({ id: row.generation_id });
-            if (typeof info?.totalCost === 'number') {
-              total += info.totalCost;
+          const tokenCost = computeCostFromTokens(row.input_tokens, row.output_tokens);
+          if (tokenCost) {
+            total += tokenCost.totalCost;
+            return;
+          }
+          if (row.generation_id) {
+            try {
+              const info = await gateway.getGenerationInfo({ id: row.generation_id });
+              if (typeof info?.totalCost === 'number') total += info.totalCost;
+            } catch {
+              // skip failed lookups
             }
-          } catch {
-            // skip failed lookups
           }
         }),
       );
       return total;
     };
 
-    const currentMonthCost = await sumCosts(
-      (currentMonthRows.data ?? []).filter(
-        (r): r is { generation_id: string } => r.generation_id !== null,
-      ),
-    );
-    const lastMonthCost = await sumCosts(
-      (lastMonthRows.data ?? []).filter(
-        (r): r is { generation_id: string } => r.generation_id !== null,
-      ),
-    );
+    const currentMonthCost = await sumCosts(currentMonthRows.data ?? []);
+    const lastMonthCost = await sumCosts(lastMonthRows.data ?? []);
 
     const projectedCost = daysElapsed > 0 ? (currentMonthCost / daysElapsed) * daysInMonth : 0;
 
@@ -244,17 +292,35 @@ export const adminDashboard = new Hono<Env>()
   .get('/user-activity', async (c) => {
     const supabase = c.get('adminSupabase');
 
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // 期間セレクタ (date_from/date_to) を尊重する。未指定時のみ直近7日にフォールバック。
+    // 直前の同じ長さの期間も取り、継続(リテンション)ユーザーを算出する。
+    const dateFrom = c.req.query('date_from');
+    const dateTo = c.req.query('date_to');
+    const periods = resolveActivityPeriods(dateFrom, dateTo, new Date());
 
-    const [writersRes, usersRes] = await Promise.all([
-      supabase.from('entries').select('user_id').gt('created_at', sevenDaysAgo),
+    const [currentRes, previousRes, usersRes] = await Promise.all([
+      supabase
+        .from('entries')
+        .select('user_id')
+        .gte('created_at', periods.currentStart)
+        .lte('created_at', periods.currentEnd),
+      supabase
+        .from('entries')
+        .select('user_id')
+        .gte('created_at', periods.previousStart)
+        .lte('created_at', periods.previousEnd),
       supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
 
-    const uniqueWriters = new Set((writersRes.data ?? []).map((r) => r.user_id));
+    const counts = countReturning(
+      (currentRes.data ?? []).map((r) => r.user_id),
+      (previousRes.data ?? []).map((r) => r.user_id),
+    );
 
     return c.json({
-      activeWriters: uniqueWriters.size,
+      activeWriters: counts.activeWriters,
       totalUsers: usersRes.data?.users?.length ?? 0,
+      returningUsers: counts.returningUsers,
+      previousActiveUsers: counts.previousActiveUsers,
     });
   });

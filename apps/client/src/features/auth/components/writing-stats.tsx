@@ -24,6 +24,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
+// verify-exempt: props/api seam が無く useUserStats() が createApiClient を内製（fetch seam 無し）。getAccessToken() は jsdom で null → fetchStats が setLoading 前に return → loading=true のまま if (loading) return null で DOM ゼロ。stats を注入する seam が無く（global fetch mock は register 経由でグローバル汚染するため禁止）、孤立描画では意味ある contract/probe を作れない。
 export function WritingStats() {
   const t = useTranslations('stats');
   const { stats, loading } = useUserStats();

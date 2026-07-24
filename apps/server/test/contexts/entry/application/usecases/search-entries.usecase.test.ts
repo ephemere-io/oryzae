@@ -57,6 +57,7 @@ describe('SearchEntriesUsecase', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
     );
   });
 
@@ -79,6 +80,7 @@ describe('SearchEntriesUsecase', () => {
       '2026-01-01T00:00:00.000Z',
       10,
       undefined,
+      undefined,
     );
   });
 
@@ -94,6 +96,23 @@ describe('SearchEntriesUsecase', () => {
       undefined,
       undefined,
       'q-1',
+      undefined,
+    );
+  });
+
+  // ソート順
+  it('order を repo に渡す', async () => {
+    vi.mocked(entryRepo.searchByUserId).mockResolvedValue([Entry.fromProps(entryProps1)]);
+
+    await usecase.execute('user-1', '天気', undefined, undefined, undefined, 'oldest');
+
+    expect(entryRepo.searchByUserId).toHaveBeenCalledWith(
+      'user-1',
+      '天気',
+      undefined,
+      undefined,
+      undefined,
+      'oldest',
     );
   });
 });

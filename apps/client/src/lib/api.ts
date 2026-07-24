@@ -6,26 +6,43 @@ export interface ApiClient {
   fetch(path: string, init?: RequestInit): Promise<Response>;
 }
 
-async function tryRefreshToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
+// Issue #362: 楽観的データ取得では、失効した access token で複数のリクエストが
+// 同時に 401 になり得る（N 個のデータフック × 複数の useAuth インスタンス）。
+// Supabase は refresh token をローテートするため、並発リフレッシュは二重実行＝
+// 後発がトークン再利用エラーで失敗する。in-flight な refresh を1本に集約し、
+// 同時呼び出しは同じ Promise を共有する（解決後にクリアし次回は再実行可能）。
+let inFlightRefresh: Promise<string | null> | null = null;
 
-  const res = await fetch('/api/v1/auth/refresh', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  });
+export async function tryRefreshToken(): Promise<string | null> {
+  if (inFlightRefresh) return inFlightRefresh;
 
-  if (!res.ok) {
-    clearTokens();
-    return null;
+  inFlightRefresh = (async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return null;
+
+    const res = await fetch('/api/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!res.ok) {
+      clearTokens();
+      return null;
+    }
+
+    const data = (await res.json()) as {
+      session: { accessToken: string; refreshToken: string };
+    };
+    setTokens(data.session.accessToken, data.session.refreshToken);
+    return data.session.accessToken;
+  })();
+
+  try {
+    return await inFlightRefresh;
+  } finally {
+    inFlightRefresh = null;
   }
-
-  const data = (await res.json()) as {
-    session: { accessToken: string; refreshToken: string };
-  };
-  setTokens(data.session.accessToken, data.session.refreshToken);
-  return data.session.accessToken;
 }
 
 export function createApiClient(accessToken?: string): ApiClient {

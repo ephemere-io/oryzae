@@ -1,29 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { type ApiClient, createApiClient } from '@/lib/api';
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/auth';
+import { type ApiClient, createApiClient, tryRefreshToken } from '@/lib/api';
+import { clearTokens, getAccessToken, setTokens } from '@/lib/auth';
 
 interface AdminAuthState {
   accessToken: string;
   user: { id: string; email: string };
-}
-
-async function tryRefresh(): Promise<{ accessToken: string; refreshToken: string } | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
-
-  const res = await createApiClient().fetch('/api/v1/auth/refresh', {
-    method: 'POST',
-    body: JSON.stringify({ refreshToken }),
-  });
-  if (!res.ok) return null;
-
-  const data = (await res.json()) as {
-    session: { accessToken: string; refreshToken: string };
-  };
-  setTokens(data.session.accessToken, data.session.refreshToken);
-  return data.session;
 }
 
 async function verifyAdminAndGetUser(token: string): Promise<{ id: string; email: string } | null> {
@@ -58,12 +41,14 @@ export function useAdminAuth() {
       }
 
       // 2. Access token expired or missing — try refresh
-      const session = await tryRefresh();
-      if (session) {
-        const user = await verifyAdminAndGetUser(session.accessToken);
+      // Issue #362: refresh は lib/api の共有シングルトン経由で1本に集約する
+      // （mount-gate でデータフックと検証が同時に refresh しても二重実行しない）。
+      const newToken = await tryRefreshToken();
+      if (newToken) {
+        const user = await verifyAdminAndGetUser(newToken);
         if (user) {
-          setAuth({ accessToken: session.accessToken, user });
-          setApi(createApiClient(session.accessToken));
+          setAuth({ accessToken: newToken, user });
+          setApi(createApiClient(newToken));
           setLoading(false);
           return;
         }

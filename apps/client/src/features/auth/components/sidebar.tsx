@@ -1,9 +1,10 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useAuth } from '@/lib/auth-context';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
 import { useUnread } from '@/lib/unread-context';
@@ -54,6 +55,7 @@ export function Sidebar() {
 
   return (
     <nav
+      {...verifyAttrs({ unit: 'Sidebar', pathname })}
       className={`fixed left-0 top-0 bottom-0 z-30 flex w-20 flex-col items-center py-10 transition-all duration-500 ${
         hidden ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
@@ -88,6 +90,7 @@ export function Sidebar() {
           return (
             <Link
               key={item.href}
+              {...verifyAttrs({ navItem: item.match, active: isActive })}
               href={item.href}
               title={item.label}
               className={`group relative flex h-12 w-12 items-center justify-center rounded-[20px] transition-all duration-300 ${

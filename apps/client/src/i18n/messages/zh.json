@@ -122,7 +122,9 @@
       "load_more": "加载更多",
       "filter_by_question_label": "按问题筛选",
       "filter_all_questions": "所有问题",
-      "filter_clear_aria": "清除筛选"
+      "filter_clear_aria": "清除筛选",
+      "error_message": "加载日记失败",
+      "retry": "重试"
     },
     "leave_modal": {
       "aria_label": "离开确认对话框",
@@ -445,6 +447,7 @@
   },
   "fermentation": {
     "detail": {
+      "close_aria": "关闭详情",
       "header_keyword": "Yeast 生成的关键词",
       "header_snippet": "Oryzae 摘选的句子",
       "header_letter": "L.A.B. 的观察记录",
@@ -518,7 +521,9 @@
     "timeline": {
       "empty": "还没有提问",
       "heading": "提问的演变",
-      "subheading": "记录你的提问诞生、成长与变化的轨迹"
+      "subheading": "记录你的提问诞生、成长与变化的轨迹",
+      "error_message": "加载问题失败",
+      "retry": "重试"
     }
   },
   "landing": {
@@ -747,5 +752,78 @@
   "support": {
     "title": "支持",
     "back_home": "返回首页"
+  },
+  "sp": {
+    "editor": {
+      "title_placeholder": "标题（可选）",
+      "body_placeholder": "把此刻的感受，如实写下。",
+      "status_editing": "编辑中",
+      "status_saving": "保存中…",
+      "status_saved": "已保存",
+      "question": "提问",
+      "question_selected": "提问：{label}",
+      "question_untitled": "无标题提问",
+      "question_sheet_title": "选择提问",
+      "question_empty": "还没有提问",
+      "close": "关闭",
+      "pickle": "放入瓶中",
+      "pickling": "封入中…",
+      "pickled": "已开始发酵 ✓",
+      "question_link": "关联提问",
+      "ferment_title": "封入瓶中发酵",
+      "ferment_sub": "静待片刻，AI 的来信将会送达",
+      "delete": "删除"
+    },
+    "nav": {
+      "write": "书写",
+      "jar": "瓶",
+      "list": "列表",
+      "account": "账户",
+      "questions": "提问"
+    },
+    "jar": {
+      "title": "瓶中收到的信",
+      "empty": "还没有收到信",
+      "untitled": "无标题提问",
+      "close": "关闭",
+      "letter_empty": "此结果还没有信",
+      "reply": "写回信",
+      "section_letter": "来信",
+      "section_keywords": "词语",
+      "section_snippets": "摘录",
+      "unread": "未读",
+      "read": "已读"
+    },
+    "unsupported": "此页面尚未支持手机，请使用电脑访问。",
+    "list": {
+      "title": "条目",
+      "empty": "还没有条目",
+      "untitled": "无标题",
+      "account": "账户",
+      "search": "搜索正文·标题",
+      "search_clear": "清除搜索",
+      "all": "全部",
+      "empty_filtered": "没有匹配的条目",
+      "sort_label": "排序",
+      "sort_newest": "最新优先",
+      "sort_oldest": "最早优先",
+      "delete": "删除"
+    },
+    "questions": {
+      "title": "提问",
+      "intro": "培育、改写或结束你正在面对的提问。",
+      "untitled": "无标题提问",
+      "proposed": "Oryzae 的建议",
+      "accept": "接受",
+      "reject": "搁置",
+      "empty": "还没有提问",
+      "add": "提出新的提问",
+      "sheet_add": "新的提问",
+      "sheet_edit": "编辑提问",
+      "placeholder": "写下提问",
+      "delete": "结束这个提问",
+      "cancel": "取消",
+      "save": "保存"
+    }
   }
 }

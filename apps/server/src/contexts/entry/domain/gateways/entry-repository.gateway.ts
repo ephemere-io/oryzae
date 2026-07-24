@@ -1,14 +1,19 @@
 import type { Entry } from '../models/entry.js';
 
+/** 一覧の作成日ソート順。'newest'=新しい順(降順, 既定) / 'oldest'=古い順(昇順)。 */
+export type EntryListOrder = 'newest' | 'oldest';
+
 export interface EntryRepositoryGateway {
   findById(id: string): Promise<Entry | null>;
   findByIds(ids: string[]): Promise<Entry[]>;
   // Issue #331: questionId が与えられたら、その問いに紐づく entry のみ返す
+  // order: created_at の並び順（既定 'newest'）。cursor は created_at 値。
   listByUserId(
     userId: string,
     cursor?: string,
     limit?: number,
     questionId?: string,
+    order?: EntryListOrder,
   ): Promise<Entry[]>;
   listByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]>;
   listFermentationEnabledByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]>;
@@ -25,6 +30,7 @@ export interface EntryRepositoryGateway {
     cursor?: string,
     limit?: number,
     questionId?: string,
+    order?: EntryListOrder,
   ): Promise<Entry[]>;
   save(entry: Entry): Promise<void>;
   delete(id: string): Promise<void>;

@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -32,7 +33,10 @@ function ResetPasswordHandler() {
 
   if (!accessToken) {
     return (
-      <div className="flex flex-col gap-4 text-center">
+      <div
+        className="flex flex-col gap-4 text-center"
+        {...verifyAttrs({ unit: 'ResetPasswordForm', state: 'invalid', hasError: false })}
+      >
         <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{t('invalid_link')}</p>
         <Link
           href="/forgot-password"
@@ -72,7 +76,11 @@ function ResetPasswordHandler() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4"
+      {...verifyAttrs({ unit: 'ResetPasswordForm', state: 'form', hasError: Boolean(error) })}
+    >
       <h1 className="text-2xl font-bold text-center">{t('heading')}</h1>
       <p className="text-sm text-center text-zinc-500">{t('subheading')}</p>
 
@@ -82,6 +90,7 @@ function ResetPasswordHandler() {
         <span className="text-sm font-medium">{t('password_label')}</span>
         <input
           type="password"
+          aria-label={t('password_label')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -94,6 +103,7 @@ function ResetPasswordHandler() {
         <span className="text-sm font-medium">{t('confirm_label')}</span>
         <input
           type="password"
+          aria-label={t('confirm_label')}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required

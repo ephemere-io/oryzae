@@ -3,14 +3,16 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback } from 'react';
-import { useAuth } from '@/features/auth/hooks/use-auth';
-import { EntryEditor } from '@/features/entries/components/entry-editor';
-import { useEntry } from '@/features/entries/hooks/use-entry';
-import { useSaveTransition } from '@/features/entries/hooks/use-save-transition';
+import { DeviceView } from '@/components/device-view';
+import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
+import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
+import { useEntry } from '@/features/shared/entries/hooks/use-entry';
 import {
   useActiveQuestions,
   useEntryQuestions,
-} from '@/features/entry-questions/hooks/use-entry-questions';
+} from '@/features/shared/entry-questions/hooks/use-entry-questions';
+import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
+import { useAuth } from '@/lib/auth-context';
 
 export default function EntryDetailPage() {
   const t = useTranslations('entries.detail');
@@ -41,19 +43,24 @@ export default function EntryDetailPage() {
   }
 
   return (
-    <EntryEditor
-      entryId={entry.id}
-      initialContent={entry.content}
-      initialEffects={entry.effects}
-      createdAt={entry.createdAt}
-      updatedAt={entry.updatedAt}
-      api={api}
-      auth={auth}
-      activeQuestions={activeQuestions}
-      initialLinkedIds={linkedQuestions.map((q) => q.id)}
-      onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
-      onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
-      onSaveTransition={handleSaveTransition}
+    <DeviceView
+      sp={<SpEntryEditor api={api} initialEntryId={entry.id} initialContent={entry.content} />}
+      pc={
+        <EntryEditor
+          entryId={entry.id}
+          initialContent={entry.content}
+          initialEffects={entry.effects}
+          createdAt={entry.createdAt}
+          updatedAt={entry.updatedAt}
+          api={api}
+          auth={auth}
+          activeQuestions={activeQuestions}
+          initialLinkedIds={linkedQuestions.map((q) => q.id)}
+          onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
+          onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
+          onSaveTransition={handleSaveTransition}
+        />
+      }
     />
   );
 }

@@ -29,6 +29,28 @@ vi.mock('@/contexts/fermentation/application/usecases/scheduled-fermentation.use
   })),
 }));
 
+// issue #353: リトライ usecase も差し替える（既定はクリーンな no-op）。
+const mockRetryExecute = vi.fn();
+vi.mock(
+  '@/contexts/fermentation/application/usecases/retry-failed-fermentations.usecase.js',
+  () => ({
+    RetryFailedFermentationsUsecase: vi.fn().mockImplementation(() => ({
+      execute: (now: Date) => mockRetryExecute(now),
+    })),
+  }),
+);
+
+const emptyRetryResult = {
+  totalCandidates: 0,
+  truncated: 0,
+  attempted: 0,
+  succeeded: 0,
+  failed: 0,
+  skipped: 0,
+  errors: [],
+  emailFailures: [],
+};
+
 import { cronFermentation } from '@/contexts/fermentation/presentation/routes/cron-fermentation.js';
 
 function createApp() {
@@ -52,6 +74,8 @@ describe('cronFermentation', () => {
   beforeEach(() => {
     mockNotifyDiscord.mockClear();
     mockExecute.mockReset();
+    mockRetryExecute.mockReset();
+    mockRetryExecute.mockResolvedValue(emptyRetryResult);
     vi.stubEnv('CRON_SECRET', SECRET);
   });
 
@@ -117,7 +141,7 @@ describe('cronFermentation', () => {
     );
   });
 
-  it('notifies Discord WARNING when there are failures', async () => {
+  it('notifies Discord ERROR with the failure reason when fermentations fail', async () => {
     mockExecute.mockResolvedValue({
       ...successResult,
       succeeded: 2,
@@ -132,8 +156,33 @@ describe('cronFermentation', () => {
 
     expect(res.status).toBe(200);
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '発酵 cron: 完了（一部失敗）', color: COLORS.WARNING }),
+      expect.objectContaining({ title: '発酵 cron: 完了（一部失敗）', color: COLORS.ERROR }),
     );
+    // 失敗理由フィールドが添付されていること。
+    const embed = mockNotifyDiscord.mock.calls[0][0];
+    const reasonField = embed.fields.find((f: { name: string }) => f.name === '失敗理由');
+    expect(reasonField?.value).toBe('boom');
+  });
+
+  it('collapses identical failure reasons into one `N× ` line (retire scenario)', async () => {
+    mockExecute.mockResolvedValue({
+      ...successResult,
+      succeeded: 0,
+      failed: 3,
+      errors: [
+        { userId: 'u1', questionId: 'q1', error: 'model: claude-sonnet-4-20250514' },
+        { userId: 'u2', questionId: 'q2', error: 'model: claude-sonnet-4-20250514' },
+        { userId: 'u3', questionId: 'q3', error: 'model: claude-sonnet-4-20250514' },
+      ],
+    });
+
+    await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+    const embed = mockNotifyDiscord.mock.calls[0][0];
+    const reasonField = embed.fields.find((f: { name: string }) => f.name === '失敗理由');
+    expect(reasonField?.value).toBe('3× model: claude-sonnet-4-20250514');
+    expect(reasonField?.value.length).toBeLessThanOrEqual(1024);
+    expect(embed.color).toBe(COLORS.ERROR);
   });
 
   it('notifies Discord WARNING when only email failures occurred', async () => {
@@ -172,5 +221,112 @@ describe('cronFermentation', () => {
     );
 
     errorSpy.mockRestore();
+  });
+
+  // issue #353: sweep 後のリトライ段。
+  describe('retry phase (issue #353)', () => {
+    it('runs the retry usecase with the same `now` as the sweep', async () => {
+      mockExecute.mockResolvedValue(successResult);
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      expect(mockRetryExecute).toHaveBeenCalledOnce();
+      // sweep とリトライへ渡る Date が同一インスタンスであること。
+      expect(mockRetryExecute.mock.calls[0][0]).toBe(mockExecute.mock.calls[0][0]);
+    });
+
+    it('adds a retry summary field when there were candidates', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 2,
+        attempted: 2,
+        succeeded: 2,
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      const retryField = embed.fields.find((f: { name: string }) => f.name === 'リトライ');
+      expect(retryField?.value).toContain('候補:2');
+      expect(retryField?.value).toContain('成功:2');
+      // リトライが全て成功なら全体は SUCCESS のまま。
+      expect(embed.color).toBe(COLORS.SUCCESS);
+    });
+
+    it('keeps the run SUCCESS when retries were only skipped (benign deletions)', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 2,
+        attempted: 0,
+        skipped: 2, // entry/question deleted — not a failure
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      expect(embed.color).toBe(COLORS.SUCCESS);
+      expect(embed.title).toBe('発酵 cron: 完了');
+      // skip 件数は summary には出す。
+      const retryField = embed.fields.find((f: { name: string }) => f.name === 'リトライ');
+      expect(retryField?.value).toContain('skip:2');
+    });
+
+    it('marks the run as failed (WARNING) when retries were truncated', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 40,
+        attempted: 30,
+        succeeded: 30,
+        truncated: 10, // dropped — one-shot window means these never retry
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      // truncated は取りこぼしなので可視化する（発酵自体は失敗していないので WARNING）。
+      expect(embed.color).toBe(COLORS.WARNING);
+    });
+
+    it('marks the run as failed (ERROR) when a retry fails', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockResolvedValue({
+        ...emptyRetryResult,
+        totalCandidates: 1,
+        attempted: 1,
+        failed: 1,
+        errors: [{ userId: 'u1', fermentationResultId: 'f1', error: 'still failing' }],
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      expect(embed.title).toBe('発酵 cron: 完了（一部失敗）');
+      expect(embed.color).toBe(COLORS.ERROR);
+      const reasonField = embed.fields.find((f: { name: string }) => f.name === 'リトライ失敗理由');
+      expect(reasonField?.value).toBe('still failing');
+    });
+
+    it('does not fail the whole cron when the retry phase throws', async () => {
+      mockExecute.mockResolvedValue(successResult);
+      mockRetryExecute.mockRejectedValue(new Error('retry list query failed'));
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      // sweep は成功しているので 200。リトライエラーは summary に添えるだけ。
+      expect(res.status).toBe(200);
+      const embed = mockNotifyDiscord.mock.calls[0][0];
+      expect(embed.color).toBe(COLORS.ERROR);
+      const errField = embed.fields.find((f: { name: string }) => f.name === 'リトライ実行エラー');
+      expect(errField?.value).toBe('retry list query failed');
+      expect(errorSpy).toHaveBeenCalledWith('[cron-fermentation] retry phase failed', {
+        error: 'retry list query failed',
+      });
+
+      errorSpy.mockRestore();
+    });
   });
 });

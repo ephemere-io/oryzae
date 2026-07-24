@@ -2,23 +2,23 @@
 
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useTransition } from 'react';
+import { useTransition } from 'react';
+import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
 import { LOCALE_OPTIONS, type Locale } from '@/i18n/config';
 import { setLocaleAction } from '@/lib/i18n-actions';
-import { useSignupAvailability } from '@/lib/use-signup-availability';
 import styles from './landing.module.css';
 import { LandingFaqItem } from './landing-faq-item';
 
 const APP_HREF = '/login';
 const LOGO_SRC = '/landing/logo/P3_mark_color.svg';
 
+// verify-exempt: ページ級の合成（ヘッダ＋Hero＋Concept/Process/Preview/Philosophy/Faq/Outro＋フッタの9セクション）で、孤立検証に意味のある状態が無い。LandingPage は props を取らず、可変状態は2つともシーム不可: (1) Hero の登録枠バッジは useSignupAvailability() が引数を取らず fetch('/api/v1/auth/signup/availability') を直叩きする（api=null seam が無く、availability を注入する経路が無い。fetch は catch されるため crash はしないが本物の通信が走る）、(2) 言語トグルは setLocaleAction（'use server' → cookies()）でリクエストスコープ外では throw するため act プローブも不可。制御できる意味ある状態が無く probe を作れない。FAQ の開閉等の振る舞いは子の LandingFaqItem が個別に covered 済み。
 export function LandingPage() {
   const t = useTranslations('landing');
   const locale = useLocale();
 
-  useEffect(() => {
-    document.title = t('title');
-  }, [t]);
+  // ページタイトル/メタは app/page.tsx の generateMetadata で SSR 付与する
+  // （旧来の document.title 上書きは欠損キー参照かつ SEO 上 SSR されないため撤去）。
 
   return (
     <div className={styles.landingRoot}>

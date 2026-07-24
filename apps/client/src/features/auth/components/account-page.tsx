@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
@@ -82,6 +83,7 @@ function EditableField({
             type={type}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            aria-label={label}
             className={`flex-1 ${inputClass}`}
             style={inputStyle}
           />
@@ -196,6 +198,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
             onChange={(e) => setNewEmail(e.target.value)}
             required
             placeholder={t('email.placeholder_new')}
+            aria-label={t('email.placeholder_new')}
             className={inputClass}
             style={inputStyle}
           />
@@ -317,6 +320,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
             onChange={(e) => setCurrentPassword(e.target.value)}
             required
             placeholder={t('password.placeholder_current')}
+            aria-label={t('password.placeholder_current')}
             className={inputClass}
             style={inputStyle}
           />
@@ -327,6 +331,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
             required
             minLength={6}
             placeholder={t('password.placeholder_new')}
+            aria-label={t('password.placeholder_new')}
             className={inputClass}
             style={inputStyle}
           />
@@ -337,6 +342,7 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
             required
             minLength={6}
             placeholder={t('password.placeholder_confirm')}
+            aria-label={t('password.placeholder_confirm')}
             className={inputClass}
             style={inputStyle}
           />
@@ -511,7 +517,10 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-12">
+    <div
+      {...verifyAttrs({ unit: 'AccountPage', hasAvatar: Boolean(user.avatarUrl), isOAuthOnly })}
+      className="mx-auto max-w-2xl px-6 py-12"
+    >
       {/* Page title */}
       <h1 className={sectionHeadingClass} style={sectionHeadingStyle}>
         Account
