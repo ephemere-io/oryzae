@@ -36,6 +36,8 @@ export const entries = new Hono<Env>()
     const q = c.req.query('q');
     // Issue #331: 指定された問いに紐づく entry のみで絞り込む
     const questionId = c.req.query('questionId');
+    // 作成日のソート順。未知の値は既定の 'newest'（新しい順）に丸める。
+    const order = c.req.query('order') === 'oldest' ? 'oldest' : 'newest';
     const supabase = c.get('supabase');
     const entryRepo = new SupabaseEntryRepository(supabase);
     const parsedLimit = limit ? Number(limit) : undefined;
@@ -47,12 +49,14 @@ export const entries = new Hono<Env>()
           cursor,
           parsedLimit,
           questionId,
+          order,
         )
       : await new ListEntriesUsecase(entryRepo).execute(
           c.get('userId'),
           cursor,
           parsedLimit,
           questionId,
+          order,
         );
 
     // Issue #323: 一覧に紐づく問いを表示。entry-context-isolation を守るため

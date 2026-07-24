@@ -1,6 +1,13 @@
+import { verifyAttrs } from '@oryzae/verify';
+
 export function ConceptIllo() {
   return (
-    <svg viewBox="0 0 280 200" className="ob-illo" aria-hidden="true">
+    <svg
+      viewBox="0 0 280 200"
+      className="ob-illo"
+      aria-hidden="true"
+      {...verifyAttrs({ unit: 'ConceptIllo', decorative: true })}
+    >
       <defs>
         <radialGradient id="ob-glow-c" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#8EA89C" stopOpacity="0.35" />
@@ -41,7 +48,12 @@ export function ConceptIllo() {
 
 export function QuestionIllo() {
   return (
-    <svg viewBox="0 0 280 200" className="ob-illo" aria-hidden="true">
+    <svg
+      viewBox="0 0 280 200"
+      className="ob-illo"
+      aria-hidden="true"
+      {...verifyAttrs({ unit: 'QuestionIllo', decorative: true })}
+    >
       <line
         x1="40"
         y1="100"
@@ -86,7 +98,12 @@ export function QuestionIllo() {
 
 export function EditorIllo() {
   return (
-    <svg viewBox="0 0 280 200" className="ob-illo" aria-hidden="true">
+    <svg
+      viewBox="0 0 280 200"
+      className="ob-illo"
+      aria-hidden="true"
+      {...verifyAttrs({ unit: 'EditorIllo', decorative: true })}
+    >
       <rect
         x="56"
         y="44"
@@ -124,7 +141,12 @@ export function EditorIllo() {
 
 export function JarIllo() {
   return (
-    <svg viewBox="0 0 280 200" className="ob-illo" aria-hidden="true">
+    <svg
+      viewBox="0 0 280 200"
+      className="ob-illo"
+      aria-hidden="true"
+      {...verifyAttrs({ unit: 'JarIllo', decorative: true })}
+    >
       <g transform="translate(85,12) scale(0.55)">
         <path
           d="M 86 36 L 86 78 C 86 88, 50 100, 42 138 C 36 172, 64 196, 100 196 C 136 196, 164 172, 158 138 C 150 100, 114 88, 114 78 L 114 36 Z"

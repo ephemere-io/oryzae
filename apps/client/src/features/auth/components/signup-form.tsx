@@ -1,13 +1,14 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/auth/components/google-login-button';
-import { useAuth } from '@/features/auth/hooks/use-auth';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
-import { useSignupAvailability } from '@/lib/use-signup-availability';
+import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
+import { useAuth } from '@/lib/auth-context';
 
 function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
   return value === 'ja' || value === 'en' || value === 'zh' || value === 'ko';
@@ -99,7 +100,18 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4"
+      {...verifyAttrs({
+        unit: 'SignupForm',
+        hasNickname: Boolean(nickname),
+        hasEmail: Boolean(email),
+        hasPassword: Boolean(password),
+        hasConfirm: Boolean(passwordConfirm),
+        hasError: Boolean(error),
+      })}
+    >
       <h1 className="text-2xl font-bold text-center">Oryzae</h1>
       <p className="text-sm text-center text-zinc-500">{t('subheading')}</p>
 
@@ -126,6 +138,7 @@ export function SignupForm() {
         <span className="text-sm font-medium">{t('nickname_label')}</span>
         <input
           type="text"
+          aria-label={t('nickname_label')}
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
           required
@@ -142,6 +155,7 @@ export function SignupForm() {
         <span className="text-sm font-medium">{t('email_label')}</span>
         <input
           type="email"
+          aria-label={t('email_label')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -153,6 +167,7 @@ export function SignupForm() {
         <span className="text-sm font-medium">{t('password_label')}</span>
         <input
           type="password"
+          aria-label={t('password_label')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -165,6 +180,7 @@ export function SignupForm() {
         <span className="text-sm font-medium">{t('confirm_label')}</span>
         <input
           type="password"
+          aria-label={t('confirm_label')}
           value={passwordConfirm}
           onChange={(e) => setPasswordConfirm(e.target.value)}
           required

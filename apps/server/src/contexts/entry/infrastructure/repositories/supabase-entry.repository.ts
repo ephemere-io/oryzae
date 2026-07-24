@@ -1,6 +1,9 @@
 import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { EntryRepositoryGateway } from '../../domain/gateways/entry-repository.gateway.js';
+import type {
+  EntryListOrder,
+  EntryRepositoryGateway,
+} from '../../domain/gateways/entry-repository.gateway.js';
 import { Entry } from '../../domain/models/entry.js';
 
 export class SupabaseEntryRepository implements EntryRepositoryGateway {
@@ -25,7 +28,11 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     cursor?: string,
     limit = 20,
     questionId?: string,
+    order: EntryListOrder = 'newest',
   ): Promise<Entry[]> {
+    // created_at の並び順と、それに対応するカーソル比較（昇順=次は cursor より新しい→gt、
+    // 降順=次は cursor より古い→lt）。cursor は最後に受け取った entry の created_at 値。
+    const ascending = order === 'oldest';
     // Issue #331: 問いで絞り込む場合は先に entry_question_links から
     // 対象 entry_id 一覧を引いて IN フィルタにかける (PostgREST inner-join より
     // 結果の安定性を優先した二段クエリ。view repository と同じ判断)。
@@ -37,9 +44,11 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
         .select('*')
         .eq('user_id', userId)
         .in('id', entryIds)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending })
         .limit(limit);
-      if (cursor) query = query.lt('created_at', cursor);
+      if (cursor) {
+        query = ascending ? query.gt('created_at', cursor) : query.lt('created_at', cursor);
+      }
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
@@ -49,11 +58,11 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       .from('entries')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending })
       .limit(limit);
 
     if (cursor) {
-      query = query.lt('created_at', cursor);
+      query = ascending ? query.gt('created_at', cursor) : query.lt('created_at', cursor);
     }
 
     const { data, error } = await query;
@@ -159,7 +168,9 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     cursor?: string,
     limit = 20,
     questionId?: string,
+    order: EntryListOrder = 'newest',
   ): Promise<Entry[]> {
+    const ascending = order === 'oldest';
     // Issue #331: 問い絞り込みと検索の同時利用
     let entryIdsFilter: string[] | undefined;
     if (questionId !== undefined) {
@@ -172,12 +183,12 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       .select('*')
       .eq('user_id', userId)
       .ilike('content', `%${query}%`)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending })
       .limit(limit);
 
     if (entryIdsFilter) q = q.in('id', entryIdsFilter);
     if (cursor) {
-      q = q.lt('created_at', cursor);
+      q = ascending ? q.gt('created_at', cursor) : q.lt('created_at', cursor);
     }
 
     const { data, error } = await q;

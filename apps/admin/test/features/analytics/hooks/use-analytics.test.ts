@@ -66,6 +66,25 @@ describe('useAnalytics', () => {
     expect(result.current.error).toBe('分析データの取得に失敗しました');
   });
 
+  it('surfaces the server-provided error message (e.g. PostHog unavailable)', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        mockResponse(false, {
+          error: 'PostHog が未設定です（POSTHOG_PERSONAL_API_KEY を確認してください）',
+        }),
+      )
+      .mockResolvedValueOnce(mockResponse(true, { data: [] }))
+      .mockResolvedValueOnce(mockResponse(true, { data: [] }));
+
+    const { result } = renderHook(() => useAnalytics());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toContain('未設定');
+  });
+
   it('does nothing when no token is stored', async () => {
     localStorage.clear();
 

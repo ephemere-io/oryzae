@@ -8,9 +8,11 @@ export const test = base.extend<{ authenticated: void }>({
   authenticated: [
     async ({ page }, use) => {
       await page.goto('/login');
-      await page.fill('input[type="email"]', TEST_EMAIL);
-      await page.fill('input[type="password"]', TEST_PASSWORD);
-      await page.click('button:has-text("ログイン")');
+      // ログインのユーザー欄は nickname/email 兼用で type="text"（type="email" ではない）。
+      await page.getByPlaceholder('nickname or email@example.com').fill(TEST_EMAIL);
+      await page.locator('input[type="password"]').fill(TEST_PASSWORD);
+      // 「Google でログイン」とも部分一致するため exact で「ログイン」ボタンを特定する。
+      await page.getByRole('button', { name: 'ログイン', exact: true }).click();
       await page.waitForURL('**/entries**');
       await use();
     },

@@ -1,22 +1,35 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
+import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Sidebar } from '@/features/auth/components/sidebar';
-import { useAuth } from '@/features/auth/hooks/use-auth';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/onboarding/types';
+import { useAuth } from '@/lib/auth-context';
 import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
+import { useDevice } from '@/lib/use-device';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
   const { shouldShow, complete } = useOnboarding(api);
+  const device = useDevice();
   const router = useRouter();
+
+  // Issue #362/#363: 保護下の children はクライアント専用に描画する（mounted ゲート）。
+  // エディタ等の時刻依存・認証依存レンダリングが SSR↔client で食い違う不一致(React #418)
+  // を防ぐため。一方 device はサーバー(x-device)で確定済みなので **シェルとスケルトンは
+  // SSR で即描画**できる（children だけ mount 後）。これで FCP が空白でなくなる。
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleOnboardingComplete = useCallback(
     async (result: OnboardingResult) => {
@@ -38,30 +51,64 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;
 
+  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せる
+  // 汎用スケルトンを描画し、FCP を「空白」でなく「枠」にする（体感ロードを短縮）。
+  const content = mounted ? children : <ShellSkeleton />;
+
   return (
     <ThemeProvider>
       <SidebarProvider>
         <UnreadProvider api={api} authLoading={loading}>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main
-              className="flex flex-1 flex-col overflow-hidden"
-              style={
-                {
-                  marginLeft: SIDEBAR_WIDTH,
-                  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-                } as React.CSSProperties
-              }
-            >
-              <div className="relative flex-1 overflow-auto">{loading ? null : children}</div>
-              <PageFooter />
-            </main>
-            {shouldShow && <OnboardingFlow onComplete={handleOnboardingComplete} />}
-            {/* スマホ専用画面が用意できるまでの暫定処置 (Issue #299) — 保護下のページはスマホ非対応 */}
-            <DesktopOnlyOverlay />
-          </div>
+          {/* device はサーバー(x-device)で確定済み＝first render から端末別シェルを SSR 描画。
+              null フォールバックは Provider 外などの保険（通常は到達しない）。 */}
+          {device === 'sp' ? (
+            // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
+            // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
+            // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
+            <div className="flex h-[100dvh] flex-col overflow-hidden">
+              <main className="relative flex-1 overflow-auto">{content}</main>
+              <SpBottomNav />
+            </div>
+          ) : device === 'pc' ? (
+            <div className="flex h-screen overflow-hidden">
+              <Sidebar />
+              <main
+                className="flex flex-1 flex-col overflow-hidden"
+                style={
+                  {
+                    marginLeft: SIDEBAR_WIDTH,
+                    '--sidebar-width': `${SIDEBAR_WIDTH}px`,
+                  } as React.CSSProperties
+                }
+              >
+                <div className="relative flex-1 overflow-auto">{content}</div>
+                <PageFooter />
+              </main>
+              {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
+              <DesktopOnlyOverlay />
+            </div>
+          ) : null}
+          {device !== null && shouldShow && (
+            <OnboardingFlow onComplete={handleOnboardingComplete} />
+          )}
         </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>
+  );
+}
+
+/**
+ * mount 前（SSR 含む）に出す汎用スケルトン。ヘッダ風の1本＋カード数枚で、一覧/エディタ
+ * どちらの画面でも破綻しない最小の「枠」。空白を見せないことが目的（Issue #362/#363）。
+ */
+function ShellSkeleton() {
+  return (
+    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4 px-5 pt-8">
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-20 w-full" />
+    </div>
   );
 }

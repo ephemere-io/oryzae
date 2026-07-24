@@ -28,6 +28,10 @@ export class RunFermentationUsecase {
     // 出力言語 (issue #279)。呼び出し側で UserLocaleResolver を使って解決する。
     // 未指定時のデフォルトは 'ja' (Oryzae のメインターゲット)。
     language?: FermentationLanguage;
+    // issue #353: 既存の失敗結果を渡すと「新規作成」ではなく「その行を再利用して再実行」する。
+    // 行を再利用することで created_at が変わらず、リトライが1回に収まる。再実行前に
+    // 過去試行の部分出力を clearOutputs で消す。
+    retryOf?: FermentationResult;
   }): Promise<{ id: string }> {
     if (params.entries.length === 0) {
       throw new LlmAnalysisError('At least one entry is required');
@@ -35,24 +39,37 @@ export class RunFermentationUsecase {
     const language: FermentationLanguage = params.language ?? 'ja';
 
     const today = new Date().toISOString().slice(0, 10);
-    const targetPeriod = today;
 
-    // 1. Create pending result
-    const createResult = FermentationResult.create(
-      {
-        userId: params.userId,
-        questionId: params.questionId,
-        targetPeriod,
-      },
-      this.generateId,
-    );
-    if (!createResult.success) {
-      throw new LlmAnalysisError(createResult.error.message);
+    // 1. 結果行を用意する（新規 or リトライで既存を再利用）。
+    let fermentationResult: FermentationResult;
+    if (params.retryOf) {
+      // リトライ: 既存行を再利用。errorMessage をクリアし、過去の部分出力を消す。
+      fermentationResult = FermentationResult.fromProps({
+        ...params.retryOf.toProps(),
+        errorMessage: null,
+      });
+      await this.fermentationRepo.clearOutputs(fermentationResult.id);
+    } else {
+      const createResult = FermentationResult.create(
+        {
+          userId: params.userId,
+          questionId: params.questionId,
+          targetPeriod: today,
+        },
+        this.generateId,
+      );
+      if (!createResult.success) {
+        throw new LlmAnalysisError(createResult.error.message);
+      }
+      fermentationResult = createResult.value;
+      await this.fermentationRepo.save(fermentationResult);
     }
-    const fermentationResult = createResult.value;
-    await this.fermentationRepo.save(fermentationResult);
+
+    // LLM に渡す対象期間。新規は今日、リトライは元の行の値（変えない）。
+    const targetPeriod = fermentationResult.toProps().targetPeriod;
 
     // 1.5. Record which entries were scanned (before LLM so it's preserved even on failure)
+    // saveScannedEntries は upsert(on conflict do nothing) なのでリトライでも冪等。
     await this.fermentationRepo.saveScannedEntries(
       fermentationResult.id,
       params.entries.map((e) => e.id),
@@ -68,7 +85,7 @@ export class RunFermentationUsecase {
 
     try {
       // 3. Run LLM analysis
-      const { output, generationId } = await this.llmGateway.analyze({
+      const { output, usage, generationId } = await this.llmGateway.analyze({
         question: params.questionText,
         entryContent: combinedContent,
         targetPeriod,
@@ -76,12 +93,15 @@ export class RunFermentationUsecase {
         language,
       });
 
-      // 3.5. Track generation ID for cost tracking
+      // 3.5. Track generation ID + token usage for cost tracking.
+      // issue #352 で Anthropic 直叩きに切替え generationId は出なくなったが、usage は
+      // 取得できる。トークンを保存して価格表からコストを算出する (claude-pricing.ts)。
       let currentResult = fermentationResult;
       if (generationId) {
-        currentResult = fermentationResult.withGenerationId(generationId);
-        await this.fermentationRepo.update(currentResult);
+        currentResult = currentResult.withGenerationId(generationId);
       }
+      currentResult = currentResult.withUsage(usage.inputTokens, usage.outputTokens);
+      await this.fermentationRepo.update(currentResult);
 
       // 4. Save all results
       const worksheet = AnalysisWorksheet.create(

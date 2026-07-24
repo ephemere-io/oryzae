@@ -12,7 +12,8 @@ test.describe('ボード画面', () => {
   });
 
   test('日付ナビゲーションで前日/翌日に切り替えできる', async ({ page }) => {
-    const dateText = page.locator('[class*="tracking"]').first();
+    // 日付ラベルは tracking-wider が一意（他コントロールは tracking-[0.15em] 等）。
+    const dateText = page.locator('[class*="tracking-wider"]').first();
     const initialDate = await dateText.textContent();
 
     await page.click('button:has-text("‹")');
@@ -27,28 +28,29 @@ test.describe('ボード画面', () => {
   });
 
   test('スニペットを作成できる', async ({ page }) => {
+    const snippet = `E2Eスニペット-${Date.now()}`;
     await page.click('button:has-text("Snippet")');
-    await expect(page.locator('text=New Snippet')).toBeVisible();
-
-    await page.fill('input[placeholder*="スニペット"]', 'E2Eテストスニペット');
-    await page.click('button:has-text("Add")');
+    // ダイアログ見出しは「スニペットを作成」、入力は textarea(placeholder="テキストを入力...")、確定は「作成」。
+    await expect(page.getByText('スニペットを作成')).toBeVisible();
+    await page.fill('textarea[placeholder*="テキスト"]', snippet);
+    await page.getByRole('button', { name: '作成', exact: true }).click();
 
     await page.waitForTimeout(1000);
-    await expect(page.locator('text=E2Eテストスニペット')).toBeVisible();
+    await expect(page.getByText(snippet)).toBeVisible();
   });
 
   test('エントリカードが表示される（当日エントリがある場合）', async ({ page }) => {
-    // まずエントリを作成
+    // まずエントリを作成（PC エディタは自動保存）
+    const unique = `ボードE2E-${Date.now()}`;
     await page.goto('/entries/new');
-    const editor = page.locator('[contenteditable="true"]');
+    const editor = page.locator('[contenteditable="true"]').first();
     await editor.click();
-    await editor.pressSequentially('ボードE2Eテスト用エントリ');
-    await page.click('button:has-text("保存")');
-    await page.waitForTimeout(2000);
+    await editor.pressSequentially(unique);
+    await page.waitForTimeout(4000);
 
-    // ボードに移動してカードを確認
+    // ボード（当日）にカードとして出る（カード見出し＋本文で2要素マッチするため first）
     await page.goto('/board');
-    await page.waitForTimeout(2000);
-    await expect(page.locator('text=ボードE2Eテスト用エントリ')).toBeVisible();
+    await page.waitForSelector('[role="application"]');
+    await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
   });
 });

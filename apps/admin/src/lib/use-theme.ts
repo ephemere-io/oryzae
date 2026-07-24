@@ -19,11 +19,20 @@ function applyTheme(theme: Theme) {
 }
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  // Issue #362: SSR と client 初回描画を必ず同じ値('dark')にしてハイドレーション
+  // 不一致(React #418)を防ぐ。実テーマはマウント後に反映する（見た目のクラスは
+  // <head> の theme-init.js が hydration 前に適用済みなので、ここで上書きしない）。
+  const [theme, setThemeState] = useState<Theme>('dark');
+  const [synced, setSynced] = useState(false);
 
   useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+    setThemeState(getInitialTheme());
+    setSynced(true);
+  }, []);
+
+  useEffect(() => {
+    if (synced) applyTheme(theme);
+  }, [theme, synced]);
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);

@@ -47,6 +47,7 @@ describe('ListActiveQuestionsUsecase', () => {
       listByQuestionId: vi.fn().mockResolvedValue([]),
       findLatestByQuestionId: vi.fn().mockResolvedValue(null),
       findLatestValidatedByQuestionId: vi.fn().mockResolvedValue(null),
+      findLatestValidatedByQuestionIds: vi.fn().mockResolvedValue(new Map()),
       findLatestUnvalidatedByQuestionId: vi.fn().mockResolvedValue(null),
       append: vi.fn().mockResolvedValue(undefined),
       save: vi.fn().mockResolvedValue(undefined),
@@ -57,7 +58,9 @@ describe('ListActiveQuestionsUsecase', () => {
 
   it('アクティブな Question 一覧と currentText を返す', async () => {
     vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([activeQuestion]);
-    vi.mocked(transactionRepo.findLatestValidatedByQuestionId).mockResolvedValue(validatedTx);
+    vi.mocked(transactionRepo.findLatestValidatedByQuestionIds).mockResolvedValue(
+      new Map([['q-1', validatedTx]]),
+    );
 
     const result = await usecase.execute('user-1');
 
@@ -74,10 +77,20 @@ describe('ListActiveQuestionsUsecase', () => {
 
   it('validated な Transaction がない場合は currentText が null になる', async () => {
     vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([activeQuestion]);
-    vi.mocked(transactionRepo.findLatestValidatedByQuestionId).mockResolvedValue(null);
+    vi.mocked(transactionRepo.findLatestValidatedByQuestionIds).mockResolvedValue(new Map());
 
     const result = await usecase.execute('user-1');
 
     expect(result[0].currentText).toBeNull();
+  });
+
+  it('N+1 を避けるため、全 questionId を一度にバッチ取得し per-id は呼ばない (Issue #362)', async () => {
+    vi.mocked(questionRepo.listActiveByUserId).mockResolvedValue([activeQuestion]);
+
+    await usecase.execute('user-1');
+
+    expect(transactionRepo.findLatestValidatedByQuestionIds).toHaveBeenCalledTimes(1);
+    expect(transactionRepo.findLatestValidatedByQuestionIds).toHaveBeenCalledWith(['q-1']);
+    expect(transactionRepo.findLatestValidatedByQuestionId).not.toHaveBeenCalled();
   });
 });

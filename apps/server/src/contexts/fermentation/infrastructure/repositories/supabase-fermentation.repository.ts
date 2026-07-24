@@ -39,6 +39,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .update({
         status: props.status,
         generation_id: props.generationId,
+        input_tokens: props.inputTokens,
+        output_tokens: props.outputTokens,
         error_message: props.errorMessage,
         updated_at: new Date().toISOString(),
       })
@@ -60,6 +62,8 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       targetPeriod: data.target_period,
       status: data.status,
       generationId: data.generation_id ?? null,
+      inputTokens: data.input_tokens ?? null,
+      outputTokens: data.output_tokens ?? null,
       errorMessage: data.error_message ?? null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
@@ -94,6 +98,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       : null;
 
     const snippets = (snippetsRes.data ?? []).map((row: Record<string, unknown>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       ExtractedSnippet.fromProps({
         id: row.id as string,
         fermentationResultId: row.fermentation_result_id as string,
@@ -121,6 +126,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       : null;
 
     const keywords = (keywordsRes.data ?? []).map((row: Record<string, unknown>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       Keyword.fromProps({
         id: row.id as string,
         fermentationResultId: row.fermentation_result_id as string,
@@ -144,6 +150,7 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
     return (data ?? []).map((row: Record<string, string>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
       FermentationResult.fromProps({
         id: row.id,
         userId: row.user_id,
@@ -151,11 +158,77 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         targetPeriod: row.target_period,
         status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
         generationId: row.generation_id ?? null,
+        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
+        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
         errorMessage: row.error_message ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }),
     );
+  }
+
+  async listByUserId(userId: string): Promise<FermentationResult[]> {
+    const { data, error } = await this.supabase
+      .from('fermentation_results')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
+    return (data ?? []).map((row: Record<string, string>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+      FermentationResult.fromProps({
+        id: row.id,
+        userId: row.user_id,
+        questionId: row.question_id,
+        targetPeriod: row.target_period,
+        status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
+        generationId: row.generation_id ?? null,
+        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
+        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
+        errorMessage: row.error_message ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }),
+    );
+  }
+
+  async listRetryable(sinceIso: string, beforeIso: string): Promise<FermentationResult[]> {
+    const { data, error } = await this.supabase
+      .from('fermentation_results')
+      .select('*')
+      // 'completed' 以外（明示失敗 + kill で宙ぶらりん）を未完了として拾う。
+      .in('status', ['pending', 'processing', 'failed'])
+      .gte('created_at', sinceIso)
+      .lt('created_at', beforeIso)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`Failed to list retryable fermentations: ${error.message}`);
+    return (data ?? []).map((row: Record<string, string>) =>
+      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+      FermentationResult.fromProps({
+        id: row.id,
+        userId: row.user_id,
+        questionId: row.question_id,
+        targetPeriod: row.target_period,
+        status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
+        generationId: row.generation_id ?? null,
+        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
+        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
+        errorMessage: row.error_message ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }),
+    );
+  }
+
+  async clearOutputs(fermentationResultId: string): Promise<void> {
+    // 行を再利用してリトライする前に、過去試行の部分出力を消す（重複防止）。
+    for (const table of ['analysis_worksheets', 'extracted_snippets', 'letters', 'keywords']) {
+      const { error } = await this.supabase
+        .from(table)
+        .delete()
+        .eq('fermentation_result_id', fermentationResultId);
+      if (error) throw new Error(`Failed to clear ${table}: ${error.message}`);
+    }
   }
 
   async saveScannedEntries(fermentationResultId: string, entryIds: string[]): Promise<void> {

@@ -17,6 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('support');
   return {
     title: t('title'),
+    alternates: { canonical: '/support' },
   };
 }
 

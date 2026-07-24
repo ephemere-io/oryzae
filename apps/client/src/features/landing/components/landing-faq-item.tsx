@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useState } from 'react';
 import styles from './landing.module.css';
 
@@ -11,7 +12,7 @@ interface LandingFaqItemProps {
 export function LandingFaqItem({ question, answer }: LandingFaqItemProps) {
   const [open, setOpen] = useState(false);
   return (
-    <li className={styles.faqItem}>
+    <li className={styles.faqItem} {...verifyAttrs({ unit: 'LandingFaqItem', open })}>
       <button
         type="button"
         className={styles.faqQ}

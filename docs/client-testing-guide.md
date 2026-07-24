@@ -23,9 +23,9 @@
 
 | 優先度 | 対象 | 方針 |
 | --- | --- | --- |
-| P0 | カスタム hooks（useAuth, useEntries, useQuestions） | API 呼び出し・状態管理のロジックを網羅的にテスト |
+| P0 | 共有データ hooks（`features/shared/{domain}/hooks`：useAuth, useEntries, useQuestions 等） | API 呼び出し・状態管理のロジックを網羅的にテスト。PC/SP 共通の振る舞いはここで担保 |
 | P1 | バリデーション統合（@oryzae/shared の Zod スキーマ利用） | スキーマの正常値・異常値の境界をテスト |
-| P2 | ロジックを含む UI コンポーネント | 条件分岐レンダリング・イベントハンドラの動作検証 |
+| P2 | ロジックを含む UI コンポーネント（`features/pc`・`features/sp`） | 条件分岐レンダリング・イベントハンドラの動作検証 |
 
 ### テストしないもの
 
@@ -36,22 +36,32 @@
 
 ## テストファイル配置
 
+`test/features/` 配下に、`src/features/` のディレクトリ構造を **reach（shared/pc/sp）ごと**にミラーして配置する。
+
+`apps/client`（reach 軸あり）:
+
 ```
-apps/{client,admin}/
+apps/client/
 ├── src/features/
-│   ├── auth/
-│   │   └── hooks/useAuth.ts
-│   └── {feature}/
-│       └── hooks/use-{name}.ts
-└── test/features/          ← src/features/ のミラー構造
-    ├── auth/
-    │   └── hooks/useAuth.test.ts
-    └── {feature}/
-        └── hooks/use-{name}.test.ts
+│   ├── shared/{domain}/
+│   │   └── hooks/use-{name}.ts       ← データ hook（P0）
+│   ├── pc/{domain}/
+│   │   └── components/ hooks/
+│   └── sp/{domain}/
+│       └── components/ hooks/
+└── test/features/                    ← src/features/ のミラー構造
+    ├── shared/{domain}/
+    │   └── hooks/use-{name}.test.ts
+    ├── pc/{domain}/
+    │   └── ...
+    └── sp/{domain}/
+        └── ...
 ```
 
-- テストファイルは `test/features/` 配下に、`src/features/` のディレクトリ構造をミラーして配置する
-- インポートは `@/` エイリアスを使用する（例: `import { useAuth } from '@/features/auth/hooks/useAuth'`）
+`apps/admin`（reach 軸なし）は従来どおり `features/{domain}/` をミラーする。
+
+- インポートは `@/` エイリアスを使用する（例: `import { useEntries } from '@/features/shared/entries/hooks/use-entries'`）
+- 共有データ hook のテストは PC/SP で重複させず、`test/features/shared/{domain}` に1か所だけ置く
 
 **なぜソースと分離するか**: テストコードをビルド対象から明確に除外し、`src/` の見通しを良く保つため。ミラー構造により対応関係は一目でわかる。
 
@@ -79,7 +89,7 @@ beforeEach(() => {
 
 ```ts
 import { renderHook, waitFor } from '@testing-library/react';
-import { useEntries } from '@/features/entry/hooks/useEntries';
+import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 
 describe('useEntries', () => {
   it('エントリ一覧を取得できる', async () => {

@@ -1,12 +1,13 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/auth/components/google-login-button';
-import { useAuth } from '@/features/auth/hooks/use-auth';
 import { translateAuthError } from '@/features/auth/utils/error-messages';
+import { useAuth } from '@/lib/auth-context';
 
 export function LoginForm() {
   const t = useTranslations('auth.login');
@@ -34,7 +35,16 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4"
+      {...verifyAttrs({
+        unit: 'LoginForm',
+        filled: identifier.trim().length > 0 && password.length > 0,
+        loading,
+        hasError: error.length > 0,
+      })}
+    >
       <h1 className="text-2xl font-bold text-center">Oryzae</h1>
       <p className="text-sm text-center text-zinc-500">{t('subheading')}</p>
 

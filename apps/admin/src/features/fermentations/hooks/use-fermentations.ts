@@ -15,6 +15,11 @@ export interface FermentationItem {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  cost: {
+    totalCost: number;
+    promptTokens: number;
+    completionTokens: number;
+  } | null;
 }
 
 interface FermentationsResponse {

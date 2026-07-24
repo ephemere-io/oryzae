@@ -10,7 +10,7 @@ jobs:
     name: Lint (Biome)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -23,7 +23,7 @@ jobs:
     name: TypeCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -36,7 +36,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -49,7 +49,7 @@ jobs:
     name: Dependency Check (DDD Layers)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -62,7 +62,7 @@ jobs:
     name: Dead Code Detection (Knip)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -70,3 +70,88 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm knip
+
+  # 検証ハーネスの「挙動確認ビュー」への導線を PR に貼る。
+  # 以前は replay をヘッドレス録画→GIF 化していたが、GIF が巨大（212 probe×~5分＝~100MB）で
+  # GitHub にアップロードできず機能していなかった。Vercel プレビューの /verify を直接開ける
+  # ようにした（verify ルートは VERCEL_ENV=preview で有効）ので、その URL を案内するだけにする。
+  # ゲートではない（合否は Test ジョブの matrix が担保）。
+  verify-demo:
+    name: Verify Preview View (PR comment)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Sticky comment with preview /verify links
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- verify-demo -->';
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+            // Vercel のブランチ別プレビュー alias（このリポジトリの命名規則に依存）。
+            const slug = pr.head.ref.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const client = `https://oryzae-client-git-${slug}-ephemere-io.vercel.app`;
+            const headSha = (pr.head?.sha ?? context.sha).slice(0, 7);
+            const body = [
+              marker,
+              '## 🔬 Verify Harness — 挙動確認ビュー（プレビュー）',
+              '',
+              'このブランチの Vercel プレビューで検証ハーネスを直接開けます（デプロイ完了後に有効）:',
+              '',
+              `- 🧩 ダッシュボード: ${client}/verify`,
+              `- ▶️ リプレイ: ${client}/verify/replay`,
+              '',
+              `<sub>🤖 verify ルートは \`VERCEL_ENV=preview\` のプレビューのみ有効（真の本番は 404）· ${headSha} · リンクが 404 の場合は上の「Vercel – oryzae-client」チェックの URL に \`/verify/replay\` を付けて開いてください</sub>`,
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
+            }
+
+  # 「見た目の実装にはテストを」を CI で強制する硬いゲート。
+  # PR で *新規追加* された client の feature コンポーネントに、隣接 *.verify.tsx が無く、
+  # かつ `// verify-exempt: <理由>` も無ければ落とす。リネーム(#363 のような移設)は -M で除外。
+  # 既存の未カバー部品は「新規追加」ではないので素通り（段階導入を壊さない）。
+  verify-coverage-gate:
+    name: Verify Coverage Gate (new components need *.verify)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Require *.verify.tsx (or // verify-exempt) for newly-added components
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          MERGE_BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          NEW=$(git diff --diff-filter=A -M --name-only "$MERGE_BASE" HEAD -- 'apps/client/src/features' \
+            | grep -E 'src/features/.*/components/.*\.tsx$' \
+            | grep -vE '\.(verify|test)\.tsx$' || true)
+          fail=0
+          for f in $NEW; do
+            sib="${f%.tsx}.verify.tsx"
+            if [ -f "$sib" ]; then
+              echo "✓ $f"
+            elif grep -q "verify-exempt" "$f"; then
+              echo "→ exempt: $f"
+            else
+              echo "::error file=$f::新規コンポーネントに $sib がありません。検証スペックを追加するか、コンポーネント先頭に '// verify-exempt: <理由>' を記載してください（docs/verify-harness-rollout.md §3）。"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "Verify coverage gate failed."
+            exit 1
+          fi
+          echo "Verify coverage gate passed."
