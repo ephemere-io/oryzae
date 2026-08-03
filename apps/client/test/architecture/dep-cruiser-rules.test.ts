@@ -63,6 +63,27 @@ describe('dep-cruiser guardrails (reach architecture)', () => {
     );
   });
 
+  // Issue #490: app への押し上げ・flat への fetch 残留を塞ぐルール。
+  // 移行完了まで warn、Phase 6 で error に上げる（severity はここでは問わない）。
+  it('app/flat の fetch 抜け道ルールが存在する', () => {
+    for (const name of ['app-no-api-client', 'app-no-reach-hooks', 'flat-features-no-api']) {
+      expect(rule(name).name).toBe(name);
+    }
+  });
+
+  it('app-no-reach-hooks: app → features/{pc,sp}/*/hooks を禁止（seam 漏れ防止）', () => {
+    const r = rule('app-no-reach-hooks');
+    expect(r.from?.path).toContain('src/app/');
+    expect(r.to?.path).toContain('(pc|sp)');
+    expect(r.to?.path).toContain('hooks');
+  });
+
+  it('app-no-api-client: Route Handler は除外される', () => {
+    const r = rule('app-no-api-client');
+    expect(r.from?.pathNot).toContain('src/app/api/');
+    expect(r.to?.path).toContain('lib/api');
+  });
+
   it('seam 強制: 保護 page は DeviceView を required している', () => {
     const req = (config.required ?? []).find((r) => r.name === 'protected-pages-use-device-view');
     expect(req?.severity).toBe('error');
