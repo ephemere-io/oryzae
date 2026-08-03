@@ -13,16 +13,7 @@ import { describe, expect, it } from 'vitest';
  * 移行中の既知違反（Issue #490 Phase 2 で解消する）。
  * **減る一方**であること。解消したら削除する（消し忘れは下のテストが検出する）。
  */
-const MIGRATING: string[] = [
-  'src/features/pc/board/hooks/use-board.ts',
-  'src/features/pc/entries/hooks/use-entry-fermentation-detail.ts',
-  'src/features/pc/entries/hooks/use-voice-dynamics.ts',
-  'src/features/pc/fermentation/hooks/use-fermentation-results.ts',
-  'src/features/pc/fermentation/hooks/use-jar-layout-save.ts',
-  'src/features/shared/entries/hooks/use-entries.ts',
-  'src/features/shared/entries/hooks/use-entry-draft.ts',
-  'src/features/shared/fermentation/hooks/use-fermentation-inbox.ts',
-];
+const MIGRATING: string[] = [];
 
 const EXPORTED_TYPE = /^export\s+(interface|type)\s/m;
 

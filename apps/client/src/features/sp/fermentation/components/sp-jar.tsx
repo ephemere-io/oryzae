@@ -5,24 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { ListSkeleton } from '@/components/ui/list-skeleton';
-import {
-  type InboxLetter,
-  useFermentationDetail,
-  useFermentationInbox,
-} from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
+import { useFermentationDetail } from '@/features/shared/fermentation/hooks/use-fermentation-detail';
+import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
+import type { InboxLetter } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
+import { formatMonthDay } from '@/lib/format-date';
 import { useUnread } from '@/lib/unread-context';
 
 interface SpJarProps {
   api: ApiClient | null;
-}
-
-/** ISO 日付を「M月D日」に。失敗時は空。 */
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
 /**
@@ -82,7 +73,7 @@ export function SpJar({ api }: SpJarProps) {
                     {letter.questionText ?? t('untitled')}
                   </span>
                   <span className="mt-0.5 block text-[11px]" style={{ color: 'var(--date-color)' }}>
-                    {letter.unread ? t('unread') : t('read')} · {formatDate(letter.createdAt)}
+                    {letter.unread ? t('unread') : t('read')} · {formatMonthDay(letter.createdAt)}
                   </span>
                 </span>
               </button>
@@ -107,7 +98,7 @@ export function SpJar({ api }: SpJarProps) {
             {/* 手紙 */}
             <SectionLabel>{t('section_letter')}</SectionLabel>
             <p className="whitespace-pre-wrap text-base leading-loose">
-              {detailLoading ? '' : (detail?.bodyText ?? t('letter_empty'))}
+              {detailLoading ? '' : (detail?.letter?.bodyText ?? t('letter_empty'))}
             </p>
 
             {/* 言葉（keywords） */}
@@ -144,7 +135,7 @@ export function SpJar({ api }: SpJarProps) {
                     >
                       <p className="text-sm leading-relaxed">「{s.originalText}」</p>
                       <p className="mt-1.5 text-[11px]" style={{ color: 'var(--date-color)' }}>
-                        {formatDate(s.sourceDate)}
+                        {formatMonthDay(s.sourceDate)}
                       </p>
                     </div>
                   ))}

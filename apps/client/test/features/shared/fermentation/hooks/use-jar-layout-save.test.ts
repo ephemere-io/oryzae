@@ -1,9 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  type JarLayout,
-  useJarLayoutSave,
-} from '@/features/pc/fermentation/hooks/use-jar-layout-save';
+import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
+import type { JarLayout } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {

@@ -11,7 +11,6 @@ import {
 } from '@/features/pc/entries/components/editor-status-bar';
 import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
 import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
-import { formatEntryDate } from '@/features/pc/entries/components/format-entry-date';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
 import { PickleConfirmModal } from '@/features/pc/entries/components/pickle-confirm-modal';
@@ -26,18 +25,14 @@ import { UnsavedChangesModal } from '@/features/pc/entries/components/unsaved-ch
 import { useAmpEffect } from '@/features/pc/entries/hooks/use-amp-effect';
 import { useBrowserNavGuard } from '@/features/pc/entries/hooks/use-browser-nav-guard';
 import { useEditorSettings } from '@/features/pc/entries/hooks/use-editor-settings';
-import { useEntryFermentationDetail } from '@/features/pc/entries/hooks/use-entry-fermentation-detail';
 import { useEraserTrace } from '@/features/pc/entries/hooks/use-eraser-trace';
 import { useFocusMode } from '@/features/pc/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/pc/entries/hooks/use-ghost-effect';
 import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-question-sync';
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
-import { useUserMe } from '@/features/pc/entries/hooks/use-user-me';
-import {
-  useVoiceDynamics,
-  type VoiceUnavailableReason,
-} from '@/features/pc/entries/hooks/use-voice-dynamics';
+import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
+import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
 import {
   loadCachedEffects,
   saveCachedEffects,
@@ -46,8 +41,12 @@ import {
   applyTextSpansToEditor,
   extractEditorEffects,
 } from '@/features/pc/entries/utils/editor-effects-codec';
+import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
+import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
+import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
+import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
 import type { ApiClient } from '@/lib/api';
 import { SIDEBAR_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
 
@@ -160,7 +159,7 @@ export function EntryEditor({
   // 既存エントリでは表示しない (執筆中の判断材料として使うため新規限定)。
   const isNewEntry = !entryId;
   const firstLinkedQuestionId = isNewEntry ? Array.from(linkedIds)[0] : undefined;
-  const { detail: fermentationOverlayDetail } = useEntryFermentationDetail(
+  const { detail: fermentationOverlayDetail } = useFermentationForQuestion(
     api,
     firstLinkedQuestionId,
   );
@@ -206,6 +205,7 @@ export function EntryEditor({
     return formatEntryDate(created, updated, t);
   });
   const { save, saving, error } = useSaveEntry(api, auth);
+  const createQuestion = useCreateQuestion(api);
   // Issue #316: 保存成功直後のナッジ表示判定に使う
   const userMe = useUserMe(api);
   const router = useRouter();
@@ -515,16 +515,8 @@ export function EntryEditor({
   const handleQuestionSelectAndPickle = useCallback(
     async (args: { existingId: string | null; newQuestionText: string | null }) => {
       let questionId = args.existingId;
-      // 新規問い作成 (POST /api/v1/questions)
-      if (!questionId && args.newQuestionText && api) {
-        const res = await api.fetch('/api/v1/questions', {
-          method: 'POST',
-          body: JSON.stringify({ string: args.newQuestionText }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { id?: string };
-          questionId = data.id ?? null;
-        }
+      if (!questionId && args.newQuestionText) {
+        questionId = await createQuestion(args.newQuestionText);
       }
       if (!questionId) return;
 
@@ -544,7 +536,15 @@ export function EntryEditor({
       // 漬け込みを実行 (タイトル未設定なら本文先頭行が title として後から解釈される)
       handleSaveWithTitle(title, { fermentationEnabled: true });
     },
-    [api, linkedIds, currentEntryId, entryId, onLinkQuestion, handleSaveWithTitle, title],
+    [
+      createQuestion,
+      linkedIds,
+      currentEntryId,
+      entryId,
+      onLinkQuestion,
+      handleSaveWithTitle,
+      title,
+    ],
   );
 
   const startTitleEdit = useCallback(() => {

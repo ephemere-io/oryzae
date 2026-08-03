@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useUserStats } from '@/features/auth/hooks/use-user-stats';
-import { I18nWrapper } from '../../../helpers/i18n-wrapper';
+import { useUserStats } from '@/features/shared/auth/hooks/use-user-stats';
+import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);

@@ -1,17 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { QuestionItem } from '@/features/shared/questions/types';
 import type { ApiClient } from '@/lib/api';
-
-interface QuestionItem {
-  id: string;
-  currentText: string | null;
-  isArchived: boolean;
-  isProposedByOryzae: boolean;
-  isValidatedByUser: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export function useQuestions(api: ApiClient | null) {
   const [questions, setQuestions] = useState<QuestionItem[]>([]);

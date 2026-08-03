@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useUserStats } from '@/features/auth/hooks/use-user-stats';
+import { useUserStats } from '@/features/shared/auth/hooks/use-user-stats';
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (

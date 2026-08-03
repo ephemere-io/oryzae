@@ -23,9 +23,10 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
+import type { FilterableQuestion } from '@/features/shared/questions/types';
 import type { ApiClient } from '@/lib/api';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { EntryList, type FilterableQuestion } from './entry-list';
+import { EntryList } from './entry-list';
 
 interface Props {
   api: ApiClient | null;

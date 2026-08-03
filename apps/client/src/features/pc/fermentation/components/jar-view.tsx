@@ -5,12 +5,10 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
 import { QuestionCircle } from '@/features/pc/fermentation/components/question-circle';
-import { useFermentationForQuestion } from '@/features/pc/fermentation/hooks/use-fermentation-results';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
-import {
-  type JarLayout,
-  useJarLayoutSave,
-} from '@/features/pc/fermentation/hooks/use-jar-layout-save';
+import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
+import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
+import type { JarLayout } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
 
 interface QuestionData {

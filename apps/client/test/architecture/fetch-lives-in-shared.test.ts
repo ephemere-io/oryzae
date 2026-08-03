@@ -20,25 +20,18 @@ const ALLOWED_PREFIXES = ['src/features/shared/', 'src/lib/', 'src/app/api/'];
  * 解消したら必ず削除すること。消し忘れは下の「陳腐化した allowlist を残さない」が検出する。
  */
 const MIGRATING: string[] = [
+  // Phase 5 で解消: app/ の API 直叩き
   'src/app/(auth)/auth/confirm/page.tsx',
   'src/app/(auth)/callback/page.tsx',
   'src/app/(protected)/entries/new/page.tsx',
   'src/app/(protected)/jar/page.tsx',
+  // Phase 3 で解消: account/profile の二重実装
   'src/features/auth/components/account-page.tsx',
+  'src/features/sp/account/components/sp-account-page.tsx',
+  // Phase 5 で解消: 認証フォームの直叩き
   'src/features/auth/components/forgot-password-form.tsx',
   'src/features/auth/components/google-login-button.tsx',
   'src/features/auth/components/reset-password-form.tsx',
-  'src/features/auth/hooks/use-user-stats.ts',
-  'src/features/onboarding/hooks/use-onboarding.ts',
-  'src/features/pc/board/hooks/use-board-save.ts',
-  'src/features/pc/board/hooks/use-board.ts',
-  'src/features/pc/entries/components/entry-editor.tsx',
-  'src/features/pc/entries/components/snippet-toolbar.tsx',
-  'src/features/pc/entries/hooks/use-entry-fermentation-detail.ts',
-  'src/features/pc/entries/hooks/use-user-me.ts',
-  'src/features/pc/fermentation/hooks/use-fermentation-results.ts',
-  'src/features/pc/fermentation/hooks/use-jar-layout-save.ts',
-  'src/features/sp/account/components/sp-account-page.tsx',
 ];
 
 function walk(dir: string): string[] {

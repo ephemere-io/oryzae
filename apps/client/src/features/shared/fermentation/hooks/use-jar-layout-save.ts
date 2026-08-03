@@ -1,20 +1,8 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
+import type { JarLayout } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
-
-interface JarPositionItem {
-  id: string;
-  jarX: number;
-  jarY: number;
-}
-
-export interface JarLayout {
-  questions: JarPositionItem[];
-  keywords: JarPositionItem[];
-  snippets: JarPositionItem[];
-  letters: JarPositionItem[];
-}
 
 const DEBOUNCE_MS = 500;
 

@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useEntryFermentationDetail } from '@/features/pc/entries/hooks/use-entry-fermentation-detail';
+import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import type { ApiClient } from '@/lib/api';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
@@ -20,7 +20,7 @@ function mockResponse(ok: boolean, body: unknown): Response {
   } as Response;
 }
 
-describe('useEntryFermentationDetail', () => {
+describe('useFermentationForQuestion', () => {
   let apiFetch: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -30,7 +30,7 @@ describe('useEntryFermentationDetail', () => {
 
   it('questionId が undefined のときは fetch せず detail は null', async () => {
     const api = createMockApi(apiFetch);
-    const { result } = renderHook(() => useEntryFermentationDetail(api, undefined));
+    const { result } = renderHook(() => useFermentationForQuestion(api, undefined));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -41,7 +41,7 @@ describe('useEntryFermentationDetail', () => {
   });
 
   it('api が null のときは fetch せず detail は null', async () => {
-    const { result } = renderHook(() => useEntryFermentationDetail(null, 'q1'));
+    const { result } = renderHook(() => useFermentationForQuestion(null, 'q1'));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -57,7 +57,7 @@ describe('useEntryFermentationDetail', () => {
       ]),
     );
     const api = createMockApi(apiFetch);
-    const { result } = renderHook(() => useEntryFermentationDetail(api, 'q1'));
+    const { result } = renderHook(() => useFermentationForQuestion(api, 'q1'));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -95,7 +95,7 @@ describe('useEntryFermentationDetail', () => {
       );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntryFermentationDetail(api, 'q1'));
+    const { result } = renderHook(() => useFermentationForQuestion(api, 'q1'));
 
     await waitFor(() => {
       expect(result.current.detail).not.toBeNull();
@@ -118,7 +118,7 @@ describe('useEntryFermentationDetail', () => {
   it('list が ok=false なら detail は null', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(false, null));
     const api = createMockApi(apiFetch);
-    const { result } = renderHook(() => useEntryFermentationDetail(api, 'q1'));
+    const { result } = renderHook(() => useFermentationForQuestion(api, 'q1'));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -146,7 +146,7 @@ describe('useEntryFermentationDetail', () => {
       );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntryFermentationDetail(api, 'q1'));
+    const { result } = renderHook(() => useFermentationForQuestion(api, 'q1'));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -182,7 +182,7 @@ describe('useEntryFermentationDetail', () => {
       );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useEntryFermentationDetail(api, 'q1'));
+    const { result } = renderHook(() => useFermentationForQuestion(api, 'q1'));
 
     await waitFor(() => {
       expect(result.current.detail).not.toBeNull();

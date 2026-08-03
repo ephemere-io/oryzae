@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import type { ApiClient } from '@/lib/api';
-import type { OnboardingResult } from '../types';
 
 interface OnboardingCompleteResult {
   /** ID of the question created during onboarding, or null if none */
