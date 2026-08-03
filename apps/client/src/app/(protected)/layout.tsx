@@ -3,13 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
-import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sidebar } from '@/features/auth/components/sidebar';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
+import { Sidebar } from '@/features/pc/navigation/components/sidebar';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
+import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
 import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';

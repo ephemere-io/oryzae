@@ -12,11 +12,8 @@ import { describe, expect, it } from 'vitest';
 
 const DEVICE_PREFIX = /^(sp|pc)-/;
 
-/**
- * 移行中の既知違反（Issue #490 Phase 4 で解消する）。
- * **減る一方**であること。解消したら削除する（消し忘れは下のテストが検出する）。
- */
-const MIGRATING: string[] = ['src/components/sp-bottom-nav.tsx'];
+/** 移行中の既知違反。**減る一方**であること（消し忘れは下のテストが検出する）。 */
+const MIGRATING: string[] = [];
 
 function walk(dir: string): string[] {
   const out: string[] = [];
