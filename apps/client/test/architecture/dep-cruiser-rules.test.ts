@@ -64,10 +64,9 @@ describe('dep-cruiser guardrails (reach architecture)', () => {
   });
 
   // Issue #490: app への押し上げ・flat への fetch 残留を塞ぐルール。
-  // 移行完了まで warn、Phase 6 で error に上げる（severity はここでは問わない）。
-  it('app/flat の fetch 抜け道ルールが存在する', () => {
+  it('app/flat の fetch 抜け道ルールが error 重大度で存在する', () => {
     for (const name of ['app-no-api-client', 'app-no-reach-hooks', 'flat-features-no-api']) {
-      expect(rule(name).name).toBe(name);
+      expect(rule(name).severity).toBe('error');
     }
   });
 

@@ -36,11 +36,10 @@ module.exports = {
     // === app/ は API を直接叩かない（seam を page に漏らさない）===
     // page/layout が fetch を持つと、端末をまたぐ共有ロジックの置き場が app に流れ、
     // features/shared が空洞化する（#490）。データは必ず features/shared の hook 経由。
-    // severity は移行完了まで warn。Phase 6 で error に上げる。
     {
       name: 'app-no-api-client',
       comment: 'app/ (Route Handler 除く) から lib/api の実装を import してはならない',
-      severity: 'warn',
+      severity: 'error',
       from: { path: '^src/app/', pathNot: '^src/app/api/' },
       to: { path: '^src/lib/api\\.ts$', dependencyTypesNot: ['type-only'] },
     },
@@ -51,7 +50,7 @@ module.exports = {
     {
       name: 'app-no-reach-hooks',
       comment: 'app/ は features/{pc,sp} の hooks を import してはならない（components のみ可）',
-      severity: 'warn',
+      severity: 'error',
       from: { path: '^src/app/' },
       to: { path: '^src/features/(pc|sp)/[^/]+/hooks/' },
     },
@@ -61,7 +60,7 @@ module.exports = {
     {
       name: 'flat-features-no-api',
       comment: '端末非依存 flat features から lib/api の実装を import してはならない',
-      severity: 'warn',
+      severity: 'error',
       from: { path: '^src/features/([^/]+)', pathNot: '^src/features/(pc|sp|shared)/' },
       to: { path: '^src/lib/api\\.ts$', dependencyTypesNot: ['type-only'] },
     },
