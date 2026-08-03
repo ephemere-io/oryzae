@@ -81,19 +81,22 @@ apps/client/src/
     (auth)/ (protected)/   #   認証境界。(protected)/layout.tsx で端末(PC/SP)を出し分け
     api/[...path]/         #   Hono への転送（変更しない）
   features/                # 機能スライス: ドメイン × reach
-    shared/{domain}/       #   端末非依存の共有ロジック（両端末が使う）
+    shared/{domain}/       #   端末非依存のロジック（全 fetch・全ドメイン型・UI なし）
       hooks/               #     データ取得・保存（use-*）
       types.ts             #     ドメイン共有型
     pc/{domain}/           #   PC 体験
-      components/  hooks/   #     PC 固有の UI・操作・演出
+      components/  hooks/   #     PC 固有の UI・操作・演出（fetch は持たない）
     sp/{domain}/           #   SP 体験
       components/  hooks/   #     SP 固有の UI（縦長・片手・音声）
-  features/{domain}/        # 端末非依存の機能はフラット（auth / landing / onboarding）
-  components/ui/           # 汎用 UI（feature 非依存）
+  features/{domain}/        # 端末非依存の UI はフラット（auth / landing / onboarding）
+  components/              # ドメイン非依存 UI・seam(device-view)・provider
+    ui/                    #   汎用 UI（feature 非依存）
   lib/                     # 基盤ユーティリティ（ドメイン非依存）
 ```
 
-reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末非依存の機能はフラットに置く。
+reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末非依存の UI はフラットに置く。
+**fetch とドメイン型は、片端末しか使っていなくても必ず `features/shared/{domain}` に置く**
+（`pc` に置くと SP 追加時にコピーが発生するため。Issue #490）。
 `apps/admin` は単一体験のため reach を持たず `features/{domain}` で薄切りする。
 配置の決定木・インポートルールなど詳細は `docs/client-architecture-guide.md`（SSoT）を参照。
 
