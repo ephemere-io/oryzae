@@ -25,9 +25,6 @@ const MIGRATING: string[] = [
   'src/app/(auth)/callback/page.tsx',
   'src/app/(protected)/entries/new/page.tsx',
   'src/app/(protected)/jar/page.tsx',
-  // Phase 3 で解消: account/profile の二重実装
-  'src/features/auth/components/account-page.tsx',
-  'src/features/sp/account/components/sp-account-page.tsx',
   // Phase 5 で解消: 認証フォームの直叩き
   'src/features/auth/components/forgot-password-form.tsx',
   'src/features/auth/components/google-login-button.tsx',

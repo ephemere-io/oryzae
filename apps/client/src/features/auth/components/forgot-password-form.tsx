@@ -4,7 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { translateAuthError } from '@/features/auth/utils/error-messages';
+import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { createApiClient } from '@/lib/api';
 
 export function ForgotPasswordForm() {

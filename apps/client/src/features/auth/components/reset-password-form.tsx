@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Suspense, useEffect, useState } from 'react';
-import { translateAuthError } from '@/features/auth/utils/error-messages';
+import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
