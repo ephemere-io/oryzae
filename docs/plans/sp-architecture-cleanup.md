@@ -4,7 +4,7 @@ Issue: [#490 スマホ版導入で乱れたアーキテクチャを修正する]
 
 対象: `apps/client`（`apps/server` / `apps/admin` / `packages/shared` は端末非依存なので無傷）
 
-最終更新: 2026-08-03 / ステータス: 計画
+最終更新: 2026-08-03 / ステータス: **Phase 0〜6 実装完了**（Phase 7 は別 Issue）
 
 ---
 
@@ -154,7 +154,25 @@ lib/         api auth device theme debounce format-date …
 
 ---
 
-## 4. 実装計画
+## 4. 実装結果
+
+| Phase | 状態 | 実際にやったこと（計画との差分） |
+| --- | --- | --- |
+| 0 | ✅ | 決定木に「fetch/型は必ず shared」を独立分岐として追加。`README.md` と `.claude/rules/client-architecture.md` も追随 |
+| 1 | ✅ | dep-cruiser 3ルール ＋ 静的テスト3本。**allowlist を「陳腐化検出テスト」と対にした**（直したのに消し忘れると落ちる＝ラチェット）。`shared-has-types` は「`hooks/` から型を export しない」に変更（そちらが実害に直結するため） |
+| 2 | ✅ | 計画どおり ＋ **コンポーネント直叩き2件も追加で解消**（entry-editor の問い作成、snippet-toolbar の抜粋作成。後者は `useBoard.createSnippet` と二重実装だった） |
+| 3 | ✅ | 計画どおり ＋ 移設で表面化した越境 import を解消するため `translateAuthError` を `features/shared/auth` へ |
+| 4 | ✅ | 計画どおり（`desktop-only-overlay` は端末ガード＝ seam の一部として `components/` に残置） |
+| 5 | ✅ | 計画どおり ＋ 認証フォーム3点の直叩きも解消。新規共有 hook 8本にテストを追加 |
+| 6 | ✅ | 3ルールを `error` に昇格。allowlist は3本とも空 |
+| 7 | 未着手 | i18n の `sp.*` namespace。別 Issue 推奨（翻訳 SSoT が Google Sheets のため） |
+
+**最終状態**: `pnpm typecheck` / `lint` / `test`(622件) / `dep-cruise`(violations 0) / `knip` すべて green。
+静的テストの `MIGRATING` allowlist は3本とも空配列＝抜け道が実際に塞がっている。
+
+---
+
+## 5. 実装計画（着手時のもの）
 
 各 Phase = 1 PR。**Phase 順に依存**（前を前提に次が成立）。
 
@@ -279,7 +297,7 @@ lib/         api auth device theme debounce format-date …
 
 ---
 
-## 5. 進め方の注意
+## 6. 進め方の注意
 
 - **移動は `git mv`** で履歴を保つ。1 PR の中で「移動」と「改修」を混ぜない（移動コミット → 改修コミットに分ける）とレビューが読める
 - **`verify` ハーネス**: `quality.md` の verify-coverage-gate は「新規追加ファイルのみ判定、リネーム＝移設は対象外」なので、移設フェーズは gate に引っかからない。ただし `app/verify/register.ts` の import パス更新は必須
@@ -287,7 +305,7 @@ lib/         api auth device theme debounce format-date …
 - **フロント変更の実機確認**: Phase 3〜5 は UI に触るので、報告前に Chrome DevTools MCP で PC / SP 両方を確認（`.claude/rules/quality.md`）
 - **PC 品質を落とさない**: `use-entry-fermentation-detail` の normalize のように、2実装のうち**厳しい方に寄せる**。「共通化＝機能の後退」にしない
 
-## 6. スコープ外
+## 7. スコープ外
 
 - `apps/server` / `packages/shared` / `apps/admin`（端末非依存。今回の崩れとは無関係）
 - SP 版 board の新規実装（`DeviceView` の「未対応」フォールバックは意図された安全既定であり、崩れではない）
