@@ -4,10 +4,10 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import { translateAuthError } from '@/features/auth/utils/error-messages';
+import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
+import type { AccountUser } from '@/features/shared/account/types';
+import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
-import { createApiClient } from '@/lib/api';
-import { getAccessToken } from '@/lib/auth';
 import { setLocaleAction } from '@/lib/i18n-actions';
 import { useTheme } from '@/lib/theme-context';
 import { WritingStats } from './writing-stats';
@@ -17,14 +17,7 @@ const LOCALE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 interface AccountPageProps {
-  user: {
-    id: string;
-    email: string;
-    nickname: string | null;
-    avatarUrl: string | null;
-    name: string | null;
-    providers: string[];
-  };
+  user: AccountUser;
   onLogout: () => void;
 }
 
@@ -132,6 +125,7 @@ function EditableField({
 function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly: boolean }) {
   const t = useTranslations('account');
   const tErr = useTranslations('auth.error');
+  const { changeEmail } = useAccountApi();
   const [editing, setEditing] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [saving, setSaving] = useState(false);
@@ -143,22 +137,13 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
     setSaving(true);
     setError(null);
 
-    const token = getAccessToken();
-    if (!token) {
-      setError(t('email.error_login_required'));
-      setSaving(false);
-      return;
-    }
-
-    const api = createApiClient(token);
-    const res = await api.fetch('/api/v1/auth/change-email', {
-      method: 'POST',
-      body: JSON.stringify({ newEmail }),
-    });
-
-    if (!res.ok) {
-      const data = (await res.json()) as { error: string };
-      setError(translateAuthError(data.error, tErr));
+    const result = await changeEmail(newEmail);
+    if (!result.ok) {
+      setError(
+        result.kind === 'unauthenticated'
+          ? t('email.error_login_required')
+          : translateAuthError(result.error, tErr),
+      );
       setSaving(false);
       return;
     }
@@ -248,6 +233,7 @@ function EmailChangeSection({ email, isOAuthOnly }: { email: string; isOAuthOnly
 function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
   const t = useTranslations('account');
   const tErr = useTranslations('auth.error');
+  const { changePassword } = useAccountApi();
   const [editing, setEditing] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -278,22 +264,13 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
 
     setSaving(true);
 
-    const token = getAccessToken();
-    if (!token) {
-      setError(t('password.error_login_required'));
-      setSaving(false);
-      return;
-    }
-
-    const api = createApiClient(token);
-    const res = await api.fetch('/api/v1/auth/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
-
-    if (!res.ok) {
-      const data = (await res.json()) as { error: string };
-      setError(translateAuthError(data.error, tErr));
+    const result = await changePassword(currentPassword, newPassword);
+    if (!result.ok) {
+      setError(
+        result.kind === 'unauthenticated'
+          ? t('password.error_login_required')
+          : translateAuthError(result.error, tErr),
+      );
       setSaving(false);
       return;
     }
@@ -496,24 +473,15 @@ function Divider() {
 
 export function AccountPage({ user, onLogout }: AccountPageProps) {
   const t = useTranslations('account');
+  const { updateProfile: saveProfile } = useAccountApi();
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
   const isOAuthOnly = user.providers.length > 0 && !user.providers.includes('email');
 
   async function updateProfile(field: string, value: string): Promise<string | null> {
-    const token = getAccessToken();
-    if (!token) return t('profile.error_login_required');
-
-    const api = createApiClient(token);
-    const res = await api.fetch('/api/v1/auth/profile', {
-      method: 'PATCH',
-      body: JSON.stringify({ [field]: value }),
-    });
-    if (!res.ok) {
-      const data = (await res.json()) as { error: string };
-      return data.error;
-    }
-    return null;
+    const result = await saveProfile(field, value);
+    if (result.ok) return null;
+    return result.kind === 'unauthenticated' ? t('profile.error_login_required') : result.error;
   }
 
   return (
