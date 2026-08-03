@@ -21,3 +21,12 @@ export interface FilterableQuestion {
   id: string;
   currentText: string;
 }
+
+/** 瓶ビューに並べる問い（座標つき）。 */
+export interface JarQuestion {
+  id: string;
+  currentText: string | null;
+  /** 瓶ビュー上の位置（0-100 の %）。null なら既定配置にフォールバック。 */
+  jarX: number | null;
+  jarY: number | null;
+}

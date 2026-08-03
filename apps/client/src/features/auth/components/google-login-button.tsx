@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { createApiClient } from '@/lib/api';
+import { useAuthActions } from '@/features/shared/auth/hooks/use-auth-actions';
 
 function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
   return value === 'ja' || value === 'en' || value === 'zh' || value === 'ko';
@@ -14,24 +14,20 @@ export function GoogleLoginButton() {
   const localeRaw = useLocale();
   const locale = isSupportedLocale(localeRaw) ? localeRaw : 'ja';
   const [loading, setLoading] = useState(false);
+  const { startGoogleOauth } = useAuthActions();
 
   async function handleClick() {
     setLoading(true);
     try {
       const callbackUrl = `${window.location.origin}/callback`;
-      const client = createApiClient();
-      const res = await client.fetch('/api/v1/auth/oauth/google', {
-        method: 'POST',
-        body: JSON.stringify({ redirectTo: callbackUrl, locale }),
-      });
+      const url = await startGoogleOauth(callbackUrl, locale);
 
-      if (!res.ok) {
+      if (!url) {
         setLoading(false);
         return;
       }
 
-      const data = (await res.json()) as { url: string };
-      window.location.href = data.url;
+      window.location.href = url;
     } catch {
       setLoading(false);
     }
