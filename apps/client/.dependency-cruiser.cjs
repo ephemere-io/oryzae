@@ -33,6 +33,39 @@ module.exports = {
       to: { path: '^src/features/(pc|sp)/' },
     },
 
+    // === app/ は API を直接叩かない（seam を page に漏らさない）===
+    // page/layout が fetch を持つと、端末をまたぐ共有ロジックの置き場が app に流れ、
+    // features/shared が空洞化する（#490）。データは必ず features/shared の hook 経由。
+    // severity は移行完了まで warn。Phase 6 で error に上げる。
+    {
+      name: 'app-no-api-client',
+      comment: 'app/ (Route Handler 除く) から lib/api の実装を import してはならない',
+      severity: 'warn',
+      from: { path: '^src/app/', pathNot: '^src/app/api/' },
+      to: { path: '^src/lib/api\\.ts$', dependencyTypesNot: ['type-only'] },
+    },
+
+    // === app/ は端末固有 hook を import しない（seam 漏れの防止）===
+    // DeviceView は描画を分岐するが hook は分岐しない。page が features/pc/**/hooks/ を
+    // 呼ぶと、その PC 専用ロジックは SP 端末でも実行される。
+    {
+      name: 'app-no-reach-hooks',
+      comment: 'app/ は features/{pc,sp} の hooks を import してはならない（components のみ可）',
+      severity: 'warn',
+      from: { path: '^src/app/' },
+      to: { path: '^src/features/(pc|sp)/[^/]+/hooks/' },
+    },
+
+    // === flat features も fetch を持たない ===
+    // 端末非依存 UI であっても、データ取得は features/shared に集約する。
+    {
+      name: 'flat-features-no-api',
+      comment: '端末非依存 flat features から lib/api の実装を import してはならない',
+      severity: 'warn',
+      from: { path: '^src/features/([^/]+)', pathNot: '^src/features/(pc|sp|shared)/' },
+      to: { path: '^src/lib/api\\.ts$', dependencyTypesNot: ['type-only'] },
+    },
+
     // === UI components independence ===
     {
       name: 'ui-components-independence',

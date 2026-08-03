@@ -173,12 +173,33 @@ apps/admin/src/
 
 ### 機械強制（dep-cruiser）
 
-上記は `apps/client/.dependency-cruiser.cjs` で機械強制している:
-- `features/pc/*` ⇎ `features/sp/*` 相互禁止 ＋ `pc`/`sp` 内の別ドメイン禁止（`→ features/shared` のみ許可）= `reach-slice-isolation`
-- `features/shared → features/{pc,sp}` 禁止 = `reach-shared-purity`
-- 端末非依存フラット機能どうしの import 禁止（`→ features/shared` のみ許可）= `feature-isolation-flat`
+上記は `apps/client/.dependency-cruiser.cjs`（import の向き）と `test/architecture/`（import では見えない層）の二段で機械強制している。
 
-**ガードレールが腐らないための番人テスト**: `test/architecture/dep-cruiser-rules.test.ts`（主要ルールの存在・形を検証）と `test/architecture/shared-no-ui.test.ts`（`features/shared` に `.tsx` を入れない）。これらが落ちたら強制が弱体化したサイン。
+**dep-cruiser（import の向き）**:
+
+| ルール | 内容 |
+| --- | --- |
+| `reach-slice-isolation` | `features/pc/*` ⇎ `features/sp/*` 相互禁止 ＋ `pc`/`sp` 内の別ドメイン禁止（`→ features/shared` のみ許可） |
+| `reach-shared-purity` | `features/shared → features/{pc,sp}` 禁止 |
+| `feature-isolation-flat` | 端末非依存フラット機能どうしの import 禁止（`→ features/shared` のみ許可） |
+| `app-no-api-client` | `app/`（Route Handler 除く）→ `lib/api` の実装 import 禁止 |
+| `app-no-reach-hooks` | `app/` → `features/{pc,sp}/*/hooks/` 禁止（seam 漏れ防止） |
+| `flat-features-no-api` | flat features → `lib/api` の実装 import 禁止 |
+| `protected-pages-use-device-view` | 保護ルートの `page.tsx` は `DeviceView` 経由（required ルール） |
+
+**静的テスト（dep-cruiser では見えないもの）**:
+
+| テスト | 内容 |
+| --- | --- |
+| `shared-no-ui.test.ts` | `features/shared` に `.tsx` を入れない |
+| `fetch-lives-in-shared.test.ts` | `/api/v1/...` を `features/shared`・`lib`・`app/api` の外に書かない |
+| `device-ui-lives-in-reach.test.ts` | `components/`・flat features に `sp-*` / `pc-*` を置かない |
+| `types-live-in-types-file.test.ts` | `hooks/` から型を export しない（ドメイン型は `types.ts`） |
+| `dep-cruiser-rules.test.ts` | 上記 dep-cruiser ルールの存在・形を検証（**番人テスト**） |
+
+これらが落ちたら強制が弱体化したサイン。静的テストの 3 本は移行中の既知違反を `MIGRATING` 配列で明示的に許容し、**「陳腐化した allowlist を残さない」テストが対になっている**（直したのに配列から消し忘れると落ちる）。allowlist は減る一方であること — 追加は負債の追認なのでレビューで止める。
+
+> **限界**: `import { EntryList, type FilterableQuestion }` のような値と型の混在 import は dep-cruiser で型だけを禁止できない。ドメイン型を `features/shared/{domain}/types.ts` に置く規律で担保する。
 
 `apps/admin/.dependency-cruiser.cjs` は reach 軸を持たないため従来どおり（`features/X → features/Y` 禁止）。
 
