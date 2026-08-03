@@ -14,22 +14,12 @@ const SRC = 'src';
 const ALLOWED_PREFIXES = ['src/features/shared/', 'src/lib/', 'src/app/api/'];
 
 /**
- * 移行中の既知違反（Issue #490 Phase 2〜5 で解消する）。
+ * 移行中の既知違反。
  *
  * **このリストは減る一方でなければならない。** 追加は新たな負債の追認なのでレビューで止める。
  * 解消したら必ず削除すること。消し忘れは下の「陳腐化した allowlist を残さない」が検出する。
  */
-const MIGRATING: string[] = [
-  // Phase 5 で解消: app/ の API 直叩き
-  'src/app/(auth)/auth/confirm/page.tsx',
-  'src/app/(auth)/callback/page.tsx',
-  'src/app/(protected)/entries/new/page.tsx',
-  'src/app/(protected)/jar/page.tsx',
-  // Phase 5 で解消: 認証フォームの直叩き
-  'src/features/auth/components/forgot-password-form.tsx',
-  'src/features/auth/components/google-login-button.tsx',
-  'src/features/auth/components/reset-password-form.tsx',
-];
+const MIGRATING: string[] = [];
 
 function walk(dir: string): string[] {
   const out: string[] = [];

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
-import { createApiClient } from '@/lib/api';
+import { useAuthActions } from '@/features/shared/auth/hooks/use-auth-actions';
 
 export function ForgotPasswordForm() {
   const t = useTranslations('auth.forgot_password');
@@ -14,6 +14,7 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { requestPasswordReset } = useAuthActions();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -21,15 +22,10 @@ export function ForgotPasswordForm() {
     setLoading(true);
 
     const redirectTo = `${window.location.origin}/reset-password`;
-    const client = createApiClient();
-    const res = await client.fetch('/api/v1/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ email, redirectTo }),
-    });
+    const result = await requestPasswordReset(email, redirectTo);
 
-    if (!res.ok) {
-      const data = (await res.json()) as { error: string };
-      setError(translateAuthError(data.error, tErr));
+    if (!result.ok) {
+      setError(translateAuthError(result.error, tErr));
       setLoading(false);
       return;
     }

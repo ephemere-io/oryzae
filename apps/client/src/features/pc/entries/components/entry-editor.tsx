@@ -30,6 +30,7 @@ import { useFocusMode } from '@/features/pc/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/pc/entries/hooks/use-ghost-effect';
 import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-question-sync';
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
+import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
@@ -78,7 +79,12 @@ interface EntryEditorProps {
   onLinkQuestion?: (entryId: string, questionId: string) => Promise<void>;
   onUnlinkQuestion?: (entryId: string, questionId: string) => Promise<void>;
   onSaveComplete?: (entryId: string, content: string) => void;
-  onSaveTransition?: (text: string, editorEl: HTMLElement) => Promise<void>;
+  /**
+   * 「瓶に漬ける」演出の完了後に呼ばれる（遷移先の決定は呼び出し側）。
+   * 演出そのもの（useSaveTransition）は PC 固有なのでこのコンポーネント内に閉じる
+   * — page から端末固有 hook を呼ぶと SP でも実行されてしまうため（Issue #490）。
+   */
+  onPickled?: () => void;
 }
 
 function voiceStatusMessage(
@@ -119,7 +125,7 @@ export function EntryEditor({
   onLinkQuestion,
   onUnlinkQuestion,
   onSaveComplete,
-  onSaveTransition,
+  onPickled,
 }: EntryEditorProps) {
   const t = useTranslations('editor');
   const locale = useLocale();
@@ -206,6 +212,7 @@ export function EntryEditor({
   });
   const { save, saving, error } = useSaveEntry(api, auth);
   const createQuestion = useCreateQuestion(api);
+  const runSaveTransition = useSaveTransition();
   // Issue #316: 保存成功直後のナッジ表示判定に使う
   const userMe = useUserMe(api);
   const router = useRouter();
@@ -444,13 +451,9 @@ export function EntryEditor({
         // 状態が変わった可能性があるので user-me を refetch (次回判定の精度向上)
         userMe.refresh();
 
-        if (
-          options.fermentationEnabled &&
-          onSaveTransition &&
-          editorRef.current &&
-          finalContent.trim()
-        ) {
-          await onSaveTransition(finalContent, editorRef.current);
+        if (options.fermentationEnabled && onPickled && editorRef.current && finalContent.trim()) {
+          await runSaveTransition(finalContent, editorRef.current);
+          onPickled();
         } else if (isNew) {
           router.push(`/entries/${savedId}`);
         }
@@ -465,7 +468,8 @@ export function EntryEditor({
       onLinkQuestion,
       router,
       onSaveComplete,
-      onSaveTransition,
+      onPickled,
+      runSaveTransition,
       createdAtIso,
       t,
       userMe,
