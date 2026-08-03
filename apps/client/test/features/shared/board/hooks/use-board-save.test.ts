@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BoardCardData } from '@/features/pc/board/hooks/use-board';
-import { useBoardSave } from '@/features/pc/board/hooks/use-board-save';
+import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
+import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {

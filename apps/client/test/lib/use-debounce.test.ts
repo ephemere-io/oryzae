@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useDebounce } from '@/features/pc/entries/hooks/use-debounce';
+import { useDebounce } from '@/lib/use-debounce';
 
 /**
  * characterization test（#434 リファクタ前の現挙動固定）。

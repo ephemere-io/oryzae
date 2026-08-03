@@ -1,43 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCreateSnippet } from '@/features/shared/board/hooks/use-create-snippet';
+import type { BoardCardData, BoardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
-
-interface EntryContent {
-  title: string;
-  preview: string;
-  createdAt: string;
-}
-
-interface SnippetContent {
-  text: string;
-}
-
-interface PhotoContent {
-  imageUrl: string;
-  caption: string;
-}
-
-export interface BoardCardData {
-  id: string;
-  cardType: 'entry' | 'snippet' | 'photo';
-  refId: string;
-  x: number;
-  y: number;
-  rotation: number;
-  width: number;
-  height: number;
-  zIndex: number;
-  createdAt: string;
-  content: EntryContent | SnippetContent | PhotoContent;
-  removing?: boolean;
-}
-
-interface BoardData {
-  dateKey: string;
-  viewType: string;
-  cards: BoardCardData[];
-}
 
 /**
  * Apply default z-ordering by creation time (newer on top).
@@ -79,6 +45,7 @@ export function useBoard(
 ) {
   const [cards, setCards] = useState<BoardCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const postSnippet = useCreateSnippet(api);
   const requestIdRef = useRef(0);
 
   const fetchBoard = useCallback(async () => {
@@ -101,16 +68,11 @@ export function useBoard(
 
   const createSnippet = useCallback(
     async (text: string) => {
-      if (!api) return;
-      const res = await api.fetch('/api/v1/board/snippets', {
-        method: 'POST',
-        body: JSON.stringify({ text, dateKey, viewType }),
-      });
-      if (res.ok) {
+      if (await postSnippet({ text, dateKey, viewType })) {
         await fetchBoard();
       }
     },
-    [api, dateKey, viewType, fetchBoard],
+    [postSnippet, dateKey, viewType, fetchBoard],
   );
 
   const updateSnippet = useCallback(

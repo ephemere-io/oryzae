@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
+import type { EntryDraft } from '@/features/shared/entries/types';
 
 /**
  * SP「書く」フローの未確定ドラフトを localStorage に退避し、+ ボタンを押し直しても
@@ -16,18 +17,6 @@ const STORAGE_KEY = 'oryzae:sp:new-entry-draft';
 
 /** 復元を許す「最終編集からの猶予」。これを超える / 日付をまたぐと新規エントリ扱いになる。 */
 export const DRAFT_MAX_IDLE_MS = 60 * 60 * 1000; // 1 時間
-
-export interface EntryDraft {
-  /** 自動保存で既にエントリが作成済みならその id（再開時は同じエントリを更新＝重複作成を防ぐ）。 */
-  entryId?: string;
-  title: string;
-  body: string;
-  questionId: string | null;
-  /** 最終編集時刻（epoch ms）。 */
-  updatedAt: number;
-  /** 最終編集時のローカル暦日（YYYY-MM-DD）。日付境界の判定に使う。 */
-  dateKey: string;
-}
 
 /** ローカルタイムゾーンの暦日キー（YYYY-MM-DD）。 */
 export function localDateKey(epochMs: number): string {

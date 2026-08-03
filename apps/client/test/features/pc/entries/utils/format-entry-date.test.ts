@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatEntryDate } from '@/features/pc/entries/components/format-entry-date';
+import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import jaMessages from '@/i18n/messages/ja.json';
 
 function jaT(key: string): string {

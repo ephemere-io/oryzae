@@ -9,7 +9,7 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
-import type { FermentationDetail } from '@/features/pc/fermentation/hooks/use-fermentation-results';
+import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { QuestionCircle } from './question-circle';
 

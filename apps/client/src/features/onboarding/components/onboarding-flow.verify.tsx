@@ -12,8 +12,8 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
+import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import type { OnboardingResult } from '../types';
 import { OnboardingFlow } from './onboarding-flow';
 
 interface Props {

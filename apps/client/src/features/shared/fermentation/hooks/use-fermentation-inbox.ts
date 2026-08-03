@@ -1,52 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { FermentationSummary, InboxLetter } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
-
-/** 瓶に届いた手紙（＝完了した発酵）の受信箱1件。 */
-export interface InboxLetter {
-  questionId: string;
-  questionText: string | null;
-  fermentationId: string;
-  createdAt: string;
-  unread: boolean;
-}
 
 interface QuestionLite {
   id: string;
   currentText: string | null;
-}
-
-interface FermentationSummary {
-  id: string;
-  questionId: string;
-  status: string;
-  createdAt: string;
-}
-
-/** 瓶の発酵が生んだ出力。手紙(letter)・言葉(keywords)・抜粋(snippets)。 */
-interface FermentationKeyword {
-  id: string;
-  keyword: string;
-  description: string;
-}
-
-interface FermentationSnippet {
-  id: string;
-  originalText: string;
-  sourceDate: string;
-}
-
-interface FermentationDetail {
-  bodyText: string | null;
-  keywords: FermentationKeyword[];
-  snippets: FermentationSnippet[];
-}
-
-interface RawFermentationDetail {
-  letter?: { bodyText?: string } | null;
-  keywords?: FermentationKeyword[];
-  snippets?: FermentationSnippet[];
 }
 
 // unread-context と同じ localStorage キーを共有（瓶を見た時刻）
@@ -117,39 +77,4 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
   }, [fetchInbox]);
 
   return { letters, loading, refetch: fetchInbox };
-}
-
-/**
- * 開いた発酵の詳細（手紙・言葉・抜粋）を取得する。指摘「瓶は手紙以外の出力も
- * 確認できるべき」への対応で、PC 同様 keywords/snippets も読む。
- */
-export function useFermentationDetail(api: ApiClient | null, fermentationId: string | null) {
-  const [detail, setDetail] = useState<FermentationDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!api || !fermentationId) {
-      setDetail(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    api.fetch(`/api/v1/fermentations/${fermentationId}`).then(async (res) => {
-      if (cancelled) return;
-      if (res.ok) {
-        const raw: RawFermentationDetail = await res.json();
-        setDetail({
-          bodyText: raw.letter?.bodyText ?? null,
-          keywords: Array.isArray(raw.keywords) ? raw.keywords : [],
-          snippets: Array.isArray(raw.snippets) ? raw.snippets : [],
-        });
-      }
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [api, fermentationId]);
-
-  return { detail, loading };
 }

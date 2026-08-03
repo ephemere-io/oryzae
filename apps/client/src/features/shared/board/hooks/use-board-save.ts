@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
+import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
-import type { BoardCardData } from './use-board';
 
 export function useBoardSave(api: ApiClient | null) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
