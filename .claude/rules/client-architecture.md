@@ -24,18 +24,24 @@ paths:
 - `app/api/[...path]/` — Hono アプリへのリクエスト転送（変更しない）
 - `features/` — 機能スライス
   - **`apps/client`**: ドメイン × reach。`features/{shared,pc,sp}/{domain}/`
-    - `shared/{domain}/` — UIを持たない共有ロジック（データ hook `use-*`・型）。両端末が使う
-    - `pc/{domain}/` / `sp/{domain}/` — 端末別 UI（components, hooks）
-    - reach は「端末で体験が変わる機能」だけ。端末非依存の機能（`auth`/`landing`/`onboarding` 等）は `features/{domain}/` のフラットなまま（pc/sp に分けない）
+    - `shared/{domain}/` — UIを持たないドメインロジック（**全 fetch** の `hooks/`・**全ドメイン型** の `types.ts`）
+    - `pc/{domain}/` / `sp/{domain}/` — 端末別 UI（components, hooks）。**fetch とドメイン型は持たない**
+    - reach は「端末で体験が変わる機能」だけ。端末非依存の UI（`auth` のフォーム/`landing`/`onboarding` 等）は `features/{domain}/` のフラットなまま（pc/sp に分けない）
+    - シェルは端末固有 UI: PC サイドバー → `features/pc/navigation/`、SP ボトムナビ → `features/sp/navigation/`
   - **`apps/admin`**: reach 軸なし。従来どおり `features/{domain}/`
+- `components/` — ドメイン非依存 UI・seam プリミティブ（`device-view`）・provider。**端末固有 UI（`sp-*`/`pc-*`）禁止**
 - `components/ui/` — 汎用 UI コンポーネント（shadcn 等。feature 依存禁止）
-- `lib/` — 基盤ユーティリティのみ（API クライアント・認証・分析等）。**ドメイン非依存・`use-*` のドメイン hook を置かない**
+- `lib/` — 基盤ユーティリティのみ（API クライアント・認証・分析・`useDebounce`・日付整形等）。**ドメイン非依存・ドメイン hook を置かない**
 
 ## 置き場の決定木（迷ったら上から）
 
 1. ドメインを知らない汎用 UI → `components/ui/`
-2. ドメインを知らない基盤 util（createApiClient・認証・分析・theme・debounce・markdown・定数）→ `lib/`
-3. ドメイン固有 → ドメインを選び reach で分ける：両端末・UIなし → `features/shared/{domain}/` ／ PC UI → `features/pc/{domain}/` ／ SP UI → `features/sp/{domain}/`
+2. ドメインを知らない基盤 util（createApiClient・認証・分析・theme・debounce・日付整形・markdown・定数）→ `lib/`
+3. **データ取得・更新（fetch）か? ドメイン型か?** → `features/shared/{domain}/`（`hooks/` と `types.ts`）
+4. 残り（UI と、その UI 専用の状態・演出）→ PC UI → `features/pc/{domain}/` ／ SP UI → `features/sp/{domain}/` ／ 端末非依存 UI → `features/{domain}/`（flat）
+
+> **3 が 4 より先**。「PC 専用画面のためのデータ hook」も `shared` に落ちる。片端末しか使わなくても
+> `shared` に置く（`pc` に置くと SP 追加時に reach 分離に阻まれて必ずコピーが生まれる。Issue #490）。
 
 ## インポートルール（dependency-cruiser で機械的に検証）
 
@@ -46,7 +52,15 @@ paths:
 - `features/shared/*` → `features/pc`, `features/sp` **禁止**（共有層は端末固有 UI を知らない）
 - `components/` → `features/`, `app/` **禁止**
 - `lib/` → `features/`, `app/`, `components/` **禁止**（ドメイン hook も置かない）
-- `app/` からは `features/`, `components/`, `lib/` のみインポート可
+- `app/` からは `features/`, `components/`, `lib/` のみインポート可。ただし
+  - `app/` → `lib/api` の実装 **禁止**（`import type { ApiClient }` は可）= `app-no-api-client`
+  - `app/` → `features/{pc,sp}/*/hooks/` **禁止** = `app-no-reach-hooks`
+    （DeviceView は描画を分岐するが hook は分岐しない。端末固有 hook を page が呼ぶと両端末で実行される）
+- flat features → `lib/api` の実装 **禁止** = `flat-features-no-api`
+
+import では見えない層は `test/architecture/` の静的テストで強制する:
+`fetch-lives-in-shared`（`/api/v1` の置き場）・`device-ui-lives-in-reach`（`sp-*`/`pc-*` の置き場）・
+`types-live-in-types-file`（`hooks/` から型を export しない）・`shared-no-ui`（shared に `.tsx` を置かない）。
 
 `apps/admin`（reach 軸なし）: 従来どおり `features/X` → `features/Y` **禁止**。
 
