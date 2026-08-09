@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/auth';
+import { openSavedEntry } from './fixtures/env';
 
 test.describe('エントリ管理', () => {
   test.beforeEach(async ({ authenticated }) => {
@@ -50,9 +51,8 @@ test.describe('エントリ管理', () => {
     await page.keyboard.type('3行目');
 
     // 自動保存（debounce 後に作成）を待ち、一覧から開き直す。
-    await page.waitForTimeout(4000);
-    await page.goto('/entries');
-    await page.locator('[href*="/entries/"]', { hasText: marker }).first().click();
+    // 固定待ちは負荷時に取りこぼすため、一覧に現れるまでの条件待ちにする。
+    await openSavedEntry(page, marker);
     await page.waitForURL(/\/entries\/[^/]+$/);
 
     const reopened = page.locator('[contenteditable="true"]').first();
