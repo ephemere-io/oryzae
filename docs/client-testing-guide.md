@@ -154,8 +154,11 @@ describe('useEntries', () => {
 
 ## E2E の運用（Issue #490 の追跡）
 
-- **PR では既定で走らない。** `run-e2e` ラベルを付けた PR だけで実行される
-  （E2E は本番 Supabase にテストデータを作るため）。週次 cron と手動実行は従来どおり
+- **E2E は使い捨ての Supabase に対して走る。** `supabase start` で migrations と
+  `supabase/seed.sql` を流した一時インスタンスを立てるため、**本番 DB には一切触らない**。
+  全 PR で無条件に実行される（本番の SERVICE_ROLE_KEY を CI に置く必要もない）
+- **ローカルでも同じ手順が使える。** `supabase start` → `supabase status` の URL/キーを
+  env に入れて `pnpm --filter @oryzae/client dev`。本番データを触らずに開発できる
 - **テストは自分が作ったデータだけを触り、最後に消す。** 一覧の先頭など「たまたま
   そこにある実データ」を掴んで書き換えてはならない（実際に利用者のエントリが
   汚染された事故がある）。`e2e/fixtures/env.ts` の `deleteEntriesByMarker` /
