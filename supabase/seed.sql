@@ -6,6 +6,21 @@
 -- ここに書く資格情報はローカル専用のダミーであり、秘密ではない。
 -- そのためワークフローにも平文で書いてよい（本番の secrets を CI に置かずに済む）。
 
+-- ── ロール権限（本番との差分を埋める）──────────────────────────────────────
+-- ホスト版 Supabase はプロジェクト作成時に public スキーマの既定 GRANT を
+-- anon / authenticated に付与するが、`supabase/migrations/` はそれを持っていない。
+-- そのため使い捨てインスタンスでは "permission denied for table questions" になる。
+-- 行単位の保護は各 migration の RLS ポリシーが担うので、ホスト版と同じ粒度で付与する。
+--
+-- NOTE: これは migrations が本番スキーマを完全には再現できていないことの裏返し。
+--       本筋は GRANT を migration に取り込むこと（別途対応）。
+grant usage on schema public to anon, authenticated, service_role;
+grant all privileges on all tables in schema public to anon, authenticated, service_role;
+grant all privileges on all sequences in schema public to anon, authenticated, service_role;
+grant all privileges on all functions in schema public to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+
 -- ── クライアント E2E 用アカウント ──────────────────────────────────────────
 --   email    : e2e@oryzae.test
 --   password : e2e-password-1234
