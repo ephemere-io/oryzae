@@ -52,7 +52,13 @@ export function useBoard(
     if (!api) return;
     const requestId = ++requestIdRef.current;
     setLoading(true);
-    const res = await api.fetch(`/api/v1/board?dateKey=${dateKey}&viewType=${viewType}`);
+    // ローカル暦日で「その日」を判定させるためオフセットを送る。これが無いとサーバーは
+    // dateKey を UTC の 00:00〜24:00 とみなし、JST 00:00〜09:00 に書いたエントリが
+    // 当日のボードに出ない（Issue: ボードの日付境界）。
+    const tzOffset = new Date().getTimezoneOffset();
+    const res = await api.fetch(
+      `/api/v1/board?dateKey=${dateKey}&viewType=${viewType}&tzOffset=${tzOffset}`,
+    );
     if (requestId !== requestIdRef.current) return;
     if (res.ok) {
       const data: BoardData = await res.json();
