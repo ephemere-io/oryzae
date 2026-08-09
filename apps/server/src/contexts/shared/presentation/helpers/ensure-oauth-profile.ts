@@ -12,7 +12,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
  * ため、capacity 上限 env の読みと profiles 件数取得は inline で実装する。
  */
 
-const DEFAULT_LIMIT = 100;
+const DEFAULT_LIMIT = 105;
 
 interface EnsureOAuthProfileSuccess {
   status: 'ok';

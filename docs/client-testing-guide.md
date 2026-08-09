@@ -149,3 +149,19 @@ describe('useEntries', () => {
 3. テストデータは最小限にし、テスト対象に直接関係するフィールドだけ設定する
 4. テスト名は日本語で、何を検証しているかが一目でわかるように書く（例: `'認証トークン期限切れ時にリフレッシュする'`）
 5. `any` 型禁止 — テストコードでも型安全性を保つ
+
+---
+
+## E2E の運用（Issue #490 の追跡）
+
+- **PR では既定で走らない。** `run-e2e` ラベルを付けた PR だけで実行される
+  （E2E は本番 Supabase にテストデータを作るため）。週次 cron と手動実行は従来どおり
+- **テストは自分が作ったデータだけを触り、最後に消す。** 一覧の先頭など「たまたま
+  そこにある実データ」を掴んで書き換えてはならない（実際に利用者のエントリが
+  汚染された事故がある）。`e2e/fixtures/env.ts` の `deleteEntriesByMarker` /
+  `deleteOpenSpEntry` を使う
+- **固定 `waitForTimeout` で保存を待たない。** `waitForAutosave()` が
+  `data-verify-status="saved"` を待つ。保存前に遷移すると debounce 中のタイマーごと
+  破棄され、エントリが作られない
+- **cookie の domain を決め打ちしない。** `cookieDomain()` が `E2E_BASE_URL` から導出する。
+  決め打ちすると本番/プレビューに向けたとき locale と device-pref が効かない

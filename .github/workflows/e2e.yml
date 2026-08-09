@@ -4,10 +4,23 @@ on:
   schedule:
     - cron: '0 0 * * 1'  # 毎週月曜 UTC 0:00 (JST 9:00)
   workflow_dispatch:        # 手動実行も可能
+  # PR では `run-e2e` ラベルが付いたときだけ走らせる。
+  # E2E は本番 Supabase にテストデータを作る（各テストが後始末はするが、
+  # 失敗時は残る）ため、全 PR で自動実行はしない。危ない変更のときだけ付ける。
+  pull_request:
+    types: [labeled, synchronize]
+
+# 同一 PR で連続 push したときは古い実行を打ち切る（本番への無駄な書き込みを減らす）。
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e-client:
     name: Playwright E2E (Client)
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'run-e2e')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -44,6 +57,9 @@ jobs:
 
   e2e-admin:
     name: Playwright E2E (Admin)
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'run-e2e')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

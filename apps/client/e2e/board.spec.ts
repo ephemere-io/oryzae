@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/auth';
-import { waitForAutosave } from './fixtures/env';
+import { deleteEntriesByMarker, waitForAutosave } from './fixtures/env';
 
 test.describe('ボード画面', () => {
   test.beforeEach(async ({ authenticated: _, page }) => {
@@ -54,5 +54,7 @@ test.describe('ボード画面', () => {
     await page.goto('/board');
     await page.waitForSelector('[role="application"]');
     await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
+
+    await deleteEntriesByMarker(page, unique);
   });
 });

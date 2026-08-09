@@ -205,10 +205,22 @@ describe('LoadBoardUsecase', () => {
 
     const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
 
-    expect(entryRepo.listByUserIdAndWeek).toHaveBeenCalledWith('user-1', '2026-04-11');
+    // tzOffsetMinutes は既定 0（＝従来どおり UTC 基準）で渡る
+    expect(entryRepo.listByUserIdAndWeek).toHaveBeenCalledWith('user-1', '2026-04-11', 0);
     expect(entryRepo.listByUserIdAndDate).not.toHaveBeenCalled();
     expect(result.viewType).toBe('weekly');
     expect(result.cards).toHaveLength(1);
+  });
+
+  it('tzOffsetMinutes をエントリ取得へ透過する（ボードの日付境界バグの回帰）', async () => {
+    vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([]);
+    vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue([]);
+    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([]);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([]);
+
+    await usecase.execute('user-1', '2026-08-10', 'daily', -540);
+
+    expect(entryRepo.listByUserIdAndDate).toHaveBeenCalledWith('user-1', '2026-08-10', -540);
   });
 
   it('weekly モードで daily のスニペット・写真カードも含める（weekly コピーを作成）', async () => {
