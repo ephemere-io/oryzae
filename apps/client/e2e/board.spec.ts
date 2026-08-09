@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/auth';
+import { waitForAutosave } from './fixtures/env';
 
 test.describe('ボード画面', () => {
   test.beforeEach(async ({ authenticated: _, page }) => {
@@ -46,7 +47,8 @@ test.describe('ボード画面', () => {
     const editor = page.locator('[contenteditable="true"]').first();
     await editor.click();
     await editor.pressSequentially(unique);
-    await page.waitForTimeout(4000);
+    // 自動保存の完了を固定待ちせず、ステータスバーの saved を待ってからボードへ。
+    await waitForAutosave(page);
 
     // ボード（当日）にカードとして出る（カード見出し＋本文で2要素マッチするため first）
     await page.goto('/board');

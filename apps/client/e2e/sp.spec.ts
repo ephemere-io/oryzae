@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/auth';
+import { cookieDomain } from './fixtures/env';
 
 // SP 体験（Issue #363）の E2E。device-pref=sp cookie で SP UI を強制し、モバイル
 // viewport で検証する。ログインは端末非依存なので authenticated フィクスチャを使う。
@@ -8,7 +9,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 async function forceSp(page: import('@playwright/test').Page) {
   await page
     .context()
-    .addCookies([{ name: 'device-pref', value: 'sp', domain: 'localhost', path: '/' }]);
+    .addCookies([{ name: 'device-pref', value: 'sp', domain: cookieDomain(), path: '/' }]);
 }
 
 test.describe('SP 体験 (#363)', () => {
