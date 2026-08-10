@@ -70,6 +70,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # high 以上のみ落とす。moderate まで落とすと推移依存で頻繁に赤くなり、
       # 「赤いのが常態」になってアラートとして機能しなくなるため。
+      #
+      # 意図的にブロッキング（continue-on-error にしない）。新しい high の advisory が
+      # 公開されると、コード変更が無くても main が赤くなりうる副作用は理解したうえで、
+      # 日記を預かる以上「high を放置したまま出荷できてしまう」状態を避けることを優先する。
+      # 実際に本ワークフロー導入時に検出された 4 件は pnpm overrides で解消できた（#501）。
       - run: pnpm audit --audit-level=high
 
   # ── 層 2: PR 差分の意味的レビュー（AI・補助） ───────────────────────────
