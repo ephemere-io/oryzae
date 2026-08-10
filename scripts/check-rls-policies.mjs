@@ -67,14 +67,22 @@ function readStatement(sql, startIndex) {
 
 const lineOf = (sql, index) => sql.slice(0, index).split('\n').length;
 
-/** 文の直前の非空行に `-- @rls-exempt: <理由>` があれば理由を返す。 */
+/**
+ * 文の直前 3 行以内に `-- @rls-exempt: <理由>` があれば理由を返す。
+ *
+ * 「最初の非空行だけを見る」実装にすると、`-- @rls-exempt:` と対象文の間に
+ * 普通のコメント行が 1 行挟まっただけで例外宣言が無視される。フェイルクローズ
+ * なので穴にはならないが、書いた人は「効かないから baseline に入れる」に
+ * 流れやすく、恒久的な抑制に化けてゲートが形骸化する。そのため窓内を走査する。
+ */
 function exemptionFor(sql, index) {
   const before = sql.slice(0, index).split('\n');
-  for (let i = before.length - 2; i >= 0 && i >= before.length - 4; i--) {
+  const LOOKBACK = 3;
+  for (let i = before.length - 2; i >= 0 && i >= before.length - 1 - LOOKBACK; i--) {
     const line = (before[i] ?? '').trim();
-    if (line === '') continue;
     const at = line.indexOf(EXEMPT_MARKER);
-    return at === -1 ? null : line.slice(at + EXEMPT_MARKER.length).trim() || '(理由未記載)';
+    if (at === -1) continue;
+    return line.slice(at + EXEMPT_MARKER.length).trim() || '(理由未記載)';
   }
   return null;
 }
@@ -129,6 +137,10 @@ function replay(files) {
       if (!head) continue;
       const name = unquote(head[1]);
       const table = normalizeTable(head[2]);
+      // キーは (テーブル, ポリシー名)。Postgres は pg_policy の (polrelid, polname) で
+      // ポリシー名をテーブル単位に一意化するため、これが DB の実態と一致する。
+      // storage.objects は全バケット共通のテーブルなので、バケットが違っても
+      // 同名ポリシーは作れない（2 つ目の CREATE POLICY が実行時に失敗する）。
       policies.set(`${table}::${name}`, {
         name,
         table,
