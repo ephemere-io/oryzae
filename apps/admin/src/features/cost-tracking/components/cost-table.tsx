@@ -39,8 +39,7 @@ type SortKey =
   | 'status'
   | 'promptTokens'
   | 'completionTokens'
-  | 'totalCost'
-  | 'latency';
+  | 'totalCost';
 type SortDir = 'asc' | 'desc';
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -86,8 +85,6 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
           return mul * ((a.cost?.completionTokens ?? 0) - (b.cost?.completionTokens ?? 0));
         case 'totalCost':
           return mul * ((a.cost?.totalCost ?? 0) - (b.cost?.totalCost ?? 0));
-        case 'latency':
-          return mul * ((a.cost?.latency ?? 0) - (b.cost?.latency ?? 0));
         default:
           return 0;
       }
@@ -127,8 +124,7 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
           <SortableHead label="Status" sortKeyName="status" />
           <SortableHead label="Input" sortKeyName="promptTokens" className="text-right" />
           <SortableHead label="Output" sortKeyName="completionTokens" className="text-right" />
-          <SortableHead label="Cost" sortKeyName="totalCost" className="text-right" />
-          <SortableHead label="Latency" sortKeyName="latency" className="text-right" />
+          <SortableHead label="推定コスト" sortKeyName="totalCost" className="text-right" />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -161,14 +157,11 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
             <TableCell className="text-right font-mono text-sm">
               {formatCost(item.cost?.totalCost)}
             </TableCell>
-            <TableCell className="text-right font-mono text-xs text-muted-foreground">
-              {item.cost?.latency ? `${item.cost.latency}ms` : '-'}
-            </TableCell>
           </TableRow>
         ))}
         {items.length === 0 && (
           <TableRow>
-            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
               No cost data
             </TableCell>
           </TableRow>
@@ -189,7 +182,6 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
             <TableCell className="text-right font-mono text-sm font-medium">
               {formatCost(totalCost)}
             </TableCell>
-            <TableCell />
           </TableRow>
         </TableFooter>
       )}

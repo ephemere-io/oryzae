@@ -11,11 +11,15 @@ export interface CostItem {
   status: string;
   generation_id: string | null;
   created_at: string;
+  /**
+   * 保存トークン × 価格表からの **推定** コスト。トークン未保存なら null。
+   * latency はかつて AI Gateway が返していたが Anthropic 直叩き (#352) 以降は
+   * 存在しない。型としては必須のまま列を出していたので常に "-" だった → 列ごと廃止。
+   */
   cost: {
     totalCost: number;
     promptTokens: number;
     completionTokens: number;
-    latency: number;
   } | null;
 }
 

@@ -4,10 +4,28 @@ import { useCallback, useEffect, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
+/**
+ * 月次コスト。実請求額 (Anthropic cost_report) と 推定 (自前トークン × 価格表) を
+ * 分けて持つ。actual.status が 'ok' でないときに 0 を表示しないこと
+ * （未設定を「$0」と誤読させるのが issue #490 で報告された症状そのもの）。
+ */
 export interface CostSummary {
-  currentMonthCost: number;
-  lastMonthCost: number;
+  actual: {
+    status: 'ok' | 'not-configured' | 'error';
+    currentMonthCost: number | null;
+    lastMonthCost: number | null;
+    message: string | null;
+  };
+  estimated: {
+    currentMonthCost: number;
+    lastMonthCost: number;
+    untrackedCount: number;
+    truncated: boolean;
+  };
   projectedCost: number;
+  projectionBasis: 'actual' | 'estimated';
+  daysElapsed: number;
+  daysInMonth: number;
 }
 
 export function useCostSummary() {
