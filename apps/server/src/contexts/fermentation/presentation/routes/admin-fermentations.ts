@@ -8,6 +8,11 @@ import { SupabaseQuestionRepository } from '../../../question/infrastructure/rep
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { computeCostFromTokens } from '../../../shared/infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
+import {
+  aggregateCost,
+  fetchFermentationCostRows,
+  resolveUserEmails,
+} from '../../../shared/infrastructure/fermentation-cost-query.js';
 import { FireFermentationUsecase } from '../../application/usecases/fire-fermentation.usecase.js';
 import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
@@ -61,61 +66,45 @@ type Env = {
 };
 
 export const adminFermentations = new Hono<Env>()
+  // ユーザー別コストは **推定値**（保存トークン × 価格表）。Anthropic の cost_report は
+  // Oryzae のユーザーを知らないため、この軸は推定でしか出せない。実請求額との突き合わせは
+  // /admin/observability/spend で行う。
   .get('/costs/by-user', async (c) => {
     const supabase = c.get('adminSupabase');
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
 
-    let byUserQuery = supabase
-      .from('fermentation_results')
-      .select('user_id, generation_id, input_tokens, output_tokens')
-      .or('input_tokens.not.is.null,generation_id.not.is.null');
-    if (dateFrom) byUserQuery = byUserQuery.gte('created_at', dateFrom);
-    if (dateTo) byUserQuery = byUserQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
-
-    const { data, error } = await byUserQuery;
-
-    if (error) return c.json({ error: error.message }, 500);
-
-    const costsByUser = new Map<string, { count: number; totalCost: number }>();
-    await Promise.all(
-      (data ?? []).map(async (row) => {
-        let costUsd = 0;
-        const tokenCost = computeCostFromTokens(row.input_tokens, row.output_tokens);
-        if (tokenCost) {
-          costUsd = tokenCost.totalCost;
-        } else if (row.generation_id) {
-          // 旧 generation_id 方式 (トークン未保存) は gateway にフォールバック。
-          try {
-            const info = await gateway.getGenerationInfo({ id: row.generation_id });
-            costUsd = typeof info?.totalCost === 'number' ? info.totalCost : 0;
-          } catch {
-            costUsd = 0;
-          }
-        }
-        const current = costsByUser.get(row.user_id) ?? { count: 0, totalCost: 0 };
-        current.count++;
-        current.totalCost += costUsd;
-        costsByUser.set(row.user_id, current);
-      }),
-    );
-
-    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const emailMap = new Map<string, string>();
-    for (const u of usersData?.users ?? []) {
-      emailMap.set(u.id, u.email ?? '');
+    // 旧実装は .range() 無しで投げていたため Supabase 既定の 1000 行で暗黙に打ち切られ、
+    // 件数が増えるほどユーザー別コストが黙って過少になっていた。全件取り切る。
+    let rows: Awaited<ReturnType<typeof fetchFermentationCostRows>>;
+    try {
+      rows = await fetchFermentationCostRows(supabase, {
+        startIso: dateFrom,
+        endIso: dateTo ? `${dateTo}T23:59:59.999Z` : undefined,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return c.json({ error: message }, 500);
     }
 
-    const items = Array.from(costsByUser.entries())
-      .map(([userId, stats]) => ({
-        userId,
-        email: emailMap.get(userId) ?? '',
-        fermentationCount: stats.count,
-        totalCostUsd: Math.round(stats.totalCost * 1000000) / 1000000,
-      }))
-      .sort((a, b) => b.totalCostUsd - a.totalCostUsd);
+    const aggregate = aggregateCost(rows.rows);
+    const emailMap = await resolveUserEmails(supabase);
 
-    return c.json({ data: items });
+    const items = aggregate.byUser.map((u) => ({
+      userId: u.userId,
+      email: emailMap.get(u.userId) ?? '',
+      fermentationCount: u.fermentationCount,
+      estimatedCostUsd: Math.round(u.estimatedCostUsd * 1000000) / 1000000,
+      inputTokens: u.inputTokens,
+      outputTokens: u.outputTokens,
+    }));
+
+    return c.json({
+      data: items,
+      // 集計の信頼度。トークン未保存の行がどれだけ落ちているかを隠さない。
+      untrackedCount: aggregate.untrackedCount,
+      truncated: rows.truncated,
+    });
   })
   .get('/', async (c) => {
     const supabase = c.get('adminSupabase');
