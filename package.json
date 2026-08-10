@@ -12,13 +12,14 @@
     "test": "pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test && pnpm --filter @oryzae/admin test",
     "knip": "knip",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise && pnpm --filter @oryzae/admin dep-cruise",
+    "security:rls": "node scripts/check-rls-policies.mjs",
     "i18n:sync": "node apps/client/scripts/build-i18n.mjs --remote",
     "i18n:build": "node apps/client/scripts/build-i18n.mjs",
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged",
-    "pre-push": "pnpm lint && pnpm typecheck"
+    "pre-push": "pnpm lint && pnpm typecheck && pnpm security:rls"
   },
   "lint-staged": {
     "!(.claude/**)!(**/docs/**)*.{js,ts,jsx,tsx,json}": "biome check --write"

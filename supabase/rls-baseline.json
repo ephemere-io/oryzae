@@ -1,0 +1,45 @@
+{
+  "$comment": [
+    "scripts/check-rls-policies.mjs の既知リスク登録簿。",
+    "ここに載っている項目は CI を止めない。載っていない新規の問題が出たら CI が落ちる。",
+    "status:",
+    "  accepted — 意図的な設計判断。恒久的に許容する。",
+    "  todo     — 未修正のセキュリティ負債。直したらこの項目を削除すること。",
+    "           （直したのに残っていると『baseline の腐敗』としてゲートが落ちる）",
+    "新しく書くマイグレーションでは、この JSON ではなく対象文の直前行に",
+    "`-- @rls-exempt: <理由>` を書いて意図を宣言する。"
+  ],
+  "knownIssues": [
+    {
+      "id": "unconditional-policy:profiles:Service role can manage all profiles",
+      "status": "todo",
+      "severity": "high",
+      "reason": "profiles の FOR ALL USING (true) に TO 句が無く PUBLIC 扱い。permissive ポリシーは OR 結合されるため、authenticated が全ユーザーの profiles（nickname / avatar_url）を読み書き・削除できる可能性がある。service role は RLS をバイパスするのでこのポリシー自体が不要。DROP するマイグレーションが必要。",
+      "issue": "TODO: issue 未起票"
+    },
+    {
+      "id": "public-bucket:board-photos",
+      "status": "todo",
+      "severity": "high",
+      "reason": "board-photos バケットが public=true。ユーザーが board に貼った写真が署名なし URL で第三者に閲覧される。private 化 + 署名付き URL 配信への移行が必要（クライアント側の画像取得も併せて変更が要る）。",
+      "issue": "TODO: issue 未起票"
+    },
+    {
+      "id": "storage-select-unscoped:board_photos_read",
+      "status": "todo",
+      "severity": "high",
+      "reason": "00006 のコメントは『users can upload/read/delete their own photos』と書いてあるが、read ポリシーだけ bucket_id の一致のみでユーザー隔離が無い。upload/delete は auth.uid() で正しく絞れているため、実装漏れと判断。",
+      "issue": "TODO: issue 未起票"
+    },
+    {
+      "id": "public-bucket:avatars",
+      "status": "accepted",
+      "reason": "アバターは公開画像として設計されている（00009 のポリシー名 'Anyone can view avatars' が意図を明示）。"
+    },
+    {
+      "id": "storage-select-unscoped:Anyone can view avatars",
+      "status": "accepted",
+      "reason": "同上。アバターの公開閲覧は意図的。"
+    }
+  ]
+}
