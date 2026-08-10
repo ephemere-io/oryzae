@@ -19,9 +19,9 @@
     "@oryzae/shared": "workspace:*",
     "@oryzae/verify": "workspace:*",
     "@sentry/nextjs": "^10.69.0",
-    "next": "16.2.12",
-    "next-intl": "^4.13.4",
-    "posthog-js": "^1.409.0",
+    "next": "16.3.0",
+    "next-intl": "^4.13.5",
+    "posthog-js": "^1.413.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -35,7 +35,7 @@
     "@types/react-dom": "^19.2.4",
     "dependency-cruiser": "^18.0.0",
     "jsdom": "^29.1.1",
-    "postcss": "^8.5.25",
+    "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
