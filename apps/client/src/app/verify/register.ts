@@ -64,6 +64,18 @@ import '@/features/auth/components/forgot-password-form.verify';
 import '@/features/auth/components/login-form.verify';
 import '@/features/pc/navigation/components/sidebar.verify';
 import '@/features/auth/components/signup-form.verify';
+// 画面ごとのロード枠（スケルトン）
+import '@/features/pc/account/components/account-page-skeleton.verify';
+import '@/features/pc/board/components/board-view-skeleton.verify';
+import '@/features/pc/entries/components/entry-editor-skeleton.verify';
+import '@/features/pc/entries/components/entry-list-skeleton.verify';
+import '@/features/pc/fermentation/components/jar-view-skeleton.verify';
+import '@/features/pc/questions/components/question-timeline-skeleton.verify';
+import '@/features/sp/account/components/sp-account-page-skeleton.verify';
+import '@/features/sp/entries/components/sp-entry-editor-skeleton.verify';
+import '@/features/sp/entries/components/sp-entry-list-skeleton.verify';
+import '@/features/sp/fermentation/components/sp-jar-skeleton.verify';
+import '@/features/sp/questions/components/sp-questions-skeleton.verify';
 // リファレンス用の自己完結サンプル（削除可）
 import '@/lib/verify/example-progress.verify';
 
