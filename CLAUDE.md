@@ -17,6 +17,7 @@ pnpm test                                   # テスト実行（server + client 
 pnpm lint                                   # Biome lint
 pnpm dep-cruise                             # アーキテクチャ依存チェック（server + client + admin）
 pnpm knip                                   # デッドコード検出
+pnpm security:rls                           # RLS / storage の認可境界チェック
 ```
 
 ## Architecture
@@ -56,6 +57,18 @@ device（端末）はフロントだけの軸で `apps/client` のみ reach を�
 - `--no-verify` 禁止
 - `any` 型禁止
 - `as` キャスト禁止（CI で検出。例外は `// @type-assertion-allowed: <理由>` を前行に記載）
+
+### セキュリティ（他人の日記を預かるプロダクトである）
+
+判断基準は常に「ある人の日記が本人以外の目に触れる経路が無いか」。詳細は `docs/security-guide.md`。
+
+- **ユーザー向け API の認可は RLS が担う**（`authMiddleware` が anon key + ユーザー JWT で
+  クライアントを作るため）。repository に `.eq('user_id', ...)` が無くても脆弱性ではない
+- **新規テーブルには必ず RLS + ポリシー**。`USING (true)` には必ず `TO service_role` を添える
+  （TO 省略時は PUBLIC 扱いになり own-data ポリシーを無効化する）。`pnpm security:rls` が強制
+- **`getSupabaseClient()`（service role）は RLS を完全にバイパスする**。利用箇所は
+  dep-cruise の `service-role-client-containment` で許可リスト固定。増やす前に必ず相談
+- **日記本文をログ・Sentry・PostHog に載せない**（例外メッセージへの埋め込みも含む）
 
 ## Design Docs (SSoT)
 

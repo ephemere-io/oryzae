@@ -210,6 +210,40 @@ module.exports = {
       to: { path: '@oryzae/shared' },
     },
 
+    // === service role の封じ込め（セキュリティ境界） ===
+    // ユーザー向け API は authMiddleware が anon key + ユーザー JWT でクライアントを作るため
+    // RLS が認可境界として効く。一方 supabase-client.ts の getSupabaseClient() は
+    // SERVICE_ROLE_KEY を使い **RLS を完全にバイパス**する。ここに新しい import が増えると、
+    // 「RLS が守ってくれる」という前提が静かに崩れて他人の日記が読める経路が生まれうる。
+    //
+    // そのため利用箇所を許可リストに固定する。追加が必要になったら、その PR で
+    // 「なぜ RLS バイパスが要るか」「ユーザー入力の ID をそのまま渡していないか」を
+    // レビューしたうえで、下のリストに明示的に足すこと。
+    {
+      name: 'service-role-client-containment',
+      comment:
+        'SERVICE_ROLE_KEY は RLS をバイパスする。利用箇所は許可リスト（auth/signup/cron/admin）に限定する',
+      severity: 'error',
+      from: {
+        path: '^src/',
+        pathNot: [
+          // 定義元自身
+          '^src/contexts/shared/infrastructure/supabase-client\\.ts$',
+          // 認証・サインアップ: ログイン前でユーザー JWT が存在しないため service role が必要
+          '^src/contexts/shared/presentation/routes/auth\\.ts$',
+          '^src/contexts/user/presentation/routes/signup\\.ts$',
+          // 管理画面: 管理者は全ユーザー横断で参照する（admin-auth.ts が別途認可する）
+          '^src/contexts/shared/presentation/middleware/admin-auth\\.ts$',
+          // cron: ユーザー文脈の無いバッチ処理
+          '^src/contexts/shared/presentation/routes/cron-cost-alert\\.ts$',
+          '^src/contexts/fermentation/presentation/routes/cron-fermentation\\.ts$',
+          // auth.admin.getUserById / メール送信先解決に service role が必須
+          '^src/contexts/fermentation/presentation/routes/fermentations\\.ts$',
+        ],
+      },
+      to: { path: '^src/contexts/shared/infrastructure/supabase-client\\.ts$' },
+    },
+
     // === No circular dependencies ===
     {
       name: 'no-circular',
