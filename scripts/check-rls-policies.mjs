@@ -147,17 +147,28 @@ function replay(files) {
       policies.delete(`${normalizeTable(m[2])}::${unquote(m[1])}`);
     }
 
-    for (const m of sql.matchAll(/insert\s+into\s+storage\.buckets[\s\S]*?values\s*\(/gi)) {
+    for (const m of sql.matchAll(/insert\s+into\s+storage\.buckets\s*\(/gi)) {
       const stmt = readStatement(sql, m.index);
+      // 列リストと値リストを名前で対応づける。位置や「どこかに true があるか」で
+      // 判定すると、列が増えたときに誤検知し、その誤検知が baseline に吸収されて
+      // ゲートが形骸化する。
+      const head = /insert\s+into\s+storage\.buckets\s*\(([^)]*)\)/i.exec(stmt);
       const values = /values\s*\(([^)]*)\)/i.exec(stmt);
-      if (!values) continue;
-      // (id, name, public) — 3 番目が true なら署名なしで誰でも読めるバケット
-      const cols = values[1].split(',').map((s) => s.trim().replace(/'/g, ''));
-      buckets.set(cols[0], {
-        bucket: cols[0],
+      if (!head || !values) continue;
+      const names = head[1].split(',').map((s) => s.trim().replace(/"/g, '').toLowerCase());
+      const vals = values[1].split(',').map((s) => s.trim().replace(/'/g, ''));
+      const pick = (col) => {
+        const i = names.indexOf(col);
+        return i === -1 ? undefined : vals[i];
+      };
+      const id = pick('id');
+      if (id === undefined) continue;
+      buckets.set(id, {
+        bucket: id,
         file,
         line: lineOf(sql, m.index),
-        isPublic: cols.some((c) => c.toLowerCase() === 'true'),
+        // public 列が省略されている場合、Postgres の既定は false（非公開）
+        isPublic: (pick('public') ?? 'false').toLowerCase() === 'true',
         exemption: exemptionFor(sql, m.index),
       });
     }
