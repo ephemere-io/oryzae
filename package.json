@@ -27,7 +27,13 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "postcss@<8.5.23": ">=8.5.23",
+      "sharp@<0.35.0": ">=0.35.0",
+      "undici@<7.29.0": ">=7.29.0 <8",
+      "nanoid@<3.3.17": ">=3.3.17"
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "~2.5.6",
