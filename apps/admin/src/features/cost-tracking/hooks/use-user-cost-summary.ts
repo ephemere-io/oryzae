@@ -53,10 +53,14 @@ export function useUserCostSummary(params?: UseUserCostSummaryParams) {
 
       const res = await api.fetch(url);
       if (res.ok) {
+        // @type-assertion-allowed: API レスポンスの JSON を宣言済みの型に束ねる
         const body = (await res.json()) as UserCostResponse;
+        // フォールバックは置かない。server は admin の Next アプリに同梱されて
+        // 一緒にデプロイされるため、型と実際のレスポンスが食い違うことはない。
+        // `?? 0` を書くと「必須と宣言しているのに欠けうる」という矛盾になる。
         setData(body.data);
-        setUntrackedCount(body.untrackedCount ?? 0);
-        setTruncated(body.truncated ?? false);
+        setUntrackedCount(body.untrackedCount);
+        setTruncated(body.truncated);
       } else {
         setError('ユーザー別コストの取得に失敗しました');
       }
