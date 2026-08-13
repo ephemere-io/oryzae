@@ -88,7 +88,9 @@ export const adminFermentations = new Hono<Env>()
     }
 
     const aggregate = aggregateCost(rows.rows);
-    const emailMap = await resolveUserEmails(supabase);
+    // listUsers は最大20往復する。解決すべきユーザーが居なければ叩かない。
+    const emailMap =
+      aggregate.byUser.length > 0 ? await resolveUserEmails(supabase) : new Map<string, string>();
 
     const items = aggregate.byUser.map((u) => ({
       userId: u.userId,

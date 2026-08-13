@@ -224,8 +224,14 @@ export const adminObservability = new Hono<Env>()
 
     const rows = rowsResult?.rows ?? [];
     const aggregate = aggregateCost(rows);
+    // 日別は UTC 日で切る。同じ画面に並ぶ Anthropic 実額が UTC 日バケット固定で、
+    // 窓を揃えないと乖離が読めないため（日次レポートは運用に合わせ JST 日。
+    // cron-cost-alert.ts 参照）。画面には「UTC 日」と明記している。
     const daily = aggregateCostByDay(rows, (createdAt) => createdAt.slice(0, 10));
-    const emailMap = await resolveUserEmails(supabase);
+    // resolveUserEmails は listUsers を最大20往復する。解決すべきユーザーが
+    // 居ない（期間内に発酵ゼロ / クエリ失敗）ときに叩く意味はない。
+    const emailMap =
+      aggregate.byUser.length > 0 ? await resolveUserEmails(supabase) : new Map<string, string>();
 
     return c.json({
       rangeDays: daysBack,
