@@ -2,11 +2,11 @@ import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DRAFT_MAX_IDLE_MS,
-  type EntryDraft,
   isDraftFresh,
   localDateKey,
   useEntryDraft,
 } from '@/features/shared/entries/hooks/use-entry-draft';
+import type { EntryDraft } from '@/features/shared/entries/types';
 
 const STORAGE_KEY = 'oryzae:sp:new-entry-draft';
 

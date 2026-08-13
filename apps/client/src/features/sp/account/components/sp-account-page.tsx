@@ -4,9 +4,9 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
+import type { AccountUser } from '@/features/shared/account/types';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
-import { createApiClient } from '@/lib/api';
-import { getAccessToken } from '@/lib/auth';
 import { setLocaleAction } from '@/lib/i18n-actions';
 import { useTheme } from '@/lib/theme-context';
 
@@ -15,14 +15,7 @@ const LOCALE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 interface SpAccountPageProps {
-  user: {
-    id: string;
-    email: string;
-    nickname: string | null;
-    avatarUrl: string | null;
-    name: string | null;
-    providers: string[];
-  };
+  user: AccountUser;
   onLogout: () => void;
 }
 
@@ -121,6 +114,7 @@ function Divider() {
 /** ニックネームのインライン編集（PC の EditableField 相当を SP 向けに簡素化）。 */
 function NicknameField({ initialValue }: { initialValue: string }) {
   const t = useTranslations('account');
+  const { updateProfile } = useAccountApi();
   const [value, setValue] = useState(initialValue);
   const [draft, setDraft] = useState(initialValue);
   const [editing, setEditing] = useState(false);
@@ -134,20 +128,11 @@ function NicknameField({ initialValue }: { initialValue: string }) {
     }
     setSaving(true);
     setError(null);
-    const token = getAccessToken();
-    if (!token) {
-      setError(t('profile.error_login_required'));
-      setSaving(false);
-      return;
-    }
-    const api = createApiClient(token);
-    const res = await api.fetch('/api/v1/auth/profile', {
-      method: 'PATCH',
-      body: JSON.stringify({ nickname: draft }),
-    });
-    if (!res.ok) {
-      const data = (await res.json()) as { error: string };
-      setError(data.error);
+    const result = await updateProfile('nickname', draft);
+    if (!result.ok) {
+      setError(
+        result.kind === 'unauthenticated' ? t('profile.error_login_required') : result.error,
+      );
       setSaving(false);
       return;
     }

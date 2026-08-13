@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
-import { type EntryDraft, useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
+import { useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
+import type { EntryDraft } from '@/features/shared/entries/types';
 import {
   useActiveQuestions,
   useEntryQuestions,

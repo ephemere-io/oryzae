@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "set -a && . ../../.env && set +a && next dev",
+    "dev": "set -a; [ -f ../../.env ] && . ../../.env || echo '[dev] ../../.env not found — using ambient env (CI)'; set +a; next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

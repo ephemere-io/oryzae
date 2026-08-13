@@ -1,29 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
 import { DeviceView } from '@/components/device-view';
-import { EntryList, type FilterableQuestion } from '@/features/pc/entries/components/entry-list';
-import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
+import { EntryList } from '@/features/pc/entries/components/entry-list';
+import { useFilterableQuestions } from '@/features/shared/questions/hooks/use-filterable-questions';
 import { SpEntryList } from '@/features/sp/entries/components/sp-entry-list';
 import { useAuth } from '@/lib/auth-context';
 
 export default function EntriesPage() {
   const { api, loading } = useAuth();
-  // Issue #331: 一覧の問いフィルタ用に問い一覧を取得。
-  // features 間直接依存禁止のため、ページ層で取得して EntryList に props で渡す。
-  const { questions } = useQuestions(api);
-
-  const availableQuestions: FilterableQuestion[] = useMemo(
-    () =>
-      questions.flatMap((q) => {
-        if (q.isArchived) return [];
-        const text = q.currentText;
-        if (text === null || text.length === 0) return [];
-        return [{ id: q.id, currentText: text }];
-      }),
-    [questions],
-  );
+  // Issue #331: 一覧の問いフィルタ用の選択肢。取得と整形は共有 hook が持ち、
+  // PC/SP の一覧へ同じものを渡す（二重 fetch を避ける）。
+  const availableQuestions = useFilterableQuestions(api);
 
   return (
     <DeviceView

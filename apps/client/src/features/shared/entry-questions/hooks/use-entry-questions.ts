@@ -86,3 +86,20 @@ export function useEntryQuestions(api: ApiClient | null, entryId: string | undef
 
   return { linkedQuestions, linkQuestion, unlinkQuestion };
 }
+
+/**
+ * 保存後に確定する entryId へ問いを紐づける（端末非依存）。
+ *
+ * `useEntryQuestions` は entryId を hook 生成時に束縛するため、新規作成のように
+ * 「保存して初めて id が決まる」経路では使えない。Issue #490 ではそれが理由で
+ * `app/(protected)/entries/new/page.tsx` が POST を直叩きしていた。
+ */
+export function useLinkEntryQuestion(api: ApiClient | null) {
+  return useCallback(
+    async (entryId: string, questionId: string): Promise<void> => {
+      if (!api) return;
+      await api.fetch(`/api/v1/entries/${entryId}/questions/${questionId}`, { method: 'POST' });
+    },
+    [api],
+  );
+}

@@ -4,14 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ListSkeleton } from '@/components/ui/list-skeleton';
-
-interface QuestionItem {
-  id: string;
-  currentText: string | null;
-  isArchived: boolean;
-  isProposedByOryzae: boolean;
-  isValidatedByUser: boolean;
-}
+import type { QuestionItem } from '@/features/shared/questions/types';
 
 interface SpQuestionsProps {
   questions: QuestionItem[];

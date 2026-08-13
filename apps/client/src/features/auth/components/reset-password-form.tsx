@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Suspense, useEffect, useState } from 'react';
-import { translateAuthError } from '@/features/auth/utils/error-messages';
-import { createApiClient } from '@/lib/api';
+import { translateAuthError } from '@/features/shared/auth/error-messages';
+import { useAuthActions } from '@/features/shared/auth/hooks/use-auth-actions';
 import { getAccessToken } from '@/lib/auth';
 
 function ResetPasswordHandler() {
@@ -17,6 +17,7 @@ function ResetPasswordHandler() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { updatePassword } = useAuthActions();
   // /auth/confirm で verifyOtp 完了 → セッションが localStorage に保存済みの想定。
   // SSR では localStorage を参照できないので useEffect で取得して状態に反映する。
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -56,18 +57,16 @@ function ResetPasswordHandler() {
       setError(t('error_mismatch'));
       return;
     }
+    // トークン無しではフォーム自体が描画されない（下の invalid_link 分岐）。
+    // クロージャからは絞り込めないのでここでも確認する。
+    if (!accessToken) return;
 
     setLoading(true);
 
-    const client = createApiClient();
-    const res = await client.fetch('/api/v1/auth/update-password', {
-      method: 'POST',
-      body: JSON.stringify({ accessToken, password }),
-    });
+    const result = await updatePassword(accessToken, password);
 
-    if (!res.ok) {
-      const data = (await res.json()) as { error: string };
-      setError(translateAuthError(data.error, tErr));
+    if (!result.ok) {
+      setError(translateAuthError(result.error, tErr));
       setLoading(false);
       return;
     }

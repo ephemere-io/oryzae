@@ -2,10 +2,8 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useCallback } from 'react';
 import { DeviceView } from '@/components/device-view';
 import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
-import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useEntry } from '@/features/shared/entries/hooks/use-entry';
 import {
   useActiveQuestions,
@@ -21,16 +19,7 @@ export default function EntryDetailPage() {
   const { entry, loading: entryLoading } = useEntry(params.id, api, authLoading);
   const activeQuestions = useActiveQuestions(api, authLoading);
   const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, params.id);
-  const runTransition = useSaveTransition();
   const router = useRouter();
-
-  const handleSaveTransition = useCallback(
-    async (text: string, editorEl: HTMLElement) => {
-      await runTransition(text, editorEl);
-      router.push('/jar');
-    },
-    [runTransition, router],
-  );
 
   if (entryLoading || authLoading) return null;
 
@@ -58,7 +47,7 @@ export default function EntryDetailPage() {
           initialLinkedIds={linkedQuestions.map((q) => q.id)}
           onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
           onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
-          onSaveTransition={handleSaveTransition}
+          onPickled={() => router.push('/jar')}
         />
       }
     />

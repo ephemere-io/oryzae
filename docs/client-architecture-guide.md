@@ -54,20 +54,22 @@ apps/client/src/
 │   │   └── (protected)/layout.tsx — 端末を判定し PC/SP のシェルを出し分ける
 │   └── {route}/page.tsx          — features を組み合わせるだけ（URL に端末は出さない）
 ├── features/                     — 機能スライス（ドメイン × reach）
-│   ├── shared/{domain}/          — UIを持たない共有ロジック（両端末が使う）
+│   ├── shared/{domain}/          — UIを持たないドメインロジック（**全 fetch・全ドメイン型**）
 │   │   ├── hooks/                — データ取得・保存などの Custom Hook（use-*）
 │   │   └── types.ts              — ドメイン固有の共有型
 │   ├── pc/{domain}/              — PC 体験
 │   │   ├── components/           — PC 固有 UI
-│   │   └── hooks/                — PC 固有の操作・演出 hook
+│   │   └── hooks/                — PC 固有の操作・演出 hook（fetch は持たない）
 │   └── sp/{domain}/              — SP 体験
 │       ├── components/           — SP 固有 UI（縦長・片手・音声）
-│       └── hooks/                — SP 固有の操作 hook
-├── components/ui/                — 汎用 UI コンポーネント（feature 非依存）
+│       └── hooks/                — SP 固有の操作 hook（fetch は持たない）
+├── components/                   — ドメイン非依存 UI・seam プリミティブ・provider
+│   ├── device-view.tsx           —   端末出し分けの唯一の seam
+│   └── ui/                       —   汎用 UI コンポーネント（feature 非依存）
 └── lib/                          — 基盤ユーティリティのみ（ドメイン非依存）
 ```
 
-`{domain}` は `entries` / `fermentation` / `questions` / `board` など。
+`{domain}` は `entries` / `fermentation` / `questions` / `board` / `account` / `navigation` など。
 同じドメインの `shared` / `pc` / `sp` は 1:1:1 で対応する（例: `entries` の取得 hook は `shared/entries`、PC エディタは `pc/entries`、SP エディタは `sp/entries`）。
 
 **reach は「端末で体験が変わる機能」だけに適用する。** 端末非依存の機能（`auth` / `landing` / `onboarding` など、両端末・公開ページで同じものを使う）は `features/{domain}/` のフラットなまま置く（pc/sp に分けない）。フラット機能どうしの直接 import は禁止、`features/shared` への import のみ可（dep-cruiser の `feature-isolation-flat`）。端末非依存のロジックを pc/sp 双方から使いたくなったら `features/shared/{domain}` へ押し上げる。
@@ -86,9 +88,16 @@ apps/admin/src/
 
 | reach | 役割 | 置くもの | UI |
 | --- | --- | --- | --- |
-| **shared** | 両端末が使う、端末非依存のドメインロジック | データ取得・保存の `use-*` hook、ドメイン型 | 持たない |
+| **shared** | 端末非依存のドメインロジック | データ取得・保存の `use-*` hook、ドメイン型 | 持たない |
 | **pc** | PC 体験 | PC の画面・操作・演出 | 持つ |
 | **sp** | SP 体験 | SP の画面・操作（縦長・片手・音声） | 持つ |
+
+> **`shared` の条件は「今どちらの端末が使っているか」ではない。**
+> データ取得・更新（fetch）とドメイン型は、**片端末しか使っていなくても `features/shared`** に置く。
+> `pc` に置くと、あとで SP を足すときに reach 分離（`reach-slice-isolation`）に阻まれて
+> 必ずコピーが発生する。実際 Issue #490 の崩れはこれが原因で、fermentation の detail 取得が
+> 3実装、profile の更新が 2実装に増殖した。`shared` は「両端末が使っているもの」ではなく
+> **「両端末が使えるようにしておく場所」** と読む。
 
 ---
 
@@ -97,17 +106,20 @@ apps/admin/src/
 コードを追加・修正するときは、**上から順に**当てはめる。これで置き場が一意に決まる。
 
 1. **ドメインを知らない汎用 UI か？**（ボタン・モーダルの土台など）→ `components/ui/`
-2. **ドメインを知らない基盤ユーティリティか？**（`createApiClient`・認証・分析・theme/context・`debounce`・`markdown`・定数）→ `lib/`
-3. **ドメイン固有** → ドメインを選び、判定軸＝**「端末ごとに別 UI を持つか」**で分ける：
-   - 両端末が同じものを使う・**UI を持たない**（データ hook・型）→ `features/shared/{domain}/`
-     （例: `use-auth` は両端末が使う認証 hook なので `features/shared/auth`）
+2. **ドメインを知らない基盤ユーティリティか？**（`createApiClient`・認証・分析・theme/context・`debounce`・日付整形・`markdown`・定数）→ `lib/`
+3. **データ取得・更新（fetch）か？ ドメイン型か？** → 端末の利用状況を問わず `features/shared/{domain}/`
+   （`hooks/` に fetch、`types.ts` に型。**ここが唯一の fetch 置き場**）
+4. **残り（＝ UI と、その UI 専用の状態・演出）** → 判定軸＝**「端末ごとに別 UI を持つか」**で分ける：
    - **PC 固有**の画面・操作・演出 → `features/pc/{domain}/`
    - **SP 固有**の画面・操作 → `features/sp/{domain}/`
-   - 機能まるごと**端末非依存**（両端末/公開で同じ画面。例: `auth` の UI・`landing`・`onboarding`）→ `features/{domain}/`（フラット）
+   - 機能まるごと**端末非依存**（両端末/公開で同じ画面。例: `auth` のフォーム・`landing`・`onboarding`）→ `features/{domain}/`（フラット）
 
-> `lib/` には `use-*` のドメイン hook を置かない。`lib/` は端末・ドメインの両方を知らない基盤専用（`createApiClient`・トークン保存・分析・context 等）。
+> `lib/` には `use-*` のドメイン hook を置かない。`lib/` は端末・ドメインの両方を知らない基盤専用（`createApiClient`・トークン保存・分析・context・`useDebounce` 等）。
 >
-> **残る1点の判断**: 新しいトップレベル機能を pc/sp に置くか flat に置くかは「端末ごとに別 UI を持つか／両端末で同じ・公開・UI なしか」という**プロダクト判断**が最後に残る。決定木は配置をほぼ一意化するが、この性質判断だけは機械化できない。
+> **3 が 4 より先にあるのが重要**。「PC 専用画面のためのデータ hook」は 3 で `shared` に落ちる。
+> 「PC 専用画面だから `pc` へ」と 4 で判断してはならない（Issue #490 の崩れの再発防止）。
+>
+> **残る1点の判断**: 新しいトップレベル機能を pc/sp に置くか flat に置くかは「端末ごとに別 UI を持つか／両端末で同じ・公開か」という**プロダクト判断**が最後に残る。決定木は配置をほぼ一意化するが、この性質判断だけは機械化できない。
 
 ---
 
@@ -115,13 +127,17 @@ apps/admin/src/
 
 | ディレクトリ | 責務 | 知ってはいけないもの |
 | --- | --- | --- |
-| **app/** | ルーティング、レイアウト、Route Handler、端末判定、features の組み合わせ | API 呼び出しの詳細、状態管理ロジック |
+| **app/** | ルーティング、レイアウト、Route Handler、端末判定、features の組み合わせ | API 呼び出し、ドメイン加工、`features/{pc,sp}/**/hooks/` |
 | **app/api/[...path]/** | Hono アプリへのリクエスト転送 | ビジネスロジック（サーバー側に委譲） |
-| **features/shared/{domain}/** | 端末非依存のドメインロジック（データ hook・型） | UI、`pc` / `sp` の存在 |
-| **features/pc/{domain}/** | PC 体験の UI・操作・演出 | 他ドメイン、`sp`、`app` |
-| **features/sp/{domain}/** | SP 体験の UI・操作 | 他ドメイン、`pc`、`app` |
+| **features/shared/{domain}/** | 端末非依存のドメインロジック（**全 fetch**・ドメイン型） | UI、`pc` / `sp` の存在 |
+| **features/pc/{domain}/** | PC 体験の UI・操作・演出 | fetch、ドメイン型定義、他ドメイン、`sp`、`app` |
+| **features/sp/{domain}/** | SP 体験の UI・操作 | fetch、ドメイン型定義、他ドメイン、`pc`、`app` |
+| **features/{domain}/**（flat） | 端末非依存の UI と、その UI 専用の状態 hook | fetch、他の flat feature、`app` |
+| **components/** | ドメイン非依存 UI・seam プリミティブ（`device-view`）・provider | 端末固有 UI（`sp-*` / `pc-*`）、feature, app の存在 |
 | **components/ui/** | 汎用 UI コンポーネント（shadcn 等） | feature, app の存在 |
-| **lib/** | API クライアント・認証・分析・context 等の基盤 | feature, app, components の存在、ドメイン |
+| **lib/** | API クライアント・認証・分析・context・汎用 hook 等の基盤 | feature, app, components の存在、ドメイン |
+
+**シェル（ナビゲーション）は端末固有 UI である。** PC サイドバーは `features/pc/navigation/`、SP ボトムナビは `features/sp/navigation/` に置く。`components/` 直下に端末固有 UI を置いてはならない（reach 軸を迂回してしまうため）。`app/(protected)/layout.tsx` はそれを選ぶだけ。
 
 ---
 
@@ -129,34 +145,61 @@ apps/admin/src/
 
 `apps/client`（reach 軸あり）の許可マトリクス:
 
-| From ＼ To | app/ | features/pc/X | features/sp/X | features/shared/* | components/ui/ | lib/ | @oryzae/shared |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| **app/** | self | YES | YES | YES | YES | YES | YES |
-| **features/pc/X** | NO | self のみ | **NO** | **YES** | YES | YES | YES |
-| **features/sp/X** | NO | **NO** | self のみ | **YES** | YES | YES | YES |
-| **features/shared/X** | NO | **NO** | **NO** | YES | YES | YES | YES |
-| **components/ui/** | NO | NO | NO | NO | self | YES | YES |
-| **lib/** | NO | NO | NO | NO | NO | self | YES |
+| From ＼ To | app/ | features/pc/X | features/sp/X | features/shared/* | components/ | lib/ | lib/api | @oryzae/shared |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **app/** | self | components のみ | components のみ | YES | YES | YES | **NO** | YES |
+| **features/pc/X** | NO | self のみ | **NO** | **YES** | YES | YES | 型のみ | YES |
+| **features/sp/X** | NO | **NO** | self のみ | **YES** | YES | YES | 型のみ | YES |
+| **features/X**（flat） | NO | **NO** | **NO** | **YES** | YES | YES | 型のみ | YES |
+| **features/shared/X** | NO | **NO** | **NO** | YES | YES | YES | YES | YES |
+| **components/** | NO | NO | NO | NO | self | YES | 型のみ | YES |
+| **lib/** | NO | NO | NO | NO | NO | self | YES | YES |
 
 - 「self のみ」＝ 自分のスライス内のみ。**`pc` / `sp` は同一 reach 内でも別ドメインの import を禁止**（例: `pc/entries → pc/fermentation` は NG）。共有したいロジックは `features/shared/{domain}` に置く。
 - `features/shared` は端末非依存の基礎層なので、`shared` どうしの import は許可（ただし `pc` / `sp` は import しない）。
+- 「components のみ」＝ `app/` は `features/{pc,sp}/{domain}/components/` だけを import してよい。**`hooks/` は import 禁止**（下記）。
+- 「型のみ」＝ `import type { ApiClient }` は可。`createApiClient()` の呼び出しは不可。
 
 ### 重要な禁止事項
 
 - **features/pc ⇎ features/sp: 禁止** — 端末をまたぐ直接依存は許さない。「別路線」を構造で保証する
 - **features → 他ドメイン: 禁止** — ドメイン間の直接依存は許さない。**唯一の例外は `features/shared`**（両端末・全ドメインから import 可）
 - **features/shared → pc / sp: 禁止** — 共有層が端末固有 UI を知ってはならない
-- **lib → 上位レイヤー / ドメイン: 禁止** — 基盤がドメインや画面を知ってはならない。`use-*` のドメイン hook を置かない
+- **lib → 上位レイヤー / ドメイン: 禁止** — 基盤がドメインや画面を知ってはならない。ドメイン hook を置かない
 - **app/ での API 呼び出し: 禁止** — `page.tsx` / `layout.tsx` から直接 API を呼ばない。必ず `features/shared` の hook 経由
+- **`features/shared` 以外での fetch: 禁止** — `features/{pc,sp}`・flat features・`components/`・`app/` に `/api/v1/...` を書かない
+- **`app/` → `features/{pc,sp}/**/hooks/`: 禁止** — 端末固有 hook は `DeviceView` の分岐と無関係に**両端末で実行される**。端末固有のロジックは必ずその端末のコンポーネントの中に閉じる（seam 漏れの防止）
+- **`components/` 直下の端末固有 UI: 禁止** — `sp-*` / `pc-*` は `features/{sp,pc}/{domain}/components/` へ
 
 ### 機械強制（dep-cruiser）
 
-上記は `apps/client/.dependency-cruiser.cjs` で機械強制している:
-- `features/pc/*` ⇎ `features/sp/*` 相互禁止 ＋ `pc`/`sp` 内の別ドメイン禁止（`→ features/shared` のみ許可）= `reach-slice-isolation`
-- `features/shared → features/{pc,sp}` 禁止 = `reach-shared-purity`
-- 端末非依存フラット機能どうしの import 禁止（`→ features/shared` のみ許可）= `feature-isolation-flat`
+上記は `apps/client/.dependency-cruiser.cjs`（import の向き）と `test/architecture/`（import では見えない層）の二段で機械強制している。
 
-**ガードレールが腐らないための番人テスト**: `test/architecture/dep-cruiser-rules.test.ts`（主要ルールの存在・形を検証）と `test/architecture/shared-no-ui.test.ts`（`features/shared` に `.tsx` を入れない）。これらが落ちたら強制が弱体化したサイン。
+**dep-cruiser（import の向き）**:
+
+| ルール | 内容 |
+| --- | --- |
+| `reach-slice-isolation` | `features/pc/*` ⇎ `features/sp/*` 相互禁止 ＋ `pc`/`sp` 内の別ドメイン禁止（`→ features/shared` のみ許可） |
+| `reach-shared-purity` | `features/shared → features/{pc,sp}` 禁止 |
+| `feature-isolation-flat` | 端末非依存フラット機能どうしの import 禁止（`→ features/shared` のみ許可） |
+| `app-no-api-client` | `app/`（Route Handler 除く）→ `lib/api` の実装 import 禁止 |
+| `app-no-reach-hooks` | `app/` → `features/{pc,sp}/*/hooks/` 禁止（seam 漏れ防止） |
+| `flat-features-no-api` | flat features → `lib/api` の実装 import 禁止 |
+| `protected-pages-use-device-view` | 保護ルートの `page.tsx` は `DeviceView` 経由（required ルール） |
+
+**静的テスト（dep-cruiser では見えないもの）**:
+
+| テスト | 内容 |
+| --- | --- |
+| `shared-no-ui.test.ts` | `features/shared` に `.tsx` を入れない |
+| `fetch-lives-in-shared.test.ts` | `/api/v1/...` を `features/shared`・`lib`・`app/api` の外に書かない |
+| `device-ui-lives-in-reach.test.ts` | `components/`・flat features に `sp-*` / `pc-*` を置かない |
+| `types-live-in-types-file.test.ts` | `hooks/` から型を export しない（ドメイン型は `types.ts`） |
+| `dep-cruiser-rules.test.ts` | 上記 dep-cruiser ルールの存在・形を検証（**番人テスト**） |
+
+これらが落ちたら強制が弱体化したサイン。静的テストの 3 本は移行中の既知違反を `MIGRATING` 配列で明示的に許容し、**「陳腐化した allowlist を残さない」テストが対になっている**（直したのに配列から消し忘れると落ちる）。allowlist は減る一方であること — 追加は負債の追認なのでレビューで止める。
+
+> **限界**: `import { EntryList, type FilterableQuestion }` のような値と型の混在 import は dep-cruiser で型だけを禁止できない。ドメイン型を `features/shared/{domain}/types.ts` に置く規律で担保する。
 
 `apps/admin/.dependency-cruiser.cjs` は reach 軸を持たないため従来どおり（`features/X → features/Y` 禁止）。
 
@@ -350,11 +393,13 @@ if (!result.success) {
 
 新しい機能を追加するときは「置き場の決定木」に従い、reach ごとに配置する:
 
-1. 端末非依存のデータ hook・型を `features/shared/{domain}/` に置く
-2. PC の画面が要るなら `features/pc/{domain}/`（`components/`, `hooks/`）を作る
-3. SP の画面が要るなら `features/sp/{domain}/`（`components/`, `hooks/`）を作る
+1. **先に** データ hook（fetch）とドメイン型を `features/shared/{domain}/`（`hooks/`, `types.ts`）に置く。
+   片端末しか使う予定が無くてもここに置く（後から SP/PC を足すときのコピーを構造で防ぐ）
+2. PC の画面が要るなら `features/pc/{domain}/`（`components/`, `hooks/`）を作る。`hooks/` は演出・操作の状態のみ
+3. SP の画面が要るなら `features/sp/{domain}/`（`components/`, `hooks/`）を作る。同上
 4. 端末固有スライスは `features/shared/{domain}` 以外の feature を import しないことを確認する
-5. `app/` の対応ルートで、端末に応じた feature を組み合わせる（URL は不変）
+5. `app/` の対応ルートで、`DeviceView` により端末に応じた **components** を組み合わせる（URL は不変）。
+   page に fetch・ドメイン加工・端末固有 hook を置かない
 
 > `apps/admin` は reach 軸を持たないため、`features/{domain}/`（`components/`, `hooks/`, `types.ts`）をそのまま作る。
 

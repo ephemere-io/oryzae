@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
 
 /**
  * 音量内包エフェクト
@@ -9,12 +10,6 @@ import { useEffect, useRef, useState } from 'react';
  * 声の大きさに応じてテキストのフォントサイズが変化する (1.0em〜4.5em)。
  * 認識中のテキストはリアルタイムで音量に追従し、確定時にピーク音量でロック。
  */
-
-export type VoiceUnavailableReason =
-  | 'unsupported' // SpeechRecognition コンストラクタが存在しない
-  | 'network' // 認識バックエンド（Chrome は Google サーバー）に到達できない (Brave 等でブロック)
-  | 'not-allowed' // マイク権限拒否
-  | 'service-not-allowed'; // OS / ブラウザが認識サービスを無効化
 
 type VoiceDynamicsState = {
   unavailable: boolean;

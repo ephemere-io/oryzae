@@ -6,23 +6,13 @@ import { useCallback, useState } from 'react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDebounce } from '@/features/pc/entries/hooks/use-debounce';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
+import type { FilterableQuestion } from '@/features/shared/questions/types';
 import type { ApiClient } from '@/lib/api';
+import { useDebounce } from '@/lib/use-debounce';
 import { DeleteConfirmModal } from './delete-confirm-modal';
 import { EntryCard } from './entry-card';
-
-/**
- * Issue #331: 問いフィルタ用に表示する選択肢。
- * `currentText` は表示用、`id` は filter キー。
- * 親 (entries page) で `useQuestions` の結果から
- * 非アーカイブかつ currentText を持つものに絞ったうえで渡す。
- */
-export interface FilterableQuestion {
-  id: string;
-  currentText: string;
-}
 
 interface EntryListProps {
   api: ApiClient | null;
