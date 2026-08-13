@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { DeviceView } from '@/components/device-view';
-import { AccountPage } from '@/features/auth/components/account-page';
+import { AccountPage } from '@/features/pc/account/components/account-page';
 import { SpAccountPage } from '@/features/sp/account/components/sp-account-page';
 import { useAuth } from '@/lib/auth-context';
 

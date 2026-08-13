@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/auth/components/google-login-button';
-import { translateAuthError } from '@/features/auth/utils/error-messages';
+import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
 import { useAuth } from '@/lib/auth-context';
 

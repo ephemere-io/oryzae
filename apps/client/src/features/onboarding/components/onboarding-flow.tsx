@@ -4,7 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import '../styles/onboarding.css';
-import type { OnboardingResult } from '../types';
+import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import { StepConcept, StepEditor, StepFerment, StepQuestion } from './steps';
 
 interface OnboardingFlowProps {

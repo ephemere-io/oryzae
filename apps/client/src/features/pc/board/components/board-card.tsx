@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useRef } from 'react';
-import type { BoardCardData } from '../hooks/use-board';
+import type { BoardCardData } from '@/features/shared/board/types';
 import { EntryCardContent } from './entry-card-content';
 import { PhotoCardContent } from './photo-card-content';
 import { SnippetCardContent } from './snippet-card-content';

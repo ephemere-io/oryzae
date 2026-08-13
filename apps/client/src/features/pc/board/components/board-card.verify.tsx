@@ -8,8 +8,8 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
+import type { BoardCardData } from '@/features/shared/board/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import type { BoardCardData } from '../hooks/use-board';
 import { BoardCard } from './board-card';
 
 interface Props {

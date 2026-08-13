@@ -3,7 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { type MouseEvent, type PointerEvent, useMemo, useRef } from 'react';
 import { DraggableJarElement } from '@/features/pc/fermentation/components/draggable-jar-element';
-import type { FermentationDetail } from '@/features/pc/fermentation/hooks/use-fermentation-results';
+import type { FermentationDetail } from '@/features/shared/fermentation/types';
 
 interface Pos {
   jarX: number;

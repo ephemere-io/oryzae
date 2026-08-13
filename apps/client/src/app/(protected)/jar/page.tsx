@@ -1,28 +1,21 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DeviceView } from '@/components/device-view';
 import { JarView } from '@/features/pc/fermentation/components/jar-view';
 import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle-success-modal';
+import { useJarQuestions } from '@/features/shared/questions/hooks/use-jar-questions';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 
-interface QuestionData {
-  id: string;
-  currentText: string | null;
-  /** Jar view position (0-100, percent of the JarView viewport). null → fall back. */
-  jarX: number | null;
-  jarY: number | null;
-}
-
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
   const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api);
   const { markSeen } = useUnread();
-  const [questions, setQuestions] = useState<QuestionData[]>([]);
+  const { questions, refetch: refetchQuestions } = useJarQuestions(api, authLoading);
   const router = useRouter();
   const searchParams = useSearchParams();
   const justPickled = searchParams.get('justPickled') === '1';
@@ -42,37 +35,24 @@ export default function JarPage() {
     router.replace('/jar');
   }, [justPickled, router]);
 
-  const fetchActiveQuestions = useCallback(async () => {
-    if (!api) return;
-    const res = await api.fetch('/api/v1/questions');
-    if (res.ok) {
-      setQuestions(await res.json());
-    }
-  }, [api]);
-
   // Mark fermentation results as seen when visiting jar page
   useEffect(() => {
     markSeen();
   }, [markSeen]);
 
-  useEffect(() => {
-    if (authLoading) return;
-    fetchActiveQuestions();
-  }, [authLoading, fetchActiveQuestions]);
-
   async function handleAddQuestion(text: string) {
     await createQuestion(text);
-    await fetchActiveQuestions();
+    await refetchQuestions();
   }
 
   async function handleEditQuestion(id: string, text: string) {
     await editQuestion(id, text);
-    await fetchActiveQuestions();
+    await refetchQuestions();
   }
 
   async function handleArchiveQuestion(id: string) {
     await archiveQuestion(id);
-    await fetchActiveQuestions();
+    await refetchQuestions();
   }
 
   // 端末で出し分け（URL は /jar のまま）。DeviceView が判定前/未対応を安全に処理。
