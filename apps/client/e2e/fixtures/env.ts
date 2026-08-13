@@ -57,3 +57,21 @@ export async function expectSignupPageRendered(page: Page, locale: 'ja' | 'en'):
   const full = locale === 'ja' ? '現在の登録枠は満了しました' : 'Sign-ups are currently full';
   await expect(page.getByText(form).or(page.getByText(full)).first()).toBeVisible();
 }
+
+/**
+ * PC の一覧から、マーカーに一致するエントリをすべて削除する（テストの後始末）。
+ *
+ * E2E が作ったエントリを残すと利用者のジャーナルが汚れ、さらに一覧が伸びて
+ * 後続テストの取得を不安定にする。作ったものは必ず自分で消す。
+ */
+export async function deleteEntriesByMarker(page: Page, marker: string): Promise<void> {
+  await page.goto('/entries');
+  for (let i = 0; i < 10; i += 1) {
+    const row = page.locator('li', { hasText: marker }).first();
+    if ((await row.count()) === 0) return;
+    await row.getByRole('button', { name: 'メニューを開く' }).click();
+    await page.getByRole('button', { name: '削除', exact: true }).click();
+    await page.getByRole('button', { name: '削除する' }).click();
+    await expect(page.locator('li', { hasText: marker })).toHaveCount(0, { timeout: 15_000 });
+  }
+}

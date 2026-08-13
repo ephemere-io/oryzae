@@ -1,0 +1,55 @@
+/**
+ * 「利用者のローカル暦日」を UTC の区間に変換する（純粋関数・依存なし）。
+ *
+ * ボードは `dateKey`（YYYY-MM-DD）で「その日」のエントリを集める。クライアントは
+ * ローカル時刻で dateKey を作るのに対し、`entries.created_at` は UTC 保存であるため、
+ * dateKey をそのまま UTC の 00:00〜24:00 とみなすとズレる。
+ *
+ * 例（JST = UTC+9, tzOffsetMinutes = -540）:
+ *   JST 2026-08-10 00:50 の投稿 → created_at = 2026-08-09T15:50Z
+ *   dateKey "2026-08-10" を UTC 窓とすると 2026-08-10T00:00Z 以降なので**取りこぼす**。
+ *   → JST 00:00〜09:00 に書いたエントリが当日のボードに出ない不具合になっていた。
+ *
+ * `tzOffsetMinutes` は JS の `Date.prototype.getTimezoneOffset()` と同じ符号
+ * （UTC − ローカル の分数。JST なら -540）。未指定（0）なら従来どおり UTC 基準。
+ */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface UtcInstantRange {
+  /** 区間の開始（含む）。ISO8601。 */
+  startUtc: string;
+  /** 区間の終端（含まない）。ISO8601。 */
+  endUtc: string;
+}
+
+function localMidnightUtcMs(dateKey: string, tzOffsetMinutes: number): number {
+  const asUtcMidnight = Date.parse(`${dateKey}T00:00:00.000Z`);
+  if (Number.isNaN(asUtcMidnight)) {
+    throw new Error(`Invalid dateKey: ${dateKey}`);
+  }
+  // ローカル 00:00 の実時刻 = 同日 00:00 UTC + offset（JST は -540 分 → 前日 15:00Z）
+  return asUtcMidnight + tzOffsetMinutes * 60_000;
+}
+
+/** `dateKey` が指すローカル暦日 1 日ぶんの UTC 区間。 */
+export function localDayRange(dateKey: string, tzOffsetMinutes = 0): UtcInstantRange {
+  const start = localMidnightUtcMs(dateKey, tzOffsetMinutes);
+  return {
+    startUtc: new Date(start).toISOString(),
+    endUtc: new Date(start + DAY_MS).toISOString(),
+  };
+}
+
+/** `dateKey` を含むローカルの週（月曜始まり）1 週間ぶんの UTC 区間。 */
+export function localWeekRange(dateKey: string, tzOffsetMinutes = 0): UtcInstantRange {
+  const start = localMidnightUtcMs(dateKey, tzOffsetMinutes);
+  // 曜日はローカル暦日で判定する（UTC に寄せると週境界がずれる）。
+  const localDow = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
+  const daysSinceMonday = (localDow + 6) % 7;
+  const monday = start - daysSinceMonday * DAY_MS;
+  return {
+    startUtc: new Date(monday).toISOString(),
+    endUtc: new Date(monday + 7 * DAY_MS).toISOString(),
+  };
+}
