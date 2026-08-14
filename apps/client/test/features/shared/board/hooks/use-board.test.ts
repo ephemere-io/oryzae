@@ -50,7 +50,11 @@ describe('useBoard', () => {
 
     expect(result.current.cards).toHaveLength(1);
     expect(result.current.cards[0].id).toBe('c-1');
-    expect(apiFetch).toHaveBeenCalledWith('/api/v1/board?dateKey=2026-04-11&viewType=daily');
+    // ローカル暦日で「その日」を判定させるため tzOffset を必ず添える
+    // （無いとサーバーが UTC 窓とみなし、JST 00:00-09:00 の投稿を取りこぼす）
+    expect(apiFetch).toHaveBeenCalledWith(
+      `/api/v1/board?dateKey=2026-04-11&viewType=daily&tzOffset=${new Date().getTimezoneOffset()}`,
+    );
   });
 
   it('api が null の場合はフェッチしない', () => {
