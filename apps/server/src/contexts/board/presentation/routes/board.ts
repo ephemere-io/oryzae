@@ -29,6 +29,14 @@ type Env = {
 
 const generateId = () => crypto.randomUUID();
 
+/** `getTimezoneOffset()` 相当の分数。±14 時間を超える値は不正として 0 に落とす。 */
+function parseTzOffset(raw: string | undefined): number {
+  if (!raw) return 0;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || Math.abs(parsed) > 14 * 60) return 0;
+  return parsed;
+}
+
 export const board = new Hono<Env>()
   // GET /api/v1/board?dateKey=YYYY-MM-DD&viewType=daily|weekly
   .get('/', async (c) => {
@@ -36,6 +44,9 @@ export const board = new Hono<Env>()
       dateKey: c.req.query('dateKey'),
     });
     const viewType = c.req.query('viewType') === 'weekly' ? 'weekly' : 'daily';
+    // クライアントのローカル暦日で「その日」を判定するためのオフセット（分）。
+    // 未指定なら 0＝UTC 基準（従来挙動）にフォールバックする。
+    const tzOffsetMinutes = parseTzOffset(c.req.query('tzOffset'));
     const supabase = c.get('supabase');
     const boardCardRepo = new SupabaseBoardCardRepository(supabase);
     const boardSnippetRepo = new SupabaseBoardSnippetRepository(supabase);
@@ -51,7 +62,7 @@ export const board = new Hono<Env>()
       generateId,
     );
 
-    const result = await usecase.execute(c.get('userId'), dateKey, viewType);
+    const result = await usecase.execute(c.get('userId'), dateKey, viewType, tzOffsetMinutes);
     return c.json(result);
   })
 
