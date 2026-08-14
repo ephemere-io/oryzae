@@ -6,6 +6,13 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
 import { QuestionCircle } from '@/features/pc/fermentation/components/question-circle';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
+import {
+  CIRCLE_FALLBACK_POSITIONS,
+  JAR_BOX,
+  JAR_GRID_BACKGROUND,
+  JAR_PATH,
+  JAR_RADIAL_BACKGROUND,
+} from '@/features/pc/fermentation/utils/jar-shape';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarLayout } from '@/features/shared/fermentation/types';
@@ -27,17 +34,6 @@ interface JarViewProps {
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
 }
-
-/**
- * Fallback positions for the up-to-3 question circles, used when the user has never
- * dragged a circle and the DB has no jar_x/jar_y for that question. Coordinates are
- * percentages of the JarView container.
- */
-const CIRCLE_FALLBACK_POSITIONS: Array<{ x: number; y: number }> = [
-  { x: 80, y: 22 }, // top-right
-  { x: 72, y: 72 }, // bottom center-right
-  { x: 14, y: 46 }, // center-left
-];
 
 interface Pos {
   jarX: number;
@@ -127,9 +123,6 @@ const MICROBE_SVGS = {
 };
 
 /* Jar bottle SVG path (reference design) */
-const JAR_PATH =
-  'M190,100 C190,60 290,60 290,100 C290,130 270,140 270,170 C270,270 410,330 410,480 C410,580 70,580 70,480 C70,330 210,270 210,170 C210,140 190,130 190,100 Z';
-
 interface CirclePosArgs {
   question: QuestionData;
   index: number;
@@ -385,8 +378,7 @@ export function JarView({
       <div
         className="pointer-events-none absolute inset-0 z-0"
         style={{
-          backgroundImage:
-            'linear-gradient(rgba(140,133,126,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(140,133,126,0.04) 1px, transparent 1px)',
+          backgroundImage: JAR_GRID_BACKGROUND,
           backgroundSize: '40px 40px',
           backgroundPosition: 'center center',
         }}
@@ -394,10 +386,7 @@ export function JarView({
       {/* Background radial */}
       <div
         className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.7) 0%, transparent 70%)',
-        }}
+        style={{ background: JAR_RADIAL_BACKGROUND }}
       />
 
       {/* Zoom backdrop */}
@@ -462,14 +451,7 @@ export function JarView({
       {/* Central jar illustration — matching reference design */}
       <div
         className="pointer-events-none absolute z-[2]"
-        style={{
-          left: '50%',
-          top: '45%',
-          transform: 'translate(-50%, -55%)',
-          width: '420px',
-          height: '520px',
-          animation: 'fadeIn 0.5s ease-out forwards',
-        }}
+        style={{ ...JAR_BOX, animation: 'fadeIn 0.5s ease-out forwards' }}
       >
         {/* Jar glow */}
         <div

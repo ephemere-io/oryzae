@@ -4,10 +4,10 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { ListSkeleton } from '@/components/ui/list-skeleton';
 import { useFermentationDetail } from '@/features/shared/fermentation/hooks/use-fermentation-detail';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import type { InboxLetter } from '@/features/shared/fermentation/types';
+import { SpJarRowsSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
 import type { ApiClient } from '@/lib/api';
 import { formatMonthDay } from '@/lib/format-date';
 import { useUnread } from '@/lib/unread-context';
@@ -51,7 +51,7 @@ export function SpJar({ api }: SpJarProps) {
       <header className="px-5 pt-6 pb-3 text-lg font-medium">{t('title')}</header>
 
       {loading ? (
-        <ListSkeleton />
+        <SpJarRowsSkeleton />
       ) : letters.length === 0 ? (
         <div className="px-5 py-12 text-center text-sm opacity-50">{t('empty')}</div>
       ) : (
