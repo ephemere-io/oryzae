@@ -3,8 +3,8 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { ListSkeleton } from '@/components/ui/list-skeleton';
 import type { QuestionItem } from '@/features/shared/questions/types';
+import { SpQuestionsCardsSkeleton } from '@/features/sp/questions/components/sp-questions-skeleton';
 
 interface SpQuestionsProps {
   questions: QuestionItem[];
@@ -90,7 +90,7 @@ export function SpQuestions({
       <p className="px-5 pb-2 text-xs leading-relaxed text-[var(--date-color)]">{t('intro')}</p>
 
       {loading ? (
-        <ListSkeleton />
+        <SpQuestionsCardsSkeleton />
       ) : (
         <div className="sp-rise flex-1 overflow-auto px-5 pb-4">
           {/* Oryzae からの提案 */}

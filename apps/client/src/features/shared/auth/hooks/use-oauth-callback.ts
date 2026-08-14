@@ -44,10 +44,28 @@ async function classifyFailure(res: Response): Promise<AuthFlowError> {
   return res.status === 409 && error === 'capacity_reached' ? 'capacity_reached' : 'auth_failed';
 }
 
-function isAuthSession(value: unknown): value is AuthSession {
+/**
+ * 2フローで必要な形が違うので型ガードを分ける。
+ * - implicit: トークンは URL ハッシュから取るので、レスポンスは `user` だけあればよい
+ * - PKCE: レスポンスの `session` からトークンを取り出すので `session` まで必須
+ * 分けずに緩い方（user だけ）で PKCE を通すと、`session` を欠くレスポンスで
+ * `data.session.accessToken` が TypeError になり、useEffect 内の未処理 rejection として
+ * 握り潰されて `setError` にも到達しない（画面が「認証中…」のまま固まる）。
+ */
+function isAuthUser(value: unknown): value is Pick<AuthSession, 'user'> {
   if (typeof value !== 'object' || value === null) return false;
   if (!('user' in value) || typeof value.user !== 'object' || value.user === null) return false;
   return 'id' in value.user && typeof value.user.id === 'string';
+}
+
+function isAuthSession(value: unknown): value is AuthSession {
+  if (!isAuthUser(value)) return false;
+  if (!('session' in value) || typeof value.session !== 'object' || value.session === null) {
+    return false;
+  }
+  const { session } = value;
+  if (!('accessToken' in session) || typeof session.accessToken !== 'string') return false;
+  return 'refreshToken' in session && typeof session.refreshToken === 'string';
 }
 
 export function useOauthCallback(): { error: AuthFlowError | null } {
@@ -96,7 +114,7 @@ export function useOauthCallback(): { error: AuthFlowError | null } {
           return;
         }
         const data: unknown = await res.json();
-        if (isAuthSession(data)) {
+        if (isAuthUser(data)) {
           posthog.identify(data.user.id, { email: data.user.email });
         }
         finish();

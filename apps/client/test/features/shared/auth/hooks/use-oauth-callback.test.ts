@@ -103,6 +103,44 @@ describe('useOauthCallback', () => {
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
   });
 
+  it('PKCE: session を欠くレスポンスは auth_failed（画面を固まらせない）', async () => {
+    params = new URLSearchParams({ code: 'c1' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      mockFetch(true, { user: { id: 'u1', email: 'a@example.com' } }),
+    );
+
+    const { result } = renderHook(() => useOauthCallback());
+
+    await waitFor(() => expect(result.current.error).toBe('auth_failed'));
+    expect(localStorage.getItem('oryzae_access_token')).toBeNull();
+  });
+
+  it('PKCE: session のトークンが文字列でなければ auth_failed', async () => {
+    params = new URLSearchParams({ code: 'c1' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      mockFetch(true, { user: { id: 'u1', email: 'a@example.com' }, session: { accessToken: 1 } }),
+    );
+
+    const { result } = renderHook(() => useOauthCallback());
+
+    await waitFor(() => expect(result.current.error).toBe('auth_failed'));
+    expect(localStorage.getItem('oryzae_access_token')).toBeNull();
+  });
+
+  it('implicit: session が無くてもハッシュのトークンで完了する（finalize は user だけ返す）', async () => {
+    window.location.hash = '#access_token=at2&refresh_token=rt2';
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(mockFetch(true, { user: { id: 'u1', email: 'a@example.com' } }));
+
+    const { result } = renderHook(() => useOauthCallback());
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+    expect(result.current.error).toBeNull();
+    expect(localStorage.getItem('oryzae_access_token')).toBe('at2');
+    await flushPending();
+  });
+
   it('implicit: hash のトークンを保存し /oauth/finalize を撃つ（#307 の profile 作成）', async () => {
     window.location.hash = '#access_token=at2&refresh_token=rt2';
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(true, session));

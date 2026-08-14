@@ -36,13 +36,21 @@ function defaultNextFor(type: EmailOtpType): string {
   }
 }
 
+/**
+ * `session` の**中身**まで検証する。直後に `data.session.accessToken` を読むので、
+ * オブジェクトの有無だけでは TypeError を防げない（未処理 rejection になり
+ * `setError` にも到達せず画面が固まる）。
+ */
 function isAuthSession(value: unknown): value is AuthSession {
   if (typeof value !== 'object' || value === null) return false;
   if (!('user' in value) || typeof value.user !== 'object' || value.user === null) return false;
+  if (!('id' in value.user) || typeof value.user.id !== 'string') return false;
   if (!('session' in value) || typeof value.session !== 'object' || value.session === null) {
     return false;
   }
-  return 'id' in value.user && typeof value.user.id === 'string';
+  const { session } = value;
+  if (!('accessToken' in session) || typeof session.accessToken !== 'string') return false;
+  return 'refreshToken' in session && typeof session.refreshToken === 'string';
 }
 
 export function useEmailConfirm(): { error: AuthFlowError | null } {

@@ -215,6 +215,46 @@ apps/admin/src/
 
 ---
 
+## ロード枠（スケルトン）
+
+スケルトンは「読み込み中である」ことを伝える飾りではない。**これから表示されるレイアウトを先に置き、
+データが届いた瞬間に同じ位置へコンテンツが入るようにする**ためのもの。したがって
+**汎用のスケルトンは存在しえない**（画面ごとに形が違うので、共通の枠は必ずどれかの画面で嘘になる）。
+
+### 1画面 = 1スケルトン
+
+| 置き場 | 何を持つか |
+| --- | --- |
+| `features/{pc,sp}/{domain}/components/*-skeleton.tsx` | **画面本体の形**。実コンポーネントの隣に置き、レイアウトを変えたら一緒に直す |
+| `app/(protected)/_skeletons/*-route-skeleton.tsx` | **page.tsx と同じ合成**。page が持つ chrome（見出し・作成フォーム等）の枠 ＋ 上記の feature スケルトン ＋ `DeviceView` での端末出し分け |
+| `app/(protected)/{route}/loading.tsx` | 対応する `*RouteSkeleton` を描くだけ |
+
+`components/ui/skeleton.tsx` が持つのは網掛け1本（`Skeleton`）だけ。**ここに「一覧の枠」のような
+画面の形を置かない**（置いた瞬間に全画面へ流用されて上の原則が壊れる）。
+
+粒度は2段用意する。画面まるごとの枠（遷移・初回描画用）と、行/カードだけの枠
+（本体が chrome を実物で描いている最中のデータ待ち用）。同じファイルから両方 export し、
+本体側のデータ待ちにも同じ行の形を使うことで、`枠 → chrome実物+行枠 → 実データ` の3段階で
+行の位置が動かない。
+
+### スケルトンが出る2つの経路（どちらも行き先の形でなければならない）
+
+1. **ハードリロード**: `(protected)/layout.tsx` は mount 前（SSR＋hydration）に children を描けない
+   （時刻/認証依存レンダリングの不一致対策）。このとき出るのが `_skeletons/route-skeleton.tsx` の
+   `RouteSkeleton`＝**パスから引いたその画面の枠**。Suspense が挟まらないので `loading.tsx` は出番が無い
+2. **クライアント遷移**: Next が行き先セグメントの `loading.tsx` を出す。
+   **ルートグループに1枚だけ置いてはいけない**（どの画面へ移動しても同じ枠が出る）
+
+### 機械強制
+
+- `test/architecture/route-skeletons.test.ts` — `page.tsx` のあるルートには `loading.tsx` が同居する／
+  ルートグループ直下に共通の `loading.tsx` を置かない／`loading.tsx` は `_skeletons` の枠を描く
+- `test/app/route-skeleton.test.tsx` — パス × 端末で**実際に別のスケルトンが描かれる**ことを DOM 契約で確認
+- 各スケルトンの `*.verify.tsx` — `lib/verify/skeleton-invariants.ts` の共通 invariant
+  （宣言した slot が描かれている／文字を持たない／`aria-hidden`）＋ 画面固有の形
+
+---
+
 ## データフェッチング
 
 ### 原則

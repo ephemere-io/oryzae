@@ -86,4 +86,17 @@ describe('useEmailConfirm', () => {
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
   });
+
+  it('session のトークンが文字列でなければ auth_failed（保存も遷移もしない）', async () => {
+    params = new URLSearchParams({ token_hash: 'th', type: 'signup' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      mockFetch(true, { user: { id: 'u1', email: 'a@example.com' }, session: { accessToken: 1 } }),
+    );
+
+    const { result } = renderHook(() => useEmailConfirm());
+
+    await waitFor(() => expect(result.current.error).toBe('auth_failed'));
+    expect(localStorage.getItem('oryzae_access_token')).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+  });
 });
