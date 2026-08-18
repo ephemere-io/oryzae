@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth-context';
  * 時点では認証が解決済みなので、ここで実際の値を渡して枠の高さを合わせる
  * （初回描画＝認証解決前は既定の「メール認証あり」で近似する）。
  */
-export function AccountRouteSkeleton() {
+export function AccountRouteLoading() {
   const { auth } = useAuth();
   const providers = auth?.user.providers ?? [];
   const isOAuthOnly = providers.length > 0 && !providers.includes('email');

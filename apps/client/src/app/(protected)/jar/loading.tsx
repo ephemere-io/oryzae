@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { JarRouteSkeleton } from '../_skeletons/jar-route-skeleton';
+import { JarRouteLoading } from '../_loading/jar-route-loading';
 
 /**
  * `/jar` の遷移ローディング。
@@ -13,5 +13,5 @@ import { JarRouteSkeleton } from '../_skeletons/jar-route-skeleton';
 export default function Loading() {
   const params = useSearchParams();
   if (params.get('justPickled')) return null;
-  return <JarRouteSkeleton />;
+  return <JarRouteLoading />;
 }

@@ -3,7 +3,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { type MouseEvent, type PointerEvent, useMemo, useRef } from 'react';
 import { DraggableJarElement } from '@/features/pc/fermentation/components/draggable-jar-element';
-import { CIRCLE_SIZE } from '@/features/pc/fermentation/utils/jar-shape';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 
 interface Pos {
@@ -154,7 +153,7 @@ export function QuestionCircle({
   style,
 }: QuestionCircleProps) {
   const hasData = detail && detail.status === 'completed';
-  const size = CIRCLE_SIZE;
+  const size = 280;
   const circleRef = useRef<HTMLDivElement | null>(null);
 
   const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);

@@ -10,7 +10,7 @@ import { SpQuestionsSkeleton } from '@/features/sp/questions/components/sp-quest
  * 作成フォーム ＋ タイムライン。SP はカードの縦積み。
  * page.tsx と同じ合成（枠 → 作成フォーム → mt-6 → タイムライン）にしてある。
  */
-export function QuestionsRouteSkeleton() {
+export function QuestionsRouteLoading() {
   return (
     <DeviceView
       sp={<SpQuestionsSkeleton />}

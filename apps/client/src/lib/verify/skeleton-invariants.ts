@@ -37,7 +37,13 @@ export function skeletonInvariants<P>(): Invariant<P>[] {
       id: 'no-text-content',
       description: 'スケルトンは文字を持たない（ロード済みコンテンツと誤認させない）',
       check: ({ root }) => {
-        const text = root.textContent?.trim() ?? '';
+        // 例外は PageLoading だけ。形を予告できない領域（書字方向が未確定の本文など）に
+        // 「読み込み中」と明示するのは意図した文字で、偽コンテンツではない。
+        const clone = root.cloneNode(true);
+        if (clone instanceof Element) {
+          for (const el of clone.querySelectorAll('[data-testid="page-loading"]')) el.remove();
+        }
+        const text = clone.textContent?.trim() ?? '';
         return text.length === 0 || `スケルトンに文字が含まれている: "${text.slice(0, 40)}"`;
       },
     },
