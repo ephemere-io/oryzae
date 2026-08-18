@@ -1,6 +1,6 @@
 'use client';
 
-import { EntriesRouteSkeleton } from '../_skeletons/entries-route-skeleton';
+import { EntriesRouteLoading } from '../_loading/entries-route-loading';
 
 /**
  * `/entries` の遷移ローディング。ルートごとに `loading.tsx` を置くことで、Next が
@@ -8,5 +8,5 @@ import { EntriesRouteSkeleton } from '../_skeletons/entries-route-skeleton';
  * 同じ枠＝一覧の枠が出てしまう。それが「/jar でも一覧のスケルトンが出る」原因だった）。
  */
 export default function Loading() {
-  return <EntriesRouteSkeleton />;
+  return <EntriesRouteLoading />;
 }

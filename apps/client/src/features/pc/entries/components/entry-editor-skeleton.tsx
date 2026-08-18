@@ -1,4 +1,5 @@
 import { verifyAttrs } from '@oryzae/verify';
+import { PageLoading } from '@/components/ui/page-loading';
 import { Skeleton, skeletonKeys } from '@/components/ui/skeleton';
 
 /**
@@ -8,10 +9,11 @@ import { Skeleton, skeletonKeys } from '@/components/ui/skeleton';
  * 執筆エリア / ステータスバー）なので、一覧枠を流用すると読み込み後に画面が総入れ替えになる。
  * 実 DOM と同じ4段・同じ境界線・同じ padding を先に置く。
  *
- * **執筆エリアは意図的に空**にしている。本文の書字方向（縦書き/横書き）は mount 後に
+ * **執筆エリアに行の枠は置かない**。本文の書字方向（縦書き/横書き）は mount 後に
  * localStorage とロケールから確定する（`DEFAULT_SETTINGS.writingMode = 'vertical'`）ため、
- * 向きを決め打ちした偽の行を描くと、確定した瞬間に必ずズレる。新規エントリでは本文が
- * 実際に空なので、余白だけを正しく確保するのが最も近い。
+ * 向きを決め打ちした偽の行を描くと、確定した瞬間に必ずズレる。代わりに:
+ *  - 新規（`/entries/new`）… 待つコンテンツが無く本文は実際に空なので、余白だけ確保する
+ *  - 既存（`/entries/[id]`）… 本文は取得待ちだが形を予告できないので `PageLoading` を1つ出す
  */
 
 /** ツールバーのアイコンボタン（実物: p-1.5 + h-5 w-5 の svg = 32px 角）。 */
@@ -28,8 +30,15 @@ function ToolbarIconsSkeleton({ count }: { count: number }) {
 /**
  * @param chips 問いリンカに並ぶチップ数の見込み（既存エントリは紐付いた問いのぶんだけ並ぶ）。
  *   0 でも行の高さは変わらない（実 QuestionLinker が入力欄と + ボタンを常に描くため）。
+ * @param bodyLoading 本文の取得を待っているか（既存エントリを開くときだけ true）。
  */
-export function EntryEditorSkeleton({ chips = 1 }: { chips?: number }) {
+export function EntryEditorSkeleton({
+  chips = 1,
+  bodyLoading = false,
+}: {
+  chips?: number;
+  bodyLoading?: boolean;
+}) {
   return (
     <div
       className="absolute inset-0 flex flex-col bg-[var(--bg)]"
@@ -38,6 +47,7 @@ export function EntryEditorSkeleton({ chips = 1 }: { chips?: number }) {
         unit: 'EntryEditorSkeleton',
         slots: 'toolbar,question-linker,body,status-bar',
         chips,
+        bodyLoading,
       })}
     >
       {/* ツールバー（実物: border-b px-4 py-2、左5アイコン / 中央 日付+タイトル / 右5アイコン） */}
@@ -66,7 +76,9 @@ export function EntryEditorSkeleton({ chips = 1 }: { chips?: number }) {
       </div>
 
       {/* 執筆エリア（実物: min-h-full px-[15%] py-6）。中身は空のまま余白だけ確保する。 */}
-      <div className="flex-1 px-[15%] py-6" data-skeleton-slot="body" />
+      <div className="relative flex-1 px-[15%] py-6" data-skeleton-slot="body">
+        {bodyLoading && <PageLoading />}
+      </div>
 
       {/* ステータスバー（実物: border-t px-4 py-1.5 text-xs、左=保存状態 / 中央=バー / 右=文字数） */}
       <div

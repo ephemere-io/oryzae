@@ -9,6 +9,7 @@ import { EntryEditorSkeleton } from './entry-editor-skeleton';
 
 interface Props {
   chips?: number;
+  bodyLoading?: boolean;
 }
 
 /** 実 EntryEditor と同じ縦順。 */
@@ -34,6 +35,11 @@ registerUnit<Props>({
       description: 'Probe: チップが多くても4段構造は崩れない（横に溢れるだけ）',
       props: { chips: 8 },
     },
+    {
+      id: 'existing-entry',
+      description: '既存エントリ: 本文は取得待ちなので執筆エリアに PageLoading を1つ出す',
+      props: { chips: 1, bodyLoading: true },
+    },
   ],
   invariants: [
     ...skeletonInvariants<Props>(),
@@ -51,14 +57,20 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'body-is-empty',
+      id: 'body-has-no-fake-lines',
       description: '執筆エリアに偽の行を描かない（書字方向が mount 後に確定するため）',
-      check: ({ root }) => {
+      check: ({ root, props }) => {
         const body = root.querySelector('[data-skeleton-slot="body"]');
         if (!body) return 'body slot が無い';
+        // 許されるのは「本文待ち」を示す PageLoading だけ。行の枠は1つも置かない。
+        const fake = Array.from(body.children).filter(
+          (el) => el.getAttribute('data-testid') !== 'page-loading',
+        ).length;
+        if (fake > 0) return `執筆エリアに ${fake} 個の行枠がある（縦書き確定時にズレる）`;
+        const hasLoading = Boolean(body.querySelector('[data-testid="page-loading"]'));
         return (
-          body.childElementCount === 0 ||
-          `執筆エリアに ${body.childElementCount} 個の枠が描かれている（縦書き確定時にズレる）`
+          hasLoading === Boolean(props.bodyLoading) ||
+          `本文のロード表示が bodyLoading と不一致: hasLoading=${hasLoading}`
         );
       },
     },

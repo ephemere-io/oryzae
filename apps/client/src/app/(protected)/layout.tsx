@@ -14,7 +14,7 @@ import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
-import { RouteSkeleton } from './_skeletons/route-skeleton';
+import { RouteLoading } from './_loading/route-loading';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
@@ -51,14 +51,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;
 
-  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せるスケルトンを
-  // 描画し、FCP を「空白」でなく「枠」にする（体感ロードを短縮）。
+  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せるロード表示を
+  // 描画し、FCP を「空白」にしない（体感ロードを短縮）。
   //
-  // ここで出す枠は **行き先の画面の形**でなければならない。ハードリロードでは Suspense が
-  // 挟まらず loading.tsx が出番を持たないため、最初に見える枠はこの1枚だけになる。
-  // 汎用の一覧枠を出していた頃は、/jar や /board を直接開いても一覧の枠が出て、
+  // ここで出すものは **行き先の画面に合わせる**。ハードリロードでは Suspense が挟まらず
+  // loading.tsx が出番を持たないため、最初に見えるのはこの1枚だけになる。
+  // 保護ルート全体で1枚を使い回していた頃は、/jar や /board を直接開いても一覧の枠が出て、
   // 読み込み完了時に画面が丸ごと入れ替わっていた。
-  const content = mounted ? children : <RouteSkeleton />;
+  const content = mounted ? children : <RouteLoading />;
 
   return (
     <ThemeProvider>
