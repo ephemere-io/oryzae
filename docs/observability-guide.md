@@ -45,6 +45,29 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 | ユーザー別 | **不可**（Anthropic は Oryzae のユーザーを知らない） | 可能。これが推定を残す唯一の理由 |
 | 実装 | `shared/infrastructure/anthropic-cost-api.ts` | `shared/infrastructure/fermentation-cost-query.ts` + `claude-pricing.ts` |
 
+### 現在の運用: 推定のみ
+
+**Anthropic Admin API は個人アカウントでは使えず、org（有料プラン）が必要**なため、
+Oryzae は当面 `ANTHROPIC_ADMIN_KEY` 未設定＝**推定のみ**で運用する。
+実額の欄は画面・通知とも「未設定」と表示され、$0 とは区別される。
+
+推定はこの用途では十分に正確である。発酵は **単一モデル・standard tier・
+プロンプトキャッシュ無し・バッチ無し・サーバーツール無し** なので、
+`トークン数 × 公表単価` は Anthropic が請求額を出すのと同じ計算式になる。
+トークン数は Anthropic 自身が返した値であり、独自に数えた推測値ではない。
+
+その前提が崩れると静かにズレるため、崩れたら気づけるようにしてある:
+
+| 崩れ方 | 検知 |
+|---|---|
+| モデルを変更した | `vercel-ai-analysis.gateway.ts` が `FERMENTATION_MODEL_ID` を import。価格表に無いモデルは**型エラー**で CI が止まる |
+| プロンプトキャッシュを導入した | gateway が `cacheReadTokens`/`cacheWriteTokens` を検知して警告ログ（単価が 0.1x / 1.25x・2x に変わるため） |
+| 公表単価が改定された | 手動。`claude-pricing.ts` の `RATES` を更新する（テストが単価を固定しているので、更新漏れは気づける） |
+| トークンが保存されていない行がある | 集計が `untrackedCount` として件数を返し、通知・画面に出す |
+
+将来 org を用意できたら `ANTHROPIC_ADMIN_KEY` を設定するだけで実額表示に切り替わる
+（コード変更不要。Spend 画面には実額との乖離率も出る）。
+
 原則:
 
 - **金額を出す画面・通知では、それが実額か推定かを必ず明示する。**
