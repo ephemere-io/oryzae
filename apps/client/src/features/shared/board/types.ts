@@ -30,9 +30,3 @@ export interface BoardCardData {
   content: EntryContent | SnippetContent | PhotoContent;
   removing?: boolean;
 }
-
-export interface BoardData {
-  dateKey: string;
-  viewType: string;
-  cards: BoardCardData[];
-}

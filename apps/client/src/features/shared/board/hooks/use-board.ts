@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCreateSnippet } from '@/features/shared/board/hooks/use-create-snippet';
-import type { BoardCardData, BoardData } from '@/features/shared/board/types';
+import { normalizeBoardCards } from '@/features/shared/board/normalize';
+import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 
 /**
@@ -56,16 +57,25 @@ export function useBoard(
     // dateKey を UTC の 00:00〜24:00 とみなし、JST 00:00〜09:00 に書いたエントリが
     // 当日のボードに出ない（Issue: ボードの日付境界）。
     const tzOffset = new Date().getTimezoneOffset();
-    const res = await api.fetch(
-      `/api/v1/board?dateKey=${dateKey}&viewType=${viewType}&tzOffset=${tzOffset}`,
-    );
-    if (requestId !== requestIdRef.current) return;
-    if (res.ok) {
-      const data: BoardData = await res.json();
+    try {
+      const res = await api.fetch(
+        `/api/v1/board?dateKey=${dateKey}&viewType=${viewType}&tzOffset=${tzOffset}`,
+      );
       if (requestId !== requestIdRef.current) return;
-      setCards(applyDefaultZOrder(data.cards));
+      if (res.ok) {
+        const data: unknown = await res.json();
+        if (requestId !== requestIdRef.current) return;
+        setCards(applyDefaultZOrder(normalizeBoardCards(data)));
+      }
+    } catch {
+      // 通信・パースの失敗。呼び出し元は useEffect 内の async 関数で、投げても誰も
+      // 受け取らない（未処理 rejection になり loading が戻らず盤面が固まる）ので、
+      // ここで止める。ボードには専用のエラー表示が無く、`!res.ok` のときも同様に
+      // 「空の盤面」になる既存挙動に揃えて、盤面は現状維持のままにする。
+    } finally {
+      // 後発リクエストに追い越されていたら loading の所有権は向こうにあるので触らない。
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-    setLoading(false);
   }, [api, dateKey, viewType]);
 
   useEffect(() => {
