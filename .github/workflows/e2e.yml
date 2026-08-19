@@ -38,7 +38,9 @@ jobs:
   e2e:
     name: Playwright E2E (${{ matrix.app }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # supabase start（Docker イメージ取得）+ ブラウザ導入 + 本体ビルドで
+    # 開始まで 10 分前後かかるため、25 分だとテスト途中で打ち切られた。
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -73,6 +75,12 @@ jobs:
             echo "SUPABASE_ANON_KEY=$(echo "$status" | jq -r '.ANON_KEY')"
             echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$status" | jq -r '.SERVICE_ROLE_KEY')"
           } >> "$GITHUB_ENV"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright browsers
         run: pnpm --filter @oryzae/${{ matrix.app }} exec playwright install chromium --with-deps
