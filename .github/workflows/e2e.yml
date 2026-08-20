@@ -10,9 +10,8 @@ name: E2E Tests
 #
 # インスタンスは毎回まっさらなので、全 PR で無条件に実行してよい。
 #
-# ⚠️ 移行途中: spec 側がまだ「利用者の実データが大量にある DB」を前提に書かれており、
-#    まっさらな DB では 8 件ほど落ちる。結果は見えるがマージはブロックしないよう
-#    continue-on-error を付けている。spec を白紙 DB 前提へ直したら外すこと。
+# spec は白紙 DB 前提に揃えてあり、client 38/38 が通る状態。失敗したら
+# ワークフローも落ちる（＝本物のマージゲート）。
 
 on:
   push:
@@ -86,8 +85,6 @@ jobs:
         run: pnpm --filter @oryzae/${{ matrix.app }} exec playwright install chromium --with-deps
 
       - name: Run E2E tests
-        # 移行途中のため失敗してもワークフローを落とさない（上の注意書き参照）
-        continue-on-error: true
         run: pnpm --filter @oryzae/${{ matrix.app }} exec playwright test
 
       - name: Upload test results
