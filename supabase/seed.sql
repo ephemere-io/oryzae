@@ -40,8 +40,10 @@ insert into auth.identities (
   now(), now(), now()
 );
 
-insert into public.profiles (id, nickname)
-values ('00000000-0000-0000-0000-0000000000e1', 'e2e-ci');
+-- onboarding_completed を立てないと初回オンボーディングのモーダル（role="dialog"）が
+-- 全画面に被さり、E2E のクリックを片っ端から遮る（実際に9件が落ちた）。
+insert into public.profiles (id, nickname, onboarding_completed)
+values ('00000000-0000-0000-0000-0000000000e1', 'e2e-ci', true);
 
 -- ── 管理画面 E2E 用アカウント ──────────────────────────────────────────────
 --   email    : test@oryzae.dev
@@ -76,5 +78,5 @@ insert into auth.identities (
   now(), now(), now()
 );
 
-insert into public.profiles (id, nickname)
-values ('00000000-0000-0000-0000-0000000000a1', 'e2e-admin');
+insert into public.profiles (id, nickname, onboarding_completed)
+values ('00000000-0000-0000-0000-0000000000a1', 'e2e-admin', true);
