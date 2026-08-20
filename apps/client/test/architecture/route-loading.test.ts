@@ -54,4 +54,16 @@ describe('保護ルートは画面ごとのロード表示を持つ', () => {
     });
     expect(offenders).toEqual([]);
   });
+
+  /**
+   * page.tsx が解決待ちに `return null` を返すと、レイアウトが mount 前に出していた
+   * ロード表示が一度消えて真っ白になる（ロード表示 → 真っ白 → 本体）。
+   * ハードリロードでは必ずこの順を通るので、空ではなく対応する *RouteLoading を返すこと。
+   */
+  it('page.tsx は解決待ちに空（return null）を返さない', () => {
+    const offenders = dirs.filter((d) =>
+      /return\s+null\s*;/.test(readFileSync(join(d, 'page.tsx'), 'utf8')),
+    );
+    expect(offenders).toEqual([]);
+  });
 });

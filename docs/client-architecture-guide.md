@@ -263,10 +263,28 @@ apps/admin/src/
 2. **クライアント遷移**: Next が行き先セグメントの `loading.tsx` を出す。
    **ルートグループに1枚だけ置いてはいけない**（どの画面へ移動しても同じものが出る）
 
+### 解決待ちに空を返さない
+
+`page.tsx` が `if (loading) return null` で真っ白を返すと、レイアウトが mount 前に出していた
+ロード表示が一度消える（**ロード表示 → 真っ白 → 本体**）。ハードリロードでは必ずこの順を通る
+（クライアント遷移は認証解決済みなのでガードを素通りし、症状が出ないぶん見落としやすい）。
+
+解決待ちの間は対応する `*RouteLoading` を返し続けること。
+
+```tsx
+// ✗ 直前まで出ていた枠が一度消える
+if (authLoading || !api) return null;
+
+// ○ 表示が途切れない
+if (authLoading || !api) return <BoardRouteLoading />;
+```
+
 ### 機械強制
 
 - `test/architecture/route-loading.test.ts` — `page.tsx` のあるルートには `loading.tsx` が同居する／
-  ルートグループ直下に共通の `loading.tsx` を置かない／`loading.tsx` は `_loading` のものを描く
+  ルートグループ直下に共通の `loading.tsx` を置かない／`loading.tsx` は `_loading` のものを描く／
+  **`page.tsx` は解決待ちに `return null` しない**
+- `test/app/protected-pages-loading.test.tsx` — 認証解決前に page が空を返さないことを実描画で確認
 - `test/app/route-loading.test.tsx` — パス × 端末で**実際に出るものが変わる**こと、
   および**キャンバス画面がスケルトンを1つも持たない**ことを DOM で確認
 - 各スケルトンの `*.verify.tsx` — `lib/verify/skeleton-invariants.ts` の共通 invariant
