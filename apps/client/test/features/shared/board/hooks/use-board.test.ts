@@ -271,4 +271,52 @@ describe('useBoard', () => {
     // The dragged card has zIndex 10 (>= totalCards=2), so it's user-modified and stays on top
     expect(draggedCard!.zIndex).toBeGreaterThan(newCard!.zIndex);
   });
+  it('cards を欠くレスポンスでも固まらない（loading が戻り、カードは空）', async () => {
+    // エラーエンベロープやスキーマ変更で cards が来ないケース。素通しだと
+    // applyDefaultZOrder が undefined.length で落ち、useEffect 内の未処理 rejection として
+    // 握り潰されて loading が true のまま固まっていた。
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { error: 'boom' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.cards).toEqual([]);
+  });
+
+  it('通信自体が失敗しても loading が戻る', async () => {
+    apiFetch.mockRejectedValueOnce(new Error('network down'));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.cards).toEqual([]);
+  });
+
+  it('壊れたカードは落とし、欠けた座標は既定値に潰す', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        dateKey: '2026-04-11',
+        viewType: 'daily',
+        cards: [
+          { id: 'ok', cardType: 'snippet', refId: 's-1', content: { text: 'hi' } },
+          { cardType: 'snippet', refId: 's-2', content: { text: 'id 無し' } },
+          { id: 'bad-type', cardType: 'unknown', refId: 's-3', content: { text: 'x' } },
+          { id: 'no-content', cardType: 'snippet', refId: 's-4' },
+        ],
+      }),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.cards.map((c) => c.id)).toEqual(['ok']);
+    const card = result.current.cards[0];
+    expect(card.x).toBe(0);
+    expect(card.y).toBe(0);
+    expect(card.width).toBeGreaterThan(0);
+    expect(card.height).toBeGreaterThan(0);
+  });
 });

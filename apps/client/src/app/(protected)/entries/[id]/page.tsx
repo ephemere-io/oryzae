@@ -11,6 +11,7 @@ import {
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
 import { useAuth } from '@/lib/auth-context';
+import { EntryEditorRouteLoading } from '../../_loading/entry-editor-route-loading';
 
 export default function EntryDetailPage() {
   const t = useTranslations('entries.detail');
@@ -21,7 +22,8 @@ export default function EntryDetailPage() {
   const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, params.id);
   const router = useRouter();
 
-  if (entryLoading || authLoading) return null;
+  // 本文の取得中もロード表示を出し続ける（null だと枠が一度消えて真っ白になる）。
+  if (entryLoading || authLoading) return <EntryEditorRouteLoading existing />;
 
   if (!entry) {
     return (

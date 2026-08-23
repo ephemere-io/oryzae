@@ -11,7 +11,9 @@ export default defineConfig({
   // ネットワーク往復込みで収まらずフレークしていた。実測 20-40s のため 60s にする。
   timeout: 60_000,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // 失敗1件あたり timeout×(1+retries) を消費する。60s へ上げたぶん
+  // リトライは 1 回に減らす（2 回だと 8 件失敗で 25 分の上限に当たった）。
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI ? 'github' : 'list',
   use: {

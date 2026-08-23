@@ -12,7 +12,7 @@ import { SpEntryListSkeleton } from '@/features/sp/entries/components/sp-entry-l
  * ページ chrome（ヘッダ行）は page.tsx が持つものなので枠もここに置き、
  * 一覧本体の形は feature 側の EntryListSkeleton が持つ。
  */
-export function EntriesRouteSkeleton() {
+export function EntriesRouteLoading() {
   return (
     <DeviceView
       sp={<SpEntryListSkeleton />}
