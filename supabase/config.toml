@@ -1,0 +1,62 @@
+# ローカル / CI 用 Supabase スタックの設定。
+#
+# 目的は E2E を本番 DB から切り離すこと（Issue #490 follow-up）。CI では
+# `supabase start` でこの設定のまま使い捨てインスタンスを立て、migrations と
+# seed.sql を流してから Playwright を走らせる。本番の SERVICE_ROLE_KEY を CI に
+# 置く必要がなくなり、毎回まっさらなので実行順やデータ蓄積に依存しなくなる。
+#
+# CI 時間を削るため、E2E に不要なサービス（studio / realtime / analytics /
+# inbucket）は無効化している。storage はボードの写真カードが使うので有効。
+
+project_id = "oryzae"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000", "http://localhost:3100"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+# E2E は受信箱を持てないため、確認メールなしでパスワードログインできるようにする。
+# 本番の Supabase 設定とは独立（ここはローカル/CI 専用）。
+enable_confirmations = false
+secure_password_change = false
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
+
+[analytics]
+enabled = false

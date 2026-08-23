@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
-import { Skeleton } from '@/components/ui/skeleton';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { Sidebar } from '@/features/pc/navigation/components/sidebar';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
@@ -15,6 +14,7 @@ import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
+import { RouteLoading } from './_loading/route-loading';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
@@ -51,9 +51,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;
 
-  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せる
-  // 汎用スケルトンを描画し、FCP を「空白」でなく「枠」にする（体感ロードを短縮）。
-  const content = mounted ? children : <ShellSkeleton />;
+  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せるロード表示を
+  // 描画し、FCP を「空白」にしない（体感ロードを短縮）。
+  //
+  // ここで出すものは **行き先の画面に合わせる**。ハードリロードでは Suspense が挟まらず
+  // loading.tsx が出番を持たないため、最初に見えるのはこの1枚だけになる。
+  // 保護ルート全体で1枚を使い回していた頃は、/jar や /board を直接開いても一覧の枠が出て、
+  // 読み込み完了時に画面が丸ごと入れ替わっていた。
+  const content = mounted ? children : <RouteLoading />;
 
   return (
     <ThemeProvider>
@@ -94,21 +99,5 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>
-  );
-}
-
-/**
- * mount 前（SSR 含む）に出す汎用スケルトン。ヘッダ風の1本＋カード数枚で、一覧/エディタ
- * どちらの画面でも破綻しない最小の「枠」。空白を見せないことが目的（Issue #362/#363）。
- */
-function ShellSkeleton() {
-  return (
-    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4 px-5 pt-8">
-      <Skeleton className="h-6 w-32" />
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
-    </div>
   );
 }

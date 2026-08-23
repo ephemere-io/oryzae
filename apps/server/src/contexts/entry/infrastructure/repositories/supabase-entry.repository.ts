@@ -5,6 +5,7 @@ import type {
   EntryRepositoryGateway,
 } from '../../domain/gateways/entry-repository.gateway.js';
 import { Entry } from '../../domain/models/entry.js';
+import { localDayRange, localWeekRange } from '../../domain/services/local-day-range.service.js';
 
 export class SupabaseEntryRepository implements EntryRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
@@ -70,11 +71,12 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
-  async listByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]> {
-    const startOfDay = `${dateKey}T00:00:00.000Z`;
-    const nextDay = new Date(`${dateKey}T00:00:00.000Z`);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    const endOfDay = nextDay.toISOString();
+  async listByUserIdAndDate(
+    userId: string,
+    dateKey: string,
+    tzOffsetMinutes = 0,
+  ): Promise<Entry[]> {
+    const { startUtc: startOfDay, endUtc: endOfDay } = localDayRange(dateKey, tzOffsetMinutes);
 
     const { data, error } = await this.supabase
       .from('entries')
@@ -141,14 +143,14 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     );
   }
 
-  async listByUserIdAndWeek(userId: string, dateKey: string): Promise<Entry[]> {
-    // Calculate Monday of the week containing dateKey
-    const d = new Date(`${dateKey}T00:00:00.000Z`);
-    const day = d.getUTCDay();
-    const monday = new Date(d);
-    monday.setUTCDate(d.getUTCDate() - ((day + 6) % 7));
-    const nextMonday = new Date(monday);
-    nextMonday.setUTCDate(monday.getUTCDate() + 7);
+  async listByUserIdAndWeek(
+    userId: string,
+    dateKey: string,
+    tzOffsetMinutes = 0,
+  ): Promise<Entry[]> {
+    const { startUtc, endUtc } = localWeekRange(dateKey, tzOffsetMinutes);
+    const monday = new Date(startUtc);
+    const nextMonday = new Date(endUtc);
 
     const { data, error } = await this.supabase
       .from('entries')
