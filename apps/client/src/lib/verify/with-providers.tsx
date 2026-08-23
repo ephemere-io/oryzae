@@ -42,6 +42,9 @@ const noopRouter: AppRouterInstance = {
   push: noop,
   replace: noop,
   prefetch: noop,
+  // Next 16.3 で必須化。React の key に渡される「遷移で変わる ID」だが、孤立検証では
+  // ナビゲーションが起きないので固定値でよい（値が変わらない = 意図しない再マウントもしない）。
+  bfcacheId: 'verify',
 };
 
 // 孤立検証用の未ログイン認証状態。loading=false で settled、login/signup/logout は no-op。
