@@ -3,11 +3,13 @@ import { expect, test } from './fixtures/auth';
 test.describe('ダッシュボード', () => {
   test('統計カードが表示される', async ({ page, authenticated }) => {
     void authenticated;
-    await expect(page.locator('text=Dashboard')).toBeVisible();
-    await expect(page.locator('text=Users')).toBeVisible();
-    await expect(page.locator('text=Entries')).toBeVisible();
-    await expect(page.locator('text=Fermentations')).toBeVisible();
-    await expect(page.locator('text=Success Rate')).toBeVisible();
+    // `text=` はサイドバーのリンクや別セクションの見出しとも一致し、
+    // strict mode violation になる（Fermentations は3要素にマッチしていた）。
+    // 統計カードは main 配下に限定し、複数一致は first() で受ける。
+    const main = page.locator('main');
+    for (const label of ['Users', 'Entries', 'Fermentations', 'Success Rate']) {
+      await expect(main.getByText(label).first()).toBeVisible();
+    }
   });
 
   test('サイドバーナビゲーションが動作する', async ({ page, authenticated }) => {
