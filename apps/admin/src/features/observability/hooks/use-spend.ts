@@ -5,19 +5,11 @@ import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
 /**
- * AI コストは2系統ある。混ぜないこと。
- *  - actual   : Anthropic cost_report の実請求額。UTC 日バケット固定。これが正。
- *  - estimated: 自前トークン × 価格表の推定。Anthropic が知り得ないユーザー別内訳用。
- * どちらも status を持ち、「未設定 / 取得失敗」を $0 と区別できるようにしてある。
+ * AI コストは保存トークン × 公表単価からの **推定**。
+ * 実請求額は Anthropic の Console (platform.claude.com/cost) で確認する
+ * （API で取るには Admin key = org 契約が必要なため、ここでは扱わない）。
+ * 取得失敗を $0 と区別できるよう status を持たせてある。
  */
-type FetchStatus = 'ok' | 'not-configured' | 'error';
-
-interface ActualDailyCost {
-  /** UTC 日 (YYYY-MM-DD) */
-  date: string;
-  costUsd: number;
-}
-
 interface EstimatedDailyCost {
   date: string;
   estimatedCostUsd: number;
@@ -37,17 +29,6 @@ interface EstimatedUserCost {
 
 export interface SpendData {
   rangeDays: number;
-  actual: {
-    status: FetchStatus;
-    totalCostUsd: number | null;
-    daily: ActualDailyCost[];
-    /**
-     * ページング打ち切りで実額が過少な場合 true。
-     * status === 'ok' のときだけ意味を持つ（失敗時の false は「該当なし」）。
-     */
-    truncated: boolean;
-    message: string | null;
-  };
   estimated: {
     status: 'ok' | 'error';
     totalCostUsd: number;

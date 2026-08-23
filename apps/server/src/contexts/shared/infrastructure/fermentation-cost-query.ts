@@ -2,8 +2,7 @@
  * fermentation_results からコスト集計を作る共通処理。
  *
  * ここが返すコストは **推定値** である（保存済みトークン × claude-pricing.ts の価格表）。
- * 実請求額は anthropic-cost-api.ts の cost_report が正。Anthropic 側は Oryzae の
- * ユーザーを知らないため、ユーザー別内訳だけはこの推定でしか出せない。
+ * 実請求額は Anthropic Console (platform.claude.com/cost) で確認する。
  * 表示・通知では必ず「推定」と明示すること。
  *
  * issue #352 以降 generation_id は発行されないので、フィルタは input_tokens 基準にする。
@@ -170,7 +169,6 @@ export interface DailyCostAggregate {
 
 /**
  * 日別に集計する。日付キーの作り方（JST / UTC）は呼び出し側が決める。
- * Anthropic の実額と並べるときは UTC、運用レポートは JST を渡すこと。
  */
 export function aggregateCostByDay(
   rows: FermentationCostRow[],

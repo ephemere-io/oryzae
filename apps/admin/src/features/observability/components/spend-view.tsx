@@ -24,43 +24,8 @@ function formatShortDate(iso: string): string {
   return month && day ? `${Number(month)}/${Number(day)}` : iso;
 }
 
-/** 実請求額の見出し値。未設定・失敗を $0.0000 と出さない。 */
-function ActualHeadline({ actual }: { actual: SpendData['actual'] }) {
-  if (actual.status === 'not-configured') {
-    return (
-      <>
-        <p className="text-xl font-semibold tracking-tight mt-0.5 text-muted-foreground">未設定</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          ANTHROPIC_ADMIN_KEY を設定すると実請求額を表示します
-        </p>
-      </>
-    );
-  }
-  if (actual.status === 'error') {
-    return (
-      <>
-        <p className="text-xl font-semibold tracking-tight mt-0.5 text-destructive">取得失敗</p>
-        <p className="mt-0.5 text-xs text-muted-foreground break-all">{actual.message ?? ''}</p>
-      </>
-    );
-  }
-  return (
-    <>
-      <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
-        {formatUsd(actual.totalCostUsd ?? 0)}
-      </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        {actual.truncated
-          ? '⚠️ 集計打ち切りのため過少 / UTC 日基準'
-          : 'Anthropic cost_report / UTC 日基準'}
-      </p>
-    </>
-  );
-}
-
 interface MergedDay {
   date: string;
-  actualUsd: number | null;
   estimatedUsd: number;
   fermentationCount: number;
 }
@@ -78,45 +43,19 @@ export function SpendView({
 }) {
   const mergedDays = useMemo<MergedDay[]>(() => {
     if (!data) return [];
-    const byDate = new Map<string, MergedDay>();
-    for (const d of data.estimated.daily) {
-      byDate.set(d.date, {
+    return data.estimated.daily
+      .map((d) => ({
         date: d.date,
-        actualUsd: null,
         estimatedUsd: d.estimatedCostUsd,
         fermentationCount: d.fermentationCount,
-      });
-    }
-    for (const d of data.actual.daily) {
-      const current = byDate.get(d.date);
-      if (current) {
-        current.actualUsd = d.costUsd;
-      } else {
-        byDate.set(d.date, {
-          date: d.date,
-          actualUsd: d.costUsd,
-          estimatedUsd: 0,
-          fermentationCount: 0,
-        });
-      }
-    }
-    return Array.from(byDate.values()).sort((a, b) => b.date.localeCompare(a.date));
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
   }, [data]);
 
   const maxDayUsd = useMemo(
-    () => Math.max(...mergedDays.map((d) => Math.max(d.actualUsd ?? 0, d.estimatedUsd)), 0.0001),
+    () => Math.max(...mergedDays.map((d) => d.estimatedUsd), 0.0001),
     [mergedDays],
   );
-
-  const drift = useMemo(() => {
-    // 実額が打ち切られている場合、乖離率は「推定が過大」に見えるだけの誤情報になる。
-    if (!data || data.actual.status !== 'ok' || data.actual.totalCostUsd === null) return null;
-    if (data.actual.truncated) return null;
-    const actualUsd = data.actual.totalCostUsd;
-    const estimatedUsd = data.estimated.totalCostUsd;
-    if (actualUsd === 0) return null;
-    return ((estimatedUsd - actualUsd) / actualUsd) * 100;
-  }, [data]);
 
   return (
     <div className="space-y-6">
@@ -147,35 +86,34 @@ export function SpendView({
         <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
       ) : data ? (
         <>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             <div className="rounded-lg border border-border/50 bg-card p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                実請求額 (Anthropic)
-              </p>
-              <ActualHeadline actual={data.actual} />
-            </div>
-
-            <div className="rounded-lg border border-border/50 bg-card p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                推定コスト (自前トークン)
-              </p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">推定コスト</p>
               <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
                 {formatUsd(data.estimated.totalCostUsd)}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {data.estimated.fermentationCount} 発酵 / in{' '}
-                {data.estimated.inputTokens.toLocaleString()} · out{' '}
-                {data.estimated.outputTokens.toLocaleString()}
+                保存トークン × 公表単価。実請求額は{' '}
+                <a
+                  href="https://platform.claude.com/cost"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground"
+                >
+                  Anthropic Console
+                </a>{' '}
+                で確認します。
               </p>
             </div>
 
             <div className="rounded-lg border border-border/50 bg-card p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">推定の乖離</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">トークン</p>
               <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
-                {drift === null ? '-' : `${drift > 0 ? '+' : ''}${drift.toFixed(1)}%`}
+                {data.estimated.fermentationCount}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {drift === null ? '実請求額が取得できると表示されます' : '推定 − 実請求額'}
+                発酵 / in {data.estimated.inputTokens.toLocaleString()} · out{' '}
+                {data.estimated.outputTokens.toLocaleString()}
               </p>
             </div>
           </div>
@@ -196,7 +134,7 @@ export function SpendView({
 
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
-              日別コスト（UTC 日）
+              日別コスト（推定 / UTC 日）
             </p>
             {mergedDays.length > 0 ? (
               <div className="space-y-1">
@@ -208,15 +146,10 @@ export function SpendView({
                     <div className="flex-1 h-4 bg-muted/30 rounded-sm overflow-hidden">
                       <div
                         className="h-full bg-primary/60 rounded-sm"
-                        style={{
-                          width: `${((d.actualUsd ?? d.estimatedUsd) / maxDayUsd) * 100}%`,
-                        }}
+                        style={{ width: `${(d.estimatedUsd / maxDayUsd) * 100}%` }}
                       />
                     </div>
                     <span className="w-20 text-right font-mono text-xs tabular-nums shrink-0">
-                      {d.actualUsd === null ? '—' : formatUsd(d.actualUsd)}
-                    </span>
-                    <span className="w-20 text-right font-mono text-xs tabular-nums shrink-0 text-muted-foreground">
                       {formatUsd(d.estimatedUsd)}
                     </span>
                     <span className="w-8 text-right text-xs text-muted-foreground shrink-0">
@@ -227,7 +160,6 @@ export function SpendView({
                 <div className="flex items-center gap-3 pt-1 text-[10px] text-muted-foreground">
                   <span className="w-10 shrink-0" />
                   <span className="flex-1" />
-                  <span className="w-20 text-right shrink-0">実請求</span>
                   <span className="w-20 text-right shrink-0">推定</span>
                   <span className="w-8 text-right shrink-0">件数</span>
                 </div>

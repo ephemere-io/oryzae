@@ -125,8 +125,8 @@ export default function CostsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-medium">Cost Tracking</h1>
-          {/* このページのコストは保存トークンからの推定。実請求額は
-              /observability/spend（Anthropic cost_report）を参照する。 */}
+          {/* このページのコストは保存トークンからの推定。
+              実請求額は Anthropic Console (platform.claude.com/cost) で確認する。 */}
           <span className="text-sm text-muted-foreground">
             {pagination.total} tracked
             <span className="mx-1.5 text-border">|</span>

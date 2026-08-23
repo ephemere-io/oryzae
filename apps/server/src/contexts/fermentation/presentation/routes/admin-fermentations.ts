@@ -66,9 +66,8 @@ type Env = {
 };
 
 export const adminFermentations = new Hono<Env>()
-  // ユーザー別コストは **推定値**（保存トークン × 価格表）。Anthropic の cost_report は
-  // Oryzae のユーザーを知らないため、この軸は推定でしか出せない。実請求額との突き合わせは
-  // /admin/observability/spend で行う。
+  // ユーザー別コストは **推定値**（保存トークン × 価格表）。
+  // 実請求額は Anthropic Console で確認する（API 取得には org 契約が必要）。
   .get('/costs/by-user', async (c) => {
     const supabase = c.get('adminSupabase');
     const dateFrom = c.req.query('date_from');

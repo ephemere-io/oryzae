@@ -70,10 +70,9 @@ export function HealthStatusBanner({
   // 24h 要対応（失敗）件数
   const failStatus: Status = failureCount > 0 ? 'bad' : 'good';
 
-  // 今月コスト着地見込み（前月比）。前月は実請求額を優先し、取れなければ推定で代替する
-  // （比率判定なので、両方が同じ系統でないと乖離ぶんだけ誤判定する点に注意）。
+  // 今月コスト着地見込み（前月比）。どちらも推定なので同じ系統で比較できる。
   const projected = summary?.projectedCost ?? null;
-  const lastMonth = summary?.actual.lastMonthCost ?? summary?.estimated.lastMonthCost ?? 0;
+  const lastMonth = summary?.lastMonthCost ?? 0;
   const costStatus: Status =
     projected === null
       ? 'neutral'

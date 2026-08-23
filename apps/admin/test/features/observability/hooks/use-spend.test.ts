@@ -15,13 +15,6 @@ function mockResponse(ok: boolean, body: unknown): Response {
 
 const sampleSpend = {
   rangeDays: 30,
-  actual: {
-    status: 'ok',
-    totalCostUsd: 1.23,
-    daily: [{ date: '2026-08-08', costUsd: 1.23 }],
-    truncated: false,
-    message: null,
-  },
   estimated: {
     status: 'ok',
     totalCostUsd: 1.19,
@@ -58,7 +51,7 @@ describe('useSpend', () => {
     localStorage.setItem('oryzae_admin_access_token', 'test-token');
   });
 
-  it('fetches actual and estimated spend on mount', async () => {
+  it('fetches estimated spend on mount', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(true, sampleSpend));
 
     const { result } = renderHook(() => useSpend(30));
@@ -67,8 +60,6 @@ describe('useSpend', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.data?.actual.status).toBe('ok');
-    expect(result.current.data?.actual.totalCostUsd).toBe(1.23);
     expect(result.current.data?.estimated.totalCostUsd).toBe(1.19);
     expect(result.current.data?.estimated.byUser).toHaveLength(1);
     expect(result.current.error).toBeNull();
@@ -85,17 +76,12 @@ describe('useSpend', () => {
     expect(String(mockFetch.mock.calls[0][0])).toContain('date_from=7');
   });
 
-  it('keeps the not-configured status instead of coercing it to zero', async () => {
+  it('keeps the truncated flag so a partial estimate is not shown as complete', async () => {
+    // 打ち切りが落ちると、途中までの集計が完全な数字として表示されてしまう。
     mockFetch.mockResolvedValueOnce(
       mockResponse(true, {
         ...sampleSpend,
-        actual: {
-          status: 'not-configured',
-          totalCostUsd: null,
-          daily: [],
-          truncated: false,
-          message: null,
-        },
+        estimated: { ...sampleSpend.estimated, truncated: true },
       }),
     );
 
@@ -105,27 +91,8 @@ describe('useSpend', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.data?.actual.status).toBe('not-configured');
-    expect(result.current.data?.actual.totalCostUsd).toBeNull();
-  });
-
-  it('keeps the truncated flag so a partial actual cost is not shown as complete', async () => {
-    // 打ち切りが落ちると SpendView の乖離率ガードが無言で効かなくなり、
-    // 「推定が過大」に見えるだけの誤情報が復活する。
-    mockFetch.mockResolvedValueOnce(
-      mockResponse(true, {
-        ...sampleSpend,
-        actual: { ...sampleSpend.actual, truncated: true },
-      }),
-    );
-
-    const { result } = renderHook(() => useSpend(30));
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
-    expect(result.current.data?.actual.truncated).toBe(true);
+    expect(result.current.data?.estimated.truncated).toBe(true);
+    expect(result.current.data?.estimated.untrackedCount).toBe(1);
   });
 
   it('sets error on a failed response', async () => {

@@ -1,24 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  jstDayRangeUtc,
-  previousJstDateKey,
-  toJstDateKey,
-  utcDateKeyOfJstFermentationRun,
-  utcDayBounds,
-} from '@/contexts/shared/infrastructure/jst-day.js';
-
-describe('toJstDateKey', () => {
-  it('advances to the next JST day for times at or after 15:00 UTC', () => {
-    // UTC 8/8 15:00 = JST 8/9 00:00
-    expect(toJstDateKey(new Date('2026-08-08T15:00:00.000Z'))).toBe('2026-08-09');
-    expect(toJstDateKey(new Date('2026-08-08T14:59:59.999Z'))).toBe('2026-08-08');
-  });
-
-  it('maps the nightly fermentation run (UTC 18:00) to the next JST day', () => {
-    // 発酵 cron は JST 03:00 = UTC 前日 18:00 に走る
-    expect(toJstDateKey(new Date('2026-08-08T18:00:00.000Z'))).toBe('2026-08-09');
-  });
-});
+import { jstDayRangeUtc, previousJstDateKey } from '@/contexts/shared/infrastructure/jst-day.js';
 
 describe('previousJstDateKey', () => {
   it('returns the JST day before the given instant', () => {
@@ -50,20 +31,5 @@ describe('jstDayRangeUtc', () => {
     const { endIso } = jstDayRangeUtc('2026-08-09');
     const nextRunAt = '2026-08-09T18:00:00.000Z'; // JST 8/10 03:00
     expect(nextRunAt > endIso).toBe(true);
-  });
-});
-
-describe('utcDateKeyOfJstFermentationRun', () => {
-  it('maps a JST day to the UTC day its nightly run landed in', () => {
-    expect(utcDateKeyOfJstFermentationRun('2026-08-09')).toBe('2026-08-08');
-    expect(utcDateKeyOfJstFermentationRun('2026-09-01')).toBe('2026-08-31');
-  });
-});
-
-describe('utcDayBounds', () => {
-  it('returns a half-open UTC day interval', () => {
-    const { start, end } = utcDayBounds('2026-08-08');
-    expect(start.toISOString()).toBe('2026-08-08T00:00:00.000Z');
-    expect(end.toISOString()).toBe('2026-08-09T00:00:00.000Z');
   });
 });

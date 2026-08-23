@@ -1,17 +1,11 @@
 import { Hono } from 'hono';
-import { type ActualCostResult, fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
 import {
   aggregateCost,
   fetchFermentationCostRows,
   type UserCostAggregate,
 } from '../../infrastructure/fermentation-cost-query.js';
-import {
-  jstDayRangeUtc,
-  previousJstDateKey,
-  utcDateKeyOfJstFermentationRun,
-  utcDayBounds,
-} from '../../infrastructure/jst-day.js';
+import { jstDayRangeUtc, previousJstDateKey } from '../../infrastructure/jst-day.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 import { createCronAuthMiddleware } from '../middleware/cron-auth.js';
 
@@ -33,16 +27,6 @@ function formatUserBreakdown(byUser: UserCostAggregate[]): string {
   const rest = byUser.length - top.length;
   if (rest > 0) lines.push(`…他 ${rest} 名`);
   return lines.join('\n');
-}
-
-function formatActualField(result: ActualCostResult, utcDateKey: string): string {
-  if (result.kind === 'ok') {
-    const amount = `$${result.totalCostUsd.toFixed(4)} (UTC ${utcDateKey})`;
-    // ページング打ち切りは過少集計。黙って完全な実額のように見せない。
-    return result.truncated ? `${amount} ※集計打ち切り・過少` : amount;
-  }
-  if (result.kind === 'not-configured') return '未設定 (ANTHROPIC_ADMIN_KEY)';
-  return `取得失敗: ${result.message.slice(0, 80)}`;
 }
 
 export const cronCostAlert = new Hono()
@@ -81,25 +65,10 @@ export const cronCostAlert = new Hono()
 
       const aggregate = aggregateCost(rows.rows);
 
-      // 実請求額は Anthropic の cost_report が正（推定と混同させない）。
-      // cost_report は UTC 日バケット固定なので、その JST 日の定期発酵が実際に
-      // 走った UTC 日 (= JST日 - 1) を対応付けて取得する。
-      const actualUtcDateKey = utcDateKeyOfJstFermentationRun(dateKey);
-      const { start, end } = utcDayBounds(actualUtcDateKey);
-      const actual = await fetchActualCost(start, end);
-
-      // 閾値判定は実額があれば実額で、なければ推定で行う。
-      const thresholdBasisUsd =
-        actual.kind === 'ok' ? actual.totalCostUsd : aggregate.estimatedCostUsd;
-      const thresholdExceeded = thresholdBasisUsd >= DAILY_COST_THRESHOLD_USD;
+      const thresholdExceeded = aggregate.estimatedCostUsd >= DAILY_COST_THRESHOLD_USD;
 
       const fields = [
         { name: '日付 (JST)', value: dateKey, inline: true },
-        {
-          name: '実請求額',
-          value: formatActualField(actual, actualUtcDateKey),
-          inline: true,
-        },
         {
           name: '推定コスト',
           value: `$${aggregate.estimatedCostUsd.toFixed(4)}`,
@@ -149,15 +118,6 @@ export const cronCostAlert = new Hono()
       return c.json({
         message: 'Cost alert check completed',
         date: dateKey,
-        actualCost:
-          actual.kind === 'ok'
-            ? {
-                status: 'ok',
-                costUsd: Math.round(actual.totalCostUsd * 1000000) / 1000000,
-                truncated: actual.truncated,
-              }
-            : { status: actual.kind },
-        actualCostUtcDate: actualUtcDateKey,
         estimatedCost: Math.round(aggregate.estimatedCostUsd * 1000000) / 1000000,
         fermentationCount: aggregate.fermentationCount,
         completedCount: aggregate.completedCount,

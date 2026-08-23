@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
-import { fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
 import {
   aggregateCost,
   fetchFermentationCostRows,
@@ -223,9 +222,8 @@ export const adminDashboard = new Hono<Env>()
   .get('/cost-summary', async (c) => {
     const supabase = c.get('adminSupabase');
 
-    // 月境界は UTC で切る。Anthropic の cost_report が UTC 日バケット固定なので、
-    // 実額と推定を同じ窓で並べないと乖離が読めなくなるため。
-    // (日次レポートは運用に合わせて JST 日で切る。cron-cost-alert.ts を参照)
+    // 月境界は UTC で切る（admin の他のコスト表示と揃える）。
+    // 日次レポートは運用に合わせて JST 日で切る。cron-cost-alert.ts を参照。
     const now = new Date();
     const currentYear = now.getUTCFullYear();
     const currentMonth = now.getUTCMonth(); // 0-indexed
@@ -236,7 +234,7 @@ export const adminDashboard = new Hono<Env>()
     const daysInMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate();
     const daysElapsed = now.getUTCDate();
 
-    const [currentRows, lastRows, currentActual, lastActual] = await Promise.all([
+    const [currentRows, lastRows] = await Promise.all([
       fetchFermentationCostRows(supabase, {
         startIso: currentMonthStart.toISOString(),
         endIso: now.toISOString(),
@@ -245,38 +243,24 @@ export const adminDashboard = new Hono<Env>()
         startIso: lastMonthStart.toISOString(),
         endIso: new Date(currentMonthStart.getTime() - 1).toISOString(),
       }),
-      fetchActualCost(currentMonthStart, now),
-      fetchActualCost(lastMonthStart, currentMonthStart),
     ]);
 
     const currentAggregate = aggregateCost(currentRows.rows);
     const lastAggregate = aggregateCost(lastRows.rows);
 
-    // 着地見込みは実額があれば実額ベース、無ければ推定ベース。
-    const projectionBasis =
-      currentActual.kind === 'ok' ? currentActual.totalCostUsd : currentAggregate.estimatedCostUsd;
-    const projectedCost = daysElapsed > 0 ? (projectionBasis / daysElapsed) * daysInMonth : 0;
+    const projectedCost =
+      daysElapsed > 0 ? (currentAggregate.estimatedCostUsd / daysElapsed) * daysInMonth : 0;
 
     const round = (n: number) => Math.round(n * 1000000) / 1000000;
 
     return c.json({
-      // 実請求額 (Anthropic cost_report)。未設定・取得失敗を $0 と区別できるよう
-      // status を必ず添えて返す。フロントは status を見て表示を出し分けること。
-      actual: {
-        status: currentActual.kind,
-        currentMonthCost: currentActual.kind === 'ok' ? round(currentActual.totalCostUsd) : null,
-        lastMonthCost: lastActual.kind === 'ok' ? round(lastActual.totalCostUsd) : null,
-        message: currentActual.kind === 'error' ? currentActual.message : null,
-      },
-      // 推定値 (保存トークン × 価格表)。ユーザー別内訳を出せる唯一の系統。
-      estimated: {
-        currentMonthCost: round(currentAggregate.estimatedCostUsd),
-        lastMonthCost: round(lastAggregate.estimatedCostUsd),
-        untrackedCount: currentAggregate.untrackedCount,
-        truncated: currentRows.truncated || lastRows.truncated,
-      },
+      // 保存トークン × 価格表からの推定。表示側で「推定」と明示すること。
+      currentMonthCost: round(currentAggregate.estimatedCostUsd),
+      lastMonthCost: round(lastAggregate.estimatedCostUsd),
       projectedCost: round(projectedCost),
-      projectionBasis: currentActual.kind === 'ok' ? 'actual' : 'estimated',
+      // 集計の信頼度。トークン未保存や打ち切りによる過少計上を隠さない。
+      untrackedCount: currentAggregate.untrackedCount,
+      truncated: currentRows.truncated || lastRows.truncated,
       daysElapsed,
       daysInMonth,
     });
