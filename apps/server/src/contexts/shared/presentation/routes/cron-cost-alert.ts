@@ -36,7 +36,11 @@ function formatUserBreakdown(byUser: UserCostAggregate[]): string {
 }
 
 function formatActualField(result: ActualCostResult, utcDateKey: string): string {
-  if (result.kind === 'ok') return `$${result.totalCostUsd.toFixed(4)} (UTC ${utcDateKey})`;
+  if (result.kind === 'ok') {
+    const amount = `$${result.totalCostUsd.toFixed(4)} (UTC ${utcDateKey})`;
+    // ページング打ち切りは過少集計。黙って完全な実額のように見せない。
+    return result.truncated ? `${amount} ※集計打ち切り・過少` : amount;
+  }
   if (result.kind === 'not-configured') return '未設定 (ANTHROPIC_ADMIN_KEY)';
   return `取得失敗: ${result.message.slice(0, 80)}`;
 }
@@ -147,7 +151,11 @@ export const cronCostAlert = new Hono()
         date: dateKey,
         actualCost:
           actual.kind === 'ok'
-            ? { status: 'ok', costUsd: Math.round(actual.totalCostUsd * 1000000) / 1000000 }
+            ? {
+                status: 'ok',
+                costUsd: Math.round(actual.totalCostUsd * 1000000) / 1000000,
+                truncated: actual.truncated,
+              }
             : { status: actual.kind },
         actualCostUtcDate: actualUtcDateKey,
         estimatedCost: Math.round(aggregate.estimatedCostUsd * 1000000) / 1000000,

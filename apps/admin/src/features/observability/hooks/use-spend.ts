@@ -41,6 +41,11 @@ export interface SpendData {
     status: FetchStatus;
     totalCostUsd: number | null;
     daily: ActualDailyCost[];
+    /**
+     * ページング打ち切りで実額が過少な場合 true。
+     * status === 'ok' のときだけ意味を持つ（失敗時の false は「該当なし」）。
+     */
+    truncated: boolean;
     message: string | null;
   };
   estimated: {

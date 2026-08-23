@@ -49,7 +49,11 @@ function ActualHeadline({ actual }: { actual: SpendData['actual'] }) {
       <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
         {formatUsd(actual.totalCostUsd ?? 0)}
       </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">Anthropic cost_report / UTC 日基準</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {actual.truncated
+          ? '⚠️ 集計打ち切りのため過少 / UTC 日基準'
+          : 'Anthropic cost_report / UTC 日基準'}
+      </p>
     </>
   );
 }
@@ -105,7 +109,9 @@ export function SpendView({
   );
 
   const drift = useMemo(() => {
+    // 実額が打ち切られている場合、乖離率は「推定が過大」に見えるだけの誤情報になる。
     if (!data || data.actual.status !== 'ok' || data.actual.totalCostUsd === null) return null;
+    if (data.actual.truncated) return null;
     const actualUsd = data.actual.totalCostUsd;
     const estimatedUsd = data.estimated.totalCostUsd;
     if (actualUsd === 0) return null;

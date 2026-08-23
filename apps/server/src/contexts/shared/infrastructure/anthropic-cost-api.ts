@@ -33,7 +33,17 @@ interface DailyActualCost {
  * （まさに issue の「いつも0円」を再生産することになる）。
  */
 export type ActualCostResult =
-  | { kind: 'ok'; totalCostUsd: number; daily: DailyActualCost[] }
+  | {
+      kind: 'ok';
+      totalCostUsd: number;
+      daily: DailyActualCost[];
+      /**
+       * MAX_PAGES に達してページングを打ち切った場合 true（= 実額は過少）。
+       * 打ち切りを黙って隠すと「途中までの合計」を完全な実請求額として
+       * 表示してしまう。fermentation-cost-query.ts の truncated と同じ方針。
+       */
+      truncated: boolean;
+    }
   | { kind: 'not-configured' }
   | { kind: 'error'; message: string };
 
@@ -75,6 +85,7 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
 
   const daily: DailyActualCost[] = [];
   let page: string | undefined;
+  let truncated = false;
 
   try {
     for (let i = 0; i < MAX_PAGES; i++) {
@@ -114,10 +125,12 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
 
       if (body.has_more !== true || typeof body.next_page !== 'string') break;
       page = body.next_page;
+      // 次ページがあるのに今回が最終イテレーションなら、この後打ち切られる。
+      if (i === MAX_PAGES - 1) truncated = true;
     }
 
     const totalCostUsd = daily.reduce((sum, d) => sum + d.costUsd, 0);
-    return { kind: 'ok', totalCostUsd, daily };
+    return { kind: 'ok', totalCostUsd, daily, truncated };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return { kind: 'error', message };
@@ -126,7 +139,10 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
 
 /** 実額を Discord / API に出すときの共通表記。未設定・失敗を $0 と混同させない。 */
 export function formatActualCost(result: ActualCostResult): string {
-  if (result.kind === 'ok') return `$${result.totalCostUsd.toFixed(4)}`;
+  if (result.kind === 'ok') {
+    const amount = `$${result.totalCostUsd.toFixed(4)}`;
+    return result.truncated ? `${amount} (集計打ち切り・過少)` : amount;
+  }
   if (result.kind === 'not-configured') return '未設定 (ANTHROPIC_ADMIN_KEY)';
   return `取得失敗: ${result.message.slice(0, 80)}`;
 }

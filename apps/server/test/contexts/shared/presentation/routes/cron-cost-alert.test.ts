@@ -238,7 +238,7 @@ describe('cronCostAlert', () => {
 
     // JST 8/9 の定期発酵は UTC 8/8 に走る
     expect(body.actualCostUtcDate).toBe('2026-08-08');
-    expect(body.actualCost).toEqual({ status: 'ok', costUsd: 0.465 });
+    expect(body.actualCost).toEqual({ status: 'ok', costUsd: 0.465, truncated: false });
     expect(fieldValue('実請求額')).toBe('$0.4650 (UTC 2026-08-08)');
   });
 

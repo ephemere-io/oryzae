@@ -62,6 +62,7 @@ describe('fetchActualCost', () => {
       kind: 'ok',
       totalCostUsd: 1.2345,
       daily: [{ date: '2026-08-08', costUsd: 1.2345 }],
+      truncated: false,
     });
   });
 
@@ -111,6 +112,55 @@ describe('fetchActualCost', () => {
     expect(result.daily).toHaveLength(2);
   });
 
+  it('flags truncation when paging hits the page cap', async () => {
+    // 上限 (MAX_PAGES=10) に達しても has_more が true のままなら、実額は途中までしか
+    // 積まれていない。これを黙って完全な実額として返すと過少計上になる。
+    for (let i = 0; i < 12; i++) {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          data: [
+            { starting_at: `2026-08-0${(i % 9) + 1}T00:00:00Z`, results: [{ amount: '100' }] },
+          ],
+          has_more: true,
+          next_page: `page_${i + 1}`,
+        }),
+      );
+    }
+
+    const result = await fetchActualCost(START, END);
+
+    expect(mockFetch).toHaveBeenCalledTimes(10);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.truncated).toBe(true);
+  });
+
+  it('does not flag truncation when the last page fits exactly at the cap', async () => {
+    // ちょうど10ページ目で has_more:false なら打ち切りではない（境界の off-by-one 防止）。
+    for (let i = 0; i < 9; i++) {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          data: [{ starting_at: `2026-08-0${i + 1}T00:00:00Z`, results: [{ amount: '100' }] }],
+          has_more: true,
+          next_page: `page_${i + 1}`,
+        }),
+      );
+    }
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [{ starting_at: '2026-08-10T00:00:00Z', results: [{ amount: '100' }] }],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+
+    expect(mockFetch).toHaveBeenCalledTimes(10);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.truncated).toBe(false);
+  });
+
   it('sends the admin key on the x-api-key header', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({ data: [], has_more: false }));
 
@@ -153,13 +203,17 @@ describe('fetchActualCost', () => {
 
     const result = await fetchActualCost(START, END);
 
-    expect(result).toEqual({ kind: 'ok', totalCostUsd: 0, daily: [] });
+    expect(result).toEqual({ kind: 'ok', totalCostUsd: 0, daily: [], truncated: false });
   });
 });
 
 describe('formatActualCost', () => {
   it.each<[ActualCostResult, string]>([
-    [{ kind: 'ok', totalCostUsd: 1.2345, daily: [] }, '$1.2345'],
+    [{ kind: 'ok', totalCostUsd: 1.2345, daily: [], truncated: false }, '$1.2345'],
+    [
+      { kind: 'ok', totalCostUsd: 1.2345, daily: [], truncated: true },
+      '$1.2345 (集計打ち切り・過少)',
+    ],
     [{ kind: 'not-configured' }, '未設定 (ANTHROPIC_ADMIN_KEY)'],
     [{ kind: 'error', message: 'boom' }, '取得失敗: boom'],
   ])('formats %j', (input, expected) => {

@@ -19,6 +19,7 @@ const sampleSpend = {
     status: 'ok',
     totalCostUsd: 1.23,
     daily: [{ date: '2026-08-08', costUsd: 1.23 }],
+    truncated: false,
     message: null,
   },
   estimated: {
@@ -88,7 +89,13 @@ describe('useSpend', () => {
     mockFetch.mockResolvedValueOnce(
       mockResponse(true, {
         ...sampleSpend,
-        actual: { status: 'not-configured', totalCostUsd: null, daily: [], message: null },
+        actual: {
+          status: 'not-configured',
+          totalCostUsd: null,
+          daily: [],
+          truncated: false,
+          message: null,
+        },
       }),
     );
 
@@ -100,6 +107,25 @@ describe('useSpend', () => {
 
     expect(result.current.data?.actual.status).toBe('not-configured');
     expect(result.current.data?.actual.totalCostUsd).toBeNull();
+  });
+
+  it('keeps the truncated flag so a partial actual cost is not shown as complete', async () => {
+    // 打ち切りが落ちると SpendView の乖離率ガードが無言で効かなくなり、
+    // 「推定が過大」に見えるだけの誤情報が復活する。
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        ...sampleSpend,
+        actual: { ...sampleSpend.actual, truncated: true },
+      }),
+    );
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data?.actual.truncated).toBe(true);
   });
 
   it('sets error on a failed response', async () => {

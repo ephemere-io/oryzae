@@ -239,6 +239,9 @@ export const adminObservability = new Hono<Env>()
         status: actual.kind,
         totalCostUsd: actual.kind === 'ok' ? actual.totalCostUsd : null,
         daily: actual.kind === 'ok' ? actual.daily : [],
+        // truncated は status === 'ok' のときだけ意味を持つ。失敗時の false は
+        // 「完全に取得できた」ではなく「該当なし」。必ず status を先に見ること。
+        truncated: actual.kind === 'ok' ? actual.truncated : false,
         message: actual.kind === 'error' ? actual.message : null,
       },
       estimated: {
