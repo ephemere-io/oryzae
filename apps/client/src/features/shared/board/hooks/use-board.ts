@@ -39,6 +39,13 @@ function applyDefaultZOrder(cards: BoardCardData[]): BoardCardData[] {
   return [...result, ...userCards];
 }
 
+/** 削除エンドポイントはカード種別で分かれる。 */
+function deletePath(cardId: string, cardType: string, refId: string): string {
+  if (cardType === 'snippet') return `/api/v1/board/snippets/${refId}`;
+  if (cardType === 'photo') return `/api/v1/board/photos/${refId}`;
+  return `/api/v1/board/cards/${cardId}`;
+}
+
 export function useBoard(
   api: ApiClient | null,
   dateKey: string,
@@ -112,20 +119,28 @@ export function useBoard(
   const deleteCard = useCallback(
     async (cardId: string, cardType: string, refId: string) => {
       if (!api) return;
-      // 1. Mark card as removing (triggers animation)
+      // 1. 消えるアニメーションを始める（ここは即時＝操作に対する反応を待たせない）
       setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, removing: true } : c)));
-      // 2. API call
-      if (cardType === 'snippet') {
-        api.fetch(`/api/v1/board/snippets/${refId}`, { method: 'DELETE' });
-      } else if (cardType === 'photo') {
-        api.fetch(`/api/v1/board/photos/${refId}`, { method: 'DELETE' });
-      } else {
-        api.fetch(`/api/v1/board/cards/${cardId}`, { method: 'DELETE' });
-      }
-      // 3. Remove from state after animation (280ms)
-      setTimeout(() => {
-        setCards((prev) => prev.filter((c) => c.id !== cardId));
-      }, 280);
+
+      // 2. 削除完了とアニメーション(280ms)の両方を待つ。
+      //    以前は結果を見ずに投げっぱなしで 280ms 後に必ず state から消していたため、
+      //    サーバー側で失敗してもカードは画面から消え、リロードすると復活していた。
+      //    reject も誰も受け取らず未処理 rejection になっていた。
+      const [ok] = await Promise.all([
+        api.fetch(deletePath(cardId, cardType, refId), { method: 'DELETE' }).then(
+          (res) => res.ok,
+          () => false,
+        ),
+        new Promise((resolve) => setTimeout(resolve, 280)),
+      ]);
+
+      // 3. 成功したときだけ取り除く。失敗したらアニメーションを戻して盤面に残す
+      //    （ボードに専用のエラー表示は無いので、「消えない」ことを結果として見せる）。
+      setCards((prev) =>
+        ok
+          ? prev.filter((c) => c.id !== cardId)
+          : prev.map((c) => (c.id === cardId ? { ...c, removing: false } : c)),
+      );
     },
     [api],
   );

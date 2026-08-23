@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import type { ApiClient } from '@/lib/api';
@@ -318,5 +318,65 @@ describe('useBoard', () => {
     expect(card.y).toBe(0);
     expect(card.width).toBeGreaterThan(0);
     expect(card.height).toBeGreaterThan(0);
+  });
+  describe('deleteCard', () => {
+    const oneCard = {
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      cards: [{ id: 'c-1', cardType: 'snippet', refId: 's-1', content: { text: 'あ' }, zIndex: 0 }],
+    };
+
+    it('削除が成功したらカードを取り除く', async () => {
+      apiFetch
+        .mockResolvedValueOnce(mockResponse(true, oneCard))
+        .mockResolvedValueOnce(mockResponse(true, {}));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.cards).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.deleteCard('c-1', 'snippet', 's-1');
+      });
+
+      expect(apiFetch.mock.calls[1][0]).toContain('/api/v1/board/snippets/s-1');
+      expect(apiFetch.mock.calls[1][1]?.method).toBe('DELETE');
+      expect(result.current.cards).toHaveLength(0);
+    });
+
+    it('削除が失敗したらカードを消さずに戻す（リロードで復活する嘘を防ぐ）', async () => {
+      apiFetch
+        .mockResolvedValueOnce(mockResponse(true, oneCard))
+        .mockResolvedValueOnce(mockResponse(false, {}));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.cards).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.deleteCard('c-1', 'snippet', 's-1');
+      });
+
+      expect(result.current.cards).toHaveLength(1);
+      // アニメーション用のフラグも戻す（消えかけの見た目で固まらせない）
+      expect(result.current.cards[0].removing).toBe(false);
+    });
+
+    it('通信自体が失敗してもカードを残す（未処理 rejection にしない）', async () => {
+      apiFetch
+        .mockResolvedValueOnce(mockResponse(true, oneCard))
+        .mockRejectedValueOnce(new Error('network down'));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.cards).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.deleteCard('c-1', 'snippet', 's-1');
+      });
+
+      expect(result.current.cards).toHaveLength(1);
+      expect(result.current.cards[0].removing).toBe(false);
+    });
   });
 });
