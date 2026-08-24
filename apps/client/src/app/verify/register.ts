@@ -49,6 +49,7 @@ import '@/features/pc/questions/components/question-timeline.verify';
 import '@/features/sp/account/components/sp-account-page.verify';
 import '@/features/sp/entries/components/sp-confirm-sheet.verify';
 import '@/features/sp/entries/components/sp-entry-editor.verify';
+import '@/features/sp/entries/components/sp-fermentation-drawer.verify';
 import '@/features/sp/questions/components/sp-questions.verify';
 import '@/features/onboarding/components/illustrations.verify';
 import '@/features/onboarding/components/onboarding-flow.verify';

@@ -135,6 +135,11 @@ export function EntryEditor({
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
+  // Issue #510: 未保存判定に**タイトルも**含める。本文だけを見ていると、タイトルだけ変えた
+  // 状態が「保存済み」に見え、離脱ガードも素通りしてしまう。
+  const [savedTitle, setSavedTitle] = useState(
+    (entryId ? (initialTitle ?? parsed.title) : '').trim(),
+  );
   const [settings, updateSettings] = useEditorSettings(locale);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -229,7 +234,7 @@ export function EntryEditor({
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  const hasUnsavedChanges = content !== savedContent;
+  const hasUnsavedChanges = content !== savedContent || title.trim() !== savedTitle;
   const {
     open: leaveConfirmOpen,
     cancel: cancelLeaveConfirm,
@@ -359,6 +364,7 @@ export function EntryEditor({
       setTitle(p.title);
       setContent(p.body);
       setSavedContent(p.body);
+      setSavedTitle(p.title.trim());
       if (editorRef.current && p.body) {
         editorRef.current.textContent = p.body;
         if (effectiveInitialEffects?.textSpans?.length) {
@@ -368,6 +374,7 @@ export function EntryEditor({
     } else {
       setContent(initialContentStable);
       setSavedContent(initialContentStable);
+      setSavedTitle('');
       if (editorRef.current && initialContentStable) {
         editorRef.current.textContent = initialContentStable;
       }
@@ -420,6 +427,7 @@ export function EntryEditor({
         saveCachedEffects(savedId, effectsSnapshot);
         setTitle(newTitle.trim());
         setSavedContent(content);
+        setSavedTitle(newTitle.trim());
         setCurrentEntryId(savedId);
         setSaveModalOpen(false);
         setPickleConfirmOpen(false);
@@ -595,13 +603,14 @@ export function EntryEditor({
   }, [isEditingTitle]);
 
   const handleAutosaved = useCallback(
-    async (newId: string, savedBody: string) => {
+    async (newId: string, savedBody: string, autosavedTitle: string) => {
       // Track the id locally so subsequent autosaves PUT instead of POST.
       // URL stays the same — the 新規エントリ button and browser refresh
       // continue to behave as if the user is still composing.
       const wasNew = currentEntryId !== newId;
       if (wasNew) setCurrentEntryId(newId);
       setSavedContent(savedBody);
+      setSavedTitle(autosavedTitle);
       setStatus('saved');
       setLastSavedAt(Date.now());
       isAutosavingRef.current = false;
