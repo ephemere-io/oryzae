@@ -61,6 +61,42 @@ test.describe('ボード画面', () => {
     await expect(page.locator('textarea')).toBeVisible();
   });
 
+  test('入力中でも Escape でダイアログを閉じられ、入力は持ち越さない', async ({ page }) => {
+    // textarea にフォーカスがある状態の Escape は、form の stopPropagation に阻まれて
+    // 長らく効いていなかった（capture で拾うようにして解消）。ここで固定する。
+    await page.click('button[data-verify-tool="snippet"]');
+    const textarea = page.locator('textarea');
+    await textarea.fill('破棄されるはずの下書き');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toHaveCount(0);
+
+    // 開き直したときに前回の入力が残らない
+    await page.click('button[data-verify-tool="snippet"]');
+    await expect(textarea).toHaveValue('');
+    await page.keyboard.press('Escape');
+
+    // 写真ダイアログも同じく Escape で閉じる
+    await page.click('button[data-verify-tool="photo"]');
+    await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: '写真を追加' })).toHaveCount(0);
+  });
+
+  test('ツールバーのショートカット（S / I）が効き、入力中は誤発火しない', async ({ page }) => {
+    await page.keyboard.press('s');
+    await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
+
+    // 本文に s / i を打っても写真ダイアログは開かない（そのまま文字として入る）
+    await page.locator('textarea').pressSequentially('sisi');
+    await expect(page.locator('textarea')).toHaveValue('sisi');
+    await expect(page.getByRole('heading', { name: '写真を追加' })).toHaveCount(0);
+
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('i');
+    await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
+    await page.keyboard.press('Escape');
+  });
+
   test('エントリカードが表示される（当日エントリがある場合）', async ({ page }) => {
     // まずエントリを作成（PC エディタは自動保存）
     const unique = `ボードE2E-${Date.now()}`;

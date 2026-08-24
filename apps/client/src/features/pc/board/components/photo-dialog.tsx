@@ -2,7 +2,8 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useEscapeKey } from '@/lib/use-escape-key';
 
 interface PhotoDialogProps {
   open: boolean;
@@ -67,6 +68,23 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // 閉じる処理は hook より前に定義する（useEscapeKey を early return の前に呼ぶため）。
+  // このダイアログは閉じても state を捨てないので、後始末（objectURL の revoke と
+  // 入力のリセット）をここで必ず通す。preview は関数形式で読み、依存に入れずに済ませる。
+  const handleClose = useCallback(() => {
+    if (uploading) return;
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setCaption('');
+    setSelectedFile(null);
+    setAspectRatio(null);
+    onClose();
+  }, [uploading, onClose]);
+
+  useEscapeKey(open, handleClose);
+
   if (!open) return null;
 
   const canSubmit = Boolean(selectedFile) && !uploading;
@@ -106,16 +124,6 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleClose = () => {
-    if (uploading) return;
-    if (preview) URL.revokeObjectURL(preview);
-    setCaption('');
-    setPreview(null);
-    setSelectedFile(null);
-    setAspectRatio(null);
-    onClose();
   };
 
   return (

@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOcrSnippetText } from '@/features/shared/board/hooks/use-ocr-snippet-text';
 import type { ApiClient } from '@/lib/api';
+import { useEscapeKey } from '@/lib/use-escape-key';
 
 interface SnippetDialogProps {
   open: boolean;
@@ -73,6 +74,11 @@ export function SnippetDialog({
   // アンマウント時の取りこぼし防止（open のまま破棄されるケース）。
   useEffect(() => releasePreview, [releasePreview]);
 
+  // 読み取り中は閉じさせない（PhotoDialog がアップロード中に閉じさせないのと同じ理由。
+  // 閉じた後に読み取り結果が届くと、次に開いたダイアログへ横入りしてしまう）。
+  const busy = ocrStatus === 'reading';
+  useEscapeKey(open && !busy, onClose);
+
   if (!open) return null;
 
   // 既存スニペットの編集では画像タブを出さない。差し替えではなく本文を直す操作なので、
@@ -82,7 +88,6 @@ export function SnippetDialog({
   const trimmed = text.trim();
   const empty = trimmed.length === 0;
   const tooLong = text.length > MAX_SNIPPET_TEXT_LENGTH;
-  const busy = ocrStatus === 'reading';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,9 +150,13 @@ export function SnippetDialog({
         ocrStatus,
         fromImage,
       })}
-      onClick={onClose}
+      onClick={() => {
+        if (!busy) onClose();
+      }}
+      // Escape の本体は useEscapeKey（window 側）。ここはフォーカスが overlay 自身に
+      // ある場合の保険で、二重に呼ばれても onClose は冪等なので害はない。
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
+        if (e.key === 'Escape' && !busy) onClose();
       }}
     >
       <form

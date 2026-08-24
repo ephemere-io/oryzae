@@ -92,8 +92,10 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
       style={{
         left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
         transform: 'translateX(-50%)',
-        backgroundColor: 'var(--bg)',
-        borderColor: 'var(--border-subtle)',
+        // 盤面と同じ --bg にすると dark で背景と同色になり、黒い影も効かず沈む。
+        // 浮いて見せるための面は専用トークンで持つ。
+        backgroundColor: 'var(--surface-raised)',
+        borderColor: 'var(--surface-raised-border)',
         fontFamily: 'Inter, "Noto Sans JP", sans-serif',
       }}
       // 盤面側の deselect（外側クリックで選択解除）まで伝播させない。

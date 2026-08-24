@@ -10,6 +10,7 @@ import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
 import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
+import { useEscapeKey } from '@/lib/use-escape-key';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
 import { BoardCard } from './board-card';
 import { BoardDateNav } from './board-date-nav';
@@ -114,6 +115,10 @@ export function BoardView({ api }: BoardViewProps) {
 
   const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
   const openPhotoDialog = useCallback(() => setPhotoDialogOpen(true), []);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
+
+  // ライトボックスも Escape で閉じる（各ダイアログと揃える）。
+  useEscapeKey(lightbox !== null, closeLightbox);
 
   const dialogOpen = snippetDialog.open || photoDialogOpen || lightbox !== null;
 
