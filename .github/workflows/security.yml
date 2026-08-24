@@ -2,16 +2,20 @@ name: Security
 
 # Oryzae は他人の日記を預かるため、セキュリティ検査を独立したワークフローに切り出す。
 # 3 層構成:
-#   1. rls-gate / codeql — 毎 PR。決定的・無料・API キー不要。ここが本丸。
+#   1. rls-gate / sast / secret-scan — 毎 PR。決定的・無料・API キー不要。ここが本丸。
 #   2. claude-review     — 毎 PR。差分に対する意味的レビュー（AI なので確率的、補助）
 #   3. weekly-audit      — 週次。リポジトリ全体を監査し Issue に起票（差分レビューが
 #                          構造上見られない「既に main にある問題」を拾う）
 #
 # 注意: claude-code-security-review は prompt injection に対して硬化されていない。
-# 本リポジトリは public なので、fork からの PR で悪意ある指示文を混入させる経路が実在する。
-# そのため pull_request_target は使わない（fork の PR ではシークレットが渡らず、
-# AI ジョブは自動 skip される）。合否を担保するのは 1. の決定的ゲートであり、
-# AI レビューはあくまで補助と位置づける。
+# 現在このリポジトリは private なので fork 経由の攻撃面は無いが、公開に戻した瞬間に
+# その経路が生きる。そのため pull_request_target は使わない（fork の PR には
+# シークレットが渡らず AI ジョブは自動 skip される）。合否を担保するのは
+# 1. の決定的ゲートであり、AI レビューはあくまで補助と位置づける。
+#
+# private 化の影響: GitHub の CodeQL / secret scanning / push protection は
+# private では有料（GitHub Advanced Security）になり使えない。同じ役割を
+# OSS の Semgrep / gitleaks で代替している（下の sast / secret-scan ジョブ）。
 
 on:
   pull_request:
@@ -40,22 +44,51 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm security:rls
 
-  codeql:
-    name: CodeQL (JS/TS)
+  # 本リポジトリは private なので CodeQL は使えない（private の code scanning は
+  # 有料の GitHub Advanced Security / Code Security が必要）。同じ役割を
+  # OSS の Semgrep で埋める。レジストリからルールセットを匿名取得するため
+  # アカウント登録もトークンも要らない。
+  sast:
+    name: SAST (Semgrep)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
     steps:
       - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v4
+      - uses: actions/setup-python@v6
         with:
-          languages: javascript-typescript
-          queries: security-extended
-      - uses: github/codeql-action/analyze@v4
+          python-version: '3.x'
+      - run: pip install --quiet semgrep
+      - name: Semgrep (security rules)
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/typescript \
+            --config p/react \
+            --error \
+            --metrics off \
+            --exclude docs --exclude .tmp --exclude '*.test.ts' --exclude '*.test.tsx'
+
+  # private 化により GitHub の secret scanning / push protection も無効になった
+  # （どちらも private では有料）。SERVICE_ROLE_KEY の漏洩はこのプロダクトで
+  # 最も致命的なので、OSS の gitleaks で最低限 CI 側の検出を維持する。
+  # Action 版は org 利用にライセンスが要るため、バイナリを直接使う。
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
         with:
-          category: '/language:javascript-typescript'
+          fetch-depth: 0
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks version
+      - name: Scan git history for secrets
+        run: ./gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
 
   dependency-audit:
     name: Dependency Audit
@@ -106,7 +139,7 @@ jobs:
         if: steps.key.outputs.available != 'true'
         run: |
           echo "::notice::ANTHROPIC_API_KEY が無いため Claude セキュリティレビューを skip しました。" \
-               "fork からの PR の場合は想定どおりです。決定的ゲート(rls-gate/codeql)は実行済みです。"
+               "fork からの PR の場合は想定どおりです。決定的ゲート(rls-gate/sast/secret-scan)は実行済みです。"
       - uses: anthropics/claude-code-security-review@main
         if: steps.key.outputs.available == 'true'
         with:
