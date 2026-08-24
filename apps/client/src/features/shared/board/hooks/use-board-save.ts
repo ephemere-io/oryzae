@@ -27,6 +27,7 @@ export function useBoardSave(api: ApiClient | null) {
               width: c.width,
               height: c.height,
               zIndex: c.zIndex,
+              userPositioned: c.userPositioned,
             })),
           }),
         });

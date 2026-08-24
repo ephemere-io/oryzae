@@ -188,6 +188,8 @@ export const boardCardUpdateSchema = z.object({
       width: z.number().min(120),
       height: z.number().min(120),
       zIndex: z.number().int(),
+      // 利用者が自分で動かしたカードか。未送信のクライアント（古いタブ等）は false 扱い。
+      userPositioned: z.boolean().optional(),
     }),
   ),
 });
