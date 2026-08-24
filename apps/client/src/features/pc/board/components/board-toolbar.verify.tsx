@@ -91,7 +91,8 @@ registerUnit<Props>({
         const slots = Array.from(root.querySelectorAll('button[data-verify-tool]'));
         const bad = slots.filter((button) => {
           const label = button.getAttribute('aria-label') ?? '';
-          const tooltip = button.parentElement?.querySelector('[role="tooltip"]');
+          const tool = button.getAttribute('data-verify-tool');
+          const tooltip = button.parentElement?.querySelector(`[data-verify-tooltip="${tool}"]`);
           return !/\([A-Z]\)$/.test(label) || tooltip === null || tooltip === undefined;
         });
         return (

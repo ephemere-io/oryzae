@@ -127,9 +127,12 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
             </button>
 
             {/* ツールチップ（Figma と同じく、ラベル＋ショートカット）。常に DOM には
-                置き、hover でだけ見せる（描画契約として検証できるようにするため）。 */}
+                置き、hover でだけ見せる（描画契約として検証できるようにするため）。
+                aria-hidden なのは、同じ文言をボタンの aria-label が既に持っており、
+                読み上げが二重になるため。ここは目で見るための装飾に徹する。 */}
             <span
-              role="tooltip"
+              aria-hidden="true"
+              data-verify-tooltip={tool.id}
               className="pointer-events-none absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100"
               style={{ backgroundColor: 'var(--fg)', color: 'var(--bg)' }}
             >

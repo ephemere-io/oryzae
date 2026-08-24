@@ -38,8 +38,9 @@ test.describe('ボード画面', () => {
   test('ツールバーからスニペットを作成できる', async ({ page }) => {
     const snippet = `E2Eスニペット-${Date.now()}`;
     await page.click('button[data-verify-tool="snippet"]');
-    // ダイアログ見出しは「スニペットを作成」、入力は textarea(placeholder="テキストを入力...")、確定は「作成」。
-    await expect(page.getByText('スニペットを作成')).toBeVisible();
+    // 入力は textarea(placeholder="テキストを入力...")、確定は「作成」。
+    // 見出しは role で取る（同じ文言をツールバーのツールチップも持つため getByText は曖昧）。
+    await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
     await page.fill('textarea[placeholder*="テキスト"]', snippet);
     await page.getByRole('button', { name: '作成', exact: true }).click();
 
@@ -49,7 +50,7 @@ test.describe('ボード画面', () => {
 
   test('スニペット作成ダイアログで「画像から読み取る」に切り替えられる', async ({ page }) => {
     await page.click('button[data-verify-tool="snippet"]');
-    await expect(page.getByText('スニペットを作成')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
 
     await page.click('button[data-verify-source-tab="image"]');
     // 画像タブではテキスト入力が消え、読み取りボタン（未選択なので無効）が出る。
