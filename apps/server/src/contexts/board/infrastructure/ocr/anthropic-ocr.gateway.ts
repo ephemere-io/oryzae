@@ -23,6 +23,9 @@ function cleanup(raw: string): string {
   return unfenced.trim().slice(0, MAX_OCR_TEXT_LENGTH);
 }
 
+// テストから参照するため export（vercel-ai-analysis.gateway.ts と同じ方式）。
+export const __INTERNAL = { cleanup, MODEL, PROMPT };
+
 export class AnthropicOcrGateway implements OcrGateway {
   async extractText(params: { image: ArrayBuffer; mediaType: string }): Promise<OcrResult> {
     const { text, usage } = await generateText({

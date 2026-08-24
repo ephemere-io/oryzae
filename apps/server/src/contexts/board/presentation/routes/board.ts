@@ -32,6 +32,10 @@ type Env = {
 
 const generateId = () => crypto.randomUUID();
 
+/** multipart の境界文字列・ヘッダ分の余裕。Content-Length は本文より必ず少し大きい。 */
+const MULTIPART_OVERHEAD_BYTES = 8 * 1024;
+const MAX_OCR_UPLOAD_BYTES = MAX_OCR_IMAGE_BYTES + MULTIPART_OVERHEAD_BYTES;
+
 /** `getTimezoneOffset()` 相当の分数。±14 時間を超える値は不正として 0 に落とす。 */
 function parseTzOffset(raw: string | undefined): number {
   if (!raw) return 0;
@@ -106,14 +110,22 @@ export const board = new Hono<Env>()
   // 画像を読み取って本文だけ返す。スニペットはまだ作らない（ユーザーが確認・編集してから
   // POST /snippets を叩く）。
   .post('/snippets/ocr', async (c) => {
+    // parseBody() は multipart 全体をメモリに載せるので、その前に Content-Length で
+    // 明らかに大きいものを落とす。ヘッダは自己申告なので **早期打ち切りであって保証
+    // ではない**（実サイズの判定は下の file.size と usecase 側）。境界文字列などの
+    // multipart オーバーヘッド分だけ上限に余裕を持たせる。
+    const declaredLength = Number(c.req.header('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_OCR_UPLOAD_BYTES) {
+      return c.json({ error: `Image must be ${MAX_OCR_IMAGE_BYTES} bytes or less` }, 400);
+    }
+
     const body = await c.req.parseBody();
     const file = body.file;
     if (!(file instanceof File)) {
       return c.json({ error: 'File is required' }, 400);
     }
 
-    // 本文を読む前に弾く。arrayBuffer() まで進めてから usecase で長さを見ると、
-    // 上限を超えた画像も一度まるごとメモリに載ってしまい上限の意味が無くなる。
+    // arrayBuffer() で複製する前に実サイズで弾く。
     if (file.size > MAX_OCR_IMAGE_BYTES) {
       return c.json({ error: `Image must be ${MAX_OCR_IMAGE_BYTES} bytes or less` }, 400);
     }
