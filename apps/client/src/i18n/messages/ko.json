@@ -161,7 +161,8 @@
     "desktop_only": {
       "heading": "데스크톱 전용입니다",
       "body": "Oryzae는 현재 데스크톱 브라우저 전용으로, 스마트폰에서는 이용할 수 없습니다. 모바일 화면이 준비될 때까지는 데스크톱에서 이용해 주세요."
-    }
+    },
+    "loading": "불러오는 중…"
   },
   "footer": {
     "label": {
@@ -288,7 +289,9 @@
       "cancel": "취소",
       "update": "변경",
       "create": "만들기"
-    }
+    },
+    "error_message": "보드를 불러오지 못했습니다",
+    "retry": "다시 시도"
   },
   "editor": {
     "status": {
