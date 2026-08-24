@@ -445,6 +445,30 @@
       "letter_badge": "来自发酵过程的信件"
     }
   },
+  "photo": {
+    "toolbar_button": "照片",
+    "modal_title": "导入照片",
+    "modal_description": "可以识别为文字，也可以直接作为照片附上。",
+    "ai_notice": "选择「识别为文字」时，照片会发送给 AI（Anthropic 的 Claude）。",
+    "preview_alt": "待导入照片的预览",
+    "transcribe": "识别为文字",
+    "transcribing": "识别中…",
+    "attach": "作为照片附上",
+    "attaching": "附加中…",
+    "cancel": "取消",
+    "back": "返回",
+    "insert": "插入正文",
+    "transcript_heading": "识别出的文字",
+    "transcript_empty": "未能识别出文字。仍可作为照片附上。",
+    "attached_label": "已附照片 {count} 张",
+    "attached_alt": "已附照片 {index}",
+    "remove": "删除第 {index} 张照片",
+    "error_decode": "无法读取该图片。请换一张照片。",
+    "error_too_large": "图片过大。请换一张照片。",
+    "error_upload": "照片上传失败。",
+    "error_transcribe": "未能识别文字。请稍后再试。",
+    "error_rate_limited": "已达到识别次数上限。请稍候再试。"
+  },
   "fermentation": {
     "detail": {
       "close_aria": "关闭详情",

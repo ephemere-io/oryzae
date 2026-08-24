@@ -8,6 +8,7 @@ import type { ApiClient } from '@/lib/api';
 interface EntryDetail {
   id: string;
   content: string;
+  mediaUrls: string[];
   effects: EditorEffectsState | null;
   createdAt: string;
   updatedAt: string;
@@ -32,6 +33,7 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
           setEntry({
             id: e.id,
             content: e.content,
+            mediaUrls: Array.isArray(e.mediaUrls) ? e.mediaUrls.map(String) : [],
             effects: e.effects ?? null,
             createdAt: e.createdAt,
             updatedAt: e.updatedAt,
@@ -49,6 +51,9 @@ interface SaveOptions {
   fermentationEnabled?: boolean;
   // undefined → 既存を維持 / null → クリア / state → 差し替え
   effects?: EditorEffectsState | null;
+  // undefined → 既存を維持 / 配列 → 差し替え。自動保存は本文しか知らないので
+  // 省略され、サーバー側で既存の media_urls が維持される（写真が消えない）。
+  mediaUrls?: string[];
 }
 
 export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
@@ -64,13 +69,17 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
 
       const payload: Record<string, unknown> = {
         content,
-        mediaUrls: [],
         editorType: 'plaintext',
         editorVersion: '1.0.0',
         extension: {},
       };
       if (options?.fermentationEnabled !== undefined) {
         payload.fermentationEnabled = options.fermentationEnabled;
+      }
+      // 送らなければサーバーは既存の media_urls を維持する。自動保存が写真を巻き添えに
+      // しないよう、明示的に変えたいときだけ載せる。
+      if (options?.mediaUrls !== undefined) {
+        payload.mediaUrls = options.mediaUrls;
       }
       if (options?.effects !== undefined) {
         payload.effects = options.effects;

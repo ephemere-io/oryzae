@@ -445,6 +445,30 @@
       "letter_badge": "발효 과정의 편지"
     }
   },
+  "photo": {
+    "toolbar_button": "사진",
+    "modal_title": "사진 가져오기",
+    "modal_description": "글자로 읽어들이거나, 사진 그대로 붙일 수 있습니다.",
+    "ai_notice": "'글자로 읽어들이기'를 선택하면 사진이 AI(Anthropic의 Claude)로 전송됩니다.",
+    "preview_alt": "가져올 사진 미리보기",
+    "transcribe": "글자로 읽어들이기",
+    "transcribing": "읽는 중…",
+    "attach": "사진으로 붙이기",
+    "attaching": "붙이는 중…",
+    "cancel": "취소",
+    "back": "뒤로",
+    "insert": "본문에 넣기",
+    "transcript_heading": "읽어들인 글자",
+    "transcript_empty": "글자를 읽어들이지 못했습니다. 사진으로 붙일 수는 있습니다.",
+    "attached_label": "첨부한 사진 {count}장",
+    "attached_alt": "첨부한 사진 {index}",
+    "remove": "{index}번째 사진 삭제",
+    "error_decode": "이 이미지를 읽어들이지 못했습니다. 다른 사진을 시도해 주세요.",
+    "error_too_large": "이미지가 너무 큽니다. 다른 사진을 시도해 주세요.",
+    "error_upload": "사진을 업로드하지 못했습니다.",
+    "error_transcribe": "글자를 읽어들이지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "error_rate_limited": "읽기 횟수 제한에 도달했습니다. 잠시 기다려 주세요."
+  },
   "fermentation": {
     "detail": {
       "close_aria": "상세 닫기",

@@ -1,10 +1,11 @@
 'use client';
 
-import type { EditorEffectsState } from '@oryzae/shared';
+import { ACCEPTED_IMAGE_MIME_TYPES, type EditorEffectsState } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PhotoStrip } from '@/components/ui/photo-strip';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -13,6 +14,7 @@ import { FermentationDisplayPromptModal } from '@/features/pc/entries/components
 import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
+import { PhotoImportModal } from '@/features/pc/entries/components/photo-import-modal';
 import { PickleConfirmModal } from '@/features/pc/entries/components/pickle-confirm-modal';
 import { PickleNudgeModal } from '@/features/pc/entries/components/pickle-nudge-modal';
 import { QuestionLinker } from '@/features/pc/entries/components/question-linker';
@@ -45,6 +47,7 @@ import {
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
+import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
@@ -70,6 +73,8 @@ interface EntryEditorProps {
    * Issue #332 — see docs/editor-effects-persistence.md.
    */
   initialEffects?: EditorEffectsState | null;
+  /** 既存エントリに添えられている写真。新規は空。 */
+  initialMediaUrls?: string[];
   createdAt?: string;
   updatedAt?: string;
   api: ApiClient | null;
@@ -116,6 +121,7 @@ export function EntryEditor({
   initialContent = '',
   initialTitle,
   initialEffects = null,
+  initialMediaUrls,
   createdAt: createdAtIso,
   updatedAt: updatedAtIso,
   api,
@@ -128,6 +134,7 @@ export function EntryEditor({
   onPickled,
 }: EntryEditorProps) {
   const t = useTranslations('editor');
+  const tPhoto = useTranslations('photo');
   const locale = useLocale();
   // For existing entries, split first line as title
   const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
@@ -152,6 +159,8 @@ export function EntryEditor({
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
+  const [mediaUrls, setMediaUrls] = useState<string[]>(initialMediaUrls ?? []);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   // Issue #319: autosave で初回エントリが作られた際に、ローカルで紐づけ済みの
@@ -395,6 +404,7 @@ export function EntryEditor({
       const saveOptions: {
         fermentationEnabled?: boolean;
         effects?: EditorEffectsState | null;
+        mediaUrls?: string[];
       } = {};
       if (options.fermentationEnabled !== undefined) {
         saveOptions.fermentationEnabled = options.fermentationEnabled;
@@ -402,6 +412,8 @@ export function EntryEditor({
       if (editorRef.current) {
         saveOptions.effects = effectsSnapshot;
       }
+      // 添えた写真はエディタが正を持つので毎回同梱する（送らなければサーバーは既存維持）。
+      saveOptions.mediaUrls = mediaUrls;
 
       const savedId = await save(
         finalContent,
@@ -474,6 +486,7 @@ export function EntryEditor({
       t,
       userMe,
       getTracesSnapshot,
+      mediaUrls,
     ],
   );
 
@@ -609,9 +622,9 @@ export function EntryEditor({
   );
 
   const autoSave = useCallback(
-    (contentToSave: string, id?: string) => {
+    (contentToSave: string, id?: string, options?: { mediaUrls?: string[] }) => {
       isAutosavingRef.current = true;
-      return save(contentToSave, id);
+      return save(contentToSave, id, options);
     },
     [save],
   );
@@ -622,7 +635,70 @@ export function EntryEditor({
     entryId: currentEntryId,
     enabled: !!api,
     save: autoSave,
+    mediaUrls,
     onSaved: handleAutosaved,
+  });
+
+  /**
+   * 起こした文字をカーソル位置に差し込む（本文の全置換はしない）。
+   * execCommand を使うのは、contentEditable の undo 履歴とカーソル位置を壊さないため
+   * （onPaste が同じ理由で使っているのと同じ判断）。
+   */
+  const insertTranscript = useCallback((text: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+
+    const selection = window.getSelection();
+    // モーダルを開いている間にカーソルが editor の外へ出ているので、
+    // 選択が editor 内に無ければ末尾に置き直してから差し込む。
+    if (!selection || selection.rangeCount === 0 || !el.contains(selection.anchorNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    const lead = el.innerText && !el.innerText.endsWith('\n') ? '\n' : '';
+    document.execCommand('insertText', false, `${lead}${text}`);
+
+    // execCommand の input が React の onInput に届かない場合があるため明示同期する。
+    setContent(el.innerText ?? '');
+    setStatus((s) => (s === 'saved' ? 'editing' : s));
+  }, []);
+
+  /**
+   * 写真を添える。本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
+   * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
+   */
+  const attachPhoto = useCallback(
+    async (url: string) => {
+      const next = [...mediaUrls, url];
+      setMediaUrls(next);
+      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
+      if (!finalContent.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
+      const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
+      if (savedId) setCurrentEntryId(savedId);
+    },
+    [mediaUrls, title, content, currentEntryId, save],
+  );
+
+  const removePhoto = useCallback(
+    async (url: string) => {
+      const next = mediaUrls.filter((u) => u !== url);
+      setMediaUrls(next);
+      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
+      if (!currentEntryId || !finalContent.trim()) return;
+      await save(finalContent, currentEntryId, { mediaUrls: next });
+    },
+    [mediaUrls, title, content, currentEntryId, save],
+  );
+
+  const photoImport = usePhotoImport({
+    api,
+    onAttach: attachPhoto,
+    onInsertText: insertTranscript,
   });
 
   /** Navigate with unsaved-changes guard */
@@ -880,6 +956,44 @@ export function EntryEditor({
               {voiceStatusMessage(voiceState.reason, t)}
             </span>
           )}
+          {/* Photo import — 文字として読み込むか、写真として貼るかをモーダルで選ばせる */}
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip={tPhoto('toolbar_button')}
+            aria-label={tPhoto('toolbar_button')}
+            data-testid="photo-import-trigger"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M18 10.5h.008v.008H18V10.5Zm2.25 6.75V6.75A2.25 2.25 0 0 0 18 4.5H6a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 6 19.5h12a2.25 2.25 0 0 0 2.25-2.25Z"
+              />
+            </svg>
+          </button>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
+            aria-label={tPhoto('modal_title')}
+            tabIndex={-1}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // 同じファイルを選び直しても change が起きるよう毎回リセットする。
+              e.target.value = '';
+              if (file) photoImport.selectFile(file);
+            }}
+          />
           {/* Voice input */}
           <button
             type="button"
@@ -1172,6 +1286,18 @@ export function EntryEditor({
           />
         </div>
       </div>
+
+      {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
+      <PhotoStrip urls={mediaUrls} onRemove={removePhoto} />
+
+      <PhotoImportModal
+        state={photoImport.state}
+        onTranscribe={photoImport.transcribe}
+        onAttach={photoImport.attach}
+        onInsertTranscript={photoImport.insertTranscript}
+        onDiscardTranscript={photoImport.discardTranscript}
+        onClose={photoImport.close}
+      />
 
       {/* Stats popup */}
       <StatsPopup

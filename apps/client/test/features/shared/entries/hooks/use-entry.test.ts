@@ -32,6 +32,7 @@ describe('useEntry', () => {
     const entry = {
       id: 'e1',
       content: 'hello',
+      mediaUrls: ['https://cdn.example/a.jpg'],
       effects: null,
       createdAt: '2024-01-01',
       updatedAt: '2024-01-01',
@@ -47,6 +48,29 @@ describe('useEntry', () => {
 
     expect(result.current.entry).toEqual(entry);
     expect(apiFetch).toHaveBeenCalledWith('/api/v1/entries/e1');
+  });
+
+  it('mediaUrls が無いレスポンスでも空配列で埋める', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        entry: {
+          id: 'e1',
+          content: 'hello',
+          effects: null,
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      }),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entry?.mediaUrls).toEqual([]);
   });
 
   it('sets loading to false after fetch', async () => {

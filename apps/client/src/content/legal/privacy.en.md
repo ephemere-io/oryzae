@@ -38,6 +38,7 @@ When you use the Service, the following information is stored on our systems.
 - Snippets (short fragments you cut out from your entries)
 - Card layout on the Board (position, rotation, size, etc.)
 - Photos and captions you add to the Board
+- Photos you attach to an entry (resized on your device to a JPEG no larger than 1568px on its long edge)
 
 ### 3.3 Output of the AI fermentation
 
@@ -73,6 +74,17 @@ Fermentation, the heart of the Service, sends text to an external AI model (Clau
 
 The AI's output is for reference only — please do not rely on it as authoritative.
 
+## 5-2. About reading text from photos
+
+If you upload a photo while writing an entry and choose "Read as text", **that photo is sent to the same external AI model (Claude, by Anthropic)** so the text in it can be transcribed.
+
+- Only the photo you selected for that action is sent. Choosing "Attach as photo" alone does not send it to the AI.
+- Before sending, the photo is converted on your device to a JPEG no larger than 1568px on its long edge.
+- The transcribed text is saved to your entry only when you review it and choose "Insert into entry". Your entry is never rewritten without your confirmation.
+- The photo itself is sent solely for transcription and is not retained by the AI provider (we use a commercial API so it is not used for training).
+
+Transcription accuracy is not guaranteed — handwriting and unclear photos in particular will contain errors.
+
 ## 6. Third parties (sub-processors)
 
 To run the Service, we rely on the providers below. Each one handles your information under its own privacy policy.
@@ -80,7 +92,7 @@ To run the Service, we rely on the providers below. Each one handles your inform
 | Provider | Purpose | Data shared |
 |---|---|---|
 | Supabase (Supabase Inc.) | Database, authentication, file storage | Account information, entries, images — all stored data |
-| Anthropic (Anthropic PBC) | AI model for fermentation | The question and the entries tied to it, only |
+| Anthropic (Anthropic PBC) | AI model for fermentation; reading text from photos | The question and the entries tied to it; photos you asked to transcribe |
 | Vercel (Vercel Inc.) | Application hosting | Network traffic (encrypted in transit) |
 | Resend (Resend, Inc.) | Transactional email (confirmation, password reset) | Email address, email body |
 | Sentry (Functional Software, Inc.) | Error tracking | Error logs, stack traces, user ID |

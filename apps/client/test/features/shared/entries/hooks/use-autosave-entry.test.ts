@@ -33,7 +33,61 @@ describe('useAutosaveEntry', () => {
     });
 
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined);
+    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined, undefined);
+  });
+
+  // 写真を添えた直後の自動保存で media_urls が巻き添えで消えないこと。
+  it('mediaUrls を渡すと save に同梱される', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+    const mediaUrls = ['https://cdn.example/a.jpg'];
+
+    const { rerender } = renderHook(
+      ({ body }) =>
+        useAutosaveEntry({
+          title: '',
+          body,
+          entryId: undefined,
+          save,
+          enabled: true,
+          mediaUrls,
+        }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: 'これは十分な長さの本文です' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined, { mediaUrls });
+  });
+
+  // 保存の起動条件は本文の変化のまま。写真を足しただけでは保存を走らせない
+  // （呼び出し側が明示的に保存するため。二重保存を避ける）。
+  it('mediaUrls が変わっただけでは save を呼ばない', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+
+    const { rerender } = renderHook(
+      ({ mediaUrls }) =>
+        useAutosaveEntry({
+          title: '',
+          body: '本文はずっと同じままにしておく',
+          entryId: 'e1',
+          save,
+          enabled: true,
+          mediaUrls,
+        }),
+      { initialProps: { mediaUrls: [] as string[] } },
+    );
+
+    rerender({ mediaUrls: ['https://cdn.example/a.jpg'] });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(save).not.toHaveBeenCalled();
   });
 
   it('delta が 10 文字未満なら save を呼ばない', async () => {
@@ -105,7 +159,11 @@ describe('useAutosaveEntry', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(save).toHaveBeenCalledWith('マイタイトル\n本文は十分長いテキストである', 'e1');
+    expect(save).toHaveBeenCalledWith(
+      'マイタイトル\n本文は十分長いテキストである',
+      'e1',
+      undefined,
+    );
   });
 
   it('enabled=false なら save を呼ばない', async () => {
@@ -161,6 +219,6 @@ describe('useAutosaveEntry', () => {
     });
 
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith('十分な長さの1つ目と2つ目と3つ目', undefined);
+    expect(save).toHaveBeenCalledWith('十分な長さの1つ目と2つ目と3つ目', undefined, undefined);
   });
 });

@@ -65,7 +65,9 @@ export type TextSpanMark = z.infer<typeof textSpanMarkSchema>;
 
 export const createEntrySchema = z.object({
   content: z.string(),
-  mediaUrls: z.array(z.string()).default([]),
+  // undefined → 既存値を維持（更新時）/ 配列 → 差し替え。effects と同じ扱いにしてあるのは、
+  // 自動保存が写真を知らないまま本文だけ送ってきても media_urls を消さないため。
+  mediaUrls: z.array(z.string()).optional(),
   editorType: z.string(),
   editorVersion: z.string(),
   extension: z.record(z.unknown()).default({}),

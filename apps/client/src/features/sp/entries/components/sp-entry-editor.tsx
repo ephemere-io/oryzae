@@ -1,13 +1,16 @@
 'use client';
 
+import { ACCEPTED_IMAGE_MIME_TYPES } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { PhotoStrip } from '@/components/ui/photo-strip';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
+import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
 import type { EntryDraft } from '@/features/shared/entries/types';
 import {
   useActiveQuestions,
@@ -15,6 +18,7 @@ import {
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { ApiClient } from '@/lib/api';
 import { SpConfirmSheet } from './sp-confirm-sheet';
+import { SpPhotoImportSheet } from './sp-photo-import-sheet';
 
 interface SpEntryEditorProps {
   api: ApiClient | null;
@@ -24,6 +28,8 @@ interface SpEntryEditorProps {
   initialEntryId?: string;
   /** 既存エントリの本文（先頭行=タイトル）。新規は空。 */
   initialContent?: string;
+  /** 既存エントリに添えられている写真。新規は空。 */
+  initialMediaUrls?: string[];
   /**
    * 書きかけドラフトの退避/復元を有効にするか（既定 true）。
    * 孤立検証（verify）では localStorage が fixture をまたいで漏れるため false にする。
@@ -52,10 +58,12 @@ export function SpEntryEditor({
   initialQuestionId = null,
   initialEntryId,
   initialContent = '',
+  initialMediaUrls,
   persistDraft = true,
 }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
   const tDelete = useTranslations('entries.delete_modal');
+  const tPhoto = useTranslations('photo');
   const router = useRouter();
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const { save, saving, error } = useSaveEntry(api, null);
@@ -86,6 +94,9 @@ export function SpEntryEditor({
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState<string[]>(initialMediaUrls ?? []);
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 書きかけ（タイトル/本文/問い/entryId）を localStorage に退避する。内容が空になればクリア。
   // 発酵（瓶に納める）後は確定とみなして退避しない。
@@ -105,11 +116,59 @@ export function SpEntryEditor({
     body,
     entryId,
     save,
+    mediaUrls,
     onSaved: (id, savedBody) => {
       setEntryId(id);
       setLastSavedBody(savedBody);
     },
     enabled: api != null,
+  });
+
+  /** 起こした文字をカーソル位置に差し込む（本文の全置換はしない）。 */
+  function insertAtCursor(text: string) {
+    const el = bodyRef.current;
+    const at = el ? (el.selectionStart ?? body.length) : body.length;
+    const before = body.slice(0, at);
+    const after = body.slice(at);
+    // 直前が改行でなければ改行を足して、既存の文と地続きにならないようにする。
+    const lead = before && !before.endsWith('\n') ? '\n' : '';
+    const next = `${before}${lead}${text}${after}`;
+    setBody(next);
+    // 差し込んだ直後にカーソルを末尾へ運ぶ（続きを書き始められるように）。
+    requestAnimationFrame(() => {
+      const target = bodyRef.current;
+      if (!target) return;
+      const caret = before.length + lead.length + text.length;
+      target.focus();
+      target.setSelectionRange(caret, caret);
+    });
+  }
+
+  /**
+   * 写真を添える。本文が未保存でも写真だけ先に確定させたいので、ここで明示的に保存する
+   * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
+   */
+  async function attachPhoto(url: string) {
+    const next = [...mediaUrls, url];
+    setMediaUrls(next);
+    const content = title.trim() ? `${title.trim()}\n${body}` : body;
+    if (!content.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
+    const saved = await save(content, entryId, { mediaUrls: next });
+    if (saved) setEntryId(saved);
+  }
+
+  async function removePhoto(url: string) {
+    const next = mediaUrls.filter((u) => u !== url);
+    setMediaUrls(next);
+    const content = title.trim() ? `${title.trim()}\n${body}` : body;
+    if (!entryId || !content.trim()) return;
+    await save(content, entryId, { mediaUrls: next });
+  }
+
+  const photoImport = usePhotoImport({
+    api,
+    onAttach: attachPhoto,
+    onInsertText: insertAtCursor,
   });
 
   // 問いはエントリ作成後（entryId 確定後）に一度だけ紐づける。
@@ -138,7 +197,7 @@ export function SpEntryEditor({
     if (!entryId || pickling || pickled) return;
     setPickling(true);
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
-    const saved = await save(content, entryId, { fermentationEnabled: true });
+    const saved = await save(content, entryId, { fermentationEnabled: true, mediaUrls });
     setPickling(false);
     if (saved) {
       setPickled(true);
@@ -243,10 +302,36 @@ export function SpEntryEditor({
             ? `◦ ${selectedQuestion.currentText ?? t('question_untitled')}`
             : `+ ${t('question_link')}`}
         </button>
+
+        {/* 写真を取り込む。押すと端末のカメラ/ライブラリが開く。 */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          aria-label={tPhoto('toolbar_button')}
+          className="ml-2 rounded-full px-3 py-1.5 text-xs"
+          style={{ color: 'var(--date-color)', border: '1px dashed var(--border-subtle)' }}
+        >
+          {`+ ${tPhoto('toolbar_button')}`}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
+          aria-label={tPhoto('modal_title')}
+          tabIndex={-1}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // 同じファイルを選び直しても change が起きるよう毎回リセットする。
+            e.target.value = '';
+            if (file) photoImport.selectFile(file);
+          }}
+        />
       </div>
 
       {/* 本文（タイトルから広い余白＋ゆったり行間）。指摘: 余白が欲しい。 */}
       <textarea
+        ref={bodyRef}
         // biome-ignore lint/a11y/noAutofocus: 縦長フォーカスエディタは開いた瞬間に書き始められることが要件
         autoFocus
         value={body}
@@ -255,6 +340,18 @@ export function SpEntryEditor({
         aria-label={t('body_placeholder')}
         className="mt-6 w-full flex-1 resize-none bg-transparent px-5 pb-4 text-base outline-none placeholder:opacity-30"
         style={{ lineHeight: 2 }}
+      />
+
+      {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
+      <PhotoStrip urls={mediaUrls} onRemove={removePhoto} />
+
+      <SpPhotoImportSheet
+        state={photoImport.state}
+        onTranscribe={photoImport.transcribe}
+        onAttach={photoImport.attach}
+        onInsertTranscript={photoImport.insertTranscript}
+        onDiscardTranscript={photoImport.discardTranscript}
+        onClose={photoImport.close}
       />
 
       {/* 発酵させる CTA（保存済み＝entryId 確定後のみ）。

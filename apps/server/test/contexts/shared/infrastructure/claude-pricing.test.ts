@@ -26,4 +26,29 @@ describe('computeCostFromTokens', () => {
     expect(cost?.totalCost).toBeCloseTo(0.003, 10);
     expect(cost?.completionTokens).toBe(0);
   });
+
+  // 文字起こし (photo_transcription_usages) はモデル名を保存するので単価が引ける。
+  it('モデルを指定するとそのモデルの単価で算出する', () => {
+    // haiku: $1/1M in, $5/1M out → 1000*1 + 1000*5 = 0.006
+    const haiku = computeCostFromTokens(1000, 1000, 'claude-haiku-4-5');
+    expect(haiku?.totalCost).toBeCloseTo(0.006, 10);
+
+    // opus: $5/1M in, $25/1M out → 0.03
+    const opus = computeCostFromTokens(1000, 1000, 'claude-opus-5');
+    expect(opus?.totalCost).toBeCloseTo(0.03, 10);
+  });
+
+  it('モデル未指定は発酵のモデル (claude-sonnet-4-6) を既定にする', () => {
+    expect(computeCostFromTokens(1000, 1000)?.totalCost).toBeCloseTo(
+      computeCostFromTokens(1000, 1000, 'claude-sonnet-4-6')?.totalCost ?? Number.NaN,
+      10,
+    );
+    expect(computeCostFromTokens(1000, 1000, null)?.totalCost).toBeCloseTo(0.018, 10);
+  });
+
+  // 未知のモデルを 0 円にすると、モデル差し替え時に集計が黙って過少になる。
+  it('未知のモデル名でも 0 円にはせず既定の単価で算出する', () => {
+    const unknown = computeCostFromTokens(1000, 1000, 'claude-something-new');
+    expect(unknown?.totalCost).toBeCloseTo(0.018, 10);
+  });
 });

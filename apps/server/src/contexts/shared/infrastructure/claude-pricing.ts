@@ -5,12 +5,21 @@
  * `gateway.getGenerationInfo()` ベースのコスト追跡が機能しなくなった。代わりに
  * 保存済みのトークン数と価格表から cost を計算する。
  *
- * 価格は fermentation gateway が使うモデル (claude-sonnet-4-6) のもの:
- *   input  $3.00 / 1M tokens, output $15.00 / 1M tokens
- * (vercel-ai-analysis.gateway.ts のモデルを変えたらここも合わせること)
+ * 単価はモデルごとに違うので価格表を持つ。使う側がモデル名を保存していない場合
+ * （fermentation_results はモデル列を持たない）は発酵のモデルを既定として扱う。
+ * gateway のモデルを変えたらここの表も合わせること:
+ *   - 発酵: vercel-ai-analysis.gateway.ts
+ *   - 文字起こし: anthropic-photo-transcription.gateway.ts
  */
-const INPUT_USD_PER_TOKEN = 3.0 / 1_000_000;
-const OUTPUT_USD_PER_TOKEN = 15.0 / 1_000_000;
+const USD_PER_MTOK: Record<string, { input: number; output: number }> = {
+  'claude-sonnet-4-6': { input: 3.0, output: 15.0 },
+  'claude-sonnet-5': { input: 3.0, output: 15.0 },
+  'claude-haiku-4-5': { input: 1.0, output: 5.0 },
+  'claude-opus-5': { input: 5.0, output: 25.0 },
+};
+
+/** モデル未記録のレコード（fermentation_results）が使う既定。発酵のモデル。 */
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 export interface TokenCost {
   totalCost: number;
@@ -21,14 +30,19 @@ export interface TokenCost {
 export function computeCostFromTokens(
   inputTokens: number | null | undefined,
   outputTokens: number | null | undefined,
+  model?: string | null,
 ): TokenCost | null {
   // どちらも無ければコスト不明 (= null)。過去の retire 期間や旧 generation_id 方式の
   // レコードはトークン未保存なので null になる。
   if (inputTokens == null && outputTokens == null) return null;
   const input = inputTokens ?? 0;
   const output = outputTokens ?? 0;
+
+  // 未知のモデル名でも 0 円扱いにはしない（集計が黙って過少になるのを避ける）。
+  const rate = USD_PER_MTOK[model ?? DEFAULT_MODEL] ?? USD_PER_MTOK[DEFAULT_MODEL];
+
   return {
-    totalCost: input * INPUT_USD_PER_TOKEN + output * OUTPUT_USD_PER_TOKEN,
+    totalCost: (input * rate.input + output * rate.output) / 1_000_000,
     promptTokens: input,
     completionTokens: output,
   };
