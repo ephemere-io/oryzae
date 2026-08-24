@@ -7,30 +7,37 @@ test.describe('ボード画面', () => {
     await page.waitForSelector('[role="application"]');
   });
 
-  test('ボード画面が表示される', async ({ page }) => {
-    await expect(page.locator('text=Daily')).toBeVisible();
-    await expect(page.locator('button:has-text("Snippet")')).toBeVisible();
+  test('ボード画面が表示される（日付ナビ＋下部ツールバー）', async ({ page }) => {
+    await expect(page.locator('button[data-verify-view-option="daily"]')).toBeVisible();
+    await expect(page.locator('[role="toolbar"]')).toBeVisible();
+    await expect(page.locator('button[data-verify-tool="snippet"]')).toBeVisible();
+    await expect(page.locator('button[data-verify-tool="photo"]')).toBeVisible();
+  });
+
+  test('不要になった要素（フッター・カード数）が出ない', async ({ page }) => {
+    await expect(page.locator('footer')).toHaveCount(0);
+    await expect(page.getByText(/\d+ CARDS/)).toHaveCount(0);
   });
 
   test('日付ナビゲーションで前日/翌日に切り替えできる', async ({ page }) => {
-    // 日付ラベルは tracking-wider が一意（他コントロールは tracking-[0.15em] 等）。
+    // 日付ラベルは tracking-wider が一意（セグメント切り替えは tracking-[0.15em]）。
     const dateText = page.locator('[class*="tracking-wider"]').first();
     const initialDate = await dateText.textContent();
 
-    await page.click('button:has-text("‹")');
+    await page.click('button[data-verify-nav="prev"]');
     await page.waitForTimeout(500);
     const prevDate = await dateText.textContent();
     expect(prevDate).not.toBe(initialDate);
 
-    await page.click('button:has-text("›")');
+    await page.click('button[data-verify-nav="next"]');
     await page.waitForTimeout(500);
     const nextDate = await dateText.textContent();
     expect(nextDate).toBe(initialDate);
   });
 
-  test('スニペットを作成できる', async ({ page }) => {
+  test('ツールバーからスニペットを作成できる', async ({ page }) => {
     const snippet = `E2Eスニペット-${Date.now()}`;
-    await page.click('button:has-text("Snippet")');
+    await page.click('button[data-verify-tool="snippet"]');
     // ダイアログ見出しは「スニペットを作成」、入力は textarea(placeholder="テキストを入力...")、確定は「作成」。
     await expect(page.getByText('スニペットを作成')).toBeVisible();
     await page.fill('textarea[placeholder*="テキスト"]', snippet);
@@ -38,6 +45,19 @@ test.describe('ボード画面', () => {
 
     await page.waitForTimeout(1000);
     await expect(page.getByText(snippet)).toBeVisible();
+  });
+
+  test('スニペット作成ダイアログで「画像から読み取る」に切り替えられる', async ({ page }) => {
+    await page.click('button[data-verify-tool="snippet"]');
+    await expect(page.getByText('スニペットを作成')).toBeVisible();
+
+    await page.click('button[data-verify-source-tab="image"]');
+    // 画像タブではテキスト入力が消え、読み取りボタン（未選択なので無効）が出る。
+    await expect(page.locator('textarea')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '文字を読み取る' })).toBeDisabled();
+
+    await page.click('button[data-verify-source-tab="text"]');
+    await expect(page.locator('textarea')).toBeVisible();
   });
 
   test('エントリカードが表示される（当日エントリがある場合）', async ({ page }) => {

@@ -7,7 +7,13 @@ interface BoardDateNavProps {
   dateKey: string;
   viewType: 'daily' | 'weekly';
   onDateChange: (dateKey: string) => void;
+  onViewTypeChange: (viewType: 'daily' | 'weekly') => void;
 }
+
+const VIEW_TYPES: { id: 'daily' | 'weekly'; label: string }[] = [
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+];
 
 function toDateKey(d: Date): string {
   const y = d.getFullYear();
@@ -44,7 +50,19 @@ function shiftDate(dateKey: string, offset: number): string {
   return toDateKey(d);
 }
 
-export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavProps) {
+/**
+ * 盤面左上の日付ナビ＋表示単位（Daily/Weekly）の切り替え。
+ *
+ * 表示単位はここに同居させる。日付ラベル（1日 or 月〜日の範囲）も送り幅（1日 or 7日）も
+ * viewType で変わるため、離すと「今どちらを見ているか」と「どこへ動くか」が別々の場所に
+ * 散る。作成系の道具は下部の BoardToolbar が持つ。
+ */
+export function BoardDateNav({
+  dateKey,
+  viewType,
+  onDateChange,
+  onViewTypeChange,
+}: BoardDateNavProps) {
   const t = useTranslations('board');
   const days = [
     t('date.day_sun'),
@@ -67,6 +85,7 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
       <button
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, -offset))}
+        data-verify-nav="prev"
         className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors"
         style={{ color: 'var(--date-color)' }}
       >
@@ -81,11 +100,39 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
       <button
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, offset))}
+        data-verify-nav="next"
         className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors"
         style={{ color: 'var(--date-color)' }}
       >
         ›
       </button>
+
+      {/* 表示単位のセグメント切り替え */}
+      <div
+        className="ml-1 flex items-center gap-0.5 rounded-lg border p-0.5"
+        style={{ borderColor: 'var(--border-subtle)' }}
+      >
+        {VIEW_TYPES.map((v) => {
+          const isActive = viewType === v.id;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => onViewTypeChange(v.id)}
+              aria-pressed={isActive}
+              data-verify-view-option={v.id}
+              className="rounded-md px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.15em] transition-colors"
+              style={
+                isActive
+                  ? { backgroundColor: 'var(--accent)', color: '#fff' }
+                  : { backgroundColor: 'transparent', color: 'var(--date-color)' }
+              }
+            >
+              {v.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

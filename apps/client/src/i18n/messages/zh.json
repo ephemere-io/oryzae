@@ -288,10 +288,27 @@
       "placeholder": "请输入文本...",
       "cancel": "取消",
       "update": "更新",
-      "create": "创建"
+      "create": "创建",
+      "source_aria": "摘录来源",
+      "tab_text": "输入文字",
+      "tab_image": "从图片识别",
+      "click_to_select_image": "点击选择图片",
+      "preview_alt": "待识别图片预览",
+      "read_image": "识别文字",
+      "reading": "识别中…",
+      "reading_aria": "识别中",
+      "ocr_empty": "未能识别到文字。请换一张图片试试。",
+      "ocr_failed": "识别失败。请检查格式（JPEG/PNG/WebP/GIF）与大小（{maxMb}MB 以内）。",
+      "ocr_note": "已从图片识别。请精简到 {max} 字以内。",
+      "too_long": "请控制在 {max} 字以内"
     },
     "error_message": "加载画板失败",
-    "retry": "重试"
+    "retry": "重试",
+    "toolbar": {
+      "aria_label": "看板工具栏",
+      "snippet": "创建摘录",
+      "photo": "粘贴图片"
+    }
   },
   "editor": {
     "status": {

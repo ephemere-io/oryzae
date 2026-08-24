@@ -288,10 +288,27 @@
       "placeholder": "Enter text...",
       "cancel": "Cancel",
       "update": "Update",
-      "create": "Create"
+      "create": "Create",
+      "source_aria": "Snippet source",
+      "tab_text": "Write text",
+      "tab_image": "Read from image",
+      "click_to_select_image": "Click to select an image",
+      "preview_alt": "Preview of the image to read",
+      "read_image": "Read text",
+      "reading": "Reading…",
+      "reading_aria": "Reading",
+      "ocr_empty": "No text found in that image. Try another one.",
+      "ocr_failed": "Reading failed. Check the format (JPEG/PNG/WebP/GIF) and size ({maxMb}MB or less).",
+      "ocr_note": "Read from the image. Trim it to {max} characters or fewer.",
+      "too_long": "Must be {max} characters or fewer"
     },
     "error_message": "Failed to load the board",
-    "retry": "Retry"
+    "retry": "Retry",
+    "toolbar": {
+      "aria_label": "Board toolbar",
+      "snippet": "Create snippet",
+      "photo": "Paste image"
+    }
   },
   "editor": {
     "status": {

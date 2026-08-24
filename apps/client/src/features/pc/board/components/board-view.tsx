@@ -12,8 +12,8 @@ import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
 import { BoardCard } from './board-card';
-import { BoardControls } from './board-controls';
 import { BoardDateNav } from './board-date-nav';
+import { BoardToolbar } from './board-toolbar';
 import { PhotoDialog } from './photo-dialog';
 import { SnippetDialog } from './snippet-dialog';
 
@@ -112,24 +112,42 @@ export function BoardView({ api }: BoardViewProps) {
     [cards, deleteCard],
   );
 
-  // Keyboard handling for Delete/Backspace
+  const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
+  const openPhotoDialog = useCallback(() => setPhotoDialogOpen(true), []);
+
+  const dialogOpen = snippetDialog.open || photoDialogOpen || lightbox !== null;
+
+  // Keyboard handling: Delete/Backspace で選択カードを消す ＋ ツールバーのショートカット。
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
+      const target = e.target as HTMLElement;
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
-        if ((e.target as HTMLElement).isContentEditable) return;
         if (selectedId) {
           e.preventDefault();
           handleDeleteCard(selectedId);
         }
+        return;
+      }
+
+      // ツールのショートカット（Figma と同じく修飾キーなしの1文字）。
+      // 何かが開いている間は拾わない（閉じるのは Escape の仕事）。
+      if (dialogOpen || e.metaKey || e.ctrlKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        openSnippetDialog();
+      } else if (key === 'i') {
+        e.preventDefault();
+        openPhotoDialog();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, handleDeleteCard]);
+  }, [selectedId, handleDeleteCard, dialogOpen, openSnippetDialog, openPhotoDialog]);
 
   return (
     <div
@@ -159,12 +177,11 @@ export function BoardView({ api }: BoardViewProps) {
         }}
       />
 
-      <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
-      <BoardControls
+      <BoardDateNav
+        dateKey={dateKey}
         viewType={viewType}
+        onDateChange={setDateKey}
         onViewTypeChange={setViewType}
-        onAddSnippet={() => setSnippetDialog({ open: true })}
-        onAddPhoto={() => setPhotoDialogOpen(true)}
       />
 
       {/* Canvas */}
@@ -206,17 +223,17 @@ export function BoardView({ api }: BoardViewProps) {
         ))}
       </div>
 
-      {/* Card count */}
-      <div
-        className="pointer-events-none absolute bottom-2 right-4 z-10 text-[10px] uppercase tracking-[0.15em]"
-        style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
-      >
-        {cards.filter((c) => !c.removing).length} CARDS
-      </div>
+      {/* 道具箱（下部中央フローティング） */}
+      <BoardToolbar
+        activeTool={snippetDialog.open ? 'snippet' : photoDialogOpen ? 'photo' : 'none'}
+        onCreateSnippet={openSnippetDialog}
+        onAddPhoto={openPhotoDialog}
+      />
 
       {/* Snippet dialog */}
       <SnippetDialog
         open={snippetDialog.open}
+        api={api}
         initialText={snippetDialog.initialText}
         onSubmit={(text) => {
           if (snippetDialog.snippetId) {

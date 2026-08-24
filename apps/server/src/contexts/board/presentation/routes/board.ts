@@ -3,6 +3,7 @@ import {
   boardQuerySchema,
   boardSnippetCreateSchema,
   boardSnippetUpdateSchema,
+  MAX_OCR_IMAGE_BYTES,
   MAX_PHOTO_CAPTION_LENGTH,
 } from '@oryzae/shared';
 import { Hono } from 'hono';
@@ -12,9 +13,11 @@ import { CreateBoardSnippetUsecase } from '../../application/usecases/create-boa
 import { DeleteBoardPhotoUsecase } from '../../application/usecases/delete-board-photo.usecase.js';
 import { DeleteBoardSnippetUsecase } from '../../application/usecases/delete-board-snippet.usecase.js';
 import { DeleteCardUsecase } from '../../application/usecases/delete-card.usecase.js';
+import { ExtractTextFromImageUsecase } from '../../application/usecases/extract-text-from-image.usecase.js';
 import { LoadBoardUsecase } from '../../application/usecases/load-board.usecase.js';
 import { SaveCardPositionsUsecase } from '../../application/usecases/save-card-positions.usecase.js';
 import { UpdateBoardSnippetUsecase } from '../../application/usecases/update-board-snippet.usecase.js';
+import { AnthropicOcrGateway } from '../../infrastructure/ocr/anthropic-ocr.gateway.js';
 import { SupabaseBoardCardRepository } from '../../infrastructure/repositories/supabase-board-card.repository.js';
 import { SupabaseBoardPhotoRepository } from '../../infrastructure/repositories/supabase-board-photo.repository.js';
 import { SupabaseBoardSnippetRepository } from '../../infrastructure/repositories/supabase-board-snippet.repository.js';
@@ -97,6 +100,30 @@ export const board = new Hono<Env>()
 
     const result = await usecase.execute(c.get('userId'), body);
     return c.json(result, 201);
+  })
+
+  // POST /api/v1/board/snippets/ocr (multipart/form-data)
+  // 画像を読み取って本文だけ返す。スニペットはまだ作らない（ユーザーが確認・編集してから
+  // POST /snippets を叩く）。
+  .post('/snippets/ocr', async (c) => {
+    const body = await c.req.parseBody();
+    const file = body.file;
+    if (!(file instanceof File)) {
+      return c.json({ error: 'File is required' }, 400);
+    }
+
+    // 本文を読む前に弾く。arrayBuffer() まで進めてから usecase で長さを見ると、
+    // 上限を超えた画像も一度まるごとメモリに載ってしまい上限の意味が無くなる。
+    if (file.size > MAX_OCR_IMAGE_BYTES) {
+      return c.json({ error: `Image must be ${MAX_OCR_IMAGE_BYTES} bytes or less` }, 400);
+    }
+
+    const usecase = new ExtractTextFromImageUsecase(new AnthropicOcrGateway());
+    const result = await usecase.execute({
+      image: await file.arrayBuffer(),
+      mediaType: file.type,
+    });
+    return c.json(result);
   })
 
   // PUT /api/v1/board/snippets/:id

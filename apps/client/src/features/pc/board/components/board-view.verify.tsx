@@ -2,21 +2,20 @@
  * BoardView の検証スペック（A 移植・PC 版ボード合成）。
  *
  * BoardView は viewType・各ダイアログ開閉を自前 state で持ち、子（BoardDateNav /
- * BoardControls / SnippetDialog / PhotoDialog / BoardCard）を束ねる feature。
+ * BoardToolbar / SnippetDialog / PhotoDialog / BoardCard）を束ねる feature。
  * データ取得は useBoard(api) / useBoardSave(api) に閉じており、いずれも api 越しの
  * fetch でしか cards を増やさない。よって「解決しない fetch を持つ ApiClient」を渡せば
- * ネットワーク0・cards は常に空のまま孤立検証できる（board は常に「0 CARDS」表示）。
+ * ネットワーク0・cards は常に空のまま孤立検証できる。
  * router は useRouter を使うが withVerifyProviders の no-op mock で供給される。
  *
- * 公表する契約は実際に変化する状態のみ: viewType（daily/weekly トグル）と、
- * snippetOpen / photoOpen（コントロールの追加ボタンで開くダイアログ）。cards は seam が
- * 無く常に空なのでカード内容は契約に載せない。loading は never-resolve では true で固定・
- * showLoader は 250ms タイマー依存のため、どちらも契約・invariant に載せない
+ * 公表する契約は実際に変化する状態のみ: viewType（日付ナビのセグメント切り替え）と、
+ * snippetOpen / photoOpen（ツールバーで開くダイアログ）。cards は seam が無く常に空なので
+ * カード内容は契約に載せない。loading は never-resolve では true で固定・showLoader は
+ * 250ms タイマー依存のため、どちらも契約・invariant に載せない
  * （sp-entry-editor の「定数・タイマー揺れは契約に載せない」と同方針）。
  *
  * i18n（board）依存のため withVerifyProviders（NextIntlClientProvider）で包む。
- * BoardControls のボタンは [data-verify-unit="BoardControls"] の直下 <button> 群で、
- * 1=Daily / 2=Weekly / 3=Snippet / 4=Photo の順なので nth-of-type で一意に押せる。
+ * 道具は data-verify-tool、表示単位は data-verify-view-option で一意に押せる。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -36,15 +35,15 @@ const neverResolveApi: ApiClient = {
   fetch: () => new Promise<Response>(() => {}),
 };
 
-const SNIPPET_BTN = '[data-verify-unit="BoardControls"] button:nth-of-type(3)';
-const PHOTO_BTN = '[data-verify-unit="BoardControls"] button:nth-of-type(4)';
-const WEEKLY_BTN = '[data-verify-unit="BoardControls"] button:nth-of-type(2)';
+const SNIPPET_BTN = '[data-verify-unit="BoardToolbar"] button[data-verify-tool="snippet"]';
+const PHOTO_BTN = '[data-verify-unit="BoardToolbar"] button[data-verify-tool="photo"]';
+const WEEKLY_BTN = '[data-verify-unit="BoardDateNav"] button[data-verify-view-option="weekly"]';
 
 registerUnit<Props>({
   id: 'BoardView',
   title: 'BoardView',
   description:
-    'PC 版ボード合成（日付ナビ＋コントロール＋カードキャンバス＋スニペット/写真ダイアログ）。',
+    'PC 版ボード合成（日付ナビ＋下部ツールバー＋カードキャンバス＋スニペット/写真ダイアログ）。',
   kind: 'feature',
   render: (props) => withVerifyProviders(<BoardView {...props} />),
   fixtures: [
@@ -55,7 +54,7 @@ registerUnit<Props>({
     },
     {
       id: 'snippet-open',
-      description: 'コントロールの ✦ Snippet を押すとスニペット作成ダイアログが開く',
+      description: 'ツールバーのスニペット作成を押すと作成ダイアログが開く',
       props: { api: neverResolveApi },
       act: async (ctx) => {
         await ctx.click(SNIPPET_BTN);
@@ -64,7 +63,7 @@ registerUnit<Props>({
     },
     {
       id: 'photo-open',
-      description: 'コントロールの Photo を押すと写真追加ダイアログが開く',
+      description: 'ツールバーの画像を貼り付けを押すと写真追加ダイアログが開く',
       props: { api: neverResolveApi },
       act: async (ctx) => {
         await ctx.click(PHOTO_BTN);
@@ -75,7 +74,7 @@ registerUnit<Props>({
       id: 'weekly',
       probe: true,
       description:
-        'Probe: Weekly トグルを押しても契約が viewType=weekly に追従しダイアログは閉のまま',
+        'Probe: Weekly セグメントを押しても契約が viewType=weekly に追従しダイアログは閉のまま',
       props: { api: neverResolveApi },
       act: async (ctx) => {
         await ctx.click(WEEKLY_BTN);
@@ -113,14 +112,33 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'viewtype-contract-matches-controls',
-      description: 'BoardView の viewType 契約と BoardControls の viewType 契約が一致する',
+      id: 'viewtype-contract-matches-date-nav',
+      description: 'BoardView の viewType 契約と BoardDateNav の viewType 契約が一致する',
       check: ({ root, contract }) => {
-        const controls = root.querySelector('[data-verify-unit="BoardControls"]');
-        const controlsViewType = controls?.getAttribute('data-verify-view-type');
+        const nav = root.querySelector('[data-verify-unit="BoardDateNav"]');
+        const navViewType = nav?.getAttribute('data-verify-view-type');
         return (
-          contract.viewType === controlsViewType ||
-          `viewType 不一致: BoardView="${contract.viewType}" / BoardControls="${controlsViewType}"`
+          contract.viewType === navViewType ||
+          `viewType 不一致: BoardView="${contract.viewType}" / BoardDateNav="${navViewType}"`
+        );
+      },
+    },
+    {
+      id: 'toolbar-active-tool-matches-open-dialog',
+      description: 'ツールバーの activeTool が、実際に開いているダイアログと一致する',
+      check: ({ root, contract }) => {
+        const toolbar = root.querySelector('[data-verify-unit="BoardToolbar"]');
+        if (!toolbar) return 'BoardToolbar が描画されていない';
+        const active = toolbar.getAttribute('data-verify-active-tool');
+        const expected =
+          contract.snippetOpen === 'true'
+            ? 'snippet'
+            : contract.photoOpen === 'true'
+              ? 'photo'
+              : 'none';
+        return (
+          active === expected ||
+          `activeTool 不一致: expected "${expected}"（snippetOpen=${contract.snippetOpen}, photoOpen=${contract.photoOpen}）, got "${active}"`
         );
       },
     },
@@ -136,7 +154,7 @@ registerUnit<Props>({
     },
     {
       id: 'weekly-after-toggle',
-      description: 'Weekly トグル後は viewType=weekly でダイアログは閉のまま',
+      description: 'Weekly セグメント押下後は viewType=weekly でダイアログは閉のまま',
       onlyFixtures: ['weekly'],
       check: ({ contract }) =>
         (contract.viewType === 'weekly' &&

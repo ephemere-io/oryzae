@@ -288,10 +288,27 @@
       "placeholder": "텍스트를 입력하세요...",
       "cancel": "취소",
       "update": "변경",
-      "create": "만들기"
+      "create": "만들기",
+      "source_aria": "스니펫 만드는 방법",
+      "tab_text": "직접 입력",
+      "tab_image": "이미지에서 읽기",
+      "click_to_select_image": "클릭하여 이미지 선택",
+      "preview_alt": "읽어들일 이미지 미리보기",
+      "read_image": "문자 읽기",
+      "reading": "읽는 중…",
+      "reading_aria": "읽는 중",
+      "ocr_empty": "문자를 읽지 못했습니다. 다른 이미지를 시도해 보세요.",
+      "ocr_failed": "읽기에 실패했습니다. 형식(JPEG/PNG/WebP/GIF)과 크기({maxMb}MB 이하)를 확인해 주세요.",
+      "ocr_note": "이미지에서 읽었습니다. {max}자 이내로 다듬어 주세요.",
+      "too_long": "{max}자 이내로 입력해 주세요"
     },
     "error_message": "보드를 불러오지 못했습니다",
-    "retry": "다시 시도"
+    "retry": "다시 시도",
+    "toolbar": {
+      "aria_label": "보드 툴바",
+      "snippet": "스니펫 만들기",
+      "photo": "이미지 붙여넣기"
+    }
   },
   "editor": {
     "status": {
