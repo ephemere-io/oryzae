@@ -9,9 +9,12 @@ export type TimeInscriptionMode = 'fontSize' | 'fontWeight' | 'pressureBleed';
 type GhostMode = 'block' | 'dust';
 
 /**
- * Issue #329: 新規エントリで問いを紐付けたとき、その問いの発酵結果をエディタ上に
- * フローティング表示するかどうかの既定挙動。'ask' は毎回モーダルで確認、
- * 'always' は自動表示、'never' は表示しない。
+ * 新規エントリで問いを紐付けたとき、その問いの発酵結果を出すかどうかの既定挙動。
+ * 'ask' は毎回モーダルで確認、'always' は自動表示、'never' は表示しない。
+ *
+ * Issue #329 で「エディタ上へのフローティング表示」として入り、Issue #466 で
+ * 右サイドバーへの集約に変わった。**型名と localStorage キーに Overlay が残っているのは
+ * 履歴上の理由**（キーを変えると既存ユーザーの選択が失われる）。挙動はサイドバーの開閉。
  */
 export type FermentationOverlayPreference = 'ask' | 'always' | 'never';
 
