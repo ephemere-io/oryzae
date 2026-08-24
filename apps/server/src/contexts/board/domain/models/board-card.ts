@@ -34,6 +34,8 @@ interface BoardCardProps {
   width: number;
   height: number;
   zIndex: number;
+  /** 利用者が自分で位置を決めたか。false なら作成日時順に自動整列してよい。 */
+  userPositioned: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +67,7 @@ export class BoardCard {
   readonly width: number;
   readonly height: number;
   readonly zIndex: number;
+  readonly userPositioned: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
 
@@ -81,6 +84,7 @@ export class BoardCard {
     this.width = props.width;
     this.height = props.height;
     this.zIndex = props.zIndex;
+    this.userPositioned = props.userPositioned;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -123,6 +127,8 @@ export class BoardCard {
         width: params.width,
         height: params.height,
         zIndex: params.zIndex,
+        // 生成時は自動配置。利用者が動かした時点で true になる。
+        userPositioned: false,
         createdAt: now,
         updatedAt: now,
       }),
@@ -179,6 +185,7 @@ export class BoardCard {
       width: this.width,
       height: this.height,
       zIndex: this.zIndex,
+      userPositioned: this.userPositioned,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
