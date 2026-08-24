@@ -70,6 +70,8 @@ Oryzae は他人の日記を預かる。**「ある人の日記が本人以外�
 
 - `USING (true)` を書くときは必ず `TO service_role` を添える
   （TO 省略時は PUBLIC 扱いになり、同テーブルの own-data ポリシーを無効化する）
+- 読み取りを許すポリシー（`FOR SELECT` / `FOR ALL`）の条件式には `auth.uid()` を必ず含める
+  （所有者を辿るサブクエリでも可。含まれないと全ユーザー分の行が読める）
 - 意図的な例外は対象文の直前行に `-- @rls-exempt: <理由>` を記載
 - 既知の未修正リスクは `supabase/rls-baseline.json` で管理（直したら項目を削除する）
 

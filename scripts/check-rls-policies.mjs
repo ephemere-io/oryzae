@@ -16,7 +16,10 @@
  *      → Postgres は TO 省略時 PUBLIC 扱い。permissive ポリシーは OR 結合なので
  *        「service role 用」のつもりの USING (true) が anon/authenticated にも効き、
  *        同テーブルの own-data ポリシーを丸ごと無効化する
- *   4. public バケットと、ユーザー隔離の無い storage SELECT ポリシーを禁止
+ *   4. 読み取りを許すポリシー（FOR SELECT / FOR ALL）の条件式に auth.uid() を必須化
+ *      → USING (true) だけを禁じても `using (is_published = true)` のような
+ *        「一見絞っているが全ユーザー分が読める」ポリシーが素通りするため
+ *   5. public バケットを禁止
  *      → 署名なし URL で他人のアップロード画像が読める状態を防ぐ
  *
  * 判定は「全マイグレーションを順に再生した最終状態」に対して行う。
@@ -96,17 +99,20 @@ function normalizeTable(raw) {
 const unquote = (s) => s.replace(/"/g, '');
 
 /**
- * マイグレーションをファイル名順に再生し、最終状態を組み立てる。
+ * マイグレーションを与えられた順に再生し、最終状態を組み立てる。
+ *
+ * ファイル読み込みは呼び出し側（main）の責務にして、この関数は純粋に保つ。
+ * ゲート本体のロジックをディスクなしでテストできるようにするため。
+ *
+ * @param {Array<{file: string, sql: string}>} migrations 適用順に並んだマイグレーション
  * @returns {{tables: Map, policies: Map, buckets: Map}}
  */
-function replay(files) {
+export function replay(migrations) {
   const tables = new Map(); // table -> {table, file, line, rls: boolean}
   const policies = new Map(); // `${table}::${name}` -> policy
   const buckets = new Map(); // bucket -> {bucket, file, line, isPublic, exemption}
 
-  for (const f of files) {
-    const sql = readFileSync(join(MIGRATIONS_DIR, f), 'utf8');
-    const file = `supabase/migrations/${f}`;
+  for (const { file, sql } of migrations) {
 
     for (const m of sql.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?([\w".]+)/gi)) {
       const table = normalizeTable(m[1]);
@@ -145,6 +151,11 @@ function replay(files) {
         name,
         table,
         hasToClause: /\bto\s+(service_role|authenticated|anon|public|postgres)\b/i.test(stmt),
+        // service_role だけに向けたポリシーは、対象ロールがそもそも RLS をバイパスするため
+        // 行の絞り込みが無くても越境にはならない。
+        isServiceRoleOnly:
+          /\bto\s+service_role\b/i.test(stmt) &&
+          !/\bto\s+[^\n]*\b(authenticated|anon|public)\b/i.test(stmt),
         isUnconditional: /\b(using|with\s+check)\s*\(\s*true\s*\)/i.test(stmt),
         scopedToUser: /auth\.uid\s*\(\s*\)/i.test(stmt),
         isSelect: /\bfor\s+(select|all)\b/i.test(stmt),
@@ -201,7 +212,7 @@ function replay(files) {
   return { tables, policies, buckets };
 }
 
-function collectFindings({ tables, policies, buckets }) {
+export function collectFindings({ tables, policies, buckets }) {
   const findings = [];
   const add = (id, o, message) => findings.push({ id, file: o.file, line: o.line, message });
 
@@ -243,16 +254,40 @@ function collectFindings({ tables, policies, buckets }) {
       );
     }
 
-    // 4-b. storage.objects の SELECT ポリシーにユーザー隔離が無い
-    if (p.table === 'storage.objects' && p.isSelect && !p.scopedToUser && !p.exemption) {
-      add(
-        `storage-select-unscoped:${p.name}`,
-        p,
-        `storage ポリシー "${p.name}" の SELECT にユーザー隔離がありません。\n` +
-          `      → bucket_id の一致だけでは、そのバケット内の**全ユーザー**のファイルが読めます。\n` +
-          `      → (storage.foldername(name))[1] = auth.uid()::text を条件に加えるか、\n` +
-          `        公開が意図的なら直前行に -- @rls-exempt: <理由> を記載してください。`,
-      );
+    // 4-b. 読み取りを許すポリシーにユーザー隔離（auth.uid()）が無い。
+    //
+    // storage.objects に限定していると、通常テーブルの
+    //   create policy "x" on entries for select using (is_published = true)
+    // のような「USING (true) ではないが auth.uid() も参照しない」ポリシーが
+    // ルール 1〜4 のどれにも掛からず素通りする。他人の日記が読める最短経路なので
+    // 全テーブルを対象にする。
+    if (
+      p.isSelect &&
+      !p.scopedToUser &&
+      !p.isServiceRoleOnly &&
+      !p.exemption &&
+      // USING (true) はルール 3 が固有のメッセージで報告するため二重計上しない
+      !(p.isUnconditional && !p.hasToClause)
+    ) {
+      if (p.table === 'storage.objects') {
+        add(
+          `storage-select-unscoped:${p.name}`,
+          p,
+          `storage ポリシー "${p.name}" の SELECT にユーザー隔離がありません。\n` +
+            `      → bucket_id の一致だけでは、そのバケット内の**全ユーザー**のファイルが読めます。\n` +
+            `      → (storage.foldername(name))[1] = auth.uid()::text を条件に加えるか、\n` +
+            `        公開が意図的なら直前行に -- @rls-exempt: <理由> を記載してください。`,
+        );
+      } else {
+        add(
+          `select-unscoped:${p.table}:${p.name}`,
+          p,
+          `ポリシー "${p.name}" (${p.table}) の読み取り条件に auth.uid() が現れません。\n` +
+            `      → 条件を満たす行は**全ユーザー分**が読めます。日記データなら越境そのものです。\n` +
+            `      → user_id = auth.uid()（または所有者を辿るサブクエリ）を条件に加えるか、\n` +
+            `        全ユーザー共通の参照データなら直前行に -- @rls-exempt: <理由> を記載してください。`,
+        );
+      }
     }
   }
 
@@ -291,7 +326,12 @@ function main() {
     .filter((f) => f.endsWith('.sql'))
     .sort();
 
-  const state = replay(files);
+  const state = replay(
+    files.map((f) => ({
+      file: `supabase/migrations/${f}`,
+      sql: readFileSync(join(MIGRATIONS_DIR, f), 'utf8'),
+    })),
+  );
   const findings = collectFindings(state);
   const baseline = loadBaseline();
 
@@ -347,4 +387,7 @@ function main() {
   }
 }
 
-main();
+// CLI として起動されたときだけ実行する（テストから import しても走らないように）。
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

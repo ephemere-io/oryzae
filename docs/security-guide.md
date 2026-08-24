@@ -77,10 +77,17 @@ AI と違って見落とさない。ここが本丸。
 
 | ゲート | 実体 | 守る不変条件 |
 |---|---|---|
-| `pnpm security:rls` | `scripts/check-rls-policies.mjs` | 全テーブルに RLS / ポリシー必須 / `USING (true)` に `TO` 必須 / public バケット禁止 / storage SELECT のユーザー隔離 |
+| `pnpm security:rls` | `scripts/check-rls-policies.mjs` | 全テーブルに RLS / ポリシー必須 / `USING (true)` に `TO` 必須 / **読み取りポリシーに `auth.uid()` 必須** / public バケット禁止 |
 | `pnpm dep-cruise` | `service-role-client-containment` | service role の利用箇所を許可リストに固定 |
 | CodeQL | GitHub 標準（public repo は無料） | JS/TS の汎用脆弱性 |
 | `pnpm audit` | pnpm | 依存の既知 CVE（high 以上） |
+
+読み取りを許すポリシー（`FOR SELECT` / `FOR ALL`）は、条件式に `auth.uid()` が
+現れることを必須にしている。`USING (true)` だけを禁止しても、
+`using (is_published = true)` のような「一見絞っているが全ユーザー分が読める」
+ポリシーが素通りするため。所有者を辿るサブクエリ（`entry_id in (select id from
+entries where user_id = auth.uid())`）は条件を満たす。全ユーザー共通の参照データなど
+本当に隔離不要な場合は `-- @rls-exempt: <理由>` で明示する。
 
 **RLS ゲートは全マイグレーションを順に再生した最終状態で判定する。**
 `DROP POLICY` / `DROP TABLE` / バケットの public 更新を追跡するので、後続マイグレーションで
