@@ -15,6 +15,7 @@ import { useBoardInteraction } from '../hooks/use-board-interaction';
 import { BoardCard } from './board-card';
 import { BoardDateNav } from './board-date-nav';
 import { BoardToolbar } from './board-toolbar';
+import { BoardViewSwitch } from './board-view-switch';
 import { PhotoDialog } from './photo-dialog';
 import { SnippetDialog } from './snippet-dialog';
 
@@ -182,12 +183,8 @@ export function BoardView({ api }: BoardViewProps) {
         }}
       />
 
-      <BoardDateNav
-        dateKey={dateKey}
-        viewType={viewType}
-        onDateChange={setDateKey}
-        onViewTypeChange={setViewType}
-      />
+      <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
+      <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
 
       {/* Canvas */}
       <div className="relative min-h-full" style={{ minWidth: 1200, minHeight: 900 }}>

@@ -2,13 +2,13 @@
  * BoardView の検証スペック（A 移植・PC 版ボード合成）。
  *
  * BoardView は viewType・各ダイアログ開閉を自前 state で持ち、子（BoardDateNav /
- * BoardToolbar / SnippetDialog / PhotoDialog / BoardCard）を束ねる feature。
+ * BoardViewSwitch / BoardToolbar / SnippetDialog / PhotoDialog / BoardCard）を束ねる feature。
  * データ取得は useBoard(api) / useBoardSave(api) に閉じており、いずれも api 越しの
  * fetch でしか cards を増やさない。よって「解決しない fetch を持つ ApiClient」を渡せば
  * ネットワーク0・cards は常に空のまま孤立検証できる。
  * router は useRouter を使うが withVerifyProviders の no-op mock で供給される。
  *
- * 公表する契約は実際に変化する状態のみ: viewType（日付ナビのセグメント切り替え）と、
+ * 公表する契約は実際に変化する状態のみ: viewType（右上のセグメント切り替え）と、
  * snippetOpen / photoOpen（ツールバーで開くダイアログ）。cards は seam が無く常に空なので
  * カード内容は契約に載せない。loading は never-resolve では true で固定・showLoader は
  * 250ms タイマー依存のため、どちらも契約・invariant に載せない
@@ -37,7 +37,7 @@ const neverResolveApi: ApiClient = {
 
 const SNIPPET_BTN = '[data-verify-unit="BoardToolbar"] button[data-verify-tool="snippet"]';
 const PHOTO_BTN = '[data-verify-unit="BoardToolbar"] button[data-verify-tool="photo"]';
-const WEEKLY_BTN = '[data-verify-unit="BoardDateNav"] button[data-verify-view-option="weekly"]';
+const WEEKLY_BTN = '[data-verify-unit="BoardViewSwitch"] button[data-verify-view-option="weekly"]';
 
 registerUnit<Props>({
   id: 'BoardView',
@@ -112,14 +112,18 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'viewtype-contract-matches-date-nav',
-      description: 'BoardView の viewType 契約と BoardDateNav の viewType 契約が一致する',
+      id: 'viewtype-agrees-across-children',
+      description: 'BoardView / BoardDateNav / BoardViewSwitch の viewType 契約が三者で一致する',
       check: ({ root, contract }) => {
-        const nav = root.querySelector('[data-verify-unit="BoardDateNav"]');
-        const navViewType = nav?.getAttribute('data-verify-view-type');
+        const nav = root
+          .querySelector('[data-verify-unit="BoardDateNav"]')
+          ?.getAttribute('data-verify-view-type');
+        const sw = root
+          .querySelector('[data-verify-unit="BoardViewSwitch"]')
+          ?.getAttribute('data-verify-view-type');
         return (
-          contract.viewType === navViewType ||
-          `viewType 不一致: BoardView="${contract.viewType}" / BoardDateNav="${navViewType}"`
+          (contract.viewType === nav && contract.viewType === sw) ||
+          `viewType 不一致: BoardView="${contract.viewType}" / BoardDateNav="${nav}" / BoardViewSwitch="${sw}"`
         );
       },
     },

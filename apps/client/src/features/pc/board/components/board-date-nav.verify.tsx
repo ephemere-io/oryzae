@@ -1,15 +1,15 @@
 /**
  * BoardDateNav の検証スペック（A 移植）。
- * ボード上部の日付ナビ（‹ ラベル ›）＋表示単位のセグメント切り替え（Daily/Weekly）。
- * 日付も表示単位も親が制御する（dateKey/viewType + onDateChange/onViewTypeChange）ため、
+ * ボード左上の日付ナビ（‹ ラベル ›）。日付は親が制御する（dateKey + onDateChange）ため、
  * BoardDateNav 単体ではクリックしても自身の DOM は変わらない。そこで board-view.tsx と
- * 同じ使い方（useState で保持し setter を渡す）の極小ホストで包み、act のクリックが実際に
- * ラベルを前後に進め、表示単位も切り替わることまで検証する（kind: 'feature'）。
+ * 同じ使い方（useState で dateKey を保持し setDateKey を onDateChange に渡す）の極小ホストで
+ * 包み、act のクリックが実際にラベルを前後に進めることまで検証する（kind: 'feature'）。
  * verifyAttrs は BoardDateNav の root に付いたままなので、契約（dateKey/viewType/label）が
  * クリックで進む。i18n（board.date.*）は withVerifyProviders が供給。
  *
- * 矢印は data-verify-nav="prev"/"next" で一意に取る。セグメント切り替えが同じ root に
- * 同居して以降、`button` の並び順（最後＝›）で取ると Weekly を押してしまうため。
+ * viewType は表示（ラベル形式と送り幅）にだけ効く props で、切り替え UI は右上の
+ * BoardViewSwitch が持つ。ここでは props として固定して両方の見え方を確認する。
+ * 矢印は data-verify-nav="prev"/"next" で一意に取る。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -19,44 +19,35 @@ import { BoardDateNav } from './board-date-nav';
 
 interface Props {
   initialDateKey: string;
-  initialViewType: 'daily' | 'weekly';
+  viewType: 'daily' | 'weekly';
 }
 
 const DAY_NAMES_JA = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
 
+const PREV_BTN = 'button[data-verify-nav="prev"]';
 const NEXT_BTN = 'button[data-verify-nav="next"]';
-const WEEKLY_BTN = 'button[data-verify-view-option="weekly"]';
 
-function BoardDateNavHost({ initialDateKey, initialViewType }: Props) {
+function BoardDateNavHost({ initialDateKey, viewType }: Props) {
   const [dateKey, setDateKey] = useState(initialDateKey);
-  const [viewType, setViewType] = useState(initialViewType);
-  return (
-    <BoardDateNav
-      dateKey={dateKey}
-      viewType={viewType}
-      onDateChange={setDateKey}
-      onViewTypeChange={setViewType}
-    />
-  );
+  return <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />;
 }
 
 registerUnit<Props>({
   id: 'BoardDateNav',
   title: 'BoardDateNav',
-  description:
-    'ボード上部の日付ナビ。‹ › で日（daily）/週（weekly）単位に前後移動し、表示単位も切り替える。',
+  description: 'ボード左上の日付ナビ。‹ › で日（daily）/週（weekly）単位に前後移動する。',
   kind: 'feature',
   render: (props) => withVerifyProviders(<BoardDateNavHost {...props} />),
   fixtures: [
     {
       id: 'daily',
       description: '日表示。2026-06-24（水曜日）のラベルを表示する',
-      props: { initialDateKey: '2026-06-24', initialViewType: 'daily' },
+      props: { initialDateKey: '2026-06-24', viewType: 'daily' },
     },
     {
       id: 'daily-next',
       description: '日表示で › を押すと翌日（2026-06-25 木曜日）に進む',
-      props: { initialDateKey: '2026-06-24', initialViewType: 'daily' },
+      props: { initialDateKey: '2026-06-24', viewType: 'daily' },
       act: async (ctx) => {
         await ctx.click(NEXT_BTN);
         await ctx.wait(16);
@@ -65,14 +56,14 @@ registerUnit<Props>({
     {
       id: 'weekly',
       description: '週表示。2026-06-28（日曜日）を含む週の月→日レンジを表示する',
-      props: { initialDateKey: '2026-06-28', initialViewType: 'weekly' },
+      props: { initialDateKey: '2026-06-28', viewType: 'weekly' },
     },
     {
-      id: 'switch-to-weekly',
-      description: 'Weekly セグメントを押すと契約が weekly に変わり、ラベルが週レンジになる',
-      props: { initialDateKey: '2026-06-28', initialViewType: 'daily' },
+      id: 'weekly-prev',
+      description: '週表示で ‹ を押すと7日戻る（前の週のレンジになる）',
+      props: { initialDateKey: '2026-06-28', viewType: 'weekly' },
       act: async (ctx) => {
-        await ctx.click(WEEKLY_BTN);
+        await ctx.click(PREV_BTN);
         await ctx.wait(16);
       },
     },
@@ -81,22 +72,23 @@ registerUnit<Props>({
       probe: true,
       description:
         'Probe: dateKey が日曜日（getDay()===0）でも weekRange の Sunday 分岐（-6）が効き、レンジは月→日（2026-06-22 — 2026-06-28）に収まる',
-      props: { initialDateKey: '2026-06-28', initialViewType: 'weekly' },
+      props: { initialDateKey: '2026-06-28', viewType: 'weekly' },
     },
   ],
   invariants: [
     {
-      id: 'viewtype-contract-matches-pressed-segment',
-      description: 'data-verify-view-type と aria-pressed のセグメントがちょうど1つ対応する',
-      check: ({ root, contract }) => {
-        const pressed = Array.from(root.querySelectorAll('button[aria-pressed="true"]')).map((b) =>
-          b.getAttribute('data-verify-view-option'),
-        );
-        return (
-          (pressed.length === 1 && pressed[0] === contract.viewType) ||
-          `セグメント不一致: contract.viewType=${contract.viewType} → pressed=[${pressed.join(', ')}]`
-        );
-      },
+      id: 'viewtype-contract-matches-props',
+      description: 'data-verify-view-type が props.viewType と一致する',
+      check: ({ contract, props }) =>
+        contract.viewType === props.viewType ||
+        `viewType 契約不一致: props.viewType=${props.viewType} → contract.viewType=${contract.viewType}`,
+    },
+    {
+      id: 'no-view-switch-here',
+      description: '表示単位の切り替えは持たない（右上の BoardViewSwitch の役目）',
+      check: ({ root }) =>
+        root.querySelectorAll('[data-verify-view-option]').length === 0 ||
+        '日付ナビに表示単位の切り替えが混ざっている',
     },
     {
       id: 'daily-label-ends-with-weekday',
@@ -115,7 +107,7 @@ registerUnit<Props>({
     {
       id: 'weekly-label-is-monday-to-sunday',
       description: '週表示のラベルは "YYYY.MM.DD — YYYY.MM.DD" で、開始は月曜・終了は日曜（7日差）',
-      onlyFixtures: ['weekly', 'weekly-sunday', 'switch-to-weekly'],
+      onlyFixtures: ['weekly', 'weekly-sunday', 'weekly-prev'],
       check: ({ contract }) => {
         const m = contract.label.match(/^(\d{4})\.(\d{2})\.(\d{2}) — (\d{4})\.(\d{2})\.(\d{2})$/);
         if (!m) return `weekly label 形式不一致: "${contract.label}"`;
@@ -139,12 +131,12 @@ registerUnit<Props>({
         `› クリック後の dateKey が翌日でない: "${contract.dateKey}"（期待 2026-06-25）`,
     },
     {
-      id: 'weekly-after-segment-click',
-      description: 'Weekly セグメントのクリックで viewType が weekly に変わる（日付は動かない）',
-      onlyFixtures: ['switch-to-weekly'],
+      id: 'prev-goes-back-one-week',
+      description: '‹ クリック後、weekly の dateKey が7日戻る',
+      onlyFixtures: ['weekly-prev'],
       check: ({ contract }) =>
-        (contract.viewType === 'weekly' && contract.dateKey === '2026-06-28') ||
-        `expected weekly/2026-06-28, got viewType=${contract.viewType}, dateKey=${contract.dateKey}`,
+        contract.dateKey === '2026-06-21' ||
+        `‹ クリック後の dateKey が7日前でない: "${contract.dateKey}"（期待 2026-06-21）`,
     },
   ],
 });
