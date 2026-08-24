@@ -223,12 +223,17 @@ export class LoadBoardUsecase {
     const photoMap = new Map<string, PhotoContent>();
     if (photoRefIds.length > 0) {
       const photos = await this.boardPhotoRepo.findByIds(photoRefIds);
-      for (const photo of photos) {
+      // 署名付き URL の発行は 1 枚ずつ非同期になる。順に await すると写真の枚数だけ
+      // 往復が積み上がるので、まとめて並行に発行する。
+      const signedUrls = await Promise.all(
+        photos.map((photo) => this.boardStorage.getImageUrl(photo.storagePath)),
+      );
+      photos.forEach((photo, i) => {
         photoMap.set(photo.id, {
-          imageUrl: this.boardStorage.getPublicUrl(photo.storagePath),
+          imageUrl: signedUrls[i],
           caption: photo.caption,
         });
-      }
+      });
     }
 
     return cards

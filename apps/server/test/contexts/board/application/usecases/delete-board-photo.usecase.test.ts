@@ -31,7 +31,7 @@ beforeEach(() => {
   };
   boardStorage = {
     upload: vi.fn().mockResolvedValue('path'),
-    getPublicUrl: vi.fn().mockReturnValue('url'),
+    getImageUrl: vi.fn().mockResolvedValue('url'),
     delete: vi.fn().mockResolvedValue(undefined),
   };
   usecase = new DeleteBoardPhotoUsecase(boardPhotoRepo, boardCardRepo, boardStorage);
