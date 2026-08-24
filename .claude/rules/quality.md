@@ -74,6 +74,9 @@ Oryzae は他人の日記を預かる。**「ある人の日記が本人以外�
   （所有者を辿るサブクエリでも可。含まれないと全ユーザー分の行が読める）
 - 意図的な例外は対象文の直前行に `-- @rls-exempt: <理由>` を記載
 - 既知の未修正リスクは `supabase/rls-baseline.json` で管理（直したら項目を削除する）
+- **ユーザー所有のテーブルを新設したら**、`apps/server/test/integration/authorization-isolation.test.ts`
+  の `USER_SCOPED_TABLES` にも追加する（実 DB で越境 0 行を確認する層。静的検査では
+  「条件式が実際に正しく絞れているか」を検証できないため）
 
 ### 絶対ルール: service role の利用箇所を増やさない
 

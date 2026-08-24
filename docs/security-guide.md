@@ -96,6 +96,25 @@ entries where user_id = auth.uid())`）は条件を満たす。全ユーザー�
 CI を止めない（`verify-coverage-gate` と同じ段階導入の思想）。直したのに baseline に
 残っているとゲートが落ちる（baseline の腐敗防止）。
 
+#### 静的検査だけでは足りない部分 — 認可境界の統合テスト
+
+RLS ゲートは SQL の**静的**検査なので、限界が 2 つある:
+
+- ポリシーが「書かれているか」は見られるが、その条件式が**実際に正しく絞れているか**は
+  見られない（`user_id` と書くべきところを `id` と書いた、参照するテーブルを間違えた等）
+- マイグレーションを経ずに作られたテーブルは視界に入らない
+
+これを埋めるのが `apps/server/test/integration/authorization-isolation.test.ts`。
+実在する 2 ユーザー（`supabase/seed.sql` の A / B）の JWT で本物の Postgres を読みに行き、
+**越境が 0 行であること**を確認する。RLS の条件式そのものを検証する唯一の層。
+
+CI では `.github/workflows/e2e.yml` の `authz` ジョブが、使い捨て Supabase に対して実行する。
+このジョブには **SERVICE_ROLE_KEY を渡さない** — RLS をバイパスする鍵が環境にあると
+検証の意味が薄れるため。ローカルでは `supabase start` 後に
+`pnpm --filter @oryzae/server test:integration`（環境が無ければ自動でスキップ）。
+
+**ユーザー所有のテーブルを新設したら、このテストの `USER_SCOPED_TABLES` にも追加すること。**
+
 ### 層 2 — PR 差分の意味的レビュー（毎 PR・AI・補助）
 
 `anthropics/claude-code-security-review` が差分を読み、PR にインラインコメントする。
