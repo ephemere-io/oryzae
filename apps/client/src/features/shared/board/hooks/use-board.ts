@@ -53,6 +53,9 @@ export function useBoard(
 ) {
   const [cards, setCards] = useState<BoardCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  // 取得失敗を surface する（use-entries と同じ形）。これが無いと失敗が「空の盤面」に
+  // なり、利用者には「この日は何も無い」と区別がつかない。
+  const [error, setError] = useState(false);
   const postSnippet = useCreateSnippet(api);
   const requestIdRef = useRef(0);
 
@@ -60,6 +63,7 @@ export function useBoard(
     if (!api) return;
     const requestId = ++requestIdRef.current;
     setLoading(true);
+    setError(false);
     // ローカル暦日で「その日」を判定させるためオフセットを送る。これが無いとサーバーは
     // dateKey を UTC の 00:00〜24:00 とみなし、JST 00:00〜09:00 に書いたエントリが
     // 当日のボードに出ない（Issue: ボードの日付境界）。
@@ -73,12 +77,14 @@ export function useBoard(
         const data: unknown = await res.json();
         if (requestId !== requestIdRef.current) return;
         setCards(applyDefaultZOrder(normalizeBoardCards(data)));
+      } else {
+        setError(true);
       }
     } catch {
+      if (requestId === requestIdRef.current) setError(true);
       // 通信・パースの失敗。呼び出し元は useEffect 内の async 関数で、投げても誰も
       // 受け取らない（未処理 rejection になり loading が戻らず盤面が固まる）ので、
-      // ここで止める。ボードには専用のエラー表示が無く、`!res.ok` のときも同様に
-      // 「空の盤面」になる既存挙動に揃えて、盤面は現状維持のままにする。
+      // ここで止める。盤面は現状維持のまま error を立て、表示は BoardView に委ねる。
     } finally {
       // 後発リクエストに追い越されていたら loading の所有権は向こうにあるので触らない。
       if (requestId === requestIdRef.current) setLoading(false);
@@ -172,6 +178,7 @@ export function useBoard(
     cards,
     setCards,
     loading,
+    error,
     refresh: fetchBoard,
     createSnippet,
     updateSnippet,

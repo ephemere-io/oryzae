@@ -379,4 +379,49 @@ describe('useBoard', () => {
       expect(result.current.cards[0].removing).toBe(false);
     });
   });
+  describe('error', () => {
+    it('取得に失敗したら error が立つ（「空の盤面」と区別できるようにする）', async () => {
+      apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe(true);
+      expect(result.current.cards).toEqual([]);
+    });
+
+    it('通信が失敗しても error が立つ', async () => {
+      apiFetch.mockRejectedValueOnce(new Error('network down'));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe(true);
+    });
+
+    it('再取得が成功したら error は下りる', async () => {
+      apiFetch.mockResolvedValueOnce(mockResponse(false, {})).mockResolvedValueOnce(
+        mockResponse(true, {
+          dateKey: '2026-04-11',
+          viewType: 'daily',
+          cards: [
+            { id: 'c-1', cardType: 'snippet', refId: 's-1', content: { text: 'あ' }, zIndex: 0 },
+          ],
+        }),
+      );
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.error).toBe(true));
+
+      await act(async () => {
+        await result.current.refresh();
+      });
+
+      expect(result.current.error).toBe(false);
+      expect(result.current.cards).toHaveLength(1);
+    });
+  });
 });
