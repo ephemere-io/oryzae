@@ -14,6 +14,12 @@ interface CreateBoardPhotoInput {
   viewType?: 'daily' | 'weekly';
   imageWidth?: number;
   imageHeight?: number;
+  /**
+   * 配置位置（world 座標）。省略時のみランダムに散らす。
+   * 詳細は create-board-snippet.usecase.ts の同名フィールドを参照。
+   */
+  x?: number;
+  y?: number;
 }
 
 interface CreateBoardPhotoResponse {
@@ -89,8 +95,8 @@ export class CreateBoardPhotoUsecase {
     const photo = photoResult.value;
 
     // 3. Create board card
-    const x = Math.floor(Math.random() * 741) + 60;
-    const y = Math.floor(Math.random() * 541) + 60;
+    const x = input.x ?? Math.floor(Math.random() * 741) + 60;
+    const y = input.y ?? Math.floor(Math.random() * 541) + 60;
     const rotation = Math.round((Math.random() * 10 - 5) * 10) / 10;
     const vt = input.viewType ?? 'daily';
 

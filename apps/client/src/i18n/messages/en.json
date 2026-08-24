@@ -291,7 +291,10 @@
       "create": "Create"
     },
     "error_message": "Failed to load the board",
-    "retry": "Retry"
+    "retry": "Retry",
+    "minimap": {
+      "aria_label": "Board minimap"
+    }
   },
   "editor": {
     "status": {
@@ -501,7 +504,9 @@
         "dismiss": "Got it",
         "aria_label": "Pickling complete notification",
         "heading": "Pickled in the jar"
-      }
+      },
+      "canvas_aria": "Jar canvas",
+      "minimap_aria": "Jar minimap"
     }
   },
   "questions": {
@@ -649,6 +654,15 @@
       "cancel": "Cancel",
       "save": "Save",
       "letter_arrived": "A letter has arrived"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "Zoom in",
+      "out_aria": "Zoom out",
+      "reset_aria": "Reset zoom",
+      "fit_aria": "Fit to content",
+      "fit": "Fit"
     }
   }
 }

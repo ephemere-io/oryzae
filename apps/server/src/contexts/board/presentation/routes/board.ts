@@ -136,6 +136,10 @@ export const board = new Hono<Env>()
       typeof body.imageWidth === 'string' ? Number.parseInt(body.imageWidth, 10) : undefined;
     const imageHeight =
       typeof body.imageHeight === 'string' ? Number.parseInt(body.imageHeight, 10) : undefined;
+    // 配置位置（world 座標）。multipart なので文字列で届く。
+    // 壊れた値は無視してサーバー既定のランダム配置に落とす。
+    const x = typeof body.x === 'string' ? Number.parseFloat(body.x) : undefined;
+    const y = typeof body.y === 'string' ? Number.parseFloat(body.y) : undefined;
     if (!dateKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return c.json({ error: 'Invalid dateKey' }, 400);
     }
@@ -167,6 +171,8 @@ export const board = new Hono<Env>()
       viewType,
       imageWidth: Number.isFinite(imageWidth) ? imageWidth : undefined,
       imageHeight: Number.isFinite(imageHeight) ? imageHeight : undefined,
+      x: Number.isFinite(x) ? x : undefined,
+      y: Number.isFinite(y) ? y : undefined,
     });
     return c.json(result, 201);
   })

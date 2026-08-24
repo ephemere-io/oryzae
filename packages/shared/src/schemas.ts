@@ -194,10 +194,22 @@ export const boardCardUpdateSchema = z.object({
   ),
 });
 
+/**
+ * 配置位置（world 座標）。ボードから作るときにクライアントが
+ * 「いま見えている場所」を渡す。省略時はサーバーがランダムに散らす。
+ *
+ * ボードは無限に広がるので範囲は設けない（負値も正しい位置）。`board_cards.x/y` は
+ * double precision、`boardCardUpdateSchema` の x/y も無制限なのでそれに揃える。
+ * 有限性だけは弾いておく（Infinity が DB に入ると復帰しづらい）。
+ */
+const boardWorldCoordSchema = z.number().finite();
+
 export const boardSnippetCreateSchema = z.object({
   text: z.string().min(1).max(50),
   dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   viewType: z.enum(['daily', 'weekly']).optional(),
+  x: boardWorldCoordSchema.optional(),
+  y: boardWorldCoordSchema.optional(),
 });
 
 export const boardSnippetUpdateSchema = z.object({

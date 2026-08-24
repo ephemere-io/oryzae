@@ -291,7 +291,10 @@
       "create": "创建"
     },
     "error_message": "加载画板失败",
-    "retry": "重试"
+    "retry": "重试",
+    "minimap": {
+      "aria_label": "看板缩略图"
+    }
   },
   "editor": {
     "status": {
@@ -501,7 +504,9 @@
         "dismiss": "知道了",
         "aria_label": "腌制完成通知",
         "heading": "已腌入发酵瓶"
-      }
+      },
+      "canvas_aria": "罐子画布",
+      "minimap_aria": "罐子缩略图"
     }
   },
   "questions": {
@@ -649,6 +654,15 @@
       "cancel": "取消",
       "save": "保存",
       "letter_arrived": "有一封信送到了"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "放大",
+      "out_aria": "缩小",
+      "reset_aria": "重置缩放",
+      "fit_aria": "适应内容",
+      "fit": "Fit"
     }
   }
 }

@@ -6,15 +6,18 @@ import { formatIsoDate } from '@/lib/format-date';
 
 interface EntryCardContentProps {
   content: EntryContent;
+  /** 中倍率では本文を省き、日付とタイトルだけ描く（意味的ズーム）。 */
+  titleOnly?: boolean;
 }
 
-export function EntryCardContent({ content }: EntryCardContentProps) {
+export function EntryCardContent({ content, titleOnly = false }: EntryCardContentProps) {
   const formattedDate = formatIsoDate(content.createdAt);
   return (
     <div
       className="flex h-full flex-col overflow-hidden p-6"
       {...verifyAttrs({
         unit: 'EntryCardContent',
+        titleOnly,
         hasTitle: Boolean(content.title),
         createdAt: content.createdAt,
         formattedDate,
@@ -41,12 +44,14 @@ export function EntryCardContent({ content }: EntryCardContentProps) {
           {content.title}
         </h3>
       )}
-      <p
-        className="flex-1 leading-loose"
-        style={{ color: 'var(--date-color)', fontSize: 13, opacity: 0.85 }}
-      >
-        {content.preview}
-      </p>
+      {!titleOnly && (
+        <p
+          className="flex-1 leading-loose"
+          style={{ color: 'var(--date-color)', fontSize: 13, opacity: 0.85 }}
+        >
+          {content.preview}
+        </p>
+      )}
       <div
         className="pointer-events-none absolute bottom-0 left-0 right-0 h-12"
         style={{

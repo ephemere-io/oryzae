@@ -20,7 +20,7 @@ interface Props {
   questionText: string;
   detail: FermentationDetail | null;
   zoomed: boolean;
-  hidden?: boolean;
+  dimmed?: boolean;
   innerOverrides: {
     keywords: Record<string, Pos>;
     snippets: Record<string, Pos>;
@@ -101,7 +101,7 @@ function makeDetail(
   };
 }
 
-const baseProps: Omit<Props, 'detail' | 'zoomed' | 'hidden'> = {
+const baseProps: Omit<Props, 'detail' | 'zoomed' | 'dimmed'> = {
   questionId: 'q-1',
   questionText: 'この一年で大切にしたいことは？',
   innerOverrides: emptyOverrides,

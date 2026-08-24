@@ -8,14 +8,17 @@ interface SnippetContent {
 
 interface SnippetCardContentProps {
   content: SnippetContent;
+  /** 中倍率では本文を省き、ラベルだけ描く（意味的ズーム）。 */
+  titleOnly?: boolean;
 }
 
-export function SnippetCardContent({ content }: SnippetCardContentProps) {
+export function SnippetCardContent({ content, titleOnly = false }: SnippetCardContentProps) {
   return (
     <div
       className="flex h-full flex-col p-6"
       {...verifyAttrs({
         unit: 'SnippetCardContent',
+        titleOnly,
         textLen: content.text.length,
         empty: content.text.length === 0,
       })}
@@ -37,9 +40,11 @@ export function SnippetCardContent({ content }: SnippetCardContentProps) {
           ✦ Snippet
         </span>
       </div>
-      <p className="flex-1 text-sm" style={{ color: 'var(--fg)', lineHeight: 1.8 }}>
-        {content.text}
-      </p>
+      {!titleOnly && (
+        <p className="flex-1 text-sm" style={{ color: 'var(--fg)', lineHeight: 1.8 }}>
+          {content.text}
+        </p>
+      )}
     </div>
   );
 }

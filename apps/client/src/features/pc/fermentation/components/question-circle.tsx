@@ -23,7 +23,8 @@ interface QuestionCircleProps {
   questionText: string;
   detail: FermentationDetail | null;
   zoomed: boolean;
-  hidden?: boolean;
+  /** 他の円が開いている間の減光。以前は opacity:0 で消していたが、カメラで寄る方式では周りが見えていた方がよい。 */
+  dimmed?: boolean;
   /** User-edited positions for inner elements; if absent we fall back to detail.{kw,sn,lt}.jarX/Y. */
   innerOverrides: {
     keywords: Record<string, Pos>;
@@ -142,7 +143,7 @@ export function QuestionCircle({
   questionText,
   detail,
   zoomed,
-  hidden = false,
+  dimmed = false,
   innerOverrides,
   onElementClick,
   onInnerDragMove,
@@ -172,7 +173,7 @@ export function QuestionCircle({
       {...verifyAttrs({
         unit: 'QuestionCircle',
         zoomed,
-        hidden,
+        dimmed,
         hasData: Boolean(hasData),
         keywordCount,
         snippetCount,
@@ -194,13 +195,17 @@ export function QuestionCircle({
               }
             }
       }
-      className={`absolute ${zoomed ? 'z-[55]' : 'z-[3]'} ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+      className={`absolute ${zoomed ? 'z-[55]' : 'z-[3]'} ${dimmed ? 'pointer-events-none opacity-30' : 'opacity-100'}`}
       style={{
         ...style,
-        width: zoomed ? 'min(50vw, 75vh, 500px)' : `${size}px`,
-        height: zoomed ? 'min(50vw, 75vh, 500px)' : `${size}px`,
-        transform: zoomed ? 'translate(-50%, -50%)' : 'translate(-50%, -50%)',
-        ...(zoomed ? { top: '50%', left: '50%' } : {}),
+        // 円は world 上の自分の位置から動かない。開いたときの拡大は
+        // キャンバス側のズーム（JarView の fitTo）が担当する。
+        // 以前はここで position を画面中央に固定して 500px まで伸ばしていたが、
+        // transform で変形した祖先の中では画面基準の固定が成立しないうえ、
+        // 「カメラを寄せる」のと「対象を動かす」のが二重になっていた。
+        width: `${size}px`,
+        height: `${size}px`,
+        transform: 'translate(-50%, -50%)',
         animation: 'fadeIn 0.5s ease-out forwards',
         // Suppress the zoom/move transition during drag so the circle follows the cursor.
         transition: isDraggingCircle ? 'none' : 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -208,7 +213,10 @@ export function QuestionCircle({
         touchAction: zoomed ? undefined : 'none',
         userSelect: 'none',
         // @ts-expect-error: CSS custom property for element scaling
-        '--el-scale': zoomed ? '1.1' : '0.65',
+        // 拡大はカメラ（キャンバスのズーム）が担当するので、要素の寸法は開閉で変えない。
+        // 円が 280→500px に伸びていた頃は中身も一緒に大きくしていたが、円が伸びなくなった
+        // 今それを残すと、寄ったときに中身だけが肥大して重なってしまう。
+        '--el-scale': '0.65',
       }}
     >
       {/* Circle keyframes */}
@@ -344,9 +352,9 @@ export function QuestionCircle({
                       background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
                       color: 'var(--fg)',
                       fontFamily: "'Noto Serif JP', serif",
-                      fontSize: zoomed ? '13px' : '11px',
+                      fontSize: '11px',
                       letterSpacing: '0.15em',
-                      padding: zoomed ? '8px 20px' : '6px 16px',
+                      padding: '6px 16px',
                       borderRadius: '999px',
                       boxShadow: '0 4px 12px rgba(217,180,143,0.3)',
                       border: '1px solid rgba(255,255,255,0.5)',
@@ -405,14 +413,14 @@ export function QuestionCircle({
                       border: '1px solid rgba(255,255,255,0.6)',
                       padding: '10px 12px',
                       borderRadius: '12px',
-                      maxWidth: zoomed ? '200px' : '140px',
+                      maxWidth: '140px',
                       boxShadow: '0 4px 16px rgba(140,133,126,0.08)',
                       transition: 'all 0.3s',
                     }}
                   >
                     <p
                       style={{
-                        fontSize: zoomed ? '11px' : '9px',
+                        fontSize: '9px',
                         color: 'var(--fg)',
                         lineHeight: 1.6,
                         fontFamily: "'Noto Sans JP', sans-serif",

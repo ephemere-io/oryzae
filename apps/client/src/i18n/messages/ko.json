@@ -291,7 +291,10 @@
       "create": "만들기"
     },
     "error_message": "보드를 불러오지 못했습니다",
-    "retry": "다시 시도"
+    "retry": "다시 시도",
+    "minimap": {
+      "aria_label": "보드 미니맵"
+    }
   },
   "editor": {
     "status": {
@@ -501,7 +504,9 @@
         "dismiss": "알겠습니다",
         "aria_label": "절임 완료 알림",
         "heading": "발효 항아리에 절여졌습니다"
-      }
+      },
+      "canvas_aria": "항아리 캔버스",
+      "minimap_aria": "항아리 미니맵"
     }
   },
   "questions": {
@@ -649,6 +654,15 @@
       "cancel": "취소",
       "save": "저장",
       "letter_arrived": "편지가 도착했습니다"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "확대",
+      "out_aria": "축소",
+      "reset_aria": "확대/축소 초기화",
+      "fit_aria": "전체 보기",
+      "fit": "Fit"
     }
   }
 }

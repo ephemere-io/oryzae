@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCreateSnippet } from '@/features/shared/board/hooks/use-create-snippet';
 import { normalizeBoardCards } from '@/features/shared/board/normalize';
-import type { BoardCardData } from '@/features/shared/board/types';
+import type { BoardCardData, CardPlacement } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 
 /**
@@ -96,8 +96,8 @@ export function useBoard(
   }, [fetchBoard]);
 
   const createSnippet = useCallback(
-    async (text: string) => {
-      if (await postSnippet({ text, dateKey, viewType })) {
+    async (text: string, placement?: CardPlacement) => {
+      if (await postSnippet({ text, dateKey, viewType, ...placement })) {
         await fetchBoard();
       }
     },
@@ -152,7 +152,13 @@ export function useBoard(
   );
 
   const createPhoto = useCallback(
-    async (file: File, caption: string, imageWidth?: number, imageHeight?: number) => {
+    async (
+      file: File,
+      caption: string,
+      imageWidth?: number,
+      imageHeight?: number,
+      placement?: CardPlacement,
+    ) => {
       if (!api) return;
       const formData = new FormData();
       formData.append('file', file);
@@ -162,6 +168,10 @@ export function useBoard(
       if (imageWidth && imageHeight) {
         formData.append('imageWidth', String(imageWidth));
         formData.append('imageHeight', String(imageHeight));
+      }
+      if (placement) {
+        formData.append('x', String(placement.x));
+        formData.append('y', String(placement.y));
       }
       const res = await api.fetch('/api/v1/board/photos', {
         method: 'POST',

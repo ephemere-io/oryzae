@@ -3,6 +3,9 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CanvasMinimap } from '@/components/ui/canvas-minimap';
+import { CanvasViewport } from '@/components/ui/canvas-viewport';
+import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
 import { QuestionCircle } from '@/features/pc/fermentation/components/question-circle';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
@@ -10,7 +13,41 @@ import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarLayout } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
+import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
+import type { Bounds } from '@/lib/canvas/viewport';
 import { useUnread } from '@/lib/unread-context';
+
+/**
+ * 瓶の「世界」の大きさ（world 単位）。
+ *
+ * ボードと違い瓶は **有限の世界** なので、寸法を固定して原点を持たせる。こうすると
+ * DB に入っている 0–100 の座標が「ビューポートの %」ではなく「この箱の %」になり、
+ * 数値の意味は変わらないままパン・ズームに乗る（マイグレーション不要。
+ * `jarPositionItemSchema` の min(0).max(100) もそのまま成立する）。
+ */
+const JAR_WORLD_WIDTH = 1600;
+const JAR_WORLD_HEIGHT = 1000;
+const JAR_WORLD_BOUNDS: Bounds = {
+  x: 0,
+  y: 0,
+  width: JAR_WORLD_WIDTH,
+  height: JAR_WORLD_HEIGHT,
+};
+
+/** QuestionCircle の一辺（world 単位）。円へズームする矩形の計算に使う。 */
+const CIRCLE_SIZE = 280;
+
+/** 円の world 矩形。中心が (jarX%, jarY%) で translate(-50%,-50%) されている前提。 */
+function circleWorldBounds(pos: Pos): Bounds {
+  const centerX = (pos.jarX / 100) * JAR_WORLD_WIDTH;
+  const centerY = (pos.jarY / 100) * JAR_WORLD_HEIGHT;
+  return {
+    x: centerX - CIRCLE_SIZE / 2,
+    y: centerY - CIRCLE_SIZE / 2,
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+  };
+}
 
 interface QuestionData {
   id: string;
@@ -184,10 +221,11 @@ function QuestionCircleWithData({
 }) {
   const { detail } = useFermentationForQuestion(api, question.id);
   const isZoomed = zoomedId === question.id;
-  const isHidden = zoomedId !== null && !isZoomed;
+  // 開いている円以外は薄くするだけ（以前は opacity:0 で完全に消していた）。
+  // カメラで寄る方式では周りの世界が見えていた方が現在地が分かる。
+  const isDimmed = zoomedId !== null && !isZoomed;
 
-  // Drag the circle around the jar viewport. Disabled while *any* circle is zoomed —
-  // including this one (the zoomed circle is fixed-positioned to the centre).
+  // 円のドラッグ移動。どれかを開いている間は無効（開いた円の中身の操作を優先する）。
   const { isDragging, pointerHandlers } = useJarDrag({
     containerRef: jarContainerRef,
     enabled: zoomedId === null,
@@ -204,7 +242,7 @@ function QuestionCircleWithData({
       questionText={question.currentText ?? ''}
       detail={detail}
       zoomed={isZoomed}
-      hidden={isHidden}
+      dimmed={isDimmed}
       innerOverrides={innerOverrides}
       onElementClick={(type, data) =>
         onElementClick(question.id, question.currentText ?? '', type, data)
@@ -214,14 +252,8 @@ function QuestionCircleWithData({
       circlePointerHandlers={pointerHandlers}
       onActivate={() => onZoom(question.id)}
       isDraggingCircle={isDragging}
-      style={
-        isZoomed
-          ? {}
-          : {
-              top: `${position.jarY}%`,
-              left: `${position.jarX}%`,
-            }
-      }
+      // 開いていても位置は変えない（拡大はカメラが担当する）。
+      style={{ top: `${position.jarY}%`, left: `${position.jarX}%` }}
     />
   );
 }
@@ -256,8 +288,27 @@ export function JarView({
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Ref attached to the JarView root — used by the circle drag to convert pointer pixels to %.
+  // world ボックス（JAR_WORLD_WIDTH × JAR_WORLD_HEIGHT）に付ける ref。
+  // useJarDrag はこの要素の getBoundingClientRect() でポインタ px を % に直す。
+  // rect は **変形後** の寸法（= world サイズ × 倍率）を返すので、ズームしていても
+  // `dx / rect.width * 100` がそのまま正しい % になる（hook 側に倍率は要らない）。
   const jarContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // ショートカット（Shift+1/2）から最新の円の位置を読むための箱。
+  const circleBoundsRef = useRef<{ all: Bounds; focused: Bounds | null }>({
+    all: JAR_WORLD_BOUNDS,
+    focused: null,
+  });
+
+  // 瓶は有限の世界なので、初回は世界全体が収まる倍率で開く。
+  const canvas = useCanvasViewport({
+    storageKey: 'jar',
+    defaultFitBounds: JAR_WORLD_BOUNDS,
+    // 瓶は世界の大きさが決まっているので「全体表示」は常に世界そのもの。
+    getContentBounds: () => circleBoundsRef.current.all,
+    getSelectionBounds: () => circleBoundsRef.current.focused,
+  });
+  const { zoomIn, zoomOut, resetZoom, fitTo } = canvas;
 
   // Drag-state overrides layer over the API data: empty after page load, fills as the user drags.
   const [overrides, setOverrides] = useState<JarLayoutOverrides>(EMPTY_OVERRIDES);
@@ -327,11 +378,6 @@ export function JarView({
     [],
   );
 
-  function closeZoom() {
-    setDetailOpen(false);
-    setZoomedId(null);
-  }
-
   if (authLoading) return null;
 
   const visibleQuestions = questions.slice(0, 3);
@@ -339,11 +385,55 @@ export function JarView({
     resolveCirclePos({ question: q, index: i, override: overrides.questions[q.id] }),
   );
 
+  /**
+   * 背景クリックで選択を解除する。以前は円の背後に敷いた backdrop がこの役目だったが、
+   * 円を画面中央へ飛ばすのをやめたので backdrop 自体が不要になった。
+   * 何も開いていないときは無反応にする（ただの背景クリックで勝手に引かないように）。
+   */
+  circleBoundsRef.current = {
+    all: JAR_WORLD_BOUNDS,
+    focused: (() => {
+      const index = visibleQuestions.findIndex((q) => q.id === zoomedId);
+      return index >= 0 ? circleWorldBounds(resolvedCirclePositions[index]) : null;
+    })(),
+  };
+
+  function closeZoom() {
+    if (!zoomedId) return;
+    setDetailOpen(false);
+    setZoomedId(null);
+    // 位置は動かさず、カメラだけ引いて世界全体に戻す。
+    fitTo(JAR_WORLD_BOUNDS);
+  }
+
+  /**
+   * 円の選択。**円は動かさずカメラを寄せる**（Figma と同じ挙動）。
+   *
+   * 以前は選択した円を position:fixed で画面中央へ飛ばし、他の円を opacity:0 で隠し、
+   * 背後に backdrop を敷いていた。transform で変形した祖先の中では fixed が
+   * 画面基準にならないため、本物のズームを入れるならどのみち成立しない作りだった。
+   * いまは `fitTo` で円の world 矩形に寄るだけなので、隠す・飛ばすが全部不要になる。
+   * `zoomedId` は「どの円を開いているか」という意味だけを持つ（中身の操作可否・拡大率）。
+   */
+  function focusCircle(id: string | null) {
+    setZoomedId(id);
+    if (id === null) {
+      fitTo(JAR_WORLD_BOUNDS);
+      return;
+    }
+    const index = visibleQuestions.findIndex((q) => q.id === id);
+    if (index >= 0) fitTo(circleWorldBounds(resolvedCirclePositions[index]));
+  }
+
+  function handleFit() {
+    setZoomedId(null);
+    fitTo(JAR_WORLD_BOUNDS);
+  }
+
   const addAvailable = !zoomedId && questions.length < 3 && Boolean(onAddQuestion);
 
   return (
     <div
-      ref={jarContainerRef}
       {...verifyAttrs({
         unit: 'JarView',
         questionCount: visibleQuestions.length,
@@ -351,8 +441,9 @@ export function JarView({
         editOpen: editingQuestion !== null,
         addOpen: showAddModal,
         addAvailable,
+        percent: Math.round(canvas.viewport.scale * 100),
       })}
-      className="relative h-full w-full overflow-hidden bg-[var(--bg)]"
+      className="relative h-full w-full bg-[var(--bg)]"
     >
       {/* Keyframes */}
       <style>{`
@@ -389,260 +480,287 @@ export function JarView({
         }
       `}</style>
 
-      {/* Background grid pattern */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(140,133,126,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(140,133,126,0.04) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-          backgroundPosition: 'center center',
-        }}
-      />
-      {/* Background radial */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.7) 0%, transparent 70%)',
-        }}
-      />
-
-      {/* Zoom backdrop */}
-      {zoomedId && (
-        <button
-          type="button"
-          onClick={closeZoom}
-          className="absolute inset-0 z-[4] bg-[rgba(0,0,0,0.3)]"
-          aria-label={t('jar.zoom_close_aria')}
-        />
-      )}
-
-      {/* Connection lines — using percentage-based SVG */}
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
-        viewBox="0 0 1000 500"
-        preserveAspectRatio="none"
-        style={{
-          opacity: zoomedId ? 0 : 1,
-          transition: 'opacity 0.5s ease',
-          animation: 'fadeIn 0.5s ease-out forwards',
-        }}
+      <CanvasViewport
+        canvas={canvas}
+        ariaLabel={t('jar.canvas_aria')}
+        onClick={closeZoom}
+        overlay={
+          <>
+            <CanvasZoomControls
+              scale={canvas.viewport.scale}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onReset={resetZoom}
+              onFit={handleFit}
+            />
+            <CanvasMinimap
+              canvas={canvas}
+              ariaLabel={t('jar.minimap_aria')}
+              extent={JAR_WORLD_BOUNDS}
+              items={visibleQuestions.map((q, i) => ({
+                id: q.id,
+                ...circleWorldBounds(resolvedCirclePositions[i]),
+              }))}
+            />
+          </>
+        }
       >
-        {visibleQuestions.map((q, i) => {
-          const pos = resolvedCirclePositions[i];
-          const endX = (pos.jarX / 100) * 1000;
-          const endY = (pos.jarY / 100) * 500;
-          const jarX = 500;
-          const jarY = 210;
-          const cpX = (jarX + endX) / 2 + (i === 0 ? 50 : i === 1 ? 25 : -50);
-          const cpY = (jarY + endY) / 2 + (i === 0 ? -30 : i === 1 ? 30 : 0);
-          return (
-            <g key={q.id}>
-              {/* Glow layer */}
-              <path
-                d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
-                stroke="rgba(142,168,156,0.08)"
-                strokeWidth="4"
-                fill="none"
-                filter="url(#lineBlur)"
-              />
-              {/* Dashed line */}
-              <path
-                d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
-                stroke="rgba(142,168,156,0.25)"
-                strokeWidth="1"
-                strokeDasharray="6 4"
-                fill="none"
-                style={{ animation: 'j2-flow 60s linear infinite' }}
-              />
-            </g>
-          );
-        })}
-        <defs>
-          <filter id="lineBlur">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
-          </filter>
-        </defs>
-      </svg>
-
-      {/* Central jar illustration — matching reference design */}
-      <div
-        className="pointer-events-none absolute z-[2]"
-        style={{
-          left: '50%',
-          top: '45%',
-          transform: 'translate(-50%, -55%)',
-          width: '420px',
-          height: '520px',
-          animation: 'fadeIn 0.5s ease-out forwards',
-        }}
-      >
-        {/* Jar glow */}
+        {/* world ボックス。中の要素は今までどおり % 指定のままでよく、その % が
+            「ビューポート基準」から「この箱基準」に読み替わるだけ。 */}
         <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(226,194,142,0.1)',
-            borderRadius: '200px',
-            filter: 'blur(80px)',
-            animation: 'j2-pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
-          }}
-        />
-
-        {/* Jar SVG */}
-        <svg
-          aria-hidden="true"
-          className="h-full w-full"
-          viewBox="0 0 480 600"
-          fill="none"
-          style={{ filter: 'drop-shadow(0 20px 40px rgba(140,133,126,0.15))' }}
+          ref={jarContainerRef}
+          className="absolute left-0 top-0 overflow-hidden"
+          style={{ width: JAR_WORLD_WIDTH, height: JAR_WORLD_HEIGHT }}
         >
-          {/* Glass body */}
-          <path
-            d={JAR_PATH}
-            fill="rgba(253,251,247,0.2)"
-            stroke="rgba(255,255,255,0.8)"
-            strokeWidth="1.5"
+          {/* Background grid pattern */}
+          <div
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(140,133,126,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(140,133,126,0.04) 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+              backgroundPosition: 'center center',
+            }}
           />
-          {/* Fermentation liquid */}
-          <path
-            d="M78,450 C78,350 180,310 200,240 C220,240 270,310 402,450 C410,580 70,580 78,450 Z"
-            fill="url(#j2-fermentGradient)"
-            opacity="0.6"
-            filter="url(#blurLiquid)"
+          {/* Background radial */}
+          <div
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{
+              background:
+                'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.7) 0%, transparent 70%)',
+            }}
           />
-          {/* Highlight stroke (left) */}
-          <path
-            d="M100,460 C100,340 220,270 220,180"
-            stroke="url(#j2-highlightGradient)"
-            strokeWidth="4"
-            strokeLinecap="round"
-            filter="url(#blurHighlight)"
-            opacity="0.7"
-          />
-          {/* Glass reflection (right) */}
-          <path
-            d="M380,480 C380,380 260,280 260,190"
-            stroke="rgba(255,255,255,0.4)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            filter="url(#blurReflection)"
-          />
-          {/* Rim highlight */}
-          <path
-            d="M210,100 Q 240,110 270,100"
-            stroke="rgba(255,255,255,0.9)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            filter="url(#blurReflection)"
-          />
-          {/* Interior flowing curves */}
-          <g stroke="rgba(226,194,142,0.4)" strokeWidth="0.75" fill="none" opacity="0.8">
-            <path d="M240,280 Q 280,350 250,420 T 320,520" className="j2-float-1" />
-            <path d="M320,320 Q 290,380 340,440 T 260,540" className="j2-float-2" />
-            <path d="M200,220 Q 240,290 180,350 T 210,480" className="j2-float-3" />
-            <path d="M160,360 Q 140,420 200,460 T 140,530" className="j2-float-1" />
-            <path d="M260,200 Q 270,250 240,290" />
-          </g>
-          <defs>
-            <linearGradient id="j2-fermentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgba(226,194,142,0.1)" />
-              <stop offset="50%" stopColor="rgba(142,168,156,0.2)" />
-              <stop offset="100%" stopColor="rgba(226,194,142,0.4)" />
-            </linearGradient>
-            <linearGradient id="j2-highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
-              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-            </linearGradient>
-            <filter id="blurLiquid">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
-            </filter>
-            <filter id="blurHighlight">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="1" />
-            </filter>
-            <filter id="blurReflection">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" />
-            </filter>
-          </defs>
-        </svg>
 
-        {/* Text particles + microbes clipped inside jar */}
-        <div
-          className="pointer-events-auto absolute inset-0 overflow-hidden"
-          style={{
-            clipPath: `path('${JAR_PATH}')`,
-          }}
-        >
-          {allWords.map((word, i) => {
-            const top = 18 + ((i * 37) % 65);
-            const left = 22 + ((i * 53) % 60);
-            const blur = BLUR_LEVELS[i % BLUR_LEVELS.length];
-            const fontSize = FONT_SIZES[i % FONT_SIZES.length];
-            const opacity = 0.3 + (i % 5) * 0.12;
-            return (
-              <span
-                key={ALL_WORD_KEYS[i]}
-                className={`${FLOAT_CLASSES[i % 3]} pointer-events-none select-none`}
-                style={{
-                  position: 'absolute',
-                  top: `${top}%`,
-                  left: `${left}%`,
-                  filter: `blur(${blur}px)`,
-                  fontSize: `${fontSize}px`,
-                  opacity,
-                  letterSpacing: '0.15em',
-                  fontFamily: "'Noto Serif JP', serif",
-                  color: 'var(--date-color)',
-                }}
-              >
-                {word}
-              </span>
-            );
-          })}
-          {JAR_MICROBES.map((m, i) => (
+          {/* Connection lines.
+          viewBox は world ボックスと 1:1。以前は 1000×500 の viewBox を
+          preserveAspectRatio="none" で引き伸ばしていたため、縦横で倍率が違い
+          曲線が歪んでいた（ズームすると露骨に出る）。等方にして歪みを消す。 */}
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+            viewBox={`0 0 ${JAR_WORLD_WIDTH} ${JAR_WORLD_HEIGHT}`}
+            style={{
+              opacity: zoomedId ? 0 : 1,
+              transition: 'opacity 0.5s ease',
+              animation: 'fadeIn 0.5s ease-out forwards',
+            }}
+          >
+            {visibleQuestions.map((q, i) => {
+              const pos = resolvedCirclePositions[i];
+              const endX = (pos.jarX / 100) * JAR_WORLD_WIDTH;
+              const endY = (pos.jarY / 100) * JAR_WORLD_HEIGHT;
+              // 瓶の中ほど（世界の中央やや上）から線が伸びる。
+              const jarX = JAR_WORLD_WIDTH / 2;
+              const jarY = JAR_WORLD_HEIGHT * 0.42;
+              const cpX = (jarX + endX) / 2 + (i === 0 ? 80 : i === 1 ? 40 : -80);
+              const cpY = (jarY + endY) / 2 + (i === 0 ? -60 : i === 1 ? 60 : 0);
+              return (
+                <g key={q.id}>
+                  {/* Glow layer */}
+                  <path
+                    d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
+                    stroke="rgba(142,168,156,0.08)"
+                    strokeWidth="4"
+                    fill="none"
+                    filter="url(#lineBlur)"
+                  />
+                  {/* Dashed line */}
+                  <path
+                    d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
+                    stroke="rgba(142,168,156,0.25)"
+                    strokeWidth="1"
+                    strokeDasharray="6 4"
+                    fill="none"
+                    style={{ animation: 'j2-flow 60s linear infinite' }}
+                  />
+                </g>
+              );
+            })}
+            <defs>
+              <filter id="lineBlur">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
+              </filter>
+            </defs>
+          </svg>
+
+          {/* Central jar illustration — matching reference design */}
+          <div
+            className="pointer-events-none absolute z-[2]"
+            style={{
+              left: '50%',
+              top: '45%',
+              transform: 'translate(-50%, -55%)',
+              width: '420px',
+              height: '520px',
+              animation: 'fadeIn 0.5s ease-out forwards',
+            }}
+          >
+            {/* Jar glow */}
             <div
-              key={`microbe-${m.type}-${m.top}-${m.left}`}
-              className={m.anim}
               style={{
                 position: 'absolute',
-                top: m.top,
-                left: m.left,
-                width: `${m.size}px`,
-                height: `${m.size}px`,
-                opacity: m.opacity,
-                pointerEvents: 'none',
+                inset: 0,
+                background: 'rgba(226,194,142,0.1)',
+                borderRadius: '200px',
+                filter: 'blur(80px)',
+                animation: 'j2-pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
               }}
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
-              dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[m.type] }}
+            />
+
+            {/* Jar SVG */}
+            <svg
+              aria-hidden="true"
+              className="h-full w-full"
+              viewBox="0 0 480 600"
+              fill="none"
+              style={{ filter: 'drop-shadow(0 20px 40px rgba(140,133,126,0.15))' }}
+            >
+              {/* Glass body */}
+              <path
+                d={JAR_PATH}
+                fill="rgba(253,251,247,0.2)"
+                stroke="rgba(255,255,255,0.8)"
+                strokeWidth="1.5"
+              />
+              {/* Fermentation liquid */}
+              <path
+                d="M78,450 C78,350 180,310 200,240 C220,240 270,310 402,450 C410,580 70,580 78,450 Z"
+                fill="url(#j2-fermentGradient)"
+                opacity="0.6"
+                filter="url(#blurLiquid)"
+              />
+              {/* Highlight stroke (left) */}
+              <path
+                d="M100,460 C100,340 220,270 220,180"
+                stroke="url(#j2-highlightGradient)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                filter="url(#blurHighlight)"
+                opacity="0.7"
+              />
+              {/* Glass reflection (right) */}
+              <path
+                d="M380,480 C380,380 260,280 260,190"
+                stroke="rgba(255,255,255,0.4)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                filter="url(#blurReflection)"
+              />
+              {/* Rim highlight */}
+              <path
+                d="M210,100 Q 240,110 270,100"
+                stroke="rgba(255,255,255,0.9)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                filter="url(#blurReflection)"
+              />
+              {/* Interior flowing curves */}
+              <g stroke="rgba(226,194,142,0.4)" strokeWidth="0.75" fill="none" opacity="0.8">
+                <path d="M240,280 Q 280,350 250,420 T 320,520" className="j2-float-1" />
+                <path d="M320,320 Q 290,380 340,440 T 260,540" className="j2-float-2" />
+                <path d="M200,220 Q 240,290 180,350 T 210,480" className="j2-float-3" />
+                <path d="M160,360 Q 140,420 200,460 T 140,530" className="j2-float-1" />
+                <path d="M260,200 Q 270,250 240,290" />
+              </g>
+              <defs>
+                <linearGradient id="j2-fermentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(226,194,142,0.1)" />
+                  <stop offset="50%" stopColor="rgba(142,168,156,0.2)" />
+                  <stop offset="100%" stopColor="rgba(226,194,142,0.4)" />
+                </linearGradient>
+                <linearGradient id="j2-highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </linearGradient>
+                <filter id="blurLiquid">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+                </filter>
+                <filter id="blurHighlight">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="1" />
+                </filter>
+                <filter id="blurReflection">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" />
+                </filter>
+              </defs>
+            </svg>
+
+            {/* Text particles + microbes clipped inside jar */}
+            <div
+              className="pointer-events-auto absolute inset-0 overflow-hidden"
+              style={{
+                clipPath: `path('${JAR_PATH}')`,
+              }}
+            >
+              {allWords.map((word, i) => {
+                const top = 18 + ((i * 37) % 65);
+                const left = 22 + ((i * 53) % 60);
+                const blur = BLUR_LEVELS[i % BLUR_LEVELS.length];
+                const fontSize = FONT_SIZES[i % FONT_SIZES.length];
+                const opacity = 0.3 + (i % 5) * 0.12;
+                return (
+                  <span
+                    key={ALL_WORD_KEYS[i]}
+                    className={`${FLOAT_CLASSES[i % 3]} pointer-events-none select-none`}
+                    style={{
+                      position: 'absolute',
+                      top: `${top}%`,
+                      left: `${left}%`,
+                      filter: `blur(${blur}px)`,
+                      fontSize: `${fontSize}px`,
+                      opacity,
+                      letterSpacing: '0.15em',
+                      fontFamily: "'Noto Serif JP', serif",
+                      color: 'var(--date-color)',
+                    }}
+                  >
+                    {word}
+                  </span>
+                );
+              })}
+              {JAR_MICROBES.map((m, i) => (
+                <div
+                  key={`microbe-${m.type}-${m.top}-${m.left}`}
+                  className={m.anim}
+                  style={{
+                    position: 'absolute',
+                    top: m.top,
+                    left: m.left,
+                    width: `${m.size}px`,
+                    height: `${m.size}px`,
+                    opacity: m.opacity,
+                    pointerEvents: 'none',
+                  }}
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
+                  dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[m.type] }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Question circles */}
+          {visibleQuestions.map((q, i) => (
+            <QuestionCircleWithData
+              key={q.id}
+              question={q}
+              api={api}
+              position={resolvedCirclePositions[i]}
+              zoomedId={zoomedId}
+              jarContainerRef={jarContainerRef}
+              innerOverrides={{
+                keywords: overrides.keywords,
+                snippets: overrides.snippets,
+                letters: overrides.letters,
+              }}
+              onZoom={focusCircle}
+              onElementClick={handleElementClick}
+              onCircleMove={handleCircleMove}
+              onCircleDragEnd={handleCircleDragEnd}
+              onInnerMove={handleInnerDragMove}
+              onInnerDragEnd={handleInnerDragEnd}
             />
           ))}
         </div>
-      </div>
-
-      {/* Question circles */}
-      {visibleQuestions.map((q, i) => (
-        <QuestionCircleWithData
-          key={q.id}
-          question={q}
-          api={api}
-          position={resolvedCirclePositions[i]}
-          zoomedId={zoomedId}
-          jarContainerRef={jarContainerRef}
-          innerOverrides={{
-            keywords: overrides.keywords,
-            snippets: overrides.snippets,
-            letters: overrides.letters,
-          }}
-          onZoom={setZoomedId}
-          onElementClick={handleElementClick}
-          onCircleMove={handleCircleMove}
-          onCircleDragEnd={handleCircleDragEnd}
-          onInnerMove={handleInnerDragMove}
-          onInnerDragEnd={handleInnerDragEnd}
-        />
-      ))}
+      </CanvasViewport>
 
       {/* Question list (bottom center) */}
       {!zoomedId && (
@@ -667,6 +785,10 @@ export function JarView({
               <button
                 key={q.id}
                 type="button"
+                // 検証スペックが「問いチップ」を一意に指すための取っ手。
+                // 以前は最初の <button> を押していたが、ズームコントロールが
+                // DOM 上で前に来たため壊れた（順序に依存しない選択子にする）。
+                data-verify-part="question-chip"
                 onClick={() => {
                   setEditingQuestion(q);
                   setEditText(q.currentText ?? '');
