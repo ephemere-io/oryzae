@@ -132,4 +132,44 @@ describe('useUnread', () => {
 
     expect(result.current.unreadCount).toBe(0);
   });
+  it('配列でないレスポンスでも落ちず 0 のまま（ナビ全体を巻き込まない）', async () => {
+    // エラーエンベロープやスキーマ変更。素通しだと直後の .filter が TypeError になり、
+    // 未読バッジは全画面のナビに出るので影響範囲が最大だった。
+    const api = createMockApi({ '/api/v1/fermentations': { error: 'boom' } });
+
+    const { result } = renderHook(() => useUnread(), { wrapper: createWrapper(api) });
+
+    await waitFor(() => expect(api.fetch).toHaveBeenCalled());
+    expect(result.current.unreadCount).toBe(0);
+  });
+
+  it('壊れた要素は数えない（status/createdAt が揃っているものだけ）', async () => {
+    localStorage.setItem(STORAGE_KEY, '2026-01-01T00:00:00Z');
+    const api = createMockApi({
+      '/api/v1/fermentations': [
+        { id: 'a', status: 'completed', createdAt: '2026-02-01T00:00:00Z' }, // 数える
+        { id: 'b', status: 'completed' }, // createdAt 無し
+        { id: 'c', status: 'pending', createdAt: '2026-02-01T00:00:00Z' }, // 未完了
+        null, // 壊れた要素
+        { id: 'd', status: 'completed', createdAt: '2025-01-01T00:00:00Z' }, // 既読より前
+      ],
+    });
+
+    const { result } = renderHook(() => useUnread(), { wrapper: createWrapper(api) });
+
+    await waitFor(() => expect(result.current.unreadCount).toBe(1));
+  });
+
+  it('通信が失敗しても落ちない（未処理 rejection にしない）', async () => {
+    const api: ApiClient = {
+      baseUrl: 'http://localhost:3000',
+      headers: {},
+      fetch: vi.fn(() => Promise.reject(new Error('network down'))),
+    };
+
+    const { result } = renderHook(() => useUnread(), { wrapper: createWrapper(api) });
+
+    await waitFor(() => expect(api.fetch).toHaveBeenCalled());
+    expect(result.current.unreadCount).toBe(0);
+  });
 });

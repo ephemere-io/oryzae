@@ -2,10 +2,8 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useCallback } from 'react';
 import { DeviceView } from '@/components/device-view';
 import { EntryEditor } from '@/features/pc/entries/components/entry-editor';
-import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useEntry } from '@/features/shared/entries/hooks/use-entry';
 import {
   useActiveQuestions,
@@ -13,6 +11,7 @@ import {
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import { SpEntryEditor } from '@/features/sp/entries/components/sp-entry-editor';
 import { useAuth } from '@/lib/auth-context';
+import { EntryEditorRouteLoading } from '../../_loading/entry-editor-route-loading';
 
 export default function EntryDetailPage() {
   const t = useTranslations('entries.detail');
@@ -21,18 +20,10 @@ export default function EntryDetailPage() {
   const { entry, loading: entryLoading } = useEntry(params.id, api, authLoading);
   const activeQuestions = useActiveQuestions(api, authLoading);
   const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, params.id);
-  const runTransition = useSaveTransition();
   const router = useRouter();
 
-  const handleSaveTransition = useCallback(
-    async (text: string, editorEl: HTMLElement) => {
-      await runTransition(text, editorEl);
-      router.push('/jar');
-    },
-    [runTransition, router],
-  );
-
-  if (entryLoading || authLoading) return null;
+  // 本文の取得中もロード表示を出し続ける（null だと枠が一度消えて真っ白になる）。
+  if (entryLoading || authLoading) return <EntryEditorRouteLoading existing />;
 
   if (!entry) {
     return (
@@ -58,7 +49,7 @@ export default function EntryDetailPage() {
           initialLinkedIds={linkedQuestions.map((q) => q.id)}
           onLinkQuestion={async (_entryId, questionId) => linkQuestion(questionId)}
           onUnlinkQuestion={async (_entryId, questionId) => unlinkQuestion(questionId)}
-          onSaveTransition={handleSaveTransition}
+          onPickled={() => router.push('/jar')}
         />
       }
     />

@@ -4,10 +4,12 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { ListSkeleton } from '@/components/ui/list-skeleton';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
-import { type EntryListOrder, useEntries } from '@/features/shared/entries/hooks/use-entries';
+import { useEntries } from '@/features/shared/entries/hooks/use-entries';
+import type { EntryListOrder } from '@/features/shared/entries/types';
+import { SpEntryListRowsSkeleton } from '@/features/sp/entries/components/sp-entry-list-skeleton';
 import type { ApiClient } from '@/lib/api';
+import { formatMonthDay } from '@/lib/format-date';
 import { SpConfirmSheet } from './sp-confirm-sheet';
 
 interface SpEntryListProps {
@@ -20,14 +22,6 @@ interface SpEntryListProps {
 function firstLine(content: string): string {
   const idx = content.indexOf('\n');
   return (idx === -1 ? content : content.slice(0, idx)).trim();
-}
-
-/** ISO 日付を「M月D日」に。失敗時は空。 */
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
 /**
@@ -188,7 +182,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
       ) : null}
 
       {loading ? (
-        <ListSkeleton />
+        <SpEntryListRowsSkeleton />
       ) : entries.length === 0 ? (
         <div className="px-5 py-12 text-center text-sm opacity-50">
           {isFiltering ? t('empty_filtered') : t('empty')}
@@ -216,7 +210,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
                     {title}
                   </span>
                   <span className="mt-1.5 flex items-center gap-2.5 text-[11px] text-[var(--date-color)]">
-                    <span>{formatDate(entry.createdAt)}</span>
+                    <span>{formatMonthDay(entry.createdAt)}</span>
                     {q ? (
                       <span style={{ color: 'var(--accent)' }}>
                         ◦ {q.currentText ?? t('untitled')}

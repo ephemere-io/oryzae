@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { setLocaleCookie } from './fixtures/env';
 
 test.describe('ランディングページ', () => {
   test('未認証で / にアクセスすると LP が表示される', async ({ page }) => {
@@ -33,9 +34,7 @@ test.describe('ランディングページ', () => {
     page,
     context,
   }) => {
-    await context.addCookies([
-      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
-    ]);
+    await setLocaleCookie(context, 'ja');
     await page.goto('/');
     await page.locator('button:has-text("English")').click();
     await expect(page.locator('h1')).toContainText('ferment');

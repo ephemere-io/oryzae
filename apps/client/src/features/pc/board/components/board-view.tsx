@@ -4,11 +4,12 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
+import { PageLoading } from '@/components/ui/page-loading';
+import { useBoard } from '@/features/shared/board/hooks/use-board';
+import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
+import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
-import type { BoardCardData } from '../hooks/use-board';
-import { useBoard } from '../hooks/use-board';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
-import { useBoardSave } from '../hooks/use-board-save';
 import { BoardCard } from './board-card';
 import { BoardControls } from './board-controls';
 import { BoardDateNav } from './board-date-nav';
@@ -158,14 +159,9 @@ export function BoardView({ api }: BoardViewProps) {
 
       {/* Canvas */}
       <div className="relative min-h-full" style={{ minWidth: 1200, minHeight: 900 }}>
-        {showLoader && (
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
-            style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
-          >
-            Loading...
-          </div>
-        )}
+        {/* ルート遷移中の枠と同じ PageLoading。表示が「枠 → ローダー → 本体」と
+            二度変わらないよう、盤面のロード表示は1種類に揃える。 */}
+        {showLoader && <PageLoading />}
 
         {!loading && cards.filter((c) => !c.removing).length === 0 && (
           <div

@@ -61,6 +61,8 @@ export class LoadBoardUsecase {
     userId: string,
     dateKey: string,
     viewType: 'daily' | 'weekly' = 'daily',
+    /** 利用者のローカル暦日を UTC 区間に直すためのオフセット（getTimezoneOffset 同符号）。 */
+    tzOffsetMinutes = 0,
   ): Promise<LoadBoardResponse> {
     // 1. Load existing cards
     let existingCards = await this.boardCardRepo.findByDateAndView(userId, dateKey, viewType);
@@ -143,8 +145,8 @@ export class LoadBoardUsecase {
 
     const entriesRaw =
       viewType === 'weekly'
-        ? await this.entryRepo.listByUserIdAndWeek(userId, dateKey)
-        : await this.entryRepo.listByUserIdAndDate(userId, dateKey);
+        ? await this.entryRepo.listByUserIdAndWeek(userId, dateKey, tzOffsetMinutes)
+        : await this.entryRepo.listByUserIdAndDate(userId, dateKey, tzOffsetMinutes);
     // Sort by createdAt ASC so newer entries get higher z-index (appear on top)
     const entries = entriesRaw.sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),

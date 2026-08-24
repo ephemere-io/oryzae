@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/auth';
+import { deleteEntriesByMarker, openSavedEntry, waitForAutosave } from './fixtures/env';
 
 test.describe('エントリ管理', () => {
   test.beforeEach(async ({ authenticated }) => {
@@ -18,10 +19,12 @@ test.describe('エントリ管理', () => {
     const unique = `E2E作成テスト-${Date.now()}`;
     await editor.pressSequentially(unique);
 
-    // PC エディタは自動保存（debounce 後に作成）。一覧に出ることで作成成功を確認する。
-    await page.waitForTimeout(4000);
+    // PC エディタは自動保存（debounce 後に作成）。固定待ちではなく保存完了を待つ。
+    await waitForAutosave(page);
     await page.goto('/entries');
     await expect(page.getByText(unique)).toBeVisible({ timeout: 10000 });
+
+    await deleteEntriesByMarker(page, unique);
   });
 
   test('エントリ一覧から詳細に遷移できる', async ({ page }) => {
@@ -50,9 +53,8 @@ test.describe('エントリ管理', () => {
     await page.keyboard.type('3行目');
 
     // 自動保存（debounce 後に作成）を待ち、一覧から開き直す。
-    await page.waitForTimeout(4000);
-    await page.goto('/entries');
-    await page.locator('[href*="/entries/"]', { hasText: marker }).first().click();
+    // 固定待ちは負荷時に取りこぼすため、一覧に現れるまでの条件待ちにする。
+    await openSavedEntry(page, marker);
     await page.waitForURL(/\/entries\/[^/]+$/);
 
     const reopened = page.locator('[contenteditable="true"]').first();
@@ -64,5 +66,7 @@ test.describe('エントリ管理', () => {
     expect(text).toContain('3行目');
     // 改行が保たれていれば本文は3行以上
     expect(text.split('\n').filter((l) => l.trim().length > 0).length).toBeGreaterThanOrEqual(3);
+
+    await deleteEntriesByMarker(page, marker);
   });
 });
