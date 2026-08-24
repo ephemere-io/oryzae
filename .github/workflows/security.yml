@@ -56,7 +56,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
-      - run: pip install --quiet semgrep
+      # バージョンを固定する。未固定だとルールエンジンの更新で、コード変更が無いのに
+      # 突然赤くなる/緑になるドリフトが起きて、ゲートの信頼性が落ちる。
+      - run: pip install --quiet semgrep==1.174.0
       - name: Semgrep (security rules)
         run: |
           semgrep scan \

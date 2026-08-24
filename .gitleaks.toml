@@ -14,12 +14,14 @@ useDefault = true
 [allowlist]
 description = "Oryzae の既知の誤検知"
 
+# 注意: ここの正規表現は「検出された秘密値そのもの」に対して、パス非限定で照合される。
+# アンカー無し・case-insensitive な緩いパターンを足すと、本物の鍵の中に部分文字列として
+# 含まれるだけで検出が握りつぶされる。SERVICE_ROLE_KEY は base64 の JWT なので
+# 任意の英数字列を含みうる。パターンは必ず ^...$ でアンカーし、最小限に保つこと。
 regexes = [
   # ドキュメント中のプレースホルダ（YOUR_ANON_KEY / YOUR_SERVICE_ROLE_KEY 等）。
   # 実体の鍵ではなく「ここに自分の鍵を入れる」という指示。
-  '''YOUR_[A-Z0-9_]+''',
-  # .env.example に置く空値・ダミー値
-  '''(?i)(your|dummy|example|placeholder|changeme|xxx+)[-_a-z0-9]*''',
+  '''^YOUR_[A-Z0-9_]+$''',
 ]
 
 paths = [
