@@ -148,6 +148,11 @@
     "save_hook": {
       "error_save": "保存失败",
       "error_create": "创建失败"
+    },
+    "question_chip": {
+      "empty": "关联问题",
+      "untitled": "无标题的问题",
+      "none_available": "还没有问题"
     }
   },
   "app": {
@@ -295,7 +300,15 @@
       "editing": "编辑中",
       "saved": "已保存",
       "saving": "保存中...",
-      "autosaving": "日记自动保存中..."
+      "autosaving": "日记自动保存中...",
+      "autosave_hint": "输入时会自动保存",
+      "saved_just_now": "刚刚已保存",
+      "saved_minutes_ago": "{n} 分钟前已保存",
+      "saved_hours_ago": "{n} 小时前已保存",
+      "context_empty": "想到什么就先写下来",
+      "context_progress": "再写 {n} 字就达到腌渍的参考值",
+      "context_ready": "已达到腌渍的参考值",
+      "stats_open": "打开写作统计"
     },
     "voice": {
       "error_network": "无法使用语音识别（请在 Chrome 中重新打开）",
@@ -304,20 +317,13 @@
     },
     "toolbar": {
       "new_entry": "新建日记",
-      "save": "保存",
       "pickle": "入瓮",
       "list": "列表",
-      "stats": "写作统计",
       "voice_stop": "停止语音输入",
       "voice": "语音输入",
       "settings": "设置",
-      "writing_horizontal": "切换为横排",
-      "writing_vertical": "切换为竖排",
-      "font_sans": "切换为黑体",
-      "font_serif": "切换为宋体",
-      "fullscreen": "全屏",
-      "fermentation_overlay_show": "显示发酵结果",
-      "fermentation_overlay_hide": "隐藏发酵结果"
+      "fermentation_sidebar_show": "打开发酵侧边栏",
+      "fermentation_sidebar_hide": "关闭发酵侧边栏"
     },
     "title": {
       "placeholder": "请输入标题...",
@@ -363,7 +369,14 @@
       "fermentation_overlay_description": "为新条目关联问题时，可以在编辑器上浮动显示该问题的最新发酵结果。请选择默认行为。",
       "fermentation_overlay_ask": "每次询问后再显示",
       "fermentation_overlay_always": "在条目编辑界面始终显示发酵结果",
-      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果"
+      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果",
+      "section_display": "显示",
+      "writing_vertical": "竖排",
+      "writing_horizontal": "横排",
+      "font_serif": "明朝体",
+      "font_sans": "黑体",
+      "fullscreen": "全屏",
+      "fullscreen_toggle": "切换"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
@@ -443,6 +456,15 @@
       "aria_snippet": "打开发酵片段",
       "aria_letter": "打开发酵过程的信件",
       "letter_badge": "来自发酵过程的信件"
+    },
+    "fermentation_sidebar": {
+      "heading": "发酵",
+      "close_aria": "关闭发酵侧边栏",
+      "empty": "这个问题还没有发酵结果。",
+      "section_letter": "信",
+      "section_keywords": "关键词",
+      "section_snippets": "摘录",
+      "letter_open": "阅读收到的信"
     }
   },
   "fermentation": {

@@ -148,6 +148,11 @@
     "save_hook": {
       "error_save": "Failed to save",
       "error_create": "Failed to create"
+    },
+    "question_chip": {
+      "empty": "Link a question",
+      "untitled": "Untitled question",
+      "none_available": "No questions yet"
     }
   },
   "app": {
@@ -295,7 +300,15 @@
       "editing": "Editing",
       "saved": "Saved",
       "saving": "Saving...",
-      "autosaving": "Auto-saving entry..."
+      "autosaving": "Auto-saving entry...",
+      "autosave_hint": "Saves automatically as you write",
+      "saved_just_now": "Saved just now",
+      "saved_minutes_ago": "Saved {n} min ago",
+      "saved_hours_ago": "Saved {n} h ago",
+      "context_empty": "Start writing whatever comes to mind",
+      "context_progress": "{n} more characters to the pickling mark",
+      "context_ready": "You've reached the pickling mark",
+      "stats_open": "Open writing stats"
     },
     "voice": {
       "error_network": "Voice recognition is unavailable (please reopen in Chrome)",
@@ -304,20 +317,13 @@
     },
     "toolbar": {
       "new_entry": "New entry",
-      "save": "Save",
       "pickle": "Pickle",
       "list": "List",
-      "stats": "Writing stats",
       "voice_stop": "Stop voice input",
       "voice": "Voice input",
       "settings": "Settings",
-      "writing_horizontal": "Switch to horizontal",
-      "writing_vertical": "Switch to vertical",
-      "font_sans": "Switch to gothic (sans)",
-      "font_serif": "Switch to mincho (serif)",
-      "fullscreen": "Fullscreen",
-      "fermentation_overlay_show": "Show fermentation result",
-      "fermentation_overlay_hide": "Hide fermentation result"
+      "fermentation_sidebar_show": "Open the fermentation sidebar",
+      "fermentation_sidebar_hide": "Close the fermentation sidebar"
     },
     "title": {
       "placeholder": "Enter a title...",
@@ -363,7 +369,14 @@
       "fermentation_overlay_description": "When you link a question to a new entry, the latest fermentation result for that question can float over the editor. Choose how this should behave.",
       "fermentation_overlay_ask": "Ask before showing",
       "fermentation_overlay_always": "Always show fermentation result on entry screen",
-      "fermentation_overlay_never": "Never show fermentation result on entry screen"
+      "fermentation_overlay_never": "Never show fermentation result on entry screen",
+      "section_display": "Display",
+      "writing_vertical": "Vertical",
+      "writing_horizontal": "Horizontal",
+      "font_serif": "Serif",
+      "font_sans": "Sans",
+      "fullscreen": "Fullscreen",
+      "fullscreen_toggle": "Toggle"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
@@ -443,6 +456,15 @@
       "aria_snippet": "Open fermentation snippet",
       "aria_letter": "Open letter from the fermentation process",
       "letter_badge": "Letter from the fermentation process"
+    },
+    "fermentation_sidebar": {
+      "heading": "FERMENTATION",
+      "close_aria": "Close the fermentation sidebar",
+      "empty": "No fermentation results for this question yet.",
+      "section_letter": "Letter",
+      "section_keywords": "Keywords",
+      "section_snippets": "Snippets",
+      "letter_open": "Read the letter"
     }
   },
   "fermentation": {

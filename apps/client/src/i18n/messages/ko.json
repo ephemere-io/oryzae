@@ -148,6 +148,11 @@
     "save_hook": {
       "error_save": "저장하지 못했습니다",
       "error_create": "만들지 못했습니다"
+    },
+    "question_chip": {
+      "empty": "물음 잇기",
+      "untitled": "제목 없는 물음",
+      "none_available": "아직 물음이 없습니다"
     }
   },
   "app": {
@@ -295,7 +300,15 @@
       "editing": "편집 중",
       "saved": "저장됨",
       "saving": "저장 중...",
-      "autosaving": "항목을 자동 저장 중..."
+      "autosaving": "항목을 자동 저장 중...",
+      "autosave_hint": "입력하면 자동으로 저장됩니다",
+      "saved_just_now": "방금 저장했습니다",
+      "saved_minutes_ago": "{n}분 전에 저장했습니다",
+      "saved_hours_ago": "{n}시간 전에 저장했습니다",
+      "context_empty": "떠오르는 대로 쓰기 시작해 보세요",
+      "context_progress": "{n}자 더 쓰면 담그기 기준에 닿습니다",
+      "context_ready": "담그기 기준에 도달했습니다",
+      "stats_open": "집필 통계 열기"
     },
     "voice": {
       "error_network": "음성 인식을 사용할 수 없습니다 (Chrome에서 다시 열어 주세요)",
@@ -304,20 +317,13 @@
     },
     "toolbar": {
       "new_entry": "새 항목",
-      "save": "저장",
       "pickle": "담그기",
       "list": "목록",
-      "stats": "글쓰기 통계",
       "voice_stop": "음성 입력 중지",
       "voice": "음성 입력",
       "settings": "설정",
-      "writing_horizontal": "가로쓰기로 전환",
-      "writing_vertical": "세로쓰기로 전환",
-      "font_sans": "고딕체로 전환",
-      "font_serif": "명조체로 전환",
-      "fullscreen": "전체 화면",
-      "fermentation_overlay_show": "발효 결과 표시",
-      "fermentation_overlay_hide": "발효 결과 숨기기"
+      "fermentation_sidebar_show": "발효 사이드바 열기",
+      "fermentation_sidebar_hide": "발효 사이드바 닫기"
     },
     "title": {
       "placeholder": "제목을 입력하세요...",
@@ -363,7 +369,14 @@
       "fermentation_overlay_description": "새 항목에 질문을 연결하면 해당 질문의 최신 발효 결과를 에디터 위에 띄울 수 있습니다. 기본 동작을 선택하세요.",
       "fermentation_overlay_ask": "표시 전 매번 확인",
       "fermentation_overlay_always": "항목 화면에서 항상 발효 결과 표시",
-      "fermentation_overlay_never": "항목 화면에서 항상 발효 결과 숨기기"
+      "fermentation_overlay_never": "항목 화면에서 항상 발효 결과 숨기기",
+      "section_display": "표시",
+      "writing_vertical": "세로쓰기",
+      "writing_horizontal": "가로쓰기",
+      "font_serif": "명조",
+      "font_sans": "고딕",
+      "fullscreen": "전체 화면",
+      "fullscreen_toggle": "전환"
     },
     "snippet_toolbar": {
       "saving": "저장 중…",
@@ -443,6 +456,15 @@
       "aria_snippet": "발효 발췌 열기",
       "aria_letter": "발효 과정의 편지 열기",
       "letter_badge": "발효 과정의 편지"
+    },
+    "fermentation_sidebar": {
+      "heading": "발효",
+      "close_aria": "발효 사이드바 닫기",
+      "empty": "이 물음의 발효 결과가 아직 없습니다.",
+      "section_letter": "편지",
+      "section_keywords": "키워드",
+      "section_snippets": "스니펫",
+      "letter_open": "도착한 편지 읽기"
     }
   },
   "fermentation": {

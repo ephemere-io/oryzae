@@ -62,6 +62,11 @@ interface SettingsDrawerProps {
   settings: EditorSettings;
   onChange: (patch: Partial<EditorSettings>) => void;
   onClose: () => void;
+  /**
+   * 全画面表示の切り替え。Issue #356 でツールバーから畳んだので、ここから呼ぶ。
+   * document.fullscreenElement を見る副作用は呼び出し側（EntryEditor）に置く。
+   */
+  onToggleFullscreen?: () => void;
 }
 
 function Toggle({
@@ -163,7 +168,13 @@ function RadioGroup({
   );
 }
 
-export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDrawerProps) {
+export function SettingsDrawer({
+  open,
+  settings,
+  onChange,
+  onClose,
+  onToggleFullscreen,
+}: SettingsDrawerProps) {
   const t = useTranslations('editor.settings');
   if (!open) return null;
 
@@ -186,6 +197,46 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
       >
         <div className="p-5">
           <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-zinc-100">Settings</h2>
+
+          {/* 表示 — ツールバーから畳んだ「書字方向 / 書体 / 全画面」（Issue #356）。
+              エントリーの見た目を決める設定は、アクションではなくここに集約する。 */}
+          <div className="mb-5">
+            <div className="mb-2 text-xs font-semibold tracking-wider text-zinc-400">
+              {t('section_display')}
+            </div>
+            <RadioGroup
+              name="writing-mode"
+              options={[
+                { value: 'vertical', label: t('writing_vertical') },
+                { value: 'horizontal', label: t('writing_horizontal') },
+              ]}
+              value={settings.writingMode}
+              onChange={(v) =>
+                onChange({ writingMode: v === 'horizontal' ? 'horizontal' : 'vertical' })
+              }
+            />
+            <RadioGroup
+              name="font-family"
+              options={[
+                { value: 'serif', label: t('font_serif') },
+                { value: 'sans', label: t('font_sans') },
+              ]}
+              value={settings.fontFamily}
+              onChange={(v) => onChange({ fontFamily: v === 'sans' ? 'sans' : 'serif' })}
+            />
+            {onToggleFullscreen && (
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm text-zinc-700 dark:text-zinc-300">{t('fullscreen')}</span>
+                <button
+                  type="button"
+                  onClick={onToggleFullscreen}
+                  className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                >
+                  {t('fullscreen_toggle')}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* 基本設定 */}
           <div className="mb-5">

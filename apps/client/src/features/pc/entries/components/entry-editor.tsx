@@ -10,12 +10,12 @@ import {
   EditorStatusBar,
 } from '@/features/pc/entries/components/editor-status-bar';
 import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
-import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
+import { FermentationSidebar } from '@/features/pc/entries/components/fermentation-sidebar';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
 import { PickleConfirmModal } from '@/features/pc/entries/components/pickle-confirm-modal';
 import { PickleNudgeModal } from '@/features/pc/entries/components/pickle-nudge-modal';
-import { QuestionLinker } from '@/features/pc/entries/components/question-linker';
+import { QuestionChip } from '@/features/pc/entries/components/question-chip';
 import { QuestionSelectModal } from '@/features/pc/entries/components/question-select-modal';
 import { SaveTitleModal } from '@/features/pc/entries/components/save-title-modal';
 import { SettingsDrawer } from '@/features/pc/entries/components/settings-drawer';
@@ -32,6 +32,7 @@ import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-questi
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
+import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
 import {
@@ -152,6 +153,9 @@ export function EntryEditor({
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
+  // Issue #360: ステータスバーが「いつ保存されたか」を語り続けるための基準時刻。
+  // 保存ボタンを廃した（原則2）ので、保存が起きている事実はこの帯だけが伝える。
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   // Issue #319: autosave で初回エントリが作られた際に、ローカルで紐づけ済みの
@@ -161,7 +165,8 @@ export function EntryEditor({
     link: onLinkQuestion,
   });
 
-  // Issue #329: 新規エントリで紐付けた問いに発酵結果がある場合のオーバーレイ表示制御。
+  // Issue #329 → #466: 新規エントリで紐付けた問いに発酵結果がある場合の表示制御。
+  // 本文に重ねるフローティング表示をやめ、右のサイドバーに集約した。
   // 既存エントリでは表示しない (執筆中の判断材料として使うため新規限定)。
   const isNewEntry = !entryId;
   const firstLinkedQuestionId = isNewEntry ? Array.from(linkedIds)[0] : undefined;
@@ -169,12 +174,12 @@ export function EntryEditor({
     api,
     firstLinkedQuestionId,
   );
-  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [fermentSidebarOpen, setFermentSidebarOpen] = useState(false);
   const [overlayPromptOpen, setOverlayPromptOpen] = useState(false);
   const promptedForQuestionRef = useRef<string | null>(null);
   useEffect(() => {
     if (!fermentationOverlayDetail) {
-      setOverlayVisible(false);
+      setFermentSidebarOpen(false);
       setOverlayPromptOpen(false);
       promptedForQuestionRef.current = null;
       return;
@@ -182,10 +187,10 @@ export function EntryEditor({
     if (promptedForQuestionRef.current === fermentationOverlayDetail.questionId) return;
     promptedForQuestionRef.current = fermentationOverlayDetail.questionId;
     if (settings.fermentationOverlayPreference === 'always') {
-      setOverlayVisible(true);
+      setFermentSidebarOpen(true);
       setOverlayPromptOpen(false);
     } else if (settings.fermentationOverlayPreference === 'never') {
-      setOverlayVisible(false);
+      setFermentSidebarOpen(false);
       setOverlayPromptOpen(false);
     } else {
       setOverlayPromptOpen(true);
@@ -193,7 +198,7 @@ export function EntryEditor({
   }, [fermentationOverlayDetail, settings.fermentationOverlayPreference]);
   const handleOverlayPromptChoose = useCallback(
     (display: boolean, remember: boolean) => {
-      setOverlayVisible(display);
+      setFermentSidebarOpen(display);
       setOverlayPromptOpen(false);
       if (remember) {
         updateSettings({ fermentationOverlayPreference: display ? 'always' : 'never' });
@@ -201,8 +206,8 @@ export function EntryEditor({
     },
     [updateSettings],
   );
-  const toggleOverlay = useCallback(() => {
-    setOverlayVisible((v) => !v);
+  const toggleFermentSidebar = useCallback(() => {
+    setFermentSidebarOpen((v) => !v);
   }, []);
   const [dateStr, setDateStr] = useState(() => {
     const now = new Date();
@@ -218,6 +223,8 @@ export function EntryEditor({
   const router = useRouter();
   const sidebarWidth = SIDEBAR_WIDTH;
   const editorRef = useRef<HTMLDivElement>(null);
+  // 横書きでスクロールする外枠（縦書きでは editor 自身がスクローラ）。Issue #364。
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -419,6 +426,7 @@ export function EntryEditor({
         setQuestionSelectOpen(false);
         setIsEditingTitle(false);
         setStatus('saved');
+        setLastSavedAt(Date.now());
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
         setDateStr(formatEntryDate(created, new Date(), t));
         if (isNew && onLinkQuestion) {
@@ -595,6 +603,7 @@ export function EntryEditor({
       if (wasNew) setCurrentEntryId(newId);
       setSavedContent(savedBody);
       setStatus('saved');
+      setLastSavedAt(Date.now());
       isAutosavingRef.current = false;
       setTimeout(() => setStatus('editing'), 2000);
 
@@ -686,15 +695,43 @@ export function EntryEditor({
     [currentEntryId, entryId, onUnlinkQuestion],
   );
 
-  function toggleFullscreen() {
+  const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
       document.documentElement.requestFullscreen();
     }
-  }
+  }, []);
+
+  // Issue #311: 執筆がノッている間、手をキーボードから離さずに済むようにする。
+  // ⌘S は「保存」だが、保存ボタンを廃した（原則2）今は「いま確定させる」操作にあたる。
+  // ⌘F はブラウザのページ内検索を奪うが、エディタ内での検索より漬け込みのほうが要る。
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        handleSaveClick();
+      } else if (key === 'f') {
+        e.preventDefault();
+        handlePickleClick();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSaveClick, handlePickleClick]);
+
+  useTypewriterScroll({
+    editorRef,
+    scrollContainerRef,
+    writingMode: settings.writingMode,
+    enabled: true,
+  });
 
   const charCount = content.length;
+  // 縦書きは行が右から左へ伸びるので、本文の「末尾側」＝左。一次アクションは末尾側に置く。
+  const dockSideClass = settings.writingMode === 'vertical' ? 'left-8' : 'right-8';
 
   return (
     <div
@@ -738,55 +775,9 @@ export function EntryEditor({
               />
             </svg>
           </button>
-          {/* Save */}
-          <button
-            type="button"
-            onClick={handleSaveClick}
-            disabled={saving || !content.trim()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip={t('toolbar.save')}
-            aria-label={t('toolbar.save')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
-              />
-            </svg>
-          </button>
-          {/* Pickle */}
-          <button
-            type="button"
-            onClick={handlePickleClick}
-            disabled={saving || !content.trim()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip={t('toolbar.pickle')}
-            aria-label={t('toolbar.pickle')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 4.5h12M7.5 4.5v-2a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v2M5 8.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-11Z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 11v5M12 11v5M15 11v5" />
-            </svg>
-          </button>
+          {/* Issue #314 / #356: 「保存」ボタンはここから消えた。保存は常に自動で、
+              人が押すボタンは「漬け込む」だけ（本文側のドックにある）。保存が起きている事実は
+              下部ステータスバーが語る。⌘S は「いま確定させる」操作として残している。 */}
           {/* List */}
           <button
             type="button"
@@ -810,30 +801,11 @@ export function EntryEditor({
               />
             </svg>
           </button>
-          {/* Stats */}
-          <button
-            type="button"
-            onClick={() => setStatsOpen((v) => !v)}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.stats')}
-            aria-label={t('toolbar.stats')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="currentColor"
-              stroke="none"
-              viewBox="0 0 24 24"
-            >
-              <rect x="4" y="14" width="4" height="7" />
-              <rect x="10" y="10" width="4" height="11" />
-              <rect x="16" y="3" width="4" height="18" />
-            </svg>
-          </button>
+          {/* 執筆統計はステータスバーの文字数から開く（帯に意味を持たせる #360）。 */}
         </div>
 
-        {/* Date + inline title (title sits directly under the date) */}
-        <div className="flex min-w-0 flex-col items-center gap-0.5">
+        {/* 中央: このエントリーの身元（日付 → タイトル → 問い）。Issue #228 */}
+        <div className="flex min-w-0 flex-col items-center gap-1">
           <span className="text-xs text-zinc-400">{dateStr}</span>
           {isEditingTitle ? (
             <input
@@ -868,63 +840,39 @@ export function EntryEditor({
               {title || t('title.add')}
             </button>
           )}
+          {/* Issue #228 #365: 専用行を廃して、問いを身元カラムの一部にする。 */}
+          <QuestionChip
+            activeQuestions={activeQuestions}
+            linkedQuestionIds={linkedIds}
+            onLink={handleLink}
+            onUnlink={handleUnlink}
+          />
         </div>
 
+        {/* 右: 表示の切り替え。書字方向・書体・全画面は設定ドロワーに収納した（#356）。 */}
         <div className="flex items-center gap-2">
-          {voiceState.unavailable && (
-            <span
-              className="text-xs text-red-500"
-              role="status"
-              data-testid="voice-unavailable-notice"
-            >
-              {voiceStatusMessage(voiceState.reason, t)}
-            </span>
-          )}
-          {/* Voice input */}
-          <button
-            type="button"
-            onClick={() => setVoiceActive((v) => !v)}
-            className={`rounded-md p-1.5 transition-all ${
-              voiceActive
-                ? 'text-red-500'
-                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-            }`}
-            data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-            aria-label={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-          >
-            <svg
-              aria-hidden="true"
-              className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-            >
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
-            </svg>
-          </button>
-          {/* Issue #329: Fermentation overlay toggle — visible when a completed result exists */}
+          {/* Issue #329 → #466: 発酵結果はサイドバーに集約。結果があるときだけ開閉ボタンを出す。 */}
           {fermentationOverlayDetail && (
             <button
               type="button"
-              onClick={toggleOverlay}
-              aria-pressed={overlayVisible}
+              onClick={toggleFermentSidebar}
+              aria-pressed={fermentSidebarOpen}
               className={`rounded-md p-1.5 transition-all hover:bg-[var(--toolbar-hover)] ${
-                overlayVisible
+                fermentSidebarOpen
                   ? 'text-emerald-600'
                   : 'text-[var(--date-color)] hover:text-[var(--fg)]'
               }`}
               data-tooltip={
-                overlayVisible
-                  ? t('toolbar.fermentation_overlay_hide')
-                  : t('toolbar.fermentation_overlay_show')
+                fermentSidebarOpen
+                  ? t('toolbar.fermentation_sidebar_hide')
+                  : t('toolbar.fermentation_sidebar_show')
               }
               aria-label={
-                overlayVisible
-                  ? t('toolbar.fermentation_overlay_hide')
-                  : t('toolbar.fermentation_overlay_show')
+                fermentSidebarOpen
+                  ? t('toolbar.fermentation_sidebar_hide')
+                  : t('toolbar.fermentation_sidebar_show')
               }
-              data-testid="fermentation-overlay-toggle"
+              data-testid="fermentation-sidebar-toggle"
             >
               <svg
                 aria-hidden="true"
@@ -970,108 +918,7 @@ export function EntryEditor({
               />
             </svg>
           </button>
-          {/* Writing direction toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              updateSettings({
-                writingMode: settings.writingMode === 'vertical' ? 'horizontal' : 'vertical',
-              })
-            }
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={
-              settings.writingMode === 'vertical'
-                ? t('toolbar.writing_horizontal')
-                : t('toolbar.writing_vertical')
-            }
-            aria-label={
-              settings.writingMode === 'vertical'
-                ? t('toolbar.writing_horizontal')
-                : t('toolbar.writing_vertical')
-            }
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-            >
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="18" x2="20" y2="18" />
-            </svg>
-          </button>
-          {/* Font toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              updateSettings({
-                fontFamily: settings.fontFamily === 'serif' ? 'sans' : 'serif',
-              })
-            }
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={
-              settings.fontFamily === 'serif' ? t('toolbar.font_sans') : t('toolbar.font_serif')
-            }
-            aria-label={
-              settings.fontFamily === 'serif' ? t('toolbar.font_sans') : t('toolbar.font_serif')
-            }
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="currentColor"
-              stroke="none"
-              viewBox="0 0 24 24"
-            >
-              <text
-                x="12"
-                y="17"
-                textAnchor="middle"
-                fontSize="16"
-                fontWeight="600"
-                fontFamily="serif"
-              >
-                T
-              </text>
-            </svg>
-          </button>
-          {/* Fullscreen */}
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.fullscreen')}
-            aria-label={t('toolbar.fullscreen')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
-              />
-            </svg>
-          </button>
         </div>
-      </div>
-
-      {/* Question linker */}
-      <div className={`border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}>
-        <QuestionLinker
-          activeQuestions={activeQuestions}
-          linkedQuestionIds={linkedIds}
-          onLink={handleLink}
-          onUnlink={handleUnlink}
-        />
       </div>
 
       {/* Settings drawer */}
@@ -1080,6 +927,7 @@ export function EntryEditor({
         settings={settings}
         onChange={updateSettings}
         onClose={() => setSettingsOpen(false)}
+        onToggleFullscreen={toggleFullscreen}
       />
 
       {/* Error display */}
@@ -1096,81 +944,150 @@ export function EntryEditor({
         style={{ left: sidebarWidth }}
       />
 
-      {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
-      <div className="relative flex-1">
-        {/* Issue #329: 発酵オーバーレイ。エディタ領域に重ねて表示。pointer-events は子要素のみで
-            受け取るため、執筆エリアの入力を妨げない。 */}
-        {overlayVisible && fermentationOverlayDetail && (
-          <FermentationOverlay detail={fermentationOverlayDetail} />
-        )}
-        {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
-        {settings.writingMode === 'vertical' && fadeLeft && (
+      {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}
+      <div className="flex min-h-0 flex-1">
+        {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
+        <div className="relative flex-1">
+          {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
+          {settings.writingMode === 'vertical' && fadeLeft && (
+            <div
+              className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
+              style={{
+                left: 0,
+                width: '18%',
+                background: 'linear-gradient(to right, var(--bg), transparent)',
+              }}
+            />
+          )}
           <div
-            className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
-            style={{
-              left: 0,
-              width: '18%',
-              background: 'linear-gradient(to right, var(--bg), transparent)',
-            }}
-          />
-        )}
-        <div
-          className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
-        >
-          {/* Snippet selection toolbar */}
-          <SnippetToolbar editorRef={editorRef} api={api} />
+            ref={scrollContainerRef}
+            className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
+          >
+            {/* Snippet selection toolbar */}
+            <SnippetToolbar editorRef={editorRef} api={api} />
 
-          {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
-          <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
+            {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
+            <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
 
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={() => {
+                // innerText を使う理由: contentEditable で Enter キー押下時に
+                // ブラウザが挿入する <br> や <div> を改行として読み取るため。
+                // textContent はこれらを無視し、改行が保存されない。
+                const text = editorRef.current?.innerText ?? '';
+                setContent(text);
+                if (status === 'saved') setStatus('editing');
+              }}
+              onPaste={(e) => {
+                e.preventDefault();
+                const text = e.clipboardData.getData('text/plain');
+                if (!text) return;
+                document.execCommand('insertText', false, text);
+                // execCommand の input イベントが React の onInput にバブルしない
+                // 場合があるため、paste 後に明示的に state を同期する（autosave が
+                // content 変化を検知できるようにするため）
+                const updated = editorRef.current?.innerText ?? '';
+                setContent(updated);
+                if (status === 'saved') setStatus('editing');
+              }}
+              data-placeholder={t('placeholder')}
+              // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
+              // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
+              className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full px-[15%] py-6 after:block after:content-[''] after:h-[50vh]`}`}
+              style={{
+                ...(settings.writingMode === 'vertical'
+                  ? {
+                      left: '6%',
+                      top: '4%',
+                      width: '79%',
+                      height: '86%',
+                      position: 'absolute',
+                      overflowX: 'auto',
+                    }
+                  : {}),
+                fontSize: `${settings.fontSize}px`,
+                lineHeight: settings.lineHeight,
+                writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
+                textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
+                fontFamily:
+                  settings.fontFamily === 'serif'
+                    ? "'Noto Serif JP', serif"
+                    : "'Noto Sans JP', sans-serif",
+              }}
+            />
+          </div>
+
+          {/* 入力（音声）と一次アクション（漬け込む）のドック。
+            Issue #356: ツールバーに埋もれた「漬け込む」を、本文の末尾側に置いた
+            唯一の一次アクションへ昇格させる。書く道具（音声）も紙の近くに置く。
+            縦書きは行が右→左なので末尾側＝左（dockSideClass）。 */}
           <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={() => {
-              // innerText を使う理由: contentEditable で Enter キー押下時に
-              // ブラウザが挿入する <br> や <div> を改行として読み取るため。
-              // textContent はこれらを無視し、改行が保存されない。
-              const text = editorRef.current?.innerText ?? '';
-              setContent(text);
-              if (status === 'saved') setStatus('editing');
-            }}
-            onPaste={(e) => {
-              e.preventDefault();
-              const text = e.clipboardData.getData('text/plain');
-              if (!text) return;
-              document.execCommand('insertText', false, text);
-              // execCommand の input イベントが React の onInput にバブルしない
-              // 場合があるため、paste 後に明示的に state を同期する（autosave が
-              // content 変化を検知できるようにするため）
-              const updated = editorRef.current?.innerText ?? '';
-              setContent(updated);
-              if (status === 'saved') setStatus('editing');
-            }}
-            data-placeholder={t('placeholder')}
-            className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
-            style={{
-              ...(settings.writingMode === 'vertical'
-                ? {
-                    left: '6%',
-                    top: '4%',
-                    width: '79%',
-                    height: '86%',
-                    position: 'absolute',
-                    overflowX: 'auto',
-                  }
-                : {}),
-              fontSize: `${settings.fontSize}px`,
-              lineHeight: settings.lineHeight,
-              writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
-              textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
-              fontFamily:
-                settings.fontFamily === 'serif'
-                  ? "'Noto Serif JP', serif"
-                  : "'Noto Sans JP', sans-serif",
-            }}
-          />
+            className={`pointer-events-none absolute bottom-6 z-[20] flex items-center gap-3 ${dockSideClass} ${fadeClass}`}
+          >
+            {voiceState.unavailable && (
+              <span
+                className="pointer-events-auto rounded bg-[var(--bg)] px-2 py-1 text-xs text-red-500 shadow"
+                role="status"
+                data-testid="voice-unavailable-notice"
+              >
+                {voiceStatusMessage(voiceState.reason, t)}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setVoiceActive((v) => !v)}
+              className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg)] shadow-sm transition-all ${
+                voiceActive ? 'text-red-500' : 'text-[var(--date-color)] hover:text-[var(--fg)]'
+              }`}
+              data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
+              aria-label={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
+            >
+              <svg
+                aria-hidden="true"
+                className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+              >
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handlePickleClick}
+              disabled={saving || !content.trim()}
+              data-testid="pickle-primary-action"
+              className="pointer-events-auto flex items-center gap-2 rounded-full px-5 py-2.5 text-sm text-white shadow-lg transition-opacity disabled:cursor-default disabled:opacity-30"
+              style={{ background: 'var(--ob-jar-warm)', fontFamily: 'var(--ob-font-sans)' }}
+              aria-label={t('toolbar.pickle')}
+            >
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.6}
+              >
+                <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
+                <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+              </svg>
+              {t('toolbar.pickle')}
+            </button>
+          </div>
         </div>
+
+        {/* Issue #466: 発酵結果は本文に重ねず、右のサイドバーに集約する。 */}
+        {fermentSidebarOpen && fermentationOverlayDetail && (
+          <FermentationSidebar
+            detail={fermentationOverlayDetail}
+            onClose={() => setFermentSidebarOpen(false)}
+          />
+        )}
       </div>
 
       {/* Stats popup */}
@@ -1183,7 +1100,12 @@ export function EntryEditor({
 
       {/* Status bar */}
       <div className={fadeClass}>
-        <EditorStatusBar status={status} charCount={charCount} />
+        <EditorStatusBar
+          status={status}
+          charCount={charCount}
+          lastSavedAt={lastSavedAt}
+          onCharCountClick={() => setStatsOpen((v) => !v)}
+        />
       </div>
 
       {/* Save title modal — shared between 保存する and 漬け込む */}
@@ -1231,9 +1153,9 @@ export function EntryEditor({
         open={pickleConfirmOpen}
         saving={saving}
         title={title}
-        linkedQuestionTexts={activeQuestions
-          .filter((q) => linkedIds.has(q.id) && q.currentText)
-          .map((q) => q.currentText as string)}
+        linkedQuestionTexts={activeQuestions.flatMap((q) =>
+          linkedIds.has(q.id) && q.currentText ? [q.currentText] : [],
+        )}
         onConfirm={handlePickleConfirm}
         onClose={() => setPickleConfirmOpen(false)}
       />

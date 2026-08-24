@@ -28,8 +28,8 @@ function ToolbarIconsSkeleton({ count }: { count: number }) {
 }
 
 /**
- * @param chips 問いリンカに並ぶチップ数の見込み（既存エントリは紐付いた問いのぶんだけ並ぶ）。
- *   0 でも行の高さは変わらない（実 QuestionLinker が入力欄と + ボタンを常に描くため）。
+ * @param chips 実 DOM の問いチップは常に1つ（結ばれている問いを出す）。Issue #228 で
+ *   専用行を畳んだので、この値は中央カラムに置くチップ枠の数として使う。
  * @param bodyLoading 本文の取得を待っているか（既存エントリを開くときだけ true）。
  */
 export function EntryEditorSkeleton({
@@ -45,34 +45,26 @@ export function EntryEditorSkeleton({
       aria-hidden="true"
       {...verifyAttrs({
         unit: 'EntryEditorSkeleton',
-        slots: 'toolbar,question-linker,body,status-bar',
+        slots: 'toolbar,body,status-bar',
         chips,
         bodyLoading,
       })}
     >
-      {/* ツールバー（実物: border-b px-4 py-2、左5アイコン / 中央 日付+タイトル / 右5アイコン） */}
+      {/* ツールバー（実物: border-b px-4 py-2、左2アイコン / 中央 日付+タイトル+問いチップ /
+          右2アイコン）。Issue #228 で問いリンカ行が中央カラムに畳まれ、3段構成になった。 */}
       <div
-        className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2"
+        className="flex items-start justify-between border-b border-[var(--border-subtle)] px-4 py-2"
         data-skeleton-slot="toolbar"
       >
-        <ToolbarIconsSkeleton count={5} />
-        <div className="flex min-w-0 flex-col items-center gap-0.5">
+        <ToolbarIconsSkeleton count={2} />
+        <div className="flex min-w-0 flex-col items-center gap-1">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-4 w-40" />
+          {skeletonKeys(chips).map((k) => (
+            <Skeleton key={k} className="h-[22px] w-[160px] rounded-full" />
+          ))}
         </div>
-        <ToolbarIconsSkeleton count={5} />
-      </div>
-
-      {/* 問いリンカ行（実物: border-b px-4 py-2 / 検索入力 w-44 ＋ + ボタン h-6 w-6 ＋ チップ） */}
-      <div
-        className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-2"
-        data-skeleton-slot="question-linker"
-      >
-        <Skeleton className="h-[26px] w-44 shrink-0 rounded-full" />
-        <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
-        {skeletonKeys(chips).map((k) => (
-          <Skeleton key={k} className="h-5 w-[120px] shrink-0 rounded-full" />
-        ))}
+        <ToolbarIconsSkeleton count={2} />
       </div>
 
       {/* 執筆エリア（実物: min-h-full px-[15%] py-6）。中身は空のまま余白だけ確保する。 */}
