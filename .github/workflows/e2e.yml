@@ -73,6 +73,8 @@ jobs:
             echo "SUPABASE_URL=$(echo "$status" | jq -r '.API_URL')"
             echo "SUPABASE_ANON_KEY=$(echo "$status" | jq -r '.ANON_KEY')"
             echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$status" | jq -r '.SERVICE_ROLE_KEY')"
+            # 確認メールの受信箱。signup.spec.ts がここから token を取り出す。
+            echo "INBUCKET_URL=$(echo "$status" | jq -r '.INBUCKET_URL')"
           } >> "$GITHUB_ENV"
 
       - name: Cache Playwright browsers
