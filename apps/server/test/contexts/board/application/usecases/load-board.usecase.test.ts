@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoadBoardUsecase } from '@/contexts/board/application/usecases/load-board.usecase';
 import type { BoardCardRepositoryGateway } from '@/contexts/board/domain/gateways/board-card-repository.gateway';
+import type { BoardPhotoRepositoryGateway } from '@/contexts/board/domain/gateways/board-photo-repository.gateway';
 import type { BoardSnippetRepositoryGateway } from '@/contexts/board/domain/gateways/board-snippet-repository.gateway';
+import type { BoardStorageGateway } from '@/contexts/board/domain/gateways/board-storage.gateway';
 import { BoardCard } from '@/contexts/board/domain/models/board-card';
+import { BoardPhoto } from '@/contexts/board/domain/models/board-photo';
 import { BoardSnippet } from '@/contexts/board/domain/models/board-snippet';
 import type { EntryRepositoryGateway } from '@/contexts/entry/domain/gateways/entry-repository.gateway';
 import { Entry } from '@/contexts/entry/domain/models/entry';
@@ -11,6 +14,8 @@ const generateId = () => 'generated-id';
 
 let boardCardRepo: BoardCardRepositoryGateway;
 let boardSnippetRepo: BoardSnippetRepositoryGateway;
+let boardPhotoRepo: BoardPhotoRepositoryGateway;
+let boardStorage: BoardStorageGateway;
 let entryRepo: EntryRepositoryGateway;
 let usecase: LoadBoardUsecase;
 
@@ -46,15 +51,21 @@ beforeEach(() => {
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
   };
-  const boardPhotoRepo = {
+  boardPhotoRepo = {
     findById: vi.fn().mockResolvedValue(null),
     findByIds: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
   };
-  const boardStorage = {
+  boardStorage = {
     upload: vi.fn().mockResolvedValue('path'),
-    getPublicUrl: vi.fn().mockReturnValue('https://example.com/photo.jpg'),
+    getSignedUrl: vi.fn().mockResolvedValue('https://example.com/photo.jpg'),
+    getSignedUrls: vi
+      .fn()
+      .mockImplementation(
+        async (paths: string[]) =>
+          new Map(paths.map((path) => [path, `https://example.com/signed/${path}`])),
+      ),
     delete: vi.fn().mockResolvedValue(undefined),
   };
   usecase = new LoadBoardUsecase(
@@ -358,5 +369,78 @@ describe('LoadBoardUsecase', () => {
 
     expect(result.cards).toHaveLength(0);
     expect(boardCardRepo.saveMany).not.toHaveBeenCalled();
+  });
+  it('photo カードは署名付き URL を imageUrl として返す（#504: 公開 URL を使わない）', async () => {
+    const card = BoardCard.fromProps({
+      id: 'card-p1',
+      userId: 'user-1',
+      cardType: 'photo',
+      refId: 'photo-1',
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      x: 10,
+      y: 20,
+      rotation: 0,
+      width: 260,
+      height: 200,
+      zIndex: 0,
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
+    });
+    const photo = BoardPhoto.fromProps({
+      id: 'photo-1',
+      userId: 'user-1',
+      storagePath: 'user-1/1700000000-a.jpg',
+      caption: '朝の風景',
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
+    });
+
+    vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([card]);
+    vi.mocked(boardPhotoRepo.findByIds).mockResolvedValue([photo]);
+
+    const result = await usecase.execute('user-1', '2026-04-11');
+
+    expect(boardStorage.getSignedUrls).toHaveBeenCalledWith(['user-1/1700000000-a.jpg']);
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].content).toEqual({
+      imageUrl: 'https://example.com/signed/user-1/1700000000-a.jpg',
+      caption: '朝の風景',
+    });
+  });
+
+  it('署名に失敗した photo カードは結果から除外する', async () => {
+    const card = BoardCard.fromProps({
+      id: 'card-p2',
+      userId: 'user-1',
+      cardType: 'photo',
+      refId: 'photo-2',
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      x: 10,
+      y: 20,
+      rotation: 0,
+      width: 260,
+      height: 200,
+      zIndex: 0,
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
+    });
+    const photo = BoardPhoto.fromProps({
+      id: 'photo-2',
+      userId: 'user-1',
+      storagePath: 'user-1/missing.jpg',
+      caption: '',
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
+    });
+
+    vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([card]);
+    vi.mocked(boardPhotoRepo.findByIds).mockResolvedValue([photo]);
+    vi.mocked(boardStorage.getSignedUrls).mockResolvedValue(new Map());
+
+    const result = await usecase.execute('user-1', '2026-04-11');
+
+    expect(result.cards).toHaveLength(0);
   });
 });
