@@ -67,14 +67,19 @@ test.describe('言語切替', () => {
     await expectSignupPageRendered(page, 'en');
   });
 
-  test('/login で切り替えた言語が landing にも反映される', async ({ page, context }) => {
+  test('/login で切り替えた言語が cookie に永続する', async ({ page, context }) => {
+    // 旧構成では「切替後に LP へ戻ると EN のまま」を見ていた。LP は別ドメインの公開サイトへ
+    // 移り cookie を共有しないので、ここではアプリ側に残る永続化そのものを検証する。
+    // LP 側での言語保持は oryzae-docs の e2e/landing.spec.ts が受け持つ。
     await setLocaleCookie(context, 'ja');
     await page.goto('/login');
     await page.getByRole('combobox', { name: 'Language' }).selectOption('en');
     await expect(page.locator('text=Log in to continue')).toBeVisible();
 
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('ferment');
+    const cookies = await context.cookies();
+    expect(cookies.find((c) => c.name === 'NEXT_LOCALE')?.value).toBe('en');
+
+    await page.goto('/forgot-password');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 });

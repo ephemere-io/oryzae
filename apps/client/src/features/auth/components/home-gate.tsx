@@ -5,6 +5,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { getAccessToken, setTokens } from '@/lib/auth';
+import { DOCS_SITE_URL } from '@/lib/docs-site';
 
 function parseHashParams(hash: string): Record<string, string> {
   const params: Record<string, string> = {};
@@ -19,12 +20,14 @@ function parseHashParams(hash: string): Record<string, string> {
 }
 
 /**
- * ランディング（/）のクライアント専用ゲート。描画は持たず（null）、副作用のみ:
+ * ルート（/）のクライアント専用ゲート。描画は持たず（null）、副作用のみ:
  * - Supabase のメール確認リダイレクト（hash に access/refresh token）を受けてログイン状態にする
  * - 既ログインなら /entries/new へ送る
+ * - どちらでもない訪問者は公開サイト（別ドメイン）へ送る
  *
- * ランディング本文は SSR で常に描画する（SEO）。ログイン者はこのゲートが直後に
- * リダイレクトするため、本文が見えるのは一瞬。
+ * ランディングは別リポジトリの公開サイトに移したため、ここは本文を持たない。
+ * 未ログイン訪問者を送り出す先が別オリジンなので、next/router ではなく
+ * `window.location.replace` を使う。
  */
 export function HomeGate() {
   const router = useRouter();
@@ -43,7 +46,9 @@ export function HomeGate() {
     }
     if (getAccessToken()) {
       router.replace('/entries/new');
+      return;
     }
+    window.location.replace(DOCS_SITE_URL);
   }, [router]);
 
   return null;

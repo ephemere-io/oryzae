@@ -37,6 +37,8 @@ pnpm knip                                   # デッドコード検出
 - `app/` — Next.js ページ（薄いラッパー、API 呼び出し禁止、端末判定）
 - `features/` — 機能スライス
   - `apps/client` は **ドメイン × reach**: `features/{shared,pc,sp}/{domain}`（shared=UIなし共有hook/型、pc/sp=端末別UI）
+    - reach は「端末で体験が変わる機能」だけに適用する。端末非依存の機能（`auth` / `landing` / `onboarding`）は
+      `features/{domain}/` のフラットなまま置く。フラット機能どうしの直接 import は禁止、`features/shared` のみ可
   - `apps/admin` は単一体験で `features/{domain}`（reach 軸なし）
 - `components/ui/` — 汎用 UI（feature 依存禁止）
 - `lib/` — 基盤ユーティリティのみ（ドメイン非依存。`use-*` のドメイン hook を置かない）
