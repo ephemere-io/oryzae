@@ -11,6 +11,8 @@ function q(id: string, currentText: string, extra: Record<string, boolean> = {})
     isArchived: false,
     isProposedByOryzae: false,
     isValidatedByUser: true,
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-01T00:00:00.000Z',
     ...extra,
   };
 }

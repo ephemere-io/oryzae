@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectSignupPageRendered, setLocaleCookie } from './fixtures/env';
 
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? 'yukiagatsuma@gmail.com';
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'Test123456';
@@ -29,7 +30,7 @@ test.describe('認証フロー', () => {
   test('サインアップページが表示される', async ({ page }) => {
     await page.goto('/signup');
     await expect(page.locator('h1')).toHaveText('Oryzae');
-    await expect(page.locator('text=アカウントを作成')).toBeVisible();
+    await expectSignupPageRendered(page, 'ja');
     await expect(page.locator('a:has-text("ログイン")')).toBeVisible();
   });
 
@@ -45,9 +46,7 @@ test.describe('認証フロー', () => {
 
 test.describe('言語切替', () => {
   test('/login の言語切替ボタンで英訳が表示され cookie が保存される', async ({ page, context }) => {
-    await context.addCookies([
-      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
-    ]);
+    await setLocaleCookie(context, 'ja');
     await page.goto('/login');
     await expect(page.locator('text=ログインして続ける')).toBeVisible();
 
@@ -59,21 +58,17 @@ test.describe('言語切替', () => {
   });
 
   test('言語切替が認証ページ間 (/login → /signup) で保持される', async ({ page, context }) => {
-    await context.addCookies([
-      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
-    ]);
+    await setLocaleCookie(context, 'ja');
     await page.goto('/login');
     await page.getByRole('combobox', { name: 'Language' }).selectOption('en');
     await expect(page.locator('text=Log in to continue')).toBeVisible();
 
     await page.goto('/signup');
-    await expect(page.locator('text=Create your account')).toBeVisible();
+    await expectSignupPageRendered(page, 'en');
   });
 
   test('/login で切り替えた言語が landing にも反映される', async ({ page, context }) => {
-    await context.addCookies([
-      { name: 'NEXT_LOCALE', value: 'ja', domain: 'localhost', path: '/' },
-    ]);
+    await setLocaleCookie(context, 'ja');
     await page.goto('/login');
     await page.getByRole('combobox', { name: 'Language' }).selectOption('en');
     await expect(page.locator('text=Log in to continue')).toBeVisible();

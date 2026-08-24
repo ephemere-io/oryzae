@@ -4,7 +4,7 @@
  * EntryEditor のデータ取得は全て `api`(ApiClient) を引数に取り、`api=null` で early-return する:
  *   - useSaveEntry の save は `if (!api ...) return null`（fetch しない）
  *   - useAutosaveEntry は enabled=`!!api`=false（タイマーも張らない）
- *   - useUserMe / useEntryFermentationDetail は api 無しで即 null（fetch ゼロ）
+ *   - useUserMe / useFermentationForQuestion は api 無しで即 null（fetch ゼロ）
  *   - SnippetToolbar も api を握るだけで描画時 fetch は無い
  * router は withVerifyProviders が no-op mock を供給する。よって `api={null} auth={null}` を渡せば
  * fetch ゼロの純レンダリングになり、props と toolbar クリックだけで孤立検証できる。

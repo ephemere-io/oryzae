@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import type { BoardCardData } from './use-board';
+import type { BoardCardData } from '@/features/shared/board/types';
 
 type InteractionType = 'drag' | 'rotate' | 'resize';
 type ResizeCorner = 'se' | 'sw' | 'ne' | 'nw';

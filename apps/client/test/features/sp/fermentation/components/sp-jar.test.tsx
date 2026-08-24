@@ -30,6 +30,25 @@ const completedFermentation = [
   { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2024-02-01T00:00:00Z' },
 ];
 
+/**
+ * GET /api/v1/fermentations/:id の実レスポンス形（apps/server の fermentations ルート）。
+ * Issue #490 で共有 hook が正規化するようになり、id / questionId を欠くレスポンスは
+ * null に落ちる。スタブも実形に合わせる。
+ */
+function detailJson(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: 'f1',
+    questionId: 'q1',
+    targetPeriod: '2024-02',
+    status: 'completed',
+    worksheet: null,
+    letter: { id: 'l1', bodyText: '過去のあなたより。', jarX: null, jarY: null },
+    keywords: [],
+    snippets: [],
+    ...overrides,
+  };
+}
+
 describe('SpJar', () => {
   afterEach(cleanup);
   beforeEach(() => vi.clearAllMocks());
@@ -58,8 +77,7 @@ describe('SpJar', () => {
         return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
       if (url === '/api/v1/fermentations')
         return Promise.resolve(jsonResponse(completedFermentation));
-      if (url === '/api/v1/fermentations/f1')
-        return Promise.resolve(jsonResponse({ letter: { bodyText: '過去のあなたより。' } }));
+      if (url === '/api/v1/fermentations/f1') return Promise.resolve(jsonResponse(detailJson({})));
       return Promise.resolve(jsonResponse({}));
     });
     renderJar(createMockApi(fetchImpl));
@@ -78,11 +96,12 @@ describe('SpJar', () => {
         return Promise.resolve(jsonResponse(completedFermentation));
       if (url === '/api/v1/fermentations/f1')
         return Promise.resolve(
-          jsonResponse({
-            letter: { bodyText: '過去のあなたより。' },
-            keywords: [{ id: 'k1', keyword: '余白', description: '...' }],
-            snippets: [{ id: 's1', originalText: 'うまく言えない', sourceDate: '2024-02-01' }],
-          }),
+          jsonResponse(
+            detailJson({
+              keywords: [{ id: 'k1', keyword: '余白', description: '...' }],
+              snippets: [{ id: 's1', originalText: 'うまく言えない', sourceDate: '2024-02-01' }],
+            }),
+          ),
         );
       return Promise.resolve(jsonResponse({}));
     });

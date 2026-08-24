@@ -2,15 +2,17 @@
 
 import { useRouter } from 'next/navigation';
 import { DeviceView } from '@/components/device-view';
-import { AccountPage } from '@/features/auth/components/account-page';
+import { AccountPage } from '@/features/pc/account/components/account-page';
 import { SpAccountPage } from '@/features/sp/account/components/sp-account-page';
 import { useAuth } from '@/lib/auth-context';
+import { AccountRouteLoading } from '../_loading/account-route-loading';
 
 export default function AccountRoute() {
   const { auth, loading, logout } = useAuth();
   const router = useRouter();
 
-  if (loading || !auth) return null;
+  // 認証解決までロード表示を出し続ける（null だと枠が一度消えて真っ白になる）。
+  if (loading || !auth) return <AccountRouteLoading />;
 
   function handleLogout() {
     logout();

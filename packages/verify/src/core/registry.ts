@@ -32,8 +32,15 @@ export function getVerifier(id: string): Verifier | undefined {
   return verifiers.get(id);
 }
 
+/**
+ * 登録済みユニットを **id 昇順**で返す。
+ *
+ * 挿入順（＝ register バレルの import 順）で返すと、バンドラがサーバーとクライアントで
+ * モジュール評価順を変えたときに dashboard の一覧順がズレ、hydration mismatch になる
+ * （実際に発生した）。順序に意味は無いので id で正規化して決定的にする。
+ */
 export function allUnits(): VerifiableUnit<unknown>[] {
-  return Array.from(units.values());
+  return Array.from(units.values()).sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export function allVerifiers(): Verifier[] {
