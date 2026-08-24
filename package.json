@@ -9,7 +9,8 @@
     "lint": "biome check apps/ packages/",
     "lint:fix": "biome check --write apps/ packages/",
     "typecheck": "pnpm --filter @oryzae/server typecheck && pnpm --filter @oryzae/shared typecheck && pnpm --filter @oryzae/verify typecheck && pnpm --filter @oryzae/client typecheck && pnpm --filter @oryzae/admin typecheck",
-    "test": "pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test && pnpm --filter @oryzae/admin test",
+    "test": "pnpm test:scripts && pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test && pnpm --filter @oryzae/admin test",
+    "test:scripts": "vitest run --config vitest.config.mjs",
     "knip": "knip",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise && pnpm --filter @oryzae/admin dep-cruise",
     "security:rls": "node scripts/check-rls-policies.mjs",
@@ -39,6 +40,7 @@
     "@biomejs/biome": "~2.5.8",
     "knip": "^6.32.2",
     "lint-staged": "^17.3.0",
-    "simple-git-hooks": "^2.13.1"
+    "simple-git-hooks": "^2.13.1",
+    "vitest": "^3.2.7"
   }
 }
