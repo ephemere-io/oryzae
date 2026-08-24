@@ -7,22 +7,22 @@ import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 
 /**
- * Apply default z-ordering by creation time (newer on top).
- * Cards whose z-index was bumped by user interaction (drag) are preserved.
+ * 自動配置のカードだけを作成日時順（新しいものほど手前）に並べ直す。
+ * 利用者が自分で動かしたカードは、その重なり順をそのまま保つ。
  *
- * Auto-assigned z-indexes are sequential (0..N-1).
- * User-dragged cards get z-index >= N (via zCounterRef in use-board-interaction).
- * We re-sort only the auto-assigned group by createdAt, keeping user-modified cards on top.
+ * 判定には `userPositioned`（サーバー保存のフラグ）を使う。
+ * 以前は「z_index >= 総枚数」で推測していたが、カードを削除すると総枚数が縮むため、
+ * 触っていないカードが判定を満たして手前に固定されてしまっていた
+ * （z_index の値からは「採番当時の総枚数」を復元できないので、式では直せない）。
  */
 function applyDefaultZOrder(cards: BoardCardData[]): BoardCardData[] {
   if (cards.length <= 1) return cards;
 
-  const total = cards.length;
   const autoCards: BoardCardData[] = [];
   const userCards: BoardCardData[] = [];
 
   for (const card of cards) {
-    if (card.zIndex >= total) {
+    if (card.userPositioned) {
       userCards.push(card);
     } else {
       autoCards.push(card);

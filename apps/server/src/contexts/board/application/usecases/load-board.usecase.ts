@@ -30,6 +30,8 @@ interface CardResponse {
   width: number;
   height: number;
   zIndex: number;
+  /** 利用者が自分で位置を決めたカードか。クライアントの自動整列の対象外になる。 */
+  userPositioned: boolean;
   createdAt: string;
   content: EntryContent | SnippetContent | PhotoContent;
 }
@@ -255,6 +257,7 @@ export class LoadBoardUsecase {
           width: card.width,
           height: card.height,
           zIndex: card.zIndex,
+          userPositioned: card.userPositioned,
           createdAt: card.createdAt,
           content,
         };
