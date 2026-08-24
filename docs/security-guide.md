@@ -79,7 +79,8 @@ AI と違って見落とさない。ここが本丸。
 |---|---|---|
 | `pnpm security:rls` | `scripts/check-rls-policies.mjs` | 全テーブルに RLS / ポリシー必須 / `USING (true)` に `TO` 必須 / **読み取りポリシーに `auth.uid()` 必須** / public バケット禁止 |
 | `pnpm dep-cruise` | `service-role-client-containment` | service role の利用箇所を許可リストに固定 |
-| CodeQL | GitHub 標準（public repo は無料） | JS/TS の汎用脆弱性 |
+| Semgrep (OSS) | `p/security-audit` `p/secrets` `p/typescript` `p/react` | JS/TS の汎用脆弱性 |
+| gitleaks (OSS) | `.gitleaks.toml` | git 履歴を含む秘密情報の混入検出 |
 | `pnpm audit` | pnpm | 依存の既知 CVE（high 以上） |
 
 読み取りを許すポリシー（`FOR SELECT` / `FOR ALL`）は、条件式に `auth.uid()` が
@@ -113,17 +114,36 @@ CI を止めない（`verify-coverage-gate` と同じ段階導入の思想）。
 GitHub Issue に起票（既存 Issue があればコメント追記）する。
 **指摘ゼロなら起票しない** — 毎週ノイズを立てると誰も読まなくなるため。
 
-### GitHub 標準機能
+### GitHub 標準機能と、private 化による制約
 
-public リポジトリなので以下は無料。全て有効化済み。
+**このリポジトリは private である。** GitHub のセキュリティ機能は public では無料だが、
+private では有料（GitHub Advanced Security / Code Security / Secret Protection）になる。
+そのため以下は**使えない**:
 
-- **Secret scanning + push protection** — `SUPABASE_SERVICE_ROLE_KEY` の push を押し戻す
-- **Dependabot security updates** — 脆弱性のある依存を自動 PR
-- **CodeQL** — 上記ワークフローで実行
+| 機能 | private での扱い | 代替 |
+|---|---|---|
+| CodeQL（code scanning） | 有料 | Semgrep OSS（`sast` ジョブ） |
+| Secret scanning | 有料 | gitleaks（`secret-scan` ジョブ） |
+| **Push protection** | 有料 | **代替なし**（下記） |
+
+利用できるのは **Dependabot security updates**（private でも無料）のみ。
+
+**失われた防御で最も痛いのは push protection** である。GitHub の push protection は
+秘密情報を含む push を **サーバー側で押し戻す**が、gitleaks は CI で「push された後に」
+気づくだけで、その時点で既にリモートに履歴が残っている。
+`SUPABASE_SERVICE_ROLE_KEY` が push されたら、CI が赤くなるより先に**鍵のローテーションが必要**。
+
+この差を埋めたい場合の選択肢:
+
+1. GitHub Secret Protection を購入する（サーバー側ブロックが戻る）
+2. gitleaks を pre-commit フックにも入れる（手元で止まる。ただし `--no-verify` や
+   別クローンからの push は素通りするので、あくまで補助）
+3. リポジトリを public に戻す（GitHub の無料機能が全て戻る。ただし当然ソースは公開される）
 
 ## prompt injection への注意
 
-このリポジトリは **public** であり、fork から PR を出せる。
+現在このリポジトリは private なので fork 経由の攻撃面は無いが、
+**public に戻した瞬間にその経路が生きる**。
 `claude-code-security-review` は公式に「prompt injection に対して硬化されていない」と
 明記されている。したがって:
 

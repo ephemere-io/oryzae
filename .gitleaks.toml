@@ -1,0 +1,31 @@
+# gitleaks 設定
+#
+# GitHub の secret scanning / push protection は private リポジトリでは有料のため、
+# その役割を OSS の gitleaks で代替する（.github/workflows/security.yml の secret-scan）。
+# 守りたいのは何よりも SUPABASE_SERVICE_ROLE_KEY の漏洩。これが漏れると RLS を
+# バイパスして全ユーザーの日記が読めるため、このプロダクトで最も致命的な事故になる。
+#
+# 誤検知を放置するとゲートが「常に赤」になり、やがて誰も見なくなる。
+# 除外はここに理由付きで明示し、範囲を最小に保つこと。
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Oryzae の既知の誤検知"
+
+regexes = [
+  # ドキュメント中のプレースホルダ（YOUR_ANON_KEY / YOUR_SERVICE_ROLE_KEY 等）。
+  # 実体の鍵ではなく「ここに自分の鍵を入れる」という指示。
+  '''YOUR_[A-Z0-9_]+''',
+  # .env.example に置く空値・ダミー値
+  '''(?i)(your|dummy|example|placeholder|changeme|xxx+)[-_a-z0-9]*''',
+]
+
+paths = [
+  # ローカル開発用 Supabase（127.0.0.1:54321）の anon 鍵は Supabase が公開している
+  # 固定値で、秘密情報ではない。
+  '''(^|/)\.env\.example$''',
+  # ロックファイルはハッシュ列が高エントロピー文字列として誤検知されやすい
+  '''(^|/)pnpm-lock\.yaml$''',
+]
