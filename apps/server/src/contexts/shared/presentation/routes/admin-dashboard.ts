@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { gateway } from 'ai';
 import { Hono } from 'hono';
+import { fetchDailyCosts, sumDailyCosts } from '../../infrastructure/anthropic-cost-report.js';
 import { computeCostFromTokens } from '../../infrastructure/claude-pricing.js';
 
 type Env = {
@@ -276,33 +277,21 @@ export const adminDashboard = new Hono<Env>()
       return total;
     };
 
-    // 写真の文字起こしも同じ Claude の実費。発酵とは別テーブル・別モデルなので
-    // それぞれの価格で出して合算する（これを足さないと月次コストが実態より小さく出る）。
-    const [currentMonthOcr, lastMonthOcr] = await Promise.all([
-      supabase
-        .from('photo_transcription_usages')
-        .select('model, input_tokens, output_tokens')
-        .gte('created_at', currentMonthStart)
-        .lte('created_at', currentMonthEnd),
-      supabase
-        .from('photo_transcription_usages')
-        .select('model, input_tokens, output_tokens')
-        .gte('created_at', lastMonthStart)
-        .lte('created_at', lastMonthEnd),
+    // 正は Anthropic の Cost Report（実請求額）。自前のトークン × 価格表では
+    // キャッシュ割引・コンテキスト窓別単価・tier 割引・期間限定価格を追えないため。
+    // Admin キー未設定や API 失敗時だけ、従来の概算にフォールバックする。
+    const [currentMonthBilled, lastMonthBilled] = await Promise.all([
+      fetchDailyCosts(currentMonthStart, currentMonthEnd),
+      fetchDailyCosts(lastMonthStart, lastMonthEnd),
     ]);
 
-    const sumOcrCosts = (
-      rows: { model: string | null; input_tokens: number | null; output_tokens: number | null }[],
-    ): number =>
-      rows.reduce((total, row) => {
-        const cost = computeCostFromTokens(row.input_tokens, row.output_tokens, row.model);
-        return total + (cost?.totalCost ?? 0);
-      }, 0);
-
-    const currentMonthCost =
-      (await sumCosts(currentMonthRows.data ?? [])) + sumOcrCosts(currentMonthOcr.data ?? []);
-    const lastMonthCost =
-      (await sumCosts(lastMonthRows.data ?? [])) + sumOcrCosts(lastMonthOcr.data ?? []);
+    const billed = currentMonthBilled !== null && lastMonthBilled !== null;
+    const currentMonthCost = billed
+      ? sumDailyCosts(currentMonthBilled)
+      : await sumCosts(currentMonthRows.data ?? []);
+    const lastMonthCost = billed
+      ? sumDailyCosts(lastMonthBilled)
+      : await sumCosts(lastMonthRows.data ?? []);
 
     const projectedCost = daysElapsed > 0 ? (currentMonthCost / daysElapsed) * daysInMonth : 0;
 
@@ -312,6 +301,9 @@ export const adminDashboard = new Hono<Env>()
       projectedCost: Math.round(projectedCost * 1000000) / 1000000,
       daysElapsed,
       daysInMonth,
+      // 'billed' = Anthropic の実請求額 / 'estimate' = 自前トークンからの概算。
+      // 画面側でどちらの数字を見ているか分かるように出す。
+      source: billed ? 'billed' : 'estimate',
     });
   })
   .get('/user-activity', async (c) => {

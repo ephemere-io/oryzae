@@ -1,7 +1,6 @@
-import { gateway } from 'ai';
 import { Hono } from 'hono';
+import { fetchDailyCosts, sumDailyCosts } from '../../infrastructure/anthropic-cost-report.js';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
-import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 import { createCronAuthMiddleware } from '../middleware/cron-auth.js';
 
 const DAILY_COST_THRESHOLD_USD = 1.0;
@@ -16,48 +15,34 @@ export const cronCostAlert = new Hono()
   )
   .post('/', async (c) => {
     try {
-      const supabase = getSupabaseClient();
-
       // Get yesterday's date range (UTC)
       const now = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       const dayStart = `${yesterday.toISOString().slice(0, 10)}T00:00:00.000Z`;
       const dayEnd = `${yesterday.toISOString().slice(0, 10)}T23:59:59.999Z`;
+      const dateLabel = yesterday.toISOString().slice(0, 10);
 
-      // Fetch fermentations with cost tracking from yesterday
-      const { data, error } = await supabase
-        .from('fermentation_results')
-        .select('generation_id')
-        .not('generation_id', 'is', null)
-        .gte('created_at', dayStart)
-        .lte('created_at', dayEnd);
+      // Anthropic の Cost Report から前日の実請求額を引く。
+      //
+      // 以前は fermentation_results の generation_id を gateway に問い合わせていたが、
+      // issue #352 で Anthropic 直叩きに切替えて以降 generation_id は発行されない。
+      // その結果このクエリは常に 0 件で、日次レポートは毎日 $0.0000 を報告していた。
+      // Cost Report なら発酵・文字起こしを含む組織全体の実費がそのまま取れる。
+      const dailyCosts = await fetchDailyCosts(dayStart, dayEnd);
 
-      if (error) {
-        console.error('[cron-cost-alert] Supabase query failed', { error: error.message });
+      if (dailyCosts === null) {
+        console.error('[cron-cost-alert] cost report unavailable', { date: dateLabel });
         await notifyDiscord({
-          title: 'コスト cron: Supabase クエリ失敗',
-          description: error.message,
+          title: 'コスト cron: Cost Report を取得できません',
+          description:
+            'ANTHROPIC_ADMIN_KEY が未設定か、Admin API がエラーを返しました。日次コストを報告できません。',
           color: COLORS.ERROR,
         });
-        return c.json({ error: error.message }, 500);
+        return c.json({ error: 'Cost report unavailable' }, 500);
       }
 
-      // Sum costs
-      let totalCost = 0;
-      let trackedCount = 0;
-      for (const row of data ?? []) {
-        try {
-          const info = await gateway.getGenerationInfo({ id: row.generation_id });
-          if (typeof info?.totalCost === 'number') {
-            totalCost += info.totalCost;
-            trackedCount++;
-          }
-        } catch {
-          // skip failed lookups
-        }
-      }
-
-      const dateLabel = yesterday.toISOString().slice(0, 10);
+      const totalCost = sumDailyCosts(dailyCosts);
+      const trackedCount = dailyCosts.length;
 
       // Always send a daily summary
       if (totalCost >= DAILY_COST_THRESHOLD_USD) {
@@ -68,7 +53,7 @@ export const cronCostAlert = new Hono()
             { name: '日付', value: dateLabel, inline: true },
             { name: '合計コスト', value: `$${totalCost.toFixed(4)}`, inline: true },
             { name: '閾値', value: `$${DAILY_COST_THRESHOLD_USD.toFixed(2)}`, inline: true },
-            { name: 'トラッキング数', value: String(trackedCount) },
+            { name: '集計日数', value: String(trackedCount) },
           ],
         });
       } else {
@@ -78,7 +63,7 @@ export const cronCostAlert = new Hono()
           fields: [
             { name: '日付', value: dateLabel, inline: true },
             { name: '合計コスト', value: `$${totalCost.toFixed(4)}`, inline: true },
-            { name: 'トラッキング数', value: String(trackedCount), inline: true },
+            { name: '集計日数', value: String(trackedCount), inline: true },
           ],
         });
       }
