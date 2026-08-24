@@ -276,8 +276,33 @@ export const adminDashboard = new Hono<Env>()
       return total;
     };
 
-    const currentMonthCost = await sumCosts(currentMonthRows.data ?? []);
-    const lastMonthCost = await sumCosts(lastMonthRows.data ?? []);
+    // 写真の文字起こしも同じ Claude の実費。発酵とは別テーブル・別モデルなので
+    // それぞれの価格で出して合算する（これを足さないと月次コストが実態より小さく出る）。
+    const [currentMonthOcr, lastMonthOcr] = await Promise.all([
+      supabase
+        .from('photo_transcription_usages')
+        .select('model, input_tokens, output_tokens')
+        .gte('created_at', currentMonthStart)
+        .lte('created_at', currentMonthEnd),
+      supabase
+        .from('photo_transcription_usages')
+        .select('model, input_tokens, output_tokens')
+        .gte('created_at', lastMonthStart)
+        .lte('created_at', lastMonthEnd),
+    ]);
+
+    const sumOcrCosts = (
+      rows: { model: string | null; input_tokens: number | null; output_tokens: number | null }[],
+    ): number =>
+      rows.reduce((total, row) => {
+        const cost = computeCostFromTokens(row.input_tokens, row.output_tokens, row.model);
+        return total + (cost?.totalCost ?? 0);
+      }, 0);
+
+    const currentMonthCost =
+      (await sumCosts(currentMonthRows.data ?? [])) + sumOcrCosts(currentMonthOcr.data ?? []);
+    const lastMonthCost =
+      (await sumCosts(lastMonthRows.data ?? [])) + sumOcrCosts(lastMonthOcr.data ?? []);
 
     const projectedCost = daysElapsed > 0 ? (currentMonthCost / daysElapsed) * daysInMonth : 0;
 

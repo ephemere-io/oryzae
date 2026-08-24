@@ -445,6 +445,30 @@
       "letter_badge": "Letter from the fermentation process"
     }
   },
+  "photo": {
+    "toolbar_button": "Photo",
+    "modal_title": "Add a photo",
+    "modal_description": "Read it as text, or attach the photo as it is.",
+    "ai_notice": "Choosing \"Read as text\" sends the photo to an AI (Claude, by Anthropic).",
+    "preview_alt": "Preview of the photo to add",
+    "transcribe": "Read as text",
+    "transcribing": "Reading…",
+    "attach": "Attach as photo",
+    "attaching": "Attaching…",
+    "cancel": "Cancel",
+    "back": "Back",
+    "insert": "Insert into entry",
+    "transcript_heading": "Text read from the photo",
+    "transcript_empty": "No text could be read. You can still attach it as a photo.",
+    "attached_label": "{count} attached photos",
+    "attached_alt": "Attached photo {index}",
+    "remove": "Remove photo {index}",
+    "error_decode": "This image could not be read. Please try another photo.",
+    "error_too_large": "This image is too large. Please try another photo.",
+    "error_upload": "The photo could not be uploaded.",
+    "error_transcribe": "The text could not be read. Please try again later.",
+    "error_rate_limited": "You have reached the reading limit. Please wait a moment."
+  },
   "fermentation": {
     "detail": {
       "close_aria": "Close detail",

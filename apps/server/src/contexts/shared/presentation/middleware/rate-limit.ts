@@ -3,11 +3,14 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import type { Context, MiddlewareHandler, Next } from 'hono';
 
-type RateLimitTier = 'fermentation' | 'auth_strict' | 'auth_lenient' | 'general';
+type RateLimitTier = 'fermentation' | 'ocr' | 'auth_strict' | 'auth_lenient' | 'general';
 type IdentifierMode = 'ip' | 'user_or_ip' | 'token_or_ip';
 
 const TIER_CONFIG: Record<RateLimitTier, { requests: number; windowMs: number }> = {
   fermentation: { requests: 5, windowMs: 60_000 },
+  // 写真の文字起こしは 1 リクエストが LLM の実費。general (60/min) では緩すぎるので
+  // 別ティアを重ねる。連続で数枚読ませる操作は通したいので fermentation よりは緩い。
+  ocr: { requests: 10, windowMs: 60_000 },
   auth_strict: { requests: 20, windowMs: 60_000 },
   auth_lenient: { requests: 120, windowMs: 60_000 },
   general: { requests: 60, windowMs: 60_000 },
@@ -119,6 +122,10 @@ function createRateLimitMiddleware(tier: RateLimitTier, mode: IdentifierMode): M
 
 export function rateLimitFermentation(): MiddlewareHandler {
   return createRateLimitMiddleware('fermentation', 'user_or_ip');
+}
+
+export function rateLimitOcr(): MiddlewareHandler {
+  return createRateLimitMiddleware('ocr', 'user_or_ip');
 }
 
 // Dispatches between strict (IP-based, 20/min — brute-force-prone endpoints)

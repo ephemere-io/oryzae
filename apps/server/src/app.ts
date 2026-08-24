@@ -15,6 +15,7 @@ import { errorHandler } from './contexts/shared/presentation/middleware/error-ha
 import {
   rateLimitAuth,
   rateLimitGeneral,
+  rateLimitOcr,
 } from './contexts/shared/presentation/middleware/rate-limit.js';
 import { adminDashboard } from './contexts/shared/presentation/routes/admin-dashboard.js';
 import { adminObservability } from './contexts/shared/presentation/routes/admin-observability.js';
@@ -42,6 +43,9 @@ const app = new Hono()
   .route('/api/v1/admin/observability', adminObservability)
   .use('/api/v1/*', authMiddleware)
   .use('/api/v1/*', rateLimitGeneral())
+  // 文字起こしは 1 リクエストが LLM の実費なので general の上にさらに絞った枠を重ねる。
+  // route 登録より前に置かないと適用されない。
+  .use('/api/v1/entries/photos/transcribe', rateLimitOcr())
   .route('/api/v1/users/me', userMe)
   .route('/api/v1/board', board)
   .route('/api/v1/entries', entries)

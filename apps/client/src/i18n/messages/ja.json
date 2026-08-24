@@ -445,6 +445,30 @@
       "letter_badge": "発酵プロセスからの手紙"
     }
   },
+  "photo": {
+    "toolbar_button": "写真",
+    "modal_title": "写真を取り込む",
+    "modal_description": "文字として読み込むか、写真としてそのまま貼るかを選べます。",
+    "ai_notice": "「文字として読み込む」を選ぶと、写真は AI（Anthropic の Claude）に送られます。",
+    "preview_alt": "取り込む写真のプレビュー",
+    "transcribe": "文字として読み込む",
+    "transcribing": "読み取り中…",
+    "attach": "写真として貼る",
+    "attaching": "貼り付け中…",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "insert": "本文に入れる",
+    "transcript_heading": "読み取った文字",
+    "transcript_empty": "文字を読み取れませんでした。写真として貼ることはできます。",
+    "attached_label": "添えた写真 {count} 枚",
+    "attached_alt": "添えた写真 {index}",
+    "remove": "{index} 枚目の写真を削除",
+    "error_decode": "この画像を読み込めませんでした。別の写真をお試しください。",
+    "error_too_large": "画像が大きすぎます。別の写真をお試しください。",
+    "error_upload": "写真をアップロードできませんでした。",
+    "error_transcribe": "文字を読み取れませんでした。時間をおいてお試しください。",
+    "error_rate_limited": "読み取りの回数制限に達しました。少し待ってからお試しください。"
+  },
   "fermentation": {
     "detail": {
       "close_aria": "詳細を閉じる",
