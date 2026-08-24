@@ -33,7 +33,7 @@ beforeEach(() => {
   };
   boardStorage = {
     upload: vi.fn().mockResolvedValue('user-1/photo.jpg'),
-    getPublicUrl: vi.fn().mockReturnValue('https://storage.example.com/user-1/photo.jpg'),
+    getImageUrl: vi.fn().mockResolvedValue('https://storage.example.com/signed/user-1/photo.jpg'),
     delete: vi.fn().mockResolvedValue(undefined),
   };
   usecase = new CreateBoardPhotoUsecase(boardPhotoRepo, boardCardRepo, boardStorage, generateId);
@@ -54,7 +54,7 @@ describe('CreateBoardPhotoUsecase', () => {
     expect(boardStorage.upload).toHaveBeenCalled();
     expect(boardPhotoRepo.save).toHaveBeenCalled();
     expect(boardCardRepo.saveMany).toHaveBeenCalled();
-    expect(result.imageUrl).toBe('https://storage.example.com/user-1/photo.jpg');
+    expect(result.imageUrl).toBe('https://storage.example.com/signed/user-1/photo.jpg');
     expect(result.caption).toBe('朝の風景');
   });
 

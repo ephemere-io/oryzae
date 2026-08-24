@@ -1,0 +1,39 @@
+-- profiles の全開ポリシーを削除する（Issue #503）
+--
+-- 何が起きていたか:
+--   00009 で「service role 用」のつもりで次のポリシーが作られていた。
+--
+--     CREATE POLICY "Service role can manage all profiles"
+--       ON public.profiles FOR ALL
+--       USING (true);
+--
+--   Postgres は TO 句を省略すると PUBLIC 扱いになり、anon / authenticated を含む
+--   全ロールに適用される。さらに RLS の permissive ポリシーは OR で結合されるため、
+--   同じテーブルにある
+--
+--     "Users can read own profile"   FOR SELECT USING (id = auth.uid())
+--     "Users can update own profile" FOR UPDATE USING (id = auth.uid())
+--
+--   が実質的に無効化されていた。00018 で anon / authenticated に public スキーマの
+--   GRANT ALL が付与されているため、テーブル権限側の防壁も無い。
+--   結果として、ログイン済みの任意のユーザーが全ユーザーの profiles を
+--   SELECT / UPDATE / DELETE できる状態だった。
+--
+-- なぜ置き換えではなく削除で良いか:
+--   service role は RLS を「バイパス」する。ポリシーの評価対象にならないので、
+--   service role のためのポリシーはそもそも不要。
+--   profiles への INSERT / UPDATE / DELETE は全て service role 経由であることを確認済み:
+--     - signup.ts / ensure-oauth-profile.ts の INSERT      → getSupabaseClient()
+--     - auth.ts の UPDATE                                   → getSupabaseClient()
+--     - GetSignupAvailabilityUsecase の count()             → getSupabaseClient()
+--     - auth.users 削除時の ON DELETE CASCADE                → auth.admin 経由 = service role
+--   ユーザー JWT のクライアント（authMiddleware 由来）が触るのは
+--   自分の行の SELECT と UPDATE のみで、下に残る 2 本のポリシーで足りる。
+
+DROP POLICY IF EXISTS "Service role can manage all profiles" ON public.profiles;
+
+-- 削除後に残るポリシー（いずれも 00009 で作成済み・変更しない）:
+--   "Users can read own profile"   FOR SELECT USING (id = auth.uid())
+--   "Users can update own profile" FOR UPDATE USING (id = auth.uid())
+-- INSERT / DELETE のポリシーは意図的に置かない。RLS をバイパスする service role
+-- 以外から profiles を作成・削除する経路を作らないため。

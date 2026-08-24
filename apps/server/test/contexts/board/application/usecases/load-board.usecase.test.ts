@@ -54,7 +54,7 @@ beforeEach(() => {
   };
   const boardStorage = {
     upload: vi.fn().mockResolvedValue('path'),
-    getPublicUrl: vi.fn().mockReturnValue('https://example.com/photo.jpg'),
+    getImageUrl: vi.fn().mockResolvedValue('https://example.com/signed/photo.jpg'),
     delete: vi.fn().mockResolvedValue(undefined),
   };
   usecase = new LoadBoardUsecase(

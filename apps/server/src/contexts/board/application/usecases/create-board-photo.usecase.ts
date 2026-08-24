@@ -124,7 +124,7 @@ export class CreateBoardPhotoUsecase {
     await this.boardPhotoRepo.save(photo);
     await this.boardCardRepo.saveMany([card]);
 
-    const imageUrl = this.boardStorage.getPublicUrl(storagePath);
+    const imageUrl = await this.boardStorage.getImageUrl(storagePath);
 
     return {
       photoId: photo.id,
