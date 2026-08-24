@@ -19,7 +19,8 @@ const BUCKET = {
   starting_at: '2026-08-01T00:00:00Z',
   ending_at: '2026-08-02T00:00:00Z',
   results: [
-    // amount は「最小通貨単位」= セント。123.45 セント = $1.2345
+    // amount は「最小通貨単位」= セント建ての文字列（anthropic-cost-report.ts の
+    // toUsd に出典あり）。123.45 セント = $1.2345、76.55 セント = $0.7655。
     { amount: '123.45', currency: 'USD', model: 'claude-sonnet-5' },
     { amount: '76.55', currency: 'USD', model: 'claude-sonnet-4-6' },
   ],

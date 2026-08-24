@@ -13,6 +13,13 @@
  * ANTHROPIC_API_KEY では 401 になる別物なので、env も別に持つ。
  * 未設定なら null を返し、呼び出し側は自前の概算にフォールバックする
  * （ローカル開発や未設定の環境で管理画面が落ちないようにするため）。
+ *
+ * 既知の制約:
+ *   - **Priority Tier のコストはこのエンドポイントに含まれない**（公式ドキュメント記載）。
+ *     Priority Tier を使い始めたらここの数字は過少になるので、usage_report 側の
+ *     service_tier=priority と突き合わせる必要がある。いまは使っていない。
+ *   - データ反映は API 呼び出しから概ね 5 分以内。
+ *   - 推奨ポーリング頻度は毎分まで。いまの用途（管理画面 + 日次 cron）は十分下回る。
  */
 const COST_REPORT_URL = 'https://api.anthropic.com/v1/organizations/cost_report';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -41,8 +48,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * `amount` は「最小通貨単位の 10 進文字列」= USD ならセント。
- * 例: "123.45" は $1.2345。ここでドルに直す。
+ * `amount` は **セント建て**の 10 進文字列なのでドルに直す。100 で割るのが正しい。
+ *
+ * ここは間違えると 100 倍ずれ、しかもテストでは検出できない（期待値も同じ前提で
+ * 書かれるため）。レビューで繰り返し疑われたので、出典と検算を残しておく。
+ *
+ * 出典（2 つの独立したページが一致）:
+ *   - https://platform.claude.com/docs/en/api/admin-api/usage-cost/get-cost-report
+ *     "Cost amount in lowest currency units (e.g. cents) as a decimal string.
+ *      For example, "123.45" in "USD" represents $1.23."
+ *   - https://platform.claude.com/docs/en/manage-claude/usage-cost-api
+ *     "All costs in USD, reported as decimal strings in lowest units (cents)"
+ *
+ * 上の例は**セント読みでしか成立しない**:
+ *   セント読み … 123.45 セント = $1.2345 → 表示すると "$1.23" ✓
+ *   ドル読み   … 123.45 ドル   = $123.45 → "$1.23" にならない ✗
+ * つまり例の "$1.23" は $1.2345 をセント表示に丸めたもので、矛盾ではない。
  */
 function toUsd(amount: unknown): number {
   if (typeof amount !== 'string') return 0;
@@ -105,6 +126,8 @@ export async function fetchDailyCosts(
         headers: {
           'x-api-key': adminKey,
           'anthropic-version': ANTHROPIC_VERSION,
+          // Anthropic が統合の利用状況を把握できるよう、ドキュメントで推奨されている。
+          'User-Agent': 'Oryzae/1.0.0 (https://github.com/ephemere-io/oryzae)',
         },
       });
 
