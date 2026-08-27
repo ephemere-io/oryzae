@@ -48,6 +48,31 @@ describe('SpEntryEditor', () => {
     expect(screen.queryByRole('button', { name: '納める' })).toBeNull();
   });
 
+  it('問いが結ばれていなければ「納める」は問い選択を開く（Issue #450）', async () => {
+    // 問いに紐づかないエントリは発酵ループに入らない（active な問いに紐づいたものだけを
+    // 走査する）。そのまま漬けられると「漬けたのに何も届かない」になる。
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+
+    // 発酵フラグ付きの保存は投げず、問い選択シートを開く。
+    await waitFor(() => expect(screen.getByText('なぜ続けるのか')).toBeTruthy());
+    expect(fetchImpl).not.toHaveBeenCalledWith(
+      '/api/v1/entries/e1',
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
+
   it('既存エントリを開くとタイトル・本文が埋まる（編集）', () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
