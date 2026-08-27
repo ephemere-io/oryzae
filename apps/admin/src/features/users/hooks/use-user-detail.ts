@@ -1,49 +1,58 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-export interface UserProfile {
-  id: string;
-  email: string;
-  createdAt: string;
-  lastSignInAt: string | null;
-}
+const userProfileSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  createdAt: z.string(),
+  lastSignInAt: z.string().nullable(),
+});
 
-export interface UserEntry {
-  id: string;
-  characterCount: number;
-  createdAt: string;
-}
+const userEntrySchema = z.object({
+  id: z.string(),
+  characterCount: z.number(),
+  createdAt: z.string(),
+});
 
-export interface UserQuestion {
-  id: string;
-  text: string;
-  isArchived: boolean;
-  createdAt: string;
-}
+const userQuestionSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  isArchived: z.boolean(),
+  createdAt: z.string(),
+});
 
-export interface UserFermentation {
-  id: string;
-  status: string;
-  errorMessage: string | null;
-  hasGenerationId: boolean;
-  createdAt: string;
-}
+const userFermentationSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  errorMessage: z.string().nullable(),
+  hasGenerationId: z.boolean(),
+  createdAt: z.string(),
+});
 
-export interface EntryDate {
-  date: string;
-  count: number;
-}
+const entryDateSchema = z.object({
+  date: z.string(),
+  count: z.number(),
+});
 
-export interface UserDetailResponse {
-  profile: UserProfile;
-  entries: UserEntry[];
-  questions: UserQuestion[];
-  fermentations: UserFermentation[];
-  entryDates: EntryDate[];
-}
+const userDetailResponseSchema = z.object({
+  profile: userProfileSchema,
+  entries: z.array(userEntrySchema),
+  questions: z.array(userQuestionSchema),
+  fermentations: z.array(userFermentationSchema),
+  entryDates: z.array(entryDateSchema),
+});
+
+export type UserProfile = z.infer<typeof userProfileSchema>;
+export type UserEntry = z.infer<typeof userEntrySchema>;
+export type UserQuestion = z.infer<typeof userQuestionSchema>;
+export type UserFermentation = z.infer<typeof userFermentationSchema>;
+export type EntryDate = z.infer<typeof entryDateSchema>;
+export type UserDetailResponse = z.infer<typeof userDetailResponseSchema>;
 
 export function useUserDetail(userId: string) {
   const [data, setData] = useState<UserDetailResponse | null>(null);
@@ -59,8 +68,8 @@ export function useUserDetail(userId: string) {
 
     const api = createApiClient(token);
     const res = await api.fetch(`/api/v1/admin/users/${userId}`);
-    if (res.ok) {
-      const json = (await res.json()) as UserDetailResponse;
+    const json = res.ok ? await parseJson(res, userDetailResponseSchema) : null;
+    if (json) {
       setData(json);
     } else {
       setError('ユーザー詳細の取得に失敗しました');

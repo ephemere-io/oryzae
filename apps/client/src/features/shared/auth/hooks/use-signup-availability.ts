@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { isObject, readBooleanField, readJson, readNumberField } from '@/lib/json';
 
 /**
  * Research Preview のサインアップ枠状況。サーバーの `SignupAvailability` と同形。
@@ -11,6 +12,17 @@ interface SignupAvailability {
   used: number;
   remaining: number;
   capacityReached: boolean;
+}
+
+/** 数値が揃っていなければ「取れなかった」として null を返す。 */
+function normalizeSignupAvailability(input: unknown): SignupAvailability | null {
+  if (!isObject(input)) return null;
+  return {
+    limit: readNumberField(input, 'limit', 0),
+    used: readNumberField(input, 'used', 0),
+    remaining: readNumberField(input, 'remaining', 0),
+    capacityReached: readBooleanField(input, 'capacityReached', false),
+  };
 }
 
 /**
@@ -39,9 +51,13 @@ export function useSignupAvailability() {
           }
           return;
         }
-        const data = (await res.json()) as SignupAvailability;
+        const data = normalizeSignupAvailability(await readJson(res));
         if (!cancelled) {
-          setAvailability(data);
+          if (data) {
+            setAvailability(data);
+          } else {
+            setError('Failed to load signup availability (unexpected response)');
+          }
           setLoading(false);
         }
       } catch (e) {

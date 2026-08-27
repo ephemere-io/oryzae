@@ -4,6 +4,7 @@ import type { EditorEffectsState } from '@oryzae/shared';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
+import { readJson, readStringField } from '@/lib/json';
 
 interface EntryDetail {
   id: string;
@@ -95,9 +96,9 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
         return null;
       }
 
-      const data = (await res.json()) as { id: string };
+      const id = readStringField(await readJson(res), 'id');
       setSaving(false);
-      return data.id;
+      return id;
     },
     [api, t],
   );

@@ -16,6 +16,13 @@ import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
 import { RouteLoading } from './_loading/route-loading';
 
+// CSS カスタムプロパティは React.CSSProperties に含まれないので、
+// `--*` を許す形で型を広げて宣言する（キャストは使わない）。
+const mainStyle: React.CSSProperties & Record<`--${string}`, string> = {
+  marginLeft: SIDEBAR_WIDTH,
+  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
+};
+
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
   const { shouldShow, complete } = useOnboarding(api);
@@ -77,15 +84,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">
               <Sidebar />
-              <main
-                className="flex flex-1 flex-col overflow-hidden"
-                style={
-                  {
-                    marginLeft: SIDEBAR_WIDTH,
-                    '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-                  } as React.CSSProperties
-                }
-              >
+              <main className="flex flex-1 flex-col overflow-hidden" style={mainStyle}>
                 <div className="relative flex-1 overflow-auto">{content}</div>
                 <PageFooter />
               </main>

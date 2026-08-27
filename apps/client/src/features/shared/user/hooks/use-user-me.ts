@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
+import { readBooleanField, readJson, readStringField } from '@/lib/json';
 
 interface UserMeData {
   id: string;
@@ -12,6 +13,24 @@ interface UserMeData {
   hasPickled: boolean;
   /** 一度でもエントリに問いを紐付けたことがあるか (Issue #316 ガイド表示判定用) */
   hasLinkedQuestion: boolean;
+}
+
+/**
+ * `/api/v1/users/me` の正規化。id / nickname が無ければ「取れなかった」として null。
+ * 表示補助のフラグは既定値へ倒す（欠けていても画面は出せる）。
+ */
+function normalizeUserMe(input: unknown): UserMeData | null {
+  const id = readStringField(input, 'id');
+  const nickname = readStringField(input, 'nickname');
+  if (id === null || nickname === null) return null;
+  return {
+    id,
+    nickname,
+    avatarUrl: readStringField(input, 'avatarUrl'),
+    onboardingCompleted: readBooleanField(input, 'onboardingCompleted', false),
+    hasPickled: readBooleanField(input, 'hasPickled', false),
+    hasLinkedQuestion: readBooleanField(input, 'hasLinkedQuestion', false),
+  };
 }
 
 interface UseUserMeResult {
@@ -40,7 +59,8 @@ export function useUserMe(api: ApiClient | null): UseUserMeResult {
     if (!client) return null;
     const res = await client.fetch('/api/v1/users/me');
     if (!res.ok) return null;
-    const next = (await res.json()) as UserMeData;
+    const next = normalizeUserMe(await readJson(res));
+    if (!next) return null;
     setData(next);
     return next;
   }, []);

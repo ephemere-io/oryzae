@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
-import { LOCALE_OPTIONS, type Locale } from '@/i18n/config';
+import { DEFAULT_LOCALE, isLocale, LOCALE_OPTIONS, type Locale } from '@/i18n/config';
 import { setLocaleAction } from '@/lib/i18n-actions';
 import styles from './landing.module.css';
 import { LandingFaqItem } from './landing-faq-item';
@@ -16,13 +16,14 @@ const LOGO_SRC = '/landing/logo/P3_mark_color.svg';
 export function LandingPage() {
   const t = useTranslations('landing');
   const locale = useLocale();
+  const lang = isLocale(locale) ? locale : DEFAULT_LOCALE;
 
   // ページタイトル/メタは app/page.tsx の generateMetadata で SSR 付与する
   // （旧来の document.title 上書きは欠損キー参照かつ SEO 上 SSR されないため撤去）。
 
   return (
     <div className={styles.landingRoot}>
-      <SiteHeader lang={locale as Locale} t={t} />
+      <SiteHeader lang={lang} t={t} />
       <main id="top">
         <Hero t={t} />
         <Concept t={t} />

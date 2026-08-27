@@ -3,6 +3,7 @@
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -14,17 +15,25 @@ import {
 } from '@/components/ui/table';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-interface SentryIssue {
-  title: string;
-  shortId: string;
-  level: string;
-  count: number;
-  userCount: number;
-  firstSeen: string;
-  lastSeen: string;
-  permalink: string;
-}
+const sentryIssueSchema = z.object({
+  title: z.string(),
+  shortId: z.string(),
+  level: z.string(),
+  count: z.number(),
+  userCount: z.number(),
+  firstSeen: z.string(),
+  lastSeen: z.string(),
+  permalink: z.string(),
+});
+
+const errorsResponseSchema = z.object({
+  issues: z.array(sentryIssueSchema),
+  configured: z.boolean(),
+});
+
+type SentryIssue = z.infer<typeof sentryIssueSchema>;
 
 function formatDate(iso: string): string {
   if (!iso) return '-';
@@ -59,8 +68,8 @@ export default function ErrorsPage() {
     setLoading(true);
     const api = createApiClient(token);
     const res = await api.fetch('/api/v1/admin/observability/errors');
-    if (res.ok) {
-      const body = (await res.json()) as { issues: SentryIssue[]; configured: boolean };
+    const body = res.ok ? await parseJson(res, errorsResponseSchema) : null;
+    if (body) {
       setIssues(body.issues);
       setConfigured(body.configured);
     }

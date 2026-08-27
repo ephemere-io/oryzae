@@ -1,42 +1,46 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
 // admin/dashboard 用 Questions 一覧 (issue #287)
 //
 // readiness は問い単位のスコア (charScore/timeScore とも問いスコープ)。
 // サーバ側 evaluateQuestionEligibility と同じ shape。
 
-export interface QuestionItem {
-  id: string;
-  user_id: string;
-  user_email: string;
-  user_nickname: string;
-  text: string;
-  is_archived: boolean;
-  is_validated_by_user: boolean;
-  is_proposed_by_oryzae: boolean;
-  created_at: string;
-  updated_at: string;
-  readiness: {
-    score: number; // [0, 1]
-    charScore: number;
-    timeScore: number;
-    threshold: number;
-    charsCurrent: number;
-    hoursElapsed: number | null;
-    hoursRequired: number | null;
-    eligible: boolean;
-    language: 'ja' | 'en';
-  };
-}
+const questionItemSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  user_email: z.string(),
+  user_nickname: z.string(),
+  text: z.string(),
+  is_archived: z.boolean(),
+  is_validated_by_user: z.boolean(),
+  is_proposed_by_oryzae: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  readiness: z.object({
+    score: z.number(), // [0, 1]
+    charScore: z.number(),
+    timeScore: z.number(),
+    threshold: z.number(),
+    charsCurrent: z.number(),
+    hoursElapsed: z.number().nullable(),
+    hoursRequired: z.number().nullable(),
+    eligible: z.boolean(),
+    language: z.enum(['ja', 'en']),
+  }),
+});
 
-interface QuestionsResponse {
-  data: QuestionItem[];
-  pagination: { page: number; limit: number; total: number };
-}
+const questionsResponseSchema = z.object({
+  data: z.array(questionItemSchema),
+  pagination: z.object({ page: z.number(), limit: z.number(), total: z.number() }),
+});
+
+export type QuestionItem = z.infer<typeof questionItemSchema>;
 
 interface UseQuestionsParams {
   page?: number;
@@ -73,8 +77,8 @@ export function useQuestions(params?: UseQuestionsParams) {
     if (archived) searchParams.set('archived', archived);
 
     const res = await api.fetch(`/api/v1/admin/questions?${searchParams.toString()}`);
-    if (res.ok) {
-      const body = (await res.json()) as QuestionsResponse;
+    const body = res.ok ? await parseJson(res, questionsResponseSchema) : null;
+    if (body) {
       setData(body.data);
       setPagination(body.pagination);
     } else {

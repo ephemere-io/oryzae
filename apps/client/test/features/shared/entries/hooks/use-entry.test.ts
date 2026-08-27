@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEntry, useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import type { ApiClient } from '@/lib/api';
 import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
+import { mockResponse } from '../../../../helpers/response';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return {
@@ -10,14 +11,6 @@ function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
     headers: {},
     fetch: fetchImpl,
   };
-}
-
-function mockResponse(ok: boolean, body: unknown): Response {
-  return {
-    ok,
-    json: () => Promise.resolve(body),
-    status: ok ? 200 : 400,
-  } as Response;
 }
 
 describe('useEntry', () => {
@@ -139,7 +132,7 @@ describe('useSaveEntry', () => {
 
     const call = apiFetch.mock.calls[0];
     const bodyStr: string = call[1].body;
-    const body = JSON.parse(bodyStr) as Record<string, unknown>;
+    const body: Record<string, unknown> = JSON.parse(bodyStr);
     expect(body.fermentationEnabled).toBeUndefined();
   });
 
@@ -157,7 +150,7 @@ describe('useSaveEntry', () => {
 
     const call = apiFetch.mock.calls[0];
     const bodyStr: string = call[1].body;
-    const body = JSON.parse(bodyStr) as Record<string, unknown>;
+    const body: Record<string, unknown> = JSON.parse(bodyStr);
     expect(body.fermentationEnabled).toBe(true);
   });
 });

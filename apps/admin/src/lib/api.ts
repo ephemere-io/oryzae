@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import { clearTokens, getRefreshToken, setTokens } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
 export interface ApiClient {
   headers: Record<string, string>;
@@ -9,6 +11,10 @@ export interface ApiClient {
 // refresh を1回に集約する（Supabase の refresh token ローテーションによる
 // 並発二重実行＝後発が再利用エラーで失敗するのを防ぐ）。
 let inFlightRefresh: Promise<string | null> | null = null;
+
+const refreshResponseSchema = z.object({
+  session: z.object({ accessToken: z.string(), refreshToken: z.string() }),
+});
 
 export async function tryRefreshToken(): Promise<string | null> {
   if (inFlightRefresh) return inFlightRefresh;
@@ -27,12 +33,13 @@ export async function tryRefreshToken(): Promise<string | null> {
       return null;
     }
 
-    // @type-assertion-allowed: refresh エンドポイントの JSON レスポンスの最小型
-    const data = (await res.json()) as {
-      session: { accessToken: string; refreshToken: string };
-    };
-    setTokens(data.session.accessToken, data.session.refreshToken);
-    return data.session.accessToken;
+    const body = await parseJson(res, refreshResponseSchema);
+    if (!body) {
+      clearTokens();
+      return null;
+    }
+    setTokens(body.session.accessToken, body.session.refreshToken);
+    return body.session.accessToken;
   })();
 
   try {

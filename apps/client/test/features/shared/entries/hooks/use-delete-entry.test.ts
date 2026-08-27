@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import type { ApiClient } from '@/lib/api';
 import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
+import { mockResponse } from '../../../../helpers/response';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return {
@@ -10,14 +11,6 @@ function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
     headers: {},
     fetch: fetchImpl,
   };
-}
-
-function mockResponse(ok: boolean, body: unknown): Response {
-  return {
-    ok,
-    json: () => Promise.resolve(body),
-    status: ok ? 200 : 400,
-  } as Response;
 }
 
 describe('useDeleteEntry', () => {

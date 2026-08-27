@@ -2,15 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useActiveQuestions } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { ApiClient } from '@/lib/api';
-
-function mockResponse(ok: boolean, body: unknown): Response {
-  // @type-assertion-allowed: minimal Response stub for test
-  return {
-    ok,
-    json: () => Promise.resolve(body),
-    status: ok ? 200 : 500,
-  } as Response;
-}
+import { mockResponse } from '../../../../helpers/response';
 
 function createApiStub(): ApiClient & { fetch: ReturnType<typeof vi.fn> } {
   const fetch = vi.fn();
@@ -56,9 +48,10 @@ describe('useActiveQuestions', () => {
       .mockResolvedValueOnce(mockResponse(true, []))
       .mockResolvedValueOnce(mockResponse(true, [{ id: 'q1', currentText: 'あとから追加された' }]));
 
+    const initialProps: { key: string | undefined } = { key: undefined };
     const { result, rerender } = renderHook(
       ({ key }: { key: string | undefined }) => useActiveQuestions(api, false, key),
-      { initialProps: { key: undefined as string | undefined } },
+      { initialProps },
     );
 
     await waitFor(() => {

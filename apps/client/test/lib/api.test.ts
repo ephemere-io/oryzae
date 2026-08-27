@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tryRefreshToken } from '@/lib/api';
+import { jsonResponse } from '../helpers/response';
 
 /**
  * Issue #362: 楽観的データ取得では失効トークンで複数リクエストが同時に 401 になり、
@@ -16,10 +17,7 @@ describe('tryRefreshToken (Issue #362: in-flight singleton)', () => {
   });
 
   function okSession(accessToken: string, refreshToken: string): Response {
-    return {
-      ok: true,
-      json: () => Promise.resolve({ session: { accessToken, refreshToken } }),
-    } as Response;
+    return jsonResponse({ session: { accessToken, refreshToken } });
   }
 
   it('並発呼び出しは refresh リクエストを1回に集約し、同じトークンを返す', async () => {

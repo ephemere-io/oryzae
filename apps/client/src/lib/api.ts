@@ -1,4 +1,5 @@
 import { clearTokens, getRefreshToken, setTokens } from '@/lib/auth';
+import { isObject, readJson, readStringField } from '@/lib/json';
 
 export interface ApiClient {
   baseUrl: string;
@@ -12,6 +13,16 @@ export interface ApiClient {
 // 後発がトークン再利用エラーで失敗する。in-flight な refresh を1本に集約し、
 // 同時呼び出しは同じ Promise を共有する（解決後にクリアし次回は再実行可能）。
 let inFlightRefresh: Promise<string | null> | null = null;
+
+/** refresh レスポンスから session を取り出す。形が違えば null（＝失効扱い）。 */
+function readSession(input: unknown): { accessToken: string; refreshToken: string } | null {
+  if (!isObject(input)) return null;
+  const session = input.session;
+  const accessToken = readStringField(session, 'accessToken');
+  const refreshToken = readStringField(session, 'refreshToken');
+  if (accessToken === null || refreshToken === null) return null;
+  return { accessToken, refreshToken };
+}
 
 export async function tryRefreshToken(): Promise<string | null> {
   if (inFlightRefresh) return inFlightRefresh;
@@ -31,11 +42,13 @@ export async function tryRefreshToken(): Promise<string | null> {
       return null;
     }
 
-    const data = (await res.json()) as {
-      session: { accessToken: string; refreshToken: string };
-    };
-    setTokens(data.session.accessToken, data.session.refreshToken);
-    return data.session.accessToken;
+    const session = readSession(await readJson(res));
+    if (!session) {
+      clearTokens();
+      return null;
+    }
+    setTokens(session.accessToken, session.refreshToken);
+    return session.accessToken;
   })();
 
   try {
