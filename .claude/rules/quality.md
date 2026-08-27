@@ -20,6 +20,11 @@ const ie = e as InputEvent;
 `@type-assertion-allowed` は違反として扱う。検出器は `scripts/check-type-assertions.mjs`。
 `as const` と import/export の別名（`import * as X`）は対象外。
 
+検出器自体は自前の字句解析なので、`scripts/check-type-assertions.test.mjs` に
+自己テストがある（`pnpm check:as` が本体より先に実行する）。検出ロジックを触ったら
+ここにケースを足すこと。**検出漏れは「CI が緑なのにルールが守られていない」状態を作る**ため、
+false negative のケースを特に厚くしてある。
+
 サーバーの Supabase 行マッピングは、キャストではなく
 `contexts/shared/infrastructure/row.ts` のリーダー（`readString` / `readNumber` /
 `readEnum` など）を使う。DB スキーマがずれた時に、どのカラムがどう違ったのかが

@@ -16,6 +16,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
 const TARGET_DIRS = ['apps', 'packages'];
@@ -267,60 +268,78 @@ function hasAllowComment(rawLines, index) {
   return false;
 }
 
-const violations = [];
-let allowed = 0;
+// `as const` 以外の ` as ` を型アサーションとみなす。
+// 1 行に複数あっても 1 件（`as unknown as T` を二重計上しない）。
+const CAST_RE = /(^|[^A-Za-z0-9_$.])as\s+(?!const\b)([A-Za-z_$([{]|<)/;
 
-for (const target of TARGET_DIRS) {
-  for (const file of walk(join(ROOT, target))) {
-    const raw = readFileSync(file, 'utf8');
-    if (!raw.includes(' as ')) continue;
+/**
+ * 1 ファイル分のソースを走査する。
+ * @returns {{violations: {line: number, text: string}[], allowed: number}}
+ */
+export function scanSource(source) {
+  const violations = [];
+  let allowed = 0;
 
-    const rawLines = raw.split('\n');
-    const codeLines = blankOutNonCode(raw).split('\n');
-    const isAlias = markModuleAliasLines(rawLines);
+  const rawLines = source.split('\n');
+  const codeLines = blankOutNonCode(source).split('\n');
+  const isAlias = markModuleAliasLines(rawLines);
 
-    for (let i = 0; i < codeLines.length; i += 1) {
-      if (isAlias[i]) continue;
-      const code = codeLines[i];
-      // `as const` / `as satisfies` 以外の ` as ` を型アサーションとみなす
-      const re = /(^|[^A-Za-z0-9_$.])as\s+(?!const\b)([A-Za-z_$([{]|<)/g;
-      let m = re.exec(code);
-      if (!m) continue;
-      // 1 行に複数あっても 1 件として数える（`as unknown as T` を二重計上しない）
-      if (hasAllowComment(rawLines, i)) {
-        allowed += 1;
-      } else {
-        violations.push({
-          file: relative(ROOT, file).split(sep).join('/'),
-          line: i + 1,
-          text: rawLines[i].trim(),
-        });
-      }
-      m = null;
+  for (let i = 0; i < codeLines.length; i += 1) {
+    if (isAlias[i]) continue;
+    if (!CAST_RE.test(codeLines[i])) continue;
+    if (hasAllowComment(rawLines, i)) {
+      allowed += 1;
+    } else {
+      violations.push({ line: i + 1, text: rawLines[i].trim() });
     }
   }
+
+  return { violations, allowed };
 }
 
-const listOnly = process.argv.includes('--list');
+function main() {
+  const violations = [];
+  let allowed = 0;
 
-if (violations.length === 0) {
-  console.log(`✔ type assertions: 違反なし（許可済み ${allowed} 件）`);
-  process.exit(0);
-}
+  for (const target of TARGET_DIRS) {
+    for (const file of walk(join(ROOT, target))) {
+      const raw = readFileSync(file, 'utf8');
+      if (!raw.includes(' as ')) continue;
 
-console.error(`✖ \`as\` 型アサーションが ${violations.length} 件見つかりました（許可済み ${allowed} 件）`);
-console.error('');
-for (const v of violations) {
-  console.error(`  ${v.file}:${v.line}`);
-  console.error(`      ${v.text.slice(0, 120)}`);
-  if (process.env.GITHUB_ACTIONS) {
-    console.log(
-      `::error file=${v.file},line=${v.line}::\`as\` キャスト禁止。型ガードを書くか、直前の行に '// ${MARKER}: <理由>' を記載してください（.claude/rules/quality.md）。`,
-    );
+      const result = scanSource(raw);
+      allowed += result.allowed;
+      for (const v of result.violations) {
+        violations.push({ file: relative(ROOT, file).split(sep).join('/'), ...v });
+      }
+    }
   }
-}
-console.error('');
-console.error('型ガードを書くか、やむを得ない場合は直前の行に次を記載してください:');
-console.error(`  // ${MARKER}: <理由>`);
 
-process.exit(listOnly ? 0 : 1);
+  const listOnly = process.argv.includes('--list');
+
+  if (violations.length === 0) {
+    console.log(`✔ type assertions: 違反なし（許可済み ${allowed} 件）`);
+    process.exit(0);
+  }
+
+  console.error(`✖ \`as\` 型アサーションが ${violations.length} 件見つかりました（許可済み ${allowed} 件）`);
+  console.error('');
+  for (const v of violations) {
+    console.error(`  ${v.file}:${v.line}`);
+    console.error(`      ${v.text.slice(0, 120)}`);
+    if (process.env.GITHUB_ACTIONS) {
+      console.log(
+        `::error file=${v.file},line=${v.line}::\`as\` キャスト禁止。型ガードを書くか、直前の行に '// ${MARKER}: <理由>' を記載してください（.claude/rules/quality.md）。`,
+      );
+    }
+  }
+  console.error('');
+  console.error('型ガードを書くか、やむを得ない場合は直前の行に次を記載してください:');
+  console.error(`  // ${MARKER}: <理由>`);
+
+  process.exit(listOnly ? 0 : 1);
+}
+
+// 直接実行されたときだけ走らせる（テストから scanSource を import できるように）
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
