@@ -1,9 +1,9 @@
 /**
  * SnippetDialog の検証スペック（A 移植）。
  * open=true で描画されるスニペット作成/編集ダイアログ。i18n（board.snippet_dialog）は
- * withVerifyProviders が供給。契約は mode（initialText 有無で create/edit）・source
+ * withVerifyProviders が供給。契約は mode（snippetId 有無で create/edit）・source
  * （text=直接書く / image=画像から読み取る）・empty（trim 後 0 文字か）・tooLong
- * （50字超）・ocrStatus。「mode が initialText prop と一致」「submit の disabled が
+ * （50字超）・ocrStatus。「mode が snippetId prop と一致」「submit の disabled が
  * empty/tooLong と一致」「テキスト入力で empty=false に反転」「編集モードでは画像タブを
  * 出さない」を invariant＋act で孤立検証する。
  * open=false は null 描画で契約が出ず dom-contract が FAIL になるため fixture には使わない
@@ -24,6 +24,7 @@ import { SnippetDialog } from './snippet-dialog';
 interface Props {
   open: boolean;
   api: ApiClient | null;
+  snippetId?: string;
   initialText?: string;
   onSubmit: (text: string) => void;
   onClose: () => void;
@@ -60,6 +61,7 @@ registerUnit<Props>({
       props: {
         open: true,
         api: neverResolveApi,
+        snippetId: 'snippet-1',
         initialText: '既存のスニペット',
         onSubmit: noop,
         onClose: noop,
@@ -90,6 +92,7 @@ registerUnit<Props>({
       props: {
         open: true,
         api: neverResolveApi,
+        snippetId: 'snippet-2',
         initialText: EXACTLY_50,
         onSubmit: noop,
         onClose: noop,
@@ -103,6 +106,7 @@ registerUnit<Props>({
       props: {
         open: true,
         api: neverResolveApi,
+        snippetId: 'snippet-3',
         initialText: `${EXACTLY_50}x`,
         onSubmit: noop,
         onClose: noop,
@@ -114,16 +118,30 @@ registerUnit<Props>({
       description: 'Probe: api=null（認証未解決）でも描画は崩れず、タブ構造も保たれる',
       props: { open: true, api: null, initialText: '', onSubmit: noop, onClose: noop },
     },
+    {
+      id: 'edit-with-empty-text',
+      probe: true,
+      description:
+        'Probe: 本文が空の既存スニペット（snippetId あり・initialText 空）でも edit 扱いになり、画像タブは出ない',
+      props: {
+        open: true,
+        api: neverResolveApi,
+        snippetId: 'snippet-empty',
+        initialText: '',
+        onSubmit: noop,
+        onClose: noop,
+      },
+    },
   ],
   invariants: [
     {
-      id: 'mode-matches-initial-text',
-      description: 'data-verify-mode が initialText の有無（edit/create）と一致する',
+      id: 'mode-matches-snippet-id',
+      description: 'data-verify-mode が snippetId の有無（edit/create）と一致する',
       check: ({ contract, props }) => {
-        const expected = props.initialText ? 'edit' : 'create';
+        const expected = props.snippetId ? 'edit' : 'create';
         return (
           contract.mode === expected ||
-          `mode 契約不一致: initialText=${JSON.stringify(props.initialText)} → expected "${expected}", got "${contract.mode}"`
+          `mode 契約不一致: snippetId=${JSON.stringify(props.snippetId)} → expected "${expected}", got "${contract.mode}"`
         );
       },
     },

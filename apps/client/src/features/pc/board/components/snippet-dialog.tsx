@@ -15,6 +15,8 @@ import { useEscapeKey } from '@/lib/use-escape-key';
 interface SnippetDialogProps {
   open: boolean;
   api: ApiClient | null;
+  /** 既存スニペットを編集するときだけ渡す。作成なら未指定。モード判定はこれで行う。 */
+  snippetId?: string;
   initialText?: string;
   onSubmit: (text: string) => void;
   onClose: () => void;
@@ -33,6 +35,7 @@ function isAllowedImage(file: File): boolean {
 export function SnippetDialog({
   open,
   api,
+  snippetId,
   initialText = '',
   onSubmit,
   onClose,
@@ -83,7 +86,14 @@ export function SnippetDialog({
 
   // 既存スニペットの編集では画像タブを出さない。差し替えではなく本文を直す操作なので、
   // 読み取り結果で丸ごと上書きできてしまうと事故になる。
-  const mode = initialText ? 'edit' : 'create';
+  //
+  // 判定は snippetId の有無で行う。本文（initialText）の truthiness で見ると、
+  // 送信側（board-view の updateSnippet/createSnippet の分岐）と基準がズレる。
+  // 本文が空の既存スニペットを開いたときに create 扱いになり、画像タブから OCR で
+  // 全文を差し替えられるのに送信は update に落ちる——このコメントが防ごうとしている
+  // 事故そのものが起きる。今はサーバーが空本文を弾いているので実際には出ないが、
+  // 「同じ判断は同じ基準で」を守る。
+  const mode = snippetId ? 'edit' : 'create';
   const canUseImage = mode === 'create';
   const trimmed = text.trim();
   const empty = trimmed.length === 0;

@@ -236,6 +236,7 @@ export function BoardView({ api }: BoardViewProps) {
       <SnippetDialog
         open={snippetDialog.open}
         api={api}
+        snippetId={snippetDialog.snippetId}
         initialText={snippetDialog.initialText}
         onSubmit={(text) => {
           if (snippetDialog.snippetId) {
