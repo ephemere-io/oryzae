@@ -41,6 +41,7 @@ export default function EntryDetailPage() {
           initialEntryId={entry.id}
           initialContent={entry.content}
           initialMediaUrls={entry.mediaUrls}
+          initialMediaSignedUrls={entry.mediaSignedUrls}
         />
       }
       pc={
@@ -49,6 +50,7 @@ export default function EntryDetailPage() {
           initialContent={entry.content}
           initialEffects={entry.effects}
           initialMediaUrls={entry.mediaUrls}
+          initialMediaSignedUrls={entry.mediaSignedUrls}
           createdAt={entry.createdAt}
           updatedAt={entry.updatedAt}
           api={api}

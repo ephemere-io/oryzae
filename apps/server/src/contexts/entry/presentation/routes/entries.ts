@@ -75,6 +75,7 @@ export const entries = new Hono<Env>()
     if (!parsed.ok) return c.json({ error: parsed.message }, 400);
 
     const usecase = new UploadEntryPhotoUsecase(new SupabaseEntryStorageGateway(c.get('supabase')));
+    // storagePath を entries.media_urls に保存し、signedUrl は表示だけに使う。
     const result = await usecase.execute(c.get('userId'), {
       file: await parsed.file.arrayBuffer(),
       fileName: parsed.file.name,
@@ -151,7 +152,11 @@ export const entries = new Hono<Env>()
     const supabase = c.get('supabase');
     const entryRepo = new SupabaseEntryRepository(supabase);
     const snapshotRepo = new SupabaseEntrySnapshotRepository(supabase);
-    const usecase = new GetEntryUsecase(entryRepo, snapshotRepo);
+    const usecase = new GetEntryUsecase(
+      entryRepo,
+      snapshotRepo,
+      new SupabaseEntryStorageGateway(supabase),
+    );
 
     const result = await usecase.execute(c.req.param('id'));
     if (!result) return c.json({ error: 'Not found' }, 404);

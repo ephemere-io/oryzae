@@ -186,9 +186,14 @@ describe('usePhotoImport', () => {
     expect(result.current.state.previewUrl).toBe('blob:preview');
   });
 
-  it('写真として貼ると URL を親へ渡して閉じる', async () => {
+  // 保存するのは storagePath。signedUrl は表示専用で 1 時間で失効する（00023 / #504）。
+  it('写真として貼ると path と署名 URL を親へ渡して閉じる', async () => {
     apiFetch.mockResolvedValueOnce(
-      mockResponse(true, { url: 'https://cdn.example/a.jpg', storagePath: 'u/1-a.jpg' }, 201),
+      mockResponse(
+        true,
+        { storagePath: 'u/1-a.jpg', signedUrl: 'https://cdn.example/a.jpg?token=abc' },
+        201,
+      ),
     );
     const { result } = setup();
 
@@ -200,13 +205,16 @@ describe('usePhotoImport', () => {
     });
 
     expect(apiFetch.mock.calls[0][0]).toBe('/api/v1/entries/photos');
-    expect(onAttach).toHaveBeenCalledWith('https://cdn.example/a.jpg');
+    expect(onAttach).toHaveBeenCalledWith({
+      storagePath: 'u/1-a.jpg',
+      signedUrl: 'https://cdn.example/a.jpg?token=abc',
+    });
     await waitFor(() => {
       expect(result.current.state.open).toBe(false);
     });
   });
 
-  it('url を返さない壊れたレスポンスでは親へ渡さずエラーにする', async () => {
+  it('storagePath だけで signedUrl が欠けるレスポンスでは親へ渡さずエラーにする', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { storagePath: 'u/1-a.jpg' }, 201));
     const { result } = setup();
 

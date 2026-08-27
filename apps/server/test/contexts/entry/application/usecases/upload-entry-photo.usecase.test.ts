@@ -9,13 +9,14 @@ describe('UploadEntryPhotoUsecase', () => {
   beforeEach(() => {
     entryStorage = {
       upload: vi.fn().mockResolvedValue('user-1/1700000000000-note.jpg'),
-      getPublicUrl: vi.fn().mockReturnValue('https://cdn.example/entry-photos/user-1/note.jpg'),
+      getSignedUrl: vi.fn().mockResolvedValue('https://cdn.example/signed/note.jpg?token=abc'),
+      getSignedUrls: vi.fn().mockResolvedValue(new Map()),
       delete: vi.fn().mockResolvedValue(undefined),
     };
     usecase = new UploadEntryPhotoUsecase(entryStorage);
   });
 
-  it('Storage に保管し storagePath と公開 URL を返す', async () => {
+  it('Storage に保管し、保存用の storagePath と表示用の署名 URL を返す', async () => {
     const file = new ArrayBuffer(8);
 
     const result = await usecase.execute('user-1', {
@@ -26,13 +27,13 @@ describe('UploadEntryPhotoUsecase', () => {
 
     expect(result).toEqual({
       storagePath: 'user-1/1700000000000-note.jpg',
-      url: 'https://cdn.example/entry-photos/user-1/note.jpg',
+      signedUrl: 'https://cdn.example/signed/note.jpg?token=abc',
     });
     expect(entryStorage.upload).toHaveBeenCalledWith('user-1', 'note.jpg', file, 'image/jpeg');
-    expect(entryStorage.getPublicUrl).toHaveBeenCalledWith('user-1/1700000000000-note.jpg');
+    expect(entryStorage.getSignedUrl).toHaveBeenCalledWith('user-1/1700000000000-note.jpg');
   });
 
-  it('公開 URL は upload が返した storagePath から引く（入力ファイル名からではない）', async () => {
+  it('署名 URL は upload が返した storagePath から引く（入力ファイル名からではない）', async () => {
     vi.mocked(entryStorage.upload).mockResolvedValue('user-1/9-renamed.jpg');
 
     await usecase.execute('user-1', {
@@ -41,7 +42,7 @@ describe('UploadEntryPhotoUsecase', () => {
       contentType: 'image/jpeg',
     });
 
-    expect(entryStorage.getPublicUrl).toHaveBeenCalledWith('user-1/9-renamed.jpg');
+    expect(entryStorage.getSignedUrl).toHaveBeenCalledWith('user-1/9-renamed.jpg');
   });
 
   it('Storage が失敗したらそのまま伝播する', async () => {
