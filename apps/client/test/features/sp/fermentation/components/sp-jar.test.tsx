@@ -6,8 +6,11 @@ import jaMessages from '@/i18n/messages/ja.json';
 import type { ApiClient } from '@/lib/api';
 import { UnreadProvider, type UnreadState } from '@/lib/unread-context';
 
+// 「もとになった記録」のタップ遷移（#453）と「返事を書く」で useRouter を使う。
+// push を module スコープで共有して呼び出しを検証できるようにする。
+const push = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
@@ -100,6 +103,55 @@ describe('SpJar', () => {
 
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
     expect(screen.getByRole('button', { name: '返事を書く' })).toBeTruthy();
+  });
+
+  it('手紙を開くと「もとになった記録」が出て、タップでそのエントリへ行く（Issue #453）', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      if (url === '/api/v1/fermentations')
+        return Promise.resolve(jsonResponse(completedFermentation));
+      if (url === '/api/v1/fermentations/f1')
+        return Promise.resolve(
+          jsonResponse(
+            detailJson({
+              scannedEntries: [
+                { id: 'e1', title: '朝の光', createdAt: '2024-01-30T00:00:00Z' },
+                { id: 'e2', title: '', createdAt: '2024-01-31T00:00:00Z' },
+              ],
+            }),
+          ),
+        );
+      return Promise.resolve(jsonResponse({}));
+    });
+    renderJar(createMockApi(fetchImpl));
+
+    fireEvent.click(await screen.findByText('なぜ続けるのか'));
+
+    // 手紙だけでは「何に対する返事か」が分からなかった。
+    expect(await screen.findByText('朝の光')).toBeTruthy();
+    // 見出しが無い記録もフォールバックで出す（開けなくならないように）。
+    expect(screen.getByText(jaMessages.sp.jar.source_untitled)).toBeTruthy();
+
+    fireEvent.click(screen.getByText('朝の光'));
+    expect(push).toHaveBeenCalledWith('/entries/e1');
+  });
+
+  it('もとになった記録が無ければセクションごと出さない', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      if (url === '/api/v1/fermentations')
+        return Promise.resolve(jsonResponse(completedFermentation));
+      if (url === '/api/v1/fermentations/f1') return Promise.resolve(jsonResponse(detailJson({})));
+      return Promise.resolve(jsonResponse({}));
+    });
+    renderJar(createMockApi(fetchImpl));
+
+    fireEvent.click(await screen.findByText('なぜ続けるのか'));
+
+    expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
+    expect(screen.queryByText(jaMessages.sp.jar.section_sources)).toBeNull();
   });
 
   it('未読の手紙には「未読」を出し、開くとその問いを既読にする（Issue #447）', async () => {

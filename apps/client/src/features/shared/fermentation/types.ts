@@ -36,7 +36,17 @@ export interface FermentationWorksheet {
   resultDiagramMarkdown: string;
 }
 
-/** 発酵1件の詳細（手紙・言葉・抜粋・ワークシート）。 */
+/**
+ * 手紙のもとになった記録 1 件（Issue #453）。
+ * 本文は重いので持たず、見出し（本文の先頭行）と日付だけ。
+ */
+export interface ScannedEntry {
+  id: string;
+  title: string;
+  createdAt: string;
+}
+
+/** 発酵1件の詳細（手紙・言葉・抜粋・ワークシート・もとになった記録）。 */
 export interface FermentationDetail {
   id: string;
   questionId: string;
@@ -46,6 +56,7 @@ export interface FermentationDetail {
   snippets: FermentationSnippet[];
   keywords: FermentationKeyword[];
   letter: FermentationLetter | null;
+  scannedEntries: ScannedEntry[];
 }
 
 /** 一覧 API が返す発酵の要約。詳細は重いので別途取得する。 */

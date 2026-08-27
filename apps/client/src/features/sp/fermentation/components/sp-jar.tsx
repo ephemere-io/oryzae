@@ -151,6 +151,38 @@ export function SpJar({ api }: SpJarProps) {
                 </div>
               </>
             ) : null}
+
+            {/* もとになった記録（Issue #453: 手紙だけ読んでも何への返事か分からなかった） */}
+            {detail && detail.scannedEntries.length > 0 ? (
+              <>
+                <SectionLabel>{t('section_sources')}</SectionLabel>
+                <ul className="flex flex-col gap-2">
+                  {detail.scannedEntries.map((e) => (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/entries/${e.id}`)}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left"
+                        style={{
+                          background: 'var(--ob-card-bg)',
+                          border: '1px solid var(--border-subtle)',
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm">
+                          {e.title || t('source_untitled')}
+                        </span>
+                        <span
+                          className="shrink-0 text-[11px]"
+                          style={{ color: 'var(--date-color)' }}
+                        >
+                          {formatMonthDay(e.createdAt)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </div>
 
           <footer className="px-5 py-4">

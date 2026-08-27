@@ -795,7 +795,9 @@
       "section_keywords": "Words",
       "section_snippets": "Excerpts",
       "unread": "Unread",
-      "read": "Read"
+      "read": "Read",
+      "section_sources": "From these entries",
+      "source_untitled": "Untitled entry"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
