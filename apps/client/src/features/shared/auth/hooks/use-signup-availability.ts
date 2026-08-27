@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { isObject, readBooleanField, readJson, readNumberField } from '@/lib/json';
+import { readBooleanField, readJson, readRequiredNumber } from '@/lib/json';
 
 /**
  * Research Preview のサインアップ枠状況。サーバーの `SignupAvailability` と同形。
@@ -14,14 +14,24 @@ interface SignupAvailability {
   capacityReached: boolean;
 }
 
-/** 数値が揃っていなければ「取れなかった」として null を返す。 */
+/**
+ * 必須の数値が揃っていなければ「取れなかった」として null を返す。
+ *
+ * ここを既定値 0 に倒すと、`{ error: '...' }` のような応答が
+ * 「残り枠 0 だが満員ではない」という矛盾した表示になって本物として描画される。
+ * 取れなかったことは呼び出し側でエラー表示に倒す。
+ */
 function normalizeSignupAvailability(input: unknown): SignupAvailability | null {
-  if (!isObject(input)) return null;
+  const limit = readRequiredNumber(input, 'limit');
+  const used = readRequiredNumber(input, 'used');
+  const remaining = readRequiredNumber(input, 'remaining');
+  if (limit === null || used === null || remaining === null) return null;
   return {
-    limit: readNumberField(input, 'limit', 0),
-    used: readNumberField(input, 'used', 0),
-    remaining: readNumberField(input, 'remaining', 0),
-    capacityReached: readBooleanField(input, 'capacityReached', false),
+    limit,
+    used,
+    remaining,
+    // 省略された場合でも remaining と矛盾しない値にする。
+    capacityReached: readBooleanField(input, 'capacityReached', remaining <= 0),
   };
 }
 

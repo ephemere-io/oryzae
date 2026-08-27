@@ -28,6 +28,19 @@ export function readStringField(value: unknown, key: string): string | null {
   return typeof field === 'string' ? field : null;
 }
 
+/**
+ * **必須の**数値フィールドを読む。無い・型が違うなら null。
+ *
+ * 既定値へ倒す `readNumberField` と違い、「そもそも期待した形の応答が来ていない」
+ * ことを呼び出し側に伝えるためのもの。エラーエンベロープ `{ error: '...' }` が
+ * ゼロ埋めの本物のデータとして描画されるのを防ぐ。
+ */
+export function readRequiredNumber(value: unknown, key: string): number | null {
+  if (!isObject(value)) return null;
+  const field = value[key];
+  return typeof field === 'number' && !Number.isNaN(field) ? field : null;
+}
+
 /** 数値フィールドを読む。無い・型が違うなら fallback。 */
 export function readNumberField(value: unknown, key: string, fallback: number): number {
   if (!isObject(value)) return fallback;
