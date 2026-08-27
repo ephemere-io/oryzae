@@ -8,6 +8,8 @@ export interface CardPositionUpdate {
   width: number;
   height: number;
   zIndex: number;
+  /** 利用者が自分で動かしたカードか。未指定なら既存値を変えない。 */
+  userPositioned?: boolean;
 }
 
 export interface BoardCardRepositoryGateway {

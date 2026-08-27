@@ -173,7 +173,9 @@ export function useBoardInteraction(
     if (state) {
       if (state.type === 'drag') {
         zCounterRef.current += 1;
-        updateCard(state.cardId, { zIndex: zCounterRef.current });
+        // ここが「利用者が自分で位置を決めた」瞬間。フラグを立てて保存に乗せることで、
+        // 次回以降の自動整列（applyDefaultZOrder）の対象から外れる。
+        updateCard(state.cardId, { zIndex: zCounterRef.current, userPositioned: true });
       }
       onInteractionEnd();
     }

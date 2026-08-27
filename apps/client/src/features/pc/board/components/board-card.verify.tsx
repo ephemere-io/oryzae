@@ -49,6 +49,7 @@ const entryCard: BoardCardData = {
   width: 220,
   height: 260,
   zIndex: 1,
+  userPositioned: false,
   createdAt: '2026-06-20T10:00:00.000Z',
   content: {
     title: '朝のメモ',
@@ -67,6 +68,7 @@ const snippetCard: BoardCardData = {
   width: 180,
   height: 140,
   zIndex: 2,
+  userPositioned: false,
   createdAt: '2026-06-21T09:00:00.000Z',
   content: { text: '走り書きのアイデア。' },
 };
@@ -81,6 +83,7 @@ const photoCard: BoardCardData = {
   width: 200,
   height: 200,
   zIndex: 3,
+  userPositioned: false,
   createdAt: '2026-06-22T08:00:00.000Z',
   content: {
     imageUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=',
