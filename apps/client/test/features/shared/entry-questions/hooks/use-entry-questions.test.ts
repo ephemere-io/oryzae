@@ -78,4 +78,42 @@ describe('useActiveQuestions', () => {
     });
     expect(result.current[0].id).toBe('q1');
   });
+  it('配列でないレスポンスでも落ちず空のまま（エディタを巻き込まない）', async () => {
+    // 素通しだと非配列が state に入り、QuestionLinker の .map でエディタ画面ごと落ちる。
+    const api = createApiStub();
+    api.fetch.mockResolvedValue(mockResponse(true, { error: 'boom' }));
+
+    const { result } = renderHook(() => useActiveQuestions(api, false));
+
+    await waitFor(() => expect(api.fetch).toHaveBeenCalled());
+    expect(result.current).toEqual([]);
+  });
+
+  it('id を持たない要素は落とし、currentText 未設定は null にする', async () => {
+    const api = createApiStub();
+    api.fetch.mockResolvedValue(
+      mockResponse(true, [
+        { id: 'q1', currentText: '問い' },
+        { id: 'q2' },
+        { currentText: 'id 無し' },
+        null,
+      ]),
+    );
+
+    const { result } = renderHook(() => useActiveQuestions(api, false));
+
+    await waitFor(() => expect(result.current).toHaveLength(2));
+    expect(result.current.map((q) => q.id)).toEqual(['q1', 'q2']);
+    expect(result.current[1].currentText).toBeNull();
+  });
+
+  it('通信が失敗しても落ちない（未処理 rejection にしない）', async () => {
+    const api = createApiStub();
+    api.fetch.mockRejectedValue(new Error('network down'));
+
+    const { result } = renderHook(() => useActiveQuestions(api, false));
+
+    await waitFor(() => expect(api.fetch).toHaveBeenCalled());
+    expect(result.current).toEqual([]);
+  });
 });

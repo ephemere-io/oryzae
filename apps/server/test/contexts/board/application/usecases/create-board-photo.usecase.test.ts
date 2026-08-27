@@ -33,7 +33,8 @@ beforeEach(() => {
   };
   boardStorage = {
     upload: vi.fn().mockResolvedValue('user-1/photo.jpg'),
-    getPublicUrl: vi.fn().mockReturnValue('https://storage.example.com/user-1/photo.jpg'),
+    getSignedUrl: vi.fn().mockResolvedValue('https://storage.example.com/user-1/photo.jpg'),
+    getSignedUrls: vi.fn().mockResolvedValue(new Map()),
     delete: vi.fn().mockResolvedValue(undefined),
   };
   usecase = new CreateBoardPhotoUsecase(boardPhotoRepo, boardCardRepo, boardStorage, generateId);

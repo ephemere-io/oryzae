@@ -7,22 +7,22 @@ import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 
 /**
- * Apply default z-ordering by creation time (newer on top).
- * Cards whose z-index was bumped by user interaction (drag) are preserved.
+ * 自動配置のカードだけを作成日時順（新しいものほど手前）に並べ直す。
+ * 利用者が自分で動かしたカードは、その重なり順をそのまま保つ。
  *
- * Auto-assigned z-indexes are sequential (0..N-1).
- * User-dragged cards get z-index >= N (via zCounterRef in use-board-interaction).
- * We re-sort only the auto-assigned group by createdAt, keeping user-modified cards on top.
+ * 判定には `userPositioned`（サーバー保存のフラグ）を使う。
+ * 以前は「z_index >= 総枚数」で推測していたが、カードを削除すると総枚数が縮むため、
+ * 触っていないカードが判定を満たして手前に固定されてしまっていた
+ * （z_index の値からは「採番当時の総枚数」を復元できないので、式では直せない）。
  */
 function applyDefaultZOrder(cards: BoardCardData[]): BoardCardData[] {
   if (cards.length <= 1) return cards;
 
-  const total = cards.length;
   const autoCards: BoardCardData[] = [];
   const userCards: BoardCardData[] = [];
 
   for (const card of cards) {
-    if (card.zIndex >= total) {
+    if (card.userPositioned) {
       userCards.push(card);
     } else {
       autoCards.push(card);
@@ -39,6 +39,13 @@ function applyDefaultZOrder(cards: BoardCardData[]): BoardCardData[] {
   return [...result, ...userCards];
 }
 
+/** 削除エンドポイントはカード種別で分かれる。 */
+function deletePath(cardId: string, cardType: string, refId: string): string {
+  if (cardType === 'snippet') return `/api/v1/board/snippets/${refId}`;
+  if (cardType === 'photo') return `/api/v1/board/photos/${refId}`;
+  return `/api/v1/board/cards/${cardId}`;
+}
+
 export function useBoard(
   api: ApiClient | null,
   dateKey: string,
@@ -46,6 +53,9 @@ export function useBoard(
 ) {
   const [cards, setCards] = useState<BoardCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  // 取得失敗を surface する（use-entries と同じ形）。これが無いと失敗が「空の盤面」に
+  // なり、利用者には「この日は何も無い」と区別がつかない。
+  const [error, setError] = useState(false);
   const postSnippet = useCreateSnippet(api);
   const requestIdRef = useRef(0);
 
@@ -53,6 +63,7 @@ export function useBoard(
     if (!api) return;
     const requestId = ++requestIdRef.current;
     setLoading(true);
+    setError(false);
     // ローカル暦日で「その日」を判定させるためオフセットを送る。これが無いとサーバーは
     // dateKey を UTC の 00:00〜24:00 とみなし、JST 00:00〜09:00 に書いたエントリが
     // 当日のボードに出ない（Issue: ボードの日付境界）。
@@ -66,12 +77,14 @@ export function useBoard(
         const data: unknown = await res.json();
         if (requestId !== requestIdRef.current) return;
         setCards(applyDefaultZOrder(normalizeBoardCards(data)));
+      } else {
+        setError(true);
       }
     } catch {
+      if (requestId === requestIdRef.current) setError(true);
       // 通信・パースの失敗。呼び出し元は useEffect 内の async 関数で、投げても誰も
       // 受け取らない（未処理 rejection になり loading が戻らず盤面が固まる）ので、
-      // ここで止める。ボードには専用のエラー表示が無く、`!res.ok` のときも同様に
-      // 「空の盤面」になる既存挙動に揃えて、盤面は現状維持のままにする。
+      // ここで止める。盤面は現状維持のまま error を立て、表示は BoardView に委ねる。
     } finally {
       // 後発リクエストに追い越されていたら loading の所有権は向こうにあるので触らない。
       if (requestId === requestIdRef.current) setLoading(false);
@@ -112,20 +125,28 @@ export function useBoard(
   const deleteCard = useCallback(
     async (cardId: string, cardType: string, refId: string) => {
       if (!api) return;
-      // 1. Mark card as removing (triggers animation)
+      // 1. 消えるアニメーションを始める（ここは即時＝操作に対する反応を待たせない）
       setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, removing: true } : c)));
-      // 2. API call
-      if (cardType === 'snippet') {
-        api.fetch(`/api/v1/board/snippets/${refId}`, { method: 'DELETE' });
-      } else if (cardType === 'photo') {
-        api.fetch(`/api/v1/board/photos/${refId}`, { method: 'DELETE' });
-      } else {
-        api.fetch(`/api/v1/board/cards/${cardId}`, { method: 'DELETE' });
-      }
-      // 3. Remove from state after animation (280ms)
-      setTimeout(() => {
-        setCards((prev) => prev.filter((c) => c.id !== cardId));
-      }, 280);
+
+      // 2. 削除完了とアニメーション(280ms)の両方を待つ。
+      //    以前は結果を見ずに投げっぱなしで 280ms 後に必ず state から消していたため、
+      //    サーバー側で失敗してもカードは画面から消え、リロードすると復活していた。
+      //    reject も誰も受け取らず未処理 rejection になっていた。
+      const [ok] = await Promise.all([
+        api.fetch(deletePath(cardId, cardType, refId), { method: 'DELETE' }).then(
+          (res) => res.ok,
+          () => false,
+        ),
+        new Promise((resolve) => setTimeout(resolve, 280)),
+      ]);
+
+      // 3. 成功したときだけ取り除く。失敗したらアニメーションを戻して盤面に残す
+      //    （ボードに専用のエラー表示は無いので、「消えない」ことを結果として見せる）。
+      setCards((prev) =>
+        ok
+          ? prev.filter((c) => c.id !== cardId)
+          : prev.map((c) => (c.id === cardId ? { ...c, removing: false } : c)),
+      );
     },
     [api],
   );
@@ -157,6 +178,7 @@ export function useBoard(
     cards,
     setCards,
     loading,
+    error,
     refresh: fetchBoard,
     createSnippet,
     updateSnippet,

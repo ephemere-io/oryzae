@@ -126,4 +126,47 @@ describe('useQuestions', () => {
       expect.objectContaining({ method: 'POST' }),
     );
   });
+  it('配列でないレスポンスでも落ちず空のまま', async () => {
+    // 素通しだと非配列が state に入り、タイムラインや SP の .filter / .map で落ちる。
+    apiFetch.mockResolvedValue(mockResponse(true, { error: 'boom' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useQuestions(api));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.questions).toEqual([]);
+  });
+
+  it('id を持たない要素は落とし、欠けたフィールドは既定値に潰す', async () => {
+    apiFetch.mockResolvedValue(
+      mockResponse(true, [
+        { id: 'q1', currentText: '問い', isArchived: true },
+        { currentText: 'id 無し' },
+        null,
+        { id: 'q2' },
+      ]),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useQuestions(api));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.questions.map((q) => q.id)).toEqual(['q1', 'q2']);
+    expect(result.current.questions[0].isArchived).toBe(true);
+    // 未設定は「まだ本文が無い問い」として null、真偽値は false に潰す
+    expect(result.current.questions[1].currentText).toBeNull();
+    expect(result.current.questions[1].isArchived).toBe(false);
+    expect(result.current.questions[1].createdAt).toBe('');
+  });
+
+  it('通信が失敗したら error になり loading も戻る', async () => {
+    apiFetch.mockRejectedValue(new Error('network down'));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useQuestions(api));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe(true);
+    expect(result.current.questions).toEqual([]);
+  });
 });

@@ -161,7 +161,8 @@
     "desktop_only": {
       "heading": "仅支持桌面",
       "body": "Oryzae 目前仅支持桌面浏览器访问，无法从智能手机使用。在移动版准备好之前，请使用桌面浏览器。"
-    }
+    },
+    "loading": "加载中…"
   },
   "footer": {
     "label": {
@@ -288,7 +289,9 @@
       "cancel": "取消",
       "update": "更新",
       "create": "创建"
-    }
+    },
+    "error_message": "加载画板失败",
+    "retry": "重试"
   },
   "editor": {
     "status": {
