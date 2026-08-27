@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import type { ApiClient } from '@/lib/api';
@@ -241,6 +241,7 @@ describe('useBoard', () => {
           width: 340,
           height: 280,
           zIndex: 10,
+          userPositioned: true,
           createdAt: '2026-04-11T08:00:00Z',
           content: { title: 'Old but dragged', preview: 'P', createdAt: '2026-04-11T08:00:00Z' },
         },
@@ -318,5 +319,159 @@ describe('useBoard', () => {
     expect(card.y).toBe(0);
     expect(card.width).toBeGreaterThan(0);
     expect(card.height).toBeGreaterThan(0);
+  });
+  describe('deleteCard', () => {
+    const oneCard = {
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      cards: [{ id: 'c-1', cardType: 'snippet', refId: 's-1', content: { text: 'あ' }, zIndex: 0 }],
+    };
+
+    it('削除が成功したらカードを取り除く', async () => {
+      apiFetch
+        .mockResolvedValueOnce(mockResponse(true, oneCard))
+        .mockResolvedValueOnce(mockResponse(true, {}));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.cards).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.deleteCard('c-1', 'snippet', 's-1');
+      });
+
+      expect(apiFetch.mock.calls[1][0]).toContain('/api/v1/board/snippets/s-1');
+      expect(apiFetch.mock.calls[1][1]?.method).toBe('DELETE');
+      expect(result.current.cards).toHaveLength(0);
+    });
+
+    it('削除が失敗したらカードを消さずに戻す（リロードで復活する嘘を防ぐ）', async () => {
+      apiFetch
+        .mockResolvedValueOnce(mockResponse(true, oneCard))
+        .mockResolvedValueOnce(mockResponse(false, {}));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.cards).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.deleteCard('c-1', 'snippet', 's-1');
+      });
+
+      expect(result.current.cards).toHaveLength(1);
+      // アニメーション用のフラグも戻す（消えかけの見た目で固まらせない）
+      expect(result.current.cards[0].removing).toBe(false);
+    });
+
+    it('通信自体が失敗してもカードを残す（未処理 rejection にしない）', async () => {
+      apiFetch
+        .mockResolvedValueOnce(mockResponse(true, oneCard))
+        .mockRejectedValueOnce(new Error('network down'));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.cards).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.deleteCard('c-1', 'snippet', 's-1');
+      });
+
+      expect(result.current.cards).toHaveLength(1);
+      expect(result.current.cards[0].removing).toBe(false);
+    });
+  });
+  describe('error', () => {
+    it('取得に失敗したら error が立つ（「空の盤面」と区別できるようにする）', async () => {
+      apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe(true);
+      expect(result.current.cards).toEqual([]);
+    });
+
+    it('通信が失敗しても error が立つ', async () => {
+      apiFetch.mockRejectedValueOnce(new Error('network down'));
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe(true);
+    });
+
+    it('再取得が成功したら error は下りる', async () => {
+      apiFetch.mockResolvedValueOnce(mockResponse(false, {})).mockResolvedValueOnce(
+        mockResponse(true, {
+          dateKey: '2026-04-11',
+          viewType: 'daily',
+          cards: [
+            { id: 'c-1', cardType: 'snippet', refId: 's-1', content: { text: 'あ' }, zIndex: 0 },
+          ],
+        }),
+      );
+      const api = createMockApi(apiFetch);
+
+      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      await waitFor(() => expect(result.current.error).toBe(true));
+
+      await act(async () => {
+        await result.current.refresh();
+      });
+
+      expect(result.current.error).toBe(false);
+      expect(result.current.cards).toHaveLength(1);
+    });
+  });
+  it('カードが減っても、触っていないカードを「動かした」と誤判定しない', async () => {
+    // 旧実装は「zIndex >= 総枚数」でユーザー操作を推測していた。カードを削除すると
+    // 総枚数が縮むため、採番当時のまま残った zIndex が判定を満たしてしまい、
+    // 触っていないカードが作成日時順から外れて手前に固定されていた。
+    // ここは「4枚から1枚消して3枚になり、zIndex に 3 が残っている」状況。
+    const boardData = {
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      cards: [
+        {
+          id: 'c-oldest',
+          cardType: 'snippet',
+          refId: 's-1',
+          zIndex: 3, // 旧実装だと 3 >= 3 で「ユーザーが動かした」扱いになっていた
+          userPositioned: false,
+          createdAt: '2026-04-11T08:00:00Z',
+          content: { text: '一番古い' },
+        },
+        {
+          id: 'c-middle',
+          cardType: 'snippet',
+          refId: 's-2',
+          zIndex: 0,
+          userPositioned: false,
+          createdAt: '2026-04-11T10:00:00Z',
+          content: { text: '真ん中' },
+        },
+        {
+          id: 'c-newest',
+          cardType: 'snippet',
+          refId: 's-3',
+          zIndex: 1,
+          userPositioned: false,
+          createdAt: '2026-04-11T14:00:00Z',
+          content: { text: '一番新しい' },
+        },
+      ],
+    };
+    apiFetch.mockResolvedValueOnce(mockResponse(true, boardData));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const byId = (id: string) => result.current.cards.find((c) => c.id === id);
+    // 3枚とも自動配置なので、作成日時順に並び直る（新しいものほど手前）
+    expect(byId('c-oldest')!.zIndex).toBeLessThan(byId('c-middle')!.zIndex);
+    expect(byId('c-middle')!.zIndex).toBeLessThan(byId('c-newest')!.zIndex);
   });
 });

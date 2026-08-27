@@ -132,6 +132,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
         width: props.width,
         height: props.height,
         z_index: props.zIndex,
+        user_positioned: props.userPositioned,
         created_at: props.createdAt,
         updated_at: props.updatedAt,
       };
@@ -158,6 +159,8 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
           width: card.width,
           height: card.height,
           z_index: card.zIndex,
+          // 未指定（旧クライアント）のときは既存値を変えない。
+          ...(card.userPositioned === undefined ? {} : { user_positioned: card.userPositioned }),
           updated_at: now,
         })
         .eq('id', card.id),
@@ -204,6 +207,8 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       width: row.width as number,
       height: row.height as number,
       zIndex: row.z_index as number,
+      // 列を足す前の行や、まだ移行していない環境では undefined になりうるので false に倒す。
+      userPositioned: row.user_positioned === true,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     });
