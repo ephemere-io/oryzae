@@ -71,11 +71,16 @@ export interface JarLayout {
   letters: JarPositionItem[];
 }
 
-/** 瓶に届いた手紙（＝完了した発酵）の受信箱1件。 */
+/** 瓶に届いた手紙（＝完了した発酵）の受信箱1件。既読/未読は UnreadState 側が持つ。 */
 export interface InboxLetter {
   questionId: string;
   questionText: string | null;
   fermentationId: string;
   createdAt: string;
-  unread: boolean;
+}
+
+/** 受信箱が手紙に見出しを付けるために要る問いの最小形。 */
+export interface InboxQuestion {
+  id: string;
+  currentText: string | null;
 }

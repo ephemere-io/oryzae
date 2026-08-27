@@ -823,7 +823,8 @@
       "placeholder": "Write a question",
       "delete": "Retire this question",
       "cancel": "Cancel",
-      "save": "Save"
+      "save": "Save",
+      "letter_arrived": "A letter has arrived"
     }
   }
 }

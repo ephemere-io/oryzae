@@ -823,7 +823,8 @@
       "placeholder": "질문 쓰기",
       "delete": "이 질문 끝내기",
       "cancel": "취소",
-      "save": "저장"
+      "save": "저장",
+      "letter_arrived": "편지가 도착했습니다"
     }
   }
 }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import jaMessages from '@/i18n/messages/ja.json';
 import type { ApiClient } from '@/lib/api';
+import { UnreadProvider, type UnreadState } from '@/lib/unread-context';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -18,10 +19,23 @@ function jsonResponse(body: unknown, ok = true): Response {
   return { ok, status: ok ? 200 : 400, json: () => Promise.resolve(body) } as Response;
 }
 
-function renderJar(api: ApiClient) {
+function makeUnread(overrides: Partial<UnreadState> = {}): UnreadState {
+  return {
+    ready: false,
+    unreadCount: 0,
+    unreadQuestionIds: new Set(),
+    markQuestionRead: vi.fn(),
+    markAllSeen: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderJar(api: ApiClient, unread: UnreadState = makeUnread()) {
   return render(
     <NextIntlClientProvider locale="ja" messages={jaMessages}>
-      <SpJar api={api} />
+      <UnreadProvider value={unread}>
+        <SpJar api={api} />
+      </UnreadProvider>
     </NextIntlClientProvider>,
   );
 }
@@ -86,6 +100,41 @@ describe('SpJar', () => {
 
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
     expect(screen.getByRole('button', { name: '返事を書く' })).toBeTruthy();
+  });
+
+  it('未読の手紙には「未読」を出し、開くとその問いを既読にする（Issue #447）', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      if (url === '/api/v1/fermentations')
+        return Promise.resolve(jsonResponse(completedFermentation));
+      if (url === '/api/v1/fermentations/f1') return Promise.resolve(jsonResponse(detailJson({})));
+      return Promise.resolve(jsonResponse({}));
+    });
+    const unread = makeUnread({ ready: true, unreadQuestionIds: new Set(['q1']) });
+    renderJar(createMockApi(fetchImpl), unread);
+
+    // 旧実装は瓶を開いた時刻で一括既読にしていたため、開いた手紙が未読のまま残っていた。
+    expect(await screen.findByText(/未読/)).toBeTruthy();
+
+    fireEvent.click(screen.getByText('なぜ続けるのか'));
+
+    expect(unread.markQuestionRead).toHaveBeenCalledWith('q1');
+  });
+
+  it('未読状態が未取得（ready=false）の間は未読/既読ラベルを出さない', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      if (url === '/api/v1/fermentations')
+        return Promise.resolve(jsonResponse(completedFermentation));
+      return Promise.resolve(jsonResponse({}));
+    });
+    renderJar(createMockApi(fetchImpl));
+
+    await screen.findByText('なぜ続けるのか');
+    expect(screen.queryByText(/未読/)).toBeNull();
+    expect(screen.queryByText(/既読/)).toBeNull();
   });
 
   it('手紙を開くと言葉(keywords)と抜粋(snippets)も表示する', async () => {
