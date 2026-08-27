@@ -4,16 +4,18 @@ import { SupabaseEntryStorageGateway } from '@/contexts/entry/infrastructure/sto
 
 /**
  * 実 Storage は叩かず、バケット名とパスの組み立てを固定する。
- * パス先頭が userId であることは Storage RLS (00020) が依存している性質なので、
+ * パス先頭が userId であることは Storage RLS (00023) が依存している性質なので、
  * DB を用意しない範囲でもここだけは回帰を検出できるようにしておく。
  */
 describe('SupabaseEntryStorageGateway', () => {
   const uploadFn = vi.fn();
-  const getPublicUrlFn = vi.fn();
+  const createSignedUrlFn = vi.fn();
+  const createSignedUrlsFn = vi.fn();
   const removeFn = vi.fn();
   const fromFn = vi.fn(() => ({
     upload: uploadFn,
-    getPublicUrl: getPublicUrlFn,
+    createSignedUrl: createSignedUrlFn,
+    createSignedUrls: createSignedUrlsFn,
     remove: removeFn,
   }));
 
@@ -26,9 +28,11 @@ describe('SupabaseEntryStorageGateway', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-24T00:00:00Z'));
     uploadFn.mockReset().mockResolvedValue({ error: null });
-    getPublicUrlFn
-      .mockReset()
-      .mockReturnValue({ data: { publicUrl: 'https://cdn.example/entry-photos/p.jpg' } });
+    createSignedUrlFn.mockReset().mockResolvedValue({
+      data: { signedUrl: 'https://cdn.example/signed/p.jpg?token=abc' },
+      error: null,
+    });
+    createSignedUrlsFn.mockReset().mockResolvedValue({ data: [], error: null });
     removeFn.mockReset().mockResolvedValue({ error: null });
     fromFn.mockClear();
   });
@@ -69,11 +73,39 @@ describe('SupabaseEntryStorageGateway', () => {
     ).rejects.toThrow('quota exceeded');
   });
 
-  it('公開 URL を返す', () => {
-    expect(gateway.getPublicUrl('user-1/1-note.jpg')).toBe(
-      'https://cdn.example/entry-photos/p.jpg',
+  // バケットは private（00023 / #504）。公開 URL は存在せず、都度署名する。
+  it('署名付き URL を返す', async () => {
+    expect(await gateway.getSignedUrl('user-1/1-note.jpg')).toBe(
+      'https://cdn.example/signed/p.jpg?token=abc',
     );
-    expect(getPublicUrlFn).toHaveBeenCalledWith('user-1/1-note.jpg');
+    expect(createSignedUrlFn).toHaveBeenCalledWith('user-1/1-note.jpg', 3600);
+  });
+
+  it('署名に失敗したら投げる（公開 URL へフォールバックしない）', async () => {
+    createSignedUrlFn.mockResolvedValue({ data: null, error: new Error('not found') });
+
+    await expect(gateway.getSignedUrl('user-1/1-note.jpg')).rejects.toThrow('not found');
+  });
+
+  it('まとめて署名し、パス→URL の Map を返す', async () => {
+    createSignedUrlsFn.mockResolvedValue({
+      data: [
+        { path: 'user-1/a.jpg', signedUrl: 'https://cdn.example/a?token=1' },
+        // 個別に失敗したパスは signedUrl が欠ける。その写真だけ落とす。
+        { path: 'user-1/b.jpg', signedUrl: null },
+      ],
+      error: null,
+    });
+
+    const urls = await gateway.getSignedUrls(['user-1/a.jpg', 'user-1/b.jpg']);
+
+    expect(urls.get('user-1/a.jpg')).toBe('https://cdn.example/a?token=1');
+    expect(urls.has('user-1/b.jpg')).toBe(false);
+  });
+
+  it('空配列なら API を呼ばない', async () => {
+    expect((await gateway.getSignedUrls([])).size).toBe(0);
+    expect(createSignedUrlsFn).not.toHaveBeenCalled();
   });
 
   it('delete は remove に委譲し、失敗したら投げる', async () => {

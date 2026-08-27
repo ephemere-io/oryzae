@@ -470,7 +470,9 @@
     "error_too_large": "This image is too large. Please try another photo.",
     "error_upload": "The photo could not be uploaded.",
     "error_transcribe": "The text could not be read. Please try again later.",
-    "error_rate_limited": "You have reached the reading limit. Please wait a moment."
+    "error_rate_limited": "You have reached the reading limit. Please wait a moment.",
+    "unavailable": "Photo {index} could not be loaded",
+    "unavailable_short": "Unavailable"
   },
   "fermentation": {
     "detail": {

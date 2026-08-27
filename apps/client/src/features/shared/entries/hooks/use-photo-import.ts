@@ -3,7 +3,7 @@
 import { MAX_ENTRY_PHOTO_BYTES } from '@oryzae/shared';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PhotoImportState } from '@/features/shared/entries/types';
+import type { AttachedPhoto, PhotoImportState } from '@/features/shared/entries/types';
 import type { ApiClient } from '@/lib/api';
 import { resizeImageForUpload } from '@/lib/resize-image';
 
@@ -17,8 +17,8 @@ import { resizeImageForUpload } from '@/lib/resize-image';
  */
 interface UsePhotoImportParams {
   api: ApiClient | null;
-  /** 「写真として貼る」で Storage に上がった公開 URL。 */
-  onAttach: (url: string) => void;
+  /** 「写真として貼る」で Storage に上がった写真。保存するのは path、表示は signedUrl。 */
+  onAttach: (photo: AttachedPhoto) => void;
   /** 「本文に入れる」で確定した文字起こし結果。 */
   onInsertText: (text: string) => void;
 }
@@ -125,17 +125,21 @@ export function usePhotoImport({ api, onAttach, onInsertText }: UsePhotoImportPa
         setState((s) => ({ ...s, status: 'idle', error: t('error_upload') }));
         return;
       }
+      // storagePath がエントリに保存する値、signedUrl は表示用（1時間で失効）。
+      // バケットが private なので公開 URL は存在しない（00023 / #504）。
       const data: unknown = await res.json();
       if (
         typeof data !== 'object' ||
         data === null ||
-        !('url' in data) ||
-        typeof data.url !== 'string'
+        !('storagePath' in data) ||
+        typeof data.storagePath !== 'string' ||
+        !('signedUrl' in data) ||
+        typeof data.signedUrl !== 'string'
       ) {
         setState((s) => ({ ...s, status: 'idle', error: t('error_upload') }));
         return;
       }
-      onAttach(data.url);
+      onAttach({ storagePath: data.storagePath, signedUrl: data.signedUrl });
       close();
     } catch {
       setState((s) => ({ ...s, status: 'idle', error: t('error_upload') }));

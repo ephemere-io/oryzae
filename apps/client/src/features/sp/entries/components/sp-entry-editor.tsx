@@ -4,14 +4,14 @@ import { ACCEPTED_IMAGE_MIME_TYPES } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
-import type { EntryDraft } from '@/features/shared/entries/types';
+import type { AttachedPhoto, EntryDraft } from '@/features/shared/entries/types';
 import {
   useActiveQuestions,
   useEntryQuestions,
@@ -28,8 +28,10 @@ interface SpEntryEditorProps {
   initialEntryId?: string;
   /** 既存エントリの本文（先頭行=タイトル）。新規は空。 */
   initialContent?: string;
-  /** 既存エントリに添えられている写真。新規は空。 */
+  /** 既存エントリに添えられている写真のストレージパス。新規は空。 */
   initialMediaUrls?: string[];
+  /** 上と同じ並びの表示用 署名付き URL。 */
+  initialMediaSignedUrls?: string[];
   /**
    * 書きかけドラフトの退避/復元を有効にするか（既定 true）。
    * 孤立検証（verify）では localStorage が fixture をまたいで漏れるため false にする。
@@ -59,6 +61,7 @@ export function SpEntryEditor({
   initialEntryId,
   initialContent = '',
   initialMediaUrls,
+  initialMediaSignedUrls,
   persistDraft = true,
 }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
@@ -94,7 +97,21 @@ export function SpEntryEditor({
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [mediaUrls, setMediaUrls] = useState<string[]>(initialMediaUrls ?? []);
+  /**
+   * 添えた写真。パスと表示 URL を **1 本の配列**で持つ。
+   * 2 本に分けると、署名に失敗した写真がある時に index がずれ、
+   * 「n 番目を削除」で別の写真を消してしまう（サーバは穴を空文字で埋めて返す）。
+   */
+  const [photos, setPhotos] = useState<AttachedPhoto[]>(() =>
+    (initialMediaUrls ?? []).map((storagePath, i) => ({
+      storagePath,
+      signedUrl: initialMediaSignedUrls?.[i] ?? '',
+    })),
+  );
+  const mediaUrls = useMemo(() => photos.map((p) => p.storagePath), [photos]);
+  /** PC と同じ理由の鏡。await をまたぐ連続操作で古い配列を送らないため。 */
+  const photosRef = useRef<AttachedPhoto[]>(photos);
+  photosRef.current = photos;
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -148,18 +165,22 @@ export function SpEntryEditor({
    * 写真を添える。本文が未保存でも写真だけ先に確定させたいので、ここで明示的に保存する
    * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
    */
-  async function attachPhoto(url: string) {
-    const next = [...mediaUrls, url];
-    setMediaUrls(next);
+  async function attachPhoto(photo: AttachedPhoto) {
+    const updated = [...photosRef.current, photo];
+    photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
+    setPhotos(updated);
+    const next = updated.map((p) => p.storagePath);
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
     if (!content.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
     const saved = await save(content, entryId, { mediaUrls: next });
     if (saved) setEntryId(saved);
   }
 
-  async function removePhoto(url: string) {
-    const next = mediaUrls.filter((u) => u !== url);
-    setMediaUrls(next);
+  async function removePhoto(index: number) {
+    const updated = photosRef.current.filter((_, i) => i !== index);
+    photosRef.current = updated;
+    setPhotos(updated);
+    const next = updated.map((p) => p.storagePath);
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
     if (!entryId || !content.trim()) return;
     await save(content, entryId, { mediaUrls: next });
@@ -343,7 +364,7 @@ export function SpEntryEditor({
       />
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={mediaUrls} onRemove={removePhoto} />
+      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
 
       <SpPhotoImportSheet
         state={photoImport.state}

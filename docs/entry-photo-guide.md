@@ -11,7 +11,7 @@
 | 取り込み方 | 挙動 | 保存先 |
 | --- | --- | --- |
 | 文字として読み込む | 画像から文字を起こし、確認のうえ本文カーソル位置に挿入する | `entries.content` |
-| 写真として貼る | 画像をそのままエントリに添える | `entries.media_urls` |
+| 写真として貼る | 画像をそのままエントリに添える | `entries.media_urls`（ストレージパス） |
 
 どちらも同じ 1 枚の画像に対して行えるし、両方やってもよい（文字を起こしたうえで元の写真も残す）。
 
@@ -71,7 +71,7 @@ Admin API キー（`sk-ant-admin...`）を `ANTHROPIC_ADMIN_KEY` に置き、`x-
 
 ### 使用量の記録（コストとは別）
 
-1 回の文字起こしにつき `photo_transcription_usages` に 1 行入れる（`00021`）。これは
+1 回の文字起こしにつき `photo_transcription_usages` に 1 行入れる（`00024`）。これは
 **お金ではなくユーザー別の使用量**のため — Anthropic 側が知っているのは API キーと
 ワークスペースであって、こちらの `user_id` ではないので、「誰が何回使ったか」は
 自前で持つしかない。
@@ -87,7 +87,7 @@ Admin API キー（`sk-ant-admin...`）を `ANTHROPIC_ADMIN_KEY` に置き、`x-
 
 ## 画像の扱い
 
-- **クライアントでリサイズしてから送る**（`lib/image/resize-image.ts`）。長辺 1568px、JPEG。
+- **クライアントでリサイズしてから送る**（`lib/resize-image.ts`）。長辺 1568px、JPEG。
   スマホの写真は 4000px 級で、そのまま送ると画像トークンが桁で増えるうえアップロードも遅い。
   canvas を通すので HEIC など Anthropic が受け付けない形式も JPEG に正規化される。
 - **受け付ける形式**は `ACCEPTED_IMAGE_MIME_TYPES`（`@oryzae/shared`）。Anthropic が
@@ -96,9 +96,20 @@ Admin API キー（`sk-ant-admin...`）を `ANTHROPIC_ADMIN_KEY` に置き、`x-
 
 ## 保存先
 
-Supabase Storage の `entry-photos` バケット（`00020_create_entry_photos.sql`）。
-board-photos と同じく、パスの先頭セグメントを `user_id` にすることで「自分のフォルダにだけ
-書ける」Storage RLS が効く。専用テーブルは作らず、公開 URL を `entries.media_urls` に持つ。
+Supabase Storage の `entry-photos` バケット（`00023_create_entry_photos.sql`）。
+パスの先頭セグメントを `user_id` にすることで、upload / read / delete の 3 ポリシー
+すべてが `auth.uid()` で自分のフォルダに絞れる。専用テーブルは作らない。
+
+**バケットは private。公開 URL は使わない。** board-photos は当初 public バケット +
+read ポリシーにユーザー隔離なし で作られており、#504 で「他ユーザーの写真を列挙・取得
+できる」状態だったことが判明して塞がれた（`00021_secure_board_photos.sql`）。日記の写真は
+board よりさらに機微なので、最初から private + 隔離で作っている。**00006 の初期設定を
+コピーしないこと。**
+
+表示用の URL はサーバ側で `createSignedUrl` して都度発行する（有効期限 1 時間）。
+署名 URL は失効するので、`entries.media_urls` に保存するのは **URL ではなくストレージパス**。
+エントリ取得時に `GetEntryUsecase` がパスを署名し、`mediaSignedUrls` として別に返す
+（`media_urls` はパスのまま返るので、クライアントはそれをそのまま保存に送り返せる）。
 
 ## レート制限
 

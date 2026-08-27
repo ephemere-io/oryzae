@@ -7,6 +7,18 @@ export type EntryListOrder = 'newest' | 'oldest';
 type PhotoImportStatus = 'idle' | 'uploading' | 'transcribing';
 
 /**
+ * エントリに添えた写真 1 枚。
+ *
+ * バケットが private なので公開 URL は無い（#504 と同じ判断。00023 参照）。
+ * エントリに保存するのは `storagePath` で、`signedUrl` は表示専用・1 時間で失効する。
+ * 署名 URL を保存すると翌日には壊れるので、取り違えないこと。
+ */
+export interface AttachedPhoto {
+  storagePath: string;
+  signedUrl: string;
+}
+
+/**
  * 写真取り込みモーダル/シートに映す状態（usePhotoImport が持つ）。
  * PC・SP の表示部品はこれを props で受け取るだけの純表示にしてある。
  */

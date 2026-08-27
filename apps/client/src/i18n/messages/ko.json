@@ -470,7 +470,9 @@
     "error_too_large": "이미지가 너무 큽니다. 다른 사진을 시도해 주세요.",
     "error_upload": "사진을 업로드하지 못했습니다.",
     "error_transcribe": "글자를 읽어들이지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    "error_rate_limited": "읽기 횟수 제한에 도달했습니다. 잠시 기다려 주세요."
+    "error_rate_limited": "읽기 횟수 제한에 도달했습니다. 잠시 기다려 주세요.",
+    "unavailable": "{index}번째 사진을 불러오지 못했습니다",
+    "unavailable_short": "불러올 수 없음"
   },
   "fermentation": {
     "detail": {

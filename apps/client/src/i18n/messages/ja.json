@@ -470,7 +470,9 @@
     "error_too_large": "画像が大きすぎます。別の写真をお試しください。",
     "error_upload": "写真をアップロードできませんでした。",
     "error_transcribe": "文字を読み取れませんでした。時間をおいてお試しください。",
-    "error_rate_limited": "読み取りの回数制限に達しました。少し待ってからお試しください。"
+    "error_rate_limited": "読み取りの回数制限に達しました。少し待ってからお試しください。",
+    "unavailable": "{index} 枚目の写真を読み込めませんでした",
+    "unavailable_short": "読み込めません"
   },
   "fermentation": {
     "detail": {

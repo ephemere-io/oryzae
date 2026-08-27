@@ -4,7 +4,7 @@ import { ACCEPTED_IMAGE_MIME_TYPES, type EditorEffectsState } from '@oryzae/shar
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import {
   type EditorStatus,
@@ -48,6 +48,7 @@ import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
+import type { AttachedPhoto } from '@/features/shared/entries/types';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
@@ -73,8 +74,10 @@ interface EntryEditorProps {
    * Issue #332 — see docs/editor-effects-persistence.md.
    */
   initialEffects?: EditorEffectsState | null;
-  /** 既存エントリに添えられている写真。新規は空。 */
+  /** 既存エントリに添えられている写真のストレージパス。新規は空。 */
   initialMediaUrls?: string[];
+  /** 上と同じ並びの表示用 署名付き URL。 */
+  initialMediaSignedUrls?: string[];
   createdAt?: string;
   updatedAt?: string;
   api: ApiClient | null;
@@ -122,6 +125,7 @@ export function EntryEditor({
   initialTitle,
   initialEffects = null,
   initialMediaUrls,
+  initialMediaSignedUrls,
   createdAt: createdAtIso,
   updatedAt: updatedAtIso,
   api,
@@ -159,7 +163,27 @@ export function EntryEditor({
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
-  const [mediaUrls, setMediaUrls] = useState<string[]>(initialMediaUrls ?? []);
+  /**
+   * 添えた写真。パスと表示 URL を **1 本の配列**で持つ。
+   * 2 本に分けると、署名に失敗した写真がある時に index がずれ、
+   * 「n 番目を削除」で別の写真を消してしまう（サーバは穴を空文字で埋めて返す）。
+   */
+  const [photos, setPhotos] = useState<AttachedPhoto[]>(() =>
+    (initialMediaUrls ?? []).map((storagePath, i) => ({
+      storagePath,
+      signedUrl: initialMediaSignedUrls?.[i] ?? '',
+    })),
+  );
+  // 保存に送るパス列。useCallback の依存に載せるので参照を安定させる。
+  const mediaUrls = useMemo(() => photos.map((p) => p.storagePath), [photos]);
+  /**
+   * 連続操作で state 更新の再レンダーを待たずに最新の並びを読むための鏡。
+   * closure の `photos` から次の配列を作ると、前回の save を await している間に
+   * 次の追加/削除が起きたとき古い配列を送ってしまい、サーバー側の media_urls から
+   * 写真が脱落する（ローカルは正しいのでリロードするまで気づけない）。
+   */
+  const photosRef = useRef<AttachedPhoto[]>(photos);
+  photosRef.current = photos;
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
@@ -673,26 +697,30 @@ export function EntryEditor({
    * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
    */
   const attachPhoto = useCallback(
-    async (url: string) => {
-      const next = [...mediaUrls, url];
-      setMediaUrls(next);
+    async (photo: AttachedPhoto) => {
+      const updated = [...photosRef.current, photo];
+      photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
+      setPhotos(updated);
+      const next = updated.map((p) => p.storagePath);
       const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
       if (!finalContent.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
       const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
       if (savedId) setCurrentEntryId(savedId);
     },
-    [mediaUrls, title, content, currentEntryId, save],
+    [title, content, currentEntryId, save],
   );
 
   const removePhoto = useCallback(
-    async (url: string) => {
-      const next = mediaUrls.filter((u) => u !== url);
-      setMediaUrls(next);
+    async (index: number) => {
+      const updated = photosRef.current.filter((_, i) => i !== index);
+      photosRef.current = updated;
+      setPhotos(updated);
+      const next = updated.map((p) => p.storagePath);
       const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
       if (!currentEntryId || !finalContent.trim()) return;
       await save(finalContent, currentEntryId, { mediaUrls: next });
     },
-    [mediaUrls, title, content, currentEntryId, save],
+    [title, content, currentEntryId, save],
   );
 
   const photoImport = usePhotoImport({
@@ -1288,7 +1316,7 @@ export function EntryEditor({
       </div>
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={mediaUrls} onRemove={removePhoto} />
+      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
 
       <PhotoImportModal
         state={photoImport.state}
