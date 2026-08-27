@@ -26,6 +26,11 @@ export interface BoardCardData {
   width: number;
   height: number;
   zIndex: number;
+  /**
+   * 利用者が自分で位置を決めたカードか。
+   * false のカードだけを作成日時順に自動整列する（applyDefaultZOrder）。
+   */
+  userPositioned: boolean;
   createdAt: string;
   content: EntryContent | SnippetContent | PhotoContent;
   removing?: boolean;
