@@ -80,7 +80,7 @@ describe.skipIf(!canRun)('認可境界: 他ユーザーのデータが読めな�
     it('A は自分の entry を読める（テスト自体が有効であることの確認）', async () => {
       const { data } = await a.client.from('entries').select('id, content').eq('id', entryId);
       expect(data).toHaveLength(1);
-      expect(data?.[0].content).toBe(secret);
+      expect(data?.[0]?.content).toBe(secret);
     });
 
     it('B は id を知っていても A の entry を読めない', async () => {
@@ -105,7 +105,7 @@ describe.skipIf(!canRun)('認可境界: 他ユーザーのデータが読めな�
       expect(data ?? []).toEqual([]);
 
       const { data: after } = await a.client.from('entries').select('content').eq('id', entryId);
-      expect(after?.[0].content).toBe(secret);
+      expect(after?.[0]?.content).toBe(secret);
     });
 
     it('B は A の entry を削除できない', async () => {
@@ -128,7 +128,7 @@ describe.skipIf(!canRun)('認可境界: 他ユーザーのデータが読めな�
       const { data, error } = await b.client.from('profiles').select('id');
       expect(error).toBeNull();
       expect(data).toHaveLength(1);
-      expect(data?.[0].id).toBe(b.userId);
+      expect(data?.[0]?.id).toBe(b.userId);
     });
 
     it('B は A の profile を読めない', async () => {
@@ -139,7 +139,7 @@ describe.skipIf(!canRun)('認可境界: 他ユーザーのデータが読めな�
     it('B は A の profile を書き換えられない', async () => {
       await b.client.from('profiles').update({ nickname: '改竄' }).eq('id', a.userId);
       const { data } = await a.client.from('profiles').select('nickname').eq('id', a.userId);
-      expect(data?.[0].nickname).not.toBe('改竄');
+      expect(data?.[0]?.nickname).not.toBe('改竄');
     });
 
     it('B は A の profile を削除できない', async () => {
@@ -178,12 +178,16 @@ describe.skipIf(!canRun)('認可境界: 他ユーザーのデータが読めな�
       for (const row of data ?? []) {
         // user_id を直接持つテーブルはそれで、profiles は id で本人性を判定する。
         const owner = table === 'profiles' ? row.id : row.user_id;
-        // user_id を持たない派生テーブル（所有者を辿るサブクエリで守るもの）は
-        // owner が undefined になる。その場合はここでは判定できないため、
-        // 「A のデータが混ざっていないこと」を別途 entries 側で担保している。
-        if (owner !== undefined) {
-          expect(owner).toBe(b.userId);
-        }
+
+        // undefined を「判定不能だから見逃す」にしてはならない。
+        // entry_snapshots / extracted_snippets / letters / keywords は user_id を持たず
+        // 所有者を辿るサブクエリで守られており、しかも日記の逐語引用を保持する
+        // 最も機微なテーブルである。見逃すと、サブクエリ条件が壊れてもテストは緑のまま通る。
+        //
+        // B は seed 直後で自分のデータを 1 件も持たないため、これらのテーブルから
+        // 行が返ること自体が越境を意味する。owner が undefined のまま比較すれば
+        // その場で落ちる（＝検出できる）ので、条件分岐を置かない。
+        expect(owner).toBe(b.userId);
       }
     });
   });
