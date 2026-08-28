@@ -60,6 +60,9 @@ export function useUserMe(api: ApiClient | null): UseUserMeResult {
     const res = await client.fetch('/api/v1/users/me');
     if (!res.ok) return null;
     const next = normalizeUserMe(await readJson(res));
+    // 形が違う応答では **既存の data を保持したまま** null を返す。この hook は
+    // エラー状態を持たず、返り値はナッジ表示の判定にしか使われないので、
+    // 壊れた応答で上書きするより直前の正しい値を残すほうが害が小さい。
     if (!next) return null;
     setData(next);
     return next;

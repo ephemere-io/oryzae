@@ -10,7 +10,7 @@
  *   node scripts/check-type-assertions.test.mjs
  */
 
-import { scanSource } from './check-type-assertions.mjs';
+import { mightContainCast, scanSource } from './check-type-assertions.mjs';
 
 let passed = 0;
 const failures = [];
@@ -191,6 +191,41 @@ expectAllowed(
   ].join('\n'),
   1,
 );
+
+// ── 走査前の足切り（main() のパス）────────────────────────────
+// ここが CAST_RE より狭いとファイルごとスキップされ、中の違反が全部隠れる。
+function expectPrefilter(name, source, expected) {
+  const actual = mightContainCast(source);
+  if (actual === expected) passed += 1;
+  else failures.push(`${name}\n    足切り 期待: ${expected}  実際: ${actual}`);
+}
+
+expectPrefilter('通常のキャストを含むファイルは走査対象', 'const a = b as Foo;\n', true);
+
+expectPrefilter(
+  'タブ区切りのキャストも走査対象（空白限定にしてはいけない）',
+  'const a = b\tas\tFoo;\n',
+  true,
+);
+
+expectPrefilter('改行を挟むキャストも走査対象', 'const a = b as\n  Foo;\n', true);
+
+expectPrefilter('`as` を含まないファイルは走査しない', 'const a = b;\n', false);
+
+expectPrefilter('識別子の一部の "as" では走査しない', 'const parseAs = 1;\nconst has = 2;\n', false);
+
+// 足切りは CAST_RE より緩くなければならない。上のケースすべてで両者を突き合わせる。
+for (const [label, src] of [
+  ['space', 'const a = b as Foo;\n'],
+  ['tab', 'const a = b\tas\tFoo;\n'],
+]) {
+  const { violations } = scanSource(src);
+  if (violations.length > 0 && !mightContainCast(src)) {
+    failures.push(`足切りが CAST_RE より狭い (${label}): 検出できるのにファイルが飛ばされる`);
+  } else {
+    passed += 1;
+  }
+}
 
 // ── 結果 ──────────────────────────────────────────────────────
 if (failures.length === 0) {

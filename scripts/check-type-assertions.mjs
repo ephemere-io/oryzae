@@ -153,7 +153,13 @@ function blankOutNonCode(source) {
   return out.join('');
 }
 
-/** import/export の別名句にある `as` を無視するため、該当行を印付けする。 */
+/**
+ * import/export の別名句にある `as` を無視するため、該当行を印付けする。
+ *
+ * 既知の限界: 印付けは行単位なので、`import a from 'b'; const c = d as E;` のように
+ * import と同じ物理行にキャストを書くと検出漏れになる。Biome が1文1行に整形するため
+ * 実際には発生しないが、整形を外す場合はここを文単位に直す必要がある。
+ */
 function markModuleAliasLines(lines) {
   const isAlias = new Array(lines.length).fill(false);
   let inClause = false;
@@ -273,6 +279,17 @@ function hasAllowComment(rawLines, index) {
 const CAST_RE = /(^|[^A-Za-z0-9_$.])as\s+(?!const\b)([A-Za-z_$([{]|<)/;
 
 /**
+ * 走査前の足切り（大半のファイルは `as` を含まないので早期に弾く）。
+ *
+ * **CAST_RE より緩くしなければならない。** ここが狭いと、該当ファイルが丸ごと
+ * スキップされ、その中の**他の違反もすべて**隠れる。`CAST_RE` の `\s` はタブも
+ * 含むので、`' as '`（空白限定）で足切りしてはいけない。
+ */
+export function mightContainCast(source) {
+  return /[^A-Za-z0-9_$.]as\s/.test(source);
+}
+
+/**
  * 1 ファイル分のソースを走査する。
  * @returns {{violations: {line: number, text: string}[], allowed: number}}
  */
@@ -304,7 +321,7 @@ function main() {
   for (const target of TARGET_DIRS) {
     for (const file of walk(join(ROOT, target))) {
       const raw = readFileSync(file, 'utf8');
-      if (!raw.includes(' as ')) continue;
+      if (!mightContainCast(raw)) continue;
 
       const result = scanSource(raw);
       allowed += result.allowed;

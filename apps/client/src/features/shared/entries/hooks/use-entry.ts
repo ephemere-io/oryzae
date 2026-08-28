@@ -96,7 +96,13 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
         return null;
       }
 
+      // 作成は成功しているのに id が読めないと、呼び出し側は失敗と区別がつかない。
+      // autosave (use-autosave-entry) は id を受け取れないと entryId を記録できず、
+      // 次のティックで再 POST してエントリを重複作成する。エラーを立てて気づけるようにする。
       const id = readStringField(await readJson(res), 'id');
+      if (id === null) {
+        setError(t('error_create'));
+      }
       setSaving(false);
       return id;
     },
