@@ -14,7 +14,12 @@ interface SpQuestionsProps {
   archiveQuestion: (id: string) => Promise<void> | void;
   acceptQuestion: (id: string) => Promise<void> | void;
   rejectQuestion: (id: string) => Promise<void> | void;
+  /** 未読の手紙が届いている問いの id（Issue #452）。page が UnreadState から渡す。 */
+  unreadQuestionIds?: ReadonlySet<string>;
 }
+
+/** 既定値を毎レンダー作らないための空集合。 */
+const NO_UNREAD: ReadonlySet<string> = new Set();
 
 type Sheet = { mode: 'add' } | { mode: 'edit'; id: string };
 
@@ -32,6 +37,7 @@ export function SpQuestions({
   archiveQuestion,
   acceptQuestion,
   rejectQuestion,
+  unreadQuestionIds = NO_UNREAD,
 }: SpQuestionsProps) {
   const t = useTranslations('sp.questions');
 
@@ -82,6 +88,7 @@ export function SpQuestions({
         draftEmpty: !draft.trim(),
         proposedCount: proposed.length,
         activeCount: active.length,
+        unreadCount: active.filter((q) => unreadQuestionIds.has(q.id)).length,
       })}
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
       style={{ fontFamily: 'var(--ob-font-serif)' }}
@@ -141,32 +148,52 @@ export function SpQuestions({
           ) : null}
 
           {/* 自分の問い */}
-          {active.map((q) => (
-            <button
-              key={q.id}
-              type="button"
-              onClick={() => openEdit(q.id, q.currentText ?? '')}
-              className="relative mb-3 block w-full rounded-2xl p-4 text-left"
-              style={{ background: 'var(--ob-card-bg)', border: '1px solid var(--border-subtle)' }}
-            >
-              <span className="block pr-6 text-[15px] leading-relaxed">
-                {q.currentText ?? t('untitled')}
-              </span>
-              <svg
-                className="absolute right-4 top-4"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--date-color)"
-                strokeWidth="1.7"
-                aria-hidden="true"
+          {active.map((q) => {
+            // Issue #452: ボトムナビのバッジだけでは「どの問いに届いたか」が分からなかった。
+            const hasUnreadLetter = unreadQuestionIds.has(q.id);
+            return (
+              <button
+                key={q.id}
+                type="button"
+                onClick={() => openEdit(q.id, q.currentText ?? '')}
+                className="relative mb-3 block w-full rounded-2xl p-4 text-left"
+                style={{
+                  background: 'var(--ob-card-bg)',
+                  border: '1px solid var(--border-subtle)',
+                }}
               >
-                <title>edit</title>
-                <path d="M4 20h4L18 10l-4-4L4 16v4Z" strokeLinejoin="round" />
-              </svg>
-            </button>
-          ))}
+                <span className="block pr-6 text-[15px] leading-relaxed">
+                  {q.currentText ?? t('untitled')}
+                </span>
+                {hasUnreadLetter ? (
+                  <span
+                    className="mt-2 flex items-center gap-1.5 text-[11px]"
+                    style={{ color: 'var(--ob-jar-warm)' }}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: 'var(--ob-jar-warm)' }}
+                      aria-hidden="true"
+                    />
+                    {t('letter_arrived')}
+                  </span>
+                ) : null}
+                <svg
+                  className="absolute right-4 top-4"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--date-color)"
+                  strokeWidth="1.7"
+                  aria-hidden="true"
+                >
+                  <title>edit</title>
+                  <path d="M4 20h4L18 10l-4-4L4 16v4Z" strokeLinejoin="round" />
+                </svg>
+              </button>
+            );
+          })}
 
           {active.length === 0 && proposed.length === 0 ? (
             <p className="py-10 text-center text-sm opacity-50">{t('empty')}</p>

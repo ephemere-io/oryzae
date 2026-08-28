@@ -36,6 +36,9 @@ function makeDetail(overrides: Partial<FermentationDetail>): FermentationDetail 
     snippets: [],
     keywords: [],
     letter: null,
+    // Issue #453: エディタのオーバーレイは「もとになった記録」を描画しない（今開いている
+    // エントリがまさにその記録なので）。契約に影響しないよう常に空。
+    scannedEntries: [],
     ...overrides,
   };
 }

@@ -96,6 +96,8 @@ function makeDetail(
     keywords: Array.from({ length: keywordCount }, (_, i) => makeKeyword(i)),
     snippets: Array.from({ length: snippetCount }, (_, i) => makeSnippet(i)),
     letter: withLetter ? { id: 'lt-1', bodyText: '手紙の本文', jarX: null, jarY: null } : null,
+    // Issue #453: 瓶の円は「もとになった記録」を描画しないので、常に空でよい。
+    scannedEntries: [],
   };
 }
 

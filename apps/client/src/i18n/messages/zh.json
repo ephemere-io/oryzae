@@ -795,7 +795,9 @@
       "section_keywords": "词语",
       "section_snippets": "摘录",
       "unread": "未读",
-      "read": "已读"
+      "read": "已读",
+      "section_sources": "来源记录",
+      "source_untitled": "无标题记录"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -826,7 +828,8 @@
       "placeholder": "写下提问",
       "delete": "结束这个提问",
       "cancel": "取消",
-      "save": "保存"
+      "save": "保存",
+      "letter_arrived": "有一封信送到了"
     }
   }
 }
