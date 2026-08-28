@@ -366,7 +366,8 @@
       "fermentation_overlay_description": "新規エントリで問いを紐付けたとき、その問いの最新の発酵結果をエディタ上に重ねて表示できます。表示／非表示の挙動を選んでください。",
       "fermentation_overlay_ask": "表示前に毎回確認する",
       "fermentation_overlay_always": "エントリ画面で発酵プロセスを常に表示する",
-      "fermentation_overlay_never": "エントリ画面で発酵プロセスを常に表示しない"
+      "fermentation_overlay_never": "エントリ画面で発酵プロセスを常に表示しない",
+      "focus_mode_fades_fermentation": "発酵要素も一緒に隠す"
     },
     "snippet_toolbar": {
       "saving": "保存中…",

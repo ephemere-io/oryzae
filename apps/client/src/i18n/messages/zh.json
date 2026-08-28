@@ -366,7 +366,8 @@
       "fermentation_overlay_description": "为新条目关联问题时，可以在编辑器上浮动显示该问题的最新发酵结果。请选择默认行为。",
       "fermentation_overlay_ask": "每次询问后再显示",
       "fermentation_overlay_always": "在条目编辑界面始终显示发酵结果",
-      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果"
+      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果",
+      "focus_mode_fades_fermentation": "同时隐藏发酵元素"
     },
     "snippet_toolbar": {
       "saving": "保存中…",

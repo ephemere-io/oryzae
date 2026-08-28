@@ -366,7 +366,8 @@
       "fermentation_overlay_description": "When you link a question to a new entry, the latest fermentation result for that question can float over the editor. Choose how this should behave.",
       "fermentation_overlay_ask": "Ask before showing",
       "fermentation_overlay_always": "Always show fermentation result on entry screen",
-      "fermentation_overlay_never": "Never show fermentation result on entry screen"
+      "fermentation_overlay_never": "Never show fermentation result on entry screen",
+      "focus_mode_fades_fermentation": "Also hide fermentation elements"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
