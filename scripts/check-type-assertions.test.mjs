@@ -55,6 +55,29 @@ expectViolations(
   [1],
 );
 
+expectViolations(
+  '`as` と型名の間で改行されたキャストも検出する（`as` のある行に帰属）',
+  ['const a =', '  someVeryLongExpression as', '    SomeVeryLongTypeName;', ''].join('\n'),
+  [2],
+);
+
+expectViolations(
+  'タブ区切りのキャストも検出する',
+  ['const a = b\tas\tFoo;', ''].join('\n'),
+  [1],
+);
+
+expectAllowed(
+  '改行されたキャストでも直前の行の許可コメントが効く',
+  [
+    '// @type-assertion-allowed: 理由あり',
+    'const a = someVeryLongExpression as',
+    '  SomeVeryLongTypeName;',
+    '',
+  ].join('\n'),
+  1,
+);
+
 // ── 対象外にすべきもの ────────────────────────────────────────
 expectViolations('`as const` は対象外', `const a = { x: 1 } as const;\n`, []);
 

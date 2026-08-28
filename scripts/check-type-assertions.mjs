@@ -298,12 +298,42 @@ export function scanSource(source) {
   let allowed = 0;
 
   const rawLines = source.split('\n');
-  const codeLines = blankOutNonCode(source).split('\n');
+  const code = blankOutNonCode(source);
   const isAlias = markModuleAliasLines(rawLines);
 
-  for (let i = 0; i < codeLines.length; i += 1) {
+  // 各行の開始オフセット（マッチ位置から行番号を逆算するため）
+  const lineStarts = [];
+  let offset = 0;
+  for (const line of code.split('\n')) {
+    lineStarts.push(offset);
+    offset += line.length + 1;
+  }
+
+  const lineOf = (index) => {
+    let lo = 0;
+    let hi = lineStarts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (lineStarts[mid] <= index) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+
+  // **行単位ではなくソース全体**に当てる。`b as\n  Foo` のように `as` と型名の間で
+  // 改行されたキャストは、行に切ってからでは `as` の後ろの空白が失われて検出できない。
+  const re = new RegExp(CAST_RE.source, 'g');
+  // 1 行に複数あっても 1 件（`as unknown as T` を二重計上しない）
+  const hitLines = new Set();
+  let match = re.exec(code);
+  while (match !== null) {
+    // マッチは区切り文字から始まるので、`as` トークンのある行に帰属させる。
+    hitLines.add(lineOf(match.index + match[1].length));
+    match = re.exec(code);
+  }
+
+  for (const i of [...hitLines].sort((a, b) => a - b)) {
     if (isAlias[i]) continue;
-    if (!CAST_RE.test(codeLines[i])) continue;
     if (hasAllowComment(rawLines, i)) {
       allowed += 1;
     } else {
