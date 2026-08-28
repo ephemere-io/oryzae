@@ -1,5 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { readEnum, readString, toRecordArray } from '../../../shared/infrastructure/row.js';
+import {
+  readEnum,
+  readNumberOrNull,
+  readString,
+  readStringOrNull,
+  toRecordArray,
+} from '../../../shared/infrastructure/row.js';
 import type {
   FermentationRepositoryGateway,
   FermentationResultWithDetails,
@@ -151,19 +157,19 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .eq('question_id', questionId)
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
-    return (data ?? []).map((row: Record<string, string>) =>
+    return toRecordArray(data ?? []).map((row) =>
       FermentationResult.fromProps({
-        id: row.id,
-        userId: row.user_id,
-        questionId: row.question_id,
-        targetPeriod: row.target_period,
+        id: readString(row, 'id'),
+        userId: readString(row, 'user_id'),
+        questionId: readString(row, 'question_id'),
+        targetPeriod: readString(row, 'target_period'),
         status: readEnum(row, 'status', FERMENTATION_STATUSES),
-        generationId: row.generation_id ?? null,
-        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
-        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
-        errorMessage: row.error_message ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        generationId: readStringOrNull(row, 'generation_id'),
+        inputTokens: readNumberOrNull(row, 'input_tokens'),
+        outputTokens: readNumberOrNull(row, 'output_tokens'),
+        errorMessage: readStringOrNull(row, 'error_message'),
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
   }
@@ -175,19 +181,19 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
-    return (data ?? []).map((row: Record<string, string>) =>
+    return toRecordArray(data ?? []).map((row) =>
       FermentationResult.fromProps({
-        id: row.id,
-        userId: row.user_id,
-        questionId: row.question_id,
-        targetPeriod: row.target_period,
+        id: readString(row, 'id'),
+        userId: readString(row, 'user_id'),
+        questionId: readString(row, 'question_id'),
+        targetPeriod: readString(row, 'target_period'),
         status: readEnum(row, 'status', FERMENTATION_STATUSES),
-        generationId: row.generation_id ?? null,
-        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
-        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
-        errorMessage: row.error_message ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        generationId: readStringOrNull(row, 'generation_id'),
+        inputTokens: readNumberOrNull(row, 'input_tokens'),
+        outputTokens: readNumberOrNull(row, 'output_tokens'),
+        errorMessage: readStringOrNull(row, 'error_message'),
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
   }
@@ -202,19 +208,19 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .lt('created_at', beforeIso)
       .order('created_at', { ascending: true });
     if (error) throw new Error(`Failed to list retryable fermentations: ${error.message}`);
-    return (data ?? []).map((row: Record<string, string>) =>
+    return toRecordArray(data ?? []).map((row) =>
       FermentationResult.fromProps({
-        id: row.id,
-        userId: row.user_id,
-        questionId: row.question_id,
-        targetPeriod: row.target_period,
+        id: readString(row, 'id'),
+        userId: readString(row, 'user_id'),
+        questionId: readString(row, 'question_id'),
+        targetPeriod: readString(row, 'target_period'),
         status: readEnum(row, 'status', FERMENTATION_STATUSES),
-        generationId: row.generation_id ?? null,
-        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
-        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
-        errorMessage: row.error_message ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        generationId: readStringOrNull(row, 'generation_id'),
+        inputTokens: readNumberOrNull(row, 'input_tokens'),
+        outputTokens: readNumberOrNull(row, 'output_tokens'),
+        errorMessage: readStringOrNull(row, 'error_message'),
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
   }
