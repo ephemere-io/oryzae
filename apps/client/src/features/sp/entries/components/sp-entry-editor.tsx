@@ -158,6 +158,14 @@ export function SpEntryEditor({
 
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
+    // Issue #450: 問いに紐づいていないエントリは発酵ループに入らない。走査対象は
+    // 「active な問いに紐づいたエントリ」だけなので（scheduled-fermentation.usecase）、
+    // このまま押せると「漬けたのに何も届かない」になる。PC（#316）と同じく、先に問いを
+    // 決めてもらう。タイトルは発酵に使われない（本文だけを読む）ので任意のままでよい。
+    if (!selectedQuestionId) {
+      setSheetOpen(true);
+      return;
+    }
     setPickling(true);
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
     const saved = await save(content, entryId, { fermentationEnabled: true });
@@ -189,7 +197,8 @@ export function SpEntryEditor({
         hasBody,
         dirty,
         hasEntry: !!entryId,
-        // Issue #448: 問いが結ばれているかを契約に載せる（一覧から開いた復元の回帰を捕まえる）。
+        // Issue #448: 一覧から開いたときの復元の回帰を捕まえる。
+        // Issue #450: 問いの有無で「納める」の挙動が変わる（無ければ問い選択を開く）。
         hasQuestion: selectedQuestionId !== null,
         sheetOpen,
         pickling,
