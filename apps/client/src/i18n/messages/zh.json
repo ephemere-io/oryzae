@@ -366,7 +366,8 @@
       "fermentation_overlay_description": "为新条目关联问题时，可以在编辑器上浮动显示该问题的最新发酵结果。请选择默认行为。",
       "fermentation_overlay_ask": "每次询问后再显示",
       "fermentation_overlay_always": "在条目编辑界面始终显示发酵结果",
-      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果"
+      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果",
+      "focus_mode_fades_fermentation": "同时隐藏发酵元素"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
@@ -795,7 +796,9 @@
       "section_keywords": "词语",
       "section_snippets": "摘录",
       "unread": "未读",
-      "read": "已读"
+      "read": "已读",
+      "section_sources": "来源记录",
+      "source_untitled": "无标题记录"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -826,7 +829,8 @@
       "placeholder": "写下提问",
       "delete": "结束这个提问",
       "cancel": "取消",
-      "save": "保存"
+      "save": "保存",
+      "letter_arrived": "有一封信送到了"
     }
   }
 }

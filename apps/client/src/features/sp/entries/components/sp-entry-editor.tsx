@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
@@ -98,7 +99,7 @@ export function SpEntryEditor({
     saveDraft({ entryId, title, body, questionId: selectedQuestionId });
   }, [draftEnabled, pickled, title, body, entryId, selectedQuestionId, saveDraft, clearDraft]);
 
-  const { linkQuestion } = useEntryQuestions(api, entryId);
+  const { linkedQuestions, linkQuestion } = useEntryQuestions(api, entryId);
 
   useAutosaveEntry({
     title,
@@ -115,6 +116,23 @@ export function SpEntryEditor({
   // 問いはエントリ作成後（entryId 確定後）に一度だけ紐づける。
   // 保存前に選んでいた場合も、autosave でエントリが出来た時点で紐づく。
   const linkAttemptedRef = useRef<string | null>(null);
+
+  // Issue #448: 既存エントリを一覧から開くと、紐づいている問いがチップに出ていなかった。
+  // 選択状態の初期値は URL の questionId と復元ドラフトしか見ておらず、サーバの
+  // 紐付け（linkedQuestions）を無視していたため。取得できたら一度だけ埋める。
+  // ユーザーが既に選んでいる場合は上書きしない。復元した問いは紐付け済みなので、
+  // 下の紐づけ effect が再 POST しないよう linkAttemptedRef にも印を付ける。
+  const questionSeededRef = useRef(false);
+  useEffect(() => {
+    if (questionSeededRef.current) return;
+    const linked = linkedQuestions[0];
+    if (!linked) return;
+    questionSeededRef.current = true;
+    if (selectedQuestionId !== null) return;
+    linkAttemptedRef.current = linked.id;
+    setSelectedQuestionId(linked.id);
+  }, [linkedQuestions, selectedQuestionId]);
+
   useEffect(() => {
     if (entryId && selectedQuestionId && linkAttemptedRef.current !== selectedQuestionId) {
       linkAttemptedRef.current = selectedQuestionId;
@@ -132,10 +150,22 @@ export function SpEntryEditor({
         ? t('status_editing')
         : t('status_saved');
 
-  const selectedQuestion = activeQuestions.find((q) => q.id === selectedQuestionId);
+  // 紐付け済みの問いが終了（アーカイブ）されていると activeQuestions に載らない。
+  // その場合もチップには出したいので、紐付け側からも探す。
+  const selectedQuestion =
+    activeQuestions.find((q) => q.id === selectedQuestionId) ??
+    linkedQuestions.find((q) => q.id === selectedQuestionId);
 
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
+    // Issue #450: 問いに紐づいていないエントリは発酵ループに入らない。走査対象は
+    // 「active な問いに紐づいたエントリ」だけなので（scheduled-fermentation.usecase）、
+    // このまま押せると「漬けたのに何も届かない」になる。PC（#316）と同じく、先に問いを
+    // 決めてもらう。タイトルは発酵に使われない（本文だけを読む）ので任意のままでよい。
+    if (!selectedQuestionId) {
+      setSheetOpen(true);
+      return;
+    }
     setPickling(true);
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
     const saved = await save(content, entryId, { fermentationEnabled: true });
@@ -167,6 +197,9 @@ export function SpEntryEditor({
         hasBody,
         dirty,
         hasEntry: !!entryId,
+        // Issue #448: 一覧から開いたときの復元の回帰を捕まえる。
+        // Issue #450: 問いの有無で「納める」の挙動が変わる（無ければ問い選択を開く）。
+        hasQuestion: selectedQuestionId !== null,
         sheetOpen,
         pickling,
         deleteOpen,
@@ -292,11 +325,9 @@ export function SpEntryEditor({
                 strokeWidth="1.6"
                 aria-hidden="true"
               >
-                <path
-                  d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z"
-                  strokeLinejoin="round"
-                />
-                <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+                <path d={JAR_ICON_PATH} strokeLinejoin="round" />
+                {/* 中身（発酵しているもの）の水位。胴の幅に合わせる。 */}
+                <path d="M6.6 14.4c1.8.8 3.6.8 5.4 0s3.6-.8 5.4 0" strokeOpacity=".55" />
               </svg>
             )}
             <span className="text-[15px] font-bold">

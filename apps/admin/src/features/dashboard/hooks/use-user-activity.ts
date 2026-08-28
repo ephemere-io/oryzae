@@ -31,6 +31,9 @@ export function useUserActivity(dateFrom?: string, dateTo?: string) {
     const params = new URLSearchParams();
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
+    // Issue #367: セレクタで選んだ日は「見ている人のローカル暦日」。これを送らないと
+    // サーバーは UTC の 00:00〜24:00 として切るので、JST では 9 時間ずれた数が出る。
+    params.set('tzOffset', String(new Date().getTimezoneOffset()));
     const qs = params.toString();
 
     const api = createApiClient(token);
