@@ -54,6 +54,19 @@ describe('useEntry', () => {
 
     expect(result.current.entry).toBeNull();
   });
+  it('形の違う応答は entry に入れない', async () => {
+    // `await res.json()` は any を返すので、素通しすると未検証の値が state に入る。
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { entry: { content: 'no id' } }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entry).toBeNull();
+  });
 });
 
 describe('useSaveEntry', () => {
@@ -152,5 +165,26 @@ describe('useSaveEntry', () => {
     const bodyStr: string = call[1].body;
     const body: Record<string, unknown> = JSON.parse(bodyStr);
     expect(body.fermentationEnabled).toBe(true);
+  });
+
+  it('200 でも id が読めなければ error を立てる（autosave の重複作成を防ぐ）', async () => {
+    // 作成自体は成功しているので、無言で null を返すと呼び出し側は失敗と区別できず、
+    // autosave が entryId を記録できないまま再 POST してエントリを重複作成する。
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { notAnId: 'oops' }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 't' }), {
+      wrapper: I18nWrapper,
+    });
+
+    let saved: string | null = 'sentinel';
+    await act(async () => {
+      saved = await result.current.save('hello');
+    });
+
+    expect(saved).toBeNull();
+    await waitFor(() => {
+      expect(result.current.error).toBeTruthy();
+    });
   });
 });
