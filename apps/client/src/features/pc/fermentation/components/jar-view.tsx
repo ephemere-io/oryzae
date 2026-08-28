@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
 import { QuestionCircle } from '@/features/pc/fermentation/components/question-circle';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
@@ -10,6 +10,7 @@ import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarLayout } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
+import { useUnread } from '@/lib/unread-context';
 
 interface QuestionData {
   id: string;
@@ -234,6 +235,13 @@ export function JarView({
   onArchiveQuestion,
 }: JarViewProps) {
   const t = useTranslations('fermentation');
+  // Issue #447: 一括既読は PC の瓶だけ。盤面に手紙が全部並ぶので「開いた＝読んだ」。
+  // SP の瓶は一覧なので、開いた手紙の問いを 1 つずつ SpJar が既読にする。
+  const { markAllSeen } = useUnread();
+  useEffect(() => {
+    markAllSeen();
+  }, [markAllSeen]);
+
   const [zoomedId, setZoomedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailType, setDetailType] = useState<'keyword' | 'snippet' | 'letter' | null>(null);

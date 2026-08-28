@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  collectWriterIds,
   countReturning,
+  countTotalUsers,
+  parseTzOffset,
   resolveActivityPeriods,
 } from '@/contexts/shared/presentation/routes/admin-dashboard.js';
 
@@ -25,6 +28,105 @@ describe('resolveActivityPeriods', () => {
     expect(p.currentEnd).toBe('2026-06-28T12:00:00.000Z');
     expect(p.previousEnd).toBe('2026-06-21T11:59:59.999Z');
     expect(p.previousStart).toBe('2026-06-14T12:00:00.000Z');
+  });
+
+  it('閲覧者のオフセットでローカル暦日の区間に直す（Issue #367: JST で 9 時間ずれていた）', () => {
+    // JST(UTC+9) の getTimezoneOffset() は -540。6/21 00:00 JST = 6/20 15:00 UTC。
+    const p = resolveActivityPeriods(
+      '2026-06-21',
+      '2026-06-27',
+      new Date('2026-06-28T00:00:00.000Z'),
+      -540,
+    );
+    expect(p.currentStart).toBe('2026-06-20T15:00:00.000Z');
+    expect(p.currentEnd).toBe('2026-06-27T14:59:59.999Z');
+    expect(p.previousEnd).toBe('2026-06-20T14:59:59.999Z');
+  });
+});
+
+describe('parseTzOffset', () => {
+  it('数値をそのまま返す', () => {
+    expect(parseTzOffset('-540')).toBe(-540);
+  });
+
+  it('未指定・非数値・範囲外は 0（＝UTC 基準）に落とす', () => {
+    expect(parseTzOffset(undefined)).toBe(0);
+    expect(parseTzOffset('abc')).toBe(0);
+    expect(parseTzOffset('99999')).toBe(0);
+  });
+});
+
+/** PostgREST の range ページングを再現する最小スタブ。 */
+function createEntriesSupabase(rows: { user_id: string }[]) {
+  const range = vi.fn((from: number, to: number) =>
+    Promise.resolve({ data: rows.slice(from, to + 1), error: null }),
+  );
+  const builder = {
+    select: vi.fn(() => builder),
+    gte: vi.fn(() => builder),
+    lte: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    range,
+  };
+  // @type-assertion-allowed: SupabaseClient 全体ではなく、この経路で使う chain だけを再現する
+  const supabase = { from: vi.fn(() => builder) } as unknown as Parameters<
+    typeof collectWriterIds
+  >[0];
+  return { supabase, range };
+}
+
+describe('collectWriterIds', () => {
+  it('1000 件を超えてもページングして全部集める（Issue #367: 黙って打ち切られていた）', async () => {
+    // 1000 件目までが user-a、それ以降に user-b が出る。1 ページだけだと b を見落とす。
+    const rows = [
+      ...Array.from({ length: 1000 }, () => ({ user_id: 'user-a' })),
+      { user_id: 'user-b' },
+    ];
+    const { supabase, range } = createEntriesSupabase(rows);
+
+    const ids = await collectWriterIds(supabase, 'start', 'end');
+
+    expect(new Set(ids)).toEqual(new Set(['user-a', 'user-b']));
+    expect(range).toHaveBeenCalledTimes(2);
+  });
+
+  it('1 ページに満たなければ 1 回で止める', async () => {
+    const { supabase, range } = createEntriesSupabase([{ user_id: 'user-a' }]);
+
+    await collectWriterIds(supabase, 'start', 'end');
+
+    expect(range).toHaveBeenCalledTimes(1);
+  });
+
+  it('エラーは握らず投げる（0 件として静かに間違えない）', async () => {
+    const builder = {
+      select: vi.fn(() => builder),
+      gte: vi.fn(() => builder),
+      lte: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      range: vi.fn(() => Promise.resolve({ data: null, error: { message: 'boom' } })),
+    };
+    // @type-assertion-allowed: 上と同じく chain だけを再現する
+    const supabase = { from: vi.fn(() => builder) } as unknown as Parameters<
+      typeof collectWriterIds
+    >[0];
+
+    await expect(collectWriterIds(supabase, 'start', 'end')).rejects.toThrow('boom');
+  });
+});
+
+describe('countTotalUsers', () => {
+  it('profiles の exact count を返す（listUsers の 1000 人上限を避ける）', async () => {
+    const builder = {
+      select: vi.fn(() => Promise.resolve({ count: 1234, error: null })),
+    };
+    // @type-assertion-allowed: この経路で使う chain だけを再現する
+    const supabase = { from: vi.fn(() => builder) } as unknown as Parameters<
+      typeof countTotalUsers
+    >[0];
+
+    await expect(countTotalUsers(supabase)).resolves.toBe(1234);
+    expect(supabase.from).toHaveBeenCalledWith('profiles');
   });
 });
 

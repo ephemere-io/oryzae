@@ -5,7 +5,9 @@ describe('manifest', () => {
   it('PWA インストールに必要な基本フィールドを持つ', () => {
     const m = manifest();
     expect(m.display).toBe('standalone');
-    expect(m.start_url).toBe('/');
+    // Issue #437: ホーム画面から開いたときにランディングを出さない。start_url はアプリの入口。
+    expect(m.start_url).toBe('/entries/new');
+    // scope はルートのまま（/login や /jar へも遷移できる必要がある）。
     expect(m.scope).toBe('/');
     expect(m.name).toBeTruthy();
     expect(m.short_name).toBeTruthy();

@@ -98,7 +98,7 @@ export function SpEntryEditor({
     saveDraft({ entryId, title, body, questionId: selectedQuestionId });
   }, [draftEnabled, pickled, title, body, entryId, selectedQuestionId, saveDraft, clearDraft]);
 
-  const { linkQuestion } = useEntryQuestions(api, entryId);
+  const { linkedQuestions, linkQuestion } = useEntryQuestions(api, entryId);
 
   useAutosaveEntry({
     title,
@@ -115,6 +115,23 @@ export function SpEntryEditor({
   // 問いはエントリ作成後（entryId 確定後）に一度だけ紐づける。
   // 保存前に選んでいた場合も、autosave でエントリが出来た時点で紐づく。
   const linkAttemptedRef = useRef<string | null>(null);
+
+  // Issue #448: 既存エントリを一覧から開くと、紐づいている問いがチップに出ていなかった。
+  // 選択状態の初期値は URL の questionId と復元ドラフトしか見ておらず、サーバの
+  // 紐付け（linkedQuestions）を無視していたため。取得できたら一度だけ埋める。
+  // ユーザーが既に選んでいる場合は上書きしない。復元した問いは紐付け済みなので、
+  // 下の紐づけ effect が再 POST しないよう linkAttemptedRef にも印を付ける。
+  const questionSeededRef = useRef(false);
+  useEffect(() => {
+    if (questionSeededRef.current) return;
+    const linked = linkedQuestions[0];
+    if (!linked) return;
+    questionSeededRef.current = true;
+    if (selectedQuestionId !== null) return;
+    linkAttemptedRef.current = linked.id;
+    setSelectedQuestionId(linked.id);
+  }, [linkedQuestions, selectedQuestionId]);
+
   useEffect(() => {
     if (entryId && selectedQuestionId && linkAttemptedRef.current !== selectedQuestionId) {
       linkAttemptedRef.current = selectedQuestionId;
@@ -132,7 +149,11 @@ export function SpEntryEditor({
         ? t('status_editing')
         : t('status_saved');
 
-  const selectedQuestion = activeQuestions.find((q) => q.id === selectedQuestionId);
+  // 紐付け済みの問いが終了（アーカイブ）されていると activeQuestions に載らない。
+  // その場合もチップには出したいので、紐付け側からも探す。
+  const selectedQuestion =
+    activeQuestions.find((q) => q.id === selectedQuestionId) ??
+    linkedQuestions.find((q) => q.id === selectedQuestionId);
 
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
@@ -175,6 +196,7 @@ export function SpEntryEditor({
         hasBody,
         dirty,
         hasEntry: !!entryId,
+        // Issue #448: 一覧から開いたときの復元の回帰を捕まえる。
         // Issue #450: 問いの有無で「納める」の挙動が変わる（無ければ問い選択を開く）。
         hasQuestion: selectedQuestionId !== null,
         sheetOpen,
