@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
@@ -315,11 +316,9 @@ export function SpEntryEditor({
                 strokeWidth="1.6"
                 aria-hidden="true"
               >
-                <path
-                  d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z"
-                  strokeLinejoin="round"
-                />
-                <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+                <path d={JAR_ICON_PATH} strokeLinejoin="round" />
+                {/* 中身（発酵しているもの）の水位。胴の幅に合わせる。 */}
+                <path d="M6.6 14.4c1.8.8 3.6.8 5.4 0s3.6-.8 5.4 0" strokeOpacity=".55" />
               </svg>
             )}
             <span className="text-[15px] font-bold">
