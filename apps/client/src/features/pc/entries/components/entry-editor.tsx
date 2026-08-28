@@ -1100,8 +1100,12 @@ export function EntryEditor({
       <div className="relative flex-1">
         {/* Issue #329: 発酵オーバーレイ。エディタ領域に重ねて表示。pointer-events は子要素のみで
             受け取るため、執筆エリアの入力を妨げない。 */}
+        {/* Issue #350: 基本 UI が透明化するのにここだけ残っていた。設定で切れる。
+            pointer-events は fadeClass 側が透明時に殺すので、消えている間は掴めない。 */}
         {overlayVisible && fermentationOverlayDetail && (
-          <FermentationOverlay detail={fermentationOverlayDetail} />
+          <div className={settings.focusModeFadesFermentation ? fadeClass : undefined}>
+            <FermentationOverlay detail={fermentationOverlayDetail} />
+          </div>
         )}
         {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
         {settings.writingMode === 'vertical' && fadeLeft && (
