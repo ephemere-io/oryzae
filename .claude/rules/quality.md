@@ -63,7 +63,7 @@ take_screenshot filePath=.tmp/screenshots/{名前}.png
 ## コミット前チェック
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip
+pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip && pnpm check:as
 ```
 
 ## Stop hook による自動テスト

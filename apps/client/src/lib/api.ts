@@ -42,11 +42,11 @@ export async function tryRefreshToken(): Promise<string | null> {
       return null;
     }
 
+    // 200 なのに body が壊れているのはサーバー側の問題で、refresh token が
+    // 無効になったわけではない。ここで clearTokens すると一時的な不具合で
+    // 全セッションが強制ログアウトになるため、今回の refresh を失敗扱いにするだけ。
     const session = readSession(await readJson(res));
-    if (!session) {
-      clearTokens();
-      return null;
-    }
+    if (!session) return null;
     setTokens(session.accessToken, session.refreshToken);
     return session.accessToken;
   })();

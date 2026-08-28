@@ -68,11 +68,12 @@ export function useUserDetail(userId: string) {
 
     const api = createApiClient(token);
     const res = await api.fetch(`/api/v1/admin/users/${userId}`);
-    const json = res.ok ? await parseJson(res, userDetailResponseSchema) : null;
-    if (json) {
-      setData(json);
-    } else {
+    if (!res.ok) {
       setError('ユーザー詳細の取得に失敗しました');
+    } else {
+      const json = await parseJson(res, userDetailResponseSchema);
+      if (json) setData(json);
+      else setError('ユーザー詳細の応答形式が不正です（API の変更を確認してください）');
     }
     setLoading(false);
   }, [userId]);

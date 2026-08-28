@@ -62,6 +62,11 @@ const fermentationDetailResponseSchema = z.object({
   updatedAt: z.string(),
   userEmail: z.string(),
   questionText: z.string(),
+  // サーバー側は computeCostFromTokens の TokenCost か、AI gateway の
+  // getGenerationInfo の戻り値のどちらかを入れる（異種混在）。形を決め打ちすると
+  // 片方で parse に失敗して詳細画面ごと出せなくなるので unknown のまま受け、
+  // 表示側の formatCost が実行時に絞る。
+  // なお Zod v3 は unknown のキーを必ず optional として推論する（required にできない）。
   cost: z.unknown(),
   masked: z.boolean(),
   worksheet: worksheetDataSchema.nullable(),
@@ -92,11 +97,12 @@ export function useFermentationDetail(id: string) {
 
     const api = createApiClient(token);
     const res = await api.fetch(`/api/v1/admin/fermentations/${id}`);
-    const json = res.ok ? await parseJson(res, fermentationDetailResponseSchema) : null;
-    if (json) {
-      setData(json);
-    } else {
+    if (!res.ok) {
       setError('発酵詳細の取得に失敗しました');
+    } else {
+      const json = await parseJson(res, fermentationDetailResponseSchema);
+      if (json) setData(json);
+      else setError('発酵詳細の応答形式が不正です（API の変更を確認してください）');
     }
     setLoading(false);
   }, [id]);

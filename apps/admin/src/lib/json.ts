@@ -6,6 +6,16 @@ import { type ZodType, z } from 'zod';
  * `(await res.json()) as T` は「そう書いただけ」で、API の形が変わっても気づけない。
  * ここを通すと、形が違えば `null` が返るので、呼び出し側でエラー表示へ倒せる。
  */
+/**
+ * プレーンなオブジェクトか。配列と null は弾く。
+ *
+ * スキーマを書くほどでもない `unknown` の値を、キャスト無しでフィールド参照
+ * できるようにするための型ガード。
+ */
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export async function parseJson<T>(res: Response, schema: ZodType<T>): Promise<T | null> {
   let body: unknown;
   try {
