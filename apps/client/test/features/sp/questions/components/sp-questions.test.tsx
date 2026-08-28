@@ -44,6 +44,16 @@ describe('SpQuestions', () => {
     expect(screen.getByText('なぜ書くのか')).toBeTruthy();
   });
 
+  it('手紙が届いた問いに印を出す（Issue #452）', () => {
+    renderQ({ unreadQuestionIds: new Set(['q1']) });
+    expect(screen.getByText(jaMessages.sp.questions.letter_arrived)).toBeTruthy();
+  });
+
+  it('手紙が届いていない問いには印を出さない', () => {
+    renderQ({ unreadQuestionIds: new Set(['other']) });
+    expect(screen.queryByText(jaMessages.sp.questions.letter_arrived)).toBeNull();
+  });
+
   it('「新しい問いを立てる」でシートが開き、作成できる', () => {
     const props = renderQ();
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.add }));

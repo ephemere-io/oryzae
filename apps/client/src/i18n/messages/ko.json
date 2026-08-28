@@ -795,7 +795,9 @@
       "section_keywords": "단어",
       "section_snippets": "발췌",
       "unread": "안 읽음",
-      "read": "읽음"
+      "read": "읽음",
+      "section_sources": "바탕이 된 기록",
+      "source_untitled": "제목 없는 기록"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -826,7 +828,8 @@
       "placeholder": "질문 쓰기",
       "delete": "이 질문 끝내기",
       "cancel": "취소",
-      "save": "저장"
+      "save": "저장",
+      "letter_arrived": "편지가 도착했습니다"
     }
   }
 }

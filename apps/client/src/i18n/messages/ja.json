@@ -795,7 +795,9 @@
       "section_keywords": "言葉",
       "section_snippets": "抜粋",
       "unread": "未読",
-      "read": "既読"
+      "read": "既読",
+      "section_sources": "もとになった記録",
+      "source_untitled": "無題の記録"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -826,7 +828,8 @@
       "placeholder": "問いを書く",
       "delete": "この問いを終える",
       "cancel": "キャンセル",
-      "save": "保存"
+      "save": "保存",
+      "letter_arrived": "手紙が届いています"
     }
   }
 }
