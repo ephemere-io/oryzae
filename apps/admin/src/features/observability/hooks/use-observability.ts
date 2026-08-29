@@ -1,40 +1,36 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-export interface ObservabilitySummary {
+const summaryApiResponseSchema = z.object({
+  sentry: z.object({ unresolvedCount: z.number().nullable() }),
+  gateway: z.object({
+    monthlySpend: z.number().nullable(),
+    monthlyRequests: z.number().nullable(),
+    creditBalance: z.string().nullable(),
+    creditUsed: z.string().nullable(),
+  }),
+  resend: z.object({
+    sentCount7d: z.number().nullable(),
+    bouncedCount7d: z.number().nullable(),
+  }),
+  upstash: z.object({ totalKeys: z.number().nullable() }),
+  vercel: z.object({ latestDeployState: z.string().nullable() }),
+});
+
+// overview は totalPageviews / totalSessions だけ使う（他フィールドは無視）。
+const analyticsOverviewSchema = z.object({
+  totalPageviews: z.number(),
+  totalSessions: z.number(),
+});
+
+export type ObservabilitySummary = z.infer<typeof summaryApiResponseSchema> & {
   posthog: { totalPageviews: number; totalSessions: number } | null;
-  sentry: { unresolvedCount: number | null };
-  gateway: {
-    monthlySpend: number | null;
-    monthlyRequests: number | null;
-    creditBalance: string | null;
-    creditUsed: string | null;
-  };
-  resend: { sentCount7d: number | null; bouncedCount7d: number | null };
-  upstash: { totalKeys: number | null };
-  vercel: { latestDeployState: string | null };
-}
-
-interface AnalyticsOverview {
-  totalPageviews: number;
-  totalSessions: number;
-}
-
-interface SummaryApiResponse {
-  sentry: { unresolvedCount: number | null };
-  gateway: {
-    monthlySpend: number | null;
-    monthlyRequests: number | null;
-    creditBalance: string | null;
-    creditUsed: string | null;
-  };
-  resend: { sentCount7d: number | null; bouncedCount7d: number | null };
-  upstash: { totalKeys: number | null };
-  vercel: { latestDeployState: string | null };
-}
+};
 
 export function useObservability() {
   const [data, setData] = useState<ObservabilitySummary | null>(null);
@@ -60,11 +56,17 @@ export function useObservability() {
       return;
     }
 
-    const summary = (await summaryRes.json()) as SummaryApiResponse;
+    const summary = await parseJson(summaryRes, summaryApiResponseSchema);
+    if (!summary) {
+      setError('監視データの取得に失敗しました');
+      setLoading(false);
+      return;
+    }
+
     let posthog: ObservabilitySummary['posthog'] = null;
     if (analyticsRes.ok) {
-      const a = (await analyticsRes.json()) as AnalyticsOverview;
-      posthog = { totalPageviews: a.totalPageviews, totalSessions: a.totalSessions };
+      const a = await parseJson(analyticsRes, analyticsOverviewSchema);
+      if (a) posthog = { totalPageviews: a.totalPageviews, totalSessions: a.totalSessions };
     }
 
     setData({ posthog, ...summary });

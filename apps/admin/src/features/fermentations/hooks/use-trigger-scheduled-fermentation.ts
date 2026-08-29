@@ -1,17 +1,21 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-interface TriggerScheduledFermentationResult {
-  dateKey: string;
-  totalUsers: number;
-  totalFermentations: number;
-  succeeded: number;
-  failed: number;
-  errors: Array<{ userId: string; questionId: string; error: string }>;
-}
+const triggerScheduledFermentationResultSchema = z.object({
+  dateKey: z.string(),
+  totalUsers: z.number(),
+  totalFermentations: z.number(),
+  succeeded: z.number(),
+  failed: z.number(),
+  errors: z.array(z.object({ userId: z.string(), questionId: z.string(), error: z.string() })),
+});
+
+type TriggerScheduledFermentationResult = z.infer<typeof triggerScheduledFermentationResultSchema>;
 
 export function useTriggerScheduledFermentation() {
   const [loading, setLoading] = useState(false);
@@ -32,8 +36,8 @@ export function useTriggerScheduledFermentation() {
       body: JSON.stringify(dateKey ? { dateKey } : {}),
     });
 
-    if (res.ok) {
-      const body = (await res.json()) as TriggerScheduledFermentationResult;
+    const body = res.ok ? await parseJson(res, triggerScheduledFermentationResultSchema) : null;
+    if (body) {
       setResult(body);
       setLoading(false);
       return true;

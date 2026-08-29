@@ -93,7 +93,7 @@ describe('editor-effects-codec', () => {
       applyTextSpansToEditor(editor, [{ kind: 'voice', start: 0, end: 5, fontSizeEm: 3 }]);
       const span = editor.querySelector('span.v-block');
       expect(span?.textContent).toBe('hello');
-      const style = (span as HTMLElement | null)?.style.fontSize;
+      const style = span instanceof HTMLElement ? span.style.fontSize : undefined;
       // jsdom normalizes "3.00em" → "3em"; just check that font-size is set
       expect(style).toMatch(/^3(\.\d+)?em$/);
     });

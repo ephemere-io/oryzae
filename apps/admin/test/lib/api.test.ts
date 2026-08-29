@@ -15,11 +15,15 @@ describe('tryRefreshToken (admin, Issue #362: in-flight singleton)', () => {
     localStorage.clear();
   });
 
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   function okSession(accessToken: string, refreshToken: string): Response {
-    return {
-      ok: true,
-      json: () => Promise.resolve({ session: { accessToken, refreshToken } }),
-    } as Response; // @type-assertion-allowed: テスト用の最小限 Response スタブ
+    return jsonResponse({ session: { accessToken, refreshToken } });
   }
 
   it('並発呼び出しは refresh リクエストを1回に集約し、同じトークンを返す', async () => {
@@ -45,5 +49,34 @@ describe('tryRefreshToken (admin, Issue #362: in-flight singleton)', () => {
     const result = await tryRefreshToken();
     expect(result).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // 以下2件は「200 だが body が壊れている」と「401」の扱いを分けたことを固定する。
+  // `null` を返す点は旧実装も同じなので、**refresh token が残るかどうか**を assert
+  // しないと退行を検出できない。
+
+  it('200 でも body の形が違えば null を返すが、refresh token は消さない', async () => {
+    localStorage.setItem('oryzae_admin_refresh_token', 'rt-1');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ session: { accessToken: 123 } }),
+    );
+
+    const result = await tryRefreshToken();
+
+    expect(result).toBeNull();
+    // サーバー側の一時的な不具合で強制ログアウトさせないこと。
+    expect(localStorage.getItem('oryzae_admin_refresh_token')).toBe('rt-1');
+  });
+
+  it('401 なら null を返し、トークンを消す（＝失効として扱う）', async () => {
+    localStorage.setItem('oryzae_admin_refresh_token', 'rt-1');
+    localStorage.setItem('oryzae_admin_access_token', 'at-1');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'invalid' }, 401));
+
+    const result = await tryRefreshToken();
+
+    expect(result).toBeNull();
+    expect(localStorage.getItem('oryzae_admin_refresh_token')).toBeNull();
+    expect(localStorage.getItem('oryzae_admin_access_token')).toBeNull();
   });
 });

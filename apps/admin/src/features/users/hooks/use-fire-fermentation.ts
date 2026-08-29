@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson, readErrorMessage } from '@/lib/json';
 
 // issue #290: admin デバッグ用に特定ユーザー / 問いを強制発火する。
 // レスポンスは server 側 fireFermentationSchema + FireFermentationUsecase の出力に対応。
@@ -10,16 +12,20 @@ import { getAccessToken } from '@/lib/auth';
 // emailReason は #290 フォローで追加: 「emailSent: true なのに実際は届かない」
 // ことを防ぐための診断情報。'no-verified-email' / 'no-api-key' / 'disabled' /
 // 'no-titles' / 'skipped-by-request' のいずれか (server 側 DigestSendResult)。
-interface FireFermentationResponse {
-  fired: Array<{
-    fermentationResultId: string;
-    questionId: string;
-    questionText: string;
-  }>;
-  emailSent: boolean;
-  emailReason?: string;
-  emailFailure?: { error: string };
-}
+const fireFermentationResponseSchema = z.object({
+  fired: z.array(
+    z.object({
+      fermentationResultId: z.string(),
+      questionId: z.string(),
+      questionText: z.string(),
+    }),
+  ),
+  emailSent: z.boolean(),
+  emailReason: z.string().optional(),
+  emailFailure: z.object({ error: z.string() }).optional(),
+});
+
+type FireFermentationResponse = z.infer<typeof fireFermentationResponseSchema>;
 
 interface FireFermentationParams {
   userId: string;
@@ -52,21 +58,19 @@ export function useFireFermentation() {
     });
 
     if (res.ok) {
-      const body = (await res.json()) as FireFermentationResponse;
-      setResult(body);
+      const body = await parseJson(res, fireFermentationResponseSchema);
+      if (body) {
+        setResult(body);
+        setLoading(false);
+        return true;
+      }
+      setError('発酵プロセスの強制発火に失敗しました（応答の形式が不正です）');
       setLoading(false);
-      return true;
+      return false;
     }
 
     // server は失敗時に { error: string } を返す。可能なら本文を拾って表示する。
-    let message = '発酵プロセスの強制発火に失敗しました';
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (typeof body.error === 'string' && body.error.length > 0) message = body.error;
-    } catch {
-      // body が JSON でない (HTML / 空) 場合はデフォルト文言のまま
-    }
-    setError(message);
+    setError(await readErrorMessage(res, '発酵プロセスの強制発火に失敗しました'));
     setLoading(false);
     return false;
   }, []);

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
 import type { ApiClient } from '@/lib/api';
+import { mockResponse } from '../../../../helpers/response';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return {
@@ -9,14 +10,6 @@ function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
     headers: {},
     fetch: fetchImpl,
   };
-}
-
-function mockResponse(ok: boolean, body: unknown): Response {
-  return {
-    ok,
-    json: () => Promise.resolve(body),
-    status: ok ? 200 : 400,
-  } as Response;
 }
 
 describe('useUserMe (Issue #316)', () => {

@@ -1389,9 +1389,9 @@ export function EntryEditor({
         open={pickleConfirmOpen}
         saving={saving}
         title={title}
-        linkedQuestionTexts={activeQuestions
-          .filter((q) => linkedIds.has(q.id) && q.currentText)
-          .map((q) => q.currentText as string)}
+        linkedQuestionTexts={activeQuestions.flatMap((q) =>
+          linkedIds.has(q.id) && q.currentText ? [q.currentText] : [],
+        )}
         onConfirm={handlePickleConfirm}
         onClose={() => setPickleConfirmOpen(false)}
       />

@@ -16,9 +16,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
-      // @oryzae/shared の main は ./dist/index.js を指す（server が本番で dist を使うため）。
-      // vitest は dist を作らないので、テストではソースへ直接向ける。
-      // 本番ビルドは vercel.json の buildCommand が先に dist を作るので影響しない。
+      // `@oryzae/shared` の `main` は dist を指すため、未ビルドだと vitest が
+      // "Failed to resolve entry for package" で落ちる（CI の test ジョブは
+      // shared を build しない）。テストはソースを直接見れば十分なので、
+      // `@oryzae/verify` と同じくソース解決に寄せてビルド状態から独立させる。
       '@oryzae/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
     },
   },
