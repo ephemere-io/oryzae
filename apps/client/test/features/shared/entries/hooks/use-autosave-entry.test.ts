@@ -2,6 +2,9 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 
+/** rerender の initialProps に型を与えるための空配列（`as` を使わずに string[] にする）。 */
+const EMPTY_MEDIA_URLS: string[] = [];
+
 describe('useAutosaveEntry', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -78,7 +81,7 @@ describe('useAutosaveEntry', () => {
           enabled: true,
           mediaUrls,
         }),
-      { initialProps: { mediaUrls: [] as string[] } },
+      { initialProps: { mediaUrls: EMPTY_MEDIA_URLS } },
     );
 
     rerender({ mediaUrls: ['https://cdn.example/a.jpg'] });

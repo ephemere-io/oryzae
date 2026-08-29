@@ -55,4 +55,18 @@ describe('useUserStats', () => {
 
     expect(result.current.error).toBe('統計データの取得に失敗しました');
   });
+
+  it('中核の集計値が欠けた応答は stats に入れずエラーにする', async () => {
+    // エラーエンベロープが「全部 0 の統計」として描画されるのを防ぐ。
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { error: 'internal' }));
+
+    const { result } = renderHook(() => useUserStats(), { wrapper: I18nWrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.stats).toBeNull();
+    expect(result.current.error).toBeTruthy();
+  });
 });

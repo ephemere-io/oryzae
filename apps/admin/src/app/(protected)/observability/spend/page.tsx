@@ -3,6 +3,7 @@
 import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -14,28 +15,31 @@ import {
 } from '@/components/ui/table';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-interface DailySpend {
-  date: string;
-  totalCost: number;
-  inputTokens: number;
-  outputTokens: number;
-  requestCount: number;
-}
+const dailySpendSchema = z.object({
+  date: z.string(),
+  totalCost: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  requestCount: z.number(),
+});
 
-interface UserSpend {
-  userId: string;
-  totalCost: number;
-  inputTokens: number;
-  outputTokens: number;
-  requestCount: number;
-}
+const userSpendSchema = z.object({
+  userId: z.string(),
+  totalCost: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  requestCount: z.number(),
+});
 
-interface SpendData {
-  daily: DailySpend[];
-  byUser: UserSpend[];
-  credits: { balance: string; totalUsed: string } | null;
-}
+const spendDataSchema = z.object({
+  daily: z.array(dailySpendSchema),
+  byUser: z.array(userSpendSchema),
+  credits: z.object({ balance: z.string(), totalUsed: z.string() }).nullable(),
+});
+
+type SpendData = z.infer<typeof spendDataSchema>;
 
 function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`;
@@ -57,9 +61,8 @@ export default function SpendPage() {
     setLoading(true);
     const api = createApiClient(token);
     const res = await api.fetch('/api/v1/admin/observability/spend?date_from=30');
-    if (res.ok) {
-      setData((await res.json()) as SpendData);
-    }
+    const body = res.ok ? await parseJson(res, spendDataSchema) : null;
+    if (body) setData(body);
     setLoading(false);
   }, []);
 

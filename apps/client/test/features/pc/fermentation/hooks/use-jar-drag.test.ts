@@ -65,18 +65,7 @@ function setupHook(opts: SetupOpts = {}) {
     if (!ref.current) {
       // Stub the bounding rect read by the hook on pointerDown.
       ref.current = {
-        getBoundingClientRect: () =>
-          ({
-            x: 0,
-            y: 0,
-            top: 0,
-            left: 0,
-            right: containerWidth,
-            bottom: containerHeight,
-            width: containerWidth,
-            height: containerHeight,
-            toJSON: () => ({}),
-          }) as DOMRect,
+        getBoundingClientRect: () => new DOMRect(0, 0, containerWidth, containerHeight),
         // @type-assertion-allowed: テスト用の最小 HTMLElement スタブ
       } as unknown as HTMLElement;
     }

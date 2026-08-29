@@ -21,7 +21,7 @@ const VALID_TYPES = ['signup', 'invite', 'magiclink', 'recovery', 'email_change'
 type EmailOtpType = (typeof VALID_TYPES)[number];
 
 function isEmailOtpType(value: string): value is EmailOtpType {
-  return (VALID_TYPES as readonly string[]).includes(value);
+  return VALID_TYPES.some((type) => type === value);
 }
 
 /** 種別ごとの既定遷移先（`next` が無いとき）。 */

@@ -1,9 +1,10 @@
 'use client';
 
-import type { EditorEffectsState } from '@oryzae/shared';
+import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/shared';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
+import { isObject, readJson, readStringField } from '@/lib/json';
 
 interface EntryDetail {
   id: string;
@@ -15,6 +16,45 @@ interface EntryDetail {
   effects: EditorEffectsState | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** 文字列配列のフィールドを読む。要素が文字列でないものは落とす（`as` を使わない）。 */
+function readStringArray(value: unknown, key: string): string[] {
+  if (!isObject(value)) return [];
+  const raw = value[key];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is string => typeof item === 'string');
+}
+
+/**
+ * `GET /api/v1/entries/:id` の正規化。
+ *
+ * `await res.json()` は `any` を返すので、そのまま `e.id` 等を読むと型検査も
+ * `pnpm check:as` もすり抜けたまま未検証の値が state に入る（`as` が無いので
+ * 検出器にも見えない）。id / content が無ければ「取れなかった」として null。
+ * effects は共有スキーマで検証し、壊れていれば null に倒す（エディタは効果なしで開ける）。
+ */
+function normalizeEntryDetail(input: unknown): EntryDetail | null {
+  if (!isObject(input)) return null;
+  const entry = input.entry;
+  const id = readStringField(entry, 'id');
+  const content = readStringField(entry, 'content');
+  if (id === null || content === null) return null;
+
+  const rawEffects = isObject(entry) ? entry.effects : null;
+  const parsedEffects = editorEffectsStateSchema.safeParse(rawEffects);
+
+  return {
+    id,
+    content,
+    // 保存用のパスは entry の中、表示用の署名 URL はレスポンス top-level。
+    // 2 つは同じ並びで 1:1 対応する（サーバが署名失敗を空文字で埋めて長さを揃える）。
+    mediaUrls: readStringArray(entry, 'mediaUrls'),
+    mediaSignedUrls: readStringArray(input, 'mediaSignedUrls'),
+    effects: parsedEffects.success ? parsedEffects.data : null,
+    createdAt: readStringField(entry, 'createdAt') ?? '',
+    updatedAt: readStringField(entry, 'updatedAt') ?? '',
+  };
 }
 
 interface AuthState {
@@ -30,22 +70,8 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
 
     api.fetch(`/api/v1/entries/${id}`).then(async (res) => {
       if (res.ok) {
-        const data = await res.json();
-        if ('entry' in data && data.entry != null) {
-          const e = data.entry;
-          setEntry({
-            id: e.id,
-            content: e.content,
-            mediaUrls: Array.isArray(e.mediaUrls) ? e.mediaUrls.map(String) : [],
-            // mediaSignedUrls はレスポンスの top-level（entry の中ではない）。
-            mediaSignedUrls: Array.isArray(data.mediaSignedUrls)
-              ? data.mediaSignedUrls.map(String)
-              : [],
-            effects: e.effects ?? null,
-            createdAt: e.createdAt,
-            updatedAt: e.updatedAt,
-          });
-        }
+        const next = normalizeEntryDetail(await readJson(res));
+        if (next) setEntry(next);
       }
       setLoading(false);
     });
@@ -111,9 +137,15 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
         return null;
       }
 
-      const data = (await res.json()) as { id: string };
+      // 作成は成功しているのに id が読めないと、呼び出し側は失敗と区別がつかない。
+      // autosave (use-autosave-entry) は id を受け取れないと entryId を記録できず、
+      // 次のティックで再 POST してエントリを重複作成する。エラーを立てて気づけるようにする。
+      const id = readStringField(await readJson(res), 'id');
+      if (id === null) {
+        setError(t('error_create'));
+      }
       setSaving(false);
-      return data.id;
+      return id;
     },
     [api, t],
   );

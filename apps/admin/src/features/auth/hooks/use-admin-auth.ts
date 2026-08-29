@@ -1,15 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import { type ApiClient, createApiClient, tryRefreshToken } from '@/lib/api';
 import { clearTokens, getAccessToken, setTokens } from '@/lib/auth';
+import { parseJson, readErrorMessage } from '@/lib/json';
+
+const authUserSchema = z.object({ id: z.string(), email: z.string() });
+
+const meResponseSchema = z.object({ user: authUserSchema });
+
+const loginResponseSchema = z.object({
+  user: authUserSchema,
+  session: z.object({ accessToken: z.string(), refreshToken: z.string() }),
+});
 
 interface AdminAuthState {
   accessToken: string;
-  user: { id: string; email: string };
+  user: z.infer<typeof authUserSchema>;
 }
 
-async function verifyAdminAndGetUser(token: string): Promise<{ id: string; email: string } | null> {
+async function verifyAdminAndGetUser(
+  token: string,
+): Promise<z.infer<typeof authUserSchema> | null> {
   const client = createApiClient(token);
   const adminRes = await client.fetch('/api/v1/admin/dashboard/stats');
   if (!adminRes.ok) return null;
@@ -17,8 +30,8 @@ async function verifyAdminAndGetUser(token: string): Promise<{ id: string; email
   const meRes = await client.fetch('/api/v1/auth/me');
   if (!meRes.ok) return null;
 
-  const meData = (await meRes.json()) as { user: { id: string; email: string } };
-  return meData.user;
+  const meData = await parseJson(meRes, meResponseSchema);
+  return meData?.user ?? null;
 }
 
 export function useAdminAuth() {
@@ -69,13 +82,10 @@ export function useAdminAuth() {
       body: JSON.stringify({ identifier: email, password }),
     });
     if (!res.ok) {
-      const data = (await res.json()) as { error: string };
-      return data.error;
+      return await readErrorMessage(res, 'ログインに失敗しました');
     }
-    const data = (await res.json()) as {
-      user: { id: string; email: string };
-      session: { accessToken: string; refreshToken: string };
-    };
+    const data = await parseJson(res, loginResponseSchema);
+    if (!data) return 'ログインに失敗しました（応答の形式が不正です）';
 
     // Verify admin access
     const adminClient = createApiClient(data.session.accessToken);

@@ -1,17 +1,13 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
+import { jsonResponse } from '../../../../helpers/response';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 function mockResponse(ok: boolean, body: unknown, status = ok ? 200 : 500): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(body),
-    // @type-assertion-allowed: テスト用の最小限 Response スタブ
-  } as Response;
+  return jsonResponse(body, status);
 }
 
 describe('useSignupAvailability', () => {
@@ -88,5 +84,32 @@ describe('useSignupAvailability', () => {
     });
 
     expect(result.current.error).toBe('network down');
+  });
+
+  it('必須の数値が欠けた応答は availability に入れずエラーにする', async () => {
+    // エラーエンベロープ。以前はゼロ埋めされて「残り 0 枠だが満員ではない」という
+    // 矛盾した状態が本物のデータとして描画されていた。
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { error: 'internal' }));
+
+    const { result } = renderHook(() => useSignupAvailability());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.availability).toBeNull();
+    expect(result.current.error).toBeTruthy();
+  });
+
+  it('capacityReached が省略されていても remaining と矛盾しない', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { limit: 100, used: 100, remaining: 0 }));
+
+    const { result } = renderHook(() => useSignupAvailability());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.availability?.capacityReached).toBe(true);
   });
 });

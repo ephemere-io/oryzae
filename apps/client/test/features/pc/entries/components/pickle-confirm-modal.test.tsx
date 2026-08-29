@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PickleConfirmModal } from '@/features/pc/entries/components/pickle-confirm-modal';
 import jaMessages from '@/i18n/messages/ja.json';
+import { closestOrThrow } from '../../../../helpers/dom';
 
 describe('PickleConfirmModal (Issue #316)', () => {
   afterEach(() => cleanup());
@@ -48,7 +49,7 @@ describe('PickleConfirmModal (Issue #316)', () => {
 
   it('saving=true の間は確認ボタンが disabled になり saving 文言を出す', () => {
     setup({ saving: true });
-    const button = screen.getByText('漬け込み中...').closest('button') as HTMLButtonElement;
+    const button = closestOrThrow(screen.getByText('漬け込み中...'), 'button');
     expect(button.disabled).toBe(true);
   });
 

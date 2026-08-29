@@ -1,5 +1,11 @@
 import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  readBooleanOr,
+  readString,
+  readStringArray,
+  toRecordArray,
+} from '../../../shared/infrastructure/row.js';
 import type {
   EntryListOrder,
   EntryRepositoryGateway,
@@ -204,7 +210,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       .select('entry_id')
       .eq('question_id', questionId);
     if (error) throw error;
-    return ((data ?? []) as Array<{ entry_id: string }>).map((r) => r.entry_id);
+    return toRecordArray(data ?? []).map((r) => readString(r, 'entry_id'));
   }
 
   async save(entry: Entry): Promise<void> {
@@ -229,14 +235,14 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
 
   private toDomain(row: Record<string, unknown>): Entry {
     return Entry.fromProps({
-      id: row.id as string,
-      userId: row.user_id as string,
-      content: row.content as string,
-      mediaUrls: (row.media_urls as string[]) ?? [],
-      fermentationEnabled: (row.fermentation_enabled as boolean) ?? false,
+      id: readString(row, 'id'),
+      userId: readString(row, 'user_id'),
+      content: readString(row, 'content'),
+      mediaUrls: readStringArray(row, 'media_urls'),
+      fermentationEnabled: readBooleanOr(row, 'fermentation_enabled', false),
       effects: parseEffects(row.effects),
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }
@@ -246,7 +252,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
 // malformed row doesn't break entry reads.
 function parseEffects(raw: unknown): EditorEffectsState | null {
   if (!raw || typeof raw !== 'object') return null;
-  if (Object.keys(raw as object).length === 0) return null;
+  if (Object.keys(raw).length === 0) return null;
   const parsed = editorEffectsStateSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
 }

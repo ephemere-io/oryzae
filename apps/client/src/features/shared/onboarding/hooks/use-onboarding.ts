@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import type { ApiClient } from '@/lib/api';
+import { readBooleanField, readJson, readStringField } from '@/lib/json';
 
 interface OnboardingCompleteResult {
   /** ID of the question created during onboarding, or null if none */
@@ -30,9 +31,13 @@ export function useOnboarding(api: ApiClient | null): UseOnboardingResult {
         setLoading(false);
         return;
       }
-      const data = (await res.json()) as { onboardingCompleted: boolean };
+      const onboardingCompleted = readBooleanField(
+        await readJson(res),
+        'onboardingCompleted',
+        false,
+      );
       if (cancelled) return;
-      setShouldShow(!data.onboardingCompleted);
+      setShouldShow(!onboardingCompleted);
       setLoading(false);
     })();
 
@@ -52,8 +57,7 @@ export function useOnboarding(api: ApiClient | null): UseOnboardingResult {
           body: JSON.stringify({ string: result.firstQuestion }),
         });
         if (res.ok) {
-          const data = (await res.json()) as { id?: string };
-          questionId = data.id ?? null;
+          questionId = readStringField(await readJson(res), 'id');
         }
       }
 
