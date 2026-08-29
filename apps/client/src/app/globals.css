@@ -71,6 +71,25 @@ body {
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
 }
 
+/* Tailwind v4 の Preflight は button を `cursor: default` にする（v3 までは
+ * ブラウザ既定の pointer だった）。そのためアプリ全体でボタンが「押せる物」に
+ * 見えなくなっていた。<a> は pointer のままなので、リンクとボタンで挙動が食い違う。
+ * 押せる要素は押せるように見せる、に戻す。
+ *
+ * base レイヤーに置くのは、`cursor-grab` のようなユーティリティに勝たせるため
+ * （ボードのカードは掴んで動かすので pointer にしてはいけない）。 */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
 ::selection {
   background: rgba(74, 158, 142, 0.2);
   color: inherit;

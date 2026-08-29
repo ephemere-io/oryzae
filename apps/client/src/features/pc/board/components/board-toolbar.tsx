@@ -112,18 +112,16 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
               aria-label={`${tool.label} (${tool.shortcut})`}
               aria-pressed={isActive}
               data-verify-tool={tool.id}
-              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors"
+              // 非アクティブ時は背景をインラインで指定しない。インライン style は
+              // CSS の :hover に必ず勝つため、指定すると hover が効かなくなる。
+              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+                isActive ? '' : 'hover:bg-[var(--toolbar-hover)] active:scale-95'
+              }`}
               style={
                 isActive
                   ? { backgroundColor: 'var(--accent)', color: '#fff' }
-                  : { backgroundColor: 'transparent', color: 'var(--fg)' }
+                  : { color: 'var(--fg)' }
               }
-              onMouseEnter={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'var(--toolbar-hover)';
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-              }}
             >
               {tool.icon}
             </button>

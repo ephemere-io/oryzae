@@ -37,11 +37,15 @@ export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchP
             onClick={() => onViewTypeChange(v.id)}
             aria-pressed={isActive}
             data-verify-view-option={v.id}
-            className="rounded-md px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.15em] transition-colors"
+            // 非選択側だけ hover を効かせる。インライン style は :hover に勝つので
+            // backgroundColor は非選択時に指定しない。
+            className={`rounded-md px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.15em] transition-colors ${
+              isActive ? '' : 'hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+            }`}
             style={
               isActive
                 ? { backgroundColor: 'var(--accent)', color: '#fff' }
-                : { backgroundColor: 'transparent', color: 'var(--date-color)' }
+                : { color: 'var(--date-color)' }
             }
           >
             {v.label}

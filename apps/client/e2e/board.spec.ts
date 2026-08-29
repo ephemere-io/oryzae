@@ -53,12 +53,27 @@ test.describe('ボード画面', () => {
     await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
 
     await page.click('button[data-verify-source-tab="image"]');
-    // 画像タブではテキスト入力が消え、読み取りボタン（未選択なので無効）が出る。
+    // 画像タブではテキスト入力が消え、ドロップゾーン（画像用 file input）が出る。
+    // 画像を選んだ時点で読み取りまで自動で進むので、未選択のうちはボタンを出さない。
     await expect(page.locator('textarea')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '文字を読み取る' })).toBeDisabled();
+    await expect(page.locator('input[type="file"][accept*="image/"]')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /読み取/ })).toHaveCount(0);
 
     await page.click('button[data-verify-source-tab="text"]');
     await expect(page.locator('textarea')).toBeVisible();
+  });
+
+  test('押せる要素にポインタカーソルが出る', async ({ page }) => {
+    // Tailwind v4 の Preflight が button を cursor:default にする。押せる物が
+    // 押せるように見えないと操作が伝わらないので、globals.css で戻している。
+    for (const sel of [
+      'button[data-verify-tool="snippet"]',
+      'button[data-verify-view-option="daily"]',
+      'button[data-verify-nav="next"]',
+    ]) {
+      const cursor = await page.locator(sel).evaluate((el) => getComputedStyle(el).cursor);
+      expect(cursor, sel).toBe('pointer');
+    }
   });
 
   test('入力中でも Escape でダイアログを閉じられ、入力は持ち越さない', async ({ page }) => {

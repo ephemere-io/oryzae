@@ -221,7 +221,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
             type="button"
             onClick={handleClose}
             disabled={uploading}
-            className="rounded-md border px-4 py-2 text-xs disabled:opacity-40"
+            className="rounded-md border px-4 py-2 text-xs transition-colors hover:bg-[var(--toolbar-hover)] disabled:opacity-40"
             style={{
               borderColor: 'var(--border-subtle)',
               color: 'var(--fg)',
@@ -233,7 +233,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
           <button
             type="submit"
             disabled={!selectedFile || uploading}
-            className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
+            className="rounded-md border px-4 py-2 text-xs text-white transition-opacity hover:opacity-85 disabled:opacity-40 disabled:hover:opacity-40"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
             {uploading ? t('uploading_button') : t('submit')}

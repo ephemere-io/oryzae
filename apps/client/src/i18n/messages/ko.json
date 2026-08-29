@@ -300,7 +300,9 @@
       "ocr_empty": "문자를 읽지 못했습니다. 다른 이미지를 시도해 보세요.",
       "ocr_failed": "읽기에 실패했습니다. 형식(JPEG/PNG/WebP/GIF)과 크기({maxMb}MB 이하)를 확인해 주세요.",
       "ocr_note": "이미지에서 읽었습니다. {max}자 이내로 다듬어 주세요.",
-      "too_long": "{max}자 이내로 입력해 주세요"
+      "too_long": "{max}자 이내로 입력해 주세요",
+      "drop_or_click_image": "이미지를 끌어다 놓거나 클릭해서 선택",
+      "read_again": "다시 읽기"
     },
     "error_message": "보드를 불러오지 못했습니다",
     "retry": "다시 시도",

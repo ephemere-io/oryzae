@@ -75,7 +75,7 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, -offset))}
         data-verify-nav="prev"
-        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors"
+        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
         style={{ color: 'var(--date-color)' }}
       >
         ‹
@@ -90,7 +90,7 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, offset))}
         data-verify-nav="next"
-        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors"
+        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
         style={{ color: 'var(--date-color)' }}
       >
         ›

@@ -49,6 +49,8 @@ export function SnippetDialog({
   const [preview, setPreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [ocrStatus, setOcrStatus] = useState<OcrStatus>('idle');
+  /** ドラッグ中の枠のハイライト。落とせることを見た目で返す。 */
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // preview の objectURL は「差し替え時」と「閉じた時」に必ず revoke する。
@@ -68,6 +70,7 @@ export function SnippetDialog({
       setOcrStatus('idle');
       setFromImage(false);
       setSource('text');
+      setDragging(false);
       return;
     }
     setText(initialText);
@@ -106,8 +109,28 @@ export function SnippetDialog({
     onClose();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  /** 画像1枚に対して読み取りを走らせ、結果を編集できる場所へ載せる。 */
+  const runOcr = async (file: File) => {
+    setOcrStatus('reading');
+    const result = await ocr(file);
+    if (result.status === 'ok') {
+      setText(result.text);
+      setFromImage(true);
+      setOcrStatus('idle');
+      // 読み取った本文はほぼ必ず手直しが要る（50文字制限）。編集できる場所へ送る。
+      setSource('text');
+      setTimeout(() => inputRef.current?.focus(), 50);
+      return;
+    }
+    setOcrStatus(result.status === 'empty' ? 'empty' : 'failed');
+  };
+
+  /**
+   * ファイル選択・ドロップの共通入口。**選んだ時点で読み取りまで進める**。
+   * 以前は選択後に「文字を読み取る」を押させていたが、画像を選ぶ意図＝読み取りたい、
+   * なので一手増やしているだけだった。失敗したときだけ「もう一度」を出す。
+   */
+  const acceptFile = (file: File | undefined) => {
     if (!file) return;
     releasePreview();
     if (!isAllowedImage(file) || file.size > MAX_OCR_IMAGE_BYTES) {
@@ -121,23 +144,12 @@ export function SnippetDialog({
     previewRef.current = url;
     setPreview(url);
     setImageFile(file);
-    setOcrStatus('idle');
+    void runOcr(file);
   };
 
-  const handleRead = async () => {
+  const handleRead = () => {
     if (!imageFile || busy) return;
-    setOcrStatus('reading');
-    const result = await ocr(imageFile);
-    if (result.status === 'ok') {
-      setText(result.text);
-      setFromImage(true);
-      setOcrStatus('idle');
-      // 読み取った本文はほぼ必ず手直しが要る（50文字制限）。編集できる場所へ送る。
-      setSource('text');
-      setTimeout(() => inputRef.current?.focus(), 50);
-      return;
-    }
-    setOcrStatus(result.status === 'empty' ? 'empty' : 'failed');
+    void runOcr(imageFile);
   };
 
   const tabStyle = (active: boolean) =>
@@ -193,7 +205,7 @@ export function SnippetDialog({
               aria-selected={source === 'text'}
               data-verify-source-tab="text"
               onClick={() => setSource('text')}
-              className="-mb-px border-b-2 pb-2 text-xs transition-colors"
+              className="-mb-px border-b-2 pb-2 text-xs transition-colors hover:text-[var(--fg)]"
               style={tabStyle(source === 'text')}
             >
               {t('tab_text')}
@@ -204,7 +216,7 @@ export function SnippetDialog({
               aria-selected={source === 'image'}
               data-verify-source-tab="image"
               onClick={() => setSource('image')}
-              className="-mb-px border-b-2 pb-2 text-xs transition-colors"
+              className="-mb-px border-b-2 pb-2 text-xs transition-colors hover:text-[var(--fg)]"
               style={tabStyle(source === 'image')}
             >
               {t('tab_image')}
@@ -214,15 +226,28 @@ export function SnippetDialog({
 
         {source === 'image' ? (
           <div className="mb-4 text-center">
+            {/* 破線の枠は「ここに落とせる」という見た目なので、実際に落とせるようにする。
+                見た目だけドロップゾーンで受け付けないのが一番の混乱のもとだった。 */}
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!busy) setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                if (!busy) acceptFile(e.dataTransfer.files?.[0]);
+              }}
               disabled={busy}
-              className="relative mx-auto mb-3 flex w-full items-center justify-center rounded-lg border-2 border-dashed"
+              aria-label={t('click_to_select_image')}
+              className="relative mx-auto mb-3 flex w-full items-center justify-center rounded-lg border-2 border-dashed transition-colors"
               style={{
                 aspectRatio: '4 / 3',
-                borderColor: 'var(--border-subtle)',
-                backgroundColor: 'var(--toolbar-hover)',
+                borderColor: dragging ? 'var(--accent)' : 'var(--border-subtle)',
+                backgroundColor: dragging ? 'var(--accent-light)' : 'var(--toolbar-hover)',
                 overflow: 'hidden',
               }}
             >
@@ -233,8 +258,11 @@ export function SnippetDialog({
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 />
               ) : (
-                <span className="px-4 text-xs" style={{ color: 'var(--date-color)' }}>
-                  {t('click_to_select_image')}
+                <span
+                  className="px-4 text-xs leading-relaxed"
+                  style={{ color: 'var(--date-color)' }}
+                >
+                  {t('drop_or_click_image')}
                 </span>
               )}
               {busy && (
@@ -254,7 +282,7 @@ export function SnippetDialog({
               type="file"
               accept={OCR_ALLOWED_IMAGE_TYPES.join(',')}
               aria-label={t('click_to_select_image')}
-              onChange={handleFileChange}
+              onChange={(e) => acceptFile(e.target.files?.[0])}
               className="hidden"
             />
 
@@ -269,15 +297,18 @@ export function SnippetDialog({
               </p>
             )}
 
-            <button
-              type="button"
-              onClick={handleRead}
-              disabled={!imageFile || busy}
-              className="w-full rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
-              style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
-            >
-              {busy ? t('reading') : t('read_image')}
-            </button>
+            {/* 選んだら自動で読み取るので、通常はこのボタンを押す必要はない。
+                読み取れなかったときの「もう一度」だけ出す。 */}
+            {imageFile && !busy && ocrStatus !== 'idle' && (
+              <button
+                type="button"
+                onClick={handleRead}
+                className="w-full rounded-md border px-4 py-2 text-xs text-white transition-opacity hover:opacity-85"
+                style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
+              >
+                {t('read_again')}
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -321,7 +352,7 @@ export function SnippetDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border px-4 py-2 text-xs"
+            className="rounded-md border px-4 py-2 text-xs transition-colors hover:bg-[var(--toolbar-hover)]"
             style={{
               borderColor: 'var(--border-subtle)',
               color: 'var(--fg)',
@@ -333,7 +364,7 @@ export function SnippetDialog({
           <button
             type="submit"
             disabled={empty || tooLong || busy}
-            className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
+            className="rounded-md border px-4 py-2 text-xs text-white transition-opacity hover:opacity-85 disabled:opacity-40 disabled:hover:opacity-40"
             style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
           >
             {mode === 'edit' ? t('update') : t('create')}

@@ -300,7 +300,9 @@
       "ocr_empty": "文字を読み取れませんでした。別の画像を試してください。",
       "ocr_failed": "読み取りに失敗しました。形式（JPEG/PNG/WebP/GIF）とサイズ（{maxMb}MB以下）を確認してください。",
       "ocr_note": "画像から読み取りました。{max}文字以内に整えてください。",
-      "too_long": "{max}文字以内にしてください"
+      "too_long": "{max}文字以内にしてください",
+      "drop_or_click_image": "画像をドラッグ＆ドロップ、またはクリックして選択",
+      "read_again": "もう一度読み取る"
     },
     "error_message": "ボードの読み込みに失敗しました",
     "retry": "再読み込み",

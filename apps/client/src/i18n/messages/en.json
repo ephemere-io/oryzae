@@ -300,7 +300,9 @@
       "ocr_empty": "No text found in that image. Try another one.",
       "ocr_failed": "Reading failed. Check the format (JPEG/PNG/WebP/GIF) and size ({maxMb}MB or less).",
       "ocr_note": "Read from the image. Trim it to {max} characters or fewer.",
-      "too_long": "Must be {max} characters or fewer"
+      "too_long": "Must be {max} characters or fewer",
+      "drop_or_click_image": "Drop an image here, or click to choose one",
+      "read_again": "Read again"
     },
     "error_message": "Failed to load the board",
     "retry": "Retry",
