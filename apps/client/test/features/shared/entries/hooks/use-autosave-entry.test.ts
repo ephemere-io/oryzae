@@ -11,7 +11,7 @@ describe('useAutosaveEntry', () => {
     vi.useRealTimers();
   });
 
-  it('debounce 経過後に delta が 10 文字以上なら save を呼ぶ', async () => {
+  it('debounce 経過後に save を呼ぶ', async () => {
     const save = vi.fn().mockResolvedValue('new-id');
 
     const { rerender } = renderHook(
@@ -90,135 +90,210 @@ describe('useAutosaveEntry', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('delta が 10 文字未満なら save を呼ばない', async () => {
-    const save = vi.fn().mockResolvedValue('id');
+  it('短い記録でも保存する（Issue #510: 10 文字未満が一度も保存されなかった）', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
 
     const { rerender } = renderHook(
-      ({ body }) =>
-        useAutosaveEntry({
-          title: '',
-          body,
-          entryId: 'e1',
-          save,
-          enabled: true,
-        }),
-      { initialProps: { body: 'original content' } },
-    );
-
-    rerender({ body: 'original contentX' }); // +1 char
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
-
-    expect(save).not.toHaveBeenCalled();
-  });
-
-  it('body が空白のみなら save を呼ばない', async () => {
-    const save = vi.fn();
-
-    const { rerender } = renderHook(
-      ({ body }) =>
-        useAutosaveEntry({
-          title: '',
-          body,
-          entryId: undefined,
-          save,
-          enabled: true,
-        }),
+      ({ body }) => useAutosaveEntry({ title: '', body, entryId: 'e1', save, enabled: true }),
       { initialProps: { body: '' } },
     );
 
-    rerender({ body: '          ' });
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
-
-    expect(save).not.toHaveBeenCalled();
-  });
-
-  it('title がある場合は title\\nbody 形式で保存する', async () => {
-    const save = vi.fn().mockResolvedValue('id');
-
-    const { rerender } = renderHook(
-      ({ body }) =>
-        useAutosaveEntry({
-          title: 'マイタイトル',
-          body,
-          entryId: 'e1',
-          save,
-          enabled: true,
-        }),
-      { initialProps: { body: '' } },
-    );
-
-    rerender({ body: '本文は十分長いテキストである' });
+    rerender({ body: '疲れた' });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(save).toHaveBeenCalledWith(
-      'マイタイトル\n本文は十分長いテキストである',
-      'e1',
-      undefined,
-    );
+    expect(save).toHaveBeenCalledWith('疲れた', 'e1', undefined);
   });
 
-  it('enabled=false なら save を呼ばない', async () => {
-    const save = vi.fn();
+  it('同じ文字数の書き換えも保存する（Issue #510: 長さ差 0 で素通りしていた）', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
 
     const { rerender } = renderHook(
-      ({ body }) =>
-        useAutosaveEntry({
-          title: '',
-          body,
-          entryId: undefined,
-          save,
-          enabled: false,
-        }),
-      { initialProps: { body: '' } },
+      ({ body }) => useAutosaveEntry({ title: '', body, entryId: 'e1', save, enabled: true }),
+      { initialProps: { body: 'あいうえおかきくけこ' } },
     );
 
-    rerender({ body: '十分な長さのテキストです' });
+    rerender({ body: 'さしすせそたちつてと' });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(save).toHaveBeenCalledWith('さしすせそたちつてと', 'e1', undefined);
+  });
+
+  it('タイトルだけの変更も保存する（Issue #510: 本文しか見ていなかった）', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
+
+    const { rerender } = renderHook(
+      ({ title }) => useAutosaveEntry({ title, body: '本文', entryId: 'e1', save, enabled: true }),
+      { initialProps: { title: '' } },
+    );
+
+    rerender({ title: '朝の光' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(save).toHaveBeenCalledWith('朝の光\n本文', 'e1', undefined);
+  });
+
+  it('内容が変わっていなければ保存しない', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
+
+    const { rerender } = renderHook(
+      ({ body }) => useAutosaveEntry({ title: '', body, entryId: 'e1', save, enabled: true }),
+      { initialProps: { body: '本文' } },
+    );
+
+    rerender({ body: '本文' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
     });
 
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('連続編集時はデバウンスで最後の1回だけ save する', async () => {
+  it('空の内容では保存しない（何も書いていない状態でエントリを作らない）', async () => {
     const save = vi.fn().mockResolvedValue('id');
 
-    const { rerender } = renderHook(
-      ({ body }) =>
-        useAutosaveEntry({
-          title: '',
-          body,
-          entryId: undefined,
-          save,
-          enabled: true,
-        }),
-      { initialProps: { body: '' } },
+    renderHook(() =>
+      useAutosaveEntry({ title: '   ', body: '   ', entryId: undefined, save, enabled: true }),
     );
 
-    rerender({ body: '十分な長さの1つ目' });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
-    rerender({ body: '十分な長さの1つ目と2つ目' });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
-    rerender({ body: '十分な長さの1つ目と2つ目と3つ目' });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('enabled=false なら保存しない', async () => {
+    const save = vi.fn().mockResolvedValue('id');
+
+    const { rerender } = renderHook(
+      ({ body }) => useAutosaveEntry({ title: '', body, entryId: 'e1', save, enabled: false }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: 'これは十分な長さの本文です' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('保存に成功したら onSaved に id と本文を渡す', async () => {
+    const save = vi.fn().mockResolvedValue('created-id');
+    const onSaved = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ body }) =>
+        useAutosaveEntry({ title: '', body, entryId: undefined, save, onSaved, enabled: true }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: 'これは十分な長さの本文です' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(onSaved).toHaveBeenCalledWith('created-id', 'これは十分な長さの本文です');
+  });
+
+  it('背景に回ったら debounce を待たずに書き出す（Issue #510: 離脱で消えていた）', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
+
+    const { rerender } = renderHook(
+      ({ body }) => useAutosaveEntry({ title: '', body, entryId: 'e1', save, enabled: true }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: '書きかけ' });
+
+    // debounce の途中でアプリを背景に回す（モバイルでは日常的に起きる）。
+    await act(async () => {
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
+        configurable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+    });
+
+    expect(save).toHaveBeenCalledWith('書きかけ', 'e1', undefined);
+
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'visible',
+      configurable: true,
+    });
+  });
+
+  it('画面を離れるときに保留中の入力を書き出す', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
+
+    const { rerender, unmount } = renderHook(
+      ({ body }) => useAutosaveEntry({ title: '', body, entryId: 'e1', save, enabled: true }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: '書きかけ' });
+
+    await act(async () => {
+      unmount();
+      await Promise.resolve();
+    });
+
+    expect(save).toHaveBeenCalledWith('書きかけ', 'e1', undefined);
+  });
+
+  it('同じ内容を二重に書かない（保存中の再入を防ぐ）', async () => {
+    let resolveSave: ((id: string) => void) | null = null;
+    const save = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+
+    const { rerender } = renderHook(
+      ({ body }) => useAutosaveEntry({ title: '', body, entryId: 'e1', save, enabled: true }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: '書きかけ' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith('十分な長さの1つ目と2つ目と3つ目', undefined, undefined);
+
+    // 保存が返る前に背景化しても、同じ内容をもう一度は投げない。
+    await act(async () => {
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
+        configurable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSave?.('e1');
+      await Promise.resolve();
+    });
+
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'visible',
+      configurable: true,
+    });
   });
 });

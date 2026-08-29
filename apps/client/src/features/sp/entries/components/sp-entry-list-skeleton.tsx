@@ -32,6 +32,20 @@ export function SpEntryListRowsSkeleton({ rows = 7 }: { rows?: number }) {
   );
 }
 
+/**
+ * 問いチップ行の枠だけ。SpEntryList 本体でも使う（PC と同じく、取得が終わるまで
+ * 行の有無を決められないので場所を取っておく）。
+ */
+export function SpEntryListChipsSkeleton({ chips = 3 }: { chips?: number }) {
+  return (
+    <div className="mt-3 flex gap-2 px-5 pb-1" data-skeleton-slot="chips">
+      {skeletonKeys(chips).map((k) => (
+        <Skeleton key={k} className="h-7 w-20 shrink-0 rounded-full" />
+      ))}
+    </div>
+  );
+}
+
 /** 画面まるごと（ヘッダ ＋ 検索 ＋ 問いチップ ＋ 行）。 */
 export function SpEntryListSkeleton({ rows = 7, chips = 3 }: { rows?: number; chips?: number }) {
   return (
@@ -57,13 +71,7 @@ export function SpEntryListSkeleton({ rows = 7, chips = 3 }: { rows?: number; ch
       </div>
 
       {/* 問いチップ（実物: mt-3 gap-2 px-5 pb-1、pill は px-3 py-1.5 = 28px） */}
-      {chips > 0 && (
-        <div className="mt-3 flex gap-2 px-5 pb-1" data-skeleton-slot="chips">
-          {skeletonKeys(chips).map((k) => (
-            <Skeleton key={k} className="h-7 w-20 shrink-0 rounded-full" />
-          ))}
-        </div>
-      )}
+      {chips > 0 && <SpEntryListChipsSkeleton chips={chips} />}
 
       <SpEntryListRowsSkeleton rows={rows} />
     </div>
