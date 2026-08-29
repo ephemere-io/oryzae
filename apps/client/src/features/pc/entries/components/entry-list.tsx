@@ -5,7 +5,10 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { EntryListRowsSkeleton } from '@/features/pc/entries/components/entry-list-skeleton';
+import {
+  EntryListFilterSkeleton,
+  EntryListRowsSkeleton,
+} from '@/features/pc/entries/components/entry-list-skeleton';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import type { FilterableQuestion } from '@/features/shared/questions/types';
@@ -18,6 +21,8 @@ interface EntryListProps {
   api: ApiClient | null;
   authLoading: boolean;
   availableQuestions?: FilterableQuestion[];
+  /** 問いの取得中か。0件と区別できないとフィルタ行の有無が後から変わり一覧がズレる。 */
+  questionsLoading?: boolean;
 }
 
 interface EntryItem {
@@ -85,7 +90,12 @@ function groupEntries(entries: EntryItem[]): MonthGroup[] {
   return result;
 }
 
-export function EntryList({ api, authLoading, availableQuestions = [] }: EntryListProps) {
+export function EntryList({
+  api,
+  authLoading,
+  availableQuestions = [],
+  questionsLoading = false,
+}: EntryListProps) {
   const t = useTranslations('entries.list');
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -130,10 +140,13 @@ export function EntryList({ api, authLoading, availableQuestions = [] }: EntryLi
         loading: authLoading || (loading && entries.length === 0),
         count: entries.length,
         hasQuestions: availableQuestions.length > 0,
+        questionsLoading,
         error: error && entries.length === 0,
       })}
     >
-      {/* Issue #331: 問いで絞り込むフィルタ (単一選択・解除可) */}
+      {/* Issue #331: 問いで絞り込むフィルタ (単一選択・解除可)。
+          取得中は枠で場所を取る（0件と区別できないと、届いた瞬間に行が挿入されてズレる）。 */}
+      {questionsLoading && availableQuestions.length === 0 && <EntryListFilterSkeleton />}
       {availableQuestions.length > 0 && (
         <div className="relative mb-3 flex items-center gap-2">
           <label
