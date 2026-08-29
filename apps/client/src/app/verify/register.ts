@@ -31,7 +31,6 @@ import '@/features/pc/entries/components/question-select-modal.verify';
 import '@/features/pc/entries/components/save-title-modal.verify';
 import '@/features/pc/entries/components/settings-drawer.verify';
 import '@/features/pc/entries/components/stats-popup.verify';
-import '@/features/pc/entries/components/unsaved-changes-modal.verify';
 import '@/features/pc/board/components/board-card.verify';
 import '@/features/pc/board/components/board-controls.verify';
 import '@/features/pc/board/components/board-date-nav.verify';

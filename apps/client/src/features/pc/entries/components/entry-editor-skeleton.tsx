@@ -50,21 +50,22 @@ export function EntryEditorSkeleton({
         bodyLoading,
       })}
     >
-      {/* ツールバー（実物: border-b px-4 py-2、左2アイコン / 中央 日付+タイトル+問いチップ /
-          右2アイコン）。Issue #228 で問いリンカ行が中央カラムに畳まれ、3段構成になった。 */}
+      {/* ヘッダー（実物: px-4 py-2、**区切り線なし**。左=問いチップ /
+          右=アクション3つ＋日付＋設定）。タイトルは本文側へ移った。 */}
       <div
-        className="flex items-start justify-between border-b border-[var(--border-subtle)] px-4 py-2"
+        className="flex items-center justify-between gap-4 px-4 py-2"
         data-skeleton-slot="toolbar"
       >
-        <ToolbarIconsSkeleton count={2} />
-        <div className="flex min-w-0 flex-col items-center gap-1">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-4 w-40" />
+        <div className="flex items-center">
           {skeletonKeys(chips).map((k) => (
             <Skeleton key={k} className="h-[22px] w-[160px] rounded-full" />
           ))}
         </div>
-        <ToolbarIconsSkeleton count={2} />
+        <div className="flex items-center gap-2">
+          <ToolbarIconsSkeleton count={3} />
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+        </div>
       </div>
 
       {/* 執筆エリア（実物: min-h-full px-[15%] py-6）。中身は空のまま余白だけ確保する。 */}

@@ -1,11 +1,13 @@
 /**
- * SettingsDrawer の検証スペック（A 移植）。
- * props で完全に制御される設定ドロワー。i18n（useTranslations）を withVerifyProviders で供給し、
- * conditional な DOM（時間内包の RadioGroup / ゴーストの Slider 群）が契約と一致することを検証する。
+ * SettingsDrawer（設定パネル）の検証スペック。
  *
- * 注意: 本コンポーネントは状態を内部に持たない controlled component（onChange は親へ委譲）。
- * fixture の親は再レンダリングしないため、クリックで checkbox が反転する類の act は書かない。
- * 代わりに props を振り分けた fixture と probe で各分岐を網羅する。
+ * props で完全に制御される表示部品。i18n（useTranslations）を withVerifyProviders で供給し、
+ * conditional な DOM（時間内包の表し方 Select / ゴーストの Slider 群）が契約と一致することを検証する。
+ *
+ * 開閉と位置決めは呼び出し側の `Popover` が持つので、このユニットは**中身だけ**を描く。
+ * 状態を内部に持たない controlled component（onChange は親へ委譲）なので、fixture の親は
+ * 再レンダリングしない。クリックでトグルが反転する類の act は書かず、props を振り分けた
+ * fixture と probe で分岐を網羅する。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -13,10 +15,8 @@ import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { DEFAULT_SETTINGS, type EditorSettings, SettingsDrawer } from './settings-drawer';
 
 interface Props {
-  open: boolean;
   settings: EditorSettings;
   onChange: (patch: Partial<EditorSettings>) => void;
-  onClose: () => void;
 }
 
 const noop = () => {};
@@ -53,26 +53,26 @@ const boundaryStress: EditorSettings = {
 registerUnit<Props>({
   id: 'SettingsDrawer',
   title: 'SettingsDrawer',
-  description: 'エディタ設定ドロワー（props で制御。時間内包/ゴーストで子UIが出現）。',
+  description: 'エディタ設定パネル（props で制御。時間内包/ゴーストで子UIが出現）。',
   kind: 'component',
   render: (props) => withVerifyProviders(<SettingsDrawer {...props} />),
   fixtures: [
     {
       id: 'default',
       description: '初期設定（エフェクト無効 → 最小ツリー）',
-      props: { open: true, settings: DEFAULT_SETTINGS, onChange: noop, onClose: noop },
+      props: { settings: DEFAULT_SETTINGS, onChange: noop },
     },
     {
       id: 'all-effects-on',
-      description: '時間内包＋ゴースト有効 → ネストした RadioGroup / Slider 群が出現',
-      props: { open: true, settings: allEffectsOn, onChange: noop, onClose: noop },
+      description: '時間内包＋ゴースト有効 → 表し方 Select と Slider 群が出現',
+      props: { settings: allEffectsOn, onChange: noop },
     },
     {
       id: 'boundary-stress',
       probe: true,
       description:
         'Probe: 全トグルON＋数値が上限（fontSize48 / ghostSize200 / blur極大）でもレイアウトが崩れない',
-      props: { open: true, settings: boundaryStress, onChange: noop, onClose: noop },
+      props: { settings: boundaryStress, onChange: noop },
     },
   ],
   invariants: [
@@ -90,29 +90,45 @@ registerUnit<Props>({
     },
     {
       id: 'time-inscription-contract-matches-dom',
-      description:
-        'timeInscriptionEnabled 契約が true のときだけ ti-mode の RadioGroup が描画される',
-      check: ({ root, contract }) => {
-        const hasTiRadio = Boolean(root.querySelector('input[name="ti-mode"]'));
+      description: 'timeInscriptionEnabled 契約が true のときだけ「表し方」の Select が描画される',
+      check: ({ root, contract, props }) => {
+        const label = props.settings.timeInscriptionEnabled ? 1 : 0;
+        const selects = root.querySelectorAll('[aria-haspopup="listbox"]').length;
         const enabled = contract.timeInscriptionEnabled === 'true';
+        // 表示セクションに常設の Select が2つ（書字方向・書体）＋発酵の既定が1つ。
+        const base = 3;
+        const expected = base + label + (props.settings.ghostEnabled ? 1 : 0);
         return (
-          hasTiRadio === enabled ||
-          `ti DOM/contract 不一致: contract.timeInscriptionEnabled=${contract.timeInscriptionEnabled}, ti-mode存在=${hasTiRadio}`
+          (enabled === (label === 1) && selects === expected) ||
+          `Select 数=${selects}, 期待=${expected}（timeInscriptionEnabled=${contract.timeInscriptionEnabled}）`
         );
       },
     },
     {
-      id: 'fermentation-preference-checked-matches-props',
-      description:
-        'チェック済みの発酵オーバーレイ radio の value が props.settings.fermentationOverlayPreference と一致する',
-      check: ({ root, props }) => {
-        const checked = root.querySelector<HTMLInputElement>(
-          'input[name="fermentation-overlay-preference"]:checked',
-        );
-        return (
-          checked?.value === props.settings.fermentationOverlayPreference ||
-          `checked radio value="${checked?.value}", expected="${props.settings.fermentationOverlayPreference}"`
-        );
+      id: 'no-native-select',
+      description: 'ネイティブ <select> を使っていない（OS 依存の見た目を出さない）',
+      check: ({ root }) =>
+        root.querySelector('select') === null ||
+        'ネイティブ <select> が残っている（Select コンポーネントに置き換えるべき）',
+    },
+    {
+      id: 'rows-are-labelled',
+      description: 'すべてのトグルが role="switch" と aria-checked を持つ（表記と操作の統一）',
+      check: ({ root }) => {
+        const switches = Array.from(root.querySelectorAll('[role="switch"]'));
+        if (switches.length === 0) return 'トグルが1つも無い';
+        const missing = switches.filter((s) => !s.hasAttribute('aria-checked'));
+        return missing.length === 0 || `aria-checked の無い switch が ${missing.length} 個ある`;
+      },
+    },
+    {
+      id: 'long-description-is-behind-help',
+      description: '長い説明文はパネルに常時出さず、? のツールチップに畳む',
+      check: ({ root }) => {
+        const help = root.querySelector('button[aria-expanded][aria-label]');
+        const tip = root.querySelector('[role="tooltip"]');
+        if (!help) return '? のヘルプトリガーが見つからない';
+        return tip === null || '閉じているのに説明文が描画されている';
       },
     },
   ],

@@ -5,6 +5,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Popover } from '@/components/ui/popover';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -21,7 +22,6 @@ import { SaveTitleModal } from '@/features/pc/entries/components/save-title-moda
 import { SettingsDrawer } from '@/features/pc/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/pc/entries/components/snippet-toolbar';
 import { StatsPopup } from '@/features/pc/entries/components/stats-popup';
-import { UnsavedChangesModal } from '@/features/pc/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/pc/entries/hooks/use-amp-effect';
 import { useBrowserNavGuard } from '@/features/pc/entries/hooks/use-browser-nav-guard';
 import { useEditorSettings } from '@/features/pc/entries/hooks/use-editor-settings';
@@ -155,7 +155,6 @@ export function EntryEditor({
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   const [statsOpen, setStatsOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
-  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
   // Issue #360: ステータスバーが「いつ保存されたか」を語り続けるための基準時刻。
@@ -250,7 +249,6 @@ export function EntryEditor({
     linkQuestionNudgeOpen ||
     isEditingTitle ||
     statsOpen ||
-    pendingNavPath !== null ||
     leaveConfirmOpen ||
     overlayPromptOpen;
   const uiVisible = useFocusMode({
@@ -643,37 +641,13 @@ export function EntryEditor({
     onSaved: handleAutosaved,
   });
 
-  /** Navigate with unsaved-changes guard */
-  const guardedNavigate = useCallback(
-    (path: string) => {
-      if (hasUnsavedChanges) {
-        setPendingNavPath(path);
-      } else {
-        router.push(path);
-      }
-    },
-    [hasUnsavedChanges, router],
-  );
-
-  const handleUnsavedSave = useCallback(() => {
-    if (!entryId && !title.trim()) {
-      setSaveModalMode('save');
-      setSaveModalOpen(true);
-    } else {
-      handleSaveWithTitle(title);
-      if (pendingNavPath) {
-        const path = pendingNavPath;
-        setPendingNavPath(null);
-        setTimeout(() => router.push(path), 300);
-      }
-    }
-  }, [entryId, handleSaveWithTitle, pendingNavPath, router, title]);
-
-  const handleUnsavedDiscard = useCallback(() => {
-    const path = pendingNavPath;
-    setPendingNavPath(null);
-    if (path) router.push(path);
-  }, [pendingNavPath, router]);
+  // 「保存せずに移動しますか？」の確認は廃止した。
+  // 画面内の移動導線（一覧 / 新規エントリ）をサイドバーへ寄せてヘッダーから外したため、
+  // このコンポーネントは遷移を握らなくなった。加えて Issue #510 で、タブが隠れたとき・
+  // ページを離れるとき・アンマウント時に必ず保存が走るようになったので、
+  // 「未保存のまま失う」経路そのものが無い。原則2（保存は常に自動）とも、
+  // 移動のたびに保存を尋ねるモーダルは噛み合わない。
+  // ブラウザの戻る/進む・タブを閉じる操作は useBrowserNavGuard + LeaveConfirmModal が担う。
 
   const handleLink = useCallback(
     async (questionId: string) => {
@@ -739,8 +713,25 @@ export function EntryEditor({
   });
 
   const charCount = content.length;
-  // 縦書きは行が右から左へ伸びるので、本文の「末尾側」＝左。一次アクションは末尾側に置く。
-  const dockSideClass = settings.writingMode === 'vertical' ? 'left-8' : 'right-8';
+
+  const isVertical = settings.writingMode === 'vertical';
+  // タイトルの置き場。縦書きは本文（left:6% / width:79%）の右に残る余白へ縦組みで、
+  // 横書きは本文（px-[15%]）の上に、同じ左端から。
+  const titleBoxClass = isVertical
+    ? 'absolute top-[4%] right-[1.5%] h-[86%] w-[3.5%] min-w-[2.2rem]'
+    : 'absolute top-6 left-[15%] w-[70%]';
+  // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
+  // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
+  const titleFontSize = Math.round(settings.fontSize * 1.15);
+  const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
+  const titleTextStyle: React.CSSProperties = {
+    fontSize: `${titleFontSize}px`,
+    lineHeight: 1.4,
+    fontFamily:
+      settings.fontFamily === 'serif' ? "'Noto Serif JP', serif" : "'Noto Sans JP', sans-serif",
+    writingMode: isVertical ? 'vertical-rl' : 'horizontal-tb',
+    textOrientation: isVertical ? 'mixed' : undefined,
+  };
 
   return (
     <div
@@ -756,100 +747,12 @@ export function EntryEditor({
         questionSelectOpen,
       })}
     >
-      {/* Top toolbar */}
-      <div
-        className={`flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}
-      >
-        <div className="flex items-center gap-2">
-          {/* New entry */}
-          <button
-            type="button"
-            onClick={() => guardedNavigate('/entries/new')}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.new_entry')}
-            aria-label={t('toolbar.new_entry')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-              />
-            </svg>
-          </button>
-          {/* Issue #314 / #356: 「保存」ボタンはここから消えた。保存は常に自動で、
-              人が押すボタンは「漬け込む」だけ（本文側のドックにある）。保存が起きている事実は
-              下部ステータスバーが語る。⌘S は「いま確定させる」操作として残している。 */}
-          {/* List */}
-          <button
-            type="button"
-            onClick={() => guardedNavigate('/entries')}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.list')}
-            aria-label={t('toolbar.list')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
-              />
-            </svg>
-          </button>
-          {/* 執筆統計はステータスバーの文字数から開く（帯に意味を持たせる #360）。 */}
-        </div>
-
-        {/* 中央: このエントリーの身元（日付 → タイトル → 問い）。Issue #228 */}
-        <div className="flex min-w-0 flex-col items-center gap-1">
-          <span className="text-xs text-zinc-400">{dateStr}</span>
-          {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              onKeyDown={(e) => {
-                // IME 変換確定の Enter / Escape は無視する（日本語入力途中で確定されてしまう不具合の対策）
-                if (e.nativeEvent.isComposing) return;
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitTitleEdit();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  cancelTitleEdit();
-                }
-              }}
-              onBlur={commitTitleEdit}
-              maxLength={100}
-              placeholder={t('title.placeholder')}
-              aria-label={t('title.placeholder')}
-              className="w-[240px] max-w-full border-none bg-transparent text-center text-sm text-[var(--fg)] outline-none"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={startTitleEdit}
-              className="max-w-full cursor-pointer truncate border-none bg-transparent text-sm transition-colors hover:text-[var(--fg)]"
-              style={{ color: title ? 'var(--fg)' : 'var(--date-color)' }}
-            >
-              {title || t('title.add')}
-            </button>
-          )}
-          {/* Issue #228 #365: 専用行を廃して、問いを身元カラムの一部にする。 */}
+      {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
+          左＝問い、右＝アクションコーナー ＋ 日付 ＋ 設定。
+          「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。 */}
+      <div className={`flex items-center justify-between gap-4 px-4 py-2 ${fadeClass}`}>
+        {/* 左: 問いを結ぶ。旧「新規エントリ」「一覧」があった位置。 */}
+        <div className="flex min-w-0 items-center">
           <QuestionChip
             activeQuestions={activeQuestions}
             linkedQuestionIds={linkedIds}
@@ -858,8 +761,78 @@ export function EntryEditor({
           />
         </div>
 
-        {/* 右: 表示の切り替え。書字方向・書体・全画面は設定ドロワーに収納した（#356）。 */}
-        <div className="flex items-center gap-2">
+        {/* 右: アクションコーナー → 日付 → 設定。 */}
+        <div className="flex shrink-0 items-center gap-1">
+          {/* 入力と一次アクション。没入に関わる全画面切替もここに置く。 */}
+          <button
+            type="button"
+            onClick={() => setVoiceActive((v) => !v)}
+            className={`rounded-md p-1.5 transition-all ${
+              voiceActive
+                ? 'text-red-500'
+                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+            }`}
+            data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
+            aria-label={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
+          >
+            <svg
+              aria-hidden="true"
+              className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+            >
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+            </svg>
+          </button>
+
+          {/* 漬け込む。**色は付けない**（塗りボタンは紙の中で浮く）。 */}
+          <button
+            type="button"
+            onClick={handlePickleClick}
+            disabled={saving || !content.trim()}
+            data-testid="pickle-primary-action"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--fg)] transition-colors hover:bg-[var(--toolbar-hover)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+            aria-label={t('toolbar.pickle')}
+          >
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.6}
+            >
+              <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
+              <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+            </svg>
+            {t('toolbar.pickle')}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip={t('toolbar.fullscreen')}
+            aria-label={t('toolbar.fullscreen')}
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+              />
+            </svg>
+          </button>
+
           {/* Issue #329 → #466: 発酵結果はサイドバーに集約。結果があるときだけ開閉ボタンを出す。 */}
           {fermentationOverlayDetail && (
             <button
@@ -899,45 +872,50 @@ export function EntryEditor({
               </svg>
             </button>
           )}
-          {/* Settings */}
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(!settingsOpen)}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.settings')}
-            aria-label={t('toolbar.settings')}
+
+          {/* 日付は設定ボタンのすぐ左に、小さく。 */}
+          <span className="ml-1 shrink-0 text-[11px] text-[var(--date-color)]">{dateStr}</span>
+
+          {/* 設定。押すと真下にパネルが開く（背景は暗転しない・外側クリックで閉じる）。 */}
+          <Popover
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            ariaLabel={t('settings.heading')}
+            panelClassName="w-[19rem]"
+            trigger={(triggerProps) => (
+              <button
+                type="button"
+                {...triggerProps}
+                className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+                data-tooltip={t('toolbar.settings')}
+                aria-label={t('toolbar.settings')}
+              >
+                <svg
+                  aria-hidden="true"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                  />
+                </svg>
+              </button>
+            )}
           >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-              />
-            </svg>
-          </button>
+            <SettingsDrawer settings={settings} onChange={updateSettings} />
+          </Popover>
         </div>
       </div>
-
-      {/* Settings drawer */}
-      <SettingsDrawer
-        open={settingsOpen}
-        settings={settings}
-        onChange={updateSettings}
-        onClose={() => setSettingsOpen(false)}
-        onToggleFullscreen={toggleFullscreen}
-      />
 
       {/* Error display */}
       {error && (
@@ -972,6 +950,44 @@ export function EntryEditor({
             ref={scrollContainerRef}
             className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
           >
+            {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
+                縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
+                本文と同じ書体で、本文より一回り大きく置く。 */}
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  // IME 変換確定の Enter / Escape は無視する（日本語入力途中で確定されてしまう不具合の対策）
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitTitleEdit();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelTitleEdit();
+                  }
+                }}
+                onBlur={commitTitleEdit}
+                maxLength={100}
+                placeholder={t('title.placeholder')}
+                aria-label={t('title.placeholder')}
+                className={`z-[12] border-none bg-transparent text-[var(--fg)] outline-none ${titleBoxClass}`}
+                style={titleTextStyle}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={startTitleEdit}
+                className={`z-[12] cursor-text truncate border-none bg-transparent text-left transition-colors hover:text-[var(--fg)] ${titleBoxClass}`}
+                style={{ ...titleTextStyle, color: title ? 'var(--fg)' : 'var(--date-color)' }}
+              >
+                {title || t('title.add')}
+              </button>
+            )}
+
             {/* Snippet selection toolbar */}
             <SnippetToolbar editorRef={editorRef} api={api} />
 
@@ -1005,8 +1021,12 @@ export function EntryEditor({
               data-placeholder={t('placeholder')}
               // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
               // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
-              className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full px-[15%] py-6 after:block after:content-[''] after:h-[50vh]`}`}
+              className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full px-[15%] pb-6 after:block after:content-[''] after:h-[50vh]`}`}
               style={{
+                // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
+                ...(settings.writingMode === 'vertical'
+                  ? {}
+                  : { paddingTop: `${titleReservedPx}px` }),
                 ...(settings.writingMode === 'vertical'
                   ? {
                       left: '6%',
@@ -1029,65 +1049,18 @@ export function EntryEditor({
             />
           </div>
 
-          {/* 入力（音声）と一次アクション（漬け込む）のドック。
-            Issue #356: ツールバーに埋もれた「漬け込む」を、本文の末尾側に置いた
-            唯一の一次アクションへ昇格させる。書く道具（音声）も紙の近くに置く。
-            縦書きは行が右→左なので末尾側＝左（dockSideClass）。 */}
-          <div
-            className={`pointer-events-none absolute bottom-6 z-[20] flex items-center gap-3 ${dockSideClass} ${fadeClass}`}
-          >
-            {voiceState.unavailable && (
+          {/* 音声入力が使えない環境の告知。ボタン自体はヘッダーのアクションコーナーへ移した。 */}
+          {voiceState.unavailable && (
+            <div className={`absolute right-6 bottom-6 z-[20] ${fadeClass}`}>
               <span
-                className="pointer-events-auto rounded bg-[var(--bg)] px-2 py-1 text-xs text-red-500 shadow"
+                className="rounded bg-[var(--bg)] px-2 py-1 text-xs text-red-500 shadow"
                 role="status"
                 data-testid="voice-unavailable-notice"
               >
                 {voiceStatusMessage(voiceState.reason, t)}
               </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setVoiceActive((v) => !v)}
-              className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg)] shadow-sm transition-all ${
-                voiceActive ? 'text-red-500' : 'text-[var(--date-color)] hover:text-[var(--fg)]'
-              }`}
-              data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-              aria-label={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-            >
-              <svg
-                aria-hidden="true"
-                className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-              >
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={handlePickleClick}
-              disabled={saving || !content.trim()}
-              data-testid="pickle-primary-action"
-              className="pointer-events-auto flex items-center gap-2 rounded-full px-5 py-2.5 text-sm text-white shadow-lg transition-opacity disabled:cursor-default disabled:opacity-30"
-              style={{ background: 'var(--ob-jar-warm)', fontFamily: 'var(--ob-font-sans)' }}
-              aria-label={t('toolbar.pickle')}
-            >
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={1.6}
-              >
-                <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
-                <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
-              </svg>
-              {t('toolbar.pickle')}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Issue #466: 発酵結果は本文に重ねず、右のサイドバーに集約する。 */}
@@ -1130,24 +1103,8 @@ export function EntryEditor({
         }
         onSave={(t) => {
           handleSaveWithTitle(t, saveModalMode === 'pickle' ? { fermentationEnabled: true } : {});
-          if (pendingNavPath) {
-            const path = pendingNavPath;
-            setPendingNavPath(null);
-            setTimeout(() => router.push(path), 300);
-          }
         }}
-        onClose={() => {
-          setSaveModalOpen(false);
-          setPendingNavPath(null);
-        }}
-      />
-
-      {/* Unsaved changes modal */}
-      <UnsavedChangesModal
-        open={pendingNavPath !== null && !saveModalOpen}
-        onSave={handleUnsavedSave}
-        onDiscard={handleUnsavedDiscard}
-        onClose={() => setPendingNavPath(null)}
+        onClose={() => setSaveModalOpen(false)}
       />
 
       {/* Browser back/forward confirmation */}
