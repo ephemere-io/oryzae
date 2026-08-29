@@ -3,6 +3,7 @@
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -14,19 +15,27 @@ import {
 } from '@/components/ui/table';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-interface Deploy {
-  id: string;
-  state: string;
-  target: string;
-  createdAt: string;
-  buildDurationMs: number | null;
-  url: string;
-  inspectorUrl: string;
-  commitMessage: string;
-  commitRef: string;
-  creatorEmail: string;
-}
+const deploySchema = z.object({
+  id: z.string(),
+  state: z.string(),
+  target: z.string(),
+  createdAt: z.string(),
+  buildDurationMs: z.number().nullable(),
+  url: z.string(),
+  inspectorUrl: z.string(),
+  commitMessage: z.string(),
+  commitRef: z.string(),
+  creatorEmail: z.string(),
+});
+
+const deploysResponseSchema = z.object({
+  deploys: z.array(deploySchema),
+  configured: z.boolean(),
+});
+
+type Deploy = z.infer<typeof deploySchema>;
 
 function formatDate(iso: string): string {
   if (!iso) return '-';
@@ -68,8 +77,8 @@ export default function DeploysPage() {
     setLoading(true);
     const api = createApiClient(token);
     const res = await api.fetch('/api/v1/admin/observability/deploys');
-    if (res.ok) {
-      const body = (await res.json()) as { deploys: Deploy[]; configured: boolean };
+    const body = res.ok ? await parseJson(res, deploysResponseSchema) : null;
+    if (body) {
       setDeploys(body.deploys);
       setConfigured(body.configured);
     }

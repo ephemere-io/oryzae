@@ -1,31 +1,37 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-export interface FermentationItem {
-  id: string;
-  user_id: string;
-  user_email: string;
-  question_id: string;
-  target_period: string;
-  status: string;
-  generation_id: string | null;
-  error_message: string | null;
-  created_at: string;
-  updated_at: string;
-  cost: {
-    totalCost: number;
-    promptTokens: number;
-    completionTokens: number;
-  } | null;
-}
+const fermentationItemSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  user_email: z.string(),
+  question_id: z.string(),
+  target_period: z.string(),
+  status: z.string(),
+  generation_id: z.string().nullable(),
+  error_message: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  cost: z
+    .object({
+      totalCost: z.number(),
+      promptTokens: z.number(),
+      completionTokens: z.number(),
+    })
+    .nullable(),
+});
 
-interface FermentationsResponse {
-  data: FermentationItem[];
-  pagination: { page: number; limit: number; total: number };
-}
+const fermentationsResponseSchema = z.object({
+  data: z.array(fermentationItemSchema),
+  pagination: z.object({ page: z.number(), limit: z.number(), total: z.number() }),
+});
+
+export type FermentationItem = z.infer<typeof fermentationItemSchema>;
 
 interface UseFermentationsParams {
   page?: number;
@@ -65,8 +71,8 @@ export function useFermentations(params?: UseFermentationsParams) {
     if (status) searchParams.set('status', status);
 
     const res = await api.fetch(`/api/v1/admin/fermentations?${searchParams.toString()}`);
-    if (res.ok) {
-      const body = (await res.json()) as FermentationsResponse;
+    const body = res.ok ? await parseJson(res, fermentationsResponseSchema) : null;
+    if (body) {
       setData(body.data);
       setPagination(body.pagination);
     } else {

@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QuestionSelectModal } from '@/features/pc/entries/components/question-select-modal';
 import jaMessages from '@/i18n/messages/ja.json';
+import { closestOrThrow } from '../../../../helpers/dom';
 
 describe('QuestionSelectModal (Issue #316)', () => {
   afterEach(() => cleanup());
@@ -44,7 +45,7 @@ describe('QuestionSelectModal (Issue #316)', () => {
   it('既存の問いがあれば pick モードがデフォルトで、selectで選択して確定すると existingId を渡す', () => {
     const { onConfirm } = setup();
     expect(screen.getByRole('dialog')).toBeTruthy();
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    const select = screen.getByRole<HTMLSelectElement>('combobox');
     fireEvent.change(select, { target: { value: 'q2' } });
     fireEvent.click(screen.getByText('紐付けて漬け込む'));
     expect(onConfirm).toHaveBeenCalledWith({ existingId: 'q2', newQuestionText: null });
@@ -52,7 +53,7 @@ describe('QuestionSelectModal (Issue #316)', () => {
 
   it('既存の問いが 1 つもなければ create モードで開き、入力して確定すると newQuestionText を渡す', () => {
     const { onConfirm } = setup({ activeQuestions: [] });
-    const input = screen.getByPlaceholderText(/問いを書く/) as HTMLInputElement;
+    const input = screen.getByPlaceholderText<HTMLInputElement>(/問いを書く/);
     fireEvent.change(input, { target: { value: '今日の感謝は？' } });
     fireEvent.click(screen.getByText('紐付けて漬け込む'));
     expect(onConfirm).toHaveBeenCalledWith({
@@ -75,7 +76,7 @@ describe('QuestionSelectModal (Issue #316)', () => {
 
   it('未選択 / 未入力のまま確定はできない (ボタン disabled)', () => {
     const { onConfirm } = setup();
-    const button = screen.getByText('紐付けて漬け込む').closest('button') as HTMLButtonElement;
+    const button = closestOrThrow(screen.getByText('紐付けて漬け込む'), 'button');
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(onConfirm).not.toHaveBeenCalled();

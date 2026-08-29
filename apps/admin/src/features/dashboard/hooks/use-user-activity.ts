@@ -1,8 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
+
+const userActivitySchema = z.object({
+  activeWriters: z.number(),
+  totalUsers: z.number(),
+  returningUsers: z.number().optional(),
+  previousActiveUsers: z.number().optional(),
+});
 
 export function useUserActivity(dateFrom?: string, dateTo?: string) {
   const [activeWriters, setActiveWriters] = useState(0);
@@ -29,26 +38,13 @@ export function useUserActivity(dateFrom?: string, dateTo?: string) {
 
     const api = createApiClient(token);
     const res = await api.fetch(`/api/v1/admin/dashboard/user-activity${qs ? `?${qs}` : ''}`);
-    if (res.ok) {
-      const data: unknown = await res.json();
-      if (
-        data !== null &&
-        typeof data === 'object' &&
-        'activeWriters' in data &&
-        'totalUsers' in data
-      ) {
-        const parsed = data as {
-          activeWriters: number;
-          totalUsers: number;
-          returningUsers?: number;
-          previousActiveUsers?: number;
-        }; // @type-assertion-allowed: 型ガード後のキャスト
-        setActiveWriters(parsed.activeWriters);
-        setTotalUsers(parsed.totalUsers);
-        setReturningUsers(parsed.returningUsers ?? 0);
-        setPreviousActiveUsers(parsed.previousActiveUsers ?? 0);
-      }
-    } else {
+    const parsed = res.ok ? await parseJson(res, userActivitySchema) : null;
+    if (parsed) {
+      setActiveWriters(parsed.activeWriters);
+      setTotalUsers(parsed.totalUsers);
+      setReturningUsers(parsed.returningUsers ?? 0);
+      setPreviousActiveUsers(parsed.previousActiveUsers ?? 0);
+    } else if (!res.ok) {
       setError('ユーザーアクティビティの取得に失敗しました');
     }
     setLoading(false);

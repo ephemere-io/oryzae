@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import jaMessages from '@/i18n/messages/ja.json';
 
+function readField(value: unknown, key: string): unknown {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const record: Record<string, unknown> = { ...value };
+  return record[key];
+}
+
 function jaT(key: string): string {
-  const segments = key.split('.');
-  let cursor: unknown = (jaMessages as Record<string, unknown>).editor;
-  for (const seg of segments) {
-    if (typeof cursor !== 'object' || cursor === null) return key;
-    cursor = (cursor as Record<string, unknown>)[seg];
+  let cursor: unknown = readField(jaMessages, 'editor');
+  for (const seg of key.split('.')) {
+    cursor = readField(cursor, seg);
   }
   return typeof cursor === 'string' ? cursor : key;
 }

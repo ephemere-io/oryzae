@@ -1,28 +1,34 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-export interface CostItem {
-  id: string;
-  user_id: string;
-  user_email: string;
-  status: string;
-  generation_id: string | null;
-  created_at: string;
-  cost: {
-    totalCost: number;
-    promptTokens: number;
-    completionTokens: number;
-    latency: number;
-  } | null;
-}
+const costItemSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  user_email: z.string(),
+  status: z.string(),
+  generation_id: z.string().nullable(),
+  created_at: z.string(),
+  cost: z
+    .object({
+      totalCost: z.number(),
+      promptTokens: z.number(),
+      completionTokens: z.number(),
+      latency: z.number(),
+    })
+    .nullable(),
+});
 
-interface CostDataResponse {
-  data: CostItem[];
-  pagination: { page: number; limit: number; total: number };
-}
+const costDataResponseSchema = z.object({
+  data: z.array(costItemSchema),
+  pagination: z.object({ page: z.number(), limit: z.number(), total: z.number() }),
+});
+
+export type CostItem = z.infer<typeof costItemSchema>;
 
 interface UseCostDataParams {
   page?: number;
@@ -59,8 +65,8 @@ export function useCostData(params?: UseCostDataParams) {
     if (userId) searchParams.set('user_id', userId);
 
     const res = await api.fetch(`/api/v1/admin/fermentations/costs?${searchParams.toString()}`);
-    if (res.ok) {
-      const body = (await res.json()) as CostDataResponse;
+    const body = res.ok ? await parseJson(res, costDataResponseSchema) : null;
+    if (body) {
       setData(body.data);
       setPagination(body.pagination);
     } else {

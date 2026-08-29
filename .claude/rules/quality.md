@@ -10,11 +10,25 @@
 
 全コードで `as` による型アサーションを使ってはならない。型が合わない場合は型ガードを書く。
 
-やむを得ない場合（ブラウザ API の型定義不足等）は、前の行に理由を記載する:
+やむを得ない場合（ブラウザ API の型定義不足等）は、**同じ行の末尾か前の行**に理由を記載する:
 ```typescript
 // @type-assertion-allowed: InputEvent.inputType は標準 TS DOM 型に含まれない
 const ie = e as InputEvent;
 ```
+
+`pnpm check:as`（CI ジョブ **No `as` Casts**）がこれを強制する。理由が空の
+`@type-assertion-allowed` は違反として扱う。検出器は `scripts/check-type-assertions.mjs`。
+`as const` と import/export の別名（`import * as X`）は対象外。
+
+検出器自体は自前の字句解析なので、`scripts/check-type-assertions.test.mjs` に
+自己テストがある（`pnpm check:as` が本体より先に実行する）。検出ロジックを触ったら
+ここにケースを足すこと。**検出漏れは「CI が緑なのにルールが守られていない」状態を作る**ため、
+false negative のケースを特に厚くしてある。
+
+サーバーの Supabase 行マッピングは、キャストではなく
+`contexts/shared/infrastructure/row.ts` のリーダー（`readString` / `readNumber` /
+`readEnum` など）を使う。DB スキーマがずれた時に、どのカラムがどう違ったのかが
+分かる例外になる。
 
 ### `any` 型禁止
 
@@ -49,7 +63,7 @@ take_screenshot filePath=.tmp/screenshots/{名前}.png
 ## コミット前チェック
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip
+pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip && pnpm check:as
 ```
 
 ## Stop hook による自動テスト

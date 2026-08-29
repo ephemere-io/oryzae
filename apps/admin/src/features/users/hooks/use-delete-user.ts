@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { readErrorMessage } from '@/lib/json';
 
 // Issue #326: 管理画面からテストアカウントを一括削除する。
 // 関連テーブル (entries, questions, fermentation_results, boards, profiles, ...)
@@ -29,14 +30,7 @@ export function useDeleteUser() {
       return true;
     }
 
-    let message = 'ユーザーの削除に失敗しました';
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (typeof body.error === 'string' && body.error.length > 0) message = body.error;
-    } catch {
-      // body が JSON でない場合はデフォルト文言のまま
-    }
-    setError(message);
+    setError(await readErrorMessage(res, 'ユーザーの削除に失敗しました'));
     setLoading(false);
     return false;
   }, []);
