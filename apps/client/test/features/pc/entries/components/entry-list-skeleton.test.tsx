@@ -11,10 +11,15 @@ import jaMessages from '@/i18n/messages/ja.json';
 describe('EntryList skeleton (Issue #362)', () => {
   afterEach(() => cleanup());
 
-  function setup(authLoading: boolean) {
+  function setup(authLoading: boolean, questionsLoading = false) {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
-        <EntryList api={null} authLoading={authLoading} availableQuestions={[]} />
+        <EntryList
+          api={null}
+          authLoading={authLoading}
+          availableQuestions={[]}
+          questionsLoading={questionsLoading}
+        />
       </NextIntlClientProvider>,
     );
   }
@@ -27,5 +32,15 @@ describe('EntryList skeleton (Issue #362)', () => {
   it('authLoading 中は「エントリがありません」等の空状態メッセージを出さない', () => {
     setup(true);
     expect(screen.queryByText(jaMessages.entries.list.no_entries)).toBeNull();
+  });
+  it('問いの取得中はフィルタ行の枠で場所を取る（届いた瞬間に一覧がズレない）', () => {
+    // 「取得中」と「問い0件」を区別できないと、枠 → 消える → 出る で2回ズレる。
+    setup(false, true);
+    expect(document.querySelector('[data-skeleton-slot="filter"]')).not.toBeNull();
+  });
+
+  it('問いが0件と確定したらフィルタ行の枠は出さない', () => {
+    setup(false, false);
+    expect(document.querySelector('[data-skeleton-slot="filter"]')).toBeNull();
   });
 });
