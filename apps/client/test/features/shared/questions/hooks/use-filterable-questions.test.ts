@@ -53,12 +53,24 @@ describe('useFilterableQuestions', () => {
     );
     const { result } = renderHook(() => useFilterableQuestions(createMockApi(fetchImpl)));
 
-    await waitFor(() => expect(result.current).toHaveLength(1));
-    expect(result.current[0]).toEqual({ id: 'q1', currentText: '生きているのか' });
+    await waitFor(() => expect(result.current.questions).toHaveLength(1));
+    expect(result.current.questions[0]).toEqual({ id: 'q1', currentText: '生きているのか' });
   });
 
   it('api が null なら空配列', () => {
     const { result } = renderHook(() => useFilterableQuestions(null));
-    expect(result.current).toEqual([]);
+    expect(result.current.questions).toEqual([]);
+  });
+  it('取得中は loading=true（一覧が「0件」と区別してフィルタ行の枠を出せるようにする）', async () => {
+    // これが無いと一覧は「まだ取得中」と「問いが0件」を区別できず、届いた瞬間に
+    // フィルタ行が挿入されて一覧全体が下へズレる。
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(jsonResponse([question({ id: 'q1', currentText: '問い' })])),
+    );
+    const { result } = renderHook(() => useFilterableQuestions(createMockApi(fetchImpl)));
+
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.questions).toHaveLength(1);
   });
 });

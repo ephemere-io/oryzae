@@ -54,6 +54,22 @@ export function EntryListRowsSkeleton({ rows = 4 }: { rows?: number }) {
 }
 
 /**
+ * 問いフィルタ行の枠だけ。
+ *
+ * EntryList 本体でも使う: 問いの取得が終わるまで行の有無を決められないため、
+ * 枠で場所を取っておく。取らないと「枠 → 行が消える → 行が出る」で2回ズレる
+ * （問いが0件のときだけ、最後に1回縮む）。
+ */
+export function EntryListFilterSkeleton() {
+  return (
+    <div className="mb-3 flex items-center gap-2" data-skeleton-slot="filter">
+      <Skeleton className="h-3 w-12 shrink-0" />
+      <Skeleton className="h-[38px] flex-1 rounded-lg" />
+    </div>
+  );
+}
+
+/**
  * 一覧まるごと（chrome ＋ 行）。`/entries` の遷移フォールバック・初回描画で使う。
  * `withFilter` は問いフィルタ行の有無（EntryList は問いが1件以上あるときだけ出す）。
  */
@@ -74,12 +90,7 @@ export function EntryListSkeleton({
         rows,
       })}
     >
-      {withFilter && (
-        <div className="mb-3 flex items-center gap-2" data-skeleton-slot="filter">
-          <Skeleton className="h-3 w-12 shrink-0" />
-          <Skeleton className="h-[38px] flex-1 rounded-lg" />
-        </div>
-      )}
+      {withFilter && <EntryListFilterSkeleton />}
       <Skeleton className="mb-4 h-[42px] w-full rounded-lg" data-skeleton-slot="search" />
       <EntryListRowsSkeleton rows={rows} />
     </div>

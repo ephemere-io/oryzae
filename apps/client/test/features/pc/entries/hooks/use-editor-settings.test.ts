@@ -7,6 +7,7 @@ const FONT_SIZE_KEY = 'oryzae-editor-font-size';
 const LINE_HEIGHT_KEY = 'oryzae-editor-line-height';
 const FOCUS_MODE_KEY = 'oryzae-editor-focus-mode';
 const FERMENTATION_OVERLAY_KEY = 'oryzae-editor-fermentation-overlay-preference';
+const FOCUS_FADES_FERMENTATION_KEY = 'oryzae-editor-focus-mode-fades-fermentation';
 
 describe('useEditorSettings', () => {
   beforeEach(() => {
@@ -200,5 +201,37 @@ describe('useEditorSettings', () => {
 
     const second = renderHook(() => useEditorSettings());
     expect(second.result.current[0].fermentationOverlayPreference).toBe('never');
+  });
+
+  // Issue #350: フォーカスモードで発酵要素も透明化するかの設定。
+  it('focusModeFadesFermentation の既定は true（書いている間は本文だけ残る）', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].focusModeFadesFermentation).toBe(true);
+  });
+
+  it('focusModeFadesFermentation を切ると localStorage に永続化される', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    act(() => {
+      result.current[1]({ focusModeFadesFermentation: false });
+    });
+    expect(result.current[0].focusModeFadesFermentation).toBe(false);
+    expect(window.localStorage.getItem(FOCUS_FADES_FERMENTATION_KEY)).toBe('false');
+  });
+
+  it('focusModeFadesFermentation は再マウント越しに保持される', () => {
+    const first = renderHook(() => useEditorSettings());
+    act(() => {
+      first.result.current[1]({ focusModeFadesFermentation: false });
+    });
+    first.unmount();
+
+    const second = renderHook(() => useEditorSettings());
+    expect(second.result.current[0].focusModeFadesFermentation).toBe(false);
+  });
+
+  it('壊れた focusModeFadesFermentation は無視して既定に戻す', () => {
+    window.localStorage.setItem(FOCUS_FADES_FERMENTATION_KEY, 'maybe');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].focusModeFadesFermentation).toBe(true);
   });
 });

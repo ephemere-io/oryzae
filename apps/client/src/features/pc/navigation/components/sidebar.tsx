@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { useAuth } from '@/lib/auth-context';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
@@ -21,7 +22,9 @@ const NAV_ITEMS: NavItem[] = [
     href: '/jar',
     label: 'Jar',
     match: '/jar',
-    iconPath: 'M8 2h8v4H8zM6 6h12v2c0 5.5-2.5 8-6 12-3.5-4-6-6.5-6-12V6z',
+    // Issue #385: SP のナビ／CTA と形が違っていた（あちらは蓋の横棒＋下すぼまりでゴミ箱に
+    // 見え、こちらは下がとがったフラスコ形）。同じ保存瓶の形に揃える。
+    iconPath: JAR_ICON_PATH,
   },
   {
     href: '/board',

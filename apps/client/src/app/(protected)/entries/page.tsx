@@ -11,11 +11,17 @@ export default function EntriesPage() {
   const { api, loading } = useAuth();
   // Issue #331: 一覧の問いフィルタ用の選択肢。取得と整形は共有 hook が持ち、
   // PC/SP の一覧へ同じものを渡す（二重 fetch を避ける）。
-  const availableQuestions = useFilterableQuestions(api);
+  const { questions: availableQuestions, loading: questionsLoading } = useFilterableQuestions(api);
 
   return (
     <DeviceView
-      sp={<SpEntryList api={api} availableQuestions={availableQuestions} />}
+      sp={
+        <SpEntryList
+          api={api}
+          availableQuestions={availableQuestions}
+          questionsLoading={questionsLoading}
+        />
+      }
       pc={
         <div className="flex min-h-full flex-col">
           <div className="mx-auto w-full max-w-[680px] flex-1 px-6 pt-10 pb-20">
@@ -36,7 +42,12 @@ export default function EntriesPage() {
               </Link>
             </div>
 
-            <EntryList api={api} authLoading={loading} availableQuestions={availableQuestions} />
+            <EntryList
+              api={api}
+              authLoading={loading}
+              availableQuestions={availableQuestions}
+              questionsLoading={questionsLoading}
+            />
           </div>
         </div>
       }

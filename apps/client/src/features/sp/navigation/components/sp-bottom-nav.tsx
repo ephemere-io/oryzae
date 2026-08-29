@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { useUnread } from '@/lib/unread-context';
 
 function ListIcon() {
@@ -58,10 +59,7 @@ function JarIcon() {
       aria-hidden="true"
     >
       <title>jar</title>
-      <path
-        d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z"
-        strokeLinejoin="round"
-      />
+      <path d={JAR_ICON_PATH} strokeLinejoin="round" />
     </svg>
   );
 }

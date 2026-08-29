@@ -6,6 +6,7 @@ import type {
   FermentationSummary,
   FermentationWorksheet,
   JarPositioned,
+  ScannedEntry,
 } from '@/features/shared/fermentation/types';
 
 /**
@@ -83,6 +84,18 @@ function normalizeWorksheet(input: unknown): FermentationWorksheet | null {
   };
 }
 
+/** 手紙のもとになった記録。id と日付を欠くものは開けないので落とす（Issue #453）。 */
+function normalizeScannedEntries(input: unknown): ScannedEntry[] {
+  if (!Array.isArray(input)) return [];
+  const out: ScannedEntry[] = [];
+  for (const raw of input) {
+    if (!isObject(raw) || typeof raw.id !== 'string') continue;
+    if (typeof raw.createdAt !== 'string') continue;
+    out.push({ id: raw.id, title: str(raw.title), createdAt: raw.createdAt });
+  }
+  return out;
+}
+
 /** 詳細レスポンスを正規化する。id / questionId を欠くものは null（＝表示しない）。 */
 export function normalizeDetail(input: unknown): FermentationDetail | null {
   if (!isObject(input)) return null;
@@ -96,6 +109,7 @@ export function normalizeDetail(input: unknown): FermentationDetail | null {
     snippets: normalizeSnippets(input.snippets),
     keywords: normalizeKeywords(input.keywords),
     letter: normalizeLetter(input.letter),
+    scannedEntries: normalizeScannedEntries(input.scannedEntries),
   };
 }
 

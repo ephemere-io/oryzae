@@ -9,12 +9,10 @@ import { useJarQuestions } from '@/features/shared/questions/hooks/use-jar-quest
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { useAuth } from '@/lib/auth-context';
-import { useUnread } from '@/lib/unread-context';
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
   const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api);
-  const { markSeen } = useUnread();
   const { questions, refetch: refetchQuestions } = useJarQuestions(api, authLoading);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,11 +32,6 @@ export default function JarPage() {
     setTimeout(() => setPickleSuccessOpen(true), 3500);
     router.replace('/jar');
   }, [justPickled, router]);
-
-  // Mark fermentation results as seen when visiting jar page
-  useEffect(() => {
-    markSeen();
-  }, [markSeen]);
 
   async function handleAddQuestion(text: string) {
     await createQuestion(text);

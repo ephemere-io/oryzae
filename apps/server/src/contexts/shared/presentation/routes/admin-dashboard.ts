@@ -11,17 +11,31 @@ type Env = {
   };
 };
 
+/** `getTimezoneOffset()` 相当の分数。±14 時間を超える値は不正として 0 に落とす。 */
+export function parseTzOffset(raw: string | undefined): number {
+  if (!raw) return 0;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || Math.abs(parsed) > 14 * 60) return 0;
+  return parsed;
+}
+
 // 現在期間と「直前の同じ長さの期間」を解決する（リテンション比較用）。
 // date_from/date_to は YYYY-MM-DD（セレクタ）。未指定時は直近7日 / now にフォールバック。
+//
+// Issue #367: セレクタで選んだ日を UTC の 00:00〜24:00 として扱っていたため、JST で見ると
+// 期間が 9 時間ずれ、前日の夜と当日の夜が混ざった数が出ていた（ボードの日付境界と同じ問題）。
+// 閲覧者のオフセットを受け取ってローカル暦日の区間に直す。
 export function resolveActivityPeriods(
   dateFrom: string | undefined,
   dateTo: string | undefined,
   now: Date,
+  tzOffsetMinutes = 0,
 ): { currentStart: string; currentEnd: string; previousStart: string; previousEnd: string } {
+  const offsetMs = tzOffsetMinutes * 60_000;
   const currentStart = dateFrom
-    ? new Date(`${dateFrom}T00:00:00.000Z`)
+    ? new Date(Date.parse(`${dateFrom}T00:00:00.000Z`) + offsetMs)
     : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const currentEnd = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : now;
+  const currentEnd = dateTo ? new Date(Date.parse(`${dateTo}T23:59:59.999Z`) + offsetMs) : now;
   // 期間長（最低1日）。直前期間は [currentStart - 期間長, currentStart) とする。
   const periodMs = Math.max(currentEnd.getTime() - currentStart.getTime(), 24 * 60 * 60 * 1000);
   const previousEnd = new Date(currentStart.getTime() - 1);
@@ -32,6 +46,55 @@ export function resolveActivityPeriods(
     previousStart: previousStart.toISOString(),
     previousEnd: previousEnd.toISOString(),
   };
+}
+
+/** PostgREST の 1 回のレスポンス上限。これを超えると黙って打ち切られる。 */
+const PAGE_SIZE = 1000;
+
+/**
+ * 期間内に 1 件以上書いた人の user_id を、取りこぼさずに集める。
+ *
+ * Issue #367: `.select('user_id')` を 1 回投げるだけだったため、期間内のエントリが 1000 件を
+ * 超えると PostgREST の既定上限で黙って打ち切られ、アクティブ数が過少になっていた。
+ * エラーにならないので「なんとなく少ない」としか見えない種類の壊れ方だった。
+ */
+export async function collectWriterIds(
+  supabase: SupabaseClient,
+  startIso: string,
+  endIso: string,
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('entries')
+      .select('user_id')
+      .gte('created_at', startIso)
+      .lte('created_at', endIso)
+      .order('created_at', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+
+    const rows = data ?? [];
+    for (const row of rows) {
+      if (typeof row.user_id === 'string') ids.push(row.user_id);
+    }
+    if (rows.length < PAGE_SIZE) return ids;
+  }
+}
+
+/**
+ * 利用者数（アクティブ率の分母）。
+ *
+ * Issue #367: `auth.admin.listUsers({ perPage: 1000 })` は 1 ページしか読んでいないため
+ * 1000 人で頭打ちになり、分母が止まった分だけアクティブ率が実際より高く出ていた。
+ * profiles は signup 時に必ず 1 行できるので、こちらを exact count で数える。
+ */
+export async function countTotalUsers(supabase: SupabaseClient): Promise<number> {
+  const { count, error } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true });
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }
 
 // 現在/直前期間の投稿者から、アクティブ数・直前アクティブ数・継続(両方に出現)数を数える。
@@ -71,9 +134,10 @@ export const adminDashboard = new Hono<Env>()
       return q as unknown as T;
     };
 
-    const [usersRes, entriesRes, allFermRes, completedRes, failedRes, costTrackedRes] =
+    const [totalUsers, entriesRes, allFermRes, completedRes, failedRes, costTrackedRes] =
       await Promise.all([
-        supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+        // Issue #367: listUsers は 1 ページ 1000 人で頭打ちになる。profiles を数える。
+        countTotalUsers(supabase),
         applyDateFilter(supabase.from('entries').select('id', { count: 'exact', head: true })),
         applyDateFilter(
           supabase.from('fermentation_results').select('id', { count: 'exact', head: true }),
@@ -99,7 +163,7 @@ export const adminDashboard = new Hono<Env>()
       ]);
 
     return c.json({
-      totalUsers: usersRes.data?.users?.length ?? 0,
+      totalUsers,
       totalEntries: entriesRes.count ?? 0,
       totalFermentations: allFermRes.count ?? 0,
       completedFermentations: completedRes.count ?? 0,
@@ -313,30 +377,21 @@ export const adminDashboard = new Hono<Env>()
     // 直前の同じ長さの期間も取り、継続(リテンション)ユーザーを算出する。
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
-    const periods = resolveActivityPeriods(dateFrom, dateTo, new Date());
+    // 閲覧者のローカル暦日で期間を切る（未指定なら UTC 基準＝従来挙動）。
+    const tzOffsetMinutes = parseTzOffset(c.req.query('tzOffset'));
+    const periods = resolveActivityPeriods(dateFrom, dateTo, new Date(), tzOffsetMinutes);
 
-    const [currentRes, previousRes, usersRes] = await Promise.all([
-      supabase
-        .from('entries')
-        .select('user_id')
-        .gte('created_at', periods.currentStart)
-        .lte('created_at', periods.currentEnd),
-      supabase
-        .from('entries')
-        .select('user_id')
-        .gte('created_at', periods.previousStart)
-        .lte('created_at', periods.previousEnd),
-      supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    const [currentIds, previousIds, totalUsers] = await Promise.all([
+      collectWriterIds(supabase, periods.currentStart, periods.currentEnd),
+      collectWriterIds(supabase, periods.previousStart, periods.previousEnd),
+      countTotalUsers(supabase),
     ]);
 
-    const counts = countReturning(
-      (currentRes.data ?? []).map((r) => r.user_id),
-      (previousRes.data ?? []).map((r) => r.user_id),
-    );
+    const counts = countReturning(currentIds, previousIds);
 
     return c.json({
       activeWriters: counts.activeWriters,
-      totalUsers: usersRes.data?.users?.length ?? 0,
+      totalUsers,
       returningUsers: counts.returningUsers,
       previousActiveUsers: counts.previousActiveUsers,
     });
