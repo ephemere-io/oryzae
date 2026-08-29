@@ -1,17 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-export interface DashboardStats {
-  totalUsers: number;
-  totalEntries: number;
-  totalFermentations: number;
-  completedFermentations: number;
-  failedFermentations: number;
-  fermentationsWithCostTracking: number;
-}
+const dashboardStatsSchema = z.object({
+  totalUsers: z.number(),
+  totalEntries: z.number(),
+  totalFermentations: z.number(),
+  completedFermentations: z.number(),
+  failedFermentations: z.number(),
+  fermentationsWithCostTracking: z.number(),
+});
+
+export type DashboardStats = z.infer<typeof dashboardStatsSchema>;
 
 interface UseDashboardStatsParams {
   dateFrom?: string;
@@ -40,8 +44,8 @@ export function useDashboardStats(params?: UseDashboardStatsParams) {
     const url = `/api/v1/admin/dashboard/stats${qs ? `?${qs}` : ''}`;
 
     const res = await api.fetch(url);
-    if (res.ok) {
-      const data = (await res.json()) as DashboardStats;
+    const data = res.ok ? await parseJson(res, dashboardStatsSchema) : null;
+    if (data) {
       setStats(data);
     } else {
       setError('統計情報の取得に失敗しました');

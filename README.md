@@ -37,6 +37,7 @@ pnpm lint        # Biome (format + lint)
 pnpm test        # Vitest (server + client + admin)
 pnpm dep-cruise  # Architecture dependency rules (server + client + admin)
 pnpm knip        # Dead code detection
+pnpm check:as    # `as` 型アサーション禁止（例外は @type-assertion-allowed で明示）
 ```
 
 Git hooks (pre-commit / pre-push) で自動実行されます。`--no-verify` は禁止です。
@@ -50,6 +51,8 @@ apps/
   admin/          # Next.js admin dashboard (@oryzae/admin)
 packages/
   shared/         # Shared Zod schemas & constants (@oryzae/shared)
+  verify/         # 検証ハーネスのランタイム（@oryzae/verify）
+scripts/          # リポジトリ共通のガードレール（as キャスト検出など）
 docs/             # Design docs (Single Source of Truth)
 supabase/
   migrations/     # DB migration SQL files

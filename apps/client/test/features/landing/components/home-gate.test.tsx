@@ -7,6 +7,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 
 /** display-mode メディアクエリを差し替える（PWA 起動の再現）。 */
 function setDisplayMode(standalone: boolean): void {
+  // @type-assertion-allowed: jsdom の matchMedia スタブ。MediaQueryList の全メンバーは持たせない
   window.matchMedia = vi.fn((query: string) => ({
     matches: standalone && query === '(display-mode: standalone)',
     media: query,
@@ -17,7 +18,6 @@ function setDisplayMode(standalone: boolean): void {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })) as unknown as typeof window.matchMedia;
-  // @type-assertion-allowed: jsdom の matchMedia スタブ。MediaQueryList の全メンバーは持たせない
 }
 
 describe('HomeGate', () => {

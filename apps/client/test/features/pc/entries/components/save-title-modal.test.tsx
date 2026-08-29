@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { describe, expect, it, vi } from 'vitest';
 import { SaveTitleModal } from '@/features/pc/entries/components/save-title-modal';
 import jaMessages from '@/i18n/messages/ja.json';
+import { closestOrThrow } from '../../../../helpers/dom';
 
 describe('SaveTitleModal', () => {
   function setup() {
@@ -24,16 +25,16 @@ describe('SaveTitleModal', () => {
 
   it('Enter キーで送信される（通常入力時）', () => {
     const { onSave } = setup();
-    const input = screen.getByLabelText('タイトル') as HTMLInputElement;
+    const input = screen.getByLabelText<HTMLInputElement>('タイトル');
     fireEvent.change(input, { target: { value: 'hello' } });
     fireEvent.keyDown(input, { key: 'Enter', isComposing: false });
-    fireEvent.submit(input.closest('form') as HTMLFormElement);
+    fireEvent.submit(closestOrThrow(input, 'form'));
     expect(onSave).toHaveBeenCalledWith('hello');
   });
 
   it('IME 変換確定の Enter（isComposing=true）では送信されない', () => {
     const { onSave } = setup();
-    const input = screen.getByLabelText('タイトル') as HTMLInputElement;
+    const input = screen.getByLabelText<HTMLInputElement>('タイトル');
     fireEvent.change(input, { target: { value: 'にほんご' } });
     // isComposing=true の Enter は preventDefault され、フォーム submit が走らない
     fireEvent.keyDown(input, { key: 'Enter', isComposing: true });

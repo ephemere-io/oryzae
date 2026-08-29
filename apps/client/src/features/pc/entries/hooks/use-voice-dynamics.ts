@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
+import { isObject, readBooleanField, readNumberField, readStringField } from '@/lib/json';
 
 /**
  * 音量内包エフェクト
@@ -15,6 +16,28 @@ type VoiceDynamicsState = {
   unavailable: boolean;
   reason: VoiceUnavailableReason | null;
 };
+
+/**
+ * SpeechRecognition 系の型は TS の DOM lib に無く、イベントは `Record<string, unknown>`
+ * で受けている。ここで「使う形（length / isFinal / [0].transcript）」だけを
+ * 実行時に確かめて取り出す。ブラウザ差分で欠けていても落とさず読み飛ばす。
+ *
+ * `SpeechRecognitionResultList` は配列ではなく array-like なので、length と
+ * 数値キーで走査する。
+ */
+function readSpeechResults(value: unknown): { isFinal: boolean; transcript: string }[] {
+  if (!isObject(value)) return [];
+  const length = readNumberField(value, 'length', 0);
+  const out: { isFinal: boolean; transcript: string }[] = [];
+  for (let i = 0; i < length; i += 1) {
+    const result = value[String(i)];
+    if (!isObject(result)) continue;
+    const transcript = readStringField(result['0'], 'transcript');
+    if (transcript === null) continue;
+    out.push({ isFinal: readBooleanField(result, 'isFinal', false), transcript });
+  }
+  return out;
+}
 
 function mapVolumeToSize(rms: number): number {
   const effective = Math.max(0, rms - 0.01);
@@ -189,15 +212,15 @@ export function useVoiceDynamics(
       };
 
       recognition.onresult = (e: Record<string, unknown>) => {
-        const results = e.results as { isFinal: boolean; 0: { transcript: string } }[];
-        const resultIndex = (e.resultIndex as number) ?? 0;
+        const results = readSpeechResults(e.results);
+        const resultIndex = readNumberField(e, 'resultIndex', 0);
         let finalStr = '';
         let interimStr = '';
         for (let i = resultIndex; i < results.length; i++) {
           if (results[i].isFinal) {
-            finalStr += results[i][0].transcript;
+            finalStr += results[i].transcript;
           } else {
-            interimStr += results[i][0].transcript;
+            interimStr += results[i].transcript;
           }
         }
         if (finalStr) {

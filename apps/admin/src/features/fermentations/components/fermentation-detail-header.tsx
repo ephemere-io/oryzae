@@ -3,6 +3,7 @@
 import { PlayCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { isObject } from '@/lib/json';
 import type { FermentationDetailResponse } from '../hooks/use-fermentation-detail';
 
 function formatDate(iso: string): string {
@@ -23,12 +24,8 @@ function statusDotColor(status: string): string {
 }
 
 function formatCost(cost: unknown): string | null {
-  if (cost == null || typeof cost !== 'object') return null;
-  const obj = cost as Record<string, unknown>; // @type-assertion-allowed: cost is unknown from API, need record access for totalCost
-  if (typeof obj.totalCost === 'number') {
-    return `$${obj.totalCost.toFixed(6)}`;
-  }
-  return null;
+  if (!isObject(cost)) return null;
+  return typeof cost.totalCost === 'number' ? `$${cost.totalCost.toFixed(6)}` : null;
 }
 
 interface FermentationDetailHeaderProps {
