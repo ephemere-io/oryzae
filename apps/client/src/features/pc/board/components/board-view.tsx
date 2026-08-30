@@ -136,8 +136,10 @@ export function BoardView({ api }: BoardViewProps) {
 
   const dialogOpen = snippetDialog.open || photoDialogOpen || lightbox !== null;
 
-  // スニペット編集中とライトボックス表示中は横取りしない（本文への貼り付けを奪わない）。
-  const intake = useImageIntake(!snippetDialog.open && lightbox === null, handleIncomingImage);
+  // 何かが開いている間は横取りしない。スニペット編集中は本文への貼り付けを奪わないため。
+  // 写真ダイアログを開いている間も同じで、ここを開けておくと、選択済みの画像がある状態で
+  // 貼り付けたときに initialFile が差し替わり、選んだ画像が黙って別のものになる。
+  const intake = useImageIntake(!dialogOpen, handleIncomingImage);
 
   // Keyboard handling: Delete/Backspace で選択カードを消す ＋ ツールバーのショートカット。
   useEffect(() => {
