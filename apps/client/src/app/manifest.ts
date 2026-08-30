@@ -13,7 +13,9 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: BRAND_NAME,
     description: 'ジャーナリング支援アプリ',
     lang: 'ja',
-    start_url: '/',
+    // Issue #437: ホーム画面から開いたのにランディングが出ていた。start_url がルート（＝LP）
+    // だったため。アプリの入口を指す。未ログインなら保護レイアウトが /login へ送る。
+    start_url: '/entries/new',
     scope: '/',
     display: 'standalone',
     background_color: '#F2EDE0',

@@ -17,6 +17,7 @@ pnpm test                                   # テスト実行（server + client 
 pnpm lint                                   # Biome lint
 pnpm dep-cruise                             # アーキテクチャ依存チェック（server + client + admin）
 pnpm knip                                   # デッドコード検出
+pnpm check:as                               # `as` 型アサーション検出（CI ゲート）
 ```
 
 ## Architecture

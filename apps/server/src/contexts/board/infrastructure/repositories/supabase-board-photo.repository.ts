@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readString } from '../../../shared/infrastructure/row.js';
 import type { BoardPhotoRepositoryGateway } from '../../domain/gateways/board-photo-repository.gateway.js';
 import { BoardPhoto } from '../../domain/models/board-photo.js';
 
@@ -41,15 +42,14 @@ export class SupabaseBoardPhotoRepository implements BoardPhotoRepositoryGateway
     if (error) throw error;
   }
 
-  // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
   private toDomain(row: Record<string, unknown>): BoardPhoto {
     return BoardPhoto.fromProps({
-      id: row.id as string,
-      userId: row.user_id as string,
-      storagePath: row.storage_path as string,
-      caption: row.caption as string,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      id: readString(row, 'id'),
+      userId: readString(row, 'user_id'),
+      storagePath: readString(row, 'storage_path'),
+      caption: readString(row, 'caption'),
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }

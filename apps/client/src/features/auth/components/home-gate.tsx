@@ -20,10 +20,25 @@ function parseHashParams(hash: string): Record<string, string> {
 }
 
 /**
+ * ホーム画面から起動された（＝ブラウザの UI を持たない）状態か。
+ *
+ * Issue #437: PWA から開いたのにランディングが出てしまうため、この判定でアプリ側へ送る。
+ * iOS Safari は display-mode を長く実装せず `navigator.standalone`（非標準）でしか
+ * 判定できないので、両方を見る。
+ */
+function isStandaloneLaunch(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
+  const legacyFlag: unknown = Reflect.get(window.navigator, 'standalone');
+  return legacyFlag === true;
+}
+
+/**
  * ルート（/）のクライアント専用ゲート。描画は持たず（null）、副作用のみ:
  * - Supabase のメール確認リダイレクト（hash に access/refresh token）を受けてログイン状態にする
  * - Supabase がエラーを返した場合（期限切れ・使用済みリンク）は確認画面へ送って理由を見せる
  * - 既ログインなら /entries/new へ送る
+ * - PWA として起動されていれば、未ログインでもログイン画面へ送る（アプリの外に出さない）
  * - どれでもない訪問者は公開サイト（別ドメイン）へ送る
  *
  * ランディングは別リポジトリの公開サイトに移したため、ここは本文を持たない。
@@ -34,6 +49,10 @@ function parseHashParams(hash: string): Record<string, string> {
  * `#error=access_denied&error_code=otp_expired&...` で戻ってくる。この分岐が無いと
  * 「トークンも無い・ログインもしていない」として公開サイトへ即離脱してしまい、
  * ユーザーはリンクが切れていた事実を知る術がなくなる。
+ *
+ * **PWA 分岐も消さないこと。** 公開サイトを別ドメインに出したことで、この分岐が無いと
+ * ホーム画面のショートカットから起動した人が別ドメインへ飛ばされ、アプリに戻れなくなる。
+ * 分割前は同一ドメインのランディングに留まっていたので、実害が一段大きくなっている。
  */
 export function HomeGate() {
   const router = useRouter();
@@ -55,10 +74,20 @@ export function HomeGate() {
         return;
       }
     }
+
     if (getAccessToken()) {
       router.replace('/entries/new');
       return;
     }
+
+    // Issue #437: manifest の start_url は直したが、既にホーム画面に置かれている
+    // ショートカットは古い start_url（＝ここ）のまま起動する。ここでも受ける。
+    if (isStandaloneLaunch()) {
+      router.replace('/login');
+      return;
+    }
+
+    // ブラウザで開いた未ログイン訪問者には公開サイトのランディングを見せる（SEO と導線）。
     window.location.replace(DOCS_SITE_URL);
   }, [router]);
 

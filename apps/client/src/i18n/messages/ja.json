@@ -161,7 +161,8 @@
     "desktop_only": {
       "heading": "デスクトップ専用です",
       "body": "Oryzaeは現在、デスクトップブラウザ専用となっていてスマートフォンからはアクセスできません。スマートフォン版画面が準備できるまでは、デスクトップからお使いください。"
-    }
+    },
+    "loading": "読み込み中…"
   },
   "footer": {
     "label": {
@@ -288,7 +289,9 @@
       "cancel": "キャンセル",
       "update": "更新",
       "create": "作成"
-    }
+    },
+    "error_message": "ボードの読み込みに失敗しました",
+    "retry": "再読み込み"
   },
   "editor": {
     "status": {
@@ -363,7 +366,8 @@
       "fermentation_overlay_description": "新規エントリで問いを紐付けたとき、その問いの最新の発酵結果をエディタ上に重ねて表示できます。表示／非表示の挙動を選んでください。",
       "fermentation_overlay_ask": "表示前に毎回確認する",
       "fermentation_overlay_always": "エントリ画面で発酵プロセスを常に表示する",
-      "fermentation_overlay_never": "エントリ画面で発酵プロセスを常に表示しない"
+      "fermentation_overlay_never": "エントリ画面で発酵プロセスを常に表示しない",
+      "focus_mode_fades_fermentation": "発酵要素も一緒に隠す"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
@@ -576,7 +580,13 @@
       "question_selected": "問い: {label}",
       "question_untitled": "無題の問い",
       "question_sheet_title": "問いを選ぶ",
-      "question_empty": "立てている問いがありません",
+      "question_empty": "立てている問いがありません。ここで1つ書きましょう。",
+      "question_new": "+ 新しく問いを書く",
+      "question_new_placeholder": "問いを書く（例: 今日の小さな発見は？）",
+      "question_create": "この問いにする",
+      "question_creating": "作成中…",
+      "question_create_failed": "問いを作れませんでした。もう一度お試しください。",
+      "question_back_to_list": "← 既存の問いから選ぶ",
       "close": "閉じる",
       "pickle": "瓶に漬ける",
       "pickling": "納めています…",
@@ -604,7 +614,9 @@
       "section_keywords": "言葉",
       "section_snippets": "抜粋",
       "unread": "未読",
-      "read": "既読"
+      "read": "既読",
+      "section_sources": "もとになった記録",
+      "source_untitled": "無題の記録"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -635,7 +647,8 @@
       "placeholder": "問いを書く",
       "delete": "この問いを終える",
       "cancel": "キャンセル",
-      "save": "保存"
+      "save": "保存",
+      "letter_arrived": "手紙が届いています"
     }
   }
 }

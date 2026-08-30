@@ -32,10 +32,26 @@ function stubLocation(hash: string) {
   vi.stubGlobal('location', { hash, replace: locationReplace });
 }
 
+/** display-mode メディアクエリを差し替える（PWA 起動の再現。Issue #437）。 */
+function setDisplayMode(standalone: boolean): void {
+  // @type-assertion-allowed: jsdom の matchMedia スタブ。MediaQueryList の全メンバーは持たせない
+  window.matchMedia = vi.fn((query: string) => ({
+    matches: standalone && query === '(display-mode: standalone)',
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getAccessToken.mockReturnValue(null);
   stubLocation('');
+  setDisplayMode(false);
 });
 
 afterEach(() => {
@@ -87,10 +103,29 @@ describe('HomeGate', () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it('未ログインの訪問者は公開サイトへ送る', () => {
+  it('ブラウザで開いた未ログイン訪問者は公開サイトへ送る', () => {
     render(<HomeGate />);
 
     expect(locationReplace).toHaveBeenCalledWith(DOCS_SITE_URL);
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('PWA から起動した未ログイン利用者はログイン画面へ送る（Issue #437）', () => {
+    // ホーム画面のショートカットは古い start_url（＝ここ）のまま起動しうる。公開サイトを
+    // 別ドメインに出したので、この分岐が無いとアプリに戻れないまま外へ飛ばされる。
+    setDisplayMode(true);
+    render(<HomeGate />);
+
+    expect(replace).toHaveBeenCalledWith('/login');
+    expect(locationReplace).not.toHaveBeenCalled();
+  });
+
+  it('PWA から起動したログイン済み利用者はエディタへ送る', () => {
+    setDisplayMode(true);
+    getAccessToken.mockReturnValue('existing-token');
+    render(<HomeGate />);
+
+    expect(replace).toHaveBeenCalledWith('/entries/new');
+    expect(locationReplace).not.toHaveBeenCalled();
   });
 });

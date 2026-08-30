@@ -91,8 +91,8 @@ function visitScan(node: Node, state: ScanState): void {
     state.cursor += (node.textContent ?? '').length;
     return;
   }
-  if (node.nodeType !== Node.ELEMENT_NODE) return;
-  const el = node as HTMLElement;
+  if (!(node instanceof HTMLElement)) return;
+  const el = node;
   if (el.tagName === 'BR') {
     state.cursor += 1;
     return;
@@ -201,8 +201,8 @@ function visitLocate(node: Node, state: LocateState): void {
     state.cursor = segEnd;
     return;
   }
-  if (node.nodeType !== Node.ELEMENT_NODE) return;
-  const el = node as HTMLElement;
+  if (!(node instanceof HTMLElement)) return;
+  const el = node;
   if (el.tagName === 'BR') {
     state.cursor += 1;
     return;

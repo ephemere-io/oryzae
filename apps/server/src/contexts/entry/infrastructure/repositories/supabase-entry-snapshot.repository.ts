@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readRecord, readString } from '../../../shared/infrastructure/row.js';
 import type { EntrySnapshotRepositoryGateway } from '../../domain/gateways/entry-snapshot-repository.gateway.js';
 import { EntrySnapshot } from '../../domain/models/entry-snapshot.js';
 
@@ -36,13 +37,13 @@ export class SupabaseEntrySnapshotRepository implements EntrySnapshotRepositoryG
 
   private toDomain(row: Record<string, unknown>): EntrySnapshot {
     return EntrySnapshot.fromProps({
-      id: row.id as string,
-      entryId: row.entry_id as string,
-      content: row.content as string,
-      editorType: row.editor_type as string,
-      editorVersion: row.editor_version as string,
-      extension: (row.extension as Record<string, unknown>) ?? {},
-      createdAt: row.created_at as string,
+      id: readString(row, 'id'),
+      entryId: readString(row, 'entry_id'),
+      content: readString(row, 'content'),
+      editorType: readString(row, 'editor_type'),
+      editorVersion: readString(row, 'editor_version'),
+      extension: readRecord(row, 'extension'),
+      createdAt: readString(row, 'created_at'),
     });
   }
 }

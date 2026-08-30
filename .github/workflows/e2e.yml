@@ -56,7 +56,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 
@@ -76,7 +76,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -94,3 +94,48 @@ jobs:
           name: playwright-report-${{ matrix.app }}
           path: apps/${{ matrix.app }}/test-results/
           retention-days: 7
+
+  # 認可境界の統合テスト（Issue #503 / #504 の回帰防止）。
+  #
+  # `pnpm security:rls` はマイグレーション SQL の静的検査なので、ポリシーが
+  # 「書かれているか」は見られても、その条件式が「実際に正しく絞れているか」は見られない
+  # （user_id と書くべきところを id と書いた、参照するテーブルを間違えた、等）。
+  # ここでは実在する 2 ユーザーの JWT で本物の Postgres を読みに行き、越境が 0 行で
+  # あることを確かめる。RLS の条件式そのものを検証する唯一の層。
+  #
+  # Playwright を使わないのでブラウザ導入が不要で、上のジョブより速く終わる。
+  authz:
+    name: Authorization Isolation (実 DB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Export Supabase env
+        run: |
+          status="$(supabase status -o json)"
+          {
+            echo "SUPABASE_URL=$(echo "$status" | jq -r '.API_URL')"
+            echo "SUPABASE_ANON_KEY=$(echo "$status" | jq -r '.ANON_KEY')"
+          } >> "$GITHUB_ENV"
+
+      # SERVICE_ROLE_KEY は意図的に渡さない。このテストは「ユーザーの JWT で越境できないこと」
+      # の検証であり、RLS をバイパスする鍵が環境にあると検証の意味が薄れるため。
+      - name: Run authorization isolation tests
+        run: pnpm --filter @oryzae/server test:integration

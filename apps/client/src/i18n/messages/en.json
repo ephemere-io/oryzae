@@ -161,7 +161,8 @@
     "desktop_only": {
       "heading": "Desktop only",
       "body": "Oryzae is currently desktop-only and cannot be accessed from a smartphone. Until the mobile version is ready, please use it from a desktop browser."
-    }
+    },
+    "loading": "Loading…"
   },
   "footer": {
     "label": {
@@ -288,7 +289,9 @@
       "cancel": "Cancel",
       "update": "Update",
       "create": "Create"
-    }
+    },
+    "error_message": "Failed to load the board",
+    "retry": "Retry"
   },
   "editor": {
     "status": {
@@ -363,7 +366,8 @@
       "fermentation_overlay_description": "When you link a question to a new entry, the latest fermentation result for that question can float over the editor. Choose how this should behave.",
       "fermentation_overlay_ask": "Ask before showing",
       "fermentation_overlay_always": "Always show fermentation result on entry screen",
-      "fermentation_overlay_never": "Never show fermentation result on entry screen"
+      "fermentation_overlay_never": "Never show fermentation result on entry screen",
+      "focus_mode_fades_fermentation": "Also hide fermentation elements"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
@@ -576,7 +580,13 @@
       "question_selected": "Question: {label}",
       "question_untitled": "Untitled question",
       "question_sheet_title": "Choose a question",
-      "question_empty": "No questions yet",
+      "question_empty": "You have no open questions yet. Write one here.",
+      "question_new": "+ Write a new question",
+      "question_new_placeholder": "Write a question (e.g. What did I notice today?)",
+      "question_create": "Use this question",
+      "question_creating": "Creating…",
+      "question_create_failed": "Couldn't create the question. Please try again.",
+      "question_back_to_list": "← Pick from existing questions",
       "close": "Close",
       "pickle": "Pickle",
       "pickling": "Sealing…",
@@ -604,7 +614,9 @@
       "section_keywords": "Words",
       "section_snippets": "Excerpts",
       "unread": "Unread",
-      "read": "Read"
+      "read": "Read",
+      "section_sources": "From these entries",
+      "source_untitled": "Untitled entry"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -635,7 +647,8 @@
       "placeholder": "Write a question",
       "delete": "Retire this question",
       "cancel": "Cancel",
-      "save": "Save"
+      "save": "Save",
+      "letter_arrived": "A letter has arrived"
     }
   }
 }
