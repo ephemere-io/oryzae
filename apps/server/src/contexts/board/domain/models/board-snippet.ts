@@ -1,7 +1,8 @@
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
 // packages/shared の MAX_SNIPPET_TEXT_LENGTH と同じ値。domain は shared を import
-// できない（最内層は何にも依存しない）ので、値はここで持つ。片方だけ動かさないこと。
+// できない（最内層は何にも依存しない）ので、値はここで持つ。ずれたら
+// board-snippet.test.ts の「上限値は packages/shared と同じであること」が落ちる。
 const MAX_TEXT_LENGTH = 2000;
 
 type BoardSnippetError =

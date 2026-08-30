@@ -165,7 +165,9 @@ export function BoardView({ api }: BoardViewProps) {
       }
 
       // ツールのショートカット（Figma と同じく修飾キーなしの1文字）。
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // 変換中は拾わない。日本語入力の途中で押した "s" を preventDefault すると、
+      // ローマ字が食われたうえにダイアログまで開く（use-escape-key と同じ理由）。
+      if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
       if (key === 's') {
         e.preventDefault();
