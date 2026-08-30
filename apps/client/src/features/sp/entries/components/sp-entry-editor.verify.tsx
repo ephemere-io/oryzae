@@ -35,6 +35,30 @@ const neverResolveApi: ApiClient = {
   fetch: () => new Promise<Response>(() => {}),
 };
 
+/** JSON を返すだけの最小 Response（as 不要で Response を満たす）。 */
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+// 立てている問いが 2 件ある状態。api=null だと activeQuestions が常に空になり、
+// シートの一覧モード（＋その下の「新しく問いを書く」）を検証できないため用意する。
+const withQuestionsApi: ApiClient = {
+  baseUrl: '',
+  headers: {},
+  fetch: (path: string) =>
+    Promise.resolve(
+      path.startsWith('/api/v1/questions')
+        ? jsonResponse([
+            { id: 'q1', currentText: 'なぜ書き続けるのか' },
+            { id: 'q2', currentText: '手放せないものは何か' },
+          ])
+        : jsonResponse([]),
+    ),
+};
+
 registerUnit<Props>({
   id: 'SpEntryEditor',
   title: 'SpEntryEditor',
@@ -134,6 +158,21 @@ registerUnit<Props>({
       act: async (ctx) => {
         await ctx.click('.mx-4 button');
         await ctx.wait(16);
+      },
+    },
+    {
+      id: 'question-list-with-composer',
+      probe: true,
+      description: 'Probe: 問いがあるときは一覧を出し、その下から新規作成にも入れる（Issue #314）',
+      props: {
+        api: withQuestionsApi,
+        initialEntryId: 'entry-1',
+        initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
+      },
+      act: async (ctx) => {
+        await ctx.click('.mx-4 button');
+        await ctx.wait(48);
       },
     },
     {
@@ -275,6 +314,21 @@ registerUnit<Props>({
             contract.composingQuestion === 'true' &&
             Boolean(input)) ||
           `expected sheetOpen=true & composingQuestion=true & 入力欄あり, got sheetOpen=${contract.sheetOpen}, composingQuestion=${contract.composingQuestion}, input=${Boolean(input)}`
+        );
+      },
+    },
+    {
+      id: 'question-list-keeps-composer-entry',
+      description: '問いがあるときは一覧を出しつつ、新規作成への導線も残す（Issue #314）',
+      onlyFixtures: ['question-list-with-composer'],
+      check: ({ root, contract }) => {
+        const options = root.querySelectorAll('ul li button');
+        const composerEntry = Array.from(root.querySelectorAll('button')).some((b) =>
+          b.textContent?.includes('新しく問いを書く'),
+        );
+        return (
+          (contract.composingQuestion === 'false' && options.length === 2 && composerEntry) ||
+          `expected 一覧2件＋作成導線, got composingQuestion=${contract.composingQuestion}, options=${options.length}, composerEntry=${composerEntry}`
         );
       },
     },
