@@ -294,7 +294,6 @@
       "tab_image": "画像から読み取る",
       "click_to_select_image": "クリックして画像を選択",
       "preview_alt": "読み取る画像のプレビュー",
-      "read_image": "文字を読み取る",
       "reading": "読み取り中…",
       "reading_aria": "読み取り中",
       "ocr_empty": "文字を読み取れませんでした。別の画像を試してください。",

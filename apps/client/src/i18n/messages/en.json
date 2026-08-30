@@ -294,7 +294,6 @@
       "tab_image": "Read from image",
       "click_to_select_image": "Click to select an image",
       "preview_alt": "Preview of the image to read",
-      "read_image": "Read text",
       "reading": "Reading…",
       "reading_aria": "Reading",
       "ocr_empty": "No text found in that image. Try another one.",

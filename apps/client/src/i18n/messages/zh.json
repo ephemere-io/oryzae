@@ -294,7 +294,6 @@
       "tab_image": "从图片识别",
       "click_to_select_image": "点击选择图片",
       "preview_alt": "待识别图片预览",
-      "read_image": "识别文字",
       "reading": "识别中…",
       "reading_aria": "识别中",
       "ocr_empty": "未能识别到文字。请换一张图片试试。",
