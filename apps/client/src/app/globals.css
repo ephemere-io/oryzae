@@ -14,6 +14,12 @@
   --border-subtle: rgba(0, 0, 0, 0.05);
   --toolbar-hover: rgba(0, 0, 0, 0.04);
   --date-color: #999;
+
+  /* 画面の上に浮く操作面（パレット・ツールバー）。素材は components/ui/surface.ts。 */
+  --surface-raised: #ffffff;
+  --surface-raised-border: rgba(0, 0, 0, 0.08);
+  /* 面を持たない切り替えの下地（セグメント）。 */
+  --track: rgba(0, 0, 0, 0.05);
   --card-snippet: #fffbe0;
   --card-photo: #ffffff;
 
@@ -54,12 +60,33 @@
   --ob-overlay: rgba(8, 10, 8, 0.6);
   --ob-ink-soft: #d8d2c9;
   --ob-ink-mute: #98918a;
+
+  --surface-raised: #2c2c2c;
+  --surface-raised-border: rgba(255, 255, 255, 0.12);
+  --track: rgba(255, 255, 255, 0.07);
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
+}
+
+/* Tailwind v4 の Preflight は button を `cursor: default` にする。押せるものは
+ * 押せるように見えてほしいので、押せる要素だけ pointer に戻す。
+ * 各コンポーネントで `cursor-pointer` を貼って回るより、ここで一度決めるほうが漏れない。 */
+@layer base {
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  button[aria-disabled="true"],
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 ::selection {

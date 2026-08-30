@@ -15,8 +15,9 @@ interface SwitchProps {
  */
 export function Switch({ id, checked, onChange, label }: SwitchProps) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <label htmlFor={id} className="cursor-pointer text-xs text-[var(--fg)]">
+    // 行の高さは設定パネルの Row と揃える（32px）。目が同じ間隔で下りていける。
+    <div className="flex h-8 items-center justify-between gap-3">
+      <label htmlFor={id} className="cursor-pointer text-[13px] text-[var(--fg)]">
         {label}
       </label>
       <button

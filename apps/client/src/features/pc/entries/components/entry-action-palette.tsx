@@ -3,13 +3,24 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  CONTENT_CENTERED_STYLE,
+  CONTROL_FONT,
+  DISABLED_CLASS,
+  ELEVATED_PANEL_CLASS,
+  ELEVATED_PANEL_STYLE,
+  ICON_SIZE,
+  ICON_STROKE_WIDTH,
+  IDLE_HOVER_CLASS,
+  TOOL_BUTTON_CLASS,
+} from '@/components/ui/surface';
 
 export interface PaletteAction {
   id: string;
   label: string;
   icon: ReactNode;
   onSelect: () => void;
-  /** 押せないときの理由。ホバーで出す（ボタンは非活性のまま）。 */
+  /** 押せないときの理由。ホバーで出す（ボタンは押せないまま）。 */
   disabledReason?: string;
   /** 押している最中（録音中など）。 */
   active?: boolean;
@@ -19,11 +30,16 @@ interface EntryActionPaletteProps {
   actions: PaletteAction[];
   /** フォーカスモードで本文以外を消しているあいだは false。 */
   visible: boolean;
+  /**
+   * 位置と畳み具合を localStorage に覚えるか（既定 true）。
+   * 孤立検証（verify）では fixture をまたいで状態が漏れるので false にする。
+   */
+  persistState?: boolean;
 }
 
 const POSITION_KEY = 'oryzae-entry-palette-position';
 const COLLAPSED_KEY = 'oryzae-entry-palette-collapsed';
-const EDGE_MARGIN = 16;
+const EDGE_MARGIN = 12;
 
 interface Position {
   x: number;
@@ -47,7 +63,7 @@ function readStoredPosition(): Position | null {
       return { x: parsed.x, y: parsed.y };
     }
   } catch {
-    // 壊れた値・localStorage 不許可。既定位置に落とす。
+    // 壊れた値・localStorage 不許可。既定位置（下端中央）に落とす。
   }
   return null;
 }
@@ -74,17 +90,22 @@ function persist(key: string, value: string): void {
  * エントリー画面の操作をまとめたフローティングパレット。
  *
  * 「問いを結ぶ」「漬け込む」「写真から文字を起こす」「全画面」「音声入力」といった
- * **操作**をここに集める。本文の周りに操作を散らかさないためのもので、
- * ボードのツールバー（#524）と同じ「浮いた面」の記号に揃えている。
+ * **操作**をここに集める。本文の周りに操作を散らかさないためのもので、面の素材と寸法は
+ * ボードのツールバー（#524）と同じ `components/ui/surface` を参照する。
  *
  * 本文に被らせない方法は、場所を空けるのではなく**振る舞い**で解く:
  *  - 書いている間は消える（フォーカスモードと同じ `visible` に乗る）
- *  - 掴んで動かせる。位置は覚える
- *  - 畳んでアイコン1つにできる
+ *  - **畳むと画面の下端に貼りつき、上向きの小さなつまみだけになる**
+ *  - 面のどこを掴んでも動かせる。位置は覚える
  *
- * 押せない操作は非活性にして、理由はホバーで出す（「あと何字」を常時表示しない）。
+ * 押せない操作は `aria-disabled` にして、理由はホバーで出す。本当の `disabled` にすると
+ * React がマウス系イベントを抑止し、フォーカスも受けないため、理由に到達できなくなる。
  */
-export function EntryActionPalette({ actions, visible }: EntryActionPaletteProps) {
+export function EntryActionPalette({
+  actions,
+  visible,
+  persistState = true,
+}: EntryActionPaletteProps) {
   const t = useTranslations('editor.palette');
   const [position, setPosition] = useState<Position | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -95,9 +116,10 @@ export function EntryActionPalette({ actions, visible }: EntryActionPaletteProps
 
   // 初回だけ localStorage から復元する（SSR では読めないので mount 後）。
   useEffect(() => {
+    if (!persistState) return;
     setPosition(readStoredPosition());
     setCollapsed(readStoredCollapsed());
-  }, []);
+  }, [persistState]);
 
   const clamp = useCallback((p: Position): Position => {
     const el = rootRef.current;
@@ -133,9 +155,9 @@ export function EntryActionPalette({ actions, visible }: EntryActionPaletteProps
 
   // ドラッグが終わった位置を覚える。
   useEffect(() => {
-    if (dragging || position === null) return;
+    if (!persistState || dragging || position === null) return;
     persist(POSITION_KEY, JSON.stringify(position));
-  }, [dragging, position]);
+  }, [persistState, dragging, position]);
 
   // 窓を縮めるとパレットが画面外へ出るので、そのつど引き戻す。
   useEffect(() => {
@@ -147,7 +169,15 @@ export function EntryActionPalette({ actions, visible }: EntryActionPaletteProps
     return () => window.removeEventListener('resize', handleResize);
   }, [position, clamp]);
 
-  function startDrag(e: React.PointerEvent) {
+  /**
+   * 面の余白部分を掴んだらドラッグを始める。
+   *
+   * 以前は幅 16px の握りだけを起点にしていて、狙って掴めなかった。ボタン以外の
+   * どこを掴んでも動くようにする（ボタンの上では `closest` で弾く）。
+   */
+  function handleSurfacePointerDown(e: React.PointerEvent) {
+    if (e.button !== 0) return;
+    if (e.target instanceof Element && e.target.closest('button')) return;
     const el = rootRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -156,129 +186,160 @@ export function EntryActionPalette({ actions, visible }: EntryActionPaletteProps
     setDragging(true);
   }
 
-  function toggleCollapsed() {
-    setCollapsed((v) => {
-      persist(COLLAPSED_KEY, v ? '0' : '1');
-      return !v;
-    });
+  function setCollapsedAndPersist(next: boolean) {
+    setCollapsed(next);
+    if (persistState) persist(COLLAPSED_KEY, next ? '1' : '0');
   }
 
-  // 既定位置は画面下部中央。動かされていればその位置。
-  const placement: React.CSSProperties =
-    position === null
-      ? { bottom: 28, left: '50%', transform: 'translateX(-50%)' }
-      : { top: position.y, left: position.x };
+  // 既定位置は本文領域（サイドバーを除いた部分）の下端中央。動かされていればその位置。
+  // 畳んでいるあいだは常に下端へ戻る（つまみは端に貼りついているのが自然）。
+  const docked = collapsed || position === null;
+  const placement: React.CSSProperties = docked
+    ? { bottom: collapsed ? 0 : 24, ...CONTENT_CENTERED_STYLE }
+    : { top: position.y, left: position.x };
 
-  return (
-    <div
-      ref={rootRef}
-      className={`fixed z-[1600] transition-opacity duration-300 ${
-        visible ? 'opacity-100' : 'pointer-events-none opacity-0'
-      }`}
-      style={placement}
-      {...verifyAttrs({
-        unit: 'EntryActionPalette',
-        visible,
-        collapsed,
-        dragging,
-        actionCount: actions.length,
-        moved: position !== null,
-      })}
-    >
-      <div
-        className="flex items-center gap-0.5 rounded-xl border border-[var(--border-subtle)] p-1"
-        style={{
-          background: 'color-mix(in srgb, var(--bg) 92%, transparent)',
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 8px 24px -12px rgba(0,0,0,0.35)',
-        }}
-      >
-        {/* 掴んで動かすための握り。ここ以外はボタンなのでドラッグの起点にしない。 */}
+  const contract = verifyAttrs({
+    unit: 'EntryActionPalette',
+    visible,
+    collapsed,
+    dragging,
+    actionCount: actions.length,
+    docked,
+  });
+
+  const wrapperClass = `fixed z-[1600] transition-opacity duration-300 ${
+    visible ? 'opacity-100' : 'pointer-events-none opacity-0'
+  }`;
+
+  if (collapsed) {
+    return (
+      <div ref={rootRef} className={wrapperClass} style={placement} {...contract}>
         <button
           type="button"
-          onPointerDown={startDrag}
-          aria-label={t('move')}
-          className="flex h-8 w-4 cursor-grab items-center justify-center text-[var(--date-color)] active:cursor-grabbing"
-        >
-          <svg aria-hidden="true" width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-            <circle cx="3" cy="4" r="1" />
-            <circle cx="7" cy="4" r="1" />
-            <circle cx="3" cy="8" r="1" />
-            <circle cx="7" cy="8" r="1" />
-            <circle cx="3" cy="12" r="1" />
-            <circle cx="7" cy="12" r="1" />
-          </svg>
-        </button>
-
-        {!collapsed &&
-          actions.map((action) => {
-            const disabled = Boolean(action.disabledReason);
-            return (
-              // ホバーの検出は**ラッパー側**で行う。React は `disabled` な button に対して
-              // onMouseEnter を含むマウス系イベントを抑止するので、ボタンに載せると
-              // 「なぜ押せないか」の理由が永久に出ない。
-              <span
-                key={action.id}
-                className="relative flex"
-                onMouseEnter={() => setHoveredId(action.id)}
-                onMouseLeave={() => setHoveredId(null)}
-              >
-                <button
-                  type="button"
-                  // 本当の `disabled` にするとフォーカスも受けられず、キーボードからは
-                  // 理由に到達できなくなる。押せないことは aria-disabled で伝え、
-                  // 実行だけを止める。
-                  aria-disabled={disabled}
-                  onClick={() => {
-                    if (disabled) return;
-                    action.onSelect();
-                  }}
-                  aria-label={action.label}
-                  data-palette-action={action.id}
-                  onFocus={() => setHoveredId(action.id)}
-                  onBlur={() => setHoveredId(null)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                    disabled
-                      ? 'cursor-default text-[var(--date-color)] opacity-35'
-                      : action.active
-                        ? 'text-red-500'
-                        : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-                  }`}
-                >
-                  {action.icon}
-                </button>
-                {hoveredId === action.id && (
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none absolute bottom-full left-1/2 z-[1610] mb-1.5 w-max max-w-[15rem] -translate-x-1/2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-2 py-1 text-[11px] leading-snug text-[var(--fg)] shadow-lg"
-                  >
-                    {action.disabledReason ?? action.label}
-                  </span>
-                )}
-              </span>
-            );
-          })}
-
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? t('expand') : t('collapse')}
-          aria-expanded={!collapsed}
-          className="flex h-8 w-6 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+          onClick={() => setCollapsedAndPersist(false)}
+          aria-expanded={false}
+          aria-label={t('expand')}
+          className={`flex h-7 w-20 items-center justify-center rounded-t-[13px] border border-b-0 transition-colors ${IDLE_HOVER_CLASS}`}
+          style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
         >
           <svg
             aria-hidden="true"
-            className="h-3.5 w-3.5"
+            width={ICON_SIZE}
+            height={ICON_SIZE}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth={2}
+            strokeWidth={ICON_STROKE_WIDTH}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ color: 'var(--date-color)' }}
           >
-            <path
-              d={collapsed ? 'm9 18 6-6-6-6' : 'm15 18-6-6 6-6'}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="m6 15 6-6 6 6" />
+          </svg>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={rootRef} className={wrapperClass} style={placement} {...contract}>
+      <div
+        className={`${ELEVATED_PANEL_CLASS} ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
+        onPointerDown={handleSurfacePointerDown}
+      >
+        {/* 掴み手。面のどこでもドラッグの起点にはなるが、実際にはボタンが敷き詰められていて
+            掴める余白は外周 6px しか残らない（実測: 面 250px 中 248px がボタン）。
+            掴める場所がある、と分かる幅を確保する。 */}
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-4 shrink-0 items-center justify-center"
+          style={{ color: 'var(--date-color)' }}
+        >
+          <svg
+            aria-hidden="true"
+            width={10}
+            height={18}
+            viewBox="0 0 10 18"
+            fill="currentColor"
+            opacity={0.5}
+          >
+            <circle cx="3" cy="5" r="1" />
+            <circle cx="7" cy="5" r="1" />
+            <circle cx="3" cy="9" r="1" />
+            <circle cx="7" cy="9" r="1" />
+            <circle cx="3" cy="13" r="1" />
+            <circle cx="7" cy="13" r="1" />
+          </svg>
+        </span>
+
+        {actions.map((action) => {
+          const disabled = Boolean(action.disabledReason);
+          return (
+            // ホバーの検出は**ラッパー側**で行う。React は `disabled` な button に対して
+            // onMouseEnter を抑止するため、押せない操作の理由が出なくなる。
+            // biome-ignore lint/a11y/noStaticElementInteractions: ホバーは理由の補足表示だけで、操作そのものは中の button が担う（onFocus/onBlur でキーボードからも同じ理由に到達できる）
+            <span
+              key={action.id}
+              className="relative flex"
+              onMouseEnter={() => setHoveredId(action.id)}
+              onMouseLeave={() => setHoveredId(null)}
+            >
+              <button
+                type="button"
+                aria-disabled={disabled}
+                onClick={() => {
+                  if (disabled) return;
+                  action.onSelect();
+                }}
+                aria-label={action.label}
+                data-palette-action={action.id}
+                onFocus={() => setHoveredId(action.id)}
+                onBlur={() => setHoveredId(null)}
+                className={`${TOOL_BUTTON_CLASS} ${
+                  disabled ? DISABLED_CLASS : action.active ? '' : IDLE_HOVER_CLASS
+                }`}
+                style={
+                  action.active
+                    ? { backgroundColor: 'var(--accent)', color: '#fff' }
+                    : { color: 'var(--fg)' }
+                }
+              >
+                {action.icon}
+              </button>
+              {hoveredId === action.id && (
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute bottom-full left-1/2 z-[1610] mb-2 max-w-[16rem] -translate-x-1/2 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium"
+                  style={{ backgroundColor: 'var(--fg)', color: 'var(--bg)', ...CONTROL_FONT }}
+                >
+                  {action.disabledReason ?? action.label}
+                </span>
+              )}
+            </span>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setCollapsedAndPersist(true)}
+          aria-expanded={true}
+          aria-label={t('collapse')}
+          className={`${TOOL_BUTTON_CLASS} ${IDLE_HOVER_CLASS}`}
+          style={{ color: 'var(--date-color)' }}
+        >
+          <svg
+            aria-hidden="true"
+            width={ICON_SIZE}
+            height={ICON_SIZE}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={ICON_STROKE_WIDTH}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
       </div>

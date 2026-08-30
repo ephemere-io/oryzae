@@ -16,6 +16,7 @@ import { EntryActionPalette, type PaletteAction } from './entry-action-palette';
 interface Props {
   actions: PaletteAction[];
   visible: boolean;
+  persistState?: boolean;
 }
 
 const PALETTE = '[data-verify-unit="EntryActionPalette"]';
@@ -58,22 +59,22 @@ registerUnit<Props>({
     {
       id: 'visible',
       description: '表示中（操作5つ）',
-      props: { actions: ACTIONS, visible: true },
+      props: { actions: ACTIONS, visible: true, persistState: false },
     },
     {
       id: 'hidden',
       description: '入力中：フォーカスモードで消えている（クリックも透過する）',
-      props: { actions: ACTIONS, visible: false },
+      props: { actions: ACTIONS, visible: false, persistState: false },
     },
     {
       id: 'with-disabled',
       description: '漬け込むが非活性（理由はホバーで出す）',
-      props: { actions: WITH_DISABLED, visible: true },
+      props: { actions: WITH_DISABLED, visible: true, persistState: false },
     },
     {
       id: 'disabled-hovered',
       description: '非活性の操作にホバーすると理由がツールチップで出る',
-      props: { actions: WITH_DISABLED, visible: true },
+      props: { actions: WITH_DISABLED, visible: true, persistState: false },
       act: async ({ root, wait }) => {
         const btn = root.querySelector<HTMLElement>('[data-palette-action="pickle"]');
         if (!btn) throw new Error('pickle ボタンが見つからない');
@@ -87,8 +88,8 @@ registerUnit<Props>({
     },
     {
       id: 'collapsed',
-      description: '畳んだ状態（握りと開閉ボタンだけが残る）',
-      props: { actions: ACTIONS, visible: true },
+      description: '畳んだ状態（下端に貼りついた、開くつまみだけが残る）',
+      props: { actions: ACTIONS, visible: true, persistState: false },
       act: async ({ root, wait }) => {
         const toggle = root.querySelector<HTMLElement>('button[aria-expanded="true"]');
         if (!toggle) throw new Error('折りたたみボタンが見つからない');
@@ -99,8 +100,8 @@ registerUnit<Props>({
     {
       id: 'no-actions',
       probe: true,
-      description: 'Probe: 操作が0件でも握りと開閉ボタンだけで崩れない',
-      props: { actions: [], visible: true },
+      description: 'Probe: 操作が0件でも畳むボタンだけで崩れない',
+      props: { actions: [], visible: true, persistState: false },
     },
   ],
   invariants: [
@@ -138,7 +139,7 @@ registerUnit<Props>({
     },
     {
       id: 'collapsed-hides-actions',
-      description: '畳むと操作は消え、握りと開閉ボタンだけが残る',
+      description: '畳むと操作は消え、開くつまみだけが残る',
       onlyFixtures: ['collapsed'],
       check: ({ root, contract }) => {
         if (contract.collapsed !== 'true') return '折りたたみが state に乗っていない';

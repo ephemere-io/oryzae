@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Popover } from '@/components/ui/popover';
+import { ICON_SIZE, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -725,11 +726,12 @@ export function EntryEditor({
   const paletteIcon = (children: React.ReactNode) => (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      width={ICON_SIZE}
+      height={ICON_SIZE}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={ICON_STROKE_WIDTH}
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -813,11 +815,11 @@ export function EntryEditor({
   // タイトルの置き場。縦書きは本文（left:6% / width:79%）のすぐ右へ縦組みで、
   // 横書きは本文（px-[15%]）の上に、同じ左端から。
   //
-  // 縦書きでは**本文との間を詰める**。以前は右端（right-1.5%）に寄せていたため、
-  // 題と本文のあいだに列1本ぶんの空白が空き、別の柱のように見えていた。
-  // 題は本文の続きではなく「本文に添う」ものなので、隣に寄せる。
+  // 縦書きでは**本文のすぐ隣**に置く。題は独立した柱ではなく、本文に添うもの。
+  // 本文は left:6% / width:79%（右端 = 85%）なので、その外側にぴったり付ける。
+  // 右に余白を残すと題だけが宙に浮いて別物に見える。
   const titleBoxClass = isVertical
-    ? 'absolute top-[4%] right-[6.5%] h-[86%] w-[9%] min-w-[3rem]'
+    ? 'absolute top-[4%] right-[11%] h-[86%] w-[4%] min-w-[2.5rem]'
     : 'absolute top-6 left-[15%] w-[70%]';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。

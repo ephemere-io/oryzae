@@ -103,7 +103,7 @@ export function Select({
         aria-controls={listId}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={handleKeyDown}
-        className="flex w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-left text-xs text-[var(--fg)] transition-colors hover:bg-[var(--toolbar-hover)]"
+        className="flex h-7 w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 text-left text-[13px] text-[var(--fg)] transition-colors hover:bg-[var(--toolbar-hover)]"
       >
         <span className="truncate">{selected ? selected.label : (placeholder ?? '')}</span>
         <svg
@@ -138,7 +138,7 @@ export function Select({
                 aria-selected={isSelected}
                 onClick={() => commit(i)}
                 onMouseEnter={() => setActiveIndex(i)}
-                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
+                className={`flex h-8 w-full items-center gap-2 px-2.5 text-left text-[13px] transition-colors ${
                   i === activeIndex ? 'bg-[var(--toolbar-hover)]' : ''
                 }`}
                 style={{ color: isSelected ? 'var(--accent)' : 'var(--fg)' }}

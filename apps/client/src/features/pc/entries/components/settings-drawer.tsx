@@ -90,7 +90,12 @@ function isFermentationPreference(value: string): value is FermentationOverlayPr
   return value === 'ask' || value === 'always' || value === 'never';
 }
 
-/** 見出し。パネル内のセクションはすべてこの形で始める。 */
+/**
+ * セクション。見出しは**小さく薄い一行**で、区切り線は引かない。
+ *
+ * Notion の設定パネルと同じ考え方: 面を線で刻むのではなく、**余白の大小**で
+ * まとまりを作る。セクション間は 20px、セクション内の行間は 2px。
+ */
 function Section({
   label,
   help,
@@ -101,15 +106,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-1 border-t border-[var(--border-subtle)] px-4 py-3 first:border-t-0">
-      <div className="mb-0.5 flex items-center gap-1.5">
-        {/* 見出しは本文より一段落とすが、読めなくなるほど落とさない（--date-color は薄すぎた）。 */}
-        <span className="text-[10px] font-semibold tracking-[0.16em] text-[var(--fg)] opacity-55">
-          {label}
-        </span>
+    <section className="flex flex-col px-4 pb-5 last:pb-3">
+      <div className="flex h-7 items-center gap-1.5">
+        <span className="text-[11px] font-medium text-[var(--fg)] opacity-45">{label}</span>
         {help && <HelpTooltip content={help.content} ariaLabel={help.ariaLabel} />}
       </div>
-      {children}
+      <div className="flex flex-col gap-0.5">{children}</div>
     </section>
   );
 }
@@ -117,11 +119,14 @@ function Section({
 /**
  * 「ラベル ⟷ コントロール」の1行。**パネル内の行はすべてこの形に揃える**
  * （以前はトグルが両端揃え・スライダーが左ラベル＋右数値・ラジオが縦積みとバラバラだった）。
+ *
+ * 行の高さは 32px で固定する。中身がトグルでもスライダーでも選択でも、
+ * 目が同じ間隔で下りていけるようにする。
  */
 function Row({ label, control }: { label: string; control: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="shrink-0 text-xs text-[var(--fg)]">{label}</span>
+    <div className="flex h-8 items-center justify-between gap-3">
+      <span className="shrink-0 text-[13px] text-[var(--fg)]">{label}</span>
       <div className="flex min-w-0 flex-1 justify-end">{control}</div>
     </div>
   );
@@ -147,11 +152,11 @@ function SliderRow({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <label htmlFor={id} className="shrink-0 text-xs text-[var(--fg)]">
+    <div className="flex h-8 items-center justify-between gap-3">
+      <label htmlFor={id} className="shrink-0 text-[13px] text-[var(--fg)]">
         {label}
       </label>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2.5">
         <input
           id={id}
           type="range"
@@ -160,9 +165,9 @@ function SliderRow({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-28 accent-[var(--accent)]"
+          className="w-28 cursor-pointer accent-[var(--accent)]"
         />
-        <span className="w-12 shrink-0 text-right text-[11px] tabular-nums text-[var(--date-color)]">
+        <span className="w-11 shrink-0 text-right text-[12px] tabular-nums text-[var(--date-color)]">
           {display}
         </span>
       </div>
@@ -184,8 +189,11 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
   const t = useTranslations('editor.settings');
 
   return (
+    // 見出し（「設定」）は置かない。歯車を押して開いた面なので、何の面かは自明。
+    // 上端の余白だけで始まりを示す。
     <div
-      className="flex flex-col pb-1"
+      className="flex flex-col pt-3"
+      style={{ fontFamily: 'Inter, "Noto Sans JP", sans-serif' }}
       {...verifyAttrs({
         unit: 'SettingsDrawer',
         timeInscriptionEnabled: settings.timeInscriptionEnabled,
@@ -193,10 +201,6 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
         fermentationOverlayPreference: settings.fermentationOverlayPreference,
       })}
     >
-      <div className="px-4 pt-3.5 pb-1">
-        <h2 className="text-sm font-bold text-[var(--fg)]">{t('heading')}</h2>
-      </div>
-
       <Section label={t('section_display')}>
         <Row
           label={t('writing_mode')}
