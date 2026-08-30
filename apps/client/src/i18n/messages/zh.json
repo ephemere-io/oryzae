@@ -311,7 +311,8 @@
       "aria_label": "看板工具栏",
       "snippet": "创建摘录",
       "photo": "粘贴图片"
-    }
+    },
+    "drop_image": "把图片拖到这里"
   },
   "editor": {
     "status": {

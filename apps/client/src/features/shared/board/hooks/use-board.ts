@@ -167,9 +167,12 @@ export function useBoard(
         method: 'POST',
         body: formData,
       });
-      if (res.ok) {
-        await fetchBoard();
+      // 失敗を握り潰すと、ダイアログが普通に閉じて盤面に何も出ない＝「押しても貼れない」
+      // としか見えなくなる。呼び出し側（PhotoDialog）に error 表示があるので投げ返す。
+      if (!res.ok) {
+        throw new Error(`Failed to create board photo (${res.status})`);
       }
+      await fetchBoard();
     },
     [api, dateKey, viewType, fetchBoard],
   );

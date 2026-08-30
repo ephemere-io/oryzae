@@ -311,7 +311,8 @@
       "aria_label": "보드 툴바",
       "snippet": "스니펫 만들기",
       "photo": "이미지 붙여넣기"
-    }
+    },
+    "drop_image": "여기에 이미지를 놓으세요"
   },
   "editor": {
     "status": {

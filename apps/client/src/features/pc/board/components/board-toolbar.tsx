@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import {
+  BOARD_INSET,
   ELEVATED_PANEL_CLASS,
   ELEVATED_PANEL_STYLE,
   IDLE_HOVER_CLASS,
@@ -94,9 +95,10 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
       {...verifyAttrs({ unit: 'BoardToolbar', activeTool, toolCount: tools.length })}
       role="toolbar"
       aria-label={t('aria_label')}
-      className={`${ELEVATED_PANEL_CLASS} bottom-6`}
+      className={ELEVATED_PANEL_CLASS}
       style={{
         ...ELEVATED_PANEL_STYLE,
+        bottom: BOARD_INSET,
         left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
         transform: 'translateX(-50%)',
       }}

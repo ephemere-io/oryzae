@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import {
+  BOARD_INSET,
   CONTROL_FONT,
   CONTROL_TEXT,
   GHOST_BUTTON_CLASS,
@@ -78,8 +79,12 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
       // ここは「今どこを見ているか」の情報。面を持たせず、盤面に直接置かれた文字として
       // 読ませる（浮かせるのは道具箱だけ、という約束を崩さない）。左端はサイドバー幅ぶん
       // 寄せる（--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
-      className={`${PLAIN_ROW_CLASS} top-[30px] h-8`}
-      style={{ ...CONTROL_FONT, left: 'calc(var(--sidebar-width, 0px) + 30px)' }}
+      className={`${PLAIN_ROW_CLASS} h-8`}
+      style={{
+        ...CONTROL_FONT,
+        top: BOARD_INSET,
+        left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
+      }}
     >
       <button
         type="button"

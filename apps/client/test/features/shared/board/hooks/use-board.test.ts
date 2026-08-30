@@ -471,4 +471,38 @@ describe('useBoard', () => {
     expect(byId('c-oldest')!.zIndex).toBeLessThan(byId('c-middle')!.zIndex);
     expect(byId('c-middle')!.zIndex).toBeLessThan(byId('c-newest')!.zIndex);
   });
+  it('写真の作成が失敗したら投げ返す（黙って閉じさせない）', async () => {
+    // 以前は res.ok を見て false なら何もせず返していた。呼び出し側の PhotoDialog は
+    // 例外が来たときだけエラーを出すので、失敗が画面に何も残らず
+    // 「押しても貼れない」としか見えなかった。
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiFetch.mockResolvedValueOnce(mockResponse(false, { error: 'boom' }));
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    await expect(result.current.createPhoto(file, '', 10, 10)).rejects.toThrow(
+      /create board photo/,
+    );
+  });
+
+  it('写真の作成に成功したらボードを取り直す', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { photoId: 'p-1' }));
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    await act(async () => {
+      await result.current.createPhoto(file, 'キャプション', 10, 10);
+    });
+
+    const paths = apiFetch.mock.calls.map((c) => c[0]);
+    expect(paths).toContain('/api/v1/board/photos');
+    // 作成 → 再取得 の順で2本目以降が飛んでいる
+    expect(paths.filter((p) => p.startsWith('/api/v1/board?')).length).toBeGreaterThanOrEqual(2);
+  });
 });

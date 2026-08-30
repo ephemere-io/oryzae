@@ -311,7 +311,8 @@
       "aria_label": "Board toolbar",
       "snippet": "Create snippet",
       "photo": "Paste image"
-    }
+    },
+    "drop_image": "Drop the image here"
   },
   "editor": {
     "status": {

@@ -311,7 +311,8 @@
       "aria_label": "ボードのツールバー",
       "snippet": "スニペットを作成",
       "photo": "画像を貼り付け"
-    }
+    },
+    "drop_image": "ここに画像をドロップ"
   },
   "editor": {
     "status": {

@@ -7,6 +7,8 @@ import { useEscapeKey } from '@/lib/use-escape-key';
 
 interface PhotoDialogProps {
   open: boolean;
+  /** 貼り付け・ドロップで入ってきた画像。開いた時点で選択済みとして扱う。 */
+  initialFile?: File | null;
   onSubmit: (file: File, caption: string, imageWidth: number, imageHeight: number) => Promise<void>;
   onClose: () => void;
 }
@@ -66,7 +68,7 @@ function readImageDimensions(file: File): Promise<{ width: number; height: numbe
   });
 }
 
-export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
+export function PhotoDialog({ open, initialFile, onSubmit, onClose }: PhotoDialogProps) {
   const t = useTranslations('board.photo_dialog');
   const [caption, setCaption] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
@@ -120,41 +122,61 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
     };
   }, []);
 
+  const acceptFile = useCallback(
+    async (file: File | null | undefined) => {
+      if (!file) return;
+
+      const generation = ++selectionRef.current;
+      setPreviewUrl(URL.createObjectURL(file));
+      setError(null);
+      setSelectedFile(file);
+      setAspectRatio(null);
+      try {
+        const { width, height } = await readImageDimensions(file);
+        // 判定中に選び直されていたら、こちらの結果はもう用済み。
+        if (generation !== selectionRef.current) return;
+        if (width > 0 && height > 0) {
+          setAspectRatio(width / height);
+        }
+      } catch {
+        // ここで落ちる＝ブラウザがこの画像をデコードできない。以前は握り潰していたので
+        // 「追加」を押せてしまい、リサイズで固まっていた。選んだ時点で伝えて止める。
+        // 追い越されていたら触らない（新しい選択を壊さない。URL は setPreviewUrl が
+        // 差し替え時に revoke 済み）。
+        if (generation !== selectionRef.current) return;
+        setPreviewUrl(null);
+        setSelectedFile(null);
+        setAspectRatio(null);
+        setError('unsupported');
+      }
+    },
+    [setPreviewUrl],
+  );
+
+  // 貼り付け・ドロップで渡された画像を、選択されたものとして取り込む。
+  // 同じ File で何度も走らないよう、取り込み済みのものを覚えておく。
+  const takenRef = useRef<File | null>(null);
+  useEffect(() => {
+    if (!open) {
+      takenRef.current = null;
+      return;
+    }
+    if (!initialFile || takenRef.current === initialFile) return;
+    takenRef.current = initialFile;
+    void acceptFile(initialFile);
+  }, [open, initialFile, acceptFile]);
+
   if (!open) return null;
 
   const canSubmit = Boolean(selectedFile) && !uploading;
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     // 同じファイルを選び直しても change が発火するよう、掴んだ直後に value を空にする。
     // これが無いと、開けない画像で弾いた後に「JPEG に変換して同じ名前で選び直す」が
     // 効かず（value が変わらないのでイベントが出ない）、エラー表示のまま詰む。
     e.target.value = '';
-    if (!file) return;
-
-    const generation = ++selectionRef.current;
-    setPreviewUrl(URL.createObjectURL(file));
-    setError(null);
-    setSelectedFile(file);
-    setAspectRatio(null);
-    try {
-      const { width, height } = await readImageDimensions(file);
-      // 判定中に選び直されていたら、こちらの結果はもう用済み。
-      if (generation !== selectionRef.current) return;
-      if (width > 0 && height > 0) {
-        setAspectRatio(width / height);
-      }
-    } catch {
-      // ここで落ちる＝ブラウザがこの画像をデコードできない。以前は握り潰していたので
-      // 「追加」を押せてしまい、リサイズで固まっていた。選んだ時点で伝えて止める。
-      // 追い越されていたら触らない（新しい選択を壊さない。URL は setPreviewUrl が
-      // 差し替え時に revoke 済み）。
-      if (generation !== selectionRef.current) return;
-      setPreviewUrl(null);
-      setSelectedFile(null);
-      setAspectRatio(null);
-      setError('unsupported');
-    }
+    void acceptFile(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -12,6 +12,7 @@ import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { useEscapeKey } from '@/lib/use-escape-key';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
+import { useImageIntake } from '../hooks/use-image-intake';
 import { BoardCard } from './board-card';
 import { BoardDateNav } from './board-date-nav';
 import { BoardToolbar } from './board-toolbar';
@@ -43,6 +44,8 @@ export function BoardView({ api }: BoardViewProps) {
   }>({ open: false });
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
+  /** 貼り付け・ドロップで入ってきた画像。写真ダイアログへ選択済みとして渡す。 */
+  const [incomingImage, setIncomingImage] = useState<File | null>(null);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
 
   const {
@@ -115,7 +118,16 @@ export function BoardView({ api }: BoardViewProps) {
   );
 
   const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
-  const openPhotoDialog = useCallback(() => setPhotoDialogOpen(true), []);
+  const openPhotoDialog = useCallback(() => {
+    setIncomingImage(null);
+    setPhotoDialogOpen(true);
+  }, []);
+
+  // 貼り付け（Cmd+V）とドロップ。どちらもツールバーの「画像を貼り付け」と同じ着地点へ。
+  const handleIncomingImage = useCallback((file: File) => {
+    setIncomingImage(file);
+    setPhotoDialogOpen(true);
+  }, []);
   const closeLightbox = useCallback(() => setLightbox(null), []);
 
   // ライトボックスも Escape で閉じる（各ダイアログと揃える）。
@@ -123,13 +135,19 @@ export function BoardView({ api }: BoardViewProps) {
 
   const dialogOpen = snippetDialog.open || photoDialogOpen || lightbox !== null;
 
+  // スニペット編集中とライトボックス表示中は横取りしない（本文への貼り付けを奪わない）。
+  const intake = useImageIntake(!snippetDialog.open && lightbox === null, handleIncomingImage);
+
   // Keyboard handling: Delete/Backspace で選択カードを消す ＋ ツールバーのショートカット。
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
-      const target = e.target as HTMLElement;
-      const tag = target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      // e.target は EventTarget で、HTMLElement とは限らない（document / window /
+      // SVGElement も来る）。キャストで名乗らせず instanceof で確かめる。
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      }
       // 何かが開いている間はボードのキー操作を一切拾わない（閉じるのは Escape の仕事）。
       // 削除より後ろに置くと、ライトボックスやダイアログの入力欄以外にフォーカスが
       // ある状態の Backspace が、背後で選択中のカードをサーバーごと消してしまう。
@@ -172,6 +190,9 @@ export function BoardView({ api }: BoardViewProps) {
       style={{ backgroundColor: 'var(--bg)' }}
       onPointerMove={(e) => onPointerMove(e.clientX, e.clientY)}
       onPointerUp={onPointerUp}
+      onDragOver={intake.onDragOver}
+      onDragLeave={intake.onDragLeave}
+      onDrop={intake.onDrop}
       onClick={deselect}
       onKeyDown={() => {}}
     >
@@ -185,6 +206,26 @@ export function BoardView({ api }: BoardViewProps) {
           opacity: 0.6,
         }}
       />
+
+      {/* ドラッグ中の目印。受け取れることが分からないと、そもそも落としてもらえない。 */}
+      {intake.dragActive && (
+        <div
+          className="pointer-events-none fixed inset-0 z-[1700] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}
+        >
+          <span
+            className="rounded-lg border border-dashed px-4 py-2 text-[11px] uppercase tracking-[0.08em]"
+            style={{
+              borderColor: 'var(--fg)',
+              color: 'var(--fg)',
+              backgroundColor: 'var(--surface-raised)',
+              fontFamily: 'Inter, "Noto Sans JP", sans-serif',
+            }}
+          >
+            {t('drop_image')}
+          </span>
+        </div>
+      )}
 
       <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
       <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
@@ -254,10 +295,14 @@ export function BoardView({ api }: BoardViewProps) {
       {/* Photo dialog */}
       <PhotoDialog
         open={photoDialogOpen}
+        initialFile={incomingImage}
         onSubmit={(file, caption, imageWidth, imageHeight) =>
           createPhoto(file, caption, imageWidth, imageHeight)
         }
-        onClose={() => setPhotoDialogOpen(false)}
+        onClose={() => {
+          setPhotoDialogOpen(false);
+          setIncomingImage(null);
+        }}
       />
 
       {/* Photo lightbox */}

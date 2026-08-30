@@ -1,7 +1,14 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import { FLAT_TRACK_CLASS, FLAT_TRACK_STYLE, SEGMENT_CLASS } from './board-surface';
+import {
+  BOARD_INSET,
+  FLAT_TRACK_CLASS,
+  FLAT_TRACK_STYLE,
+  SEGMENT_ACTIVE_STYLE,
+  SEGMENT_CLASS,
+  SEGMENT_IDLE_STYLE,
+} from './board-surface';
 
 interface BoardViewSwitchProps {
   viewType: 'daily' | 'weekly';
@@ -28,8 +35,8 @@ export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchP
       // 持つため、group を足すと fieldset/legend を要求されるだけで読み上げは良くならない。
       // これは「行為」ではなく「状態」の選択なので、浮かせない。盤面に沈んだ溝として
       // 描き、道具箱（浮いた面）と役割を見た目で分ける。
-      className={`${FLAT_TRACK_CLASS} right-[30px] top-[30px]`}
-      style={FLAT_TRACK_STYLE}
+      className={FLAT_TRACK_CLASS}
+      style={{ ...FLAT_TRACK_STYLE, top: BOARD_INSET, right: BOARD_INSET }}
     >
       {VIEW_TYPES.map((v) => {
         const isActive = viewType === v.id;
@@ -43,11 +50,7 @@ export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchP
             // 非選択側だけ hover を効かせる。インライン style は :hover に勝つので
             // backgroundColor は非選択時に指定しない。
             className={`${SEGMENT_CLASS} ${isActive ? '' : 'hover:text-[var(--fg)]'}`}
-            style={
-              isActive
-                ? { backgroundColor: 'var(--accent)', color: '#fff' }
-                : { color: 'var(--date-color)' }
-            }
+            style={isActive ? SEGMENT_ACTIVE_STYLE : SEGMENT_IDLE_STYLE}
           >
             {v.label}
           </button>
