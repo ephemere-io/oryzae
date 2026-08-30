@@ -8,6 +8,7 @@ import {
 } from '@oryzae/shared';
 import { Hono } from 'hono';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
+import { rateLimitOcr } from '../../../shared/presentation/middleware/rate-limit.js';
 import { CreateBoardPhotoUsecase } from '../../application/usecases/create-board-photo.usecase.js';
 import { CreateBoardSnippetUsecase } from '../../application/usecases/create-board-snippet.usecase.js';
 import { DeleteBoardPhotoUsecase } from '../../application/usecases/delete-board-photo.usecase.js';
@@ -109,7 +110,7 @@ export const board = new Hono<Env>()
   // POST /api/v1/board/snippets/ocr (multipart/form-data)
   // 画像を読み取って本文だけ返す。スニペットはまだ作らない（ユーザーが確認・編集してから
   // POST /snippets を叩く）。
-  .post('/snippets/ocr', async (c) => {
+  .post('/snippets/ocr', rateLimitOcr(), async (c) => {
     // parseBody() は multipart 全体をメモリに載せるので、その前に Content-Length で
     // 明らかに大きいものを落とす。ヘッダは自己申告なので **早期打ち切りであって保証
     // ではない**（実サイズの判定は下の file.size と usecase 側）。境界文字列などの
