@@ -5,12 +5,46 @@
  * `gateway.getGenerationInfo()` ベースのコスト追跡が機能しなくなった。代わりに
  * 保存済みのトークン数と価格表から cost を計算する。
  *
- * 価格は fermentation gateway が使うモデル (claude-sonnet-4-6) のもの:
- *   input  $3.00 / 1M tokens, output $15.00 / 1M tokens
- * (vercel-ai-analysis.gateway.ts のモデルを変えたらここも合わせること)
+ * ## この算出値の位置づけ
+ *
+ * Oryzae の発酵は「単一モデル・standard tier・プロンプトキャッシュ無し・
+ * バッチ無し・サーバーツール無し」なので、`トークン数 × 公表単価` は
+ * Anthropic が請求額を出すのと同じ計算式になる。当てずっぽうの見積りではなく、
+ * Anthropic 自身が返したトークン数に公表単価を掛けた値である。
+ * （丸めや値引き契約のぶんだけ実額とズレうるので、表示上は「推定」と呼ぶ）
+ *
+ * 前提が崩れると静かにズレるので、崩れたら気づけるようにしてある:
+ *   - モデル変更 → vercel-ai-analysis.gateway.ts が FERMENTATION_MODEL_ID を
+ *     import して anthropic() に渡す。価格表に無いモデルへ変えると型エラーになる。
+ *   - キャッシュ導入 → 同 gateway が cacheRead/cacheWrite を検知して警告ログを出す
+ *     （キャッシュ読みは 0.1x、書きは 1.25x/2x なので一律単価では合わなくなる）。
  */
-const INPUT_USD_PER_TOKEN = 3.0 / 1_000_000;
-const OUTPUT_USD_PER_TOKEN = 15.0 / 1_000_000;
+
+export interface ModelRate {
+  /** 100万入力トークンあたりの USD */
+  inputUsdPerMTok: number;
+  /** 100万出力トークンあたりの USD */
+  outputUsdPerMTok: number;
+}
+
+/**
+ * 価格表。モデルを追加・変更したらここも更新すること。
+ * 出典: https://platform.claude.com/docs/en/about-claude/pricing
+ */
+const RATES = {
+  'claude-sonnet-4-6': { inputUsdPerMTok: 3.0, outputUsdPerMTok: 15.0 },
+} as const satisfies Record<string, ModelRate>;
+
+/**
+ * fermentation の LLM 呼び出しに使うモデル。gateway はここから import する。
+ *
+ * 型注釈ではなく satisfies を使うこと。`: keyof typeof RATES` と注釈すると
+ * リテラル型が union に広がり、価格表に無いモデルを書いても通ってしまう。
+ */
+export const FERMENTATION_MODEL_ID = 'claude-sonnet-4-6' satisfies keyof typeof RATES;
+
+/** 上記モデルの単価。推定の根拠を画面に出すためにも使う。 */
+export const FERMENTATION_MODEL_RATE: ModelRate = RATES[FERMENTATION_MODEL_ID];
 
 export interface TokenCost {
   totalCost: number;
@@ -28,7 +62,9 @@ export function computeCostFromTokens(
   const input = inputTokens ?? 0;
   const output = outputTokens ?? 0;
   return {
-    totalCost: input * INPUT_USD_PER_TOKEN + output * OUTPUT_USD_PER_TOKEN,
+    totalCost:
+      (input * FERMENTATION_MODEL_RATE.inputUsdPerMTok) / 1_000_000 +
+      (output * FERMENTATION_MODEL_RATE.outputUsdPerMTok) / 1_000_000,
     promptTokens: input,
     completionTokens: output,
   };

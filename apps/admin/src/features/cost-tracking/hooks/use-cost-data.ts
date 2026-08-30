@@ -6,6 +6,10 @@ import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 import { parseJson } from '@/lib/json';
 
+/**
+ * latency はかつて AI Gateway が返していたが、Anthropic 直叩き (#352) 以降は
+ * 存在しない。型としては必須のまま列を出していたので常に "-" だった → 列ごと廃止。
+ */
 const costItemSchema = z.object({
   id: z.string(),
   user_id: z.string(),
@@ -18,7 +22,6 @@ const costItemSchema = z.object({
       totalCost: z.number(),
       promptTokens: z.number(),
       completionTokens: z.number(),
-      latency: z.number(),
     })
     .nullable(),
 });
