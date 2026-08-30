@@ -23,6 +23,23 @@ const MINIMAP_HEIGHT = 100;
 /** 俯瞰の縁に中身が貼り付かないよう、包含矩形をこの割合だけ広げる。 */
 const MARGIN_RATIO = 0.08;
 
+/**
+ * ミニマップと同じ縦横比になるまで短い辺を広げる（中心は保つ）。
+ *
+ * viewBox の比が枠と違うと `preserveAspectRatio` のレターボックスが生まれ、
+ * その帯だけ暗転パスの外側に取り残されて **白い余白** として見える。
+ * 中身を切らずに比を合わせれば、帯そのものが無くなる。
+ */
+function matchAspect(bounds: Bounds, aspect: number): Bounds {
+  const current = bounds.width / bounds.height;
+  if (current < aspect) {
+    const width = bounds.height * aspect;
+    return { ...bounds, x: bounds.x - (width - bounds.width) / 2, width };
+  }
+  const height = bounds.width / aspect;
+  return { ...bounds, y: bounds.y - (height - bounds.height) / 2, height };
+}
+
 function expand(bounds: Bounds, ratio: number): Bounds {
   const mx = Math.max(bounds.width * ratio, 1);
   const my = Math.max(bounds.height * ratio, 1);
@@ -82,7 +99,14 @@ export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinima
             ? [{ x: contentX, y: contentY, width: contentW, height: contentH }, visible]
             : [visible],
         ) ?? visible;
-      const area = expand(union, MARGIN_RATIO);
+      // 余白を足したうえで枠の比に合わせる（順序が逆だと比が崩れる）。
+      // 比は **SVG の実寸から測る**。定数（148x100）は枠線を含む外寸なので、
+      // 内側の描画領域（146x98）とわずかにずれ、その差が白い帯として残る。
+      const box = svg.getBoundingClientRect();
+      const area =
+        box.height > 0
+          ? matchAspect(expand(union, MARGIN_RATIO), box.width / box.height)
+          : expand(union, MARGIN_RATIO);
 
       svg.setAttribute('viewBox', `${area.x} ${area.y} ${area.width} ${area.height}`);
 
