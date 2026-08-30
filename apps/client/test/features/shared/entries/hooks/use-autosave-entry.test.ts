@@ -121,6 +121,24 @@ describe('useAutosaveEntry', () => {
     expect(save).toHaveBeenCalledWith('今日は疲れた', undefined);
   });
 
+  it('api の解決（enabled false→true）では強制保存が走らない', async () => {
+    // enabled=false の回は effect が cleanup を返さないので、有効化しても離脱扱いにならない。
+    // ここが崩れると「打ちかけの1文字で新規エントリが生える」ことになるので固定しておく。
+    const save = vi.fn().mockResolvedValue('id');
+    const { rerender } = renderHook(
+      ({ enabled, body }) =>
+        useAutosaveEntry({ title: '', body, entryId: undefined, save, enabled }),
+      { initialProps: { enabled: false, body: 'あ' } },
+    );
+
+    await act(async () => {
+      rerender({ enabled: true, body: 'あ' });
+      await Promise.resolve();
+    });
+
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('離脱時はしきい値を無視して書き出す（未確定でも書いたものは残す）', async () => {
     const save = vi.fn().mockResolvedValue('new-id');
     const { rerender } = setup(save, { body: '' });

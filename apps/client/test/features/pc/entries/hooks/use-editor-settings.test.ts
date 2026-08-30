@@ -8,6 +8,7 @@ const LINE_HEIGHT_KEY = 'oryzae-editor-line-height';
 const FOCUS_MODE_KEY = 'oryzae-editor-focus-mode';
 const FERMENTATION_OVERLAY_KEY = 'oryzae-editor-fermentation-overlay-preference';
 const FOCUS_FADES_FERMENTATION_KEY = 'oryzae-editor-focus-mode-fades-fermentation';
+const PALETTE_AUTO_HIDE_KEY = 'oryzae-editor-palette-auto-hide';
 
 describe('useEditorSettings', () => {
   beforeEach(() => {
@@ -233,5 +234,37 @@ describe('useEditorSettings', () => {
     window.localStorage.setItem(FOCUS_FADES_FERMENTATION_KEY, 'maybe');
     const { result } = renderHook(() => useEditorSettings());
     expect(result.current[0].focusModeFadesFermentation).toBe(true);
+  });
+
+  // アクションパレットを書いている間は隠すか。既定は隠す（原則1: 文字に道具を被せない）。
+  it('paletteAutoHide の既定は true（書き始めたら道具は引く）', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].paletteAutoHide).toBe(true);
+  });
+
+  it('paletteAutoHide を切ると localStorage に永続化される', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    act(() => {
+      result.current[1]({ paletteAutoHide: false });
+    });
+    expect(result.current[0].paletteAutoHide).toBe(false);
+    expect(window.localStorage.getItem(PALETTE_AUTO_HIDE_KEY)).toBe('false');
+  });
+
+  it('paletteAutoHide は再マウント越しに保持される', () => {
+    const first = renderHook(() => useEditorSettings());
+    act(() => {
+      first.result.current[1]({ paletteAutoHide: false });
+    });
+    first.unmount();
+
+    const second = renderHook(() => useEditorSettings());
+    expect(second.result.current[0].paletteAutoHide).toBe(false);
+  });
+
+  it('壊れた paletteAutoHide は無視して既定に戻す', () => {
+    window.localStorage.setItem(PALETTE_AUTO_HIDE_KEY, 'sometimes');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].paletteAutoHide).toBe(true);
   });
 });
