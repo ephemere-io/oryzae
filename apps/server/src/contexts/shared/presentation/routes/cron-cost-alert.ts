@@ -1,10 +1,37 @@
 import { Hono } from 'hono';
-import { fetchDailyCosts, sumDailyCosts } from '../../infrastructure/anthropic-cost-report.js';
+import { computeCostFromTokens } from '../../infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
+import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 import { createCronAuthMiddleware } from '../middleware/cron-auth.js';
 
 const DAILY_COST_THRESHOLD_USD = 1.0;
 
+interface TokenRow {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  model?: string | null;
+}
+
+function sumCost(rows: TokenRow[]): number {
+  return rows.reduce((total, row) => {
+    const cost = computeCostFromTokens(row.input_tokens, row.output_tokens, row.model);
+    return total + (cost?.totalCost ?? 0);
+  }, 0);
+}
+
+/**
+ * 前日の AI コストを Discord に日次報告する。
+ *
+ * 保存済みのトークン数 × 価格表から算出する。Anthropic の Cost Report（実請求額）は
+ * Admin API キーが要り、それは組織アカウントでしか発行できないため使えない。
+ * したがってここの数字は**概算**で、キャッシュ割引・tier 割引・価格改定は反映されない。
+ * 正確な請求額は Console の Cost ページを見ること。
+ *
+ * 以前は fermentation_results の generation_id を gateway に問い合わせていたが、
+ * issue #352 で Anthropic 直叩きに切替えて以降 generation_id は発行されない。
+ * その結果クエリは常に 0 件で、日次レポートは毎日 $0.0000 を報告していた。
+ * トークン数から出す方式に変え、写真の文字起こし分も足す。
+ */
 export const cronCostAlert = new Hono()
   .use(
     '*',
@@ -15,6 +42,8 @@ export const cronCostAlert = new Hono()
   )
   .post('/', async (c) => {
     try {
+      const supabase = getSupabaseClient();
+
       // Get yesterday's date range (UTC)
       const now = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -22,27 +51,36 @@ export const cronCostAlert = new Hono()
       const dayEnd = `${yesterday.toISOString().slice(0, 10)}T23:59:59.999Z`;
       const dateLabel = yesterday.toISOString().slice(0, 10);
 
-      // Anthropic の Cost Report から前日の実請求額を引く。
-      //
-      // 以前は fermentation_results の generation_id を gateway に問い合わせていたが、
-      // issue #352 で Anthropic 直叩きに切替えて以降 generation_id は発行されない。
-      // その結果このクエリは常に 0 件で、日次レポートは毎日 $0.0000 を報告していた。
-      // Cost Report なら発酵・文字起こしを含む組織全体の実費がそのまま取れる。
-      const dailyCosts = await fetchDailyCosts(dayStart, dayEnd);
+      const [fermentations, transcriptions] = await Promise.all([
+        supabase
+          .from('fermentation_results')
+          .select('input_tokens, output_tokens')
+          .gte('created_at', dayStart)
+          .lte('created_at', dayEnd),
+        supabase
+          .from('photo_transcription_usages')
+          .select('model, input_tokens, output_tokens')
+          .gte('created_at', dayStart)
+          .lte('created_at', dayEnd),
+      ]);
 
-      if (dailyCosts === null) {
-        console.error('[cron-cost-alert] cost report unavailable', { date: dateLabel });
+      const failed = fermentations.error ?? transcriptions.error;
+      if (failed) {
+        console.error('[cron-cost-alert] Supabase query failed', { error: failed.message });
         await notifyDiscord({
-          title: 'コスト cron: Cost Report を取得できません',
-          description:
-            'ANTHROPIC_ADMIN_KEY が未設定か、Admin API がエラーを返しました。日次コストを報告できません。',
+          title: 'コスト cron: Supabase クエリ失敗',
+          description: failed.message,
           color: COLORS.ERROR,
         });
-        return c.json({ error: 'Cost report unavailable' }, 500);
+        return c.json({ error: failed.message }, 500);
       }
 
-      const totalCost = sumDailyCosts(dailyCosts);
-      const trackedCount = dailyCosts.length;
+      const fermentationRows = fermentations.data ?? [];
+      const transcriptionRows = transcriptions.data ?? [];
+      const totalCost = sumCost(fermentationRows) + sumCost(transcriptionRows);
+      // 集計に使ったレコード数（発酵 + 文字起こし）。旧実装の trackedCount は
+      // 「generation_id を引けた件数」で意味が違うため、名前を変えて取り違えを防ぐ。
+      const recordCount = fermentationRows.length + transcriptionRows.length;
 
       // Always send a daily summary
       if (totalCost >= DAILY_COST_THRESHOLD_USD) {
@@ -51,9 +89,10 @@ export const cronCostAlert = new Hono()
           color: COLORS.ERROR,
           fields: [
             { name: '日付', value: dateLabel, inline: true },
-            { name: '合計コスト', value: `$${totalCost.toFixed(4)}`, inline: true },
+            { name: '合計コスト（概算）', value: `$${totalCost.toFixed(4)}`, inline: true },
             { name: '閾値', value: `$${DAILY_COST_THRESHOLD_USD.toFixed(2)}`, inline: true },
-            { name: '集計日数', value: String(trackedCount) },
+            { name: '発酵', value: String(fermentationRows.length), inline: true },
+            { name: '文字起こし', value: String(transcriptionRows.length), inline: true },
           ],
         });
       } else {
@@ -62,8 +101,9 @@ export const cronCostAlert = new Hono()
           color: COLORS.INFO,
           fields: [
             { name: '日付', value: dateLabel, inline: true },
-            { name: '合計コスト', value: `$${totalCost.toFixed(4)}`, inline: true },
-            { name: '集計日数', value: String(trackedCount), inline: true },
+            { name: '合計コスト（概算）', value: `$${totalCost.toFixed(4)}`, inline: true },
+            { name: '発酵', value: String(fermentationRows.length), inline: true },
+            { name: '文字起こし', value: String(transcriptionRows.length), inline: true },
           ],
         });
       }
@@ -72,7 +112,7 @@ export const cronCostAlert = new Hono()
         message: 'Cost alert check completed',
         date: dateLabel,
         totalCost: Math.round(totalCost * 1000000) / 1000000,
-        trackedCount,
+        recordCount,
         thresholdExceeded: totalCost >= DAILY_COST_THRESHOLD_USD,
       });
     } catch (error) {

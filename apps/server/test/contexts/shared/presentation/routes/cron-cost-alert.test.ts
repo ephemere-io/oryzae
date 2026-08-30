@@ -10,19 +10,42 @@ vi.mock('@/contexts/shared/infrastructure/discord-notify.js', () => ({
 
 import { COLORS } from '@/contexts/shared/infrastructure/discord-notify.js';
 
-// 前日のコストは Anthropic の Cost Report から引く。
-// （以前は fermentation_results の generation_id を辿っていたが、issue #352 で
-//  generation_id が出なくなり、この cron は毎日 $0 を報告していた。）
-const mockFetchDailyCosts = vi.fn();
-const costReportState = { shouldThrow: false };
+/**
+ * 前日のコストは 2 つのテーブルのトークン数から出す。
+ * （以前は fermentation_results の generation_id を辿っていたが、issue #352 で
+ *  generation_id が出なくなり、この cron は毎日 $0 を報告していた。）
+ */
+interface TokenRow {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  model?: string | null;
+}
 
-vi.mock('@/contexts/shared/infrastructure/anthropic-cost-report.js', () => ({
-  fetchDailyCosts: (...args: unknown[]) => {
-    if (costReportState.shouldThrow) throw new Error('cost report init failed');
-    return mockFetchDailyCosts(...args);
+const tableResults: {
+  fermentation_results: { data: TokenRow[] | null; error: { message: string } | null };
+  photo_transcription_usages: { data: TokenRow[] | null; error: { message: string } | null };
+} = {
+  fermentation_results: { data: [], error: null },
+  photo_transcription_usages: { data: [], error: null },
+};
+
+const supabaseClientState = { shouldThrow: false };
+
+vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
+  getSupabaseClient: () => {
+    if (supabaseClientState.shouldThrow) {
+      throw new Error('supabase init failed');
+    }
+    return {
+      from: (table: 'fermentation_results' | 'photo_transcription_usages') => ({
+        select: () => ({
+          gte: () => ({
+            lte: () => Promise.resolve(tableResults[table]),
+          }),
+        }),
+      }),
+    };
   },
-  sumDailyCosts: (costs: { amountUsd: number }[]) =>
-    costs.reduce((total, day) => total + day.amountUsd, 0),
 }));
 
 import { cronCostAlert } from '@/contexts/shared/presentation/routes/cron-cost-alert.js';
@@ -37,8 +60,9 @@ const validHeaders = { Authorization: `Bearer ${SECRET}` };
 describe('cronCostAlert', () => {
   beforeEach(() => {
     mockNotifyDiscord.mockClear();
-    mockFetchDailyCosts.mockReset().mockResolvedValue([]);
-    costReportState.shouldThrow = false;
+    tableResults.fermentation_results = { data: [], error: null };
+    tableResults.photo_transcription_usages = { data: [], error: null };
+    supabaseClientState.shouldThrow = false;
     vi.stubEnv('CRON_SECRET', SECRET);
   });
 
@@ -75,9 +99,6 @@ describe('cronCostAlert', () => {
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'Unauthorized' });
-    expect(errorSpy).toHaveBeenCalledWith('[cron-cost-alert] Unauthorized request', {
-      hasAuthHeader: true,
-    });
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'コスト cron: 認証失敗', color: COLORS.ERROR }),
     );
@@ -85,27 +106,18 @@ describe('cronCostAlert', () => {
     errorSpy.mockRestore();
   });
 
-  it('前日1日分を Cost Report に問い合わせる', async () => {
-    await createApp().request('/cron', { method: 'POST', headers: validHeaders });
-
-    const [startingAt, endingAt] = mockFetchDailyCosts.mock.calls[0];
-    expect(startingAt).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/);
-    expect(endingAt).toMatch(/^\d{4}-\d{2}-\d{2}T23:59:59\.999Z$/);
-    expect(startingAt.slice(0, 10)).toBe(endingAt.slice(0, 10));
-  });
-
-  // Cost Report が引けないなら黙って $0 と報告してはいけない（それが以前のバグ）。
-  it('Cost Report を取得できないときは 500 にして Discord に知らせる', async () => {
-    mockFetchDailyCosts.mockResolvedValue(null);
+  it('returns 500 and notifies Discord when Supabase query fails', async () => {
+    tableResults.fermentation_results = { data: null, error: { message: 'permission denied' } };
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: 'Cost report unavailable' });
+    expect(await res.json()).toEqual({ error: 'permission denied' });
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'コスト cron: Cost Report を取得できません',
+        title: 'コスト cron: Supabase クエリ失敗',
+        description: 'permission denied',
         color: COLORS.ERROR,
       }),
     );
@@ -113,28 +125,64 @@ describe('cronCostAlert', () => {
     errorSpy.mockRestore();
   });
 
+  // 発酵だけ数えていると、写真の文字起こし分が丸ごと抜ける。
+  it('発酵と文字起こしのコストを合算する', async () => {
+    // sonnet-4-6: 1000 in / 1000 out = 0.003 + 0.015 = 0.018
+    tableResults.fermentation_results = {
+      data: [{ input_tokens: 1000, output_tokens: 1000 }],
+      error: null,
+    };
+    // haiku-4-5: 1000 in / 1000 out = 0.001 + 0.005 = 0.006
+    tableResults.photo_transcription_usages = {
+      data: [{ model: 'claude-haiku-4-5', input_tokens: 1000, output_tokens: 1000 }],
+      error: null,
+    };
+
+    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+    const body = await res.json();
+    expect(body.totalCost).toBeCloseTo(0.024, 6);
+    expect(body.recordCount).toBe(2);
+  });
+
+  it('文字起こしはモデル別の単価で計算する', async () => {
+    tableResults.photo_transcription_usages = {
+      data: [{ model: 'claude-opus-5', input_tokens: 1000, output_tokens: 1000 }],
+      error: null,
+    };
+
+    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+    // opus-5: 1000 * 5/1e6 + 1000 * 25/1e6 = 0.03
+    expect((await res.json()).totalCost).toBeCloseTo(0.03, 6);
+  });
+
   it('sends INFO Discord notification when total cost is below threshold', async () => {
-    mockFetchDailyCosts.mockResolvedValue([{ date: '2026-08-24', amountUsd: 0.3 }]);
+    tableResults.fermentation_results = {
+      data: [{ input_tokens: 1000, output_tokens: 1000 }],
+      error: null,
+    };
 
     const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.thresholdExceeded).toBe(false);
-    expect(body.totalCost).toBeCloseTo(0.3, 6);
+    expect((await res.json()).thresholdExceeded).toBe(false);
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'AI コスト日次レポート', color: COLORS.INFO }),
     );
   });
 
   it('sends ERROR Discord notification when total cost exceeds threshold', async () => {
-    mockFetchDailyCosts.mockResolvedValue([{ date: '2026-08-24', amountUsd: 2.5 }]);
+    // 1M in / 1M out = 3 + 15 = $18
+    tableResults.fermentation_results = {
+      data: [{ input_tokens: 1_000_000, output_tokens: 1_000_000 }],
+      error: null,
+    };
 
     const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.thresholdExceeded).toBe(true);
+    expect((await res.json()).thresholdExceeded).toBe(true);
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'AI コスト警告 — 閾値超過',
@@ -143,8 +191,19 @@ describe('cronCostAlert', () => {
     );
   });
 
+  it('使用が無い日は $0 で INFO 報告する', async () => {
+    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+    const body = await res.json();
+    expect(body.totalCost).toBe(0);
+    expect(body.recordCount).toBe(0);
+    expect(mockNotifyDiscord).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'AI コスト日次レポート' }),
+    );
+  });
+
   it('returns 500 and notifies Discord ERROR when an unexpected error is thrown', async () => {
-    costReportState.shouldThrow = true;
+    supabaseClientState.shouldThrow = true;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
@@ -152,15 +211,12 @@ describe('cronCostAlert', () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({
       error: 'Internal Server Error',
-      message: 'cost report init failed',
-    });
-    expect(errorSpy).toHaveBeenCalledWith('[cron-cost-alert] execution failed', {
-      error: 'cost report init failed',
+      message: 'supabase init failed',
     });
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'コスト cron: 実行中にエラー',
-        description: 'cost report init failed',
+        description: 'supabase init failed',
         color: COLORS.ERROR,
       }),
     );
