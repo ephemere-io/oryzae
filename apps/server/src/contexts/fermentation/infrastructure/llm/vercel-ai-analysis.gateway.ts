@@ -1,6 +1,7 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { FERMENTATION_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type {
   LlmAnalysisGateway,
   LlmAnalysisResult,
@@ -187,7 +188,9 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
     language: FermentationLanguage;
   }): Promise<LlmAnalysisResult> {
     const { object, usage } = await generateObject({
-      model: anthropic('claude-sonnet-4-6'),
+      // モデル ID は価格表 (claude-pricing.ts) から取る。ここでハードコードすると
+      // モデルだけ差し替えたときにコスト算出が黙って間違った値になる。
+      model: anthropic(FERMENTATION_MODEL_ID),
       prompt: buildPrompt(
         {
           question: params.question,
@@ -199,6 +202,19 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
       schema: buildSchema(params.language),
       maxOutputTokens: 16000,
     });
+
+    // コスト算出は「入力・出力トークン × 一律単価」を前提にしている。プロンプト
+    // キャッシュを使うとキャッシュ読み 0.1x / 書き 1.25x・2x と単価が変わり前提が崩れる。
+    // 現在キャッシュは未使用なので通常ここは 0。将来 cacheControl を入れたときに
+    // 黙ってコストがズレないよう検知しておく。
+    const cacheReadTokens = usage.inputTokenDetails?.cacheReadTokens ?? 0;
+    const cacheWriteTokens = usage.inputTokenDetails?.cacheWriteTokens ?? 0;
+    if (cacheReadTokens > 0 || cacheWriteTokens > 0) {
+      console.warn(
+        '[VercelAiAnalysisGateway] prompt cache tokens detected; claude-pricing.ts の一律単価では実額とズレる',
+        { cacheReadTokens, cacheWriteTokens },
+      );
+    }
 
     return {
       output: object,

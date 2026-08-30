@@ -16,7 +16,6 @@ import { AnthropicPhotoTranscriptionGateway } from '../../infrastructure/llm/ant
 import { SupabaseEntryRepository } from '../../infrastructure/repositories/supabase-entry.repository.js';
 import { SupabaseEntryLinkedQuestionsViewRepository } from '../../infrastructure/repositories/supabase-entry-linked-questions-view.repository.js';
 import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository.js';
-import { SupabasePhotoTranscriptionUsageRepository } from '../../infrastructure/repositories/supabase-photo-transcription-usage.repository.js';
 import { SupabaseEntryStorageGateway } from '../../infrastructure/storage/supabase-entry-storage.gateway.js';
 
 type Env = {
@@ -92,13 +91,8 @@ export const entries = new Hono<Env>()
     if (!parsed.ok) return c.json({ error: parsed.message }, 400);
 
     const language = typeof body.language === 'string' && body.language ? body.language : 'ja';
-    const usecase = new TranscribeEntryPhotoUsecase(
-      new AnthropicPhotoTranscriptionGateway(),
-      new SupabasePhotoTranscriptionUsageRepository(c.get('supabase')),
-      generateId,
-    );
+    const usecase = new TranscribeEntryPhotoUsecase(new AnthropicPhotoTranscriptionGateway());
     const result = await usecase.execute({
-      userId: c.get('userId'),
       file: await parsed.file.arrayBuffer(),
       contentType: parsed.file.type,
       language,

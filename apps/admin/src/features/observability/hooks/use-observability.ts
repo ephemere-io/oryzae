@@ -8,11 +8,12 @@ import { parseJson } from '@/lib/json';
 
 const summaryApiResponseSchema = z.object({
   sentry: z.object({ unresolvedCount: z.number().nullable() }),
-  gateway: z.object({
+  // 実請求額 (Anthropic cost_report)。status で「未設定 / 取得失敗 / 実データ」を
+  // 区別する。null と 0 を潰すと未設定を $0 と誤読させるため必ず status を見ること。
+  anthropic: z.object({
+    status: z.enum(['ok', 'not-configured', 'error']),
     monthlySpend: z.number().nullable(),
-    monthlyRequests: z.number().nullable(),
-    creditBalance: z.string().nullable(),
-    creditUsed: z.string().nullable(),
+    message: z.string().nullable(),
   }),
   resend: z.object({
     sentCount7d: z.number().nullable(),

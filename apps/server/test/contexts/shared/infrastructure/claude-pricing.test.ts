@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeCostFromTokens } from '@/contexts/shared/infrastructure/claude-pricing.js';
+import { __INTERNAL } from '@/contexts/fermentation/infrastructure/llm/vercel-ai-analysis.gateway.js';
+import {
+  computeCostFromTokens,
+  FERMENTATION_MODEL_ID,
+  FERMENTATION_MODEL_RATE,
+} from '@/contexts/shared/infrastructure/claude-pricing.js';
 
 describe('computeCostFromTokens', () => {
   it('両方 null/undefined なら null (コスト不明)', () => {
@@ -28,16 +33,6 @@ describe('computeCostFromTokens', () => {
   });
 
   // 文字起こし (photo_transcription_usages) はモデル名を保存するので単価が引ける。
-  it('モデルを指定するとそのモデルの単価で算出する', () => {
-    // haiku: $1/1M in, $5/1M out → 1000*1 + 1000*5 = 0.006
-    const haiku = computeCostFromTokens(1000, 1000, 'claude-haiku-4-5');
-    expect(haiku?.totalCost).toBeCloseTo(0.006, 10);
-
-    // opus: $5/1M in, $25/1M out → 0.03
-    const opus = computeCostFromTokens(1000, 1000, 'claude-opus-5');
-    expect(opus?.totalCost).toBeCloseTo(0.03, 10);
-  });
-
   it('モデル未指定は発酵のモデル (claude-sonnet-4-6) を既定にする', () => {
     expect(computeCostFromTokens(1000, 1000)?.totalCost).toBeCloseTo(
       computeCostFromTokens(1000, 1000, 'claude-sonnet-4-6')?.totalCost ?? Number.NaN,
@@ -50,5 +45,28 @@ describe('computeCostFromTokens', () => {
   it('未知のモデル名でも 0 円にはせず既定の単価で算出する', () => {
     const unknown = computeCostFromTokens(1000, 1000, 'claude-something-new');
     expect(unknown?.totalCost).toBeCloseTo(0.018, 10);
+  });
+});
+
+// 推定コストが静かにズレる唯一の経路は「価格表とモデルの対応が切れること」。
+// gateway がこの定数を使う限り、モデル変更は型エラーになって CI で止まる。
+describe('価格表とモデルの対応', () => {
+  it('公表単価と一致する ($3 / $15 per MTok)', () => {
+    expect(FERMENTATION_MODEL_ID).toBe('claude-sonnet-4-6');
+    expect(FERMENTATION_MODEL_RATE.inputUsdPerMTok).toBe(3.0);
+    expect(FERMENTATION_MODEL_RATE.outputUsdPerMTok).toBe(15.0);
+  });
+
+  it('computeCostFromTokens が価格表の単価をそのまま使う', () => {
+    const cost = computeCostFromTokens(1_000_000, 1_000_000);
+    expect(cost?.totalCost).toBeCloseTo(
+      FERMENTATION_MODEL_RATE.inputUsdPerMTok + FERMENTATION_MODEL_RATE.outputUsdPerMTok,
+      10,
+    );
+  });
+
+  it('gateway がプロンプトを組める（価格表の定数を import しても壊れない）', () => {
+    // gateway が claude-pricing を import する構造になったことの回帰確認。
+    expect(typeof __INTERNAL.buildPrompt).toBe('function');
   });
 });

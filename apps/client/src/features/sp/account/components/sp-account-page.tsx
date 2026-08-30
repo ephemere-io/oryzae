@@ -1,12 +1,12 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
 import type { AccountUser } from '@/features/shared/account/types';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
+import { docsHref } from '@/lib/docs-site';
 import { setLocaleAction } from '@/lib/i18n-actions';
 import { useTheme } from '@/lib/theme-context';
 
@@ -82,12 +82,25 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
           <ThemeRow />
           <LanguageRow />
 
-          <Link href="/support" className="text-sm" style={{ color: 'var(--accent)' }}>
+          {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
+          <a
+            href={docsHref('/support')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm"
+            style={{ color: 'var(--accent)' }}
+          >
             {t('links.support')} →
-          </Link>
-          <Link href="/privacy" className="text-sm" style={{ color: 'var(--accent)' }}>
+          </a>
+          <a
+            href={docsHref('/privacy')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm"
+            style={{ color: 'var(--accent)' }}
+          >
             {t('links.privacy')} →
-          </Link>
+          </a>
         </div>
       </section>
 

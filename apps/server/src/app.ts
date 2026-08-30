@@ -12,6 +12,7 @@ import { questions } from './contexts/question/presentation/routes/questions.js'
 import { adminAuthMiddleware } from './contexts/shared/presentation/middleware/admin-auth.js';
 import { authMiddleware } from './contexts/shared/presentation/middleware/auth.js';
 import { errorHandler } from './contexts/shared/presentation/middleware/error-handler.js';
+import { publicCors } from './contexts/shared/presentation/middleware/public-cors.js';
 import {
   rateLimitAuth,
   rateLimitGeneral,
@@ -31,6 +32,9 @@ const app = new Hono()
   .route('/api/v1/cron/fermentation', cronFermentation)
   .route('/api/v1/cron/cost-alert', cronCostAlert)
   .use('/api/v1/auth/*', rateLimitAuth())
+  // 公開サイト（docs.oryzae.ephemere.io）は別ドメインなので、LP の登録枠バッジが
+  // 読むこの 1 本だけクロスオリジンを許可する。認証済み API には広げない。
+  .use('/api/v1/auth/signup/availability', publicCors())
   // signupRoutes (POST /signup, GET /signup/availability) — Issue #300
   .route('/api/v1/auth/signup', signupRoutes)
   .route('/api/v1/auth', authRoutes)
