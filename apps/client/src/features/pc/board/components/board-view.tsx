@@ -15,6 +15,7 @@ import { useBoardInteraction } from '../hooks/use-board-interaction';
 import { useImageIntake } from '../hooks/use-image-intake';
 import { BoardCard } from './board-card';
 import { BoardDateNav } from './board-date-nav';
+import { BOARD_INSET, TOP_BAR_CLASS } from './board-surface';
 import { BoardToolbar } from './board-toolbar';
 import { BoardViewSwitch } from './board-view-switch';
 import { PhotoDialog } from './photo-dialog';
@@ -227,8 +228,19 @@ export function BoardView({ api }: BoardViewProps) {
         </div>
       )}
 
-      <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
-      <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
+      {/* 上段バー: 日付と、その日付の単位を決める Daily/Weekly を1行に並べる。 */}
+      <div
+        className={TOP_BAR_CLASS}
+        style={{
+          top: BOARD_INSET,
+          // 左端はサイドバー幅ぶん寄せる
+          // （--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
+          left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
+        }}
+      >
+        <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
+        <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
+      </div>
 
       {/* Canvas */}
       <div className="relative min-h-full" style={{ minWidth: 1200, minHeight: 900 }}>

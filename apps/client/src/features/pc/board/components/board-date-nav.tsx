@@ -3,7 +3,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import {
-  BOARD_INSET,
   CONTROL_FONT,
   CONTROL_TEXT,
   GHOST_BUTTON_CLASS,
@@ -56,7 +55,7 @@ function shiftDate(dateKey: string, offset: number): string {
  * 盤面左上の日付ナビ（‹ ラベル ›）。
  *
  * viewType は受け取るが切り替えは持たない。ラベル（1日 or 月〜日の範囲）と送り幅
- * （1日 or 7日）が viewType で変わるため表示にだけ使う。切り替え自体は右上の
+ * （1日 or 7日）が viewType で変わるため表示にだけ使う。切り替え自体は隣の
  * BoardViewSwitch、作成系の道具は下部の BoardToolbar が持つ。
  */
 export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavProps) {
@@ -77,14 +76,10 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
     <div
       {...verifyAttrs({ unit: 'BoardDateNav', viewType, dateKey, label })}
       // ここは「今どこを見ているか」の情報。面を持たせず、盤面に直接置かれた文字として
-      // 読ませる（浮かせるのは道具箱だけ、という約束を崩さない）。左端はサイドバー幅ぶん
-      // 寄せる（--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
+      // 読ませる（浮かせるのは道具箱だけ、という約束を崩さない）。
+      // 位置は持たない——上段バー（BoardView の TOP_BAR）が並べる。
       className={`${PLAIN_ROW_CLASS} h-8`}
-      style={{
-        ...CONTROL_FONT,
-        top: BOARD_INSET,
-        left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
-      }}
+      style={CONTROL_FONT}
     >
       <button
         type="button"

@@ -36,6 +36,17 @@ export const IDLE_HOVER_CLASS = 'hover:bg-[var(--toolbar-hover)]';
 
 export const CONTROL_FONT = { fontFamily: 'Inter, "Noto Sans JP", sans-serif' } as const;
 
+/* ---------- 上段のバー（日付と表示単位を1行に収める） ---------- */
+
+/**
+ * 盤面左上。日付ナビと Daily/Weekly を並べて置く。
+ *
+ * 元は左上（日付）と右上（切り替え）に分かれていた。だが Daily/Weekly は日付の
+ * **単位**を決めるスイッチで、切り替えると隣の日付表示そのものが 1 日から週レンジへ
+ * 変わる。離して置くと、何を切り替えたのかが目で追えない。隣り合わせなら因果が見える。
+ */
+export const TOP_BAR_CLASS = 'fixed z-[1600] flex items-center gap-4';
+
 /* ---------- 行為: 浮いた面（道具箱だけ） ---------- */
 
 export const ELEVATED_PANEL_CLASS =
@@ -58,7 +69,7 @@ export const TOOL_BUTTON_CLASS =
  * 盤面に沈んだ溝。影も枠線も持たせない。道具箱より一段小さい（32px）のは、
  * 主役ではないことを寸法でも言うため。
  */
-export const FLAT_TRACK_CLASS = 'fixed z-[1600] flex items-center gap-0.5 rounded-lg p-0.5';
+export const FLAT_TRACK_CLASS = 'flex items-center gap-0.5 rounded-lg p-0.5';
 
 export const FLAT_TRACK_STYLE = {
   ...CONTROL_FONT,
@@ -83,7 +94,7 @@ export const SEGMENT_IDLE_STYLE = { color: 'var(--date-color)' } as const;
 /* ---------- 情報: 文字だけ（日付ナビ） ---------- */
 
 /** 面を持たない。盤面に直接置かれた文字として読ませる。 */
-export const PLAIN_ROW_CLASS = 'fixed z-[1600] flex items-center gap-1';
+export const PLAIN_ROW_CLASS = 'flex items-center gap-1';
 
 /** 前後に送る矢印。押せるが、道具ではないので背景を持たない。 */
 export const GHOST_BUTTON_CLASS =

@@ -2,7 +2,6 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import {
-  BOARD_INSET,
   FLAT_TRACK_CLASS,
   FLAT_TRACK_STYLE,
   SEGMENT_ACTIVE_STYLE,
@@ -21,11 +20,13 @@ const VIEW_TYPES: { id: 'daily' | 'weekly'; label: string }[] = [
 ];
 
 /**
- * 盤面右上の表示単位切り替え（Daily / Weekly）。
+ * 表示単位の切り替え（Daily / Weekly）。左上で日付ナビの隣に並ぶ。
  *
- * 日付ナビ（左上）とは別パーツにしている。どちらも viewType を見るが、左上は
+ * 日付ナビとは別パーツのままにしている。どちらも viewType を見るが、あちらは
  * 「いつを見ているか」の表示と前後移動、こちらは「どの粒度で見るか」の選択で、
- * 画面上の役割が違う。作成系の道具は下部の BoardToolbar が持つ。
+ * 役割が違うので重さも変える（あちらは文字だけ、こちらは沈んだ溝）。
+ * ただし置き場は隣り合わせにする——これを押すと隣の日付表示が 1 日から週レンジへ
+ * 変わるので、離れていると何が起きたのか目で追えない。
  */
 export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchProps) {
   return (
@@ -36,7 +37,7 @@ export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchP
       // これは「行為」ではなく「状態」の選択なので、浮かせない。盤面に沈んだ溝として
       // 描き、道具箱（浮いた面）と役割を見た目で分ける。
       className={FLAT_TRACK_CLASS}
-      style={{ ...FLAT_TRACK_STYLE, top: BOARD_INSET, right: BOARD_INSET }}
+      style={FLAT_TRACK_STYLE}
     >
       {VIEW_TYPES.map((v) => {
         const isActive = viewType === v.id;
