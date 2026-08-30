@@ -110,7 +110,7 @@ export function SpendView({
 
   const drift = useMemo(() => {
     // 実額が打ち切られている場合、乖離率は「推定が過大」に見えるだけの誤情報になる。
-    if (!data || data.actual.status !== 'ok' || data.actual.totalCostUsd === null) return null;
+    if (data?.actual.status !== 'ok' || data.actual.totalCostUsd === null) return null;
     if (data.actual.truncated) return null;
     const actualUsd = data.actual.totalCostUsd;
     const estimatedUsd = data.estimated.totalCostUsd;

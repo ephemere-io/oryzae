@@ -1,65 +1,70 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
 /**
  * AI コストは2系統ある。混ぜないこと。
  *  - actual   : Anthropic cost_report の実請求額。UTC 日バケット固定。これが正。
  *  - estimated: 自前トークン × 価格表の推定。Anthropic が知り得ないユーザー別内訳用。
  * どちらも status を持ち、「未設定 / 取得失敗」を $0 と区別できるようにしてある。
+ *
+ * SpendView は data.actual.status を無条件に参照するので、形の違う応答をそのまま
+ * state に入れると描画時に落ちる。キャストではなく実行時に検証して通すこと。
  */
-type FetchStatus = 'ok' | 'not-configured' | 'error';
-
-interface ActualDailyCost {
+const actualDailyCostSchema = z.object({
   /** UTC 日 (YYYY-MM-DD) */
-  date: string;
-  costUsd: number;
-}
+  date: z.string(),
+  costUsd: z.number(),
+});
 
-interface EstimatedDailyCost {
-  date: string;
-  estimatedCostUsd: number;
-  inputTokens: number;
-  outputTokens: number;
-  fermentationCount: number;
-}
+const estimatedDailyCostSchema = z.object({
+  date: z.string(),
+  estimatedCostUsd: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  fermentationCount: z.number(),
+});
 
-interface EstimatedUserCost {
-  userId: string;
-  email: string;
-  estimatedCostUsd: number;
-  inputTokens: number;
-  outputTokens: number;
-  fermentationCount: number;
-}
+const estimatedUserCostSchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  estimatedCostUsd: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  fermentationCount: z.number(),
+});
 
-export interface SpendData {
-  rangeDays: number;
-  actual: {
-    status: FetchStatus;
-    totalCostUsd: number | null;
-    daily: ActualDailyCost[];
+const spendDataSchema = z.object({
+  rangeDays: z.number(),
+  actual: z.object({
+    status: z.enum(['ok', 'not-configured', 'error']),
+    totalCostUsd: z.number().nullable(),
+    daily: z.array(actualDailyCostSchema),
     /**
      * ページング打ち切りで実額が過少な場合 true。
      * status === 'ok' のときだけ意味を持つ（失敗時の false は「該当なし」）。
      */
-    truncated: boolean;
-    message: string | null;
-  };
-  estimated: {
-    status: 'ok' | 'error';
-    totalCostUsd: number;
-    inputTokens: number;
-    outputTokens: number;
-    fermentationCount: number;
-    untrackedCount: number;
-    truncated: boolean;
-    daily: EstimatedDailyCost[];
-    byUser: EstimatedUserCost[];
-  };
-}
+    truncated: z.boolean(),
+    message: z.string().nullable(),
+  }),
+  estimated: z.object({
+    status: z.enum(['ok', 'error']),
+    totalCostUsd: z.number(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    fermentationCount: z.number(),
+    untrackedCount: z.number(),
+    truncated: z.boolean(),
+    daily: z.array(estimatedDailyCostSchema),
+    byUser: z.array(estimatedUserCostSchema),
+  }),
+});
+
+export type SpendData = z.infer<typeof spendDataSchema>;
 
 export function useSpend(rangeDays = 30) {
   const [data, setData] = useState<SpendData | null>(null);
@@ -76,9 +81,8 @@ export function useSpend(rangeDays = 30) {
     try {
       const api = createApiClient(token);
       const res = await api.fetch(`/api/v1/admin/observability/spend?date_from=${rangeDays}`);
-      if (res.ok) {
-        // @type-assertion-allowed: API レスポンスの JSON を宣言済みの型に束ねる
-        const body = (await res.json()) as SpendData;
+      const body = res.ok ? await parseJson(res, spendDataSchema) : null;
+      if (body) {
         setData(body);
       } else {
         setError('コストデータの取得に失敗しました');
