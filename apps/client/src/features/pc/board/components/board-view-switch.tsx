@@ -28,7 +28,7 @@ export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchP
       // 持つため、group を足すと fieldset/legend を要求されるだけで読み上げは良くならない。
       // これは「行為」ではなく「状態」の選択なので、浮かせない。盤面に沈んだ溝として
       // 描き、道具箱（浮いた面）と役割を見た目で分ける。
-      className={`${FLAT_TRACK_CLASS} right-6 top-5`}
+      className={`${FLAT_TRACK_CLASS} right-[30px] top-[30px]`}
       style={FLAT_TRACK_STYLE}
     >
       {VIEW_TYPES.map((v) => {
