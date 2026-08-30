@@ -3,7 +3,12 @@ import { MAX_OCR_TEXT_LENGTH } from '@oryzae/shared';
 import { generateText } from 'ai';
 import type { OcrGateway, OcrResult } from '../../domain/gateways/ocr.gateway.js';
 
-// 発酵分析 (vercel-ai-analysis.gateway.ts) と同じ provider を使う。
+// provider は発酵分析 (vercel-ai-analysis.gateway.ts) と同じだが、**モデルは別**。
+// あちらは claude-sonnet-4-6、こちらは claude-opus-5 で、揃える必要はない。
+// 手書きの読み取りは誤読がそのままスニペットの中身になるので、精度を優先している。
+// （ID の実在は API に直接投げて 200 を確認済み。型では守れない——AnthropicModelId は
+//   末尾が `(string & {})` なので任意の文字列が通る）
+//
 // OCR は「見えている文字をそのまま書き起こす」だけの単発呼び出しなので、
 // generateObject ではなく generateText で足りる。
 const MODEL = 'claude-opus-5';
