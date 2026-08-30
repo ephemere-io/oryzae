@@ -72,7 +72,7 @@ apps/client/src/
 `{domain}` は `entries` / `fermentation` / `questions` / `board` / `account` / `navigation` など。
 同じドメインの `shared` / `pc` / `sp` は 1:1:1 で対応する（例: `entries` の取得 hook は `shared/entries`、PC エディタは `pc/entries`、SP エディタは `sp/entries`）。
 
-**reach は「端末で体験が変わる機能」だけに適用する。** 端末非依存の機能（`auth` / `landing` / `onboarding` など、両端末・公開ページで同じものを使う）は `features/{domain}/` のフラットなまま置く（pc/sp に分けない）。フラット機能どうしの直接 import は禁止、`features/shared` への import のみ可（dep-cruiser の `feature-isolation-flat`）。端末非依存のロジックを pc/sp 双方から使いたくなったら `features/shared/{domain}` へ押し上げる。
+**reach は「端末で体験が変わる機能」だけに適用する。** 端末非依存の機能（`auth` / `onboarding` など、両端末で同じものを使う）は `features/{domain}/` のフラットなまま置く（pc/sp に分けない）。フラット機能どうしの直接 import は禁止、`features/shared` への import のみ可（dep-cruiser の `feature-isolation-flat`）。端末非依存のロジックを pc/sp 双方から使いたくなったら `features/shared/{domain}` へ押し上げる。
 
 ### apps/admin（reach 軸なし・単一体験）
 
@@ -112,7 +112,7 @@ apps/admin/src/
 4. **残り（＝ UI と、その UI 専用の状態・演出）** → 判定軸＝**「端末ごとに別 UI を持つか」**で分ける：
    - **PC 固有**の画面・操作・演出 → `features/pc/{domain}/`
    - **SP 固有**の画面・操作 → `features/sp/{domain}/`
-   - 機能まるごと**端末非依存**（両端末/公開で同じ画面。例: `auth` のフォーム・`landing`・`onboarding`）→ `features/{domain}/`（フラット）
+   - 機能まるごと**端末非依存**（両端末で同じ画面。例: `auth` のフォーム・`onboarding`）→ `features/{domain}/`（フラット）
 
 > `lib/` には `use-*` のドメイン hook を置かない。`lib/` は端末・ドメインの両方を知らない基盤専用（`createApiClient`・トークン保存・分析・context・`useDebounce` 等）。
 >

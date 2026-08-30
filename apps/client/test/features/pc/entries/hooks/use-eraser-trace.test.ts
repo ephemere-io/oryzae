@@ -35,18 +35,7 @@ function stubEditorGeom(editor: HTMLDivElement, g: EditorGeom) {
     writable: true,
     configurable: true,
   });
-  editor.getBoundingClientRect = () =>
-    ({
-      x: g.left,
-      y: g.top,
-      left: g.left,
-      top: g.top,
-      right: g.left + g.width,
-      bottom: g.top + g.height,
-      width: g.width,
-      height: g.height,
-      toJSON: () => ({}),
-    }) as DOMRect;
+  editor.getBoundingClientRect = () => new DOMRect(g.left, g.top, g.width, g.height);
 }
 
 function stubCharRange(viewportLeft: number, viewportTop: number, w = 16, h = 20) {
@@ -92,6 +81,8 @@ function stubCanvasContext() {
     lineWidth: 0,
     globalAlpha: 1,
   };
+  // @type-assertion-allowed: getContext は '2d' / 'webgl' 等で戻り値が変わる多重定義で、
+  // 全オーバーロードを満たすスタブは書けない。テストが使う 2d の描画メソッドだけ実装する。
   HTMLCanvasElement.prototype.getContext = vi.fn(
     () => ctxStub,
   ) as unknown as typeof HTMLCanvasElement.prototype.getContext;

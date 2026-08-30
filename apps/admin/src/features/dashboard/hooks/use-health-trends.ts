@@ -1,8 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
+
+const trendsResponseSchema = z.object({
+  days: z.array(
+    z.object({
+      date: z.string(),
+      totalFermentations: z.number(),
+      completedFermentations: z.number(),
+      activeWriters: z.number(),
+    }),
+  ),
+});
 
 export interface TrendDay {
   date: string;
@@ -31,17 +44,10 @@ export function useHealthTrends(dateFrom?: string, dateTo?: string) {
 
     const api = createApiClient(token);
     const res = await api.fetch(`/api/v1/admin/dashboard/trends${qs ? `?${qs}` : ''}`);
-    if (res.ok) {
-      const body = (await res.json()) as {
-        days: {
-          date: string;
-          totalFermentations: number;
-          completedFermentations: number;
-          activeWriters: number;
-        }[];
-      };
+    const body = res.ok ? await parseJson(res, trendsResponseSchema) : null;
+    if (body) {
       setDays(
-        (body.days ?? []).map((d) => ({
+        body.days.map((d) => ({
           ...d,
           successRate:
             d.totalFermentations > 0 ? (d.completedFermentations / d.totalFermentations) * 100 : 0,

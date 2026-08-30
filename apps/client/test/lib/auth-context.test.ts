@@ -1,16 +1,21 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { mockResponse } from '../helpers/response';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-function mockResponse(ok: boolean, body: unknown): Response {
-  return {
-    ok,
-    json: () => Promise.resolve(body),
-    status: ok ? 200 : 400,
-  } as Response;
+/** mockFetch の init から body を文字列として取り出す。形が違えばそこで落とす。 */
+function readRequestBody(init: unknown): string {
+  if (typeof init !== 'object' || init === null || !('body' in init)) {
+    throw new Error('fetch init に body がありません');
+  }
+  const { body } = init;
+  if (typeof body !== 'string') {
+    throw new Error(`fetch body が文字列ではありません: ${typeof body}`);
+  }
+  return body;
 }
 
 describe('useAuth', () => {
@@ -119,7 +124,7 @@ describe('useAuth', () => {
     });
 
     const [, init] = mockFetch.mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
+    const body: Record<string, unknown> = JSON.parse(readRequestBody(init));
     expect(body.locale).toBe('en');
   });
 
@@ -145,7 +150,7 @@ describe('useAuth', () => {
     });
 
     const [, init] = mockFetch.mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
+    const body: Record<string, unknown> = JSON.parse(readRequestBody(init));
     expect(body.locale).toBeUndefined();
   });
 

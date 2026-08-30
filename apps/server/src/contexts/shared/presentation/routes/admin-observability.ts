@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { type ActualCostResult, fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
 import {
   aggregateCost,
@@ -14,6 +15,44 @@ type Env = {
     adminSupabase: SupabaseClient;
   };
 };
+
+// 外部 API のレスポンスは信用せず、必要な形だけを実行時に検証して取り出す。
+const vercelLatestDeploySchema = z.object({
+  deployments: z.array(z.object({ state: z.string() })),
+});
+
+const resendEmailsSchema = z.object({
+  data: z.array(
+    z.object({
+      created_at: z.string().optional(),
+      last_event: z.string().optional(),
+    }),
+  ),
+});
+
+const upstashDbSizeSchema = z.object({ result: z.number() });
+
+const vercelDeployListSchema = z.object({
+  deployments: z.array(
+    z.object({
+      uid: z.string().optional(),
+      state: z.string().optional(),
+      target: z.string().optional(),
+      created: z.number().optional(),
+      buildingAt: z.number().optional(),
+      ready: z.number().optional(),
+      url: z.string().optional(),
+      inspectorUrl: z.string().optional(),
+      meta: z
+        .object({
+          githubCommitMessage: z.string().optional(),
+          githubCommitRef: z.string().optional(),
+        })
+        .optional(),
+      creator: z.object({ email: z.string().optional() }).optional(),
+    }),
+  ),
+});
 
 // ── Summary (hub page) ──────────────────────────────────
 
@@ -58,10 +97,9 @@ async function getVercelLatestDeploy(): Promise<string | null> {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null || !('deployments' in body)) return null;
-    const deployments = (body as { deployments: { state: string }[] }).deployments;
-    return deployments[0]?.state ?? null;
+    const parsed = vercelLatestDeploySchema.safeParse(await res.json());
+    if (!parsed.success) return null;
+    return parsed.data.deployments[0]?.state ?? null;
   } catch {
     return null;
   }
@@ -76,10 +114,9 @@ async function getResendStats(): Promise<{ sentCount: number; bouncedCount: numb
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null || !('data' in body)) return null;
-    const data = (body as { data: { created_at?: string; last_event?: string }[] }).data;
-    if (!Array.isArray(data)) return null;
+    const parsed = resendEmailsSchema.safeParse(await res.json());
+    if (!parsed.success) return null;
+    const data = parsed.data.data;
 
     const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
     let sentCount = 0;
@@ -107,11 +144,8 @@ async function getUpstashKeyCount(): Promise<number | null> {
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
-    const body: unknown = await res.json();
-    if (typeof body === 'object' && body !== null && 'result' in body) {
-      return (body as { result: number }).result;
-    }
-    return null;
+    const parsed = upstashDbSizeSchema.safeParse(await res.json());
+    return parsed.success ? parsed.data.result : null;
   } catch {
     return null;
   }
@@ -278,25 +312,12 @@ export const adminObservability = new Hono<Env>()
       });
       if (!res.ok) return c.json({ deploys: [], configured: true });
 
-      const body: unknown = await res.json();
-      if (typeof body !== 'object' || body === null || !('deployments' in body)) {
+      const parsed = vercelDeployListSchema.safeParse(await res.json());
+      if (!parsed.success) {
         return c.json({ deploys: [], configured: true });
       }
 
-      interface VercelDeploy {
-        uid?: string;
-        state?: string;
-        target?: string;
-        created?: number;
-        buildingAt?: number;
-        ready?: number;
-        url?: string;
-        inspectorUrl?: string;
-        meta?: { githubCommitMessage?: string; githubCommitRef?: string };
-        creator?: { email?: string };
-      }
-
-      const deploys = (body as { deployments: VercelDeploy[] }).deployments.map((d) => ({
+      const deploys = parsed.data.deployments.map((d) => ({
         id: d.uid ?? '',
         state: d.state ?? '',
         target: d.target ?? '',

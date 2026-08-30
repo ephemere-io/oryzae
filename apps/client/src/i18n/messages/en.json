@@ -366,7 +366,8 @@
       "fermentation_overlay_description": "When you link a question to a new entry, the latest fermentation result for that question can float over the editor. Choose how this should behave.",
       "fermentation_overlay_ask": "Ask before showing",
       "fermentation_overlay_always": "Always show fermentation result on entry screen",
-      "fermentation_overlay_never": "Never show fermentation result on entry screen"
+      "fermentation_overlay_never": "Never show fermentation result on entry screen",
+      "focus_mode_fades_fermentation": "Also hide fermentation elements"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
@@ -529,184 +530,6 @@
       "retry": "Retry"
     }
   },
-  "landing": {
-    "nav": {
-      "concept": "Concept",
-      "process": "Three microbes",
-      "preview": "The app",
-      "philosophy": "Philosophy",
-      "faq": "FAQ",
-      "cta": "Open the app",
-      "support": "Help"
-    },
-    "hero": {
-      "eyebrow": "AN ASPERGILLUS FOR WORDS.",
-      "title": {
-        "l1": "Let your writing",
-        "l2": "ferment."
-      },
-      "lead": "Oryzae is a writing app inspired by koji mold — Aspergillus oryzae. Set a question that matters to you, write into it for a week, and the system decomposes your text, surfaces a few essential snippets, and returns a single short letter. Slow self-dialogue, made on purpose.",
-      "cta": {
-        "primary": "Open the app",
-        "secondary": "Read the concept",
-        "full": "Sign-ups closed"
-      },
-      "foot": "Vertical or horizontal writing, in Japanese, English, and beyond.",
-      "chip": {
-        "1": "autonomy of the dead",
-        "2": "fermentative time",
-        "3": "the mediator",
-        "4": "an ethics of forgetting"
-      },
-      "snippet": {
-        "1": "As a nukadoko slowly absorbs the household it lives in, an AI may also change its character…"
-      },
-      "question": "YOUR QUESTION",
-      "capacity_badge": "Research Preview · {remaining} of {max} spots left",
-      "capacity_full_badge": "Research Preview · sign-ups closed"
-    },
-    "concept": {
-      "kicker": "CONCEPT",
-      "title": "Brew your question while you write.",
-      "lead": "",
-      "p1": {
-        "title": "Set a question",
-        "body": "Capture, in one sentence, the question that matters most right now. Everything else ferments around it."
-      },
-      "p2": {
-        "title": "Write daily",
-        "body": "On a quiet vertical page, write whatever comes — typos, detours and all. The trace of your hand stays."
-      },
-      "p3": {
-        "title": "A letter arrives",
-        "body": "Each week, a short letter and a few keywords distilled from your own words come back. Read them, then begin again."
-      }
-    },
-    "process": {
-      "kicker": "THREE MICROBES",
-      "title": {
-        "l1": "Koji · Lactic · Yeast",
-        "l2": "— three stages of fermentation"
-      },
-      "lead": "Inside Oryzae, three microbes — like the inhabitants of a nukadoko — each take a different role, and together brew a week of your words.",
-      "koji": {
-        "role": "Decomposition — 分解",
-        "body": "",
-        "output": "Output: an analysis worksheet, a result diagram, snippets that illuminate the question."
-      },
-      "lactic": {
-        "role": "A letter — 手紙",
-        "body": "Working from the worksheet and the snippets, this stage traces how your thinking has moved this week — not as a summary, but as a roughly 500-character poetic note in vocabulary deliberately offset from your own.",
-        "output": "Output: a single 500-character letter."
-      },
-      "yeast": {
-        "role": "Widening — キーワード",
-        "body": "Three to five short phrases — \"the autonomy of the dead\", \"the dead activated by the living\" — that step a little back from your question and widen the imaginative space around it.",
-        "output": "Output: 3–5 keywords."
-      }
-    },
-    "preview": {
-      "kicker": "THE APP",
-      "title": "Open the places.",
-      "lead": "Write daily in the Editor. Arrange your week on the Board. Look back on it from above in the Jar. At week's end, a Letter arrives. Four places, one slow practice.",
-      "editor": {
-        "title": "Add a title",
-        "prompt": "What did you feel today?",
-        "status": "editing",
-        "caption": "Editor — a quiet vertical page. Optional typing effects — drifting, ghosting, fading characters — bring a small body to keystrokes.",
-        "effect": "EFFECT · GHOST"
-      },
-      "jar": {
-        "chip": {
-          "1": "reflective distance",
-          "2": "cognitive sanctuary",
-          "3": "a spiritual proxy",
-          "4": "dative relations"
-        },
-        "label": "YOUR QUESTION · What is a design that lets nature inhabit the body?",
-        "caption": ""
-      },
-      "letter": {
-        "from": "— from Oryzae · Letter, week 18",
-        "body": "You have walked, this week, around the question of how the dead and the living might continue to live together. In a dream, the figure of Y arrives in ordinary clothes, then shrinks — quietly — back into the shape of a foetus and disappears. It is loss, and it is also a return to origin, a faint outline of a circular view of life and death. Across the week you begin to notice that an analytical posture may not be the right one toward what matters most. Forgetting, perhaps, is one form of living-with.",
-        "caption": "Letter — a 500-character letter, weekly. Not a summary; a small ember to keep you writing."
-      },
-      "board": {
-        "toggle": {
-          "daily": "DAILY",
-          "weekly": "WEEKLY"
-        },
-        "snippet": {
-          "1": "Forgetting, perhaps, is one form of living-with.",
-          "2": "On nukadoko, people, and the way time mixes in."
-        },
-        "entry": {
-          "title": "A design that feels the mountain",
-          "meta": "765 chars · 04-20"
-        },
-        "label": "7 cards · 5 entries · 2 snippets · 3 photos",
-        "caption": "Board — A daily and weekly canvas where entries, snippets and photos sit beside each other. Memories begin to settle through relations, not through time."
-      }
-    },
-    "philosophy": {
-      "kicker": "PHILOSOPHY",
-      "title": "A tool worth outgrowing."
-    },
-    "philo": {
-      "1": {
-        "title": "Embodied writing",
-        "body": ""
-      },
-      "2": {
-        "title": "Without immediacy",
-        "body": "AI replies are deliberately delayed — once a week, like a letter. The exchange shifts from information processing to a quiet kind of relationship."
-      },
-      "3": {
-        "title": "Fermentative time",
-        "body": "Not an answer, a brewing. As a nukadoko takes on the flavour of the household it lives in, your thinking absorbs your own time and microbiome and slowly ripens."
-      },
-      "4": {
-        "title": "Tech you can outgrow",
-        "body": "The point is not dependence. Oryzae is meant to support, then quietly fall away as your own self-dialogue gets stronger."
-      },
-      "lineage": {
-        "label": "LINEAGE",
-        "body": "Oryzae carries forward what we learned from Pickles (2020–), a journaling tool for self-dialogue. The wider research context lives at ephemere.io."
-      }
-    },
-    "faq": {
-      "1": {
-        "q": "How is this different from Pickles?",
-        "a": "Pickles was a place to write the journal itself. Oryzae sets a question at the centre and adds the time around the writing — a fermentation process that returns your own words to you in a different shape."
-      },
-      "2": {
-        "q": "Do I have to write vertically?",
-        "a": "No. Vertical writing is the default, but you can switch to horizontal in one click. The font flips between mincho (serif) and gothic (sans) too."
-      },
-      "3": {
-        "q": "What does the AI read?",
-        "a": "Only the question you set, and the entries you tied to it during that week. Anything not tied to a question stays out of the fermentation."
-      },
-      "4": {
-        "q": "Can I write in languages other than Japanese?",
-        "a": "Yes — multilingual input is supported, including English. Vertical writing is tuned for Japanese and Chinese."
-      },
-      "5": {
-        "q": "How is my writing handled?",
-        "a": "Your entries and questions are stored encrypted on our servers, readable only by you and the fermentation process. They are never shared with third parties. See our Privacy Policy for details."
-      },
-      "kicker": "QUESTIONS",
-      "title": "Frequent questions"
-    },
-    "outro": {
-      "l1": "Set a question,",
-      "l2": "and begin to write.",
-      "cta": "Begin writing"
-    },
-    "foot": {
-      "tag": "Brewing words, slowly."
-    }
-  },
   "onboarding": {
     "dialog_label": "Welcome to Oryzae",
     "skip": "Skip",
@@ -746,16 +569,6 @@
       "next": "Begin with Oryzae"
     }
   },
-  "legal": {
-    "privacy": {
-      "title": "Privacy Policy",
-      "back_home": "Back to home"
-    }
-  },
-  "support": {
-    "title": "Support",
-    "back_home": "Back home"
-  },
   "sp": {
     "editor": {
       "title_placeholder": "Title (optional)",
@@ -767,7 +580,13 @@
       "question_selected": "Question: {label}",
       "question_untitled": "Untitled question",
       "question_sheet_title": "Choose a question",
-      "question_empty": "No questions yet",
+      "question_empty": "You have no open questions yet. Write one here.",
+      "question_new": "+ Write a new question",
+      "question_new_placeholder": "Write a question (e.g. What did I notice today?)",
+      "question_create": "Use this question",
+      "question_creating": "Creating…",
+      "question_create_failed": "Couldn't create the question. Please try again.",
+      "question_back_to_list": "← Pick from existing questions",
       "close": "Close",
       "pickle": "Pickle",
       "pickling": "Sealing…",
@@ -795,7 +614,9 @@
       "section_keywords": "Words",
       "section_snippets": "Excerpts",
       "unread": "Unread",
-      "read": "Read"
+      "read": "Read",
+      "section_sources": "From these entries",
+      "source_untitled": "Untitled entry"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -826,7 +647,8 @@
       "placeholder": "Write a question",
       "delete": "Retire this question",
       "cancel": "Cancel",
-      "save": "Save"
+      "save": "Save",
+      "letter_arrived": "A letter has arrived"
     }
   }
 }

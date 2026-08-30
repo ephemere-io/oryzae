@@ -21,7 +21,7 @@ const VALID_TYPES = ['signup', 'invite', 'magiclink', 'recovery', 'email_change'
 type EmailOtpType = (typeof VALID_TYPES)[number];
 
 function isEmailOtpType(value: string): value is EmailOtpType {
-  return (VALID_TYPES as readonly string[]).includes(value);
+  return VALID_TYPES.some((type) => type === value);
 }
 
 /** 種別ごとの既定遷移先（`next` が無いとき）。 */
@@ -60,6 +60,13 @@ export function useEmailConfirm(): { error: AuthFlowError | null } {
 
   useEffect(() => {
     async function handle() {
+      // Supabase が hash でエラーを返したケース（期限切れ・使用済みリンク）。
+      // ルート（/）の HomeGate がここへ回してくるので、通信はせず理由だけ見せる。
+      if (searchParams.get('auth_error')) {
+        setError('auth_failed');
+        return;
+      }
+
       const tokenHash = searchParams.get('token_hash');
       const typeParam = searchParams.get('type');
       const next = searchParams.get('next');

@@ -1,91 +1,54 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import type { ApiClient } from '@/lib/api';
-
-const STORAGE_KEY = 'oryzae_jar_last_seen_at';
+import { createContext, useContext } from 'react';
 
 /**
- * 未読件数を数える。
+ * 未読状態の配布口（context の器のみ）。
  *
- * `res.json()` は型なし。以前は `const data: FermentationSummary[] = await res.json()` と
- * 名乗らせて直後に `.filter` していたため、配列でないレスポンス（エラーエンベロープ等）で
- * TypeError になっていた。未読バッジは**全画面のナビ**に出るので、影響範囲が最も広い。
- * ここは表示できなければ 0 でよいので、要素ごとに形を確かめて数えるだけにする。
+ * 算出（発酵の取得・既読の保存）は features/shared/fermentation/hooks/use-unread-letters が
+ * 持ち、ここは値の形と配布だけ。lib は「ドメイン非依存の基盤」なので、型もプリミティブと
+ * コールバックだけで構成し、発酵/問いのドメイン型は参照しない（auth/theme context と同じ扱い）。
+ *
+ * page ごとに hook を呼ぶ形にはしない。インスタンスが分かれると、瓶で既読にしても
+ * ナビのバッジが減らなくなる（Issue #447 の再発）。
  */
-function countUnread(input: unknown, lastSeen: string): number {
-  if (!Array.isArray(input)) return 0;
-  return input.filter((row) => {
-    if (typeof row !== 'object' || row === null) return false;
-    const r: Record<string, unknown> = row;
-    return r.status === 'completed' && typeof r.createdAt === 'string' && r.createdAt > lastSeen;
-  }).length;
-}
-
-interface UnreadContextValue {
+export interface UnreadState {
+  /** 手紙一覧を1回でも取得できたか。false の間は未読/既読の印を出さない（逆ちらつき防止）。 */
+  ready: boolean;
+  /** 未読の手紙（＝まだ開いていない完了発酵）の件数。ナビのバッジに出す。 */
   unreadCount: number;
-  markSeen: () => void;
+  /** 未読の手紙が届いている問いの id（Issue #452: 問い一覧にも印を出す）。 */
+  unreadQuestionIds: ReadonlySet<string>;
+  /**
+   * その問いに今届いている手紙を既読にする（Issue #447）。
+   * 受信箱は問いごとに最新1通しか出さないので、既読の単位も問いに揃える。
+   */
+  markQuestionRead: (questionId: string) => void;
+  /** 届いている手紙をすべて既読にする。PC の瓶は盤面に全部並ぶので開いた＝読んだ。 */
+  markAllSeen: () => void;
 }
 
-const UnreadContext = createContext<UnreadContextValue>({
+/** provider 不在（孤立検証・テスト）でも crash させないための既定値。 */
+const EMPTY: UnreadState = {
+  ready: false,
   unreadCount: 0,
-  markSeen: () => {},
-});
+  unreadQuestionIds: new Set(),
+  markQuestionRead: () => {},
+  markAllSeen: () => {},
+};
 
-export function useUnread() {
+const UnreadContext = createContext<UnreadState>(EMPTY);
+
+export function useUnread(): UnreadState {
   return useContext(UnreadContext);
 }
 
-function getLastSeenAt(): string {
-  if (typeof window === 'undefined') return new Date().toISOString();
-  return localStorage.getItem(STORAGE_KEY) ?? new Date(0).toISOString();
-}
-
 export function UnreadProvider({
-  api,
-  authLoading,
+  value,
   children,
 }: {
-  api: ApiClient | null;
-  authLoading: boolean;
+  value: UnreadState;
   children: React.ReactNode;
 }) {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (!api || authLoading) return;
-
-    let cancelled = false;
-
-    async function check() {
-      try {
-        // Issue #363 perf: 全発酵をバルク取得（questionId 省略）して未読を数える。
-        // 旧来は /questions → 問いごとに /fermentations の N+1 だった。
-        const res = await api!.fetch('/api/v1/fermentations');
-        if (!res.ok || cancelled) return;
-        const data: unknown = await res.json();
-        if (cancelled) return;
-        setUnreadCount(countUnread(data, getLastSeenAt()));
-      } catch {
-        // バッジは補助表示。取れなければ 0 のままでよく、ナビ全体を巻き込まない
-        // （catch が無いと useEffect 内の未処理 rejection になっていた）。
-      }
-    }
-
-    check();
-    return () => {
-      cancelled = true;
-    };
-  }, [api, authLoading]);
-
-  const markSeen = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, new Date().toISOString());
-    }
-    setUnreadCount(0);
-  }, []);
-
-  return (
-    <UnreadContext.Provider value={{ unreadCount, markSeen }}>{children}</UnreadContext.Provider>
-  );
+  return <UnreadContext.Provider value={value}>{children}</UnreadContext.Provider>;
 }

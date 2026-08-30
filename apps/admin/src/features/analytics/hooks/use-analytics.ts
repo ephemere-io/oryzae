@@ -1,35 +1,36 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson, readErrorMessage } from '@/lib/json';
 
-export interface AnalyticsOverview {
-  totalPageviews: number;
-  totalSessions: number;
-  avgSessionDurationSeconds: number;
-  entryPageViews: number;
-  jarPageViews: number;
-}
+const analyticsOverviewSchema = z.object({
+  totalPageviews: z.number(),
+  totalSessions: z.number(),
+  avgSessionDurationSeconds: z.number(),
+  entryPageViews: z.number(),
+  jarPageViews: z.number(),
+});
 
-export interface PageViewItem {
-  path: string;
-  views: number;
-}
+const pageViewItemSchema = z.object({
+  path: z.string(),
+  views: z.number(),
+});
 
-export interface DailyMetric {
-  date: string;
-  pageviews: number;
-  uniqueUsers: number;
-}
+const dailyMetricSchema = z.object({
+  date: z.string(),
+  pageviews: z.number(),
+  uniqueUsers: z.number(),
+});
 
-interface PagesResponse {
-  data: PageViewItem[];
-}
+const pagesResponseSchema = z.object({ data: z.array(pageViewItemSchema) });
+const dailyResponseSchema = z.object({ data: z.array(dailyMetricSchema) });
 
-interface DailyResponse {
-  data: DailyMetric[];
-}
+export type AnalyticsOverview = z.infer<typeof analyticsOverviewSchema>;
+export type PageViewItem = z.infer<typeof pageViewItemSchema>;
+export type DailyMetric = z.infer<typeof dailyMetricSchema>;
 
 interface UseAnalyticsParams {
   dateFrom?: string;
@@ -65,24 +66,27 @@ export function useAnalytics(params?: UseAnalyticsParams) {
     ]);
 
     if (overviewRes.ok && pagesRes.ok && dailyRes.ok) {
-      setOverview((await overviewRes.json()) as AnalyticsOverview);
-      const pagesBody = (await pagesRes.json()) as PagesResponse;
-      setPages(pagesBody.data);
-      const dailyBody = (await dailyRes.json()) as DailyResponse;
-      setDaily(dailyBody.data);
+      const [overviewBody, pagesBody, dailyBody] = await Promise.all([
+        parseJson(overviewRes, analyticsOverviewSchema),
+        parseJson(pagesRes, pagesResponseSchema),
+        parseJson(dailyRes, dailyResponseSchema),
+      ]);
+      if (overviewBody && pagesBody && dailyBody) {
+        setOverview(overviewBody);
+        setPages(pagesBody.data);
+        setDaily(dailyBody.data);
+      } else {
+        setError('分析データの取得に失敗しました（応答の形式が不正です）');
+      }
     } else {
       // サーバーが返す具体的なエラー（PostHog 未設定 / 取得失敗 (HTTP xxx) 等）を優先表示。
       // 以前は失敗が握りつぶされ「全部 0」に見えていたため、原因が分かるようにする。
       const failed = [overviewRes, pagesRes, dailyRes].find((r) => !r.ok);
-      const body: unknown = failed ? await failed.json().catch(() => null) : null;
-      const message =
-        body !== null &&
-        typeof body === 'object' &&
-        'error' in body &&
-        typeof body.error === 'string'
-          ? body.error
-          : '分析データの取得に失敗しました';
-      setError(message);
+      setError(
+        failed
+          ? await readErrorMessage(failed, '分析データの取得に失敗しました')
+          : '分析データの取得に失敗しました',
+      );
     }
     setLoading(false);
   }, [dateFrom, dateTo]);

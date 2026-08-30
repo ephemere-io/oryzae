@@ -3,7 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useFermentationDetail } from '@/features/shared/fermentation/hooks/use-fermentation-detail';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import type { InboxLetter } from '@/features/shared/fermentation/types';
@@ -25,17 +25,12 @@ export function SpJar({ api }: SpJarProps) {
   const t = useTranslations('sp.jar');
   const router = useRouter();
   const { letters, loading } = useFermentationInbox(api, false);
-  const { markSeen } = useUnread();
+  const { ready: unreadReady, unreadQuestionIds, markQuestionRead } = useUnread();
   const [open, setOpen] = useState<InboxLetter | null>(null);
   const { detail, loading: detailLoading } = useFermentationDetail(
     api,
     open?.fermentationId ?? null,
   );
-
-  // 瓶を開いたら未読バッジ（ナビ）を既読化する
-  useEffect(() => {
-    markSeen();
-  }, [markSeen]);
 
   return (
     <div
@@ -46,6 +41,9 @@ export function SpJar({ api }: SpJarProps) {
         loading,
         letterCount: letters.length,
         open: open !== null,
+        unreadCount: unreadReady
+          ? letters.filter((l) => unreadQuestionIds.has(l.questionId)).length
+          : 0,
       })}
     >
       <header className="px-5 pt-6 pb-3 text-lg font-medium">{t('title')}</header>
@@ -56,29 +54,40 @@ export function SpJar({ api }: SpJarProps) {
         <div className="px-5 py-12 text-center text-sm opacity-50">{t('empty')}</div>
       ) : (
         <ul className="sp-rise flex-1 overflow-auto px-5">
-          {letters.map((letter) => (
-            <li key={letter.fermentationId}>
-              <button
-                type="button"
-                onClick={() => setOpen(letter)}
-                className="flex w-full items-center gap-3 border-b border-[color-mix(in_srgb,var(--fg)_8%,transparent)] py-4 text-left"
-              >
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: letter.unread ? 'var(--ob-jar-warm)' : 'transparent' }}
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className={`block truncate ${letter.unread ? 'font-medium' : ''}`}>
-                    {letter.questionText ?? t('untitled')}
+          {letters.map((letter) => {
+            // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
+            const unread = unreadReady && unreadQuestionIds.has(letter.questionId);
+            return (
+              <li key={letter.fermentationId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(letter);
+                    markQuestionRead(letter.questionId);
+                  }}
+                  className="flex w-full items-center gap-3 border-b border-[color-mix(in_srgb,var(--fg)_8%,transparent)] py-4 text-left"
+                >
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: unread ? 'var(--ob-jar-warm)' : 'transparent' }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate ${unread ? 'font-medium' : ''}`}>
+                      {letter.questionText ?? t('untitled')}
+                    </span>
+                    <span
+                      className="mt-0.5 block text-[11px]"
+                      style={{ color: 'var(--date-color)' }}
+                    >
+                      {unreadReady ? `${unread ? t('unread') : t('read')} · ` : ''}
+                      {formatMonthDay(letter.createdAt)}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block text-[11px]" style={{ color: 'var(--date-color)' }}>
-                    {letter.unread ? t('unread') : t('read')} · {formatMonthDay(letter.createdAt)}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -140,6 +149,38 @@ export function SpJar({ api }: SpJarProps) {
                     </div>
                   ))}
                 </div>
+              </>
+            ) : null}
+
+            {/* もとになった記録（Issue #453: 手紙だけ読んでも何への返事か分からなかった） */}
+            {detail && detail.scannedEntries.length > 0 ? (
+              <>
+                <SectionLabel>{t('section_sources')}</SectionLabel>
+                <ul className="flex flex-col gap-2">
+                  {detail.scannedEntries.map((e) => (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/entries/${e.id}`)}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left"
+                        style={{
+                          background: 'var(--ob-card-bg)',
+                          border: '1px solid var(--border-subtle)',
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm">
+                          {e.title || t('source_untitled')}
+                        </span>
+                        <span
+                          className="shrink-0 text-[11px]"
+                          style={{ color: 'var(--date-color)' }}
+                        >
+                          {formatMonthDay(e.createdAt)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </>
             ) : null}
           </div>

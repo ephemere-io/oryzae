@@ -1,26 +1,30 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
 /** コストは保存トークン × 価格表からの **推定**（Anthropic はユーザーを識別しない）。 */
-export interface UserCostSummary {
-  userId: string;
-  email: string;
-  fermentationCount: number;
-  estimatedCostUsd: number;
-  inputTokens: number;
-  outputTokens: number;
-}
+const userCostSummarySchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  fermentationCount: z.number(),
+  estimatedCostUsd: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+});
 
-interface UserCostResponse {
-  data: UserCostSummary[];
+const userCostResponseSchema = z.object({
+  data: z.array(userCostSummarySchema),
   /** トークン未保存で推定に含められなかった件数。 */
-  untrackedCount: number;
+  untrackedCount: z.number(),
   /** 集計上限に達して打ち切られた場合 true（推定は過少）。 */
-  truncated: boolean;
-}
+  truncated: z.boolean(),
+});
+
+export type UserCostSummary = z.infer<typeof userCostSummarySchema>;
 
 interface UseUserCostSummaryParams {
   dateFrom?: string;
@@ -52,12 +56,8 @@ export function useUserCostSummary(params?: UseUserCostSummaryParams) {
       const url = `/api/v1/admin/fermentations/costs/by-user${qs ? `?${qs}` : ''}`;
 
       const res = await api.fetch(url);
-      if (res.ok) {
-        // @type-assertion-allowed: API レスポンスの JSON を宣言済みの型に束ねる
-        const body = (await res.json()) as UserCostResponse;
-        // フォールバックは置かない。server は admin の Next アプリに同梱されて
-        // 一緒にデプロイされるため、型と実際のレスポンスが食い違うことはない。
-        // `?? 0` を書くと「必須と宣言しているのに欠けうる」という矛盾になる。
+      const body = res.ok ? await parseJson(res, userCostResponseSchema) : null;
+      if (body) {
         setData(body.data);
         setUntrackedCount(body.untrackedCount);
         setTruncated(body.truncated);

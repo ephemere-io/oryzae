@@ -1,20 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-export interface AdminUser {
-  id: string;
-  email: string;
-  createdAt: string;
-  lastSignInAt: string | null;
-  entryCount: number;
-  questionCount: number;
-  fermentationTotal: number;
-  fermentationCompleted: number;
-  fermentationFailed: number;
-}
+const adminUserSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  createdAt: z.string(),
+  lastSignInAt: z.string().nullable(),
+  entryCount: z.number(),
+  questionCount: z.number(),
+  fermentationTotal: z.number(),
+  fermentationCompleted: z.number(),
+  fermentationFailed: z.number(),
+});
+
+const usersResponseSchema = z.object({ users: z.array(adminUserSchema) });
+
+export type AdminUser = z.infer<typeof adminUserSchema>;
 
 export function useUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -30,8 +36,8 @@ export function useUsers() {
 
     const api = createApiClient(token);
     const res = await api.fetch('/api/v1/admin/users');
-    if (res.ok) {
-      const data = (await res.json()) as { users: AdminUser[] };
+    const data = res.ok ? await parseJson(res, usersResponseSchema) : null;
+    if (data) {
       setUsers(data.users);
     } else {
       setError('ユーザー情報の取得に失敗しました');
