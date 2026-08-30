@@ -13,88 +13,92 @@ interface MinimapItem extends Bounds {
 interface CanvasMinimapProps {
   canvas: CanvasSurface;
   items: readonly MinimapItem[];
-  /** 俯瞰の範囲（world 矩形）。省略時は items を包む矩形。 */
+  /** 中身が無くても必ず含める範囲（瓶の world 箱など）。 */
   extent?: Bounds | null;
   ariaLabel: string;
 }
 
 const MINIMAP_WIDTH = 148;
 const MINIMAP_HEIGHT = 100;
-/** 中身がミニマップの縁に貼り付かないよう内側に取る余白（ミニマップ px）。 */
-const PADDING = 8;
+/** 俯瞰の縁に中身が貼り付かないよう、包含矩形をこの割合だけ広げる。 */
+const MARGIN_RATIO = 0.08;
 
-/** world 矩形 → ミニマップ座標への写像。 */
-function projection(area: Bounds) {
-  const scale = Math.min(
-    (MINIMAP_WIDTH - PADDING * 2) / area.width,
-    (MINIMAP_HEIGHT - PADDING * 2) / area.height,
-  );
+function expand(bounds: Bounds, ratio: number): Bounds {
+  const mx = Math.max(bounds.width * ratio, 1);
+  const my = Math.max(bounds.height * ratio, 1);
   return {
-    scale,
-    offsetX: (MINIMAP_WIDTH - area.width * scale) / 2,
-    offsetY: (MINIMAP_HEIGHT - area.height * scale) / 2,
+    x: bounds.x - mx,
+    y: bounds.y - my,
+    width: bounds.width + mx * 2,
+    height: bounds.height + my * 2,
   };
 }
 
 /**
  * キャンバスの俯瞰図。中身の位置と、いま見ている範囲を小さく描く。
  *
- * **ビューポート枠は購読（`canvas.subscribe`）で毎フレーム更新する。**
- * `canvas.viewport`（React state）はジェスチャ中に更新されないので、それを使うと
- * パン中だけ枠が止まって見える。ここは React の再描画を挟まず直接 style を書く。
+ * **表示範囲は「中身 ∪ いま見えている範囲」** を毎フレーム取り直す。
+ * 中身の外接矩形だけを枠にすると、引いて中身より広く見えた瞬間に「いま見ている範囲」が
+ * 俯瞰からはみ出し、画面の状態と俯瞰の状態が食い違う（枠を縁にクランプしても
+ * 「どこを見ているか」の情報は失われる）。両方を含めれば、寄っても引いても離れても
+ * 関係が保たれる。
+ *
+ * SVG の `viewBox` を world 座標そのものにしているので、中身の矩形は world 座標のまま
+ * 置くだけでよく、毎フレーム書き換えるのは viewBox と可視範囲の2つだけで済む。
  */
 export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinimapProps) {
   const { subscribe, frameSize } = canvas;
-  const viewRectRef = useRef<HTMLDivElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const viewRectRef = useRef<SVGRectElement | null>(null);
+  const dimRef = useRef<SVGPathElement | null>(null);
 
-  const area = extent ?? unionBounds(items);
-  const areaX = area?.x ?? 0;
-  const areaY = area?.y ?? 0;
-  const areaW = area?.width ?? 0;
-  const areaH = area?.height ?? 0;
+  const content = extent ?? unionBounds(items);
+  const contentX = content?.x ?? 0;
+  const contentY = content?.y ?? 0;
+  const contentW = content?.width ?? 0;
+  const contentH = content?.height ?? 0;
 
-  // area は毎レンダー新しい参照になりうるので、依存は数値に展開する。
+  // content は毎レンダー新しい参照になりうるので、依存は数値に展開する。
   useEffect(() => {
-    if (areaW <= 0 || areaH <= 0) return;
-    const { scale, offsetX, offsetY } = projection({
-      x: areaX,
-      y: areaY,
-      width: areaW,
-      height: areaH,
-    });
-
     return subscribe((vp) => {
+      const svg = svgRef.current;
       const rect = viewRectRef.current;
-      if (!rect) return;
+      const dim = dimRef.current;
+      if (!svg || !rect || !dim) return;
       const frame = frameSize();
       if (frame.width === 0 || frame.height === 0) return;
 
-      // いま見えている world 矩形 → ミニマップ座標。
-      const worldLeft = -vp.x / vp.scale;
-      const worldTop = -vp.y / vp.scale;
-      const rawLeft = offsetX + (worldLeft - areaX) * scale;
-      const rawTop = offsetY + (worldTop - areaY) * scale;
-      const rawRight = rawLeft + (frame.width / vp.scale) * scale;
-      const rawBottom = rawTop + (frame.height / vp.scale) * scale;
+      // いま見えている world 矩形。
+      const visible: Bounds = {
+        x: -vp.x / vp.scale,
+        y: -vp.y / vp.scale,
+        width: frame.width / vp.scale,
+        height: frame.height / vp.scale,
+      };
+      const hasContent = contentW > 0 && contentH > 0;
+      const union =
+        unionBounds(
+          hasContent
+            ? [{ x: contentX, y: contentY, width: contentW, height: contentH }, visible]
+            : [visible],
+        ) ?? visible;
+      const area = expand(union, MARGIN_RATIO);
 
-      // ミニマップの内側にクランプする。引ききって可視範囲が中身より広くなると
-      // 枠が完全に外へ出てしまい「どこを見ているか」が消えるため、
-      // 縁に貼り付けて「全部見えている」ことを示す。
-      const left = Math.max(rawLeft, 0);
-      const top = Math.max(rawTop, 0);
-      const right = Math.min(rawRight, MINIMAP_WIDTH);
-      const bottom = Math.min(rawBottom, MINIMAP_HEIGHT);
+      svg.setAttribute('viewBox', `${area.x} ${area.y} ${area.width} ${area.height}`);
 
-      rect.style.left = `${left}px`;
-      rect.style.top = `${top}px`;
-      rect.style.width = `${Math.max(right - left, 0)}px`;
-      rect.style.height = `${Math.max(bottom - top, 0)}px`;
+      rect.setAttribute('x', String(visible.x));
+      rect.setAttribute('y', String(visible.y));
+      rect.setAttribute('width', String(visible.width));
+      rect.setAttribute('height', String(visible.height));
+
+      // 可視範囲の「外側」を暗く落とす。外枠と内枠を1つのパスにして evenodd で抜く。
+      dim.setAttribute(
+        'd',
+        `M${area.x},${area.y}H${area.x + area.width}V${area.y + area.height}H${area.x}Z` +
+          `M${visible.x},${visible.y}H${visible.x + visible.width}V${visible.y + visible.height}H${visible.x}Z`,
+      );
     });
-  }, [subscribe, frameSize, areaX, areaY, areaW, areaH]);
-
-  if (!area || areaW <= 0 || areaH <= 0) return null;
-
-  const { scale, offsetX, offsetY } = projection(area);
+  }, [subscribe, frameSize, contentX, contentY, contentW, contentH]);
 
   return (
     <div
@@ -109,44 +113,38 @@ export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinima
         height: MINIMAP_HEIGHT,
         border: '1px solid var(--border-subtle)',
         backgroundColor: 'var(--bg)',
-        opacity: 0.9,
+        opacity: 0.95,
       }}
     >
-      {/* 中身の位置。カードらしく見えるよう塗り＋縁で描く。 */}
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="absolute"
-          style={{
-            left: offsetX + (item.x - areaX) * scale,
-            top: offsetY + (item.y - areaY) * scale,
-            // 引ききっても点として見えるように最小サイズを与える。
-            width: Math.max(item.width * scale, 3),
-            height: Math.max(item.height * scale, 3),
-            backgroundColor: 'var(--date-color)',
-            // 重なったときに1枚ずつの粒が見えるよう、塗りに薄い縁を足す。
-            outline: '1px solid var(--bg)',
-            opacity: 0.5,
-            borderRadius: 1,
-          }}
+      {/* viewBox は world 座標。中身は world のまま置けばよい。 */}
+      <svg ref={svgRef} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
+        <title>{ariaLabel}</title>
+        {items.map((item) => (
+          <rect
+            key={item.id}
+            x={item.x}
+            y={item.y}
+            width={item.width}
+            height={item.height}
+            fill="var(--date-color)"
+            fillOpacity={0.45}
+            stroke="var(--bg)"
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+        {/* 可視範囲の外側を暗く落とす。 */}
+        <path ref={dimRef} fill="rgba(74,69,65,0.26)" fillRule="evenodd" />
+        {/* いま見ている範囲。 */}
+        <rect
+          ref={viewRectRef}
+          data-verify-part="minimap-viewport"
+          fill="rgba(74,158,142,0.10)"
+          stroke="var(--accent)"
+          strokeWidth={1.5}
+          vectorEffect="non-scaling-stroke"
         />
-      ))}
-      {/*
-        いま見ている範囲。位置と大きさは購読側が毎フレーム書き込む。
-        外側を暗く落とす「スポットライト」にすることで、枠線だけのときより
-        「ここを見ている」が一目で伝わる（外周の影は親の overflow:hidden で切られる）。
-      */}
-      <div
-        ref={viewRectRef}
-        data-verify-part="minimap-viewport"
-        className="absolute"
-        style={{
-          border: '1.5px solid var(--accent)',
-          borderRadius: 2,
-          backgroundColor: 'rgba(74,158,142,0.10)',
-          boxShadow: '0 0 0 9999px rgba(74,69,65,0.28)',
-        }}
-      />
+      </svg>
     </div>
   );
 }

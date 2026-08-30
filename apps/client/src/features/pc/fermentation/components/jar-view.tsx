@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
@@ -300,10 +301,9 @@ export function JarView({
     focused: null,
   });
 
-  // 瓶は有限の世界なので、初回は世界全体が収まる倍率で開く。
+  // 既定は等倍で開く（全体表示は FIT ボタン / Shift+1 で明示的に行う）。
   const canvas = useCanvasViewport({
     storageKey: 'jar',
-    defaultFitBounds: JAR_WORLD_BOUNDS,
     // 瓶は世界の大きさが決まっているので「全体表示」は常に世界そのもの。
     getContentBounds: () => circleBoundsRef.current.all,
     getSelectionBounds: () => circleBoundsRef.current.focused,
@@ -484,6 +484,9 @@ export function JarView({
         canvas={canvas}
         ariaLabel={t('jar.canvas_aria')}
         onClick={closeZoom}
+        // 方眼は frame（スクリーン空間）に敷く。world ボックスの内側に置くと
+        // ボックスの外へパン・ズームしたときに背景が途切れる。
+        background={<CanvasGrid canvas={canvas} color="rgba(140,133,126,0.07)" />}
         overlay={
           // 操作 UI の上ではパンを始めない。
           <div data-canvas-no-pan="">
@@ -515,16 +518,6 @@ export function JarView({
           className="absolute left-0 top-0"
           style={{ width: JAR_WORLD_WIDTH, height: JAR_WORLD_HEIGHT }}
         >
-          {/* Background grid pattern */}
-          <div
-            className="pointer-events-none absolute inset-0 z-0"
-            style={{
-              backgroundImage:
-                'linear-gradient(rgba(140,133,126,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(140,133,126,0.04) 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-              backgroundPosition: 'center center',
-            }}
-          />
           {/* Background radial */}
           <div
             className="pointer-events-none absolute inset-0 z-0"
