@@ -386,7 +386,8 @@
       "fermentation_overlay_description": "새 항목에 질문을 연결하면 해당 질문의 최신 발효 결과를 에디터 위에 띄울 수 있습니다. 기본 동작을 선택하세요.",
       "fermentation_overlay_ask": "표시 전 매번 확인",
       "fermentation_overlay_always": "항목 화면에서 항상 발효 결과 표시",
-      "fermentation_overlay_never": "항목 화면에서 항상 발효 결과 숨기기"
+      "fermentation_overlay_never": "항목 화면에서 항상 발효 결과 숨기기",
+      "focus_mode_fades_fermentation": "발효 요소도 함께 숨기기"
     },
     "snippet_toolbar": {
       "saving": "저장 중…",
@@ -787,7 +788,13 @@
       "question_selected": "질문: {label}",
       "question_untitled": "제목 없는 질문",
       "question_sheet_title": "질문 선택",
-      "question_empty": "세운 질문이 없습니다",
+      "question_empty": "아직 세운 질문이 없습니다. 여기서 하나 적어 보세요.",
+      "question_new": "+ 새 질문 쓰기",
+      "question_new_placeholder": "질문을 쓰세요 (예: 오늘의 작은 발견은?)",
+      "question_create": "이 질문으로 하기",
+      "question_creating": "만드는 중…",
+      "question_create_failed": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+      "question_back_to_list": "← 기존 질문에서 고르기",
       "close": "닫기",
       "pickle": "병에 담그기",
       "pickling": "담는 중…",
@@ -815,7 +822,9 @@
       "section_keywords": "단어",
       "section_snippets": "발췌",
       "unread": "안 읽음",
-      "read": "읽음"
+      "read": "읽음",
+      "section_sources": "바탕이 된 기록",
+      "source_untitled": "제목 없는 기록"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -846,7 +855,8 @@
       "placeholder": "질문 쓰기",
       "delete": "이 질문 끝내기",
       "cancel": "취소",
-      "save": "저장"
+      "save": "저장",
+      "letter_arrived": "편지가 도착했습니다"
     }
   }
 }

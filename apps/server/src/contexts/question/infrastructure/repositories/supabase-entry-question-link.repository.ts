@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readString } from '../../../shared/infrastructure/row.js';
 import type { EntryQuestionLinkRepositoryGateway } from '../../domain/gateways/entry-question-link-repository.gateway.js';
 
 export class SupabaseEntryQuestionLinkRepository implements EntryQuestionLinkRepositoryGateway {
@@ -30,9 +31,7 @@ export class SupabaseEntryQuestionLinkRepository implements EntryQuestionLinkRep
       .eq('entry_id', entryId);
 
     if (error) throw error;
-    return (data ?? []).map(
-      (row: Record<string, unknown>) => (row as Record<string, unknown>).question_id as string,
-    );
+    return (data ?? []).map((row: Record<string, unknown>) => readString(row, 'question_id'));
   }
 
   async listEntryIdsByQuestionId(questionId: string): Promise<string[]> {
@@ -42,8 +41,6 @@ export class SupabaseEntryQuestionLinkRepository implements EntryQuestionLinkRep
       .eq('question_id', questionId);
 
     if (error) throw error;
-    return (data ?? []).map(
-      (row: Record<string, unknown>) => (row as Record<string, unknown>).entry_id as string,
-    );
+    return (data ?? []).map((row: Record<string, unknown>) => readString(row, 'entry_id'));
   }
 }

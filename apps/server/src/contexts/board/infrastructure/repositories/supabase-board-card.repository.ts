@@ -1,9 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  readEnum,
+  readNumber,
+  readString,
+  toRecord,
+  toRecordArray,
+} from '../../../shared/infrastructure/row.js';
 import type {
   BoardCardRepositoryGateway,
   CardPositionUpdate,
 } from '../../domain/gateways/board-card-repository.gateway.js';
 import { BoardCard } from '../../domain/models/board-card.js';
+
+const CARD_TYPES = ['entry', 'snippet', 'photo'] as const;
+const VIEW_TYPES = ['daily', 'weekly'] as const;
 
 export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
@@ -19,7 +29,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .order('z_index', { ascending: true });
 
     if (error) throw error;
-    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+    return toRecordArray(data ?? []).map((row) => this.toDomain(row));
   }
 
   async findDailyCardsByDateRange(
@@ -38,7 +48,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .order('z_index', { ascending: true });
 
     if (error) throw error;
-    return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
+    return toRecordArray(data ?? []).map((row) => this.toDomain(row));
   }
 
   async findRefIdsByDateRange(
@@ -57,8 +67,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .lte('date_key', endDate);
 
     if (error) throw error;
-    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
-    return (data ?? []).map((row: Record<string, unknown>) => row.ref_id as string);
+    return toRecordArray(data ?? []).map((row) => readString(row, 'ref_id'));
   }
 
   async findRefIdsByDateAndView(
@@ -76,8 +85,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .eq('card_type', cardType);
 
     if (error) throw error;
-    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
-    return (data ?? []).map((row: Record<string, unknown>) => row.ref_id as string);
+    return toRecordArray(data ?? []).map((row) => readString(row, 'ref_id'));
   }
 
   async findSoftDeletedRefIdsByDateAndView(
@@ -94,8 +102,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .eq('is_deleted', true);
 
     if (error) throw error;
-    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
-    return (data ?? []).map((row: Record<string, unknown>) => row.ref_id as string);
+    return toRecordArray(data ?? []).map((row) => readString(row, 'ref_id'));
   }
 
   async findMaxZIndex(userId: string, dateKey: string, viewType: string): Promise<number> {
@@ -111,11 +118,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
 
     if (error) throw error;
     if (!data || data.length === 0) return -1;
-    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
-    const zIndex = (data[0] as Record<string, unknown>).z_index;
-    // 値の側はキャストしない。z_index が null で返ると `null as number` がそのまま漏れ、
-    // 呼び出し側の `findMaxZIndex(...) + 1` が 1 になって新しいカードが既存の裏に潜る。
-    return typeof zIndex === 'number' ? zIndex : -1;
+    return readNumber(toRecord(data[0]), 'z_index');
   }
 
   async saveMany(cards: BoardCard[]): Promise<void> {
@@ -136,6 +139,7 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
         width: props.width,
         height: props.height,
         z_index: props.zIndex,
+        user_positioned: props.userPositioned,
         created_at: props.createdAt,
         updated_at: props.updatedAt,
       };
@@ -162,6 +166,8 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
           width: card.width,
           height: card.height,
           z_index: card.zIndex,
+          // 未指定（旧クライアント）のときは既存値を変えない。
+          ...(card.userPositioned === undefined ? {} : { user_positioned: card.userPositioned }),
           updated_at: now,
         })
         .eq('id', card.id),
@@ -193,23 +199,24 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
     if (error) throw error;
   }
 
-  // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
   private toDomain(row: Record<string, unknown>): BoardCard {
     return BoardCard.fromProps({
-      id: row.id as string,
-      userId: row.user_id as string,
-      cardType: row.card_type as 'entry' | 'snippet' | 'photo',
-      refId: row.ref_id as string,
-      dateKey: row.date_key as string,
-      viewType: row.view_type as 'daily' | 'weekly',
-      x: row.x as number,
-      y: row.y as number,
-      rotation: row.rotation as number,
-      width: row.width as number,
-      height: row.height as number,
-      zIndex: row.z_index as number,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      id: readString(row, 'id'),
+      userId: readString(row, 'user_id'),
+      cardType: readEnum(row, 'card_type', CARD_TYPES),
+      refId: readString(row, 'ref_id'),
+      dateKey: readString(row, 'date_key'),
+      viewType: readEnum(row, 'view_type', VIEW_TYPES),
+      x: readNumber(row, 'x'),
+      y: readNumber(row, 'y'),
+      rotation: readNumber(row, 'rotation'),
+      width: readNumber(row, 'width'),
+      height: readNumber(row, 'height'),
+      zIndex: readNumber(row, 'z_index'),
+      // 列を足す前の行や、まだ移行していない環境では undefined になりうるので false に倒す。
+      userPositioned: row.user_positioned === true,
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }

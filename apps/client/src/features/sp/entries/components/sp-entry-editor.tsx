@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
@@ -13,6 +14,8 @@ import {
   useActiveQuestions,
   useEntryQuestions,
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
+import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
+import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
 import { SpConfirmSheet } from './sp-confirm-sheet';
 
@@ -87,6 +90,21 @@ export function SpEntryEditor({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  // Issue #314: 問いが1つも無いと、シートが「ありません」を出すだけで手詰まりだった。
+  // その場で問いを立てられるようにする（PC は #316 の QuestionSelectModal で既に可能）。
+  const createQuestion = useCreateQuestion(api);
+  // 「書く」に切り替えたい意思だけを持ち、モードは activeQuestions から導出する。
+  // 開いた時点の件数で固定すると、問いの取得が終わる前にシートを開いた場合に
+  // 一覧が来ても入力欄のままになる（選べる問いがあるのに選べない）。
+  const [composeRequested, setComposeRequested] = useState(false);
+  const [newQuestionText, setNewQuestionText] = useState('');
+  const [creatingQuestion, setCreatingQuestion] = useState(false);
+  const [createQuestionFailed, setCreateQuestionFailed] = useState(false);
+  // 作りたての問いは activeQuestions（マウント時に一度取るだけ）にも linkedQuestions
+  // （紐づけ POST の往復後に入る）にも即座には現れない。チップのラベルが
+  // 「問いを結ぶ」に戻って見えるのを避けるため、ここで覚えておく。
+  const [createdQuestions, setCreatedQuestions] = useState<LinkedQuestion[]>([]);
+
   // 書きかけ（タイトル/本文/問い/entryId）を localStorage に退避する。内容が空になればクリア。
   // 発酵（瓶に納める）後は確定とみなして退避しない。
   useEffect(() => {
@@ -98,7 +116,7 @@ export function SpEntryEditor({
     saveDraft({ entryId, title, body, questionId: selectedQuestionId });
   }, [draftEnabled, pickled, title, body, entryId, selectedQuestionId, saveDraft, clearDraft]);
 
-  const { linkQuestion } = useEntryQuestions(api, entryId);
+  const { linkedQuestions, linkQuestion } = useEntryQuestions(api, entryId);
 
   useAutosaveEntry({
     title,
@@ -115,6 +133,23 @@ export function SpEntryEditor({
   // 問いはエントリ作成後（entryId 確定後）に一度だけ紐づける。
   // 保存前に選んでいた場合も、autosave でエントリが出来た時点で紐づく。
   const linkAttemptedRef = useRef<string | null>(null);
+
+  // Issue #448: 既存エントリを一覧から開くと、紐づいている問いがチップに出ていなかった。
+  // 選択状態の初期値は URL の questionId と復元ドラフトしか見ておらず、サーバの
+  // 紐付け（linkedQuestions）を無視していたため。取得できたら一度だけ埋める。
+  // ユーザーが既に選んでいる場合は上書きしない。復元した問いは紐付け済みなので、
+  // 下の紐づけ effect が再 POST しないよう linkAttemptedRef にも印を付ける。
+  const questionSeededRef = useRef(false);
+  useEffect(() => {
+    if (questionSeededRef.current) return;
+    const linked = linkedQuestions[0];
+    if (!linked) return;
+    questionSeededRef.current = true;
+    if (selectedQuestionId !== null) return;
+    linkAttemptedRef.current = linked.id;
+    setSelectedQuestionId(linked.id);
+  }, [linkedQuestions, selectedQuestionId]);
+
   useEffect(() => {
     if (entryId && selectedQuestionId && linkAttemptedRef.current !== selectedQuestionId) {
       linkAttemptedRef.current = selectedQuestionId;
@@ -132,10 +167,52 @@ export function SpEntryEditor({
         ? t('status_editing')
         : t('status_saved');
 
-  const selectedQuestion = activeQuestions.find((q) => q.id === selectedQuestionId);
+  // 紐付け済みの問いが終了（アーカイブ）されていると activeQuestions に載らない。
+  // その場合もチップには出したいので、紐付け側からも探す。
+  const selectedQuestion =
+    activeQuestions.find((q) => q.id === selectedQuestionId) ??
+    linkedQuestions.find((q) => q.id === selectedQuestionId) ??
+    createdQuestions.find((q) => q.id === selectedQuestionId);
+
+  // 選べる問いが無ければ入力欄、あれば一覧。取得が遅れて届いても自動で一覧に切り替わる。
+  const composingQuestion = composeRequested || activeQuestions.length === 0;
+
+  // シートを開くたび、書きかけと失敗表示はリセットする（前回の状態を持ち越さない）。
+  function openQuestionSheet() {
+    setComposeRequested(false);
+    setNewQuestionText('');
+    setCreateQuestionFailed(false);
+    setSheetOpen(true);
+  }
+
+  // 問いを立てて、そのまま選択状態にする。紐づけは下の effect が entryId 確定後に行う。
+  async function handleCreateQuestion() {
+    const text = newQuestionText.trim();
+    if (!text || creatingQuestion) return;
+    setCreatingQuestion(true);
+    setCreateQuestionFailed(false);
+    const id = await createQuestion(text);
+    setCreatingQuestion(false);
+    if (!id) {
+      setCreateQuestionFailed(true);
+      return;
+    }
+    setCreatedQuestions((prev) => [...prev, { id, currentText: text }]);
+    setSelectedQuestionId(id);
+    setNewQuestionText('');
+    setSheetOpen(false);
+  }
 
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
+    // Issue #450: 問いに紐づいていないエントリは発酵ループに入らない。走査対象は
+    // 「active な問いに紐づいたエントリ」だけなので（scheduled-fermentation.usecase）、
+    // このまま押せると「漬けたのに何も届かない」になる。PC（#316）と同じく、先に問いを
+    // 決めてもらう。タイトルは発酵に使われない（本文だけを読む）ので任意のままでよい。
+    if (!selectedQuestionId) {
+      openQuestionSheet();
+      return;
+    }
     setPickling(true);
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
     const saved = await save(content, entryId, { fermentationEnabled: true });
@@ -167,7 +244,12 @@ export function SpEntryEditor({
         hasBody,
         dirty,
         hasEntry: !!entryId,
+        // Issue #448: 一覧から開いたときの復元の回帰を捕まえる。
+        // Issue #450: 問いの有無で「納める」の挙動が変わる（無ければ問い選択を開く）。
+        hasQuestion: selectedQuestionId !== null,
         sheetOpen,
+        // Issue #314: 問いがゼロでも行き止まりにならないこと（入力欄が出ること）を捕まえる。
+        composingQuestion,
         pickling,
         deleteOpen,
       })}
@@ -227,7 +309,7 @@ export function SpEntryEditor({
       <div className="px-5 pt-4">
         <button
           type="button"
-          onClick={() => setSheetOpen(true)}
+          onClick={openQuestionSheet}
           className="max-w-full truncate rounded-full px-3 py-1.5 text-xs"
           style={
             selectedQuestion
@@ -292,11 +374,9 @@ export function SpEntryEditor({
                 strokeWidth="1.6"
                 aria-hidden="true"
               >
-                <path
-                  d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z"
-                  strokeLinejoin="round"
-                />
-                <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+                <path d={JAR_ICON_PATH} strokeLinejoin="round" />
+                {/* 中身（発酵しているもの）の水位。胴の幅に合わせる。 */}
+                <path d="M6.6 14.4c1.8.8 3.6.8 5.4 0s3.6-.8 5.4 0" strokeOpacity=".55" />
               </svg>
             )}
             <span className="text-[15px] font-bold">
@@ -321,29 +401,90 @@ export function SpEntryEditor({
             <div className="px-5 py-4 text-sm font-medium opacity-70">
               {t('question_sheet_title')}
             </div>
-            {activeQuestions.length === 0 ? (
-              <div className="px-5 py-4 text-sm opacity-50">{t('question_empty')}</div>
+            {composingQuestion ? (
+              <div className="px-5 pb-2">
+                {activeQuestions.length === 0 ? (
+                  <p className="pb-3 text-sm opacity-50">{t('question_empty')}</p>
+                ) : null}
+                <input
+                  // biome-ignore lint/a11y/noAutofocus: 問いが無くて手が止まっている場面なので、開いた瞬間に書き始められる必要がある
+                  autoFocus
+                  value={newQuestionText}
+                  onChange={(e) => setNewQuestionText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCreateQuestion();
+                    }
+                  }}
+                  placeholder={t('question_new_placeholder')}
+                  aria-label={t('question_new_placeholder')}
+                  className="w-full rounded-xl px-4 py-3 text-base outline-none"
+                  style={{
+                    background: 'color-mix(in srgb, var(--fg) 5%, transparent)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                />
+                {createQuestionFailed ? (
+                  <p className="pt-2 text-xs" style={{ color: 'var(--danger, #c0392b)' }}>
+                    {t('question_create_failed')}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleCreateQuestion}
+                  disabled={!newQuestionText.trim() || creatingQuestion}
+                  className="mt-3 w-full rounded-xl py-3 text-base font-medium disabled:opacity-40"
+                  style={{ background: 'var(--accent)', color: 'var(--bg)' }}
+                >
+                  {creatingQuestion ? t('question_creating') : t('question_create')}
+                </button>
+                {activeQuestions.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setComposeRequested(false)}
+                    className="mt-2 w-full py-2 text-sm opacity-60"
+                  >
+                    {t('question_back_to_list')}
+                  </button>
+                ) : null}
+              </div>
             ) : (
-              <ul>
-                {activeQuestions.map((q) => {
-                  const selected = q.id === selectedQuestionId;
-                  return (
-                    <li key={q.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedQuestionId(selected ? null : q.id);
-                          setSheetOpen(false);
-                        }}
-                        className="flex w-full items-center justify-between px-5 py-3 text-left text-base hover:bg-[color-mix(in_srgb,var(--fg)_6%,transparent)]"
-                      >
-                        <span className="truncate">{q.currentText ?? t('question_untitled')}</span>
-                        {selected ? <span className="ml-3 shrink-0">✓</span> : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <ul>
+                  {activeQuestions.map((q) => {
+                    const selected = q.id === selectedQuestionId;
+                    return (
+                      <li key={q.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedQuestionId(selected ? null : q.id);
+                            setSheetOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between px-5 py-3 text-left text-base hover:bg-[color-mix(in_srgb,var(--fg)_6%,transparent)]"
+                        >
+                          <span className="truncate">
+                            {q.currentText ?? t('question_untitled')}
+                          </span>
+                          {selected ? <span className="ml-3 shrink-0">✓</span> : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateQuestionFailed(false);
+                    setComposeRequested(true);
+                  }}
+                  className="w-full px-5 py-3 text-left text-base"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  {t('question_new')}
+                </button>
+              </>
             )}
           </div>
         </div>

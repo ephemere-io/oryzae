@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readString, toRecordArray } from '../../../shared/infrastructure/row.js';
 import type {
   EntryLinkedQuestionsViewRepositoryGateway,
   LinkedQuestionView,
@@ -36,11 +37,11 @@ export class SupabaseEntryLinkedQuestionsViewRepository
       .select('entry_id, question_id')
       .in('entry_id', entryIds);
     if (linkErr) throw linkErr;
-    const links = (linkRows ?? []) as Array<Record<string, unknown>>;
+    const links = toRecordArray(linkRows ?? []);
     if (links.length === 0) return {};
 
     // 2) 関連する全 question_id の validated transaction を取得
-    const questionIds = Array.from(new Set(links.map((r) => r.question_id as string)));
+    const questionIds = Array.from(new Set(links.map((r) => readString(r, 'question_id'))));
     const { data: txRows, error: txErr } = await this.supabase
       .from('question_transactions')
       .select('question_id, string, question_version')
@@ -52,16 +53,16 @@ export class SupabaseEntryLinkedQuestionsViewRepository
     // question_id → 最新 validated 文字列。order desc なので最初に出てきたもの
     // が version max。
     const latestTextByQuestion = new Map<string, string>();
-    for (const row of (txRows ?? []) as Array<Record<string, unknown>>) {
-      const qId = row.question_id as string;
+    for (const row of toRecordArray(txRows ?? [])) {
+      const qId = readString(row, 'question_id');
       if (latestTextByQuestion.has(qId)) continue;
-      latestTextByQuestion.set(qId, row.string as string);
+      latestTextByQuestion.set(qId, readString(row, 'string'));
     }
 
     const result: Record<string, LinkedQuestionView[]> = {};
     for (const row of links) {
-      const entryId = row.entry_id as string;
-      const questionId = row.question_id as string;
+      const entryId = readString(row, 'entry_id');
+      const questionId = readString(row, 'question_id');
       const bucket = result[entryId] ?? [];
       bucket.push({ id: questionId, currentText: latestTextByQuestion.get(questionId) ?? null });
       result[entryId] = bucket;

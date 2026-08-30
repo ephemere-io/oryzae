@@ -6,6 +6,7 @@ import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
 import { Sidebar } from '@/features/pc/navigation/components/sidebar';
+import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
@@ -16,9 +17,19 @@ import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
 import { RouteLoading } from './_loading/route-loading';
 
+// CSS カスタムプロパティは React.CSSProperties に含まれないので、
+// `--*` を許す形で型を広げて宣言する（キャストは使わない）。
+const mainStyle: React.CSSProperties & Record<`--${string}`, string> = {
+  marginLeft: SIDEBAR_WIDTH,
+  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
+};
+
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
   const { shouldShow, complete } = useOnboarding(api);
+  // 未読の算出は features/shared の hook が持ち、context は配るだけ（lib はドメインを知らない）。
+  // 全画面で 1 つの状態を共有するため、取得もここで 1 回だけ行う（#363 の N+1 解消を維持）。
+  const unread = useUnreadLetters(api, loading);
   const device = useDevice();
   const router = useRouter();
 
@@ -63,7 +74,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <ThemeProvider>
       <SidebarProvider>
-        <UnreadProvider api={api} authLoading={loading}>
+        <UnreadProvider value={unread}>
           {/* device はサーバー(x-device)で確定済み＝first render から端末別シェルを SSR 描画。
               null フォールバックは Provider 外などの保険（通常は到達しない）。 */}
           {device === 'sp' ? (
@@ -77,15 +88,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">
               <Sidebar />
-              <main
-                className="flex flex-1 flex-col overflow-hidden"
-                style={
-                  {
-                    marginLeft: SIDEBAR_WIDTH,
-                    '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-                  } as React.CSSProperties
-                }
-              >
+              <main className="flex flex-1 flex-col overflow-hidden" style={mainStyle}>
                 <div className="relative flex-1 overflow-auto">{content}</div>
                 <PageFooter />
               </main>

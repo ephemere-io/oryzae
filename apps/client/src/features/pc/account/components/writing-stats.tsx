@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { WritingStatsSkeleton } from '@/features/pc/account/components/writing-stats-skeleton';
 import { useUserStats } from '@/features/shared/auth/hooks/use-user-stats';
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -24,12 +25,14 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
-// verify-exempt: props/api seam が無く useUserStats() が createApiClient を内製（fetch seam 無し）。getAccessToken() は jsdom で null → fetchStats が setLoading 前に return → loading=true のまま if (loading) return null で DOM ゼロ。stats を注入する seam が無く（global fetch mock は register 経由でグローバル汚染するため禁止）、孤立描画では意味ある contract/probe を作れない。
+// verify-exempt: props/api seam が無く useUserStats() が createApiClient を内製（fetch seam 無し）。getAccessToken() は jsdom で null → fetchStats が setLoading 前に return → loading=true のまま。stats を注入する seam が無く（global fetch mock は register 経由でグローバル汚染するため禁止）、読み込み後の状態を孤立検証できない。ロード中に出す枠は WritingStatsSkeleton として切り出し、そちらを検証している。
 export function WritingStats() {
   const t = useTranslations('stats');
   const { stats, loading } = useUserStats();
 
-  if (loading) return null;
+  // 高さゼロを返すと、届いた瞬間にブロックまるごと出現して下のセクションを押し下げる
+  // （スクロール中は「急に画面が増える」ように見える）。枠で場所を取っておく。
+  if (loading) return <WritingStatsSkeleton />;
 
   if (!stats) return null;
 
