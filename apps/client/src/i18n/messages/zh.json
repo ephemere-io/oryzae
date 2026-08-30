@@ -385,16 +385,6 @@
       "create": "做成摘录",
       "too_long": "不超过 50 字"
     },
-    "stats": {
-      "aria_label": "写作统计",
-      "reading_time_under_minute": "不到 1 分钟",
-      "reading_time_minutes": "约 {n} 分钟",
-      "heading": "写作统计",
-      "label_chars": "字数",
-      "label_lines": "行数",
-      "label_paragraphs": "段落数",
-      "label_reading_time": "阅读时间"
-    },
     "date": {
       "day_sun": "星期日",
       "day_mon": "星期一",
@@ -472,10 +462,8 @@
       "collapse": "收起面板",
       "expand": "展开面板",
       "link_question": "关联问题",
-      "photo": "从照片转成文字",
       "pickle_needs_body": "写点内容后即可腌渍",
-      "pickle_needs_question": "关联问题后即可腌渍",
-      "stats": "写作统计"
+      "pickle_needs_question": "关联问题后即可腌渍"
     }
   },
   "fermentation": {

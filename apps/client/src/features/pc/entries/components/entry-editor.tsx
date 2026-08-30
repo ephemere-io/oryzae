@@ -26,7 +26,6 @@ import { QuestionSelectModal } from '@/features/pc/entries/components/question-s
 import { SaveTitleModal } from '@/features/pc/entries/components/save-title-modal';
 import { SettingsDrawer } from '@/features/pc/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/pc/entries/components/snippet-toolbar';
-import { StatsPopup } from '@/features/pc/entries/components/stats-popup';
 import { useAmpEffect } from '@/features/pc/entries/hooks/use-amp-effect';
 import { useBrowserNavGuard } from '@/features/pc/entries/hooks/use-browser-nav-guard';
 import { useEditorSettings } from '@/features/pc/entries/hooks/use-editor-settings';
@@ -156,7 +155,6 @@ export function EntryEditor({
   const [pickleNudgeOpen, setPickleNudgeOpen] = useState(false);
   const [linkQuestionNudgeOpen, setLinkQuestionNudgeOpen] = useState(false);
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
-  const [statsOpen, setStatsOpen] = useState(false);
   // 問いのドロップダウンは、ヘッダーのチップからもパレットの操作からも開く。
   const [questionChipOpen, setQuestionChipOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
@@ -252,7 +250,6 @@ export function EntryEditor({
     questionSelectOpen ||
     pickleNudgeOpen ||
     linkQuestionNudgeOpen ||
-    statsOpen ||
     leaveConfirmOpen ||
     overlayPromptOpen;
   const uiVisible = useFocusMode({
@@ -695,8 +692,6 @@ export function EntryEditor({
     enabled: true,
   });
 
-  const charCount = content.length;
-
   // パレットの操作。押せないものは非活性にして、理由はホバーで出す
   // （「あと何字」を常時表示しない代わり）。
   const paletteIcon = (children: React.ReactNode) => (
@@ -751,12 +746,6 @@ export function EntryEditor({
         </>,
       ),
       onSelect: handlePickleClick,
-    },
-    {
-      id: 'stats',
-      label: t('palette.stats'),
-      icon: paletteIcon(<path d="M5 20V14M12 20V5M19 20v-9" />),
-      onSelect: () => setStatsOpen((v) => !v),
     },
     {
       id: 'fullscreen',
@@ -824,7 +813,6 @@ export function EntryEditor({
         hasEntry: !!entryId,
         hasBody: content.trim().length > 0,
         settingsOpen,
-        statsOpen,
         saveModalOpen,
         questionSelectOpen,
       })}
@@ -1040,14 +1028,6 @@ export function EntryEditor({
           </div>
         )}
       </div>
-
-      {/* Stats popup */}
-      <StatsPopup
-        open={statsOpen}
-        charCount={charCount}
-        content={content}
-        onClose={() => setStatsOpen(false)}
-      />
 
       {/* 操作はすべてここに集める（問いを結ぶ・写真・音声・漬け込む・発酵・全画面）。
           本文に被らせないやり方は「場所を空ける」ではなく「振る舞い」で解く:

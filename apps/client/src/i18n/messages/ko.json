@@ -385,16 +385,6 @@
       "create": "스니펫 만들기",
       "too_long": "50자 이내"
     },
-    "stats": {
-      "aria_label": "글쓰기 통계",
-      "reading_time_under_minute": "1분 미만",
-      "reading_time_minutes": "약 {n}분",
-      "heading": "글쓰기 통계",
-      "label_chars": "글자 수",
-      "label_lines": "줄 수",
-      "label_paragraphs": "단락 수",
-      "label_reading_time": "읽는 시간"
-    },
     "date": {
       "day_sun": "일요일",
       "day_mon": "월요일",
@@ -472,10 +462,8 @@
       "collapse": "팔레트 접기",
       "expand": "팔레트 펼치기",
       "link_question": "물음 잇기",
-      "photo": "사진에서 글자 옮기기",
       "pickle_needs_body": "본문을 쓰면 담글 수 있습니다",
-      "pickle_needs_question": "물음을 이으면 담글 수 있습니다",
-      "stats": "글쓰기 통계"
+      "pickle_needs_question": "물음을 이으면 담글 수 있습니다"
     }
   },
   "fermentation": {

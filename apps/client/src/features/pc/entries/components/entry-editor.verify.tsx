@@ -40,7 +40,6 @@ interface Props {
 
 const PICKLE_BTN = 'button[data-palette-action="pickle"]';
 const SETTINGS_BTN = 'button[aria-label="設定"]';
-const STATS_BTN = 'button[data-palette-action="stats"]';
 const QUESTION_CHIP_BTN = '[data-verify-unit="QuestionChip"] > button';
 
 registerUnit<Props>({
@@ -77,15 +76,6 @@ registerUnit<Props>({
       props: { api: null, auth: null, initialContent: '本文' },
       act: async (ctx) => {
         await ctx.click(SETTINGS_BTN);
-        await ctx.wait(16);
-      },
-    },
-    {
-      id: 'stats-open',
-      description: 'ステータスバーの文字数を押すと統計ポップアップが開く（statsOpen=true）',
-      props: { api: null, auth: null, initialContent: '本文' },
-      act: async (ctx) => {
-        await ctx.click(STATS_BTN);
         await ctx.wait(16);
       },
     },
@@ -176,18 +166,6 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'stats-popup-present-iff-open',
-      description: '統計ポップアップは statsOpen=true のときだけ描画される',
-      check: ({ root, contract }) => {
-        const present = Boolean(root.querySelector('[data-verify-unit="StatsPopup"]'));
-        const expectOpen = contract.statsOpen === 'true';
-        return (
-          present === expectOpen ||
-          `StatsPopup present=${present} だが contract.statsOpen="${contract.statsOpen}"`
-        );
-      },
-    },
-    {
       id: 'save-modal-present-iff-open',
       description: 'タイトル入力モーダルは saveModalOpen=true のときだけ描画される',
       check: ({ root, contract }) => {
@@ -219,10 +197,9 @@ registerUnit<Props>({
         (contract.hasBody === 'false' &&
           contract.hasEntry === 'false' &&
           contract.settingsOpen === 'false' &&
-          contract.statsOpen === 'false' &&
           contract.saveModalOpen === 'false' &&
           contract.questionSelectOpen === 'false') ||
-        `expected empty/closed, got hasBody=${contract.hasBody}, hasEntry=${contract.hasEntry}, settingsOpen=${contract.settingsOpen}, statsOpen=${contract.statsOpen}, saveModalOpen=${contract.saveModalOpen}, questionSelectOpen=${contract.questionSelectOpen}`,
+        `expected empty/closed, got hasBody=${contract.hasBody}, hasEntry=${contract.hasEntry}, settingsOpen=${contract.settingsOpen}, saveModalOpen=${contract.saveModalOpen}, questionSelectOpen=${contract.questionSelectOpen}`,
     },
     {
       id: 'existing-has-entry',
@@ -238,14 +215,6 @@ registerUnit<Props>({
       check: ({ contract }) =>
         contract.settingsOpen === 'true' ||
         `expected settingsOpen=true after click, got "${contract.settingsOpen}"`,
-    },
-    {
-      id: 'stats-opened-after-click',
-      description: '文字数クリック後は statsOpen=true（帯に意味がある #360）',
-      onlyFixtures: ['stats-open'],
-      check: ({ contract }) =>
-        contract.statsOpen === 'true' ||
-        `expected statsOpen=true after click, got "${contract.statsOpen}"`,
     },
     {
       id: 'question-select-opened-after-click',

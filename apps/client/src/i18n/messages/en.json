@@ -385,16 +385,6 @@
       "create": "Make snippet",
       "too_long": "Max. 50 characters"
     },
-    "stats": {
-      "aria_label": "Writing stats",
-      "reading_time_under_minute": "Under 1 min",
-      "reading_time_minutes": "About {n} min",
-      "heading": "Writing stats",
-      "label_chars": "Characters",
-      "label_lines": "Lines",
-      "label_paragraphs": "Paragraphs",
-      "label_reading_time": "Reading time"
-    },
     "date": {
       "day_sun": "Sunday",
       "day_mon": "Monday",
@@ -472,10 +462,8 @@
       "collapse": "Collapse the palette",
       "expand": "Expand the palette",
       "link_question": "Link a question",
-      "photo": "Transcribe from a photo",
       "pickle_needs_body": "Write something to pickle it",
-      "pickle_needs_question": "Link a question to pickle it",
-      "stats": "Writing stats"
+      "pickle_needs_question": "Link a question to pickle it"
     }
   },
   "fermentation": {
