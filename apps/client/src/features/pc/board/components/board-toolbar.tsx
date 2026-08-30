@@ -2,7 +2,12 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { ICON_BUTTON_CLASS, IDLE_HOVER_CLASS, SURFACE_CLASS, SURFACE_STYLE } from './board-surface';
+import {
+  ELEVATED_PANEL_CLASS,
+  ELEVATED_PANEL_STYLE,
+  IDLE_HOVER_CLASS,
+  TOOL_BUTTON_CLASS,
+} from './board-surface';
 
 /** ツールバーで選べる道具。'none' はどのダイアログも開いていない状態。 */
 type BoardTool = 'none' | 'snippet' | 'photo';
@@ -89,9 +94,9 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
       {...verifyAttrs({ unit: 'BoardToolbar', activeTool, toolCount: tools.length })}
       role="toolbar"
       aria-label={t('aria_label')}
-      className={`${SURFACE_CLASS} bottom-6 gap-1`}
+      className={`${ELEVATED_PANEL_CLASS} bottom-6`}
       style={{
-        ...SURFACE_STYLE,
+        ...ELEVATED_PANEL_STYLE,
         left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
         transform: 'translateX(-50%)',
       }}
@@ -111,7 +116,7 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
               data-verify-tool={tool.id}
               // 非アクティブ時は背景をインラインで指定しない。インライン style は
               // CSS の :hover に必ず勝つため、指定すると hover が効かなくなる。
-              className={`${ICON_BUTTON_CLASS} ${
+              className={`${TOOL_BUTTON_CLASS} ${
                 isActive ? '' : `${IDLE_HOVER_CLASS} active:scale-95`
               }`}
               style={
