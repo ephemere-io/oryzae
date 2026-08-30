@@ -1,3 +1,5 @@
+import { SpendLimitReachedError } from '../../../shared/application/errors/application.errors.js';
+import { isSpendLimitError } from '../../../shared/infrastructure/anthropic-spend-limit.js';
 import type { PhotoTranscriptionGateway } from '../../domain/gateways/photo-transcription.gateway.js';
 import type { PhotoTranscriptionUsageRepositoryGateway } from '../../domain/gateways/photo-transcription-usage-repository.gateway.js';
 import { PhotoTranscriptionUsage } from '../../domain/models/photo-transcription-usage.js';
@@ -33,11 +35,17 @@ export class TranscribeEntryPhotoUsecase {
   ) {}
 
   async execute(input: TranscribeEntryPhotoInput): Promise<TranscribeEntryPhotoResponse> {
-    const result = await this.transcription.transcribe(
-      input.file,
-      input.contentType,
-      input.language,
-    );
+    let result: Awaited<ReturnType<PhotoTranscriptionGateway['transcribe']>>;
+    try {
+      result = await this.transcription.transcribe(input.file, input.contentType, input.language);
+    } catch (error) {
+      // 支出上限で止まっているだけなら、AI の失敗と混ぜない。
+      // 「読み取れませんでした」と出すと原因不明の不具合に見えるため。
+      if (isSpendLimitError(error)) {
+        throw new SpendLimitReachedError('Anthropic spend limit reached');
+      }
+      throw error;
+    }
 
     const usageResult = PhotoTranscriptionUsage.create(
       {

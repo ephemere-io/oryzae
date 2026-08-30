@@ -96,7 +96,14 @@ export function usePhotoImport({ api, onAttach, onInsertText }: UsePhotoImportPa
         body: form,
       });
       if (!res.ok) {
-        const message = res.status === 429 ? t('error_rate_limited') : t('error_transcribe');
+        // 503 は Anthropic の支出上限に達した状態（サーバーが他の失敗と区別して返す）。
+        // 「読み取れませんでした」だと原因不明の不具合に見えるので、別の文言を出す。
+        const message =
+          res.status === 503
+            ? t('error_spend_limit')
+            : res.status === 429
+              ? t('error_rate_limited')
+              : t('error_transcribe');
         setState((s) => ({ ...s, status: 'idle', error: message }));
         return;
       }

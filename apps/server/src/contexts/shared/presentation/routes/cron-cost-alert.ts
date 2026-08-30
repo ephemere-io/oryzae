@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { fetchDailyCosts, sumDailyCosts } from '../../infrastructure/anthropic-cost-report.js';
 import { computeCostFromTokens } from '../../infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
@@ -22,10 +23,9 @@ function sumCost(rows: TokenRow[]): number {
 /**
  * 前日の AI コストを Discord に日次報告する。
  *
- * 保存済みのトークン数 × 価格表から算出する。Anthropic の Cost Report（実請求額）は
- * Admin API キーが要り、それは組織アカウントでしか発行できないため使えない。
- * したがってここの数字は**概算**で、キャッシュ割引・tier 割引・価格改定は反映されない。
- * 正確な請求額は Console の Cost ページを見ること。
+ * 金額は Anthropic の Cost Report（実請求額）から引く。Admin API キーが無い環境では
+ * 保存済みトークン × 価格表の**概算**に落とし、その旨を通知に出す（黙って別種の数字に
+ * すり替わるのを避けるため）。概算にはキャッシュ割引・tier 割引・価格改定が乗らない。
  *
  * 以前は fermentation_results の generation_id を gateway に問い合わせていたが、
  * issue #352 で Anthropic 直叩きに切替えて以降 generation_id は発行されない。
@@ -77,7 +77,14 @@ export const cronCostAlert = new Hono()
 
       const fermentationRows = fermentations.data ?? [];
       const transcriptionRows = transcriptions.data ?? [];
-      const totalCost = sumCost(fermentationRows) + sumCost(transcriptionRows);
+
+      // 実請求額が取れればそれを使う。取れなければトークンからの概算。
+      const billedDaily = await fetchDailyCosts(dayStart, dayEnd);
+      const billed = billedDaily !== null;
+      const totalCost = billed
+        ? sumDailyCosts(billedDaily)
+        : sumCost(fermentationRows) + sumCost(transcriptionRows);
+      const costLabel = billed ? '合計コスト（実請求）' : '合計コスト（概算）';
       // 集計に使ったレコード数（発酵 + 文字起こし）。旧実装の trackedCount は
       // 「generation_id を引けた件数」で意味が違うため、名前を変えて取り違えを防ぐ。
       const recordCount = fermentationRows.length + transcriptionRows.length;
@@ -89,7 +96,7 @@ export const cronCostAlert = new Hono()
           color: COLORS.ERROR,
           fields: [
             { name: '日付', value: dateLabel, inline: true },
-            { name: '合計コスト（概算）', value: `$${totalCost.toFixed(4)}`, inline: true },
+            { name: costLabel, value: `$${totalCost.toFixed(4)}`, inline: true },
             { name: '閾値', value: `$${DAILY_COST_THRESHOLD_USD.toFixed(2)}`, inline: true },
             { name: '発酵', value: String(fermentationRows.length), inline: true },
             { name: '文字起こし', value: String(transcriptionRows.length), inline: true },
@@ -101,7 +108,7 @@ export const cronCostAlert = new Hono()
           color: COLORS.INFO,
           fields: [
             { name: '日付', value: dateLabel, inline: true },
-            { name: '合計コスト（概算）', value: `$${totalCost.toFixed(4)}`, inline: true },
+            { name: costLabel, value: `$${totalCost.toFixed(4)}`, inline: true },
             { name: '発酵', value: String(fermentationRows.length), inline: true },
             { name: '文字起こし', value: String(transcriptionRows.length), inline: true },
           ],
@@ -113,6 +120,7 @@ export const cronCostAlert = new Hono()
         date: dateLabel,
         totalCost: Math.round(totalCost * 1000000) / 1000000,
         recordCount,
+        billed,
         thresholdExceeded: totalCost >= DAILY_COST_THRESHOLD_USD,
       });
     } catch (error) {

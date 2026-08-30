@@ -473,7 +473,8 @@
     "error_transcribe": "The text could not be read. Please try again later.",
     "error_rate_limited": "You have reached the reading limit. Please wait a moment.",
     "unavailable": "Photo {index} could not be loaded",
-    "unavailable_short": "Unavailable"
+    "unavailable_short": "Unavailable",
+    "error_spend_limit": "The AI usage limit has been reached. This feature is unavailable for now."
   },
   "fermentation": {
     "detail": {

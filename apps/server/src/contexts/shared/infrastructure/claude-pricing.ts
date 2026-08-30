@@ -1,11 +1,11 @@
 /**
  * トークン数 → cost(USD) の **概算**。請求額そのものではない。
  *
- * 実請求額は Anthropic の Cost Report API から取れるが、あれは Admin API キーを要求し、
- * Admin API キーは組織アカウントでしか発行できない（個人アカウントは対象外）。
- * このプロジェクトは組織を持たないので、自前のトークン数 × 価格表で概算する。
+ * 金額の正は Anthropic の Cost Report（`anthropic-cost-report.ts`）。この関数は
+ * ANTHROPIC_ADMIN_KEY が無い環境でのフォールバックと、Cost Report では出せない
+ * レコード単位の表示（この発酵 1 件がいくらか）のために残してある。
  *
- * したがって次のどれも反映されない。正確な金額は Console の Cost ページを見ること:
+ * 概算なので次のどれも反映されない。合計金額として見せるときは必ず「概算」と明示する:
  *   - キャッシュトークンの割引単価（cache_read は通常の約 1/10。そもそも記録していない）
  *   - コンテキスト窓別の単価（0-200k と 200k-1M で違う）
  *   - service tier の割引（batch は 50% 引き）
@@ -26,6 +26,12 @@ const USD_PER_MTOK: Record<string, { input: number; output: number }> = {
 
 /** モデル未記録のレコード（fermentation_results）が使う既定。発酵のモデル。 */
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
+
+/**
+ * 上の価格表を最後に確認した年月。管理画面に出して「いつ時点の単価か」を可視化する。
+ * 価格表を更新したらここも直すこと。放っておくと古い単価で静かに計算し続ける。
+ */
+export const PRICING_AS_OF = '2026-08';
 
 export interface TokenCost {
   totalCost: number;

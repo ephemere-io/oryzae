@@ -10,6 +10,10 @@ const costSummarySchema = z.object({
   currentMonthCost: z.number(),
   lastMonthCost: z.number(),
   projectedCost: z.number(),
+  // 保存済みトークン × 価格表からの概算。請求額ではない（Anthropic の Cost API は
+  // Admin キー = 組織アカウントが要るため使えない）。古いサーバーからは来ないので既定を持つ。
+  estimated: z.boolean().optional(),
+  pricingAsOf: z.string().optional(),
 });
 
 export type CostSummary = z.infer<typeof costSummarySchema>;

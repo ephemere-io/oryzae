@@ -3,6 +3,7 @@ import { EntryValidationError } from '@/contexts/entry/application/errors/entry.
 import { TranscribeEntryPhotoUsecase } from '@/contexts/entry/application/usecases/transcribe-entry-photo.usecase';
 import type { PhotoTranscriptionGateway } from '@/contexts/entry/domain/gateways/photo-transcription.gateway';
 import type { PhotoTranscriptionUsageRepositoryGateway } from '@/contexts/entry/domain/gateways/photo-transcription-usage-repository.gateway';
+import { SpendLimitReachedError } from '@/contexts/shared/application/errors/application.errors';
 
 describe('TranscribeEntryPhotoUsecase', () => {
   let transcription: PhotoTranscriptionGateway;
@@ -89,5 +90,26 @@ describe('TranscribeEntryPhotoUsecase', () => {
 
     await expect(usecase.execute(input)).rejects.toThrow('llm unavailable');
     expect(usageRepo.save).not.toHaveBeenCalled();
+  });
+
+  // 支出上限で止まっているだけなのに「読み取れませんでした」と出すと、
+  // ユーザーにも運用側にも原因が分からない。専用のエラーに変換する。
+  it('支出上限に達したときは SpendLimitReachedError に変換する', async () => {
+    vi.mocked(transcription.transcribe).mockRejectedValue({
+      status: 400,
+      message: 'You have reached your specified API usage limits',
+    });
+
+    await expect(usecase.execute(input)).rejects.toThrow(SpendLimitReachedError);
+    expect(usageRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('通常のレート制限は SpendLimitReachedError にしない（待てば直るため）', async () => {
+    vi.mocked(transcription.transcribe).mockRejectedValue({
+      status: 429,
+      message: 'Number of requests has exceeded your rate limit',
+    });
+
+    await expect(usecase.execute(input)).rejects.not.toBeInstanceOf(SpendLimitReachedError);
   });
 });
