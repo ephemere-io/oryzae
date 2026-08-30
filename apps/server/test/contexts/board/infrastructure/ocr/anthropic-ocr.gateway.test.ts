@@ -49,12 +49,13 @@ describe('AnthropicOcrGateway.extractText', () => {
     ]);
   });
 
-  it('installed な @ai-sdk/anthropic が受け付けるモデル ID を使う', async () => {
+  it('選んだモデル ID をそのまま SDK へ渡す', async () => {
     await new AnthropicOcrGateway().extractText({ image, mediaType: 'image/jpeg' });
 
     expect(anthropicMock).toHaveBeenCalledWith(__INTERNAL.MODEL);
-    // typecheck が AnthropicModelId との一致を守る。ここでは「発酵分析とは別枠で
-    // 明示的に選んだモデルである」ことを固定し、うっかり書き換えを検出する。
+    // ここが守れるのは「発酵分析とは別枠で明示的に選んだモデルを、加工せず渡している」
+    // ことだけ。ID そのものの正しさは型では守れない（AnthropicModelId は末尾が
+    // `(string & {})` なので任意の文字列が通る）。綴りの誤りは実行時にしか出ない。
     expect(__INTERNAL.MODEL).toBe('claude-opus-5');
   });
 
