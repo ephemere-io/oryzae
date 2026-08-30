@@ -80,3 +80,43 @@ insert into auth.identities (
 
 insert into public.profiles (id, nickname, onboarding_completed)
 values ('00000000-0000-0000-0000-0000000000a1', 'e2e-admin', true);
+
+-- ── 認可境界テスト用の 2 人目 ──────────────────────────────────────────────
+--   email    : e2e-b@oryzae.test
+--   password : e2e-password-1234
+--   nickname : e2e-ci-b
+--
+-- apps/server/test/integration/authorization-isolation.test.ts が
+-- 「A が作ったデータを B が 1 行も読めない」ことを検証するために使う。
+-- 越境を検出するには、A とは別の実在ユーザーが必ず 1 人要る。
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) values (
+  '00000000-0000-0000-0000-000000000000',
+  '00000000-0000-0000-0000-0000000000e2',
+  'authenticated', 'authenticated',
+  'e2e-b@oryzae.test',
+  crypt('e2e-password-1234', gen_salt('bf')),
+  now(), now(), now(),
+  '{"provider":"email","providers":["email"]}',
+  '{"locale":"ja"}',
+  '', '', '', ''
+);
+
+insert into auth.identities (
+  id, user_id, provider_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at
+) values (
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-0000000000e2',
+  '00000000-0000-0000-0000-0000000000e2',
+  '{"sub":"00000000-0000-0000-0000-0000000000e2","email":"e2e-b@oryzae.test"}',
+  'email',
+  now(), now(), now()
+);
+
+insert into public.profiles (id, nickname, onboarding_completed)
+values ('00000000-0000-0000-0000-0000000000e2', 'e2e-ci-b', true);
