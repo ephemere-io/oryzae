@@ -26,7 +26,10 @@ export function useImageIntake(enabled: boolean, onImage: (file: File) => void) 
         const tag = target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
       }
-      const file = firstImage(e.clipboardData?.files);
+      // 貼り付けは files だけを見ていると取りこぼす。スクリーンショットや Web ページから
+      // コピーした画像は files が空で items 側にしか入らないことがある（Safari と、
+      // コピー元によっては Chrome も）。両方見る。
+      const file = imageFromClipboard(e.clipboardData);
       if (!file) return;
       e.preventDefault();
       onImage(file);
@@ -84,6 +87,18 @@ function firstImage(files: FileList | null | undefined): File | null {
   if (!files) return null;
   for (const file of Array.from(files)) {
     if (file.type.startsWith('image/')) return file;
+  }
+  return null;
+}
+
+function imageFromClipboard(data: DataTransfer | null | undefined): File | null {
+  if (!data) return null;
+  const fromFiles = firstImage(data.files);
+  if (fromFiles) return fromFiles;
+  for (const item of Array.from(data.items ?? [])) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+    const file = item.getAsFile();
+    if (file) return file;
   }
   return null;
 }

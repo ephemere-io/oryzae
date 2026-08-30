@@ -39,13 +39,13 @@ export const CONTROL_FONT = { fontFamily: 'Inter, "Noto Sans JP", sans-serif' } 
 /* ---------- 上段のバー（日付と表示単位を1行に収める） ---------- */
 
 /**
- * 盤面左上。日付ナビと Daily/Weekly を並べて置く。
+ * 盤面の上段。左端に日付ナビ、右端に Daily/Weekly を置く1本のバー。
  *
- * 元は左上（日付）と右上（切り替え）に分かれていた。だが Daily/Weekly は日付の
- * **単位**を決めるスイッチで、切り替えると隣の日付表示そのものが 1 日から週レンジへ
- * 変わる。離して置くと、何を切り替えたのかが目で追えない。隣り合わせなら因果が見える。
+ * 別々に置いて座標を持たせるのではなく、1本のバーの両端に寄せる。こうすると
+ * 上下の位置が必ず揃い、片方だけ余白がずれることが起きない
+ * （元は 2 つが別々に fixed で、上と左右で 30px / 下のツールバーだけ 24px とばらついていた）。
  */
-export const TOP_BAR_CLASS = 'fixed z-[1600] flex items-center gap-4';
+export const TOP_BAR_CLASS = 'fixed z-[1600] flex items-center justify-between gap-4';
 
 /* ---------- 行為: 浮いた面（道具箱だけ） ---------- */
 

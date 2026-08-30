@@ -232,7 +232,8 @@ export function BoardView({ api }: BoardViewProps) {
         </div>
       )}
 
-      {/* 上段バー: 日付と、その日付の単位を決める Daily/Weekly を1行に並べる。 */}
+      {/* 上段バー: 左端に日付、右端に表示単位。1本のバーの両端に置くことで、
+          左右に散らばって見えないようにする。 */}
       <div
         className={TOP_BAR_CLASS}
         style={{
@@ -240,6 +241,7 @@ export function BoardView({ api }: BoardViewProps) {
           // 左端はサイドバー幅ぶん寄せる
           // （--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
           left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
+          right: BOARD_INSET,
         }}
       >
         <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />

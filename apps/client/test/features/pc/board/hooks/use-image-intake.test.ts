@@ -15,6 +15,19 @@ function firePaste(files: File[], target: EventTarget = document.body) {
   return event;
 }
 
+/** files が空で items 側にしか画像が無いクリップボード（スクリーンショット等）。 */
+function firePasteViaItems(file: File, target: EventTarget = document.body) {
+  const event = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'clipboardData', {
+    value: {
+      files: [],
+      items: [{ kind: 'file', type: file.type, getAsFile: () => file }],
+    },
+  });
+  Object.defineProperty(event, 'target', { value: target, configurable: true });
+  target.dispatchEvent(event);
+}
+
 /** React の DragEvent を、hook が触る範囲だけ組み立てる。 */
 function dragEvent(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -124,5 +137,18 @@ describe('useImageIntake', () => {
 
     rerender({ on: false });
     expect(result.current.dragActive).toBe(false);
+  });
+  it('files が空で items にしか無いクリップボードからも拾う', () => {
+    // スクリーンショットや Web ページからコピーした画像は、files が空で items 側に
+    // しか入らないことがある。files だけ見ていると「貼れない」になる。
+    const onImage = vi.fn();
+    renderHook(() => useImageIntake(true, onImage));
+
+    const file = imageFile('screenshot.png');
+    act(() => {
+      firePasteViaItems(file);
+    });
+
+    expect(onImage).toHaveBeenCalledWith(file);
   });
 });
