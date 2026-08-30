@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { ICON_BUTTON_CLASS, IDLE_HOVER_CLASS, SURFACE_CLASS, SURFACE_STYLE } from './board-surface';
 
 interface BoardDateNavProps {
   dateKey: string;
@@ -68,21 +69,24 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
   return (
     <div
       {...verifyAttrs({ unit: 'BoardDateNav', viewType, dateKey, label })}
-      className="absolute left-6 top-5 z-10 flex items-center gap-3"
-      style={{ fontFamily: 'Inter, sans-serif' }}
+      // ツールバー・表示切替と同じ「浮いた面」に載せる。3つの操作 UI で素材を揃えないと
+      // 同じ画面の住人に見えない。左端はサイドバー幅ぶん寄せる（--sidebar-width は
+      // (protected)/layout.tsx が <main> に生やしている）。
+      className={`${SURFACE_CLASS} top-5 gap-1`}
+      style={{ ...SURFACE_STYLE, left: 'calc(var(--sidebar-width, 0px) + 24px)' }}
     >
       <button
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, -offset))}
         data-verify-nav="prev"
-        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+        className={`${ICON_BUTTON_CLASS} ${IDLE_HOVER_CLASS} text-base hover:text-[var(--fg)]`}
         style={{ color: 'var(--date-color)' }}
       >
         ‹
       </button>
       <span
-        className="text-[10px] font-medium uppercase tracking-wider"
-        style={{ color: 'var(--date-color)' }}
+        className="px-1 text-[11px] font-medium uppercase tracking-[0.08em]"
+        style={{ color: 'var(--fg)' }}
       >
         {label}
       </span>
@@ -90,7 +94,7 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, offset))}
         data-verify-nav="next"
-        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+        className={`${ICON_BUTTON_CLASS} ${IDLE_HOVER_CLASS} text-base hover:text-[var(--fg)]`}
         style={{ color: 'var(--date-color)' }}
       >
         ›

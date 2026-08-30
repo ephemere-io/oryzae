@@ -1,6 +1,7 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
+import { IDLE_HOVER_CLASS, SURFACE_CLASS, SURFACE_STYLE, TEXT_BUTTON_CLASS } from './board-surface';
 
 interface BoardViewSwitchProps {
   viewType: 'daily' | 'weekly';
@@ -25,8 +26,10 @@ export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchP
       {...verifyAttrs({ unit: 'BoardViewSwitch', viewType })}
       // ロールは付けない。各ボタンが "Daily" / "Weekly" と自己説明的で aria-pressed も
       // 持つため、group を足すと fieldset/legend を要求されるだけで読み上げは良くならない。
-      className="absolute right-6 top-5 z-10 flex items-center gap-0.5 rounded-lg border p-0.5"
-      style={{ borderColor: 'var(--border-subtle)', fontFamily: 'Inter, sans-serif' }}
+      // 下部ツールバーと同じ「浮いた面」。fixed なのも同じで、盤面をスクロールしても
+      // 操作 UI は画面に残る。右端からの距離はツールバーの余白（24px）に合わせる。
+      className={`${SURFACE_CLASS} right-6 top-5 gap-1`}
+      style={SURFACE_STYLE}
     >
       {VIEW_TYPES.map((v) => {
         const isActive = viewType === v.id;
@@ -39,8 +42,8 @@ export function BoardViewSwitch({ viewType, onViewTypeChange }: BoardViewSwitchP
             data-verify-view-option={v.id}
             // 非選択側だけ hover を効かせる。インライン style は :hover に勝つので
             // backgroundColor は非選択時に指定しない。
-            className={`rounded-md px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.15em] transition-colors ${
-              isActive ? '' : 'hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
+            className={`${TEXT_BUTTON_CLASS} ${
+              isActive ? '' : `${IDLE_HOVER_CLASS} hover:text-[var(--fg)]`
             }`}
             style={
               isActive

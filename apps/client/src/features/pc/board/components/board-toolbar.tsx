@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { ICON_BUTTON_CLASS, IDLE_HOVER_CLASS, SURFACE_CLASS, SURFACE_STYLE } from './board-surface';
 
 /** ツールバーで選べる道具。'none' はどのダイアログも開いていない状態。 */
 type BoardTool = 'none' | 'snippet' | 'photo';
@@ -88,15 +89,11 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
       {...verifyAttrs({ unit: 'BoardToolbar', activeTool, toolCount: tools.length })}
       role="toolbar"
       aria-label={t('aria_label')}
-      className="fixed bottom-6 z-[1600] flex items-center gap-1 rounded-[13px] border p-1.5 shadow-[0_8px_24px_-6px_rgba(0,0,0,0.22),0_2px_6px_-2px_rgba(0,0,0,0.12)]"
+      className={`${SURFACE_CLASS} bottom-6 gap-1`}
       style={{
+        ...SURFACE_STYLE,
         left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
         transform: 'translateX(-50%)',
-        // 盤面と同じ --bg にすると dark で背景と同色になり、黒い影も効かず沈む。
-        // 浮いて見せるための面は専用トークンで持つ。
-        backgroundColor: 'var(--surface-raised)',
-        borderColor: 'var(--surface-raised-border)',
-        fontFamily: 'Inter, "Noto Sans JP", sans-serif',
       }}
       // 盤面側の deselect（外側クリックで選択解除）まで伝播させない。
       onClick={(e) => e.stopPropagation()}
@@ -114,8 +111,8 @@ export function BoardToolbar({ activeTool, onCreateSnippet, onAddPhoto }: BoardT
               data-verify-tool={tool.id}
               // 非アクティブ時は背景をインラインで指定しない。インライン style は
               // CSS の :hover に必ず勝つため、指定すると hover が効かなくなる。
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
-                isActive ? '' : 'hover:bg-[var(--toolbar-hover)] active:scale-95'
+              className={`${ICON_BUTTON_CLASS} ${
+                isActive ? '' : `${IDLE_HOVER_CLASS} active:scale-95`
               }`}
               style={
                 isActive

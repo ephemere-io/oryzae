@@ -20,19 +20,20 @@ test.describe('ボード画面', () => {
   });
 
   test('日付ナビゲーションで前日/翌日に切り替えできる', async ({ page }) => {
-    // 日付ラベルは tracking-wider が一意（セグメント切り替えは tracking-[0.15em]）。
-    const dateText = page.locator('[class*="tracking-wider"]').first();
-    const initialDate = await dateText.textContent();
+    // 日付は BoardDateNav が公表する契約（data-verify-date-key）で見る。
+    // 以前はクラス名（tracking-wider）で拾っていたが、見た目を変えるたびに
+    // 壊れるうえ、何を見ているのかも読み取れなかった。
+    const nav = page.locator('[data-verify-unit="BoardDateNav"]');
+    const dateKey = () => nav.getAttribute('data-verify-date-key');
+    const initial = await dateKey();
 
     await page.click('button[data-verify-nav="prev"]');
     await page.waitForTimeout(500);
-    const prevDate = await dateText.textContent();
-    expect(prevDate).not.toBe(initialDate);
+    expect(await dateKey()).not.toBe(initial);
 
     await page.click('button[data-verify-nav="next"]');
     await page.waitForTimeout(500);
-    const nextDate = await dateText.textContent();
-    expect(nextDate).toBe(initialDate);
+    expect(await dateKey()).toBe(initial);
   });
 
   test('ツールバーからスニペットを作成できる', async ({ page }) => {
