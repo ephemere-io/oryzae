@@ -91,7 +91,7 @@ apps/client/src/
       components/  hooks/   #     PC 固有の UI・操作・演出（fetch は持たない）
     sp/{domain}/           #   SP 体験
       components/  hooks/   #     SP 固有の UI（縦長・片手・音声）
-  features/{domain}/        # 端末非依存の UI はフラット（auth / landing / onboarding）
+  features/{domain}/        # 端末非依存の UI はフラット（auth / onboarding）
   components/              # ドメイン非依存 UI・seam(device-view)・provider
     ui/                    #   汎用 UI（feature 非依存）
   lib/                     # 基盤ユーティリティ（ドメイン非依存）

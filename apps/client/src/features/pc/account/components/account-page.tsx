@@ -1,13 +1,13 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
 import type { AccountUser } from '@/features/shared/account/types';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
+import { docsHref } from '@/lib/docs-site';
 import { setLocaleAction } from '@/lib/i18n-actions';
 import { useTheme } from '@/lib/theme-context';
 import { WritingStats } from './writing-stats';
@@ -580,21 +580,26 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
           <ThemeToggleSection />
           <LanguageSection />
 
-          <Link
-            href="/support"
+          {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
+          <a
+            href={docsHref('/support')}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm underline-offset-2 transition-colors hover:underline"
             style={{ color: 'var(--accent)' }}
           >
             {t('links.support')} →
-          </Link>
+          </a>
 
-          <Link
-            href="/privacy"
+          <a
+            href={docsHref('/privacy')}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm underline-offset-2 transition-colors hover:underline"
             style={{ color: 'var(--accent)' }}
           >
             {t('links.privacy')} →
-          </Link>
+          </a>
 
           <div>
             <p className={labelClass} style={labelStyle}>

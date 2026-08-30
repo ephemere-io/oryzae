@@ -1,19 +1,21 @@
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { DOCS_SITE_URL } from './src/lib/docs-site';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@oryzae/shared', '@oryzae/server', '@oryzae/verify'],
   turbopack: {},
-  // Static MD-backed pages read their bodies from `src/content/**/*.md` at
-  // request time. Next.js' file-trace can't detect dynamic `process.cwd()`
-  // reads, so include the directories explicitly so the files ship with the
-  // deployment.
-  outputFileTracingIncludes: {
-    '/privacy': ['./src/content/legal/**/*.md'],
-    '/support': ['./src/content/support/**/*.md'],
+  // `/privacy` と `/support` は公開サイト（別リポジトリ・別ドメイン）へ移した。
+  // これらの URL は App Store の審査情報やメール文面など**アプリの外から参照されている**
+  // ため、消すのではなく 301 で恒久転送する。検索評価も移設先へ引き継ぐ。
+  async redirects() {
+    return [
+      { source: '/privacy', destination: `${DOCS_SITE_URL}/privacy`, permanent: true },
+      { source: '/support', destination: `${DOCS_SITE_URL}/support`, permanent: true },
+    ];
   },
   // PostHog reverse proxy: 広告ブロッカーが posthog.com 系ドメインを既定で遮断する
   // ため (#225)、自ドメインの `/ingest/*` 経由でリクエストを中継する。
