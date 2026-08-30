@@ -120,7 +120,8 @@ export function SnippetDialog({
       setText(result.text);
       setFromImage(true);
       setOcrStatus('idle');
-      // 読み取った本文はほぼ必ず手直しが要る（50文字制限）。編集できる場所へ送る。
+      // 読み取り結果はそのまま貼らず、必ず編集できる場所へ送る。誤読は残るし、
+      // 要るのは写した文字そのものではなく、自分の言葉に直したものであることが多い。
       setSource('text');
       setTimeout(() => inputRef.current?.focus(), 50);
       return;
