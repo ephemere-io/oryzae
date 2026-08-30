@@ -111,7 +111,11 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
 
     if (error) throw error;
     if (!data || data.length === 0) return -1;
-    return (data[0] as Record<string, unknown>).z_index as number;
+    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    const zIndex = (data[0] as Record<string, unknown>).z_index;
+    // 値の側はキャストしない。z_index が null で返ると `null as number` がそのまま漏れ、
+    // 呼び出し側の `findMaxZIndex(...) + 1` が 1 になって新しいカードが既存の裏に潜る。
+    return typeof zIndex === 'number' ? zIndex : -1;
   }
 
   async saveMany(cards: BoardCard[]): Promise<void> {
