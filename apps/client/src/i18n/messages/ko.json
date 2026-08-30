@@ -279,7 +279,9 @@
       "caption_placeholder": "캡션 (20자 이내)",
       "cancel": "취소",
       "uploading_button": "업로드 중…",
-      "submit": "추가"
+      "submit": "추가",
+      "unsupported": "이 이미지를 열 수 없습니다. iPhone 사진(HEIC)은 브라우저가 읽지 못할 수 있습니다. JPEG / PNG로 저장한 뒤 다시 선택해 주세요.",
+      "upload_failed": "추가하지 못했습니다. 다시 시도해 주세요."
     },
     "snippet_dialog": {
       "aria_label": "스니펫 대화상자",

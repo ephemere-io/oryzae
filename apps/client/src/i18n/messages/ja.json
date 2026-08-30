@@ -279,7 +279,9 @@
       "caption_placeholder": "キャプション（20文字以内）",
       "cancel": "キャンセル",
       "uploading_button": "アップロード中…",
-      "submit": "追加"
+      "submit": "追加",
+      "unsupported": "この画像は開けませんでした。iPhone の写真（HEIC）はブラウザが読めないことがあります。JPEG / PNG で保存し直して選んでください。",
+      "upload_failed": "追加できませんでした。もう一度お試しください。"
     },
     "snippet_dialog": {
       "aria_label": "Snippet dialog",

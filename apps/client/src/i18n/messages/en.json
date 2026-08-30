@@ -279,7 +279,9 @@
       "caption_placeholder": "Caption (max. 20 characters)",
       "cancel": "Cancel",
       "uploading_button": "Uploading…",
-      "submit": "Add"
+      "submit": "Add",
+      "unsupported": "This image could not be opened. iPhone photos (HEIC) often can't be read by the browser. Save it as JPEG or PNG and try again.",
+      "upload_failed": "Couldn't add the photo. Please try again."
     },
     "snippet_dialog": {
       "aria_label": "Snippet dialog",

@@ -282,7 +282,13 @@ export function SnippetDialog({
               type="file"
               accept={OCR_ALLOWED_IMAGE_TYPES.join(',')}
               aria-label={t('click_to_select_image')}
-              onChange={(e) => acceptFile(e.target.files?.[0])}
+              // 同じファイルを選び直しても change が発火するよう value を空に戻す。
+              // 無いと、対応外で弾いた後に同じ名前で選び直しても何も起きない。
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                acceptFile(file);
+              }}
               className="hidden"
             />
 

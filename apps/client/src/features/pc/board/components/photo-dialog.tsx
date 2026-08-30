@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEscapeKey } from '@/lib/use-escape-key';
 
 interface PhotoDialogProps {
@@ -18,7 +18,7 @@ interface ResizeResult {
 }
 
 function resizeImage(file: File, maxWidth: number, quality: number): Promise<ResizeResult> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
@@ -38,6 +38,13 @@ function resizeImage(file: File, maxWidth: number, quality: number): Promise<Res
         'image/jpeg',
         quality,
       );
+    };
+    // onerror が無いと、デコードできない画像（iPhone の HEIC を Chrome で開いた等）で
+    // onload が永遠に来ず、この Promise が解決しないまま handleSubmit が待ち続ける。
+    // 「アップロード中…」のまま固まり、閉じることもできなくなっていた。
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to decode image'));
     };
     img.src = objectUrl;
   });
@@ -66,24 +73,52 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  /** 'unsupported' = ブラウザがデコードできない画像 / 'failed' = 変換・送信の失敗。 */
+  const [error, setError] = useState<'unsupported' | 'failed' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** 表示中の objectURL。state だけだと非同期中の取りこぼしが出るので ref でも持つ。 */
+  const previewRef = useRef<string | null>(null);
+  /**
+   * 選択の世代。画像の判定は非同期なので、判定中に選び直されると古い結果が
+   * 新しい選択を壊す（HEIC を選ぶ → 案内どおり JPEG に選び直す → 古い失敗が
+   * 後から届いて新しいプレビューを消す）。await の後はこれを見て、追い越されて
+   * いたら何もしない。
+   */
+  const selectionRef = useRef(0);
+
+  /** objectURL の差し替えを1か所に集約する（前の URL を必ず revoke する）。 */
+  const setPreviewUrl = useCallback((url: string | null) => {
+    if (previewRef.current && previewRef.current !== url) {
+      URL.revokeObjectURL(previewRef.current);
+    }
+    previewRef.current = url;
+    setPreview(url);
+  }, []);
 
   // 閉じる処理は hook より前に定義する（useEscapeKey を early return の前に呼ぶため）。
-  // このダイアログは閉じても state を捨てないので、後始末（objectURL の revoke と
-  // 入力のリセット）をここで必ず通す。preview は関数形式で読み、依存に入れずに済ませる。
+  // このダイアログは閉じても state を捨てないので、後始末をここで必ず通す。
   const handleClose = useCallback(() => {
     if (uploading) return;
-    setPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
+    selectionRef.current++;
+    setPreviewUrl(null);
     setCaption('');
     setSelectedFile(null);
     setAspectRatio(null);
+    setError(null);
     onClose();
-  }, [uploading, onClose]);
+  }, [uploading, onClose, setPreviewUrl]);
 
   useEscapeKey(open, handleClose);
+
+  // アンマウント時の取りこぼし防止。handleClose はアップロード中に早期 return するので、
+  // 送信中に親ごと破棄されると objectURL が誰にも revoke されずに残る
+  // （SnippetDialog は同じ理由で releasePreview を返している）。
+  useEffect(() => {
+    return () => {
+      if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+      previewRef.current = null;
+    };
+  }, []);
 
   if (!open) return null;
 
@@ -91,18 +126,34 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // 同じファイルを選び直しても change が発火するよう、掴んだ直後に value を空にする。
+    // これが無いと、開けない画像で弾いた後に「JPEG に変換して同じ名前で選び直す」が
+    // 効かず（value が変わらないのでイベントが出ない）、エラー表示のまま詰む。
+    e.target.value = '';
     if (!file) return;
-    if (preview) URL.revokeObjectURL(preview);
+
+    const generation = ++selectionRef.current;
+    setPreviewUrl(URL.createObjectURL(file));
+    setError(null);
     setSelectedFile(file);
-    setPreview(URL.createObjectURL(file));
     setAspectRatio(null);
     try {
       const { width, height } = await readImageDimensions(file);
+      // 判定中に選び直されていたら、こちらの結果はもう用済み。
+      if (generation !== selectionRef.current) return;
       if (width > 0 && height > 0) {
         setAspectRatio(width / height);
       }
     } catch {
+      // ここで落ちる＝ブラウザがこの画像をデコードできない。以前は握り潰していたので
+      // 「追加」を押せてしまい、リサイズで固まっていた。選んだ時点で伝えて止める。
+      // 追い越されていたら触らない（新しい選択を壊さない。URL は setPreviewUrl が
+      // 差し替え時に revoke 済み）。
+      if (generation !== selectionRef.current) return;
+      setPreviewUrl(null);
+      setSelectedFile(null);
       setAspectRatio(null);
+      setError('unsupported');
     }
   };
 
@@ -111,16 +162,21 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
     if (!selectedFile || uploading) return;
 
     setUploading(true);
+    setError(null);
     try {
       const { blob, width, height } = await resizeImage(selectedFile, 800, 0.7);
       const resizedFile = new File([blob], selectedFile.name, { type: 'image/jpeg' });
       await onSubmit(resizedFile, caption.trim(), width, height);
-      if (preview) URL.revokeObjectURL(preview);
+      selectionRef.current++;
+      setPreviewUrl(null);
       setCaption('');
-      setPreview(null);
       setSelectedFile(null);
       setAspectRatio(null);
       onClose();
+    } catch {
+      // リサイズ・アップロードの失敗。以前は握り潰す先すら無く、resizeImage が
+      // 解決しないまま「アップロード中…」で固まっていた。結果を画面に返す。
+      setError('failed');
     } finally {
       setUploading(false);
     }
@@ -131,6 +187,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
       {...verifyAttrs({
         unit: 'PhotoDialog',
         uploading,
+        error: error ?? 'none',
         hasPreview: Boolean(preview),
         canSubmit,
       })}
@@ -192,6 +249,11 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
             </div>
           )}
         </button>
+        {error && (
+          <p className="mb-3 text-xs leading-relaxed" style={{ color: 'var(--accent)' }}>
+            {error === 'unsupported' ? t('unsupported') : t('upload_failed')}
+          </p>
+        )}
         <input
           ref={fileRef}
           type="file"
