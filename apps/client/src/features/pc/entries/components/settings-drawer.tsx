@@ -106,12 +106,14 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col px-4 pb-5 last:pb-3">
-      <div className="flex h-7 items-center gap-1.5">
-        <span className="text-[11px] font-medium text-[var(--fg)] opacity-45">{label}</span>
+    <section className="flex flex-col px-5 pb-7 last:pb-5">
+      <div className="mb-2 flex h-5 items-center gap-1.5">
+        <span className="text-[11px] font-medium tracking-[0.04em] text-[var(--fg)] opacity-45">
+          {label}
+        </span>
         {help && <HelpTooltip content={help.content} ariaLabel={help.ariaLabel} />}
       </div>
-      <div className="flex flex-col gap-0.5">{children}</div>
+      <div className="flex flex-col gap-1.5">{children}</div>
     </section>
   );
 }
@@ -125,7 +127,7 @@ function Section({
  */
 function Row({ label, control }: { label: string; control: React.ReactNode }) {
   return (
-    <div className="flex h-8 items-center justify-between gap-3">
+    <div className="flex h-9 items-center justify-between gap-4">
       <span className="shrink-0 text-[13px] text-[var(--fg)]">{label}</span>
       <div className="flex min-w-0 flex-1 justify-end">{control}</div>
     </div>
@@ -152,7 +154,7 @@ function SliderRow({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex h-8 items-center justify-between gap-3">
+    <div className="flex h-9 items-center justify-between gap-4">
       <label htmlFor={id} className="shrink-0 text-[13px] text-[var(--fg)]">
         {label}
       </label>
@@ -192,7 +194,7 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
     // 見出し（「設定」）は置かない。歯車を押して開いた面なので、何の面かは自明。
     // 上端の余白だけで始まりを示す。
     <div
-      className="flex flex-col pt-3"
+      className="flex flex-col pt-4"
       style={{ fontFamily: 'Inter, "Noto Sans JP", sans-serif' }}
       {...verifyAttrs({
         unit: 'SettingsDrawer',

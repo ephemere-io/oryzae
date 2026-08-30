@@ -155,8 +155,6 @@ export function EntryEditor({
   // Issue #316: 保存成功直後に出すガイドモーダル
   const [pickleNudgeOpen, setPickleNudgeOpen] = useState(false);
   const [linkQuestionNudgeOpen, setLinkQuestionNudgeOpen] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [draftTitle, setDraftTitle] = useState('');
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   const [statsOpen, setStatsOpen] = useState(false);
   // 問いのドロップダウンは、ヘッダーのチップからもパレットの操作からも開く。
@@ -254,7 +252,6 @@ export function EntryEditor({
     questionSelectOpen ||
     pickleNudgeOpen ||
     linkQuestionNudgeOpen ||
-    isEditingTitle ||
     statsOpen ||
     leaveConfirmOpen ||
     overlayPromptOpen;
@@ -437,7 +434,6 @@ export function EntryEditor({
         setSaveModalOpen(false);
         setPickleConfirmOpen(false);
         setQuestionSelectOpen(false);
-        setIsEditingTitle(false);
         setStatus('saved');
         setLastSavedAt(Date.now());
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
@@ -572,40 +568,20 @@ export function EntryEditor({
     ],
   );
 
-  const startTitleEdit = useCallback(() => {
-    setDraftTitle(title);
-    setIsEditingTitle(true);
-  }, [title]);
-
-  const cancelTitleEdit = useCallback(() => {
-    setIsEditingTitle(false);
-    setDraftTitle('');
-  }, []);
-
+  /**
+   * タイトルは常時入力できる。以前は「押すと入力に変わるボタン」だったが、
+   * タイトルは入力欄であってボタンではない。押して初めて編集できる形は、
+   * 入力欄であることを隠しているだけだった。
+   *
+   * 本文と同じく、確定は保存に任せる（autosave が content = title\nbody を書く）。
+   * 既存エントリでフォーカスを外したときだけ、その場で確定させる。
+   */
   const commitTitleEdit = useCallback(() => {
-    const trimmed = draftTitle.trim();
+    const trimmed = title.trim();
+    if (trimmed === savedTitle) return;
     const targetId = currentEntryId ?? entryId;
-    if (targetId) {
-      if (trimmed !== title) {
-        handleSaveWithTitle(trimmed);
-      } else {
-        setIsEditingTitle(false);
-      }
-    } else {
-      setTitle(trimmed);
-      setIsEditingTitle(false);
-    }
-  }, [draftTitle, currentEntryId, entryId, handleSaveWithTitle, title]);
-
-  useEffect(() => {
-    if (isEditingTitle) {
-      const t = setTimeout(() => {
-        titleInputRef.current?.focus();
-        titleInputRef.current?.select();
-      }, 0);
-      return () => clearTimeout(t);
-    }
-  }, [isEditingTitle]);
+    if (targetId) handleSaveWithTitle(trimmed);
+  }, [title, savedTitle, currentEntryId, entryId, handleSaveWithTitle]);
 
   const handleAutosaved = useCallback(
     async (newId: string, savedBody: string, autosavedTitle: string) => {
@@ -815,11 +791,13 @@ export function EntryEditor({
   // タイトルの置き場。縦書きは本文（left:6% / width:79%）のすぐ右へ縦組みで、
   // 横書きは本文（px-[15%]）の上に、同じ左端から。
   //
-  // 縦書きでは**本文のすぐ隣**に置く。題は独立した柱ではなく、本文に添うもの。
-  // 本文は left:6% / width:79%（右端 = 85%）なので、その外側にぴったり付ける。
-  // 右に余白を残すと題だけが宙に浮いて別物に見える。
+  // 縦書きの題は**紙の右肩**に置く。本や原稿用紙と同じで、題は本文の始まりより外側に立つ。
+  //
+  // 本文は left:6% / width:79%（右端 = 85%）。題を本文にぴったり付けると、
+  // 右側だけが大きく空いて題が宙に浮き、かつ本文と一体化して2列に見えてしまう。
+  // 右端の余白（6%）を本文の左端と揃え、題と本文のあいだに 5% の間を取る。
   const titleBoxClass = isVertical
-    ? 'absolute top-[4%] right-[11%] h-[86%] w-[4%] min-w-[2.5rem]'
+    ? 'absolute top-[4%] right-[6%] h-[86%] w-[6%] min-w-[3rem]'
     : 'absolute top-6 left-[15%] w-[70%]';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
@@ -854,7 +832,7 @@ export function EntryEditor({
       {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
           左＝問い、右＝アクションコーナー ＋ 日付 ＋ 設定。
           「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。 */}
-      <div className={`flex items-center justify-between gap-4 px-4 py-2 ${fadeClass}`}>
+      <div className={`flex items-center justify-between gap-6 px-6 py-4 ${fadeClass}`}>
         {/* 左: 問いを結ぶ。旧「新規エントリ」「一覧」があった位置。 */}
         <div className="flex min-w-0 items-center">
           <QuestionChip
@@ -868,9 +846,9 @@ export function EntryEditor({
         </div>
 
         {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-3">
           {/* 日付は設定ボタンのすぐ左に、小さく。 */}
-          <span className="ml-1 shrink-0 text-[11px] text-[var(--date-color)]">{dateStr}</span>
+          <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>
 
           {/* 設定。押すと真下にパネルが開く（背景は暗転しない・外側クリックで閉じる）。 */}
           <Popover
@@ -882,17 +860,18 @@ export function EntryEditor({
               <button
                 type="button"
                 {...triggerProps}
-                className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
                 data-tooltip={t('toolbar.settings')}
                 aria-label={t('toolbar.settings')}
               >
                 <svg
                   aria-hidden="true"
-                  className="h-5 w-5"
+                  width={ICON_SIZE}
+                  height={ICON_SIZE}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
-                  strokeWidth={1.5}
+                  strokeWidth={ICON_STROKE_WIDTH}
                 >
                   <path
                     strokeLinecap="round"
@@ -953,40 +932,26 @@ export function EntryEditor({
             {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
                 縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
                 本文と同じ書体で、本文より一回り大きく置く。 */}
-            {isEditingTitle ? (
-              <input
-                ref={titleInputRef}
-                type="text"
-                value={draftTitle}
-                onChange={(e) => setDraftTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  // IME 変換確定の Enter / Escape は無視する（日本語入力途中で確定されてしまう不具合の対策）
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    commitTitleEdit();
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancelTitleEdit();
-                  }
-                }}
-                onBlur={commitTitleEdit}
-                maxLength={100}
-                placeholder={t('title.placeholder')}
-                aria-label={t('title.placeholder')}
-                className={`z-[12] border-none bg-transparent text-[var(--fg)] outline-none ${titleBoxClass}`}
-                style={titleTextStyle}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={startTitleEdit}
-                className={`z-[12] cursor-text truncate border-none bg-transparent text-left transition-colors hover:text-[var(--fg)] ${titleBoxClass}`}
-                style={{ ...titleTextStyle, color: title ? 'var(--fg)' : 'var(--date-color)' }}
-              >
-                {title || t('title.add')}
-              </button>
-            )}
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  editorRef.current?.focus();
+                }
+              }}
+              onBlur={commitTitleEdit}
+              maxLength={100}
+              placeholder={t('title.placeholder')}
+              aria-label={t('title.placeholder')}
+              className={`z-[12] border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
+              style={titleTextStyle}
+            />
 
             {/* Snippet selection toolbar */}
             <SnippetToolbar editorRef={editorRef} api={api} />

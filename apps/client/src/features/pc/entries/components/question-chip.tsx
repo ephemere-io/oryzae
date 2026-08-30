@@ -95,7 +95,7 @@ export function QuestionChip({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="flex max-w-[320px] items-center gap-1 rounded-full px-2.5 py-0.5 text-xs transition-colors"
+        className="flex h-7 max-w-[320px] items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors"
         style={
           primary
             ? {
@@ -118,10 +118,15 @@ export function QuestionChip({
         <div
           role="listbox"
           aria-label={t('empty')}
-          className="absolute top-full z-[62] mt-1.5 max-h-[50vh] w-[300px] overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] py-1 shadow-lg"
+          className="absolute top-full z-[62] mt-2 max-h-[50vh] w-[320px] overflow-y-auto rounded-lg border py-1.5 shadow-xl"
+          style={{
+            backgroundColor: 'var(--surface-raised)',
+            borderColor: 'var(--surface-raised-border)',
+            fontFamily: 'Inter, "Noto Sans JP", sans-serif',
+          }}
         >
           {activeQuestions.length === 0 ? (
-            <p className="px-3 py-2.5 text-xs text-[var(--date-color)]">{t('none_available')}</p>
+            <p className="px-3 py-2 text-[13px] text-[var(--date-color)]">{t('none_available')}</p>
           ) : (
             activeQuestions.map((q) => {
               const isLinked = linkedQuestionIds.has(q.id);
@@ -132,7 +137,7 @@ export function QuestionChip({
                   role="option"
                   aria-selected={isLinked}
                   onClick={() => (isLinked ? onUnlink(q.id) : onLink(q.id))}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--toolbar-hover)]"
+                  className="flex h-8 w-full items-center gap-2 px-3 text-left text-[13px] transition-colors hover:bg-[var(--toolbar-hover)]"
                   style={{ color: isLinked ? 'var(--accent)' : 'var(--fg)' }}
                 >
                   <span className="w-3 shrink-0" aria-hidden="true">

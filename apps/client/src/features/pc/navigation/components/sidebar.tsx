@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
+import { ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { useAuth } from '@/lib/auth-context';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
@@ -75,7 +76,7 @@ export function Sidebar() {
     >
       {/* Vertical logo */}
       <div
-        className="mb-14 text-[11px] font-serif uppercase tracking-[0.4em] opacity-80"
+        className="mb-10 text-[11px] font-serif uppercase tracking-[0.4em] opacity-80"
         style={{
           writingMode: 'vertical-rl',
           textOrientation: 'mixed',
@@ -86,7 +87,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav items */}
-      <div className="flex w-full flex-col items-center gap-8 px-4">
+      <div className="flex w-full flex-col items-center gap-3 px-4">
         {NAV_ITEMS.map((item) => {
           const isActive =
             item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
@@ -116,10 +117,10 @@ export function Sidebar() {
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={ICON_STROKE_WIDTH}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={`${isActive ? 'h-6 w-6' : 'h-5 w-5'} shrink-0 transition-transform duration-300 group-hover:scale-110`}
+                className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover:scale-110"
               >
                 <path d={item.iconPath} />
               </svg>
