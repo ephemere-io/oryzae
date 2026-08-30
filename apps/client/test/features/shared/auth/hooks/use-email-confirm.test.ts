@@ -35,6 +35,18 @@ describe('useEmailConfirm', () => {
   });
   afterEach(() => localStorage.clear());
 
+  it('auth_error が付いていれば auth_failed（通信しない）', async () => {
+    // ルート（/）の HomeGate が Supabase の #error=... をここへ回してくる経路。
+    // 期限切れリンクの理由をユーザーに見せるための分岐で、通信は一切しない。
+    params = new URLSearchParams({ auth_error: 'otp_expired' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { result } = renderHook(() => useEmailConfirm());
+
+    await waitFor(() => expect(result.current.error).toBe('auth_failed'));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it('token_hash / type が無ければ invalid_link（通信しない）', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const { result } = renderHook(() => useEmailConfirm());
