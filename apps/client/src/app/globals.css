@@ -26,6 +26,9 @@
   /* 盤面に沈んだ溝（表示単位の切り替えのトラック）。浮いた面とは逆向きの表現で、
      「これは道具ではなく状態の選択」を見た目で言い分ける。 */
   --track: rgba(0, 0, 0, 0.05);
+  /* 溝の中で選ばれている側。両テーマとも「選択＝溝より明るい」に揃える。
+     地の色（--bg）を使うと dark で溝より暗くなり、light と関係が反転していた。 */
+  --track-active: #ffffff;
 
   /* Onboarding tokens */
   --ob-sage: #8ea89c;
@@ -62,6 +65,7 @@
   --surface-raised: #2c2c2c;
   --surface-raised-border: rgba(255, 255, 255, 0.12);
   --track: rgba(255, 255, 255, 0.07);
+  --track-active: rgba(255, 255, 255, 0.14);
 
   --ob-card-bg: #1f1d1a;
   --ob-card-border: rgba(255, 255, 255, 0.08);

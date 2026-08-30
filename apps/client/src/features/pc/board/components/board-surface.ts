@@ -87,7 +87,10 @@ export const SEGMENT_CLASS = `flex h-7 items-center rounded-md px-3 transition-c
  * 地の色（--bg）を出すぶんだけ明るくなる、という差だけで選択を示す。
  * 浮かせない（影を持たせない）のは、浮いているのは道具だけという約束を守るため。
  */
-export const SEGMENT_ACTIVE_STYLE = { backgroundColor: 'var(--bg)', color: 'var(--fg)' } as const;
+export const SEGMENT_ACTIVE_STYLE = {
+  backgroundColor: 'var(--track-active)',
+  color: 'var(--fg)',
+} as const;
 
 export const SEGMENT_IDLE_STYLE = { color: 'var(--date-color)' } as const;
 
