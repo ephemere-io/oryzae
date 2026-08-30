@@ -13,7 +13,6 @@
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
 import '@/features/auth/components/reset-password-form.verify';
-import '@/features/landing/components/landing-faq-item.verify';
 import '@/features/pc/entries/components/delete-confirm-modal.verify';
 import '@/features/pc/entries/components/editor-status-bar.verify';
 import '@/features/pc/entries/components/entry-action-palette.verify';

@@ -26,7 +26,7 @@ paths:
   - **`apps/client`**: ドメイン × reach。`features/{shared,pc,sp}/{domain}/`
     - `shared/{domain}/` — UIを持たないドメインロジック（**全 fetch** の `hooks/`・**全ドメイン型** の `types.ts`）
     - `pc/{domain}/` / `sp/{domain}/` — 端末別 UI（components, hooks）。**fetch とドメイン型は持たない**
-    - reach は「端末で体験が変わる機能」だけ。端末非依存の UI（`auth` のフォーム/`landing`/`onboarding` 等）は `features/{domain}/` のフラットなまま（pc/sp に分けない）
+    - reach は「端末で体験が変わる機能」だけ。端末非依存の UI（`auth` のフォーム/`onboarding` 等）は `features/{domain}/` のフラットなまま（pc/sp に分けない）
     - シェルは端末固有 UI: PC サイドバー → `features/pc/navigation/`、SP ボトムナビ → `features/sp/navigation/`
   - **`apps/admin`**: reach 軸なし。従来どおり `features/{domain}/`
 - `components/` — ドメイン非依存 UI・seam プリミティブ（`device-view`）・provider。**端末固有 UI（`sp-*`/`pc-*`）禁止**

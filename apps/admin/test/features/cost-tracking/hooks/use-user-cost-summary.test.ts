@@ -21,7 +21,18 @@ describe('useUserCostSummary', () => {
 
   it('fetches user cost summary on mount', async () => {
     const responseBody = {
-      data: [{ userId: 'u1', email: 'user@test.com', fermentationCount: 5, totalCostUsd: 0.25 }],
+      data: [
+        {
+          userId: 'u1',
+          email: 'user@test.com',
+          fermentationCount: 5,
+          estimatedCostUsd: 0.25,
+          inputTokens: 1000,
+          outputTokens: 200,
+        },
+      ],
+      untrackedCount: 2,
+      truncated: false,
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, responseBody));
 
@@ -32,7 +43,9 @@ describe('useUserCostSummary', () => {
     });
 
     expect(result.current.data).toHaveLength(1);
-    expect(result.current.data[0].totalCostUsd).toBe(0.25);
+    expect(result.current.data[0].estimatedCostUsd).toBe(0.25);
+    expect(result.current.untrackedCount).toBe(2);
+    expect(result.current.truncated).toBe(false);
     expect(result.current.error).toBeNull();
   });
 

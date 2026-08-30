@@ -7,8 +7,8 @@
           {
             "type": "agent",
             "if": "Bash(git push:*)",
-            "prompt": "Push 前のコードレビュー。まず `git fetch -q origin main` してから `git diff origin/main...HEAD` の差分を確認してください（ローカルの main ブランチは worktree 運用で古いことがあり、そのまま使うと他人のマージ済みコードまでレビュー対象に入ってしまう）。レビュー対象は **この差分に含まれるファイルだけ**。以下を検証してください:\n1. .claude/rules/ のルール違反がないか（as キャスト禁止、hooks テスト必須、feature 隔離）\n2. 明らかなバグや型安全性の問題がないか\n3. 不要なファイル（.DS_Store, console.log 等）が含まれていないか\n\n問題がなければ何も出力せず通過。問題があれば具体的に指摘してください。",
-            "timeout": 120,
+            "prompt": "Push 前のコードレビュー。まず `git fetch -q origin main` してから `git diff origin/main...HEAD` の差分を確認してください（ローカルの main ブランチは worktree 運用で古いことがあり、そのまま使うと他人のマージ済みコードまでレビュー対象に入ってしまう）。レビュー対象は **この差分に含まれるファイルだけ**。以下を検証してください:\n1. .claude/rules/ のルール違反がないか（as キャスト禁止、hooks テスト必須、feature 隔離）\n2. 明らかなバグや型安全性の問題がないか\n3. 不要なファイル（.DS_Store, console.log 等）が含まれていないか\n4. セキュリティ: Oryzae は他人の日記を預かる。「ある人の日記が本人以外の目に触れる経路」を最優先で探す。観点は .github/security/scan-instructions.md、誤検知の除外基準は .github/security/false-positives.md を読んで従うこと。特に (a) 新規テーブルの RLS 漏れ・USING (true) に TO 句が無いもの、(b) getSupabaseClient()（service role = RLS バイパス）にユーザー入力の ID が流れていないか、(c) 日記本文が console.log / Sentry / PostHog に載っていないか、(d) fermentation のメール宛先解決でユーザーの取り違えが起きないか。\n\n問題がなければ何も出力せず通過。問題があれば具体的に指摘してください。",
+            "timeout": 180,
             "statusMessage": "Push 前コードレビュー実行中..."
           }
         ]

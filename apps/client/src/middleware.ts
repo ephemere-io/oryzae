@@ -5,9 +5,6 @@ import { DEVICE_COOKIE, DEVICE_PREF_COOKIE, isDevice, resolveDevice } from '@/li
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
-// インデックス許可する公開ページ。これ以外（認証/保護下・計測系）は noindex にする。
-const PUBLIC_INDEXABLE_PATHS = new Set(['/', '/privacy', '/support']);
-
 export function middleware(req: NextRequest) {
   // 端末を解決（手動切替 device-pref があれば優先、無ければ UA 判定）。
   const pref = req.cookies.get(DEVICE_PREF_COOKIE)?.value;
@@ -55,11 +52,10 @@ export function middleware(req: NextRequest) {
     });
   }
 
-  // SEO: 公開ページ以外はクローラに noindex を返す（保護ページは client 描画で
-  // metadata を持てないため、ヘッダで確実に noindex する。robots.txt と二重担保）。
-  if (!PUBLIC_INDEXABLE_PATHS.has(req.nextUrl.pathname)) {
-    res.headers.set('X-Robots-Tag', 'noindex, nofollow');
-  }
+  // SEO: このアプリは全ページ非公開（公開ページは別ドメインの公開サイトが持つ）。
+  // 保護ページは client 描画で metadata を持てないため、ヘッダで確実に noindex する
+  // （robots.txt と二重担保）。
+  res.headers.set('X-Robots-Tag', 'noindex, nofollow');
 
   return res;
 }

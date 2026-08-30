@@ -60,6 +60,13 @@ export function useEmailConfirm(): { error: AuthFlowError | null } {
 
   useEffect(() => {
     async function handle() {
+      // Supabase が hash でエラーを返したケース（期限切れ・使用済みリンク）。
+      // ルート（/）の HomeGate がここへ回してくるので、通信はせず理由だけ見せる。
+      if (searchParams.get('auth_error')) {
+        setError('auth_failed');
+        return;
+      }
+
       const tokenHash = searchParams.get('token_hash');
       const typeParam = searchParams.get('type');
       const next = searchParams.get('next');
