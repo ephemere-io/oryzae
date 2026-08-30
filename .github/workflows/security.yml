@@ -1,0 +1,201 @@
+name: Security
+
+# Oryzae は他人の日記を預かるため、セキュリティ検査を独立したワークフローに切り出す。
+# 3 層構成:
+#   1. rls-gate / sast / secret-scan — 毎 PR。決定的・無料・API キー不要。ここが本丸。
+#   2. claude-review     — 毎 PR。差分に対する意味的レビュー（AI なので確率的、補助）
+#   3. weekly-audit      — 週次。リポジトリ全体を監査し Issue に起票（差分レビューが
+#                          構造上見られない「既に main にある問題」を拾う）
+#
+# 注意: claude-code-security-review は prompt injection に対して硬化されていない。
+# 現在このリポジトリは private なので fork 経由の攻撃面は無いが、公開に戻した瞬間に
+# その経路が生きる。そのため pull_request_target は使わない（fork の PR には
+# シークレットが渡らず AI ジョブは自動 skip される）。合否を担保するのは
+# 1. の決定的ゲートであり、AI レビューはあくまで補助と位置づける。
+#
+# private 化の影響: GitHub の CodeQL / secret scanning / push protection は
+# private では有料（GitHub Advanced Security）になり使えない。同じ役割を
+# OSS の Semgrep / gitleaks で代替している（下の sast / secret-scan ジョブ）。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # 毎週月曜 03:17 JST（= 日曜 18:17 UTC）。CI 混雑を避けるため 0 分ちょうどを外す。
+    - cron: '17 18 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 層 1: 決定的ゲート（API キー不要・常に走る） ─────────────────────────
+  rls-gate:
+    name: RLS Gate (認可境界の静的検証)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm security:rls
+
+  # 本リポジトリは private なので CodeQL は使えない（private の code scanning は
+  # 有料の GitHub Advanced Security / Code Security が必要）。同じ役割を
+  # OSS の Semgrep で埋める。レジストリからルールセットを匿名取得するため
+  # アカウント登録もトークンも要らない。
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      # バージョンを固定する。未固定だとルールエンジンの更新で、コード変更が無いのに
+      # 突然赤くなる/緑になるドリフトが起きて、ゲートの信頼性が落ちる。
+      - run: pip install --quiet semgrep==1.174.0
+      - name: Semgrep (security rules)
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/typescript \
+            --config p/react \
+            --error \
+            --metrics off \
+            --exclude docs --exclude .tmp --exclude '*.test.ts' --exclude '*.test.tsx'
+
+  # private 化により GitHub の secret scanning / push protection も無効になった
+  # （どちらも private では有料）。SERVICE_ROLE_KEY の漏洩はこのプロダクトで
+  # 最も致命的なので、OSS の gitleaks で最低限 CI 側の検出を維持する。
+  # Action 版は org 利用にライセンスが要るため、バイナリを直接使う。
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks version
+      - name: Scan git history for secrets
+        run: ./gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # high 以上のみ落とす。moderate まで落とすと推移依存で頻繁に赤くなり、
+      # 「赤いのが常態」になってアラートとして機能しなくなるため。
+      #
+      # 意図的にブロッキング（continue-on-error にしない）。新しい high の advisory が
+      # 公開されると、コード変更が無くても main が赤くなりうる副作用は理解したうえで、
+      # 日記を預かる以上「high を放置したまま出荷できてしまう」状態を避けることを優先する。
+      # 実際に本ワークフロー導入時に検出された 4 件は pnpm overrides で解消できた（#501）。
+      - run: pnpm audit --audit-level=high
+
+  # ── 層 2: PR 差分の意味的レビュー（AI・補助） ───────────────────────────
+  claude-review:
+    name: Claude Security Review (PR 差分)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+      # fork からの PR ではシークレットが空になる。その場合は静かに skip し、
+      # 「AI レビューが無い PR」であることを明示してレビュアーの判断に委ねる。
+      - name: Check API key availability
+        id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Notice (no API key)
+        if: steps.key.outputs.available != 'true'
+        run: |
+          echo "::notice::ANTHROPIC_API_KEY が無いため Claude セキュリティレビューを skip しました。" \
+               "fork からの PR の場合は想定どおりです。決定的ゲート(rls-gate/sast/secret-scan)は実行済みです。"
+      - uses: anthropics/claude-code-security-review@main
+        if: steps.key.outputs.available == 'true'
+        with:
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          comment-pr: true
+          # migrations は除外しない。RLS ゲートは正規表現ベースで「構造」しか見られず、
+          # 「ポリシーの条件式が参照している列が間違っている」ような意味的な誤りは
+          # AI にしか拾えないため。
+          exclude-directories: 'docs,.tmp'
+          custom-security-scan-instructions: .github/security/scan-instructions.md
+          false-positive-filtering-instructions: .github/security/false-positives.md
+
+  # ── 層 3: 週次のリポジトリ全体監査 ─────────────────────────────────────
+  weekly-audit:
+    name: Weekly Full Audit (→ Issue)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      # 週次監査はキーが無いと成立しない。静かに skip すると「監視できているつもり」に
+      # なるのが最悪なので、未設定なら明示的に落とす。
+      - name: Require API key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY が未設定のため週次セキュリティ監査を実行できません。" \
+                 "リポジトリの Settings > Secrets and variables > Actions で設定してください。"
+            exit 1
+          fi
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: '--allowed-tools Read,Grep,Glob,Bash(gh issue:*),Bash(pnpm security:rls)'
+          prompt: |
+            あなたは Oryzae（ジャーナリング＝日記アプリ）のセキュリティ監査担当です。
+            このリポジトリ全体を監査してください。差分ではなくコードベース全体が対象です。
+
+            監査の観点は `.github/security/scan-instructions.md` に定義されています。
+            まずそれを読み、その観点に沿って調査してください。
+            `pnpm security:rls` も実行し、既知リスク（baseline）の状況を確認してください。
+
+            重要な前提:
+            - 誤検知はレビュー体力を削り、やがてアラート全体が無視されるようになります。
+              確信が持てない指摘は出さないでください。
+            - 各指摘には「攻撃者が具体的に何をすると、どのデータが漏れるか」を
+              file:line 付きで書いてください。抽象的な指摘は価値がありません。
+
+            結果は GitHub Issue に報告してください:
+            - タイトルは必ず `[security-audit] 週次セキュリティ監査` で始めること
+            - 既存の open な同タイトル Issue があれば、新規作成せずコメントを追記すること
+            - 重大な指摘がゼロなら、Issue は作らず「問題なし」とだけ出力して終了すること
+              （毎週ノイズを起票すると誰も読まなくなるため）

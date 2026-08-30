@@ -18,6 +18,7 @@ pnpm lint                                   # Biome lint
 pnpm dep-cruise                             # アーキテクチャ依存チェック（server + client + admin）
 pnpm knip                                   # デッドコード検出
 pnpm check:as                               # `as` 型アサーション検出（CI ゲート）
+pnpm security:rls                           # RLS / storage の認可境界チェック
 ```
 
 ## Architecture
@@ -38,6 +39,8 @@ pnpm check:as                               # `as` 型アサーション検出�
 - `app/` — Next.js ページ（薄いラッパー、API 呼び出し禁止、端末判定）
 - `features/` — 機能スライス
   - `apps/client` は **ドメイン × reach**: `features/{shared,pc,sp}/{domain}`（shared=UIなし共有hook/型、pc/sp=端末別UI）
+    - reach は「端末で体験が変わる機能」だけに適用する。端末非依存の機能（`auth` / `onboarding`）は
+      `features/{domain}/` のフラットなまま置く。フラット機能どうしの直接 import は禁止、`features/shared` のみ可
   - `apps/admin` は単一体験で `features/{domain}`（reach 軸なし）
 - `components/ui/` — 汎用 UI（feature 依存禁止）
 - `lib/` — 基盤ユーティリティのみ（ドメイン非依存。`use-*` のドメイン hook を置かない）
@@ -57,6 +60,18 @@ device（端末）はフロントだけの軸で `apps/client` のみ reach を�
 - `--no-verify` 禁止
 - `any` 型禁止
 - `as` キャスト禁止（CI で検出。例外は `// @type-assertion-allowed: <理由>` を前行に記載）
+
+### セキュリティ（他人の日記を預かるプロダクトである）
+
+判断基準は常に「ある人の日記が本人以外の目に触れる経路が無いか」。詳細は `docs/security-guide.md`。
+
+- **ユーザー向け API の認可は RLS が担う**（`authMiddleware` が anon key + ユーザー JWT で
+  クライアントを作るため）。repository に `.eq('user_id', ...)` が無くても脆弱性ではない
+- **新規テーブルには必ず RLS + ポリシー**。`USING (true)` には必ず `TO service_role` を添える
+  （TO 省略時は PUBLIC 扱いになり own-data ポリシーを無効化する）。`pnpm security:rls` が強制
+- **`getSupabaseClient()`（service role）は RLS を完全にバイパスする**。利用箇所は
+  dep-cruise の `service-role-client-containment` で許可リスト固定。増やす前に必ず相談
+- **日記本文をログ・Sentry・PostHog に載せない**（例外メッセージへの埋め込みも含む）
 
 ## Design Docs (SSoT)
 
