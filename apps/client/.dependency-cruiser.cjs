@@ -1,17 +1,18 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
-    // === Feature isolation (device-agnostic flat features) ===
-    // reach(pc/sp) は「端末で体験が変わる機能」だけに適用する。端末非依存の機能
-    // (auth / landing / onboarding 等) は features/{domain} のフラットなまま置く。
-    // それらの相互依存は従来どおり禁止し、features/shared への import だけ許可する。
+    // === reach: features/shared で端末を判定しない ===
+    // shared は「端末非依存」の層。UI を持つことは許すが、その中で端末を分岐したら
+    // 端末で出し分ける場所が DeviceView 以外にも増え、reach 軸が骨抜きになる（#490）。
+    // 防ぎたいのは「UI があること」ではなく「shared の中で端末が分岐すること」なので、
+    // 判定の入口（lib/use-device）と分岐プリミティブ（components/device-view）を禁じる。
     {
-      name: 'feature-isolation-flat',
+      name: 'shared-no-device-detection',
       comment:
-        'Device-agnostic flat features must not import other flat features (features/shared is allowed)',
+        'features/shared must not detect the device (lib/use-device) or branch on it (components/device-view)',
       severity: 'error',
-      from: { path: '^src/features/([^/]+)', pathNot: '^src/features/(pc|sp|shared)/' },
-      to: { path: '^src/features/', pathNot: ['^src/features/$1', '^src/features/shared/'] },
+      from: { path: '^src/features/shared/' },
+      to: { path: '^src/(lib/use-device|components/device-view)' },
     },
 
     // === reach: pc/sp スライスは「自ドメイン」と「features/shared」のみ import 可 ===
@@ -53,16 +54,6 @@ module.exports = {
       severity: 'error',
       from: { path: '^src/app/' },
       to: { path: '^src/features/(pc|sp)/[^/]+/hooks/' },
-    },
-
-    // === flat features も fetch を持たない ===
-    // 端末非依存 UI であっても、データ取得は features/shared に集約する。
-    {
-      name: 'flat-features-no-api',
-      comment: '端末非依存 flat features から lib/api の実装を import してはならない',
-      severity: 'error',
-      from: { path: '^src/features/([^/]+)', pathNot: '^src/features/(pc|sp|shared)/' },
-      to: { path: '^src/lib/api\\.ts$', dependencyTypesNot: ['type-only'] },
     },
 
     // === UI components independence ===
