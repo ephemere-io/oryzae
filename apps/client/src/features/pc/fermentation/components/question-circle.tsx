@@ -169,6 +169,8 @@ export function QuestionCircle({
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label と role="button" は同じ !zoomed 条件で付与され、ズーム時は両方 undefined（generic role には付かない）。Biome は条件付き role を静的解決できず誤検出する。
     <div
       ref={circleRef}
+      // 掴んだら円を動かす／開く（キャンバスのパンを始めない）。
+      data-canvas-no-pan=""
       {...circlePointerHandlers}
       {...verifyAttrs({
         unit: 'QuestionCircle',

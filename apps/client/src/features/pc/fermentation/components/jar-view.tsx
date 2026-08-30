@@ -485,7 +485,8 @@ export function JarView({
         ariaLabel={t('jar.canvas_aria')}
         onClick={closeZoom}
         overlay={
-          <>
+          // 操作 UI の上ではパンを始めない。
+          <div data-canvas-no-pan="">
             <CanvasZoomControls
               scale={canvas.viewport.scale}
               onZoomIn={zoomIn}
@@ -502,14 +503,16 @@ export function JarView({
                 ...circleWorldBounds(resolvedCirclePositions[i]),
               }))}
             />
-          </>
+          </div>
         }
       >
         {/* world ボックス。中の要素は今までどおり % 指定のままでよく、その % が
             「ビューポート基準」から「この箱基準」に読み替わるだけ。 */}
         <div
           ref={jarContainerRef}
-          className="absolute left-0 top-0 overflow-hidden"
+          // overflow は付けない。world の縁ぎりぎりに置かれた円（jarX=100 等）が
+          // 半分だけ切り取られてしまうため。frame 側が画面外を隠す。
+          className="absolute left-0 top-0"
           style={{ width: JAR_WORLD_WIDTH, height: JAR_WORLD_HEIGHT }}
         >
           {/* Background grid pattern */}

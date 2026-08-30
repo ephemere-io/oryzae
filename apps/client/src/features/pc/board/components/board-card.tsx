@@ -113,6 +113,8 @@ export function BoardCard({
     <div
       ref={cardRef}
       data-card-id={card.id}
+      // 掴んだらカードを動かす（キャンバスのパンを始めない）。
+      data-canvas-no-pan=""
       className="board-card"
       {...verifyAttrs({
         unit: 'BoardCard',

@@ -447,6 +447,117 @@ describe('useCanvasViewport', () => {
     });
   });
 
+  describe('素の左ドラッグでパンする', () => {
+    // 実機で「クリック&ドラッグで動かせない」と報告された退行の再発防止。
+    // 以前は「押した先が frame か world そのもののとき」だけパンしていたため、
+    // world 直下にラッパー（瓶の world ボックス等）があると背景を掴んでも動かなかった。
+    function drag(from: EventTarget, dx: number, dy: number) {
+      const opts = {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 5,
+        pointerType: 'mouse',
+        button: 0,
+        buttons: 1,
+        isPrimary: true,
+      };
+      act(() => {
+        from.dispatchEvent(
+          new PointerEvent('pointerdown', { ...opts, clientX: 400, clientY: 300 }),
+        );
+        window.dispatchEvent(
+          new PointerEvent('pointermove', { ...opts, clientX: 400 + dx, clientY: 300 + dy }),
+        );
+        window.dispatchEvent(
+          new PointerEvent('pointerup', {
+            ...opts,
+            buttons: 0,
+            clientX: 400 + dx,
+            clientY: 300 + dy,
+          }),
+        );
+      });
+    }
+
+    it('frame の背景を掴んで動かせる', async () => {
+      render(<Harness />);
+      stubFrameRect();
+      await flushFrame();
+      const before = readViewport();
+
+      drag(frameEl(), 70, -40);
+      await flushFrame();
+
+      const after = readViewport();
+      expect(after.x).toBe(before.x + 70);
+      expect(after.y).toBe(before.y - 40);
+    });
+
+    it('world 直下のラッパーを掴んでも動かせる（瓶の world ボックス相当）', async () => {
+      function WrappedHarness() {
+        const canvas = useCanvasViewport({});
+        return (
+          <CanvasViewport canvas={canvas} ariaLabel="test canvas">
+            <div data-testid="world-box" style={{ width: 1600, height: 1000 }} />
+          </CanvasViewport>
+        );
+      }
+      render(<WrappedHarness />);
+      stubFrameRect();
+      await flushFrame();
+      const before = readViewport();
+
+      drag(screen.getByTestId('world-box'), 50, 30);
+      await flushFrame();
+
+      const after = readViewport();
+      expect(after.x).toBe(before.x + 50);
+      expect(after.y).toBe(before.y + 30);
+    });
+
+    it('data-canvas-no-pan を付けた要素の上ではパンを始めない（カード・操作UI）', async () => {
+      function CardHarness() {
+        const canvas = useCanvasViewport({});
+        return (
+          <CanvasViewport canvas={canvas} ariaLabel="test canvas">
+            <div data-testid="card" data-canvas-no-pan="" style={{ width: 200, height: 100 }} />
+          </CanvasViewport>
+        );
+      }
+      render(<CardHarness />);
+      stubFrameRect();
+      await flushFrame();
+      const before = readViewport();
+
+      drag(screen.getByTestId('card'), 90, 90);
+      await flushFrame();
+
+      expect(readViewport()).toEqual(before);
+    });
+
+    it('no-pan 要素の**子孫**から始めてもパンしない', async () => {
+      function NestedHarness() {
+        const canvas = useCanvasViewport({});
+        return (
+          <CanvasViewport canvas={canvas} ariaLabel="test canvas">
+            <div data-canvas-no-pan="">
+              <span data-testid="inner">中身</span>
+            </div>
+          </CanvasViewport>
+        );
+      }
+      render(<NestedHarness />);
+      stubFrameRect();
+      await flushFrame();
+      const before = readViewport();
+
+      drag(screen.getByTestId('inner'), 60, 60);
+      await flushFrame();
+
+      expect(readViewport()).toEqual(before);
+    });
+  });
+
   describe('2本指ピンチ', () => {
     function pointer(type: string, id: number, x: number, y: number, target: EventTarget) {
       act(() => {

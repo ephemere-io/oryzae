@@ -7,6 +7,11 @@ interface CanvasViewportProps {
   /** {@link useCanvasViewport} の戻り値。frame/world の ref と操作をまとめて受け取る。 */
   canvas: CanvasSurface;
   ariaLabel: string;
+  /**
+   * world の**後ろ**に敷くスクリーン空間の背景（方眼など）。
+   * world に入れると合成レイヤーが巨大化して描画が打ち切られるため、ここに置く。
+   */
+  background?: ReactNode;
   /** スクリーン空間の UI（ズームコントロール・ナビ）。倍率の影響を受けない。 */
   overlay?: ReactNode;
   /** world 空間の中身。world 座標のまま `position: absolute` で置く。 */
@@ -29,6 +34,7 @@ interface CanvasViewportProps {
 export function CanvasViewport({
   canvas,
   ariaLabel,
+  background,
   overlay,
   children,
   onPointerMove,
@@ -55,11 +61,17 @@ export function CanvasViewport({
       onClick={onClick}
       onKeyDown={() => {}}
     >
+      {background}
       <div
         ref={canvas.worldRef}
         // サイズ 0 の原点ノード。子は world 座標のまま absolute で配置する。
+        //
+        // `will-change: transform` は付けない。合成レイヤーが子の外接矩形まで広がるため、
+        // 遠くに要素がある無限キャンバスではテクスチャ上限を超えて描画が打ち切られる
+        // （画面外の背景が消える・DOM が途中で切れる）。transform は毎フレーム
+        // 書き換わるのでヒントが無くてもブラウザは合成する。
         className="absolute left-0 top-0"
-        style={{ transformOrigin: '0 0', willChange: 'transform' }}
+        style={{ transformOrigin: '0 0' }}
       >
         {children}
       </div>

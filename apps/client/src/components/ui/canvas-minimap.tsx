@@ -72,11 +72,23 @@ export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinima
       // いま見えている world 矩形 → ミニマップ座標。
       const worldLeft = -vp.x / vp.scale;
       const worldTop = -vp.y / vp.scale;
+      const rawLeft = offsetX + (worldLeft - areaX) * scale;
+      const rawTop = offsetY + (worldTop - areaY) * scale;
+      const rawRight = rawLeft + (frame.width / vp.scale) * scale;
+      const rawBottom = rawTop + (frame.height / vp.scale) * scale;
 
-      rect.style.left = `${offsetX + (worldLeft - areaX) * scale}px`;
-      rect.style.top = `${offsetY + (worldTop - areaY) * scale}px`;
-      rect.style.width = `${(frame.width / vp.scale) * scale}px`;
-      rect.style.height = `${(frame.height / vp.scale) * scale}px`;
+      // ミニマップの内側にクランプする。引ききって可視範囲が中身より広くなると
+      // 枠が完全に外へ出てしまい「どこを見ているか」が消えるため、
+      // 縁に貼り付けて「全部見えている」ことを示す。
+      const left = Math.max(rawLeft, 0);
+      const top = Math.max(rawTop, 0);
+      const right = Math.min(rawRight, MINIMAP_WIDTH);
+      const bottom = Math.min(rawBottom, MINIMAP_HEIGHT);
+
+      rect.style.left = `${left}px`;
+      rect.style.top = `${top}px`;
+      rect.style.width = `${Math.max(right - left, 0)}px`;
+      rect.style.height = `${Math.max(bottom - top, 0)}px`;
     });
   }, [subscribe, frameSize, areaX, areaY, areaW, areaH]);
 
@@ -100,6 +112,7 @@ export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinima
         opacity: 0.9,
       }}
     >
+      {/* 中身の位置。カードらしく見えるよう塗り＋縁で描く。 */}
       {items.map((item) => (
         <div
           key={item.id}
@@ -108,20 +121,31 @@ export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinima
             left: offsetX + (item.x - areaX) * scale,
             top: offsetY + (item.y - areaY) * scale,
             // 引ききっても点として見えるように最小サイズを与える。
-            width: Math.max(item.width * scale, 2),
-            height: Math.max(item.height * scale, 2),
+            width: Math.max(item.width * scale, 3),
+            height: Math.max(item.height * scale, 3),
             backgroundColor: 'var(--date-color)',
-            opacity: 0.35,
+            // 重なったときに1枚ずつの粒が見えるよう、塗りに薄い縁を足す。
+            outline: '1px solid var(--bg)',
+            opacity: 0.5,
             borderRadius: 1,
           }}
         />
       ))}
-      {/* いま見ている範囲。位置と大きさは購読側が毎フレーム書き込む。 */}
+      {/*
+        いま見ている範囲。位置と大きさは購読側が毎フレーム書き込む。
+        外側を暗く落とす「スポットライト」にすることで、枠線だけのときより
+        「ここを見ている」が一目で伝わる（外周の影は親の overflow:hidden で切られる）。
+      */}
       <div
         ref={viewRectRef}
         data-verify-part="minimap-viewport"
         className="absolute"
-        style={{ border: '1px solid var(--accent)', borderRadius: 2 }}
+        style={{
+          border: '1.5px solid var(--accent)',
+          borderRadius: 2,
+          backgroundColor: 'rgba(74,158,142,0.10)',
+          boxShadow: '0 0 0 9999px rgba(74,69,65,0.28)',
+        }}
       />
     </div>
   );

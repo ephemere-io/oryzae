@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
@@ -26,14 +27,6 @@ import { SnippetDialog } from './snippet-dialog';
 interface BoardViewProps {
   api: ApiClient;
 }
-
-/** グリッドの目盛り（world 単位）。 */
-const GRID_SIZE = 40;
-/**
- * グリッドを敷く範囲（world 単位、原点中心）。
- * 最小倍率で全画面を覆える大きさがあればよく、実際に描画されるのは可視部分だけ。
- */
-const GRID_EXTENT = 20000;
 
 /**
  * 意味的ズームのしきい値。
@@ -70,32 +63,6 @@ function todayKey(): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
-
-/**
- * world に貼り付くグリッド。
- *
- * world ノードの中に置くのでパン・ズームに追従する（毎フレームの JS 計算が要らない）。
- * 線の太さだけは `--vp-scale` で逆スケールし、どの倍率でも 1 画面 px のヘアラインに保つ。
- * 逆スケールしないと、引いたときに線が消え、寄ったときに帯になる。
- */
-function BoardGrid() {
-  const line = 'calc(1px / var(--vp-scale, 1))';
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute"
-      style={{
-        left: -GRID_EXTENT,
-        top: -GRID_EXTENT,
-        width: GRID_EXTENT * 2,
-        height: GRID_EXTENT * 2,
-        backgroundImage: `linear-gradient(rgba(0,0,0,0.03) ${line}, transparent ${line}), linear-gradient(90deg, rgba(0,0,0,0.03) ${line}, transparent ${line})`,
-        backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-        opacity: 0.6,
-      }}
-    />
-  );
 }
 
 export function BoardView({ api }: BoardViewProps) {
@@ -298,8 +265,10 @@ export function BoardView({ api }: BoardViewProps) {
         onPointerMove={handleFramePointerMove}
         onPointerUp={onPointerUp}
         onClick={deselect}
+        background={<CanvasGrid canvas={canvas} />}
         overlay={
-          <>
+          // 操作 UI の上ではパンを始めない。
+          <div data-canvas-no-pan="">
             <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
             <BoardControls
               viewType={viewType}
@@ -354,10 +323,9 @@ export function BoardView({ api }: BoardViewProps) {
             >
               {visibleCardCount} CARDS
             </div>
-          </>
+          </div>
         }
       >
-        <BoardGrid />
         {cards.map((card) => (
           <BoardCard
             key={card.id}

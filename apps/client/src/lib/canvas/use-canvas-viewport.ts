@@ -30,6 +30,11 @@ const COMMIT_IDLE_MS = 120;
  * レイアウト確定が遅れる場合の保険で、超えたら等倍で開いて先へ進む（無限リトライ防止）。
  */
 const INITIAL_FIT_MAX_FRAMES = 60;
+/**
+ * この中で始まったポインタ操作はパンを開始しない。
+ * カード・問いの円・オーバーレイの操作 UI がこの印を付ける。
+ */
+const NO_PAN_SELECTOR = '[data-canvas-no-pan]';
 
 export interface CanvasViewportOptions {
   /**
@@ -442,6 +447,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       }
 
       if (panId !== null) return;
+      // 中ボタン・space+ドラッグはどこからでもパン（おまけ。無くても操作できる）。
       const forced = e.button === 1 || (e.button === 0 && spaceDownRef.current);
       if (forced) {
         e.preventDefault();
@@ -450,8 +456,15 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
         return;
       }
       if (e.button !== 0) return;
-      // 背景（frame / world そのもの）を押したときだけパン。カードの上では何もしない。
-      if (e.target === frame || e.target === worldRef.current) startPan(e);
+
+      // 素の左ドラッグは **既定でパン**。掴めるもの（カード・円・操作 UI）だけが
+      // `data-canvas-no-pan` で名乗り出て、パンの開始を辞退する。
+      //
+      // 以前は「押した先が frame か world そのもののときだけパン」にしていたが、
+      // world 直下に別のラッパー（瓶の world ボックス等）があるとそこが target になり、
+      // 背景を掴んでも一切パンできなかった。除外リスト方式なら層が増えても壊れない。
+      if (e.target instanceof Element && e.target.closest(NO_PAN_SELECTOR)) return;
+      startPan(e);
     };
 
     frame.addEventListener('pointerdown', onPointerDownCapture, { capture: true });
