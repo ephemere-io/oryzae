@@ -13,13 +13,16 @@ interface UseAutosaveEntryParams {
   debounceMs?: number;
   /**
    * **新規エントリを作るのに**必要な最小文字数。既存エントリの更新には適用しない。
-   * 打ち間違いの1文字でエントリが出来てしまうのを防ぐためだけのしきい値。
+   * 打ち間違いの1文字でエントリが出来てしまうのを防ぐためだけのしきい値なので、
+   * 小さく取る。**離脱時の書き出しには適用しない**（下記 saveNow の force を参照）。
    */
   minCreateChars?: number;
 }
 
 const DEFAULT_DEBOUNCE_MS = 2000;
-const DEFAULT_MIN_CREATE_CHARS = 10;
+// 打ち間違いの1文字でエントリが生えないための最小限。**短い記録を弾く値にしてはいけない**
+// （「今日は疲れた」で終える人がいる。Issue #510 はまさにそれが消える話だった）。
+const DEFAULT_MIN_CREATE_CHARS = 2;
 
 /** エディタの保存形式（先頭行＝タイトル）。 */
 function composeContent(title: string, body: string): string {
@@ -85,7 +88,12 @@ export function useAutosaveEntry({
 
   const scheduleRef = useRef<() => void>(() => {});
 
-  const saveNow = useCallback(async () => {
+  /**
+   * @param force 離脱時の書き出し。**しきい値を無視して書く**。
+   *   画面を離れるときに「まだ短いから」と捨てるのは、書いたものを失うのと同じ。
+   *   しきい値は「打ちかけでエントリを作らない」ためのもので、離脱時には意味を持たない。
+   */
+  const saveNow = useCallback(async (force = false) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -96,8 +104,8 @@ export function useAutosaveEntry({
 
     const content = composeContent(current.title, current.body);
     if (content === lastSavedContentRef.current) return;
-    // まだエントリが存在しないときだけ、作成に足る長さを要求する。
-    if (!current.entryId && current.body.trim().length < current.minCreateChars) return;
+    // まだエントリが存在しないときだけ、作成に足る長さを要求する（離脱時は要求しない）。
+    if (!force && !current.entryId && current.body.trim().length < current.minCreateChars) return;
 
     inFlightRef.current = true;
     try {
@@ -149,7 +157,8 @@ export function useAutosaveEntry({
     if (typeof document === 'undefined') return;
 
     function flush() {
-      void saveNow();
+      // 離脱時はしきい値を無視する。短くても書いたものは残す。
+      void saveNow(true);
     }
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') flush();

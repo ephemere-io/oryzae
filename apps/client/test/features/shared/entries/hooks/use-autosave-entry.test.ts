@@ -111,6 +111,30 @@ describe('useAutosaveEntry', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  it('新規でも短い記録は保存する（「今日は疲れた」で終える人が消えない）', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+    const { rerender } = setup(save, { body: '' });
+
+    rerender({ title: '', body: '今日は疲れた' });
+    await tick();
+
+    expect(save).toHaveBeenCalledWith('今日は疲れた', undefined);
+  });
+
+  it('離脱時はしきい値を無視して書き出す（未確定でも書いたものは残す）', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+    const { rerender } = setup(save, { body: '' });
+
+    // しきい値未満のまま画面を離れる。捨てるのは「書いたものを失う」のと同じ。
+    rerender({ title: '', body: 'あ' });
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'));
+      await Promise.resolve();
+    });
+
+    expect(save).toHaveBeenCalledWith('あ', undefined);
+  });
+
   it('body が空白のみなら save を呼ばない', async () => {
     const save = vi.fn();
     const { rerender } = setup(save, { body: '' });
