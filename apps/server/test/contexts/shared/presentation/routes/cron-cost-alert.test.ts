@@ -29,6 +29,14 @@ const tableResults: {
   photo_transcription_usages: { data: [], error: null },
 };
 
+// Cost Report（実請求額）。Admin キーが無い環境では null を返し、概算に落ちる。
+const mockFetchDailyCosts = vi.fn();
+vi.mock('@/contexts/shared/infrastructure/anthropic-cost-report.js', () => ({
+  fetchDailyCosts: (...args: unknown[]) => mockFetchDailyCosts(...args),
+  sumDailyCosts: (costs: { amountUsd: number }[]) =>
+    costs.reduce((total, day) => total + day.amountUsd, 0),
+}));
+
 const supabaseClientState = { shouldThrow: false };
 
 vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
@@ -62,6 +70,7 @@ describe('cronCostAlert', () => {
     mockNotifyDiscord.mockClear();
     tableResults.fermentation_results = { data: [], error: null };
     tableResults.photo_transcription_usages = { data: [], error: null };
+    mockFetchDailyCosts.mockReset().mockResolvedValue(null);
     supabaseClientState.shouldThrow = false;
     vi.stubEnv('CRON_SECRET', SECRET);
   });
@@ -143,6 +152,38 @@ describe('cronCostAlert', () => {
     const body = await res.json();
     expect(body.totalCost).toBeCloseTo(0.024, 6);
     expect(body.recordCount).toBe(2);
+  });
+
+  // 実請求額が取れるならそちらが正。概算とすり替わったことが分かるよう billed も返す。
+  it('Cost Report が引ければ実請求額を使う', async () => {
+    mockFetchDailyCosts.mockResolvedValue([{ date: '2026-08-29', amountUsd: 0.42 }]);
+    // 自前トークンからの概算とは違う値にして、どちらを採ったか判別できるようにする。
+    tableResults.fermentation_results = {
+      data: [{ input_tokens: 1000, output_tokens: 1000 }],
+      error: null,
+    };
+
+    const body = await (
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders })
+    ).json();
+
+    expect(body.billed).toBe(true);
+    expect(body.totalCost).toBeCloseTo(0.42, 6);
+  });
+
+  it('Cost Report が引けなければ概算に落ちる（エラーにはしない）', async () => {
+    mockFetchDailyCosts.mockResolvedValue(null);
+    tableResults.fermentation_results = {
+      data: [{ input_tokens: 1000, output_tokens: 1000 }],
+      error: null,
+    };
+
+    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.billed).toBe(false);
+    expect(body.totalCost).toBeCloseTo(0.018, 6);
   });
 
   it('文字起こしはモデル別の単価で計算する', async () => {

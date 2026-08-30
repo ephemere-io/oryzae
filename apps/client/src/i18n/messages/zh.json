@@ -473,7 +473,8 @@
     "error_transcribe": "未能识别文字。请稍后再试。",
     "error_rate_limited": "已达到识别次数上限。请稍候再试。",
     "unavailable": "无法加载第 {index} 张照片",
-    "unavailable_short": "无法加载"
+    "unavailable_short": "无法加载",
+    "error_spend_limit": "已达到 AI 使用上限。此功能暂时不可用。"
   },
   "fermentation": {
     "detail": {

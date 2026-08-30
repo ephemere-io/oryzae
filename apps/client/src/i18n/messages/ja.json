@@ -473,7 +473,8 @@
     "error_transcribe": "文字を読み取れませんでした。時間をおいてお試しください。",
     "error_rate_limited": "読み取りの回数制限に達しました。少し待ってからお試しください。",
     "unavailable": "{index} 枚目の写真を読み込めませんでした",
-    "unavailable_short": "読み込めません"
+    "unavailable_short": "読み込めません",
+    "error_spend_limit": "AI の利用上限に達しています。しばらく利用できません（管理者にお問い合わせください）。"
   },
   "fermentation": {
     "detail": {

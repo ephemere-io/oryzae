@@ -48,33 +48,40 @@ VLM を選んだ理由は次の 3 つ。
 
 変更するときは `OCR_MODEL` を差し替える。
 
-### コストは自前で概算する（実請求額は取れない）
+### コスト: 総額は Anthropic、内訳は自前
 
-**なぜ Anthropic の Cost Report を使わないのか。** 実請求額は
-`GET /v1/organizations/cost_report` から取れるが、**Admin API キーが必須**で、
-Admin API キーは**組織アカウントでしか発行できない**（個人アカウントは Admin API の
-対象外）。このプロジェクトは組織を持たないため使えない。Usage API も同じ壁。
-一度 Cost Report 版を実装したが、キーを発行できないと分かって巻き戻した。
+**この 2 つは別の道具**なので、両方持つ。
 
-そのため 1 回の文字起こしにつき `photo_transcription_usages` に 1 行入れ（`00024`）、
-`claude-pricing.ts` のモデル別価格表と掛けて概算する。読む側は 2 か所:
+**総額（いくら請求されるか）** は Anthropic の Cost Report（`anthropic-cost-report.ts`、
+`GET /v1/organizations/cost_report`）から**実請求額**を引く。キャッシュ割引・
+コンテキスト窓別単価・tier 割引・期間限定価格まで込みの数字が返るので、自前の価格表では
+到達できない正確さになる。Admin API キー（`sk-ant-admin...`、Console > Settings >
+Admin keys）を `ANTHROPIC_ADMIN_KEY` に置き、`x-api-key` で送る。通常の
+`ANTHROPIC_API_KEY` とは別物。
 
-- 管理画面の月次コスト（`/api/v1/admin/dashboard/cost-summary`）— 発酵の分と合算する
-- 日次コスト cron（`cron-cost-alert`）— 前日分を Discord に報告する
+**内訳（誰が・どの機能が、いくら使っているか）** は自前で持つしかない。Anthropic 側が
+知っているのは API キーとワークスペースであって、こちらの `user_id` ではないため。
+1 回の文字起こしにつき `photo_transcription_usages` に 1 行入れる（`00024`）。
+立ち上げ期に効くのはこちらで、「ユーザーが 1 人増えると月いくら増えるか」は
+総額（Anthropic）÷ 分母（自前）でしか出せない。
 
-**この数字は概算であって請求額ではない。** 次のどれも反映されない:
-
-- キャッシュトークンの割引単価（`cache_read` は通常の約 1/10。そもそも記録していない）
-- コンテキスト窓別の単価（0-200k と 200k-1M で違う）
-- service tier の割引（batch は 50% 引き）
-- 期間限定の導入価格（例: Sonnet 5 は 2026-08-31 まで $2/$10 だった）
-
-正確な金額が要るときは Console の Cost ページを見ること。モデルを差し替えたら
-`claude-pricing.ts` の価格表にそのモデルを足す。過去の記録は保存済みのモデル名で
-計算されるので、差し替えても遡って単価が変わることはない。
+Admin キーが無い環境では `claude-pricing.ts` の価格表からの概算に落ち、レスポンスの
+`estimated: true` と `pricingAsOf` を返す。管理画面はそれを見て "(est.)" と単価の時点を
+出す —— 概算を請求額と取り違えないようにするため。
 
 **起こした文字そのものは保存しない。** 日記の中身であり、本文に入れた時点で `entries` に
 残るため、重複して置く理由が無い。記録するのはモデル名・トークン数・文字数だけ。
+
+### 支出上限に達したとき
+
+Anthropic 側で止まる経路は 3 つ（残高切れ 402 / ティア上限 429 +
+`enforced_spend_limit_reached` / 自分で設定した上限 400）。これを「AI が失敗した」と
+まとめて扱うと、ユーザーには原因不明の不具合に見える。`anthropic-spend-limit.ts` が
+待てば直るレート制限と区別し、`SpendLimitReachedError`（503）に変換して、
+クライアントは専用の文言（`photo.error_spend_limit`）を出す。
+
+**請求額そのものを抑えたいなら、Console > Settings > Billing で支出上限を設定するのが
+確実。** オートリロードを切れば、買ったクレジット以上は請求されない。
 
 ---
 

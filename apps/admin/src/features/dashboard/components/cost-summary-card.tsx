@@ -22,7 +22,9 @@ export function CostSummaryCard({ summary }: { summary: CostSummary | null }) {
   return (
     <div className="flex flex-col justify-between rounded-lg border border-border/50 bg-card p-4">
       <div>
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">Monthly Cost</span>
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+          Monthly Cost{summary.estimated === false ? '' : ' (est.)'}
+        </span>
         <div className="text-3xl font-semibold tracking-tight mt-0.5">
           {formatCost(summary.currentMonthCost)}
         </div>
@@ -34,6 +36,15 @@ export function CostSummaryCard({ summary }: { summary: CostSummary | null }) {
         <p className="text-[10px] text-muted-foreground">
           Projected: {formatCost(summary.projectedCost)}
         </p>
+        {/* 請求額と取り違えないよう、概算であることと単価の時点を明示する。
+            実際の請求額は Anthropic Console の Cost ページが正。 */}
+        {summary.estimated === false ? null : (
+          <p className="text-[10px] text-muted-foreground">
+            Estimated from tokens
+            {summary.pricingAsOf ? ` · rates as of ${summary.pricingAsOf}` : ''} · billed amount in
+            Anthropic Console
+          </p>
+        )}
       </div>
     </div>
   );
