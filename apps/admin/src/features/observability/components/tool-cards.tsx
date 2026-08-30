@@ -18,6 +18,17 @@ function formatMetric(value: number | string | null, suffix = ''): string {
   return value;
 }
 
+/**
+ * 実請求額の表示。未設定・取得失敗を「$0.00」と出さないこと。
+ * それをやると issue #352 以降ずっと出ていた「コストが常に0」の再来になる。
+ */
+function formatAnthropicMetric(anthropic: ObservabilitySummary['anthropic']): string {
+  if (anthropic.status === 'not-configured') return 'ADMIN_KEY 未設定';
+  if (anthropic.status === 'error') return '取得失敗';
+  if (anthropic.monthlySpend === null) return '-';
+  return `$${anthropic.monthlySpend.toFixed(2)} MTD`;
+}
+
 interface ToolRow {
   id: string;
   name: string;
@@ -50,15 +61,12 @@ function buildRows(data: ObservabilitySummary): ToolRow[] {
       externalUrl: 'https://oryzae.sentry.io',
     },
     {
-      id: 'gateway',
-      name: 'AI Gateway',
+      id: 'anthropic',
+      name: 'Anthropic',
       category: 'LLM Cost',
-      metric:
-        data.gateway.creditBalance !== null
-          ? `$${Number(data.gateway.creditBalance).toFixed(2)} balance`
-          : '-',
+      metric: formatAnthropicMetric(data.anthropic),
       href: '/observability/spend',
-      externalUrl: 'https://vercel.com',
+      externalUrl: 'https://platform.claude.com/cost',
     },
     {
       id: 'resend',
