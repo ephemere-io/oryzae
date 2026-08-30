@@ -130,6 +130,10 @@ export function BoardView({ api }: BoardViewProps) {
       const target = e.target as HTMLElement;
       const tag = target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      // 何かが開いている間はボードのキー操作を一切拾わない（閉じるのは Escape の仕事）。
+      // 削除より後ろに置くと、ライトボックスやダイアログの入力欄以外にフォーカスが
+      // ある状態の Backspace が、背後で選択中のカードをサーバーごと消してしまう。
+      if (dialogOpen) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId) {
@@ -140,8 +144,7 @@ export function BoardView({ api }: BoardViewProps) {
       }
 
       // ツールのショートカット（Figma と同じく修飾キーなしの1文字）。
-      // 何かが開いている間は拾わない（閉じるのは Escape の仕事）。
-      if (dialogOpen || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
       if (key === 's') {
         e.preventDefault();

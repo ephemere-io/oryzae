@@ -113,6 +113,34 @@ test.describe('ボード画面', () => {
     await page.keyboard.press('Escape');
   });
 
+  test('ダイアログを開いている間の Backspace で背後のカードが消えない', async ({ page }) => {
+    // キーハンドラの dialogOpen ガードが削除分岐より後ろにあり、ライトボックスや
+    // ダイアログ表示中の Backspace が背後の選択カードをサーバーごと消していた。
+    // 入力欄以外にフォーカスがある状態を作るのがポイント（textarea だと素通りする）。
+    const snippet = `E2E消えない-${Date.now()}`;
+    await page.click('button[data-verify-tool="snippet"]');
+    await page.fill('textarea[placeholder*="テキスト"]', snippet);
+    await page.getByRole('button', { name: '作成', exact: true }).click();
+    await expect(page.getByText(snippet)).toBeVisible({ timeout: 10000 });
+
+    // カードを選択してから写真ダイアログを開く（カードは選択されたまま背後に残る）
+    const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: snippet });
+    await card.click();
+    await expect(card).toHaveAttribute('data-verify-selected', 'true');
+    await page.click('button[data-verify-tool="photo"]');
+    await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
+
+    // 入力欄ではなくダイアログの見出しにフォーカスが無い状態で Backspace
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: '写真を追加' })).toHaveCount(0);
+
+    // 消えていないこと（リロードしてサーバー側でも生きているのを確かめる）
+    await page.reload();
+    await page.waitForSelector('[role="application"]');
+    await expect(page.getByText(snippet)).toBeVisible({ timeout: 10000 });
+  });
+
   test('エントリカードが表示される（当日エントリがある場合）', async ({ page }) => {
     // まずエントリを作成（PC エディタは自動保存）
     const unique = `ボードE2E-${Date.now()}`;
