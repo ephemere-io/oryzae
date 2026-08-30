@@ -1,6 +1,8 @@
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
-const MAX_TEXT_LENGTH = 50;
+// packages/shared の MAX_SNIPPET_TEXT_LENGTH と同じ値。domain は shared を import
+// できない（最内層は何にも依存しない）ので、値はここで持つ。片方だけ動かさないこと。
+const MAX_TEXT_LENGTH = 2000;
 
 type BoardSnippetError =
   | { type: 'EMPTY_TEXT'; message: string }

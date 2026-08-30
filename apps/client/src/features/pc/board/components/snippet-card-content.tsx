@@ -37,7 +37,13 @@ export function SnippetCardContent({ content }: SnippetCardContentProps) {
           ✦ Snippet
         </span>
       </div>
-      <p className="flex-1 text-sm" style={{ color: 'var(--fg)', lineHeight: 1.8 }}>
+      {/* カードの高さは作成時の本文量から見積もっている。あとから編集して伸びた分は
+          ここで送れるようにする（カード自体は overflow:hidden なので、これが無いと
+          はみ出した文字が黙って消える）。 */}
+      <p
+        className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap text-sm"
+        style={{ color: 'var(--fg)', lineHeight: 1.8 }}
+      >
         {content.text}
       </p>
     </div>

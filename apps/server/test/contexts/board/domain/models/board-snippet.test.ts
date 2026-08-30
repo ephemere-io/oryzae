@@ -31,8 +31,8 @@ describe('BoardSnippet', () => {
       }
     });
 
-    it('51文字以上のテキストで TEXT_TOO_LONG エラーを返す', () => {
-      const longText = 'a'.repeat(51);
+    it('2001文字以上のテキストで TEXT_TOO_LONG エラーを返す', () => {
+      const longText = 'a'.repeat(2001);
       const result = BoardSnippet.create({ userId: 'user-1', text: longText }, generateId);
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -40,8 +40,8 @@ describe('BoardSnippet', () => {
       }
     });
 
-    it('50文字ちょうどのテキストは成功する', () => {
-      const maxText = 'a'.repeat(50);
+    it('2000文字ちょうどのテキストは成功する', () => {
+      const maxText = 'a'.repeat(2000);
       const result = BoardSnippet.create({ userId: 'user-1', text: maxText }, generateId);
       expect(result.success).toBe(true);
     });
@@ -87,8 +87,8 @@ describe('BoardSnippet', () => {
       }
     });
 
-    it('51文字で TEXT_TOO_LONG エラーを返す', () => {
-      const result = snippet.withText('a'.repeat(51));
+    it('2001文字で TEXT_TOO_LONG エラーを返す', () => {
+      const result = snippet.withText('a'.repeat(2001));
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.type).toBe('TEXT_TOO_LONG');

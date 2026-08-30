@@ -18,9 +18,9 @@ function isAllowedMediaType(mediaType: string): boolean {
 /**
  * 画像から文字を読み取り、スニペットの下書きとして返す（issue: ボードのツールバー刷新）。
  *
- * ここで本文を 50 文字（MAX_SNIPPET_TEXT_LENGTH）に切り詰めないのは意図的。
- * 読み取り結果はまず全部見せて、削る判断はクライアント側のユーザーに委ねる。
- * 実際に 50 文字を強制するのは CreateBoardSnippetUsecase → BoardSnippet.create。
+ * 読み取り結果はここで削らず全部返す。上限（MAX_OCR_TEXT_LENGTH）はスニペット本体の
+ * 上限（MAX_SNIPPET_TEXT_LENGTH）と同じ値なので、読み取れたものはそのまま保存できる。
+ * 実際に上限を強制するのは CreateBoardSnippetUsecase → BoardSnippet.create。
  */
 export class ExtractTextFromImageUsecase {
   constructor(private ocr: OcrGateway) {}

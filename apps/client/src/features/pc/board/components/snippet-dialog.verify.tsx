@@ -40,7 +40,8 @@ const neverResolveApi: ApiClient = {
 };
 
 const IMAGE_TAB = 'button[data-verify-source-tab="image"]';
-const EXACTLY_50 = '01234567890123456789012345678901234567890123456789';
+/** 上限ちょうどの本文。境界は定数から作る（上限を動かしたときに黙って外れないように）。 */
+const EXACTLY_AT_LIMIT = 'あ'.repeat(MAX_SNIPPET_TEXT_LENGTH);
 
 registerUnit<Props>({
   id: 'SnippetDialog',
@@ -88,12 +89,12 @@ registerUnit<Props>({
     {
       id: 'exactly-at-limit',
       probe: true,
-      description: 'Probe: 50字ちょうど（境界）は tooLong=false で送信できる',
+      description: 'Probe: 上限ちょうど（境界）は tooLong=false で送信できる',
       props: {
         open: true,
         api: neverResolveApi,
         snippetId: 'snippet-2',
-        initialText: EXACTLY_50,
+        initialText: EXACTLY_AT_LIMIT,
         onSubmit: noop,
         onClose: noop,
       },
@@ -101,13 +102,12 @@ registerUnit<Props>({
     {
       id: 'over-limit',
       probe: true,
-      description:
-        'Probe: 51字（OCR の結果はしばしばこうなる）は tooLong=true で送信不可のまま編集できる',
+      description: 'Probe: 上限を1字越えると tooLong=true で送信不可のまま編集できる',
       props: {
         open: true,
         api: neverResolveApi,
         snippetId: 'snippet-3',
-        initialText: `${EXACTLY_50}x`,
+        initialText: `${EXACTLY_AT_LIMIT}x`,
         onSubmit: noop,
         onClose: noop,
       },
@@ -185,13 +185,17 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'char-counter-rendered-on-text-source',
-      description: `テキストタブでは文字数カウンタ "<n>/${MAX_SNIPPET_TEXT_LENGTH}" が描画される`,
-      check: ({ root, contract }) => {
+      id: 'char-counter-only-near-the-limit',
+      description: `文字数カウンタ "<n>/${MAX_SNIPPET_TEXT_LENGTH}" は上限が近いときだけ出す`,
+      // 上限は 2000 文字あるので、常に "3/2000" を出しても意味が無く、目に入り続けるだけ。
+      // 8割を越えてから出す。
+      check: ({ root, contract, props }) => {
         if (contract.source !== 'text') return true;
+        const shown = Boolean(root.textContent?.includes(`/${MAX_SNIPPET_TEXT_LENGTH}`));
+        const expected = (props.initialText ?? '').length > MAX_SNIPPET_TEXT_LENGTH * 0.8;
         return (
-          Boolean(root.textContent?.includes(`/${MAX_SNIPPET_TEXT_LENGTH}`)) ||
-          `"n/${MAX_SNIPPET_TEXT_LENGTH}" カウンタが描画されていない`
+          shown === expected ||
+          `カウンタ描画=${shown} だが len=${(props.initialText ?? '').length}（期待 ${expected}）`
         );
       },
     },

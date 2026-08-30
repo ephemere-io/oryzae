@@ -101,6 +101,9 @@ export function SnippetDialog({
   const trimmed = text.trim();
   const empty = trimmed.length === 0;
   const tooLong = text.length > MAX_SNIPPET_TEXT_LENGTH;
+  // 上限は 2000 文字あるので、普段は文字数を出さない。"3/2000" は誰も見ていないのに
+  // 目に入り続けるだけで、上限が迫っていることを伝える役に立っていない。
+  const showCounter = text.length > MAX_SNIPPET_TEXT_LENGTH * 0.8;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,15 +344,17 @@ export function SnippetDialog({
                 {tooLong
                   ? t('too_long', { max: MAX_SNIPPET_TEXT_LENGTH })
                   : fromImage
-                    ? t('ocr_note', { max: MAX_SNIPPET_TEXT_LENGTH })
+                    ? t('ocr_note')
                     : ''}
               </p>
-              <span
-                className="shrink-0 text-[11px]"
-                style={{ color: tooLong ? 'var(--accent)' : 'var(--date-color)' }}
-              >
-                {text.length}/{MAX_SNIPPET_TEXT_LENGTH}
-              </span>
+              {showCounter && (
+                <span
+                  className="shrink-0 text-[11px]"
+                  style={{ color: tooLong ? 'var(--accent)' : 'var(--date-color)' }}
+                >
+                  {text.length}/{MAX_SNIPPET_TEXT_LENGTH}
+                </span>
+              )}
             </div>
           </>
         )}

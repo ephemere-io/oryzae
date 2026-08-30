@@ -53,9 +53,27 @@ describe('CreateBoardSnippetUsecase', () => {
     );
   });
 
-  it('51文字超で BoardSnippetValidationError を投げる', async () => {
+  it('上限超えで BoardSnippetValidationError を投げる', async () => {
     await expect(
-      usecase.execute('user-1', { text: 'a'.repeat(51), dateKey: '2026-04-11' }),
+      usecase.execute('user-1', { text: 'a'.repeat(2001), dateKey: '2026-04-11' }),
     ).rejects.toThrow(BoardSnippetValidationError);
+  });
+
+  it('本文が長いほどカードを高くする（切れて読めなくならないように）', async () => {
+    await usecase.execute('user-1', { text: '短い', dateKey: '2026-04-11' });
+    const short = boardCardRepo.saveMany.mock.calls[0][0][0].height;
+
+    await usecase.execute('user-1', { text: 'あ'.repeat(400), dateKey: '2026-04-11' });
+    const long = boardCardRepo.saveMany.mock.calls[1][0][0].height;
+
+    expect(short).toBe(120);
+    expect(long).toBeGreaterThan(short);
+  });
+
+  it('どれだけ長くてもカードは盤面を覆うほどには伸びない', async () => {
+    await usecase.execute('user-1', { text: 'あ'.repeat(2000), dateKey: '2026-04-11' });
+    const height = boardCardRepo.saveMany.mock.calls[0][0][0].height;
+
+    expect(height).toBeLessThanOrEqual(480);
   });
 });
