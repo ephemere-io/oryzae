@@ -178,4 +178,92 @@ describe('SpEntryEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: /問い/ }));
     expect(await screen.findByText(/立てている問いがありません/)).toBeTruthy();
   });
+  it('問いがゼロでも「納める」から問いをその場で立てられる（Issue #314）', async () => {
+    // 旧実装は空のとき「立てている問いがありません」を出すだけで、問いを作る導線が
+    // 無かった。問いを全て終了したユーザーは、書いても漬けられない状態に陥っていた。
+    const fetchImpl = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/questions' && init?.method === 'POST')
+        return Promise.resolve(jsonResponse({ id: 'new-q' }));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+
+    // 行き止まりではなく、その場で書く入力欄が出る。
+    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    fireEvent.change(input, { target: { value: '今日は何に驚いたか' } });
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+
+    // 作った問いが即チップに出る（作りたては /questions にも紐付けにも載らないため、
+    // ローカルに覚えていないと「+ 問いを結ぶ」に戻って見える）。
+    expect(await screen.findByText('◦ 今日は何に驚いたか')).toBeTruthy();
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/v1/questions',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    // 作った問いはエントリにも紐づく（紐づかないと発酵ループに入らない）。
+    await waitFor(() =>
+      expect(fetchImpl).toHaveBeenCalledWith(
+        '/api/v1/entries/e1/questions/new-q',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+  });
+
+  it('問いの作成に失敗したらエラーを出し、シートを閉じない（Issue #314）', async () => {
+    const fetchImpl = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/questions' && init?.method === 'POST')
+        return Promise.resolve(jsonResponse({}, false));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    fireEvent.change(input, { target: { value: '通らない問い' } });
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+
+    expect(await screen.findByText(jaMessages.sp.editor.question_create_failed)).toBeTruthy();
+    // 書いた内容を失わないよう入力欄は残す。
+    expect(screen.getByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeTruthy();
+  });
+
+  it('問いの取得が遅れてシートを先に開いても、届いたら一覧に切り替わる（Issue #314）', async () => {
+    // モードを「開いた時点の件数」で固定すると、選べる問いがあるのに入力欄のままになる。
+    let resolveQuestions: ((res: Response) => void) | undefined;
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return new Promise<Response>((resolve) => {
+          resolveQuestions = resolve;
+        });
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+    expect(
+      await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder),
+    ).toBeTruthy();
+
+    resolveQuestions?.(jsonResponse([{ id: 'q1', currentText: '後から届いた問い' }]));
+
+    expect(await screen.findByText('後から届いた問い')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeNull();
+  });
 });
