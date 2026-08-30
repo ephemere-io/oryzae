@@ -24,32 +24,57 @@ export function CostSummaryCard({ summary }: { summary: CostSummary | null }) {
     );
   }
 
-  const delta = summary.currentMonthCost - summary.lastMonthCost;
-  const isDown = delta <= 0;
+  const { actual, estimated } = summary;
+
+  // 実請求額が取れないときに 0 を出さない。未設定/失敗はその旨を表示し、
+  // 補助的に推定値を「推定」と明示して見せる。
+  if (actual.status !== 'ok' || actual.currentMonthCost === null) {
+    return (
+      <Shell>
+        <div>
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            Monthly Cost
+          </span>
+          <div className="text-xl font-semibold tracking-tight mt-0.5 text-muted-foreground">
+            {actual.status === 'not-configured' ? '実請求額 未設定' : '実請求額 取得失敗'}
+          </div>
+        </div>
+        <div className="mt-2 space-y-0.5">
+          <p className="text-xs text-muted-foreground">
+            推定 {formatCost(estimated.currentMonthCost)}（自前トークン算出）
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            {actual.status === 'not-configured'
+              ? 'ANTHROPIC_ADMIN_KEY 未設定'
+              : (actual.message ?? '')}
+          </p>
+        </div>
+      </Shell>
+    );
+  }
+
+  const lastMonth = actual.lastMonthCost;
+  const delta = lastMonth === null ? null : actual.currentMonthCost - lastMonth;
+  const isDown = delta !== null && delta <= 0;
 
   return (
     <Shell>
       <div>
-        <span className="text-xs uppercase tracking-wider text-muted-foreground">
-          Monthly Cost (推定)
-        </span>
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">Monthly Cost</span>
         <div className="text-3xl font-semibold tracking-tight mt-0.5">
-          {formatCost(summary.currentMonthCost)}
+          {formatCost(actual.currentMonthCost)}
         </div>
       </div>
       <div className="mt-2 space-y-0.5">
-        <span className={`text-xs ${isDown ? 'text-green-500' : 'text-red-500'}`}>
-          {isDown ? '↓' : '↑'} {formatCost(Math.abs(delta))} vs last month
-        </span>
+        {delta !== null && (
+          <span className={`text-xs ${isDown ? 'text-green-500' : 'text-red-500'}`}>
+            {isDown ? '↓' : '↑'} {formatCost(Math.abs(delta))} vs last month
+          </span>
+        )}
         <p className="text-[10px] text-muted-foreground">
           Projected: {formatCost(summary.projectedCost)}
+          {summary.projectionBasis === 'estimated' && '（推定ベース）'}
         </p>
-        {/* トークン未保存ぶんは推定に含められない。過少計上を隠さない。 */}
-        {summary.untrackedCount > 0 && (
-          <p className="text-[10px] text-yellow-600 dark:text-yellow-500">
-            {summary.untrackedCount} 件はトークン未保存のため未計上
-          </p>
-        )}
       </div>
     </Shell>
   );

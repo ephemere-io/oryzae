@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
+import { type ActualCostResult, fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
 import {
   aggregateCost,
   aggregateCostByDay,
@@ -35,30 +36,17 @@ async function getSentryCount(): Promise<number | null> {
 }
 
 /**
- * 今月の推定 LLM コスト（保存トークン × 価格表）。
+ * 今月の実請求額 (Anthropic cost_report)。
  *
  * 旧実装は Vercel AI Gateway の getSpendReport / getCredits を叩いていたが、
  * issue #352 で Anthropic 直叩きに切替えて以降 Gateway 経由の実績はゼロで、
  * 画面には常に $0.0000 と空のチャートが出ていた（実際には課金されている）。
  * クレジット残高は Gateway 固有の概念なので廃止した。
  */
-async function getMonthToDateEstimate(
-  supabase: SupabaseClient,
-): Promise<{ costUsd: number } | null> {
+async function getMonthToDateActual(): Promise<ActualCostResult> {
   const now = new Date();
   const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  try {
-    const rows = await fetchFermentationCostRows(supabase, {
-      startIso: startOfMonth.toISOString(),
-      endIso: now.toISOString(),
-    });
-    return { costUsd: aggregateCost(rows.rows).estimatedCostUsd };
-  } catch (error) {
-    console.error('[admin-observability] month-to-date estimate failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-    return null;
-  }
+  return fetchActualCost(startOfMonth, now);
 }
 
 async function getVercelLatestDeploy(): Promise<string | null> {
@@ -131,24 +119,24 @@ async function getUpstashKeyCount(): Promise<number | null> {
 
 export const adminObservability = new Hono<Env>()
   .get('/summary', async (c) => {
-    const supabase = c.get('adminSupabase');
-    const [sentryCount, monthlyEstimate, vercelDeploy, upstashKeys, resendStats] =
-      await Promise.all([
-        getSentryCount(),
-        getMonthToDateEstimate(supabase),
-        getVercelLatestDeploy(),
-        getUpstashKeyCount(),
-        getResendStats(),
-      ]);
+    const [sentryCount, monthlyActual, vercelDeploy, upstashKeys, resendStats] = await Promise.all([
+      getSentryCount(),
+      getMonthToDateActual(),
+      getVercelLatestDeploy(),
+      getUpstashKeyCount(),
+      getResendStats(),
+    ]);
 
     return c.json({
       posthog: { metric: null }, // fetched client-side from /analytics/overview
       sentry: {
         unresolvedCount: sentryCount,
       },
-      llmCost: {
-        // 取得失敗を「$0」と誤読させないため null を返す（0 は「本当に0円」）。
-        monthlyEstimatedUsd: monthlyEstimate?.costUsd ?? null,
+      anthropic: {
+        // status を必ず返す。null と 0 を潰すと「未設定」を「$0」と誤読させる。
+        status: monthlyActual.kind,
+        monthlySpend: monthlyActual.kind === 'ok' ? monthlyActual.totalCostUsd : null,
+        message: monthlyActual.kind === 'error' ? monthlyActual.message : null,
       },
       resend: {
         sentCount7d: resendStats?.sentCount ?? null,
@@ -211,7 +199,9 @@ export const adminObservability = new Hono<Env>()
   })
 
   // ── AI spend detail ───────────────────────────────────
-  // コストは保存トークン × 価格表からの推定。実請求額は Anthropic Console で見る。
+  // 実請求額 (Anthropic cost_report) と 推定 (自前トークン × 価格表) を明確に分けて返す。
+  // Anthropic 側は Oryzae のユーザーを知らないため、ユーザー別内訳は推定のみ。
+  // 日別は両者を突き合わせられるよう UTC 日で揃える（cost_report が UTC 固定のため）。
   .get('/spend', async (c) => {
     const supabase = c.get('adminSupabase');
     const daysBackParam = Number(c.req.query('date_from') ?? '30');
@@ -220,19 +210,23 @@ export const adminObservability = new Hono<Env>()
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
 
-    const rowsResult = await fetchFermentationCostRows(supabase, {
-      startIso: start.toISOString(),
-      endIso: now.toISOString(),
-    }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[admin-observability] spend query failed', { error: message });
-      return null;
-    });
+    const [actual, rowsResult] = await Promise.all([
+      fetchActualCost(start, now),
+      fetchFermentationCostRows(supabase, {
+        startIso: start.toISOString(),
+        endIso: now.toISOString(),
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[admin-observability] spend query failed', { error: message });
+        return null;
+      }),
+    ]);
 
     const rows = rowsResult?.rows ?? [];
     const aggregate = aggregateCost(rows);
-    // 日別は created_at の UTC 日で切る（画面に「UTC 日」と明記）。
-    // 日次レポートは運用に合わせ JST 日で切る。cron-cost-alert.ts 参照。
+    // 日別は UTC 日で切る。同じ画面に並ぶ Anthropic 実額が UTC 日バケット固定で、
+    // 窓を揃えないと乖離が読めないため（日次レポートは運用に合わせ JST 日。
+    // cron-cost-alert.ts 参照）。画面には「UTC 日」と明記している。
     const daily = aggregateCostByDay(rows, (createdAt) => createdAt.slice(0, 10));
     // resolveUserEmails は listUsers を最大20往復する。解決すべきユーザーが
     // 居ない（期間内に発酵ゼロ / クエリ失敗）ときに叩く意味はない。
@@ -241,6 +235,15 @@ export const adminObservability = new Hono<Env>()
 
     return c.json({
       rangeDays: daysBack,
+      actual: {
+        status: actual.kind,
+        totalCostUsd: actual.kind === 'ok' ? actual.totalCostUsd : null,
+        daily: actual.kind === 'ok' ? actual.daily : [],
+        // truncated は status === 'ok' のときだけ意味を持つ。失敗時の false は
+        // 「完全に取得できた」ではなく「該当なし」。必ず status を先に見ること。
+        truncated: actual.kind === 'ok' ? actual.truncated : false,
+        message: actual.kind === 'error' ? actual.message : null,
+      },
       estimated: {
         // rowsResult が null = クエリ失敗。空配列を「コスト0」と読ませないため status を返す。
         status: rowsResult === null ? 'error' : 'ok',

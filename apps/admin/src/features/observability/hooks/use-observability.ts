@@ -7,10 +7,12 @@ import { getAccessToken } from '@/lib/auth';
 export interface ObservabilitySummary {
   posthog: { totalPageviews: number; totalSessions: number } | null;
   sentry: { unresolvedCount: number | null };
-  // 今月の推定 LLM コスト（保存トークン × 価格表）。取得失敗は null で、
-  // 0（本当に0円）と区別する。$0 と誤表示しないこと。
-  llmCost: {
-    monthlyEstimatedUsd: number | null;
+  // 実請求額 (Anthropic cost_report)。status で「未設定 / 取得失敗 / 実データ」を
+  // 区別する。null と 0 を潰すと未設定を $0 と誤読させるため必ず status を見ること。
+  anthropic: {
+    status: 'ok' | 'not-configured' | 'error';
+    monthlySpend: number | null;
+    message: string | null;
   };
   resend: { sentCount7d: number | null; bouncedCount7d: number | null };
   upstash: { totalKeys: number | null };
@@ -24,10 +26,12 @@ interface AnalyticsOverview {
 
 interface SummaryApiResponse {
   sentry: { unresolvedCount: number | null };
-  // 今月の推定 LLM コスト（保存トークン × 価格表）。取得失敗は null で、
-  // 0（本当に0円）と区別する。$0 と誤表示しないこと。
-  llmCost: {
-    monthlyEstimatedUsd: number | null;
+  // 実請求額 (Anthropic cost_report)。status で「未設定 / 取得失敗 / 実データ」を
+  // 区別する。null と 0 を潰すと未設定を $0 と誤読させるため必ず status を見ること。
+  anthropic: {
+    status: 'ok' | 'not-configured' | 'error';
+    monthlySpend: number | null;
+    message: string | null;
   };
   resend: { sentCount7d: number | null; bouncedCount7d: number | null };
   upstash: { totalKeys: number | null };

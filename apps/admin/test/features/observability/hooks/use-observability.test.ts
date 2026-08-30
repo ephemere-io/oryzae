@@ -22,7 +22,7 @@ describe('useObservability', () => {
   it('fetches summary and merges PostHog data', async () => {
     const summaryBody = {
       sentry: { unresolvedCount: 3 },
-      llmCost: { monthlyEstimatedUsd: 1.5 },
+      anthropic: { status: 'ok', monthlySpend: 1.5, message: null },
       resend: { sentCount7d: 12, bouncedCount7d: 1 },
       upstash: { totalKeys: 42 },
       vercel: { latestDeployState: 'READY' },
@@ -41,7 +41,8 @@ describe('useObservability', () => {
 
     expect(result.current.data?.posthog?.totalPageviews).toBe(1234);
     expect(result.current.data?.sentry.unresolvedCount).toBe(3);
-    expect(result.current.data?.llmCost.monthlyEstimatedUsd).toBe(1.5);
+    expect(result.current.data?.anthropic.status).toBe('ok');
+    expect(result.current.data?.anthropic.monthlySpend).toBe(1.5);
     expect(result.current.data?.resend.sentCount7d).toBe(12);
     expect(result.current.data?.resend.bouncedCount7d).toBe(1);
     expect(result.current.error).toBeNull();

@@ -14,11 +14,20 @@ function mockResponse(ok: boolean, body: unknown): Response {
 }
 
 const sampleSummary = {
-  currentMonthCost: 12.5,
-  lastMonthCost: 15.3,
+  actual: {
+    status: 'ok',
+    currentMonthCost: 12.5,
+    lastMonthCost: 15.3,
+    message: null,
+  },
+  estimated: {
+    currentMonthCost: 12.1,
+    lastMonthCost: 15.0,
+    untrackedCount: 0,
+    truncated: false,
+  },
   projectedCost: 18.0,
-  untrackedCount: 0,
-  truncated: false,
+  projectionBasis: 'actual',
   daysElapsed: 20,
   daysInMonth: 31,
 };

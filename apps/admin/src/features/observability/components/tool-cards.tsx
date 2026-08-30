@@ -19,12 +19,14 @@ function formatMetric(value: number | string | null, suffix = ''): string {
 }
 
 /**
- * 推定 LLM コストの表示。取得失敗を「$0.00」と出さないこと。
+ * 実請求額の表示。未設定・取得失敗を「$0.00」と出さないこと。
  * それをやると issue #352 以降ずっと出ていた「コストが常に0」の再来になる。
  */
-function formatLlmCostMetric(llmCost: ObservabilitySummary['llmCost']): string {
-  if (llmCost.monthlyEstimatedUsd === null) return '-';
-  return `$${llmCost.monthlyEstimatedUsd.toFixed(2)} MTD (推定)`;
+function formatAnthropicMetric(anthropic: ObservabilitySummary['anthropic']): string {
+  if (anthropic.status === 'not-configured') return 'ADMIN_KEY 未設定';
+  if (anthropic.status === 'error') return '取得失敗';
+  if (anthropic.monthlySpend === null) return '-';
+  return `$${anthropic.monthlySpend.toFixed(2)} MTD`;
 }
 
 interface ToolRow {
@@ -59,12 +61,11 @@ function buildRows(data: ObservabilitySummary): ToolRow[] {
       externalUrl: 'https://oryzae.sentry.io',
     },
     {
-      id: 'llm-cost',
+      id: 'anthropic',
       name: 'Anthropic',
       category: 'LLM Cost',
-      metric: formatLlmCostMetric(data.llmCost),
+      metric: formatAnthropicMetric(data.anthropic),
       href: '/observability/spend',
-      // 実請求額は Console で見る（API 取得には Admin key = org 契約が必要）。
       externalUrl: 'https://platform.claude.com/cost',
     },
     {

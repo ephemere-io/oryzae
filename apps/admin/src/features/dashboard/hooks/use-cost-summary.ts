@@ -5,17 +5,25 @@ import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
 /**
- * 月次コスト。保存トークン × 公表単価からの **推定**。
- * 実請求額は Anthropic Console (platform.claude.com/cost) で確認する。
+ * 月次コスト。実請求額 (Anthropic cost_report) と 推定 (自前トークン × 価格表) を
+ * 分けて持つ。actual.status が 'ok' でないときに 0 を表示しないこと
+ * （未設定を「$0」と誤読させるのが issue #490 で報告された症状そのもの）。
  */
 export interface CostSummary {
-  currentMonthCost: number;
-  lastMonthCost: number;
+  actual: {
+    status: 'ok' | 'not-configured' | 'error';
+    currentMonthCost: number | null;
+    lastMonthCost: number | null;
+    message: string | null;
+  };
+  estimated: {
+    currentMonthCost: number;
+    lastMonthCost: number;
+    untrackedCount: number;
+    truncated: boolean;
+  };
   projectedCost: number;
-  /** トークン未保存で推定に含められなかった件数。 */
-  untrackedCount: number;
-  /** 集計上限に達して打ち切られた場合 true（推定は過少）。 */
-  truncated: boolean;
+  projectionBasis: 'actual' | 'estimated';
   daysElapsed: number;
   daysInMonth: number;
 }

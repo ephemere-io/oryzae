@@ -96,6 +96,7 @@ describe('cronCostAlert', () => {
     supabaseState.shouldThrow = false;
     supabaseState.capturedRange = {};
     vi.stubEnv('CRON_SECRET', SECRET);
+    vi.stubEnv('ANTHROPIC_ADMIN_KEY', '');
     // コスト cron は JST 10:00 (= UTC 01:00) 実行 → 対象は JST 前日 (8/9)
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-10T01:00:00.000Z'));
@@ -218,6 +219,40 @@ describe('cronCostAlert', () => {
     expect(fieldValue('コスト未計上')).toBe('1 件');
   });
 
+  it('reports the actual billed cost when the admin key is configured', async () => {
+    vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+    supabaseState.rows = [fermentation()];
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          data: [{ starting_at: '2026-08-08T00:00:00Z', results: [{ amount: '46.5' }] }],
+          has_more: false,
+        }),
+      text: () => Promise.resolve(''),
+    });
+
+    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+    const body = await res.json();
+
+    // JST 8/9 の定期発酵は UTC 8/8 に走る
+    expect(body.actualCostUtcDate).toBe('2026-08-08');
+    expect(body.actualCost).toEqual({ status: 'ok', costUsd: 0.465, truncated: false });
+    expect(fieldValue('実請求額')).toBe('$0.4650 (UTC 2026-08-08)');
+  });
+
+  it('says the admin key is unset rather than reporting $0', async () => {
+    supabaseState.rows = [fermentation()];
+
+    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+    const body = await res.json();
+
+    expect(body.actualCost).toEqual({ status: 'not-configured' });
+    expect(fieldValue('実請求額')).toBe('未設定 (ANTHROPIC_ADMIN_KEY)');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('sends an INFO report below the threshold', async () => {
     supabaseState.rows = [fermentation()];
 
@@ -238,6 +273,26 @@ describe('cronCostAlert', () => {
     expect(mockNotifyDiscord).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'AI コスト警告 — 閾値超過', color: COLORS.ERROR }),
     );
+  });
+
+  it('prefers the actual cost over the estimate for the threshold decision', async () => {
+    vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+    // 推定は閾値未満だが、実請求額は $2.00 で超過している
+    supabaseState.rows = [fermentation()];
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          data: [{ starting_at: '2026-08-08T00:00:00Z', results: [{ amount: '200' }] }],
+          has_more: false,
+        }),
+      text: () => Promise.resolve(''),
+    });
+
+    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+    expect((await res.json()).thresholdExceeded).toBe(true);
   });
 
   it('returns 500 and notifies Discord ERROR when an unexpected error is thrown', async () => {
