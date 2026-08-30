@@ -1,6 +1,6 @@
 /**
  * Oryzae ブランド定数。LP（ランディングページ）と同じ正式ロゴ・配色を共有する。
- * - SVG ロゴ: `apps/client/public/landing/logo/` の P3_appicon_cream / P3_mark_color に対応
+ * - SVG ロゴ: 実体は公開サイト（ephemere-io/oryzae-docs）の public/landing/logo/ にある
  * - 用途: ファビコン、Apple touch icon、OGP 画像、メタデータ
  */
 

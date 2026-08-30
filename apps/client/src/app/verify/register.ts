@@ -13,7 +13,6 @@
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
 import '@/features/auth/components/reset-password-form.verify';
-import '@/features/landing/components/landing-faq-item.verify';
 import '@/features/pc/entries/components/delete-confirm-modal.verify';
 import '@/features/pc/entries/components/editor-status-bar.verify';
 import '@/features/pc/entries/components/entry-card.verify';
@@ -66,6 +65,7 @@ import '@/features/pc/navigation/components/sidebar.verify';
 import '@/features/auth/components/signup-form.verify';
 // 画面ごとのロード枠（スケルトン）
 import '@/features/pc/account/components/account-page-skeleton.verify';
+import '@/features/pc/account/components/writing-stats-skeleton.verify';
 import '@/features/pc/entries/components/entry-editor-skeleton.verify';
 import '@/features/pc/entries/components/entry-list-skeleton.verify';
 import '@/features/pc/questions/components/question-timeline-skeleton.verify';

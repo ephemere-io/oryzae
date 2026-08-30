@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readBoolean, readString } from '../../../shared/infrastructure/row.js';
 import type {
   JarPositionUpdate,
   QuestionRepositoryGateway,
@@ -102,15 +103,15 @@ export class SupabaseQuestionRepository implements QuestionRepositoryGateway {
 
   private toDomain(row: Record<string, unknown>): Question {
     return Question.fromProps({
-      id: row.id as string,
-      userId: row.user_id as string,
-      isArchived: row.is_archived as boolean,
-      isValidatedByUser: row.is_validated_by_user as boolean,
-      isProposedByOryzae: row.is_proposed_by_oryzae as boolean,
+      id: readString(row, 'id'),
+      userId: readString(row, 'user_id'),
+      isArchived: readBoolean(row, 'is_archived'),
+      isValidatedByUser: readBoolean(row, 'is_validated_by_user'),
+      isProposedByOryzae: readBoolean(row, 'is_proposed_by_oryzae'),
       jarX: typeof row.jar_x === 'number' ? row.jar_x : null,
       jarY: typeof row.jar_y === 'number' ? row.jar_y : null,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }

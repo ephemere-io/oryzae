@@ -4,10 +4,11 @@
  * 即 null・activeQuestions は []・autosave は enabled=false）。router 依存も無い。よって
  * `api=null` を渡せば fetch ゼロの純レンダリングになり、props だけで孤立検証できる。
  *
- * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / sheetOpen ＋発酵 CTA の
- * pickling。saving / pickled / questionLinked は到達しない（api=null では fetch せず save も即
- * null・activeQuestions が空のまま selectedQuestion が出ない／never-resolve でも save が解決せず
- * pickled が立たない）ため、定数になる属性は契約に載せない。
+ * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / hasQuestion / sheetOpen
+ * ＋発酵 CTA の pickling。saving / pickled は到達しない（api=null では fetch せず save も即
+ * null・never-resolve でも save が解決せず pickled が立たない）ため、定数になる属性は
+ * 契約に載せない。hasQuestion は Issue #450 で分岐条件になったので載せる（問い未選択で
+ * 発酵 CTA を押すと、漬けずに問い選択シートが開く）。
  *
  * i18n（sp.editor）依存のため withVerifyProviders（NextIntlClientProvider）で包む。
  * pickling=true は never-resolve fetch を持つ ApiClient を渡し、CTA を押して再現する
@@ -32,6 +33,30 @@ const neverResolveApi: ApiClient = {
   baseUrl: '',
   headers: {},
   fetch: () => new Promise<Response>(() => {}),
+};
+
+/** JSON を返すだけの最小 Response（as 不要で Response を満たす）。 */
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+// 立てている問いが 2 件ある状態。api=null だと activeQuestions が常に空になり、
+// シートの一覧モード（＋その下の「新しく問いを書く」）を検証できないため用意する。
+const withQuestionsApi: ApiClient = {
+  baseUrl: '',
+  headers: {},
+  fetch: (path: string) =>
+    Promise.resolve(
+      path.startsWith('/api/v1/questions')
+        ? jsonResponse([
+            { id: 'q1', currentText: 'なぜ書き続けるのか' },
+            { id: 'q2', currentText: '手放せないものは何か' },
+          ])
+        : jsonResponse([]),
+    ),
 };
 
 registerUnit<Props>({
@@ -91,12 +116,63 @@ registerUnit<Props>({
       props: {
         api: neverResolveApi,
         initialEntryId: 'entry-1',
+        // Issue #450: 問いが結ばれていない状態で CTA を押すと問い選択が開くようになった
+        // （問い無しのエントリは発酵ループに入らないため）。pickling を再現するには
+        // 問いが結ばれている必要があるので、URL 経由の初期紐づけを渡す。
+        initialQuestionId: 'question-1',
         initialContent: 'タイトル\n本文がここに入る',
         persistDraft: false,
       },
       act: async (ctx) => {
         await ctx.click('.mx-4 button');
         await ctx.wait(16);
+      },
+    },
+    {
+      id: 'pickle-without-question',
+      probe: true,
+      description:
+        'Probe: 問い未選択で発酵 CTA を押すと、漬けずに問い選択シートが開く（Issue #450）',
+      props: {
+        api: neverResolveApi,
+        initialEntryId: 'entry-1',
+        initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
+      },
+      act: async (ctx) => {
+        await ctx.click('.mx-4 button');
+        await ctx.wait(16);
+      },
+    },
+    {
+      id: 'question-empty-compose',
+      probe: true,
+      description:
+        'Probe: 立てている問いがゼロでも、CTA から開いたシートでその場で問いを書ける（Issue #314）',
+      props: {
+        api: null,
+        initialEntryId: 'entry-1',
+        initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
+      },
+      act: async (ctx) => {
+        await ctx.click('.mx-4 button');
+        await ctx.wait(16);
+      },
+    },
+    {
+      id: 'question-list-with-composer',
+      probe: true,
+      description: 'Probe: 問いがあるときは一覧を出し、その下から新規作成にも入れる（Issue #314）',
+      props: {
+        api: withQuestionsApi,
+        initialEntryId: 'entry-1',
+        initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
+      },
+      act: async (ctx) => {
+        await ctx.click('.mx-4 button');
+        await ctx.wait(48);
       },
     },
     {
@@ -137,6 +213,20 @@ registerUnit<Props>({
         return (
           hasCta === expectEntry ||
           `発酵 CTA present=${hasCta} だが contract.hasEntry="${contract.hasEntry}"`
+        );
+      },
+    },
+    {
+      id: 'no-dead-end-without-questions',
+      description:
+        'Issue #314: 問い作成モードでシートが開いているなら、必ず入力欄がある（行き止まりにしない）',
+      check: ({ root, contract }) => {
+        if (contract.sheetOpen !== 'true' || contract.composingQuestion !== 'true') return true;
+        // タイトル入力と取り違えないよう、問い入力の aria-label で特定する。
+        const input = root.querySelector('input[aria-label^="問いを書く"]');
+        return (
+          Boolean(input) ||
+          'シートを問い作成モードで開いたのに、その場で問いを書く入力欄が無い（＝行き止まり）'
         );
       },
     },
@@ -199,6 +289,46 @@ registerUnit<Props>({
         return (
           (contract.pickling === 'true' && btn?.disabled === true) ||
           `expected pickling=true & disabled, got pickling=${contract.pickling}, disabled=${btn?.disabled}`
+        );
+      },
+    },
+    {
+      id: 'pickle-without-question-opens-sheet',
+      description: '問い未選択で発酵 CTA を押しても漬けず、問い選択シートが開く（Issue #450）',
+      onlyFixtures: ['pickle-without-question'],
+      check: ({ contract }) =>
+        (contract.hasQuestion === 'false' &&
+          contract.pickling === 'false' &&
+          contract.sheetOpen === 'true') ||
+        `expected hasQuestion=false & pickling=false & sheetOpen=true, got hasQuestion=${contract.hasQuestion}, pickling=${contract.pickling}, sheetOpen=${contract.sheetOpen}`,
+    },
+    {
+      id: 'question-empty-offers-composer',
+      description:
+        '問いがゼロのとき CTA から開いたシートは、最初から問いの入力欄を出す（Issue #314）',
+      onlyFixtures: ['question-empty-compose'],
+      check: ({ root, contract }) => {
+        const input = root.querySelector('input[aria-label^="問いを書く"]');
+        return (
+          (contract.sheetOpen === 'true' &&
+            contract.composingQuestion === 'true' &&
+            Boolean(input)) ||
+          `expected sheetOpen=true & composingQuestion=true & 入力欄あり, got sheetOpen=${contract.sheetOpen}, composingQuestion=${contract.composingQuestion}, input=${Boolean(input)}`
+        );
+      },
+    },
+    {
+      id: 'question-list-keeps-composer-entry',
+      description: '問いがあるときは一覧を出しつつ、新規作成への導線も残す（Issue #314）',
+      onlyFixtures: ['question-list-with-composer'],
+      check: ({ root, contract }) => {
+        const options = root.querySelectorAll('ul li button');
+        const composerEntry = Array.from(root.querySelectorAll('button')).some((b) =>
+          b.textContent?.includes('新しく問いを書く'),
+        );
+        return (
+          (contract.composingQuestion === 'false' && options.length === 2 && composerEntry) ||
+          `expected 一覧2件＋作成導線, got composingQuestion=${contract.composingQuestion}, options=${options.length}, composerEntry=${composerEntry}`
         );
       },
     },

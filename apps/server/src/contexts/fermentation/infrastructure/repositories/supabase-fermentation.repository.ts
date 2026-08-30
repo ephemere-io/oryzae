@@ -1,4 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  readEnum,
+  readNumberOrNull,
+  readString,
+  readStringOrNull,
+  toRecordArray,
+} from '../../../shared/infrastructure/row.js';
 import type {
   FermentationRepositoryGateway,
   FermentationResultWithDetails,
@@ -9,6 +16,9 @@ import { ExtractedSnippet } from '../../domain/models/extracted-snippet.js';
 import { FermentationResult } from '../../domain/models/fermentation-result.js';
 import { Keyword } from '../../domain/models/keyword.js';
 import { Letter } from '../../domain/models/letter.js';
+
+const SNIPPET_TYPES = ['new_perspective', 'deepen', 'core'] as const;
+const FERMENTATION_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const;
 
 function readJarCoord(value: unknown): number | null {
   return typeof value === 'number' ? value : null;
@@ -97,19 +107,18 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         })
       : null;
 
-    const snippets = (snippetsRes.data ?? []).map((row: Record<string, unknown>) =>
-      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    const snippets = toRecordArray(snippetsRes.data ?? []).map((row) =>
       ExtractedSnippet.fromProps({
-        id: row.id as string,
-        fermentationResultId: row.fermentation_result_id as string,
-        snippetType: row.snippet_type as 'new_perspective' | 'deepen' | 'core',
-        originalText: row.original_text as string,
-        sourceDate: row.source_date as string,
-        selectionReason: row.selection_reason as string,
+        id: readString(row, 'id'),
+        fermentationResultId: readString(row, 'fermentation_result_id'),
+        snippetType: readEnum(row, 'snippet_type', SNIPPET_TYPES),
+        originalText: readString(row, 'original_text'),
+        sourceDate: readString(row, 'source_date'),
+        selectionReason: readString(row, 'selection_reason'),
         jarX: readJarCoord(row.jar_x),
         jarY: readJarCoord(row.jar_y),
-        createdAt: row.created_at as string,
-        updatedAt: row.updated_at as string,
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
 
@@ -125,17 +134,16 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         })
       : null;
 
-    const keywords = (keywordsRes.data ?? []).map((row: Record<string, unknown>) =>
-      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    const keywords = toRecordArray(keywordsRes.data ?? []).map((row) =>
       Keyword.fromProps({
-        id: row.id as string,
-        fermentationResultId: row.fermentation_result_id as string,
-        keyword: row.keyword as string,
-        description: row.description as string,
+        id: readString(row, 'id'),
+        fermentationResultId: readString(row, 'fermentation_result_id'),
+        keyword: readString(row, 'keyword'),
+        description: readString(row, 'description'),
         jarX: readJarCoord(row.jar_x),
         jarY: readJarCoord(row.jar_y),
-        createdAt: row.created_at as string,
-        updatedAt: row.updated_at as string,
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
 
@@ -149,20 +157,19 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .eq('question_id', questionId)
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
-    return (data ?? []).map((row: Record<string, string>) =>
-      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    return toRecordArray(data ?? []).map((row) =>
       FermentationResult.fromProps({
-        id: row.id,
-        userId: row.user_id,
-        questionId: row.question_id,
-        targetPeriod: row.target_period,
-        status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
-        generationId: row.generation_id ?? null,
-        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
-        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
-        errorMessage: row.error_message ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        id: readString(row, 'id'),
+        userId: readString(row, 'user_id'),
+        questionId: readString(row, 'question_id'),
+        targetPeriod: readString(row, 'target_period'),
+        status: readEnum(row, 'status', FERMENTATION_STATUSES),
+        generationId: readStringOrNull(row, 'generation_id'),
+        inputTokens: readNumberOrNull(row, 'input_tokens'),
+        outputTokens: readNumberOrNull(row, 'output_tokens'),
+        errorMessage: readStringOrNull(row, 'error_message'),
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
   }
@@ -174,20 +181,19 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Failed to list fermentation results: ${error.message}`);
-    return (data ?? []).map((row: Record<string, string>) =>
-      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    return toRecordArray(data ?? []).map((row) =>
       FermentationResult.fromProps({
-        id: row.id,
-        userId: row.user_id,
-        questionId: row.question_id,
-        targetPeriod: row.target_period,
-        status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
-        generationId: row.generation_id ?? null,
-        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
-        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
-        errorMessage: row.error_message ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        id: readString(row, 'id'),
+        userId: readString(row, 'user_id'),
+        questionId: readString(row, 'question_id'),
+        targetPeriod: readString(row, 'target_period'),
+        status: readEnum(row, 'status', FERMENTATION_STATUSES),
+        generationId: readStringOrNull(row, 'generation_id'),
+        inputTokens: readNumberOrNull(row, 'input_tokens'),
+        outputTokens: readNumberOrNull(row, 'output_tokens'),
+        errorMessage: readStringOrNull(row, 'error_message'),
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
   }
@@ -202,20 +208,19 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .lt('created_at', beforeIso)
       .order('created_at', { ascending: true });
     if (error) throw new Error(`Failed to list retryable fermentations: ${error.message}`);
-    return (data ?? []).map((row: Record<string, string>) =>
-      // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
+    return toRecordArray(data ?? []).map((row) =>
       FermentationResult.fromProps({
-        id: row.id,
-        userId: row.user_id,
-        questionId: row.question_id,
-        targetPeriod: row.target_period,
-        status: row.status as 'pending' | 'processing' | 'completed' | 'failed',
-        generationId: row.generation_id ?? null,
-        inputTokens: row.input_tokens != null ? Number(row.input_tokens) : null,
-        outputTokens: row.output_tokens != null ? Number(row.output_tokens) : null,
-        errorMessage: row.error_message ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        id: readString(row, 'id'),
+        userId: readString(row, 'user_id'),
+        questionId: readString(row, 'question_id'),
+        targetPeriod: readString(row, 'target_period'),
+        status: readEnum(row, 'status', FERMENTATION_STATUSES),
+        generationId: readStringOrNull(row, 'generation_id'),
+        inputTokens: readNumberOrNull(row, 'input_tokens'),
+        outputTokens: readNumberOrNull(row, 'output_tokens'),
+        errorMessage: readStringOrNull(row, 'error_message'),
+        createdAt: readString(row, 'created_at'),
+        updatedAt: readString(row, 'updated_at'),
       }),
     );
   }

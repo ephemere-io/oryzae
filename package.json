@@ -12,6 +12,7 @@
     "test": "pnpm test:scripts && pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test && pnpm --filter @oryzae/admin test",
     "test:scripts": "vitest run --config vitest.config.mjs",
     "knip": "knip",
+    "check:as": "node scripts/check-type-assertions.test.mjs && node scripts/check-type-assertions.mjs",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise && pnpm --filter @oryzae/admin dep-cruise",
     "security:rls": "node scripts/check-rls-policies.mjs",
     "i18n:sync": "node apps/client/scripts/build-i18n.mjs --remote",
@@ -37,7 +38,7 @@
     }
   },
   "devDependencies": {
-    "@biomejs/biome": "~2.5.8",
+    "@biomejs/biome": "~2.5.9",
     "knip": "^6.32.2",
     "lint-staged": "^17.3.0",
     "simple-git-hooks": "^2.13.1",
