@@ -38,6 +38,8 @@ function makeDetail(overrides: Partial<FermentationDetail>): FermentationDetail 
     snippets: [],
     keywords: [],
     letter: null,
+    // main の型集約で必須になったフィールド。サイドバーはまだ使わないので空で埋める。
+    scannedEntries: [],
     ...overrides,
   };
 }

@@ -1,74 +1,73 @@
 /**
- * EditorStatusBar の検証スペック（A 移植 pilot #1）。
- * i18n 依存の純表示部品を、withVerifyProviders（NextIntlClientProvider）で孤立検証できる実証。
+ * EditorStatusBar の検証スペック。
  *
- * Issue #360 / #229 で 3カラム（保存状態 / 文字数ゲージ / 漬け込みまでの文脈）に再設計した。
- * 相対時刻は `lastSavedAt` を props で受けるので、固定値を渡せば決定的に検証できる。
+ * 画面幅いっぱいの帯（保存状態＋文字数＋「あと何字」）をやめ、**左下の小さな処理表示**に
+ * 作り直した。文字数と漬け込みの目安は、書いている最中に読む必要が無いので消してある
+ * （漬け込みの条件はパレットのボタンの活性/非活性とツールチップが伝える）。
+ *
+ * ここで見張るのは「裏で起きていることだけを、起きているときだけ出す」という契約。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { type EditorStatus, EditorStatusBar, PICKLE_HINT_CHARS } from './editor-status-bar';
+import { type EditorStatus, EditorStatusBar } from './editor-status-bar';
 
 interface Props {
   status: EditorStatus;
-  charCount: number;
   lastSavedAt?: number | null;
-  onCharCountClick?: () => void;
 }
 
-const noop = () => {};
-
-/** 固定の基準時刻（相対時刻の描画を決定的にするため、Date.now() は使わない）。 */
+/** 固定の基準時刻（Date.now() を使わず決定的にする）。 */
 const T0 = Date.UTC(2026, 4, 1, 9, 0, 0);
 
 registerUnit<Props>({
   id: 'EditorStatusBar',
   title: 'EditorStatusBar',
-  description: 'エディタ下部のステータスバー（保存状態 + 文字数バー + 漬け込みまでの文脈）',
+  description: '左下の処理表示（保存中／保存しました だけを、起きているときだけ出す）',
   kind: 'component',
   render: (props) => withVerifyProviders(<EditorStatusBar {...props} />),
   fixtures: [
     {
-      id: 'editing',
-      description: '編集中・未保存（自動保存されることを告げる）',
-      props: { status: 'editing', charCount: 120, lastSavedAt: null, onCharCountClick: noop },
-    },
-    {
-      id: 'saved',
-      description: '保存済み（相対時刻を出す）',
-      props: { status: 'saved', charCount: 800, lastSavedAt: T0, onCharCountClick: noop },
+      id: 'idle',
+      description: '編集中・未保存 — 何も出さない（無言が既定）',
+      props: { status: 'editing', lastSavedAt: null },
     },
     {
       id: 'saving',
-      description: '保存中（in-flight）',
-      props: { status: 'saving', charCount: 1500, lastSavedAt: T0, onCharCountClick: noop },
+      description: '保存中（手動）',
+      props: { status: 'saving', lastSavedAt: null },
     },
     {
-      id: 'empty',
-      description: '1文字も書いていない（右カラムは書き出しの案内）',
-      props: { status: 'editing', charCount: 0, lastSavedAt: null, onCharCountClick: noop },
+      id: 'autosaving',
+      description: '自動保存中',
+      props: { status: 'autosaving', lastSavedAt: T0 },
     },
     {
-      id: 'overflow',
+      id: 'saved',
+      description: '保存が終わった直後',
+      props: { status: 'saved', lastSavedAt: T0 },
+    },
+    {
+      id: 'saved-without-timestamp',
       probe: true,
-      description: 'Probe: 2000字超でもバーは100%で頭打ち（レイアウト崩れない）',
-      props: { status: 'saved', charCount: 8000, lastSavedAt: T0, onCharCountClick: noop },
+      description: 'Probe: status=saved でも保存時刻が無ければ出さない（嘘をつかない）',
+      props: { status: 'saved', lastSavedAt: null },
     },
     {
-      id: 'no-stats-handler',
+      id: 'editing-after-save',
       probe: true,
-      description: 'Probe: onCharCountClick 未指定でも文字数は読め、ボタンは無効化される',
-      props: { status: 'editing', charCount: 42, lastSavedAt: null },
+      description: 'Probe: 一度保存したあと編集を再開したら、また無言に戻る',
+      props: { status: 'editing', lastSavedAt: T0 },
     },
   ],
   invariants: [
     {
-      id: 'charcount-rendered',
-      description: '文字数が "<n> CHARS" として表示される',
-      check: ({ root, props }) =>
-        Boolean(root.textContent?.includes(`${props.charCount} CHARS`)) ||
-        `"${props.charCount} CHARS" が描画されていない`,
+      id: 'no-char-count',
+      description: '文字数を出さない（書き手の判断が変わらない情報を常時出さない）',
+      check: ({ root }) => {
+        const text = root.textContent ?? '';
+        return !/CHARS|\d+\s*字/.test(text) || `文字数らしき表示が残っている: "${text}"`;
+      },
     },
     {
       id: 'inflight-contract',
@@ -77,16 +76,8 @@ registerUnit<Props>({
         const expected = props.status === 'saving' || props.status === 'autosaving';
         return (
           contract.inFlight === String(expected) ||
-          `inFlight 契約不一致: status=${props.status} → contract.inFlight=${contract.inFlight}`
+          `inFlight 契約不一致: status=${props.status} → ${contract.inFlight}`
         );
-      },
-    },
-    {
-      id: 'fill-capped',
-      description: 'バーの幅は 0〜100% に収まる（charCount 過大でも頭打ち）',
-      check: ({ contract }) => {
-        const pct = Number(contract.fillPct);
-        return (pct >= 0 && pct <= 100) || `fillPct が 0〜100 の範囲外: ${contract.fillPct}`;
       },
     },
     {
@@ -101,34 +92,27 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'context-column-never-empty',
-      description: '右カラム（漬け込みまでの文脈）が常に何かを語る（空白の帯にしない）',
-      check: ({ root }) => {
-        const columns = root.querySelectorAll('[data-verify-unit="EditorStatusBar"] > *');
-        const last = columns[columns.length - 1];
-        const text = last?.textContent?.trim() ?? '';
-        return text.length > 0 || '右カラムが空（#360 の「何のための帯か分からない」に戻っている）';
-      },
-    },
-    {
-      id: 'stats-button-disabled-without-handler',
-      description: 'onCharCountClick が無いときは文字数ボタンが disabled になる',
-      check: ({ root, props }) => {
-        const button = root.querySelector('button');
-        if (!button) return '文字数ボタンが見つからない';
-        const expected = !props.onCharCountClick;
-        const isDisabled = button.hasAttribute('disabled');
-        return isDisabled === expected || `disabled=${isDisabled}, 期待=${expected}`;
-      },
-    },
-    {
-      id: 'gauge-threshold-consistent',
-      description: 'fillPct が PICKLE_HINT_CHARS を基準に算出されている',
+      id: 'silent-unless-something-happens',
+      description: '保存中でも保存直後でもなければ何も出さない',
       check: ({ contract, props }) => {
-        const expected = Math.min(100, (props.charCount / PICKLE_HINT_CHARS) * 100);
+        const inFlight = props.status === 'saving' || props.status === 'autosaving';
+        const showsSaved = props.status === 'saved' && (props.lastSavedAt ?? null) !== null;
+        const expected = inFlight || showsSaved;
         return (
-          Math.abs(Number(contract.fillPct) - expected) < 0.001 ||
-          `fillPct=${contract.fillPct}, 期待=${expected}`
+          contract.visible === String(expected) ||
+          `visible=${contract.visible}, 期待=${expected}（status=${props.status}）`
+        );
+      },
+    },
+    {
+      id: 'does-not-block-the-paper',
+      description: '本文の上に置くので、クリックを吸わない',
+      check: ({ root }) => {
+        const el = root.querySelector('[data-verify-unit="EditorStatusBar"]');
+        if (!el) return '契約要素が見つからない';
+        return (
+          el.className.includes('pointer-events-none') ||
+          'pointer-events が生きている（本文のクリックを奪う）'
         );
       },
     },

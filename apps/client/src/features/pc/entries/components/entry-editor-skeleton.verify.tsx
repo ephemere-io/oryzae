@@ -6,6 +6,7 @@
 
 import { registerUnit } from '@oryzae/verify';
 import { skeletonInvariants } from '@/lib/verify/skeleton-invariants';
+import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { EntryEditorSkeleton } from './entry-editor-skeleton';
 
 interface Props {
@@ -22,7 +23,9 @@ registerUnit<Props>({
   description:
     'PC エディタのロード枠: ツールバー（日付/タイトル/問い） / 執筆エリア / ステータスバー',
   kind: 'component',
-  render: (props) => <EntryEditorSkeleton {...props} />,
+  // bodyLoading の枠は PageLoading（i18n 依存）を描くので、孤立検証でも
+  // NextIntlClientProvider を供給する。
+  render: (props) => withVerifyProviders(<EntryEditorSkeleton {...props} />),
   fixtures: [
     { id: 'default', description: '既定（問いチップ1件想定）', props: {} },
     {

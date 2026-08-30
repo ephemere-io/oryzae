@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readString } from '../../../shared/infrastructure/row.js';
 import type { BoardSnippetRepositoryGateway } from '../../domain/gateways/board-snippet-repository.gateway.js';
 import { BoardSnippet } from '../../domain/models/board-snippet.js';
 
@@ -54,14 +55,13 @@ export class SupabaseBoardSnippetRepository implements BoardSnippetRepositoryGat
     if (error) throw error;
   }
 
-  // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
   private toDomain(row: Record<string, unknown>): BoardSnippet {
     return BoardSnippet.fromProps({
-      id: row.id as string,
-      userId: row.user_id as string,
-      text: row.text as string,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      id: readString(row, 'id'),
+      userId: readString(row, 'user_id'),
+      text: readString(row, 'text'),
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }

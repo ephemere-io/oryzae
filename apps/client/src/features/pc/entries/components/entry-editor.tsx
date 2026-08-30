@@ -10,6 +10,10 @@ import {
   type EditorStatus,
   EditorStatusBar,
 } from '@/features/pc/entries/components/editor-status-bar';
+import {
+  EntryActionPalette,
+  type PaletteAction,
+} from '@/features/pc/entries/components/entry-action-palette';
 import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
 import { FermentationSidebar } from '@/features/pc/entries/components/fermentation-sidebar';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
@@ -154,6 +158,8 @@ export function EntryEditor({
   const [draftTitle, setDraftTitle] = useState('');
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   const [statsOpen, setStatsOpen] = useState(false);
+  // 問いのドロップダウンは、ヘッダーのチップからもパレットの操作からも開く。
+  const [questionChipOpen, setQuestionChipOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
@@ -714,15 +720,111 @@ export function EntryEditor({
 
   const charCount = content.length;
 
+  // パレットの操作。押せないものは非活性にして、理由はホバーで出す
+  // （「あと何字」を常時表示しない代わり）。
+  const paletteIcon = (children: React.ReactNode) => (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+
+  const paletteActions: PaletteAction[] = [
+    {
+      id: 'question',
+      label: t('palette.link_question'),
+      icon: paletteIcon(
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.4 9.4a2.6 2.6 0 0 1 4.6 1.6c0 1.7-2.4 2-2.4 3.4" />
+          <circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none" />
+        </>,
+      ),
+      onSelect: () => setQuestionChipOpen(true),
+    },
+    {
+      id: 'voice',
+      label: voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice'),
+      active: voiceActive,
+      icon: paletteIcon(
+        <>
+          <rect x="9" y="2.5" width="6" height="11" rx="3" />
+          <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 20v2" />
+        </>,
+      ),
+      onSelect: () => setVoiceActive((v) => !v),
+    },
+    {
+      id: 'pickle',
+      label: t('toolbar.pickle'),
+      disabledReason: !content.trim() ? t('palette.pickle_needs_body') : undefined,
+      icon: paletteIcon(
+        <>
+          <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
+          <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+        </>,
+      ),
+      onSelect: handlePickleClick,
+    },
+    {
+      id: 'stats',
+      label: t('palette.stats'),
+      icon: paletteIcon(<path d="M5 20V14M12 20V5M19 20v-9" />),
+      onSelect: () => setStatsOpen((v) => !v),
+    },
+    {
+      id: 'fullscreen',
+      label: t('toolbar.fullscreen'),
+      icon: paletteIcon(<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />),
+      onSelect: toggleFullscreen,
+    },
+  ];
+
+  if (fermentationOverlayDetail) {
+    paletteActions.push({
+      id: 'fermentation',
+      label: fermentSidebarOpen
+        ? t('toolbar.fermentation_sidebar_hide')
+        : t('toolbar.fermentation_sidebar_show'),
+      active: fermentSidebarOpen,
+      icon: paletteIcon(
+        <>
+          <path d="M9 3.75v3.75M15 3.75v3.75M7.5 7.5h9a1.5 1.5 0 0 1 1.5 1.5v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V9a1.5 1.5 0 0 1 1.5-1.5Z" />
+          <path d="M9 12.75h6M9 15.75h4.5" />
+        </>,
+      ),
+      onSelect: toggleFermentSidebar,
+    });
+  }
+
+  // 書いている間はパレットも一緒に消す（ヘッダーや処理表示と同じ挙動）。
+  // 常に出しておきたい人のために設定で切れる。
+  const paletteVisible = settings.paletteAutoHide ? uiVisible : true;
+
   const isVertical = settings.writingMode === 'vertical';
-  // タイトルの置き場。縦書きは本文（left:6% / width:79%）の右に残る余白へ縦組みで、
+  // タイトルの置き場。縦書きは本文（left:6% / width:79%）のすぐ右へ縦組みで、
   // 横書きは本文（px-[15%]）の上に、同じ左端から。
+  //
+  // 縦書きでは**本文との間を詰める**。以前は右端（right-1.5%）に寄せていたため、
+  // 題と本文のあいだに列1本ぶんの空白が空き、別の柱のように見えていた。
+  // 題は本文の続きではなく「本文に添う」ものなので、隣に寄せる。
   const titleBoxClass = isVertical
-    ? 'absolute top-[4%] right-[1.5%] h-[86%] w-[3.5%] min-w-[2.2rem]'
+    ? 'absolute top-[4%] right-[6.5%] h-[86%] w-[9%] min-w-[3rem]'
     : 'absolute top-6 left-[15%] w-[70%]';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
-  const titleFontSize = Math.round(settings.fontSize * 1.15);
+  //
+  // 題と本文の**大きさの差**をはっきりつける（1.15 倍では差が読めず、ただの1行に見えた）。
+  // 縦書きは題が本文の隣に立つので差が効く。横書きは見出しとして上に載るのでもう少し強く。
+  const titleFontSize = Math.round(settings.fontSize * (isVertical ? 1.45 : 1.6));
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
   const titleTextStyle: React.CSSProperties = {
     fontSize: `${titleFontSize}px`,
@@ -758,121 +860,13 @@ export function EntryEditor({
             linkedQuestionIds={linkedIds}
             onLink={handleLink}
             onUnlink={handleUnlink}
+            open={questionChipOpen}
+            onOpenChange={setQuestionChipOpen}
           />
         </div>
 
-        {/* 右: アクションコーナー → 日付 → 設定。 */}
+        {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
         <div className="flex shrink-0 items-center gap-1">
-          {/* 入力と一次アクション。没入に関わる全画面切替もここに置く。 */}
-          <button
-            type="button"
-            onClick={() => setVoiceActive((v) => !v)}
-            className={`rounded-md p-1.5 transition-all ${
-              voiceActive
-                ? 'text-red-500'
-                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-            }`}
-            data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-            aria-label={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-          >
-            <svg
-              aria-hidden="true"
-              className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-            >
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
-            </svg>
-          </button>
-
-          {/* 漬け込む。**色は付けない**（塗りボタンは紙の中で浮く）。 */}
-          <button
-            type="button"
-            onClick={handlePickleClick}
-            disabled={saving || !content.trim()}
-            data-testid="pickle-primary-action"
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--fg)] transition-colors hover:bg-[var(--toolbar-hover)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
-            aria-label={t('toolbar.pickle')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4 shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.6}
-            >
-              <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
-              <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
-            </svg>
-            {t('toolbar.pickle')}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.fullscreen')}
-            aria-label={t('toolbar.fullscreen')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
-              />
-            </svg>
-          </button>
-
-          {/* Issue #329 → #466: 発酵結果はサイドバーに集約。結果があるときだけ開閉ボタンを出す。 */}
-          {fermentationOverlayDetail && (
-            <button
-              type="button"
-              onClick={toggleFermentSidebar}
-              aria-pressed={fermentSidebarOpen}
-              className={`rounded-md p-1.5 transition-all hover:bg-[var(--toolbar-hover)] ${
-                fermentSidebarOpen
-                  ? 'text-emerald-600'
-                  : 'text-[var(--date-color)] hover:text-[var(--fg)]'
-              }`}
-              data-tooltip={
-                fermentSidebarOpen
-                  ? t('toolbar.fermentation_sidebar_hide')
-                  : t('toolbar.fermentation_sidebar_show')
-              }
-              aria-label={
-                fermentSidebarOpen
-                  ? t('toolbar.fermentation_sidebar_hide')
-                  : t('toolbar.fermentation_sidebar_show')
-              }
-              data-testid="fermentation-sidebar-toggle"
-            >
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 3.75v3.75M15 3.75v3.75M7.5 7.5h9a1.5 1.5 0 0 1 1.5 1.5v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V9a1.5 1.5 0 0 1 1.5-1.5Zm1.5 5.25h6m-6 3h4.5"
-                />
-              </svg>
-            </button>
-          )}
-
           {/* 日付は設定ボタンのすぐ左に、小さく。 */}
           <span className="ml-1 shrink-0 text-[11px] text-[var(--date-color)]">{dateStr}</span>
 
@@ -931,7 +925,11 @@ export function EntryEditor({
         style={{ left: sidebarWidth }}
       />
 
-      {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}
+      {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。
+          Issue #350 は「基本 UI が透明化するのに発酵要素だけ残る」問題で、main では
+          フローティング表示を fadeClass で包むことで直していた。ここでは表示先が
+          サイドバーに変わっただけなので、同じ設定（focusModeFadesFermentation）を
+          サイドバー側に適用して意図をそのまま引き継ぐ。 */}
       <div className="flex min-h-0 flex-1">
         {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
         <div className="relative flex-1">
@@ -1063,12 +1061,16 @@ export function EntryEditor({
           )}
         </div>
 
-        {/* Issue #466: 発酵結果は本文に重ねず、右のサイドバーに集約する。 */}
+        {/* Issue #466: 発酵結果は本文に重ねず、右のサイドバーに集約する。
+            Issue #350: フォーカスモードで基本 UI が消えるとき、発酵結果だけ残ると浮くので
+            一緒に薄くする。切りたい人のために設定で外せる。 */}
         {fermentSidebarOpen && fermentationOverlayDetail && (
-          <FermentationSidebar
-            detail={fermentationOverlayDetail}
-            onClose={() => setFermentSidebarOpen(false)}
-          />
+          <div className={settings.focusModeFadesFermentation ? fadeClass : undefined}>
+            <FermentationSidebar
+              detail={fermentationOverlayDetail}
+              onClose={() => setFermentSidebarOpen(false)}
+            />
+          </div>
         )}
       </div>
 
@@ -1080,14 +1082,14 @@ export function EntryEditor({
         onClose={() => setStatsOpen(false)}
       />
 
+      {/* 操作はすべてここに集める（問いを結ぶ・写真・音声・漬け込む・発酵・全画面）。
+          本文に被らせないやり方は「場所を空ける」ではなく「振る舞い」で解く:
+          書いている間は uiVisible が false になって一緒に消え、掴んで動かせ、畳める。 */}
+      <EntryActionPalette actions={paletteActions} visible={paletteVisible} />
+
       {/* Status bar */}
       <div className={fadeClass}>
-        <EditorStatusBar
-          status={status}
-          charCount={charCount}
-          lastSavedAt={lastSavedAt}
-          onCharCountClick={() => setStatsOpen((v) => !v)}
-        />
+        <EditorStatusBar status={status} lastSavedAt={lastSavedAt} />
       </div>
 
       {/* Save title modal — shared between 保存する and 漬け込む */}

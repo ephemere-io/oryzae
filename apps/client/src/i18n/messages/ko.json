@@ -166,7 +166,8 @@
     "desktop_only": {
       "heading": "데스크톱 전용입니다",
       "body": "Oryzae는 현재 데스크톱 브라우저 전용으로, 스마트폰에서는 이용할 수 없습니다. 모바일 화면이 준비될 때까지는 데스크톱에서 이용해 주세요."
-    }
+    },
+    "loading": "불러오는 중…"
   },
   "footer": {
     "label": {
@@ -293,7 +294,9 @@
       "cancel": "취소",
       "update": "변경",
       "create": "만들기"
-    }
+    },
+    "error_message": "보드를 불러오지 못했습니다",
+    "retry": "다시 시도"
   },
   "editor": {
     "status": {
@@ -301,14 +304,8 @@
       "saved": "저장됨",
       "saving": "저장 중...",
       "autosaving": "항목을 자동 저장 중...",
-      "autosave_hint": "입력하면 자동으로 저장됩니다",
-      "saved_just_now": "방금 저장했습니다",
-      "saved_minutes_ago": "{n}분 전에 저장했습니다",
-      "saved_hours_ago": "{n}시간 전에 저장했습니다",
-      "context_empty": "떠오르는 대로 쓰기 시작해 보세요",
-      "context_progress": "{n}자 더 쓰면 담그기 기준에 닿습니다",
-      "context_ready": "담그기 기준에 도달했습니다",
-      "stats_open": "집필 통계 열기"
+      "saving_now": "저장 중",
+      "saved_moment_ago": "저장했습니다"
     },
     "voice": {
       "error_network": "음성 인식을 사용할 수 없습니다 (Chrome에서 다시 열어 주세요)",
@@ -378,7 +375,9 @@
       "time_inscription_mode": "표현 방식",
       "ghost_mode": "표현 방식",
       "fermentation_overlay_label": "기본 표시",
-      "fermentation_overlay_help_aria": "발효 사이드바 설명"
+      "fermentation_overlay_help_aria": "발효 사이드바 설명",
+      "focus_mode_fades_fermentation": "발효 요소도 함께 숨기기",
+      "palette_auto_hide": "쓰는 동안 팔레트 숨기기"
     },
     "snippet_toolbar": {
       "saving": "저장 중…",
@@ -467,6 +466,16 @@
       "section_keywords": "키워드",
       "section_snippets": "스니펫",
       "letter_open": "도착한 편지 읽기"
+    },
+    "palette": {
+      "move": "팔레트 이동",
+      "collapse": "팔레트 접기",
+      "expand": "팔레트 펼치기",
+      "link_question": "물음 잇기",
+      "photo": "사진에서 글자 옮기기",
+      "pickle_needs_body": "본문을 쓰면 담글 수 있습니다",
+      "pickle_needs_question": "물음을 이으면 담글 수 있습니다",
+      "stats": "글쓰기 통계"
     }
   },
   "fermentation": {
@@ -816,7 +825,9 @@
       "section_keywords": "단어",
       "section_snippets": "발췌",
       "unread": "안 읽음",
-      "read": "읽음"
+      "read": "읽음",
+      "section_sources": "바탕이 된 기록",
+      "source_untitled": "제목 없는 기록"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -847,7 +858,8 @@
       "placeholder": "질문 쓰기",
       "delete": "이 질문 끝내기",
       "cancel": "취소",
-      "save": "저장"
+      "save": "저장",
+      "letter_arrived": "편지가 도착했습니다"
     }
   }
 }

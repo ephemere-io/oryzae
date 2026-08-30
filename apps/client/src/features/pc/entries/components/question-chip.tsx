@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface QuestionOption {
   id: string;
@@ -14,6 +14,12 @@ interface QuestionChipProps {
   linkedQuestionIds: Set<string>;
   onLink: (questionId: string) => void;
   onUnlink: (questionId: string) => void;
+  /**
+   * 開閉を外から制御する（省略時は自分で持つ）。
+   * アクションパレットの「問いを結ぶ」からも同じドロップダウンを開けるようにするため。
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -30,9 +36,19 @@ export function QuestionChip({
   linkedQuestionIds,
   onLink,
   onUnlink,
+  open: controlledOpen,
+  onOpenChange,
 }: QuestionChipProps) {
   const t = useTranslations('entries.question_chip');
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (onOpenChange) onOpenChange(next);
+      else setUncontrolledOpen(next);
+    },
+    [onOpenChange],
+  );
   const rootRef = useRef<HTMLDivElement>(null);
 
   const linked = activeQuestions.filter((q) => linkedQuestionIds.has(q.id));
@@ -56,7 +72,7 @@ export function QuestionChip({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   const primaryText = primary ? (primary.currentText ?? t('untitled')) : null;
   const label = primaryText ?? t('empty');
@@ -76,7 +92,7 @@ export function QuestionChip({
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="listbox"
         className="flex max-w-[320px] items-center gap-1 rounded-full px-2.5 py-0.5 text-xs transition-colors"

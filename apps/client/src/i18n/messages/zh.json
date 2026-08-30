@@ -166,7 +166,8 @@
     "desktop_only": {
       "heading": "仅支持桌面",
       "body": "Oryzae 目前仅支持桌面浏览器访问，无法从智能手机使用。在移动版准备好之前，请使用桌面浏览器。"
-    }
+    },
+    "loading": "加载中…"
   },
   "footer": {
     "label": {
@@ -293,7 +294,9 @@
       "cancel": "取消",
       "update": "更新",
       "create": "创建"
-    }
+    },
+    "error_message": "加载画板失败",
+    "retry": "重试"
   },
   "editor": {
     "status": {
@@ -301,14 +304,8 @@
       "saved": "已保存",
       "saving": "保存中...",
       "autosaving": "日记自动保存中...",
-      "autosave_hint": "输入时会自动保存",
-      "saved_just_now": "刚刚已保存",
-      "saved_minutes_ago": "{n} 分钟前已保存",
-      "saved_hours_ago": "{n} 小时前已保存",
-      "context_empty": "想到什么就先写下来",
-      "context_progress": "再写 {n} 字就达到腌渍的参考值",
-      "context_ready": "已达到腌渍的参考值",
-      "stats_open": "打开写作统计"
+      "saving_now": "正在保存",
+      "saved_moment_ago": "已保存"
     },
     "voice": {
       "error_network": "无法使用语音识别（请在 Chrome 中重新打开）",
@@ -378,7 +375,9 @@
       "time_inscription_mode": "表现方式",
       "ghost_mode": "呈现方式",
       "fermentation_overlay_label": "默认显示",
-      "fermentation_overlay_help_aria": "关于发酵侧边栏"
+      "fermentation_overlay_help_aria": "关于发酵侧边栏",
+      "focus_mode_fades_fermentation": "同时隐藏发酵元素",
+      "palette_auto_hide": "书写时隐藏面板"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
@@ -467,6 +466,16 @@
       "section_keywords": "关键词",
       "section_snippets": "摘录",
       "letter_open": "阅读收到的信"
+    },
+    "palette": {
+      "move": "移动面板",
+      "collapse": "收起面板",
+      "expand": "展开面板",
+      "link_question": "关联问题",
+      "photo": "从照片转成文字",
+      "pickle_needs_body": "写点内容后即可腌渍",
+      "pickle_needs_question": "关联问题后即可腌渍",
+      "stats": "写作统计"
     }
   },
   "fermentation": {
@@ -816,7 +825,9 @@
       "section_keywords": "词语",
       "section_snippets": "摘录",
       "unread": "未读",
-      "read": "已读"
+      "read": "已读",
+      "section_sources": "来源记录",
+      "source_untitled": "无标题记录"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -847,7 +858,8 @@
       "placeholder": "写下提问",
       "delete": "结束这个提问",
       "cancel": "取消",
-      "save": "保存"
+      "save": "保存",
+      "letter_arrived": "有一封信送到了"
     }
   }
 }

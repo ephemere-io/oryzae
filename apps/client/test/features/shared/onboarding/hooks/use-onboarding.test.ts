@@ -2,15 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { ApiClient } from '@/lib/api';
-
-function mockResponse(ok: boolean, body: unknown): Response {
-  // @type-assertion-allowed: minimal Response stub for test
-  return {
-    ok,
-    json: () => Promise.resolve(body),
-    status: ok ? 200 : 500,
-  } as Response;
-}
+import { mockResponse } from '../../../../helpers/response';
 
 function createApiStub(): ApiClient & { fetch: ReturnType<typeof vi.fn> } {
   const fetch = vi.fn();

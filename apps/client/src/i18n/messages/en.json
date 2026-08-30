@@ -166,7 +166,8 @@
     "desktop_only": {
       "heading": "Desktop only",
       "body": "Oryzae is currently desktop-only and cannot be accessed from a smartphone. Until the mobile version is ready, please use it from a desktop browser."
-    }
+    },
+    "loading": "Loading…"
   },
   "footer": {
     "label": {
@@ -293,7 +294,9 @@
       "cancel": "Cancel",
       "update": "Update",
       "create": "Create"
-    }
+    },
+    "error_message": "Failed to load the board",
+    "retry": "Retry"
   },
   "editor": {
     "status": {
@@ -301,14 +304,8 @@
       "saved": "Saved",
       "saving": "Saving...",
       "autosaving": "Auto-saving entry...",
-      "autosave_hint": "Saves automatically as you write",
-      "saved_just_now": "Saved just now",
-      "saved_minutes_ago": "Saved {n} min ago",
-      "saved_hours_ago": "Saved {n} h ago",
-      "context_empty": "Start writing whatever comes to mind",
-      "context_progress": "{n} more characters to the pickling mark",
-      "context_ready": "You've reached the pickling mark",
-      "stats_open": "Open writing stats"
+      "saving_now": "Saving",
+      "saved_moment_ago": "Saved"
     },
     "voice": {
       "error_network": "Voice recognition is unavailable (please reopen in Chrome)",
@@ -378,7 +375,9 @@
       "time_inscription_mode": "Shown as",
       "ghost_mode": "Shown as",
       "fermentation_overlay_label": "Default display",
-      "fermentation_overlay_help_aria": "About the fermentation sidebar"
+      "fermentation_overlay_help_aria": "About the fermentation sidebar",
+      "focus_mode_fades_fermentation": "Also hide fermentation elements",
+      "palette_auto_hide": "Hide the palette while writing"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
@@ -467,6 +466,16 @@
       "section_keywords": "Keywords",
       "section_snippets": "Snippets",
       "letter_open": "Read the letter"
+    },
+    "palette": {
+      "move": "Move the palette",
+      "collapse": "Collapse the palette",
+      "expand": "Expand the palette",
+      "link_question": "Link a question",
+      "photo": "Transcribe from a photo",
+      "pickle_needs_body": "Write something to pickle it",
+      "pickle_needs_question": "Link a question to pickle it",
+      "stats": "Writing stats"
     }
   },
   "fermentation": {
@@ -816,7 +825,9 @@
       "section_keywords": "Words",
       "section_snippets": "Excerpts",
       "unread": "Unread",
-      "read": "Read"
+      "read": "Read",
+      "section_sources": "From these entries",
+      "source_untitled": "Untitled entry"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -847,7 +858,8 @@
       "placeholder": "Write a question",
       "delete": "Retire this question",
       "cancel": "Cancel",
-      "save": "Save"
+      "save": "Save",
+      "letter_arrived": "A letter has arrived"
     }
   }
 }

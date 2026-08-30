@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthActions } from '@/features/shared/auth/hooks/use-auth-actions';
+import { textResponse } from '../../../../helpers/response';
 
 /**
  * Issue #490: 認証フォームが直叩きしていた3つの POST を共有 hook に集約した分の担保。
@@ -52,14 +53,8 @@ describe('useAuthActions', () => {
 
   it('エラー本文が JSON でなくても落ちず空コードを返す', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
-      // @type-assertion-allowed: テスト用の最小限 Response スタブ
-      vi.fn(() =>
-        Promise.resolve({
-          ok: false,
-          status: 500,
-          json: () => Promise.reject(new Error('not json')),
-        } as unknown as Response),
-      ),
+      // JSON にならない 500（HTML エラーページ等）を本物の Response で再現する。
+      vi.fn(() => Promise.resolve(textResponse('<html>500</html>', 500))),
     );
     const { result } = renderHook(() => useAuthActions());
 

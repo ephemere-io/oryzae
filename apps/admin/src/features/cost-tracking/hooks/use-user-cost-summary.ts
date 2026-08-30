@@ -1,19 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-interface UserCostSummary {
-  userId: string;
-  email: string;
-  fermentationCount: number;
-  totalCostUsd: number;
-}
+const userCostSummarySchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  fermentationCount: z.number(),
+  totalCostUsd: z.number(),
+});
 
-interface UserCostResponse {
-  data: UserCostSummary[];
-}
+const userCostResponseSchema = z.object({ data: z.array(userCostSummarySchema) });
+
+type UserCostSummary = z.infer<typeof userCostSummarySchema>;
 
 interface UseUserCostSummaryParams {
   dateFrom?: string;
@@ -42,8 +44,8 @@ export function useUserCostSummary(params?: UseUserCostSummaryParams) {
     const url = `/api/v1/admin/fermentations/costs/by-user${qs ? `?${qs}` : ''}`;
 
     const res = await api.fetch(url);
-    if (res.ok) {
-      const body = (await res.json()) as UserCostResponse;
+    const body = res.ok ? await parseJson(res, userCostResponseSchema) : null;
+    if (body) {
       setData(body.data);
     } else {
       setError('ユーザー別コストの取得に失敗しました');

@@ -38,9 +38,9 @@ interface Props {
   auth: AuthState | null;
 }
 
-const PICKLE_BTN = 'button[data-testid="pickle-primary-action"]';
+const PICKLE_BTN = 'button[data-palette-action="pickle"]';
 const SETTINGS_BTN = 'button[aria-label="設定"]';
-const STATS_BTN = 'button[aria-label="執筆統計を開く"]';
+const STATS_BTN = 'button[data-palette-action="stats"]';
 const QUESTION_CHIP_BTN = '[data-verify-unit="QuestionChip"] > button';
 
 registerUnit<Props>({
@@ -135,13 +135,17 @@ registerUnit<Props>({
     },
     {
       id: 'pickle-disabled-iff-no-body',
-      description: '漬込ボタンは hasBody=false のとき disabled（本文が無いと漬け込めない）',
+      description: '漬込ボタンは hasBody=false のとき aria-disabled（本文が無いと漬け込めない）',
       check: ({ root, contract }) => {
         const btn = root.querySelector<HTMLButtonElement>(PICKLE_BTN);
+        // 押せないことは本当の `disabled` ではなく aria-disabled で伝えている。
+        // disabled にすると React がマウス系イベントを抑止し、フォーカスも受けないため、
+        // 「なぜ押せないか」の理由に到達する手段が無くなる。
+        const actualDisabled = btn?.getAttribute('aria-disabled') === 'true';
         const expectDisabled = contract.hasBody !== 'true';
         return (
-          btn?.disabled === expectDisabled ||
-          `pickle disabled=${btn?.disabled} だが contract.hasBody="${contract.hasBody}"`
+          actualDisabled === expectDisabled ||
+          `pickle aria-disabled=${btn?.getAttribute('aria-disabled')} だが contract.hasBody="${contract.hasBody}"`
         );
       },
     },

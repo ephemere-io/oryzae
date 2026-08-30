@@ -3,12 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 
 /**
- * Issue #510: 保存ボタンを廃した（docs/entry-screen-design.md 原則2）ので、
+ * Issue #510: 保存ボタンが無い（SP には元から無く、PC も原則2で廃した）ので、
  * 「書いたものが必ず残る」ことはこの hook だけが保証する。
  *
  * 旧実装は「本文の**文字数の増減**が10文字以上」を保存条件にしていたため、
- * タイトルのみの変更・10文字未満の追記・同じ長さの書き換えが保存されなかった。
- * ここではその3つの取りこぼしが再発しないことを主に見張る。
+ * タイトルのみの変更・短い追記・同じ長さの書き換えが保存されなかった。
+ * ここではその取りこぼしが再発しないことを主に見張る。
  */
 describe('useAutosaveEntry', () => {
   beforeEach(() => {
@@ -48,7 +48,7 @@ describe('useAutosaveEntry', () => {
   });
 
   // regression #510-1
-  it('既存エントリならタイトルだけの変更も保存する', async () => {
+  it('既存エントリならタイトルだけの変更も保存する（本文しか見ていなかった）', async () => {
     const save = vi.fn().mockResolvedValue('e1');
     const { rerender } = setup(save, { title: '', body: '本文はそのまま' }, 'e1');
 
@@ -69,8 +69,19 @@ describe('useAutosaveEntry', () => {
     expect(save).toHaveBeenCalledWith('original contentX', 'e1');
   });
 
+  // regression #510-2b: 短い記録そのもの（既存エントリの更新として）
+  it('既存エントリなら短い記録も保存する（「今日は疲れた」で終えても残る）', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
+    const { rerender } = setup(save, { body: 'x' }, 'e1');
+
+    rerender({ title: '', body: '今日は疲れた' });
+    await tick();
+
+    expect(save).toHaveBeenCalledWith('今日は疲れた', 'e1');
+  });
+
   // regression #510-3
-  it('既存エントリなら長さが変わらない書き換えも保存する（誤字の修正）', async () => {
+  it('既存エントリなら長さが変わらない書き換えも保存する（差が0で素通りしていた）', async () => {
     const save = vi.fn().mockResolvedValue('e1');
     const { rerender } = setup(save, { body: 'あいうえお' }, 'e1');
 
@@ -179,6 +190,19 @@ describe('useAutosaveEntry', () => {
     expect(save).toHaveBeenCalledWith('original+追記', 'e1');
   });
 
+  it('ページを離れるとき（pagehide）も保留中の入力を書き出す', async () => {
+    const save = vi.fn().mockResolvedValue('e1');
+    const { rerender } = setup(save, { body: 'original' }, 'e1');
+
+    rerender({ title: '', body: 'original+離脱直前' });
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'));
+      await Promise.resolve();
+    });
+
+    expect(save).toHaveBeenCalledWith('original+離脱直前', 'e1');
+  });
+
   it('アンマウント時も、デバウンス待ちの内容を保存する', async () => {
     const save = vi.fn().mockResolvedValue('e1');
     const { rerender, unmount } = setup(save, { body: 'original' }, 'e1');
@@ -192,7 +216,7 @@ describe('useAutosaveEntry', () => {
     expect(save).toHaveBeenCalledWith('original+離脱直前の追記', 'e1');
   });
 
-  it('保存中に届いた変更は、保存完了後に追いかけて保存する', async () => {
+  it('保存中に届いた変更は、保存完了後に追いかけて保存する（同じ内容は二重に書かない）', async () => {
     let resolveFirst: (v: string) => void = () => {};
     const save = vi
       .fn()

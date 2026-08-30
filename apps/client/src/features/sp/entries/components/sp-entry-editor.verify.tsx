@@ -4,10 +4,11 @@
  * 即 null・activeQuestions は []・autosave は enabled=false）。router 依存も無い。よって
  * `api=null` を渡せば fetch ゼロの純レンダリングになり、props だけで孤立検証できる。
  *
- * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / sheetOpen ＋発酵 CTA の
- * pickling。saving / pickled / questionLinked は到達しない（api=null では fetch せず save も即
- * null・activeQuestions が空のまま selectedQuestion が出ない／never-resolve でも save が解決せず
- * pickled が立たない）ため、定数になる属性は契約に載せない。
+ * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / hasQuestion / sheetOpen
+ * ＋発酵 CTA の pickling。saving / pickled は到達しない（api=null では fetch せず save も即
+ * null・never-resolve でも save が解決せず pickled が立たない）ため、定数になる属性は
+ * 契約に載せない。hasQuestion は Issue #450 で分岐条件になったので載せる（問い未選択で
+ * 発酵 CTA を押すと、漬けずに問い選択シートが開く）。
  *
  * i18n（sp.editor）依存のため withVerifyProviders（NextIntlClientProvider）で包む。
  * pickling=true は never-resolve fetch を持つ ApiClient を渡し、CTA を押して再現する
@@ -88,6 +89,26 @@ registerUnit<Props>({
       id: 'pickling',
       probe: true,
       description: 'Probe: 発酵 CTA 送信中は pickling=true でボタンが disabled（多重送信不可）',
+      props: {
+        api: neverResolveApi,
+        initialEntryId: 'entry-1',
+        // Issue #450: 問いが結ばれていない状態で CTA を押すと問い選択が開くようになった
+        // （問い無しのエントリは発酵ループに入らないため）。pickling を再現するには
+        // 問いが結ばれている必要があるので、URL 経由の初期紐づけを渡す。
+        initialQuestionId: 'question-1',
+        initialContent: 'タイトル\n本文がここに入る',
+        persistDraft: false,
+      },
+      act: async (ctx) => {
+        await ctx.click('.mx-4 button');
+        await ctx.wait(16);
+      },
+    },
+    {
+      id: 'pickle-without-question',
+      probe: true,
+      description:
+        'Probe: 問い未選択で発酵 CTA を押すと、漬けずに問い選択シートが開く（Issue #450）',
       props: {
         api: neverResolveApi,
         initialEntryId: 'entry-1',
@@ -201,6 +222,16 @@ registerUnit<Props>({
           `expected pickling=true & disabled, got pickling=${contract.pickling}, disabled=${btn?.disabled}`
         );
       },
+    },
+    {
+      id: 'pickle-without-question-opens-sheet',
+      description: '問い未選択で発酵 CTA を押しても漬けず、問い選択シートが開く（Issue #450）',
+      onlyFixtures: ['pickle-without-question'],
+      check: ({ contract }) =>
+        (contract.hasQuestion === 'false' &&
+          contract.pickling === 'false' &&
+          contract.sheetOpen === 'true') ||
+        `expected hasQuestion=false & pickling=false & sheetOpen=true, got hasQuestion=${contract.hasQuestion}, pickling=${contract.pickling}, sheetOpen=${contract.sheetOpen}`,
     },
     {
       id: 'delete-trigger-iff-hasentry',

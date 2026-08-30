@@ -68,6 +68,8 @@ export function normalizeBoardCards(input: unknown): BoardCardData[] {
       width: num(raw.width, 200),
       height: num(raw.height, 160),
       zIndex: num(raw.zIndex, 0),
+      // 列を足す前のサーバーからは来ないので false に倒す（＝自動整列の対象）。
+      userPositioned: raw.userPositioned === true,
       createdAt: str(raw.createdAt),
       content: cardContent(type, raw.content),
     });

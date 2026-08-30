@@ -166,7 +166,8 @@
     "desktop_only": {
       "heading": "デスクトップ専用です",
       "body": "Oryzaeは現在、デスクトップブラウザ専用となっていてスマートフォンからはアクセスできません。スマートフォン版画面が準備できるまでは、デスクトップからお使いください。"
-    }
+    },
+    "loading": "読み込み中…"
   },
   "footer": {
     "label": {
@@ -293,7 +294,9 @@
       "cancel": "キャンセル",
       "update": "更新",
       "create": "作成"
-    }
+    },
+    "error_message": "ボードの読み込みに失敗しました",
+    "retry": "再読み込み"
   },
   "editor": {
     "status": {
@@ -301,14 +304,8 @@
       "saved": "保存済み",
       "saving": "保存中...",
       "autosaving": "エントリーを自動保存中...",
-      "autosave_hint": "入力すると自動保存されます",
-      "saved_just_now": "たった今保存しました",
-      "saved_minutes_ago": "{n}分前に保存しました",
-      "saved_hours_ago": "{n}時間前に保存しました",
-      "context_empty": "思いつくままに書き始めてください",
-      "context_progress": "あと{n}字で漬け込みの目安です",
-      "context_ready": "漬け込みの目安に届きました",
-      "stats_open": "執筆統計を開く"
+      "saving_now": "保存しています",
+      "saved_moment_ago": "保存しました"
     },
     "voice": {
       "error_network": "音声認識が利用できません（Chrome で開き直してください）",
@@ -378,7 +375,9 @@
       "time_inscription_mode": "表し方",
       "ghost_mode": "出し方",
       "fermentation_overlay_label": "表示の既定",
-      "fermentation_overlay_help_aria": "発酵サイドバーの説明"
+      "fermentation_overlay_help_aria": "発酵サイドバーの説明",
+      "focus_mode_fades_fermentation": "発酵要素も一緒に隠す",
+      "palette_auto_hide": "書いている間はパレットを隠す"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
@@ -467,6 +466,16 @@
       "section_keywords": "キーワード",
       "section_snippets": "スニペット",
       "letter_open": "届いた手紙を読む"
+    },
+    "palette": {
+      "move": "パレットを移動",
+      "collapse": "パレットを畳む",
+      "expand": "パレットを開く",
+      "link_question": "問いを結ぶ",
+      "photo": "写真から文字を起こす",
+      "pickle_needs_body": "本文を書くと漬け込めます",
+      "pickle_needs_question": "問いを結ぶと漬け込めます",
+      "stats": "執筆統計"
     }
   },
   "fermentation": {
@@ -816,7 +825,9 @@
       "section_keywords": "言葉",
       "section_snippets": "抜粋",
       "unread": "未読",
-      "read": "既読"
+      "read": "既読",
+      "section_sources": "もとになった記録",
+      "source_untitled": "無題の記録"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -847,7 +858,8 @@
       "placeholder": "問いを書く",
       "delete": "この問いを終える",
       "cancel": "キャンセル",
-      "save": "保存"
+      "save": "保存",
+      "letter_arrived": "手紙が届いています"
     }
   }
 }
