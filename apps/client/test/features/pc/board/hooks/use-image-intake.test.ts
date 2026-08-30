@@ -108,4 +108,21 @@ describe('useImageIntake', () => {
 
     expect(result.current.dragActive).toBe(false);
   });
+  it('ドラッグ中に受け付けをやめたら目印を畳む', () => {
+    // enabled は動的（スニペット編集やライトボックスを開くと false）。切り替わると
+    // 以降 dragover は来ないので、目印を消す機会がここにしか無い。
+    const onImage = vi.fn();
+    const { result, rerender } = renderHook(({ on }) => useImageIntake(on, onImage), {
+      initialProps: { on: true },
+    });
+
+    act(() => {
+      // @ts-expect-error React.DragEvent の全プロパティは不要（hook が触る範囲だけ渡す）
+      result.current.onDragOver(dragEvent());
+    });
+    expect(result.current.dragActive).toBe(true);
+
+    rerender({ on: false });
+    expect(result.current.dragActive).toBe(false);
+  });
 });

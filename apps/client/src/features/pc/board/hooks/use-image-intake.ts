@@ -58,6 +58,13 @@ export function useImageIntake(enabled: boolean, onImage: (file: File) => void) 
     setDragActive(false);
   }, []);
 
+  // ドラッグ中に受け付けをやめたら目印を畳む。enabled は動的な値（スニペット編集や
+  // ライトボックスを開くと false になる）なので、途中で切り替わると onDragOver は
+  // 止まるのに目印だけ残る。この後もう dragover は来ないので、ここで消すしかない。
+  useEffect(() => {
+    if (!enabled) setDragActive(false);
+  }, [enabled]);
+
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       if (!enabled) return;
