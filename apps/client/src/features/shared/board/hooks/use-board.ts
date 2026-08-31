@@ -158,8 +158,8 @@ export function useBoard(
       imageWidth?: number,
       imageHeight?: number,
       placement?: CardPlacement,
-    ) => {
-      if (!api) return;
+    ): Promise<boolean> => {
+      if (!api) return false;
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caption', caption);
@@ -173,13 +173,17 @@ export function useBoard(
         formData.append('x', String(placement.x));
         formData.append('y', String(placement.y));
       }
-      const res = await api.fetch('/api/v1/board/photos', {
-        method: 'POST',
-        body: formData,
-      });
-      if (res.ok) {
-        await fetchBoard();
-      }
+      // 失敗をそのまま返す。握り潰すと、アップロードに失敗しても
+      // ダイアログが閉じて盤面に何も出ず「押したのに無反応」になる。
+      const res = await api
+        .fetch('/api/v1/board/photos', {
+          method: 'POST',
+          body: formData,
+        })
+        .catch(() => null);
+      if (!res?.ok) return false;
+      await fetchBoard();
+      return true;
     },
     [api, dateKey, viewType, fetchBoard],
   );

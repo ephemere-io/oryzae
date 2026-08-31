@@ -279,7 +279,8 @@
       "caption_placeholder": "说明（20 字以内）",
       "cancel": "取消",
       "uploading_button": "上传中…",
-      "submit": "添加"
+      "submit": "添加",
+      "upload_failed": "添加照片失败，请重试"
     },
     "snippet_dialog": {
       "aria_label": "摘录对话框",

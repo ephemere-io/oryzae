@@ -279,7 +279,8 @@
       "caption_placeholder": "キャプション（20文字以内）",
       "cancel": "キャンセル",
       "uploading_button": "アップロード中…",
-      "submit": "追加"
+      "submit": "追加",
+      "upload_failed": "写真の追加に失敗しました。もう一度お試しください"
     },
     "snippet_dialog": {
       "aria_label": "Snippet dialog",

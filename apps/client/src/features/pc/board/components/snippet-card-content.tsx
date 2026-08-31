@@ -8,7 +8,11 @@ interface SnippetContent {
 
 interface SnippetCardContentProps {
   content: SnippetContent;
-  /** 中倍率では本文を省き、ラベルだけ描く（意味的ズーム）。 */
+  /**
+   * 中倍率での簡略表示。**本文は隠さない**（スニペットは本文が唯一の中身で、
+   * 消すと「✦ Snippet」ラベルだけの空カードになり壊れて見える）。
+   * 行数だけ抑えて描画量を減らす。
+   */
   titleOnly?: boolean;
 }
 
@@ -40,11 +44,12 @@ export function SnippetCardContent({ content, titleOnly = false }: SnippetCardCo
           ✦ Snippet
         </span>
       </div>
-      {!titleOnly && (
-        <p className="flex-1 text-sm" style={{ color: 'var(--fg)', lineHeight: 1.8 }}>
-          {content.text}
-        </p>
-      )}
+      <p
+        className={`flex-1 text-sm ${titleOnly ? 'line-clamp-2' : ''}`}
+        style={{ color: 'var(--fg)', lineHeight: 1.8 }}
+      >
+        {content.text}
+      </p>
     </div>
   );
 }

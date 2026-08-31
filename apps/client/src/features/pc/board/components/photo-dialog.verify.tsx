@@ -16,12 +16,18 @@ import { PhotoDialog } from './photo-dialog';
 
 interface Props {
   open: boolean;
-  onSubmit: (file: File, caption: string, imageWidth: number, imageHeight: number) => Promise<void>;
+  onSubmit: (
+    file: File,
+    caption: string,
+    imageWidth: number,
+    imageHeight: number,
+  ) => Promise<boolean>;
   onClose: () => void;
 }
 
 const noop = () => {};
-const asyncNoop = () => Promise.resolve();
+// 送信は成功扱い（true）。失敗表示は下の fixture で個別に検証する。
+const asyncNoop = () => Promise.resolve(true);
 
 registerUnit<Props>({
   id: 'PhotoDialog',
@@ -36,6 +42,12 @@ registerUnit<Props>({
       props: { open: true, onSubmit: asyncNoop, onClose: noop },
     },
     {
+      id: 'submit-failed',
+      probe: true,
+      description: 'Probe: 送信が失敗を返しても閉じず、失敗が契約(failed)に出る（無反応にしない）',
+      props: { open: true, onSubmit: () => Promise.resolve(false), onClose: noop },
+    },
+    {
       id: 'caption-typed',
       probe: true,
       description: 'Probe: キャプションを入力しても、ファイル未選択なら送信は不可のまま',
@@ -47,6 +59,26 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'failed-defaults-false',
+      description: '送信していない状態では failed=false（初期状態でエラーを出さない）',
+      onlyFixtures: ['open', 'submit-failed'],
+      check: ({ contract }) =>
+        contract.failed === 'false' ||
+        `未送信なのに failed=${contract.failed}（開いた瞬間にエラーが出ている）`,
+    },
+    {
+      id: 'alert-iff-failed',
+      description: 'エラー文（role=alert）は failed=true のときだけ描画される',
+      check: ({ root, contract }) => {
+        const hasAlert = Boolean(root.querySelector('[role="alert"]'));
+        const expected = contract.failed === 'true';
+        return (
+          hasAlert === expected ||
+          `alert present=${hasAlert} だが contract.failed="${contract.failed}"`
+        );
+      },
+    },
     {
       id: 'dialog-semantics',
       description: 'role="dialog" かつ aria-label を持つモーダルとして描画される',

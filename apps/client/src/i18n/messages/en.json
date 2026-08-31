@@ -279,7 +279,8 @@
       "caption_placeholder": "Caption (max. 20 characters)",
       "cancel": "Cancel",
       "uploading_button": "Uploading…",
-      "submit": "Add"
+      "submit": "Add",
+      "upload_failed": "Failed to add the photo. Please try again."
     },
     "snippet_dialog": {
       "aria_label": "Snippet dialog",

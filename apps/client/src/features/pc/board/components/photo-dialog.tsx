@@ -6,7 +6,13 @@ import { useRef, useState } from 'react';
 
 interface PhotoDialogProps {
   open: boolean;
-  onSubmit: (file: File, caption: string, imageWidth: number, imageHeight: number) => Promise<void>;
+  /** 成功したら true。false のときはダイアログを閉じずエラーを出す。 */
+  onSubmit: (
+    file: File,
+    caption: string,
+    imageWidth: number,
+    imageHeight: number,
+  ) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -65,6 +71,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [failed, setFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
@@ -93,10 +100,17 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
     if (!selectedFile || uploading) return;
 
     setUploading(true);
+    setFailed(false);
     try {
       const { blob, width, height } = await resizeImage(selectedFile, 800, 0.7);
       const resizedFile = new File([blob], selectedFile.name, { type: 'image/jpeg' });
-      await onSubmit(resizedFile, caption.trim(), width, height);
+      const ok = await onSubmit(resizedFile, caption.trim(), width, height);
+      if (!ok) {
+        // 選んだ写真を保持したまま開いておく。閉じてしまうと失敗に気づけず、
+        // 選び直しもやり直しもできない。
+        setFailed(true);
+        return;
+      }
       if (preview) URL.revokeObjectURL(preview);
       setCaption('');
       setPreview(null);
@@ -123,6 +137,7 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
       {...verifyAttrs({
         unit: 'PhotoDialog',
         uploading,
+        failed,
         hasPreview: Boolean(preview),
         canSubmit,
       })}
@@ -208,6 +223,15 @@ export function PhotoDialog({ open, onSubmit, onClose }: PhotoDialogProps) {
             color: 'var(--fg)',
           }}
         />
+        {failed && (
+          <p
+            role="alert"
+            className="mb-2 text-center text-xs"
+            style={{ color: 'rgba(200,80,80,0.9)' }}
+          >
+            {t('upload_failed')}
+          </p>
+        )}
         <div className="flex justify-center gap-2">
           <button
             type="button"

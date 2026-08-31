@@ -33,9 +33,13 @@ interface BoardViewProps {
  *
  * これより引いたら中身を落とす。倍率が下がるほど1枚あたりの文字は読めなくなる一方、
  * 描画コストは変わらないので、読めなくなった時点で描くのをやめる。
+ *
+ * **「まだ読める倍率で消さない」ことを優先する。** 以前は 75% 未満で本文を落として
+ * いたが、75% はまだ十分読めるうえ、スニペットは本文が唯一の中身なので空カードに
+ * 見えてしまった（PR #533 のレビュー指摘）。本文が実際に潰れ始める辺りまで下げる。
  */
-const DETAIL_THRESHOLD_TITLE = 0.4;
-const DETAIL_THRESHOLD_FULL = 0.75;
+const DETAIL_THRESHOLD_TITLE = 0.28;
+const DETAIL_THRESHOLD_FULL = 0.45;
 
 /**
  * 新規カードの既定サイズ（world 単位）。中心合わせの計算にだけ使う。

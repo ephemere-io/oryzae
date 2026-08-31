@@ -279,7 +279,8 @@
       "caption_placeholder": "캡션 (20자 이내)",
       "cancel": "취소",
       "uploading_button": "업로드 중…",
-      "submit": "추가"
+      "submit": "추가",
+      "upload_failed": "사진 추가에 실패했습니다. 다시 시도해 주세요"
     },
     "snippet_dialog": {
       "aria_label": "스니펫 대화상자",
