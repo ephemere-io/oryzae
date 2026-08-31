@@ -315,6 +315,38 @@ describe('useAutosaveEntry', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  // 保存が失敗しても lastSavedContent は前のままなので、「まだ差がある」判定が真に居座る。
+  // 離脱時はその場で呼び直す作りなので、抜け道が無いと同じ内容を無限に送り続ける。
+  it('保存が失敗しても、同じ内容を送り続けない（離脱時）', async () => {
+    const save = vi.fn().mockResolvedValue(null);
+    const { rerender } = setup(save, { body: 'original' }, 'e1');
+
+    rerender({ title: '', body: 'original+書いた分' });
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('保存が例外で落ちても、そこで止まる（未処理の rejection にしない）', async () => {
+    const save = vi.fn().mockRejectedValue(new Error('network down'));
+    const { rerender } = setup(save, { body: 'original' }, 'e1');
+
+    rerender({ title: '', body: 'original+書いた分' });
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
   it('保存中に離脱しても、保存中に打った分を書き出す（追いかけ保存は離脱後に発火しない）', async () => {
     let resolveFirst: (v: string) => void = () => {};
     const save = vi

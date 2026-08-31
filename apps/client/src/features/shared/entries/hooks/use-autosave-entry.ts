@@ -67,7 +67,7 @@ export function useAutosaveEntry({
   // 保存中に次の保存が重ならないようにする（同じ内容を 2 回書かない）。
   const inFlightRef = useRef(false);
   // 進行中の保存そのもの。離脱時はこれを待ってから書き直す（下記 saveNow の force を参照）。
-  const inFlightPromiseRef = useRef<Promise<void> | null>(null);
+  const inFlightPromiseRef = useRef<Promise<boolean> | null>(null);
   const lastSavedContentRef = useRef<string | null>(null);
   const prevEntryIdRef = useRef<string | undefined>(entryId);
 
@@ -125,21 +125,31 @@ export function useAutosaveEntry({
     if (!force && !current.entryId && content.trim().length < current.minCreateChars) return;
 
     inFlightRef.current = true;
-    const run = (async () => {
+    // 成否を返す。**失敗したかどうかを次の判断に使う**（下の追いかけを参照）。
+    const run = (async (): Promise<boolean> => {
       try {
         const savedId = await saveRef.current(content, current.entryId);
-        if (savedId) {
-          lastSavedContentRef.current = content;
-          prevEntryIdRef.current = savedId;
-          onSavedRef.current?.(savedId, current.body, current.title.trim());
-        }
+        if (!savedId) return false;
+        lastSavedContentRef.current = content;
+        prevEntryIdRef.current = savedId;
+        onSavedRef.current?.(savedId, current.body, current.title.trim());
+        return true;
+      } catch {
+        // 通信が落ちても hook は黙って引き下がる。次の入力で改めて走る
+        // （ここで投げると、離脱時の書き出しが unhandled rejection になる）。
+        return false;
       } finally {
         inFlightRef.current = false;
         inFlightPromiseRef.current = null;
       }
     })();
     inFlightPromiseRef.current = run;
-    await run;
+    const saved = await run;
+
+    // **保存できなかったら追いかけない。** 失敗すると lastSavedContent は前のままなので、
+    // 「まだ差がある」という判定が永久に真になる。離脱時はその場で呼び直す作りなので、
+    // ここを抜けないと同じ内容を無限に送り続けることになる。
+    if (!saved) return;
 
     // 保存している間に書き進めていたら、その分をもう一度追いかける
     // （そうしないと「保存中に打った最後の数文字」が次の入力まで残らない）。
