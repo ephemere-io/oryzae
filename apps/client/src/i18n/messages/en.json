@@ -466,7 +466,10 @@
       "collapse": "Collapse the palette",
       "expand": "Expand the palette",
       "pickle_needs_body": "Write something to pickle it",
-      "pickle_needs_question": "Link a question to pickle it"
+      "pickle_needs_question": "Link a question to pickle it",
+      "fermentation_needs_question": "Link a question to see its last fermentation",
+      "fermentation_not_ready": "This question has not fermented yet",
+      "fermentation_new_entry_only": "Past fermentation shows while writing a new entry"
     }
   },
   "fermentation": {

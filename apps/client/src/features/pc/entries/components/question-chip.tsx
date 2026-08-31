@@ -79,6 +79,23 @@ export function QuestionChip({
   const label = primaryText ?? t('empty');
   const extraCount = linked.length - 1;
 
+  // CSS カスタムプロパティは React.CSSProperties に含まれないので、`--*` を許す形で広げる。
+  const chipStyle: React.CSSProperties & Record<`--${string}`, string> = primary
+    ? {
+        color: 'var(--accent)',
+        '--chip-bg': 'color-mix(in srgb, var(--accent) 14%, var(--surface-raised))',
+        '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 24%, var(--surface-raised))',
+        '--chip-border': 'color-mix(in srgb, var(--accent) 38%, transparent)',
+        '--chip-border-hover': 'color-mix(in srgb, var(--accent) 60%, transparent)',
+      }
+    : {
+        color: 'var(--fg)',
+        '--chip-bg': 'var(--surface-raised)',
+        '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 12%, var(--surface-raised))',
+        '--chip-border': 'var(--surface-raised-border)',
+        '--chip-border-hover': 'color-mix(in srgb, var(--accent) 45%, transparent)',
+      };
+
   return (
     // 器はボタンに張りつく大きさにする（inline-flex）。中央寄せの箱にしていた頃は、
     // 器がヘッダーの幅いっぱいに広がり、開いた面の左端がボタンの左端とずれていた。
@@ -105,20 +122,13 @@ export function QuestionChip({
         // 日付や歯車より一段強く出す（高さ・字の大きさ・地の濃さを上げる）。
         // 結ばれていないときも、点線の枠だけの弱い印にはしない——結ぶ操作に気づかれないと、
         // エントリーは問いに結ばれないまま溜まっていく。
-        className="flex h-8 max-w-[340px] items-center gap-2 rounded-full px-3.5 text-[13.5px] font-medium transition-colors hover:brightness-[0.97]"
-        style={
-          primary
-            ? {
-                color: 'var(--accent)',
-                background: 'color-mix(in srgb, var(--accent) 16%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
-              }
-            : {
-                color: 'var(--fg)',
-                background: 'var(--hover-wash)',
-                border: '1px solid var(--border-subtle)',
-              }
-        }
+        // 色は CSS 変数で渡し、地の切り替えは class（`hover:`）に任せる。
+        // インラインの background を直接置くと :hover に必ず勝ってしまい、
+        // 触っても何も変わらないボタンになる（そうなっていた）。
+        // 結ばれていないときの地は**黒の洗いではなく白い面**にする。紙の上に黒を敷くと、
+        // 沈んで汚れて見える。
+        className="flex h-8 max-w-[340px] items-center gap-2 rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3.5 text-[13.5px] font-medium transition-colors duration-150 hover:border-[var(--chip-border-hover)] hover:bg-[var(--chip-bg-hover)]"
+        style={chipStyle}
       >
         <span aria-hidden="true">{primary ? '◦' : '+'}</span>
         <span className="truncate">{label}</span>

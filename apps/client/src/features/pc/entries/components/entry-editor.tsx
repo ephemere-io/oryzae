@@ -41,7 +41,7 @@ import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-questi
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
-import { useTitleFollowsScroll } from '@/features/pc/entries/hooks/use-title-follows-scroll';
+import { useTitleFadesOnScroll } from '@/features/pc/entries/hooks/use-title-fades-on-scroll';
 import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
@@ -671,9 +671,9 @@ export function EntryEditor({
     enabled: true,
   });
 
-  // 縦書きの題は紙の右肩に絶対配置してあるので、放っておくと本文だけが流れて題が残る。
-  // 横書きと同じく、読み進めれば題も画面の外へ出るようにする。
-  useTitleFollowsScroll({
+  // 縦書きの題は紙の右肩に絶対配置してある。**位置は動かさず、濃さだけ**紙の進みに結ぶ
+  // （動かすと書いている最中に横へ滑って落ち着かず、動かさないと居場所が分からない）。
+  useTitleFadesOnScroll({
     titleRef: titleInputRef,
     editorRef,
     enabled: settings.writingMode === 'vertical',
@@ -735,22 +735,35 @@ export function EntryEditor({
     },
   ];
 
-  if (fermentationOverlayDetail) {
-    paletteActions.push({
-      id: 'fermentation',
-      label: fermentSidebarOpen
-        ? t('toolbar.fermentation_sidebar_hide')
-        : t('toolbar.fermentation_sidebar_show'),
-      active: fermentSidebarOpen,
-      icon: paletteIcon(
-        <>
-          <path d="M9 3.75v3.75M15 3.75v3.75M7.5 7.5h9a1.5 1.5 0 0 1 1.5 1.5v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V9a1.5 1.5 0 0 1 1.5-1.5Z" />
-          <path d="M9 12.75h6M9 15.75h4.5" />
-        </>,
-      ),
-      onSelect: toggleFermentSidebar,
-    });
-  }
+  // 発酵結果の出し入れは**常にここに置く**。出せるものが無いときだけ非活性にして、
+  // 理由をホバーで言う。押せるときだけ現れる作りだと、そもそもこの操作があることに
+  // 気づけない（「パレットに発酵の表示切替が無い」と言われた）。
+  //
+  // 出せるのは**新しく書くとき**だけ（発酵の取得が isNewEntry に閉じている）。
+  // 既存エントリを開き直したときは、その旨を理由として言う。
+  const fermentationReason = fermentationOverlayDetail
+    ? undefined
+    : !isNewEntry
+      ? t('palette.fermentation_new_entry_only')
+      : linkedIds.size === 0
+        ? t('palette.fermentation_needs_question')
+        : t('palette.fermentation_not_ready');
+
+  paletteActions.push({
+    id: 'fermentation',
+    label: fermentSidebarOpen
+      ? t('toolbar.fermentation_sidebar_hide')
+      : t('toolbar.fermentation_sidebar_show'),
+    active: fermentSidebarOpen,
+    disabledReason: fermentationReason,
+    icon: paletteIcon(
+      <>
+        <path d="M9 3.75v3.75M15 3.75v3.75M7.5 7.5h9a1.5 1.5 0 0 1 1.5 1.5v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V9a1.5 1.5 0 0 1 1.5-1.5Z" />
+        <path d="M9 12.75h6M9 15.75h4.5" />
+      </>,
+    ),
+    onSelect: toggleFermentSidebar,
+  });
 
   // 書いている間はパレットも一緒に消す（ヘッダーや処理表示と同じ挙動）。
   // 常に出しておきたい人のために設定で切れる。

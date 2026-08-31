@@ -466,7 +466,10 @@
       "collapse": "收起面板",
       "expand": "展开面板",
       "pickle_needs_body": "写点内容后即可腌渍",
-      "pickle_needs_question": "关联问题后即可腌渍"
+      "pickle_needs_question": "关联问题后即可腌渍",
+      "fermentation_needs_question": "联结提问后，可查看上次的发酵结果",
+      "fermentation_not_ready": "这个提问还没有发酵",
+      "fermentation_new_entry_only": "上次的发酵结果会在书写新条目时显示"
     }
   },
   "fermentation": {

@@ -42,6 +42,9 @@ interface EntryActionPaletteProps {
 
 const POSITION_KEY = 'oryzae-entry-palette-position';
 const COLLAPSED_KEY = 'oryzae-entry-palette-collapsed';
+/** これ以上動いて初めて「掴んだ」と見なす（px）。 */
+const DRAG_THRESHOLD = 4;
+
 const EDGE_MARGIN = 12;
 
 interface Position {
@@ -124,6 +127,9 @@ export function EntryActionPalette({
   // 次のフレームまで位置の反映を1回にまとめる（pointermove は1フレームに何度も来る）。
   const pendingRef = useRef<Position | null>(null);
   const frameRef = useRef<number | null>(null);
+  // 掴んだ位置と、そこから実際に動いたか。押しただけならボタンのクリックとして通す。
+  const dragStartRef = useRef<Position>({ x: 0, y: 0 });
+  const movedRef = useRef(false);
 
   // 初回だけ localStorage から復元する（SSR では読めないので mount 後）。
   useEffect(() => {
@@ -163,6 +169,13 @@ export function EntryActionPalette({
       if (next) setPosition(next);
     }
     function handleMove(e: PointerEvent) {
+      if (!movedRef.current) {
+        const dx = e.clientX - dragStartRef.current.x;
+        const dy = e.clientY - dragStartRef.current.y;
+        // 指1本ぶんも動いていないなら、それは「掴んだ」ではなく「押した」。
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        movedRef.current = true;
+      }
       pendingRef.current = clamp(
         { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y },
         dragSizeRef.current,
@@ -208,20 +221,25 @@ export function EntryActionPalette({
   }, [position, clamp]);
 
   /**
-   * 面の余白部分を掴んだらドラッグを始める。
+   * 面のどこを掴んでもドラッグを始める。**ボタンの上も含む。**
    *
-   * 以前は幅 16px の握りだけを起点にしていて、狙って掴めなかった。ボタン以外の
-   * どこを掴んでも動くようにする（ボタンの上では `closest` で弾く）。
+   * 以前はボタンの上を `closest` で弾いていたが、面はほぼ全域がボタンで
+   * （実測: 面 250px 中 248px）、掴める余白は外周に数 px しか残らない。
+   * 掴んだつもりが動かない、が起きるのはこれが理由。
+   *
+   * 代わりに**動いた距離**で区別する: DRAG_THRESHOLD を超えて初めてドラッグと見なし、
+   * 超えなければただのクリックとしてボタンに通す（超えた場合はその後の click を食う）。
    */
   function handleSurfacePointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return;
-    if (e.target instanceof Element && e.target.closest('button')) return;
     const el = rootRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     // 面の寸法はドラッグ中に変わらないので、ここで一度だけ測って持ち回る。
     dragSizeRef.current = { w: rect.width, h: rect.height };
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    movedRef.current = false;
     pendingRef.current = { x: rect.left, y: rect.top };
     setPosition({ x: rect.left, y: rect.top });
     setDragging(true);
@@ -345,6 +363,11 @@ export function EntryActionPalette({
                 aria-disabled={disabled}
                 onClick={() => {
                   if (disabled) return;
+                  // 掴んで動かした直後の click は、操作ではなく移動の余韻。
+                  if (movedRef.current) {
+                    movedRef.current = false;
+                    return;
+                  }
                   action.onSelect();
                 }}
                 aria-label={action.label}
@@ -380,7 +403,13 @@ export function EntryActionPalette({
 
         <button
           type="button"
-          onClick={() => setCollapsedAndPersist(true)}
+          onClick={() => {
+            if (movedRef.current) {
+              movedRef.current = false;
+              return;
+            }
+            setCollapsedAndPersist(true);
+          }}
           aria-expanded={true}
           aria-label={t('collapse')}
           className={`${TOOL_BUTTON_CLASS} ${HOVER_CLASS}`}

@@ -63,8 +63,10 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
           width: SIDE_PANEL_WIDTH,
           paddingTop: SHELL_INSET,
           paddingBottom: SHELL_INSET,
-          borderColor: 'var(--border-subtle)',
-          background: 'color-mix(in srgb, var(--bg) 94%, var(--fg))',
+          // 左のサイドバーと同じ「書く紙ではない面」。両側で同じ材質にして、
+          // 紙が中央にある、という画面の成り立ちを伝える。
+          borderColor: 'var(--surface-sunken-border)',
+          background: 'var(--surface-sunken)',
         }}
         {...verifyAttrs({
           unit: 'FermentationSidebar',

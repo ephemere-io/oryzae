@@ -27,6 +27,10 @@
   /* 画面の上に浮く操作面（パレット・ツールバー）。素材は components/ui/surface.ts。 */
   --surface-raised: #ffffff;
   --surface-raised-border: rgba(0, 0, 0, 0.08);
+  /* **書く紙ではない面**（左のサイドバー・右の発酵結果）。紙より一段沈める。
+   * 透けた白に頼っていた頃は、紙とほぼ同じ明るさで境界が読めなかった。 */
+  --surface-sunken: #f2f0ea;
+  --surface-sunken-border: rgba(0, 0, 0, 0.08);
   /* 面を持たない切り替えの下地（セグメント）。 */
   --track: rgba(0, 0, 0, 0.05);
   --card-snippet: #fffbe0;
@@ -61,6 +65,8 @@
   --border-subtle: rgba(255, 255, 255, 0.06);
   --hover-wash: rgba(255, 255, 255, 0.07);
   --toolbar-hover: rgba(255, 255, 255, 0.06);
+  --surface-sunken: #131313;
+  --surface-sunken-border: rgba(255, 255, 255, 0.1);
   --date-color: #666;
   --card-snippet: #3a3520;
   --card-photo: #2a2a2a;

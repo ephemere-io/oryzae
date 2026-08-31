@@ -10,7 +10,6 @@ import { ICON_STROKE_WIDTH, SHELL_INSET, SHELL_ROW_HEIGHT } from '@/components/u
 import { useAuth } from '@/lib/auth-context';
 import { docsHref } from '@/lib/docs-site';
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
-import { useTheme } from '@/lib/theme-context';
 import { useUnread } from '@/lib/unread-context';
 
 interface NavItem {
@@ -28,6 +27,9 @@ interface NavItem {
  * （手紙が届くのもここ）であって、ブランド名ではない。ロゴは名乗りであって行き先ではないので、
  * 行き先の列の先頭を占めない。
  */
+/** これ以上動いて初めて「掴んだ」と見なす（px）。 */
+const DRAG_THRESHOLD = 4;
+
 const NAV_ITEMS: NavItem[] = [
   {
     href: '/jar',
@@ -73,7 +75,6 @@ export function Sidebar() {
   const t = useTranslations('sidebar');
   const pathname = usePathname();
   const { auth } = useAuth();
-  const { theme } = useTheme();
   const { unreadCount } = useUnread();
   const { hidden, collapsed, setCollapsed, expandedWidth, setExpandedWidth, width, restored } =
     useSidebarVisibility();
@@ -86,6 +87,8 @@ export function Sidebar() {
   // pointermove は1フレームに何度も来る。幅の反映は画面全体（本文の折返しまで）に
   // 波及するので、次のフレームで1回にまとめる。
   const pendingWidthRef = useRef<number | null>(null);
+  // 掴んだ位置。ここから DRAG_THRESHOLD 動くまでは「押しただけ」と見なす。
+  const dragStartXRef = useRef(0);
   const frameRef = useRef<number | null>(null);
 
   const stopDrag = useCallback(() => setDragging(false), []);
@@ -99,8 +102,12 @@ export function Sidebar() {
       if (next !== null) setExpandedWidth(next);
     }
     function handleMove(e: PointerEvent) {
-      draggedRef.current = true;
       const next = e.clientX;
+      // 指1本ぶんも動いていないなら、それは「掴んだ」ではなく「押した」。
+      // 閾値が無いと、畳むつもりの1クリックでも 1px の揺れでドラッグ扱いになり、
+      // そのあとの click が食われて**押しても畳まれない**。
+      if (Math.abs(next - dragStartXRef.current) < DRAG_THRESHOLD) return;
+      draggedRef.current = true;
       // 最小幅より内側まで引いたら畳む。ドラッグで閉じられるのが自然なので、
       // 「掴んで縮める」と「畳む」を別の操作にしない。
       if (next < SIDEBAR_MIN_WIDTH - 24) {
@@ -145,14 +152,12 @@ export function Sidebar() {
         width,
         paddingTop: SHELL_INSET,
         paddingBottom: SHELL_INSET,
-        background: theme === 'dark' ? 'rgba(8, 8, 14, 0.8)' : 'rgba(253, 251, 247, 0.4)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        borderRight:
-          theme === 'dark'
-            ? '1px solid rgba(60, 70, 80, 0.1)'
-            : '1px solid rgba(255, 255, 255, 0.6)',
-        boxShadow: '4px 0 24px rgba(140, 133, 126, 0.02)',
+        // 透けた白に頼っていたため、紙（--bg）とほぼ同じ明るさで境界が読めなかった。
+        // ここは**書く紙ではない面**なので一段沈め、境界は線1本ではっきり引く
+        // （影は境界を伝えるには弱すぎるので、線を主役にして影は添えるだけ）。
+        background: 'var(--surface-sunken)',
+        borderRight: '1px solid var(--surface-sunken-border)',
+        boxShadow: '1px 0 3px rgba(0, 0, 0, 0.03)',
       }}
     >
       {/* 行き先 */}
@@ -311,9 +316,13 @@ export function Sidebar() {
           if (collapsed) return;
           e.preventDefault();
           draggedRef.current = false;
+          dragStartXRef.current = e.clientX;
           setDragging(true);
         }}
-        className={`absolute top-0 -right-1.5 bottom-0 z-10 w-3 cursor-col-resize bg-transparent transition-colors after:absolute after:top-0 after:bottom-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:transition-colors ${
+        // 縁は**サイドバーの内側**に置く。外へはみ出させると、はみ出した側が
+        // エディタ（fixed / z-50）の下敷きになって押せなくなる。サイドバーは z-30 なので、
+        // 「畳んだのに開きにくい」＝当たり判定が実質 6px しか残っていなかった、という話。
+        className={`absolute top-0 right-0 bottom-0 z-10 w-3 cursor-col-resize bg-transparent transition-colors after:absolute after:top-0 after:right-0 after:bottom-0 after:w-px after:transition-colors ${
           dragging
             ? 'after:bg-[var(--accent)]'
             : 'after:bg-transparent hover:after:bg-[var(--accent)]'

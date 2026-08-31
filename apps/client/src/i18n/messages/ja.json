@@ -466,7 +466,10 @@
       "collapse": "パレットを畳む",
       "expand": "パレットを開く",
       "pickle_needs_body": "本文を書くと漬け込めます",
-      "pickle_needs_question": "問いを結ぶと漬け込めます"
+      "pickle_needs_question": "問いを結ぶと漬け込めます",
+      "fermentation_needs_question": "問いを結ぶと、前回の発酵結果が見られます",
+      "fermentation_not_ready": "この問いはまだ発酵していません",
+      "fermentation_new_entry_only": "前回の発酵結果は、新しく書くときに見られます"
     }
   },
   "fermentation": {
