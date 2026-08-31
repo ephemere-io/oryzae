@@ -35,6 +35,8 @@ export function EntryPickerDialog({
 }: EntryPickerDialogProps) {
   const t = useTranslations('board.entry_picker');
   const [placingId, setPlacingId] = useState<string | null>(null);
+  /** 置く操作そのものが失敗した（一覧の取得失敗＝error とは別物）。 */
+  const [failed, setFailed] = useState(false);
 
   useEscapeKey(open, onClose);
 
@@ -45,6 +47,13 @@ export function EntryPickerDialog({
     setPlacingId(entryId);
     try {
       await onPlace(entryId);
+      // 置けたら閉じる。開いたままだと、置いたカードがこのダイアログの裏に出るうえ
+      // 一覧の「置いてある」表示も変わらないので、押しても何も起きていないように
+      // 見えていた（実際にはカードは作られている）。
+      onClose();
+    } catch {
+      // 失敗したら開いたままにして、押し直せるようにする。
+      setFailed(true);
     } finally {
       setPlacingId(null);
     }
@@ -56,6 +65,7 @@ export function EntryPickerDialog({
         unit: 'EntryPickerDialog',
         loading,
         error,
+        failed,
         count: entries.length,
         placeable: entries.filter((e) => !e.placed).length,
       })}
@@ -80,6 +90,12 @@ export function EntryPickerDialog({
         <p className="mb-4 text-xs" style={{ color: 'var(--date-color)' }}>
           {t('lead')}
         </p>
+
+        {failed && (
+          <p className="mb-3 text-xs" style={{ color: 'var(--accent)' }}>
+            {t('place_failed')}
+          </p>
+        )}
 
         <div className="min-h-0 flex-1 overflow-auto">
           {loading && (

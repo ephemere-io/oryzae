@@ -331,7 +331,8 @@
       "untitled": "(제목 없음)",
       "place": "놓기",
       "already_placed": "놓여 있음",
-      "close": "닫기"
+      "close": "닫기",
+      "place_failed": "보드에 놓지 못했습니다. 다시 시도해 주세요."
     }
   },
   "editor": {

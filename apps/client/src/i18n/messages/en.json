@@ -331,7 +331,8 @@
       "untitled": "(untitled)",
       "place": "Place",
       "already_placed": "On board",
-      "close": "Close"
+      "close": "Close",
+      "place_failed": "Couldn't place it on the board. Please try again."
     }
   },
   "editor": {

@@ -80,6 +80,19 @@ registerUnit<Props>({
       props: base,
     },
     {
+      id: 'place-succeeds-and-closes',
+      probe: true,
+      description: 'Probe: 置ける項目を押すと onPlace が走り、失敗表示は出ない（成功時は閉じる）',
+      props: {
+        ...base,
+        entries: [entry('e-1', '朝の記録', false)],
+      },
+      act: async (ctx) => {
+        await ctx.click('button[data-verify-entry-option="e-1"]');
+        await ctx.wait(32);
+      },
+    },
+    {
       id: 'all-placed',
       probe: true,
       description: 'Probe: 全部置き済み（一覧からは消えず、押せないだけ）',
@@ -127,6 +140,17 @@ registerUnit<Props>({
           contract.placeable === String(enabled) ||
           `placeable=${contract.placeable} だが押せるボタンは ${enabled} 個`
         );
+      },
+    },
+    {
+      id: 'place-failure-is-visible',
+      description: '置く操作が失敗したときは、その理由が画面に出ている',
+      check: ({ root, contract }) => {
+        if (contract.failed !== 'true') return true;
+        const shown = Array.from(root.querySelectorAll('p')).some(
+          (p) => (p.textContent ?? '').trim().length > 0,
+        );
+        return shown || 'failed=true なのに画面に何も出ていない';
       },
     },
     {

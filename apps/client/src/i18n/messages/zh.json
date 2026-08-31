@@ -331,7 +331,8 @@
       "untitled": "（无标题）",
       "place": "放置",
       "already_placed": "已放置",
-      "close": "关闭"
+      "close": "关闭",
+      "place_failed": "无法放到板上，请重试。"
     }
   },
   "editor": {

@@ -169,9 +169,12 @@ test.describe('ボード画面', () => {
     // 2. ツールバーから選んで置くと出る
     await page.click('button[data-verify-tool="entry"]');
     await expect(page.getByRole('heading', { name: 'エントリーを置く' })).toBeVisible();
-    await page.locator('button[data-verify-entry-option]').first().click();
-    await page.waitForTimeout(2000);
-    await page.keyboard.press('Escape');
+    await page.locator('button[data-verify-entry-option]:not([disabled])').first().click();
+    // 置けたらダイアログは自分で閉じる。開いたままだと置いたカードが裏に隠れ、
+    // 一覧の表示も変わらないので「押しても何も起きない」ように見えていた。
+    await expect(page.getByRole('heading', { name: 'エントリーを置く' })).toHaveCount(0, {
+      timeout: 10000,
+    });
     await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
 
     // 3. カードを選ぶとツールバーが操作に入れ替わり、そこから外せる

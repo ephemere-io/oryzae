@@ -331,7 +331,8 @@
       "untitled": "（無題）",
       "place": "置く",
       "already_placed": "置いてある",
-      "close": "閉じる"
+      "close": "閉じる",
+      "place_failed": "ボードに置けませんでした。もう一度お試しください。"
     }
   },
   "editor": {
