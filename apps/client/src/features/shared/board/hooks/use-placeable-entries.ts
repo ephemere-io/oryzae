@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { normalizePlaceableEntries } from '@/features/shared/board/normalize';
 import type { PlaceableEntry } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 
@@ -38,8 +39,14 @@ export function usePlaceableEntries(
         `/api/v1/board/entries?dateKey=${dateKey}&viewType=${viewType}&tzOffset=${tzOffset}`,
       );
       if (!res.ok) throw new Error(`Failed to load placeable entries (${res.status})`);
-      const data = await res.json();
-      setEntries(Array.isArray(data.entries) ? data.entries : []);
+      // res.json() は型なし。型注釈を付けるのは `as` と実質同じアサーションになり、
+      // 要素が壊れた応答をそのまま state に流してしまう（描画側で落ちる）。
+      const data: unknown = await res.json();
+      setEntries(
+        normalizePlaceableEntries(
+          typeof data === 'object' && data !== null && 'entries' in data ? data.entries : null,
+        ),
+      );
     } catch {
       // 取得できなかったことを画面に出せるよう、握り潰さず状態にする。
       setError(true);

@@ -77,6 +77,40 @@ describe('usePlaceableEntries', () => {
     expect(result.current.entries).toEqual([]);
   });
 
+  it('壊れた要素は落とし、欠けたフィールドは既定値に潰す', async () => {
+    // 素通しにすると null がそのまま state に入り、描画側の entry.title で落ちる。
+    apiFetch.mockResolvedValue(
+      mockResponse(true, {
+        entries: [null, { title: 'id が無い' }, { id: 'e-ok' }, { id: 'e-2', placed: 'yes' }],
+      }),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => usePlaceableEntries(api, '2026-04-11', 'daily', true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.entries.map((e) => e.id)).toEqual(['e-ok', 'e-2']);
+    expect(result.current.entries[0]).toEqual({
+      id: 'e-ok',
+      title: '',
+      preview: '',
+      createdAt: '',
+      placed: false,
+    });
+    // placed は true 以外を「置いていない」に倒す（押せないより押せるほうが安全）
+    expect(result.current.entries[1].placed).toBe(false);
+  });
+
+  it('entries キーが無い応答でも落ちない', async () => {
+    apiFetch.mockResolvedValue(mockResponse(true, { unexpected: 1 }));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => usePlaceableEntries(api, '2026-04-11', 'daily', true));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.entries).toEqual([]);
+  });
+
   it('api が無いあいだは取りに行かない', () => {
     renderHook(() => usePlaceableEntries(null, '2026-04-11', 'daily', true));
 
