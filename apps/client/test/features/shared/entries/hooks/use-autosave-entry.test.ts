@@ -268,6 +268,38 @@ describe('useAutosaveEntry', () => {
     expect(save).toHaveBeenCalledWith('original+離脱直前の追記', 'e1');
   });
 
+  it('保存中に離脱しても、保存中に打った分を書き出す（追いかけ保存は離脱後に発火しない）', async () => {
+    let resolveFirst: (v: string) => void = () => {};
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<string>((r) => {
+            resolveFirst = r;
+          }),
+      )
+      .mockResolvedValue('e1');
+    const { rerender } = setup(save, { body: 'original' }, 'e1');
+
+    // 1回目の保存を走らせる（まだ解決しない＝通信中）。
+    rerender({ title: '', body: 'original+1回目' });
+    await tick();
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // 通信中にさらに書き、そのまま画面を離れる。
+    rerender({ title: '', body: 'original+1回目+通信中に打った分' });
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'));
+      resolveFirst('e1');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith('original+1回目+通信中に打った分', 'e1');
+  });
+
   it('保存中に届いた変更は、保存完了後に追いかけて保存する（同じ内容は二重に書かない）', async () => {
     let resolveFirst: (v: string) => void = () => {};
     const save = vi

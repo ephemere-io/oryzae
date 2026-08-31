@@ -238,7 +238,8 @@
       "jar": "Jar",
       "board": "Board",
       "list": "Entries",
-      "editor": "Write"
+      "editor": "Write",
+      "help": "Help"
     },
     "expand": "Expand sidebar",
     "collapse": "Collapse sidebar"

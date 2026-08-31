@@ -238,7 +238,8 @@
       "jar": "罐",
       "board": "画板",
       "list": "列表",
-      "editor": "书写"
+      "editor": "书写",
+      "help": "使用说明"
     },
     "expand": "展开侧边栏",
     "collapse": "收起侧边栏"

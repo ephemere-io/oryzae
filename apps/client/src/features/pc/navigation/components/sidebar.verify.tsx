@@ -130,16 +130,44 @@ registerUnit<Props>({
     },
     {
       id: 'labels-follow-collapsed',
-      description: '畳んでいるときはメニュー名を出さず、開いているときは全項目に出す',
+      description: '畳んでいるときはメニュー名を出さず、開いているときは全ての行に出す',
       check: ({ root, contract }) => {
-        const links = Array.from(root.querySelectorAll<HTMLElement>('[data-verify-nav-item]'));
+        // 行き先だけでなく、下にまとめた「使い方」「アカウント」も同じ規則に従う。
+        const rows = Array.from(root.querySelectorAll<HTMLElement>('nav a'));
         // アイコンの span に加えて名前の span があるか（畳んでいるときは1つだけ）。
-        const withLabel = links.filter((l) => l.querySelectorAll(':scope > span').length > 1);
-        const expected = contract.collapsed === 'true' ? 0 : links.length;
+        const withLabel = rows.filter((l) => l.querySelectorAll(':scope > span').length > 1);
+        const expected = contract.collapsed === 'true' ? 0 : rows.length;
         return (
           withLabel.length === expected ||
           `名前つき=${withLabel.length}, 期待=${expected}（collapsed=${contract.collapsed}）`
         );
+      },
+    },
+    {
+      id: 'help-leaves-the-app',
+      // 使い方は別ドメインの公開サイトにある（Issue #532）。相対パスで書くとアプリ内で
+      // 404 になるので、絶対 URL で新しいタブに開くことを固定する。
+      description: '「使い方」は公開サイトへ、新しいタブで出る',
+      check: ({ root }) => {
+        const help = root.querySelector<HTMLAnchorElement>('nav a[target="_blank"]');
+        if (!help) return '公開サイトへのリンクが無い';
+        if (!/^https?:\/\//.test(help.getAttribute('href') ?? '')) {
+          return `href が絶対 URL でない: "${help.getAttribute('href')}"`;
+        }
+        return (
+          (help.getAttribute('rel') ?? '').includes('noopener') ||
+          'rel に noopener が無い（新しいタブに開くリンクには必須）'
+        );
+      },
+    },
+    {
+      id: 'no-wordmark-in-nav',
+      // ロゴは名乗りであって行き先ではない。列に混ぜると押せるものに見える。
+      description: 'サイドバーに名乗り（Oryzae）を置かない',
+      check: ({ root }) => {
+        const nav = root.querySelector('nav');
+        const text = nav?.textContent ?? '';
+        return !/Oryzae/i.test(text) || 'サイドバーに "Oryzae" の文字が残っている';
       },
     },
     {

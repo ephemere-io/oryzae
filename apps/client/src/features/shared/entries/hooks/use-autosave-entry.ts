@@ -66,6 +66,8 @@ export function useAutosaveEntry({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 保存中に次の保存が重ならないようにする（同じ内容を 2 回書かない）。
   const inFlightRef = useRef(false);
+  // 進行中の保存そのもの。離脱時はこれを待ってから書き直す（下記 saveNow の force を参照）。
+  const inFlightPromiseRef = useRef<Promise<void> | null>(null);
   const lastSavedContentRef = useRef<string | null>(null);
   const prevEntryIdRef = useRef<string | undefined>(entryId);
 
@@ -100,8 +102,19 @@ export function useAutosaveEntry({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    if (!latestRef.current.enabled) return;
+
+    if (inFlightRef.current) {
+      // 通常の保存なら、いま走っている保存が終わったあとに追いかけ保存が走るので降りてよい。
+      if (!force) return;
+      // 離脱時は降りられない。**降りると、保存中に打った分がそのまま消える**
+      // （追いかけ保存は 2 秒の debounce に載るが、そのタイマーは離脱後には発火しない）。
+      // 進行中の保存を待ってから、あらためて最新の内容を書く。
+      await inFlightPromiseRef.current;
+    }
+
     const current = latestRef.current;
-    if (!current.enabled || inFlightRef.current) return;
+    if (!current.enabled) return;
 
     // 判定はタイトルを含めた content で行う。本文だけを見ると、
     // 「題だけ付けて本文はこれから」の状態が丸ごと保存対象から外れる。
@@ -112,21 +125,30 @@ export function useAutosaveEntry({
     if (!force && !current.entryId && content.trim().length < current.minCreateChars) return;
 
     inFlightRef.current = true;
-    try {
-      const savedId = await saveRef.current(content, current.entryId);
-      if (savedId) {
-        lastSavedContentRef.current = content;
-        prevEntryIdRef.current = savedId;
-        onSavedRef.current?.(savedId, current.body, current.title.trim());
+    const run = (async () => {
+      try {
+        const savedId = await saveRef.current(content, current.entryId);
+        if (savedId) {
+          lastSavedContentRef.current = content;
+          prevEntryIdRef.current = savedId;
+          onSavedRef.current?.(savedId, current.body, current.title.trim());
+        }
+      } finally {
+        inFlightRef.current = false;
+        inFlightPromiseRef.current = null;
       }
-    } finally {
-      inFlightRef.current = false;
-    }
+    })();
+    inFlightPromiseRef.current = run;
+    await run;
 
     // 保存している間に書き進めていたら、その分をもう一度追いかける
     // （そうしないと「保存中に打った最後の数文字」が次の入力まで残らない）。
     const after = composeContent(latestRef.current.title, latestRef.current.body);
-    if (after !== lastSavedContentRef.current) scheduleRef.current();
+    if (after === lastSavedContentRef.current) return;
+    // 離脱時は debounce に載せられない（タイマーが発火する前にページが消える）ので、
+    // その場で続けて書く。
+    if (force) return saveNow(true);
+    scheduleRef.current();
   }, []);
 
   const schedule = useCallback(() => {

@@ -238,7 +238,8 @@
       "jar": "瓶",
       "board": "ボード",
       "list": "一覧",
-      "editor": "書く"
+      "editor": "書く",
+      "help": "使い方"
     },
     "expand": "サイドバーを開く",
     "collapse": "サイドバーを畳む"

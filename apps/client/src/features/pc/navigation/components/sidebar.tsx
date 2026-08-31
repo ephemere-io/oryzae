@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { ICON_STROKE_WIDTH, SHELL_INSET, SHELL_ROW_HEIGHT } from '@/components/ui/surface';
 import { useAuth } from '@/lib/auth-context';
+import { docsHref } from '@/lib/docs-site';
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
 import { useTheme } from '@/lib/theme-context';
 import { useUnread } from '@/lib/unread-context';
@@ -219,24 +220,44 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* 名乗り。行き先の列と、自分（アカウント）のあいだの空きに置く。
-          畳んでいるときは縦組みで幅を食わない。 */}
-      <div className="flex flex-1 items-center justify-center px-4">
-        <span
-          className="font-serif text-[11px] tracking-[0.4em] uppercase opacity-70"
-          style={{
-            color: '#8EA89C',
-            ...(collapsed
-              ? { writingMode: 'vertical-rl' as const, textOrientation: 'mixed' as const }
-              : {}),
-          }}
-        >
-          Oryzae
-        </span>
-      </div>
+      {/* 行き先の列と、下の2行のあいだの空き。 */}
+      <div className="flex-1" />
 
-      {/* 自分 */}
-      <div className="px-4">
+      {/* 使い方と、自分。どちらも「書く」ための行き先ではないので、下にまとめる。 */}
+      <div className="flex flex-col gap-1 px-4">
+        {/* 使い方は別ドメインの公開サイトにある（Issue #532 で切り出した）。
+            アプリの外へ出るので Link ではなく素の <a> で、新しいタブに開く。 */}
+        <a
+          href={docsHref('/support')}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={collapsed ? t('nav.help') : undefined}
+          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[#8C857E] transition-colors duration-300 hover:bg-[rgba(140,133,126,0.1)] hover:text-[#4A4541] ${
+            collapsed ? 'w-12 justify-center' : 'w-full px-3'
+          }`}
+          style={{ height: SHELL_ROW_HEIGHT }}
+        >
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={ICON_STROKE_WIDTH}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.4 9.4a2.6 2.6 0 0 1 4.6 1.6c0 1.7-2.4 2-2.4 3.4" />
+              <circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          {!collapsed && (
+            <span className="truncate text-[13px] whitespace-nowrap">{t('nav.help')}</span>
+          )}
+        </a>
+
         <Link
           href="/account"
           title={collapsed ? t('nav.account') : undefined}

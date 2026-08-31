@@ -238,7 +238,8 @@
       "jar": "항아리",
       "board": "보드",
       "list": "목록",
-      "editor": "쓰기"
+      "editor": "쓰기",
+      "help": "사용법"
     },
     "expand": "사이드바 열기",
     "collapse": "사이드바 접기"
