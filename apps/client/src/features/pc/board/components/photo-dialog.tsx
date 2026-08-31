@@ -34,7 +34,14 @@ function resizeImage(file: File, maxWidth: number, quality: number): Promise<Res
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0, width, height);
+      // JPEG は透明を持てない。canvas の初期値は透明な黒なので、そのまま JPEG に
+      // すると PNG の透明部分が**黒く潰れる**。ロゴやスクリーンショットのように背景が
+      // 抜けている画像だと、貼った瞬間に黒い板になって出てくる。先に白で塗る。
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+      }
       canvas.toBlob(
         (blob) => resolve({ blob: blob ?? file, width, height }),
         'image/jpeg',
