@@ -65,6 +65,32 @@ export class PlaceEntryCardUsecase {
     }
 
     const maxZ = await this.boardCardRepo.findMaxZIndex(userId, input.dateKey, vt);
+
+    // いったん外したものを置き直す場合は「復活」で扱う。board_cards は
+    // (user_id, ref_id, date_key, view_type) が一意で、外しても行が残るため、
+    // 新しい行を insert しようとすると saveMany の upsert が
+    // ignoreDuplicates: true で**黙って何も書かない**（201 は返るのにカードは出ない）。
+    const removed = await this.boardCardRepo.findSoftDeletedByRefId(
+      userId,
+      input.entryId,
+      input.dateKey,
+      vt,
+    );
+    if (removed) {
+      await this.boardCardRepo.restore(removed.id, userId, maxZ + 1);
+      return {
+        cardId: removed.id,
+        refId: removed.refId,
+        // 位置は外す前のまま戻す（また同じところに置き直す手間をかけさせない）。
+        x: removed.x,
+        y: removed.y,
+        rotation: removed.rotation,
+        width: removed.width,
+        height: removed.height,
+        zIndex: maxZ + 1,
+      };
+    }
+
     const result = BoardCard.create(
       {
         userId,

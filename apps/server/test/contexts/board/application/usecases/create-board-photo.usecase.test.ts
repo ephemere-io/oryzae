@@ -25,6 +25,8 @@ beforeEach(() => {
     findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
     findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
     findSoftDeletedRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
+    findSoftDeletedByRefId: vi.fn().mockResolvedValue(null),
+    restore: vi.fn().mockResolvedValue(undefined),
     findMaxZIndex: vi.fn().mockResolvedValue(-1),
     saveMany: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),

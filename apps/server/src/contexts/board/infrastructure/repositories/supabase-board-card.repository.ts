@@ -105,6 +105,36 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
     return toRecordArray(data ?? []).map((row) => readString(row, 'ref_id'));
   }
 
+  async findSoftDeletedByRefId(
+    userId: string,
+    refId: string,
+    dateKey: string,
+    viewType: string,
+  ): Promise<BoardCard | null> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('ref_id', refId)
+      .eq('date_key', dateKey)
+      .eq('view_type', viewType)
+      .eq('is_deleted', true)
+      .limit(1);
+
+    if (error) throw error;
+    const rows = toRecordArray(data ?? []);
+    return rows.length > 0 ? this.toDomain(rows[0]) : null;
+  }
+
+  async restore(id: string, userId: string, zIndex: number): Promise<void> {
+    const { error } = await this.supabase
+      .from('board_cards')
+      .update({ is_deleted: false, z_index: zIndex, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', userId);
+    if (error) throw error;
+  }
+
   async findMaxZIndex(userId: string, dateKey: string, viewType: string): Promise<number> {
     const { data, error } = await this.supabase
       .from('board_cards')

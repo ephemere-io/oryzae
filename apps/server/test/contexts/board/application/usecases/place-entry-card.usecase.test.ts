@@ -31,6 +31,8 @@ beforeEach(() => {
     findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
     findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
     findSoftDeletedRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
+    findSoftDeletedByRefId: vi.fn().mockResolvedValue(null),
+    restore: vi.fn().mockResolvedValue(undefined),
     findMaxZIndex: vi.fn().mockResolvedValue(4),
     saveMany: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),
@@ -134,5 +136,44 @@ describe('PlaceEntryCardUsecase', () => {
     expect(boardCardRepo.saveMany).toHaveBeenCalledWith([
       expect.objectContaining({ viewType: 'weekly' }),
     ]);
+  });
+  it('一度外したエントリは、新しい行を作らず復活させる', async () => {
+    // board_cards は (user_id, ref_id, date_key, view_type) が一意で、外しても行が残る。
+    // ここで新規 insert に行くと saveMany の upsert が ignoreDuplicates で**黙って
+    // 何も書かず**、201 が返るのに盤面にカードが出ない（実際に踏んだ不具合）。
+    const removed = BoardCard.fromProps({
+      id: 'card-removed',
+      userId: 'user-1',
+      cardType: 'entry',
+      refId: 'e-1',
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      x: 321,
+      y: 123,
+      rotation: -2.5,
+      width: 340,
+      height: 280,
+      zIndex: 0,
+      userPositioned: true,
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
+    });
+    vi.mocked(boardCardRepo.findSoftDeletedByRefId).mockResolvedValue(removed);
+
+    const result = await usecase.execute('user-1', { entryId: 'e-1', dateKey: '2026-04-11' });
+
+    expect(boardCardRepo.restore).toHaveBeenCalledWith('card-removed', 'user-1', 5);
+    expect(boardCardRepo.saveMany).not.toHaveBeenCalled();
+    // 位置は外す前のまま戻す（また同じところに置き直させない）
+    expect(result).toMatchObject({ cardId: 'card-removed', x: 321, y: 123, zIndex: 5 });
+  });
+
+  it('外した行が無ければ普通に新規作成する', async () => {
+    vi.mocked(boardCardRepo.findSoftDeletedByRefId).mockResolvedValue(null);
+
+    await usecase.execute('user-1', { entryId: 'e-1', dateKey: '2026-04-11' });
+
+    expect(boardCardRepo.restore).not.toHaveBeenCalled();
+    expect(boardCardRepo.saveMany).toHaveBeenCalled();
   });
 });
