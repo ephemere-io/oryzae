@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import type { PaletteSize } from '@/components/ui/surface';
 import {
   DEFAULT_SETTINGS,
   type EditorSettings,
@@ -18,6 +19,29 @@ const FOCUS_MODE_STORAGE_KEY = 'oryzae-editor-focus-mode';
 
 /** 書いている間、操作パレットを隠すか。 */
 const PALETTE_AUTO_HIDE_KEY = 'oryzae-editor-palette-auto-hide';
+
+/** 道具（アクションパレット）の大きさ。 */
+const PALETTE_SIZE_KEY = 'oryzae-editor-palette-size';
+
+function readStoredPaletteSize(): PaletteSize | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(PALETTE_SIZE_KEY);
+    if (raw === 'small' || raw === 'medium' || raw === 'large') return raw;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredPaletteSize(value: PaletteSize): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PALETTE_SIZE_KEY, value);
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
 
 function readStoredPaletteAutoHide(): boolean | null {
   if (typeof window === 'undefined') return null;
@@ -121,6 +145,8 @@ function getInitialSettings(locale: string | undefined): EditorSettings {
   if (focusMode !== null) next.focusModeEnabled = focusMode;
   const paletteAutoHide = readStoredPaletteAutoHide();
   if (paletteAutoHide !== null) next.paletteAutoHide = paletteAutoHide;
+  const paletteSize = readStoredPaletteSize();
+  if (paletteSize !== null) next.paletteSize = paletteSize;
   return next;
 }
 
@@ -141,6 +167,13 @@ export function useEditorSettings(
     }
     if (typeof patch.paletteAutoHide === 'boolean') {
       writeStoredPaletteAutoHide(patch.paletteAutoHide);
+    }
+    if (
+      patch.paletteSize === 'small' ||
+      patch.paletteSize === 'medium' ||
+      patch.paletteSize === 'large'
+    ) {
+      writeStoredPaletteSize(patch.paletteSize);
     }
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);

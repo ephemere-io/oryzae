@@ -10,23 +10,30 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
+import { PALETTE_SCALE, type PaletteSize } from '@/components/ui/surface';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { EntryActionPalette, type PaletteAction } from './entry-action-palette';
 
 interface Props {
   actions: PaletteAction[];
   visible: boolean;
+  size?: PaletteSize;
   persistState?: boolean;
 }
 
 const PALETTE = '[data-verify-unit="EntryActionPalette"]';
 const noop = () => {};
 
-function icon(path: string) {
+/**
+ * fixture 用のアイコン。実物（entry-editor の paletteIcon）と同じく、
+ * 大きさの段に追従させる — ここを固定にすると、寸法の追従漏れを見逃す。
+ */
+function icon(path: string, size: PaletteSize = 'medium') {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      width={PALETTE_SCALE[size].icon}
+      height={PALETTE_SCALE[size].icon}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -49,6 +56,12 @@ const WITH_DISABLED: PaletteAction[] = ACTIONS.map((a) =>
   a.id === 'pickle' ? { ...a, disabledReason: '本文を書くと漬け込めます' } : a,
 );
 
+/** 大きい段の fixture 用。アイコンも段に合わせる。 */
+const LARGE_ACTIONS: PaletteAction[] = ACTIONS.map((a) => ({
+  ...a,
+  icon: icon('M12 5v14M5 12h14', 'large'),
+}));
+
 registerUnit<Props>({
   id: 'EntryActionPalette',
   title: 'EntryActionPalette',
@@ -65,6 +78,11 @@ registerUnit<Props>({
       id: 'hidden',
       description: '入力中：フォーカスモードで消えている（クリックも透過する）',
       props: { actions: ACTIONS, visible: false, persistState: false },
+    },
+    {
+      id: 'large',
+      description: '道具を大きくした状態（設定で選べる3段のいちばん上）',
+      props: { actions: LARGE_ACTIONS, visible: true, size: 'large', persistState: false },
     },
     {
       id: 'with-disabled',
@@ -105,6 +123,36 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'buttons-follow-the-chosen-size',
+      // 面・ボタン・アイコン・角丸は**まとめて**動かす。1つだけ変わると比率が崩れて、
+      // 「大きくした」ではなく「太った」ように見える。
+      description: '操作ボタンの寸法が、選ばれた大きさの段と一致する',
+      onlyFixtures: ['visible', 'large'],
+      check: ({ root, contract }) => {
+        const size = contract.size;
+        if (size !== 'small' && size !== 'medium' && size !== 'large') {
+          return `契約に大きさが出ていない: "${size}"`;
+        }
+        const expected = PALETTE_SCALE[size].button;
+        const buttons = Array.from(
+          root.querySelectorAll<HTMLElement>('button[data-palette-action]'),
+        );
+        if (buttons.length === 0) return '操作ボタンが無い';
+        const wrong = buttons.filter((b) => b.style.height !== `${expected}px`);
+        if (wrong.length > 0) {
+          return `${wrong.length} 個のボタンが ${expected}px でない（先頭: "${wrong[0]?.style.height}"）`;
+        }
+        // アイコンも一緒に大きくなること。ボタンだけ大きくすると道具が太っただけに見える。
+        const expectedIcon = String(PALETTE_SCALE[size].icon);
+        const icons = buttons.map((b) => b.querySelector('svg')?.getAttribute('width'));
+        const wrongIcon = icons.filter((w) => w !== expectedIcon);
+        return (
+          wrongIcon.length === 0 ||
+          `${wrongIcon.length} 個のアイコンが ${expectedIcon}px でない（先頭: "${wrongIcon[0]}"）`
+        );
+      },
+    },
     {
       id: 'hidden-is-click-through',
       description: '消えているときはクリックを透過する（本文の操作を奪わない）',

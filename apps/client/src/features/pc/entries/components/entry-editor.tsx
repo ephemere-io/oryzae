@@ -9,6 +9,7 @@ import { Popover } from '@/components/ui/popover';
 import {
   ICON_SIZE,
   ICON_STROKE_WIDTH,
+  paletteScale,
   SHELL_INSET,
   SHELL_ROW_HEIGHT,
 } from '@/components/ui/surface';
@@ -680,11 +681,13 @@ export function EntryEditor({
 
   // パレットの操作。押せないものは非活性にして、理由はホバーで出す
   // （「あと何字」を常時表示しない代わり）。
+  // アイコンもボタンと一緒に大きくする。ボタンだけ大きくすると、道具が太っただけに見える。
+  const paletteIconSize = paletteScale(settings.paletteSize).icon;
   const paletteIcon = (children: React.ReactNode) => (
     <svg
       aria-hidden="true"
-      width={ICON_SIZE}
-      height={ICON_SIZE}
+      width={paletteIconSize}
+      height={paletteIconSize}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -1041,7 +1044,11 @@ export function EntryEditor({
       {/* 操作はすべてここに集める（問いを結ぶ・写真・音声・漬け込む・発酵・全画面）。
           本文に被らせないやり方は「場所を空ける」ではなく「振る舞い」で解く:
           書いている間は uiVisible が false になって一緒に消え、掴んで動かせ、畳める。 */}
-      <EntryActionPalette actions={paletteActions} visible={paletteVisible} />
+      <EntryActionPalette
+        actions={paletteActions}
+        visible={paletteVisible}
+        size={settings.paletteSize}
+      />
 
       {/* Status bar */}
       <div className={fadeClass}>

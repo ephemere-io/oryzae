@@ -22,21 +22,44 @@
  *
  * ## 寸法
  *
- * | 用途 | 値 |
- * |---|---|
- * | 面の内側の余白 | 6px（`p-1.5`） |
- * | 面に載るボタン | 36px 角（`h-9 w-9`） |
- * | ボタンの中のアイコン | 18px（`ICON_SIZE`。className ではなく width/height 属性で指定する） |
- * | ボタン同士の間 | 4px（`gap-1`） |
- * | 面の角丸 | 13px |
- * | ボタンの角丸 | 8px（`rounded-lg`） |
- *
+ * 寸法は1段ではなく**3段**持つ（`PALETTE_SCALE`）。道具の大きさは画面の広さと
+ * その人の目に依るので、既定を1つに決め切らず選べるようにしてある。
  * アイコンの線幅は **1.6** で統一する。
  */
 
-/** 浮いた面。角丸・余白・影を揃える。位置は呼び出し側が付ける。 */
+/** 道具の面の大きさ。設定で選べる（`editor.settings.palette_size`）。 */
+export type PaletteSize = 'small' | 'medium' | 'large';
+
+/**
+ * 大きさの段。**面・ボタン・アイコン・角丸を一括で動かす**（1つだけ変えると比率が崩れる）。
+ * 既定は `medium`。以前の実寸は `small` にあたり、道具として小さすぎた。
+ */
+export const PALETTE_SCALE: Record<
+  PaletteSize,
+  {
+    button: number;
+    icon: number;
+    pad: number;
+    gap: number;
+    panelRadius: number;
+    buttonRadius: number;
+  }
+> = {
+  small: { button: 36, icon: 18, pad: 6, gap: 4, panelRadius: 13, buttonRadius: 8 },
+  medium: { button: 44, icon: 20, pad: 8, gap: 4, panelRadius: 16, buttonRadius: 10 },
+  large: { button: 52, icon: 24, pad: 10, gap: 6, panelRadius: 18, buttonRadius: 12 },
+};
+
+export function paletteScale(size: PaletteSize) {
+  return PALETTE_SCALE[size];
+}
+
+/**
+ * 浮いた面。角丸・余白・影を揃える。位置と寸法は呼び出し側が付ける
+ * （寸法は `paletteScale()` から style で渡す）。
+ */
 export const ELEVATED_PANEL_CLASS =
-  'flex items-center gap-1 rounded-[13px] border p-1.5 ' +
+  'flex items-center border ' +
   'shadow-[0_8px_24px_-6px_rgba(0,0,0,0.22),0_2px_6px_-2px_rgba(0,0,0,0.12)]';
 
 export const ELEVATED_PANEL_STYLE = {
@@ -54,8 +77,9 @@ export const ELEVATED_PANEL_STYLE = {
  */
 export const HOVER_CLASS = 'transition-colors duration-150 hover:bg-[var(--hover-wash)]';
 
+/** 面に載る正方形のアイコンボタン。寸法は `paletteScale()` から style で渡す。 */
 export const TOOL_BUTTON_CLASS =
-  'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors active:scale-95';
+  'flex shrink-0 items-center justify-center transition-colors active:scale-95';
 
 /**
  * 選択されていないボタンの hover。

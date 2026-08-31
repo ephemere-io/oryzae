@@ -7,6 +7,7 @@ const FONT_SIZE_KEY = 'oryzae-editor-font-size';
 const LINE_HEIGHT_KEY = 'oryzae-editor-line-height';
 const FOCUS_MODE_KEY = 'oryzae-editor-focus-mode';
 const PALETTE_AUTO_HIDE_KEY = 'oryzae-editor-palette-auto-hide';
+const PALETTE_SIZE_KEY = 'oryzae-editor-palette-size';
 
 describe('useEditorSettings', () => {
   beforeEach(() => {
@@ -181,6 +182,30 @@ describe('useEditorSettings', () => {
 
     const second = renderHook(() => useEditorSettings());
     expect(second.result.current[0].paletteAutoHide).toBe(false);
+  });
+
+  // 道具の大きさ。既定は medium（以前の実寸は small にあたり、道具として小さすぎた）。
+  it('paletteSize の既定は medium', () => {
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].paletteSize).toBe('medium');
+  });
+
+  it('paletteSize を変えると localStorage に永続化され、再マウント越しに残る', () => {
+    const first = renderHook(() => useEditorSettings());
+    act(() => {
+      first.result.current[1]({ paletteSize: 'large' });
+    });
+    expect(window.localStorage.getItem(PALETTE_SIZE_KEY)).toBe('large');
+    first.unmount();
+
+    const second = renderHook(() => useEditorSettings());
+    expect(second.result.current[0].paletteSize).toBe('large');
+  });
+
+  it('壊れた paletteSize は無視して既定に戻す', () => {
+    window.localStorage.setItem(PALETTE_SIZE_KEY, 'enormous');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].paletteSize).toBe('medium');
   });
 
   it('壊れた paletteAutoHide は無視して既定に戻す', () => {

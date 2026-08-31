@@ -377,7 +377,11 @@
       "font_family": "Typeface",
       "time_inscription_mode": "Shown as",
       "ghost_mode": "Shown as",
-      "palette_auto_hide": "Hide the palette while writing"
+      "palette_auto_hide": "Hide the palette while writing",
+      "palette_size": "Tool size",
+      "palette_size_small": "Small",
+      "palette_size_medium": "Medium",
+      "palette_size_large": "Large"
     },
     "snippet_toolbar": {
       "saving": "Saving…",

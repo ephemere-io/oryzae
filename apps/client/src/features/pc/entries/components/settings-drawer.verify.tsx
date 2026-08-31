@@ -93,10 +93,10 @@ registerUnit<Props>({
         const label = props.settings.timeInscriptionEnabled ? 1 : 0;
         const selects = root.querySelectorAll('[aria-haspopup="listbox"]').length;
         const enabled = contract.timeInscriptionEnabled === 'true';
-        // 面に畳む Select は「選択肢が3つ以上」のものだけ。いま残っているのは
-        // 「時間の表し方」（3択）だけで、それも時間内包が入のときにしか出ない。
+        // 面に畳む Select は「選択肢が3つ以上」のものだけ。常設は「道具の大きさ」（3択）で、
+        // 「時間の表し方」（3択）は時間内包が入のときにだけ増える。
         // 2択（書字方向・書体・ゴーストの表し方）は Segmented で開かせない。
-        const expected = label;
+        const expected = 1 + label;
         return (
           (enabled === (label === 1) && selects === expected) ||
           `Select 数=${selects}, 期待=${expected}（timeInscriptionEnabled=${contract.timeInscriptionEnabled}）`

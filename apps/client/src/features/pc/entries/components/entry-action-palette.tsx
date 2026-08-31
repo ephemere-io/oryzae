@@ -10,8 +10,9 @@ import {
   ELEVATED_PANEL_CLASS,
   ELEVATED_PANEL_STYLE,
   HOVER_CLASS,
-  ICON_SIZE,
   ICON_STROKE_WIDTH,
+  type PaletteSize,
+  paletteScale,
   TOOL_BUTTON_CLASS,
 } from '@/components/ui/surface';
 
@@ -27,6 +28,8 @@ export interface PaletteAction {
 }
 
 interface EntryActionPaletteProps {
+  /** 道具の大きさ（設定で変えられる）。既定は medium。 */
+  size?: PaletteSize;
   actions: PaletteAction[];
   /** フォーカスモードで本文以外を消しているあいだは false。 */
   visible: boolean;
@@ -104,8 +107,11 @@ function persist(key: string, value: string): void {
 export function EntryActionPalette({
   actions,
   visible,
+  size = 'medium',
   persistState = true,
 }: EntryActionPaletteProps) {
+  // 面・ボタン・アイコン・角丸は**まとめて**動かす（1つだけ変えると比率が崩れる）。
+  const scale = paletteScale(size);
   const t = useTranslations('editor.palette');
   const [position, setPosition] = useState<Position | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -240,6 +246,7 @@ export function EntryActionPalette({
     dragging,
     actionCount: actions.length,
     docked,
+    size,
   });
 
   const wrapperClass = `fixed z-[1600] transition-opacity duration-300 ${
@@ -254,13 +261,20 @@ export function EntryActionPalette({
           onClick={() => setCollapsedAndPersist(false)}
           aria-expanded={false}
           aria-label={t('expand')}
-          className={`flex h-7 w-20 items-center justify-center rounded-t-[13px] border border-b-0 transition-colors ${HOVER_CLASS}`}
-          style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
+          className={`flex items-center justify-center border border-b-0 transition-colors ${HOVER_CLASS}`}
+          style={{
+            height: scale.button - 16,
+            width: scale.button * 2,
+            borderTopLeftRadius: scale.panelRadius,
+            borderTopRightRadius: scale.panelRadius,
+            ...ELEVATED_PANEL_STYLE,
+            ...CONTROL_FONT,
+          }}
         >
           <svg
             aria-hidden="true"
-            width={ICON_SIZE}
-            height={ICON_SIZE}
+            width={scale.icon}
+            height={scale.icon}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -280,7 +294,13 @@ export function EntryActionPalette({
     <div ref={rootRef} className={wrapperClass} style={placement} {...contract}>
       <div
         className={`${ELEVATED_PANEL_CLASS} ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
+        style={{
+          gap: scale.gap,
+          padding: scale.pad,
+          borderRadius: scale.panelRadius,
+          ...ELEVATED_PANEL_STYLE,
+          ...CONTROL_FONT,
+        }}
         onPointerDown={handleSurfacePointerDown}
       >
         {/* 掴み手。面のどこでもドラッグの起点にはなるが、実際にはボタンが敷き詰められていて
@@ -288,8 +308,8 @@ export function EntryActionPalette({
             掴める場所がある、と分かる幅を確保する。 */}
         <span
           aria-hidden="true"
-          className="flex h-9 w-4 shrink-0 items-center justify-center"
-          style={{ color: 'var(--date-color)' }}
+          className="flex shrink-0 items-center justify-center"
+          style={{ height: scale.button, width: 16, color: 'var(--date-color)' }}
         >
           <svg
             aria-hidden="true"
@@ -334,11 +354,14 @@ export function EntryActionPalette({
                 className={`${TOOL_BUTTON_CLASS} ${
                   disabled ? DISABLED_CLASS : action.active ? '' : HOVER_CLASS
                 }`}
-                style={
-                  action.active
+                style={{
+                  height: scale.button,
+                  width: scale.button,
+                  borderRadius: scale.buttonRadius,
+                  ...(action.active
                     ? { backgroundColor: 'var(--accent)', color: '#fff' }
-                    : { color: 'var(--fg)' }
-                }
+                    : { color: 'var(--fg)' }),
+                }}
               >
                 {action.icon}
               </button>
@@ -361,12 +384,17 @@ export function EntryActionPalette({
           aria-expanded={true}
           aria-label={t('collapse')}
           className={`${TOOL_BUTTON_CLASS} ${HOVER_CLASS}`}
-          style={{ color: 'var(--date-color)' }}
+          style={{
+            height: scale.button,
+            width: scale.button,
+            borderRadius: scale.buttonRadius,
+            color: 'var(--date-color)',
+          }}
         >
           <svg
             aria-hidden="true"
-            width={ICON_SIZE}
-            height={ICON_SIZE}
+            width={scale.icon}
+            height={scale.icon}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

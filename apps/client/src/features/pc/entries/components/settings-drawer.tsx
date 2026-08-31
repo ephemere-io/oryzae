@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
+import type { PaletteSize } from '@/components/ui/surface';
 import { Switch } from '@/components/ui/switch';
 
 type WritingMode = 'vertical' | 'horizontal';
@@ -19,6 +20,8 @@ export interface EditorSettings {
   focusModeEnabled: boolean;
   /** 書いている間はアクションパレットを隠すか（既定 ON）。 */
   paletteAutoHide: boolean;
+  /** 道具（アクションパレット）の大きさ。画面の広さと目に依るので選べるようにしてある。 */
+  paletteSize: PaletteSize;
   timeInscriptionEnabled: boolean;
   timeInscriptionMode: TimeInscriptionMode;
   eraserTraceEnabled: boolean;
@@ -40,6 +43,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   lineHeight: 1.625,
   focusModeEnabled: true,
   paletteAutoHide: true,
+  paletteSize: 'medium',
   timeInscriptionEnabled: false,
   timeInscriptionMode: 'fontSize',
   eraserTraceEnabled: false,
@@ -61,6 +65,10 @@ interface SettingsPanelProps {
 
 function isTimeInscriptionMode(value: string): value is TimeInscriptionMode {
   return value === 'fontSize' || value === 'fontWeight' || value === 'pressureBleed';
+}
+
+function isPaletteSize(value: string): value is PaletteSize {
+  return value === 'small' || value === 'medium' || value === 'large';
 }
 
 function isGhostMode(value: string): value is GhostMode {
@@ -235,6 +243,25 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
           label={t('palette_auto_hide')}
           checked={settings.paletteAutoHide}
           onChange={(v) => onChange({ paletteAutoHide: v })}
+        />
+        {/* 道具の大きさ。3段あるので面に畳む（2択なら Segmented）。 */}
+        <Row
+          label={t('palette_size')}
+          control={
+            <Select
+              className="w-32"
+              ariaLabel={t('palette_size')}
+              value={settings.paletteSize}
+              options={[
+                { value: 'small', label: t('palette_size_small') },
+                { value: 'medium', label: t('palette_size_medium') },
+                { value: 'large', label: t('palette_size_large') },
+              ]}
+              onChange={(v) => {
+                if (isPaletteSize(v)) onChange({ paletteSize: v });
+              }}
+            />
+          }
         />
       </Section>
 
