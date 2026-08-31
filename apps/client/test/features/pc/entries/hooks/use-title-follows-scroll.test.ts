@@ -1,16 +1,16 @@
 import { renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { useTitleFadesOnScroll } from '@/features/pc/entries/hooks/use-title-fades-on-scroll';
+import { useTitleFollowsScroll } from '@/features/pc/entries/hooks/use-title-follows-scroll';
 
 /**
- * 縦書きの題には相反する2つの要求がある（PR #525 のやりとり）:
- * 常に出ていると「いまどこにいるか」が分からず、かといって紙と一緒に動くと
- * 書いている最中に落ち着かない。**位置は動かさず濃さだけ紙の進みに結ぶ**のがここの答え。
+ * 縦書きの題は紙の右肩に絶対配置してあるため、放っておくと本文だけが流れて題が残る。
+ * **題と本文が同じ紙に書かれている**ように見せたいので、紙の進んだ分を題にも掛ける。
  *
- * 見張るのは「書き始め（進み 0）では濃いまま動かない」「進めば薄れて消える」
- * 「横書きへ戻せば跡を残さない」。
+ * 書いている最中に題がふらつかないのは、紙自体が1文字ごとには動かないから
+ * （use-typewriter-scroll が端に着くまで紙を止める）。ここではその前提の上で
+ * 「紙が動いたら題も同じだけ動く」「横書きへ戻せば跡を残さない」を見張る。
  */
-describe('useTitleFadesOnScroll', () => {
+describe('useTitleFollowsScroll', () => {
   const created: HTMLElement[] = [];
 
   function makeElements() {
@@ -33,7 +33,7 @@ describe('useTitleFadesOnScroll', () => {
 
   function setup(enabled: boolean, title: HTMLElement, editor: HTMLElement) {
     return renderHook(() =>
-      useTitleFadesOnScroll({
+      useTitleFollowsScroll({
         titleRef: { current: title },
         editorRef: { current: editor },
         enabled,
@@ -41,40 +41,32 @@ describe('useTitleFadesOnScroll', () => {
     );
   }
 
-  it('書き始め（進み 0）では濃いまま', () => {
+  it('紙が動いた分だけ題も動く', () => {
     const { title, editor } = makeElements();
     setup(true, title, editor);
 
-    expect(title.style.opacity).toBe('1');
+    // vertical-rl は先頭（右端）で 0、左へ読み進むと負。
+    scrollTo(editor, -240);
+
+    expect(title.style.transform).toBe('translateX(-240px)');
   });
 
-  it('位置は動かさない（題は最後まで同じ場所にいる）', () => {
+  it('紙が止まっていれば題も動かない（書いている最中にふらつかない）', () => {
     const { title, editor } = makeElements();
     setup(true, title, editor);
 
-    scrollTo(editor, -120);
+    scrollTo(editor, 0);
 
-    expect(title.style.transform).toBe('');
+    expect(title.style.transform).toBe('translateX(0px)');
   });
 
-  it('紙が進むほど薄くなる', () => {
+  it('マウント直後に現在の位置へ合わせる（途中から開いても題がずれない）', () => {
     const { title, editor } = makeElements();
+    Object.defineProperty(editor, 'scrollLeft', { value: -120, configurable: true });
+
     setup(true, title, editor);
 
-    // vertical-rl は左へ読み進むと負。240px で消えるので、半分で 0.5。
-    scrollTo(editor, -120);
-
-    expect(title.style.opacity).toBe('0.5');
-  });
-
-  it('十分に進めば消え、本文のクリックを奪わない', () => {
-    const { title, editor } = makeElements();
-    setup(true, title, editor);
-
-    scrollTo(editor, -400);
-
-    expect(title.style.opacity).toBe('0');
-    expect(title.style.pointerEvents).toBe('none');
+    expect(title.style.transform).toBe('translateX(-120px)');
   });
 
   it('戻れば題も戻ってくる', () => {
@@ -84,8 +76,7 @@ describe('useTitleFadesOnScroll', () => {
 
     scrollTo(editor, 0);
 
-    expect(title.style.opacity).toBe('1');
-    expect(title.style.pointerEvents).toBe('');
+    expect(title.style.transform).toBe('translateX(0px)');
   });
 
   it('横書き（enabled=false）では何も付けない', () => {
@@ -94,35 +85,35 @@ describe('useTitleFadesOnScroll', () => {
 
     scrollTo(editor, -240);
 
-    expect(title.style.opacity).toBe('');
+    expect(title.style.transform).toBe('');
   });
 
-  it('縦書きから横書きへ切り替えたら、付けた薄さを消す', () => {
+  it('縦書きから横書きへ切り替えたら、付けたずれを消す', () => {
     const { title, editor } = makeElements();
     const { rerender } = renderHook(
       ({ enabled }) =>
-        useTitleFadesOnScroll({
+        useTitleFollowsScroll({
           titleRef: { current: title },
           editorRef: { current: editor },
           enabled,
         }),
       { initialProps: { enabled: true } },
     );
-    scrollTo(editor, -400);
-    expect(title.style.opacity).toBe('0');
+    scrollTo(editor, -300);
+    expect(title.style.transform).toBe('translateX(-300px)');
 
     rerender({ enabled: false });
 
-    expect(title.style.opacity).toBe('');
+    expect(title.style.transform).toBe('');
   });
 
-  it('外した後はスクロールしても変わらない（listener が残らない）', () => {
+  it('外した後はスクロールしても動かさない（listener が残らない）', () => {
     const { title, editor } = makeElements();
     const { unmount } = setup(true, title, editor);
     unmount();
 
     scrollTo(editor, -400);
 
-    expect(title.style.opacity).toBe('');
+    expect(title.style.transform).toBe('');
   });
 });

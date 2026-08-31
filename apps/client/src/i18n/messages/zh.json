@@ -459,7 +459,8 @@
       "section_letter": "信",
       "section_keywords": "关键词",
       "section_snippets": "摘录",
-      "letter_open": "阅读收到的信"
+      "letter_open": "阅读收到的信",
+      "back_aria": "返回列表"
     },
     "palette": {
       "move": "移动面板",

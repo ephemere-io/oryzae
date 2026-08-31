@@ -5,8 +5,8 @@
  * データ取得は親（useFermentationForQuestion）が担うので props だけで孤立レンダリングできる。
  *
  * 注意:
- * - FermentationOverlayDetailPane は常時マウントされ、閉じていても閉ボタンが root に存在する。
- *   ボタン数を数える invariant は契約要素（data-verify-unit="FermentationSidebar"）配下に限定する。
+ * - **面は1枚**。項目を開いても別の面は生えず、この面の中身が一覧 ⇄ 中身で入れ替わる。
+ *   同じ場所に同じ幅の面が2枚重なると、どちらを見ているのか分からなくなるため。
  * - キーワードは 5 件、スニペットは 3 件で slice する。契約は **描画済み（cap 後）** の件数を
  *   公表するので、cap 超過 probe でも DOM 件数と一致する。
  */
@@ -94,6 +94,19 @@ registerUnit<Props>({
       props: { detail: makeDetail({}), onClose: noop },
     },
     {
+      id: 'detail-open',
+      description: '手紙を開いた状態（面は増えず、この面の中身が入れ替わる）',
+      props: { detail: fullDetail, onClose: noop },
+      act: async ({ root, wait }) => {
+        const letter = Array.from(root.querySelectorAll<HTMLElement>('button')).find((b) =>
+          b.textContent?.includes('手紙'),
+        );
+        if (!letter) throw new Error('手紙を開くボタンが見つからない');
+        letter.click();
+        await wait(16);
+      },
+    },
+    {
       id: 'over-cap',
       probe: true,
       description: 'Probe: cap 超過（キーワード7件・スニペット5件）でも 5/3 件に頭打ちになる',
@@ -134,6 +147,7 @@ registerUnit<Props>({
     {
       id: 'items-are-clickable',
       description: '契約件数の合計 + 閉じるボタン = サイドバー内のボタン総数（全項目が開ける）',
+      onlyFixtures: ['full', 'letter-only', 'empty', 'over-cap'],
       check: ({ root, contract }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
         if (!sidebar) return 'FermentationSidebar の契約要素が見つからない';
@@ -144,6 +158,31 @@ registerUnit<Props>({
           (contract.hasLetter === 'true' ? 1 : 0) +
           1; // 閉じるボタン
         return buttons === expected || `ボタン数=${buttons}, 期待=${expected}`;
+      },
+    },
+    {
+      id: 'stays-one-surface',
+      // 以前は項目を押すと別の面が右から重なった（面が2枚・閉じる操作も2回）。
+      description: '項目を開いても面は1枚のまま（一覧と中身が入れ替わる）',
+      onlyFixtures: ['detail-open'],
+      check: ({ root, contract }) => {
+        const surfaces = root.querySelectorAll('aside').length;
+        if (surfaces !== 1) return `面が ${surfaces} 枚ある（1枚であるべき）`;
+        if (contract.detailOpen !== 'true') return '中身が開いていない';
+        // 中身を出しているあいだ、一覧の項目は消えている（重ねて出さない）。
+        const sidebar = root.querySelector(SIDEBAR_SELECTOR);
+        const listItems = sidebar?.querySelectorAll('section').length ?? 0;
+        return listItems === 0 || `中身を開いているのに一覧が ${listItems} 節残っている`;
+      },
+    },
+    {
+      id: 'detail-has-a-way-back',
+      description: '中身を開いたら、一覧へ戻る道がある',
+      onlyFixtures: ['detail-open'],
+      check: ({ root }) => {
+        const sidebar = root.querySelector(SIDEBAR_SELECTOR);
+        const buttons = Array.from(sidebar?.querySelectorAll('button') ?? []);
+        return buttons.length >= 2 || '戻る／閉じるが揃っていない（中身から出られない）';
       },
     },
     {

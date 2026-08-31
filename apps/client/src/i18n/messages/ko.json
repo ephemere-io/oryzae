@@ -459,7 +459,8 @@
       "section_letter": "편지",
       "section_keywords": "키워드",
       "section_snippets": "스니펫",
-      "letter_open": "도착한 편지 읽기"
+      "letter_open": "도착한 편지 읽기",
+      "back_aria": "목록으로"
     },
     "palette": {
       "move": "팔레트 이동",

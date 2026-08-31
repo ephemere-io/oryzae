@@ -9,7 +9,13 @@ import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { ICON_STROKE_WIDTH, SHELL_INSET, SHELL_ROW_HEIGHT } from '@/components/ui/surface';
 import { useAuth } from '@/lib/auth-context';
 import { docsHref } from '@/lib/docs-site';
-import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
+import {
+  applySidebarWidth,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  setSidebarResizing,
+  useSidebarVisibility,
+} from '@/lib/sidebar-context';
 import { useUnread } from '@/lib/unread-context';
 
 interface NavItem {
@@ -76,7 +82,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { auth } = useAuth();
   const { unreadCount } = useUnread();
-  const { hidden, collapsed, setCollapsed, expandedWidth, setExpandedWidth, width, restored } =
+  const { hidden, collapsed, setCollapsed, expandedWidth, setExpandedWidth, width } =
     useSidebarVisibility();
   const [dragging, setDragging] = useState(false);
   // ドラッグ中は state を書き換えず ref で追う（毎フレームの再描画を避ける）。
@@ -96,10 +102,12 @@ export function Sidebar() {
   useEffect(() => {
     if (!dragging) return;
 
+    // 掴んでいる間は **state を一切触らない**。幅は CSS 変数へ直に書く。
+    // 再描画を挟むと、本文の折返しまで巻き込んで指の動きから遅れる。
     function flush() {
       frameRef.current = null;
       const next = pendingWidthRef.current;
-      if (next !== null) setExpandedWidth(next);
+      if (next !== null) applySidebarWidth(next);
     }
     function handleMove(e: PointerEvent) {
       const next = e.clientX;
@@ -111,6 +119,7 @@ export function Sidebar() {
       // 最小幅より内側まで引いたら畳む。ドラッグで閉じられるのが自然なので、
       // 「掴んで縮める」と「畳む」を別の操作にしない。
       if (next < SIDEBAR_MIN_WIDTH - 24) {
+        pendingWidthRef.current = null;
         setCollapsed(true);
         setDragging(false);
         return;
@@ -119,6 +128,7 @@ export function Sidebar() {
       pendingWidthRef.current = dragWidthRef.current;
       if (frameRef.current === null) frameRef.current = requestAnimationFrame(flush);
     }
+    setSidebarResizing(true);
     document.addEventListener('pointermove', handleMove);
     document.addEventListener('pointerup', stopDrag);
     document.addEventListener('pointercancel', stopDrag);
@@ -130,11 +140,12 @@ export function Sidebar() {
       document.removeEventListener('pointerup', stopDrag);
       document.removeEventListener('pointercancel', stopDrag);
       document.body.style.userSelect = previousSelect;
+      setSidebarResizing(false);
       if (frameRef.current !== null) {
         cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
       }
-      // 最後の1フレームぶんを取りこぼさない。
+      // 掴み終わってはじめて state を確定する（保存もここで1回だけ）。
       if (pendingWidthRef.current !== null) setExpandedWidth(pendingWidthRef.current);
     };
   }, [dragging, setCollapsed, setExpandedWidth, stopDrag]);
@@ -144,12 +155,10 @@ export function Sidebar() {
   return (
     <nav
       {...verifyAttrs({ unit: 'Sidebar', pathname, collapsed, width })}
-      className={`fixed top-0 bottom-0 left-0 z-30 flex flex-col ${
-        // 復元前は幅を動かさない（保存値へ飛ぶ瞬間が滑って見えるのを避ける）。
-        restored && !dragging ? 'transition-[width,opacity] duration-300' : ''
-      } ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+      className={`sidebar-sized fixed top-0 bottom-0 left-0 z-30 flex flex-col transition-opacity duration-300 ${
+        hidden ? 'pointer-events-none opacity-0' : 'opacity-100'
+      }`}
       style={{
-        width,
         paddingTop: SHELL_INSET,
         paddingBottom: SHELL_INSET,
         // 透けた白に頼っていたため、紙（--bg）とほぼ同じ明るさで境界が読めなかった。

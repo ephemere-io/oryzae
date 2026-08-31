@@ -10,6 +10,32 @@ const SIDEBAR_DEFAULT_WIDTH = 232;
 export const SIDEBAR_MIN_WIDTH = 176;
 export const SIDEBAR_MAX_WIDTH = 360;
 
+/**
+ * 幅を配る CSS 変数。**サイドバー・本文の左余白・エディタの左端が、この1本だけを見る。**
+ *
+ * 以前は React の state を毎フレーム更新して各所に px を配っていた。掴んで引くたびに
+ * 画面全体（本文の折返しを含む）が再描画され、明らかにぎこちなかった。
+ * 変数を1つ根に置いて CSS に配らせれば、掴んでいる間は再描画が1回も起きない
+ * （shadcn のサイドバーと同じ作り）。
+ */
+const SIDEBAR_WIDTH_VAR = '--sidebar-width';
+
+/** 掴んでいる間だけ根に立てる印。これが立っているあいだは幅の遷移を止める。 */
+const SIDEBAR_RESIZING_ATTR = 'data-sidebar-resizing';
+
+/** 掴んでいる間、再描画を挟まずに幅を配る。 */
+export function applySidebarWidth(width: number): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.style.setProperty(SIDEBAR_WIDTH_VAR, `${width}px`);
+}
+
+/** 幅の遷移を止める／戻す（掴んでいる間は追従が遅れて見えるため）。 */
+export function setSidebarResizing(resizing: boolean): void {
+  if (typeof document === 'undefined') return;
+  if (resizing) document.documentElement.setAttribute(SIDEBAR_RESIZING_ATTR, '');
+  else document.documentElement.removeAttribute(SIDEBAR_RESIZING_ATTR);
+}
+
 const COLLAPSED_KEY = 'oryzae-sidebar-collapsed';
 const WIDTH_KEY = 'oryzae-sidebar-width';
 
@@ -112,6 +138,12 @@ export function SidebarProvider({
     [persist],
   );
 
+  // 掴んでいない間の反映はここ1か所。掴んでいる間は applySidebarWidth が直に書く。
+  const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : expandedWidth;
+  useEffect(() => {
+    applySidebarWidth(width);
+  }, [width]);
+
   const value = useMemo(
     () => ({
       hidden,
@@ -120,10 +152,10 @@ export function SidebarProvider({
       setCollapsed,
       expandedWidth,
       setExpandedWidth,
-      width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : expandedWidth,
+      width,
       restored,
     }),
-    [hidden, setHidden, collapsed, setCollapsed, expandedWidth, setExpandedWidth, restored],
+    [hidden, setHidden, collapsed, setCollapsed, expandedWidth, setExpandedWidth, width, restored],
   );
 
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;

@@ -41,7 +41,7 @@ import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-questi
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
-import { useTitleFadesOnScroll } from '@/features/pc/entries/hooks/use-title-fades-on-scroll';
+import { useTitleFollowsScroll } from '@/features/pc/entries/hooks/use-title-follows-scroll';
 import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
@@ -239,8 +239,8 @@ export function EntryEditor({
     uiVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
   }`;
 
-  // エディタは画面に貼りつく（fixed）ので、サイドバーの幅を自分で見て左端を決める。
-  const { setHidden: setSidebarHidden, width: sidebarWidth } = useSidebarVisibility();
+  // 左端は CSS 変数（--sidebar-width）が配る。掴んで引いている間も再描画が起きない。
+  const { setHidden: setSidebarHidden } = useSidebarVisibility();
   useEffect(() => {
     setSidebarHidden(!uiVisible);
     return () => setSidebarHidden(false);
@@ -671,9 +671,9 @@ export function EntryEditor({
     enabled: true,
   });
 
-  // 縦書きの題は紙の右肩に絶対配置してある。**位置は動かさず、濃さだけ**紙の進みに結ぶ
-  // （動かすと書いている最中に横へ滑って落ち着かず、動かさないと居場所が分からない）。
-  useTitleFadesOnScroll({
+  // 縦書きの題は紙の右肩に絶対配置してあるので、紙の進んだ分をそのまま題にも掛ける
+  // （題と本文が同じ紙に書かれているように見せる）。
+  useTitleFollowsScroll({
     titleRef: titleInputRef,
     editorRef,
     enabled: settings.writingMode === 'vertical',
@@ -816,8 +816,7 @@ export function EntryEditor({
 
   return (
     <div
-      className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-[var(--bg)] transition-[left] duration-200 ease-linear"
-      style={{ left: sidebarWidth }}
+      className="sidebar-anchored fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-[var(--bg)]"
       {...verifyAttrs({
         unit: 'EntryEditor',
         hasEntry: !!entryId,
@@ -911,8 +910,7 @@ export function EntryEditor({
       {/* Ghost layer — must be above editor (z-50) */}
       <div
         ref={ghostLayerRef}
-        className="pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden transition-[left] duration-200 ease-linear"
-        style={{ left: sidebarWidth }}
+        className="sidebar-anchored pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden"
       />
 
       {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}
@@ -1039,18 +1037,14 @@ export function EntryEditor({
         </div>
 
         {/* Issue #466: 発酵結果は本文に重ねず、右のサイドバーに集約する。
-            Issue #350: フォーカスモードで基本 UI が消えるとき、発酵結果だけ残ると浮くので
-            一緒に薄くする。切りたい人のために設定で外せる。 */}
-        {/* 発酵結果は本文の**隣**に並ぶので、書いている間も消さない（本文には重ならない）。
-            Issue #350 の「フォーカスモードで一緒に薄くする」は、本文の上に浮いていた頃の
-            話だった。並ぶようになった以上、消す理由がない。 */}
+            本文の**隣**に並ぶので、書いている間も消さない（本文には重ならない）。
+            余計なラッパーで包まないこと——包むと面が中身ぶんの高さしか持たず、
+            画面の上半分で切れて見える。 */}
         {fermentSidebarOpen && fermentationOverlayDetail && (
-          <div>
-            <FermentationSidebar
-              detail={fermentationOverlayDetail}
-              onClose={() => setFermentSidebarOpen(false)}
-            />
-          </div>
+          <FermentationSidebar
+            detail={fermentationOverlayDetail}
+            onClose={() => setFermentSidebarOpen(false)}
+          />
         )}
       </div>
 
