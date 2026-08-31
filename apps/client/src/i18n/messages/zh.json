@@ -233,8 +233,14 @@
   },
   "sidebar": {
     "nav": {
-      "account": "账户"
-    }
+      "account": "账户",
+      "jar": "罐",
+      "board": "画板",
+      "list": "列表",
+      "editor": "书写"
+    },
+    "expand": "展开侧边栏",
+    "collapse": "收起侧边栏"
   },
   "stats": {
     "label": {
@@ -461,7 +467,6 @@
       "move": "移动面板",
       "collapse": "收起面板",
       "expand": "展开面板",
-      "link_question": "关联问题",
       "pickle_needs_body": "写点内容后即可腌渍",
       "pickle_needs_question": "关联问题后即可腌渍"
     }

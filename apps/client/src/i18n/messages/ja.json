@@ -233,8 +233,14 @@
   },
   "sidebar": {
     "nav": {
-      "account": "アカウント"
-    }
+      "account": "アカウント",
+      "jar": "瓶",
+      "board": "ボード",
+      "list": "一覧",
+      "editor": "書く"
+    },
+    "expand": "サイドバーを開く",
+    "collapse": "サイドバーを畳む"
   },
   "stats": {
     "label": {
@@ -461,7 +467,6 @@
       "move": "パレットを移動",
       "collapse": "パレットを畳む",
       "expand": "パレットを開く",
-      "link_question": "問いを結ぶ",
       "pickle_needs_body": "本文を書くと漬け込めます",
       "pickle_needs_question": "問いを結ぶと漬け込めます"
     }

@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MenuOption, MenuPanel } from '@/components/ui/menu';
 
 interface QuestionOption {
   id: string;
@@ -79,9 +80,11 @@ export function QuestionChip({
   const extraCount = linked.length - 1;
 
   return (
+    // 器はボタンに張りつく大きさにする（inline-flex）。中央寄せの箱にしていた頃は、
+    // 器がヘッダーの幅いっぱいに広がり、開いた面の左端がボタンの左端とずれていた。
     <div
       ref={rootRef}
-      className="relative flex max-w-full justify-center"
+      className="relative inline-flex max-w-full"
       {...verifyAttrs({
         unit: 'QuestionChip',
         open,
@@ -94,7 +97,7 @@ export function QuestionChip({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-haspopup="listbox"
+        aria-haspopup="menu"
         className="flex h-7 max-w-[320px] items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors"
         style={
           primary
@@ -115,39 +118,28 @@ export function QuestionChip({
       </button>
 
       {open && (
-        <div
-          role="listbox"
-          aria-label={t('empty')}
-          className="absolute top-full z-[62] mt-2 max-h-[50vh] w-[320px] overflow-y-auto rounded-lg border py-1.5 shadow-xl"
-          style={{
-            backgroundColor: 'var(--surface-raised)',
-            borderColor: 'var(--surface-raised-border)',
-            fontFamily: 'Inter, "Noto Sans JP", sans-serif',
-          }}
-        >
-          {activeQuestions.length === 0 ? (
-            <p className="px-3 py-2 text-[13px] text-[var(--date-color)]">{t('none_available')}</p>
-          ) : (
-            activeQuestions.map((q) => {
-              const isLinked = linkedQuestionIds.has(q.id);
-              return (
-                <button
+        // 面の左端をボタンの左端に合わせる（left-0）。設定パネルの Select と同じ
+        // MenuPanel / MenuOption を使うので、材質も行の高さも同じ。
+        // ただし役割は違う: こちらは**結ぶ／解く**の付け外しなので menuitemcheckbox。
+        <div className="absolute top-full left-0 z-[62] mt-2 w-[320px]">
+          <MenuPanel role="menu" ariaLabel={t('empty')} className="max-h-[50vh]">
+            {activeQuestions.length === 0 ? (
+              <p className="px-3 py-2 text-[13px] text-[var(--date-color)]">
+                {t('none_available')}
+              </p>
+            ) : (
+              activeQuestions.map((q) => (
+                <MenuOption
                   key={q.id}
-                  type="button"
-                  role="option"
-                  aria-selected={isLinked}
-                  onClick={() => (isLinked ? onUnlink(q.id) : onLink(q.id))}
-                  className="flex h-8 w-full items-center gap-2 px-3 text-left text-[13px] transition-colors hover:bg-[var(--toolbar-hover)]"
-                  style={{ color: isLinked ? 'var(--accent)' : 'var(--fg)' }}
+                  role="menuitemcheckbox"
+                  selected={linkedQuestionIds.has(q.id)}
+                  onClick={() => (linkedQuestionIds.has(q.id) ? onUnlink(q.id) : onLink(q.id))}
                 >
-                  <span className="w-3 shrink-0" aria-hidden="true">
-                    {isLinked ? '✓' : ''}
-                  </span>
-                  <span className="truncate">{q.currentText ?? t('untitled')}</span>
-                </button>
-              );
-            })
-          )}
+                  {q.currentText ?? t('untitled')}
+                </MenuOption>
+              ))
+            )}
+          </MenuPanel>
         </div>
       )}
     </div>

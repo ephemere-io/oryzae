@@ -22,11 +22,14 @@
 
 import { registerUnit } from '@oryzae/verify';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { SidebarProvider } from '@/lib/sidebar-context';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { Sidebar } from './sidebar';
 
 interface Props {
   pathname: string;
+  /** 畳んだ状態（アイコンだけ）か、開いた状態（アイコン + メニュー名）か。 */
+  collapsed?: boolean;
 }
 
 // pathname から「どの navItem がアクティブであるべきか」を計算する（sidebar.tsx の isActive と同型）。
@@ -49,7 +52,10 @@ registerUnit<Props>({
   render: (props) =>
     withVerifyProviders(
       <PathnameContext.Provider value={props.pathname}>
-        <Sidebar />
+        {/* 開閉は context 由来。persist=false にして、fixture 間で localStorage を漏らさない。 */}
+        <SidebarProvider initialCollapsed={props.collapsed ?? true} persist={false}>
+          <Sidebar />
+        </SidebarProvider>
       </PathnameContext.Provider>,
     ),
   fixtures: [
@@ -67,6 +73,11 @@ registerUnit<Props>({
       id: 'no-active',
       description: 'どのナビにもマッチしないパスではアクティブ項目ゼロ',
       props: { pathname: '/account' },
+    },
+    {
+      id: 'expanded',
+      description: '開いた状態 — 各項目にアイコンとメニュー名が並ぶ',
+      props: { pathname: '/jar', collapsed: false },
     },
     {
       id: 'editor-not-list',
@@ -104,6 +115,30 @@ registerUnit<Props>({
         const activeMatch = active[0]?.getAttribute('data-verify-nav-item');
         return (
           activeMatch === expected || `expected active navItem "${expected}", got "${activeMatch}"`
+        );
+      },
+    },
+    {
+      id: 'jar-is-first',
+      // 最初に目に入るべきは「書いたものが納まっている場所」。ロゴは行き先ではない。
+      description: '行き先の先頭は瓶（ロゴを列の先頭に置かない）',
+      check: ({ root }) => {
+        const first = root.querySelector('[data-verify-nav-item]');
+        const match = first?.getAttribute('data-verify-nav-item');
+        return match === '/jar' || `先頭が "${match}"（瓶であるべき）`;
+      },
+    },
+    {
+      id: 'labels-follow-collapsed',
+      description: '畳んでいるときはメニュー名を出さず、開いているときは全項目に出す',
+      check: ({ root, contract }) => {
+        const links = Array.from(root.querySelectorAll<HTMLElement>('[data-verify-nav-item]'));
+        // アイコンの span に加えて名前の span があるか（畳んでいるときは1つだけ）。
+        const withLabel = links.filter((l) => l.querySelectorAll(':scope > span').length > 1);
+        const expected = contract.collapsed === 'true' ? 0 : links.length;
+        return (
+          withLabel.length === expected ||
+          `名前つき=${withLabel.length}, 期待=${expected}（collapsed=${contract.collapsed}）`
         );
       },
     },

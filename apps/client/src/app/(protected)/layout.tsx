@@ -11,18 +11,42 @@ import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
-import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
+import { SidebarProvider, useSidebarVisibility } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
 import { RouteLoading } from './_loading/route-loading';
 
-// CSS カスタムプロパティは React.CSSProperties に含まれないので、
-// `--*` を許す形で型を広げて宣言する（キャストは使わない）。
-const mainStyle: React.CSSProperties & Record<`--${string}`, string> = {
-  marginLeft: SIDEBAR_WIDTH,
-  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-};
+/**
+ * PC のシェル。サイドバーの幅は畳む／開く／掴んで引く で変わるので、
+ * `<main>` の左余白と `--sidebar-width` はその値に追従させる。
+ * Provider が配る値を読むために、Provider の**中**の部品として切ってある。
+ */
+function PcShell({ children }: { children: React.ReactNode }) {
+  const { width, restored } = useSidebarVisibility();
+  // CSS カスタムプロパティは React.CSSProperties に含まれないので、
+  // `--*` を許す形で型を広げて宣言する（キャストは使わない）。
+  const mainStyle: React.CSSProperties & Record<`--${string}`, string> = {
+    marginLeft: width,
+    '--sidebar-width': `${width}px`,
+  };
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <main
+        className={`flex flex-1 flex-col overflow-hidden ${
+          restored ? 'transition-[margin-left] duration-300' : ''
+        }`}
+        style={mainStyle}
+      >
+        <div className="relative flex-1 overflow-auto">{children}</div>
+        <PageFooter />
+      </main>
+      {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
+      <DesktopOnlyOverlay />
+    </div>
+  );
+}
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
@@ -86,15 +110,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               <SpBottomNav />
             </div>
           ) : device === 'pc' ? (
-            <div className="flex h-screen overflow-hidden">
-              <Sidebar />
-              <main className="flex flex-1 flex-col overflow-hidden" style={mainStyle}>
-                <div className="relative flex-1 overflow-auto">{content}</div>
-                <PageFooter />
-              </main>
-              {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
-              <DesktopOnlyOverlay />
-            </div>
+            <PcShell>{content}</PcShell>
           ) : null}
           {device !== null && shouldShow && (
             <OnboardingFlow onComplete={handleOnboardingComplete} />

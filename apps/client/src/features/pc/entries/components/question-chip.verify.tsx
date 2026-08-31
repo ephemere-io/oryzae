@@ -112,34 +112,51 @@ registerUnit<QuestionChipProps>({
     },
     {
       id: 'closed-renders-single-trigger',
-      description: '閉じているときは listbox を描かない（本文の邪魔をしない）',
+      description: '閉じているときは面を描かない（本文の邪魔をしない）',
       check: ({ root, contract }) => {
-        const listbox = root.querySelector('[role="listbox"]');
+        const panel = root.querySelector('[role="menu"]');
         if (contract.open === 'true') return true;
-        return listbox === null || '閉じているのに listbox が描画されている';
+        return panel === null || '閉じているのに面が描画されている';
       },
     },
     {
       id: 'open-lists-every-active-question',
-      description: '開いているときは option が activeQuestions と同数（過不足なく選べる）',
+      // 問いは**付け外し**なので menuitemcheckbox（単一選択の option ではない）。
+      // 面と行は設定パネルの Select と同じ MenuPanel / MenuOption を使う。
+      description: '開いているときは行が activeQuestions と同数（過不足なく選べる）',
       onlyFixtures: ['open'],
       check: ({ root, props }) => {
-        const options = root.querySelectorAll('[role="option"]').length;
+        const options = root.querySelectorAll('[role="menuitemcheckbox"]').length;
         return (
           options === props.activeQuestions.length ||
-          `option 数=${options}, 期待=${props.activeQuestions.length}`
+          `行数=${options}, 期待=${props.activeQuestions.length}`
         );
       },
     },
     {
       id: 'selected-options-match-linked',
-      description: 'aria-selected=true の option 数が linkedCount と一致する',
+      description: 'aria-checked=true の行数が linkedCount と一致する',
       onlyFixtures: ['open'],
       check: ({ root, contract }) => {
-        const selected = root.querySelectorAll('[role="option"][aria-selected="true"]').length;
+        const selected = root.querySelectorAll(
+          '[role="menuitemcheckbox"][aria-checked="true"]',
+        ).length;
         return (
           selected === Number(contract.linkedCount) ||
-          `aria-selected=${selected} だが linkedCount=${contract.linkedCount}`
+          `aria-checked=${selected} だが linkedCount=${contract.linkedCount}`
+        );
+      },
+    },
+    {
+      id: 'panel-left-aligns-with-trigger',
+      description: '開いた面の左端はチップの左端に合う（器がボタンに張りついている）',
+      onlyFixtures: ['open'],
+      check: ({ root }) => {
+        const wrapper = root.querySelector('[data-verify-unit="QuestionChip"]');
+        if (!wrapper) return '器が見つからない';
+        return (
+          wrapper.className.includes('inline-flex') ||
+          `器が inline-flex でない（ヘッダー幅いっぱいに広がると面の左端がずれる）: ${wrapper.className}`
         );
       },
     },

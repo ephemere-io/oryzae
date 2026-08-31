@@ -233,8 +233,14 @@
   },
   "sidebar": {
     "nav": {
-      "account": "Account"
-    }
+      "account": "Account",
+      "jar": "Jar",
+      "board": "Board",
+      "list": "Entries",
+      "editor": "Write"
+    },
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar"
   },
   "stats": {
     "label": {
@@ -461,7 +467,6 @@
       "move": "Move the palette",
       "collapse": "Collapse the palette",
       "expand": "Expand the palette",
-      "link_question": "Link a question",
       "pickle_needs_body": "Write something to pickle it",
       "pickle_needs_question": "Link a question to pickle it"
     }

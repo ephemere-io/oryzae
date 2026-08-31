@@ -80,3 +80,15 @@ export const CONTENT_CENTERED_STYLE = {
   left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
   transform: 'translateX(-50%)',
 } as const;
+
+/**
+ * 画面の外枠から中身までの余白。**サイドバーの上下端と、エントリー画面のヘッダー上端が
+ * これを共有する**。同じ数字を使うから、瓶と「問いを結ぶ」が同じ線に乗る。
+ */
+export const SHELL_INSET = 20;
+
+/**
+ * 外枠に並ぶ行の高さ。サイドバーの各項目と、エントリー画面のヘッダー行。
+ * 中身（アイコン・チップ・アバター）は高さが違っても、この箱の中央に揃える。
+ */
+export const SHELL_ROW_HEIGHT = 48;

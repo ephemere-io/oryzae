@@ -226,11 +226,11 @@ registerUnit<Props>({
     },
     {
       id: 'question-chip-dropdown-opened',
-      description: 'チップクリック後は問いの listbox が開く',
+      description: 'チップクリック後は問いの面が開く',
       onlyFixtures: ['question-chip-open'],
       check: ({ root }) =>
-        Boolean(root.querySelector('[data-verify-unit="QuestionChip"] [role="listbox"]')) ||
-        'チップを押しても問いの listbox が開かない',
+        Boolean(root.querySelector('[data-verify-unit="QuestionChip"] [role="menu"]')) ||
+        'チップを押しても問いの面が開かない',
     },
     {
       id: 'whitespace-stays-empty',

@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Popover } from '@/components/ui/popover';
-import { ICON_SIZE, ICON_STROKE_WIDTH } from '@/components/ui/surface';
+import {
+  ICON_SIZE,
+  ICON_STROKE_WIDTH,
+  SHELL_INSET,
+  SHELL_ROW_HEIGHT,
+} from '@/components/ui/surface';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -54,7 +59,7 @@ import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
 import type { ApiClient } from '@/lib/api';
-import { SIDEBAR_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
+import { useSidebarVisibility } from '@/lib/sidebar-context';
 
 interface AuthState {
   accessToken: string;
@@ -156,7 +161,6 @@ export function EntryEditor({
   const [linkQuestionNudgeOpen, setLinkQuestionNudgeOpen] = useState(false);
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   // 問いのドロップダウンは、ヘッダーのチップからもパレットの操作からも開く。
-  const [questionChipOpen, setQuestionChipOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
@@ -228,7 +232,6 @@ export function EntryEditor({
   // Issue #316: 保存成功直後のナッジ表示判定に使う
   const userMe = useUserMe(api);
   const router = useRouter();
-  const sidebarWidth = SIDEBAR_WIDTH;
   const editorRef = useRef<HTMLDivElement>(null);
   // 横書きでスクロールする外枠（縦書きでは editor 自身がスクローラ）。Issue #364。
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -261,7 +264,8 @@ export function EntryEditor({
     uiVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
   }`;
 
-  const { setHidden: setSidebarHidden } = useSidebarVisibility();
+  // エディタは画面に貼りつく（fixed）ので、サイドバーの幅を自分で見て左端を決める。
+  const { setHidden: setSidebarHidden, width: sidebarWidth } = useSidebarVisibility();
   useEffect(() => {
     setSidebarHidden(!uiVisible);
     return () => setSidebarHidden(false);
@@ -710,19 +714,10 @@ export function EntryEditor({
     </svg>
   );
 
+  // パレットは**本文に対してすることだけ**を持つ（声で書く・漬け込む・広く見る）。
+  // 「問いを結ぶ」はここに置かない。エントリーの身元（日付・問い）はヘッダーが持ち、
+  // 同じ操作の入口が2か所にあると、どちらが本体か分からなくなる。
   const paletteActions: PaletteAction[] = [
-    {
-      id: 'question',
-      label: t('palette.link_question'),
-      icon: paletteIcon(
-        <>
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9.4 9.4a2.6 2.6 0 0 1 4.6 1.6c0 1.7-2.4 2-2.4 3.4" />
-          <circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none" />
-        </>,
-      ),
-      onSelect: () => setQuestionChipOpen(true),
-    },
     {
       id: 'voice',
       label: voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice'),
@@ -777,8 +772,16 @@ export function EntryEditor({
   const paletteVisible = settings.paletteAutoHide ? uiVisible : true;
 
   const isVertical = settings.writingMode === 'vertical';
+  // 横書きの左右余白。**ヘッダーと同じ縦の線**に乗せる（SHELL_INSET の倍）。
+  // 以前は px-[15%] で、1512px の画面だと本文の左端が 295px、「問いを結ぶ」の左端が
+  // 104px と、同じ画面の中で2本の別の縦線が立っていた。ここを1本に揃える。
+  const gutterPx = SHELL_INSET * 2;
+  // 1行の長さの上限。日本語は 30〜40 字で読みやすさが頭打ちになるので 34 字で切る
+  // （文字サイズを上げても行が伸び続けないよう、px ではなく文字数で持つ）。
+  const measurePx = settings.fontSize * 34;
+
   // タイトルの置き場。縦書きは本文（left:6% / width:79%）のすぐ右へ縦組みで、
-  // 横書きは本文（px-[15%]）の上に、同じ左端から。
+  // 横書きは本文の上に、**本文と同じ左端から**。
   //
   // 縦書きの題は**紙の右肩**に置く。本や原稿用紙と同じで、題は本文の始まりより外側に立つ。
   //
@@ -787,7 +790,7 @@ export function EntryEditor({
   // 右端の余白（6%）を本文の左端と揃え、題と本文のあいだに 5% の間を取る。
   const titleBoxClass = isVertical
     ? 'absolute top-[4%] right-[6%] h-[86%] w-[6%] min-w-[3rem]'
-    : 'absolute top-6 left-[15%] w-[70%]';
+    : 'absolute top-6';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
   //
@@ -796,6 +799,14 @@ export function EntryEditor({
   const titleFontSize = Math.round(settings.fontSize * (isVertical ? 1.45 : 1.6));
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
   const titleTextStyle: React.CSSProperties = {
+    // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。
+    ...(isVertical
+      ? {}
+      : {
+          left: `${gutterPx}px`,
+          width: `${measurePx}px`,
+          maxWidth: `calc(100% - ${gutterPx * 2}px)`,
+        }),
     fontSize: `${titleFontSize}px`,
     lineHeight: 1.4,
     fontFamily:
@@ -820,21 +831,30 @@ export function EntryEditor({
       {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
           左＝問い、右＝アクションコーナー ＋ 日付 ＋ 設定。
           「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。 */}
-      <div className={`flex items-center justify-between gap-6 px-6 py-4 ${fadeClass}`}>
-        {/* 左: 問いを結ぶ。旧「新規エントリ」「一覧」があった位置。 */}
-        <div className="flex min-w-0 items-center">
+      <div
+        className={`flex items-center justify-between gap-6 ${fadeClass}`}
+        style={{
+          paddingTop: SHELL_INSET,
+          paddingBottom: SHELL_INSET / 2,
+          // 左右は本文と同じ縦の線に乗せる（gutterPx）。ヘッダーと本文で
+          // 別の数字を使うと、同じ画面に2本の縦線が立つ。
+          paddingLeft: gutterPx,
+          paddingRight: gutterPx,
+        }}
+      >
+        {/* 左: 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
+            チップの中心が瓶アイコンの中心と同じ線に乗るようにする。 */}
+        <div className="flex min-w-0 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
           <QuestionChip
             activeQuestions={activeQuestions}
             linkedQuestionIds={linkedIds}
             onLink={handleLink}
             onUnlink={handleUnlink}
-            open={questionChipOpen}
-            onOpenChange={setQuestionChipOpen}
           />
         </div>
 
         {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3" style={{ height: SHELL_ROW_HEIGHT }}>
           {/* 日付は設定ボタンのすぐ左に、小さく。 */}
           <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>
 
@@ -850,6 +870,8 @@ export function EntryEditor({
                 {...triggerProps}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
                 data-tooltip={t('toolbar.settings')}
+                // 画面の一番上にあるボタンなので、既定の「上に出す」だと窓の外へ切れる。
+                data-tooltip-pos="bottom"
                 aria-label={t('toolbar.settings')}
               >
                 <svg
@@ -974,12 +996,17 @@ export function EntryEditor({
               data-placeholder={t('placeholder')}
               // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
               // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
-              className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full px-[15%] pb-6 after:block after:content-[''] after:h-[50vh]`}`}
+              className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full pb-6 after:block after:content-[''] after:h-[50vh]`}`}
               style={{
                 // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
                 ...(settings.writingMode === 'vertical'
                   ? {}
-                  : { paddingTop: `${titleReservedPx}px` }),
+                  : {
+                      paddingTop: `${titleReservedPx}px`,
+                      paddingLeft: `${gutterPx}px`,
+                      paddingRight: `${gutterPx}px`,
+                      maxWidth: `${measurePx + gutterPx * 2}px`,
+                    }),
                 ...(settings.writingMode === 'vertical'
                   ? {
                       left: '6%',

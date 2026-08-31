@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { HelpTooltip } from '@/components/ui/tooltip';
@@ -94,7 +95,7 @@ function isFermentationPreference(value: string): value is FermentationOverlayPr
  * セクション。見出しは**小さく薄い一行**で、区切り線は引かない。
  *
  * Notion の設定パネルと同じ考え方: 面を線で刻むのではなく、**余白の大小**で
- * まとまりを作る。セクション間は 20px、セクション内の行間は 2px。
+ * まとまりを作る。セクション間は 28px、セクション内の行間は 6px。
  */
 function Section({
   label,
@@ -122,7 +123,7 @@ function Section({
  * 「ラベル ⟷ コントロール」の1行。**パネル内の行はすべてこの形に揃える**
  * （以前はトグルが両端揃え・スライダーが左ラベル＋右数値・ラジオが縦積みとバラバラだった）。
  *
- * 行の高さは 32px で固定する。中身がトグルでもスライダーでも選択でも、
+ * 行の高さは 36px で固定する。中身がトグルでもスライダーでも選択でも、
  * 目が同じ間隔で下りていけるようにする。
  */
 function Row({ label, control }: { label: string; control: React.ReactNode }) {
@@ -204,11 +205,12 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
       })}
     >
       <Section label={t('section_display')}>
+        {/* 縦か横か。2択なので開かせない（Segmented の doc を参照）。 */}
         <Row
           label={t('writing_mode')}
           control={
-            <Select
-              className="w-32"
+            <Segmented
+              className="w-40"
               ariaLabel={t('writing_mode')}
               value={settings.writingMode}
               options={[
@@ -224,8 +226,8 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
         <Row
           label={t('font_family')}
           control={
-            <Select
-              className="w-32"
+            <Segmented
+              className="w-40"
               ariaLabel={t('font_family')}
               value={settings.fontFamily}
               options={[
@@ -338,8 +340,8 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
             <Row
               label={t('ghost_mode')}
               control={
-                <Select
-                  className="w-32"
+                <Segmented
+                  className="w-40"
                   ariaLabel={t('ghost_mode')}
                   value={settings.ghostMode}
                   options={[

@@ -111,6 +111,16 @@ describe('useAutosaveEntry', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  it('本文が空でもタイトルだけの新規は保存する（題を付けただけの状態を捨てない）', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+    const { rerender } = setup(save, { body: '' });
+
+    rerender({ title: '会えなかった日', body: '' });
+    await tick();
+
+    expect(save).toHaveBeenCalledWith('会えなかった日\n', undefined);
+  });
+
   it('新規でも短い記録は保存する（「今日は疲れた」で終える人が消えない）', async () => {
     const save = vi.fn().mockResolvedValue('new-id');
     const { rerender } = setup(save, { body: '' });

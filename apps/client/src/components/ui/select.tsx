@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { MenuOption, MenuPanel } from '@/components/ui/menu';
 
 interface SelectOption {
   value: string;
@@ -119,37 +120,23 @@ export function Select({
       </button>
 
       {open && (
-        // listbox の器は <ul> ではなく <div>。<ul> には list という非対話の暗黙ロールがあり、
-        // そこへ listbox を被せるのは不正（役割の上書きになる）。div は暗黙ロールを持たない。
-        // 選択肢は <button role="option"> にして、クリックもキーボードもネイティブに任せる。
-        <div
-          id={listId}
-          role="listbox"
-          aria-label={ariaLabel}
-          className="absolute z-[75] mt-1 w-full overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] py-1 shadow-lg"
-        >
-          {options.map((option, i) => {
-            const isSelected = option.value === value;
-            return (
-              <button
+        // 面と行は MenuPanel / MenuOption（components/ui/menu）が持つ。問いを結ぶチップの
+        // ドロップダウンと**同じ部品**なので、同じ材質・同じ行の高さで開く。
+        <div className="absolute z-[75] mt-1 w-full">
+          <MenuPanel id={listId} role="listbox" ariaLabel={ariaLabel}>
+            {options.map((option, i) => (
+              <MenuOption
                 key={option.value}
-                type="button"
                 role="option"
-                aria-selected={isSelected}
+                selected={option.value === value}
+                active={i === activeIndex}
                 onClick={() => commit(i)}
                 onMouseEnter={() => setActiveIndex(i)}
-                className={`flex h-8 w-full items-center gap-2 px-2.5 text-left text-[13px] transition-colors ${
-                  i === activeIndex ? 'bg-[var(--toolbar-hover)]' : ''
-                }`}
-                style={{ color: isSelected ? 'var(--accent)' : 'var(--fg)' }}
               >
-                <span className="w-3 shrink-0" aria-hidden="true">
-                  {isSelected ? '✓' : ''}
-                </span>
-                <span className="truncate">{option.label}</span>
-              </button>
-            );
-          })}
+                {option.label}
+              </MenuOption>
+            ))}
+          </MenuPanel>
         </div>
       )}
     </div>

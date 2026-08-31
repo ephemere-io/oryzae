@@ -95,13 +95,25 @@ registerUnit<Props>({
         const label = props.settings.timeInscriptionEnabled ? 1 : 0;
         const selects = root.querySelectorAll('[aria-haspopup="listbox"]').length;
         const enabled = contract.timeInscriptionEnabled === 'true';
-        // 表示セクションに常設の Select が2つ（書字方向・書体）＋発酵の既定が1つ。
-        const base = 3;
-        const expected = base + label + (props.settings.ghostEnabled ? 1 : 0);
+        // 面に畳む Select は「選択肢が3つ以上」のものだけ（発酵の既定）。
+        // 2択（書字方向・書体・ゴーストの表し方）は Segmented で開かせない。
+        const base = 1;
+        const expected = base + label;
         return (
           (enabled === (label === 1) && selects === expected) ||
           `Select 数=${selects}, 期待=${expected}（timeInscriptionEnabled=${contract.timeInscriptionEnabled}）`
         );
+      },
+    },
+    {
+      id: 'binary-choices-do-not-open',
+      // 「縦か横か」に開く操作を挟むと、1クリックで済む切り替えが2クリックになる。
+      description: '2択の設定は畳まずに並べて出す（Segmented）',
+      check: ({ root, props }) => {
+        const segmented = root.querySelectorAll('[data-verify-unit="Segmented"]').length;
+        // 書字方向・書体は常設、ゴーストの表し方は ghostEnabled のときだけ。
+        const expected = 2 + (props.settings.ghostEnabled ? 1 : 0);
+        return segmented === expected || `Segmented 数=${segmented}, 期待=${expected}`;
       },
     },
     {

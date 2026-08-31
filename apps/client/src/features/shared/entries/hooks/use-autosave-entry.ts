@@ -12,9 +12,10 @@ interface UseAutosaveEntryParams {
   enabled: boolean;
   debounceMs?: number;
   /**
-   * **新規エントリを作るのに**必要な最小文字数。既存エントリの更新には適用しない。
-   * 打ち間違いの1文字でエントリが出来てしまうのを防ぐためだけのしきい値なので、
-   * 小さく取る。**離脱時の書き出しには適用しない**（下記 saveNow の force を参照）。
+   * **新規エントリを作るのに**必要な、保存する内容（タイトル + 本文）の最小文字数。
+   * 既存エントリの更新には適用しない。打ち間違いの1文字でエントリが出来てしまうのを
+   * 防ぐためだけのしきい値なので小さく取る。
+   * **離脱時の書き出しには適用しない**（下記 saveNow の force を参照）。
    */
   minCreateChars?: number;
 }
@@ -22,6 +23,7 @@ interface UseAutosaveEntryParams {
 const DEFAULT_DEBOUNCE_MS = 2000;
 // 打ち間違いの1文字でエントリが生えないための最小限。**短い記録を弾く値にしてはいけない**
 // （「今日は疲れた」で終える人がいる。Issue #510 はまさにそれが消える話だった）。
+// 数えるのはタイトル + 本文（composeContent の結果）。
 const DEFAULT_MIN_CREATE_CHARS = 2;
 
 /** エディタの保存形式（先頭行＝タイトル）。 */
@@ -100,12 +102,14 @@ export function useAutosaveEntry({
     }
     const current = latestRef.current;
     if (!current.enabled || inFlightRef.current) return;
-    if (!current.body.trim()) return;
 
+    // 判定はタイトルを含めた content で行う。本文だけを見ると、
+    // 「題だけ付けて本文はこれから」の状態が丸ごと保存対象から外れる。
     const content = composeContent(current.title, current.body);
+    if (!content.trim()) return;
     if (content === lastSavedContentRef.current) return;
     // まだエントリが存在しないときだけ、作成に足る長さを要求する（離脱時は要求しない）。
-    if (!force && !current.entryId && current.body.trim().length < current.minCreateChars) return;
+    if (!force && !current.entryId && content.trim().length < current.minCreateChars) return;
 
     inFlightRef.current = true;
     try {
@@ -136,10 +140,10 @@ export function useAutosaveEntry({
 
   useEffect(() => {
     if (!enabled) return;
-    if (!body.trim()) return;
     const content = composeContent(title, body);
+    if (!content.trim()) return;
     if (content === lastSavedContentRef.current) return;
-    if (!entryId && body.trim().length < minCreateChars) return;
+    if (!entryId && content.trim().length < minCreateChars) return;
 
     schedule();
     return () => {
