@@ -209,7 +209,7 @@ export function BoardView({ api }: BoardViewProps) {
       if (key === 's') {
         e.preventDefault();
         openSnippetDialog();
-      } else if (key === 'p') {
+      } else if (key === 'i') {
         e.preventDefault();
         openPhotoDialog();
       } else if (key === 'e') {

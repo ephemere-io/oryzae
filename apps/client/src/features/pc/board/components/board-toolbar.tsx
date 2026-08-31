@@ -141,11 +141,12 @@ export function BoardToolbar({
     },
     {
       id: 'photo',
-      // ショートカットは P（Photo）。以前は I（Image）だったが、Inter の大文字 i は
-      // ただの縦棒に見えて「キーの表示」だと気づかれなかった。Figma でも I は
-      // スポイトなので、慣習の後ろ盾も無かった。
+      // ショートカットは I（Image）。Inter の大文字 i は縦棒とほぼ同形なので、
+      // 一時 P に変えたことがあるが、読めなかった原因は文字ではなく**キーとして
+      // 描いていなかったこと**だった。下のツールチップで kbd の枠に入れたので、
+      // 意味の合う I に戻している。
       label: t('photo'),
-      shortcut: 'P',
+      shortcut: 'I',
       onSelect: onAddPhoto,
       icon: <PhotoIcon />,
     },

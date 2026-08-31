@@ -98,26 +98,27 @@ test.describe('ボード画面', () => {
     await expect(page.getByRole('heading', { name: '写真を追加' })).toHaveCount(0);
   });
 
-  test('ツールバーのショートカット（S / P）が効き、入力中は誤発火しない', async ({ page }) => {
+  test('ツールバーのショートカット（S / I）が効き、入力中は誤発火しない', async ({ page }) => {
     await page.keyboard.press('s');
     await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
 
-    // 本文に s / p を打っても写真ダイアログは開かない（そのまま文字として入る）
-    await page.locator('textarea').pressSequentially('spsp');
-    await expect(page.locator('textarea')).toHaveValue('spsp');
+    // 本文に s / i を打っても写真ダイアログは開かない（そのまま文字として入る）
+    await page.locator('textarea').pressSequentially('sisi');
+    await expect(page.locator('textarea')).toHaveValue('sisi');
     await expect(page.getByRole('heading', { name: '写真を追加' })).toHaveCount(0);
 
     await page.keyboard.press('Escape');
-    await page.keyboard.press('p');
+    await page.keyboard.press('i');
     await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
     await page.keyboard.press('Escape');
   });
 
   test('ツールチップのショートカットが kbd として描かれる', async ({ page }) => {
     // 「I」を薄い文字で置いていた頃、ただの縦棒に見えて誰もキーだと気づかなかった。
-    // 枠付きの kbd で描くことを契約として固定する。
+    // 原因は文字ではなく「キーとして描いていなかったこと」なので、枠付きの kbd で
+    // 描くことを契約として固定する（文字は Image の I のまま）。
     const key = page.locator('[data-verify-tooltip="photo"] kbd');
-    await expect(key).toHaveText('P');
+    await expect(key).toHaveText('I');
   });
 
   test('ダイアログを開いている間の Backspace で背後のカードが消えない', async ({ page }) => {
