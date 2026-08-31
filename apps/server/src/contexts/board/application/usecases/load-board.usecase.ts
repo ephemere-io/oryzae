@@ -147,13 +147,8 @@ export class LoadBoardUsecase {
     if (entryRefIds.length > 0) {
       const entries = await this.entryRepo.findByIds(entryRefIds);
       for (const entry of entries) {
-        const content = entry.content;
-        const firstLine = content.split('\n').find((l) => l.trim().length > 0);
-        entryMap.set(entry.id, {
-          title: firstLine?.substring(0, TITLE_LENGTH) ?? '',
-          preview: content.substring(0, PREVIEW_LENGTH),
-          createdAt: entry.createdAt,
-        });
+        const { title, preview } = LoadBoardUsecase.summarizeEntry(entry.content);
+        entryMap.set(entry.id, { title, preview, createdAt: entry.createdAt });
       }
     }
 
@@ -208,6 +203,28 @@ export class LoadBoardUsecase {
         };
       })
       .filter((c): c is CardResponse => c !== null);
+  }
+
+  /**
+   * カードに載せる見出しと本文を作る。
+   *
+   * 見出しは本文の1行目。抜粋からはその行を**外す**——同じ行が見出しと本文で
+   * 二度出ると、カードが自分を繰り返しているように見える。
+   */
+  private static summarizeEntry(content: string): { title: string; preview: string } {
+    const lines = content.split('\n');
+    const titleIndex = lines.findIndex((line) => line.trim().length > 0);
+    if (titleIndex === -1) {
+      return { title: '', preview: content.substring(0, PREVIEW_LENGTH) };
+    }
+    return {
+      title: lines[titleIndex].substring(0, TITLE_LENGTH),
+      preview: lines
+        .slice(titleIndex + 1)
+        .join('\n')
+        .trimStart()
+        .substring(0, PREVIEW_LENGTH),
+    };
   }
 
   private static weekRange(dateKey: string): { startDate: string; endDate: string } {

@@ -121,9 +121,84 @@ describe('LoadBoardUsecase', () => {
     expect(result.cards[0].id).toBe('card-1');
     expect(result.cards[0].content).toEqual({
       title: 'タイトル',
-      preview: 'タイトル\n本文テキスト',
+      // 見出しに使った1行目は抜粋から外す（カードで同じ行が二度出ないように）
+      preview: '本文テキスト',
       createdAt: '2026-04-11T10:00:00Z',
     });
+  });
+
+  it('見出しに使った行を抜粋から外す（カードで同じ行が二度出ない）', async () => {
+    const entry = Entry.fromProps({
+      id: 'entry-1',
+      userId: 'user-1',
+      content: '  \n見出しの行\n\n本文の1行目\n本文の2行目',
+      mediaUrls: [],
+      fermentationEnabled: false,
+      createdAt: '2026-04-11T10:00:00Z',
+      updatedAt: '2026-04-11T10:00:00Z',
+    });
+    const card = BoardCard.fromProps({
+      id: 'card-1',
+      userId: 'user-1',
+      cardType: 'entry',
+      refId: 'entry-1',
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      x: 0,
+      y: 0,
+      rotation: 0,
+      width: 340,
+      height: 280,
+      zIndex: 0,
+      userPositioned: false,
+      createdAt: '2026-04-11T10:00:00Z',
+      updatedAt: '2026-04-11T10:00:00Z',
+    });
+    vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([card]);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
+
+    const result = await usecase.execute('user-1', '2026-04-11');
+
+    expect(result.cards[0].content).toMatchObject({
+      // 先頭の空行は見出しにしない
+      title: '見出しの行',
+      preview: '本文の1行目\n本文の2行目',
+    });
+  });
+
+  it('本文が1行だけなら抜粋は空になる（見出しがすべて）', async () => {
+    const entry = Entry.fromProps({
+      id: 'entry-1',
+      userId: 'user-1',
+      content: '一行だけの日記',
+      mediaUrls: [],
+      fermentationEnabled: false,
+      createdAt: '2026-04-11T10:00:00Z',
+      updatedAt: '2026-04-11T10:00:00Z',
+    });
+    const card = BoardCard.fromProps({
+      id: 'card-1',
+      userId: 'user-1',
+      cardType: 'entry',
+      refId: 'entry-1',
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      x: 0,
+      y: 0,
+      rotation: 0,
+      width: 340,
+      height: 280,
+      zIndex: 0,
+      userPositioned: false,
+      createdAt: '2026-04-11T10:00:00Z',
+      updatedAt: '2026-04-11T10:00:00Z',
+    });
+    vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([card]);
+    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
+
+    const result = await usecase.execute('user-1', '2026-04-11');
+
+    expect(result.cards[0].content).toMatchObject({ title: '一行だけの日記', preview: '' });
   });
 
   it('その日のエントリがあってもカードを勝手に作らない', async () => {
