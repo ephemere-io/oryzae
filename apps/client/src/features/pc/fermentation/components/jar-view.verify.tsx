@@ -5,7 +5,9 @@
  * early-return（fetch ゼロ・detail=null）、useJarLayoutSave(api) の saveLayout も api=null で no-op。
  * useJarDrag は純フック（描画時は getBoundingClientRect を呼ばない＝ pointer ハンドラ内だけ）。
  * 子の DetailPane は常時マウントされる（閉時は画面外）が useRouter は withVerifyProviders の
- * no-op router が供給する。よって api=null を渡せば fetch ゼロの純レンダリングで孤立検証できる。
+ * no-op router が供給する。useUnread() は provider 不在で既定値に落ち、マウント時の
+ * markAllSeen() は no-op（Issue #447: PC の瓶は盤面に全部並ぶので開いた＝読んだ）。
+ * よって api=null を渡せば fetch ゼロの純レンダリングで孤立検証できる。
  *
  * 公表する契約は api=null で到達し、かつ fixture 間で実際に変化する状態のみ:
  * questionCount（最大3にキャップ）/ zoomed / editOpen / addOpen / addAvailable。

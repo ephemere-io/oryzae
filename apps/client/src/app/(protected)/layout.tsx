@@ -3,22 +3,33 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
-import { SpBottomNav } from '@/components/sp-bottom-nav';
 import { PageFooter } from '@/components/ui/page-footer';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Sidebar } from '@/features/auth/components/sidebar';
 import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
-import { useOnboarding } from '@/features/onboarding/hooks/use-onboarding';
-import type { OnboardingResult } from '@/features/onboarding/types';
+import { Sidebar } from '@/features/pc/navigation/components/sidebar';
+import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
+import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
+import type { OnboardingResult } from '@/features/shared/onboarding/types';
+import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
 import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
+import { RouteLoading } from './_loading/route-loading';
+
+// CSS カスタムプロパティは React.CSSProperties に含まれないので、
+// `--*` を許す形で型を広げて宣言する（キャストは使わない）。
+const mainStyle: React.CSSProperties & Record<`--${string}`, string> = {
+  marginLeft: SIDEBAR_WIDTH,
+  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
+};
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
   const { shouldShow, complete } = useOnboarding(api);
+  // 未読の算出は features/shared の hook が持ち、context は配るだけ（lib はドメインを知らない）。
+  // 全画面で 1 つの状態を共有するため、取得もここで 1 回だけ行う（#363 の N+1 解消を維持）。
+  const unread = useUnreadLetters(api, loading);
   const device = useDevice();
   const router = useRouter();
 
@@ -51,14 +62,19 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;
 
-  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せる
-  // 汎用スケルトンを描画し、FCP を「空白」でなく「枠」にする（体感ロードを短縮）。
-  const content = mounted ? children : <ShellSkeleton />;
+  // Issue #362/#363: 認証完了を待たず children を描画。mount 前は SSR でも出せるロード表示を
+  // 描画し、FCP を「空白」にしない（体感ロードを短縮）。
+  //
+  // ここで出すものは **行き先の画面に合わせる**。ハードリロードでは Suspense が挟まらず
+  // loading.tsx が出番を持たないため、最初に見えるのはこの1枚だけになる。
+  // 保護ルート全体で1枚を使い回していた頃は、/jar や /board を直接開いても一覧の枠が出て、
+  // 読み込み完了時に画面が丸ごと入れ替わっていた。
+  const content = mounted ? children : <RouteLoading />;
 
   return (
     <ThemeProvider>
       <SidebarProvider>
-        <UnreadProvider api={api} authLoading={loading}>
+        <UnreadProvider value={unread}>
           {/* device はサーバー(x-device)で確定済み＝first render から端末別シェルを SSR 描画。
               null フォールバックは Provider 外などの保険（通常は到達しない）。 */}
           {device === 'sp' ? (
@@ -72,15 +88,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">
               <Sidebar />
-              <main
-                className="flex flex-1 flex-col overflow-hidden"
-                style={
-                  {
-                    marginLeft: SIDEBAR_WIDTH,
-                    '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-                  } as React.CSSProperties
-                }
-              >
+              <main className="flex flex-1 flex-col overflow-hidden" style={mainStyle}>
                 <div className="relative flex-1 overflow-auto">{content}</div>
                 <PageFooter />
               </main>
@@ -94,21 +102,5 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>
-  );
-}
-
-/**
- * mount 前（SSR 含む）に出す汎用スケルトン。ヘッダ風の1本＋カード数枚で、一覧/エディタ
- * どちらの画面でも破綻しない最小の「枠」。空白を見せないことが目的（Issue #362/#363）。
- */
-function ShellSkeleton() {
-  return (
-    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4 px-5 pt-8">
-      <Skeleton className="h-6 w-32" />
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
-    </div>
   );
 }

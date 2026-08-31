@@ -1,7 +1,7 @@
 /**
  * FermentationOverlay の検証スペック。
  * detail を props で受け取りエディタ上にフローティング要素（キーワード/スニペット/手紙）を
- * 重ねる部品。データ取得は親（useEntryFermentationDetail）が担い、本体は props だけで
+ * 重ねる部品。データ取得は親（useFermentationForQuestion）が担い、本体は props だけで
  * 孤立レンダリングできる。ドラッグは useOverlayDrag（純粋なポインタ/state フック、router/
  * fetch 非依存）なので withVerifyProviders（i18n 供給）だけで検証できる。
  *
@@ -13,31 +13,45 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
-import type { EntryFermentationDetail } from '@/features/pc/entries/hooks/use-entry-fermentation-detail';
+import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { FermentationOverlay } from './fermentation-overlay';
 
 interface Props {
-  detail: EntryFermentationDetail;
+  detail: FermentationDetail;
 }
 
 const OVERLAY_SELECTOR = '[data-verify-unit="FermentationOverlay"]';
 
-function makeDetail(overrides: Partial<EntryFermentationDetail>): EntryFermentationDetail {
+/** 瓶ビュー用の座標。エディタのオーバーレイは自前で配置するので常に null でよい。 */
+const NO_JAR_POS = { jarX: null, jarY: null };
+
+function makeDetail(overrides: Partial<FermentationDetail>): FermentationDetail {
   return {
     id: 'ferm-1',
     questionId: 'q-1',
+    targetPeriod: '2026-05',
+    status: 'completed',
+    worksheet: null,
     snippets: [],
     keywords: [],
     letter: null,
+    // Issue #453: エディタのオーバーレイは「もとになった記録」を描画しない（今開いている
+    // エントリがまさにその記録なので）。契約に影響しないよう常に空。
+    scannedEntries: [],
     ...overrides,
   };
 }
 
-const fullDetail: EntryFermentationDetail = makeDetail({
+const fullDetail: FermentationDetail = makeDetail({
   keywords: [
-    { id: 'k1', keyword: '静けさ', description: '心が落ち着く瞬間についての気づき。' },
-    { id: 'k2', keyword: '余白', description: '予定を詰め込まない時間の価値。' },
+    {
+      id: 'k1',
+      keyword: '静けさ',
+      description: '心が落ち着く瞬間についての気づき。',
+      ...NO_JAR_POS,
+    },
+    { id: 'k2', keyword: '余白', description: '予定を詰め込まない時間の価値。', ...NO_JAR_POS },
   ],
   snippets: [
     {
@@ -46,9 +60,10 @@ const fullDetail: EntryFermentationDetail = makeDetail({
       originalText: '朝の光が差し込む台所で、ゆっくりとコーヒーを淹れる時間が好きだ。',
       sourceDate: '2026-05-01',
       selectionReason: '日常の中の幸福を捉えた一節。',
+      ...NO_JAR_POS,
     },
   ],
-  letter: { id: 'l1', bodyText: 'あなたの言葉から、静かな強さを感じました。' },
+  letter: { id: 'l1', bodyText: 'あなたの言葉から、静かな強さを感じました。', ...NO_JAR_POS },
 });
 
 registerUnit<Props>({
@@ -68,7 +83,9 @@ registerUnit<Props>({
       description: 'キーワードのみ（スニペット・手紙なし）',
       props: {
         detail: makeDetail({
-          keywords: [{ id: 'k1', keyword: '対話', description: '誰かと話すことの効用。' }],
+          keywords: [
+            { id: 'k1', keyword: '対話', description: '誰かと話すことの効用。', ...NO_JAR_POS },
+          ],
         }),
       },
     },
@@ -91,6 +108,7 @@ registerUnit<Props>({
             id: `k${i}`,
             keyword: `語${i}`,
             description: `説明${i}`,
+            ...NO_JAR_POS,
           })),
         }),
       },

@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCreateSnippet } from '@/features/shared/board/hooks/use-create-snippet';
 import type { ApiClient } from '@/lib/api';
 
 interface SnippetToolbarProps {
@@ -24,6 +25,7 @@ function getTodayKey(): string {
 
 // verify-exempt: 描画が外部 editorRef への実テキスト選択に依存する。visible=false の間は null を返し（DOM契約要素が出ない）、visible は handleSelection 経由でのみ true になるが、それには window.getSelection()/getRangeAt(0)/getBoundingClientRect() が必要で jsdom では再現不可。editorRef は本体外のため孤立描画では選択対象が存在せず、act も click/type/wait のみで selectionchange/Range を作れない。唯一の回避策（Range/Selection の monkeypatch）は register 経由で実ブラウザの /verify dashboard・matrix 双方に読み込まれグローバル汚染するため不可。
 export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
+  const postSnippet = useCreateSnippet(api);
   const t = useTranslations('editor.snippet_toolbar');
   const [visible, setVisible] = useState(false);
   const [selectedText, setSelectedText] = useState('');
@@ -113,13 +115,7 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
 
     setStatus('saving');
     try {
-      await api.fetch('/api/v1/board/snippets', {
-        method: 'POST',
-        body: JSON.stringify({
-          text: selectedText,
-          dateKey: getTodayKey(),
-        }),
-      });
+      await postSnippet({ text: selectedText, dateKey: getTodayKey() });
       window.getSelection()?.removeAllRanges();
       setStatus('saved');
       if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
@@ -132,7 +128,7 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
       setStatus('idle');
       throw err;
     }
-  }, [api, selectedText, tooLong, isBusy]);
+  }, [api, postSnippet, selectedText, tooLong, isBusy]);
 
   if (!visible) return null;
 

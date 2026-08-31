@@ -21,6 +21,12 @@ export interface EditorSettings {
   fontSize: number;
   lineHeight: number;
   focusModeEnabled: boolean;
+  /**
+   * Issue #350: フォーカスモードで基本 UI が透明化するとき、フローティングの発酵要素も
+   * 一緒に透明化するか。既定は true（書いている間は本文だけが残る）。
+   * 発酵結果を見ながら書きたい人のために切れるようにしてある。
+   */
+  focusModeFadesFermentation: boolean;
   timeInscriptionEnabled: boolean;
   timeInscriptionMode: TimeInscriptionMode;
   eraserTraceEnabled: boolean;
@@ -42,6 +48,7 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   fontSize: 32,
   lineHeight: 1.625,
   focusModeEnabled: true,
+  focusModeFadesFermentation: true,
   timeInscriptionEnabled: false,
   timeInscriptionMode: 'fontSize',
   eraserTraceEnabled: false,
@@ -217,6 +224,16 @@ export function SettingsDrawer({ open, settings, onChange, onClose }: SettingsDr
               checked={settings.focusModeEnabled}
               onChange={(v) => onChange({ focusModeEnabled: v })}
             />
+            {/* Issue #350: 発酵要素も一緒に消すかどうか。フォーカスモードが切ってあるときは
+                意味を持たないので出さない。 */}
+            {settings.focusModeEnabled && (
+              <Toggle
+                id="focus-mode-fades-fermentation"
+                label={t('focus_mode_fades_fermentation')}
+                checked={settings.focusModeFadesFermentation}
+                onChange={(v) => onChange({ focusModeFadesFermentation: v })}
+              />
+            )}
           </div>
 
           {/* エフェクト */}

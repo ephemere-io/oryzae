@@ -1,10 +1,17 @@
 import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  readBooleanOr,
+  readString,
+  readStringArray,
+  toRecordArray,
+} from '../../../shared/infrastructure/row.js';
 import type {
   EntryListOrder,
   EntryRepositoryGateway,
 } from '../../domain/gateways/entry-repository.gateway.js';
 import { Entry } from '../../domain/models/entry.js';
+import { localDayRange, localWeekRange } from '../../domain/services/local-day-range.service.js';
 
 export class SupabaseEntryRepository implements EntryRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
@@ -70,11 +77,12 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
-  async listByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]> {
-    const startOfDay = `${dateKey}T00:00:00.000Z`;
-    const nextDay = new Date(`${dateKey}T00:00:00.000Z`);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    const endOfDay = nextDay.toISOString();
+  async listByUserIdAndDate(
+    userId: string,
+    dateKey: string,
+    tzOffsetMinutes = 0,
+  ): Promise<Entry[]> {
+    const { startUtc: startOfDay, endUtc: endOfDay } = localDayRange(dateKey, tzOffsetMinutes);
 
     const { data, error } = await this.supabase
       .from('entries')
@@ -141,14 +149,14 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     );
   }
 
-  async listByUserIdAndWeek(userId: string, dateKey: string): Promise<Entry[]> {
-    // Calculate Monday of the week containing dateKey
-    const d = new Date(`${dateKey}T00:00:00.000Z`);
-    const day = d.getUTCDay();
-    const monday = new Date(d);
-    monday.setUTCDate(d.getUTCDate() - ((day + 6) % 7));
-    const nextMonday = new Date(monday);
-    nextMonday.setUTCDate(monday.getUTCDate() + 7);
+  async listByUserIdAndWeek(
+    userId: string,
+    dateKey: string,
+    tzOffsetMinutes = 0,
+  ): Promise<Entry[]> {
+    const { startUtc, endUtc } = localWeekRange(dateKey, tzOffsetMinutes);
+    const monday = new Date(startUtc);
+    const nextMonday = new Date(endUtc);
 
     const { data, error } = await this.supabase
       .from('entries')
@@ -202,7 +210,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       .select('entry_id')
       .eq('question_id', questionId);
     if (error) throw error;
-    return ((data ?? []) as Array<{ entry_id: string }>).map((r) => r.entry_id);
+    return toRecordArray(data ?? []).map((r) => readString(r, 'entry_id'));
   }
 
   async save(entry: Entry): Promise<void> {
@@ -227,14 +235,14 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
 
   private toDomain(row: Record<string, unknown>): Entry {
     return Entry.fromProps({
-      id: row.id as string,
-      userId: row.user_id as string,
-      content: row.content as string,
-      mediaUrls: (row.media_urls as string[]) ?? [],
-      fermentationEnabled: (row.fermentation_enabled as boolean) ?? false,
+      id: readString(row, 'id'),
+      userId: readString(row, 'user_id'),
+      content: readString(row, 'content'),
+      mediaUrls: readStringArray(row, 'media_urls'),
+      fermentationEnabled: readBooleanOr(row, 'fermentation_enabled', false),
       effects: parseEffects(row.effects),
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }
@@ -244,7 +252,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
 // malformed row doesn't break entry reads.
 function parseEffects(raw: unknown): EditorEffectsState | null {
   if (!raw || typeof raw !== 'object') return null;
-  if (Object.keys(raw as object).length === 0) return null;
+  if (Object.keys(raw).length === 0) return null;
   const parsed = editorEffectsStateSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
 }

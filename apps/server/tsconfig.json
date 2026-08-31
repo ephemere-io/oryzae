@@ -4,6 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
+    // TS7 は pnpm が symlink で張った node_modules/@types を typeRoots 走査で拾えないため明示する。
+    "types": ["node"],
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
@@ -11,8 +13,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
+    // 型は package.json の exports が ./src/app.ts を直接指すため .d.ts は誰も参照しない。
+    // 出しても Hono の巨大な推論型が非 export の内部型を掴んで TS4023 になるだけなので出さない。
+    "declaration": false,
+    "declarationMap": false,
     "sourceMap": true,
     "verbatimModuleSyntax": true
   },

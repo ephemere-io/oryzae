@@ -32,8 +32,9 @@ test.describe('管理者認証フロー', () => {
     await page.click('button:has-text("ログイン")');
     await page.waitForURL('**/dashboard**');
 
-    // Logout
-    await page.click('button:has-text("Logout")');
+    // ログアウトはアイコンボタン（admin-sidebar.tsx の title="ログアウト"）。
+    // 文字 "Logout" は UI に存在しない。
+    await page.getByTitle('ログアウト').click();
     await page.waitForURL('**/login**');
     await expect(page).toHaveURL(/\/login/);
   });

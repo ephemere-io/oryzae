@@ -48,6 +48,99 @@ describe('SpEntryEditor', () => {
     expect(screen.queryByRole('button', { name: '納める' })).toBeNull();
   });
 
+  it('問いが結ばれていなければ「納める」は問い選択を開く（Issue #450）', async () => {
+    // 問いに紐づかないエントリは発酵ループに入らない（active な問いに紐づいたものだけを
+    // 走査する）。そのまま漬けられると「漬けたのに何も届かない」になる。
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+
+    // 発酵フラグ付きの保存は投げず、問い選択シートを開く。
+    await waitFor(() => expect(screen.getByText('なぜ続けるのか')).toBeTruthy());
+    expect(fetchImpl).not.toHaveBeenCalledWith(
+      '/api/v1/entries/e1',
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
+
+  it('一覧から既存エントリを開くと、紐づいている問いをチップに復元する（Issue #448）', async () => {
+    // 旧実装は URL の questionId と復元ドラフトしか見ておらず、サーバの紐付けを無視して
+    // いたため「+ 問いを結ぶ」のまま出ていた。
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/entries/e1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor
+          api={createMockApi(fetchImpl)}
+          initialEntryId="e1"
+          initialContent={'既存タイトル\n既存の本文'}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(await screen.findByText('◦ なぜ続けるのか')).toBeTruthy();
+    // 既に紐づいているので、復元だけで POST は投げ直さない。
+    expect(fetchImpl).not.toHaveBeenCalledWith(
+      '/api/v1/entries/e1/questions/q1',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('紐づいた問いが終了（アーカイブ）済みでもチップに出る', async () => {
+    // activeQuestions（/questions）には載らないので、紐付け側から引けないと消えてしまう。
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/entries/e1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'archived', currentText: '終えた問い' }]));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent={'本文'} />
+      </NextIntlClientProvider>,
+    );
+
+    expect(await screen.findByText('◦ 終えた問い')).toBeTruthy();
+  });
+
+  it('URL の questionId が優先され、サーバの紐付けで上書きされない', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'fromUrl', currentText: 'URL の問い' }]));
+      if (url === '/api/v1/entries/e1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'サーバの問い' }]));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor
+          api={createMockApi(fetchImpl)}
+          initialEntryId="e1"
+          initialQuestionId="fromUrl"
+          initialContent={'本文'}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(await screen.findByText('◦ URL の問い')).toBeTruthy();
+    expect(screen.queryByText('◦ サーバの問い')).toBeNull();
+  });
+
   it('既存エントリを開くとタイトル・本文が埋まる（編集）', () => {
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
@@ -84,5 +177,93 @@ describe('SpEntryEditor', () => {
     renderEditor(createMockApi(apiFetch));
     fireEvent.click(screen.getByRole('button', { name: /問い/ }));
     expect(await screen.findByText(/立てている問いがありません/)).toBeTruthy();
+  });
+  it('問いがゼロでも「納める」から問いをその場で立てられる（Issue #314）', async () => {
+    // 旧実装は空のとき「立てている問いがありません」を出すだけで、問いを作る導線が
+    // 無かった。問いを全て終了したユーザーは、書いても漬けられない状態に陥っていた。
+    const fetchImpl = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/questions' && init?.method === 'POST')
+        return Promise.resolve(jsonResponse({ id: 'new-q' }));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+
+    // 行き止まりではなく、その場で書く入力欄が出る。
+    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    fireEvent.change(input, { target: { value: '今日は何に驚いたか' } });
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+
+    // 作った問いが即チップに出る（作りたては /questions にも紐付けにも載らないため、
+    // ローカルに覚えていないと「+ 問いを結ぶ」に戻って見える）。
+    expect(await screen.findByText('◦ 今日は何に驚いたか')).toBeTruthy();
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/v1/questions',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    // 作った問いはエントリにも紐づく（紐づかないと発酵ループに入らない）。
+    await waitFor(() =>
+      expect(fetchImpl).toHaveBeenCalledWith(
+        '/api/v1/entries/e1/questions/new-q',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+  });
+
+  it('問いの作成に失敗したらエラーを出し、シートを閉じない（Issue #314）', async () => {
+    const fetchImpl = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/questions' && init?.method === 'POST')
+        return Promise.resolve(jsonResponse({}, false));
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    fireEvent.change(input, { target: { value: '通らない問い' } });
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+
+    expect(await screen.findByText(jaMessages.sp.editor.question_create_failed)).toBeTruthy();
+    // 書いた内容を失わないよう入力欄は残す。
+    expect(screen.getByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeTruthy();
+  });
+
+  it('問いの取得が遅れてシートを先に開いても、届いたら一覧に切り替わる（Issue #314）', async () => {
+    // モードを「開いた時点の件数」で固定すると、選べる問いがあるのに入力欄のままになる。
+    let resolveQuestions: ((res: Response) => void) | undefined;
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return new Promise<Response>((resolve) => {
+          resolveQuestions = resolve;
+        });
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+    expect(
+      await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder),
+    ).toBeTruthy();
+
+    resolveQuestions?.(jsonResponse([{ id: 'q1', currentText: '後から届いた問い' }]));
+
+    expect(await screen.findByText('後から届いた問い')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeNull();
   });
 });

@@ -10,11 +10,25 @@
 
 全コードで `as` による型アサーションを使ってはならない。型が合わない場合は型ガードを書く。
 
-やむを得ない場合（ブラウザ API の型定義不足等）は、前の行に理由を記載する:
+やむを得ない場合（ブラウザ API の型定義不足等）は、**同じ行の末尾か前の行**に理由を記載する:
 ```typescript
 // @type-assertion-allowed: InputEvent.inputType は標準 TS DOM 型に含まれない
 const ie = e as InputEvent;
 ```
+
+`pnpm check:as`（CI ジョブ **No `as` Casts**）がこれを強制する。理由が空の
+`@type-assertion-allowed` は違反として扱う。検出器は `scripts/check-type-assertions.mjs`。
+`as const` と import/export の別名（`import * as X`）は対象外。
+
+検出器自体は自前の字句解析なので、`scripts/check-type-assertions.test.mjs` に
+自己テストがある（`pnpm check:as` が本体より先に実行する）。検出ロジックを触ったら
+ここにケースを足すこと。**検出漏れは「CI が緑なのにルールが守られていない」状態を作る**ため、
+false negative のケースを特に厚くしてある。
+
+サーバーの Supabase 行マッピングは、キャストではなく
+`contexts/shared/infrastructure/row.ts` のリーダー（`readString` / `readNumber` /
+`readEnum` など）を使う。DB スキーマがずれた時に、どのカラムがどう違ったのかが
+分かる例外になる。
 
 ### `any` 型禁止
 
@@ -49,8 +63,44 @@ take_screenshot filePath=.tmp/screenshots/{名前}.png
 ## コミット前チェック
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip
+pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip && pnpm check:as && pnpm security:rls
 ```
+
+## セキュリティ
+
+Oryzae は他人の日記を預かる。**「ある人の日記が本人以外の目に触れる経路が無いか」**が
+唯一の最上位基準。詳細は `docs/security-guide.md`。
+
+### 認可の急所（これを誤解しないこと）
+
+ユーザー向け API は `authMiddleware` が **anon key + ユーザー JWT** でクライアントを作るため、
+**RLS が認可境界**。repository に `.eq('user_id', ...)` が無くても RLS が守る。
+一方 `getSupabaseClient()` は **service role key で RLS を完全にバイパス**する。
+
+### 絶対ルール: 新規テーブルには必ず RLS
+
+`supabase/migrations/` でテーブルを作ったら、必ず RLS を有効化しポリシーを書く。
+`pnpm security:rls` が CI で強制する。
+
+- `USING (true)` を書くときは必ず `TO service_role` を添える
+  （TO 省略時は PUBLIC 扱いになり、同テーブルの own-data ポリシーを無効化する）
+- 読み取りを許すポリシー（`FOR SELECT` / `FOR ALL`）の条件式には `auth.uid()` を必ず含める
+  （所有者を辿るサブクエリでも可。含まれないと全ユーザー分の行が読める）
+- 意図的な例外は対象文の直前行に `-- @rls-exempt: <理由>` を記載
+- 既知の未修正リスクは `supabase/rls-baseline.json` で管理（直したら項目を削除する）
+
+### 絶対ルール: service role の利用箇所を増やさない
+
+`getSupabaseClient()` の import 元は `apps/server/.dependency-cruiser.cjs` の
+`service-role-client-containment` で許可リスト化されている。追加が必要な場合は、
+その PR で「なぜ RLS バイパスが要るか」「ユーザー入力の ID をそのままクエリ条件に
+渡していないか」をレビューしたうえで許可リストに明示的に足すこと。
+
+### 日記本文をログ・監視に載せない
+
+`console.log` / `logger.*` / `Sentry.captureException` / PostHog イベントに、
+entry の本文・snapshot・snippet・letter を含めない。例外メッセージへの本文埋め込みも同様
+（Sentry に自動送信される）。
 
 ## Stop hook による自動テスト
 

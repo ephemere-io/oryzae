@@ -1,17 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { normalizeQuestions } from '@/features/shared/questions/normalize';
+import type { QuestionItem } from '@/features/shared/questions/types';
 import type { ApiClient } from '@/lib/api';
-
-interface QuestionItem {
-  id: string;
-  currentText: string | null;
-  isArchived: boolean;
-  isProposedByOryzae: boolean;
-  isValidatedByUser: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export function useQuestions(api: ApiClient | null) {
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
@@ -26,8 +18,8 @@ export function useQuestions(api: ApiClient | null) {
     try {
       const res = await api.fetch('/api/v1/questions/all');
       if (res.ok) {
-        const data: QuestionItem[] = await res.json();
-        setQuestions(data);
+        const data: unknown = await res.json();
+        setQuestions(normalizeQuestions(data));
       } else {
         setError(true);
       }

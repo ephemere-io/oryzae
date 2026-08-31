@@ -11,6 +11,8 @@ function q(id: string, currentText: string, extra: Record<string, boolean> = {})
     isArchived: false,
     isProposedByOryzae: false,
     isValidatedByUser: true,
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-01T00:00:00.000Z',
     ...extra,
   };
 }
@@ -40,6 +42,16 @@ describe('SpQuestions', () => {
   it('問いの一覧を表示する', () => {
     renderQ();
     expect(screen.getByText('なぜ書くのか')).toBeTruthy();
+  });
+
+  it('手紙が届いた問いに印を出す（Issue #452）', () => {
+    renderQ({ unreadQuestionIds: new Set(['q1']) });
+    expect(screen.getByText(jaMessages.sp.questions.letter_arrived)).toBeTruthy();
+  });
+
+  it('手紙が届いていない問いには印を出さない', () => {
+    renderQ({ unreadQuestionIds: new Set(['other']) });
+    expect(screen.queryByText(jaMessages.sp.questions.letter_arrived)).toBeNull();
   });
 
   it('「新しい問いを立てる」でシートが開き、作成できる', () => {

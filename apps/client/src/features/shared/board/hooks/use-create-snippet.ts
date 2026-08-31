@@ -1,0 +1,33 @@
+'use client';
+
+import { useCallback } from 'react';
+import type { ApiClient } from '@/lib/api';
+
+interface CreateSnippetPayload {
+  text: string;
+  dateKey: string;
+  /** ボードから作るときのみ指定。エディタの選択テキストから作る場合は未指定。 */
+  viewType?: string;
+}
+
+/**
+ * 抜粋（snippet）をボードに1件作る（端末非依存）。
+ *
+ * Issue #490: ボード（useBoard.createSnippet）とエディタの選択ツールバー
+ * （snippet-toolbar）が同じ POST を別実装で叩いていたため、ここへ集約した。
+ * 呼び出し側の後処理（ボードは再取得、ツールバーは保存表示）が違うだけなので、
+ * 送信のみを共有し、成否を boolean で返す。
+ */
+export function useCreateSnippet(api: ApiClient | null) {
+  return useCallback(
+    async (payload: CreateSnippetPayload): Promise<boolean> => {
+      if (!api) return false;
+      const res = await api.fetch('/api/v1/board/snippets', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.ok;
+    },
+    [api],
+  );
+}

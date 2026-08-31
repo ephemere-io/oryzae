@@ -175,6 +175,61 @@ describe('RunFermentationUsecase', () => {
     expect(repo.saveScannedEntries).toHaveBeenCalledWith('test-id', ['e1']);
   });
 
+  // コスト集計の正確性: LLM が成功した時点で課金は発生しているので、その後の保存処理が
+  // 落ちてもトークンは残さなければならない。旧実装は catch 側で usage 未設定の元
+  // インスタンスから update していたため、input_tokens/output_tokens を NULL で
+  // 上書きし、失敗した発酵のコストがレポートから丸ごと消えていた。
+  it('keeps the token usage when a post-LLM step fails', async () => {
+    const repo = mockRepo();
+    repo.saveWorksheet = vi.fn().mockRejectedValue(new Error('db write failed'));
+    const llm = mockLlm();
+    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+
+    await expect(
+      usecase.execute({
+        userId: 'u1',
+        questionId: 'q1',
+        questionText: 'test',
+        entries: [{ id: 'e1', content: 'test' }],
+      }),
+    ).rejects.toThrow('db write failed');
+
+    const failedUpdate = vi
+      .mocked(repo.update)
+      .mock.calls.map(([result]) => result.toProps())
+      .find((props) => props.status === 'failed');
+
+    expect(failedUpdate).toBeDefined();
+    expect(failedUpdate?.inputTokens).toBe(100);
+    expect(failedUpdate?.outputTokens).toBe(200);
+    expect(failedUpdate?.errorMessage).toBe('db write failed');
+  });
+
+  it('leaves tokens null when the LLM itself fails (nothing was billed)', async () => {
+    const repo = mockRepo();
+    const llm: LlmAnalysisGateway = {
+      analyze: vi.fn().mockRejectedValue(new Error('LLM timeout')),
+    };
+    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+
+    await expect(
+      usecase.execute({
+        userId: 'u1',
+        questionId: 'q1',
+        questionText: 'test',
+        entries: [{ id: 'e1', content: 'test' }],
+      }),
+    ).rejects.toThrow('LLM analysis failed');
+
+    const failedUpdate = vi
+      .mocked(repo.update)
+      .mock.calls.map(([result]) => result.toProps())
+      .find((props) => props.status === 'failed');
+
+    expect(failedUpdate?.inputTokens).toBeNull();
+    expect(failedUpdate?.outputTokens).toBeNull();
+  });
+
   // issue #353: retryOf を渡すと既存行を再利用して再実行する。
   describe('retry mode (issue #353)', () => {
     it('reuses the existing row instead of creating a new one', async () => {

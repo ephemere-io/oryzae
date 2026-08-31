@@ -12,16 +12,9 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
+import type { QuestionItem } from '@/features/shared/questions/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpQuestions } from './sp-questions';
-
-interface QuestionItem {
-  id: string;
-  currentText: string | null;
-  isArchived: boolean;
-  isProposedByOryzae: boolean;
-  isValidatedByUser: boolean;
-}
 
 interface Props {
   questions: QuestionItem[];
@@ -37,12 +30,15 @@ const noop = () => Promise.resolve();
 // 送信中状態を保持するため解決しない Promise（setSubmitting(false) を発火させない）。
 const neverResolve = () => new Promise<void>(() => {});
 
+const TIMESTAMPS = { createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z' };
+
 const proposedItem: QuestionItem = {
   id: 'q-proposed',
   currentText: '最近、何に時間を使いたいと思っている？',
   isArchived: false,
   isProposedByOryzae: true,
   isValidatedByUser: false,
+  ...TIMESTAMPS,
 };
 
 const activeItem: QuestionItem = {
@@ -51,6 +47,7 @@ const activeItem: QuestionItem = {
   isArchived: false,
   isProposedByOryzae: false,
   isValidatedByUser: false,
+  ...TIMESTAMPS,
 };
 
 const baseProps = (overrides: Partial<Props> = {}): Props => ({
