@@ -12,7 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { AdminUser } from '../hooks/use-users';
+import { compareUsers, type SortDir, type UserSortKey } from '../sort';
 
 function formatDate(iso: string | null): string {
   if (!iso) return '-';
@@ -33,9 +35,6 @@ function isActive(user: AdminUser): boolean {
   return user.entryCount > 0 || user.fermentationTotal > 0;
 }
 
-type SortKey = 'email' | 'createdAt' | 'entryCount' | 'questionCount' | 'fermentationTotal';
-type SortDir = 'asc' | 'desc';
-
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-30" />;
   return dir === 'asc' ? (
@@ -53,10 +52,10 @@ interface UserTableProps {
 }
 
 export function UserTable({ users, onUserClick, searchQuery, statusFilter }: UserTableProps) {
-  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [sortKey, setSortKey] = useState<UserSortKey>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  function handleSort(key: SortKey) {
+  function handleSort(key: UserSortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -79,23 +78,7 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
       result = result.filter((u) => !isActive(u));
     }
 
-    return [...result].sort((a, b) => {
-      const mul = sortDir === 'asc' ? 1 : -1;
-      switch (sortKey) {
-        case 'email':
-          return mul * a.email.localeCompare(b.email);
-        case 'createdAt':
-          return mul * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        case 'entryCount':
-          return mul * (a.entryCount - b.entryCount);
-        case 'questionCount':
-          return mul * (a.questionCount - b.questionCount);
-        case 'fermentationTotal':
-          return mul * (a.fermentationTotal - b.fermentationTotal);
-        default:
-          return 0;
-      }
-    });
+    return [...result].sort((a, b) => compareUsers(a, b, sortKey, sortDir));
   }, [users, searchQuery, statusFilter, sortKey, sortDir]);
 
   const totalEntries = filtered.reduce((sum, u) => sum + u.entryCount, 0);
@@ -108,7 +91,7 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
     className,
   }: {
     label: string;
-    sortKeyName: SortKey;
+    sortKeyName: UserSortKey;
     className?: string;
   }) {
     return (
@@ -126,17 +109,33 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
     <Table>
       <TableHeader>
         <TableRow>
-          <SortableHead label="User" sortKeyName="email" />
-          <SortableHead label="Registered" sortKeyName="createdAt" />
-          <TableHead>Last Login</TableHead>
-          <SortableHead label="Entries" sortKeyName="entryCount" className="text-right" />
-          <SortableHead label="Questions" sortKeyName="questionCount" className="text-right" />
-          <SortableHead
-            label="Fermentations"
-            sortKeyName="fermentationTotal"
-            className="text-right"
-          />
-          <TableHead>Status</TableHead>
+          <SortableHead label="ユーザー" sortKeyName="email" />
+          <SortableHead label="登録日" sortKeyName="createdAt" />
+          <SortableHead label="最終ログイン" sortKeyName="lastSignInAt" />
+          <SortableHead label="最終活動" sortKeyName="lastActivityAt" />
+          <SortableHead label="エントリー" sortKeyName="entryCount" className="text-right" />
+          <SortableHead label="問い" sortKeyName="questionCount" className="text-right" />
+          <SortableHead label="発酵" sortKeyName="fermentationTotal" className="text-right" />
+          <TableHead>
+            <Tooltip
+              content={
+                <span>
+                  <strong>Active</strong>: エントリーを 1 件以上書いた、または発酵が 1 件以上ある
+                  <br />
+                  <strong>Inactive</strong>: そのどちらも無い
+                  <br />
+                  <span className="text-muted-foreground">
+                    ※ 期間の条件は無く、登録以降の累計で判定します。最近使っているかは
+                    「最終活動」列を見てください
+                  </span>
+                </span>
+              }
+            >
+              <span className="cursor-help underline decoration-dotted underline-offset-2">
+                状態
+              </span>
+            </Tooltip>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -165,6 +164,9 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
             <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
               {formatDate(user.lastSignInAt)}
             </TableCell>
+            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+              {formatDate(user.lastActivityAt)}
+            </TableCell>
             <TableCell className="text-right font-mono text-sm">{user.entryCount}</TableCell>
             <TableCell className="text-right font-mono text-sm">{user.questionCount}</TableCell>
             <TableCell className="text-right">
@@ -187,8 +189,8 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
         ))}
         {filtered.length === 0 && (
           <TableRow>
-            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-              No users
+            <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+              ユーザーがいません
             </TableCell>
           </TableRow>
         )}
@@ -196,8 +198,8 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
       {filtered.length > 0 && (
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={3} className="text-xs font-medium">
-              Total ({filtered.length} users)
+            <TableCell colSpan={4} className="text-xs font-medium">
+              合計（{filtered.length} 人）
             </TableCell>
             <TableCell className="text-right font-mono text-xs font-medium">
               {totalEntries}
