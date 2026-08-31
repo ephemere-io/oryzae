@@ -16,6 +16,11 @@ interface EntryCardContentProps {
   editLoading?: boolean;
 }
 
+/** 見出しは本文の1行目。編集中も同じ作り方で出して、カードの顔を消さない。 */
+function firstLine(text: string): string {
+  return text.split('\n').find((line) => line.trim().length > 0) ?? '';
+}
+
 export function EntryCardContent({
   content,
   editing = false,
@@ -33,6 +38,9 @@ export function EntryCardContent({
     if (editing && !editLoading) inputRef.current?.focus();
   }, [editing, editLoading]);
 
+  // 編集中は打っている内容から見出しを作る。表示中はサーバーが作ったものを使う。
+  const heading = editing && !editLoading ? firstLine(editValue) : content.title;
+
   return (
     <div
       className="flex h-full flex-col overflow-hidden p-6"
@@ -46,7 +54,7 @@ export function EntryCardContent({
       })}
     >
       {/* Header with border separator */}
-      <div className="mb-2 flex items-center justify-between pb-2">
+      <div className="mb-2 flex shrink-0 items-center justify-between pb-2">
         <span
           className="text-[9px] uppercase tracking-[0.2em]"
           style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
@@ -59,6 +67,17 @@ export function EntryCardContent({
         />
       </div>
 
+      {/* 見出しは編集中も出す。消えるとカードがどれだか分からなくなる。
+          編集中は打っている1行目に追従するので、直したそばから反映される。 */}
+      {heading && (
+        <h3
+          className="mb-2 line-clamp-2 shrink-0 text-sm font-medium leading-snug"
+          style={{ color: 'var(--fg)' }}
+        >
+          {heading}
+        </h3>
+      )}
+
       {editing ? (
         <textarea
           ref={inputRef}
@@ -69,35 +88,21 @@ export function EntryCardContent({
           placeholder={editLoading ? t('loading') : undefined}
           data-verify-entry-editor="true"
           // 掴んで動かす操作と喧嘩しないよう、ここで pointer 系を止める。
-          // 親（BoardCard）は編集中はドラッグを始めないが、選択の開始点が
-          // カード側に伝わると選択が途切れることがある。
           onPointerDown={(e) => e.stopPropagation()}
           className="min-h-0 w-full flex-1 resize-none border-none bg-transparent leading-loose outline-none"
           style={{ color: 'var(--fg)', fontSize: 13 }}
         />
       ) : (
         <>
-          {content.title && (
-            <h3
-              className="mb-2 line-clamp-2 text-sm font-medium leading-snug"
-              style={{ color: 'var(--fg)' }}
-            >
-              {content.title}
-            </h3>
-          )}
+          {/* 本文は読ませるものなので、地の文と同じ濃さで出す。以前は日付と同じ
+              薄い色に opacity まで掛けており、カードの上では読み取れなかった。
+              長い日記はここで送れる（掴んで広げれば、そのぶん見える）。 */}
           <p
-            className="flex-1 leading-loose"
-            style={{ color: 'var(--date-color)', fontSize: 13, opacity: 0.85 }}
+            className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap leading-loose"
+            style={{ color: 'var(--fg)', fontSize: 13, opacity: 0.92 }}
           >
             {content.preview}
           </p>
-          {/* 読み終わりをぼかす帯。編集中は文字が隠れると困るので出さない。 */}
-          <div
-            className="pointer-events-none absolute bottom-0 left-0 right-0 h-12"
-            style={{
-              background: 'linear-gradient(transparent, var(--card-bg, var(--bg)))',
-            }}
-          />
         </>
       )}
     </div>

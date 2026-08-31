@@ -36,6 +36,17 @@ interface CardResponse {
   content: EntryContent | SnippetContent | PhotoContent;
 }
 
+const TITLE_LENGTH = 100;
+/**
+ * カードに載せる抜粋の長さ。
+ *
+ * 200 文字だと既定サイズのカードでちょうど埋まってしまい、カードを大きくしても
+ * 文字が増えず「途中で切れたまま」に見えていた。カードは掴んで広げられるので、
+ * 広げたぶんは読めるようにしておく。全文を積むと盤面1枚ぶんの応答が重くなるので、
+ * 読み物として足りる長さで止める（続きはカードの上で編集に入れば全文が出る）。
+ */
+const PREVIEW_LENGTH = 800;
+
 interface LoadBoardResponse {
   dateKey: string;
   viewType: string;
@@ -139,8 +150,8 @@ export class LoadBoardUsecase {
         const content = entry.content;
         const firstLine = content.split('\n').find((l) => l.trim().length > 0);
         entryMap.set(entry.id, {
-          title: firstLine?.substring(0, 100) ?? '',
-          preview: content.substring(0, 200),
+          title: firstLine?.substring(0, TITLE_LENGTH) ?? '',
+          preview: content.substring(0, PREVIEW_LENGTH),
           createdAt: entry.createdAt,
         });
       }

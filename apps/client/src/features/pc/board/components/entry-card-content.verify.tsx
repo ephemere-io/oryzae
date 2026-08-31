@@ -115,6 +115,21 @@ registerUnit<Props>({
         `整形済み日付 "${contract.formattedDate}" が描画されていない`,
     },
     {
+      id: 'heading-survives-editing',
+      description: '編集に入っても見出しは消えず、打っている1行目に追従する',
+      // 消えるとカードがどれだか分からなくなる、という指摘への回帰止め。
+      check: ({ root, props }) => {
+        if (!props.editing || props.editLoading) return true;
+        const heading = root.querySelector('h3')?.textContent?.trim() ?? '';
+        const expected = (props.editValue ?? '').split('\n').find((l) => l.trim().length > 0) ?? '';
+        if (!expected) return true;
+        return (
+          heading === expected.trim() ||
+          `編集中の見出しが本文の1行目と違う: heading="${heading}" expected="${expected.trim()}"`
+        );
+      },
+    },
+    {
       id: 'editor-iff-editing',
       description: '編集欄は editing のときだけ出て、そのときは抜粋を出さない',
       check: ({ root, contract }) => {
