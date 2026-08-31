@@ -53,6 +53,18 @@ interface QuestionCircleProps {
   style?: React.CSSProperties;
 }
 
+/**
+ * 問いの円の直径（world 単位）。
+ *
+ * 中の吹き出し（最大 140px 幅）やキーワードのピルは **絶対 px** なので、円が小さいと
+ * 物理的に収まらず文字が重なる。280px では 140px の吹き出しが直径の半分を占め、
+ * 3つ並べた時点で破綻していた。キャンバスをズームできるようになったので、円自体を
+ * 広げて余白を稼ぐ（読むときは寄ればよい）。
+ *
+ * 変えるときは jar-view の world サイズも同じ比率で動かすこと。円が近づきすぎる。
+ */
+export const QUESTION_CIRCLE_SIZE = 700;
+
 /* ── Microbe SVG templates (matching reference) ── */
 const MICROBE_SVGS = {
   koji: '<svg viewBox="0 0 28 28"><g fill="none"><path d="M14,24 C10,20 8,14 12,8 C14,6 16,6 18,8 C22,12 22,18 18,22" stroke="#A3B8A8" stroke-width="2" stroke-linecap="round" opacity="0.65"/><ellipse cx="14" cy="6" rx="3.5" ry="5" fill="#A3B8A8" opacity="0.35"/><ellipse cx="9" cy="10" rx="2" ry="3" fill="#8EA89C" opacity="0.45"/><ellipse cx="19" cy="14" rx="1.5" ry="2.5" fill="#8EA89C" opacity="0.3"/></g></svg>',
@@ -154,7 +166,7 @@ export function QuestionCircle({
   style,
 }: QuestionCircleProps) {
   const hasData = detail && detail.status === 'completed';
-  const size = 280;
+  const size = QUESTION_CIRCLE_SIZE;
   const circleRef = useRef<HTMLDivElement | null>(null);
 
   const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);
@@ -266,7 +278,8 @@ export function QuestionCircle({
           <text
             style={{
               fontFamily: "'Noto Serif JP', serif",
-              fontSize: '9px',
+              // 円に比例させる（元は直径 280 に対して 9px）。
+              fontSize: `${Math.round(size * (9 / 280))}px`,
               letterSpacing: '0.2em',
               fill: '#7A3B3F',
               opacity: 0.6,

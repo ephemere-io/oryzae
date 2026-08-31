@@ -8,7 +8,10 @@ import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
-import { QuestionCircle } from '@/features/pc/fermentation/components/question-circle';
+import {
+  QUESTION_CIRCLE_SIZE,
+  QuestionCircle,
+} from '@/features/pc/fermentation/components/question-circle';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
@@ -26,8 +29,11 @@ import { useUnread } from '@/lib/unread-context';
  * 数値の意味は変わらないままパン・ズームに乗る（マイグレーション不要。
  * `jarPositionItemSchema` の min(0).max(100) もそのまま成立する）。
  */
-const JAR_WORLD_WIDTH = 1600;
-const JAR_WORLD_HEIGHT = 1000;
+// 円を 280→700 に広げたぶん、世界も同じ比率で広げる。世界を据え置くと
+// 既定配置の円どうしが重なる（3つの中心間距離が最短 516px しかなく、直径 700 を下回る）。
+// 座標は % で持っているので、比率を保つ限り既存の配置は崩れない。
+const JAR_WORLD_WIDTH = 2800;
+const JAR_WORLD_HEIGHT = 1750;
 const JAR_WORLD_BOUNDS: Bounds = {
   x: 0,
   y: 0,
@@ -35,8 +41,8 @@ const JAR_WORLD_BOUNDS: Bounds = {
   height: JAR_WORLD_HEIGHT,
 };
 
-/** QuestionCircle の一辺（world 単位）。円へズームする矩形の計算に使う。 */
-const CIRCLE_SIZE = 280;
+/** 円へズームする矩形の計算に使う。実体は QuestionCircle 側の定数（二重管理しない）。 */
+const CIRCLE_SIZE = QUESTION_CIRCLE_SIZE;
 
 /** 円の world 矩形。中心が (jarX%, jarY%) で translate(-50%,-50%) されている前提。 */
 function circleWorldBounds(pos: Pos): Bounds {
@@ -586,8 +592,8 @@ export function JarView({
               left: '50%',
               top: '45%',
               transform: 'translate(-50%, -55%)',
-              width: '420px',
-              height: '520px',
+              width: '735px',
+              height: '910px',
               animation: 'fadeIn 0.5s ease-out forwards',
             }}
           >
