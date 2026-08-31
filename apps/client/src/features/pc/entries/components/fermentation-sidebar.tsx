@@ -3,7 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { ICON_STROKE_WIDTH, SHELL_INSET } from '@/components/ui/surface';
+import { ICON_STROKE_WIDTH, SHELL_INSET, SIDE_PANEL_WIDTH } from '@/components/ui/surface';
 import {
   type FermentationOverlayDetailData,
   FermentationOverlayDetailPane,
@@ -57,8 +57,10 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
   return (
     <>
       <aside
-        className="flex w-72 shrink-0 flex-col overflow-y-auto border-l"
+        className="flex shrink-0 flex-col overflow-y-auto border-l"
         style={{
+          // 詳細ペインと同じ幅。開いた瞬間に面の幅が変わると別物に見える。
+          width: SIDE_PANEL_WIDTH,
           paddingTop: SHELL_INSET,
           paddingBottom: SHELL_INSET,
           borderColor: 'var(--border-subtle)',

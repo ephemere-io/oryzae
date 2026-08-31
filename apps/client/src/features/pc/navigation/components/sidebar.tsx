@@ -82,11 +82,21 @@ export function Sidebar() {
   // 掴んで動かしたあとに発火する click を食う。縁は「掴む」と「押す」を兼ねているので、
   // これが無いと幅を変えるたびに畳まれる。
   const draggedRef = useRef(false);
+  // pointermove は1フレームに何度も来る。幅の反映は画面全体（本文の折返しまで）に
+  // 波及するので、次のフレームで1回にまとめる。
+  const pendingWidthRef = useRef<number | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   const stopDrag = useCallback(() => setDragging(false), []);
 
   useEffect(() => {
     if (!dragging) return;
+
+    function flush() {
+      frameRef.current = null;
+      const next = pendingWidthRef.current;
+      if (next !== null) setExpandedWidth(next);
+    }
     function handleMove(e: PointerEvent) {
       draggedRef.current = true;
       const next = e.clientX;
@@ -98,8 +108,8 @@ export function Sidebar() {
         return;
       }
       dragWidthRef.current = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, next));
-      setCollapsed(false);
-      setExpandedWidth(dragWidthRef.current);
+      pendingWidthRef.current = dragWidthRef.current;
+      if (frameRef.current === null) frameRef.current = requestAnimationFrame(flush);
     }
     document.addEventListener('pointermove', handleMove);
     document.addEventListener('pointerup', stopDrag);
@@ -112,6 +122,12 @@ export function Sidebar() {
       document.removeEventListener('pointerup', stopDrag);
       document.removeEventListener('pointercancel', stopDrag);
       document.body.style.userSelect = previousSelect;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      // 最後の1フレームぶんを取りこぼさない。
+      if (pendingWidthRef.current !== null) setExpandedWidth(pendingWidthRef.current);
     };
   }, [dragging, setCollapsed, setExpandedWidth, stopDrag]);
 

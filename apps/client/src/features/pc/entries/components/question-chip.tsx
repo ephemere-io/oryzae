@@ -93,11 +93,14 @@ export function QuestionChip({
         linked: linked.length > 0,
       })}
     >
+      {/* 複数結ばれていることは見た目の「+n」で出すが、読み上げには数が届かないので
+          そのときだけ aria-label で件数を言う。 */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={linked.length > 1 ? t('linked_count', { count: linked.length }) : undefined}
         className="flex h-7 max-w-[320px] items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors"
         style={
           primary
@@ -114,7 +117,19 @@ export function QuestionChip({
       >
         <span aria-hidden="true">{primary ? '◦' : '+'}</span>
         <span className="truncate">{label}</span>
-        {extraCount > 0 && <span className="shrink-0 opacity-70">+{extraCount}</span>}
+        {/* 2つ目以降。薄い「+1」では複数結ばれていることが読み取れなかったので、
+            チップの中にもう1枚の丸をはっきり置く（数はここでしか出ない情報）。 */}
+        {extraCount > 0 && (
+          <span
+            className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-[11px] leading-none font-medium"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--accent) 22%, transparent)',
+              color: 'var(--accent)',
+            }}
+          >
+            +{extraCount}
+          </span>
+        )}
       </button>
 
       {open && (

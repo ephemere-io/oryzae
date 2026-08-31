@@ -152,7 +152,8 @@
     "question_chip": {
       "empty": "关联问题",
       "untitled": "无标题的问题",
-      "none_available": "还没有问题"
+      "none_available": "还没有问题",
+      "linked_count": "已联结 {count} 个提问"
     }
   },
   "app": {

@@ -113,6 +113,11 @@ export function EntryActionPalette({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
+  // ドラッグ中に読む面の寸法。**掴んだ瞬間に一度だけ測る**（後述）。
+  const dragSizeRef = useRef<{ w: number; h: number }>({ w: 240, h: 48 });
+  // 次のフレームまで位置の反映を1回にまとめる（pointermove は1フレームに何度も来る）。
+  const pendingRef = useRef<Position | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   // 初回だけ localStorage から復元する（SSR では読めないので mount 後）。
   useEffect(() => {
@@ -121,10 +126,18 @@ export function EntryActionPalette({
     setCollapsed(readStoredCollapsed());
   }, [persistState]);
 
-  const clamp = useCallback((p: Position): Position => {
+  /**
+   * 画面の中に収める。
+   *
+   * @param size 面の寸法。**呼び出し側が渡す**のが肝心で、ここで offsetWidth を読むと
+   *   pointermove のたびにレイアウトが同期的に走る。本文の contentEditable と
+   *   ゴーストのキャンバスを抱えた画面ではそれが数百 ms の詰まりになる
+   *   （実測: INP Issue「Event handlers on this element blocked UI updates for 576ms」）。
+   */
+  const clamp = useCallback((p: Position, size?: { w: number; h: number }): Position => {
     const el = rootRef.current;
-    const w = el?.offsetWidth ?? 240;
-    const h = el?.offsetHeight ?? 48;
+    const w = size?.w ?? el?.offsetWidth ?? 240;
+    const h = size?.h ?? el?.offsetHeight ?? 48;
     const maxX = Math.max(EDGE_MARGIN, window.innerWidth - w - EDGE_MARGIN);
     const maxY = Math.max(EDGE_MARGIN, window.innerHeight - h - EDGE_MARGIN);
     return {
@@ -135,12 +148,27 @@ export function EntryActionPalette({
 
   useEffect(() => {
     if (!dragging) return;
+
+    // pointermove は1フレームに何度も来る。そのたびに state を書くと、
+    // 描画1回ぶんの仕事に対して何度も再描画が走る。次のフレームで1回だけ反映する。
+    function flush() {
+      frameRef.current = null;
+      const next = pendingRef.current;
+      if (next) setPosition(next);
+    }
     function handleMove(e: PointerEvent) {
-      setPosition(
-        clamp({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y }),
+      pendingRef.current = clamp(
+        { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y },
+        dragSizeRef.current,
       );
+      if (frameRef.current === null) frameRef.current = requestAnimationFrame(flush);
     }
     function handleUp() {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      if (pendingRef.current) setPosition(pendingRef.current);
       setDragging(false);
     }
     window.addEventListener('pointermove', handleMove);
@@ -150,6 +178,10 @@ export function EntryActionPalette({
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('pointercancel', handleUp);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
     };
   }, [dragging, clamp]);
 
@@ -182,6 +214,9 @@ export function EntryActionPalette({
     if (!el) return;
     const rect = el.getBoundingClientRect();
     dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    // 面の寸法はドラッグ中に変わらないので、ここで一度だけ測って持ち回る。
+    dragSizeRef.current = { w: rect.width, h: rect.height };
+    pendingRef.current = { x: rect.left, y: rect.top };
     setPosition({ x: rect.left, y: rect.top });
     setDragging(true);
   }

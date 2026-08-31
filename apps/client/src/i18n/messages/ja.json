@@ -152,7 +152,8 @@
     "question_chip": {
       "empty": "問いを結ぶ",
       "untitled": "無題の問い",
-      "none_available": "まだ問いがありません"
+      "none_available": "まだ問いがありません",
+      "linked_count": "{count}つの問いを結んでいる"
     }
   },
   "app": {

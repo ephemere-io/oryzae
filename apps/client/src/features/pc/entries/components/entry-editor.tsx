@@ -41,6 +41,7 @@ import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-questi
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
+import { useTitleFollowsScroll } from '@/features/pc/entries/hooks/use-title-follows-scroll';
 import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
@@ -160,7 +161,6 @@ export function EntryEditor({
   const [pickleNudgeOpen, setPickleNudgeOpen] = useState(false);
   const [linkQuestionNudgeOpen, setLinkQuestionNudgeOpen] = useState(false);
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
-  // 問いのドロップダウンは、ヘッダーのチップからもパレットの操作からも開く。
   const [voiceActive, setVoiceActive] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
@@ -696,6 +696,14 @@ export function EntryEditor({
     enabled: true,
   });
 
+  // 縦書きの題は紙の右肩に絶対配置してあるので、放っておくと本文だけが流れて題が残る。
+  // 横書きと同じく、読み進めれば題も画面の外へ出るようにする。
+  useTitleFollowsScroll({
+    titleRef: titleInputRef,
+    editorRef,
+    enabled: settings.writingMode === 'vertical',
+  });
+
   // パレットの操作。押せないものは非活性にして、理由はホバーで出す
   // （「あと何字」を常時表示しない代わり）。
   const paletteIcon = (children: React.ReactNode) => (
@@ -788,9 +796,7 @@ export function EntryEditor({
   // 本文は left:6% / width:79%（右端 = 85%）。題を本文にぴったり付けると、
   // 右側だけが大きく空いて題が宙に浮き、かつ本文と一体化して2列に見えてしまう。
   // 右端の余白（6%）を本文の左端と揃え、題と本文のあいだに 5% の間を取る。
-  const titleBoxClass = isVertical
-    ? 'absolute top-[4%] right-[6%] h-[86%] w-[6%] min-w-[3rem]'
-    : 'absolute top-6';
+  const titleBoxClass = isVertical ? 'absolute top-[4%] right-[6%] h-[86%]' : 'absolute top-6';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
   //
@@ -801,7 +807,10 @@ export function EntryEditor({
   const titleTextStyle: React.CSSProperties = {
     // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。
     ...(isVertical
-      ? {}
+      ? // 縦書きの題の桁幅。**字の幅ぎりぎりにしない**（以前は 6% / 最小 3rem で、
+        // 46px の字に対して箱が 48px しか無かった）。日本語入力の変換候補は
+        // キャレットの脇に開くので、逃げ場が無いと字の上に重なって打てなくなる。
+        { width: `${titleFontSize * 2}px` }
       : {
           left: `${gutterPx}px`,
           width: `${measurePx}px`,

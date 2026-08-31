@@ -148,6 +148,44 @@ registerUnit<QuestionChipProps>({
       },
     },
     {
+      id: 'extra-count-is-legible',
+      // 「+1」を薄い文字で添えていたときは、複数結ばれていることが読み取れなかった。
+      description: '2つ以上結ばれていれば、余りの件数が独立した丸として出る',
+      check: ({ root, contract }) => {
+        const trigger = root.querySelector('[data-verify-unit="QuestionChip"] > button');
+        const linkedCount = Number(contract.linkedCount);
+        const badge = Array.from(trigger?.querySelectorAll('span') ?? []).find((el) =>
+          /^\+\d+$/.test(el.textContent?.trim() ?? ''),
+        );
+        if (linkedCount <= 1) {
+          return badge === undefined || `1件以下なのに余りの表示がある: "${badge.textContent}"`;
+        }
+        if (!badge) return `${linkedCount}件結ばれているのに余りの表示が無い`;
+        return (
+          badge.textContent?.trim() === `+${linkedCount - 1}` ||
+          `余りの表示が "${badge.textContent}"（+${linkedCount - 1} であるべき）`
+        );
+      },
+    },
+    {
+      id: 'multi-linked-is-announced',
+      // 見た目の「+n」は読み上げに届かないので、そのときだけ件数を言う。
+      // 翻訳キーの入れ忘れもここで落ちる（未定義なら生キーが出る）。
+      description: '2つ以上結ばれていれば、件数が aria-label で言われる',
+      check: ({ root, contract }) => {
+        const trigger = root.querySelector('[data-verify-unit="QuestionChip"] > button');
+        const label = trigger?.getAttribute('aria-label');
+        if (Number(contract.linkedCount) <= 1) {
+          return label === null || `1件以下なのに件数の読み上げが付いている: "${label}"`;
+        }
+        if (!label) return '複数結ばれているのに aria-label が無い';
+        return (
+          (label.includes(contract.linkedCount) && !label.includes('linked_count')) ||
+          `aria-label が件数を伝えていない: "${label}"`
+        );
+      },
+    },
+    {
       id: 'panel-left-aligns-with-trigger',
       description: '開いた面の左端はチップの左端に合う（器がボタンに張りついている）',
       onlyFixtures: ['open'],

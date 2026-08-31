@@ -152,7 +152,8 @@
     "question_chip": {
       "empty": "물음 잇기",
       "untitled": "제목 없는 물음",
-      "none_available": "아직 물음이 없습니다"
+      "none_available": "아직 물음이 없습니다",
+      "linked_count": "{count}개의 물음을 이었다"
     }
   },
   "app": {

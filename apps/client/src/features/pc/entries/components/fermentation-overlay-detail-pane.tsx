@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { SIDE_PANEL_WIDTH } from '@/components/ui/surface';
 
 export type FermentationOverlayDetailType = 'keyword' | 'snippet' | 'letter';
 
@@ -42,9 +43,12 @@ export function FermentationOverlayDetailPane({
 
   return (
     <div
-      className="fixed top-0 z-[65] flex h-full w-[400px] flex-col border-l border-[rgba(139,115,85,0.2)] bg-[#faf8f5] transition-[right] duration-500"
+      className="fixed top-0 z-[65] flex h-full flex-col border-l border-[rgba(139,115,85,0.2)] bg-[#faf8f5] transition-[right] duration-500"
       style={{
-        right: open ? 0 : -400,
+        // 常設の発酵サイドバーと同じ幅（SIDE_PANEL_WIDTH）。開いた瞬間に面が広がると、
+        // 同じ場所にある別のものに見える。
+        width: SIDE_PANEL_WIDTH,
+        right: open ? 0 : -SIDE_PANEL_WIDTH,
         backdropFilter: 'blur(12px)',
         fontFamily: "'Noto Serif JP', serif",
       }}
