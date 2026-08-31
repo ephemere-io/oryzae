@@ -108,17 +108,32 @@ describe('useTypewriterScroll', () => {
     });
   }
 
-  it('横書き: キャレットが中央より下に来たら、その差分だけ紙を送る', () => {
+  it('横書き: 中央を越えても、端(85%)に届くまでは紙を動かさない', () => {
+    // 1文字ごとに紙が動くと「文字は動かないのに背景だけ流れる」ように見える。
+    // 書いているあいだは止めておく。
     scroller.getBoundingClientRect = () => makeRect({ top: 0, height: 600, width: 800 });
     setScrollMetrics(scroller, { clientHeight: 600, scrollHeight: 2000 });
     scroller.scrollTop = 100;
-    // キャレットの下端が 500 → アンカー(300) より 200 下にある
+    // 下端 500 は中央(300) より下だが、送り出しの線(510) にはまだ届いていない。
     stubCaret(editor, makeRect({ top: 480, bottom: 500, height: 20, width: 1 }));
 
     render('horizontal');
     type();
 
-    expect(scroller.scrollTop).toBe(300);
+    expect(scroller.scrollTop).toBe(100);
+  });
+
+  it('横書き: 端(85%)に届いたら、キャレットが中央に来るまで送る', () => {
+    scroller.getBoundingClientRect = () => makeRect({ top: 0, height: 600, width: 800 });
+    setScrollMetrics(scroller, { clientHeight: 600, scrollHeight: 2000 });
+    scroller.scrollTop = 100;
+    // 下端 560 が送り出しの線(510) を越えた → 中央(300) まで 260 送る。
+    stubCaret(editor, makeRect({ top: 540, bottom: 560, height: 20, width: 1 }));
+
+    render('horizontal');
+    type();
+
+    expect(scroller.scrollTop).toBe(360);
   });
 
   it('横書き: キャレットが中央より上なら紙を動かさない（読み返しの位置を奪わない）', () => {
@@ -145,18 +160,31 @@ describe('useTypewriterScroll', () => {
     expect(scroller.scrollTop).toBe(0);
   });
 
-  it('縦書き: 行が左へ伸びてアンカーを越えたら、editor 自身を負方向へ送る', () => {
+  it('縦書き: 中央を越えても、端(左から15%)に届くまでは動かさない', () => {
     // 縦書きでは editor 自身が overflowX:auto のスクローラ。
     editor.getBoundingClientRect = () => makeRect({ left: 0, width: 800, height: 600 });
     setScrollMetrics(editor, { clientWidth: 800, scrollWidth: 3000 });
     editor.scrollLeft = 0;
-    // キャレットの左端が 300 → アンカー(400) より 100 左にある
+    // 左端 300 は中央(400) より左だが、送り出しの線(120) にはまだ届いていない。
     stubCaret(editor, makeRect({ left: 300, right: 301, width: 1, height: 20 }));
 
     render('vertical');
     type();
 
-    expect(editor.scrollLeft).toBe(-100);
+    expect(editor.scrollLeft).toBe(0);
+  });
+
+  it('縦書き: 端に届いたら、キャレットが中央に来るまで負方向へ送る', () => {
+    editor.getBoundingClientRect = () => makeRect({ left: 0, width: 800, height: 600 });
+    setScrollMetrics(editor, { clientWidth: 800, scrollWidth: 3000 });
+    editor.scrollLeft = 0;
+    // 左端 100 が送り出しの線(120) を越えた → 中央(400) まで 300 送る（左向きなので負）。
+    stubCaret(editor, makeRect({ left: 100, right: 101, width: 1, height: 20 }));
+
+    render('vertical');
+    type();
+
+    expect(editor.scrollLeft).toBe(-300);
   });
 
   it('縦書き: キャレットがアンカーより右（＝書き始め側）なら動かさない', () => {

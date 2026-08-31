@@ -172,7 +172,7 @@ export function Sidebar() {
               } ${
                 isActive
                   ? 'border text-[#8EA89C]'
-                  : 'border border-transparent text-[#8C857E] hover:bg-[rgba(140,133,126,0.1)] hover:text-[#4A4541]'
+                  : 'border border-transparent text-[#8C857E] hover:bg-[var(--hover-wash)] hover:text-[#4A4541]'
               }`}
               style={{
                 height: SHELL_ROW_HEIGHT,
@@ -194,7 +194,7 @@ export function Sidebar() {
                   strokeWidth={ICON_STROKE_WIDTH}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+                  className="h-5 w-5"
                 >
                   <path d={item.iconPath} />
                 </svg>
@@ -232,7 +232,7 @@ export function Sidebar() {
           target="_blank"
           rel="noopener noreferrer"
           title={collapsed ? t('nav.help') : undefined}
-          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[#8C857E] transition-colors duration-300 hover:bg-[rgba(140,133,126,0.1)] hover:text-[#4A4541] ${
+          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[#8C857E] transition-colors duration-300 hover:bg-[var(--hover-wash)] hover:text-[#4A4541] ${
             collapsed ? 'w-12 justify-center' : 'w-full px-3'
           }`}
           style={{ height: SHELL_ROW_HEIGHT }}
@@ -246,7 +246,7 @@ export function Sidebar() {
               strokeWidth={ICON_STROKE_WIDTH}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
+              className="h-5 w-5"
             >
               <circle cx="12" cy="12" r="9" />
               <path d="M9.4 9.4a2.6 2.6 0 0 1 4.6 1.6c0 1.7-2.4 2-2.4 3.4" />
@@ -261,7 +261,7 @@ export function Sidebar() {
         <Link
           href="/account"
           title={collapsed ? t('nav.account') : undefined}
-          className={`group flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-300 hover:bg-[rgba(140,133,126,0.1)] ${
+          className={`group flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-300 hover:bg-[var(--hover-wash)] ${
             collapsed ? 'w-12 justify-center' : 'w-full px-3'
           }`}
           style={{ height: SHELL_ROW_HEIGHT }}

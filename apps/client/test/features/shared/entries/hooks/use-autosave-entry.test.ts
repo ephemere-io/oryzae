@@ -30,6 +30,12 @@ describe('useAutosaveEntry', () => {
     );
   }
 
+  /** entryId が変化する再レンダーを書くための props 型（`as` を使わずに undefined を許す）。 */
+  interface SwitchableProps {
+    entryId: string | undefined;
+    body: string;
+  }
+
   async function tick(ms = 2000) {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(ms);
@@ -266,6 +272,47 @@ describe('useAutosaveEntry', () => {
     });
 
     expect(save).toHaveBeenCalledWith('original+離脱直前の追記', 'e1');
+  });
+
+  // entryId は「呼び出し側が保存結果を返してくる」前提で動く。hook は自分が作った id を
+  // 覚えるが、次の保存の宛先は props の entryId なので、返ってこないと二重に作られる。
+  // 逆に別のエントリへ切り替わったときは、前の本文を新しい id に書いてはいけない。
+  it('自分が作った id が返ってきたら、次は作り直さずその id を更新する', async () => {
+    const save = vi.fn().mockResolvedValue('A');
+    const initialProps: SwitchableProps = { entryId: undefined, body: '' };
+    const { rerender } = renderHook(
+      ({ entryId, body }: SwitchableProps) =>
+        useAutosaveEntry({ title: '', body, entryId, save, enabled: true }),
+      { initialProps },
+    );
+
+    rerender({ entryId: undefined, body: '最初の本文' });
+    await tick();
+    expect(save).toHaveBeenLastCalledWith('最初の本文', undefined);
+
+    // 呼び出し側が onSaved で受け取った id を返してくる。
+    rerender({ entryId: 'A', body: '最初の本文' });
+    rerender({ entryId: 'A', body: '最初の本文と続き' });
+    await tick();
+
+    expect(save).toHaveBeenLastCalledWith('最初の本文と続き', 'A');
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it('別のエントリに切り替わったら、前の本文を新しい id に書かない', async () => {
+    const save = vi.fn().mockResolvedValue('B');
+    const initialProps: SwitchableProps = { entryId: 'A', body: 'Aの本文' };
+    const { rerender } = renderHook(
+      ({ entryId, body }: SwitchableProps) =>
+        useAutosaveEntry({ title: '', body, entryId, save, enabled: true }),
+      { initialProps },
+    );
+
+    // 切り替え: id も本文も同時に差し替わる（一覧から別のエントリを開いた状況）。
+    rerender({ entryId: 'B', body: 'Bの本文' });
+    await tick(5000);
+
+    expect(save).not.toHaveBeenCalled();
   });
 
   it('保存中に離脱しても、保存中に打った分を書き出す（追いかけ保存は離脱後に発火しない）', async () => {

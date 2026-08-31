@@ -45,6 +45,15 @@ export const ELEVATED_PANEL_STYLE = {
 } as const;
 
 /** 面に載る正方形のアイコンボタン。 */
+/**
+ * **押せるものは、ホバーで地がわずかに沈む。アプリ全体でこれ1つ。**
+ *
+ * 以前は同じ意味のホバーに4種類の色が混ざっていた（灰・砂・茶）。触るたびに手応えの色が
+ * 違うと、押せるかどうかを色で覚えられない。色の種類ではなく「地が沈む」ことで伝える。
+ * 動き（拡大・浮き上がり）はホバーの言語にしない——押す前に物が動くと、狙いがずれる。
+ */
+export const HOVER_CLASS = 'transition-colors duration-150 hover:bg-[var(--hover-wash)]';
+
 export const TOOL_BUTTON_CLASS =
   'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors active:scale-95';
 
@@ -54,7 +63,6 @@ export const TOOL_BUTTON_CLASS =
  * 背景をインライン style で指定すると `:hover` に必ず勝ってしまうので、非選択時は
  * インラインで背景を持たせず、この class に委ねる。
  */
-export const IDLE_HOVER_CLASS = 'hover:bg-[var(--toolbar-hover)]';
 
 /** 押せないことを伝える見た目。`disabled` 属性は使わない（理由に到達できなくなる）。 */
 export const DISABLED_CLASS = 'cursor-default opacity-40';

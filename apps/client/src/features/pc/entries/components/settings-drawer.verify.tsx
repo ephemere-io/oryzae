@@ -27,7 +27,6 @@ const allEffectsOn: EditorSettings = {
   timeInscriptionMode: 'fontWeight',
   ghostEnabled: true,
   ghostMode: 'dust',
-  fermentationOverlayPreference: 'always',
 };
 
 const boundaryStress: EditorSettings = {
@@ -47,7 +46,6 @@ const boundaryStress: EditorSettings = {
   ghostBlurStart: 20,
   ghostBlurEnd: 40,
   ghostDuration: 250,
-  fermentationOverlayPreference: 'never',
 };
 
 registerUnit<Props>({
@@ -95,10 +93,10 @@ registerUnit<Props>({
         const label = props.settings.timeInscriptionEnabled ? 1 : 0;
         const selects = root.querySelectorAll('[aria-haspopup="listbox"]').length;
         const enabled = contract.timeInscriptionEnabled === 'true';
-        // 面に畳む Select は「選択肢が3つ以上」のものだけ（発酵の既定）。
+        // 面に畳む Select は「選択肢が3つ以上」のものだけ。いま残っているのは
+        // 「時間の表し方」（3択）だけで、それも時間内包が入のときにしか出ない。
         // 2択（書字方向・書体・ゴーストの表し方）は Segmented で開かせない。
-        const base = 1;
-        const expected = base + label;
+        const expected = label;
         return (
           (enabled === (label === 1) && selects === expected) ||
           `Select 数=${selects}, 期待=${expected}（timeInscriptionEnabled=${contract.timeInscriptionEnabled}）`
@@ -134,13 +132,18 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'long-description-is-behind-help',
-      description: '長い説明文はパネルに常時出さず、? のツールチップに畳む',
+      id: 'no-prose-in-the-panel',
+      // パネルは「何をどう変えるか」の一覧であって、読みものではない。
+      // 説明が要るほど複雑な設定は、設定そのものを見直す合図。
+      description: 'パネルに長い説明文を置かない',
       check: ({ root }) => {
-        const help = root.querySelector('button[aria-expanded][aria-label]');
-        const tip = root.querySelector('[role="tooltip"]');
-        if (!help) return '? のヘルプトリガーが見つからない';
-        return tip === null || '閉じているのに説明文が描画されている';
+        const longest = Array.from(root.querySelectorAll('section *'))
+          .filter((el) => el.children.length === 0)
+          .map((el) => (el.textContent ?? '').trim())
+          .reduce((max, text) => Math.max(max, text.length), 0);
+        return (
+          longest <= 24 || `パネル内に ${longest} 文字の文がある（設定の一覧に散文は置かない）`
+        );
       },
     },
   ],

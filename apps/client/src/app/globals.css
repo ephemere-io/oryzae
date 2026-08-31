@@ -9,9 +9,18 @@
 :root {
   --bg: #f9f8f4;
   --fg: #2d2d2d;
-  --accent: #4a9e8e;
-  --accent-light: rgba(74, 158, 142, 0.08);
+  /* このアプリの緑は**1つ**。以前は accent が青緑(#4a9e8e)、サイドバーとオンボーディングが
+   * セージ(#8ea89c)で、同じ画面に2つの緑が並んでいた（設定パネルのトグルとスライダーが
+   * いちばん目につく）。セージ側に寄せ、文字色として使える濃さまで落としてある
+   * （白地に対して 4.6:1 で、小さなラベルにも使える）。 */
+  --accent: #5a7c6a;
+  --accent-light: rgba(90, 124, 106, 0.08);
   --border-subtle: rgba(0, 0, 0, 0.05);
+  /* **押せるものに掛かる地の洗いは、アプリ全体でこの1つだけ。**
+   * 以前は同じ「ホバー」に4種類の色（灰・砂・茶の rgba）が混ざっていて、
+   * どこを触っても手応えの色が違った。押せるかどうかは色の種類ではなく
+   * 「地がわずかに沈むこと」で伝える。 */
+  --hover-wash: rgba(0, 0, 0, 0.05);
   --toolbar-hover: rgba(0, 0, 0, 0.04);
   --date-color: #999;
 
@@ -47,9 +56,10 @@
 [data-theme="dark"] {
   --bg: #1a1a1a;
   --fg: #cccccc;
-  --accent: #5ab8a6;
-  --accent-light: rgba(90, 184, 166, 0.1);
+  --accent: #9cbfae;
+  --accent-light: rgba(156, 191, 174, 0.1);
   --border-subtle: rgba(255, 255, 255, 0.06);
+  --hover-wash: rgba(255, 255, 255, 0.07);
   --toolbar-hover: rgba(255, 255, 255, 0.06);
   --date-color: #666;
   --card-snippet: #3a3520;

@@ -367,11 +367,6 @@
       "ghost_blur_start": "初期ぼかし",
       "ghost_blur_end": "最終ぼかし",
       "ghost_duration": "持続時間",
-      "section_fermentation_overlay": "発酵サイドバー",
-      "fermentation_overlay_description": "新規エントリで問いを紐付けたとき、その問いの最新の発酵結果を右のサイドバーに表示できます。",
-      "fermentation_overlay_ask": "毎回確認する",
-      "fermentation_overlay_always": "常に表示する",
-      "fermentation_overlay_never": "表示しない",
       "section_display": "表示",
       "writing_vertical": "縦書き",
       "writing_horizontal": "横書き",
@@ -382,9 +377,6 @@
       "font_family": "書体",
       "time_inscription_mode": "表し方",
       "ghost_mode": "出し方",
-      "fermentation_overlay_label": "表示の既定",
-      "fermentation_overlay_help_aria": "発酵サイドバーの説明",
-      "focus_mode_fades_fermentation": "発酵要素も一緒に隠す",
       "palette_auto_hide": "書いている間はパレットを隠す"
     },
     "snippet_toolbar": {

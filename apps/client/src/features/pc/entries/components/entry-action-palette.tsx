@@ -9,9 +9,9 @@ import {
   DISABLED_CLASS,
   ELEVATED_PANEL_CLASS,
   ELEVATED_PANEL_STYLE,
+  HOVER_CLASS,
   ICON_SIZE,
   ICON_STROKE_WIDTH,
-  IDLE_HOVER_CLASS,
   TOOL_BUTTON_CLASS,
 } from '@/components/ui/surface';
 
@@ -254,7 +254,7 @@ export function EntryActionPalette({
           onClick={() => setCollapsedAndPersist(false)}
           aria-expanded={false}
           aria-label={t('expand')}
-          className={`flex h-7 w-20 items-center justify-center rounded-t-[13px] border border-b-0 transition-colors ${IDLE_HOVER_CLASS}`}
+          className={`flex h-7 w-20 items-center justify-center rounded-t-[13px] border border-b-0 transition-colors ${HOVER_CLASS}`}
           style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
         >
           <svg
@@ -332,7 +332,7 @@ export function EntryActionPalette({
                 onFocus={() => setHoveredId(action.id)}
                 onBlur={() => setHoveredId(null)}
                 className={`${TOOL_BUTTON_CLASS} ${
-                  disabled ? DISABLED_CLASS : action.active ? '' : IDLE_HOVER_CLASS
+                  disabled ? DISABLED_CLASS : action.active ? '' : HOVER_CLASS
                 }`}
                 style={
                   action.active
@@ -360,7 +360,7 @@ export function EntryActionPalette({
           onClick={() => setCollapsedAndPersist(true)}
           aria-expanded={true}
           aria-label={t('collapse')}
-          className={`${TOOL_BUTTON_CLASS} ${IDLE_HOVER_CLASS}`}
+          className={`${TOOL_BUTTON_CLASS} ${HOVER_CLASS}`}
           style={{ color: 'var(--date-color)' }}
         >
           <svg

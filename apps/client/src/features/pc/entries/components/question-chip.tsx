@@ -101,17 +101,22 @@ export function QuestionChip({
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={linked.length > 1 ? t('linked_count', { count: linked.length }) : undefined}
-        className="flex h-7 max-w-[320px] items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors"
+        // ヘッダーで唯一の「押せるもの」であり、この画面でいちばん大事な選択なので、
+        // 日付や歯車より一段強く出す（高さ・字の大きさ・地の濃さを上げる）。
+        // 結ばれていないときも、点線の枠だけの弱い印にはしない——結ぶ操作に気づかれないと、
+        // エントリーは問いに結ばれないまま溜まっていく。
+        className="flex h-8 max-w-[340px] items-center gap-2 rounded-full px-3.5 text-[13.5px] font-medium transition-colors hover:brightness-[0.97]"
         style={
           primary
             ? {
                 color: 'var(--accent)',
-                background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
+                background: 'color-mix(in srgb, var(--accent) 16%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
               }
             : {
-                color: 'var(--date-color)',
-                border: '1px dashed var(--border-subtle)',
+                color: 'var(--fg)',
+                background: 'var(--hover-wash)',
+                border: '1px solid var(--border-subtle)',
               }
         }
       >

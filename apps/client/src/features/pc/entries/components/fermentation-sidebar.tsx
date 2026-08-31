@@ -85,7 +85,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
             type="button"
             onClick={onClose}
             aria-label={t('close_aria')}
-            className="-mr-1.5 flex h-6 w-6 items-center justify-center rounded-md text-[var(--date-color)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            className="-mr-1.5 flex h-6 w-6 items-center justify-center rounded-md text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
           >
             <svg
               aria-hidden="true"
@@ -135,7 +135,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                   onClick={() =>
                     openDetail('keyword', { keyword: kw.keyword, description: kw.description })
                   }
-                  className="flex h-7 items-center rounded-full px-3 text-[12px] transition-transform hover:-translate-y-px"
+                  className="flex h-7 items-center rounded-full px-3 text-[12px] transition-[filter] duration-150 hover:brightness-[0.96]"
                   style={{
                     background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
                     border: '1px solid rgba(255,255,255,0.5)',

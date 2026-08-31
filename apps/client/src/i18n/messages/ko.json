@@ -367,11 +367,6 @@
       "ghost_blur_start": "초기 흐림",
       "ghost_blur_end": "최종 흐림",
       "ghost_duration": "지속 시간",
-      "section_fermentation_overlay": "발효 사이드바",
-      "fermentation_overlay_description": "새 엔트리에 물음을 이으면 그 물음의 최신 발효 결과를 오른쪽 사이드바에 표시할 수 있습니다.",
-      "fermentation_overlay_ask": "매번 확인",
-      "fermentation_overlay_always": "항상 표시",
-      "fermentation_overlay_never": "표시 안 함",
       "section_display": "표시",
       "writing_vertical": "세로쓰기",
       "writing_horizontal": "가로쓰기",
@@ -382,9 +377,6 @@
       "font_family": "서체",
       "time_inscription_mode": "표현 방식",
       "ghost_mode": "표현 방식",
-      "fermentation_overlay_label": "기본 표시",
-      "fermentation_overlay_help_aria": "발효 사이드바 설명",
-      "focus_mode_fades_fermentation": "발효 요소도 함께 숨기기",
       "palette_auto_hide": "쓰는 동안 팔레트 숨기기"
     },
     "snippet_toolbar": {

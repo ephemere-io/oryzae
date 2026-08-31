@@ -11,7 +11,13 @@ interface UseTypewriterScrollOptions {
   enabled: boolean;
 }
 
-/** キャレットをこの位置（スクローラに対する比率）より先に進ませない。 */
+/**
+ * キャレットがこの位置（スクローラに対する比率）を越えたら、紙を送る。
+ * 越えるまでは一切動かさない。
+ */
+const CARET_TRIGGER = 0.85;
+
+/** 送るときに、キャレットをこの位置まで戻す。 */
 const CARET_ANCHOR = 0.5;
 
 /**
@@ -20,6 +26,11 @@ const CARET_ANCHOR = 0.5;
  * 「縦書きだと左端に行くと半透明になってスクロールしなくちゃいけない／横書きでもスクロールが
  * 必要」＝ 書いている手が止まる、という指摘への対応。紙のほうを動かし、書き手は動かさない。
  * docs/entry-screen-design.md §3「本文（紙）」。
+ *
+ * **常に中央に留めるのではなく、端に着いてから中央へ戻す。** 1文字打つたびに紙が
+ * 少しずつ動くと、書いている本人の目には「文字は動かないのに背景だけが流れる」ように映り、
+ * かえって落ち着かない。書いているあいだは紙を止めておき、キャレットが端（85%）まで
+ * 来たところで初めて中央（50%）まで送る——紙をめくる動きに近い。
  *
  * - **入力時だけ**動かす。selectionchange やスクロールでは動かさないので、読み返しのために
  *   自分でスクロールした位置を奪わない。
@@ -51,15 +62,18 @@ export function useTypewriterScroll({
 
       if (writingMode === 'vertical') {
         // vertical-rl: 行は右から左へ伸びる。scrollLeft は先頭(右端)で 0、左へ進むと負。
+        // 進む向きが左なので、「端」は左端側 = 幅の (1 - 0.85) の位置。
         if (scroller.scrollWidth - scroller.clientWidth < 1) return;
+        const trigger = box.left + box.width * (1 - CARET_TRIGGER);
+        if (caret.left > trigger) return;
         const anchor = box.left + box.width * CARET_ANCHOR;
-        const delta = caret.left - anchor;
-        if (delta < 0) scroller.scrollLeft += delta;
+        scroller.scrollLeft += caret.left - anchor;
       } else {
         if (scroller.scrollHeight - scroller.clientHeight < 1) return;
+        const trigger = box.top + box.height * CARET_TRIGGER;
+        if (caret.bottom < trigger) return;
         const anchor = box.top + box.height * CARET_ANCHOR;
-        const delta = caret.bottom - anchor;
-        if (delta > 0) scroller.scrollTop += delta;
+        scroller.scrollTop += caret.bottom - anchor;
       }
     }
 

@@ -5,22 +5,11 @@ import { useTranslations } from 'next-intl';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { HelpTooltip } from '@/components/ui/tooltip';
 
 type WritingMode = 'vertical' | 'horizontal';
 type FontFamily = 'serif' | 'sans';
 export type TimeInscriptionMode = 'fontSize' | 'fontWeight' | 'pressureBleed';
 type GhostMode = 'block' | 'dust';
-
-/**
- * 新規エントリで問いを紐付けたとき、その問いの発酵結果を出すかどうかの既定挙動。
- * 'ask' は毎回モーダルで確認、'always' は自動表示、'never' は表示しない。
- *
- * Issue #329 で「エディタ上へのフローティング表示」として入り、Issue #466 で
- * 右サイドバーへの集約に変わった。**型名と localStorage キーに Overlay が残っているのは
- * 履歴上の理由**（キーを変えると既存ユーザーの選択が失われる）。挙動はサイドバーの開閉。
- */
-export type FermentationOverlayPreference = 'ask' | 'always' | 'never';
 
 export interface EditorSettings {
   writingMode: WritingMode;
@@ -30,12 +19,6 @@ export interface EditorSettings {
   focusModeEnabled: boolean;
   /** 書いている間はアクションパレットを隠すか（既定 ON）。 */
   paletteAutoHide: boolean;
-  /**
-   * Issue #350: フォーカスモードで基本 UI が透明化するとき、フローティングの発酵要素も
-   * 一緒に透明化するか。既定は true（書いている間は本文だけが残る）。
-   * 発酵結果を見ながら書きたい人のために切れるようにしてある。
-   */
-  focusModeFadesFermentation: boolean;
   timeInscriptionEnabled: boolean;
   timeInscriptionMode: TimeInscriptionMode;
   eraserTraceEnabled: boolean;
@@ -48,7 +31,6 @@ export interface EditorSettings {
   ghostBlurStart: number;
   ghostBlurEnd: number;
   ghostDuration: number;
-  fermentationOverlayPreference: FermentationOverlayPreference;
 }
 
 export const DEFAULT_SETTINGS: EditorSettings = {
@@ -58,7 +40,6 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   lineHeight: 1.625,
   focusModeEnabled: true,
   paletteAutoHide: true,
-  focusModeFadesFermentation: true,
   timeInscriptionEnabled: false,
   timeInscriptionMode: 'fontSize',
   eraserTraceEnabled: false,
@@ -71,7 +52,6 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   ghostBlurStart: 4,
   ghostBlurEnd: 14,
   ghostDuration: 100,
-  fermentationOverlayPreference: 'ask',
 };
 
 interface SettingsPanelProps {
@@ -87,32 +67,19 @@ function isGhostMode(value: string): value is GhostMode {
   return value === 'block' || value === 'dust';
 }
 
-function isFermentationPreference(value: string): value is FermentationOverlayPreference {
-  return value === 'ask' || value === 'always' || value === 'never';
-}
-
 /**
  * セクション。見出しは**小さく薄い一行**で、区切り線は引かない。
  *
  * Notion の設定パネルと同じ考え方: 面を線で刻むのではなく、**余白の大小**で
  * まとまりを作る。セクション間は 28px、セクション内の行間は 6px。
  */
-function Section({
-  label,
-  help,
-  children,
-}: {
-  label: string;
-  help?: { content: string; ariaLabel: string };
-  children: React.ReactNode;
-}) {
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col px-5 pb-7 last:pb-5">
-      <div className="mb-2 flex h-5 items-center gap-1.5">
+      <div className="mb-2 flex h-5 items-center">
         <span className="text-[11px] font-medium tracking-[0.04em] text-[var(--fg)] opacity-45">
           {label}
         </span>
-        {help && <HelpTooltip content={help.content} ariaLabel={help.ariaLabel} />}
       </div>
       <div className="flex flex-col gap-1.5">{children}</div>
     </section>
@@ -201,7 +168,6 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
         unit: 'SettingsDrawer',
         timeInscriptionEnabled: settings.timeInscriptionEnabled,
         ghostEnabled: settings.ghostEnabled,
-        fermentationOverlayPreference: settings.fermentationOverlayPreference,
       })}
     >
       <Section label={t('section_display')}>
@@ -270,17 +236,6 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
           checked={settings.paletteAutoHide}
           onChange={(v) => onChange({ paletteAutoHide: v })}
         />
-        {/* Issue #350: 発酵結果も一緒に消すかどうか。フォーカスモードが切ってあるときは
-            意味を持たないので出さない。（main では対象がフローティング表示だったが、
-            Issue #466 でサイドバーに移ったので、そちらに掛かる） */}
-        {settings.focusModeEnabled && (
-          <Switch
-            id="focus-mode-fades-fermentation"
-            label={t('focus_mode_fades_fermentation')}
-            checked={settings.focusModeFadesFermentation}
-            onChange={(v) => onChange({ focusModeFadesFermentation: v })}
-          />
-        )}
       </Section>
 
       <Section label={t('section_effects')}>
@@ -403,33 +358,6 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
             />
           </>
         )}
-      </Section>
-
-      <Section
-        label={t('section_fermentation_overlay')}
-        help={{
-          content: t('fermentation_overlay_description'),
-          ariaLabel: t('fermentation_overlay_help_aria'),
-        }}
-      >
-        <Row
-          label={t('fermentation_overlay_label')}
-          control={
-            <Select
-              className="w-40"
-              ariaLabel={t('fermentation_overlay_label')}
-              value={settings.fermentationOverlayPreference}
-              options={[
-                { value: 'ask', label: t('fermentation_overlay_ask') },
-                { value: 'always', label: t('fermentation_overlay_always') },
-                { value: 'never', label: t('fermentation_overlay_never') },
-              ]}
-              onChange={(v) => {
-                if (isFermentationPreference(v)) onChange({ fermentationOverlayPreference: v });
-              }}
-            />
-          }
-        />
       </Section>
     </div>
   );

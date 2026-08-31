@@ -20,7 +20,6 @@ import {
   EntryActionPalette,
   type PaletteAction,
 } from '@/features/pc/entries/components/entry-action-palette';
-import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
 import { FermentationSidebar } from '@/features/pc/entries/components/fermentation-sidebar';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
@@ -185,38 +184,14 @@ export function EntryEditor({
     api,
     firstLinkedQuestionId,
   );
+  // 発酵結果は**閉じた状態で始まり、パレットの操作でだけ開く**。
+  // 以前はエントリーを開いた瞬間に「出しますか？」と訊いていたが、書きに来た人の手を
+  // いきなり止める問いだった。出したいときに出せるなら、訊く必要がない。
   const [fermentSidebarOpen, setFermentSidebarOpen] = useState(false);
-  const [overlayPromptOpen, setOverlayPromptOpen] = useState(false);
-  const promptedForQuestionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!fermentationOverlayDetail) {
-      setFermentSidebarOpen(false);
-      setOverlayPromptOpen(false);
-      promptedForQuestionRef.current = null;
-      return;
-    }
-    if (promptedForQuestionRef.current === fermentationOverlayDetail.questionId) return;
-    promptedForQuestionRef.current = fermentationOverlayDetail.questionId;
-    if (settings.fermentationOverlayPreference === 'always') {
-      setFermentSidebarOpen(true);
-      setOverlayPromptOpen(false);
-    } else if (settings.fermentationOverlayPreference === 'never') {
-      setFermentSidebarOpen(false);
-      setOverlayPromptOpen(false);
-    } else {
-      setOverlayPromptOpen(true);
-    }
-  }, [fermentationOverlayDetail, settings.fermentationOverlayPreference]);
-  const handleOverlayPromptChoose = useCallback(
-    (display: boolean, remember: boolean) => {
-      setFermentSidebarOpen(display);
-      setOverlayPromptOpen(false);
-      if (remember) {
-        updateSettings({ fermentationOverlayPreference: display ? 'always' : 'never' });
-      }
-    },
-    [updateSettings],
-  );
+    // 問いを外した／別の問いに移ったら、前の発酵結果を出したままにしない。
+    if (!fermentationOverlayDetail) setFermentSidebarOpen(false);
+  }, [fermentationOverlayDetail]);
   const toggleFermentSidebar = useCallback(() => {
     setFermentSidebarOpen((v) => !v);
   }, []);
@@ -253,8 +228,7 @@ export function EntryEditor({
     questionSelectOpen ||
     pickleNudgeOpen ||
     linkQuestionNudgeOpen ||
-    leaveConfirmOpen ||
-    overlayPromptOpen;
+    leaveConfirmOpen;
   const uiVisible = useFocusMode({
     enabled: settings.focusModeEnabled,
     forceVisible: anyOverlayOpen,
@@ -877,7 +851,7 @@ export function EntryEditor({
               <button
                 type="button"
                 {...triggerProps}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
                 data-tooltip={t('toolbar.settings')}
                 // 画面の一番上にあるボタンなので、既定の「上に出す」だと窓の外へ切れる。
                 data-tooltip-pos="bottom"
@@ -925,11 +899,7 @@ export function EntryEditor({
         style={{ left: sidebarWidth }}
       />
 
-      {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。
-          Issue #350 は「基本 UI が透明化するのに発酵要素だけ残る」問題で、main では
-          フローティング表示を fadeClass で包むことで直していた。ここでは表示先が
-          サイドバーに変わっただけなので、同じ設定（focusModeFadesFermentation）を
-          サイドバー側に適用して意図をそのまま引き継ぐ。 */}
+      {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}
       <div className="flex min-h-0 flex-1">
         {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
         <div className="relative flex-1">
@@ -1055,8 +1025,11 @@ export function EntryEditor({
         {/* Issue #466: 発酵結果は本文に重ねず、右のサイドバーに集約する。
             Issue #350: フォーカスモードで基本 UI が消えるとき、発酵結果だけ残ると浮くので
             一緒に薄くする。切りたい人のために設定で外せる。 */}
+        {/* 発酵結果は本文の**隣**に並ぶので、書いている間も消さない（本文には重ならない）。
+            Issue #350 の「フォーカスモードで一緒に薄くする」は、本文の上に浮いていた頃の
+            話だった。並ぶようになった以上、消す理由がない。 */}
         {fermentSidebarOpen && fermentationOverlayDetail && (
-          <div className={settings.focusModeFadesFermentation ? fadeClass : undefined}>
+          <div>
             <FermentationSidebar
               detail={fermentationOverlayDetail}
               onClose={() => setFermentSidebarOpen(false)}
@@ -1128,13 +1101,6 @@ export function EntryEditor({
       <LinkQuestionNudgeModal
         open={linkQuestionNudgeOpen}
         onClose={() => setLinkQuestionNudgeOpen(false)}
-      />
-
-      {/* Issue #329: 発酵結果フローティング表示の確認モーダル */}
-      <FermentationDisplayPromptModal
-        open={overlayPromptOpen}
-        onChoose={handleOverlayPromptChoose}
-        onClose={() => setOverlayPromptOpen(false)}
       />
     </div>
   );

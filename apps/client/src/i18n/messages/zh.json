@@ -367,11 +367,6 @@
       "ghost_blur_start": "初始模糊",
       "ghost_blur_end": "最终模糊",
       "ghost_duration": "持续时间",
-      "section_fermentation_overlay": "发酵侧边栏",
-      "fermentation_overlay_description": "在新条目中关联问题后，可以在右侧边栏显示该问题最新的发酵结果。",
-      "fermentation_overlay_ask": "每次询问",
-      "fermentation_overlay_always": "始终显示",
-      "fermentation_overlay_never": "不显示",
       "section_display": "显示",
       "writing_vertical": "竖排",
       "writing_horizontal": "横排",
@@ -382,9 +377,6 @@
       "font_family": "字体",
       "time_inscription_mode": "表现方式",
       "ghost_mode": "呈现方式",
-      "fermentation_overlay_label": "默认显示",
-      "fermentation_overlay_help_aria": "关于发酵侧边栏",
-      "focus_mode_fades_fermentation": "同时隐藏发酵元素",
       "palette_auto_hide": "书写时隐藏面板"
     },
     "snippet_toolbar": {

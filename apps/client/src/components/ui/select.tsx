@@ -104,7 +104,7 @@ export function Select({
         aria-controls={listId}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={handleKeyDown}
-        className="flex h-7 w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 text-left text-[13px] text-[var(--fg)] transition-colors hover:bg-[var(--toolbar-hover)]"
+        className="flex h-7 w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 text-left text-[13px] text-[var(--fg)] transition-colors hover:bg-[var(--hover-wash)]"
       >
         <span className="truncate">{selected ? selected.label : (placeholder ?? '')}</span>
         <svg

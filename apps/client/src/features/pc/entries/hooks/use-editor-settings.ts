@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react';
 import {
   DEFAULT_SETTINGS,
   type EditorSettings,
-  type FermentationOverlayPreference,
 } from '@/features/pc/entries/components/settings-drawer';
 
 const FONT_SIZE_STORAGE_KEY = 'oryzae-editor-font-size';
@@ -16,9 +15,6 @@ const LINE_HEIGHT_MIN = 1.0;
 const LINE_HEIGHT_MAX = 2.5;
 
 const FOCUS_MODE_STORAGE_KEY = 'oryzae-editor-focus-mode';
-
-/** Issue #350: フォーカスモードで発酵要素も一緒に透明化するか。 */
-const FOCUS_MODE_FADES_FERMENTATION_KEY = 'oryzae-editor-focus-mode-fades-fermentation';
 
 /** 書いている間、操作パレットを隠すか。 */
 const PALETTE_AUTO_HIDE_KEY = 'oryzae-editor-palette-auto-hide';
@@ -43,8 +39,6 @@ function writeStoredPaletteAutoHide(value: boolean): void {
     // ignore quota / private-mode errors
   }
 }
-
-const FERMENTATION_OVERLAY_PREFERENCE_KEY = 'oryzae-editor-fermentation-overlay-preference';
 
 function readStoredFontSize(): number | null {
   if (typeof window === 'undefined') return null;
@@ -113,47 +107,6 @@ function writeStoredFocusMode(value: boolean): void {
   }
 }
 
-function readStoredFocusModeFadesFermentation(): boolean | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(FOCUS_MODE_FADES_FERMENTATION_KEY);
-    if (raw === 'true') return true;
-    if (raw === 'false') return false;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredFocusModeFadesFermentation(value: boolean): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(FOCUS_MODE_FADES_FERMENTATION_KEY, String(value));
-  } catch {
-    // ignore quota / private-mode errors
-  }
-}
-
-function readStoredFermentationOverlayPreference(): FermentationOverlayPreference | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(FERMENTATION_OVERLAY_PREFERENCE_KEY);
-    if (raw === 'ask' || raw === 'always' || raw === 'never') return raw;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredFermentationOverlayPreference(value: FermentationOverlayPreference): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(FERMENTATION_OVERLAY_PREFERENCE_KEY, value);
-  } catch {
-    // ignore quota / private-mode errors
-  }
-}
-
 function getInitialSettings(locale: string | undefined): EditorSettings {
   const next: EditorSettings = { ...DEFAULT_SETTINGS };
   // 英語ロケールでサインアップ／利用しているユーザーは横書きをデフォルトにする (issue #269)
@@ -166,13 +119,8 @@ function getInitialSettings(locale: string | undefined): EditorSettings {
   if (lineHeight !== null) next.lineHeight = lineHeight;
   const focusMode = readStoredFocusMode();
   if (focusMode !== null) next.focusModeEnabled = focusMode;
-  const focusFades = readStoredFocusModeFadesFermentation();
-  if (focusFades !== null) next.focusModeFadesFermentation = focusFades;
-
   const paletteAutoHide = readStoredPaletteAutoHide();
   if (paletteAutoHide !== null) next.paletteAutoHide = paletteAutoHide;
-  const overlayPref = readStoredFermentationOverlayPreference();
-  if (overlayPref !== null) next.fermentationOverlayPreference = overlayPref;
   return next;
 }
 
@@ -191,18 +139,8 @@ export function useEditorSettings(
     if (typeof patch.focusModeEnabled === 'boolean') {
       writeStoredFocusMode(patch.focusModeEnabled);
     }
-    if (typeof patch.focusModeFadesFermentation === 'boolean') {
-      writeStoredFocusModeFadesFermentation(patch.focusModeFadesFermentation);
-    }
     if (typeof patch.paletteAutoHide === 'boolean') {
       writeStoredPaletteAutoHide(patch.paletteAutoHide);
-    }
-    if (
-      patch.fermentationOverlayPreference === 'ask' ||
-      patch.fermentationOverlayPreference === 'always' ||
-      patch.fermentationOverlayPreference === 'never'
-    ) {
-      writeStoredFermentationOverlayPreference(patch.fermentationOverlayPreference);
     }
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);

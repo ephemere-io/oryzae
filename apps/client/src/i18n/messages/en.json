@@ -367,11 +367,6 @@
       "ghost_blur_start": "Initial blur",
       "ghost_blur_end": "Final blur",
       "ghost_duration": "Duration",
-      "section_fermentation_overlay": "Fermentation sidebar",
-      "fermentation_overlay_description": "When you link a question to a new entry, its latest fermentation results can appear in the sidebar on the right.",
-      "fermentation_overlay_ask": "Ask each time",
-      "fermentation_overlay_always": "Always show",
-      "fermentation_overlay_never": "Never show",
       "section_display": "Display",
       "writing_vertical": "Vertical",
       "writing_horizontal": "Horizontal",
@@ -382,9 +377,6 @@
       "font_family": "Typeface",
       "time_inscription_mode": "Shown as",
       "ghost_mode": "Shown as",
-      "fermentation_overlay_label": "Default display",
-      "fermentation_overlay_help_aria": "About the fermentation sidebar",
-      "focus_mode_fades_fermentation": "Also hide fermentation elements",
       "palette_auto_hide": "Hide the palette while writing"
     },
     "snippet_toolbar": {
