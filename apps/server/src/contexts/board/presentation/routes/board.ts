@@ -26,6 +26,7 @@ import { SupabaseBoardCardRepository } from '../../infrastructure/repositories/s
 import { SupabaseBoardPhotoRepository } from '../../infrastructure/repositories/supabase-board-photo.repository.js';
 import { SupabaseBoardSnippetRepository } from '../../infrastructure/repositories/supabase-board-snippet.repository.js';
 import { SupabaseBoardStorageGateway } from '../../infrastructure/storage/supabase-board-storage.gateway.js';
+import { parseDimension } from '../params.js';
 
 type Env = {
   Variables: {
@@ -201,10 +202,8 @@ export const board = new Hono<Env>()
     const caption = typeof body.caption === 'string' ? body.caption : '';
     const dateKey = typeof body.dateKey === 'string' ? body.dateKey : '';
     const viewType = body.viewType === 'weekly' ? 'weekly' : 'daily';
-    const imageWidth =
-      typeof body.imageWidth === 'string' ? Number.parseInt(body.imageWidth, 10) : undefined;
-    const imageHeight =
-      typeof body.imageHeight === 'string' ? Number.parseInt(body.imageHeight, 10) : undefined;
+    const imageWidth = parseDimension(body.imageWidth);
+    const imageHeight = parseDimension(body.imageHeight);
     if (!dateKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return c.json({ error: 'Invalid dateKey' }, 400);
     }
@@ -234,8 +233,8 @@ export const board = new Hono<Env>()
       caption,
       dateKey,
       viewType,
-      imageWidth: Number.isFinite(imageWidth) ? imageWidth : undefined,
-      imageHeight: Number.isFinite(imageHeight) ? imageHeight : undefined,
+      imageWidth,
+      imageHeight,
     });
     return c.json(result, 201);
   })
