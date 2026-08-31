@@ -28,6 +28,7 @@ interface Props {
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
   onDeleteSelected: () => void;
+  onEditSelectedOnCard?: () => void;
 }
 
 const noop = () => {};
@@ -42,6 +43,7 @@ const base: Props = {
   onOpenSelected: noop,
   onBringSelectedToFront: noop,
   onDeleteSelected: noop,
+  onEditSelectedOnCard: noop,
 };
 
 function pressedTools(root: ParentNode): string[] {
@@ -138,14 +140,30 @@ registerUnit<Props>({
     },
     {
       id: 'card-actions-replace-tools-when-selected',
-      description: 'カードを選んでいるときは操作3つが出て、作成系は消える（入れ替わっている）',
+      description: 'カードを選んでいるときは操作が出て、作成系は消える（入れ替わっている）',
       check: ({ root, props }) => {
         if (!props.selection) return true;
         const ids = toolIds(root);
         const actions = actionIds(root);
+        // entry だけ「カードで編集」が増える（他はカードの上で直せない）
+        const expected =
+          props.selection.cardType === 'entry' ? 'delete,edit,front,open' : 'delete,front,open';
         return (
-          (actions.join(',') === 'delete,front,open' && ids.length === 0) ||
+          (actions.join(',') === expected && ids.length === 0) ||
           `選択モードの構造が崩れている: actions=[${actions.join(', ')}] tools=[${ids.join(', ')}]`
+        );
+      },
+    },
+    {
+      id: 'edit-on-card-only-for-entry',
+      description: '「カードで編集」は entry のときだけ出す（開く＝画面遷移とは別の操作）',
+      check: ({ root, props }) => {
+        if (!props.selection) return true;
+        const hasEdit = root.querySelector('button[data-verify-card-action="edit"]') !== null;
+        const isEntry = props.selection.cardType === 'entry';
+        return (
+          hasEdit === isEntry ||
+          `編集アクションの出し分けが違う: cardType=${props.selection.cardType} hasEdit=${hasEdit}`
         );
       },
     },

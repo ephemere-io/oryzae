@@ -23,6 +23,8 @@ interface BoardToolbarProps {
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
   onDeleteSelected: () => void;
+  /** entry カードだけ: カードの上で本文を編集する。 */
+  onEditSelectedOnCard?: () => void;
 }
 
 interface ToolSpec {
@@ -75,6 +77,15 @@ function EntryIcon() {
   );
 }
 
+function EditIcon() {
+  return (
+    <svg {...ICON_PROPS} aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
 function OpenIcon() {
   return (
     <svg {...ICON_PROPS} aria-hidden="true">
@@ -121,6 +132,7 @@ export function BoardToolbar({
   onOpenSelected,
   onBringSelectedToFront,
   onDeleteSelected,
+  onEditSelectedOnCard,
 }: BoardToolbarProps) {
   const t = useTranslations('board.toolbar');
 
@@ -163,6 +175,18 @@ export function BoardToolbar({
           icon: <OpenIcon />,
           danger: false,
         },
+        ...(selection.cardType === 'entry' && onEditSelectedOnCard
+          ? [
+              {
+                // 日記へ飛ばずにカードの上で直す。開く（＝画面遷移）と混ぜない。
+                id: 'edit' as const,
+                label: t('edit_on_card'),
+                onSelect: onEditSelectedOnCard,
+                icon: <EditIcon />,
+                danger: false,
+              },
+            ]
+          : []),
         {
           id: 'front' as const,
           label: t('bring_to_front'),

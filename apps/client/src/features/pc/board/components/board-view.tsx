@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { PageLoading } from '@/components/ui/page-loading';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
+import { useCardEntryEdit } from '@/features/shared/board/hooks/use-card-entry-edit';
 import { usePlaceableEntries } from '@/features/shared/board/hooks/use-placeable-entries';
 import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
@@ -48,6 +49,8 @@ export function BoardView({ api }: BoardViewProps) {
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [entryPickerOpen, setEntryPickerOpen] = useState(false);
+  /** カードの上で本文を編集中の entry カード id。 */
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
   /** 貼り付け・ドロップで入ってきた画像。写真ダイアログへ選択済みとして渡す。 */
   const [incomingImage, setIncomingImage] = useState<File | null>(null);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
@@ -99,19 +102,29 @@ export function BoardView({ api }: BoardViewProps) {
     didDrag,
   } = useBoardInteraction(cards, handleCardsChange, handleInteractionEnd);
 
-  /** カードを開く（種別ごとの行き先）。ドラッグ判定は呼び出し側の責任。 */
-  const openCard = useCallback(
+  /** 日記の画面へ移る。パレットの「日記を開く」だけがここへ来る。 */
+  const openEntryPage = useCallback(
     (card: BoardCardData) => {
-      if (card.cardType === 'entry') {
-        router.push(`/entries/${card.refId}`);
-      } else if (card.cardType === 'snippet' && 'text' in card.content) {
-        setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
-      } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
-        setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
-      }
+      router.push(`/entries/${card.refId}`);
     },
     [router],
   );
+
+  /**
+   * カードをダブルクリックしたときの行き先。
+   *
+   * entry は**画面遷移しない**。読み書きの続きはカードの上でできるほうが、盤面を
+   * 見ながら手を入れられる。日記そのものを開きたいときはパレットから明示的に選ぶ。
+   */
+  const openCard = useCallback((card: BoardCardData) => {
+    if (card.cardType === 'entry') {
+      setEditingCardId(card.id);
+    } else if (card.cardType === 'snippet' && 'text' in card.content) {
+      setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
+    } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
+      setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
+    }
+  }, []);
 
   const handleCardClick = useCallback(
     (card: BoardCardData) => {
@@ -126,9 +139,36 @@ export function BoardView({ api }: BoardViewProps) {
   /** 選択中のカード。ツールバーが「そのカードにできること」を出すために使う。 */
   const selectedCard = selectedId ? (cards.find((c) => c.id === selectedId) ?? null) : null;
 
+  const editingCard = editingCardId ? (cards.find((c) => c.id === editingCardId) ?? null) : null;
+  const cardEdit = useCardEntryEdit(api, editingCard?.refId ?? null);
+
+  /** 編集を終える。変わっていれば保存し、盤面の抜粋も取り直す。 */
+  const stopEditing = useCallback(async () => {
+    if (!editingCardId) return;
+    const saved = await cardEdit.save();
+    setEditingCardId(null);
+    if (saved) await refresh();
+  }, [editingCardId, cardEdit, refresh]);
+
+  // 編集中は Escape で抜ける（保存してから閉じる）。
+  useEscapeKey(editingCardId !== null, () => {
+    void stopEditing();
+  });
+
   const handleOpenSelected = useCallback(() => {
-    if (selectedCard) openCard(selectedCard);
-  }, [selectedCard, openCard]);
+    if (!selectedCard) return;
+    // entry のときだけ画面遷移。ここが**唯一**の遷移経路で、カードの
+    // ダブルクリックは編集に入る。写真とスニペットは従来どおり拡大/編集。
+    if (selectedCard.cardType === 'entry') {
+      openEntryPage(selectedCard);
+    } else {
+      openCard(selectedCard);
+    }
+  }, [selectedCard, openEntryPage, openCard]);
+
+  const handleEditOnCard = useCallback(() => {
+    if (selectedCard?.cardType === 'entry') setEditingCardId(selectedCard.id);
+  }, [selectedCard]);
 
   /** 選択中のカードを最前面へ。重なって読めなくなったときの逃げ道。 */
   const handleBringToFront = useCallback(() => {
@@ -237,6 +277,7 @@ export function BoardView({ api }: BoardViewProps) {
         photoOpen: photoDialogOpen,
         entryPickerOpen,
         selectedType: selectedCard?.cardType ?? 'none',
+        editingCard: editingCardId !== null,
       })}
       role="application"
       aria-label={t('canvas.aria_label')}
@@ -247,7 +288,11 @@ export function BoardView({ api }: BoardViewProps) {
       onDragOver={intake.onDragOver}
       onDragLeave={intake.onDragLeave}
       onDrop={intake.onDrop}
-      onClick={deselect}
+      onClick={() => {
+        // 盤面の余白を押したら編集も終える（保存してから閉じる）。
+        if (editingCardId !== null) void stopEditing();
+        deselect();
+      }}
       onKeyDown={() => {}}
     >
       {/* Grid background */}
@@ -332,6 +377,10 @@ export function BoardView({ api }: BoardViewProps) {
             onResizeStart={startResize}
             onDelete={handleDeleteCard}
             onClick={handleCardClick}
+            isEditing={editingCardId === card.id}
+            editValue={cardEdit.content}
+            onEditChange={cardEdit.setContent}
+            editLoading={cardEdit.loading}
           />
         ))}
       </div>
@@ -354,6 +403,7 @@ export function BoardView({ api }: BoardViewProps) {
         onOpenSelected={handleOpenSelected}
         onBringSelectedToFront={handleBringToFront}
         onDeleteSelected={() => selectedCard && handleDeleteCard(selectedCard.id)}
+        onEditSelectedOnCard={handleEditOnCard}
       />
 
       {/* エントリーを置く（サーバ側の自動生成をやめた代わりの入口） */}

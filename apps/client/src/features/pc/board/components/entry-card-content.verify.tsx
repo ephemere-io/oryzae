@@ -18,6 +18,10 @@ interface Content {
 
 interface Props {
   content: Content;
+  editing?: boolean;
+  editValue?: string;
+  onEditChange?: (next: string) => void;
+  editLoading?: boolean;
 }
 
 registerUnit<Props>({
@@ -50,6 +54,36 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'editing',
+      probe: true,
+      description: 'Probe: カード上の編集中は、抜粋ではなく全文が編集欄に出る',
+      props: {
+        content: {
+          title: '朝のジャーナル',
+          preview: '今日は早起きして散歩に出かけた。',
+          createdAt: '2026-06-27',
+        },
+        editing: true,
+        // 抜粋（preview）より長い＝カードが持っている文字列ではないことを示す
+        editValue: `今日は早起きして散歩に出かけた。${'続きの本文。'.repeat(30)}`,
+      },
+    },
+    {
+      id: 'editing-loading',
+      probe: true,
+      description: 'Probe: 全文が届くまでは編集欄を触らせない',
+      props: {
+        content: {
+          title: '朝のジャーナル',
+          preview: '今日は早起きして散歩に出かけた。',
+          createdAt: '2026-06-27',
+        },
+        editing: true,
+        editValue: '',
+        editLoading: true,
+      },
+    },
+    {
       id: 'empty-content',
       probe: true,
       description: 'Probe: タイトル・本文が空でも日付は描画されレイアウトが崩れない',
@@ -61,8 +95,10 @@ registerUnit<Props>({
   invariants: [
     {
       id: 'h3-iff-has-title',
-      description: 'h3（タイトル見出し）の有無が hasTitle 契約と一致する',
+      description: '表示中は、h3（タイトル見出し）の有無が hasTitle 契約と一致する',
       check: ({ root, contract }) => {
+        // 編集中は見出しを出さない（カードの全面を編集欄に使う）ので対象外。
+        if (contract.editing === 'true') return true;
         const hasHeading = root.querySelector('h3') !== null;
         const expectTitle = contract.hasTitle === 'true';
         return (
@@ -77,6 +113,45 @@ registerUnit<Props>({
       check: ({ root, contract }) =>
         Boolean(contract.formattedDate && root.textContent?.includes(contract.formattedDate)) ||
         `整形済み日付 "${contract.formattedDate}" が描画されていない`,
+    },
+    {
+      id: 'editor-iff-editing',
+      description: '編集欄は editing のときだけ出て、そのときは抜粋を出さない',
+      check: ({ root, contract }) => {
+        const editor = root.querySelector('textarea[data-verify-entry-editor]');
+        const editing = contract.editing === 'true';
+        if (editing && !editor) return '編集中なのに編集欄が無い';
+        if (!editing && editor) return '編集していないのに編集欄がある';
+        return true;
+      },
+    },
+    {
+      id: 'editor-shows-full-text-not-preview',
+      description: '編集欄に入るのは渡された全文（カードの抜粋ではない）',
+      // 抜粋を編集させて保存すると、日記が先頭 200 文字へ切り詰められる。
+      // 「編集欄の中身 = editValue」を契約として固定しておく。
+      check: ({ root, props }) => {
+        if (!props.editing || props.editLoading) return true;
+        const editor = root.querySelector<HTMLTextAreaElement>(
+          'textarea[data-verify-entry-editor]',
+        );
+        if (!editor) return '編集欄が無い';
+        return (
+          editor.value === (props.editValue ?? '') ||
+          `編集欄の中身が editValue と違う（抜粋が入っている可能性）: "${editor.value.slice(0, 40)}"`
+        );
+      },
+    },
+    {
+      id: 'editor-disabled-until-loaded',
+      description: '全文が届くまで編集欄は触れない（抜粋のまま保存させない）',
+      check: ({ root, contract }) => {
+        if (contract.editLoading !== 'true') return true;
+        const editor = root.querySelector<HTMLTextAreaElement>(
+          'textarea[data-verify-entry-editor]',
+        );
+        return editor?.disabled === true || '読み込み中なのに編集欄が触れる';
+      },
     },
     {
       id: 'self-identifies',

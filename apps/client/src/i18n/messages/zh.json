@@ -318,7 +318,9 @@
       "open_photo": "放大",
       "bring_to_front": "移到最前",
       "remove_from_board": "从板上移除",
-      "delete": "删除"
+      "delete": "删除",
+      "edit_on_card": "在卡片上编辑",
+      "edit_failed": "无法保存"
     },
     "drop_image": "把图片拖到这里",
     "entry_picker": {
@@ -333,6 +335,10 @@
       "already_placed": "已放置",
       "close": "关闭",
       "place_failed": "无法放到板上，请重试。"
+    },
+    "entry_card": {
+      "edit_aria": "日记正文",
+      "loading": "加载中…"
     }
   },
   "editor": {

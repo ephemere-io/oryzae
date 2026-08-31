@@ -318,7 +318,9 @@
       "open_photo": "拡大",
       "bring_to_front": "前面へ",
       "remove_from_board": "ボードから外す",
-      "delete": "削除"
+      "delete": "削除",
+      "edit_on_card": "カードで編集",
+      "edit_failed": "保存できませんでした"
     },
     "drop_image": "ここに画像をドロップ",
     "entry_picker": {
@@ -333,6 +335,10 @@
       "already_placed": "置いてある",
       "close": "閉じる",
       "place_failed": "ボードに置けませんでした。もう一度お試しください。"
+    },
+    "entry_card": {
+      "edit_aria": "日記の本文",
+      "loading": "読み込み中…"
     }
   },
   "editor": {

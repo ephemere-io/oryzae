@@ -149,6 +149,52 @@ test.describe('ボード画面', () => {
     await expect(page.getByText(snippet)).toBeVisible({ timeout: 10000 });
   });
 
+  test('エントリーカードはダブルクリックで遷移せず、カード上で直せる', async ({ page }) => {
+    // 以前はカード全面に透明ボタンを敷いており、ダブルクリックで日記へ飛び、
+    // ついでにカードの文字を一切選べなかった（コピーもできない）。
+    // 遷移はパレットの「日記を開く」だけ、編集はカードの上で、に変えた。
+    const unique = `カード編集E2E-${Date.now()}`;
+    await page.goto('/entries/new');
+    const editor = page.locator('[contenteditable="true"]').first();
+    await editor.click();
+    await editor.pressSequentially(unique);
+    await waitForAutosave(page);
+
+    await page.goto('/board');
+    await page.waitForSelector('[role="application"]');
+    await page.waitForTimeout(1500);
+    await page.click('button[data-verify-tool="entry"]');
+    await page.locator('button[data-verify-entry-option]:not([disabled])').first().click();
+    await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
+
+    const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
+
+    // ダブルクリックしても /entries へ飛ばない。代わりに編集欄が出る。
+    await card.dblclick({ position: { x: 60, y: 60 } });
+    await expect(page).toHaveURL(/\/board$/);
+    const box = card.locator('textarea[data-verify-entry-editor]');
+    await expect(box).toBeVisible({ timeout: 10000 });
+    // 抜粋ではなく全文が入っている
+    await expect(box).toHaveValue(new RegExp(unique));
+
+    // カードの上で直せて、保存される
+    await box.click();
+    await box.pressSequentially('・追記');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(2500);
+    await page.reload();
+    await page.waitForSelector('[role="application"]');
+    await expect(page.getByText(/・追記/).first()).toBeVisible({ timeout: 10000 });
+
+    // 遷移はパレットの「日記を開く」から
+    await card.click({ position: { x: 60, y: 10 }, force: true });
+    await page.click('button[data-verify-card-action="open"]');
+    await expect(page).toHaveURL(/\/entries\/[0-9a-f-]+$/, { timeout: 10000 });
+
+    await page.goto('/entries');
+    await deleteEntriesByMarker(page, unique);
+  });
+
   test('日記は自動では出ず、選んで置いてから外せる', async ({ page }) => {
     // 以前は期間内の日記が勝手にカード化されていた。置いた覚えのないものが現れる
     // 一方で外し方も見えなかったので、「選んで置く／選んで外す」に変えた。

@@ -318,7 +318,9 @@
       "open_photo": "Enlarge",
       "bring_to_front": "Bring to front",
       "remove_from_board": "Remove from board",
-      "delete": "Delete"
+      "delete": "Delete",
+      "edit_on_card": "Edit on card",
+      "edit_failed": "Couldn't save"
     },
     "drop_image": "Drop the image here",
     "entry_picker": {
@@ -333,6 +335,10 @@
       "already_placed": "On board",
       "close": "Close",
       "place_failed": "Couldn't place it on the board. Please try again."
+    },
+    "entry_card": {
+      "edit_aria": "Entry body",
+      "loading": "Loading…"
     }
   },
   "editor": {

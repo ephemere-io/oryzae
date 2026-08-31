@@ -22,6 +22,12 @@ interface BoardCardProps {
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
   onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
+  /** カード上で本文を編集中か。編集中はドラッグせず、文字を選べるようにする。 */
+  isEditing?: boolean;
+  /** 編集中に表示・更新する本文（全文）。 */
+  editValue?: string;
+  onEditChange?: (next: string) => void;
+  editLoading?: boolean;
 }
 
 function isEntryContent(
@@ -49,15 +55,22 @@ export function BoardCard({
   onResizeStart,
   onDelete,
   onClick,
+  isEditing = false,
+  editValue = '',
+  onEditChange,
+  editLoading = false,
 }: BoardCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.stopPropagation();
+      // 編集中はドラッグを始めない。始めてしまうと、本文を選ぼうとしただけで
+      // カードが動き、文字も選べない（pointerdown を握ったままになるため）。
+      if (isEditing) return;
       onPointerDown(card.id, e.clientX, e.clientY);
     },
-    [card.id, onPointerDown],
+    [card.id, onPointerDown, isEditing],
   );
 
   const handleRotateDown = useCallback(
@@ -93,6 +106,7 @@ export function BoardCard({
         unit: 'BoardCard',
         cardType: card.cardType,
         selected: isSelected,
+        editing: isEditing,
         dragging: isDragging,
         rotation: card.rotation,
         removing: Boolean(card.removing),
@@ -105,7 +119,7 @@ export function BoardCard({
         height: card.height,
         transform: `rotate(${card.rotation}deg)`,
         zIndex: isDragging ? 1000 : card.zIndex,
-        cursor: isDragging ? 'grabbing' : 'grab',
+        cursor: isEditing ? 'default' : isDragging ? 'grabbing' : 'grab',
         borderRadius: 2,
         backgroundColor:
           card.cardType === 'snippet'
@@ -120,7 +134,9 @@ export function BoardCard({
         outline: isSelected ? '1.5px solid rgba(74,158,142,0.5)' : 'none',
         outlineOffset: isSelected ? 4 : 0,
         overflow: isSelected ? 'visible' : 'hidden',
-        userSelect: 'none',
+        // 編集中だけ文字を選べるようにする。常に選べると、掴んで動かそうとした
+        // だけで選択が始まってカードが動かせない。
+        userSelect: isEditing ? 'text' : 'none',
         touchAction: 'none',
         animation: card.removing
           ? 'itemRemove 0.28s ease forwards'
@@ -130,26 +146,23 @@ export function BoardCard({
       }}
       onPointerDown={handlePointerDown}
       onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        if (isEditing) return;
+        onClick(card);
+      }}
     >
-      {/* Invisible double-click target */}
-      <button
-        type="button"
-        aria-label={
-          card.cardType === 'entry'
-            ? 'Open entry'
-            : card.cardType === 'photo'
-              ? 'View photo'
-              : 'Edit snippet'
-        }
-        className="absolute inset-0 z-[1] cursor-grab bg-transparent"
-        style={{ border: 'none', outline: 'none' }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          onClick(card);
-        }}
-      />
+      {/* 全面を覆う透明ボタンは置かない。以前はダブルクリックの的として敷いていたが、
+          それがカードの文字を一切選べなくしていた（コピーもできなかった）。
+          ダブルクリックはカード本体で受ける。 */}
       {card.cardType === 'entry' && isEntryContent(card.content) && (
-        <EntryCardContent content={card.content} />
+        <EntryCardContent
+          content={card.content}
+          editing={isEditing}
+          editValue={editValue}
+          onEditChange={onEditChange}
+          editLoading={editLoading}
+        />
       )}
       {card.cardType === 'snippet' && isSnippetContent(card.content) && (
         <SnippetCardContent content={card.content} />

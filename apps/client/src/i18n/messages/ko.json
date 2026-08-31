@@ -318,7 +318,9 @@
       "open_photo": "확대",
       "bring_to_front": "맨 앞으로",
       "remove_from_board": "보드에서 빼기",
-      "delete": "삭제"
+      "delete": "삭제",
+      "edit_on_card": "카드에서 편집",
+      "edit_failed": "저장하지 못했습니다"
     },
     "drop_image": "여기에 이미지를 놓으세요",
     "entry_picker": {
@@ -333,6 +335,10 @@
       "already_placed": "놓여 있음",
       "close": "닫기",
       "place_failed": "보드에 놓지 못했습니다. 다시 시도해 주세요."
+    },
+    "entry_card": {
+      "edit_aria": "일기 본문",
+      "loading": "불러오는 중…"
     }
   },
   "editor": {
