@@ -1,5 +1,6 @@
 'use client';
 
+import { verifyAttrs } from '@oryzae/verify';
 import { useEffect, useId, useRef, useState } from 'react';
 import { MenuOption, MenuPanel } from '@/components/ui/menu';
 
@@ -94,16 +95,29 @@ export function Select({
     }
   }
 
+  const activeOptionId = `${listId}-${activeIndex}`;
+
   return (
-    <div ref={rootRef} className={`relative ${className}`}>
+    // キーは**器で**捌く。行は本物の <button> なので、トリガーだけに onKeyDown を
+    // 付けていると、フォーカスが行に移った瞬間に ↑↓ / Enter / Escape が死ぬ。
+    // 行は tabIndex=-1 にして Tab で入らせず、いまいる行は aria-activedescendant で伝える。
+    <div
+      ref={rootRef}
+      className={`relative ${className}`}
+      onKeyDown={handleKeyDown}
+      {...verifyAttrs({ unit: 'Select', open, optionCount: options.length, value })}
+    >
       <button
         type="button"
+        // combobox として名乗る。ボタンのままだと aria-activedescendant を
+        // 持てず、「開いている面のどの行にいるか」を読み上げに伝えられない。
+        role="combobox"
         aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={listId}
+        aria-activedescendant={open ? activeOptionId : undefined}
         onClick={() => setOpen((v) => !v)}
-        onKeyDown={handleKeyDown}
         className="flex h-7 w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 text-left text-[13px] text-[var(--fg)] transition-colors hover:bg-[var(--hover-wash)]"
       >
         <span className="truncate">{selected ? selected.label : (placeholder ?? '')}</span>
@@ -127,9 +141,11 @@ export function Select({
             {options.map((option, i) => (
               <MenuOption
                 key={option.value}
+                id={`${listId}-${i}`}
                 role="option"
                 selected={option.value === value}
                 active={i === activeIndex}
+                tabIndex={-1}
                 onClick={() => commit(i)}
                 onMouseEnter={() => setActiveIndex(i)}
               >

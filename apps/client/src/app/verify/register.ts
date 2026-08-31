@@ -15,6 +15,7 @@ import { registerBuiltinVerifiers } from '@oryzae/verify';
 import '@/features/auth/components/reset-password-form.verify';
 import '@/components/ui/menu.verify';
 import '@/components/ui/segmented.verify';
+import '@/components/ui/select.verify';
 import '@/features/pc/entries/components/delete-confirm-modal.verify';
 import '@/features/pc/entries/components/editor-status-bar.verify';
 import '@/features/pc/entries/components/entry-action-palette.verify';

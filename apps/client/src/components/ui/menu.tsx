@@ -78,17 +78,26 @@ export function MenuPanel({
  * ここが可変だと、選ぶたびに文字列が横に跳ねる。
  */
 export function MenuOption({
+  id,
   role,
   selected,
   active,
+  tabIndex,
   onClick,
   onMouseEnter,
   children,
 }: {
+  /** aria-activedescendant で指し示すための id（キーボードを面の外で捌くとき）。 */
+  id?: string;
   role: 'option' | 'menuitemcheckbox';
   selected: boolean;
   /** キーボードで今いる行（ホバーと同じ見え方にする）。 */
   active?: boolean;
+  /**
+   * -1 を渡すと Tab で行に入らなくなる。**面の外（器）でキーを捌く場合はこれを使う**
+   * — 行にフォーカスが移ると、器の onKeyDown までイベントが上がってこないため。
+   */
+  tabIndex?: number;
   onClick: () => void;
   onMouseEnter?: () => void;
   children: ReactNode;
@@ -97,9 +106,11 @@ export function MenuOption({
     role === 'option' ? { 'aria-selected': selected } : { 'aria-checked': selected };
   return (
     <button
+      id={id}
       type="button"
       role={role}
       {...ariaProps}
+      tabIndex={tabIndex}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       className={`flex ${MENU_ROW_HEIGHT_CLASS} w-full items-center gap-2 px-3 text-left text-[13px] transition-colors ${
