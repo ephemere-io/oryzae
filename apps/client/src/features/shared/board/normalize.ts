@@ -38,7 +38,7 @@ function cardContent(
   raw: Record<string, unknown>,
 ): BoardCardData['content'] {
   if (type === 'entry') {
-    return { title: str(raw.title), preview: str(raw.preview), createdAt: str(raw.createdAt) };
+    return { title: str(raw.title), body: str(raw.body), createdAt: str(raw.createdAt) };
   }
   if (type === 'snippet') return { text: str(raw.text) };
   return { imageUrl: str(raw.imageUrl), caption: str(raw.caption) };

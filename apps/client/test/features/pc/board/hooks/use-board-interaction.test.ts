@@ -16,7 +16,7 @@ function card(id: string, zIndex: number): BoardCardData {
     zIndex,
     userPositioned: false,
     createdAt: '2026-04-11T10:00:00Z',
-    content: { title: 'タイトル', preview: '本文', createdAt: '2026-04-11T10:00:00Z' },
+    content: { title: 'タイトル', body: '本文', createdAt: '2026-04-11T10:00:00Z' },
   };
 }
 

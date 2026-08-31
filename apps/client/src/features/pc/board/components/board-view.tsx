@@ -8,8 +8,8 @@ import { ErrorState } from '@/components/ui/error-state';
 import { PageLoading } from '@/components/ui/page-loading';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
-import { useCardEntryEdit } from '@/features/shared/board/hooks/use-card-entry-edit';
 import { usePlaceableEntries } from '@/features/shared/board/hooks/use-placeable-entries';
+import { useSaveEntryContent } from '@/features/shared/board/hooks/use-save-entry-content';
 import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { useEscapeKey } from '@/lib/use-escape-key';
@@ -49,8 +49,9 @@ export function BoardView({ api }: BoardViewProps) {
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [entryPickerOpen, setEntryPickerOpen] = useState(false);
-  /** カードの上で本文を編集中の entry カード id。 */
+  /** カードの上で編集中の entry カード id と、その下書き。 */
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ title: '', body: '' });
   /** 貼り付け・ドロップで入ってきた画像。写真ダイアログへ選択済みとして渡す。 */
   const [incomingImage, setIncomingImage] = useState<File | null>(null);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
@@ -140,15 +141,28 @@ export function BoardView({ api }: BoardViewProps) {
   const selectedCard = selectedId ? (cards.find((c) => c.id === selectedId) ?? null) : null;
 
   const editingCard = editingCardId ? (cards.find((c) => c.id === editingCardId) ?? null) : null;
-  const cardEdit = useCardEntryEdit(api, editingCard?.refId ?? null);
+  const { save: saveEntryContent } = useSaveEntryContent(api);
 
-  /** 編集を終える。変わっていれば保存し、盤面の抜粋も取り直す。 */
+  /**
+   * 編集を始める。カードが既に本文の全部を持っているので、取り直しはしない
+   * （＝「読み込み中」が挟まらない）。
+   */
+  const startEditing = useCallback((card: BoardCardData) => {
+    if (card.cardType !== 'entry' || !('body' in card.content)) return;
+    setDraft({ title: card.content.title, body: card.content.body });
+    setEditingCardId(card.id);
+  }, []);
+
+  /** 編集を終える。変わっていれば保存し、盤面を取り直す。 */
   const stopEditing = useCallback(async () => {
-    if (!editingCardId) return;
-    const saved = await cardEdit.save();
+    const card = editingCard;
     setEditingCardId(null);
-    if (saved) await refresh();
-  }, [editingCardId, cardEdit, refresh]);
+    if (!card || !('body' in card.content)) return;
+    if (draft.title === card.content.title && draft.body === card.content.body) return;
+    // 見出しは本文の1行目。編集した2つを繋ぎ直したものが日記の中身になる。
+    const next = draft.body ? `${draft.title}\n${draft.body}` : draft.title;
+    if (await saveEntryContent(card.refId, next)) await refresh({ silent: true });
+  }, [editingCard, draft, saveEntryContent, refresh]);
 
   // 編集中は Escape で抜ける（保存してから閉じる）。
   useEscapeKey(editingCardId !== null, () => {
@@ -167,8 +181,8 @@ export function BoardView({ api }: BoardViewProps) {
   }, [selectedCard, openEntryPage, openCard]);
 
   const handleEditOnCard = useCallback(() => {
-    if (selectedCard?.cardType === 'entry') setEditingCardId(selectedCard.id);
-  }, [selectedCard]);
+    if (selectedCard) startEditing(selectedCard);
+  }, [selectedCard, startEditing]);
 
   /** 選択中のカードを最前面へ。重なって読めなくなったときの逃げ道。 */
   const handleBringToFront = useCallback(() => {
@@ -378,9 +392,10 @@ export function BoardView({ api }: BoardViewProps) {
             onDelete={handleDeleteCard}
             onClick={handleCardClick}
             isEditing={editingCardId === card.id}
-            editValue={cardEdit.content}
-            onEditChange={cardEdit.setContent}
-            editLoading={cardEdit.loading}
+            editTitle={draft.title}
+            editBody={draft.body}
+            onEditTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+            onEditBodyChange={(body) => setDraft((d) => ({ ...d, body }))}
           />
         ))}
       </div>

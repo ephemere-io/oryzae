@@ -9,7 +9,7 @@
  *   - mode が selection の有無と一致する
  *   - 作成モードでは3道具が必ず揃い、aria-pressed が activeTool と1対1
  *   - 選択モードでは card アクションが3つ揃い、作成系は出ない（入れ替わりが起きている）
- *   - entry の削除だけ文言が違う（盤面から外すだけで日記本体は残るため）
+ *   - 操作の名前は種別で変えない（例外は「日記を開く」だけ）
  *
  * クリックは props を変えない（制御コンポーネント）ので act fixture は持たず、
  * prop バリエーション方式にする。i18n 依存なので withVerifyProviders で包む。
@@ -102,7 +102,7 @@ registerUnit<Props>({
     {
       id: 'photo-selected',
       probe: true,
-      description: 'Probe: 写真カードを選んだとき（削除の文言が entry と違う）',
+      description: 'Probe: 写真カードを選んだとき（編集は出ず、文言は entry と同じ）',
       props: { ...base, selection: { cardType: 'photo' } },
     },
   ],
@@ -168,20 +168,20 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'delete-wording-differs-for-entry',
-      description: 'entry の削除は「外す」、snippet/photo は「削除」（起きることが違う）',
+      id: 'action-wording-is-shared-across-types',
+      description: '操作の名前は種別で変えない（例外は行き先が盤面の外である「日記を開く」だけ）',
+      // 同じ形の操作に別々の言葉を当てると、「これは違う何かなのでは」と読ませてしまう。
+      // 以前は entry だけ削除が「ボードから外す」で、スニペットは「削除」だった。
       check: ({ root, props }) => {
         if (!props.selection) return true;
-        const del = root.querySelector('button[data-verify-card-action="delete"]');
-        const text = (del?.textContent ?? '').trim();
-        if (!text) return '削除ボタンが見つからない';
-        const isEntry = props.selection.cardType === 'entry';
-        // entry は盤面から外すだけ（日記本体は残る）ので、同じ文言にしてはいけない。
-        const looksLikeRemove = text.includes('外す') || text.toLowerCase().includes('remove');
-        return (
-          isEntry === looksLikeRemove ||
-          `削除の文言が種別と噛み合っていない: cardType=${props.selection.cardType} text="${text}"`
-        );
+        const label = (id: string) =>
+          (root.querySelector(`button[data-verify-card-action="${id}"]`)?.textContent ?? '').trim();
+        const del = label('delete');
+        const front = label('front');
+        if (!del || !front) return '削除／前面へのボタンが見つからない';
+        // 種別に紐づく語（外す・remove）を混ぜない
+        const typeSpecific = /外す|remove/i.test(del);
+        return !typeSpecific || `削除の文言が種別に寄っている: "${del}"`;
       },
     },
     {

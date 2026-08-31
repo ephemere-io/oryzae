@@ -121,13 +121,13 @@ describe('LoadBoardUsecase', () => {
     expect(result.cards[0].id).toBe('card-1');
     expect(result.cards[0].content).toEqual({
       title: 'タイトル',
-      // 見出しに使った1行目は抜粋から外す（カードで同じ行が二度出ないように）
-      preview: '本文テキスト',
+      // 見出しに使った1行目は本文から外す（カードで同じ行が二度出ないように）
+      body: '本文テキスト',
       createdAt: '2026-04-11T10:00:00Z',
     });
   });
 
-  it('見出しに使った行を抜粋から外す（カードで同じ行が二度出ない）', async () => {
+  it('見出しに使った行を本文から外す（カードで同じ行が二度出ない）', async () => {
     const entry = Entry.fromProps({
       id: 'entry-1',
       userId: 'user-1',
@@ -162,11 +162,11 @@ describe('LoadBoardUsecase', () => {
     expect(result.cards[0].content).toMatchObject({
       // 先頭の空行は見出しにしない
       title: '見出しの行',
-      preview: '本文の1行目\n本文の2行目',
+      body: '本文の1行目\n本文の2行目',
     });
   });
 
-  it('本文が1行だけなら抜粋は空になる（見出しがすべて）', async () => {
+  it('本文が1行だけなら body は空になる（見出しがすべて）', async () => {
     const entry = Entry.fromProps({
       id: 'entry-1',
       userId: 'user-1',
@@ -198,7 +198,7 @@ describe('LoadBoardUsecase', () => {
 
     const result = await usecase.execute('user-1', '2026-04-11');
 
-    expect(result.cards[0].content).toMatchObject({ title: '一行だけの日記', preview: '' });
+    expect(result.cards[0].content).toMatchObject({ title: '一行だけの日記', body: '' });
   });
 
   it('その日のエントリがあってもカードを勝手に作らない', async () => {

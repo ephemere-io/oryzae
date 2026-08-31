@@ -314,13 +314,10 @@
       "entry": "エントリーを置く",
       "aria_label_card": "選択中のカードの操作",
       "open_entry": "日記を開く",
-      "open_snippet": "編集",
-      "open_photo": "拡大",
       "bring_to_front": "前面へ",
-      "remove_from_board": "ボードから外す",
       "delete": "削除",
-      "edit_on_card": "カードで編集",
-      "edit_failed": "保存できませんでした"
+      "open": "開く",
+      "edit": "編集"
     },
     "drop_image": "ここに画像をドロップ",
     "entry_picker": {
@@ -338,7 +335,7 @@
     },
     "entry_card": {
       "edit_aria": "日記の本文",
-      "loading": "読み込み中…"
+      "title_aria": "日記の見出し"
     }
   },
   "editor": {

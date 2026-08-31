@@ -314,13 +314,10 @@
       "entry": "Place an entry",
       "aria_label_card": "Actions for the selected card",
       "open_entry": "Open entry",
-      "open_snippet": "Edit",
-      "open_photo": "Enlarge",
       "bring_to_front": "Bring to front",
-      "remove_from_board": "Remove from board",
       "delete": "Delete",
-      "edit_on_card": "Edit on card",
-      "edit_failed": "Couldn't save"
+      "open": "Open",
+      "edit": "Edit"
     },
     "drop_image": "Drop the image here",
     "entry_picker": {
@@ -338,7 +335,7 @@
     },
     "entry_card": {
       "edit_aria": "Entry body",
-      "loading": "Loading…"
+      "title_aria": "Entry title"
     }
   },
   "editor": {

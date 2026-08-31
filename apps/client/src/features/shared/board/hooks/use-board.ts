@@ -59,37 +59,48 @@ export function useBoard(
   const postSnippet = useCreateSnippet(api);
   const requestIdRef = useRef(0);
 
-  const fetchBoard = useCallback(async () => {
-    if (!api) return;
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setError(false);
-    // ローカル暦日で「その日」を判定させるためオフセットを送る。これが無いとサーバーは
-    // dateKey を UTC の 00:00〜24:00 とみなし、JST 00:00〜09:00 に書いたエントリが
-    // 当日のボードに出ない（Issue: ボードの日付境界）。
-    const tzOffset = new Date().getTimezoneOffset();
-    try {
-      const res = await api.fetch(
-        `/api/v1/board?dateKey=${dateKey}&viewType=${viewType}&tzOffset=${tzOffset}`,
-      );
-      if (requestId !== requestIdRef.current) return;
-      if (res.ok) {
-        const data: unknown = await res.json();
+  /**
+   * 盤面を取り直す。
+   *
+   * `silent` は「既に盤面が見えている状態での取り直し」。スニペットや写真を作った
+   * 直後は必ずこれになる。loading を立てると 250ms 後にページ全体のロード表示が
+   * かぶさり、作るたびに画面が一瞬暗くなっていた（作成が遅いのではなく、
+   * 出来上がりを隠していた）。中身は差し替わるので、待たせる表示は要らない。
+   */
+  const fetchBoard = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!api) return;
+      const requestId = ++requestIdRef.current;
+      if (!options?.silent) setLoading(true);
+      setError(false);
+      // ローカル暦日で「その日」を判定させるためオフセットを送る。これが無いとサーバーは
+      // dateKey を UTC の 00:00〜24:00 とみなし、JST 00:00〜09:00 に書いたエントリが
+      // 当日のボードに出ない（Issue: ボードの日付境界）。
+      const tzOffset = new Date().getTimezoneOffset();
+      try {
+        const res = await api.fetch(
+          `/api/v1/board?dateKey=${dateKey}&viewType=${viewType}&tzOffset=${tzOffset}`,
+        );
         if (requestId !== requestIdRef.current) return;
-        setCards(applyDefaultZOrder(normalizeBoardCards(data)));
-      } else {
-        setError(true);
+        if (res.ok) {
+          const data: unknown = await res.json();
+          if (requestId !== requestIdRef.current) return;
+          setCards(applyDefaultZOrder(normalizeBoardCards(data)));
+        } else {
+          setError(true);
+        }
+      } catch {
+        if (requestId === requestIdRef.current) setError(true);
+        // 通信・パースの失敗。呼び出し元は useEffect 内の async 関数で、投げても誰も
+        // 受け取らない（未処理 rejection になり loading が戻らず盤面が固まる）ので、
+        // ここで止める。盤面は現状維持のまま error を立て、表示は BoardView に委ねる。
+      } finally {
+        // 後発リクエストに追い越されていたら loading の所有権は向こうにあるので触らない。
+        if (requestId === requestIdRef.current && !options?.silent) setLoading(false);
       }
-    } catch {
-      if (requestId === requestIdRef.current) setError(true);
-      // 通信・パースの失敗。呼び出し元は useEffect 内の async 関数で、投げても誰も
-      // 受け取らない（未処理 rejection になり loading が戻らず盤面が固まる）ので、
-      // ここで止める。盤面は現状維持のまま error を立て、表示は BoardView に委ねる。
-    } finally {
-      // 後発リクエストに追い越されていたら loading の所有権は向こうにあるので触らない。
-      if (requestId === requestIdRef.current) setLoading(false);
-    }
-  }, [api, dateKey, viewType]);
+    },
+    [api, dateKey, viewType],
+  );
 
   useEffect(() => {
     fetchBoard();
@@ -98,7 +109,7 @@ export function useBoard(
   const createSnippet = useCallback(
     async (text: string) => {
       if (await postSnippet({ text, dateKey, viewType })) {
-        await fetchBoard();
+        await fetchBoard({ silent: true });
       }
     },
     [postSnippet, dateKey, viewType, fetchBoard],
@@ -172,7 +183,7 @@ export function useBoard(
       if (!res.ok) {
         throw new Error(`Failed to create board photo (${res.status})`);
       }
-      await fetchBoard();
+      await fetchBoard({ silent: true });
     },
     [api, dateKey, viewType, fetchBoard],
   );
@@ -189,7 +200,7 @@ export function useBoard(
       if (!res.ok) {
         throw new Error(`Failed to place entry card (${res.status})`);
       }
-      await fetchBoard();
+      await fetchBoard({ silent: true });
     },
     [api, dateKey, viewType, fetchBoard],
   );

@@ -12,16 +12,17 @@ import { EntryCardContent } from './entry-card-content';
 
 interface Content {
   title: string;
-  preview: string;
+  body: string;
   createdAt: string;
 }
 
 interface Props {
   content: Content;
   editing?: boolean;
-  editValue?: string;
-  onEditChange?: (next: string) => void;
-  editLoading?: boolean;
+  editTitle?: string;
+  editBody?: string;
+  onEditTitleChange?: (next: string) => void;
+  onEditBodyChange?: (next: string) => void;
 }
 
 registerUnit<Props>({
@@ -37,7 +38,7 @@ registerUnit<Props>({
       props: {
         content: {
           title: '朝のジャーナル',
-          preview: '今日は早起きして散歩に出かけた。空気が澄んでいて気持ちよかった。',
+          body: '今日は早起きして散歩に出かけた。空気が澄んでいて気持ちよかった。',
           createdAt: '2026-06-27',
         },
       },
@@ -48,7 +49,7 @@ registerUnit<Props>({
       props: {
         content: {
           title: '',
-          preview: 'タイトルを付けずに書き始めたメモ。',
+          body: 'タイトルを付けずに書き始めたメモ。',
           createdAt: '2026-05-01',
         },
       },
@@ -56,31 +57,16 @@ registerUnit<Props>({
     {
       id: 'editing',
       probe: true,
-      description: 'Probe: カード上の編集中は、抜粋ではなく全文が編集欄に出る',
+      description: 'Probe: 編集中も表示中と同じ中身・同じ配置（取り直しは無い）',
       props: {
         content: {
           title: '朝のジャーナル',
-          preview: '今日は早起きして散歩に出かけた。',
+          body: '今日は早起きして散歩に出かけた。空気が澄んでいて気持ちよかった。',
           createdAt: '2026-06-27',
         },
         editing: true,
-        // 抜粋（preview）より長い＝カードが持っている文字列ではないことを示す
-        editValue: `今日は早起きして散歩に出かけた。${'続きの本文。'.repeat(30)}`,
-      },
-    },
-    {
-      id: 'editing-loading',
-      probe: true,
-      description: 'Probe: 全文が届くまでは編集欄を触らせない',
-      props: {
-        content: {
-          title: '朝のジャーナル',
-          preview: '今日は早起きして散歩に出かけた。',
-          createdAt: '2026-06-27',
-        },
-        editing: true,
-        editValue: '',
-        editLoading: true,
+        editTitle: '朝のジャーナル',
+        editBody: '今日は早起きして散歩に出かけた。空気が澄んでいて気持ちよかった。',
       },
     },
     {
@@ -88,7 +74,7 @@ registerUnit<Props>({
       probe: true,
       description: 'Probe: タイトル・本文が空でも日付は描画されレイアウトが崩れない',
       props: {
-        content: { title: '', preview: '', createdAt: '2026-01-15' },
+        content: { title: '', body: '', createdAt: '2026-01-15' },
       },
     },
   ],
@@ -116,56 +102,53 @@ registerUnit<Props>({
     },
     {
       id: 'heading-survives-editing',
-      description: '編集に入っても見出しは消えず、打っている1行目に追従する',
-      // 消えるとカードがどれだか分からなくなる、という指摘への回帰止め。
+      description: '編集に入っても見出しは消えず、直せる入力欄になる',
       check: ({ root, props }) => {
-        if (!props.editing || props.editLoading) return true;
-        const heading = root.querySelector('h3')?.textContent?.trim() ?? '';
-        const expected = (props.editValue ?? '').split('\n').find((l) => l.trim().length > 0) ?? '';
-        if (!expected) return true;
+        if (!props.editing) return true;
+        const input = root.querySelector<HTMLInputElement>('[data-verify-entry-title-editor]');
+        if (!input) return '編集中に見出しの入力欄が無い（消えている）';
         return (
-          heading === expected.trim() ||
-          `編集中の見出しが本文の1行目と違う: heading="${heading}" expected="${expected.trim()}"`
+          input.value === (props.editTitle ?? '') ||
+          `見出しの入力欄が editTitle と違う: "${input.value}"`
         );
       },
     },
     {
+      id: 'title-not-duplicated-while-editing',
+      description: '編集中に見出しが二重に出ない（h3 と入力欄が並ばない）',
+      // 見出しを h3 のまま出しつつ本文の全文を編集欄に入れていた頃、1行目が
+      // 二度見えていた。見出しは入力欄に「置き換わる」のが正しい。
+      check: ({ root, props }) => {
+        if (!props.editing) return true;
+        return root.querySelector('h3') === null || '編集中なのに h3 が残っている（二重表示）';
+      },
+    },
+    {
       id: 'editor-iff-editing',
-      description: '編集欄は editing のときだけ出て、そのときは抜粋を出さない',
+      description: '本文の編集欄は editing のときだけ出て、そのときは表示用の段落を出さない',
       check: ({ root, contract }) => {
         const editor = root.querySelector('textarea[data-verify-entry-editor]');
+        const shown = root.querySelector('p');
         const editing = contract.editing === 'true';
         if (editing && !editor) return '編集中なのに編集欄が無い';
         if (!editing && editor) return '編集していないのに編集欄がある';
+        if (editing && shown) return '編集中なのに表示用の段落も出ている';
         return true;
       },
     },
     {
-      id: 'editor-shows-full-text-not-preview',
-      description: '編集欄に入るのは渡された全文（カードの抜粋ではない）',
-      // 抜粋を編集させて保存すると、日記が先頭 200 文字へ切り詰められる。
-      // 「編集欄の中身 = editValue」を契約として固定しておく。
+      id: 'edit-shows-what-is-displayed',
+      description: '編集欄の中身が、表示していた本文と同じ（取り直しで食い違わない）',
       check: ({ root, props }) => {
-        if (!props.editing || props.editLoading) return true;
+        if (!props.editing) return true;
         const editor = root.querySelector<HTMLTextAreaElement>(
           'textarea[data-verify-entry-editor]',
         );
         if (!editor) return '編集欄が無い';
         return (
-          editor.value === (props.editValue ?? '') ||
-          `編集欄の中身が editValue と違う（抜粋が入っている可能性）: "${editor.value.slice(0, 40)}"`
+          editor.value === (props.editBody ?? '') ||
+          `編集欄の中身が editBody と違う: "${editor.value.slice(0, 40)}"`
         );
-      },
-    },
-    {
-      id: 'editor-disabled-until-loaded',
-      description: '全文が届くまで編集欄は触れない（抜粋のまま保存させない）',
-      check: ({ root, contract }) => {
-        if (contract.editLoading !== 'true') return true;
-        const editor = root.querySelector<HTMLTextAreaElement>(
-          'textarea[data-verify-entry-editor]',
-        );
-        return editor?.disabled === true || '読み込み中なのに編集欄が触れる';
       },
     },
     {

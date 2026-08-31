@@ -314,13 +314,10 @@
       "entry": "放置条目",
       "aria_label_card": "所选卡片的操作",
       "open_entry": "打开日记",
-      "open_snippet": "编辑",
-      "open_photo": "放大",
       "bring_to_front": "移到最前",
-      "remove_from_board": "从板上移除",
       "delete": "删除",
-      "edit_on_card": "在卡片上编辑",
-      "edit_failed": "无法保存"
+      "open": "打开",
+      "edit": "编辑"
     },
     "drop_image": "把图片拖到这里",
     "entry_picker": {
@@ -338,7 +335,7 @@
     },
     "entry_card": {
       "edit_aria": "日记正文",
-      "loading": "加载中…"
+      "title_aria": "日记标题"
     }
   },
   "editor": {

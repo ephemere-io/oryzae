@@ -314,13 +314,10 @@
       "entry": "엔트리 놓기",
       "aria_label_card": "선택한 카드 작업",
       "open_entry": "일기 열기",
-      "open_snippet": "편집",
-      "open_photo": "확대",
       "bring_to_front": "맨 앞으로",
-      "remove_from_board": "보드에서 빼기",
       "delete": "삭제",
-      "edit_on_card": "카드에서 편집",
-      "edit_failed": "저장하지 못했습니다"
+      "open": "열기",
+      "edit": "편집"
     },
     "drop_image": "여기에 이미지를 놓으세요",
     "entry_picker": {
@@ -338,7 +335,7 @@
     },
     "entry_card": {
       "edit_aria": "일기 본문",
-      "loading": "불러오는 중…"
+      "title_aria": "일기 제목"
     }
   },
   "editor": {

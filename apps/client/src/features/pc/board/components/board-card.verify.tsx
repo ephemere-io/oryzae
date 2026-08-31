@@ -53,7 +53,7 @@ const entryCard: BoardCardData = {
   createdAt: '2026-06-20T10:00:00.000Z',
   content: {
     title: '朝のメモ',
-    preview: '今日は早起きして散歩した。空気が澄んでいて気持ちがよかった。',
+    body: '今日は早起きして散歩した。空気が澄んでいて気持ちがよかった。',
     createdAt: '2026-06-20T10:00:00.000Z',
   },
 };

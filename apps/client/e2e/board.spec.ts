@@ -174,10 +174,11 @@ test.describe('ボード画面', () => {
     await expect(page).toHaveURL(/\/board$/);
     const box = card.locator('textarea[data-verify-entry-editor]');
     await expect(box).toBeVisible({ timeout: 10000 });
-    // 抜粋ではなく全文が入っている
-    await expect(box).toHaveValue(new RegExp(unique));
+    // 見出しは入力欄に置き換わる（消えないし、二重にも出ない）
+    await expect(card.locator('[data-verify-entry-title-editor]')).toHaveValue(unique);
+    await expect(card.locator('h3')).toHaveCount(0);
 
-    // カードの上で直せて、保存される
+    // カードの上で直せて、保存される（本文側を直す）
     await box.click();
     await box.pressSequentially('・追記');
     await page.keyboard.press('Escape');

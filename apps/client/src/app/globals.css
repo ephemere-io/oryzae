@@ -87,6 +87,26 @@ body {
  *
  * base レイヤーに置くのは、`cursor-grab` のようなユーティリティに勝たせるため
  * （ボードのカードは掴んで動かすので pointer にしてはいけない）。 */
+/* 盤面のカードの中で送れる場所は、送れることが見えるようにする。
+   既定のスクロールバーは macOS だと触るまで出ないので、常に細い軌道を見せる。 */
+.board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+.board-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.board-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--border-subtle);
+  border-radius: 3px;
+}
+.board-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--date-color);
+}
+
 @layer base {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

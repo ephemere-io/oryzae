@@ -37,7 +37,7 @@ describe('useBoardSave', () => {
         zIndex: 0,
         userPositioned: false,
         createdAt: '2026-04-11T00:00:00Z',
-        content: { title: '', preview: '', createdAt: '' },
+        content: { title: '', body: '', createdAt: '' },
       },
     ];
 
@@ -77,7 +77,7 @@ describe('useBoardSave', () => {
         zIndex: 0,
         userPositioned: false,
         createdAt: '2026-04-11T00:00:00Z',
-        content: { title: '', preview: '', createdAt: '' },
+        content: { title: '', body: '', createdAt: '' },
       },
     ];
     const cards2: BoardCardData[] = [
@@ -93,7 +93,7 @@ describe('useBoardSave', () => {
         zIndex: 1,
         userPositioned: false,
         createdAt: '2026-04-11T00:00:00Z',
-        content: { title: '', preview: '', createdAt: '' },
+        content: { title: '', body: '', createdAt: '' },
       },
     ];
 

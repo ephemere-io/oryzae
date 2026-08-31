@@ -6,8 +6,10 @@ import type { BoardStorageGateway } from '../../domain/gateways/board-storage.ga
 import { BoardCard } from '../../domain/models/board-card.js';
 
 interface EntryContent {
+  /** 本文の1行目。カードの見出しに使う。 */
   title: string;
-  preview: string;
+  /** 見出し行を除いた**本文の全部**。カードで見えているものと編集するものを一致させる。 */
+  body: string;
   createdAt: string;
 }
 
@@ -37,15 +39,6 @@ interface CardResponse {
 }
 
 const TITLE_LENGTH = 100;
-/**
- * カードに載せる抜粋の長さ。
- *
- * 200 文字だと既定サイズのカードでちょうど埋まってしまい、カードを大きくしても
- * 文字が増えず「途中で切れたまま」に見えていた。カードは掴んで広げられるので、
- * 広げたぶんは読めるようにしておく。全文を積むと盤面1枚ぶんの応答が重くなるので、
- * 読み物として足りる長さで止める（続きはカードの上で編集に入れば全文が出る）。
- */
-const PREVIEW_LENGTH = 800;
 
 interface LoadBoardResponse {
   dateKey: string;
@@ -147,8 +140,8 @@ export class LoadBoardUsecase {
     if (entryRefIds.length > 0) {
       const entries = await this.entryRepo.findByIds(entryRefIds);
       for (const entry of entries) {
-        const { title, preview } = LoadBoardUsecase.summarizeEntry(entry.content);
-        entryMap.set(entry.id, { title, preview, createdAt: entry.createdAt });
+        const { title, body } = LoadBoardUsecase.summarizeEntry(entry.content);
+        entryMap.set(entry.id, { title, body, createdAt: entry.createdAt });
       }
     }
 
@@ -206,24 +199,26 @@ export class LoadBoardUsecase {
   }
 
   /**
-   * カードに載せる見出しと本文を作る。
+   * カードに載せる見出しと本文に分ける。
    *
-   * 見出しは本文の1行目。抜粋からはその行を**外す**——同じ行が見出しと本文で
-   * 二度出ると、カードが自分を繰り返しているように見える。
+   * 見出しは1行目、本文はその残り**全部**。抜粋（先頭 N 文字）にしていた頃は、
+   * カードで見えているものと編集で扱うものが食い違い、編集に入るたびに全文を
+   * 取り直す必要があった（そのたびに「読み込み中」が出た）。全部載せておけば、
+   * 見ているものと直しているものが常に同じになり、取り直しも要らない。
+   *
+   * 見出しは本文から**外す**。同じ行が見出しと本文で二度出ると、カードが自分を
+   * 繰り返しているように見える。
    */
-  private static summarizeEntry(content: string): { title: string; preview: string } {
+  private static summarizeEntry(content: string): { title: string; body: string } {
     const lines = content.split('\n');
     const titleIndex = lines.findIndex((line) => line.trim().length > 0);
-    if (titleIndex === -1) {
-      return { title: '', preview: content.substring(0, PREVIEW_LENGTH) };
-    }
+    if (titleIndex === -1) return { title: '', body: '' };
     return {
       title: lines[titleIndex].substring(0, TITLE_LENGTH),
-      preview: lines
+      body: lines
         .slice(titleIndex + 1)
         .join('\n')
-        .trimStart()
-        .substring(0, PREVIEW_LENGTH),
+        .trimStart(),
     };
   }
 

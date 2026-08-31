@@ -1,8 +1,10 @@
 /** ボード（日付ごとの自由配置ビュー）の共有型（端末非依存）。 */
 
 export interface EntryContent {
+  /** 本文の1行目。カードの見出し。 */
   title: string;
-  preview: string;
+  /** 見出し行を除いた本文の全部。カードで見えているものと編集するものは同じ。 */
+  body: string;
   createdAt: string;
 }
 

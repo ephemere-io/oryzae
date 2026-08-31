@@ -19,6 +19,17 @@ interface ResizeResult {
   height: number;
 }
 
+/**
+ * 送信前の縮小。
+ *
+ * 800px / 品質 0.7 まで落としていたので、盤面で拡大すると目に見えて荒れていた。
+ * ライトボックスは画面の 80% まで開くので、Retina だと 3000px 近く要る。
+ * 上限を 2400px・品質 0.9 に上げ、元がそれより小さければ**一切触らない**
+ * （小さい画像をわざわざ JPEG に焼き直して劣化させない）。
+ */
+const MAX_UPLOAD_WIDTH = 2400;
+const JPEG_QUALITY = 0.9;
+
 function resizeImage(file: File, maxWidth: number, quality: number): Promise<ResizeResult> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -27,8 +38,10 @@ function resizeImage(file: File, maxWidth: number, quality: number): Promise<Res
       URL.revokeObjectURL(objectUrl);
       const canvas = document.createElement('canvas');
       let { width, height } = img;
+      // 上限より小さい画像は縮小しない。ここで再エンコードすると、荒くなるだけで
+      // 得るものが無い（元が JPEG なら二重圧縮、PNG なら不可逆になる）。
       if (width > maxWidth) {
-        height = (height * maxWidth) / width;
+        height = Math.round((height * maxWidth) / width);
         width = maxWidth;
       }
       canvas.width = width;
@@ -193,7 +206,11 @@ export function PhotoDialog({ open, initialFile, onSubmit, onClose }: PhotoDialo
     setUploading(true);
     setError(null);
     try {
-      const { blob, width, height } = await resizeImage(selectedFile, 800, 0.7);
+      const { blob, width, height } = await resizeImage(
+        selectedFile,
+        MAX_UPLOAD_WIDTH,
+        JPEG_QUALITY,
+      );
       const resizedFile = new File([blob], selectedFile.name, { type: 'image/jpeg' });
       await onSubmit(resizedFile, caption.trim(), width, height);
       selectionRef.current++;

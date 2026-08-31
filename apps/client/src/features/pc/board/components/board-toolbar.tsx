@@ -166,11 +166,14 @@ export function BoardToolbar({
 
   // カードを選んでいる間は、作る道具ではなく「そのカードにできること」を出す。
   // Backspace しか経路が無かった削除が、選んだ瞬間に目に入るようになる。
+  // 操作の名前は種別で変えない。同じ形の操作に別々の言葉を当てると、
+  // 「これは違う何かなのでは」と読ませてしまう。唯一の例外が「日記を開く」で、
+  // 行き先が盤面の外（日記の画面）だと分かるほうが親切なため残している。
   const cardActions = selection
     ? [
         {
           id: 'open' as const,
-          label: t(`open_${selection.cardType}`),
+          label: selection.cardType === 'entry' ? t('open_entry') : t('open'),
           onSelect: onOpenSelected,
           icon: <OpenIcon />,
           danger: false,
@@ -178,9 +181,8 @@ export function BoardToolbar({
         ...(selection.cardType === 'entry' && onEditSelectedOnCard
           ? [
               {
-                // 日記へ飛ばずにカードの上で直す。開く（＝画面遷移）と混ぜない。
                 id: 'edit' as const,
-                label: t('edit_on_card'),
+                label: t('edit'),
                 onSelect: onEditSelectedOnCard,
                 icon: <EditIcon />,
                 danger: false,
@@ -196,9 +198,7 @@ export function BoardToolbar({
         },
         {
           id: 'delete' as const,
-          // entry は盤面から外すだけで日記本体は残る。snippet / photo は実体ごと消える。
-          // 同じ「削除」でも起きることが違うので、文言で言い分ける。
-          label: selection.cardType === 'entry' ? t('remove_from_board') : t('delete'),
+          label: t('delete'),
           onSelect: onDeleteSelected,
           icon: <TrashIcon />,
           danger: true,

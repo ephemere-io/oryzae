@@ -24,15 +24,16 @@ interface BoardCardProps {
   onClick: (card: BoardCardData) => void;
   /** カード上で本文を編集中か。編集中はドラッグせず、文字を選べるようにする。 */
   isEditing?: boolean;
-  /** 編集中に表示・更新する本文（全文）。 */
-  editValue?: string;
-  onEditChange?: (next: string) => void;
-  editLoading?: boolean;
+  /** 編集中の見出し・本文。表示中と同じものが入る。 */
+  editTitle?: string;
+  editBody?: string;
+  onEditTitleChange?: (next: string) => void;
+  onEditBodyChange?: (next: string) => void;
 }
 
 function isEntryContent(
   content: BoardCardData['content'],
-): content is { title: string; preview: string; createdAt: string } {
+): content is { title: string; body: string; createdAt: string } {
   return 'title' in content;
 }
 
@@ -56,9 +57,10 @@ export function BoardCard({
   onDelete,
   onClick,
   isEditing = false,
-  editValue = '',
-  onEditChange,
-  editLoading = false,
+  editTitle = '',
+  editBody = '',
+  onEditTitleChange,
+  onEditBodyChange,
 }: BoardCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -159,9 +161,10 @@ export function BoardCard({
         <EntryCardContent
           content={card.content}
           editing={isEditing}
-          editValue={editValue}
-          onEditChange={onEditChange}
-          editLoading={editLoading}
+          editTitle={editTitle}
+          editBody={editBody}
+          onEditTitleChange={onEditTitleChange}
+          onEditBodyChange={onEditBodyChange}
         />
       )}
       {card.cardType === 'snippet' && isSnippetContent(card.content) && (
@@ -226,7 +229,7 @@ export function BoardCard({
               backgroundColor: 'var(--bg)',
               border: '2px solid var(--accent)',
               opacity: 1,
-              cursor: 'crosshair',
+              cursor: 'grab',
               zIndex: 10,
             }}
           >
