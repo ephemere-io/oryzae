@@ -42,13 +42,6 @@ interface LoadBoardResponse {
   cards: CardResponse[];
 }
 
-const DEFAULT_ENTRY_WIDTH = 340;
-const DEFAULT_ENTRY_HEIGHT = 280;
-
-function randomBetween(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
 export class LoadBoardUsecase {
   constructor(
     private boardCardRepo: BoardCardRepositoryGateway,
@@ -63,8 +56,9 @@ export class LoadBoardUsecase {
     userId: string,
     dateKey: string,
     viewType: 'daily' | 'weekly' = 'daily',
-    /** 利用者のローカル暦日を UTC 区間に直すためのオフセット（getTimezoneOffset 同符号）。 */
-    tzOffsetMinutes = 0,
+    // tzOffset は受け取らない。日付でエントリを引くのをやめた（カードを自動で
+    // 作らなくなった）ため、ここに暦日の判定は残っていない。境界の扱いは
+    // ListPlaceableEntriesUsecase が引き継いでいる。
   ): Promise<LoadBoardResponse> {
     // 1. Load existing cards
     let existingCards = await this.boardCardRepo.findByDateAndView(userId, dateKey, viewType);
@@ -118,72 +112,12 @@ export class LoadBoardUsecase {
       existingCards = [...existingCards, ...weeklyCopies];
     }
 
-    // 2. Auto-populate entries that don't have cards yet
-    let existingEntryRefIds: string[];
-    if (viewType === 'weekly') {
-      const { startDate, endDate } = LoadBoardUsecase.weekRange(dateKey);
-      const weeklyRefIds = await this.boardCardRepo.findRefIdsByDateAndView(
-        userId,
-        dateKey,
-        viewType,
-        'entry',
-      );
-      const dailyRefIds = await this.boardCardRepo.findRefIdsByDateRange(
-        userId,
-        startDate,
-        endDate,
-        'entry',
-      );
-      existingEntryRefIds = [...new Set([...weeklyRefIds, ...dailyRefIds])];
-    } else {
-      existingEntryRefIds = await this.boardCardRepo.findRefIdsByDateAndView(
-        userId,
-        dateKey,
-        viewType,
-        'entry',
-      );
-    }
-    const existingRefIdSet = new Set(existingEntryRefIds);
+    // エントリのカードは**自動では作らない**。以前はその日/その週に書いた日記を
+    // 勝手に盤面へ並べていたが、置いた覚えのないカードが現れる一方で、消し方も
+    // 見えなかった。今は ListPlaceableEntriesUsecase で候補を出し、利用者が
+    // 選んで置く（PlaceEntryCardUsecase）。既に置かれているカードはそのまま残る。
 
-    const entriesRaw =
-      viewType === 'weekly'
-        ? await this.entryRepo.listByUserIdAndWeek(userId, dateKey, tzOffsetMinutes)
-        : await this.entryRepo.listByUserIdAndDate(userId, dateKey, tzOffsetMinutes);
-    // Sort by createdAt ASC so newer entries get higher z-index (appear on top)
-    const entries = entriesRaw.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    );
-    const newCards: BoardCard[] = [];
-
-    for (const entry of entries) {
-      if (existingRefIdSet.has(entry.id)) continue;
-
-      const result = BoardCard.create(
-        {
-          userId,
-          cardType: 'entry',
-          refId: entry.id,
-          dateKey,
-          viewType,
-          x: randomBetween(60, 800),
-          y: randomBetween(60, 600),
-          rotation: Math.round((Math.random() * 10 - 5) * 10) / 10,
-          width: DEFAULT_ENTRY_WIDTH,
-          height: DEFAULT_ENTRY_HEIGHT,
-          zIndex: existingCards.length + newCards.length,
-        },
-        this.generateId,
-      );
-      if (result.success) {
-        newCards.push(result.value);
-      }
-    }
-
-    if (newCards.length > 0) {
-      await this.boardCardRepo.saveMany(newCards);
-    }
-
-    const allCards = [...existingCards, ...newCards];
+    const allCards = existingCards;
 
     // 3. Hydrate content
     const cardResponses = await this.hydrateCards(allCards);

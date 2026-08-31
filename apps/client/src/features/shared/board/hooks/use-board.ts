@@ -177,6 +177,23 @@ export function useBoard(
     [api, dateKey, viewType, fetchBoard],
   );
 
+  /** 選んだ日記を盤面に置く。サーバ側の自動生成をやめた代わりの経路。 */
+  const placeEntry = useCallback(
+    async (entryId: string) => {
+      if (!api) return;
+      const res = await api.fetch('/api/v1/board/cards/entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId, dateKey, viewType }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to place entry card (${res.status})`);
+      }
+      await fetchBoard();
+    },
+    [api, dateKey, viewType, fetchBoard],
+  );
+
   return {
     cards,
     setCards,
@@ -186,6 +203,7 @@ export function useBoard(
     createSnippet,
     updateSnippet,
     createPhoto,
+    placeEntry,
     deleteCard,
   };
 }

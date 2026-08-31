@@ -310,9 +310,29 @@
     "toolbar": {
       "aria_label": "보드 툴바",
       "snippet": "스니펫 만들기",
-      "photo": "이미지 붙여넣기"
+      "photo": "이미지 붙여넣기",
+      "entry": "엔트리 놓기",
+      "aria_label_card": "선택한 카드 작업",
+      "open_entry": "일기 열기",
+      "open_snippet": "편집",
+      "open_photo": "확대",
+      "bring_to_front": "맨 앞으로",
+      "remove_from_board": "보드에서 빼기",
+      "delete": "삭제"
     },
-    "drop_image": "여기에 이미지를 놓으세요"
+    "drop_image": "여기에 이미지를 놓으세요",
+    "entry_picker": {
+      "aria_label": "엔트리 놓기",
+      "heading": "엔트리 놓기",
+      "lead": "이 기간에 쓴 일기 중에서 골라 보드에 놓습니다.",
+      "loading": "불러오는 중…",
+      "load_failed": "목록을 가져오지 못했습니다.",
+      "empty": "이 기간에 쓴 일기가 아직 없습니다.",
+      "untitled": "(제목 없음)",
+      "place": "놓기",
+      "already_placed": "놓여 있음",
+      "close": "닫기"
+    }
   },
   "editor": {
     "status": {

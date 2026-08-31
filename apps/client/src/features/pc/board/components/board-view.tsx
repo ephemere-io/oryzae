@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { PageLoading } from '@/components/ui/page-loading';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
+import { usePlaceableEntries } from '@/features/shared/board/hooks/use-placeable-entries';
 import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { useEscapeKey } from '@/lib/use-escape-key';
@@ -18,6 +19,7 @@ import { BoardDateNav } from './board-date-nav';
 import { BOARD_INSET, TOP_BAR_CLASS } from './board-surface';
 import { BoardToolbar } from './board-toolbar';
 import { BoardViewSwitch } from './board-view-switch';
+import { EntryPickerDialog } from './entry-picker-dialog';
 import { PhotoDialog } from './photo-dialog';
 import { SnippetDialog } from './snippet-dialog';
 
@@ -45,6 +47,7 @@ export function BoardView({ api }: BoardViewProps) {
   }>({ open: false });
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
+  const [entryPickerOpen, setEntryPickerOpen] = useState(false);
   /** 貼り付け・ドロップで入ってきた画像。写真ダイアログへ選択済みとして渡す。 */
   const [incomingImage, setIncomingImage] = useState<File | null>(null);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
@@ -58,6 +61,7 @@ export function BoardView({ api }: BoardViewProps) {
     createSnippet,
     updateSnippet,
     createPhoto,
+    placeEntry,
     deleteCard,
   } = useBoard(api, dateKey, viewType);
   const { savePositions } = useBoardSave(api);
@@ -95,9 +99,9 @@ export function BoardView({ api }: BoardViewProps) {
     didDrag,
   } = useBoardInteraction(cards, handleCardsChange, handleInteractionEnd);
 
-  const handleCardClick = useCallback(
+  /** カードを開く（種別ごとの行き先）。ドラッグ判定は呼び出し側の責任。 */
+  const openCard = useCallback(
     (card: BoardCardData) => {
-      if (didDrag()) return;
       if (card.cardType === 'entry') {
         router.push(`/entries/${card.refId}`);
       } else if (card.cardType === 'snippet' && 'text' in card.content) {
@@ -106,8 +110,37 @@ export function BoardView({ api }: BoardViewProps) {
         setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
       }
     },
-    [router, didDrag],
+    [router],
   );
+
+  const handleCardClick = useCallback(
+    (card: BoardCardData) => {
+      // 掴んで動かしただけのときは開かない。ツールバー経由（openCard 直呼び）には
+      // この判定を通さない——ボタンを押したのは明確な意思表示なので。
+      if (didDrag()) return;
+      openCard(card);
+    },
+    [openCard, didDrag],
+  );
+
+  /** 選択中のカード。ツールバーが「そのカードにできること」を出すために使う。 */
+  const selectedCard = selectedId ? (cards.find((c) => c.id === selectedId) ?? null) : null;
+
+  const handleOpenSelected = useCallback(() => {
+    if (selectedCard) openCard(selectedCard);
+  }, [selectedCard, openCard]);
+
+  /** 選択中のカードを最前面へ。重なって読めなくなったときの逃げ道。 */
+  const handleBringToFront = useCallback(() => {
+    if (!selectedCard) return;
+    const maxZ = cards.reduce((max, c) => Math.max(max, c.zIndex), 0);
+    if (selectedCard.zIndex === maxZ) return;
+    const next = cards.map((c) =>
+      c.id === selectedCard.id ? { ...c, zIndex: maxZ + 1, userPositioned: true } : c,
+    );
+    setCards(next);
+    savePositions(next);
+  }, [selectedCard, cards, setCards, savePositions]);
 
   const handleDeleteCard = useCallback(
     (cardId: string) => {
@@ -119,6 +152,10 @@ export function BoardView({ api }: BoardViewProps) {
   );
 
   const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
+  const placeable = usePlaceableEntries(api, dateKey, viewType, entryPickerOpen);
+
+  const openEntryPicker = useCallback(() => setEntryPickerOpen(true), []);
+
   const openPhotoDialog = useCallback(() => {
     setIncomingImage(null);
     setPhotoDialogOpen(true);
@@ -134,7 +171,7 @@ export function BoardView({ api }: BoardViewProps) {
   // ライトボックスも Escape で閉じる（各ダイアログと揃える）。
   useEscapeKey(lightbox !== null, closeLightbox);
 
-  const dialogOpen = snippetDialog.open || photoDialogOpen || lightbox !== null;
+  const dialogOpen = snippetDialog.open || photoDialogOpen || entryPickerOpen || lightbox !== null;
 
   // 何かが開いている間は横取りしない。スニペット編集中は本文への貼り付けを奪わないため。
   // 写真ダイアログを開いている間も同じで、ここを開けておくと、選択済みの画像がある状態で
@@ -172,14 +209,24 @@ export function BoardView({ api }: BoardViewProps) {
       if (key === 's') {
         e.preventDefault();
         openSnippetDialog();
-      } else if (key === 'i') {
+      } else if (key === 'p') {
         e.preventDefault();
         openPhotoDialog();
+      } else if (key === 'e') {
+        e.preventDefault();
+        openEntryPicker();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, handleDeleteCard, dialogOpen, openSnippetDialog, openPhotoDialog]);
+  }, [
+    selectedId,
+    handleDeleteCard,
+    dialogOpen,
+    openSnippetDialog,
+    openPhotoDialog,
+    openEntryPicker,
+  ]);
 
   return (
     <div
@@ -188,6 +235,8 @@ export function BoardView({ api }: BoardViewProps) {
         viewType,
         snippetOpen: snippetDialog.open,
         photoOpen: photoDialogOpen,
+        entryPickerOpen,
+        selectedType: selectedCard?.cardType ?? 'none',
       })}
       role="application"
       aria-label={t('canvas.aria_label')}
@@ -289,9 +338,32 @@ export function BoardView({ api }: BoardViewProps) {
 
       {/* 道具箱（下部中央フローティング） */}
       <BoardToolbar
-        activeTool={snippetDialog.open ? 'snippet' : photoDialogOpen ? 'photo' : 'none'}
+        activeTool={
+          snippetDialog.open
+            ? 'snippet'
+            : photoDialogOpen
+              ? 'photo'
+              : entryPickerOpen
+                ? 'entry'
+                : 'none'
+        }
         onCreateSnippet={openSnippetDialog}
         onAddPhoto={openPhotoDialog}
+        onPlaceEntry={openEntryPicker}
+        selection={selectedCard ? { cardType: selectedCard.cardType } : null}
+        onOpenSelected={handleOpenSelected}
+        onBringSelectedToFront={handleBringToFront}
+        onDeleteSelected={() => selectedCard && handleDeleteCard(selectedCard.id)}
+      />
+
+      {/* エントリーを置く（サーバ側の自動生成をやめた代わりの入口） */}
+      <EntryPickerDialog
+        open={entryPickerOpen}
+        entries={placeable.entries}
+        loading={placeable.loading}
+        error={placeable.error}
+        onPlace={placeEntry}
+        onClose={() => setEntryPickerOpen(false)}
       />
 
       {/* Snippet dialog */}

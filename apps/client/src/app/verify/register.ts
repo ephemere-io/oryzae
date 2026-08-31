@@ -37,6 +37,7 @@ import '@/features/pc/board/components/board-date-nav.verify';
 import '@/features/pc/board/components/board-toolbar.verify';
 import '@/features/pc/board/components/board-view-switch.verify';
 import '@/features/pc/board/components/entry-card-content.verify';
+import '@/features/pc/board/components/entry-picker-dialog.verify';
 import '@/features/pc/board/components/photo-card-content.verify';
 import '@/features/pc/board/components/photo-dialog.verify';
 import '@/features/pc/board/components/snippet-card-content.verify';

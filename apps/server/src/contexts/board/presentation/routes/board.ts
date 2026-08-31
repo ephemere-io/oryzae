@@ -1,5 +1,6 @@
 import {
   boardCardUpdateSchema,
+  boardEntryCardCreateSchema,
   boardQuerySchema,
   boardSnippetCreateSchema,
   boardSnippetUpdateSchema,
@@ -15,7 +16,9 @@ import { DeleteBoardPhotoUsecase } from '../../application/usecases/delete-board
 import { DeleteBoardSnippetUsecase } from '../../application/usecases/delete-board-snippet.usecase.js';
 import { DeleteCardUsecase } from '../../application/usecases/delete-card.usecase.js';
 import { ExtractTextFromImageUsecase } from '../../application/usecases/extract-text-from-image.usecase.js';
+import { ListPlaceableEntriesUsecase } from '../../application/usecases/list-placeable-entries.usecase.js';
 import { LoadBoardUsecase } from '../../application/usecases/load-board.usecase.js';
+import { PlaceEntryCardUsecase } from '../../application/usecases/place-entry-card.usecase.js';
 import { SaveCardPositionsUsecase } from '../../application/usecases/save-card-positions.usecase.js';
 import { UpdateBoardSnippetUsecase } from '../../application/usecases/update-board-snippet.usecase.js';
 import { AnthropicOcrGateway } from '../../infrastructure/ocr/anthropic-ocr.gateway.js';
@@ -52,9 +55,6 @@ export const board = new Hono<Env>()
       dateKey: c.req.query('dateKey'),
     });
     const viewType = c.req.query('viewType') === 'weekly' ? 'weekly' : 'daily';
-    // クライアントのローカル暦日で「その日」を判定するためのオフセット（分）。
-    // 未指定なら 0＝UTC 基準（従来挙動）にフォールバックする。
-    const tzOffsetMinutes = parseTzOffset(c.req.query('tzOffset'));
     const supabase = c.get('supabase');
     const boardCardRepo = new SupabaseBoardCardRepository(supabase);
     const boardSnippetRepo = new SupabaseBoardSnippetRepository(supabase);
@@ -70,8 +70,37 @@ export const board = new Hono<Env>()
       generateId,
     );
 
+    const result = await usecase.execute(c.get('userId'), dateKey, viewType);
+    return c.json(result);
+  })
+
+  // GET /api/v1/board/entries — その日/その週に書いた日記のうち盤面に置ける候補
+  .get('/entries', async (c) => {
+    const { dateKey } = boardQuerySchema.parse({ dateKey: c.req.query('dateKey') });
+    const viewType = c.req.query('viewType') === 'weekly' ? 'weekly' : 'daily';
+    const tzOffsetMinutes = parseTzOffset(c.req.query('tzOffset'));
+    const supabase = c.get('supabase');
+    const usecase = new ListPlaceableEntriesUsecase(
+      new SupabaseEntryRepository(supabase),
+      new SupabaseBoardCardRepository(supabase),
+    );
+
     const result = await usecase.execute(c.get('userId'), dateKey, viewType, tzOffsetMinutes);
     return c.json(result);
+  })
+
+  // POST /api/v1/board/cards/entry — 選んだ日記を盤面に置く
+  .post('/cards/entry', async (c) => {
+    const body = boardEntryCardCreateSchema.parse(await c.req.json());
+    const supabase = c.get('supabase');
+    const usecase = new PlaceEntryCardUsecase(
+      new SupabaseEntryRepository(supabase),
+      new SupabaseBoardCardRepository(supabase),
+      generateId,
+    );
+
+    const result = await usecase.execute(c.get('userId'), body);
+    return c.json(result, 201);
   })
 
   // PUT /api/v1/board/cards

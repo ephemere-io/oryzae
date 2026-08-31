@@ -15,6 +15,16 @@ interface PhotoContent {
   caption: string;
 }
 
+/** 盤面に置ける日記の候補（その日/その週に書いたもの）。 */
+export interface PlaceableEntry {
+  id: string;
+  title: string;
+  preview: string;
+  createdAt: string;
+  /** すでに盤面にあるか。置かれていても一覧からは消さず、状態として見せる。 */
+  placed: boolean;
+}
+
 /** ボード上に置かれた1枚のカード。 */
 export interface BoardCardData {
   id: string;

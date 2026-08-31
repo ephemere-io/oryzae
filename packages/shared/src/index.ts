@@ -12,6 +12,7 @@ export {
 } from './constants.js';
 export {
   boardCardUpdateSchema,
+  boardEntryCardCreateSchema,
   boardQuerySchema,
   boardSnippetCreateSchema,
   boardSnippetUpdateSchema,

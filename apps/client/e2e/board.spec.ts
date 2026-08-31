@@ -98,19 +98,26 @@ test.describe('ボード画面', () => {
     await expect(page.getByRole('heading', { name: '写真を追加' })).toHaveCount(0);
   });
 
-  test('ツールバーのショートカット（S / I）が効き、入力中は誤発火しない', async ({ page }) => {
+  test('ツールバーのショートカット（S / P）が効き、入力中は誤発火しない', async ({ page }) => {
     await page.keyboard.press('s');
     await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
 
-    // 本文に s / i を打っても写真ダイアログは開かない（そのまま文字として入る）
-    await page.locator('textarea').pressSequentially('sisi');
-    await expect(page.locator('textarea')).toHaveValue('sisi');
+    // 本文に s / p を打っても写真ダイアログは開かない（そのまま文字として入る）
+    await page.locator('textarea').pressSequentially('spsp');
+    await expect(page.locator('textarea')).toHaveValue('spsp');
     await expect(page.getByRole('heading', { name: '写真を追加' })).toHaveCount(0);
 
     await page.keyboard.press('Escape');
-    await page.keyboard.press('i');
+    await page.keyboard.press('p');
     await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
     await page.keyboard.press('Escape');
+  });
+
+  test('ツールチップのショートカットが kbd として描かれる', async ({ page }) => {
+    // 「I」を薄い文字で置いていた頃、ただの縦棒に見えて誰もキーだと気づかなかった。
+    // 枠付きの kbd で描くことを契約として固定する。
+    const key = page.locator('[data-verify-tooltip="photo"] kbd');
+    await expect(key).toHaveText('P');
   });
 
   test('ダイアログを開いている間の Backspace で背後のカードが消えない', async ({ page }) => {
@@ -141,19 +148,48 @@ test.describe('ボード画面', () => {
     await expect(page.getByText(snippet)).toBeVisible({ timeout: 10000 });
   });
 
-  test('エントリカードが表示される（当日エントリがある場合）', async ({ page }) => {
-    // まずエントリを作成（PC エディタは自動保存）
+  test('日記は自動では出ず、選んで置いてから外せる', async ({ page }) => {
+    // 以前は期間内の日記が勝手にカード化されていた。置いた覚えのないものが現れる
+    // 一方で外し方も見えなかったので、「選んで置く／選んで外す」に変えた。
     const unique = `ボードE2E-${Date.now()}`;
     await page.goto('/entries/new');
     const editor = page.locator('[contenteditable="true"]').first();
     await editor.click();
     await editor.pressSequentially(unique);
-    // 自動保存の完了を固定待ちせず、ステータスバーの saved を待ってからボードへ。
     await waitForAutosave(page);
 
-    // ボード（当日）にカードとして出る（カード見出し＋本文で2要素マッチするため first）
     await page.goto('/board');
     await page.waitForSelector('[role="application"]');
+    await page.waitForTimeout(1500);
+
+    // 1. 書いただけでは盤面に出ない
+    await expect(page.getByText(unique)).toHaveCount(0);
+
+    // 2. ツールバーから選んで置くと出る
+    await page.click('button[data-verify-tool="entry"]');
+    await expect(page.getByRole('heading', { name: 'エントリーを置く' })).toBeVisible();
+    await page.locator('button[data-verify-entry-option]').first().click();
+    await page.waitForTimeout(2000);
+    await page.keyboard.press('Escape');
+    await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
+
+    // 3. カードを選ぶとツールバーが操作に入れ替わり、そこから外せる
+    const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
+    await card.locator('button').first().click({ force: true });
+    await expect(page.locator('[data-verify-unit="BoardToolbar"]')).toHaveAttribute(
+      'data-verify-mode',
+      'card',
+    );
+    await page.click('button[data-verify-card-action="delete"]');
+    await page.waitForTimeout(2000);
+
+    // 4. 外しても日記そのものは残っている（盤面から消えるだけ）
+    await page.reload();
+    await page.waitForSelector('[role="application"]');
+    await page.waitForTimeout(1500);
+    await expect(page.getByText(unique)).toHaveCount(0);
+
+    await page.goto('/entries');
     await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
 
     await deleteEntriesByMarker(page, unique);

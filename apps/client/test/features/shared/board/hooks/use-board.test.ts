@@ -505,4 +505,31 @@ describe('useBoard', () => {
     // 作成 → 再取得 の順で2本目以降が飛んでいる
     expect(paths.filter((p) => p.startsWith('/api/v1/board?')).length).toBeGreaterThanOrEqual(2);
   });
+  it('選んだ日記を置き、置いたらボードを取り直す', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cardId: 'c-1', refId: 'e-1' }));
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    await act(async () => {
+      await result.current.placeEntry('e-1');
+    });
+
+    const call = apiFetch.mock.calls.find((c) => c[0] === '/api/v1/board/cards/entry');
+    expect(call).toBeDefined();
+    expect(JSON.parse(call![1].body)).toMatchObject({ entryId: 'e-1', dateKey: '2026-04-11' });
+    expect(apiFetch.mock.calls.filter((c) => c[0].startsWith('/api/v1/board?')).length).toBe(2);
+  });
+
+  it('日記を置けなかったら投げ返す（黙って閉じさせない）', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiFetch.mockResolvedValueOnce(mockResponse(false, { error: 'boom' }));
+    await expect(result.current.placeEntry('e-1')).rejects.toThrow(/place entry card/);
+  });
 });
