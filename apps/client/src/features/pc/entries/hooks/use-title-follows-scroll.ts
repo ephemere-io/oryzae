@@ -22,8 +22,10 @@ interface UseTitleFollowsScrollOptions {
  * 見えた。動かすほうが素直。**書いている最中に題がふらつかないのは、紙自体が
  * 1文字ごとには動かないから**（`use-typewriter-scroll`: 端に着くまで紙を止める）。
  *
- * vertical-rl のスクローラは先頭（右端）で scrollLeft が 0、左へ進むと負になるので、
- * その値をそのまま横移動に使えばよい。transform だけを触るのでレイアウトは動かない。
+ * vertical-rl のスクローラは先頭（右端）で scrollLeft が 0、左へ進むと負になる。
+ * 中身はそのぶん**右へ**送られるので、題に掛けるのは `-scrollLeft`。
+ * ここを符号のまま足すと、本文が右へ流れるのに題だけ左へ動く（実際にそうなっていた）。
+ * transform だけを触るのでレイアウトは動かない。
  */
 export function useTitleFollowsScroll({
   titleRef,
@@ -44,7 +46,9 @@ export function useTitleFollowsScroll({
       const el = titleRef.current;
       const scroller = editorRef.current;
       if (!el || !scroller) return;
-      el.style.transform = `translateX(${scroller.scrollLeft}px)`;
+      // **符号に注意。** vertical-rl では scrollLeft が 0 → 負に進み、そのぶん中身は
+      // 右へ送られる。scrollLeft をそのまま足すと題だけが本文と逆（左）へ動く。
+      el.style.transform = `translateX(${-scroller.scrollLeft}px)`;
     }
 
     sync();

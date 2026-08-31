@@ -176,11 +176,12 @@ export function EntryEditor({
     link: onLinkQuestion,
   });
 
-  // Issue #329 → #466: 新規エントリで紐付けた問いに発酵結果がある場合の表示制御。
-  // 本文に重ねるフローティング表示をやめ、右のサイドバーに集約した。
-  // 既存エントリでは表示しない (執筆中の判断材料として使うため新規限定)。
-  const isNewEntry = !entryId;
-  const firstLinkedQuestionId = isNewEntry ? Array.from(linkedIds)[0] : undefined;
+  // Issue #329 → #466: 紐付けた問いに発酵結果があれば、右のサイドバーに出す。
+  //
+  // 以前は**新規エントリだけ**に限っていた（執筆中の判断材料という位置づけだった）。
+  // だが一覧から既存のエントリを開くと、パレットの発酵ボタンが理由もなく死んだままになる。
+  // 書き足すときにも前回の発酵結果は読みたいので、新旧を問わず結んだ問いから引く。
+  const firstLinkedQuestionId = Array.from(linkedIds)[0];
   const { detail: fermentationOverlayDetail } = useFermentationForQuestion(
     api,
     firstLinkedQuestionId,
@@ -739,15 +740,11 @@ export function EntryEditor({
   // 理由をホバーで言う。押せるときだけ現れる作りだと、そもそもこの操作があることに
   // 気づけない（「パレットに発酵の表示切替が無い」と言われた）。
   //
-  // 出せるのは**新しく書くとき**だけ（発酵の取得が isNewEntry に閉じている）。
-  // 既存エントリを開き直したときは、その旨を理由として言う。
   const fermentationReason = fermentationOverlayDetail
     ? undefined
-    : !isNewEntry
-      ? t('palette.fermentation_new_entry_only')
-      : linkedIds.size === 0
-        ? t('palette.fermentation_needs_question')
-        : t('palette.fermentation_not_ready');
+    : linkedIds.size === 0
+      ? t('palette.fermentation_needs_question')
+      : t('palette.fermentation_not_ready');
 
   paletteActions.push({
     id: 'fermentation',
@@ -816,7 +813,7 @@ export function EntryEditor({
 
   return (
     <div
-      className="sidebar-anchored fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-[var(--bg)]"
+      className="sidebar-anchored fixed top-0 right-0 bottom-0 z-50 flex bg-[var(--bg)]"
       {...verifyAttrs({
         unit: 'EntryEditor',
         hasEntry: !!entryId,
@@ -826,227 +823,258 @@ export function EntryEditor({
         questionSelectOpen,
       })}
     >
-      {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
+      {/* 紙の側（ヘッダー + 本文）。発酵の面はこの列の**外**に並べる——中に入れると
+          ヘッダーの下からしか始まらず、画面の縦いっぱいに立たない。 */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
           左＝問い、右＝アクションコーナー ＋ 日付 ＋ 設定。
           「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。 */}
-      <div
-        className={`flex items-center justify-between gap-6 ${fadeClass}`}
-        style={{
-          paddingTop: SHELL_INSET,
-          paddingBottom: SHELL_INSET / 2,
-          // 左右は本文と同じ縦の線に乗せる（gutterPx）。ヘッダーと本文で
-          // 別の数字を使うと、同じ画面に2本の縦線が立つ。
-          paddingLeft: gutterPx,
-          paddingRight: gutterPx,
-        }}
-      >
-        {/* 左: 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
+        <div
+          className={`flex items-center justify-between gap-6 ${fadeClass}`}
+          style={{
+            paddingTop: SHELL_INSET,
+            paddingBottom: SHELL_INSET / 2,
+            // 左右は本文と同じ縦の線に乗せる（gutterPx）。ヘッダーと本文で
+            // 別の数字を使うと、同じ画面に2本の縦線が立つ。
+            paddingLeft: gutterPx,
+            paddingRight: gutterPx,
+          }}
+        >
+          {/* 左: 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
             チップの中心が瓶アイコンの中心と同じ線に乗るようにする。 */}
-        <div className="flex min-w-0 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
-          <QuestionChip
-            activeQuestions={activeQuestions}
-            linkedQuestionIds={linkedIds}
-            onLink={handleLink}
-            onUnlink={handleUnlink}
-          />
-        </div>
-
-        {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
-        <div className="flex shrink-0 items-center gap-3" style={{ height: SHELL_ROW_HEIGHT }}>
-          {/* 日付は設定ボタンのすぐ左に、小さく。 */}
-          <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>
-
-          {/* 設定。押すと真下にパネルが開く（背景は暗転しない・外側クリックで閉じる）。 */}
-          <Popover
-            open={settingsOpen}
-            onOpenChange={setSettingsOpen}
-            ariaLabel={t('settings.heading')}
-            panelClassName="w-[19rem]"
-            trigger={(triggerProps) => (
-              <button
-                type="button"
-                {...triggerProps}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
-                data-tooltip={t('toolbar.settings')}
-                // 画面の一番上にあるボタンなので、既定の「上に出す」だと窓の外へ切れる。
-                data-tooltip-pos="bottom"
-                aria-label={t('toolbar.settings')}
-              >
-                <svg
-                  aria-hidden="true"
-                  width={ICON_SIZE}
-                  height={ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  strokeWidth={ICON_STROKE_WIDTH}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-                  />
-                </svg>
-              </button>
-            )}
-          >
-            <SettingsDrawer settings={settings} onChange={updateSettings} />
-          </Popover>
-        </div>
-      </div>
-
-      {/* Error display */}
-      {error && (
-        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Ghost layer — must be above editor (z-50) */}
-      <div
-        ref={ghostLayerRef}
-        className="sidebar-anchored pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden"
-      />
-
-      {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}
-      <div className="flex min-h-0 flex-1">
-        {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
-        <div className="relative flex-1">
-          {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
-          {settings.writingMode === 'vertical' && fadeLeft && (
-            <div
-              className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
-              style={{
-                left: 0,
-                width: '18%',
-                background: 'linear-gradient(to right, var(--bg), transparent)',
-              }}
-            />
-          )}
-          <div
-            ref={scrollContainerRef}
-            className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
-          >
-            {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
-                縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
-                本文と同じ書体で、本文より一回り大きく置く。 */}
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
-                if (e.nativeEvent.isComposing) return;
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  editorRef.current?.focus();
-                }
-              }}
-              onBlur={commitTitleEdit}
-              maxLength={100}
-              placeholder={t('title.placeholder')}
-              aria-label={t('title.placeholder')}
-              className={`z-[12] border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
-              style={titleTextStyle}
-            />
-
-            {/* Snippet selection toolbar */}
-            <SnippetToolbar editorRef={editorRef} api={api} />
-
-            {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
-            <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
-
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              onInput={() => {
-                // innerText を使う理由: contentEditable で Enter キー押下時に
-                // ブラウザが挿入する <br> や <div> を改行として読み取るため。
-                // textContent はこれらを無視し、改行が保存されない。
-                const text = editorRef.current?.innerText ?? '';
-                setContent(text);
-                if (status === 'saved') setStatus('editing');
-              }}
-              onPaste={(e) => {
-                e.preventDefault();
-                const text = e.clipboardData.getData('text/plain');
-                if (!text) return;
-                document.execCommand('insertText', false, text);
-                // execCommand の input イベントが React の onInput にバブルしない
-                // 場合があるため、paste 後に明示的に state を同期する（autosave が
-                // content 変化を検知できるようにするため）
-                const updated = editorRef.current?.innerText ?? '';
-                setContent(updated);
-                if (status === 'saved') setStatus('editing');
-              }}
-              data-placeholder={t('placeholder')}
-              // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
-              // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
-              className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full pb-6 after:block after:content-[''] after:h-[50vh]`}`}
-              style={{
-                // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
-                ...(settings.writingMode === 'vertical'
-                  ? {}
-                  : {
-                      paddingTop: `${titleReservedPx}px`,
-                      paddingLeft: `${gutterPx}px`,
-                      paddingRight: `${gutterPx}px`,
-                      maxWidth: `${measurePx + gutterPx * 2}px`,
-                    }),
-                ...(settings.writingMode === 'vertical'
-                  ? {
-                      left: '6%',
-                      top: '4%',
-                      width: '79%',
-                      height: '86%',
-                      position: 'absolute',
-                      overflowX: 'auto',
-                    }
-                  : {}),
-                fontSize: `${settings.fontSize}px`,
-                lineHeight: settings.lineHeight,
-                writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
-                textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
-                fontFamily:
-                  settings.fontFamily === 'serif'
-                    ? "'Noto Serif JP', serif"
-                    : "'Noto Sans JP', sans-serif",
-              }}
+          <div className="flex min-w-0 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
+            <QuestionChip
+              activeQuestions={activeQuestions}
+              linkedQuestionIds={linkedIds}
+              onLink={handleLink}
+              onUnlink={handleUnlink}
             />
           </div>
 
-          {/* 音声入力が使えない環境の告知。ボタン自体はヘッダーのアクションコーナーへ移した。 */}
-          {voiceState.unavailable && (
-            <div className={`absolute right-6 bottom-6 z-[20] ${fadeClass}`}>
-              <span
-                className="rounded bg-[var(--bg)] px-2 py-1 text-xs text-red-500 shadow"
-                role="status"
-                data-testid="voice-unavailable-notice"
-              >
-                {voiceStatusMessage(voiceState.reason, t)}
-              </span>
-            </div>
-          )}
+          {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
+          <div className="flex shrink-0 items-center gap-3" style={{ height: SHELL_ROW_HEIGHT }}>
+            {/* 日付は設定ボタンのすぐ左に、小さく。 */}
+            <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>
+
+            {/* 設定。押すと真下にパネルが開く（背景は暗転しない・外側クリックで閉じる）。 */}
+            <Popover
+              open={settingsOpen}
+              onOpenChange={setSettingsOpen}
+              ariaLabel={t('settings.heading')}
+              panelClassName="w-[19rem]"
+              trigger={(triggerProps) => (
+                <button
+                  type="button"
+                  {...triggerProps}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
+                  data-tooltip={t('toolbar.settings')}
+                  // 画面の一番上にあるボタンなので、既定の「上に出す」だと窓の外へ切れる。
+                  data-tooltip-pos="bottom"
+                  aria-label={t('toolbar.settings')}
+                >
+                  <svg
+                    aria-hidden="true"
+                    width={ICON_SIZE}
+                    height={ICON_SIZE}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={ICON_STROKE_WIDTH}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                    />
+                  </svg>
+                </button>
+              )}
+            >
+              <SettingsDrawer settings={settings} onChange={updateSettings} />
+            </Popover>
+          </div>
         </div>
 
-        {/* Issue #466: 発酵結果は本文に重ねず、右のサイドバーに集約する。
-            本文の**隣**に並ぶので、書いている間も消さない（本文には重ならない）。
-            余計なラッパーで包まないこと——包むと面が中身ぶんの高さしか持たず、
-            画面の上半分で切れて見える。 */}
-        {fermentSidebarOpen && fermentationOverlayDetail && (
-          <FermentationSidebar
-            detail={fermentationOverlayDetail}
-            onClose={() => setFermentSidebarOpen(false)}
-          />
+        {/* Error display */}
+        {error && (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
+            {error}
+          </div>
         )}
+
+        {/* Ghost layer — must be above editor (z-50) */}
+        <div
+          ref={ghostLayerRef}
+          className="sidebar-anchored pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden"
+        />
+
+        {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}
+        <div className="flex min-h-0 flex-1">
+          {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
+          <div className="relative flex-1">
+            {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
+            {settings.writingMode === 'vertical' && fadeLeft && (
+              <div
+                className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
+                style={{
+                  left: 0,
+                  width: '18%',
+                  background: 'linear-gradient(to right, var(--bg), transparent)',
+                }}
+              />
+            )}
+            <div
+              ref={scrollContainerRef}
+              className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
+            >
+              {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
+                縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
+                本文と同じ書体で、本文より一回り大きく置く。 */}
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    editorRef.current?.focus();
+                  }
+                }}
+                onBlur={commitTitleEdit}
+                maxLength={100}
+                placeholder={t('title.placeholder')}
+                aria-label={t('title.placeholder')}
+                className={`z-[12] border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
+                style={titleTextStyle}
+              />
+
+              {/* Snippet selection toolbar */}
+              <SnippetToolbar editorRef={editorRef} api={api} />
+
+              {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
+              <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
+
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => {
+                  // innerText を使う理由: contentEditable で Enter キー押下時に
+                  // ブラウザが挿入する <br> や <div> を改行として読み取るため。
+                  // textContent はこれらを無視し、改行が保存されない。
+                  const text = editorRef.current?.innerText ?? '';
+                  setContent(text);
+                  if (status === 'saved') setStatus('editing');
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData('text/plain');
+                  if (!text) return;
+                  document.execCommand('insertText', false, text);
+                  // execCommand の input イベントが React の onInput にバブルしない
+                  // 場合があるため、paste 後に明示的に state を同期する（autosave が
+                  // content 変化を検知できるようにするため）
+                  const updated = editorRef.current?.innerText ?? '';
+                  setContent(updated);
+                  if (status === 'saved') setStatus('editing');
+                }}
+                // ドロップを受け付ける宣言。**これが無いと drop は発火しない**
+                // （dragover の既定動作がドロップを拒否する）。
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes('text/plain')) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                }}
+                // 発酵の面から言葉を引き込む経路（キーワード・断片のドラッグ）。
+                // **ブラウザ任せの drop では state が置いていかれる**——paste と同じ理由で、
+                // DOM だけが変わって content が古いまま残り、自動保存が変化に気づかない。
+                // 落ちる位置はブラウザのキャレットに従い、挿入と同期はこちらで持つ。
+                onDrop={(e) => {
+                  const text = e.dataTransfer.getData('text/plain');
+                  if (!text) return;
+                  e.preventDefault();
+                  const dropped = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+                  if (dropped && editorRef.current?.contains(dropped.startContainer)) {
+                    const selection = window.getSelection();
+                    selection?.removeAllRanges();
+                    selection?.addRange(dropped);
+                  }
+                  editorRef.current?.focus();
+                  document.execCommand('insertText', false, text);
+                  const updated = editorRef.current?.innerText ?? '';
+                  setContent(updated);
+                  if (status === 'saved') setStatus('editing');
+                }}
+                data-placeholder={t('placeholder')}
+                // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
+                // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
+                className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full pb-6 after:block after:content-[''] after:h-[50vh]`}`}
+                style={{
+                  // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
+                  ...(settings.writingMode === 'vertical'
+                    ? {}
+                    : {
+                        paddingTop: `${titleReservedPx}px`,
+                        paddingLeft: `${gutterPx}px`,
+                        paddingRight: `${gutterPx}px`,
+                        maxWidth: `${measurePx + gutterPx * 2}px`,
+                      }),
+                  ...(settings.writingMode === 'vertical'
+                    ? {
+                        left: '6%',
+                        top: '4%',
+                        width: '79%',
+                        height: '86%',
+                        position: 'absolute',
+                        overflowX: 'auto',
+                      }
+                    : {}),
+                  fontSize: `${settings.fontSize}px`,
+                  lineHeight: settings.lineHeight,
+                  writingMode:
+                    settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
+                  textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
+                  fontFamily:
+                    settings.fontFamily === 'serif'
+                      ? "'Noto Serif JP', serif"
+                      : "'Noto Sans JP', sans-serif",
+                }}
+              />
+            </div>
+
+            {/* 音声入力が使えない環境の告知。ボタン自体はヘッダーのアクションコーナーへ移した。 */}
+            {voiceState.unavailable && (
+              <div className={`absolute right-6 bottom-6 z-[20] ${fadeClass}`}>
+                <span
+                  className="rounded bg-[var(--bg)] px-2 py-1 text-xs text-red-500 shadow"
+                  role="status"
+                  data-testid="voice-unavailable-notice"
+                >
+                  {voiceStatusMessage(voiceState.reason, t)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Issue #466: 発酵結果は本文に重ねず、右の面に集約する。
+          面は**画面の縦いっぱい**に立てる（ヘッダーの下から始めない）。
+          余計なラッパーで包まないこと——包むと中身ぶんの高さしか持たない。 */}
+      {fermentSidebarOpen && fermentationOverlayDetail && (
+        <FermentationSidebar
+          detail={fermentationOverlayDetail}
+          onClose={() => setFermentSidebarOpen(false)}
+        />
+      )}
 
       {/* 操作はすべてここに集める（問いを結ぶ・写真・音声・漬け込む・発酵・全画面）。
           本文に被らせないやり方は「場所を空ける」ではなく「振る舞い」で解く:

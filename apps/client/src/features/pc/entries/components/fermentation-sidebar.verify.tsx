@@ -95,14 +95,14 @@ registerUnit<Props>({
     },
     {
       id: 'detail-open',
-      description: '手紙を開いた状態（面は増えず、この面の中身が入れ替わる）',
+      description: 'キーワードを開いた状態（面は増えず、この面の中身が入れ替わる）',
       props: { detail: fullDetail, onClose: noop },
       act: async ({ root, wait }) => {
-        const letter = Array.from(root.querySelectorAll<HTMLElement>('button')).find((b) =>
-          b.textContent?.includes('手紙'),
+        const keyword = Array.from(root.querySelectorAll<HTMLElement>('button')).find((b) =>
+          b.textContent?.includes('静けさ'),
         );
-        if (!letter) throw new Error('手紙を開くボタンが見つからない');
-        letter.click();
+        if (!keyword) throw new Error('キーワードのボタンが見つからない');
+        keyword.click();
         await wait(16);
       },
     },
@@ -146,18 +146,40 @@ registerUnit<Props>({
     },
     {
       id: 'items-are-clickable',
-      description: '契約件数の合計 + 閉じるボタン = サイドバー内のボタン総数（全項目が開ける）',
+      // **手紙はボタンではない**。この面に来る目的そのものなので畳まずそのまま置く。
+      description: 'ことば + 断片 + 閉じるボタン = サイドバー内のボタン総数（全項目が開ける）',
       onlyFixtures: ['full', 'letter-only', 'empty', 'over-cap'],
       check: ({ root, contract }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
         if (!sidebar) return 'FermentationSidebar の契約要素が見つからない';
         const buttons = sidebar.querySelectorAll('button').length;
-        const expected =
-          Number(contract.keywordCount) +
-          Number(contract.snippetCount) +
-          (contract.hasLetter === 'true' ? 1 : 0) +
-          1; // 閉じるボタン
+        const expected = Number(contract.keywordCount) + Number(contract.snippetCount) + 1; // 閉じるボタン
         return buttons === expected || `ボタン数=${buttons}, 期待=${expected}`;
+      },
+    },
+    {
+      id: 'letter-is-readable-without-a-click',
+      // 押して開く形だと、この面に来た目的を読むのに1手余分に要る。
+      description: '手紙は畳まず、そのまま読める形で置く',
+      onlyFixtures: ['full', 'letter-only'],
+      check: ({ root }) => {
+        const sidebar = root.querySelector(SIDEBAR_SELECTOR);
+        const opener = Array.from(sidebar?.querySelectorAll('button') ?? []).find((b) =>
+          b.textContent?.includes('手紙'),
+        );
+        return opener === undefined || '手紙が押して開く形になっている';
+      },
+    },
+    {
+      id: 'past-words-are-draggable',
+      // 過去の言葉をいまの文章に取り込むのがこの面の役目。掴んで本文へ落とせる。
+      description: 'ことばと断片は掴んで本文へ引ける',
+      onlyFixtures: ['full'],
+      check: ({ root, contract }) => {
+        const sidebar = root.querySelector(SIDEBAR_SELECTOR);
+        const draggable = sidebar?.querySelectorAll('[draggable="true"]').length ?? 0;
+        const expected = Number(contract.keywordCount) + Number(contract.snippetCount);
+        return draggable === expected || `掴める項目=${draggable}, 期待=${expected}`;
       },
     },
     {

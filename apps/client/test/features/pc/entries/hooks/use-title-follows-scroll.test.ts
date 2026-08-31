@@ -41,14 +41,15 @@ describe('useTitleFollowsScroll', () => {
     );
   }
 
-  it('紙が動いた分だけ題も動く', () => {
+  it('紙が動いた分だけ題も、本文と同じ向きへ動く', () => {
     const { title, editor } = makeElements();
     setup(true, title, editor);
 
     // vertical-rl は先頭（右端）で 0、左へ読み進むと負。
     scrollTo(editor, -240);
 
-    expect(title.style.transform).toBe('translateX(-240px)');
+    // 中身は右へ送られるので、題も右へ。scrollLeft をそのまま足すと逆走する。
+    expect(title.style.transform).toBe('translateX(240px)');
   });
 
   it('紙が止まっていれば題も動かない（書いている最中にふらつかない）', () => {
@@ -66,7 +67,7 @@ describe('useTitleFollowsScroll', () => {
 
     setup(true, title, editor);
 
-    expect(title.style.transform).toBe('translateX(-120px)');
+    expect(title.style.transform).toBe('translateX(120px)');
   });
 
   it('戻れば題も戻ってくる', () => {
@@ -100,7 +101,7 @@ describe('useTitleFollowsScroll', () => {
       { initialProps: { enabled: true } },
     );
     scrollTo(editor, -300);
-    expect(title.style.transform).toBe('translateX(-300px)');
+    expect(title.style.transform).toBe('translateX(300px)');
 
     rerender({ enabled: false });
 

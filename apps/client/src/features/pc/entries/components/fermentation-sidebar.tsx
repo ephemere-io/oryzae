@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { type DragEvent as ReactDragEvent, useState } from 'react';
 import { ICON_STROKE_WIDTH, SHELL_INSET, SIDE_PANEL_WIDTH } from '@/components/ui/surface';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 
@@ -15,8 +15,16 @@ const MAX_KEYWORDS = 5;
 const MAX_SNIPPETS = 3;
 const SNIPPET_PREVIEW_LENGTH = 60;
 
+/**
+ * 掴んだ言葉を本文へ渡す。ここで決めるのは**何を渡すか**だけ。
+ * 受け取り（onDragOver / onDrop）と state の同期はエディタ側が持つ。
+ */
+function startTextDrag(e: ReactDragEvent, text: string) {
+  e.dataTransfer.setData('text/plain', text);
+  e.dataTransfer.effectAllowed = 'copy';
+}
+
 type OpenItem =
-  | { kind: 'letter'; bodyText: string }
   | { kind: 'keyword'; keyword: string; description: string }
   | { kind: 'snippet'; originalText: string; sourceDate: string; selectionReason: string };
 
@@ -32,6 +40,15 @@ type OpenItem =
  * 以前は、この面から項目を押すとさらに別の面が右から重なって出てきた（面が2枚）。
  * 同じ場所に同じ幅の面が2枚重なると、どちらを見ているのか分からなくなるし、閉じる操作も
  * 2回要る。**1枚の中で入れ替える**: 一覧 ⇄ 中身。左上の矢印で一覧へ返る。
+ *
+ * 手紙だけは畳まない。この面に来る目的そのものなので、**開いた瞬間から読める**ように
+ * そのまま置く（押して開く形だと、読むのに1手余分に要る）。面の見出しは「手紙」。
+ *
+ * ## ことばと断片は本文へ引ける
+ *
+ * 過去の言葉をいまの文章に取り込むのがこの面の役目なので、掴んで本文へ落とせば
+ * その位置に入る。ここで決めるのは**何を渡すか**だけで、受け取りと state の同期は
+ * エディタ側の onDrop が持つ（ブラウザ任せにすると DOM だけ変わって保存が気づかない）。
  *
  * ## 色は本文と同じ世界のもの
  *
@@ -54,10 +71,13 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
   const isEmpty = keywords.length === 0 && snippets.length === 0 && detail.letter === null;
 
   const headers = {
-    letter: td('header_letter'),
     keyword: td('header_keyword'),
     snippet: td('header_snippet'),
   };
+
+  // 面の見出し。「発酵」とだけ書かれていても何のことか分からないので、
+  // いま何を見ているか（手紙／ことば／断片）を出す。
+  const heading = open ? headers[open.kind] : detail.letter ? t('section_letter') : t('heading');
 
   return (
     <aside
@@ -101,7 +121,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
           </button>
         )}
         <span className="flex-1 truncate text-[11px] font-medium tracking-[0.12em] text-[var(--fg)] opacity-45">
-          {open ? headers[open.kind] : t('heading')}
+          {heading}
         </span>
         <button
           type="button"
@@ -133,25 +153,14 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
               </p>
             )}
 
-            {/* 手紙。この面でいちばん長く読むものなので、いちばん上に、いちばん大きく置く。 */}
+            {/* 手紙はこの面に来る目的そのもの。畳まずそのまま置く（見出しは面の上にある）。 */}
             {detail.letter && (
-              <Section label={t('section_letter')}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpen({ kind: 'letter', bodyText: detail.letter?.bodyText ?? '' })
-                  }
-                  className="w-full rounded-lg border px-3.5 py-3 text-left text-[13px] leading-relaxed transition-colors duration-150"
-                  style={{
-                    borderColor: 'color-mix(in srgb, var(--accent) 30%, transparent)',
-                    background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
-                    color: 'var(--fg)',
-                    fontFamily: "'Noto Serif JP', serif",
-                  }}
-                >
-                  {t('letter_open')}
-                </button>
-              </Section>
+              <div
+                className="mb-7 px-5 text-[13px] leading-[2] whitespace-pre-wrap text-[var(--fg)]"
+                style={{ fontFamily: "'Noto Serif JP', serif" }}
+              >
+                {detail.letter.bodyText}
+              </div>
             )}
 
             {keywords.length > 0 && (
@@ -161,6 +170,9 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                     <button
                       key={kw.id}
                       type="button"
+                      // 掴んで本文へ落とせば、その位置に入る。押せば意味を読む。
+                      draggable
+                      onDragStart={(e) => startTextDrag(e, kw.keyword)}
                       onClick={() =>
                         setOpen({
                           kind: 'keyword',
@@ -168,7 +180,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                           description: kw.description,
                         })
                       }
-                      className="flex h-7 items-center rounded-full border px-3 text-[12px] transition-colors duration-150"
+                      className="flex h-7 cursor-grab items-center rounded-full border px-3 text-[12px] transition-colors duration-150 active:cursor-grabbing"
                       style={{
                         borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)',
                         background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
@@ -191,6 +203,10 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                     <button
                       key={s.id}
                       type="button"
+                      // 掴めば本文へ引き込める。落とすのは**全文**（一覧の表示は頭打ちだが、
+                      // 取り込むときに切れていては使い物にならない）。
+                      draggable
+                      onDragStart={(e) => startTextDrag(e, s.originalText)}
                       onClick={() =>
                         setOpen({
                           kind: 'snippet',
@@ -201,7 +217,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                       }
                       // 断片は自分が過去に書いた文なので、本文と同じ明朝で、引用のように
                       // 左の罫だけを持たせる（面の中で唯一の線）。
-                      className="border-l-2 py-1 pl-3 text-left text-[12px] leading-relaxed text-[var(--fg)] transition-colors duration-150 hover:border-[var(--accent)]"
+                      className="cursor-grab border-l-2 py-1 pl-3 text-left text-[12px] leading-relaxed text-[var(--fg)] transition-colors duration-150 hover:border-[var(--accent)] active:cursor-grabbing"
                       style={{
                         borderColor: 'var(--surface-sunken-border)',
                         fontFamily: "'Noto Serif JP', serif",
@@ -229,8 +245,6 @@ function ItemDetail({ item, sourcePrefix }: { item: OpenItem; sourcePrefix: stri
       className="px-5 text-[13px] leading-[2] text-[var(--fg)]"
       style={{ fontFamily: "'Noto Serif JP', serif" }}
     >
-      {item.kind === 'letter' && <div className="whitespace-pre-wrap">{item.bodyText}</div>}
-
       {item.kind === 'keyword' && (
         <>
           <h3 className="mb-3 text-[16px] font-medium text-[var(--accent)]">{item.keyword}</h3>

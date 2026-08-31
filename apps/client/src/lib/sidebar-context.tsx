@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 /** 畳んだ状態の幅（アイコンだけ）。アイコン48px + 左右16pxずつ。 */
-const SIDEBAR_COLLAPSED_WIDTH = 80;
+export const SIDEBAR_COLLAPSED_WIDTH = 80;
 /** 開いた状態の既定幅（アイコン + メニュー名）。 */
 const SIDEBAR_DEFAULT_WIDTH = 232;
 /** 開いた状態で許す最小幅。これを下回るドラッグは「畳む」とみなす。 */

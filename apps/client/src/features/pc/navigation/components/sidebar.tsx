@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import { docsHref } from '@/lib/docs-site';
 import {
   applySidebarWidth,
+  SIDEBAR_COLLAPSED_WIDTH,
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
   setSidebarResizing,
@@ -95,6 +96,8 @@ export function Sidebar() {
   const pendingWidthRef = useRef<number | null>(null);
   // 掴んだ位置。ここから DRAG_THRESHOLD 動くまでは「押しただけ」と見なす。
   const dragStartXRef = useRef(0);
+  // 掴んだまま最小幅より内側へ入ったか。離した時点の姿がそのまま確定する。
+  const collapsedDuringDragRef = useRef(false);
   const frameRef = useRef<number | null>(null);
 
   const stopDrag = useCallback(() => setDragging(false), []);
@@ -116,14 +119,16 @@ export function Sidebar() {
       // そのあとの click が食われて**押しても畳まれない**。
       if (Math.abs(next - dragStartXRef.current) < DRAG_THRESHOLD) return;
       draggedRef.current = true;
-      // 最小幅より内側まで引いたら畳む。ドラッグで閉じられるのが自然なので、
-      // 「掴んで縮める」と「畳む」を別の操作にしない。
+      // 最小幅より内側なら畳んだ姿。外へ出れば開いた姿。**掴んだまま行き来できる**
+      // （畳む／開くを別の操作にしない）。畳みに落ちてもドラッグは切らないので、
+      // そのまま右へ引き戻せばまた開く。
       if (next < SIDEBAR_MIN_WIDTH - 24) {
         pendingWidthRef.current = null;
-        setCollapsed(true);
-        setDragging(false);
+        applySidebarWidth(SIDEBAR_COLLAPSED_WIDTH);
+        collapsedDuringDragRef.current = true;
         return;
       }
+      collapsedDuringDragRef.current = false;
       dragWidthRef.current = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, next));
       pendingWidthRef.current = dragWidthRef.current;
       if (frameRef.current === null) frameRef.current = requestAnimationFrame(flush);
@@ -146,7 +151,13 @@ export function Sidebar() {
         frameRef.current = null;
       }
       // 掴み終わってはじめて state を確定する（保存もここで1回だけ）。
-      if (pendingWidthRef.current !== null) setExpandedWidth(pendingWidthRef.current);
+      if (collapsedDuringDragRef.current) {
+        collapsedDuringDragRef.current = false;
+        setCollapsed(true);
+      } else if (pendingWidthRef.current !== null) {
+        setCollapsed(false);
+        setExpandedWidth(pendingWidthRef.current);
+      }
     };
   }, [dragging, setCollapsed, setExpandedWidth, stopDrag]);
 
@@ -321,8 +332,9 @@ export function Sidebar() {
           setCollapsed(!collapsed);
         }}
         onPointerDown={(e) => {
-          // 開いているときだけ掴める（畳んだ状態から引き出すのは1クリックで足りる）。
-          if (collapsed) return;
+          // **畳んでいても掴める。** 掴めないのに col-resize のカーソルが出ていたので、
+          // 「引けるはずなのに引けない」状態だった。しかも引いて畳んだ直後は
+          // また掴めなくなる（畳んだ = 掴めない、だったため）。
           e.preventDefault();
           draggedRef.current = false;
           dragStartXRef.current = e.clientX;
