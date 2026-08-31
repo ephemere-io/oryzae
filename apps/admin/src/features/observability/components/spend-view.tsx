@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -22,6 +23,34 @@ function formatShortDate(iso: string): string {
   if (!iso) return '-';
   const [, month, day] = iso.split('-');
   return month && day ? `${Number(month)}/${Number(day)}` : iso;
+}
+
+/**
+ * 読み込み中の骨組み。実データと同じ「3枚のカード + 表」の形にしてある。
+ *
+ * この画面は Anthropic の cost_report と Supabase の集計を待つため数秒かかる。
+ * 素の "Loading..." だと止まって見えるので、出てくる形を先に見せる。
+ */
+function SpendSkeleton() {
+  return (
+    <div className="space-y-6" role="status" aria-busy="true" aria-label="コストデータを読み込み中">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        {['actual', 'estimated', 'drift'].map((key) => (
+          <div key={key} className="rounded-lg border border-border/50 bg-card p-4">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="mt-2 h-8 w-32" />
+            <Skeleton className="mt-2 h-3 w-40" />
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3">
+        <Skeleton className="h-3 w-24" />
+        {['r1', 'r2', 'r3', 'r4', 'r5'].map((key) => (
+          <Skeleton key={key} className="h-4 w-full" />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /** 実請求額の見出し値。未設定・失敗を $0.0000 と出さない。 */
@@ -144,7 +173,7 @@ export function SpendView({
       )}
 
       {loading && !data ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
+        <SpendSkeleton />
       ) : data ? (
         <>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">

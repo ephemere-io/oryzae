@@ -18,7 +18,13 @@
 const COST_REPORT_URL = 'https://api.anthropic.com/v1/organizations/cost_report';
 const ANTHROPIC_VERSION = '2023-06-01';
 const REQUEST_TIMEOUT_MS = 10_000;
-// 1リクエスト最大31バケット。暴走防止に上限を置く（31日 × 数ページで十分）。
+/**
+ * 1ページあたりのバケット数。**明示しないと既定 7 になる**（docs: "limit … default: 7,
+ * maximum: 31"）。30 日分を取るのに api.anthropic.com へ逐次 5 往復していて、これが
+ * コスト画面の待ち時間の主因だった。上限の 31 を渡せば 30 日は 1 往復で済む。
+ */
+const BUCKETS_PER_PAGE = 31;
+// 暴走防止の上限。31バケット × 10ページ ≒ 10か月分まで取り切れる。
 const MAX_PAGES = 10;
 
 interface DailyActualCost {
@@ -93,6 +99,7 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
         starting_at: startingAt.toISOString(),
         ending_at: endingAt.toISOString(),
         bucket_width: '1d',
+        limit: String(BUCKETS_PER_PAGE),
       });
       if (page) params.set('page', page);
 
