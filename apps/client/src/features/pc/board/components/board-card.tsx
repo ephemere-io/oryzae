@@ -176,16 +176,17 @@ export function BoardCard({
           onClick(card);
         }}
       />
-      {/* 'block' では中身を描かない。引ききった状態では読めず、枚数分の
-          テキスト描画がそのまま無駄になるため、色の付いた矩形だけにする。 */}
+      {/* 引ききった状態（'block'）では **文字だけ** 落とす。読めない文字を枚数分
+          描くのは無駄だが、写真は縮んでも何の写真か分かるので落とさない。
+          落とすと白い矩形になり「写真が表示されない」ように見える（PR #533 のレビュー指摘）。 */}
       {detail !== 'block' && card.cardType === 'entry' && isEntryContent(card.content) && (
         <EntryCardContent content={card.content} titleOnly={detail === 'title'} />
       )}
       {detail !== 'block' && card.cardType === 'snippet' && isSnippetContent(card.content) && (
         <SnippetCardContent content={card.content} titleOnly={detail === 'title'} />
       )}
-      {detail !== 'block' && card.cardType === 'photo' && isPhotoContent(card.content) && (
-        <PhotoCardContent content={card.content} />
+      {card.cardType === 'photo' && isPhotoContent(card.content) && (
+        <PhotoCardContent content={card.content} captionHidden={detail === 'block'} />
       )}
 
       {/* Handles - visible only when selected */}

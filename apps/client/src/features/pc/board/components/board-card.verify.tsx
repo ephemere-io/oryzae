@@ -14,6 +14,7 @@ import { BoardCard } from './board-card';
 
 interface Props {
   card: BoardCardData;
+  detail?: 'block' | 'title' | 'full';
   isSelected: boolean;
   isDragging: boolean;
   onPointerDown: (cardId: string, x: number, y: number) => void;
@@ -114,6 +115,18 @@ registerUnit<Props>({
       props: { card: photoCard, isSelected: true, isDragging: false, ...baseCallbacks },
     },
     {
+      id: 'photo-block-detail',
+      probe: true,
+      description: 'Probe: 引ききった表示(block)でも写真の img は残る（白い矩形にしない）',
+      props: {
+        card: photoCard,
+        detail: 'block',
+        isSelected: false,
+        isDragging: false,
+        ...baseCallbacks,
+      },
+    },
+    {
       id: 'selected-removing-dragging',
       probe: true,
       description:
@@ -127,6 +140,17 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'photo-img-always-rendered',
+      description: 'どの詳細度でも写真カードは img を描く（文字だけを落とす）',
+      check: ({ root, props }) => {
+        if (props.card.cardType !== 'photo') return true;
+        return (
+          Boolean(root.querySelector('img')) ||
+          `写真カードなのに img が無い（detail=${props.detail ?? 'full'}）`
+        );
+      },
+    },
     {
       id: 'cardtype-contract-matches-props',
       description: 'data-verify-card-type が props.card.cardType と一致する',
