@@ -1,20 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { createApiClient } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
+import { parseJson } from '@/lib/json';
 
-interface FailureItem {
-  id: string;
-  errorMessage: string | null;
-  createdAt: string;
-}
+const failureItemSchema = z.object({
+  id: z.string(),
+  errorMessage: z.string().nullable(),
+  createdAt: z.string(),
+});
 
-export interface FailureGroup {
-  userId: string;
-  email: string;
-  failures: FailureItem[];
-}
+const failureGroupSchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  failures: z.array(failureItemSchema),
+});
+
+const failuresResponseSchema = z.object({ groups: z.array(failureGroupSchema) });
+
+export type FailureGroup = z.infer<typeof failureGroupSchema>;
 
 export function useFailureAlerts() {
   const [groups, setGroups] = useState<FailureGroup[]>([]);
@@ -30,14 +36,9 @@ export function useFailureAlerts() {
 
     const api = createApiClient(token);
     const res = await api.fetch('/api/v1/admin/dashboard/failures-24h');
-    if (res.ok) {
-      const data: unknown = await res.json();
-      if (typeof data === 'object' && data !== null && 'groups' in data) {
-        const groupsRaw = (data as { groups: unknown }).groups; // @type-assertion-allowed: in 演算子で存在確認後
-        if (Array.isArray(groupsRaw)) {
-          setGroups(groupsRaw as FailureGroup[]); // @type-assertion-allowed: API レスポンスの shape
-        }
-      }
+    const data = res.ok ? await parseJson(res, failuresResponseSchema) : null;
+    if (data) {
+      setGroups(data.groups);
     } else {
       setError('障害情報の取得に失敗しました');
     }

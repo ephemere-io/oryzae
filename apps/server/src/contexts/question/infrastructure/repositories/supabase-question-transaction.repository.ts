@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readBoolean, readNumber, readString } from '../../../shared/infrastructure/row.js';
 import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway.js';
 import { QuestionTransaction } from '../../domain/models/question-transaction.js';
 
@@ -123,14 +124,14 @@ export class SupabaseQuestionTransactionRepository implements QuestionTransactio
 
   private toDomain(row: Record<string, unknown>): QuestionTransaction {
     return QuestionTransaction.fromProps({
-      id: row.id as string,
-      questionId: row.question_id as string,
-      string: row.string as string,
-      questionVersion: row.question_version as number,
-      isValidatedByUser: row.is_validated_by_user as boolean,
-      isProposedByOryzae: row.is_proposed_by_oryzae as boolean,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      id: readString(row, 'id'),
+      questionId: readString(row, 'question_id'),
+      string: readString(row, 'string'),
+      questionVersion: readNumber(row, 'question_version'),
+      isValidatedByUser: readBoolean(row, 'is_validated_by_user'),
+      isProposedByOryzae: readBoolean(row, 'is_proposed_by_oryzae'),
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }

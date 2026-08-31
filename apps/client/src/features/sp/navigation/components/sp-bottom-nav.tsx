@@ -1,0 +1,213 @@
+'use client';
+
+import { verifyAttrs } from '@oryzae/verify';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
+import { useUnread } from '@/lib/unread-context';
+
+function ListIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <title>list</title>
+      <path d="M4 5h16M4 10h16M4 15h10" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function QuestionIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <title>questions</title>
+      <circle cx="12" cy="12" r="9" />
+      <path
+        d="M9.4 9.4a2.6 2.6 0 0 1 4.6 1.6c0 1.7-2.4 2-2.4 3.4"
+        strokeLinecap="round"
+        strokeOpacity=".7"
+      />
+      <circle cx="12" cy="17" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+function JarIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <title>jar</title>
+      <path d={JAR_ICON_PATH} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function AccountIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <title>account</title>
+      <circle cx="12" cy="8" r="3.4" />
+      <path d="M5 20c0-3.5 3.1-5.3 7-5.3s7 1.8 7 5.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * SP シェルのボトムナビ（Issue #363）。SP のデフォルトメニュー＝
+ * エントリー / 問い / 書く(中央FAB) / 瓶 / アカウント の5つ。
+ * 瓶には未読（届いた手紙）バッジ。device=sp の (protected) シェルでのみ使う。
+ */
+// verify-exempt: usePathname（能動タブ）と useUnread（バッジ）依存で、孤立検証には
+// フィクスチャ毎の PathnameContext 差し替え＋Unread 供給が要る。能動状態・バッジは
+// ブラウザゴールデン（実 router/実 unread）で担保する。DOM 契約は verifyAttrs で公表。
+export function SpBottomNav() {
+  const t = useTranslations('sp.nav');
+  const pathname = usePathname();
+  const { unreadCount } = useUnread();
+
+  const tabStyle = (on: boolean) => ({ color: on ? 'var(--accent)' : 'var(--date-color)' });
+  const onList = pathname === '/entries';
+  const onQuestions = pathname.startsWith('/questions');
+  const onJar = pathname.startsWith('/jar');
+  const onAccount = pathname.startsWith('/account');
+  const activeTab = onList
+    ? 'list'
+    : onQuestions
+      ? 'questions'
+      : onJar
+        ? 'jar'
+        : onAccount
+          ? 'account'
+          : 'none';
+
+  return (
+    <nav
+      {...verifyAttrs({ unit: 'SpBottomNav', activeTab, unreadCount, tabCount: 5 })}
+      className="relative flex flex-none items-center justify-around px-1"
+      style={{
+        // ホームインジケータ分を下パディングで確保（viewport-fit=cover で env が効く）。
+        // タブ自体は 64px の領域に収め、その下に safe-area を空ける。
+        height: 'calc(64px + env(safe-area-inset-bottom))',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        borderTop: '1px solid var(--border-subtle)',
+        background: 'color-mix(in srgb, var(--bg) 92%, transparent)',
+        backdropFilter: 'blur(10px)',
+        fontFamily: 'var(--ob-font-sans)',
+      }}
+    >
+      <Link
+        href="/entries"
+        className="flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onList)}
+        aria-current={onList ? 'page' : undefined}
+      >
+        <ListIcon />
+        {t('list')}
+      </Link>
+
+      <Link
+        href="/questions"
+        className="flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onQuestions)}
+        aria-current={onQuestions ? 'page' : undefined}
+      >
+        <QuestionIcon />
+        {t('questions')}
+      </Link>
+
+      <Link
+        href="/entries/new"
+        aria-label={t('write')}
+        className="flex flex-none items-center justify-center text-white"
+        style={{
+          width: 52,
+          height: 52,
+          marginTop: -22,
+          borderRadius: 18,
+          background: 'var(--ob-jar-warm)',
+          boxShadow: '0 8px 20px -6px color-mix(in srgb, var(--ob-jar-warm) 55%, transparent)',
+          border: '3px solid var(--bg)',
+        }}
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <title>write</title>
+          <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+        </svg>
+      </Link>
+
+      <Link
+        href="/jar"
+        className="relative flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onJar)}
+        aria-current={onJar ? 'page' : undefined}
+      >
+        <JarIcon />
+        {t('jar')}
+        {unreadCount > 0 ? (
+          <span
+            className="absolute flex items-center justify-center text-[9px] font-bold text-white"
+            style={{
+              top: -3,
+              right: 6,
+              minWidth: 15,
+              height: 15,
+              padding: '0 3px',
+              borderRadius: 8,
+              background: 'var(--ob-jar-warm)',
+            }}
+          >
+            {unreadCount}
+          </span>
+        ) : null}
+      </Link>
+
+      <Link
+        href="/account"
+        className="flex w-14 flex-col items-center gap-0.5 text-[10px]"
+        style={tabStyle(onAccount)}
+        aria-current={onAccount ? 'page' : undefined}
+      >
+        <AccountIcon />
+        {t('account')}
+      </Link>
+    </nav>
+  );
+}

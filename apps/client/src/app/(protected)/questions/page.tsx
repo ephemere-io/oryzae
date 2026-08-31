@@ -3,16 +3,19 @@
 import { useTranslations } from 'next-intl';
 import { DeviceView } from '@/components/device-view';
 import { ErrorState } from '@/components/ui/error-state';
-import { Skeleton } from '@/components/ui/skeleton';
 import { QuestionCreateForm } from '@/features/pc/questions/components/question-create-form';
 import { QuestionTimeline } from '@/features/pc/questions/components/question-timeline';
+import { QuestionTimelineSkeleton } from '@/features/pc/questions/components/question-timeline-skeleton';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
 import { useAuth } from '@/lib/auth-context';
+import { useUnread } from '@/lib/unread-context';
 
 export default function QuestionsPage() {
   const t = useTranslations('questions.timeline');
   const { api } = useAuth();
+  // Issue #452: どの問いに手紙が届いたのかを一覧でも分かるようにする。
+  const { unreadQuestionIds } = useUnread();
   const {
     questions,
     loading,
@@ -37,6 +40,7 @@ export default function QuestionsPage() {
           archiveQuestion={archiveQuestion}
           acceptQuestion={acceptQuestion}
           rejectQuestion={rejectQuestion}
+          unreadQuestionIds={unreadQuestionIds}
         />
       }
       pc={
@@ -46,10 +50,8 @@ export default function QuestionsPage() {
 
             <div className="mt-6">
               {loading ? (
-                <div className="flex flex-col gap-4" data-testid="questions-skeleton">
-                  {[0, 1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-14 w-full" />
-                  ))}
+                <div data-testid="questions-skeleton">
+                  <QuestionTimelineSkeleton />
                 </div>
               ) : error && questions.length === 0 ? (
                 <ErrorState

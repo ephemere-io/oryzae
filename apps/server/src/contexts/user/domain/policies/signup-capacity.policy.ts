@@ -5,7 +5,7 @@
  * env 読み取りは application 層に置く。ここは（used, limit）→ 状態の純関数のみ。
  */
 
-export const DEFAULT_MAX_USER_COUNT = 100;
+export const DEFAULT_MAX_USER_COUNT = 105;
 
 export interface SignupAvailability {
   /** 上限人数 */

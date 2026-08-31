@@ -1,27 +1,15 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-
-interface EntryContent {
-  title: string;
-  preview: string;
-  createdAt: string;
-}
+import type { EntryContent } from '@/features/shared/board/types';
+import { formatIsoDate } from '@/lib/format-date';
 
 interface EntryCardContentProps {
   content: EntryContent;
 }
 
-function formatEntryDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 export function EntryCardContent({ content }: EntryCardContentProps) {
-  const formattedDate = formatEntryDate(content.createdAt);
+  const formattedDate = formatIsoDate(content.createdAt);
   return (
     <div
       className="flex h-full flex-col overflow-hidden p-6"

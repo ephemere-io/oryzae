@@ -8,11 +8,11 @@ import {
   FermentationOverlayDetailPane,
   type FermentationOverlayDetailType,
 } from '@/features/pc/entries/components/fermentation-overlay-detail-pane';
-import type { EntryFermentationDetail } from '@/features/pc/entries/hooks/use-entry-fermentation-detail';
 import { useOverlayDrag } from '@/features/pc/entries/hooks/use-overlay-drag';
+import type { FermentationDetail } from '@/features/shared/fermentation/types';
 
 interface FermentationOverlayProps {
-  detail: EntryFermentationDetail;
+  detail: FermentationDetail;
 }
 
 interface Pos {

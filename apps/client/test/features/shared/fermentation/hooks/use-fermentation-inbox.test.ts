@@ -1,9 +1,6 @@
-import { renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  useFermentationDetail,
-  useFermentationInbox,
-} from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
+import { cleanup, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import type { ApiClient } from '@/lib/api';
 
 function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
@@ -20,6 +17,10 @@ describe('useFermentationInbox', () => {
     vi.clearAllMocks();
     localStorage.clear();
   });
+
+  // アンマウントしないと、環境が壊された後に fetch が解決して React が更新を走らせる
+  // （"window is not defined"）。この repo は setup ファイルを持たないので明示的に呼ぶ。
+  afterEach(cleanup);
 
   it('完了した発酵のある問いだけを未読として返す（バルク取得・問いごとに最新1件）', async () => {
     const fetchImpl = vi.fn((url: string) => {
@@ -54,8 +55,9 @@ describe('useFermentationInbox', () => {
       questionId: 'q1',
       questionText: '問いA',
       fermentationId: 'f1', // q1 の最新の完了発酵
-      unread: true,
     });
+    // Issue #447: 既読/未読は受信箱では決めない（use-unread-letters に一本化）。
+    expect(result.current.letters[0]).not.toHaveProperty('unread');
   });
 
   it('authLoading 中は取得しない', () => {
@@ -64,43 +66,62 @@ describe('useFermentationInbox', () => {
     renderHook(() => useFermentationInbox(api, true));
     expect(fetchImpl).not.toHaveBeenCalled();
   });
-});
 
-describe('useFermentationDetail', () => {
-  beforeEach(() => vi.clearAllMocks());
+  it('問い一覧に無い問いの手紙も落とさない（開けない未読を作らない）', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions') return Promise.resolve(jsonResponse([]));
+      if (url === '/api/v1/fermentations')
+        return Promise.resolve(
+          jsonResponse([
+            {
+              id: 'f9',
+              questionId: 'gone',
+              status: 'completed',
+              createdAt: '2026-05-01T00:00:00Z',
+            },
+          ]),
+        );
+      throw new Error(`unexpected fetch: ${url}`);
+    });
 
-  it('発酵詳細から手紙・言葉・抜粋を取り出す', async () => {
-    const fetchImpl = vi.fn(() =>
-      Promise.resolve(
-        jsonResponse({
-          letter: { bodyText: 'こんにちは、過去の自分より' },
-          keywords: [{ id: 'k1', keyword: '余白', description: '...' }],
-          snippets: [{ id: 's1', originalText: 'うまく言えない', sourceDate: '2024-02-01' }],
-        }),
-      ),
-    );
-    const api = createMockApi(fetchImpl);
-    const { result } = renderHook(() => useFermentationDetail(api, 'f1'));
-    await waitFor(() => expect(result.current.detail?.bodyText).toBe('こんにちは、過去の自分より'));
-    expect(result.current.detail?.keywords).toHaveLength(1);
-    expect(result.current.detail?.keywords[0].keyword).toBe('余白');
-    expect(result.current.detail?.snippets).toHaveLength(1);
-  });
+    const { result } = renderHook(() => useFermentationInbox(createMockApi(fetchImpl), false));
 
-  it('letter / keywords / snippets が無ければ空で返す', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse({ letter: null })));
-    const api = createMockApi(fetchImpl);
-    const { result } = renderHook(() => useFermentationDetail(api, 'f1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.detail?.bodyText).toBeNull();
-    expect(result.current.detail?.keywords).toEqual([]);
-    expect(result.current.detail?.snippets).toEqual([]);
+    expect(result.current.letters).toHaveLength(1);
+    expect(result.current.letters[0]).toMatchObject({
+      questionId: 'gone',
+      questionText: null,
+      fermentationId: 'f9',
+    });
   });
 
-  it('fermentationId が null なら fetch しない', () => {
-    const fetchImpl = vi.fn();
+  it('問い一覧が配列でなくても落ちない', async () => {
+    const fetchImpl = vi.fn((url: string) => {
+      if (url === '/api/v1/questions') return Promise.resolve(jsonResponse({ error: 'boom' }));
+      if (url === '/api/v1/fermentations')
+        return Promise.resolve(
+          jsonResponse([
+            { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2026-05-01T00:00:00Z' },
+          ]),
+        );
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    const { result } = renderHook(() => useFermentationInbox(createMockApi(fetchImpl), false));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    // 見出しが取れなくても手紙自体は開けるようにする（問いの本文は null）。
+    expect(result.current.letters).toHaveLength(1);
+    expect(result.current.letters[0].questionText).toBeNull();
+  });
+
+  it('通信が失敗しても loading が張り付かない', async () => {
+    const fetchImpl = vi.fn(() => Promise.reject(new Error('network down')));
     const api = createMockApi(fetchImpl);
-    renderHook(() => useFermentationDetail(api, null));
-    expect(fetchImpl).not.toHaveBeenCalled();
+
+    const { result } = renderHook(() => useFermentationInbox(api, false));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.letters).toEqual([]);
   });
 });

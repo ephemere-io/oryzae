@@ -24,6 +24,8 @@ describe('useDashboardStats', () => {
       totalUsers: 10,
       totalEntries: 50,
       totalFermentations: 20,
+      completedFermentations: 15,
+      failedFermentations: 5,
       fermentationsWithCostTracking: 5,
     };
     mockFetch.mockResolvedValueOnce(mockResponse(true, stats));

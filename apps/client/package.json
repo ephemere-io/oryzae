@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "set -a && . ../../.env && set +a && next dev",
+    "dev": "set -a; [ -f ../../.env ] && . ../../.env || echo '[dev] ../../.env not found — using ambient env (CI)'; set +a; next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -18,26 +18,26 @@
     "@oryzae/server": "workspace:*",
     "@oryzae/shared": "workspace:*",
     "@oryzae/verify": "workspace:*",
-    "@sentry/nextjs": "^10.61.0",
-    "next": "16.2.7",
-    "next-intl": "^4.13.0",
-    "posthog-js": "^1.393.5",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "@sentry/nextjs": "^10.70.0",
+    "next": "16.3.1",
+    "next-intl": "^4.13.7",
+    "posthog-js": "^1.418.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "@tailwindcss/postcss": "^4.3.1",
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^25.9.4",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "dependency-cruiser": "^17.4.3",
-    "jsdom": "^29.1.1",
-    "postcss": "^8.5.15",
-    "tailwindcss": "^4.3.1",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.6"
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "dependency-cruiser": "^18.2.0",
+    "jsdom": "^30.0.1",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
   }
 }

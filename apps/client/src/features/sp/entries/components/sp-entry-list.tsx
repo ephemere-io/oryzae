@@ -4,16 +4,23 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { ListSkeleton } from '@/components/ui/list-skeleton';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
-import { type EntryListOrder, useEntries } from '@/features/shared/entries/hooks/use-entries';
+import { useEntries } from '@/features/shared/entries/hooks/use-entries';
+import type { EntryListOrder } from '@/features/shared/entries/types';
+import {
+  SpEntryListChipsSkeleton,
+  SpEntryListRowsSkeleton,
+} from '@/features/sp/entries/components/sp-entry-list-skeleton';
 import type { ApiClient } from '@/lib/api';
+import { formatMonthDay } from '@/lib/format-date';
 import { SpConfirmSheet } from './sp-confirm-sheet';
 
 interface SpEntryListProps {
   api: ApiClient | null;
   /** 問いフィルタ用の選択肢。page の useQuestions から渡す（重複 fetch を避ける）。 */
   availableQuestions?: { id: string; currentText: string | null }[];
+  /** 問いの取得中か。0件と区別できないとチップ行の有無が後から変わり一覧がズレる。 */
+  questionsLoading?: boolean;
 }
 
 /** content の先頭行をタイトル代わりに使う（エディタの保存形式: 先頭行=タイトル）。 */
@@ -22,20 +29,16 @@ function firstLine(content: string): string {
   return (idx === -1 ? content : content.slice(0, idx)).trim();
 }
 
-/** ISO 日付を「M月D日」に。失敗時は空。 */
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
 /**
  * SP 版エントリ一覧（Issue #363）。PC 同等に検索・問いで絞り込みを備える。
  * タップで詳細（/entries/[id]）へ遷移し、SP エディタで読み＋編集する。
  * アカウント等への移動はボトムナビから。
  */
-export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) {
+export function SpEntryList({
+  api,
+  availableQuestions = [],
+  questionsLoading = false,
+}: SpEntryListProps) {
   const t = useTranslations('sp.list');
   const tDelete = useTranslations('entries.delete_modal');
   const router = useRouter();
@@ -77,6 +80,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
         loading,
         count: entries.length,
         hasQuestions: activeQuestions.length > 0,
+        questionsLoading,
         order,
         deleteOpen: deleteId !== null,
       })}
@@ -166,7 +170,9 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
         </div>
       </div>
 
-      {/* 問いで絞り込み（チップ） */}
+      {/* 問いで絞り込み（チップ）。取得中は枠で場所を取る（届いた瞬間に行が挿入されると
+          一覧全体が下へズレるため）。 */}
+      {questionsLoading && activeQuestions.length === 0 ? <SpEntryListChipsSkeleton /> : null}
       {activeQuestions.length > 0 ? (
         <div
           className="mt-3 flex gap-2 overflow-x-auto px-5 pb-1"
@@ -188,7 +194,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
       ) : null}
 
       {loading ? (
-        <ListSkeleton />
+        <SpEntryListRowsSkeleton />
       ) : entries.length === 0 ? (
         <div className="px-5 py-12 text-center text-sm opacity-50">
           {isFiltering ? t('empty_filtered') : t('empty')}
@@ -216,7 +222,7 @@ export function SpEntryList({ api, availableQuestions = [] }: SpEntryListProps) 
                     {title}
                   </span>
                   <span className="mt-1.5 flex items-center gap-2.5 text-[11px] text-[var(--date-color)]">
-                    <span>{formatDate(entry.createdAt)}</span>
+                    <span>{formatMonthDay(entry.createdAt)}</span>
                     {q ? (
                       <span style={{ color: 'var(--accent)' }}>
                         ◦ {q.currentText ?? t('untitled')}

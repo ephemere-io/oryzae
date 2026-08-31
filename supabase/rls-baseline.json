@@ -1,0 +1,24 @@
+{
+  "$comment": [
+    "scripts/check-rls-policies.mjs の既知リスク登録簿。",
+    "ここに載っている項目は CI を止めない。載っていない新規の問題が出たら CI が落ちる。",
+    "status:",
+    "  accepted — 意図的な設計判断。恒久的に許容する。",
+    "  todo     — 未修正のセキュリティ負債。直したらこの項目を削除すること。",
+    "           （直したのに残っていると『baseline の腐敗』としてゲートが落ちる）",
+    "新しく書くマイグレーションでは、この JSON ではなく対象文の直前行に",
+    "`-- @rls-exempt: <理由>` を書いて意図を宣言する。"
+  ],
+  "knownIssues": [
+    {
+      "id": "public-bucket:avatars",
+      "status": "accepted",
+      "reason": "アバターは公開画像として設計されている（00009 のポリシー名 'Anyone can view avatars' が意図を明示）。"
+    },
+    {
+      "id": "storage-select-unscoped:Anyone can view avatars",
+      "status": "accepted",
+      "reason": "同上。アバターの公開閲覧は意図的。"
+    }
+  ]
+}

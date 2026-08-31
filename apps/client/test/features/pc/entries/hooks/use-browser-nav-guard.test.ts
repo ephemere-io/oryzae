@@ -1,10 +1,13 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { useBrowserNavGuard } from '@/features/pc/entries/hooks/use-browser-nav-guard';
 
 describe('useBrowserNavGuard', () => {
+  // spyOn の戻り値を保持しておけば mock.calls をキャスト無しで読める。
+  let pushStateSpy: MockInstance<History['pushState']>;
+
   beforeEach(() => {
-    vi.spyOn(window.history, 'pushState');
+    pushStateSpy = vi.spyOn(window.history, 'pushState');
     vi.spyOn(window.history, 'go').mockImplementation(() => {});
   });
 
@@ -76,14 +79,13 @@ describe('useBrowserNavGuard', () => {
       result.current.confirm();
     });
 
-    const pushCallsBefore = (window.history.pushState as ReturnType<typeof vi.fn>).mock.calls
-      .length;
+    const pushCallsBefore = pushStateSpy.mock.calls.length;
 
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
 
-    const pushCallsAfter = (window.history.pushState as ReturnType<typeof vi.fn>).mock.calls.length;
+    const pushCallsAfter = pushStateSpy.mock.calls.length;
     expect(pushCallsAfter).toBe(pushCallsBefore);
     expect(result.current.open).toBe(false);
   });

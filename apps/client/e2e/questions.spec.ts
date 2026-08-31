@@ -8,8 +8,12 @@ test.describe('質問管理', () => {
   test('質問ページに遷移できる', async ({ page }) => {
     await page.goto('/questions');
     await page.waitForURL('**/questions**');
-    // PC の問い画面は「問いの変遷」見出し（用語は「質問」→「問い」）。
-    await expect(page.getByText('問いの変遷')).toBeVisible();
+    // 問いが0件だとタイムラインは空表示になり「問いの変遷」見出しは描画されない
+    // （question-timeline.tsx の early return）。まっさらな DB でも通るよう、
+    // どちらの状態でも「問い画面が描画されている」ことを見る。
+    await expect(
+      page.getByText('問いの変遷').or(page.getByText('問いはまだありません')).first(),
+    ).toBeVisible();
   });
 
   test('新しい質問を作成できる', async ({ page }) => {

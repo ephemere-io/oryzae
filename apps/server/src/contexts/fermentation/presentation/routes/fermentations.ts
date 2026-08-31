@@ -126,7 +126,7 @@ export const fermentations = new Hono<Env>()
   .get('/:id', async (c) => {
     const supabase = c.get('supabase');
     const repo = new SupabaseFermentationRepository(supabase);
-    const usecase = new GetFermentationResultUsecase(repo);
+    const usecase = new GetFermentationResultUsecase(repo, new SupabaseEntryRepository(supabase));
 
     const detail = await usecase.execute(c.req.param('id'));
     return c.json({
@@ -135,5 +135,7 @@ export const fermentations = new Hono<Env>()
       snippets: detail.snippets.map((s) => s.toProps()),
       letter: detail.letter?.toProps() ?? null,
       keywords: detail.keywords.map((k) => k.toProps()),
+      // Issue #453: 手紙だけでは「何に対する返事か」が分からないので、もとの記録を添える。
+      scannedEntries: detail.scannedEntries,
     });
   });

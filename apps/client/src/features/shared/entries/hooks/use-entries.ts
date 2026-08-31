@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { EntryListOrder } from '@/features/shared/entries/types';
 import type { ApiClient } from '@/lib/api';
 
 interface LinkedQuestionSummary {
@@ -20,9 +21,6 @@ interface Entry {
 }
 
 const PAGE_SIZE = 20;
-
-/** 一覧の作成日ソート順。'newest'=新しい順(既定) / 'oldest'=古い順。 */
-export type EntryListOrder = 'newest' | 'oldest';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';

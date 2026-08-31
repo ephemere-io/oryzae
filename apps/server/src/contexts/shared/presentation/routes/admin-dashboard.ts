@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { gateway } from 'ai';
 import { Hono } from 'hono';
-import { computeCostFromTokens } from '../../infrastructure/claude-pricing.js';
+import { fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
+import {
+  aggregateCost,
+  fetchFermentationCostRows,
+} from '../../infrastructure/fermentation-cost-query.js';
 
 type Env = {
   Variables: {
@@ -10,17 +13,31 @@ type Env = {
   };
 };
 
+/** `getTimezoneOffset()` 相当の分数。±14 時間を超える値は不正として 0 に落とす。 */
+export function parseTzOffset(raw: string | undefined): number {
+  if (!raw) return 0;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || Math.abs(parsed) > 14 * 60) return 0;
+  return parsed;
+}
+
 // 現在期間と「直前の同じ長さの期間」を解決する（リテンション比較用）。
 // date_from/date_to は YYYY-MM-DD（セレクタ）。未指定時は直近7日 / now にフォールバック。
+//
+// Issue #367: セレクタで選んだ日を UTC の 00:00〜24:00 として扱っていたため、JST で見ると
+// 期間が 9 時間ずれ、前日の夜と当日の夜が混ざった数が出ていた（ボードの日付境界と同じ問題）。
+// 閲覧者のオフセットを受け取ってローカル暦日の区間に直す。
 export function resolveActivityPeriods(
   dateFrom: string | undefined,
   dateTo: string | undefined,
   now: Date,
+  tzOffsetMinutes = 0,
 ): { currentStart: string; currentEnd: string; previousStart: string; previousEnd: string } {
+  const offsetMs = tzOffsetMinutes * 60_000;
   const currentStart = dateFrom
-    ? new Date(`${dateFrom}T00:00:00.000Z`)
+    ? new Date(Date.parse(`${dateFrom}T00:00:00.000Z`) + offsetMs)
     : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const currentEnd = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : now;
+  const currentEnd = dateTo ? new Date(Date.parse(`${dateTo}T23:59:59.999Z`) + offsetMs) : now;
   // 期間長（最低1日）。直前期間は [currentStart - 期間長, currentStart) とする。
   const periodMs = Math.max(currentEnd.getTime() - currentStart.getTime(), 24 * 60 * 60 * 1000);
   const previousEnd = new Date(currentStart.getTime() - 1);
@@ -31,6 +48,55 @@ export function resolveActivityPeriods(
     previousStart: previousStart.toISOString(),
     previousEnd: previousEnd.toISOString(),
   };
+}
+
+/** PostgREST の 1 回のレスポンス上限。これを超えると黙って打ち切られる。 */
+const PAGE_SIZE = 1000;
+
+/**
+ * 期間内に 1 件以上書いた人の user_id を、取りこぼさずに集める。
+ *
+ * Issue #367: `.select('user_id')` を 1 回投げるだけだったため、期間内のエントリが 1000 件を
+ * 超えると PostgREST の既定上限で黙って打ち切られ、アクティブ数が過少になっていた。
+ * エラーにならないので「なんとなく少ない」としか見えない種類の壊れ方だった。
+ */
+export async function collectWriterIds(
+  supabase: SupabaseClient,
+  startIso: string,
+  endIso: string,
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('entries')
+      .select('user_id')
+      .gte('created_at', startIso)
+      .lte('created_at', endIso)
+      .order('created_at', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+
+    const rows = data ?? [];
+    for (const row of rows) {
+      if (typeof row.user_id === 'string') ids.push(row.user_id);
+    }
+    if (rows.length < PAGE_SIZE) return ids;
+  }
+}
+
+/**
+ * 利用者数（アクティブ率の分母）。
+ *
+ * Issue #367: `auth.admin.listUsers({ perPage: 1000 })` は 1 ページしか読んでいないため
+ * 1000 人で頭打ちになり、分母が止まった分だけアクティブ率が実際より高く出ていた。
+ * profiles は signup 時に必ず 1 行できるので、こちらを exact count で数える。
+ */
+export async function countTotalUsers(supabase: SupabaseClient): Promise<number> {
+  const { count, error } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true });
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }
 
 // 現在/直前期間の投稿者から、アクティブ数・直前アクティブ数・継続(両方に出現)数を数える。
@@ -70,9 +136,10 @@ export const adminDashboard = new Hono<Env>()
       return q as unknown as T;
     };
 
-    const [usersRes, entriesRes, allFermRes, completedRes, failedRes, costTrackedRes] =
+    const [totalUsers, entriesRes, allFermRes, completedRes, failedRes, costTrackedRes] =
       await Promise.all([
-        supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+        // Issue #367: listUsers は 1 ページ 1000 人で頭打ちになる。profiles を数える。
+        countTotalUsers(supabase),
         applyDateFilter(supabase.from('entries').select('id', { count: 'exact', head: true })),
         applyDateFilter(
           supabase.from('fermentation_results').select('id', { count: 'exact', head: true }),
@@ -90,15 +157,18 @@ export const adminDashboard = new Hono<Env>()
             .eq('status', 'failed'),
         ),
         applyDateFilter(
+          // issue #352 以降 generation_id は NULL 固定。旧条件のままだと
+          // 「コスト追跡済み」が常に 0 件になるため、トークン保存有無で数える
+          // （旧 generation_id 方式のレコードも追跡済みとして拾う）。
           supabase
             .from('fermentation_results')
             .select('id', { count: 'exact', head: true })
-            .not('generation_id', 'is', null),
+            .or('input_tokens.not.is.null,generation_id.not.is.null'),
         ),
       ]);
 
     return c.json({
-      totalUsers: usersRes.data?.users?.length ?? 0,
+      totalUsers,
       totalEntries: entriesRes.count ?? 0,
       totalFermentations: allFermRes.count ?? 0,
       completedFermentations: completedRes.count ?? 0,
@@ -217,74 +287,60 @@ export const adminDashboard = new Hono<Env>()
   .get('/cost-summary', async (c) => {
     const supabase = c.get('adminSupabase');
 
+    // 月境界は UTC で切る。Anthropic の cost_report が UTC 日バケット固定なので、
+    // 実額と推定を同じ窓で並べないと乖離が読めなくなるため。
+    // (日次レポートは運用に合わせて JST 日で切る。cron-cost-alert.ts を参照)
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-indexed
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth(); // 0-indexed
 
-    const currentMonthStart = new Date(currentYear, currentMonth, 1).toISOString();
-    const currentMonthEnd = now.toISOString();
+    const currentMonthStart = new Date(Date.UTC(currentYear, currentMonth, 1));
+    const lastMonthStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
 
-    const lastMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString();
-    const lastMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999).toISOString();
+    const daysInMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate();
+    const daysElapsed = now.getUTCDate();
 
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const daysElapsed = now.getDate();
-
-    // issue #352 で generation_id が出なくなったため、トークン保存分 (input_tokens/
-    // output_tokens) から価格算出する。旧 generation_id レコードは gateway フォールバック。
-    // (/costs エンドポイントと同じ方式。これをやらないと monthly cost が常に $0.00 になる)
-    const [currentMonthRows, lastMonthRows] = await Promise.all([
-      supabase
-        .from('fermentation_results')
-        .select('generation_id, input_tokens, output_tokens')
-        .or('input_tokens.not.is.null,generation_id.not.is.null')
-        .gte('created_at', currentMonthStart)
-        .lte('created_at', currentMonthEnd),
-      supabase
-        .from('fermentation_results')
-        .select('generation_id, input_tokens, output_tokens')
-        .or('input_tokens.not.is.null,generation_id.not.is.null')
-        .gte('created_at', lastMonthStart)
-        .lte('created_at', lastMonthEnd),
+    const [currentRows, lastRows, currentActual, lastActual] = await Promise.all([
+      fetchFermentationCostRows(supabase, {
+        startIso: currentMonthStart.toISOString(),
+        endIso: now.toISOString(),
+      }),
+      fetchFermentationCostRows(supabase, {
+        startIso: lastMonthStart.toISOString(),
+        endIso: new Date(currentMonthStart.getTime() - 1).toISOString(),
+      }),
+      fetchActualCost(currentMonthStart, now),
+      fetchActualCost(lastMonthStart, currentMonthStart),
     ]);
 
-    const sumCosts = async (
-      rows: {
-        generation_id: string | null;
-        input_tokens: number | null;
-        output_tokens: number | null;
-      }[],
-    ): Promise<number> => {
-      let total = 0;
-      await Promise.all(
-        rows.map(async (row) => {
-          const tokenCost = computeCostFromTokens(row.input_tokens, row.output_tokens);
-          if (tokenCost) {
-            total += tokenCost.totalCost;
-            return;
-          }
-          if (row.generation_id) {
-            try {
-              const info = await gateway.getGenerationInfo({ id: row.generation_id });
-              if (typeof info?.totalCost === 'number') total += info.totalCost;
-            } catch {
-              // skip failed lookups
-            }
-          }
-        }),
-      );
-      return total;
-    };
+    const currentAggregate = aggregateCost(currentRows.rows);
+    const lastAggregate = aggregateCost(lastRows.rows);
 
-    const currentMonthCost = await sumCosts(currentMonthRows.data ?? []);
-    const lastMonthCost = await sumCosts(lastMonthRows.data ?? []);
+    // 着地見込みは実額があれば実額ベース、無ければ推定ベース。
+    const projectionBasis =
+      currentActual.kind === 'ok' ? currentActual.totalCostUsd : currentAggregate.estimatedCostUsd;
+    const projectedCost = daysElapsed > 0 ? (projectionBasis / daysElapsed) * daysInMonth : 0;
 
-    const projectedCost = daysElapsed > 0 ? (currentMonthCost / daysElapsed) * daysInMonth : 0;
+    const round = (n: number) => Math.round(n * 1000000) / 1000000;
 
     return c.json({
-      currentMonthCost: Math.round(currentMonthCost * 1000000) / 1000000,
-      lastMonthCost: Math.round(lastMonthCost * 1000000) / 1000000,
-      projectedCost: Math.round(projectedCost * 1000000) / 1000000,
+      // 実請求額 (Anthropic cost_report)。未設定・取得失敗を $0 と区別できるよう
+      // status を必ず添えて返す。フロントは status を見て表示を出し分けること。
+      actual: {
+        status: currentActual.kind,
+        currentMonthCost: currentActual.kind === 'ok' ? round(currentActual.totalCostUsd) : null,
+        lastMonthCost: lastActual.kind === 'ok' ? round(lastActual.totalCostUsd) : null,
+        message: currentActual.kind === 'error' ? currentActual.message : null,
+      },
+      // 推定値 (保存トークン × 価格表)。ユーザー別内訳を出せる唯一の系統。
+      estimated: {
+        currentMonthCost: round(currentAggregate.estimatedCostUsd),
+        lastMonthCost: round(lastAggregate.estimatedCostUsd),
+        untrackedCount: currentAggregate.untrackedCount,
+        truncated: currentRows.truncated || lastRows.truncated,
+      },
+      projectedCost: round(projectedCost),
+      projectionBasis: currentActual.kind === 'ok' ? 'actual' : 'estimated',
       daysElapsed,
       daysInMonth,
     });
@@ -296,30 +352,21 @@ export const adminDashboard = new Hono<Env>()
     // 直前の同じ長さの期間も取り、継続(リテンション)ユーザーを算出する。
     const dateFrom = c.req.query('date_from');
     const dateTo = c.req.query('date_to');
-    const periods = resolveActivityPeriods(dateFrom, dateTo, new Date());
+    // 閲覧者のローカル暦日で期間を切る（未指定なら UTC 基準＝従来挙動）。
+    const tzOffsetMinutes = parseTzOffset(c.req.query('tzOffset'));
+    const periods = resolveActivityPeriods(dateFrom, dateTo, new Date(), tzOffsetMinutes);
 
-    const [currentRes, previousRes, usersRes] = await Promise.all([
-      supabase
-        .from('entries')
-        .select('user_id')
-        .gte('created_at', periods.currentStart)
-        .lte('created_at', periods.currentEnd),
-      supabase
-        .from('entries')
-        .select('user_id')
-        .gte('created_at', periods.previousStart)
-        .lte('created_at', periods.previousEnd),
-      supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    const [currentIds, previousIds, totalUsers] = await Promise.all([
+      collectWriterIds(supabase, periods.currentStart, periods.currentEnd),
+      collectWriterIds(supabase, periods.previousStart, periods.previousEnd),
+      countTotalUsers(supabase),
     ]);
 
-    const counts = countReturning(
-      (currentRes.data ?? []).map((r) => r.user_id),
-      (previousRes.data ?? []).map((r) => r.user_id),
-    );
+    const counts = countReturning(currentIds, previousIds);
 
     return c.json({
       activeWriters: counts.activeWriters,
-      totalUsers: usersRes.data?.users?.length ?? 0,
+      totalUsers,
       returningUsers: counts.returningUsers,
       previousActiveUsers: counts.previousActiveUsers,
     });

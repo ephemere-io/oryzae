@@ -1,4 +1,5 @@
 import type { EditorEffectsState } from '@oryzae/shared';
+import { editorEffectsStateSchema } from '@oryzae/shared';
 
 /**
  * localStorage キャッシュ層。
@@ -15,9 +16,9 @@ export function loadCachedEffects(entryId: string | undefined): EditorEffectsSta
   try {
     const raw = window.localStorage.getItem(PREFIX + entryId);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed as EditorEffectsState;
+    const parsed: unknown = JSON.parse(raw);
+    const result = editorEffectsStateSchema.safeParse(parsed);
+    return result.success ? result.data : null;
   } catch {
     return null;
   }

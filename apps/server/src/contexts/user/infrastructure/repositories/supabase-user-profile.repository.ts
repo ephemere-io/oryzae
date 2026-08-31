@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readBoolean, readString, readStringOrNull } from '../../../shared/infrastructure/row.js';
 import type { UserProfileRepositoryGateway } from '../../domain/gateways/user-profile-repository.gateway.js';
 import { UserProfile } from '../../domain/models/user-profile.js';
 
@@ -39,14 +40,13 @@ export class SupabaseUserProfileRepository implements UserProfileRepositoryGatew
   }
 
   private toDomain(row: Record<string, unknown>): UserProfile {
-    // @type-assertion-allowed: Supabase row data is untyped Record<string, unknown>
     return UserProfile.fromProps({
-      id: row.id as string,
-      nickname: row.nickname as string,
-      avatarUrl: (row.avatar_url as string | null) ?? null,
-      onboardingCompleted: row.onboarding_completed as boolean,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
+      id: readString(row, 'id'),
+      nickname: readString(row, 'nickname'),
+      avatarUrl: readStringOrNull(row, 'avatar_url'),
+      onboardingCompleted: readBoolean(row, 'onboarding_completed'),
+      createdAt: readString(row, 'created_at'),
+      updatedAt: readString(row, 'updated_at'),
     });
   }
 }

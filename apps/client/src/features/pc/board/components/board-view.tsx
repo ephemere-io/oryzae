@@ -4,11 +4,13 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
+import { ErrorState } from '@/components/ui/error-state';
+import { PageLoading } from '@/components/ui/page-loading';
+import { useBoard } from '@/features/shared/board/hooks/use-board';
+import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
+import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
-import type { BoardCardData } from '../hooks/use-board';
-import { useBoard } from '../hooks/use-board';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
-import { useBoardSave } from '../hooks/use-board-save';
 import { BoardCard } from './board-card';
 import { BoardControls } from './board-controls';
 import { BoardDateNav } from './board-date-nav';
@@ -41,8 +43,17 @@ export function BoardView({ api }: BoardViewProps) {
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
 
-  const { cards, setCards, loading, createSnippet, updateSnippet, createPhoto, deleteCard } =
-    useBoard(api, dateKey, viewType);
+  const {
+    cards,
+    setCards,
+    loading,
+    error,
+    refresh,
+    createSnippet,
+    updateSnippet,
+    createPhoto,
+    deleteCard,
+  } = useBoard(api, dateKey, viewType);
   const { savePositions } = useBoardSave(api);
 
   const [showLoader, setShowLoader] = useState(false);
@@ -158,16 +169,20 @@ export function BoardView({ api }: BoardViewProps) {
 
       {/* Canvas */}
       <div className="relative min-h-full" style={{ minWidth: 1200, minHeight: 900 }}>
-        {showLoader && (
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
-            style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
-          >
-            Loading...
+        {/* ルート遷移中の枠と同じ PageLoading。表示が「枠 → ローダー → 本体」と
+            二度変わらないよう、盤面のロード表示は1種類に揃える。 */}
+        {showLoader && <PageLoading />}
+
+        {/* 取得に失敗したまま盤面が空だと「この日は何も無い」と区別がつかないので、
+            空表示ではなく理由と再試行を出す。カードが残っているときは（更新失敗でも
+            盤面は使えるので）そのまま表示を続ける。 */}
+        {!loading && error && cards.length === 0 && (
+          <div className="absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2">
+            <ErrorState message={t('error_message')} onRetry={refresh} retryLabel={t('retry')} />
           </div>
         )}
 
-        {!loading && cards.filter((c) => !c.removing).length === 0 && (
+        {!loading && !error && cards.filter((c) => !c.removing).length === 0 && (
           <div
             className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
             style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}

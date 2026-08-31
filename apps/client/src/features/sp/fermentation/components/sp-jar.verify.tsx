@@ -9,7 +9,8 @@
  * .ok と .json() が成立する（as / any 不要）。
  *
  * router(useRouter) は withVerifyProviders が no-op を供給するため返信ボタンの push も副作用なし。
- * useUnread() は UnreadContext の default 値（markSeen=no-op）で provider 無しでもクラッシュしない。
+ * useUnread() は UnreadContext の default 値（ready=false / markQuestionRead=no-op）で provider
+ * 無しでもクラッシュしない。ready=false の間は未読/既読ラベルを出さない契約なので日付だけが出る。
  * i18n（sp.jar）依存のため withVerifyProviders（NextIntlClientProvider）で包む。
  *
  * 公表する契約は実際に変化する状態のみ: loading / letterCount / open。受信箱は /questions と
@@ -32,8 +33,20 @@ const summaryJson = [
   { id: 'f-1', questionId: 'q-1', status: 'completed', createdAt: '2026-06-20T00:00:00.000Z' },
 ];
 
+// GET /api/v1/fermentations/:id の実レスポンス形。Issue #490 で共有 hook が正規化する
+// ようになったため、id / questionId を欠くスタブは null に落ちる（＝手紙が出ない）。
 const detailJson = {
-  letter: { bodyText: 'あなたの言葉から、静かな喜びが立ち上っています。' },
+  id: 'f-1',
+  questionId: 'q-1',
+  targetPeriod: '2026-06',
+  status: 'completed',
+  worksheet: null,
+  letter: {
+    id: 'l-1',
+    bodyText: 'あなたの言葉から、静かな喜びが立ち上っています。',
+    jarX: null,
+    jarY: null,
+  },
   keywords: [{ id: 'k-1', keyword: '感謝', description: '' }],
   snippets: [
     { id: 's-1', originalText: '朝の光がきれいだった', sourceDate: '2026-06-18T00:00:00.000Z' },

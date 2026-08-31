@@ -7,9 +7,9 @@ import { APP_ICON_SVG, BRAND_NAME, svgDataUri } from '@/lib/brand';
  * スマートフォンでアクセスされたときに全画面を覆う暫定オーバーレイ。
  * スマホ専用画面が用意できるまでの措置 (Issue #299)。
  *
- * - 適用範囲: 認証フロー (`(auth)`) と認証後の画面 (`(protected)`) のみ。
- *   ランディングページや /privacy /support などの静的ページはスマホでも見せたいので、
- *   ルート layout には置かず、認証 / 保護ルートの layout 内で個別にマウントする。
+ * - 適用範囲: 認証フロー (`(auth)`) と認証後の画面 (`(protected)`) のみ。ルート layout には
+ *   置かず、認証 / 保護ルートの layout 内で個別にマウントする（`/` は描画を持たない
+ *   振り分けゲートで、公開サイトはそもそも別ドメインにある）。
  * - CSS メディアクエリのみで制御。JS による UA 判定は行わない。
  * - 判定式: `(max-width: 767px) AND (pointer: coarse)`
  *   - 画面幅 < md (768px) かつ

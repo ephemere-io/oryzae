@@ -1,0 +1,84 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ApiClient } from '@/lib/api';
+import { readBooleanField, readJson, readStringField } from '@/lib/json';
+
+interface UserMeData {
+  id: string;
+  nickname: string;
+  avatarUrl: string | null;
+  onboardingCompleted: boolean;
+  /** 一度でも漬け込んだことがあるか (Issue #316 ガイド表示判定用) */
+  hasPickled: boolean;
+  /** 一度でもエントリに問いを紐付けたことがあるか (Issue #316 ガイド表示判定用) */
+  hasLinkedQuestion: boolean;
+}
+
+/**
+ * `/api/v1/users/me` の正規化。id / nickname が無ければ「取れなかった」として null。
+ * 表示補助のフラグは既定値へ倒す（欠けていても画面は出せる）。
+ */
+function normalizeUserMe(input: unknown): UserMeData | null {
+  const id = readStringField(input, 'id');
+  const nickname = readStringField(input, 'nickname');
+  if (id === null || nickname === null) return null;
+  return {
+    id,
+    nickname,
+    avatarUrl: readStringField(input, 'avatarUrl'),
+    onboardingCompleted: readBooleanField(input, 'onboardingCompleted', false),
+    hasPickled: readBooleanField(input, 'hasPickled', false),
+    hasLinkedQuestion: readBooleanField(input, 'hasLinkedQuestion', false),
+  };
+}
+
+interface UseUserMeResult {
+  data: UserMeData | null;
+  loading: boolean;
+  /** 保存成功後など、フラグが変わり得るタイミングで呼ぶ */
+  refresh: () => Promise<UserMeData | null>;
+}
+
+/**
+ * Issue #316: EntryEditor の保存成功後ナッジ表示判定に必要な
+ * `hasPickled` / `hasLinkedQuestion` を含む user-me を取得する。
+ *
+ * `useOnboarding` も同じエンドポイントを叩くが、用途とライフサイクルが
+ * 異なるためフックを分けている (onboarding は app/(protected)/layout、
+ * これは entries feature 内で消費)。
+ */
+export function useUserMe(api: ApiClient | null): UseUserMeResult {
+  const [data, setData] = useState<UserMeData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const apiRef = useRef(api);
+  apiRef.current = api;
+
+  const fetchMe = useCallback(async (): Promise<UserMeData | null> => {
+    const client = apiRef.current;
+    if (!client) return null;
+    const res = await client.fetch('/api/v1/users/me');
+    if (!res.ok) return null;
+    const next = normalizeUserMe(await readJson(res));
+    // 形が違う応答では **既存の data を保持したまま** null を返す。この hook は
+    // エラー状態を持たず、返り値はナッジ表示の判定にしか使われないので、
+    // 壊れた応答で上書きするより直前の正しい値を残すほうが害が小さい。
+    if (!next) return null;
+    setData(next);
+    return next;
+  }, []);
+
+  useEffect(() => {
+    if (!api) return;
+    let cancelled = false;
+    setLoading(true);
+    fetchMe().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, fetchMe]);
+
+  return { data, loading, refresh: fetchMe };
+}

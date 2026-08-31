@@ -78,10 +78,8 @@ describe('useVoiceDynamics', () => {
     editorEl.remove();
     vi.restoreAllMocks();
     vi.useRealTimers();
-    // biome-ignore lint/suspicious/noExplicitAny: test teardown of global
-    (window as any).SpeechRecognition = undefined;
-    // biome-ignore lint/suspicious/noExplicitAny: test teardown of global
-    (window as any).webkitSpeechRecognition = undefined;
+    // グローバルへの注入は Object.assign で行う（any キャストが不要になる）。
+    Object.assign(window, { SpeechRecognition: undefined, webkitSpeechRecognition: undefined });
   });
 
   it('requests OS default microphone explicitly so getUserMedia follows OS changes', async () => {
@@ -107,8 +105,7 @@ describe('useVoiceDynamics', () => {
 
   it('stops the restart loop and surfaces reason=network on network error (Brave)', async () => {
     vi.useFakeTimers();
-    // biome-ignore lint/suspicious/noExplicitAny: injecting fake into window for the hook under test
-    (window as any).SpeechRecognition = FakeSpeechRecognition;
+    Object.assign(window, { SpeechRecognition: FakeSpeechRecognition });
 
     const { result } = renderHook(() => useVoiceDynamics(editorRef, true));
 

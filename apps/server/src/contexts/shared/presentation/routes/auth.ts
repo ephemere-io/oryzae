@@ -119,16 +119,15 @@ export const authRoutes = new Hono()
       refresh_token: refreshToken,
     });
 
-    if (error) {
-      return c.json({ error: error.message }, 401);
+    if (error || !data.session) {
+      return c.json({ error: error?.message ?? 'Failed to refresh session' }, 401);
     }
 
     return c.json({
       session: {
-        // @type-assertion-allowed: session is guaranteed non-null after successful refresh
-        accessToken: (data.session as NonNullable<typeof data.session>).access_token,
-        refreshToken: (data.session as NonNullable<typeof data.session>).refresh_token,
-        expiresAt: (data.session as NonNullable<typeof data.session>).expires_at,
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
       },
     });
   })

@@ -17,6 +17,9 @@ const LINE_HEIGHT_MAX = 2.5;
 
 const FOCUS_MODE_STORAGE_KEY = 'oryzae-editor-focus-mode';
 
+/** Issue #350: フォーカスモードで発酵要素も一緒に透明化するか。 */
+const FOCUS_MODE_FADES_FERMENTATION_KEY = 'oryzae-editor-focus-mode-fades-fermentation';
+
 const FERMENTATION_OVERLAY_PREFERENCE_KEY = 'oryzae-editor-fermentation-overlay-preference';
 
 function readStoredFontSize(): number | null {
@@ -86,6 +89,27 @@ function writeStoredFocusMode(value: boolean): void {
   }
 }
 
+function readStoredFocusModeFadesFermentation(): boolean | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(FOCUS_MODE_FADES_FERMENTATION_KEY);
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredFocusModeFadesFermentation(value: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FOCUS_MODE_FADES_FERMENTATION_KEY, String(value));
+  } catch {
+    // ignore quota / private-mode errors
+  }
+}
+
 function readStoredFermentationOverlayPreference(): FermentationOverlayPreference | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -118,6 +142,8 @@ function getInitialSettings(locale: string | undefined): EditorSettings {
   if (lineHeight !== null) next.lineHeight = lineHeight;
   const focusMode = readStoredFocusMode();
   if (focusMode !== null) next.focusModeEnabled = focusMode;
+  const focusFades = readStoredFocusModeFadesFermentation();
+  if (focusFades !== null) next.focusModeFadesFermentation = focusFades;
   const overlayPref = readStoredFermentationOverlayPreference();
   if (overlayPref !== null) next.fermentationOverlayPreference = overlayPref;
   return next;
@@ -137,6 +163,9 @@ export function useEditorSettings(
     }
     if (typeof patch.focusModeEnabled === 'boolean') {
       writeStoredFocusMode(patch.focusModeEnabled);
+    }
+    if (typeof patch.focusModeFadesFermentation === 'boolean') {
+      writeStoredFocusModeFadesFermentation(patch.focusModeFadesFermentation);
     }
     if (
       patch.fermentationOverlayPreference === 'ask' ||

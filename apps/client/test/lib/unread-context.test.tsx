@@ -1,135 +1,43 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ApiClient } from '@/lib/api';
-import { UnreadProvider, useUnread } from '@/lib/unread-context';
+import { describe, expect, it, vi } from 'vitest';
+import { UnreadProvider, type UnreadState, useUnread } from '@/lib/unread-context';
 
-const STORAGE_KEY = 'oryzae_jar_last_seen_at';
+// fetch と既読の永続化は features/shared/fermentation/hooks/use-unread-letters が持つ
+// （検証はそちらの test に集約）。ここは context が「値を配るだけの器」であることだけを見る。
 
-function createMockApi(responses: Record<string, unknown>): ApiClient {
+function makeState(overrides: Partial<UnreadState> = {}): UnreadState {
   return {
-    baseUrl: 'http://localhost:3000',
-    headers: {},
-    fetch: vi.fn((url: string, _init?: RequestInit) => {
-      const body = responses[url];
-      return Promise.resolve(
-        new Response(JSON.stringify(body), {
-          status: body !== undefined ? 200 : 404,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      );
-    }),
+    ready: true,
+    unreadCount: 3,
+    unreadQuestionIds: new Set(['q1']),
+    markQuestionRead: vi.fn(),
+    markAllSeen: vi.fn(),
+    ...overrides,
   };
 }
 
-function createWrapper(api: ApiClient | null, authLoading = false) {
-  return function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <UnreadProvider api={api} authLoading={authLoading}>
-        {children}
-      </UnreadProvider>
+describe('UnreadContext', () => {
+  it('provider が無くても既定値に落ちる（孤立検証で crash しない）', () => {
+    const { result } = renderHook(() => useUnread());
+
+    // 未取得の間は印を出さない（未読マークがちらつかない）。
+    expect(result.current.ready).toBe(false);
+    expect(result.current.unreadCount).toBe(0);
+    expect(result.current.unreadQuestionIds.size).toBe(0);
+  });
+
+  it('provider に渡した値をそのまま配る', () => {
+    const value = makeState();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <UnreadProvider value={value}>{children}</UnreadProvider>
     );
-  };
-}
 
-describe('useUnread', () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
+    const { result } = renderHook(() => useUnread(), { wrapper });
 
-  it('returns 0 when there are no fermentations', async () => {
-    const api = createMockApi({ '/api/v1/fermentations': [] });
-    const { result } = renderHook(() => useUnread(), {
-      wrapper: createWrapper(api),
-    });
-
-    await waitFor(() => {
-      expect(api.fetch).toHaveBeenCalledWith('/api/v1/fermentations');
-    });
-    // Issue #363 perf: 未読集計は /fermentations のバルク1回のみ（/questions は叩かない）。
-    expect(api.fetch).not.toHaveBeenCalledWith('/api/v1/questions');
-    expect(result.current.unreadCount).toBe(0);
-  });
-
-  it('counts completed fermentations newer than lastSeenAt (across questions)', async () => {
-    // Set lastSeenAt to a past date
-    localStorage.setItem(STORAGE_KEY, '2025-01-01T00:00:00.000Z');
-
-    const api = createMockApi({
-      '/api/v1/fermentations': [
-        { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2025-06-01T00:00:00.000Z' },
-        { id: 'f2', questionId: 'q2', status: 'completed', createdAt: '2025-06-02T00:00:00.000Z' },
-        { id: 'f3', questionId: 'q1', status: 'pending', createdAt: '2025-06-03T00:00:00.000Z' },
-      ],
-    });
-
-    const { result } = renderHook(() => useUnread(), {
-      wrapper: createWrapper(api),
-    });
-
-    await waitFor(() => {
-      expect(result.current.unreadCount).toBe(2);
-    });
-  });
-
-  it('does not count fermentations older than lastSeenAt', async () => {
-    localStorage.setItem(STORAGE_KEY, '2025-07-01T00:00:00.000Z');
-
-    const api = createMockApi({
-      '/api/v1/fermentations': [
-        { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2025-06-01T00:00:00.000Z' },
-      ],
-    });
-
-    const { result } = renderHook(() => useUnread(), {
-      wrapper: createWrapper(api),
-    });
-
-    await waitFor(() => {
-      expect(api.fetch).toHaveBeenCalledWith('/api/v1/fermentations');
-    });
-    expect(result.current.unreadCount).toBe(0);
-  });
-
-  it('markSeen sets localStorage and resets count to 0', async () => {
-    localStorage.setItem(STORAGE_KEY, '2025-01-01T00:00:00.000Z');
-
-    const api = createMockApi({
-      '/api/v1/fermentations': [
-        { id: 'f1', questionId: 'q1', status: 'completed', createdAt: '2025-06-01T00:00:00.000Z' },
-      ],
-    });
-
-    const { result } = renderHook(() => useUnread(), {
-      wrapper: createWrapper(api),
-    });
-
-    await waitFor(() => {
-      expect(result.current.unreadCount).toBe(1);
-    });
-
-    act(() => {
-      result.current.markSeen();
-    });
-
-    expect(result.current.unreadCount).toBe(0);
-    expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy();
-  });
-
-  it('does not fetch when authLoading is true', () => {
-    const api = createMockApi({ '/api/v1/fermentations': [] });
-    renderHook(() => useUnread(), {
-      wrapper: createWrapper(api, true),
-    });
-
-    expect(api.fetch).not.toHaveBeenCalled();
-  });
-
-  it('does not fetch when api is null', () => {
-    const { result } = renderHook(() => useUnread(), {
-      wrapper: createWrapper(null),
-    });
-
-    expect(result.current.unreadCount).toBe(0);
+    expect(result.current.unreadCount).toBe(3);
+    expect([...result.current.unreadQuestionIds]).toEqual(['q1']);
+    result.current.markQuestionRead('q1');
+    expect(value.markQuestionRead).toHaveBeenCalledWith('q1');
   });
 });

@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { gateway } from 'ai';
 import { Hono } from 'hono';
+import { z } from 'zod';
+import { type ActualCostResult, fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
+import {
+  aggregateCost,
+  aggregateCostByDay,
+  fetchFermentationCostRows,
+  resolveUserEmails,
+} from '../../infrastructure/fermentation-cost-query.js';
 
 type Env = {
   Variables: {
@@ -8,6 +15,44 @@ type Env = {
     adminSupabase: SupabaseClient;
   };
 };
+
+// 外部 API のレスポンスは信用せず、必要な形だけを実行時に検証して取り出す。
+const vercelLatestDeploySchema = z.object({
+  deployments: z.array(z.object({ state: z.string() })),
+});
+
+const resendEmailsSchema = z.object({
+  data: z.array(
+    z.object({
+      created_at: z.string().optional(),
+      last_event: z.string().optional(),
+    }),
+  ),
+});
+
+const upstashDbSizeSchema = z.object({ result: z.number() });
+
+const vercelDeployListSchema = z.object({
+  deployments: z.array(
+    z.object({
+      uid: z.string().optional(),
+      state: z.string().optional(),
+      target: z.string().optional(),
+      created: z.number().optional(),
+      buildingAt: z.number().optional(),
+      ready: z.number().optional(),
+      url: z.string().optional(),
+      inspectorUrl: z.string().optional(),
+      meta: z
+        .object({
+          githubCommitMessage: z.string().optional(),
+          githubCommitRef: z.string().optional(),
+        })
+        .optional(),
+      creator: z.object({ email: z.string().optional() }).optional(),
+    }),
+  ),
+});
 
 // ── Summary (hub page) ──────────────────────────────────
 
@@ -29,34 +74,18 @@ async function getSentryCount(): Promise<number | null> {
   }
 }
 
-async function getGatewaySpend(): Promise<{ totalCost: number; requestCount: number } | null> {
-  try {
-    const now = new Date();
-    const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const endDate = now.toISOString().slice(0, 10);
-    const report = await gateway.getSpendReport({
-      startDate: startOfMonth,
-      endDate,
-      tags: ['fermentation'],
-    });
-    let totalCost = 0;
-    let requestCount = 0;
-    for (const r of report.results) {
-      totalCost += r.totalCost;
-      requestCount += r.requestCount ?? 0;
-    }
-    return { totalCost, requestCount };
-  } catch {
-    return null;
-  }
-}
-
-async function getGatewayCredits(): Promise<{ balance: string; totalUsed: string } | null> {
-  try {
-    return await gateway.getCredits();
-  } catch {
-    return null;
-  }
+/**
+ * 今月の実請求額 (Anthropic cost_report)。
+ *
+ * 旧実装は Vercel AI Gateway の getSpendReport / getCredits を叩いていたが、
+ * issue #352 で Anthropic 直叩きに切替えて以降 Gateway 経由の実績はゼロで、
+ * 画面には常に $0.0000 と空のチャートが出ていた（実際には課金されている）。
+ * クレジット残高は Gateway 固有の概念なので廃止した。
+ */
+async function getMonthToDateActual(): Promise<ActualCostResult> {
+  const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return fetchActualCost(startOfMonth, now);
 }
 
 async function getVercelLatestDeploy(): Promise<string | null> {
@@ -68,10 +97,9 @@ async function getVercelLatestDeploy(): Promise<string | null> {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null || !('deployments' in body)) return null;
-    const deployments = (body as { deployments: { state: string }[] }).deployments;
-    return deployments[0]?.state ?? null;
+    const parsed = vercelLatestDeploySchema.safeParse(await res.json());
+    if (!parsed.success) return null;
+    return parsed.data.deployments[0]?.state ?? null;
   } catch {
     return null;
   }
@@ -86,10 +114,9 @@ async function getResendStats(): Promise<{ sentCount: number; bouncedCount: numb
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null || !('data' in body)) return null;
-    const data = (body as { data: { created_at?: string; last_event?: string }[] }).data;
-    if (!Array.isArray(data)) return null;
+    const parsed = resendEmailsSchema.safeParse(await res.json());
+    if (!parsed.success) return null;
+    const data = parsed.data.data;
 
     const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
     let sentCount = 0;
@@ -117,11 +144,8 @@ async function getUpstashKeyCount(): Promise<number | null> {
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
-    const body: unknown = await res.json();
-    if (typeof body === 'object' && body !== null && 'result' in body) {
-      return (body as { result: number }).result;
-    }
-    return null;
+    const parsed = upstashDbSizeSchema.safeParse(await res.json());
+    return parsed.success ? parsed.data.result : null;
   } catch {
     return null;
   }
@@ -129,26 +153,24 @@ async function getUpstashKeyCount(): Promise<number | null> {
 
 export const adminObservability = new Hono<Env>()
   .get('/summary', async (c) => {
-    const [sentryCount, gatewaySpend, gatewayCredits, vercelDeploy, upstashKeys, resendStats] =
-      await Promise.all([
-        getSentryCount(),
-        getGatewaySpend(),
-        getGatewayCredits(),
-        getVercelLatestDeploy(),
-        getUpstashKeyCount(),
-        getResendStats(),
-      ]);
+    const [sentryCount, monthlyActual, vercelDeploy, upstashKeys, resendStats] = await Promise.all([
+      getSentryCount(),
+      getMonthToDateActual(),
+      getVercelLatestDeploy(),
+      getUpstashKeyCount(),
+      getResendStats(),
+    ]);
 
     return c.json({
       posthog: { metric: null }, // fetched client-side from /analytics/overview
       sentry: {
         unresolvedCount: sentryCount,
       },
-      gateway: {
-        monthlySpend: gatewaySpend?.totalCost ?? null,
-        monthlyRequests: gatewaySpend?.requestCount ?? null,
-        creditBalance: gatewayCredits?.balance ?? null,
-        creditUsed: gatewayCredits?.totalUsed ?? null,
+      anthropic: {
+        // status を必ず返す。null と 0 を潰すと「未設定」を「$0」と誤読させる。
+        status: monthlyActual.kind,
+        monthlySpend: monthlyActual.kind === 'ok' ? monthlyActual.totalCostUsd : null,
+        message: monthlyActual.kind === 'error' ? monthlyActual.message : null,
       },
       resend: {
         sentCount7d: resendStats?.sentCount ?? null,
@@ -210,54 +232,72 @@ export const adminObservability = new Hono<Env>()
     }
   })
 
-  // ── Gateway spend detail ──────────────────────────────
+  // ── AI spend detail ───────────────────────────────────
+  // 実請求額 (Anthropic cost_report) と 推定 (自前トークン × 価格表) を明確に分けて返す。
+  // Anthropic 側は Oryzae のユーザーを知らないため、ユーザー別内訳は推定のみ。
+  // 日別は両者を突き合わせられるよう UTC 日で揃える（cost_report が UTC 固定のため）。
   .get('/spend', async (c) => {
-    const dateFrom = c.req.query('date_from') ?? '30';
-    const daysBack = Number(dateFrom);
+    const supabase = c.get('adminSupabase');
+    const daysBackParam = Number(c.req.query('date_from') ?? '30');
+    const daysBack = Number.isFinite(daysBackParam) && daysBackParam > 0 ? daysBackParam : 30;
+
     const now = new Date();
-    const start = new Date(now);
-    start.setDate(start.getDate() - daysBack);
+    const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
 
-    try {
-      const [dailyReport, userReport, credits] = await Promise.all([
-        gateway.getSpendReport({
-          startDate: start.toISOString().slice(0, 10),
-          endDate: now.toISOString().slice(0, 10),
-          groupBy: 'day',
-          tags: ['fermentation'],
-        }),
-        gateway.getSpendReport({
-          startDate: start.toISOString().slice(0, 10),
-          endDate: now.toISOString().slice(0, 10),
-          groupBy: 'user',
-          tags: ['fermentation'],
-        }),
-        gateway.getCredits(),
-      ]);
+    const [actual, rowsResult] = await Promise.all([
+      fetchActualCost(start, now),
+      fetchFermentationCostRows(supabase, {
+        startIso: start.toISOString(),
+        endIso: now.toISOString(),
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[admin-observability] spend query failed', { error: message });
+        return null;
+      }),
+    ]);
 
-      return c.json({
-        daily: dailyReport.results.map((r) => ({
-          date: r.day ?? '',
-          totalCost: r.totalCost,
-          inputTokens: r.inputTokens ?? 0,
-          outputTokens: r.outputTokens ?? 0,
-          requestCount: r.requestCount ?? 0,
+    const rows = rowsResult?.rows ?? [];
+    const aggregate = aggregateCost(rows);
+    // 日別は UTC 日で切る。同じ画面に並ぶ Anthropic 実額が UTC 日バケット固定で、
+    // 窓を揃えないと乖離が読めないため（日次レポートは運用に合わせ JST 日。
+    // cron-cost-alert.ts 参照）。画面には「UTC 日」と明記している。
+    const daily = aggregateCostByDay(rows, (createdAt) => createdAt.slice(0, 10));
+    // resolveUserEmails は listUsers を最大20往復する。解決すべきユーザーが
+    // 居ない（期間内に発酵ゼロ / クエリ失敗）ときに叩く意味はない。
+    const emailMap =
+      aggregate.byUser.length > 0 ? await resolveUserEmails(supabase) : new Map<string, string>();
+
+    return c.json({
+      rangeDays: daysBack,
+      actual: {
+        status: actual.kind,
+        totalCostUsd: actual.kind === 'ok' ? actual.totalCostUsd : null,
+        daily: actual.kind === 'ok' ? actual.daily : [],
+        // truncated は status === 'ok' のときだけ意味を持つ。失敗時の false は
+        // 「完全に取得できた」ではなく「該当なし」。必ず status を先に見ること。
+        truncated: actual.kind === 'ok' ? actual.truncated : false,
+        message: actual.kind === 'error' ? actual.message : null,
+      },
+      estimated: {
+        // rowsResult が null = クエリ失敗。空配列を「コスト0」と読ませないため status を返す。
+        status: rowsResult === null ? 'error' : 'ok',
+        totalCostUsd: aggregate.estimatedCostUsd,
+        inputTokens: aggregate.inputTokens,
+        outputTokens: aggregate.outputTokens,
+        fermentationCount: aggregate.fermentationCount,
+        untrackedCount: aggregate.untrackedCount,
+        truncated: rowsResult?.truncated ?? false,
+        daily,
+        byUser: aggregate.byUser.map((u) => ({
+          userId: u.userId,
+          email: emailMap.get(u.userId) ?? '',
+          estimatedCostUsd: u.estimatedCostUsd,
+          inputTokens: u.inputTokens,
+          outputTokens: u.outputTokens,
+          fermentationCount: u.fermentationCount,
         })),
-        byUser: userReport.results.map((r) => ({
-          userId: r.user ?? '',
-          totalCost: r.totalCost,
-          inputTokens: r.inputTokens ?? 0,
-          outputTokens: r.outputTokens ?? 0,
-          requestCount: r.requestCount ?? 0,
-        })),
-        credits: {
-          balance: credits.balance,
-          totalUsed: credits.totalUsed,
-        },
-      });
-    } catch {
-      return c.json({ daily: [], byUser: [], credits: null });
-    }
+      },
+    });
   })
 
   // ── Vercel deploys detail ─────────────────────────────
@@ -272,25 +312,12 @@ export const adminObservability = new Hono<Env>()
       });
       if (!res.ok) return c.json({ deploys: [], configured: true });
 
-      const body: unknown = await res.json();
-      if (typeof body !== 'object' || body === null || !('deployments' in body)) {
+      const parsed = vercelDeployListSchema.safeParse(await res.json());
+      if (!parsed.success) {
         return c.json({ deploys: [], configured: true });
       }
 
-      interface VercelDeploy {
-        uid?: string;
-        state?: string;
-        target?: string;
-        created?: number;
-        buildingAt?: number;
-        ready?: number;
-        url?: string;
-        inspectorUrl?: string;
-        meta?: { githubCommitMessage?: string; githubCommitRef?: string };
-        creator?: { email?: string };
-      }
-
-      const deploys = (body as { deployments: VercelDeploy[] }).deployments.map((d) => ({
+      const deploys = parsed.data.deployments.map((d) => ({
         id: d.uid ?? '',
         state: d.state ?? '',
         target: d.target ?? '',
