@@ -115,14 +115,11 @@ function voiceStatusMessage(
   }
 }
 
-/**
- * 題の字数の上限。桁（画面の高さ）に収まり、かつ字が小さくなりすぎない範囲。
- * これを超える長さは、題ではなく本文の一行目に書くべきもの。
- */
-const TITLE_MAX_LENGTH = 16;
-
 /** 題が使える桁数の上限。これ以上増やすと、題が紙の面積を占領する。 */
 const TITLE_MAX_COLUMNS = 3;
+
+/** 桁を使い切ってなお入らないときに落とす下限。これ以上小さいと題に見えない。 */
+const TITLE_MIN_FONT_SIZE = 12;
 
 /**
  * 縦書きのとき、題の右にとる余白と、題と本文のあいだの間。
@@ -841,13 +838,29 @@ export function EntryEditor({
   // **縮めるのではなく、桁を増やす。** 長さに応じて字を小さくしていたが、長い題ほど
   // 読めなくなるうえ、本文より小さい題は題に見えない。字の大きさは本文と同じに保ち、
   // 入り切らなければ2桁目・3桁目へ折り返す（縦書きの紙で自然な畳み方）。
-  const titleFontSize = isVertical ? settings.fontSize : Math.round(settings.fontSize * 1.3);
-  // 1桁に何字入るか → 何桁要るか。桁数は上限で止める（題が紙を占領しないように）。
-  const charsPerColumn = Math.max(1, Math.floor((titleColumnHeightPx * 0.94) / titleFontSize));
+  // **字数の上限は設けない。** 題の長さは書き手が決めることで、入力欄が決めることではない。
+  // 収め方は2段構え: まず桁を増やし（最大3桁）、それでも入らなければ字を縮める。
+  // どちらも尽きることが無いので、どんな長さでも見切れない。
+  const horizontalTitleFontSize = Math.round(settings.fontSize * 1.3);
+  const charsPerColumnAtFullSize = Math.max(
+    1,
+    Math.floor((titleColumnHeightPx * 0.94) / settings.fontSize),
+  );
   const titleColumns = Math.min(
     TITLE_MAX_COLUMNS,
-    Math.max(1, Math.ceil(titleLength / charsPerColumn)),
+    Math.max(1, Math.ceil(titleLength / charsPerColumnAtFullSize)),
   );
+  // 3桁でも入らないぶんは、入る大きさまで落とす（下限 12px）。
+  const fitsAtFullSize = titleLength <= charsPerColumnAtFullSize * titleColumns;
+  const shrunkFontSize = Math.max(
+    TITLE_MIN_FONT_SIZE,
+    Math.floor((titleColumnHeightPx * 0.94 * titleColumns) / titleLength),
+  );
+  const titleFontSize = isVertical
+    ? fitsAtFullSize
+      ? settings.fontSize
+      : Math.min(settings.fontSize, shrunkFontSize)
+    : horizontalTitleFontSize;
   // 桁の太さ × 桁数。折り返した題はこの幅に収まる。
   const titleColumnWidth = Math.round(titleFontSize * 1.6) * titleColumns;
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
@@ -1025,8 +1038,6 @@ export function EntryEditor({
                   }
                 }}
                 onBlur={commitTitleEdit}
-                // 長い題は桁に収まらず、収めようとすると字が小さくなりすぎる。
-                maxLength={TITLE_MAX_LENGTH}
                 placeholder={t('title.placeholder')}
                 aria-label={t('title.placeholder')}
                 className={`z-[12] resize-none overflow-hidden border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
