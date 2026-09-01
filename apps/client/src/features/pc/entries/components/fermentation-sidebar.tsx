@@ -7,7 +7,8 @@ import { ICON_STROKE_WIDTH, SHELL_INSET, SIDE_PANEL_WIDTH } from '@/components/u
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 
 interface FermentationSidebarProps {
-  detail: FermentationDetail;
+  /** まだ発酵が無いこともある（問いは紐づいているが結果はこれから）。 */
+  detail: FermentationDetail | null;
   /** 畳んでいるか。畳んでいるときは縁だけを残す（左のサイドバーと同じ作法）。 */
   collapsed: boolean;
   onToggle: () => void;
@@ -111,9 +112,10 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
   const td = useTranslations('editor.fermentation_overlay.detail');
   const [open, setOpen] = useState<OpenItem | null>(null);
 
-  const keywords = detail.keywords.slice(0, MAX_KEYWORDS);
-  const snippets = detail.snippets.slice(0, MAX_SNIPPETS);
-  const isEmpty = keywords.length === 0 && snippets.length === 0 && detail.letter === null;
+  const keywords = detail?.keywords.slice(0, MAX_KEYWORDS) ?? [];
+  const snippets = detail?.snippets.slice(0, MAX_SNIPPETS) ?? [];
+  const letter = detail?.letter ?? null;
+  const isEmpty = keywords.length === 0 && snippets.length === 0 && letter === null;
 
   const headers = {
     keyword: td('header_keyword'),
@@ -125,7 +127,7 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
   // （手紙 → ことば → 断片 の順）。何も無いときだけ、面そのものの名前に落ちる。
   const heading = open
     ? headers[open.kind]
-    : detail.letter
+    : letter
       ? t('section_letter')
       : keywords.length > 0
         ? t('section_keywords')
@@ -139,7 +141,7 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
     unit: 'FermentationSidebar',
     keywordCount: keywords.length,
     snippetCount: snippets.length,
-    hasLetter: detail.letter !== null,
+    hasLetter: letter !== null,
     empty: isEmpty,
     detailOpen: !collapsed && open !== null,
     detailType: collapsed ? 'none' : (open?.kind ?? 'none'),
@@ -245,12 +247,12 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
             )}
 
             {/* 手紙はこの面に来る目的そのもの。畳まずそのまま置く（見出しは面の上にある）。 */}
-            {detail.letter && (
+            {letter && (
               <div
                 className="mb-7 px-5 text-[13px] leading-[2] whitespace-pre-wrap text-[var(--fg)]"
                 style={{ fontFamily: "'Noto Serif JP', serif" }}
               >
-                {detail.letter.bodyText}
+                {letter.bodyText}
               </div>
             )}
 

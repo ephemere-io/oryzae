@@ -17,7 +17,7 @@ import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { FermentationSidebar } from './fermentation-sidebar';
 
 interface Props {
-  detail: FermentationDetail;
+  detail: FermentationDetail | null;
   collapsed: boolean;
   onToggle: () => void;
 }
@@ -96,6 +96,12 @@ registerUnit<Props>({
       props: { detail: makeDetail({}), collapsed: false, onToggle: noop },
     },
     {
+      id: 'no-fermentation-yet',
+      probe: true,
+      description: 'Probe: 問いは紐づいているが発酵はまだ（面は開けて、中身が無いと言う）',
+      props: { detail: null, collapsed: false, onToggle: noop },
+    },
+    {
       id: 'collapsed',
       description: '畳んだ状態（縁だけが残り、押せば開く）',
       props: { detail: fullDetail, collapsed: true, onToggle: noop },
@@ -134,7 +140,7 @@ registerUnit<Props>({
       id: 'keyword-cap',
       description: 'キーワードは最大5件に頭打ちされ、契約が描画数と一致する',
       check: ({ contract, props }) => {
-        const expected = Math.min(props.detail.keywords.length, 5);
+        const expected = Math.min(props.detail?.keywords.length ?? 0, 5);
         return (
           Number(contract.keywordCount) === expected ||
           `keywordCount=${contract.keywordCount}, 期待=${expected}`
@@ -145,7 +151,7 @@ registerUnit<Props>({
       id: 'snippet-cap',
       description: 'スニペットは最大3件に頭打ちされ、契約が描画数と一致する',
       check: ({ contract, props }) => {
-        const expected = Math.min(props.detail.snippets.length, 3);
+        const expected = Math.min(props.detail?.snippets.length ?? 0, 3);
         return (
           Number(contract.snippetCount) === expected ||
           `snippetCount=${contract.snippetCount}, 期待=${expected}`

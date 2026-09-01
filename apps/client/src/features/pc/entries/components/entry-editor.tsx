@@ -121,8 +121,8 @@ function voiceStatusMessage(
  */
 const TITLE_MAX_LENGTH = 16;
 
-/** 題として読める最小の大きさ。これ以上は縮めない（縮めても読めない）。 */
-const TITLE_MIN_FONT_SIZE = 12;
+/** 題が使える桁数の上限。これ以上増やすと、題が紙の面積を占領する。 */
+const TITLE_MAX_COLUMNS = 3;
 
 /**
  * 縦書きのとき、題の右にとる余白と、題と本文のあいだの間。
@@ -239,7 +239,7 @@ export function EntryEditor({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasUnsavedChanges = content !== savedContent || title.trim() !== savedTitle;
   const {
@@ -783,11 +783,10 @@ export function EntryEditor({
   // 理由をホバーで言う。押せるときだけ現れる作りだと、そもそもこの操作があることに
   // 気づけない（「パレットに発酵の表示切替が無い」と言われた）。
   //
-  const fermentationReason = fermentationOverlayDetail
-    ? undefined
-    : linkedIds.size === 0
-      ? t('palette.fermentation_needs_question')
-      : t('palette.fermentation_not_ready');
+  // 面は問いを紐づけていれば開ける（中身が無ければ「まだ発酵していません」と言う）。
+  // 押せないのは、開く先そのものが無いとき＝問いを紐づけていないときだけ。
+  const fermentationReason =
+    linkedIds.size === 0 ? t('palette.fermentation_needs_question') : undefined;
 
   paletteActions.push({
     id: 'fermentation',
@@ -839,16 +838,18 @@ export function EntryEditor({
   // 縦書きの題は桁の高さ（画面の 86%）に収まる必要があるので、字数から逆算する。
   // 上限は本文と同じ大きさまで——題が本文より大きいと、紙の主役が入れ替わってうるさい。
   const titleLength = Math.max(title.length, 1);
-  // 下限を本文の 0.7 倍で止めていたため、24 字を超えると縮小が効かず桁からあふれた
-  // （maxLength は**新しく打つ分**しか止めないので、既に長い題は残る）。
-  // 収まるところまで縮める。読める最小として 12px だけ残す。
-  const titleFontSize = isVertical
-    ? Math.max(
-        TITLE_MIN_FONT_SIZE,
-        Math.min(settings.fontSize, Math.floor((titleColumnHeightPx * 0.94) / titleLength)),
-      )
-    : Math.round(settings.fontSize * 1.3);
-  const titleColumnWidth = Math.round(titleFontSize * 1.6);
+  // **縮めるのではなく、桁を増やす。** 長さに応じて字を小さくしていたが、長い題ほど
+  // 読めなくなるうえ、本文より小さい題は題に見えない。字の大きさは本文と同じに保ち、
+  // 入り切らなければ2桁目・3桁目へ折り返す（縦書きの紙で自然な畳み方）。
+  const titleFontSize = isVertical ? settings.fontSize : Math.round(settings.fontSize * 1.3);
+  // 1桁に何字入るか → 何桁要るか。桁数は上限で止める（題が紙を占領しないように）。
+  const charsPerColumn = Math.max(1, Math.floor((titleColumnHeightPx * 0.94) / titleFontSize));
+  const titleColumns = Math.min(
+    TITLE_MAX_COLUMNS,
+    Math.max(1, Math.ceil(titleLength / charsPerColumn)),
+  );
+  // 桁の太さ × 桁数。折り返した題はこの幅に収まる。
+  const titleColumnWidth = Math.round(titleFontSize * 1.6) * titleColumns;
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
   const titleTextStyle: React.CSSProperties = {
     // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。
@@ -901,7 +902,9 @@ export function EntryEditor({
         >
           {/* 左: 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
             チップの中心が瓶アイコンの中心と同じ線に乗るようにする。 */}
-          <div className="flex min-w-0 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
+          {/* flex-1 が要る。**基準幅が中身のままだと縮まず**、結ばれた問いが増えたぶん
+              そのまま右へはみ出して、日付や設定の下に潜り込む。 */}
+          <div className="flex min-w-0 flex-1 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
             <QuestionChip
               activeQuestions={activeQuestions}
               linkedQuestionIds={linkedIds}
@@ -1006,9 +1009,11 @@ export function EntryEditor({
               {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
                 縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
                 本文と同じ書体で、本文より一回り大きく置く。 */}
-              <input
+              {/* **textarea であって input ではない。** input は1行しか持てないので、
+                  長い題を折り返せず、縮めるか見切れるかの二択になる。 */}
+              <textarea
                 ref={titleInputRef}
-                type="text"
+                rows={1}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => {
@@ -1024,7 +1029,7 @@ export function EntryEditor({
                 maxLength={TITLE_MAX_LENGTH}
                 placeholder={t('title.placeholder')}
                 aria-label={t('title.placeholder')}
-                className={`z-[12] border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
+                className={`z-[12] resize-none overflow-hidden border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
                 style={titleTextStyle}
               />
 
@@ -1144,9 +1149,11 @@ export function EntryEditor({
       {/* Issue #466: 発酵結果は本文に重ねず、右の面に集約する。
           面は**画面の縦いっぱい**に立てる（ヘッダーの下から始めない）。
           余計なラッパーで包まないこと——包むと中身ぶんの高さしか持たない。 */}
-      {/* 畳んでいるときも縁は残す（開き直す場所が画面の反対側だけだと遠い）。
-          パレットの操作とこの縁は同じ状態を切り替える。 */}
-      {fermentationOverlayDetail && (
+      {/* **問いを紐づけていれば必ず縁を出す。** 発酵結果があるときだけ現れる作りだと、
+          開閉できる面があること自体に気づけない（結果が無い＝面ごと存在しない、に見える）。
+          中身が無いときは開いた先で「まだ発酵していません」と言う。
+          畳んでいるときも縁は残す（開き直す場所が画面の反対側だけだと遠い）。 */}
+      {linkedIds.size > 0 && (
         <FermentationSidebar
           detail={fermentationOverlayDetail}
           collapsed={!fermentSidebarOpen}
