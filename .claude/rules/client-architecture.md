@@ -61,7 +61,8 @@ paths:
 
 import では見えない層は `test/architecture/` の静的テストで強制する:
 `fetch-lives-in-shared`（`/api/v1` の置き場）・`device-ui-lives-in-reach`（`sp-*`/`pc-*` の置き場）・
-`types-live-in-types-file`（`hooks/` から型を export しない）・`features-are-reach-only`（`features/` 直下は 3 つだけ）。
+`types-live-in-types-file`（`hooks/` から型を export しない）・`features-are-reach-only`（`features/` 直下は 3 つだけ）・
+`no-cross-device-duplication`（pc と sp の間にコピペを作らない。コピペは import を作らないので dep-cruiser では検出できない）。
 
 `apps/admin`（reach 軸なし）: 従来どおり `features/X` → `features/Y` **禁止**。
 
