@@ -60,20 +60,14 @@ export function QuestionChip({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const linked = activeQuestions.filter((q) => linkedQuestionIds.has(q.id));
-  const primary = linked[0];
 
-  /** 選び直す。既に結ばれていれば解き、違う問いなら**前のを解いてから**結ぶ。 */
-  const choose = useCallback(
+  /** 付け外し。押すたびに結び／解く（面は開いたままにする——続けて選べるように）。 */
+  const toggleLink = useCallback(
     (questionId: string) => {
-      if (linkedQuestionIds.has(questionId)) {
-        onUnlink(questionId);
-        return;
-      }
-      for (const id of linkedQuestionIds) onUnlink(id);
-      onLink(questionId);
-      setOpen(false);
+      if (linkedQuestionIds.has(questionId)) onUnlink(questionId);
+      else onLink(questionId);
     },
-    [linkedQuestionIds, onLink, onUnlink, setOpen],
+    [linkedQuestionIds, onLink, onUnlink],
   );
 
   // 外側クリック / Escape で閉じる。ドロップダウンは中央に開くので、
@@ -96,33 +90,32 @@ export function QuestionChip({
     };
   }, [open, setOpen]);
 
-  const primaryText = primary ? (primary.currentText ?? t('untitled')) : null;
-  const label = primaryText ?? t('empty');
-  const extraCount = linked.length - 1;
-
   // CSS カスタムプロパティは React.CSSProperties に含まれないので、`--*` を許す形で広げる。
-  const chipStyle: React.CSSProperties & Record<`--${string}`, string> = primary
-    ? {
-        color: 'var(--accent)',
-        '--chip-bg': 'color-mix(in srgb, var(--accent) 14%, var(--surface-raised))',
-        '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 24%, var(--surface-raised))',
-        '--chip-border': 'color-mix(in srgb, var(--accent) 38%, transparent)',
-        '--chip-border-hover': 'color-mix(in srgb, var(--accent) 60%, transparent)',
-      }
-    : {
-        color: 'var(--fg)',
-        '--chip-bg': 'var(--surface-raised)',
-        '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 12%, var(--surface-raised))',
-        '--chip-border': 'var(--surface-raised-border)',
-        '--chip-border-hover': 'color-mix(in srgb, var(--accent) 45%, transparent)',
-      };
+  const linkedChipStyle: React.CSSProperties & Record<`--${string}`, string> = {
+    color: 'var(--accent)',
+    '--chip-bg': 'color-mix(in srgb, var(--accent) 14%, var(--surface-raised))',
+    '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 24%, var(--surface-raised))',
+    '--chip-border': 'color-mix(in srgb, var(--accent) 38%, transparent)',
+    '--chip-border-hover': 'color-mix(in srgb, var(--accent) 60%, transparent)',
+  };
+  const addChipStyle: React.CSSProperties & Record<`--${string}`, string> = {
+    color: 'var(--fg)',
+    '--chip-bg': 'var(--surface-raised)',
+    '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 12%, var(--surface-raised))',
+    '--chip-border': 'var(--surface-raised-border)',
+    '--chip-border-hover': 'color-mix(in srgb, var(--accent) 45%, transparent)',
+  };
+  const chipClass =
+    'flex h-8 shrink-0 items-center gap-2 rounded-full border border-[var(--chip-border)] ' +
+    'bg-[var(--chip-bg)] px-3.5 text-[13.5px] font-medium transition-colors duration-150 ' +
+    'hover:border-[var(--chip-border-hover)] hover:bg-[var(--chip-bg-hover)]';
 
   return (
     // 器はボタンに張りつく大きさにする（inline-flex）。中央寄せの箱にしていた頃は、
     // 器がヘッダーの幅いっぱいに広がり、開いた面の左端がボタンの左端とずれていた。
     <div
       ref={rootRef}
-      className="relative inline-flex max-w-full"
+      className="flex min-w-0 items-center gap-1.5"
       {...verifyAttrs({
         unit: 'QuestionChip',
         open,
@@ -131,67 +124,69 @@ export function QuestionChip({
         linked: linked.length > 0,
       })}
     >
-      {/* 複数結ばれていることは見た目の「+n」で出すが、読み上げには数が届かないので
-          そのときだけ aria-label で件数を言う。 */}
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        aria-label={linked.length > 1 ? t('linked_count', { count: linked.length }) : undefined}
-        // ヘッダーで唯一の「押せるもの」であり、この画面でいちばん大事な選択なので、
-        // 日付や歯車より一段強く出す（高さ・字の大きさ・地の濃さを上げる）。
-        // 結ばれていないときも、点線の枠だけの弱い印にはしない——結ぶ操作に気づかれないと、
-        // エントリーは問いに結ばれないまま溜まっていく。
-        // 色は CSS 変数で渡し、地の切り替えは class（`hover:`）に任せる。
-        // インラインの background を直接置くと :hover に必ず勝ってしまい、
-        // 触っても何も変わらないボタンになる（そうなっていた）。
-        // 結ばれていないときの地は**黒の洗いではなく白い面**にする。紙の上に黒を敷くと、
-        // 沈んで汚れて見える。
-        className="flex h-8 max-w-[340px] items-center gap-2 rounded-full border border-[var(--chip-border)] bg-[var(--chip-bg)] px-3.5 text-[13.5px] font-medium transition-colors duration-150 hover:border-[var(--chip-border-hover)] hover:bg-[var(--chip-bg-hover)]"
-        style={chipStyle}
-      >
-        <span aria-hidden="true">{primary ? '◦' : '+'}</span>
-        <span className="truncate">{label}</span>
-        {/* 2つ目以降。薄い「+1」では複数結ばれていることが読み取れなかったので、
-            チップの中にもう1枚の丸をはっきり置く（数はここでしか出ない情報）。 */}
-        {extraCount > 0 && (
-          <span
-            className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-[11px] leading-none font-medium"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--accent) 22%, transparent)',
-              color: 'var(--accent)',
-            }}
+      {/* 結ばれている問いは**全部並べる**。以前は先頭だけを出して残りを「+n」に畳んでいたが、
+          畳んだ数字からは「どの問いを結んだのか」が分からない。横に余裕がある場所なので、
+          そのまま並べ、あふれたら横に流す（縦に折り返すとヘッダーの高さが動く）。 */}
+      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {linked.map((q) => (
+          <button
+            key={q.id}
+            type="button"
+            onClick={() => onUnlink(q.id)}
+            aria-label={t('unlink_aria', { text: q.currentText ?? t('untitled') })}
+            className={chipClass}
+            style={linkedChipStyle}
           >
-            +{extraCount}
-          </span>
-        )}
-      </button>
+            <span aria-hidden="true">◦</span>
+            <span className="whitespace-nowrap">{q.currentText ?? t('untitled')}</span>
+            <span aria-hidden="true" className="text-[11px] opacity-55">
+              ×
+            </span>
+          </button>
+        ))}
+      </div>
 
-      {open && (
-        // 面の左端をボタンの左端に合わせる（left-0）。設定パネルの Select と
-        // **同じ部品・同じ役割**（listbox / option）で開く。
-        <div className="absolute top-full left-0 z-[62] mt-2 w-[320px]">
-          <MenuPanel role="listbox" ariaLabel={t('empty')} className="max-h-[50vh]">
-            {activeQuestions.length === 0 ? (
-              <p className="px-3 py-2 text-[13px] text-[var(--date-color)]">
-                {t('none_available')}
-              </p>
-            ) : (
-              activeQuestions.map((q) => (
-                <MenuOption
-                  key={q.id}
-                  role="option"
-                  selected={linkedQuestionIds.has(q.id)}
-                  onClick={() => choose(q.id)}
-                >
-                  {q.currentText ?? t('untitled')}
-                </MenuOption>
-              ))
-            )}
-          </MenuPanel>
-        </div>
-      )}
+      {/* 足す。**行の外**に置く——行は横に流れる（overflow）ので、中に置くと
+          開いた面がその枠で切られてしまう。 */}
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label={t('empty')}
+          className={chipClass}
+          style={addChipStyle}
+        >
+          <span aria-hidden="true">+</span>
+          {linked.length === 0 && <span className="whitespace-nowrap">{t('empty')}</span>}
+        </button>
+
+        {open && (
+          // 面の左端を「足す」チップの左端に合わせる（left-0）。
+          // 設定パネルの Select と同じ MenuPanel / MenuOption で開く。
+          <div className="absolute top-full left-0 z-[62] mt-2 w-[320px]">
+            <MenuPanel role="menu" ariaLabel={t('empty')} className="max-h-[50vh]">
+              {activeQuestions.length === 0 ? (
+                <p className="px-3 py-2 text-[13px] text-[var(--date-color)]">
+                  {t('none_available')}
+                </p>
+              ) : (
+                activeQuestions.map((q) => (
+                  <MenuOption
+                    key={q.id}
+                    role="menuitemcheckbox"
+                    selected={linkedQuestionIds.has(q.id)}
+                    onClick={() => toggleLink(q.id)}
+                  >
+                    {q.currentText ?? t('untitled')}
+                  </MenuOption>
+                ))
+              )}
+            </MenuPanel>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

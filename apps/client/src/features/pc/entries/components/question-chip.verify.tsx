@@ -20,11 +20,6 @@ interface QuestionChipProps {
   linkedQuestionIds: Set<string>;
   onLink: (questionId: string) => void;
   onUnlink: (questionId: string) => void;
-  /**
-   * 単一選択の確認用。何を解いて何を結んだかを fixture 側に残す
-   * （DOM には出ない出来事なので、契約ではなくここで受ける）。
-   */
-  calls?: { linked: string[]; unlinked: string[] };
 }
 
 const noop = () => {};
@@ -35,10 +30,8 @@ const SAMPLE_QUESTIONS: QuestionOption[] = [
   { id: 'q3', currentText: '最近うれしかった小さなことは？' },
 ];
 
-const CHIP_SELECTOR = '[data-verify-unit="QuestionChip"] > button';
-
-/** 「別の問いを選ぶ」fixture 用。呼び出しを記録するだけの器。 */
-const CHOOSE_CALLS: { linked: string[]; unlinked: string[] } = { linked: [], unlinked: [] };
+/** 面を開くチップ（「+」）。結ばれた問いのチップが前に並ぶので、最後の1つを指す。 */
+const ADD_CHIP_SELECTOR = '[data-verify-unit="QuestionChip"] button[aria-haspopup="menu"]';
 
 registerUnit<QuestionChipProps>({
   id: 'QuestionChip',
@@ -77,30 +70,8 @@ registerUnit<QuestionChipProps>({
         onUnlink: noop,
       },
       act: async ({ click, wait }) => {
-        await click(CHIP_SELECTOR);
+        await click(ADD_CHIP_SELECTOR);
         await wait(0);
-      },
-    },
-    {
-      id: 'choose-another',
-      description: 'q1 が結ばれている状態で q2 を選ぶ（結び直しになる）',
-      props: {
-        activeQuestions: SAMPLE_QUESTIONS,
-        linkedQuestionIds: new Set<string>(['q1']),
-        onLink: (id) => CHOOSE_CALLS.linked.push(id),
-        onUnlink: (id) => CHOOSE_CALLS.unlinked.push(id),
-        calls: CHOOSE_CALLS,
-      },
-      act: async ({ root, click, wait }) => {
-        CHOOSE_CALLS.linked.length = 0;
-        CHOOSE_CALLS.unlinked.length = 0;
-        await click(CHIP_SELECTOR);
-        await wait(16);
-        const rows = Array.from(root.querySelectorAll<HTMLElement>('[role="option"]'));
-        const second = rows[1];
-        if (!second) throw new Error('2つ目の問いが見つからない');
-        second.click();
-        await wait(16);
       },
     },
     {
@@ -144,18 +115,18 @@ registerUnit<QuestionChipProps>({
       id: 'closed-renders-single-trigger',
       description: '閉じているときは面を描かない（本文の邪魔をしない）',
       check: ({ root, contract }) => {
-        const panel = root.querySelector('[role="listbox"]');
+        const panel = root.querySelector('[role="menu"]');
         if (contract.open === 'true') return true;
         return panel === null || '閉じているのに面が描画されている';
       },
     },
     {
       id: 'open-lists-every-active-question',
-      // 問いは**1つだけ選ぶ**ので listbox / option。面も行も設定パネルの Select と同じ。
+      // 問いは**付け外し**（menu / menuitemcheckbox）。面と行は設定パネルの Select と同じ部品。
       description: '開いているときは行が activeQuestions と同数（過不足なく選べる）',
       onlyFixtures: ['open'],
       check: ({ root, props }) => {
-        const options = root.querySelectorAll('[role="option"]').length;
+        const options = root.querySelectorAll('[role="menuitemcheckbox"]').length;
         return (
           options === props.activeQuestions.length ||
           `行数=${options}, 期待=${props.activeQuestions.length}`
@@ -164,83 +135,71 @@ registerUnit<QuestionChipProps>({
     },
     {
       id: 'selected-options-match-linked',
-      description: 'aria-selected=true の行数が linkedCount と一致する',
+      description: 'aria-checked=true の行数が linkedCount と一致する',
       onlyFixtures: ['open'],
       check: ({ root, contract }) => {
-        const selected = root.querySelectorAll('[role="option"][aria-selected="true"]').length;
+        const selected = root.querySelectorAll(
+          '[role="menuitemcheckbox"][aria-checked="true"]',
+        ).length;
         return (
           selected === Number(contract.linkedCount) ||
-          `aria-selected=${selected} だが linkedCount=${contract.linkedCount}`
+          `aria-checked=${selected} だが linkedCount=${contract.linkedCount}`
         );
       },
     },
     {
-      id: 'choosing-replaces-instead-of-adding',
-      // このエントリーは「この問いへの答え」であって、複数の問いへの同時の答えではない。
-      description: '別の問いを選ぶと、前の問いは解かれてから結ばれる',
-      onlyFixtures: ['choose-another'],
-      check: ({ props }) => {
-        const calls = props.calls;
-        if (!calls) return 'fixture が呼び出しを記録していない';
-        // 記録の器は fixture 間で共有されるので（同じ面が複数回マウントされる）、
-        // **件数の絶対値ではなく最後の1回と対応関係**を見る。
-        if (calls.linked.length === 0) return '結び直しが起きていない';
-        const replaced = calls.unlinked.length === calls.linked.length;
-        return (
-          (replaced && calls.unlinked.at(-1) === 'q1' && calls.linked.at(-1) === 'q2') ||
-          `解いた=${JSON.stringify(calls.unlinked)}, 結んだ=${JSON.stringify(calls.linked)}` +
-            '（1つ結ぶたびに1つ解かれるべき）'
-        );
-      },
-    },
-    {
-      id: 'extra-count-is-legible',
-      // 「+1」を薄い文字で添えていたときは、複数結ばれていることが読み取れなかった。
-      description: '2つ以上結ばれていれば、余りの件数が独立した丸として出る',
+      id: 'every-linked-question-is-shown',
+      // 先頭だけ出して残りを「+n」に畳んでいた頃は、畳んだ数字から
+      // 「どの問いを結んだのか」が分からなかった。全部並べる。
+      description: '結ばれている問いは、数だけでなく全部が並ぶ',
       check: ({ root, contract }) => {
-        const trigger = root.querySelector('[data-verify-unit="QuestionChip"] > button');
-        const linkedCount = Number(contract.linkedCount);
-        const badge = Array.from(trigger?.querySelectorAll('span') ?? []).find((el) =>
-          /^\+\d+$/.test(el.textContent?.trim() ?? ''),
-        );
-        if (linkedCount <= 1) {
-          return badge === undefined || `1件以下なのに余りの表示がある: "${badge.textContent}"`;
-        }
-        if (!badge) return `${linkedCount}件結ばれているのに余りの表示が無い`;
-        return (
-          badge.textContent?.trim() === `+${linkedCount - 1}` ||
-          `余りの表示が "${badge.textContent}"（+${linkedCount - 1} であるべき）`
-        );
+        const chips = root.querySelectorAll(
+          '[data-verify-unit="QuestionChip"] button[aria-label^="「"]',
+        ).length;
+        const expected = Number(contract.linkedCount);
+        return chips === expected || `並んでいるチップ=${chips}, 結ばれた数=${expected}`;
       },
     },
     {
-      id: 'multi-linked-is-announced',
-      // 見た目の「+n」は読み上げに届かないので、そのときだけ件数を言う。
+      id: 'overflow-scrolls-sideways',
+      // 縦に折り返すとヘッダーの高さが動き、本文の始まる位置がずれる。
+      description: 'あふれたら横に流す（折り返さない）',
+      check: ({ root }) => {
+        const row = root.querySelector('[data-verify-unit="QuestionChip"] > div');
+        if (!row) return 'チップの並びが見つからない';
+        return row.className.includes('overflow-x-auto') || `横に流す指定が無い: ${row.className}`;
+      },
+    },
+    {
+      id: 'each-chip-says-what-it-does',
+      // チップを押すと紐づけが外れる。押す前にそれが分かる必要がある。
       // 翻訳キーの入れ忘れもここで落ちる（未定義なら生キーが出る）。
-      description: '2つ以上結ばれていれば、件数が aria-label で言われる',
+      description: '結ばれたチップは、外す操作であることを読み上げに伝える',
       check: ({ root, contract }) => {
-        const trigger = root.querySelector('[data-verify-unit="QuestionChip"] > button');
-        const label = trigger?.getAttribute('aria-label');
-        if (Number(contract.linkedCount) <= 1) {
-          return label === null || `1件以下なのに件数の読み上げが付いている: "${label}"`;
+        const chips = Array.from(
+          root.querySelectorAll('[data-verify-unit="QuestionChip"] button[aria-label^="「"]'),
+        );
+        if (chips.length !== Number(contract.linkedCount)) {
+          return `チップ=${chips.length}, 結ばれた数=${contract.linkedCount}`;
         }
-        if (!label) return '複数結ばれているのに aria-label が無い';
+        const bad = chips.find((c) => (c.getAttribute('aria-label') ?? '').includes('unlink_aria'));
         return (
-          (label.includes(contract.linkedCount) && !label.includes('linked_count')) ||
-          `aria-label が件数を伝えていない: "${label}"`
+          bad === undefined || `翻訳キーが解決されていない: "${bad.getAttribute('aria-label')}"`
         );
       },
     },
     {
-      id: 'panel-left-aligns-with-trigger',
-      description: '開いた面の左端はチップの左端に合う（器がボタンに張りついている）',
+      id: 'panel-is-not-clipped-by-the-row',
+      // 結ばれた問いの行は横に流れる（overflow）。「足す」チップと面をその中に置くと、
+      // 開いた面が行の枠で切られる。
+      description: '開いた面は、横に流れる行の外側で開く',
       onlyFixtures: ['open'],
       check: ({ root }) => {
-        const wrapper = root.querySelector('[data-verify-unit="QuestionChip"]');
-        if (!wrapper) return '器が見つからない';
+        const panel = root.querySelector('[role="menu"]');
+        if (!panel) return '面が開いていない';
         return (
-          wrapper.className.includes('inline-flex') ||
-          `器が inline-flex でない（ヘッダー幅いっぱいに広がると面の左端がずれる）: ${wrapper.className}`
+          panel.closest('.overflow-x-auto') === null ||
+          '面が横スクロールの内側にある（枠で切られる）'
         );
       },
     },

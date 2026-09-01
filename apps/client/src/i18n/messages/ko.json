@@ -153,7 +153,8 @@
       "empty": "물음 연결하기",
       "untitled": "제목 없는 물음",
       "none_available": "아직 물음이 없습니다",
-      "linked_count": "{count}개의 물음을 연결함"
+      "linked_count": "{count}개의 물음을 연결함",
+      "unlink_aria": "“{text}” 연결 해제"
     }
   },
   "app": {
@@ -460,7 +461,9 @@
       "section_keywords": "키워드",
       "section_snippets": "스니펫",
       "back_aria": "목록으로",
-      "read_more": "선택된 이유 보기"
+      "read_more": "선택된 이유 보기",
+      "drag_to_body": "“{text}”을 본문으로 끌어 넣기",
+      "open_aria": "발효 결과 열기"
     },
     "palette": {
       "move": "팔레트 이동",

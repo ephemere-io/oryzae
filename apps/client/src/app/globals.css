@@ -92,8 +92,8 @@ body {
  * 押せるように見えてほしいので、押せる要素だけ pointer に戻す。
  * 各コンポーネントで `cursor-pointer` を貼って回るより、ここで一度決めるほうが漏れない。 */
 /* サイドバーの幅。**この1本だけをサイドバー・本文の左余白・エディタの左端が見る**
- * （配り方は lib/sidebar-context.tsx）。掴んで引いている間は data-sidebar-resizing が
- * 立ち、遷移を止める——遷移が生きていると指の位置に対して面が遅れて付いてくる。 */
+ * （配り方は lib/sidebar-context.tsx）。開閉は2状態だけなので、同じ遷移を3者に掛ければ
+ * 同じフレームで一緒に動く。 */
 :root {
   --sidebar-width: 80px;
 }
@@ -111,12 +111,6 @@ body {
 .sidebar-anchored {
   transition: left 200ms linear;
   left: var(--sidebar-width);
-}
-
-:root[data-sidebar-resizing] .sidebar-sized,
-:root[data-sidebar-resizing] .sidebar-inset,
-:root[data-sidebar-resizing] .sidebar-anchored {
-  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

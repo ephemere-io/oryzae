@@ -8,7 +8,9 @@ import type { FermentationDetail } from '@/features/shared/fermentation/types';
 
 interface FermentationSidebarProps {
   detail: FermentationDetail;
-  onClose: () => void;
+  /** 畳んでいるか。畳んでいるときは縁だけを残す（左のサイドバーと同じ作法）。 */
+  collapsed: boolean;
+  onToggle: () => void;
 }
 
 const MAX_KEYWORDS = 5;
@@ -22,6 +24,43 @@ const SNIPPET_PREVIEW_LENGTH = 60;
 function startTextDrag(e: ReactDragEvent, text: string) {
   e.dataTransfer.setData('text/plain', text);
   e.dataTransfer.effectAllowed = 'copy';
+}
+
+/** 過去の言葉（キーワード）の地。 */
+const PAST_WORD_STYLE = {
+  borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)',
+  background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+} as const;
+
+/**
+ * 掴む所。
+ *
+ * **押すと掴むを同じ場所に載せない。** 1つの部品が両方を担うと、押していいのか
+ * 引いていいのかが分からず、結局どちらもされない。つまみを立てて、
+ * ここは引く場所・隣は押す場所、と形で分ける。
+ */
+function GrabHandle({ text, label }: { text: string; label: string }) {
+  return (
+    <button
+      type="button"
+      draggable
+      // 押す用途は持たない（掴むためだけの取っ手）。タブ順にも入れない——
+      // キーボードからは隣の「読む」ボタンで同じ中身に届く。
+      tabIndex={-1}
+      aria-label={label}
+      onDragStart={(e) => startTextDrag(e, text)}
+      className="flex w-5 shrink-0 cursor-grab items-center justify-center self-stretch text-[var(--date-color)] opacity-45 transition-opacity duration-150 hover:opacity-100 active:cursor-grabbing"
+    >
+      <svg aria-hidden="true" width={8} height={14} viewBox="0 0 8 14" fill="currentColor">
+        <circle cx="2" cy="3" r="1" />
+        <circle cx="6" cy="3" r="1" />
+        <circle cx="2" cy="7" r="1" />
+        <circle cx="6" cy="7" r="1" />
+        <circle cx="2" cy="11" r="1" />
+        <circle cx="6" cy="11" r="1" />
+      </svg>
+    </button>
+  );
 }
 
 type OpenItem =
@@ -60,8 +99,14 @@ type OpenItem =
  *
  * `h-full` を明示する。親の flex 行に置いただけでは中身ぶんの高さしか持たず、
  * 面が画面の上半分で切れて見えていた。
+ *
+ * ## 開閉
+ *
+ * 左のサイドバーと同じで、**畳んでいるときも縁が残る**。パレットからも開閉できるが、
+ * 面そのものにも開く道が要る——閉じたあと、開き直す場所が画面の反対側にしか無いのは
+ * 遠い。開くか畳むかの2状態だけで、中間は持たない。
  */
-export function FermentationSidebar({ detail, onClose }: FermentationSidebarProps) {
+export function FermentationSidebar({ detail, collapsed, onToggle }: FermentationSidebarProps) {
   const t = useTranslations('editor.fermentation_sidebar');
   const td = useTranslations('editor.fermentation_overlay.detail');
   const [open, setOpen] = useState<OpenItem | null>(null);
@@ -88,6 +133,37 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
           ? t('section_snippets')
           : t('heading');
 
+  // 畳んだ姿でも**同じ契約を出す**。片方だけ欠けると、契約を読む側が
+  // 「0件」なのか「畳んでいるだけ」なのかを区別できない。
+  const contract = verifyAttrs({
+    unit: 'FermentationSidebar',
+    keywordCount: keywords.length,
+    snippetCount: snippets.length,
+    hasLetter: detail.letter !== null,
+    empty: isEmpty,
+    detailOpen: !collapsed && open !== null,
+    detailType: collapsed ? 'none' : (open?.kind ?? 'none'),
+    collapsed,
+  });
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={t('open_aria')}
+        title={t('open_aria')}
+        aria-expanded={false}
+        className="flex h-full w-3 shrink-0 cursor-pointer border-l transition-colors duration-150 hover:bg-[var(--hover-wash)]"
+        style={{
+          borderColor: 'var(--surface-sunken-border)',
+          background: 'var(--surface-sunken)',
+        }}
+        {...contract}
+      />
+    );
+  }
+
   return (
     <aside
       className="flex h-full shrink-0 flex-col overflow-hidden border-l"
@@ -98,15 +174,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
         borderColor: 'var(--surface-sunken-border)',
         background: 'var(--surface-sunken)',
       }}
-      {...verifyAttrs({
-        unit: 'FermentationSidebar',
-        keywordCount: keywords.length,
-        snippetCount: snippets.length,
-        hasLetter: detail.letter !== null,
-        empty: isEmpty,
-        detailOpen: open !== null,
-        detailType: open?.kind ?? 'none',
-      })}
+      {...contract}
     >
       {/* 面の始まりを示す1行。中身を開いているときは、そのまま戻る導線を兼ねる。 */}
       <div className="mb-5 flex h-6 shrink-0 items-center gap-1 px-5">
@@ -134,7 +202,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
         </span>
         <button
           type="button"
-          onClick={onClose}
+          onClick={onToggle}
           aria-label={t('close_aria')}
           className="-mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--date-color)] transition-colors duration-150 hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
         >
@@ -190,35 +258,37 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
               <Section label={t('section_keywords')}>
                 <div className="flex flex-wrap gap-1.5">
                   {keywords.map((kw) => (
-                    <button
+                    <span
                       key={kw.id}
-                      type="button"
-                      // 掴んで本文へ落とせば、その位置に入る。押せば意味を読む。
-                      draggable
-                      onDragStart={(e) => startTextDrag(e, kw.keyword)}
-                      onClick={() =>
-                        setOpen({
-                          kind: 'keyword',
-                          keyword: kw.keyword,
-                          description: kw.description,
-                        })
-                      }
-                      className="flex h-7 cursor-grab items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-150 hover:brightness-[0.97] active:cursor-grabbing"
-                      style={{
-                        borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)',
-                        background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-                        color: 'var(--accent)',
-                        fontFamily: "'Noto Serif JP', serif",
-                        letterSpacing: '0.06em',
-                      }}
+                      className="flex h-7 items-center rounded-full border pr-2.5 transition-colors duration-150"
+                      style={PAST_WORD_STYLE}
                     >
-                      {kw.keyword}
-                      {/* 押せば意味が読める、という手がかり。ホバーしないと分からない
-                          作りだと、多くの人は押さないまま通り過ぎる。 */}
-                      <span aria-hidden="true" className="text-[10px] opacity-60">
-                        ›
-                      </span>
-                    </button>
+                      <GrabHandle
+                        text={kw.keyword}
+                        label={t('drag_to_body', { text: kw.keyword })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpen({
+                            kind: 'keyword',
+                            keyword: kw.keyword,
+                            description: kw.description,
+                          })
+                        }
+                        className="flex h-7 items-center gap-1.5 rounded-full pr-1 text-[12px] transition-colors duration-150 hover:underline"
+                        style={{
+                          color: 'var(--accent)',
+                          fontFamily: "'Noto Serif JP', serif",
+                          letterSpacing: '0.06em',
+                        }}
+                      >
+                        {kw.keyword}
+                        <span aria-hidden="true" className="text-[10px] opacity-60">
+                          ›
+                        </span>
+                      </button>
+                    </span>
                   ))}
                 </div>
               </Section>
@@ -228,39 +298,49 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
               <Section label={t('section_snippets')}>
                 <div className="flex flex-col gap-2">
                   {snippets.map((s) => (
-                    <button
+                    <div
                       key={s.id}
-                      type="button"
-                      // 掴めば本文へ引き込める。落とすのは**全文**（一覧の表示は頭打ちだが、
-                      // 取り込むときに切れていては使い物にならない）。
-                      draggable
-                      onDragStart={(e) => startTextDrag(e, s.originalText)}
-                      onClick={() =>
-                        setOpen({
-                          kind: 'snippet',
-                          originalText: s.originalText,
-                          sourceDate: s.sourceDate,
-                          selectionReason: s.selectionReason,
-                        })
-                      }
                       // 断片は自分が過去に書いた文なので、本文と同じ明朝で、引用のように
                       // 左の罫だけを持たせる（面の中で唯一の線）。
-                      className="cursor-grab border-l-2 py-1 pl-3 text-left text-[12px] leading-relaxed text-[var(--fg)] transition-colors duration-150 hover:border-[var(--accent)] active:cursor-grabbing"
+                      className="group flex gap-1 rounded-r-md border-l-2 py-1.5 pr-1 transition-colors duration-150 hover:bg-[var(--hover-wash)]"
                       style={{
                         borderColor: 'var(--surface-sunken-border)',
                         fontFamily: "'Noto Serif JP', serif",
                       }}
                     >
-                      {s.originalText.length > SNIPPET_PREVIEW_LENGTH
-                        ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
-                        : s.originalText}
-                      <span
-                        aria-hidden="true"
-                        className="mt-1 block text-[10px] text-[var(--accent)] opacity-80"
-                      >
-                        {t('read_more')} ›
-                      </span>
-                    </button>
+                      <GrabHandle
+                        text={s.originalText}
+                        label={t('drag_to_body', { text: s.originalText.slice(0, 12) })}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] leading-relaxed text-[var(--fg)]">
+                          {s.originalText.length > SNIPPET_PREVIEW_LENGTH
+                            ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
+                            : s.originalText}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpen({
+                              kind: 'snippet',
+                              originalText: s.originalText,
+                              sourceDate: s.sourceDate,
+                              selectionReason: s.selectionReason,
+                            })
+                          }
+                          // 「読める」ではなく「押せる」に見せる。枠を持たせないと、
+                          // ただの補足文と区別がつかない。
+                          className="mt-1.5 flex h-6 items-center gap-1 rounded-md border px-2 text-[10px] transition-colors duration-150 hover:bg-[var(--surface-raised)]"
+                          style={{
+                            borderColor: 'color-mix(in srgb, var(--accent) 30%, transparent)',
+                            color: 'var(--accent)',
+                          }}
+                        >
+                          {t('read_more')}
+                          <span aria-hidden="true">›</span>
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </Section>

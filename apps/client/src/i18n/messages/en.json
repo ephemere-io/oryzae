@@ -153,7 +153,8 @@
       "empty": "Link a question",
       "untitled": "Untitled question",
       "none_available": "No questions yet",
-      "linked_count": "{count} questions linked"
+      "linked_count": "{count} questions linked",
+      "unlink_aria": "Unlink “{text}”"
     }
   },
   "app": {
@@ -460,7 +461,9 @@
       "section_keywords": "Keywords",
       "section_snippets": "Snippets",
       "back_aria": "Back to list",
-      "read_more": "Why this was chosen"
+      "read_more": "Why this was chosen",
+      "drag_to_body": "Drag “{text}” into the entry",
+      "open_aria": "Open fermentation"
     },
     "palette": {
       "move": "Move the palette",

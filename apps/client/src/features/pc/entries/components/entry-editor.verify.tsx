@@ -40,7 +40,8 @@ interface Props {
 
 const PICKLE_BTN = 'button[data-palette-action="pickle"]';
 const SETTINGS_BTN = 'button[aria-label="設定"]';
-const QUESTION_CHIP_BTN = '[data-verify-unit="QuestionChip"] > button';
+/** 問いの面を開くチップ（「+」）。結ばれた問いのチップが前に並ぶので、役割で指す。 */
+const QUESTION_CHIP_BTN = '[data-verify-unit="QuestionChip"] button[aria-haspopup="menu"]';
 
 registerUnit<Props>({
   id: 'EntryEditor',
@@ -229,7 +230,7 @@ registerUnit<Props>({
       description: 'チップクリック後は問いの面が開く',
       onlyFixtures: ['question-chip-open'],
       check: ({ root }) =>
-        Boolean(root.querySelector('[data-verify-unit="QuestionChip"] [role="listbox"]')) ||
+        Boolean(root.querySelector('[data-verify-unit="QuestionChip"] [role="menu"]')) ||
         'チップを押しても問いの面が開かない',
     },
     {

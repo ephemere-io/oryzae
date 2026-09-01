@@ -3,41 +3,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 /** 畳んだ状態の幅（アイコンだけ）。アイコン48px + 左右16pxずつ。 */
-export const SIDEBAR_COLLAPSED_WIDTH = 80;
-/** 開いた状態の既定幅（アイコン + メニュー名）。 */
-const SIDEBAR_DEFAULT_WIDTH = 232;
-/** 開いた状態で許す最小幅。これを下回るドラッグは「畳む」とみなす。 */
-export const SIDEBAR_MIN_WIDTH = 176;
-export const SIDEBAR_MAX_WIDTH = 360;
+const SIDEBAR_COLLAPSED_WIDTH = 80;
+/** 開いた状態の幅（アイコン + メニュー名）。 */
+const SIDEBAR_EXPANDED_WIDTH = 240;
+
+const COLLAPSED_KEY = 'oryzae-sidebar-collapsed';
 
 /**
  * 幅を配る CSS 変数。**サイドバー・本文の左余白・エディタの左端が、この1本だけを見る。**
  *
- * 以前は React の state を毎フレーム更新して各所に px を配っていた。掴んで引くたびに
- * 画面全体（本文の折返しを含む）が再描画され、明らかにぎこちなかった。
- * 変数を1つ根に置いて CSS に配らせれば、掴んでいる間は再描画が1回も起きない
+ * 以前は React の state を各所へ px で配っていた。開閉のたびに画面全体（本文の折返しを
+ * 含む）が再描画され、3者が別々のタイミングで動いて見えた。変数を1つ根に置いて CSS に
+ * 配らせれば、状態が変わっても再描画は1回で済み、3者が同じフレームで動く
  * （shadcn のサイドバーと同じ作り）。
  */
 const SIDEBAR_WIDTH_VAR = '--sidebar-width';
 
-/** 掴んでいる間だけ根に立てる印。これが立っているあいだは幅の遷移を止める。 */
-const SIDEBAR_RESIZING_ATTR = 'data-sidebar-resizing';
-
-/** 掴んでいる間、再描画を挟まずに幅を配る。 */
-export function applySidebarWidth(width: number): void {
+function applySidebarWidth(width: number): void {
   if (typeof document === 'undefined') return;
   document.documentElement.style.setProperty(SIDEBAR_WIDTH_VAR, `${width}px`);
 }
-
-/** 幅の遷移を止める／戻す（掴んでいる間は追従が遅れて見えるため）。 */
-export function setSidebarResizing(resizing: boolean): void {
-  if (typeof document === 'undefined') return;
-  if (resizing) document.documentElement.setAttribute(SIDEBAR_RESIZING_ATTR, '');
-  else document.documentElement.removeAttribute(SIDEBAR_RESIZING_ATTR);
-}
-
-const COLLAPSED_KEY = 'oryzae-sidebar-collapsed';
-const WIDTH_KEY = 'oryzae-sidebar-width';
 
 interface SidebarContextValue {
   /** フォーカスモード等で一時的に消しているか（畳むとは別の軸）。 */
@@ -45,13 +30,8 @@ interface SidebarContextValue {
   setHidden: (hidden: boolean) => void;
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
-  /** 開いているときの幅（ユーザーが引いて決めた値）。 */
-  expandedWidth: number;
-  setExpandedWidth: (width: number) => void;
-  /** いま実際に占めている幅。レイアウトはこれだけを見る。 */
+  /** いま占めている幅。契約に出すために持つ（レイアウトは CSS 変数のほうを見る）。 */
   width: number;
-  /** localStorage の復元が済んだか。済むまで幅のアニメーションを掛けない。 */
-  restored: boolean;
 }
 
 const SidebarContext = createContext<SidebarContextValue>({
@@ -59,16 +39,17 @@ const SidebarContext = createContext<SidebarContextValue>({
   setHidden: () => {},
   collapsed: true,
   setCollapsed: () => {},
-  expandedWidth: SIDEBAR_DEFAULT_WIDTH,
-  setExpandedWidth: () => {},
   width: SIDEBAR_COLLAPSED_WIDTH,
-  restored: false,
 });
 
-function clampWidth(value: number): number {
-  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)));
-}
-
+/**
+ * サイドバーの開閉。
+ *
+ * **開くか畳むかの2状態だけ**にしてある。掴んで幅を変えられるようにもしていたが、
+ * 「掴めるはずの縁が掴めない」「畳むとまた掴めない」「本文が指に遅れて付いてくる」と
+ * 不具合が続いた。中間の幅に意味がある画面ではないので、状態そのものを減らした
+ * （shadcn のサイドバーも expanded / icon の2状態しか持たない）。
+ */
 export function SidebarProvider({
   children,
   initialCollapsed = true,
@@ -86,27 +67,15 @@ export function SidebarProvider({
   // SSR と最初の描画は既定値で揃える。localStorage はマウント後に読む
   // （初期値として読むと、サーバーの出力と食い違って hydration が壊れる）。
   const [collapsed, setCollapsedState] = useState(initialCollapsed);
-  const [expandedWidth, setExpandedWidthState] = useState(SIDEBAR_DEFAULT_WIDTH);
-  const [restored, setRestored] = useState(false);
 
   useEffect(() => {
-    if (!persist) {
-      setRestored(true);
-      return;
-    }
+    if (!persist) return;
     try {
-      const storedCollapsed = window.localStorage.getItem(COLLAPSED_KEY);
-      if (storedCollapsed === 'true' || storedCollapsed === 'false') {
-        setCollapsedState(storedCollapsed === 'true');
-      }
-      const storedWidth = Number(window.localStorage.getItem(WIDTH_KEY));
-      if (Number.isFinite(storedWidth) && storedWidth > 0) {
-        setExpandedWidthState(clampWidth(storedWidth));
-      }
+      const stored = window.localStorage.getItem(COLLAPSED_KEY);
+      if (stored === 'true' || stored === 'false') setCollapsedState(stored === 'true');
     } catch {
       // プライベートウィンドウ等で localStorage が使えないときは既定のまま。
     }
-    setRestored(true);
   }, [persist]);
 
   const setHidden = useCallback((next: boolean) => setHiddenState(next), []);
@@ -124,38 +93,14 @@ export function SidebarProvider({
     [persist],
   );
 
-  const setExpandedWidth = useCallback(
-    (next: number) => {
-      const clamped = clampWidth(next);
-      setExpandedWidthState(clamped);
-      if (!persist) return;
-      try {
-        window.localStorage.setItem(WIDTH_KEY, String(clamped));
-      } catch {
-        // 同上。
-      }
-    },
-    [persist],
-  );
-
-  // 掴んでいない間の反映はここ1か所。掴んでいる間は applySidebarWidth が直に書く。
-  const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : expandedWidth;
+  const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH;
   useEffect(() => {
     applySidebarWidth(width);
   }, [width]);
 
   const value = useMemo(
-    () => ({
-      hidden,
-      setHidden,
-      collapsed,
-      setCollapsed,
-      expandedWidth,
-      setExpandedWidth,
-      width,
-      restored,
-    }),
-    [hidden, setHidden, collapsed, setCollapsed, expandedWidth, setExpandedWidth, width, restored],
+    () => ({ hidden, setHidden, collapsed, setCollapsed, width }),
+    [hidden, setHidden, collapsed, setCollapsed, width],
   );
 
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;

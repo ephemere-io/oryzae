@@ -4,19 +4,12 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { ICON_STROKE_WIDTH, SHELL_INSET, SHELL_ROW_HEIGHT } from '@/components/ui/surface';
 import { useAuth } from '@/lib/auth-context';
 import { docsHref } from '@/lib/docs-site';
-import {
-  applySidebarWidth,
-  SIDEBAR_COLLAPSED_WIDTH,
-  SIDEBAR_MAX_WIDTH,
-  SIDEBAR_MIN_WIDTH,
-  setSidebarResizing,
-  useSidebarVisibility,
-} from '@/lib/sidebar-context';
+import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useUnread } from '@/lib/unread-context';
 
 interface NavItem {
@@ -34,9 +27,6 @@ interface NavItem {
  * （手紙が届くのもここ）であって、ブランド名ではない。ロゴは名乗りであって行き先ではないので、
  * 行き先の列の先頭を占めない。
  */
-/** これ以上動いて初めて「掴んだ」と見なす（px）。 */
-const DRAG_THRESHOLD = 4;
-
 const NAV_ITEMS: NavItem[] = [
   {
     href: '/jar',
@@ -71,8 +61,8 @@ const NAV_ITEMS: NavItem[] = [
 /**
  * PC のサイドバー。
  *
- * **畳んだ状態がアイコンだけ、開いた状態がアイコン + メニュー名**。右端を掴めば幅を変えられ、
- * 縁のつまみを1回押せば畳める。幅と開閉は localStorage に残る（`lib/sidebar-context`）。
+ * **畳んだ状態がアイコンだけ、開いた状態がアイコン + メニュー名**。その2つだけ。
+ * 右の縁を押すか ⌘B で切り替わり、状態は localStorage に残る（`lib/sidebar-context`）。
  *
  * 上端の余白（20px）と行の高さ（48px）は `components/ui/surface` の SHELL_INSET /
  * SHELL_ROW_HEIGHT。**エントリー画面のヘッダーが同じ2つの数字を使う**ので、瓶と
@@ -83,83 +73,18 @@ export function Sidebar() {
   const pathname = usePathname();
   const { auth } = useAuth();
   const { unreadCount } = useUnread();
-  const { hidden, collapsed, setCollapsed, expandedWidth, setExpandedWidth, width } =
-    useSidebarVisibility();
-  const [dragging, setDragging] = useState(false);
-  // ドラッグ中は state を書き換えず ref で追う（毎フレームの再描画を避ける）。
-  const dragWidthRef = useRef(expandedWidth);
-  // 掴んで動かしたあとに発火する click を食う。縁は「掴む」と「押す」を兼ねているので、
-  // これが無いと幅を変えるたびに畳まれる。
-  const draggedRef = useRef(false);
-  // pointermove は1フレームに何度も来る。幅の反映は画面全体（本文の折返しまで）に
-  // 波及するので、次のフレームで1回にまとめる。
-  const pendingWidthRef = useRef<number | null>(null);
-  // 掴んだ位置。ここから DRAG_THRESHOLD 動くまでは「押しただけ」と見なす。
-  const dragStartXRef = useRef(0);
-  // 掴んだまま最小幅より内側へ入ったか。離した時点の姿がそのまま確定する。
-  const collapsedDuringDragRef = useRef(false);
-  const frameRef = useRef<number | null>(null);
+  const { hidden, collapsed, setCollapsed, width } = useSidebarVisibility();
 
-  const stopDrag = useCallback(() => setDragging(false), []);
-
+  // ⌘B / Ctrl+B で開閉（shadcn のサイドバーと同じ）。道具はキーボードから届くのが速い。
   useEffect(() => {
-    if (!dragging) return;
-
-    // 掴んでいる間は **state を一切触らない**。幅は CSS 変数へ直に書く。
-    // 再描画を挟むと、本文の折返しまで巻き込んで指の動きから遅れる。
-    function flush() {
-      frameRef.current = null;
-      const next = pendingWidthRef.current;
-      if (next !== null) applySidebarWidth(next);
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'b' || !(e.metaKey || e.ctrlKey)) return;
+      e.preventDefault();
+      setCollapsed(!collapsed);
     }
-    function handleMove(e: PointerEvent) {
-      const next = e.clientX;
-      // 指1本ぶんも動いていないなら、それは「掴んだ」ではなく「押した」。
-      // 閾値が無いと、畳むつもりの1クリックでも 1px の揺れでドラッグ扱いになり、
-      // そのあとの click が食われて**押しても畳まれない**。
-      if (Math.abs(next - dragStartXRef.current) < DRAG_THRESHOLD) return;
-      draggedRef.current = true;
-      // 最小幅より内側なら畳んだ姿。外へ出れば開いた姿。**掴んだまま行き来できる**
-      // （畳む／開くを別の操作にしない）。畳みに落ちてもドラッグは切らないので、
-      // そのまま右へ引き戻せばまた開く。
-      if (next < SIDEBAR_MIN_WIDTH - 24) {
-        pendingWidthRef.current = null;
-        applySidebarWidth(SIDEBAR_COLLAPSED_WIDTH);
-        collapsedDuringDragRef.current = true;
-        return;
-      }
-      collapsedDuringDragRef.current = false;
-      dragWidthRef.current = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, next));
-      pendingWidthRef.current = dragWidthRef.current;
-      if (frameRef.current === null) frameRef.current = requestAnimationFrame(flush);
-    }
-    setSidebarResizing(true);
-    document.addEventListener('pointermove', handleMove);
-    document.addEventListener('pointerup', stopDrag);
-    document.addEventListener('pointercancel', stopDrag);
-    // ドラッグ中に本文が選択されるのを止める。
-    const previousSelect = document.body.style.userSelect;
-    document.body.style.userSelect = 'none';
-    return () => {
-      document.removeEventListener('pointermove', handleMove);
-      document.removeEventListener('pointerup', stopDrag);
-      document.removeEventListener('pointercancel', stopDrag);
-      document.body.style.userSelect = previousSelect;
-      setSidebarResizing(false);
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
-      }
-      // 掴み終わってはじめて state を確定する（保存もここで1回だけ）。
-      if (collapsedDuringDragRef.current) {
-        collapsedDuringDragRef.current = false;
-        setCollapsed(true);
-      } else if (pendingWidthRef.current !== null) {
-        setCollapsed(false);
-        setExpandedWidth(pendingWidthRef.current);
-      }
-    };
-  }, [dragging, setCollapsed, setExpandedWidth, stopDrag]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [collapsed, setCollapsed]);
 
   const accountLabel = auth?.user.nickname ?? auth?.user.email ?? t('nav.account');
 
@@ -317,37 +242,16 @@ export function Sidebar() {
         </Link>
       </div>
 
-      {/* 右の縁。掴めば幅が変わり、押せば畳む／開く。
-          shadcn のサイドバーと同じで、**縁そのものが操作子**（別の場所にボタンを置かない）。 */}
+      {/* 右の縁。押せば開閉する。**掴んで幅を変える**のはやめた——中間の幅に意味が
+          ある画面ではないうえ、掴めない・畳むと掴めない・本文が指に遅れる、と
+          不具合が続いた。状態そのものを2つに減らす（shadcn のサイドバーと同じ）。 */}
       <button
         type="button"
         aria-label={collapsed ? t('expand') : t('collapse')}
         title={collapsed ? t('expand') : t('collapse')}
-        onClick={() => {
-          // 直前が「掴んで動かした」なら、それは畳む操作ではない。
-          if (draggedRef.current) {
-            draggedRef.current = false;
-            return;
-          }
-          setCollapsed(!collapsed);
-        }}
-        onPointerDown={(e) => {
-          // **畳んでいても掴める。** 掴めないのに col-resize のカーソルが出ていたので、
-          // 「引けるはずなのに引けない」状態だった。しかも引いて畳んだ直後は
-          // また掴めなくなる（畳んだ = 掴めない、だったため）。
-          e.preventDefault();
-          draggedRef.current = false;
-          dragStartXRef.current = e.clientX;
-          setDragging(true);
-        }}
-        // 縁は**サイドバーの内側**に置く。外へはみ出させると、はみ出した側が
-        // エディタ（fixed / z-50）の下敷きになって押せなくなる。サイドバーは z-30 なので、
-        // 「畳んだのに開きにくい」＝当たり判定が実質 6px しか残っていなかった、という話。
-        className={`absolute top-0 right-0 bottom-0 z-10 w-3 cursor-col-resize bg-transparent transition-colors after:absolute after:top-0 after:right-0 after:bottom-0 after:w-px after:transition-colors ${
-          dragging
-            ? 'after:bg-[var(--accent)]'
-            : 'after:bg-transparent hover:after:bg-[var(--accent)]'
-        }`}
+        aria-expanded={!collapsed}
+        onClick={() => setCollapsed(!collapsed)}
+        className="absolute top-0 right-0 bottom-0 z-10 w-3 cursor-pointer bg-transparent transition-colors after:absolute after:top-0 after:right-0 after:bottom-0 after:w-px after:bg-transparent after:transition-colors hover:after:bg-[var(--accent)]"
       />
     </nav>
   );

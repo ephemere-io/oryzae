@@ -121,6 +121,20 @@ function voiceStatusMessage(
  */
 const TITLE_MAX_LENGTH = 16;
 
+/** 題として読める最小の大きさ。これ以上は縮めない（縮めても読めない）。 */
+const TITLE_MIN_FONT_SIZE = 12;
+
+/**
+ * 縦書きのとき、題の右にとる余白と、題と本文のあいだの間。
+ *
+ * 以前は題を右端から 32px に置き、本文の右端は 85%（％指定）だったため、
+ * **右の余白 32px に対して題と本文のあいだが 117px** と逆転していた。
+ * 紙の右肩に題が乗っているのではなく、題だけが宙に浮いて見える。
+ * 両方を px で持ち、本文の右端をここから逆算する。
+ */
+const TITLE_RIGHT_MARGIN = 64;
+const TITLE_TO_BODY_GAP = 24;
+
 /** Extract title (first line) and body from stored content */
 function splitTitleBody(raw: string): { title: string; body: string } {
   const idx = raw.indexOf('\n');
@@ -812,11 +826,9 @@ export function EntryEditor({
   //
   // 縦書きの題は**紙の右肩**に置く。本や原稿用紙と同じで、題は本文の始まりより外側に立つ。
   //
-  // 本文は left:6% / width:79%（右端 = 85%）。題を本文にぴったり付けると、
-  // 右側だけが大きく空いて題が宙に浮き、かつ本文と一体化して2列に見えてしまう。
-  // 右端の余白（6%）を本文の左端と揃え、題と本文のあいだに 5% の間を取る。
-  // 右端の余白は左のサイドバーの余白と釣り合わせる（右だけ広いと歪んで見える）。
-  const titleBoxClass = isVertical ? 'absolute top-[4%] right-8 h-[86%]' : 'absolute top-6';
+  // 題の右余白と、題と本文のあいだの間は px で持つ（TITLE_RIGHT_MARGIN /
+  // TITLE_TO_BODY_GAP）。本文の右端はそこから逆算する。
+  const titleBoxClass = isVertical ? 'absolute top-[4%] h-[86%]' : 'absolute top-6';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
   //
@@ -827,12 +839,16 @@ export function EntryEditor({
   // 縦書きの題は桁の高さ（画面の 86%）に収まる必要があるので、字数から逆算する。
   // 上限は本文と同じ大きさまで——題が本文より大きいと、紙の主役が入れ替わってうるさい。
   const titleLength = Math.max(title.length, 1);
+  // 下限を本文の 0.7 倍で止めていたため、24 字を超えると縮小が効かず桁からあふれた
+  // （maxLength は**新しく打つ分**しか止めないので、既に長い題は残る）。
+  // 収まるところまで縮める。読める最小として 12px だけ残す。
   const titleFontSize = isVertical
     ? Math.max(
-        Math.round(settings.fontSize * 0.7),
-        Math.min(settings.fontSize, Math.floor((titleColumnHeightPx * 0.92) / titleLength)),
+        TITLE_MIN_FONT_SIZE,
+        Math.min(settings.fontSize, Math.floor((titleColumnHeightPx * 0.94) / titleLength)),
       )
     : Math.round(settings.fontSize * 1.3);
+  const titleColumnWidth = Math.round(titleFontSize * 1.6);
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
   const titleTextStyle: React.CSSProperties = {
     // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。
@@ -840,7 +856,7 @@ export function EntryEditor({
       ? // 縦書きの題の桁幅。**字の幅ぎりぎりにしない**（以前は 6% / 最小 3rem で、
         // 46px の字に対して箱が 48px しか無かった）。日本語入力の変換候補は
         // キャレットの脇に開くので、逃げ場が無いと字の上に重なって打てなくなる。
-        { width: `${Math.round(titleFontSize * 1.6)}px` }
+        { width: `${titleColumnWidth}px`, right: `${TITLE_RIGHT_MARGIN}px` }
       : {
           left: `${gutterPx}px`,
           width: `${measurePx}px`,
@@ -1088,7 +1104,9 @@ export function EntryEditor({
                     ? {
                         left: '6%',
                         top: '4%',
-                        width: '79%',
+                        // 右端は題から逆算する。％で置くと、題の右余白との釣り合いが
+                        // 画面幅ごとに変わってしまう。
+                        right: `${TITLE_RIGHT_MARGIN + titleColumnWidth + TITLE_TO_BODY_GAP}px`,
                         height: '86%',
                         position: 'absolute',
                         overflowX: 'auto',
@@ -1126,10 +1144,13 @@ export function EntryEditor({
       {/* Issue #466: 発酵結果は本文に重ねず、右の面に集約する。
           面は**画面の縦いっぱい**に立てる（ヘッダーの下から始めない）。
           余計なラッパーで包まないこと——包むと中身ぶんの高さしか持たない。 */}
-      {fermentSidebarOpen && fermentationOverlayDetail && (
+      {/* 畳んでいるときも縁は残す（開き直す場所が画面の反対側だけだと遠い）。
+          パレットの操作とこの縁は同じ状態を切り替える。 */}
+      {fermentationOverlayDetail && (
         <FermentationSidebar
           detail={fermentationOverlayDetail}
-          onClose={() => setFermentSidebarOpen(false)}
+          collapsed={!fermentSidebarOpen}
+          onToggle={() => setFermentSidebarOpen((v) => !v)}
         />
       )}
 

@@ -153,7 +153,8 @@
       "empty": "关联提问",
       "untitled": "无标题的问题",
       "none_available": "还没有问题",
-      "linked_count": "已关联 {count} 个提问"
+      "linked_count": "已关联 {count} 个提问",
+      "unlink_aria": "取消关联“{text}”"
     }
   },
   "app": {
@@ -460,7 +461,9 @@
       "section_keywords": "关键词",
       "section_snippets": "摘录",
       "back_aria": "返回列表",
-      "read_more": "查看入选理由"
+      "read_more": "查看入选理由",
+      "drag_to_body": "将“{text}”拖入正文",
+      "open_aria": "展开发酵结果"
     },
     "palette": {
       "move": "移动面板",

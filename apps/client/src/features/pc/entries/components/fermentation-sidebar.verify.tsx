@@ -18,7 +18,8 @@ import { FermentationSidebar } from './fermentation-sidebar';
 
 interface Props {
   detail: FermentationDetail;
-  onClose: () => void;
+  collapsed: boolean;
+  onToggle: () => void;
 }
 
 const SIDEBAR_SELECTOR = '[data-verify-unit="FermentationSidebar"]';
@@ -75,7 +76,7 @@ registerUnit<Props>({
     {
       id: 'full',
       description: '手紙・キーワード2件・スニペット1件がすべて揃った状態',
-      props: { detail: fullDetail, onClose: noop },
+      props: { detail: fullDetail, collapsed: false, onToggle: noop },
     },
     {
       id: 'letter-only',
@@ -84,19 +85,25 @@ registerUnit<Props>({
         detail: makeDetail({
           letter: { id: 'l1', bodyText: '今週の言葉を受け取りました。', ...NO_JAR_POS },
         }),
-        onClose: noop,
+        collapsed: false,
+        onToggle: noop,
       },
     },
     {
       id: 'empty',
       probe: true,
       description: 'Probe: 完了済みだが中身が空（空状態の文言が出て崩れない）',
-      props: { detail: makeDetail({}), onClose: noop },
+      props: { detail: makeDetail({}), collapsed: false, onToggle: noop },
+    },
+    {
+      id: 'collapsed',
+      description: '畳んだ状態（縁だけが残り、押せば開く）',
+      props: { detail: fullDetail, collapsed: true, onToggle: noop },
     },
     {
       id: 'detail-open',
       description: 'キーワードを開いた状態（面は増えず、この面の中身が入れ替わる）',
-      props: { detail: fullDetail, onClose: noop },
+      props: { detail: fullDetail, collapsed: false, onToggle: noop },
       act: async ({ root, wait }) => {
         const keyword = Array.from(root.querySelectorAll<HTMLElement>('button')).find((b) =>
           b.textContent?.includes('静けさ'),
@@ -117,7 +124,8 @@ registerUnit<Props>({
             snippet(`s${i}`, `${'とても長い抜粋のテキスト'.repeat(6)}${i}`),
           ),
         }),
-        onClose: noop,
+        collapsed: false,
+        onToggle: noop,
       },
     },
   ],
@@ -146,15 +154,29 @@ registerUnit<Props>({
     },
     {
       id: 'items-are-clickable',
-      // **手紙はボタンではない**。この面に来る目的そのものなので畳まずそのまま置く。
-      description: 'ことば + 断片 + 閉じるボタン = サイドバー内のボタン総数（全項目が開ける）',
-      onlyFixtures: ['full', 'letter-only', 'empty', 'over-cap'],
+      // **手紙はボタンではない**（畳まずそのまま置く）。
+      // 一覧では、ことば／断片それぞれが**掴み手と押す所の2つ**を持つ
+      // （押すと掴むを同じ場所に載せない、という決まり）。
+      // 数え分けは fixture 名ではなく**契約**で行う——onlyFixtures で逃げると、
+      // 新しい fixture を足したときに黙って的外れになる。
+      description: '姿ごとにボタンの数が合う（一覧 / 中身 / 畳んだ姿）',
       check: ({ root, contract }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
         if (!sidebar) return 'FermentationSidebar の契約要素が見つからない';
+        // 畳んだ姿は縁そのものが押せる要素なので、内側にボタンは無い。
+        if (contract.collapsed === 'true') {
+          const inner = sidebar.querySelectorAll('button').length;
+          return inner === 0 || `畳んだ姿の内側にボタンが ${inner} 個ある`;
+        }
         const buttons = sidebar.querySelectorAll('button').length;
-        const expected = Number(contract.keywordCount) + Number(contract.snippetCount) + 1; // 閉じるボタン
-        return buttons === expected || `ボタン数=${buttons}, 期待=${expected}`;
+        const expected =
+          contract.detailOpen === 'true'
+            ? 3 // 上の戻る + 末尾の戻る + 閉じる
+            : (Number(contract.keywordCount) + Number(contract.snippetCount)) * 2 + 1;
+        return (
+          buttons === expected ||
+          `ボタン数=${buttons}, 期待=${expected}（detailOpen=${contract.detailOpen}）`
+        );
       },
     },
     {
@@ -168,6 +190,20 @@ registerUnit<Props>({
           b.textContent?.includes('手紙'),
         );
         return opener === undefined || '手紙が押して開く形になっている';
+      },
+    },
+    {
+      id: 'collapsed-keeps-a-way-in',
+      // 閉じたあと、開き直す場所が画面の反対側にしか無いのは遠い。
+      description: '畳んでいても、押せば開く縁が残る',
+      onlyFixtures: ['collapsed'],
+      check: ({ root }) => {
+        const rail = root.querySelector(SIDEBAR_SELECTOR);
+        if (!(rail instanceof HTMLButtonElement)) return '畳んだ姿が押せる要素になっていない';
+        return (
+          rail.getAttribute('aria-expanded') === 'false' ||
+          'aria-expanded で閉じていることを伝えていない'
+        );
       },
     },
     {

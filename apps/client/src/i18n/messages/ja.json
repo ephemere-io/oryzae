@@ -153,7 +153,8 @@
       "empty": "問いを紐づける",
       "untitled": "無題の問い",
       "none_available": "まだ問いがありません",
-      "linked_count": "{count}つの問いを紐づけている"
+      "linked_count": "{count}つの問いを紐づけている",
+      "unlink_aria": "「{text}」の紐づけを外す"
     }
   },
   "app": {
@@ -460,7 +461,9 @@
       "section_keywords": "キーワード",
       "section_snippets": "スニペット",
       "back_aria": "一覧に戻る",
-      "read_more": "選ばれた理由を読む"
+      "read_more": "選ばれた理由を読む",
+      "drag_to_body": "「{text}」を本文へドラッグ",
+      "open_aria": "発酵結果を開く"
     },
     "palette": {
       "move": "パレットを移動",
