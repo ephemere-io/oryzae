@@ -34,7 +34,7 @@ function pathNotList(rule: DepRule): string[] {
 describe('dep-cruiser guardrails (reach architecture)', () => {
   it('主要ルールが error 重大度で存在する', () => {
     for (const name of [
-      'feature-isolation-flat',
+      'shared-no-device-detection',
       'reach-slice-isolation',
       'reach-shared-purity',
       'ui-components-independence',
@@ -57,15 +57,16 @@ describe('dep-cruiser guardrails (reach architecture)', () => {
     expect(r.to?.path).toContain('(pc|sp)');
   });
 
-  it('feature-isolation-flat: flat → shared は許可（pathNot に shared）', () => {
-    expect(pathNotList(rule('feature-isolation-flat')).some((p) => p.includes('shared'))).toBe(
-      true,
-    );
+  it('shared-no-device-detection: shared → use-device / device-view を禁止', () => {
+    const r = rule('shared-no-device-detection');
+    expect(r.from?.path).toContain('shared');
+    expect(r.to?.path).toContain('use-device');
+    expect(r.to?.path).toContain('device-view');
   });
 
-  // Issue #490: app への押し上げ・flat への fetch 残留を塞ぐルール。
-  it('app/flat の fetch 抜け道ルールが error 重大度で存在する', () => {
-    for (const name of ['app-no-api-client', 'app-no-reach-hooks', 'flat-features-no-api']) {
+  // Issue #490: app への押し上げで features/shared が空洞化するのを塞ぐルール。
+  it('app の fetch 抜け道ルールが error 重大度で存在する', () => {
+    for (const name of ['app-no-api-client', 'app-no-reach-hooks']) {
       expect(rule(name).severity).toBe('error');
     }
   });

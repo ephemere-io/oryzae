@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HomeGate } from '@/features/auth/components/home-gate';
+import { HomeGate } from '@/features/shared/auth/components/home-gate';
 import { DOCS_SITE_URL } from '@/lib/docs-site';
 
 /**

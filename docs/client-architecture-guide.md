@@ -54,7 +54,8 @@ apps/client/src/
 │   │   └── (protected)/layout.tsx — 端末を判定し PC/SP のシェルを出し分ける
 │   └── {route}/page.tsx          — features を組み合わせるだけ（URL に端末は出さない）
 ├── features/                     — 機能スライス（ドメイン × reach）
-│   ├── shared/{domain}/          — UIを持たないドメインロジック（**全 fetch・全ドメイン型**）
+│   ├── shared/{domain}/          — 端末非依存（**全 fetch・全ドメイン型**・端末で変わらない UI）
+│   │   ├── components/           — 両端末で同じ UI（ログインフォーム等）
 │   │   ├── hooks/                — データ取得・保存などの Custom Hook（use-*）
 │   │   └── types.ts              — ドメイン固有の共有型
 │   ├── pc/{domain}/              — PC 体験
@@ -72,7 +73,13 @@ apps/client/src/
 `{domain}` は `entries` / `fermentation` / `questions` / `board` / `account` / `navigation` など。
 同じドメインの `shared` / `pc` / `sp` は 1:1:1 で対応する（例: `entries` の取得 hook は `shared/entries`、PC エディタは `pc/entries`、SP エディタは `sp/entries`）。
 
-**reach は「端末で体験が変わる機能」だけに適用する。** 端末非依存の機能（`auth` / `onboarding` など、両端末で同じものを使う）は `features/{domain}/` のフラットなまま置く（pc/sp に分けない）。フラット機能どうしの直接 import は禁止、`features/shared` への import のみ可（dep-cruiser の `feature-isolation-flat`）。端末非依存のロジックを pc/sp 双方から使いたくなったら `features/shared/{domain}` へ押し上げる。
+**`features/` の直下は `shared` / `pc` / `sp` の 3 つだけ。**端末非依存のものは、ロジックでも UI でも `features/shared/{domain}/` に置く（`auth` のフォーム、`onboarding` など）。`features/{domain}/` のようなフラットな第4のグループは作らない（`features-are-reach-only.test.ts` が強制）。
+
+> **なぜ flat 層を廃したか（2026-08）**: 以前は「端末非依存の UI」を `features/{domain}/` に置き、`shared` は UI を持たないロジック専用層としていた。しかしこの形には穴があった —
+> `pc`/`sp` は他ドメインを import できず（例外は `features/shared` のみ）flat features を使えない、かつ `shared` には UI を置けない。
+> その結果「両端末で同じ見た目で、pc と sp の双方から使いたいドメイン UI」に置き場がなく、コピーするしかなかった。
+> **これは #490 そのもの**（SP が PC のコードを再利用できず重複が生まれる）で、ロジックについては直したのに UI については同じ罠を残していた。
+> 懸念していた「`shared` の中で端末が分岐する」は、UI を禁じるのではなく端末判定そのものを禁じる `shared-no-device-detection` で直接防ぐ。
 
 ### apps/admin（reach 軸なし・単一体験）
 
@@ -88,7 +95,7 @@ apps/admin/src/
 
 | reach | 役割 | 置くもの | UI |
 | --- | --- | --- | --- |
-| **shared** | 端末非依存のドメインロジック | データ取得・保存の `use-*` hook、ドメイン型 | 持たない |
+| **shared** | 端末非依存のすべて | データ取得・保存の `use-*` hook、ドメイン型、両端末で同じ UI | 持てる（ただし端末判定は禁止） |
 | **pc** | PC 体験 | PC の画面・操作・演出 | 持つ |
 | **sp** | SP 体験 | SP の画面・操作（縦長・片手・音声） | 持つ |
 
@@ -112,14 +119,14 @@ apps/admin/src/
 4. **残り（＝ UI と、その UI 専用の状態・演出）** → 判定軸＝**「端末ごとに別 UI を持つか」**で分ける：
    - **PC 固有**の画面・操作・演出 → `features/pc/{domain}/`
    - **SP 固有**の画面・操作 → `features/sp/{domain}/`
-   - 機能まるごと**端末非依存**（両端末で同じ画面。例: `auth` のフォーム・`onboarding`）→ `features/{domain}/`（フラット）
+   - 機能まるごと**端末非依存**（両端末で同じ画面。例: `auth` のフォーム・`onboarding`）→ `features/shared/{domain}/components/`
 
 > `lib/` には `use-*` のドメイン hook を置かない。`lib/` は端末・ドメインの両方を知らない基盤専用（`createApiClient`・トークン保存・分析・context・`useDebounce` 等）。
 >
 > **3 が 4 より先にあるのが重要**。「PC 専用画面のためのデータ hook」は 3 で `shared` に落ちる。
 > 「PC 専用画面だから `pc` へ」と 4 で判断してはならない（Issue #490 の崩れの再発防止）。
 >
-> **残る1点の判断**: 新しいトップレベル機能を pc/sp に置くか flat に置くかは「端末ごとに別 UI を持つか／両端末で同じ・公開か」という**プロダクト判断**が最後に残る。決定木は配置をほぼ一意化するが、この性質判断だけは機械化できない。
+> **残る1点の判断**: UI を `pc`/`sp` に分けるか `shared` にまとめるかは「端末ごとに別 UI を持つか」という**プロダクト判断**が最後に残る。決定木は配置をほぼ一意化するが、この性質判断だけは機械化できない。迷ったら `shared` から始めてよい — 後から端末差が出たらその時 `pc`/`sp` に割ればよく、逆（コピーが増えてから統合する）より安全。
 
 ---
 
@@ -129,10 +136,9 @@ apps/admin/src/
 | --- | --- | --- |
 | **app/** | ルーティング、レイアウト、Route Handler、端末判定、features の組み合わせ | API 呼び出し、ドメイン加工、`features/{pc,sp}/**/hooks/` |
 | **app/api/[...path]/** | Hono アプリへのリクエスト転送 | ビジネスロジック（サーバー側に委譲） |
-| **features/shared/{domain}/** | 端末非依存のドメインロジック（**全 fetch**・ドメイン型） | UI、`pc` / `sp` の存在 |
+| **features/shared/{domain}/** | 端末非依存のすべて（**全 fetch**・ドメイン型・両端末で同じ UI） | 端末判定（`lib/use-device`・`components/device-view`）、`pc` / `sp` の存在 |
 | **features/pc/{domain}/** | PC 体験の UI・操作・演出 | fetch、ドメイン型定義、他ドメイン、`sp`、`app` |
 | **features/sp/{domain}/** | SP 体験の UI・操作 | fetch、ドメイン型定義、他ドメイン、`pc`、`app` |
-| **features/{domain}/**（flat） | 端末非依存の UI と、その UI 専用の状態 hook | fetch、他の flat feature、`app` |
 | **components/** | ドメイン非依存 UI・seam プリミティブ（`device-view`）・provider | 端末固有 UI（`sp-*` / `pc-*`）、feature, app の存在 |
 | **components/ui/** | 汎用 UI コンポーネント（shadcn 等） | feature, app の存在 |
 | **lib/** | API クライアント・認証・分析・context・汎用 hook 等の基盤 | feature, app, components の存在、ドメイン |
@@ -150,7 +156,6 @@ apps/admin/src/
 | **app/** | self | components のみ | components のみ | YES | YES | YES | **NO** | YES |
 | **features/pc/X** | NO | self のみ | **NO** | **YES** | YES | YES | 型のみ | YES |
 | **features/sp/X** | NO | **NO** | self のみ | **YES** | YES | YES | 型のみ | YES |
-| **features/X**（flat） | NO | **NO** | **NO** | **YES** | YES | YES | 型のみ | YES |
 | **features/shared/X** | NO | **NO** | **NO** | YES | YES | YES | YES | YES |
 | **components/** | NO | NO | NO | NO | self | YES | 型のみ | YES |
 | **lib/** | NO | NO | NO | NO | NO | self | YES | YES |
@@ -167,7 +172,7 @@ apps/admin/src/
 - **features/shared → pc / sp: 禁止** — 共有層が端末固有 UI を知ってはならない
 - **lib → 上位レイヤー / ドメイン: 禁止** — 基盤がドメインや画面を知ってはならない。ドメイン hook を置かない
 - **app/ での API 呼び出し: 禁止** — `page.tsx` / `layout.tsx` から直接 API を呼ばない。必ず `features/shared` の hook 経由
-- **`features/shared` 以外での fetch: 禁止** — `features/{pc,sp}`・flat features・`components/`・`app/` に `/api/v1/...` を書かない
+- **`features/shared` 以外での fetch: 禁止** — `features/{pc,sp}`・`components/`・`app/` に `/api/v1/...` を書かない
 - **`app/` → `features/{pc,sp}/**/hooks/`: 禁止** — 端末固有 hook は `DeviceView` の分岐と無関係に**両端末で実行される**。端末固有のロジックは必ずその端末のコンポーネントの中に閉じる（seam 漏れの防止）
 - **`components/` 直下の端末固有 UI: 禁止** — `sp-*` / `pc-*` は `features/{sp,pc}/{domain}/components/` へ
 
@@ -181,19 +186,18 @@ apps/admin/src/
 | --- | --- |
 | `reach-slice-isolation` | `features/pc/*` ⇎ `features/sp/*` 相互禁止 ＋ `pc`/`sp` 内の別ドメイン禁止（`→ features/shared` のみ許可） |
 | `reach-shared-purity` | `features/shared → features/{pc,sp}` 禁止 |
-| `feature-isolation-flat` | 端末非依存フラット機能どうしの import 禁止（`→ features/shared` のみ許可） |
+| `shared-no-device-detection` | `features/shared` → `lib/use-device` / `components/device-view` の import 禁止（shared の中で端末を分岐させない） |
 | `app-no-api-client` | `app/`（Route Handler 除く）→ `lib/api` の実装 import 禁止 |
 | `app-no-reach-hooks` | `app/` → `features/{pc,sp}/*/hooks/` 禁止（seam 漏れ防止） |
-| `flat-features-no-api` | flat features → `lib/api` の実装 import 禁止 |
 | `protected-pages-use-device-view` | 保護ルートの `page.tsx` は `DeviceView` 経由（required ルール） |
 
 **静的テスト（dep-cruiser では見えないもの）**:
 
 | テスト | 内容 |
 | --- | --- |
-| `shared-no-ui.test.ts` | `features/shared` に `.tsx` を入れない |
+| `features-are-reach-only.test.ts` | `features/` 直下は `pc` / `sp` / `shared` の 3 つだけ（flat 層を作らせない） |
 | `fetch-lives-in-shared.test.ts` | `/api/v1/...` を `features/shared`・`lib`・`app/api` の外に書かない |
-| `device-ui-lives-in-reach.test.ts` | `components/`・flat features に `sp-*` / `pc-*` を置かない |
+| `device-ui-lives-in-reach.test.ts` | `components/`・`features/shared` に `sp-*` / `pc-*` を置かない |
 | `types-live-in-types-file.test.ts` | `hooks/` から型を export しない（ドメイン型は `types.ts`） |
 | `dep-cruiser-rules.test.ts` | 上記 dep-cruiser ルールの存在・形を検証（**番人テスト**） |
 

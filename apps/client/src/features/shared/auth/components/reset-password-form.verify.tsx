@@ -44,15 +44,27 @@ registerUnit<Props>({
     return withVerifyProviders(<ResetPasswordForm />);
   },
   fixtures: [
+    // このユニットは localStorage の読み取りを useEffect に置いており（SSR では
+    // localStorage を参照できないため）、tokenChecked が立つまで DOM 契約を出さない
+    // loading 分岐を通る。ランナーはマウント後に tick（setTimeout 0）を 1 回しか挟まないので、
+    // act を持たない fixture は実ブラウザで「No DOM contract emitted」になる。
+    // jsdom では effect が同期的に落ち着くため露見せず、実ブラウザで初めて落ちる。
+    // 観測前に effect を確定させるため、両 fixture に最小の待機を置く。
     {
       id: 'invalid-link',
       description: 'token 無し → 無効リンク表示（state=invalid・戻るリンクのみ）',
       props: { token: null },
+      act: async (ctx) => {
+        await ctx.wait(16);
+      },
     },
     {
       id: 'form',
       description: 'token 有り → 入力フォーム表示（state=form・エラー無し）',
       props: { token: 'reset-token-abc' },
+      act: async (ctx) => {
+        await ctx.wait(16);
+      },
     },
     {
       id: 'mismatch',
