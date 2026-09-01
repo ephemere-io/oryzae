@@ -72,7 +72,7 @@ repository があるが、**これは設計どおり**で IDOR ではない。�
 
 ### 層 1 — 決定的ゲート（毎 PR・API キー不要・無料）
 
-`.github/workflows/security.yml` の `rls-gate` / `codeql` / `dependency-audit`。
+`.github/workflows/security.yml` の `deterministic-gates`（RLS ゲート + 依存監査）/ `sast` / `secret-scan`。
 AI と違って見落とさない。ここが本丸。
 
 | ゲート | 実体 | 守る不変条件 |
