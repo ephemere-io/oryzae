@@ -24,6 +24,7 @@ const sampleSpend = {
   },
   estimated: {
     status: 'ok',
+    pricing: { modelId: 'claude-sonnet-4-6', inputUsdPerMTok: 3, outputUsdPerMTok: 15 },
     totalCostUsd: 1.19,
     inputTokens: 300000,
     outputTokens: 40000,
