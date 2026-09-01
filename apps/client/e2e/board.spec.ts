@@ -58,7 +58,9 @@ test.describe('ボード画面', () => {
     // 画像を選んだ時点で読み取りまで自動で進むので、未選択のうちはボタンを出さない。
     await expect(page.locator('textarea')).toHaveCount(0);
     await expect(page.locator('input[type="file"][accept*="image/"]')).toHaveCount(1);
-    await expect(page.getByRole('button', { name: /読み取/ })).toHaveCount(0);
+    // ツールバーにも「画像から読み取る」があるので、ダイアログの中だけを見る。
+    const dialog = page.locator('[data-verify-unit="SnippetDialog"]');
+    await expect(dialog.getByRole('button', { name: /読み取/ })).toHaveCount(0);
 
     await page.click('button[data-verify-source-tab="text"]');
     await expect(page.locator('textarea')).toBeVisible();
@@ -141,11 +143,16 @@ test.describe('ボード画面', () => {
     await page.getByRole('button', { name: '作成', exact: true }).click();
     await expect(page.getByText(snippet)).toBeVisible({ timeout: 10000 });
 
-    // カードを選択してから写真ダイアログを開く（カードは選択されたまま背後に残る）
+    // カードを選ぶとツールバーはカード操作へ入れ替わる（作成系は消える）ので、
+    // 選択 → 写真ダイアログの順で開く。カードは選択されたまま背後に残る。
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: snippet });
-    await card.click();
+    // 選択前のカードにはボタンが無い（全面を覆う透明ボタンを外したため）。
+    // 本文は送れる領域なので当たり判定が不安定。座標でカード上端を押す。
+    const snippetBox = await card.boundingBox();
+    if (!snippetBox) throw new Error('カードが見つからない');
+    await page.mouse.click(snippetBox.x + 40, snippetBox.y + 12);
     await expect(card).toHaveAttribute('data-verify-selected', 'true');
-    await page.click('button[data-verify-tool="photo"]');
+    await page.keyboard.press('i');
     await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
 
     // 入力欄ではなくダイアログの見出しにフォーカスが無い状態で Backspace
@@ -180,7 +187,11 @@ test.describe('ボード画面', () => {
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
 
     // ダブルクリックしても /entries へ飛ばない。代わりに編集欄が出る。
-    await card.dblclick({ position: { x: 60, y: 60 } });
+    // カードは回転しており、本文は送れる領域なので、locator の click は当たり判定が
+    // 安定しない。座標でカード上端（見出しの帯）を叩く。
+    const box0 = await card.boundingBox();
+    if (!box0) throw new Error('カードが見つからない');
+    await page.mouse.dblclick(box0.x + 40, box0.y + 12);
     await expect(page).toHaveURL(/\/board$/);
     const box = card.locator('textarea[data-verify-entry-editor]');
     await expect(box).toBeVisible({ timeout: 10000 });
@@ -189,8 +200,11 @@ test.describe('ボード画面', () => {
     await expect(card.locator('h3')).toHaveCount(0);
 
     // カードの上で直せて、保存される（本文側を直す）
-    await box.click();
-    await box.pressSequentially('・追記');
+    await box.evaluate((el: HTMLTextAreaElement) => {
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+    await page.keyboard.type('・追記');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(2500);
     await page.reload();
@@ -198,7 +212,9 @@ test.describe('ボード画面', () => {
     await expect(page.getByText(/・追記/).first()).toBeVisible({ timeout: 10000 });
 
     // 遷移はパレットの「日記を開く」から
-    await card.click({ position: { x: 60, y: 10 }, force: true });
+    const box1 = await card.boundingBox();
+    if (!box1) throw new Error('カードが見つからない');
+    await page.mouse.click(box1.x + 40, box1.y + 12);
     await page.click('button[data-verify-card-action="open"]');
     await expect(page).toHaveURL(/\/entries\/[0-9a-f-]+$/, { timeout: 10000 });
 
@@ -236,7 +252,9 @@ test.describe('ボード画面', () => {
 
     // 3. カードを選ぶとツールバーが操作に入れ替わり、そこから外せる
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
-    await card.locator('button').first().click({ force: true });
+    const removeBox = await card.boundingBox();
+    if (!removeBox) throw new Error('カードが見つからない');
+    await page.mouse.click(removeBox.x + 40, removeBox.y + 12);
     await expect(page.locator('[data-verify-unit="BoardToolbar"]')).toHaveAttribute(
       'data-verify-mode',
       'card',
