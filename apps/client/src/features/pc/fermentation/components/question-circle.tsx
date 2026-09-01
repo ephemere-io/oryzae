@@ -63,7 +63,12 @@ interface QuestionCircleProps {
  *
  * 変えるときは jar-view の world サイズも同じ比率で動かすこと。円が近づきすぎる。
  */
-export const QUESTION_CIRCLE_SIZE = 700;
+export const QUESTION_CIRCLE_SIZE = 540;
+
+/** リング文字の字送り（em）。収まり計算と描画で同じ値を使う。 */
+const RING_TRACKING = 0.2;
+/** 直径 280 のときに 9px だった比率。 */
+const RING_FONT_RATIO = 9 / 280;
 
 /* ── Microbe SVG templates (matching reference) ── */
 const MICROBE_SVGS = {
@@ -169,6 +174,17 @@ export function QuestionCircle({
   const size = QUESTION_CIRCLE_SIZE;
   const circleRef = useRef<HTMLDivElement | null>(null);
 
+  // リングは textPath なので、円周に収まらない分は描かれず末尾が黙って切れる。
+  // 和文は 1 文字 ≒ 1em なので「文字数 x (1 + 字送り)」で必要な長さが出る。
+  // 収まらないときだけ字を小さくして、長い問いでも最後まで読めるようにする。
+  const ringChars = questionText.length + 3; // 末尾の " • " ぶん
+  const ringFontSize = useMemo(() => {
+    const circumference = Math.PI * (size - 24);
+    const fitted = circumference / (ringChars * (1 + RING_TRACKING));
+    return Math.round(Math.min(size * RING_FONT_RATIO, fitted));
+    // size はモジュール定数なので依存に入れない（myceliumHtml と同じ扱い）。
+  }, [ringChars]);
+
   const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);
 
   // Rendered (capped) counts — matches the .slice() limits below so the DOM contract
@@ -192,6 +208,8 @@ export function QuestionCircle({
         keywordCount,
         snippetCount,
         hasLetter,
+        ringFontSize,
+        ringChars,
       })}
       role={zoomed ? undefined : 'button'}
       tabIndex={zoomed ? undefined : 0}
@@ -223,14 +241,17 @@ export function QuestionCircle({
         animation: 'fadeIn 0.5s ease-out forwards',
         // Suppress the zoom/move transition during drag so the circle follows the cursor.
         transition: isDraggingCircle ? 'none' : 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-        cursor: zoomed ? 'default' : isDraggingCircle ? 'grabbing' : 'grab',
+        cursor: zoomed ? 'default' : isDraggingCircle ? 'grabbing' : 'pointer',
         touchAction: zoomed ? undefined : 'none',
         userSelect: 'none',
         // @ts-expect-error: CSS custom property for element scaling
         // 拡大はカメラ（キャンバスのズーム）が担当するので、要素の寸法は開閉で変えない。
         // 円が 280→500px に伸びていた頃は中身も一緒に大きくしていたが、円が伸びなくなった
         // 今それを残すと、寄ったときに中身だけが肥大して重なってしまう。
-        '--el-scale': '0.65',
+        //
+        // 値は円の直径に連動させる。重なるかどうかは「要素の実寸 / 直径」で決まるので、
+        // 直径 700 のとき 0.65 で重なりが解けた比率を、直径を変えても保つ。
+        '--el-scale': String(Math.round((size / 700) * 0.65 * 100) / 100),
       }}
     >
       {/* Circle keyframes */}
@@ -278,9 +299,10 @@ export function QuestionCircle({
           <text
             style={{
               fontFamily: "'Noto Serif JP', serif",
-              // 円に比例させる（元は直径 280 に対して 9px）。
-              fontSize: `${Math.round(size * (9 / 280))}px`,
-              letterSpacing: '0.2em',
+              // 円に比例させる（元は直径 280 に対して 9px）。ただし長い問いは
+              // それだと円周に収まらず末尾が切れるので、収まる大きさまで落とす。
+              fontSize: `${ringFontSize}px`,
+              letterSpacing: `${RING_TRACKING}em`,
               fill: '#7A3B3F',
               opacity: 0.6,
             }}
@@ -502,12 +524,14 @@ export function QuestionCircle({
                       style={{
                         position: 'relative',
                         zIndex: 20,
-                        width: '32px',
-                        height: '32px',
+                        width: '56px',
+                        height: '56px',
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, white, #FDFBF7)',
-                        boxShadow: '0 4px 12px rgba(140,133,126,0.15)',
-                        border: '1px solid rgba(140,133,126,0.2)',
+                        background: 'linear-gradient(135deg, #FFFFFF, #FBF1EE)',
+                        // 手紙は円の中でいちばん強い報酬なので、他より一段強く出す。
+                        boxShadow:
+                          '0 0 0 6px rgba(122,59,63,0.06), 0 6px 18px rgba(122,59,63,0.22)',
+                        border: '1.5px solid rgba(122,59,63,0.45)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -516,8 +540,8 @@ export function QuestionCircle({
                     >
                       <svg
                         aria-hidden="true"
-                        width="16"
-                        height="16"
+                        width="22"
+                        height="22"
                         viewBox="0 0 16 16"
                         fill="none"
                         style={{ color: '#7A3B3F' }}

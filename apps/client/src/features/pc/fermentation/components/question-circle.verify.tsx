@@ -11,7 +11,7 @@
 import { registerUnit } from '@oryzae/verify';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { QuestionCircle } from './question-circle';
+import { QUESTION_CIRCLE_SIZE, QuestionCircle } from './question-circle';
 
 type Pos = { jarX: number; jarY: number };
 
@@ -145,6 +145,18 @@ registerUnit<Props>({
       props: { ...baseProps, detail: makeDetail(3, 2, true), zoomed: true },
     },
     {
+      id: 'long-question',
+      probe: true,
+      description: 'Probe: 上限いっぱいの長い問いでも、リング文字が円周に収まる大きさになる',
+      props: {
+        ...baseProps,
+        // 問いの最大長（questionStringSchema の 64 文字）ちょうど。
+        questionText: 'あ'.repeat(64),
+        detail: makeDetail(3, 2, true),
+        zoomed: false,
+      },
+    },
+    {
       id: 'overflow',
       probe: true,
       description: 'Probe: keyword8 / snippet6 でも描画は slice 上限（kw5 / sn3）で頭打ち',
@@ -152,6 +164,31 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'ring-text-fits-circumference',
+      description: 'リング文字の総長は円周を超えない（超えると textPath が末尾を黙って切り落とす）',
+      check: ({ contract }) => {
+        const fontSize = Number(contract.ringFontSize);
+        const chars = Number(contract.ringChars);
+        if (!Number.isFinite(fontSize) || !Number.isFinite(chars)) {
+          return `契約が数値でない: ringFontSize=${contract.ringFontSize}, ringChars=${contract.ringChars}`;
+        }
+        // 和文 1 文字 ≒ 1em + 字送り 0.2em。パス半径は size/2 - 12。
+        const needed = chars * fontSize * 1.2;
+        const circumference = Math.PI * (QUESTION_CIRCLE_SIZE - 24);
+        return (
+          needed <= circumference ||
+          `必要な長さ ${Math.round(needed)}px が円周 ${Math.round(circumference)}px を超える` +
+            `（${chars}文字 x ${fontSize}px）。末尾が切れる。`
+        );
+      },
+    },
+    {
+      id: 'ring-font-never-zero',
+      description: 'リング文字は 1px 未満に潰れない（収まらせるために消してはいけない）',
+      check: ({ contract }) =>
+        Number(contract.ringFontSize) >= 1 || `ringFontSize=${contract.ringFontSize}`,
+    },
     {
       id: 'role-matches-zoomed',
       description:

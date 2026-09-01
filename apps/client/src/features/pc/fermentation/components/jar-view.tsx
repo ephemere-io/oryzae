@@ -32,8 +32,8 @@ import { useUnread } from '@/lib/unread-context';
 // 円を 280→700 に広げたぶん、世界も同じ比率で広げる。世界を据え置くと
 // 既定配置の円どうしが重なる（3つの中心間距離が最短 516px しかなく、直径 700 を下回る）。
 // 座標は % で持っているので、比率を保つ限り既存の配置は崩れない。
-const JAR_WORLD_WIDTH = 2800;
-const JAR_WORLD_HEIGHT = 1750;
+const JAR_WORLD_WIDTH = 2300;
+const JAR_WORLD_HEIGHT = 1440;
 const JAR_WORLD_BOUNDS: Bounds = {
   x: 0,
   y: 0,
@@ -307,9 +307,11 @@ export function JarView({
     focused: null,
   });
 
-  // 既定は等倍で開く（全体表示は FIT ボタン / Shift+1 で明示的に行う）。
+  // 初回（保存された視点が無いとき）は世界全体が収まる倍率で開く。
+  // 一度でも動かせば保存値が優先されるので、続きから開いた人の視点は壊さない。
   const canvas = useCanvasViewport({
     storageKey: 'jar',
+    defaultFitBounds: JAR_WORLD_BOUNDS,
     // 瓶は世界の大きさが決まっているので「全体表示」は常に世界そのもの。
     getContentBounds: () => circleBoundsRef.current.all,
     getSelectionBounds: () => circleBoundsRef.current.focused,
@@ -528,8 +530,11 @@ export function JarView({
           <div
             className="pointer-events-none absolute inset-0 z-0"
             style={{
+              // closest-side にして、白が透明になりきる前に箱の縁へ達しないようにする。
+              // 既定の farthest-corner だと半径が箱の高さ半分を超え、上下の縁で
+              // グラデーションが途中のまま断ち切られて四角い境目が見えていた。
               background:
-                'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.7) 0%, transparent 70%)',
+                'radial-gradient(circle closest-side at 50% 42%, rgba(255,255,255,0.7) 0%, transparent 100%)',
             }}
           />
 
@@ -592,8 +597,8 @@ export function JarView({
               left: '50%',
               top: '45%',
               transform: 'translate(-50%, -55%)',
-              width: '735px',
-              height: '910px',
+              width: '500px',
+              height: '620px',
               animation: 'fadeIn 0.5s ease-out forwards',
             }}
           >
