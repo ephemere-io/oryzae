@@ -1,6 +1,26 @@
 import { expect, test } from './fixtures/auth';
 import { deleteEntriesByMarker, waitForAutosave } from './fixtures/env';
 
+/**
+ * ボードカードを座標で押す。
+ *
+ * カードは回転しており、本文は送れる領域なので locator の当たり判定が安定しない。
+ * また `boundingBox()` は回転後の**外接矩形**なので、左上寄りの座標はカードの外に
+ * 落ちることがある。中心なら回転していても必ずカードの内側に入る。
+ */
+async function clickCard(
+  page: import('@playwright/test').Page,
+  card: import('@playwright/test').Locator,
+  { double = false } = {},
+) {
+  const box = await card.boundingBox();
+  if (!box) throw new Error('カードが見つからない');
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  if (double) await page.mouse.dblclick(x, y);
+  else await page.mouse.click(x, y);
+}
+
 test.describe('ボード画面', () => {
   test.beforeEach(async ({ authenticated: _, page }) => {
     await page.goto('/board');
@@ -148,9 +168,7 @@ test.describe('ボード画面', () => {
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: snippet });
     // 選択前のカードにはボタンが無い（全面を覆う透明ボタンを外したため）。
     // 本文は送れる領域なので当たり判定が不安定。座標でカード上端を押す。
-    const snippetBox = await card.boundingBox();
-    if (!snippetBox) throw new Error('カードが見つからない');
-    await page.mouse.click(snippetBox.x + 40, snippetBox.y + 12);
+    await clickCard(page, card);
     await expect(card).toHaveAttribute('data-verify-selected', 'true');
     await page.keyboard.press('i');
     await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
@@ -189,9 +207,7 @@ test.describe('ボード画面', () => {
     // ダブルクリックしても /entries へ飛ばない。代わりに編集欄が出る。
     // カードは回転しており、本文は送れる領域なので、locator の click は当たり判定が
     // 安定しない。座標でカード上端（見出しの帯）を叩く。
-    const box0 = await card.boundingBox();
-    if (!box0) throw new Error('カードが見つからない');
-    await page.mouse.dblclick(box0.x + 40, box0.y + 12);
+    await clickCard(page, card, { double: true });
     await expect(page).toHaveURL(/\/board$/);
     const box = card.locator('textarea[data-verify-entry-editor]');
     await expect(box).toBeVisible({ timeout: 10000 });
@@ -212,9 +228,7 @@ test.describe('ボード画面', () => {
     await expect(page.getByText(/・追記/).first()).toBeVisible({ timeout: 10000 });
 
     // 遷移はパレットの「日記を開く」から
-    const box1 = await card.boundingBox();
-    if (!box1) throw new Error('カードが見つからない');
-    await page.mouse.click(box1.x + 40, box1.y + 12);
+    await clickCard(page, card);
     await page.click('button[data-verify-card-action="open"]');
     await expect(page).toHaveURL(/\/entries\/[0-9a-f-]+$/, { timeout: 10000 });
 
@@ -252,9 +266,7 @@ test.describe('ボード画面', () => {
 
     // 3. カードを選ぶとツールバーが操作に入れ替わり、そこから外せる
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
-    const removeBox = await card.boundingBox();
-    if (!removeBox) throw new Error('カードが見つからない');
-    await page.mouse.click(removeBox.x + 40, removeBox.y + 12);
+    await clickCard(page, card);
     await expect(page.locator('[data-verify-unit="BoardToolbar"]')).toHaveAttribute(
       'data-verify-mode',
       'card',
