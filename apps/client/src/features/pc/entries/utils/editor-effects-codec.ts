@@ -1,4 +1,5 @@
 import type { EditorEffectsState, TextSpanMark } from '@oryzae/shared';
+import { isInlineImage } from './inline-image-codec.js';
 
 /**
  * editor の DOM ↔ `EditorEffectsState` のシリアライズ/デシリアライズ。
@@ -10,6 +11,10 @@ import type { EditorEffectsState, TextSpanMark } from '@oryzae/shared';
  *   - block element (`<div>` 等) は、前にコンテンツがあれば content の前に 1 文字 (`\n`)
  *
  * span (eblock / v-block) はその子テキストの長さ分を消費する。子要素には潜らない。
+ * 本文中に置いた写真（`<img class="inline-photo">`）は 1 文字（U+FFFC）を消費する。
+ *
+ * **この規則は `inline-image-codec.ts` と一致していなければならない。** ずれると
+ * 装飾と写真が別の位置を指す。一致は inline-image-codec.test.ts で固定してある。
  */
 
 const EBLOCK_CLASS = 'eblock';
@@ -89,6 +94,11 @@ function walkScan(node: Node, state: ScanState): void {
 function visitScan(node: Node, state: ScanState): void {
   if (node.nodeType === Node.TEXT_NODE) {
     state.cursor += (node.textContent ?? '').length;
+    return;
+  }
+  // 本文中の写真はプレースホルダ 1 文字分を占める。
+  if (isInlineImage(node)) {
+    state.cursor += 1;
     return;
   }
   if (!(node instanceof HTMLElement)) return;
@@ -186,6 +196,10 @@ function walkLocate(node: Node, state: LocateState): void {
 }
 
 function visitLocate(node: Node, state: LocateState): void {
+  if (isInlineImage(node)) {
+    state.cursor += 1;
+    return;
+  }
   if (node.nodeType === Node.TEXT_NODE) {
     const len = (node.textContent ?? '').length;
     const segStart = state.cursor;
