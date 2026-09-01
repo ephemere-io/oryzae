@@ -46,16 +46,19 @@ env:
   E2E_ADMIN_PASSWORD: TestAdmin2026!
 
 jobs:
+  # 以前は client / admin の matrix 2 ジョブ と authz ジョブの計 3 つに分かれており、
+  # `supabase start` を 3 回（79s + 79s + 116s ≒ 4.5 分）踏んでいた（Issue #551）。
+  # 使い捨てインスタンスは 1 つあれば足りるので、1 ジョブに畳んで起動を 1 回にする。
+  #
+  # 引き換えに 3 つが直列になり体感の待ち時間は伸びるが、最長 5 分 → 6 分程度で実害は小さい。
+  # `fail-fast: false` 相当（1 つ落ちても残りを走らせ、全体の結果を一度に見る）は
+  # `if: '!cancelled()'` で維持する。
   e2e:
-    name: Playwright E2E (${{ matrix.app }})
+    name: E2E + Authorization (単一 Supabase)
     runs-on: ubuntu-latest
     # supabase start（Docker イメージ取得）+ ブラウザ導入 + 本体ビルドで
-    # 開始まで 10 分前後かかるため、25 分だとテスト途中で打ち切られた。
+    # 開始まで 10 分前後かかるうえ、3 つを直列で回すため余裕を持たせる。
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [client, admin]
     steps:
       - uses: actions/checkout@v7
 
@@ -72,82 +75,81 @@ jobs:
         with:
           version: latest
 
-      # migrations と seed.sql を流した使い捨てインスタンスを立てる。
+      # migrations と seed.sql を流した使い捨てインスタンスを立てる。ここが 1 回になる。
       - name: Start local Supabase
         run: supabase start
 
       # 生成された URL / キーを後続ステップへ渡す（ローカル固定値だが、
       # CLI のバージョンで変わりうるので status から読む）。
-      - name: Export Supabase env
+      #
+      # ここでは SERVICE_ROLE_KEY を **出さない**。直後の認可分離テストは
+      # 「ユーザーの JWT で越境できないこと」の検証であり、RLS をバイパスする鍵が
+      # 環境にあると検証の意味が薄れるため。ジョブを分けていた頃はジョブ境界が
+      # それを保証していたが、畳んだ今は **ステップの順序**が保証している。
+      # このテストより前に SERVICE_ROLE_KEY を export してはならない。
+      - name: Export Supabase env (service role は含めない)
         run: |
           status="$(supabase status -o json)"
           {
             echo "SUPABASE_URL=$(echo "$status" | jq -r '.API_URL')"
             echo "SUPABASE_ANON_KEY=$(echo "$status" | jq -r '.ANON_KEY')"
-            echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$status" | jq -r '.SERVICE_ROLE_KEY')"
           } >> "$GITHUB_ENV"
 
+      # 認可境界の統合テスト（Issue #503 / #504 の回帰防止）。
+      #
+      # `pnpm security:rls` はマイグレーション SQL の静的検査なので、ポリシーが
+      # 「書かれているか」は見られても、その条件式が「実際に正しく絞れているか」は見られない
+      # （user_id と書くべきところを id と書いた、参照するテーブルを間違えた、等）。
+      # ここでは実在する 2 ユーザーの JWT で本物の Postgres を読みに行き、越境が 0 行で
+      # あることを確かめる。RLS の条件式そのものを検証する唯一の層。
+      #
+      # ブラウザ導入より前に置く。4 秒で終わるうえ、上記のとおり
+      # SERVICE_ROLE_KEY が環境に入る前に済ませる必要があるため。
+      - name: Run authorization isolation tests
+        run: pnpm --filter @oryzae/server test:integration
+
+      # ここから先は Playwright。dev サーバーが内蔵 API を起動する際に
+      # apps/server の getSupabaseClient() が SERVICE_ROLE_KEY を要求するため、
+      # 認可分離テストが終わったこの位置で初めて export する。
+      - name: Export service role key (Playwright 用)
+        if: '!cancelled()'
+        run: |
+          status="$(supabase status -o json)"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$status" | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
+
       - name: Cache Playwright browsers
+        if: '!cancelled()'
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
+      # client と admin は同じ @playwright/test（lockfile 上 1 本に解決される）なので、
+      # ブラウザの導入は 1 回で両方に効く。
       - name: Install Playwright browsers
-        run: pnpm --filter @oryzae/${{ matrix.app }} exec playwright install chromium --with-deps
+        if: '!cancelled()'
+        run: pnpm --filter @oryzae/client exec playwright install chromium --with-deps
 
-      - name: Run E2E tests
-        run: pnpm --filter @oryzae/${{ matrix.app }} exec playwright test
+      - name: Run E2E tests (client)
+        if: '!cancelled()'
+        run: pnpm --filter @oryzae/client exec playwright test
 
-      - name: Upload test results
+      - name: Run E2E tests (admin)
+        if: '!cancelled()'
+        run: pnpm --filter @oryzae/admin exec playwright test
+
+      - name: Upload test results (client)
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.app }}
-          path: apps/${{ matrix.app }}/test-results/
+          name: playwright-report-client
+          path: apps/client/test-results/
           retention-days: 7
 
-  # 認可境界の統合テスト（Issue #503 / #504 の回帰防止）。
-  #
-  # `pnpm security:rls` はマイグレーション SQL の静的検査なので、ポリシーが
-  # 「書かれているか」は見られても、その条件式が「実際に正しく絞れているか」は見られない
-  # （user_id と書くべきところを id と書いた、参照するテーブルを間違えた、等）。
-  # ここでは実在する 2 ユーザーの JWT で本物の Postgres を読みに行き、越境が 0 行で
-  # あることを確かめる。RLS の条件式そのものを検証する唯一の層。
-  #
-  # Playwright を使わないのでブラウザ導入が不要で、上のジョブより速く終わる。
-  authz:
-    name: Authorization Isolation (実 DB)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
+      - name: Upload test results (admin)
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - uses: supabase/setup-cli@v3
-        with:
-          version: latest
-
-      - name: Start local Supabase
-        run: supabase start
-
-      - name: Export Supabase env
-        run: |
-          status="$(supabase status -o json)"
-          {
-            echo "SUPABASE_URL=$(echo "$status" | jq -r '.API_URL')"
-            echo "SUPABASE_ANON_KEY=$(echo "$status" | jq -r '.ANON_KEY')"
-          } >> "$GITHUB_ENV"
-
-      # SERVICE_ROLE_KEY は意図的に渡さない。このテストは「ユーザーの JWT で越境できないこと」
-      # の検証であり、RLS をバイパスする鍵が環境にあると検証の意味が薄れるため。
-      - name: Run authorization isolation tests
-        run: pnpm --filter @oryzae/server test:integration
+          name: playwright-report-admin
+          path: apps/admin/test-results/
+          retention-days: 7
