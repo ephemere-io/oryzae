@@ -65,6 +65,27 @@ function hairline(px: number): string {
   return `calc(${px}px / var(--vp-scale, 1))`;
 }
 
+/**
+ * 簡略度が切り替わる倍率。`detailForScale`（board-view）と、下の重ね合わせの
+ * 両方がここを見る。**ずれると入れ替えの瞬間に段差が出る**ので一箇所に置く。
+ */
+export const DETAIL_THRESHOLD_TITLE = 0.28;
+export const DETAIL_THRESHOLD_FULL = 0.45;
+/** 文字と図が入れ替わる帯の幅。この区間で両方が重なってすれ違う。 */
+const LOD_FADE_SPAN = 0.06;
+const LOD_FADE_END = 0.34; // = DETAIL_THRESHOLD_TITLE + LOD_FADE_SPAN
+
+/**
+ * 文字と図の入れ替えは、**`detail` の切り替わりではなく倍率そのもの**に追従させる。
+ *
+ * `detail` は React の state から来るので、ホイールが止まって 120ms 経つまで変わらない。
+ * そこで出し分けると「引いても何も起きず、指を止めた瞬間に全部入れ替わる」動きになる。
+ * `--vp-scale` は毎フレーム書かれるため、CSS で不透明度を作れば**再描画ゼロのまま**
+ * 操作に追従する。DOM の出し入れ自体は不透明度が 0 の側で起きるので目に見えない。
+ */
+const GLYPH_OPACITY = `clamp(0, calc((${LOD_FADE_END} - var(--vp-scale, 1)) / ${LOD_FADE_SPAN}), 1)`;
+const TEXT_OPACITY = `clamp(0, calc((var(--vp-scale, 1) - ${DETAIL_THRESHOLD_TITLE}) / ${LOD_FADE_SPAN}), 1)`;
+
 export function BoardCard({
   card,
   detail = 'full',
@@ -177,20 +198,41 @@ export function BoardCard({
           onClick(card);
         }}
       />
-      {/* 引ききった状態（'block'）では **文字だけ** 落とす。読めない文字を枚数分
-          描くのは無駄だが、写真は縮んでも何の写真か分かるので落とさない。
-          落とすと白い矩形になり「写真が表示されない」ように見える（PR #533 のレビュー指摘）。
+      {/* 引ききった状態では **文字だけ** 落とす。読めない文字を枚数分描くのは無駄だが、
+          写真は縮んでも何の写真か分かるので落とさない。落とすと白い矩形になり
+          「写真が表示されない」ように見える（PR #533 のレビュー指摘）。
 
           ただし文字を落とした跡を空白のままにすると、今度は中身が無いカードと
-          見分けが付かない（同レビューの2度目の指摘）。行の並びだけを図として残す。 */}
-      {detail === 'block' && (card.cardType === 'entry' || card.cardType === 'snippet') && (
-        <CardTextGlyph withHeading={card.cardType === 'entry'} />
+          見分けが付かない（同レビューの2度目の指摘）。行の並びだけを図として残す。
+
+          図と文字は重ねて置き、すれ違わせる。どちらも `absolute inset-0` なので
+          帯の中では同じ場所に重なり、`--vp-scale` 由来の不透明度で入れ替わる。 */}
+      {detail !== 'full' && (card.cardType === 'entry' || card.cardType === 'snippet') && (
+        <div
+          data-verify-part="glyph-layer"
+          className="pointer-events-none absolute inset-0"
+          style={{ opacity: GLYPH_OPACITY }}
+        >
+          <CardTextGlyph withHeading={card.cardType === 'entry'} />
+        </div>
       )}
       {detail !== 'block' && card.cardType === 'entry' && isEntryContent(card.content) && (
-        <EntryCardContent content={card.content} titleOnly={detail === 'title'} />
+        <div
+          data-verify-part="text-layer"
+          className="absolute inset-0"
+          style={{ opacity: TEXT_OPACITY }}
+        >
+          <EntryCardContent content={card.content} titleOnly={detail === 'title'} />
+        </div>
       )}
       {detail !== 'block' && card.cardType === 'snippet' && isSnippetContent(card.content) && (
-        <SnippetCardContent content={card.content} titleOnly={detail === 'title'} />
+        <div
+          data-verify-part="text-layer"
+          className="absolute inset-0"
+          style={{ opacity: TEXT_OPACITY }}
+        >
+          <SnippetCardContent content={card.content} titleOnly={detail === 'title'} />
+        </div>
       )}
       {card.cardType === 'photo' && isPhotoContent(card.content) && (
         <PhotoCardContent content={card.content} captionHidden={detail === 'block'} />

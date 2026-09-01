@@ -17,7 +17,12 @@ import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
-import { BoardCard, type CardDetail } from './board-card';
+import {
+  BoardCard,
+  type CardDetail,
+  DETAIL_THRESHOLD_FULL,
+  DETAIL_THRESHOLD_TITLE,
+} from './board-card';
 import { BoardControls } from './board-controls';
 import { BoardDateNav } from './board-date-nav';
 
@@ -38,8 +43,8 @@ interface BoardViewProps {
  * いたが、75% はまだ十分読めるうえ、スニペットは本文が唯一の中身なので空カードに
  * 見えてしまった（PR #533 のレビュー指摘）。本文が実際に潰れ始める辺りまで下げる。
  */
-const DETAIL_THRESHOLD_TITLE = 0.28;
-const DETAIL_THRESHOLD_FULL = 0.45;
+// 閾値の実体は board-card 側にある。カード内の重ね合わせ（文字↔図のすれ違い）が
+// 同じ値を見ており、ここで別に持つとずれた瞬間に段差が出る。
 
 /**
  * 新規カードの既定サイズ（world 単位）。中心合わせの計算にだけ使う。
