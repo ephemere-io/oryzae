@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useRef } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
+import { CardTextGlyph } from './card-text-glyph';
 import { EntryCardContent } from './entry-card-content';
 import { PhotoCardContent } from './photo-card-content';
 import { SnippetCardContent } from './snippet-card-content';
@@ -178,7 +179,13 @@ export function BoardCard({
       />
       {/* 引ききった状態（'block'）では **文字だけ** 落とす。読めない文字を枚数分
           描くのは無駄だが、写真は縮んでも何の写真か分かるので落とさない。
-          落とすと白い矩形になり「写真が表示されない」ように見える（PR #533 のレビュー指摘）。 */}
+          落とすと白い矩形になり「写真が表示されない」ように見える（PR #533 のレビュー指摘）。
+
+          ただし文字を落とした跡を空白のままにすると、今度は中身が無いカードと
+          見分けが付かない（同レビューの2度目の指摘）。行の並びだけを図として残す。 */}
+      {detail === 'block' && (card.cardType === 'entry' || card.cardType === 'snippet') && (
+        <CardTextGlyph withHeading={card.cardType === 'entry'} />
+      )}
       {detail !== 'block' && card.cardType === 'entry' && isEntryContent(card.content) && (
         <EntryCardContent content={card.content} titleOnly={detail === 'title'} />
       )}

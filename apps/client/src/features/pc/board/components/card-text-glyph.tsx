@@ -1,0 +1,58 @@
+'use client';
+
+import { verifyAttrs } from '@oryzae/verify';
+
+/**
+ * 引ききった倍率（`detail === 'block'`）で、本文の代わりに置く「文字があるしるし」。
+ *
+ * 以前はこの倍率で文字を描くのをやめ、**カードを空白のまま**にしていた。
+ * 読めない文字を枚数分描くのは無駄だが、空白にすると「中身が無いカード」と
+ * 見分けが付かない（PR #533 のレビュー指摘）。行の並びだけを図として残せば、
+ * 描画量は増やさずに「ここには文章がある」ことが伝わる。
+ *
+ * 実際の文字数には連動させない。この倍率では 1 行が 1〜2px にしかならず、
+ * 行数を正確にしても読み取れないため、段落らしい見えだけを作る。
+ */
+
+/** 本文行の幅（%）。最終行を短くして段落の終わりに見せる。 */
+const BODY_LINES = [
+  { id: 'l1', width: 100 },
+  { id: 'l2', width: 94 },
+  { id: 'l3', width: 98 },
+  { id: 'l4', width: 62 },
+];
+
+interface CardTextGlyphProps {
+  /** 見出し行（エントリのタイトル）を先頭に描くか。 */
+  withHeading?: boolean;
+}
+
+export function CardTextGlyph({ withHeading = false }: CardTextGlyphProps) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none flex h-full flex-col justify-center gap-[6px] p-6"
+      {...verifyAttrs({
+        unit: 'CardTextGlyph',
+        withHeading,
+        lineCount: BODY_LINES.length + (withHeading ? 1 : 0),
+      })}
+    >
+      {withHeading && (
+        <div
+          data-verify-part="glyph-heading"
+          className="mb-[4px] rounded-[1px]"
+          style={{ width: '68%', height: 9, backgroundColor: 'rgba(74,69,65,0.34)' }}
+        />
+      )}
+      {BODY_LINES.map((line) => (
+        <div
+          key={line.id}
+          data-verify-part="glyph-line"
+          className="rounded-[1px]"
+          style={{ width: `${line.width}%`, height: 6, backgroundColor: 'rgba(74,69,65,0.18)' }}
+        />
+      ))}
+    </div>
+  );
+}

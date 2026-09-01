@@ -63,7 +63,7 @@ interface QuestionCircleProps {
  *
  * 変えるときは jar-view の world サイズも同じ比率で動かすこと。円が近づきすぎる。
  */
-export const QUESTION_CIRCLE_SIZE = 540;
+export const QUESTION_CIRCLE_SIZE = 420;
 
 /** リング文字の字送り（em）。収まり計算と描画で同じ値を使う。 */
 const RING_TRACKING = 0.2;
@@ -524,8 +524,8 @@ export function QuestionCircle({
                       style={{
                         position: 'relative',
                         zIndex: 20,
-                        width: '56px',
-                        height: '56px',
+                        width: '72px',
+                        height: '72px',
                         borderRadius: '50%',
                         background: 'linear-gradient(135deg, #FFFFFF, #FBF1EE)',
                         // 手紙は円の中でいちばん強い報酬なので、他より一段強く出す。
