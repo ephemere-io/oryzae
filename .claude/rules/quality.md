@@ -102,6 +102,23 @@ Oryzae は他人の日記を預かる。**「ある人の日記が本人以外�
 entry の本文・snapshot・snippet・letter を含めない。例外メッセージへの本文埋め込みも同様
 （Sentry に自動送信される）。
 
+## Git hooks
+
+`package.json` の `simple-git-hooks` に定義がある。**上のコミット前チェックと同一**にしてあり、
+どちらか一方だけを増やさないこと（片方が緩いと「ローカルは通るのに CI で落ちる」が生まれる）。
+
+| hook | 実行内容 |
+| --- | --- |
+| pre-commit | `pnpm lint-staged` |
+| pre-push | 上の「コミット前チェック」7 つすべて |
+
+pre-push に条件分岐（`[ -f ... ] || ...` の類）を足さないこと。スクリプトが移動・改名された
+ときにゲートが黙って素通りし、CI でしか落ちなくなる。実際 `check:as` と `test` が
+pre-push から抜けていた時期があり、ローカルで捕まえられない状態になっていた。
+
+定義を変えたら `pnpm exec simple-git-hooks` で `.git/hooks/` を再生成する
+（package.json を書き換えただけでは反映されない）。
+
 ## Stop hook による自動テスト
 
 Claude の応答完了時に `.claude/hooks/run-tests-on-stop.sh` が `pnpm typecheck && pnpm test` を実行する。失敗するとブロックされ、Claude がもう一周して修正する（`stop_hook_active` で 2 周目は通す）。

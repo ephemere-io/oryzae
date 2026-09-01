@@ -21,7 +21,7 @@
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged",
-    "pre-push": "pnpm lint && pnpm typecheck && { [ ! -f scripts/check-rls-policies.mjs ] || pnpm security:rls; }"
+    "pre-push": "pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip && pnpm check:as && pnpm security:rls"
   },
   "lint-staged": {
     "!(.claude/**)!(**/docs/**)*.{js,ts,jsx,tsx,json}": "biome check --write"

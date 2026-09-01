@@ -193,15 +193,22 @@ apps/admin/src/
 
 **静的テスト（dep-cruiser では見えないもの）**:
 
+> **コピペは import を作らないので dep-cruiser では原理的に検出できない。** `reach-slice-isolation` は
+> `pc → sp` の import を止めるが、ファイルを丸ごと写した場合は依存グラフに何も現れない。
+> #490 の症状（SP が PC のコードを再利用できずコピーが生まれる）は構造としては解消したが、
+> **共有できるようになっただけで、コピーが禁止されたわけではない。**そこはテキストの類似度で見る。
+> 閾値 0.6 の根拠（実測）: 正当な別実装は 0.063〜0.304、コピペ（リネーム＋微修正）は 1.000。
+
 | テスト | 内容 |
 | --- | --- |
 | `features-are-reach-only.test.ts` | `features/` 直下は `pc` / `sp` / `shared` の 3 つだけ（flat 層を作らせない） |
 | `fetch-lives-in-shared.test.ts` | `/api/v1/...` を `features/shared`・`lib`・`app/api` の外に書かない |
 | `device-ui-lives-in-reach.test.ts` | `components/`・`features/shared` に `sp-*` / `pc-*` を置かない |
 | `types-live-in-types-file.test.ts` | `hooks/` から型を export しない（ドメイン型は `types.ts`） |
+| `no-cross-device-duplication.test.ts` | `features/pc` と `features/sp` の間にコピペを作らない（正規化後の類似度 0.6 以上で落とす） |
 | `dep-cruiser-rules.test.ts` | 上記 dep-cruiser ルールの存在・形を検証（**番人テスト**） |
 
-これらが落ちたら強制が弱体化したサイン。静的テストの 3 本は移行中の既知違反を `MIGRATING` 配列で明示的に許容し、**「陳腐化した allowlist を残さない」テストが対になっている**（直したのに配列から消し忘れると落ちる）。allowlist は減る一方であること — 追加は負債の追認なのでレビューで止める。
+これらが落ちたら強制が弱体化したサイン。静的テストの 4 本は移行中の既知違反を `MIGRATING` 配列で明示的に許容し、**「陳腐化した allowlist を残さない」テストが対になっている**（直したのに配列から消し忘れると落ちる）。allowlist は減る一方であること — 追加は負債の追認なのでレビューで止める。
 
 > **限界**: `import { EntryList, type FilterableQuestion }` のような値と型の混在 import は dep-cruiser で型だけを禁止できない。ドメイン型を `features/shared/{domain}/types.ts` に置く規律で担保する。
 
