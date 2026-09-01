@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { toSafeStorageFileName } from '../../../shared/infrastructure/storage-object-name.js';
 import type { BoardStorageGateway } from '../../domain/gateways/board-storage.gateway.js';
 
 const BUCKET_NAME = 'board-photos';
@@ -19,7 +20,9 @@ export class SupabaseBoardStorageGateway implements BoardStorageGateway {
     file: ArrayBuffer,
     contentType: string,
   ): Promise<string> {
-    const storagePath = `${userId}/${Date.now()}-${fileName}`;
+    // ファイル名はそのまま使えない。日本語名は Storage が 400 InvalidKey で弾く
+    // （entry 側で実際に踏んだ。board も同じ形なので同じ関数に通す）。
+    const storagePath = `${userId}/${Date.now()}-${toSafeStorageFileName(fileName)}`;
     const { error } = await this.supabase.storage
       .from(BUCKET_NAME)
       .upload(storagePath, file, { contentType, upsert: false });
