@@ -45,6 +45,7 @@ import { useTitleFollowsScroll } from '@/features/pc/entries/hooks/use-title-fol
 import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
+import { caretRangeFromPoint } from '@/features/pc/entries/utils/caret-from-point';
 import {
   loadCachedEffects,
   saveCachedEffects,
@@ -1001,7 +1002,8 @@ export function EntryEditor({
                   const text = e.dataTransfer.getData('text/plain');
                   if (!text) return;
                   e.preventDefault();
-                  const dropped = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+                  // 落とした場所に入れる。API 名がブラウザで割れているので utils を通す。
+                  const dropped = caretRangeFromPoint(e.clientX, e.clientY);
                   if (dropped && editorRef.current?.contains(dropped.startContainer)) {
                     const selection = window.getSelection();
                     selection?.removeAllRanges();

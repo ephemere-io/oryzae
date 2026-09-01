@@ -76,8 +76,17 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
   };
 
   // 面の見出し。「発酵」とだけ書かれていても何のことか分からないので、
-  // いま何を見ているか（手紙／ことば／断片）を出す。
-  const heading = open ? headers[open.kind] : detail.letter ? t('section_letter') : t('heading');
+  // **いま何を見ているか**を出す。一覧のときは、この面が最初に見せるものの名前
+  // （手紙 → ことば → 断片 の順）。何も無いときだけ、面そのものの名前に落ちる。
+  const heading = open
+    ? headers[open.kind]
+    : detail.letter
+      ? t('section_letter')
+      : keywords.length > 0
+        ? t('section_keywords')
+        : snippets.length > 0
+          ? t('section_snippets')
+          : t('heading');
 
   return (
     <aside
