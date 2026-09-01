@@ -38,6 +38,7 @@ pnpm test        # Vitest (server + client + admin)
 pnpm dep-cruise  # Architecture dependency rules (server + client + admin)
 pnpm knip        # Dead code detection
 pnpm check:as    # `as` 型アサーション禁止（例外は @type-assertion-allowed で明示）
+pnpm security:rls # RLS / storage の認可境界チェック（docs/security-guide.md）
 ```
 
 Git hooks (pre-commit / pre-push) で自動実行されます。`--no-verify` は禁止です。
@@ -91,7 +92,7 @@ apps/client/src/
       components/  hooks/   #     PC 固有の UI・操作・演出（fetch は持たない）
     sp/{domain}/           #   SP 体験
       components/  hooks/   #     SP 固有の UI（縦長・片手・音声）
-  features/{domain}/        # 端末非依存の UI はフラット（auth / landing / onboarding）
+  features/{domain}/        # 端末非依存の UI はフラット（auth / onboarding）
   components/              # ドメイン非依存 UI・seam(device-view)・provider
     ui/                    #   汎用 UI（feature 非依存）
   lib/                     # 基盤ユーティリティ（ドメイン非依存）
@@ -118,4 +119,5 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
+| `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 3 層構成 |
 | `docs/i18n-guide.md` | apps/client の日英バイリンガル運用（next-intl + Google Sheets SSoT） |

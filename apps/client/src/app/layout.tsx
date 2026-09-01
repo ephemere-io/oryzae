@@ -64,7 +64,8 @@ export async function generateMetadata(): Promise<Metadata> {
     publisher: 'Ephemere',
     category: 'productivity',
     formatDetection: { telephone: false, email: false, address: false },
-    // 公開ページの既定 canonical（各公開ページで上書き）。保護/認証は middleware で noindex。
+    // このアプリは全ページ noindex（middleware の X-Robots-Tag と robots.txt で二重担保）。
+    // canonical は PWA / OGP プレビュー用に自ドメインを指すだけで、インデックス目的ではない。
     alternates: { canonical: '/' },
     // PWA: manifest（app/manifest.ts）と iOS スタンドアロン設定。
     manifest: '/manifest.webmanifest',
