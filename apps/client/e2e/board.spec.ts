@@ -202,14 +202,19 @@ test.describe('ボード画面', () => {
       timeout: 10000,
     });
 
-    const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
-    await expect(card).toBeVisible({ timeout: 10000 });
+    const placed = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
+    await expect(placed).toBeVisible({ timeout: 10000 });
+
+    // **カードは id で掴む。** 編集に入ると見出しは <input value>、本文は
+    // <textarea value> になり、どちらも textContent に出ない。`hasText` で掴んで
+    // いると、編集に入った瞬間にそのカードを見失う。
+    const cardId = await placed.getAttribute('data-card-id');
+    const card = page.locator(`[data-card-id="${cardId}"]`);
 
     // ダブルクリックしても /entries へ飛ばない。代わりに編集欄が出る。
-    // カードは回転しており、本文は送れる領域なので、locator の click は当たり判定が
-    // 安定しない。座標でカード上端（見出しの帯）を叩く。
     await clickCard(card, { double: true });
     await expect(page).toHaveURL(/\/board$/);
+    await expect(card).toHaveAttribute('data-verify-editing', 'true', { timeout: 10000 });
     const box = card.locator('textarea[data-verify-entry-editor]');
     await expect(box).toBeVisible({ timeout: 10000 });
     // 見出しは入力欄に置き換わる（消えないし、二重にも出ない）
