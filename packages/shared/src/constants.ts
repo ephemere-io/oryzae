@@ -18,5 +18,16 @@ export const ACCEPTED_IMAGE_MIME_TYPES = [
   'image/webp',
 ] as const;
 export const MAX_ENTRY_PHOTO_BYTES = 10 * 1024 * 1024;
+/**
+ * 本文中に置いた写真 1 枚を表す 1 文字（U+FFFC OBJECT REPLACEMENT CHARACTER）。
+ *
+ * 本文に「写真がここにある」印を埋めることで、位置がテキスト編集にそのまま追従する
+ * （前に文字を足せばずれ、消せば写真も消える）。専用の不可視文字を使うのは、
+ * `[写真1]` のような可読トークンだと利用者が普通に打ててしまい、本物と区別できなくなるため。
+ *
+ * この 1 文字は `content` に含まれるので、発酵プロンプト・検索・文字数にも乗る。
+ * 1 枚 1 文字なので実害は無いと判断している。
+ */
+export const INLINE_IMAGE_PLACEHOLDER = '\uFFFC';
 /** 文字起こしに渡す前に長辺をこの px まで縮める（画像トークン量を抑えるため）。 */
 export const ENTRY_PHOTO_MAX_EDGE_PX = 1568;
