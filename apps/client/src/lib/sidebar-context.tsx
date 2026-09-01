@@ -82,6 +82,10 @@ export function SidebarProvider({
 
   const setCollapsed = useCallback(
     (next: boolean) => {
+      // **幅は state より先に配る。** 押した瞬間に CSS 変数へ書けば、そのフレームから
+      // 遷移が始まる。state 更新の後（effect）に回すと、エディタを含む画面全体の
+      // 再描画を待ってからようやく動き出すので、押してから動くまでが目に見えて遅い。
+      applySidebarWidth(next ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH);
       setCollapsedState(next);
       if (!persist) return;
       try {
@@ -94,6 +98,7 @@ export function SidebarProvider({
   );
 
   const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH;
+  // 復元（localStorage）と、上の即時反映を取りこぼした場合の保険。
   useEffect(() => {
     applySidebarWidth(width);
   }, [width]);

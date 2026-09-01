@@ -117,7 +117,7 @@ export function Sidebar() {
               {...verifyAttrs({ navItem: item.match, active: isActive })}
               href={item.href}
               title={collapsed ? label : undefined}
-              className={`group relative flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-300 ${
+              className={`group relative flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-150 ${
                 collapsed ? 'w-12 justify-center' : 'w-full px-3'
               } ${
                 isActive
@@ -182,7 +182,7 @@ export function Sidebar() {
           target="_blank"
           rel="noopener noreferrer"
           title={collapsed ? t('nav.help') : undefined}
-          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[#8C857E] transition-colors duration-300 hover:bg-[var(--hover-wash)] hover:text-[#4A4541] ${
+          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[#8C857E] transition-colors duration-150 hover:bg-[var(--hover-wash)] hover:text-[#4A4541] ${
             collapsed ? 'w-12 justify-center' : 'w-full px-3'
           }`}
           style={{ height: SHELL_ROW_HEIGHT }}
@@ -211,7 +211,7 @@ export function Sidebar() {
         <Link
           href="/account"
           title={collapsed ? t('nav.account') : undefined}
-          className={`group flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-300 hover:bg-[var(--hover-wash)] ${
+          className={`group flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-150 hover:bg-[var(--hover-wash)] ${
             collapsed ? 'w-12 justify-center' : 'w-full px-3'
           }`}
           style={{ height: SHELL_ROW_HEIGHT }}

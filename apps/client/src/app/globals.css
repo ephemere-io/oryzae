@@ -98,18 +98,20 @@ body {
   --sidebar-width: 80px;
 }
 
+/* 開閉の速さ。linear の 200ms は「等速で長い」ぶん、実際より遅く感じる。
+ * 出だしを速く、終わりで受け止める曲線にして 160ms に詰める。 */
 .sidebar-sized {
-  transition: width 200ms linear;
+  transition: width 160ms cubic-bezier(0.32, 0.72, 0, 1);
   width: var(--sidebar-width);
 }
 
 .sidebar-inset {
-  transition: margin-left 200ms linear;
+  transition: margin-left 160ms cubic-bezier(0.32, 0.72, 0, 1);
   margin-left: var(--sidebar-width);
 }
 
 .sidebar-anchored {
-  transition: left 200ms linear;
+  transition: left 160ms cubic-bezier(0.32, 0.72, 0, 1);
   left: var(--sidebar-width);
 }
 
