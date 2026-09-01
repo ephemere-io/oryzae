@@ -86,6 +86,16 @@ registerUnit<QuestionChipProps>({
       },
     },
     {
+      id: 'all-linked',
+      description: '選べる問いを出し切った状態（「足す」は消える）',
+      props: {
+        activeQuestions: SAMPLE_QUESTIONS,
+        linkedQuestionIds: new Set<string>(['q1', 'q2', 'q3']),
+        onLink: noop,
+        onUnlink: noop,
+      },
+    },
+    {
       id: 'null-text-and-empty',
       probe: true,
       description: 'Probe: currentText=null / 問いが0件でもチップが崩れない',
@@ -144,6 +154,26 @@ registerUnit<QuestionChipProps>({
         return (
           selected === Number(contract.linkedCount) ||
           `aria-checked=${selected} だが linkedCount=${contract.linkedCount}`
+        );
+      },
+    },
+    {
+      id: 'add-disappears-when-nothing-is-left',
+      // 押しても選べるものが無いボタンは「壊れている」と思わせる。
+      // ただし問いがまだ1つも無いときは、紐づける入口そのものなので残す。
+      description: '選べる問いを出し切ったら「足す」は消える（問いが0件のときは残る）',
+      check: ({ root, props }) => {
+        const add = root.querySelector(
+          '[data-verify-unit="QuestionChip"] button[aria-haspopup="menu"]',
+        );
+        const available = props.activeQuestions.length;
+        const remaining = props.activeQuestions.filter(
+          (q) => !props.linkedQuestionIds.has(q.id),
+        ).length;
+        const shouldShow = available === 0 || remaining > 0;
+        return (
+          Boolean(add) === shouldShow ||
+          `「足す」present=${Boolean(add)}, 期待=${shouldShow}（残り=${remaining}/${available}）`
         );
       },
     },

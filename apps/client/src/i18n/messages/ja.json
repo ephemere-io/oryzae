@@ -461,9 +461,8 @@
       "section_keywords": "キーワード",
       "section_snippets": "スニペット",
       "back_aria": "一覧に戻る",
-      "read_more": "選ばれた理由を読む",
-      "drag_to_body": "「{text}」を本文へドラッグ",
-      "open_aria": "発酵結果を開く"
+      "open_aria": "発酵結果を開く",
+      "drag_or_open": "押すと理由が読める・掴むと本文へ入る"
     },
     "palette": {
       "move": "パレットを移動",

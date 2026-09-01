@@ -18,6 +18,11 @@ const MAX_KEYWORDS = 5;
 const MAX_SNIPPETS = 3;
 const SNIPPET_PREVIEW_LENGTH = 60;
 
+/** 面の中で開いている1件。手紙は畳まないのでここには来ない。 */
+type OpenItem =
+  | { kind: 'keyword'; keyword: string; description: string }
+  | { kind: 'snippet'; originalText: string; sourceDate: string; selectionReason: string };
+
 /**
  * 掴んだ言葉を本文へ渡す。ここで決めるのは**何を渡すか**だけ。
  * 受け取り（onDragOver / onDrop）と state の同期はエディタ側が持つ。
@@ -32,41 +37,6 @@ const PAST_WORD_STYLE = {
   borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)',
   background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
 } as const;
-
-/**
- * 掴む所。
- *
- * **押すと掴むを同じ場所に載せない。** 1つの部品が両方を担うと、押していいのか
- * 引いていいのかが分からず、結局どちらもされない。つまみを立てて、
- * ここは引く場所・隣は押す場所、と形で分ける。
- */
-function GrabHandle({ text, label }: { text: string; label: string }) {
-  return (
-    <button
-      type="button"
-      draggable
-      // 押す用途は持たない（掴むためだけの取っ手）。タブ順にも入れない——
-      // キーボードからは隣の「読む」ボタンで同じ中身に届く。
-      tabIndex={-1}
-      aria-label={label}
-      onDragStart={(e) => startTextDrag(e, text)}
-      className="flex w-5 shrink-0 cursor-grab items-center justify-center self-stretch text-[var(--date-color)] opacity-45 transition-opacity duration-150 hover:opacity-100 active:cursor-grabbing"
-    >
-      <svg aria-hidden="true" width={8} height={14} viewBox="0 0 8 14" fill="currentColor">
-        <circle cx="2" cy="3" r="1" />
-        <circle cx="6" cy="3" r="1" />
-        <circle cx="2" cy="7" r="1" />
-        <circle cx="6" cy="7" r="1" />
-        <circle cx="2" cy="11" r="1" />
-        <circle cx="6" cy="11" r="1" />
-      </svg>
-    </button>
-  );
-}
-
-type OpenItem =
-  | { kind: 'keyword'; keyword: string; description: string }
-  | { kind: 'snippet'; originalText: string; sourceDate: string; selectionReason: string };
 
 /**
  * エントリー画面の発酵結果サイドバー（Issue #466）。
@@ -84,11 +54,16 @@ type OpenItem =
  * 手紙だけは畳まない。この面に来る目的そのものなので、**開いた瞬間から読める**ように
  * そのまま置く（押して開く形だと、読むのに1手余分に要る）。面の見出しは「手紙」。
  *
- * ## ことばと断片は本文へ引ける
+ * ## ことばと断片は、掴めば入り、押せば読める
  *
- * 過去の言葉をいまの文章に取り込むのがこの面の役目なので、掴んで本文へ落とせば
- * その位置に入る。ここで決めるのは**何を渡すか**だけで、受け取りと state の同期は
- * エディタ側の onDrop が持つ（ブラウザ任せにすると DOM だけ変わって保存が気づかない）。
+ * **どちらも同じ形にする。** 片方が矢印で片方がボタン、片方はつまみだけ掴める、という
+ * 状態だと、同じ「過去の言葉」なのに触り方を2つ覚えることになる。
+ * 項目そのものを掴めて、項目そのものを押せる（掴んだときはクリックが起きない、という
+ * ブラウザの決まりに乗る）。
+ *
+ * 掴んで本文へ落とせばその位置に入る。ここで決めるのは**何を渡すか**だけで、
+ * 受け取りと state の同期はエディタ側の onDrop が持つ
+ * （ブラウザ任せにすると DOM だけ変わって保存が気づかない）。
  *
  * ## 色は本文と同じ世界のもの
  *
@@ -156,7 +131,8 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
         aria-label={t('open_aria')}
         title={t('open_aria')}
         aria-expanded={false}
-        className="flex h-full w-3 shrink-0 cursor-pointer border-l transition-colors duration-150 hover:bg-[var(--hover-wash)]"
+        // 左のサイドバーと同じポインタ。畳んでいれば左へ開くので w-resize。
+        className="flex h-full w-3 shrink-0 cursor-w-resize border-l transition-colors duration-150 hover:bg-[var(--hover-wash)]"
         style={{
           borderColor: 'var(--surface-sunken-border)',
           background: 'var(--surface-sunken)',
@@ -168,7 +144,7 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
 
   return (
     <aside
-      className="flex h-full shrink-0 flex-col overflow-hidden border-l"
+      className="relative flex h-full shrink-0 flex-col overflow-hidden border-l"
       style={{
         width: SIDE_PANEL_WIDTH,
         paddingTop: SHELL_INSET,
@@ -223,21 +199,7 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {open ? (
-          <>
-            <ItemDetail item={open} sourcePrefix={td('snippet_source_prefix')} />
-            {/* 読み終えた場所にも戻る道を置く。上まで戻らないと出られないと、
-                長い中身では出口が遠い。 */}
-            <div className="px-5 pt-6 pb-2">
-              <button
-                type="button"
-                onClick={() => setOpen(null)}
-                className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] text-[var(--date-color)] transition-colors duration-150 hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
-              >
-                <span aria-hidden="true">‹</span>
-                {t('back_aria')}
-              </button>
-            </div>
-          </>
+          <ItemDetail item={open} sourcePrefix={td('snippet_source_prefix')} />
         ) : (
           <>
             {isEmpty && (
@@ -260,37 +222,32 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
               <Section label={t('section_keywords')}>
                 <div className="flex flex-wrap gap-1.5">
                   {keywords.map((kw) => (
-                    <span
+                    <button
                       key={kw.id}
-                      className="flex h-7 items-center rounded-full border pr-2.5 transition-colors duration-150"
-                      style={PAST_WORD_STYLE}
+                      type="button"
+                      draggable
+                      onDragStart={(e) => startTextDrag(e, kw.keyword)}
+                      onClick={() =>
+                        setOpen({
+                          kind: 'keyword',
+                          keyword: kw.keyword,
+                          description: kw.description,
+                        })
+                      }
+                      title={t('drag_or_open')}
+                      className="flex h-7 cursor-grab items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-150 hover:brightness-[0.96] active:cursor-grabbing"
+                      style={{
+                        ...PAST_WORD_STYLE,
+                        color: 'var(--accent)',
+                        fontFamily: "'Noto Serif JP', serif",
+                        letterSpacing: '0.06em',
+                      }}
                     >
-                      <GrabHandle
-                        text={kw.keyword}
-                        label={t('drag_to_body', { text: kw.keyword })}
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpen({
-                            kind: 'keyword',
-                            keyword: kw.keyword,
-                            description: kw.description,
-                          })
-                        }
-                        className="flex h-7 items-center gap-1.5 rounded-full pr-1 text-[12px] transition-colors duration-150 hover:underline"
-                        style={{
-                          color: 'var(--accent)',
-                          fontFamily: "'Noto Serif JP', serif",
-                          letterSpacing: '0.06em',
-                        }}
-                      >
-                        {kw.keyword}
-                        <span aria-hidden="true" className="text-[10px] opacity-60">
-                          ›
-                        </span>
-                      </button>
-                    </span>
+                      {kw.keyword}
+                      <span aria-hidden="true" className="text-[10px] opacity-60">
+                        ›
+                      </span>
+                    </button>
                   ))}
                 </div>
               </Section>
@@ -300,49 +257,35 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
               <Section label={t('section_snippets')}>
                 <div className="flex flex-col gap-2">
                   {snippets.map((s) => (
-                    <div
+                    <button
                       key={s.id}
-                      // 断片は自分が過去に書いた文なので、本文と同じ明朝で、引用のように
-                      // 左の罫だけを持たせる（面の中で唯一の線）。
-                      className="group flex gap-1 rounded-r-md border-l-2 py-1.5 pr-1 transition-colors duration-150 hover:bg-[var(--hover-wash)]"
-                      style={{
-                        borderColor: 'var(--surface-sunken-border)',
-                        fontFamily: "'Noto Serif JP', serif",
-                      }}
+                      type="button"
+                      draggable
+                      onDragStart={(e) => startTextDrag(e, s.originalText)}
+                      onClick={() =>
+                        setOpen({
+                          kind: 'snippet',
+                          originalText: s.originalText,
+                          sourceDate: s.sourceDate,
+                          selectionReason: s.selectionReason,
+                        })
+                      }
+                      title={t('drag_or_open')}
+                      className="flex w-full cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-[var(--hover-wash)] active:cursor-grabbing"
+                      style={{ fontFamily: "'Noto Serif JP', serif" }}
                     >
-                      <GrabHandle
-                        text={s.originalText}
-                        label={t('drag_to_body', { text: s.originalText.slice(0, 12) })}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[12px] leading-relaxed text-[var(--fg)]">
-                          {s.originalText.length > SNIPPET_PREVIEW_LENGTH
-                            ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
-                            : s.originalText}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpen({
-                              kind: 'snippet',
-                              originalText: s.originalText,
-                              sourceDate: s.sourceDate,
-                              selectionReason: s.selectionReason,
-                            })
-                          }
-                          // 「読める」ではなく「押せる」に見せる。枠を持たせないと、
-                          // ただの補足文と区別がつかない。
-                          className="mt-1.5 flex h-6 items-center gap-1 rounded-md border px-2 text-[10px] transition-colors duration-150 hover:bg-[var(--surface-raised)]"
-                          style={{
-                            borderColor: 'color-mix(in srgb, var(--accent) 30%, transparent)',
-                            color: 'var(--accent)',
-                          }}
-                        >
-                          {t('read_more')}
-                          <span aria-hidden="true">›</span>
-                        </button>
-                      </div>
-                    </div>
+                      <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-[var(--fg)]">
+                        {s.originalText.length > SNIPPET_PREVIEW_LENGTH
+                          ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
+                          : s.originalText}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="mt-0.5 shrink-0 text-[10px] text-[var(--accent)] opacity-60"
+                      >
+                        ›
+                      </span>
+                    </button>
                   ))}
                 </div>
               </Section>

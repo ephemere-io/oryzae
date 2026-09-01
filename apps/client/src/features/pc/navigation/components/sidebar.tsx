@@ -122,7 +122,7 @@ export function Sidebar() {
               } ${
                 isActive
                   ? 'border text-[#8EA89C]'
-                  : 'border border-transparent text-[#8C857E] hover:bg-[var(--hover-wash)] hover:text-[#4A4541]'
+                  : 'border border-transparent text-[var(--fg)] hover:bg-[var(--hover-wash)]'
               }`}
               style={{
                 height: SHELL_ROW_HEIGHT,
@@ -182,7 +182,7 @@ export function Sidebar() {
           target="_blank"
           rel="noopener noreferrer"
           title={collapsed ? t('nav.help') : undefined}
-          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[#8C857E] transition-colors duration-150 hover:bg-[var(--hover-wash)] hover:text-[#4A4541] ${
+          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[var(--fg)] transition-colors duration-150 hover:bg-[var(--hover-wash)] ${
             collapsed ? 'w-12 justify-center' : 'w-full px-3'
           }`}
           style={{ height: SHELL_ROW_HEIGHT }}
@@ -235,7 +235,7 @@ export function Sidebar() {
             </span>
           )}
           {!collapsed && (
-            <span className="truncate text-[13px] text-[#8C857E] whitespace-nowrap">
+            <span className="truncate text-[13px] text-[var(--fg)] whitespace-nowrap">
               {accountLabel}
             </span>
           )}
@@ -251,7 +251,11 @@ export function Sidebar() {
         title={collapsed ? t('expand') : t('collapse')}
         aria-expanded={!collapsed}
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute top-0 right-0 bottom-0 z-10 w-3 cursor-pointer bg-transparent transition-colors after:absolute after:top-0 after:right-0 after:bottom-0 after:w-px after:bg-transparent after:transition-colors hover:after:bg-[var(--accent)]"
+        // ポインタは**次に起きること**を指す（shadcn のサイドバーと同じ）。
+        // 畳んでいれば右へ開くので e-resize、開いていれば左へ閉じるので w-resize。
+        className={`absolute top-0 right-0 bottom-0 z-10 w-3 bg-transparent transition-colors after:absolute after:top-0 after:right-0 after:bottom-0 after:w-px after:bg-transparent after:transition-colors hover:after:bg-[var(--accent)] ${
+          collapsed ? 'cursor-e-resize' : 'cursor-w-resize'
+        }`}
       />
     </nav>
   );

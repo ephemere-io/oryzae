@@ -461,9 +461,8 @@
       "section_keywords": "Keywords",
       "section_snippets": "Snippets",
       "back_aria": "Back to list",
-      "read_more": "Why this was chosen",
-      "drag_to_body": "Drag “{text}” into the entry",
-      "open_aria": "Open fermentation"
+      "open_aria": "Open fermentation",
+      "drag_or_open": "Click to read why · drag into the entry"
     },
     "palette": {
       "move": "Move the palette",

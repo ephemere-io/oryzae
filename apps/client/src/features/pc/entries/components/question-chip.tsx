@@ -60,6 +60,12 @@ export function QuestionChip({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const linked = activeQuestions.filter((q) => linkedQuestionIds.has(q.id));
+  // 「足す」を隠すのは、**選べる問いを出し切ったときだけ**。
+  // 押しても選べるものが無いボタンは「壊れている」と思わせるが、逆に
+  // 問いがまだ1つも無いときに隠すと、紐づける入口そのものが消えてしまう
+  // （面を開けば「まだ問いがありません」と言える）。
+  const hasMoreToLink =
+    activeQuestions.length === 0 || activeQuestions.some((q) => !linkedQuestionIds.has(q.id));
 
   /** 付け外し。押すたびに結び／解く（面は開いたままにする——続けて選べるように）。 */
   const toggleLink = useCallback(
@@ -147,20 +153,22 @@ export function QuestionChip({
       </div>
 
       {/* 足す。**行の外**に置く——行は横に流れる（overflow）ので、中に置くと
-          開いた面がその枠で切られてしまう。 */}
+          開いた面がその枠で切られてしまう。選べる問いが残っているときだけ出す。 */}
       <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-haspopup="menu"
-          aria-label={t('empty')}
-          className={chipClass}
-          style={addChipStyle}
-        >
-          <span aria-hidden="true">+</span>
-          {linked.length === 0 && <span className="whitespace-nowrap">{t('empty')}</span>}
-        </button>
+        {hasMoreToLink && (
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-haspopup="menu"
+            aria-label={t('empty')}
+            className={chipClass}
+            style={addChipStyle}
+          >
+            <span aria-hidden="true">+</span>
+            {linked.length === 0 && <span className="whitespace-nowrap">{t('empty')}</span>}
+          </button>
+        )}
 
         {open && (
           // 面の左端を「足す」チップの左端に合わせる（left-0）。

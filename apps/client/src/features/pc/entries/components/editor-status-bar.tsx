@@ -34,7 +34,9 @@ export function EditorStatusBar({ status, lastSavedAt = null }: EditorStatusBarP
 
   return (
     <div
-      className="pointer-events-none fixed bottom-4 left-6 z-[40] flex items-center gap-1.5 text-[11px] text-[var(--date-color)] transition-opacity duration-500"
+      // 位置は**エントリー画面の中**で決める（absolute）。fixed だと画面全体が基準になり、
+      // 左のサイドバーの上に重なる。
+      className="pointer-events-none absolute bottom-4 left-6 z-[40] flex items-center gap-1.5 text-[11px] text-[var(--date-color)] transition-opacity duration-500"
       style={{ opacity: label ? 1 : 0 }}
       aria-live="polite"
       {...verifyAttrs({

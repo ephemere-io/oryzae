@@ -161,8 +161,7 @@ registerUnit<Props>({
     {
       id: 'items-are-clickable',
       // **手紙はボタンではない**（畳まずそのまま置く）。
-      // 一覧では、ことば／断片それぞれが**掴み手と押す所の2つ**を持つ
-      // （押すと掴むを同じ場所に載せない、という決まり）。
+      // ことば・断片は、項目そのものが押せて掴める（触り方を2つ覚えさせない）。
       // 数え分けは fixture 名ではなく**契約**で行う——onlyFixtures で逃げると、
       // 新しい fixture を足したときに黙って的外れになる。
       description: '姿ごとにボタンの数が合う（一覧 / 中身 / 畳んだ姿）',
@@ -175,10 +174,11 @@ registerUnit<Props>({
           return inner === 0 || `畳んだ姿の内側にボタンが ${inner} 個ある`;
         }
         const buttons = sidebar.querySelectorAll('button').length;
+        // ことば・断片は**項目そのもの**が押せて掴める（別の取っ手は持たない）。
         const expected =
           contract.detailOpen === 'true'
-            ? 3 // 上の戻る + 末尾の戻る + 閉じる
-            : (Number(contract.keywordCount) + Number(contract.snippetCount)) * 2 + 1;
+            ? 2 // 戻る + 閉じる
+            : Number(contract.keywordCount) + Number(contract.snippetCount) + 1;
         return (
           buttons === expected ||
           `ボタン数=${buttons}, 期待=${expected}（detailOpen=${contract.detailOpen}）`
@@ -215,13 +215,21 @@ registerUnit<Props>({
     {
       id: 'past-words-are-draggable',
       // 過去の言葉をいまの文章に取り込むのがこの面の役目。掴んで本文へ落とせる。
-      description: 'ことばと断片は掴んで本文へ引ける',
+      // 掴める所と押せる所が同じ数＝**項目そのもの**が両方を担っている。
+      description: 'ことばと断片は、項目そのものを掴んで本文へ引ける',
       onlyFixtures: ['full'],
       check: ({ root, contract }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
-        const draggable = sidebar?.querySelectorAll('[draggable="true"]').length ?? 0;
+        const draggable = Array.from(sidebar?.querySelectorAll('[draggable="true"]') ?? []);
         const expected = Number(contract.keywordCount) + Number(contract.snippetCount);
-        return draggable === expected || `掴める項目=${draggable}, 期待=${expected}`;
+        if (draggable.length !== expected) {
+          return `掴める項目=${draggable.length}, 期待=${expected}`;
+        }
+        const notButtons = draggable.filter((el) => !(el instanceof HTMLButtonElement));
+        return (
+          notButtons.length === 0 ||
+          `${notButtons.length} 個が押せない（掴めるだけの取っ手が残っている）`
+        );
       },
     },
     {
@@ -241,14 +249,13 @@ registerUnit<Props>({
     },
     {
       id: 'detail-has-a-way-back',
-      // 上まで戻らないと出られないと、長い中身では出口が遠い。読み終えた場所にも置く。
-      description: '中身を開いたら、頭と末尾の両方に一覧へ戻る道がある',
+      // 戻る道は**1つ**。同じ場所に戻すボタンが2つあると、どちらが何なのか考えさせる。
+      description: '中身を開いたら、一覧へ戻る道が1つある',
       onlyFixtures: ['detail-open'],
       check: ({ root }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
         const buttons = Array.from(sidebar?.querySelectorAll('button') ?? []);
-        // 閉じるを除いた残りが「戻る」。頭と末尾の2つあること。
-        return buttons.length >= 3 || `ボタンが ${buttons.length} 個（戻る2つ + 閉じるが要る）`;
+        return buttons.length === 2 || `ボタンが ${buttons.length} 個（戻る + 閉じるの2つ）`;
       },
     },
     {
