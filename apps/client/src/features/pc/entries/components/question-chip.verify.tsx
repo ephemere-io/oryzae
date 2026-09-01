@@ -20,6 +20,11 @@ interface QuestionChipProps {
   linkedQuestionIds: Set<string>;
   onLink: (questionId: string) => void;
   onUnlink: (questionId: string) => void;
+  /**
+   * 単一選択の確認用。何を解いて何を結んだかを fixture 側に残す
+   * （DOM には出ない出来事なので、契約ではなくここで受ける）。
+   */
+  calls?: { linked: string[]; unlinked: string[] };
 }
 
 const noop = () => {};
@@ -31,6 +36,9 @@ const SAMPLE_QUESTIONS: QuestionOption[] = [
 ];
 
 const CHIP_SELECTOR = '[data-verify-unit="QuestionChip"] > button';
+
+/** 「別の問いを選ぶ」fixture 用。呼び出しを記録するだけの器。 */
+const CHOOSE_CALLS: { linked: string[]; unlinked: string[] } = { linked: [], unlinked: [] };
 
 registerUnit<QuestionChipProps>({
   id: 'QuestionChip',
@@ -74,6 +82,28 @@ registerUnit<QuestionChipProps>({
       },
     },
     {
+      id: 'choose-another',
+      description: 'q1 が結ばれている状態で q2 を選ぶ（結び直しになる）',
+      props: {
+        activeQuestions: SAMPLE_QUESTIONS,
+        linkedQuestionIds: new Set<string>(['q1']),
+        onLink: (id) => CHOOSE_CALLS.linked.push(id),
+        onUnlink: (id) => CHOOSE_CALLS.unlinked.push(id),
+        calls: CHOOSE_CALLS,
+      },
+      act: async ({ root, click, wait }) => {
+        CHOOSE_CALLS.linked.length = 0;
+        CHOOSE_CALLS.unlinked.length = 0;
+        await click(CHIP_SELECTOR);
+        await wait(16);
+        const rows = Array.from(root.querySelectorAll<HTMLElement>('[role="option"]'));
+        const second = rows[1];
+        if (!second) throw new Error('2つ目の問いが見つからない');
+        second.click();
+        await wait(16);
+      },
+    },
+    {
       id: 'multi-linked',
       probe: true,
       description: 'Probe: 複数紐付け（先頭のみ表示し残りは +n に畳む）',
@@ -114,19 +144,18 @@ registerUnit<QuestionChipProps>({
       id: 'closed-renders-single-trigger',
       description: '閉じているときは面を描かない（本文の邪魔をしない）',
       check: ({ root, contract }) => {
-        const panel = root.querySelector('[role="menu"]');
+        const panel = root.querySelector('[role="listbox"]');
         if (contract.open === 'true') return true;
         return panel === null || '閉じているのに面が描画されている';
       },
     },
     {
       id: 'open-lists-every-active-question',
-      // 問いは**付け外し**なので menuitemcheckbox（単一選択の option ではない）。
-      // 面と行は設定パネルの Select と同じ MenuPanel / MenuOption を使う。
+      // 問いは**1つだけ選ぶ**ので listbox / option。面も行も設定パネルの Select と同じ。
       description: '開いているときは行が activeQuestions と同数（過不足なく選べる）',
       onlyFixtures: ['open'],
       check: ({ root, props }) => {
-        const options = root.querySelectorAll('[role="menuitemcheckbox"]').length;
+        const options = root.querySelectorAll('[role="option"]').length;
         return (
           options === props.activeQuestions.length ||
           `行数=${options}, 期待=${props.activeQuestions.length}`
@@ -135,15 +164,32 @@ registerUnit<QuestionChipProps>({
     },
     {
       id: 'selected-options-match-linked',
-      description: 'aria-checked=true の行数が linkedCount と一致する',
+      description: 'aria-selected=true の行数が linkedCount と一致する',
       onlyFixtures: ['open'],
       check: ({ root, contract }) => {
-        const selected = root.querySelectorAll(
-          '[role="menuitemcheckbox"][aria-checked="true"]',
-        ).length;
+        const selected = root.querySelectorAll('[role="option"][aria-selected="true"]').length;
         return (
           selected === Number(contract.linkedCount) ||
-          `aria-checked=${selected} だが linkedCount=${contract.linkedCount}`
+          `aria-selected=${selected} だが linkedCount=${contract.linkedCount}`
+        );
+      },
+    },
+    {
+      id: 'choosing-replaces-instead-of-adding',
+      // このエントリーは「この問いへの答え」であって、複数の問いへの同時の答えではない。
+      description: '別の問いを選ぶと、前の問いは解かれてから結ばれる',
+      onlyFixtures: ['choose-another'],
+      check: ({ props }) => {
+        const calls = props.calls;
+        if (!calls) return 'fixture が呼び出しを記録していない';
+        // 記録の器は fixture 間で共有されるので（同じ面が複数回マウントされる）、
+        // **件数の絶対値ではなく最後の1回と対応関係**を見る。
+        if (calls.linked.length === 0) return '結び直しが起きていない';
+        const replaced = calls.unlinked.length === calls.linked.length;
+        return (
+          (replaced && calls.unlinked.at(-1) === 'q1' && calls.linked.at(-1) === 'q2') ||
+          `解いた=${JSON.stringify(calls.unlinked)}, 結んだ=${JSON.stringify(calls.linked)}` +
+            '（1つ結ぶたびに1つ解かれるべき）'
         );
       },
     },

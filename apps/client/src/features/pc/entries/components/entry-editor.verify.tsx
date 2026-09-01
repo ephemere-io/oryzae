@@ -229,7 +229,7 @@ registerUnit<Props>({
       description: 'チップクリック後は問いの面が開く',
       onlyFixtures: ['question-chip-open'],
       check: ({ root }) =>
-        Boolean(root.querySelector('[data-verify-unit="QuestionChip"] [role="menu"]')) ||
+        Boolean(root.querySelector('[data-verify-unit="QuestionChip"] [role="listbox"]')) ||
         'チップを押しても問いの面が開かない',
     },
     {

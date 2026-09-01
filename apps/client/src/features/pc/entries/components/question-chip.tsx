@@ -30,6 +30,13 @@ interface QuestionChipProps {
  * 中央の1カラムに集約する。Issue #365: select + ＋ボタン + チップ列という3部品の並びを、
  * 「いま結ばれている問い」を出す1つのチップ + ドロップダウンに畳む。
  *
+ * **選ぶのは1つ。** このエントリーは「この問いへの答え」であって、複数の問いへの
+ * 同時の答えではない。別の問いを選べば結び直し、同じ問いをもう一度選べば解ける。
+ * 役割は設定パネルの Select と同じ（listbox / option）——同じ「選ぶ」なので同じ形にする。
+ *
+ * 既に複数結ばれている記録（単一選択にする前のもの）は、そのまま「+n」で見せる。
+ * 隠すと、本人が結んだはずの問いが黙って消えたように見える。
+ *
  * docs/entry-screen-design.md §3「トップバーの再編」/ 原則3。
  */
 export function QuestionChip({
@@ -54,6 +61,20 @@ export function QuestionChip({
 
   const linked = activeQuestions.filter((q) => linkedQuestionIds.has(q.id));
   const primary = linked[0];
+
+  /** 選び直す。既に結ばれていれば解き、違う問いなら**前のを解いてから**結ぶ。 */
+  const choose = useCallback(
+    (questionId: string) => {
+      if (linkedQuestionIds.has(questionId)) {
+        onUnlink(questionId);
+        return;
+      }
+      for (const id of linkedQuestionIds) onUnlink(id);
+      onLink(questionId);
+      setOpen(false);
+    },
+    [linkedQuestionIds, onLink, onUnlink, setOpen],
+  );
 
   // 外側クリック / Escape で閉じる。ドロップダウンは中央に開くので、
   // 本文をクリックして書き始めた瞬間に消えてほしい。
@@ -116,7 +137,7 @@ export function QuestionChip({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-haspopup="menu"
+        aria-haspopup="listbox"
         aria-label={linked.length > 1 ? t('linked_count', { count: linked.length }) : undefined}
         // ヘッダーで唯一の「押せるもの」であり、この画面でいちばん大事な選択なので、
         // 日付や歯車より一段強く出す（高さ・字の大きさ・地の濃さを上げる）。
@@ -148,11 +169,10 @@ export function QuestionChip({
       </button>
 
       {open && (
-        // 面の左端をボタンの左端に合わせる（left-0）。設定パネルの Select と同じ
-        // MenuPanel / MenuOption を使うので、材質も行の高さも同じ。
-        // ただし役割は違う: こちらは**結ぶ／解く**の付け外しなので menuitemcheckbox。
+        // 面の左端をボタンの左端に合わせる（left-0）。設定パネルの Select と
+        // **同じ部品・同じ役割**（listbox / option）で開く。
         <div className="absolute top-full left-0 z-[62] mt-2 w-[320px]">
-          <MenuPanel role="menu" ariaLabel={t('empty')} className="max-h-[50vh]">
+          <MenuPanel role="listbox" ariaLabel={t('empty')} className="max-h-[50vh]">
             {activeQuestions.length === 0 ? (
               <p className="px-3 py-2 text-[13px] text-[var(--date-color)]">
                 {t('none_available')}
@@ -161,9 +181,9 @@ export function QuestionChip({
               activeQuestions.map((q) => (
                 <MenuOption
                   key={q.id}
-                  role="menuitemcheckbox"
+                  role="option"
                   selected={linkedQuestionIds.has(q.id)}
-                  onClick={() => (linkedQuestionIds.has(q.id) ? onUnlink(q.id) : onLink(q.id))}
+                  onClick={() => choose(q.id)}
                 >
                   {q.currentText ?? t('untitled')}
                 </MenuOption>
