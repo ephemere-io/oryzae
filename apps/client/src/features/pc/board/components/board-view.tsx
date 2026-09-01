@@ -46,6 +46,7 @@ export function BoardView({ api }: BoardViewProps) {
     open: boolean;
     snippetId?: string;
     initialText?: string;
+    source?: 'text' | 'image';
   }>({ open: false });
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
@@ -206,6 +207,8 @@ export function BoardView({ api }: BoardViewProps) {
   );
 
   const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
+  /** 画像から読み取る。作成ダイアログを画像タブで開くので、1手で読み取りに着く。 */
+  const openOcrDialog = useCallback(() => setSnippetDialog({ open: true, source: 'image' }), []);
   const placeable = usePlaceableEntries(api, dateKey, viewType, entryPickerOpen);
 
   const openEntryPicker = useCallback(() => setEntryPickerOpen(true), []);
@@ -269,6 +272,9 @@ export function BoardView({ api }: BoardViewProps) {
       } else if (key === 'e') {
         e.preventDefault();
         openEntryPicker();
+      } else if (key === 'r') {
+        e.preventDefault();
+        openOcrDialog();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -280,6 +286,7 @@ export function BoardView({ api }: BoardViewProps) {
     openSnippetDialog,
     openPhotoDialog,
     openEntryPicker,
+    openOcrDialog,
   ]);
 
   return (
@@ -404,7 +411,9 @@ export function BoardView({ api }: BoardViewProps) {
       <BoardToolbar
         activeTool={
           snippetDialog.open
-            ? 'snippet'
+            ? snippetDialog.source === 'image'
+              ? 'ocr'
+              : 'snippet'
             : photoDialogOpen
               ? 'photo'
               : entryPickerOpen
@@ -412,6 +421,7 @@ export function BoardView({ api }: BoardViewProps) {
                 : 'none'
         }
         onCreateSnippet={openSnippetDialog}
+        onReadImage={openOcrDialog}
         onAddPhoto={openPhotoDialog}
         onPlaceEntry={openEntryPicker}
         selection={selectedCard ? { cardType: selectedCard.cardType } : null}
@@ -437,6 +447,7 @@ export function BoardView({ api }: BoardViewProps) {
         api={api}
         snippetId={snippetDialog.snippetId}
         initialText={snippetDialog.initialText}
+        initialSource={snippetDialog.source ?? 'text'}
         onSubmit={(text) => {
           if (snippetDialog.snippetId) {
             updateSnippet(snippetDialog.snippetId, text);

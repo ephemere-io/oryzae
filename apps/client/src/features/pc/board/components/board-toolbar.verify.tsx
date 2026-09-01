@@ -2,12 +2,12 @@
  * BoardToolbar の検証スペック。
  *
  * 完全制御（state を持たない）の道具箱。選択の有無で**中身が入れ替わる**のが要点で、
- * 何も選んでいなければ作成系の3道具（スニペット/エントリー/画像）、カードを選んで
+ * 何も選んでいなければ作成系の4道具（スニペット/読み取り/エントリー/画像）、カードを選んで
  * いればそのカードにできること（開く/前面へ/削除）を出す。
  *
  * 検証する契約:
  *   - mode が selection の有無と一致する
- *   - 作成モードでは3道具が必ず揃い、aria-pressed が activeTool と1対1
+ *   - 作成モードでは4道具が必ず揃い、aria-pressed が activeTool と1対1
  *   - 選択モードでは card アクションが3つ揃い、作成系は出ない（入れ替わりが起きている）
  *   - 操作の名前は種別で変えない（例外は「日記を開く」だけ）
  *
@@ -20,8 +20,9 @@ import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { BoardToolbar } from './board-toolbar';
 
 interface Props {
-  activeTool: 'none' | 'snippet' | 'photo' | 'entry';
+  activeTool: 'none' | 'snippet' | 'ocr' | 'photo' | 'entry';
   onCreateSnippet: () => void;
+  onReadImage: () => void;
   onAddPhoto: () => void;
   onPlaceEntry: () => void;
   selection: { cardType: 'entry' | 'snippet' | 'photo' } | null;
@@ -37,6 +38,7 @@ const noop = () => {};
 const base: Props = {
   activeTool: 'none',
   onCreateSnippet: noop,
+  onReadImage: noop,
   onAddPhoto: noop,
   onPlaceEntry: noop,
   selection: null,
@@ -74,7 +76,7 @@ registerUnit<Props>({
   fixtures: [
     {
       id: 'idle',
-      description: '何も選んでいない（作成系の3道具・未選択）',
+      description: '何も選んでいない（作成系の4道具・未選択）',
       props: base,
     },
     {
@@ -85,8 +87,13 @@ registerUnit<Props>({
     {
       id: 'photo-active',
       probe: true,
-      description: 'Probe: 非デフォルト（画像側が選択中）でも契約=props・3道具構造が保たれる',
+      description: 'Probe: 非デフォルト（画像側が選択中）でも契約=props・道具の構成が保たれる',
       props: { ...base, activeTool: 'photo' },
+    },
+    {
+      id: 'ocr-active',
+      description: '画像から読み取るを選んでいる（作成ダイアログが画像タブで開く）',
+      props: { ...base, activeTool: 'ocr' },
     },
     {
       id: 'entry-active',
@@ -126,14 +133,14 @@ registerUnit<Props>({
         `activeTool 契約不一致: props=${props.activeTool} → contract=${contract.activeTool}`,
     },
     {
-      id: 'three-tools-when-nothing-selected',
-      description: '選択が無いときは作成系の3道具が揃い、カード操作は出ない',
+      id: 'create-tools-when-nothing-selected',
+      description: '選択が無いときは作成系の4道具が揃い、カード操作は出ない',
       check: ({ root, props }) => {
         if (props.selection) return true;
         const ids = toolIds(root);
         const actions = actionIds(root);
         return (
-          (ids.join(',') === 'entry,photo,snippet' && actions.length === 0) ||
+          (ids.join(',') === 'entry,ocr,photo,snippet' && actions.length === 0) ||
           `作成モードの構造が崩れている: tools=[${ids.join(', ')}] actions=[${actions.join(', ')}]`
         );
       },

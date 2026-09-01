@@ -11,11 +11,13 @@ import {
 } from './board-surface';
 
 /** ツールバーで選べる道具。'none' はどのダイアログも開いていない状態。 */
-type BoardTool = 'none' | 'snippet' | 'photo' | 'entry';
+type BoardTool = 'none' | 'snippet' | 'ocr' | 'photo' | 'entry';
 
 interface BoardToolbarProps {
   activeTool: BoardTool;
   onCreateSnippet: () => void;
+  /** 画像から文字を読み取ってスニペットにする。作成ダイアログを画像タブで開く。 */
+  onReadImage: () => void;
   onAddPhoto: () => void;
   onPlaceEntry: () => void;
   /** 選択中のカード。null なら作成系の道具を出す。 */
@@ -28,7 +30,7 @@ interface BoardToolbarProps {
 }
 
 interface ToolSpec {
-  id: 'snippet' | 'entry' | 'photo';
+  id: 'snippet' | 'ocr' | 'entry' | 'photo';
   label: string;
   shortcut: string;
   onSelect: () => void;
@@ -63,6 +65,19 @@ function PhotoIcon() {
       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
       <circle cx="8.5" cy="8.5" r="1.5" />
       <polyline points="21 15 16 10 5 21" />
+    </svg>
+  );
+}
+
+/** 画像から文字を読み取る。枠の中に字がある形で「写真そのもの」と区別する。 */
+function ScanTextIcon() {
+  return (
+    <svg {...ICON_PROPS} aria-hidden="true">
+      <path d="M3 8V5a2 2 0 0 1 2-2h3" />
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+      <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
+      <path d="M7 10h10M7 14h6" />
     </svg>
   );
 }
@@ -126,6 +141,7 @@ function TrashIcon() {
 export function BoardToolbar({
   activeTool,
   onCreateSnippet,
+  onReadImage,
   onAddPhoto,
   onPlaceEntry,
   selection,
@@ -143,6 +159,15 @@ export function BoardToolbar({
       shortcut: 'S',
       onSelect: onCreateSnippet,
       icon: <SnippetIcon />,
+    },
+    {
+      id: 'ocr',
+      // スニペット作成の中のタブに埋もれていて、読み取りに着くまで2手かかっていた。
+      // 「画像から作る」は独立した意図なので、道具として出す。
+      label: t('ocr'),
+      shortcut: 'R',
+      onSelect: onReadImage,
+      icon: <ScanTextIcon />,
     },
     {
       id: 'entry',

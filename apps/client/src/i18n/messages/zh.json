@@ -300,10 +300,11 @@
       "reading_aria": "识别中",
       "ocr_empty": "未能识别到文字。请换一张图片试试。",
       "ocr_failed": "识别失败。请检查格式（JPEG/PNG/WebP/GIF）与大小（{maxMb}MB 以内）。",
-      "ocr_note": "已从图片中读取。如需要请修改。",
+      "ocr_note": "已从图片中读取。可能存在错误，请确认后再放置。",
       "too_long": "请控制在 {max} 字以内",
       "drop_or_click_image": "拖放图片到此处，或点击选择",
-      "read_again": "重新识别"
+      "read_again": "重新识别",
+      "ocr_caveat": "识别并不完美。手写或模糊的文字可能出错，请在放置前确认。"
     },
     "error_message": "加载画板失败",
     "retry": "重试",
@@ -317,7 +318,8 @@
       "bring_to_front": "移到最前",
       "delete": "删除",
       "open": "打开",
-      "edit": "编辑"
+      "edit": "编辑",
+      "ocr": "从图片读取"
     },
     "drop_image": "把图片拖到这里",
     "entry_picker": {

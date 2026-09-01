@@ -18,6 +18,8 @@ interface SnippetDialogProps {
   /** 既存スニペットを編集するときだけ渡す。作成なら未指定。モード判定はこれで行う。 */
   snippetId?: string;
   initialText?: string;
+  /** 開いた直後にどちらのタブを出すか。ツールバーの「画像から読み取る」は 'image'。 */
+  initialSource?: Source;
   onSubmit: (text: string) => void;
   onClose: () => void;
 }
@@ -37,13 +39,14 @@ export function SnippetDialog({
   api,
   snippetId,
   initialText = '',
+  initialSource = 'text',
   onSubmit,
   onClose,
 }: SnippetDialogProps) {
   const t = useTranslations('board.snippet_dialog');
   const ocr = useOcrSnippetText(api);
 
-  const [source, setSource] = useState<Source>('text');
+  const [source, setSource] = useState<Source>(initialSource);
   const [text, setText] = useState(initialText);
   const [fromImage, setFromImage] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -69,13 +72,15 @@ export function SnippetDialog({
       setImageFile(null);
       setOcrStatus('idle');
       setFromImage(false);
-      setSource('text');
       setDragging(false);
       return;
     }
+    // 開くたびに入口へ戻す。ツールバーの「画像から読み取る」から来たときは
+    // 画像タブが開いた状態で始まる（1手で読み取りに着く）。
+    setSource(initialSource);
     setText(initialText);
     setTimeout(() => inputRef.current?.focus(), 50);
-  }, [open, initialText, releasePreview]);
+  }, [open, initialText, initialSource, releasePreview]);
 
   // アンマウント時の取りこぼし防止（open のまま破棄されるケース）。
   useEffect(() => releasePreview, [releasePreview]);
@@ -189,8 +194,10 @@ export function SnippetDialog({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
-        className="w-[90%] max-w-[400px] rounded-xl shadow-lg"
-        style={{ backgroundColor: 'var(--bg)', padding: '28px 32px' }}
+        // 上限が 2000 文字あるのに 400px 幅・3行の窓では書けない。読み取り結果を
+        // その場で直す前提の場所なので、書き物として成立する大きさにする。
+        className="flex w-[90%] max-w-[640px] flex-col rounded-xl shadow-lg"
+        style={{ backgroundColor: 'var(--bg)', padding: '28px 32px', maxHeight: '80vh' }}
       >
         <h3 className="mb-4 text-sm font-semibold" style={{ color: 'var(--fg)' }}>
           {mode === 'edit' ? t('heading_edit') : t('heading_create')}
@@ -230,6 +237,14 @@ export function SnippetDialog({
 
         {source === 'image' ? (
           <div className="mb-4 text-center">
+            {/* 読み取りは完全ではない。結果を見てから「あれ、違う」と気づくより、
+                選ぶ前に分かっているほうが、確かめる構えで受け取れる。 */}
+            <p
+              className="mb-3 text-left text-[11px] leading-relaxed"
+              style={{ color: 'var(--date-color)' }}
+            >
+              {t('ocr_caveat')}
+            </p>
             {/* 破線の枠は「ここに落とせる」という見た目なので、実際に落とせるようにする。
                 見た目だけドロップゾーンで受け付けないのが一番の混乱のもとだった。 */}
             <button
@@ -329,12 +344,12 @@ export function SnippetDialog({
               // 1文字打った途端に「画像から読み取った下書き」という説明が消えると、
               // 何を整えている最中なのか分からなくなる。
               onChange={(e) => setText(e.target.value)}
-              rows={3}
+              rows={12}
               aria-label={t('placeholder')}
               placeholder={t('placeholder')}
-              className="mb-2 w-full resize-none rounded-md border px-3 py-2.5 text-sm outline-none"
+              className="board-scroll mb-2 w-full resize-y rounded-md border px-3 py-2.5 text-sm leading-relaxed outline-none"
               style={{
-                height: 80,
+                minHeight: 260,
                 backgroundColor: 'var(--bg)',
                 borderColor: tooLong ? 'var(--accent)' : 'var(--border-subtle)',
                 color: 'var(--fg)',

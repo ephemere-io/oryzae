@@ -300,10 +300,11 @@
       "reading_aria": "Reading",
       "ocr_empty": "No text found in that image. Try another one.",
       "ocr_failed": "Reading failed. Check the format (JPEG/PNG/WebP/GIF) and size ({maxMb}MB or less).",
-      "ocr_note": "Read from the image. Edit it if you need to.",
+      "ocr_note": "Read from the image. It can contain mistakes — check it before placing.",
       "too_long": "Must be {max} characters or fewer",
       "drop_or_click_image": "Drop an image here, or click to choose one",
-      "read_again": "Read again"
+      "read_again": "Read again",
+      "ocr_caveat": "Reading isn't perfect. Handwriting and unclear text can come out wrong, so check it before you place it."
     },
     "error_message": "Failed to load the board",
     "retry": "Retry",
@@ -317,7 +318,8 @@
       "bring_to_front": "Bring to front",
       "delete": "Delete",
       "open": "Open",
-      "edit": "Edit"
+      "edit": "Edit",
+      "ocr": "Read from image"
     },
     "drop_image": "Drop the image here",
     "entry_picker": {

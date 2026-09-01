@@ -113,6 +113,16 @@ test.describe('ボード画面', () => {
     await page.keyboard.press('Escape');
   });
 
+  test('R で画像タブが開いた状態のスニペット作成に入る（OCR まで1手）', async ({ page }) => {
+    // 読み取りはスニペット作成の中のタブに埋もれており、たどり着くまで2手かかっていた。
+    // ツールバーの道具として独立させ、押した時点で画像タブが開くようにした。
+    await page.keyboard.press('r');
+    await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
+    await expect(page.locator('input[type="file"][accept*="image/"]')).toHaveCount(1);
+    await expect(page.locator('textarea')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  });
+
   test('ツールチップのショートカットが kbd として描かれる', async ({ page }) => {
     // 「I」を薄い文字で置いていた頃、ただの縦棒に見えて誰もキーだと気づかなかった。
     // 原因は文字ではなく「キーとして描いていなかったこと」なので、枠付きの kbd で

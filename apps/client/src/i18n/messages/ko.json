@@ -300,10 +300,11 @@
       "reading_aria": "읽는 중",
       "ocr_empty": "문자를 읽지 못했습니다. 다른 이미지를 시도해 보세요.",
       "ocr_failed": "읽기에 실패했습니다. 형식(JPEG/PNG/WebP/GIF)과 크기({maxMb}MB 이하)를 확인해 주세요.",
-      "ocr_note": "이미지에서 읽어들였습니다. 필요하면 수정해 주세요.",
+      "ocr_note": "이미지에서 읽어들였습니다. 오류가 섞일 수 있으니 확인한 뒤 붙여 주세요.",
       "too_long": "{max}자 이내로 입력해 주세요",
       "drop_or_click_image": "이미지를 끌어다 놓거나 클릭해서 선택",
-      "read_again": "다시 읽기"
+      "read_again": "다시 읽기",
+      "ocr_caveat": "읽기가 완벽하지는 않습니다. 손글씨나 흐린 글자는 잘못 읽힐 수 있으니 붙이기 전에 확인해 주세요."
     },
     "error_message": "보드를 불러오지 못했습니다",
     "retry": "다시 시도",
@@ -317,7 +318,8 @@
       "bring_to_front": "맨 앞으로",
       "delete": "삭제",
       "open": "열기",
-      "edit": "편집"
+      "edit": "편집",
+      "ocr": "이미지에서 읽기"
     },
     "drop_image": "여기에 이미지를 놓으세요",
     "entry_picker": {
