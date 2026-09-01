@@ -62,12 +62,21 @@ export function DetailPane({
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
 
-  useEffect(() => {
-    const stored = readStoredWidth();
-    if (stored !== null) setWidth(stored);
+  // 確定時に「いまの幅」を読むための鏡。setState の updater は純粋でなければならず
+  // （StrictMode では2回呼ばれる）、その中で保存すると二重に書く。
+  const widthRef = useRef(DEFAULT_WIDTH);
+
+  const applyWidth = useCallback((next: number) => {
+    widthRef.current = next;
+    setWidth(next);
   }, []);
 
-  // ドラッグ中は毎フレーム setState が走るので、保存は確定時だけにする。
+  useEffect(() => {
+    const stored = readStoredWidth();
+    if (stored !== null) applyWidth(stored);
+  }, [applyWidth]);
+
+  // ドラッグ中は毎フレーム幅が変わるので、保存は確定時だけにする。
   const persistWidth = useCallback((next: number) => {
     try {
       window.localStorage.setItem(WIDTH_STORAGE_KEY, String(next));
@@ -83,7 +92,7 @@ export function DetailPane({
     // 左端の取っ手はキャンバスのパンより先に掴む。
     e.stopPropagation();
     e.preventDefault();
-    dragRef.current = { startX: e.clientX, startWidth: width };
+    dragRef.current = { startX: e.clientX, startWidth: widthRef.current };
     e.currentTarget.setPointerCapture(e.pointerId);
     setIsResizing(true);
   };
@@ -92,7 +101,7 @@ export function DetailPane({
     const drag = dragRef.current;
     if (!drag) return;
     // 右端に固定された面なので、左へ動かすほど幅は増える。
-    setWidth(clampWidth(drag.startWidth + (drag.startX - e.clientX)));
+    applyWidth(clampWidth(drag.startWidth + (drag.startX - e.clientX)));
   };
 
   const endResize = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -102,10 +111,7 @@ export function DetailPane({
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     setIsResizing(false);
-    setWidth((current) => {
-      persistWidth(current);
-      return current;
-    });
+    persistWidth(widthRef.current);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -113,11 +119,9 @@ export function DetailPane({
     const delta = e.key === 'ArrowLeft' ? KEY_STEP : e.key === 'ArrowRight' ? -KEY_STEP : 0;
     if (delta === 0) return;
     e.preventDefault();
-    setWidth((current) => {
-      const next = clampWidth(current + delta);
-      persistWidth(next);
-      return next;
-    });
+    const next = clampWidth(widthRef.current + delta);
+    applyWidth(next);
+    persistWidth(next);
   };
 
   function handleWriteEntry() {
