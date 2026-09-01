@@ -2,23 +2,18 @@ import { expect, test } from './fixtures/auth';
 import { deleteEntriesByMarker, waitForAutosave } from './fixtures/env';
 
 /**
- * ボードカードを座標で押す。
+ * ボードカードを押す。
  *
- * カードは回転しており、本文は送れる領域なので locator の当たり判定が安定しない。
- * また `boundingBox()` は回転後の**外接矩形**なので、左上寄りの座標はカードの外に
- * 落ちることがある。中心なら回転していても必ずカードの内側に入る。
+ * カードは ±5° 回転していて位置もランダム（x:60-800 / y:60-600）なので、
+ *   - `page.mouse` の座標クリックは自動スクロールしないため、画面外のカードに届かない
+ *   - `boundingBox()` は回転後の**外接矩形**で、左上寄りの座標はカードの外に落ちる
+ * の2つで落ちる。locator 経由なら中心を押しつつスクロールも面倒を見てくれる。
+ * `force` は「本文が送れる領域で pointer events を横取りする」判定を飛ばすため。
  */
-async function clickCard(
-  page: import('@playwright/test').Page,
-  card: import('@playwright/test').Locator,
-  { double = false } = {},
-) {
-  const box = await card.boundingBox();
-  if (!box) throw new Error('カードが見つからない');
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  if (double) await page.mouse.dblclick(x, y);
-  else await page.mouse.click(x, y);
+async function clickCard(card: import('@playwright/test').Locator, { double = false } = {}) {
+  await card.scrollIntoViewIfNeeded();
+  if (double) await card.dblclick({ force: true });
+  else await card.click({ force: true });
 }
 
 test.describe('ボード画面', () => {
@@ -168,7 +163,7 @@ test.describe('ボード画面', () => {
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: snippet });
     // 選択前のカードにはボタンが無い（全面を覆う透明ボタンを外したため）。
     // 本文は送れる領域なので当たり判定が不安定。座標でカード上端を押す。
-    await clickCard(page, card);
+    await clickCard(card);
     await expect(card).toHaveAttribute('data-verify-selected', 'true');
     await page.keyboard.press('i');
     await expect(page.getByRole('heading', { name: '写真を追加' })).toBeVisible();
@@ -200,14 +195,20 @@ test.describe('ボード画面', () => {
     await page.waitForTimeout(1500);
     await page.click('button[data-verify-tool="entry"]');
     await page.locator('button[data-verify-entry-option]:not([disabled])').first().click();
-    await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
+    // ピッカーは候補の見出しも表示するので、`getByText(unique)` はダイアログが
+    // 開いたままでも当たる。閉じるのを待たないと、次のクリックがダイアログの
+    // 覆いに当たってカードに届かない。
+    await expect(page.locator('[data-verify-unit="EntryPickerDialog"]')).toHaveCount(0, {
+      timeout: 10000,
+    });
 
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
+    await expect(card).toBeVisible({ timeout: 10000 });
 
     // ダブルクリックしても /entries へ飛ばない。代わりに編集欄が出る。
     // カードは回転しており、本文は送れる領域なので、locator の click は当たり判定が
     // 安定しない。座標でカード上端（見出しの帯）を叩く。
-    await clickCard(page, card, { double: true });
+    await clickCard(card, { double: true });
     await expect(page).toHaveURL(/\/board$/);
     const box = card.locator('textarea[data-verify-entry-editor]');
     await expect(box).toBeVisible({ timeout: 10000 });
@@ -228,7 +229,7 @@ test.describe('ボード画面', () => {
     await expect(page.getByText(/・追記/).first()).toBeVisible({ timeout: 10000 });
 
     // 遷移はパレットの「日記を開く」から
-    await clickCard(page, card);
+    await clickCard(card);
     await page.click('button[data-verify-card-action="open"]');
     await expect(page).toHaveURL(/\/entries\/[0-9a-f-]+$/, { timeout: 10000 });
 
@@ -259,14 +260,14 @@ test.describe('ボード画面', () => {
     await page.locator('button[data-verify-entry-option]:not([disabled])').first().click();
     // 置けたらダイアログは自分で閉じる。開いたままだと置いたカードが裏に隠れ、
     // 一覧の表示も変わらないので「押しても何も起きない」ように見えていた。
-    await expect(page.getByRole('heading', { name: 'エントリーを置く' })).toHaveCount(0, {
+    await expect(page.locator('[data-verify-unit="EntryPickerDialog"]')).toHaveCount(0, {
       timeout: 10000,
     });
     await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
 
     // 3. カードを選ぶとツールバーが操作に入れ替わり、そこから外せる
     const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
-    await clickCard(page, card);
+    await clickCard(card);
     await expect(page.locator('[data-verify-unit="BoardToolbar"]')).toHaveAttribute(
       'data-verify-mode',
       'card',
