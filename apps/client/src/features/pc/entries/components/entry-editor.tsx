@@ -54,6 +54,7 @@ import {
   extractEditorEffects,
 } from '@/features/pc/entries/utils/editor-effects-codec';
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
+import { measureTitle } from '@/features/pc/entries/utils/title-metrics';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
@@ -114,12 +115,6 @@ function voiceStatusMessage(
       return '';
   }
 }
-
-/** 題が使える桁数の上限。これ以上増やすと、題が紙の面積を占領する。 */
-const TITLE_MAX_COLUMNS = 3;
-
-/** 桁を使い切ってなお入らないときに落とす下限。これ以上小さいと題に見えない。 */
-const TITLE_MIN_FONT_SIZE = 12;
 
 /**
  * 縦書きのとき、題の右にとる余白と、題と本文のあいだの間。
@@ -824,7 +819,7 @@ export function EntryEditor({
   //
   // 題の右余白と、題と本文のあいだの間は px で持つ（TITLE_RIGHT_MARGIN /
   // TITLE_TO_BODY_GAP）。本文の右端はそこから逆算する。
-  const titleBoxClass = isVertical ? 'absolute top-[4%] h-[86%]' : 'absolute top-6';
+  const titleBoxClass = isVertical ? 'absolute top-[4%]' : 'absolute top-6';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
   //
@@ -835,34 +830,25 @@ export function EntryEditor({
   // 縦書きの題は桁の高さ（画面の 86%）に収まる必要があるので、字数から逆算する。
   // 上限は本文と同じ大きさまで——題が本文より大きいと、紙の主役が入れ替わってうるさい。
   const titleLength = Math.max(title.length, 1);
-  // **縮めるのではなく、桁を増やす。** 長さに応じて字を小さくしていたが、長い題ほど
-  // 読めなくなるうえ、本文より小さい題は題に見えない。字の大きさは本文と同じに保ち、
-  // 入り切らなければ2桁目・3桁目へ折り返す（縦書きの紙で自然な畳み方）。
   // **字数の上限は設けない。** 題の長さは書き手が決めることで、入力欄が決めることではない。
-  // 収め方は2段構え: まず桁を増やし（最大3桁）、それでも入らなければ字を縮める。
-  // どちらも尽きることが無いので、どんな長さでも見切れない。
-  const horizontalTitleFontSize = Math.round(settings.fontSize * 1.3);
-  const charsPerColumnAtFullSize = Math.max(
-    1,
-    Math.floor((titleColumnHeightPx * 0.94) / settings.fontSize),
-  );
-  const titleColumns = Math.min(
-    TITLE_MAX_COLUMNS,
-    Math.max(1, Math.ceil(titleLength / charsPerColumnAtFullSize)),
-  );
-  // 3桁でも入らないぶんは、入る大きさまで落とす（下限 12px）。
-  const fitsAtFullSize = titleLength <= charsPerColumnAtFullSize * titleColumns;
-  const shrunkFontSize = Math.max(
-    TITLE_MIN_FONT_SIZE,
-    Math.floor((titleColumnHeightPx * 0.94 * titleColumns) / titleLength),
-  );
-  const titleFontSize = isVertical
-    ? fitsAtFullSize
-      ? settings.fontSize
-      : Math.min(settings.fontSize, shrunkFontSize)
-    : horizontalTitleFontSize;
+  // どんな長さでも見切れない寸法は utils/title-metrics が決める
+  // （桁を増やす → 字を縮める → さらに桁を増やす、の3段）。
+  const verticalTitle = measureTitle({
+    length: titleLength,
+    baseFontSize: settings.fontSize,
+    columnHeight: titleColumnHeightPx,
+  });
+  const titleColumns = verticalTitle.columns;
+  const titleFontSize = isVertical ? verticalTitle.fontSize : Math.round(settings.fontSize * 1.3);
   // 桁の太さ × 桁数。折り返した題はこの幅に収まる。
   const titleColumnWidth = Math.round(titleFontSize * 1.6) * titleColumns;
+  // **箱は中身に合わせる。** 桁の高さを丸ごと取っていたので、3文字の題でも
+  // 588px の縦長の箱を占めていた（中身は 96px）。使う長さは「いちばん長い桁」ぶん。
+  // 端数と行送りのぶんだけ余裕を持たせ、空いている高さを超えない。
+  const titleUsedHeightPx = Math.min(
+    titleColumnHeightPx,
+    Math.ceil(titleLength / titleColumns) * titleFontSize + Math.round(titleFontSize * 0.6),
+  );
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
   const titleTextStyle: React.CSSProperties = {
     // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。
@@ -870,7 +856,11 @@ export function EntryEditor({
       ? // 縦書きの題の桁幅。**字の幅ぎりぎりにしない**（以前は 6% / 最小 3rem で、
         // 46px の字に対して箱が 48px しか無かった）。日本語入力の変換候補は
         // キャレットの脇に開くので、逃げ場が無いと字の上に重なって打てなくなる。
-        { width: `${titleColumnWidth}px`, right: `${TITLE_RIGHT_MARGIN}px` }
+        {
+          width: `${titleColumnWidth}px`,
+          height: `${titleUsedHeightPx}px`,
+          right: `${TITLE_RIGHT_MARGIN}px`,
+        }
       : {
           left: `${gutterPx}px`,
           width: `${measurePx}px`,
