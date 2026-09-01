@@ -14,6 +14,7 @@ import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { useEscapeKey } from '@/lib/use-escape-key';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
+import { useEntryCardDraft } from '../hooks/use-entry-card-draft';
 import { useImageIntake } from '../hooks/use-image-intake';
 import { BoardCard } from './board-card';
 import { BoardDateNav } from './board-date-nav';
@@ -49,9 +50,15 @@ export function BoardView({ api }: BoardViewProps) {
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [entryPickerOpen, setEntryPickerOpen] = useState(false);
-  /** カードの上で編集中の entry カード id と、その下書き。 */
-  const [editingCardId, setEditingCardId] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ title: '', body: '' });
+  /** カード上の編集。入り口は hook に閉じてあり、下書きを積まずには入れない。 */
+  const {
+    editingCardId,
+    draft,
+    setTitle: setDraftTitle,
+    setBody: setDraftBody,
+    start: startEditing,
+    stop: stopEditingState,
+  } = useEntryCardDraft();
   /** 貼り付け・ドロップで入ってきた画像。写真ダイアログへ選択済みとして渡す。 */
   const [incomingImage, setIncomingImage] = useState<File | null>(null);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
@@ -117,15 +124,18 @@ export function BoardView({ api }: BoardViewProps) {
    * entry は**画面遷移しない**。読み書きの続きはカードの上でできるほうが、盤面を
    * 見ながら手を入れられる。日記そのものを開きたいときはパレットから明示的に選ぶ。
    */
-  const openCard = useCallback((card: BoardCardData) => {
-    if (card.cardType === 'entry') {
-      setEditingCardId(card.id);
-    } else if (card.cardType === 'snippet' && 'text' in card.content) {
-      setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
-    } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
-      setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
-    }
-  }, []);
+  const openCard = useCallback(
+    (card: BoardCardData) => {
+      if (card.cardType === 'entry') {
+        startEditing(card);
+      } else if (card.cardType === 'snippet' && 'text' in card.content) {
+        setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
+      } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
+        setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
+      }
+    },
+    [startEditing],
+  );
 
   const handleCardClick = useCallback(
     (card: BoardCardData) => {
@@ -143,26 +153,16 @@ export function BoardView({ api }: BoardViewProps) {
   const editingCard = editingCardId ? (cards.find((c) => c.id === editingCardId) ?? null) : null;
   const { save: saveEntryContent } = useSaveEntryContent(api);
 
-  /**
-   * 編集を始める。カードが既に本文の全部を持っているので、取り直しはしない
-   * （＝「読み込み中」が挟まらない）。
-   */
-  const startEditing = useCallback((card: BoardCardData) => {
-    if (card.cardType !== 'entry' || !('body' in card.content)) return;
-    setDraft({ title: card.content.title, body: card.content.body });
-    setEditingCardId(card.id);
-  }, []);
-
   /** 編集を終える。変わっていれば保存し、盤面を取り直す。 */
   const stopEditing = useCallback(async () => {
     const card = editingCard;
-    setEditingCardId(null);
+    stopEditingState();
     if (!card || !('body' in card.content)) return;
     if (draft.title === card.content.title && draft.body === card.content.body) return;
     // 見出しは本文の1行目。編集した2つを繋ぎ直したものが日記の中身になる。
     const next = draft.body ? `${draft.title}\n${draft.body}` : draft.title;
     if (await saveEntryContent(card.refId, next)) await refresh({ silent: true });
-  }, [editingCard, draft, saveEntryContent, refresh]);
+  }, [editingCard, draft, stopEditingState, saveEntryContent, refresh]);
 
   // 編集中は Escape で抜ける（保存してから閉じる）。
   useEscapeKey(editingCardId !== null, () => {
@@ -394,8 +394,8 @@ export function BoardView({ api }: BoardViewProps) {
             isEditing={editingCardId === card.id}
             editTitle={draft.title}
             editBody={draft.body}
-            onEditTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-            onEditBodyChange={(body) => setDraft((d) => ({ ...d, body }))}
+            onEditTitleChange={setDraftTitle}
+            onEditBodyChange={setDraftBody}
           />
         ))}
       </div>
