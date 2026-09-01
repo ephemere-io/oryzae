@@ -26,7 +26,12 @@ interface Props {
     snippets: Record<string, Pos>;
     letters: Record<string, Pos>;
   };
-  onElementClick: (type: 'keyword' | 'snippet' | 'letter', data: Record<string, string>) => void;
+  onElementClick: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    data: Record<string, string>,
+  ) => void;
+  selectedElementId?: string | null;
   onInnerDragMove: (
     type: 'keyword' | 'snippet' | 'letter',
     id: string,
@@ -145,6 +150,28 @@ registerUnit<Props>({
       props: { ...baseProps, detail: makeDetail(3, 2, true), zoomed: true },
     },
     {
+      id: 'element-selected',
+      probe: true,
+      description: 'Probe: サイドバーに出している要素（kw-1）だけに印が付く',
+      props: {
+        ...baseProps,
+        detail: makeDetail(3, 2, true),
+        zoomed: true,
+        selectedElementId: 'kw-1',
+      },
+    },
+    {
+      id: 'selected-element-missing',
+      probe: true,
+      description: 'Probe: 消えた要素の id が残っていても、どれにも印が付かない（誤爆しない）',
+      props: {
+        ...baseProps,
+        detail: makeDetail(3, 2, true),
+        zoomed: true,
+        selectedElementId: 'kw-999',
+      },
+    },
+    {
       id: 'long-question',
       probe: true,
       description: 'Probe: 上限いっぱいの長い問いでも、リング文字が円周に収まる大きさになる',
@@ -164,6 +191,50 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'selection-mark-is-unique',
+      description:
+        '印が付くのは高々1つ（複数付くと、どれをサイドバーに出しているのか分からなくなる）',
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length <= 1 || `印が ${marked.length} 個ある（1つ以下であるべき）`;
+      },
+    },
+    {
+      id: 'no-mark-without-selection',
+      description: '何も選んでいなければ印は付かない',
+      onlyFixtures: ['completed', 'zoomed'],
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length === 0 || `未選択なのに印が ${marked.length} 個ある`;
+      },
+    },
+    {
+      id: 'selection-mark-present-when-id-matches',
+      description: '存在する要素を選んだときは、ちょうど1つに印が付く',
+      onlyFixtures: ['element-selected'],
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length === 1 || `kw-1 を選んだのに印が ${marked.length} 個`;
+      },
+    },
+    {
+      id: 'no-mark-when-id-unknown',
+      description: '存在しない id が残っていても印は付かない（消えた要素で誤爆しない）',
+      onlyFixtures: ['selected-element-missing'],
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length === 0 || `未知の id なのに印が ${marked.length} 個ある`;
+      },
+    },
     {
       id: 'ring-text-fits-circumference',
       description: 'リング文字の総長は円周を超えない（超えると textPath が末尾を黙って切り落とす）',

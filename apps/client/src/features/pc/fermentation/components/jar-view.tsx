@@ -199,6 +199,7 @@ function QuestionCircleWithData({
   innerOverrides,
   onZoom,
   onElementClick,
+  selectedElementId,
   onCircleMove,
   onCircleDragEnd,
   onInnerMove,
@@ -219,8 +220,10 @@ function QuestionCircleWithData({
     questionId: string,
     questionText: string,
     type: 'keyword' | 'snippet' | 'letter',
+    id: string,
     data: Record<string, string>,
   ) => void;
+  selectedElementId: string | null;
   onCircleMove: (id: string, pos: Pos) => void;
   onCircleDragEnd: (id: string, pos: Pos) => void;
   onInnerMove: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
@@ -251,8 +254,9 @@ function QuestionCircleWithData({
       zoomed={isZoomed}
       dimmed={isDimmed}
       innerOverrides={innerOverrides}
-      onElementClick={(type, data) =>
-        onElementClick(question.id, question.currentText ?? '', type, data)
+      selectedElementId={selectedElementId}
+      onElementClick={(type, id, data) =>
+        onElementClick(question.id, question.currentText ?? '', type, id, data)
       }
       onInnerDragMove={(type, id, x, y) => onInnerMove(type, id, { jarX: x, jarY: y })}
       onInnerDragEnd={(type, id, x, y) => onInnerDragEnd(type, id, { jarX: x, jarY: y })}
@@ -285,6 +289,8 @@ export function JarView({
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailType, setDetailType] = useState<'keyword' | 'snippet' | 'letter' | null>(null);
   const [detailData, setDetailData] = useState<Record<string, string> | null>(null);
+  // サイドバーに出している要素。円の中でも同じものに印を付けるために持つ。
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [detailQuestion, setDetailQuestion] = useState('');
   const [detailQuestionId, setDetailQuestionId] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -375,12 +381,14 @@ export function JarView({
       questionId: string,
       questionText: string,
       type: 'keyword' | 'snippet' | 'letter',
+      id: string,
       data: Record<string, string>,
     ) => {
       setDetailQuestionId(questionId);
       setDetailQuestion(questionText);
       setDetailType(type);
       setDetailData(data);
+      setSelectedElementId(id);
       setDetailOpen(true);
     },
     [],
@@ -760,6 +768,7 @@ export function JarView({
               }}
               onZoom={focusCircle}
               onElementClick={handleElementClick}
+              selectedElementId={selectedElementId}
               onCircleMove={handleCircleMove}
               onCircleDragEnd={handleCircleDragEnd}
               onInnerMove={handleInnerDragMove}
@@ -975,7 +984,10 @@ export function JarView({
       {/* Detail pane */}
       <DetailPane
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => {
+          setDetailOpen(false);
+          setSelectedElementId(null);
+        }}
         questionId={detailQuestionId}
         questionText={detailQuestion}
         type={detailType}

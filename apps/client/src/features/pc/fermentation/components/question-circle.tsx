@@ -31,7 +31,13 @@ interface QuestionCircleProps {
     snippets: Record<string, Pos>;
     letters: Record<string, Pos>;
   };
-  onElementClick: (type: 'keyword' | 'snippet' | 'letter', data: Record<string, string>) => void;
+  onElementClick: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    data: Record<string, string>,
+  ) => void;
+  /** いまサイドバーに出している要素の id。円の中でも同じものに印を付ける。 */
+  selectedElementId?: string | null;
   onInnerDragMove: (
     type: 'keyword' | 'snippet' | 'letter',
     id: string,
@@ -64,6 +70,20 @@ interface QuestionCircleProps {
  * 変えるときは jar-view の world サイズも同じ比率で動かすこと。円が近づきすぎる。
  */
 export const QUESTION_CIRCLE_SIZE = 420;
+
+/**
+ * サイドバーに出している要素の印。キーワード（丸い chip）・スニペット（角丸のカード）・
+ * 手紙（円）で形が違うので、**輪郭に沿う outline** を使って同じ見え方に揃える。
+ * 中身の色を変える方法だと、型ごとに背景が違うため印の強さが揃わない。
+ */
+function selectionMark(selected: boolean): React.CSSProperties {
+  if (!selected) return {};
+  return {
+    outline: '2px solid var(--accent)',
+    outlineOffset: '3px',
+    boxShadow: '0 0 0 7px rgba(74,158,142,0.16)',
+  };
+}
 
 /** リング文字の字送り（em）。収まり計算と描画で同じ値を使う。 */
 const RING_TRACKING = 0.2;
@@ -163,6 +183,7 @@ export function QuestionCircle({
   dimmed = false,
   innerOverrides,
   onElementClick,
+  selectedElementId = null,
   onInnerDragMove,
   onInnerDragEnd,
   circlePointerHandlers,
@@ -210,6 +231,7 @@ export function QuestionCircle({
         hasLetter,
         ringFontSize,
         ringChars,
+        selectedElementId: selectedElementId ?? 'none',
       })}
       role={zoomed ? undefined : 'button'}
       tabIndex={zoomed ? undefined : 0}
@@ -368,7 +390,7 @@ export function QuestionCircle({
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
-                    onElementClick('keyword', {
+                    onElementClick('keyword', kw.id, {
                       keyword: kw.keyword,
                       description: kw.description,
                     })
@@ -395,6 +417,7 @@ export function QuestionCircle({
                       borderRadius: '999px',
                       boxShadow: '0 4px 12px rgba(217,180,143,0.3)',
                       border: '1px solid rgba(255,255,255,0.5)',
+                      ...selectionMark(selectedElementId === kw.id),
                       whiteSpace: 'nowrap',
                       transition: 'transform 0.5s',
                     }}
@@ -425,7 +448,7 @@ export function QuestionCircle({
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
-                    onElementClick('snippet', {
+                    onElementClick('snippet', s.id, {
                       originalText: s.originalText,
                       sourceDate: s.sourceDate,
                       selectionReason: s.selectionReason,
@@ -445,6 +468,7 @@ export function QuestionCircle({
                       position: 'relative',
                       zIndex: 20,
                       background: 'rgba(253,251,247,0.4)',
+                      ...selectionMark(selectedElementId === s.id),
                       backdropFilter: 'blur(12px)',
                       WebkitBackdropFilter: 'blur(12px)',
                       border: '1px solid rgba(255,255,255,0.6)',
@@ -509,7 +533,7 @@ export function QuestionCircle({
                     x={pos.jarX}
                     y={pos.jarY}
                     onClickWithoutDrag={() =>
-                      onElementClick('letter', { bodyText: letter.bodyText })
+                      onElementClick('letter', letter.id, { bodyText: letter.bodyText })
                     }
                     onDragMove={(x, y) => onInnerDragMove('letter', letter.id, x, y)}
                     onDragEnd={(x, y) => onInnerDragEnd('letter', letter.id, x, y)}
@@ -532,6 +556,7 @@ export function QuestionCircle({
                         boxShadow:
                           '0 0 0 6px rgba(122,59,63,0.06), 0 6px 18px rgba(122,59,63,0.22)',
                         border: '1.5px solid rgba(122,59,63,0.45)',
+                        ...selectionMark(selectedElementId === letter.id),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
