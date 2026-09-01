@@ -19,12 +19,23 @@ name: Security
 
 on:
   pull_request:
+    # ドキュメントだけの変更では走らせない（Issue #551）。
+    # schedule / workflow_dispatch には paths が効かないので、週次のフル監査は従来どおり。
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.claude/**'
   push:
     branches: [main]
   schedule:
     # 毎週月曜 03:17 JST（= 日曜 18:17 UTC）。CI 混雑を避けるため 0 分ちょうどを外す。
     - cron: '17 18 * * 0'
   workflow_dispatch:
+
+# 追い越された run を止める。main への push だけはキャンセルしない（ci.yml と同じ理由）。
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read

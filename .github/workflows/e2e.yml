@@ -17,6 +17,18 @@ on:
   push:
     branches: [main]
   pull_request:
+    # E2E は 1 push あたりの課金分で最も重い。サーバ/クライアントのコードが
+    # 変わらない PR では走らせない（Issue #551）。allowlist なので、
+    # ここに挙がっていない領域だけの変更では起動しない。
+    # このワークフロー自身の変更で E2E が走らないと、変更を検証せずにマージすることに
+    # なるため、e2e.yml 自体も対象に含める。
+    # schedule / workflow_dispatch には paths が効かないので、週次のフル回帰は残る。
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'supabase/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/e2e.yml'
   schedule:
     - cron: '0 0 * * 1' # 毎週月曜 UTC 0:00 (JST 9:00)
   workflow_dispatch:
