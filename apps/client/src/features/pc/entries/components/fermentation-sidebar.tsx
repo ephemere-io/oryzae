@@ -153,7 +153,21 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {open ? (
-          <ItemDetail item={open} sourcePrefix={td('snippet_source_prefix')} />
+          <>
+            <ItemDetail item={open} sourcePrefix={td('snippet_source_prefix')} />
+            {/* 読み終えた場所にも戻る道を置く。上まで戻らないと出られないと、
+                長い中身では出口が遠い。 */}
+            <div className="px-5 pt-6 pb-2">
+              <button
+                type="button"
+                onClick={() => setOpen(null)}
+                className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] text-[var(--date-color)] transition-colors duration-150 hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
+              >
+                <span aria-hidden="true">‹</span>
+                {t('back_aria')}
+              </button>
+            </div>
+          </>
         ) : (
           <>
             {isEmpty && (
@@ -189,7 +203,7 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                           description: kw.description,
                         })
                       }
-                      className="flex h-7 cursor-grab items-center rounded-full border px-3 text-[12px] transition-colors duration-150 active:cursor-grabbing"
+                      className="flex h-7 cursor-grab items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-150 hover:brightness-[0.97] active:cursor-grabbing"
                       style={{
                         borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)',
                         background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
@@ -199,6 +213,11 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                       }}
                     >
                       {kw.keyword}
+                      {/* 押せば意味が読める、という手がかり。ホバーしないと分からない
+                          作りだと、多くの人は押さないまま通り過ぎる。 */}
+                      <span aria-hidden="true" className="text-[10px] opacity-60">
+                        ›
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -235,6 +254,12 @@ export function FermentationSidebar({ detail, onClose }: FermentationSidebarProp
                       {s.originalText.length > SNIPPET_PREVIEW_LENGTH
                         ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
                         : s.originalText}
+                      <span
+                        aria-hidden="true"
+                        className="mt-1 block text-[10px] text-[var(--accent)] opacity-80"
+                      >
+                        {t('read_more')} ›
+                      </span>
                     </button>
                   ))}
                 </div>

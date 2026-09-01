@@ -459,7 +459,8 @@
       "section_letter": "Letter",
       "section_keywords": "Keywords",
       "section_snippets": "Snippets",
-      "back_aria": "Back to list"
+      "back_aria": "Back to list",
+      "read_more": "Why this was chosen"
     },
     "palette": {
       "move": "Move the palette",

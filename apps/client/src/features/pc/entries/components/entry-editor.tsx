@@ -41,7 +41,6 @@ import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-questi
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
-import { useTitleFollowsScroll } from '@/features/pc/entries/hooks/use-title-follows-scroll';
 import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
@@ -116,6 +115,12 @@ function voiceStatusMessage(
   }
 }
 
+/**
+ * 題の字数の上限。桁（画面の高さ）に収まり、かつ字が小さくなりすぎない範囲。
+ * これを超える長さは、題ではなく本文の一行目に書くべきもの。
+ */
+const TITLE_MAX_LENGTH = 16;
+
 /** Extract title (first line) and body from stored content */
 function splitTitleBody(raw: string): { title: string; body: string } {
   const idx = raw.indexOf('\n');
@@ -164,6 +169,11 @@ export function EntryEditor({
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   const [voiceActive, setVoiceActive] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
+  // 末尾側だけでなく**先頭側**も切れる。右がぶつ切りだと「まだ続いている」ことが
+  // 伝わらず、いま紙のどこにいるのかを見失う。
+  const [fadeRight, setFadeRight] = useState(false);
+  // 縦書きの題が使える桁の高さ（実測）。題の字の大きさを字数から決めるのに要る。
+  const [editorAreaHeight, setEditorAreaHeight] = useState(0);
   const [status, setStatus] = useState<EditorStatus>('editing');
   // Issue #360: ステータスバーが「いつ保存されたか」を語り続けるための基準時刻。
   // 保存ボタンを廃した（原則2）ので、保存が起きている事実はこの帯だけが伝える。
@@ -295,20 +305,39 @@ export function EntryEditor({
     if (saving) setStatus(isAutosavingRef.current ? 'autosaving' : 'saving');
   }, [saving]);
 
+  // 本文領域の高さを測る（縦書きの題は、この高さに収まる大きさで組む）。
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    function measure() {
+      const box = scrollContainerRef.current;
+      if (box) setEditorAreaHeight(box.clientHeight);
+    }
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // Track scroll position of editor to show/hide end-side fade overlay
   useEffect(() => {
     const el = editorRef.current;
     if (!el || settings.writingMode !== 'vertical') {
       setFadeLeft(false);
+      setFadeRight(false);
       return;
     }
     function updateFade() {
       if (!el) return;
       const { scrollLeft, scrollWidth, clientWidth } = el;
       const maxScroll = scrollWidth - clientWidth;
-      // vertical-rl: scrollLeft=0 at start (rightmost/beginning), goes negative when scrolled left
-      // End-side fade: show when not scrolled all the way to the end
+      // vertical-rl: 先頭（右端）で scrollLeft=0、左へ進むと負。
+      // 末尾側（左）は、まだ最後まで来ていないときに掛ける。
       setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
+      // 先頭側（右）は、書き出しから離れたときに掛ける。**左だけフェードして右が
+      // ぶつ切り**だと、右にまだ続いていることが伝わらない。
+      setFadeRight(Math.abs(scrollLeft) > 5);
     }
     updateFade();
     el.addEventListener('scroll', updateFade);
@@ -673,13 +702,12 @@ export function EntryEditor({
     enabled: true,
   });
 
-  // 縦書きの題は紙の右肩に絶対配置してあるので、紙の進んだ分をそのまま題にも掛ける
-  // （題と本文が同じ紙に書かれているように見せる）。
-  useTitleFollowsScroll({
-    titleRef: titleInputRef,
-    editorRef,
-    enabled: settings.writingMode === 'vertical',
-  });
+  // 題は**動かさない**。読み進めても消さない。
+  //
+  // 一度は本文と一緒に流して消していた（「いま文章のどこにいるか分からない」への対応）。
+  // だが消してみると、今度は**何のエントリーを書いているのかという大文脈**が失われた。
+  // 位置の手がかりは本文の側（末尾の余白・端のフェード）で示せるが、
+  // 題は他のどこにも出ていないので、ここから消すと戻る先が無くなる。
 
   // パレットの操作。押せないものは非活性にして、理由はホバーで出す
   // （「あと何字」を常時表示しない代わり）。
@@ -772,6 +800,9 @@ export function EntryEditor({
   // 以前は px-[15%] で、1512px の画面だと本文の左端が 295px、「問いを結ぶ」の左端が
   // 104px と、同じ画面の中で2本の別の縦線が立っていた。ここを1本に揃える。
   const gutterPx = SHELL_INSET * 2;
+  // 縦書きの題が使える桁の高さ。字の大きさを字数から決めるのに要る。
+  // 測れないうち（初回描画・jsdom）は画面高からの概算に倒す。
+  const titleColumnHeightPx = editorAreaHeight * 0.86;
   // 1行の長さの上限。日本語は 30〜40 字で読みやすさが頭打ちになるので 34 字で切る
   // （文字サイズを上げても行が伸び続けないよう、px ではなく文字数で持つ）。
   const measurePx = settings.fontSize * 34;
@@ -784,13 +815,24 @@ export function EntryEditor({
   // 本文は left:6% / width:79%（右端 = 85%）。題を本文にぴったり付けると、
   // 右側だけが大きく空いて題が宙に浮き、かつ本文と一体化して2列に見えてしまう。
   // 右端の余白（6%）を本文の左端と揃え、題と本文のあいだに 5% の間を取る。
-  const titleBoxClass = isVertical ? 'absolute top-[4%] right-[6%] h-[86%]' : 'absolute top-6';
+  // 右端の余白は左のサイドバーの余白と釣り合わせる（右だけ広いと歪んで見える）。
+  const titleBoxClass = isVertical ? 'absolute top-[4%] right-8 h-[86%]' : 'absolute top-6';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
   //
   // 題と本文の**大きさの差**をはっきりつける（1.15 倍では差が読めず、ただの1行に見えた）。
   // 縦書きは題が本文の隣に立つので差が効く。横書きは見出しとして上に載るのでもう少し強く。
-  const titleFontSize = Math.round(settings.fontSize * (isVertical ? 1.45 : 1.6));
+  //
+  // **長い題ほど小さくする。** 固定倍率だと、長い題が桁からはみ出して見切れた。
+  // 縦書きの題は桁の高さ（画面の 86%）に収まる必要があるので、字数から逆算する。
+  // 上限は本文と同じ大きさまで——題が本文より大きいと、紙の主役が入れ替わってうるさい。
+  const titleLength = Math.max(title.length, 1);
+  const titleFontSize = isVertical
+    ? Math.max(
+        Math.round(settings.fontSize * 0.7),
+        Math.min(settings.fontSize, Math.floor((titleColumnHeightPx * 0.92) / titleLength)),
+      )
+    : Math.round(settings.fontSize * 1.3);
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
   const titleTextStyle: React.CSSProperties = {
     // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。
@@ -798,7 +840,7 @@ export function EntryEditor({
       ? // 縦書きの題の桁幅。**字の幅ぎりぎりにしない**（以前は 6% / 最小 3rem で、
         // 46px の字に対して箱が 48px しか無かった）。日本語入力の変換候補は
         // キャレットの脇に開くので、逃げ場が無いと字の上に重なって打てなくなる。
-        { width: `${titleFontSize * 2}px` }
+        { width: `${Math.round(titleFontSize * 1.6)}px` }
       : {
           left: `${gutterPx}px`,
           width: `${measurePx}px`,
@@ -929,6 +971,18 @@ export function EntryEditor({
                 }}
               />
             )}
+            {/* 先頭側（右）。左と同じ掛け方にして、両端とも「まだ続いている」と分かるようにする。
+                題より内側から始めるので、題は薄くならない。 */}
+            {settings.writingMode === 'vertical' && fadeRight && (
+              <div
+                className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
+                style={{
+                  right: '10%',
+                  width: '12%',
+                  background: 'linear-gradient(to left, var(--bg), transparent)',
+                }}
+              />
+            )}
             <div
               ref={scrollContainerRef}
               className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
@@ -950,7 +1004,8 @@ export function EntryEditor({
                   }
                 }}
                 onBlur={commitTitleEdit}
-                maxLength={100}
+                // 長い題は桁に収まらず、収めようとすると字が小さくなりすぎる。
+                maxLength={TITLE_MAX_LENGTH}
                 placeholder={t('title.placeholder')}
                 aria-label={t('title.placeholder')}
                 className={`z-[12] border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}

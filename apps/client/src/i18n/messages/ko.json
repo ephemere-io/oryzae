@@ -150,10 +150,10 @@
       "error_create": "만들지 못했습니다"
     },
     "question_chip": {
-      "empty": "물음 잇기",
+      "empty": "물음 연결하기",
       "untitled": "제목 없는 물음",
       "none_available": "아직 물음이 없습니다",
-      "linked_count": "{count}개의 물음을 이었다"
+      "linked_count": "{count}개의 물음을 연결함"
     }
   },
   "app": {
@@ -459,7 +459,8 @@
       "section_letter": "편지",
       "section_keywords": "키워드",
       "section_snippets": "스니펫",
-      "back_aria": "목록으로"
+      "back_aria": "목록으로",
+      "read_more": "선택된 이유 보기"
     },
     "palette": {
       "move": "팔레트 이동",
@@ -467,7 +468,7 @@
       "expand": "팔레트 펼치기",
       "pickle_needs_body": "본문을 쓰면 담글 수 있습니다",
       "pickle_needs_question": "물음을 이으면 담글 수 있습니다",
-      "fermentation_needs_question": "물음을 이으면 지난 발효 결과를 볼 수 있어요",
+      "fermentation_needs_question": "물음을 연결하면 지난 발효 결과를 볼 수 있어요",
       "fermentation_not_ready": "이 물음은 아직 발효되지 않았어요",
       "fermentation_new_entry_only": "지난 발효 결과는 새로 쓸 때 볼 수 있어요"
     }

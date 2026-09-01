@@ -150,10 +150,10 @@
       "error_create": "作成に失敗しました"
     },
     "question_chip": {
-      "empty": "問いを結ぶ",
+      "empty": "問いを紐づける",
       "untitled": "無題の問い",
       "none_available": "まだ問いがありません",
-      "linked_count": "{count}つの問いを結んでいる"
+      "linked_count": "{count}つの問いを紐づけている"
     }
   },
   "app": {
@@ -459,7 +459,8 @@
       "section_letter": "手紙",
       "section_keywords": "キーワード",
       "section_snippets": "スニペット",
-      "back_aria": "一覧に戻る"
+      "back_aria": "一覧に戻る",
+      "read_more": "選ばれた理由を読む"
     },
     "palette": {
       "move": "パレットを移動",
@@ -467,7 +468,7 @@
       "expand": "パレットを開く",
       "pickle_needs_body": "本文を書くと漬け込めます",
       "pickle_needs_question": "問いを結ぶと漬け込めます",
-      "fermentation_needs_question": "問いを結ぶと、前回の発酵結果が見られます",
+      "fermentation_needs_question": "問いを紐づけると、前回の発酵結果が見られます",
       "fermentation_not_ready": "この問いはまだ発酵していません",
       "fermentation_new_entry_only": "前回の発酵結果は、新しく書くときに見られます"
     }

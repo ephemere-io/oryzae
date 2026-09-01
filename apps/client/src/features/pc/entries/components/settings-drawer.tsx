@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { startTransition } from 'react';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import type { PaletteSize } from '@/components/ui/surface';
@@ -179,7 +180,10 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
       })}
     >
       <Section label={t('section_display')}>
-        {/* 縦か横か。2択なので開かせない（Segmented の doc を参照）。 */}
+        {/* 縦か横か。2択なので開かせない（Segmented の doc を参照）。
+            切り替えは**紙の組み直し**なので重い（本文全体の再レイアウト）。入力の応答を
+            止めないよう、反映を transition に載せてブラウザに先に描かせる
+            （実測: 切り替えのたびに 200ms 入力が詰まっていた）。 */}
         <Row
           label={t('writing_mode')}
           control={
@@ -192,7 +196,9 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
                 { value: 'horizontal', label: t('writing_horizontal') },
               ]}
               onChange={(v) =>
-                onChange({ writingMode: v === 'horizontal' ? 'horizontal' : 'vertical' })
+                startTransition(() =>
+                  onChange({ writingMode: v === 'horizontal' ? 'horizontal' : 'vertical' }),
+                )
               }
             />
           }

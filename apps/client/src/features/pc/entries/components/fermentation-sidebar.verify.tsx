@@ -199,12 +199,14 @@ registerUnit<Props>({
     },
     {
       id: 'detail-has-a-way-back',
-      description: '中身を開いたら、一覧へ戻る道がある',
+      // 上まで戻らないと出られないと、長い中身では出口が遠い。読み終えた場所にも置く。
+      description: '中身を開いたら、頭と末尾の両方に一覧へ戻る道がある',
       onlyFixtures: ['detail-open'],
       check: ({ root }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
         const buttons = Array.from(sidebar?.querySelectorAll('button') ?? []);
-        return buttons.length >= 2 || '戻る／閉じるが揃っていない（中身から出られない）';
+        // 閉じるを除いた残りが「戻る」。頭と末尾の2つあること。
+        return buttons.length >= 3 || `ボタンが ${buttons.length} 個（戻る2つ + 閉じるが要る）`;
       },
     },
     {

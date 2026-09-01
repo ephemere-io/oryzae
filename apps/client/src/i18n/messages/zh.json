@@ -150,10 +150,10 @@
       "error_create": "创建失败"
     },
     "question_chip": {
-      "empty": "关联问题",
+      "empty": "关联提问",
       "untitled": "无标题的问题",
       "none_available": "还没有问题",
-      "linked_count": "已联结 {count} 个提问"
+      "linked_count": "已关联 {count} 个提问"
     }
   },
   "app": {
@@ -459,7 +459,8 @@
       "section_letter": "信",
       "section_keywords": "关键词",
       "section_snippets": "摘录",
-      "back_aria": "返回列表"
+      "back_aria": "返回列表",
+      "read_more": "查看入选理由"
     },
     "palette": {
       "move": "移动面板",
@@ -467,7 +468,7 @@
       "expand": "展开面板",
       "pickle_needs_body": "写点内容后即可腌渍",
       "pickle_needs_question": "关联问题后即可腌渍",
-      "fermentation_needs_question": "联结提问后，可查看上次的发酵结果",
+      "fermentation_needs_question": "关联提问后，可查看上次的发酵结果",
       "fermentation_not_ready": "这个提问还没有发酵",
       "fermentation_new_entry_only": "上次的发酵结果会在书写新条目时显示"
     }
