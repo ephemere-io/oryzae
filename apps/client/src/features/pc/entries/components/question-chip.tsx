@@ -134,21 +134,21 @@ export function QuestionChip({
           畳んだ数字からは「どの問いを結んだのか」が分からない。横に余裕がある場所なので、
           そのまま並べ、あふれたら横に流す（縦に折り返すとヘッダーの高さが動く）。 */}
       <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* チップ**全体**を外すボタンにしない。結んだ問いを確かめようと押しただけで
+            消えてしまう（実際にそうなっていた）。外すのは × だけ。 */}
         {linked.map((q) => (
-          <button
-            key={q.id}
-            type="button"
-            onClick={() => onUnlink(q.id)}
-            aria-label={t('unlink_aria', { text: q.currentText ?? t('untitled') })}
-            className={chipClass}
-            style={linkedChipStyle}
-          >
+          <span key={q.id} className={chipClass} style={linkedChipStyle}>
             <span aria-hidden="true">◦</span>
             <span className="whitespace-nowrap">{q.currentText ?? t('untitled')}</span>
-            <span aria-hidden="true" className="text-[11px] opacity-55">
+            <button
+              type="button"
+              onClick={() => onUnlink(q.id)}
+              aria-label={t('unlink_aria', { text: q.currentText ?? t('untitled') })}
+              className="-mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] opacity-45 transition-opacity duration-150 hover:opacity-100"
+            >
               ×
-            </span>
-          </button>
+            </button>
+          </span>
         ))}
       </div>
 

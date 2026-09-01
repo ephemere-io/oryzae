@@ -843,12 +843,16 @@ export function EntryEditor({
   // 桁の太さ × 桁数。折り返した題はこの幅に収まる。
   const titleColumnWidth = Math.round(titleFontSize * 1.6) * titleColumns;
   // **箱は中身に合わせる。** 桁の高さを丸ごと取っていたので、3文字の題でも
-  // 588px の縦長の箱を占めていた（中身は 96px）。使う長さは「いちばん長い桁」ぶん。
-  // 端数と行送りのぶんだけ余裕を持たせ、空いている高さを超えない。
-  const titleUsedHeightPx = Math.min(
-    titleColumnHeightPx,
-    Math.ceil(titleLength / titleColumns) * titleFontSize + Math.round(titleFontSize * 0.6),
-  );
+  // 588px の縦長の箱を占めていた（中身は 96px）。
+  //
+  // ただし縮めるのは**1桁のあいだだけ**。桁数で均等に割ると、折り返した瞬間に
+  // 高さが半分になって幅が倍になり、題が飛び跳ねて見える（「急に2行目になる」）。
+  // 2桁目に入ったら高さは開いているぶん全部を使う——紙と同じで、1桁目を下まで
+  // 書き切ってから左へ移る。そうすれば折り返しで動くのは幅だけになる。
+  const titleUsedHeightPx =
+    titleColumns === 1
+      ? Math.min(titleColumnHeightPx, titleLength * titleFontSize + Math.round(titleFontSize * 0.6))
+      : titleColumnHeightPx;
   const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
   const titleTextStyle: React.CSSProperties = {
     // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。

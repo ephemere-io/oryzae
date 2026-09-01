@@ -21,7 +21,7 @@ export interface EditorSettings {
   focusModeEnabled: boolean;
   /** 書いている間はアクションパレットを隠すか（既定 ON）。 */
   paletteAutoHide: boolean;
-  /** 道具（アクションパレット）の大きさ。画面の広さと目に依るので選べるようにしてある。 */
+  /** アクションパレットの大きさ。画面の広さと目に依るので選べるようにしてある。 */
   paletteSize: PaletteSize;
   timeInscriptionEnabled: boolean;
   timeInscriptionMode: TimeInscriptionMode;
@@ -250,7 +250,7 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
           checked={settings.paletteAutoHide}
           onChange={(v) => onChange({ paletteAutoHide: v })}
         />
-        {/* 道具の大きさ。3段あるので面に畳む（2択なら Segmented）。 */}
+        {/* パレットの大きさ。3段あるので面に畳む（2択なら Segmented）。 */}
         <Row
           label={t('palette_size')}
           control={
