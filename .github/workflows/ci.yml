@@ -4,6 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
+    # ドキュメントだけの変更で CI 一式を回すのは無駄（Issue #551）。
+    # このリポジトリには branch protection が無く required status checks も存在しないため、
+    # skip で PR がマージ不能になる罠は踏まない。将来 branch protection を有効化したら要再確認。
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.claude/**'
+
+# 追い越された run を止める。main への push だけは、マージを取りこぼさないよう
+# キャンセルしない（マージ後に壊れたことへ気づく唯一の網であるため）。
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   lint:
