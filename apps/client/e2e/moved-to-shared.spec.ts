@@ -28,7 +28,7 @@ const MOVED_UNITS = [
 
 test.describe('shared へ移動したコンポーネント', () => {
   for (const { unit, fixture } of MOVED_UNITS) {
-    test(`${unit} が孤立マウントで PASS する`, async ({ page }) => {
+    test(`${unit}/${fixture} が孤立マウントで PASS する`, async ({ page }) => {
       await page.goto(`/verify/${unit}/${fixture}`);
 
       // ハーネスは非同期に act を回してから結果を書き出す。結果が出るまで待つ。
