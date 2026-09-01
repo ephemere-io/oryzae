@@ -20,6 +20,7 @@ const MOVED_UNITS = [
   { unit: 'SignupForm', fixture: 'empty' },
   { unit: 'ForgotPasswordForm', fixture: 'empty' },
   { unit: 'ResetPasswordForm', fixture: 'invalid-link' },
+  { unit: 'ResetPasswordForm', fixture: 'form' },
   { unit: 'OnboardingFlow', fixture: 'step-concept' },
   { unit: 'StepQuestion', fixture: 'empty' },
   { unit: 'ConceptIllo', fixture: 'default' },
