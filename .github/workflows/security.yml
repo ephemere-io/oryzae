@@ -2,7 +2,7 @@ name: Security
 
 # Oryzae は他人の日記を預かるため、セキュリティ検査を独立したワークフローに切り出す。
 # 3 層構成:
-#   1. rls-gate / sast / secret-scan — 毎 PR。決定的・無料・API キー不要。ここが本丸。
+#   1. deterministic-gates / sast / secret-scan — 毎 PR。決定的・無料・API キー不要。ここが本丸。
 #   2. claude-review     — 毎 PR。差分に対する意味的レビュー（AI なので確率的、補助）
 #   3. weekly-audit      — 週次。リポジトリ全体を監査し Issue に起票（差分レビューが
 #                          構造上見られない「既に main にある問題」を拾う）
@@ -42,8 +42,17 @@ permissions:
 
 jobs:
   # ── 層 1: 決定的ゲート（API キー不要・常に走る） ─────────────────────────
-  rls-gate:
-    name: RLS Gate (認可境界の静的検証)
+  #
+  # RLS ゲート（33s）と依存監査（31s）はどちらも pnpm の setup を踏むだけなので、
+  # ジョブを分けていると checkout + install（毎回 約20 秒）を 2 回払うことになり、
+  # 分単位切り上げの課金で 2 分かかっていた（Issue #551）。1 ジョブに畳む。
+  # 「片方が落ちてももう片方の結果が見える」挙動は `!cancelled()` で維持する。
+  #
+  # sast(Semgrep=python) と secret-scan(gitleaks=バイナリ) は依存が違うので畳まない。
+  # ここは「決定的ゲート」という層の内訳であって、ci.yml 側へは寄せない
+  # （セキュリティ検査を独立したワークフローに置く、という上の設計意図を保つため）。
+  deterministic-gates:
+    name: Deterministic Security Gates (RLS / 依存監査)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -53,7 +62,18 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm security:rls
+      - name: RLS Gate (認可境界の静的検証)
+        run: pnpm security:rls
+      # high 以上のみ落とす。moderate まで落とすと推移依存で頻繁に赤くなり、
+      # 「赤いのが常態」になってアラートとして機能しなくなるため。
+      #
+      # 意図的にブロッキング（continue-on-error にしない）。新しい high の advisory が
+      # 公開されると、コード変更が無くても main が赤くなりうる副作用は理解したうえで、
+      # 日記を預かる以上「high を放置したまま出荷できてしまう」状態を避けることを優先する。
+      # 実際に本ワークフロー導入時に検出された 4 件は pnpm overrides で解消できた（#501）。
+      - name: Dependency Audit
+        run: pnpm audit --audit-level=high
+        if: '!cancelled()'
 
   # 本リポジトリは private なので CodeQL は使えない（private の code scanning は
   # 有料の GitHub Advanced Security / Code Security が必要）。同じ役割を
@@ -103,26 +123,6 @@ jobs:
       - name: Scan git history for secrets
         run: ./gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
 
-  dependency-audit:
-    name: Dependency Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # high 以上のみ落とす。moderate まで落とすと推移依存で頻繁に赤くなり、
-      # 「赤いのが常態」になってアラートとして機能しなくなるため。
-      #
-      # 意図的にブロッキング（continue-on-error にしない）。新しい high の advisory が
-      # 公開されると、コード変更が無くても main が赤くなりうる副作用は理解したうえで、
-      # 日記を預かる以上「high を放置したまま出荷できてしまう」状態を避けることを優先する。
-      # 実際に本ワークフロー導入時に検出された 4 件は pnpm overrides で解消できた（#501）。
-      - run: pnpm audit --audit-level=high
-
   # ── 層 2: PR 差分の意味的レビュー（AI・補助） ───────────────────────────
   claude-review:
     name: Claude Security Review (PR 差分)
@@ -152,7 +152,7 @@ jobs:
         if: steps.key.outputs.available != 'true'
         run: |
           echo "::notice::ANTHROPIC_API_KEY が無いため Claude セキュリティレビューを skip しました。" \
-               "fork からの PR の場合は想定どおりです。決定的ゲート(rls-gate/sast/secret-scan)は実行済みです。"
+               "fork からの PR の場合は想定どおりです。決定的ゲート(deterministic-gates/sast/secret-scan)は実行済みです。"
       - uses: anthropics/claude-code-security-review@main
         if: steps.key.outputs.available == 'true'
         with:
