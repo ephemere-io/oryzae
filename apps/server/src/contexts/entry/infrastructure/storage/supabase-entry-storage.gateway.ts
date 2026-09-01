@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { toSafeStorageFileName } from '../../../shared/infrastructure/storage-object-name.js';
 import type { EntryStorageGateway } from '../../domain/gateways/entry-storage.gateway.js';
 
 const BUCKET_NAME = 'entry-photos';
@@ -19,7 +20,8 @@ export class SupabaseEntryStorageGateway implements EntryStorageGateway {
     contentType: string,
   ): Promise<string> {
     // 先頭セグメントを userId にすることで Storage の RLS（00023）が効く。
-    const storagePath = `${userId}/${Date.now()}-${fileName}`;
+    // ファイル名はそのまま使えない。日本語名は Storage が 400 InvalidKey で弾く。
+    const storagePath = `${userId}/${Date.now()}-${toSafeStorageFileName(fileName)}`;
     const { error } = await this.supabase.storage
       .from(BUCKET_NAME)
       .upload(storagePath, file, { contentType, upsert: false });
