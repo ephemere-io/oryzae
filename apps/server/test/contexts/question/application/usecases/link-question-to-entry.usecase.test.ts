@@ -57,6 +57,7 @@ describe('LinkQuestionToEntryUsecase', () => {
       listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
       listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
       countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
+      countCharsByQuestionIdSince: vi.fn().mockResolvedValue(0),
       listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),

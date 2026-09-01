@@ -149,6 +149,30 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     );
   }
 
+  async countCharsByQuestionIdSince(
+    userId: string,
+    questionId: string,
+    sinceIso: string | null,
+  ): Promise<number> {
+    // listByUserId と同じ二段クエリ (PostgREST の埋め込み join より結果が安定する)。
+    // 対象は「その問いに紐づくエントリ」なので、まず link から entry_id を引く。
+    const entryIds = await this.fetchEntryIdsByQuestion(questionId);
+    if (entryIds.length === 0) return 0;
+
+    let query = this.supabase
+      .from('entries')
+      .select('content')
+      .eq('user_id', userId)
+      .in('id', entryIds);
+    if (sinceIso) query = query.gt('created_at', sinceIso);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).reduce(
+      (sum, row: { content: string | null }) => sum + (row.content ? [...row.content].length : 0),
+      0,
+    );
+  }
+
   async listByUserIdAndWeek(
     userId: string,
     dateKey: string,
