@@ -16,7 +16,7 @@
 const ie = e as InputEvent;
 ```
 
-`pnpm check:as`（CI ジョブ **No `as` Casts**）がこれを強制する。理由が空の
+`pnpm check:as`（CI ジョブ **Static Checks** の "No `as` Casts" ステップ）がこれを強制する。理由が空の
 `@type-assertion-allowed` は違反として扱う。検出器は `scripts/check-type-assertions.mjs`。
 `as const` と import/export の別名（`import * as X`）は対象外。
 
