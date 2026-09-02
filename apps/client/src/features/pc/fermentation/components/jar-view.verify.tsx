@@ -94,7 +94,8 @@ registerUnit<Props>({
         onArchiveQuestion: noopAsync,
       },
       act: async (ctx) => {
-        await ctx.click('button');
+        // 順序ではなく役割で指す。素の 'button' だとズームコントロールを押してしまう。
+        await ctx.click('[data-verify-part="question-chip"]');
         await ctx.wait(16);
       },
     },

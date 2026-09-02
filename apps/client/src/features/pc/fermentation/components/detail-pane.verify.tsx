@@ -129,6 +129,56 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'closed-offset-equals-own-width',
+      description:
+        '閉じているときは自分の幅ぶんだけ右へ逃がす（幅が可変なので固定値で逃がすと隙間が残る）',
+      onlyFixtures: ['closed'],
+      check: ({ root, contract }) => {
+        const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
+        const right = Number.parseInt(el?.style.right ?? '', 10);
+        const width = Number(contract.width);
+        return (
+          right === -width ||
+          `right=${right} だが幅は ${width}。差の ${width + right}px ぶん画面に残る。`
+        );
+      },
+    },
+    {
+      id: 'resize-handle-is-a-labelled-separator',
+      description: '幅の取っ手は名前を持つ separator で、キーボードでも掴める',
+      check: ({ root }) => {
+        const handle = root.querySelector('[data-verify-part="resize-handle"]');
+        if (!handle) return '幅の取っ手が描画されていない（リサイズ不可）';
+        const role = handle.getAttribute('role');
+        const label = handle.getAttribute('aria-label');
+        const focusable = handle.getAttribute('tabindex') === '0';
+        return (
+          (role === 'separator' && Boolean(label) && focusable) ||
+          `role=${role}, aria-label=${label}, tabindex=${handle.getAttribute('tabindex')}`
+        );
+      },
+    },
+    {
+      id: 'width-matches-handle-range-and-style',
+      description: '契約 width が実寸・aria-valuenow・上下限のすべてと整合する',
+      check: ({ root, contract }) => {
+        const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
+        const handle = root.querySelector('[data-verify-part="resize-handle"]');
+        if (!handle) return '幅の取っ手が描画されていない';
+        const width = Number(contract.width);
+        const styleWidth = Number.parseInt(el?.style.width ?? '', 10);
+        const now = Number(handle.getAttribute('aria-valuenow'));
+        const min = Number(handle.getAttribute('aria-valuemin'));
+        const max = Number(handle.getAttribute('aria-valuemax'));
+        if (styleWidth !== width) return `style.width=${styleWidth} が契約 width=${width} と違う`;
+        if (now !== width) return `aria-valuenow=${now} が契約 width=${width} と違う`;
+        if (!(min < max)) return `上下限が不正: min=${min}, max=${max}`;
+        return (
+          (width >= min && width <= max) || `width=${width} が範囲 [${min}, ${max}] の外に出ている`
+        );
+      },
+    },
+    {
       id: 'body-block-matches-type',
       description:
         '本文ブロックは契約 type と一致する（keyword→h3 / snippet→blockquote / letter→whitespace-pre-wrap、data 無しは描かない）',
