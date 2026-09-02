@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OnboardingFlow } from '@/features/onboarding/components/onboarding-flow';
+import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
 import jaMessages from '@/i18n/messages/ja.json';
 
 function renderFlow(onComplete: ReturnType<typeof vi.fn>, initialStep = 0) {

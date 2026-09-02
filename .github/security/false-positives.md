@@ -60,7 +60,7 @@ service role を使っていること自体は、レビュー済みの意図的�
 
 ## 8. 依存パッケージの既知 CVE
 
-依存の脆弱性は `pnpm audit`（Security ワークフローの `dependency-audit` ジョブ）と
+依存の脆弱性は `pnpm audit`（Security ワークフローの `deterministic-gates` ジョブ）と
 Dependabot が担当します。AI レビューでは重複して報告しないでください。
 
 ---
