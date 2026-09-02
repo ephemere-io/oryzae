@@ -1,5 +1,5 @@
 import type { EditorEffectsState, TextSpanMark } from '@oryzae/shared';
-import { extractInlineImages, isInlineImage } from './inline-image-codec.js';
+import { extractInlineImages, isInlineImage } from './inline-image-codec';
 
 /**
  * editor の DOM ↔ `EditorEffectsState` のシリアライズ/デシリアライズ。
