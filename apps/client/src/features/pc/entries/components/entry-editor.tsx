@@ -125,7 +125,22 @@ function voiceStatusMessage(
  * 両方を px で持ち、本文の右端をここから逆算する。
  */
 const TITLE_RIGHT_MARGIN = 64;
+
+/** 横書きの題の上に取る余白。題は上端から置き、この分だけ内側へ下げる。 */
+const TITLE_TOP_INSET = 24;
 const TITLE_TO_BODY_GAP = 24;
+
+/**
+ * 題に打てる長さの上限。
+ *
+ * 制限そのものが目的ではない（一度は外した）。だが**上限が無いと見切れる**——
+ * 3筋に収める規則がある以上、字を下限まで落としてもなお入らない長さが必ず存在する。
+ * 見切れた題は端的に美しくないので、そこへ辿り着けないようにする。
+ *
+ * 60 字は「標準的な画面（桁の高さ 588px）で 3 筋に 27px で収まる長さ」。本文と同じ
+ * 32px よりは小さくなるが、読める大きさは保てる。題としても十分に長い。
+ */
+const TITLE_MAX_LENGTH = 60;
 
 /** Extract title (first line) and body from stored content */
 function splitTitleBody(raw: string): { title: string; body: string } {
@@ -829,7 +844,9 @@ export function EntryEditor({
   //
   // 題の右余白と、題と本文のあいだの間は px で持つ（TITLE_RIGHT_MARGIN /
   // TITLE_TO_BODY_GAP）。本文の右端はそこから逆算する。
-  const titleBoxClass = isVertical ? 'absolute top-[4%]' : 'absolute top-6';
+  // 横書きの題は**上端から**置く（余白は padding で作る）。top を空けると、その隙間を
+  // 本文が通り抜けて題の上に文字が覗く。
+  const titleBoxClass = isVertical ? 'absolute top-[4%]' : 'absolute top-0';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
   //
@@ -837,7 +854,10 @@ export function EntryEditor({
   // 縦書きは題が本文の隣に立つので差が効く。横書きは見出しとして上に載るのでもう少し強く。
   //
   // **長い題ほど小さくする。** 固定倍率だと、長い題が桁からはみ出して見切れた。
-  const titleLength = Math.max(title.length, 1);
+  // 箱の長さは「いま見えている文字」で決める。空のときに中身の 0 文字で組むと、
+  // **置き文字（「タイトルを入力」）が1文字ぶんの箱に閉じ込められて「タ」しか出ない**。
+  const titlePlaceholder = t('title.placeholder');
+  const titleLength = Math.max(title.length || titlePlaceholder.length, 1);
   // **縦書きも横書きも同じ規則で組む。** 筋（縦書きなら桁、横書きなら行）を最大3本まで
   // 増やし、それでも入らなければ字を落とす。決めるのは utils/title-metrics。
   // 字数に上限は設けない——題の長さは書き手が決めることで、入力欄が決めることではない。
@@ -878,8 +898,11 @@ export function EntryEditor({
         }
       : {
           left: `${gutterPx}px`,
-          width: `${titleUsedLengthPx}px`,
-          height: `${titleThicknessPx}px`,
+          // 横書きの題は**行いっぱい**を占める。文字の幅ぶんだけにすると、その横を
+          // 本文が同じ高さで流れて見える（題の下を通すために地を敷いてある）。
+          width: `${measurePx}px`,
+          height: `${titleThicknessPx + TITLE_TOP_INSET}px`,
+          paddingTop: `${TITLE_TOP_INSET}px`,
           maxWidth: `calc(100% - ${gutterPx * 2}px)`,
         }),
     fontSize: `${titleFontSize}px`,
@@ -1038,44 +1061,52 @@ export function EntryEditor({
                         background: 'linear-gradient(to left, var(--bg), transparent)',
                       }
                     : {
+                        // 題のすぐ下から始める。離して置くと、何もないところに帯が
+                        // 浮いて見える（「奇妙なスリット」）。
                         left: 0,
                         right: 0,
-                        top: `${titleReservedPx}px`,
-                        height: '10%',
+                        top: `${titleThicknessPx + TITLE_TOP_INSET}px`,
+                        height: '8%',
                         background: 'linear-gradient(to bottom, var(--bg), transparent)',
                       }
                 }
               />
             )}
+            {/* 題はスクローラの**外**に置く。中に入れると横書きで本文と一緒に流れて
+                消えてしまう（縦書きでは本文自身がスクローラなので気づかなかった）。
+                地を敷いて、下を通る本文が透けないようにする。 */}
+            {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
+              縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
+              本文と同じ書体で、本文より一回り大きく置く。 */}
+            {/* **textarea であって input ではない。** input は1行しか持てないので、
+                長い題を折り返せず、縮めるか見切れるかの二択になる。 */}
+            <textarea
+              ref={titleInputRef}
+              rows={1}
+              // 上限は「3筋に、本文と同じ大きさで収まる長さ」から導く。恣意的な数字では
+              // なく**紙が受け取れる量**そのものなので、ここを超えると必ず見切れる。
+              maxLength={TITLE_MAX_LENGTH}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  editorRef.current?.focus();
+                }
+              }}
+              onBlur={commitTitleEdit}
+              placeholder={titlePlaceholder}
+              aria-label={t('title.placeholder')}
+              className={`z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
+              style={{ background: 'var(--bg)', ...titleTextStyle }}
+            />
+
             <div
               ref={scrollContainerRef}
               className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
             >
-              {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
-                縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
-                本文と同じ書体で、本文より一回り大きく置く。 */}
-              {/* **textarea であって input ではない。** input は1行しか持てないので、
-                  長い題を折り返せず、縮めるか見切れるかの二択になる。 */}
-              <textarea
-                ref={titleInputRef}
-                rows={1}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    editorRef.current?.focus();
-                  }
-                }}
-                onBlur={commitTitleEdit}
-                placeholder={t('title.placeholder')}
-                aria-label={t('title.placeholder')}
-                className={`z-[12] resize-none overflow-hidden border-none bg-transparent text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
-                style={titleTextStyle}
-              />
-
               {/* Snippet selection toolbar */}
               <SnippetToolbar editorRef={editorRef} api={api} />
 
