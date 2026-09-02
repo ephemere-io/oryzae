@@ -26,7 +26,7 @@ function str(value: unknown): string {
 }
 
 function cardType(value: unknown): BoardCardData['cardType'] | null {
-  return value === 'entry' || value === 'snippet' || value === 'photo' ? value : null;
+  return value === 'snippet' || value === 'photo' ? value : null;
 }
 
 /**
@@ -37,9 +37,6 @@ function cardContent(
   type: BoardCardData['cardType'],
   raw: Record<string, unknown>,
 ): BoardCardData['content'] {
-  if (type === 'entry') {
-    return { title: str(raw.title), preview: str(raw.preview), createdAt: str(raw.createdAt) };
-  }
   if (type === 'snippet') return { text: str(raw.text) };
   return { imageUrl: str(raw.imageUrl), caption: str(raw.caption) };
 }

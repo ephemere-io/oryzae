@@ -100,5 +100,33 @@ registerUnit<Props>({
         );
       },
     },
+    {
+      id: 'error-is-visible-when-set',
+      description: 'error 契約が立っているとき、その理由が画面にも出ている',
+      // 注意: 現状この分岐は **踏まれない**。error は画像のデコード失敗で立つが、
+      // jsdom は画像を復号せず Image の onload も onerror も発火しないため、
+      // 孤立描画では到達できない。将来 error を props で注入できるようにしたら
+      // 効き始める。実際の詰み経路を守っているのは下の no-submit-without-file。
+      check: ({ root, contract }) => {
+        if (contract.error === 'none') return true;
+        const shown = Array.from(root.querySelectorAll('p')).some(
+          (p) => (p.textContent ?? '').trim().length > 0,
+        );
+        return shown || `error="${contract.error}" なのに画面に何も出ていない`;
+      },
+    },
+    {
+      id: 'no-submit-without-file',
+      description: '画像が無いあいだは送信できない（デコードできない画像を選んだ後もここに戻る）',
+      check: ({ root, contract }) => {
+        if (contract.hasPreview === 'true') return true;
+        const submit = root.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (!submit) return 'submit ボタンが見つからない';
+        return (
+          submit.disabled ||
+          'プレビューが無いのに送信できてしまう（開けない画像で固まる経路になる）'
+        );
+      },
+    },
   ],
 });

@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 // 端末固有 UI は features/{pc,sp} にだけ置く。
 // （doc: client-architecture-guide.md「各ディレクトリの責務」）
 //
-// なぜ機械強制するか: components/ や flat features に sp-*/pc-* を置くと reach 軸を
+// なぜ機械強制するか: components/ や features/shared に sp-*/pc-* を置くと reach 軸を
 // 迂回できてしまう。Issue #490 では SP ボトムナビが components/ 直下に、PC サイドバーが
-// features/auth（端末非依存のはずの flat）に置かれ、シェルが左右非対称になった。
+// features/auth（端末非依存のはずの層）に置かれ、シェルが左右非対称になった。
 // ファイル名の接頭辞を強制の取っ手にする（命名規則は doc の「命名規則」に従う）。
 
 const DEVICE_PREFIX = /^(sp|pc)-/;
@@ -25,12 +25,12 @@ function walk(dir: string): string[] {
   return out;
 }
 
-/** reach を持たない領域＝ components/ と flat features（pc/sp/shared 以外）。 */
+/**
+ * 端末非依存であるべき領域＝ components/ と features/shared。
+ * shared は UI を持てるが（flat 層を畳んだため）、端末で分かれる UI は置けない。
+ */
 function deviceAgnosticDirs(): string[] {
-  const flat = readdirSync('src/features', { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !['pc', 'sp', 'shared'].includes(e.name))
-    .map((e) => join('src/features', e.name));
-  return ['src/components', ...flat];
+  return ['src/components', 'src/features/shared'];
 }
 
 function findViolations(): string[] {
@@ -42,7 +42,7 @@ function findViolations(): string[] {
 }
 
 describe('端末固有 UI は features/{pc,sp} に置く', () => {
-  it('components/ と flat features に sp-*/pc-* のファイルが無い', () => {
+  it('components/ と features/shared に sp-*/pc-* のファイルが無い', () => {
     const unexpected = findViolations().filter((f) => !MIGRATING.includes(f));
     expect(unexpected).toEqual([]);
   });
