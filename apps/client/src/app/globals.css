@@ -24,27 +24,21 @@
   --toolbar-hover: rgba(0, 0, 0, 0.04);
   --date-color: #999;
 
-  /* 画面の上に浮く操作面（パレット・ツールバー）。素材は components/ui/surface.ts。 */
+  /* 画面の上に浮く操作面（パレット・ツールバー・盤面のフローティングツールバー）。
+   * 素材は components/ui/surface.ts。light は --bg と影で分離できるが、dark で
+   * --bg をそのまま使うと盤面と同色になり黒い影も効かないので、dark だけ一段明るい。 */
   --surface-raised: #ffffff;
   --surface-raised-border: rgba(0, 0, 0, 0.08);
   /* **書く紙ではない面**（左のサイドバー・右の発酵結果）。紙より一段沈める。
    * 透けた白に頼っていた頃は、紙とほぼ同じ明るさで境界が読めなかった。 */
   --surface-sunken: #f2f0ea;
   --surface-sunken-border: rgba(0, 0, 0, 0.08);
-  /* 面を持たない切り替えの下地（セグメント）。 */
+  /* 面を持たない切り替えの下地（セグメント・表示単位のトラック）。浮いた面とは
+   * 逆向きの表現で、「これは道具ではなく状態の選択」を見た目で言い分ける。 */
   --track: rgba(0, 0, 0, 0.05);
   --card-snippet: #fffbe0;
   --card-photo: #ffffff;
 
-  /* 盤面から浮いて見せたい面（ボードのフローティングツールバー等）。
-     light では --bg と影で十分に分離できるが、dark で --bg をそのまま使うと
-     盤面と同色になり、黒い影も効かずに沈む。dark 側だけ一段明るくする。 */
-  --surface-raised: #ffffff;
-  --surface-raised-border: rgba(0, 0, 0, 0.08);
-
-  /* 盤面に沈んだ溝（表示単位の切り替えのトラック）。浮いた面とは逆向きの表現で、
-     「これは道具ではなく状態の選択」を見た目で言い分ける。 */
-  --track: rgba(0, 0, 0, 0.05);
   /* 溝の中で選ばれている側。両テーマとも「選択＝溝より明るい」に揃える。
      地の色（--bg）を使うと dark で溝より暗くなり、light と関係が反転していた。 */
   --track-active: #ffffff;
@@ -94,10 +88,6 @@
   --ob-overlay: rgba(8, 10, 8, 0.6);
   --ob-ink-soft: #d8d2c9;
   --ob-ink-mute: #98918a;
-
-  --surface-raised: #2c2c2c;
-  --surface-raised-border: rgba(255, 255, 255, 0.12);
-  --track: rgba(255, 255, 255, 0.07);
 }
 
 body {
