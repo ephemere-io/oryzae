@@ -73,6 +73,24 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'ink-follows-the-theme',
+      description:
+        '線は本文と同じインク（--fg）で描く。色をベタ書きすると暗いテーマで沈んで「消えた」ように見える',
+      check: ({ root }) => {
+        const bars = Array.from(
+          root.querySelectorAll<HTMLElement>(
+            '[data-verify-part="glyph-line"], [data-verify-part="glyph-heading"]',
+          ),
+        );
+        if (bars.length === 0) return '線が1本も無い';
+        const hardcoded = bars.filter((el) => !el.className.includes('bg-[var(--fg)]'));
+        return (
+          hardcoded.length === 0 ||
+          `テーマに追従しない線が ${hardcoded.length} 本ある（--fg 以外で塗っている）`
+        );
+      },
+    },
+    {
       id: 'decorative-and-inert',
       description: '装飾なので aria-hidden かつクリックを奪わない',
       check: ({ root }) => {
