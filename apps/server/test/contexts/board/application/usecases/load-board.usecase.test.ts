@@ -7,8 +7,6 @@ import type { BoardStorageGateway } from '@/contexts/board/domain/gateways/board
 import { BoardCard } from '@/contexts/board/domain/models/board-card';
 import { BoardPhoto } from '@/contexts/board/domain/models/board-photo';
 import { BoardSnippet } from '@/contexts/board/domain/models/board-snippet';
-import type { EntryRepositoryGateway } from '@/contexts/entry/domain/gateways/entry-repository.gateway';
-import { Entry } from '@/contexts/entry/domain/models/entry';
 
 const generateId = () => 'generated-id';
 
@@ -16,7 +14,6 @@ let boardCardRepo: BoardCardRepositoryGateway;
 let boardSnippetRepo: BoardSnippetRepositoryGateway;
 let boardPhotoRepo: BoardPhotoRepositoryGateway;
 let boardStorage: BoardStorageGateway;
-let entryRepo: EntryRepositoryGateway;
 let usecase: LoadBoardUsecase;
 
 beforeEach(() => {
@@ -37,19 +34,6 @@ beforeEach(() => {
     findByIds: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
     update: vi.fn().mockResolvedValue(undefined),
-    delete: vi.fn().mockResolvedValue(undefined),
-  };
-  entryRepo = {
-    findById: vi.fn().mockResolvedValue(null),
-    findByIds: vi.fn().mockResolvedValue([]),
-    listByUserId: vi.fn().mockResolvedValue([]),
-    listByUserIdAndDate: vi.fn().mockResolvedValue([]),
-    listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
-    listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
-    countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
-    countCharsByQuestionIdSince: vi.fn().mockResolvedValue(0),
-    listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
-    save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
   };
   boardPhotoRepo = {
@@ -74,7 +58,6 @@ beforeEach(() => {
     boardSnippetRepo,
     boardPhotoRepo,
     boardStorage,
-    entryRepo,
     generateId,
   );
 });
@@ -84,8 +67,8 @@ describe('LoadBoardUsecase', () => {
     const card = BoardCard.fromProps({
       id: 'card-1',
       userId: 'user-1',
-      cardType: 'entry',
-      refId: 'entry-1',
+      cardType: 'snippet',
+      refId: 'snippet-1',
       dateKey: '2026-04-11',
       viewType: 'daily',
       x: 100,
@@ -97,20 +80,16 @@ describe('LoadBoardUsecase', () => {
       createdAt: '2026-04-11T00:00:00Z',
       updatedAt: '2026-04-11T00:00:00Z',
     });
-    const entry = Entry.fromProps({
-      id: 'entry-1',
+    const snippet = BoardSnippet.fromProps({
+      id: 'snippet-1',
       userId: 'user-1',
-      content: 'タイトル\n本文テキスト',
-      mediaUrls: [],
-      fermentationEnabled: false,
-      createdAt: '2026-04-11T10:00:00Z',
-      updatedAt: '2026-04-11T10:00:00Z',
+      text: '走り書き',
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
     });
 
     vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([card]);
-    vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue(['entry-1']);
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
-    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
+    vi.mocked(boardSnippetRepo.findByIds).mockResolvedValue([snippet]);
 
     const result = await usecase.execute('user-1', '2026-04-11');
 
@@ -118,53 +97,35 @@ describe('LoadBoardUsecase', () => {
     expect(result.viewType).toBe('daily');
     expect(result.cards).toHaveLength(1);
     expect(result.cards[0].id).toBe('card-1');
-    expect(result.cards[0].content).toEqual({
-      title: 'タイトル',
-      preview: 'タイトル\n本文テキスト',
-      createdAt: '2026-04-11T10:00:00Z',
-    });
+    expect(result.cards[0].content).toEqual({ text: '走り書き' });
   });
 
-  it('カード未作成のエントリを自動追加する', async () => {
-    const entry = Entry.fromProps({
-      id: 'entry-new',
+  it('過去に置かれた日記のカードは盤面に出さない（行は消さずに読み飛ばす）', async () => {
+    // ボードは付箋と写真を貼る場所で、日記は瓶に漬け込むもの、という切り分けにした。
+    // 既に置かれている entry の行は DB に残してあるので、ここで落ちることを確かめる。
+    const entryCard = BoardCard.fromProps({
+      id: 'card-entry-1',
       userId: 'user-1',
-      content: '新しいエントリ',
-      mediaUrls: [],
-      fermentationEnabled: false,
-      createdAt: '2026-04-11T10:00:00Z',
-      updatedAt: '2026-04-11T10:00:00Z',
+      cardType: 'entry',
+      refId: 'entry-1',
+      dateKey: '2026-04-11',
+      viewType: 'daily',
+      x: 0,
+      y: 0,
+      rotation: 0,
+      width: 340,
+      height: 280,
+      zIndex: 0,
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
     });
-
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
-    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
+    vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([entryCard]);
 
     const result = await usecase.execute('user-1', '2026-04-11');
 
-    expect(boardCardRepo.saveMany).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ refId: 'entry-new' })]),
-    );
-    expect(result.cards).toHaveLength(1);
-    expect(result.cards[0].cardType).toBe('entry');
-  });
-
-  it('既にカードがあるエントリは重複追加しない', async () => {
-    const entry = Entry.fromProps({
-      id: 'entry-1',
-      userId: 'user-1',
-      content: '既存',
-      mediaUrls: [],
-      fermentationEnabled: false,
-      createdAt: '2026-04-11T10:00:00Z',
-      updatedAt: '2026-04-11T10:00:00Z',
-    });
-
-    vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue(['entry-1']);
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([entry]);
-
-    await usecase.execute('user-1', '2026-04-11');
-
-    expect(boardCardRepo.saveMany).not.toHaveBeenCalled();
+    expect(result.cards).toHaveLength(0);
+    expect(boardCardRepo.delete).not.toHaveBeenCalled();
+    expect(boardCardRepo.deleteByRefId).not.toHaveBeenCalled();
   });
 
   it('snippet カードのコンテンツを hydrate する', async () => {
@@ -199,40 +160,6 @@ describe('LoadBoardUsecase', () => {
 
     expect(result.cards).toHaveLength(1);
     expect(result.cards[0].content).toEqual({ text: '重要な気づき' });
-  });
-
-  it('weekly モードで listByUserIdAndWeek を使ってエントリを取得する', async () => {
-    const entry = Entry.fromProps({
-      id: 'entry-week',
-      userId: 'user-1',
-      content: '週間エントリ',
-      mediaUrls: [],
-      fermentationEnabled: false,
-      createdAt: '2026-04-08T10:00:00Z',
-      updatedAt: '2026-04-08T10:00:00Z',
-    });
-
-    vi.mocked(entryRepo.listByUserIdAndWeek).mockResolvedValue([entry]);
-    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
-
-    const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
-
-    // tzOffsetMinutes は既定 0（＝従来どおり UTC 基準）で渡る
-    expect(entryRepo.listByUserIdAndWeek).toHaveBeenCalledWith('user-1', '2026-04-11', 0);
-    expect(entryRepo.listByUserIdAndDate).not.toHaveBeenCalled();
-    expect(result.viewType).toBe('weekly');
-    expect(result.cards).toHaveLength(1);
-  });
-
-  it('tzOffsetMinutes をエントリ取得へ透過する（ボードの日付境界バグの回帰）', async () => {
-    vi.mocked(boardCardRepo.findByDateAndView).mockResolvedValue([]);
-    vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue([]);
-    vi.mocked(entryRepo.listByUserIdAndDate).mockResolvedValue([]);
-    vi.mocked(entryRepo.findByIds).mockResolvedValue([]);
-
-    await usecase.execute('user-1', '2026-08-10', 'daily', -540);
-
-    expect(entryRepo.listByUserIdAndDate).toHaveBeenCalledWith('user-1', '2026-08-10', -540);
   });
 
   it('weekly モードで daily のスニペット・写真カードも含める（weekly コピーを作成）', async () => {
@@ -283,11 +210,11 @@ describe('LoadBoardUsecase', () => {
   });
 
   it('weekly コピーは daily の位置を初期値として持つが独立したカードになる', async () => {
-    const dailyEntryCard = BoardCard.fromProps({
+    const dailyPhotoCard = BoardCard.fromProps({
       id: 'card-daily-1',
       userId: 'user-1',
-      cardType: 'entry',
-      refId: 'entry-1',
+      cardType: 'photo',
+      refId: 'photo-1',
       dateKey: '2026-04-09',
       viewType: 'daily',
       x: 300,
@@ -299,27 +226,25 @@ describe('LoadBoardUsecase', () => {
       createdAt: '2026-04-09T00:00:00Z',
       updatedAt: '2026-04-09T00:00:00Z',
     });
-    const entry = Entry.fromProps({
-      id: 'entry-1',
+    const photo = BoardPhoto.fromProps({
+      id: 'photo-1',
       userId: 'user-1',
-      content: 'テスト',
-      mediaUrls: [],
-      fermentationEnabled: false,
+      storagePath: 'user-1/daily.jpg',
+      caption: '',
       createdAt: '2026-04-09T10:00:00Z',
       updatedAt: '2026-04-09T10:00:00Z',
     });
 
-    vi.mocked(boardCardRepo.findDailyCardsByDateRange).mockResolvedValue([dailyEntryCard]);
-    vi.mocked(boardCardRepo.findRefIdsByDateRange).mockResolvedValue(['entry-1']);
-    vi.mocked(entryRepo.listByUserIdAndWeek).mockResolvedValue([entry]);
-    vi.mocked(entryRepo.findByIds).mockResolvedValue([entry]);
+    vi.mocked(boardCardRepo.findDailyCardsByDateRange).mockResolvedValue([dailyPhotoCard]);
+    vi.mocked(boardCardRepo.findRefIdsByDateRange).mockResolvedValue(['photo-1']);
+    vi.mocked(boardPhotoRepo.findByIds).mockResolvedValue([photo]);
 
     const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
 
     // The weekly copy should have the daily card's position as initial values
     const savedCards = vi.mocked(boardCardRepo.saveMany).mock.calls[0]?.[0] ?? [];
     const weeklyCopy = savedCards.find(
-      (c: BoardCard) => c.refId === 'entry-1' && c.viewType === 'weekly',
+      (c: BoardCard) => c.refId === 'photo-1' && c.viewType === 'weekly',
     );
     expect(weeklyCopy).toBeDefined();
     expect(weeklyCopy?.x).toBe(300);
@@ -331,11 +256,11 @@ describe('LoadBoardUsecase', () => {
   });
 
   it('weekly で削除済みカードの daily 版がマージされない', async () => {
-    const dailyEntryCard = BoardCard.fromProps({
+    const dailySnippetCard = BoardCard.fromProps({
       id: 'card-daily-e1',
       userId: 'user-1',
-      cardType: 'entry',
-      refId: 'entry-deleted',
+      cardType: 'snippet',
+      refId: 'snippet-deleted',
       dateKey: '2026-04-09',
       viewType: 'daily',
       x: 100,
@@ -347,24 +272,13 @@ describe('LoadBoardUsecase', () => {
       createdAt: '2026-04-09T00:00:00Z',
       updatedAt: '2026-04-09T00:00:00Z',
     });
-    const entry = Entry.fromProps({
-      id: 'entry-deleted',
-      userId: 'user-1',
-      content: '削除したエントリ',
-      mediaUrls: [],
-      fermentationEnabled: false,
-      createdAt: '2026-04-09T10:00:00Z',
-      updatedAt: '2026-04-09T10:00:00Z',
-    });
-
-    vi.mocked(boardCardRepo.findDailyCardsByDateRange).mockResolvedValue([dailyEntryCard]);
+    vi.mocked(boardCardRepo.findDailyCardsByDateRange).mockResolvedValue([dailySnippetCard]);
     vi.mocked(boardCardRepo.findSoftDeletedRefIdsByDateAndView).mockResolvedValue([
-      'entry-deleted',
+      'snippet-deleted',
     ]);
-    vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue(['entry-deleted']);
-    vi.mocked(boardCardRepo.findRefIdsByDateRange).mockResolvedValue(['entry-deleted']);
-    vi.mocked(entryRepo.listByUserIdAndWeek).mockResolvedValue([entry]);
-    vi.mocked(entryRepo.findByIds).mockResolvedValue([]);
+    vi.mocked(boardCardRepo.findRefIdsByDateAndView).mockResolvedValue(['snippet-deleted']);
+    vi.mocked(boardCardRepo.findRefIdsByDateRange).mockResolvedValue(['snippet-deleted']);
+    vi.mocked(boardSnippetRepo.findByIds).mockResolvedValue([]);
 
     const result = await usecase.execute('user-1', '2026-04-11', 'weekly');
 

@@ -38,9 +38,11 @@ pnpm security:rls                           # RLS / storage の認可境界チ�
 
 - `app/` — Next.js ページ（薄いラッパー、API 呼び出し禁止、端末判定）
 - `features/` — 機能スライス
-  - `apps/client` は **ドメイン × reach**: `features/{shared,pc,sp}/{domain}`（shared=UIなし共有hook/型、pc/sp=端末別UI）
-    - reach は「端末で体験が変わる機能」だけに適用する。端末非依存の機能（`auth` / `onboarding`）は
-      `features/{domain}/` のフラットなまま置く。フラット機能どうしの直接 import は禁止、`features/shared` のみ可
+  - `apps/client` は **ドメイン × reach**: `features/{shared,pc,sp}/{domain}`（shared=端末非依存、pc/sp=端末別UI）
+    - **`features/` 直下は shared / pc / sp の 3 つだけ**。端末非依存のものはロジックも UI も
+      `features/shared/{domain}/` に置く（`auth` のフォーム・`onboarding` 等）
+    - shared は UI を持ってよいが、その中で端末を判定してはならない（`shared-no-device-detection`）。
+      端末で分岐する場所は `DeviceView` の1か所だけ
   - `apps/admin` は単一体験で `features/{domain}`（reach 軸なし）
 - `components/ui/` — 汎用 UI（feature 依存禁止）
 - `lib/` — 基盤ユーティリティのみ（ドメイン非依存。`use-*` のドメイン hook を置かない）

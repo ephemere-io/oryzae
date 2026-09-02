@@ -3,15 +3,59 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CanvasGrid } from '@/components/ui/canvas-grid';
+import { CanvasMinimap } from '@/components/ui/canvas-minimap';
+import { CanvasViewport } from '@/components/ui/canvas-viewport';
+import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
 import { JarVessel } from '@/features/pc/fermentation/components/jar-vessel';
-import { QuestionCircle } from '@/features/pc/fermentation/components/question-circle';
+import {
+  QUESTION_CIRCLE_SIZE,
+  QuestionCircle,
+} from '@/features/pc/fermentation/components/question-circle';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarLayout } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
+import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
+import type { Bounds } from '@/lib/canvas/viewport';
 import { useUnread } from '@/lib/unread-context';
+
+/**
+ * 瓶の「世界」の大きさ（world 単位）。
+ *
+ * ボードと違い瓶は **有限の世界** なので、寸法を固定して原点を持たせる。こうすると
+ * DB に入っている 0–100 の座標が「ビューポートの %」ではなく「この箱の %」になり、
+ * 数値の意味は変わらないままパン・ズームに乗る（マイグレーション不要。
+ * `jarPositionItemSchema` の min(0).max(100) もそのまま成立する）。
+ */
+// 円を 280→700 に広げたぶん、世界も同じ比率で広げる。世界を据え置くと
+// 既定配置の円どうしが重なる（3つの中心間距離が最短 516px しかなく、直径 700 を下回る）。
+// 座標は % で持っているので、比率を保つ限り既存の配置は崩れない。
+const JAR_WORLD_WIDTH = 2300;
+const JAR_WORLD_HEIGHT = 1440;
+const JAR_WORLD_BOUNDS: Bounds = {
+  x: 0,
+  y: 0,
+  width: JAR_WORLD_WIDTH,
+  height: JAR_WORLD_HEIGHT,
+};
+
+/** 円へズームする矩形の計算に使う。実体は QuestionCircle 側の定数（二重管理しない）。 */
+const CIRCLE_SIZE = QUESTION_CIRCLE_SIZE;
+
+/** 円の world 矩形。中心が (jarX%, jarY%) で translate(-50%,-50%) されている前提。 */
+function circleWorldBounds(pos: Pos): Bounds {
+  const centerX = (pos.jarX / 100) * JAR_WORLD_WIDTH;
+  const centerY = (pos.jarY / 100) * JAR_WORLD_HEIGHT;
+  return {
+    x: centerX - CIRCLE_SIZE / 2,
+    y: centerY - CIRCLE_SIZE / 2,
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+  };
+}
 
 interface QuestionData {
   id: string;
@@ -98,6 +142,7 @@ function QuestionCircleWithData({
   innerOverrides,
   onZoom,
   onElementClick,
+  selectedElementId,
   onCircleMove,
   onCircleDragEnd,
   onInnerMove,
@@ -118,8 +163,10 @@ function QuestionCircleWithData({
     questionId: string,
     questionText: string,
     type: 'keyword' | 'snippet' | 'letter',
+    id: string,
     data: Record<string, string>,
   ) => void;
+  selectedElementId: string | null;
   onCircleMove: (id: string, pos: Pos) => void;
   onCircleDragEnd: (id: string, pos: Pos) => void;
   onInnerMove: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
@@ -127,10 +174,11 @@ function QuestionCircleWithData({
 }) {
   const { detail } = useFermentationForQuestion(api, question.id);
   const isZoomed = zoomedId === question.id;
-  const isHidden = zoomedId !== null && !isZoomed;
+  // 開いている円以外は薄くするだけ（以前は opacity:0 で完全に消していた）。
+  // カメラで寄る方式では周りの世界が見えていた方が現在地が分かる。
+  const isDimmed = zoomedId !== null && !isZoomed;
 
-  // Drag the circle around the jar viewport. Disabled while *any* circle is zoomed —
-  // including this one (the zoomed circle is fixed-positioned to the centre).
+  // 円のドラッグ移動。どれかを開いている間は無効（開いた円の中身の操作を優先する）。
   const { isDragging, pointerHandlers } = useJarDrag({
     containerRef: jarContainerRef,
     enabled: zoomedId === null,
@@ -147,24 +195,19 @@ function QuestionCircleWithData({
       questionText={question.currentText ?? ''}
       detail={detail}
       zoomed={isZoomed}
-      hidden={isHidden}
+      dimmed={isDimmed}
       innerOverrides={innerOverrides}
-      onElementClick={(type, data) =>
-        onElementClick(question.id, question.currentText ?? '', type, data)
+      selectedElementId={selectedElementId}
+      onElementClick={(type, id, data) =>
+        onElementClick(question.id, question.currentText ?? '', type, id, data)
       }
       onInnerDragMove={(type, id, x, y) => onInnerMove(type, id, { jarX: x, jarY: y })}
       onInnerDragEnd={(type, id, x, y) => onInnerDragEnd(type, id, { jarX: x, jarY: y })}
       circlePointerHandlers={pointerHandlers}
       onActivate={() => onZoom(question.id)}
       isDraggingCircle={isDragging}
-      style={
-        isZoomed
-          ? {}
-          : {
-              top: `${position.jarY}%`,
-              left: `${position.jarX}%`,
-            }
-      }
+      // 開いていても位置は変えない（拡大はカメラが担当する）。
+      style={{ top: `${position.jarY}%`, left: `${position.jarX}%` }}
     />
   );
 }
@@ -190,6 +233,8 @@ export function JarView({
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailType, setDetailType] = useState<'keyword' | 'snippet' | 'letter' | null>(null);
   const [detailData, setDetailData] = useState<Record<string, string> | null>(null);
+  // サイドバーに出している要素。円の中でも同じものに印を付けるために持つ。
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [detailQuestion, setDetailQuestion] = useState('');
   const [detailQuestionId, setDetailQuestionId] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -200,8 +245,28 @@ export function JarView({
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Ref attached to the JarView root — used by the circle drag to convert pointer pixels to %.
+  // world ボックス（JAR_WORLD_WIDTH × JAR_WORLD_HEIGHT）に付ける ref。
+  // useJarDrag はこの要素の getBoundingClientRect() でポインタ px を % に直す。
+  // rect は **変形後** の寸法（= world サイズ × 倍率）を返すので、ズームしていても
+  // `dx / rect.width * 100` がそのまま正しい % になる（hook 側に倍率は要らない）。
   const jarContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // ショートカット（Shift+1/2）から最新の円の位置を読むための箱。
+  const circleBoundsRef = useRef<{ all: Bounds; focused: Bounds | null }>({
+    all: JAR_WORLD_BOUNDS,
+    focused: null,
+  });
+
+  // 初回（保存された視点が無いとき）は世界全体が収まる倍率で開く。
+  // 一度でも動かせば保存値が優先されるので、続きから開いた人の視点は壊さない。
+  const canvas = useCanvasViewport({
+    storageKey: 'jar',
+    defaultFitBounds: JAR_WORLD_BOUNDS,
+    // 瓶は世界の大きさが決まっているので「全体表示」は常に世界そのもの。
+    getContentBounds: () => circleBoundsRef.current.all,
+    getSelectionBounds: () => circleBoundsRef.current.focused,
+  });
+  const { zoomIn, zoomOut, resetZoom, fitTo } = canvas;
 
   // Drag-state overrides layer over the API data: empty after page load, fills as the user drags.
   const [overrides, setOverrides] = useState<JarLayoutOverrides>(EMPTY_OVERRIDES);
@@ -258,21 +323,18 @@ export function JarView({
       questionId: string,
       questionText: string,
       type: 'keyword' | 'snippet' | 'letter',
+      id: string,
       data: Record<string, string>,
     ) => {
       setDetailQuestionId(questionId);
       setDetailQuestion(questionText);
       setDetailType(type);
       setDetailData(data);
+      setSelectedElementId(id);
       setDetailOpen(true);
     },
     [],
   );
-
-  function closeZoom() {
-    setDetailOpen(false);
-    setZoomedId(null);
-  }
 
   if (authLoading) return null;
 
@@ -281,11 +343,55 @@ export function JarView({
     resolveCirclePos({ question: q, index: i, override: overrides.questions[q.id] }),
   );
 
+  /**
+   * 背景クリックで選択を解除する。以前は円の背後に敷いた backdrop がこの役目だったが、
+   * 円を画面中央へ飛ばすのをやめたので backdrop 自体が不要になった。
+   * 何も開いていないときは無反応にする（ただの背景クリックで勝手に引かないように）。
+   */
+  circleBoundsRef.current = {
+    all: JAR_WORLD_BOUNDS,
+    focused: (() => {
+      const index = visibleQuestions.findIndex((q) => q.id === zoomedId);
+      return index >= 0 ? circleWorldBounds(resolvedCirclePositions[index]) : null;
+    })(),
+  };
+
+  function closeZoom() {
+    if (!zoomedId) return;
+    setDetailOpen(false);
+    setZoomedId(null);
+    // 位置は動かさず、カメラだけ引いて世界全体に戻す。
+    fitTo(JAR_WORLD_BOUNDS);
+  }
+
+  /**
+   * 円の選択。**円は動かさずカメラを寄せる**（Figma と同じ挙動）。
+   *
+   * 以前は選択した円を position:fixed で画面中央へ飛ばし、他の円を opacity:0 で隠し、
+   * 背後に backdrop を敷いていた。transform で変形した祖先の中では fixed が
+   * 画面基準にならないため、本物のズームを入れるならどのみち成立しない作りだった。
+   * いまは `fitTo` で円の world 矩形に寄るだけなので、隠す・飛ばすが全部不要になる。
+   * `zoomedId` は「どの円を開いているか」という意味だけを持つ（中身の操作可否・拡大率）。
+   */
+  function focusCircle(id: string | null) {
+    setZoomedId(id);
+    if (id === null) {
+      fitTo(JAR_WORLD_BOUNDS);
+      return;
+    }
+    const index = visibleQuestions.findIndex((q) => q.id === id);
+    if (index >= 0) fitTo(circleWorldBounds(resolvedCirclePositions[index]));
+  }
+
+  function handleFit() {
+    setZoomedId(null);
+    fitTo(JAR_WORLD_BOUNDS);
+  }
+
   const addAvailable = !zoomedId && questions.length < 3 && Boolean(onAddQuestion);
 
   return (
     <div
-      ref={jarContainerRef}
       {...verifyAttrs({
         unit: 'JarView',
         questionCount: visibleQuestions.length,
@@ -293,8 +399,9 @@ export function JarView({
         editOpen: editingQuestion !== null,
         addOpen: showAddModal,
         addAvailable,
+        percent: Math.round(canvas.viewport.scale * 100),
       })}
-      className="relative h-full w-full overflow-hidden bg-[var(--bg)]"
+      className="relative h-full w-full bg-[var(--bg)]"
     >
       {/* Keyframes */}
       <style>{`
@@ -331,109 +438,137 @@ export function JarView({
         }
       `}</style>
 
-      {/* Background grid pattern */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(140,133,126,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(140,133,126,0.04) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-          backgroundPosition: 'center center',
-        }}
-      />
-      {/* Background radial */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background:
-            'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.7) 0%, transparent 70%)',
-        }}
-      />
-
-      {/* Zoom backdrop */}
-      {zoomedId && (
-        <button
-          type="button"
-          onClick={closeZoom}
-          className="absolute inset-0 z-[4] bg-[rgba(0,0,0,0.3)]"
-          aria-label={t('jar.zoom_close_aria')}
-        />
-      )}
-
-      {/* Connection lines — using percentage-based SVG */}
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
-        viewBox="0 0 1000 500"
-        preserveAspectRatio="none"
-        style={{
-          opacity: zoomedId ? 0 : 1,
-          transition: 'opacity 0.5s ease',
-          animation: 'fadeIn 0.5s ease-out forwards',
-        }}
+      <CanvasViewport
+        canvas={canvas}
+        ariaLabel={t('jar.canvas_aria')}
+        onClick={closeZoom}
+        // 方眼は frame（スクリーン空間）に敷く。world ボックスの内側に置くと
+        // ボックスの外へパン・ズームしたときに背景が途切れる。
+        background={<CanvasGrid canvas={canvas} color="rgba(140,133,126,0.07)" />}
+        overlay={
+          // 操作 UI の上ではパンを始めない。
+          <div data-canvas-no-pan="">
+            <CanvasZoomControls
+              scale={canvas.viewport.scale}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onReset={resetZoom}
+              onFit={handleFit}
+            />
+            <CanvasMinimap
+              canvas={canvas}
+              ariaLabel={t('jar.minimap_aria')}
+              extent={JAR_WORLD_BOUNDS}
+              items={visibleQuestions.map((q, i) => ({
+                id: q.id,
+                ...circleWorldBounds(resolvedCirclePositions[i]),
+              }))}
+            />
+          </div>
+        }
       >
-        {visibleQuestions.map((q, i) => {
-          const pos = resolvedCirclePositions[i];
-          const endX = (pos.jarX / 100) * 1000;
-          const endY = (pos.jarY / 100) * 500;
-          const jarX = 500;
-          const jarY = 210;
-          const cpX = (jarX + endX) / 2 + (i === 0 ? 50 : i === 1 ? 25 : -50);
-          const cpY = (jarY + endY) / 2 + (i === 0 ? -30 : i === 1 ? 30 : 0);
-          return (
-            <g key={q.id}>
-              {/* Glow layer */}
-              <path
-                d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
-                stroke="rgba(142,168,156,0.08)"
-                strokeWidth="4"
-                fill="none"
-                filter="url(#lineBlur)"
-              />
-              {/* Dashed line */}
-              <path
-                d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
-                stroke="rgba(142,168,156,0.25)"
-                strokeWidth="1"
-                strokeDasharray="6 4"
-                fill="none"
-                style={{ animation: 'j2-flow 60s linear infinite' }}
-              />
-            </g>
-          );
-        })}
-        <defs>
-          <filter id="lineBlur">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
-          </filter>
-        </defs>
-      </svg>
+        {/* world ボックス。中の要素は今までどおり % 指定のままでよく、その % が
+            「ビューポート基準」から「この箱基準」に読み替わるだけ。 */}
+        <div
+          ref={jarContainerRef}
+          // overflow は付けない。world の縁ぎりぎりに置かれた円（jarX=100 等）が
+          // 半分だけ切り取られてしまうため。frame 側が画面外を隠す。
+          className="absolute left-0 top-0"
+          style={{ width: JAR_WORLD_WIDTH, height: JAR_WORLD_HEIGHT }}
+        >
+          {/* Background radial */}
+          <div
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{
+              // closest-side にして、白が透明になりきる前に箱の縁へ達しないようにする。
+              // 既定の farthest-corner だと半径が箱の高さ半分を超え、上下の縁で
+              // グラデーションが途中のまま断ち切られて四角い境目が見えていた。
+              background:
+                'radial-gradient(circle closest-side at 50% 42%, rgba(255,255,255,0.7) 0%, transparent 100%)',
+            }}
+          />
 
-      {/* 瓶本体。見た目は readiness に追従する（issue #278）。 */}
-      <JarVessel readiness={readiness} />
+          {/* Connection lines.
+          viewBox は world ボックスと 1:1。以前は 1000×500 の viewBox を
+          preserveAspectRatio="none" で引き伸ばしていたため、縦横で倍率が違い
+          曲線が歪んでいた（ズームすると露骨に出る）。等方にして歪みを消す。 */}
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+            viewBox={`0 0 ${JAR_WORLD_WIDTH} ${JAR_WORLD_HEIGHT}`}
+            style={{
+              opacity: zoomedId ? 0 : 1,
+              transition: 'opacity 0.5s ease',
+              animation: 'fadeIn 0.5s ease-out forwards',
+            }}
+          >
+            {visibleQuestions.map((q, i) => {
+              const pos = resolvedCirclePositions[i];
+              const endX = (pos.jarX / 100) * JAR_WORLD_WIDTH;
+              const endY = (pos.jarY / 100) * JAR_WORLD_HEIGHT;
+              // 瓶の中ほど（世界の中央やや上）から線が伸びる。
+              const jarX = JAR_WORLD_WIDTH / 2;
+              const jarY = JAR_WORLD_HEIGHT * 0.42;
+              const cpX = (jarX + endX) / 2 + (i === 0 ? 80 : i === 1 ? 40 : -80);
+              const cpY = (jarY + endY) / 2 + (i === 0 ? -60 : i === 1 ? 60 : 0);
+              return (
+                <g key={q.id}>
+                  {/* Glow layer */}
+                  <path
+                    d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
+                    stroke="rgba(142,168,156,0.08)"
+                    strokeWidth="4"
+                    fill="none"
+                    filter="url(#lineBlur)"
+                  />
+                  {/* Dashed line */}
+                  <path
+                    d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
+                    stroke="rgba(142,168,156,0.25)"
+                    strokeWidth="1"
+                    strokeDasharray="6 4"
+                    fill="none"
+                    style={{ animation: 'j2-flow 60s linear infinite' }}
+                  />
+                </g>
+              );
+            })}
+            <defs>
+              <filter id="lineBlur">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
+              </filter>
+            </defs>
+          </svg>
 
-      {/* Question circles */}
-      {visibleQuestions.map((q, i) => (
-        <QuestionCircleWithData
-          key={q.id}
-          question={q}
-          api={api}
-          position={resolvedCirclePositions[i]}
-          zoomedId={zoomedId}
-          jarContainerRef={jarContainerRef}
-          innerOverrides={{
-            keywords: overrides.keywords,
-            snippets: overrides.snippets,
-            letters: overrides.letters,
-          }}
-          onZoom={setZoomedId}
-          onElementClick={handleElementClick}
-          onCircleMove={handleCircleMove}
-          onCircleDragEnd={handleCircleDragEnd}
-          onInnerMove={handleInnerDragMove}
-          onInnerDragEnd={handleInnerDragEnd}
-        />
-      ))}
+          {/* 瓶本体。見た目は readiness に追従する（issue #278）。
+              #533 で world ボックスに合わせて 420×520 → 500×620 に拡大している。 */}
+          <JarVessel readiness={readiness} width={500} height={620} />
+
+          {/* Question circles */}
+          {visibleQuestions.map((q, i) => (
+            <QuestionCircleWithData
+              key={q.id}
+              question={q}
+              api={api}
+              position={resolvedCirclePositions[i]}
+              zoomedId={zoomedId}
+              jarContainerRef={jarContainerRef}
+              innerOverrides={{
+                keywords: overrides.keywords,
+                snippets: overrides.snippets,
+                letters: overrides.letters,
+              }}
+              onZoom={focusCircle}
+              onElementClick={handleElementClick}
+              selectedElementId={selectedElementId}
+              onCircleMove={handleCircleMove}
+              onCircleDragEnd={handleCircleDragEnd}
+              onInnerMove={handleInnerDragMove}
+              onInnerDragEnd={handleInnerDragEnd}
+            />
+          ))}
+        </div>
+      </CanvasViewport>
 
       {/* Question list (bottom center) */}
       {!zoomedId && (
@@ -458,6 +593,10 @@ export function JarView({
               <button
                 key={q.id}
                 type="button"
+                // 検証スペックが「問いチップ」を一意に指すための取っ手。
+                // 以前は最初の <button> を押していたが、ズームコントロールが
+                // DOM 上で前に来たため壊れた（順序に依存しない選択子にする）。
+                data-verify-part="question-chip"
                 onClick={() => {
                   setEditingQuestion(q);
                   setEditText(q.currentText ?? '');
@@ -637,7 +776,10 @@ export function JarView({
       {/* Detail pane */}
       <DetailPane
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => {
+          setDetailOpen(false);
+          setSelectedElementId(null);
+        }}
         questionId={detailQuestionId}
         questionText={detailQuestion}
         type={detailType}
