@@ -23,14 +23,21 @@ interface QuestionCircleProps {
   questionText: string;
   detail: FermentationDetail | null;
   zoomed: boolean;
-  hidden?: boolean;
+  /** 他の円が開いている間の減光。以前は opacity:0 で消していたが、カメラで寄る方式では周りが見えていた方がよい。 */
+  dimmed?: boolean;
   /** User-edited positions for inner elements; if absent we fall back to detail.{kw,sn,lt}.jarX/Y. */
   innerOverrides: {
     keywords: Record<string, Pos>;
     snippets: Record<string, Pos>;
     letters: Record<string, Pos>;
   };
-  onElementClick: (type: 'keyword' | 'snippet' | 'letter', data: Record<string, string>) => void;
+  onElementClick: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    data: Record<string, string>,
+  ) => void;
+  /** いまサイドバーに出している要素の id。円の中でも同じものに印を付ける。 */
+  selectedElementId?: string | null;
   onInnerDragMove: (
     type: 'keyword' | 'snippet' | 'letter',
     id: string,
@@ -51,6 +58,37 @@ interface QuestionCircleProps {
   isDraggingCircle: boolean;
   style?: React.CSSProperties;
 }
+
+/**
+ * 問いの円の直径（world 単位）。
+ *
+ * 中の吹き出し（最大 140px 幅）やキーワードのピルは **絶対 px** なので、円が小さいと
+ * 物理的に収まらず文字が重なる。280px では 140px の吹き出しが直径の半分を占め、
+ * 3つ並べた時点で破綻していた。キャンバスをズームできるようになったので、円自体を
+ * 広げて余白を稼ぐ（読むときは寄ればよい）。
+ *
+ * 変えるときは jar-view の world サイズも同じ比率で動かすこと。円が近づきすぎる。
+ */
+export const QUESTION_CIRCLE_SIZE = 420;
+
+/**
+ * サイドバーに出している要素の印。キーワード（丸い chip）・スニペット（角丸のカード）・
+ * 手紙（円）で形が違うので、**輪郭に沿う outline** を使って同じ見え方に揃える。
+ * 中身の色を変える方法だと、型ごとに背景が違うため印の強さが揃わない。
+ */
+function selectionMark(selected: boolean): React.CSSProperties {
+  if (!selected) return {};
+  return {
+    outline: '2px solid var(--accent)',
+    outlineOffset: '3px',
+    boxShadow: '0 0 0 7px rgba(74,158,142,0.16)',
+  };
+}
+
+/** リング文字の字送り（em）。収まり計算と描画で同じ値を使う。 */
+const RING_TRACKING = 0.2;
+/** 直径 280 のときに 9px だった比率。 */
+const RING_FONT_RATIO = 9 / 280;
 
 /* ── Microbe SVG templates (matching reference) ── */
 const MICROBE_SVGS = {
@@ -142,9 +180,10 @@ export function QuestionCircle({
   questionText,
   detail,
   zoomed,
-  hidden = false,
+  dimmed = false,
   innerOverrides,
   onElementClick,
+  selectedElementId = null,
   onInnerDragMove,
   onInnerDragEnd,
   circlePointerHandlers,
@@ -153,8 +192,19 @@ export function QuestionCircle({
   style,
 }: QuestionCircleProps) {
   const hasData = detail && detail.status === 'completed';
-  const size = 280;
+  const size = QUESTION_CIRCLE_SIZE;
   const circleRef = useRef<HTMLDivElement | null>(null);
+
+  // リングは textPath なので、円周に収まらない分は描かれず末尾が黙って切れる。
+  // 和文は 1 文字 ≒ 1em なので「文字数 x (1 + 字送り)」で必要な長さが出る。
+  // 収まらないときだけ字を小さくして、長い問いでも最後まで読めるようにする。
+  const ringChars = questionText.length + 3; // 末尾の " • " ぶん
+  const ringFontSize = useMemo(() => {
+    const circumference = Math.PI * (size - 24);
+    const fitted = circumference / (ringChars * (1 + RING_TRACKING));
+    return Math.round(Math.min(size * RING_FONT_RATIO, fitted));
+    // size はモジュール定数なので依存に入れない（myceliumHtml と同じ扱い）。
+  }, [ringChars]);
 
   const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);
 
@@ -168,15 +218,20 @@ export function QuestionCircle({
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label と role="button" は同じ !zoomed 条件で付与され、ズーム時は両方 undefined（generic role には付かない）。Biome は条件付き role を静的解決できず誤検出する。
     <div
       ref={circleRef}
+      // 掴んだら円を動かす／開く（キャンバスのパンを始めない）。
+      data-canvas-no-pan=""
       {...circlePointerHandlers}
       {...verifyAttrs({
         unit: 'QuestionCircle',
         zoomed,
-        hidden,
+        dimmed,
         hasData: Boolean(hasData),
         keywordCount,
         snippetCount,
         hasLetter,
+        ringFontSize,
+        ringChars,
+        selectedElementId: selectedElementId ?? 'none',
       })}
       role={zoomed ? undefined : 'button'}
       tabIndex={zoomed ? undefined : 0}
@@ -194,21 +249,31 @@ export function QuestionCircle({
               }
             }
       }
-      className={`absolute ${zoomed ? 'z-[55]' : 'z-[3]'} ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+      className={`absolute ${zoomed ? 'z-[55]' : 'z-[3]'} ${dimmed ? 'pointer-events-none opacity-30' : 'opacity-100'}`}
       style={{
         ...style,
-        width: zoomed ? 'min(50vw, 75vh, 500px)' : `${size}px`,
-        height: zoomed ? 'min(50vw, 75vh, 500px)' : `${size}px`,
-        transform: zoomed ? 'translate(-50%, -50%)' : 'translate(-50%, -50%)',
-        ...(zoomed ? { top: '50%', left: '50%' } : {}),
+        // 円は world 上の自分の位置から動かない。開いたときの拡大は
+        // キャンバス側のズーム（JarView の fitTo）が担当する。
+        // 以前はここで position を画面中央に固定して 500px まで伸ばしていたが、
+        // transform で変形した祖先の中では画面基準の固定が成立しないうえ、
+        // 「カメラを寄せる」のと「対象を動かす」のが二重になっていた。
+        width: `${size}px`,
+        height: `${size}px`,
+        transform: 'translate(-50%, -50%)',
         animation: 'fadeIn 0.5s ease-out forwards',
         // Suppress the zoom/move transition during drag so the circle follows the cursor.
         transition: isDraggingCircle ? 'none' : 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-        cursor: zoomed ? 'default' : isDraggingCircle ? 'grabbing' : 'grab',
+        cursor: zoomed ? 'default' : isDraggingCircle ? 'grabbing' : 'pointer',
         touchAction: zoomed ? undefined : 'none',
         userSelect: 'none',
         // @ts-expect-error: CSS custom property for element scaling
-        '--el-scale': zoomed ? '1.1' : '0.65',
+        // 拡大はカメラ（キャンバスのズーム）が担当するので、要素の寸法は開閉で変えない。
+        // 円が 280→500px に伸びていた頃は中身も一緒に大きくしていたが、円が伸びなくなった
+        // 今それを残すと、寄ったときに中身だけが肥大して重なってしまう。
+        //
+        // 値は円の直径に連動させる。重なるかどうかは「要素の実寸 / 直径」で決まるので、
+        // 直径 700 のとき 0.65 で重なりが解けた比率を、直径を変えても保つ。
+        '--el-scale': String(Math.round((size / 700) * 0.65 * 100) / 100),
       }}
     >
       {/* Circle keyframes */}
@@ -256,8 +321,10 @@ export function QuestionCircle({
           <text
             style={{
               fontFamily: "'Noto Serif JP', serif",
-              fontSize: '9px',
-              letterSpacing: '0.2em',
+              // 円に比例させる（元は直径 280 に対して 9px）。ただし長い問いは
+              // それだと円周に収まらず末尾が切れるので、収まる大きさまで落とす。
+              fontSize: `${ringFontSize}px`,
+              letterSpacing: `${RING_TRACKING}em`,
               fill: '#7A3B3F',
               opacity: 0.6,
             }}
@@ -323,7 +390,7 @@ export function QuestionCircle({
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
-                    onElementClick('keyword', {
+                    onElementClick('keyword', kw.id, {
                       keyword: kw.keyword,
                       description: kw.description,
                     })
@@ -344,12 +411,13 @@ export function QuestionCircle({
                       background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
                       color: 'var(--fg)',
                       fontFamily: "'Noto Serif JP', serif",
-                      fontSize: zoomed ? '13px' : '11px',
+                      fontSize: '11px',
                       letterSpacing: '0.15em',
-                      padding: zoomed ? '8px 20px' : '6px 16px',
+                      padding: '6px 16px',
                       borderRadius: '999px',
                       boxShadow: '0 4px 12px rgba(217,180,143,0.3)',
                       border: '1px solid rgba(255,255,255,0.5)',
+                      ...selectionMark(selectedElementId === kw.id),
                       whiteSpace: 'nowrap',
                       transition: 'transform 0.5s',
                     }}
@@ -380,7 +448,7 @@ export function QuestionCircle({
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
-                    onElementClick('snippet', {
+                    onElementClick('snippet', s.id, {
                       originalText: s.originalText,
                       sourceDate: s.sourceDate,
                       selectionReason: s.selectionReason,
@@ -400,19 +468,20 @@ export function QuestionCircle({
                       position: 'relative',
                       zIndex: 20,
                       background: 'rgba(253,251,247,0.4)',
+                      ...selectionMark(selectedElementId === s.id),
                       backdropFilter: 'blur(12px)',
                       WebkitBackdropFilter: 'blur(12px)',
                       border: '1px solid rgba(255,255,255,0.6)',
                       padding: '10px 12px',
                       borderRadius: '12px',
-                      maxWidth: zoomed ? '200px' : '140px',
+                      maxWidth: '140px',
                       boxShadow: '0 4px 16px rgba(140,133,126,0.08)',
                       transition: 'all 0.3s',
                     }}
                   >
                     <p
                       style={{
-                        fontSize: zoomed ? '11px' : '9px',
+                        fontSize: '9px',
                         color: 'var(--fg)',
                         lineHeight: 1.6,
                         fontFamily: "'Noto Sans JP', sans-serif",
@@ -464,7 +533,7 @@ export function QuestionCircle({
                     x={pos.jarX}
                     y={pos.jarY}
                     onClickWithoutDrag={() =>
-                      onElementClick('letter', { bodyText: letter.bodyText })
+                      onElementClick('letter', letter.id, { bodyText: letter.bodyText })
                     }
                     onDragMove={(x, y) => onInnerDragMove('letter', letter.id, x, y)}
                     onDragEnd={(x, y) => onInnerDragEnd('letter', letter.id, x, y)}
@@ -479,12 +548,15 @@ export function QuestionCircle({
                       style={{
                         position: 'relative',
                         zIndex: 20,
-                        width: '32px',
-                        height: '32px',
+                        width: '72px',
+                        height: '72px',
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, white, #FDFBF7)',
-                        boxShadow: '0 4px 12px rgba(140,133,126,0.15)',
-                        border: '1px solid rgba(140,133,126,0.2)',
+                        background: 'linear-gradient(135deg, #FFFFFF, #FBF1EE)',
+                        // 手紙は円の中でいちばん強い報酬なので、他より一段強く出す。
+                        boxShadow:
+                          '0 0 0 6px rgba(122,59,63,0.06), 0 6px 18px rgba(122,59,63,0.22)',
+                        border: '1.5px solid rgba(122,59,63,0.45)',
+                        ...selectionMark(selectedElementId === letter.id),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -493,8 +565,8 @@ export function QuestionCircle({
                     >
                       <svg
                         aria-hidden="true"
-                        width="16"
-                        height="16"
+                        width="22"
+                        height="22"
                         viewBox="0 0 16 16"
                         fill="none"
                         style={{ color: '#7A3B3F' }}

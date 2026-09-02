@@ -11,7 +11,7 @@
 import { registerUnit } from '@oryzae/verify';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { QuestionCircle } from './question-circle';
+import { QUESTION_CIRCLE_SIZE, QuestionCircle } from './question-circle';
 
 type Pos = { jarX: number; jarY: number };
 
@@ -20,13 +20,18 @@ interface Props {
   questionText: string;
   detail: FermentationDetail | null;
   zoomed: boolean;
-  hidden?: boolean;
+  dimmed?: boolean;
   innerOverrides: {
     keywords: Record<string, Pos>;
     snippets: Record<string, Pos>;
     letters: Record<string, Pos>;
   };
-  onElementClick: (type: 'keyword' | 'snippet' | 'letter', data: Record<string, string>) => void;
+  onElementClick: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    data: Record<string, string>,
+  ) => void;
+  selectedElementId?: string | null;
   onInnerDragMove: (
     type: 'keyword' | 'snippet' | 'letter',
     id: string,
@@ -101,7 +106,7 @@ function makeDetail(
   };
 }
 
-const baseProps: Omit<Props, 'detail' | 'zoomed' | 'hidden'> = {
+const baseProps: Omit<Props, 'detail' | 'zoomed' | 'dimmed'> = {
   questionId: 'q-1',
   questionText: 'この一年で大切にしたいことは？',
   innerOverrides: emptyOverrides,
@@ -145,6 +150,40 @@ registerUnit<Props>({
       props: { ...baseProps, detail: makeDetail(3, 2, true), zoomed: true },
     },
     {
+      id: 'element-selected',
+      probe: true,
+      description: 'Probe: サイドバーに出している要素（kw-1）だけに印が付く',
+      props: {
+        ...baseProps,
+        detail: makeDetail(3, 2, true),
+        zoomed: true,
+        selectedElementId: 'kw-1',
+      },
+    },
+    {
+      id: 'selected-element-missing',
+      probe: true,
+      description: 'Probe: 消えた要素の id が残っていても、どれにも印が付かない（誤爆しない）',
+      props: {
+        ...baseProps,
+        detail: makeDetail(3, 2, true),
+        zoomed: true,
+        selectedElementId: 'kw-999',
+      },
+    },
+    {
+      id: 'long-question',
+      probe: true,
+      description: 'Probe: 上限いっぱいの長い問いでも、リング文字が円周に収まる大きさになる',
+      props: {
+        ...baseProps,
+        // 問いの最大長（questionStringSchema の 64 文字）ちょうど。
+        questionText: 'あ'.repeat(64),
+        detail: makeDetail(3, 2, true),
+        zoomed: false,
+      },
+    },
+    {
       id: 'overflow',
       probe: true,
       description: 'Probe: keyword8 / snippet6 でも描画は slice 上限（kw5 / sn3）で頭打ち',
@@ -152,6 +191,75 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'selection-mark-is-unique',
+      description:
+        '印が付くのは高々1つ（複数付くと、どれをサイドバーに出しているのか分からなくなる）',
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length <= 1 || `印が ${marked.length} 個ある（1つ以下であるべき）`;
+      },
+    },
+    {
+      id: 'no-mark-without-selection',
+      description: '何も選んでいなければ印は付かない',
+      onlyFixtures: ['completed', 'zoomed'],
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length === 0 || `未選択なのに印が ${marked.length} 個ある`;
+      },
+    },
+    {
+      id: 'selection-mark-present-when-id-matches',
+      description: '存在する要素を選んだときは、ちょうど1つに印が付く',
+      onlyFixtures: ['element-selected'],
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length === 1 || `kw-1 を選んだのに印が ${marked.length} 個`;
+      },
+    },
+    {
+      id: 'no-mark-when-id-unknown',
+      description: '存在しない id が残っていても印は付かない（消えた要素で誤爆しない）',
+      onlyFixtures: ['selected-element-missing'],
+      check: ({ root }) => {
+        const marked = Array.from(root.querySelectorAll<HTMLElement>('[style]')).filter((el) =>
+          el.style.outline.includes('var(--accent)'),
+        );
+        return marked.length === 0 || `未知の id なのに印が ${marked.length} 個ある`;
+      },
+    },
+    {
+      id: 'ring-text-fits-circumference',
+      description: 'リング文字の総長は円周を超えない（超えると textPath が末尾を黙って切り落とす）',
+      check: ({ contract }) => {
+        const fontSize = Number(contract.ringFontSize);
+        const chars = Number(contract.ringChars);
+        if (!Number.isFinite(fontSize) || !Number.isFinite(chars)) {
+          return `契約が数値でない: ringFontSize=${contract.ringFontSize}, ringChars=${contract.ringChars}`;
+        }
+        // 和文 1 文字 ≒ 1em + 字送り 0.2em。パス半径は size/2 - 12。
+        const needed = chars * fontSize * 1.2;
+        const circumference = Math.PI * (QUESTION_CIRCLE_SIZE - 24);
+        return (
+          needed <= circumference ||
+          `必要な長さ ${Math.round(needed)}px が円周 ${Math.round(circumference)}px を超える` +
+            `（${chars}文字 x ${fontSize}px）。末尾が切れる。`
+        );
+      },
+    },
+    {
+      id: 'ring-font-never-zero',
+      description: 'リング文字は 1px 未満に潰れない（収まらせるために消してはいけない）',
+      check: ({ contract }) =>
+        Number(contract.ringFontSize) >= 1 || `ringFontSize=${contract.ringFontSize}`,
+    },
     {
       id: 'role-matches-zoomed',
       description:

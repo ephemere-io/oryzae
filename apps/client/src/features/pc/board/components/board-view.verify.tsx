@@ -112,6 +112,25 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'zoom-contract-matches-zoom-controls',
+      description: 'BoardView の percent 契約と CanvasZoomControls の percent 契約が一致する',
+      check: ({ root, contract }) => {
+        const zoom = root.querySelector('[data-verify-unit="CanvasZoomControls"]');
+        const zoomPercent = zoom?.getAttribute('data-verify-percent');
+        return (
+          contract.percent === zoomPercent ||
+          `倍率不一致: BoardView="${contract.percent}" / CanvasZoomControls="${zoomPercent}"`
+        );
+      },
+    },
+    {
+      id: 'initial-zoom-is-identity',
+      description: 'ジェスチャ前のビューポートは等倍（100%）',
+      onlyFixtures: ['default'],
+      check: ({ contract }) =>
+        contract.percent === '100' || `初期倍率が等倍でない: percent=${contract.percent}`,
+    },
+    {
       id: 'viewtype-agrees-across-children',
       description: 'BoardView / BoardDateNav / BoardViewSwitch の viewType 契約が三者で一致する',
       check: ({ root, contract }) => {

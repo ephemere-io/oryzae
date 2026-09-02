@@ -8,6 +8,15 @@ interface CreateBoardSnippetInput {
   text: string;
   dateKey: string;
   viewType?: 'daily' | 'weekly';
+  /**
+   * 配置位置（world 座標）。クライアントが「いま見えている場所」を渡す。
+   *
+   * 省略時のみ従来どおりランダムに散らす。サーバーはビューポートを知らないため、
+   * ズーム・パンできる盤面では **クライアントが決めた位置が正** になる
+   * （渡さないと、遠くへパンした状態で作ったカードが画面外に生まれる）。
+   */
+  x?: number;
+  y?: number;
 }
 
 interface CreateBoardSnippetResponse {
@@ -71,8 +80,8 @@ export class CreateBoardSnippetUsecase {
     }
     const snippet = snippetResult.value;
 
-    const x = Math.floor(Math.random() * 741) + 60;
-    const y = Math.floor(Math.random() * 541) + 60;
+    const x = input.x ?? Math.floor(Math.random() * 741) + 60;
+    const y = input.y ?? Math.floor(Math.random() * 541) + 60;
     const rotation = Math.round((Math.random() * 10 - 5) * 10) / 10;
     const vt = input.viewType ?? 'daily';
 

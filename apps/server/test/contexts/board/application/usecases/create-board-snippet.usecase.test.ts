@@ -47,6 +47,45 @@ describe('CreateBoardSnippetUsecase', () => {
     expect(result.cardId).toBe('generated-id');
   });
 
+  // ボードがパン・ズームできるようになったので、配置はクライアントが決められる。
+  // サーバー既定（固定範囲のランダム）のままだと、遠くを見ている状態で作ったカードが
+  // 画面外に生まれて「押したのに何も起きない」ように見える。
+  it('x/y を渡すとその座標にカードを置く', async () => {
+    const result = await usecase.execute('user-1', {
+      text: '見えている場所に置く',
+      dateKey: '2026-04-11',
+      x: -1234.5,
+      y: 987.25,
+    });
+
+    expect(result.x).toBe(-1234.5);
+    expect(result.y).toBe(987.25);
+  });
+
+  it('x/y を渡さなければ従来どおりランダムに散らす（エディタからの作成）', async () => {
+    const result = await usecase.execute('user-1', {
+      text: 'ランダム配置',
+      dateKey: '2026-04-11',
+    });
+
+    expect(result.x).toBeGreaterThanOrEqual(60);
+    expect(result.x).toBeLessThanOrEqual(800);
+    expect(result.y).toBeGreaterThanOrEqual(60);
+    expect(result.y).toBeLessThanOrEqual(600);
+  });
+
+  it('負の座標も受け付ける（無限キャンバスでは原点より左上も正しい位置）', async () => {
+    const result = await usecase.execute('user-1', {
+      text: '原点の外',
+      dateKey: '2026-04-11',
+      x: -5000,
+      y: -3000,
+    });
+
+    expect(result.x).toBe(-5000);
+    expect(result.y).toBe(-3000);
+  });
+
   it('空テキストで BoardSnippetValidationError を投げる', async () => {
     await expect(usecase.execute('user-1', { text: '', dateKey: '2026-04-11' })).rejects.toThrow(
       BoardSnippetValidationError,

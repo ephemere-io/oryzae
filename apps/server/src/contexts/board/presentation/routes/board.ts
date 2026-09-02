@@ -22,7 +22,7 @@ import { SupabaseBoardCardRepository } from '../../infrastructure/repositories/s
 import { SupabaseBoardPhotoRepository } from '../../infrastructure/repositories/supabase-board-photo.repository.js';
 import { SupabaseBoardSnippetRepository } from '../../infrastructure/repositories/supabase-board-snippet.repository.js';
 import { SupabaseBoardStorageGateway } from '../../infrastructure/storage/supabase-board-storage.gateway.js';
-import { parseDimension } from '../params.js';
+import { parseDimension, parseWorldCoord } from '../params.js';
 
 type Env = {
   Variables: {
@@ -161,6 +161,10 @@ export const board = new Hono<Env>()
     const viewType = body.viewType === 'weekly' ? 'weekly' : 'daily';
     const imageWidth = parseDimension(body.imageWidth);
     const imageHeight = parseDimension(body.imageHeight);
+    // 配置位置（world 座標）。multipart なので文字列で届く。
+    // 壊れた値は無視してサーバー既定のランダム配置に落とす。
+    const x = parseWorldCoord(body.x);
+    const y = parseWorldCoord(body.y);
     if (!dateKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return c.json({ error: 'Invalid dateKey' }, 400);
     }
@@ -192,6 +196,8 @@ export const board = new Hono<Env>()
       viewType,
       imageWidth,
       imageHeight,
+      x,
+      y,
     });
     return c.json(result, 201);
   })

@@ -34,7 +34,11 @@ export function SnippetCardContent({ content }: SnippetCardContentProps) {
       </div>
       {/* カードの高さは作成時の本文量から見積もっている。あとから編集して伸びた分は
           ここで送れるようにする（カード自体は overflow:hidden なので、これが無いと
-          はみ出した文字が黙って消える）。 */}
+          はみ出した文字が黙って消える）。
+
+          引いたときに行数を間引く（line-clamp）ことはしない。スクロールする本文と
+          両立しないうえ、読めない倍率では下の CardTextGlyph に丸ごと入れ替わるので、
+          中間倍率だけのために描画を削っても得るものが無い。 */}
       <p
         className="board-scroll min-h-0 flex-1 overflow-auto whitespace-pre-wrap text-sm"
         style={{ color: 'var(--fg)', lineHeight: 1.8 }}
