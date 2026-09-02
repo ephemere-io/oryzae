@@ -1,7 +1,7 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { type DragEvent as ReactDragEvent, useState } from 'react';
 import { ICON_STROKE_WIDTH, SHELL_INSET, SIDE_PANEL_WIDTH } from '@/components/ui/surface';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
@@ -30,6 +30,27 @@ type OpenItem =
 function startTextDrag(e: ReactDragEvent, text: string) {
   e.dataTransfer.setData('text/plain', text);
   e.dataTransfer.effectAllowed = 'copy';
+}
+
+/**
+ * 発酵が見ていた期間（`2026-05` のような年月）を、読める形にする。
+ *
+ * 手紙もことばも、**いつのものか**が分からないと過去の重みが伝わらない。個々の要素は
+ * 日付を持たないので（型に無い）、発酵1件が見ていた期間を面の頭に出す。
+ * 断片だけは自分の出どころの日付を持つので、そちらは各行に添える。
+ */
+function formatPeriod(period: string, locale: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!match) return period;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  if (Number.isNaN(date.getTime())) return period;
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
 /** 過去の言葉（キーワード）の地。 */
@@ -84,6 +105,7 @@ const PAST_WORD_STYLE = {
  */
 export function FermentationSidebar({ detail, collapsed, onToggle }: FermentationSidebarProps) {
   const t = useTranslations('editor.fermentation_sidebar');
+  const locale = useLocale();
   const td = useTranslations('editor.fermentation_overlay.detail');
   const [open, setOpen] = useState<OpenItem | null>(null);
 
@@ -197,6 +219,13 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
         </button>
       </div>
 
+      {/* いつのものか。個々の要素は日付を持たないので、発酵が見ていた期間をここで言う。 */}
+      {detail && !open && (
+        <p className="mb-4 px-5 text-[11px] text-[var(--date-color)]">
+          {formatPeriod(detail.targetPeriod, locale)}
+        </p>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto">
         {open ? (
           <ItemDetail item={open} sourcePrefix={td('snippet_source_prefix')} />
@@ -274,10 +303,18 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
                       className="flex w-full cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-[var(--hover-wash)] active:cursor-grabbing"
                       style={{ fontFamily: "'Noto Serif JP', serif" }}
                     >
-                      <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-[var(--fg)]">
-                        {s.originalText.length > SNIPPET_PREVIEW_LENGTH
-                          ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
-                          : s.originalText}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[12px] leading-relaxed text-[var(--fg)]">
+                          {s.originalText.length > SNIPPET_PREVIEW_LENGTH
+                            ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
+                            : s.originalText}
+                        </span>
+                        {/* 断片は出どころの日付を持つ。いつ書いた自分の言葉なのかが要る。 */}
+                        {s.sourceDate && (
+                          <span className="mt-1 block text-[10px] text-[var(--date-color)]">
+                            {s.sourceDate}
+                          </span>
+                        )}
                       </span>
                       <span
                         aria-hidden="true"

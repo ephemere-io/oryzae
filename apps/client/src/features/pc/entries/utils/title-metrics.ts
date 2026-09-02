@@ -1,76 +1,67 @@
 /**
- * 縦書きの題を、桁（画面の高さ）にちょうど収める寸法を決める。
+ * 題を、与えられた長さの筋に収める寸法（字の大きさ／何筋使うか）を決める。
  *
- * 題の長さは書き手が決めることなので、**字数に上限を設けない**。そのぶん、題として
- * 現実的な長さ（標準的な画面で 550 字まで）は見切れない収め方が要る。
- * 手順は3段で、上から順に試す:
+ * 縦書きなら筋は「桁」で、筋の長さは画面の高さ。横書きなら筋は「行」で、筋の長さは
+ * 1行の幅。**向きが違うだけで規則は同じ**なので、ここは向きを知らない。
  *
- *  1. **本文と同じ大きさのまま、桁を増やす**（最大3桁）。題は本文より小さくしたくない
- *  2. それでも入らなければ、**字を縮める**（下限 12px）。長い題は小さくなって当然
- *  3. 下限に当たってなお入らなければ、**さらに桁を増やす**（最大12桁）。
- *     ここまで来る題は極端に長いので、細い柱が何本か立つ形になる
+ * 題の長さは書き手が決めることなので、**字数に上限を設けない**。代わりに、題が紙を
+ * 占領しないよう**筋の数に上限を置き**、そこへ収まるまで字を小さくする:
  *
- * 3 を持たないと、200 字のような題が下限の字でも3桁に入らず、そのまま見切れる。
+ *  1. **本文と同じ大きさのまま、筋を増やす**（最大3筋）。題は本文より小さくしたくない
+ *  2. 3筋でも入らなければ、**入る大きさまで字を落とす**（下限 10px）
+ *
+ * 筋を無制限に増やすと長い題が紙の半分を覆い、字を無制限に小さくすると読めなくなる。
+ * どちらも上限を持つので、下限の字でも3筋に入らない極端な題（標準的な画面で 165 字超）は
+ * 見切れる。そこまで来ると「題ではなく本文」なので、収める努力より紙を守るほうを採る。
  */
 
-/** 題が使える桁数の上限（本文と同じ大きさのとき）。これ以上は紙の面積を占領する。 */
-const MAX_COLUMNS = 3;
-
-/**
- * 字を下限まで縮めてなお入らないときに許す桁数。細い柱が並ぶ形になる。
- *
- * 12 桁 × 12px は、標準的な画面（桁の高さ 588px）で **550 字ぶん**。題としては
- * 十分に極端な長さで、幅も 230px に収まる。これを超える題は見切れるが、
- * そこまで来ると「題ではなく本文」なので、収める努力より紙を守るほうを採る。
- */
-const MAX_COLUMNS_AT_MIN_SIZE = 12;
+/** 題が使える筋の数の上限。これ以上増やすと、題が紙の面積を占領する。 */
+const MAX_LINES = 3;
 
 /** これ以上小さいと題に見えない。 */
-export const TITLE_MIN_FONT_SIZE = 12;
+export const TITLE_MIN_FONT_SIZE = 10;
 
 interface TitleMetricsInput {
   /** 題の字数。0 でも 1 として扱う（空でも1文字ぶんの箱は要る）。 */
   length: number;
-  /** 本文の字の大きさ。題はこれより大きくしない。 */
+  /** 本文の字の大きさを基準にした、題の最大の大きさ。 */
   baseFontSize: number;
-  /** 題が使える桁の高さ（px）。測れていなければ 0。 */
-  columnHeight: number;
+  /** 1筋に使える長さ（px）。縦書きなら桁の高さ、横書きなら行の幅。測れていなければ 0。 */
+  lineLength: number;
 }
 
 export interface TitleMetrics {
   fontSize: number;
-  columns: number;
+  /** 使う筋の数（縦書きなら桁、横書きなら行）。 */
+  lines: number;
 }
 
-function charsPerColumn(columnHeight: number, fontSize: number): number {
-  return Math.max(1, Math.floor((columnHeight * 0.94) / fontSize));
+function charsPerLine(lineLength: number, fontSize: number): number {
+  return Math.max(1, Math.floor((lineLength * 0.94) / fontSize));
 }
 
 export function measureTitle({
   length,
   baseFontSize,
-  columnHeight,
+  lineLength,
 }: TitleMetricsInput): TitleMetrics {
   const chars = Math.max(1, length);
-  // 高さが測れていないうちは、本文と同じ大きさの1桁に倒す（次の描画で測り直る）。
-  if (columnHeight <= 0) return { fontSize: baseFontSize, columns: 1 };
+  // 長さがまだ測れていないうちは、本文と同じ大きさの1筋に倒す（次の描画で測り直る）。
+  if (lineLength <= 0) return { fontSize: baseFontSize, lines: 1 };
 
-  // 1) 本文と同じ大きさのまま、桁を増やす
-  const perColumnAtBase = charsPerColumn(columnHeight, baseFontSize);
-  const columns = Math.min(MAX_COLUMNS, Math.max(1, Math.ceil(chars / perColumnAtBase)));
-  if (chars <= perColumnAtBase * columns) return { fontSize: baseFontSize, columns };
+  // 1) 本文と同じ大きさのまま、筋を増やす
+  const perLineAtBase = charsPerLine(lineLength, baseFontSize);
+  const lines = Math.min(MAX_LINES, Math.max(1, Math.ceil(chars / perLineAtBase)));
+  if (chars <= perLineAtBase * lines) return { fontSize: baseFontSize, lines };
 
-  // 2) 入らないぶんは字を縮める
-  const fontSize = Math.max(
-    TITLE_MIN_FONT_SIZE,
-    Math.min(baseFontSize, Math.floor((columnHeight * 0.94 * columns) / chars)),
-  );
-  const perColumn = charsPerColumn(columnHeight, fontSize);
-  if (chars <= perColumn * columns) return { fontSize, columns };
-
-  // 3) 下限に当たってなお入らなければ、さらに桁を増やす
-  return {
-    fontSize,
-    columns: Math.min(MAX_COLUMNS_AT_MIN_SIZE, Math.ceil(chars / perColumn)),
-  };
+  // 2) 上限の筋数でも入らないぶんは、入る大きさまで字を落とす
+  //
+  // 割り算の答えをそのまま使わない。1筋に入る字数は floor で切り捨てられるので、
+  // 「計算上はぴったり」でも実際には1文字あふれることがある（実測で発生した）。
+  // 見積もりから始めて、**本当に収まるまで**1pxずつ下げる。
+  let fontSize = Math.min(baseFontSize, Math.floor((lineLength * 0.94 * lines) / chars));
+  while (fontSize > TITLE_MIN_FONT_SIZE && chars > charsPerLine(lineLength, fontSize) * lines) {
+    fontSize -= 1;
+  }
+  return { fontSize: Math.max(TITLE_MIN_FONT_SIZE, fontSize), lines };
 }

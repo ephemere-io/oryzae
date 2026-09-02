@@ -163,6 +163,7 @@ export function EntryEditor({
     (entryId ? (initialTitle ?? parsed.title) : '').trim(),
   );
   const [settings, updateSettings] = useEditorSettings(locale);
+  const isVertical = settings.writingMode === 'vertical';
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');
@@ -328,22 +329,32 @@ export function EntryEditor({
 
   // Track scroll position of editor to show/hide end-side fade overlay
   useEffect(() => {
-    const el = editorRef.current;
-    if (!el || settings.writingMode !== 'vertical') {
+    // 縦書きは本文自身がスクローラ、横書きは外枠。**どちらにも掛ける**——
+    // 切れている端が見えないと、紙のどこにいるのか分からなくなる。
+    const el = isVertical ? editorRef.current : scrollContainerRef.current;
+    if (!el) {
       setFadeLeft(false);
       setFadeRight(false);
       return;
     }
     function updateFade() {
       if (!el) return;
-      const { scrollLeft, scrollWidth, clientWidth } = el;
-      const maxScroll = scrollWidth - clientWidth;
-      // vertical-rl: 先頭（右端）で scrollLeft=0、左へ進むと負。
-      // 末尾側（左）は、まだ最後まで来ていないときに掛ける。
-      setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
-      // 先頭側（右）は、書き出しから離れたときに掛ける。**左だけフェードして右が
-      // ぶつ切り**だと、右にまだ続いていることが伝わらない。
-      setFadeRight(Math.abs(scrollLeft) > 5);
+      if (isVertical) {
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        const maxScroll = scrollWidth - clientWidth;
+        // vertical-rl: 先頭（右端）で scrollLeft=0、左へ進むと負。
+        // 末尾側（左）は、まだ最後まで来ていないときに掛ける。
+        setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
+        // 先頭側（右）は、書き出しから離れたときに掛ける。**左だけフェードして右が
+        // ぶつ切り**だと、右にまだ続いていることが伝わらない。
+        setFadeRight(Math.abs(scrollLeft) > 5);
+        return;
+      }
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const maxScroll = scrollHeight - clientHeight;
+      // 横書きは上下。末尾側（下）と先頭側（上）に、縦書きと同じ扱いで掛ける。
+      setFadeLeft(maxScroll > 5 && scrollTop < maxScroll - 5);
+      setFadeRight(scrollTop > 5);
     }
     updateFade();
     el.addEventListener('scroll', updateFade);
@@ -358,7 +369,7 @@ export function EntryEditor({
       el.removeEventListener('scroll', updateFade);
       ro?.disconnect();
     };
-  }, [settings.writingMode]);
+  }, [isVertical]);
 
   // Warn before browser close with unsaved changes
   useEffect(() => {
@@ -800,7 +811,6 @@ export function EntryEditor({
   // 常に出しておきたい人のために設定で切れる。
   const paletteVisible = settings.paletteAutoHide ? uiVisible : true;
 
-  const isVertical = settings.writingMode === 'vertical';
   // 横書きの左右余白。**ヘッダーと同じ縦の線**に乗せる（SHELL_INSET の倍）。
   // 以前は px-[15%] で、1512px の画面だと本文の左端が 295px、「問いを結ぶ」の左端が
   // 104px と、同じ画面の中で2本の別の縦線が立っていた。ここを1本に揃える。
@@ -827,47 +837,49 @@ export function EntryEditor({
   // 縦書きは題が本文の隣に立つので差が効く。横書きは見出しとして上に載るのでもう少し強く。
   //
   // **長い題ほど小さくする。** 固定倍率だと、長い題が桁からはみ出して見切れた。
-  // 縦書きの題は桁の高さ（画面の 86%）に収まる必要があるので、字数から逆算する。
-  // 上限は本文と同じ大きさまで——題が本文より大きいと、紙の主役が入れ替わってうるさい。
   const titleLength = Math.max(title.length, 1);
-  // **字数の上限は設けない。** 題の長さは書き手が決めることで、入力欄が決めることではない。
-  // どんな長さでも見切れない寸法は utils/title-metrics が決める
-  // （桁を増やす → 字を縮める → さらに桁を増やす、の3段）。
-  const verticalTitle = measureTitle({
-    length: titleLength,
-    baseFontSize: settings.fontSize,
-    columnHeight: titleColumnHeightPx,
-  });
-  const titleColumns = verticalTitle.columns;
-  const titleFontSize = isVertical ? verticalTitle.fontSize : Math.round(settings.fontSize * 1.3);
-  // 桁の太さ × 桁数。折り返した題はこの幅に収まる。
-  const titleColumnWidth = Math.round(titleFontSize * 1.6) * titleColumns;
-  // **箱は中身に合わせる。** 桁の高さを丸ごと取っていたので、3文字の題でも
-  // 588px の縦長の箱を占めていた（中身は 96px）。
+  // **縦書きも横書きも同じ規則で組む。** 筋（縦書きなら桁、横書きなら行）を最大3本まで
+  // 増やし、それでも入らなければ字を落とす。決めるのは utils/title-metrics。
+  // 字数に上限は設けない——題の長さは書き手が決めることで、入力欄が決めることではない。
   //
-  // ただし縮めるのは**1桁のあいだだけ**。桁数で均等に割ると、折り返した瞬間に
-  // 高さが半分になって幅が倍になり、題が飛び跳ねて見える（「急に2行目になる」）。
-  // 2桁目に入ったら高さは開いているぶん全部を使う——紙と同じで、1桁目を下まで
-  // 書き切ってから左へ移る。そうすれば折り返しで動くのは幅だけになる。
-  const titleUsedHeightPx =
-    titleColumns === 1
-      ? Math.min(titleColumnHeightPx, titleLength * titleFontSize + Math.round(titleFontSize * 0.6))
-      : titleColumnHeightPx;
-  const titleReservedPx = Math.round(titleFontSize * 1.4) + 40;
+  // 1筋に使える長さは、縦書きなら桁の高さ、横書きなら1行の幅。
+  const titleLineLength = isVertical ? titleColumnHeightPx : measurePx;
+  const titleMetrics = measureTitle({
+    length: titleLength,
+    // 横書きの題は見出しとして本文の上に載るので、一回り大きいところから始める。
+    baseFontSize: isVertical ? settings.fontSize : Math.round(settings.fontSize * 1.3),
+    lineLength: titleLineLength,
+  });
+  const titleFontSize = titleMetrics.fontSize;
+  const titleLines = titleMetrics.lines;
+  // 筋の太さ（字の 1.6 倍）× 筋の数。折り返した題はこの厚みに収まる。
+  // **字の幅ぎりぎりにしない**（以前は 46px の字に対して箱が 48px しか無く、
+  // 日本語入力の変換候補がキャレットの脇に開けずに字へ重なっていた）。
+  const titleThicknessPx = Math.round(titleFontSize * 1.6) * titleLines;
+  // **箱は中身に合わせる。** 筋の長さを丸ごと取っていたので、3文字の題でも
+  // 画面いっぱいの箱を占めていた。
+  //
+  // ただし縮めるのは**1筋のあいだだけ**。筋の数で均等に割ると、折り返した瞬間に
+  // 長さが半分になって厚みが倍になり、題が飛び跳ねて見える（「急に2行目になる」）。
+  // 2筋目に入ったら開いているぶん全部を使う——紙と同じで、1筋目を最後まで書き切ってから
+  // 次の筋へ移る。そうすれば折り返しで動くのは厚みだけになる。
+  const titleUsedLengthPx =
+    titleLines === 1
+      ? Math.min(titleLineLength, titleLength * titleFontSize + Math.round(titleFontSize * 0.6))
+      : titleLineLength;
+  // 横書きは題が本文の真上に重なるので、本文側にその厚みぶんの上余白を空ける。
+  const titleReservedPx = titleThicknessPx + 40;
   const titleTextStyle: React.CSSProperties = {
-    // 横書きは本文と同じ左端・同じ最大幅（縦書きは titleBoxClass が位置を持つ）。
     ...(isVertical
-      ? // 縦書きの題の桁幅。**字の幅ぎりぎりにしない**（以前は 6% / 最小 3rem で、
-        // 46px の字に対して箱が 48px しか無かった）。日本語入力の変換候補は
-        // キャレットの脇に開くので、逃げ場が無いと字の上に重なって打てなくなる。
-        {
-          width: `${titleColumnWidth}px`,
-          height: `${titleUsedHeightPx}px`,
+      ? {
+          width: `${titleThicknessPx}px`,
+          height: `${titleUsedLengthPx}px`,
           right: `${TITLE_RIGHT_MARGIN}px`,
         }
       : {
           left: `${gutterPx}px`,
-          width: `${measurePx}px`,
+          width: `${titleUsedLengthPx}px`,
+          height: `${titleThicknessPx}px`,
           maxWidth: `calc(100% - ${gutterPx * 2}px)`,
         }),
     fontSize: `${titleFontSize}px`,
@@ -987,26 +999,52 @@ export function EntryEditor({
           {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
           <div className="relative flex-1">
             {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
-            {settings.writingMode === 'vertical' && fadeLeft && (
+            {/* 切れている端に掛ける半透明。**両端とも**掛けて、そちらにまだ続いていることを
+                伝える（片側だけだと、ぶつ切りの側で場所の感覚を見失う）。
+                縦書きは左右、横書きは上下。 */}
+            {fadeLeft && (
               <div
-                className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
-                style={{
-                  left: 0,
-                  width: '18%',
-                  background: 'linear-gradient(to right, var(--bg), transparent)',
-                }}
+                className="pointer-events-none absolute z-[10] transition-opacity duration-300"
+                style={
+                  isVertical
+                    ? {
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '18%',
+                        background: 'linear-gradient(to right, var(--bg), transparent)',
+                      }
+                    : {
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: '14%',
+                        background: 'linear-gradient(to top, var(--bg), transparent)',
+                      }
+                }
               />
             )}
-            {/* 先頭側（右）。左と同じ掛け方にして、両端とも「まだ続いている」と分かるようにする。
-                題より内側から始めるので、題は薄くならない。 */}
-            {settings.writingMode === 'vertical' && fadeRight && (
+            {fadeRight && (
               <div
-                className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
-                style={{
-                  right: '10%',
-                  width: '12%',
-                  background: 'linear-gradient(to left, var(--bg), transparent)',
-                }}
+                className="pointer-events-none absolute z-[10] transition-opacity duration-300"
+                style={
+                  isVertical
+                    ? {
+                        // 本文の右端に合わせて置く。題より内側なので、題は薄くならない。
+                        right: `${TITLE_RIGHT_MARGIN + titleThicknessPx + TITLE_TO_BODY_GAP}px`,
+                        top: 0,
+                        bottom: 0,
+                        width: '12%',
+                        background: 'linear-gradient(to left, var(--bg), transparent)',
+                      }
+                    : {
+                        left: 0,
+                        right: 0,
+                        top: `${titleReservedPx}px`,
+                        height: '10%',
+                        background: 'linear-gradient(to bottom, var(--bg), transparent)',
+                      }
+                }
               />
             )}
             <div
@@ -1116,7 +1154,7 @@ export function EntryEditor({
                         top: '4%',
                         // 右端は題から逆算する。％で置くと、題の右余白との釣り合いが
                         // 画面幅ごとに変わってしまう。
-                        right: `${TITLE_RIGHT_MARGIN + titleColumnWidth + TITLE_TO_BODY_GAP}px`,
+                        right: `${TITLE_RIGHT_MARGIN + titleThicknessPx + TITLE_TO_BODY_GAP}px`,
                         height: '86%',
                         position: 'absolute',
                         overflowX: 'auto',
