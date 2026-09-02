@@ -51,8 +51,16 @@ test.describe('新規登録', () => {
     // （signup-form.tsx の emailSent 分岐）。URL を見ても何も分からないので、
     // その描画と宛先アドレスの表示を待つ。ここが緩いと、409 や 500 で失敗しても
     // 気づけないまま次に進んでしまう。
-    await expect(page.getByText('確認メールを送信しました')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(email)).toBeVisible();
+    //
+    // `exact: true` が要る。本文側（email_sent_body）が
+    // 「…に確認メールを送信しました。メール内のリンクを…」と見出しを部分文字列として
+    // 含むため、部分一致だと 2 要素に当たって strict mode violation になる。
+    await expect(page.getByText('確認メールを送信しました', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
+    // 宛先が画面に出ていることも見る（登録枠満了の分岐にはアドレスが出ないので、
+    // 「送信しました」だけだと満了画面と取り違えうる）。
+    await expect(page.getByText(email, { exact: false })).toBeVisible();
 
     // ── 確認メールを受け取り、token を取り出す ──
     const mail = await waitForLatestEmail(email);
