@@ -26,6 +26,10 @@ export function PhotoCardContent({ content, captionHidden = false }: PhotoCardCo
       <img
         src={content.imageUrl}
         alt={content.caption || 'Board photo'}
+        // 画像はブラウザ既定でドラッグできる。掴んだ瞬間にネイティブの画像ドラッグが
+        // 始まってしまい、カードを動かせなくなっていた（カード全面を覆っていた
+        // 透明ボタンを外した副作用）。
+        draggable={false}
         style={{
           width: '100%',
           flex: '1 1 auto',

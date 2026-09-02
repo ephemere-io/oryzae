@@ -280,7 +280,8 @@
       "cancel": "Cancel",
       "uploading_button": "Uploading…",
       "submit": "Add",
-      "upload_failed": "Failed to add the photo. Please try again."
+      "unsupported": "This image could not be opened. iPhone photos (HEIC) often can't be read by the browser. Save it as JPEG or PNG and try again.",
+      "upload_failed": "Couldn't add the photo. Please try again."
     },
     "snippet_dialog": {
       "aria_label": "Snippet dialog",
@@ -289,13 +290,38 @@
       "placeholder": "Enter text...",
       "cancel": "Cancel",
       "update": "Update",
-      "create": "Create"
+      "create": "Create",
+      "source_aria": "Snippet source",
+      "tab_text": "Write text",
+      "tab_image": "Read from image",
+      "click_to_select_image": "Click to select an image",
+      "preview_alt": "Preview of the image to read",
+      "reading": "Reading…",
+      "reading_aria": "Reading",
+      "ocr_empty": "No text found in that image. Try another one.",
+      "ocr_failed": "Reading failed. Check the format (JPEG/PNG/WebP/GIF) and size ({maxMb}MB or less).",
+      "ocr_note": "Read from the image. It can contain mistakes — check it before placing.",
+      "too_long": "Must be {max} characters or fewer",
+      "drop_or_click_image": "Drop an image here, or click to choose one",
+      "read_again": "Read again",
+      "ocr_caveat": "Reading isn't perfect. Handwriting and unclear text can come out wrong, so check it before you place it."
     },
     "error_message": "Failed to load the board",
     "retry": "Retry",
     "minimap": {
       "aria_label": "Board minimap"
-    }
+    },
+    "toolbar": {
+      "aria_label": "Board toolbar",
+      "snippet": "Create snippet",
+      "photo": "Paste image",
+      "aria_label_card": "Actions for the selected card",
+      "bring_to_front": "Bring to front",
+      "delete": "Delete",
+      "open": "Open",
+      "ocr": "Read from image"
+    },
+    "drop_image": "Drop the image here"
   },
   "editor": {
     "status": {

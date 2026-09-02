@@ -189,13 +189,21 @@ export function useBoardInteraction(
   const onPointerUp = useCallback(() => {
     const state = stateRef.current;
     if (state) {
-      if (state.type === 'drag') {
+      // **実際に動かしたときだけ**前面に出す。startDrag は pointerdown の時点で
+      // type='drag' を立てるので、ここで didDrag を見ないと「選ぶために1回押した」
+      // だけでカードが最前面へ飛び、しかも userPositioned が立って自動整列からも
+      // 外れてしまう（選択のつもりが並び順を書き換えていた）。
+      if (state.type === 'drag' && didDragRef.current) {
         zCounterRef.current += 1;
         // ここが「利用者が自分で位置を決めた」瞬間。フラグを立てて保存に乗せることで、
         // 次回以降の自動整列（applyDefaultZOrder）の対象から外れる。
         updateCard(state.cardId, { zIndex: zCounterRef.current, userPositioned: true });
+        onInteractionEnd();
+      } else if (state.type !== 'drag') {
+        // 回転・リサイズは動いた分がそのまま結果なので、従来どおり保存する。
+        onInteractionEnd();
       }
-      onInteractionEnd();
+      // 動かしていない click では保存要求を出さない（盤面に変化が無いため）。
     }
     stateRef.current = null;
     setDraggingId(null);

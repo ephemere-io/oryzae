@@ -1,7 +1,6 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CanvasGrid } from '@/components/ui/canvas-grid';
@@ -16,16 +15,19 @@ import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
+import { useEscapeKey } from '@/lib/use-escape-key';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
+import { useImageIntake } from '../hooks/use-image-intake';
 import {
   BoardCard,
   type CardDetail,
   DETAIL_THRESHOLD_FULL,
   DETAIL_THRESHOLD_TITLE,
 } from './board-card';
-import { BoardControls } from './board-controls';
 import { BoardDateNav } from './board-date-nav';
-
+import { BOARD_INSET, TOP_BAR_CLASS } from './board-surface';
+import { BoardToolbar } from './board-toolbar';
+import { BoardViewSwitch } from './board-view-switch';
 import { PhotoDialog } from './photo-dialog';
 import { SnippetDialog } from './snippet-dialog';
 
@@ -76,16 +78,19 @@ function todayKey(): string {
 
 export function BoardView({ api }: BoardViewProps) {
   const t = useTranslations('board');
-  const router = useRouter();
   const [dateKey, setDateKey] = useState(todayKey);
   const [viewType, setViewType] = useState<'daily' | 'weekly'>('daily');
   const [snippetDialog, setSnippetDialog] = useState<{
     open: boolean;
     snippetId?: string;
     initialText?: string;
+    source?: 'text' | 'image';
   }>({ open: false });
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
+  /** カード上の編集。入り口は hook に閉じてあり、下書きを積まずには入れない。 */
+  /** 貼り付け・ドロップで入ってきた画像。写真ダイアログへ選択済みとして渡す。 */
+  const [incomingImage, setIncomingImage] = useState<File | null>(null);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
 
   const {
@@ -211,19 +216,43 @@ export function BoardView({ api }: BoardViewProps) {
     fitTo(unionBounds(cards.filter((c) => !c.removing).map(cardBounds)));
   }, [cards, fitTo]);
 
+  /** カードをダブルクリックしたときの行き先。 */
+  const openCard = useCallback((card: BoardCardData) => {
+    if (card.cardType === 'snippet' && 'text' in card.content) {
+      setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
+    } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
+      setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
+    }
+  }, []);
+
   const handleCardClick = useCallback(
     (card: BoardCardData) => {
+      // 掴んで動かしただけのときは開かない。ツールバー経由（openCard 直呼び）には
+      // この判定を通さない——ボタンを押したのは明確な意思表示なので。
       if (didDrag()) return;
-      if (card.cardType === 'entry') {
-        router.push(`/entries/${card.refId}`);
-      } else if (card.cardType === 'snippet' && 'text' in card.content) {
-        setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
-      } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
-        setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
-      }
+      openCard(card);
     },
-    [router, didDrag],
+    [openCard, didDrag],
   );
+
+  /** 選択中のカード。ツールバーが「そのカードにできること」を出すために使う。 */
+  const selectedCard = selectedId ? (cards.find((c) => c.id === selectedId) ?? null) : null;
+
+  const handleOpenSelected = useCallback(() => {
+    if (selectedCard) openCard(selectedCard);
+  }, [selectedCard, openCard]);
+
+  /** 選択中のカードを最前面へ。重なって読めなくなったときの逃げ道。 */
+  const handleBringToFront = useCallback(() => {
+    if (!selectedCard) return;
+    const maxZ = cards.reduce((max, c) => Math.max(max, c.zIndex), 0);
+    if (selectedCard.zIndex === maxZ) return;
+    const next = cards.map((c) =>
+      c.id === selectedCard.id ? { ...c, zIndex: maxZ + 1, userPositioned: true } : c,
+    );
+    setCards(next);
+    savePositions(next);
+  }, [selectedCard, cards, setCards, savePositions]);
 
   const handleDeleteCard = useCallback(
     (cardId: string) => {
@@ -234,24 +263,74 @@ export function BoardView({ api }: BoardViewProps) {
     [cards, deleteCard],
   );
 
-  // Keyboard handling for Delete/Backspace
+  const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
+  /** 画像から読み取る。作成ダイアログを画像タブで開くので、1手で読み取りに着く。 */
+  const openOcrDialog = useCallback(() => setSnippetDialog({ open: true, source: 'image' }), []);
+
+  const openPhotoDialog = useCallback(() => {
+    setIncomingImage(null);
+    setPhotoDialogOpen(true);
+  }, []);
+
+  // 貼り付け（Cmd+V）とドロップ。どちらもツールバーの「画像を貼り付け」と同じ着地点へ。
+  const handleIncomingImage = useCallback((file: File) => {
+    setIncomingImage(file);
+    setPhotoDialogOpen(true);
+  }, []);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
+
+  // ライトボックスも Escape で閉じる（各ダイアログと揃える）。
+  useEscapeKey(lightbox !== null, closeLightbox);
+
+  const dialogOpen = snippetDialog.open || photoDialogOpen || lightbox !== null;
+
+  // 何かが開いている間は横取りしない。スニペット編集中は本文への貼り付けを奪わないため。
+  // 写真ダイアログを開いている間も同じで、ここを開けておくと、選択済みの画像がある状態で
+  // 貼り付けたときに initialFile が差し替わり、選んだ画像が黙って別のものになる。
+  const intake = useImageIntake(!dialogOpen, handleIncomingImage);
+
+  // Keyboard handling: Delete/Backspace で選択カードを消す ＋ ツールバーのショートカット。
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // e.target は EventTarget で、HTMLElement とは限らない（document / window /
+      // SVGElement も来る）。キャストで名乗らせず instanceof で確かめる。
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      }
+      // 何かが開いている間はボードのキー操作を一切拾わない（閉じるのは Escape の仕事）。
+      // 削除より後ろに置くと、ライトボックスやダイアログの入力欄以外にフォーカスが
+      // ある状態の Backspace が、背後で選択中のカードをサーバーごと消してしまう。
+      if (dialogOpen) return;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-        // @type-assertion-allowed: DOM KeyboardEvent target is always HTMLElement
-        if ((e.target as HTMLElement).isContentEditable) return;
         if (selectedId) {
           e.preventDefault();
           handleDeleteCard(selectedId);
         }
+        return;
+      }
+
+      // ツールのショートカット（Figma と同じく修飾キーなしの1文字）。
+      // 変換中は拾わない。日本語入力の途中で押した "s" を preventDefault すると、
+      // ローマ字が食われたうえにダイアログまで開く（use-escape-key と同じ理由）。
+      if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        openSnippetDialog();
+      } else if (key === 'i') {
+        e.preventDefault();
+        openPhotoDialog();
+      } else if (key === 'r') {
+        e.preventDefault();
+        openOcrDialog();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, handleDeleteCard]);
+  }, [selectedId, handleDeleteCard, dialogOpen, openSnippetDialog, openPhotoDialog, openOcrDialog]);
 
   const visibleCardCount = cards.filter((c) => !c.removing).length;
 
@@ -264,8 +343,16 @@ export function BoardView({ api }: BoardViewProps) {
         photoOpen: photoDialogOpen,
         percent: Math.round(scale * 100),
         detail,
+        selectedType: selectedCard?.cardType ?? 'none',
       })}
+      // role / aria-label と、ポインタ操作・選択解除は CanvasViewport が持つ。
+      // ここで overflow-auto にはしない（スクロールはパンに置き換わった）。
       className="relative h-full w-full"
+      // 画像の受け取りだけは面の外側で受ける。ドラッグ&ドロップはポインタ操作とは
+      // イベントの系統が違うので、パンとは競合しない。
+      onDragOver={intake.onDragOver}
+      onDragLeave={intake.onDragLeave}
+      onDrop={intake.onDrop}
     >
       <CanvasViewport
         canvas={canvas}
@@ -278,13 +365,21 @@ export function BoardView({ api }: BoardViewProps) {
         overlay={
           // 操作 UI の上ではパンを始めない。
           <div data-canvas-no-pan="">
-            <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
-            <BoardControls
-              viewType={viewType}
-              onViewTypeChange={setViewType}
-              onAddSnippet={() => setSnippetDialog({ open: true })}
-              onAddPhoto={() => setPhotoDialogOpen(true)}
-            />
+            {/* 上段バー: 左端に日付、右端に表示単位。1本のバーの両端に置くことで、
+                左右に散らばって見えないようにする。 */}
+            <div
+              className={TOP_BAR_CLASS}
+              style={{
+                top: BOARD_INSET,
+                // 左端はサイドバー幅ぶん寄せる
+                // （--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
+                left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
+                right: BOARD_INSET,
+              }}
+            >
+              <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
+              <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
+            </div>
             <CanvasZoomControls
               scale={scale}
               onZoomIn={zoomIn}
@@ -351,10 +446,54 @@ export function BoardView({ api }: BoardViewProps) {
         ))}
       </CanvasViewport>
 
+      {/* ドラッグ中の目印。受け取れることが分からないと、そもそも落としてもらえない。
+          画面全体を覆うので、面（CanvasViewport）の外に置く。 */}
+      {intake.dragActive && (
+        <div
+          className="pointer-events-none fixed inset-0 z-[1700] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}
+        >
+          <span
+            className="rounded-lg border border-dashed px-4 py-2 text-[11px] uppercase tracking-[0.08em]"
+            style={{
+              borderColor: 'var(--fg)',
+              color: 'var(--fg)',
+              backgroundColor: 'var(--surface-raised)',
+              fontFamily: 'Inter, "Noto Sans JP", sans-serif',
+            }}
+          >
+            {t('drop_image')}
+          </span>
+        </div>
+      )}
+
+      {/* 道具箱（下部中央フローティング）。面の外に置くので、掴んでもパンは始まらない。 */}
+      <BoardToolbar
+        activeTool={
+          snippetDialog.open
+            ? snippetDialog.source === 'image'
+              ? 'ocr'
+              : 'snippet'
+            : photoDialogOpen
+              ? 'photo'
+              : 'none'
+        }
+        onCreateSnippet={openSnippetDialog}
+        onReadImage={openOcrDialog}
+        onAddPhoto={openPhotoDialog}
+        selection={selectedCard ? { cardType: selectedCard.cardType } : null}
+        onOpenSelected={handleOpenSelected}
+        onBringSelectedToFront={handleBringToFront}
+        onDeleteSelected={() => selectedCard && handleDeleteCard(selectedCard.id)}
+      />
+
       {/* Snippet dialog */}
       <SnippetDialog
         open={snippetDialog.open}
+        api={api}
+        snippetId={snippetDialog.snippetId}
         initialText={snippetDialog.initialText}
+        initialSource={snippetDialog.source ?? 'text'}
         onSubmit={(text) => {
           if (snippetDialog.snippetId) {
             updateSnippet(snippetDialog.snippetId, text);
@@ -368,6 +507,7 @@ export function BoardView({ api }: BoardViewProps) {
       {/* Photo dialog */}
       <PhotoDialog
         open={photoDialogOpen}
+        initialFile={incomingImage}
         onSubmit={(file, caption, imageWidth, imageHeight) =>
           createPhoto(
             file,
@@ -377,7 +517,10 @@ export function BoardView({ api }: BoardViewProps) {
             placementForNewCard(NEW_PHOTO_SIZE, NEW_PHOTO_SIZE),
           )
         }
-        onClose={() => setPhotoDialogOpen(false)}
+        onClose={() => {
+          setPhotoDialogOpen(false);
+          setIncomingImage(null);
+        }}
       />
 
       {/* Photo lightbox */}

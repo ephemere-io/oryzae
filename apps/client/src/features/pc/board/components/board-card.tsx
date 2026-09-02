@@ -4,7 +4,6 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useRef } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
 import { CardTextGlyph } from './card-text-glyph';
-import { EntryCardContent } from './entry-card-content';
 import { PhotoCardContent } from './photo-card-content';
 import { SnippetCardContent } from './snippet-card-content';
 
@@ -31,12 +30,6 @@ interface BoardCardProps {
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
   onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
-}
-
-function isEntryContent(
-  content: BoardCardData['content'],
-): content is { title: string; preview: string; createdAt: string } {
-  return 'title' in content;
 }
 
 function isSnippetContent(content: BoardCardData['content']): content is { text: string } {
@@ -170,6 +163,8 @@ export function BoardCard({
         outline: isSelected ? `${hairline(1.5)} solid rgba(74,158,142,0.5)` : 'none',
         outlineOffset: isSelected ? hairline(4) : 0,
         overflow: isSelected ? 'visible' : 'hidden',
+        // 編集中だけ文字を選べるようにする。常に選べると、掴んで動かそうとした
+        // だけで選択が始まってカードが動かせない。
         userSelect: 'none',
         touchAction: 'none',
         animation: card.removing
@@ -180,24 +175,15 @@ export function BoardCard({
       }}
       onPointerDown={handlePointerDown}
       onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onClick(card);
+      }}
     >
-      {/* Invisible double-click target */}
-      <button
-        type="button"
-        aria-label={
-          card.cardType === 'entry'
-            ? 'Open entry'
-            : card.cardType === 'photo'
-              ? 'View photo'
-              : 'Edit snippet'
-        }
-        className="absolute inset-0 z-[1] cursor-grab bg-transparent"
-        style={{ border: 'none', outline: 'none' }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          onClick(card);
-        }}
-      />
+      {/* 全面を覆う透明ボタンは置かない。以前はダブルクリックの的として敷いていたが、
+          それがカードの文字を一切選べなくしていた（コピーもできなかった）。
+          ダブルクリックはカード本体で受ける。 */}
+
       {/* 引ききった状態では **文字だけ** 落とす。読めない文字を枚数分描くのは無駄だが、
           写真は縮んでも何の写真か分かるので落とさない。落とすと白い矩形になり
           「写真が表示されない」ように見える（PR #533 のレビュー指摘）。
@@ -207,22 +193,13 @@ export function BoardCard({
 
           図と文字は重ねて置き、すれ違わせる。どちらも `absolute inset-0` なので
           帯の中では同じ場所に重なり、`--vp-scale` 由来の不透明度で入れ替わる。 */}
-      {detail !== 'full' && (card.cardType === 'entry' || card.cardType === 'snippet') && (
+      {detail !== 'full' && card.cardType === 'snippet' && (
         <div
           data-verify-part="glyph-layer"
           className="pointer-events-none absolute inset-0"
           style={{ opacity: GLYPH_OPACITY }}
         >
-          <CardTextGlyph withHeading={card.cardType === 'entry'} />
-        </div>
-      )}
-      {detail !== 'block' && card.cardType === 'entry' && isEntryContent(card.content) && (
-        <div
-          data-verify-part="text-layer"
-          className="absolute inset-0"
-          style={{ opacity: TEXT_OPACITY }}
-        >
-          <EntryCardContent content={card.content} titleOnly={detail === 'title'} />
+          <CardTextGlyph />
         </div>
       )}
       {detail !== 'block' && card.cardType === 'snippet' && isSnippetContent(card.content) && (
@@ -231,7 +208,7 @@ export function BoardCard({
           className="absolute inset-0"
           style={{ opacity: TEXT_OPACITY }}
         >
-          <SnippetCardContent content={card.content} titleOnly={detail === 'title'} />
+          <SnippetCardContent content={card.content} />
         </div>
       )}
       {card.cardType === 'photo' && isPhotoContent(card.content) && (
@@ -294,7 +271,7 @@ export function BoardCard({
               backgroundColor: 'var(--bg)',
               border: '2px solid var(--accent)',
               opacity: 1,
-              cursor: 'crosshair',
+              cursor: 'grab',
               zIndex: 10,
             }}
           >

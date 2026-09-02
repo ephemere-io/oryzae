@@ -13,6 +13,9 @@ import { verifyAttrs } from '@oryzae/verify';
  * 実際の文字数には連動させない。この倍率では 1 行が 1〜2px にしかならず、
  * 行数を正確にしても読み取れないため、段落らしい見えだけを作る。
  *
+ * 使うのはスニペットだけ。以前はエントリのカードにも見出し行付きで出していたが、
+ * PR #524 でエントリのカード種別そのものが無くなった。
+ *
  * 色は **必ず `--fg`**（本文と同じインク）にする。最初は明色前提の濃いグレーを
  * ベタ書きしていたため、ダークモードでは白い本文が薄いグレーの線に入れ替わり
  * 「消えた？」と見えた（PR #533 のレビュー指摘）。暗い地は明るい線の見え方が
@@ -27,29 +30,16 @@ const BODY_LINES = [
   { id: 'l4', width: 62 },
 ];
 
-interface CardTextGlyphProps {
-  /** 見出し行（エントリのタイトル）を先頭に描くか。 */
-  withHeading?: boolean;
-}
-
-export function CardTextGlyph({ withHeading = false }: CardTextGlyphProps) {
+export function CardTextGlyph() {
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none flex h-full flex-col justify-center gap-[6px] p-6"
       {...verifyAttrs({
         unit: 'CardTextGlyph',
-        withHeading,
-        lineCount: BODY_LINES.length + (withHeading ? 1 : 0),
+        lineCount: BODY_LINES.length,
       })}
     >
-      {withHeading && (
-        <div
-          data-verify-part="glyph-heading"
-          className="mb-[4px] rounded-[1px] bg-[var(--fg)] opacity-[0.34] dark:opacity-[0.5]"
-          style={{ width: '68%', height: 9 }}
-        />
-      )}
       {BODY_LINES.map((line) => (
         <div
           key={line.id}

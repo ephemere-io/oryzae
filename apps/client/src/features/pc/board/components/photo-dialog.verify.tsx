@@ -16,18 +16,12 @@ import { PhotoDialog } from './photo-dialog';
 
 interface Props {
   open: boolean;
-  onSubmit: (
-    file: File,
-    caption: string,
-    imageWidth: number,
-    imageHeight: number,
-  ) => Promise<boolean>;
+  onSubmit: (file: File, caption: string, imageWidth: number, imageHeight: number) => Promise<void>;
   onClose: () => void;
 }
 
 const noop = () => {};
-// 送信は成功扱い（true）。失敗表示は下の fixture で個別に検証する。
-const asyncNoop = () => Promise.resolve(true);
+const asyncNoop = () => Promise.resolve();
 
 registerUnit<Props>({
   id: 'PhotoDialog',
@@ -42,12 +36,6 @@ registerUnit<Props>({
       props: { open: true, onSubmit: asyncNoop, onClose: noop },
     },
     {
-      id: 'submit-failed',
-      probe: true,
-      description: 'Probe: 送信が失敗を返しても閉じず、失敗が契約(failed)に出る（無反応にしない）',
-      props: { open: true, onSubmit: () => Promise.resolve(false), onClose: noop },
-    },
-    {
       id: 'caption-typed',
       probe: true,
       description: 'Probe: キャプションを入力しても、ファイル未選択なら送信は不可のまま',
@@ -59,26 +47,6 @@ registerUnit<Props>({
     },
   ],
   invariants: [
-    {
-      id: 'failed-defaults-false',
-      description: '送信していない状態では failed=false（初期状態でエラーを出さない）',
-      onlyFixtures: ['open', 'submit-failed'],
-      check: ({ contract }) =>
-        contract.failed === 'false' ||
-        `未送信なのに failed=${contract.failed}（開いた瞬間にエラーが出ている）`,
-    },
-    {
-      id: 'alert-iff-failed',
-      description: 'エラー文（role=alert）は failed=true のときだけ描画される',
-      check: ({ root, contract }) => {
-        const hasAlert = Boolean(root.querySelector('[role="alert"]'));
-        const expected = contract.failed === 'true';
-        return (
-          hasAlert === expected ||
-          `alert present=${hasAlert} だが contract.failed="${contract.failed}"`
-        );
-      },
-    },
     {
       id: 'dialog-semantics',
       description: 'role="dialog" かつ aria-label を持つモーダルとして描画される',
@@ -129,6 +97,34 @@ registerUnit<Props>({
           `idle なのに非送信ボタンが無効: count=${nonSubmit.length}, disabled=[${nonSubmit
             .map((b) => b.disabled)
             .join(',')}]`
+        );
+      },
+    },
+    {
+      id: 'error-is-visible-when-set',
+      description: 'error 契約が立っているとき、その理由が画面にも出ている',
+      // 注意: 現状この分岐は **踏まれない**。error は画像のデコード失敗で立つが、
+      // jsdom は画像を復号せず Image の onload も onerror も発火しないため、
+      // 孤立描画では到達できない。将来 error を props で注入できるようにしたら
+      // 効き始める。実際の詰み経路を守っているのは下の no-submit-without-file。
+      check: ({ root, contract }) => {
+        if (contract.error === 'none') return true;
+        const shown = Array.from(root.querySelectorAll('p')).some(
+          (p) => (p.textContent ?? '').trim().length > 0,
+        );
+        return shown || `error="${contract.error}" なのに画面に何も出ていない`;
+      },
+    },
+    {
+      id: 'no-submit-without-file',
+      description: '画像が無いあいだは送信できない（デコードできない画像を選んだ後もここに戻る）',
+      check: ({ root, contract }) => {
+        if (contract.hasPreview === 'true') return true;
+        const submit = root.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (!submit) return 'submit ボタンが見つからない';
+        return (
+          submit.disabled ||
+          'プレビューが無いのに送信できてしまう（開けない画像で固まる経路になる）'
         );
       },
     },
