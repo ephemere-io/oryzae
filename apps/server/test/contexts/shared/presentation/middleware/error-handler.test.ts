@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { ValidationError } from '@/contexts/shared/application/errors/application.errors.js';
 import { errorHandler } from '@/contexts/shared/presentation/middleware/error-handler.js';
 
@@ -17,6 +18,10 @@ function createApp() {
     })
     .get('/unhandled', () => {
       throw new Error('Something went wrong');
+    })
+    .get('/zod', () => {
+      z.object({ text: z.string().min(1).max(3) }).parse({ text: 'too long' });
+      return new Response('unreachable');
     });
 }
 
@@ -63,5 +68,14 @@ describe('errorHandler', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+  it('入力が形に合わないときは 500 ではなく 400 で、どこが悪いかを返す', async () => {
+    // ルートは schema.parse() で検証している。ZodError を拾っていなかった頃は
+    // 入力ミスが全部 500 になり、Sentry にも未処理例外として上がっていた。
+    const app = createApp();
+    const res = await app.request('/zod');
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('text');
   });
 });
