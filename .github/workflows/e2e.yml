@@ -71,9 +71,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # バージョンを固定する。`latest` だと CLI 側の config スキーマ変更で
+      # ある日突然 E2E が壊れる。実際、確認メールの受信箱は [inbucket]（Inbucket）から
+      # [local_smtp]（Mailpit）へ名称・実装ごと置き換わっており、API も別物になっている。
+      # `latest` のままなら、気づかないうちに壊れていた。
+      # 上げるときは supabase/config.toml のキー名と
+      # apps/client/e2e/fixtures/mailbox.ts の API 呼び出しを合わせて確認すること。
       - uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: 2.115.0
 
       # migrations と seed.sql を流した使い捨てインスタンスを立てる。ここが 1 回になる。
       - name: Start local Supabase
@@ -93,6 +99,9 @@ jobs:
           {
             echo "SUPABASE_URL=$(echo "$status" | jq -r '.API_URL')"
             echo "SUPABASE_ANON_KEY=$(echo "$status" | jq -r '.ANON_KEY')"
+            # 確認メールの受信箱（Mailpit）。signup.spec.ts がここから token を読む。
+            # 秘密ではないのでこの時点で出してよい。
+            echo "MAILPIT_URL=http://127.0.0.1:54324"
           } >> "$GITHUB_ENV"
 
       # 認可境界の統合テスト（Issue #503 / #504 の回帰防止）。
