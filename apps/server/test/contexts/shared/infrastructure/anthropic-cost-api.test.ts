@@ -220,3 +220,55 @@ describe('formatActualCost', () => {
     expect(formatActualCost(input)).toBe(expected);
   });
 });
+
+describe('fetchActualCost のページング効率', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+    vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  // limit を渡さないと既定 7 バケットになり、30 日を取るのに外部 API へ 5 往復する。
+  // これがコスト画面の待ち時間の主因だった。上限の 31 を明示していることを固定する。
+  it('1ページで上限（31バケット）を要求する', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: [], has_more: false, next_page: null }));
+
+    await fetchActualCost(START, END);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const url = new URL(mockFetch.mock.calls[0][0]);
+    expect(url.searchParams.get('limit')).toBe('31');
+    expect(url.searchParams.get('bucket_width')).toBe('1d');
+  });
+
+  // 31 を超える範囲では従来どおりページングする（1ページ目で打ち切らない）。
+  it('has_more が続く限りページを進める', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [{ starting_at: '2026-08-01T00:00:00Z', results: [{ amount: '100' }] }],
+          has_more: true,
+          next_page: 'page_2',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [{ starting_at: '2026-09-01T00:00:00Z', results: [{ amount: '250' }] }],
+          has_more: false,
+          next_page: null,
+        }),
+      );
+
+    const result = await fetchActualCost(START, END);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(new URL(mockFetch.mock.calls[1][0]).searchParams.get('page')).toBe('page_2');
+    // amount はセント単位の10進文字列。100 + 250 セント = $3.50。
+    expect(result).toMatchObject({ kind: 'ok', totalCostUsd: 3.5, truncated: false });
+  });
+});
