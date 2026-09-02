@@ -60,7 +60,8 @@ client と admin で別プロジェクト。ビルド順序: shared → server �
 |---|---|---|
 | Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | DB・認証 |
 | AI | `ANTHROPIC_API_KEY` | fermentation の LLM 呼び出し（Anthropic API 直叩き、issue #352） |
-| AI | `AI_GATEWAY_API_KEY` | `generation_id` ベースのコスト集計（cron-cost-alert / admin-dashboard） |
+| AI | `ANTHROPIC_ADMIN_KEY` | 実請求額の取得（Admin API `cost_report`）。コスト日次レポート・admin Spend 画面。org 管理者のみ発行可。未設定でも動作（推定のみになる） |
+| AI | `AI_GATEWAY_API_KEY` | #352 以前の `generation_id` レコードを `/costs` 一覧で解決するフォールバックのみ |
 | PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `POSTHOG_PERSONAL_API_KEY` | ユーザー行動分析 |
 | Sentry | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | エラー監視 |
 | Upstash | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | API レート制限 |

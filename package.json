@@ -9,17 +9,19 @@
     "lint": "biome check apps/ packages/",
     "lint:fix": "biome check --write apps/ packages/",
     "typecheck": "pnpm --filter @oryzae/server typecheck && pnpm --filter @oryzae/shared typecheck && pnpm --filter @oryzae/verify typecheck && pnpm --filter @oryzae/client typecheck && pnpm --filter @oryzae/admin typecheck",
-    "test": "pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test && pnpm --filter @oryzae/admin test",
+    "test": "pnpm test:scripts && pnpm --filter @oryzae/server test && pnpm --filter @oryzae/client test && pnpm --filter @oryzae/admin test",
+    "test:scripts": "vitest run --config vitest.config.mjs",
     "knip": "knip",
     "check:as": "node scripts/check-type-assertions.test.mjs && node scripts/check-type-assertions.mjs",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise && pnpm --filter @oryzae/admin dep-cruise",
+    "security:rls": "node scripts/check-rls-policies.mjs",
     "i18n:sync": "node apps/client/scripts/build-i18n.mjs --remote",
     "i18n:build": "node apps/client/scripts/build-i18n.mjs",
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged",
-    "pre-push": "pnpm lint && pnpm typecheck"
+    "pre-push": "pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip && pnpm check:as && pnpm security:rls"
   },
   "lint-staged": {
     "!(.claude/**)!(**/docs/**)*.{js,ts,jsx,tsx,json}": "biome check --write"
@@ -27,12 +29,19 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "postcss@<8.5.23": ">=8.5.23",
+      "sharp@<0.35.0": ">=0.35.0",
+      "undici@<7.29.0": ">=7.29.0 <8",
+      "nanoid@<3.3.17": ">=3.3.17"
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "~2.5.9",
     "knip": "^6.32.2",
     "lint-staged": "^17.3.0",
-    "simple-git-hooks": "^2.13.1"
+    "simple-git-hooks": "^2.13.1",
+    "vitest": "^3.2.7"
   }
 }

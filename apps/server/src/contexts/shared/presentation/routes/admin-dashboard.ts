@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { gateway } from 'ai';
 import { Hono } from 'hono';
-import { computeCostFromTokens } from '../../infrastructure/claude-pricing.js';
+import { fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
+import {
+  aggregateCost,
+  fetchFermentationCostRows,
+} from '../../infrastructure/fermentation-cost-query.js';
 
 type Env = {
   Variables: {
@@ -154,10 +157,13 @@ export const adminDashboard = new Hono<Env>()
             .eq('status', 'failed'),
         ),
         applyDateFilter(
+          // issue #352 以降 generation_id は NULL 固定。旧条件のままだと
+          // 「コスト追跡済み」が常に 0 件になるため、トークン保存有無で数える
+          // （旧 generation_id 方式のレコードも追跡済みとして拾う）。
           supabase
             .from('fermentation_results')
             .select('id', { count: 'exact', head: true })
-            .not('generation_id', 'is', null),
+            .or('input_tokens.not.is.null,generation_id.not.is.null'),
         ),
       ]);
 
@@ -281,74 +287,60 @@ export const adminDashboard = new Hono<Env>()
   .get('/cost-summary', async (c) => {
     const supabase = c.get('adminSupabase');
 
+    // 月境界は UTC で切る。Anthropic の cost_report が UTC 日バケット固定なので、
+    // 実額と推定を同じ窓で並べないと乖離が読めなくなるため。
+    // (日次レポートは運用に合わせて JST 日で切る。cron-cost-alert.ts を参照)
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-indexed
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth(); // 0-indexed
 
-    const currentMonthStart = new Date(currentYear, currentMonth, 1).toISOString();
-    const currentMonthEnd = now.toISOString();
+    const currentMonthStart = new Date(Date.UTC(currentYear, currentMonth, 1));
+    const lastMonthStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
 
-    const lastMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString();
-    const lastMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999).toISOString();
+    const daysInMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate();
+    const daysElapsed = now.getUTCDate();
 
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const daysElapsed = now.getDate();
-
-    // issue #352 で generation_id が出なくなったため、トークン保存分 (input_tokens/
-    // output_tokens) から価格算出する。旧 generation_id レコードは gateway フォールバック。
-    // (/costs エンドポイントと同じ方式。これをやらないと monthly cost が常に $0.00 になる)
-    const [currentMonthRows, lastMonthRows] = await Promise.all([
-      supabase
-        .from('fermentation_results')
-        .select('generation_id, input_tokens, output_tokens')
-        .or('input_tokens.not.is.null,generation_id.not.is.null')
-        .gte('created_at', currentMonthStart)
-        .lte('created_at', currentMonthEnd),
-      supabase
-        .from('fermentation_results')
-        .select('generation_id, input_tokens, output_tokens')
-        .or('input_tokens.not.is.null,generation_id.not.is.null')
-        .gte('created_at', lastMonthStart)
-        .lte('created_at', lastMonthEnd),
+    const [currentRows, lastRows, currentActual, lastActual] = await Promise.all([
+      fetchFermentationCostRows(supabase, {
+        startIso: currentMonthStart.toISOString(),
+        endIso: now.toISOString(),
+      }),
+      fetchFermentationCostRows(supabase, {
+        startIso: lastMonthStart.toISOString(),
+        endIso: new Date(currentMonthStart.getTime() - 1).toISOString(),
+      }),
+      fetchActualCost(currentMonthStart, now),
+      fetchActualCost(lastMonthStart, currentMonthStart),
     ]);
 
-    const sumCosts = async (
-      rows: {
-        generation_id: string | null;
-        input_tokens: number | null;
-        output_tokens: number | null;
-      }[],
-    ): Promise<number> => {
-      let total = 0;
-      await Promise.all(
-        rows.map(async (row) => {
-          const tokenCost = computeCostFromTokens(row.input_tokens, row.output_tokens);
-          if (tokenCost) {
-            total += tokenCost.totalCost;
-            return;
-          }
-          if (row.generation_id) {
-            try {
-              const info = await gateway.getGenerationInfo({ id: row.generation_id });
-              if (typeof info?.totalCost === 'number') total += info.totalCost;
-            } catch {
-              // skip failed lookups
-            }
-          }
-        }),
-      );
-      return total;
-    };
+    const currentAggregate = aggregateCost(currentRows.rows);
+    const lastAggregate = aggregateCost(lastRows.rows);
 
-    const currentMonthCost = await sumCosts(currentMonthRows.data ?? []);
-    const lastMonthCost = await sumCosts(lastMonthRows.data ?? []);
+    // 着地見込みは実額があれば実額ベース、無ければ推定ベース。
+    const projectionBasis =
+      currentActual.kind === 'ok' ? currentActual.totalCostUsd : currentAggregate.estimatedCostUsd;
+    const projectedCost = daysElapsed > 0 ? (projectionBasis / daysElapsed) * daysInMonth : 0;
 
-    const projectedCost = daysElapsed > 0 ? (currentMonthCost / daysElapsed) * daysInMonth : 0;
+    const round = (n: number) => Math.round(n * 1000000) / 1000000;
 
     return c.json({
-      currentMonthCost: Math.round(currentMonthCost * 1000000) / 1000000,
-      lastMonthCost: Math.round(lastMonthCost * 1000000) / 1000000,
-      projectedCost: Math.round(projectedCost * 1000000) / 1000000,
+      // 実請求額 (Anthropic cost_report)。未設定・取得失敗を $0 と区別できるよう
+      // status を必ず添えて返す。フロントは status を見て表示を出し分けること。
+      actual: {
+        status: currentActual.kind,
+        currentMonthCost: currentActual.kind === 'ok' ? round(currentActual.totalCostUsd) : null,
+        lastMonthCost: lastActual.kind === 'ok' ? round(lastActual.totalCostUsd) : null,
+        message: currentActual.kind === 'error' ? currentActual.message : null,
+      },
+      // 推定値 (保存トークン × 価格表)。ユーザー別内訳を出せる唯一の系統。
+      estimated: {
+        currentMonthCost: round(currentAggregate.estimatedCostUsd),
+        lastMonthCost: round(lastAggregate.estimatedCostUsd),
+        untrackedCount: currentAggregate.untrackedCount,
+        truncated: currentRows.truncated || lastRows.truncated,
+      },
+      projectedCost: round(projectedCost),
+      projectionBasis: currentActual.kind === 'ok' ? 'actual' : 'estimated',
       daysElapsed,
       daysInMonth,
     });

@@ -83,6 +83,13 @@ export class RunFermentationUsecase {
 
     const combinedContent = params.entries.map((e) => e.content).join('\n\n---\n\n');
 
+    // usage を載せた最新インスタンスを try の外に置く。try の中で宣言すると、
+    // LLM 成功後 (= 課金発生済み) に後続処理が落ちたとき catch 側が usage を持たない
+    // 元インスタンスから update してしまい、保存済みの input_tokens/output_tokens を
+    // NULL で上書きする。実際にはトークンを消費しているのにコスト集計から消えるため、
+    // 失敗が多い日ほどレポートが過少になっていた。
+    let currentResult = fermentationResult;
+
     try {
       // 3. Run LLM analysis
       const { output, usage, generationId } = await this.llmGateway.analyze({
@@ -96,7 +103,6 @@ export class RunFermentationUsecase {
       // 3.5. Track generation ID + token usage for cost tracking.
       // issue #352 で Anthropic 直叩きに切替え generationId は出なくなったが、usage は
       // 取得できる。トークンを保存して価格表からコストを算出する (claude-pricing.ts)。
-      let currentResult = fermentationResult;
       if (generationId) {
         currentResult = currentResult.withGenerationId(generationId);
       }
@@ -144,9 +150,11 @@ export class RunFermentationUsecase {
 
       return { id: currentResult.id };
     } catch (error) {
-      // Mark failed with error message
+      // Mark failed with error message。currentResult を使うことで、LLM 呼び出しが
+      // 成功していた場合の usage を保持したまま failed に落とす（課金済みのトークンを
+      // コスト集計に残す）。LLM 自体が失敗した場合は usage 未設定のままなので無害。
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const withError = fermentationResult.withErrorMessage(errorMessage);
+      const withError = currentResult.withErrorMessage(errorMessage);
       const failedResult = withError.withStatus('failed');
       if (failedResult.success) {
         await this.fermentationRepo.update(failedResult.value);
