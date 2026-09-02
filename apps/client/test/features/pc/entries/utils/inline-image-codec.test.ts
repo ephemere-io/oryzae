@@ -1,7 +1,8 @@
-import { INLINE_IMAGE_PLACEHOLDER } from '@oryzae/shared';
+import { INLINE_IMAGE_PLACEHOLDER, type InlineImage } from '@oryzae/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { extractEditorEffects } from '@/features/pc/entries/utils/editor-effects-codec';
 import {
+  applyInlineImagesToEditor,
   extractInlineImages,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
@@ -151,3 +152,133 @@ describe('editor-effects-codec とオフセットの数え方が一致する', (
     expect(text.slice(span?.start, span?.end)).toBe('yz');
   });
 });
+
+/**
+ * 保存 → 読み込みの往復。ここが壊れると「書いたのに開いたら写真が消えている」になる。
+ * 実際の編集画面は content（プレースホルダ入りテキスト）と effects を別々に保存し、
+ * 読み込み時に textContent へ戻してから写真を実体化する。その順序を再現している。
+ */
+describe('保存と復元の往復', () => {
+  let editor: HTMLDivElement;
+
+  beforeEach(() => {
+    editor = document.createElement('div');
+    document.body.appendChild(editor);
+  });
+
+  afterEach(() => {
+    editor.remove();
+  });
+
+  function roundTrip(html: string): { text: string; images: InlineImage[] } {
+    editor.innerHTML = html;
+    const text = serializeEditorText(editor);
+    const images = extractInlineImages(editor);
+
+    // 保存されたものだけから作り直す。
+    const restored = document.createElement('div');
+    document.body.appendChild(restored);
+    restored.textContent = text;
+    applyInlineImagesToEditor(
+      restored,
+      images,
+      new Map(images.map((i) => [i.storagePath, `signed:${i.storagePath}`])),
+    );
+
+    const result = {
+      text: serializeEditorText(restored),
+      images: extractInlineImages(restored),
+    };
+    restored.remove();
+    return result;
+  }
+
+  it('本文と写真の位置がそのまま戻る', () => {
+    const before = editorHtmlWithImages();
+    editor.innerHTML = before;
+    const expectedText = serializeEditorText(editor);
+    const expectedImages = extractInlineImages(editor);
+
+    const after = roundTrip(before);
+
+    expect(after.text).toBe(expectedText);
+    expect(after.images).toEqual(expectedImages);
+  });
+
+  it('写真が本文の先頭にあっても戻る', () => {
+    const after = roundTrip(`${img({ 'data-storage-path': 'p1' })}あとの文`);
+    expect(after.images.map((i) => i.offset)).toEqual([0]);
+    expect(after.text.slice(1)).toBe('あとの文');
+  });
+
+  it('写真が連続していても戻る', () => {
+    const after = roundTrip(
+      img({ 'data-storage-path': 'p1' }) + img({ 'data-storage-path': 'p2' }),
+    );
+    expect(after.images.map((i) => i.storagePath)).toEqual(['p1', 'p2']);
+    expect(after.images.map((i) => i.offset)).toEqual([0, 1]);
+  });
+
+  it('表示設定（幅・回り込み・寄せ・比率）が保たれる', () => {
+    const after = roundTrip(
+      img({
+        'data-storage-path': 'p1',
+        'data-width-ratio': '0.75',
+        'data-layout': 'wrap',
+        'data-align': 'end',
+        'data-aspect': '1.5',
+      }),
+    );
+
+    expect(after.images[0]).toEqual({
+      offset: 0,
+      storagePath: 'p1',
+      widthRatio: 0.75,
+      layout: 'wrap',
+      align: 'end',
+      aspect: 1.5,
+    });
+  });
+
+  // effects だけ古い（本文から写真を消したのに effects が残っている）ケース。
+  // ここで例外を投げると本文まで開けなくなる。
+  it('本文にプレースホルダが無い写真は捨てて、本文は守る', () => {
+    const restored = document.createElement('div');
+    document.body.appendChild(restored);
+    restored.textContent = 'プレースホルダの無い本文';
+
+    applyInlineImagesToEditor(
+      restored,
+      [{ offset: 3, storagePath: 'p1', widthRatio: 0.4, layout: 'inline', align: 'start' }],
+      new Map(),
+    );
+
+    expect(serializeEditorText(restored)).toBe('プレースホルダの無い本文');
+    expect(extractInlineImages(restored)).toEqual([]);
+    restored.remove();
+  });
+
+  // 署名切れは空文字で来る。ここで写真ごと消すと、次の保存で位置が失われる。
+  it('署名 URL が無くても写真の位置は保つ', () => {
+    const restored = document.createElement('div');
+    document.body.appendChild(restored);
+    restored.textContent = `あ${INLINE_IMAGE_PLACEHOLDER}い`;
+
+    applyInlineImagesToEditor(
+      restored,
+      [{ offset: 1, storagePath: 'p1', widthRatio: 0.4, layout: 'inline', align: 'start' }],
+      new Map(),
+    );
+
+    expect(extractInlineImages(restored)).toHaveLength(1);
+    expect(serializeEditorText(restored)).toBe(`あ${INLINE_IMAGE_PLACEHOLDER}い`);
+    restored.remove();
+  });
+});
+
+function editorHtmlWithImages(): string {
+  return (
+    `冒頭の文${img({ 'data-storage-path': 'p1', 'data-width-ratio': '0.5' })}` +
+    `つづき<br>改行のあと${img({ 'data-storage-path': 'p2', 'data-layout': 'block' })}おわり`
+  );
+}

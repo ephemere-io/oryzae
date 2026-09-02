@@ -45,6 +45,12 @@ import {
   extractEditorEffects,
 } from '@/features/pc/entries/utils/editor-effects-codec';
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
+import {
+  applyInlineImagesToEditor,
+  createInlineImageElement,
+  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  serializeEditorText,
+} from '@/features/pc/entries/utils/inline-image-codec';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
@@ -387,6 +393,15 @@ export function EntryEditor({
       setSavedContent(p.body);
       if (editorRef.current && p.body) {
         editorRef.current.textContent = p.body;
+        // 写真を先に実体化する。装飾のオフセットは写真を 1 文字として数えているので、
+        // 先に実体化しておけば両者の数え方が一致する（逆順にすると置換に失敗する）。
+        if (effectiveInitialEffects?.inlineImages?.length) {
+          applyInlineImagesToEditor(
+            editorRef.current,
+            effectiveInitialEffects.inlineImages,
+            new Map(photosRef.current.map((ph) => [ph.storagePath, ph.signedUrl])),
+          );
+        }
         if (effectiveInitialEffects?.textSpans?.length) {
           applyTextSpansToEditor(editorRef.current, effectiveInitialEffects.textSpans);
         }
@@ -684,25 +699,51 @@ export function EntryEditor({
       selection?.addRange(range);
     }
 
-    const lead = el.innerText && !el.innerText.endsWith('\n') ? '\n' : '';
+    const existing = serializeEditorText(el);
+    const lead = existing && !existing.endsWith('\n') ? '\n' : '';
     document.execCommand('insertText', false, `${lead}${text}`);
 
     // execCommand の input が React の onInput に届かない場合があるため明示同期する。
-    setContent(el.innerText ?? '');
+    setContent(serializeEditorText(el));
     setStatus((s) => (s === 'saved' ? 'editing' : s));
   }, []);
 
   /**
-   * 写真を添える。本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
+   * 写真を本文のキャレット位置に差し込む。
+   *
+   * `execCommand('insertHTML')` を使うのは、contentEditable の undo 履歴と
+   * キャレット位置を壊さないため（本文への文字挿入で execCommand を使っているのと同じ理由）。
+   * Range で直接 DOM を挿すと Ctrl+Z で戻せなくなる。
+   *
+   * 本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
    * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
    */
   const attachPhoto = useCallback(
     async (photo: AttachedPhoto) => {
+      const el = editorRef.current;
       const updated = [...photosRef.current, photo];
       photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
       setPhotos(updated);
+
+      if (el) {
+        el.focus();
+        const node = createInlineImageElement(
+          {
+            offset: 0, // 実際の位置は保存時に DOM から数え直す
+            storagePath: photo.storagePath,
+            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+            layout: 'inline',
+            align: 'start',
+          },
+          photo.signedUrl,
+        );
+        document.execCommand('insertHTML', false, node.outerHTML);
+      }
+
+      const nextContent = el ? serializeEditorText(el) : content;
+      setContent(nextContent);
       const next = updated.map((p) => p.storagePath);
-      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
+      const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
       if (!finalContent.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
       const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
       if (savedId) setCurrentEntryId(savedId);
@@ -1274,10 +1315,11 @@ export function EntryEditor({
             contentEditable
             suppressContentEditableWarning
             onInput={() => {
-              // innerText を使う理由: contentEditable で Enter キー押下時に
-              // ブラウザが挿入する <br> や <div> を改行として読み取るため。
-              // textContent はこれらを無視し、改行が保存されない。
-              const text = editorRef.current?.innerText ?? '';
+              // serializeEditorText を使う理由: innerText と同じく <br>/<div> を改行として
+              // 読むうえに、本文中の写真をプレースホルダ 1 文字として書き出せる。
+              // innerText は <img> を 1 文字も残さないため、写真の位置が保存できない。
+              const el = editorRef.current;
+              const text = el ? serializeEditorText(el) : '';
               setContent(text);
               if (status === 'saved') setStatus('editing');
             }}
@@ -1289,7 +1331,8 @@ export function EntryEditor({
               // execCommand の input イベントが React の onInput にバブルしない
               // 場合があるため、paste 後に明示的に state を同期する（autosave が
               // content 変化を検知できるようにするため）
-              const updated = editorRef.current?.innerText ?? '';
+              const pasted = editorRef.current;
+              const updated = pasted ? serializeEditorText(pasted) : '';
               setContent(updated);
               if (status === 'saved') setStatus('editing');
             }}

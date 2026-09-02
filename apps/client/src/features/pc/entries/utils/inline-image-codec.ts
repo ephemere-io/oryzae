@@ -19,12 +19,13 @@ import { INLINE_IMAGE_PLACEHOLDER, type InlineImage } from '@oryzae/shared';
  */
 
 /** 本文中に置いた写真の `<img>` に付ける印。装飾用の span と区別するために使う。 */
-export const INLINE_IMAGE_CLASS = 'inline-photo';
+const INLINE_IMAGE_CLASS = 'inline-photo';
 
 const EBLOCK_CLASS = 'eblock';
 const VBLOCK_CLASS = 'v-block';
 
-const DEFAULT_WIDTH_RATIO = 0.4;
+/** 差し込んだ直後の表示幅（本文 1 行に対する割合）。半分より小さめにして本文を潰さない。 */
+export const DEFAULT_INLINE_IMAGE_WIDTH_RATIO = 0.4;
 
 export function isInlineImage(node: Node): node is HTMLImageElement {
   return node instanceof HTMLImageElement && node.classList.contains(INLINE_IMAGE_CLASS);
@@ -109,7 +110,7 @@ function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
 
 function readRatio(raw: string | undefined): number {
   const n = Number.parseFloat(raw ?? '');
-  if (!Number.isFinite(n)) return DEFAULT_WIDTH_RATIO;
+  if (!Number.isFinite(n)) return DEFAULT_INLINE_IMAGE_WIDTH_RATIO;
   return Math.min(1, Math.max(0.05, n));
 }
 
@@ -129,7 +130,7 @@ function readAlign(raw: string | undefined): InlineImage['align'] {
  * 「横スクロール方向の 40%」という無意味な値になるが、`inline-size: 40%` なら
  * 横書きでは行幅の 40%、縦書きでは行の高さの 40% と、どちらでも「1 行に対する割合」になる。
  */
-export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage): void {
+function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage): void {
   el.dataset.storagePath = image.storagePath;
   el.dataset.widthRatio = String(image.widthRatio);
   el.dataset.layout = image.layout;
@@ -191,4 +192,63 @@ export function createInlineImageElement(image: InlineImage, signedUrl: string):
   el.draggable = false;
   applyInlineImageStyle(el, image);
   return el;
+}
+
+/**
+ * 保存された本文（プレースホルダ入り）と `inlineImages` から、editor DOM を復元する。
+ *
+ * **`applyTextSpansToEditor` より先に呼ぶこと。** 装飾のオフセットは写真を 1 文字として
+ * 数えているので、先に写真を実体化しておけば両者の数え方が一致する。順番を逆にすると、
+ * 装飾で包んだテキストノードの内側にプレースホルダが残り、置換に失敗する。
+ *
+ * @param editor `textContent` に保存済み本文がセット済みの editor 要素
+ * @param images 保存された写真（`offset` 昇順でなくてよい）
+ * @param signedUrlByPath storagePath → 表示用 URL。署名に失敗したものは空文字で入る
+ */
+export function applyInlineImagesToEditor(
+  editor: HTMLElement,
+  images: InlineImage[],
+  signedUrlByPath: Map<string, string>,
+): void {
+  if (images.length === 0) return;
+
+  // 後ろから置換する。前から置くと、置換のたびに以降のオフセットがずれる。
+  const ordered = [...images].sort((a, b) => b.offset - a.offset);
+  for (const image of ordered) {
+    const found = locatePlaceholder(editor, image.offset);
+    if (!found) continue; // 本文と effects が食い違っている。写真を落として本文を守る。
+    const node = createInlineImageElement(image, signedUrlByPath.get(image.storagePath) ?? '');
+    replaceCharWithNode(found.node, found.offset, node);
+  }
+}
+
+interface FoundChar {
+  node: Text;
+  offset: number;
+}
+
+/** 指定オフセットにあるプレースホルダのテキストノードと、その中での位置を返す。 */
+function locatePlaceholder(editor: HTMLElement, offset: number): FoundChar | null {
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let cursor = 0;
+  let current = walker.nextNode();
+  while (current) {
+    const text = current.textContent ?? '';
+    if (offset < cursor + text.length) {
+      const local = offset - cursor;
+      if (text[local] !== INLINE_IMAGE_PLACEHOLDER) return null;
+      // SHOW_TEXT なので Text のはずだが、キャストせず型ガードで確かめる。
+      return current instanceof Text ? { node: current, offset: local } : null;
+    }
+    cursor += text.length;
+    current = walker.nextNode();
+  }
+  return null;
+}
+
+/** テキストノードの 1 文字を要素に差し替える。 */
+function replaceCharWithNode(node: Text, offset: number, replacement: Node): void {
+  const after = node.splitText(offset);
+  after.deleteData(0, 1); // プレースホルダ 1 文字を取り除く
+  after.parentNode?.insertBefore(replacement, after);
 }
