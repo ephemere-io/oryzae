@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDimension } from '@/contexts/board/presentation/params';
+import { parseDimension, parseWorldCoord } from '@/contexts/board/presentation/params';
 
 /**
  * 画像の実寸はクライアントの自己申告なので、入口で疑ってかかる。
@@ -43,5 +43,50 @@ describe('parseDimension', () => {
   it('空文字は捨てる', () => {
     expect(parseDimension('')).toBeUndefined();
     expect(parseDimension('   ')).toBeUndefined();
+  });
+});
+
+/**
+ * 置き場所は寸法と違い、負の値も小数も正しい（原点より左・上にも置ける）。
+ * だからといって何でも通すわけではなく、形を外れた値は既定のランダム配置に落とす。
+ */
+describe('parseWorldCoord', () => {
+  it('負の値も小数も受ける（原点より左・上に置ける）', () => {
+    expect(parseWorldCoord('120')).toBe(120);
+    expect(parseWorldCoord('-40')).toBe(-40);
+    expect(parseWorldCoord('12.5')).toBe(12.5);
+    expect(parseWorldCoord('-12.5')).toBe(-12.5);
+    expect(parseWorldCoord('0')).toBe(0);
+  });
+
+  it('数字で始まるだけの文字列は捨てる（parseFloat が拾ってしまう）', () => {
+    expect(parseWorldCoord('12abc')).toBeUndefined();
+    expect(parseWorldCoord('12px')).toBeUndefined();
+  });
+
+  it('指数表記は捨てる（Infinity になりうる）', () => {
+    expect(parseWorldCoord('1e999')).toBeUndefined();
+    expect(parseWorldCoord('1e3')).toBeUndefined();
+  });
+
+  it('Infinity / NaN の綴りは捨てる', () => {
+    expect(parseWorldCoord('Infinity')).toBeUndefined();
+    expect(parseWorldCoord('-Infinity')).toBeUndefined();
+    expect(parseWorldCoord('NaN')).toBeUndefined();
+  });
+
+  it('現実離れした遠さは捨てる', () => {
+    expect(parseWorldCoord('1000000')).toBe(1000000);
+    expect(parseWorldCoord('-1000000')).toBe(-1000000);
+    expect(parseWorldCoord('9'.repeat(30))).toBeUndefined();
+  });
+
+  it('前後の空白は許すが、文字列以外と空文字は捨てる', () => {
+    expect(parseWorldCoord(' 120 ')).toBe(120);
+    expect(parseWorldCoord('')).toBeUndefined();
+    expect(parseWorldCoord('   ')).toBeUndefined();
+    expect(parseWorldCoord(undefined)).toBeUndefined();
+    expect(parseWorldCoord(null)).toBeUndefined();
+    expect(parseWorldCoord(120)).toBeUndefined();
   });
 });

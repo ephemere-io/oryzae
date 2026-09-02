@@ -38,13 +38,28 @@ interface ResizeState {
 
 type InteractionState = DragState | RotateState | ResizeState | null;
 
+/** world 単位。`boardCardUpdateSchema` の width/height 下限（120）と揃える。 */
 const MIN_SIZE = 120;
-const DRAG_THRESHOLD = 4;
+/** ドラッグとみなす移動量（**画面 px**）。world 換算は scale で割って求める。 */
+const DRAG_THRESHOLD_PX = 4;
 
+/**
+ * ボード上のカードのドラッグ・回転・リサイズ。
+ *
+ * **座標はすべて world 単位で受け取る**（`clientX/Y` ではない）。呼び出し側が
+ * `CanvasSurface.toWorld()` で変換してから渡すこと。こうしておくとズーム倍率が
+ * この hook に一切漏れず、位置計算は「world の差分を world の値に足す」だけで済む。
+ *
+ * 唯一 scale を知る必要があるのは「どれだけ動いたらドラッグ開始か」の閾値で、これは
+ * ユーザーの指の移動量＝画面 px で決まるべきものなので、world 換算に scale を使う。
+ *
+ * @param scale 現在の表示倍率。ドラッグ開始閾値の換算にのみ使う。
+ */
 export function useBoardInteraction(
   cards: BoardCardData[],
   onCardsChange: (cards: BoardCardData[]) => void,
   onInteractionEnd: () => void,
+  scale = 1,
 ) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -123,7 +138,10 @@ export function useBoardInteraction(
       if (state.type === 'drag') {
         const dx = pointerX - state.startX;
         const dy = pointerY - state.startY;
-        if (!didDragRef.current && Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
+        // 閾値は画面 px 基準。引いた状態（scale<1）で過敏に、寄った状態（scale>1）で
+        // 鈍くならないよう world 単位に換算してから比べる。
+        const thresholdWorld = DRAG_THRESHOLD_PX / scale;
+        if (!didDragRef.current && Math.abs(dx) + Math.abs(dy) < thresholdWorld) return;
         didDragRef.current = true;
         setDraggingId(state.cardId);
         updateCard(state.cardId, {
@@ -165,7 +183,7 @@ export function useBoardInteraction(
         updateCard(state.cardId, { x: newX, y: newY, width: newW, height: newH });
       }
     },
-    [updateCard],
+    [updateCard, scale],
   );
 
   const onPointerUp = useCallback(() => {

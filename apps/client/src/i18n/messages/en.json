@@ -308,6 +308,9 @@
     },
     "error_message": "Failed to load the board",
     "retry": "Retry",
+    "minimap": {
+      "aria_label": "Board minimap"
+    },
     "toolbar": {
       "aria_label": "Board toolbar",
       "snippet": "Create snippet",
@@ -483,6 +486,7 @@
       "header_snippet": "Snippets cut by Oryzae",
       "header_letter": "Observations from L.A.B.",
       "snippet_source_prefix": "Source:",
+      "resize_aria": "Resize detail panel",
       "write_entry": "Write an entry for this question"
     },
     "jar": {
@@ -528,7 +532,9 @@
         "dismiss": "Got it",
         "aria_label": "Pickling complete notification",
         "heading": "Pickled in the jar"
-      }
+      },
+      "canvas_aria": "Jar canvas",
+      "minimap_aria": "Jar minimap"
     }
   },
   "questions": {
@@ -676,6 +682,15 @@
       "cancel": "Cancel",
       "save": "Save",
       "letter_arrived": "A letter has arrived"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "Zoom in",
+      "out_aria": "Zoom out",
+      "reset_aria": "Reset zoom",
+      "fit_aria": "Fit to content",
+      "fit": "Fit"
     }
   }
 }

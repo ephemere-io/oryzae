@@ -308,6 +308,9 @@
     },
     "error_message": "보드를 불러오지 못했습니다",
     "retry": "다시 시도",
+    "minimap": {
+      "aria_label": "보드 미니맵"
+    },
     "toolbar": {
       "aria_label": "보드 툴바",
       "snippet": "스니펫 만들기",
@@ -483,6 +486,7 @@
       "header_snippet": "Oryzae가 골라낸 문장",
       "header_letter": "L.A.B.의 관찰 기록",
       "snippet_source_prefix": "출처:",
+      "resize_aria": "상세 패널 너비 조절",
       "write_entry": "이 질문으로 항목 쓰기"
     },
     "jar": {
@@ -528,7 +532,9 @@
         "dismiss": "알겠습니다",
         "aria_label": "절임 완료 알림",
         "heading": "발효 항아리에 절여졌습니다"
-      }
+      },
+      "canvas_aria": "항아리 캔버스",
+      "minimap_aria": "항아리 미니맵"
     }
   },
   "questions": {
@@ -676,6 +682,15 @@
       "cancel": "취소",
       "save": "저장",
       "letter_arrived": "편지가 도착했습니다"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "확대",
+      "out_aria": "축소",
+      "reset_aria": "확대/축소 초기화",
+      "fit_aria": "전체 보기",
+      "fit": "Fit"
     }
   }
 }

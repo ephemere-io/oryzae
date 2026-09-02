@@ -9,6 +9,17 @@ interface PhotoContent {
   caption: string;
 }
 
+/**
+ * 新規カードを置く world 座標。
+ *
+ * 盤面がパン・ズームできるようになったため、サーバーの既定（固定範囲のランダム）では
+ * 遠くを見ているときに画面外へ生まれてしまう。作成時に「いま見えている場所」を渡す。
+ */
+export interface CardPlacement {
+  x: number;
+  y: number;
+}
+
 /** ボード上に置かれた1枚のカード。 */
 export interface BoardCardData {
   id: string;

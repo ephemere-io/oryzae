@@ -30,3 +30,26 @@ export function parseDimension(raw: unknown): number | undefined {
   const value = Number.parseInt(trimmed, 10);
   return value > 0 && value <= MAX_IMAGE_DIMENSION ? value : undefined;
 }
+
+/**
+ * 置き場所（world 座標）の上限。キャンバスは無限に広いが、実際に人が置ける
+ * 範囲をはるかに超えた値は入力ミスか改竄なので、入口で捨てる。
+ */
+const MAX_WORLD_COORD = 1_000_000;
+
+/**
+ * カードを置く world 座標を受ける。
+ *
+ * 寸法と違い、**負の値も小数も正しい**（原点より左・上にも置ける）ので
+ * `parseDimension` の「正の整数だけ」は使えない。ただし考え方は同じで、
+ * 少しでも怪しい値は捨ててサーバー既定のランダム配置に任せる。
+ * 正規表現で形を縛るのは、`Number.parseFloat` が `"12abc"` を 12 として通し、
+ * `"1e999"` を Infinity にしてしまうため。
+ */
+export function parseWorldCoord(raw: unknown): number | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!/^-?\d{1,7}(\.\d{1,6})?$/.test(trimmed)) return undefined;
+  const value = Number.parseFloat(trimmed);
+  return Number.isFinite(value) && Math.abs(value) <= MAX_WORLD_COORD ? value : undefined;
+}

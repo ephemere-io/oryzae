@@ -9,9 +9,11 @@ interface PhotoContent {
 
 interface PhotoCardContentProps {
   content: PhotoContent;
+  /** 引ききった状態ではキャプション（文字）だけ隠す。画像そのものは常に描く。 */
+  captionHidden?: boolean;
 }
 
-export function PhotoCardContent({ content }: PhotoCardContentProps) {
+export function PhotoCardContent({ content, captionHidden = false }: PhotoCardContentProps) {
   return (
     <div
       className="flex h-full flex-col"
@@ -37,7 +39,7 @@ export function PhotoCardContent({ content }: PhotoCardContentProps) {
           backgroundColor: 'var(--toolbar-hover)',
         }}
       />
-      {content.caption && (
+      {content.caption && !captionHidden && (
         <p
           className="mt-2 shrink-0 text-center text-xs italic"
           style={{ color: 'var(--date-color)' }}
