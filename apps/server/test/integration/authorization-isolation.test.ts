@@ -76,6 +76,12 @@ describe.skipIf(!canRun)('認可境界: 他ユーザーのデータが読めな�
   const createdEntryIds: string[] = [];
 
   beforeAll(async () => {
+    // canRun（describe.skipIf）で担保されているが、暗黙にしない。
+    // 空文字でクライアントを作ると全リクエストが失敗し、このファイルの
+    // 「0 行だから安全」という検証が軒並み素通りする。ここで落としておく。
+    expect(SUPABASE_URL, 'SUPABASE_URL が未設定').toBeTruthy();
+    expect(SUPABASE_ANON_KEY, 'SUPABASE_ANON_KEY が未設定').toBeTruthy();
+
     a = await signIn(USER_A);
     b = await signIn(USER_B);
     expect(a.userId).not.toBe(b.userId);
