@@ -1,7 +1,6 @@
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeGate } from '@/features/shared/auth/components/home-gate';
-import { DOCS_SITE_URL } from '@/lib/docs-site';
 
 /**
  * ルート（/）の振り分けゲート。公開ページを別ドメインの公開サイトへ移したことで、
@@ -74,7 +73,7 @@ describe('HomeGate', () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it('Supabase のエラー hash では確認画面へ送り、公開サイトへ離脱させない', () => {
+  it('Supabase のエラー hash では確認画面へ送り、ログイン画面へ流さない', () => {
     // 期限切れ・使用済みリンクはトークンではなくエラーで戻ってくる。ここで拾わないと
     // 「トークンも無い・未ログイン」と判定され、理由を見せないまま別ドメインへ飛ぶ。
     stubLocation(
@@ -103,16 +102,24 @@ describe('HomeGate', () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it('ブラウザで開いた未ログイン訪問者は公開サイトへ送る', () => {
+  // 以前はここで公開サイト（別ドメイン）へ飛ばしていた。アプリのドメインを開いた人が
+  // 「戻れないまま外へ出される」状態になり、プレビュー（常に未ログイン）では
+  // 動作確認そのものができなかった。アプリのドメインはアプリの入口として扱う。
+  it('ブラウザで開いた未ログイン訪問者はログイン画面へ送る', () => {
     render(<HomeGate />);
 
-    expect(locationReplace).toHaveBeenCalledWith(DOCS_SITE_URL);
-    expect(replace).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith('/login');
+    expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it('PWA から起動した未ログイン利用者はログイン画面へ送る（Issue #437）', () => {
-    // ホーム画面のショートカットは古い start_url（＝ここ）のまま起動しうる。公開サイトを
-    // 別ドメインに出したので、この分岐が無いとアプリに戻れないまま外へ飛ばされる。
+  it('外部ドメインへ離脱させない', () => {
+    render(<HomeGate />);
+
+    expect(locationReplace).not.toHaveBeenCalled();
+  });
+
+  it('PWA から起動した未ログイン利用者もログイン画面へ送る（Issue #437）', () => {
+    // ホーム画面のショートカットは古い start_url（＝ここ）のまま起動しうる。
     setDisplayMode(true);
     render(<HomeGate />);
 
