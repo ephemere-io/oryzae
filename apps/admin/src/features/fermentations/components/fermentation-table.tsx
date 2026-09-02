@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { FermentationItem } from '../hooks/use-fermentations';
 
 function formatDate(iso: string): string {
@@ -115,12 +116,34 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
     <Table>
       <TableHeader>
         <TableRow>
-          <SortableHead label="Date" sortKeyName="created_at" />
-          <SortableHead label="User" sortKeyName="user_email" />
-          <SortableHead label="Period" sortKeyName="target_period" />
-          <SortableHead label="Status" sortKeyName="status" />
-          <TableHead>Error</TableHead>
-          <TableHead>Cost</TableHead>
+          <SortableHead label="日時" sortKeyName="created_at" />
+          <SortableHead label="ユーザー" sortKeyName="user_email" />
+          <SortableHead label="対象期間" sortKeyName="target_period" />
+          <SortableHead label="状態" sortKeyName="status" />
+          <TableHead>エラー</TableHead>
+          <TableHead>
+            <Tooltip
+              content={
+                <span>
+                  <strong>実請求額ではありません。</strong>
+                  保存済みトークン数 × 価格表（claude-sonnet-4-6: 入力 $3 / 出力 $15 per 1M）
+                  で計算した推定です。
+                  <br />
+                  キャッシュ割引・tier 割引・期間限定価格は反映されません（実測で 40%
+                  前後ずれます）。
+                  <br />
+                  <span className="text-muted-foreground">
+                    1 件ごとの金額は Anthropic 側が出せない（user_id を持たない）ため、ここは
+                    推定でしか出せません。実請求額は Observability → AI Spend を見てください
+                  </span>
+                </span>
+              }
+            >
+              <span className="cursor-help underline decoration-dotted underline-offset-2">
+                推定コスト
+              </span>
+            </Tooltip>
+          </TableHead>
           <TableHead className="w-[48px]" />
         </TableRow>
       </TableHeader>
