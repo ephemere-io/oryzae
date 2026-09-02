@@ -3,11 +3,15 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import type { Context, MiddlewareHandler, Next } from 'hono';
 
-type RateLimitTier = 'fermentation' | 'auth_strict' | 'auth_lenient' | 'general';
+type RateLimitTier = 'fermentation' | 'ocr' | 'auth_strict' | 'auth_lenient' | 'general';
 type IdentifierMode = 'ip' | 'user_or_ip' | 'token_or_ip';
 
 const TIER_CONFIG: Record<RateLimitTier, { requests: number; windowMs: number }> = {
   fermentation: { requests: 5, windowMs: 60_000 },
+  // OCR も 1 回ごとに LLM を叩く。発酵分析より一段ゆるいのは、写真を続けて何枚か
+  // 読ませる使い方が自然だから。general(60/分) のままだと、5MB の画像で毎分 60 回
+  // Opus を回せてしまう。
+  ocr: { requests: 15, windowMs: 60_000 },
   auth_strict: { requests: 20, windowMs: 60_000 },
   auth_lenient: { requests: 120, windowMs: 60_000 },
   general: { requests: 60, windowMs: 60_000 },
@@ -119,6 +123,10 @@ function createRateLimitMiddleware(tier: RateLimitTier, mode: IdentifierMode): M
 
 export function rateLimitFermentation(): MiddlewareHandler {
   return createRateLimitMiddleware('fermentation', 'user_or_ip');
+}
+
+export function rateLimitOcr(): MiddlewareHandler {
+  return createRateLimitMiddleware('ocr', 'user_or_ip');
 }
 
 // Dispatches between strict (IP-based, 20/min — brute-force-prone endpoints)

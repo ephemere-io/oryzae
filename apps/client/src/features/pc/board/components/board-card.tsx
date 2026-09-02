@@ -3,7 +3,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useRef } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
-import { EntryCardContent } from './entry-card-content';
 import { PhotoCardContent } from './photo-card-content';
 import { SnippetCardContent } from './snippet-card-content';
 
@@ -22,12 +21,6 @@ interface BoardCardProps {
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
   onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
-}
-
-function isEntryContent(
-  content: BoardCardData['content'],
-): content is { title: string; preview: string; createdAt: string } {
-  return 'title' in content;
 }
 
 function isSnippetContent(content: BoardCardData['content']): content is { text: string } {
@@ -120,6 +113,8 @@ export function BoardCard({
         outline: isSelected ? '1.5px solid rgba(74,158,142,0.5)' : 'none',
         outlineOffset: isSelected ? 4 : 0,
         overflow: isSelected ? 'visible' : 'hidden',
+        // 編集中だけ文字を選べるようにする。常に選べると、掴んで動かそうとした
+        // だけで選択が始まってカードが動かせない。
         userSelect: 'none',
         touchAction: 'none',
         animation: card.removing
@@ -130,27 +125,14 @@ export function BoardCard({
       }}
       onPointerDown={handlePointerDown}
       onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onClick(card);
+      }}
     >
-      {/* Invisible double-click target */}
-      <button
-        type="button"
-        aria-label={
-          card.cardType === 'entry'
-            ? 'Open entry'
-            : card.cardType === 'photo'
-              ? 'View photo'
-              : 'Edit snippet'
-        }
-        className="absolute inset-0 z-[1] cursor-grab bg-transparent"
-        style={{ border: 'none', outline: 'none' }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          onClick(card);
-        }}
-      />
-      {card.cardType === 'entry' && isEntryContent(card.content) && (
-        <EntryCardContent content={card.content} />
-      )}
+      {/* 全面を覆う透明ボタンは置かない。以前はダブルクリックの的として敷いていたが、
+          それがカードの文字を一切選べなくしていた（コピーもできなかった）。
+          ダブルクリックはカード本体で受ける。 */}
       {card.cardType === 'snippet' && isSnippetContent(card.content) && (
         <SnippetCardContent content={card.content} />
       )}
@@ -213,7 +195,7 @@ export function BoardCard({
               backgroundColor: 'var(--bg)',
               border: '2px solid var(--accent)',
               opacity: 1,
-              cursor: 'crosshair',
+              cursor: 'grab',
               zIndex: 10,
             }}
           >

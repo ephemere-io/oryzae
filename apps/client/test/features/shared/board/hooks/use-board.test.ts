@@ -23,7 +23,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-1',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-1',
           x: 100,
           y: 200,
@@ -32,7 +32,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-11T00:00:00Z',
-          content: { title: 'Test', preview: 'Preview', createdAt: '2026-04-11T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -80,7 +80,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-2',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-2',
           x: 50,
           y: 50,
@@ -89,7 +89,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-12T00:00:00Z',
-          content: { title: 'T', preview: 'P', createdAt: '2026-04-12T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -117,7 +117,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-old',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-1',
           x: 100,
           y: 100,
@@ -126,7 +126,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 1,
           createdAt: '2026-04-11T08:00:00Z',
-          content: { title: 'Old', preview: 'Old entry', createdAt: '2026-04-11T08:00:00Z' },
+          content: { text: 'Test' },
         },
         {
           id: 'c-new',
@@ -162,7 +162,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'stale-card',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-stale',
           x: 0,
           y: 0,
@@ -171,7 +171,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-11T00:00:00Z',
-          content: { title: 'Stale', preview: 'P', createdAt: '2026-04-11T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -181,7 +181,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'fresh-card',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-fresh',
           x: 0,
           y: 0,
@@ -190,7 +190,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-12T00:00:00Z',
-          content: { title: 'Fresh', preview: 'P', createdAt: '2026-04-12T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -230,7 +230,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-old-dragged',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-1',
           x: 100,
           y: 100,
@@ -240,7 +240,7 @@ describe('useBoard', () => {
           zIndex: 10,
           userPositioned: true,
           createdAt: '2026-04-11T08:00:00Z',
-          content: { title: 'Old but dragged', preview: 'P', createdAt: '2026-04-11T08:00:00Z' },
+          content: { text: 'Test' },
         },
         {
           id: 'c-new',
@@ -470,5 +470,39 @@ describe('useBoard', () => {
     // 3枚とも自動配置なので、作成日時順に並び直る（新しいものほど手前）
     expect(byId('c-oldest')!.zIndex).toBeLessThan(byId('c-middle')!.zIndex);
     expect(byId('c-middle')!.zIndex).toBeLessThan(byId('c-newest')!.zIndex);
+  });
+  it('写真の作成が失敗したら投げ返す（黙って閉じさせない）', async () => {
+    // 以前は res.ok を見て false なら何もせず返していた。呼び出し側の PhotoDialog は
+    // 例外が来たときだけエラーを出すので、失敗が画面に何も残らず
+    // 「押しても貼れない」としか見えなかった。
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiFetch.mockResolvedValueOnce(mockResponse(false, { error: 'boom' }));
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    await expect(result.current.createPhoto(file, '', 10, 10)).rejects.toThrow(
+      /create board photo/,
+    );
+  });
+
+  it('写真の作成に成功したらボードを取り直す', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { photoId: 'p-1' }));
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    await act(async () => {
+      await result.current.createPhoto(file, 'キャプション', 10, 10);
+    });
+
+    const paths = apiFetch.mock.calls.map((c) => c[0]);
+    expect(paths).toContain('/api/v1/board/photos');
+    // 作成 → 再取得 の順で2本目以降が飛んでいる
+    expect(paths.filter((p) => p.startsWith('/api/v1/board?')).length).toBeGreaterThanOrEqual(2);
   });
 });

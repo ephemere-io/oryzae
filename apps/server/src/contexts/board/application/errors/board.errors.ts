@@ -20,3 +20,5 @@ export class BoardCardValidationError extends ValidationError {}
 export class BoardSnippetValidationError extends ValidationError {}
 
 export class BoardPhotoValidationError extends ValidationError {}
+
+export class BoardOcrValidationError extends ValidationError {}

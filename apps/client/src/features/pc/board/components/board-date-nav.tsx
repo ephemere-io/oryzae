@@ -2,6 +2,13 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import {
+  CONTROL_FONT,
+  CONTROL_TEXT,
+  GHOST_BUTTON_CLASS,
+  IDLE_HOVER_CLASS,
+  PLAIN_ROW_CLASS,
+} from './board-surface';
 
 interface BoardDateNavProps {
   dateKey: string;
@@ -44,6 +51,13 @@ function shiftDate(dateKey: string, offset: number): string {
   return toDateKey(d);
 }
 
+/**
+ * 盤面左上の日付ナビ（‹ ラベル ›）。
+ *
+ * viewType は受け取るが切り替えは持たない。ラベル（1日 or 月〜日の範囲）と送り幅
+ * （1日 or 7日）が viewType で変わるため表示にだけ使う。切り替え自体は隣の
+ * BoardViewSwitch、作成系の道具は下部の BoardToolbar が持つ。
+ */
 export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavProps) {
   const t = useTranslations('board');
   const days = [
@@ -61,27 +75,29 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
   return (
     <div
       {...verifyAttrs({ unit: 'BoardDateNav', viewType, dateKey, label })}
-      className="absolute left-6 top-5 z-10 flex items-center gap-3"
-      style={{ fontFamily: 'Inter, sans-serif' }}
+      // ここは「今どこを見ているか」の情報。面を持たせず、盤面に直接置かれた文字として
+      // 読ませる（浮かせるのは道具箱だけ、という約束を崩さない）。
+      // 位置は持たない——上段バー（BoardView の TOP_BAR）が並べる。
+      className={`${PLAIN_ROW_CLASS} h-8`}
+      style={CONTROL_FONT}
     >
       <button
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, -offset))}
-        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors"
+        data-verify-nav="prev"
+        className={`${GHOST_BUTTON_CLASS} ${IDLE_HOVER_CLASS} hover:text-[var(--fg)]`}
         style={{ color: 'var(--date-color)' }}
       >
         ‹
       </button>
-      <span
-        className="text-[10px] font-medium uppercase tracking-wider"
-        style={{ color: 'var(--date-color)' }}
-      >
+      <span className={`px-1 ${CONTROL_TEXT}`} style={{ color: 'var(--fg)' }}>
         {label}
       </span>
       <button
         type="button"
         onClick={() => onDateChange(shiftDate(dateKey, offset))}
-        className="flex h-6 w-6 items-center justify-center rounded text-sm transition-colors"
+        data-verify-nav="next"
+        className={`${GHOST_BUTTON_CLASS} ${IDLE_HOVER_CLASS} hover:text-[var(--fg)]`}
         style={{ color: 'var(--date-color)' }}
       >
         ›

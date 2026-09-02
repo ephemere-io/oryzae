@@ -1,3 +1,4 @@
+import { MAX_SNIPPET_TEXT_LENGTH } from '@oryzae/shared';
 import { describe, expect, it } from 'vitest';
 import { BoardSnippet } from '@/contexts/board/domain/models/board-snippet';
 
@@ -31,8 +32,8 @@ describe('BoardSnippet', () => {
       }
     });
 
-    it('51文字以上のテキストで TEXT_TOO_LONG エラーを返す', () => {
-      const longText = 'a'.repeat(51);
+    it('2001文字以上のテキストで TEXT_TOO_LONG エラーを返す', () => {
+      const longText = 'a'.repeat(2001);
       const result = BoardSnippet.create({ userId: 'user-1', text: longText }, generateId);
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -40,8 +41,8 @@ describe('BoardSnippet', () => {
       }
     });
 
-    it('50文字ちょうどのテキストは成功する', () => {
-      const maxText = 'a'.repeat(50);
+    it('2000文字ちょうどのテキストは成功する', () => {
+      const maxText = 'a'.repeat(2000);
       const result = BoardSnippet.create({ userId: 'user-1', text: maxText }, generateId);
       expect(result.success).toBe(true);
     });
@@ -87,8 +88,8 @@ describe('BoardSnippet', () => {
       }
     });
 
-    it('51文字で TEXT_TOO_LONG エラーを返す', () => {
-      const result = snippet.withText('a'.repeat(51));
+    it('2001文字で TEXT_TOO_LONG エラーを返す', () => {
+      const result = snippet.withText('a'.repeat(2001));
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.type).toBe('TEXT_TOO_LONG');
@@ -98,6 +99,26 @@ describe('BoardSnippet', () => {
     it('元の BoardSnippet は変更されない（イミュータブル）', () => {
       snippet.withText('変更');
       expect(snippet.text).toBe('オリジナル');
+    });
+  });
+  // domain は最内層なので packages/shared を import できず、上限値を自前で持っている。
+  // 「コメントで揃えてね」だけだと必ずずれる——実際、同じ理由で Zod スキーマに
+  // .max(50) が取り残され、長い本文が 500 で弾かれた。ここで機械的に縛る。
+  describe('上限値は packages/shared と同じであること', () => {
+    it('shared の上限ちょうどは通る', () => {
+      const result = BoardSnippet.create(
+        { userId: 'u', text: 'a'.repeat(MAX_SNIPPET_TEXT_LENGTH) },
+        generateId,
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('shared の上限を1文字越えると弾かれる', () => {
+      const result = BoardSnippet.create(
+        { userId: 'u', text: 'a'.repeat(MAX_SNIPPET_TEXT_LENGTH + 1) },
+        generateId,
+      );
+      expect(result.success).toBe(false);
     });
   });
 });

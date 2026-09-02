@@ -8,9 +8,16 @@ interface FooterEntry {
   label: string;
 }
 
+/**
+ * フッターを出さないルート。
+ *
+ * /board は Figma 風の下部中央ツールバー（BoardToolbar）が同じ帯を使う。ステータス表示の
+ * ためだけの 36px を残すと道具箱が押し上げられ、キャンバスも削られるので出さない。
+ */
+const HIDDEN_PATHS = ['/board'];
+
 function buildEntries(questionsLabel: string): FooterEntry[] {
   return [
-    { match: (p) => p === '/board', label: 'BOARD' },
     { match: (p) => p === '/jar', label: 'FERMENTING' },
     { match: (p) => p === '/entries/new' || p.startsWith('/entries/'), label: 'EDITOR' },
     { match: (p) => p === '/entries', label: 'LIST' },
@@ -37,6 +44,8 @@ export function PageFooter() {
   const t = useTranslations('footer.label');
   const entries = buildEntries(t('questions'));
   const label = resolveLabel(pathname, entries);
+
+  if (HIDDEN_PATHS.includes(pathname)) return null;
 
   return (
     <footer
