@@ -420,13 +420,8 @@ export function BoardView({ api }: BoardViewProps) {
               items={cards.filter((c) => !c.removing).map((c) => ({ id: c.id, ...cardBounds(c) }))}
             />
 
-            {/* Card count — ミニマップ（高さ100 + 下余白16）の上に逃がす。 */}
-            <div
-              className="pointer-events-none absolute right-4 z-10 text-[10px] uppercase tracking-[0.15em]"
-              style={{ bottom: 124, color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
-            >
-              {visibleCardCount} CARDS
-            </div>
+            {/* 「n CARDS」は置かない。PR #524 で「常に見えている必要がない」として
+                外されたもので、こちらのマージで復活させてしまっていた（E2E が検出）。 */}
           </div>
         }
       >
