@@ -1,6 +1,5 @@
 import {
   boardCardUpdateSchema,
-  boardEntryCardCreateSchema,
   boardQuerySchema,
   boardSnippetCreateSchema,
   boardSnippetUpdateSchema,
@@ -8,7 +7,6 @@ import {
   MAX_PHOTO_CAPTION_LENGTH,
 } from '@oryzae/shared';
 import { Hono } from 'hono';
-import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
 import { rateLimitOcr } from '../../../shared/presentation/middleware/rate-limit.js';
 import { CreateBoardPhotoUsecase } from '../../application/usecases/create-board-photo.usecase.js';
 import { CreateBoardSnippetUsecase } from '../../application/usecases/create-board-snippet.usecase.js';
@@ -16,9 +14,7 @@ import { DeleteBoardPhotoUsecase } from '../../application/usecases/delete-board
 import { DeleteBoardSnippetUsecase } from '../../application/usecases/delete-board-snippet.usecase.js';
 import { DeleteCardUsecase } from '../../application/usecases/delete-card.usecase.js';
 import { ExtractTextFromImageUsecase } from '../../application/usecases/extract-text-from-image.usecase.js';
-import { ListPlaceableEntriesUsecase } from '../../application/usecases/list-placeable-entries.usecase.js';
 import { LoadBoardUsecase } from '../../application/usecases/load-board.usecase.js';
-import { PlaceEntryCardUsecase } from '../../application/usecases/place-entry-card.usecase.js';
 import { SaveCardPositionsUsecase } from '../../application/usecases/save-card-positions.usecase.js';
 import { UpdateBoardSnippetUsecase } from '../../application/usecases/update-board-snippet.usecase.js';
 import { AnthropicOcrGateway } from '../../infrastructure/ocr/anthropic-ocr.gateway.js';
@@ -41,14 +37,6 @@ const generateId = () => crypto.randomUUID();
 const MULTIPART_OVERHEAD_BYTES = 8 * 1024;
 const MAX_OCR_UPLOAD_BYTES = MAX_OCR_IMAGE_BYTES + MULTIPART_OVERHEAD_BYTES;
 
-/** `getTimezoneOffset()` 相当の分数。±14 時間を超える値は不正として 0 に落とす。 */
-function parseTzOffset(raw: string | undefined): number {
-  if (!raw) return 0;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || Math.abs(parsed) > 14 * 60) return 0;
-  return parsed;
-}
-
 export const board = new Hono<Env>()
   // GET /api/v1/board?dateKey=YYYY-MM-DD&viewType=daily|weekly
   .get('/', async (c) => {
@@ -61,47 +49,16 @@ export const board = new Hono<Env>()
     const boardSnippetRepo = new SupabaseBoardSnippetRepository(supabase);
     const boardPhotoRepo = new SupabaseBoardPhotoRepository(supabase);
     const boardStorage = new SupabaseBoardStorageGateway(supabase);
-    const entryRepo = new SupabaseEntryRepository(supabase);
     const usecase = new LoadBoardUsecase(
       boardCardRepo,
       boardSnippetRepo,
       boardPhotoRepo,
       boardStorage,
-      entryRepo,
       generateId,
     );
 
     const result = await usecase.execute(c.get('userId'), dateKey, viewType);
     return c.json(result);
-  })
-
-  // GET /api/v1/board/entries — その日/その週に書いた日記のうち盤面に置ける候補
-  .get('/entries', async (c) => {
-    const { dateKey } = boardQuerySchema.parse({ dateKey: c.req.query('dateKey') });
-    const viewType = c.req.query('viewType') === 'weekly' ? 'weekly' : 'daily';
-    const tzOffsetMinutes = parseTzOffset(c.req.query('tzOffset'));
-    const supabase = c.get('supabase');
-    const usecase = new ListPlaceableEntriesUsecase(
-      new SupabaseEntryRepository(supabase),
-      new SupabaseBoardCardRepository(supabase),
-    );
-
-    const result = await usecase.execute(c.get('userId'), dateKey, viewType, tzOffsetMinutes);
-    return c.json(result);
-  })
-
-  // POST /api/v1/board/cards/entry — 選んだ日記を盤面に置く
-  .post('/cards/entry', async (c) => {
-    const body = boardEntryCardCreateSchema.parse(await c.req.json());
-    const supabase = c.get('supabase');
-    const usecase = new PlaceEntryCardUsecase(
-      new SupabaseEntryRepository(supabase),
-      new SupabaseBoardCardRepository(supabase),
-      generateId,
-    );
-
-    const result = await usecase.execute(c.get('userId'), body);
-    return c.json(result, 201);
   })
 
   // PUT /api/v1/board/cards

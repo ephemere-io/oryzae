@@ -1,13 +1,5 @@
 /** ボード（日付ごとの自由配置ビュー）の共有型（端末非依存）。 */
 
-export interface EntryContent {
-  /** 本文の1行目。カードの見出し。 */
-  title: string;
-  /** 見出し行を除いた本文の全部。カードで見えているものと編集するものは同じ。 */
-  body: string;
-  createdAt: string;
-}
-
 interface SnippetContent {
   text: string;
 }
@@ -17,20 +9,10 @@ interface PhotoContent {
   caption: string;
 }
 
-/** 盤面に置ける日記の候補（その日/その週に書いたもの）。 */
-export interface PlaceableEntry {
-  id: string;
-  title: string;
-  preview: string;
-  createdAt: string;
-  /** すでに盤面にあるか。置かれていても一覧からは消さず、状態として見せる。 */
-  placed: boolean;
-}
-
 /** ボード上に置かれた1枚のカード。 */
 export interface BoardCardData {
   id: string;
-  cardType: 'entry' | 'snippet' | 'photo';
+  cardType: 'snippet' | 'photo';
   refId: string;
   x: number;
   y: number;
@@ -44,7 +26,7 @@ export interface BoardCardData {
    */
   userPositioned: boolean;
   createdAt: string;
-  content: EntryContent | SnippetContent | PhotoContent;
+  content: SnippetContent | PhotoContent;
   removing?: boolean;
 }
 

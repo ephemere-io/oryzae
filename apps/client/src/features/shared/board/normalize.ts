@@ -1,4 +1,4 @@
-import type { BoardCardData, PlaceableEntry } from '@/features/shared/board/types';
+import type { BoardCardData } from '@/features/shared/board/types';
 
 /**
  * ボード API レスポンスの正規化。
@@ -26,7 +26,7 @@ function str(value: unknown): string {
 }
 
 function cardType(value: unknown): BoardCardData['cardType'] | null {
-  return value === 'entry' || value === 'snippet' || value === 'photo' ? value : null;
+  return value === 'snippet' || value === 'photo' ? value : null;
 }
 
 /**
@@ -37,9 +37,6 @@ function cardContent(
   type: BoardCardData['cardType'],
   raw: Record<string, unknown>,
 ): BoardCardData['content'] {
-  if (type === 'entry') {
-    return { title: str(raw.title), body: str(raw.body), createdAt: str(raw.createdAt) };
-  }
   if (type === 'snippet') return { text: str(raw.text) };
   return { imageUrl: str(raw.imageUrl), caption: str(raw.caption) };
 }
@@ -72,32 +69,6 @@ export function normalizeBoardCards(input: unknown): BoardCardData[] {
       userPositioned: raw.userPositioned === true,
       createdAt: str(raw.createdAt),
       content: cardContent(type, raw.content),
-    });
-  }
-  return out;
-}
-
-/**
- * 盤面に置ける日記の候補の正規化。カードと同じ「厳しい方に寄せる」方針で、
- * 配列でなければ空、id を持たない要素は落とす。
- *
- * 素通しにすると `{ entries: [null] }` のような応答がそのまま state に入り、
- * 描画側の `entry.title` で落ちる（ダイアログごと死ぬ）。
- */
-export function normalizePlaceableEntries(input: unknown): PlaceableEntry[] {
-  if (!Array.isArray(input)) return [];
-
-  const out: PlaceableEntry[] = [];
-  for (const raw of input) {
-    if (!isObject(raw) || typeof raw.id !== 'string') continue;
-    out.push({
-      id: raw.id,
-      title: str(raw.title),
-      preview: str(raw.preview),
-      createdAt: str(raw.createdAt),
-      // 不明なら「置いていない」に倒す。置けるはずのものが押せないより、
-      // 押して二重に置こうとしたときにサーバが既存カードを返すほうが安全。
-      placed: raw.placed === true,
     });
   }
   return out;

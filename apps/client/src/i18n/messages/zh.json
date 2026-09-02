@@ -312,33 +312,13 @@
       "aria_label": "看板工具栏",
       "snippet": "创建摘录",
       "photo": "粘贴图片",
-      "entry": "放置条目",
       "aria_label_card": "所选卡片的操作",
-      "open_entry": "打开日记",
       "bring_to_front": "移到最前",
       "delete": "删除",
       "open": "打开",
-      "edit": "编辑",
       "ocr": "从图片读取"
     },
-    "drop_image": "把图片拖到这里",
-    "entry_picker": {
-      "aria_label": "放置条目",
-      "heading": "放置条目",
-      "lead": "从这段时间写的日记中选择并放到板上。",
-      "loading": "加载中…",
-      "load_failed": "无法获取列表。",
-      "empty": "这段时间还没有写过日记。",
-      "untitled": "（无标题）",
-      "place": "放置",
-      "already_placed": "已放置",
-      "close": "关闭",
-      "place_failed": "无法放到板上，请重试。"
-    },
-    "entry_card": {
-      "edit_aria": "日记正文",
-      "title_aria": "日记标题"
-    }
+    "drop_image": "把图片拖到这里"
   },
   "editor": {
     "status": {

@@ -312,33 +312,13 @@
       "aria_label": "Board toolbar",
       "snippet": "Create snippet",
       "photo": "Paste image",
-      "entry": "Place an entry",
       "aria_label_card": "Actions for the selected card",
-      "open_entry": "Open entry",
       "bring_to_front": "Bring to front",
       "delete": "Delete",
       "open": "Open",
-      "edit": "Edit",
       "ocr": "Read from image"
     },
-    "drop_image": "Drop the image here",
-    "entry_picker": {
-      "aria_label": "Place an entry",
-      "heading": "Place an entry",
-      "lead": "Choose from the entries you wrote in this period.",
-      "loading": "Loading…",
-      "load_failed": "Couldn't load the list.",
-      "empty": "No entries written in this period yet.",
-      "untitled": "(untitled)",
-      "place": "Place",
-      "already_placed": "On board",
-      "close": "Close",
-      "place_failed": "Couldn't place it on the board. Please try again."
-    },
-    "entry_card": {
-      "edit_aria": "Entry body",
-      "title_aria": "Entry title"
-    }
+    "drop_image": "Drop the image here"
   },
   "editor": {
     "status": {

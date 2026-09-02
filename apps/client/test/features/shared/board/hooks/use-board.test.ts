@@ -23,7 +23,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-1',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-1',
           x: 100,
           y: 200,
@@ -32,7 +32,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-11T00:00:00Z',
-          content: { title: 'Test', preview: 'Preview', createdAt: '2026-04-11T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -80,7 +80,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-2',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-2',
           x: 50,
           y: 50,
@@ -89,7 +89,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-12T00:00:00Z',
-          content: { title: 'T', preview: 'P', createdAt: '2026-04-12T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -117,7 +117,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-old',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-1',
           x: 100,
           y: 100,
@@ -126,7 +126,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 1,
           createdAt: '2026-04-11T08:00:00Z',
-          content: { title: 'Old', preview: 'Old entry', createdAt: '2026-04-11T08:00:00Z' },
+          content: { text: 'Test' },
         },
         {
           id: 'c-new',
@@ -162,7 +162,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'stale-card',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-stale',
           x: 0,
           y: 0,
@@ -171,7 +171,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-11T00:00:00Z',
-          content: { title: 'Stale', preview: 'P', createdAt: '2026-04-11T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -181,7 +181,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'fresh-card',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-fresh',
           x: 0,
           y: 0,
@@ -190,7 +190,7 @@ describe('useBoard', () => {
           height: 280,
           zIndex: 0,
           createdAt: '2026-04-12T00:00:00Z',
-          content: { title: 'Fresh', preview: 'P', createdAt: '2026-04-12T00:00:00Z' },
+          content: { text: 'Test' },
         },
       ],
     };
@@ -230,7 +230,7 @@ describe('useBoard', () => {
       cards: [
         {
           id: 'c-old-dragged',
-          cardType: 'entry',
+          cardType: 'snippet',
           refId: 'e-1',
           x: 100,
           y: 100,
@@ -240,7 +240,7 @@ describe('useBoard', () => {
           zIndex: 10,
           userPositioned: true,
           createdAt: '2026-04-11T08:00:00Z',
-          content: { title: 'Old but dragged', preview: 'P', createdAt: '2026-04-11T08:00:00Z' },
+          content: { text: 'Test' },
         },
         {
           id: 'c-new',
@@ -504,32 +504,5 @@ describe('useBoard', () => {
     expect(paths).toContain('/api/v1/board/photos');
     // 作成 → 再取得 の順で2本目以降が飛んでいる
     expect(paths.filter((p) => p.startsWith('/api/v1/board?')).length).toBeGreaterThanOrEqual(2);
-  });
-  it('選んだ日記を置き、置いたらボードを取り直す', async () => {
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
-    const api = createMockApi(apiFetch);
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { cardId: 'c-1', refId: 'e-1' }));
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
-    await act(async () => {
-      await result.current.placeEntry('e-1');
-    });
-
-    const call = apiFetch.mock.calls.find((c) => c[0] === '/api/v1/board/cards/entry');
-    expect(call).toBeDefined();
-    expect(JSON.parse(call![1].body)).toMatchObject({ entryId: 'e-1', dateKey: '2026-04-11' });
-    expect(apiFetch.mock.calls.filter((c) => c[0].startsWith('/api/v1/board?')).length).toBe(2);
-  });
-
-  it('日記を置けなかったら投げ返す（黙って閉じさせない）', async () => {
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
-    const api = createMockApi(apiFetch);
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    apiFetch.mockResolvedValueOnce(mockResponse(false, { error: 'boom' }));
-    await expect(result.current.placeEntry('e-1')).rejects.toThrow(/place entry card/);
   });
 });

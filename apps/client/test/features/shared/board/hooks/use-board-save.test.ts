@@ -27,7 +27,7 @@ describe('useBoardSave', () => {
     const cards: BoardCardData[] = [
       {
         id: 'c-1',
-        cardType: 'entry',
+        cardType: 'snippet',
         refId: 'e-1',
         x: 100,
         y: 200,
@@ -37,7 +37,7 @@ describe('useBoardSave', () => {
         zIndex: 0,
         userPositioned: false,
         createdAt: '2026-04-11T00:00:00Z',
-        content: { title: '', body: '', createdAt: '' },
+        content: { text: 'メモ' },
       },
     ];
 
@@ -67,7 +67,7 @@ describe('useBoardSave', () => {
     const cards1: BoardCardData[] = [
       {
         id: 'c-1',
-        cardType: 'entry',
+        cardType: 'snippet',
         refId: 'e-1',
         x: 100,
         y: 200,
@@ -77,13 +77,13 @@ describe('useBoardSave', () => {
         zIndex: 0,
         userPositioned: false,
         createdAt: '2026-04-11T00:00:00Z',
-        content: { title: '', body: '', createdAt: '' },
+        content: { text: 'メモ' },
       },
     ];
     const cards2: BoardCardData[] = [
       {
         id: 'c-1',
-        cardType: 'entry',
+        cardType: 'snippet',
         refId: 'e-1',
         x: 200,
         y: 300,
@@ -93,7 +93,7 @@ describe('useBoardSave', () => {
         zIndex: 1,
         userPositioned: false,
         createdAt: '2026-04-11T00:00:00Z',
-        content: { title: '', body: '', createdAt: '' },
+        content: { text: 'メモ' },
       },
     ];
 

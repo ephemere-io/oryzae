@@ -3,7 +3,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useRef } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
-import { EntryCardContent } from './entry-card-content';
 import { PhotoCardContent } from './photo-card-content';
 import { SnippetCardContent } from './snippet-card-content';
 
@@ -22,19 +21,6 @@ interface BoardCardProps {
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
   onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
-  /** カード上で本文を編集中か。編集中はドラッグせず、文字を選べるようにする。 */
-  isEditing?: boolean;
-  /** 編集中の見出し・本文。表示中と同じものが入る。 */
-  editTitle?: string;
-  editBody?: string;
-  onEditTitleChange?: (next: string) => void;
-  onEditBodyChange?: (next: string) => void;
-}
-
-function isEntryContent(
-  content: BoardCardData['content'],
-): content is { title: string; body: string; createdAt: string } {
-  return 'title' in content;
 }
 
 function isSnippetContent(content: BoardCardData['content']): content is { text: string } {
@@ -56,23 +42,15 @@ export function BoardCard({
   onResizeStart,
   onDelete,
   onClick,
-  isEditing = false,
-  editTitle = '',
-  editBody = '',
-  onEditTitleChange,
-  onEditBodyChange,
 }: BoardCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.stopPropagation();
-      // 編集中はドラッグを始めない。始めてしまうと、本文を選ぼうとしただけで
-      // カードが動き、文字も選べない（pointerdown を握ったままになるため）。
-      if (isEditing) return;
       onPointerDown(card.id, e.clientX, e.clientY);
     },
-    [card.id, onPointerDown, isEditing],
+    [card.id, onPointerDown],
   );
 
   const handleRotateDown = useCallback(
@@ -108,7 +86,6 @@ export function BoardCard({
         unit: 'BoardCard',
         cardType: card.cardType,
         selected: isSelected,
-        editing: isEditing,
         dragging: isDragging,
         rotation: card.rotation,
         removing: Boolean(card.removing),
@@ -121,7 +98,7 @@ export function BoardCard({
         height: card.height,
         transform: `rotate(${card.rotation}deg)`,
         zIndex: isDragging ? 1000 : card.zIndex,
-        cursor: isEditing ? 'default' : isDragging ? 'grabbing' : 'grab',
+        cursor: isDragging ? 'grabbing' : 'grab',
         borderRadius: 2,
         backgroundColor:
           card.cardType === 'snippet'
@@ -138,7 +115,7 @@ export function BoardCard({
         overflow: isSelected ? 'visible' : 'hidden',
         // 編集中だけ文字を選べるようにする。常に選べると、掴んで動かそうとした
         // だけで選択が始まってカードが動かせない。
-        userSelect: isEditing ? 'text' : 'none',
+        userSelect: 'none',
         touchAction: 'none',
         animation: card.removing
           ? 'itemRemove 0.28s ease forwards'
@@ -150,23 +127,12 @@ export function BoardCard({
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        if (isEditing) return;
         onClick(card);
       }}
     >
       {/* 全面を覆う透明ボタンは置かない。以前はダブルクリックの的として敷いていたが、
           それがカードの文字を一切選べなくしていた（コピーもできなかった）。
           ダブルクリックはカード本体で受ける。 */}
-      {card.cardType === 'entry' && isEntryContent(card.content) && (
-        <EntryCardContent
-          content={card.content}
-          editing={isEditing}
-          editTitle={editTitle}
-          editBody={editBody}
-          onEditTitleChange={onEditTitleChange}
-          onEditBodyChange={onEditBodyChange}
-        />
-      )}
       {card.cardType === 'snippet' && isSnippetContent(card.content) && (
         <SnippetCardContent content={card.content} />
       )}

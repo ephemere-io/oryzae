@@ -11,7 +11,7 @@ import {
 } from './board-surface';
 
 /** ツールバーで選べる道具。'none' はどのダイアログも開いていない状態。 */
-type BoardTool = 'none' | 'snippet' | 'ocr' | 'photo' | 'entry';
+type BoardTool = 'none' | 'snippet' | 'ocr' | 'photo';
 
 interface BoardToolbarProps {
   activeTool: BoardTool;
@@ -19,18 +19,15 @@ interface BoardToolbarProps {
   /** 画像から文字を読み取ってスニペットにする。作成ダイアログを画像タブで開く。 */
   onReadImage: () => void;
   onAddPhoto: () => void;
-  onPlaceEntry: () => void;
   /** 選択中のカード。null なら作成系の道具を出す。 */
-  selection: { cardType: 'entry' | 'snippet' | 'photo' } | null;
+  selection: { cardType: 'snippet' | 'photo' } | null;
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
   onDeleteSelected: () => void;
-  /** entry カードだけ: カードの上で本文を編集する。 */
-  onEditSelectedOnCard?: () => void;
 }
 
 interface ToolSpec {
-  id: 'snippet' | 'ocr' | 'entry' | 'photo';
+  id: 'snippet' | 'ocr' | 'photo';
   label: string;
   shortcut: string;
   onSelect: () => void;
@@ -82,25 +79,6 @@ function ScanTextIcon() {
   );
 }
 
-function EntryIcon() {
-  return (
-    <svg {...ICON_PROPS} aria-hidden="true">
-      <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
-      <path d="M15 4v5h5" />
-      <path d="M7 13h8M7 17h5" />
-    </svg>
-  );
-}
-
-function EditIcon() {
-  return (
-    <svg {...ICON_PROPS} aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
 function OpenIcon() {
   return (
     <svg {...ICON_PROPS} aria-hidden="true">
@@ -143,12 +121,10 @@ export function BoardToolbar({
   onCreateSnippet,
   onReadImage,
   onAddPhoto,
-  onPlaceEntry,
   selection,
   onOpenSelected,
   onBringSelectedToFront,
   onDeleteSelected,
-  onEditSelectedOnCard,
 }: BoardToolbarProps) {
   const t = useTranslations('board.toolbar');
 
@@ -168,13 +144,6 @@ export function BoardToolbar({
       shortcut: 'R',
       onSelect: onReadImage,
       icon: <ScanTextIcon />,
-    },
-    {
-      id: 'entry',
-      label: t('entry'),
-      shortcut: 'E',
-      onSelect: onPlaceEntry,
-      icon: <EntryIcon />,
     },
     {
       id: 'photo',
@@ -198,22 +167,11 @@ export function BoardToolbar({
     ? [
         {
           id: 'open' as const,
-          label: selection.cardType === 'entry' ? t('open_entry') : t('open'),
+          label: t('open'),
           onSelect: onOpenSelected,
           icon: <OpenIcon />,
           danger: false,
         },
-        ...(selection.cardType === 'entry' && onEditSelectedOnCard
-          ? [
-              {
-                id: 'edit' as const,
-                label: t('edit'),
-                onSelect: onEditSelectedOnCard,
-                icon: <EditIcon />,
-                danger: false,
-              },
-            ]
-          : []),
         {
           id: 'front' as const,
           label: t('bring_to_front'),

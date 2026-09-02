@@ -20,12 +20,11 @@ import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { BoardToolbar } from './board-toolbar';
 
 interface Props {
-  activeTool: 'none' | 'snippet' | 'ocr' | 'photo' | 'entry';
+  activeTool: 'none' | 'snippet' | 'ocr' | 'photo';
   onCreateSnippet: () => void;
   onReadImage: () => void;
   onAddPhoto: () => void;
-  onPlaceEntry: () => void;
-  selection: { cardType: 'entry' | 'snippet' | 'photo' } | null;
+  selection: { cardType: 'snippet' | 'photo' } | null;
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
   onDeleteSelected: () => void;
@@ -40,7 +39,6 @@ const base: Props = {
   onCreateSnippet: noop,
   onReadImage: noop,
   onAddPhoto: noop,
-  onPlaceEntry: noop,
   selection: null,
   onOpenSelected: noop,
   onBringSelectedToFront: noop,
@@ -76,7 +74,7 @@ registerUnit<Props>({
   fixtures: [
     {
       id: 'idle',
-      description: '何も選んでいない（作成系の4道具・未選択）',
+      description: '何も選んでいない（作成系の3道具・未選択）',
       props: base,
     },
     {
@@ -96,20 +94,15 @@ registerUnit<Props>({
       props: { ...base, activeTool: 'ocr' },
     },
     {
-      id: 'entry-active',
-      description: 'エントリーを置くダイアログを開いている',
-      props: { ...base, activeTool: 'entry' },
-    },
-    {
-      id: 'entry-selected',
+      id: 'snippet-selected',
       probe: true,
-      description: 'Probe: エントリーカードを選ぶと、作成系が消えてカードの操作に入れ替わる',
-      props: { ...base, selection: { cardType: 'entry' } },
+      description: 'Probe: スニペットカードを選ぶと、作成系が消えてカードの操作に入れ替わる',
+      props: { ...base, selection: { cardType: 'snippet' } },
     },
     {
       id: 'photo-selected',
       probe: true,
-      description: 'Probe: 写真カードを選んだとき（編集は出ず、文言は entry と同じ）',
+      description: 'Probe: 写真カードを選んだとき（文言はスニペットと同じ）',
       props: { ...base, selection: { cardType: 'photo' } },
     },
   ],
@@ -134,13 +127,13 @@ registerUnit<Props>({
     },
     {
       id: 'create-tools-when-nothing-selected',
-      description: '選択が無いときは作成系の4道具が揃い、カード操作は出ない',
+      description: '選択が無いときは作成系の3道具が揃い、カード操作は出ない',
       check: ({ root, props }) => {
         if (props.selection) return true;
         const ids = toolIds(root);
         const actions = actionIds(root);
         return (
-          (ids.join(',') === 'entry,ocr,photo,snippet' && actions.length === 0) ||
+          (ids.join(',') === 'ocr,photo,snippet' && actions.length === 0) ||
           `作成モードの構造が崩れている: tools=[${ids.join(', ')}] actions=[${actions.join(', ')}]`
         );
       },
@@ -152,9 +145,7 @@ registerUnit<Props>({
         if (!props.selection) return true;
         const ids = toolIds(root);
         const actions = actionIds(root);
-        // entry だけ「カードで編集」が増える（他はカードの上で直せない）
-        const expected =
-          props.selection.cardType === 'entry' ? 'delete,edit,front,open' : 'delete,front,open';
+        const expected = 'delete,front,open';
         return (
           (actions.join(',') === expected && ids.length === 0) ||
           `選択モードの構造が崩れている: actions=[${actions.join(', ')}] tools=[${ids.join(', ')}]`
@@ -162,23 +153,18 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'edit-on-card-only-for-entry',
-      description: '「カードで編集」は entry のときだけ出す（開く＝画面遷移とは別の操作）',
+      id: 'no-edit-action-on-card',
+      description: 'カードの上で直す操作は出さない（盤面は貼る場所で、書くのは日記の画面）',
       check: ({ root, props }) => {
         if (!props.selection) return true;
         const hasEdit = root.querySelector('button[data-verify-card-action="edit"]') !== null;
-        const isEntry = props.selection.cardType === 'entry';
-        return (
-          hasEdit === isEntry ||
-          `編集アクションの出し分けが違う: cardType=${props.selection.cardType} hasEdit=${hasEdit}`
-        );
+        return !hasEdit || '「編集」がカード操作に出ている';
       },
     },
     {
       id: 'action-wording-is-shared-across-types',
-      description: '操作の名前は種別で変えない（例外は行き先が盤面の外である「日記を開く」だけ）',
+      description: '操作の名前は種別で変えない',
       // 同じ形の操作に別々の言葉を当てると、「これは違う何かなのでは」と読ませてしまう。
-      // 以前は entry だけ削除が「ボードから外す」で、スニペットは「削除」だった。
       check: ({ root, props }) => {
         if (!props.selection) return true;
         const label = (id: string) =>

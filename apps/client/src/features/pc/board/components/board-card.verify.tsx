@@ -1,6 +1,6 @@
 /**
  * BoardCard の検証スペック（A 移植）。
- * ボード上のカード（entry / snippet / photo）。状態はすべて props 由来で
+ * ボード上のカード（snippet / photo）。状態はすべて props 由来で
  * useState を持たない純表示部品のため、act ではなく prop 駆動の fixture で検証する。
  * 選択時のみハンドル（削除ボタン・回転スライダー）が出ることを契約↔DOM 一致で確認。
  * getBoundingClientRect は回転ハンドルの onPointerDown 内のみで描画経路に無いため
@@ -39,25 +39,6 @@ const baseCallbacks = {
   onClick: noop,
 };
 
-const entryCard: BoardCardData = {
-  id: 'card-entry-1',
-  cardType: 'entry',
-  refId: 'entry-1',
-  x: 40,
-  y: 40,
-  rotation: 0,
-  width: 220,
-  height: 260,
-  zIndex: 1,
-  userPositioned: false,
-  createdAt: '2026-06-20T10:00:00.000Z',
-  content: {
-    title: '朝のメモ',
-    body: '今日は早起きして散歩した。空気が澄んでいて気持ちがよかった。',
-    createdAt: '2026-06-20T10:00:00.000Z',
-  },
-};
-
 const snippetCard: BoardCardData = {
   id: 'card-snippet-1',
   cardType: 'snippet',
@@ -94,15 +75,10 @@ const photoCard: BoardCardData = {
 registerUnit<Props>({
   id: 'BoardCard',
   title: 'BoardCard',
-  description: 'ボード上のカード（entry / snippet / photo）。選択時のみ操作ハンドルを出す。',
+  description: 'ボード上のカード（snippet / photo）。選択時のみ操作ハンドルを出す。',
   kind: 'component',
   render: (props) => withVerifyProviders(<BoardCard {...props} />),
   fixtures: [
-    {
-      id: 'entry-unselected',
-      description: 'エントリカード・未選択（ハンドルなし）',
-      props: { card: entryCard, isSelected: false, isDragging: false, ...baseCallbacks },
-    },
     {
       id: 'snippet-unselected',
       description: 'スニペットカード・未選択',
@@ -119,7 +95,7 @@ registerUnit<Props>({
       description:
         'Probe: 選択中かつ removing かつ dragging が同時に成立しても、ハンドルは描画され契約が破綻しない',
       props: {
-        card: { ...entryCard, removing: true },
+        card: { ...snippetCard, removing: true },
         isSelected: true,
         isDragging: true,
         ...baseCallbacks,

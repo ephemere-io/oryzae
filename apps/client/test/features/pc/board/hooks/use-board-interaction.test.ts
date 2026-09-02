@@ -6,7 +6,7 @@ import type { BoardCardData } from '@/features/shared/board/types';
 function card(id: string, zIndex: number): BoardCardData {
   return {
     id,
-    cardType: 'entry',
+    cardType: 'snippet',
     refId: `e-${id}`,
     x: 100,
     y: 100,
@@ -16,7 +16,7 @@ function card(id: string, zIndex: number): BoardCardData {
     zIndex,
     userPositioned: false,
     createdAt: '2026-04-11T10:00:00Z',
-    content: { title: 'タイトル', body: '本文', createdAt: '2026-04-11T10:00:00Z' },
+    content: { text: 'メモ' },
   };
 }
 

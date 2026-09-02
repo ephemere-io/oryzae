@@ -10,10 +10,9 @@ import { deleteEntriesByMarker, waitForAutosave } from './fixtures/env';
  * の2つで落ちる。locator 経由なら中心を押しつつスクロールも面倒を見てくれる。
  * `force` は「本文が送れる領域で pointer events を横取りする」判定を飛ばすため。
  */
-async function clickCard(card: import('@playwright/test').Locator, { double = false } = {}) {
+async function clickCard(card: import('@playwright/test').Locator) {
   await card.scrollIntoViewIfNeeded();
-  if (double) await card.dblclick({ force: true });
-  else await card.click({ force: true });
+  await card.click({ force: true });
 }
 
 test.describe('ボード画面', () => {
@@ -179,72 +178,10 @@ test.describe('ボード画面', () => {
     await expect(page.getByText(snippet)).toBeVisible({ timeout: 10000 });
   });
 
-  test('エントリーカードはダブルクリックで遷移せず、カード上で直せる', async ({ page }) => {
-    // 以前はカード全面に透明ボタンを敷いており、ダブルクリックで日記へ飛び、
-    // ついでにカードの文字を一切選べなかった（コピーもできない）。
-    // 遷移はパレットの「日記を開く」だけ、編集はカードの上で、に変えた。
-    const unique = `カード編集E2E-${Date.now()}`;
-    await page.goto('/entries/new');
-    const editor = page.locator('[contenteditable="true"]').first();
-    await editor.click();
-    await editor.pressSequentially(unique);
-    await waitForAutosave(page);
-
-    await page.goto('/board');
-    await page.waitForSelector('[role="application"]');
-    await page.waitForTimeout(1500);
-    await page.click('button[data-verify-tool="entry"]');
-    await page.locator('button[data-verify-entry-option]:not([disabled])').first().click();
-    // ピッカーは候補の見出しも表示するので、`getByText(unique)` はダイアログが
-    // 開いたままでも当たる。閉じるのを待たないと、次のクリックがダイアログの
-    // 覆いに当たってカードに届かない。
-    await expect(page.locator('[data-verify-unit="EntryPickerDialog"]')).toHaveCount(0, {
-      timeout: 10000,
-    });
-
-    const placed = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
-    await expect(placed).toBeVisible({ timeout: 10000 });
-
-    // **カードは id で掴む。** 編集に入ると見出しは <input value>、本文は
-    // <textarea value> になり、どちらも textContent に出ない。`hasText` で掴んで
-    // いると、編集に入った瞬間にそのカードを見失う。
-    const cardId = await placed.getAttribute('data-card-id');
-    const card = page.locator(`[data-card-id="${cardId}"]`);
-
-    // ダブルクリックしても /entries へ飛ばない。代わりに編集欄が出る。
-    await clickCard(card, { double: true });
-    await expect(page).toHaveURL(/\/board$/);
-    await expect(card).toHaveAttribute('data-verify-editing', 'true', { timeout: 10000 });
-    const box = card.locator('textarea[data-verify-entry-editor]');
-    await expect(box).toBeVisible({ timeout: 10000 });
-    // 見出しは入力欄に置き換わる（消えないし、二重にも出ない）
-    await expect(card.locator('[data-verify-entry-title-editor]')).toHaveValue(unique);
-    await expect(card.locator('h3')).toHaveCount(0);
-
-    // カードの上で直せて、保存される（本文側を直す）
-    await box.evaluate((el: HTMLTextAreaElement) => {
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    });
-    await page.keyboard.type('・追記');
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(2500);
-    await page.reload();
-    await page.waitForSelector('[role="application"]');
-    await expect(page.getByText(/・追記/).first()).toBeVisible({ timeout: 10000 });
-
-    // 遷移はパレットの「日記を開く」から
-    await clickCard(card);
-    await page.click('button[data-verify-card-action="open"]');
-    await expect(page).toHaveURL(/\/entries\/[0-9a-f-]+$/, { timeout: 10000 });
-
-    await page.goto('/entries');
-    await deleteEntriesByMarker(page, unique);
-  });
-
-  test('日記は自動では出ず、選んで置いてから外せる', async ({ page }) => {
-    // 以前は期間内の日記が勝手にカード化されていた。置いた覚えのないものが現れる
-    // 一方で外し方も見えなかったので、「選んで置く／選んで外す」に変えた。
+  test('日記はボードに出ない（盤面は付箋と写真だけ）', async ({ page }) => {
+    // ボードは付箋と写真を貼る場所で、日記は瓶に漬け込むもの——という切り分けにした。
+    // 以前は期間内の日記が勝手にカード化され、その後は「選んで置く」道具を出していたが、
+    // どちらも盤面に日記が現れる点は同じで、瓶との境界が曖昧だった。
     const unique = `ボードE2E-${Date.now()}`;
     await page.goto('/entries/new');
     const editor = page.locator('[contenteditable="true"]').first();
@@ -256,36 +193,14 @@ test.describe('ボード画面', () => {
     await page.waitForSelector('[role="application"]');
     await page.waitForTimeout(1500);
 
-    // 1. 書いただけでは盤面に出ない
+    // 1. 書いた日記は盤面に出ない
     await expect(page.getByText(unique)).toHaveCount(0);
 
-    // 2. ツールバーから選んで置くと出る
-    await page.click('button[data-verify-tool="entry"]');
-    await expect(page.getByRole('heading', { name: 'エントリーを置く' })).toBeVisible();
-    await page.locator('button[data-verify-entry-option]:not([disabled])').first().click();
-    // 置けたらダイアログは自分で閉じる。開いたままだと置いたカードが裏に隠れ、
-    // 一覧の表示も変わらないので「押しても何も起きない」ように見えていた。
-    await expect(page.locator('[data-verify-unit="EntryPickerDialog"]')).toHaveCount(0, {
-      timeout: 10000,
-    });
-    await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
+    // 2. 置く道具も無い（作成系はスニペット / 読み取り / 写真の3つ）
+    await expect(page.locator('button[data-verify-tool="entry"]')).toHaveCount(0);
+    await expect(page.locator('button[data-verify-tool]')).toHaveCount(3);
 
-    // 3. カードを選ぶとツールバーが操作に入れ替わり、そこから外せる
-    const card = page.locator('[data-verify-unit="BoardCard"]').filter({ hasText: unique });
-    await clickCard(card);
-    await expect(page.locator('[data-verify-unit="BoardToolbar"]')).toHaveAttribute(
-      'data-verify-mode',
-      'card',
-    );
-    await page.click('button[data-verify-card-action="delete"]');
-    await page.waitForTimeout(2000);
-
-    // 4. 外しても日記そのものは残っている（盤面から消えるだけ）
-    await page.reload();
-    await page.waitForSelector('[role="application"]');
-    await page.waitForTimeout(1500);
-    await expect(page.getByText(unique)).toHaveCount(0);
-
+    // 3. 日記そのものは残っている
     await page.goto('/entries');
     await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
 

@@ -1,27 +1,22 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import { ErrorState } from '@/components/ui/error-state';
 import { PageLoading } from '@/components/ui/page-loading';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
-import { usePlaceableEntries } from '@/features/shared/board/hooks/use-placeable-entries';
-import { useSaveEntryContent } from '@/features/shared/board/hooks/use-save-entry-content';
 import type { BoardCardData } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { useEscapeKey } from '@/lib/use-escape-key';
 import { useBoardInteraction } from '../hooks/use-board-interaction';
-import { useEntryCardDraft } from '../hooks/use-entry-card-draft';
 import { useImageIntake } from '../hooks/use-image-intake';
 import { BoardCard } from './board-card';
 import { BoardDateNav } from './board-date-nav';
 import { BOARD_INSET, TOP_BAR_CLASS } from './board-surface';
 import { BoardToolbar } from './board-toolbar';
 import { BoardViewSwitch } from './board-view-switch';
-import { EntryPickerDialog } from './entry-picker-dialog';
 import { PhotoDialog } from './photo-dialog';
 import { SnippetDialog } from './snippet-dialog';
 
@@ -39,7 +34,6 @@ function todayKey(): string {
 
 export function BoardView({ api }: BoardViewProps) {
   const t = useTranslations('board');
-  const router = useRouter();
   const [dateKey, setDateKey] = useState(todayKey);
   const [viewType, setViewType] = useState<'daily' | 'weekly'>('daily');
   const [snippetDialog, setSnippetDialog] = useState<{
@@ -50,16 +44,7 @@ export function BoardView({ api }: BoardViewProps) {
   }>({ open: false });
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
-  const [entryPickerOpen, setEntryPickerOpen] = useState(false);
   /** カード上の編集。入り口は hook に閉じてあり、下書きを積まずには入れない。 */
-  const {
-    editingCardId,
-    draft,
-    setTitle: setDraftTitle,
-    setBody: setDraftBody,
-    start: startEditing,
-    stop: stopEditingState,
-  } = useEntryCardDraft();
   /** 貼り付け・ドロップで入ってきた画像。写真ダイアログへ選択済みとして渡す。 */
   const [incomingImage, setIncomingImage] = useState<File | null>(null);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
@@ -73,7 +58,6 @@ export function BoardView({ api }: BoardViewProps) {
     createSnippet,
     updateSnippet,
     createPhoto,
-    placeEntry,
     deleteCard,
   } = useBoard(api, dateKey, viewType);
   const { savePositions } = useBoardSave(api);
@@ -111,32 +95,14 @@ export function BoardView({ api }: BoardViewProps) {
     didDrag,
   } = useBoardInteraction(cards, handleCardsChange, handleInteractionEnd);
 
-  /** 日記の画面へ移る。パレットの「日記を開く」だけがここへ来る。 */
-  const openEntryPage = useCallback(
-    (card: BoardCardData) => {
-      router.push(`/entries/${card.refId}`);
-    },
-    [router],
-  );
-
-  /**
-   * カードをダブルクリックしたときの行き先。
-   *
-   * entry は**画面遷移しない**。読み書きの続きはカードの上でできるほうが、盤面を
-   * 見ながら手を入れられる。日記そのものを開きたいときはパレットから明示的に選ぶ。
-   */
-  const openCard = useCallback(
-    (card: BoardCardData) => {
-      if (card.cardType === 'entry') {
-        startEditing(card);
-      } else if (card.cardType === 'snippet' && 'text' in card.content) {
-        setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
-      } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
-        setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
-      }
-    },
-    [startEditing],
-  );
+  /** カードをダブルクリックしたときの行き先。 */
+  const openCard = useCallback((card: BoardCardData) => {
+    if (card.cardType === 'snippet' && 'text' in card.content) {
+      setSnippetDialog({ open: true, snippetId: card.refId, initialText: card.content.text });
+    } else if (card.cardType === 'photo' && 'imageUrl' in card.content) {
+      setLightbox({ imageUrl: card.content.imageUrl, caption: card.content.caption });
+    }
+  }, []);
 
   const handleCardClick = useCallback(
     (card: BoardCardData) => {
@@ -151,39 +117,9 @@ export function BoardView({ api }: BoardViewProps) {
   /** 選択中のカード。ツールバーが「そのカードにできること」を出すために使う。 */
   const selectedCard = selectedId ? (cards.find((c) => c.id === selectedId) ?? null) : null;
 
-  const editingCard = editingCardId ? (cards.find((c) => c.id === editingCardId) ?? null) : null;
-  const { save: saveEntryContent } = useSaveEntryContent(api);
-
-  /** 編集を終える。変わっていれば保存し、盤面を取り直す。 */
-  const stopEditing = useCallback(async () => {
-    const card = editingCard;
-    stopEditingState();
-    if (!card || !('body' in card.content)) return;
-    if (draft.title === card.content.title && draft.body === card.content.body) return;
-    // 見出しは本文の1行目。編集した2つを繋ぎ直したものが日記の中身になる。
-    const next = draft.body ? `${draft.title}\n${draft.body}` : draft.title;
-    if (await saveEntryContent(card.refId, next)) await refresh({ silent: true });
-  }, [editingCard, draft, stopEditingState, saveEntryContent, refresh]);
-
-  // 編集中は Escape で抜ける（保存してから閉じる）。
-  useEscapeKey(editingCardId !== null, () => {
-    void stopEditing();
-  });
-
   const handleOpenSelected = useCallback(() => {
-    if (!selectedCard) return;
-    // entry のときだけ画面遷移。ここが**唯一**の遷移経路で、カードの
-    // ダブルクリックは編集に入る。写真とスニペットは従来どおり拡大/編集。
-    if (selectedCard.cardType === 'entry') {
-      openEntryPage(selectedCard);
-    } else {
-      openCard(selectedCard);
-    }
-  }, [selectedCard, openEntryPage, openCard]);
-
-  const handleEditOnCard = useCallback(() => {
-    if (selectedCard) startEditing(selectedCard);
-  }, [selectedCard, startEditing]);
+    if (selectedCard) openCard(selectedCard);
+  }, [selectedCard, openCard]);
 
   /** 選択中のカードを最前面へ。重なって読めなくなったときの逃げ道。 */
   const handleBringToFront = useCallback(() => {
@@ -209,9 +145,6 @@ export function BoardView({ api }: BoardViewProps) {
   const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
   /** 画像から読み取る。作成ダイアログを画像タブで開くので、1手で読み取りに着く。 */
   const openOcrDialog = useCallback(() => setSnippetDialog({ open: true, source: 'image' }), []);
-  const placeable = usePlaceableEntries(api, dateKey, viewType, entryPickerOpen);
-
-  const openEntryPicker = useCallback(() => setEntryPickerOpen(true), []);
 
   const openPhotoDialog = useCallback(() => {
     setIncomingImage(null);
@@ -228,7 +161,7 @@ export function BoardView({ api }: BoardViewProps) {
   // ライトボックスも Escape で閉じる（各ダイアログと揃える）。
   useEscapeKey(lightbox !== null, closeLightbox);
 
-  const dialogOpen = snippetDialog.open || photoDialogOpen || entryPickerOpen || lightbox !== null;
+  const dialogOpen = snippetDialog.open || photoDialogOpen || lightbox !== null;
 
   // 何かが開いている間は横取りしない。スニペット編集中は本文への貼り付けを奪わないため。
   // 写真ダイアログを開いている間も同じで、ここを開けておくと、選択済みの画像がある状態で
@@ -269,9 +202,6 @@ export function BoardView({ api }: BoardViewProps) {
       } else if (key === 'i') {
         e.preventDefault();
         openPhotoDialog();
-      } else if (key === 'e') {
-        e.preventDefault();
-        openEntryPicker();
       } else if (key === 'r') {
         e.preventDefault();
         openOcrDialog();
@@ -279,15 +209,7 @@ export function BoardView({ api }: BoardViewProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    selectedId,
-    handleDeleteCard,
-    dialogOpen,
-    openSnippetDialog,
-    openPhotoDialog,
-    openEntryPicker,
-    openOcrDialog,
-  ]);
+  }, [selectedId, handleDeleteCard, dialogOpen, openSnippetDialog, openPhotoDialog, openOcrDialog]);
 
   return (
     <div
@@ -296,9 +218,7 @@ export function BoardView({ api }: BoardViewProps) {
         viewType,
         snippetOpen: snippetDialog.open,
         photoOpen: photoDialogOpen,
-        entryPickerOpen,
         selectedType: selectedCard?.cardType ?? 'none',
-        editingCard: editingCardId !== null,
       })}
       role="application"
       aria-label={t('canvas.aria_label')}
@@ -309,11 +229,7 @@ export function BoardView({ api }: BoardViewProps) {
       onDragOver={intake.onDragOver}
       onDragLeave={intake.onDragLeave}
       onDrop={intake.onDrop}
-      onClick={() => {
-        // 盤面の余白を押したら編集も終える（保存してから閉じる）。
-        if (editingCardId !== null) void stopEditing();
-        deselect();
-      }}
+      onClick={deselect}
       onKeyDown={() => {}}
     >
       {/* Grid background */}
@@ -398,11 +314,6 @@ export function BoardView({ api }: BoardViewProps) {
             onResizeStart={startResize}
             onDelete={handleDeleteCard}
             onClick={handleCardClick}
-            isEditing={editingCardId === card.id}
-            editTitle={draft.title}
-            editBody={draft.body}
-            onEditTitleChange={setDraftTitle}
-            onEditBodyChange={setDraftBody}
           />
         ))}
       </div>
@@ -416,30 +327,18 @@ export function BoardView({ api }: BoardViewProps) {
               : 'snippet'
             : photoDialogOpen
               ? 'photo'
-              : entryPickerOpen
-                ? 'entry'
-                : 'none'
+              : 'none'
         }
         onCreateSnippet={openSnippetDialog}
         onReadImage={openOcrDialog}
         onAddPhoto={openPhotoDialog}
-        onPlaceEntry={openEntryPicker}
         selection={selectedCard ? { cardType: selectedCard.cardType } : null}
         onOpenSelected={handleOpenSelected}
         onBringSelectedToFront={handleBringToFront}
         onDeleteSelected={() => selectedCard && handleDeleteCard(selectedCard.id)}
-        onEditSelectedOnCard={handleEditOnCard}
       />
 
       {/* エントリーを置く（サーバ側の自動生成をやめた代わりの入口） */}
-      <EntryPickerDialog
-        open={entryPickerOpen}
-        entries={placeable.entries}
-        loading={placeable.loading}
-        error={placeable.error}
-        onPlace={placeEntry}
-        onClose={() => setEntryPickerOpen(false)}
-      />
 
       {/* Snippet dialog */}
       <SnippetDialog

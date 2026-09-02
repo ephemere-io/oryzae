@@ -312,33 +312,13 @@
       "aria_label": "ボードのツールバー",
       "snippet": "スニペットを作成",
       "photo": "画像を貼り付け",
-      "entry": "エントリーを置く",
       "aria_label_card": "選択中のカードの操作",
-      "open_entry": "日記を開く",
       "bring_to_front": "前面へ",
       "delete": "削除",
       "open": "開く",
-      "edit": "編集",
       "ocr": "画像から読み取る"
     },
-    "drop_image": "ここに画像をドロップ",
-    "entry_picker": {
-      "aria_label": "エントリーを置く",
-      "heading": "エントリーを置く",
-      "lead": "この期間に書いた日記から選んでボードに置きます。",
-      "loading": "読み込み中…",
-      "load_failed": "一覧を取得できませんでした。",
-      "empty": "この期間に書いた日記がまだありません。",
-      "untitled": "（無題）",
-      "place": "置く",
-      "already_placed": "置いてある",
-      "close": "閉じる",
-      "place_failed": "ボードに置けませんでした。もう一度お試しください。"
-    },
-    "entry_card": {
-      "edit_aria": "日記の本文",
-      "title_aria": "日記の見出し"
-    }
+    "drop_image": "ここに画像をドロップ"
   },
   "editor": {
     "status": {

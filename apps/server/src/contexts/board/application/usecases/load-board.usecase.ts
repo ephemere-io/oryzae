@@ -1,17 +1,8 @@
-import type { EntryRepositoryGateway } from '../../../entry/domain/gateways/entry-repository.gateway.js';
 import type { BoardCardRepositoryGateway } from '../../domain/gateways/board-card-repository.gateway.js';
 import type { BoardPhotoRepositoryGateway } from '../../domain/gateways/board-photo-repository.gateway.js';
 import type { BoardSnippetRepositoryGateway } from '../../domain/gateways/board-snippet-repository.gateway.js';
 import type { BoardStorageGateway } from '../../domain/gateways/board-storage.gateway.js';
 import { BoardCard } from '../../domain/models/board-card.js';
-
-interface EntryContent {
-  /** 本文の1行目。カードの見出しに使う。 */
-  title: string;
-  /** 見出し行を除いた**本文の全部**。カードで見えているものと編集するものを一致させる。 */
-  body: string;
-  createdAt: string;
-}
 
 interface SnippetContent {
   text: string;
@@ -24,7 +15,7 @@ interface PhotoContent {
 
 interface CardResponse {
   id: string;
-  cardType: 'entry' | 'snippet' | 'photo';
+  cardType: 'snippet' | 'photo';
   refId: string;
   x: number;
   y: number;
@@ -35,10 +26,8 @@ interface CardResponse {
   /** 利用者が自分で位置を決めたカードか。クライアントの自動整列の対象外になる。 */
   userPositioned: boolean;
   createdAt: string;
-  content: EntryContent | SnippetContent | PhotoContent;
+  content: SnippetContent | PhotoContent;
 }
-
-const TITLE_LENGTH = 100;
 
 interface LoadBoardResponse {
   dateKey: string;
@@ -52,7 +41,6 @@ export class LoadBoardUsecase {
     private boardSnippetRepo: BoardSnippetRepositoryGateway,
     private boardPhotoRepo: BoardPhotoRepositoryGateway,
     private boardStorage: BoardStorageGateway,
-    private entryRepo: EntryRepositoryGateway,
     private generateId: () => string,
   ) {}
 
@@ -60,20 +48,23 @@ export class LoadBoardUsecase {
     userId: string,
     dateKey: string,
     viewType: 'daily' | 'weekly' = 'daily',
-    // tzOffset は受け取らない。日付でエントリを引くのをやめた（カードを自動で
-    // 作らなくなった）ため、ここに暦日の判定は残っていない。境界の扱いは
-    // ListPlaceableEntriesUsecase が引き継いでいる。
+    // tzOffset は受け取らない。日付でエントリを引くのをやめたため、ここに暦日の
+    // 判定は残っていない。
   ): Promise<LoadBoardResponse> {
     // 1. Load existing cards
-    let existingCards = await this.boardCardRepo.findByDateAndView(userId, dateKey, viewType);
+    //
+    // 日記のカードは盤面に出さない。ボードは付箋（スニペット）と写真を貼る場所で、
+    // 日記は瓶に漬け込むもの——という切り分けにした。以前に置かれた entry の行は
+    // 消さずに残してあるので（復元できるように）、ここで読み飛ばす。
+    let existingCards = LoadBoardUsecase.withoutEntries(
+      await this.boardCardRepo.findByDateAndView(userId, dateKey, viewType),
+    );
 
     // For weekly view, also include daily cards from the same week
     if (viewType === 'weekly') {
       const { startDate, endDate } = LoadBoardUsecase.weekRange(dateKey);
-      const dailyCards = await this.boardCardRepo.findDailyCardsByDateRange(
-        userId,
-        startDate,
-        endDate,
+      const dailyCards = LoadBoardUsecase.withoutEntries(
+        await this.boardCardRepo.findDailyCardsByDateRange(userId, startDate, endDate),
       );
       // Exclude daily cards whose refIds were soft-deleted in weekly view
       const deletedWeeklyRefIds = await this.boardCardRepo.findSoftDeletedRefIdsByDateAndView(
@@ -116,11 +107,6 @@ export class LoadBoardUsecase {
       existingCards = [...existingCards, ...weeklyCopies];
     }
 
-    // エントリのカードは**自動では作らない**。以前はその日/その週に書いた日記を
-    // 勝手に盤面へ並べていたが、置いた覚えのないカードが現れる一方で、消し方も
-    // 見えなかった。今は ListPlaceableEntriesUsecase で候補を出し、利用者が
-    // 選んで置く（PlaceEntryCardUsecase）。既に置かれているカードはそのまま残る。
-
     const allCards = existingCards;
 
     // 3. Hydrate content
@@ -131,19 +117,8 @@ export class LoadBoardUsecase {
 
   private async hydrateCards(cards: BoardCard[]): Promise<CardResponse[]> {
     // Collect refIds by type
-    const entryRefIds = cards.filter((c) => c.cardType === 'entry').map((c) => c.refId);
     const snippetRefIds = cards.filter((c) => c.cardType === 'snippet').map((c) => c.refId);
     const photoRefIds = cards.filter((c) => c.cardType === 'photo').map((c) => c.refId);
-
-    // Fetch entry content (batch)
-    const entryMap = new Map<string, EntryContent>();
-    if (entryRefIds.length > 0) {
-      const entries = await this.entryRepo.findByIds(entryRefIds);
-      for (const entry of entries) {
-        const { title, body } = LoadBoardUsecase.summarizeEntry(entry.content);
-        entryMap.set(entry.id, { title, body, createdAt: entry.createdAt });
-      }
-    }
 
     // Fetch snippet content
     const snippetMap = new Map<string, SnippetContent>();
@@ -170,10 +145,8 @@ export class LoadBoardUsecase {
 
     return cards
       .map((card) => {
-        let content: EntryContent | SnippetContent | PhotoContent | undefined;
-        if (card.cardType === 'entry') {
-          content = entryMap.get(card.refId);
-        } else if (card.cardType === 'snippet') {
+        let content: SnippetContent | PhotoContent | undefined;
+        if (card.cardType === 'snippet') {
           content = snippetMap.get(card.refId);
         } else if (card.cardType === 'photo') {
           content = photoMap.get(card.refId);
@@ -182,7 +155,7 @@ export class LoadBoardUsecase {
 
         return {
           id: card.id,
-          cardType: card.cardType,
+          cardType: card.cardType === 'photo' ? 'photo' : 'snippet',
           refId: card.refId,
           x: card.x,
           y: card.y,
@@ -198,28 +171,9 @@ export class LoadBoardUsecase {
       .filter((c): c is CardResponse => c !== null);
   }
 
-  /**
-   * カードに載せる見出しと本文に分ける。
-   *
-   * 見出しは1行目、本文はその残り**全部**。抜粋（先頭 N 文字）にしていた頃は、
-   * カードで見えているものと編集で扱うものが食い違い、編集に入るたびに全文を
-   * 取り直す必要があった（そのたびに「読み込み中」が出た）。全部載せておけば、
-   * 見ているものと直しているものが常に同じになり、取り直しも要らない。
-   *
-   * 見出しは本文から**外す**。同じ行が見出しと本文で二度出ると、カードが自分を
-   * 繰り返しているように見える。
-   */
-  private static summarizeEntry(content: string): { title: string; body: string } {
-    const lines = content.split('\n');
-    const titleIndex = lines.findIndex((line) => line.trim().length > 0);
-    if (titleIndex === -1) return { title: '', body: '' };
-    return {
-      title: lines[titleIndex].substring(0, TITLE_LENGTH),
-      body: lines
-        .slice(titleIndex + 1)
-        .join('\n')
-        .trimStart(),
-    };
+  /** 盤面に出す対象から日記のカードを除く。行そのものは DB に残す。 */
+  private static withoutEntries(cards: BoardCard[]): BoardCard[] {
+    return cards.filter((c) => c.cardType !== 'entry');
   }
 
   private static weekRange(dateKey: string): { startDate: string; endDate: string } {
