@@ -293,7 +293,9 @@
       "caption_placeholder": "キャプション（20文字以内）",
       "cancel": "キャンセル",
       "uploading_button": "アップロード中…",
-      "submit": "追加"
+      "submit": "追加",
+      "unsupported": "この画像は開けませんでした。iPhone の写真（HEIC）はブラウザが読めないことがあります。JPEG / PNG で保存し直して選んでください。",
+      "upload_failed": "追加できませんでした。もう一度お試しください。"
     },
     "snippet_dialog": {
       "aria_label": "Snippet dialog",
@@ -302,10 +304,38 @@
       "placeholder": "テキストを入力...",
       "cancel": "キャンセル",
       "update": "更新",
-      "create": "作成"
+      "create": "作成",
+      "source_aria": "スニペットの作り方",
+      "tab_text": "テキストを書く",
+      "tab_image": "画像から読み取る",
+      "click_to_select_image": "クリックして画像を選択",
+      "preview_alt": "読み取る画像のプレビュー",
+      "reading": "読み取り中…",
+      "reading_aria": "読み取り中",
+      "ocr_empty": "文字を読み取れませんでした。別の画像を試してください。",
+      "ocr_failed": "読み取りに失敗しました。形式（JPEG/PNG/WebP/GIF）とサイズ（{maxMb}MB以下）を確認してください。",
+      "ocr_note": "画像から読み取りました。誤りが混じることがあるので、確かめてから貼ってください。",
+      "too_long": "{max}文字以内にしてください",
+      "drop_or_click_image": "画像をドラッグ＆ドロップ、またはクリックして選択",
+      "read_again": "もう一度読み取る",
+      "ocr_caveat": "読み取りは完全ではありません。手書きや崩れた字は誤ることがあるので、貼る前に確かめてください。"
     },
     "error_message": "ボードの読み込みに失敗しました",
-    "retry": "再読み込み"
+    "retry": "再読み込み",
+    "minimap": {
+      "aria_label": "ボードの俯瞰図"
+    },
+    "toolbar": {
+      "aria_label": "ボードのツールバー",
+      "snippet": "スニペットを作成",
+      "photo": "画像を貼り付け",
+      "aria_label_card": "選択中のカードの操作",
+      "bring_to_front": "前面へ",
+      "delete": "削除",
+      "open": "開く",
+      "ocr": "画像から読み取る"
+    },
+    "drop_image": "ここに画像をドロップ"
   },
   "editor": {
     "status": {
@@ -482,6 +512,7 @@
       "header_snippet": "Oryzae が切り取った文章",
       "header_letter": "L.A.B.による観察記録",
       "snippet_source_prefix": "出典:",
+      "resize_aria": "詳細パネルの幅を変える",
       "write_entry": "この問いのエントリを書く"
     },
     "jar": {
@@ -527,7 +558,9 @@
         "dismiss": "わかりました",
         "aria_label": "漬け込み完了のお知らせ",
         "heading": "発酵瓶に漬け込まれました"
-      }
+      },
+      "canvas_aria": "瓶のキャンバス",
+      "minimap_aria": "瓶の俯瞰図"
     }
   },
   "questions": {
@@ -676,6 +709,15 @@
       "cancel": "キャンセル",
       "save": "保存",
       "letter_arrived": "手紙が届いています"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "ズームイン",
+      "out_aria": "ズームアウト",
+      "reset_aria": "ズームをリセット",
+      "fit_aria": "全体を表示",
+      "fit": "Fit"
     }
   }
 }

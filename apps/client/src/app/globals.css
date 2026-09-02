@@ -36,6 +36,19 @@
   --card-snippet: #fffbe0;
   --card-photo: #ffffff;
 
+  /* 盤面から浮いて見せたい面（ボードのフローティングツールバー等）。
+     light では --bg と影で十分に分離できるが、dark で --bg をそのまま使うと
+     盤面と同色になり、黒い影も効かずに沈む。dark 側だけ一段明るくする。 */
+  --surface-raised: #ffffff;
+  --surface-raised-border: rgba(0, 0, 0, 0.08);
+
+  /* 盤面に沈んだ溝（表示単位の切り替えのトラック）。浮いた面とは逆向きの表現で、
+     「これは道具ではなく状態の選択」を見た目で言い分ける。 */
+  --track: rgba(0, 0, 0, 0.05);
+  /* 溝の中で選ばれている側。両テーマとも「選択＝溝より明るい」に揃える。
+     地の色（--bg）を使うと dark で溝より暗くなり、light と関係が反転していた。 */
+  --track-active: #ffffff;
+
   /* Onboarding tokens */
   --ob-sage: #8ea89c;
   --ob-sage-soft: rgba(142, 168, 156, 0.16);
@@ -71,6 +84,11 @@
   --card-snippet: #3a3520;
   --card-photo: #2a2a2a;
 
+  --surface-raised: #2c2c2c;
+  --surface-raised-border: rgba(255, 255, 255, 0.12);
+  --track: rgba(255, 255, 255, 0.07);
+  --track-active: rgba(255, 255, 255, 0.14);
+
   --ob-card-bg: #1f1d1a;
   --ob-card-border: rgba(255, 255, 255, 0.08);
   --ob-overlay: rgba(8, 10, 8, 0.6);
@@ -88,9 +106,14 @@ body {
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
 }
 
-/* Tailwind v4 の Preflight は button を `cursor: default` にする。押せるものは
- * 押せるように見えてほしいので、押せる要素だけ pointer に戻す。
- * 各コンポーネントで `cursor-pointer` を貼って回るより、ここで一度決めるほうが漏れない。 */
+/* Tailwind v4 の Preflight は button を `cursor: default` にする（v3 までは
+ * ブラウザ既定の pointer だった）。そのためアプリ全体でボタンが「押せる物」に
+ * 見えなくなっていた。<a> は pointer のままなので、リンクとボタンで挙動が食い違う。
+ * 押せる要素は押せるように見せる、に戻す。
+ *
+ * base レイヤーに置くのは、`cursor-grab` のようなユーティリティに勝たせるため
+ * （ボードのカードは掴んで動かすので pointer にしてはいけない）。 */
+
 /* サイドバーの幅。**この1本だけをサイドバー・本文の左余白・エディタの左端が見る**
  * （配り方は lib/sidebar-context.tsx）。開閉は2状態だけなので、同じ遷移を3者に掛ければ
  * 同じフレームで一緒に動く。 */
@@ -123,7 +146,29 @@ body {
   }
 }
 
+/* 盤面のカードの中で送れる場所は、送れることが見えるようにする。
+   既定のスクロールバーは macOS だと触るまで出ないので、常に細い軌道を見せる。 */
+.board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+.board-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.board-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--border-subtle);
+  border-radius: 3px;
+}
+.board-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--date-color);
+}
+
 @layer base {
+  /* aria-disabled も除く。押せない理由をホバーで伝えるボタンは `disabled` 属性を
+     使えない（React が disabled な要素のマウスイベントを止めるため）。 */
   button:not(:disabled):not([aria-disabled="true"]),
   [role="button"]:not([aria-disabled="true"]),
   summary {

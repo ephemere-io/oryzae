@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { ValidationError } from '@/contexts/shared/application/errors/application.errors.js';
 import { errorHandler } from '@/contexts/shared/presentation/middleware/error-handler.js';
 
@@ -17,10 +18,23 @@ function createApp() {
     })
     .get('/unhandled', () => {
       throw new Error('Something went wrong');
+    })
+    .get('/zod', () => {
+      z.object({ text: z.string().min(1).max(3) }).parse({ text: 'too long' });
+      return new Response('unreachable');
     });
 }
 
 describe('errorHandler', () => {
+  // errorHandler の Sentry 送信は dynamic import の fire-and-forget なので、
+  // リクエストが返った後に着弾する。前のテストの飛び残りが次のスパイに落ちると、
+  // 「送っていないはずのテスト」が他人の呼び出しを拾って落ちる（実際に約5回に1回落ちていた）。
+  // **落ち着くのを待ってから記録を消す**ことで、各テストが自分の呼び出しだけを見る。
+  beforeEach(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    mockCaptureException.mockClear();
+  });
+
   it('returns appropriate status for ApplicationError', async () => {
     const app = createApp();
     const res = await app.request('/app-error');
@@ -54,14 +68,23 @@ describe('errorHandler', () => {
   });
 
   it('does not call Sentry for ApplicationError', async () => {
-    mockCaptureException.mockClear();
     const app = createApp();
     await app.request('/app-error');
 
-    // ApplicationError は dynamic import を起動しないので、十分な余裕を取って
-    // 他テスト由来の遅延した呼び出しが漏れていないことを確認する。
+    // ApplicationError は dynamic import を起動しない。仮に起動していたら
+    // この待ち時間の中で着弾するので、待ってから「呼ばれていない」を見る。
+    // （前のテストの飛び残りは beforeEach で切り離し済み）
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+  it('入力が形に合わないときは 500 ではなく 400 で、どこが悪いかを返す', async () => {
+    // ルートは schema.parse() で検証している。ZodError を拾っていなかった頃は
+    // 入力ミスが全部 500 になり、Sentry にも未処理例外として上がっていた。
+    const app = createApp();
+    const res = await app.request('/zod');
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('text');
   });
 });

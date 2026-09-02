@@ -9,9 +9,11 @@ interface PhotoContent {
 
 interface PhotoCardContentProps {
   content: PhotoContent;
+  /** 引ききった状態ではキャプション（文字）だけ隠す。画像そのものは常に描く。 */
+  captionHidden?: boolean;
 }
 
-export function PhotoCardContent({ content }: PhotoCardContentProps) {
+export function PhotoCardContent({ content, captionHidden = false }: PhotoCardContentProps) {
   return (
     <div
       className="flex h-full flex-col"
@@ -24,6 +26,10 @@ export function PhotoCardContent({ content }: PhotoCardContentProps) {
       <img
         src={content.imageUrl}
         alt={content.caption || 'Board photo'}
+        // 画像はブラウザ既定でドラッグできる。掴んだ瞬間にネイティブの画像ドラッグが
+        // 始まってしまい、カードを動かせなくなっていた（カード全面を覆っていた
+        // 透明ボタンを外した副作用）。
+        draggable={false}
         style={{
           width: '100%',
           flex: '1 1 auto',
@@ -33,7 +39,7 @@ export function PhotoCardContent({ content }: PhotoCardContentProps) {
           backgroundColor: 'var(--toolbar-hover)',
         }}
       />
-      {content.caption && (
+      {content.caption && !captionHidden && (
         <p
           className="mt-2 shrink-0 text-center text-xs italic"
           style={{ color: 'var(--date-color)' }}
