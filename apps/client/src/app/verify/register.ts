@@ -12,10 +12,10 @@
 
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
-import '@/features/auth/components/reset-password-form.verify';
 import '@/components/ui/menu.verify';
 import '@/components/ui/segmented.verify';
 import '@/components/ui/select.verify';
+import '@/features/shared/auth/components/reset-password-form.verify';
 import '@/features/pc/entries/components/delete-confirm-modal.verify';
 import '@/features/pc/entries/components/editor-status-bar.verify';
 import '@/features/pc/entries/components/entry-action-palette.verify';
@@ -50,9 +50,9 @@ import '@/features/sp/entries/components/sp-confirm-sheet.verify';
 import '@/features/sp/entries/components/sp-entry-editor.verify';
 import '@/features/sp/entries/components/sp-fermentation-drawer.verify';
 import '@/features/sp/questions/components/sp-questions.verify';
-import '@/features/onboarding/components/illustrations.verify';
-import '@/features/onboarding/components/onboarding-flow.verify';
-import '@/features/onboarding/components/steps.verify';
+import '@/features/shared/onboarding/components/illustrations.verify';
+import '@/features/shared/onboarding/components/onboarding-flow.verify';
+import '@/features/shared/onboarding/components/steps.verify';
 import '@/features/pc/entries/components/entry-editor.verify';
 import '@/features/pc/board/components/board-view.verify';
 import '@/features/pc/fermentation/components/detail-pane.verify';
@@ -60,10 +60,10 @@ import '@/features/pc/fermentation/components/jar-view.verify';
 import '@/features/sp/entries/components/sp-entry-list.verify';
 import '@/features/sp/fermentation/components/sp-jar.verify';
 import '@/features/pc/account/components/account-page.verify';
-import '@/features/auth/components/forgot-password-form.verify';
-import '@/features/auth/components/login-form.verify';
+import '@/features/shared/auth/components/forgot-password-form.verify';
+import '@/features/shared/auth/components/login-form.verify';
 import '@/features/pc/navigation/components/sidebar.verify';
-import '@/features/auth/components/signup-form.verify';
+import '@/features/shared/auth/components/signup-form.verify';
 // 画面ごとのロード枠（スケルトン）
 import '@/features/pc/account/components/account-page-skeleton.verify';
 import '@/features/pc/account/components/writing-stats-skeleton.verify';

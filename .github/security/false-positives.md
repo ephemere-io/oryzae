@@ -44,7 +44,7 @@ service role を使っていること自体は、レビュー済みの意図的�
 ## 5. `supabase/rls-baseline.json` に登録済みの既知リスク
 
 同ファイルの `status: todo` の項目は**既に把握されており、対応が管理されています**。
-週次監査で毎回同じものを再報告しないでください。ただし、baseline の記述より
+定期監査で毎回同じものを再報告しないでください。ただし、baseline の記述より
 **影響範囲が広いことを示す新しい証拠**を見つけた場合は報告してください。
 
 ## 6. `/verify` ルートの存在
@@ -60,7 +60,7 @@ service role を使っていること自体は、レビュー済みの意図的�
 
 ## 8. 依存パッケージの既知 CVE
 
-依存の脆弱性は `pnpm audit`（Security ワークフローの `dependency-audit` ジョブ）と
+依存の脆弱性は `pnpm audit`（Security ワークフローの `deterministic-gates` ジョブ）と
 Dependabot が担当します。AI レビューでは重複して報告しないでください。
 
 ---

@@ -3,6 +3,10 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { type ActualCostResult, fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
 import {
+  FERMENTATION_MODEL_ID,
+  FERMENTATION_MODEL_RATE,
+} from '../../infrastructure/claude-pricing.js';
+import {
   aggregateCost,
   aggregateCostByDay,
   fetchFermentationCostRows,
@@ -281,6 +285,13 @@ export const adminObservability = new Hono<Env>()
       estimated: {
         // rowsResult が null = クエリ失敗。空配列を「コスト0」と読ませないため status を返す。
         status: rowsResult === null ? 'error' : 'ok',
+        // 推定の計算根拠。画面で「どう出した数字か」を検算できるように返す。
+        // 単価は claude-pricing.ts が唯一の正なので、フロントでハードコードしない。
+        pricing: {
+          modelId: FERMENTATION_MODEL_ID,
+          inputUsdPerMTok: FERMENTATION_MODEL_RATE.inputUsdPerMTok,
+          outputUsdPerMTok: FERMENTATION_MODEL_RATE.outputUsdPerMTok,
+        },
         totalCostUsd: aggregate.estimatedCostUsd,
         inputTokens: aggregate.inputTokens,
         outputTokens: aggregate.outputTokens,
