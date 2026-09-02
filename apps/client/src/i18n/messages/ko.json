@@ -279,7 +279,9 @@
       "caption_placeholder": "캡션 (20자 이내)",
       "cancel": "취소",
       "uploading_button": "업로드 중…",
-      "submit": "추가"
+      "submit": "추가",
+      "unsupported": "이 이미지를 열 수 없습니다. iPhone 사진(HEIC)은 브라우저가 읽지 못할 수 있습니다. JPEG / PNG로 저장한 뒤 다시 선택해 주세요.",
+      "upload_failed": "추가하지 못했습니다. 다시 시도해 주세요."
     },
     "snippet_dialog": {
       "aria_label": "스니펫 대화상자",
@@ -288,10 +290,38 @@
       "placeholder": "텍스트를 입력하세요...",
       "cancel": "취소",
       "update": "변경",
-      "create": "만들기"
+      "create": "만들기",
+      "source_aria": "스니펫 만드는 방법",
+      "tab_text": "직접 입력",
+      "tab_image": "이미지에서 읽기",
+      "click_to_select_image": "클릭하여 이미지 선택",
+      "preview_alt": "읽어들일 이미지 미리보기",
+      "reading": "읽는 중…",
+      "reading_aria": "읽는 중",
+      "ocr_empty": "문자를 읽지 못했습니다. 다른 이미지를 시도해 보세요.",
+      "ocr_failed": "읽기에 실패했습니다. 형식(JPEG/PNG/WebP/GIF)과 크기({maxMb}MB 이하)를 확인해 주세요.",
+      "ocr_note": "이미지에서 읽어들였습니다. 오류가 섞일 수 있으니 확인한 뒤 붙여 주세요.",
+      "too_long": "{max}자 이내로 입력해 주세요",
+      "drop_or_click_image": "이미지를 끌어다 놓거나 클릭해서 선택",
+      "read_again": "다시 읽기",
+      "ocr_caveat": "읽기가 완벽하지는 않습니다. 손글씨나 흐린 글자는 잘못 읽힐 수 있으니 붙이기 전에 확인해 주세요."
     },
     "error_message": "보드를 불러오지 못했습니다",
-    "retry": "다시 시도"
+    "retry": "다시 시도",
+    "minimap": {
+      "aria_label": "보드 미니맵"
+    },
+    "toolbar": {
+      "aria_label": "보드 툴바",
+      "snippet": "스니펫 만들기",
+      "photo": "이미지 붙여넣기",
+      "aria_label_card": "선택한 카드 작업",
+      "bring_to_front": "맨 앞으로",
+      "delete": "삭제",
+      "open": "열기",
+      "ocr": "이미지에서 읽기"
+    },
+    "drop_image": "여기에 이미지를 놓으세요"
   },
   "editor": {
     "status": {
@@ -456,6 +486,7 @@
       "header_snippet": "Oryzae가 골라낸 문장",
       "header_letter": "L.A.B.의 관찰 기록",
       "snippet_source_prefix": "출처:",
+      "resize_aria": "상세 패널 너비 조절",
       "write_entry": "이 질문으로 항목 쓰기"
     },
     "jar": {
@@ -501,7 +532,9 @@
         "dismiss": "알겠습니다",
         "aria_label": "절임 완료 알림",
         "heading": "발효 항아리에 절여졌습니다"
-      }
+      },
+      "canvas_aria": "항아리 캔버스",
+      "minimap_aria": "항아리 미니맵"
     }
   },
   "questions": {
@@ -649,6 +682,15 @@
       "cancel": "취소",
       "save": "저장",
       "letter_arrived": "편지가 도착했습니다"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "확대",
+      "out_aria": "축소",
+      "reset_aria": "확대/축소 초기화",
+      "fit_aria": "전체 보기",
+      "fit": "Fit"
     }
   }
 }
