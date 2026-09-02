@@ -1,5 +1,5 @@
 import type { EditorEffectsState, TextSpanMark } from '@oryzae/shared';
-import { isInlineImage } from './inline-image-codec.js';
+import { extractInlineImages, isInlineImage } from './inline-image-codec.js';
 
 /**
  * editor の DOM ↔ `EditorEffectsState` のシリアライズ/デシリアライズ。
@@ -37,13 +37,17 @@ export function extractEditorEffects(
 ): EditorEffectsState | null {
   const textSpans = scanTextSpans(editor);
   const tracesSnapshot = eraserTraces && eraserTraces.length > 0 ? eraserTraces : undefined;
+  // 本文中の写真もここで一緒に拾う。呼び出し側が別途集める作りにすると、
+  // 「装飾だけ保存されて写真の位置が落ちる」保存経路が生まれる。
+  const inlineImages = extractInlineImages(editor);
 
-  if (textSpans.length === 0 && !tracesSnapshot) return null;
+  if (textSpans.length === 0 && !tracesSnapshot && inlineImages.length === 0) return null;
 
   return {
     version: 1,
     ...(textSpans.length > 0 ? { textSpans } : {}),
     ...(tracesSnapshot ? { eraserTraces: tracesSnapshot.map((t) => ({ ...t })) } : {}),
+    ...(inlineImages.length > 0 ? { inlineImages } : {}),
   };
 }
 
