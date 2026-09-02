@@ -4,9 +4,11 @@ updates:
   # ルートのみを対象にする。個別ディレクトリを指定すると lockfile が競合する。
   - package-ecosystem: "npm"
     directory: "/"
+    # minor/patch は月次で十分（Issue #551）。weekly だと Actions の無料枠を
+    # dependabot の PR だけで月 300 分以上使う。security update は interval に
+    # 関わらず即時作成されるので、脆弱性対応が遅れることはない。
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
       timezone: "Asia/Tokyo"
     groups:
@@ -14,14 +16,13 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
       timezone: "Asia/Tokyo"
     groups:

@@ -52,6 +52,39 @@ describe('useHealthTrends', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('reports successRate as null on days with no fermentations', async () => {
+    // 0 件の日を 0% にすると「全部失敗した日」と区別が付かず、ダッシュボードが
+    // 障害に見えてしまう（赤い目標ラインの下に落ちる）。null で「データなし」を表す
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        days: [
+          {
+            date: '2026-04-06',
+            totalFermentations: 0,
+            completedFermentations: 0,
+            activeWriters: 3,
+          },
+          {
+            date: '2026-04-07',
+            totalFermentations: 4,
+            completedFermentations: 0,
+            activeWriters: 5,
+          },
+        ],
+      }),
+    );
+
+    const { result } = renderHook(() => useHealthTrends());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.days[0].successRate).toBeNull();
+    // 実際に全部失敗した日は 0（null ではない）
+    expect(result.current.days[1].successRate).toBe(0);
+  });
+
   it('passes date_from and date_to as query parameters', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(true, { days: sampleResponseDays }));
 

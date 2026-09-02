@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 // データ取得・更新（fetch）は features/shared / lib / app/api にだけ置く。
 // （doc: client-architecture-guide.md「置き場の決定木」3）
 //
-// なぜ機械強制するか: pc/sp/flat/app に fetch が生えると、reach 分離に阻まれて端末間で
+// なぜ機械強制するか: pc/sp/app に fetch が生えると、reach 分離に阻まれて端末間で
 // 共有できず、必ずコピーが発生する。Issue #490 では fermentation detail の取得が 3実装、
 // profile 更新が 2実装に増殖し、page が API を直叩きして features/shared が空洞化した。
 // dep-cruiser は import しか見ないので、エンドポイント文字列はここで見る。

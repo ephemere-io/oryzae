@@ -21,7 +21,8 @@ export interface TrendDay {
   date: string;
   totalFermentations: number;
   completedFermentations: number;
-  successRate: number;
+  /** その日の漬け込みが 0 件なら null。0% だと「全部失敗した日」と見分けが付かない */
+  successRate: number | null;
   activeWriters: number;
 }
 
@@ -50,7 +51,9 @@ export function useHealthTrends(dateFrom?: string, dateTo?: string) {
         body.days.map((d) => ({
           ...d,
           successRate:
-            d.totalFermentations > 0 ? (d.completedFermentations / d.totalFermentations) * 100 : 0,
+            d.totalFermentations > 0
+              ? (d.completedFermentations / d.totalFermentations) * 100
+              : null,
         })),
       );
     } else {

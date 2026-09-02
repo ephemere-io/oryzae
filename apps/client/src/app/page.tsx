@@ -1,4 +1,4 @@
-import { HomeGate } from '@/features/auth/components/home-gate';
+import { HomeGate } from '@/features/shared/auth/components/home-gate';
 
 /**
  * ルート（/）= 振り分けゲート。描画物を持たない。

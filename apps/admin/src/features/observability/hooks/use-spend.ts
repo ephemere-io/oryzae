@@ -53,6 +53,12 @@ const spendDataSchema = z.object({
   }),
   estimated: z.object({
     status: z.enum(['ok', 'error']),
+    /** 推定の計算根拠。画面で検算できるようにサーバーが返す（単価の正は claude-pricing.ts）。 */
+    pricing: z.object({
+      modelId: z.string(),
+      inputUsdPerMTok: z.number(),
+      outputUsdPerMTok: z.number(),
+    }),
     totalCostUsd: z.number(),
     inputTokens: z.number(),
     outputTokens: z.number(),

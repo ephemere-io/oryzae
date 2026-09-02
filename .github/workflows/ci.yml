@@ -4,10 +4,29 @@ on:
   push:
     branches: [main]
   pull_request:
+    # ドキュメントだけの変更で CI 一式を回すのは無駄（Issue #551）。
+    # このリポジトリには branch protection が無く required status checks も存在しないため、
+    # skip で PR がマージ不能になる罠は踏まない。将来 branch protection を有効化したら要再確認。
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.claude/**'
+
+# 追い越された run を止める。main への push だけは、マージを取りこぼさないよう
+# キャンセルしない（マージ後に壊れたことへ気づく唯一の網であるため）。
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  lint:
-    name: Lint (Biome)
+  # lint / typecheck / dep-cruise / check:as / knip は本題が合計 23 秒しかないのに、
+  # ジョブを分けていたせいで checkout + pnpm setup + install（毎回 約20 秒）を 5 回踏み、
+  # 分単位切り上げの課金で 5 分を払っていた（Issue #551）。1 ジョブに畳む。
+  #
+  # 分割時の利点だった「1 つ落ちても残りの結果が見える」は、個別ステップ +
+  # `!cancelled()` で維持する（先頭が落ちても後続は走り、まとめて赤が見える）。
+  checks:
+    name: Static Checks (lint/type/deps/knip)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -17,21 +36,23 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
+      - name: Lint (Biome)
+        run: pnpm lint
+      - name: TypeCheck
+        run: pnpm typecheck
+        if: '!cancelled()'
+      - name: Dependency Check (DDD Layers)
+        run: pnpm dep-cruise
+        if: '!cancelled()'
+      - name: No `as` Casts
+        run: pnpm check:as
+        if: '!cancelled()'
+      - name: Dead Code Detection (Knip)
+        run: pnpm knip
+        if: '!cancelled()'
 
-  typecheck:
-    name: TypeCheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-
+  # test だけは分けたまま残す。168 秒あるので checks に畳むと 23 秒の静的検査の結果まで
+  # 待たされることになり、しかも別ジョブのままでも課金分は変わらない（畳む得が無い）。
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -44,45 +65,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
-
-  dependency-check:
-    name: Dependency Check (DDD Layers)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm dep-cruise
-
-  type-assertions:
-    name: No `as` Casts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check:as
-
-  knip:
-    name: Dead Code Detection (Knip)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm knip
 
   # 検証ハーネスの「挙動確認ビュー」への導線を PR に貼る。
   # 以前は replay をヘッドレス録画→GIF 化していたが、GIF が巨大（212 probe×~5分＝~100MB）で

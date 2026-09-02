@@ -26,7 +26,7 @@ paths:
   - **`apps/client`**: ドメイン × reach。`features/{shared,pc,sp}/{domain}/`
     - `shared/{domain}/` — UIを持たないドメインロジック（**全 fetch** の `hooks/`・**全ドメイン型** の `types.ts`）
     - `pc/{domain}/` / `sp/{domain}/` — 端末別 UI（components, hooks）。**fetch とドメイン型は持たない**
-    - reach は「端末で体験が変わる機能」だけ。端末非依存の UI（`auth` のフォーム/`onboarding` 等）は `features/{domain}/` のフラットなまま（pc/sp に分けない）
+    - **`features/` 直下は shared / pc / sp の 3 つだけ**。端末非依存のものはロジックも UI も `features/shared/{domain}/` へ（`auth` のフォーム・`onboarding` 等）。フラットな第4のグループは作らない
     - シェルは端末固有 UI: PC サイドバー → `features/pc/navigation/`、SP ボトムナビ → `features/sp/navigation/`
   - **`apps/admin`**: reach 軸なし。従来どおり `features/{domain}/`
 - `components/` — ドメイン非依存 UI・seam プリミティブ（`device-view`）・provider。**端末固有 UI（`sp-*`/`pc-*`）禁止**
@@ -38,7 +38,7 @@ paths:
 1. ドメインを知らない汎用 UI → `components/ui/`
 2. ドメインを知らない基盤 util（createApiClient・認証・分析・theme・debounce・日付整形・markdown・定数）→ `lib/`
 3. **データ取得・更新（fetch）か? ドメイン型か?** → `features/shared/{domain}/`（`hooks/` と `types.ts`）
-4. 残り（UI と、その UI 専用の状態・演出）→ PC UI → `features/pc/{domain}/` ／ SP UI → `features/sp/{domain}/` ／ 端末非依存 UI → `features/{domain}/`（flat）
+4. 残り（UI と、その UI 専用の状態・演出）→ PC UI → `features/pc/{domain}/` ／ SP UI → `features/sp/{domain}/` ／ 端末非依存 UI → `features/shared/{domain}/components/`
 
 > **3 が 4 より先**。「PC 専用画面のためのデータ hook」も `shared` に落ちる。片端末しか使わなくても
 > `shared` に置く（`pc` に置くと SP 追加時に reach 分離に阻まれて必ずコピーが生まれる。Issue #490）。
@@ -56,17 +56,19 @@ paths:
   - `app/` → `lib/api` の実装 **禁止**（`import type { ApiClient }` は可）= `app-no-api-client`
   - `app/` → `features/{pc,sp}/*/hooks/` **禁止** = `app-no-reach-hooks`
     （DeviceView は描画を分岐するが hook は分岐しない。端末固有 hook を page が呼ぶと両端末で実行される）
-- flat features → `lib/api` の実装 **禁止** = `flat-features-no-api`
+- `features/shared/*` → `lib/use-device`, `components/device-view` **禁止** = `shared-no-device-detection`
+  （shared は UI を持ってよいが、その中で端末を分岐させない。分岐は DeviceView の1か所だけ）
 
 import では見えない層は `test/architecture/` の静的テストで強制する:
 `fetch-lives-in-shared`（`/api/v1` の置き場）・`device-ui-lives-in-reach`（`sp-*`/`pc-*` の置き場）・
-`types-live-in-types-file`（`hooks/` から型を export しない）・`shared-no-ui`（shared に `.tsx` を置かない）。
+`types-live-in-types-file`（`hooks/` から型を export しない）・`features-are-reach-only`（`features/` 直下は 3 つだけ）・
+`no-cross-device-duplication`（pc と sp の間にコピペを作らない。コピペは import を作らないので dep-cruiser では検出できない）。
 
 `apps/admin`（reach 軸なし）: 従来どおり `features/X` → `features/Y` **禁止**。
 
 ## feature 追加手順（迷ったらこの順。各ステップは dep-cruiser/テストで機械検証される）
 
-1. **置き場を決定木で決める**（reach: shared / pc / sp / flat）
+1. **置き場を決定木で決める**（reach: shared / pc / sp）
 2. `features/{reach}/{domain}/` に作る（pc/sp は `components`・`hooks`、shared は `hooks`・型）
 3. **データ取得・保存は `features/shared/{domain}/hooks` に**置き、pc/sp はそれを import（直接 API を叩かない）。端末非依存の hook（例 `use-auth`）も shared に置けば pc/sp 双方から使える
 4. 画面を出すなら **page は必ず `<DeviceView pc={…} sp={…} />`**（`components/device-view`）で出し分ける。SP 変種が無ければ `pc` だけでよい（SP は安全な「未対応」表示にフォールバック）。← `protected-pages-use-device-view` で必須化
