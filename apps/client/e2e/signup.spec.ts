@@ -9,7 +9,7 @@ import { extractTokenHash, waitForLatestEmail } from './fixtures/mailbox';
  * `use-email-confirm.ts` として全面的に書き直した箇所でもある。
  *
  * 登録できなかった人は何も言わずに去るため、壊れても気づけない（＝静かな障害）。
- * 使い捨て Supabase には受信箱（inbucket）が付いてくるので、ここで実際に通す。
+ * 使い捨て Supabase には受信箱（Mailpit）が付いてくるので、ここで実際に通す。
  * 実行ごとにユーザーを1人作るが、CI のインスタンスは毎回破棄されるので枠は溜まらない。
  *
  * 失敗系の読み方に注意:
