@@ -4,7 +4,7 @@ name: Security
 # 3 層構成:
 #   1. deterministic-gates / sast / secret-scan — 毎 PR。決定的・無料・API キー不要。ここが本丸。
 #   2. claude-review     — 毎 PR。差分に対する意味的レビュー（AI なので確率的、補助）
-#   3. weekly-audit      — 週次。リポジトリ全体を監査し Issue に起票（差分レビューが
+#   3. scheduled-audit   — 月2回。リポジトリ全体を監査し Issue に起票（差分レビューが
 #                          構造上見られない「既に main にある問題」を拾う）
 #
 # 注意: claude-code-security-review は prompt injection に対して硬化されていない。
@@ -20,7 +20,7 @@ name: Security
 on:
   pull_request:
     # ドキュメントだけの変更では走らせない（Issue #551）。
-    # schedule / workflow_dispatch には paths が効かないので、週次のフル監査は従来どおり。
+    # schedule / workflow_dispatch には paths が効かないので、定期のフル監査は対象外。
     paths-ignore:
       - 'docs/**'
       - '**.md'
@@ -28,8 +28,15 @@ on:
   push:
     branches: [main]
   schedule:
-    # 毎週月曜 03:17 JST（= 日曜 18:17 UTC）。CI 混雑を避けるため 0 分ちょうどを外す。
-    - cron: '17 18 * * 0'
+    # 毎月 2 日と 16 日の 03:17 JST（= 1 日と 15 日の 18:17 UTC）。
+    # CI 混雑を避けるため 0 分ちょうどを外している。
+    #
+    # 週次から月 2 回に落とした理由: AI 監査は従量課金で、頻度がそのまま費用になる。
+    # 一方 PR ごとの決定的ゲート（RLS / 認可テスト / gitleaks / Semgrep / 依存監査）は
+    # 無料で全 PR に効き続けるため、「見つかるまで最大 2 週間」の遅れを負うのは
+    # AI にしか見えない種類の問題（ログへの日記本文混入など）だけになる。
+    # 費用と露出時間の釣り合いとして月 2 回を選んだ。頻度を上げたくなったらここを変える。
+    - cron: '17 18 1,15 * *'
   workflow_dispatch:
 
 # 追い越された run を止める。main への push だけはキャンセルしない（ci.yml と同じ理由）。
@@ -123,10 +130,19 @@ jobs:
       - name: Scan git history for secrets
         run: ./gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
 
-  # ── 層 2: PR 差分の意味的レビュー（AI・補助） ───────────────────────────
+  # ── 層 2: PR 差分の意味的レビュー（AI・補助）※ 既定では停止 ──────────────
+  #
+  # 費用が PR 数に比例するため、既定では動かさない。
+  # このリポジトリは月 40〜60 本の PR がマージされており、全 PR で AI を回すと
+  # 月 1 万円規模になる。同じ「AI にしか見えない問題」は層 3 の定期監査が
+  # リポジトリ全体に対して拾うので、そちらに寄せている。
+  #
+  # 有効化したくなったら、GitHub の Settings > Secrets and variables > Actions >
+  # Variables で ENABLE_PR_AI_REVIEW = true を作るだけでよい（コード変更不要）。
+  # 逆に止めたくなったら変数を消す。
   claude-review:
     name: Claude Security Review (PR 差分)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.ENABLE_PR_AI_REVIEW == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -165,9 +181,13 @@ jobs:
           custom-security-scan-instructions: .github/security/scan-instructions.md
           false-positive-filtering-instructions: .github/security/false-positives.md
 
-  # ── 層 3: 週次のリポジトリ全体監査 ─────────────────────────────────────
-  weekly-audit:
-    name: Weekly Full Audit (→ Issue)
+  # ── 層 3: 定期のリポジトリ全体監査（月 2 回） ───────────────────────────
+  #
+  # ここが AI 監査の主役。差分ではなくコードベース全体を見るので、
+  # 「既に main にあって誰も気づいていない問題」を拾える。
+  # 費用は実行回数だけで決まり、PR 数に左右されない（＝上限が読める）。
+  scheduled-audit:
+    name: Scheduled Full Audit (→ Issue)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -175,14 +195,14 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v7
-      # 週次監査はキーが無いと成立しない。静かに skip すると「監視できているつもり」に
+      # 定期監査はキーが無いと成立しない。静かに skip すると「監視できているつもり」に
       # なるのが最悪なので、未設定なら明示的に落とす。
       - name: Require API key
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::error::ANTHROPIC_API_KEY が未設定のため週次セキュリティ監査を実行できません。" \
+            echo "::error::ANTHROPIC_API_KEY が未設定のため定期セキュリティ監査を実行できません。" \
                  "リポジトリの Settings > Secrets and variables > Actions で設定してください。"
             exit 1
           fi
@@ -206,7 +226,7 @@ jobs:
               file:line 付きで書いてください。抽象的な指摘は価値がありません。
 
             結果は GitHub Issue に報告してください:
-            - タイトルは必ず `[security-audit] 週次セキュリティ監査` で始めること
+            - タイトルは必ず `[security-audit] 定期セキュリティ監査` で始めること
             - 既存の open な同タイトル Issue があれば、新規作成せずコメントを追記すること
             - 重大な指摘がゼロなら、Issue は作らず「問題なし」とだけ出力して終了すること
-              （毎週ノイズを起票すると誰も読まなくなるため）
+              （毎回ノイズを起票すると誰も読まなくなるため）
