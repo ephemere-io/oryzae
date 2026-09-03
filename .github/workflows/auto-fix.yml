@@ -1,0 +1,595 @@
+name: Auto Fix
+
+# 自動バグ修正ループ。設計と運用の正は docs/auto-fix-loop-guide.md。
+#
+# 起動する経路は 3 つ。上から優先度が高い:
+#   1. main が赤くなった（CI / E2E / Security の失敗）— 壊れているものを直す
+#   2. Issue に `auto-fix` ラベルが付いた             — 人が「これを直して」と指した
+#   3. 週次の定期巡回                                  — 起票が無くても回る
+#
+# 費用の考え方:
+# AI に探索を任せると費用は探索の深さで決まり、事前に読めない。だから
+# 「回数を我慢する」ではなく「実行前に残額を計算し、足りなければ走らせない」で守る。
+# 上限は scripts/bot-budget.mjs が台帳 Issue（`[auto-fix] 予算台帳と稼働状況`）で管理する。
+#
+# マージの判断は AI がしない:
+# Claude はファイルを編集するところまでしか行わない。許可領域の判定・ガードレール・
+# コミット・PR・マージはすべてこのワークフローが決定的に行う。
+# 「ゲートを通したことにして進む」余地をモデルに与えないための分割である。
+
+on:
+  # 毎週月曜 05:25 JST（= 日曜 20:25 UTC）。週次 E2E（月 09:00 JST）より前に置き、
+  # 巡回で入った変更をその日の E2E が拾えるようにする。
+  schedule:
+    - cron: '25 20 * * 0'
+  issues:
+    types: [labeled]
+  workflow_run:
+    workflows: ['CI', 'E2E Tests', 'Security']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: '直したい Issue 番号（空なら定期巡回と同じ動きをする）'
+        required: false
+        default: ''
+
+# 台帳 Issue を 2 つの run が同時に書き換えると、使用額が失われて上限が効かなくなる。
+# 追い越しはキャンセルではなく直列化で捌く（キャンセルすると費用だけ計上漏れになる）。
+concurrency:
+  group: auto-fix
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    name: 自動修正
+    # AUTO_FIX_ENABLED を明示的に true にしない限り動かない（opt-in）。
+    # 人のレビュー無しで main を書き換える仕組みなので、
+    # 「マージした瞬間に勝手に走り始める」ことがないようにしてある。止めたい時は変数を消す。
+    if: >-
+      vars.AUTO_FIX_ENABLED == 'true' &&
+      (github.event_name != 'issues' || github.event.label.name == 'auto-fix') &&
+      (github.event_name != 'workflow_run' ||
+        (github.event.workflow_run.conclusion == 'failure' &&
+         github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write # 修正ブランチを push する
+      pull-requests: write # PR を作ってマージする
+      issues: write # 台帳 Issue の更新と、対象 Issue へのコメント
+      actions: write # 失敗した run のログを読み、マージ後に E2E を起動する
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LEDGER_TITLE: '[auto-fix] 予算台帳と稼働状況'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # 定期監査と同じ方針。キーが無いのに静かに skip すると
+      # 「動いているつもり」になるので、明示的に落とす。
+      - name: API キーの確認
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY が未設定のため自動修正ループを実行できません。"
+            exit 1
+          fi
+
+      - name: 作業ディレクトリを用意する
+        run: mkdir -p .bot
+
+      # ── 何を直すかを決める ────────────────────────────────────────────
+      #
+      # Issue 本文や CI ログは人が書いたテキストなので、シェルに直接展開しない
+      # （`${{ }}` での埋め込みはコマンド注入になりうる）。必ずファイル経由で渡す。
+      - name: 直す対象を決める
+        id: task
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FAILED_RUN_ID: ${{ github.event.workflow_run.id }}
+          FAILED_RUN_NAME: ${{ github.event.workflow_run.name }}
+          LABELED_ISSUE: ${{ github.event.issue.number }}
+          INPUT_ISSUE: ${{ github.event.inputs.issue }}
+        run: |
+          set -euo pipefail
+
+          kind=sweep
+          kind_class=sweep
+          label=''
+
+          resolve_issue() {
+            local num="$1"
+            kind=issue
+            kind_class=reactive
+            label="Issue #${num}"
+            {
+              echo "## 対象: Issue #${num}"
+              echo
+              # 本文やコメントは null になりうる（`// ""` を外すと jq が落ちて task.md が空になる）。
+              gh issue view "$num" --json title,body,labels \
+                --jq '"### " + .title + "\n\nラベル: " + ([.labels[].name] | join(", ")) + "\n\n" + (.body // "")'
+              echo
+              echo "### この Issue に付いたコメント"
+              gh issue view "$num" --json comments \
+                --jq '[.comments[] | "- @" + .author.login + ": " + ((.body // "") | .[0:1500])] | join("\n")'
+              echo
+              echo "修正できたら PR に \`Closes #${num}\` が入る（ワークフローが付ける）。"
+              echo "この Issue が「バグの修正」ではなく仕様変更・新機能・議論だった場合は、"
+              echo "何も編集せず fixed: false と理由を返すこと。"
+            } > .bot/task.md
+            echo "issue_number=${num}" >> "$GITHUB_OUTPUT"
+          }
+
+          case "$EVENT_NAME" in
+            workflow_run)
+              kind=main-red
+              kind_class=reactive
+              label="main の失敗（${FAILED_RUN_NAME}）"
+              gh run view "$FAILED_RUN_ID" --log-failed 2>/dev/null | tail -c 12000 > .bot/failed.log \
+                || echo '(ログを取得できなかった)' > .bot/failed.log
+
+              # 依存の脆弱性 advisory による `pnpm audit` の失敗は、package.json の
+              # overrides を触らないと直せない＝許可領域外である。AI に渡しても
+              # 「直せません」を確認するためだけに費用がかかるので、呼ばずに人へ回す。
+              if grep -qE 'Dependency Audit|pnpm audit|vulnerabilities found' .bot/failed.log; then
+                {
+                  echo "skip=true"
+                  echo "kind=deps-advisory"
+                  echo "kind_class=reactive"
+                  echo "label=${label}"
+                } >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              {
+                echo "## 対象: main が赤い"
+                echo
+                echo "ワークフロー \`${FAILED_RUN_NAME}\` が main で失敗した（run ${FAILED_RUN_ID}）。"
+                echo "失敗したステップのログ末尾は以下。原因を特定して直すこと。"
+                echo
+                echo '```'
+                cat .bot/failed.log
+                echo '```'
+              } > .bot/task.md
+              ;;
+            issues)
+              resolve_issue "$LABELED_ISSUE"
+              ;;
+            *)
+              # 定期巡回と手動実行。まず「人が指した Issue」を探し、無ければ巡回する。
+              picked="$INPUT_ISSUE"
+              if [ -z "$picked" ]; then
+                picked=$(gh issue list --label auto-fix --state open --limit 1 \
+                          --json number --jq '.[0].number // empty')
+              fi
+              if [ -n "$picked" ]; then
+                resolve_issue "$picked"
+              else
+                count=$(jq '.slices | length' .github/bot/sweep-slices.json)
+                # ISO 週番号で回す。1 周 ≒ スライス数（週）。
+                week=$(date -u +%V)
+                idx=$(( 10#$week % count ))
+                slice_id=$(jq -r ".slices[$idx].id" .github/bot/sweep-slices.json)
+                label=$(jq -r ".slices[$idx].label" .github/bot/sweep-slices.json)
+                kind="sweep:${slice_id}"
+                {
+                  echo "## 対象: 定期巡回 — ${label}"
+                  echo
+                  echo "以下のディレクトリだけを対象に、実際に起きうる不具合を探すこと。"
+                  echo "全体を読み漁らないこと（予算が尽きて何も直せずに終わる）。"
+                  echo
+                  jq -r ".slices[$idx].paths[] | \"- \" + ." .github/bot/sweep-slices.json
+                  echo
+                  echo "探し方の目安:"
+                  echo "- 例外を握り潰している箇所、失敗時に黙って既定値へ落ちる箇所"
+                  echo "- 0 件・空配列・null・日付境界を踏むと壊れる分岐"
+                  echo "- await 漏れ、クリーンアップ漏れ、競合状態"
+                  echo "- 型は通るが実行時に来ない形を許している箇所"
+                  echo
+                  echo "**確信が持てるものが 1 件も無ければ、何も編集せず fixed: false で終えること。**"
+                  echo "見つからないのは正しい結果であり、無理に直すより価値がある。"
+                } > .bot/task.md
+              fi
+              ;;
+          esac
+
+          {
+            echo "kind=${kind}"
+            echo "kind_class=${kind_class}"
+            echo "label=${label}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "### 対象: ${label:-$kind}" >> "$GITHUB_STEP_SUMMARY"
+
+      # AI では直せないと分かっている失敗は、呼ばずに人へ回す（費用 0 円）。
+      - name: AI では直せない失敗として報告する
+        if: steps.task.outputs.skip == 'true'
+        env:
+          LABEL: ${{ steps.task.outputs.label }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## 依存の脆弱性で main が赤い — 人の対応が要る"
+            echo ""
+            echo "${LABEL}"
+            echo ""
+            echo "\`pnpm audit\` の失敗は \`package.json\` の \`overrides\` を触らないと直せず、"
+            echo "自動修正の許可領域外である。AI を呼んでも「直せません」を確認するだけなので呼んでいない。"
+            echo ""
+            echo "対応: dependabot の security update PR を待つか、\`pnpm audit\` の出力を見て"
+            echo "\`overrides\` に上限を足す（過去の例: #501）。"
+            echo ""
+            echo "[失敗した run を開く](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }})"
+          } > .bot/comment.md
+          # 同じタイトルの Issue を毎回立てない（gh issue create は重複を弾かないため、
+          # 探してから決める）。毎回ノイズを起票すると、やがて誰も読まなくなる。
+          title='[auto-fix] 依存の脆弱性で main が赤い'
+          gh issue list --state open --search "$title in:title" --limit 10 \
+            --json number,title --jq '.[] | [.number, .title] | @tsv' > .bot/dup.tsv || true
+          existing=$(awk -F'\t' -v t="$title" '$2 == t { print $1; exit }' .bot/dup.tsv)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file .bot/comment.md
+          else
+            gh issue create --title "$title" --body-file .bot/comment.md --label bug
+          fi
+
+      # ── 予算 ──────────────────────────────────────────────────────────
+      - name: 台帳 Issue を用意して読む
+        id: ledger
+        if: steps.task.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          # 検索は前方一致で拾いすぎるので、タイトル完全一致を bash 側で取り直す
+          # （似た名前の Issue を台帳と誤認すると、その本文を上書きしてしまう）。
+          gh issue list --state open --search "$LEDGER_TITLE in:title" --limit 10 \
+            --json number,title --jq '.[] | [.number, .title] | @tsv' > .bot/ledger-candidates.tsv || true
+          num=$(awk -F'\t' -v t="$LEDGER_TITLE" '$2 == t { print $1; exit }' .bot/ledger-candidates.tsv)
+          if [ -z "$num" ]; then
+            # 空の本文は必ずスクリプトに書かせる。手書きすると JSON の形が合わず、
+            # 初回から「台帳が壊れている」と判定されて何も動かなくなる。
+            node scripts/bot-budget.mjs init --out .bot/ledger-body.md \
+              --budget-jpy "${AUTO_FIX_BUDGET_JPY:-500}" --jpy-per-usd "${AUTO_FIX_JPY_PER_USD:-170}"
+            url=$(gh issue create --title "$LEDGER_TITLE" --body-file .bot/ledger-body.md)
+            num="${url##*/}"
+            echo "台帳 Issue を作成: $url"
+          else
+            gh issue view "$num" --json body --jq .body > .bot/ledger-body.md
+          fi
+          echo "number=${num}" >> "$GITHUB_OUTPUT"
+        env:
+          AUTO_FIX_BUDGET_JPY: ${{ vars.AUTO_FIX_BUDGET_JPY }}
+          AUTO_FIX_JPY_PER_USD: ${{ vars.AUTO_FIX_JPY_PER_USD }}
+
+      - name: 予算を確認する
+        id: budget
+        if: steps.task.outputs.skip != 'true'
+        env:
+          AUTO_FIX_BUDGET_JPY: ${{ vars.AUTO_FIX_BUDGET_JPY }}
+          AUTO_FIX_JPY_PER_USD: ${{ vars.AUTO_FIX_JPY_PER_USD }}
+          AUTO_FIX_PER_RUN_USD: ${{ vars.AUTO_FIX_PER_RUN_USD }}
+          KIND_CLASS: ${{ steps.task.outputs.kind_class }}
+        run: |
+          set -euo pipefail
+          node scripts/bot-budget.mjs plan \
+            --kind "$KIND_CLASS" \
+            --body-file .bot/ledger-body.md \
+            --budget-jpy "${AUTO_FIX_BUDGET_JPY:-500}" \
+            --jpy-per-usd "${AUTO_FIX_JPY_PER_USD:-170}" \
+            --per-run-usd "${AUTO_FIX_PER_RUN_USD:-0.60}"
+
+      - name: 予算切れで停止したことを記録する
+        if: steps.task.outputs.skip != 'true' && steps.budget.outputs.allowed != 'true'
+        # reason には `$2.94` のような文字列が入る。`${{ }}` を直接 echo に埋めると
+        # シェルが `$2` を位置パラメータとして展開し、金額が壊れて表示される。
+        env:
+          REASON: ${{ steps.budget.outputs.reason }}
+          LEDGER: ${{ steps.ledger.outputs.number }}
+        run: |
+          echo "::notice::今回は実行しない — ${REASON}"
+          {
+            echo "**実行しなかった**: ${REASON}"
+            echo ""
+            echo "台帳: #${LEDGER}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 修正 ──────────────────────────────────────────────────────────
+      - uses: pnpm/action-setup@v6
+        if: steps.budget.outputs.allowed == 'true'
+      - uses: actions/setup-node@v7
+        if: steps.budget.outputs.allowed == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.budget.outputs.allowed == 'true'
+
+      - name: Claude に修正させる
+        id: claude
+        if: steps.budget.outputs.allowed == 'true'
+        continue-on-error: true # 途中で予算上限に当たっても、費用の記録まで進めたい
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # gh / git commit / git push を渡さない。コミットとマージはワークフローの仕事で、
+          # モデルに「自分で通してしまう」経路を残さないため。
+          # effort は既定の high のまま。落とすと 1 回は安くなるが、ガードレールに落ちた実行は
+          # 費用が丸ごと無駄になるので、「1 回で通る確率」のほうが月の総額に効く。
+          # 打ち切り（aborted）が続くようなら AUTO_FIX_EFFORT を medium に下げるのが最初の手。
+          claude_args: >-
+            --model ${{ vars.AUTO_FIX_MODEL || 'claude-sonnet-5' }}
+            --effort ${{ vars.AUTO_FIX_EFFORT || 'high' }}
+            --max-budget-usd ${{ steps.budget.outputs.budget_usd }}
+            --allowed-tools "Read,Grep,Glob,Edit,Write,TodoWrite,Bash(pnpm:*),Bash(node:*),Bash(ls:*),Bash(cat:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*)"
+            --disallowed-tools "WebSearch,WebFetch,Bash(gh:*),Bash(curl:*),Bash(git commit:*),Bash(git push:*),Bash(git checkout:*),Bash(git reset:*),Bash(git stash:*),Bash(rm:*)"
+          prompt: |
+            あなたは Oryzae の自動修正担当です。以下の 2 つを **必ず最初に読んでから** 作業を始めてください。
+
+            1. `.github/bot/fix-instructions.md` — 守るべきルール（何を直してよいか、何に触れてはいけないか）
+            2. `.bot/task.md` — 今回の対象
+
+            作業が終わったら、結果を `.bot/result.json` に次の形で書いてください（このファイルは
+            .gitignore 済みなので差分には入りません）:
+
+            ```json
+            {
+              "fixed": true,
+              "title": "fix(entries): 空の一覧でスクロール位置が復元されないのを直す",
+              "summary": "何が起きていたか / なぜ起きたか / どう直したか（Markdown 可）",
+              "risk": "low",
+              "skipped_reason": ""
+            }
+            ```
+
+            コミット・push・PR 作成はしないでください。ファイルを編集するところまでがあなたの仕事です。
+            直す価値のあるものが見つからなければ、何も編集せず `"fixed": false` と
+            `skipped_reason` を書いて終えてください。それは失敗ではありません。
+
+      # ── ここから先は決定的な判定。AI の自己申告は使わない ────────────
+      - name: 差分を取り出して判定する
+        id: diff
+        if: steps.budget.outputs.allowed == 'true' && steps.claude.outcome == 'success'
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --name-status -M > .bot/changes.txt
+          if [ ! -s .bot/changes.txt ]; then
+            echo "verdict=empty" >> "$GITHUB_OUTPUT"
+            echo "変更なし" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "変更されたファイル:"
+          cat .bot/changes.txt
+          # 判定は scripts/bot-change-policy.mjs（テスト付き）が行う。
+          # verdict を GITHUB_OUTPUT に書くのはスクリプト側。
+          node scripts/bot-change-policy.mjs .bot/changes.txt .bot/blocked-reasons.md
+          git diff --cached > .bot/proposed.patch
+
+      - name: 許可領域外だったので取り下げる
+        if: steps.diff.outputs.verdict == 'blocked'
+        run: |
+          set -euo pipefail
+          git reset --hard
+          {
+            echo "### 自動マージできない差分だった"
+            echo ""
+            cat .bot/blocked-reasons.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## 自動修正を取り下げた（$(date -u +%Y-%m-%dT%H:%MZ)）"
+            echo ""
+            echo "対象: ${{ steps.task.outputs.label }}"
+            echo ""
+            echo "以下の理由で、人のレビュー無しにマージできない差分だったため破棄した:"
+            echo ""
+            cat .bot/blocked-reasons.md
+            echo ""
+            echo "差分は run のアーティファクト \`proposed-patch\` に残してある。"
+            echo "[run を開く](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } > .bot/comment.md
+          gh issue comment "${{ steps.ledger.outputs.number }}" --body-file .bot/comment.md
+
+      - name: 取り下げた差分を残す
+        if: steps.diff.outputs.verdict == 'blocked'
+        uses: actions/upload-artifact@v7
+        with:
+          name: proposed-patch
+          path: .bot/proposed.patch
+          retention-days: 14
+
+      # ci.yml の Static Checks / Test と同じ 7 つ。片方だけを緩めないこと
+      # （package.json の pre-push と ci.yml と、ここは常に同一である必要がある）。
+      #
+      # なお GITHUB_TOKEN が作った PR には pull_request のワークフローが起動しない
+      # （GitHub の再帰防止の仕様）。つまり **ここが唯一のゲート** であり、
+      # 落ちたらマージしない。E2E だけはここで回せないので、マージ後に dispatch する。
+      - name: ガードレールを回す
+        id: gates
+        if: steps.diff.outputs.verdict == 'auto-merge'
+        # 落ちてもジョブをここで止めない。止めると後続の「取り下げ」と「費用の記録」が
+        # 走らず、使った費用が台帳に載らないまま終わる（＝上限が静かに効かなくなる）。
+        # 最後の step でまとめて赤くする。
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+          pnpm lint
+          pnpm test
+          pnpm dep-cruise
+          pnpm knip
+          pnpm check:as
+          pnpm security:rls
+
+      - name: ガードレールに落ちたので取り下げる
+        if: steps.diff.outputs.verdict == 'auto-merge' && steps.gates.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          {
+            echo "## 自動修正がガードレールに落ちた（$(date -u +%Y-%m-%dT%H:%MZ)）"
+            echo ""
+            echo "対象: ${{ steps.task.outputs.label }}"
+            echo ""
+            echo "差分は出たが typecheck / lint / test / dep-cruise / knip / check:as / security:rls の"
+            echo "いずれかが落ちたためマージしなかった。差分は run のアーティファクトに残してある。"
+            echo ""
+            echo "[run を開く](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } > .bot/comment.md
+          gh issue comment "${{ steps.ledger.outputs.number }}" --body-file .bot/comment.md
+
+      - name: 落ちた差分を残す
+        if: steps.diff.outputs.verdict == 'auto-merge' && steps.gates.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: proposed-patch
+          path: .bot/proposed.patch
+          retention-days: 14
+
+      # ── マージ ────────────────────────────────────────────────────────
+      - name: コミットして PR を作り、マージする
+        id: merge
+        if: steps.diff.outputs.verdict == 'auto-merge' && steps.gates.outcome == 'success'
+        env:
+          KIND: ${{ steps.task.outputs.kind }}
+          ISSUE_NUMBER: ${{ steps.task.outputs.issue_number }}
+        run: |
+          set -euo pipefail
+
+          # result.json が無い/壊れていても止めない。差分とゲートが本体で、
+          # ここは PR の見出しを作るためだけの情報であるため。
+          # タイトルは改行を潰して長さを切る（改行が入ると gh pr create が壊れる）。
+          title=$(jq -r '.title // empty' .bot/result.json 2>/dev/null | tr '\n' ' ' | cut -c1-120 || true)
+          summary=$(jq -r '.summary // empty' .bot/result.json 2>/dev/null || true)
+          risk=$(jq -r '.risk // "unknown"' .bot/result.json 2>/dev/null || echo unknown)
+          [ -n "$title" ] || title="fix(auto): 自動修正ループによる修正 (${KIND})"
+          [ -n "$summary" ] || summary="（要約が生成されなかった。差分を参照。）"
+
+          {
+            echo "$summary"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## この PR について"
+            echo ""
+            echo "自動修正ループ（\`.github/workflows/auto-fix.yml\`）が作成し、**人のレビューを経ずにマージ**した。"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| 起動 | ${KIND} |"
+            echo "| 対象 | ${{ steps.task.outputs.label }} |"
+            echo "| モデルの自己申告リスク | ${risk} |"
+            echo "| 通過したゲート | typecheck / lint / test / dep-cruise / knip / check:as / security:rls |"
+            echo "| 費用の上限 | \$${{ steps.budget.outputs.budget_usd }}（台帳 #${{ steps.ledger.outputs.number }}） |"
+            echo ""
+            if [ -n "${ISSUE_NUMBER:-}" ]; then echo "Closes #${ISSUE_NUMBER}"; echo ""; fi
+            echo "🤖 [run を開く](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } > .bot/pr-body.md
+
+          {
+            echo "$title"
+            echo ""
+            echo "自動修正ループ（.github/workflows/auto-fix.yml）による変更。"
+            echo "typecheck / lint / test / dep-cruise / knip / check:as / security:rls を通過している。"
+            echo ""
+            echo "Co-Authored-By: Claude <noreply@anthropic.com>"
+          } > .bot/commit-message.txt
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          branch="auto-fix/${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git commit -F .bot/commit-message.txt
+          # push 時に pre-push フックが同じ 7 ゲートを回す。重複するぶん遅くなるが
+          # --no-verify は使わない（フックを迂回する経路を一度作ると、それが常用の抜け道になる）。
+          git push -u origin "$branch"
+
+          url=$(gh pr create --base main --head "$branch" --title "$title" --body-file .bot/pr-body.md)
+          echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
+
+          # 作成直後は GitHub 側の mergeable 判定が済んでいないことがあるので数回試す。
+          for attempt in 1 2 3 4 5; do
+            if gh pr merge "$branch" --squash --delete-branch; then
+              echo "マージした: $url" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "マージ待ち（${attempt} 回目）"
+            sleep 10
+          done
+          echo "::error::PR は作成したがマージできなかった: $url"
+          exit 1
+
+      # マージした変更は push イベントの CI を起動しない（GITHUB_TOKEN の再帰防止）。
+      # 上のゲートで CI 相当は回しているが E2E だけは回していないので、
+      # ここで明示的に起動する。落ちれば main-red 経路がこのループ自身を呼び戻す。
+      - name: E2E を起動する
+        if: steps.merge.outcome == 'success'
+        run: |
+          set -euo pipefail
+          if grep -qE '^[A-Z][0-9]*[[:space:]]+(apps|packages|supabase)/' .bot/changes.txt; then
+            gh workflow run e2e.yml --ref main
+            echo "E2E を起動した" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ── 費用の記録（必ず最後に、失敗しても走る） ──────────────────────
+      #
+      # ここが飛ぶと使用額が台帳に載らず、上限が静かに効かなくなる。
+      # always() で必ず通す。
+      - name: 費用を台帳に記録する
+        if: always() && steps.budget.outputs.allowed == 'true'
+        env:
+          AUTO_FIX_BUDGET_JPY: ${{ vars.AUTO_FIX_BUDGET_JPY }}
+          AUTO_FIX_JPY_PER_USD: ${{ vars.AUTO_FIX_JPY_PER_USD }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          KIND: ${{ steps.task.outputs.kind }}
+          FALLBACK_USD: ${{ steps.budget.outputs.budget_usd }}
+        run: |
+          set -euo pipefail
+
+          case "${{ steps.diff.outputs.verdict }}" in
+            auto-merge)
+              if [ "${{ steps.gates.outcome }}" = "success" ] && [ "${{ steps.merge.outcome }}" = "success" ]; then
+                result="merged:#${{ steps.merge.outputs.number }}"
+              else
+                result="gates-failed"
+              fi
+              ;;
+            blocked) result="blocked" ;;
+            empty)   result="no-fix" ;;
+            *)       result="aborted" ;;
+          esac
+
+          node scripts/bot-budget.mjs record \
+            --body-file .bot/ledger-body.md \
+            --execution-file "${EXECUTION_FILE:-}" \
+            --kind "$KIND" \
+            --result "$result" \
+            --fallback-usd "$FALLBACK_USD" \
+            --budget-jpy "${AUTO_FIX_BUDGET_JPY:-500}" \
+            --jpy-per-usd "${AUTO_FIX_JPY_PER_USD:-170}" \
+            --out .bot/ledger-next.md
+
+          gh issue edit "${{ steps.ledger.outputs.number }}" --body-file .bot/ledger-next.md
+          echo "結果: $result" >> "$GITHUB_STEP_SUMMARY"
+
+      # continue-on-error で握った失敗を、費用の記録が済んだあとに改めて赤くする。
+      # 緑のまま終わると「毎回うまくいっている」ように見えてしまい、
+      # 台帳を開くまで空回りに気づけない。
+      #
+      # 「許可領域外だったので取り下げた」は失敗ではない（ゲートが仕事をしただけ）ので
+      # ここには含めない。
+      - name: 握った失敗をジョブの結果に反映する
+        if: steps.gates.outcome == 'failure' || steps.claude.outcome == 'failure'
+        run: |
+          if [ "${{ steps.claude.outcome }}" = "failure" ]; then
+            echo "::error::Claude の実行が失敗した（API エラー、または 1 回あたりの予算上限に到達）。"
+          fi
+          if [ "${{ steps.gates.outcome }}" = "failure" ]; then
+            echo "::error::修正差分がガードレールに落ちたためマージしなかった。"
+          fi
+          exit 1
