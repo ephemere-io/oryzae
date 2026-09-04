@@ -23,7 +23,8 @@
     "next-intl": "^4.14.1",
     "posthog-js": "^1.422.5",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
@@ -33,6 +34,7 @@
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@types/three": "^0.185.4",
     "dependency-cruiser": "^18.2.0",
     "jsdom": "^30.0.1",
     "postcss": "^8.5.26",

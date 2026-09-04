@@ -1,0 +1,128 @@
+/**
+ * 書斎のモーションの唯一の置き場（`docs/oryzae-study/21-3d-parameters.md`）。
+ *
+ * duration / easing / カメラ距離 / フェード時間をここ 1 箇所に集めるのは、細かい調整の
+ * ために古いプロトタイプへ戻らずに済むようにするため（README の運用方針）。
+ * **数値をシーンのコードへ直接書かないこと。**
+ */
+
+/** 遷移の所要時間（ms）。 */
+export const DURATION = {
+  /** 瓶へのパン。突っ込まず左へ寄せる。 */
+  jarPan: 1250,
+  /** 手帳の真上へ。傾きを 0 に戻すのも同じ長さで並走させる。 */
+  journalTop: 950,
+  /** 表紙が開く。 */
+  coverOpen: 760,
+  /** 見開きの中心へ寄る。 */
+  spreadIn: 620,
+  /** ボードへ正対する。 */
+  boardFront: 900,
+  /** SP だけ: 正対のあとさらに寄る。 */
+  boardCloseSp: 860,
+  /** SP だけ: 寄りと並走する瓶のフェードアウト。 */
+  jarFadeSp: 620,
+  /** 棚へパンする。 */
+  shelfPan: 1000,
+  /** 棚の背表紙が持ち上がる。 */
+  spineLift: 420,
+  /** 書斎へ戻る。 */
+  backToStudy: 900,
+  /** canvas 自体のフェード。 */
+  canvasFade: 600,
+  /** 行き先の画面レイヤーのフェード。 */
+  screenFade: 800,
+} as const;
+
+/** 遷移の前に置く待ち（ms）。 */
+export const DELAY = {
+  /** SP のボード: 正対してから寄り始めるまで。 */
+  boardCloseSp: 120,
+  /** 書斎へ戻る: 画面を伏せてからカメラが動き出すまで。 */
+  backToStudy: 550,
+} as const;
+
+/** ページ束が表紙に遅れて開く比率（21-3d-parameters.md「ページの追従」）。 */
+export const PAGE_FOLLOW = {
+  /** 表紙の duration に対する 1 枚目の遅れ。 */
+  leadDelayRatio: 0.24,
+  /** 1 枚ごとに増える遅れ。 */
+  perPageDelayRatio: 0.17,
+  /** 表紙の duration に対する 1 枚の長さ。 */
+  durationRatio: 0.82,
+} as const;
+
+/**
+ * 遷移先へ寄るときのカメラ距離。PC と SP で式は同じで、距離だけ差し替える
+ * （21-3d-parameters.md「遷移先のカメラ」）。
+ */
+export const VIEW_DISTANCE = {
+  pc: { jar: 5.6, journal: 6.1, board: 4.5 },
+  sp: { jar: 5.9, journal: 5.9, board: 11.3 },
+} as const;
+
+/** SP のボードは 2 段構え。正対したあとこの倍率まで寄る。 */
+export const SP_BOARD_CLOSE_RATIO = 0.44;
+
+/**
+ * 真上から見るときに注視点から z をずらす量。
+ *
+ * 完全な真上は up ベクトルと平行になり `lookAt` が破綻する。
+ */
+export const TOP_VIEW_Z_NUDGE = 0.06;
+
+/** 見開きへ寄るときの z のずらし量（真上より浅いので少し小さい）。 */
+export const SPREAD_VIEW_Z_NUDGE = 0.04;
+
+/** ホームで漂う「呼吸」。 */
+export const BREATH = {
+  /** 周期（ms）。 */
+  periodMs: 1000,
+  /** カメラ y の振幅。 */
+  amplitude: 0.05,
+} as const;
+
+/**
+ * イージング。すべて 0..1 → 0..1 の純関数。
+ *
+ * `21-3d-parameters.md` の表で名前を指す先がこれ。新しい曲線を足すときはここに足し、
+ * シーン側でインラインの式を書かない。
+ */
+export const EASING = {
+  linear: (p: number): number => p,
+  /** `1-(1-p)³`。着地が緩やか。 */
+  easeOutCubic: (p: number): number => 1 - (1 - p) ** 3,
+  /** 立ち上がりと着地の両方が緩やか。 */
+  easeInOutCubic: (p: number): number => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2),
+} as const;
+
+/** 0..1 に丸める。イージングへ渡す前に必ず通す。 */
+export function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+/**
+ * 経過時間から進捗（0..1）を出す。
+ *
+ * duration が 0 以下のときに NaN や Infinity を返さないこと
+ * （`prefers-reduced-motion` で duration を 0 に落とす経路があり、そこで必ず 1 になる）。
+ */
+export function progress(elapsedMs: number, durationMs: number): number {
+  if (durationMs <= 0) return 1;
+  return clamp01(elapsedMs / durationMs);
+}
+
+/** 描画コストの上限（21-3d-parameters.md / 20-3d-component.md）。 */
+export const RENDER_LIMITS = {
+  /** ボードに貼るカードの最大枚数。zIndex 順に打ち切る。 */
+  maxBoardCards: 30,
+  /** devicePixelRatio の上限。 */
+  maxPixelRatio: 2,
+  /** 机に積む手帳の冊数（当月＋直近 2 ヶ月）。 */
+  deskNotebooks: 3,
+  /** 棚に並べる背表紙の本数。超えたら間隔を詰める。 */
+  shelfSpines: 3,
+} as const;
