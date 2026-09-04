@@ -16,6 +16,7 @@ import '@/features/shared/auth/components/reset-password-form.verify';
 import '@/features/shared/study/components/back-to-study.verify';
 import '@/features/shared/study/components/entry-list-overlay.verify';
 import '@/features/shared/study/components/study-fallback.verify';
+import '@/features/shared/study/components/study-labels.verify';
 import '@/features/shared/study/components/study-chrome.verify';
 import '@/features/pc/entries/components/delete-confirm-modal.verify';
 import '@/features/pc/entries/components/editor-status-bar.verify';
