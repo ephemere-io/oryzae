@@ -44,7 +44,7 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
   const router = useRouter();
   const { api, auth, loading: authLoading } = useAuth();
   const { theme } = useTheme();
-  const { state } = useStudyState(api, authLoading);
+  const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
