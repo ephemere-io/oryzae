@@ -55,6 +55,11 @@ export function StudyCanvas({
   const callbacks = useRef({ onNavigate, onOpenOverlay, onHoverChange, onLabelPositions });
   callbacks.current = { onNavigate, onOpenOverlay, onHoverChange, onLabelPositions };
 
+  // state はレンダーのたびに新しい参照になりうる（取得が落ち着くまで数回変わる）。
+  // 最新を ref で渡し、シーンの作り直しは effect の外で行う。
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -64,7 +69,7 @@ export function StudyCanvas({
     try {
       handle = initScene({
         container,
-        state,
+        state: stateRef.current,
         layout,
         theme,
         reducedMotion: prefersReducedMotion(),
@@ -96,9 +101,17 @@ export function StudyCanvas({
       handle.dispose();
       handleRef.current = null;
     };
-    // state / layout / theme が変わったらシーンを作り直す（差分更新はしない）。
-    // 書斎の更新頻度は画面遷移と同程度で、差分更新の複雑さに見合わない。
-  }, [state, layout, theme]);
+    // **renderer は layout / theme が変わったときだけ作り直す。**
+    // ここに state を入れていたせいで、取得が落ち着くまでの数回の更新でそのつど
+    // renderer を捨てて作り直しており、WebGL のコンテキストを食い潰していた
+    // （`Too many active WebGL contexts`）。あわせて遷移中に作り直されると
+    // カメラがホームへ巻き戻り、押したのに何も起きない状態になっていた。
+  }, [layout, theme]);
+
+  // 状態の反映は作り直しではなく差し替えで行う（遷移中は scene 側が無視する）。
+  useEffect(() => {
+    handleRef.current?.setState(state);
+  }, [state]);
 
   return (
     <div

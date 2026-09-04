@@ -3,6 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
+// TODO(review): マージ前に外す（components/device-switch.tsx のコメント参照）。
+import { DeviceSwitch } from '@/components/device-switch';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/pc/navigation/components/sidebar';
 import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
@@ -133,6 +135,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             </div>
           ) : null}
           {device !== null && showBackToStudy && <BackToStudy />}
+          {/* TODO(review): レビュー用の端末切替。マージ前に外す。 */}
+          <DeviceSwitch />
           {device !== null && shouldShow && (
             <OnboardingFlow onComplete={handleOnboardingComplete} />
           )}
