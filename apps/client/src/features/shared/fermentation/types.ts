@@ -65,6 +65,11 @@ export interface FermentationSummary {
   questionId: string;
   status: string;
   createdAt: string;
+  /**
+   * 対象期間ラベル（'WEEK 35' 等）。一覧 API は元から返していたが、以前は誰も読んでいなかった。
+   * 発酵履歴（Cover Flow）が円盤ごとの期間表示に使うので拾う。欠損時は空文字。
+   */
+  targetPeriod: string;
 }
 
 /** 瓶ビューでユーザーがドラッグして決めた要素の位置。 */
