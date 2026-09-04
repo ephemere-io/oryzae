@@ -56,6 +56,20 @@ interface QuestionCircleProps {
   onActivate: () => void;
   /** True while the circle is being dragged — disables the zoom transition for snappy follow. */
   isDraggingCircle: boolean;
+  /**
+   * 直径（world / px）。既定は瓶のキャンバス上の {@link QUESTION_CIRCLE_SIZE}。
+   * 発酵履歴の円盤は画面の実寸から直径を出すので、そこだけ差し替える。
+   */
+  size?: number;
+  /**
+   * 円周を回る問いテキスト。発酵履歴では画面上部に問いが出るので消す（同じ文が二重に出る）。
+   */
+  showRing?: boolean;
+  /**
+   * 中の要素をドラッグで動かせるか（既定 true = 従来どおりズーム中だけ動かせる）。
+   * 発酵履歴の円盤は 3D で倒して重ねてあり、getBoundingClientRect が歪むので掴ませない。
+   */
+  elementsDraggable?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -189,10 +203,12 @@ export function QuestionCircle({
   circlePointerHandlers,
   onActivate,
   isDraggingCircle,
+  size = QUESTION_CIRCLE_SIZE,
+  showRing = true,
+  elementsDraggable = true,
   style,
 }: QuestionCircleProps) {
   const hasData = detail && detail.status === 'completed';
-  const size = QUESTION_CIRCLE_SIZE;
   const circleRef = useRef<HTMLDivElement | null>(null);
 
   // リングは textPath なので、円周に収まらない分は描かれず末尾が黙って切れる。
@@ -203,10 +219,9 @@ export function QuestionCircle({
     const circumference = Math.PI * (size - 24);
     const fitted = circumference / (ringChars * (1 + RING_TRACKING));
     return Math.round(Math.min(size * RING_FONT_RATIO, fitted));
-    // size はモジュール定数なので依存に入れない（myceliumHtml と同じ扱い）。
-  }, [ringChars]);
+  }, [ringChars, size]);
 
-  const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);
+  const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId, size]);
 
   // Rendered (capped) counts — matches the .slice() limits below so the DOM contract
   // never claims more elements than are actually drawn.
@@ -231,6 +246,8 @@ export function QuestionCircle({
         hasLetter,
         ringFontSize,
         ringChars,
+        showRing,
+        size,
         selectedElementId: selectedElementId ?? 'none',
       })}
       role={zoomed ? undefined : 'button'}
@@ -300,41 +317,44 @@ export function QuestionCircle({
         }}
       />
 
-      {/* Rotating question text ring */}
-      <div
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          width: '100%',
-          height: '100%',
-          animation: 'spin 120s linear infinite',
-          pointerEvents: 'none',
-        }}
-      >
-        <svg aria-hidden="true" viewBox={`0 0 ${size} ${size}`} className="h-full w-full">
-          <path
-            id={`ring-${questionId}`}
-            d={`M ${size / 2},${size / 2} m ${-(size / 2 - 12)},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${size - 24},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${-(size - 24)},0`}
-            fill="transparent"
-          />
-          <text
-            style={{
-              fontFamily: "'Noto Serif JP', serif",
-              // 円に比例させる（元は直径 280 に対して 9px）。ただし長い問いは
-              // それだと円周に収まらず末尾が切れるので、収まる大きさまで落とす。
-              fontSize: `${ringFontSize}px`,
-              letterSpacing: `${RING_TRACKING}em`,
-              fill: '#7A3B3F',
-              opacity: 0.6,
-            }}
-          >
-            <textPath href={`#ring-${questionId}`} startOffset="0%">
-              {questionText} &bull;{' '}
-            </textPath>
-          </text>
-        </svg>
-      </div>
+      {/* Rotating question text ring.
+          発酵履歴の円盤では出さない（画面上部に同じ問いが出るので二重になる）。 */}
+      {showRing && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: '100%',
+            height: '100%',
+            animation: 'spin 120s linear infinite',
+            pointerEvents: 'none',
+          }}
+        >
+          <svg aria-hidden="true" viewBox={`0 0 ${size} ${size}`} className="h-full w-full">
+            <path
+              id={`ring-${questionId}`}
+              d={`M ${size / 2},${size / 2} m ${-(size / 2 - 12)},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${size - 24},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${-(size - 24)},0`}
+              fill="transparent"
+            />
+            <text
+              style={{
+                fontFamily: "'Noto Serif JP', serif",
+                // 円に比例させる（元は直径 280 に対して 9px）。ただし長い問いは
+                // それだと円周に収まらず末尾が切れるので、収まる大きさまで落とす。
+                fontSize: `${ringFontSize}px`,
+                letterSpacing: `${RING_TRACKING}em`,
+                fill: '#7A3B3F',
+                opacity: 0.6,
+              }}
+            >
+              <textPath href={`#ring-${questionId}`} startOffset="0%">
+                {questionText} &bull;{' '}
+              </textPath>
+            </text>
+          </svg>
+        </div>
+      )}
 
       {/* Mycelium lines (counter-rotating) */}
       <div
@@ -386,7 +406,7 @@ export function QuestionCircle({
                 <DraggableJarElement
                   key={kw.id}
                   containerRef={circleRef}
-                  enabled={zoomed}
+                  enabled={zoomed && elementsDraggable}
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
@@ -444,7 +464,7 @@ export function QuestionCircle({
                 <DraggableJarElement
                   key={s.id}
                   containerRef={circleRef}
-                  enabled={zoomed}
+                  enabled={zoomed && elementsDraggable}
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
@@ -529,7 +549,7 @@ export function QuestionCircle({
                   <DraggableJarElement
                     key={letter.id}
                     containerRef={circleRef}
-                    enabled={zoomed}
+                    enabled={zoomed && elementsDraggable}
                     x={pos.jarX}
                     y={pos.jarY}
                     onClickWithoutDrag={() =>

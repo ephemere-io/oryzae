@@ -535,6 +535,20 @@
       },
       "canvas_aria": "罐子画布",
       "minimap_aria": "罐子缩略图"
+    },
+    "history": {
+      "ghost_jar_title": "发酵瓶",
+      "back_to_jar": "返回瓶中",
+      "progress": "FERMENTATION HISTORY — {current} / {total}",
+      "date_line_latest": "{date}的发酵（最新）",
+      "date_line_back": "{date}的发酵（前{steps}次）",
+      "entries_scanned": "{count} ENTRIES SCANNED",
+      "new": "NEW",
+      "prev_aria": "上一次发酵",
+      "next_aria": "下一次发酵",
+      "hint": "用 ← → 键、拖动或滚动翻页 ／ 按 ESC 返回瓶中",
+      "fermentations_count": "{count} FERMENTATIONS",
+      "open_aria": "打开「{question}」的发酵历史"
     }
   },
   "questions": {
