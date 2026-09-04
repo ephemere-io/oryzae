@@ -1,6 +1,6 @@
 'use client';
 
-import { isEnvFlagOn, useFeatureFlag } from '@/lib/feature-flags';
+import { type FeatureFlagState, isEnvFlagOn, useFeatureFlag } from '@/lib/feature-flags';
 
 /** PostHog のフラグキー（`docs/oryzae-study/50-rollout.md`）。 */
 const FLAG_KEY = 'study-home';
@@ -18,8 +18,12 @@ const STORAGE_KEY = 'oryzae_study_home';
  *
  * **撤退はこのフラグを off にして再デプロイするだけ。** 緊急時は PostHog を切っても
  * 止まる（ただし手動切替をした端末は on のまま。レビュー用の逃げ道として意図的）。
+ *
+ * `resolved` が false の間は `enabled` で分岐しないこと。手動切替はブラウザにしか
+ * 無いので初回レンダーでは読めず、その一瞬を「off」と読むとリダイレクトのような
+ * 後戻りできない判断を誤る。
  */
-export function useStudyHome(): boolean {
+export function useStudyHome(): FeatureFlagState {
   return useFeatureFlag({
     key: FLAG_KEY,
     envEnabled: isEnvFlagOn(process.env.NEXT_PUBLIC_STUDY_HOME),

@@ -28,6 +28,19 @@ export interface FeatureFlagOptions {
 
 type Override = boolean | null;
 
+/**
+ * フラグの現在値と、それを信用してよいか。
+ *
+ * 手動切替（URL / localStorage）はブラウザにしか無いので、**初回レンダーでは読めない**。
+ * `enabled` だけを返すと、呼び出し側は「まだ読めていない false」と「本当に off」を
+ * 区別できず、解決前にリダイレクトのような後戻りできない判断をしてしまう。
+ */
+export interface FeatureFlagState {
+  enabled: boolean;
+  /** 手動切替を読み終えたか。false の間は `enabled` で分岐しないこと。 */
+  resolved: boolean;
+}
+
 /** localStorage は private mode や容量超過で throw しうる。切替は補助なので握る。 */
 function readStoredOverride(storageKey: string): Override {
   if (typeof window === 'undefined') return null;
@@ -74,25 +87,30 @@ function readQueryOverride(queryParam: string): Override {
  * `!== false` にして「まだ分からない」を off に倒さない（フラグ ON の環境で
  * 一瞬だけ従来画面が出るのを防ぐ）。
  */
-export function useFeatureFlag(options: FeatureFlagOptions): boolean {
+export function useFeatureFlag(options: FeatureFlagOptions): FeatureFlagState {
   const posthogEnabled = useFeatureFlagEnabled(options.key);
 
   // SSR では URL も localStorage も読めない。マウント後に確定させる。
-  const [override, setOverride] = useState<Override>(null);
+  const [state, setState] = useState<{ override: Override; resolved: boolean }>({
+    override: null,
+    resolved: false,
+  });
 
   useEffect(() => {
     const fromQuery = readQueryOverride(options.queryParam);
     if (fromQuery !== null) {
       // URL で切り替えたら憶える。リロードや画面遷移のたびに付け直さなくて済む。
       writeStoredOverride(options.storageKey, fromQuery);
-      setOverride(fromQuery);
+      setState({ override: fromQuery, resolved: true });
       return;
     }
-    setOverride(readStoredOverride(options.storageKey));
+    setState({ override: readStoredOverride(options.storageKey), resolved: true });
   }, [options.queryParam, options.storageKey]);
 
-  if (override !== null) return override;
-  return options.envEnabled && posthogEnabled !== false;
+  const enabled =
+    state.override !== null ? state.override : options.envEnabled && posthogEnabled !== false;
+
+  return { enabled, resolved: state.resolved };
 }
 
 /** `NEXT_PUBLIC_*` の文字列を真偽に。既定は off。 */

@@ -59,10 +59,14 @@ export function HomeGate() {
   const router = useRouter();
   // 書斎ホームが有効なら、既ログインの行き先が /entries/new から /study に変わる。
   // フラグ off の間はここも従来どおりで、書斎のコードは読み込まれない。
-  const studyHome = useStudyHome();
+  const { enabled: studyHome, resolved } = useStudyHome();
   const home = studyHome ? '/study' : '/entries/new';
 
   useEffect(() => {
+    // 手動切替（?study=on / localStorage）を読み終えるまで行き先を決めない。
+    // 待たずに送ると、切替を付けていても従来の入口へ弾かれる。
+    if (!resolved) return;
+
     const hash = window.location.hash;
     if (hash) {
       const params = parseHashParams(hash);
@@ -94,7 +98,7 @@ export function HomeGate() {
 
     // ブラウザで開いた未ログイン訪問者には公開サイトのランディングを見せる（SEO と導線）。
     window.location.replace(DOCS_SITE_URL);
-  }, [router, home]);
+  }, [router, home, resolved]);
 
   return null;
 }

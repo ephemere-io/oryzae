@@ -55,7 +55,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   // 書斎ホームのときだけ PC シェルの構成が変わる（サイドバーとフッターを外す）。
   // フラグ off の間はこの分岐が常に false になり、シェルは従来どおり。
-  const studyHome = useStudyHome();
+  // 解決前は false 扱いでよい（シェルの見た目が 1 フレーム遅れて変わるだけで、
+  // 後戻りできない判断はしていない）。env で on にしている環境では初回から true。
+  const { enabled: studyHome } = useStudyHome();
   const onStudy = studyHome && pathname === STUDY_PATH;
   // 書斎が有効な間、サブ画面の左上にはマークが「書斎へ戻る」として浮く。
   const showBackToStudy = studyHome && pathname !== STUDY_PATH;
