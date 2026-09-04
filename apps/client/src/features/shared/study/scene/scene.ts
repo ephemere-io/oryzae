@@ -1028,12 +1028,9 @@ function buildJar(
     const material = materials.sprite(texture, 0.5);
     fadeables.push({ material, baseOpacity: 0.5 });
     const sprite = new Sprite(material);
-    // 幅は文字幅の実測から決める（全語同幅にしない）。
-    sprite.scale.set(
-      (texture.image.width / texture.image.height) * WORD_SPRITE_HEIGHT,
-      WORD_SPRITE_HEIGHT,
-      1,
-    );
+    // 幅は文字幅の実測から決め、高さは語ごとの倍率を掛ける（全語同じ大きさにしない）。
+    const height = WORD_SPRITE_HEIGHT * placement.scale;
+    sprite.scale.set((texture.image.width / texture.image.height) * height, height, 1);
     sprite.position.y = placement.y;
     group.add(sprite);
     words.push({ sprite, y: placement.y, angle: placement.angle });

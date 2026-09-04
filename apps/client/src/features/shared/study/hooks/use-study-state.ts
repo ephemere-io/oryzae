@@ -5,8 +5,8 @@ import { useBoard } from '@/features/shared/board/hooks/use-board';
 import type { BoardCardData } from '@/features/shared/board/types';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useEntryMonthlyCounts } from '@/features/shared/entries/hooks/use-entry-monthly-counts';
-import { useFermentationDetail } from '@/features/shared/fermentation/hooks/use-fermentation-detail';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
+import { useFermentationKeywords } from '@/features/shared/fermentation/hooks/use-fermentation-keywords';
 import { useFermentationReadiness } from '@/features/shared/fermentation/hooks/use-fermentation-readiness';
 import type { ApiClient } from '@/lib/api';
 import { useUnread } from '@/lib/unread-context';
@@ -40,11 +40,12 @@ export function useStudyState(
   const now = useMemo(() => localDateKey(new Date()), []);
   const { cards, loading: boardLoading } = useBoard(api, now);
 
-  // 瓶に漂う言葉は**直近に完了した発酵のキーワード**。いま漬けているものではない。
-  // キーワードは発酵完了時に一括保存されるので、発酵中には 1 件も存在しない
-  // （docs/oryzae-study/60-implementation-notes.md §3）。
-  const latestLetter = letters[0] ?? null;
-  const { detail } = useFermentationDetail(api, latestLetter?.fermentationId ?? null);
+  // 瓶に漂う言葉は**問いごとの最新のキーワード**。いま漬けているものではない
+  // （キーワードは発酵完了時に一括保存されるので、発酵中には 1 件も存在しない。
+  // docs/oryzae-study/60-implementation-notes.md §3）。
+  // 受信箱が問いごとに最新 1 通へ畳んでいるので、その全部から集める。
+  const fermentationIds = useMemo(() => letters.map((letter) => letter.fermentationId), [letters]);
+  const { keywords } = useFermentationKeywords(api, fermentationIds);
 
   const state = useMemo<StudyState>(() => {
     const status = deriveStatus(readiness.readiness, letters.length);
@@ -52,7 +53,7 @@ export function useStudyState(
       now,
       unreadCount: unread.unreadCount,
       fermentation: { readiness: readiness.readiness, status, letters },
-      words: (detail?.keywords ?? []).map((keyword) => keyword.keyword).slice(0, MAX_WORDS),
+      words: keywords.slice(0, MAX_WORDS),
       notebooks: counts.map((count) => ({
         month: count.month,
         entryCount: count.count,
@@ -62,7 +63,7 @@ export function useStudyState(
       entries: entries.map(toStudyEntry),
       board: { dateKey: now, viewType: 'daily', cards: cards.map(toStudyBoardCard) },
     };
-  }, [now, unread.unreadCount, readiness.readiness, letters, detail, counts, entries, cards]);
+  }, [now, unread.unreadCount, readiness.readiness, letters, keywords, counts, entries, cards]);
 
   return {
     state,
