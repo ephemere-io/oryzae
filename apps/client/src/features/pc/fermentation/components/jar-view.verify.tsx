@@ -1,17 +1,22 @@
 /**
  * JarView の検証スペック（発酵瓶ビュー・PC 版）。
  *
- * データ取得はすべて api seam の奥にある: useFermentationForQuestion(api, id) は api=null で
- * early-return（fetch ゼロ・detail=null）、useJarLayoutSave(api) の saveLayout も api=null で no-op。
+ * データ取得はすべて api seam の奥にある: useFermentationForQuestion / useFermentationHistory /
+ * useFermentationDetails はいずれも api=null で early-return（fetch ゼロ・空）、
+ * useJarLayoutSave(api) の saveLayout も api=null で no-op。
  * useJarDrag は純フック（描画時は getBoundingClientRect を呼ばない＝ pointer ハンドラ内だけ）。
  * 子の DetailPane は常時マウントされる（閉時は画面外）が useRouter は withVerifyProviders の
- * no-op router が供給する。useUnread() は provider 不在で既定値に落ち、マウント時の
- * markAllSeen() は no-op（Issue #447: PC の瓶は盤面に全部並ぶので開いた＝読んだ）。
- * よって api=null を渡せば fetch ゼロの純レンダリングで孤立検証できる。
+ * no-op router が供給する。useUnread() は provider 不在で既定値（未読ゼロ・markQuestionRead は
+ * no-op）に落ちる。よって api=null を渡せば fetch ゼロの純レンダリングで孤立検証できる。
  *
  * 公表する契約は api=null で到達し、かつ fixture 間で実際に変化する状態のみ:
- * questionCount（最大3にキャップ）/ zoomed / editOpen / addOpen / addAvailable。
+ * questionCount（最大3にキャップ）/ zoomed / editOpen / addOpen / addAvailable / historyOpen。
  * detailOpen は出さない（inner 要素は detail があるときだけ描画＝ api=null では開けず定数になる）。
+ *
+ * historyOpen は api=null では **常に false**。履歴への入口（円の下のメタラベル）は発酵が
+ * 1 件以上ある問いにしか出ず、その一覧は api 越しにしか来ないため。ここでは「発酵ゼロの
+ * 瓶に履歴の入口が生えない」という向きだけを invariant で縛り、開いた状態の検証は
+ * FermentationCoverFlow 側の spec が props で受け持つ。
  *
  * authLoading=true は null を返すため fixture にしない（null fixture 禁止）。
  * 両モーダルは role="dialog" を共有するため、見出しテキスト（問いを編集 / 新しい問いを追加）で識別する。
@@ -122,6 +127,17 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'no-history-entry-without-fermentations',
+      description: '発酵が1件も無ければ履歴の入口（メタラベル）は生えない',
+      check: ({ root, contract }) => {
+        const entries = root.querySelectorAll('[data-verify-part="history-entry"]').length;
+        return (
+          (entries === 0 && contract.historyOpen === 'false') ||
+          `発酵ゼロなのに履歴の入口=${entries} 個 / historyOpen="${contract.historyOpen}"`
+        );
+      },
+    },
     {
       id: 'circle-count-matches-contract',
       description: '描画される QuestionCircle 数が contract.questionCount と一致する',

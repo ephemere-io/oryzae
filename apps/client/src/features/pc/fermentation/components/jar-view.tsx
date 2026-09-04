@@ -8,14 +8,18 @@ import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
+import { FermentationCoverFlow } from '@/features/pc/fermentation/components/fermentation-cover-flow';
 import {
   QUESTION_CIRCLE_SIZE,
   QuestionCircle,
 } from '@/features/pc/fermentation/components/question-circle';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
+import { pad2, toDateStamp } from '@/features/pc/fermentation/utils/history-labels';
+import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
+import { useFermentationHistory } from '@/features/shared/fermentation/hooks/use-fermentation-history';
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
-import type { JarLayout } from '@/features/shared/fermentation/types';
+import type { FermentationDetail, JarLayout } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import type { Bounds } from '@/lib/canvas/viewport';
@@ -204,6 +208,7 @@ function QuestionCircleWithData({
   onCircleDragEnd,
   onInnerMove,
   onInnerDragEnd,
+  onDetailLoaded,
 }: {
   question: QuestionData;
   api: ApiClient | null;
@@ -228,8 +233,14 @@ function QuestionCircleWithData({
   onCircleDragEnd: (id: string, pos: Pos) => void;
   onInnerMove: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
   onInnerDragEnd: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
+  /** 取れた詳細を親へ上げる。瓶の中に流す言葉をここから作る。 */
+  onDetailLoaded: (questionId: string, detail: FermentationDetail | null) => void;
 }) {
   const { detail } = useFermentationForQuestion(api, question.id);
+
+  useEffect(() => {
+    onDetailLoaded(question.id, detail);
+  }, [question.id, detail, onDetailLoaded]);
   const isZoomed = zoomedId === question.id;
   // 開いている円以外は薄くするだけ（以前は opacity:0 で完全に消していた）。
   // カメラで寄る方式では周りの世界が見えていた方が現在地が分かる。
@@ -278,14 +289,26 @@ export function JarView({
   onArchiveQuestion,
 }: JarViewProps) {
   const t = useTranslations('fermentation');
-  // Issue #447: 一括既読は PC の瓶だけ。盤面に手紙が全部並ぶので「開いた＝読んだ」。
-  // SP の瓶は一覧なので、開いた手紙の問いを 1 つずつ SpJar が既読にする。
-  const { markAllSeen } = useUnread();
-  useEffect(() => {
-    markAllSeen();
-  }, [markAllSeen]);
+  /**
+   * 既読は「その問いの履歴を開いたとき」に進める（SP の瓶と同じ単位）。
+   *
+   * Issue #447 の時点では PC の瓶を開いた瞬間に全部を既読にしていた（`markAllSeen`）。
+   * 「盤面に手紙が全部並ぶので開いた＝読んだ」が理由だったが、発酵履歴が入って前提が
+   * 変わった。過去の発酵は Cover Flow の奥にあり、瓶を開いただけでは見えていない。
+   * 一括既読を残すと、届いたばかりの手紙が読む前に既読になり、履歴の未読の印
+   * （`· NEW`）も常に空になる。
+   */
+  const { markQuestionRead, unreadFermentationIds } = useUnread();
 
   const [zoomedId, setZoomedId] = useState<string | null>(null);
+  /** 発酵履歴を開いている問い。null なら瓶のキャンバス。 */
+  const [historyQuestionId, setHistoryQuestionId] = useState<string | null>(null);
+  /** 問いごとに正面に出している段。未設定なら最新（末尾）。 */
+  const [historyIndex, setHistoryIndex] = useState<Record<string, number>>({});
+  /** 円が取ってきた最新の発酵詳細。瓶の中に流す言葉をここから作る。 */
+  const [detailByQuestion, setDetailByQuestion] = useState<
+    Record<string, FermentationDetail | null>
+  >({});
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailType, setDetailType] = useState<'keyword' | 'snippet' | 'letter' | null>(null);
   const [detailData, setDetailData] = useState<Record<string, string> | null>(null);
@@ -323,6 +346,31 @@ export function JarView({
     getSelectionBounds: () => circleBoundsRef.current.focused,
   });
   const { zoomIn, zoomOut, resetZoom, fitTo } = canvas;
+
+  // 問いごとの完了済み発酵（古い順）。ユーザー全件を 1 回で取って束ねるので、
+  // 円が 3 つでもリクエストは 1 本しか増えない。
+  const { byQuestion } = useFermentationHistory(api, authLoading);
+
+  const historyResults = useMemo(
+    () => (historyQuestionId ? (byQuestion.get(historyQuestionId) ?? []) : []),
+    [byQuestion, historyQuestionId],
+  );
+
+  // 未設定なら最新（末尾）を正面にして開く。
+  const activeHistoryIndex =
+    historyQuestionId === null
+      ? 0
+      : (historyIndex[historyQuestionId] ?? Math.max(0, historyResults.length - 1));
+
+  // 本文が要るのは正面と左右 1 枚だけ。全件を先読みしない。
+  const visibleResultIds = useMemo(
+    () =>
+      historyResults
+        .slice(Math.max(0, activeHistoryIndex - 1), activeHistoryIndex + 2)
+        .map((r) => r.id),
+    [historyResults, activeHistoryIndex],
+  );
+  const { details: historyDetails } = useFermentationDetails(api, visibleResultIds);
 
   // Drag-state overrides layer over the API data: empty after page load, fills as the user drags.
   const [overrides, setOverrides] = useState<JarLayoutOverrides>(EMPTY_OVERRIDES);
@@ -374,7 +422,60 @@ export function JarView({
     [saveLayout],
   );
 
-  const allWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
+  const fallbackWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
+
+  /**
+   * 瓶の中に漂う言葉。
+   *
+   * 既定の英単語（発酵 / 記憶 / …）ではなく、**その人の発酵が生んだキーワード**を流す。
+   * 瓶の中身が自分の言葉になることが、この画面のいちばん強い手応えになる。
+   * まだ 1 件も発酵していない人には既定の語を出す（空の瓶にしない）。
+   */
+  const allWords = useMemo(() => {
+    const keywords = Object.values(detailByQuestion)
+      .flatMap((detail) => detail?.keywords ?? [])
+      .map((k) => k.keyword)
+      .filter((word) => word.length > 0);
+    const unique = [...new Set(keywords)];
+    return unique.length > 0 ? unique : fallbackWords;
+  }, [detailByQuestion, fallbackWords]);
+
+  const handleDetailLoaded = useCallback(
+    (questionId: string, detail: FermentationDetail | null) => {
+      setDetailByQuestion((prev) =>
+        prev[questionId] === detail ? prev : { ...prev, [questionId]: detail },
+      );
+    },
+    [],
+  );
+
+  /** 発酵履歴をひらく。ここを既読の単位にする（瓶を開いただけでは既読にしない）。 */
+  const openHistory = useCallback(
+    (questionId: string) => {
+      setHistoryQuestionId(questionId);
+      setDetailOpen(false);
+      setSelectedElementId(null);
+      markQuestionRead(questionId);
+    },
+    [markQuestionRead],
+  );
+
+  const closeHistory = useCallback(() => {
+    setHistoryQuestionId(null);
+    setDetailOpen(false);
+    setSelectedElementId(null);
+  }, []);
+
+  /** 段を移動したら詳細パネルは閉じる（別の回の内容を出したままにしない）。 */
+  const handleHistoryIndexChange = useCallback(
+    (next: number) => {
+      if (!historyQuestionId) return;
+      setHistoryIndex((prev) => ({ ...prev, [historyQuestionId]: next }));
+      setDetailOpen(false);
+      setSelectedElementId(null);
+    },
+    [historyQuestionId],
+  );
 
   const handleElementClick = useCallback(
     (
@@ -415,6 +516,8 @@ export function JarView({
   };
 
   function closeZoom() {
+    // 履歴が開いている間はキャンバスに触れない（オーバーレイが上に乗っている）。
+    if (historyQuestionId !== null) return;
     if (!zoomedId) return;
     setDetailOpen(false);
     setZoomedId(null);
@@ -454,6 +557,7 @@ export function JarView({
         unit: 'JarView',
         questionCount: visibleQuestions.length,
         zoomed: zoomedId !== null,
+        historyOpen: historyQuestionId !== null,
         editOpen: editingQuestion !== null,
         addOpen: showAddModal,
         addAvailable,
@@ -630,12 +734,15 @@ export function JarView({
               fill="none"
               style={{ filter: 'drop-shadow(0 20px 40px rgba(140,133,126,0.15))' }}
             >
-              {/* Glass body */}
+              {/* Glass body.
+                  縁は元々 白 0.8 だったが、紙色（--bg #f9f8f4）の地の上ではほぼ消えて
+                  瓶の形が読めなかった。輪郭を落として形が立つようにする。濃くしすぎると
+                  絵が硬くなるので、0.3 / 1.2px に留める。 */}
               <path
                 d={JAR_PATH}
-                fill="rgba(253,251,247,0.2)"
-                stroke="rgba(255,255,255,0.8)"
-                strokeWidth="1.5"
+                fill="rgba(226,194,142,0.05)"
+                stroke="rgba(122,116,64,0.3)"
+                strokeWidth="1.2"
               />
               {/* Fermentation liquid */}
               <path
@@ -773,13 +880,72 @@ export function JarView({
               onCircleDragEnd={handleCircleDragEnd}
               onInnerMove={handleInnerDragMove}
               onInnerDragEnd={handleInnerDragEnd}
+              onDetailLoaded={handleDetailLoaded}
             />
           ))}
+
+          {/* 円の下のメタラベル ＝ 発酵履歴への入口。
+              円そのものはカメラを寄せる取っ手のままにして（ズームで読む・中身を並べ替える
+              体験を残す）、履歴はここから入る。world 座標に置くのでズームに自然に乗る。
+              位置は円の半径から出す（固定 px オフセットにしない）。 */}
+          {visibleQuestions.map((q, i) => {
+            const results = byQuestion.get(q.id) ?? [];
+            if (results.length === 0) return null;
+            const pos = resolvedCirclePositions[i];
+            const latest = results[results.length - 1];
+            const hasUnread = results.some((r) => unreadFermentationIds.has(r.id));
+            const dimmed = zoomedId !== null && zoomedId !== q.id;
+            return (
+              <button
+                key={`meta-${q.id}`}
+                type="button"
+                data-canvas-no-pan=""
+                data-verify-part="history-entry"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openHistory(q.id);
+                }}
+                aria-label={t('history.open_aria', { question: q.currentText ?? '' })}
+                className={`absolute z-[4] flex -translate-x-1/2 cursor-pointer flex-col items-center gap-1 whitespace-nowrap rounded-lg border-0 bg-transparent px-2 py-1 transition-opacity hover:bg-[rgba(140,133,126,0.08)] ${
+                  dimmed ? 'pointer-events-none opacity-30' : 'opacity-100'
+                }`}
+                style={{
+                  left: (pos.jarX / 100) * JAR_WORLD_WIDTH,
+                  top: (pos.jarY / 100) * JAR_WORLD_HEIGHT + CIRCLE_SIZE / 2 + 18,
+                  animation: 'fadeIn 0.5s ease-out forwards',
+                }}
+              >
+                <span
+                  className="text-[9px] uppercase tracking-[0.3em] text-[var(--date-color)]"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  {t('history.fermentations_count', { count: pad2(results.length) })}
+                </span>
+                <span
+                  className="flex items-center gap-[5px] text-[9px] tracking-[0.2em]"
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
+                    opacity: hasUnread ? 1 : 0.7,
+                  }}
+                >
+                  {hasUnread && (
+                    <span
+                      className="block h-[5px] w-[5px] rounded-full"
+                      style={{ background: 'var(--ob-jar-warm)' }}
+                    />
+                  )}
+                  {toDateStamp(latest.createdAt)}
+                  {hasUnread ? ` · ${t('history.new')}` : ''}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </CanvasViewport>
 
       {/* Question list (bottom center) */}
-      {!zoomedId && (
+      {!zoomedId && historyQuestionId === null && (
         <div
           className="absolute bottom-12 left-1/2 z-[30] flex -translate-x-1/2 flex-col items-center gap-2.5"
           style={{ animation: 'fadeIn 0.5s ease-out forwards' }}
@@ -980,6 +1146,35 @@ export function JarView({
           </div>
         </div>
       )}
+
+      {/* 発酵履歴（Cover Flow）。
+          CanvasViewport の **外側** に敷く。3D の perspective は変形した祖先の中では
+          成立しないので、world ボックスの中に置くと円盤が平たく潰れる。 */}
+      <FermentationCoverFlow
+        questionId={historyQuestionId}
+        questionText={visibleQuestions.find((q) => q.id === historyQuestionId)?.currentText ?? ''}
+        results={historyResults}
+        index={activeHistoryIndex}
+        details={historyDetails}
+        unreadFermentationIds={unreadFermentationIds}
+        onIndexChange={handleHistoryIndexChange}
+        onClose={closeHistory}
+        onElementClick={(resultId, type, id, data) => {
+          const question = visibleQuestions.find((q) => q.id === historyQuestionId);
+          const result = historyResults.find((r) => r.id === resultId);
+          handleElementClick(
+            historyQuestionId ?? '',
+            // どの回の結果かが分かるように、見出しに発酵日を添える。
+            result
+              ? `${question?.currentText ?? ''}　／　${toDateStamp(result.createdAt)} の発酵`
+              : (question?.currentText ?? ''),
+            type,
+            id,
+            data,
+          );
+        }}
+        selectedElementId={selectedElementId}
+      />
 
       {/* Detail pane */}
       <DetailPane
