@@ -1,0 +1,219 @@
+'use client';
+
+import { verifyAttrs } from '@oryzae/verify';
+import { useTranslations } from 'next-intl';
+import type { StudyLayout } from '../layout';
+import { clampPillToScreen, jarPillStateKey, LABEL_STYLE, PILL_MIN_HEIGHT } from '../scene/labels';
+import type { StudyFermentationStatus, StudyTarget } from '../types';
+
+/** どの対象のラベルか。 */
+export type LabelKind = 'jar' | 'journal' | 'board' | 'archive';
+
+export interface LabelPoint {
+  x: number;
+  y: number;
+  visible: boolean;
+}
+
+export interface StudyLabelsProps {
+  layout: StudyLayout;
+  /** 毎フレーム更新される画面座標。null はその対象が今フレームで出ない。 */
+  positions: Partial<Record<LabelKind, LabelPoint | null>>;
+  /** ホバー中の対象（PC）。SP は常に null。 */
+  hovered: LabelKind | null;
+  /** ピルに添える状態。 */
+  status: StudyFermentationStatus;
+  readiness: number;
+  entryCount: number;
+  volumeCount: number;
+  cardCount: number;
+  /** canvas の実寸。ピルの押し戻しに使う。 */
+  screen: { width: number; height: number };
+  onPick: (target: StudyTarget) => void;
+}
+
+/** ピルのおおよその実寸。押し戻しの計算に使う（実測に近い固定値で足りる）。 */
+const PILL_SIZE = { width: 132, height: PILL_MIN_HEIGHT };
+
+/**
+ * 対象ラベル（`docs/oryzae-study/00-overview.md`「対象ラベルとホバー」）。
+ *
+ * PC は「押せる」ことだけを伝える最小の注釈。SP はホバーが無いので、
+ * **注釈そのものを押せるピルに変える**ことで「押せる」提示と「中身の予告」を 1 つにまとめる
+ * （ツールチップは出す契機が無いので使わない）。
+ *
+ * 3D 座標に貼り付く HTML なので、位置は毎フレーム外から与えられる。
+ * 透視スケールはかけない — 注釈は UI の側であって、遠近で小さくならない。
+ */
+export function StudyLabels(props: StudyLabelsProps) {
+  const isSp = props.layout.pillOffsets !== null;
+  return isSp ? <SpPills {...props} /> : <PcLabels {...props} />;
+}
+
+function PcLabels({ layout, positions, hovered, onPick }: StudyLabelsProps) {
+  const t = useTranslations('study');
+  const kinds: LabelKind[] = ['jar', 'journal', 'board'];
+
+  return (
+    <div
+      {...verifyAttrs({ unit: 'StudyLabels', mode: 'pc', hovered: hovered ?? 'none' })}
+      className="pointer-events-none absolute inset-0"
+    >
+      {kinds.map((kind) => {
+        const point = positions[kind];
+        if (!point || !point.visible) return null;
+        if (kind === 'archive' && layout.labelAnchors.archive === null) return null;
+
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => onPick(targetFor(kind))}
+            className="pointer-events-auto absolute flex items-center gap-1.5 whitespace-nowrap"
+            style={{
+              left: point.x,
+              top: point.y,
+              transform: 'translate(-50%, -50%)',
+              fontSize: LABEL_STYLE.fontSize,
+              letterSpacing: LABEL_STYLE.letterSpacing,
+              color: LABEL_STYLE.color,
+              fontFamily: 'Inter, sans-serif',
+              // 既定は控えめ。その対象をホバーしたときだけ濃くなる。
+              opacity: hovered === kind ? LABEL_STYLE.hoverOpacity : LABEL_STYLE.restOpacity,
+              transition: `opacity ${LABEL_STYLE.fadeMs}ms ease`,
+            }}
+          >
+            <span
+              style={{
+                width: LABEL_STYLE.dotSize,
+                height: LABEL_STYLE.dotSize,
+                borderRadius: '50%',
+                background: LABEL_STYLE.dotColor,
+              }}
+            />
+            {t(labelKey(kind))}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SpPills(props: StudyLabelsProps) {
+  const t = useTranslations('study');
+  const { layout, positions, screen, onPick } = props;
+  const offsets = layout.pillOffsets;
+  if (offsets === null) return null;
+
+  const kinds: LabelKind[] = ['jar', 'journal', 'board', 'archive'];
+
+  return (
+    <div
+      {...verifyAttrs({ unit: 'StudyLabels', mode: 'sp', pillCount: kinds.length })}
+      className="pointer-events-none absolute inset-0"
+    >
+      {kinds.map((kind) => {
+        const point = positions[kind];
+        if (!point) return null;
+
+        const placed = clampPillToScreen(point, offsets[kind], PILL_SIZE, screen);
+
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => onPick(targetFor(kind))}
+            className="pointer-events-auto absolute flex items-center gap-1.5 whitespace-nowrap rounded-full px-3"
+            style={{
+              left: placed.x,
+              top: placed.y,
+              transform: 'translate(-50%, -50%)',
+              // パディングだけだと文字量で高さが変わり、下限を割る。明示する。
+              minHeight: PILL_MIN_HEIGHT,
+              background: 'rgba(253,251,247,0.9)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: '1px solid rgba(122,116,64,0.22)',
+              boxShadow: '0 2px 12px rgba(140,133,126,0.14)',
+              // 常に 1.0。ホバーで濃くなるのは PC 限定。
+              opacity: 1,
+            }}
+          >
+            <span
+              style={{
+                width: LABEL_STYLE.dotSize,
+                height: LABEL_STYLE.dotSize,
+                borderRadius: '50%',
+                background: LABEL_STYLE.dotColor,
+              }}
+            />
+            <span
+              style={{
+                fontSize: LABEL_STYLE.fontSize,
+                letterSpacing: LABEL_STYLE.letterSpacing,
+                color: LABEL_STYLE.color,
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              {t(labelKey(kind))}
+            </span>
+            <span style={{ fontSize: 11, color: '#5C4F3F' }}>{stateWord(props, kind, t)}</span>
+            {/* 末尾の `›` とピル形状の 2 つで押せることを示す。 */}
+            <span style={{ fontSize: 12, color: '#A8A381' }}>›</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function stateWord(
+  props: StudyLabelsProps,
+  kind: LabelKind,
+  t: ReturnType<typeof useTranslations<'study'>>,
+): string {
+  switch (kind) {
+    case 'jar':
+      return t(jarPillStateKey(props.status, props.readiness));
+    case 'journal':
+      return t('pill_entries', { count: props.entryCount });
+    case 'archive':
+      return t('pill_volumes', { count: props.volumeCount });
+    case 'board':
+      return t('pill_cards', { count: props.cardCount });
+  }
+}
+
+function labelKey(
+  kind: LabelKind,
+): 'label_jar' | 'label_journal' | 'label_board' | 'label_archive' {
+  switch (kind) {
+    case 'jar':
+      return 'label_jar';
+    case 'journal':
+      return 'label_journal';
+    case 'board':
+      return 'label_board';
+    case 'archive':
+      return 'label_archive';
+  }
+}
+
+/**
+ * ラベルを押したときの行き先。
+ *
+ * **3D の物本体を押したときと同じ行き先**にする（40-acceptance.md「SP のタッチ提示」）。
+ * JOURNAL は当月の手帳＝新規執筆、ARCHIVE は棚ごと＝全月の一覧。
+ */
+function targetFor(kind: LabelKind): StudyTarget {
+  switch (kind) {
+    case 'jar':
+      return { kind: 'jar' };
+    case 'journal':
+      return { kind: 'journal-new' };
+    case 'board':
+      return { kind: 'board' };
+    case 'archive':
+      return { kind: 'archive' };
+  }
+}

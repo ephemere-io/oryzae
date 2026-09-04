@@ -5,16 +5,18 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
-import { overlayScope, targetHref } from '../navigation';
+import { overlayScope, staysInStudy, targetHref } from '../navigation';
+import type { LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
 import { StudyChrome } from './study-chrome';
 import { StudyFallback } from './study-fallback';
+import { type LabelKind, StudyLabels } from './study-labels';
 
 /**
  * three.js は初期バンドルに載せない（`/jar` を直接開いた人に 600KB を配らない）。
@@ -44,8 +46,33 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
 
+  // ラベルは 3D 座標に貼り付くので、毎フレーム画面座標が届く。
+  const [labelPositions, setLabelPositions] = useState<LabelPositions>(EMPTY_LABELS);
+  const [hoveredLabel, setHoveredLabel] = useState<LabelKind | null>(null);
+
+  // ピルの押し戻しに canvas の実寸が要る。
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [screen, setScreen] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = rootRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      setScreen({ width: element.clientWidth, height: element.clientHeight });
+    });
+    observer.observe(element);
+    setScreen({ width: element.clientWidth, height: element.clientHeight });
+    return () => observer.disconnect();
+  }, []);
+
   const months = useMemo(
     () => state.notebooks.map((notebook) => notebook.month),
+    [state.notebooks],
+  );
+
+  /** JOURNAL のピルに出す件数は**当月**のもの（積み全体ではない）。 */
+  const currentMonthCount = useMemo(
+    () => state.notebooks.find((notebook) => notebook.current)?.entryCount ?? 0,
     [state.notebooks],
   );
 
@@ -70,15 +97,46 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
     [router],
   );
 
+  const handlePickFromLabel = useCallback(
+    (target: StudyTarget) => {
+      // ラベル／ピルからの行き先は 3D の物を押したときと同じ。カメラの演出は経ずに
+      // 直接移る（注釈は UI の側で、3D の当たりではない）。
+      if (staysInStudy(target)) {
+        setOverlay(overlayScope(target));
+        return;
+      }
+      handleNavigate(target);
+    },
+    [handleNavigate],
+  );
+
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div ref={rootRef} className="absolute inset-0 overflow-hidden">
       <StudyCanvas
         state={state}
         layout={layout}
         theme={theme}
         onNavigate={handleNavigate}
         onOpenOverlay={handleOpenOverlay}
+        onLabelPositions={setLabelPositions}
+        onHoverChange={(hovered) => setHoveredLabel(hovered?.label ?? null)}
       />
+
+      {/* 一覧を開いている間はラベルを消す（サブ画面と遷移中も scene 側が消す）。 */}
+      {overlay === null && (
+        <StudyLabels
+          layout={layout}
+          positions={labelPositions}
+          hovered={hoveredLabel}
+          status={state.fermentation.status}
+          readiness={state.fermentation.readiness}
+          entryCount={currentMonthCount}
+          volumeCount={state.notebooks.length}
+          cardCount={state.board.cards.length}
+          screen={screen}
+          onPick={handlePickFromLabel}
+        />
+      )}
 
       <StudyChrome
         status={state.fermentation.status}
@@ -100,6 +158,9 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
     </div>
   );
 }
+
+/** 位置が届く前の初期値。 */
+const EMPTY_LABELS: LabelPositions = { jar: null, journal: null, board: null, archive: null };
 
 /** アバターに出す 1 文字。 */
 function initialOf(nickname?: string | null, email?: string | null): string {
