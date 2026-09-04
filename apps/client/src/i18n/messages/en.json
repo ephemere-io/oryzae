@@ -682,6 +682,11 @@
       "cancel": "Cancel",
       "save": "Save",
       "letter_arrived": "A letter has arrived"
+    },
+    "board": {
+      "cards": "{count} cards",
+      "empty": "Nothing here yet today",
+      "hint": "Drag cards with your finger"
     }
   },
   "canvas": {

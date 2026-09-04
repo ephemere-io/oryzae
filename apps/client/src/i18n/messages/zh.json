@@ -682,6 +682,11 @@
       "cancel": "取消",
       "save": "保存",
       "letter_arrived": "有一封信送到了"
+    },
+    "board": {
+      "cards": "{count}张",
+      "empty": "今天还没有任何内容",
+      "hint": "可以用手指拖动卡片"
     }
   },
   "canvas": {

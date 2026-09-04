@@ -76,8 +76,9 @@ const EXPECTED: Array<{
   },
   // PC の瓶はキャンバス（予告できる枠が無い）。SP の瓶は手紙の一覧なのでスケルトン。
   { path: '/jar', pc: 'loading', sp: { skeleton: 'SpJarSkeleton' } },
-  // ボードもキャンバス。SP 変種は無いので DeviceView が「未対応」表示にフォールバックする。
-  { path: '/board', pc: 'loading', sp: null },
+  // ボードもキャンバス。SP も同じ理由でスケルトンを持たない（盤面は開いた時に
+  // 一度フィットさせるので、枠を先に置いても位置が当たらない）。
+  { path: '/board', pc: 'loading', sp: 'loading' },
   {
     path: '/questions',
     pc: { skeleton: 'QuestionTimelineSkeleton' },

@@ -682,6 +682,11 @@
       "cancel": "キャンセル",
       "save": "保存",
       "letter_arrived": "手紙が届いています"
+    },
+    "board": {
+      "cards": "{count}枚",
+      "empty": "この日はまだ何もありません",
+      "hint": "カードは指で動かせます"
     }
   },
   "canvas": {
