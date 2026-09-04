@@ -49,7 +49,7 @@ import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
 import type { ApiClient } from '@/lib/api';
-import { SIDEBAR_WIDTH, useSidebarVisibility } from '@/lib/sidebar-context';
+import { useSidebarVisibility } from '@/lib/sidebar-context';
 
 interface AuthState {
   accessToken: string;
@@ -216,7 +216,10 @@ export function EntryEditor({
   // Issue #316: 保存成功直後のナッジ表示判定に使う
   const userMe = useUserMe(api);
   const router = useRouter();
-  const sidebarWidth = SIDEBAR_WIDTH;
+  // 左端はサイドバーの幅に合わせる。**定数ではなく CSS 変数を読む** —
+  // 書斎が有効な間はサイドバーを描かないので、80px を決め打ちにすると左に隙間が残る。
+  // 変数は (protected)/layout.tsx が <main> に生やしていて、既定は 0px。
+  const sidebarWidth = 'var(--sidebar-width, 0px)';
   const editorRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);

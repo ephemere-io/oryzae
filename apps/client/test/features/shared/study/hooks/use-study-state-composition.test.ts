@@ -1,5 +1,5 @@
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStudyState } from '@/features/shared/study/hooks/use-study-state';
 import type { ApiClient } from '@/lib/api';
 
@@ -11,6 +11,7 @@ import type { ApiClient } from '@/lib/api';
  */
 
 afterEach(cleanup);
+beforeEach(() => localStorage.clear());
 
 interface RouteMap {
   [pattern: string]: { body: unknown; ok?: boolean };
@@ -151,5 +152,71 @@ describe('useStudyState', () => {
 
   it('api が無くても落ちない', () => {
     expect(() => renderHook(() => useStudyState(null, true))).not.toThrow();
+  });
+});
+
+describe('前回の書斎を憶えて即座に出す', () => {
+  const USER = 'u-1';
+
+  it('取得が終わったら憶える', async () => {
+    const { api } = apiFor(HAPPY);
+    const { result } = renderHook(() => useStudyState(api, false, USER));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const raw = localStorage.getItem(`oryzae_cache:study:${USER}`);
+    expect(raw).not.toBeNull();
+    expect(raw).toContain('2026-09');
+  });
+
+  it('次に開いたとき、取得を待たずに前回の中身が出る', async () => {
+    // 1 回目: 取得して憶える。
+    const first = apiFor(HAPPY);
+    const a = renderHook(() => useStudyState(first.api, false, USER));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    const remembered = a.result.current.state.notebooks;
+    a.unmount();
+
+    // 2 回目: まだ取得中の時点で、前回の手帳とカードが出ていること。
+    // これが無いと、開くたびに空の机と空の壁がいったん出る。
+    const second = apiFor(HAPPY);
+    const b = renderHook(() => useStudyState(second.api, false, USER));
+    await waitFor(() => expect(b.result.current.state.notebooks.length).toBeGreaterThan(0));
+    expect(b.result.current.state.notebooks).toEqual(remembered);
+  });
+
+  it('利用者が違えば前の人の中身を出さない', async () => {
+    const first = apiFor(HAPPY);
+    const a = renderHook(() => useStudyState(first.api, false, USER));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    a.unmount();
+
+    const second = apiFor({ ...HAPPY, '/api/v1/entries/monthly-counts': { body: [] } });
+    const b = renderHook(() => useStudyState(second.api, false, 'someone-else'));
+    // 取得前の時点で前の人の手帳が出ていないこと。
+    expect(b.result.current.state.notebooks).toEqual([]);
+  });
+
+  it('利用者が分からなければ憶えない', async () => {
+    const { api } = apiFor(HAPPY);
+    const { result } = renderHook(() => useStudyState(api, false));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(localStorage.getItem('oryzae_cache:study:null')).toBeNull();
+  });
+
+  it('日付は憶えた値を使わない（日をまたいでも当月がずれない）', async () => {
+    const first = apiFor(HAPPY);
+    const a = renderHook(() => useStudyState(first.api, false, USER));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    // 憶えた値の日付を古いものに書き換える。
+    const key = `oryzae_cache:study:${USER}`;
+    const envelope = JSON.parse(localStorage.getItem(key) ?? '{}');
+    envelope.value.now = '2020-01-01';
+    localStorage.setItem(key, JSON.stringify(envelope));
+    a.unmount();
+
+    const second = apiFor(HAPPY);
+    const b = renderHook(() => useStudyState(second.api, false, USER));
+    expect(b.result.current.state.now).not.toBe('2020-01-01');
+    expect(b.result.current.state.now).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

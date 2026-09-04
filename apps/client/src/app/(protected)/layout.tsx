@@ -31,11 +31,15 @@ const mainStyle: MainStyle = {
 };
 
 /**
- * 書斎ホームではサイドバーを描かず、本文を全幅にする。
+ * 書斎が有効な間はサイドバーを描かず、本文を全幅にする。
  *
- * **`--sidebar-width` も 0 にすること。** この変数はボードが読んでいて
- * （board-view のツールバー位置、board-toolbar の中央寄せ）、margin だけ外して
- * 変数を残すと、サイドバーの無い画面でツールバーが 40px ずれる。
+ * **書斎ホームだけでなく jar / board / entry でも外す。** 書斎が「唯一のグローバル
+ * ナビゲーション」（00-overview.md）である以上、行き先の画面にだけ旧ナビが残るのは
+ * 半端で、戻り道が左上のマーク（BackToStudy）と左のサイドバーで二重になる。
+ *
+ * **`--sidebar-width` も 0 にすること。** この変数はボードとエディタが読んでいて
+ * （board-view のツールバー位置、board-toolbar の中央寄せ、entry-editor の左端）、
+ * margin だけ外して変数を残すと、サイドバーの無い画面で中身が 80px ずれる。
  */
 const studyMainStyle: MainStyle = {
   marginLeft: 0,
@@ -120,11 +124,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             </div>
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">
-              {/* 書斎ホームでは左サイドバーを描かない。行き先は 3D の物そのものが持つ。 */}
-              {!onStudy && <Sidebar />}
+              {/* 書斎が有効な間は左サイドバーを描かない。行き先は 3D の物そのものが持ち、
+                  サブ画面からの戻り道は左上のマークが担う。 */}
+              {!studyHome && <Sidebar />}
               <main
                 className="flex flex-1 flex-col overflow-hidden"
-                style={onStudy ? studyMainStyle : mainStyle}
+                style={studyHome ? studyMainStyle : mainStyle}
               >
                 <div className="relative flex-1 overflow-auto">{content}</div>
                 {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
