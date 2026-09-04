@@ -152,7 +152,12 @@ describe('BREATH', () => {
   it('振幅が十分小さい（呼吸が移動に見えない）', () => {
     expect(BREATH.amplitude).toBeGreaterThan(0);
     expect(BREATH.amplitude).toBeLessThan(0.2);
-    expect(BREATH.periodMs).toBeGreaterThan(0);
+  });
+
+  it('周期が数秒あり、小刻みに揺れない', () => {
+    // 1 秒周期にすると画面全体が上下して酔う。原案は sin(t)（t は秒）＝ 約 6.3 秒周期。
+    const periodSeconds = (Math.PI * 2) / BREATH.radiansPerSecond;
+    expect(periodSeconds).toBeGreaterThan(4);
   });
 });
 

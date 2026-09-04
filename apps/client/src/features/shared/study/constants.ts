@@ -74,10 +74,17 @@ export const TOP_VIEW_Z_NUDGE = 0.06;
 /** 見開きへ寄るときの z のずらし量（真上より浅いので少し小さい）。 */
 export const SPREAD_VIEW_Z_NUDGE = 0.04;
 
-/** ホームで漂う「呼吸」。 */
+/**
+ * ホームで漂う「呼吸」。
+ *
+ * **周期はおよそ 6.3 秒（2π 秒）で、1 秒ではない。** 原案は `sin(t) * 0.05`（t は秒）で、
+ * これは角速度 1 rad/s ＝ 周期 2π 秒。`21-3d-parameters.md` の「（1s）」という注記は
+ * 式の読み違いで、1 秒周期にすると画面全体が小刻みに上下し、見ていて酔う
+ * （実機のレビューで「行きつ戻りつして気持ち悪い」と報告された）。
+ */
 export const BREATH = {
-  /** 周期（ms）。 */
-  periodMs: 1000,
+  /** 角速度（rad/s）。 */
+  radiansPerSecond: 1,
   /** カメラ y の振幅。 */
   amplitude: 0.05,
 } as const;
