@@ -23,6 +23,7 @@ import {
   Mesh,
   type Object3D,
   PerspectiveCamera,
+  PlaneGeometry,
   Raycaster,
   RingGeometry,
   Scene,
@@ -140,6 +141,8 @@ export interface StudySceneHandle {
   goTo(target: StudyTarget): Promise<void>;
   /** 書斎へ戻す。 */
   returnHome(): Promise<void>;
+  /** 状態を差し替えて物を組み直す。遷移中は何もしない。 */
+  setState(state: StudyState): void;
   /** マウス位置（-1..1）。パララックスとホバーに使う。 */
   setPointer(x: number, y: number): void;
   /** ポインタが canvas から外れた。 */
@@ -157,8 +160,29 @@ const MS_PER_SECOND = 1000;
 /** 輪郭の呼吸の周期（ms）。 */
 const OUTLINE_BREATH_MS = 4000;
 
+/**
+ * 状態で作り替わる部分。**renderer と camera は含めない。**
+ *
+ * WebGL のコンテキストはタブごとに十数個しか持てず、renderer を作り直すたびに 1 つ
+ * 食う（`Too many active WebGL contexts` で実際に踏んだ）。状態が変わるたびに
+ * renderer ごと捨てていたのが原因で、あわせて遷移中のカメラも巻き戻っていた。
+ */
+interface SceneContent {
+  materials: StudyMaterials;
+  geometries: BufferGeometry[];
+  textures: CanvasTexture[];
+  registry: ReturnType<typeof buildHitRegistry>;
+  notebooks: ReturnType<typeof layoutNotebooks>;
+  letter: StudyState['fermentation']['letters'][number] | null;
+  groups: Object3D[];
+  hitboxes: Mesh[];
+  jar: JarParts;
+  seal: { group: Group } | null;
+  books: BooksParts;
+}
+
 export function initScene(options: StudySceneOptions): StudySceneHandle {
-  const { container, state, layout, theme } = options;
+  const { container, layout, theme } = options;
 
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDER_LIMITS.maxPixelRatio));
@@ -173,57 +197,82 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     layout.camera.far,
   );
 
-  const materials = createMaterials(theme);
-  /** 破棄すべきジオメトリ。素材は materials がまとめて持つ。 */
-  const geometries: BufferGeometry[] = [];
-  const textures: CanvasTexture[] = [];
+  /** 物を組む。renderer と camera はそのまま使い回す。 */
+  function buildContent(state: StudyState): SceneContent {
+    const materials = createMaterials(theme);
+    const geometries: BufferGeometry[] = [];
+    const textures: CanvasTexture[] = [];
 
-  function ownGeometry<T extends BufferGeometry>(geometry: T): T {
-    geometries.push(geometry);
-    return geometry;
+    function ownGeometry<T extends BufferGeometry>(geometry: T): T {
+      geometries.push(geometry);
+      return geometry;
+    }
+
+    const notebooks = layoutNotebooks(state.notebooks, state.now);
+    const completed = state.fermentation.status === 'completed';
+    const letter = state.fermentation.letters[0] ?? null;
+
+    const registry = buildHitRegistry({
+      desk: notebooks.desk.map((placement) => placement.notebook),
+      shelf: notebooks.shelf,
+      hasLetter: completed && letter !== null,
+      shelfAsSingleTarget: layout.pillOffsets !== null,
+    });
+
+    const deskGroup = buildDesk(layout, materials, ownGeometry);
+    const floorGroup = buildFloorGrid(layout, materials, ownGeometry);
+    const jar = buildJar(state, layout, materials, ownGeometry, textures);
+    const seal = completed && letter !== null ? buildSeal(layout, materials, ownGeometry) : null;
+    const books = buildBooks(notebooks, layout, materials, ownGeometry, textures);
+    const board = buildBoard(state, layout, materials, ownGeometry);
+
+    const groups: Object3D[] = [deskGroup, floorGroup, jar.group, books.group, board.group];
+    if (seal) groups.push(seal.group);
+
+    const hitboxes = buildHitboxes({
+      layout,
+      materials,
+      ownGeometry,
+      desk: books.deskPlacements,
+      shelf: books.shelfSpines,
+      hasSeal: seal !== null,
+      shelfAsSingleTarget: layout.pillOffsets !== null,
+    });
+
+    for (const group of groups) scene.add(group);
+    for (const hitbox of hitboxes) scene.add(hitbox);
+
+    return {
+      materials,
+      geometries,
+      textures,
+      registry,
+      notebooks,
+      letter,
+      groups,
+      hitboxes,
+      jar,
+      seal,
+      books,
+    };
   }
 
-  const notebooks = layoutNotebooks(state.notebooks, state.now);
-  const completed = state.fermentation.status === 'completed';
-  const letter = state.fermentation.letters[0] ?? null;
+  /** 物だけを捨てる（renderer は残す）。 */
+  function disposeContent(current: SceneContent): void {
+    for (const group of current.groups) scene.remove(group);
+    for (const hitbox of current.hitboxes) scene.remove(hitbox);
+    for (const geometry of current.geometries) geometry.dispose();
+    for (const texture of current.textures) texture.dispose();
+    current.jar.disposeFadeables();
+    current.materials.dispose();
+    current.registry.clear();
+  }
 
-  const registry = buildHitRegistry({
-    desk: notebooks.desk.map((placement) => placement.notebook),
-    shelf: notebooks.shelf,
-    hasLetter: completed && letter !== null,
-    shelfAsSingleTarget: layout.pillOffsets !== null,
-  });
-
-  // ---- 物を組む ----------------------------------------------------------
-
-  const deskGroup = buildDesk(layout, materials, ownGeometry);
-  scene.add(deskGroup);
-
-  const floorGroup = buildFloorGrid(layout, materials, ownGeometry);
-  scene.add(floorGroup);
-
-  const jar = buildJar(state, layout, materials, ownGeometry, textures);
-  scene.add(jar.group);
-
-  const seal = completed && letter !== null ? buildSeal(layout, materials, ownGeometry) : null;
-  if (seal) scene.add(seal.group);
-
-  const books = buildBooks(notebooks, layout, materials, ownGeometry, textures);
-  scene.add(books.group);
-
-  const board = buildBoard(state, layout, materials, ownGeometry);
-  scene.add(board.group);
-
-  const hitboxes = buildHitboxes({
-    layout,
-    materials,
-    ownGeometry,
-    desk: books.deskPlacements,
-    shelf: books.shelfSpines,
-    hasSeal: seal !== null,
-    shelfAsSingleTarget: layout.pillOffsets !== null,
-  });
-  for (const hitbox of hitboxes) scene.add(hitbox);
+  /** いま描いている状態。更新時にだけ差し替える。 */
+  let currentState = options.state;
+  /** 遷移中に届いた更新。手が空いたら反映する。 */
+  let pendingState: StudyState | null = null;
+  let content = buildContent(currentState);
 
   // ---- 状態 --------------------------------------------------------------
 
@@ -261,6 +310,11 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     frame = requestAnimationFrame(tick);
     const now = performance.now();
     const elapsed = now - startedAt;
+
+    // 遷移中に預かった更新は、手が空いた最初のフレームで反映する。
+    if (pendingState !== null && transition === null && settled === null) {
+      applyState(pendingState);
+    }
 
     updateCamera(now, elapsed);
     updateJar(elapsed);
@@ -314,7 +368,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const kind = active.target.kind;
 
     if (kind === 'journal-new' || kind === 'journal-month') {
-      const topY = layout.desk.y + stackTopY(notebooks.desk);
+      const topY = layout.desk.y + stackTopY(content.notebooks.desk);
       const top = journalTopView(layout, topY);
       const spread = journalSpreadView(layout, topY);
       const toTop = progressOf(active.plan, 'journal-top', elapsed);
@@ -350,36 +404,36 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     // 傾きを 0 に戻すのは真上へ寄るのと並走。
     const flatten = progressOf(active.plan, 'journal-flatten', elapsed);
-    books.group.rotation.y = books.baseRotationY * (1 - flatten);
+    content.books.group.rotation.y = content.books.baseRotationY * (1 - flatten);
 
     const cover = active.plan.steps.find((step) => step.name === 'cover-open');
-    if (!cover || !books.topCover) return;
+    if (!cover || !content.books.topCover) return;
     const open = progressOf(active.plan, 'cover-open', elapsed);
-    books.topCover.rotation.z = -COVER_OPEN_ANGLE * open;
+    content.books.topCover.rotation.z = -COVER_OPEN_ANGLE * open;
 
-    books.topPages.forEach((page, index) => {
+    content.books.topPages.forEach((page, index) => {
       page.rotation.z = -SPREAD_PAGES.angleAt(index) * pageProgress(cover, index, elapsed);
     });
   }
 
   function updateJar(elapsed: number): void {
-    const readiness = state.fermentation.readiness;
+    const readiness = currentState.fermentation.readiness;
 
     // 泡は液面まで上がったら底へ戻す。
-    for (const bubble of jar.bubbles) {
+    for (const bubble of content.jar.bubbles) {
       bubble.mesh.position.y += bubble.speed;
-      if (bubble.mesh.position.y > jar.level) bubble.mesh.position.y = 0.2;
+      if (bubble.mesh.position.y > content.jar.level) bubble.mesh.position.y = 0.2;
     }
 
     // 輪郭は毎フレーム解き直す。頂点バッファは一度だけ確保してある。
     updateSilhouette();
 
     const phase = (elapsed % OUTLINE_BREATH_MS) / OUTLINE_BREATH_MS;
-    jar.silhouetteMaterial.opacity = outlineOpacity(readiness, phase) * jar.fade;
+    content.jar.silhouetteMaterial.opacity = outlineOpacity(readiness, phase) * content.jar.fade;
 
     // 言葉は上下に揺れながら周回する。
     const seconds = elapsed / MS_PER_SECOND;
-    jar.words.forEach((word, index) => {
+    content.jar.words.forEach((word, index) => {
       const bob = Math.sin(seconds * 0.3 * Math.PI * 2 + index) * WORD_BOB_AMPLITUDE;
       const orbit = seconds * 0.1 * Math.PI * 2 + word.angle;
       word.sprite.position.set(
@@ -392,17 +446,17 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function updateSilhouette(): void {
     const jarWorld = new Vector3();
-    jar.group.getWorldPosition(jarWorld);
+    content.jar.group.getWorldPosition(jarWorld);
     const dx = camera.position.x - jarWorld.x;
     const dz = camera.position.z - jarWorld.z;
 
-    const points = solveJarSilhouette(jar.profile, {
+    const points = solveJarSilhouette(content.jar.profile, {
       horizontalDistance: Math.hypot(dx, dz),
       azimuth: Math.atan2(dx, dz),
       y: camera.position.y - jarWorld.y,
     });
 
-    const positions = jar.silhouettePositions;
+    const positions = content.jar.silhouettePositions;
     const count = Math.min(points.length, positions.count);
     for (let i = 0; i < count; i++) {
       const point = points[i];
@@ -414,14 +468,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       );
     }
     positions.needsUpdate = true;
-    jar.silhouette.geometry.setDrawRange(0, count);
+    content.jar.silhouette.geometry.setDrawRange(0, count);
   }
 
   function updateSeal(elapsed: number): void {
-    if (!seal) return;
+    if (!content.seal) return;
     const float = sealFloat(elapsed / MS_PER_SECOND);
-    seal.group.position.y = layout.jar.y + SEAL_BASE_Y + float.yOffset;
-    seal.group.rotation.z = float.rotationZ;
+    content.seal.group.position.y = layout.jar.y + SEAL_BASE_Y + float.yOffset;
+    content.seal.group.rotation.z = float.rotationZ;
   }
 
   /**
@@ -431,14 +485,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
    * 机やボードまで一緒に消える。
    */
   function setJarOpacity(value: number): void {
-    jar.fade = value;
-    for (const owned of jar.fadeables) {
+    content.jar.fade = value;
+    for (const owned of content.jar.fadeables) {
       owned.material.opacity = owned.baseOpacity * value;
       owned.material.transparent = true;
     }
     const hidden = value <= 0.02;
-    jar.group.visible = !hidden;
-    if (seal) seal.group.visible = !hidden;
+    content.jar.group.visible = !hidden;
+    if (content.seal) content.seal.group.visible = !hidden;
   }
 
   function updateHover(): void {
@@ -452,7 +506,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function raycast(): { id: HitId | null; object: Object3D | null } {
     raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(hitboxes, false);
+    const intersects = raycaster.intersectObjects(content.hitboxes, false);
     const first = intersects[0];
     if (!first) return { id: null, object: null };
     const hitId = first.object.userData.hitId;
@@ -471,7 +525,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     renderer.domElement.style.cursor = id ? 'pointer' : 'default';
 
-    const entry = registry.get(id);
+    const entry = content.registry.get(id);
     options.onHoverChange?.(
       entry
         ? { label: entry.label, month: entry.month, screen: projectHover(hoveredObject) }
@@ -537,13 +591,17 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (transition || settled) return;
     // タッチでは pointermove が click より先に来ないことがある。その場で拾い直す。
     const id = resolveClickTarget(hoveredId, () => raycast().id);
-    const entry = registry.get(id);
+    const entry = content.registry.get(id);
     if (!entry) return;
 
     // 封は手紙の id を載せて渡す。
     const target: StudyTarget =
-      id === 'seal' && letter
-        ? { kind: 'letter', fermentationId: letter.fermentationId, questionId: letter.questionId }
+      id === 'seal' && content.letter
+        ? {
+            kind: 'letter',
+            fermentationId: content.letter.fermentationId,
+            questionId: content.letter.questionId,
+          }
         : entry.target;
     options.onPick?.(target);
   }
@@ -574,9 +632,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const plan = planBackToStudy(options.reducedMotion);
     setJarOpacity(1);
     // 手帳の表紙と傾きを元に戻す。
-    books.group.rotation.y = books.baseRotationY;
-    if (books.topCover) books.topCover.rotation.z = 0;
-    for (const page of books.topPages) page.rotation.z = 0;
+    content.books.group.rotation.y = content.books.baseRotationY;
+    if (content.books.topCover) content.books.topCover.rotation.z = 0;
+    for (const page of content.books.topPages) page.rotation.z = 0;
 
     return new Promise<void>((resolve) => {
       settled = null;
@@ -612,7 +670,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         return jarView(layout);
       case 'journal-new':
       case 'journal-month':
-        return journalSpreadView(layout, layout.desk.y + stackTopY(notebooks.desk));
+        return journalSpreadView(layout, layout.desk.y + stackTopY(content.notebooks.desk));
       case 'archive':
         return shelfView(layout);
       case 'board':
@@ -641,20 +699,46 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     cancelAnimationFrame(frame);
     resizeObserver.disconnect();
 
-    for (const geometry of geometries) geometry.dispose();
-    for (const texture of textures) texture.dispose();
-    materials.dispose();
-    jar.disposeFadeables();
+    disposeContent(content);
 
     renderer.dispose();
+    // dispose() だけでは WebGL のコンテキストが解放されない。明示的に落とさないと
+    // タブごとの上限（十数個）に達し、`Too many active WebGL contexts` で古い層から
+    // 失われていく。
+    renderer.forceContextLoss();
     // renderer.domElement を含め、コンテナを空にする。
     while (container.firstChild) container.removeChild(container.firstChild);
-    registry.clear();
+  }
+
+  /**
+   * 状態が変わったら物を組み直す（差分更新はしない）。renderer と camera は使い回す。
+   *
+   * **遷移中は組み直さない。** 組み直すとカメラがホームに戻り、進行中の `goTo` の
+   * Promise も宙に浮くので、押したのに何も起きずホームへ巻き戻る（実機で
+   * 「トランジションが始まったのにリセットされる」として出ていた）。取得が落ち着く
+   * まで数回 state が変わるので、その間に押すと必ず踏む。
+   */
+  function setState(next: StudyState): void {
+    if (transition !== null || settled !== null) {
+      // 捨てずに預かる。捨てると、遷移中に届いた更新が二度と反映されない。
+      pendingState = next;
+      return;
+    }
+    applyState(next);
+  }
+
+  function applyState(next: StudyState): void {
+    pendingState = null;
+    currentState = next;
+    disposeContent(content);
+    content = buildContent(next);
+    setHovered(null, null);
   }
 
   return {
     goTo,
     returnHome,
+    setState,
     setPointer,
     clearPointer,
     pick,
@@ -986,6 +1070,15 @@ function buildBooks(
     const book = new Group();
     book.position.y = placement.baseY;
 
+    // **面で埋める。** 線だけだと後ろが透けて、机やボードが本の中に見えてしまう。
+    // solid は polygonOffset 付きなので、この上に引く罫は面に負けない。
+    const slab = new Mesh(
+      own(new BoxGeometry(NOTEBOOK_SIZE.width, placement.thickness, NOTEBOOK_SIZE.depth)),
+      materials.solid,
+    );
+    slab.position.y = placement.thickness / 2;
+    book.add(slab);
+
     // 表紙の輪郭。
     book.add(
       lineFrom(
@@ -1056,6 +1149,13 @@ function buildBooks(
     if (index === 0) {
       const cover = new Group();
       cover.position.set(COVER_HINGE_X, placement.thickness + COVER_THICKNESS, 0);
+      // 開いたときに向こうが透けないよう、表紙にも面を持たせる。
+      const coverFace = new Mesh(
+        own(new BoxGeometry(NOTEBOOK_SIZE.width, COVER_THICKNESS, NOTEBOOK_SIZE.depth)),
+        materials.solid,
+      );
+      coverFace.position.set(NOTEBOOK_SIZE.width / 2, -COVER_THICKNESS / 2, 0);
+      cover.add(coverFace);
       cover.add(
         lineFrom(
           [
@@ -1079,6 +1179,12 @@ function buildBooks(
           placement.thickness + 0.002 + i * SPREAD_PAGES.thickness,
           0,
         );
+        const pageFace = new Mesh(
+          own(new BoxGeometry(NOTEBOOK_SIZE.width, SPREAD_PAGES.thickness, NOTEBOOK_SIZE.depth)),
+          materials.solid,
+        );
+        pageFace.position.set(NOTEBOOK_SIZE.width / 2, 0, 0);
+        page.add(pageFace);
         for (let r = 0; r < RULES.spreadCount; r++) {
           const z = -halfD + (r + 1) * RULES.spreadSpacing;
           page.add(
@@ -1121,6 +1227,17 @@ function buildBooks(
   const shelfW = 2.6 / 2;
   const shelfH = 1.7;
   const shelfD = 1.1 / 2;
+
+  // **背板と棚板を面で埋める。** 線だけだと棚の中に壁のボードが透けて見え、
+  // 背表紙が宙に浮いたままに見える。前面は開けておく（塞ぐと背表紙が隠れる）。
+  const shelfBack = new Mesh(own(new BoxGeometry(shelfW * 2, shelfH, 0.04)), materials.solid);
+  shelfBack.position.set(0, shelfH / 2, -shelfD);
+  shelfGroup.add(shelfBack);
+
+  const shelfBottom = new Mesh(own(new BoxGeometry(shelfW * 2, 0.04, shelfD * 2)), materials.solid);
+  shelfBottom.position.set(0, 0, 0);
+  shelfGroup.add(shelfBottom);
+
   for (const x of [-shelfW, shelfW]) {
     shelfGroup.add(
       lineFrom(
@@ -1158,6 +1275,13 @@ function buildBooks(
     spine.position.x = offsets[index];
     const thickness = 0.22;
     const height = 1.4;
+    // 背表紙も面で埋める（背文字のスプライトが背板に沈まないよう、少し手前に出す）。
+    const spineFace = new Mesh(
+      own(new BoxGeometry(thickness, height, shelfD * 1.5)),
+      materials.solid,
+    );
+    spineFace.position.set(0, height / 2, shelfD * 0.2);
+    spine.add(spineFace);
     spine.add(
       lineFrom(
         [
@@ -1199,6 +1323,8 @@ function buildPen(layout: StudyLayout, materials: StudyMaterials, own: OwnGeomet
   pen.rotation.y = 0.3;
 
   const bodyGeometry = own(new CylinderGeometry(0.055, 0.055, 1.9, 12));
+  // 胴も面で埋める。線だけだと机の輪郭が軸の中を通って見える。
+  pen.add(new Mesh(bodyGeometry, materials.solid));
   pen.add(new LineSegments(own(new EdgesGeometry(bodyGeometry, 30)), materials.faint(0.35)));
 
   const tipGeometry = own(new CylinderGeometry(0.055, 0.004, 0.34, 12));
@@ -1235,6 +1361,14 @@ function buildBoard(
   const halfW = BOARD_FACE.width / 2;
   const halfH = BOARD_FACE.height / 2;
 
+  // 板の面。カードはこの手前に貼るので、板が抜けていると奥の壁が透けて見える。
+  const face = new Mesh(
+    own(new PlaneGeometry(BOARD_FACE.width, BOARD_FACE.height)),
+    materials.solid,
+  );
+  face.position.z = -0.01;
+  group.add(face);
+
   group.add(
     lineFrom(
       [
@@ -1269,6 +1403,13 @@ function buildBoard(
 
     const w = placed.width / 2;
     const h = placed.height / 2;
+
+    // カードも面で埋める。写真は白、スニペットは紙の地色。
+    const face = new Mesh(
+      own(new PlaneGeometry(placed.width, placed.height)),
+      placed.card.cardType === 'photo' ? materials.paper : materials.solid,
+    );
+    card.add(face);
 
     card.add(
       lineFrom(

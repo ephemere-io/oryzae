@@ -201,3 +201,21 @@ pointer-events を切るだけで `marginLeft` は残るので、書斎の全幅
 無い新しいサーバー変更で、入口の設計（過去月の手帳を押す）そのものに関わるため、
 独立して判断・レビューされるべきだと考えた。机に積む直近 3 ヶ月は 20 件に収まる
 ことが多く、棚（4 ヶ月以上前）を押したときに出やすい。
+
+## 10. ⚠️ レビュー用の一時的な端末切替（マージ前に外す）
+
+画面右下に PC / SP の切替スイッチを置いてある。端末は middleware が `device-pref`
+cookie（無ければ UA）から確定して `x-device` ヘッダで渡す作りなので、切り替えには
+cookie の書き換えとリロードの両方が要り、レビュー中に DevTools の Console を毎回
+開くことになっていた。プレビューで PC / SP を見比べる間だけの足場。
+
+一時的なものだと見た目で分かるよう、枠を破線・テラコッタにしてある。
+
+**外し方（3 箇所）:**
+
+1. `apps/client/src/components/device-switch.tsx` を消す
+2. `apps/client/src/app/(protected)/layout.tsx` の `<DeviceSwitch />` と import を消す
+   （どちらにも `TODO(review):` を付けてある）
+3. この節を消す
+
+`git grep 'TODO(review)'` で 2 箇所とも出る。
