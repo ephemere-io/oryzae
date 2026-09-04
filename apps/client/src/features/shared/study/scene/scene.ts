@@ -21,12 +21,13 @@ import {
   LineSegments,
   type Material,
   Mesh,
-  type Object3D,
+  Object3D,
   PerspectiveCamera,
   PlaneGeometry,
   Raycaster,
   RingGeometry,
   Scene,
+  SphereGeometry,
   Sprite,
   Vector2,
   Vector3,
@@ -47,6 +48,7 @@ import {
   edgeLineCount,
   layoutNotebooks,
   NOTEBOOK_SIZE,
+  notebookThickness,
   RULES,
   SPINE_LABEL,
   SPREAD_PAGES,
@@ -237,6 +239,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       shelf: books.shelfSpines,
       hasSeal: seal !== null,
       shelfAsSingleTarget: layout.pillOffsets !== null,
+      jarGroup: jar.group,
+      sealGroup: seal?.group ?? null,
+      shelfGroup: books.shelfGroup,
+      boardGroup: board.group,
     });
 
     for (const group of groups) scene.add(group);
@@ -419,10 +425,17 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function updateJar(elapsed: number): void {
     const readiness = currentState.fermentation.readiness;
 
-    // 泡は液面まで上がったら底へ戻す。
+    // 泡は液面まで上がったら底へ戻す。横にも少し揺らす（まっすぐ上がると機械的に見える）。
+    const bubbleSeconds = elapsed / MS_PER_SECOND;
     for (const bubble of content.jar.bubbles) {
       bubble.mesh.position.y += bubble.speed;
-      if (bubble.mesh.position.y > content.jar.level) bubble.mesh.position.y = 0.2;
+      bubble.mesh.position.x = bubble.baseX + Math.sin(bubbleSeconds + bubble.wobble) * 0.03;
+      bubble.mesh.position.z = bubble.baseZ + Math.cos(bubbleSeconds + bubble.wobble) * 0.03;
+      if (bubble.mesh.position.y > content.jar.level) {
+        bubble.mesh.position.y = 0.05;
+        bubble.baseX = (Math.random() - 0.5) * 0.6;
+        bubble.baseZ = (Math.random() - 0.5) * 0.6;
+      }
     }
 
     // 輪郭は毎フレーム解き直す。頂点バッファは一度だけ確保してある。
@@ -511,17 +524,21 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!first) return { id: null, object: null };
     const hitId = first.object.userData.hitId;
     if (typeof hitId !== 'string') return { id: null, object: null };
-    return { id: hitId, object: first.object };
+    // 拡大するのは見えている方。ヒットボックスは不可視なので、そこを拡大しても何も起きない。
+    const visible = first.object.userData.parentGroup;
+    return { id: hitId, object: visible instanceof Object3D ? visible : first.object };
   }
 
   function setHovered(id: HitId | null, object: Object3D | null): void {
     if (id === hoveredId) return;
 
     // ホバーは scale とカーソルだけ。色は変えない。
-    if (hoveredObject) hoveredObject.scale.setScalar(1);
+    // 戻すときは 1 ではなく**基準の倍率**へ。棚とボードは配置表で 0.68 / 0.72 に
+    // 縮めてあるので、1 に戻すと触るたびに大きくなってしまう。
+    if (hoveredObject) hoveredObject.scale.setScalar(baseScaleOf(hoveredObject));
     hoveredId = id;
     hoveredObject = object;
-    if (hoveredObject) hoveredObject.scale.setScalar(HOVER_SCALE);
+    if (hoveredObject) hoveredObject.scale.setScalar(baseScaleOf(hoveredObject) * HOVER_SCALE);
 
     renderer.domElement.style.cursor = id ? 'pointer' : 'default';
 
@@ -531,6 +548,15 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         ? { label: entry.label, month: entry.month, screen: projectHover(hoveredObject) }
         : null,
     );
+  }
+
+  /** ホバー前の倍率。初回に今の倍率を憶えておく。 */
+  function baseScaleOf(object: Object3D): number {
+    const remembered = object.userData.baseScale;
+    if (typeof remembered === 'number') return remembered;
+    const current = object.scale.x;
+    object.userData.baseScale = current;
+    return current;
   }
 
   function projectHover(object: Object3D | null): { x: number; y: number } {
@@ -763,6 +789,28 @@ function applyView(camera: PerspectiveCamera, view: CameraView): void {
   camera.lookAt(view.target.x, view.target.y, view.target.z);
 }
 
+/**
+ * 面 + 稜線の 1 組（原案の `lineArt`）。
+ *
+ * **書斎の立体はすべてこれで作る。** 面が無いと後ろが透けて、机やボードが物の中を
+ * 通って見える。`solid` は polygonOffset 付きなので、上に引く罫はこの面に負けない。
+ * ホバーで拡大したあと元に戻せるよう、基準の倍率を持たせておく。
+ */
+function lineArt(
+  geometry: BufferGeometry,
+  materials: StudyMaterials,
+  own: OwnGeometry,
+  options: { face?: Material; threshold?: number } = {},
+): Group {
+  const group = new Group();
+  group.add(new Mesh(own(geometry), options.face ?? materials.solid));
+  group.add(
+    new LineSegments(own(new EdgesGeometry(geometry, options.threshold ?? 15)), materials.ink),
+  );
+  group.userData.baseScale = 1;
+  return group;
+}
+
 function lineFrom(points: Vector3[], material: Material, own: OwnGeometry): Line {
   const geometry = own(new BufferGeometry().setFromPoints(points));
   return new Line(geometry, material);
@@ -841,11 +889,15 @@ function buildFloorGrid(layout: StudyLayout, materials: StudyMaterials, own: Own
   const step = 1;
   const points: Vector3[] = [];
   for (let i = -half; i <= half; i += step) {
+    // 中央の 2 本は原案でも地の色（＝ほぼ見えない）。ここだけ抜くと格子が締まる。
+    if (i === 0) continue;
     points.push(new Vector3(-half, layout.floorY, i), new Vector3(half, layout.floorY, i));
     points.push(new Vector3(i, layout.floorY, -half), new Vector3(i, layout.floorY, half));
   }
   const geometry = own(new BufferGeometry().setFromPoints(points));
-  group.add(new LineSegments(geometry, materials.grid));
+  // 床は**気配だけ**。原案では格子がほとんど知覚されず、机の天板と手前の木端が
+  // 主役になっている。同じ 20 分割のまま濃度を落として、格子が絵を仕切らないようにする。
+  group.add(new LineSegments(geometry, materials.gridFaint));
   return group;
 }
 
@@ -858,7 +910,7 @@ interface JarParts {
   group: Group;
   profile: Vector2[];
   level: number;
-  bubbles: { mesh: Mesh; speed: number }[];
+  bubbles: { mesh: Mesh; speed: number; wobble: number; baseX: number; baseZ: number }[];
   words: { sprite: Sprite; y: number; angle: number }[];
   silhouette: Line;
   silhouettePositions: BufferAttribute;
@@ -945,18 +997,26 @@ function buildJar(
   ring.position.y = level;
   group.add(ring);
 
-  // 泡。
-  const bubbles: { mesh: Mesh; speed: number }[] = [];
-  const bubbleGeometry = own(new RingGeometry(0.03, 0.045, 10));
-  const bubbleMaterial = fadeable(materials.xray(0.35).clone());
+  // 泡。**球**にする。平らなリングだと向きによって線に潰れ、沈んだ点にしか見えない。
+  const bubbles: { mesh: Mesh; speed: number; wobble: number; baseX: number; baseZ: number }[] = [];
+  const bubbleGeometry = own(new SphereGeometry(0.028, 8, 8));
+  const bubbleMaterial = fadeable(materials.xray(completed ? 0.18 : 0.34).clone());
   const count = bubbleCount(readiness, completed);
   for (let i = 0; i < count; i++) {
     const mesh = new Mesh(bubbleGeometry, bubbleMaterial);
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.random() * levelRadius * 0.7;
-    mesh.position.set(Math.cos(angle) * radius, Math.random() * level, Math.sin(angle) * radius);
+    const radius = jarRadiusAt(profile, Math.random() * level) * 0.7;
+    const baseX = Math.cos(angle) * radius;
+    const baseZ = Math.sin(angle) * radius;
+    mesh.position.set(baseX, Math.random() * level, baseZ);
     group.add(mesh);
-    bubbles.push({ mesh, speed: bubbleSpeed(readiness, completed, Math.random()) });
+    bubbles.push({
+      mesh,
+      speed: bubbleSpeed(readiness, completed, Math.random()),
+      wobble: Math.random() * Math.PI * 2,
+      baseX,
+      baseZ,
+    });
   }
 
   // 漂う言葉。液面までの高さを実際の語数で割って並べる。
@@ -1045,6 +1105,8 @@ interface BooksParts {
   topPages: Group[];
   deskPlacements: { group: Group; topY: number; thickness: number }[];
   shelfSpines: Group[];
+  /** 棚ごと 1 つの的にするとき（SP）にホバーで拡大するグループ。 */
+  shelfGroup: Group;
 }
 
 function buildBooks(
@@ -1059,7 +1121,7 @@ function buildBooks(
   const baseRotationY = -0.15;
   group.rotation.y = baseRotationY;
 
-  const halfW = NOTEBOOK_SIZE.width / 2;
+  // 表紙と束の寸法は lineArt に渡す。奥行きの半分だけは開いたページの罫で使う。
   const halfD = NOTEBOOK_SIZE.depth / 2;
 
   const deskPlacements: { group: Group; topY: number; thickness: number }[] = [];
@@ -1070,75 +1132,77 @@ function buildBooks(
     const book = new Group();
     book.position.y = placement.baseY;
 
-    // **面で埋める。** 線だけだと後ろが透けて、机やボードが本の中に見えてしまう。
-    // solid は polygonOffset 付きなので、この上に引く罫は面に負けない。
-    const slab = new Mesh(
-      own(new BoxGeometry(NOTEBOOK_SIZE.width, placement.thickness, NOTEBOOK_SIZE.depth)),
-      materials.solid,
-    );
-    slab.position.y = placement.thickness / 2;
-    book.add(slab);
+    // 束は表紙より一回り小さく作る（表紙がわずかに出ることで箱に見えない）。
+    // 面と稜線の 1 組にしないと後ろが透ける。
+    const blockW = NOTEBOOK_SIZE.width - BLOCK_INSET * 2;
+    const blockD = NOTEBOOK_SIZE.depth - BLOCK_INSET * 2;
+    const block = lineArt(new BoxGeometry(blockW, placement.thickness, blockD), materials, own);
+    block.position.y = placement.thickness / 2;
+    book.add(block);
 
-    // 表紙の輪郭。
-    book.add(
-      lineFrom(
-        [
-          new Vector3(-halfW, placement.thickness, -halfD),
-          new Vector3(halfW, placement.thickness, -halfD),
-          new Vector3(halfW, placement.thickness, halfD),
-          new Vector3(-halfW, placement.thickness, halfD),
-          new Vector3(-halfW, placement.thickness, -halfD),
-        ],
-        materials.faint(0.4),
-        own,
-      ),
+    // 表紙。束より少し大きく、薄い板として上に載せる。
+    const coverSlab = lineArt(
+      new BoxGeometry(NOTEBOOK_SIZE.width, COVER_THICKNESS, NOTEBOOK_SIZE.depth),
+      materials,
+      own,
     );
+    coverSlab.position.y = placement.thickness + COVER_THICKNESS / 2;
+    book.add(coverSlab);
 
-    // 束は表紙より小さく作る（表紙がわずかに出ることで箱に見えない）。
-    const blockW = halfW - BLOCK_INSET;
-    const blockD = halfD - BLOCK_INSET;
+    // 小口・天・地の三方に紙の断面を引く。**束の面より外側**に置くこと。
+    // 内側に引くと面に埋もれて 1 本も見えない（面で埋めたときに実際そうなった）。
+    const halfBlockW = blockW / 2 + 0.002;
+    const halfBlockD = blockD / 2 + 0.002;
     const lines = edgeLineCount(placement.thickness);
     for (let i = 0; i < lines; i++) {
       const t = (i + 1) / (lines + 1);
       const y = placement.thickness * t;
       const jitter = (i % 3) * EDGE_LINE_JITTER;
-      const opacity = EDGE_LINE_OPACITIES[i % 2];
-      const material = materials.faint(opacity);
-      // 小口・天・地の三方。クオータービューでどの角度からでも断面が見える。
+      const material = materials.faint(EDGE_LINE_OPACITIES[i % 2]);
       book.add(
         lineFrom(
-          [new Vector3(blockW - jitter, y, -blockD), new Vector3(blockW - jitter, y, blockD)],
+          [
+            new Vector3(halfBlockW - jitter, y, -halfBlockD),
+            new Vector3(halfBlockW - jitter, y, halfBlockD),
+          ],
           material,
           own,
         ),
       );
       book.add(
         lineFrom(
-          [new Vector3(-blockW, y, blockD - jitter), new Vector3(blockW, y, blockD - jitter)],
+          [
+            new Vector3(-halfBlockW, y, halfBlockD - jitter),
+            new Vector3(halfBlockW, y, halfBlockD - jitter),
+          ],
           material,
           own,
         ),
       );
       book.add(
         lineFrom(
-          [new Vector3(-blockW, y, -blockD + jitter), new Vector3(blockW, y, -blockD + jitter)],
+          [
+            new Vector3(-halfBlockW, y, -halfBlockD + jitter),
+            new Vector3(halfBlockW, y, -halfBlockD + jitter),
+          ],
           material,
           own,
         ),
       );
     }
 
-    // 表紙のラベル枠。
+    // 表紙のラベル枠。表紙の面のすぐ上に置く。
+    const labelY = placement.thickness + COVER_THICKNESS + 0.002;
     const lw = COVER_LABEL.width / 2;
     const lh = COVER_LABEL.height / 2;
     book.add(
       lineFrom(
         [
-          new Vector3(-lw, placement.thickness + 0.001, -lh),
-          new Vector3(lw, placement.thickness + 0.001, -lh),
-          new Vector3(lw, placement.thickness + 0.001, lh),
-          new Vector3(-lw, placement.thickness + 0.001, lh),
-          new Vector3(-lw, placement.thickness + 0.001, -lh),
+          new Vector3(-lw, labelY, -lh),
+          new Vector3(lw, labelY, -lh),
+          new Vector3(lw, labelY, lh),
+          new Vector3(-lw, labelY, lh),
+          new Vector3(-lw, labelY, -lh),
         ],
         materials.faint(COVER_LABEL.opacity),
         own,
@@ -1222,47 +1286,32 @@ function buildBooks(
   shelfGroup.rotation.x = layout.shelf.tiltX;
   shelfGroup.scale.setScalar(layout.shelf.scale);
 
-  // 棚の躯体（2.6 × 1.7 × 1.1）。これが無いと背表紙が宙に浮いて見える。
-  // 側板・棚板・奥の見切りだけの最小限で、箱として閉じない（線が増えると机と競合する）。
-  const shelfW = 2.6 / 2;
-  const shelfH = 1.7;
-  const shelfD = 1.1 / 2;
+  // ブックスタンド（2.6 × 1.7 × 1.1）。**天板も背板も無い**、底板と側面だけの形。
+  // 箱にすると棚に見えてしまい、原案の「本を立てて置く台」から離れる。
+  const standW = 2.6 / 2;
+  const standH = 1.7;
+  const standD = 1.1 / 2;
+  const standBaseThickness = 0.06;
 
-  // **背板と棚板を面で埋める。** 線だけだと棚の中に壁のボードが透けて見え、
-  // 背表紙が宙に浮いたままに見える。前面は開けておく（塞ぐと背表紙が隠れる）。
-  const shelfBack = new Mesh(own(new BoxGeometry(shelfW * 2, shelfH, 0.04)), materials.solid);
-  shelfBack.position.set(0, shelfH / 2, -shelfD);
-  shelfGroup.add(shelfBack);
+  // 底板だけは面を持つ（背表紙が宙に浮いて見えないように）。
+  const standBase = lineArt(
+    new BoxGeometry(standW * 2, standBaseThickness, standD * 2),
+    materials,
+    own,
+  );
+  shelfGroup.add(standBase);
 
-  const shelfBottom = new Mesh(own(new BoxGeometry(shelfW * 2, 0.04, shelfD * 2)), materials.solid);
-  shelfBottom.position.set(0, 0, 0);
-  shelfGroup.add(shelfBottom);
-
-  for (const x of [-shelfW, shelfW]) {
+  // 側面は輪郭線だけ。下辺は底板が兼ねるので、開いたコの字にする。
+  for (const x of [-standW, standW]) {
     shelfGroup.add(
       lineFrom(
         [
-          new Vector3(x, 0, shelfD),
-          new Vector3(x, shelfH, shelfD),
-          new Vector3(x, shelfH, -shelfD),
-          new Vector3(x, 0, -shelfD),
+          new Vector3(x, 0, -standD),
+          new Vector3(x, standH, -standD),
+          new Vector3(x, standH, standD),
+          new Vector3(x, 0, standD),
         ],
-        materials.faint(0.28),
-        own,
-      ),
-    );
-  }
-  for (const y of [0, shelfH]) {
-    shelfGroup.add(
-      lineFrom(
-        [
-          new Vector3(-shelfW, y, shelfD),
-          new Vector3(shelfW, y, shelfD),
-          new Vector3(shelfW, y, -shelfD),
-          new Vector3(-shelfW, y, -shelfD),
-          new Vector3(-shelfW, y, shelfD),
-        ],
-        materials.faint(y === 0 ? 0.32 : 0.22),
+        materials.faint(0.4),
         own,
       ),
     );
@@ -1273,28 +1322,12 @@ function buildBooks(
   notebooks.shelf.forEach((notebook, index) => {
     const spine = new Group();
     spine.position.x = offsets[index];
-    const thickness = 0.22;
-    const height = 1.4;
-    // 背表紙も面で埋める（背文字のスプライトが背板に沈まないよう、少し手前に出す）。
-    const spineFace = new Mesh(
-      own(new BoxGeometry(thickness, height, shelfD * 1.5)),
-      materials.solid,
-    );
-    spineFace.position.set(0, height / 2, shelfD * 0.2);
-    spine.add(spineFace);
-    spine.add(
-      lineFrom(
-        [
-          new Vector3(-thickness / 2, 0, 0),
-          new Vector3(thickness / 2, 0, 0),
-          new Vector3(thickness / 2, height, 0),
-          new Vector3(-thickness / 2, height, 0),
-          new Vector3(-thickness / 2, 0, 0),
-        ],
-        materials.faint(0.35),
-        own,
-      ),
-    );
+    // 背表紙は面 + 稜線。厚みはその月の件数から決める（原案と同じ）。
+    const thickness = Math.max(0.16, notebookThickness(notebook.entryCount));
+    const height = 1.5;
+    const spineBody = lineArt(new BoxGeometry(thickness, height, standD * 1.8), materials, own);
+    spineBody.position.y = standBaseThickness / 2 + height / 2;
+    spine.add(spineBody);
 
     // 背表紙には年月を刷る。棚が「本が並んでいる場所」だと一目で分かる。
     const texture = createTextTexture(spineLabelText(notebook.month), SPINE_LABEL.fontPx);
@@ -1303,7 +1336,7 @@ function buildBooks(
       const sprite = new Sprite(materials.sprite(texture, SPINE_LABEL.opacity));
       const width = thickness * SPINE_LABEL.fitRatio;
       sprite.scale.set(width, width * (texture.image.height / texture.image.width), 1);
-      sprite.position.set(0, height / 2, 0.01);
+      sprite.position.set(0, standBaseThickness / 2 + height / 2, standD * 1.8 * 0.5 + 0.01);
       spine.add(sprite);
     }
 
@@ -1312,7 +1345,7 @@ function buildBooks(
   });
   group.add(shelfGroup);
 
-  return { group, baseRotationY, topCover, topPages, deskPlacements, shelfSpines };
+  return { group, baseRotationY, topCover, topPages, deskPlacements, shelfSpines, shelfGroup };
 }
 
 /** 胴＋ペン先の円錐＋バンド 2 本。線画でもペンとして読める最小の構成。 */
@@ -1475,6 +1508,11 @@ function buildHitboxes(options: {
   shelf: Group[];
   hasSeal: boolean;
   shelfAsSingleTarget: boolean;
+  /** ホバーで拡大する可視グループ。 */
+  jarGroup: Group;
+  sealGroup: Group | null;
+  shelfGroup: Group;
+  boardGroup: Group;
 }): Mesh[] {
   const { layout, materials, ownGeometry } = options;
   const boxes: Mesh[] = [];
@@ -1483,17 +1521,24 @@ function buildHitboxes(options: {
     id: HitId,
     size: [number, number, number],
     position: Vector3,
-    parent?: Object3D,
+    visible?: Object3D,
   ): void {
     const mesh = new Mesh(ownGeometry(new BoxGeometry(...size)), materials.hitbox);
     mesh.position.copy(position);
     mesh.userData.hitId = id;
-    if (parent) parent.add(mesh);
+    // ホバーで拡大するのは**見えている方**。ヒットボックスを拡大しても何も起きない
+    // （原案は `hit.parentGroup` を辿って可視グループを拡大している）。
+    mesh.userData.parentGroup = visible ?? null;
     boxes.push(mesh);
   }
 
   // 瓶は円柱で囲む。
-  box('jar', [2.8, 3.4, 2.8], new Vector3(layout.jar.x, layout.jar.y + 1.5, layout.jar.z));
+  box(
+    'jar',
+    [2.8, 3.4, 2.8],
+    new Vector3(layout.jar.x, layout.jar.y + 1.5, layout.jar.z),
+    options.jarGroup,
+  );
 
   if (options.hasSeal) {
     box(
@@ -1511,6 +1556,7 @@ function buildHitboxes(options: {
       `notebook-${index}`,
       [NOTEBOOK_SIZE.width, Math.max(placement.thickness, 0.12), NOTEBOOK_SIZE.depth],
       new Vector3(world.x, world.y + placement.thickness / 2, world.z),
+      placement.group,
     );
   });
 
@@ -1520,12 +1566,13 @@ function buildHitboxes(options: {
       'shelf',
       [2.8, 2.0, 1.2],
       new Vector3(layout.shelf.position.x, layout.shelf.position.y + 0.9, layout.shelf.position.z),
+      options.shelfGroup,
     );
   } else {
     options.shelf.forEach((spine, index) => {
       const world = new Vector3();
       spine.getWorldPosition(world);
-      box(`spine-${index}`, [0.3, 1.5, 0.4], new Vector3(world.x, world.y + 0.7, world.z));
+      box(`spine-${index}`, [0.3, 1.5, 0.4], new Vector3(world.x, world.y + 0.7, world.z), spine);
     });
   }
 
@@ -1538,6 +1585,7 @@ function buildHitboxes(options: {
       0.4,
     ],
     new Vector3(layout.board.position.x, layout.board.position.y, layout.board.position.z),
+    options.boardGroup,
   );
 
   return boxes;
