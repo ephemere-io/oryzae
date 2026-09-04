@@ -126,13 +126,23 @@ export function bubbleCount(readiness: number, completed: boolean): number {
 }
 
 /**
- * 泡の 1 フレームあたりの上昇量。完了時は 0（＝静止）。
+ * 完了した瓶の泡の速さ（readiness 換算）。
+ *
+ * **仕様と原案は「完了時 0＝静止」だが、そこだけ変えている。** 止めきると、
+ * 手紙が届いている瓶（＝いちばん見る状態）が壊れているように見えるため。
+ * 「静けさ」は泡の数（30 → 4）と浮かぶ封が担っているので、ゆっくり上がっても
+ * 発酵中との区別は付く。戻すならここを 0 にすればよい。
+ */
+const COMPLETED_DRIFT = 0.12;
+
+/**
+ * 泡の 1 フレームあたりの上昇量。
  *
  * `random` は 0..1。泡ごとに速さを散らすために呼び出し側が渡す。
  */
 export function bubbleSpeed(readiness: number, completed: boolean, random: number): number {
-  if (completed) return 0;
-  return (0.25 + random * 0.5) * 0.008 * (0.45 + clamp01(readiness) * 1.7);
+  const scale = completed ? COMPLETED_DRIFT : 0.45 + clamp01(readiness) * 1.7;
+  return (0.25 + random * 0.5) * 0.008 * scale;
 }
 
 /** 上部のもやを出すか。 */
@@ -212,6 +222,20 @@ export interface WordPlacement {
   scale: number;
 }
 
+/**
+ * 言葉を置ける上限の高さ。
+ *
+ * 首がくびれ始める手前まで。ここを超えるとコルクに文字が重なる。
+ */
+const WORD_CEILING = 2.35;
+
+/** 語を並べるのに要る高さ。行間は隣り合う 2 語の高さから決まる。 */
+function spanBetween(heights: readonly number[], count: number, ratio: number): number {
+  let span = 0;
+  for (let i = 1; i < count; i++) span += ((heights[i - 1] + heights[i]) / 2) * ratio;
+  return span;
+}
+
 /** 行間は隣り合う 2 語の高さから決める。これを下回らせない。 */
 const GAP_RATIO = 1.7;
 
@@ -231,17 +255,19 @@ export function placeWords(words: readonly string[], level: number): WordPlaceme
   const candidates = words.slice(0, MAX_WORDS);
   if (candidates.length === 0) return [];
 
-  const top = Math.max(WORD_BOTTOM, level - WORD_TOP_MARGIN);
-  const available = top - WORD_BOTTOM;
-
   const heights = candidates.map((word) => WORD_SPRITE_HEIGHT * wordScale(word));
 
-  // 全語を並べるのに要る高さ（行間 GAP_RATIO のとき）。
-  const spanAt = (ratio: number, count: number): number => {
-    let span = 0;
-    for (let i = 1; i < count; i++) span += ((heights[i - 1] + heights[i]) / 2) * ratio;
-    return span;
-  };
+  // まずは液面までに収めたい（言葉は発酵の中にある、という見立て）。
+  const preferredTop = Math.max(WORD_BOTTOM, level - WORD_TOP_MARGIN);
+
+  // **液面で頭打ちにしない。** readiness が低いと液面までの高さが 0.1 ほどしか無く、
+  // そこに収めようとすると 2 語目以降が全部落ちる（実機で 1 語しか出ていなかった）。
+  // 入り切らないぶんは瓶の中の空いている高さへ伸ばす。
+  const neededSpan = spanBetween(heights, heights.length, GAP_RATIO);
+  const top = Math.min(WORD_CEILING, Math.max(preferredTop, WORD_BOTTOM + neededSpan));
+  const available = top - WORD_BOTTOM;
+
+  const spanAt = (ratio: number, count: number): number => spanBetween(heights, count, ratio);
 
   // まず行間を詰めて全語を収められないか試し、それでも無理なら語数を減らす。
   let count = candidates.length;
