@@ -137,7 +137,10 @@ export const SP_LAYOUT: StudyLayout = {
     // 積みの右脇（空いている机の面）へ逃がす。左脇はペンがいる。
     jar: vec3(-1.15, -1.14, 1.25),
     journal: vec3(SP_DESK.x + 2.1, -1.14, SP_DESK.z + 1.1),
-    board: vec3(0, -0.28, -4.25),
+    // **板のすぐ下に置く。** PC と同じ「机の高さ」（y ≈ -0.28）に置くと、
+    // クオータートップでは y の差がそのまま画面の下方向に伸び、ピルが板ではなく
+    // 瓶の上に乗る（実機で確認）。俯瞰では「板の直下」を板の座標系で取る必要がある。
+    board: vec3(0, 1.5, -4.0),
     archive: vec3(SP_SHELF.x, SP_SHELF.y + 2.1 * SP_SHELF_SCALE, SP_SHELF.z),
   },
   pillOffsets: {

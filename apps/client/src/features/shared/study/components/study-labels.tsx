@@ -2,8 +2,15 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { useCallback, useState } from 'react';
 import type { StudyLayout } from '../layout';
-import { clampPillToScreen, jarPillStateKey, LABEL_STYLE, PILL_MIN_HEIGHT } from '../scene/labels';
+import {
+  clampPillToScreen,
+  jarPillStateKey,
+  LABEL_STYLE,
+  PILL_MIN_HEIGHT,
+  type PillSize,
+} from '../scene/labels';
 import type { StudyFermentationStatus, StudyTarget } from '../types';
 
 /** どの対象のラベルか。 */
@@ -32,8 +39,14 @@ export interface StudyLabelsProps {
   onPick: (target: StudyTarget) => void;
 }
 
-/** ピルのおおよその実寸。押し戻しの計算に使う（実測に近い固定値で足りる）。 */
-const PILL_SIZE = { width: 132, height: PILL_MIN_HEIGHT };
+/**
+ * 実測できるまでの暫定の寸法。
+ *
+ * **押し戻しには実測値を使う。** 固定値で代用すると、状態語の長い言語や大きい件数で
+ * ピルが想定より広くなり、画面の端からはみ出す（実測 155px に対し 132px で計算していて
+ * 右端が 1px 切れていた）。
+ */
+const FALLBACK_PILL_SIZE = { width: 132, height: PILL_MIN_HEIGHT };
 
 /**
  * 対象ラベル（`docs/oryzae-study/00-overview.md`「対象ラベルとホバー」）。
@@ -102,6 +115,22 @@ function PcLabels({ layout, positions, hovered, onPick }: StudyLabelsProps) {
 function SpPills(props: StudyLabelsProps) {
   const t = useTranslations('study');
   const { layout, positions, screen, onPick } = props;
+
+  // ピルの実寸。文字量で変わるので、描画されたものを測って押し戻しに使う。
+  const [sizes, setSizes] = useState<Partial<Record<LabelKind, PillSize>>>({});
+
+  const measure = useCallback((kind: LabelKind, element: HTMLButtonElement | null) => {
+    if (!element) return;
+    const width = element.offsetWidth;
+    const height = element.offsetHeight;
+    setSizes((previous) => {
+      const current = previous[kind];
+      // 同じ寸法で setState し続けると再描画が止まらない。
+      if (current && current.width === width && current.height === height) return previous;
+      return { ...previous, [kind]: { width, height } };
+    });
+  }, []);
+
   const offsets = layout.pillOffsets;
   if (offsets === null) return null;
 
@@ -116,11 +145,17 @@ function SpPills(props: StudyLabelsProps) {
         const point = positions[kind];
         if (!point) return null;
 
-        const placed = clampPillToScreen(point, offsets[kind], PILL_SIZE, screen);
+        const placed = clampPillToScreen(
+          point,
+          offsets[kind],
+          sizes[kind] ?? FALLBACK_PILL_SIZE,
+          screen,
+        );
 
         return (
           <button
             key={kind}
+            ref={(element) => measure(kind, element)}
             type="button"
             onClick={() => onPick(targetFor(kind))}
             className="pointer-events-auto absolute flex items-center gap-1.5 whitespace-nowrap rounded-full px-3"
