@@ -8,10 +8,9 @@ import { SP_LAYOUT } from '@/features/shared/study/layout';
 /**
  * SP の書斎。机と正対したクオータートップ（仰角およそ 52°）。
  *
- * 下端のキャプションは出さない。SP シェルには 64px のボトムナビが常時あり、
- * そこへ「書斎 / STUDY / 状態」を重ねると縦の余白が足りない
- * （docs/oryzae-study/60-implementation-notes.md §6）。
+ * ボトムナビを書斎ホームでは描かなくなったので、下端のキャプションを出せる
+ * （競合していた 64px が空いた）。
  */
 export function SpStudy() {
-  return <StudyHome layout={SP_LAYOUT} showCaption={false} />;
+  return <StudyHome layout={SP_LAYOUT} showCaption />;
 }

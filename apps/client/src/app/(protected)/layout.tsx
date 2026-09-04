@@ -110,9 +110,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
             <div className="flex h-[100dvh] flex-col overflow-hidden">
               <main className="relative flex-1 overflow-auto">{content}</main>
-              {/* SP のボトムナビは書斎ホームでも残す。`/questions` の入口がここにしか
-                  無く、外すと問いへ行けなくなる（60-implementation-notes.md §6）。 */}
-              <SpBottomNav />
+              {/* 書斎ホームではボトムナビも描かない。PC のサイドバーと同じで、
+                  書斎そのものが唯一のグローバルナビゲーションになる。 */}
+              {!onStudy && <SpBottomNav />}
             </div>
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">
