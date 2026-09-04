@@ -1,6 +1,7 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
+import { useMemo } from 'react';
 import { QuestionCircle } from '@/features/pc/fermentation/components/question-circle';
 import type { DiscPlacement } from '@/features/pc/fermentation/utils/cover-flow-geometry';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
@@ -60,7 +61,58 @@ const NOOP_POINTER_HANDLERS = {
   onPointerCancel: NOOP_DRAG,
   onClick: NOOP_DRAG,
 };
-const NO_OVERRIDES = { keywords: {}, snippets: {}, letters: {} };
+/**
+ * 円盤の中の要素の大きさ（素の寸法の何倍か）。
+ *
+ * 瓶のキャンバスでは円の直径から出した倍率（直径 420 なら 0.39）で縮めている。円へ
+ * **カメラが寄る**ので、縮んでいても寄れば読めるからだ。履歴はカメラが動かないので、
+ * 同じ倍率だと 9px の抜粋が 4px 相当で乗り、まったく読めない。
+ *
+ * 素の寸法（1.0）で出す。言葉が 11px・抜粋が 9px の設計どおりに読める。
+ */
+const DISC_ELEMENT_SCALE = 1;
+
+/**
+ * 円盤の中の配置（円の内側比・要素の左上を指す）。
+ *
+ * 瓶に保存されている配置は使わない。あちらは直径 420 の円に **0.39 倍**で並べる前提の
+ * 座標なので、素の寸法で置くと右の要素が円からはみ出し、要素どうしも重なる（実データの
+ * 言葉 5 件・抜粋 3 件で確認）。
+ *
+ * 左右 2 列に分け、列の中で縦にずらす。列の x は「いちばん幅の広い言葉（英語で 170px ≒
+ * 円の 36%）を置いても円の内側に収まる」ように決めてある。ユーザーが瓶で並べ替えた配置を
+ * 反映しないのは意図的で、履歴は **読むための面**（瓶は並べるための面）。
+ */
+const DISC_KEYWORD_POSITIONS = [
+  { jarX: 50, jarY: 18 },
+  { jarX: 10, jarY: 30 },
+  { jarX: 10, jarY: 42 },
+  { jarX: 50, jarY: 52 },
+  { jarX: 46, jarY: 65 },
+];
+const DISC_SNIPPET_POSITIONS = [
+  { jarX: 10, jarY: 14 },
+  { jarX: 50, jarY: 34 },
+  { jarX: 10, jarY: 55 },
+];
+const DISC_LETTER_POSITION = { jarX: 28, jarY: 75 };
+
+/** 詳細から「この円盤ではここに置く」という配置表を作る。 */
+function discOverrides(detail: FermentationDetail | null) {
+  if (!detail) return { keywords: {}, snippets: {}, letters: {} };
+  const keywords: Record<string, { jarX: number; jarY: number }> = {};
+  detail.keywords.slice(0, DISC_KEYWORD_POSITIONS.length).forEach((kw, i) => {
+    keywords[kw.id] = DISC_KEYWORD_POSITIONS[i];
+  });
+  const snippets: Record<string, { jarX: number; jarY: number }> = {};
+  detail.snippets.slice(0, DISC_SNIPPET_POSITIONS.length).forEach((sn, i) => {
+    snippets[sn.id] = DISC_SNIPPET_POSITIONS[i];
+  });
+  const letters: Record<string, { jarX: number; jarY: number }> = detail.letter
+    ? { [detail.letter.id]: DISC_LETTER_POSITION }
+    : {};
+  return { keywords, snippets, letters };
+}
 
 /**
  * 発酵履歴の円盤 1 枚（1 発酵 = 1 円盤）。
@@ -86,6 +138,8 @@ export function HistoryDisc({
   onElementClick,
   selectedElementId,
 }: HistoryDiscProps) {
+  const innerOverrides = useMemo(() => discOverrides(active ? detail : null), [active, detail]);
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: 円盤の操作は role="button" を持つ内側の QuestionCircle（onActivate）とステージ背景のヒットテストが担う。この層は 3D 変形の器で、ここに role を足すと同じ操作に取っ手が二重にできる。
     // biome-ignore lint/a11y/useKeyWithClickEvents: 同上。キーボードでのめくりは ← → キー（useCoverFlowInput）が画面全体で受ける。
@@ -133,7 +187,8 @@ export function HistoryDisc({
         size={placement.size}
         showRing={false}
         elementsDraggable={false}
-        innerOverrides={NO_OVERRIDES}
+        elementScale={DISC_ELEMENT_SCALE}
+        innerOverrides={innerOverrides}
         selectedElementId={selectedElementId}
         onElementClick={onElementClick}
         onInnerDragMove={NOOP_DRAG}

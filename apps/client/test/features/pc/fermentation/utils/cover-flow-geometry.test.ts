@@ -18,8 +18,13 @@ function rectAt(index: number, cx: number, size: number, zIndex: number): DiscRe
 }
 
 describe('discSize', () => {
-  it('広い画面では上限 442 で頭打ちになる', () => {
-    expect(discSize(TALL)).toBe(442);
+  it('縦に長い画面では上限 560 で頭打ちになる', () => {
+    expect(discSize(TALL)).toBe(560);
+  });
+
+  it('ふつうの横長画面では高さ側（下のクロームを避ける係数）で決まる', () => {
+    // min(1440*0.55, 900*0.52) = min(792, 468)
+    expect(discSize(WIDE)).toBeCloseTo(468);
   });
 
   it('狭い画面では幅・高さの小さい方に追従する', () => {

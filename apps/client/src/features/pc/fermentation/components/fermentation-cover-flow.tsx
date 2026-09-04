@@ -19,6 +19,22 @@ import type { FermentationDetail, FermentationSummary } from '@/features/shared/
 const JAR_PATH =
   'M190,100 C190,60 290,60 290,100 C290,130 270,140 270,170 C270,270 410,330 410,480 C410,580 70,580 70,480 C70,330 210,270 210,170 C210,140 190,130 190,100 Z';
 
+/**
+ * 円盤の下に添える期間ラベル。`target_period` が発酵日と同じ文字列の環境では、
+ * 真上の日付スタンプと重複するので期間を落として `NEW` だけ残す。
+ */
+function discPeriodStamp(
+  result: FermentationSummary,
+  unreadIds: ReadonlySet<string>,
+  t: (key: string) => string,
+): string {
+  const period = result.targetPeriod.startsWith(toDateStamp(result.createdAt))
+    ? ''
+    : result.targetPeriod;
+  if (!unreadIds.has(result.id)) return period;
+  return period ? `${period} · ${t('history.new')}` : t('history.new');
+}
+
 interface FermentationCoverFlowProps {
   /** 開いている問い。null なら履歴は閉じている。 */
   questionId: string | null;
@@ -144,6 +160,12 @@ export function FermentationCoverFlow({
   );
 
   const dateStamp = active ? toDateStamp(active.createdAt) : '';
+  /**
+   * 期間ラベル。`target_period` は環境によって 'WEEK 35' のこともあれば発酵日そのもの
+   * （'2026-08-27'）のこともある。後者だと真上の日付と同じ文字が二度並ぶので落とす。
+   */
+  const activePeriod =
+    active && !active.targetPeriod.startsWith(dateStamp) ? active.targetPeriod : null;
   const stepsBack = results.length - 1 - clampedIndex;
   const activeDetail = active ? (details.get(active.id) ?? null) : null;
   const scanned = activeDetail?.scannedEntries.length ?? 0;
@@ -242,11 +264,7 @@ export function FermentationCoverFlow({
             placement={placements[i]}
             detail={details.get(result.id) ?? null}
             dateStamp={toDateStamp(result.createdAt)}
-            periodStamp={
-              unreadFermentationIds.has(result.id)
-                ? `${result.targetPeriod} · ${t('history.new')}`
-                : result.targetPeriod
-            }
+            periodStamp={discPeriodStamp(result, unreadFermentationIds, t)}
             unread={unreadFermentationIds.has(result.id)}
             dragging={dragging}
             onActivate={i === clampedIndex ? undefined : () => onIndexChange(i)}
@@ -314,7 +332,7 @@ export function FermentationCoverFlow({
                 style={{ fontFamily: 'Inter, sans-serif' }}
               >
                 {[
-                  active?.targetPeriod,
+                  activePeriod,
                   // 詳細が届くまでは件数を出さない（0 ENTRIES と嘘をつかない）。
                   activeDetail ? t('history.entries_scanned', { count: scanned }) : null,
                   activeUnread ? t('history.new') : null,

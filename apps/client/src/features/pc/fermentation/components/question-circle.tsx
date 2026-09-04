@@ -70,6 +70,19 @@ interface QuestionCircleProps {
    * 発酵履歴の円盤は 3D で倒して重ねてあり、getBoundingClientRect が歪むので掴ませない。
    */
   elementsDraggable?: boolean;
+  /**
+   * 中の要素の大きさを、素の寸法の何倍にするか。
+   *
+   * 省略時は従来どおり直径から出した `--el-scale`（`transform` 経由）に任せる。
+   * 値を渡すと **その倍率をそのまま**適用し、`--el-scale` は 1 に倒して噛ませない
+   * （掛け算になって意図した大きさから外れるため）。
+   *
+   * 倍率を `transform` ではなく独立した `scale` プロパティで効かせるのは、中の要素に
+   * 浮遊アニメ（`j2-float-*`）が当たっているから。キーフレームは `transform` を丸ごと
+   * 書き換えるうえアニメーションはインライン指定より強いので、`transform` 経由の倍率は
+   * 浮いている間に落ちうる。独立プロパティなら animated transform と合成される。
+   */
+  elementScale?: number;
   style?: React.CSSProperties;
 }
 
@@ -206,6 +219,7 @@ export function QuestionCircle({
   size = QUESTION_CIRCLE_SIZE,
   showRing = true,
   elementsDraggable = true,
+  elementScale,
   style,
 }: QuestionCircleProps) {
   const hasData = detail && detail.status === 'completed';
@@ -248,6 +262,7 @@ export function QuestionCircle({
         ringChars,
         showRing,
         size,
+        elementScale: elementScale ?? 'auto',
         selectedElementId: selectedElementId ?? 'none',
       })}
       role={zoomed ? undefined : 'button'}
@@ -290,7 +305,11 @@ export function QuestionCircle({
         //
         // 値は円の直径に連動させる。重なるかどうかは「要素の実寸 / 直径」で決まるので、
         // 直径 700 のとき 0.65 で重なりが解けた比率を、直径を変えても保つ。
-        '--el-scale': String(Math.round((size / 700) * 0.65 * 100) / 100),
+        //
+        // elementScale を渡された場合はそちらが倍率の主になるので、ここは 1 に倒す
+        // （両方効くと掛け算になり、指定した倍率にならない）。
+        '--el-scale':
+          elementScale != null ? '1' : String(Math.round((size / 700) * 0.65 * 100) / 100),
       }}
     >
       {/* Circle keyframes */}
@@ -420,6 +439,7 @@ export function QuestionCircle({
                   className={FLOAT_CLASSES[i % 3]}
                   style={{
                     transform: 'scale(var(--el-scale))',
+                    scale: elementScale,
                     transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
@@ -479,6 +499,7 @@ export function QuestionCircle({
                   className={FLOAT_CLASSES[(i + 1) % 3]}
                   style={{
                     transform: 'scale(var(--el-scale))',
+                    scale: elementScale,
                     transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
@@ -560,6 +581,7 @@ export function QuestionCircle({
                     className="j2-float-2"
                     style={{
                       transform: 'scale(var(--el-scale))',
+                      scale: elementScale,
                       transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
                   >

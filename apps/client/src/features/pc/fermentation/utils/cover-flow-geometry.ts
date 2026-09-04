@@ -10,9 +10,14 @@
 const SPREAD = 330;
 /** 隣の円盤を向こう向きに倒す角度。 */
 const TILT_DEG = 46;
-/** 正面の円盤の直径の上限・下限。 */
+/**
+ * 正面の円盤の直径の上限・下限。
+ *
+ * 実効値はたいてい高さ側（`vh * 0.52`）で決まる。この係数は下のクロームを避けるための
+ * もので、上げると日付レールに円盤がかぶる。上限 560 が効くのは縦に長い画面だけ。
+ */
 const DISC_MIN = 200;
-const DISC_MAX = 442;
+const DISC_MAX = 560;
 
 export interface CanvasSize {
   width: number;
