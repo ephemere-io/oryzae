@@ -160,9 +160,22 @@ describe('breathOffset', () => {
     }
   });
 
-  it('1 秒周期で戻る', () => {
-    expect(breathOffset(1000)).toBeCloseTo(breathOffset(0), 10);
-    expect(breathOffset(1500)).toBeCloseTo(breathOffset(500), 10);
+  it('約 6.3 秒（2π 秒）で一周する', () => {
+    // 1 秒周期にすると画面全体が小刻みに上下して酔う（実機で報告された）。
+    const periodMs = Math.PI * 2 * 1000;
+    expect(breathOffset(periodMs)).toBeCloseTo(breathOffset(0), 10);
+    expect(breathOffset(periodMs / 2)).toBeCloseTo(-breathOffset(0), 10);
+    // 1 秒後にはまだ一周していない（＝速すぎない）。
+    expect(breathOffset(1000)).not.toBeCloseTo(breathOffset(0), 3);
+  });
+
+  it('1 秒あたりの動きが小さい（せわしなく見えない）', () => {
+    let maxStep = 0;
+    for (let ms = 0; ms < 8000; ms += 16) {
+      maxStep = Math.max(maxStep, Math.abs(breathOffset(ms + 16) - breathOffset(ms)));
+    }
+    // 1 フレームあたりの変化が振幅の 2% を超えると、揺れとして目に付く。
+    expect(maxStep).toBeLessThan(0.05 * 0.02);
   });
 });
 

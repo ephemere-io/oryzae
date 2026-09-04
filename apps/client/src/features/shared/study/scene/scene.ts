@@ -444,11 +444,12 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const phase = (elapsed % OUTLINE_BREATH_MS) / OUTLINE_BREATH_MS;
     content.jar.silhouetteMaterial.opacity = outlineOpacity(readiness, phase) * content.jar.fade;
 
-    // 言葉は上下に揺れながら周回する。
+    // 言葉は上下に揺れながら周回する。**係数は rad/s。** 2π を掛けると 6 倍速くなり、
+    // 呼吸と同じ「せわしない」揺れになる（原案は sin(t * 0.3) / cos(t * 0.1)）。
     const seconds = elapsed / MS_PER_SECOND;
     content.jar.words.forEach((word, index) => {
-      const bob = Math.sin(seconds * 0.3 * Math.PI * 2 + index) * WORD_BOB_AMPLITUDE;
-      const orbit = seconds * 0.1 * Math.PI * 2 + word.angle;
+      const bob = Math.sin(seconds * 0.3 + index) * WORD_BOB_AMPLITUDE;
+      const orbit = seconds * 0.1 + word.angle;
       word.sprite.position.set(
         Math.cos(orbit) * WORD_ORBIT_RADIUS,
         word.y + bob,

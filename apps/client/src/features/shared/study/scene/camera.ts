@@ -97,7 +97,7 @@ export function shelfView(layout: StudyLayout): CameraView {
  * 一段跳ぶ（着地でカクッと見える原因がこれだった）。
  */
 export function breathOffset(elapsedMs: number): number {
-  return Math.sin((elapsedMs / BREATH.periodMs) * Math.PI * 2) * BREATH.amplitude;
+  return Math.sin((elapsedMs / 1000) * BREATH.radiansPerSecond) * BREATH.amplitude;
 }
 
 /**
