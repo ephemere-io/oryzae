@@ -116,9 +116,12 @@ describe('bubbleCount / bubbleSpeed', () => {
     expect(bubbleCount(0.5, false)).toBeGreaterThan(bubbleCount(0.2, false));
   });
 
-  it('完了すると泡が最小になり、速度が 0 になる（静かになる）', () => {
+  it('完了すると泡が最小になり、ゆっくりになる（ただし止まりきらない）', () => {
+    // 静けさは泡の数（30 → 4）と浮かぶ封が担う。止めきると、手紙が届いている瓶が
+    // 壊れて見える（仕様の「完了時 0」からはここだけ外している）。
     expect(bubbleCount(1, true)).toBe(4);
-    expect(bubbleSpeed(1, true, 0.5)).toBe(0);
+    expect(bubbleSpeed(1, true, 0.5)).toBeGreaterThan(0);
+    expect(bubbleSpeed(1, true, 0.5)).toBeLessThan(bubbleSpeed(1, false, 0.5));
   });
 
   it('発酵中は必ず上へ動く', () => {
@@ -212,17 +215,21 @@ describe('placeWords', () => {
     expect(WORD_BOB_AMPLITUDE * 2).toBeLessThan(MIN_WORD_GAP);
   });
 
-  it('readiness が低いほど表示語数が減る（発酵が浅い＝語も少ない）', () => {
-    const shallow = placeWords(WORDS, liquidLevel(0.1)).length;
+  it('液面が低くても語数が減らない（問いごとのキーワードを全部出す）', () => {
+    // 液面までに収めようとすると、readiness が低いとき 2 語目以降が全部落ちる
+    // （実機で 1 語しか出ていなかった）。入り切らないぶんは瓶の空いた高さへ伸ばす。
+    const shallow = placeWords(WORDS, liquidLevel(0.05)).length;
     const deep = placeWords(WORDS, liquidLevel(1)).length;
-    expect(shallow).toBeLessThan(deep);
+    expect(shallow).toBe(deep);
+    expect(shallow).toBeGreaterThan(1);
   });
 
-  it('液面を突き抜けない', () => {
-    for (const readiness of [0.2, 0.6, 1]) {
-      const level = liquidLevel(readiness);
-      for (const placement of placeWords(WORDS, level)) {
-        expect(placement.y).toBeLessThan(level);
+  it('瓶の口やコルクに重ならない', () => {
+    for (const readiness of [0, 0.2, 0.6, 1]) {
+      for (const placement of placeWords(WORDS, liquidLevel(readiness))) {
+        // 首がくびれ始める手前まで。ここを超えるとコルクに文字が乗る。
+        expect(placement.y).toBeLessThan(2.45);
+        expect(placement.y).toBeGreaterThanOrEqual(0.3);
       }
     }
   });
