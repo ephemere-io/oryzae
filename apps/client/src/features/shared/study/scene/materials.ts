@@ -65,6 +65,8 @@ export interface StudyMaterials {
   cork: MeshBasicMaterial;
   ink: LineBasicMaterial;
   grid: LineBasicMaterial;
+  /** 床の格子。気配だけ残す濃度。 */
+  gridFaint: LineBasicMaterial;
   /** 不透明度つきの線。同じ濃さは 1 つを使い回す。 */
   faint(opacity: number): LineBasicMaterial;
   /** 瓶の中身用。面より必ず手前に出る。 */
@@ -117,6 +119,9 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
   );
   const ink = own(new LineBasicMaterial({ color: palette.ink }));
   const grid = own(new LineBasicMaterial({ color: palette.grid }));
+  const gridFaint = own(
+    new LineBasicMaterial({ color: palette.grid, transparent: true, opacity: 0.45 }),
+  );
   const hitbox = own(new MeshBasicMaterial({ visible: false }));
 
   const faintCache = new Map<string, LineBasicMaterial>();
@@ -128,6 +133,7 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
     cork,
     ink,
     grid,
+    gridFaint,
     hitbox,
     faint(opacity: number): LineBasicMaterial {
       const key = opacityKey(opacity);

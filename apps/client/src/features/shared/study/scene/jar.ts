@@ -193,14 +193,18 @@ export interface WordPlacement {
  * 数まで語を減らす（＝発酵が浅ければ表示語数も減る）。
  */
 export function placeWords(words: readonly string[], level: number): WordPlacement[] {
-  const top = level - WORD_TOP_MARGIN;
-  const available = top - WORD_BOTTOM;
   const candidates = words.slice(0, MAX_WORDS);
-  if (candidates.length === 0 || available < 0) return [];
+  if (candidates.length === 0) return [];
 
-  // 入る語数を決める。1 語なら行間は要らないので必ず入る。
-  let count = candidates.length;
-  while (count > 1 && available / (count - 1) < MIN_WORD_GAP) count--;
+  // 液面が低くても範囲を潰さない。**言葉が 1 つも出ない状態は作らない** —
+  // readiness が低いほど語が減るのは意図どおりだが、0 になると「言葉が漂う」という
+  // 見せ方そのものが消える（原案も必ず 1 語は出す）。
+  const top = Math.max(WORD_BOTTOM, level - WORD_TOP_MARGIN);
+  const available = top - WORD_BOTTOM;
+
+  // 行間の下限を割らない範囲で入る語数。1 語なら行間は要らない。
+  const fit = Math.floor(available / MIN_WORD_GAP) + 1;
+  const count = Math.max(1, Math.min(candidates.length, fit));
 
   const placements: WordPlacement[] = [];
   for (let i = 0; i < count; i++) {

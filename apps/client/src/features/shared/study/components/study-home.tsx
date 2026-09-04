@@ -12,12 +12,14 @@ import { RENDER_LIMITS } from '../constants';
 import { useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
-import type { LabelPositions } from '../scene/scene';
+import { monthDateRange } from '../scene/books';
+import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
 import { StudyChrome } from './study-chrome';
 import { StudyFallback } from './study-fallback';
 import { type LabelKind, StudyLabels } from './study-labels';
+import { StudyTooltip } from './study-tooltip';
 
 /**
  * three.js は初期バンドルに載せない（`/jar` を直接開いた人に 600KB を配らない）。
@@ -50,6 +52,8 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
   // ラベルは 3D 座標に貼り付くので、毎フレーム画面座標が届く。
   const [labelPositions, setLabelPositions] = useState<LabelPositions>(EMPTY_LABELS);
   const [hoveredLabel, setHoveredLabel] = useState<LabelKind | null>(null);
+  // 手帳・背表紙のホバーで出す紙のツールチップ。
+  const [hover, setHover] = useState<HoverInfo | null>(null);
 
   // ピルの押し戻しに canvas の実寸が要る。
   const rootRef = useRef<HTMLDivElement>(null);
@@ -131,7 +135,10 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
         onNavigate={handleNavigate}
         onOpenOverlay={handleOpenOverlay}
         onLabelPositions={setLabelPositions}
-        onHoverChange={(hovered) => setHoveredLabel(hovered?.label ?? null)}
+        onHoverChange={(hovered) => {
+          setHoveredLabel(hovered?.label ?? null);
+          setHover(hovered);
+        }}
       />
 
       {/* 一覧を開いている間はラベルを消す（サブ画面と遷移中も scene 側が消す）。 */}
@@ -157,6 +164,22 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
         avatarUrl={auth?.user.avatarUrl}
         showCaption={showCaption && overlay === null}
       />
+
+      {/* その冊に何が入っているかを、開く前に見せる。 */}
+      {overlay === null && hover?.month && (
+        <StudyTooltip
+          month={hover.month}
+          entryCount={
+            state.notebooks.find((notebook) => notebook.month === hover.month)?.entryCount ?? 0
+          }
+          range={monthDateRange(
+            state.entries.map((entry) => entry.createdAt),
+            hover.month,
+          )}
+          current={hover.month === state.now.slice(0, 7)}
+          screen={hover.screen}
+        />
+      )}
 
       <EntryListOverlay
         open={overlay !== null}

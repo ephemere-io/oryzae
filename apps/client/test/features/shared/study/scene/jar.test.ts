@@ -217,6 +217,14 @@ describe('placeWords', () => {
     expect(placeWords([], liquidLevel(1))).toEqual([]);
   });
 
+  it('液面が低くても必ず 1 語は出す（言葉が漂う見せ方そのものを消さない）', () => {
+    // readiness が低いほど語が減るのは意図どおりだが、0 語になると瓶がただの容器に見える。
+    for (const readiness of [0, 0.05, 0.2]) {
+      expect(placeWords(WORDS, liquidLevel(readiness)).length).toBeGreaterThanOrEqual(1);
+    }
+    expect(placeWords(WORDS, 0).length).toBeGreaterThanOrEqual(1);
+  });
+
   it('液面が低すぎても落ちない', () => {
     expect(() => placeWords(WORDS, 0)).not.toThrow();
   });
