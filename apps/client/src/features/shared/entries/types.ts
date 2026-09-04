@@ -15,3 +15,12 @@ export interface EntryDraft {
   /** 最終編集時のローカル暦日（YYYY-MM-DD）。日付境界の判定に使う。 */
   dateKey: string;
 }
+
+/**
+ * ある月に書かれた記録の件数。`month` は `YYYY-MM`（利用者のローカル暦月であって
+ * UTC の月ではない）。書斎の手帳の厚みと、棚に並ぶ冊数を決める。
+ */
+export interface MonthlyEntryCount {
+  month: string;
+  count: number;
+}
