@@ -1116,6 +1116,41 @@ function buildBooks(
   shelfGroup.rotation.x = layout.shelf.tiltX;
   shelfGroup.scale.setScalar(layout.shelf.scale);
 
+  // 棚の躯体（2.6 × 1.7 × 1.1）。これが無いと背表紙が宙に浮いて見える。
+  // 側板・棚板・奥の見切りだけの最小限で、箱として閉じない（線が増えると机と競合する）。
+  const shelfW = 2.6 / 2;
+  const shelfH = 1.7;
+  const shelfD = 1.1 / 2;
+  for (const x of [-shelfW, shelfW]) {
+    shelfGroup.add(
+      lineFrom(
+        [
+          new Vector3(x, 0, shelfD),
+          new Vector3(x, shelfH, shelfD),
+          new Vector3(x, shelfH, -shelfD),
+          new Vector3(x, 0, -shelfD),
+        ],
+        materials.faint(0.28),
+        own,
+      ),
+    );
+  }
+  for (const y of [0, shelfH]) {
+    shelfGroup.add(
+      lineFrom(
+        [
+          new Vector3(-shelfW, y, shelfD),
+          new Vector3(shelfW, y, shelfD),
+          new Vector3(shelfW, y, -shelfD),
+          new Vector3(-shelfW, y, -shelfD),
+          new Vector3(-shelfW, y, shelfD),
+        ],
+        materials.faint(y === 0 ? 0.32 : 0.22),
+        own,
+      ),
+    );
+  }
+
   const shelfSpines: Group[] = [];
   const offsets = shelfSpineOffsets(notebooks.shelf.length);
   notebooks.shelf.forEach((notebook, index) => {

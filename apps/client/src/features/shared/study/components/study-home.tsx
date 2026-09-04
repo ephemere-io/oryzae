@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
+import { RENDER_LIMITS } from '../constants';
 import { useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
@@ -76,6 +77,17 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
     [state.notebooks],
   );
 
+  /**
+   * ARCHIVE のピルに出す冊数は**棚に入っている月**の数。
+   *
+   * 全月を数えると、机に積んである 3 冊まで「書庫の冊数」に混ざる（実機で
+   * 「5 volumes」と出ているのに棚には 2 本しか無い、という食い違いになっていた）。
+   */
+  const archiveCount = useMemo(
+    () => Math.max(0, state.notebooks.length - RENDER_LIMITS.deskNotebooks),
+    [state.notebooks],
+  );
+
   const handleNavigate = useCallback(
     (target: StudyTarget) => {
       const href = targetHref(target);
@@ -131,7 +143,7 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
           status={state.fermentation.status}
           readiness={state.fermentation.readiness}
           entryCount={currentMonthCount}
-          volumeCount={state.notebooks.length}
+          volumeCount={archiveCount}
           cardCount={state.board.cards.length}
           screen={screen}
           onPick={handlePickFromLabel}
