@@ -637,8 +637,7 @@
       "questions": "Questions"
     },
     "jar": {
-      "title": "Letters in the jar",
-      "empty": "No letters have arrived yet",
+      "title": "The jar",
       "untitled": "Untitled question",
       "close": "Close",
       "letter_empty": "No letter for this result yet",
@@ -646,10 +645,14 @@
       "section_letter": "Letter",
       "section_keywords": "Words",
       "section_snippets": "Excerpts",
-      "unread": "Unread",
-      "read": "Read",
       "section_sources": "From these entries",
-      "source_untitled": "Untitled entry"
+      "source_untitled": "Untitled entry",
+      "no_questions": "No questions yet. Start one with the button below.",
+      "spin_hint": "Swipe sideways to spin",
+      "manage_questions": "Tend your questions",
+      "not_fermented": "This question hasn't fermented yet",
+      "tap_hint": "Tap to read",
+      "selection_reason": "Why this was chosen"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -681,7 +684,8 @@
       "delete": "Retire this question",
       "cancel": "Cancel",
       "save": "Save",
-      "letter_arrived": "A letter has arrived"
+      "letter_arrived": "A letter has arrived",
+      "close": "Close"
     },
     "board": {
       "cards": "{count} cards",

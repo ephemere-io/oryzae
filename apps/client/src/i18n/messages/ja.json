@@ -637,8 +637,7 @@
       "questions": "問い"
     },
     "jar": {
-      "title": "瓶に届いた手紙",
-      "empty": "まだ手紙は届いていません",
+      "title": "瓶",
       "untitled": "無題の問い",
       "close": "閉じる",
       "letter_empty": "この結果にはまだ手紙がありません",
@@ -646,10 +645,14 @@
       "section_letter": "手紙",
       "section_keywords": "言葉",
       "section_snippets": "抜粋",
-      "unread": "未読",
-      "read": "既読",
       "section_sources": "もとになった記録",
-      "source_untitled": "無題の記録"
+      "source_untitled": "無題の記録",
+      "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
+      "spin_hint": "横に払うと回ります",
+      "manage_questions": "問いを整える",
+      "not_fermented": "この問いはまだ発酵していません",
+      "tap_hint": "タップして読む",
+      "selection_reason": "選ばれた理由"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -681,7 +684,8 @@
       "delete": "この問いを終える",
       "cancel": "キャンセル",
       "save": "保存",
-      "letter_arrived": "手紙が届いています"
+      "letter_arrived": "手紙が届いています",
+      "close": "閉じる"
     },
     "board": {
       "cards": "{count}枚",

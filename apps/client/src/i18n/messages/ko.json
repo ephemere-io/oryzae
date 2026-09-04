@@ -637,8 +637,7 @@
       "questions": "질문"
     },
     "jar": {
-      "title": "병에 도착한 편지",
-      "empty": "아직 편지가 없습니다",
+      "title": "병",
       "untitled": "제목 없는 질문",
       "close": "닫기",
       "letter_empty": "이 결과에는 아직 편지가 없습니다",
@@ -646,10 +645,14 @@
       "section_letter": "편지",
       "section_keywords": "단어",
       "section_snippets": "발췌",
-      "unread": "안 읽음",
-      "read": "읽음",
       "section_sources": "바탕이 된 기록",
-      "source_untitled": "제목 없는 기록"
+      "source_untitled": "제목 없는 기록",
+      "no_questions": "아직 질문이 없습니다. 아래 버튼에서 시작해 보세요.",
+      "spin_hint": "옆으로 밀면 돌아갑니다",
+      "manage_questions": "질문 정리하기",
+      "not_fermented": "이 질문은 아직 발효되지 않았습니다",
+      "tap_hint": "탭하여 읽기",
+      "selection_reason": "선택된 이유"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -681,7 +684,8 @@
       "delete": "이 질문 끝내기",
       "cancel": "취소",
       "save": "저장",
-      "letter_arrived": "편지가 도착했습니다"
+      "letter_arrived": "편지가 도착했습니다",
+      "close": "닫기"
     },
     "board": {
       "cards": "{count}장",

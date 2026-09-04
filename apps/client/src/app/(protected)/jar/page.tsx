@@ -8,13 +8,32 @@ import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle
 import { useJarQuestions } from '@/features/shared/questions/hooks/use-jar-questions';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
+import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
 import { useAuth } from '@/lib/auth-context';
+import { useUnread } from '@/lib/unread-context';
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
-  const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api);
-  const { questions, refetch: refetchQuestions } = useJarQuestions(api, authLoading);
+  const {
+    questions: allQuestions,
+    loading: allQuestionsLoading,
+    createQuestion,
+    editQuestion,
+    archiveQuestion,
+    acceptQuestion,
+    rejectQuestion,
+  } = useQuestions(api);
+  const {
+    questions,
+    loading: questionsLoading,
+    refetch: refetchQuestions,
+  } = useJarQuestions(api, authLoading);
+  const { unreadQuestionIds } = useUnread();
   const router = useRouter();
+  // SP はボトムナビを持たない（書斎が唯一のグローバルナビ）ので、問いの管理へは
+  // 瓶から入る。ドメインをまたぐ合成なので、重ねるのは page の仕事
+  // （features/sp/fermentation → features/sp/questions は reach-slice-isolation で禁止）。
+  const [manageOpen, setManageOpen] = useState(false);
   const searchParams = useSearchParams();
   const justPickled = searchParams.get('justPickled') === '1';
   const [pickleSuccessOpen, setPickleSuccessOpen] = useState(false);
@@ -51,7 +70,31 @@ export default function JarPage() {
   // 端末で出し分け（URL は /jar のまま）。DeviceView が判定前/未対応を安全に処理。
   return (
     <DeviceView
-      sp={<SpJar api={api} />}
+      sp={
+        <>
+          <SpJar
+            api={api}
+            questions={questions}
+            loading={questionsLoading}
+            onManageQuestions={() => setManageOpen(true)}
+          />
+          {manageOpen ? (
+            <div className="absolute inset-0 z-40 flex flex-col bg-[var(--bg)]">
+              <SpQuestions
+                questions={allQuestions}
+                loading={allQuestionsLoading}
+                createQuestion={handleAddQuestion}
+                editQuestion={handleEditQuestion}
+                archiveQuestion={handleArchiveQuestion}
+                acceptQuestion={acceptQuestion}
+                rejectQuestion={rejectQuestion}
+                unreadQuestionIds={unreadQuestionIds}
+                onClose={() => setManageOpen(false)}
+              />
+            </div>
+          ) : null}
+        </>
+      }
       pc={
         <div className="absolute inset-0">
           <JarView

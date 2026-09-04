@@ -60,4 +60,36 @@ describe('useJarQuestions', () => {
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
     expect(result.current.questions).toEqual([]);
   });
+
+  // 「まだ取れていない」と「0 件」を呼び出し側が見分けられること。
+  // 見分けられないと、取得中に「問いがまだありません」が一瞬出る。
+  it('取得が終わるまで loading=true', async () => {
+    const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse(questions)));
+    const { result } = renderHook(() => useJarQuestions(createMockApi(fetchImpl), false));
+
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.questions).toHaveLength(1);
+  });
+
+  it('取得に失敗しても loading は下ろす（枠のまま固まらない）', async () => {
+    const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse(null, false)));
+    const { result } = renderHook(() => useJarQuestions(createMockApi(fetchImpl), false));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.questions).toEqual([]);
+  });
+
+  it('例外が飛んでも loading は下ろす', async () => {
+    const fetchImpl = vi.fn(() => Promise.reject(new Error('offline')));
+    const { result } = renderHook(() => useJarQuestions(createMockApi(fetchImpl), false));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+  });
+
+  it('authLoading 中は loading のまま（取得を始めていないので）', () => {
+    const fetchImpl = vi.fn();
+    const { result } = renderHook(() => useJarQuestions(createMockApi(fetchImpl), true));
+    expect(result.current.loading).toBe(true);
+  });
 });
