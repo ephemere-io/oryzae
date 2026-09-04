@@ -3,211 +3,138 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { useFermentationDetail } from '@/features/shared/fermentation/hooks/use-fermentation-detail';
+import { useMemo, useState } from 'react';
+import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
-import type { InboxLetter } from '@/features/shared/fermentation/types';
-import { SpJarRowsSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
+import type { JarQuestion } from '@/features/shared/questions/types';
+import {
+  SpElementSheet,
+  type SpJarElement,
+} from '@/features/sp/fermentation/components/sp-element-sheet';
+import { type OrbitQuestion, SpJarOrbit } from '@/features/sp/fermentation/components/sp-jar-orbit';
+import { SpJarOrbitSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
+import { SpQuestionZoom } from '@/features/sp/fermentation/components/sp-question-zoom';
 import type { ApiClient } from '@/lib/api';
-import { formatMonthDay } from '@/lib/format-date';
 import { useUnread } from '@/lib/unread-context';
 
 interface SpJarProps {
   api: ApiClient | null;
+  /** 壜のまわりを回る問い。取得は page（use-jar-questions）が行う。 */
+  questions: JarQuestion[];
+  /** 問いがまだ取れていない間は「0 件」ではなく枠を出す。 */
+  loading: boolean;
+  /** 問いの追加・編集・終了を開く。一覧は page が重ねる（ドメインをまたぐため）。 */
+  onManageQuestions: () => void;
 }
 
 /**
- * SP 版「瓶」= 発酵の結果を読む場所（Issue #363）。問いごとに、届いた発酵を
- * 一覧（未読/既読を明示）→ タップで 手紙・言葉(keywords)・抜粋(snippets) を読む
- * →「返事を書く」。PC のドラッグ盤面・アニメーションは持たない（モバイル向けに簡略）。
+ * SP 版「瓶」。
+ *
+ * PC と同じ壜を中央に置き、そのまわりを問いの円が回る。指で払うと速く回り、
+ * ひとつタップすると円が画面いっぱいに開いて、中の言葉・抜粋・手紙を読める。
+ *
+ * PC との違いは**盤面を持たないこと**。PC は問いの円を自分で好きな場所へ置ける
+ * 世界だが、SP は片手で持つ画面なので「置き場」を作れない。代わりに軌道の上に
+ * 等間隔で並べ、回して選ぶ。
  */
-export function SpJar({ api }: SpJarProps) {
+export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps) {
   const t = useTranslations('sp.jar');
   const router = useRouter();
-  const { letters, loading } = useFermentationInbox(api, false);
+  const { letters } = useFermentationInbox(api, false);
   const { ready: unreadReady, unreadQuestionIds, markQuestionRead } = useUnread();
-  const [open, setOpen] = useState<InboxLetter | null>(null);
-  const { detail, loading: detailLoading } = useFermentationDetail(
-    api,
-    open?.fermentationId ?? null,
-  );
+
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [element, setElement] = useState<SpJarElement | null>(null);
+
+  const openQuestion = questions.find((question) => question.id === openId) ?? null;
+  const { detail, loading: detailLoading } = useFermentationForQuestion(api, openQuestion?.id);
+
+  const untitled = t('untitled');
+  const orbitQuestions = useMemo<OrbitQuestion[]>(() => {
+    const withLetter = new Set(letters.map((letter) => letter.questionId));
+    return questions.map((question) => ({
+      id: question.id,
+      text: question.currentText ?? untitled,
+      hasLetter: withLetter.has(question.id),
+      unread: unreadReady && unreadQuestionIds.has(question.id),
+    }));
+  }, [questions, letters, unreadReady, unreadQuestionIds, untitled]);
 
   return (
     <div
-      className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
+      className="relative flex h-full flex-col overflow-hidden bg-[var(--bg)] text-[var(--fg)]"
       style={{ fontFamily: 'var(--ob-font-serif)' }}
       {...verifyAttrs({
         unit: 'SpJar',
         loading,
-        letterCount: letters.length,
-        open: open !== null,
-        unreadCount: unreadReady
-          ? letters.filter((l) => unreadQuestionIds.has(l.questionId)).length
-          : 0,
+        questionCount: orbitQuestions.length,
+        open: openId !== null,
+        element: element?.kind ?? 'none',
+        unreadCount: orbitQuestions.filter((question) => question.unread).length,
       })}
     >
-      <header className="px-5 pt-6 pb-3 text-lg font-medium">{t('title')}</header>
+      <header className="px-5 pt-6 pb-2 text-lg font-medium">{t('title')}</header>
 
+      {/* 取得中に「問いがありません」を出すと、一瞬「問いを消してしまった」ように見える。
+          取れていない間は枠のまま待つ。 */}
       {loading ? (
-        <SpJarRowsSkeleton />
-      ) : letters.length === 0 ? (
-        <div className="px-5 py-12 text-center text-sm opacity-50">{t('empty')}</div>
+        <SpJarOrbitSkeleton />
+      ) : orbitQuestions.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 px-10 text-center">
+          <p className="text-sm leading-relaxed opacity-60">{t('no_questions')}</p>
+        </div>
       ) : (
-        <ul className="sp-rise flex-1 overflow-auto px-5">
-          {letters.map((letter) => {
-            // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
-            const unread = unreadReady && unreadQuestionIds.has(letter.questionId);
-            return (
-              <li key={letter.fermentationId}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(letter);
-                    markQuestionRead(letter.questionId);
-                  }}
-                  className="flex w-full items-center gap-3 border-b border-[color-mix(in_srgb,var(--fg)_8%,transparent)] py-4 text-left"
-                >
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: unread ? 'var(--ob-jar-warm)' : 'transparent' }}
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate ${unread ? 'font-medium' : ''}`}>
-                      {letter.questionText ?? t('untitled')}
-                    </span>
-                    <span
-                      className="mt-0.5 block text-[11px]"
-                      style={{ color: 'var(--date-color)' }}
-                    >
-                      {unreadReady ? `${unread ? t('unread') : t('read')} · ` : ''}
-                      {formatMonthDay(letter.createdAt)}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <SpJarOrbit questions={orbitQuestions} onSelect={setOpenId} />
+          <p
+            className="pb-1 text-center text-[11px]"
+            style={{ color: 'var(--date-color)', fontFamily: 'var(--ob-font-sans)' }}
+          >
+            {t('spin_hint')}
+          </p>
+        </>
       )}
 
-      {open ? (
-        <div className="sp-rise absolute inset-0 z-10 flex flex-col bg-[var(--bg)]">
-          <header
-            className="flex items-center justify-between gap-3 px-5 py-4 text-xs"
-            style={{ color: 'var(--date-color)' }}
-          >
-            <span className="truncate">◦ {open.questionText ?? t('untitled')}</span>
-            <button type="button" onClick={() => setOpen(null)} className="shrink-0">
-              {t('close')}
-            </button>
-          </header>
+      <div className="flex justify-center px-5 pb-7 pt-2">
+        <button
+          type="button"
+          onClick={onManageQuestions}
+          className="rounded-full px-6 py-3 text-sm"
+          style={{
+            background: 'var(--ob-card-bg)',
+            border: '1px solid var(--border-subtle)',
+            fontFamily: 'var(--ob-font-sans)',
+          }}
+        >
+          {t('manage_questions')}
+        </button>
+      </div>
 
-          <div className="flex-1 overflow-auto px-6 pb-6">
-            {/* 手紙 */}
-            <SectionLabel>{t('section_letter')}</SectionLabel>
-            <p className="whitespace-pre-wrap text-base leading-loose">
-              {detailLoading ? '' : (detail?.letter?.bodyText ?? t('letter_empty'))}
-            </p>
+      {openQuestion ? (
+        <SpQuestionZoom
+          questionText={openQuestion.currentText ?? untitled}
+          detail={detail}
+          loading={detailLoading}
+          onClose={() => {
+            setOpenId(null);
+            setElement(null);
+          }}
+          onOpenElement={(next) => {
+            setElement(next);
+            // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
+            if (next.kind === 'letter') markQuestionRead(openQuestion.id);
+          }}
+        />
+      ) : null}
 
-            {/* 言葉（keywords） */}
-            {detail && detail.keywords.length > 0 ? (
-              <>
-                <SectionLabel>{t('section_keywords')}</SectionLabel>
-                <div className="flex flex-wrap gap-2">
-                  {detail.keywords.map((k) => (
-                    <span
-                      key={k.id}
-                      className="rounded-full px-3 py-1 text-xs"
-                      style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}
-                    >
-                      {k.keyword}
-                    </span>
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            {/* 抜粋（snippets） */}
-            {detail && detail.snippets.length > 0 ? (
-              <>
-                <SectionLabel>{t('section_snippets')}</SectionLabel>
-                <div className="flex flex-col gap-3">
-                  {detail.snippets.map((s) => (
-                    <div
-                      key={s.id}
-                      className="rounded-xl p-3"
-                      style={{
-                        background: 'var(--ob-card-bg)',
-                        border: '1px solid var(--border-subtle)',
-                      }}
-                    >
-                      <p className="text-sm leading-relaxed">「{s.originalText}」</p>
-                      <p className="mt-1.5 text-[11px]" style={{ color: 'var(--date-color)' }}>
-                        {formatMonthDay(s.sourceDate)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            {/* もとになった記録（Issue #453: 手紙だけ読んでも何への返事か分からなかった） */}
-            {detail && detail.scannedEntries.length > 0 ? (
-              <>
-                <SectionLabel>{t('section_sources')}</SectionLabel>
-                <ul className="flex flex-col gap-2">
-                  {detail.scannedEntries.map((e) => (
-                    <li key={e.id}>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/entries/${e.id}`)}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left"
-                        style={{
-                          background: 'var(--ob-card-bg)',
-                          border: '1px solid var(--border-subtle)',
-                        }}
-                      >
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          {e.title || t('source_untitled')}
-                        </span>
-                        <span
-                          className="shrink-0 text-[11px]"
-                          style={{ color: 'var(--date-color)' }}
-                        >
-                          {formatMonthDay(e.createdAt)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : null}
-          </div>
-
-          <footer className="px-5 py-4">
-            <button
-              type="button"
-              onClick={() => router.push(`/entries/new?questionId=${open.questionId}`)}
-              className="w-full rounded-full py-3 text-center text-sm font-medium text-white"
-              style={{ background: 'var(--accent)', fontFamily: 'var(--ob-font-sans)' }}
-            >
-              {t('reply')}
-            </button>
-          </footer>
-        </div>
+      {element && openQuestion ? (
+        <SpElementSheet
+          element={element}
+          onClose={() => setElement(null)}
+          onReply={() => router.push(`/entries/new?questionId=${openQuestion.id}`)}
+          onOpenSource={(entryId) => router.push(`/entries/${entryId}`)}
+        />
       ) : null}
     </div>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p
-      className="mt-6 mb-2 text-[11px] uppercase tracking-[0.14em] first:mt-2"
-      style={{ color: 'var(--accent)', fontFamily: 'var(--ob-font-sans)' }}
-    >
-      {children}
-    </p>
   );
 }

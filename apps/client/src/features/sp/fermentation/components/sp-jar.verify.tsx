@@ -1,40 +1,43 @@
 /**
- * SpJar の検証スペック（SP 版「瓶」= 発酵の結果を読む場所・Issue #363）。
+ * SpJar の検証スペック（SP 版「瓶」= 壜のまわりを問いの円が回る画面）。
  *
- * データ取得は useFermentationInbox / useFermentationDetail がともに `api` を引数に取り、
- * `api=null` で early-return する seam を持つ。ただし inbox は loading=useState(true) で開始し
- * setLoading(false) が fetch 完了後にしか走らないため、api=null だと loading=true に張り付き
- * ヘッダのみ描画になる（有効な描画状態だが契約が薄い）。よって「fetch を解決する」偽 ApiClient を
- * 注入して受信箱の状態機械（empty / 一覧 / 開封）を孤立再現する。new Response(body,{status:200}) で
- * .ok と .json() が成立する（as / any 不要）。
+ * `questions` / `loading` / `onManageQuestions` は props なので、状態機械
+ * （読込中 / 問い0件 / 問いあり / 円を開く / 要素を開く）を props と click だけで再現できる。
+ * 手紙の有無（円の中心の印）と円の中身は `api` 越しに取るので、fetch を解決する偽
+ * ApiClient を注入する。`new Response(body, { status: 200 })` で .ok と .json() が成立する
+ * （as / any 不要）。
  *
- * router(useRouter) は withVerifyProviders が no-op を供給するため返信ボタンの push も副作用なし。
- * useUnread() は UnreadContext の default 値（ready=false / markQuestionRead=no-op）で provider
- * 無しでもクラッシュしない。ready=false の間は未読/既読ラベルを出さない契約なので日付だけが出る。
+ * router(useRouter) は withVerifyProviders が no-op を供給するため「返事を書く」も副作用なし。
+ * useUnread() は UnreadContext の default（ready=false）なので、未読の印は出ない状態で固定される。
  * i18n（sp.jar）依存のため withVerifyProviders（NextIntlClientProvider）で包む。
  *
- * 公表する契約は実際に変化する状態のみ: loading / letterCount / open。受信箱は /questions と
- * バルク /fermentations（questionId なし・#363 で N+1 解消）を並行取得して setLetters するため
- * microtask チェーンが残る。データ駆動 fixture は act で wait してから契約を読む。
+ * 公表する契約は実際に変化する状態のみ: questionCount / open / element / unreadCount。
  */
 
 import { registerUnit } from '@oryzae/verify';
+import type { JarQuestion } from '@/features/shared/questions/types';
 import type { ApiClient } from '@/lib/api';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpJar } from './sp-jar';
 
 interface Props {
   api: ApiClient | null;
+  questions: JarQuestion[];
+  loading: boolean;
+  onManageQuestions: () => void;
 }
 
-const questionsJson = [{ id: 'q-1', currentText: '最近うれしかったことは？' }];
+const questions: JarQuestion[] = [
+  { id: 'q-1', currentText: '最近うれしかったことは？', jarX: null, jarY: null },
+  { id: 'q-2', currentText: 'なぜ続けているのか', jarX: null, jarY: null },
+];
 
 const summaryJson = [
   { id: 'f-1', questionId: 'q-1', status: 'completed', createdAt: '2026-06-20T00:00:00.000Z' },
 ];
 
 // GET /api/v1/fermentations/:id の実レスポンス形。Issue #490 で共有 hook が正規化する
-// ようになったため、id / questionId を欠くスタブは null に落ちる（＝手紙が出ない）。
+// ようになったため、id / questionId を欠くスタブは null に落ちる（＝中身が出ない）。
 const detailJson = {
   id: 'f-1',
   questionId: 'q-1',
@@ -47,9 +50,14 @@ const detailJson = {
     jarX: null,
     jarY: null,
   },
-  keywords: [{ id: 'k-1', keyword: '感謝', description: '' }],
+  keywords: [{ id: 'k-1', keyword: '感謝', description: '小さなことに気づく力。' }],
   snippets: [
-    { id: 's-1', originalText: '朝の光がきれいだった', sourceDate: '2026-06-18T00:00:00.000Z' },
+    {
+      id: 's-1',
+      originalText: '朝の光がきれいだった',
+      sourceDate: '2026-06-18T00:00:00.000Z',
+      selectionReason: '同じ光景が三度出てくる。',
+    },
   ],
 };
 
@@ -57,44 +65,56 @@ function jsonResponse(body: unknown): Promise<Response> {
   return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
 }
 
-/** fetch を解決して受信箱を満たす偽 ApiClient（手紙1通＋詳細）。as/any 不要で型を満たす。 */
+/** 手紙が1通届いている偽 ApiClient。as/any 不要で型を満たす。 */
 const filledApi: ApiClient = {
   baseUrl: '',
   headers: {},
   fetch: (path) => {
-    // 詳細(/fermentations/:id) を先に判定 → バルク一覧(/fermentations, questionId なし) → questions。
+    // 詳細(/fermentations/:id) を先に判定 → 一覧(/fermentations) → questions。
     if (path.includes('/fermentations/')) return jsonResponse(detailJson);
     if (path.includes('/fermentations')) return jsonResponse(summaryJson);
-    return jsonResponse(questionsJson);
+    return jsonResponse([]);
   },
 };
 
-/** /questions は空配列。受信箱は空（empty メッセージ）になる。 */
+/** どのエンドポイントも空。円は出るが中身も手紙も無い。 */
 const emptyApi: ApiClient = {
   baseUrl: '',
   headers: {},
   fetch: () => jsonResponse([]),
 };
 
+const noop = () => {};
+
 registerUnit<Props>({
   id: 'SpJar',
   title: 'SpJar',
-  description: 'SP 版「瓶」: 届いた発酵（手紙）を一覧→タップで手紙・言葉・抜粋を読む→返事を書く。',
+  description:
+    'SP 版「瓶」: 中央の壜のまわりを問いの円が回り、タップで開いて言葉・抜粋・手紙を読む。',
   kind: 'component',
-  render: (props) => withVerifyProviders(<SpJar {...props} />),
+  // SP の一画面ぶんの箱に入れて描く。SpJar は縦積みで余りを軌道に渡すので、
+  // 高さの無い箱に置くと壜も円も潰れる（実画面は 100dvh のシェルの中にある）。
+  render: (props) =>
+    withVerifyProviders(
+      <div style={{ position: 'relative', width: '390px', height: '640px' }}>
+        <SpJar {...props} />
+      </div>,
+    ),
   fixtures: [
     {
-      id: 'empty',
-      description: '届いた手紙が無い（empty メッセージ・letterCount=0）',
-      props: { api: emptyApi },
-      act: async (ctx) => {
-        await ctx.wait(32);
-      },
+      id: 'loading',
+      description: '問いがまだ取れていない（枠を出す・「問いがありません」は出さない）',
+      props: { api: emptyApi, questions: [], loading: true, onManageQuestions: noop },
     },
     {
-      id: 'list',
-      description: '手紙が1通届いている一覧（letterCount=1・未開封 open=false）',
-      props: { api: filledApi },
+      id: 'no-questions',
+      description: '問いが0件（立てる前。壜だけでは何もできないので案内を出す）',
+      props: { api: emptyApi, questions: [], loading: false, onManageQuestions: noop },
+    },
+    {
+      id: 'orbit',
+      description: '問いが2件、軌道の上に並ぶ（questionCount=2・open=false）',
+      props: { api: filledApi, questions, loading: false, onManageQuestions: noop },
       act: async (ctx) => {
         await ctx.wait(32);
       },
@@ -102,23 +122,23 @@ registerUnit<Props>({
     {
       id: 'opened',
       probe: true,
-      description: 'Probe: 手紙をタップすると開封（open=true・手紙/言葉/抜粋セクションが出る）',
-      props: { api: filledApi },
+      description: 'Probe: 円をタップすると開く（open=true・中の要素が並ぶ）',
+      props: { api: filledApi, questions, loading: false, onManageQuestions: noop },
       act: async (ctx) => {
         await ctx.wait(32);
-        await ctx.click('ul li button');
-        await ctx.wait(32);
+        await ctx.click('button[data-question-id="q-1"]');
+        await ctx.wait(48);
       },
     },
     {
       id: 'open-close',
       probe: true,
-      description: 'Probe: 開いて閉じると一覧に戻る（open=true→false のトグル対称性）',
-      props: { api: filledApi },
+      description: 'Probe: 開いて閉じると軌道に戻る（open=true→false のトグル対称性）',
+      props: { api: filledApi, questions, loading: false, onManageQuestions: noop },
       act: async (ctx) => {
         await ctx.wait(32);
-        await ctx.click('ul li button');
-        await ctx.wait(32);
+        await ctx.click('button[data-question-id="q-1"]');
+        await ctx.wait(48);
         await ctx.click('header button');
         await ctx.wait(16);
       },
@@ -126,65 +146,77 @@ registerUnit<Props>({
   ],
   invariants: [
     {
-      id: 'letter-buttons-match-count',
-      description: '一覧の手紙ボタン（ul li button）の数が contract.letterCount と一致する',
+      id: 'circles-match-question-count',
+      description: '軌道の円の数が contract.questionCount と一致する',
       check: ({ root, contract }) => {
-        const buttons = root.querySelectorAll('ul li button').length;
+        const circles = root.querySelectorAll('button[data-question-id]').length;
         return (
-          String(buttons) === contract.letterCount ||
-          `手紙ボタン数=${buttons} だが contract.letterCount="${contract.letterCount}"`
+          String(circles) === contract.questionCount ||
+          `円の数=${circles} だが contract.questionCount="${contract.questionCount}"`
         );
       },
     },
     {
-      id: 'overlay-present-iff-open',
-      description: '開封オーバーレイ（閉じるボタンを持つ header）は open=true のときだけ描画される',
+      id: 'manage-button-always-present',
+      description: '問いの管理へ入る口は常にある（SP はボトムナビを持たない唯一の入口）',
+      onlyFixtures: ['loading', 'no-questions', 'orbit', 'opened'],
+      check: ({ root }) => {
+        const text = root.textContent ?? '';
+        return text.includes('問いを整える') || '「問いを整える」ボタンが無い';
+      },
+    },
+    {
+      id: 'loading-shows-frame-not-empty-message',
+      description: '取得中は枠だけ出す（0件の案内を出さない）',
+      onlyFixtures: ['loading'],
       check: ({ root, contract }) => {
-        const hasOverlay = Boolean(root.querySelector('.absolute.inset-0'));
-        const expectOpen = contract.open === 'true';
+        const skeleton = root.querySelector('[data-skeleton-slot="orbit"]');
+        const saysEmpty = (root.textContent ?? '').includes('問いがまだありません');
         return (
-          hasOverlay === expectOpen ||
-          `overlay present=${hasOverlay} だが contract.open="${contract.open}"`
+          (contract.loading === 'true' && skeleton !== null && !saysEmpty) ||
+          `loading=${contract.loading}, 枠=${skeleton !== null}, 0件の案内=${saysEmpty}（取得中に「ありません」を出すと問いを消したように見える）`
         );
       },
     },
     {
-      id: 'empty-message-when-no-letters',
-      description: '手紙が無いときは empty メッセージを出す（letterCount=0・loading=false）',
-      onlyFixtures: ['empty'],
+      id: 'empty-message-when-no-questions',
+      description: '問いが0件なら案内を出す（questionCount=0）',
+      onlyFixtures: ['no-questions'],
       check: ({ root, contract }) => {
-        const emptyShown = Boolean(root.textContent?.includes('まだ手紙は届いていません'));
+        const shown = (root.textContent ?? '').includes('問いがまだありません');
         return (
-          (contract.loading === 'false' && contract.letterCount === '0' && emptyShown) ||
-          `expected loading=false & letterCount=0 & empty message, got loading=${contract.loading}, letterCount=${contract.letterCount}, emptyShown=${emptyShown}`
+          (contract.questionCount === '0' && shown) ||
+          `questionCount=${contract.questionCount}, 案内=${shown}`
         );
       },
     },
     {
-      id: 'list-loaded-not-open',
-      description: '一覧読込後は手紙が並び未開封（letterCount>0・open=false）',
-      onlyFixtures: ['list'],
-      check: ({ contract }) =>
-        (contract.loading === 'false' &&
-          Number(contract.letterCount) > 0 &&
-          contract.open === 'false') ||
-        `expected loaded list & open=false, got loading=${contract.loading}, letterCount=${contract.letterCount}, open=${contract.open}`,
+      id: 'zoom-present-iff-open',
+      description: '開いた円（SpQuestionZoom）は open=true のときだけ描画される',
+      check: ({ root, contract }) => {
+        const zoom = root.querySelector('[data-verify-unit="SpQuestionZoom"]') !== null;
+        return (
+          zoom === (contract.open === 'true') ||
+          `zoom present=${zoom} だが contract.open="${contract.open}"`
+        );
+      },
     },
     {
-      id: 'detail-sections-when-open',
-      description: '開封中は手紙・言葉・抜粋セクションが描画される（open=true）',
+      id: 'opened-shows-elements',
+      description: '開いた円には言葉・抜粋・手紙が並ぶ（読むのはタップした後）',
       onlyFixtures: ['opened'],
       check: ({ root, contract }) => {
-        const text = root.textContent ?? '';
-        const hasSections = text.includes('手紙') && text.includes('言葉') && text.includes('抜粋');
+        const zoom = root.querySelector('[data-verify-unit="SpQuestionZoom"]');
+        const keywords = zoom?.getAttribute('data-verify-keyword-count');
+        const hasLetter = zoom?.getAttribute('data-verify-has-letter');
         return (
-          (contract.open === 'true' && hasSections) ||
-          `expected open=true & 手紙/言葉/抜粋 sections, got open=${contract.open}, hasSections=${hasSections}`
+          (contract.open === 'true' && keywords === '1' && hasLetter === 'true') ||
+          `open=${contract.open}, keywordCount=${keywords}, hasLetter=${hasLetter}`
         );
       },
     },
     {
-      id: 'open-then-close-returns-to-list',
+      id: 'open-then-close-returns-to-orbit',
       description: '開いて閉じると open=false に戻る（トグル対称性）',
       onlyFixtures: ['open-close'],
       check: ({ contract }) =>

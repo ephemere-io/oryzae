@@ -118,9 +118,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
             <div className="flex h-[100dvh] flex-col overflow-hidden">
               <main className="relative flex-1 overflow-auto">{content}</main>
-              {/* 書斎ホームではボトムナビも描かない。PC のサイドバーと同じで、
-                  書斎そのものが唯一のグローバルナビゲーションになる。 */}
-              {!onStudy && <SpBottomNav />}
+              {/* 書斎が有効な間はボトムナビを描かない。PC のサイドバーと同じ扱いで、
+                  書斎そのものが唯一のグローバルナビゲーションになる。
+                  **書斎ホームだけでなく jar / board / entry でも外す**（行き先の画面にだけ
+                  旧ナビが残ると、戻り道が左上のマークとボトムナビで二重になる）。
+                  フラグ off の間は従来どおり全画面に出る。 */}
+              {!studyHome && <SpBottomNav />}
             </div>
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">

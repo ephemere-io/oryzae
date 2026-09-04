@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { JarQuestion } from '@/features/shared/questions/types';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import jaMessages from '@/i18n/messages/ja.json';
 import type { ApiClient } from '@/lib/api';
@@ -33,11 +34,27 @@ function makeUnread(overrides: Partial<UnreadState> = {}): UnreadState {
   };
 }
 
-function renderJar(api: ApiClient, unread: UnreadState = makeUnread()) {
+const questions: JarQuestion[] = [
+  { id: 'q1', currentText: 'なぜ続けるのか', jarX: null, jarY: null },
+];
+
+interface RenderOptions {
+  unread?: UnreadState;
+  jarQuestions?: JarQuestion[];
+  loading?: boolean;
+  onManageQuestions?: () => void;
+}
+
+function renderJar(api: ApiClient, options: RenderOptions = {}) {
   return render(
     <NextIntlClientProvider locale="ja" messages={jaMessages}>
-      <UnreadProvider value={unread}>
-        <SpJar api={api} />
+      <UnreadProvider value={options.unread ?? makeUnread()}>
+        <SpJar
+          api={api}
+          questions={options.jarQuestions ?? questions}
+          loading={options.loading ?? false}
+          onManageQuestions={options.onManageQuestions ?? vi.fn()}
+        />
       </UnreadProvider>
     </NextIntlClientProvider>,
   );
@@ -66,67 +83,107 @@ function detailJson(overrides: Record<string, unknown>): Record<string, unknown>
   };
 }
 
+/** 一覧・詳細ともに満たす既定のスタブ。 */
+function filledApi(detail: Record<string, unknown> = detailJson({})): ApiClient {
+  return createMockApi(
+    vi.fn((url: string) => {
+      // 詳細(/fermentations/:id) を先に判定 → 一覧(?questionId= 付きもここ) → questions。
+      if (url.startsWith('/api/v1/fermentations/')) return Promise.resolve(jsonResponse(detail));
+      if (url.startsWith('/api/v1/fermentations'))
+        return Promise.resolve(jsonResponse(completedFermentation));
+      if (url.startsWith('/api/v1/questions'))
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      return Promise.resolve(jsonResponse({}));
+    }),
+  );
+}
+
+/** 円を開く（軌道の円はアクセシブル名に問い文を持つ）。 */
+function openCircle(name: string) {
+  fireEvent.click(screen.getByRole('button', { name }));
+}
+
 describe('SpJar', () => {
   afterEach(cleanup);
   beforeEach(() => vi.clearAllMocks());
 
-  it('受信箱に届いた手紙（問い）を表示する', async () => {
-    const fetchImpl = vi.fn((url: string) => {
-      if (url === '/api/v1/questions')
-        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url === '/api/v1/fermentations')
-        return Promise.resolve(jsonResponse(completedFermentation));
-      return Promise.resolve(jsonResponse({}));
-    });
-    renderJar(createMockApi(fetchImpl));
-    expect(await screen.findByText('なぜ続けるのか')).toBeTruthy();
+  it('問いの数だけ円を軌道に置く', () => {
+    renderJar(filledApi());
+    expect(screen.getByRole('button', { name: 'なぜ続けるのか' })).toBeTruthy();
   });
 
-  it('手紙が無ければ空状態を表示する', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse([])));
-    renderJar(createMockApi(fetchImpl));
-    expect(await screen.findByText('まだ手紙は届いていません')).toBeTruthy();
+  it('取得中は「問いがまだありません」を出さない（消したように見える）', () => {
+    renderJar(filledApi(), { jarQuestions: [], loading: true });
+    expect(screen.queryByText(/問いがまだありません/)).toBeNull();
   });
 
-  it('手紙を開くと本文と「返事を書く」を表示する', async () => {
-    const fetchImpl = vi.fn((url: string) => {
-      if (url === '/api/v1/questions')
-        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url === '/api/v1/fermentations')
-        return Promise.resolve(jsonResponse(completedFermentation));
-      if (url === '/api/v1/fermentations/f1') return Promise.resolve(jsonResponse(detailJson({})));
-      return Promise.resolve(jsonResponse({}));
-    });
-    renderJar(createMockApi(fetchImpl));
+  it('問いが0件なら案内を出す', () => {
+    renderJar(filledApi(), { jarQuestions: [], loading: false });
+    expect(screen.getByText(/問いがまだありません/)).toBeTruthy();
+  });
 
-    fireEvent.click(await screen.findByText('なぜ続けるのか'));
+  it('「問いを整える」を押すと問いの管理を開く（SP はボトムナビを持たない）', () => {
+    const onManageQuestions = vi.fn();
+    renderJar(filledApi(), { onManageQuestions });
+
+    fireEvent.click(screen.getByRole('button', { name: '問いを整える' }));
+    expect(onManageQuestions).toHaveBeenCalled();
+  });
+
+  it('円をタップすると開き、中の言葉・抜粋・手紙が並ぶ', async () => {
+    const api = filledApi(
+      detailJson({
+        keywords: [{ id: 'k1', keyword: '余白', description: '...' }],
+        snippets: [{ id: 's1', originalText: 'うまく言えない', sourceDate: '2024-02-01' }],
+      }),
+    );
+    renderJar(api);
+
+    openCircle('なぜ続けるのか');
+
+    // 円の中は「在ること」だけを示す（本文は開いてから）。
+    expect(await screen.findByText('余白')).toBeTruthy();
+    expect(screen.getByText(/うまく言えない/)).toBeTruthy();
+  });
+
+  it('言葉をタップすると意味が読める', async () => {
+    const api = filledApi(
+      detailJson({ keywords: [{ id: 'k1', keyword: '余白', description: '埋めない時間。' }] }),
+    );
+    renderJar(api);
+
+    openCircle('なぜ続けるのか');
+    fireEvent.click(await screen.findByText('余白'));
+
+    expect(await screen.findByText('埋めない時間。')).toBeTruthy();
+  });
+
+  it('手紙をタップすると本文と「返事を書く」が出る', async () => {
+    renderJar(filledApi());
+
+    openCircle('なぜ続けるのか');
+    // 手紙は円の中央。アクセシブル名を持たないので、封筒のボタンを位置で拾う。
+    const letterButton = await screen.findByTestId('sp-jar-letter');
+    fireEvent.click(letterButton);
 
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '返事を書く' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '返事を書く' }));
+    expect(push).toHaveBeenCalledWith('/entries/new?questionId=q1');
   });
 
   it('手紙を開くと「もとになった記録」が出て、タップでそのエントリへ行く（Issue #453）', async () => {
-    const fetchImpl = vi.fn((url: string) => {
-      if (url === '/api/v1/questions')
-        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url === '/api/v1/fermentations')
-        return Promise.resolve(jsonResponse(completedFermentation));
-      if (url === '/api/v1/fermentations/f1')
-        return Promise.resolve(
-          jsonResponse(
-            detailJson({
-              scannedEntries: [
-                { id: 'e1', title: '朝の光', createdAt: '2024-01-30T00:00:00Z' },
-                { id: 'e2', title: '', createdAt: '2024-01-31T00:00:00Z' },
-              ],
-            }),
-          ),
-        );
-      return Promise.resolve(jsonResponse({}));
-    });
-    renderJar(createMockApi(fetchImpl));
+    const api = filledApi(
+      detailJson({
+        scannedEntries: [
+          { id: 'e1', title: '朝の光', createdAt: '2024-01-30T00:00:00Z' },
+          { id: 'e2', title: '', createdAt: '2024-01-31T00:00:00Z' },
+        ],
+      }),
+    );
+    renderJar(api);
 
-    fireEvent.click(await screen.findByText('なぜ続けるのか'));
+    openCircle('なぜ続けるのか');
+    fireEvent.click(await screen.findByTestId('sp-jar-letter'));
 
     // 手紙だけでは「何に対する返事か」が分からなかった。
     expect(await screen.findByText('朝の光')).toBeTruthy();
@@ -138,79 +195,53 @@ describe('SpJar', () => {
   });
 
   it('もとになった記録が無ければセクションごと出さない', async () => {
-    const fetchImpl = vi.fn((url: string) => {
-      if (url === '/api/v1/questions')
-        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url === '/api/v1/fermentations')
-        return Promise.resolve(jsonResponse(completedFermentation));
-      if (url === '/api/v1/fermentations/f1') return Promise.resolve(jsonResponse(detailJson({})));
-      return Promise.resolve(jsonResponse({}));
-    });
-    renderJar(createMockApi(fetchImpl));
+    renderJar(filledApi());
 
-    fireEvent.click(await screen.findByText('なぜ続けるのか'));
+    openCircle('なぜ続けるのか');
+    fireEvent.click(await screen.findByTestId('sp-jar-letter'));
 
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
     expect(screen.queryByText(jaMessages.sp.jar.section_sources)).toBeNull();
   });
 
-  it('未読の手紙には「未読」を出し、開くとその問いを既読にする（Issue #447）', async () => {
-    const fetchImpl = vi.fn((url: string) => {
-      if (url === '/api/v1/questions')
-        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url === '/api/v1/fermentations')
-        return Promise.resolve(jsonResponse(completedFermentation));
-      if (url === '/api/v1/fermentations/f1') return Promise.resolve(jsonResponse(detailJson({})));
-      return Promise.resolve(jsonResponse({}));
-    });
+  it('手紙を開いたときにその問いを既読にする（Issue #447）', async () => {
     const unread = makeUnread({ ready: true, unreadQuestionIds: new Set(['q1']) });
-    renderJar(createMockApi(fetchImpl), unread);
+    renderJar(filledApi(), { unread });
+
+    openCircle('なぜ続けるのか');
+    fireEvent.click(await screen.findByTestId('sp-jar-letter'));
 
     // 旧実装は瓶を開いた時刻で一括既読にしていたため、開いた手紙が未読のまま残っていた。
-    expect(await screen.findByText(/未読/)).toBeTruthy();
-
-    fireEvent.click(screen.getByText('なぜ続けるのか'));
-
     expect(unread.markQuestionRead).toHaveBeenCalledWith('q1');
   });
 
-  it('未読状態が未取得（ready=false）の間は未読/既読ラベルを出さない', async () => {
-    const fetchImpl = vi.fn((url: string) => {
-      if (url === '/api/v1/questions')
-        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url === '/api/v1/fermentations')
-        return Promise.resolve(jsonResponse(completedFermentation));
-      return Promise.resolve(jsonResponse({}));
-    });
-    renderJar(createMockApi(fetchImpl));
+  it('円を開いただけでは既読にしない（読んだのは手紙を開いたとき）', async () => {
+    const unread = makeUnread({ ready: true, unreadQuestionIds: new Set(['q1']) });
+    renderJar(filledApi(), { unread });
 
-    await screen.findByText('なぜ続けるのか');
-    expect(screen.queryByText(/未読/)).toBeNull();
-    expect(screen.queryByText(/既読/)).toBeNull();
+    openCircle('なぜ続けるのか');
+    await screen.findByTestId('sp-jar-letter');
+
+    expect(unread.markQuestionRead).not.toHaveBeenCalled();
   });
 
-  it('手紙を開くと言葉(keywords)と抜粋(snippets)も表示する', async () => {
-    const fetchImpl = vi.fn((url: string) => {
-      if (url === '/api/v1/questions')
-        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
-      if (url === '/api/v1/fermentations')
-        return Promise.resolve(jsonResponse(completedFermentation));
-      if (url === '/api/v1/fermentations/f1')
-        return Promise.resolve(
-          jsonResponse(
-            detailJson({
-              keywords: [{ id: 'k1', keyword: '余白', description: '...' }],
-              snippets: [{ id: 's1', originalText: 'うまく言えない', sourceDate: '2024-02-01' }],
-            }),
-          ),
-        );
-      return Promise.resolve(jsonResponse({}));
-    });
-    renderJar(createMockApi(fetchImpl));
+  it('発酵がまだなら円の中でそう伝える', async () => {
+    const api = createMockApi(vi.fn(() => Promise.resolve(jsonResponse([]))));
+    renderJar(api);
 
-    fireEvent.click(await screen.findByText('なぜ続けるのか'));
+    openCircle('なぜ続けるのか');
 
-    expect(await screen.findByText('余白')).toBeTruthy();
-    expect(screen.getByText('「うまく言えない」')).toBeTruthy();
+    expect(await screen.findByText(jaMessages.sp.jar.not_fermented)).toBeTruthy();
+  });
+
+  it('閉じると軌道に戻る', async () => {
+    renderJar(filledApi());
+
+    openCircle('なぜ続けるのか');
+    await screen.findByTestId('sp-jar-letter');
+
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    expect(screen.queryByTestId('sp-jar-letter')).toBeNull();
+    expect(screen.getByRole('button', { name: 'なぜ続けるのか' })).toBeTruthy();
   });
 });

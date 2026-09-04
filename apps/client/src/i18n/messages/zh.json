@@ -637,8 +637,7 @@
       "questions": "提问"
     },
     "jar": {
-      "title": "瓶中收到的信",
-      "empty": "还没有收到信",
+      "title": "瓶",
       "untitled": "无标题提问",
       "close": "关闭",
       "letter_empty": "此结果还没有信",
@@ -646,10 +645,14 @@
       "section_letter": "来信",
       "section_keywords": "词语",
       "section_snippets": "摘录",
-      "unread": "未读",
-      "read": "已读",
       "section_sources": "来源记录",
-      "source_untitled": "无标题记录"
+      "source_untitled": "无标题记录",
+      "no_questions": "还没有提问。可以从下方按钮开始。",
+      "spin_hint": "横向滑动即可转动",
+      "manage_questions": "整理提问",
+      "not_fermented": "这个提问还没有发酵",
+      "tap_hint": "点按阅读",
+      "selection_reason": "被选中的理由"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -681,7 +684,8 @@
       "delete": "结束这个提问",
       "cancel": "取消",
       "save": "保存",
-      "letter_arrived": "有一封信送到了"
+      "letter_arrived": "有一封信送到了",
+      "close": "关闭"
     },
     "board": {
       "cards": "{count}张",
