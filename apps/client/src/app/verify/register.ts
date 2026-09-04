@@ -13,6 +13,7 @@
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
 import '@/features/shared/auth/components/reset-password-form.verify';
+import '@/features/shared/study/components/back-to-study.verify';
 import '@/features/shared/study/components/entry-list-overlay.verify';
 import '@/features/shared/study/components/study-fallback.verify';
 import '@/features/shared/study/components/study-chrome.verify';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
@@ -9,6 +9,8 @@ import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unrea
 import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
+import { BackToStudy } from '@/features/shared/study/components/back-to-study';
+import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
 import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
@@ -19,10 +21,27 @@ import { RouteLoading } from './_loading/route-loading';
 
 // CSS カスタムプロパティは React.CSSProperties に含まれないので、
 // `--*` を許す形で型を広げて宣言する（キャストは使わない）。
-const mainStyle: React.CSSProperties & Record<`--${string}`, string> = {
+type MainStyle = React.CSSProperties & Record<`--${string}`, string>;
+
+const mainStyle: MainStyle = {
   marginLeft: SIDEBAR_WIDTH,
   '--sidebar-width': `${SIDEBAR_WIDTH}px`,
 };
+
+/**
+ * 書斎ホームではサイドバーを描かず、本文を全幅にする。
+ *
+ * **`--sidebar-width` も 0 にすること。** この変数はボードが読んでいて
+ * （board-view のツールバー位置、board-toolbar の中央寄せ）、margin だけ外して
+ * 変数を残すと、サイドバーの無い画面でツールバーが 40px ずれる。
+ */
+const studyMainStyle: MainStyle = {
+  marginLeft: 0,
+  '--sidebar-width': '0px',
+};
+
+/** 書斎ホームそのもののパス。ここだけサイドバーを外す。 */
+const STUDY_PATH = '/study';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
@@ -32,6 +51,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const unread = useUnreadLetters(api, loading);
   const device = useDevice();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // 書斎ホームのときだけ PC シェルの構成が変わる（サイドバーとフッターを外す）。
+  // フラグ off の間はこの分岐が常に false になり、シェルは従来どおり。
+  const studyHome = useStudyHome();
+  const onStudy = studyHome && pathname === STUDY_PATH;
+  // 書斎が有効な間、サブ画面の左上にはマークが「書斎へ戻る」として浮く。
+  const showBackToStudy = studyHome && pathname !== STUDY_PATH;
 
   // Issue #362/#363: 保護下の children はクライアント専用に描画する（mounted ゲート）。
   // エディタ等の時刻依存・認証依存レンダリングが SSR↔client で食い違う不一致(React #418)
@@ -83,19 +110,27 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
             <div className="flex h-[100dvh] flex-col overflow-hidden">
               <main className="relative flex-1 overflow-auto">{content}</main>
+              {/* SP のボトムナビは書斎ホームでも残す。`/questions` の入口がここにしか
+                  無く、外すと問いへ行けなくなる（60-implementation-notes.md §6）。 */}
               <SpBottomNav />
             </div>
           ) : device === 'pc' ? (
             <div className="flex h-screen overflow-hidden">
-              <Sidebar />
-              <main className="flex flex-1 flex-col overflow-hidden" style={mainStyle}>
+              {/* 書斎ホームでは左サイドバーを描かない。行き先は 3D の物そのものが持つ。 */}
+              {!onStudy && <Sidebar />}
+              <main
+                className="flex flex-1 flex-col overflow-hidden"
+                style={onStudy ? studyMainStyle : mainStyle}
+              >
                 <div className="relative flex-1 overflow-auto">{content}</div>
-                <PageFooter />
+                {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
+                {!onStudy && <PageFooter />}
               </main>
               {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
               <DesktopOnlyOverlay />
             </div>
           ) : null}
+          {device !== null && showBackToStudy && <BackToStudy />}
           {device !== null && shouldShow && (
             <OnboardingFlow onComplete={handleOnboardingComplete} />
           )}
