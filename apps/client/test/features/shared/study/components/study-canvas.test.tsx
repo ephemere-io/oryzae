@@ -15,10 +15,8 @@ afterEach(cleanup);
 
 const STATE: StudyState = {
   now: '2026-09-02',
-  profile: { nickname: 'asuka', initial: 'A' },
   unreadCount: 0,
   fermentation: { readiness: 0.4, status: 'fermenting', letters: [] },
-  questions: [],
   words: ['発酵'],
   notebooks: [{ month: '2026-09', entryCount: 3, current: true }],
   entries: [],

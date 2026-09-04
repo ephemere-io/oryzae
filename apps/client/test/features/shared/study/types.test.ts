@@ -10,7 +10,6 @@ import type {
   StudyEntry,
   StudyFermentation,
   StudyFermentationStatus,
-  StudyProfile,
   StudyState,
 } from '@/features/shared/study/types';
 
@@ -32,15 +31,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isStudyStatus(value: unknown): value is StudyFermentationStatus {
   return value === 'idle' || value === 'fermenting' || value === 'completed';
-}
-
-function parseProfile(raw: unknown): StudyProfile {
-  if (!isRecord(raw)) throw new Error('profile is not an object');
-  const { nickname, initial } = raw;
-  if (typeof nickname !== 'string' || typeof initial !== 'string') {
-    throw new Error('profile.nickname / initial must be strings');
-  }
-  return { nickname, initial };
 }
 
 function parseFermentation(raw: unknown): StudyFermentation {
@@ -117,7 +107,7 @@ function parseBoard(raw: unknown): StudyBoard {
 
 function parsePreset(raw: unknown): StudyState {
   if (!isRecord(raw)) throw new Error('preset is not an object');
-  const { now, unreadCount, questions, words, notebooks } = raw;
+  const { now, unreadCount, words, notebooks } = raw;
   if (typeof now !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(now)) {
     throw new Error(`now must be YYYY-MM-DD but got ${String(now)}`);
   }
@@ -127,18 +117,8 @@ function parsePreset(raw: unknown): StudyState {
 
   return {
     now,
-    profile: parseProfile(raw.profile),
     unreadCount,
     fermentation: parseFermentation(raw.fermentation),
-    questions: (Array.isArray(questions) ? questions : []).filter(isRecord).map((question) => ({
-      id: String(question.id ?? ''),
-      currentText: typeof question.currentText === 'string' ? question.currentText : null,
-      isArchived: question.isArchived === true,
-      isProposedByOryzae: question.isProposedByOryzae === true,
-      isValidatedByUser: question.isValidatedByUser === true,
-      createdAt: String(question.createdAt ?? ''),
-      updatedAt: String(question.updatedAt ?? ''),
-    })),
     words: words.map((word) => String(word)),
     notebooks: notebooks.filter(isRecord).map((notebook) => ({
       month: String(notebook.month ?? ''),
@@ -200,7 +180,6 @@ describe('仕様のモック 6 状態', () => {
     expect(empty?.notebooks).toEqual([]);
     expect(empty?.entries).toEqual([]);
     expect(empty?.board.cards).toEqual([]);
-    expect(empty?.questions).toEqual([]);
   });
 });
 

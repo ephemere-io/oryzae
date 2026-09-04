@@ -95,3 +95,18 @@ export interface InboxQuestion {
   id: string;
   currentText: string | null;
 }
+
+/**
+ * 発酵の進み具合（`GET /api/v1/fermentations/readiness`）。
+ *
+ * サーバーが cron の発火条件そのものから計算した値。UI 側で条件を再実装しない
+ * （再実装するとサーバーの条件が変わった時点で嘘になる）。
+ */
+export interface FermentationReadiness {
+  /** 0..1。**数値としては画面に出さない**（進み具合は瓶の見た目が語る）。 */
+  readiness: number;
+  /** 文字数・経過時間の両方を満たしていて、次の cron で発火しうるか。 */
+  eligible: boolean;
+  /** 次に発火しうる時刻。未発酵（時間ゲートが無い）なら null。 */
+  nextRunAt: string | null;
+}

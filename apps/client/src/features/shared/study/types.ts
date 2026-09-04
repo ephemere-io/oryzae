@@ -6,7 +6,6 @@
  */
 
 import type { InboxLetter } from '@/features/shared/fermentation/types';
-import type { QuestionItem } from '@/features/shared/questions/types';
 
 /** 書斎から出ていける先。3D の物と SP のピルが共有する語彙。 */
 export type StudyTarget =
@@ -82,20 +81,19 @@ export interface StudyBoard {
   cards: StudyBoardCard[];
 }
 
-export interface StudyProfile {
-  nickname: string;
-  /** アバターに出す 1 文字。 */
-  initial: string;
-  avatarUrl?: string | null;
-}
-
+/**
+ * 書斎が読むものすべて。
+ *
+ * `10-data-contract.md` の StudyState から **profile と questions を落としてある**。
+ * どちらも書斎の絵に出てこないためで、questions は `/questions/all` を 1 往復まるごと
+ * 増やすだけになり、profile は `useAuth()` が全画面に配っているものの写しになる
+ * （アバターを出すのは 3D ではなくフローティングのクローム側）。
+ */
 export interface StudyState {
   /** `YYYY-MM-DD`（ローカル暦日）。 */
   now: string;
-  profile: StudyProfile;
   unreadCount: number;
   fermentation: StudyFermentation;
-  questions: QuestionItem[];
   /**
    * 瓶の中を漂う言葉。
    *
