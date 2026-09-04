@@ -4,6 +4,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { getAccessToken, setTokens } from '@/lib/auth';
 import { DOCS_SITE_URL } from '@/lib/docs-site';
 
@@ -37,7 +38,7 @@ function isStandaloneLaunch(): boolean {
  * ルート（/）のクライアント専用ゲート。描画は持たず（null）、副作用のみ:
  * - Supabase のメール確認リダイレクト（hash に access/refresh token）を受けてログイン状態にする
  * - Supabase がエラーを返した場合（期限切れ・使用済みリンク）は確認画面へ送って理由を見せる
- * - 既ログインなら /entries/new へ送る
+ * - 既ログインならホーム（書斎ホームが有効なら /study、そうでなければ /entries/new）へ送る
  * - PWA として起動されていれば、未ログインでもログイン画面へ送る（アプリの外に出さない）
  * - どれでもない訪問者は公開サイト（別ドメイン）へ送る
  *
@@ -56,6 +57,10 @@ function isStandaloneLaunch(): boolean {
  */
 export function HomeGate() {
   const router = useRouter();
+  // 書斎ホームが有効なら、既ログインの行き先が /entries/new から /study に変わる。
+  // フラグ off の間はここも従来どおりで、書斎のコードは読み込まれない。
+  const studyHome = useStudyHome();
+  const home = studyHome ? '/study' : '/entries/new';
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -65,7 +70,7 @@ export function HomeGate() {
       const refreshToken = params.refresh_token;
       if (accessToken && refreshToken) {
         setTokens(accessToken, refreshToken);
-        router.replace('/entries/new');
+        router.replace(home);
         return;
       }
       const errorCode = params.error_code ?? params.error;
@@ -76,7 +81,7 @@ export function HomeGate() {
     }
 
     if (getAccessToken()) {
-      router.replace('/entries/new');
+      router.replace(home);
       return;
     }
 
@@ -89,7 +94,7 @@ export function HomeGate() {
 
     // ブラウザで開いた未ログイン訪問者には公開サイトのランディングを見せる（SEO と導線）。
     window.location.replace(DOCS_SITE_URL);
-  }, [router]);
+  }, [router, home]);
 
   return null;
 }
