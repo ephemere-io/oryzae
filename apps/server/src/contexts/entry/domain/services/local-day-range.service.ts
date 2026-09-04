@@ -41,6 +41,27 @@ export function localDayRange(dateKey: string, tzOffsetMinutes = 0): UtcInstantR
   };
 }
 
+/**
+ * UTC の瞬間（`entries.created_at`）が、利用者のローカル暦では何年何月かを返す（`YYYY-MM`）。
+ *
+ * 書斎の手帳は「月」で 1 冊になる（docs/oryzae-study）。`created_at` を UTC のまま
+ * 月に丸めると、JST の利用者が月初 00:00〜09:00 に書いた記録が**前月の冊に落ちる**
+ * — `localDayRange` が日で踏んだのと同じズレを、月でもう一度踏むことになる。
+ *
+ * `tzOffsetMinutes` の符号は `localDayRange` と同じ（UTC − ローカル の分数。JST は -540）。
+ * 不正な日時は null を返す（呼び出し側が黙って捨てられるように。集計が 1 行落ちることは
+ * あっても、壊れた 1 行で月別集計そのものを失敗させない）。
+ */
+export function localMonthKey(createdAtIso: string, tzOffsetMinutes = 0): string | null {
+  const at = Date.parse(createdAtIso);
+  if (Number.isNaN(at)) return null;
+  // ローカル壁時計 = 実時刻 − offset（JST は -540 分なので +9 時間される）。
+  const local = new Date(at - tzOffsetMinutes * 60_000);
+  const year = local.getUTCFullYear();
+  const month = `${local.getUTCMonth() + 1}`.padStart(2, '0');
+  return `${year}-${month}`;
+}
+
 /** `dateKey` を含むローカルの週（月曜始まり）1 週間ぶんの UTC 区間。 */
 export function localWeekRange(dateKey: string, tzOffsetMinutes = 0): UtcInstantRange {
   const start = localMidnightUtcMs(dateKey, tzOffsetMinutes);

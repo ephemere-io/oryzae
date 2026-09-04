@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   localDayRange,
+  localMonthKey,
   localWeekRange,
 } from '../../../../../src/contexts/entry/domain/services/local-day-range.service.js';
 
@@ -67,5 +68,45 @@ describe('localWeekRange', () => {
       startUtc: '2026-08-10T00:00:00.000Z',
       endUtc: '2026-08-17T00:00:00.000Z',
     });
+  });
+});
+
+/**
+ * 書斎の手帳は「月」で 1 冊になる（docs/oryzae-study）。日で踏んだのと同じズレを
+ * 月でもう一度踏まないことを固定する。
+ */
+describe('localMonthKey', () => {
+  it('オフセット未指定なら UTC の暦月', () => {
+    expect(localMonthKey('2026-08-10T12:00:00.000Z')).toBe('2026-08');
+  });
+
+  it('JST の月初 00:00〜09:00 に書いた記録が前月に落ちない', () => {
+    // JST 2026-09-01 00:50 = 2026-08-31T15:50Z。UTC のまま丸めると 2026-08 になる。
+    expect(localMonthKey('2026-08-31T15:50:00.000Z', JST)).toBe('2026-09');
+    expect(localMonthKey('2026-08-31T15:50:00.000Z')).toBe('2026-08');
+  });
+
+  it('JST の月末深夜が翌月に繰り上がらない', () => {
+    // JST 2026-08-31 23:59 = 2026-08-31T14:59Z
+    expect(localMonthKey('2026-08-31T14:59:00.000Z', JST)).toBe('2026-08');
+  });
+
+  it('年またぎ（JST 1/1 未明）で年も繰り上がる', () => {
+    // JST 2027-01-01 08:00 = 2026-12-31T23:00Z
+    expect(localMonthKey('2026-12-31T23:00:00.000Z', JST)).toBe('2027-01');
+  });
+
+  it('反対符号のオフセット（EST = +300）では月初が前月に戻る', () => {
+    // EST 2026-08-31 20:00 = 2026-09-01T01:00Z
+    expect(localMonthKey('2026-09-01T01:00:00.000Z', 300)).toBe('2026-08');
+  });
+
+  it('月を必ず 2 桁にする（1月が 2026-1 にならない）', () => {
+    expect(localMonthKey('2026-01-15T00:00:00.000Z')).toBe('2026-01');
+  });
+
+  it('壊れた日時は null（集計側がその行だけ捨てられるように）', () => {
+    expect(localMonthKey('not-a-date')).toBeNull();
+    expect(localMonthKey('')).toBeNull();
   });
 });
