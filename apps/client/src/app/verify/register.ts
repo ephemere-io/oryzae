@@ -65,6 +65,7 @@ import '@/features/pc/board/components/board-view.verify';
 import '@/features/pc/fermentation/components/detail-pane.verify';
 import '@/features/pc/fermentation/components/jar-view.verify';
 import '@/features/sp/entries/components/sp-entry-list.verify';
+import '@/features/shared/fermentation/components/jar-bottle.verify';
 import '@/features/sp/fermentation/components/sp-jar.verify';
 import '@/features/pc/account/components/account-page.verify';
 import '@/features/shared/auth/components/forgot-password-form.verify';
