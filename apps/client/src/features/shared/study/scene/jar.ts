@@ -174,8 +174,33 @@ const WORD_BOTTOM = 0.3;
 /** 液面からこれだけ下までに収める（液面を突き抜けさせない）。 */
 const WORD_TOP_MARGIN = 0.14;
 
-/** 瓶に入れる言葉の最大数。 */
-export const MAX_WORDS = 6;
+/**
+ * 瓶に入れる言葉の上限。
+ *
+ * 問いごとの最新キーワードを**全部**浮かべるのが基本だが、描画コストと読みやすさの
+ * 両方に天井は要る。問いは生存が最大 3 件、1 発酵あたりのキーワードも数語なので、
+ * 実際にここへ当たることはほとんど無い。
+ */
+export const MAX_WORDS = 18;
+
+/** 語の大きさの下限・上限（基準を 1 とした倍率）。 */
+const WORD_SCALE_MIN = 0.72;
+const WORD_SCALE_MAX = 1.38;
+
+/**
+ * 語ごとの大きさ。
+ *
+ * **文字列から決める。** `Math.random()` にすると、シーンを組み直すたびに大きさが
+ * 変わって画面がちらつく（状態が更新されるたびに組み直すため）。同じ語は常に同じ
+ * 大きさになる。
+ */
+export function wordScale(word: string): number {
+  let hash = 0;
+  for (let i = 0; i < word.length; i++) {
+    hash = (hash * 31 + word.charCodeAt(i)) % 100000;
+  }
+  return WORD_SCALE_MIN + (hash / 100000) * (WORD_SCALE_MAX - WORD_SCALE_MIN);
+}
 
 export interface WordPlacement {
   word: string;
@@ -183,35 +208,67 @@ export interface WordPlacement {
   y: number;
   /** 方位（rad）。 */
   angle: number;
+  /** 基準に対する大きさの倍率。 */
+  scale: number;
 }
+
+/** 行間は隣り合う 2 語の高さから決める。これを下回らせない。 */
+const GAP_RATIO = 1.7;
+
+/** 全部入らないときに詰める下限。ここを割ると隣の語に触れる。 */
+const MIN_GAP_RATIO = 1.15;
 
 /**
  * 漂う言葉の配置。
  *
- * 液面までの高さを**実際の語数**で割る。固定の分母で並べると、readiness が低くて
- * 液面が浅いときに全語が同じ高さへ寄って重なる。行間が下限を割るなら、割らなくなる
- * 数まで語を減らす（＝発酵が浅ければ表示語数も減る）。
+ * 問いごとの最新キーワードを**全部**並べる。語ごとに大きさが違うので、行間は
+ * 隣り合う 2 語の高さから決める（一律の間隔だと、大きい語どうしが触れる）。
+ * 全部が入らないときは行間を詰めて収める。詰めても入らない語だけは出さない。
+ *
+ * 液面が低くても**必ず 1 語は出す**。0 語だと「言葉が漂う」という見せ方そのものが消える。
  */
 export function placeWords(words: readonly string[], level: number): WordPlacement[] {
   const candidates = words.slice(0, MAX_WORDS);
   if (candidates.length === 0) return [];
 
-  // 液面が低くても範囲を潰さない。**言葉が 1 つも出ない状態は作らない** —
-  // readiness が低いほど語が減るのは意図どおりだが、0 になると「言葉が漂う」という
-  // 見せ方そのものが消える（原案も必ず 1 語は出す）。
   const top = Math.max(WORD_BOTTOM, level - WORD_TOP_MARGIN);
   const available = top - WORD_BOTTOM;
 
-  // 行間の下限を割らない範囲で入る語数。1 語なら行間は要らない。
-  const fit = Math.floor(available / MIN_WORD_GAP) + 1;
-  const count = Math.max(1, Math.min(candidates.length, fit));
+  const heights = candidates.map((word) => WORD_SPRITE_HEIGHT * wordScale(word));
+
+  // 全語を並べるのに要る高さ（行間 GAP_RATIO のとき）。
+  const spanAt = (ratio: number, count: number): number => {
+    let span = 0;
+    for (let i = 1; i < count; i++) span += ((heights[i - 1] + heights[i]) / 2) * ratio;
+    return span;
+  };
+
+  // まず行間を詰めて全語を収められないか試し、それでも無理なら語数を減らす。
+  let count = candidates.length;
+  let ratio = GAP_RATIO;
+  while (count > 1) {
+    if (spanAt(GAP_RATIO, count) <= available) {
+      ratio = GAP_RATIO;
+      break;
+    }
+    if (spanAt(MIN_GAP_RATIO, count) <= available) {
+      // 詰めれば入る。必要なぶんだけ詰める。
+      ratio = available / (spanAt(1, count) || 1);
+      break;
+    }
+    count--;
+  }
 
   const placements: WordPlacement[] = [];
+  let y = count === 1 ? WORD_BOTTOM + available / 2 : WORD_BOTTOM;
   for (let i = 0; i < count; i++) {
-    // 1 語だけのときは範囲の中ほどに置く（底に貼り付けない）。
-    const y =
-      count === 1 ? WORD_BOTTOM + available / 2 : WORD_BOTTOM + (available / (count - 1)) * i;
-    placements.push({ word: candidates[i], y, angle: GOLDEN_ANGLE * i });
+    if (i > 0) y += ((heights[i - 1] + heights[i]) / 2) * ratio;
+    placements.push({
+      word: candidates[i],
+      y,
+      angle: GOLDEN_ANGLE * i,
+      scale: wordScale(candidates[i]),
+    });
   }
   return placements;
 }

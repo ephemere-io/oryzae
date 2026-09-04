@@ -24,6 +24,7 @@ import {
   WORD_BOB_AMPLITUDE,
   WORD_ORBIT_RADIUS,
   WORD_SPRITE_HEIGHT,
+  wordScale,
 } from '@/features/shared/study/scene/jar';
 
 const PROFILE = sampleJarProfile();
@@ -176,16 +177,35 @@ describe('placeWords', () => {
     expect(placements.length).toBeLessThanOrEqual(MAX_WORDS);
   });
 
-  it.each([0, 0.1, 0.3, 0.5, 0.7, 0.9, 1])(
-    'readiness %s でも語が重ならない（行間が下限を割らない）',
-    (readiness) => {
-      const placements = placeWords(WORDS, liquidLevel(readiness));
-      for (let i = 1; i < placements.length; i++) {
-        const gap = placements[i].y - placements[i - 1].y;
-        expect(gap).toBeGreaterThanOrEqual(MIN_WORD_GAP - 1e-9);
-      }
-    },
-  );
+  it.each([0, 0.1, 0.3, 0.5, 0.7, 0.9, 1])('readiness %s でも語が重ならない', (readiness) => {
+    // 語ごとに大きさが違うので、行間は**隣り合う 2 語の高さ**から決まる。
+    // 一律の間隔で見ると、大きい語どうしが触れているのを見逃す。
+    const placements = placeWords(WORDS, liquidLevel(readiness));
+    for (let i = 1; i < placements.length; i++) {
+      const gap = placements[i].y - placements[i - 1].y;
+      const touching =
+        (WORD_SPRITE_HEIGHT * placements[i - 1].scale + WORD_SPRITE_HEIGHT * placements[i].scale) /
+        2;
+      expect(gap).toBeGreaterThanOrEqual(touching - 1e-9);
+    }
+  });
+
+  it('語ごとに大きさが変わる（全語が同じ大きさにならない）', () => {
+    const scales = placeWords(WORDS, liquidLevel(1)).map((p) => p.scale);
+    expect(new Set(scales).size).toBeGreaterThan(1);
+  });
+
+  it('同じ語は常に同じ大きさ（組み直しでちらつかない）', () => {
+    // Math.random() で決めると、状態が更新されるたびに大きさが変わって画面が騒がしくなる。
+    expect(wordScale('発酵')).toBe(wordScale('発酵'));
+    expect(wordScale('発酵')).not.toBe(wordScale('沈黙'));
+  });
+
+  it('問いごとのキーワードを全部並べられる', () => {
+    const many = ['あ', 'いい', 'ううう', 'ええ', 'おおお', 'かか', 'きき', 'くく'];
+    // 行間を詰めてでも全部出す（入り切らない語だけを落とす）。
+    expect(placeWords(many, liquidLevel(1)).length).toBeGreaterThanOrEqual(6);
+  });
 
   it('揺れを足しても隣の語に触れない', () => {
     // 上下 ±0.045 の揺れは行間より十分小さくないと意味がない。
