@@ -535,6 +535,20 @@
       },
       "canvas_aria": "瓶のキャンバス",
       "minimap_aria": "瓶の俯瞰図"
+    },
+    "history": {
+      "ghost_jar_title": "発酵瓶",
+      "back_to_jar": "瓶にもどる",
+      "progress": "FERMENTATION HISTORY — {current} / {total}",
+      "date_line_latest": "{date}の発酵（最新）",
+      "date_line_back": "{date}の発酵（{steps}つ前）",
+      "entries_scanned": "{count} ENTRIES SCANNED",
+      "new": "NEW",
+      "prev_aria": "前の発酵",
+      "next_aria": "次の発酵",
+      "hint": "← → キー・ドラッグ・スクロールでめくる ／ ESC で瓶にもどる",
+      "fermentations_count": "{count} FERMENTATIONS",
+      "open_aria": "{question}の発酵履歴をひらく"
     }
   },
   "questions": {

@@ -535,6 +535,20 @@
       },
       "canvas_aria": "Jar canvas",
       "minimap_aria": "Jar minimap"
+    },
+    "history": {
+      "ghost_jar_title": "Fermentation jar",
+      "back_to_jar": "Back to the jar",
+      "progress": "FERMENTATION HISTORY — {current} / {total}",
+      "date_line_latest": "Fermented on {date} (latest)",
+      "date_line_back": "Fermented on {date} ({steps} back)",
+      "entries_scanned": "{count} ENTRIES SCANNED",
+      "new": "NEW",
+      "prev_aria": "Previous fermentation",
+      "next_aria": "Next fermentation",
+      "hint": "Flip with ← → keys, drag, or scroll ／ ESC to return to the jar",
+      "fermentations_count": "{count} FERMENTATIONS",
+      "open_aria": "Open the fermentation history for {question}"
     }
   },
   "questions": {

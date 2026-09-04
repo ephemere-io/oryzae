@@ -535,6 +535,20 @@
       },
       "canvas_aria": "항아리 캔버스",
       "minimap_aria": "항아리 미니맵"
+    },
+    "history": {
+      "ghost_jar_title": "발효 항아리",
+      "back_to_jar": "항아리로 돌아가기",
+      "progress": "FERMENTATION HISTORY — {current} / {total}",
+      "date_line_latest": "{date}의 발효 (최신)",
+      "date_line_back": "{date}의 발효 ({steps}번째 이전)",
+      "entries_scanned": "{count} ENTRIES SCANNED",
+      "new": "NEW",
+      "prev_aria": "이전 발효",
+      "next_aria": "다음 발효",
+      "hint": "← → 키·드래그·스크롤로 넘기기 ／ ESC 로 항아리로 돌아가기",
+      "fermentations_count": "{count} FERMENTATIONS",
+      "open_aria": "{question}의 발효 이력 열기"
     }
   },
   "questions": {
