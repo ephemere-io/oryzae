@@ -6,7 +6,7 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useEntriesByMonth } from '@/features/shared/entries/hooks/use-entries-by-month';
+import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { DURATION, RENDER_LIMITS } from '../constants';
@@ -50,15 +50,23 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
 
+  // 一覧の絞り込み。開いている間だけ持つ（閉じれば次に開いたときは素の状態から）。
+  const [listSearch, setListSearch] = useState('');
+  const [listQuestionId, setListQuestionId] = useState<string | null>(null);
+
   /**
-   * 月を選んでいる間は、その月ぶんをサーバーから取り直す。
+   * 一覧が出す記録。**開いている間だけ**取りに行く（`api` を渡さなければ取得は起きない）。
    *
-   * `state.entries` は直近 20 件しか持たない（一覧のためではなく、手帳のホバーに出す
-   * 日付の範囲を作るためのもの）。それを手元で月で絞ると、20 件より古い月が必ず空になる。
+   * `state.entries` を使い回さないのは、あれが直近 20 件しか持たないため（一覧のためでは
+   * なく、手帳のホバーに出す日付の範囲を作るためのもの）。手元で月に絞ると、20 件より
+   * 古い月が必ず空になる。月・問い・検索の絞り込みも、続きの読み込みもサーバーに任せる。
    */
-  const { entries: monthEntries, loading: monthLoading } = useEntriesByMonth(
-    api,
-    overlay?.month ?? null,
+  const list = useEntries(
+    overlay === null ? null : api,
+    listSearch.trim() === '' ? undefined : listSearch.trim(),
+    listQuestionId ?? undefined,
+    'newest',
+    overlay?.month ?? undefined,
   );
 
   /**
@@ -103,10 +111,10 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
     [state.notebooks],
   );
 
-  /** 月を選んでいればその月ぶん、全月なら手元の直近ぶん。 */
+  /** 一覧に出す行。開くまでは取りに行っていないので、その間は手元の直近ぶんを出す。 */
   const overlayEntries = useMemo(
-    () => (overlay?.month != null ? monthEntries.map(toStudyEntry) : state.entries),
-    [overlay?.month, monthEntries, state.entries],
+    () => (overlay === null ? state.entries : list.entries.map(toStudyEntry)),
+    [overlay, list.entries, state.entries],
   );
 
   /** JOURNAL のピルに出す件数は**当月**のもの（積み全体ではない）。 */
@@ -226,12 +234,25 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
       <EntryListOverlay
         open={overlay !== null}
         entries={overlayEntries}
-        loading={overlay?.month != null && monthLoading}
+        loading={list.loading && list.entries.length === 0}
+        hasMore={list.hasMore}
+        onLoadMore={list.loadMore}
+        search={listSearch}
+        onSearchChange={setListSearch}
+        questions={state.questions}
+        questionId={listQuestionId}
+        onSelectQuestion={setListQuestionId}
         months={months}
         selectedMonth={overlay?.month ?? null}
         onSelectMonth={(month) => setOverlay({ month })}
         onSelectEntry={handleSelectEntry}
-        onClose={() => setOverlay(null)}
+        onClose={() => {
+          setOverlay(null);
+          // 次に開いたときは素の状態から。絞ったまま閉じると、別の月を開いても
+          // 前の検索語が効いていて「記録が無い」ように見える。
+          setListSearch('');
+          setListQuestionId(null);
+        }}
       />
     </div>
   );

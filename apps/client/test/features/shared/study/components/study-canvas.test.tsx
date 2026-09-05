@@ -20,6 +20,7 @@ const STATE: StudyState = {
   words: ['発酵'],
   notebooks: [{ month: '2026-09', entryCount: 3, current: true }],
   entries: [],
+  questions: [],
   board: { dateKey: '2026-09-02', viewType: 'daily', cards: [] },
 };
 

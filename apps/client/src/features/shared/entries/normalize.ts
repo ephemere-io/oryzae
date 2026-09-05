@@ -11,7 +11,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
 }
 
-export function normalizeEntry(raw: unknown): EntryListItem {
+function normalizeEntry(raw: unknown): EntryListItem {
   const r = isRecord(raw) ? raw : {};
   const rawLinked = Array.isArray(r.linkedQuestions) ? r.linkedQuestions : [];
   const linkedQuestions: EntryLinkedQuestion[] = rawLinked.filter(isRecord).map((q) => ({

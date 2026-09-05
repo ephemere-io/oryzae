@@ -126,6 +126,8 @@ function parsePreset(raw: unknown): StudyState {
       current: notebook.current === true,
     })),
     entries: parseEntries(raw.entries),
+    // プリセットは問いを持たない（一覧の絞り込みは書斎の見た目に関わらない）。
+    questions: [],
     board: parseBoard(raw.board),
   };
 }

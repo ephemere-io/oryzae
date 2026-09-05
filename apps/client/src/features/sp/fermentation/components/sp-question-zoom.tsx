@@ -8,12 +8,24 @@ import type { SpJarElement } from '@/features/sp/fermentation/components/sp-elem
 import { fitRingText, RING_INSET, RING_TRACKING } from '@/features/sp/fermentation/ring-text';
 import { ringSlots } from '@/features/sp/fermentation/zoom-layout';
 
+/** 円の中での位置（円の直径に対する %）。 */
+export interface ZoomPosition {
+  xPercent: number;
+  yPercent: number;
+}
+
 interface SpQuestionZoomProps {
   questionText: string;
   detail: FermentationDetail | null;
   loading: boolean;
   onClose: () => void;
   onOpenElement: (element: SpJarElement) => void;
+  /**
+   * 動かした要素の位置（id → 位置）。無い要素は輪の上の既定位置に置く。
+   * 保存は呼び出し側（page/瓶）が持つ — この部品は置き場を知らない。
+   */
+  positions?: Record<string, ZoomPosition>;
+  onMove?: (id: string, position: ZoomPosition) => void;
 }
 
 /**
@@ -60,6 +72,8 @@ export function SpQuestionZoom({
   loading,
   onClose,
   onOpenElement,
+  positions = {},
+  onMove,
 }: SpQuestionZoomProps) {
   const t = useTranslations('sp.jar');
   const circleRef = useRef<HTMLDivElement | null>(null);
@@ -87,6 +101,10 @@ export function SpQuestionZoom({
   const radius = size / 2 - RING_INSET;
   const scale = elementScale(size);
 
+  /** 動かしてあればその位置、無ければ輪の上の既定位置。 */
+  const placed = (id: string, fallback: ZoomPosition | undefined): ZoomPosition | undefined =>
+    positions[id] ?? fallback;
+
   return (
     <div
       className="sp-rise absolute inset-0 z-20 flex flex-col"
@@ -100,8 +118,9 @@ export function SpQuestionZoom({
         empty,
       })}
     >
-      <header className="flex items-center justify-between gap-3 px-5 py-4">
-        <p className="min-w-0 flex-1 truncate text-sm">{questionText}</p>
+      {/* 問いは円の外周に書いてある。ここでもう一度出すと同じ文が 2 つ並ぶだけなので、
+          閉じる導線だけを置く。 */}
+      <header className="flex items-center justify-end px-5 py-4">
         <button
           type="button"
           onClick={onClose}
@@ -176,7 +195,9 @@ export function SpQuestionZoom({
           {keywords.map((keyword, i) => (
             <ElementButton
               key={keyword.id}
-              slot={keywordSlots[i]}
+              slot={placed(keyword.id, keywordSlots[i])}
+              id={keyword.id}
+              onMove={onMove}
               scale={scale}
               onClick={() =>
                 onOpenElement({
@@ -206,7 +227,9 @@ export function SpQuestionZoom({
           {snippets.map((snippet, i) => (
             <ElementButton
               key={snippet.id}
-              slot={snippetSlots[i]}
+              slot={placed(snippet.id, snippetSlots[i])}
+              id={snippet.id}
+              onMove={onMove}
               scale={scale}
               onClick={() =>
                 onOpenElement({
@@ -238,7 +261,9 @@ export function SpQuestionZoom({
           {/* 手紙（中央）。円の中でいちばん強い報酬なので席は真ん中。 */}
           {letter ? (
             <ElementButton
-              slot={{ xPercent: 50, yPercent: 50 }}
+              slot={placed(letter.id, { xPercent: 50, yPercent: 50 })}
+              id={letter.id}
+              onMove={onMove}
               scale={scale}
               testId="sp-jar-letter"
               ariaLabel={t('section_letter')}
@@ -301,10 +326,13 @@ export function SpQuestionZoom({
 }
 
 interface ElementButtonProps {
-  slot: { xPercent: number; yPercent: number } | undefined;
+  /** 要素の id。動かした位置を憶えるときの鍵。 */
+  id: string;
+  slot: ZoomPosition | undefined;
   /** 円の大きさに合わせた倍率。位置は % なので、寸法だけをここで合わせる。 */
   scale: number;
   onClick: () => void;
+  onMove?: (id: string, position: ZoomPosition) => void;
   /** 手紙のように文字を持たない要素を掴むための目印。 */
   testId?: string;
   /** 中身が絵だけの要素に名前を与える（読み上げで「ボタン」としか言われなくなる）。 */
@@ -312,12 +340,73 @@ interface ElementButtonProps {
   children: React.ReactNode;
 }
 
-function ElementButton({ slot, scale, onClick, testId, ariaLabel, children }: ElementButtonProps) {
+/** これ以上動いたらタップではなく動かした、とみなす（px）。 */
+const DRAG_SLOP = 6;
+
+/**
+ * 円の中の要素。**タップで読み、ドラッグで動かす。**
+ *
+ * click は pointerup の後に来るので、動かし終えた指離しで中身が開かないよう、
+ * 動かしたかどうかを次の click まで持ち越す（軌道の円と同じ作り）。
+ */
+function ElementButton({
+  id,
+  slot,
+  scale,
+  onClick,
+  onMove,
+  testId,
+  ariaLabel,
+  children,
+}: ElementButtonProps) {
+  const draggedRef = useRef(false);
+  const originRef = useRef<{ x: number; y: number; moved: number } | null>(null);
+
   if (!slot) return null;
+
+  const circle = (event: React.PointerEvent<HTMLElement>): DOMRect | null =>
+    event.currentTarget.parentElement?.getBoundingClientRect() ?? null;
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (draggedRef.current) {
+          draggedRef.current = false;
+          return;
+        }
+        onClick();
+      }}
+      onPointerDown={(event) => {
+        if (!onMove) return;
+        draggedRef.current = false;
+        originRef.current = { x: event.clientX, y: event.clientY, moved: 0 };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const origin = originRef.current;
+        if (!onMove || !origin) return;
+        origin.moved += Math.abs(event.clientX - origin.x) + Math.abs(event.clientY - origin.y);
+        origin.x = event.clientX;
+        origin.y = event.clientY;
+        if (origin.moved < DRAG_SLOP) return;
+
+        const rect = circle(event);
+        if (!rect || rect.width === 0) return;
+        draggedRef.current = true;
+        // 円からはみ出さない範囲に留める（外へ出すと二度と掴めない）。
+        onMove(id, {
+          xPercent: clampPercent(((event.clientX - rect.left) / rect.width) * 100),
+          yPercent: clampPercent(((event.clientY - rect.top) / rect.height) * 100),
+        });
+      }}
+      onPointerUp={() => {
+        originRef.current = null;
+      }}
+      onPointerCancel={() => {
+        originRef.current = null;
+        draggedRef.current = false;
+      }}
       data-testid={testId}
       aria-label={ariaLabel}
       className="absolute"
@@ -325,9 +414,17 @@ function ElementButton({ slot, scale, onClick, testId, ariaLabel, children }: El
         left: `${slot.xPercent}%`,
         top: `${slot.yPercent}%`,
         transform: `translate(-50%, -50%) scale(${scale})`,
+        touchAction: 'none',
+        cursor: onMove ? 'grab' : undefined,
       }}
     >
       {children}
     </button>
   );
+}
+
+/** 円の内側（縁から少し内）に収める。 */
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(92, Math.max(8, value));
 }

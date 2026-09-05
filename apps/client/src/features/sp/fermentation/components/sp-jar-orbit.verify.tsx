@@ -45,9 +45,30 @@ function drag(root: HTMLElement, fromX: number, toX: number): void {
 }
 
 const three: OrbitQuestion[] = [
-  { id: 'q-1', text: '最近うれしかったことは？', hasLetter: true, unread: true },
-  { id: 'q-2', text: 'なぜ続けているのか', hasLetter: true, unread: false },
-  { id: 'q-3', text: 'いま怖いものは何か', hasLetter: false, unread: false },
+  {
+    id: 'q-1',
+    text: '最近うれしかったことは？',
+    hasLetter: true,
+    unread: true,
+    keywords: ['感謝', '余白'],
+    snippetCount: 2,
+  },
+  {
+    id: 'q-2',
+    text: 'なぜ続けているのか',
+    hasLetter: true,
+    unread: false,
+    keywords: ['静けさ'],
+    snippetCount: 1,
+  },
+  {
+    id: 'q-3',
+    text: 'いま怖いものは何か',
+    hasLetter: false,
+    unread: false,
+    keywords: [],
+    snippetCount: 0,
+  },
 ];
 
 const longText =
@@ -110,7 +131,16 @@ registerUnit<Props>({
       probe: true,
       description: 'Probe: 長い問いは末尾を畳む（黙って切れない）',
       props: {
-        questions: [{ id: 'q-long', text: longText, hasLetter: false, unread: false }],
+        questions: [
+          {
+            id: 'q-long',
+            text: longText,
+            hasLetter: false,
+            unread: false,
+            keywords: [],
+            snippetCount: 0,
+          },
+        ],
         onSelect: noop,
       },
     },
@@ -150,6 +180,19 @@ registerUnit<Props>({
       onlyFixtures: ['drag-does-not-open'],
       check: () =>
         selections.length === 0 || `回しただけで開いてしまった: ${JSON.stringify(selections)}`,
+    },
+    {
+      id: 'contents-visible-before-opening',
+      description: '開く前から円の中に言葉が見えている（タップして初めて出るのではない）',
+      onlyFixtures: ['three'],
+      check: ({ root }) => {
+        const front = root.querySelector('button[data-question-id="q-1"]');
+        const text = front?.textContent ?? '';
+        return (
+          (text.includes('感謝') && text.includes('余白')) ||
+          `円の中に言葉が出ていない: "${text.slice(0, 40)}"`
+        );
+      },
     },
     {
       id: 'stacking-stays-inside',

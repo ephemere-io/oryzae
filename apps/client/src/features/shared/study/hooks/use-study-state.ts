@@ -26,7 +26,7 @@ import type { StudyBoardCard, StudyEntry, StudyFermentationStatus, StudyState } 
  * 取得したものを配っているので、ここで取り直さない（#363 の N+1 解消を維持）。
  */
 /** 憶えてある書斎の形が変わったら上げる。 */
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 /** 一週間。裏で必ず取り直すので、長くても古い値が居座らない。 */
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -45,6 +45,7 @@ function isCachedStudyState(value: unknown): value is StudyState {
   if (!Array.isArray(state.words)) return false;
   if (!Array.isArray(state.notebooks)) return false;
   if (!Array.isArray(state.entries)) return false;
+  if (!Array.isArray(state.questions)) return false;
   const fermentation = state.fermentation;
   if (typeof fermentation !== 'object' || fermentation === null) return false;
   const board = state.board;
@@ -75,6 +76,7 @@ export function useStudyState(
   } = useFermentationReadiness(api, authLoading);
   const {
     letters,
+    questions,
     loading: lettersLoading,
     error: lettersError,
   } = useFermentationInbox(api, authLoading);
@@ -127,9 +129,20 @@ export function useStudyState(
         current: count.month === now.slice(0, 7),
       })),
       entries: entries.map(toStudyEntry),
+      questions,
       board: { dateKey: now, viewType: 'daily', cards: cards.map(toStudyBoardCard) },
     };
-  }, [now, unread.unreadCount, readiness.readiness, letters, keywords, counts, entries, cards]);
+  }, [
+    now,
+    unread.unreadCount,
+    readiness.readiness,
+    letters,
+    questions,
+    keywords,
+    counts,
+    entries,
+    cards,
+  ]);
 
   // 言葉は「手紙が届いてから、その詳細を引く」二段構え。ここに入れ忘れると、一段目が
   // 終わった時点で「取得済み・言葉ゼロ」になり、憶えていた言葉がいったん消えてから

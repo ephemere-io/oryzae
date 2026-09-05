@@ -305,9 +305,10 @@ export function SpEntryEditor({
         placeholder={t('title_placeholder')}
         aria-label={t('title_placeholder')}
         className="w-full bg-transparent px-5 pt-2 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
-        // 「書斎へ戻る」マークはヘッダの下端まで届く高さがある。見出しの行にも同じ幅を
-        // 空けないと、マークがタイトルの頭に重なる。
-        style={{ paddingLeft: 'calc(1.25rem + var(--study-back-inset, 0px))' }}
+        // 「書斎へ戻る」マークはヘッダより下まで届く高さがある。左に幅を空けるだけだと
+        // タイトルの頭に重なるので、**行そのものを marks の下へ落とす**。
+        // マークが出ていない間（フラグ off）は 0 なので、従来どおり詰まったまま。
+        style={{ paddingTop: 'calc(0.5rem + var(--study-back-drop, 0px))' }}
       />
 
       {/* 問いを結ぶチップ */}

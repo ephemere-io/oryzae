@@ -16,6 +16,13 @@ import { EntryListOverlay } from './entry-list-overlay';
 
 interface Props {
   loading?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  questions?: { id: string; currentText: string | null }[];
+  questionId?: string | null;
+  onSelectQuestion?: (questionId: string | null) => void;
   open: boolean;
   entries: StudyEntry[];
   months: string[];
@@ -94,6 +101,40 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'has-more',
+      probe: true,
+      description: 'Probe: 続きがあるときは「さらに読み込む」を出す（古い記録へ辿れる）',
+      props: {
+        open: true,
+        entries: ENTRIES,
+        months: ['2026-09', '2026-08'],
+        selectedMonth: null,
+        hasMore: true,
+        onLoadMore: () => {},
+        ...NOOP,
+      },
+    },
+    {
+      id: 'with-tools',
+      probe: true,
+      description: 'Probe: 検索と問いの絞り込みが出る',
+      props: {
+        open: true,
+        entries: ENTRIES,
+        months: ['2026-09', '2026-08'],
+        selectedMonth: null,
+        search: '',
+        onSearchChange: () => {},
+        questions: [
+          { id: 'q1', currentText: '続ける意味とは' },
+          { id: 'q2', currentText: null },
+        ],
+        questionId: 'q1',
+        onSelectQuestion: () => {},
+        ...NOOP,
+      },
+    },
+    {
       id: 'loading-month',
       probe: true,
       description: 'Probe: その月を取りに行っている間は 0 件だと断定しない',
@@ -116,6 +157,40 @@ registerUnit<Props>({
         const expected = props.loading ? 0 : props.entries.length;
         const rows = root.querySelectorAll('li').length;
         return rows === expected || `行数不一致: expected=${expected} actual=${rows}`;
+      },
+    },
+    {
+      id: 'load-more-only-when-more',
+      description: '「さらに読み込む」は続きがあるときだけ出す',
+      check: ({ root, contract }) => {
+        const shown = (root.textContent ?? '').includes('さらに読み込む');
+        return (
+          shown === (contract.hasMore === 'true') ||
+          `ボタン=${shown} だが hasMore="${contract.hasMore}"`
+        );
+      },
+    },
+    {
+      id: 'question-filter-is-single-choice',
+      description: '問いの絞り込みはちょうど 1 つ選ばれている（すべて or ひとつ）',
+      onlyFixtures: ['with-tools'],
+      check: ({ root }) => {
+        // 月のチップと問いのチップが両方あるので、押されているのは 2 つ（月=ALL と 問い）。
+        const pressed = root.querySelectorAll(
+          '[data-chip-group="question"] button[aria-pressed="true"]',
+        ).length;
+        return pressed === 1 || `押されている問いのチップが ${pressed} 個（期待: 1）`;
+      },
+    },
+    {
+      id: 'search-box-when-supported',
+      description: '検索が使えるときだけ入力欄を出す',
+      check: ({ root, props }) => {
+        const hasInput = root.querySelector('input') !== null;
+        return (
+          hasInput === (props.onSearchChange !== undefined) ||
+          `入力欄=${hasInput} だが onSearchChange=${props.onSearchChange !== undefined}`
+        );
       },
     },
     {
@@ -147,9 +222,12 @@ registerUnit<Props>({
     },
     {
       id: 'one-chip-selected',
-      description: '選択中のチップがちょうど 1 つ塗られている',
+      description: '月のチップは常にちょうど 1 つ塗られている',
       check: ({ root }) => {
-        const pressed = root.querySelectorAll('button[aria-pressed="true"]').length;
+        // 問いのチップも同じ形なので、月の帯に限って数える。
+        const pressed = root.querySelectorAll(
+          '[data-chip-group="month"] button[aria-pressed="true"]',
+        ).length;
         return pressed === 1 || `選択中のチップが ${pressed} 個`;
       },
     },

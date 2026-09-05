@@ -55,7 +55,16 @@ const studyMainStyle: MainStyle = {
  */
 const STUDY_BACK_INSET = '44px';
 
-const studyBackStyle: MainStyle = { '--study-back-inset': STUDY_BACK_INSET };
+/**
+ * マークの下端。左に幅を空けるだけでは足りない行（SP エディタのタイトル）が、
+ * ここまで下がって重なりを避ける。
+ */
+const STUDY_BACK_DROP = '28px';
+
+const studyBackStyle: MainStyle = {
+  '--study-back-inset': STUDY_BACK_INSET,
+  '--study-back-drop': STUDY_BACK_DROP,
+};
 
 /** 書斎ホームそのもののパス。ここだけサイドバーを外す。 */
 const STUDY_PATH = '/study';

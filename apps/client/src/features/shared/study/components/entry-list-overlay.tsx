@@ -21,12 +21,23 @@ export interface EntryListOverlayProps {
    */
   selectedMonth: string | null;
   /**
-   * その月の記録を取りに行っている最中か。
+   * 記録を取りに行っている最中か。
    *
    * これが無いと、取得中に「この月の記録はありません」が出てから行が現れる。
    * 手帳の厚みが件数を言っているぶん、0 件の断定はとくに嘘っぽく見える。
    */
   loading?: boolean;
+  /** まだ続きがあるか。ALL は直近から順に取るので、古い記録はここから辿る。 */
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  /** 本文の検索語。空なら絞らない。 */
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  /** 絞り込みに出す問い。 */
+  questions?: { id: string; currentText: string | null }[];
+  /** 絞り込み中の問い。`null` は全部。 */
+  questionId?: string | null;
+  onSelectQuestion?: (questionId: string | null) => void;
   onSelectMonth: (month: string | null) => void;
   onSelectEntry: (entry: StudyEntry) => void;
   onClose: () => void;
@@ -62,6 +73,13 @@ export function EntryListOverlay({
   months,
   selectedMonth,
   loading = false,
+  hasMore = false,
+  onLoadMore,
+  search = '',
+  onSearchChange,
+  questions = [],
+  questionId = null,
+  onSelectQuestion,
   onSelectMonth,
   onSelectEntry,
   onClose,
@@ -79,6 +97,9 @@ export function EntryListOverlay({
         rowCount: entries.length,
         monthCount: months.length,
         loading,
+        hasMore,
+        questionId: questionId ?? 'all',
+        searching: search.length > 0,
       })}
       className="absolute inset-0 z-20 flex items-start justify-center overflow-auto px-6 py-14"
     >
@@ -116,7 +137,7 @@ export function EntryListOverlay({
         </div>
 
         {/* 月チップ。背表紙を狙わなくても月を切り替えられる（SP はこれが唯一の手段）。 */}
-        <div className="mb-5 flex flex-wrap gap-2">
+        <div className="mb-5 flex flex-wrap gap-2" data-chip-group="month">
           <MonthChip
             label={t('chip_all')}
             selected={selectedMonth === null}
@@ -131,6 +152,41 @@ export function EntryListOverlay({
             />
           ))}
         </div>
+
+        {/* 本文の検索。サーバーが絞るので、まだ読み込んでいない古い記録にも当たる。 */}
+        {onSearchChange && (
+          <input
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={t('list_search_placeholder')}
+            aria-label={t('list_search_placeholder')}
+            className="mb-4 w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+            style={{
+              background: 'rgba(140,133,126,0.06)',
+              border: '1px solid rgba(122,116,64,0.14)',
+              color: '#4A4541',
+            }}
+          />
+        )}
+
+        {/* 問いで絞る。問いが 1 つも無ければ行ごと出さない（空の帯が残らない）。 */}
+        {onSelectQuestion && questions.length > 0 && (
+          <div className="mb-5 flex flex-wrap gap-2" data-chip-group="question">
+            <MonthChip
+              label={t('chip_all_questions')}
+              selected={questionId === null}
+              onClick={() => onSelectQuestion(null)}
+            />
+            {questions.map((question) => (
+              <MonthChip
+                key={question.id}
+                label={question.currentText ?? t('question_untitled')}
+                selected={questionId === question.id}
+                onClick={() => onSelectQuestion(question.id)}
+              />
+            ))}
+          </div>
+        )}
 
         {loading ? (
           // 取りに行っている間は 0 件だと断定しない。
@@ -199,6 +255,18 @@ export function EntryListOverlay({
               </li>
             ))}
           </ul>
+        )}
+
+        {/* ALL は直近から順に取る。ここを押さないと古い記録に辿り着けない。 */}
+        {hasMore && onLoadMore && !loading && (
+          <button
+            type="button"
+            onClick={onLoadMore}
+            className="mt-4 w-full rounded-lg py-3 text-center text-[12px] transition-colors hover:bg-[rgba(140,133,126,0.08)]"
+            style={{ color: '#8C857E', border: '1px solid rgba(122,116,64,0.14)' }}
+          >
+            {t('list_load_more')}
+          </button>
         )}
       </div>
     </div>
