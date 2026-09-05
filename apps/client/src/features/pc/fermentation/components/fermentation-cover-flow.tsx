@@ -46,6 +46,24 @@ interface FermentationCoverFlowProps {
   /** 取得済みの詳細（id → 詳細）。 */
   details: ReadonlyMap<string, FermentationDetail>;
   unreadFermentationIds: ReadonlySet<string>;
+  /** ユーザーが動かした中身の位置（瓶と共有する）。 */
+  innerOverrides: {
+    keywords: Record<string, { jarX: number; jarY: number }>;
+    snippets: Record<string, { jarX: number; jarY: number }>;
+    letters: Record<string, { jarX: number; jarY: number }>;
+  };
+  onInnerDragMove: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
+  onInnerDragEnd: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
   onIndexChange: (index: number) => void;
   onClose: () => void;
   onElementClick: (
@@ -71,6 +89,9 @@ export function FermentationCoverFlow({
   index,
   details,
   unreadFermentationIds,
+  innerOverrides,
+  onInnerDragMove,
+  onInnerDragEnd,
   onIndexChange,
   onClose,
   onElementClick,
@@ -119,6 +140,22 @@ export function FermentationCoverFlow({
     onStep: step,
     onClose,
   });
+
+  /**
+   * 円盤の中身（言葉・抜粋・手紙）を掴んだときは、ステージのめくりを始めない。
+   *
+   * 両方が同じ pointerdown を受けると、要素を動かしたつもりが同時に段まで送られる。
+   * 掴む対象が要素かどうかは DOM を辿って決める（要素側で stopPropagation すると、
+   * 今度はステージ背景のヒットテストまで止まってしまう）。
+   */
+  const isInnerElement = (target: EventTarget | null) =>
+    target instanceof Element &&
+    target.closest('[data-verify-unit="DraggableJarElement"]') !== null;
+
+  const handleStagePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isInnerElement(e.target)) return;
+    onPointerDown(e);
+  };
 
   const maxOffset = maxOffsetFrom(clampedIndex, results.length);
   const ghost = ghostJarBox(canvas);
@@ -239,7 +276,7 @@ export function FermentationCoverFlow({
         ref={stageRef}
         onClick={handleStageClick}
         onWheel={onWheel}
-        onPointerDown={onPointerDown}
+        onPointerDown={handleStagePointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
@@ -267,6 +304,9 @@ export function FermentationCoverFlow({
             periodStamp={discPeriodStamp(result, unreadFermentationIds, t)}
             unread={unreadFermentationIds.has(result.id)}
             dragging={dragging}
+            innerOverrides={innerOverrides}
+            onInnerDragMove={onInnerDragMove}
+            onInnerDragEnd={onInnerDragEnd}
             onActivate={i === clampedIndex ? undefined : () => onIndexChange(i)}
             onElementClick={(type, id, data) => onElementClick(result.id, type, id, data)}
             selectedElementId={selectedElementId}

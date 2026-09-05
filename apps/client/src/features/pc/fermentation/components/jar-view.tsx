@@ -197,20 +197,34 @@ const MICROBE_SVGS = {
 };
 
 /**
- * 発酵履歴への入口に添えるアイコン。積み重なった円盤＝めくれる束。
+ * 発酵履歴への入口に添えるアイコン。時計＋反時計回りの矢印＝一般的な「履歴」記号。
  *
- * **塗りで描く**。この取っ手は world の中にあるので、俯瞰（全体表示）では 15px 前後まで
- * 縮む。線画の円を並べる案は実機で試したが、その大きさだと線が潰れて枠のリングと
- * 混ざり、ただのぼやけた輪になった。塗りの楕円なら小さくても「重なっている」が残る。
+ * 独自の絵（円盤の束）も試したが、初見で意味が伝わる保証が無い。ここは発見してもらう
+ * ことが仕事の取っ手なので、既に世の中で通じている記号に寄せる。
  *
- * 手前を濃く、奥へ薄くして「手前の 1 枚だけが開いている」Cover Flow の見え方と揃える。
+ * 円弧は 12 時のすこし左（φ=345°）から時計回りに 315° 描き、左上に隙間を空けて
+ * そこへ矢じりを置く（矢は反時計回り＝過去へ向かう向き）。線は太めにしてある ──
+ * この取っ手は world の中にあり、俯瞰では 15px 前後まで縮むため。
  */
-function HistoryStackIcon() {
+function HistoryIcon() {
   return (
-    <svg viewBox="0 0 26 26" fill="none" aria-hidden="true" className="h-full w-full">
-      <ellipse cx="13" cy="7.5" rx="8.5" ry="3.1" fill="currentColor" opacity="0.3" />
-      <ellipse cx="13" cy="13" rx="8.5" ry="3.1" fill="currentColor" opacity="0.5" />
-      <ellipse cx="13" cy="18.5" rx="8.5" ry="3.1" fill="currentColor" opacity="0.85" />
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-full w-full">
+      <path
+        d="M9.93 4.27 A 8 8 0 1 1 5.07 8"
+        stroke="currentColor"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+      />
+      {/* 反時計回りを示す矢じり（円弧の始点に付ける） */}
+      <path d="M6.45 5.2 L 9.18 1.47 L 10.68 7.07 Z" fill="currentColor" />
+      {/* 針: 12 時と 4 時 */}
+      <path
+        d="M12 7.6 V 12.2 L 15.4 14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -960,7 +974,7 @@ export function JarView({
                 {/* 枠と背景は **クラスで**指定する。インラインの style はどのクラスより強く、
                     group-hover の指定に勝ってしまう（ホバーの手応えが死ぬ）。 */}
                 <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md border border-[rgba(140,133,126,0.3)] bg-[rgba(253,251,247,0.5)] p-[4px] text-[var(--date-color)] transition-colors group-hover:border-[rgba(140,133,126,0.6)] group-hover:bg-[rgba(253,251,247,0.95)] group-hover:text-[var(--fg)]">
-                  <HistoryStackIcon />
+                  <HistoryIcon />
                 </span>
                 <span className="flex flex-col items-start gap-1">
                   <span
@@ -1206,6 +1220,13 @@ export function JarView({
         index={activeHistoryIndex}
         details={historyDetails}
         unreadFermentationIds={unreadFermentationIds}
+        innerOverrides={{
+          keywords: overrides.keywords,
+          snippets: overrides.snippets,
+          letters: overrides.letters,
+        }}
+        onInnerDragMove={(type, id, x, y) => handleInnerDragMove(type, id, { jarX: x, jarY: y })}
+        onInnerDragEnd={(type, id, x, y) => handleInnerDragEnd(type, id, { jarX: x, jarY: y })}
         onIndexChange={handleHistoryIndexChange}
         onClose={closeHistory}
         onElementClick={(resultId, type, id, data) => {

@@ -31,6 +31,23 @@ interface Props {
   periodStamp: string;
   unread: boolean;
   dragging: boolean;
+  innerOverrides: {
+    keywords: Record<string, { jarX: number; jarY: number }>;
+    snippets: Record<string, { jarX: number; jarY: number }>;
+    letters: Record<string, { jarX: number; jarY: number }>;
+  };
+  onInnerDragMove: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
+  onInnerDragEnd: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
   onActivate?: () => void;
   onElementClick: (
     type: 'keyword' | 'snippet' | 'letter',
@@ -96,6 +113,10 @@ const base = {
   questionText: 'なぜ私は急ぐのが苦手なのか',
   periodStamp: 'WEEK 35',
   dragging: false,
+  // 位置は円盤の既定にまかせる（ユーザーが動かしていない状態）。
+  innerOverrides: { keywords: {}, snippets: {}, letters: {} },
+  onInnerDragMove: noop,
+  onInnerDragEnd: noop,
   onElementClick: noop,
   selectedElementId: null,
 };

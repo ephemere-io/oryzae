@@ -28,6 +28,23 @@ interface Props {
   index: number;
   details: ReadonlyMap<string, FermentationDetail>;
   unreadFermentationIds: ReadonlySet<string>;
+  innerOverrides: {
+    keywords: Record<string, { jarX: number; jarY: number }>;
+    snippets: Record<string, { jarX: number; jarY: number }>;
+    letters: Record<string, { jarX: number; jarY: number }>;
+  };
+  onInnerDragMove: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
+  onInnerDragEnd: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
   onIndexChange: (index: number) => void;
   onClose: () => void;
   onElementClick: (
@@ -86,6 +103,9 @@ const DETAIL: FermentationDetail = {
 
 const base = {
   questionText: 'なぜ私は急ぐのが苦手なのか',
+  innerOverrides: { keywords: {}, snippets: {}, letters: {} },
+  onInnerDragMove: noop,
+  onInnerDragEnd: noop,
   onIndexChange: noop,
   onClose: noop,
   onElementClick: noop,

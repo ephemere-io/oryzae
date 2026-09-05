@@ -6,6 +6,17 @@ import { QuestionCircle } from '@/features/pc/fermentation/components/question-c
 import type { DiscPlacement } from '@/features/pc/fermentation/utils/cover-flow-geometry';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 
+interface Pos {
+  jarX: number;
+  jarY: number;
+}
+
+interface InnerOverrides {
+  keywords: Record<string, Pos>;
+  snippets: Record<string, Pos>;
+  letters: Record<string, Pos>;
+}
+
 /** 円盤の下に敷く半透明の皿。背景の瓶をうっすら透かすために不透明にしない。 */
 function plateStyle(active: boolean): React.CSSProperties {
   return {
@@ -43,6 +54,20 @@ interface HistoryDiscProps {
   unread: boolean;
   /** ドラッグ中は transition を切って指に追従させる。 */
   dragging: boolean;
+  /** ユーザーが動かした中身の位置（瓶と共有する。保存もそちらの経路に乗る）。 */
+  innerOverrides: InnerOverrides;
+  onInnerDragMove: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
+  onInnerDragEnd: (
+    type: 'keyword' | 'snippet' | 'letter',
+    id: string,
+    x: number,
+    y: number,
+  ) => void;
   /** 正面でない円盤を押したとき。正面では undefined。 */
   onActivate?: () => void;
   onElementClick: (
@@ -97,21 +122,34 @@ const DISC_SNIPPET_POSITIONS = [
 ];
 const DISC_LETTER_POSITION = { jarX: 28, jarY: 75 };
 
-/** 詳細から「この円盤ではここに置く」という配置表を作る。 */
-function discOverrides(detail: FermentationDetail | null) {
+/**
+ * 円盤の中の配置を決める。優先順位は **ユーザーが動かした位置 > 保存された位置 >
+ * 円盤の既定**。
+ *
+ * `QuestionCircle` の内蔵フォールバックには落とさない。あれは 0.39 倍に縮めて置く前提の
+ * 座標なので、素の寸法で並べる円盤では右へはみ出して重なる。
+ */
+function discOverrides(detail: FermentationDetail | null, dragged: InnerOverrides): InnerOverrides {
   if (!detail) return { keywords: {}, snippets: {}, letters: {} };
-  const keywords: Record<string, { jarX: number; jarY: number }> = {};
-  detail.keywords.slice(0, DISC_KEYWORD_POSITIONS.length).forEach((kw, i) => {
-    keywords[kw.id] = DISC_KEYWORD_POSITIONS[i];
-  });
-  const snippets: Record<string, { jarX: number; jarY: number }> = {};
-  detail.snippets.slice(0, DISC_SNIPPET_POSITIONS.length).forEach((sn, i) => {
-    snippets[sn.id] = DISC_SNIPPET_POSITIONS[i];
-  });
-  const letters: Record<string, { jarX: number; jarY: number }> = detail.letter
-    ? { [detail.letter.id]: DISC_LETTER_POSITION }
-    : {};
-  return { keywords, snippets, letters };
+  const place = (
+    items: readonly { id: string; jarX: number | null; jarY: number | null }[],
+    defaults: readonly Pos[],
+    live: Record<string, Pos>,
+  ): Record<string, Pos> => {
+    const out: Record<string, Pos> = {};
+    items.forEach((item, i) => {
+      const fallback = defaults[i] ?? defaults[defaults.length - 1];
+      out[item.id] =
+        live[item.id] ??
+        (item.jarX != null && item.jarY != null ? { jarX: item.jarX, jarY: item.jarY } : fallback);
+    });
+    return out;
+  };
+  return {
+    keywords: place(detail.keywords, DISC_KEYWORD_POSITIONS, dragged.keywords),
+    snippets: place(detail.snippets, DISC_SNIPPET_POSITIONS, dragged.snippets),
+    letters: detail.letter ? place([detail.letter], [DISC_LETTER_POSITION], dragged.letters) : {},
+  };
 }
 
 /**
@@ -134,11 +172,17 @@ export function HistoryDisc({
   periodStamp,
   unread,
   dragging,
+  innerOverrides,
+  onInnerDragMove,
+  onInnerDragEnd,
   onActivate,
   onElementClick,
   selectedElementId,
 }: HistoryDiscProps) {
-  const innerOverrides = useMemo(() => discOverrides(active ? detail : null), [active, detail]);
+  const placed = useMemo(
+    () => discOverrides(active ? detail : null, innerOverrides),
+    [active, detail, innerOverrides],
+  );
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: 円盤の操作は role="button" を持つ内側の QuestionCircle（onActivate）とステージ背景のヒットテストが担う。この層は 3D 変形の器で、ここに role を足すと同じ操作に取っ手が二重にできる。
@@ -186,13 +230,15 @@ export function HistoryDisc({
         zoomed={active}
         size={placement.size}
         showRing={false}
-        elementsDraggable={false}
+        // 正面の円盤だけ掴める。隣は rotateY で倒れていて getBoundingClientRect が
+        // 歪むため（% が正しく出ない）、そもそも中身も開いていない。
+        elementsDraggable={active}
         elementScale={DISC_ELEMENT_SCALE}
-        innerOverrides={innerOverrides}
+        innerOverrides={placed}
         selectedElementId={selectedElementId}
         onElementClick={onElementClick}
-        onInnerDragMove={NOOP_DRAG}
-        onInnerDragEnd={NOOP_DRAG}
+        onInnerDragMove={onInnerDragMove}
+        onInnerDragEnd={onInnerDragEnd}
         circlePointerHandlers={NOOP_POINTER_HANDLERS}
         onActivate={onActivate ?? NOOP_DRAG}
         isDraggingCircle={false}
