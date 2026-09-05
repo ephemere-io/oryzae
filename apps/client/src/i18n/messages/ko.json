@@ -727,6 +727,7 @@
     "list_heading_month": "{month} — {count} ENTRIES",
     "list_close": "닫기",
     "list_empty_month": "이 달의 기록이 없습니다",
+    "list_loading": "불러오는 중",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
     "row_pickled": "PICKLED",
