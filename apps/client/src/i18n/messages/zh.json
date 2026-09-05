@@ -727,6 +727,7 @@
     "list_heading_month": "{month} — {count} ENTRIES",
     "list_close": "关闭",
     "list_empty_month": "本月没有记录",
+    "list_loading": "加载中",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
     "row_pickled": "PICKLED",

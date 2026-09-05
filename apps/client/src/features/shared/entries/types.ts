@@ -24,3 +24,20 @@ export interface MonthlyEntryCount {
   month: string;
   count: number;
 }
+
+/** 一覧の行に紐づく問いの最小形（Issue #323 でサーバーが埋め込んで返す）。 */
+export interface EntryLinkedQuestion {
+  id: string;
+  currentText: string | null;
+}
+
+/** 一覧が返す記録 1 件。本文まで含む（一覧は冒頭しか見せないが、行の描画側が決める）。 */
+export interface EntryListItem {
+  id: string;
+  userId: string;
+  content: string;
+  mediaUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+  linkedQuestions: EntryLinkedQuestion[];
+}

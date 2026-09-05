@@ -727,6 +727,7 @@
     "list_heading_month": "{month} — {count} ENTRIES",
     "list_close": "Close",
     "list_empty_month": "No entries this month",
+    "list_loading": "Loading",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
     "row_pickled": "PICKLED",
