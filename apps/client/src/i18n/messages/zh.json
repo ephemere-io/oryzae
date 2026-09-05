@@ -690,7 +690,16 @@
     "board": {
       "cards": "{count}张",
       "empty": "今天还没有任何内容",
-      "hint": "可以用手指拖动卡片"
+      "hint": "可以用手指拖动卡片",
+      "add_snippet": "摘录",
+      "add_photo": "照片",
+      "edit": "编辑",
+      "bring_to_front": "移到前面",
+      "remove": "移除",
+      "cancel": "取消",
+      "save": "保存",
+      "resize": "改变大小和方向",
+      "snippet_placeholder": "想留下的话"
     }
   },
   "canvas": {

@@ -4,10 +4,19 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
-import { toTransform, type Viewport } from '@/lib/canvas/viewport';
+import { toTransform, type Viewport, worldToScreen } from '@/lib/canvas/viewport';
 
 /** つかんでいる間だけ最前面へ。 */
 const DRAGGING_Z = 1000;
+
+/** これ以上動いたら「動かした」。それ未満なら「選んだ」。 */
+const TAP_SLOP = 6;
+
+/** 角のつまみの大きさ（画面上の px）。指で掴める最小限。 */
+const HANDLE_SIZE = 28;
+
+/** カードをこれより小さくしない（掴めなくなる）。 */
+const MIN_CARD_SIZE = 60;
 
 /** 隅に小さく出す日付。`2026-09-04` → `09.04`。 */
 export function formatCornerDate(dateKey: string): string {
@@ -26,6 +35,42 @@ export function toWorldDelta(screenDelta: number, scale: number): number {
   return screenDelta / scale;
 }
 
+/**
+ * カードの中心から指までの向きと距離から、回転角と大きさを出す。
+ *
+ * 角のつまみ 1 つで**回転と拡大縮小を同時に**扱う。SP に 2 種類のつまみを並べると、
+ * どちらも指より小さくなって掴み分けられない。掴んだ瞬間の向き・距離を基準にして、
+ * そこからの差分を角度と倍率にする。
+ */
+export function resizeFromHandle(options: {
+  /** 掴んだ瞬間の、中心から指への向き（rad）と距離（world）。 */
+  startAngle: number;
+  startDistance: number;
+  /** いまの向きと距離。 */
+  angle: number;
+  distance: number;
+  /** 掴んだ瞬間のカードの回転（deg）と大きさ（world）。 */
+  startRotation: number;
+  startWidth: number;
+  startHeight: number;
+}): { rotation: number; width: number; height: number } {
+  const { startAngle, startDistance, angle, distance } = options;
+  const ratio = startDistance > 0 ? distance / startDistance : 1;
+  // 縦横の比は変えない。SP では片方だけ伸ばす操作は要求されておらず、比が崩れると
+  // 写真が引き伸ばされて元に戻せない。
+  const width = Math.max(MIN_CARD_SIZE, options.startWidth * ratio);
+  const height = Math.max(MIN_CARD_SIZE, options.startHeight * ratio);
+  const turned = ((angle - startAngle) * 180) / Math.PI;
+  return { rotation: normalizeDegrees(options.startRotation + turned), width, height };
+}
+
+/** -180..180 に畳む。値が無限に増えると保存した数字が読めなくなる。 */
+export function normalizeDegrees(deg: number): number {
+  if (!Number.isFinite(deg)) return 0;
+  const wrapped = ((((deg + 180) % 360) + 360) % 360) - 180;
+  return Math.round(wrapped * 10) / 10;
+}
+
 interface DragState {
   cardId: string;
   pointerId: number;
@@ -33,6 +78,19 @@ interface DragState {
   startY: number;
   originX: number;
   originY: number;
+  /** 指が動いた総量（px）。これが小さいまま離したら「選んだ」。 */
+  moved: number;
+}
+
+interface ResizeState {
+  cardId: string;
+  pointerId: number;
+  /** 掴んだ瞬間の、カード中心から指への向きと距離。 */
+  startAngle: number;
+  startDistance: number;
+  startRotation: number;
+  startWidth: number;
+  startHeight: number;
 }
 
 export interface SpBoardSurfaceProps {
@@ -44,6 +102,11 @@ export interface SpBoardSurfaceProps {
   onMove: (cardId: string, x: number, y: number) => void;
   /** 指を離したとき（保存はここで投げる）。 */
   onCommit: () => void;
+  /** 選んでいるカード。`null` なら何も選んでいない。 */
+  selectedId?: string | null;
+  onSelect?: (cardId: string | null) => void;
+  /** 角のつまみで回転と大きさが決まったとき。 */
+  onTransform?: (cardId: string, next: { rotation: number; width: number; height: number }) => void;
 }
 
 /**
@@ -62,10 +125,14 @@ export function SpBoardSurface({
   viewport,
   onMove,
   onCommit,
+  selectedId = null,
+  onSelect,
+  onTransform,
 }: SpBoardSurfaceProps) {
   const t = useTranslations('sp.board');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>, card: BoardCardData) => {
@@ -78,6 +145,7 @@ export function SpBoardSurface({
         startY: event.clientY,
         originX: card.x,
         originY: card.y,
+        moved: 0,
       };
       setDraggingId(card.id);
     },
@@ -88,10 +156,16 @@ export function SpBoardSurface({
     (event: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      drag.moved = Math.abs(dx) + Math.abs(dy);
+      // 触れただけでは動かさない。指はわずかに揺れるので、選ぶつもりの操作で
+      // カードが 1〜2px ずれて保存されてしまう。
+      if (drag.moved < TAP_SLOP) return;
       onMove(
         drag.cardId,
-        drag.originX + toWorldDelta(event.clientX - drag.startX, viewport.scale),
-        drag.originY + toWorldDelta(event.clientY - drag.startY, viewport.scale),
+        drag.originX + toWorldDelta(dx, viewport.scale),
+        drag.originY + toWorldDelta(dy, viewport.scale),
       );
     },
     [onMove, viewport.scale],
@@ -103,6 +177,65 @@ export function SpBoardSurface({
       if (!drag || drag.pointerId !== event.pointerId) return;
       dragRef.current = null;
       setDraggingId(null);
+      // 動かしていなければ「選んだ」。動かしたなら位置を保存する。
+      if (drag.moved < TAP_SLOP) onSelect?.(drag.cardId);
+      else onCommit();
+    },
+    [onCommit, onSelect],
+  );
+
+  /**
+   * 指が横取りされたとき（pointercancel）。
+   *
+   * 「選んだ」とは扱わない — 利用者が離したわけではないので、選択が勝手に変わると
+   * 押した覚えのないカードの操作が道具箱に出る。動かしていたぶんは画面に残っているので、
+   * そこだけ保存して掴みを解く。
+   */
+  const cancelDrag = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      dragRef.current = null;
+      setDraggingId(null);
+      if (drag.moved >= TAP_SLOP) onCommit();
+    },
+    [onCommit],
+  );
+
+  /** 角のつまみ。中心から指への向きと距離で、回転と大きさを同時に決める。 */
+  const handleResizeMove = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const resize = resizeRef.current;
+      if (!resize || resize.pointerId !== event.pointerId || !onTransform) return;
+      const card = cards.find((candidate) => candidate.id === resize.cardId);
+      if (!card) return;
+
+      const center = cardCenterOnScreen(event.currentTarget, card, viewport);
+      if (!center) return;
+      const dx = event.clientX - center.x;
+      const dy = event.clientY - center.y;
+
+      onTransform(
+        resize.cardId,
+        resizeFromHandle({
+          startAngle: resize.startAngle,
+          startDistance: resize.startDistance,
+          angle: Math.atan2(dy, dx),
+          distance: toWorldDelta(Math.hypot(dx, dy), viewport.scale),
+          startRotation: resize.startRotation,
+          startWidth: resize.startWidth,
+          startHeight: resize.startHeight,
+        }),
+      );
+    },
+    [cards, onTransform, viewport],
+  );
+
+  const endResize = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const resize = resizeRef.current;
+      if (!resize || resize.pointerId !== event.pointerId) return;
+      resizeRef.current = null;
       onCommit();
     },
     [onCommit],
@@ -118,9 +251,14 @@ export function SpBoardSurface({
         dragging: draggingId !== null,
         dateKey,
         hasSidePane: false,
+        selectedId: selectedId ?? 'none',
       })}
       className="relative h-full w-full overflow-hidden"
       style={{ backgroundColor: 'var(--bg)' }}
+      // 板の何も無いところを押したら選択を解く（PC の盤面と同じ）。
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onSelect?.(null);
+      }}
     >
       <div
         className="absolute left-0 top-0"
@@ -135,7 +273,7 @@ export function SpBoardSurface({
               onPointerDown={(event) => handlePointerDown(event, card)}
               onPointerMove={handlePointerMove}
               onPointerUp={endDrag}
-              onPointerCancel={endDrag}
+              onPointerCancel={cancelDrag}
               style={{
                 position: 'absolute',
                 left: card.x,
@@ -158,9 +296,73 @@ export function SpBoardSurface({
               }}
             >
               <SpBoardCardContent card={card} />
+
+              {/* 選んでいる印。枠は**逆スケール**して、盤面の倍率によらず一定の太さにする。 */}
+              {selectedId === card.id && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    border: `${1.5 / viewport.scale}px solid var(--accent)`,
+                    borderRadius: 4,
+                  }}
+                />
+              )}
             </div>
           );
         })}
+
+        {/* 角のつまみ。カードの外（右下）に浮かせる。カードの中に置くと本文に重なる。 */}
+        {onTransform &&
+          visible
+            .filter((card) => card.id === selectedId)
+            .map((card) => (
+              <button
+                key={`handle-${card.id}`}
+                type="button"
+                aria-label={t('resize')}
+                data-testid="sp-board-handle"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  const center = cardCenterOnScreen(event.currentTarget, card, viewport);
+                  if (!center) return;
+                  const dx = event.clientX - center.x;
+                  const dy = event.clientY - center.y;
+                  resizeRef.current = {
+                    cardId: card.id,
+                    pointerId: event.pointerId,
+                    startAngle: Math.atan2(dy, dx),
+                    startDistance: toWorldDelta(Math.hypot(dx, dy), viewport.scale),
+                    startRotation: card.rotation,
+                    startWidth: card.width,
+                    startHeight: card.height,
+                  };
+                }}
+                onPointerMove={handleResizeMove}
+                onPointerUp={endResize}
+                onPointerCancel={endResize}
+                style={{
+                  position: 'absolute',
+                  // カードは回転しているので、つまみも同じ回転の右下に置く。
+                  left: card.x + card.width,
+                  top: card.y + card.height,
+                  // 逆スケール。盤面を縮めても指で掴める大きさを保つ。
+                  width: HANDLE_SIZE / viewport.scale,
+                  height: HANDLE_SIZE / viewport.scale,
+                  marginLeft: -HANDLE_SIZE / viewport.scale / 2,
+                  marginTop: -HANDLE_SIZE / viewport.scale / 2,
+                  transformOrigin: `${-card.width / 2}px ${-card.height / 2}px`,
+                  transform: `rotate(${card.rotation}deg)`,
+                  zIndex: DRAGGING_Z + 1,
+                  borderRadius: '50%',
+                  background: 'var(--accent)',
+                  border: `${2 / viewport.scale}px solid #fff`,
+                  boxShadow: '0 2px 8px rgba(140,133,126,0.3)',
+                  touchAction: 'none',
+                }}
+              />
+            ))}
       </div>
 
       {visible.length === 0 && (
@@ -215,4 +417,22 @@ function SpBoardCardContent({ card }: { card: BoardCardData }) {
     );
   }
   return null;
+}
+
+/**
+ * カードの中心の**画面座標**。つまみの向きと距離を測る基準。
+ *
+ * つまみ自身の位置から逆算する（カードの DOM を探しに行かない）。つまみはカードの
+ * 右下角に、カードと同じ回転で置いてあるので、そこからカードの中心が決まる。
+ */
+function cardCenterOnScreen(
+  handle: HTMLElement,
+  card: BoardCardData,
+  viewport: Viewport,
+): { x: number; y: number } | null {
+  const frame = handle.offsetParent;
+  if (!(frame instanceof HTMLElement)) return null;
+  const rect = frame.getBoundingClientRect();
+  const center = worldToScreen(viewport, card.x + card.width / 2, card.y + card.height / 2);
+  return { x: rect.left + center.x, y: rect.top + center.y };
 }
