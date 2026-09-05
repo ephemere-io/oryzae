@@ -46,6 +46,17 @@ const studyMainStyle: MainStyle = {
   '--sidebar-width': '0px',
 };
 
+/**
+ * 左上のマーク（BackToStudy）が占める幅。
+ *
+ * マークはどの画面の上にも浮くので、画面側の左上に操作があるとその上に重なる
+ * （エディタの「新規」ボタンがまさにそうだった）。**画面側が席を空けるための変数**で、
+ * 読むのは PC/SP のエディタの上端の行だけ。マークが出ていない間は 0px。
+ */
+const STUDY_BACK_INSET = '44px';
+
+const studyBackStyle: MainStyle = { '--study-back-inset': STUDY_BACK_INSET };
+
 /** 書斎ホームそのもののパス。ここだけサイドバーを外す。 */
 const STUDY_PATH = '/study';
 
@@ -116,7 +127,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
             // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
             // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
-            <div className="flex h-[100dvh] flex-col overflow-hidden">
+            <div
+              className="flex h-[100dvh] flex-col overflow-hidden"
+              style={showBackToStudy ? studyBackStyle : undefined}
+            >
               <main className="relative flex-1 overflow-auto">{content}</main>
               {/* 書斎が有効な間はボトムナビを描かない。PC のサイドバーと同じ扱いで、
                   書斎そのものが唯一のグローバルナビゲーションになる。
@@ -132,7 +146,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               {!studyHome && <Sidebar />}
               <main
                 className="flex flex-1 flex-col overflow-hidden"
-                style={studyHome ? studyMainStyle : mainStyle}
+                style={
+                  showBackToStudy
+                    ? { ...(studyHome ? studyMainStyle : mainStyle), ...studyBackStyle }
+                    : studyHome
+                      ? studyMainStyle
+                      : mainStyle
+                }
               >
                 <div className="relative flex-1 overflow-auto">{content}</div>
                 {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}

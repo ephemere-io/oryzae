@@ -12,6 +12,11 @@ import { useTranslations } from 'next-intl';
  *
  * ここに置くことで jar / board / entry の各画面そのものには一切触らずに済む
  * （今回変えるのはナビゲーションと入口だけ、という前提を守る）。
+ *
+ * **重なり順は 55。** エディタは `fixed inset z-50`（ゴースト層が 51）なので、40 のままだと
+ * エディタの下に潜って**そもそも見えない**。一方でドロワーやモーダル（60 以上）より前に
+ * 出てはいけない（開いている間はマークも一緒に伏せる）。
+ * 席の確保は画面側の仕事で、`--study-back-inset`（(protected)/layout.tsx）を読む。
  */
 export function BackToStudy() {
   const t = useTranslations('study');
@@ -21,7 +26,7 @@ export function BackToStudy() {
       href="/study"
       {...verifyAttrs({ unit: 'BackToStudy' })}
       aria-label={t('back_to_study')}
-      className="group fixed left-6 top-6 z-40 flex h-10 items-center gap-2 rounded-full px-3 transition-all duration-300"
+      className="group fixed left-6 top-6 z-[55] flex h-10 items-center gap-2 rounded-full px-3 transition-all duration-300"
       style={{
         background: 'rgba(253, 251, 247, 0.72)',
         backdropFilter: 'blur(10px)',
