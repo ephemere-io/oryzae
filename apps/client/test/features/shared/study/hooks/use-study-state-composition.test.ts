@@ -14,7 +14,8 @@ afterEach(cleanup);
 beforeEach(() => localStorage.clear());
 
 interface RouteMap {
-  [pattern: string]: { body: unknown; ok?: boolean };
+  /** `delayMs` を付けた経路は 1 往復ぶん遅れて返る（二段構えの取得を再現する）。 */
+  [pattern: string]: { body: unknown; ok?: boolean; delayMs?: number };
 }
 
 function apiFor(routes: RouteMap): { api: ApiClient; calls: string[] } {
@@ -27,6 +28,7 @@ function apiFor(routes: RouteMap): { api: ApiClient; calls: string[] } {
       const match = Object.keys(routes).find((pattern) => path.startsWith(pattern));
       if (!match) return new Response('{}', { status: 404 });
       const route = routes[match];
+      if (route.delayMs) await new Promise((resolve) => setTimeout(resolve, route.delayMs));
       return new Response(JSON.stringify(route.body), { status: route.ok === false ? 500 : 200 });
     }),
   };
@@ -155,8 +157,66 @@ describe('useStudyState', () => {
   });
 });
 
+/**
+ * 言葉（瓶に浮かぶキーワード）は二段構えで取る: まず手紙の一覧、その各詳細。
+ * 一段目が終わった時点を「取得済み」と数えると、二段目の待ち時間だけ言葉がゼロになる。
+ */
+const WITH_LETTERS: RouteMap = {
+  ...HAPPY,
+  '/api/v1/fermentations/readiness': {
+    body: { readiness: 0.62, eligible: false, nextRunAt: null },
+  },
+  // 詳細（/fermentations/:id）。HAPPY の同じ鍵を差し替える（前方一致なので順序が効く）。
+  // 一覧より遅らせるのが肝。実物も「一覧が返ってから詳細を引く」ので、ここが同時に
+  // 返ってしまうと二段構えの穴（言葉がいったん消える）が再現しない。
+  '/api/v1/fermentations/': {
+    delayMs: 150,
+    body: {
+      id: 'f-1',
+      questionId: 'q-1',
+      targetPeriod: '2026-08',
+      status: 'completed',
+      keywords: [{ id: 'k-1', keyword: '余白', description: '' }],
+      snippets: [],
+      letter: null,
+    },
+  },
+  '/api/v1/fermentations': {
+    body: [
+      { id: 'f-1', questionId: 'q-1', status: 'completed', createdAt: '2026-08-31T00:00:00.000Z' },
+    ],
+  },
+  '/api/v1/questions': { body: [{ id: 'q-1', currentText: '続ける意味とは' }] },
+};
+
 describe('前回の書斎を憶えて即座に出す', () => {
   const USER = 'u-1';
+
+  it('憶えた言葉が、取得の途中でいったん消えない', async () => {
+    // 1 回目: 取得して憶える。
+    const first = apiFor(WITH_LETTERS);
+    const a = renderHook(() => useStudyState(first.api, false, USER));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    expect(a.result.current.state.words).toEqual(['余白']);
+    a.unmount();
+
+    // 2 回目: 描画のたびに言葉の数を記録する。**一度出た言葉が消えないこと**を見る
+    // （実機で「言葉が出た後に消えて、1 秒ほどして また出る」として出ていた）。
+    // 憶えた値を読むのは effect なので、それより前の初回描画がゼロなのは正常。
+    const second = apiFor(WITH_LETTERS);
+    const seen: number[] = [];
+    const b = renderHook(() => {
+      const value = useStudyState(second.api, false, USER);
+      seen.push(value.state.words.length);
+      return value;
+    });
+    await waitFor(() => expect(b.result.current.loading).toBe(false));
+
+    const firstShown = seen.findIndex((count) => count > 0);
+    expect(firstShown).toBeGreaterThanOrEqual(0);
+    expect(seen.slice(firstShown).filter((count) => count === 0)).toEqual([]);
+    expect(b.result.current.state.words).toEqual(['余白']);
+  });
 
   it('取得が終わったら憶える', async () => {
     const { api } = apiFor(HAPPY);
