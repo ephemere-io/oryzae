@@ -170,19 +170,35 @@ describe('SpBoardSurface', () => {
     expect(Number(target.style.zIndex)).toBeLessThan(1000);
   });
 
-  it('指を離したときに保存を促す', () => {
+  it('動かしてから離すと保存を促す', () => {
     const onCommit = vi.fn();
     const { container } = renderSurface({ onCommit });
     const target = container.querySelector('[data-card-id="c1"]');
     if (!(target instanceof HTMLElement)) throw new Error('missing card');
     target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0 }));
+    target.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 20, clientY: 20 }));
     target.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 20, clientY: 20 }));
     expect(onCommit).toHaveBeenCalledTimes(1);
   });
 
-  it('指がキャンセルされても掴んだままにしない', () => {
+  it('動かさずに離したら「選んだ」（保存はしない）', () => {
+    // 指はわずかに揺れる。触れただけの操作で 1〜2px ずれた位置を保存しない。
     const onCommit = vi.fn();
-    const { container } = renderSurface({ onCommit });
+    const onSelect = vi.fn();
+    const { container } = renderSurface({ onCommit, onSelect });
+    const target = container.querySelector('[data-card-id="c1"]');
+    if (!(target instanceof HTMLElement)) throw new Error('missing card');
+    target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0 }));
+    target.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 2, clientY: 1 }));
+    target.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 2, clientY: 1 }));
+    expect(onSelect).toHaveBeenCalledWith('c1');
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('指がキャンセルされても掴んだままにしない（勝手に選ばない）', () => {
+    const onCommit = vi.fn();
+    const onSelect = vi.fn();
+    const { container } = renderSurface({ onCommit, onSelect });
     const target = container.querySelector('[data-card-id="c1"]');
     if (!(target instanceof HTMLElement)) throw new Error('missing card');
     act(() => {
@@ -192,7 +208,9 @@ describe('SpBoardSurface', () => {
       target.dispatchEvent(pointerEvent('pointercancel', { pointerId: 1, clientX: 0, clientY: 0 }));
     });
     expect(Number(target.style.zIndex)).toBeLessThan(1000);
-    expect(onCommit).toHaveBeenCalledTimes(1);
+    // 離したわけではないので、選択は変えない。
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
   });
 
   it('カードが指の操作を受ける（ブラウザのスクロールに取られない）', () => {

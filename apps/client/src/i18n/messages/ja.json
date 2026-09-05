@@ -690,7 +690,16 @@
     "board": {
       "cards": "{count}枚",
       "empty": "この日はまだ何もありません",
-      "hint": "カードは指で動かせます"
+      "hint": "カードは指で動かせます",
+      "add_snippet": "抜粋",
+      "add_photo": "写真",
+      "edit": "編集",
+      "bring_to_front": "前面へ",
+      "remove": "外す",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "resize": "大きさと向きを変える",
+      "snippet_placeholder": "書き留めておきたいことを"
     }
   },
   "canvas": {

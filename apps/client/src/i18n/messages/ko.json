@@ -690,7 +690,16 @@
     "board": {
       "cards": "{count}장",
       "empty": "오늘은 아직 아무것도 없습니다",
-      "hint": "카드는 손가락으로 옮길 수 있습니다"
+      "hint": "카드는 손가락으로 옮길 수 있습니다",
+      "add_snippet": "발췌",
+      "add_photo": "사진",
+      "edit": "편집",
+      "bring_to_front": "앞으로",
+      "remove": "빼기",
+      "cancel": "취소",
+      "save": "저장",
+      "resize": "크기와 방향 바꾸기",
+      "snippet_placeholder": "남겨 두고 싶은 것"
     }
   },
   "canvas": {
