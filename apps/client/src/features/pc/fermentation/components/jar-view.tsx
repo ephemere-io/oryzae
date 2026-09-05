@@ -48,6 +48,15 @@ const JAR_WORLD_BOUNDS: Bounds = {
 /** 円へズームする矩形の計算に使う。実体は QuestionCircle 側の定数（二重管理しない）。 */
 const CIRCLE_SIZE = QUESTION_CIRCLE_SIZE;
 
+/** メタラベル（発酵履歴への入口）を円の下端からどれだけ離すか（world 単位）。 */
+const META_LABEL_GAP = 18;
+/**
+ * メタラベルの高さ（world 単位）。9px の 2 行＋行間＋上下パディングでおよそ 40。
+ * 実測に合わせた概算だが、**円へ寄るときの画面に収める計算**にしか使わないので、
+ * 多少大きめに見積もる方が安全（余白が増えるだけ）。
+ */
+const META_LABEL_HEIGHT = 40;
+
 /** 円の world 矩形。中心が (jarX%, jarY%) で translate(-50%,-50%) されている前提。 */
 function circleWorldBounds(pos: Pos): Bounds {
   const centerX = (pos.jarX / 100) * JAR_WORLD_WIDTH;
@@ -58,6 +67,18 @@ function circleWorldBounds(pos: Pos): Bounds {
     width: CIRCLE_SIZE,
     height: CIRCLE_SIZE,
   };
+}
+
+/**
+ * 円へ寄るときに画面へ収める矩形。**円だけでなく下のメタラベルまで**含める。
+ *
+ * 円ぴったりに寄せると、`fitBounds` が円を画面中央に置くぶんラベルが下へはみ出し、
+ * キャンバスの下端（＝フッターの直上）で切られて押せなくなる。ラベルは発酵履歴への
+ * 唯一の入口なので、寄った状態でも必ず画面に残っていないといけない。
+ */
+function circleFocusBounds(pos: Pos): Bounds {
+  const box = circleWorldBounds(pos);
+  return { ...box, height: box.height + META_LABEL_GAP + META_LABEL_HEIGHT };
 }
 
 interface QuestionData {
@@ -511,7 +532,7 @@ export function JarView({
     all: JAR_WORLD_BOUNDS,
     focused: (() => {
       const index = visibleQuestions.findIndex((q) => q.id === zoomedId);
-      return index >= 0 ? circleWorldBounds(resolvedCirclePositions[index]) : null;
+      return index >= 0 ? circleFocusBounds(resolvedCirclePositions[index]) : null;
     })(),
   };
 
@@ -541,7 +562,7 @@ export function JarView({
       return;
     }
     const index = visibleQuestions.findIndex((q) => q.id === id);
-    if (index >= 0) fitTo(circleWorldBounds(resolvedCirclePositions[index]));
+    if (index >= 0) fitTo(circleFocusBounds(resolvedCirclePositions[index]));
   }
 
   function handleFit() {
@@ -911,7 +932,7 @@ export function JarView({
                 }`}
                 style={{
                   left: (pos.jarX / 100) * JAR_WORLD_WIDTH,
-                  top: (pos.jarY / 100) * JAR_WORLD_HEIGHT + CIRCLE_SIZE / 2 + 18,
+                  top: (pos.jarY / 100) * JAR_WORLD_HEIGHT + CIRCLE_SIZE / 2 + META_LABEL_GAP,
                   animation: 'fadeIn 0.5s ease-out forwards',
                 }}
               >
