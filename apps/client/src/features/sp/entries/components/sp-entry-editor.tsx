@@ -257,7 +257,9 @@ export function SpEntryEditor({
       {/* 保存ステータス（右・常設）＋ 既存エントリの削除トリガー（左・⋯）。 */}
       <header
         className="flex items-center justify-between px-5 pt-3 pb-1"
-        style={{ minHeight: 28 }}
+        // 書斎が有効な間、左上には「書斎へ戻る」マークが浮く。席を空けないと
+        // マークが ⋯ ボタンの上に重なる（変数は (protected)/layout.tsx）。
+        style={{ minHeight: 28, paddingLeft: 'calc(1.25rem + var(--study-back-inset, 0px))' }}
       >
         {/* 既存エントリだけ削除できる（新規は削除対象が無いので出さない）。 */}
         {entryId ? (
@@ -303,6 +305,9 @@ export function SpEntryEditor({
         placeholder={t('title_placeholder')}
         aria-label={t('title_placeholder')}
         className="w-full bg-transparent px-5 pt-2 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
+        // 「書斎へ戻る」マークはヘッダの下端まで届く高さがある。見出しの行にも同じ幅を
+        // 空けないと、マークがタイトルの頭に重なる。
+        style={{ paddingLeft: 'calc(1.25rem + var(--study-back-inset, 0px))' }}
       />
 
       {/* 問いを結ぶチップ */}
