@@ -62,6 +62,30 @@ export function localMonthKey(createdAtIso: string, tzOffsetMinutes = 0): string
   return `${year}-${month}`;
 }
 
+/**
+ * `YYYY-MM` が指すローカル暦月 1 ヶ月ぶんの UTC 区間。
+ *
+ * 書斎の一覧が「その月の記録」を引くのに使う。件数（`countByMonth` → `localMonthKey`）と
+ * **同じ月の切り方**でなければならない。ここがずれると、手帳の厚みが言う件数と一覧の
+ * 件数が食い違う（月初 00:00〜09:00 の記録が、片方では当月・片方では前月に入る）。
+ */
+export function localMonthRange(month: string, tzOffsetMinutes = 0): UtcInstantRange {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new Error(`Invalid month: ${month}`);
+  }
+  const start = localMidnightUtcMs(`${month}-01`, tzOffsetMinutes);
+  // 翌月 1 日のローカル 00:00。年跨ぎは Date の桁上がりに任せる。
+  const [year, monthIndex] = month.split('-').map(Number);
+  const nextYear = monthIndex === 12 ? year + 1 : year;
+  const nextMonth = monthIndex === 12 ? 1 : monthIndex + 1;
+  const nextKey = `${nextYear}-${`${nextMonth}`.padStart(2, '0')}-01`;
+  const end = localMidnightUtcMs(nextKey, tzOffsetMinutes);
+  return {
+    startUtc: new Date(start).toISOString(),
+    endUtc: new Date(end).toISOString(),
+  };
+}
+
 /** `dateKey` を含むローカルの週（月曜始まり）1 週間ぶんの UTC 区間。 */
 export function localWeekRange(dateKey: string, tzOffsetMinutes = 0): UtcInstantRange {
   const start = localMidnightUtcMs(dateKey, tzOffsetMinutes);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTzOffsetMinutes } from '@/contexts/entry/presentation/params.js';
+import { parseMonth, parseTzOffsetMinutes } from '@/contexts/entry/presentation/params.js';
 
 describe('parseTzOffsetMinutes', () => {
   it('getTimezoneOffset() 相当の分数をそのまま返す', () => {
@@ -25,5 +25,26 @@ describe('parseTzOffsetMinutes', () => {
     expect(parseTzOffsetMinutes('841')).toBe(0);
     expect(parseTzOffsetMinutes('-841')).toBe(0);
     expect(parseTzOffsetMinutes('99999')).toBe(0);
+  });
+});
+
+describe('parseMonth', () => {
+  it('YYYY-MM を受ける', () => {
+    expect(parseMonth('2026-06')).toBe('2026-06');
+    expect(parseMonth('  2026-12  ')).toBe('2026-12');
+  });
+
+  it('形が違えば絞らない（undefined）', () => {
+    expect(parseMonth(undefined)).toBeUndefined();
+    expect(parseMonth('')).toBeUndefined();
+    expect(parseMonth('2026-6')).toBeUndefined();
+    expect(parseMonth('2026-06-01')).toBeUndefined();
+    expect(parseMonth('abc')).toBeUndefined();
+  });
+
+  it('実在しない月は受けない', () => {
+    // 通すと空の区間で必ず 0 件になり、「その月には無い」と区別がつかない。
+    expect(parseMonth('2026-00')).toBeUndefined();
+    expect(parseMonth('2026-13')).toBeUndefined();
   });
 });

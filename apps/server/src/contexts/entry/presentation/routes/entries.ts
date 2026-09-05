@@ -10,7 +10,7 @@ import { UpdateEntryUsecase } from '../../application/usecases/update-entry.usec
 import { SupabaseEntryRepository } from '../../infrastructure/repositories/supabase-entry.repository.js';
 import { SupabaseEntryLinkedQuestionsViewRepository } from '../../infrastructure/repositories/supabase-entry-linked-questions-view.repository.js';
 import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository.js';
-import { parseTzOffsetMinutes } from '../params.js';
+import { parseMonth, parseTzOffsetMinutes } from '../params.js';
 
 type Env = {
   Variables: {
@@ -40,6 +40,12 @@ export const entries = new Hono<Env>()
     const questionId = c.req.query('questionId');
     // 作成日のソート順。未知の値は既定の 'newest'（新しい順）に丸める。
     const order = c.req.query('order') === 'oldest' ? 'oldest' : 'newest';
+    // 書斎の一覧（docs/oryzae-study）用の月絞り。tzOffset は件数（monthly-counts）と
+    // 同じものを受ける — 切り方が違うと手帳の厚みと一覧の件数が食い違う。
+    const monthKey = parseMonth(c.req.query('month'));
+    const month = monthKey
+      ? { month: monthKey, tzOffsetMinutes: parseTzOffsetMinutes(c.req.query('tzOffset')) }
+      : undefined;
     const supabase = c.get('supabase');
     const entryRepo = new SupabaseEntryRepository(supabase);
     const parsedLimit = limit ? Number(limit) : undefined;
@@ -59,6 +65,7 @@ export const entries = new Hono<Env>()
           parsedLimit,
           questionId,
           order,
+          month,
         );
 
     // Issue #323: 一覧に紐づく問いを表示。entry-context-isolation を守るため
