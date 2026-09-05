@@ -32,9 +32,11 @@ function normalizeReadiness(raw: unknown): FermentationReadiness {
 export function useFermentationReadiness(
   api: ApiClient | null,
   authLoading: boolean,
-): { readiness: FermentationReadiness; loading: boolean } {
+): { readiness: FermentationReadiness; loading: boolean; error: boolean } {
   const [readiness, setReadiness] = useState<FermentationReadiness>(IDLE);
   const [loading, setLoading] = useState(true);
+  // 取れなかったのか、本当に何も無いのか。書斎はこれを見て、前回の絵を出すか決める。
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!api || authLoading) return;
@@ -45,8 +47,10 @@ export function useFermentationReadiness(
         const res = await client.fetch('/api/v1/fermentations/readiness');
         if (cancelled) return;
         if (res.ok) setReadiness(normalizeReadiness(await readJson(res)));
+        else setError(true);
       } catch {
         // 瓶は idle の見た目で出る。書斎そのものは壊さない。
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -58,5 +62,5 @@ export function useFermentationReadiness(
     };
   }, [api, authLoading]);
 
-  return { readiness, loading };
+  return { readiness, loading, error };
 }

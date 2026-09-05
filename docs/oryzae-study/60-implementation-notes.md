@@ -469,3 +469,30 @@ SP の瓶にも「PC と同じ壜」を中央に置くため、`JarView` の中�
 親の境界は**行き先のパスから引く**（`_loading/route-loading` の `RouteLoading`）。
 子を持つルートがこれを守っているかは `test/architecture/route-loading.test.ts` が見る。
 
+## 25. 取りに行って届かなかったときは、前回の書斎を出す
+
+レート制限（429）に当たった直後、机の手帳も壜の言葉もボードのカードも消えて**空の部屋**が
+出ていた。憶えてある書斎（§15）は「取得中」の間しか使っておらず、取得が**失敗して**
+終わったときは空の live で塗り潰していたため。
+
+- 取りに行く hook（readiness / 受信箱 / 月別件数 / 記録）に `error` を足し、
+  「届かなかった」と「本当に何も無い」を見分けられるようにした
+- どれか 1 つでも落ちていたら、前回の書斎をそのまま出す（通信の失敗はまとめて起きる）
+- **届かなかったときは憶えている中身を上書きしない。** 空で塗り潰すと、次に開いたときも
+  空になる
+
+本当に空（200 で空配列）なら空で出す。憶えた中身を出し続けると、全部消した人に
+消えたはずの物が見え続ける。
+
+### 残っている穴: 書斎は 1 回開くたびに 8 往復する
+
+`general` の上限は **60 リクエスト/分・利用者**（`rate-limit.ts`）。書斎を 1 回開くと
+users/me・questions・fermentations（**2 回**）・fermentations/readiness・
+entries/monthly-counts・entries・board の 8 往復が走る。行き来を繰り返すと数分で上限に届く。
+
+`/api/v1/fermentations` が 2 回なのは、`(protected)/layout.tsx` の `useUnreadLetters` と
+書斎の `useFermentationInbox` が同じものを別々に取っているため。書斎は `questionText` を
+使っていないので、受信箱を未読側と 1 本化すれば `/questions` ともども 2 往復減らせる。
+ただし `UnreadState` は `lib/` にあり、発酵ドメインの型を持たせられない（lib はドメインを
+知らない）。**共有の取得を `features/shared/fermentation` 側の provider へ移す**のが筋。
+

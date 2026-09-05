@@ -68,10 +68,22 @@ export function useStudyState(
   loading: boolean;
 } {
   const unread = useUnread();
-  const { readiness, loading: readinessLoading } = useFermentationReadiness(api, authLoading);
-  const { letters, loading: lettersLoading } = useFermentationInbox(api, authLoading);
-  const { counts, loading: countsLoading } = useEntryMonthlyCounts(api, authLoading);
-  const { entries, loading: entriesLoading } = useEntries(api);
+  const {
+    readiness,
+    loading: readinessLoading,
+    error: readinessError,
+  } = useFermentationReadiness(api, authLoading);
+  const {
+    letters,
+    loading: lettersLoading,
+    error: lettersError,
+  } = useFermentationInbox(api, authLoading);
+  const {
+    counts,
+    loading: countsLoading,
+    error: countsError,
+  } = useEntryMonthlyCounts(api, authLoading);
+  const { entries, loading: entriesLoading, error: entriesError } = useEntries(api);
 
   const now = useMemo(() => localDateKey(new Date()), []);
   const { cards, loading: boardLoading } = useBoard(api, now);
@@ -130,24 +142,36 @@ export function useStudyState(
     entriesLoading ||
     boardLoading;
 
+  /**
+   * 取りに行って**届かなかった**か（429・オフライン・500）。
+   *
+   * 「本当に何も無い」と区別が要る。区別しないと、通信が失敗しただけで空の部屋を描き、
+   * 憶えていた書斎まで消してしまう（実機で、レート制限に当たった直後にそう見えていた）。
+   * どれか 1 つでも落ちていれば「届かなかった」とみなす — 通信の失敗はまとめて起きる。
+   */
+  const failed = readinessError || lettersError || countsError || entriesError;
+
   // 取り終えたら憶える。次に書斎を開いたとき、取得を待たずに前回の絵が出る。
+  // **届かなかったときは上書きしない。** 空の書斎で塗り潰すと、次に開いたときも空になる。
   useEffect(() => {
-    if (loading || cacheKey === null) return;
+    if (loading || failed || cacheKey === null) return;
     writeStaleCache(cacheKey, live, { version: CACHE_VERSION, maxAgeMs: CACHE_MAX_AGE_MS });
-  }, [loading, cacheKey, live]);
+  }, [loading, failed, cacheKey, live]);
 
   /**
-   * 取得が終わるまでは**前回の書斎**を出す。
+   * 取得が終わるまで、**そして届かなかったときも**、前回の書斎を出す。
    *
-   * これが無いと、開くたびに空の机と空の壁がいったん出てから中身が入る。瓶の言葉と
-   * ボードのカードは取得に時間がかかるので、その間ずっと空に見えていた。
+   * 待っている間これが無いと、開くたびに空の机と空の壁がいったん出てから中身が入る。
+   * 届かなかったときにこれが無いと、通信が失敗しただけで**部屋が空になる**
+   * （レート制限に当たった直後、机の手帳も壜の言葉もボードのカードも消えていた）。
    *
    * 日付だけは憶えた値を使わない。日をまたぐと当月の手帳が前月として出てしまう。
    */
   const state = useMemo<StudyState>(() => {
-    if (!loading || cached === null) return live;
+    if (cached === null) return live;
+    if (!loading && !failed) return live;
     return { ...cached, now: live.now, unreadCount: live.unreadCount };
-  }, [loading, cached, live]);
+  }, [loading, failed, cached, live]);
 
   return {
     state,
