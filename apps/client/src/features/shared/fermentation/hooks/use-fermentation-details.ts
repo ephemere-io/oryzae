@@ -24,6 +24,10 @@ const EMPTY: ReadonlyMap<string, FermentationDetail> = new Map();
  *
  * `useFermentationDetail`（1 件・id が変わるたび取得）とは役割が違うので別に置く。
  * あちらは「開いた手紙 1 通」、こちらは「めくりながら見る窓」。
+ *
+ * ⚠️ `api` は **参照が安定していること**（context から受け取ったものをそのまま渡す）。
+ * 毎レンダー新しい `ApiClient` を作って渡すとキャッシュが毎回破棄され、取得が終わらない。
+ * この前提は同じ層の他のフック（`useFermentationForQuestion` 等）と揃えてある。
  */
 export function useFermentationDetails(
   api: ApiClient | null,
@@ -41,6 +45,15 @@ export function useFermentationDetails(
   /** 直前の api。差し替わったらキャッシュは別人のものになりうるので捨てる。 */
   const lastApi = useRef(api);
 
+  /** アンマウント後に state を触らないための唯一のガード。 */
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   // ids は呼び出し側が毎レンダー新しい配列を作るので、中身を文字列に畳んで依存にする。
   const key = ids.join(',');
 
@@ -56,7 +69,6 @@ export function useFermentationDetails(
     if (missing.length === 0) return;
     for (const id of missing) requested.current.add(id);
 
-    let cancelled = false;
     setPending((n) => n + missing.length);
 
     Promise.all(
@@ -73,10 +85,16 @@ export function useFermentationDetails(
         }
       }),
     ).then((loaded) => {
-      // 取得中の数は cancel でも必ず戻す。ここを早期 return にすると、
-      // 依存が変わって張り直されたときに loading が true のまま残る。
+      if (!mounted.current) return;
       setPending((n) => Math.max(0, n - missing.length));
-      if (cancelled) return;
+      // 取れたものは **必ず** キャッシュへ入れる。
+      //
+      // ここに「途中で ids が変わったから捨てる」を置いてはいけない。ids は
+      // **めくるたびに変わる**ので、「その発酵を見るためにめくる操作」がその発酵の
+      // 取得を打ち切ることになる。requested には id が残るので二度と取りに行かず、
+      // 2 段目から先が永久に空白の円盤になっていた。キャッシュは id で引くだけの
+      // 純粋な追記なので、段が変わっていても入れて困るものは無い。
+      if (lastApi.current !== client) return;
       const found = loaded.filter((d): d is FermentationDetail => d !== null);
       if (found.length === 0) return;
       setDetails((prev) => {
@@ -85,10 +103,6 @@ export function useFermentationDetails(
         return next;
       });
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, [api, key]);
 
   return { details, loading: pending > 0 };

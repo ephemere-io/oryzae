@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import type { ApiClient } from '@/lib/api';
@@ -50,7 +50,8 @@ describe('useFermentationDetails', () => {
 
   it('id を渡さなければ fetch しない', () => {
     const apiFetch = detailRouter();
-    renderHook(() => useFermentationDetails(createMockApi(apiFetch), []));
+    const api = createMockApi(apiFetch);
+    renderHook(() => useFermentationDetails(api, []));
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
@@ -122,6 +123,64 @@ describe('useFermentationDetails', () => {
 
     expect(result.current.details.has('f1')).toBe(false);
     expect(result.current.details.get('f2')?.id).toBe('f2');
+  });
+
+  it('取得中に ids が変わっても、取れた詳細は捨てない（めくる速さが取得より速いとき）', async () => {
+    // 実バグの再現: cleanup で結果を捨てつつ requested には id を残していたため、
+    // 「その発酵を見るためにめくる操作」がその発酵の取得を打ち切り、2 段目から先が
+    // 永久に空白になっていた（Vercel プレビューで発覚）。
+    const resolvers: Record<string, (r: Response) => void> = {};
+    const apiFetch = vi.fn((url: string) => {
+      const id = url.split('/').pop() ?? '';
+      return new Promise<Response>((resolve) => {
+        resolvers[id] = resolve;
+      });
+    });
+    const api = createMockApi(apiFetch);
+    const { result, rerender } = renderHook(
+      ({ ids }: { ids: string[] }) => useFermentationDetails(api, ids),
+      { initialProps: { ids: ['f3', 'f4'] } },
+    );
+
+    // f3/f4 の取得が飛んでいる最中に 1 段めくる（= ids が入れ替わる）。
+    rerender({ ids: ['f2', 'f3', 'f4'] });
+    // さらにもう 1 段めくる。ここで従来は f2 の結果が捨てられていた。
+    rerender({ ids: ['f1', 'f2', 'f3'] });
+
+    // 遅れて全部が返ってくる。
+    await act(async () => {
+      for (const id of ['f1', 'f2', 'f3', 'f4']) {
+        resolvers[id]?.(mockResponse(true, detailBody(id)));
+      }
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // どの段の詳細も落ちていない。
+    for (const id of ['f1', 'f2', 'f3', 'f4']) {
+      expect(result.current.details.get(id)?.id).toBe(id);
+    }
+  });
+
+  it('アンマウント後に解決しても state を触らない', async () => {
+    const resolvers: Record<string, (r: Response) => void> = {};
+    const apiFetch = vi.fn((url: string) => {
+      const id = url.split('/').pop() ?? '';
+      return new Promise<Response>((resolve) => {
+        resolvers[id] = resolve;
+      });
+    });
+    // api は毎レンダー同じ参照でなければならない（呼び出し側は context から受け取る）。
+    const api = createMockApi(apiFetch);
+    const { unmount } = renderHook(() => useFermentationDetails(api, ['f1']));
+    unmount();
+    // 解決してもエラーにならない（React の警告も出ない）。
+    await act(async () => {
+      resolvers.f1?.(mockResponse(true, detailBody('f1')));
+    });
+    expect(apiFetch).toHaveBeenCalledTimes(1);
   });
 
   it('fetch が reject しても loading は解け、失敗した id は取りに行き直さない', async () => {
