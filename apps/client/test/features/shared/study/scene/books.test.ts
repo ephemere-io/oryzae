@@ -108,6 +108,47 @@ describe('紙の束に見せるための寸法', () => {
     expect(SPREAD_PAGES.thickness).toBeLessThan(COVER_THICKNESS);
   });
 
+  it('紙は上からめくる（下からだと上に載っている紙に隠れて 1 枚しか動いて見えない）', () => {
+    const count = SPREAD_PAGES.count;
+    // 積んだ順は下から 0。いちばん上（count-1）が最初（0 番目）にめくれる。
+    expect(SPREAD_PAGES.turnOrderOf(count - 1, count)).toBe(0);
+    expect(SPREAD_PAGES.turnOrderOf(0, count)).toBe(count - 1);
+  });
+
+  it('めくる順は全部の紙をちょうど 1 回ずつ使う（重なって 1 枚に見えない）', () => {
+    const count = SPREAD_PAGES.count;
+    const orders = Array.from({ length: count }, (_, i) => SPREAD_PAGES.turnOrderOf(i, count));
+    expect([...orders].sort()).toEqual(Array.from({ length: count }, (_, i) => i));
+  });
+
+  it('上の紙ほど深く開く（下の紙が上の紙を追い越さない）', () => {
+    const count = SPREAD_PAGES.count;
+    for (let stackIndex = 1; stackIndex < count; stackIndex++) {
+      const upper = SPREAD_PAGES.angleAt(SPREAD_PAGES.turnOrderOf(stackIndex, count));
+      const lower = SPREAD_PAGES.angleAt(SPREAD_PAGES.turnOrderOf(stackIndex - 1, count));
+      expect(upper).toBeGreaterThan(lower);
+    }
+  });
+
+  it('紙は束の上に載り、表紙の下に収まる（閉じている間は見えない）', () => {
+    const top = SPREAD_PAGES.liftBase + (SPREAD_PAGES.count - 1) * SPREAD_PAGES.gap;
+    expect(SPREAD_PAGES.liftBase).toBeGreaterThan(0);
+    expect(top + SPREAD_PAGES.thickness).toBeLessThan(COVER_THICKNESS);
+  });
+
+  it('紙は表紙より一回り小さい（表紙の下からはみ出さない）', () => {
+    expect(SPREAD_PAGES.inset).toBeGreaterThan(0);
+    expect(SPREAD_PAGES.inset).toBeLessThan(NOTEBOOK_SIZE.width / 2);
+  });
+
+  it('見開きは左右そろっている（片方だけだと開いた先が白紙に見える）', () => {
+    // 右の頁＝束の上面、左の頁＝表紙の裏。どちらかが 0 本だと片側が白紙になる。
+    expect(RULES.spreadCount).toBeGreaterThan(0);
+    expect(RULES.coverInnerCount).toBeGreaterThan(0);
+    // 表紙の裏は蝶番のぶん狭いので、右の頁より本数は多くしない。
+    expect(RULES.coverInnerCount).toBeLessThanOrEqual(RULES.spreadCount);
+  });
+
   it('表紙のラベルが表紙に収まる', () => {
     expect(COVER_LABEL.width).toBeLessThan(NOTEBOOK_SIZE.width);
     expect(COVER_LABEL.height).toBeLessThan(NOTEBOOK_SIZE.depth);
@@ -125,7 +166,12 @@ describe('紙の束に見せるための寸法', () => {
   });
 
   it('罫はどれも薄い（線が主張しすぎると紙に見えない）', () => {
-    for (const opacity of [RULES.foreEdgeOpacity, RULES.spreadOpacity, ...EDGE_LINE_OPACITIES]) {
+    for (const opacity of [
+      RULES.foreEdgeOpacity,
+      RULES.spreadOpacity,
+      RULES.coverInnerOpacity,
+      ...EDGE_LINE_OPACITIES,
+    ]) {
       expect(opacity).toBeGreaterThan(0);
       expect(opacity).toBeLessThan(0.4);
     }

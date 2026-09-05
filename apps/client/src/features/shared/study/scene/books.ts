@@ -53,12 +53,31 @@ export const COVER_HINGE_X = -1.3;
 /** 表紙の開き角。π ちょうどにしないのは、完全に平らだと裏返って見えるため。 */
 export const COVER_OPEN_ANGLE = Math.PI * 0.995;
 
-/** 当月だけが持つ見開きのページ。 */
+/**
+ * 当月だけが持つ見開きのページ（紙）。
+ *
+ * 束の上面と表紙のあいだに挟まる薄い紙。閉じている間は表紙に隠れていて、開くときだけ
+ * 表紙を追って持ち上がる。**上の紙からめくる**（下からめくると、上に載っている紙に
+ * 隠れて 1 枚しか動いて見えない）。
+ */
 export const SPREAD_PAGES = {
   count: 3,
   thickness: 0.007,
-  /** i 枚目の開き角。 */
+  /** 束の上面からの持ち上げ。1 枚目の位置。 */
+  liftBase: 0.004,
+  /** 1 枚ごとの間隔。 */
+  gap: 0.008,
+  /** 表紙より一回り小さく作る（表紙の下から紙がはみ出して見えない）。 */
+  inset: 0.08,
+  /** i 枚目の開き角。0 が最初にめくる紙。 */
   angleAt: (i: number): number => Math.PI * 0.986 - i * 0.007,
+  /**
+   * 積んだ順（下から 0）を、めくる順（上から 0）に直す。
+   *
+   * 紙は下から積むが、めくるのは上から。下からめくると、上に載っている紙に隠れて
+   * **1 枚しか動いて見えない**（実機でそう見えていた）。
+   */
+  turnOrderOf: (stackIndex: number, count: number): number => count - 1 - stackIndex,
 } as const;
 
 /** 手帳の平面の寸法。 */
@@ -67,13 +86,25 @@ export const NOTEBOOK_SIZE = { width: 2.6, depth: 3.4 } as const;
 /** 表紙のラベル枠。 */
 export const COVER_LABEL = { width: 1.1, height: 0.48, opacity: 0.35 } as const;
 
-/** 小口の罫と見開きの罫。 */
+/**
+ * 小口の罫と見開きの罫。
+ *
+ * 見開きの罫は**束の上面**に引く（表紙が開いたときに現れる右の頁）。表紙の裏側にも
+ * 罫を引く（左の頁）。この 2 枚で見開きが成立するので、どちらが欠けても開いた先が
+ * 白紙に見える。
+ */
 export const RULES = {
   foreEdgeCount: 14,
   foreEdgeOpacity: 0.24,
+  /** 束の上面（右の頁）の罫。 */
   spreadCount: 9,
   spreadSpacing: 0.28,
   spreadOpacity: 0.18,
+  /** 表紙の裏（左の頁）の罫。表紙のぶん少し狭い。 */
+  coverInnerCount: 7,
+  coverInnerOpacity: 0.14,
+  /** 罫の端を紙の縁から引っ込める量。 */
+  spreadEdgeInset: 0.35,
 } as const;
 
 /** 棚の背文字（CanvasTexture）。 */
