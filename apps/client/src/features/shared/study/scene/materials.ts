@@ -82,6 +82,29 @@ function opacityKey(opacity: number): string {
   return opacity.toFixed(3);
 }
 
+/** フェードで書き換える 2 つの値。元の状態は素材を作った時点で控えておく。 */
+export interface FadeState {
+  opacity: number;
+  transparent: boolean;
+}
+
+/**
+ * 素材を `fade`（0..1）まで薄くしたときの状態。
+ *
+ * **`transparent` を戻すのが肝。** three.js は透明な物を不透明な物とは別のパスで、
+ * 奥から手前へ並べ替えて描く。元が不透明な瓶体を `transparent: true` のままにすると、
+ * 瓶体が透明キューに入り、中の言葉（`depthTest: false` の sprite）より**後に**
+ * 描かれることがある。そうなると言葉が瓶体に塗り潰されて消える
+ * （実機で「一覧を開いて閉じると壜のキーワードが減る」として出ていた）。
+ */
+export function fadedMaterialState(base: FadeState, fade: number): FadeState {
+  return {
+    opacity: base.opacity * fade,
+    // 薄くしている間だけ透明扱い。戻り切ったら元のフラグに返す。
+    transparent: base.transparent || fade < 1,
+  };
+}
+
 export function createMaterials(theme: StudyTheme): StudyMaterials {
   const palette = paletteFor(theme);
   const owned: Material[] = [];

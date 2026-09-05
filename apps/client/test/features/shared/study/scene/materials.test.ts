@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createMaterials,
   DARK_PALETTE,
+  fadedMaterialState,
   LIGHT_PALETTE,
   paletteFor,
 } from '@/features/shared/study/scene/materials';
@@ -95,3 +96,41 @@ function luminance(hex: string): number {
   const b = (value & 0xff) / 255;
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
+
+describe('fadedMaterialState', () => {
+  const opaque = { opacity: 1, transparent: false };
+  const glassy = { opacity: 0.5, transparent: true };
+
+  it('元の不透明度に倍率を掛ける', () => {
+    expect(fadedMaterialState(opaque, 0.4).opacity).toBeCloseTo(0.4, 10);
+    expect(fadedMaterialState(glassy, 0.4).opacity).toBeCloseTo(0.2, 10);
+  });
+
+  it('薄くしている間は透明扱いにする（そうしないと薄くならない）', () => {
+    expect(fadedMaterialState(opaque, 0.4).transparent).toBe(true);
+    expect(fadedMaterialState(opaque, 0.999).transparent).toBe(true);
+  });
+
+  it('戻し切ったら元の不透明さに返す', () => {
+    // ここが要。three.js は透明な物を別のパスで奥から手前へ並べ替えて描くので、
+    // 不透明な瓶体を透明扱いのままにすると、中の言葉（depthTest:false の sprite）を
+    // **後から**塗り潰して消してしまう。
+    expect(fadedMaterialState(opaque, 1)).toEqual({ opacity: 1, transparent: false });
+  });
+
+  it('元から透明な素材は戻しても透明のまま', () => {
+    expect(fadedMaterialState(glassy, 1)).toEqual({ opacity: 0.5, transparent: true });
+  });
+
+  it('0 まで薄くできる（SP のボードで瓶を消す経路）', () => {
+    expect(fadedMaterialState(opaque, 0)).toEqual({ opacity: 0, transparent: true });
+  });
+
+  it('往復しても元に戻る（薄く → 戻す を繰り返しても劣化しない）', () => {
+    let state = { ...opaque };
+    for (const fade of [0.5, 0, 1, 0.2, 1]) {
+      state = fadedMaterialState(opaque, fade);
+    }
+    expect(state).toEqual(opaque);
+  });
+});
