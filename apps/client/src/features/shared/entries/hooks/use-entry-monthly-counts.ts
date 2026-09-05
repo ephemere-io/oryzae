@@ -31,9 +31,11 @@ function normalizeCounts(raw: unknown): MonthlyEntryCount[] {
 export function useEntryMonthlyCounts(
   api: ApiClient | null,
   authLoading: boolean,
-): { counts: MonthlyEntryCount[]; loading: boolean } {
+): { counts: MonthlyEntryCount[]; loading: boolean; error: boolean } {
   const [counts, setCounts] = useState<MonthlyEntryCount[]>([]);
   const [loading, setLoading] = useState(true);
+  // 取れなかったのか、本当に 1 件も無いのか。呼び出し側が見分けられるようにする。
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!api || authLoading) return;
@@ -45,8 +47,10 @@ export function useEntryMonthlyCounts(
         const res = await client.fetch(`/api/v1/entries/monthly-counts?tzOffset=${tzOffset}`);
         if (cancelled) return;
         if (res.ok) setCounts(normalizeCounts(await readJson(res)));
+        else setError(true);
       } catch {
         // 机が空になるだけ。書斎そのものは壊さない。
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -58,5 +62,5 @@ export function useEntryMonthlyCounts(
     };
   }, [api, authLoading]);
 
-  return { counts, loading };
+  return { counts, loading, error };
 }

@@ -244,6 +244,66 @@ describe('前回の書斎を憶えて即座に出す', () => {
     expect(b.result.current.state.notebooks).toEqual(remembered);
   });
 
+  it('取りに行って届かなかったら、前回の書斎をそのまま出す', async () => {
+    // 1 回目: 取得して憶える。
+    const first = apiFor(WITH_LETTERS);
+    const a = renderHook(() => useStudyState(first.api, false, USER));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    const remembered = a.result.current.state;
+    expect(remembered.notebooks.length).toBeGreaterThan(0);
+    a.unmount();
+
+    // 2 回目: 全部 429（レート制限）。空の部屋ではなく、憶えていた書斎が出ること。
+    const blocked: RouteMap = Object.fromEntries(
+      Object.keys(WITH_LETTERS).map((pattern) => [pattern, { body: {}, ok: false }]),
+    );
+    const blockedApi = apiFor(blocked).api;
+    const b = renderHook(() => useStudyState(blockedApi, false, USER));
+    await waitFor(() => expect(b.result.current.loading).toBe(false));
+
+    expect(b.result.current.state.notebooks).toEqual(remembered.notebooks);
+    expect(b.result.current.state.words).toEqual(remembered.words);
+  });
+
+  it('届かなかったときは憶えている中身を上書きしない', async () => {
+    const first = apiFor(WITH_LETTERS);
+    const a = renderHook(() => useStudyState(first.api, false, USER));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    const before = localStorage.getItem(`oryzae_cache:study:${USER}`);
+    a.unmount();
+
+    const blocked: RouteMap = Object.fromEntries(
+      Object.keys(WITH_LETTERS).map((pattern) => [pattern, { body: {}, ok: false }]),
+    );
+    const blockedApi = apiFor(blocked).api;
+    const b = renderHook(() => useStudyState(blockedApi, false, USER));
+    await waitFor(() => expect(b.result.current.loading).toBe(false));
+
+    // 空で塗り潰すと、次に開いたときも空になる。
+    expect(localStorage.getItem(`oryzae_cache:study:${USER}`)).toBe(before);
+  });
+
+  it('本当に空なら空で出す（憶えた中身を出し続けない）', async () => {
+    const first = apiFor(WITH_LETTERS);
+    const a = renderHook(() => useStudyState(first.api, false, USER));
+    await waitFor(() => expect(a.result.current.loading).toBe(false));
+    a.unmount();
+
+    // 200 で空を返す＝「取れたうえで何も無い」。ここは憶えた中身に頼ってはいけない。
+    const emptied: RouteMap = {
+      ...WITH_LETTERS,
+      '/api/v1/fermentations': { body: [] },
+      '/api/v1/entries/monthly-counts': { body: [] },
+      '/api/v1/entries': { body: [] },
+    };
+    const emptiedApi = apiFor(emptied).api;
+    const b = renderHook(() => useStudyState(emptiedApi, false, USER));
+    await waitFor(() => expect(b.result.current.loading).toBe(false));
+
+    expect(b.result.current.state.words).toEqual([]);
+    expect(b.result.current.state.entries).toEqual([]);
+  });
+
   it('利用者が違えば前の人の中身を出さない', async () => {
     const first = apiFor(HAPPY);
     const a = renderHook(() => useStudyState(first.api, false, USER));
