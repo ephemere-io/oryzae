@@ -11,24 +11,43 @@ export interface EntryListOverlayProps {
   entries: StudyEntry[];
   /** 選べる月（新しい順）。`ALL` チップは常に先頭に出る。 */
   months: string[];
-  /** 絞り込み中の月。`null` は全月。 */
+  /**
+   * 絞り込み中の月。`null` は全月。**見出しとチップの表示にだけ使う。**
+   *
+   * 行の絞り込みはここでは行わない。呼び出し側が既にその月ぶんを渡している
+   * （サーバーが利用者のローカル暦月で絞る）。ここで `createdAt` の頭 7 文字を見て
+   * もう一度絞ると、**UTC の月**で判定することになり、JST の月初 00:00〜09:00 に
+   * 書いた記録を前月扱いで落としてしまう。
+   */
   selectedMonth: string | null;
+  /**
+   * その月の記録を取りに行っている最中か。
+   *
+   * これが無いと、取得中に「この月の記録はありません」が出てから行が現れる。
+   * 手帳の厚みが件数を言っているぶん、0 件の断定はとくに嘘っぽく見える。
+   */
+  loading?: boolean;
   onSelectMonth: (month: string | null) => void;
   onSelectEntry: (entry: StudyEntry) => void;
   onClose: () => void;
 }
 
-/** その月の記録だけに絞る。`null` は全部。 */
-export function filterByMonth(entries: readonly StudyEntry[], month: string | null): StudyEntry[] {
-  if (month === null) return [...entries];
-  return entries.filter((entry) => entry.createdAt.slice(0, 7) === month);
-}
-
-/** `2026-09-02T…` → `09.02`。行の先頭に置く日付。 */
+/**
+ * `2026-09-02T…` → `09.02`。行の先頭に置く日付。
+ *
+ * **利用者のローカル暦日で出す。** `createdAt` は UTC 保存なので、文字列を切ると
+ * JST の 09:00 より前に書いた記録が前日として並ぶ。月で絞った一覧では、6 月の一覧に
+ * `05.31` の行が混じって見えることになる（月の切り方はサーバー側でローカル暦月）。
+ */
 export function formatRowDate(createdAt: string): string {
-  const date = createdAt.slice(0, 10);
-  const [, month, day] = date.split('-');
-  return month && day ? `${month}.${day}` : date;
+  const at = new Date(createdAt);
+  if (Number.isNaN(at.getTime())) {
+    // 壊れた日付。切り出せるところまでで出す（行そのものは落とさない）。
+    return createdAt.slice(0, 10);
+  }
+  const month = `${at.getMonth() + 1}`.padStart(2, '0');
+  const day = `${at.getDate()}`.padStart(2, '0');
+  return `${month}.${day}`;
 }
 
 /**
@@ -42,14 +61,13 @@ export function EntryListOverlay({
   entries,
   months,
   selectedMonth,
+  loading = false,
   onSelectMonth,
   onSelectEntry,
   onClose,
 }: EntryListOverlayProps) {
   const t = useTranslations('study');
   useEscapeKey(open, onClose);
-
-  const visible = filterByMonth(entries, selectedMonth);
 
   if (!open) return null;
 
@@ -58,8 +76,9 @@ export function EntryListOverlay({
       {...verifyAttrs({
         unit: 'EntryListOverlay',
         selectedMonth: selectedMonth ?? 'all',
-        rowCount: visible.length,
+        rowCount: entries.length,
         monthCount: months.length,
+        loading,
       })}
       className="absolute inset-0 z-20 flex items-start justify-center overflow-auto px-6 py-14"
     >
@@ -77,11 +96,13 @@ export function EntryListOverlay({
             style={{ color: '#8C857E', fontFamily: 'Inter, sans-serif' }}
           >
             {selectedMonth === null
-              ? t('list_heading_all', { count: visible.length })
-              : t('list_heading_month', {
-                  month: spineLabelText(selectedMonth),
-                  count: visible.length,
-                })}
+              ? t('list_heading_all', { count: entries.length })
+              : loading
+                ? spineLabelText(selectedMonth)
+                : t('list_heading_month', {
+                    month: spineLabelText(selectedMonth),
+                    count: entries.length,
+                  })}
           </h2>
           <button
             type="button"
@@ -111,14 +132,19 @@ export function EntryListOverlay({
           ))}
         </div>
 
-        {visible.length === 0 ? (
+        {loading ? (
+          // 取りに行っている間は 0 件だと断定しない。
+          <p className="py-10 text-center text-[12px]" style={{ color: '#8C857E' }}>
+            {t('list_loading')}
+          </p>
+        ) : entries.length === 0 ? (
           // 空の行を並べるのではなく、無いと言う。
           <p className="py-10 text-center text-[12px]" style={{ color: '#8C857E' }}>
             {t('list_empty_month')}
           </p>
         ) : (
           <ul className="flex flex-col">
-            {visible.map((entry) => (
+            {entries.map((entry) => (
               <li key={entry.id}>
                 <button
                   type="button"

@@ -2,7 +2,6 @@ import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EntryListOverlay,
-  filterByMonth,
   formatRowDate,
 } from '@/features/shared/study/components/entry-list-overlay';
 import type { StudyEntry } from '@/features/shared/study/types';
@@ -23,28 +22,16 @@ function entry(id: string, createdAt: string): StudyEntry {
 
 const ENTRIES = [entry('e1', '2026-09-02T01:00:00.000Z'), entry('e2', '2026-08-20T01:00:00.000Z')];
 
-describe('filterByMonth', () => {
-  it('null は全部通す', () => {
-    expect(filterByMonth(ENTRIES, null)).toHaveLength(2);
-  });
-
-  it('その月だけに絞る', () => {
-    expect(filterByMonth(ENTRIES, '2026-09').map((e) => e.id)).toEqual(['e1']);
-  });
-
-  it('該当が無ければ空', () => {
-    expect(filterByMonth(ENTRIES, '2026-07')).toEqual([]);
-  });
-
-  it('元の配列を書き換えない', () => {
-    filterByMonth(ENTRIES, '2026-09');
-    expect(ENTRIES).toHaveLength(2);
-  });
-});
-
 describe('formatRowDate', () => {
   it('MM.DD にする', () => {
     expect(formatRowDate('2026-09-02T01:00:00.000Z')).toBe('09.02');
+  });
+
+  it('利用者のローカル暦日で出す（UTC の文字列を切らない）', () => {
+    // JST の 6/1 01:00 は UTC では 5/31T16:00。文字列を切ると 6 月の一覧に 05.31 が並ぶ。
+    const at = new Date('2026-06-01T00:30:00.000Z');
+    const expected = `${`${at.getMonth() + 1}`.padStart(2, '0')}.${`${at.getDate()}`.padStart(2, '0')}`;
+    expect(formatRowDate(at.toISOString())).toBe(expected);
   });
 
   it('壊れた日付でも落ちない', () => {
@@ -72,6 +59,50 @@ describe('EntryListOverlay', () => {
       ),
     );
     expect(container.textContent).toBe('');
+  });
+
+  /**
+   * 月の絞り込みは**呼び出し側**（サーバーが利用者のローカル暦月で絞ったもの）。
+   * ここで `createdAt` の頭 7 文字を見て絞り直すと、UTC の月で判定することになり、
+   * JST の月初 00:00〜09:00 に書いた記録を前月扱いで落としてしまう。
+   */
+  it('渡された記録をそのまま出す（手元で月を絞り直さない）', () => {
+    // 6/1 01:00 JST に書いた記録。createdAt は 5/31T16:00Z なので、頭 7 文字は 2026-05。
+    const june = entry('june-first', '2026-05-31T16:00:00.000Z');
+    const { container } = render(
+      withVerifyProviders(
+        <EntryListOverlay
+          open
+          entries={[june]}
+          months={['2026-06']}
+          selectedMonth="2026-06"
+          onSelectMonth={vi.fn()}
+          onSelectEntry={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(container.querySelectorAll('li')).toHaveLength(1);
+  });
+
+  it('取りに行っている間は 0 件だと断定しない', () => {
+    const { container } = render(
+      withVerifyProviders(
+        <EntryListOverlay
+          open
+          loading
+          entries={[]}
+          months={['2026-04']}
+          selectedMonth="2026-04"
+          onSelectMonth={vi.fn()}
+          onSelectEntry={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(container.textContent).not.toContain('この月の記録はありません');
   });
 
   it('Esc で閉じる', () => {

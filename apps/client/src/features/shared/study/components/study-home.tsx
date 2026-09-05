@@ -6,10 +6,11 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEntriesByMonth } from '@/features/shared/entries/hooks/use-entries-by-month';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { DURATION, RENDER_LIMITS } from '../constants';
-import { useStudyState } from '../hooks/use-study-state';
+import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
 import { monthDateRange } from '../scene/books';
@@ -48,6 +49,17 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
+
+  /**
+   * 月を選んでいる間は、その月ぶんをサーバーから取り直す。
+   *
+   * `state.entries` は直近 20 件しか持たない（一覧のためではなく、手帳のホバーに出す
+   * 日付の範囲を作るためのもの）。それを手元で月で絞ると、20 件より古い月が必ず空になる。
+   */
+  const { entries: monthEntries, loading: monthLoading } = useEntriesByMonth(
+    api,
+    overlay?.month ?? null,
+  );
 
   /**
    * 書斎の出入りは切り替えではなく**溶暗**にする。
@@ -89,6 +101,12 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
   const months = useMemo(
     () => state.notebooks.map((notebook) => notebook.month),
     [state.notebooks],
+  );
+
+  /** 月を選んでいればその月ぶん、全月なら手元の直近ぶん。 */
+  const overlayEntries = useMemo(
+    () => (overlay?.month != null ? monthEntries.map(toStudyEntry) : state.entries),
+    [overlay?.month, monthEntries, state.entries],
   );
 
   /** JOURNAL のピルに出す件数は**当月**のもの（積み全体ではない）。 */
@@ -207,7 +225,8 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
 
       <EntryListOverlay
         open={overlay !== null}
-        entries={state.entries}
+        entries={overlayEntries}
+        loading={overlay?.month != null && monthLoading}
         months={months}
         selectedMonth={overlay?.month ?? null}
         onSelectMonth={(month) => setOverlay({ month })}

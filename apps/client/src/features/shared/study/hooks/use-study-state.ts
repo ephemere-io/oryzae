@@ -213,7 +213,12 @@ export function toExcerpt(content: string): string {
   return firstSentence.length > 60 ? `${firstSentence.slice(0, 60)}…` : firstSentence;
 }
 
-function toStudyEntry(entry: {
+/**
+ * 一覧の 1 件を書斎の形に落とす。**本文そのものは持たない**（冒頭 1 文と文字数だけ）。
+ *
+ * 月で絞った一覧（use-entries-by-month）も同じ形にするので export している。
+ */
+export function toStudyEntry(entry: {
   id: string;
   content: string;
   createdAt: string;
