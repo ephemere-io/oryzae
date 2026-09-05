@@ -324,7 +324,10 @@ export function QuestionCircle({
         }
       `}</style>
 
-      {/* Circle glow */}
+      {/* Circle glow.
+          飾りなのでクリックを拾わせない。`inset: -10%` で円より 1 割ぶん外へはみ出す一方、
+          開いた円は z-55 まで上がるため、円の下に置いた発酵履歴の入口（z-4）の中央を
+          この見えない面が覆って押せなくしていた。 */}
       <div
         style={{
           position: 'absolute',
@@ -333,6 +336,7 @@ export function QuestionCircle({
           background: 'rgba(217,180,143,0.05)',
           filter: 'blur(30px)',
           animation: 'j2-pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
+          pointerEvents: 'none',
         }}
       />
 
