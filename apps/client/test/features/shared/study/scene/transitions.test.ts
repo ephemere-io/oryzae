@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DURATION } from '@/features/shared/study/constants';
 import {
-  crossfadeOpacity,
   isPlanDone,
+  leaveFadeDuration,
+  leaveFadeStart,
   pageProgress,
-  planBackToStudy,
   planFor,
   progressOf,
   stepProgress,
@@ -131,10 +131,11 @@ describe('prefers-reduced-motion', () => {
     for (const step of plan.steps) expect(stepProgress(step, 0)).toBe(1);
   });
 
-  it('クロスフェードだけは残る', () => {
-    // 動きを消しても、切り替わったことは伝える必要がある。
-    expect(crossfadeOpacity(0).screen).toBe(0);
-    expect(crossfadeOpacity(DURATION.screenFade).screen).toBe(1);
+  it('段取りが 0 でも溶暗の計算が壊れない', () => {
+    // 動きを消しても「切り替わった」ことは伝える必要がある。長さ 0 の段取りでは
+    // 薄くする時間も 0 で、呼び出し側は即座に消す。
+    expect(leaveFadeDuration(0)).toBe(0);
+    expect(leaveFadeStart(0)).toBe(0);
   });
 });
 
@@ -216,35 +217,44 @@ describe('pageProgress', () => {
   });
 });
 
-describe('planBackToStudy', () => {
-  it('画面を伏せてからカメラが動き出す', () => {
-    const plan = planBackToStudy(false);
-    const step = plan.steps[0];
-    expect(step.delayMs).toBeGreaterThan(0);
-    // 待ちの間はカメラが動かない＝層が消えてから中身が戻る。
-    expect(stepProgress(step, step.delayMs - 1)).toBe(0);
+describe('出ていくときの溶暗', () => {
+  it('遷移の後半に重ねる（待ち時間を増やさない）', () => {
+    // 薄くし終わるのは、カメラが着くのとちょうど同時。
+    for (const total of [900, 1250, 2330]) {
+      expect(leaveFadeStart(total) + leaveFadeDuration(total)).toBeCloseTo(total, 10);
+    }
   });
 
-  it('reduced-motion では待たずに終わる', () => {
-    expect(planBackToStudy(true).totalMs).toBe(0);
-  });
-});
-
-describe('crossfadeOpacity', () => {
-  it('canvas が消えながら画面が出る', () => {
-    expect(crossfadeOpacity(0)).toEqual({ canvas: 1, screen: 0 });
-    const mid = crossfadeOpacity(DURATION.canvasFade / 2);
-    expect(mid.canvas).toBeLessThan(1);
-    expect(mid.screen).toBeGreaterThan(0);
+  it('長い遷移では canvasFade ぶんだけ薄くする', () => {
+    expect(leaveFadeDuration(2330)).toBe(DURATION.canvasFade);
+    expect(leaveFadeStart(2330)).toBe(2330 - DURATION.canvasFade);
   });
 
-  it('0..1 を外れない', () => {
-    for (const ms of [-100, 0, 500, 100000]) {
-      const { canvas, screen } = crossfadeOpacity(ms);
-      expect(canvas).toBeGreaterThanOrEqual(0);
-      expect(canvas).toBeLessThanOrEqual(1);
-      expect(screen).toBeGreaterThanOrEqual(0);
-      expect(screen).toBeLessThanOrEqual(1);
+  it('短い遷移では半分までに抑える（最初から薄いとカメラが見えない）', () => {
+    // ボードは 900ms。600ms 薄くすると 2/3 が溶暗になってしまう。
+    expect(leaveFadeDuration(900)).toBe(450);
+    expect(leaveFadeStart(900)).toBe(450);
+  });
+
+  it('薄くし始めるのは必ず遷移の途中から（0 から始めない）', () => {
+    for (const total of [1, 100, 900, 1250, 2330]) {
+      expect(leaveFadeStart(total)).toBeGreaterThan(0);
+      expect(leaveFadeStart(total)).toBeLessThan(total);
+    }
+  });
+
+  it('壊れた長さでも落ちない', () => {
+    for (const total of [0, -100, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(leaveFadeDuration(total)).toBe(0);
+      expect(leaveFadeStart(total)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('実際の段取りすべてで成立する', () => {
+    for (const target of ALL_TARGETS) {
+      const total = planFor(target, PC).totalMs;
+      expect(leaveFadeDuration(total)).toBeGreaterThan(0);
+      expect(leaveFadeStart(total)).toBeLessThan(total);
     }
   });
 });

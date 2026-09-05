@@ -30,6 +30,11 @@ export interface StudyCanvasProps {
   onOpenOverlay?: (target: StudyTarget) => void;
   onHoverChange?: (hovered: HoverInfo | null) => void;
   onLabelPositions?: (positions: LabelPositions) => void;
+  /**
+   * 出ていく遷移が終盤に入り、書斎を薄くし始めてよくなったとき。
+   * `durationMs` かけて 0 にすると、カメラが着くのと同時に消え終わる。
+   */
+  onLeaveStart?: (durationMs: number) => void;
 }
 
 /** `prefers-reduced-motion` を読む。SSR とテストでは false に倒す。 */
@@ -46,14 +51,21 @@ export function StudyCanvas({
   onOpenOverlay,
   onHoverChange,
   onLabelPositions,
+  onLeaveStart,
 }: StudyCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<StudySceneHandle | null>(null);
 
   // コールバックは ref 経由で読む。props が変わるたびにシーンを作り直すと、
   // 親が再描画しただけで canvas が組み直される。
-  const callbacks = useRef({ onNavigate, onOpenOverlay, onHoverChange, onLabelPositions });
-  callbacks.current = { onNavigate, onOpenOverlay, onHoverChange, onLabelPositions };
+  const callbacks = useRef({
+    onNavigate,
+    onOpenOverlay,
+    onHoverChange,
+    onLabelPositions,
+    onLeaveStart,
+  });
+  callbacks.current = { onNavigate, onOpenOverlay, onHoverChange, onLabelPositions, onLeaveStart };
 
   // state はレンダーのたびに新しい参照になりうる（取得が落ち着くまで数回変わる）。
   // 最新を ref で渡し、シーンの作り直しは effect の外で行う。
@@ -75,16 +87,19 @@ export function StudyCanvas({
         reducedMotion: prefersReducedMotion(),
         onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
         onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
+        onLeaveStart: (durationMs) => callbacks.current.onLeaveStart?.(durationMs),
         onPick: (target) => {
-          // 遷移の中身は**カメラが動く前**に決まっている（targetHref / overlayScope が
-          // 対象そのものから導く）。着いてから初めて画面を切り替える。
+          // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
+          // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
+          // 「机の手帳が開く → 別の景色の上に一覧が出る → しばらくして書斎に戻る」と、
+          // 押した物と関係のない芝居が挟まっていた。
+          if (staysInStudy(target)) {
+            callbacks.current.onOpenOverlay?.(target);
+            return;
+          }
+          // 出ていく的だけカメラが動く。中身は**カメラが動く前**に決まっている
+          // （targetHref が対象そのものから導く）。着いてから画面を切り替える。
           handle.goTo(target).then(() => {
-            if (staysInStudy(target)) {
-              callbacks.current.onOpenOverlay?.(target);
-              // オーバーレイは書斎の中。閉じたときに戻れるようホーム位置へ返す。
-              handle.returnHome();
-              return;
-            }
             callbacks.current.onNavigate(target);
           });
         },

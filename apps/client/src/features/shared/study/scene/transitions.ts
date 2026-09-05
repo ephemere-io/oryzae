@@ -5,7 +5,7 @@
  * 段取りそのものをテストできる。
  */
 
-import { clamp01, DURATION, EASING, PAGE_FOLLOW, progress } from '../constants';
+import { DELAY, DURATION, EASING, PAGE_FOLLOW, progress } from '../constants';
 import type { StudyTarget } from '../types';
 
 type EasingFn = (p: number) => number;
@@ -134,30 +134,17 @@ function boardSteps(twoStage: boolean): TransitionStep[] {
   // SP だけ: 正対しただけでは視線の手前に瓶が残って主役を食う。寄りと瓶のフェードを並走させる。
   const close: TransitionStep = {
     name: 'board-close',
-    delayMs: DURATION.boardFront + 120,
+    delayMs: DURATION.boardFront + DELAY.boardCloseSp,
     durationMs: DURATION.boardCloseSp,
     easing: EASING.easeInOutCubic,
   };
   const jarFade: TransitionStep = {
     name: 'jar-fade',
-    delayMs: DURATION.boardFront + 120,
+    delayMs: DURATION.boardFront + DELAY.boardCloseSp,
     durationMs: DURATION.jarFadeSp,
     easing: EASING.linear,
   };
   return [front, close, jarFade];
-}
-
-/** 書斎へ戻る段取り。画面を伏せてからカメラが動き出す。 */
-export function planBackToStudy(reducedMotion: boolean): TransitionPlan {
-  const steps: TransitionStep[] = [
-    {
-      name: 'back-to-study',
-      delayMs: 550,
-      durationMs: DURATION.backToStudy,
-      easing: EASING.easeOutCubic,
-    },
-  ];
-  return plan(reducedMotion ? stilled(steps) : steps);
 }
 
 /**
@@ -205,13 +192,21 @@ export function pageProgress(cover: TransitionStep, index: number, elapsedMs: nu
 }
 
 /**
- * canvas と画面レイヤーのクロスフェード。
+ * 書斎から出ていくときに、書斎そのものを薄くする時間。
  *
- * `reducedMotion` でも**これだけは残す**（動きを消しても、切り替わったことは伝える必要がある）。
+ * **遷移の後半に重ねる。** カメラが着いてから薄くし始めると、その分だけ待ち時間が伸びる。
+ * 逆に最初から薄くすると、カメラが動いているのが見えなくなる。短い遷移（ボードの 900ms）
+ * では遷移の半分までに抑える。
  */
-export function crossfadeOpacity(elapsedMs: number): { canvas: number; screen: number } {
-  return {
-    canvas: 1 - clamp01(elapsedMs / DURATION.canvasFade),
-    screen: clamp01(elapsedMs / DURATION.screenFade),
-  };
+export function leaveFadeDuration(totalMs: number): number {
+  if (!Number.isFinite(totalMs) || totalMs <= 0) return 0;
+  return Math.min(DURATION.canvasFade, totalMs / 2);
+}
+
+/** 薄くし始める時刻。ここから `leaveFadeDuration` かけて 0 になり、着いた瞬間に切り替わる。 */
+export function leaveFadeStart(totalMs: number): number {
+  const duration = leaveFadeDuration(totalMs);
+  // 長さが決まらない段取り（reduced-motion の 0 など）は「最初から薄い」に倒す。
+  if (duration <= 0) return 0;
+  return Math.max(0, totalMs - duration);
 }

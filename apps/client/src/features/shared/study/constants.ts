@@ -26,9 +26,7 @@ export const DURATION = {
   shelfPan: 1000,
   /** 棚の背表紙が持ち上がる。 */
   spineLift: 420,
-  /** 書斎へ戻る。 */
-  backToStudy: 900,
-  /** canvas 自体のフェード。 */
+  /** 出ていくときに書斎を薄くする（遷移の後半に重ねる）。 */
   canvasFade: 600,
   /** 行き先の画面レイヤーのフェード。 */
   screenFade: 800,
@@ -38,8 +36,6 @@ export const DURATION = {
 export const DELAY = {
   /** SP のボード: 正対してから寄り始めるまで。 */
   boardCloseSp: 120,
-  /** 書斎へ戻る: 画面を伏せてからカメラが動き出すまで。 */
-  backToStudy: 550,
 } as const;
 
 /** ページ束が表紙に遅れて開く比率（21-3d-parameters.md「ページの追従」）。 */
