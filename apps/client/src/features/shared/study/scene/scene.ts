@@ -93,11 +93,17 @@ import {
   WORD_ORBIT_RADIUS,
   WORD_SPRITE_HEIGHT,
 } from './jar';
-import { createMaterials, type StudyMaterials, type StudyTheme } from './materials';
+import {
+  createMaterials,
+  fadedMaterialState,
+  type StudyMaterials,
+  type StudyTheme,
+} from './materials';
 import {
   isPlanDone,
+  leaveFadeDuration,
+  leaveFadeStart,
   pageProgress,
-  planBackToStudy,
   planFor,
   progressOf,
   type TransitionPlan,
@@ -115,6 +121,13 @@ export interface StudySceneOptions {
   onPick?: (target: StudyTarget) => void;
   /** ラベルを毎フレーム貼り直すための画面座標。 */
   onLabelPositions?: (positions: LabelPositions) => void;
+  /**
+   * 書斎から出ていく遷移が、薄くなり始めたとき（遷移の後半に 1 回だけ）。
+   *
+   * 呼び出し側は `durationMs` かけて書斎全体を消す。カメラが着くのと同時に消え終わる
+   * ので、行き先の画面へは切り替わりではなく**溶暗**で入る。
+   */
+  onLeaveStart?: (durationMs: number) => void;
 }
 
 export interface HoverInfo {
@@ -142,7 +155,6 @@ export interface StudySceneHandle {
   /** 対象へカメラを動かす。**着いてから** resolve する。 */
   goTo(target: StudyTarget): Promise<void>;
   /** 書斎へ戻す。 */
-  returnHome(): Promise<void>;
   /** 状態を差し替えて物を組み直す。遷移中は何もしない。 */
   setState(state: StudyState): void;
   /** マウス位置（-1..1）。パララックスとホバーに使う。 */
@@ -291,6 +303,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   const parallax = { x: 0, y: 0 };
 
+  /** 出ていくフェードを 1 回だけ知らせるための印。 */
+  let leaveAnnounced = false;
+
   /** 遷移の状態。`null` ならホーム。 */
   let transition: {
     plan: TransitionPlan;
@@ -305,7 +320,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   let settled: CameraView | null = null;
 
   let frame = 0;
-  let startedAt = performance.now();
+  const startedAt = performance.now();
 
   const homeCamera = homeView(layout);
   applyView(camera, homeCamera);
@@ -337,6 +352,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       applyView(camera, view);
       // 手帳は表紙とページが遅れて開く。
       updateOpening(transition, now);
+      announceLeave(transition, now - transition.startedAt);
       if (isPlanDone(transition.plan, now - transition.startedAt)) {
         settled = transition.to;
         const resolve = transition.resolve;
@@ -507,8 +523,16 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function setJarOpacity(value: number): void {
     content.jar.fade = value;
     for (const owned of content.jar.fadeables) {
-      owned.material.opacity = owned.baseOpacity * value;
-      owned.material.transparent = true;
+      const next = fadedMaterialState(
+        { opacity: owned.baseOpacity, transparent: owned.baseTransparent },
+        value,
+      );
+      owned.material.opacity = next.opacity;
+      if (owned.material.transparent !== next.transparent) {
+        owned.material.transparent = next.transparent;
+        // transparent はシェーダの選択に効く。切り替えたら作り直させる。
+        owned.material.needsUpdate = true;
+      }
     }
     const hidden = value <= 0.02;
     content.jar.group.visible = !hidden;
@@ -641,6 +665,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function goTo(target: StudyTarget): Promise<void> {
     if (transition) transition.resolve();
+    leaveAnnounced = false;
     const from = currentView();
     const plan = planFor(target, {
       reducedMotion: options.reducedMotion,
@@ -660,30 +685,17 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     });
   }
 
-  function returnHome(): Promise<void> {
-    const from = currentView();
-    const plan = planBackToStudy(options.reducedMotion);
-    setJarOpacity(1);
-    // 手帳の表紙と傾きを元に戻す。
-    content.books.group.rotation.y = content.books.baseRotationY;
-    if (content.books.topCover) content.books.topCover.rotation.z = 0;
-    for (const page of content.books.topPages) page.rotation.z = 0;
-
-    return new Promise<void>((resolve) => {
-      settled = null;
-      transition = {
-        plan,
-        from,
-        to: homeCamera,
-        target: { kind: 'jar' },
-        startedAt: performance.now(),
-        resolve: () => {
-          settled = null;
-          startedAt = performance.now();
-          resolve();
-        },
-      };
-    });
+  /**
+   * 遷移の後半に入ったら、書斎を薄くし始めてよいと 1 回だけ知らせる。
+   *
+   * 出ていく遷移だけ。書斎の中で完結する的はそもそもカメラを動かさないので、ここへは来ない。
+   */
+  function announceLeave(active: NonNullable<typeof transition>, elapsed: number): void {
+    if (leaveAnnounced) return;
+    const total = active.plan.totalMs;
+    if (elapsed < leaveFadeStart(total)) return;
+    leaveAnnounced = true;
+    options.onLeaveStart?.(leaveFadeDuration(total));
   }
 
   function currentView(): CameraView {
@@ -770,7 +782,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   return {
     goTo,
-    returnHome,
     setState,
     setPointer,
     clearPointer,
@@ -911,6 +922,8 @@ function buildFloorGrid(layout: StudyLayout, materials: StudyMaterials, own: Own
 interface FadeableMaterial {
   material: Material & { opacity: number; transparent: boolean };
   baseOpacity: number;
+  /** 作ったときの透明フラグ。戻すときにここへ返す（fadedMaterialState の注釈を参照）。 */
+  baseTransparent: boolean;
 }
 
 interface JarParts {
@@ -947,7 +960,11 @@ function buildJar(
   const fadeables: FadeableMaterial[] = [];
   function fadeable<T extends Material & { opacity: number; transparent: boolean }>(source: T): T {
     const cloned = source.clone();
-    fadeables.push({ material: cloned, baseOpacity: cloned.opacity });
+    fadeables.push({
+      material: cloned,
+      baseOpacity: cloned.opacity,
+      baseTransparent: cloned.transparent,
+    });
     return cloned;
   }
 
@@ -1033,7 +1050,7 @@ function buildJar(
     if (!texture) continue;
     textures.push(texture);
     const material = materials.sprite(texture, 0.5);
-    fadeables.push({ material, baseOpacity: 0.5 });
+    fadeables.push({ material, baseOpacity: 0.5, baseTransparent: material.transparent });
     const sprite = new Sprite(material);
     // 幅は文字幅の実測から決め、高さは語ごとの倍率を掛ける（全語同じ大きさにしない）。
     const height = WORD_SPRITE_HEIGHT * placement.scale;
@@ -1049,7 +1066,11 @@ function buildJar(
     if (texture) {
       textures.push(texture);
       const material = materials.sprite(texture, hazeOpacity(readiness));
-      fadeables.push({ material, baseOpacity: hazeOpacity(readiness) });
+      fadeables.push({
+        material,
+        baseOpacity: hazeOpacity(readiness),
+        baseTransparent: material.transparent,
+      });
       const haze = new Sprite(material);
       haze.scale.set(1.5, 1.2, 1);
       haze.position.y = hazeY(level);

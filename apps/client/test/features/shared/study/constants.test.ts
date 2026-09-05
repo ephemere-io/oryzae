@@ -93,9 +93,9 @@ describe('DURATION / DELAY', () => {
     expect(DURATION.spineLift).toBeLessThan(DURATION.shelfPan);
   });
 
-  it('書斎へ戻る待ちが画面レイヤーのフェードより短くない', () => {
-    // 層が消えきる前にカメラが動くと、戻り際に中身の切替が見える。
-    expect(DELAY.backToStudy).toBeGreaterThanOrEqual(DURATION.screenFade / 2);
+  it('書斎が薄くなる時間は、行き先の層が出る時間より短い', () => {
+    // 出ていく側が長く残ると、行き先が出たあとも書斎が重なって見える。
+    expect(DURATION.canvasFade).toBeLessThan(DURATION.screenFade);
   });
 });
 

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
-import { RENDER_LIMITS } from '../constants';
+import { DURATION, RENDER_LIMITS } from '../constants';
 import { useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
@@ -48,6 +48,22 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
+
+  /**
+   * 書斎の出入りは切り替えではなく**溶暗**にする。
+   *
+   * - 入り: マウント直後に 0 → 1（サブ画面から戻ったときに書斎が唐突に現れない）
+   * - 出: 遷移の終盤に scene から合図が来たら 1 → 0。カメラが着くのと同時に消え終わるので、
+   *   行き先の画面は同じ地の色の上に現れる
+   */
+  const [entered, setEntered] = useState(false);
+  const [leaveMs, setLeaveMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    // 次のフレームで立てる。マウントと同じフレームだと transition が走らない。
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   // ラベルは 3D 座標に貼り付くので、毎フレーム画面座標が届く。
   const [labelPositions, setLabelPositions] = useState<LabelPositions>(EMPTY_LABELS);
@@ -95,7 +111,7 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
   const handleNavigate = useCallback(
     (target: StudyTarget) => {
       const href = targetHref(target);
-      // カメラが着いてから URL を変える。クロスフェードの間に遷移する。
+      // カメラが着いてから URL を変える。書斎はこの時点でもう消えている（溶暗）。
       if (href !== null) router.push(href);
     },
     [router],
@@ -127,8 +143,16 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
   );
 
   return (
-    <div ref={rootRef} className="absolute inset-0 overflow-hidden">
+    <div
+      ref={rootRef}
+      className="absolute inset-0 overflow-hidden"
+      style={{
+        opacity: leaveMs !== null ? 0 : entered ? 1 : 0,
+        transition: `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
+      }}
+    >
       <StudyCanvas
+        onLeaveStart={setLeaveMs}
         state={state}
         layout={layout}
         theme={theme}
