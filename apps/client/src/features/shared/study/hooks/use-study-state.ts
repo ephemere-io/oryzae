@@ -81,7 +81,7 @@ export function useStudyState(
   // docs/oryzae-study/60-implementation-notes.md §3）。
   // 受信箱が問いごとに最新 1 通へ畳んでいるので、その全部から集める。
   const fermentationIds = useMemo(() => letters.map((letter) => letter.fermentationId), [letters]);
-  const { keywords } = useFermentationKeywords(api, fermentationIds);
+  const { keywords, loading: keywordsLoading } = useFermentationKeywords(api, fermentationIds);
 
   // 憶えてある書斎。**利用者ごとに分ける** — 端末を共有していると、前の人の
   // 記録の冒頭や発酵の言葉がそのまま出てしまう。
@@ -119,8 +119,16 @@ export function useStudyState(
     };
   }, [now, unread.unreadCount, readiness.readiness, letters, keywords, counts, entries, cards]);
 
+  // 言葉は「手紙が届いてから、その詳細を引く」二段構え。ここに入れ忘れると、一段目が
+  // 終わった時点で「取得済み・言葉ゼロ」になり、憶えていた言葉がいったん消えてから
+  // 1 秒ほどして戻る（実機でそう見えていた）。
   const loading =
-    readinessLoading || lettersLoading || countsLoading || entriesLoading || boardLoading;
+    readinessLoading ||
+    lettersLoading ||
+    keywordsLoading ||
+    countsLoading ||
+    entriesLoading ||
+    boardLoading;
 
   // 取り終えたら憶える。次に書斎を開いたとき、取得を待たずに前回の絵が出る。
   useEffect(() => {
