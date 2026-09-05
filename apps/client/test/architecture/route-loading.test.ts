@@ -50,7 +50,27 @@ describe('保護ルートは画面ごとのロード表示を持つ', () => {
   it('各 loading.tsx は _loading の *RouteLoading を描く', () => {
     const offenders = dirs.filter((d) => {
       const src = readFileSync(join(d, 'loading.tsx'), 'utf8');
-      return !/_loading\/[a-z-]+-route-loading/.test(src);
+      // `route-loading`（パスから引く方）も可。子を持つルートはこちらを使う（下のテスト）。
+      return !/_loading\/(?:[a-z-]+-)?route-loading/.test(src);
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * Next の loading 境界は**親も子を覆う**。`/entries/new` へ移ると `entries` セグメントも
+   * 新しく作られるので、子の枠より先に親の枠が出る。親が自分の画面の枠（一覧）を決め打ちで
+   * 描くと、エディタへ移ったのに一覧のスケルトンが一瞬映る。
+   * 子を持つルートは、行き先のパスから引く `RouteLoading` を描くこと。
+   */
+  it('子を持つルートの loading.tsx は行き先から引く（自分の枠を決め打ちしない）', () => {
+    const withChildren = dirs.filter((d) =>
+      dirs.some((other) => other !== d && other.startsWith(`${d}/`)),
+    );
+    expect(withChildren.length).toBeGreaterThan(0);
+
+    const offenders = withChildren.filter((d) => {
+      const src = readFileSync(join(d, 'loading.tsx'), 'utf8');
+      return !/_loading\/route-loading/.test(src);
     });
     expect(offenders).toEqual([]);
   });
