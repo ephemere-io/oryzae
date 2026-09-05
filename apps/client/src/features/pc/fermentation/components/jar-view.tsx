@@ -196,6 +196,25 @@ const MICROBE_SVGS = {
   lab: '<svg viewBox="0 0 32 20"><g fill="none"><path d="M6,14 Q12,6 18,12 Q26,18 30,10" stroke="#A3B8A8" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/><circle cx="6" cy="14" r="3" fill="#A3B8A8" opacity="0.4"/><circle cx="18" cy="12" r="2.5" fill="#8EA89C" opacity="0.35"/><circle cx="30" cy="10" r="2" fill="#A3B8A8" opacity="0.3"/></g></svg>',
 };
 
+/**
+ * 発酵履歴への入口に添えるアイコン。積み重なった円盤＝めくれる束。
+ *
+ * **塗りで描く**。この取っ手は world の中にあるので、俯瞰（全体表示）では 15px 前後まで
+ * 縮む。線画の円を並べる案は実機で試したが、その大きさだと線が潰れて枠のリングと
+ * 混ざり、ただのぼやけた輪になった。塗りの楕円なら小さくても「重なっている」が残る。
+ *
+ * 手前を濃く、奥へ薄くして「手前の 1 枚だけが開いている」Cover Flow の見え方と揃える。
+ */
+function HistoryStackIcon() {
+  return (
+    <svg viewBox="0 0 26 26" fill="none" aria-hidden="true" className="h-full w-full">
+      <ellipse cx="13" cy="7.5" rx="8.5" ry="3.1" fill="currentColor" opacity="0.3" />
+      <ellipse cx="13" cy="13" rx="8.5" ry="3.1" fill="currentColor" opacity="0.5" />
+      <ellipse cx="13" cy="18.5" rx="8.5" ry="3.1" fill="currentColor" opacity="0.85" />
+    </svg>
+  );
+}
+
 /* Jar bottle SVG path (reference design) */
 const JAR_PATH =
   'M190,100 C190,60 290,60 290,100 C290,130 270,140 270,170 C270,270 410,330 410,480 C410,580 70,580 70,480 C70,330 210,270 210,170 C210,140 190,130 190,100 Z';
@@ -927,7 +946,7 @@ export function JarView({
                   openHistory(q.id);
                 }}
                 aria-label={t('history.open_aria', { question: q.currentText ?? '' })}
-                className={`absolute z-[4] flex -translate-x-1/2 cursor-pointer flex-col items-center gap-1 whitespace-nowrap rounded-lg border-0 bg-transparent px-2 py-1 transition-opacity hover:bg-[rgba(140,133,126,0.08)] ${
+                className={`group absolute z-[4] flex -translate-x-1/2 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border-0 bg-transparent px-2 py-1 transition-opacity hover:bg-[rgba(140,133,126,0.08)] ${
                   dimmed ? 'pointer-events-none opacity-30' : 'opacity-100'
                 }`}
                 style={{
@@ -936,28 +955,37 @@ export function JarView({
                   animation: 'fadeIn 0.5s ease-out forwards',
                 }}
               >
-                <span
-                  className="text-[9px] uppercase tracking-[0.3em] text-[var(--date-color)]"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                  {t('history.fermentations_count', { count: pad2(results.length) })}
+                {/* 押せることを見せる取っ手。2 行ぶんの高さを持たせて、文字だけの
+                    ラベル（＝ただの注記に見える）から「開けるもの」に変える。 */}
+                {/* 枠と背景は **クラスで**指定する。インラインの style はどのクラスより強く、
+                    group-hover の指定に勝ってしまう（ホバーの手応えが死ぬ）。 */}
+                <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md border border-[rgba(140,133,126,0.3)] bg-[rgba(253,251,247,0.5)] p-[4px] text-[var(--date-color)] transition-colors group-hover:border-[rgba(140,133,126,0.6)] group-hover:bg-[rgba(253,251,247,0.95)] group-hover:text-[var(--fg)]">
+                  <HistoryStackIcon />
                 </span>
-                <span
-                  className="flex items-center gap-[5px] text-[9px] tracking-[0.2em]"
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
-                    opacity: hasUnread ? 1 : 0.7,
-                  }}
-                >
-                  {hasUnread && (
-                    <span
-                      className="block h-[5px] w-[5px] rounded-full"
-                      style={{ background: 'var(--ob-jar-warm)' }}
-                    />
-                  )}
-                  {toDateStamp(latest.createdAt)}
-                  {hasUnread ? ` · ${t('history.new')}` : ''}
+                <span className="flex flex-col items-start gap-1">
+                  <span
+                    className="text-[9px] uppercase tracking-[0.3em] text-[var(--date-color)]"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  >
+                    {t('history.fermentations_count', { count: pad2(results.length) })}
+                  </span>
+                  <span
+                    className="flex items-center gap-[5px] text-[9px] tracking-[0.2em]"
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
+                      opacity: hasUnread ? 1 : 0.7,
+                    }}
+                  >
+                    {hasUnread && (
+                      <span
+                        className="block h-[5px] w-[5px] rounded-full"
+                        style={{ background: 'var(--ob-jar-warm)' }}
+                      />
+                    )}
+                    {toDateStamp(latest.createdAt)}
+                    {hasUnread ? ` · ${t('history.new')}` : ''}
+                  </span>
                 </span>
               </button>
             );
