@@ -15,6 +15,7 @@ import type { StudyEntry } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
 
 interface Props {
+  loading?: boolean;
   open: boolean;
   entries: StudyEntry[];
   months: string[];
@@ -71,10 +72,10 @@ registerUnit<Props>({
     },
     {
       id: 'month',
-      description: '過去月に絞った状態',
+      description: '過去月に絞った状態（呼び出し側がその月ぶんを渡す）',
       props: {
         open: true,
-        entries: ENTRIES,
+        entries: [ENTRIES[2]],
         months: ['2026-09', '2026-08'],
         selectedMonth: '2026-08',
         ...NOOP,
@@ -86,23 +87,44 @@ registerUnit<Props>({
       description: 'Probe: 記録が無い月は空の行を並べず「ありません」と出す',
       props: {
         open: true,
-        entries: ENTRIES,
+        entries: [],
         months: ['2026-09', '2026-08', '2026-07'],
         selectedMonth: '2026-07',
+        ...NOOP,
+      },
+    },
+    {
+      id: 'loading-month',
+      probe: true,
+      description: 'Probe: その月を取りに行っている間は 0 件だと断定しない',
+      props: {
+        open: true,
+        entries: [],
+        months: ['2026-09', '2026-08', '2026-04'],
+        selectedMonth: '2026-04',
+        loading: true,
         ...NOOP,
       },
     },
   ],
   invariants: [
     {
-      id: 'row-count-matches-filter',
-      description: '出る行数が絞り込みと一致する',
+      id: 'rows-are-what-was-given',
+      description: '渡された記録をそのまま出す（手元でもう一度絞らない）',
       check: ({ root, props }) => {
-        const expected = props.entries.filter(
-          (e) => props.selectedMonth === null || e.createdAt.slice(0, 7) === props.selectedMonth,
-        ).length;
+        // 手元で絞ると UTC の月で判定することになり、月初の記録を落とす。
+        const expected = props.loading ? 0 : props.entries.length;
         const rows = root.querySelectorAll('li').length;
         return rows === expected || `行数不一致: expected=${expected} actual=${rows}`;
+      },
+    },
+    {
+      id: 'loading-does-not-claim-empty',
+      description: '取りに行っている間は「ありません」と断定しない',
+      onlyFixtures: ['loading-month'],
+      check: ({ root }) => {
+        const text = root.textContent ?? '';
+        return !text.includes('この月の記録はありません') || '取得中なのに 0 件だと断定している';
       },
     },
     {
