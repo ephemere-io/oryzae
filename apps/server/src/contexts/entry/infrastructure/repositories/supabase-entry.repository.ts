@@ -8,6 +8,7 @@ import {
 } from '../../../shared/infrastructure/row.js';
 import type {
   EntryListOrder,
+  EntryMonthFilter,
   EntryRepositoryGateway,
   MonthlyEntryCount,
 } from '../../domain/gateways/entry-repository.gateway.js';
@@ -15,8 +16,21 @@ import { Entry } from '../../domain/models/entry.js';
 import {
   localDayRange,
   localMonthKey,
+  localMonthRange,
   localWeekRange,
 } from '../../domain/services/local-day-range.service.js';
+
+/**
+ * 月で絞る（書斎の一覧）。範囲は `localMonthRange` が決めるので、件数（`localMonthKey`）と
+ * 必ず同じ切り方になる。指定が無ければ素通し。
+ */
+function applyMonthFilter<
+  T extends { gte: (c: string, v: string) => T; lt: (c: string, v: string) => T },
+>(query: T, month: EntryMonthFilter | undefined): T {
+  if (!month) return query;
+  const { startUtc, endUtc } = localMonthRange(month.month, month.tzOffsetMinutes);
+  return query.gte('created_at', startUtc).lt('created_at', endUtc);
+}
 
 /** PostgREST の 1 レスポンス上限。これを超えると黙って打ち切られる。 */
 const MONTHLY_COUNT_PAGE_SIZE = 1000;
@@ -54,6 +68,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     limit = 20,
     questionId?: string,
     order: EntryListOrder = 'newest',
+    month?: EntryMonthFilter,
   ): Promise<Entry[]> {
     // created_at の並び順と、それに対応するカーソル比較（昇順=次は cursor より新しい→gt、
     // 降順=次は cursor より古い→lt）。cursor は最後に受け取った entry の created_at 値。
@@ -74,6 +89,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       if (cursor) {
         query = ascending ? query.gt('created_at', cursor) : query.lt('created_at', cursor);
       }
+      query = applyMonthFilter(query, month);
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
@@ -89,6 +105,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     if (cursor) {
       query = ascending ? query.gt('created_at', cursor) : query.lt('created_at', cursor);
     }
+    query = applyMonthFilter(query, month);
 
     const { data, error } = await query;
     if (error) throw error;

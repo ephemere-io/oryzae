@@ -9,6 +9,14 @@ export interface MonthlyEntryCount {
   count: number;
 }
 
+/** ローカル暦月で絞るときの指定。月だけでは時差ぶんの境界が決まらない。 */
+export interface EntryMonthFilter {
+  /** `YYYY-MM`。 */
+  month: string;
+  /** `Date.prototype.getTimezoneOffset()` と同じ符号（JST は -540）。 */
+  tzOffsetMinutes: number;
+}
+
 export interface EntryRepositoryGateway {
   findById(id: string): Promise<Entry | null>;
   findByIds(ids: string[]): Promise<Entry[]>;
@@ -20,6 +28,9 @@ export interface EntryRepositoryGateway {
     limit?: number,
     questionId?: string,
     order?: EntryListOrder,
+    // 書斎の一覧（docs/oryzae-study）用。`YYYY-MM` のローカル暦月で絞る。
+    // 件数（countByMonth）と同じ月の切り方でなければ、手帳の厚みと一覧が食い違う。
+    month?: EntryMonthFilter,
   ): Promise<Entry[]>;
   listByUserIdAndDate(userId: string, dateKey: string, tzOffsetMinutes?: number): Promise<Entry[]>;
   listFermentationEnabledByUserIdAndDate(userId: string, dateKey: string): Promise<Entry[]>;
