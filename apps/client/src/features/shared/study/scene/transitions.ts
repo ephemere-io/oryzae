@@ -5,7 +5,7 @@
  * 段取りそのものをテストできる。
  */
 
-import { clamp01, DURATION, EASING, progress } from '../constants';
+import { clamp01, DURATION, EASING, PAGE_FOLLOW, progress } from '../constants';
 import type { StudyTarget } from '../types';
 
 type EasingFn = (p: number) => number;
@@ -193,12 +193,12 @@ export function progressOf(plan: TransitionPlan, name: string, elapsedMs: number
  * 表紙の段を基準に、遅れと長さを比率で決める（21-3d-parameters.md「ページの追従」）。
  */
 export function pageProgress(cover: TransitionStep, index: number, elapsedMs: number): number {
-  const lead = cover.durationMs * 0.24;
-  const perPage = cover.durationMs * 0.17;
+  const lead = cover.durationMs * PAGE_FOLLOW.leadDelayRatio;
+  const perPage = cover.durationMs * PAGE_FOLLOW.perPageDelayRatio;
   const pageStep: TransitionStep = {
     name: `${cover.name}-page-${index}`,
     delayMs: cover.delayMs + lead + perPage * index,
-    durationMs: cover.durationMs * 0.82,
+    durationMs: cover.durationMs * PAGE_FOLLOW.durationRatio,
     easing: cover.easing,
   };
   return stepProgress(pageStep, elapsedMs);

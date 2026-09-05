@@ -415,10 +415,16 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const cover = active.plan.steps.find((step) => step.name === 'cover-open');
     if (!cover || !content.books.topCover) return;
     const open = progressOf(active.plan, 'cover-open', elapsed);
-    content.books.topCover.rotation.z = -COVER_OPEN_ANGLE * open;
+    // 蝶番は左端（x = COVER_HINGE_X）にあり、表紙はそこから右へ伸びている。**正の回転**で
+    // 表紙が持ち上がって左へ倒れる。負にすると机を突き抜けて下から回り込む。
+    content.books.topCover.rotation.z = COVER_OPEN_ANGLE * open;
 
-    content.books.topPages.forEach((page, index) => {
-      page.rotation.z = -SPREAD_PAGES.angleAt(index) * pageProgress(cover, index, elapsed);
+    const pages = content.books.topPages;
+    pages.forEach((page, index) => {
+      // 紙は下から積んであるが、めくるのは**上から**。下からめくると、上に載っている
+      // 紙に隠れて 1 枚しか動いて見えない。
+      const order = SPREAD_PAGES.turnOrderOf(index, pages.length);
+      page.rotation.z = SPREAD_PAGES.angleAt(order) * pageProgress(cover, order, elapsed);
     });
   }
 
@@ -1138,15 +1144,6 @@ function buildBooks(
     block.position.y = placement.thickness / 2;
     book.add(block);
 
-    // 表紙。束より少し大きく、薄い板として上に載せる。
-    const coverSlab = lineArt(
-      new BoxGeometry(NOTEBOOK_SIZE.width, COVER_THICKNESS, NOTEBOOK_SIZE.depth),
-      materials,
-      own,
-    );
-    coverSlab.position.y = placement.thickness + COVER_THICKNESS / 2;
-    book.add(coverSlab);
-
     // 小口・天・地の三方に紙の断面を引く。**束の面より外側**に置くこと。
     // 内側に引くと面に埋もれて 1 本も見えない（面で埋めたときに実際そうなった）。
     const halfBlockW = blockW / 2 + 0.002;
@@ -1189,74 +1186,92 @@ function buildBooks(
       );
     }
 
-    // 表紙のラベル枠。表紙の面のすぐ上に置く。
-    const labelY = placement.thickness + COVER_THICKNESS + 0.002;
+    // 見開きの右の頁。**束の上面**に引く。表紙が開いたときにここが現れるので、
+    // 紙（leaf）ではなく束に引かないと、紙をめくり終えた先が白紙になる。
+    const spreadZ = halfBlockD - RULES.spreadEdgeInset;
+    for (let r = 0; r < RULES.spreadCount; r++) {
+      const x = (r - (RULES.spreadCount - 1) / 2) * RULES.spreadSpacing;
+      book.add(
+        lineFrom(
+          [
+            new Vector3(x, placement.thickness + 0.002, -spreadZ),
+            new Vector3(x, placement.thickness + 0.002, spreadZ),
+          ],
+          materials.faint(RULES.spreadOpacity),
+          own,
+        ),
+      );
+    }
+
+    // 表紙は**開く蝶番の中だけ**に置く。板を別に敷いてしまうと、開いても同じ位置に
+    // 表紙が残り、右半分がいつまでも閉じたままに見える（実機でそうなっていた）。
+    const cover = new Group();
+    cover.position.set(COVER_HINGE_X, placement.thickness + COVER_THICKNESS / 2 + 0.002, 0);
+    const coverSlab = lineArt(
+      new BoxGeometry(NOTEBOOK_SIZE.width, COVER_THICKNESS, NOTEBOOK_SIZE.depth),
+      materials,
+      own,
+    );
+    coverSlab.position.x = NOTEBOOK_SIZE.width / 2;
+    cover.add(coverSlab);
+
+    // 表紙のラベル枠。表紙と一緒に動く。
+    const labelY = COVER_THICKNESS / 2 + 0.002;
     const lw = COVER_LABEL.width / 2;
     const lh = COVER_LABEL.height / 2;
-    book.add(
+    const lx = NOTEBOOK_SIZE.width / 2;
+    cover.add(
       lineFrom(
         [
-          new Vector3(-lw, labelY, -lh),
-          new Vector3(lw, labelY, -lh),
-          new Vector3(lw, labelY, lh),
-          new Vector3(-lw, labelY, lh),
-          new Vector3(-lw, labelY, -lh),
+          new Vector3(lx - lw, labelY, -lh),
+          new Vector3(lx + lw, labelY, -lh),
+          new Vector3(lx + lw, labelY, lh),
+          new Vector3(lx - lw, labelY, lh),
+          new Vector3(lx - lw, labelY, -lh),
         ],
         materials.faint(COVER_LABEL.opacity),
         own,
       ),
     );
 
-    // 当月だけが開く表紙とページを持つ。
-    if (index === 0) {
-      const cover = new Group();
-      cover.position.set(COVER_HINGE_X, placement.thickness + COVER_THICKNESS, 0);
-      // 開いたときに向こうが透けないよう、表紙にも面を持たせる。
-      const coverFace = new Mesh(
-        own(new BoxGeometry(NOTEBOOK_SIZE.width, COVER_THICKNESS, NOTEBOOK_SIZE.depth)),
-        materials.solid,
-      );
-      coverFace.position.set(NOTEBOOK_SIZE.width / 2, -COVER_THICKNESS / 2, 0);
-      cover.add(coverFace);
+    // 見開きの左の頁＝表紙の裏。開くまで見えないが、開いた先が白紙にならないよう引く。
+    const innerY = -COVER_THICKNESS / 2 - 0.003;
+    const innerZ = halfD - 0.4;
+    for (let r = 0; r < RULES.coverInnerCount; r++) {
+      const x = lx + (r - (RULES.coverInnerCount - 1) / 2) * RULES.spreadSpacing;
       cover.add(
         lineFrom(
-          [
-            new Vector3(0, 0, -halfD),
-            new Vector3(NOTEBOOK_SIZE.width, 0, -halfD),
-            new Vector3(NOTEBOOK_SIZE.width, 0, halfD),
-            new Vector3(0, 0, halfD),
-            new Vector3(0, 0, -halfD),
-          ],
-          materials.faint(0.45),
+          [new Vector3(x, innerY, -innerZ), new Vector3(x, innerY, innerZ)],
+          materials.faint(RULES.coverInnerOpacity),
           own,
         ),
       );
-      book.add(cover);
+    }
+
+    book.add(cover);
+
+    // 当月（積みの一番上）だけが、表紙を追ってめくれる紙を持つ。
+    if (index === 0) {
       topCover = cover;
 
       for (let i = 0; i < SPREAD_PAGES.count; i++) {
         const page = new Group();
         page.position.set(
           COVER_HINGE_X,
-          placement.thickness + 0.002 + i * SPREAD_PAGES.thickness,
+          placement.thickness + SPREAD_PAGES.liftBase + i * SPREAD_PAGES.gap,
           0,
         );
-        const pageFace = new Mesh(
-          own(new BoxGeometry(NOTEBOOK_SIZE.width, SPREAD_PAGES.thickness, NOTEBOOK_SIZE.depth)),
-          materials.solid,
+        const leaf = lineArt(
+          new BoxGeometry(
+            NOTEBOOK_SIZE.width - SPREAD_PAGES.inset,
+            SPREAD_PAGES.thickness,
+            NOTEBOOK_SIZE.depth - SPREAD_PAGES.inset,
+          ),
+          materials,
+          own,
         );
-        pageFace.position.set(NOTEBOOK_SIZE.width / 2, 0, 0);
-        page.add(pageFace);
-        for (let r = 0; r < RULES.spreadCount; r++) {
-          const z = -halfD + (r + 1) * RULES.spreadSpacing;
-          page.add(
-            lineFrom(
-              [new Vector3(0.2, 0, z), new Vector3(NOTEBOOK_SIZE.width - 0.2, 0, z)],
-              materials.faint(RULES.spreadOpacity),
-              own,
-            ),
-          );
-        }
+        leaf.position.x = NOTEBOOK_SIZE.width / 2;
+        page.add(leaf);
         book.add(page);
         topPages.push(page);
       }
