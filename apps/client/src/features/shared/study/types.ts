@@ -104,5 +104,12 @@ export interface StudyState {
   words: string[];
   notebooks: Notebook[];
   entries: StudyEntry[];
+  /**
+   * 生きている問い（一覧の絞り込みに出す）。
+   *
+   * 受信箱が `/questions` を引くついでに配ってもらう。ここで別に取ると同じものを
+   * 2 回取りに行くことになる。
+   */
+  questions: { id: string; currentText: string | null }[];
   board: StudyBoard;
 }

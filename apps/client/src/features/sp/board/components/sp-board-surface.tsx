@@ -204,9 +204,11 @@ function SpBoardCardContent({ card }: { card: BoardCardData }) {
   }
   if ('text' in card.content) {
     return (
+      // 盤面は縮小して全体を映すので、カードの中の文字は**縮尺のぶん割り増して**おかないと
+      // 実機で読めない（12px は板の縮尺が乗ると 6〜7px 相当になる）。
       <p
-        className="h-full overflow-hidden whitespace-pre-wrap p-3 text-[12px]"
-        style={{ color: 'var(--fg)', lineHeight: 1.7 }}
+        className="h-full overflow-hidden whitespace-pre-wrap p-2.5 text-[17px]"
+        style={{ color: 'var(--fg)', lineHeight: 1.6 }}
       >
         {card.content.text}
       </p>

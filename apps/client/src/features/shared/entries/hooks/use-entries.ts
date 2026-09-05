@@ -1,17 +1,25 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { normalizeEntry } from '@/features/shared/entries/normalize';
+import { normalizeEntries } from '@/features/shared/entries/normalize';
 import type { EntryListItem, EntryListOrder } from '@/features/shared/entries/types';
 import type { ApiClient } from '@/lib/api';
 
 const PAGE_SIZE = 20;
 
+/**
+ * 記録の一覧。検索・問い・並び順・**月**で絞れる。
+ *
+ * 月の絞りはサーバーが利用者のローカル暦月で行う（`?month=YYYY-MM&tzOffset=`）。
+ * 手元で `createdAt` を切って絞ると **UTC の月**での判定になり、月初 00:00〜09:00 に
+ * 書いた記録を前月扱いで落とす。書斎の一覧がまさにそれで空になっていた。
+ */
 export function useEntries(
   api: ApiClient | null,
   search?: string,
   questionId?: string,
   order: EntryListOrder = 'newest',
+  month?: string,
 ) {
   const [entries, setEntries] = useState<EntryListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +30,7 @@ export function useEntries(
   const prevSearchRef = useRef(search);
   const prevQuestionIdRef = useRef(questionId);
   const prevOrderRef = useRef(order);
+  const prevMonthRef = useRef(month);
 
   const fetchEntries = useCallback(
     async (nextCursor?: string) => {
@@ -34,13 +43,17 @@ export function useEntries(
         if (nextCursor) params.set('cursor', nextCursor);
         if (search) params.set('q', search);
         if (questionId) params.set('questionId', questionId);
+        if (month) {
+          params.set('month', month);
+          // 件数（monthly-counts）と同じ月の切り方にするために必ず送る。
+          params.set('tzOffset', String(new Date().getTimezoneOffset()));
+        }
         params.set('order', order);
 
         const res = await api.fetch(`/api/v1/entries?${params}`);
 
         if (res.ok) {
-          const data = await res.json();
-          const items: EntryListItem[] = (Array.isArray(data) ? data : []).map(normalizeEntry);
+          const items: EntryListItem[] = normalizeEntries(await res.json());
           setEntries((prev) => (nextCursor ? [...prev, ...items] : items));
           setHasMore(items.length === PAGE_SIZE);
           if (items.length > 0) {
@@ -57,7 +70,7 @@ export function useEntries(
 
       setLoading(false);
     },
-    [api, search, questionId, order],
+    [api, search, questionId, order, month],
   );
 
   useEffect(() => {
@@ -66,16 +79,18 @@ export function useEntries(
     if (
       prevSearchRef.current !== search ||
       prevQuestionIdRef.current !== questionId ||
-      prevOrderRef.current !== order
+      prevOrderRef.current !== order ||
+      prevMonthRef.current !== month
     ) {
       prevSearchRef.current = search;
       prevQuestionIdRef.current = questionId;
       prevOrderRef.current = order;
+      prevMonthRef.current = month;
       setEntries([]);
       setCursor(undefined);
       setHasMore(true);
     }
-  }, [search, questionId, order]);
+  }, [search, questionId, order, month]);
 
   // Issue #362: auth/me 完了を待たず、api が用意でき次第すぐ取得する（体感ロード短縮）。
   useEffect(() => {

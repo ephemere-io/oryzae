@@ -71,8 +71,8 @@ export function SpJarSkeleton({ circles = 3 }: { circles?: number }) {
       aria-hidden="true"
       {...verifyAttrs({ unit: 'SpJarSkeleton', slots: 'header,orbit,jar,manage', circles })}
     >
-      {/* ヘッダ（実物: px-5 pt-6 pb-3 text-lg） */}
-      <div className="px-5 pt-6 pb-3" data-skeleton-slot="header">
+      {/* ヘッダ（実物: px-5 pt-6 pb-2 text-lg・中央寄せ） */}
+      <div className="flex justify-center px-5 pt-6 pb-2" data-skeleton-slot="header">
         <Skeleton className="h-[22px] w-20" />
       </div>
 

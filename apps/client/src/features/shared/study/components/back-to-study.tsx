@@ -10,6 +10,9 @@ import { useTranslations } from 'next-intl';
  * 書斎ホームでは同じ位置にブランドマークが出る。サブ画面ではそれが戻る導線を兼ねる、
  * というのが仕様なので、**同じ大きさ・同じ位置**に置く。
  *
+ * 中身は**書斎の縮図**（机・壜・手帳・奥の板）。行き先が「あの部屋」だと絵で分かる方が、
+ * ブランドの一文字より戻り道として読める。
+ *
  * ここに置くことで jar / board / entry の各画面そのものには一切触らずに済む
  * （今回変えるのはナビゲーションと入口だけ、という前提を守る）。
  *
@@ -35,12 +38,46 @@ export function BackToStudy() {
         boxShadow: '0 2px 12px rgba(140, 133, 126, 0.14)',
       }}
     >
-      <span
-        className="font-serif text-[13px] lowercase tracking-[0.08em]"
+      {/* 書斎そのものを小さく描く: 机の上に壜と手帳、奥に板。行き先が「あの部屋」だと
+          一目で分かるようにする（以前は "o" の一文字で、書斎を想起させなかった）。 */}
+      <svg
+        aria-hidden="true"
+        width="20"
+        height="20"
+        viewBox="0 0 20 20"
+        fill="none"
         style={{ color: '#8EA89C' }}
       >
-        o
-      </span>
+        {/* 奥の板 */}
+        <rect
+          x="11.4"
+          y="3.2"
+          width="6"
+          height="4.6"
+          rx="0.4"
+          stroke="currentColor"
+          strokeWidth="0.9"
+          opacity="0.55"
+        />
+        {/* 机の天板 */}
+        <path d="M1.8 14.2H18.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+        {/* 壜（首とふくらみ） */}
+        <path
+          d="M6.1 6.4V8.1C6.1 9.2 4.6 9.9 4.6 11.6C4.6 13.1 5.7 14.1 7.3 14.1C8.9 14.1 10 13.1 10 11.6C10 9.9 8.5 9.2 8.5 8.1V6.4"
+          stroke="currentColor"
+          strokeWidth="0.9"
+          strokeLinejoin="round"
+        />
+        <path d="M5.7 6.4H8.9" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" />
+        {/* 机に積んだ手帳 */}
+        <path
+          d="M11.6 14.1V12.4H17.1V14.1"
+          stroke="currentColor"
+          strokeWidth="0.9"
+          strokeLinejoin="round"
+        />
+        <path d="M11.9 13.2H16.8" stroke="currentColor" strokeWidth="0.7" opacity="0.6" />
+      </svg>
       {/* 文字はホバーで開く。常時出すと画面の左上を占め続ける。 */}
       <span
         className="max-w-0 overflow-hidden whitespace-nowrap text-[9px] uppercase tracking-[0.2em] opacity-0 transition-all duration-300 group-hover:max-w-[140px] group-hover:opacity-100"

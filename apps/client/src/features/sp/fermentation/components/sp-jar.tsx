@@ -3,9 +3,12 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
+import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
+import type { FermentationDetail, JarLayout } from '@/features/shared/fermentation/types';
 import type { JarQuestion } from '@/features/shared/questions/types';
 import {
   SpElementSheet,
@@ -13,7 +16,10 @@ import {
 } from '@/features/sp/fermentation/components/sp-element-sheet';
 import { type OrbitQuestion, SpJarOrbit } from '@/features/sp/fermentation/components/sp-jar-orbit';
 import { SpJarOrbitSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
-import { SpQuestionZoom } from '@/features/sp/fermentation/components/sp-question-zoom';
+import {
+  SpQuestionZoom,
+  type ZoomPosition,
+} from '@/features/sp/fermentation/components/sp-question-zoom';
 import type { ApiClient } from '@/lib/api';
 import { useUnread } from '@/lib/unread-context';
 
@@ -46,19 +52,64 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
   const [openId, setOpenId] = useState<string | null>(null);
   const [element, setElement] = useState<SpJarElement | null>(null);
 
+  /**
+   * 円の中で動かした要素の位置（id → 位置）。
+   *
+   * サーバーにも憶える（PC の瓶と同じ `PUT /api/v1/jar/layout`）。置いた場所が端末を
+   * またいで残らないと、動かせる意味が薄い。保存は 500ms まとめ（useJarLayoutSave）。
+   */
+  const [positions, setPositions] = useState<Record<string, ZoomPosition>>({});
+  const { saveLayout } = useJarLayoutSave(api);
+
   const openQuestion = questions.find((question) => question.id === openId) ?? null;
   const { detail, loading: detailLoading } = useFermentationForQuestion(api, openQuestion?.id);
 
+  // サーバーが憶えている位置を初期値にする。動かしていない要素は輪の上の既定位置。
+  const storedPositions = useMemo<Record<string, ZoomPosition>>(() => {
+    if (!detail) return {};
+    const out: Record<string, ZoomPosition> = {};
+    const put = (item: { id: string; jarX: number | null; jarY: number | null }) => {
+      if (item.jarX === null || item.jarY === null) return;
+      out[item.id] = { xPercent: item.jarX, yPercent: item.jarY };
+    };
+    for (const keyword of detail.keywords) put(keyword);
+    for (const snippet of detail.snippets) put(snippet);
+    if (detail.letter) put(detail.letter);
+    return out;
+  }, [detail]);
+
+  const handleMove = useCallback(
+    (id: string, position: ZoomPosition) => {
+      setPositions((prev) => {
+        const next = { ...prev, [id]: position };
+        if (detail) saveLayout(toJarLayout(detail, { ...storedPositions, ...next }));
+        return next;
+      });
+    },
+    [detail, storedPositions, saveLayout],
+  );
+
+  // 円の中身は**開く前から**見せる。届いた手紙の詳細をまとめて引いておく
+  // （問いは生存が最大 3 件なので往復も 3 回に収まる）。
+  const fermentationIds = useMemo(() => letters.map((letter) => letter.fermentationId), [letters]);
+  const { details } = useFermentationDetails(api, fermentationIds);
+
   const untitled = t('untitled');
   const orbitQuestions = useMemo<OrbitQuestion[]>(() => {
-    const withLetter = new Set(letters.map((letter) => letter.questionId));
-    return questions.map((question) => ({
-      id: question.id,
-      text: question.currentText ?? untitled,
-      hasLetter: withLetter.has(question.id),
-      unread: unreadReady && unreadQuestionIds.has(question.id),
-    }));
-  }, [questions, letters, unreadReady, unreadQuestionIds, untitled]);
+    const letterByQuestion = new Map(letters.map((letter) => [letter.questionId, letter]));
+    return questions.map((question) => {
+      const letter = letterByQuestion.get(question.id);
+      const detail = letter ? details.get(letter.fermentationId) : undefined;
+      return {
+        id: question.id,
+        text: question.currentText ?? untitled,
+        hasLetter: letter !== undefined,
+        unread: unreadReady && unreadQuestionIds.has(question.id),
+        keywords: detail?.keywords.map((keyword) => keyword.keyword) ?? [],
+        snippetCount: detail?.snippets.length ?? 0,
+      };
+    });
+  }, [questions, letters, details, unreadReady, unreadQuestionIds, untitled]);
 
   return (
     <div
@@ -73,7 +124,9 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
         unreadCount: orbitQuestions.filter((question) => question.unread).length,
       })}
     >
-      <header className="px-5 pt-6 pb-2 text-lg font-medium">{t('title')}</header>
+      {/* 左上は「書斎へ戻る」マークの席なので、見出しは中央に置く
+          （左寄せだとマークの下に潜って読めない）。 */}
+      <header className="px-5 pt-6 pb-2 text-center text-lg font-medium">{t('title')}</header>
 
       {/* 取得中に「問いがありません」を出すと、一瞬「問いを消してしまった」ように見える。
           取れていない間は枠のまま待つ。 */}
@@ -119,6 +172,8 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
             setOpenId(null);
             setElement(null);
           }}
+          positions={{ ...storedPositions, ...positions }}
+          onMove={handleMove}
           onOpenElement={(next) => {
             setElement(next);
             // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
@@ -137,4 +192,30 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
       ) : null}
     </div>
   );
+}
+
+/**
+ * 動かした位置を保存の形に直す。
+ *
+ * サーバーは種類ごとの配列（keywords / snippets / letters）で受ける。ここに載せるのは
+ * **位置が決まっているものだけ**（まだ動かしていない要素は既定の輪の上に居るので、
+ * 座標を持たせない＝次に開いたときも輪の上から始まる）。
+ */
+function toJarLayout(
+  detail: FermentationDetail,
+  positions: Record<string, ZoomPosition>,
+): JarLayout {
+  const pick = (items: readonly { id: string }[]) =>
+    items.flatMap((item) => {
+      const position = positions[item.id];
+      if (!position) return [];
+      return [{ id: item.id, jarX: position.xPercent, jarY: position.yPercent }];
+    });
+
+  return {
+    questions: [],
+    keywords: pick(detail.keywords),
+    snippets: pick(detail.snippets),
+    letters: pick(detail.letter ? [detail.letter] : []),
+  };
 }

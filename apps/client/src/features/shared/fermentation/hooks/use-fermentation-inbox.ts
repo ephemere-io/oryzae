@@ -37,6 +37,9 @@ function byCreatedAtDesc(a: { createdAt: string }, b: { createdAt: string }): nu
  */
 export function useFermentationInbox(api: ApiClient | null, authLoading: boolean) {
   const [letters, setLetters] = useState<InboxLetter[]>([]);
+  // 手紙の見出しを作るために `/questions` も引いている。一覧の絞り込みが同じものを
+  // もう一度取りに行かなくて済むよう、ここから配る（往復を増やさない）。
+  const [questions, setQuestions] = useState<InboxQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   // 取れなかったのか、本当に 1 通も無いのか。書斎はこれを見て、前回の絵を出すか決める。
   const [error, setError] = useState(false);
@@ -66,7 +69,7 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
         return;
       }
 
-      const questions = parseInboxQuestions(await qRes.json());
+      const inboxQuestions = parseInboxQuestions(await qRes.json());
       const completed = normalizeSummaries(await fRes.json()).filter(
         (f) => f.status === 'completed',
       );
@@ -78,7 +81,7 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
         if (!cur || f.createdAt > cur.createdAt) latestByQuestion.set(f.questionId, f);
       }
 
-      const textByQuestionId = new Map(questions.map((q) => [q.id, q.currentText]));
+      const textByQuestionId = new Map(inboxQuestions.map((q) => [q.id, q.currentText]));
       const inbox = [...latestByQuestion.values()].map(
         (latest): InboxLetter => ({
           questionId: latest.questionId,
@@ -89,6 +92,7 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
       );
 
       if (!mounted.current) return;
+      setQuestions(inboxQuestions);
       setLetters(inbox.sort(byCreatedAtDesc));
     } catch {
       // 受信箱が取れなくても瓶は「まだ手紙は届いていません」で成立する。catch が無いと
@@ -103,5 +107,5 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
     fetchInbox();
   }, [fetchInbox]);
 
-  return { letters, loading, error, refetch: fetchInbox };
+  return { letters, questions, loading, error, refetch: fetchInbox };
 }

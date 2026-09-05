@@ -12,6 +12,7 @@ import {
   orbitSlot,
 } from '@/features/sp/fermentation/orbit';
 import { fitRingText, RING_INSET, RING_TRACKING } from '@/features/sp/fermentation/ring-text';
+import { ringSlots } from '@/features/sp/fermentation/zoom-layout';
 
 export interface OrbitQuestion {
   id: string;
@@ -21,6 +22,10 @@ export interface OrbitQuestion {
   hasLetter: boolean;
   /** その手紙がまだ読まれていないか。 */
   unread: boolean;
+  /** 円の中に浮かべる言葉。**開く前から中身が見えている**ことがこの円の役目。 */
+  keywords: string[];
+  /** 抜粋の数。中身は開いてから読むので、ここでは「何枚あるか」だけを示す。 */
+  snippetCount: number;
 }
 
 interface SpJarOrbitProps {
@@ -33,14 +38,14 @@ const CENTER_X = 50;
 const CENTER_Y = 52;
 
 /** 軌道の横半径（コンテナ幅に対する比）。円がはみ出さない範囲でいちばん広く。 */
-const RADIUS_X_RATIO = 0.33;
+const RADIUS_X_RATIO = 0.36;
 /**
  * 軌道の縦半径（px）。輪を真横から見ず、少し上から見た角度にする。
  *
  * ここが小さいと手前の円が壜の胴の真ん中に重なり、壜が読めなくなる。手前は壜の裾、
  * 奥は壜の首、と縦にずらすことで「まわりを回っている」ように見せる。
  */
-const RADIUS_Y = 58;
+const RADIUS_Y = 76;
 
 /**
  * 手前の円の直径（px）。画面幅に比例させつつ、大きくなりすぎないよう頭を打つ。
@@ -48,15 +53,28 @@ const RADIUS_Y = 58;
  * 中央に壜が居るので、円が大きすぎると壜を飲み込む。問いが読める下限（ring-text の
  * 12px）と、壜が見える上限のあいだを取る。
  */
-const CIRCLE_RATIO = 0.35;
-const CIRCLE_MAX = 138;
-const CIRCLE_MIN = 96;
+const CIRCLE_RATIO = 0.44;
+const CIRCLE_MAX = 176;
+const CIRCLE_MIN = 128;
 
 /** 壜の重なり順。奥の円（z<500）より手前、手前の円（z>500）より奥。 */
 const JAR_Z = 500;
 
 /** これ以上動いたらタップではなく回した、とみなす（px）。 */
 const TAP_SLOP = 8;
+
+/**
+ * 円の中に出す中身の上限。
+ *
+ * 小さな円なので、全部は入らない。**在ることが伝わればよい**ので数を絞る
+ * （読むのは開いてからで、円の中はその予告）。
+ */
+const PREVIEW_KEYWORDS = 3;
+const PREVIEW_SNIPPETS = 3;
+
+/** 中身を置く輪の半径（円の直径に対する %）。外周のリング文字とぶつからない内側。 */
+const PREVIEW_KEYWORD_RADIUS = 30;
+const PREVIEW_SNIPPET_RADIUS = 39;
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -324,6 +342,9 @@ function OrbitCircle({ question, size, reduced, registerRef, onSelect }: OrbitCi
         </svg>
       </span>
 
+      {/* 中身の予告。開く前から「この問いに何が入っているか」が見えているようにする。 */}
+      <PreviewContents question={question} size={size} />
+
       {/* 中心の印。手紙が届いているか／読んだかだけを示す（中身は開いてから）。 */}
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
         {question.hasLetter ? (
@@ -374,5 +395,73 @@ function OrbitCircle({ question, size, reduced, registerRef, onSelect }: OrbitCi
         )}
       </span>
     </button>
+  );
+}
+
+interface PreviewContentsProps {
+  question: OrbitQuestion;
+  size: number;
+}
+
+/**
+ * 円の中に浮かぶ言葉と抜粋の印。
+ *
+ * 開いた画面（SpQuestionZoom）と**同じ輪の並べ方**にしてあるので、タップしたときに
+ * 中身が飛ばずにそのまま大きくなる。文字は小さいので読ませることは狙わず、
+ * 「この問いには言葉が 3 つ、抜粋が 2 枚ある」と分かればよい。
+ */
+function PreviewContents({ question, size }: PreviewContentsProps) {
+  const keywords = question.keywords.slice(0, PREVIEW_KEYWORDS);
+  const snippets = Math.min(question.snippetCount, PREVIEW_SNIPPETS);
+  if (keywords.length === 0 && snippets === 0) return null;
+
+  const keywordSlots = ringSlots(keywords.length, PREVIEW_KEYWORD_RADIUS, 0);
+  const snippetSlots = ringSlots(snippets, PREVIEW_SNIPPET_RADIUS, Math.PI / 2);
+  // 円の大きさに追従させる（奥の小さい円で文字だけが肥大しない）。
+  const fontSize = Math.max(8, Math.round(size * 0.062));
+
+  return (
+    <span className="pointer-events-none absolute inset-0 block">
+      {keywords.map((keyword, i) => {
+        const slot = keywordSlots[i];
+        if (!slot) return null;
+        return (
+          <span
+            key={keyword}
+            className="absolute block max-w-[52%] truncate rounded-full px-1.5 py-0.5"
+            style={{
+              left: `${slot.xPercent}%`,
+              top: `${slot.yPercent}%`,
+              transform: 'translate(-50%, -50%)',
+              fontSize: `${fontSize}px`,
+              lineHeight: 1.3,
+              background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
+              color: 'var(--fg)',
+              border: '1px solid rgba(255,255,255,0.5)',
+            }}
+          >
+            {keyword}
+          </span>
+        );
+      })}
+
+      {snippetSlots.map((slot) => (
+        <span
+          // 抜粋は枚数だけを示す印。中身を持たないので、輪の上の位置がそのまま鍵になる
+          // （ringSlots は等間隔なので同じ位置は 2 つ出ない）。
+          key={`${slot.xPercent}-${slot.yPercent}`}
+          className="absolute block rounded-[3px]"
+          style={{
+            left: `${slot.xPercent}%`,
+            top: `${slot.yPercent}%`,
+            transform: 'translate(-50%, -50%)',
+            width: `${Math.round(size * 0.1)}px`,
+            height: `${Math.round(size * 0.075)}px`,
+            background: 'rgba(253,251,247,0.9)',
+            border: '1px solid rgba(140,133,126,0.35)',
+          }}
+        />
+      ))}
+    </span>
   );
 }
