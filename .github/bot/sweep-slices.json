@@ -1,0 +1,54 @@
+{
+  "_why": "定期巡回は毎回コードベース全体を読ませると費用が青天井になる。1 回 1 スライスに絞り、週ごとに回す。1 周 ≒ 8 週。スライスを足すと 1 周が長くなり、削ると 1 スライスあたりが重くなる。",
+  "slices": [
+    {
+      "id": "server-entry",
+      "label": "サーバー: エントリー（日記本体）",
+      "paths": ["apps/server/src/contexts/entry", "apps/server/test/contexts/entry"]
+    },
+    {
+      "id": "server-fermentation",
+      "label": "サーバー: 発酵（LLM 呼び出しとコスト記録）",
+      "paths": ["apps/server/src/contexts/fermentation", "apps/server/test/contexts/fermentation"]
+    },
+    {
+      "id": "server-question-board",
+      "label": "サーバー: 問い・ボード",
+      "paths": [
+        "apps/server/src/contexts/question",
+        "apps/server/src/contexts/board",
+        "apps/server/test/contexts/question",
+        "apps/server/test/contexts/board"
+      ]
+    },
+    {
+      "id": "server-user-shared",
+      "label": "サーバー: ユーザー・共有基盤（認可の急所は除く）",
+      "paths": [
+        "apps/server/src/contexts/user",
+        "apps/server/src/contexts/shared",
+        "apps/server/src/contexts/analytics"
+      ]
+    },
+    {
+      "id": "client-shared",
+      "label": "クライアント: 端末非依存の機能スライス",
+      "paths": ["apps/client/src/features/shared"]
+    },
+    {
+      "id": "client-sp",
+      "label": "クライアント: SP（スマートフォン）UI",
+      "paths": ["apps/client/src/features/sp"]
+    },
+    {
+      "id": "client-pc",
+      "label": "クライアント: PC UI",
+      "paths": ["apps/client/src/features/pc"]
+    },
+    {
+      "id": "admin-and-shared-pkg",
+      "label": "管理画面と共有パッケージ",
+      "paths": ["apps/admin/src/features", "packages/shared/src"]
+    }
+  ]
+}
