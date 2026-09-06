@@ -1,3 +1,4 @@
+import { MAX_ENTRY_PHOTO_TEXT_LENGTH } from '@oryzae/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // 実 LLM は呼ばず、generateText/anthropic をモックしてリクエスト構築と
@@ -69,9 +70,10 @@ describe('AnthropicPhotoTranscriptionGateway', () => {
     expect(request.messages[0].role).toBe('user');
     const [textPart, imagePart] = request.messages[0].content;
     expect(textPart.type).toBe('text');
-    expect(imagePart.type).toBe('image');
+    // 'image' パートは AI SDK v6 で deprecated。画像も mediaType 付きの 'file' で送る。
+    expect(imagePart.type).toBe('file');
     expect(imagePart.mediaType).toBe('image/jpeg');
-    expect(imagePart.image).toEqual(bytes);
+    expect(imagePart.data).toBe(bytes.buffer);
   });
 
   it('contentType をそのまま mediaType に載せる', async () => {
@@ -90,6 +92,32 @@ describe('AnthropicPhotoTranscriptionGateway', () => {
     const result = await gateway.transcribe(new Uint8Array([1]).buffer, 'image/jpeg', 'ja');
 
     expect(result.text).toBe('書き起こし本文');
+  });
+
+  it('モデルがコードフェンスで包んで返しても剥がす', async () => {
+    // プロンプトで「本文だけを返す」と指示していても包んで返ることがある。
+    // 剥がさないと ``` がそのまま日記の本文に入る。
+    generateTextMock.mockResolvedValue({
+      text: '```\n書き起こし本文\n```',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    const result = await gateway.transcribe(new Uint8Array([1]).buffer, 'image/jpeg', 'ja');
+
+    expect(result.text).toBe('書き起こし本文');
+  });
+
+  it('想定外に長い応答は MAX_ENTRY_PHOTO_TEXT_LENGTH で頭打ちにする', async () => {
+    // maxOutputTokens が抑えるのはトークン数で、文字数の保証ではない。
+    // 本文 (MAX_CONTENT_LENGTH) へそのまま流れ込む経路を塞ぐ。
+    generateTextMock.mockResolvedValue({
+      text: 'あ'.repeat(MAX_ENTRY_PHOTO_TEXT_LENGTH + 500),
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    const result = await gateway.transcribe(new Uint8Array([1]).buffer, 'image/jpeg', 'ja');
+
+    expect(result.text).toHaveLength(MAX_ENTRY_PHOTO_TEXT_LENGTH);
   });
 
   it('usage が欠けていてもトークン数は 0 で埋める', async () => {
