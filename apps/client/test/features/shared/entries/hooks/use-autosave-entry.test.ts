@@ -2,6 +2,9 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 
+/** rerender の initialProps に型を与えるための空配列（`as` を使わずに string[] にする）。 */
+const EMPTY_MEDIA_URLS: string[] = [];
+
 describe('useAutosaveEntry', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -33,7 +36,61 @@ describe('useAutosaveEntry', () => {
     });
 
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined);
+    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined, undefined);
+  });
+
+  // 写真を添えた直後の自動保存で media_urls が巻き添えで消えないこと。
+  it('mediaUrls を渡すと save に同梱される', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+    const mediaUrls = ['https://cdn.example/a.jpg'];
+
+    const { rerender } = renderHook(
+      ({ body }) =>
+        useAutosaveEntry({
+          title: '',
+          body,
+          entryId: undefined,
+          save,
+          enabled: true,
+          mediaUrls,
+        }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: 'これは十分な長さの本文です' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined, { mediaUrls });
+  });
+
+  // 保存の起動条件は本文の変化のまま。写真を足しただけでは保存を走らせない
+  // （呼び出し側が明示的に保存するため。二重保存を避ける）。
+  it('mediaUrls が変わっただけでは save を呼ばない', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+
+    const { rerender } = renderHook(
+      ({ mediaUrls }) =>
+        useAutosaveEntry({
+          title: '',
+          body: '本文はずっと同じままにしておく',
+          entryId: 'e1',
+          save,
+          enabled: true,
+          mediaUrls,
+        }),
+      { initialProps: { mediaUrls: EMPTY_MEDIA_URLS } },
+    );
+
+    rerender({ mediaUrls: ['https://cdn.example/a.jpg'] });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(save).not.toHaveBeenCalled();
   });
 
   it('短い記録でも保存する（Issue #510: 10 文字未満が一度も保存されなかった）', async () => {
@@ -50,7 +107,7 @@ describe('useAutosaveEntry', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(save).toHaveBeenCalledWith('疲れた', 'e1');
+    expect(save).toHaveBeenCalledWith('疲れた', 'e1', undefined);
   });
 
   it('同じ文字数の書き換えも保存する（Issue #510: 長さ差 0 で素通りしていた）', async () => {
@@ -67,7 +124,7 @@ describe('useAutosaveEntry', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(save).toHaveBeenCalledWith('さしすせそたちつてと', 'e1');
+    expect(save).toHaveBeenCalledWith('さしすせそたちつてと', 'e1', undefined);
   });
 
   it('タイトルだけの変更も保存する（Issue #510: 本文しか見ていなかった）', async () => {
@@ -84,7 +141,7 @@ describe('useAutosaveEntry', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(save).toHaveBeenCalledWith('朝の光\n本文', 'e1');
+    expect(save).toHaveBeenCalledWith('朝の光\n本文', 'e1', undefined);
   });
 
   it('内容が変わっていなければ保存しない', async () => {
@@ -174,7 +231,7 @@ describe('useAutosaveEntry', () => {
       await Promise.resolve();
     });
 
-    expect(save).toHaveBeenCalledWith('書きかけ', 'e1');
+    expect(save).toHaveBeenCalledWith('書きかけ', 'e1', undefined);
 
     Object.defineProperty(document, 'visibilityState', {
       value: 'visible',
@@ -197,7 +254,7 @@ describe('useAutosaveEntry', () => {
       await Promise.resolve();
     });
 
-    expect(save).toHaveBeenCalledWith('書きかけ', 'e1');
+    expect(save).toHaveBeenCalledWith('書きかけ', 'e1', undefined);
   });
 
   it('同じ内容を二重に書かない（保存中の再入を防ぐ）', async () => {

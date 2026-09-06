@@ -2,14 +2,27 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
+interface AutosaveOptions {
+  mediaUrls?: string[];
+}
+
 interface UseAutosaveEntryParams {
   title: string;
   body: string;
   entryId: string | undefined;
-  save: (content: string, entryId?: string) => Promise<string | null>;
+  save: (content: string, entryId?: string, options?: AutosaveOptions) => Promise<string | null>;
   onSaved?: (entryId: string, savedBody: string) => void;
   enabled: boolean;
   debounceMs?: number;
+  /**
+   * エントリに添えた写真のストレージパス。渡すと保存のたびに一緒に送られる。
+   *
+   * 保存の**起動条件**は本文・タイトルの変化のままにしてある。写真を足しただけで
+   * autosave を走らせると、呼び出し側の明示的な保存と二重になるため
+   * （写真の追加/削除は editor 側がその場で save する）。
+   * 値は latestRef 経由で保存の瞬間に読む。
+   */
+  mediaUrls?: string[];
 }
 
 const DEFAULT_DEBOUNCE_MS = 2000;
@@ -47,6 +60,7 @@ export function useAutosaveEntry({
   onSaved,
   enabled,
   debounceMs = DEFAULT_DEBOUNCE_MS,
+  mediaUrls,
 }: UseAutosaveEntryParams) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedContentRef = useRef<string>(composeContent(title, body));
@@ -54,8 +68,8 @@ export function useAutosaveEntry({
   // 保存中に次の保存が重ならないようにする（同じ内容を 2 回書かない）。
   const savingRef = useRef(false);
   // 離脱時のフラッシュから最新値を読むための箱。effect の再登録を増やさないため ref で持つ。
-  const latestRef = useRef({ title, body, entryId, enabled, save, onSaved });
-  latestRef.current = { title, body, entryId, enabled, save, onSaved };
+  const latestRef = useRef({ title, body, entryId, enabled, save, onSaved, mediaUrls });
+  latestRef.current = { title, body, entryId, enabled, save, onSaved, mediaUrls };
 
   // autosave がエントリを作った直後など、id が変わったら基準を引き直す。
   if (prevEntryIdRef.current !== entryId) {
@@ -75,7 +89,13 @@ export function useAutosaveEntry({
 
     savingRef.current = true;
     try {
-      const savedId = await current.save(content, current.entryId);
+      // mediaUrls を渡さない呼び出し元では options ごと省く。サーバーは未指定を
+      // 「既存の media_urls を維持」として扱うので、写真を巻き添えで消さない。
+      const savedId = await current.save(
+        content,
+        current.entryId,
+        current.mediaUrls === undefined ? undefined : { mediaUrls: current.mediaUrls },
+      );
       if (savedId) {
         lastSavedContentRef.current = content;
         current.onSaved?.(savedId, current.body);

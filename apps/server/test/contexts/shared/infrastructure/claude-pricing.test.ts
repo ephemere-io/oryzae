@@ -31,6 +31,21 @@ describe('computeCostFromTokens', () => {
     expect(cost?.totalCost).toBeCloseTo(0.003, 10);
     expect(cost?.completionTokens).toBe(0);
   });
+
+  // 文字起こし (photo_transcription_usages) はモデル名を保存するので単価が引ける。
+  it('モデル未指定は発酵のモデル (claude-sonnet-4-6) を既定にする', () => {
+    expect(computeCostFromTokens(1000, 1000)?.totalCost).toBeCloseTo(
+      computeCostFromTokens(1000, 1000, 'claude-sonnet-4-6')?.totalCost ?? Number.NaN,
+      10,
+    );
+    expect(computeCostFromTokens(1000, 1000, null)?.totalCost).toBeCloseTo(0.018, 10);
+  });
+
+  // 未知のモデルを 0 円にすると、モデル差し替え時に集計が黙って過少になる。
+  it('未知のモデル名でも 0 円にはせず既定の単価で算出する', () => {
+    const unknown = computeCostFromTokens(1000, 1000, 'claude-something-new');
+    expect(unknown?.totalCost).toBeCloseTo(0.018, 10);
+  });
 });
 
 // 推定コストが静かにズレる唯一の経路は「価格表とモデルの対応が切れること」。

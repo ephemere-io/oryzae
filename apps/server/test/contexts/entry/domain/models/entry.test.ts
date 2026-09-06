@@ -124,6 +124,48 @@ describe('Entry', () => {
       const result = entry.withContent('', []);
       expect(result.success).toBe(false);
     });
+
+    // 自動保存は本文しか知らずに withContent を呼ぶ。ここで mediaUrls が [] に
+    // 潰れると、写真を添えた直後の自動保存で写真が消える。
+    it('mediaUrls を省略すると既存値を維持する', () => {
+      const withPhoto = Entry.fromProps({
+        id: 'e-2',
+        userId: 'u-1',
+        content: 'original',
+        mediaUrls: ['https://cdn.example/a.jpg'],
+        fermentationEnabled: false,
+        effects: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const result = withPhoto.withContent('updated');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.value.mediaUrls).toEqual(['https://cdn.example/a.jpg']);
+      }
+    });
+
+    it('mediaUrls に空配列を渡すと明示的にクリアできる', () => {
+      const withPhoto = Entry.fromProps({
+        id: 'e-3',
+        userId: 'u-1',
+        content: 'original',
+        mediaUrls: ['https://cdn.example/a.jpg'],
+        fermentationEnabled: false,
+        effects: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const result = withPhoto.withContent('updated', []);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.value.mediaUrls).toEqual([]);
+      }
+    });
   });
 
   describe('withFermentationEnabled', () => {
