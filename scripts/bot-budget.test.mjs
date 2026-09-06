@@ -250,6 +250,13 @@ describe('barrenStreak — 直らないまま回り続けるのを止める', ()
     expect(barrenStreak(withRuns('gates-failed', 'gates-failed', 'no-fix'))).toBe(0);
   });
 
+  // 実測（2026-09-06 の初回実行）: effort=high・上限 $0.60 で 30 ターン使い切って中断した。
+  // 上限と対象の大きさが釣り合っていないと何度でも同じように使い切るので、止める側に数える。
+  it('上限に当たって中断した実行（aborted）も数える', () => {
+    expect(barrenStreak(withRuns('merged:#1', 'aborted', 'aborted'))).toBe(2);
+    expect(barrenStreak(withRuns('aborted', 'gates-failed', 'blocked'))).toBe(3);
+  });
+
   it('月をまたいでも連続とみなす', () => {
     const ledger = {
       version: 1,
