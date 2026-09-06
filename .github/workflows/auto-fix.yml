@@ -62,6 +62,7 @@ jobs:
       pull-requests: write # PR を作ってマージする
       issues: write # 台帳 Issue の更新と、対象 Issue へのコメント
       actions: write # 失敗した run のログを読み、マージ後に E2E を起動する
+      administration: read # 「Actions が PR を作れるか」を事前に確かめる
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       LEDGER_TITLE: '[auto-fix] 予算台帳と稼働状況'
@@ -81,6 +82,23 @@ jobs:
             echo "::error::ANTHROPIC_API_KEY が未設定のため自動修正ループを実行できません。"
             exit 1
           fi
+
+      # 最後の step でしか判らない設定不備を、AI を呼ぶ前に潰す。
+      # 「$0.5 使ってから PR が作れずに落ちる」を「5 秒で無料で落ちる」に変える。
+      - name: PR を作れる設定になっているか確認する
+        run: |
+          set -euo pipefail
+          allowed=$(gh api "repos/${GITHUB_REPOSITORY}/actions/permissions/workflow" \
+                     --jq .can_approve_pull_request_reviews 2>/dev/null || echo unknown)
+          if [ "$allowed" = "false" ]; then
+            echo "::error::Actions からの PR 作成が禁止されているため、修正をマージできません。" \
+                 "Organization Settings > Actions > General > Workflow permissions の" \
+                 "'Allow GitHub Actions to create and approve pull requests' を ON にしてください" \
+                 "（docs/auto-fix-loop-guide.md）。"
+            exit 1
+          fi
+          # unknown（権限不足で読めなかった）は止めない。読めないこと自体は不備ではないため。
+          echo "PR 作成の可否: ${allowed}"
 
       - name: 作業ディレクトリを用意する
         run: mkdir -p .bot

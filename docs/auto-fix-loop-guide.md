@@ -178,6 +178,15 @@ Claude Sonnet 5 は $2.00 / MTok（入力）・$10.00 / MTok（出力）、キ�
 
 必要なシークレットは `ANTHROPIC_API_KEY` のみ（定期セキュリティ監査と共用）。
 
+### 組織設定が 1 つ要る
+
+Organization Settings > Actions > General > Workflow permissions の
+**「Allow GitHub Actions to create and approve pull requests」を ON** にする必要がある。
+OFF のままだと `gh pr create` が 403 で落ち、修正をマージできない。
+
+この不備は AI を呼ぶ前に検出して落とす（`PR を作れる設定になっているか確認する` ステップ）。
+最後の手前まで進んでから落ちると、その回のトークン費用が丸ごと無駄になるため。
+
 ### 止め方
 
 1. **今すぐ全部止める** — `AUTO_FIX_ENABLED` を消す（`auto-fix` と `auto-merge-deps` の両方が止まる）
