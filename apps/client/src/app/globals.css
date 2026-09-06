@@ -250,3 +250,30 @@ body {
     animation: none;
   }
 }
+
+/* 遅れて現れる案内文。ルート（/）の振り分けゲートで使う。
+ *
+ * `/` の判定はクライアント側でしかできず（トークンは localStorage、メール確認は hash）、
+ * 通常 100-300ms でリダイレクトが走る。案内文をすぐ出すと、その一瞬だけ文字が出て消える
+ * チラつきになり、無地だった頃より雑に見える。
+ * 遅延させることで「速いときは一度も見えない・遅いときだけ説明が出る」にする。 */
+@keyframes delayedFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.delayed-notice {
+  animation: delayedFadeIn 0.2s ease-out 0.4s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* animation:none にすると即座に出てしまい、消したかったチラつきが戻る。
+     動き（フェード）だけを外し、遅延は残す。 */
+  .delayed-notice {
+    animation: delayedFadeIn 0s linear 0.4s both;
+  }
+}
