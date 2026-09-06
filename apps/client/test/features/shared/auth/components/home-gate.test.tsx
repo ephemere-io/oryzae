@@ -67,11 +67,17 @@ afterEach(() => {
 });
 
 describe('HomeGate', () => {
-  it('リダイレクト中であることを伝える文言を出す', () => {
+  it('リダイレクト中であることを伝える文言を、遅延表示で出す', () => {
     // 判定はすべて JS 側なので、JS が動くまでの間このページは必ず一瞬見える。
-    // 以前は null を返していて無地の画面になっていた。
+    // 以前は null を返していて無地の画面だった。
+    //
+    // ただし通常のリダイレクトは 100-300ms で終わるため、すぐ出すと文字が出て消える
+    // チラつきになる。`delayed-notice`（globals.css）で 400ms 遅らせて、速いときは
+    // 一度も見せない。このクラスが外れるとチラつきが戻るのでここで固定する。
     const { getByText } = render(<HomeGate />);
-    expect(getByText('移動しています…')).toBeTruthy();
+    const notice = getByText('移動しています…');
+    expect(notice).toBeTruthy();
+    expect(notice.classList.contains('delayed-notice')).toBe(true);
   });
 
   it('JS 無効でも行き止まりにならない出口を SSR 出力の noscript に持つ', () => {

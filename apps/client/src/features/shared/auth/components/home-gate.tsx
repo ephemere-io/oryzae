@@ -98,7 +98,9 @@ export function HomeGate() {
   // 行き止まりが避けられないので、最低限の出口を置く。
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="text-sm" style={{ color: 'var(--date-color)' }}>
+      {/* delayed-notice: 速いリダイレクトでは一度も見せない（globals.css）。
+          消し忘れると一瞬の文字チラつきが戻るので、外すときは理由を確認すること。 */}
+      <p className="delayed-notice text-sm" style={{ color: 'var(--date-color)' }}>
         {t('redirecting')}
       </p>
       <noscript>
