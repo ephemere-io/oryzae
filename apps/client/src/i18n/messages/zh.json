@@ -162,7 +162,13 @@
       "heading": "仅支持桌面",
       "body": "Oryzae 目前仅支持桌面浏览器访问，无法从智能手机使用。在移动版准备好之前，请使用桌面浏览器。"
     },
-    "loading": "加载中…"
+    "loading": "加载中…",
+    "home_gate": {
+      "redirecting": "正在跳转…",
+      "no_script": "需要启用 JavaScript 才能继续。",
+      "link_about": "关于 Oryzae",
+      "link_login": "登录"
+    }
   },
   "footer": {
     "label": {

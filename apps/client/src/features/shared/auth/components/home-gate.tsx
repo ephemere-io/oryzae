@@ -1,8 +1,9 @@
 'use client';
 
-// verify-exempt: localStorage トークン処理と認証リダイレクトのみを行う非描画ゲート（router/storage 依存でシーム不可）。
+// verify-exempt: localStorage トークン処理と認証リダイレクトのみを行うゲート（router/storage 依存でシーム不可）。
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { getAccessToken, setTokens } from '@/lib/auth';
 import { DOCS_SITE_URL } from '@/lib/docs-site';
@@ -56,6 +57,7 @@ function isStandaloneLaunch(): boolean {
  */
 export function HomeGate() {
   const router = useRouter();
+  const t = useTranslations('app.home_gate');
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -91,5 +93,27 @@ export function HomeGate() {
     window.location.replace(DOCS_SITE_URL);
   }, [router]);
 
-  return null;
+  // 判定はすべて JS 側でしかできない（トークンは localStorage、確認リンクは hash で
+  // サーバーに届かない）。そのぶん JS が動くまでの空白と、JS が無効・失敗したときの
+  // 行き止まりが避けられないので、最低限の出口を置く。
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 text-center">
+      <p className="text-sm" style={{ color: 'var(--date-color)' }}>
+        {t('redirecting')}
+      </p>
+      <noscript>
+        <p className="text-sm" style={{ color: 'var(--fg)' }}>
+          {t('no_script')}
+        </p>
+        <p className="mt-3 flex justify-center gap-4 text-sm">
+          <a href={DOCS_SITE_URL} style={{ color: 'var(--accent)' }}>
+            {t('link_about')}
+          </a>
+          <a href="/login" style={{ color: 'var(--accent)' }}>
+            {t('link_login')}
+          </a>
+        </p>
+      </noscript>
+    </div>
+  );
 }

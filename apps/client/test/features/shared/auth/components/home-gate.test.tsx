@@ -1,7 +1,14 @@
-import { render } from '@testing-library/react';
+import { render as rtlRender } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeGate } from '@/features/shared/auth/components/home-gate';
 import { DOCS_SITE_URL } from '@/lib/docs-site';
+import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
+
+/** HomeGate は文言を i18n から引くので、常に provider 付きで描画する。 */
+function render(ui: React.ReactElement) {
+  return rtlRender(ui, { wrapper: I18nWrapper });
+}
 
 /**
  * ルート（/）の振り分けゲート。公開ページを別ドメインの公開サイトへ移したことで、
@@ -60,9 +67,29 @@ afterEach(() => {
 });
 
 describe('HomeGate', () => {
-  it('描画物を持たない', () => {
-    const { container } = render(<HomeGate />);
-    expect(container.innerHTML).toBe('');
+  it('リダイレクト中であることを伝える文言を出す', () => {
+    // 判定はすべて JS 側なので、JS が動くまでの間このページは必ず一瞬見える。
+    // 以前は null を返していて無地の画面になっていた。
+    const { getByText } = render(<HomeGate />);
+    expect(getByText('移動しています…')).toBeTruthy();
+  });
+
+  it('JS 無効でも行き止まりにならない出口を SSR 出力の noscript に持つ', () => {
+    // JS が無効だと 4 経路のどれも走らず、このページで詰む。公開サイトとログインへの
+    // 出口を noscript に置いてある。
+    //
+    // **クライアント描画では検証できない。** React の client renderer は noscript の
+    // 子を描画せず `<noscript></noscript>` になる。中身が入るのは SSR 出力だけで、
+    // JS 無効の人が受け取るのもその SSR HTML なので、そちらを直接見る。
+    const html = renderToStaticMarkup(
+      <I18nWrapper>
+        <HomeGate />
+      </I18nWrapper>,
+    );
+
+    expect(html).toContain('<noscript>');
+    expect(html).toContain(`href="${DOCS_SITE_URL}"`);
+    expect(html).toContain('href="/login"');
   });
 
   it('hash のトークンを受けてログイン状態にし /entries/new へ送る', () => {
