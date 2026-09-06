@@ -114,7 +114,7 @@ export function MenuOption({
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       className={`flex ${MENU_ROW_HEIGHT_CLASS} w-full items-center gap-2 px-3 text-left text-[13px] transition-colors ${
-        active ? 'bg-[var(--toolbar-hover)]' : 'hover:bg-[var(--hover-wash)]'
+        active ? 'bg-[var(--hover-wash)]' : 'hover:bg-[var(--hover-wash)]'
       }`}
       style={{ color: selected ? 'var(--accent)' : 'var(--fg)' }}
     >

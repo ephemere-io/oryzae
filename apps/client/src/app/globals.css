@@ -21,7 +21,6 @@
    * どこを触っても手応えの色が違った。押せるかどうかは色の種類ではなく
    * 「地がわずかに沈むこと」で伝える。 */
   --hover-wash: rgba(0, 0, 0, 0.05);
-  --toolbar-hover: rgba(0, 0, 0, 0.04);
   --date-color: #999;
 
   /* 画面の上に浮く操作面（パレット・ツールバー・盤面のフローティングツールバー）。
@@ -79,7 +78,6 @@
   --accent-light: rgba(156, 191, 174, 0.1);
   --border-subtle: rgba(255, 255, 255, 0.06);
   --hover-wash: rgba(255, 255, 255, 0.07);
-  --toolbar-hover: rgba(255, 255, 255, 0.06);
   --surface-sunken: #131313;
   --surface-sunken-border: rgba(255, 255, 255, 0.1);
   --date-color: #666;

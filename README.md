@@ -114,6 +114,7 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/backend-testing-guide.md` | バックエンドテスト戦略、ガードレール |
 | `docs/client-architecture-guide.md` | Feature-Sliced 構造（ドメイン × reach: shared/pc/sp）、インポートルール、端末出し分け |
 | `docs/client-testing-guide.md` | フロントエンドテスト戦略 |
+| `docs/design-language.md` | 面の重さ・ホバー・選択・寸法・書体の共通語彙（どれをいつ使うか） |
 | `docs/shared-package-guide.md` | `@oryzae/shared` の使用ルール |
 | `docs/entry-backend-guide.md` | Entry コンテキスト実装ガイド |
 | `docs/entry-screen-design.md` | エントリー画面（PC / SP / 一覧）の最終形 UI/UX、エントリーとボードの役割定義 |
