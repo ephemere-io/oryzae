@@ -140,6 +140,11 @@ GITHUB_TOKEN が作った PR には `pull_request` のワークフローが起�
   GITHUB_TOKEN でも起動する数少ない例外である
 - その E2E が落ちれば `main-red` 経路がこのループ自身を呼び戻す（自己修復）
 
+なお 2026-09 に、E2E は人の PR でも「push のたび」ではなく
+「PR を開いたとき / `run-e2e` ラベル / main への push / 週次」に絞った
+（Actions の無料枠を 6 日で使い切ったため。`.github/workflows/e2e.yml` の冒頭に経緯）。
+**このループが main の E2E 失敗を拾う経路は、以前より重要になっている。**
+
 ---
 
 ## 費用（実測）
