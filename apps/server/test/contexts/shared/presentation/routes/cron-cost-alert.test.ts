@@ -354,6 +354,18 @@ describe('cronCostAlert', () => {
       expect(body.actualCost.byModel[0].feature).toBeNull();
     });
 
+    it('内訳が取れなかったときは、その旨を出す（総額は正しいと添える）', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      // group_by が効かない応答（model も cost_type も無い）
+      mockFetch.mockResolvedValueOnce(costReportResponse([{ amount: '500' }]));
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const breakdown = fieldValue('実請求額の内訳（モデル別・実額）') ?? '';
+      expect(breakdown).toContain('group_by が効いていない可能性');
+      expect(breakdown).toContain('総額は正しい値です');
+    });
+
     it('実額が取れないときは内訳フィールドを出さない', async () => {
       supabaseState.rows = [fermentation()];
 

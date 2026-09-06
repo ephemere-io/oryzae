@@ -310,6 +310,9 @@ export const adminObservability = new Hono<Env>()
                 feature: featureOfModel(m.model),
               }))
             : [],
+        // 内訳が返らなかった場合 true。総額は正しいまま内訳だけ消えるので、
+        // 空配列を「内訳ゼロ」と読ませないために別途返す。
+        groupingUnavailable: actual.kind === 'ok' ? actual.groupingUnavailable : false,
         // truncated は status === 'ok' のときだけ意味を持つ。失敗時の false は
         // 「完全に取得できた」ではなく「該当なし」。必ず status を先に見ること。
         truncated: actual.kind === 'ok' ? actual.truncated : false,

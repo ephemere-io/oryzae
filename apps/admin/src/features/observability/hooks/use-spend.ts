@@ -72,6 +72,8 @@ const spendDataSchema = z.object({
     truncated: z.boolean(),
     message: z.string().nullable(),
     byModel: z.array(actualModelCostSchema),
+    /** 内訳が返らなかった場合 true。空の byModel を「内訳ゼロ」と読ませない。 */
+    groupingUnavailable: z.boolean(),
   }),
   estimated: z.object({
     status: z.enum(['ok', 'error']),

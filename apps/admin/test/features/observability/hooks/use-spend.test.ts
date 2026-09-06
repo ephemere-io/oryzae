@@ -29,6 +29,7 @@ const sampleSpend = {
         feature: 'OCR',
       },
     ],
+    groupingUnavailable: false,
   },
   estimated: {
     status: 'ok',
@@ -105,6 +106,7 @@ describe('useSpend', () => {
           truncated: false,
           message: null,
           byModel: [],
+          groupingUnavailable: false,
         },
       }),
     );
@@ -193,6 +195,23 @@ describe('useSpend', () => {
 
     expect(result.current.data).toBeNull();
     expect(result.current.error).toBe('コストデータの取得に失敗しました');
+  });
+
+  it('groupingUnavailable を保持する（内訳なしを内訳ゼロと見せない）', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        ...sampleSpend,
+        actual: { ...sampleSpend.actual, byModel: [], groupingUnavailable: true },
+      }),
+    );
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data?.actual.groupingUnavailable).toBe(true);
   });
 
   it('does nothing when no token is stored', async () => {

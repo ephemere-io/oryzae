@@ -64,6 +64,7 @@ describe('fetchActualCost', () => {
       daily: [{ date: '2026-08-08', costUsd: 1.2345 }],
       // group_by が無い応答（model も cost_type も無い）は受け皿に積む。
       // 落とすと内訳の合計が総額と合わなくなる。
+      groupingUnavailable: true,
       byModel: [
         {
           model: '(内訳なし)',
@@ -217,6 +218,7 @@ describe('fetchActualCost', () => {
       totalCostUsd: 0,
       daily: [],
       byModel: [],
+      groupingUnavailable: false,
       truncated: false,
     });
   });
@@ -224,9 +226,26 @@ describe('fetchActualCost', () => {
 
 describe('formatActualCost', () => {
   it.each<[ActualCostResult, string]>([
-    [{ kind: 'ok', totalCostUsd: 1.2345, daily: [], byModel: [], truncated: false }, '$1.2345'],
     [
-      { kind: 'ok', totalCostUsd: 1.2345, daily: [], byModel: [], truncated: true },
+      {
+        kind: 'ok',
+        totalCostUsd: 1.2345,
+        daily: [],
+        byModel: [],
+        groupingUnavailable: false,
+        truncated: false,
+      },
+      '$1.2345',
+    ],
+    [
+      {
+        kind: 'ok',
+        totalCostUsd: 1.2345,
+        daily: [],
+        byModel: [],
+        groupingUnavailable: false,
+        truncated: true,
+      },
       '$1.2345 (集計打ち切り・過少)',
     ],
     [{ kind: 'not-configured' }, '未設定 (ANTHROPIC_ADMIN_KEY)'],
@@ -354,6 +373,60 @@ describe('モデル別の実額内訳', () => {
     expect(result.byModel[0]?.costUsd).toBeCloseTo(0.2, 10);
     // 1.7916 + 10.692 セント = $0.124836（自前推定と同じ額を実額側から得られる）
     expect(result.byModel[1]?.costUsd).toBeCloseTo(0.124836, 10);
+  });
+
+  // group_by が効かなくなると「総額は正しいのに内訳だけ静かに消える」。
+  // 実 API で書式を確かめられない以上、実行時に気づける形にしておく。
+  it('内訳が返らなければ groupingUnavailable を立てる', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [{ starting_at: '2026-08-08T00:00:00Z', results: [{ amount: '500' }] }],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.groupingUnavailable).toBe(true);
+    // 総額そのものは正しい（内訳だけが取れていない）
+    expect(result.totalCostUsd).toBeCloseTo(5, 10);
+  });
+
+  it('内訳が1件でも返っていれば立てない', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            starting_at: '2026-08-08T00:00:00Z',
+            results: [
+              { amount: '500', model: 'claude-opus-5', token_type: 'output_tokens' },
+              { amount: '10' },
+            ],
+          },
+        ],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.groupingUnavailable).toBe(false);
+  });
+
+  it('課金ゼロの期間では立てない（内訳が無くて当然）', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [{ starting_at: '2026-08-08T00:00:00Z', results: [] }],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.groupingUnavailable).toBe(false);
   });
 
   it('token_type ごとの内訳も返す（キャッシュが混ざれば見える）', async () => {

@@ -30,6 +30,7 @@ function makeData(overrides: Partial<SpendData> = {}): SpendData {
           feature: '発酵',
         },
       ],
+      groupingUnavailable: false,
     },
     estimated: {
       status: 'ok',
@@ -96,6 +97,7 @@ describe('SpendView の Anthropic Console リンク', () => {
           truncated: false,
           message: null,
           byModel: [],
+          groupingUnavailable: false,
         },
       }),
     );
@@ -114,6 +116,7 @@ describe('SpendView の Anthropic Console リンク', () => {
           truncated: false,
           message: 'cost_report responded 401',
           byModel: [],
+          groupingUnavailable: false,
         },
       }),
     );
@@ -192,6 +195,19 @@ describe('SpendView の実請求額のモデル別内訳', () => {
     expect(screen.getByText(/そのモデルを使っている機能/)).toBeTruthy();
   });
 
+  // group_by が効かないと総額は正しいまま内訳だけ消える。空配列を
+  // 「内訳ゼロ」と見せると気づけないので、明示的に伝える。
+  it('内訳が取れなかったときは、その旨を出して内訳を並べない', () => {
+    const base = makeData();
+    renderView({
+      ...base,
+      actual: { ...base.actual, groupingUnavailable: true },
+    });
+
+    expect(screen.getByText(/内訳を返しませんでした/)).toBeTruthy();
+    expect(screen.queryByText('実請求額の内訳（モデル別）')).toBeNull();
+  });
+
   it('実額が取れないときは内訳を出さない（$0 の行を並べない）', () => {
     renderView(
       makeData({
@@ -202,6 +218,7 @@ describe('SpendView の実請求額のモデル別内訳', () => {
           truncated: false,
           message: null,
           byModel: [],
+          groupingUnavailable: false,
         },
       }),
     );

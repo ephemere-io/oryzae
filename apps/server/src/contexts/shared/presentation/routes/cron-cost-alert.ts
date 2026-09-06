@@ -182,9 +182,12 @@ export const cronCostAlert = new Hono()
 
       if (actual.kind === 'ok') {
         // 用途別の実額。「OCR がいくらか」はここで読む（推定ではなく実額）。
+        // grouping が効いていないと総額は正しいまま内訳だけ消えるので、その旨を出す。
         fields.push({
           name: '実請求額の内訳（モデル別・実額）',
-          value: formatModelBreakdown(actual.byModel),
+          value: actual.groupingUnavailable
+            ? 'Anthropic が内訳を返しませんでした（group_by が効いていない可能性）。総額は正しい値です'
+            : formatModelBreakdown(actual.byModel),
           inline: false,
         });
 

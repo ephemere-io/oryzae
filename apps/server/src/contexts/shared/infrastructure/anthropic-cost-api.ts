@@ -82,6 +82,15 @@ export type ActualCostResult =
       /** モデル別の実額（コスト降順）。合計は totalCostUsd と一致する。 */
       byModel: ModelActualCost[];
       /**
+       * `group_by[]` を送ったのに内訳が1件も返らなかった場合 true。
+       *
+       * 書式や仕様が変わって grouping が無視されると、results が1件に丸められ
+       * `model` が null になる。**これは失敗しない**——総額は正しいまま内訳だけが
+       * 静かに消えるので、フラグにして呼び出し側から見えるようにする。
+       * `(内訳なし)` の行だけを見せると、モデル名の一種のように読めてしまう。
+       */
+      groupingUnavailable: boolean;
+      /**
        * MAX_PAGES に達してページングを打ち切った場合 true（= 実額は過少）。
        * 打ち切りを黙って隠すと「途中までの合計」を完全な実請求額として
        * 表示してしまう。fermentation-cost-query.ts の truncated と同じ方針。
@@ -214,6 +223,12 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
     }
 
     const totalCostUsd = daily.reduce((sum, d) => sum + d.costUsd, 0);
+    // 課金があるのに内訳キーが受け皿しか無い = grouping が効いていない。
+    // 0 円の日は内訳が無くて当然なので、総額が正のときだけ判定する。
+    const groupingUnavailable =
+      totalCostUsd > 0 &&
+      perModel.size > 0 &&
+      Array.from(perModel.keys()).every((key) => key === UNGROUPED_MODEL_LABEL);
     const byModel: ModelActualCost[] = Array.from(perModel.entries())
       .map(([model, v]) => ({
         model,
@@ -224,7 +239,7 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
       }))
       .sort((a, b) => b.costUsd - a.costUsd);
 
-    return { kind: 'ok', totalCostUsd, daily, byModel, truncated };
+    return { kind: 'ok', totalCostUsd, daily, byModel, groupingUnavailable, truncated };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return { kind: 'error', message };

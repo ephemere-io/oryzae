@@ -280,47 +280,58 @@ export function SpendView({
           {/* 用途別の内訳は **実額** で出す。cost_report を group_by[]=description で
               取るとモデル別に割れ、Oryzae は用途ごとに別モデルを使っているので、
               モデル別内訳がそのまま用途別の実額になる。「OCR がいくらか」はここで読む。 */}
-          {data.actual.status === 'ok' && data.actual.byModel.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-                実請求額の内訳（モデル別）
-              </p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Anthropic は「用途」を知りません。用途名は
-                <strong>そのモデルを使っている機能</strong>を 指すだけで、同じモデルの他の利用（CI
-                のレビュー等）も同じ行に含まれます。
-              </p>
-              <div className="space-y-2">
-                {data.actual.byModel.map((m) => (
-                  <div key={m.model} className="rounded-lg border border-border/50 bg-card p-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-mono text-sm">
-                        {m.model}
-                        {m.feature && (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            ← {m.feature} のモデル
-                          </span>
-                        )}
-                      </span>
-                      <span className="font-mono text-sm tabular-nums">{formatUsd(m.costUsd)}</span>
-                    </div>
-                    {/* token_type の内訳。キャッシュ読み書きが混ざっていればここに出る
-                        （自前推定では表現できない部分）。 */}
-                    {m.byTokenType.length > 0 && (
-                      <div className="mt-1.5 space-y-0.5 font-mono text-xs text-muted-foreground tabular-nums">
-                        {m.byTokenType.map((t) => (
-                          <div key={t.tokenType} className="flex justify-between gap-3">
-                            <span>{t.tokenType}</span>
-                            <span>{formatUsd(t.costUsd)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {data.actual.status === 'ok' && data.actual.groupingUnavailable && (
+            <div className="rounded-md bg-yellow-500/10 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-500">
+              Anthropic が実請求額の内訳を返しませんでした（group_by
+              が効いていない可能性）。上の総額は正しい値です。
             </div>
           )}
+
+          {data.actual.status === 'ok' &&
+            !data.actual.groupingUnavailable &&
+            data.actual.byModel.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  実請求額の内訳（モデル別）
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Anthropic は「用途」を知りません。用途名は
+                  <strong>そのモデルを使っている機能</strong>を 指すだけで、同じモデルの他の利用（CI
+                  のレビュー等）も同じ行に含まれます。
+                </p>
+                <div className="space-y-2">
+                  {data.actual.byModel.map((m) => (
+                    <div key={m.model} className="rounded-lg border border-border/50 bg-card p-3">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-sm">
+                          {m.model}
+                          {m.feature && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ← {m.feature} のモデル
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono text-sm tabular-nums">
+                          {formatUsd(m.costUsd)}
+                        </span>
+                      </div>
+                      {/* token_type の内訳。キャッシュ読み書きが混ざっていればここに出る
+                        （自前推定では表現できない部分）。 */}
+                      {m.byTokenType.length > 0 && (
+                        <div className="mt-1.5 space-y-0.5 font-mono text-xs text-muted-foreground tabular-nums">
+                          {m.byTokenType.map((t) => (
+                            <div key={t.tokenType} className="flex justify-between gap-3">
+                              <span>{t.tokenType}</span>
+                              <span>{formatUsd(t.costUsd)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           {(data.estimated.untrackedCount > 0 || data.estimated.truncated) && (
             <div className="rounded-md bg-yellow-500/10 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-500 space-y-1">
