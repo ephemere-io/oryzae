@@ -5,8 +5,9 @@
 # seed.sql を流してから Playwright を走らせる。本番の SERVICE_ROLE_KEY を CI に
 # 置く必要がなくなり、毎回まっさらなので実行順やデータ蓄積に依存しなくなる。
 #
-# CI 時間を削るため、E2E に不要なサービス（studio / realtime / analytics /
-# inbucket）は無効化している。storage はボードの写真カードが使うので有効。
+# CI 時間を削るため、E2E に不要なサービス（studio / realtime / analytics）は無効化。
+# storage はボードの写真カードが使うので有効。inbucket（メール受信箱）は
+# 「サインアップ → 確認メール → リンク → ログイン」を E2E で通すために有効。
 
 project_id = "oryzae"
 
@@ -40,9 +41,10 @@ enable_manual_linking = false
 [auth.email]
 enable_signup = true
 double_confirm_changes = false
-# E2E は受信箱を持てないため、確認メールなしでパスワードログインできるようにする。
-# 本番の Supabase 設定とは独立（ここはローカル/CI 専用）。
-enable_confirmations = false
+# 本番と同じく確認メールを必須にする。ローカルは inbucket が受信箱になるので、
+# E2E から実際にメールを開いてリンクを踏める（signup.spec.ts）。
+# seed 済みアカウントは email_confirmed_at を入れてあるので影響を受けない。
+enable_confirmations = true
 secure_password_change = false
 
 [storage]
@@ -55,8 +57,12 @@ enabled = false
 [studio]
 enabled = false
 
-[inbucket]
-enabled = false
+# 確認メールの受信箱。E2E がここから token を取り出して /auth/confirm を踏む。
+# 実体は Mailpit（旧 CLI の [inbucket] から名称・実装ごと置き換わっている）。
+# API が別物なので e2e/fixtures/mailbox.ts も Mailpit 用に書いてある。
+[local_smtp]
+enabled = true
+port = 54324
 
 [analytics]
 enabled = false

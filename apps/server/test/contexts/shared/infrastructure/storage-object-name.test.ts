@@ -12,8 +12,7 @@ describe('toSafeStorageFileName', () => {
   it('日本語のスクリーンショット名を通せる形に落とす', () => {
     const result = toSafeStorageFileName('スクリーンショット 2026-08-09 10.11.11.jpg');
 
-    // 基底名の中のドットも区切りに潰れる（拡張子の区切りだけが残る）。
-    expect(result).toBe('2026-08-09-10-11-11.jpg');
+    expect(result).toBe('2026-08-09-10.11.11.jpg');
     expect(result).toMatch(/^[A-Za-z0-9._-]+$/);
   });
 
@@ -48,7 +47,26 @@ describe('toSafeStorageFileName', () => {
   it('極端に長い名前は切り詰める', () => {
     const result = toSafeStorageFileName(`${'a'.repeat(500)}.jpg`);
 
-    expect(result).toBe(`${'a'.repeat(64)}.jpg`);
+    expect(result).toBe(`${'a'.repeat(60)}.jpg`);
+  });
+
+  // 以下は board 側（#524）にあった重複実装のテストを移したもの。
+  // 同じ関数が 2 つあると片方だけ直す事故が起きるため 1 本に畳んだ。
+  it('括弧や空白も安全な文字へ均す', () => {
+    expect(toSafeStorageFileName('logo (1) copy.png')).toMatch(/^[a-zA-Z0-9._-]+\.png$/);
+  });
+
+  it('区切り記号だけの名前でも空にならない', () => {
+    expect(toSafeStorageFileName('---.png')).toBe('photo.png');
+  });
+
+  it('名前が全部非 ASCII でも空にならない', () => {
+    expect(toSafeStorageFileName('写真.jpeg')).toBe('photo.jpeg');
+  });
+
+  // `.JPG` と `.jpg` で別キーになると、同じ写真を二重に持つことになる。
+  it('拡張子は小文字に揃える', () => {
+    expect(toSafeStorageFileName('IMG_1234.JPG')).toBe('IMG_1234.jpg');
   });
 
   // 素通しすると `?` 以降がクエリ扱いされうる。キーに残さない。

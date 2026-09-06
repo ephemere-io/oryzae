@@ -44,6 +44,30 @@ describe('useCreateSnippet', () => {
     });
   });
 
+  it('配置位置（x/y）を渡すとそのまま POST に載る', async () => {
+    const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse(true)));
+    const { result } = renderHook(() => useCreateSnippet(createMockApi(fetchImpl)));
+
+    await result.current({
+      text: '抜粋',
+      dateKey: '2026-08-03',
+      viewType: 'daily',
+      x: -320,
+      y: 480,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith('/api/v1/board/snippets', {
+      method: 'POST',
+      body: JSON.stringify({
+        text: '抜粋',
+        dateKey: '2026-08-03',
+        viewType: 'daily',
+        x: -320,
+        y: 480,
+      }),
+    });
+  });
+
   it('失敗は false、api が null なら通信せず false', async () => {
     const failing = vi.fn(() => Promise.resolve(jsonResponse(false)));
     const { result: r1 } = renderHook(() => useCreateSnippet(createMockApi(failing)));

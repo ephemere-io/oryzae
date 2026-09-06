@@ -1,3 +1,5 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
@@ -5,9 +7,20 @@ import { DOCS_SITE_URL } from './src/lib/docs-site';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
+/**
+ * ワークスペースのルート（この設定ファイルから2つ上＝pnpm-workspace.yaml のある場所）。
+ *
+ * 明示しないと Turbopack はロックファイルを探して上へ遡り、git worktree
+ * （`<repo>/.claude/worktrees/<name>/`）で動かしたときに **元のチェックアウト側** を
+ * ルートと誤認する。すると worktree の node_modules を辿れず、`@oryzae/server` などの
+ * workspace パッケージが "Module not found" になる。
+ * 設定ファイル基準で解決するので、通常のチェックアウトでも worktree でも正しく決まる。
+ */
+const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
 const nextConfig: NextConfig = {
   transpilePackages: ['@oryzae/shared', '@oryzae/server', '@oryzae/verify'],
-  turbopack: {},
+  turbopack: { root: workspaceRoot },
   // `/privacy` と `/support` は公開サイト（別リポジトリ・別ドメイン）へ移した。
   // これらの URL は App Store の審査情報やメール文面など**アプリの外から参照されている**
   // ため、消すのではなく 301 で恒久転送する。検索評価も移設先へ引き継ぐ。

@@ -8,19 +8,23 @@
  *
  * ファイル名はキーの見た目を分かりやすくするためだけのもので、意味を持たない
  * （パスの先頭は userId、続けてタイムスタンプが入る）。安全側に倒して
- * `[A-Za-z0-9_-]` 以外はすべて `-` に潰し、拡張子の区切りのドットだけを残す。
- * Storage が実際に許す文字はもう少し広いが、`?` や `&` のような URL で意味を持つ文字や、
- * `/` のようなパスを掘れる文字を残す利点が無い。
+ * `[A-Za-z0-9._-]` 以外はすべて `-` に潰す。Storage が実際に許す文字はもう少し広いが、
+ * `?` や `&` のような URL で意味を持つ文字や、`/` のようなパスを掘れる文字を残す利点が無い。
+ *
+ * board と entry の両方がここを通る。以前は同じ関数が board 側にも別実装で存在したが、
+ * 片方だけ直す事故が起きるので 1 本に畳んである。
  */
 
 /** キーが長くなりすぎないよう、基底名はこの文字数で切る。 */
-const MAX_BASE_LENGTH = 64;
+const MAX_BASE_LENGTH = 60;
+/** 拡張子の上限。長い拡張子はキーを膨らませるだけで意味を持たない。 */
+const MAX_EXTENSION_LENGTH = 10;
 
-function slug(value: string): string {
+function slugBase(value: string): string {
   return value
-    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
     .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^[-._]+|[-._]+$/g, '');
 }
 
 /**
@@ -34,8 +38,12 @@ export function toSafeStorageFileName(fileName: string): string {
   const rawBase = hasExtension ? fileName.slice(0, lastDot) : fileName;
   const rawExtension = hasExtension ? fileName.slice(lastDot + 1) : '';
 
-  const base = slug(rawBase).slice(0, MAX_BASE_LENGTH) || 'photo';
-  const extension = slug(rawExtension);
+  const base = slugBase(rawBase).slice(0, MAX_BASE_LENGTH) || 'photo';
+  // 拡張子は小文字に揃える（`.JPG` と `.jpg` で別キーにしない）。
+  const extension = rawExtension
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, MAX_EXTENSION_LENGTH);
 
   return extension ? `${base}.${extension}` : base;
 }

@@ -10,6 +10,87 @@ type Env = {
   };
 };
 
+/** PostgREST の 1 レスポンス上限。これを超えると黙って打ち切られる。 */
+const PAGE_SIZE = 1000;
+
+/** 辿るページ数の上限。1000 行 × 200 = 20 万行。到達したら黙って返さず投げる。 */
+const MAX_PAGES = 200;
+
+/**
+ * 指定カラムを全件読む。
+ *
+ * `.range()` を付けずに投げると PostgREST の既定上限（1000 行）で静かに打ち切られ、
+ * 集計が実態より少なく出る（#367 と同じ壊れ方で、エラーにならないので「なんとなく
+ * 少ない」としか見えない）。
+ *
+ * ページングは offset ではなく **id のカーソル**で進める。id は gen_random_uuid() で
+ * 時系列に並ばないため、offset 方式だと読んでいる最中の INSERT が既読ページより前に
+ * 入り込み、以降の行がずれて重複カウント・取りこぼしになる。`id > 直前の最大 id` で
+ * 進めればその影響を受けない。
+ *
+ * 上限に達したら**投げる**。黙って部分結果を返すと、この関数が防ぐはずの
+ * 「エラーにならないのに数字が少ない」状態を自分で作ってしまう。
+ */
+async function selectAllRows<T>(
+  supabase: SupabaseClient,
+  table: string,
+  columns: string,
+  userIds: string[],
+  toRow: (raw: Record<string, unknown>) => T | null,
+): Promise<T[]> {
+  if (userIds.length === 0) return [];
+
+  const rows: T[] = [];
+  let cursor: string | null = null;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const base = supabase
+      .from(table)
+      // id はカーソルに使うので、呼び出し側が要求していなくても必ず読む。
+      // includes('id') では駄目（'user_id' が部分一致してしまい id が select されない）。
+      .select(withIdColumn(columns))
+      .in('user_id', userIds);
+    // 絞り込みを先に積んでから order/limit を付ける（読み手にも自然な順序）。
+    const filtered = cursor ? base.gt('id', cursor) : base;
+
+    const { data, error } = await filtered.order('id', { ascending: true }).limit(PAGE_SIZE);
+    if (error) throw new Error(error.message);
+
+    const batch: unknown[] = data ?? [];
+    let lastId: string | null = null;
+    for (const raw of batch) {
+      if (typeof raw !== 'object' || raw === null) continue;
+      const record: Record<string, unknown> = { ...raw };
+      const id = record.id;
+      if (typeof id === 'string') lastId = id;
+      const row = toRow(record);
+      if (row) rows.push(row);
+    }
+
+    if (batch.length < PAGE_SIZE) return rows;
+    if (!lastId) {
+      // カーソルを進められないと同じページを取り続ける。止めて気づけるようにする。
+      throw new Error(`${table}: could not advance pagination cursor (missing id)`);
+    }
+    cursor = lastId;
+  }
+
+  throw new Error(
+    `${table}: exceeded ${MAX_PAGES * PAGE_SIZE} rows; aggregate would be incomplete`,
+  );
+}
+
+/** select 句に `id` を必ず含める。列名を分割して**完全一致**で判定する。 */
+function withIdColumn(columns: string): string {
+  const names = columns.split(',').map((c) => c.trim());
+  return names.includes('id') ? columns : `id, ${columns}`;
+}
+
+function readString(raw: Record<string, unknown>, key: string): string | null {
+  const value = raw[key];
+  return typeof value === 'string' ? value : null;
+}
+
 export const adminUsers = new Hono<Env>()
   .get('/', async (c) => {
     const supabase = c.get('adminSupabase');
@@ -19,32 +100,51 @@ export const adminUsers = new Hono<Env>()
 
     const userIds = users.map((u) => u.id);
 
-    const [entriesRes, questionsRes, fermentationsRes] = await Promise.all([
-      supabase.from('entries').select('user_id').in('user_id', userIds),
-      supabase.from('questions').select('user_id').in('user_id', userIds),
-      supabase.from('fermentation_results').select('user_id, status').in('user_id', userIds),
+    const [entryRows, questionRows, fermentationRows] = await Promise.all([
+      // created_at も読むのは、最終活動日時（最後に書いた日）を出すため。
+      selectAllRows(supabase, 'entries', 'user_id, created_at', userIds, (raw) => {
+        const userId = readString(raw, 'user_id');
+        return userId ? { userId, createdAt: readString(raw, 'created_at') } : null;
+      }),
+      selectAllRows(supabase, 'questions', 'user_id', userIds, (raw) => {
+        const userId = readString(raw, 'user_id');
+        return userId ? { userId } : null;
+      }),
+      selectAllRows(supabase, 'fermentation_results', 'user_id, status', userIds, (raw) => {
+        const userId = readString(raw, 'user_id');
+        return userId ? { userId, status: readString(raw, 'status') } : null;
+      }),
     ]);
 
     const entryCounts = new Map<string, number>();
-    for (const row of entriesRes.data ?? []) {
-      entryCounts.set(row.user_id, (entryCounts.get(row.user_id) ?? 0) + 1);
+    /**
+     * 最後にエントリーを書いた日時。「活動」を発酵で測らないのは、発酵が cron による
+     * 自動実行で、本人が使っているかどうかを表さないため。
+     */
+    const lastActivity = new Map<string, string>();
+    for (const row of entryRows) {
+      entryCounts.set(row.userId, (entryCounts.get(row.userId) ?? 0) + 1);
+      if (row.createdAt) {
+        const current = lastActivity.get(row.userId);
+        if (!current || row.createdAt > current) lastActivity.set(row.userId, row.createdAt);
+      }
     }
 
     const questionCounts = new Map<string, number>();
-    for (const row of questionsRes.data ?? []) {
-      questionCounts.set(row.user_id, (questionCounts.get(row.user_id) ?? 0) + 1);
+    for (const row of questionRows) {
+      questionCounts.set(row.userId, (questionCounts.get(row.userId) ?? 0) + 1);
     }
 
     const fermentationStats = new Map<
       string,
       { total: number; completed: number; failed: number }
     >();
-    for (const row of fermentationsRes.data ?? []) {
-      const current = fermentationStats.get(row.user_id) ?? { total: 0, completed: 0, failed: 0 };
+    for (const row of fermentationRows) {
+      const current = fermentationStats.get(row.userId) ?? { total: 0, completed: 0, failed: 0 };
       current.total++;
       if (row.status === 'completed') current.completed++;
       if (row.status === 'failed') current.failed++;
-      fermentationStats.set(row.user_id, current);
+      fermentationStats.set(row.userId, current);
     }
 
     const result = users.map((u) => {
@@ -54,6 +154,8 @@ export const adminUsers = new Hono<Env>()
         email: u.email ?? '',
         createdAt: u.created_at,
         lastSignInAt: u.last_sign_in_at ?? null,
+        /** 最後にエントリーを書いた日時。一度も書いていなければ null。 */
+        lastActivityAt: lastActivity.get(u.id) ?? null,
         entryCount: entryCounts.get(u.id) ?? 0,
         questionCount: questionCounts.get(u.id) ?? 0,
         fermentationTotal: ferm.total,

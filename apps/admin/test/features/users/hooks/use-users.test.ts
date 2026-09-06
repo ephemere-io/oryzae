@@ -26,6 +26,7 @@ describe('useUsers', () => {
         email: 'test@test.com',
         createdAt: '2026-04-01',
         lastSignInAt: '2026-04-10',
+        lastActivityAt: '2026-04-12',
         entryCount: 5,
         questionCount: 2,
         fermentationTotal: 3,
@@ -43,6 +44,36 @@ describe('useUsers', () => {
 
     expect(result.current.users).toHaveLength(1);
     expect(result.current.users[0].email).toBe('test@test.com');
+    expect(result.current.users[0].lastActivityAt).toBe('2026-04-12');
+  });
+
+  // 一度も書いていないユーザーは lastActivityAt が null で返る。
+  // nullable を落とすと、その行だけ schema に弾かれて一覧から消える。
+  it('lastActivityAt が null のユーザーも読み込める', async () => {
+    const users = [
+      {
+        id: 'u2',
+        email: 'silent@test.com',
+        createdAt: '2026-04-01',
+        lastSignInAt: null,
+        lastActivityAt: null,
+        entryCount: 0,
+        questionCount: 0,
+        fermentationTotal: 0,
+        fermentationCompleted: 0,
+        fermentationFailed: 0,
+      },
+    ];
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { users }));
+
+    const { result } = renderHook(() => useUsers());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.users).toHaveLength(1);
+    expect(result.current.users[0].lastActivityAt).toBeNull();
   });
 
   it('sets error on fetch failure', async () => {

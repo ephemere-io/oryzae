@@ -11,6 +11,8 @@ const adminUserSchema = z.object({
   email: z.string(),
   createdAt: z.string(),
   lastSignInAt: z.string().nullable(),
+  /** 最後にエントリーを書いた日時。一度も書いていなければ null。 */
+  lastActivityAt: z.string().nullable(),
   entryCount: z.number(),
   questionCount: z.number(),
   fermentationTotal: z.number(),

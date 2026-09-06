@@ -59,6 +59,22 @@ describe('CreateBoardPhotoUsecase', () => {
     expect(result.caption).toBe('朝の風景');
   });
 
+  it('x/y を渡すとその座標にカードを置く（スニペットと同じ扱い）', async () => {
+    const result = await usecase.execute('user-1', { ...validInput, x: 640.5, y: -120 });
+
+    expect(result.x).toBe(640.5);
+    expect(result.y).toBe(-120);
+  });
+
+  it('x/y を渡さなければ従来どおりランダムに散らす', async () => {
+    const result = await usecase.execute('user-1', validInput);
+
+    expect(result.x).toBeGreaterThanOrEqual(60);
+    expect(result.x).toBeLessThanOrEqual(800);
+    expect(result.y).toBeGreaterThanOrEqual(60);
+    expect(result.y).toBeLessThanOrEqual(600);
+  });
+
   it('画像寸法未指定時はデフォルトの縦長カードを作成する', async () => {
     const result = await usecase.execute('user-1', validInput);
 

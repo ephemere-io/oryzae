@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { UserTable } from '@/features/users/components/user-table';
 import { useUsers } from '@/features/users/hooks/use-users';
 
-const STATUS_OPTIONS = ['all', 'active', 'inactive'] as const;
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'すべて' },
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+] as const;
 
 export default function UsersPage() {
   const router = useRouter();
@@ -23,9 +27,8 @@ export default function UsersPage() {
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-medium">Users</h1>
           <span className="text-sm text-muted-foreground">
-            {users.length} total
-            <span className="mx-1.5 text-border">|</span>
-            {active} active
+            {users.length} 人<span className="mx-1.5 text-border">|</span>
+            うち Active {active} 人
           </span>
         </div>
         <Button variant="ghost" size="icon-xs" onClick={refresh} disabled={loading}>
@@ -48,16 +51,16 @@ export default function UsersPage() {
         <div className="flex items-center gap-0.5">
           {STATUS_OPTIONS.map((s) => (
             <button
-              key={s}
+              key={s.value}
               type="button"
-              onClick={() => setStatusFilter(s)}
+              onClick={() => setStatusFilter(s.value)}
               className={`rounded-md px-2 py-1 text-xs transition-colors ${
-                statusFilter === s
+                statusFilter === s.value
                   ? 'bg-foreground text-background'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {s}
+              {s.label}
             </button>
           ))}
         </div>
@@ -70,7 +73,7 @@ export default function UsersPage() {
       )}
 
       {loading && users.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">読み込み中…</p>
       ) : (
         <UserTable
           users={users}

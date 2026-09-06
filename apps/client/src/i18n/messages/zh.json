@@ -279,7 +279,9 @@
       "caption_placeholder": "说明（20 字以内）",
       "cancel": "取消",
       "uploading_button": "上传中…",
-      "submit": "添加"
+      "submit": "添加",
+      "unsupported": "无法打开这张图片。iPhone 照片（HEIC）浏览器常常无法读取。请另存为 JPEG / PNG 后再选择。",
+      "upload_failed": "添加失败，请重试。"
     },
     "snippet_dialog": {
       "aria_label": "摘录对话框",
@@ -288,10 +290,38 @@
       "placeholder": "请输入文本...",
       "cancel": "取消",
       "update": "更新",
-      "create": "创建"
+      "create": "创建",
+      "source_aria": "摘录来源",
+      "tab_text": "输入文字",
+      "tab_image": "从图片识别",
+      "click_to_select_image": "点击选择图片",
+      "preview_alt": "待识别图片预览",
+      "reading": "识别中…",
+      "reading_aria": "识别中",
+      "ocr_empty": "未能识别到文字。请换一张图片试试。",
+      "ocr_failed": "识别失败。请检查格式（JPEG/PNG/WebP/GIF）与大小（{maxMb}MB 以内）。",
+      "ocr_note": "已从图片中读取。可能存在错误，请确认后再放置。",
+      "too_long": "请控制在 {max} 字以内",
+      "drop_or_click_image": "拖放图片到此处，或点击选择",
+      "read_again": "重新识别",
+      "ocr_caveat": "识别并不完美。手写或模糊的文字可能出错，请在放置前确认。"
     },
     "error_message": "加载画板失败",
-    "retry": "重试"
+    "retry": "重试",
+    "minimap": {
+      "aria_label": "看板缩略图"
+    },
+    "toolbar": {
+      "aria_label": "看板工具栏",
+      "snippet": "创建摘录",
+      "photo": "粘贴图片",
+      "aria_label_card": "所选卡片的操作",
+      "bring_to_front": "移到最前",
+      "delete": "删除",
+      "open": "打开",
+      "ocr": "从图片读取"
+    },
+    "drop_image": "把图片拖到这里"
   },
   "editor": {
     "status": {
@@ -483,6 +513,7 @@
       "header_snippet": "Oryzae 摘选的句子",
       "header_letter": "L.A.B. 的观察记录",
       "snippet_source_prefix": "出处:",
+      "resize_aria": "调整详情面板宽度",
       "write_entry": "为这个提问写日记"
     },
     "jar": {
@@ -528,7 +559,9 @@
         "dismiss": "知道了",
         "aria_label": "腌制完成通知",
         "heading": "已腌入发酵瓶"
-      }
+      },
+      "canvas_aria": "罐子画布",
+      "minimap_aria": "罐子缩略图"
     }
   },
   "questions": {
@@ -676,6 +709,15 @@
       "cancel": "取消",
       "save": "保存",
       "letter_arrived": "有一封信送到了"
+    }
+  },
+  "canvas": {
+    "zoom": {
+      "in_aria": "放大",
+      "out_aria": "缩小",
+      "reset_aria": "重置缩放",
+      "fit_aria": "适应内容",
+      "fit": "Fit"
     }
   }
 }
