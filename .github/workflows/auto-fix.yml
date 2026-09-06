@@ -27,6 +27,11 @@ on:
   workflow_run:
     workflows: ['CI', 'E2E Tests', 'Security']
     types: [completed]
+    # main で失敗したときだけが対象。この branches を外すと、PR ブランチの CI が
+    # 終わるたびに（下の if で skip されるだけの）run が作られ、Actions 画面が
+    # 空の run で埋まる。さらに悪いことに、それらは concurrency グループ auto-fix に
+    # 積まれる（cancel-in-progress: false）ため、本物の実行を待たせる。
+    branches: [main]
   workflow_dispatch:
     inputs:
       issue:
