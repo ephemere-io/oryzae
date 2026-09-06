@@ -20,8 +20,6 @@ export class SupabaseBoardStorageGateway implements BoardStorageGateway {
     file: ArrayBuffer,
     contentType: string,
   ): Promise<string> {
-    // ファイル名はそのまま使えない。日本語名は Storage が 400 InvalidKey で弾く
-    // （entry 側で実際に踏んだ。board も同じ形なので同じ関数に通す）。
     const storagePath = `${userId}/${Date.now()}-${toSafeStorageFileName(fileName)}`;
     const { error } = await this.supabase.storage
       .from(BUCKET_NAME)

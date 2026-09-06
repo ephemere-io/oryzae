@@ -18,12 +18,3 @@ export function formatMonthDay(iso: string): string {
   if (!d) return '';
   return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
-
-/** 「YYYY-MM-DD」。ボードのカードで使う。 */
-export function formatIsoDate(iso: string): string {
-  const d = parse(iso);
-  if (!d) return '';
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
-}
