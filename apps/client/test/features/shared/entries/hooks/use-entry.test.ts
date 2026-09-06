@@ -22,14 +22,18 @@ describe('useEntry', () => {
   });
 
   it('fetches entry by id', async () => {
+    // mediaUrls はストレージパス、mediaSignedUrls は表示用でレスポンス top-level。
     const entry = {
       id: 'e1',
       content: 'hello',
+      mediaUrls: ['user-1/a.jpg'],
       effects: null,
       createdAt: '2024-01-01',
       updatedAt: '2024-01-01',
     };
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { entry }));
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, { entry, mediaSignedUrls: ['https://cdn.example/a.jpg?token=abc'] }),
+    );
     const api = createMockApi(apiFetch);
 
     const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
@@ -38,8 +42,35 @@ describe('useEntry', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.entry).toEqual(entry);
+    expect(result.current.entry).toEqual({
+      ...entry,
+      mediaSignedUrls: ['https://cdn.example/a.jpg?token=abc'],
+    });
     expect(apiFetch).toHaveBeenCalledWith('/api/v1/entries/e1');
+  });
+
+  it('mediaUrls が無いレスポンスでも空配列で埋める', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        entry: {
+          id: 'e1',
+          content: 'hello',
+          effects: null,
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      }),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useEntry('e1', api, false), { wrapper: I18nWrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.entry?.mediaUrls).toEqual([]);
+    expect(result.current.entry?.mediaSignedUrls).toEqual([]);
   });
 
   it('sets loading to false after fetch', async () => {
