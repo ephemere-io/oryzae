@@ -71,6 +71,10 @@ const many: FermentationDetail = {
   })),
 };
 
+/** 問いの上限ちょうど（MAX_QUESTION_STRING_LENGTH = 64 字）。 */
+const LONG_QUESTION =
+  'ここ数ヶ月のあいだに自分のなかで静かに変わってしまったものは何だったのか、それをいまあらためて言葉にするとどんな形になるだろうか';
+
 registerUnit<Props>({
   id: 'SpQuestionZoom',
   title: 'SpQuestionZoom',
@@ -119,6 +123,18 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'long-question',
+      probe: true,
+      description: 'Probe: 上限いっぱい（64 字）の問いも、輪を増やして全文を出す',
+      props: {
+        questionText: LONG_QUESTION,
+        detail: filled,
+        loading: false,
+        onClose: noop,
+        onOpenElement: noop,
+      },
+    },
+    {
       id: 'overflow',
       probe: true,
       description: 'Probe: 言葉9・抜粋7 でも上限までしか置かない（指で選び分けられる数）',
@@ -132,6 +148,31 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'question-is-never-cut',
+      description: '問いは切らない（どの問いを開いているかを語る場所なので）',
+      check: ({ root }) => {
+        const folded = Array.from(root.querySelectorAll('textPath'))
+          .map((path) => path.textContent ?? '')
+          .filter((text) => text.endsWith('…'));
+        return folded.length === 0 || `${folded.length} 個の問いが畳まれている`;
+      },
+    },
+    {
+      id: 'long-question-reads-whole',
+      description: '上限いっぱいの問いも、輪をつなぐと全文になる',
+      onlyFixtures: ['long-question'],
+      check: ({ root }) => {
+        const rings = Array.from(root.querySelectorAll('textPath'));
+        // 円は採寸してから描く（`size > 0`）。版組みの無い jsdom では輪が出ないので、
+        // そこでは判定できない。輪の分け方そのものは ring-text.test.ts が見ている。
+        if (rings.length === 0) return true;
+        const read = rings.map((path) => path.textContent ?? '').join('');
+        return (
+          read === LONG_QUESTION || `全文にならない（${read.length}/${LONG_QUESTION.length} 字）`
+        );
+      },
+    },
     {
       id: 'element-buttons-match-contract',
       description: '押せる要素の数が契約（言葉＋抜粋＋手紙）と一致する',

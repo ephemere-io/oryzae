@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import type { SpJarElement } from '@/features/sp/fermentation/components/sp-element-sheet';
-import { fitRingText, RING_INSET, RING_TRACKING } from '@/features/sp/fermentation/ring-text';
+import { fitRingText, RING_TRACKING, ringPath } from '@/features/sp/fermentation/ring-text';
 import { ringSlots } from '@/features/sp/fermentation/zoom-layout';
 
 /** 円の中での位置（円の直径に対する %）。 */
@@ -98,7 +98,6 @@ export function SpQuestionZoom({
   const empty = !loading && keywords.length === 0 && snippets.length === 0 && letter === null;
 
   const ring = fitRingText(questionText, size);
-  const radius = size / 2 - RING_INSET;
   const scale = elementScale(size);
 
   /** 動かしてあればその位置、無ければ輪の上の既定位置。 */
@@ -136,7 +135,9 @@ export function SpQuestionZoom({
           ref={circleRef}
           className="relative aspect-square rounded-full"
           style={{
-            width: 'min(88vw, 56vh)',
+            // 長い問いは輪が外へ増えるので、その分だけ円を控えめにする
+            // （88vw のままだと 2 重目が画面の縁で切れる）。
+            width: 'min(80vw, 52vh)',
             background:
               'radial-gradient(circle at 50% 42%, rgba(253,251,247,0.75), rgba(253,251,247,0.15))',
             border: '1px solid rgba(226,194,142,0.5)',
@@ -147,29 +148,45 @@ export function SpQuestionZoom({
           {size > 0 ? (
             <svg
               aria-hidden="true"
-              viewBox={`0 0 ${size} ${size}`}
-              className="pointer-events-none absolute inset-0 h-full w-full"
+              viewBox={`0 0 ${ring.box} ${ring.box}`}
+              className="pointer-events-none absolute"
+              style={{
+                left: '50%',
+                top: '50%',
+                width: `${ring.box}px`,
+                height: `${ring.box}px`,
+                marginLeft: `${-ring.box / 2}px`,
+                marginTop: `${-ring.box / 2}px`,
+              }}
             >
-              <path
-                id="sp-zoom-ring"
-                d={`M ${size / 2},${size / 2} m ${-radius},0 a ${radius},${radius} 0 1,1 ${radius * 2},0 a ${radius},${radius} 0 1,1 ${-radius * 2},0`}
-                fill="transparent"
-              />
-              <text
-                style={{
-                  fontFamily: "'Noto Serif JP', serif",
-                  fontSize: `${ring.fontSize}px`,
-                  letterSpacing: `${RING_TRACKING}em`,
-                  fill: '#7A3B3F',
-                  opacity: 0.7,
-                }}
-              >
-                {/* 経路は 9 時から時計回り。25% ＝ 12 時に中央を合わせて、
-                    問いが円の上を渡るようにする（0% だと左側面から始まって読みにくい）。 */}
-                <textPath href="#sp-zoom-ring" startOffset="25%" textAnchor="middle">
-                  {ring.label}
-                </textPath>
-              </text>
+              {ring.lines.map((line) => (
+                <g key={line.radius}>
+                  <path
+                    id={`sp-zoom-ring-${Math.round(line.radius)}`}
+                    d={ringPath(ring.box / 2, line.radius)}
+                    fill="transparent"
+                  />
+                  <text
+                    style={{
+                      fontFamily: "'Noto Serif JP', serif",
+                      fontSize: `${ring.fontSize}px`,
+                      letterSpacing: `${RING_TRACKING}em`,
+                      fill: '#7A3B3F',
+                      opacity: 0.7,
+                    }}
+                  >
+                    {/* 経路は 9 時から時計回り。25% ＝ 12 時に中央を合わせて、
+                        問いが円の上を渡るようにする（0% だと左側面から始まって読みにくい）。 */}
+                    <textPath
+                      href={`#sp-zoom-ring-${Math.round(line.radius)}`}
+                      startOffset="25%"
+                      textAnchor="middle"
+                    >
+                      {line.label}
+                    </textPath>
+                  </text>
+                </g>
+              ))}
             </svg>
           ) : null}
 
