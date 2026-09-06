@@ -1246,10 +1246,14 @@ export function EntryEditor({
               <span
                 className="pointer-events-none absolute z-[12] whitespace-nowrap text-[11px] text-[var(--date-color)]"
                 style={{
-                  // **1文字目の右上。** 題の真下に置くと、本文との間合いに割り込んで
-                  // 題が本文から離れて見える。桁の始まりのすぐ上、右端で揃える。
-                  right: `${TITLE_RIGHT_MARGIN}px`,
-                  top: 'calc(4% - 18px)',
+                  // **紙の右上の隅。** 題の真下に置くと本文との間合いに割り込み、
+                  // 題のすぐ上だと題にくっついて読みづらい。題から離して隅へ逃がす。
+                  //
+                  // 右端は**ヘッダーと同じ縦の線**（gutterPx）に乗せる。題の右余白
+                  // （TITLE_RIGHT_MARGIN）に合わせると、日付や設定より内側に落ちて
+                  // 同じ画面に2本の縦線が立つ。
+                  right: `${gutterPx}px`,
+                  top: 0,
                   ...CONTROL_FONT,
                 }}
               >
