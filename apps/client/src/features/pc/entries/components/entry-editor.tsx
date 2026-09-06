@@ -4,7 +4,7 @@ import type { EditorEffectsState } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Popover } from '@/components/ui/popover';
 import {
   CONTROL_FONT,
@@ -135,10 +135,34 @@ const TITLE_RIGHT_MARGIN = 64;
  * 紙の上端から1行目（＝題）までの余白。
  *
  * 横書きの題は**紙の1行目**なので、上に載る帯ではなく本文と同じ流れの中にある。
- * 書き出しの前に息を置くための余白で、Notion のページ上部と同じ役目。
+ * 書き出しの前に息を置くための余白。
+ *
+ * ヘッダーがすでに 78px（上下の余白 + 行の高さ）を使っているので、ここに大きな数字を
+ * 置くと題が紙の真ん中まで落ちる。ヘッダーと題は**同じ紙の上端**にあるものとして扱う。
  */
-const PAGE_TOP_INSET = 88;
+const PAGE_TOP_INSET = 32;
 const TITLE_TO_BODY_GAP = 24;
+
+/**
+ * 題の筋（縦書きなら桁、横書きなら行）1本ぶんの太さ。字の何倍か。
+ *
+ * **箱の太さと行の高さが同じ数字を見る**のが肝要。以前は箱が 1.6 倍・行が 1.4 倍で、
+ * その差 0.2 倍 × 筋の数が、そのまま題と本文のあいだの空きになって現れていた
+ * （筋が増えるほど広がる＝「長く打つと余白が入る」）。
+ *
+ * 字の幅ぎりぎり（1.0）にしないのは、日本語入力の変換候補がキャレットの脇に開けず
+ * 字へ重なるため。
+ */
+const TITLE_LINE_BOX = 1.6;
+
+/**
+ * 描画の前に測るための effect。
+ *
+ * 題の箱は**中身を測ってから**決めるので、描かれたあとに測ると1フレーム遅れ、
+ * 打つたびに箱が跳ねて見える。SSR では layout effect が使えないので、そこだけ逃がす
+ * （エディタは mount 後にしか描かれないため実害は無いが、検証ページは SSR される）。
+ */
+const useMeasureEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /**
  * 題に打てる長さの上限。
@@ -941,10 +965,39 @@ export function EntryEditor({
   });
   const titleFontSize = titleMetrics.fontSize;
   const titleLines = titleMetrics.lines;
-  // 筋の太さ（字の 1.6 倍）× 筋の数。折り返した題はこの厚みに収まる。
-  // **字の幅ぎりぎりにしない**（以前は 46px の字に対して箱が 48px しか無く、
-  // 日本語入力の変換候補がキャレットの脇に開けずに字へ重なっていた）。
-  const titleThicknessPx = Math.round(titleFontSize * 1.6) * titleLines;
+  const titleLineBoxPx = Math.round(titleFontSize * TITLE_LINE_BOX);
+
+  /**
+   * 題が実際に占めた厚み。**予測ではなく測る。**
+   *
+   * 「1筋に何字入るか」の見積もりは必ずどこかでずれる（半角混じり・約物・書体差）。
+   * ずれて筋を1本多く数えると、その1本ぶんが丸ごと題と本文のあいだの空きになって出る。
+   * 箱をいったん 0 にして中身の広がりを読めば、折り返しは実物そのものなので
+   * ずれようがない——**題がどれだけ長くても、本文との間は常に同じ**になる。
+   */
+  const [measuredTitleThicknessPx, setMeasuredTitleThicknessPx] = useState(0);
+  useMeasureEffect(() => {
+    const el = titleInputRef.current;
+    if (!el) return;
+    if (isVertical) {
+      const prev = el.style.width;
+      el.style.width = '0px';
+      const next = el.scrollWidth;
+      el.style.width = prev;
+      setMeasuredTitleThicknessPx(next);
+      return;
+    }
+    const prev = el.style.height;
+    el.style.height = '0px';
+    const next = el.scrollHeight;
+    el.style.height = prev;
+    setMeasuredTitleThicknessPx(next);
+  }, [title, titlePlaceholder, titleFontSize, titleLineLength, isVertical, settings.fontFamily]);
+
+  // 測る前の1回（初回描画）だけ見積もりに倒す。跳ねないよう、同じ係数から出す。
+  const titleThicknessPx = measuredTitleThicknessPx || titleLineBoxPx * titleLines;
+  // 何筋使ったかも測った厚みから逆算する（見積もりの筋数はここでは使わない）。
+  const titleLinesUsed = Math.max(1, Math.round(titleThicknessPx / titleLineBoxPx));
   // **箱は中身に合わせる。** 筋の長さを丸ごと取っていたので、3文字の題でも
   // 画面いっぱいの箱を占めていた。
   //
@@ -953,7 +1006,7 @@ export function EntryEditor({
   // 2筋目に入ったら開いているぶん全部を使う——紙と同じで、1筋目を最後まで書き切ってから
   // 次の筋へ移る。そうすれば折り返しで動くのは厚みだけになる。
   const titleUsedLengthPx =
-    titleLines === 1
+    titleLinesUsed === 1
       ? Math.min(titleLineLength, titleLength * titleFontSize + Math.round(titleFontSize * 0.6))
       : titleLineLength;
   const titleTextStyle: React.CSSProperties = {
@@ -972,7 +1025,8 @@ export function EntryEditor({
           background: 'transparent',
         }),
     fontSize: `${titleFontSize}px`,
-    lineHeight: 1.4,
+    // 箱の太さと同じ数字。ずれるとその差が題と本文のあいだの空きになる。
+    lineHeight: TITLE_LINE_BOX,
     fontFamily:
       settings.fontFamily === 'serif' ? "'Noto Serif JP', serif" : "'Noto Sans JP', sans-serif",
     writingMode: isVertical ? 'vertical-rl' : 'horizontal-tb',
@@ -992,8 +1046,12 @@ export function EntryEditor({
    */
   // 残りは**上限の手前に来たときだけ**言う。0 になってから初めて打てなくなるより、
   // 近づいていることが先に見えているほうが、書き手は言葉を選び直せる。
+  //
+  // **題から手が離れたら消す。** 打ち止めが近いことは打っている本人にだけ要る話で、
+  // 読み返しているときに残っていると、ただの余計な数字になる。
+  const [titleFocused, setTitleFocused] = useState(false);
   const titleRemaining = TITLE_MAX_LENGTH - title.length;
-  const showTitleRemaining = titleRemaining <= TITLE_REMAINING_THRESHOLD;
+  const showTitleRemaining = titleFocused && titleRemaining <= TITLE_REMAINING_THRESHOLD;
   const titleRemainingLabel = t('title.remaining', { count: titleRemaining });
 
   const titleField = (
@@ -1013,7 +1071,11 @@ export function EntryEditor({
           editorRef.current?.focus();
         }
       }}
-      onBlur={commitTitleEdit}
+      onFocus={() => setTitleFocused(true)}
+      onBlur={() => {
+        setTitleFocused(false);
+        commitTitleEdit();
+      }}
       placeholder={titlePlaceholder}
       aria-label={t('title.placeholder')}
       className={`z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
@@ -1184,10 +1246,10 @@ export function EntryEditor({
               <span
                 className="pointer-events-none absolute z-[12] whitespace-nowrap text-[11px] text-[var(--date-color)]"
                 style={{
-                  // 桁の中心に合わせて、その真下へ。桁より広い字数表示が右へずれない。
-                  right: `${TITLE_RIGHT_MARGIN + titleThicknessPx / 2}px`,
-                  top: `calc(4% + ${titleUsedLengthPx}px + 10px)`,
-                  transform: 'translateX(50%)',
+                  // **1文字目の右上。** 題の真下に置くと、本文との間合いに割り込んで
+                  // 題が本文から離れて見える。桁の始まりのすぐ上、右端で揃える。
+                  right: `${TITLE_RIGHT_MARGIN}px`,
+                  top: 'calc(4% - 18px)',
                   ...CONTROL_FONT,
                 }}
               >
@@ -1208,21 +1270,28 @@ export function EntryEditor({
               {/* 横書きの題は本文と同じ列に乗せ、一緒に上へ流す。 */}
               {!isVertical && (
                 <div
+                  className="relative"
                   style={{
                     ...horizontalColumnStyle,
                     paddingTop: `${PAGE_TOP_INSET}px`,
                     paddingBottom: `${TITLE_TO_BODY_GAP}px`,
                   }}
                 >
-                  {titleField}
+                  {/* **題の1行目の右上。** 題の下に置くと、その高さぶん本文が押し下げられ、
+                      題と本文の間合いが広がってしまう。流れから外して上に逃がす。 */}
                   {showTitleRemaining && (
                     <span
-                      className="mt-1 block text-right text-[11px] text-[var(--date-color)]"
-                      style={CONTROL_FONT}
+                      className="pointer-events-none absolute whitespace-nowrap text-[11px] text-[var(--date-color)]"
+                      style={{
+                        right: `${gutterPx}px`,
+                        top: `${PAGE_TOP_INSET - 18}px`,
+                        ...CONTROL_FONT,
+                      }}
                     >
                       {titleRemainingLabel}
                     </span>
                   )}
+                  {titleField}
                 </div>
               )}
 
