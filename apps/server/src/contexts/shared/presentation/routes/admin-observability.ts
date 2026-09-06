@@ -6,7 +6,6 @@ import {
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
   OCR_MODEL_ID,
-  OCR_MODEL_RATE,
 } from '../../infrastructure/claude-pricing.js';
 import {
   aggregateCost,
@@ -14,11 +13,6 @@ import {
   fetchFermentationCostRows,
   resolveUserEmails,
 } from '../../infrastructure/fermentation-cost-query.js';
-import {
-  aggregateOcrCost,
-  aggregateOcrCostByDay,
-  fetchOcrUsageRows,
-} from '../../infrastructure/ocr-cost-query.js';
 
 type Env = {
   Variables: {
@@ -64,6 +58,20 @@ const vercelDeployListSchema = z.object({
     }),
   ),
 });
+
+/**
+ * モデル ID → Oryzae での用途。
+ *
+ * Anthropic は「用途」を知らない。モデルが分かれているから用途別に読めるだけで、
+ * **同じモデルを他の用途や CI が使えば同じバケットに混ざる**。だから返すのは
+ * 「このモデルを使っている機能」であって「その機能のコード」ではない。
+ * 画面・通知の文言もそのつもりで書くこと。
+ */
+function featureOfModel(model: string): string | null {
+  if (model === FERMENTATION_MODEL_ID) return '発酵';
+  if (model === OCR_MODEL_ID) return 'OCR';
+  return null;
+}
 
 // ── Summary (hub page) ──────────────────────────────────
 
@@ -246,11 +254,13 @@ export const adminObservability = new Hono<Env>()
   // ── AI spend detail ───────────────────────────────────
   // 実請求額 (Anthropic cost_report) と 推定 (自前トークン × 価格表) を明確に分けて返す。
   //
-  // 推定はさらに 発酵 / OCR に割る。単価が違う（発酵 claude-sonnet-4-6 $3/$15、
-  // OCR claude-opus-5 $5/$25）ので合算してから一律単価は掛けられないし、
-  // 「OCR だけで幾らか」を見るためでもある。
+  // **用途別の内訳は実額側で出す。** cost_report を group_by[]=description で取ると
+  // モデル別に割れ、Oryzae は用途ごとに別モデルを使っている（発酵 = sonnet-4-6、
+  // OCR = opus-5）ので、モデル別内訳がそのまま用途別の実額になる。推定しない。
   //
-  // Anthropic 側は Oryzae のユーザーを知らないため、ユーザー別内訳は推定のみ。
+  // 推定が残っているのは **ユーザー別内訳** のためだけ。Anthropic は Oryzae の
+  // ユーザーを知らないので、その軸だけは実額で出せない。
+  //
   // 日別は両者を突き合わせられるよう UTC 日で揃える（cost_report が UTC 固定のため）。
   .get('/spend', async (c) => {
     const supabase = c.get('adminSupabase');
@@ -259,45 +269,29 @@ export const adminObservability = new Hono<Env>()
 
     const now = new Date();
     const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-    const startIso = start.toISOString();
-    const endIso = now.toISOString();
 
-    const [actual, rowsResult, ocrRowsResult] = await Promise.all([
+    const [actual, rowsResult] = await Promise.all([
       fetchActualCost(start, now),
-      fetchFermentationCostRows(supabase, { startIso, endIso }).catch((error: unknown) => {
+      fetchFermentationCostRows(supabase, {
+        startIso: start.toISOString(),
+        endIso: now.toISOString(),
+      }).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.error('[admin-observability] spend query failed', { error: message });
-        return null;
-      }),
-      // migration 00023 未適用の環境ではテーブルが無い。0 件（$0）と区別するため
-      // null を返し、status で「取得できていない」と伝える。
-      fetchOcrUsageRows(supabase, { startIso, endIso }).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[admin-observability] ocr usage query failed', { error: message });
         return null;
       }),
     ]);
 
     const rows = rowsResult?.rows ?? [];
     const aggregate = aggregateCost(rows);
-    const ocrRows = ocrRowsResult?.rows ?? [];
-    const ocrAggregate = aggregateOcrCost(ocrRows);
-
     // 日別は UTC 日で切る。同じ画面に並ぶ Anthropic 実額が UTC 日バケット固定で、
     // 窓を揃えないと乖離が読めないため（日次レポートは運用に合わせ JST 日。
     // cron-cost-alert.ts 参照）。画面には「UTC 日」と明記している。
-    const toUtcDateKey = (createdAt: string) => createdAt.slice(0, 10);
-    const daily = aggregateCostByDay(rows, toUtcDateKey);
-    const ocrDaily = aggregateOcrCostByDay(ocrRows, toUtcDateKey);
-
+    const daily = aggregateCostByDay(rows, (createdAt) => createdAt.slice(0, 10));
     // resolveUserEmails は listUsers を最大20往復する。解決すべきユーザーが
-    // 居ない（期間内に利用ゼロ / クエリ失敗）ときに叩く意味はない。
-    const needsEmails = aggregate.byUser.length > 0 || ocrAggregate.byUser.length > 0;
-    const emailMap = needsEmails ? await resolveUserEmails(supabase) : new Map<string, string>();
-
-    // 片方だけ取れた状態を「ok」と言わない。合計が過少なのに完全なように見える。
-    const estimatedStatus =
-      rowsResult === null ? 'error' : ocrRowsResult === null ? 'partial' : 'ok';
+    // 居ない（期間内に発酵ゼロ / クエリ失敗）ときに叩く意味はない。
+    const emailMap =
+      aggregate.byUser.length > 0 ? await resolveUserEmails(supabase) : new Map<string, string>();
 
     return c.json({
       rangeDays: daysBack,
@@ -305,68 +299,47 @@ export const adminObservability = new Hono<Env>()
         status: actual.kind,
         totalCostUsd: actual.kind === 'ok' ? actual.totalCostUsd : null,
         daily: actual.kind === 'ok' ? actual.daily : [],
+        // モデル別の実額。どのモデルがどの用途かは feature で添える。
+        // Anthropic は「用途」を知らないので、対応付けはこちらの知識。
+        byModel:
+          actual.kind === 'ok'
+            ? actual.byModel.map((m) => ({
+                model: m.model,
+                costUsd: m.costUsd,
+                byTokenType: m.byTokenType,
+                feature: featureOfModel(m.model),
+              }))
+            : [],
         // truncated は status === 'ok' のときだけ意味を持つ。失敗時の false は
         // 「完全に取得できた」ではなく「該当なし」。必ず status を先に見ること。
         truncated: actual.kind === 'ok' ? actual.truncated : false,
         message: actual.kind === 'error' ? actual.message : null,
       },
       estimated: {
-        // 'ok' = 両方取れた / 'partial' = OCR だけ取れていない / 'error' = 発酵が取れていない。
-        // 空配列を「コスト0」と読ませないため必ず status を先に見ること。
-        status: estimatedStatus,
-        /** 発酵 + OCR。実請求額と突き合わせる相手はこの合計。 */
-        totalCostUsd: aggregate.estimatedCostUsd + ocrAggregate.estimatedCostUsd,
-        truncated: (rowsResult?.truncated ?? false) || (ocrRowsResult?.truncated ?? false),
-        fermentation: {
-          // 推定の計算根拠。画面で「どう出した数字か」を検算できるように返す。
-          // 単価は claude-pricing.ts が唯一の正なので、フロントでハードコードしない。
-          pricing: {
-            modelId: FERMENTATION_MODEL_ID,
-            inputUsdPerMTok: FERMENTATION_MODEL_RATE.inputUsdPerMTok,
-            outputUsdPerMTok: FERMENTATION_MODEL_RATE.outputUsdPerMTok,
-          },
-          totalCostUsd: aggregate.estimatedCostUsd,
-          inputTokens: aggregate.inputTokens,
-          outputTokens: aggregate.outputTokens,
-          fermentationCount: aggregate.fermentationCount,
-          untrackedCount: aggregate.untrackedCount,
-          truncated: rowsResult?.truncated ?? false,
-          daily,
-          byUser: aggregate.byUser.map((u) => ({
-            userId: u.userId,
-            email: emailMap.get(u.userId) ?? '',
-            estimatedCostUsd: u.estimatedCostUsd,
-            inputTokens: u.inputTokens,
-            outputTokens: u.outputTokens,
-            fermentationCount: u.fermentationCount,
-          })),
+        // rowsResult が null = クエリ失敗。空配列を「コスト0」と読ませないため status を返す。
+        status: rowsResult === null ? 'error' : 'ok',
+        // 推定の計算根拠。画面で「どう出した数字か」を検算できるように返す。
+        // 単価は claude-pricing.ts が唯一の正なので、フロントでハードコードしない。
+        pricing: {
+          modelId: FERMENTATION_MODEL_ID,
+          inputUsdPerMTok: FERMENTATION_MODEL_RATE.inputUsdPerMTok,
+          outputUsdPerMTok: FERMENTATION_MODEL_RATE.outputUsdPerMTok,
         },
-        ocr: {
-          status: ocrRowsResult === null ? 'error' : 'ok',
-          pricing: {
-            modelId: OCR_MODEL_ID,
-            inputUsdPerMTok: OCR_MODEL_RATE.inputUsdPerMTok,
-            outputUsdPerMTok: OCR_MODEL_RATE.outputUsdPerMTok,
-          },
-          totalCostUsd: ocrAggregate.estimatedCostUsd,
-          inputTokens: ocrAggregate.inputTokens,
-          outputTokens: ocrAggregate.outputTokens,
-          requestCount: ocrAggregate.requestCount,
-          untrackedCount: ocrAggregate.untrackedCount,
-          truncated: ocrRowsResult?.truncated ?? false,
-          daily: ocrDaily,
-          // 実際に使われたモデルと単価。価格表に無いモデルは unpriced=true で
-          // 「金額を出せていない」ことを隠さない。
-          byModel: ocrAggregate.byModel,
-          byUser: ocrAggregate.byUser.map((u) => ({
-            userId: u.userId,
-            email: emailMap.get(u.userId) ?? '',
-            estimatedCostUsd: u.estimatedCostUsd,
-            inputTokens: u.inputTokens,
-            outputTokens: u.outputTokens,
-            requestCount: u.requestCount,
-          })),
-        },
+        totalCostUsd: aggregate.estimatedCostUsd,
+        inputTokens: aggregate.inputTokens,
+        outputTokens: aggregate.outputTokens,
+        fermentationCount: aggregate.fermentationCount,
+        untrackedCount: aggregate.untrackedCount,
+        truncated: rowsResult?.truncated ?? false,
+        daily,
+        byUser: aggregate.byUser.map((u) => ({
+          userId: u.userId,
+          email: emailMap.get(u.userId) ?? '',
+          estimatedCostUsd: u.estimatedCostUsd,
+          inputTokens: u.inputTokens,
+          outputTokens: u.outputTokens,
+          fermentationCount: u.fermentationCount,
+        })),
       },
     });
   })

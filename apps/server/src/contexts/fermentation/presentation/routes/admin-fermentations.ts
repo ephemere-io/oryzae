@@ -6,10 +6,7 @@ import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositor
 import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
-import {
-  computeCostFromTokens,
-  FERMENTATION_MODEL_RATE,
-} from '../../../shared/infrastructure/claude-pricing.js';
+import { computeCostFromTokens } from '../../../shared/infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import {
   aggregateCost,
@@ -159,7 +156,7 @@ export const adminFermentations = new Hono<Env>()
     const items = (data ?? []).map((row) => ({
       ...row,
       user_email: emailMap.get(row.user_id) ?? '',
-      cost: computeCostFromTokens(row.input_tokens, row.output_tokens, FERMENTATION_MODEL_RATE),
+      cost: computeCostFromTokens(row.input_tokens, row.output_tokens),
     }));
 
     return c.json({
@@ -214,11 +211,7 @@ export const adminFermentations = new Hono<Env>()
 
     const items = await Promise.all(
       (data ?? []).map(async (row) => {
-        let cost: unknown = computeCostFromTokens(
-          row.input_tokens,
-          row.output_tokens,
-          FERMENTATION_MODEL_RATE,
-        );
+        let cost: unknown = computeCostFromTokens(row.input_tokens, row.output_tokens);
         // 旧 generation_id 方式のレコード (トークン未保存) は gateway にフォールバック。
         if (cost === null && row.generation_id) {
           try {
@@ -248,11 +241,7 @@ export const adminFermentations = new Hono<Env>()
 
     if (error || !data) return c.json({ error: 'Fermentation result not found' }, 404);
 
-    let cost: unknown = computeCostFromTokens(
-      data.input_tokens,
-      data.output_tokens,
-      FERMENTATION_MODEL_RATE,
-    );
+    let cost: unknown = computeCostFromTokens(data.input_tokens, data.output_tokens);
     if (cost === null && data.generation_id) {
       try {
         cost = await gateway.getGenerationInfo({ id: data.generation_id });
@@ -339,7 +328,6 @@ export const adminFermentations = new Hono<Env>()
     let cost: unknown = computeCostFromTokens(
       fermentation.input_tokens,
       fermentation.output_tokens,
-      FERMENTATION_MODEL_RATE,
     );
     if (cost === null && fermentation.generation_id) {
       try {

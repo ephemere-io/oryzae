@@ -9,14 +9,14 @@ export interface OcrResult {
   /** 読み取れた本文。1文字も読み取れなかった場合は空文字。 */
   text: string;
   /**
-   * 実際に使ったモデル ID。
+   * 発酵分析の LlmAnalysisResult と同じ形。将来コストを記録するときの取り出し口。
    *
-   * 単価はモデルで変わる（OCR の claude-opus-5 は発酵の claude-sonnet-4-6 より高い）。
-   * 記録側がモデルを推測すると、モデルを差し替えたときに黙って誤った単価で金額化される。
-   * 「どのモデルで何トークン使ったか」を事実として持ち回るためにここで返す。
+   * ⚠️ **`claude-pricing.ts` の calculateCost() をそのまま当てないこと。** あちらは
+   * 単一モデル前提で claude-sonnet-4-6 の単価しか持たない。OCR は別モデル
+   * （claude-opus-5）で動いているので、そのまま通すと単価が何倍もずれた金額を
+   * 「正しい数字」として出してしまい、しかも何も失敗しないので気づけない。
+   * 記録するなら、先に単価表を複数モデル対応にすること。
    */
-  model: string;
-  /** 発酵分析の LlmAnalysisResult と同じ形。ocr_usage に記録してコスト集計に載せる。 */
   usage: { inputTokens: number; outputTokens: number };
 }
 

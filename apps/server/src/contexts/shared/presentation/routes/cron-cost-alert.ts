@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
-import { type ActualCostResult, fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
+import {
+  type ActualCostResult,
+  fetchActualCost,
+  type ModelActualCost,
+} from '../../infrastructure/anthropic-cost-api.js';
 import {
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
-  type ModelRate,
   OCR_MODEL_ID,
-  OCR_MODEL_RATE,
 } from '../../infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
 import {
@@ -19,7 +21,6 @@ import {
   utcDateKeyOfJstFermentationRun,
   utcDayBounds,
 } from '../../infrastructure/jst-day.js';
-import { aggregateOcrCost, fetchOcrUsageRows } from '../../infrastructure/ocr-cost-query.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 import { createCronAuthMiddleware } from '../middleware/cron-auth.js';
 
@@ -38,6 +39,19 @@ function tokens(value: number): string {
 /** JSON レスポンス用。マイクロドル単位で丸める。 */
 function round6(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+/**
+ * モデル ID → Oryzae での用途。
+ *
+ * Anthropic は「用途」を知らない。モデルが分かれているから用途別に読めるだけで、
+ * 同じモデルを CI 等が使えば同じバケットに混ざる。だから「そのモデルを使っている
+ * 機能」を添えるだけで、「その機能のコスト」とは言い切らない。
+ */
+function featureOfModel(model: string): string | null {
+  if (model === FERMENTATION_MODEL_ID) return '発酵';
+  if (model === OCR_MODEL_ID) return 'OCR';
+  return null;
 }
 
 /**
@@ -67,23 +81,35 @@ function formatActualField(result: ActualCostResult, utcDateKey: string): string
 }
 
 /**
+ * 実額のモデル別内訳。「OCR がいくらか」はここで読む。
+ *
+ * 自前トークンの推定ではなく cost_report の実額なので、キャッシュ・値引き・
+ * 課金丸めも反映済み。用途名は「そのモデルを使っている機能」を指すだけで、
+ * 同じモデルの他の利用（CI 等）も同じ行に混ざっている。
+ */
+function formatModelBreakdown(byModel: ModelActualCost[]): string {
+  if (byModel.length === 0) return '-';
+  return byModel
+    .map((m) => {
+      const feature = featureOfModel(m.model);
+      return `${m.model}  ${usd(m.costUsd)}${feature ? `  ← ${feature} のモデル` : ''}`;
+    })
+    .join('\n');
+}
+
+/**
  * 推定コストの計算式をそのまま出す。
  *
  * 金額だけ出していると「どう出した数字か」が分からず、実請求額とズレたときに
  * 計算が壊れているのか対象範囲が違うのかを切り分けられない。式を書いておけば
  * レポートの数字だけで検算できる。
  */
-function formatBasis(
-  label: string,
-  modelId: string,
-  inputTokens: number,
-  outputTokens: number,
-  rate: ModelRate,
-): string {
+function formatBasis(inputTokens: number, outputTokens: number): string {
+  const rate = FERMENTATION_MODEL_RATE;
   const inUsd = (inputTokens * rate.inputUsdPerMTok) / 1_000_000;
   const outUsd = (outputTokens * rate.outputUsdPerMTok) / 1_000_000;
   return [
-    `${label} (${modelId})`,
+    `発酵 (${FERMENTATION_MODEL_ID})`,
     `  in  ${tokens(inputTokens)} × $${rate.inputUsdPerMTok.toFixed(2)}/MTok = $${inUsd.toFixed(6)}`,
     `  out ${tokens(outputTokens)} × $${rate.outputUsdPerMTok.toFixed(2)}/MTok = $${outUsd.toFixed(6)}`,
     `  → $${(inUsd + outUsd).toFixed(6)}`,
@@ -124,21 +150,7 @@ export const cronCostAlert = new Hono()
         return c.json({ error: message }, 500);
       }
 
-      // OCR は発酵と別テーブル・別モデル（claude-opus-5 $5/$25）。記録していなかった頃は
-      // 課金だけ発生して推定に $0 しか乗らず、実請求額との差の一因になっていた。
-      // migration 00023 未適用ならテーブルが無いので、取れなかったことを明示する。
-      let ocrRows: Awaited<ReturnType<typeof fetchOcrUsageRows>> | null = null;
-      try {
-        ocrRows = await fetchOcrUsageRows(supabase, { startIso, endIso });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[cron-cost-alert] OCR usage query failed', { error: message });
-      }
-      const ocrAvailable = ocrRows !== null;
-
       const aggregate = aggregateCost(rows.rows);
-      const ocr = aggregateOcrCost(ocrRows?.rows ?? []);
-      const estimatedTotalUsd = aggregate.estimatedCostUsd + ocr.estimatedCostUsd;
 
       // 実請求額は Anthropic の cost_report が正（推定と混同させない）。
       // cost_report は UTC 日バケット固定なので、その JST 日の定期発酵が実際に
@@ -148,7 +160,8 @@ export const cronCostAlert = new Hono()
       const actual = await fetchActualCost(start, end);
 
       // 閾値判定は実額があれば実額で、なければ推定で行う。
-      const thresholdBasisUsd = actual.kind === 'ok' ? actual.totalCostUsd : estimatedTotalUsd;
+      const thresholdBasisUsd =
+        actual.kind === 'ok' ? actual.totalCostUsd : aggregate.estimatedCostUsd;
       const thresholdExceeded = thresholdBasisUsd >= DAILY_COST_THRESHOLD_USD;
 
       const fields = [
@@ -161,67 +174,53 @@ export const cronCostAlert = new Hono()
           inline: true,
         },
         {
-          name: '推定コスト (Oryzae 記録分)',
-          value: usd(estimatedTotalUsd),
+          name: '推定コスト (発酵・記録分)',
+          value: usd(aggregate.estimatedCostUsd),
           inline: true,
         },
       ];
 
       if (actual.kind === 'ok') {
+        // 用途別の実額。「OCR がいくらか」はここで読む（推定ではなく実額）。
+        fields.push({
+          name: '実請求額の内訳（モデル別・実額）',
+          value: formatModelBreakdown(actual.byModel),
+          inline: false,
+        });
+
         // 「なぜ数字が違うのか」をレポート自身に書く。毎朝これを見た人が
         // 推定の計算そのものが壊れていると誤解しないようにする。
-        //
-        // OCR を読めていないときは、差額に「記録済みだが読めなかった OCR」も
-        // 混ざる。原因を1つに決めつけない文言にする。
-        const gap = actual.totalCostUsd - estimatedTotalUsd;
+        const gap = actual.totalCostUsd - aggregate.estimatedCostUsd;
         fields.push({
           name: '差額 (実請求 − 推定)',
-          value: ocrAvailable
-            ? `${usd(gap)}\nOryzae が記録していない利用（CI のレビュー・手元の検証など）`
-            : `${usd(gap)}\n※OCR を集計できていないため、この差額には OCR 分も含まれます`,
+          value: `${usd(gap)}\n推定は発酵のみ。差は OCR・CI のレビュー・手元の検証など`,
           inline: false,
         });
       }
 
       fields.push(
         {
-          name: '推定の内訳',
-          value: `発酵 ${usd(aggregate.estimatedCostUsd)} / OCR ${
-            ocrAvailable ? usd(ocr.estimatedCostUsd) : '取得失敗'
-          }`,
-          inline: true,
-        },
-        {
           name: '発酵数',
           value: `${aggregate.fermentationCount} (成功 ${aggregate.completedCount} / 失敗 ${aggregate.failedCount})`,
           inline: true,
         },
         {
-          name: 'OCR 回数',
-          value: ocrAvailable ? `${ocr.requestCount} 回` : '取得失敗',
+          name: 'トークン',
+          value: `in ${tokens(aggregate.inputTokens)} / out ${tokens(aggregate.outputTokens)}`,
           inline: true,
-        },
-        {
-          name: '計算根拠',
-          value: [
-            formatBasis(
-              '発酵',
-              FERMENTATION_MODEL_ID,
-              aggregate.inputTokens,
-              aggregate.outputTokens,
-              FERMENTATION_MODEL_RATE,
-            ),
-            formatBasis('OCR', OCR_MODEL_ID, ocr.inputTokens, ocr.outputTokens, OCR_MODEL_RATE),
-          ].join('\n'),
-          inline: false,
         },
         {
           name: 'コスト未計上',
-          value: `発酵 ${aggregate.untrackedCount} 件 / OCR ${ocr.untrackedCount} 件`,
+          value: `${aggregate.untrackedCount} 件`,
           inline: true,
         },
         {
-          name: `ユーザー別 推定コスト・発酵 (上位${TOP_USER_COUNT})`,
+          name: '推定の計算根拠',
+          value: formatBasis(aggregate.inputTokens, aggregate.outputTokens),
+          inline: false,
+        },
+        {
+          name: `ユーザー別 推定コスト (上位${TOP_USER_COUNT})`,
           value: formatUserBreakdown(aggregate.byUser),
           inline: false,
         },
@@ -234,17 +233,10 @@ export const cronCostAlert = new Hono()
           inline: true,
         });
       }
-      if (rows.truncated || ocrRows?.truncated) {
+      if (rows.truncated) {
         fields.push({
           name: '⚠️ 集計打ち切り',
-          value: '件数が上限を超えたため、上記は過少集計です',
-          inline: false,
-        });
-      }
-      if (!ocrAvailable) {
-        fields.push({
-          name: '⚠️ OCR 未集計',
-          value: 'ocr_usage を読めませんでした（migration 00023 未適用の可能性）。推定は過少です',
+          value: '件数が上限を超えたため、推定は過少集計です',
           inline: false,
         });
       }
@@ -260,21 +252,20 @@ export const cronCostAlert = new Hono()
         date: dateKey,
         actualCost:
           actual.kind === 'ok'
-            ? { status: 'ok', costUsd: round6(actual.totalCostUsd), truncated: actual.truncated }
+            ? {
+                status: 'ok',
+                costUsd: round6(actual.totalCostUsd),
+                truncated: actual.truncated,
+                byModel: actual.byModel.map((m) => ({
+                  model: m.model,
+                  costUsd: round6(m.costUsd),
+                  feature: featureOfModel(m.model),
+                })),
+              }
             : { status: actual.kind },
         actualCostUtcDate: actualUtcDateKey,
-        /** 発酵 + OCR。実請求額と突き合わせる相手はこの合計。 */
-        estimatedCost: round6(estimatedTotalUsd),
-        fermentationEstimatedCost: round6(aggregate.estimatedCostUsd),
-        ocr: {
-          status: ocrAvailable ? 'ok' : 'error',
-          estimatedCost: round6(ocr.estimatedCostUsd),
-          requestCount: ocr.requestCount,
-          inputTokens: ocr.inputTokens,
-          outputTokens: ocr.outputTokens,
-          untrackedCount: ocr.untrackedCount,
-          truncated: ocrRows?.truncated ?? false,
-        },
+        /** 発酵のみの推定。用途別の実額は actualCost.byModel を見る。 */
+        estimatedCost: round6(aggregate.estimatedCostUsd),
         fermentationCount: aggregate.fermentationCount,
         completedCount: aggregate.completedCount,
         failedCount: aggregate.failedCount,

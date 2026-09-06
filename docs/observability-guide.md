@@ -29,9 +29,9 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 | `/observability` | 全ツール API | ハブ。各ツールのキー指標をカードで一覧 |
 | `/analytics` | PostHog API | PV・セッション・滞在時間・ページ別・日別推移 |
 | `/observability/errors` | Sentry API | 未解決 issue 一覧（タイトル, 発生回数, 影響ユーザー数） |
-| `/observability/spend` | Anthropic Cost API + DB | 実請求額の日別チャート・推定との乖離・用途別（発酵/OCR）内訳・ユーザー別推定内訳 |
+| `/observability/spend` | Anthropic Cost API + DB | 実請求額の日別チャート・**モデル別の実額内訳**・推定との乖離・ユーザー別推定内訳 |
 | `/observability/deploys` | Vercel API | デプロイ一覧（状態, ビルド時間, コミットメッセージ） |
-| `/costs` | DB (保存トークン) | **発酵の** per-request 推定コスト詳細（OCR は含まない。レガシー、将来的に /observability/spend に統合） |
+| `/costs` | DB (保存トークン) | **発酵の** per-request 推定コスト詳細（レガシー、将来的に /observability/spend に統合） |
 
 ## LLM コストの二系統（重要）
 
@@ -39,25 +39,57 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 
 | | 実請求額 (actual) | 推定 (estimated) |
 |---|---|---|
-| 出典 | Anthropic Admin API `/v1/organizations/cost_report` | `fermentation_results` + `ocr_usage` の保存トークン × 価格表 |
-| **対象範囲** | **org 全体**。CI のレビュー・手元の検証・他プロジェクトも含む | **Oryzae が記録した呼び出しだけ** |
-| 正確さ | **正**。実際に課金された額 | 近似。キャッシュ読み書き・値引き・課金丸めを反映しない |
-| 粒度 | UTC 日バケット固定（`bucket_width=1d` のみ） | 任意の期間・**ユーザー別**・**用途別**（発酵 / OCR） |
-| ユーザー別 | **不可**（Anthropic は Oryzae のユーザーを知らない） | 可能。これが推定を残す唯一の理由 |
-| 実装 | `shared/infrastructure/anthropic-cost-api.ts` | `fermentation-cost-query.ts` + `ocr-cost-query.ts` + `claude-pricing.ts` |
+| 出典 | Anthropic Admin API `/v1/organizations/cost_report` | `fermentation_results` の保存トークン × 価格表 |
+| **対象範囲** | **org 全体**。CI のレビュー・手元の検証・他プロジェクトも含む | **発酵のうち、トークンを記録できた分だけ** |
+| 正確さ | **正**。実際に課金された額（キャッシュ・値引き・課金丸め込み） | 近似。キャッシュ読み書き・値引き・課金丸めを反映しない |
+| 粒度 | UTC 日バケット固定 + **モデル別**（`group_by[]=description`） | 任意の期間・**ユーザー別**・発酵単位 |
+| ユーザー別 | **不可**（Anthropic は Oryzae のユーザーを知らない） | 可能。**これが推定を残す唯一の理由** |
+| 実装 | `shared/infrastructure/anthropic-cost-api.ts` | `shared/infrastructure/fermentation-cost-query.ts` + `claude-pricing.ts` |
 
 ### 実請求 ≧ 推定 が常態（ズレ自体は異常ではない）
 
 実請求は **org 全体**の額で、Oryzae のアプリ以外の利用も含む。一方 推定は
-**Oryzae が自分で記録した呼び出しだけ**を数える。したがって差が出るのが正常で、
-**差額は「記録していない利用」の量**を意味する。
+**発酵の記録分だけ**を数える。したがって差が出るのが正常で、
+**差額は「推定に含めていない利用」の量**を意味する。
 
 「推定が全然合っていない」と読めてしまうのを防ぐため、画面・通知では
 
-- 見出しに範囲を書く（「実請求額 (org 全体)」「推定コスト (Oryzae 記録分)」）
+- 見出しに範囲を書く（「実請求額 (org 全体)」「推定コスト (発酵・記録分)」）
 - 差額そのものと、それが何なのかを書く
 - 推定は**計算式を並記**する（`in 5,972 × $3.00/MTok = $0.017916`）。
   金額だけだと、計算が壊れているのか対象範囲が違うのかを切り分けられない
+
+### 用途別の内訳は **実額** で出す（推定しない）
+
+`cost_report` を `group_by[]=description` で取ると、各 result に `model` /
+`token_type` / `service_tier` が入る。Oryzae は用途ごとに別モデルを使っている
+（発酵 = `claude-sonnet-4-6`、OCR = `claude-opus-5`）ので、
+**モデル別の内訳がそのまま用途別の実額**になる。
+
+| 用途 | モデル | 実額の取得元 |
+|---|---|---|
+| 発酵 | `claude-sonnet-4-6` | `cost_report` のモデル別内訳 |
+| OCR | `claude-opus-5` | 同上 |
+
+自前でトークンを記録して単価を掛ける必要はない。実額のほうがキャッシュ読み書き・
+値引き・課金丸めも反映済みで**正確**でもある（`token_type` に `cache_read` /
+`cache_creation` が現れる）。
+
+**注意すべき前提が3つある。**
+
+1. **モデル別 ≠ 用途別。** 同じ org の他の利用が同じモデルを使えば同じ行に混ざる。
+   実際 CI のセキュリティレビューはアプリと同じ `ANTHROPIC_API_KEY` を使っている。
+   分離するには Anthropic Console で **Workspace を分ける**（`group_by[]` に
+   `workspace_id` を足せば Oryzae アプリだけの実額が取れる）。
+   画面・通知の文言は「そのモデルを使っている機能」と書き、
+   「その機能のコスト」と言い切らないこと。
+2. **発酵と OCR が同じモデルになると割れなくなる。**
+   `claude-pricing.test.ts` が `OCR_MODEL_ID !== FERMENTATION_MODEL_ID` を固定している。
+3. **`group_by[]` の書式を間違えると黙って内訳が消える。**
+   `group_by=` だと無視され `model` が null になる。`anthropic-cost-api.test.ts` が
+   クエリに `group_by[]=description` が載ることを固定している。
+   さらに内訳が取れなかった行は `(内訳なし)` に積み、
+   **内訳の合計が総額と必ず一致する**ことをテストで固定している（落とすと欠けに気づけない）。
 
 ### 実額と推定の使い分け
 
@@ -68,42 +100,34 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 **推定 (estimated)** は保存トークン × 公表単価。Anthropic は Oryzae のユーザーを
 知らないため、**ユーザー別内訳はこの推定でしか出せない**。これが推定を残す理由。
 
-推定はこの用途では十分に正確である。Oryzae の LLM 呼び出しは **standard tier・
+推定はこの用途では十分に正確である。発酵は **単一モデル・standard tier・
 プロンプトキャッシュ無し・バッチ無し・サーバーツール無し** なので、
 `トークン数 × 公表単価` は Anthropic が請求額を出すのと同じ計算式になる。
 トークン数は Anthropic 自身が返した値であり、独自に数えた推測値ではない。
+実額と並べれば乖離率が出るので、前提が崩れたら数字で気づける。
 
-### 用途ごとにモデルと単価が違う
-
-| 用途 | モデル | 単価 (in / out per MTok) | 記録先 |
-|---|---|---|---|
-| 発酵 | `claude-sonnet-4-6` | $3 / $15 | `fermentation_results.{input,output}_tokens` |
-| OCR | `claude-opus-5` | $5 / $25 | `ocr_usage`（migration 00023） |
-
-**合算してから一律単価を掛けてはいけない。** `computeCostFromTokens` は単価を
-必須引数にしてあり、呼び出し側が用途に応じた `*_MODEL_RATE` を明示する。
-既定値を置くと、別モデルの呼び出しが誤った単価で計算されても何も失敗せず、
-合計が増えるだけなので気づけない。
-
-`ocr_usage` は `model` を列に持ち、集計は**行ごとに** `rateForModel()` で単価を
-引き直す（gateway のモデルを差し替えた前後のレコードが混在しうるため）。
-価格表に無いモデルは既定単価で埋めず `untrackedCount` に計上する。
-
-OCR に専用テーブルがあるのは、**呼び出しごとに残るレコードが無い**ため。
-読み取っただけでスニペットを作らない場合もあるが、課金は発生している。
+**推定を増やさないこと。** 新しく LLM を叩く経路を足しても、自前でトークンを
+記録する必要はない——**別モデルを使えば実額がモデル別に割れる**。推定が要るのは
+ユーザー別内訳だけで、それは発酵にしか無い軸である。
 
 ### 前提が崩れたときに気づく仕組み
 
 | 崩れ方 | 検知 |
 |---|---|
-| モデルを変更した | 各 gateway が `FERMENTATION_MODEL_ID` / `OCR_MODEL_ID` を import。価格表に無いモデルは**型エラー**で CI が止まる |
-| プロンプトキャッシュを導入した | 両 gateway が `cacheReadTokens`/`cacheWriteTokens` を検知して警告ログ（単価が 0.1x / 1.25x・2x に変わるため） |
+| モデルを変更した | `vercel-ai-analysis.gateway.ts` が `FERMENTATION_MODEL_ID` を import。価格表に無いモデルは**型エラー**で CI が止まる |
+| プロンプトキャッシュを導入した | gateway が `cacheReadTokens`/`cacheWriteTokens` を検知して警告ログ（単価が 0.1x / 1.25x・2x に変わるため） |
 | 公表単価が改定された | 手動。`claude-pricing.ts` の `RATES` を更新する（テストが単価を固定しているので更新漏れは落ちる） |
 | トークン未保存の行がある | `untrackedCount` として件数を返し、通知・画面に出す |
-| 価格表に無いモデルで動いた | 同上。金額 0 のまま `untrackedCount` に計上し、`byModel` に `unpriced` を立てる |
-| `ocr_usage` を読めない（migration 未適用） | `$0` ではなく「取得失敗」と出し、推定の status を `partial` にする |
 | 件数が集計上限を超えた | `truncated` として返し「過少集計」と明示する |
-| 推定と実額がズレた | Spend 画面の乖離率で観測できる |
+| 推定と実額がズレた | Spend 画面の乖離率で観測できる（**ズレるのが正常**。上記の対象範囲の違い） |
+| 実額の内訳が出なくなった | `group_by[]` の書式を壊すと `model` が null になる。テストがクエリ文字列を固定 |
+| 内訳が総額と合わなくなった | 内訳なしの行を `(内訳なし)` に積み、合計一致をテストで固定 |
+
+### 既知の限界
+
+- リトライ (`retryOf`) は同じ行を再利用するため、前回試行ぶんのトークンは上書きされる。
+- `cost_report` は Priority Tier のコストを含まない（Oryzae は standard のみ）。
+- 反映ラグは通常5分程度。直近の利用は実額に載らないことがある。
 
 原則:
 
@@ -114,11 +138,10 @@ OCR に専用テーブルがあるのは、**呼び出しごとに残るレコ�
 - **日次レポートは JST 日**（発酵 cron が JST 03:00 に走るため）。
   実額は UTC 日でしか取れないので、`utcDateKeyOfJstFermentationRun()` で
   対応 UTC 日を求め、表示に「UTC」と明記する。
-- 価格表 (`claude-pricing.ts`) は各 gateway のモデルと対で管理する。
-  モデルを変えたら価格も変える。
-- **LLM を叩く経路を増やしたら、必ずトークンを記録する。** 記録しないと課金だけ
-  発生して推定には $0 しか乗らず、実額との差が「原因不明の乖離」になる
-  （OCR が実際にこの状態だった）。
+- 価格表 (`claude-pricing.ts`) は `vercel-ai-analysis.gateway.ts` のモデルと
+  対で管理する。モデルを変えたら価格も変える。
+- **用途別のコストは実額（モデル別）で出す。自前トークンの推定を増やさない。**
+  推定は「ユーザー別」という Anthropic が知り得ない軸のためだけに残す。
 
 ### 既知の限界
 
@@ -126,9 +149,6 @@ OCR に専用テーブルがあるのは、**呼び出しごとに残るレコ�
   実額との乖離要因になる（`/observability/spend` の乖離率で観測できる）。
 - `cost_report` は Priority Tier のコストを含まない（Oryzae は standard のみ利用）。
 - 反映ラグは通常5分程度。直近の利用は実額に載らないことがある。
-- OCR の記録に失敗しても読み取り結果は返す（課金は既に発生していて取り返せない）。
-  その分は推定から漏れるので、実額との差として現れる。
-- `/costs` 画面は発酵のみ。OCR を含む合計は `/observability/spend` を見る。
 
 ## ツール追加時の手順
 

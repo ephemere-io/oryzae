@@ -5,12 +5,12 @@ import { OCR_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type { OcrGateway, OcrResult } from '../../domain/gateways/ocr.gateway.js';
 
 // provider は発酵分析 (vercel-ai-analysis.gateway.ts) と同じだが、**モデルは別**。
-// あちらは claude-sonnet-4-6、こちらは claude-opus-5 で、揃える必要はない。
-// 手書きの読み取りは誤読がそのままスニペットの中身になるので、精度を優先している。
+// あちらは claude-sonnet-4-6、こちらは claude-opus-5。手書きの読み取りは誤読が
+// そのままスニペットの中身になるので、精度を優先している。
 //
-// モデル ID は claude-pricing.ts から取る。ベタ書きすると価格表に無いモデルへ
-// 変えても何も失敗せず、記録したトークンが誤った単価で金額化される
-// （AnthropicModelId は末尾が `(string & {})` なので型では守れない）。
+// モデル ID は claude-pricing.ts から取る。ベタ書きしないのは、コストのモデル別内訳が
+// 「どのモデルが OCR か」を知っている必要があるため（実額を用途別に読むのに使う）。
+// 型では守れない——AnthropicModelId は末尾が `(string & {})` なので任意の文字列が通る。
 //
 // OCR は「見えている文字をそのまま書き起こす」だけの単発呼び出しなので、
 // generateObject ではなく generateText で足りる。
@@ -52,21 +52,8 @@ export class AnthropicOcrGateway implements OcrGateway {
       maxOutputTokens: 1024,
     });
 
-    // コスト算出は「入力・出力トークン × 一律単価」を前提にしている。プロンプト
-    // キャッシュを使うとキャッシュ読み 0.1x / 書き 1.25x・2x と単価が変わり前提が崩れる。
-    // 現在キャッシュは未使用なので通常ここは 0。将来入れたときに黙ってズレないよう検知する。
-    const cacheReadTokens = usage.inputTokenDetails?.cacheReadTokens ?? 0;
-    const cacheWriteTokens = usage.inputTokenDetails?.cacheWriteTokens ?? 0;
-    if (cacheReadTokens > 0 || cacheWriteTokens > 0) {
-      console.warn(
-        '[AnthropicOcrGateway] prompt cache tokens detected; claude-pricing.ts の一律単価では実額とズレる',
-        { cacheReadTokens, cacheWriteTokens },
-      );
-    }
-
     return {
       text: cleanup(text),
-      model: MODEL,
       usage: {
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,

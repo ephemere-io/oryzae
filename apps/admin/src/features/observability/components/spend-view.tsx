@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { SpendData, SpendPricing } from '../hooks/use-spend';
+import type { SpendData } from '../hooks/use-spend';
 
 /**
  * 実請求額の出典。画面の数字をここと突き合わせて裏取りできるようにする。
@@ -121,19 +121,9 @@ function ActualHeadline({ actual }: { actual: SpendData['actual'] }) {
 /**
  * 推定コストの計算根拠。単価とトークン数を出して、その場で検算できるようにする。
  * 実額は Console のリンクで裏取りできるが、推定は式を見せないと確かめようがない。
- *
- * 単価は必ず引数で受ける。用途ごとにモデルが違う（発酵 claude-sonnet-4-6、
- * OCR claude-opus-5）ので、画面側に固定値を置くと片方が黙って誤表示になる。
  */
-function EstimateBasis({
-  pricing,
-  inputTokens,
-  outputTokens,
-}: {
-  pricing: SpendPricing;
-  inputTokens: number;
-  outputTokens: number;
-}) {
+function EstimateBasis({ estimated }: { estimated: SpendData['estimated'] }) {
+  const { pricing, inputTokens, outputTokens } = estimated;
   const inputUsd = (inputTokens * pricing.inputUsdPerMTok) / 1_000_000;
   const outputUsd = (outputTokens * pricing.outputUsdPerMTok) / 1_000_000;
 
@@ -162,21 +152,8 @@ function EstimateBasis({
 interface MergedDay {
   date: string;
   actualUsd: number | null;
-  /** 発酵 + OCR。実請求と並べる相手はこの合計。 */
   estimatedUsd: number;
   fermentationCount: number;
-  ocrCount: number;
-}
-
-/** ユーザー1人の推定コスト。発酵と OCR を合算する（カードの合計と一致させるため）。 */
-interface MergedUser {
-  userId: string;
-  email: string;
-  estimatedCostUsd: number;
-  inputTokens: number;
-  outputTokens: number;
-  fermentationCount: number;
-  ocrCount: number;
 }
 
 export function SpendView({
@@ -193,75 +170,28 @@ export function SpendView({
   const mergedDays = useMemo<MergedDay[]>(() => {
     if (!data) return [];
     const byDate = new Map<string, MergedDay>();
-    const dayOf = (date: string): MergedDay => {
-      const current = byDate.get(date) ?? {
-        date,
+    for (const d of data.estimated.daily) {
+      byDate.set(d.date, {
+        date: d.date,
         actualUsd: null,
-        estimatedUsd: 0,
-        fermentationCount: 0,
-        ocrCount: 0,
-      };
-      byDate.set(date, current);
-      return current;
-    };
-
-    for (const d of data.estimated.fermentation.daily) {
-      const day = dayOf(d.date);
-      day.estimatedUsd += d.estimatedCostUsd;
-      day.fermentationCount += d.fermentationCount;
-    }
-    // OCR も同じ日に足す。ここで足さないと、日別だけ OCR 分が抜けて
-    // カードの合計と行の和が合わなくなる。
-    for (const d of data.estimated.ocr.daily) {
-      const day = dayOf(d.date);
-      day.estimatedUsd += d.estimatedCostUsd;
-      day.ocrCount += d.requestCount;
+        estimatedUsd: d.estimatedCostUsd,
+        fermentationCount: d.fermentationCount,
+      });
     }
     for (const d of data.actual.daily) {
-      dayOf(d.date).actualUsd = d.costUsd;
+      const current = byDate.get(d.date);
+      if (current) {
+        current.actualUsd = d.costUsd;
+      } else {
+        byDate.set(d.date, {
+          date: d.date,
+          actualUsd: d.costUsd,
+          estimatedUsd: 0,
+          fermentationCount: 0,
+        });
+      }
     }
     return Array.from(byDate.values()).sort((a, b) => b.date.localeCompare(a.date));
-  }, [data]);
-
-  // ユーザー別も発酵 + OCR。片方だけ出すと表の和がカードの推定合計と合わない。
-  const mergedUsers = useMemo<MergedUser[]>(() => {
-    if (!data) return [];
-    const byUser = new Map<string, MergedUser>();
-    const userOf = (userId: string, email: string): MergedUser => {
-      const current = byUser.get(userId);
-      if (!current) {
-        const created = {
-          userId,
-          email,
-          estimatedCostUsd: 0,
-          inputTokens: 0,
-          outputTokens: 0,
-          fermentationCount: 0,
-          ocrCount: 0,
-        };
-        byUser.set(userId, created);
-        return created;
-      }
-      // 片方の集計でしか email を解決できていない場合に備えて拾う。
-      if (!current.email && email) current.email = email;
-      return current;
-    };
-
-    for (const u of data.estimated.fermentation.byUser) {
-      const row = userOf(u.userId, u.email);
-      row.estimatedCostUsd += u.estimatedCostUsd;
-      row.inputTokens += u.inputTokens;
-      row.outputTokens += u.outputTokens;
-      row.fermentationCount += u.fermentationCount;
-    }
-    for (const u of data.estimated.ocr.byUser) {
-      const row = userOf(u.userId, u.email);
-      row.estimatedCostUsd += u.estimatedCostUsd;
-      row.inputTokens += u.inputTokens;
-      row.outputTokens += u.outputTokens;
-      row.ocrCount += u.requestCount;
-    }
-    return Array.from(byUser.values()).sort((a, b) => b.estimatedCostUsd - a.estimatedCostUsd);
   }, [data]);
 
   const maxDayUsd = useMemo(
@@ -318,17 +248,18 @@ export function SpendView({
 
             <div className="rounded-lg border border-border/50 bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                推定コスト (Oryzae 記録分)
+                推定コスト (発酵・記録分)
               </p>
               <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
                 {formatUsd(data.estimated.totalCostUsd)}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                発酵 {formatUsd(data.estimated.fermentation.totalCostUsd)} / OCR{' '}
-                {data.estimated.ocr.status === 'error'
-                  ? '取得失敗'
-                  : formatUsd(data.estimated.ocr.totalCostUsd)}
+                {data.estimated.fermentationCount} 発酵 / in{' '}
+                {data.estimated.inputTokens.toLocaleString()} · out{' '}
+                {data.estimated.outputTokens.toLocaleString()}
               </p>
+              {/* 実額は Console で裏取りできるが、推定は計算式を出さないと検算できない。 */}
+              <EstimateBasis estimated={data.estimated} />
             </div>
 
             <div className="rounded-lg border border-border/50 bg-card p-4">
@@ -341,94 +272,62 @@ export function SpendView({
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {drift === null
                   ? '実請求額が取得できると表示されます'
-                  : '(推定 − 実請求) ÷ 実請求。実請求は org 全体なので通常マイナス'}
+                  : '推定は発酵のみ。実請求は org 全体なので通常マイナス'}
               </p>
             </div>
           </div>
 
-          {/* 用途別の内訳。単価が違うので分けて出す（発酵 $3/$15、OCR $5/$25）。
-              「OCR だけで幾らかかったか」はここで読む。 */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/50 bg-card p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">発酵 (推定)</p>
-              <p className="text-2xl font-semibold tracking-tight mt-0.5 tabular-nums">
-                {formatUsd(data.estimated.fermentation.totalCostUsd)}
+          {/* 用途別の内訳は **実額** で出す。cost_report を group_by[]=description で
+              取るとモデル別に割れ、Oryzae は用途ごとに別モデルを使っているので、
+              モデル別内訳がそのまま用途別の実額になる。「OCR がいくらか」はここで読む。 */}
+          {data.actual.status === 'ok' && data.actual.byModel.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                実請求額の内訳（モデル別）
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {data.estimated.fermentation.fermentationCount} 発酵 / in{' '}
-                {data.estimated.fermentation.inputTokens.toLocaleString()} · out{' '}
-                {data.estimated.fermentation.outputTokens.toLocaleString()}
+              <p className="text-xs text-muted-foreground mb-3">
+                Anthropic は「用途」を知りません。用途名は
+                <strong>そのモデルを使っている機能</strong>を 指すだけで、同じモデルの他の利用（CI
+                のレビュー等）も同じ行に含まれます。
               </p>
-              <EstimateBasis
-                pricing={data.estimated.fermentation.pricing}
-                inputTokens={data.estimated.fermentation.inputTokens}
-                outputTokens={data.estimated.fermentation.outputTokens}
-              />
-            </div>
-
-            <div className="rounded-lg border border-border/50 bg-card p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">OCR (推定)</p>
-              {data.estimated.ocr.status === 'error' ? (
-                <>
-                  <p className="text-2xl font-semibold tracking-tight mt-0.5 text-muted-foreground">
-                    取得失敗
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    ocr_usage を読めませんでした（migration 00023 未適用の可能性）
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-2xl font-semibold tracking-tight mt-0.5 tabular-nums">
-                    {formatUsd(data.estimated.ocr.totalCostUsd)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {data.estimated.ocr.requestCount} 回 / in{' '}
-                    {data.estimated.ocr.inputTokens.toLocaleString()} · out{' '}
-                    {data.estimated.ocr.outputTokens.toLocaleString()}
-                  </p>
-                  <EstimateBasis
-                    pricing={data.estimated.ocr.pricing}
-                    inputTokens={data.estimated.ocr.inputTokens}
-                    outputTokens={data.estimated.ocr.outputTokens}
-                  />
-                  {/* 実際に使われたモデル。価格表に無いものは金額を出せていないので明示する。 */}
-                  {data.estimated.ocr.byModel.length > 0 && (
-                    <div className="mt-2 space-y-0.5 text-xs text-muted-foreground font-mono tabular-nums">
-                      {data.estimated.ocr.byModel.map((m) => (
-                        <p key={m.model}>
-                          {m.model} · {m.requestCount} 回 ·{' '}
-                          {m.unpriced ? '単価不明（未計上）' : formatUsd(m.estimatedCostUsd)}
-                        </p>
-                      ))}
+              <div className="space-y-2">
+                {data.actual.byModel.map((m) => (
+                  <div key={m.model} className="rounded-lg border border-border/50 bg-card p-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-mono text-sm">
+                        {m.model}
+                        {m.feature && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            ← {m.feature} のモデル
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-mono text-sm tabular-nums">{formatUsd(m.costUsd)}</span>
                     </div>
-                  )}
-                </>
-              )}
+                    {/* token_type の内訳。キャッシュ読み書きが混ざっていればここに出る
+                        （自前推定では表現できない部分）。 */}
+                    {m.byTokenType.length > 0 && (
+                      <div className="mt-1.5 space-y-0.5 font-mono text-xs text-muted-foreground tabular-nums">
+                        {m.byTokenType.map((t) => (
+                          <div key={t.tokenType} className="flex justify-between gap-3">
+                            <span>{t.tokenType}</span>
+                            <span>{formatUsd(t.costUsd)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {(data.estimated.fermentation.untrackedCount > 0 ||
-            data.estimated.ocr.untrackedCount > 0 ||
-            data.estimated.truncated ||
-            data.estimated.status !== 'ok') && (
+          {(data.estimated.untrackedCount > 0 || data.estimated.truncated) && (
             <div className="rounded-md bg-yellow-500/10 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-500 space-y-1">
-              {data.estimated.status === 'partial' && (
-                <p>OCR を集計できていないため、推定合計は過少です。</p>
-              )}
-              {data.estimated.status === 'error' && (
-                <p>発酵の集計に失敗しました。推定合計は当てになりません。</p>
-              )}
-              {data.estimated.fermentation.untrackedCount > 0 && (
+              {data.estimated.untrackedCount > 0 && (
                 <p>
-                  トークン未保存のため推定に含められなかった発酵が{' '}
-                  {data.estimated.fermentation.untrackedCount} 件あります（推定は過少です）。
-                </p>
-              )}
-              {data.estimated.ocr.untrackedCount > 0 && (
-                <p>
-                  価格表に無いモデルで実行された OCR が {data.estimated.ocr.untrackedCount}{' '}
-                  件あります（金額を出せていません）。
+                  トークン未保存のため推定に含められなかった発酵が {data.estimated.untrackedCount}{' '}
+                  件あります（推定は過少です）。
                 </p>
               )}
               {data.estimated.truncated && (
@@ -467,8 +366,8 @@ export function SpendView({
                     <span className="w-20 text-right font-mono text-xs tabular-nums shrink-0 text-muted-foreground">
                       {formatUsd(d.estimatedUsd)}
                     </span>
-                    <span className="w-14 text-right text-xs text-muted-foreground shrink-0 tabular-nums">
-                      {d.fermentationCount}/{d.ocrCount}
+                    <span className="w-8 text-right text-xs text-muted-foreground shrink-0">
+                      {d.fermentationCount}
                     </span>
                   </div>
                 ))}
@@ -477,7 +376,7 @@ export function SpendView({
                   <span className="flex-1" />
                   <span className="w-20 text-right shrink-0">実請求</span>
                   <span className="w-20 text-right shrink-0">推定</span>
-                  <span className="w-14 text-right shrink-0">発酵/OCR</span>
+                  <span className="w-8 text-right shrink-0">件数</span>
                 </div>
               </div>
             ) : (
@@ -491,24 +390,23 @@ export function SpendView({
             </p>
             <p className="text-xs text-muted-foreground mb-3">
               Anthropic
-              はアプリのユーザーを識別しないため、この内訳は保存トークンからの推定です。発酵と OCR
-              を合算しています。
+              はアプリのユーザーを識別しないため、この内訳は保存トークンからの推定です（発酵のみ）。
+              ユーザー別だけは実額で出せないので、推定を残しています。
             </p>
-            {mergedUsers.length > 0 ? (
+            {data.estimated.byUser.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
                       <TableHead className="text-right">発酵数</TableHead>
-                      <TableHead className="text-right">OCR</TableHead>
                       <TableHead className="text-right">Input</TableHead>
                       <TableHead className="text-right">Output</TableHead>
                       <TableHead className="text-right">推定コスト</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mergedUsers.map((u) => (
+                    {data.estimated.byUser.map((u) => (
                       <TableRow key={u.userId}>
                         <TableCell className="text-xs">
                           {u.email || `${u.userId.slice(0, 12)}...`}
@@ -516,7 +414,6 @@ export function SpendView({
                         <TableCell className="text-right font-mono text-sm">
                           {u.fermentationCount}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">{u.ocrCount}</TableCell>
                         <TableCell className="text-right font-mono text-xs text-muted-foreground">
                           {u.inputTokens.toLocaleString()}
                         </TableCell>

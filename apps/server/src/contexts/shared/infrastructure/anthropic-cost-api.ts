@@ -5,15 +5,27 @@
  * spend API (`gateway.getSpendReport`) には実績が一切入らなくなった。実額の正は
  * Anthropic の cost_report だけなので、コスト画面と日次レポートはここを参照する。
  *
- * claude-pricing.ts の算出値は「自前トークン × 価格表」の *推定* であり、実額とは
- * 別物として扱うこと（キャッシュ読み書き・値引き・課金丸めを反映できないため）。
- * 推定はユーザー別内訳のように Anthropic 側が知り得ない軸でのみ使う。
+ * ## 用途別の内訳も **実額** で取る（推定しない）
+ *
+ * `group_by[]=description` を付けると、各 result に `model` / `token_type` /
+ * `service_tier` が入る。Oryzae は用途ごとに別モデルを使っている
+ * （発酵 = claude-sonnet-4-6、OCR = claude-opus-5）ので、**モデル別の内訳が
+ * そのまま用途別の実額**になる。自前でトークンを記録して単価を掛ける必要はない。
+ *
+ * これはキャッシュ読み書き・値引き・課金丸めも反映済みの実額なので、自前推定より
+ * 正確でもある（`token_type` に cache_read / cache_creation が現れる）。
+ *
+ * 自前トークンからの推定 (claude-pricing.ts) が残っているのは **ユーザー別内訳**
+ * のためだけ。Anthropic は Oryzae のユーザーを知らないので、その軸だけは実額で出せない。
  *
  * 仕様上の制約（docs/observability-guide.md にも記載）:
  *   - バケットは UTC 日固定（bucket_width=1d のみ）。JST 日での実額は取得できない。
  *   - amount は「最小通貨単位（セント）の10進文字列」。100 で割って USD にする。
  *   - 反映ラグは通常5分程度。直近数分の利用は載らないことがある。
  *   - Priority Tier のコストは cost_report に含まれない（Oryzae は standard のみ）。
+ *   - cost_report の group_by は `description` / `workspace_id` のみ。api_key 別には
+ *     割れないので、**同じ org の他の利用（CI のセキュリティレビュー等）は同じモデルの
+ *     バケットに混ざる**。分離するには Anthropic Console で Workspace を分ける。
  */
 const COST_REPORT_URL = 'https://api.anthropic.com/v1/organizations/cost_report';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -27,10 +39,34 @@ const BUCKETS_PER_PAGE = 31;
 // 暴走防止の上限。31バケット × 10ページ ≒ 10か月分まで取り切れる。
 const MAX_PAGES = 10;
 
+/**
+ * 内訳が取れなかった行の受け皿。
+ *
+ * group_by が効かない・トークン以外のコスト（web_search 等）で model が null の場合に使う。
+ * 落とさずここに積むことで、**内訳の合計は必ず総額と一致する**（テストで固定）。
+ * 黙って捨てると「内訳を全部出した」ように見えて実際は欠けている状態になる。
+ */
+const UNGROUPED_MODEL_LABEL = '(内訳なし)';
+const UNKNOWN_TOKEN_TYPE_LABEL = '(その他)';
+
 interface DailyActualCost {
   /** UTC 日 (YYYY-MM-DD)。cost_report のバケットは UTC 固定。 */
   date: string;
   costUsd: number;
+}
+
+interface TokenTypeActualCost {
+  /** cost_report の token_type（uncached_input_tokens / output_tokens / cache_read_input_tokens 等）。 */
+  tokenType: string;
+  costUsd: number;
+}
+
+export interface ModelActualCost {
+  /** cost_report の model。トークン以外のコストや内訳なしの場合は代替ラベル。 */
+  model: string;
+  costUsd: number;
+  /** 単価の内訳。キャッシュ読み書きが混ざっていれば token_type に現れる。 */
+  byTokenType: TokenTypeActualCost[];
 }
 
 /**
@@ -43,6 +79,8 @@ export type ActualCostResult =
       kind: 'ok';
       totalCostUsd: number;
       daily: DailyActualCost[];
+      /** モデル別の実額（コスト降順）。合計は totalCostUsd と一致する。 */
+      byModel: ModelActualCost[];
       /**
        * MAX_PAGES に達してページングを打ち切った場合 true（= 実額は過少）。
        * 打ち切りを黙って隠すと「途中までの合計」を完全な実請求額として
@@ -64,7 +102,25 @@ function parseAmountToUsd(amount: unknown): number {
   return Number.isFinite(cents) ? cents / 100 : 0;
 }
 
-function parseBucket(bucket: unknown): DailyActualCost | null {
+/** result 1件をどのモデルに積むか決める。model が無ければ cost_type、それも無ければ受け皿へ。 */
+function modelKeyOf(item: Record<string, unknown>): string {
+  if (typeof item.model === 'string' && item.model !== '') return item.model;
+  // web_search / code_execution / session_usage はトークンではないので model が null。
+  if (typeof item.cost_type === 'string' && item.cost_type !== '') return `(${item.cost_type})`;
+  return UNGROUPED_MODEL_LABEL;
+}
+
+function tokenTypeKeyOf(item: Record<string, unknown>): string {
+  if (typeof item.token_type === 'string' && item.token_type !== '') return item.token_type;
+  return UNKNOWN_TOKEN_TYPE_LABEL;
+}
+
+interface ParsedBucket {
+  daily: DailyActualCost;
+  items: { modelKey: string; tokenTypeKey: string; costUsd: number }[];
+}
+
+function parseBucket(bucket: unknown): ParsedBucket | null {
   if (!isRecord(bucket)) return null;
   const startingAt = bucket.starting_at;
   if (typeof startingAt !== 'string') return null;
@@ -72,11 +128,18 @@ function parseBucket(bucket: unknown): DailyActualCost | null {
   if (!Array.isArray(results)) return null;
 
   let costUsd = 0;
+  const items: ParsedBucket['items'] = [];
   for (const item of results) {
     if (!isRecord(item)) continue;
-    costUsd += parseAmountToUsd(item.amount);
+    const itemCost = parseAmountToUsd(item.amount);
+    costUsd += itemCost;
+    items.push({
+      modelKey: modelKeyOf(item),
+      tokenTypeKey: tokenTypeKeyOf(item),
+      costUsd: itemCost,
+    });
   }
-  return { date: startingAt.slice(0, 10), costUsd };
+  return { daily: { date: startingAt.slice(0, 10), costUsd }, items };
 }
 
 /**
@@ -90,6 +153,7 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
   if (!adminKey) return { kind: 'not-configured' };
 
   const daily: DailyActualCost[] = [];
+  const perModel = new Map<string, { costUsd: number; byTokenType: Map<string, number> }>();
   let page: string | undefined;
   let truncated = false;
 
@@ -101,6 +165,9 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
         bucket_width: '1d',
         limit: String(BUCKETS_PER_PAGE),
       });
+      // 配列パラメータは `group_by[]`。これを付けないと results が1件に丸められ、
+      // model / token_type が null になって用途別の内訳が出せない。
+      params.append('group_by[]', 'description');
       if (page) params.set('page', page);
 
       const res = await fetch(`${COST_REPORT_URL}?${params.toString()}`, {
@@ -127,7 +194,17 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
 
       for (const bucket of body.data) {
         const parsed = parseBucket(bucket);
-        if (parsed) daily.push(parsed);
+        if (!parsed) continue;
+        daily.push(parsed.daily);
+        for (const item of parsed.items) {
+          const model = perModel.get(item.modelKey) ?? { costUsd: 0, byTokenType: new Map() };
+          model.costUsd += item.costUsd;
+          model.byTokenType.set(
+            item.tokenTypeKey,
+            (model.byTokenType.get(item.tokenTypeKey) ?? 0) + item.costUsd,
+          );
+          perModel.set(item.modelKey, model);
+        }
       }
 
       if (body.has_more !== true || typeof body.next_page !== 'string') break;
@@ -137,7 +214,17 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
     }
 
     const totalCostUsd = daily.reduce((sum, d) => sum + d.costUsd, 0);
-    return { kind: 'ok', totalCostUsd, daily, truncated };
+    const byModel: ModelActualCost[] = Array.from(perModel.entries())
+      .map(([model, v]) => ({
+        model,
+        costUsd: v.costUsd,
+        byTokenType: Array.from(v.byTokenType.entries())
+          .map(([tokenType, cost]) => ({ tokenType, costUsd: cost }))
+          .sort((a, b) => b.costUsd - a.costUsd),
+      }))
+      .sort((a, b) => b.costUsd - a.costUsd);
+
+    return { kind: 'ok', totalCostUsd, daily, byModel, truncated };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return { kind: 'error', message };
