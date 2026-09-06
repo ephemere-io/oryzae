@@ -162,7 +162,13 @@
       "heading": "Desktop only",
       "body": "Oryzae is currently desktop-only and cannot be accessed from a smartphone. Until the mobile version is ready, please use it from a desktop browser."
     },
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "home_gate": {
+      "redirecting": "Redirecting…",
+      "no_script": "JavaScript is required to continue.",
+      "link_about": "About Oryzae",
+      "link_login": "Log in"
+    }
   },
   "footer": {
     "label": {

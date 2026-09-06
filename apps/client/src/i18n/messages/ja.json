@@ -162,7 +162,13 @@
       "heading": "デスクトップ専用です",
       "body": "Oryzaeは現在、デスクトップブラウザ専用となっていてスマートフォンからはアクセスできません。スマートフォン版画面が準備できるまでは、デスクトップからお使いください。"
     },
-    "loading": "読み込み中…"
+    "loading": "読み込み中…",
+    "home_gate": {
+      "redirecting": "移動しています…",
+      "no_script": "このページを表示するには JavaScript が必要です。",
+      "link_about": "Oryzae について",
+      "link_login": "ログイン"
+    }
   },
   "footer": {
     "label": {
