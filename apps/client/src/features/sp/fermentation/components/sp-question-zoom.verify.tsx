@@ -10,6 +10,7 @@
 
 import { registerUnit } from '@oryzae/verify';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
+import { textPathFitsInvariant } from '@/lib/verify/text-path-invariant';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpQuestionZoom } from './sp-question-zoom';
 
@@ -148,6 +149,7 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    textPathFitsInvariant(),
     {
       id: 'question-is-never-cut',
       description: '問いは切らない（どの問いを開いているかを語る場所なので）',

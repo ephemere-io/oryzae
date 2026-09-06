@@ -9,6 +9,7 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
+import { textPathFitsInvariant } from '@/lib/verify/text-path-invariant';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { type OrbitQuestion, SpJarOrbit } from './sp-jar-orbit';
 
@@ -128,6 +129,26 @@ registerUnit<Props>({
       },
     },
     {
+      // 実機で頭の 3 字（「自然環」）が黙って消えていた問い。字数の計算は通っていて、
+      // 経路からはみ出した分が描かれていなかった。
+      id: 'reported-cut',
+      probe: true,
+      description: 'Probe: 実機で頭が欠けていた問い（19 字）が、1 字も欠けずに出る',
+      props: {
+        questions: [
+          {
+            id: 'q-reported',
+            text: '自然環境を身に宿すためのデザインとは？',
+            hasLetter: true,
+            unread: false,
+            keywords: ['制御する手'],
+            snippetCount: 2,
+          },
+        ],
+        onSelect: noop,
+      },
+    },
+    {
       id: 'long-text',
       probe: true,
       description: 'Probe: 上限いっぱいの問いでも、輪を増やして全文を出す',
@@ -232,6 +253,7 @@ registerUnit<Props>({
         return tooSmall === 0 || `${tooSmall} 個のリング文字が 12px 未満`;
       },
     },
+    textPathFitsInvariant(),
     {
       id: 'question-is-never-cut',
       description: '問いは切らない（読めない問いなら円に置く意味が無い）',
