@@ -7,7 +7,7 @@ import { EntryValidationError } from '../errors/entry.errors.js';
 
 interface CreateEntryInput {
   content: string;
-  mediaUrls: string[];
+  mediaUrls?: string[];
   editorType: string;
   editorVersion: string;
   extension: Record<string, unknown>;
@@ -27,7 +27,7 @@ export class CreateEntryUsecase {
       {
         userId,
         content: input.content,
-        mediaUrls: input.mediaUrls,
+        mediaUrls: input.mediaUrls ?? [],
         fermentationEnabled: input.fermentationEnabled ?? false,
         effects: input.effects ?? null,
       },
