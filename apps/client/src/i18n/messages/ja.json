@@ -504,7 +504,22 @@
     "error_rate_limited": "読み取りの回数制限に達しました。少し待ってからお試しください。",
     "unavailable": "{index} 枚目の写真を読み込めませんでした",
     "unavailable_short": "読み込めません",
-    "error_spend_limit": "AI の利用上限に達しています。しばらく利用できません（管理者にお問い合わせください）。"
+    "error_spend_limit": "AI の利用上限に達しています。しばらく利用できません（管理者にお問い合わせください）。",
+    "layout_inline": "行内",
+    "layout_block": "ブロック",
+    "layout_wrap": "回り込み",
+    "align_start": "始め",
+    "align_center": "中央",
+    "align_end": "終わり",
+    "remove_inline": "写真を削除",
+    "resize_nw": "左上をドラッグしてサイズ変更",
+    "resize_n": "上をドラッグしてサイズ変更",
+    "resize_ne": "右上をドラッグしてサイズ変更",
+    "resize_e": "右をドラッグしてサイズ変更",
+    "resize_se": "右下をドラッグしてサイズ変更",
+    "resize_s": "下をドラッグしてサイズ変更",
+    "resize_sw": "左下をドラッグしてサイズ変更",
+    "resize_w": "左をドラッグしてサイズ変更"
   },
   "fermentation": {
     "detail": {
