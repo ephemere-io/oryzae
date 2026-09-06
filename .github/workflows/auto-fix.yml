@@ -27,6 +27,11 @@ on:
   workflow_run:
     workflows: ['CI', 'E2E Tests', 'Security']
     types: [completed]
+    # main で失敗したときだけが対象。この branches を外すと、PR ブランチの CI が
+    # 終わるたびに（下の if で skip されるだけの）run が作られ、Actions 画面が
+    # 空の run で埋まる。さらに悪いことに、それらは concurrency グループ auto-fix に
+    # 積まれる（cancel-in-progress: false）ため、本物の実行を待たせる。
+    branches: [main]
   workflow_dispatch:
     inputs:
       issue:
@@ -192,6 +197,17 @@ jobs:
                   echo "- await 漏れ、クリーンアップ漏れ、競合状態"
                   echo "- 型は通るが実行時に来ない形を許している箇所"
                   echo
+                  echo "### 進め方（守ること）"
+                  echo
+                  echo "このセッションには硬い費用上限があり、**超えた瞬間に作業ごと捨てられる**。"
+                  echo "途中まで直しても、上限に当たれば何も残らない。だから広く読まずに早く決める:"
+                  echo
+                  echo "1. まず対象ディレクトリのファイル一覧を 1 回で取る（Glob）"
+                  echo "2. 名前と役割から怪しい順に **最大 8 ファイル** を選んで読む"
+                  echo "3. **20 ターンを目安に結論を出す。** 直す対象が決まらなければ、そこで打ち切って"
+                  echo "   fixed: false を返す。粘るより、次回の予算を残すほうが価値がある"
+                  echo "4. 直すと決めたら、その 1 件だけを直して終える"
+                  echo
                   echo "**確信が持てるものが 1 件も無ければ、何も編集せず fixed: false で終えること。**"
                   echo "見つからないのは正しい結果であり、無理に直すより価値がある。"
                 } > .bot/task.md
@@ -319,12 +335,15 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # gh / git commit / git push を渡さない。コミットとマージはワークフローの仕事で、
           # モデルに「自分で通してしまう」経路を残さないため。
-          # effort は既定の high のまま。落とすと 1 回は安くなるが、ガードレールに落ちた実行は
-          # 費用が丸ごと無駄になるので、「1 回で通る確率」のほうが月の総額に効く。
-          # 打ち切り（aborted）が続くようなら AUTO_FIX_EFFORT を medium に下げるのが最初の手。
+          # effort=medium。当初は high にしていたが、初回実行（2026-09-06）が
+          # 30 ターン・175 秒で上限 $0.60 を使い切って中断した（何も残らず $0.60 の損失）。
+          # 1 ターンあたり約 $0.02 かかっており、high では上限に届く前に仕事が終わらない。
+          #
+          # ここには「1 回で通る確率」と「1 回に入るターン数」のトレードオフがあり、
+          # 上限が硬い以上、後者が効く。品質は 7 種のガードレールが別途担保する。
           claude_args: >-
             --model ${{ vars.AUTO_FIX_MODEL || 'claude-sonnet-5' }}
-            --effort ${{ vars.AUTO_FIX_EFFORT || 'high' }}
+            --effort ${{ vars.AUTO_FIX_EFFORT || 'medium' }}
             --max-budget-usd ${{ steps.budget.outputs.budget_usd }}
             --allowed-tools "Read,Grep,Glob,Edit,Write,TodoWrite,Bash(pnpm:*),Bash(node:*),Bash(ls:*),Bash(cat:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*)"
             --disallowed-tools "WebSearch,WebFetch,Bash(gh:*),Bash(curl:*),Bash(git commit:*),Bash(git push:*),Bash(git checkout:*),Bash(git reset:*),Bash(git stash:*),Bash(rm:*)"
