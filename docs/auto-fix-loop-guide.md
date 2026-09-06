@@ -184,8 +184,14 @@ Organization Settings > Actions > General > Workflow permissions の
 **「Allow GitHub Actions to create and approve pull requests」を ON** にする必要がある。
 OFF のままだと `gh pr create` が 403 で落ち、修正をマージできない。
 
-この不備は AI を呼ぶ前に検出して落とす（`PR を作れる設定になっているか確認する` ステップ）。
-最後の手前まで進んでから落ちると、その回のトークン費用が丸ごと無駄になるため。
+**この不備は事前に検出できない。** GITHUB_TOKEN にはこの設定を読む権限が無く、
+`administration` はワークフローの `permissions` に指定できるキーでもない
+（指定するとワークフロー自体がパースできずに 422 で落ちる）。
+
+したがって OFF のまま有効化すると、修正を作ってから最後の段階で落ちる＝その回の費用が無駄になる。
+ただし差分はブランチに push 済みなので手で PR を作れば拾えるし、
+`gates-failed` が 3 回続けばサーキットブレーカーが止めるので、被害は最大 3 回に収まる。
+**有効化する前にこの設定を確認すること。**
 
 ### 止め方
 
