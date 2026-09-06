@@ -11,7 +11,7 @@ import {
   IDLE_SPIN,
   orbitSlot,
 } from '@/features/sp/fermentation/orbit';
-import { fitRingText, RING_INSET, RING_TRACKING } from '@/features/sp/fermentation/ring-text';
+import { fitRingText, RING_TRACKING, ringPath } from '@/features/sp/fermentation/ring-text';
 import { ringSlots } from '@/features/sp/fermentation/zoom-layout';
 
 export interface OrbitQuestion {
@@ -283,7 +283,6 @@ interface OrbitCircleProps {
 
 function OrbitCircle({ question, size, reduced, registerRef, onSelect }: OrbitCircleProps) {
   const ring = fitRingText(question.text, size);
-  const radius = size / 2 - RING_INSET;
   const pathId = `sp-ring-${question.id}`;
 
   return (
@@ -313,32 +312,54 @@ function OrbitCircle({ question, size, reduced, registerRef, onSelect }: OrbitCi
       }}
       data-question-id={question.id}
     >
-      {/* 外周を回る問いテキスト */}
+      {/* 外周を回る問いテキスト。長い問いは輪が外へ増える（円の中は予告の席）。 */}
       <span
         className="pointer-events-none absolute inset-0 block"
         style={reduced ? undefined : { animation: 'sp-orbit-ring 150s linear infinite' }}
       >
-        <svg aria-hidden="true" viewBox={`0 0 ${size} ${size}`} className="h-full w-full">
-          <path
-            id={pathId}
-            d={`M ${size / 2},${size / 2} m ${-radius},0 a ${radius},${radius} 0 1,1 ${radius * 2},0 a ${radius},${radius} 0 1,1 ${-radius * 2},0`}
-            fill="transparent"
-          />
-          <text
-            style={{
-              fontFamily: "'Noto Serif JP', serif",
-              fontSize: `${ring.fontSize}px`,
-              letterSpacing: `${RING_TRACKING}em`,
-              fill: '#7A3B3F',
-              opacity: 0.75,
-            }}
-          >
-            {/* 経路は 9 時から時計回り。25% ＝ 12 時に中央を合わせて、止まって見えた
-                瞬間でも問いが円の上を渡っているようにする。 */}
-            <textPath href={`#${pathId}`} startOffset="25%" textAnchor="middle">
-              {ring.label}
-            </textPath>
-          </text>
+        {/* 輪は円より大きくなりうるので、svg は inset-0 ではなく中心合わせで置く。
+            transform を使うと回転アニメーションと取り合いになるので margin で寄せる。 */}
+        <svg
+          aria-hidden="true"
+          viewBox={`0 0 ${ring.box} ${ring.box}`}
+          className="absolute"
+          style={{
+            left: '50%',
+            top: '50%',
+            width: `${ring.box}px`,
+            height: `${ring.box}px`,
+            marginLeft: `${-ring.box / 2}px`,
+            marginTop: `${-ring.box / 2}px`,
+          }}
+        >
+          {ring.lines.map((line) => (
+            <g key={line.radius}>
+              <path
+                id={`${pathId}-${Math.round(line.radius)}`}
+                d={ringPath(ring.box / 2, line.radius)}
+                fill="transparent"
+              />
+              <text
+                style={{
+                  fontFamily: "'Noto Serif JP', serif",
+                  fontSize: `${ring.fontSize}px`,
+                  letterSpacing: `${RING_TRACKING}em`,
+                  fill: '#7A3B3F',
+                  opacity: 0.75,
+                }}
+              >
+                {/* 経路は 9 時から時計回り。25% ＝ 12 時に中央を合わせて、止まって見えた
+                    瞬間でも問いが円の上を渡っているようにする。 */}
+                <textPath
+                  href={`#${pathId}-${Math.round(line.radius)}`}
+                  startOffset="25%"
+                  textAnchor="middle"
+                >
+                  {line.label}
+                </textPath>
+              </text>
+            </g>
+          ))}
         </svg>
       </span>
 

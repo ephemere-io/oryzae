@@ -71,8 +71,9 @@ const three: OrbitQuestion[] = [
   },
 ];
 
+/** 問いの上限ちょうど（MAX_QUESTION_STRING_LENGTH = 64 字）。いちばん厳しい場合を見る。 */
 const longText =
-  'ここ数ヶ月のあいだに自分のなかで静かに変わってしまったものは何だったのか、いま言葉にするとどうなるか';
+  'ここ数ヶ月のあいだに自分のなかで静かに変わってしまったものは何だったのか、それをいまあらためて言葉にするとどんな形になるだろうか';
 
 registerUnit<Props>({
   id: 'SpJarOrbit',
@@ -129,7 +130,7 @@ registerUnit<Props>({
     {
       id: 'long-text',
       probe: true,
-      description: 'Probe: 長い問いは末尾を畳む（黙って切れない）',
+      description: 'Probe: 上限いっぱいの問いでも、輪を増やして全文を出す',
       props: {
         questions: [
           {
@@ -232,14 +233,36 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'long-question-is-folded',
-      description: '長い問いは「…」で畳まれる（textPath は入らない分を黙って捨てるため）',
+      id: 'question-is-never-cut',
+      description: '問いは切らない（読めない問いなら円に置く意味が無い）',
+      check: ({ root }) => {
+        // textPath は経路に収まらない分を黙って捨てる。畳んだ印（…）が出ていたら、
+        // 輪の増やし方が足りていない。
+        const folded = Array.from(root.querySelectorAll('button[data-question-id] textPath'))
+          .map((path) => path.textContent ?? '')
+          .filter((text) => text.endsWith('…'));
+        return folded.length === 0 || `${folded.length} 個の問いが畳まれている`;
+      },
+    },
+    {
+      id: 'long-question-reads-whole',
+      description: '上限いっぱい（64 字）の問いも、輪をつなぐと全文になる',
       onlyFixtures: ['long-text'],
       check: ({ root }) => {
-        const text = root.querySelector('button[data-question-id] textPath')?.textContent ?? '';
+        const circle = root.querySelector('button[data-question-id]');
+        const rings = Array.from(circle?.querySelectorAll('textPath') ?? []);
+        const read = rings.map((path) => path.textContent ?? '').join('');
+        if (read !== longText)
+          return `輪をつないでも全文にならない（${read.length}/${longText.length} 字）`;
+        // 外側の輪から読む。12 時では外の輪が上に来るので、横書きと同じ順になる。
+        const radii = rings.map((path) => {
+          const id = path.getAttribute('href')?.slice(1) ?? '';
+          return Number.parseFloat(id.split('-').at(-1) ?? '0');
+        });
+        const outerFirst = [...radii].sort((a, b) => b - a);
         return (
-          (text.endsWith('…') && text.length < longText.length) ||
-          `畳まれていない: "${text.slice(0, 20)}…"（長さ ${text.length}）`
+          radii.every((radius, i) => radius === outerFirst[i]) ||
+          `読む順が外→内になっていない: ${radii.join(',')}`
         );
       },
     },
