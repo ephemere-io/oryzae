@@ -486,7 +486,6 @@
       "letter_badge": "来自发酵过程的信件"
     },
     "fermentation_sidebar": {
-      "heading": "发酵",
       "close_aria": "关闭发酵侧边栏",
       "empty": "这个问题还没有发酵结果。",
       "section_letter": "信",
@@ -494,7 +493,11 @@
       "section_snippets": "摘录",
       "back_aria": "返回列表",
       "open_aria": "展开发酵结果",
-      "drag_or_open": "点击查看理由 · 拖入正文"
+      "drag_or_open": "点击查看理由 · 拖入正文",
+      "loading": "正在读取…",
+      "question_select_aria": "查看哪个提问的发酵",
+      "question_select_placeholder": "选择提问",
+      "question_unnamed": "（无标题提问）"
     },
     "palette": {
       "move": "移动面板",

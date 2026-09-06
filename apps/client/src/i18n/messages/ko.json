@@ -486,7 +486,6 @@
       "letter_badge": "발효 과정의 편지"
     },
     "fermentation_sidebar": {
-      "heading": "발효",
       "close_aria": "발효 사이드바 닫기",
       "empty": "이 물음의 발효 결과가 아직 없습니다.",
       "section_letter": "편지",
@@ -494,7 +493,11 @@
       "section_snippets": "스니펫",
       "back_aria": "목록으로",
       "open_aria": "발효 결과 열기",
-      "drag_or_open": "누르면 이유를 읽고 · 끌면 본문에 넣어요"
+      "drag_or_open": "누르면 이유를 읽고 · 끌면 본문에 넣어요",
+      "loading": "불러오는 중…",
+      "question_select_aria": "어떤 물음의 발효를 볼지",
+      "question_select_placeholder": "물음 고르기",
+      "question_unnamed": "(제목 없는 물음)"
     },
     "palette": {
       "move": "팔레트 이동",

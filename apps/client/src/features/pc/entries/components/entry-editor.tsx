@@ -22,7 +22,10 @@ import {
   EntryActionPalette,
   type PaletteAction,
 } from '@/features/pc/entries/components/entry-action-palette';
-import { FermentationSidebar } from '@/features/pc/entries/components/fermentation-sidebar';
+import {
+  FermentationSidebar,
+  type SidebarQuestion,
+} from '@/features/pc/entries/components/fermentation-sidebar';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
 import { PickleConfirmModal } from '@/features/pc/entries/components/pickle-confirm-modal';
@@ -229,11 +232,22 @@ export function EntryEditor({
   // 以前は**新規エントリだけ**に限っていた（執筆中の判断材料という位置づけだった）。
   // だが一覧から既存のエントリを開くと、パレットの発酵ボタンが理由もなく死んだままになる。
   // 書き足すときにも前回の発酵結果は読みたいので、新旧を問わず結んだ問いから引く。
-  const firstLinkedQuestionId = Array.from(linkedIds)[0];
-  const { detail: fermentationOverlayDetail } = useFermentationForQuestion(
-    api,
-    firstLinkedQuestionId,
-  );
+  // 面が見せるのは**問い1つぶん**の発酵。問いは複数結べるので、どれを見るかは面の中で選ぶ。
+  // 選んでいた問いを外したときは、残っている先頭へ落とす（外した問いの結果を出したままに
+  // しない、が第一。選び直しを促して手を止めるほどのことではない）。
+  const linkedQuestionList: SidebarQuestion[] = Array.from(linkedIds).map((id) => ({
+    id,
+    text:
+      activeQuestions.find((q) => q.id === id)?.currentText ??
+      t('fermentation_sidebar.question_unnamed'),
+  }));
+  const [pickedFermentQuestionId, setPickedFermentQuestionId] = useState<string | null>(null);
+  const selectedFermentQuestionId =
+    pickedFermentQuestionId && linkedIds.has(pickedFermentQuestionId)
+      ? pickedFermentQuestionId
+      : (Array.from(linkedIds)[0] ?? null);
+  const { detail: fermentationOverlayDetail, loading: fermentationLoading } =
+    useFermentationForQuestion(api, selectedFermentQuestionId ?? undefined);
   // 発酵結果は**閉じた状態で始まり、パレットの操作でだけ開く**。
   // 以前はエントリーを開いた瞬間に「出しますか？」と訊いていたが、書きに来た人の手を
   // いきなり止める問いだった。出したいときに出せるなら、訊く必要がない。
@@ -1322,6 +1336,10 @@ export function EntryEditor({
       {linkedIds.size > 0 && (
         <FermentationSidebar
           detail={fermentationOverlayDetail}
+          questions={linkedQuestionList}
+          selectedQuestionId={selectedFermentQuestionId}
+          onSelectQuestion={setPickedFermentQuestionId}
+          loading={fermentationLoading}
           collapsed={!fermentSidebarOpen}
           onToggle={() => setFermentSidebarOpen((v) => !v)}
         />

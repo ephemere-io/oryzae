@@ -33,6 +33,14 @@
    * 透けた白に頼っていた頃は、紙とほぼ同じ明るさで境界が読めなかった。 */
   --surface-sunken: #f2f0ea;
   --surface-sunken-border: rgba(0, 0, 0, 0.08);
+  /* **いま選ばれている行き先**（サイドバーの項目・発酵の面の切り替え）。
+   * 行ごとに rgba を直書きしていたので、dark で白い内側光がそのまま浮いていた。
+   * 選択の表現はアプリ全体でこの4本だけが持つ。 */
+  --nav-active-fg: #8ea89c;
+  --nav-active-bg: rgba(142, 168, 156, 0.15);
+  --nav-active-border: rgba(142, 168, 156, 0.2);
+  --nav-active-sheen: rgba(255, 255, 255, 0.8);
+
   /* 面を持たない切り替えの下地（セグメント・表示単位のトラック）。浮いた面とは
    * 逆向きの表現で、「これは道具ではなく状態の選択」を見た目で言い分ける。 */
   --track: rgba(0, 0, 0, 0.05);
@@ -82,6 +90,13 @@
   --surface-raised-border: rgba(255, 255, 255, 0.12);
   --track: rgba(255, 255, 255, 0.07);
   --track-active: rgba(255, 255, 255, 0.14);
+
+  /* dark では地が暗いので、白い内側光はほとんど効かせない（light の 0.8 をそのまま
+     使うと、選ばれた行だけが白く霞んで浮き上がっていた）。 */
+  --nav-active-fg: #9cbfae;
+  --nav-active-bg: rgba(156, 191, 174, 0.14);
+  --nav-active-border: rgba(156, 191, 174, 0.24);
+  --nav-active-sheen: rgba(255, 255, 255, 0.04);
 
   --ob-card-bg: #1f1d1a;
   --ob-card-border: rgba(255, 255, 255, 0.08);

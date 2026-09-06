@@ -486,7 +486,6 @@
       "letter_badge": "発酵プロセスからの手紙"
     },
     "fermentation_sidebar": {
-      "heading": "発酵",
       "close_aria": "発酵サイドバーを閉じる",
       "empty": "この問いの発酵結果はまだありません。",
       "section_letter": "手紙",
@@ -494,7 +493,11 @@
       "section_snippets": "スニペット",
       "back_aria": "一覧に戻る",
       "open_aria": "発酵結果を開く",
-      "drag_or_open": "押すと理由が読める・掴むと本文へ入る"
+      "drag_or_open": "押すと理由が読める・掴むと本文へ入る",
+      "loading": "読み込んでいます…",
+      "question_select_aria": "どの問いの発酵を見るか",
+      "question_select_placeholder": "問いを選ぶ",
+      "question_unnamed": "（無題の問い）"
     },
     "palette": {
       "move": "パレットを移動",

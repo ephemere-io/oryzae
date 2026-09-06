@@ -10,7 +10,8 @@
  *
  * 唯一の状態 seam は pathname。withVerifyProviders の内側に PathnameContext.Provider を
  * 重ねて fixture ごとに上書きする（内側 provider が土台の "/verify" に勝つ）。
- * 公表する契約は「変化するもの」だけ: root の pathname と、各ナビ Link の navItem/active。
+ * 公表する契約は「変化するもの」だけ: root の pathname と、各 NavRow の href/active
+ * （行そのものは components/ui/nav-row が持つので、契約もそちらが出す）。
  * theme / unreadCount / hidden / auth は既定値に固定され変化しないため契約に載せない。
  *
  * Probe は /entries の完全一致特例（sidebar.tsx の isActive 分岐）。/entries/new では素朴な
@@ -100,7 +101,7 @@ registerUnit<Props>({
       description:
         'pathname から計算したナビ項目だけが active=true（ハイライトが pathname と一致する）',
       check: ({ root, props }) => {
-        const links = Array.from(root.querySelectorAll<HTMLElement>('[data-verify-nav-item]'));
+        const links = Array.from(root.querySelectorAll<HTMLElement>('[data-verify-unit="NavRow"]'));
         const active = links.filter((l) => l.getAttribute('data-verify-active') === 'true');
         const expected = expectedActiveMatch(props.pathname);
         if (expected === null) {
@@ -112,7 +113,7 @@ registerUnit<Props>({
         if (active.length !== 1) {
           return `expected exactly 1 active item for "${props.pathname}", got ${active.length}`;
         }
-        const activeMatch = active[0]?.getAttribute('data-verify-nav-item');
+        const activeMatch = active[0]?.getAttribute('data-verify-href');
         return (
           activeMatch === expected || `expected active navItem "${expected}", got "${activeMatch}"`
         );
@@ -123,8 +124,8 @@ registerUnit<Props>({
       // 最初に目に入るべきは「書いたものが納まっている場所」。ロゴは行き先ではない。
       description: '行き先の先頭は瓶（ロゴを列の先頭に置かない）',
       check: ({ root }) => {
-        const first = root.querySelector('[data-verify-nav-item]');
-        const match = first?.getAttribute('data-verify-nav-item');
+        const first = root.querySelector('[data-verify-unit="NavRow"]');
+        const match = first?.getAttribute('data-verify-href');
         return match === '/jar' || `先頭が "${match}"（瓶であるべき）`;
       },
     },

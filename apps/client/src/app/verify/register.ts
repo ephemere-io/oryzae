@@ -13,6 +13,7 @@
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
 import '@/components/ui/menu.verify';
+import '@/components/ui/nav-row.verify';
 import '@/components/ui/segmented.verify';
 import '@/components/ui/select.verify';
 import '@/features/shared/auth/components/reset-password-form.verify';

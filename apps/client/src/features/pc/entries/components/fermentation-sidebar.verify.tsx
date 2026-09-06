@@ -1,12 +1,13 @@
 /**
  * FermentationSidebar の検証スペック（Issue #466）。
  *
- * detail を props で受け取り、手紙・キーワード・スニペットをサイドバーに列挙する部品。
+ * detail を props で受け取り、手紙・キーワード・スニペットをサイドバーに集約する部品。
  * データ取得は親（useFermentationForQuestion）が担うので props だけで孤立レンダリングできる。
  *
  * 注意:
  * - **面は1枚**。項目を開いても別の面は生えず、この面の中身が一覧 ⇄ 中身で入れ替わる。
- *   同じ場所に同じ幅の面が2枚重なると、どちらを見ているのか分からなくなるため。
+ * - 面は**2つの軸**で決まる: どの問いの（＝どの発酵の）、何を（手紙 / ことば / 断片）。
+ *   後者は左のサイドバーと同じ行（components/ui/nav-row）で並べる。
  * - キーワードは 5 件、スニペットは 3 件で slice する。契約は **描画済み（cap 後）** の件数を
  *   公表するので、cap 超過 probe でも DOM 件数と一致する。
  */
@@ -14,20 +15,30 @@
 import { registerUnit } from '@oryzae/verify';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { FermentationSidebar } from './fermentation-sidebar';
+import { FermentationSidebar, type SidebarQuestion } from './fermentation-sidebar';
 
 interface Props {
   detail: FermentationDetail | null;
+  questions: SidebarQuestion[];
+  selectedQuestionId: string | null;
+  loading?: boolean;
   collapsed: boolean;
-  onToggle: () => void;
 }
 
 const SIDEBAR_SELECTOR = '[data-verify-unit="FermentationSidebar"]';
+/** 面の中の切り替え。左のサイドバーと同じ行を使うので、同じ契約で数えられる。 */
+const NAV_ROW_SELECTOR = '[data-verify-unit="NavRow"]';
 
 /** 瓶ビュー用の座標。サイドバーは座標を使わないので常に null でよい。 */
 const NO_JAR_POS = { jarX: null, jarY: null };
 
 const noop = () => {};
+
+const ONE_QUESTION: SidebarQuestion[] = [{ id: 'q-1', text: 'いま、何に守られている？' }];
+const TWO_QUESTIONS: SidebarQuestion[] = [
+  ...ONE_QUESTION,
+  { id: 'q-2', text: '手放したいものは何？' },
+];
 
 function makeDetail(overrides: Partial<FermentationDetail>): FermentationDetail {
   return {
@@ -66,17 +77,37 @@ const fullDetail = makeDetail({
   letter: { id: 'l1', bodyText: 'あなたの言葉から、静かな強さを感じました。', ...NO_JAR_POS },
 });
 
+/** 面の中の切り替えを、名前で押す。 */
+async function switchTo(
+  root: HTMLElement,
+  label: string,
+  wait: (ms: number) => Promise<void>,
+): Promise<void> {
+  const row = Array.from(root.querySelectorAll<HTMLElement>(NAV_ROW_SELECTOR)).find(
+    (el) => el.getAttribute('data-verify-label') === label,
+  );
+  if (!row) throw new Error(`切り替え「${label}」が見つからない`);
+  row.click();
+  await wait(16);
+}
+
 registerUnit<Props>({
   id: 'FermentationSidebar',
   title: 'FermentationSidebar',
-  description: 'エントリー画面の右サイドバー。発酵結果（手紙/キーワード/スニペット）を集約する。',
+  description: 'エントリー画面の右サイドバー。発酵結果（手紙/ことば/断片）を集約する。',
   kind: 'component',
-  render: (props) => withVerifyProviders(<FermentationSidebar {...props} />),
+  render: (props) =>
+    withVerifyProviders(<FermentationSidebar {...props} onSelectQuestion={noop} onToggle={noop} />),
   fixtures: [
     {
       id: 'full',
-      description: '手紙・キーワード2件・スニペット1件がすべて揃った状態',
-      props: { detail: fullDetail, collapsed: false, onToggle: noop },
+      description: '手紙・キーワード2件・スニペット1件がすべて揃った状態（既定は手紙）',
+      props: {
+        detail: fullDetail,
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
+        collapsed: false,
+      },
     },
     {
       id: 'letter-only',
@@ -85,37 +116,103 @@ registerUnit<Props>({
         detail: makeDetail({
           letter: { id: 'l1', bodyText: '今週の言葉を受け取りました。', ...NO_JAR_POS },
         }),
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
         collapsed: false,
-        onToggle: noop,
       },
+    },
+    {
+      id: 'two-questions',
+      description: '問いが2つ結ばれている（どちらの発酵を見るか選べる）',
+      props: {
+        detail: fullDetail,
+        questions: TWO_QUESTIONS,
+        selectedQuestionId: 'q-1',
+        collapsed: false,
+      },
+    },
+    {
+      id: 'keywords-view',
+      description: 'ことばに切り替えた状態',
+      props: {
+        detail: fullDetail,
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
+        collapsed: false,
+      },
+      act: async ({ root, wait }) => switchTo(root, 'キーワード', wait),
+    },
+    {
+      id: 'snippets-view',
+      description: '断片に切り替えた状態',
+      props: {
+        detail: fullDetail,
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
+        collapsed: false,
+      },
+      act: async ({ root, wait }) => switchTo(root, 'スニペット', wait),
     },
     {
       id: 'empty',
       probe: true,
-      description: 'Probe: 完了済みだが中身が空（空状態の文言が出て崩れない）',
-      props: { detail: makeDetail({}), collapsed: false, onToggle: noop },
+      description: 'Probe: 完了済みだが中身が空（切り替えは3つ残り、空状態の文言が出る）',
+      props: {
+        detail: makeDetail({}),
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
+        collapsed: false,
+      },
     },
     {
       id: 'no-fermentation-yet',
       probe: true,
       description: 'Probe: 問いは紐づいているが発酵はまだ（面は開けて、中身が無いと言う）',
-      props: { detail: null, collapsed: false, onToggle: noop },
+      props: {
+        detail: null,
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
+        collapsed: false,
+      },
+    },
+    {
+      id: 'loading',
+      probe: true,
+      description: 'Probe: 問いを選び直した直後（空と読み込み中を混同しない）',
+      props: {
+        detail: null,
+        questions: TWO_QUESTIONS,
+        selectedQuestionId: 'q-2',
+        loading: true,
+        collapsed: false,
+      },
     },
     {
       id: 'collapsed',
       description: '畳んだ状態（縁だけが残り、押せば開く）',
-      props: { detail: fullDetail, collapsed: true, onToggle: noop },
+      props: {
+        detail: fullDetail,
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
+        collapsed: true,
+      },
     },
     {
       id: 'detail-open',
       description: 'キーワードを開いた状態（面は増えず、この面の中身が入れ替わる）',
-      props: { detail: fullDetail, collapsed: false, onToggle: noop },
+      props: {
+        detail: fullDetail,
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
+        collapsed: false,
+      },
       act: async ({ root, wait }) => {
-        const keyword = Array.from(root.querySelectorAll<HTMLElement>('button')).find((b) =>
+        await switchTo(root, 'キーワード', wait);
+        const item = Array.from(root.querySelectorAll<HTMLElement>('button')).find((b) =>
           b.textContent?.includes('静けさ'),
         );
-        if (!keyword) throw new Error('キーワードのボタンが見つからない');
-        keyword.click();
+        if (!item) throw new Error('キーワードのボタンが見つからない');
+        item.click();
         await wait(16);
       },
     },
@@ -130,8 +227,9 @@ registerUnit<Props>({
             snippet(`s${i}`, `${'とても長い抜粋のテキスト'.repeat(6)}${i}`),
           ),
         }),
+        questions: ONE_QUESTION,
+        selectedQuestionId: 'q-1',
         collapsed: false,
-        onToggle: noop,
       },
     },
   ],
@@ -159,43 +257,86 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'items-are-clickable',
-      // **手紙はボタンではない**（畳まずそのまま置く）。
-      // ことば・断片は、項目そのものが押せて掴める（触り方を2つ覚えさせない）。
-      // 数え分けは fixture 名ではなく**契約**で行う——onlyFixtures で逃げると、
-      // 新しい fixture を足したときに黙って的外れになる。
-      description: '姿ごとにボタンの数が合う（一覧 / 中身 / 畳んだ姿）',
+      id: 'every-kind-is-always-listed',
+      // 中身があるものだけ並べると、無いものは**入れ物ごと存在しない**ように見える。
+      // 3つは常に並べ、空かどうかは開いた先で言う（パレットの非活性と同じ考え）。
+      description: '開いているときは、手紙・ことば・断片の3つが必ず並ぶ',
       check: ({ root, contract }) => {
-        const sidebar = root.querySelector(SIDEBAR_SELECTOR);
-        if (!sidebar) return 'FermentationSidebar の契約要素が見つからない';
-        // 畳んだ姿は縁そのものが押せる要素なので、内側にボタンは無い。
-        if (contract.collapsed === 'true') {
-          const inner = sidebar.querySelectorAll('button').length;
-          return inner === 0 || `畳んだ姿の内側にボタンが ${inner} 個ある`;
-        }
-        const buttons = sidebar.querySelectorAll('button').length;
-        // ことば・断片は**項目そのもの**が押せて掴める（別の取っ手は持たない）。
-        const expected =
-          contract.detailOpen === 'true'
-            ? 2 // 戻る + 閉じる
-            : Number(contract.keywordCount) + Number(contract.snippetCount) + 1;
+        if (contract.collapsed === 'true') return true;
+        const rows = root.querySelectorAll(NAV_ROW_SELECTOR).length;
+        return rows === 3 || `切り替えが ${rows} 個（3つであるべき）`;
+      },
+    },
+    {
+      id: 'exactly-one-view-is-active',
+      // どれを見ているのかが色でしか分からない状態にしない（契約でも1つに定まる）。
+      description: '一覧を見ているあいだ、選ばれている切り替えはちょうど1つ',
+      check: ({ root, contract }) => {
+        if (contract.collapsed === 'true' || contract.detailOpen === 'true') return true;
+        const active = Array.from(root.querySelectorAll(NAV_ROW_SELECTOR)).filter(
+          (el) => el.getAttribute('data-verify-active') === 'true',
+        );
+        if (active.length !== 1) return `選ばれている切り替えが ${active.length} 個`;
         return (
-          buttons === expected ||
-          `ボタン数=${buttons}, 期待=${expected}（detailOpen=${contract.detailOpen}）`
+          active[0]?.getAttribute('aria-pressed') === 'true' ||
+          '選ばれていることが aria-pressed で伝わっていない'
         );
       },
     },
     {
-      id: 'letter-is-readable-without-a-click',
-      // 押して開く形だと、この面に来た目的を読むのに1手余分に要る。
-      description: '手紙は畳まず、そのまま読める形で置く',
-      onlyFixtures: ['full', 'letter-only'],
+      id: 'letter-comes-first',
+      // この面に来る目的は手紙。届いているなら、押さずに読める状態で開く。
+      description: '手紙があるときは、何も押さずに手紙が開いている',
+      onlyFixtures: ['full', 'letter-only', 'two-questions'],
+      check: ({ contract }) =>
+        contract.view === 'letter' || `最初に開いている面が ${contract.view} になっている`,
+    },
+    {
+      // 「掴める項目の数が view と合う」だけだと、切り替えが空振りして手紙のままでも
+      // 0 件どうしで釣り合ってしまう。**押した先が本当に開いたか**を別に見る。
+      id: 'keywords-view-shows-keywords',
+      description: 'ことばに切り替えたら、ことばが出ている',
+      onlyFixtures: ['keywords-view'],
+      check: ({ root, contract }) => {
+        if (contract.view !== 'keywords') return `切り替えが効いていない（view=${contract.view}）`;
+        const sidebar = root.querySelector(SIDEBAR_SELECTOR);
+        return sidebar?.textContent?.includes('静けさ') || 'ことばが出ていない';
+      },
+    },
+    {
+      id: 'snippets-view-shows-snippets',
+      description: '断片に切り替えたら、断片が出ている',
+      onlyFixtures: ['snippets-view'],
+      check: ({ root, contract }) => {
+        if (contract.view !== 'snippets') return `切り替えが効いていない（view=${contract.view}）`;
+        const sidebar = root.querySelector(SIDEBAR_SELECTOR);
+        return sidebar?.textContent?.includes('朝の光') || '断片が出ていない';
+      },
+    },
+    {
+      id: 'question-picker-only-when-there-is-a-choice',
+      // 選択肢が1つの選択は、選択ではなく飾りになる。
+      description: '問いが2つ以上あるときだけ、どれを見るかを選べる',
+      check: ({ root, contract }) => {
+        if (contract.collapsed === 'true') return true;
+        const pickers = root.querySelectorAll('[role="combobox"]').length;
+        const expected = Number(contract.questionCount) > 1 ? 1 : 0;
+        return (
+          pickers === expected ||
+          `問いの切り替え=${pickers}, 期待=${expected}（問い ${contract.questionCount} 件）`
+        );
+      },
+    },
+    {
+      id: 'loading-is-not-emptiness',
+      // 取りに行っている最中に「ありません」と言うと、無いものとして受け取られる。
+      description: '読み込み中は、空状態の文言を出さない',
+      onlyFixtures: ['loading'],
       check: ({ root }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
-        const opener = Array.from(sidebar?.querySelectorAll('button') ?? []).find((b) =>
-          b.textContent?.includes('手紙'),
-        );
-        return opener === undefined || '手紙が押して開く形になっている';
+        const text = sidebar?.textContent ?? '';
+        if (text.includes('まだありません')) return '読み込み中に空状態の文言が出ている';
+        return text.includes('読み込んで') || '読み込み中であることが伝わっていない';
       },
     },
     {
@@ -215,15 +356,20 @@ registerUnit<Props>({
     {
       id: 'past-words-are-draggable',
       // 過去の言葉をいまの文章に取り込むのがこの面の役目。掴んで本文へ落とせる。
-      // 掴める所と押せる所が同じ数＝**項目そのもの**が両方を担っている。
-      description: 'ことばと断片は、項目そのものを掴んで本文へ引ける',
-      onlyFixtures: ['full'],
+      // 掴める所と押せる所が同じ＝**項目そのもの**が両方を担っている。
+      description: '見ているものが、そのまま掴んで本文へ引ける',
       check: ({ root, contract }) => {
+        if (contract.collapsed === 'true' || contract.detailOpen === 'true') return true;
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
         const draggable = Array.from(sidebar?.querySelectorAll('[draggable="true"]') ?? []);
-        const expected = Number(contract.keywordCount) + Number(contract.snippetCount);
+        const expected =
+          contract.view === 'keywords'
+            ? Number(contract.keywordCount)
+            : contract.view === 'snippets'
+              ? Number(contract.snippetCount)
+              : 0;
         if (draggable.length !== expected) {
-          return `掴める項目=${draggable.length}, 期待=${expected}`;
+          return `掴める項目=${draggable.length}, 期待=${expected}（view=${contract.view}）`;
         }
         const notButtons = draggable.filter((el) => !(el instanceof HTMLButtonElement));
         return (
@@ -243,8 +389,8 @@ registerUnit<Props>({
         if (contract.detailOpen !== 'true') return '中身が開いていない';
         // 中身を出しているあいだ、一覧の項目は消えている（重ねて出さない）。
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
-        const listItems = sidebar?.querySelectorAll('section').length ?? 0;
-        return listItems === 0 || `中身を開いているのに一覧が ${listItems} 節残っている`;
+        const stillListed = sidebar?.querySelectorAll('[draggable="true"]').length ?? 0;
+        return stillListed === 0 || `中身を開いているのに一覧が ${stillListed} 件残っている`;
       },
     },
     {
@@ -254,8 +400,10 @@ registerUnit<Props>({
       onlyFixtures: ['detail-open'],
       check: ({ root }) => {
         const sidebar = root.querySelector(SIDEBAR_SELECTOR);
-        const buttons = Array.from(sidebar?.querySelectorAll('button') ?? []);
-        return buttons.length === 2 || `ボタンが ${buttons.length} 個（戻る + 閉じるの2つ）`;
+        const back = Array.from(sidebar?.querySelectorAll('button') ?? []).filter(
+          (b) => b.getAttribute('aria-label') === '一覧に戻る',
+        );
+        return back.length === 1 || `戻るボタンが ${back.length} 個（1つであるべき）`;
       },
     },
     {

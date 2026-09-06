@@ -1,12 +1,12 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
-import { ICON_STROKE_WIDTH, SHELL_INSET, SHELL_ROW_HEIGHT } from '@/components/ui/surface';
+import { NavRow } from '@/components/ui/nav-row';
+import { ICON_STROKE_WIDTH, SHELL_INSET } from '@/components/ui/surface';
 import { useAuth } from '@/lib/auth-context';
 import { docsHref } from '@/lib/docs-site';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
@@ -105,37 +105,20 @@ export function Sidebar() {
         boxShadow: '1px 0 3px rgba(0, 0, 0, 0.03)',
       }}
     >
-      {/* 行き先 */}
+      {/* 行き先。**行そのものは components/ui/nav-row が持つ**——同じ「選んで移る」ものが
+          発酵の面の中にもあり、そこと形が食い違わないようにする。 */}
       <div className="flex flex-col gap-1 px-4">
         {NAV_ITEMS.map((item) => {
           const isActive =
             item.match === '/entries' ? pathname === '/entries' : pathname.startsWith(item.match);
-          const label = t(`nav.${item.labelKey}`);
           return (
-            <Link
+            <NavRow
               key={item.href}
-              {...verifyAttrs({ navItem: item.match, active: isActive })}
               href={item.href}
-              title={collapsed ? label : undefined}
-              className={`group relative flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-150 ${
-                collapsed ? 'w-12 justify-center' : 'w-full px-3'
-              } ${
-                isActive
-                  ? 'border text-[#8EA89C]'
-                  : 'border border-transparent text-[var(--fg)] hover:bg-[var(--hover-wash)]'
-              }`}
-              style={{
-                height: SHELL_ROW_HEIGHT,
-                ...(isActive
-                  ? {
-                      backgroundColor: 'rgba(142, 168, 156, 0.15)',
-                      borderColor: 'rgba(142, 168, 156, 0.2)',
-                      boxShadow: 'inset 0 0 12px rgba(255, 255, 255, 0.8)',
-                    }
-                  : {}),
-              }}
-            >
-              <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+              label={t(`nav.${item.labelKey}`)}
+              active={isActive}
+              collapsed={collapsed}
+              icon={
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -148,9 +131,11 @@ export function Sidebar() {
                 >
                   <path d={item.iconPath} />
                 </svg>
-                {/* 未読は瓶にだけ付く。アイコンに寄せて置く（行の右端に置くと、
-                    畳んだときと開いたときで位置が飛ぶ）。 */}
-                {item.match === '/jar' && unreadCount > 0 && (
+              }
+              // 未読は瓶にだけ付く。アイコンに寄せて置く（行の右端に置くと、
+              // 畳んだときと開いたときで位置が飛ぶ）。
+              badge={
+                item.match === '/jar' && unreadCount > 0 ? (
                   <span
                     className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[10px] leading-none font-bold text-white"
                     style={{
@@ -160,12 +145,9 @@ export function Sidebar() {
                   >
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
-                )}
-              </span>
-              {!collapsed && (
-                <span className="truncate text-[13px] whitespace-nowrap">{label}</span>
-              )}
-            </Link>
+                ) : undefined
+              }
+            />
           );
         })}
       </div>
@@ -176,18 +158,13 @@ export function Sidebar() {
       {/* 使い方と、自分。どちらも「書く」ための行き先ではないので、下にまとめる。 */}
       <div className="flex flex-col gap-1 px-4">
         {/* 使い方は別ドメインの公開サイトにある（Issue #532 で切り出した）。
-            アプリの外へ出るので Link ではなく素の <a> で、新しいタブに開く。 */}
-        <a
+            アプリの外へ出るので、新しいタブに開く。 */}
+        <NavRow
           href={docsHref('/support')}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={collapsed ? t('nav.help') : undefined}
-          className={`group flex shrink-0 items-center gap-3 rounded-[16px] text-[var(--fg)] transition-colors duration-150 hover:bg-[var(--hover-wash)] ${
-            collapsed ? 'w-12 justify-center' : 'w-full px-3'
-          }`}
-          style={{ height: SHELL_ROW_HEIGHT }}
-        >
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+          external
+          label={t('nav.help')}
+          collapsed={collapsed}
+          icon={
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -202,44 +179,34 @@ export function Sidebar() {
               <path d="M9.4 9.4a2.6 2.6 0 0 1 4.6 1.6c0 1.7-2.4 2-2.4 3.4" />
               <circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none" />
             </svg>
-          </span>
-          {!collapsed && (
-            <span className="truncate text-[13px] whitespace-nowrap">{t('nav.help')}</span>
-          )}
-        </a>
+          }
+        />
 
-        <Link
+        <NavRow
           href="/account"
-          title={collapsed ? t('nav.account') : undefined}
-          className={`group flex shrink-0 items-center gap-3 rounded-[16px] transition-colors duration-150 hover:bg-[var(--hover-wash)] ${
-            collapsed ? 'w-12 justify-center' : 'w-full px-3'
-          }`}
-          style={{ height: SHELL_ROW_HEIGHT }}
-        >
-          {auth?.user.avatarUrl ? (
-            // biome-ignore lint/performance/noImgElement: external avatar URL from OAuth
-            <img
-              src={auth.user.avatarUrl}
-              alt=""
-              className="h-7 w-7 shrink-0 rounded-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-              style={{ backgroundColor: auth ? 'var(--accent)' : '#ccc' }}
-            >
-              {auth?.user.nickname?.charAt(0).toUpperCase() ??
-                auth?.user.email?.charAt(0).toUpperCase() ??
-                '?'}
-            </span>
-          )}
-          {!collapsed && (
-            <span className="truncate text-[13px] text-[var(--fg)] whitespace-nowrap">
-              {accountLabel}
-            </span>
-          )}
-        </Link>
+          label={accountLabel}
+          collapsed={collapsed}
+          icon={
+            auth?.user.avatarUrl ? (
+              // biome-ignore lint/performance/noImgElement: external avatar URL from OAuth
+              <img
+                src={auth.user.avatarUrl}
+                alt=""
+                className="h-7 w-7 shrink-0 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                style={{ backgroundColor: auth ? 'var(--accent)' : '#ccc' }}
+              >
+                {auth?.user.nickname?.charAt(0).toUpperCase() ??
+                  auth?.user.email?.charAt(0).toUpperCase() ??
+                  '?'}
+              </span>
+            )
+          }
+        />
       </div>
 
       {/* 右の縁。押せば開閉する。**掴んで幅を変える**のはやめた——中間の幅に意味が

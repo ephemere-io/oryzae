@@ -3,12 +3,26 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useLocale, useTranslations } from 'next-intl';
 import { type DragEvent as ReactDragEvent, useState } from 'react';
+import { NavRow } from '@/components/ui/nav-row';
+import { Select } from '@/components/ui/select';
 import { ICON_STROKE_WIDTH, SHELL_INSET, SIDE_PANEL_WIDTH } from '@/components/ui/surface';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
+
+/** 面の中で選べる問い。テキストは表示用に解決済み。 */
+export interface SidebarQuestion {
+  id: string;
+  text: string;
+}
 
 interface FermentationSidebarProps {
   /** まだ発酵が無いこともある（問いは紐づいているが結果はこれから）。 */
   detail: FermentationDetail | null;
+  /** 結ばれている問い。2つ以上あるときだけ切り替えが出る。 */
+  questions: SidebarQuestion[];
+  selectedQuestionId: string | null;
+  onSelectQuestion: (questionId: string) => void;
+  /** 選び直した直後は取りに行っている最中。空と区別する。 */
+  loading?: boolean;
   /** 畳んでいるか。畳んでいるときは縁だけを残す（左のサイドバーと同じ作法）。 */
   collapsed: boolean;
   onToggle: () => void;
@@ -18,7 +32,12 @@ const MAX_KEYWORDS = 5;
 const MAX_SNIPPETS = 3;
 const SNIPPET_PREVIEW_LENGTH = 60;
 
-/** 面の中で開いている1件。手紙は畳まないのでここには来ない。 */
+/** 面が見せられるもの。**発酵1件がこの3つを持つ**ので、切り替えの軸もこの3つ。 */
+type View = 'letter' | 'keywords' | 'snippets';
+
+const VIEWS: View[] = ['letter', 'keywords', 'snippets'];
+
+/** 面の中で開いている1件。 */
 type OpenItem =
   | { kind: 'keyword'; keyword: string; description: string }
   | { kind: 'snippet'; originalText: string; sourceDate: string; selectionReason: string };
@@ -59,6 +78,30 @@ const PAST_WORD_STYLE = {
   background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
 } as const;
 
+const VIEW_ICON_PATHS: Record<View, string> = {
+  letter:
+    'M3 7.5 12 13l9-5.5M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z',
+  keywords: 'M20.6 13.4 12 4.8H4.8V12l8.6 8.6a2 2 0 0 0 2.8 0l4.4-4.4a2 2 0 0 0 0-2.8ZM8.5 8.5h.01',
+  snippets: 'M9 7H5.5A1.5 1.5 0 0 0 4 8.5V12h4l-1 5M19 7h-3.5A1.5 1.5 0 0 0 14 8.5V12h4l-1 5',
+};
+
+function ViewIcon({ view }: { view: View }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={ICON_STROKE_WIDTH}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+    >
+      <path d={VIEW_ICON_PATHS[view]} />
+    </svg>
+  );
+}
+
 /**
  * エントリー画面の発酵結果サイドバー（Issue #466）。
  *
@@ -66,14 +109,17 @@ const PAST_WORD_STYLE = {
  * なので、本文の流れを乱すものは本文に置かない。手紙・キーワード・スニペットはここに集約し、
  * 本文は先頭から末尾まで途切れないようにする。
  *
- * ## 面は1枚
+ * ## 面は2つの軸で決まる
  *
- * 以前は、この面から項目を押すとさらに別の面が右から重なって出てきた（面が2枚）。
- * 同じ場所に同じ幅の面が2枚重なると、どちらを見ているのか分からなくなるし、閉じる操作も
- * 2回要る。**1枚の中で入れ替える**: 一覧 ⇄ 中身。左上の矢印で一覧へ返る。
+ * **どの問いの**（＝どの発酵の）**何を**見るか。問いは複数結べるので、片方だけでは足りない。
  *
- * 手紙だけは畳まない。この面に来る目的そのものなので、**開いた瞬間から読める**ように
- * そのまま置く（押して開く形だと、読むのに1手余分に要る）。面の見出しは「手紙」。
+ * - 問い … 2つ以上結ばれているときだけ、面の頭に切り替えが出る。1つなら選ぶものが
+ *   無いので出さない（選択肢が1つの選択肢は、選択ではなく飾りになる）
+ * - 何を … 手紙・ことば・断片。**左のサイドバーと同じ行**（components/ui/nav-row）で並べる。
+ *   同じ「選んで移る」ことが、画面ごとに別の見た目で語られないようにする
+ *
+ * 以前は3つを縦に積み、面の見出しが「最初に中身があるもの」の名前になっていた。
+ * 見出しが中身次第で変わるので、いま何を見ているのかを名前から知ることができなかった。
  *
  * ## ことばと断片は、掴めば入り、押せば読める
  *
@@ -88,14 +134,8 @@ const PAST_WORD_STYLE = {
  *
  * ## 色は本文と同じ世界のもの
  *
- * 砂色のグラデーションや別系統の茶の枠を持っていて、エントリー画面の中で明らかに出自の
- * 違う部品に見えていた。地は左のサイドバーと同じ `--surface-sunken`、効かせる色は
- * `--accent`（アプリで唯一の緑）だけにする。過去の言葉は本文と同じ明朝で置く。
- *
- * ## 高さ
- *
- * `h-full` を明示する。親の flex 行に置いただけでは中身ぶんの高さしか持たず、
- * 面が画面の上半分で切れて見えていた。
+ * 地は左のサイドバーと同じ `--surface-sunken`、効かせる色は `--accent`（アプリで唯一の緑）
+ * だけにする。過去の言葉は本文と同じ明朝で置く。
  *
  * ## 開閉
  *
@@ -103,34 +143,47 @@ const PAST_WORD_STYLE = {
  * 面そのものにも開く道が要る——閉じたあと、開き直す場所が画面の反対側にしか無いのは
  * 遠い。開くか畳むかの2状態だけで、中間は持たない。
  */
-export function FermentationSidebar({ detail, collapsed, onToggle }: FermentationSidebarProps) {
+export function FermentationSidebar({
+  detail,
+  questions,
+  selectedQuestionId,
+  onSelectQuestion,
+  loading = false,
+  collapsed,
+  onToggle,
+}: FermentationSidebarProps) {
   const t = useTranslations('editor.fermentation_sidebar');
   const locale = useLocale();
   const td = useTranslations('editor.fermentation_overlay.detail');
   const [open, setOpen] = useState<OpenItem | null>(null);
+  // 「まだ何も選んでいない」を持たない。**面は必ず何かを見ている**——空の面を出して
+  // 選ばせるより、いちばん読みたいもの（手紙）を先に出すほうが手数が少ない。
+  const [requestedView, setRequestedView] = useState<View | null>(null);
 
   const keywords = detail?.keywords.slice(0, MAX_KEYWORDS) ?? [];
   const snippets = detail?.snippets.slice(0, MAX_SNIPPETS) ?? [];
   const letter = detail?.letter ?? null;
   const isEmpty = keywords.length === 0 && snippets.length === 0 && letter === null;
 
+  const has: Record<View, boolean> = {
+    letter: letter !== null,
+    keywords: keywords.length > 0,
+    snippets: snippets.length > 0,
+  };
+  // 選ばれていた面が、問いを替えた先に無いこともある。そのときは中身のある先頭へ落とす
+  // （空の面をそのまま見せ続けると、切り替えが効いていないように見える）。
+  const fallbackView: View = VIEWS.find((v) => has[v]) ?? 'letter';
+  const view: View = requestedView && has[requestedView] ? requestedView : fallbackView;
+
   const headers = {
     keyword: td('header_keyword'),
     snippet: td('header_snippet'),
   };
-
-  // 面の見出し。「発酵」とだけ書かれていても何のことか分からないので、
-  // **いま何を見ているか**を出す。一覧のときは、この面が最初に見せるものの名前
-  // （手紙 → ことば → 断片 の順）。何も無いときだけ、面そのものの名前に落ちる。
-  const heading = open
-    ? headers[open.kind]
-    : letter
-      ? t('section_letter')
-      : keywords.length > 0
-        ? t('section_keywords')
-        : snippets.length > 0
-          ? t('section_snippets')
-          : t('heading');
+  const viewLabel: Record<View, string> = {
+    letter: t('section_letter'),
+    keywords: t('section_keywords'),
+    snippets: t('section_snippets'),
+  };
 
   // 畳んだ姿でも**同じ契約を出す**。片方だけ欠けると、契約を読む側が
   // 「0件」なのか「畳んでいるだけ」なのかを区別できない。
@@ -142,6 +195,8 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
     empty: isEmpty,
     detailOpen: !collapsed && open !== null,
     detailType: collapsed ? 'none' : (open?.kind ?? 'none'),
+    view: collapsed ? 'none' : view,
+    questionCount: questions.length,
     collapsed,
   });
 
@@ -177,7 +232,7 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
       {...contract}
     >
       {/* 面の始まりを示す1行。中身を開いているときは、そのまま戻る導線を兼ねる。 */}
-      <div className="mb-5 flex h-6 shrink-0 items-center gap-1 px-5">
+      <div className="mb-3 flex h-6 shrink-0 items-center gap-1 px-5">
         {open && (
           <button
             type="button"
@@ -198,7 +253,7 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
           </button>
         )}
         <span className="flex-1 truncate text-[11px] font-medium tracking-[0.12em] text-[var(--fg)] opacity-45">
-          {heading}
+          {open ? headers[open.kind] : viewLabel[view]}
         </span>
         <button
           type="button"
@@ -219,9 +274,39 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
         </button>
       </div>
 
+      {/* どの問いの発酵を見るか。**2つ以上結ばれているときだけ**出す。
+          1つしか無いのに選ばせると、選択肢が1つの選択になる。 */}
+      {questions.length > 1 && (
+        <div className="mb-3 px-5">
+          <Select
+            value={selectedQuestionId ?? ''}
+            options={questions.map((q) => ({ value: q.id, label: q.text }))}
+            onChange={onSelectQuestion}
+            ariaLabel={t('question_select_aria')}
+            placeholder={t('question_select_placeholder')}
+          />
+        </div>
+      )}
+
+      {/* 何を見るか。**左のサイドバーと同じ行**で並べる。 */}
+      <nav className="mb-3 flex shrink-0 flex-col gap-1 px-4">
+        {VIEWS.map((v) => (
+          <NavRow
+            key={v}
+            label={viewLabel[v]}
+            icon={<ViewIcon view={v} />}
+            active={!open && view === v}
+            onClick={() => {
+              setOpen(null);
+              setRequestedView(v);
+            }}
+          />
+        ))}
+      </nav>
+
       {/* いつのものか。個々の要素は日付を持たないので、発酵が見ていた期間をここで言う。 */}
       {detail && !open && (
-        <p className="mb-4 px-5 text-[11px] text-[var(--date-color)]">
+        <p className="mb-3 px-5 text-[11px] text-[var(--date-color)]">
           {formatPeriod(detail.targetPeriod, locale)}
         </p>
       )}
@@ -229,105 +314,93 @@ export function FermentationSidebar({ detail, collapsed, onToggle }: Fermentatio
       <div className="min-h-0 flex-1 overflow-y-auto">
         {open ? (
           <ItemDetail item={open} sourcePrefix={td('snippet_source_prefix')} />
+        ) : loading ? (
+          <p className="px-5 text-[13px] leading-relaxed text-[var(--date-color)]">
+            {t('loading')}
+          </p>
+        ) : !has[view] ? (
+          // 空でも面ごと消さない。**その入れ物があること自体**は伝わっているべき。
+          <p className="px-5 text-[13px] leading-relaxed text-[var(--date-color)]">{t('empty')}</p>
+        ) : view === 'letter' && letter ? (
+          <div
+            className="px-5 text-[13px] leading-[2] whitespace-pre-wrap text-[var(--fg)]"
+            style={{ fontFamily: "'Noto Serif JP', serif" }}
+          >
+            {letter.bodyText}
+          </div>
+        ) : view === 'keywords' ? (
+          <div className="flex flex-wrap gap-1.5 px-5">
+            {keywords.map((kw) => (
+              <button
+                key={kw.id}
+                type="button"
+                draggable
+                onDragStart={(e) => startTextDrag(e, kw.keyword)}
+                onClick={() =>
+                  setOpen({
+                    kind: 'keyword',
+                    keyword: kw.keyword,
+                    description: kw.description,
+                  })
+                }
+                title={t('drag_or_open')}
+                className="flex h-7 cursor-grab items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-150 hover:brightness-[0.96] active:cursor-grabbing"
+                style={{
+                  ...PAST_WORD_STYLE,
+                  color: 'var(--accent)',
+                  fontFamily: "'Noto Serif JP', serif",
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {kw.keyword}
+                <span aria-hidden="true" className="text-[10px] opacity-60">
+                  ›
+                </span>
+              </button>
+            ))}
+          </div>
         ) : (
-          <>
-            {isEmpty && (
-              <p className="px-5 text-[13px] leading-relaxed text-[var(--date-color)]">
-                {t('empty')}
-              </p>
-            )}
-
-            {/* 手紙はこの面に来る目的そのもの。畳まずそのまま置く（見出しは面の上にある）。 */}
-            {letter && (
-              <div
-                className="mb-7 px-5 text-[13px] leading-[2] whitespace-pre-wrap text-[var(--fg)]"
+          <div className="flex flex-col gap-2 px-5">
+            {snippets.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                draggable
+                onDragStart={(e) => startTextDrag(e, s.originalText)}
+                onClick={() =>
+                  setOpen({
+                    kind: 'snippet',
+                    originalText: s.originalText,
+                    sourceDate: s.sourceDate,
+                    selectionReason: s.selectionReason,
+                  })
+                }
+                title={t('drag_or_open')}
+                className="flex w-full cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-[var(--hover-wash)] active:cursor-grabbing"
                 style={{ fontFamily: "'Noto Serif JP', serif" }}
               >
-                {letter.bodyText}
-              </div>
-            )}
-
-            {keywords.length > 0 && (
-              <Section label={t('section_keywords')}>
-                <div className="flex flex-wrap gap-1.5">
-                  {keywords.map((kw) => (
-                    <button
-                      key={kw.id}
-                      type="button"
-                      draggable
-                      onDragStart={(e) => startTextDrag(e, kw.keyword)}
-                      onClick={() =>
-                        setOpen({
-                          kind: 'keyword',
-                          keyword: kw.keyword,
-                          description: kw.description,
-                        })
-                      }
-                      title={t('drag_or_open')}
-                      className="flex h-7 cursor-grab items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors duration-150 hover:brightness-[0.96] active:cursor-grabbing"
-                      style={{
-                        ...PAST_WORD_STYLE,
-                        color: 'var(--accent)',
-                        fontFamily: "'Noto Serif JP', serif",
-                        letterSpacing: '0.06em',
-                      }}
-                    >
-                      {kw.keyword}
-                      <span aria-hidden="true" className="text-[10px] opacity-60">
-                        ›
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {snippets.length > 0 && (
-              <Section label={t('section_snippets')}>
-                <div className="flex flex-col gap-2">
-                  {snippets.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      draggable
-                      onDragStart={(e) => startTextDrag(e, s.originalText)}
-                      onClick={() =>
-                        setOpen({
-                          kind: 'snippet',
-                          originalText: s.originalText,
-                          sourceDate: s.sourceDate,
-                          selectionReason: s.selectionReason,
-                        })
-                      }
-                      title={t('drag_or_open')}
-                      className="flex w-full cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-[var(--hover-wash)] active:cursor-grabbing"
-                      style={{ fontFamily: "'Noto Serif JP', serif" }}
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[12px] leading-relaxed text-[var(--fg)]">
-                          {s.originalText.length > SNIPPET_PREVIEW_LENGTH
-                            ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
-                            : s.originalText}
-                        </span>
-                        {/* 断片は出どころの日付を持つ。いつ書いた自分の言葉なのかが要る。 */}
-                        {s.sourceDate && (
-                          <span className="mt-1 block text-[10px] text-[var(--date-color)]">
-                            {s.sourceDate}
-                          </span>
-                        )}
-                      </span>
-                      <span
-                        aria-hidden="true"
-                        className="mt-0.5 shrink-0 text-[10px] text-[var(--accent)] opacity-60"
-                      >
-                        ›
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </Section>
-            )}
-          </>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12px] leading-relaxed text-[var(--fg)]">
+                    {s.originalText.length > SNIPPET_PREVIEW_LENGTH
+                      ? `${s.originalText.substring(0, SNIPPET_PREVIEW_LENGTH)}…`
+                      : s.originalText}
+                  </span>
+                  {/* 断片は出どころの日付を持つ。いつ書いた自分の言葉なのかが要る。 */}
+                  {s.sourceDate && (
+                    <span className="mt-1 block text-[10px] text-[var(--date-color)]">
+                      {s.sourceDate}
+                    </span>
+                  )}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 shrink-0 text-[10px] text-[var(--accent)] opacity-60"
+                >
+                  ›
+                </span>
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </aside>
@@ -365,20 +438,5 @@ function ItemDetail({ item, sourcePrefix }: { item: OpenItem; sourcePrefix: stri
         </>
       )}
     </div>
-  );
-}
-
-/**
- * まとまり。設定パネルの Section と同じ作法（小さく薄い見出し1行 + 余白で区切る）。
- * 左右の余白は面全体で 20px に揃える。
- */
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col px-5 pb-7 last:pb-0">
-      <div className="mb-2 flex h-5 items-center">
-        <span className="text-[11px] tracking-[0.04em] text-[var(--fg)] opacity-40">{label}</span>
-      </div>
-      {children}
-    </section>
   );
 }

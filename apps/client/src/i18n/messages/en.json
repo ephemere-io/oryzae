@@ -486,7 +486,6 @@
       "letter_badge": "Letter from the fermentation process"
     },
     "fermentation_sidebar": {
-      "heading": "FERMENTATION",
       "close_aria": "Close the fermentation sidebar",
       "empty": "No fermentation results for this question yet.",
       "section_letter": "Letter",
@@ -494,7 +493,11 @@
       "section_snippets": "Snippets",
       "back_aria": "Back to list",
       "open_aria": "Open fermentation",
-      "drag_or_open": "Click to read why · drag into the entry"
+      "drag_or_open": "Click to read why · drag into the entry",
+      "loading": "Loading…",
+      "question_select_aria": "Which question to view",
+      "question_select_placeholder": "Choose a question",
+      "question_unnamed": "(Untitled question)"
     },
     "palette": {
       "move": "Move the palette",
