@@ -29,6 +29,25 @@ export const JAR_BUBBLE_SLOTS = 14;
 /** 文字粒子の最小数。readiness 0 でも瓶が「ただの空き瓶」に見えないよう少しだけ残す。 */
 const PARTICLE_MIN = 3;
 
+/**
+ * 瓶の中の縦位置（下端からの比率）。泡が液面まで昇るかはここの引き算で決まる。
+ *
+ * 液面は瓶 SVG（viewBox 600）の y≈240、つまり下から 60%。泡は下から 8% で生まれる。
+ *
+ * **px で固定しないこと。** もとは上昇距離が 260px 決め打ちで、瓶が 420×520 だった頃は
+ * たまたま液面と一致していたが、#533 で 500×620 になった時点で 60px 手前で消えるように
+ * なっていた（水中でふっと消える見え方）。比率にしておけば寸法変更に勝手に追従する。
+ * この「数は合っているのに見た目がずれる」型は DOM の個数チェックでは捕まらないので、
+ * ここに置いて算数として固定する。
+ */
+export const LIQUID_SURFACE_RATIO = 0.6;
+export const BUBBLE_START_RATIO = 0.08;
+
+/** 泡が液面まで昇る距離（px）。瓶の高さに比例する。 */
+export function bubbleRisePx(height: number): number {
+  return Math.round(height * (LIQUID_SURFACE_RATIO - BUBBLE_START_RATIO));
+}
+
 export interface JarVisuals {
   /**
    * 発酵液の充填率 0〜1。液体 path を下へずらす量に使う（1 = 元の設計どおり満ちた状態）。

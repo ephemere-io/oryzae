@@ -4,6 +4,8 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import {
+  BUBBLE_START_RATIO,
+  bubbleRisePx,
   JAR_BUBBLE_SLOTS,
   JAR_MICROBE_SLOTS,
   jarParticleCount,
@@ -158,6 +160,17 @@ const MICROBE_SVGS = {
  */
 const LIQUID_DROP = 340;
 
+/**
+ * 泡の上昇距離を CSS 変数として渡す。keyframe 側は
+ * `translateY(calc(var(--jar-bubble-rise) * -1))` で読む。
+ *
+ * React.CSSProperties はカスタムプロパティを型に持たないので、`as` を避けて
+ * Record として組み立て、style へ spread する。
+ */
+function bubbleRiseVar(height: number): Record<string, string> {
+  return { '--jar-bubble-rise': `${bubbleRisePx(height)}px` };
+}
+
 /** 液体グラデーションの色を warmth で補間する。0 は澄んだ緑寄り、1 は温かい琥珀。 */
 function liquidStops(warmth: number) {
   const mix = (cold: number, warm: number) => Math.round(cold + (warm - cold) * warmth);
@@ -204,6 +217,8 @@ export function JarVessel({ readiness = 0, width = 420, height = 520 }: JarVesse
         width: `${width}px`,
         height: `${height}px`,
         animation: 'fadeIn 0.5s ease-out forwards',
+        // 泡の上昇距離。keyframe から calc() で読むので、瓶の高さが変わっても追従する。
+        ...bubbleRiseVar(height),
       }}
     >
       {/* 瓶が使うキーフレーム。JarView にも同名の定義があるが（QuestionCircle が親の定義に
@@ -243,7 +258,7 @@ export function JarVessel({ readiness = 0, width = 420, height = 520 }: JarVesse
           0%   { transform: translateY(0) scale(0.7); opacity: 0; }
           15%  { opacity: 0.9; }
           80%  { opacity: 0.5; }
-          100% { transform: translateY(-260px) scale(1.15); opacity: 0; }
+          100% { transform: translateY(calc(var(--jar-bubble-rise) * -1)) scale(1.15); opacity: 0; }
         }
         .j2-bubble { animation-name: j2-bubble; animation-timing-function: ease-in; animation-iteration-count: infinite; }
       `}</style>
@@ -420,7 +435,7 @@ export function JarVessel({ readiness = 0, width = 420, height = 520 }: JarVesse
             className="j2-bubble pointer-events-none"
             style={{
               position: 'absolute',
-              bottom: '8%',
+              bottom: `${BUBBLE_START_RATIO * 100}%`,
               left: b.left,
               width: `${b.size}px`,
               height: `${b.size}px`,

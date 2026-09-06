@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BUBBLE_START_RATIO,
+  bubbleRisePx,
   JAR_BUBBLE_SLOTS,
   JAR_MICROBE_SLOTS,
   JAR_READINESS_MAX,
   jarParticleCount,
   jarVisuals,
+  LIQUID_SURFACE_RATIO,
 } from '@/features/pc/fermentation/utils/jar-visuals';
 
 const TOTAL_WORDS = 23; // JarVessel の語彙数（particle 8 + filler 15）
@@ -86,5 +89,31 @@ describe('jarParticleCount', () => {
   it('語彙が最小数より少なくても総数を超えない', () => {
     expect(jarParticleCount(0, 2)).toBe(2);
     expect(jarParticleCount(3, 2)).toBe(2);
+  });
+});
+
+describe('bubbleRisePx', () => {
+  // #533 で瓶が 420×520 → 500×620 になったとき、上昇距離が 260px 決め打ちだったため
+  // 泡が液面の 60px 手前で消えていた。DOM の個数チェックは全部緑だったので気づけない。
+  // 「泡は液面まで昇る」という関係そのものをここで固定する。
+  it.each([420, 520, 620, 800])('高さ %i px でも泡はちょうど液面まで昇る', (height) => {
+    const start = height * BUBBLE_START_RATIO;
+    const surface = height * LIQUID_SURFACE_RATIO;
+    // 丸め誤差 1px は許容（px 整数に丸めているため）。
+    expect(start + bubbleRisePx(height)).toBeCloseTo(surface, 0);
+  });
+
+  it('高さに比例する（px 決め打ちに戻していない）', () => {
+    expect(bubbleRisePx(620)).toBeGreaterThan(bubbleRisePx(520));
+    // px 整数へ丸めるぶん厳密な2倍にはならないので 1px の幅を許す。
+    expect(Math.abs(bubbleRisePx(1040) - bubbleRisePx(520) * 2)).toBeLessThanOrEqual(1);
+  });
+
+  it('液面より上へは行き過ぎない（泡が瓶の外へ抜けない）', () => {
+    for (const height of [420, 520, 620, 800]) {
+      expect(height * BUBBLE_START_RATIO + bubbleRisePx(height)).toBeLessThanOrEqual(
+        height * LIQUID_SURFACE_RATIO + 1,
+      );
+    }
   });
 });
