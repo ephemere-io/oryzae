@@ -16,17 +16,33 @@ interface FermentationRow {
   created_at: string;
 }
 
+interface OcrRow {
+  user_id: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  created_at: string;
+}
+
 // Supabase クエリ結果をテストごとに差し替える。
+// ocr_usage は別テーブルなので、from() のテーブル名で分岐する。同じ行を返すと
+// 発酵の行を OCR として読んでしまい、テストが実態とズレる。
 const supabaseState: {
   rows: FermentationRow[];
+  ocrRows: OcrRow[];
   error: { message: string } | null;
+  ocrError: { message: string } | null;
   shouldThrow: boolean;
   capturedRange: { gte?: string; lte?: string };
+  capturedOcrRange: { gte?: string; lte?: string };
 } = {
   rows: [],
+  ocrRows: [],
   error: null,
+  ocrError: null,
   shouldThrow: false,
   capturedRange: {},
+  capturedOcrRange: {},
 };
 
 vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
@@ -53,7 +69,29 @@ vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
         return Promise.resolve({ data: from === 0 ? supabaseState.rows : [], error: null });
       },
     };
-    return { from: () => ({ select: () => builder }) };
+    const ocrBuilder = {
+      eq: () => ocrBuilder,
+      gte: (_col: string, value: string) => {
+        supabaseState.capturedOcrRange.gte = value;
+        return ocrBuilder;
+      },
+      lte: (_col: string, value: string) => {
+        supabaseState.capturedOcrRange.lte = value;
+        return ocrBuilder;
+      },
+      order: () => ocrBuilder,
+      range: (from: number) => {
+        if (supabaseState.ocrError) {
+          return Promise.resolve({ data: null, error: supabaseState.ocrError });
+        }
+        return Promise.resolve({ data: from === 0 ? supabaseState.ocrRows : [], error: null });
+      },
+    };
+    return {
+      from: (table: string) => ({
+        select: () => (table === 'ocr_usage' ? ocrBuilder : builder),
+      }),
+    };
   },
 }));
 
@@ -92,9 +130,12 @@ describe('cronCostAlert', () => {
     mockFetch.mockReset();
     vi.stubGlobal('fetch', mockFetch);
     supabaseState.rows = [];
+    supabaseState.ocrRows = [];
     supabaseState.error = null;
+    supabaseState.ocrError = null;
     supabaseState.shouldThrow = false;
     supabaseState.capturedRange = {};
+    supabaseState.capturedOcrRange = {};
     vi.stubEnv('CRON_SECRET', SECRET);
     vi.stubEnv('ANTHROPIC_ADMIN_KEY', '');
     // コスト cron は JST 10:00 (= UTC 01:00) 実行 → 対象は JST 前日 (8/9)
@@ -174,7 +215,7 @@ describe('cronCostAlert', () => {
     // 100,000 * $3/1M + 10,000 * $15/1M = 0.3 + 0.15 = 0.45
     expect(body.estimatedCost).toBeCloseTo(0.45, 6);
     expect(body.fermentationCount).toBe(1);
-    expect(fieldValue('推定コスト')).toBe('$0.4500');
+    expect(fieldValue('推定コスト (Oryzae 記録分)')).toBe('$0.4500');
   });
 
   it('aggregates over the JST day, not the UTC day', async () => {
@@ -196,7 +237,7 @@ describe('cronCostAlert', () => {
     const body = await res.json();
 
     expect(body.userCount).toBe(2);
-    const breakdown = fieldValue('ユーザー別 推定コスト (上位5)') ?? '';
+    const breakdown = fieldValue('ユーザー別 推定コスト・発酵 (上位5)') ?? '';
     // コスト降順。b が $0.90、a が 2件で $0.60。
     expect(breakdown.indexOf('bbbbbbbb')).toBeLessThan(breakdown.indexOf('aaaaaaaa'));
     expect(breakdown).toContain('$0.9000');
@@ -216,7 +257,7 @@ describe('cronCostAlert', () => {
 
     expect(body.untrackedCount).toBe(1);
     expect(body.failedCount).toBe(1);
-    expect(fieldValue('コスト未計上')).toBe('1 件');
+    expect(fieldValue('コスト未計上')).toBe('発酵 1 件 / OCR 0 件');
   });
 
   it('reports the actual billed cost when the admin key is configured', async () => {
@@ -239,7 +280,7 @@ describe('cronCostAlert', () => {
     // JST 8/9 の定期発酵は UTC 8/8 に走る
     expect(body.actualCostUtcDate).toBe('2026-08-08');
     expect(body.actualCost).toEqual({ status: 'ok', costUsd: 0.465, truncated: false });
-    expect(fieldValue('実請求額')).toBe('$0.4650 (UTC 2026-08-08)');
+    expect(fieldValue('実請求額 (org 全体)')).toBe('$0.4650 (UTC 2026-08-08)');
   });
 
   it('says the admin key is unset rather than reporting $0', async () => {
@@ -249,7 +290,7 @@ describe('cronCostAlert', () => {
     const body = await res.json();
 
     expect(body.actualCost).toEqual({ status: 'not-configured' });
-    expect(fieldValue('実請求額')).toBe('未設定 (ANTHROPIC_ADMIN_KEY)');
+    expect(fieldValue('実請求額 (org 全体)')).toBe('未設定 (ANTHROPIC_ADMIN_KEY)');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -315,5 +356,157 @@ describe('cronCostAlert', () => {
     );
 
     errorSpy.mockRestore();
+  });
+
+  // OCR は課金されているのに usage が捨てられており、推定に $0 しか乗らなかった。
+  // 実請求額との差が「原因不明の乖離」に見えていた原因のひとつ。
+  describe('OCR コストの計上', () => {
+    function ocrUsage(overrides: Partial<OcrRow> = {}): OcrRow {
+      return {
+        user_id: 'user-1',
+        model: 'claude-opus-5',
+        input_tokens: 100_000,
+        output_tokens: 10_000,
+        created_at: '2026-08-08T18:10:00.000Z',
+        ...overrides,
+      };
+    }
+
+    it('OCR の単価 (opus-5 $5/$25) で計上し、推定合計に足す', async () => {
+      supabaseState.rows = [fermentation()]; // $0.4500
+      supabaseState.ocrRows = [ocrUsage()]; // 100,000×$5/1M + 10,000×$25/1M = 0.5 + 0.25 = 0.75
+
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const body = await res.json();
+
+      expect(body.ocr.estimatedCost).toBeCloseTo(0.75, 6);
+      expect(body.fermentationEstimatedCost).toBeCloseTo(0.45, 6);
+      expect(body.estimatedCost).toBeCloseTo(1.2, 6);
+      expect(fieldValue('推定コスト (Oryzae 記録分)')).toBe('$1.2000');
+      expect(fieldValue('推定の内訳')).toBe('発酵 $0.4500 / OCR $0.7500');
+    });
+
+    it('発酵の単価で OCR を計算しない', async () => {
+      supabaseState.ocrRows = [ocrUsage({ input_tokens: 1_000_000, output_tokens: 0 })];
+
+      const body = await (
+        await createApp().request('/cron', { method: 'POST', headers: validHeaders })
+      ).json();
+
+      // opus-5 の $5。発酵の $3 で計算していたら 3 になる。
+      expect(body.ocr.estimatedCost).toBeCloseTo(5, 6);
+    });
+
+    it('OCR も JST 日で絞る', async () => {
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      expect(supabaseState.capturedOcrRange.gte).toBe('2026-08-08T15:00:00.000Z');
+      expect(supabaseState.capturedOcrRange.lte).toBe('2026-08-09T14:59:59.999Z');
+    });
+
+    it('OCR 回数を出す', async () => {
+      supabaseState.ocrRows = [ocrUsage(), ocrUsage()];
+
+      const body = await (
+        await createApp().request('/cron', { method: 'POST', headers: validHeaders })
+      ).json();
+
+      expect(body.ocr.requestCount).toBe(2);
+      expect(fieldValue('OCR 回数')).toBe('2 回');
+    });
+
+    // migration 00023 未適用の環境。0 件（$0）と区別できないと、
+    // 「OCR は使っていない」と誤読される。
+    it('ocr_usage を読めなければ、$0 ではなく取得失敗として出す', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      supabaseState.rows = [fermentation()];
+      supabaseState.ocrError = { message: 'relation "ocr_usage" does not exist' };
+
+      const body = await (
+        await createApp().request('/cron', { method: 'POST', headers: validHeaders })
+      ).json();
+
+      expect(body.ocr.status).toBe('error');
+      expect(fieldValue('OCR 回数')).toBe('取得失敗');
+      expect(fieldValue('推定の内訳')).toBe('発酵 $0.4500 / OCR 取得失敗');
+      expect(fieldValue('⚠️ OCR 未集計')).toContain('migration 00023');
+      // 発酵のレポート自体は出す（OCR が読めないだけで日次通知を止めない）
+      expect(mockNotifyDiscord).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'AI コスト日次レポート' }),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
+  // 「推定コストが全然推定できていないように見えるし、そのエビデンスもわからない」
+  // への対応。金額だけでなく式を出し、実請求との差が何なのかもレポートに書く。
+  describe('推定の根拠と、実請求との差の説明', () => {
+    it('計算式をそのまま載せる（レポートの数字だけで検算できる）', async () => {
+      supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const basis = fieldValue('計算根拠') ?? '';
+      expect(basis).toContain('発酵 (claude-sonnet-4-6)');
+      expect(basis).toContain('in  5,972 × $3.00/MTok = $0.017916');
+      expect(basis).toContain('out 7,128 × $15.00/MTok = $0.106920');
+      expect(basis).toContain('$0.124836');
+      expect(basis).toContain('OCR (claude-opus-5)');
+    });
+
+    it('実請求と推定の差額と、その正体を書く', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            data: [{ starting_at: '2026-08-08T00:00:00Z', results: [{ amount: '31.29' }] }],
+            has_more: false,
+          }),
+        text: () => Promise.resolve(''),
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const gap = fieldValue('差額 (実請求 − 推定)') ?? '';
+      // 0.3129 - 0.124836 = 0.188064
+      expect(gap).toContain('$0.1881');
+      expect(gap).toContain('記録していない利用');
+    });
+
+    it('OCR を集計できていないときは、差額の説明にその旨を含める', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      supabaseState.rows = [fermentation()];
+      supabaseState.ocrError = { message: 'relation "ocr_usage" does not exist' };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            data: [{ starting_at: '2026-08-08T00:00:00Z', results: [{ amount: '100' }] }],
+            has_more: false,
+          }),
+        text: () => Promise.resolve(''),
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      // OCR が読めていない以上、差額を「記録していない利用」と断定してはいけない。
+      const gap = fieldValue('差額 (実請求 − 推定)') ?? '';
+      expect(gap).toContain('OCR');
+      expect(gap).not.toContain('記録していない利用');
+      errorSpy.mockRestore();
+    });
+
+    it('実請求が取れないときは差額を出さない（引き算できない）', async () => {
+      supabaseState.rows = [fermentation()];
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      expect(fieldValue('差額 (実請求 − 推定)')).toBeUndefined();
+    });
   });
 });

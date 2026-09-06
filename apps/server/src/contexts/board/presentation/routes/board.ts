@@ -21,6 +21,7 @@ import { AnthropicOcrGateway } from '../../infrastructure/ocr/anthropic-ocr.gate
 import { SupabaseBoardCardRepository } from '../../infrastructure/repositories/supabase-board-card.repository.js';
 import { SupabaseBoardPhotoRepository } from '../../infrastructure/repositories/supabase-board-photo.repository.js';
 import { SupabaseBoardSnippetRepository } from '../../infrastructure/repositories/supabase-board-snippet.repository.js';
+import { SupabaseOcrUsageRepository } from '../../infrastructure/repositories/supabase-ocr-usage.repository.js';
 import { SupabaseBoardStorageGateway } from '../../infrastructure/storage/supabase-board-storage.gateway.js';
 import { parseDimension, parseWorldCoord } from '../params.js';
 
@@ -118,8 +119,12 @@ export const board = new Hono<Env>()
       return c.json({ error: `Image must be ${MAX_OCR_IMAGE_BYTES} bytes or less` }, 400);
     }
 
-    const usecase = new ExtractTextFromImageUsecase(new AnthropicOcrGateway());
+    const usecase = new ExtractTextFromImageUsecase(
+      new AnthropicOcrGateway(),
+      new SupabaseOcrUsageRepository(c.get('supabase')),
+    );
     const result = await usecase.execute({
+      userId: c.get('userId'),
       image: await file.arrayBuffer(),
       mediaType: file.type,
     });

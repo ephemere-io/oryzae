@@ -24,32 +24,76 @@ const sampleSpend = {
   },
   estimated: {
     status: 'ok',
-    pricing: { modelId: 'claude-sonnet-4-6', inputUsdPerMTok: 3, outputUsdPerMTok: 15 },
-    totalCostUsd: 1.19,
-    inputTokens: 300000,
-    outputTokens: 40000,
-    fermentationCount: 12,
-    untrackedCount: 1,
+    // 発酵 1.19 + OCR 0.30
+    totalCostUsd: 1.49,
     truncated: false,
-    daily: [
-      {
-        date: '2026-08-08',
-        estimatedCostUsd: 1.19,
-        inputTokens: 300000,
-        outputTokens: 40000,
-        fermentationCount: 12,
-      },
-    ],
-    byUser: [
-      {
-        userId: 'u1',
-        email: 'user@test.com',
-        estimatedCostUsd: 1.19,
-        inputTokens: 300000,
-        outputTokens: 40000,
-        fermentationCount: 12,
-      },
-    ],
+    fermentation: {
+      pricing: { modelId: 'claude-sonnet-4-6', inputUsdPerMTok: 3, outputUsdPerMTok: 15 },
+      totalCostUsd: 1.19,
+      inputTokens: 300000,
+      outputTokens: 40000,
+      fermentationCount: 12,
+      untrackedCount: 1,
+      truncated: false,
+      daily: [
+        {
+          date: '2026-08-08',
+          estimatedCostUsd: 1.19,
+          inputTokens: 300000,
+          outputTokens: 40000,
+          fermentationCount: 12,
+        },
+      ],
+      byUser: [
+        {
+          userId: 'u1',
+          email: 'user@test.com',
+          estimatedCostUsd: 1.19,
+          inputTokens: 300000,
+          outputTokens: 40000,
+          fermentationCount: 12,
+        },
+      ],
+    },
+    ocr: {
+      status: 'ok',
+      pricing: { modelId: 'claude-opus-5', inputUsdPerMTok: 5, outputUsdPerMTok: 25 },
+      totalCostUsd: 0.3,
+      inputTokens: 40000,
+      outputTokens: 4000,
+      requestCount: 4,
+      untrackedCount: 0,
+      truncated: false,
+      daily: [
+        {
+          date: '2026-08-08',
+          estimatedCostUsd: 0.3,
+          inputTokens: 40000,
+          outputTokens: 4000,
+          requestCount: 4,
+        },
+      ],
+      byModel: [
+        {
+          model: 'claude-opus-5',
+          requestCount: 4,
+          estimatedCostUsd: 0.3,
+          inputTokens: 40000,
+          outputTokens: 4000,
+          unpriced: false,
+        },
+      ],
+      byUser: [
+        {
+          userId: 'u1',
+          email: 'user@test.com',
+          estimatedCostUsd: 0.3,
+          inputTokens: 40000,
+          outputTokens: 4000,
+          requestCount: 4,
+        },
+      ],
+    },
   },
 };
 
@@ -70,8 +114,8 @@ describe('useSpend', () => {
 
     expect(result.current.data?.actual.status).toBe('ok');
     expect(result.current.data?.actual.totalCostUsd).toBe(1.23);
-    expect(result.current.data?.estimated.totalCostUsd).toBe(1.19);
-    expect(result.current.data?.estimated.byUser).toHaveLength(1);
+    expect(result.current.data?.estimated.totalCostUsd).toBe(1.49);
+    expect(result.current.data?.estimated.fermentation.byUser).toHaveLength(1);
     expect(result.current.error).toBeNull();
   });
 
@@ -152,6 +196,62 @@ describe('useSpend', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    expect(result.current.error).toBe('コストデータの取得に失敗しました');
+  });
+
+  // OCR は課金されているのに記録されておらず、推定に $0 しか乗っていなかった。
+  // 分けて取れていることと、片方だけ落ちた状態を ok と言わないことを固定する。
+  it('OCR の推定を発酵と分けて保持する', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleSpend));
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data?.estimated.ocr.totalCostUsd).toBe(0.3);
+    expect(result.current.data?.estimated.ocr.requestCount).toBe(4);
+    // 単価はサーバー (claude-pricing.ts) が正。画面側で決め打たない。
+    expect(result.current.data?.estimated.ocr.pricing.modelId).toBe('claude-opus-5');
+    expect(result.current.data?.estimated.ocr.pricing.inputUsdPerMTok).toBe(5);
+    expect(result.current.data?.estimated.fermentation.pricing.modelId).toBe('claude-sonnet-4-6');
+  });
+
+  it('OCR だけ取れていない状態を partial として保持する（ok にしない）', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        ...sampleSpend,
+        estimated: {
+          ...sampleSpend.estimated,
+          status: 'partial',
+          totalCostUsd: 1.19,
+          ocr: { ...sampleSpend.estimated.ocr, status: 'error', totalCostUsd: 0, requestCount: 0 },
+        },
+      }),
+    );
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data?.estimated.status).toBe('partial');
+    expect(result.current.data?.estimated.ocr.status).toBe('error');
+  });
+
+  it('OCR ブロックが欠けた応答は取り込まない（$0 として描画させない）', async () => {
+    const { ocr: _ocr, ...withoutOcr } = sampleSpend.estimated;
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { ...sampleSpend, estimated: withoutOcr }));
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data).toBeNull();
     expect(result.current.error).toBe('コストデータの取得に失敗しました');
   });
 

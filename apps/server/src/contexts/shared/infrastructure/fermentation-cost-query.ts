@@ -11,7 +11,7 @@
  * 「集計から漏れている件数」を隠さない。
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { computeCostFromTokens } from './claude-pricing.js';
+import { computeCostFromTokens, FERMENTATION_MODEL_RATE } from './claude-pricing.js';
 
 /** Supabase の1リクエスト上限。これを超える分はページングで取り切る。 */
 const PAGE_SIZE = 1000;
@@ -123,7 +123,7 @@ export function aggregateCost(rows: FermentationCostRow[]): CostAggregate {
     if (row.status === 'completed') completedCount++;
     if (row.status === 'failed') failedCount++;
 
-    const cost = computeCostFromTokens(row.inputTokens, row.outputTokens);
+    const cost = computeCostFromTokens(row.inputTokens, row.outputTokens, FERMENTATION_MODEL_RATE);
     if (!cost) untrackedCount++;
 
     const rowCost = cost?.totalCost ?? 0;
@@ -180,7 +180,7 @@ export function aggregateCostByDay(
 
   for (const row of rows) {
     const date = toDateKey(row.createdAt);
-    const cost = computeCostFromTokens(row.inputTokens, row.outputTokens);
+    const cost = computeCostFromTokens(row.inputTokens, row.outputTokens, FERMENTATION_MODEL_RATE);
     const current = perDay.get(date) ?? {
       date,
       estimatedCostUsd: 0,
