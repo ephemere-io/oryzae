@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import {
   type ActualCostResult,
+  ANTHROPIC_COST_CONSOLE_URL,
   fetchActualCost,
   type ModelActualCost,
 } from '../../infrastructure/anthropic-cost-api.js';
@@ -183,11 +184,14 @@ export const cronCostAlert = new Hono()
       if (actual.kind === 'ok') {
         // 用途別の実額。「OCR がいくらか」はここで読む（推定ではなく実額）。
         // grouping が効いていないと総額は正しいまま内訳だけ消えるので、その旨を出す。
+        // 数字の裏取り先を通知そのものに載せる。Console はモデル別に加えて
+        // API キー別にも割れるので、混ざりの切り分けもそこでできる。
+        const breakdown = actual.groupingUnavailable
+          ? 'Anthropic が内訳を返しませんでした（group_by が効いていない可能性）。総額は正しい値です'
+          : formatModelBreakdown(actual.byModel);
         fields.push({
           name: '実請求額の内訳（モデル別・実額）',
-          value: actual.groupingUnavailable
-            ? 'Anthropic が内訳を返しませんでした（group_by が効いていない可能性）。総額は正しい値です'
-            : formatModelBreakdown(actual.byModel),
+          value: `${breakdown}\n\n[Anthropic Console で照合](${ANTHROPIC_COST_CONSOLE_URL})`,
           inline: false,
         });
 

@@ -299,6 +299,12 @@ export function SpendView({
                   <strong>そのモデルを使っている機能</strong>を 指すだけで、同じモデルの他の利用（CI
                   のレビュー等）も同じ行に含まれます。
                 </p>
+                {/* 数字の裏取り先。Console はモデル別に加えて API キー別にも割れるので、
+                    「CI と混ざっているぶん」はそちらで切り分けられる。 */}
+                <p className="text-xs text-muted-foreground mb-3">
+                  <ConsoleLink label="Console の Cost ページで照合" />
+                  （API キー別の内訳もそちらで見られます）
+                </p>
                 <div className="space-y-2">
                   {data.actual.byModel.map((m) => (
                     <div key={m.model} className="rounded-lg border border-border/50 bg-card p-3">

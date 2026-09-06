@@ -28,6 +28,11 @@
  *     バケットに混ざる**。分離するには Anthropic Console で Workspace を分ける。
  */
 const COST_REPORT_URL = 'https://api.anthropic.com/v1/organizations/cost_report';
+/**
+ * 実額の出典（人が見る側）。画面・通知からここへ飛ばして数字を突き合わせられるようにする。
+ * Console はモデル別に加えて **API キー別** にも割れるので、この API より細かく見られる。
+ */
+export const ANTHROPIC_COST_CONSOLE_URL = 'https://platform.claude.com/cost';
 const ANTHROPIC_VERSION = '2023-06-01';
 const REQUEST_TIMEOUT_MS = 10_000;
 /**

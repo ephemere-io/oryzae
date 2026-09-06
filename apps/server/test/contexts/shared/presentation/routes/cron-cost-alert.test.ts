@@ -350,7 +350,7 @@ describe('cronCostAlert', () => {
       const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
       const body = await res.json();
 
-      expect(fieldValue('実請求額の内訳（モデル別・実額）')).toBe('some-other-model  $5.0000');
+      expect(fieldValue('実請求額の内訳（モデル別・実額）')).toContain('some-other-model  $5.0000');
       expect(body.actualCost.byModel[0].feature).toBeNull();
     });
 
@@ -364,6 +364,20 @@ describe('cronCostAlert', () => {
       const breakdown = fieldValue('実請求額の内訳（モデル別・実額）') ?? '';
       expect(breakdown).toContain('group_by が効いていない可能性');
       expect(breakdown).toContain('総額は正しい値です');
+    });
+
+    it('内訳に Anthropic Console への照合リンクを付ける', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      mockFetch.mockResolvedValueOnce(
+        costReportResponse([{ amount: '500', model: 'claude-opus-5' }]),
+      );
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      // 通知だけで数字の裏取りに行けること（Console はモデル別 + API キー別に割れる）
+      expect(fieldValue('実請求額の内訳（モデル別・実額）')).toContain(
+        '[Anthropic Console で照合](https://platform.claude.com/cost)',
+      );
     });
 
     it('実額が取れないときは内訳フィールドを出さない', async () => {

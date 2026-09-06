@@ -197,6 +197,13 @@ describe('SpendView の実請求額のモデル別内訳', () => {
 
   // group_by が効かないと総額は正しいまま内訳だけ消える。空配列を
   // 「内訳ゼロ」と見せると気づけないので、明示的に伝える。
+  it('内訳の隣に Console への照合リンクを置く', () => {
+    renderView(makeData());
+
+    expect(screen.getByText('Console の Cost ページで照合')).toBeTruthy();
+    expect(screen.getByText(/API キー別の内訳もそちらで見られます/)).toBeTruthy();
+  });
+
   it('内訳が取れなかったときは、その旨を出して内訳を並べない', () => {
     const base = makeData();
     renderView({
