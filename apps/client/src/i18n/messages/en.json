@@ -504,7 +504,22 @@
     "error_rate_limited": "You have reached the reading limit. Please wait a moment.",
     "unavailable": "Photo {index} could not be loaded",
     "unavailable_short": "Unavailable",
-    "error_spend_limit": "The AI usage limit has been reached. This feature is unavailable for now."
+    "error_spend_limit": "The AI usage limit has been reached. This feature is unavailable for now.",
+    "layout_inline": "In line",
+    "layout_block": "Block",
+    "layout_wrap": "Wrap",
+    "align_start": "Start",
+    "align_center": "Center",
+    "align_end": "End",
+    "remove_inline": "Remove photo",
+    "resize_nw": "Drag top-left to resize",
+    "resize_n": "Drag top to resize",
+    "resize_ne": "Drag top-right to resize",
+    "resize_e": "Drag right to resize",
+    "resize_se": "Drag bottom-right to resize",
+    "resize_s": "Drag bottom to resize",
+    "resize_sw": "Drag bottom-left to resize",
+    "resize_w": "Drag left to resize"
   },
   "fermentation": {
     "detail": {

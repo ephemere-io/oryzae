@@ -18,6 +18,7 @@ import '@/features/pc/entries/components/editor-status-bar.verify';
 import '@/features/pc/entries/components/entry-card.verify';
 import '@/features/pc/entries/components/entry-kebab-menu.verify';
 import '@/features/pc/entries/components/entry-list.verify';
+import '@/features/pc/entries/components/inline-image-overlay.verify';
 import '@/features/pc/entries/components/fermentation-display-prompt-modal.verify';
 import '@/features/pc/entries/components/fermentation-overlay-detail-pane.verify';
 import '@/features/pc/entries/components/fermentation-overlay.verify';

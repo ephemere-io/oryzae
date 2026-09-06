@@ -12,6 +12,7 @@ import {
 } from '@/features/pc/entries/components/editor-status-bar';
 import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
 import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
+import { InlineImageOverlay } from '@/features/pc/entries/components/inline-image-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
 import { PhotoImportModal } from '@/features/pc/entries/components/photo-import-modal';
@@ -30,6 +31,7 @@ import { useEditorSettings } from '@/features/pc/entries/hooks/use-editor-settin
 import { useEraserTrace } from '@/features/pc/entries/hooks/use-eraser-trace';
 import { useFocusMode } from '@/features/pc/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/pc/entries/hooks/use-ghost-effect';
+import { useInlineImageSelection } from '@/features/pc/entries/hooks/use-inline-image-selection';
 import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-question-sync';
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
@@ -770,6 +772,29 @@ export function EntryEditor({
     onInsertText: insertTranscript,
   });
 
+  /**
+   * 写真の見た目が確定したら本文ごと保存する。effects は extractEditorEffects が
+   * DOM から数え直すので、ここでは本文を送るだけでよい。
+   */
+  const commitInlineImageChange = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const nextContent = serializeEditorText(el);
+    setContent(nextContent);
+    setStatus((st) => (st === 'saved' ? 'editing' : st));
+    const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
+    if (!currentEntryId || !finalContent.trim()) return;
+    void save(finalContent, currentEntryId, {
+      mediaUrls: photosRef.current.map((ph) => ph.storagePath),
+    });
+  }, [title, currentEntryId, save]);
+
+  const inlineImages = useInlineImageSelection({
+    editorRef,
+    isVertical: settings.writingMode === 'vertical',
+    onCommit: commitInlineImageChange,
+  });
+
   /** Navigate with unsaved-changes guard */
   const guardedNavigate = useCallback(
     (path: string) => {
@@ -1364,6 +1389,14 @@ export function EntryEditor({
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
       <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
+
+      <InlineImageOverlay
+        rect={inlineImages.selection.rect}
+        image={inlineImages.selection.image}
+        onResizeStart={inlineImages.beginResize}
+        onLayoutChange={inlineImages.updateLayout}
+        onRemove={inlineImages.removeSelected}
+      />
 
       <PhotoImportModal
         state={photoImport.state}

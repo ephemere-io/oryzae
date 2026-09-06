@@ -504,7 +504,22 @@
     "error_rate_limited": "已达到识别次数上限。请稍候再试。",
     "unavailable": "无法加载第 {index} 张照片",
     "unavailable_short": "无法加载",
-    "error_spend_limit": "已达到 AI 使用上限。此功能暂时不可用。"
+    "error_spend_limit": "已达到 AI 使用上限。此功能暂时不可用。",
+    "layout_inline": "嵌入行内",
+    "layout_block": "独占一行",
+    "layout_wrap": "文字环绕",
+    "align_start": "起始",
+    "align_center": "居中",
+    "align_end": "末尾",
+    "remove_inline": "删除照片",
+    "resize_nw": "拖动左上角调整大小",
+    "resize_n": "拖动上边调整大小",
+    "resize_ne": "拖动右上角调整大小",
+    "resize_e": "拖动右边调整大小",
+    "resize_se": "拖动右下角调整大小",
+    "resize_s": "拖动下边调整大小",
+    "resize_sw": "拖动左下角调整大小",
+    "resize_w": "拖动左边调整大小"
   },
   "fermentation": {
     "detail": {

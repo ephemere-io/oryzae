@@ -95,6 +95,10 @@ function visit(node: Node, state: WalkState): void {
 }
 
 /** `<img>` の data 属性から保存形式を読む。壊れた値は既定に丸めて写真を失わない。 */
+export function readInlineImageFromElement(el: HTMLImageElement): InlineImage {
+  return readInlineImage(el, 0);
+}
+
 function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
   const aspect = Number.parseFloat(el.dataset.aspect ?? '');
   return {
@@ -130,7 +134,7 @@ function readAlign(raw: string | undefined): InlineImage['align'] {
  * 「横スクロール方向の 40%」という無意味な値になるが、`inline-size: 40%` なら
  * 横書きでは行幅の 40%、縦書きでは行の高さの 40% と、どちらでも「1 行に対する割合」になる。
  */
-function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage): void {
+export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage): void {
   el.dataset.storagePath = image.storagePath;
   el.dataset.widthRatio = String(image.widthRatio);
   el.dataset.layout = image.layout;
