@@ -5,7 +5,12 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import type { SpJarElement } from '@/features/sp/fermentation/components/sp-element-sheet';
-import { fitRingText, RING_TRACKING, ringPath } from '@/features/sp/fermentation/ring-text';
+import {
+  fitRingText,
+  RING_START_OFFSET,
+  RING_TRACKING,
+  ringPath,
+} from '@/features/sp/fermentation/ring-text';
 import { ringSlots } from '@/features/sp/fermentation/zoom-layout';
 
 /** 円の中での位置（円の直径に対する %）。 */
@@ -175,11 +180,11 @@ export function SpQuestionZoom({
                       opacity: 0.7,
                     }}
                   >
-                    {/* 経路は 9 時から時計回り。25% ＝ 12 時に中央を合わせて、
-                        問いが円の上を渡るようにする（0% だと左側面から始まって読みにくい）。 */}
+                    {/* 経路は 6 時から時計回り。その中央（12 時）に問いを合わせて、
+                        問いが円の上を渡るようにする。 */}
                     <textPath
                       href={`#sp-zoom-ring-${Math.round(line.radius)}`}
-                      startOffset="25%"
+                      startOffset={RING_START_OFFSET}
                       textAnchor="middle"
                     >
                       {line.label}

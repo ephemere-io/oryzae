@@ -70,9 +70,27 @@ export interface RingText {
   box: number;
 }
 
-/** 円周の経路（9 時から時計回り）。`textPath` はこの上に字を並べる。 */
+/**
+ * 経路上で問いを中央揃えする位置。`ringPath` と**必ず対で使う**。
+ *
+ * `textAnchor="middle"` の字は起点の前後へ伸びる。**経路の頭より手前へ出た字は
+ * 描かれない**（SVG は経路の外に出た字を落とす）。頭を 6 時に置いて 50% を中央に
+ * すれば前後に半周ずつ使えるが、頭が 9 時のまま 25%（＝12 時）を中央にすると、
+ * 使えるのは前の四半周だけ ＝ 円周の半分しか置けない。
+ *
+ * 実際、直径 172px の円で「自然環境を身に宿すためのデザインとは？」の頭 3 字が
+ * 黙って消えていた（字数の計算は通っていたのに、描画で落ちていた）。
+ */
+export const RING_START_OFFSET = '50%';
+
+/**
+ * 円周の経路。**6 時から時計回り**（`RING_START_OFFSET` の説明を参照）。
+ *
+ * 継ぎ目（頭と終わりが出会う点）が 6 時に来るのも都合がよい。問いは 12 時を中心に
+ * 置くので、隙間はいちばん読まない側へ寄る。
+ */
 export function ringPath(center: number, radius: number): string {
-  return `M ${center},${center} m ${-radius},0 a ${radius},${radius} 0 1,1 ${radius * 2},0 a ${radius},${radius} 0 1,1 ${-radius * 2},0`;
+  return `M ${center},${center} m 0,${radius} a ${radius},${radius} 0 1,1 0,${-radius * 2} a ${radius},${radius} 0 1,1 0,${radius * 2}`;
 }
 
 /** 外側から内側へ並べた半径。いちばん内側は常に円の縁の内側。 */

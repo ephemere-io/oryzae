@@ -11,7 +11,12 @@ import {
   IDLE_SPIN,
   orbitSlot,
 } from '@/features/sp/fermentation/orbit';
-import { fitRingText, RING_TRACKING, ringPath } from '@/features/sp/fermentation/ring-text';
+import {
+  fitRingText,
+  RING_START_OFFSET,
+  RING_TRACKING,
+  ringPath,
+} from '@/features/sp/fermentation/ring-text';
 import { ringSlots } from '@/features/sp/fermentation/zoom-layout';
 
 export interface OrbitQuestion {
@@ -348,11 +353,11 @@ function OrbitCircle({ question, size, reduced, registerRef, onSelect }: OrbitCi
                   opacity: 0.75,
                 }}
               >
-                {/* 経路は 9 時から時計回り。25% ＝ 12 時に中央を合わせて、止まって見えた
-                    瞬間でも問いが円の上を渡っているようにする。 */}
+                {/* 経路は 6 時から時計回り。その中央（12 時）に問いを合わせて、
+                    止まって見えた瞬間でも問いが円の上を渡っているようにする。 */}
                 <textPath
                   href={`#${pathId}-${Math.round(line.radius)}`}
-                  startOffset="25%"
+                  startOffset={RING_START_OFFSET}
                   textAnchor="middle"
                 >
                   {line.label}
