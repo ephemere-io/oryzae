@@ -358,10 +358,12 @@
       "settings": "設定",
       "fermentation_sidebar_show": "発酵結果のサイドバーを開く",
       "fermentation_sidebar_hide": "発酵結果のサイドバーを閉じる",
-      "fullscreen": "フルスクリーン"
+      "fullscreen": "フルスクリーン",
+      "fullscreen_exit": "フルスクリーンを解除"
     },
     "title": {
       "placeholder": "タイトルを入力...",
+      "remaining": "残り{count}字",
       "add": "タイトルを追加"
     },
     "placeholder": "今日は何を感じましたか？",

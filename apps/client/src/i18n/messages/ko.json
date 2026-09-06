@@ -358,10 +358,12 @@
       "settings": "설정",
       "fermentation_sidebar_show": "발효 사이드바 열기",
       "fermentation_sidebar_hide": "발효 사이드바 닫기",
-      "fullscreen": "전체 화면"
+      "fullscreen": "전체 화면",
+      "fullscreen_exit": "전체 화면 해제"
     },
     "title": {
       "placeholder": "제목을 입력하세요...",
+      "remaining": "{count}자 남음",
       "add": "제목 추가"
     },
     "placeholder": "오늘은 무엇을 느꼈나요?",

@@ -358,10 +358,12 @@
       "settings": "设置",
       "fermentation_sidebar_show": "打开发酵侧边栏",
       "fermentation_sidebar_hide": "关闭发酵侧边栏",
-      "fullscreen": "全屏"
+      "fullscreen": "全屏",
+      "fullscreen_exit": "退出全屏"
     },
     "title": {
       "placeholder": "请输入标题...",
+      "remaining": "还剩 {count} 字",
       "add": "添加标题"
     },
     "placeholder": "今天有什么感受？",

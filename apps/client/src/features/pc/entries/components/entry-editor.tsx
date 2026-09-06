@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Popover } from '@/components/ui/popover';
 import {
+  CONTROL_FONT,
   ICON_SIZE,
   ICON_STROKE_WIDTH,
   paletteScale,
@@ -127,7 +128,13 @@ function voiceStatusMessage(
 const TITLE_RIGHT_MARGIN = 64;
 
 /** 横書きの題の上に取る余白。題は上端から置き、この分だけ内側へ下げる。 */
-const TITLE_TOP_INSET = 24;
+/**
+ * 紙の上端から1行目（＝題）までの余白。
+ *
+ * 横書きの題は**紙の1行目**なので、上に載る帯ではなく本文と同じ流れの中にある。
+ * 書き出しの前に息を置くための余白で、Notion のページ上部と同じ役目。
+ */
+const PAGE_TOP_INSET = 88;
 const TITLE_TO_BODY_GAP = 24;
 
 /**
@@ -141,6 +148,14 @@ const TITLE_TO_BODY_GAP = 24;
  * 32px よりは小さくなるが、読める大きさは保てる。題としても十分に長い。
  */
 const TITLE_MAX_LENGTH = 60;
+
+/**
+ * 残り字数を出し始める距離。
+ *
+ * 常に出しておくと、書く前から数を意識させることになる（題は書き手のもので、
+ * 入力欄のものではない）。**打ち止めが見えてきてから**そっと言う。
+ */
+const TITLE_REMAINING_THRESHOLD = 15;
 
 /** Extract title (first line) and body from stored content */
 function splitTitleBody(raw: string): { title: string; body: string } {
@@ -700,11 +715,29 @@ export function EntryEditor({
     [currentEntryId, entryId, onUnlinkQuestion],
   );
 
+  /**
+   * いま全画面かどうか。**自分で持たず、ブラウザに訊く。**
+   *
+   * 全画面は押した結果とは限らない——Esc・F11・OS 側の操作でも入るし抜ける。
+   * 自前の boolean を持つと、そこで抜けたときにアイコンだけが取り残されて
+   * 「戻る道具が見当たらない」状態になる。
+   */
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    function sync() {
+      setIsFullscreen(document.fullscreenElement !== null);
+    }
+    sync();
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      // 拒否されうる（すでに抜けている等）。落とさずに諦める。
+      void document.exitFullscreen().catch(() => {});
     } else {
-      document.documentElement.requestFullscreen();
+      void document.documentElement.requestFullscreen().catch(() => {});
     }
   }, []);
 
@@ -791,8 +824,16 @@ export function EntryEditor({
     },
     {
       id: 'fullscreen',
-      label: t('toolbar.fullscreen'),
-      icon: paletteIcon(<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />),
+      // **同じボタンが逆のことをするなら、見た目も逆にする。** 入るときは外向きの矢、
+      // 出るときは内向きの矢。名前も一緒に変える（読み上げも同じ道を通る）。
+      label: isFullscreen ? t('toolbar.fullscreen_exit') : t('toolbar.fullscreen'),
+      icon: paletteIcon(
+        isFullscreen ? (
+          <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+        ) : (
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        ),
+      ),
       onSelect: toggleFullscreen,
     },
   ];
@@ -837,6 +878,20 @@ export function EntryEditor({
   // （文字サイズを上げても行が伸び続けないよう、px ではなく文字数で持つ）。
   const measurePx = settings.fontSize * 34;
 
+  /**
+   * 横書きの紙の列。**題と本文が同じ1本の列に乗る**。
+   *
+   * 左端に寄せていたので、広い画面では右に何も無い帯が残り、紙が左に片寄って見えた。
+   * 読む場所は目の正面にあるほうがよいので、余った幅は左右へ等しく配る。
+   */
+  const horizontalColumnStyle: React.CSSProperties = {
+    maxWidth: `${measurePx + gutterPx * 2}px`,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    paddingLeft: `${gutterPx}px`,
+    paddingRight: `${gutterPx}px`,
+  };
+
   // タイトルの置き場。縦書きは本文（left:6% / width:79%）のすぐ右へ縦組みで、
   // 横書きは本文の上に、**本文と同じ左端から**。
   //
@@ -846,7 +901,7 @@ export function EntryEditor({
   // TITLE_TO_BODY_GAP）。本文の右端はそこから逆算する。
   // 横書きの題は**上端から**置く（余白は padding で作る）。top を空けると、その隙間を
   // 本文が通り抜けて題の上に文字が覗く。
-  const titleBoxClass = isVertical ? 'absolute top-[4%]' : 'absolute top-0';
+  const titleBoxClass = isVertical ? 'absolute top-[4%]' : 'block';
   // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
   // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
   //
@@ -887,8 +942,6 @@ export function EntryEditor({
     titleLines === 1
       ? Math.min(titleLineLength, titleLength * titleFontSize + Math.round(titleFontSize * 0.6))
       : titleLineLength;
-  // 横書きは題が本文の真上に重なるので、本文側にその厚みぶんの上余白を空ける。
-  const titleReservedPx = titleThicknessPx + 40;
   const titleTextStyle: React.CSSProperties = {
     ...(isVertical
       ? {
@@ -897,13 +950,12 @@ export function EntryEditor({
           right: `${TITLE_RIGHT_MARGIN}px`,
         }
       : {
-          left: `${gutterPx}px`,
           // 横書きの題は**行いっぱい**を占める。文字の幅ぶんだけにすると、その横を
-          // 本文が同じ高さで流れて見える（題の下を通すために地を敷いてある）。
-          width: `${measurePx}px`,
-          height: `${titleThicknessPx + TITLE_TOP_INSET}px`,
-          paddingTop: `${TITLE_TOP_INSET}px`,
-          maxWidth: `calc(100% - ${gutterPx * 2}px)`,
+          // 本文が同じ高さで流れて見える。
+          width: '100%',
+          height: `${titleThicknessPx}px`,
+          // 流れの中にいるので、下を本文が通らない。地を敷く必要がなくなった。
+          background: 'transparent',
         }),
     fontSize: `${titleFontSize}px`,
     lineHeight: 1.4,
@@ -912,6 +964,48 @@ export function EntryEditor({
     writingMode: isVertical ? 'vertical-rl' : 'horizontal-tb',
     textOrientation: isVertical ? 'mixed' : undefined,
   };
+
+  /**
+   * 題。**置き場所は書字方向で変わる**。
+   *
+   * 縦書き … スクローラの外に立てる。本文自身が横スクローラなので、中に入れると
+   *          本文と一緒に流れてしまう。紙の右肩に据え置く。
+   * 横書き … Notion と同じで、**紙の1行目として本文と一緒に上へ流れる**。
+   *          据え置くと、読み進めた先でも題が上を占め続け、そのぶん紙が狭くなる。
+   *
+   * **textarea であって input ではない。** input は1行しか持てないので、長い題を
+   * 折り返せず、縮めるか見切れるかの二択になる。
+   */
+  // 残りは**上限の手前に来たときだけ**言う。0 になってから初めて打てなくなるより、
+  // 近づいていることが先に見えているほうが、書き手は言葉を選び直せる。
+  const titleRemaining = TITLE_MAX_LENGTH - title.length;
+  const showTitleRemaining = titleRemaining <= TITLE_REMAINING_THRESHOLD;
+  const titleRemainingLabel = t('title.remaining', { count: titleRemaining });
+
+  const titleField = (
+    <textarea
+      ref={titleInputRef}
+      rows={1}
+      // 上限は「3筋に、本文と同じ大きさで収まる長さ」から導く。恣意的な数字では
+      // なく**紙が受け取れる量**そのものなので、ここを超えると必ず見切れる。
+      maxLength={TITLE_MAX_LENGTH}
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      onKeyDown={(e) => {
+        // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          editorRef.current?.focus();
+        }
+      }}
+      onBlur={commitTitleEdit}
+      placeholder={titlePlaceholder}
+      aria-label={t('title.placeholder')}
+      className={`z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
+      style={{ background: 'var(--bg)', ...titleTextStyle }}
+    />
+  );
 
   return (
     <div
@@ -1061,47 +1155,31 @@ export function EntryEditor({
                         background: 'linear-gradient(to left, var(--bg), transparent)',
                       }
                     : {
-                        // 題のすぐ下から始める。離して置くと、何もないところに帯が
-                        // 浮いて見える（「奇妙なスリット」）。
+                        // 題も一緒に流れるので、帯は紙の上端に置く。
                         left: 0,
                         right: 0,
-                        top: `${titleThicknessPx + TITLE_TOP_INSET}px`,
+                        top: 0,
                         height: '8%',
                         background: 'linear-gradient(to bottom, var(--bg), transparent)',
                       }
                 }
               />
             )}
-            {/* 題はスクローラの**外**に置く。中に入れると横書きで本文と一緒に流れて
-                消えてしまう（縦書きでは本文自身がスクローラなので気づかなかった）。
-                地を敷いて、下を通る本文が透けないようにする。 */}
-            {/* タイトル。ヘッダーの小さな行から、本文の書き出しの隣へ移した。
-              縦書きなら本文の右に空いている余白へ縦組みで、横書きなら本文の上へ。
-              本文と同じ書体で、本文より一回り大きく置く。 */}
-            {/* **textarea であって input ではない。** input は1行しか持てないので、
-                長い題を折り返せず、縮めるか見切れるかの二択になる。 */}
-            <textarea
-              ref={titleInputRef}
-              rows={1}
-              // 上限は「3筋に、本文と同じ大きさで収まる長さ」から導く。恣意的な数字では
-              // なく**紙が受け取れる量**そのものなので、ここを超えると必ず見切れる。
-              maxLength={TITLE_MAX_LENGTH}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
-                if (e.nativeEvent.isComposing) return;
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  editorRef.current?.focus();
-                }
-              }}
-              onBlur={commitTitleEdit}
-              placeholder={titlePlaceholder}
-              aria-label={t('title.placeholder')}
-              className={`z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
-              style={{ background: 'var(--bg)', ...titleTextStyle }}
-            />
+            {isVertical && titleField}
+            {isVertical && showTitleRemaining && (
+              <span
+                className="pointer-events-none absolute z-[12] whitespace-nowrap text-[11px] text-[var(--date-color)]"
+                style={{
+                  // 桁の中心に合わせて、その真下へ。桁より広い字数表示が右へずれない。
+                  right: `${TITLE_RIGHT_MARGIN + titleThicknessPx / 2}px`,
+                  top: `calc(4% + ${titleUsedLengthPx}px + 10px)`,
+                  transform: 'translateX(50%)',
+                  ...CONTROL_FONT,
+                }}
+              >
+                {titleRemainingLabel}
+              </span>
+            )}
 
             <div
               ref={scrollContainerRef}
@@ -1112,6 +1190,27 @@ export function EntryEditor({
 
               {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
               <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
+
+              {/* 横書きの題は本文と同じ列に乗せ、一緒に上へ流す。 */}
+              {!isVertical && (
+                <div
+                  style={{
+                    ...horizontalColumnStyle,
+                    paddingTop: `${PAGE_TOP_INSET}px`,
+                    paddingBottom: `${TITLE_TO_BODY_GAP}px`,
+                  }}
+                >
+                  {titleField}
+                  {showTitleRemaining && (
+                    <span
+                      className="mt-1 block text-right text-[11px] text-[var(--date-color)]"
+                      style={CONTROL_FONT}
+                    >
+                      {titleRemainingLabel}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div
                 ref={editorRef}
@@ -1168,17 +1267,10 @@ export function EntryEditor({
                 data-placeholder={t('placeholder')}
                 // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
                 // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
-                className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `min-h-full pb-6 after:block after:content-[''] after:h-[50vh]`}`}
+                className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `pb-6 after:block after:content-[''] after:h-[50vh]`}`}
                 style={{
                   // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
-                  ...(settings.writingMode === 'vertical'
-                    ? {}
-                    : {
-                        paddingTop: `${titleReservedPx}px`,
-                        paddingLeft: `${gutterPx}px`,
-                        paddingRight: `${gutterPx}px`,
-                        maxWidth: `${measurePx + gutterPx * 2}px`,
-                      }),
+                  ...(settings.writingMode === 'vertical' ? {} : horizontalColumnStyle),
                   ...(settings.writingMode === 'vertical'
                     ? {
                         left: '6%',

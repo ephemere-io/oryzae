@@ -358,10 +358,12 @@
       "settings": "Settings",
       "fermentation_sidebar_show": "Open the fermentation sidebar",
       "fermentation_sidebar_hide": "Close the fermentation sidebar",
-      "fullscreen": "Fullscreen"
+      "fullscreen": "Fullscreen",
+      "fullscreen_exit": "Exit fullscreen"
     },
     "title": {
       "placeholder": "Enter a title...",
+      "remaining": "{count} left",
       "add": "Add a title"
     },
     "placeholder": "What did you feel today?",

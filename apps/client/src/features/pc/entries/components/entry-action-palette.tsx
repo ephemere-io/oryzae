@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   CONTENT_CENTERED_STYLE,
   CONTROL_FONT,
@@ -40,7 +40,9 @@ interface EntryActionPaletteProps {
   persistState?: boolean;
 }
 
-const POSITION_KEY = 'oryzae-entry-palette-position';
+// 旧 `oryzae-entry-palette-position`（左上からの px）とは別の鍵にする。
+// 同じ鍵のまま意味を変えると、前の値が新しい意味で読まれて明後日の場所に出る。
+const ANCHOR_KEY = 'oryzae-entry-palette-anchor';
 const COLLAPSED_KEY = 'oryzae-entry-palette-collapsed';
 /** これ以上動いて初めて「掴んだ」と見なす（px）。 */
 const DRAG_THRESHOLD = 4;
@@ -52,10 +54,41 @@ interface Position {
   y: number;
 }
 
-function readStoredPosition(): Position | null {
+interface Size {
+  w: number;
+  h: number;
+}
+
+/**
+ * パレットの居場所。**画面の左上からの px ではなく、近いほうの端からの距離で持つ。**
+ *
+ * 左上からの px で持つと、窓が縦に伸びたときに伸びたぶんが丸ごと下の余白になる。
+ * 全画面はまさにそれで、ブラウザのヘッダーが消えたぶん窓が高くなり、下に置いたはずの
+ * パレットが画面の中ほどまで浮き上がって見えていた。
+ *
+ * 端からの距離なら、下に置いたものは下に、右に置いたものは右に残る。
+ * **ヘッダーの高さを数える必要がない**ので、ブラウザや OS が変わっても、
+ * ツールバーの有無が変わっても同じように効く。
+ */
+interface Anchor {
+  xEdge: 'left' | 'right';
+  x: number;
+  yEdge: 'top' | 'bottom';
+  y: number;
+}
+
+function isEdgeX(value: unknown): value is 'left' | 'right' {
+  return value === 'left' || value === 'right';
+}
+
+function isEdgeY(value: unknown): value is 'top' | 'bottom' {
+  return value === 'top' || value === 'bottom';
+}
+
+function readStoredAnchor(): Anchor | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(POSITION_KEY);
+    const raw = window.localStorage.getItem(ANCHOR_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (
@@ -63,15 +96,55 @@ function readStoredPosition(): Position | null {
       parsed !== null &&
       'x' in parsed &&
       'y' in parsed &&
+      'xEdge' in parsed &&
+      'yEdge' in parsed &&
       typeof parsed.x === 'number' &&
-      typeof parsed.y === 'number'
+      typeof parsed.y === 'number' &&
+      isEdgeX(parsed.xEdge) &&
+      isEdgeY(parsed.yEdge)
     ) {
-      return { x: parsed.x, y: parsed.y };
+      return { xEdge: parsed.xEdge, x: parsed.x, yEdge: parsed.yEdge, y: parsed.y };
     }
   } catch {
     // 壊れた値・localStorage 不許可。既定位置（下端中央）に落とす。
   }
   return null;
+}
+
+/**
+ * 画面の中に収めたうえで、**近いほうの端**に留める。
+ *
+ * @param size 面の寸法。**呼び出し側が渡す**のが肝心で、ここで offsetWidth を読むと
+ *   pointermove のたびにレイアウトが同期的に走る。本文の contentEditable と
+ *   ゴーストのキャンバスを抱えた画面ではそれが数百 ms の詰まりになる
+ *   （実測: INP Issue「Event handlers on this element blocked UI updates for 576ms」）。
+ */
+function toAnchor(left: number, top: number, size: Size): Anchor {
+  const maxX = Math.max(EDGE_MARGIN, window.innerWidth - size.w - EDGE_MARGIN);
+  const maxY = Math.max(EDGE_MARGIN, window.innerHeight - size.h - EDGE_MARGIN);
+  const clampedLeft = Math.min(Math.max(EDGE_MARGIN, left), maxX);
+  const clampedTop = Math.min(Math.max(EDGE_MARGIN, top), maxY);
+  const rightGap = Math.max(EDGE_MARGIN, window.innerWidth - clampedLeft - size.w);
+  const bottomGap = Math.max(EDGE_MARGIN, window.innerHeight - clampedTop - size.h);
+  const nearLeft = clampedLeft <= rightGap;
+  const nearTop = clampedTop <= bottomGap;
+  return {
+    xEdge: nearLeft ? 'left' : 'right',
+    x: nearLeft ? clampedLeft : rightGap,
+    yEdge: nearTop ? 'top' : 'bottom',
+    y: nearTop ? clampedTop : bottomGap,
+  };
+}
+
+/** 窓が縮んで端からの距離が入らなくなったときに引き戻す。端の選択は変えない。 */
+function clampAnchor(anchor: Anchor, size: Size): Anchor {
+  const maxX = Math.max(EDGE_MARGIN, window.innerWidth - size.w - EDGE_MARGIN);
+  const maxY = Math.max(EDGE_MARGIN, window.innerHeight - size.h - EDGE_MARGIN);
+  return {
+    ...anchor,
+    x: Math.min(Math.max(EDGE_MARGIN, anchor.x), maxX),
+    y: Math.min(Math.max(EDGE_MARGIN, anchor.y), maxY),
+  };
 }
 
 function readStoredCollapsed(): boolean {
@@ -116,16 +189,16 @@ export function EntryActionPalette({
   // 面・ボタン・アイコン・角丸は**まとめて**動かす（1つだけ変えると比率が崩れる）。
   const scale = paletteScale(size);
   const t = useTranslations('editor.palette');
-  const [position, setPosition] = useState<Position | null>(null);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
   // ドラッグ中に読む面の寸法。**掴んだ瞬間に一度だけ測る**（後述）。
-  const dragSizeRef = useRef<{ w: number; h: number }>({ w: 240, h: 48 });
+  const dragSizeRef = useRef<Size>({ w: 240, h: 48 });
   // 次のフレームまで位置の反映を1回にまとめる（pointermove は1フレームに何度も来る）。
-  const pendingRef = useRef<Position | null>(null);
+  const pendingRef = useRef<Anchor | null>(null);
   const frameRef = useRef<number | null>(null);
   // 掴んだ位置と、そこから実際に動いたか。押しただけならボタンのクリックとして通す。
   const dragStartRef = useRef<Position>({ x: 0, y: 0 });
@@ -134,29 +207,9 @@ export function EntryActionPalette({
   // 初回だけ localStorage から復元する（SSR では読めないので mount 後）。
   useEffect(() => {
     if (!persistState) return;
-    setPosition(readStoredPosition());
+    setAnchor(readStoredAnchor());
     setCollapsed(readStoredCollapsed());
   }, [persistState]);
-
-  /**
-   * 画面の中に収める。
-   *
-   * @param size 面の寸法。**呼び出し側が渡す**のが肝心で、ここで offsetWidth を読むと
-   *   pointermove のたびにレイアウトが同期的に走る。本文の contentEditable と
-   *   ゴーストのキャンバスを抱えた画面ではそれが数百 ms の詰まりになる
-   *   （実測: INP Issue「Event handlers on this element blocked UI updates for 576ms」）。
-   */
-  const clamp = useCallback((p: Position, size?: { w: number; h: number }): Position => {
-    const el = rootRef.current;
-    const w = size?.w ?? el?.offsetWidth ?? 240;
-    const h = size?.h ?? el?.offsetHeight ?? 48;
-    const maxX = Math.max(EDGE_MARGIN, window.innerWidth - w - EDGE_MARGIN);
-    const maxY = Math.max(EDGE_MARGIN, window.innerHeight - h - EDGE_MARGIN);
-    return {
-      x: Math.min(Math.max(EDGE_MARGIN, p.x), maxX),
-      y: Math.min(Math.max(EDGE_MARGIN, p.y), maxY),
-    };
-  }, []);
 
   useEffect(() => {
     if (!dragging) return;
@@ -166,7 +219,7 @@ export function EntryActionPalette({
     function flush() {
       frameRef.current = null;
       const next = pendingRef.current;
-      if (next) setPosition(next);
+      if (next) setAnchor(next);
     }
     function handleMove(e: PointerEvent) {
       if (!movedRef.current) {
@@ -176,8 +229,9 @@ export function EntryActionPalette({
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         movedRef.current = true;
       }
-      pendingRef.current = clamp(
-        { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y },
+      pendingRef.current = toAnchor(
+        e.clientX - dragOffsetRef.current.x,
+        e.clientY - dragOffsetRef.current.y,
         dragSizeRef.current,
       );
       if (frameRef.current === null) frameRef.current = requestAnimationFrame(flush);
@@ -187,7 +241,7 @@ export function EntryActionPalette({
         cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
       }
-      if (pendingRef.current) setPosition(pendingRef.current);
+      if (pendingRef.current) setAnchor(pendingRef.current);
       setDragging(false);
     }
     window.addEventListener('pointermove', handleMove);
@@ -202,23 +256,31 @@ export function EntryActionPalette({
         frameRef.current = null;
       }
     };
-  }, [dragging, clamp]);
+  }, [dragging]);
 
   // ドラッグが終わった位置を覚える。
   useEffect(() => {
-    if (!persistState || dragging || position === null) return;
-    persist(POSITION_KEY, JSON.stringify(position));
-  }, [persistState, dragging, position]);
+    if (!persistState || dragging || anchor === null) return;
+    persist(ANCHOR_KEY, JSON.stringify(anchor));
+  }, [persistState, dragging, anchor]);
 
   // 窓を縮めるとパレットが画面外へ出るので、そのつど引き戻す。
+  // **全画面の出入りもここに乗せる**——resize が来る保証がないブラウザがある。
+  // 端からの距離で持っているので、ここでするのは「入りきらない距離を詰める」だけ。
   useEffect(() => {
-    if (position === null) return;
+    if (anchor === null) return;
     function handleResize() {
-      setPosition((p) => (p === null ? p : clamp(p)));
+      const el = rootRef.current;
+      const size: Size = { w: el?.offsetWidth ?? 240, h: el?.offsetHeight ?? 48 };
+      setAnchor((a) => (a === null ? a : clampAnchor(a, size)));
     }
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [position, clamp]);
+    document.addEventListener('fullscreenchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('fullscreenchange', handleResize);
+    };
+  }, [anchor]);
 
   /**
    * 面のどこを掴んでもドラッグを始める。**ボタンの上も含む。**
@@ -240,8 +302,9 @@ export function EntryActionPalette({
     dragSizeRef.current = { w: rect.width, h: rect.height };
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     movedRef.current = false;
-    pendingRef.current = { x: rect.left, y: rect.top };
-    setPosition({ x: rect.left, y: rect.top });
+    const startAnchor = toAnchor(rect.left, rect.top, dragSizeRef.current);
+    pendingRef.current = startAnchor;
+    setAnchor(startAnchor);
     setDragging(true);
   }
 
@@ -252,10 +315,14 @@ export function EntryActionPalette({
 
   // 既定位置は本文領域（サイドバーを除いた部分）の下端中央。動かされていればその位置。
   // 畳んでいるあいだは常に下端へ戻る（つまみは端に貼りついているのが自然）。
-  const docked = collapsed || position === null;
+  const docked = collapsed || anchor === null;
+  // 端は動的なキーになるが、`as` を使わずに書ける（分岐ごとに素直に組む）。
   const placement: React.CSSProperties = docked
     ? { bottom: collapsed ? 0 : 24, ...CONTENT_CENTERED_STYLE }
-    : { top: position.y, left: position.x };
+    : {
+        ...(anchor.yEdge === 'top' ? { top: anchor.y } : { bottom: anchor.y }),
+        ...(anchor.xEdge === 'left' ? { left: anchor.x } : { right: anchor.x }),
+      };
 
   const contract = verifyAttrs({
     unit: 'EntryActionPalette',
