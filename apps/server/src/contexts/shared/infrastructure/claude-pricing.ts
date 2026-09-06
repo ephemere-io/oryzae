@@ -43,6 +43,19 @@ const RATES = {
  */
 export const FERMENTATION_MODEL_ID = 'claude-sonnet-4-6' satisfies keyof typeof RATES;
 
+/**
+ * OCR のモデル。**RATES には載せない。**
+ *
+ * OCR のコストは cost_report の実額をモデル別に割って取る（anthropic-cost-api.ts）。
+ * 自前で単価を持つと二重管理になり、価格改定時に「実額と推定でモデルごとに違う額が
+ * 出る」状態を作る。ここに置く理由は3つだけ:
+ *   1. gateway がモデル ID をベタ書きしないため
+ *   2. 実額のモデル別内訳に「どれが OCR か」のラベルを付けるため
+ *   3. 発酵と別モデルであることをテストで固定するため——**同じモデルになると
+ *      モデル別内訳が用途別内訳として機能しなくなる**（混ざって区別できない）
+ */
+export const OCR_MODEL_ID = 'claude-opus-5';
+
 /** 上記モデルの単価。推定の根拠を画面に出すためにも使う。 */
 export const FERMENTATION_MODEL_RATE: ModelRate = RATES[FERMENTATION_MODEL_ID];
 
