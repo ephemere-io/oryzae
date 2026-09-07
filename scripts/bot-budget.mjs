@@ -94,6 +94,7 @@ export function capUsd({ budgetJpy, jpyPerUsd }) {
  *
  * 数える対象:
  *   - gates-failed / blocked … 差分は出たがマージできなかった
+ *   - merge-failed          … ゲートは通ったが、権限や競合でマージできなかった
  *   - aborted               … 1 回あたりの上限に当たって途中で切られた
  *
  * どれも直し方の問題ではなく前提の問題（ハーネスが変わった・指示が古い・
@@ -116,6 +117,7 @@ export function barrenStreak(ledger) {
     const result = String(runs[i]?.result ?? '');
     if (
       result.startsWith('gates-failed') ||
+      result.startsWith('merge-failed') ||
       result.startsWith('blocked') ||
       result.startsWith('aborted')
     ) {

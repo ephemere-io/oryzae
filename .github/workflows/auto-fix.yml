@@ -667,12 +667,18 @@ jobs:
         run: |
           set -euo pipefail
 
+          # ゲート落ちとマージ失敗を混ぜない。原因が違えば直し方も違うのに、
+          # 台帳に同じ名前で並ぶと「何が起きているか」が読めなくなる。
+          #   gates-failed … 修正が間違っていた → 指示や対象の選び方を見直す
+          #   merge-failed … 修正は正しかったが権限や競合で入らなかった → 設定を見直す
           case "${{ steps.diff.outputs.verdict }}" in
             auto-merge)
-              if [ "${{ steps.gates.outcome }}" = "success" ] && [ "${{ steps.merge.outcome }}" = "success" ]; then
+              if [ "${{ steps.gates.outcome }}" != "success" ]; then
+                result="gates-failed"
+              elif [ "${{ steps.merge.outcome }}" = "success" ]; then
                 result="merged:#${{ steps.merge.outputs.number }}"
               else
-                result="gates-failed"
+                result="merge-failed"
               fi
               ;;
             blocked) result="blocked" ;;
