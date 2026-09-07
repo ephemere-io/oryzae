@@ -108,8 +108,35 @@ jobs:
             exit 1
           fi
 
+      # AUTO_FIX_TOKEN は GitHub のトークンであって Anthropic の API キーではない。
+      # 取り違えると被害がマージ失敗に留まらない: この値は GH_TOKEN として
+      # すべての `gh` 呼び出しに使われるため、台帳の読み書きも Issue コメントも壊れ、
+      # 「なぜか全部落ちる」状態になる。しかも `secrets.A || secrets.B` の
+      # フォールバックは未設定のときしか効かず、**間違った値には効かない**。
+      #
+      # だから最初に 1 回だけ叩いて、使えるかどうかを確かめる。
       - name: 作業ディレクトリを用意する
         run: mkdir -p .bot
+
+      - name: GitHub トークンの確認
+        env:
+          HAS_CUSTOM_TOKEN: ${{ secrets.AUTO_FIX_TOKEN != '' }}
+        run: |
+          # 叩き先は「このリポジトリ自身」にする。`gh api user` は GITHUB_TOKEN
+          # （= インストールトークン）では 403 になるため、既定構成でも通る確認にならない。
+          if ! gh api "repos/${GITHUB_REPOSITORY}" --jq .full_name > .bot/whoami.txt 2> .bot/whoami.err; then
+            if [ "$HAS_CUSTOM_TOKEN" = "true" ]; then
+              echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
+                   "このシークレットに入れるのは **GitHub の fine-grained PAT**（github_pat_ で始まる）です。" \
+                   "Anthropic の API キー（sk-ant-... / ANTHROPIC_API_KEY のほう）ではありません。" \
+                   "シークレットを削除すれば GITHUB_TOKEN で動き、マージだけが人待ちになります。"
+            else
+              echo "::error::GITHUB_TOKEN で GitHub API を呼べませんでした。"
+            fi
+            sed 's/^/  /' .bot/whoami.err || true
+            exit 1
+          fi
+          echo "gh が見ているリポジトリ: $(cat .bot/whoami.txt)"
 
       # ── 何を直すかを決める ────────────────────────────────────────────
       #
