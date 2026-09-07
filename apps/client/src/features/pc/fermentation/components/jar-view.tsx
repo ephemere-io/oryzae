@@ -14,7 +14,7 @@ import {
   QuestionCircle,
 } from '@/features/pc/fermentation/components/question-circle';
 import { useJarDrag } from '@/features/pc/fermentation/hooks/use-jar-drag';
-import { pad2, toDateStamp } from '@/features/pc/fermentation/utils/history-labels';
+import { toDateStamp } from '@/features/pc/fermentation/utils/history-labels';
 import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationHistory } from '@/features/shared/fermentation/hooks/use-fermentation-history';
@@ -48,12 +48,14 @@ const JAR_WORLD_BOUNDS: Bounds = {
 /** 円へズームする矩形の計算に使う。実体は QuestionCircle 側の定数（二重管理しない）。 */
 const CIRCLE_SIZE = QUESTION_CIRCLE_SIZE;
 
-/** メタラベル（発酵履歴への入口）を円の下端からどれだけ離すか（world 単位）。 */
+/** 発酵履歴の印を円の下端からどれだけ離すか（world 単位）。 */
 const META_LABEL_GAP = 18;
 /**
- * メタラベルの高さ（world 単位）。9px の 2 行＋行間＋上下パディングでおよそ 40。
- * 実測に合わせた概算だが、**円へ寄るときの画面に収める計算**にしか使わないので、
- * 多少大きめに見積もる方が安全（余白が増えるだけ）。
+ * 円の下に空けておく帯の高さ（world 単位）。
+ *
+ * 全体表示では発酵履歴の印がここに入り、円へ寄ったときは印が引っ込んで画面座標の
+ * 操作面がこの帯の下に現れる。どちらの状態でも「円の真下に手が届く余地」が要るので、
+ * 寄せる先の矩形にこのぶんを足しておく。多少大きめの見積もりでよい（余白が増えるだけ）。
  */
 const META_LABEL_HEIGHT = 40;
 
@@ -352,7 +354,7 @@ export function JarView({
    * 一括既読を残すと、届いたばかりの手紙が読む前に既読になり、履歴の未読の印
    * （`· NEW`）も常に空になる。
    */
-  const { markQuestionRead, unreadFermentationIds } = useUnread();
+  const { markQuestionRead, unreadQuestionIds, unreadFermentationIds } = useUnread();
 
   const [zoomedId, setZoomedId] = useState<string | null>(null);
   /** 発酵履歴を開いている問い。null なら瓶のキャンバス。 */
@@ -548,6 +550,25 @@ export function JarView({
     },
     [],
   );
+
+  /**
+   * 円になっていない問いの手紙を既読にする。
+   *
+   * 瓶は問いを 3 つまでしか出さない。それを超えた問い（アーカイブ済みも含む）の手紙は、
+   * この画面からは開きようがない ── なのに未読として数えられ続けると、ナビのバッジが
+   * 二度と減らなくなる（既読の単位を「瓶を開いた＝全部既読」から「その問いの履歴を
+   * 開いた」に変えたときに生まれた穴で、実データで 4 件が張り付いていた）。
+   *
+   * 以前は瓶を開いた時点で全部を既読にしていたので、ここで潰すのは **その頃より狭い**
+   * 範囲でしかない。開ける手紙の未読は今までどおり残る。
+   */
+  useEffect(() => {
+    if (unreadQuestionIds.size === 0) return;
+    const reachable = new Set(questions.slice(0, 3).map((q) => q.id));
+    for (const questionId of unreadQuestionIds) {
+      if (!reachable.has(questionId)) markQuestionRead(questionId);
+    }
+  }, [unreadQuestionIds, questions, markQuestionRead]);
 
   if (authLoading) return null;
 
@@ -938,17 +959,20 @@ export function JarView({
             />
           ))}
 
-          {/* 円の下のメタラベル ＝ 発酵履歴への入口。
-              円そのものはカメラを寄せる取っ手のままにして（ズームで読む・中身を並べ替える
-              体験を残す）、履歴はここから入る。world 座標に置くのでズームに自然に乗る。
+          {/* 円の下の印 ＝ 発酵履歴があることの合図。
+              **文字は出さない。** 全体表示では world の 9px が実寸 4.6px にしかならず、
+              読ませようがない。読めない文字を描くのはやめて、件数と未読だけを図で置く。
+              押して開くのは画面座標に出す操作面（下の HistoryLauncher）の仕事。
               位置は円の半径から出す（固定 px オフセットにしない）。 */}
           {visibleQuestions.map((q, i) => {
             const results = byQuestion.get(q.id) ?? [];
             if (results.length === 0) return null;
             const pos = resolvedCirclePositions[i];
-            const latest = results[results.length - 1];
             const hasUnread = results.some((r) => unreadFermentationIds.has(r.id));
-            const dimmed = zoomedId !== null && zoomedId !== q.id;
+            // 開いている円の印は出さない。画面座標の操作面（HistoryLauncher）が
+            // その役を引き継ぐので、両方出すと同じ入口が重なって見える。
+            if (zoomedId === q.id) return null;
+            const dimmed = zoomedId !== null;
             return (
               <button
                 key={`meta-${q.id}`}
@@ -960,41 +984,100 @@ export function JarView({
                   openHistory(q.id);
                 }}
                 aria-label={t('history.open_aria', { question: q.currentText ?? '' })}
-                className={`group absolute z-[4] flex -translate-x-1/2 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border-0 bg-transparent px-2 py-1 transition-opacity hover:bg-[rgba(140,133,126,0.08)] ${
+                className={`group absolute z-[4] flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(140,133,126,0.3)] bg-[rgba(253,251,247,0.5)] px-2.5 py-1.5 transition-colors hover:border-[rgba(140,133,126,0.6)] hover:bg-[rgba(253,251,247,0.95)] ${
                   dimmed ? 'pointer-events-none opacity-30' : 'opacity-100'
                 }`}
                 style={{
                   left: (pos.jarX / 100) * JAR_WORLD_WIDTH,
                   top: (pos.jarY / 100) * JAR_WORLD_HEIGHT + CIRCLE_SIZE / 2 + META_LABEL_GAP,
+                  color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
                   animation: 'fadeIn 0.5s ease-out forwards',
                 }}
               >
-                {/* 押せることを見せる取っ手。2 行ぶんの高さを持たせて、文字だけの
-                    ラベル（＝ただの注記に見える）から「開けるもの」に変える。 */}
-                {/* 枠と背景は **クラスで**指定する。インラインの style はどのクラスより強く、
-                    group-hover の指定に勝ってしまう（ホバーの手応えが死ぬ）。 */}
-                <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md border border-[rgba(140,133,126,0.3)] bg-[rgba(253,251,247,0.5)] p-[4px] text-[var(--date-color)] transition-colors group-hover:border-[rgba(140,133,126,0.6)] group-hover:bg-[rgba(253,251,247,0.95)] group-hover:text-[var(--fg)]">
+                <span className="block h-[18px] w-[18px] shrink-0 transition-colors group-hover:text-[var(--fg)]">
                   <HistoryIcon />
                 </span>
-                <span className="flex flex-col items-start gap-1">
+                {/* 件数だけは数字で出す。1 文字なら潰れた大きさでも形が残る。 */}
+                <span
+                  className="text-[11px] leading-none transition-colors group-hover:text-[var(--fg)]"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  {results.length}
+                </span>
+                {/* 未読は呼吸させる。押してほしい動機はここにしかない。 */}
+                {hasUnread && (
                   <span
-                    className="text-[9px] uppercase tracking-[0.3em] text-[var(--date-color)]"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
+                    data-verify-part="history-unread-dot"
+                    className="block h-[5px] w-[5px] shrink-0 rounded-full"
+                    style={{
+                      background: 'var(--ob-jar-warm)',
+                      animation: 'j2-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite',
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </CanvasViewport>
+
+      {/*
+        円を開いている間の履歴への入口。**world の外＝画面座標**に置く。
+
+        world の中の印は全体表示で 4〜5px まで縮むので、押せる面としては当てにできない。
+        履歴を見るのは寄ったときなので、寄った状態でだけ「常に同じ大きさで読める操作面」を
+        出す、と表示の重さを実際の使われ方に合わせる。
+      */}
+      {zoomedId !== null &&
+        historyQuestionId === null &&
+        (() => {
+          const question = visibleQuestions.find((q) => q.id === zoomedId);
+          const results = question ? (byQuestion.get(question.id) ?? []) : [];
+          if (!question || results.length === 0) return null;
+          const latest = results[results.length - 1];
+          const hasUnread = results.some((r) => unreadFermentationIds.has(r.id));
+          return (
+            <div className="absolute bottom-12 left-1/2 z-[30] -translate-x-1/2">
+              <button
+                type="button"
+                data-verify-part="history-launcher"
+                onClick={() => openHistory(question.id)}
+                aria-label={t('history.open_aria', { question: question.currentText ?? '' })}
+                className="group flex items-center gap-3 rounded-full border border-[var(--border-subtle)] bg-[rgba(253,251,247,0.72)] py-2.5 pr-5 pl-3.5 transition-colors hover:bg-[rgba(253,251,247,0.95)]"
+                style={{
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  boxShadow: '0 4px 16px rgba(140,133,126,0.12)',
+                  animation: 'fadeIn 0.4s ease-out forwards',
+                }}
+              >
+                <span
+                  className="block h-[22px] w-[22px] shrink-0 transition-colors group-hover:text-[var(--fg)]"
+                  style={{ color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)' }}
+                >
+                  <HistoryIcon />
+                </span>
+                <span className="flex flex-col items-start gap-0.5">
+                  <span
+                    className="text-[12px] tracking-[0.06em] text-[var(--fg)]"
+                    style={{ fontFamily: "'Noto Serif JP', serif" }}
                   >
-                    {t('history.fermentations_count', { count: pad2(results.length) })}
+                    {t('history.launcher', { count: results.length })}
                   </span>
                   <span
-                    className="flex items-center gap-[5px] text-[9px] tracking-[0.2em]"
+                    className="flex items-center gap-1.5 text-[9px] tracking-[0.2em]"
                     style={{
                       fontFamily: 'Inter, sans-serif',
                       color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
-                      opacity: hasUnread ? 1 : 0.7,
                     }}
                   >
                     {hasUnread && (
                       <span
                         className="block h-[5px] w-[5px] rounded-full"
-                        style={{ background: 'var(--ob-jar-warm)' }}
+                        style={{
+                          background: 'var(--ob-jar-warm)',
+                          animation: 'j2-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite',
+                        }}
                       />
                     )}
                     {toDateStamp(latest.createdAt)}
@@ -1002,10 +1085,9 @@ export function JarView({
                   </span>
                 </span>
               </button>
-            );
-          })}
-        </div>
-      </CanvasViewport>
+            </div>
+          );
+        })()}
 
       {/* Question list (bottom center) */}
       {!zoomedId && historyQuestionId === null && (
@@ -1229,6 +1311,7 @@ export function JarView({
         onInnerDragEnd={(type, id, x, y) => handleInnerDragEnd(type, id, { jarX: x, jarY: y })}
         onIndexChange={handleHistoryIndexChange}
         onClose={closeHistory}
+        paneOpen={detailOpen}
         onElementClick={(resultId, type, id, data) => {
           const question = visibleQuestions.find((q) => q.id === historyQuestionId);
           const result = historyResults.find((r) => r.id === resultId);
