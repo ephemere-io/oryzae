@@ -10,6 +10,7 @@ import { OnboardingFlow } from '@/features/shared/onboarding/components/onboardi
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import { BackToStudy } from '@/features/shared/study/components/back-to-study';
+import { QuestionsLink } from '@/features/shared/study/components/questions-link';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
@@ -85,6 +86,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const onStudy = studyHome && pathname === STUDY_PATH;
   // 書斎が有効な間、サブ画面の左上にはマークが「書斎へ戻る」として浮く。
   const showBackToStudy = studyHome && pathname !== STUDY_PATH;
+  /**
+   * 「問いの変遷」への導線を出すか。
+   *
+   * サイドバーを外したことで `/questions` はどこからも行けなくなった。問いの追加と
+   * 編集は瓶の中でできるが、いつ・どう変わってきたかはあの画面にしかない。
+   *
+   * **PC だけ**。SP の瓶には「問いを整える」が下端にあり、そこから同じ画面へ入れる。
+   * 右上にもう 1 つ置くと、同じ行き先の入口が 2 つ並ぶことになる。
+   */
+  const showQuestionsLink = studyHome && device === 'pc' && pathname === '/jar';
 
   // Issue #362/#363: 保護下の children はクライアント専用に描画する（mounted ゲート）。
   // エディタ等の時刻依存・認証依存レンダリングが SSR↔client で食い違う不一致(React #418)
@@ -170,6 +181,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             </div>
           ) : null}
           {device !== null && showBackToStudy && <BackToStudy />}
+          {showQuestionsLink && <QuestionsLink />}
           {device !== null && shouldShow && (
             <OnboardingFlow onComplete={handleOnboardingComplete} />
           )}
