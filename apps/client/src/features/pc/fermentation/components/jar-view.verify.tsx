@@ -33,7 +33,8 @@ interface Props {
   api: ApiClient | null;
   authLoading: boolean;
   questions: QuestionData[];
-  readiness?: number;
+  readinessTop?: number;
+  readinessTotal?: number;
   onAddQuestion?: (text: string) => Promise<void>;
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
@@ -124,12 +125,13 @@ registerUnit<Props>({
     {
       id: 'readiness-bubbling',
       probe: true,
-      description: 'Probe: readiness=3 が瓶へ素通しで渡る（泡立つ・issue #278）',
+      description: 'Probe: readiness が瓶へ素通しで渡る（泡立つ・issue #278）',
       props: {
         api: null,
         authLoading: false,
         questions: twoQuestions,
-        readiness: 3,
+        readinessTop: 1,
+        readinessTotal: 2,
         onAddQuestion: noopAsync,
       },
     },
@@ -251,7 +253,7 @@ registerUnit<Props>({
         const rendered = vessel.querySelectorAll('[data-jar-bubble]').length;
         return (
           (Number(bubbles) > 0 && String(rendered) === bubbles) ||
-          `readiness=3 なのに泡が出ていない（contract=${bubbles} / 描画=${rendered}）`
+          `readiness を渡したのに泡が出ていない（contract=${bubbles} / 描画=${rendered}）`
         );
       },
     },

@@ -8,18 +8,30 @@ import { evaluateQuestionEligibility } from '../../domain/services/fermentation-
 // 発酵瓶の readiness (issue #278)。
 //
 // #268 の時点では readiness はユーザー単位だったが、#287 (PR #291) で
-// 「問い単位の readiness」に作り替えた。瓶は問いを最大3つ抱えるので、
-//   瓶の readiness = その人が持っているアクティブな問いの readiness の総和
-// と捉える。1問いあたり上限 1.0 なので、総和の上限は問いの数 (現状は最大 3.0)。
+// 「問い単位の readiness」に作り替えた。瓶はそれを2つの軸に畳んで受け取る。
 //
-// **返すのは総和と問いの数だけ**。lastRunAt / nextEligibleAt / 文字数の内訳は
+//   top   = いちばん進んだ問いの readiness (0〜1)
+//   total = 全問いの readiness の総和 (0〜問いの数)
+//
+// 当初は total だけを返し、演出の段階を 1.0/2.0/3.0 で切っていた。しかしそれだと
+// **問いを1つしか持たない人は上限 1.0 で、泡立ちに一生到達しない**。issue の
+// 「総和」という記述どおりではあったが、意図ではなかった (PR #559 でのレビュー)。
+//
+// そこで役割を分けた:
+//   - 「何が起きるか」(段階) は top が決める → 問い1つでも最後まで到達できる
+//   - 「どれだけ賑やかか」(密度) は total が決める → 同時に多く発酵させている人ほど濃い
+// 畳み方の正は client 側の jar-visuals.ts。ここは素材を返すだけに徹する。
+//
+// **返すのはこの2つと問いの数だけ**。lastRunAt / nextEligibleAt / 文字数の内訳は
 // client には返さない。「いつ来るか分からない」ことがこのプロダクトの体験の芯で、
 // 残り時間や残り文字数が分かると逆算できてしまう (issue #278「3. UX の補強」)。
 // admin 側 (GET /admin/fermentations/readiness/:userId) は従来どおり全部返す。
 export interface JarReadiness {
-  /** アクティブな問いの readiness の総和。0 〜 questionCount。 */
-  score: number;
-  /** 総和の分母にあたるアクティブな問いの数。 */
+  /** いちばん進んだ問いの readiness。0〜1。演出の段階を決める。 */
+  top: number;
+  /** アクティブな問いの readiness の総和。0 〜 questionCount。密度を決める。 */
+  total: number;
+  /** アクティブな問いの数。 */
   questionCount: number;
 }
 
@@ -34,7 +46,7 @@ export class GetJarReadinessUsecase {
 
   async execute(userId: string, now: Date = new Date()): Promise<JarReadiness> {
     const questions = await this.questionRepo.listActiveByUserId(userId);
-    if (questions.length === 0) return { score: 0, questionCount: 0 };
+    if (questions.length === 0) return { top: 0, total: 0, questionCount: 0 };
 
     const [language, state, results] = await Promise.all([
       this.localeResolver.resolve(userId),
@@ -75,7 +87,16 @@ export class GetJarReadinessUsecase {
     );
 
     const total = scores.reduce((sum, score) => sum + score, 0);
+    const top = scores.reduce((max, score) => (score > max ? score : max), 0);
     // 浮動小数の端数をそのまま JSON に載せない (0.30000000000000004 のような値を防ぐ)。
-    return { score: Math.round(total * 100) / 100, questionCount: questions.length };
+    return {
+      top: round2(top),
+      total: round2(total),
+      questionCount: questions.length,
+    };
   }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

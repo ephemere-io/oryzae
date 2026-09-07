@@ -8,7 +8,7 @@ import { readJson, readNumberField } from '@/lib/json';
 /**
  * 発酵瓶の readiness を取得する（issue #278）。端末非依存。
  *
- * 返るのは「持っている問いの readiness の総和」と「問いの数」だけ。次回発火時刻や
+ * 返るのは「いちばん進んだ問い（top）」「総和（total）」「問いの数」だけ。次回発火時刻や
  * 残り文字数はサーバーが返さない（「いつ来るか分からない」ことが体験の芯なので、
  * 逆算の材料を client に置かない）。
  *
@@ -40,7 +40,8 @@ export function useFermentationReadiness(api: ApiClient | null, authLoading: boo
       // 形が違えば既定値へ倒す（normalize.ts と同じ「厳しい方に寄せる」方針）。
       // readiness が取れなくても瓶は「空の瓶」として成立するので、0 が安全な既定値。
       setData({
-        score: readNumberField(body, 'score', 0),
+        top: readNumberField(body, 'top', 0),
+        total: readNumberField(body, 'total', 0),
         questionCount: readNumberField(body, 'questionCount', 0),
       });
     } catch {

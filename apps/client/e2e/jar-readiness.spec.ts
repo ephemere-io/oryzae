@@ -29,14 +29,17 @@ test.describe('発酵瓶の readiness (#278)', () => {
     // ログイン済み状態
   });
 
-  test('readiness API が総和と問い数を返す', async ({ page }) => {
+  test('readiness API が top / total / 問い数を返す', async ({ page }) => {
     const body = await fetchReadiness(page);
 
-    expect(typeof body.score).toBe('number');
+    expect(typeof body.top).toBe('number');
+    expect(typeof body.total).toBe('number');
     expect(typeof body.questionCount).toBe('number');
-    expect(body.score).toBeGreaterThanOrEqual(0);
-    // 1問いあたり上限 1.0 なので、総和は問いの数を超えない。
-    expect(body.score).toBeLessThanOrEqual(body.questionCount);
+    // top は1問いぶんなので 0〜1、total は総和なので問いの数まで。
+    expect(body.top).toBeGreaterThanOrEqual(0);
+    expect(body.top).toBeLessThanOrEqual(1);
+    expect(body.total).toBeGreaterThanOrEqual(body.top);
+    expect(body.total).toBeLessThanOrEqual(body.questionCount);
   });
 
   test('次回発火を逆算できる材料を返さない', async ({ page }) => {
@@ -44,7 +47,7 @@ test.describe('発酵瓶の readiness (#278)', () => {
 
     // 「いつ来るか分からない」が体験の芯なので、admin にだけ出す値が
     // client 用 API に混ざっていないことをここで固定する。
-    expect(Object.keys(body).sort()).toEqual(['questionCount', 'score']);
+    expect(Object.keys(body).sort()).toEqual(['questionCount', 'top', 'total']);
   });
 
   test('エントリを書くと cron を待たず readiness が上がる', async ({ page }) => {
@@ -90,9 +93,9 @@ test.describe('発酵瓶の readiness (#278)', () => {
     const after = await fetchReadiness(page);
 
     // cron の日次更新を待たずに反映されること（受け入れ基準「リアルタイムで反映」）。
-    expect(after.score).toBeGreaterThanOrEqual(before.score);
+    expect(after.total).toBeGreaterThanOrEqual(before.total);
     // この問いは 1200 字ぶんの材料を得たので、時間ゲートで頭打ちでない限り 0 ではない。
-    expect(after.score).toBeGreaterThan(0);
+    expect(after.total).toBeGreaterThan(0);
 
     // 後片付け（他テストの前提を汚さない）
     await page.request.delete(`/api/v1/entries/${entry.id}`, { headers });

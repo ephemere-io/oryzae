@@ -29,7 +29,7 @@ describe('useFermentationReadiness', () => {
   });
 
   it('readiness を取得して score / questionCount を返す', async () => {
-    apiFetch.mockResolvedValue(mockResponse(true, { score: 1.75, questionCount: 3 }));
+    apiFetch.mockResolvedValue(mockResponse(true, { top: 0.8, total: 1.75, questionCount: 3 }));
     const { result } = renderHook(() => useFermentationReadiness(api, false));
 
     await waitFor(() => {
@@ -37,7 +37,7 @@ describe('useFermentationReadiness', () => {
     });
 
     expect(apiFetch).toHaveBeenCalledWith('/api/v1/fermentations/readiness');
-    expect(result.current.data).toEqual({ score: 1.75, questionCount: 3 });
+    expect(result.current.data).toEqual({ top: 0.8, total: 1.75, questionCount: 3 });
     expect(result.current.error).toBeNull();
   });
 
@@ -91,23 +91,23 @@ describe('useFermentationReadiness', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.data).toEqual({ score: 0, questionCount: 0 });
+    expect(result.current.data).toEqual({ top: 0, total: 0, questionCount: 0 });
   });
 
   it('refresh で再取得する（エントリを書いた直後に瓶を更新できる）', async () => {
     apiFetch
-      .mockResolvedValueOnce(mockResponse(true, { score: 0.5, questionCount: 2 }))
-      .mockResolvedValueOnce(mockResponse(true, { score: 1.5, questionCount: 2 }));
+      .mockResolvedValueOnce(mockResponse(true, { top: 0.5, total: 0.5, questionCount: 2 }))
+      .mockResolvedValueOnce(mockResponse(true, { top: 0.9, total: 1.5, questionCount: 2 }));
     const { result } = renderHook(() => useFermentationReadiness(api, false));
 
     await waitFor(() => {
-      expect(result.current.data?.score).toBe(0.5);
+      expect(result.current.data?.total).toBe(0.5);
     });
 
     await result.current.refresh();
 
     await waitFor(() => {
-      expect(result.current.data?.score).toBe(1.5);
+      expect(result.current.data?.total).toBe(1.5);
     });
     expect(apiFetch).toHaveBeenCalledTimes(2);
   });

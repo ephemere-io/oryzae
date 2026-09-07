@@ -15,7 +15,7 @@ export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
   const { createQuestion, editQuestion, archiveQuestion } = useQuestions(api);
   const { questions, refetch: refetchQuestions } = useJarQuestions(api, authLoading);
-  // issue #278: 瓶の見た目に反映する readiness（問いごとの readiness の総和, 0〜3）。
+  // issue #278: 瓶の見た目に反映する readiness（段階を決める top と、賑やかさを決める total）。
   // サーバーがリクエストのたびに評価し直すので、漬け込み後にこのページへ来れば最新になる。
   const { data: readiness } = useFermentationReadiness(api, authLoading);
   const router = useRouter();
@@ -62,7 +62,8 @@ export default function JarPage() {
             api={api}
             authLoading={authLoading}
             questions={questions}
-            readiness={readiness?.score ?? 0}
+            readinessTop={readiness?.top ?? 0}
+            readinessTotal={readiness?.total ?? 0}
             onAddQuestion={handleAddQuestion}
             onEditQuestion={handleEditQuestion}
             onArchiveQuestion={handleArchiveQuestion}

@@ -182,18 +182,26 @@ function liquidStops(warmth: number) {
 }
 
 interface JarVesselProps {
-  /** 問いごとの readiness の総和（0〜3）。既定は 0＝空の瓶。 */
-  readiness?: number;
+  /**
+   * いちばん進んだ問いの readiness（0〜1）。**演出の段階**を決める。
+   * 問いを1つしか持たない人でも、これが 1.0 まで行けば泡立つ。
+   */
+  top?: number;
+  /**
+   * 全問いの readiness の総和（0〜3）。**密度**（微生物と泡の数・動きの速さ）を決める。
+   * 同時に多く発酵させている人ほど瓶が賑やかになる。
+   */
+  total?: number;
   /** 瓶の描画サイズ（px）。JarView のレイアウトに合わせて渡す。 */
   width?: number;
   height?: number;
 }
 
-export function JarVessel({ readiness = 0, width = 420, height = 520 }: JarVesselProps) {
+export function JarVessel({ top = 0, total = 0, width = 420, height = 520 }: JarVesselProps) {
   const t = useTranslations('fermentation');
-  const visuals = jarVisuals(readiness);
+  const visuals = jarVisuals(top, total);
   const allWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
-  const wordCount = jarParticleCount(readiness, allWords.length);
+  const wordCount = jarParticleCount(top, allWords.length);
   const stops = liquidStops(visuals.warmth);
   // 動きが活発になるほどアニメーションを短く。glow の脈も一緒に速くする。
   const speedUp = (seconds: number) => `${(seconds / visuals.agitation).toFixed(2)}s`;

@@ -70,10 +70,12 @@ interface JarViewProps {
   authLoading: boolean;
   questions: QuestionData[];
   /**
-   * 発酵瓶の readiness（issue #278）。問いごとの readiness の総和なので 0〜3。
-   * 瓶の見た目だけがこれに追従する。数値としては一切表示しない。
+   * 発酵瓶の readiness（issue #278）。瓶の見た目だけがこれに追従し、
+   * 数値としては一切表示しない。
+   * `top` が演出の段階を、`total` が賑やかさを決める（詳細は utils/jar-visuals.ts）。
    */
-  readiness?: number;
+  readinessTop?: number;
+  readinessTotal?: number;
   onAddQuestion?: (text: string) => Promise<void>;
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
@@ -216,7 +218,8 @@ export function JarView({
   api,
   authLoading,
   questions,
-  readiness = 0,
+  readinessTop = 0,
+  readinessTotal = 0,
   onAddQuestion,
   onEditQuestion,
   onArchiveQuestion,
@@ -542,7 +545,7 @@ export function JarView({
 
           {/* 瓶本体。見た目は readiness に追従する（issue #278）。
               #533 で world ボックスに合わせて 420×520 → 500×620 に拡大している。 */}
-          <JarVessel readiness={readiness} width={500} height={620} />
+          <JarVessel top={readinessTop} total={readinessTotal} width={500} height={620} />
 
           {/* Question circles */}
           {visibleQuestions.map((q, i) => (

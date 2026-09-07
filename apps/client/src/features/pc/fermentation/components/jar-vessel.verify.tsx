@@ -1,16 +1,17 @@
 /**
  * JarVessel の検証スペック（発酵瓶そのもの・issue #278）。
  *
- * 瓶は readiness（問いごとの readiness の総和 0〜3）を受け取るだけの純表示部品で、
- * fetch も router も持たない。i18n だけ withVerifyProviders で供給すれば孤立検証できる。
+ * 瓶は readiness を2軸（top = いちばん進んだ問い 0〜1 / total = 総和 0〜3）で受け取るだけの
+ * 純表示部品で、fetch も router も持たない。i18n だけ withVerifyProviders で供給すれば
+ * 孤立検証できる。top が段階を、total が賑やかさを決める（utils/jar-visuals.ts）。
  *
  * 公表する契約は「見た目のどこが動いたか」だけ:
  * fillPct（液面）/ microbes（微生物の数）/ bubbles（泡の数）/ words（文字粒子の数）。
  * **readiness の生の値は契約に出さない**。DOM に出ると devtools から逆算でき、
  * 「いつ来るか分からない」という issue #278 の狙いが崩れるため。
  *
- * fixture は issue が定めた 4 段階（0 / 1.0 / 2.0 / 3.0）と、その狙いどおり
- * 「段階ごとに主役が入れ替わる」ことを確かめる境界値。
+ * fixture は 4 段階（空 → 液 → 微生物 → 泡）の境界値と、PR #559 のレビューで決まった
+ * 「問い1つでも泡立つ」「問いが多い人の瓶のほうが賑やか」を並べて確かめる 2 件。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -18,7 +19,8 @@ import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { JAR_VESSEL_SLOTS, JarVessel } from './jar-vessel';
 
 interface Props {
-  readiness?: number;
+  top?: number;
+  total?: number;
   width?: number;
   height?: number;
 }
@@ -32,40 +34,45 @@ registerUnit<Props>({
   fixtures: [
     {
       id: 'empty',
-      description: 'readiness 0.0 — 空っぽ（液は瓶底へ沈み、微生物も泡も出ない）',
-      props: { readiness: 0 },
+      description: '空っぽ（液は瓶底へ沈み、微生物も泡も出ない）',
+      props: { top: 0, total: 0 },
     },
     {
-      id: 'half',
-      description: 'readiness 0.5 — 液が半分まで満ちる（微生物・泡はまだ出ない）',
-      props: { readiness: 0.5 },
+      id: 'filling',
+      description: '液が半分まで満ちる（微生物・泡はまだ出ない）',
+      props: { top: 1 / 6, total: 1 / 6 },
     },
     {
       id: 'matured',
-      description: 'readiness 1.0 — かなり熟成（液が満ちきる。微生物はここから増え始める）',
-      props: { readiness: 1 },
+      description: '液が満ちきる（微生物はここから増え始める）',
+      props: { top: 1 / 3, total: 1 / 3 },
     },
     {
       id: 'active',
-      description: 'readiness 2.0 — 微生物が出そろい動きが活性化（泡はまだ出始めない）',
-      props: { readiness: 2 },
+      description: '微生物が漂い動きが活性化（泡はまだ出始めない）',
+      props: { top: 2 / 3, total: 2 / 3 },
     },
     {
-      id: 'bubbling',
-      description: 'readiness 3.0 — ぶくぶくと激しく泡立つ（全要素が上限）',
-      props: { readiness: 3 },
+      id: 'solo-bubbling',
+      description: '問い1つが満タン — 泡は立つが量は控えめ（PR #559 レビューでの決定）',
+      props: { top: 1, total: 1 },
+    },
+    {
+      id: 'trio-bubbling',
+      description: '問い3つが同時に満タン — 同じ段階でも微生物・泡が倍で上限に達する',
+      props: { top: 1, total: 3 },
     },
     {
       id: 'out-of-range',
       probe: true,
-      description: 'Probe: 上限を超える readiness（99）でも 3.0 と同じ上限で頭打ちになる',
-      props: { readiness: 99 },
+      description: 'Probe: 上限を超える値でも満タンで頭打ちになる',
+      props: { top: 99, total: 99 },
     },
     {
       id: 'negative',
       probe: true,
-      description: 'Probe: 負の readiness は 0 と同じ扱い（空っぽ）',
-      props: { readiness: -1 },
+      description: 'Probe: 負の値は 0 と同じ扱い（空っぽ）',
+      props: { top: -1, total: -1 },
     },
   ],
   invariants: [
@@ -114,7 +121,7 @@ registerUnit<Props>({
     },
     {
       id: 'empty-jar-is-empty',
-      description: 'readiness 0 では液が空・微生物も泡も無い',
+      description: '何も進んでいなければ液は空・微生物も泡も無い',
       onlyFixtures: ['empty', 'negative'],
       check: ({ contract }) =>
         (contract.fillPct === '0' && contract.microbes === '0' && contract.bubbles === '0') ||
@@ -122,7 +129,7 @@ registerUnit<Props>({
     },
     {
       id: 'matured-fills-liquid-only',
-      description: 'readiness 1.0 で液は満ちきるが、微生物はまだ増え始めていない',
+      description: '液が満ちきった時点では、微生物はまだ増え始めていない',
       onlyFixtures: ['matured'],
       check: ({ contract }) =>
         (contract.fillPct === '100' && contract.microbes === '0' && contract.bubbles === '0') ||
@@ -130,22 +137,44 @@ registerUnit<Props>({
     },
     {
       id: 'active-has-microbes-but-no-bubbles',
-      description: 'readiness 2.0 で微生物が出そろい、泡はまだ出ない（段階の境目）',
+      description: '微生物が漂う段階では、泡はまだ出ない（段階の境目）',
       onlyFixtures: ['active'],
       check: ({ contract }) =>
-        (contract.microbes === String(JAR_VESSEL_SLOTS.microbes) && contract.bubbles === '0') ||
-        `expected microbes=${JAR_VESSEL_SLOTS.microbes} & bubbles=0, got microbes=${contract.microbes}, bubbles=${contract.bubbles}`,
+        (Number(contract.microbes) > 0 && contract.bubbles === '0') ||
+        `expected some microbes & bubbles=0, got microbes=${contract.microbes}, bubbles=${contract.bubbles}`,
     },
     {
       id: 'bubbling-is-maxed',
-      description: 'readiness 3.0 で液・微生物・泡・文字がすべて上限に達する',
-      onlyFixtures: ['bubbling', 'out-of-range'],
+      description: '問い3つが満タンなら液・微生物・泡・文字がすべて上限に達する',
+      onlyFixtures: ['trio-bubbling'],
       check: ({ contract }) =>
         (contract.fillPct === '100' &&
           contract.microbes === String(JAR_VESSEL_SLOTS.microbes) &&
           contract.bubbles === String(JAR_VESSEL_SLOTS.bubbles) &&
           contract.words === String(JAR_VESSEL_SLOTS.words)) ||
         `expected everything maxed, got fillPct=${contract.fillPct}, microbes=${contract.microbes}, bubbles=${contract.bubbles}, words=${contract.words}`,
+    },
+    {
+      id: 'solo-still-bubbles',
+      description: '問いが1つでも泡は立つ（PR #559 レビューでの決定）',
+      onlyFixtures: ['solo-bubbling'],
+      check: ({ root, contract }) => {
+        const bubbles = root.querySelectorAll('[data-jar-bubble]').length;
+        return (
+          (Number(contract.bubbles) > 0 && bubbles > 0) ||
+          `問い1つでも泡立つはずが bubbles=${contract.bubbles} / 描画=${bubbles}`
+        );
+      },
+    },
+    {
+      id: 'out-of-range-is-capped',
+      description: '上限を超える値でも満タン（問い1つぶん）で頭打ちになる',
+      onlyFixtures: ['out-of-range'],
+      check: ({ contract }) =>
+        (contract.fillPct === '100' &&
+          Number(contract.microbes) <= JAR_VESSEL_SLOTS.microbes &&
+          Number(contract.bubbles) <= JAR_VESSEL_SLOTS.bubbles) ||
+        `expected capped, got fillPct=${contract.fillPct}, microbes=${contract.microbes}, bubbles=${contract.bubbles}`,
     },
   ],
 });

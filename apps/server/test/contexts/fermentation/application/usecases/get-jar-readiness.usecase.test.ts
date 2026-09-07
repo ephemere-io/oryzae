@@ -127,7 +127,7 @@ describe('GetJarReadinessUsecase', () => {
       buildLocaleResolver('ja'),
     );
 
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 0, questionCount: 0 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({ top: 0, total: 0, questionCount: 0 });
     expect(fermentationRepo.listByUserId).not.toHaveBeenCalled();
   });
 
@@ -141,7 +141,7 @@ describe('GetJarReadinessUsecase', () => {
     );
 
     // ja 閾値 1000 → 500/1000 = 0.5
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 0.5, questionCount: 1 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({ top: 0.5, total: 0.5, questionCount: 1 });
   });
 
   it('問いごとの readiness を足し合わせる（3問い満タンで 3.0）', async () => {
@@ -154,7 +154,26 @@ describe('GetJarReadinessUsecase', () => {
     );
 
     // 1問いあたり 1.0 で頭打ち。q-2 が 2000 字でも 1.0 のまま。
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 3, questionCount: 3 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({ top: 1, total: 3, questionCount: 3 });
+  });
+
+  it('top はいちばん進んだ問い、total は総和（問い1つでも段階が進むための素材）', async () => {
+    // 問いごとに進み具合が違うケース。ja 閾値 1000 → 0.2 / 0.9 / 0.3。
+    const usecase = new GetJarReadinessUsecase(
+      buildQuestionRepo([buildQuestion('q-1'), buildQuestion('q-2'), buildQuestion('q-3')]),
+      buildEntryRepo({ 'q-1': 200, 'q-2': 900, 'q-3': 300 }),
+      buildFermentationRepo([]),
+      buildStateRepo(null),
+      buildLocaleResolver('ja'),
+    );
+
+    // top が総和や平均になっていたら 1.4 や 0.47 になる。最大でなければ、
+    // 問い1つの人が泡立てるようにした狙い (PR #559) が崩れる。
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({
+      top: 0.9,
+      total: 1.4,
+      questionCount: 3,
+    });
   });
 
   it('浮動小数の端数を残さない（0.1 + 0.2 が 0.30000000000000004 にならない）', async () => {
@@ -166,7 +185,7 @@ describe('GetJarReadinessUsecase', () => {
       buildLocaleResolver('ja'),
     );
 
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 0.3, questionCount: 2 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({ top: 0.2, total: 0.3, questionCount: 2 });
   });
 
   it('発酵済みの問いは直近成功発酵からの経過時間で頭打ちになる', async () => {
@@ -180,7 +199,11 @@ describe('GetJarReadinessUsecase', () => {
     );
 
     // charScore=1.0 / timeScore=12h÷48h=0.25 → min は 0.25
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 0.25, questionCount: 1 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({
+      top: 0.25,
+      total: 0.25,
+      questionCount: 1,
+    });
   });
 
   it('失敗した発酵は「直近の成功」に数えない（時間ゲートを開始させない）', async () => {
@@ -194,7 +217,7 @@ describe('GetJarReadinessUsecase', () => {
     );
 
     // 未発酵扱い → 時間ゲート免除で charScore(=1.0) がそのまま出る
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 1, questionCount: 1 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({ top: 1, total: 1, questionCount: 1 });
   });
 
   it('同じ問いに複数の成功発酵があれば最新を基準にする', async () => {
@@ -213,7 +236,7 @@ describe('GetJarReadinessUsecase', () => {
     );
 
     // 古い方を基準にすると timeScore=1.0 になってしまう。新しい方なら 24÷48=0.5。
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 0.5, questionCount: 1 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({ top: 0.5, total: 0.5, questionCount: 1 });
     expect(entryRepo.countCharsByQuestionIdSince).toHaveBeenCalledWith(USER_ID, 'q-1', newer);
   });
 
@@ -226,7 +249,7 @@ describe('GetJarReadinessUsecase', () => {
       buildLocaleResolver('en'),
     );
 
-    expect(await usecase.execute(USER_ID, NOW)).toEqual({ score: 0.5, questionCount: 1 });
+    expect(await usecase.execute(USER_ID, NOW)).toEqual({ top: 0.5, total: 0.5, questionCount: 1 });
   });
 
   it('lastRunAt / nextEligibleAt など逆算の材料を返さない（issue #278）', async () => {
@@ -241,7 +264,8 @@ describe('GetJarReadinessUsecase', () => {
 
     expect(Object.keys(await usecase.execute(USER_ID, NOW)).sort()).toEqual([
       'questionCount',
-      'score',
+      'top',
+      'total',
     ]);
   });
 });

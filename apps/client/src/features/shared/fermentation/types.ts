@@ -96,7 +96,10 @@ export interface InboxLetter {
  * という体験が壊れるため、サーバーも返さない）。
  */
 export interface JarReadiness {
-  score: number;
+  /** いちばん進んだ問いの readiness（0〜1）。瓶の演出の段階を決める。 */
+  top: number;
+  /** 全問いの readiness の総和（0〜問いの数）。瓶の賑やかさを決める。 */
+  total: number;
   questionCount: number;
 }
 

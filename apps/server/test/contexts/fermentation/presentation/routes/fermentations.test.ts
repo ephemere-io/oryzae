@@ -61,22 +61,22 @@ describe('GET /api/v1/fermentations/readiness', () => {
   // Hono は登録順に照合するので、`/readiness` が `/:id` より後ろに移ると
   // id="readiness" として詳細取得へ吸われる。順序が壊れたらここで落ちる。
   it('`/:id` に吸われず readiness usecase が呼ばれる（route 順の回帰ガード）', async () => {
-    mockJarReadinessExecute.mockResolvedValue({ score: 1.5, questionCount: 3 });
+    mockJarReadinessExecute.mockResolvedValue({ top: 0.9, total: 1.5, questionCount: 3 });
 
     const res = await buildApp().request('/api/v1/fermentations/readiness');
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ score: 1.5, questionCount: 3 });
+    expect(await res.json()).toEqual({ top: 0.9, total: 1.5, questionCount: 3 });
     expect(mockJarReadinessExecute).toHaveBeenCalledWith('user-1');
     expect(mockGetResultExecute).not.toHaveBeenCalled();
   });
 
   it('逆算の材料（lastRunAt / nextEligibleAt）を返さない（issue #278）', async () => {
-    mockJarReadinessExecute.mockResolvedValue({ score: 0.25, questionCount: 1 });
+    mockJarReadinessExecute.mockResolvedValue({ top: 0.25, total: 0.25, questionCount: 1 });
 
     const res = await buildApp().request('/api/v1/fermentations/readiness');
     const body = await res.json();
 
-    expect(Object.keys(body).sort()).toEqual(['questionCount', 'score']);
+    expect(Object.keys(body).sort()).toEqual(['questionCount', 'top', 'total']);
   });
 });
