@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { StudyMark } from './study-mark';
 
 /**
  * サブ画面の左上に浮く「書斎へ戻る」マーク（`docs/oryzae-study/00-overview.md`）。
@@ -39,45 +40,9 @@ export function BackToStudy() {
       }}
     >
       {/* 書斎そのものを小さく描く: 机の上に壜と手帳、奥に板。行き先が「あの部屋」だと
-          一目で分かるようにする（以前は "o" の一文字で、書斎を想起させなかった）。 */}
-      <svg
-        aria-hidden="true"
-        width="20"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        style={{ color: '#8EA89C' }}
-      >
-        {/* 奥の板 */}
-        <rect
-          x="11.4"
-          y="3.2"
-          width="6"
-          height="4.6"
-          rx="0.4"
-          stroke="currentColor"
-          strokeWidth="0.9"
-          opacity="0.55"
-        />
-        {/* 机の天板 */}
-        <path d="M1.8 14.2H18.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-        {/* 壜（首とふくらみ） */}
-        <path
-          d="M6.1 6.4V8.1C6.1 9.2 4.6 9.9 4.6 11.6C4.6 13.1 5.7 14.1 7.3 14.1C8.9 14.1 10 13.1 10 11.6C10 9.9 8.5 9.2 8.5 8.1V6.4"
-          stroke="currentColor"
-          strokeWidth="0.9"
-          strokeLinejoin="round"
-        />
-        <path d="M5.7 6.4H8.9" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" />
-        {/* 机に積んだ手帳 */}
-        <path
-          d="M11.6 14.1V12.4H17.1V14.1"
-          stroke="currentColor"
-          strokeWidth="0.9"
-          strokeLinejoin="round"
-        />
-        <path d="M11.9 13.2H16.8" stroke="currentColor" strokeWidth="0.7" opacity="0.6" />
-      </svg>
+          一目で分かるようにする（以前は "o" の一文字で、書斎を想起させなかった）。
+          書斎側の左上マークと**同じ絵**を共有する（StudyMark）。 */}
+      <StudyMark />
       {/* 文字はホバーで開く。常時出すと画面の左上を占め続ける。 */}
       <span
         className="max-w-0 overflow-hidden whitespace-nowrap text-[9px] uppercase tracking-[0.2em] opacity-0 transition-all duration-300 group-hover:max-w-[140px] group-hover:opacity-100"
