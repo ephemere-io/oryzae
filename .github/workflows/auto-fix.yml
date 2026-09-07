@@ -81,7 +81,15 @@ jobs:
       issues: write # 台帳 Issue の更新と、対象 Issue へのコメント
       actions: write # 失敗した run のログを読み、マージ後に E2E を起動する
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ルールセット「Protect main」が main に 1 承認を要求するため、GITHUB_TOKEN では
+      # マージできない（bypass できるのは Admin ロールだけで、github-actions[bot] は Admin ではない。
+      # GitHub Actions 自体をルールセットの bypass に指定することは API が拒否する:
+      # "Actor GitHub Actions integration must be part of the ruleset source or owner organization"）。
+      #
+      # AUTO_FIX_TOKEN（Admin 権限を持つ fine-grained PAT）があればそれを使い、
+      # 無ければ GITHUB_TOKEN のまま動く。後者の場合、修正はブランチと PR までは作られ、
+      # マージだけが人待ちになる（差分は失われない）。
+      GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
       LEDGER_TITLE: '[auto-fix] 予算台帳と稼働状況'
     steps:
       - uses: actions/checkout@v7
@@ -614,15 +622,22 @@ jobs:
           echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
 
           # 作成直後は GitHub 側の mergeable 判定が済んでいないことがあるので数回試す。
+          # --admin はルールセットの 1 承認要求を bypass するために要る（AUTO_FIX_TOKEN が
+          # Admin のときだけ通る）。権限が無ければ素の merge に落として、そちらも駄目なら諦める。
           for attempt in 1 2 3 4 5; do
-            if gh pr merge "$branch" --squash --delete-branch; then
+            if gh pr merge "$branch" --squash --delete-branch --admin 2>/dev/null \
+               || gh pr merge "$branch" --squash --delete-branch; then
               echo "マージした: $url" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             echo "マージ待ち（${attempt} 回目）"
             sleep 10
           done
-          echo "::error::PR は作成したがマージできなかった: $url"
+          # ここに来るのはほぼ「ルールセットの 1 承認要求を bypass できるトークンが無い」場合。
+          # 差分はブランチと PR に残っているので、人がマージすれば拾える。
+          echo "::error::PR は作成したがマージできなかった: $url" \
+               "AUTO_FIX_TOKEN（Admin 権限の fine-grained PAT）を設定すると自動マージできる。" \
+               "設定しない場合、このループは「修正して PR を出すところまで」動く（docs/auto-fix-loop-guide.md）。"
           exit 1
 
       # マージした変更は push イベントの CI を起動しない（GITHUB_TOKEN の再帰防止）。
