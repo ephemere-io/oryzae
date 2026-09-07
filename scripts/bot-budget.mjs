@@ -90,11 +90,19 @@ export function capUsd({ budgetJpy, jpyPerUsd }) {
 }
 
 /**
- * 直近の「差分は出たがマージできなかった」実行が何回続いているかを数える。
+ * 直近の「費用は使ったが何も入らなかった」実行が何回続いているかを数える。
  *
- * ゲート落ち（gates-failed）や許可領域外（blocked）が続くのは、直し方の問題ではなく
- * 前提の問題（ハーネスが変わった・指示が古い・対象の選び方が悪い）であることが多い。
- * そのまま回すと、毎回同じ壁に当たって予算だけが減る。人が見るまで止める。
+ * 数える対象:
+ *   - gates-failed / blocked … 差分は出たがマージできなかった
+ *   - aborted               … 1 回あたりの上限に当たって途中で切られた
+ *
+ * どれも直し方の問題ではなく前提の問題（ハーネスが変わった・指示が古い・
+ * 対象が大きすぎる・上限が低すぎる）であることが多い。そのまま回すと毎回同じ壁に
+ * 当たって予算だけが減る。人が見るまで止める。
+ *
+ * aborted を数える理由は実測にある。初回実行（2026-09-06）は effort=high・上限 $0.60 で
+ * 30 ターン・175 秒を使い切って中断した。上限と対象の大きさが釣り合っていないと、
+ * 何度でも同じように使い切る。「使い切ったのに何も残らない」は止めるべき兆候である。
  *
  * 「何も見つからなかった（no-fix）」は数えない。巡回で問題が無いのは正しい結果であり、
  * それで止めると、壊れたものを直す経路まで巻き添えで止まる。
@@ -106,8 +114,13 @@ export function barrenStreak(ledger) {
   let streak = 0;
   for (let i = runs.length - 1; i >= 0; i--) {
     const result = String(runs[i]?.result ?? '');
-    if (result.startsWith('gates-failed') || result.startsWith('blocked')) streak++;
-    else break;
+    if (
+      result.startsWith('gates-failed') ||
+      result.startsWith('blocked') ||
+      result.startsWith('aborted')
+    ) {
+      streak++;
+    } else break;
   }
   return streak;
 }

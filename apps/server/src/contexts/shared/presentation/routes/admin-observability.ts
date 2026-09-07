@@ -5,6 +5,7 @@ import { type ActualCostResult, fetchActualCost } from '../../infrastructure/ant
 import {
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
+  OCR_MODEL_ID,
 } from '../../infrastructure/claude-pricing.js';
 import {
   aggregateCost,
@@ -57,6 +58,20 @@ const vercelDeployListSchema = z.object({
     }),
   ),
 });
+
+/**
+ * モデル ID → Oryzae での用途。
+ *
+ * Anthropic は「用途」を知らない。モデルが分かれているから用途別に読めるだけで、
+ * **同じモデルを他の用途や CI が使えば同じバケットに混ざる**。だから返すのは
+ * 「このモデルを使っている機能」であって「その機能のコード」ではない。
+ * 画面・通知の文言もそのつもりで書くこと。
+ */
+function featureOfModel(model: string): string | null {
+  if (model === FERMENTATION_MODEL_ID) return '発酵';
+  if (model === OCR_MODEL_ID) return 'OCR';
+  return null;
+}
 
 // ── Summary (hub page) ──────────────────────────────────
 
@@ -238,7 +253,14 @@ export const adminObservability = new Hono<Env>()
 
   // ── AI spend detail ───────────────────────────────────
   // 実請求額 (Anthropic cost_report) と 推定 (自前トークン × 価格表) を明確に分けて返す。
-  // Anthropic 側は Oryzae のユーザーを知らないため、ユーザー別内訳は推定のみ。
+  //
+  // **用途別の内訳は実額側で出す。** cost_report を group_by[]=description で取ると
+  // モデル別に割れ、Oryzae は用途ごとに別モデルを使っている（発酵 = sonnet-4-6、
+  // OCR = opus-5）ので、モデル別内訳がそのまま用途別の実額になる。推定しない。
+  //
+  // 推定が残っているのは **ユーザー別内訳** のためだけ。Anthropic は Oryzae の
+  // ユーザーを知らないので、その軸だけは実額で出せない。
+  //
   // 日別は両者を突き合わせられるよう UTC 日で揃える（cost_report が UTC 固定のため）。
   .get('/spend', async (c) => {
     const supabase = c.get('adminSupabase');
@@ -277,6 +299,20 @@ export const adminObservability = new Hono<Env>()
         status: actual.kind,
         totalCostUsd: actual.kind === 'ok' ? actual.totalCostUsd : null,
         daily: actual.kind === 'ok' ? actual.daily : [],
+        // モデル別の実額。どのモデルがどの用途かは feature で添える。
+        // Anthropic は「用途」を知らないので、対応付けはこちらの知識。
+        byModel:
+          actual.kind === 'ok'
+            ? actual.byModel.map((m) => ({
+                model: m.model,
+                costUsd: m.costUsd,
+                byTokenType: m.byTokenType,
+                feature: featureOfModel(m.model),
+              }))
+            : [],
+        // 内訳が返らなかった場合 true。総額は正しいまま内訳だけ消えるので、
+        // 空配列を「内訳ゼロ」と読ませないために別途返す。
+        groupingUnavailable: actual.kind === 'ok' ? actual.groupingUnavailable : false,
         // truncated は status === 'ok' のときだけ意味を持つ。失敗時の false は
         // 「完全に取得できた」ではなく「該当なし」。必ず status を先に見ること。
         truncated: actual.kind === 'ok' ? actual.truncated : false,

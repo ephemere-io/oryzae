@@ -35,12 +35,22 @@ export default function EntryDetailPage() {
 
   return (
     <DeviceView
-      sp={<SpEntryEditor api={api} initialEntryId={entry.id} initialContent={entry.content} />}
+      sp={
+        <SpEntryEditor
+          api={api}
+          initialEntryId={entry.id}
+          initialContent={entry.content}
+          initialMediaUrls={entry.mediaUrls}
+          initialMediaSignedUrls={entry.mediaSignedUrls}
+        />
+      }
       pc={
         <EntryEditor
           entryId={entry.id}
           initialContent={entry.content}
           initialEffects={entry.effects}
+          initialMediaUrls={entry.mediaUrls}
+          initialMediaSignedUrls={entry.mediaSignedUrls}
           createdAt={entry.createdAt}
           updatedAt={entry.updatedAt}
           api={api}
