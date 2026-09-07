@@ -174,7 +174,7 @@ describe('cronCostAlert', () => {
     // 100,000 * $3/1M + 10,000 * $15/1M = 0.3 + 0.15 = 0.45
     expect(body.estimatedCost).toBeCloseTo(0.45, 6);
     expect(body.fermentationCount).toBe(1);
-    expect(fieldValue('推定コスト')).toBe('$0.4500');
+    expect(fieldValue('推定コスト (発酵・記録分)')).toBe('$0.4500');
   });
 
   it('aggregates over the JST day, not the UTC day', async () => {
@@ -238,8 +238,14 @@ describe('cronCostAlert', () => {
 
     // JST 8/9 の定期発酵は UTC 8/8 に走る
     expect(body.actualCostUtcDate).toBe('2026-08-08');
-    expect(body.actualCost).toEqual({ status: 'ok', costUsd: 0.465, truncated: false });
-    expect(fieldValue('実請求額')).toBe('$0.4650 (UTC 2026-08-08)');
+    expect(body.actualCost).toEqual({
+      status: 'ok',
+      costUsd: 0.465,
+      truncated: false,
+      // group_by が無い応答なので内訳は受け皿に入る（総額と一致する）
+      byModel: [{ model: '(内訳なし)', costUsd: 0.465, feature: null }],
+    });
+    expect(fieldValue('実請求額 (org 全体)')).toBe('$0.4650 (UTC 2026-08-08)');
   });
 
   it('says the admin key is unset rather than reporting $0', async () => {
@@ -249,7 +255,7 @@ describe('cronCostAlert', () => {
     const body = await res.json();
 
     expect(body.actualCost).toEqual({ status: 'not-configured' });
-    expect(fieldValue('実請求額')).toBe('未設定 (ANTHROPIC_ADMIN_KEY)');
+    expect(fieldValue('実請求額 (org 全体)')).toBe('未設定 (ANTHROPIC_ADMIN_KEY)');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -293,6 +299,132 @@ describe('cronCostAlert', () => {
     const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
     expect((await res.json()).thresholdExceeded).toBe(true);
+  });
+
+  // 用途別（= モデル別）の内訳は **実額** から取る。自前トークンを記録して
+  // 単価を掛ける方式はやめた（cost_report が group_by[]=description で
+  // モデル別に割れるため。そちらはキャッシュ・値引きも反映済みで正確）。
+  describe('実請求額のモデル別内訳', () => {
+    function costReportResponse(results: Record<string, unknown>[]) {
+      return {
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            data: [{ starting_at: '2026-08-08T00:00:00Z', results }],
+            has_more: false,
+          }),
+        text: () => Promise.resolve(''),
+      };
+    }
+
+    it('モデル別の実額を出し、Oryzae での用途を添える', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      supabaseState.rows = [fermentation()];
+      mockFetch.mockResolvedValueOnce(
+        costReportResponse([
+          { amount: '12.4836', model: 'claude-sonnet-4-6', token_type: 'output_tokens' },
+          { amount: '18.81', model: 'claude-opus-5', token_type: 'output_tokens' },
+        ]),
+      );
+
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const body = await res.json();
+
+      const breakdown = fieldValue('実請求額の内訳（モデル別・実額）') ?? '';
+      expect(breakdown).toContain('claude-opus-5  $0.1881  ← OCR のモデル');
+      expect(breakdown).toContain('claude-sonnet-4-6  $0.1248  ← 発酵 のモデル');
+
+      expect(body.actualCost.byModel).toEqual([
+        { model: 'claude-opus-5', costUsd: 0.1881, feature: 'OCR' },
+        { model: 'claude-sonnet-4-6', costUsd: 0.124836, feature: '発酵' },
+      ]);
+    });
+
+    it('知らないモデルは用途を付けずにそのまま出す（勝手に決めつけない）', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      mockFetch.mockResolvedValueOnce(
+        costReportResponse([{ amount: '500', model: 'some-other-model' }]),
+      );
+
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const body = await res.json();
+
+      expect(fieldValue('実請求額の内訳（モデル別・実額）')).toContain('some-other-model  $5.0000');
+      expect(body.actualCost.byModel[0].feature).toBeNull();
+    });
+
+    it('内訳が取れなかったときは、その旨を出す（総額は正しいと添える）', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      // group_by が効かない応答（model も cost_type も無い）
+      mockFetch.mockResolvedValueOnce(costReportResponse([{ amount: '500' }]));
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const breakdown = fieldValue('実請求額の内訳（モデル別・実額）') ?? '';
+      expect(breakdown).toContain('group_by が効いていない可能性');
+      expect(breakdown).toContain('総額は正しい値です');
+    });
+
+    it('内訳に Anthropic Console への照合リンクを付ける', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      mockFetch.mockResolvedValueOnce(
+        costReportResponse([{ amount: '500', model: 'claude-opus-5' }]),
+      );
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      // 通知だけで数字の裏取りに行けること（Console はモデル別 + API キー別に割れる）
+      expect(fieldValue('実請求額の内訳（モデル別・実額）')).toContain(
+        '[Anthropic Console で照合](https://platform.claude.com/cost)',
+      );
+    });
+
+    it('実額が取れないときは内訳フィールドを出さない', async () => {
+      supabaseState.rows = [fermentation()];
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      expect(fieldValue('実請求額の内訳（モデル別・実額）')).toBeUndefined();
+      expect(fieldValue('差額 (実請求 − 推定)')).toBeUndefined();
+    });
+  });
+
+  // 「推定と実請求の違いが分からない・エビデンスも分からない」への対応。
+  describe('推定の根拠と、実請求との差の説明', () => {
+    it('計算式をそのまま載せる（レポートの数字だけで検算できる）', async () => {
+      supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const basis = fieldValue('推定の計算根拠') ?? '';
+      expect(basis).toContain('発酵 (claude-sonnet-4-6)');
+      expect(basis).toContain('in  5,972 × $3.00/MTok = $0.017916');
+      expect(basis).toContain('out 7,128 × $15.00/MTok = $0.106920');
+      expect(basis).toContain('$0.124836');
+    });
+
+    it('実請求と推定の差額と、その正体を書く', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            data: [{ starting_at: '2026-08-08T00:00:00Z', results: [{ amount: '31.29' }] }],
+            has_more: false,
+          }),
+        text: () => Promise.resolve(''),
+      });
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      // 0.3129 - 0.124836 = 0.188064
+      const gap = fieldValue('差額 (実請求 − 推定)') ?? '';
+      expect(gap).toContain('$0.1881');
+      expect(gap).toContain('推定は発酵のみ');
+    });
   });
 
   it('returns 500 and notifies Discord ERROR when an unexpected error is thrown', async () => {

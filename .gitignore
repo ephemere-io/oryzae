@@ -18,3 +18,6 @@ screenshots/
 .claude/worktrees/
 .vercel
 supabase/.temp/
+# 自動修正ループ（.github/workflows/auto-fix.yml）の作業用。
+# ここを追跡すると、指示ファイルや結果 JSON が修正差分に混ざってマージされる。
+.bot/

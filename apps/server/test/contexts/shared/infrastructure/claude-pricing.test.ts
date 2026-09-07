@@ -4,6 +4,7 @@ import {
   computeCostFromTokens,
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
+  OCR_MODEL_ID,
 } from '@/contexts/shared/infrastructure/claude-pricing.js';
 
 describe('computeCostFromTokens', () => {
@@ -68,5 +69,20 @@ describe('価格表とモデルの対応', () => {
   it('gateway がプロンプトを組める（価格表の定数を import しても壊れない）', () => {
     // gateway が claude-pricing を import する構造になったことの回帰確認。
     expect(typeof __INTERNAL.buildPrompt).toBe('function');
+  });
+});
+
+// コストの用途別内訳は cost_report の **モデル別** 実額で出している
+// (anthropic-cost-api.ts)。発酵と OCR が同じモデルになると、その内訳が
+// 用途別として機能しなくなる（混ざって区別できない）。
+describe('用途とモデルの対応', () => {
+  it('発酵と OCR は別モデル（モデル別内訳が用途別内訳として成立する前提）', () => {
+    expect(OCR_MODEL_ID).not.toBe(FERMENTATION_MODEL_ID);
+  });
+
+  it('OCR のモデルは価格表に載せない（実額から取るので二重管理しない）', async () => {
+    const pricing = await import('@/contexts/shared/infrastructure/claude-pricing.js');
+    // RATES は非公開なので、公開されている単価の口が発酵のぶんだけであることで代用する。
+    expect(Object.keys(pricing)).not.toContain('OCR_MODEL_RATE');
   });
 });

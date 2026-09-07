@@ -16,6 +16,21 @@ function makeData(overrides: Partial<SpendData> = {}): SpendData {
       daily: [{ date: '2026-08-30', costUsd: 1.23 }],
       truncated: false,
       message: null,
+      byModel: [
+        {
+          model: 'claude-opus-5',
+          costUsd: 0.8,
+          byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.8 }],
+          feature: 'OCR',
+        },
+        {
+          model: 'claude-sonnet-4-6',
+          costUsd: 0.43,
+          byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.43 }],
+          feature: '発酵',
+        },
+      ],
+      groupingUnavailable: false,
     },
     estimated: {
       status: 'ok',
@@ -81,6 +96,8 @@ describe('SpendView の Anthropic Console リンク', () => {
           daily: [],
           truncated: false,
           message: null,
+          byModel: [],
+          groupingUnavailable: false,
         },
       }),
     );
@@ -98,6 +115,8 @@ describe('SpendView の Anthropic Console リンク', () => {
           daily: [],
           truncated: false,
           message: 'cost_report responded 401',
+          byModel: [],
+          groupingUnavailable: false,
         },
       }),
     );
@@ -125,7 +144,7 @@ describe('SpendView の推定コストの計算根拠', () => {
     renderView(makeData());
 
     expect(screen.getByText('計算根拠')).toBeTruthy();
-    expect(screen.getByText('claude-sonnet-4-6')).toBeTruthy();
+    expect(screen.getAllByText('claude-sonnet-4-6').length).toBeGreaterThan(0);
     // in 300,000 × $3/MTok = $0.9000
     expect(screen.getByText(/in 300,000 × \$3\.00\/MTok = \$0\.9000/)).toBeTruthy();
     // out 40,000 × $15/MTok = $0.6000
@@ -143,7 +162,74 @@ describe('SpendView の推定コストの計算根拠', () => {
       }),
     );
 
-    expect(screen.getByText('claude-opus-5')).toBeTruthy();
+    expect(screen.getAllByText('claude-opus-5').length).toBeGreaterThan(0);
     expect(screen.getByText(/in 300,000 × \$5\.00\/MTok = \$1\.5000/)).toBeTruthy();
+  });
+});
+
+// 用途別（= モデル別）の内訳は **実額** で出す。自前トークンの推定ではないので、
+// キャッシュ・値引き・課金丸めも反映済み。「OCR がいくらか」はここで読む。
+describe('SpendView の実請求額のモデル別内訳', () => {
+  it('モデル別の実額と、そのモデルを使っている機能を出す', () => {
+    renderView(makeData());
+
+    expect(screen.getByText('実請求額の内訳（モデル別）')).toBeTruthy();
+    expect(screen.getAllByText('claude-opus-5').length).toBeGreaterThan(0);
+    expect(screen.getByText(/← OCR のモデル/)).toBeTruthy();
+    // モデル合計と token_type 内訳の両方に出る（内訳が合計と一致している証拠）
+    expect(screen.getAllByText('$0.8000').length).toBe(2);
+    expect(screen.getByText(/← 発酵 のモデル/)).toBeTruthy();
+  });
+
+  it('token_type の内訳も出す（キャッシュが混ざれば見える）', () => {
+    renderView(makeData());
+
+    expect(screen.getAllByText('output_tokens').length).toBeGreaterThan(0);
+  });
+
+  // 「そのモデルのコスト」であって「その機能のコスト」ではない。
+  // 同じモデルを CI 等が使えば混ざるので、そこを言い切らない。
+  it('用途名が「そのモデルを使っている機能」だと明示する', () => {
+    renderView(makeData());
+
+    expect(screen.getByText(/そのモデルを使っている機能/)).toBeTruthy();
+  });
+
+  // group_by が効かないと総額は正しいまま内訳だけ消える。空配列を
+  // 「内訳ゼロ」と見せると気づけないので、明示的に伝える。
+  it('内訳の隣に Console への照合リンクを置く', () => {
+    renderView(makeData());
+
+    expect(screen.getByText('Console の Cost ページで照合')).toBeTruthy();
+    expect(screen.getByText(/API キー別の内訳もそちらで見られます/)).toBeTruthy();
+  });
+
+  it('内訳が取れなかったときは、その旨を出して内訳を並べない', () => {
+    const base = makeData();
+    renderView({
+      ...base,
+      actual: { ...base.actual, groupingUnavailable: true },
+    });
+
+    expect(screen.getByText(/内訳を返しませんでした/)).toBeTruthy();
+    expect(screen.queryByText('実請求額の内訳（モデル別）')).toBeNull();
+  });
+
+  it('実額が取れないときは内訳を出さない（$0 の行を並べない）', () => {
+    renderView(
+      makeData({
+        actual: {
+          status: 'not-configured',
+          totalCostUsd: null,
+          daily: [],
+          truncated: false,
+          message: null,
+          byModel: [],
+          groupingUnavailable: false,
+        },
+      }),
+    );
+
+    expect(screen.queryByText('実請求額の内訳（モデル別）')).toBeNull();
   });
 });

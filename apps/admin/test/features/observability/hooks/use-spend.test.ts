@@ -21,6 +21,15 @@ const sampleSpend = {
     daily: [{ date: '2026-08-08', costUsd: 1.23 }],
     truncated: false,
     message: null,
+    byModel: [
+      {
+        model: 'claude-opus-5',
+        costUsd: 0.8,
+        byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.8 }],
+        feature: 'OCR',
+      },
+    ],
+    groupingUnavailable: false,
   },
   estimated: {
     status: 'ok',
@@ -96,6 +105,8 @@ describe('useSpend', () => {
           daily: [],
           truncated: false,
           message: null,
+          byModel: [],
+          groupingUnavailable: false,
         },
       }),
     );
@@ -153,6 +164,54 @@ describe('useSpend', () => {
     });
 
     expect(result.current.error).toBe('コストデータの取得に失敗しました');
+  });
+
+  // 用途別の内訳は実額側（actual.byModel）にある。推定で OCR を出す方式はやめた。
+  it('モデル別の実額内訳を保持する', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleSpend));
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data?.actual.byModel).toHaveLength(1);
+    expect(result.current.data?.actual.byModel[0]?.model).toBe('claude-opus-5');
+    expect(result.current.data?.actual.byModel[0]?.feature).toBe('OCR');
+  });
+
+  it('byModel が欠けた応答は取り込まない（内訳なしを内訳ゼロと見せない）', async () => {
+    const { byModel: _byModel, ...actualWithoutByModel } = sampleSpend.actual;
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, { ...sampleSpend, actual: actualWithoutByModel }),
+    );
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBe('コストデータの取得に失敗しました');
+  });
+
+  it('groupingUnavailable を保持する（内訳なしを内訳ゼロと見せない）', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        ...sampleSpend,
+        actual: { ...sampleSpend.actual, byModel: [], groupingUnavailable: true },
+      }),
+    );
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data?.actual.groupingUnavailable).toBe(true);
   });
 
   it('does nothing when no token is stored', async () => {
