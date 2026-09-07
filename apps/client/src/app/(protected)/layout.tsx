@@ -51,14 +51,17 @@ const studyMainStyle: MainStyle = {
  * マークはどの画面の上にも浮くので、画面側の左上に操作があるとその上に重なる
  * （エディタの「新規」ボタンがまさにそうだった）。**画面側が席を空けるための変数**で、
  * 読むのは PC/SP のエディタの上端の行だけ。マークが出ていない間は 0px。
+ *
+ * マーク自体を 40px から 32px へ縮めた（実機レビューで「既存 UI の邪魔になる」）ので、
+ * 席も 44px → 34px に詰める。左端 16px + マーク 32px から、隣の操作との最小の間を取る。
  */
-const STUDY_BACK_INSET = '44px';
+const STUDY_BACK_INSET = '34px';
 
 /**
  * マークの下端。左に幅を空けるだけでは足りない行（SP エディタのタイトル）が、
- * ここまで下がって重なりを避ける。
+ * ここまで下がって重なりを避ける。マークの高さ（32px）＋上端 16px より内側で足りる。
  */
-const STUDY_BACK_DROP = '28px';
+const STUDY_BACK_DROP = '20px';
 
 const studyBackStyle: MainStyle = {
   '--study-back-inset': STUDY_BACK_INSET,

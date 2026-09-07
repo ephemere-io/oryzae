@@ -132,6 +132,7 @@ export function SpElementSheet({ element, onClose, onReply, onOpenSource }: SpEl
             {element.sources.length > 0 ? (
               <>
                 <p
+                  data-sources-heading
                   className="mt-6 mb-2 text-[11px] uppercase tracking-[0.14em]"
                   style={{ color: 'var(--accent)', fontFamily: 'var(--ob-font-sans)' }}
                 >
@@ -149,7 +150,10 @@ export function SpElementSheet({ element, onClose, onReply, onOpenSource }: SpEl
                           border: '1px solid var(--border-subtle)',
                         }}
                       >
-                        <span className="min-w-0 flex-1 truncate text-sm">
+                        <span
+                          className="min-w-0 flex-1 truncate text-sm"
+                          data-source-title={source.title ? 'own' : 'fallback'}
+                        >
                           {source.title || t('source_untitled')}
                         </span>
                         <span

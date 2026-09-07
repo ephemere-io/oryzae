@@ -21,6 +21,11 @@ import { StudyMark } from './study-mark';
  * エディタの下に潜って**そもそも見えない**。一方でドロワーやモーダル（60 以上）より前に
  * 出てはいけない（開いている間はマークも一緒に伏せる）。
  * 席の確保は画面側の仕事で、`--study-back-inset`（(protected)/layout.tsx）を読む。
+ *
+ * **大きさは 32px。** 40px のときは jar / board / entry のどれでも既存の操作と近すぎ、
+ * 「邪魔になる」と実機レビューで報告された。指の当たりの下限（44px）を割るが、
+ * ここは常時出ている二次的な導線で、押し損ねても失うものが無い（もう一度押せばよい）。
+ * 主要な操作をこの大きさにはしない。
  */
 export function BackToStudy() {
   const t = useTranslations('study');
@@ -30,7 +35,7 @@ export function BackToStudy() {
       href="/study"
       {...verifyAttrs({ unit: 'BackToStudy' })}
       aria-label={t('back_to_study')}
-      className="group fixed left-6 top-6 z-[55] flex h-10 items-center gap-2 rounded-full px-3 transition-all duration-300"
+      className="group fixed left-4 top-4 z-[55] flex h-8 items-center gap-1.5 rounded-full px-2.5 transition-all duration-300"
       style={{
         background: 'rgba(253, 251, 247, 0.72)',
         backdropFilter: 'blur(10px)',
@@ -42,7 +47,7 @@ export function BackToStudy() {
       {/* 書斎そのものを小さく描く: 机の上に壜と手帳、奥に板。行き先が「あの部屋」だと
           一目で分かるようにする（以前は "o" の一文字で、書斎を想起させなかった）。
           書斎側の左上マークと**同じ絵**を共有する（StudyMark）。 */}
-      <StudyMark />
+      <StudyMark size={16} />
       {/* 文字はホバーで開く。常時出すと画面の左上を占め続ける。 */}
       <span
         className="max-w-0 overflow-hidden whitespace-nowrap text-[9px] uppercase tracking-[0.2em] opacity-0 transition-all duration-300 group-hover:max-w-[140px] group-hover:opacity-100"

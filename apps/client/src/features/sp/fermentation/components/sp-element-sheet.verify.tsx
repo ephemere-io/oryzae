@@ -70,13 +70,13 @@ registerUnit<Props>({
     },
     {
       id: 'letter',
-      description: '手紙（本文 ＋ もとになった記録 ＋ 返事を書く）',
+      description: '手紙（本文 ＋ もとになったエントリー ＋ 返事を書く）',
       props: { element: letter, onClose: noop, onReply: noop, onOpenSource: noop },
     },
     {
       id: 'letter-without-sources',
       probe: true,
-      description: 'Probe: もとになった記録が無ければ見出しごと出さない',
+      description: 'Probe: もとになったエントリーが無ければ見出しごと出さない',
       props: {
         element: { ...letter, sources: [] },
         onClose: noop,
@@ -128,21 +128,25 @@ registerUnit<Props>({
     },
     {
       id: 'sources-only-when-present',
-      description: 'もとになった記録は在るときだけ見出しごと出す',
+      description: 'もとになったエントリーは在るときだけ見出しごと出す',
       onlyFixtures: ['letter', 'letter-without-sources'],
+      // 文言そのもので探すと、用語を直すたびに検証まで壊れる（実際に壊れた）。
+      // 「見出しという場所があるか」を目印で見る。
       check: ({ root, props }) => {
-        const shown = (root.textContent ?? '').includes('もとになった記録');
+        const shown = root.querySelector('[data-sources-heading]') !== null;
         const expected = props.element.kind === 'letter' && props.element.sources.length > 0;
         return shown === expected || `見出し=${shown}（期待: ${expected}）`;
       },
     },
     {
       id: 'untitled-source-still-openable',
-      description: '見出しの無い記録も名前を補って開ける（開けなくならないように）',
+      description: '見出しの無いエントリーも名前を補って開ける（開けなくならないように）',
       onlyFixtures: ['letter'],
       check: ({ root }) => {
-        const shown = (root.textContent ?? '').includes('無題の記録');
-        return shown || '見出しの無い記録が空のボタンになっている';
+        const fallback = root.querySelector('[data-source-title="fallback"]');
+        if (fallback === null) return '名前を補う行が無い';
+        const text = (fallback.textContent ?? '').trim();
+        return text.length > 0 || '名前を補ったのに空のボタンのまま';
       },
     },
     {

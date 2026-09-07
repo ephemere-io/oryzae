@@ -33,7 +33,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { RENDER_LIMITS } from '../constants';
+import { HOME_ZOOM, RENDER_LIMITS } from '../constants';
 import type { StudyLayout } from '../layout';
 import type { StudyState, StudyTarget } from '../types';
 import { BOARD_FACE, BOARD_GRID_SPACING, PHOTO_INNER_INSET, placeBoardCards } from './board';
@@ -57,6 +57,7 @@ import {
   stackTopY,
 } from './books';
 import {
+  approach,
   boardCloseView,
   boardView,
   breathOffset,
@@ -68,6 +69,9 @@ import {
   lerpView,
   parallaxOffset,
   shelfView,
+  zoomByPinch,
+  zoomByWheel,
+  zoomedView,
 } from './camera';
 import { buildHitRegistry, type HitId, HOVER_SCALE, resolveClickTarget } from './hit-targets';
 import {
@@ -178,6 +182,12 @@ export interface StudySceneHandle {
   setPointer(x: number, y: number): void;
   /** ポインタが canvas から外れた。 */
   clearPointer(): void;
+  /** ホイールで寄り引きする（ホームのみ）。 */
+  zoomBy(deltaY: number): void;
+  /** 2 本指を置いた。以後の比はここを基準にする。 */
+  startPinch(): void;
+  /** 2 本指の間隔の比（置いた時点を 1 とする）。 */
+  pinchTo(ratio: number): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
   /** 遷移中・サブ画面ではラベルを消す。 */
@@ -319,6 +329,11 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   let hoveredObject: Object3D | null = null;
   /** いま触れている瓶の中の語。的のホバーとは排他（語のほうが優先）。 */
   let hoveredWord: JarWords[number] | null = null;
+  /** ホームの寄り引き。目標へ lerp で寄せる（指を離しても少し滑る）。 */
+  let zoom = 1;
+  let zoomTarget = 1;
+  /** 2 本指を置いた時点の倍率。 */
+  let pinchBase = 1;
 
   const parallax = { x: 0, y: 0 };
 
@@ -396,12 +411,16 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     parallax.x += (wanted.x - parallax.x) * lerp;
     parallax.y += (wanted.y - parallax.y) * lerp;
 
+    // 寄り引き。注視点は動かさないので、構図は保たれたまま距離だけ変わる。
+    zoom = approach(zoom, zoomTarget, HOME_ZOOM.lerp);
+    const view = zoomedView(homeCamera, zoom);
+
     camera.position.set(
-      homeCamera.position.x + parallax.x,
-      homeCamera.position.y + parallax.y + breathOffset(elapsed),
-      homeCamera.position.z,
+      view.position.x + parallax.x,
+      view.position.y + parallax.y + breathOffset(elapsed),
+      view.position.z,
     );
-    camera.lookAt(homeCamera.target.x, homeCamera.target.y, homeCamera.target.z);
+    camera.lookAt(view.target.x, view.target.y, view.target.z);
   }
 
   function viewAtTransition(active: NonNullable<typeof transition>, now: number): CameraView {
@@ -705,7 +724,29 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function clearPointer(): void {
     pointerInside = false;
+    setHoveredWord(null);
     setHovered(null, null);
+  }
+
+  /**
+   * 寄り引き。**ホームだけ**で効かせる。
+   *
+   * 遷移中に効かせると、着いた先のカメラと喧嘩して目的地がずれる。行き先の画面では
+   * そもそも書斎が見えていない。
+   */
+  function zoomBy(deltaY: number): void {
+    if (transition || settled) return;
+    zoomTarget = zoomByWheel(zoomTarget, deltaY);
+  }
+
+  function startPinch(): void {
+    if (transition || settled) return;
+    pinchBase = zoomTarget;
+  }
+
+  function pinchTo(ratio: number): void {
+    if (transition || settled) return;
+    zoomTarget = zoomByPinch(pinchBase, ratio);
   }
 
   function pick(): void {
@@ -858,6 +899,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     setState,
     setPointer,
     clearPointer,
+    zoomBy,
+    startPinch,
+    pinchTo,
     pick,
     isBusy: () => transition !== null || settled !== null,
     dispose,

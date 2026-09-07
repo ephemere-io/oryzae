@@ -5,7 +5,13 @@
  * 純関数のみ。
  */
 
-import { BREATH, SP_BOARD_CLOSE_RATIO, SPREAD_VIEW_Z_NUDGE, TOP_VIEW_Z_NUDGE } from '../constants';
+import {
+  BREATH,
+  HOME_ZOOM,
+  SP_BOARD_CLOSE_RATIO,
+  SPREAD_VIEW_Z_NUDGE,
+  TOP_VIEW_Z_NUDGE,
+} from '../constants';
 import type { StudyLayout } from '../layout';
 
 export interface CameraView {
@@ -100,10 +106,56 @@ export function breathOffset(elapsedMs: number): number {
   return Math.sin((elapsedMs / 1000) * BREATH.radiansPerSecond) * BREATH.amplitude;
 }
 
+/** 寄り引きの倍率を上下限に丸める。壊れた値は等倍に倒す。 */
+export function clampZoom(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(HOME_ZOOM.max, Math.max(HOME_ZOOM.min, value));
+}
+
+/**
+ * 注視点からの距離を `zoom` 倍にした view。
+ *
+ * **注視点は動かさない。** 動かすと寄り引きが平行移動を兼ねてしまい、部屋の外へ
+ * 出られるようになる。見る先は据えたまま、そこへ近づく／離れるだけにする。
+ */
+export function zoomedView(view: CameraView, zoom: number): CameraView {
+  const factor = clampZoom(zoom);
+  const { position, target } = view;
+  return {
+    position: {
+      x: target.x + (position.x - target.x) * factor,
+      y: target.y + (position.y - target.y) * factor,
+      z: target.z + (position.z - target.z) * factor,
+    },
+    target: { ...target },
+  };
+}
+
+/**
+ * ホイールの delta を寄り引きに畳む。
+ *
+ * 下へ回す（`deltaY > 0`）と離れる。ブラウザのページ送りと同じ向きにしておく。
+ */
+export function zoomByWheel(current: number, deltaY: number): number {
+  if (!Number.isFinite(deltaY)) return clampZoom(current);
+  return clampZoom(current + deltaY * HOME_ZOOM.wheelStep);
+}
+
+/**
+ * 2 本指の間隔の比を寄り引きに畳む。`base` は指を置いた時点の倍率。
+ *
+ * 指を広げる（`ratio > 1`）と近づく。距離は比の**逆数**で効く。
+ */
+export function zoomByPinch(base: number, ratio: number): number {
+  if (!Number.isFinite(ratio) || ratio <= 0) return clampZoom(base);
+  return clampZoom(base / ratio);
+}
+
 /**
  * マウス位置に応じたパララックス。`pointer` は -1..1 に正規化した画面座標。
  *
- * オービットもズームも与えない。視点は「軽く動く」だけで、利用者が構図を壊せない。
+ * オービットは与えない。寄り引き（`zoomedView`）だけは利用者に渡すが、構図
+ * （物の位置関係）は壊せない。
  */
 export function parallaxOffset(
   layout: StudyLayout,
