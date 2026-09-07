@@ -135,11 +135,17 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'pc-no-archive-label',
-      description: 'PC では ARCHIVE を出さない（背表紙のツールチップが担う）',
-      check: ({ root, contract }) => {
-        if (contract.mode !== 'pc') return true;
-        return !root.textContent?.includes('ARCHIVE') || 'PC に ARCHIVE ラベルが出ている';
+      id: 'every-target-announces-itself',
+      description: '4 つの的すべてが名乗る（黙っている的を作らない）',
+      check: ({ root }) => {
+        // 棚だけラベルを出していなかった（ホバーで背表紙のツールチップが出るから、
+        // という理由）。ホバーは**そこに何かがあると知っている人にしか効かない**ので、
+        // 過去の記録を全部持っている棚へ辿り着けなくなっていた（実機レビュー）。
+        const text = root.textContent ?? '';
+        const missing = ['JAR', 'JOURNAL', 'BOARD', 'ARCHIVE'].filter(
+          (label) => !text.includes(label),
+        );
+        return missing.length === 0 || `名乗っていない的: ${missing.join(', ')}`;
       },
     },
   ],
