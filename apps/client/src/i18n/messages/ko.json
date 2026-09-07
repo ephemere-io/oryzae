@@ -486,7 +486,9 @@
       "header_snippet": "Oryzae가 골라낸 문장",
       "header_letter": "L.A.B.의 관찰 기록",
       "snippet_source_prefix": "출처:",
-      "write_entry": "이 질문으로 항목 쓰기"
+      "write_entry": "이 질문으로 항목 쓰기",
+      "empty_label": "READING",
+      "empty_hint": "원 안의 말·발췌·편지를 고르면 여기에 펼쳐집니다."
     },
     "jar": {
       "zoom_close_aria": "확대 닫기",

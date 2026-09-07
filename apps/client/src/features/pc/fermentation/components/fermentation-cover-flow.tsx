@@ -14,6 +14,7 @@ import {
 } from '@/features/pc/fermentation/utils/cover-flow-geometry';
 import { toDateStamp } from '@/features/pc/fermentation/utils/history-labels';
 import type { FermentationDetail, FermentationSummary } from '@/features/shared/fermentation/types';
+import { useElementResize } from '@/lib/use-element-resize';
 
 /** 操作ヒントを見たか。一度めくれば以後は出さない。 */
 const HINT_SEEN_KEY = 'oryzae:jar-history-hint-seen';
@@ -106,30 +107,34 @@ export function FermentationCoverFlow({
   const t = useTranslations('fermentation');
   const open = questionId !== null && results.length > 0;
 
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  /** state で持つ（ref だと「後から現れた」ことに気づけず監視が張られない）。 */
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [canvas, setCanvas] = useState({ width: 1280, height: 800 });
 
-  // 実測はマウント直後だと 0 やレイアウト前の値になることがある。resize に加えて
-  // 400ms 後にもう一度測る（サイドバーやフォントが落ち着いてからの寸法を採る）。
+  // 実測はマウント直後だと 0 やレイアウト前の値になることがある。400ms 後にもう一度測る
+  // （サイドバーやフォントが落ち着いてからの寸法を採る）。
+  //
+  // 以後の追従は `useElementResize` に任せる。詳細列が開くとこの面は横に縮むが、
+  // ウィンドウの大きさは変わらないので window の resize では気づけない（扇が縮んだ列の
+  // 中央からずれたままになる）。
+  const measure = useCallback(() => {
+    const rect = rootEl?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    setCanvas((prev) =>
+      prev.width === rect.width && prev.height === rect.height
+        ? prev
+        : { width: rect.width, height: rect.height },
+    );
+  }, [rootEl]);
+
   useEffect(() => {
-    const measure = () => {
-      const rect = rootRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0 || rect.height === 0) return;
-      setCanvas((prev) =>
-        prev.width === rect.width && prev.height === rect.height
-          ? prev
-          : { width: rect.width, height: rect.height },
-      );
-    };
     measure();
     const timer = setTimeout(measure, 400);
-    window.addEventListener('resize', measure);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', measure);
-    };
-  }, []);
+    return () => clearTimeout(timer);
+  }, [measure]);
+
+  useElementResize(rootEl, measure);
 
   /**
    * 操作ヒントを出すか。一度でもめくった人には二度と出さない。
@@ -236,7 +241,7 @@ export function FermentationCoverFlow({
 
   return (
     <div
-      ref={rootRef}
+      ref={setRootEl}
       {...verifyAttrs({
         unit: 'FermentationCoverFlow',
         open,
