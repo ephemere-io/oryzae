@@ -24,8 +24,11 @@ const INLINE_IMAGE_CLASS = 'inline-photo';
 const EBLOCK_CLASS = 'eblock';
 const VBLOCK_CLASS = 'v-block';
 
-/** 差し込んだ直後の表示幅（本文 1 行に対する割合）。半分より小さめにして本文を潰さない。 */
-export const DEFAULT_INLINE_IMAGE_WIDTH_RATIO = 0.4;
+/** 長辺が行方向に沿うときの幅（本文 1 行に対する割合）。 */
+const INLINE_IMAGE_WIDE_RATIO = 0.8;
+/** 長辺が行と直交するときの幅。 */
+const INLINE_IMAGE_NARROW_RATIO = 0.5;
+// 向きが読めないときは INLINE_IMAGE_NARROW_RATIO に倒す（本文を潰さない側）。
 
 export function isInlineImage(node: Node): node is HTMLImageElement {
   return node instanceof HTMLImageElement && node.classList.contains(INLINE_IMAGE_CLASS);
@@ -101,29 +104,21 @@ export function readInlineImageFromElement(el: HTMLImageElement): InlineImage {
 
 function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
   const aspect = Number.parseFloat(el.dataset.aspect ?? '');
+  const rotation = Number.parseFloat(el.dataset.rotation ?? '');
   return {
     offset,
     storagePath: el.dataset.storagePath ?? '',
     widthRatio: readRatio(el.dataset.widthRatio),
-    layout: readLayout(el.dataset.layout),
-    align: readAlign(el.dataset.align),
     // 自由変形していないときは書かない（写真本来の比率を使う）。
     ...(Number.isFinite(aspect) && aspect > 0 ? { aspect } : {}),
+    ...(Number.isFinite(rotation) && rotation !== 0 ? { rotation } : {}),
   };
 }
 
 function readRatio(raw: string | undefined): number {
   const n = Number.parseFloat(raw ?? '');
-  if (!Number.isFinite(n)) return DEFAULT_INLINE_IMAGE_WIDTH_RATIO;
+  if (!Number.isFinite(n)) return INLINE_IMAGE_NARROW_RATIO;
   return Math.min(1, Math.max(0.05, n));
-}
-
-function readLayout(raw: string | undefined): InlineImage['layout'] {
-  return raw === 'block' || raw === 'wrap' ? raw : 'inline';
-}
-
-function readAlign(raw: string | undefined): InlineImage['align'] {
-  return raw === 'center' || raw === 'end' ? raw : 'start';
 }
 
 /**
@@ -137,51 +132,28 @@ function readAlign(raw: string | undefined): InlineImage['align'] {
 export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage): void {
   el.dataset.storagePath = image.storagePath;
   el.dataset.widthRatio = String(image.widthRatio);
-  el.dataset.layout = image.layout;
-  el.dataset.align = image.align;
   if (image.aspect) {
     el.dataset.aspect = String(image.aspect);
   } else {
     el.removeAttribute('data-aspect');
+  }
+  if (image.rotation) {
+    el.dataset.rotation = String(image.rotation);
+  } else {
+    el.removeAttribute('data-rotation');
   }
 
   el.style.inlineSize = `${image.widthRatio * 100}%`;
   // 自由変形したときだけ比率を固定する。既定は写真本来の比率に任せる。
   el.style.blockSize = 'auto';
   el.style.aspectRatio = image.aspect ? `1 / ${image.aspect}` : '';
+  el.style.transform = image.rotation ? `rotate(${image.rotation}deg)` : '';
 
-  applyLayoutStyle(el, image);
-}
-
-function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
-  // 一旦すべて解除してから当てる。モードを切り替えたとき前の指定が残らないように。
-  el.style.display = '';
-  el.style.float = '';
-  el.style.marginInline = '';
-  el.style.marginBlock = '';
-  el.style.verticalAlign = '';
-
-  if (image.layout === 'inline') {
-    // 文字と同じ流れに置く。大きな 1 文字として振る舞う。
-    el.style.display = 'inline-block';
-    el.style.verticalAlign = 'middle';
-    return;
-  }
-
-  if (image.layout === 'block') {
-    // 独立した行を占める。寄せは inline 軸のマージンで作る
-    // （横書きなら左右、縦書きなら上下に効く）。
-    el.style.display = 'block';
-    el.style.marginInline =
-      image.align === 'center' ? 'auto' : image.align === 'end' ? 'auto 0' : '0 auto';
-    return;
-  }
-
-  // wrap: 本文が写真を避けて流れる。物理方向ではなく論理方向で寄せる
-  // （縦書きでは inline-start が上、inline-end が下になる）。
-  el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
-  el.style.marginBlock = '0.25em';
-  el.style.marginInline = '0 0.5em';
+  // 配置は常に「独立した行の中央」。inline 軸のマージンで寄せるので、
+  // 横書きなら左右中央、縦書きなら上下中央になる（物理方向を書かないのが要点）。
+  el.style.display = 'block';
+  el.style.marginInline = 'auto';
+  el.style.marginBlock = '0.5em';
 }
 
 /** 本文中に置く `<img>` を作る。`src` は署名付き URL（失効するので保存はしない）。 */
@@ -255,4 +227,108 @@ function replaceCharWithNode(node: Text, offset: number, replacement: Node): voi
   const after = node.splitText(offset);
   after.deleteData(0, 1); // プレースホルダ 1 文字を取り除く
   after.parentNode?.insertBefore(replacement, after);
+}
+
+/**
+ * 差し込んだ直後の表示幅を、写真の向きと書字方向から決める。
+ *
+ * 一律 40% だと、縦書きに縦長の写真を入れたときだけ極端に小さく見える。行の方向と
+ * 写真の長辺が揃っているかで決めると、どの組み合わせでも同じくらいの存在感になる:
+ *
+ * | 書字方向 | 写真   | 長辺の向き | 行に対する幅 |
+ * |----------|--------|------------|--------------|
+ * | 縦書き   | 縦長   | 行と同じ   | 80%          |
+ * | 縦書き   | 横長   | 行と直交   | 50%          |
+ * | 横書き   | 縦長   | 行と直交   | 50%          |
+ * | 横書き   | 横長   | 行と同じ   | 80%          |
+ *
+ * つまり「**長辺が行方向に沿うなら 80%、そうでなければ 50%**」の 1 本の規則になる。
+ */
+export function defaultWidthRatioFor(
+  naturalWidth: number,
+  naturalHeight: number,
+  isVertical: boolean,
+): number {
+  // 向きが読めない（読み込み前など）ときは、狭いほうに倒して本文を潰さない。
+  if (!naturalWidth || !naturalHeight) return INLINE_IMAGE_NARROW_RATIO;
+  const isPortrait = naturalHeight > naturalWidth;
+  // 縦書きは行が縦に伸びるので、縦長の写真が「行に沿う」側になる。
+  const longEdgeFollowsLine = isVertical ? isPortrait : !isPortrait;
+  return longEdgeFollowsLine ? INLINE_IMAGE_WIDE_RATIO : INLINE_IMAGE_NARROW_RATIO;
+}
+
+/**
+ * 写真の実寸を先に読む。差し込むときの既定幅を向きから決めるために要る。
+ *
+ * 読めなかった場合は 0 を返す。呼び出し側は既定幅にフォールバックして写真自体は差し込む
+ * （寸法が分からないことを、写真を入れられない理由にしない）。
+ */
+export function loadNaturalSize(src: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    if (!src) {
+      resolve({ width: 0, height: 0 });
+      return;
+    }
+    const probe = new Image();
+    probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+    probe.onerror = () => resolve({ width: 0, height: 0 });
+    probe.src = src;
+  });
+}
+
+/**
+ * 放した画面座標のキャレット位置へ写真を移す。
+ *
+ * 座標で絶対配置するのではなく **本文中の並び順を変える**のが要点。絶対配置にすると、
+ * その後で本文を編集したときに写真だけ取り残される（位置はテキストに追従してほしい）。
+ *
+ * `caretPositionFromPoint` は Firefox 系、`caretRangeFromPoint` は Chrome/Safari 系。
+ * どちらも無い環境では移動せず false を返す（写真はその場に残る）。
+ *
+ * @returns 実際に位置が変わったら true
+ */
+export function moveImageToPoint(el: HTMLImageElement, clientX: number, clientY: number): boolean {
+  const caret = caretFromPoint(clientX, clientY);
+  if (!caret) return false;
+
+  // 自分自身の中に落とした場合は何もしない（無限に入れ子にならないように）。
+  if (el.contains(caret.node)) return false;
+
+  const before = el.nextSibling;
+  if (caret.node instanceof Text) {
+    const text = caret.node;
+    const parent = text.parentNode;
+    if (!parent) return false;
+    // テキストの途中なら分割して、その境目に差し込む。
+    const after = caret.offset > 0 ? text.splitText(caret.offset) : text;
+    parent.insertBefore(el, after);
+  } else {
+    const parent = caret.node;
+    parent.insertBefore(el, parent.childNodes[caret.offset] ?? null);
+  }
+
+  // 元の位置と同じなら「変わっていない」と伝える（無駄な保存をしない）。
+  return el.nextSibling !== before;
+}
+
+interface CaretPoint {
+  node: Node;
+  offset: number;
+}
+
+function caretFromPoint(x: number, y: number): CaretPoint | null {
+  // 標準（Firefox）。
+  const doc: Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+  } = document;
+
+  const position = doc.caretPositionFromPoint?.(x, y);
+  if (position) return { node: position.offsetNode, offset: position.offset };
+
+  // WebKit / Blink。
+  const range = doc.caretRangeFromPoint?.(x, y);
+  if (range) return { node: range.startContainer, offset: range.startOffset };
+
+  return null;
 }
