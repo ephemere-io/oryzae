@@ -750,6 +750,7 @@
     "fallback_body": "사용 중인 환경에서는 3D 표시를 지원하지 않습니다. 기존 화면에서 계속 사용하실 수 있습니다.",
     "fallback_jar": "병 열기",
     "fallback_journal": "기록 쓰기",
-    "fallback_board": "보드 열기"
+    "fallback_board": "보드 열기",
+    "word_question_gone": "질문이 남아 있지 않습니다"
   }
 }

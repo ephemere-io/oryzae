@@ -17,7 +17,7 @@ const STATE: StudyState = {
   now: '2026-09-02',
   unreadCount: 0,
   fermentation: { readiness: 0.4, status: 'fermenting', letters: [] },
-  words: ['発酵'],
+  words: [{ text: '発酵', question: 'なぜ続けているのか' }],
   notebooks: [{ month: '2026-09', entryCount: 3, current: true }],
   entries: [],
   questions: [],

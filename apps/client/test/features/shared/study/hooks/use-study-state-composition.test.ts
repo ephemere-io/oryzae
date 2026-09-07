@@ -197,7 +197,8 @@ describe('前回の書斎を憶えて即座に出す', () => {
     const first = apiFor(WITH_LETTERS);
     const a = renderHook(() => useStudyState(first.api, false, USER));
     await waitFor(() => expect(a.result.current.loading).toBe(false));
-    expect(a.result.current.state.words).toEqual(['余白']);
+    // 語は出どころの問いと一緒に運ぶ（瓶の中の語が何を指すか触れて分かるように）。
+    expect(a.result.current.state.words).toEqual([{ text: '余白', question: '続ける意味とは' }]);
     a.unmount();
 
     // 2 回目: 描画のたびに言葉の数を記録する。**一度出た言葉が消えないこと**を見る
@@ -215,7 +216,7 @@ describe('前回の書斎を憶えて即座に出す', () => {
     const firstShown = seen.findIndex((count) => count > 0);
     expect(firstShown).toBeGreaterThanOrEqual(0);
     expect(seen.slice(firstShown).filter((count) => count === 0)).toEqual([]);
-    expect(b.result.current.state.words).toEqual(['余白']);
+    expect(b.result.current.state.words).toEqual([{ text: '余白', question: '続ける意味とは' }]);
   });
 
   it('取得が終わったら憶える', async () => {

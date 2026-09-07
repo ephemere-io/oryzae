@@ -21,6 +21,7 @@ import { StudyChrome } from './study-chrome';
 import { StudyFallback } from './study-fallback';
 import { type LabelKind, StudyLabels } from './study-labels';
 import { StudyTooltip } from './study-tooltip';
+import { StudyWordTooltip } from './study-word-tooltip';
 
 /**
  * three.js は初期バンドルに載せない（`/jar` を直接開いた人に 600KB を配らない）。
@@ -227,6 +228,16 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
             hover.month,
           )}
           current={hover.month === state.now.slice(0, 7)}
+          screen={hover.screen}
+        />
+      )}
+
+      {/* 瓶の語に触れたとき、その語が出てきた問いを見せる。語だけでは何を指すのか
+          読み取れない（実機レビュー）。 */}
+      {overlay === null && hover?.word && (
+        <StudyWordTooltip
+          word={hover.word.text}
+          question={hover.word.question}
           screen={hover.screen}
         />
       )}

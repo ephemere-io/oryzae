@@ -750,6 +750,7 @@
     "fallback_body": "お使いの環境では 3D 表示に対応していません。これまでどおりの画面からお使いいただけます。",
     "fallback_jar": "瓶を開く",
     "fallback_journal": "記録を書く",
-    "fallback_board": "ボードを開く"
+    "fallback_board": "ボードを開く",
+    "word_question_gone": "問いは残っていません"
   }
 }

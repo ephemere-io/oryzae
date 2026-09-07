@@ -89,6 +89,20 @@ export interface StudyBoard {
  * 増やすだけになり、profile は `useAuth()` が全画面に配っているものの写しになる
  * （アバターを出すのは 3D ではなくフローティングのクローム側）。
  */
+/**
+ * 瓶に浮かぶ 1 語と、その出どころの問い。
+ *
+ * 語だけを浮かべていたころ「何を指すのか推測しづらい」と実機レビューで報告された。
+ * 触れたときに出どころを見せるために、**語と問いを一緒に運ぶ**。
+ *
+ * `question` が null なのは、問いが消えている（消された・取れなかった）場合。
+ * その語は出どころを出さないだけで、浮かぶことは変わらない。
+ */
+export interface StudyWord {
+  text: string;
+  question: string | null;
+}
+
 export interface StudyState {
   /** `YYYY-MM-DD`（ローカル暦日）。 */
   now: string;
@@ -101,7 +115,7 @@ export interface StudyState {
    * （キーワードは発酵完了時に一括保存されるため、発酵中には 1 件も存在しない。
    * 60-implementation-notes.md §3）。
    */
-  words: string[];
+  words: StudyWord[];
   notebooks: Notebook[];
   entries: StudyEntry[];
   /**

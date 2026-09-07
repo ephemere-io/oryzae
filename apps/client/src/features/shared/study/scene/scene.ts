@@ -130,9 +130,26 @@ export interface StudySceneOptions {
   onLeaveStart?: (durationMs: number) => void;
 }
 
+/** 瓶の中を漂う語。位置（漂わせるための基準）と、触れたときに見せる出どころ。 */
+type JarWords = {
+  sprite: Sprite;
+  y: number;
+  angle: number;
+  text: string;
+  question: string | null;
+}[];
+
 export interface HoverInfo {
   label: 'jar' | 'journal' | 'board' | 'archive' | null;
   month: string | null;
+  /**
+   * 瓶の中の語に触れているとき、その語と出どころの問い。
+   *
+   * 語だけが浮いていると「何を指すのか推測しづらい」（実機レビュー）。触れたときに
+   * 出どころを見せる。的（hitbox）ではなく語そのものに当てているので、`label` や
+   * `month` とは同時に立たない。
+   */
+  word: { text: string; question: string | null } | null;
   /** ツールチップを出す画面座標。 */
   screen: { x: number; y: number };
 }
@@ -300,6 +317,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   let hoveredId: HitId | null = null;
   let hoveredObject: Object3D | null = null;
+  /** いま触れている瓶の中の語。的のホバーとは排他（語のほうが優先）。 */
+  let hoveredWord: JarWords[number] | null = null;
 
   const parallax = { x: 0, y: 0 };
 
@@ -541,11 +560,48 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function updateHover(): void {
     if (transition || settled || !pointerInside) {
+      setHoveredWord(null);
+      setHovered(null, null);
+      return;
+    }
+    // 語は的より**先に**見る。瓶の的は語を丸ごと覆っているので、後にすると
+    // 語には決して触れられない。
+    const word = raycastWord();
+    setHoveredWord(word);
+    if (word) {
       setHovered(null, null);
       return;
     }
     const hit = raycast();
     setHovered(hit.id, hit.object);
+  }
+
+  /** 瓶の中の語に当てる。的（hitbox）ではなくスプライトそのものを見る。 */
+  function raycastWord(): JarWords[number] | null {
+    const jar = content.jar;
+    if (!jar || jar.words.length === 0) return null;
+    raycaster.setFromCamera(pointer, camera);
+    const sprites = jar.words.map((word) => word.sprite);
+    const first = raycaster.intersectObjects(sprites, false)[0];
+    if (!first) return null;
+    return jar.words.find((word) => word.sprite === first.object) ?? null;
+  }
+
+  function setHoveredWord(word: JarWords[number] | null): void {
+    if (word?.text === hoveredWord?.text) return;
+    hoveredWord = word;
+    if (!word) {
+      // 語から離れたときは、的のホバー（setHovered）が続けて知らせる。
+      options.onHoverChange?.(null);
+      return;
+    }
+    renderer.domElement.style.cursor = 'pointer';
+    options.onHoverChange?.({
+      label: null,
+      month: null,
+      word: { text: word.text, question: word.question },
+      screen: projectHover(word.sprite),
+    });
   }
 
   function raycast(): { id: HitId | null; object: Object3D | null } {
@@ -573,10 +629,18 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     renderer.domElement.style.cursor = id ? 'pointer' : 'default';
 
+    // 語に触れている間は、そちらが知らせている（上書きして消さない）。
+    if (hoveredWord) return;
+
     const entry = content.registry.get(id);
     options.onHoverChange?.(
       entry
-        ? { label: entry.label, month: entry.month, screen: projectHover(hoveredObject) }
+        ? {
+            label: entry.label,
+            month: entry.month,
+            word: null,
+            screen: projectHover(hoveredObject),
+          }
         : null,
     );
   }
@@ -646,6 +710,15 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function pick(): void {
     if (transition || settled) return;
+
+    // 語を押したときは瓶を開かず、出どころの問いを見せるだけにする。
+    // 指では pointermove が来ないことがあるので、その場で当て直す。
+    const word = raycastWord();
+    if (word) {
+      setHoveredWord(word);
+      return;
+    }
+
     // タッチでは pointermove が click より先に来ないことがある。その場で拾い直す。
     const id = resolveClickTarget(hoveredId, () => raycast().id);
     const entry = content.registry.get(id);
@@ -931,7 +1004,7 @@ interface JarParts {
   profile: Vector2[];
   level: number;
   bubbles: { mesh: Mesh; speed: number; wobble: number; baseX: number; baseZ: number }[];
-  words: { sprite: Sprite; y: number; angle: number }[];
+  words: JarWords;
   silhouette: Line;
   silhouettePositions: BufferAttribute;
   silhouetteMaterial: Material & { opacity: number };
@@ -1044,8 +1117,14 @@ function buildJar(
   }
 
   // 漂う言葉。液面までの高さを実際の語数で割って並べる。
-  const words: { sprite: Sprite; y: number; angle: number }[] = [];
-  for (const placement of placeWords(state.words, level)) {
+  const words: JarWords = [];
+  // 語の並べ方は文字列だけで決まる（純粋な採寸）。出どころは語をキーに戻す
+  // — 語は瓶の中で重複しないよう畳んであるので、この対応は一意になる。
+  const questionByWord = new Map(state.words.map((word) => [word.text, word.question]));
+  for (const placement of placeWords(
+    state.words.map((word) => word.text),
+    level,
+  )) {
     const texture = createTextTexture(placement.word);
     if (!texture) continue;
     textures.push(texture);
@@ -1057,7 +1136,13 @@ function buildJar(
     sprite.scale.set((texture.image.width / texture.image.height) * height, height, 1);
     sprite.position.y = placement.y;
     group.add(sprite);
-    words.push({ sprite, y: placement.y, angle: placement.angle });
+    words.push({
+      sprite,
+      y: placement.y,
+      angle: placement.angle,
+      text: placement.word,
+      question: questionByWord.get(placement.word) ?? null,
+    });
   }
 
   // 上部のもや。
