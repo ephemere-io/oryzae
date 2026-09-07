@@ -8,7 +8,7 @@ import {
 import {
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
-  OCR_MODEL_ID,
+  featureOfModel,
 } from '../../infrastructure/claude-pricing.js';
 import { type ActualCostTrend, summarizeActualCostTrend } from '../../infrastructure/cost-trend.js';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
@@ -80,11 +80,6 @@ function percent(ratio: number): string {
  * 同じモデルを CI 等が使えば同じバケットに混ざる。だから「そのモデルを使っている
  * 機能」を添えるだけで、「その機能のコスト」とは言い切らない。
  */
-function featureOfModel(model: string): string | null {
-  if (model === FERMENTATION_MODEL_ID) return '発酵';
-  if (model === OCR_MODEL_ID) return 'OCR';
-  return null;
-}
 
 function fermentationActualUsd(byModel: ModelActualCost[]): number {
   return byModel.find((m) => m.model === FERMENTATION_MODEL_ID)?.costUsd ?? 0;

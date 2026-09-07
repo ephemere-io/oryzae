@@ -1,6 +1,7 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { MAX_ENTRY_PHOTO_TEXT_LENGTH } from '@oryzae/shared';
 import { generateText } from 'ai';
+import { PHOTO_TRANSCRIPTION_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type {
   PhotoTranscriptionGateway,
   PhotoTranscriptionResult,
@@ -25,7 +26,9 @@ import type {
  * ページ全体を起こすため呼び出しあたりの単価が効き、定型タスクである文字起こしに
  * Opus の推論力は要らないと判断している。揃えるなら、両方のコスト影響を見てから。
  */
-const OCR_MODEL = 'claude-sonnet-5';
+// 価格表から引く。ベタ書きすると featureOfModel の読み替え表と食い違い、
+// この機能の費用が「分類不明」に落ちる（board の OCR gateway と同じ形）。
+const OCR_MODEL = PHOTO_TRANSCRIPTION_MODEL_ID;
 
 /** 起こした文字だけを返させる。前置き・要約・推測での補完をさせないのが肝。 */
 function buildPrompt(language: string): string {
