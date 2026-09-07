@@ -65,7 +65,10 @@ export function StudyLabels(props: StudyLabelsProps) {
 
 function PcLabels({ layout, positions, hovered, onPick }: StudyLabelsProps) {
   const t = useTranslations('study');
-  const kinds: LabelKind[] = ['jar', 'journal', 'board'];
+  // 棚（ARCHIVE）を外していた時期がある。ホバーで背表紙のツールチップが出るから、
+  // という理由だったが、**ホバーはそこに何かがあると知っている人にしか効かない**。
+  // 過去の記録を全部持っている的だけが黙っている状態になっていた（実機レビュー）。
+  const kinds: LabelKind[] = ['jar', 'journal', 'board', 'archive'];
 
   return (
     <div

@@ -97,11 +97,31 @@ describe('PC と SP の構図の違い', () => {
     expect(PC_LAYOUT.pen.x).toBeGreaterThan(0);
   });
 
-  it('SP だけが棚のラベルとピルのオフセットを持つ', () => {
-    expect(SP_LAYOUT.labelAnchors.archive).not.toBeNull();
+  it('ピルのオフセットを持つのは SP だけ（PC はホバーで注釈が濃くなる）', () => {
     expect(SP_LAYOUT.pillOffsets).not.toBeNull();
-    expect(PC_LAYOUT.labelAnchors.archive).toBeNull();
     expect(PC_LAYOUT.pillOffsets).toBeNull();
+  });
+
+  it('4 つの的すべてが名乗る（黙っている的を作らない）', () => {
+    // 棚だけラベルを出していなかった（ホバーすれば背表紙のツールチップが出るから、
+    // という理由）。ホバーは**そこに何かがあると知っている人にしか効かない**ので、
+    // 過去の記録を全部持っている棚へ辿り着けなくなっていた。
+    for (const layout of [PC_LAYOUT, SP_LAYOUT]) {
+      expect(layout.labelAnchors.jar).not.toBeNull();
+      expect(layout.labelAnchors.journal).not.toBeNull();
+      expect(layout.labelAnchors.board).not.toBeNull();
+      expect(layout.labelAnchors.archive).not.toBeNull();
+    }
+  });
+
+  it('PC の棚のラベルは机の面の、棚より手前', () => {
+    const archive = PC_LAYOUT.labelAnchors.archive;
+    if (archive === null) throw new Error('PC の棚のラベルが無い');
+    // 机の天板の高さ。瓶・手帳のラベルと同じ面に並ぶ。
+    expect(archive.y).toBeCloseTo(PC_LAYOUT.labelAnchors.jar.y, 5);
+    // 棚そのものに重ならないよう、手前（z が大きい側）へ出す。
+    expect(archive.z).toBeGreaterThan(PC_LAYOUT.shelf.position.z);
+    expect(archive.x).toBeCloseTo(PC_LAYOUT.shelf.position.x, 5);
   });
 
   it('SP の JOURNAL ラベルは積みの右脇に逃がす（表紙に文字が乗らない）', () => {
