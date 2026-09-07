@@ -486,7 +486,6 @@
       "header_snippet": "Oryzae가 골라낸 문장",
       "header_letter": "L.A.B.의 관찰 기록",
       "snippet_source_prefix": "출처:",
-      "resize_aria": "상세 패널 너비 조절",
       "write_entry": "이 질문으로 항목 쓰기"
     },
     "jar": {
@@ -539,15 +538,12 @@
     "history": {
       "ghost_jar_title": "발효 항아리",
       "back_to_jar": "항아리로 돌아가기",
-      "progress": "FERMENTATION HISTORY — {current} / {total}",
-      "date_line_latest": "{date}의 발효 (최신)",
-      "date_line_back": "{date}의 발효 ({steps}번째 이전)",
-      "entries_scanned": "{count} ENTRIES SCANNED",
       "new": "NEW",
+      "newest": "최신",
       "prev_aria": "이전 발효",
       "next_aria": "다음 발효",
       "hint": "← → 키·드래그·스크롤로 넘기기 ／ ESC 로 항아리로 돌아가기",
-      "fermentations_count": "{count} FERMENTATIONS",
+      "launcher": "{count}번의 발효를 되돌아보기",
       "open_aria": "{question}의 발효 이력 열기"
     }
   },

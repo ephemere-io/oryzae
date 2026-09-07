@@ -12,8 +12,11 @@ import {
   hitTestStage,
   maxOffsetFrom,
 } from '@/features/pc/fermentation/utils/cover-flow-geometry';
-import { pad2, toDateStamp, toJapaneseDate } from '@/features/pc/fermentation/utils/history-labels';
+import { toDateStamp } from '@/features/pc/fermentation/utils/history-labels';
 import type { FermentationDetail, FermentationSummary } from '@/features/shared/fermentation/types';
+
+/** 操作ヒントを見たか。一度めくれば以後は出さない。 */
+const HINT_SEEN_KEY = 'oryzae:jar-history-hint-seen';
 
 /** 瓶のシルエット。jar-view と同じ 480×600 座標系のパス。 */
 const JAR_PATH =
@@ -66,6 +69,8 @@ interface FermentationCoverFlowProps {
   ) => void;
   onIndexChange: (index: number) => void;
   onClose: () => void;
+  /** 詳細ウィンドウが開いているか。開いている間は ESC を譲る（1 回目はあちらが閉じる）。 */
+  paneOpen: boolean;
   onElementClick: (
     resultId: string,
     type: 'keyword' | 'snippet' | 'letter',
@@ -94,6 +99,7 @@ export function FermentationCoverFlow({
   onInnerDragEnd,
   onIndexChange,
   onClose,
+  paneOpen,
   onElementClick,
   selectedElementId,
 }: FermentationCoverFlowProps) {
@@ -125,20 +131,50 @@ export function FermentationCoverFlow({
     };
   }, []);
 
+  /**
+   * 操作ヒントを出すか。一度でもめくった人には二度と出さない。
+   *
+   * localStorage は初期値で読まない（SSR とハイドレーションで食い違う）。マウント後に
+   * 一度だけ読む ── 詳細パネルの幅復元やキャンバスの視点保存と同じ流儀。
+   */
+  const [showHint, setShowHint] = useState(false);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(HINT_SEEN_KEY) === null) setShowHint(true);
+    } catch {
+      // localStorage が使えない環境ではヒントを出さない（出せなくても操作はできる）。
+    }
+  }, []);
+
+  const markHintSeen = useCallback(() => {
+    setShowHint((prev) => {
+      if (!prev) return prev;
+      try {
+        window.localStorage.setItem(HINT_SEEN_KEY, '1');
+      } catch {
+        // 覚えられなくても、この画面を開いている間は消える。
+      }
+      return false;
+    });
+  }, []);
+
   const clampedIndex = Math.min(Math.max(index, 0), Math.max(0, results.length - 1));
 
   const step = useCallback(
     (delta: number) => {
       const next = Math.min(results.length - 1, Math.max(0, clampedIndex + delta));
-      if (next !== clampedIndex) onIndexChange(next);
+      if (next === clampedIndex) return;
+      markHintSeen();
+      onIndexChange(next);
     },
-    [clampedIndex, results.length, onIndexChange],
+    [clampedIndex, results.length, onIndexChange, markHintSeen],
   );
 
   const { dragging, onWheel, onPointerDown, onPointerMove, onPointerUp } = useCoverFlowInput({
     active: open,
     onStep: step,
     onClose,
+    closeOnEscape: !paneOpen,
   });
 
   /**
@@ -196,16 +232,7 @@ export function FermentationCoverFlow({
     [clampedIndex, onIndexChange, onClose],
   );
 
-  const dateStamp = active ? toDateStamp(active.createdAt) : '';
-  /**
-   * 期間ラベル。`target_period` は環境によって 'WEEK 35' のこともあれば発酵日そのもの
-   * （'2026-08-27'）のこともある。後者だと真上の日付と同じ文字が二度並ぶので落とす。
-   */
-  const activePeriod =
-    active && !active.targetPeriod.startsWith(dateStamp) ? active.targetPeriod : null;
-  const stepsBack = results.length - 1 - clampedIndex;
   const activeDetail = active ? (details.get(active.id) ?? null) : null;
-  const scanned = activeDetail?.scannedEntries.length ?? 0;
 
   return (
     <div
@@ -334,54 +361,24 @@ export function FermentationCoverFlow({
             </button>
           </div>
 
-          {/* 上中央: 問いと進捗 */}
-          <div className="pointer-events-none absolute top-6 left-1/2 z-[70] flex -translate-x-1/2 flex-col items-center gap-[7px]">
+          {/* 上中央: 問いだけ。
+              「NN / NN」は日付レールが位置そのものを見せているので出さない。 */}
+          <div className="pointer-events-none absolute top-6 left-1/2 z-[70] flex -translate-x-1/2 flex-col items-center">
             <span
               className="text-[15px] tracking-[0.06em] text-[var(--fg)]"
               style={{ fontFamily: "'Noto Serif JP', serif" }}
             >
               {questionText}
             </span>
-            <span
-              className="text-[9px] uppercase tracking-[0.32em] text-[var(--date-color)]"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              {t('history.progress', {
-                current: pad2(clampedIndex + 1),
-                total: pad2(results.length),
-              })}
-            </span>
           </div>
 
-          {/* 下中央: 日付・期間・レール・操作ヒント */}
+          {/*
+            下中央は **日付レール一本**。
+            以前はこの上に「2026年08月27日の発酵（最新）」と「WEEK 35 · 2 ENTRIES SCANNED」を
+            重ねていたが、日付も順序もレールが見せている内容の言い換えでしかなかった。
+            走査件数は読む前に要る数字ではないので、もとの記録を並べている詳細側へ譲る。
+          */}
           <div className="absolute bottom-[90px] left-1/2 z-[70] flex -translate-x-1/2 flex-col items-center gap-3.5">
-            <div className="flex flex-col items-center gap-1.5">
-              <span
-                className="text-sm tracking-[0.04em] text-[var(--fg)]"
-                style={{ fontFamily: "'Noto Serif JP', serif" }}
-              >
-                {stepsBack === 0
-                  ? t('history.date_line_latest', { date: toJapaneseDate(dateStamp) })
-                  : t('history.date_line_back', {
-                      date: toJapaneseDate(dateStamp),
-                      steps: stepsBack,
-                    })}
-              </span>
-              <span
-                className="text-[9px] uppercase tracking-[0.28em] text-[var(--date-color)]"
-                style={{ fontFamily: 'Inter, sans-serif' }}
-              >
-                {[
-                  activePeriod,
-                  // 詳細が届くまでは件数を出さない（0 ENTRIES と嘘をつかない）。
-                  activeDetail ? t('history.entries_scanned', { count: scanned }) : null,
-                  activeUnread ? t('history.new') : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            </div>
-
             {/* 日付レール: 任意の段へ飛ぶ */}
             <div className="flex items-center gap-1">
               <button
@@ -396,15 +393,24 @@ export function FermentationCoverFlow({
               {results.map((result, i) => {
                 const isActive = i === clampedIndex;
                 const isUnread = unreadFermentationIds.has(result.id);
+                const isNewest = i === results.length - 1;
+                const stamp = toDateStamp(result.createdAt);
                 return (
                   <button
                     key={result.id}
                     type="button"
                     data-verify-part="rail-item"
-                    onClick={() => onIndexChange(i)}
-                    className="whitespace-nowrap rounded-full px-[11px] py-[5px] text-[9px] tracking-[0.18em] transition-colors"
+                    data-verify-rail-active={isActive}
+                    onClick={() => {
+                      markHintSeen();
+                      onIndexChange(i);
+                    }}
+                    className={`flex items-baseline gap-1.5 whitespace-nowrap rounded-full transition-all ${
+                      isActive
+                        ? 'px-4 py-1.5'
+                        : 'px-[11px] py-[5px] hover:bg-[rgba(140,133,126,0.08)]'
+                    }`}
                     style={{
-                      fontFamily: 'Inter, sans-serif',
                       background: isActive ? 'rgba(74,158,142,0.1)' : 'transparent',
                       color: isActive
                         ? 'var(--accent)'
@@ -413,7 +419,33 @@ export function FermentationCoverFlow({
                           : 'var(--date-color)',
                     }}
                   >
-                    {toDateStamp(result.createdAt)}
+                    <span
+                      style={
+                        isActive
+                          ? {
+                              fontFamily: "'Noto Serif JP', serif",
+                              fontSize: 14,
+                              letterSpacing: '0.06em',
+                            }
+                          : {
+                              fontFamily: 'Inter, sans-serif',
+                              fontSize: 9,
+                              letterSpacing: '0.18em',
+                            }
+                      }
+                    >
+                      {/* 選ばれていない段は月日だけ。年は選択中のチップが持っているので、
+                          50 件並んでもレールが横に伸びきらない。 */}
+                      {isActive ? stamp : stamp.slice(5)}
+                    </span>
+                    {isNewest && (
+                      <span
+                        className="uppercase tracking-[0.2em] opacity-70"
+                        style={{ fontFamily: 'Inter, sans-serif', fontSize: 8 }}
+                      >
+                        {t('history.newest')}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -428,9 +460,16 @@ export function FermentationCoverFlow({
               </button>
             </div>
 
+            {/* 操作ヒントは **初めて開いたときだけ**。扇の形とレールの矢印で見えている
+                ことを、毎回文章で言い直す必要はない。1 段めくれば役目は終わる。 */}
             <span
-              className="text-[9px] tracking-[0.24em] text-[var(--date-color)] opacity-85"
-              style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
+              data-verify-part="hint"
+              className="text-[9px] tracking-[0.24em] text-[var(--date-color)]"
+              style={{
+                fontFamily: "'Noto Sans JP', sans-serif",
+                opacity: showHint ? 0.85 : 0,
+                transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
             >
               {t('history.hint')}
             </span>

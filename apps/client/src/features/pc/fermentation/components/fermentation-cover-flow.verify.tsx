@@ -47,6 +47,7 @@ interface Props {
   ) => void;
   onIndexChange: (index: number) => void;
   onClose: () => void;
+  paneOpen: boolean;
   onElementClick: (
     resultId: string,
     type: 'keyword' | 'snippet' | 'letter',
@@ -108,6 +109,7 @@ const base = {
   onInnerDragEnd: noop,
   onIndexChange: noop,
   onClose: noop,
+  paneOpen: false,
   onElementClick: noop,
   selectedElementId: null,
   unreadFermentationIds: new Set<string>(),
@@ -303,14 +305,41 @@ registerUnit<Props>({
         `index=${contract.index} だが total=${contract.total} なので ${Number(contract.total) - 1} へ寄せるべき`,
     },
     {
-      id: 'scanned-count-waits-for-detail',
-      description: '走査件数は詳細が届いてから出す（0 ENTRIES と嘘をつかない）',
+      id: 'rail-is-the-only-status-line',
+      description: '日付・順序を語るのは日付レールだけ（進捗や走査件数を文章で言い直さない）',
+      check: ({ root }) => {
+        const text = root.textContent ?? '';
+        const echoes = ['FERMENTATION HISTORY', 'ENTRIES SCANNED', 'の発酵（'].filter((phrase) =>
+          text.includes(phrase),
+        );
+        return echoes.length === 0 || `レールと同じ内容を文章でも出している: ${echoes.join(' / ')}`;
+      },
+    },
+    {
+      id: 'exactly-one-active-rail-item',
+      description: 'レールで選ばれているチップはちょうど1つ（円盤の正面と対応する）',
       check: ({ root, contract }) => {
-        const shows = Boolean(root.textContent?.includes('ENTRIES SCANNED'));
-        const expected = contract.open === 'true' && contract.hasActiveDetail === 'true';
+        const active = root.querySelectorAll(
+          '[data-verify-part="rail-item"][data-verify-rail-active="true"]',
+        ).length;
+        const expected = contract.open === 'true' ? 1 : 0;
         return (
-          shows === expected ||
-          `ENTRIES SCANNED present=${shows} だが open=${contract.open} / hasActiveDetail=${contract.hasActiveDetail}`
+          active === expected ||
+          `選択中のチップ=${active} だが open="${contract.open}" では ${expected} 個であるべき`
+        );
+      },
+    },
+    {
+      id: 'newest-marker-on-the-last-item',
+      description: '「最新」の印は右端のチップだけに付く（どちら向きが新しいか常に分かる）',
+      onlyFixtures: ['latest-front', 'middle-front', 'oldest-front'],
+      check: ({ root }) => {
+        const items = [...root.querySelectorAll('[data-verify-part="rail-item"]')];
+        const marked = items.filter((el) => (el.textContent ?? '').includes('最新'));
+        const last = items[items.length - 1];
+        return (
+          (marked.length === 1 && marked[0] === last) ||
+          `「最新」の印が ${marked.length} 個（右端に1つだけであるべき）`
         );
       },
     },
