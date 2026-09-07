@@ -56,3 +56,21 @@ export function utcDayBounds(dateKey: string): { start: Date; end: Date } {
   const start = new Date(`${dateKey}T00:00:00.000Z`);
   return { start, end: new Date(start.getTime() + DAY_MS) };
 }
+
+/** UTC 日 (YYYY-MM-DD) の前日。cost_report の日別バケットを前日比で並べるのに使う。 */
+export function previousUtcDateKey(dateKey: string): string {
+  return new Date(Date.parse(`${dateKey}T00:00:00.000Z`) - DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * UTC 日 (YYYY-MM-DD) が属する UTC 月の区間と日数。
+ * 月累計・月末見込みを出すのに使う。実額が UTC 日バケット固定なので月も UTC で切る。
+ */
+export function utcMonthBounds(dateKey: string): { start: Date; end: Date; daysInMonth: number } {
+  const year = Number(dateKey.slice(0, 4));
+  const month = Number(dateKey.slice(5, 7));
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 1));
+  // UTC には DST が無いので、差を DAY_MS で割れば当月日数がそのまま出る。
+  return { start, end, daysInMonth: (end.getTime() - start.getTime()) / DAY_MS };
+}
