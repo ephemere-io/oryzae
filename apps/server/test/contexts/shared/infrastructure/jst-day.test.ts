@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   jstDayRangeUtc,
   previousJstDateKey,
+  previousUtcDateKey,
   toJstDateKey,
   utcDateKeyOfJstFermentationRun,
   utcDayBounds,
+  utcMonthBounds,
 } from '@/contexts/shared/infrastructure/jst-day.js';
 
 describe('toJstDateKey', () => {
@@ -65,5 +67,37 @@ describe('utcDayBounds', () => {
     const { start, end } = utcDayBounds('2026-08-08');
     expect(start.toISOString()).toBe('2026-08-08T00:00:00.000Z');
     expect(end.toISOString()).toBe('2026-08-09T00:00:00.000Z');
+  });
+});
+
+describe('previousUtcDateKey', () => {
+  it('steps back one UTC day', () => {
+    expect(previousUtcDateKey('2026-08-08')).toBe('2026-08-07');
+  });
+
+  it('crosses month and year boundaries', () => {
+    expect(previousUtcDateKey('2026-08-01')).toBe('2026-07-31');
+    expect(previousUtcDateKey('2026-01-01')).toBe('2025-12-31');
+    expect(previousUtcDateKey('2028-03-01')).toBe('2028-02-29');
+  });
+});
+
+describe('utcMonthBounds', () => {
+  it('returns a half-open UTC month interval and its length', () => {
+    const { start, end, daysInMonth } = utcMonthBounds('2026-08-08');
+    expect(start.toISOString()).toBe('2026-08-01T00:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+    expect(daysInMonth).toBe(31);
+  });
+
+  it('knows short months and leap Februaries', () => {
+    expect(utcMonthBounds('2026-02-15').daysInMonth).toBe(28);
+    expect(utcMonthBounds('2028-02-15').daysInMonth).toBe(29);
+    expect(utcMonthBounds('2026-04-30').daysInMonth).toBe(30);
+  });
+
+  it('rolls the end into the next year for December', () => {
+    const { end } = utcMonthBounds('2026-12-31');
+    expect(end.toISOString()).toBe('2027-01-01T00:00:00.000Z');
   });
 });
