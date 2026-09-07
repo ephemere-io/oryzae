@@ -12,7 +12,7 @@ describe('measureTitle', () => {
   const LINE = 588; // 実測値（1512×900 の画面での桁の高さ）
 
   /** その寸法で本当に収まるか。収まらなければ見切れる。 */
-  function fit(length: number, lineLength = LINE, baseFontSize = BASE) {
+  function measured(length: number, lineLength = LINE, baseFontSize = BASE) {
     const { fontSize, lines } = measureTitle({ length, baseFontSize, lineLength });
     const perLine = Math.floor((lineLength * 0.94) / fontSize);
     return { fontSize, lines, fits: length <= perLine * lines };
@@ -43,12 +43,12 @@ describe('measureTitle', () => {
 
   it('**筋は3本を超えない**（長い題が紙の面積を占領しない）', () => {
     for (const length of [40, 80, 200, 500]) {
-      expect(fit(length).lines, `${length}字`).toBeLessThanOrEqual(3);
+      expect(measured(length).lines, `${length}字`).toBeLessThanOrEqual(3);
     }
   });
 
   it('3筋でも入らなくなったら字を落とす', () => {
-    const m = fit(80);
+    const m = measured(80);
     expect(m.fontSize).toBeLessThan(BASE);
     expect(m.lines).toBe(3);
     expect(m.fits).toBe(true);
@@ -56,12 +56,12 @@ describe('measureTitle', () => {
 
   it('題として現実的な長さは、3筋に収まる（見切れない）', () => {
     for (const length of [1, 3, 10, 17, 18, 40, 41, 80, 120, 165]) {
-      expect(fit(length), `${length}字`).toMatchObject({ fits: true });
+      expect(measured(length), `${length}字`).toMatchObject({ fits: true });
     }
   });
 
   it('下限より小さくはしない（読めなくなるので、そこからは見切れる）', () => {
-    const m = fit(1000);
+    const m = measured(1000);
     expect(m.fontSize).toBe(TITLE_MIN_FONT_SIZE);
     expect(m.fits).toBe(false);
   });
@@ -74,7 +74,7 @@ describe('measureTitle', () => {
 
   it('画面が低い（狭い）ときも3筋に収まる', () => {
     for (const length of [1, 10, 40, 80]) {
-      expect(fit(length, 300), `${length}字 / 短い筋`).toMatchObject({ fits: true });
+      expect(measured(length, 300), `${length}字 / 短い筋`).toMatchObject({ fits: true });
     }
   });
 

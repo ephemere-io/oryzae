@@ -4,6 +4,7 @@ import { ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -42,6 +43,34 @@ function ConsoleLink({ label = 'Anthropic Console' }: { label?: string }) {
       {label}
       <ExternalLink className="h-3 w-3" />
     </a>
+  );
+}
+
+/**
+ * 読み込み中の骨組み。実データと同じ「3枚のカード + 表」の形にしてある。
+ *
+ * この画面は Anthropic の cost_report と Supabase の集計を待つため数秒かかる。
+ * 素の "Loading..." だと止まって見えるので、出てくる形を先に見せる。
+ */
+function SpendSkeleton() {
+  return (
+    <div className="space-y-6" role="status" aria-busy="true" aria-label="コストデータを読み込み中">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        {['actual', 'estimated', 'drift'].map((key) => (
+          <div key={key} className="rounded-lg border border-border/50 bg-card p-4">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="mt-2 h-8 w-32" />
+            <Skeleton className="mt-2 h-3 w-40" />
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3">
+        <Skeleton className="h-3 w-24" />
+        {['r1', 'r2', 'r3', 'r4', 'r5'].map((key) => (
+          <Skeleton key={key} className="h-4 w-full" />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -206,20 +235,20 @@ export function SpendView({
       )}
 
       {loading && !data ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
+        <SpendSkeleton />
       ) : data ? (
         <>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <div className="rounded-lg border border-border/50 bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                実請求額 (Anthropic)
+                実請求額 (org 全体)
               </p>
               <ActualHeadline actual={data.actual} />
             </div>
 
             <div className="rounded-lg border border-border/50 bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                推定コスト (自前トークン)
+                推定コスト (発酵・記録分)
               </p>
               <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
                 {formatUsd(data.estimated.totalCostUsd)}
@@ -238,11 +267,77 @@ export function SpendView({
               <p className="text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">
                 {drift === null ? '-' : `${drift > 0 ? '+' : ''}${drift.toFixed(1)}%`}
               </p>
+              {/* drift は (推定 − 実請求) ÷ 実請求。実請求は org 全体で Oryzae 外の
+                  利用も含むため、通常はマイナス（推定のほうが小さい）になる。 */}
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {drift === null ? '実請求額が取得できると表示されます' : '推定 − 実請求額'}
+                {drift === null
+                  ? '実請求額が取得できると表示されます'
+                  : '推定は発酵のみ。実請求は org 全体なので通常マイナス'}
               </p>
             </div>
           </div>
+
+          {/* 用途別の内訳は **実額** で出す。cost_report を group_by[]=description で
+              取るとモデル別に割れ、Oryzae は用途ごとに別モデルを使っているので、
+              モデル別内訳がそのまま用途別の実額になる。「OCR がいくらか」はここで読む。 */}
+          {data.actual.status === 'ok' && data.actual.groupingUnavailable && (
+            <div className="rounded-md bg-yellow-500/10 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-500">
+              Anthropic が実請求額の内訳を返しませんでした（group_by
+              が効いていない可能性）。上の総額は正しい値です。
+            </div>
+          )}
+
+          {data.actual.status === 'ok' &&
+            !data.actual.groupingUnavailable &&
+            data.actual.byModel.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  実請求額の内訳（モデル別）
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Anthropic は「用途」を知りません。用途名は
+                  <strong>そのモデルを使っている機能</strong>を 指すだけで、同じモデルの他の利用（CI
+                  のレビュー等）も同じ行に含まれます。
+                </p>
+                {/* 数字の裏取り先。Console はモデル別に加えて API キー別にも割れるので、
+                    「CI と混ざっているぶん」はそちらで切り分けられる。 */}
+                <p className="text-xs text-muted-foreground mb-3">
+                  <ConsoleLink label="Console の Cost ページで照合" />
+                  （API キー別の内訳もそちらで見られます）
+                </p>
+                <div className="space-y-2">
+                  {data.actual.byModel.map((m) => (
+                    <div key={m.model} className="rounded-lg border border-border/50 bg-card p-3">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-sm">
+                          {m.model}
+                          {m.feature && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ← {m.feature} のモデル
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono text-sm tabular-nums">
+                          {formatUsd(m.costUsd)}
+                        </span>
+                      </div>
+                      {/* token_type の内訳。キャッシュ読み書きが混ざっていればここに出る
+                        （自前推定では表現できない部分）。 */}
+                      {m.byTokenType.length > 0 && (
+                        <div className="mt-1.5 space-y-0.5 font-mono text-xs text-muted-foreground tabular-nums">
+                          {m.byTokenType.map((t) => (
+                            <div key={t.tokenType} className="flex justify-between gap-3">
+                              <span>{t.tokenType}</span>
+                              <span>{formatUsd(t.costUsd)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           {(data.estimated.untrackedCount > 0 || data.estimated.truncated) && (
             <div className="rounded-md bg-yellow-500/10 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-500 space-y-1">
@@ -311,7 +406,9 @@ export function SpendView({
               ユーザー別（推定）
             </p>
             <p className="text-xs text-muted-foreground mb-3">
-              Anthropic はアプリのユーザーを識別しないため、この内訳は保存トークンからの推定です。
+              Anthropic
+              はアプリのユーザーを識別しないため、この内訳は保存トークンからの推定です（発酵のみ）。
+              ユーザー別だけは実額で出せないので、推定を残しています。
             </p>
             {data.estimated.byUser.length > 0 ? (
               <div className="overflow-x-auto">

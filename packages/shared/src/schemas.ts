@@ -54,19 +54,68 @@ const textSpanMarkSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+/**
+ * 本文中に置いた写真 1 枚。
+ *
+ * **`offset` は本文の文字位置**で、そこに 1 文字だけ置かれた
+ * `INLINE_IMAGE_PLACEHOLDER`（U+FFFC）と 1 対 1 で対応する。プレースホルダを本文側に
+ * 持たせるのは、位置をテキスト編集そのものに追従させるため —— 文字を消せば写真も消え、
+ * 前に文字を足せば写真も後ろへずれる。オフセットだけを別管理すると、この追従を
+ * 自前で書くことになり必ずズレる。
+ *
+ * `storagePath` は `entries.media_urls` に入っている値と一致していなければならない
+ * （表示用の署名付き URL は都度サーバーが発行する）。本文から消えた写真は
+ * media_urls にも残らないので、両者は同じ集合を指す。
+ */
+const inlineImageSchema = z.object({
+  /** 本文中のプレースホルダ位置。`content` の文字オフセット。 */
+  offset: z.number().int().nonnegative(),
+  /** Storage 上のパス。`mediaUrls` の要素と一致する。 */
+  storagePath: z.string(),
+  /**
+   * 表示幅。本文の折り返し幅に対する割合（0.05〜1.0）。
+   * px ではなく割合にしてあるのは、縦書き / 横書きや画面幅でレイアウト幅が変わるため。
+   * px で持つと、書いたときと違う端末で開いたときに本文との比率が崩れる。
+   */
+  widthRatio: z.number().min(0.05).max(1),
+  /**
+   * 回り込み。Word の「文字列の折り返し」に相当するが、**縦書きでも意味が通る名前**にしてある
+   * （Word の「上下」は縦書きだと左右になるため、方向を含む名前は使えない）。
+   *   - `inline` : 文字と同じ流れに置く（大きな 1 文字として振る舞う）
+   *   - `block`  : 独立した行を占める。前後に本文が来る
+   *   - `wrap`   : 本文が写真を避けて回り込む（float 相当）
+   */
+  layout: z.enum(['inline', 'block', 'wrap']),
+  /**
+   * 行方向の寄せ。`block` / `wrap` のときだけ意味を持つ（`inline` は文字の流れが決める）。
+   * `start` / `end` は書字方向に依存しない —— 横書きなら左右、縦書きなら上下になる。
+   */
+  align: z.enum(['start', 'center', 'end']),
+  /**
+   * 縦横比の上書き（block 方向 ÷ inline 方向）。辺ハンドルで自由変形したときだけ入る。
+   * 未指定なら写真本来の比率を使う（角ハンドルは比率を保つので値を書かない）。
+   */
+  aspect: z.number().positive().optional(),
+});
+
 export const editorEffectsStateSchema = z.object({
   version: z.literal(1),
   eraserTraces: z.array(eraserTraceSchema).optional(),
   textSpans: z.array(textSpanMarkSchema).optional(),
+  /** 本文中に置いた写真。`offset` 昇順である必要はない（読み込み時に整列する）。 */
+  inlineImages: z.array(inlineImageSchema).optional(),
 });
 
 export type EditorEffectsState = z.infer<typeof editorEffectsStateSchema>;
 export type EraserTracePayload = z.infer<typeof eraserTraceSchema>;
 export type TextSpanMark = z.infer<typeof textSpanMarkSchema>;
+export type InlineImage = z.infer<typeof inlineImageSchema>;
 
 export const createEntrySchema = z.object({
   content: z.string(),
-  mediaUrls: z.array(z.string()).default([]),
+  // undefined → 既存値を維持（更新時）/ 配列 → 差し替え。effects と同じ扱いにしてあるのは、
+  // 自動保存が写真を知らないまま本文だけ送ってきても media_urls を消さないため。
+  mediaUrls: z.array(z.string()).optional(),
   editorType: z.string(),
   editorVersion: z.string(),
   extension: z.record(z.unknown()).default({}),

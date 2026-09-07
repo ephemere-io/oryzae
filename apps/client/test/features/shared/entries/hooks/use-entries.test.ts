@@ -403,6 +403,48 @@ describe('useEntries', () => {
     expect(apiFetch.mock.calls[1][0]).toContain('order=oldest');
   });
 
+  it('検索を素早く切り替えたとき、遅れて届いた古い応答が新しい結果を上書きしない', async () => {
+    let resolveFirst: (res: Response) => void = () => {};
+    const firstPromise = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    apiFetch.mockReturnValueOnce(firstPromise);
+    const api = createMockApi(apiFetch);
+
+    const { result, rerender } = renderHook(({ search }) => useEntries(api, search), {
+      initialProps: { search: 'first' },
+    });
+
+    // 2 回目（最新の検索語）の応答は 1 回目より先に届く。
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, [
+        { id: '2', userId: 'u1', content: 'second', mediaUrls: [], createdAt: '', updatedAt: '' },
+      ]),
+    );
+    rerender({ search: 'second' });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.entries).toEqual([
+      expect.objectContaining({ id: '2', content: 'second' }),
+    ]);
+
+    // 1 回目（古い検索語）の応答が今ごろ届いても、既に表示されている最新結果を上書きしない。
+    await act(async () => {
+      resolveFirst(
+        mockResponse(true, [
+          { id: '1', userId: 'u1', content: 'first', mediaUrls: [], createdAt: '', updatedAt: '' },
+        ]),
+      );
+      await firstPromise;
+    });
+
+    expect(result.current.entries).toEqual([
+      expect.objectContaining({ id: '2', content: 'second' }),
+    ]);
+  });
+
   it('Issue #323: linkedQuestions 欠落時は空配列にフォールバックする', async () => {
     apiFetch.mockResolvedValueOnce(
       mockResponse(true, [

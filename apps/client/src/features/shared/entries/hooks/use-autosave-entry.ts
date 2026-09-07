@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
+interface AutosaveOptions {
+  mediaUrls?: string[];
+}
+
 interface UseAutosaveEntryParams {
   title: string;
   body: string;
   entryId: string | undefined;
-  save: (content: string, entryId?: string) => Promise<string | null>;
+  save: (content: string, entryId?: string, options?: AutosaveOptions) => Promise<string | null>;
   /** 保存が成功したとき。savedTitle は trim 済み（保存された形）。 */
   onSaved?: (entryId: string, savedBody: string, savedTitle: string) => void;
   enabled: boolean;
@@ -18,6 +22,15 @@ interface UseAutosaveEntryParams {
    * **離脱時の書き出しには適用しない**（下記 saveNow の force を参照）。
    */
   minCreateChars?: number;
+  /**
+   * エントリに添えた写真のストレージパス。渡すと保存のたびに一緒に送られる。
+   *
+   * 保存の**起動条件**は本文・タイトルの変化のままにしてある。写真を足しただけで
+   * autosave を走らせると、呼び出し側の明示的な保存と二重になるため
+   * （写真の追加/削除は editor 側がその場で save する）。
+   * 値は latestRef 経由で保存の瞬間に読む。
+   */
+  mediaUrls?: string[];
 }
 
 const DEFAULT_DEBOUNCE_MS = 2000;
@@ -62,6 +75,7 @@ export function useAutosaveEntry({
   enabled,
   debounceMs = DEFAULT_DEBOUNCE_MS,
   minCreateChars = DEFAULT_MIN_CREATE_CHARS,
+  mediaUrls,
 }: UseAutosaveEntryParams) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 保存中に次の保存が重ならないようにする（同じ内容を 2 回書かない）。
@@ -72,8 +86,16 @@ export function useAutosaveEntry({
   const prevEntryIdRef = useRef<string | undefined>(entryId);
 
   // 最新の入力をコールバックから読むための箱（依存配列を空に保ち、リスナを貼り直さない）。
-  const latestRef = useRef({ title, body, entryId, enabled, minCreateChars, debounceMs });
-  latestRef.current = { title, body, entryId, enabled, minCreateChars, debounceMs };
+  const latestRef = useRef({
+    title,
+    body,
+    entryId,
+    enabled,
+    minCreateChars,
+    debounceMs,
+    mediaUrls,
+  });
+  latestRef.current = { title, body, entryId, enabled, minCreateChars, debounceMs, mediaUrls };
   const saveRef = useRef(save);
   saveRef.current = save;
   const onSavedRef = useRef(onSaved);
@@ -128,7 +150,13 @@ export function useAutosaveEntry({
     // 成否を返す。**失敗したかどうかを次の判断に使う**（下の追いかけを参照）。
     const run = (async (): Promise<boolean> => {
       try {
-        const savedId = await saveRef.current(content, current.entryId);
+        // mediaUrls を渡さない呼び出し元では options ごと省く。サーバーは未指定を
+        // 「既存の media_urls を維持」として扱うので、写真を巻き添えで消さない。
+        const savedId = await saveRef.current(
+          content,
+          current.entryId,
+          current.mediaUrls === undefined ? undefined : { mediaUrls: current.mediaUrls },
+        );
         if (!savedId) return false;
         lastSavedContentRef.current = content;
         prevEntryIdRef.current = savedId;

@@ -50,7 +50,7 @@ describe('useAutosaveEntry', () => {
     await tick();
 
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined);
+    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined, undefined);
   });
 
   // regression #510-1
@@ -61,7 +61,7 @@ describe('useAutosaveEntry', () => {
     rerender({ title: 'あとから付けた題', body: '本文はそのまま' });
     await tick();
 
-    expect(save).toHaveBeenCalledWith('あとから付けた題\n本文はそのまま', 'e1');
+    expect(save).toHaveBeenCalledWith('あとから付けた題\n本文はそのまま', 'e1', undefined);
   });
 
   // regression #510-2
@@ -72,7 +72,7 @@ describe('useAutosaveEntry', () => {
     rerender({ title: '', body: 'original contentX' }); // +1 文字
     await tick(3000);
 
-    expect(save).toHaveBeenCalledWith('original contentX', 'e1');
+    expect(save).toHaveBeenCalledWith('original contentX', 'e1', undefined);
   });
 
   // regression #510-2b: 短い記録そのもの（既存エントリの更新として）
@@ -83,7 +83,7 @@ describe('useAutosaveEntry', () => {
     rerender({ title: '', body: '今日は疲れた' });
     await tick();
 
-    expect(save).toHaveBeenCalledWith('今日は疲れた', 'e1');
+    expect(save).toHaveBeenCalledWith('今日は疲れた', 'e1', undefined);
   });
 
   // regression #510-3
@@ -94,7 +94,57 @@ describe('useAutosaveEntry', () => {
     rerender({ title: '', body: 'あいうえを' }); // 長さは同じ
     await tick(3000);
 
-    expect(save).toHaveBeenCalledWith('あいうえを', 'e1');
+    expect(save).toHaveBeenCalledWith('あいうえを', 'e1', undefined);
+  });
+
+  /** rerender の initialProps に型を与えるための空配列（`as` を使わずに string[] にする）。 */
+  const EMPTY_MEDIA_URLS: string[] = [];
+
+  it('mediaUrls を渡すと save に同梱される', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+    const mediaUrls = ['https://cdn.example/a.jpg'];
+
+    const { rerender } = renderHook(
+      ({ body }) =>
+        useAutosaveEntry({
+          title: '',
+          body,
+          entryId: undefined,
+          save,
+          enabled: true,
+          mediaUrls,
+        }),
+      { initialProps: { body: '' } },
+    );
+
+    rerender({ body: 'これは十分な長さの本文です' });
+    await tick(3000);
+
+    expect(save).toHaveBeenCalledWith('これは十分な長さの本文です', undefined, { mediaUrls });
+  });
+
+  // 保存の起動条件は本文の変化のまま。写真を足しただけでは保存を走らせない
+  // （呼び出し側が明示的に保存するため。二重保存を避ける）。
+  it('mediaUrls が変わっただけでは save を呼ばない', async () => {
+    const save = vi.fn().mockResolvedValue('new-id');
+
+    const { rerender } = renderHook(
+      ({ mediaUrls }) =>
+        useAutosaveEntry({
+          title: '',
+          body: '本文はずっと同じままにしておく',
+          entryId: 'e1',
+          save,
+          enabled: true,
+          mediaUrls,
+        }),
+      { initialProps: { mediaUrls: EMPTY_MEDIA_URLS } },
+    );
+
+    rerender({ mediaUrls: ['https://cdn.example/a.jpg'] });
+    await tick(3000);
+
+    expect(save).not.toHaveBeenCalled();
   });
 
   it('内容が変わっていなければ保存しない（開いただけで PUT しない）', async () => {
@@ -124,7 +174,7 @@ describe('useAutosaveEntry', () => {
     rerender({ title: '会えなかった日', body: '' });
     await tick();
 
-    expect(save).toHaveBeenCalledWith('会えなかった日\n', undefined);
+    expect(save).toHaveBeenCalledWith('会えなかった日\n', undefined, undefined);
   });
 
   it('新規でも短い記録は保存する（「今日は疲れた」で終える人が消えない）', async () => {
@@ -134,7 +184,7 @@ describe('useAutosaveEntry', () => {
     rerender({ title: '', body: '今日は疲れた' });
     await tick();
 
-    expect(save).toHaveBeenCalledWith('今日は疲れた', undefined);
+    expect(save).toHaveBeenCalledWith('今日は疲れた', undefined, undefined);
   });
 
   it('api の解決（enabled false→true）では強制保存が走らない', async () => {
@@ -166,7 +216,7 @@ describe('useAutosaveEntry', () => {
       await Promise.resolve();
     });
 
-    expect(save).toHaveBeenCalledWith('あ', undefined);
+    expect(save).toHaveBeenCalledWith('あ', undefined, undefined);
   });
 
   it('body が空白のみなら save を呼ばない', async () => {
@@ -186,7 +236,11 @@ describe('useAutosaveEntry', () => {
     rerender({ title: 'マイタイトル', body: '本文は十分長いテキストである' });
     await tick();
 
-    expect(save).toHaveBeenCalledWith('マイタイトル\n本文は十分長いテキストである', 'e1');
+    expect(save).toHaveBeenCalledWith(
+      'マイタイトル\n本文は十分長いテキストである',
+      'e1',
+      undefined,
+    );
   });
 
   it('enabled=false なら save を呼ばない', async () => {
@@ -214,7 +268,7 @@ describe('useAutosaveEntry', () => {
     await tick(2000);
 
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith('十分な長さの1つ目と2つ目と3つ目', undefined);
+    expect(save).toHaveBeenCalledWith('十分な長さの1つ目と2つ目と3つ目', undefined, undefined);
   });
 
   it('onSaved には entryId・本文・trim 済みタイトルが渡る', async () => {
@@ -245,7 +299,7 @@ describe('useAutosaveEntry', () => {
       await Promise.resolve();
     });
 
-    expect(save).toHaveBeenCalledWith('original+追記', 'e1');
+    expect(save).toHaveBeenCalledWith('original+追記', 'e1', undefined);
   });
 
   it('ページを離れるとき（pagehide）も保留中の入力を書き出す', async () => {
@@ -258,7 +312,7 @@ describe('useAutosaveEntry', () => {
       await Promise.resolve();
     });
 
-    expect(save).toHaveBeenCalledWith('original+離脱直前', 'e1');
+    expect(save).toHaveBeenCalledWith('original+離脱直前', 'e1', undefined);
   });
 
   it('アンマウント時も、デバウンス待ちの内容を保存する', async () => {
@@ -271,7 +325,7 @@ describe('useAutosaveEntry', () => {
       await Promise.resolve();
     });
 
-    expect(save).toHaveBeenCalledWith('original+離脱直前の追記', 'e1');
+    expect(save).toHaveBeenCalledWith('original+離脱直前の追記', 'e1', undefined);
   });
 
   // entryId は「呼び出し側が保存結果を返してくる」前提で動く。hook は自分が作った id を
@@ -288,14 +342,14 @@ describe('useAutosaveEntry', () => {
 
     rerender({ entryId: undefined, body: '最初の本文' });
     await tick();
-    expect(save).toHaveBeenLastCalledWith('最初の本文', undefined);
+    expect(save).toHaveBeenLastCalledWith('最初の本文', undefined, undefined);
 
     // 呼び出し側が onSaved で受け取った id を返してくる。
     rerender({ entryId: 'A', body: '最初の本文' });
     rerender({ entryId: 'A', body: '最初の本文と続き' });
     await tick();
 
-    expect(save).toHaveBeenLastCalledWith('最初の本文と続き', 'A');
+    expect(save).toHaveBeenLastCalledWith('最初の本文と続き', 'A', undefined);
     expect(save).toHaveBeenCalledTimes(2);
   });
 
@@ -376,7 +430,7 @@ describe('useAutosaveEntry', () => {
     });
 
     expect(save).toHaveBeenCalledTimes(2);
-    expect(save).toHaveBeenLastCalledWith('original+1回目+通信中に打った分', 'e1');
+    expect(save).toHaveBeenLastCalledWith('original+1回目+通信中に打った分', 'e1', undefined);
   });
 
   it('保存中に届いた変更は、保存完了後に追いかけて保存する（同じ内容は二重に書かない）', async () => {
@@ -404,6 +458,6 @@ describe('useAutosaveEntry', () => {
     await tick();
 
     expect(save).toHaveBeenCalledTimes(2);
-    expect(save).toHaveBeenLastCalledWith('original+1回目の追記+2回目', 'e1');
+    expect(save).toHaveBeenLastCalledWith('original+1回目の追記+2回目', 'e1', undefined);
   });
 });

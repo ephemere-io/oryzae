@@ -71,4 +71,35 @@ test.describe('エントリ管理', () => {
 
     await deleteEntriesByMarker(page, marker);
   });
+
+  // 1x1 の PNG。canvas でのリサイズを実ブラウザで通すために実データが要る。
+  const TINY_PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+
+  /**
+   * 写真を選ぶと取り込みモーダルが開き、2つの取り込み方を選べる。
+   *
+   * ここでは「文字として読み込む」は押さない — 1回ごとに LLM の実費が発生し、
+   * 結果も非決定的なため。ボタンが押せる状態であることまでを検証範囲とする。
+   */
+  test('写真を選ぶと取り込みモーダルが開き、取り込み方を選べる', async ({ page }) => {
+    await page.goto('/entries/new');
+    await expect(page.getByTestId('photo-import-trigger')).toBeVisible();
+
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({ name: 'note.png', mimeType: 'image/png', buffer: TINY_PNG });
+
+    const dialog = page.getByRole('dialog', { name: '写真を取り込む' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: '文字として読み込む' })).toBeEnabled();
+    await expect(dialog.getByRole('button', { name: '写真として貼る' })).toBeEnabled();
+
+    // キャンセルで閉じる（本文にもエントリにも副作用を残さない）。
+    await dialog.getByRole('button', { name: 'キャンセル' }).click();
+    await expect(dialog).toBeHidden();
+  });
 });

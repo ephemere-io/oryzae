@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Info } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import {
   Table,
@@ -11,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { CostItem } from '../hooks/use-cost-data';
 
 function formatDate(iso: string): string {
@@ -99,10 +101,13 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
     label,
     sortKeyName,
     className,
+    tooltip,
   }: {
     label: string;
     sortKeyName: SortKey;
     className?: string;
+    /** 渡すと列名に点線が付き、hover で説明が出る。 */
+    tooltip?: ReactNode;
   }) {
     return (
       <TableHead
@@ -110,6 +115,18 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
         onClick={() => handleSort(sortKeyName)}
       >
         {label}
+        {tooltip ? (
+          <Tooltip content={tooltip}>
+            {/* 並び替えヘッダの中なので、説明を読むクリックで並び替わらないよう伝播を止める。 */}
+            <span
+              className="ml-1 inline-flex cursor-help align-middle text-muted-foreground"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <Info className="h-3 w-3" />
+            </span>
+          </Tooltip>
+        ) : null}
         <SortIcon active={sortKey === sortKeyName} dir={sortDir} />
       </TableHead>
     );
@@ -119,12 +136,35 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <SortableHead label="Date" sortKeyName="created_at" />
-          <SortableHead label="User" sortKeyName="user_email" />
-          <SortableHead label="Status" sortKeyName="status" />
-          <SortableHead label="Input" sortKeyName="promptTokens" className="text-right" />
-          <SortableHead label="Output" sortKeyName="completionTokens" className="text-right" />
-          <SortableHead label="推定コスト" sortKeyName="totalCost" className="text-right" />
+          <SortableHead label="日時" sortKeyName="created_at" />
+          <SortableHead label="ユーザー" sortKeyName="user_email" />
+          <SortableHead label="状態" sortKeyName="status" />
+          <SortableHead label="入力トークン" sortKeyName="promptTokens" className="text-right" />
+          <SortableHead
+            label="出力トークン"
+            sortKeyName="completionTokens"
+            className="text-right"
+          />
+          <SortableHead
+            label="推定コスト"
+            sortKeyName="totalCost"
+            className="text-right"
+            tooltip={
+              <span>
+                <strong>実請求額ではありません。</strong>
+                保存済みトークン数 × 価格表（claude-sonnet-4-6: 入力 $3 / 出力 $15 per 1M）で
+                その場で計算した推定です。
+                <br />
+                キャッシュ割引・コンテキスト窓別単価・tier 割引・期間限定価格は反映されません
+                （実測で 40% 前後ずれます）。
+                <br />
+                <span className="text-muted-foreground">
+                  1 件ごとの金額は Anthropic 側が出せない（user_id を持たない）ため、ここは
+                  推定でしか出せません。実請求額は Observability → AI Spend を見てください
+                </span>
+              </span>
+            }
+          />
         </TableRow>
       </TableHeader>
       <TableBody>
