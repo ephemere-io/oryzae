@@ -1,4 +1,5 @@
 import { anthropic } from '@ai-sdk/anthropic';
+import { MAX_ENTRY_PHOTO_TEXT_LENGTH } from '@oryzae/shared';
 import { generateText } from 'ai';
 import type {
   PhotoTranscriptionGateway,
@@ -17,6 +18,12 @@ import type {
  * `grep -oE "'claude-[a-z0-9.-]+'"` して確認できる）。
  *
  * 選定理由とコスト比較は docs/entry-photo-guide.md を参照。
+ *
+ * **board の OCR (board/infrastructure/ocr/anthropic-ocr.gateway.ts) は claude-opus-5 で、
+ * ここと違うのは意図的**。あちらはスニペット 1 枚を切り出す用途で、誤読がそのまま
+ * スニペットの中身になるうえ 1 回あたりの入力が小さいので精度に振れる。こちらは日記の
+ * ページ全体を起こすため呼び出しあたりの単価が効き、定型タスクである文字起こしに
+ * Opus の推論力は要らないと判断している。揃えるなら、両方のコスト影響を見てから。
  */
 const OCR_MODEL = 'claude-sonnet-5';
 
@@ -38,8 +45,24 @@ function buildPrompt(language: string): string {
 - 文字がまったく写っていない場合は、空文字だけを返す。`;
 }
 
+/**
+ * 前後の空白と、モデルが付けがちな囲み記号を落としてから頭打ちにする。
+ *
+ * プロンプトで「本文だけを返す」と指示していても、コードフェンスで包んで返ってくることが
+ * ある。board の OCR (anthropic-ocr.gateway.ts の cleanup) と同じ処理で、そちらと
+ * 揃えてある。
+ *
+ * maxOutputTokens で頭打ちにしているのはトークン数であって文字数ではないので、
+ * 起こした文字が本文へ流れ込む前にここで文字数も抑える。
+ */
+function cleanup(raw: string): string {
+  const trimmed = raw.trim();
+  const unfenced = trimmed.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '');
+  return unfenced.trim().slice(0, MAX_ENTRY_PHOTO_TEXT_LENGTH);
+}
+
 /** テスト専用の内部公開（fermentation の gateway と同じ流儀）。 */
-export const __INTERNAL = { buildPrompt, OCR_MODEL };
+export const __INTERNAL = { buildPrompt, cleanup, OCR_MODEL };
 
 export class AnthropicPhotoTranscriptionGateway implements PhotoTranscriptionGateway {
   async transcribe(
@@ -57,14 +80,17 @@ export class AnthropicPhotoTranscriptionGateway implements PhotoTranscriptionGat
             { type: 'text', text: buildPrompt(language) },
             // contentType は presentation 層で ACCEPTED_IMAGE_MIME_TYPES に対して
             // 検証済みのものだけが渡ってくる（Anthropic は jpeg/png/gif/webp のみ受理）。
-            { type: 'image', image: new Uint8Array(image), mediaType: contentType },
+            //
+            // 'image' パートは AI SDK v6 で deprecated（実行時に警告が出る）。画像も
+            // mediaType 付きの 'file' パートで渡すのが現行の形で、board の OCR も同じ。
+            { type: 'file', data: image, mediaType: contentType },
           ],
         },
       ],
     });
 
     return {
-      text: text.trim(),
+      text: cleanup(text),
       model: OCR_MODEL,
       inputTokens: usage.inputTokens ?? 0,
       outputTokens: usage.outputTokens ?? 0,
