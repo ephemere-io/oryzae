@@ -3,32 +3,24 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
+import { useEscapeKey } from '@/lib/use-escape-key';
 
-/** 幅の下限。これ以上狭めると引用文が1行2〜3文字になり読めない。 */
-const MIN_WIDTH = 320;
-/** 幅の上限。広げすぎると背後のキャンバスが見えなくなる。 */
-const MAX_WIDTH = 720;
-const DEFAULT_WIDTH = 400;
-/** キーボードで掴んだときの1回ぶんの移動量。 */
-const KEY_STEP = 24;
-const WIDTH_STORAGE_KEY = 'oryzae:jar-detail-pane-width';
-
-function clampWidth(px: number): number {
-  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(px)));
-}
-
-function readStoredWidth(): number | null {
-  try {
-    const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
-    if (raw === null) return null;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? clampWidth(parsed) : null;
-  } catch {
-    // localStorage が使えない環境（プライベートモード等）では既定幅で動かす。
-    return null;
-  }
-}
+/**
+ * 種類ごとのウィンドウ幅（px）。
+ *
+ * 右から出る固定幅のペインをやめて中央のウィンドウにしたのは、**中身の長さがまるで違う**
+ * のに同じ器に入れていたから。キーワードの説明（2〜3行）と L.A.B. の手紙（十数行）が、
+ * どちらも幅 400px・全画面高のカラムに入っていた。前者はスカスカ、後者は窮屈になる。
+ *
+ * 手紙が広いのは行長のため。400px の器は左右の余白を引くと実質 336px しかなく、14px の
+ * 和文で **1 行 24 文字**にしかならない。長文を読ませる行長ではない（和文は 30〜40 文字）。
+ */
+const WINDOW_WIDTH: Record<'keyword' | 'snippet' | 'letter', number> = {
+  keyword: 420,
+  snippet: 560,
+  letter: 680,
+};
 
 interface DetailPaneProps {
   open: boolean;
@@ -46,6 +38,20 @@ interface DetailPaneProps {
   } | null;
 }
 
+/**
+ * 発酵の中身（言葉・抜粋・手紙）を読むための面。瓶の中央にふわりと現れる。
+ *
+ * 瓶のキャンバスでも発酵履歴でも、押した要素はたいてい画面の中央付近にある。右から板が
+ * 出てくる作りは、履歴の円盤（画面中央）や瓶（同じく中央）と構図で喧嘩していた。中央に
+ * 置けば構図が崩れず、幅を中身に合わせられる。
+ *
+ * 背後のスクリムは半透明＋ぼかしにして、瓶や円盤をうっすら透かす。「瓶の中にいる」文脈を
+ * 切らないためで、発酵履歴のスクリムと同じ考え方。
+ *
+ * ⚠️ エディタ側の発酵オーバーレイ（`pc/entries/fermentation-overlay-detail-pane`）は
+ * **右ペインのまま**にしてある。あちらは本文を書いている最中に開くので、書く手元を
+ * 覆ってはいけない。読むための面（中央）と、書きながら参照する面（右）で作りが違う。
+ */
 export function DetailPane({
   open,
   onClose,
@@ -57,72 +63,11 @@ export function DetailPane({
   const router = useRouter();
   const t = useTranslations('fermentation');
 
-  // 初期値で localStorage を読まないのは SSR とハイドレーションで食い違うため。
-  // マウント後に一度だけ復元する（キャンバスの視点保存と同じ考え方）。
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const [isResizing, setIsResizing] = useState(false);
-
-  // 確定時に「いまの幅」を読むための鏡。setState の updater は純粋でなければならず
-  // （StrictMode では2回呼ばれる）、その中で保存すると二重に書く。
-  const widthRef = useRef(DEFAULT_WIDTH);
-
-  const applyWidth = useCallback((next: number) => {
-    widthRef.current = next;
-    setWidth(next);
-  }, []);
-
-  useEffect(() => {
-    const stored = readStoredWidth();
-    if (stored !== null) applyWidth(stored);
-  }, [applyWidth]);
-
-  // ドラッグ中は毎フレーム幅が変わるので、保存は確定時だけにする。
-  const persistWidth = useCallback((next: number) => {
-    try {
-      window.localStorage.setItem(WIDTH_STORAGE_KEY, String(next));
-    } catch {
-      // 保存できなくても操作自体は成立させる。
-    }
-  }, []);
-
-  // ドラッグ開始時の値。pointermove のたびに差分で幅を出す（累積誤差を避ける）。
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // 左端の取っ手はキャンバスのパンより先に掴む。
-    e.stopPropagation();
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startWidth: widthRef.current };
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsResizing(true);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    // 右端に固定された面なので、左へ動かすほど幅は増える。
-    applyWidth(clampWidth(drag.startWidth + (drag.startX - e.clientX)));
-  };
-
-  const endResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current) return;
-    dragRef.current = null;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-    setIsResizing(false);
-    persistWidth(widthRef.current);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // 取っ手はポインタ専用にしない（キーボードだけでも幅を変えられるようにする）。
-    const delta = e.key === 'ArrowLeft' ? KEY_STEP : e.key === 'ArrowRight' ? -KEY_STEP : 0;
-    if (delta === 0) return;
-    e.preventDefault();
-    const next = clampWidth(widthRef.current + delta);
-    applyWidth(next);
-    persistWidth(next);
-  };
+  // Escape で閉じる。window の capture で拾うので、発酵履歴側の Escape（document の
+  // bubble）より先に走る。履歴側は開いている間だけ Escape を止めてある ── 1 回目で
+  // このウィンドウ、2 回目で履歴、という順に閉じてほしいため。
+  const handleEscape = useCallback(() => onClose(), [onClose]);
+  useEscapeKey(open, handleEscape);
 
   function handleWriteEntry() {
     router.push(`/entries/new?questionId=${questionId}`);
@@ -134,6 +79,8 @@ export function DetailPane({
     letter: t('detail.header_letter'),
   };
 
+  const width = type ? WINDOW_WIDTH[type] : WINDOW_WIDTH.keyword;
+
   return (
     <div
       {...verifyAttrs({
@@ -142,92 +89,105 @@ export function DetailPane({
         type: type ?? 'none',
         hasData: Boolean(data),
         width,
-        resizing: isResizing,
       })}
-      className="fixed top-0 z-[60] flex h-full flex-col border-l border-[rgba(139,115,85,0.2)] bg-[#faf8f5]"
+      // z は発酵履歴のクローム（日付レール = z-70）より上、問いの追加/編集モーダル
+      // （z-100）より下。60 のままだとレールが手紙の上に重なって読めなかった。
+      className="absolute inset-0 z-[80] flex items-center justify-center"
       style={{
-        width,
-        // 閉じているときは自分の幅ぶんだけ右に逃がす（幅が可変なので -400 固定にはできない）。
-        right: open ? 0 : -width,
-        // 掴んでいる間は追従を優先し、開閉のときだけ滑らせる。
-        transition: isResizing ? 'none' : 'right 0.7s',
-        backdropFilter: 'blur(12px)',
-        fontFamily: "'Noto Serif JP', serif",
+        // 閉じているときは触れない。要素そのものは残す（開閉を滑らせるため）。
+        pointerEvents: open ? 'auto' : 'none',
       }}
     >
-      {/* 幅を変える取っ手（左端）。 */}
-      {/* biome-ignore lint/a11y/useSemanticElements: <hr> は分割線であって掴める仕切りではない。
-          これは WAI-ARIA の Window Splitter（focusable な separator + aria-valuenow）で、
-          void 要素の <hr> ではポインタ/キーボードの取っ手として成立しない。 */}
-      <div
-        data-verify-part="resize-handle"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={t('detail.resize_aria')}
-        aria-valuenow={width}
-        aria-valuemin={MIN_WIDTH}
-        aria-valuemax={MAX_WIDTH}
-        tabIndex={0}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endResize}
-        onPointerCancel={endResize}
-        onKeyDown={handleKeyDown}
-        className="absolute inset-y-0 left-0 z-10 w-2 -translate-x-1/2 cursor-col-resize touch-none focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
-        style={{ backgroundColor: isResizing ? 'rgba(74,158,142,0.35)' : 'transparent' }}
-      />
-
-      {/* Close */}
+      {/* スクリム。押すと閉じる。 */}
       <button
         type="button"
-        onClick={onClose}
+        data-verify-part="scrim"
         aria-label={t('detail.close_aria')}
-        className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full text-lg text-[#6b5c4a] hover:bg-[rgba(139,115,85,0.1)]"
+        tabIndex={-1}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default border-0"
+        style={{
+          background: 'rgba(249,248,244,0.55)',
+          backdropFilter: 'blur(3px)',
+          WebkitBackdropFilter: 'blur(3px)',
+          opacity: open ? 1 : 0,
+          // スクリムを先に、ウィンドウを少し遅れて出すと「奥から浮いてくる」感じになる。
+          transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      />
+
+      {/* ウィンドウ本体 */}
+      <div
+        data-verify-part="window"
+        className="relative flex max-h-[78vh] w-[90vw] flex-col overflow-hidden rounded-2xl"
+        style={{
+          width: `min(${width}px, 90vw)`,
+          background: '#faf8f5',
+          border: '1px solid var(--ob-card-border)',
+          boxShadow: 'var(--ob-shadow-card)',
+          fontFamily: "'Noto Serif JP', serif",
+          opacity: open ? 1 : 0,
+          transform: open ? 'translateY(0) scale(1)' : 'translateY(8px) scale(0.96)',
+          transition:
+            'opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
-        ×
-      </button>
-
-      {/* Question */}
-      <div className="shrink-0 px-8 pt-8 pb-3 text-sm font-medium text-[#4a3f35]">
-        {questionText}
-      </div>
-
-      {/* Header */}
-      <div className="shrink-0 border-b border-[rgba(139,115,85,0.1)] px-8 pb-5 text-[22px] font-medium text-[#4a3f35]">
-        {type ? headers[type] : ''}
-      </div>
-
-      {/* Body — scrollable */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6 text-sm leading-[2.0] text-[#4a3f35]">
-        {type === 'keyword' && data && (
-          <>
-            <h3 className="mb-3 text-lg font-medium text-[var(--accent)]">{data.keyword}</h3>
-            <p>{data.description}</p>
-          </>
-        )}
-        {type === 'snippet' && data && (
-          <>
-            <blockquote className="mb-4 text-base font-medium leading-relaxed">
-              「{data.originalText}」
-            </blockquote>
-            <p className="mb-4 text-xs text-[var(--date-color)]">
-              <span>{t('detail.snippet_source_prefix')}</span> {data.sourceDate}
-            </p>
-            <p>{data.selectionReason}</p>
-          </>
-        )}
-        {type === 'letter' && data && <div className="whitespace-pre-wrap">{data.bodyText}</div>}
-      </div>
-
-      {/* Footer */}
-      <div className="shrink-0 border-t border-[rgba(139,115,85,0.1)] px-8 py-6">
+        {/* Close */}
         <button
           type="button"
-          onClick={handleWriteEntry}
-          className="w-full rounded-lg border border-[var(--accent)] px-4 py-3 text-sm text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white"
+          onClick={onClose}
+          aria-label={t('detail.close_aria')}
+          className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-lg text-[#6b5c4a] transition-colors hover:bg-[rgba(139,115,85,0.1)]"
         >
-          {t('detail.write_entry')}
+          ×
         </button>
+
+        {/* どの問いの、どの回のものか */}
+        <div className="shrink-0 px-8 pt-8 pb-3 pr-16 text-sm font-medium text-[#4a3f35]">
+          {questionText}
+        </div>
+
+        {/* Header */}
+        <div className="shrink-0 border-b border-[rgba(139,115,85,0.1)] px-8 pb-5 text-[22px] font-medium text-[#4a3f35]">
+          {type ? headers[type] : ''}
+        </div>
+
+        {/* Body — scrollable */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6 text-sm leading-[2.0] text-[#4a3f35]">
+          {type === 'keyword' && data && (
+            <>
+              <h3 className="mb-3 text-lg font-medium text-[var(--accent)]">{data.keyword}</h3>
+              <p>{data.description}</p>
+            </>
+          )}
+          {type === 'snippet' && data && (
+            <>
+              <blockquote className="mb-4 text-base font-medium leading-relaxed">
+                「{data.originalText}」
+              </blockquote>
+              <p className="mb-4 text-xs text-[var(--date-color)]">
+                <span>{t('detail.snippet_source_prefix')}</span> {data.sourceDate}
+              </p>
+              <p>{data.selectionReason}</p>
+            </>
+          )}
+          {/* 手紙だけ行長を絞る。器を広げたのは読みやすさのためなので、
+              広げたぶん 1 行が伸びきってしまっては意味がない。 */}
+          {type === 'letter' && data && (
+            <div className="mx-auto max-w-[34em] whitespace-pre-wrap">{data.bodyText}</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-[rgba(139,115,85,0.1)] px-8 py-6">
+          <button
+            type="button"
+            onClick={handleWriteEntry}
+            className="w-full rounded-lg border border-[var(--accent)] px-4 py-3 text-sm text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-white"
+          >
+            {t('detail.write_entry')}
+          </button>
+        </div>
       </div>
     </div>
   );
