@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import type { StudyFermentationStatus } from '../types';
+import { StudyMark } from './study-mark';
 
 /** readiness がこれ以上なら「もうすぐ発酵します」に言い換える。 */
 const ALMOST_THRESHOLD = 0.9;
@@ -39,17 +40,14 @@ export function StudyChrome({
       {...verifyAttrs({ unit: 'StudyChrome', status, statusKey, showCaption })}
       className="pointer-events-none absolute inset-0"
     >
-      {/* 左上のブランドマーク。サブ画面では「BACK TO STUDY」を兼ねる（layout 側で出し分け）。 */}
+      {/* 左上のマーク。サブ画面では同じ位置に「書斎へ戻る」が出る（layout 側で出し分け）。
+          **同じ絵**にしてあるのは、戻り先が「さっきまで居たこの部屋」だと繋がるようにするため。
+          以前は `o` の一文字で、実機レビューで「意味が分からない」と報告された。 */}
       <div
         className="pointer-events-auto absolute left-6 top-6 flex h-10 w-10 items-center justify-center rounded-full"
         style={glass}
       >
-        <span
-          className="font-serif text-[13px] lowercase tracking-[0.08em]"
-          style={{ color: '#8EA89C' }}
-        >
-          o
-        </span>
+        <StudyMark />
       </div>
 
       {/* 左下のアバター。サイドバーの下端にあったものがそのまま浮く。 */}
@@ -78,19 +76,15 @@ export function StudyChrome({
       </Link>
 
       {showCaption && (
-        <div className="absolute bottom-7 left-1/2 -translate-x-1/2 text-center">
+        <div data-study-caption className="absolute bottom-7 left-1/2 -translate-x-1/2 text-center">
           <div
             className="font-serif text-[13px] tracking-[0.28em]"
             style={{ color: '#5C4F3F', opacity: 0.75 }}
           >
             {t('title')}
           </div>
-          <div
-            className="mt-1 text-[9px] uppercase tracking-[0.24em]"
-            style={{ color: '#8C857E', opacity: 0.7 }}
-          >
-            STUDY
-          </div>
+          {/* 「書斎」の下に `STUDY` も出していたが、同じ語が二重に見えると実機レビューで
+              報告された。本文が日本語なので日本語だけ残す。 */}
           <div className="mt-2 text-[11px]" style={{ color: '#5C4F3F', opacity: 0.6 }}>
             {t(statusKey)}
           </div>

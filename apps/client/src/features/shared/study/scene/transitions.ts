@@ -5,7 +5,7 @@
  * 段取りそのものをテストできる。
  */
 
-import { DELAY, DURATION, EASING, PAGE_FOLLOW, progress } from '../constants';
+import { DELAY, DURATION, EASING, JOURNAL_OVERLAP, PAGE_FOLLOW, progress } from '../constants';
 import type { StudyTarget } from '../types';
 
 type EasingFn = (p: number) => number;
@@ -52,7 +52,8 @@ export interface PlanOptions {
  * 対象ごとの段取りを組む。
  *
  * 手帳は「真上へ寄る」→「表紙が開く」→「見開きへ寄る」の 3 段。**開き終わってから**
- * 画面を切り替えるので、`totalMs` は最後の段の終わりになる。
+ * 画面を切り替えるので、`totalMs` は最後の段の終わりになる。3 段は順序を保ったまま
+ * 少しずつ重ねてある（`JOURNAL_OVERLAP`）。
  */
 export function planFor(target: StudyTarget, options: PlanOptions): TransitionPlan {
   const steps = rawSteps(target, options);
@@ -107,15 +108,18 @@ function journalSteps(): TransitionStep[] {
     durationMs: DURATION.journalTop,
     easing: EASING.easeOutCubic,
   };
+  // 段は順に始まるが、前の段の終わりを待たない（JOURNAL_OVERLAP）。直列だと 2.3 秒かかり、
+  // 「開くのを待たされる」状態になっていた。
+  const coverDelay = DURATION.journalTop * JOURNAL_OVERLAP.coverStartsAt;
   const cover: TransitionStep = {
     name: 'cover-open',
-    delayMs: DURATION.journalTop,
+    delayMs: coverDelay,
     durationMs: DURATION.coverOpen,
     easing: EASING.easeInOutCubic,
   };
   const spread: TransitionStep = {
     name: 'spread-in',
-    delayMs: DURATION.journalTop + DURATION.coverOpen,
+    delayMs: coverDelay + DURATION.coverOpen * JOURNAL_OVERLAP.spreadStartsAt,
     durationMs: DURATION.spreadIn,
     easing: EASING.easeOutCubic,
   };

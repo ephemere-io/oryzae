@@ -24,14 +24,15 @@ registerUnit<Props>({
     {
       id: 'loading',
       probe: true,
-      description: 'Probe: 読み込み中は理由文を出さない（すぐ書斎に置き換わる）',
+      description: 'Probe: 読み込み中は理由文も行き先も出さない（書斎の絵だけ）',
       props: { loading: true },
     },
   ],
   invariants: [
     {
       id: 'three-destinations',
-      description: '瓶・記録・ボードの 3 つへ行けるリンクが残る',
+      description: '書斎が出せないときは、瓶・記録・ボードの 3 つへ行けるリンクが残る',
+      onlyFixtures: ['unsupported'],
       check: ({ root }) => {
         const hrefs = [...root.querySelectorAll('a')].map((a) => a.getAttribute('href'));
         for (const href of ['/jar', '/entries/new', '/board']) {
@@ -41,10 +42,23 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'loading-offers-no-destinations',
+      description: '読み込み中は行き先を出さない（すぐ書斎に置き換わるのに選択を迫らない）',
+      onlyFixtures: ['loading'],
+      check: ({ root }) => {
+        const links = root.querySelectorAll('a').length;
+        return links === 0 || `読み込み中なのにリンクが ${links} 本ある`;
+      },
+    },
+    {
       id: 'not-blank',
       description: '白画面にならない（必ず何かが描かれる）',
-      check: ({ root }) =>
-        (root.textContent ?? '').trim().length > 0 || '文字が 1 つも描かれていない',
+      check: ({ root }) => {
+        // 読み込み中は文字を持たないので、書斎の絵が出ていることで判定する。
+        const hasGlyph = root.querySelector('svg') !== null;
+        const hasText = (root.textContent ?? '').trim().length > 0;
+        return hasGlyph || hasText || '文字も絵も描かれていない';
+      },
     },
     {
       id: 'loading-hides-reason',

@@ -30,6 +30,16 @@ registerUnit<Record<string, never>>({
         Boolean(root.querySelector('a[href="/study"]')) || '/study へのリンクが無い',
     },
     {
+      id: 'mark-is-the-room',
+      description: '書斎の縮図を出す（書斎側の左上マークと同じ絵）',
+      check: ({ root }) => {
+        // 戻り先が「さっきまで居たあの部屋」だと繋がるよう、両側で同じ絵を使う。
+        // 片方だけ差し替えられると、行き先と戻り先が別物に見える。
+        const mark = root.querySelector('[data-study-mark]');
+        return mark !== null || '書斎のマークが描かれていない';
+      },
+    },
+    {
       id: 'has-accessible-name',
       description: 'アイコンだけでも名前が読める',
       check: ({ root }) => {

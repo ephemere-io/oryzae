@@ -87,6 +87,25 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'one-name-for-the-room',
+      description: '部屋の名前を二重に出さない（「書斎」と「STUDY」が並ばない）',
+      check: ({ root }) => {
+        const caption = root.querySelector('[data-study-caption]');
+        if (caption === null) return true;
+        const text = caption.textContent ?? '';
+        return !text.includes('STUDY') || '「書斎」の下に STUDY も出ている';
+      },
+    },
+    {
+      id: 'mark-is-the-room',
+      description: '左上は書斎の縮図（サブ画面の戻るマークと同じ絵）',
+      check: ({ root }) => {
+        // 以前は `o` の一文字で、何を指すのか読めなかった。
+        const mark = root.querySelector('[data-study-mark]');
+        return mark !== null || '左上に書斎のマークが無い';
+      },
+    },
+    {
       id: 'account-link',
       description: 'アバターから /account に行ける',
       check: ({ root }) =>
@@ -104,8 +123,10 @@ registerUnit<Props>({
     {
       id: 'caption-toggles',
       description: 'showCaption=false でキャプションを出さない',
+      // 文言そのもの（以前は 'STUDY'）で見ると、語を変えるたびに検証も壊れる。
+      // 「キャプションという場所があるか」を目印で見る。
       check: ({ root, props }) => {
-        const hasCaption = Boolean(root.textContent?.includes('STUDY'));
+        const hasCaption = Boolean(root.querySelector('[data-study-caption]'));
         const expected = props.showCaption !== false;
         return hasCaption === expected || `キャプションの出し分けが契約と違う`;
       },

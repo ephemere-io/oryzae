@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DURATION } from '@/features/shared/study/constants';
+import { DURATION, OPEN_BUDGET_MS } from '@/features/shared/study/constants';
+import { SPREAD_PAGES } from '@/features/shared/study/scene/books';
 import {
   isPlanDone,
   leaveFadeDuration,
@@ -47,16 +48,45 @@ describe('planFor', () => {
     expect(letter).toEqual(planFor({ kind: 'jar' }, PC));
   });
 
-  it('手帳は 真上へ → 表紙が開く → 見開きへ の順に重ならず並ぶ', () => {
+  it('手帳は 真上へ → 表紙が開く → 見開きへ の順に始まる', () => {
     const plan = planFor({ kind: 'journal-new' }, PC);
     const top = plan.steps.find((s) => s.name === 'journal-top');
     const cover = plan.steps.find((s) => s.name === 'cover-open');
     const spread = plan.steps.find((s) => s.name === 'spread-in');
     if (!top || !cover || !spread) throw new Error('missing step');
 
-    // 着いてから開く。開き終わってから寄る。
-    expect(cover.delayMs).toBeGreaterThanOrEqual(top.delayMs + top.durationMs);
-    expect(spread.delayMs).toBeGreaterThanOrEqual(cover.delayMs + cover.durationMs);
+    // 順序は保つ。寄る前に開いたり、開く前に覗き込んだりしない。
+    expect(cover.delayMs).toBeGreaterThan(top.delayMs);
+    expect(spread.delayMs).toBeGreaterThan(cover.delayMs);
+  });
+
+  it('3 段は重ねる（前の段の終わりを待たない）', () => {
+    // 直列に並べると 2.3 秒かかり、「エントリーが開くのを待たされる」と報告された。
+    // 人は表紙が開き始めるのを、カメラが止まり切る前から読み取れる。
+    const plan = planFor({ kind: 'journal-new' }, PC);
+    const top = plan.steps.find((s) => s.name === 'journal-top');
+    const cover = plan.steps.find((s) => s.name === 'cover-open');
+    const spread = plan.steps.find((s) => s.name === 'spread-in');
+    if (!top || !cover || !spread) throw new Error('missing step');
+
+    expect(cover.delayMs).toBeLessThan(top.delayMs + top.durationMs);
+    expect(spread.delayMs).toBeLessThan(cover.delayMs + cover.durationMs);
+  });
+
+  it('手帳は 1 秒以内に開き切る（開くのを待たせない）', () => {
+    // これを超えたら「待たされている」。段を足すときはここが先に落ちる。
+    expect(planFor({ kind: 'journal-new' }, PC).totalMs).toBeLessThanOrEqual(OPEN_BUDGET_MS);
+  });
+
+  it('紙は画面が切り替わるまでにめくり終わる', () => {
+    // 表紙より遅れてめくれる紙が、切り替わりに間に合わないと「途中で消えた」ように見える。
+    // 段の長さを詰めるとここが最初に破れるので、実際の段取りで見る。
+    const plan = planFor({ kind: 'journal-new' }, PC);
+    const cover = plan.steps.find((s) => s.name === 'cover-open');
+    if (!cover) throw new Error('missing step');
+    for (let i = 0; i < SPREAD_PAGES.count; i += 1) {
+      expect(pageProgress(cover, i, plan.totalMs)).toBe(1);
+    }
   });
 
   it('手帳の傾き戻しは真上へ寄るのと並走する', () => {

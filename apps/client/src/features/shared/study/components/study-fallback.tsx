@@ -19,18 +19,24 @@ export interface StudyFallbackProps {
  *
  * WebGL 非対応と、three.js の読み込み中の両方で使う。**3 つの行き先を `<a>` で出す**の
  * が肝で、白画面にしないだけでなく「ここから先へ行ける」ことを保つ。
+ *
+ * **ただし読み込み中は行き先を出さない。** 出していたところ、書斎へ入るたびに
+ * 「謎の 3 つの選択肢」が一瞬現れて消える、と実機レビューで報告された。
+ * 3 つのリンクは「書斎が**出せない**から代わりにここへ行ってくれ」という意味で、
+ * すぐ書斎に置き換わる読み込み中に出すと、意味の違う画面が割り込んだように見える。
+ * 読み込み中は書斎の絵だけを置いて、これから出るものの形を予告する。
  */
 export function StudyFallback({ loading = false }: StudyFallbackProps) {
   const t = useTranslations('study');
 
   return (
     <div
-      {...verifyAttrs({ unit: 'StudyFallback', loading, linkCount: 3 })}
+      {...verifyAttrs({ unit: 'StudyFallback', loading, linkCount: loading ? 0 : 3 })}
       className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center"
     >
       <StudyGlyph />
 
-      {!loading && (
+      {loading ? null : (
         <div className="max-w-[420px]">
           <h1 className="text-[13px] tracking-[0.2em]" style={{ color: '#5C4F3F' }}>
             {t('fallback_heading')}
@@ -41,11 +47,13 @@ export function StudyFallback({ loading = false }: StudyFallbackProps) {
         </div>
       )}
 
-      <nav className="flex flex-wrap items-center justify-center gap-3">
-        <FallbackLink href="/jar" label={t('fallback_jar')} />
-        <FallbackLink href="/entries/new" label={t('fallback_journal')} />
-        <FallbackLink href="/board" label={t('fallback_board')} />
-      </nav>
+      {loading ? null : (
+        <nav className="flex flex-wrap items-center justify-center gap-3">
+          <FallbackLink href="/jar" label={t('fallback_jar')} />
+          <FallbackLink href="/entries/new" label={t('fallback_journal')} />
+          <FallbackLink href="/board" label={t('fallback_board')} />
+        </nav>
+      )}
     </div>
   );
 }
