@@ -3,8 +3,10 @@
  *
  * 本文（contentEditable）そのものは孤立検証に載らないが、この部品は
  * 「選択中の写真の設定 → 出す操作 UI」の純粋な写像なので単体で検証できる。
- * 特に **寄せは行内では出さない**（文字の流れが位置を決めるため意味を持たない）という
- * 分岐を、Word のレイアウトオプションに倣った仕様として固定しておく。
+ *
+ * 見張るのは **道具を増やさないこと**。以前はここに「行内 / ブロック / 回り込み」×
+ * 「先頭 / 中央 / 末尾」の6つが並び、全部試さないと意味が分からなかった。
+ * いま出せるのは「大きさを変える」「消す」の2つだけで、位置は本文の中で掴んで動かす。
  */
 
 import type { InlineImage } from '@oryzae/shared';
@@ -37,9 +39,9 @@ function image(over: Partial<InlineImage> = {}): InlineImage {
   return {
     offset: 0,
     storagePath: 'u1/1-photo.jpg',
-    widthRatio: 0.4,
-    layout: 'inline',
-    align: 'start',
+    widthRatio: 0.5,
+    layout: 'block',
+    align: 'center',
     ...over,
   };
 }
@@ -47,7 +49,7 @@ function image(over: Partial<InlineImage> = {}): InlineImage {
 registerUnit<Props>({
   id: 'InlineImageOverlay',
   title: 'InlineImageOverlay',
-  description: '本文中の写真を選んだときに重なる操作 UI（8 ハンドル + レイアウト切替）',
+  description: '本文中の写真を選んだときに重なる操作 UI（8 ハンドル + 削除）',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
@@ -55,21 +57,20 @@ registerUnit<Props>({
         rect={RECT}
         image={props.image}
         onResizeStart={() => {}}
-        onLayoutChange={() => {}}
         onRemove={() => {}}
       />,
     ),
   fixtures: [
-    { id: 'inline', description: '行内（既定）', props: { image: image() } },
+    { id: 'block-center', description: '独立した行の中央（既定）', props: { image: image() } },
     {
-      id: 'block',
-      description: 'ブロック配置。寄せが選べる',
-      props: { image: image({ layout: 'block', align: 'center' }) },
+      id: 'wide',
+      description: '行と同じ向きの写真（行の 80%）',
+      props: { image: image({ widthRatio: 0.8 }) },
     },
     {
-      id: 'wrap',
+      id: 'legacy-wrap',
       probe: true,
-      description: 'Probe: 回り込み + 終わり寄せ',
+      description: 'Probe: 以前の記録に残る回り込み。読めるが、道具は増えない',
       props: { image: image({ layout: 'wrap', align: 'end', widthRatio: 0.75 }) },
     },
     {
@@ -89,16 +90,21 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'align-only-when-meaningful',
-      description: '寄せは行内では出さず、ブロック / 回り込みでだけ出す',
-      check: ({ root, props }) => {
-        // aria-pressed を持つボタンのうち、レイアウト 3 種を除いたものが寄せ。
+      id: 'no-layout-choices',
+      // 「全部試さないと意味が分からない」が起きたのはここ。**選ばせない**ことで直した。
+      // 以前の記録（wrap）を開いても道具が増えないことも、同じ規則で見張る。
+      description: '回り込みや寄せを選ぶ道具は出さない（写真は独立した行の中央に置く）',
+      check: ({ root }) => {
         const pressable = root.querySelectorAll('[aria-pressed]').length;
-        const expected = props.image.layout === 'inline' ? 3 : 6;
-        return (
-          pressable === expected ||
-          `layout=${props.image.layout} のとき選択ボタンは ${expected} 個のはずが ${pressable} 個`
-        );
+        return pressable === 0 || `選択ボタンが ${pressable} 個残っている`;
+      },
+    },
+    {
+      id: 'only-resize-and-remove',
+      description: '押せるものは、8 つのハンドルと削除だけ',
+      check: ({ root }) => {
+        const buttons = root.querySelectorAll('button').length;
+        return buttons === 9 || `ボタンが ${buttons} 個（ハンドル8 + 削除1 のはず）`;
       },
     },
     {

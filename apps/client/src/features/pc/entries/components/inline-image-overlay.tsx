@@ -6,7 +6,12 @@ import { useTranslations } from 'next-intl';
 import type { ResizeHandle } from '../utils/inline-image-resize';
 
 /**
- * 選択中の写真に重ねる操作 UI。Word の画像選択に倣って 8 ハンドルとレイアウト切替を出す。
+ * 選択中の写真に重ねる操作 UI。8 ハンドルと削除だけ。
+ *
+ * **回り込みの設定は置かない。** 以前は「行内 / ブロック / 回り込み」×「先頭 / 中央 / 末尾」の
+ * 6 つを並べていたが、全部試さないと意味が分からない道具になっていた。写真は
+ * **独立した行の中央**に置く、と決め打つ（差し込み時の既定も同じ）。
+ * ここでできるのは「大きさを変える」「消す」「掴んで動かす」の3つだけ。
  *
  * **本文（contentEditable）の中には描かない。** 中に React の要素を混ぜると、
  * ブラウザが編集で書き換えた DOM と React の管理が食い違って本文が壊れる。
@@ -25,16 +30,12 @@ const HANDLES: { handle: ResizeHandle; style: React.CSSProperties; cursor: strin
   { handle: 'w', style: { insetInlineStart: -4, insetBlockStart: '50%' }, cursor: 'ew-resize' },
 ];
 
-const LAYOUTS: InlineImage['layout'][] = ['inline', 'block', 'wrap'];
-const ALIGNS: InlineImage['align'][] = ['start', 'center', 'end'];
-
 interface InlineImageOverlayProps {
   /** 選択中の写真の画面上の位置。null なら何も描かない。 */
   rect: DOMRect | null;
   /** 選択中の写真の設定。 */
   image: InlineImage | null;
   onResizeStart: (handle: ResizeHandle, e: React.PointerEvent) => void;
-  onLayoutChange: (patch: Partial<Pick<InlineImage, 'layout' | 'align'>>) => void;
   onRemove: () => void;
 }
 
@@ -42,7 +43,6 @@ export function InlineImageOverlay({
   rect,
   image,
   onResizeStart,
-  onLayoutChange,
   onRemove,
 }: InlineImageOverlayProps) {
   const t = useTranslations('photo');
@@ -74,51 +74,12 @@ export function InlineImageOverlay({
         />
       ))}
 
-      {/* レイアウト操作。Word の「レイアウトオプション」に相当する位置（右上の外側）に置く。 */}
-      <div className="pointer-events-auto absolute left-full top-0 ml-2 flex flex-col gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] p-1 shadow-md">
-        <div className="flex gap-1">
-          {LAYOUTS.map((layout) => (
-            <button
-              key={layout}
-              type="button"
-              onClick={() => onLayoutChange({ layout })}
-              aria-pressed={image.layout === layout}
-              className={`rounded px-1.5 py-1 text-[11px] whitespace-nowrap ${
-                image.layout === layout
-                  ? 'bg-[var(--toolbar-hover)] text-[var(--fg)]'
-                  : 'text-[var(--date-color)]'
-              }`}
-            >
-              {t(`layout_${layout}`)}
-            </button>
-          ))}
-        </div>
-
-        {/* 寄せは行内では効かない（文字の流れが位置を決める）ので出さない。 */}
-        {image.layout !== 'inline' && (
-          <div className="flex gap-1">
-            {ALIGNS.map((align) => (
-              <button
-                key={align}
-                type="button"
-                onClick={() => onLayoutChange({ align })}
-                aria-pressed={image.align === align}
-                className={`rounded px-1.5 py-1 text-[11px] whitespace-nowrap ${
-                  image.align === align
-                    ? 'bg-[var(--toolbar-hover)] text-[var(--fg)]'
-                    : 'text-[var(--date-color)]'
-                }`}
-              >
-                {t(`align_${align}`)}
-              </button>
-            ))}
-          </div>
-        )}
-
+      {/* 操作は削除だけ。大きさはハンドル、位置は本文の中で掴んで動かす。 */}
+      <div className="pointer-events-auto absolute top-0 left-full ml-2 flex flex-col gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] p-1 shadow-md">
         <button
           type="button"
           onClick={onRemove}
-          className="rounded px-1.5 py-1 text-[11px] text-red-500 hover:bg-[var(--toolbar-hover)]"
+          className="rounded px-1.5 py-1 text-[11px] whitespace-nowrap text-red-500 hover:bg-[var(--hover-wash)]"
         >
           {t('remove_inline')}
         </button>

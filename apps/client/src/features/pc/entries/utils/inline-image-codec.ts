@@ -24,8 +24,14 @@ const INLINE_IMAGE_CLASS = 'inline-photo';
 const EBLOCK_CLASS = 'eblock';
 const VBLOCK_CLASS = 'v-block';
 
-/** 差し込んだ直後の表示幅（本文 1 行に対する割合）。半分より小さめにして本文を潰さない。 */
-export const DEFAULT_INLINE_IMAGE_WIDTH_RATIO = 0.4;
+/**
+ * 壊れた値を読んだときに丸める先（本文 1 行に対する割合）。
+ *
+ * 差し込むときの大きさは**写真の向き**から決まるので、ここではない
+ * （`utils/inline-image-placement` の `defaultWidthRatio`）。ここは
+ * data 属性が読めなかったときに写真を失わないための受け皿。
+ */
+const FALLBACK_WIDTH_RATIO = 0.5;
 
 export function isInlineImage(node: Node): node is HTMLImageElement {
   return node instanceof HTMLImageElement && node.classList.contains(INLINE_IMAGE_CLASS);
@@ -114,16 +120,22 @@ function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
 
 function readRatio(raw: string | undefined): number {
   const n = Number.parseFloat(raw ?? '');
-  if (!Number.isFinite(n)) return DEFAULT_INLINE_IMAGE_WIDTH_RATIO;
+  if (!Number.isFinite(n)) return FALLBACK_WIDTH_RATIO;
   return Math.min(1, Math.max(0.05, n));
 }
 
+/**
+ * 既定は**独立した行の中央**。
+ *
+ * `inline` / `wrap` は以前の記録のために読めるままにしてあるが、新しく差し込む写真は
+ * すべて block/center で入る（回り込みの細かい設定は道具として置かないことにした）。
+ */
 function readLayout(raw: string | undefined): InlineImage['layout'] {
-  return raw === 'block' || raw === 'wrap' ? raw : 'inline';
+  return raw === 'inline' || raw === 'wrap' ? raw : 'block';
 }
 
 function readAlign(raw: string | undefined): InlineImage['align'] {
-  return raw === 'center' || raw === 'end' ? raw : 'start';
+  return raw === 'start' || raw === 'end' ? raw : 'center';
 }
 
 /**
@@ -193,7 +205,10 @@ export function createInlineImageElement(image: InlineImage, signedUrl: string):
   // contentEditable の中で画像自身が編集対象にならないようにする
   // （これが無いと Chrome が画像内にキャレットを置こうとする）。
   el.contentEditable = 'false';
-  el.draggable = false;
+  // **掴んで動かせる。** 差し込む位置を間違えたときに「消して貼り直す」しか
+  // 手が無いのは、写真1枚のために本文の流れを止めることになる。
+  el.draggable = true;
+  el.style.cursor = 'grab';
   applyInlineImageStyle(el, image);
   return el;
 }

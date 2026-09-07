@@ -174,17 +174,6 @@ export function useInlineImageSelection({
   }, [selection.element, editorRef, isVertical, refresh, onCommit]);
 
   /** レイアウト（行内 / ブロック / 回り込み）と寄せを変える。 */
-  const updateLayout = useCallback(
-    (patch: Partial<Pick<InlineImage, 'layout' | 'align'>>) => {
-      const el = selection.element;
-      if (!el) return;
-      applyInlineImageStyle(el, { ...readInlineImageFromElement(el), ...patch });
-      refresh();
-      onCommit();
-    },
-    [selection.element, refresh, onCommit],
-  );
-
   /** 選択中の写真を本文から取り除く。 */
   const removeSelected = useCallback(() => {
     const el = selection.element;
@@ -194,5 +183,5 @@ export function useInlineImageSelection({
     onCommit();
   }, [selection.element, clear, onCommit]);
 
-  return { selection, beginResize, updateLayout, removeSelected, clear };
+  return { selection, beginResize, removeSelected, clear };
 }

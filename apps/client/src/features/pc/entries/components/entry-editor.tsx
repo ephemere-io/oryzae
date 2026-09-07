@@ -5,7 +5,6 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PhotoStrip } from '@/components/ui/photo-strip';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -38,6 +37,7 @@ import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transiti
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
+import { caretRangeFromPoint } from '@/features/pc/entries/utils/caret-from-point';
 import {
   loadCachedEffects,
   saveCachedEffects,
@@ -50,9 +50,10 @@ import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import {
   applyInlineImagesToEditor,
   createInlineImageElement,
-  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  isInlineImage,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
+import { defaultWidthRatio, loadAspect } from '@/features/pc/entries/utils/inline-image-placement';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
@@ -729,13 +730,17 @@ export function EntryEditor({
 
       if (el) {
         el.focus();
+        // **差し込んだ瞬間に読める姿にする。** 行頭・小さいままで入れると、使う人が
+        // 毎回レイアウトと大きさを整え直すことになる。既定は独立した行の中央、
+        // 大きさは写真の向きと行の向きの関係から決める（utils/inline-image-placement）。
+        const aspect = await loadAspect(photo.signedUrl);
         const node = createInlineImageElement(
           {
             offset: 0, // 実際の位置は保存時に DOM から数え直す
             storagePath: photo.storagePath,
-            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
-            layout: 'inline',
-            align: 'start',
+            widthRatio: defaultWidthRatio(aspect, settings.writingMode === 'vertical'),
+            layout: 'block',
+            align: 'center',
           },
           photo.signedUrl,
         );
@@ -750,18 +755,28 @@ export function EntryEditor({
       const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
       if (savedId) setCurrentEntryId(savedId);
     },
-    [title, content, currentEntryId, save],
+    [title, content, currentEntryId, save, settings.writingMode],
   );
 
-  const removePhoto = useCallback(
-    async (index: number) => {
-      const updated = photosRef.current.filter((_, i) => i !== index);
+  /**
+   * 写真を1枚、記録から外す。
+   *
+   * **消す場所は本文の中の1か所だけ。** 以前は本文の下にサムネイルの帯があり、
+   * 帯の × は添付一覧からしか外さず（本文の写真は残る）、本文の × は本文からしか
+   * 消さなかった。同じ写真が2か所に出て、どちらを押しても半分しか消えない状態だった。
+   * 帯をやめ、本文の × がここを呼んで両方を引き受ける。
+   */
+  const detachPhoto = useCallback(
+    async (storagePath: string) => {
+      const updated = photosRef.current.filter((p) => p.storagePath !== storagePath);
       photosRef.current = updated;
       setPhotos(updated);
-      const next = updated.map((p) => p.storagePath);
-      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
+      const el = editorRef.current;
+      const nextContent = el ? serializeEditorText(el) : content;
+      setContent(nextContent);
+      const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
       if (!currentEntryId || !finalContent.trim()) return;
-      await save(finalContent, currentEntryId, { mediaUrls: next });
+      await save(finalContent, currentEntryId, { mediaUrls: updated.map((p) => p.storagePath) });
     },
     [title, content, currentEntryId, save],
   );
@@ -788,6 +803,14 @@ export function EntryEditor({
       mediaUrls: photosRef.current.map((ph) => ph.storagePath),
     });
   }, [title, currentEntryId, save]);
+
+  /**
+   * いま掴んでいる本文中の写真。
+   *
+   * `dataTransfer` に要素そのものは載らないので、こちらで持つ。載せられるのは文字列だけで、
+   * 同じ写真が2枚ある本文では id を振っても取り違えうる（貼り直しで storagePath が同じになる）。
+   */
+  const draggedImageRef = useRef<HTMLImageElement | null>(null);
 
   const inlineImages = useInlineImageSelection({
     editorRef,
@@ -1361,6 +1384,50 @@ export function EntryEditor({
               setContent(updated);
               if (status === 'saved') setStatus('editing');
             }}
+            // 写真を掴んだら、それが誰かを覚えておく（落とす先で動かすのに要る）。
+            onDragStart={(e) => {
+              const target = e.target;
+              if (!(target instanceof Node) || !isInlineImage(target)) {
+                draggedImageRef.current = null;
+                return;
+              }
+              draggedImageRef.current = target;
+              // ブラウザに「動かす操作だ」と伝える。空だと落とせない環境がある。
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', '');
+            }}
+            // **これが無いと drop は発火しない**（dragover の既定動作がドロップを拒否する）。
+            onDragOver={(e) => {
+              if (!draggedImageRef.current) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            }}
+            onDragEnd={() => {
+              draggedImageRef.current = null;
+            }}
+            /**
+             * 落とした場所へ写真を運ぶ。
+             *
+             * **ブラウザ任せにしない。** 既定の動作は写真を複製して置いたり、
+             * DOM だけ書き換えて React の state を置き去りにしたりする（本文が変わったのに
+             * 自動保存が気づかない）。位置はブラウザのキャレットに従い、
+             * 移動と保存はこちらで持つ。
+             */
+            onDrop={(e) => {
+              const moving = draggedImageRef.current;
+              if (!moving) return;
+              e.preventDefault();
+              draggedImageRef.current = null;
+              const dropped = caretRangeFromPoint(e.clientX, e.clientY);
+              const editor = editorRef.current;
+              if (!editor || !dropped || !editor.contains(dropped.startContainer)) return;
+              // 自分自身の中には落とせない（落とすと写真が消える）。
+              if (moving.contains(dropped.startContainer)) return;
+              dropped.insertNode(moving);
+              setContent(serializeEditorText(editor));
+              if (status === 'saved') setStatus('editing');
+              commitInlineImageChange();
+            }}
             data-placeholder={t('placeholder')}
             className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
             style={{
@@ -1388,14 +1455,17 @@ export function EntryEditor({
       </div>
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
 
       <InlineImageOverlay
         rect={inlineImages.selection.rect}
         image={inlineImages.selection.image}
         onResizeStart={inlineImages.beginResize}
-        onLayoutChange={inlineImages.updateLayout}
-        onRemove={inlineImages.removeSelected}
+        onRemove={() => {
+          // 本文から消すのと、記録から外すのを1つの操作にする。
+          const path = inlineImages.selection.image?.storagePath;
+          inlineImages.removeSelected();
+          if (path) void detachPhoto(path);
+        }}
       />
 
       <PhotoImportModal

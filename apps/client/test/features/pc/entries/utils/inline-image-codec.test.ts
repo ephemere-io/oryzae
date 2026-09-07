@@ -90,11 +90,13 @@ describe('extractInlineImages', () => {
   });
 
   // 壊れた属性で写真ごと落とすと、本文にプレースホルダだけが残って復元不能になる。
+  // 丸め先は**差し込み時の既定と同じ**（独立した行の中央）。ここだけ別の値に落ちると、
+  // 属性が壊れた1枚だけが他と違う置かれ方をする。
   it('属性が壊れていても既定値に丸めて拾う', () => {
     editor.innerHTML = img({ 'data-width-ratio': 'NaN', 'data-layout': 'bogus', 'data-align': '' });
 
     expect(extractInlineImages(editor)).toEqual([
-      { offset: 0, storagePath: '', widthRatio: 0.4, layout: 'inline', align: 'start' },
+      { offset: 0, storagePath: '', widthRatio: 0.5, layout: 'block', align: 'center' },
     ]);
   });
 
