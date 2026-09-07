@@ -5,9 +5,12 @@
  * （open / type / data）から決まる。useRouter / useTranslations はどちらも withVerifyProviders
  * が供給するため、props を渡すだけで fetch ゼロの孤立検証ができる（covered）。
  *
- * このパネルは null を返さない（open=false でも DOM に残り `right: -400` で画面外へスライドする）。
- * よって open=false も有効な fixture で、契約 `open` は常に読める。スライド位置は React が
- * `right:0` を `'0'`（px 無し）で描くため `=== '0px'` 比較は脆い。Number.parseInt の符号で判定する。
+ * この面は null を返さない（open=false でも DOM に残り、不透明度と拡大率で消える）。
+ * よって open=false も有効な fixture で、契約 `open` は常に読める。開閉はスクリムと
+ * ウィンドウの `opacity` で見るのがいちばん壊れにくい（transform 文字列の比較は脆い）。
+ *
+ * 幅は **中身の種類で決まる**（keyword 420 / snippet 560 / letter 680）。ここが右ペイン
+ * だった頃との一番の違いで、契約 `width` が type と連動していることを invariant で縛る。
  *
  * 契約 `type`（keyword/snippet/letter/none）が本文ブロックの discriminator。verifyAttrs は
  * null を落とすため type=null は 'none' に正規化して常に読めるようにしている。
@@ -115,66 +118,72 @@ registerUnit<Props>({
   ],
   invariants: [
     {
-      id: 'slide-position-reflects-open',
-      description: '契約 open=true なら right>=0（表示）、false なら right<0（画面外）',
+      id: 'visibility-reflects-open',
+      description: 'スクリムとウィンドウの不透明度が契約 open と一致する',
       check: ({ root, contract }) => {
-        const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
-        const right = Number.parseInt(el?.style.right ?? '', 10);
+        const scrim = root.querySelector<HTMLElement>('[data-verify-part="scrim"]');
+        const win = root.querySelector<HTMLElement>('[data-verify-part="window"]');
+        if (!scrim || !win) return `scrim=${Boolean(scrim)} window=${Boolean(win)}（両方要る）`;
+        const shown = scrim.style.opacity === '1' && win.style.opacity === '1';
         const isOpen = contract.open === 'true';
-        const onScreen = right >= 0;
         return (
-          isOpen === onScreen ||
-          `contract.open="${contract.open}" だが style.right="${el?.style.right}"（parseInt=${right}）`
+          shown === isOpen ||
+          `contract.open="${contract.open}" だが scrim.opacity=${scrim.style.opacity} / window.opacity=${win.style.opacity}`
         );
       },
     },
     {
-      id: 'closed-offset-equals-own-width',
-      description:
-        '閉じているときは自分の幅ぶんだけ右へ逃がす（幅が可変なので固定値で逃がすと隙間が残る）',
+      id: 'closed-is-not-clickable',
+      description: '閉じているときは面ごとクリックを通さない（背後の瓶を触れる）',
       onlyFixtures: ['closed'],
       check: ({ root, contract }) => {
         const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
-        const right = Number.parseInt(el?.style.right ?? '', 10);
-        const width = Number(contract.width);
         return (
-          right === -width ||
-          `right=${right} だが幅は ${width}。差の ${width + right}px ぶん画面に残る。`
+          el?.style.pointerEvents === 'none' ||
+          `open=${contract.open} なのに pointerEvents="${el?.style.pointerEvents}"`
         );
       },
     },
     {
-      id: 'resize-handle-is-a-labelled-separator',
-      description: '幅の取っ手は名前を持つ separator で、キーボードでも掴める',
-      check: ({ root }) => {
-        const handle = root.querySelector('[data-verify-part="resize-handle"]');
-        if (!handle) return '幅の取っ手が描画されていない（リサイズ不可）';
-        const role = handle.getAttribute('role');
-        const label = handle.getAttribute('aria-label');
-        const focusable = handle.getAttribute('tabindex') === '0';
+      id: 'width-follows-content-type',
+      description:
+        '幅は中身の種類で決まる（keyword 420 / snippet 560 / letter 680）。長い手紙ほど広い',
+      check: ({ contract }) => {
+        const expected: Record<string, string> = {
+          keyword: '420',
+          snippet: '560',
+          letter: '680',
+          // type=null はまだ何も選んでいない状態。いちばん小さい器に倒す。
+          none: '420',
+        };
+        const want = expected[contract.type];
         return (
-          (role === 'separator' && Boolean(label) && focusable) ||
-          `role=${role}, aria-label=${label}, tabindex=${handle.getAttribute('tabindex')}`
+          contract.width === want ||
+          `type="${contract.type}" では width=${want} を期待したが ${contract.width}`
         );
       },
     },
     {
-      id: 'width-matches-handle-range-and-style',
-      description: '契約 width が実寸・aria-valuenow・上下限のすべてと整合する',
+      id: 'window-width-is-capped-by-viewport',
+      description: 'ウィンドウ幅は狭い画面でも溢れない（min() で 90vw に頭打ちする）',
       check: ({ root, contract }) => {
-        const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
-        const handle = root.querySelector('[data-verify-part="resize-handle"]');
-        if (!handle) return '幅の取っ手が描画されていない';
-        const width = Number(contract.width);
-        const styleWidth = Number.parseInt(el?.style.width ?? '', 10);
-        const now = Number(handle.getAttribute('aria-valuenow'));
-        const min = Number(handle.getAttribute('aria-valuemin'));
-        const max = Number(handle.getAttribute('aria-valuemax'));
-        if (styleWidth !== width) return `style.width=${styleWidth} が契約 width=${width} と違う`;
-        if (now !== width) return `aria-valuenow=${now} が契約 width=${width} と違う`;
-        if (!(min < max)) return `上下限が不正: min=${min}, max=${max}`;
+        const win = root.querySelector<HTMLElement>('[data-verify-part="window"]');
+        const width = win?.style.width ?? '';
         return (
-          (width >= min && width <= max) || `width=${width} が範囲 [${min}, ${max}] の外に出ている`
+          (width.includes(`${contract.width}px`) && width.includes('90vw')) ||
+          `window の width="${width}"（${contract.width}px と 90vw の min を期待）`
+        );
+      },
+    },
+    {
+      id: 'scrim-closes-the-window',
+      description: 'スクリムは名前を持つ閉じる取っ手（背景を押して閉じられる）',
+      check: ({ root }) => {
+        const scrim = root.querySelector('[data-verify-part="scrim"]');
+        if (!scrim) return 'スクリムが描画されていない';
+        return (
+          (scrim.tagName === 'BUTTON' && Boolean(scrim.getAttribute('aria-label'))) ||
+          `tag=${scrim.tagName} aria-label=${scrim.getAttribute('aria-label')}`
         );
       },
     },
@@ -205,10 +214,11 @@ registerUnit<Props>({
         const text = root.textContent ?? '';
         const hasQuestion = text.includes(props.questionText);
         const buttons = Array.from(root.querySelectorAll('button'));
-        const hasCta = buttons.length === 2;
+        // scrim（背景を押して閉じる）+ close(×) + write-entry の 3 つ。
+        const hasCta = buttons.length === 3;
         return (
           (hasQuestion && hasCta) ||
-          `問い文 present=${hasQuestion} / button数=${buttons.length}（close + write-entry の2つを期待）`
+          `問い文 present=${hasQuestion} / button数=${buttons.length}（scrim + close + write-entry の3つを期待）`
         );
       },
     },

@@ -16,6 +16,12 @@ interface UseCoverFlowInputOptions {
   onStep: (delta: number) => void;
   /** ESC で閉じる。 */
   onClose: () => void;
+  /**
+   * ESC を受け付けるか（既定 true）。詳細ウィンドウが開いている間は false にする。
+   * あちらは window の capture で Escape を拾うので、ここを止めておかないと 1 回の
+   * Escape でウィンドウと履歴が同時に閉じる。1 回目でウィンドウ、2 回目で履歴。
+   */
+  closeOnEscape?: boolean;
 }
 
 interface UseCoverFlowInputResult {
@@ -38,6 +44,7 @@ export function useCoverFlowInput({
   active,
   onStep,
   onClose,
+  closeOnEscape = true,
 }: UseCoverFlowInputOptions): UseCoverFlowInputResult {
   const [dragging, setDragging] = useState(false);
 
@@ -56,14 +63,14 @@ export function useCoverFlowInput({
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         stepRef.current(1);
-      } else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape' && closeOnEscape) {
         e.preventDefault();
         closeRef.current();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [active]);
+  }, [active, closeOnEscape]);
 
   /** ホイールの累積と最後に動いた時刻。 */
   const wheel = useRef({ acc: 0, at: 0 });
