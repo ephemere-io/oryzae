@@ -91,6 +91,19 @@ export interface InboxLetter {
 }
 
 /** 受信箱が手紙に見出しを付けるために要る問いの最小形。 */
+/**
+ * 瓶に浮かべる言葉と、その出どころ。
+ *
+ * 言葉だけを渡していたころ、書斎の瓶に浮かぶ語が**何を指すのか読み取れない**と
+ * 実機レビューで報告された。語と問いは 1 対 1 ではない（同じ語が別の問いから出る）ので、
+ * 出どころは語と一緒に運ばないと後から復元できない。
+ */
+export interface JarWord {
+  word: string;
+  /** その語が出てきた発酵の問い。 */
+  questionId: string;
+}
+
 export interface InboxQuestion {
   id: string;
   currentText: string | null;

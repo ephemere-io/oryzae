@@ -21,6 +21,7 @@ import '@/features/shared/study/components/entry-list-overlay.verify';
 import '@/features/shared/study/components/study-fallback.verify';
 import '@/features/shared/study/components/study-labels.verify';
 import '@/features/shared/study/components/study-tooltip.verify';
+import '@/features/shared/study/components/study-word-tooltip.verify';
 import '@/features/shared/study/components/study-chrome.verify';
 import '@/features/pc/entries/components/delete-confirm-modal.verify';
 import '@/features/pc/entries/components/editor-status-bar.verify';

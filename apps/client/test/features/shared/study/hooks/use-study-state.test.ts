@@ -3,6 +3,7 @@ import {
   deriveStatus,
   localDateKey,
   toExcerpt,
+  toStudyWords,
 } from '@/features/shared/study/hooks/use-study-state';
 
 describe('deriveStatus', () => {
@@ -72,5 +73,44 @@ describe('toExcerpt', () => {
 
   it('前後の空白を落とす', () => {
     expect(toExcerpt('  今日は静かだった。  ')).toBe('今日は静かだった。');
+  });
+});
+
+describe('toStudyWords', () => {
+  const QUESTIONS = [
+    { id: 'q-1', currentText: 'なぜ続けているのか' },
+    { id: 'q-2', currentText: null },
+  ];
+
+  it('語に出どころの問いを結びつける', () => {
+    // 語だけを浮かべると「何を指すのか推測しづらい」（実機レビュー）。
+    expect(toStudyWords([{ word: '余白', questionId: 'q-1' }], QUESTIONS)).toEqual([
+      { text: '余白', question: 'なぜ続けているのか' },
+    ]);
+  });
+
+  it('問いが見つからない語も落とさない', () => {
+    // 消された問いから出た語でも、瓶の中で発酵したことに変わりはない。
+    expect(toStudyWords([{ word: '静けさ', questionId: 'gone' }], QUESTIONS)).toEqual([
+      { text: '静けさ', question: null },
+    ]);
+  });
+
+  it('文言を持たない問いは出どころ無しとして扱う', () => {
+    expect(toStudyWords([{ word: '間', questionId: 'q-2' }], QUESTIONS)).toEqual([
+      { text: '間', question: null },
+    ]);
+  });
+
+  it('語の順は変えない（瓶の中の並びがそのまま決まる）', () => {
+    const words = toStudyWords(
+      [
+        { word: 'あ', questionId: 'q-1' },
+        { word: 'い', questionId: 'gone' },
+        { word: 'う', questionId: 'q-1' },
+      ],
+      QUESTIONS,
+    );
+    expect(words.map((word) => word.text)).toEqual(['あ', 'い', 'う']);
   });
 });

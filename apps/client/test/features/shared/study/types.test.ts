@@ -119,7 +119,8 @@ function parsePreset(raw: unknown): StudyState {
     now,
     unreadCount,
     fermentation: parseFermentation(raw.fermentation),
-    words: words.map((word) => String(word)),
+    // プリセットの JSON は語だけを持つ（出どころの問いは書斎の見た目に関わらない）。
+    words: words.map((word) => ({ text: String(word), question: null })),
     notebooks: notebooks.filter(isRecord).map((notebook) => ({
       month: String(notebook.month ?? ''),
       entryCount: Number(notebook.entryCount ?? 0),
@@ -196,7 +197,10 @@ describe('モックをシーンの計算に通す', () => {
   it.each(PRESET_NAMES)('%s: 漂う言葉が重ならない', (name) => {
     const state = PRESETS.get(name);
     if (!state) throw new Error(`missing preset ${name}`);
-    const placements = placeWords(state.words, liquidLevel(state.fermentation.readiness));
+    const placements = placeWords(
+      state.words.map((word) => word.text),
+      liquidLevel(state.fermentation.readiness),
+    );
     for (let i = 1; i < placements.length; i++) {
       expect(placements[i].y).toBeGreaterThan(placements[i - 1].y);
     }
