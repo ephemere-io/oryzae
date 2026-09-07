@@ -1,13 +1,25 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { isLocale, LOCALE_COOKIE } from '@/i18n/config';
-import { DEVICE_COOKIE, DEVICE_PREF_COOKIE, isDevice, resolveDevice } from '@/lib/device';
+import {
+  DEVICE_COOKIE,
+  DEVICE_PREF_COOKIE,
+  isDevice,
+  parseDeviceRequest,
+  resolveDevice,
+} from '@/lib/device';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 export function middleware(req: NextRequest) {
   // 端末を解決（手動切替 device-pref があれば優先、無ければ UA 判定）。
-  const pref = req.cookies.get(DEVICE_PREF_COOKIE)?.value;
+  //
+  // `?device=pc|sp` はこのリクエストから効かせる。cookie はレスポンスにしか乗らないので、
+  // 保存するだけだとリロードするまで反映されない（＝付けた URL では何も変わらない）。
+  // `?device=auto` は切替を解除して UA 判定へ戻す。
+  const deviceRequest = parseDeviceRequest(req.nextUrl.searchParams.get('device'));
+  const storedPref = req.cookies.get(DEVICE_PREF_COOKIE)?.value;
+  const pref = deviceRequest === 'auto' ? undefined : (deviceRequest ?? storedPref);
   const resolvedDevice = resolveDevice(pref, req.headers.get('user-agent'));
 
   // Issue #363 perf: 解決した端末を **リクエストヘッダ x-device** で server component に渡す。
@@ -31,6 +43,17 @@ export function middleware(req: NextRequest) {
   const lang = req.nextUrl.searchParams.get('lang');
   if (lang && isLocale(lang) && req.cookies.get(LOCALE_COOKIE)?.value !== lang) {
     res.cookies.set(LOCALE_COOKIE, lang, {
+      path: '/',
+      maxAge: ONE_YEAR_SECONDS,
+      sameSite: 'lax',
+    });
+  }
+
+  // 端末: ?device= を cookie に固定（?lang= と同じ形）。`auto` は消して UA 判定へ戻す。
+  if (deviceRequest === 'auto') {
+    res.cookies.delete(DEVICE_PREF_COOKIE);
+  } else if (deviceRequest !== null && storedPref !== deviceRequest) {
+    res.cookies.set(DEVICE_PREF_COOKIE, deviceRequest, {
       path: '/',
       maxAge: ONE_YEAR_SECONDS,
       sameSite: 'lax',

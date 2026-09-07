@@ -24,7 +24,13 @@ function isEmailOtpType(value: string): value is EmailOtpType {
   return VALID_TYPES.some((type) => type === value);
 }
 
-/** 種別ごとの既定遷移先（`next` が無いとき）。 */
+/**
+ * 種別ごとの既定遷移先（`next` が無いとき）。
+ *
+ * 既定が `/` なのは、ホームがどこか（書斎か従来の入口か）を知っているのが
+ * `HomeGate`（= `useHomeHref`）1 か所だから。ここで `/entries/new` と書くと、
+ * 書斎ホームが有効な人だけ着地が食い違う。
+ */
 function defaultNextFor(type: EmailOtpType): string {
   switch (type) {
     case 'recovery':
@@ -32,7 +38,7 @@ function defaultNextFor(type: EmailOtpType): string {
     case 'email_change':
       return '/account';
     default:
-      return '/entries/new';
+      return '/';
   }
 }
 

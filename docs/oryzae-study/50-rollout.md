@@ -6,23 +6,32 @@
 POSTHOG_KEY のみ）。PostHog は入っているので、2段構えにする。
 
 ```ts
-// lib/study-flag.ts
-export function useStudyHome(): boolean {
-  const env = process.env.NEXT_PUBLIC_STUDY_HOME === 'on';       // ビルド単位の大元
-  const ph = useFeatureFlagEnabled('study-home');                 // PostHog で段階配信
-  const override = useLocalOverride('oryzae_study_home');         // ?study=on / localStorage
-  return override ?? (env && ph !== false);
-}
+// lib/feature-flags.ts + features/shared/study/hooks/use-study-home-flag.ts
+const enabled = override !== null ? override : envEnabled && posthogEnabled !== false;
 ```
 
-- `NEXT_PUBLIC_STUDY_HOME` 既定 `off`。off なら書斎のコードは一切実行されない（dynamic import も走らない）。
+- `NEXT_PUBLIC_STUDY_HOME` 既定 `off`。**配信としては** off の間、書斎のコードは実行されず
+  dynamic import も走らない。
 - PostHog フラグ `study-home` で Research Preview の一部にだけ配る。
-- `?study=on` / `?study=off` で自分で切り替えられるようにする（レビューと不具合報告のため）。
+- `?study=on` / `?study=off` / `?study=auto` で自分で切り替えられる（レビューと不具合報告のため）。
+
+**手動切替は env と PostHog の両方より優先する。** つまり env が off でも「フラグの中身が
+絶対に実行されない」わけではなく、切替を付けた人には出る。裏返せば、**確認に環境変数は
+要らない** — preview URL に `?study=on` を付ければよい。
+
+`?study=auto` は憶えた切替を捨てて配信に戻す。これが無いと、レビューで一度でも
+`?study=on|off` を触った端末が env と PostHog の配信から永久に外れ、手順 3〜4 で見る
+コホートの数字が汚れる（`?study=off` は「off に固定」を憶えるだけで、解除ではない）。
 
 ## 手順
 
-1. **Preview 環境で内部確認** — Vercel preview に `NEXT_PUBLIC_STUDY_HOME=on`。
-   `?study=off` で従来のサイドバー版に戻れることも確認する。
+1. **Preview 環境で内部確認** — preview URL に **`?study=on`** を付けて開く。
+   毎 PR で preview が立つので、確認場所はそこで足りる。
+   `?study=off` で従来のサイドバー版に戻れること、`?study=auto` で配信どおりに戻ることも確認する。
+
+   > **Vercel preview に `NEXT_PUBLIC_STUDY_HOME` を置かないこと。** 環境変数の
+   > Preview scope は**全ブランチの preview に効く**ため、このブランチのために置いて
+   > 忘れると、以後すべての PR の preview が書斎になる。しかも上のとおり不要。
 2. **本番に置くがフラグ off** — コードだけ入れる。バンドル差分（three.js が入っていないこと）を確認。
 3. **自分たちだけ on** — PostHog で内部アカウントに限定。1週間。
    見るもの: 書斎からの離脱率、`/entries/new` への到達率、WebGL フォールバック発生率、
@@ -46,3 +55,6 @@ export function useStudyHome(): boolean {
 
 `NEXT_PUBLIC_STUDY_HOME=off` を入れて再デプロイするだけで元に戻る（1〜5 のコミットは
 画面に出ないため残しても無害）。緊急時は PostHog フラグを切るだけでも止まる。
+
+ただし **`?study=on` を触った端末は憶えたまま**なので、配信の停止だけでは戻らない。
+その端末は `?study=auto` を開いて切替を捨てる。

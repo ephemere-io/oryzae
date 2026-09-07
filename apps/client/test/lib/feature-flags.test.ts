@@ -112,6 +112,34 @@ describe('useFeatureFlag', () => {
     setItem.mockRestore();
   });
 
+  it('?flag=auto は憶えた切替を捨てて配信に戻す', async () => {
+    // 入る道だけあって出る道が無いと、レビューで触った端末が段階配信から永久に外れる。
+    localStorage.setItem(OPTIONS.storageKey, 'on');
+
+    setSearch('?study=auto');
+    const { result } = renderHook(() => useFeatureFlag(OPTIONS));
+    await waitFor(() => expect(result.current.resolved).toBe(true));
+
+    expect(result.current.enabled).toBe(false); // env=off の配信どおり
+    expect(localStorage.getItem(OPTIONS.storageKey)).toBeNull(); // 鍵ごと消える
+  });
+
+  it('?flag=auto の後は env の配信に素直に従う', async () => {
+    localStorage.setItem(OPTIONS.storageKey, 'off');
+
+    setSearch('?study=auto');
+    const cleared = renderHook(() => useFeatureFlag({ ...OPTIONS, envEnabled: true }));
+    await waitFor(() => expect(cleared.result.current.resolved).toBe(true));
+    expect(cleared.result.current.enabled).toBe(true);
+    cleared.unmount();
+
+    // URL を外しても、憶えた「off 固定」は戻ってこない。
+    setSearch('');
+    const after = renderHook(() => useFeatureFlag({ ...OPTIONS, envEnabled: true }));
+    await waitFor(() => expect(after.result.current.resolved).toBe(true));
+    expect(after.result.current.enabled).toBe(true);
+  });
+
   it('知らない値の切替は無視して env に従う', async () => {
     setSearch('?study=maybe');
     const { result } = renderHook(() => useFeatureFlag(OPTIONS));

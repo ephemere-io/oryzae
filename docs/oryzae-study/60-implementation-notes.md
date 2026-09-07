@@ -198,23 +198,34 @@ pointer-events を切るだけで `marginLeft` は残るので、書斎の全幅
 
 **→ §26 で直した。**
 
-## 10. ⚠️ レビュー用の一時的な端末切替（マージ前に外す）
+## 10. 端末の切替は `?device=pc|sp|auto`（URL で行う）
 
-画面右下に PC / SP の切替スイッチを置いてある。端末は middleware が `device-pref`
-cookie（無ければ UA）から確定して `x-device` ヘッダで渡す作りなので、切り替えには
-cookie の書き換えとリロードの両方が要り、レビュー中に DevTools の Console を毎回
-開くことになっていた。プレビューで PC / SP を見比べる間だけの足場。
+端末は middleware が `device-pref` cookie（無ければ UA）から確定し `x-device` ヘッダで
+渡す。切り替えるには cookie の書き換えとリロードの両方が要るため、PC と SP を見比べる
+たびに DevTools の Console を開くことになっていた。
 
-一時的なものだと見た目で分かるよう、枠を破線・テラコッタにしてある。
+最初は画面右下にレビュー用の切替スイッチ（`DeviceSwitch`）を置いていたが、**消し忘れると
+本番のログイン後の全画面に出る**うえ、それを止めるのが人の記憶しか無かった。このリポジトリは
+`check:as` / `knip` / `dep-cruise` / `security:rls` / `verify-coverage-gate` と、守りたいことを
+全部機械に持たせてきた場所なので、ここだけ人力なのは浮いている。
 
-**外し方（3 箇所）:**
+そこで**恒久の仕組みに寄せた**。middleware は既に `?lang=` を cookie に固定しているので、
+同じ形で `?device=` を受ける。`?study=on` とも操作感が揃う。
 
-1. `apps/client/src/components/device-switch.tsx` を消す
-2. `apps/client/src/app/(protected)/layout.tsx` の `<DeviceSwitch />` と import を消す
-   （どちらにも `TODO(review):` を付けてある）
-3. この節を消す
+```
+?device=sp     … SP として描く（cookie に憶える）
+?device=pc     … PC として描く
+?device=auto   … 切替を捨てて UA 判定へ戻す
+```
 
-`git grep 'TODO(review)'` で 2 箇所とも出る。
+**そのリクエストから効かせる**のが要点。cookie はレスポンスにしか乗らないので、保存だけ
+だとリロードするまで反映されず「付けても何も起きない」ように見える。middleware は
+`?device=` を読んだ値をその場の解決に使い、同時に cookie にも書く。
+
+`auto` を用意するのは、**入る道だけあって出る道が無い切替を作らない**ため（`?study=auto`
+と同じ理由）。一度 sp に固定した端末が UA 判定へ戻れないと、以後ずっと嘘の見え方をする。
+
+契約は `test/middleware.test.ts` が固定している。
 
 ## 11. 瓶の言葉は「問いごとの最新キーワード」を全部浮かべる（原案からの拡張）
 
