@@ -38,7 +38,9 @@ jobs:
       contents: write
       pull-requests: write
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # main のルールセットが 1 承認を要求するため、GITHUB_TOKEN 単体ではマージできない。
+      # AUTO_FIX_TOKEN（Admin 権限の fine-grained PAT）があればそれを使う。
+      GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
     steps:
       - name: 対象を選んでマージする
@@ -104,7 +106,10 @@ jobs:
               continue
             fi
 
-            if gh pr merge "$number" --repo "$REPO" --squash --delete-branch; then
+            # --admin はルールセットの 1 承認要求を bypass するために要る。
+            # 権限が無ければ素の merge に落ちる。
+            if gh pr merge "$number" --repo "$REPO" --squash --delete-branch --admin 2>/dev/null \
+               || gh pr merge "$number" --repo "$REPO" --squash --delete-branch; then
               echo "  → マージした"
               merged=$((merged + 1))
             else

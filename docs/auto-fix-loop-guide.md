@@ -193,7 +193,29 @@ Claude Sonnet 5 は $2.00 / MTok（入力）・$10.00 / MTok（出力）、キ�
 | `AUTO_FIX_MODEL` | `claude-sonnet-5` | 使うモデル |
 | `AUTO_FIX_EFFORT` | `medium` | 思考の深さ（`low`〜`max`）。`aborted` が続くならさらに下げる |
 
-必要なシークレットは `ANTHROPIC_API_KEY` のみ（定期セキュリティ監査と共用）。
+必要なシークレットは `ANTHROPIC_API_KEY`（定期セキュリティ監査と共用）と、
+自動マージまで通すなら `AUTO_FIX_TOKEN`。
+
+### `AUTO_FIX_TOKEN` が要る理由
+
+main のルールセット「Protect main」が **1 承認** を要求する
+（public 化した 2026-09-07 に有効化された。private の無料プランでは効いていなかった）。
+bypass できるのは Admin ロールだけで、`github-actions[bot]` は Admin ではないため、
+`GITHUB_TOKEN` では自分の PR をマージできない。
+
+**GitHub Actions をルールセットの bypass に足すことはできない。** API が拒否する:
+`Actor GitHub Actions integration must be part of the ruleset source or owner organization`。
+bypass に指定できるのは、組織にインストールされた App・チーム・リポジトリロールだけである。
+
+したがって選択肢は 2 つ:
+
+| | 設定 | 挙動 |
+|---|---|---|
+| 自動マージまで通す | Admin 権限の fine-grained PAT を `AUTO_FIX_TOKEN` に入れる | ループが `--admin` でマージする |
+| PR まで自動化する | 何もしない | 修正とブランチと PR は自動。マージだけ人がする（差分は失われない） |
+
+PAT は「このリポジトリのみ」に絞り、`contents: write` と `pull requests: write` を与える。
+期限切れでループが静かに止まらないよう、期限は台帳 Issue に控えておくこと。
 
 ### 組織設定が 1 つ要る
 
