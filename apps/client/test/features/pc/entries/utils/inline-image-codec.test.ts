@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { extractEditorEffects } from '@/features/pc/entries/utils/editor-effects-codec';
 import {
   applyInlineImagesToEditor,
+  defaultWidthRatioFor,
   extractInlineImages,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
@@ -67,12 +68,11 @@ describe('extractInlineImages', () => {
     editor.innerHTML = `ab${img({
       'data-storage-path': 'u1/1-a.jpg',
       'data-width-ratio': '0.6',
-      'data-layout': 'wrap',
-      'data-align': 'end',
+      'data-rotation': '12',
     })}cd`;
 
     expect(extractInlineImages(editor)).toEqual([
-      { offset: 2, storagePath: 'u1/1-a.jpg', widthRatio: 0.6, layout: 'wrap', align: 'end' },
+      { offset: 2, storagePath: 'u1/1-a.jpg', widthRatio: 0.6, rotation: 12 },
     ]);
   });
 
@@ -91,11 +91,9 @@ describe('extractInlineImages', () => {
 
   // 壊れた属性で写真ごと落とすと、本文にプレースホルダだけが残って復元不能になる。
   it('属性が壊れていても既定値に丸めて拾う', () => {
-    editor.innerHTML = img({ 'data-width-ratio': 'NaN', 'data-layout': 'bogus', 'data-align': '' });
+    editor.innerHTML = img({ 'data-width-ratio': 'NaN', 'data-rotation': 'bogus' });
 
-    expect(extractInlineImages(editor)).toEqual([
-      { offset: 0, storagePath: '', widthRatio: 0.4, layout: 'inline', align: 'start' },
-    ]);
+    expect(extractInlineImages(editor)).toEqual([{ offset: 0, storagePath: '', widthRatio: 0.5 }]);
   });
 
   it('範囲外の幅は 0.05〜1.0 に収める', () => {
@@ -219,14 +217,13 @@ describe('保存と復元の往復', () => {
     expect(after.images.map((i) => i.offset)).toEqual([0, 1]);
   });
 
-  it('表示設定（幅・回り込み・寄せ・比率）が保たれる', () => {
+  it('表示設定（幅・比率・傾き）が保たれる', () => {
     const after = roundTrip(
       img({
         'data-storage-path': 'p1',
         'data-width-ratio': '0.75',
-        'data-layout': 'wrap',
-        'data-align': 'end',
         'data-aspect': '1.5',
+        'data-rotation': '-8',
       }),
     );
 
@@ -234,9 +231,8 @@ describe('保存と復元の往復', () => {
       offset: 0,
       storagePath: 'p1',
       widthRatio: 0.75,
-      layout: 'wrap',
-      align: 'end',
       aspect: 1.5,
+      rotation: -8,
     });
   });
 
@@ -249,7 +245,7 @@ describe('保存と復元の往復', () => {
 
     applyInlineImagesToEditor(
       restored,
-      [{ offset: 3, storagePath: 'p1', widthRatio: 0.4, layout: 'inline', align: 'start' }],
+      [{ offset: 3, storagePath: 'p1', widthRatio: 0.4 }],
       new Map(),
     );
 
@@ -266,7 +262,7 @@ describe('保存と復元の往復', () => {
 
     applyInlineImagesToEditor(
       restored,
-      [{ offset: 1, storagePath: 'p1', widthRatio: 0.4, layout: 'inline', align: 'start' }],
+      [{ offset: 1, storagePath: 'p1', widthRatio: 0.4 }],
       new Map(),
     );
 
@@ -279,6 +275,42 @@ describe('保存と復元の往復', () => {
 function editorHtmlWithImages(): string {
   return (
     `冒頭の文${img({ 'data-storage-path': 'p1', 'data-width-ratio': '0.5' })}` +
-    `つづき<br>改行のあと${img({ 'data-storage-path': 'p2', 'data-layout': 'block' })}おわり`
+    `つづき<br>改行のあと${img({ 'data-storage-path': 'p2', 'data-rotation': '5' })}おわり`
   );
 }
+
+/**
+ * 差し込んだ直後の大きさ。一律だと、縦書きに縦長の写真を入れたときだけ極端に小さく見える。
+ * 「長辺が行方向に沿うなら 80%、そうでなければ 50%」という 1 本の規則で 4 通りを満たす。
+ */
+describe('defaultWidthRatioFor', () => {
+  const PORTRAIT = { w: 800, h: 1200 };
+  const LANDSCAPE = { w: 1200, h: 800 };
+
+  it('縦書き × 縦長 → 行に沿うので 80%', () => {
+    expect(defaultWidthRatioFor(PORTRAIT.w, PORTRAIT.h, true)).toBe(0.8);
+  });
+
+  it('縦書き × 横長 → 行と直交するので 50%', () => {
+    expect(defaultWidthRatioFor(LANDSCAPE.w, LANDSCAPE.h, true)).toBe(0.5);
+  });
+
+  it('横書き × 縦長 → 行と直交するので 50%', () => {
+    expect(defaultWidthRatioFor(PORTRAIT.w, PORTRAIT.h, false)).toBe(0.5);
+  });
+
+  it('横書き × 横長 → 行に沿うので 80%', () => {
+    expect(defaultWidthRatioFor(LANDSCAPE.w, LANDSCAPE.h, false)).toBe(0.8);
+  });
+
+  it('正方形は行と直交する側（狭いほう）に倒す', () => {
+    expect(defaultWidthRatioFor(1000, 1000, true)).toBe(0.5);
+    expect(defaultWidthRatioFor(1000, 1000, false)).toBe(0.8);
+  });
+
+  // 読み込み前などで実寸が取れないことがある。ここで 0 や NaN を返すと写真が潰れる。
+  it('実寸が取れなくても狭いほうの既定に落ちる', () => {
+    expect(defaultWidthRatioFor(0, 0, true)).toBe(0.5);
+    expect(defaultWidthRatioFor(Number.NaN, 100, false)).toBe(0.5);
+  });
+});

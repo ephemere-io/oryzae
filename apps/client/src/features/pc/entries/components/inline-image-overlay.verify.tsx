@@ -3,8 +3,10 @@
  *
  * 本文（contentEditable）そのものは孤立検証に載らないが、この部品は
  * 「選択中の写真の設定 → 出す操作 UI」の純粋な写像なので単体で検証できる。
- * 特に **寄せは行内では出さない**（文字の流れが位置を決めるため意味を持たない）という
- * 分岐を、Word のレイアウトオプションに倣った仕様として固定しておく。
+ *
+ * ここで固定したいのは **操作の数を増やさないこと**。以前は回り込みと寄せを選ばせて
+ * いたが「項目が多く、全部試さないと意味が分からない」という指摘で畳んだ経緯がある。
+ * 操作はサイズ（8 ハンドル）・回転・削除の 3 つだけ。
  */
 
 import type { InlineImage } from '@oryzae/shared';
@@ -34,20 +36,13 @@ const RECT: DOMRect = {
 };
 
 function image(over: Partial<InlineImage> = {}): InlineImage {
-  return {
-    offset: 0,
-    storagePath: 'u1/1-photo.jpg',
-    widthRatio: 0.4,
-    layout: 'inline',
-    align: 'start',
-    ...over,
-  };
+  return { offset: 0, storagePath: 'u1/1-photo.jpg', widthRatio: 0.8, ...over };
 }
 
 registerUnit<Props>({
   id: 'InlineImageOverlay',
   title: 'InlineImageOverlay',
-  description: '本文中の写真を選んだときに重なる操作 UI（8 ハンドル + レイアウト切替）',
+  description: '本文中の写真を選んだときに重なる操作 UI（8 ハンドル + 回転 + 削除）',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
@@ -55,22 +50,22 @@ registerUnit<Props>({
         rect={RECT}
         image={props.image}
         onResizeStart={() => {}}
-        onLayoutChange={() => {}}
+        onRotateStart={() => {}}
         onRemove={() => {}}
       />,
     ),
   fixtures: [
-    { id: 'inline', description: '行内（既定）', props: { image: image() } },
+    { id: 'default', description: '既定（長辺が行に沿う写真の 80%）', props: { image: image() } },
     {
-      id: 'block',
-      description: 'ブロック配置。寄せが選べる',
-      props: { image: image({ layout: 'block', align: 'center' }) },
+      id: 'narrow',
+      description: '長辺が行と直交する写真（50%）',
+      props: { image: image({ widthRatio: 0.5 }) },
     },
     {
-      id: 'wrap',
+      id: 'rotated',
       probe: true,
-      description: 'Probe: 回り込み + 終わり寄せ',
-      props: { image: image({ layout: 'wrap', align: 'end', widthRatio: 0.75 }) },
+      description: 'Probe: 傾けた写真',
+      props: { image: image({ rotation: -8 }) },
     },
     {
       id: 'tiny',
@@ -82,40 +77,46 @@ registerUnit<Props>({
   invariants: [
     {
       id: 'eight-handles',
-      description: 'リサイズハンドルが常に 8 個ある（Word と同じ角 4 + 辺 4）',
+      description: 'リサイズハンドルが常に 8 個ある（角 4 + 辺 4）',
       check: ({ root }) => {
         const n = root.querySelectorAll('[data-handle]').length;
         return n === 8 || `ハンドルが 8 個ではない: ${n}`;
       },
     },
     {
-      id: 'align-only-when-meaningful',
-      description: '寄せは行内では出さず、ブロック / 回り込みでだけ出す',
-      check: ({ root, props }) => {
-        // aria-pressed を持つボタンのうち、レイアウト 3 種を除いたものが寄せ。
-        const pressable = root.querySelectorAll('[aria-pressed]').length;
-        const expected = props.image.layout === 'inline' ? 3 : 6;
-        return (
-          pressable === expected ||
-          `layout=${props.image.layout} のとき選択ボタンは ${expected} 個のはずが ${pressable} 個`
-        );
+      id: 'no-layout-choices',
+      description: '配置を選ばせない（操作はサイズ・回転・削除だけ）',
+      check: ({ root }) => {
+        // 選択式の操作が復活すると aria-pressed 付きのボタンが現れる。
+        const toggles = root.querySelectorAll('[aria-pressed]').length;
+        return toggles === 0 || `配置の選択肢が ${toggles} 個ある（畳んだはず）`;
       },
+    },
+    {
+      id: 'remove-and-rotate-present',
+      description: '削除（右上のバツ）と回転がある',
+      check: ({ root }) =>
+        Boolean(
+          root.querySelector('[data-testid="inline-image-remove"]') &&
+            root.querySelector('[data-testid="inline-image-rotate"]'),
+        ) || '削除または回転のハンドルが無い',
     },
     {
       id: 'contract-matches-props',
       description: '公表する契約が渡された設定と一致する',
       check: ({ contract, props }) =>
-        (contract.layout === props.image.layout && contract.align === props.image.align) ||
-        `契約不一致: layout=${contract.layout} align=${contract.align}`,
+        (contract.widthRatio === String(props.image.widthRatio) &&
+          contract.rotation === String(props.image.rotation ?? 0)) ||
+        `契約不一致: widthRatio=${contract.widthRatio} rotation=${contract.rotation}`,
     },
     {
-      id: 'handles-are-labelled',
-      description: '各ハンドルに説明がある（アイコンだけの当たり判定にしない）',
+      id: 'controls-are-labelled',
+      description: '掴む対象すべてに説明がある（アイコンだけの当たり判定にしない）',
       check: ({ root }) => {
-        const unlabelled = Array.from(root.querySelectorAll('[data-handle]')).filter(
+        const unlabelled = Array.from(root.querySelectorAll('button')).filter(
           (el) => !el.getAttribute('aria-label'),
         );
-        return unlabelled.length === 0 || `ラベルの無いハンドルが ${unlabelled.length} 個`;
+        return unlabelled.length === 0 || `ラベルの無い操作が ${unlabelled.length} 個`;
       },
     },
   ],

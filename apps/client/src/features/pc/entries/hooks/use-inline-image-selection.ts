@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   applyInlineImageStyle,
   isInlineImage,
+  moveImageToPoint,
   readInlineImageFromElement,
 } from '@/features/pc/entries/utils/inline-image-codec';
 import {
@@ -58,6 +59,17 @@ export function useInlineImageSelection({
     startBlockPx: number;
   } | null>(null);
 
+  /** 回転ドラッグ。写真の中心から見た角度の差分で回す。 */
+  const rotateRef = useRef<{
+    start: InlineImage;
+    centerX: number;
+    centerY: number;
+    startAngle: number;
+  } | null>(null);
+
+  /** 本文中を掴んで移動しているか。 */
+  const moveRef = useRef<{ started: boolean } | null>(null);
+
   /** 選択中の写真の位置をもう一度測る。ドラッグ中やスクロール後に呼ぶ。 */
   const refresh = useCallback(() => {
     setSelection((s) =>
@@ -93,6 +105,10 @@ export function useInlineImageSelection({
       // EventTarget は Node とは限らない（window 等も来る）。絞ってから判定する。
       if (target instanceof Node && isInlineImage(target)) {
         select(target);
+        // 掴んだ時点で移動を仕込む。実際に動かさなければ放したときに何も起きない。
+        moveRef.current = { started: false };
+        target.style.opacity = '0.4';
+        e.preventDefault();
         return;
       }
       clear();
@@ -139,10 +155,28 @@ export function useInlineImageSelection({
     if (!selection.element) return;
 
     const onMove = (e: PointerEvent) => {
-      const drag = dragRef.current;
       const el = selection.element;
       const editor = editorRef.current;
-      if (!drag || !el || !editor) return;
+      if (!el || !editor) return;
+
+      const rotate = rotateRef.current;
+      if (rotate) {
+        const angle = Math.atan2(e.clientY - rotate.centerY, e.clientX - rotate.centerX);
+        const deltaDeg = ((angle - rotate.startAngle) * 180) / Math.PI;
+        const next = Math.round((rotate.start.rotation ?? 0) + deltaDeg);
+        applyInlineImageStyle(el, { ...rotate.start, rotation: next });
+        refresh();
+        return;
+      }
+
+      const move = moveRef.current;
+      if (move) {
+        move.started = true;
+        return;
+      }
+
+      const drag = dragRef.current;
+      if (!drag) return;
 
       const next = resizeInlineImage({
         start: drag.start,
@@ -159,9 +193,27 @@ export function useInlineImageSelection({
       refresh();
     };
 
-    const onUp = () => {
-      if (!dragRef.current) return;
+    const onUp = (e: PointerEvent) => {
+      const el = selection.element;
+      const move = moveRef.current;
+      moveRef.current = null;
+
+      if (move && el) {
+        el.style.opacity = '';
+        // 動かさずに放しただけ（＝ただのクリック）なら、位置を変えない。
+        if (move.started) {
+          const moved = moveImageToPoint(el, e.clientX, e.clientY);
+          if (moved) {
+            refresh();
+            onCommit();
+          }
+          return;
+        }
+      }
+
+      if (!dragRef.current && !rotateRef.current) return;
       dragRef.current = null;
+      rotateRef.current = null;
       onCommit(); // 保存はドラッグ終了の 1 回だけ。移動中に毎回保存すると保存が詰まる。
     };
 
@@ -173,16 +225,24 @@ export function useInlineImageSelection({
     };
   }, [selection.element, editorRef, isVertical, refresh, onCommit]);
 
-  /** レイアウト（行内 / ブロック / 回り込み）と寄せを変える。 */
-  const updateLayout = useCallback(
-    (patch: Partial<Pick<InlineImage, 'layout' | 'align'>>) => {
+  /** 回転ハンドルを掴んだ。 */
+  const beginRotate = useCallback(
+    (e: React.PointerEvent) => {
       const el = selection.element;
       if (!el) return;
-      applyInlineImageStyle(el, { ...readInlineImageFromElement(el), ...patch });
-      refresh();
-      onCommit();
+      const rect = el.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      rotateRef.current = {
+        start: readInlineImageFromElement(el),
+        centerX,
+        centerY,
+        startAngle: Math.atan2(e.clientY - centerY, e.clientX - centerX),
+      };
+      e.preventDefault();
+      e.stopPropagation();
     },
-    [selection.element, refresh, onCommit],
+    [selection.element],
   );
 
   /** 選択中の写真を本文から取り除く。 */
@@ -194,5 +254,5 @@ export function useInlineImageSelection({
     onCommit();
   }, [selection.element, clear, onCommit]);
 
-  return { selection, beginResize, updateLayout, removeSelected, clear };
+  return { selection, beginResize, beginRotate, removeSelected, clear };
 }

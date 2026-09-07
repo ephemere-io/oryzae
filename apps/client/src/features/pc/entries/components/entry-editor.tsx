@@ -5,7 +5,6 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PhotoStrip } from '@/components/ui/photo-strip';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -50,7 +49,9 @@ import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import {
   applyInlineImagesToEditor,
   createInlineImageElement,
-  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  defaultWidthRatioFor,
+  extractInlineImages,
+  loadNaturalSize,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
@@ -717,6 +718,10 @@ export function EntryEditor({
    * キャレット位置を壊さないため（本文への文字挿入で execCommand を使っているのと同じ理由）。
    * Range で直接 DOM を挿すと Ctrl+Z で戻せなくなる。
    *
+   * 既定は **ブロック・中央**（Notion / Medium と同じ）。写真は独立した行を占め、
+   * 幅は写真の向きと書字方向から決める（`defaultWidthRatioFor`）。行頭に小さく置いても
+   * 使い道が無いため、行内配置や寄せは既定にしない。
+   *
    * 本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
    * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
    */
@@ -729,13 +734,17 @@ export function EntryEditor({
 
       if (el) {
         el.focus();
+        // 実寸を知るために先に読み込む。失敗しても既定幅で差し込み、写真を失わない。
+        const natural = await loadNaturalSize(photo.signedUrl);
         const node = createInlineImageElement(
           {
             offset: 0, // 実際の位置は保存時に DOM から数え直す
             storagePath: photo.storagePath,
-            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
-            layout: 'inline',
-            align: 'start',
+            widthRatio: defaultWidthRatioFor(
+              natural.width,
+              natural.height,
+              settings.writingMode === 'vertical',
+            ),
           },
           photo.signedUrl,
         );
@@ -744,26 +753,14 @@ export function EntryEditor({
 
       const nextContent = el ? serializeEditorText(el) : content;
       setContent(nextContent);
-      const next = updated.map((p) => p.storagePath);
       const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
       if (!finalContent.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
-      const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
+      const savedId = await save(finalContent, currentEntryId, {
+        mediaUrls: el ? extractInlineImages(el).map((i) => i.storagePath) : [],
+      });
       if (savedId) setCurrentEntryId(savedId);
     },
-    [title, content, currentEntryId, save],
-  );
-
-  const removePhoto = useCallback(
-    async (index: number) => {
-      const updated = photosRef.current.filter((_, i) => i !== index);
-      photosRef.current = updated;
-      setPhotos(updated);
-      const next = updated.map((p) => p.storagePath);
-      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
-      if (!currentEntryId || !finalContent.trim()) return;
-      await save(finalContent, currentEntryId, { mediaUrls: next });
-    },
-    [title, content, currentEntryId, save],
+    [title, content, currentEntryId, save, settings.writingMode],
   );
 
   const photoImport = usePhotoImport({
@@ -784,8 +781,10 @@ export function EntryEditor({
     setStatus((st) => (st === 'saved' ? 'editing' : st));
     const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
     if (!currentEntryId || !finalContent.trim()) return;
+    // 保存する mediaUrls は **本文にいま入っている写真**から作る。photosRef から作ると、
+    // 本文から消した写真が Storage の参照として残り続ける（孤児になる）。
     void save(finalContent, currentEntryId, {
-      mediaUrls: photosRef.current.map((ph) => ph.storagePath),
+      mediaUrls: extractInlineImages(el).map((i) => i.storagePath),
     });
   }, [title, currentEntryId, save]);
 
@@ -1388,13 +1387,11 @@ export function EntryEditor({
       </div>
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
-
       <InlineImageOverlay
         rect={inlineImages.selection.rect}
         image={inlineImages.selection.image}
         onResizeStart={inlineImages.beginResize}
-        onLayoutChange={inlineImages.updateLayout}
+        onRotateStart={inlineImages.beginRotate}
         onRemove={inlineImages.removeSelected}
       />
 
