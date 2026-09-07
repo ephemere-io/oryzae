@@ -72,6 +72,13 @@ interface JarViewProps {
   onAddQuestion?: (text: string) => Promise<void>;
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
+  /**
+   * 開いた状態で入りたい手紙の発酵 id（`/jar?letter=`）。
+   *
+   * 書斎の瓶の上の封を押すとここへ来る。「届いた」ことを 3D で見せておいて、
+   * 押した先で改めて探させるのでは、封を出した意味が無い。
+   */
+  openLetterFor?: string | null;
 }
 
 /**
@@ -142,6 +149,8 @@ function QuestionCircleWithData({
   onCircleDragEnd,
   onInnerMove,
   onInnerDragEnd,
+  openLetterFor,
+  onLetterOpened,
 }: {
   question: QuestionData;
   api: ApiClient | null;
@@ -166,8 +175,28 @@ function QuestionCircleWithData({
   onCircleDragEnd: (id: string, pos: Pos) => void;
   onInnerMove: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
   onInnerDragEnd: (type: 'keyword' | 'snippet' | 'letter', id: string, pos: Pos) => void;
+  /** 開いた状態で入りたい手紙の発酵 id（`/jar?letter=`）。自分のでなければ何もしない。 */
+  openLetterFor: string | null;
+  /** 開き終わったことを親へ返す（同じ手紙を二度開かない）。 */
+  onLetterOpened: () => void;
 }) {
   const { detail } = useFermentationForQuestion(api, question.id);
+
+  /**
+   * 書斎の封を押して来たとき、その手紙を開いた状態で始める。
+   *
+   * 詳細は円ごとに引くので、**どの円が持っている手紙かはここでしか分からない**。
+   * 自分の発酵でなければ何もしない（3 つの円のうち 1 つだけが反応する）。
+   * 開いたら親へ返して合図を消す — 閉じたあとに開き直らないようにするため。
+   */
+  useEffect(() => {
+    if (openLetterFor === null || detail === null) return;
+    if (detail.id !== openLetterFor || !detail.letter) return;
+    onElementClick(question.id, question.currentText ?? '', 'letter', detail.letter.id, {
+      bodyText: detail.letter.bodyText,
+    });
+    onLetterOpened();
+  }, [openLetterFor, detail, question.id, question.currentText, onElementClick, onLetterOpened]);
   const isZoomed = zoomedId === question.id;
   // 開いている円以外は薄くするだけ（以前は opacity:0 で完全に消していた）。
   // カメラで寄る方式では周りの世界が見えていた方が現在地が分かる。
@@ -214,6 +243,7 @@ export function JarView({
   onAddQuestion,
   onEditQuestion,
   onArchiveQuestion,
+  openLetterFor = null,
 }: JarViewProps) {
   const t = useTranslations('fermentation');
   // Issue #447: 一括既読は PC の瓶だけ。盤面に手紙が全部並ぶので「開いた＝読んだ」。
@@ -224,6 +254,13 @@ export function JarView({
   }, [markAllSeen]);
 
   const [zoomedId, setZoomedId] = useState<string | null>(null);
+  /**
+   * 書斎の封から渡された「開いて入りたい手紙」。
+   *
+   * 一度開いたら消す。残したままだと、利用者が閉じた瞬間に効果が再び効いて開き直る。
+   */
+  const [pendingLetter, setPendingLetter] = useState<string | null>(openLetterFor);
+  const clearPendingLetter = useCallback(() => setPendingLetter(null), []);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailType, setDetailType] = useState<'keyword' | 'snippet' | 'letter' | null>(null);
   const [detailData, setDetailData] = useState<Record<string, string> | null>(null);
@@ -571,6 +608,8 @@ export function JarView({
               onCircleDragEnd={handleCircleDragEnd}
               onInnerMove={handleInnerDragMove}
               onInnerDragEnd={handleInnerDragEnd}
+              openLetterFor={pendingLetter}
+              onLetterOpened={clearPendingLetter}
             />
           ))}
         </div>
