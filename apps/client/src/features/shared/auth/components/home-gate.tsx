@@ -4,7 +4,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
+import { useHomeHref } from '@/features/shared/study/hooks/use-home-href';
 import { getAccessToken, setTokens } from '@/lib/auth';
 
 function parseHashParams(hash: string): Record<string, string> {
@@ -41,10 +41,8 @@ function parseHashParams(hash: string): Record<string, string> {
  */
 export function HomeGate() {
   const router = useRouter();
-  // 書斎ホームが有効なら、既ログインの行き先が /entries/new から /study に変わる。
-  // フラグ off の間はここも従来どおりで、書斎のコードは読み込まれない。
-  const { enabled: studyHome, resolved } = useStudyHome();
-  const home = studyHome ? '/study' : '/entries/new';
+  // 行き先の判断は useHomeHref に 1 か所だけ置く（ログインフォームも同じものを使う）。
+  const { href: home, resolved } = useHomeHref();
 
   useEffect(() => {
     // 手動切替（?study=on / localStorage）を読み終えるまで行き先を決めない。

@@ -113,6 +113,35 @@ jobs:
               await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
             }
 
+  # マージ前に外すつもりの足場（レビュー用の一時 UI・デバッグ表示）を、人の記憶ではなく
+  # CI で止める。`TODO(review)` を書いたまま main へ入れようとしたら落とす。
+  #
+  # 実際、レビュー用の端末切替スイッチが `(protected)` 配下＝ログイン後の全画面に出る形で
+  # 入っていた（PR #570 のレビュー指摘）。外し忘れれば本番のユーザー全員に見える。
+  # 「消し忘れないよう気をつける」だけなのは、このリポジトリの他のゲートと釣り合わない。
+  #
+  # 検査対象はコードだけ（apps / packages / scripts / supabase）。docs と CI 設定は
+  # この決まり自体を説明する場所なので、素の文字列が出てきても落とさない。
+  review-marker-gate:
+    name: No Review-Only Scaffolding Left
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fail if a "remove before merge" marker survives
+        run: |
+          set -euo pipefail
+          if git grep -nE 'TODO\(review\)' -- apps packages scripts supabase > /tmp/markers.txt; then
+            echo "マージ前に外すはずの足場が残っています:"
+            cat /tmp/markers.txt
+            while IFS= read -r line; do
+              file="${line%%:*}"
+              rest="${line#*:}"
+              echo "::error file=${file},line=${rest%%:*}::マージ前に外すはずの足場が残っています（恒久機能にするか、削除してください）。"
+            done < /tmp/markers.txt
+            exit 1
+          fi
+          echo "No review-only scaffolding left."
+
   # 「見た目の実装にはテストを」を CI で強制する硬いゲート。
   # PR で *新規追加* された client の feature コンポーネントに、隣接 *.verify.tsx が無く、
   # かつ `// verify-exempt: <理由>` も無ければ落とす。リネーム(#363 のような移設)は -M で除外。
