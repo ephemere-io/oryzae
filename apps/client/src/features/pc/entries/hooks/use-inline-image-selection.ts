@@ -5,16 +5,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   applyInlineImageStyle,
   isInlineImage,
-  moveImageToPoint,
   readInlineImageFromElement,
 } from '@/features/pc/entries/utils/inline-image-codec';
+import {
+  applyDrop,
+  type DropTarget,
+  findDropTarget,
+} from '@/features/pc/entries/utils/inline-image-drop';
 import {
   type ResizeHandle,
   resizeInlineImage,
 } from '@/features/pc/entries/utils/inline-image-resize';
 
 /**
- * 本文中の写真の選択とリサイズを扱う。
+ * 本文中の写真の選択・リサイズ・回転・移動を扱う。
  *
  * DOM を直接触るのは、本文が contentEditable だから。写真を React で描くと、
  * ブラウザが編集で書き換えた DOM と React の仮想 DOM が食い違って本文が壊れる。
@@ -25,18 +29,23 @@ interface UseInlineImageSelectionParams {
   editorRef: React.RefObject<HTMLElement | null>;
   /** 縦書きか。リサイズの軸の向きが変わる。 */
   isVertical: boolean;
-  /** 写真の見た目が確定したとき（ドラッグ終了・レイアウト変更）に呼ぶ。 */
+  /** 写真の見た目や位置が確定したとき（ドラッグ終了・回転終了・削除）に呼ぶ。 */
   onCommit: () => void;
 }
 
 interface InlineImageSelection {
-  /** 選ばれている写真の要素。null なら未選択。 */
   element: HTMLImageElement | null;
-  /** 選ばれている写真の現在の設定。 */
   image: InlineImage | null;
-  /** 画面上の位置（オーバーレイを重ねるのに使う）。 */
   rect: DOMRect | null;
 }
+
+/**
+ * クリックと移動を分ける距離（px）。
+ *
+ * これが無いと、選ぼうとして少し指が動いただけで写真が動いてしまう。Word も
+ * わずかに動かすまでは移動を始めない。
+ */
+const DRAG_THRESHOLD_PX = 4;
 
 export function useInlineImageSelection({
   editorRef,
@@ -48,9 +57,10 @@ export function useInlineImageSelection({
     image: null,
     rect: null,
   });
+  /** ドラッグ中に「ここに入る」を示す線。null なら出さない。 */
+  const [dropRect, setDropRect] = useState<DOMRect | null>(null);
 
-  // ドラッグ中の情報。再描画に関係しないので ref に置く。
-  const dragRef = useRef<{
+  const resizeRef = useRef<{
     handle: ResizeHandle;
     startX: number;
     startY: number;
@@ -59,7 +69,6 @@ export function useInlineImageSelection({
     startBlockPx: number;
   } | null>(null);
 
-  /** 回転ドラッグ。写真の中心から見た角度の差分で回す。 */
   const rotateRef = useRef<{
     start: InlineImage;
     centerX: number;
@@ -67,10 +76,15 @@ export function useInlineImageSelection({
     startAngle: number;
   } | null>(null);
 
-  /** 本文中を掴んで移動しているか。 */
-  const moveRef = useRef<{ started: boolean } | null>(null);
+  /** 移動。しきい値を超えるまで `active` は false のまま（＝ただのクリック）。 */
+  const moveRef = useRef<{
+    el: HTMLImageElement;
+    startX: number;
+    startY: number;
+    active: boolean;
+    target: DropTarget | null;
+  } | null>(null);
 
-  /** 選択中の写真の位置をもう一度測る。ドラッグ中やスクロール後に呼ぶ。 */
   const refresh = useCallback(() => {
     setSelection((s) =>
       s.element
@@ -95,6 +109,16 @@ export function useInlineImageSelection({
     });
   }, []);
 
+  /** 移動を打ち切って見た目を戻す。取り消しでも完了でも通る。 */
+  const endMove = useCallback(() => {
+    const move = moveRef.current;
+    moveRef.current = null;
+    setDropRect(null);
+    document.body.style.removeProperty('cursor');
+    if (move) move.el.style.opacity = '';
+    return move;
+  }, []);
+
   // 写真をクリックしたら選ぶ。本文の他の場所を触ったら外す。
   useEffect(() => {
     const editor = editorRef.current;
@@ -102,16 +126,20 @@ export function useInlineImageSelection({
 
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target;
-      // EventTarget は Node とは限らない（window 等も来る）。絞ってから判定する。
-      if (target instanceof Node && isInlineImage(target)) {
-        select(target);
-        // 掴んだ時点で移動を仕込む。実際に動かさなければ放したときに何も起きない。
-        moveRef.current = { started: false };
-        target.style.opacity = '0.4';
-        e.preventDefault();
+      if (!(target instanceof Node) || !isInlineImage(target)) {
+        clear();
         return;
       }
-      clear();
+      select(target);
+      // ここでは preventDefault しない。動かさずに放したときは、ただの選択として
+      // 扱いたい（キャレット操作や二度目のクリックを潰さない）。
+      moveRef.current = {
+        el: target,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false,
+        target: null,
+      };
     };
 
     editor.addEventListener('pointerdown', onPointerDown);
@@ -130,13 +158,12 @@ export function useInlineImageSelection({
     };
   }, [selection.element, editorRef, refresh]);
 
-  /** ハンドルを掴んだ。ここから pointermove で追う。 */
   const beginResize = useCallback(
     (handle: ResizeHandle, e: React.PointerEvent) => {
       const el = selection.element;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      dragRef.current = {
+      resizeRef.current = {
         handle,
         startX: e.clientX,
         startY: e.clientY,
@@ -151,81 +178,6 @@ export function useInlineImageSelection({
     [selection.element, isVertical],
   );
 
-  useEffect(() => {
-    if (!selection.element) return;
-
-    const onMove = (e: PointerEvent) => {
-      const el = selection.element;
-      const editor = editorRef.current;
-      if (!el || !editor) return;
-
-      const rotate = rotateRef.current;
-      if (rotate) {
-        const angle = Math.atan2(e.clientY - rotate.centerY, e.clientX - rotate.centerX);
-        const deltaDeg = ((angle - rotate.startAngle) * 180) / Math.PI;
-        const next = Math.round((rotate.start.rotation ?? 0) + deltaDeg);
-        applyInlineImageStyle(el, { ...rotate.start, rotation: next });
-        refresh();
-        return;
-      }
-
-      const move = moveRef.current;
-      if (move) {
-        move.started = true;
-        return;
-      }
-
-      const drag = dragRef.current;
-      if (!drag) return;
-
-      const next = resizeInlineImage({
-        start: drag.start,
-        handle: drag.handle,
-        dx: e.clientX - drag.startX,
-        dy: e.clientY - drag.startY,
-        // 1 行の長さ。縦書きなら editor の高さ。
-        editorInlineSize: isVertical ? editor.clientHeight : editor.clientWidth,
-        startInlinePx: drag.startInlinePx,
-        startBlockPx: drag.startBlockPx,
-        isVertical,
-      });
-      applyInlineImageStyle(el, { ...drag.start, ...next });
-      refresh();
-    };
-
-    const onUp = (e: PointerEvent) => {
-      const el = selection.element;
-      const move = moveRef.current;
-      moveRef.current = null;
-
-      if (move && el) {
-        el.style.opacity = '';
-        // 動かさずに放しただけ（＝ただのクリック）なら、位置を変えない。
-        if (move.started) {
-          const moved = moveImageToPoint(el, e.clientX, e.clientY);
-          if (moved) {
-            refresh();
-            onCommit();
-          }
-          return;
-        }
-      }
-
-      if (!dragRef.current && !rotateRef.current) return;
-      dragRef.current = null;
-      rotateRef.current = null;
-      onCommit(); // 保存はドラッグ終了の 1 回だけ。移動中に毎回保存すると保存が詰まる。
-    };
-
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
-  }, [selection.element, editorRef, isVertical, refresh, onCommit]);
-
-  /** 回転ハンドルを掴んだ。 */
   const beginRotate = useCallback(
     (e: React.PointerEvent) => {
       const el = selection.element;
@@ -245,6 +197,99 @@ export function useInlineImageSelection({
     [selection.element],
   );
 
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      // ── 移動 ───────────────────────────────────────
+      const move = moveRef.current;
+      if (move) {
+        if (!move.active) {
+          const far =
+            Math.abs(e.clientX - move.startX) > DRAG_THRESHOLD_PX ||
+            Math.abs(e.clientY - move.startY) > DRAG_THRESHOLD_PX;
+          if (!far) return; // まだクリックの範囲。移動を始めない。
+          move.active = true;
+          move.el.style.opacity = '0.4'; // 運んでいるものを分かるようにする
+          document.body.style.setProperty('cursor', 'grabbing');
+        }
+        // 落ちる先を毎回測って線で示す。Word の挿入バーと同じ役割。
+        move.target = findDropTarget(editor, move.el, e.clientX, e.clientY);
+        setDropRect(move.target?.rect ?? null);
+        e.preventDefault(); // ドラッグ中にテキスト選択が走らないように
+        return;
+      }
+
+      // ── 回転 ───────────────────────────────────────
+      const el = selection.element;
+      if (!el) return;
+      const rotate = rotateRef.current;
+      if (rotate) {
+        const angle = Math.atan2(e.clientY - rotate.centerY, e.clientX - rotate.centerX);
+        const deltaDeg = ((angle - rotate.startAngle) * 180) / Math.PI;
+        applyInlineImageStyle(el, {
+          ...rotate.start,
+          rotation: Math.round((rotate.start.rotation ?? 0) + deltaDeg),
+        });
+        refresh();
+        return;
+      }
+
+      // ── リサイズ ───────────────────────────────────
+      const drag = resizeRef.current;
+      if (!drag) return;
+      const next = resizeInlineImage({
+        start: drag.start,
+        handle: drag.handle,
+        dx: e.clientX - drag.startX,
+        dy: e.clientY - drag.startY,
+        // 1 行の長さ。縦書きなら editor の高さ。
+        editorInlineSize: isVertical ? editor.clientHeight : editor.clientWidth,
+        startInlinePx: drag.startInlinePx,
+        startBlockPx: drag.startBlockPx,
+        isVertical,
+      });
+      applyInlineImageStyle(el, { ...drag.start, ...next });
+      refresh();
+    };
+
+    const onUp = () => {
+      if (moveRef.current) {
+        const finished = endMove();
+        // 動かさずに放しただけなら、位置は変えない（＝ただの選択）。
+        if (finished?.active && finished.target && applyDrop(finished.el, finished.target)) {
+          refresh();
+          onCommit();
+        }
+        return;
+      }
+
+      if (!resizeRef.current && !rotateRef.current) return;
+      resizeRef.current = null;
+      rotateRef.current = null;
+      onCommit(); // 保存はドラッグ終了の 1 回だけ。移動中に毎回保存すると保存が詰まる。
+    };
+
+    /** Esc で移動を取り消す。運んでいる途中で戻せないと、置き場所を試せない。 */
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !moveRef.current) return;
+      endMove();
+      e.preventDefault();
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [selection.element, editorRef, isVertical, refresh, onCommit, endMove]);
+
   /** 選択中の写真を本文から取り除く。 */
   const removeSelected = useCallback(() => {
     const el = selection.element;
@@ -254,5 +299,5 @@ export function useInlineImageSelection({
     onCommit();
   }, [selection.element, clear, onCommit]);
 
-  return { selection, beginResize, beginRotate, removeSelected, clear };
+  return { selection, dropRect, beginResize, beginRotate, removeSelected, clear };
 }

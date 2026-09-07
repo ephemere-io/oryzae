@@ -514,7 +514,8 @@
     "resize_s": "拖动下边调整大小",
     "resize_sw": "拖动左下角调整大小",
     "resize_w": "拖动左边调整大小",
-    "rotate": "旋转照片"
+    "rotate": "旋转照片",
+    "elapsed": "已用 {seconds} 秒"
   },
   "fermentation": {
     "detail": {

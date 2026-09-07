@@ -514,7 +514,8 @@
     "resize_s": "下をドラッグしてサイズ変更",
     "resize_sw": "左下をドラッグしてサイズ変更",
     "resize_w": "左をドラッグしてサイズ変更",
-    "rotate": "写真を回転"
+    "rotate": "写真を回転",
+    "elapsed": "{seconds} 秒経過"
   },
   "fermentation": {
     "detail": {

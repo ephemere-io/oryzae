@@ -154,6 +154,8 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   el.style.display = 'block';
   el.style.marginInline = 'auto';
   el.style.marginBlock = '0.5em';
+  // 掴んで動かせることを見せる。実際の移動は use-inline-image-selection が扱う。
+  el.style.cursor = 'grab';
 }
 
 /** 本文中に置く `<img>` を作る。`src` は署名付き URL（失効するので保存はしない）。 */
@@ -274,61 +276,4 @@ export function loadNaturalSize(src: string): Promise<{ width: number; height: n
     probe.onerror = () => resolve({ width: 0, height: 0 });
     probe.src = src;
   });
-}
-
-/**
- * 放した画面座標のキャレット位置へ写真を移す。
- *
- * 座標で絶対配置するのではなく **本文中の並び順を変える**のが要点。絶対配置にすると、
- * その後で本文を編集したときに写真だけ取り残される（位置はテキストに追従してほしい）。
- *
- * `caretPositionFromPoint` は Firefox 系、`caretRangeFromPoint` は Chrome/Safari 系。
- * どちらも無い環境では移動せず false を返す（写真はその場に残る）。
- *
- * @returns 実際に位置が変わったら true
- */
-export function moveImageToPoint(el: HTMLImageElement, clientX: number, clientY: number): boolean {
-  const caret = caretFromPoint(clientX, clientY);
-  if (!caret) return false;
-
-  // 自分自身の中に落とした場合は何もしない（無限に入れ子にならないように）。
-  if (el.contains(caret.node)) return false;
-
-  const before = el.nextSibling;
-  if (caret.node instanceof Text) {
-    const text = caret.node;
-    const parent = text.parentNode;
-    if (!parent) return false;
-    // テキストの途中なら分割して、その境目に差し込む。
-    const after = caret.offset > 0 ? text.splitText(caret.offset) : text;
-    parent.insertBefore(el, after);
-  } else {
-    const parent = caret.node;
-    parent.insertBefore(el, parent.childNodes[caret.offset] ?? null);
-  }
-
-  // 元の位置と同じなら「変わっていない」と伝える（無駄な保存をしない）。
-  return el.nextSibling !== before;
-}
-
-interface CaretPoint {
-  node: Node;
-  offset: number;
-}
-
-function caretFromPoint(x: number, y: number): CaretPoint | null {
-  // 標準（Firefox）。
-  const doc: Document & {
-    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-  } = document;
-
-  const position = doc.caretPositionFromPoint?.(x, y);
-  if (position) return { node: position.offsetNode, offset: position.offset };
-
-  // WebKit / Blink。
-  const range = doc.caretRangeFromPoint?.(x, y);
-  if (range) return { node: range.startContainer, offset: range.startOffset };
-
-  return null;
 }
