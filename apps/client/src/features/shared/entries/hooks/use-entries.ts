@@ -63,10 +63,14 @@ export function useEntries(
   const prevSearchRef = useRef(search);
   const prevQuestionIdRef = useRef(questionId);
   const prevOrderRef = useRef(order);
+  // 検索・並び替えを素早く切り替えると複数の fetch が並行して飛ぶ。応答が要求順と
+  // 前後すると、古い応答が新しい検索結果を上書きしてしまう（use-board.ts と同じ対策）。
+  const requestIdRef = useRef(0);
 
   const fetchEntries = useCallback(
     async (nextCursor?: string) => {
       if (!api) return;
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setError(false);
 
@@ -78,9 +82,11 @@ export function useEntries(
         params.set('order', order);
 
         const res = await api.fetch(`/api/v1/entries?${params}`);
+        if (requestId !== requestIdRef.current) return;
 
         if (res.ok) {
           const data = await res.json();
+          if (requestId !== requestIdRef.current) return;
           const items: Entry[] = (Array.isArray(data) ? data : []).map(normalizeEntry);
           setEntries((prev) => (nextCursor ? [...prev, ...items] : items));
           setHasMore(items.length === PAGE_SIZE);
@@ -93,10 +99,10 @@ export function useEntries(
           setError(true);
         }
       } catch {
-        setError(true);
+        if (requestId === requestIdRef.current) setError(true);
       }
 
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     },
     [api, search, questionId, order],
   );
