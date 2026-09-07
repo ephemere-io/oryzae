@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { ElapsedSeconds } from '@/features/pc/entries/components/elapsed-seconds';
 import type { PhotoImportState } from '@/features/shared/entries/types';
 
 interface PhotoImportModalProps {
@@ -48,7 +49,9 @@ export function PhotoImportModal({
       aria-modal="true"
       aria-label={t('modal_title')}
       className="fixed inset-0 z-[2000] flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}
+      // 読み取り中は待ちカーソルにする。押しても何も起きない時間があることを、
+      // ボタンの文言だけでなくポインタでも伝える。
+      style={{ backgroundColor: 'rgba(0,0,0,0.35)', cursor: busy ? 'wait' : undefined }}
       onClick={busy ? undefined : onClose}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !busy) onClose();
@@ -172,6 +175,11 @@ export function PhotoImportModal({
               >
                 {state.status === 'transcribing' ? t('transcribing') : t('transcribe')}
               </button>
+              {/* 残り時間は出さない。実測の経過だけ出して「止まっていない」ことを示す。 */}
+              <ElapsedSeconds
+                running={state.status === 'transcribing'}
+                label={(s) => t('elapsed', { seconds: s })}
+              />
             </>
           )}
         </div>

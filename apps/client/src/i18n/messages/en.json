@@ -514,7 +514,8 @@
     "resize_s": "Drag bottom to resize",
     "resize_sw": "Drag bottom-left to resize",
     "resize_w": "Drag left to resize",
-    "rotate": "Rotate photo"
+    "rotate": "Rotate photo",
+    "elapsed": "{seconds}s elapsed"
   },
   "fermentation": {
     "detail": {

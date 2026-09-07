@@ -11,7 +11,10 @@ import {
 } from '@/features/pc/entries/components/editor-status-bar';
 import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
 import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
-import { InlineImageOverlay } from '@/features/pc/entries/components/inline-image-overlay';
+import {
+  InlineImageDropIndicator,
+  InlineImageOverlay,
+} from '@/features/pc/entries/components/inline-image-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
 import { PhotoImportModal } from '@/features/pc/entries/components/photo-import-modal';
@@ -1387,6 +1390,8 @@ export function EntryEditor({
       </div>
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
+      <InlineImageDropIndicator rect={inlineImages.dropRect} />
+
       <InlineImageOverlay
         rect={inlineImages.selection.rect}
         image={inlineImages.selection.image}

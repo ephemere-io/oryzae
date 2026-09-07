@@ -514,7 +514,8 @@
     "resize_s": "아래쪽을 끌어 크기 조절",
     "resize_sw": "왼쪽 아래를 끌어 크기 조절",
     "resize_w": "왼쪽을 끌어 크기 조절",
-    "rotate": "사진 회전"
+    "rotate": "사진 회전",
+    "elapsed": "{seconds}초 경과"
   },
   "fermentation": {
     "detail": {

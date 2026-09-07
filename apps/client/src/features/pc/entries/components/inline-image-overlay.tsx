@@ -29,6 +29,30 @@ const HANDLES: { handle: ResizeHandle; style: React.CSSProperties; cursor: strin
   { handle: 'w', style: { left: 0, top: '50%' }, cursor: 'ew-resize' },
 ];
 
+/**
+ * ドラッグ中に「ここに入る」を示す線。
+ *
+ * キャレットの矩形をそのまま描く。横書きなら縦棒、縦書きなら横棒になり、
+ * 書字方向の分岐を書かずに正しい向きになる。
+ */
+export function InlineImageDropIndicator({ rect }: { rect: DOMRect | null }) {
+  if (!rect) return null;
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="inline-image-drop-indicator"
+      className="pointer-events-none fixed z-50 bg-[var(--accent,#3b82f6)]"
+      style={{
+        left: rect.left,
+        top: rect.top,
+        // 潰れた矩形でも見えるように、細い側に最低の太さを与える。
+        width: Math.max(rect.width, 2),
+        height: Math.max(rect.height, 2),
+      }}
+    />
+  );
+}
+
 interface InlineImageOverlayProps {
   /** 選択中の写真の画面上の位置。null なら何も描かない。 */
   rect: DOMRect | null;
