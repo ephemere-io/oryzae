@@ -486,7 +486,6 @@
       "header_snippet": "Oryzae が切り取った文章",
       "header_letter": "L.A.B.による観察記録",
       "snippet_source_prefix": "出典:",
-      "resize_aria": "詳細パネルの幅を変える",
       "write_entry": "この問いのエントリを書く"
     },
     "jar": {
@@ -539,15 +538,12 @@
     "history": {
       "ghost_jar_title": "発酵瓶",
       "back_to_jar": "瓶にもどる",
-      "progress": "FERMENTATION HISTORY — {current} / {total}",
-      "date_line_latest": "{date}の発酵（最新）",
-      "date_line_back": "{date}の発酵（{steps}つ前）",
-      "entries_scanned": "{count} ENTRIES SCANNED",
       "new": "NEW",
+      "newest": "最新",
       "prev_aria": "前の発酵",
       "next_aria": "次の発酵",
       "hint": "← → キー・ドラッグ・スクロールでめくる ／ ESC で瓶にもどる",
-      "fermentations_count": "{count} FERMENTATIONS",
+      "launcher": "{count}件の発酵をふりかえる",
       "open_aria": "{question}の発酵履歴をひらく"
     }
   },
