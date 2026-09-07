@@ -58,7 +58,7 @@ import {
   extractEditorEffects,
 } from '@/features/pc/entries/utils/editor-effects-codec';
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
-import { measureTitle } from '@/features/pc/entries/utils/title-metrics';
+import { measureTitle, TITLE_MIN_FONT_SIZE } from '@/features/pc/entries/utils/title-metrics';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
@@ -146,14 +146,25 @@ const TITLE_TO_BODY_GAP = 24;
 /**
  * 題の筋（縦書きなら桁、横書きなら行）1本ぶんの太さ。字の何倍か。
  *
- * **箱の太さと行の高さが同じ数字を見る**のが肝要。以前は箱が 1.6 倍・行が 1.4 倍で、
+ * **箱の太さと行の高さが同じ数字を見る**のが肝要。かつて箱が 1.6 倍・行が 1.4 倍で、
  * その差 0.2 倍 × 筋の数が、そのまま題と本文のあいだの空きになって現れていた
  * （筋が増えるほど広がる＝「長く打つと余白が入る」）。
  *
- * 字の幅ぎりぎり（1.0）にしないのは、日本語入力の変換候補がキャレットの脇に開けず
- * 字へ重なるため。
+ * **縦書きだけ広い。** 日本語入力の変換候補は縦書きだと桁の**脇**に開くので、
+ * 桁が字の幅ぎりぎりだと候補が字に重なって打てなくなる。2.0 で解消することを
+ * 一度確認しており（PR #525 レビュー）、1.6 に絞ったら再発した。ここは戻さない。
+ * 横書きの候補は行の下に開くので、見出しとして詰めて組んでよい。
  */
-const TITLE_LINE_BOX = 1.6;
+const TITLE_LINE_BOX_VERTICAL = 2.0;
+const TITLE_LINE_BOX_HORIZONTAL = 1.4;
+
+/**
+ * 読み進めていると見なすスクロール量（px）。これを超えたら題は退く。
+ */
+const TITLE_COMPACT_SCROLL = 24;
+
+/** 退いているときの題の大きさ（もとの何倍か）。 */
+const TITLE_COMPACT_RATIO = 0.5;
 
 /**
  * 描画の前に測るための effect。
@@ -232,6 +243,16 @@ export function EntryEditor({
   const [linkQuestionNudgeOpen, setLinkQuestionNudgeOpen] = useState(false);
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
   const [voiceActive, setVoiceActive] = useState(false);
+  /**
+   * 題が退いているか。
+   *
+   * 縦書きの題は据え置き（消すと「何を書いているのか」が分からなくなる、と一度戻した）
+   * だが、据え置いたままだと本文に対して**存在感が大きすぎて書く邪魔になる**。
+   * 読み進めているあいだは小さくして脇へ退かせ、頭に戻れば元の大きさに返す。
+   *
+   * 横書きは題そのものが本文と一緒に流れて画面から出るので、ここは常に false。
+   */
+  const [titleCompact, setTitleCompact] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   // 末尾側だけでなく**先頭側**も切れる。右がぶつ切りだと「まだ続いている」ことが
   // 伝わらず、いま紙のどこにいるのかを見失う。
@@ -410,6 +431,9 @@ export function EntryEditor({
       if (isVertical) {
         const { scrollLeft, scrollWidth, clientWidth } = el;
         const maxScroll = scrollWidth - clientWidth;
+        // 読み進めたら題は退く。**紙の頭にいるあいだは大きいまま**——そこは
+        // 題を決める場所なので、小さくすると打ちにくい。
+        setTitleCompact(Math.abs(scrollLeft) > TITLE_COMPACT_SCROLL);
         // vertical-rl: 先頭（右端）で scrollLeft=0、左へ進むと負。
         // 末尾側（左）は、まだ最後まで来ていないときに掛ける。
         setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
@@ -418,6 +442,8 @@ export function EntryEditor({
         setFadeRight(Math.abs(scrollLeft) > 5);
         return;
       }
+      // 横書きの題は本文と一緒に流れて画面から出るので、退かせる相手がいない。
+      setTitleCompact(false);
       const { scrollTop, scrollHeight, clientHeight } = el;
       const maxScroll = scrollHeight - clientHeight;
       // 横書きは上下。末尾側（下）と先頭側（上）に、縦書きと同じ扱いで掛ける。
@@ -965,7 +991,21 @@ export function EntryEditor({
   });
   const titleFontSize = titleMetrics.fontSize;
   const titleLines = titleMetrics.lines;
-  const titleLineBoxPx = Math.round(titleFontSize * TITLE_LINE_BOX);
+  const titleLineBox = isVertical ? TITLE_LINE_BOX_VERTICAL : TITLE_LINE_BOX_HORIZONTAL;
+  // 退いているあいだの大きさ。measureTitle が決めた「収まる大きさ」から更に落とす。
+  const titleRenderFontSize =
+    titleCompact && isVertical
+      ? Math.max(TITLE_MIN_FONT_SIZE, Math.round(titleFontSize * TITLE_COMPACT_RATIO))
+      : titleFontSize;
+  const titleLineBoxPx = Math.round(titleRenderFontSize * titleLineBox);
+  /**
+   * いちばん本文寄りの筋に残る、字の外側の空き。
+   *
+   * 筋の中で字は真ん中に置かれるので、桁を広く取ると字の外側に半分ずつ空きが残る。
+   * **目に見える間合いは字と字のあいだ**なので、本文の位置を決めるときはこの半分を
+   * 差し引く。差し引かないと、桁を広げたぶんだけ間合いが広がって見える。
+   */
+  const titleHalfLeadingPx = Math.round(((titleLineBox - 1) / 2) * titleRenderFontSize);
 
   /**
    * 題が実際に占めた厚み。**予測ではなく測る。**
@@ -979,11 +1019,16 @@ export function EntryEditor({
   useMeasureEffect(() => {
     const el = titleInputRef.current;
     if (!el) return;
+    // 測るあいだだけ遷移を止める。0 にして戻す動きが、そのままアニメーションとして
+    // 見えてしまう（題が一瞬つぶれて開く）。
+    const prevTransition = el.style.transition;
+    el.style.transition = 'none';
     if (isVertical) {
       const prev = el.style.width;
       el.style.width = '0px';
       const next = el.scrollWidth;
       el.style.width = prev;
+      el.style.transition = prevTransition;
       setMeasuredTitleThicknessPx(next);
       return;
     }
@@ -991,11 +1036,21 @@ export function EntryEditor({
     el.style.height = '0px';
     const next = el.scrollHeight;
     el.style.height = prev;
+    el.style.transition = prevTransition;
     setMeasuredTitleThicknessPx(next);
-  }, [title, titlePlaceholder, titleFontSize, titleLineLength, isVertical, settings.fontFamily]);
+  }, [
+    title,
+    titlePlaceholder,
+    titleRenderFontSize,
+    titleLineLength,
+    isVertical,
+    settings.fontFamily,
+  ]);
 
   // 測る前の1回（初回描画）だけ見積もりに倒す。跳ねないよう、同じ係数から出す。
   const titleThicknessPx = measuredTitleThicknessPx || titleLineBoxPx * titleLines;
+  // 本文が空ける場所。**箱ではなく字の端**から測るので、桁を広げても間合いは変わらない。
+  const titleReservePx = Math.max(0, titleThicknessPx - titleHalfLeadingPx);
   // 何筋使ったかも測った厚みから逆算する（見積もりの筋数はここでは使わない）。
   const titleLinesUsed = Math.max(1, Math.round(titleThicknessPx / titleLineBoxPx));
   // **箱は中身に合わせる。** 筋の長さを丸ごと取っていたので、3文字の題でも
@@ -1007,7 +1062,10 @@ export function EntryEditor({
   // 次の筋へ移る。そうすれば折り返しで動くのは厚みだけになる。
   const titleUsedLengthPx =
     titleLinesUsed === 1
-      ? Math.min(titleLineLength, titleLength * titleFontSize + Math.round(titleFontSize * 0.6))
+      ? Math.min(
+          titleLineLength,
+          titleLength * titleRenderFontSize + Math.round(titleRenderFontSize * 0.6),
+        )
       : titleLineLength;
   const titleTextStyle: React.CSSProperties = {
     ...(isVertical
@@ -1024,9 +1082,9 @@ export function EntryEditor({
           // 流れの中にいるので、下を本文が通らない。地を敷く必要がなくなった。
           background: 'transparent',
         }),
-    fontSize: `${titleFontSize}px`,
+    fontSize: `${titleRenderFontSize}px`,
     // 箱の太さと同じ数字。ずれるとその差が題と本文のあいだの空きになる。
-    lineHeight: TITLE_LINE_BOX,
+    lineHeight: titleLineBox,
     fontFamily:
       settings.fontFamily === 'serif' ? "'Noto Serif JP', serif" : "'Noto Sans JP', sans-serif",
     writingMode: isVertical ? 'vertical-rl' : 'horizontal-tb',
@@ -1078,7 +1136,7 @@ export function EntryEditor({
       }}
       placeholder={titlePlaceholder}
       aria-label={t('title.placeholder')}
-      className={`z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
+      className={`title-sized z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
       style={{ background: 'var(--bg)', ...titleTextStyle }}
     />
   );
@@ -1224,7 +1282,7 @@ export function EntryEditor({
                   isVertical
                     ? {
                         // 本文の右端に合わせて置く。題より内側なので、題は薄くならない。
-                        right: `${TITLE_RIGHT_MARGIN + titleThicknessPx + TITLE_TO_BODY_GAP}px`,
+                        right: `${TITLE_RIGHT_MARGIN + titleReservePx + TITLE_TO_BODY_GAP}px`,
                         top: 0,
                         bottom: 0,
                         width: '12%',
@@ -1278,7 +1336,8 @@ export function EntryEditor({
                   style={{
                     ...horizontalColumnStyle,
                     paddingTop: `${PAGE_TOP_INSET}px`,
-                    paddingBottom: `${TITLE_TO_BODY_GAP}px`,
+                    // 箱の下端ではなく**字の下端**から空ける（上と同じ考え方）。
+                    paddingBottom: `${Math.max(0, TITLE_TO_BODY_GAP - titleHalfLeadingPx)}px`,
                   }}
                 >
                   {/* **題の1行目の右上。** 題の下に置くと、その高さぶん本文が押し下げられ、
@@ -1354,7 +1413,7 @@ export function EntryEditor({
                 data-placeholder={t('placeholder')}
                 // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
                 // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
-                className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `pb-6 after:block after:content-[''] after:h-[50vh]`}`}
+                className={`title-inset whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `pb-6 after:block after:content-[''] after:h-[50vh]`}`}
                 style={{
                   // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
                   ...(settings.writingMode === 'vertical' ? {} : horizontalColumnStyle),
@@ -1364,7 +1423,7 @@ export function EntryEditor({
                         top: '4%',
                         // 右端は題から逆算する。％で置くと、題の右余白との釣り合いが
                         // 画面幅ごとに変わってしまう。
-                        right: `${TITLE_RIGHT_MARGIN + titleThicknessPx + TITLE_TO_BODY_GAP}px`,
+                        right: `${TITLE_RIGHT_MARGIN + titleReservePx + TITLE_TO_BODY_GAP}px`,
                         height: '86%',
                         position: 'absolute',
                         overflowX: 'auto',

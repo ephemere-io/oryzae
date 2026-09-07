@@ -149,6 +149,27 @@ body {
   }
 }
 
+/* 題の大きさの移り変わり。読み進めると題は小さくなって脇へ退き、頭に戻れば元に返る
+ * （据え置いたままだと本文に対して存在感が大きく、書く邪魔になる）。
+ * 本文の左端も同じ時間で動かして、題と一緒に一息で収まるようにする。 */
+.title-sized {
+  transition:
+    width 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    height 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    font-size 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.title-inset {
+  transition: right 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-sized,
+  .title-inset {
+    transition: none;
+  }
+}
+
 /* 盤面のカードの中で送れる場所は、送れることが見えるようにする。
    既定のスクロールバーは macOS だと触るまで出ないので、常に細い軌道を見せる。 */
 .board-scroll {
