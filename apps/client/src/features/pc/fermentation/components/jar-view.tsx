@@ -24,6 +24,7 @@ import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import type { Bounds } from '@/lib/canvas/viewport';
 import { useUnread } from '@/lib/unread-context';
+import { useElementResize } from '@/lib/use-element-resize';
 
 /**
  * 瓶の「世界」の大きさ（world 単位）。
@@ -386,6 +387,15 @@ export function JarView({
   // `dx / rect.width * 100` がそのまま正しい % になる（hook 側に倍率は要らない）。
   const jarContainerRef = useRef<HTMLDivElement | null>(null);
 
+  /**
+   * キャンバス列の実体。ref ではなく state で持つ。
+   *
+   * `authLoading` の間は JarView が null を返すのでこの要素はまだ無い。ref だと
+   * 「後から現れた」ことに気づけず、監視が張られないままになる（`useCanvasViewport` が
+   * frame を state で持っているのと同じ理由）。
+   */
+  const [canvasAreaEl, setCanvasAreaEl] = useState<HTMLDivElement | null>(null);
+
   // ショートカット（Shift+1/2）から最新の円の位置を読むための箱。
   const circleBoundsRef = useRef<{ all: Bounds; focused: Bounds | null }>({
     all: JAR_WORLD_BOUNDS,
@@ -476,6 +486,22 @@ export function JarView({
       });
     },
     [saveLayout],
+  );
+
+  /**
+   * 詳細列の開閉でキャンバス列の幅が変わる。円を開いている間は、幅が変わっていくあいだ
+   * ずっと寄せ直して、円が列の中央に居続けるようにする（CSS の transition にカメラが追従する）。
+   *
+   * window の resize ではなく **この列の大きさ**を見る。詳細列が開いてもウィンドウの
+   * 大きさは変わらないので、resize では気づけない。
+   */
+  useElementResize(
+    canvasAreaEl,
+    useCallback(() => {
+      const focused = circleBoundsRef.current.focused;
+      // 何も開いていないときは動かさない（自分でパンした視点を勝手に戻さない）。
+      if (focused) fitTo(focused);
+    }, [fitTo]),
   );
 
   const fallbackWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
@@ -624,6 +650,14 @@ export function JarView({
     fitTo(JAR_WORLD_BOUNDS);
   }
 
+  /**
+   * 詳細列を出すか。**中身を選んだかではなく、問いの中に入っているかで決める。**
+   *
+   * 選ぶたびに列が出入りすると、そのたびにキャンバス列の幅が変わって円が動く。読む対象を
+   * 渡り歩くのがこの画面の主な使われ方なので、入った時点で場所を空けておく。
+   */
+  const detailColumnVisible = zoomedId !== null || historyQuestionId !== null;
+
   const addAvailable = !zoomedId && questions.length < 3 && Boolean(onAddQuestion);
 
   return (
@@ -638,7 +672,7 @@ export function JarView({
         addAvailable,
         percent: Math.round(canvas.viewport.scale * 100),
       })}
-      className="relative h-full w-full bg-[var(--bg)]"
+      className="relative flex h-full w-full bg-[var(--bg)]"
     >
       {/* Keyframes */}
       <style>{`
@@ -675,481 +709,539 @@ export function JarView({
         }
       `}</style>
 
-      <CanvasViewport
-        canvas={canvas}
-        ariaLabel={t('jar.canvas_aria')}
-        onClick={closeZoom}
-        // 方眼は frame（スクリーン空間）に敷く。world ボックスの内側に置くと
-        // ボックスの外へパン・ズームしたときに背景が途切れる。
-        background={<CanvasGrid canvas={canvas} color="rgba(140,133,126,0.07)" />}
-        overlay={
-          // 操作 UI の上ではパンを始めない。
-          <div data-canvas-no-pan="">
-            <CanvasZoomControls
-              scale={canvas.viewport.scale}
-              onZoomIn={zoomIn}
-              onZoomOut={zoomOut}
-              onReset={resetZoom}
-              onFit={handleFit}
-            />
-            <CanvasMinimap
-              canvas={canvas}
-              ariaLabel={t('jar.minimap_aria')}
-              extent={JAR_WORLD_BOUNDS}
-              items={visibleQuestions.map((q, i) => ({
-                id: q.id,
-                ...circleWorldBounds(resolvedCirclePositions[i]),
-              }))}
-            />
-          </div>
-        }
-      >
-        {/* world ボックス。中の要素は今までどおり % 指定のままでよく、その % が
-            「ビューポート基準」から「この箱基準」に読み替わるだけ。 */}
-        <div
-          ref={jarContainerRef}
-          // overflow は付けない。world の縁ぎりぎりに置かれた円（jarX=100 等）が
-          // 半分だけ切り取られてしまうため。frame 側が画面外を隠す。
-          className="absolute left-0 top-0"
-          style={{ width: JAR_WORLD_WIDTH, height: JAR_WORLD_HEIGHT }}
+      {/*
+        左＝キャンバス列。詳細列が開くと **覆われるのではなく狭くなる**。
+        円や円盤が隠れないまま隣で読める、というのがこの並べ方の狙い。
+      */}
+      <div ref={setCanvasAreaEl} className="relative min-w-0 flex-1">
+        <CanvasViewport
+          canvas={canvas}
+          ariaLabel={t('jar.canvas_aria')}
+          onClick={closeZoom}
+          // 方眼は frame（スクリーン空間）に敷く。world ボックスの内側に置くと
+          // ボックスの外へパン・ズームしたときに背景が途切れる。
+          background={<CanvasGrid canvas={canvas} color="rgba(140,133,126,0.07)" />}
+          overlay={
+            // 操作 UI の上ではパンを始めない。
+            <div data-canvas-no-pan="">
+              <CanvasZoomControls
+                scale={canvas.viewport.scale}
+                onZoomIn={zoomIn}
+                onZoomOut={zoomOut}
+                onReset={resetZoom}
+                onFit={handleFit}
+              />
+              <CanvasMinimap
+                canvas={canvas}
+                ariaLabel={t('jar.minimap_aria')}
+                extent={JAR_WORLD_BOUNDS}
+                items={visibleQuestions.map((q, i) => ({
+                  id: q.id,
+                  ...circleWorldBounds(resolvedCirclePositions[i]),
+                }))}
+              />
+            </div>
+          }
         >
-          {/* Background radial */}
+          {/* world ボックス。中の要素は今までどおり % 指定のままでよく、その % が
+            「ビューポート基準」から「この箱基準」に読み替わるだけ。 */}
           <div
-            className="pointer-events-none absolute inset-0 z-0"
-            style={{
-              // closest-side にして、白が透明になりきる前に箱の縁へ達しないようにする。
-              // 既定の farthest-corner だと半径が箱の高さ半分を超え、上下の縁で
-              // グラデーションが途中のまま断ち切られて四角い境目が見えていた。
-              background:
-                'radial-gradient(circle closest-side at 50% 42%, rgba(255,255,255,0.7) 0%, transparent 100%)',
-            }}
-          />
-
-          {/* Connection lines.
-          viewBox は world ボックスと 1:1。以前は 1000×500 の viewBox を
-          preserveAspectRatio="none" で引き伸ばしていたため、縦横で倍率が違い
-          曲線が歪んでいた（ズームすると露骨に出る）。等方にして歪みを消す。 */}
-          <svg
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
-            viewBox={`0 0 ${JAR_WORLD_WIDTH} ${JAR_WORLD_HEIGHT}`}
-            style={{
-              opacity: zoomedId ? 0 : 1,
-              transition: 'opacity 0.5s ease',
-              animation: 'fadeIn 0.5s ease-out forwards',
-            }}
+            ref={jarContainerRef}
+            // overflow は付けない。world の縁ぎりぎりに置かれた円（jarX=100 等）が
+            // 半分だけ切り取られてしまうため。frame 側が画面外を隠す。
+            className="absolute left-0 top-0"
+            style={{ width: JAR_WORLD_WIDTH, height: JAR_WORLD_HEIGHT }}
           >
-            {visibleQuestions.map((q, i) => {
-              const pos = resolvedCirclePositions[i];
-              const endX = (pos.jarX / 100) * JAR_WORLD_WIDTH;
-              const endY = (pos.jarY / 100) * JAR_WORLD_HEIGHT;
-              // 瓶の中ほど（世界の中央やや上）から線が伸びる。
-              const jarX = JAR_WORLD_WIDTH / 2;
-              const jarY = JAR_WORLD_HEIGHT * 0.42;
-              const cpX = (jarX + endX) / 2 + (i === 0 ? 80 : i === 1 ? 40 : -80);
-              const cpY = (jarY + endY) / 2 + (i === 0 ? -60 : i === 1 ? 60 : 0);
-              return (
-                <g key={q.id}>
-                  {/* Glow layer */}
-                  <path
-                    d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
-                    stroke="rgba(142,168,156,0.08)"
-                    strokeWidth="4"
-                    fill="none"
-                    filter="url(#lineBlur)"
-                  />
-                  {/* Dashed line */}
-                  <path
-                    d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
-                    stroke="rgba(142,168,156,0.25)"
-                    strokeWidth="1"
-                    strokeDasharray="6 4"
-                    fill="none"
-                    style={{ animation: 'j2-flow 60s linear infinite' }}
-                  />
-                </g>
-              );
-            })}
-            <defs>
-              <filter id="lineBlur">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
-              </filter>
-            </defs>
-          </svg>
-
-          {/* Central jar illustration — matching reference design */}
-          <div
-            className="pointer-events-none absolute z-[2]"
-            style={{
-              left: '50%',
-              top: '45%',
-              transform: 'translate(-50%, -55%)',
-              width: '500px',
-              height: '620px',
-              animation: 'fadeIn 0.5s ease-out forwards',
-            }}
-          >
-            {/* Jar glow */}
+            {/* Background radial */}
             <div
+              className="pointer-events-none absolute inset-0 z-0"
               style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(226,194,142,0.1)',
-                borderRadius: '200px',
-                filter: 'blur(80px)',
-                animation: 'j2-pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
+                // closest-side にして、白が透明になりきる前に箱の縁へ達しないようにする。
+                // 既定の farthest-corner だと半径が箱の高さ半分を超え、上下の縁で
+                // グラデーションが途中のまま断ち切られて四角い境目が見えていた。
+                background:
+                  'radial-gradient(circle closest-side at 50% 42%, rgba(255,255,255,0.7) 0%, transparent 100%)',
               }}
             />
 
-            {/* Jar SVG */}
+            {/* Connection lines.
+          viewBox は world ボックスと 1:1。以前は 1000×500 の viewBox を
+          preserveAspectRatio="none" で引き伸ばしていたため、縦横で倍率が違い
+          曲線が歪んでいた（ズームすると露骨に出る）。等方にして歪みを消す。 */}
             <svg
               aria-hidden="true"
-              className="h-full w-full"
-              viewBox="0 0 480 600"
-              fill="none"
-              style={{ filter: 'drop-shadow(0 20px 40px rgba(140,133,126,0.15))' }}
+              className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+              viewBox={`0 0 ${JAR_WORLD_WIDTH} ${JAR_WORLD_HEIGHT}`}
+              style={{
+                opacity: zoomedId ? 0 : 1,
+                transition: 'opacity 0.5s ease',
+                animation: 'fadeIn 0.5s ease-out forwards',
+              }}
             >
-              {/* Glass body.
-                  縁は元々 白 0.8 だったが、紙色（--bg #f9f8f4）の地の上ではほぼ消えて
-                  瓶の形が読めなかった。輪郭を落として形が立つようにする。濃くしすぎると
-                  絵が硬くなるので、0.3 / 1.2px に留める。 */}
-              <path
-                d={JAR_PATH}
-                fill="rgba(226,194,142,0.05)"
-                stroke="rgba(122,116,64,0.3)"
-                strokeWidth="1.2"
-              />
-              {/* Fermentation liquid */}
-              <path
-                d="M78,450 C78,350 180,310 200,240 C220,240 270,310 402,450 C410,580 70,580 78,450 Z"
-                fill="url(#j2-fermentGradient)"
-                opacity="0.6"
-                filter="url(#blurLiquid)"
-              />
-              {/* Highlight stroke (left) */}
-              <path
-                d="M100,460 C100,340 220,270 220,180"
-                stroke="url(#j2-highlightGradient)"
-                strokeWidth="4"
-                strokeLinecap="round"
-                filter="url(#blurHighlight)"
-                opacity="0.7"
-              />
-              {/* Glass reflection (right) */}
-              <path
-                d="M380,480 C380,380 260,280 260,190"
-                stroke="rgba(255,255,255,0.4)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                filter="url(#blurReflection)"
-              />
-              {/* Rim highlight */}
-              <path
-                d="M210,100 Q 240,110 270,100"
-                stroke="rgba(255,255,255,0.9)"
-                strokeWidth="3"
-                strokeLinecap="round"
-                filter="url(#blurReflection)"
-              />
-              {/* Interior flowing curves */}
-              <g stroke="rgba(226,194,142,0.4)" strokeWidth="0.75" fill="none" opacity="0.8">
-                <path d="M240,280 Q 280,350 250,420 T 320,520" className="j2-float-1" />
-                <path d="M320,320 Q 290,380 340,440 T 260,540" className="j2-float-2" />
-                <path d="M200,220 Q 240,290 180,350 T 210,480" className="j2-float-3" />
-                <path d="M160,360 Q 140,420 200,460 T 140,530" className="j2-float-1" />
-                <path d="M260,200 Q 270,250 240,290" />
-              </g>
+              {visibleQuestions.map((q, i) => {
+                const pos = resolvedCirclePositions[i];
+                const endX = (pos.jarX / 100) * JAR_WORLD_WIDTH;
+                const endY = (pos.jarY / 100) * JAR_WORLD_HEIGHT;
+                // 瓶の中ほど（世界の中央やや上）から線が伸びる。
+                const jarX = JAR_WORLD_WIDTH / 2;
+                const jarY = JAR_WORLD_HEIGHT * 0.42;
+                const cpX = (jarX + endX) / 2 + (i === 0 ? 80 : i === 1 ? 40 : -80);
+                const cpY = (jarY + endY) / 2 + (i === 0 ? -60 : i === 1 ? 60 : 0);
+                return (
+                  <g key={q.id}>
+                    {/* Glow layer */}
+                    <path
+                      d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
+                      stroke="rgba(142,168,156,0.08)"
+                      strokeWidth="4"
+                      fill="none"
+                      filter="url(#lineBlur)"
+                    />
+                    {/* Dashed line */}
+                    <path
+                      d={`M ${jarX} ${jarY} Q ${cpX} ${cpY} ${endX} ${endY}`}
+                      stroke="rgba(142,168,156,0.25)"
+                      strokeWidth="1"
+                      strokeDasharray="6 4"
+                      fill="none"
+                      style={{ animation: 'j2-flow 60s linear infinite' }}
+                    />
+                  </g>
+                );
+              })}
               <defs>
-                <linearGradient id="j2-fermentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(226,194,142,0.1)" />
-                  <stop offset="50%" stopColor="rgba(142,168,156,0.2)" />
-                  <stop offset="100%" stopColor="rgba(226,194,142,0.4)" />
-                </linearGradient>
-                <linearGradient id="j2-highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                </linearGradient>
-                <filter id="blurLiquid">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
-                </filter>
-                <filter id="blurHighlight">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="1" />
-                </filter>
-                <filter id="blurReflection">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" />
+                <filter id="lineBlur">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
                 </filter>
               </defs>
             </svg>
 
-            {/* Text particles + microbes clipped inside jar */}
+            {/* Central jar illustration — matching reference design */}
             <div
-              className="pointer-events-auto absolute inset-0 overflow-hidden"
+              className="pointer-events-none absolute z-[2]"
               style={{
-                clipPath: `path('${JAR_PATH}')`,
+                left: '50%',
+                top: '45%',
+                transform: 'translate(-50%, -55%)',
+                width: '500px',
+                height: '620px',
+                animation: 'fadeIn 0.5s ease-out forwards',
               }}
             >
-              {allWords.map((word, i) => {
-                const top = 18 + ((i * 37) % 65);
-                const left = 22 + ((i * 53) % 60);
-                const blur = BLUR_LEVELS[i % BLUR_LEVELS.length];
-                const fontSize = FONT_SIZES[i % FONT_SIZES.length];
-                const opacity = 0.3 + (i % 5) * 0.12;
-                return (
-                  <span
-                    key={ALL_WORD_KEYS[i]}
-                    className={`${FLOAT_CLASSES[i % 3]} pointer-events-none select-none`}
+              {/* Jar glow */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(226,194,142,0.1)',
+                  borderRadius: '200px',
+                  filter: 'blur(80px)',
+                  animation: 'j2-pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
+                }}
+              />
+
+              {/* Jar SVG */}
+              <svg
+                aria-hidden="true"
+                className="h-full w-full"
+                viewBox="0 0 480 600"
+                fill="none"
+                style={{ filter: 'drop-shadow(0 20px 40px rgba(140,133,126,0.15))' }}
+              >
+                {/* Glass body.
+                  縁は元々 白 0.8 だったが、紙色（--bg #f9f8f4）の地の上ではほぼ消えて
+                  瓶の形が読めなかった。輪郭を落として形が立つようにする。濃くしすぎると
+                  絵が硬くなるので、0.3 / 1.2px に留める。 */}
+                <path
+                  d={JAR_PATH}
+                  fill="rgba(226,194,142,0.05)"
+                  stroke="rgba(122,116,64,0.3)"
+                  strokeWidth="1.2"
+                />
+                {/* Fermentation liquid */}
+                <path
+                  d="M78,450 C78,350 180,310 200,240 C220,240 270,310 402,450 C410,580 70,580 78,450 Z"
+                  fill="url(#j2-fermentGradient)"
+                  opacity="0.6"
+                  filter="url(#blurLiquid)"
+                />
+                {/* Highlight stroke (left) */}
+                <path
+                  d="M100,460 C100,340 220,270 220,180"
+                  stroke="url(#j2-highlightGradient)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  filter="url(#blurHighlight)"
+                  opacity="0.7"
+                />
+                {/* Glass reflection (right) */}
+                <path
+                  d="M380,480 C380,380 260,280 260,190"
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  filter="url(#blurReflection)"
+                />
+                {/* Rim highlight */}
+                <path
+                  d="M210,100 Q 240,110 270,100"
+                  stroke="rgba(255,255,255,0.9)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  filter="url(#blurReflection)"
+                />
+                {/* Interior flowing curves */}
+                <g stroke="rgba(226,194,142,0.4)" strokeWidth="0.75" fill="none" opacity="0.8">
+                  <path d="M240,280 Q 280,350 250,420 T 320,520" className="j2-float-1" />
+                  <path d="M320,320 Q 290,380 340,440 T 260,540" className="j2-float-2" />
+                  <path d="M200,220 Q 240,290 180,350 T 210,480" className="j2-float-3" />
+                  <path d="M160,360 Q 140,420 200,460 T 140,530" className="j2-float-1" />
+                  <path d="M260,200 Q 270,250 240,290" />
+                </g>
+                <defs>
+                  <linearGradient id="j2-fermentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(226,194,142,0.1)" />
+                    <stop offset="50%" stopColor="rgba(142,168,156,0.2)" />
+                    <stop offset="100%" stopColor="rgba(226,194,142,0.4)" />
+                  </linearGradient>
+                  <linearGradient id="j2-highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(255,255,255,0.8)" />
+                    <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                  </linearGradient>
+                  <filter id="blurLiquid">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+                  </filter>
+                  <filter id="blurHighlight">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="1" />
+                  </filter>
+                  <filter id="blurReflection">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" />
+                  </filter>
+                </defs>
+              </svg>
+
+              {/* Text particles + microbes clipped inside jar */}
+              <div
+                className="pointer-events-auto absolute inset-0 overflow-hidden"
+                style={{
+                  clipPath: `path('${JAR_PATH}')`,
+                }}
+              >
+                {allWords.map((word, i) => {
+                  const top = 18 + ((i * 37) % 65);
+                  const left = 22 + ((i * 53) % 60);
+                  const blur = BLUR_LEVELS[i % BLUR_LEVELS.length];
+                  const fontSize = FONT_SIZES[i % FONT_SIZES.length];
+                  const opacity = 0.3 + (i % 5) * 0.12;
+                  return (
+                    <span
+                      key={ALL_WORD_KEYS[i]}
+                      className={`${FLOAT_CLASSES[i % 3]} pointer-events-none select-none`}
+                      style={{
+                        position: 'absolute',
+                        top: `${top}%`,
+                        left: `${left}%`,
+                        filter: `blur(${blur}px)`,
+                        fontSize: `${fontSize}px`,
+                        opacity,
+                        letterSpacing: '0.15em',
+                        fontFamily: "'Noto Serif JP', serif",
+                        color: 'var(--date-color)',
+                      }}
+                    >
+                      {word}
+                    </span>
+                  );
+                })}
+                {JAR_MICROBES.map((m, i) => (
+                  <div
+                    key={`microbe-${m.type}-${m.top}-${m.left}`}
+                    className={m.anim}
                     style={{
                       position: 'absolute',
-                      top: `${top}%`,
-                      left: `${left}%`,
-                      filter: `blur(${blur}px)`,
-                      fontSize: `${fontSize}px`,
-                      opacity,
-                      letterSpacing: '0.15em',
-                      fontFamily: "'Noto Serif JP', serif",
-                      color: 'var(--date-color)',
+                      top: m.top,
+                      left: m.left,
+                      width: `${m.size}px`,
+                      height: `${m.size}px`,
+                      opacity: m.opacity,
+                      pointerEvents: 'none',
                     }}
-                  >
-                    {word}
-                  </span>
-                );
-              })}
-              {JAR_MICROBES.map((m, i) => (
-                <div
-                  key={`microbe-${m.type}-${m.top}-${m.left}`}
-                  className={m.anim}
-                  style={{
-                    position: 'absolute',
-                    top: m.top,
-                    left: m.left,
-                    width: `${m.size}px`,
-                    height: `${m.size}px`,
-                    opacity: m.opacity,
-                    pointerEvents: 'none',
-                  }}
-                  // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
-                  dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[m.type] }}
-                />
-              ))}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: static constant SVG
+                    dangerouslySetInnerHTML={{ __html: MICROBE_SVGS[m.type] }}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Question circles */}
-          {visibleQuestions.map((q, i) => (
-            <QuestionCircleWithData
-              key={q.id}
-              question={q}
-              api={api}
-              position={resolvedCirclePositions[i]}
-              zoomedId={zoomedId}
-              jarContainerRef={jarContainerRef}
-              innerOverrides={{
-                keywords: overrides.keywords,
-                snippets: overrides.snippets,
-                letters: overrides.letters,
-              }}
-              onZoom={focusCircle}
-              onElementClick={handleElementClick}
-              selectedElementId={selectedElementId}
-              onCircleMove={handleCircleMove}
-              onCircleDragEnd={handleCircleDragEnd}
-              onInnerMove={handleInnerDragMove}
-              onInnerDragEnd={handleInnerDragEnd}
-              onDetailLoaded={handleDetailLoaded}
-            />
-          ))}
+            {/* Question circles */}
+            {visibleQuestions.map((q, i) => (
+              <QuestionCircleWithData
+                key={q.id}
+                question={q}
+                api={api}
+                position={resolvedCirclePositions[i]}
+                zoomedId={zoomedId}
+                jarContainerRef={jarContainerRef}
+                innerOverrides={{
+                  keywords: overrides.keywords,
+                  snippets: overrides.snippets,
+                  letters: overrides.letters,
+                }}
+                onZoom={focusCircle}
+                onElementClick={handleElementClick}
+                selectedElementId={selectedElementId}
+                onCircleMove={handleCircleMove}
+                onCircleDragEnd={handleCircleDragEnd}
+                onInnerMove={handleInnerDragMove}
+                onInnerDragEnd={handleInnerDragEnd}
+                onDetailLoaded={handleDetailLoaded}
+              />
+            ))}
 
-          {/* 円の下の印 ＝ 発酵履歴があることの合図。
+            {/* 円の下の印 ＝ 発酵履歴があることの合図。
               **文字は出さない。** 全体表示では world の 9px が実寸 4.6px にしかならず、
               読ませようがない。読めない文字を描くのはやめて、件数と未読だけを図で置く。
               押して開くのは画面座標に出す操作面（下の HistoryLauncher）の仕事。
               位置は円の半径から出す（固定 px オフセットにしない）。 */}
-          {visibleQuestions.map((q, i) => {
-            const results = byQuestion.get(q.id) ?? [];
-            if (results.length === 0) return null;
-            const pos = resolvedCirclePositions[i];
-            const hasUnread = results.some((r) => unreadFermentationIds.has(r.id));
-            // 開いている円の印は出さない。画面座標の操作面（HistoryLauncher）が
-            // その役を引き継ぐので、両方出すと同じ入口が重なって見える。
-            if (zoomedId === q.id) return null;
-            const dimmed = zoomedId !== null;
-            return (
-              <button
-                key={`meta-${q.id}`}
-                type="button"
-                data-canvas-no-pan=""
-                data-verify-part="history-entry"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openHistory(q.id);
-                }}
-                aria-label={t('history.open_aria', { question: q.currentText ?? '' })}
-                className={`group absolute z-[4] flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(140,133,126,0.3)] bg-[rgba(253,251,247,0.5)] px-2.5 py-1.5 transition-colors hover:border-[rgba(140,133,126,0.6)] hover:bg-[rgba(253,251,247,0.95)] ${
-                  dimmed ? 'pointer-events-none opacity-30' : 'opacity-100'
-                }`}
-                style={{
-                  left: (pos.jarX / 100) * JAR_WORLD_WIDTH,
-                  top: (pos.jarY / 100) * JAR_WORLD_HEIGHT + CIRCLE_SIZE / 2 + META_LABEL_GAP,
-                  color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
-                  animation: 'fadeIn 0.5s ease-out forwards',
-                }}
-              >
-                <span className="block h-[18px] w-[18px] shrink-0 transition-colors group-hover:text-[var(--fg)]">
-                  <HistoryIcon />
-                </span>
-                {/* 件数だけは数字で出す。1 文字なら潰れた大きさでも形が残る。 */}
-                <span
-                  className="text-[11px] leading-none transition-colors group-hover:text-[var(--fg)]"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
+            {visibleQuestions.map((q, i) => {
+              const results = byQuestion.get(q.id) ?? [];
+              if (results.length === 0) return null;
+              const pos = resolvedCirclePositions[i];
+              const hasUnread = results.some((r) => unreadFermentationIds.has(r.id));
+              // 開いている円の印は出さない。画面座標の操作面（HistoryLauncher）が
+              // その役を引き継ぐので、両方出すと同じ入口が重なって見える。
+              if (zoomedId === q.id) return null;
+              const dimmed = zoomedId !== null;
+              return (
+                <button
+                  key={`meta-${q.id}`}
+                  type="button"
+                  data-canvas-no-pan=""
+                  data-verify-part="history-entry"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openHistory(q.id);
+                  }}
+                  aria-label={t('history.open_aria', { question: q.currentText ?? '' })}
+                  className={`group absolute z-[4] flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border border-[rgba(140,133,126,0.3)] bg-[rgba(253,251,247,0.5)] px-2.5 py-1.5 transition-colors hover:border-[rgba(140,133,126,0.6)] hover:bg-[rgba(253,251,247,0.95)] ${
+                    dimmed ? 'pointer-events-none opacity-30' : 'opacity-100'
+                  }`}
+                  style={{
+                    left: (pos.jarX / 100) * JAR_WORLD_WIDTH,
+                    top: (pos.jarY / 100) * JAR_WORLD_HEIGHT + CIRCLE_SIZE / 2 + META_LABEL_GAP,
+                    color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
+                    animation: 'fadeIn 0.5s ease-out forwards',
+                  }}
                 >
-                  {results.length}
-                </span>
-                {/* 未読は呼吸させる。押してほしい動機はここにしかない。 */}
-                {hasUnread && (
+                  <span className="block h-[18px] w-[18px] shrink-0 transition-colors group-hover:text-[var(--fg)]">
+                    <HistoryIcon />
+                  </span>
+                  {/* 件数だけは数字で出す。1 文字なら潰れた大きさでも形が残る。 */}
                   <span
-                    data-verify-part="history-unread-dot"
-                    className="block h-[5px] w-[5px] shrink-0 rounded-full"
-                    style={{
-                      background: 'var(--ob-jar-warm)',
-                      animation: 'j2-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite',
-                    }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </CanvasViewport>
+                    className="text-[11px] leading-none transition-colors group-hover:text-[var(--fg)]"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  >
+                    {results.length}
+                  </span>
+                  {/* 未読は呼吸させる。押してほしい動機はここにしかない。 */}
+                  {hasUnread && (
+                    <span
+                      data-verify-part="history-unread-dot"
+                      className="block h-[5px] w-[5px] shrink-0 rounded-full"
+                      style={{
+                        background: 'var(--ob-jar-warm)',
+                        animation: 'j2-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite',
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </CanvasViewport>
 
-      {/*
+        {/*
         円を開いている間の履歴への入口。**world の外＝画面座標**に置く。
 
         world の中の印は全体表示で 4〜5px まで縮むので、押せる面としては当てにできない。
         履歴を見るのは寄ったときなので、寄った状態でだけ「常に同じ大きさで読める操作面」を
         出す、と表示の重さを実際の使われ方に合わせる。
       */}
-      {zoomedId !== null &&
-        historyQuestionId === null &&
-        (() => {
-          const question = visibleQuestions.find((q) => q.id === zoomedId);
-          const results = question ? (byQuestion.get(question.id) ?? []) : [];
-          if (!question || results.length === 0) return null;
-          const latest = results[results.length - 1];
-          const hasUnread = results.some((r) => unreadFermentationIds.has(r.id));
-          return (
-            <div className="absolute bottom-12 left-1/2 z-[30] -translate-x-1/2">
-              <button
-                type="button"
-                data-verify-part="history-launcher"
-                onClick={() => openHistory(question.id)}
-                aria-label={t('history.open_aria', { question: question.currentText ?? '' })}
-                className="group flex items-center gap-3 rounded-full border border-[var(--border-subtle)] bg-[rgba(253,251,247,0.72)] py-2.5 pr-5 pl-3.5 transition-colors hover:bg-[rgba(253,251,247,0.95)]"
-                style={{
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  boxShadow: '0 4px 16px rgba(140,133,126,0.12)',
-                  animation: 'fadeIn 0.4s ease-out forwards',
-                }}
-              >
-                <span
-                  className="block h-[22px] w-[22px] shrink-0 transition-colors group-hover:text-[var(--fg)]"
-                  style={{ color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)' }}
+        {zoomedId !== null &&
+          historyQuestionId === null &&
+          (() => {
+            const question = visibleQuestions.find((q) => q.id === zoomedId);
+            const results = question ? (byQuestion.get(question.id) ?? []) : [];
+            if (!question || results.length === 0) return null;
+            const latest = results[results.length - 1];
+            const hasUnread = results.some((r) => unreadFermentationIds.has(r.id));
+            return (
+              <div className="absolute bottom-12 left-1/2 z-[30] -translate-x-1/2">
+                <button
+                  type="button"
+                  data-verify-part="history-launcher"
+                  onClick={() => openHistory(question.id)}
+                  aria-label={t('history.open_aria', { question: question.currentText ?? '' })}
+                  className="group flex items-center gap-3 rounded-full border border-[var(--border-subtle)] bg-[rgba(253,251,247,0.72)] py-2.5 pr-5 pl-3.5 transition-colors hover:bg-[rgba(253,251,247,0.95)]"
+                  style={{
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    boxShadow: '0 4px 16px rgba(140,133,126,0.12)',
+                    animation: 'fadeIn 0.4s ease-out forwards',
+                  }}
                 >
-                  <HistoryIcon />
-                </span>
-                <span className="flex flex-col items-start gap-0.5">
                   <span
-                    className="text-[12px] tracking-[0.06em] text-[var(--fg)]"
-                    style={{ fontFamily: "'Noto Serif JP', serif" }}
+                    className="block h-[22px] w-[22px] shrink-0 transition-colors group-hover:text-[var(--fg)]"
+                    style={{ color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)' }}
                   >
-                    {t('history.launcher', { count: results.length })}
+                    <HistoryIcon />
                   </span>
-                  <span
-                    className="flex items-center gap-1.5 text-[9px] tracking-[0.2em]"
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
-                    }}
-                  >
-                    {hasUnread && (
-                      <span
-                        className="block h-[5px] w-[5px] rounded-full"
-                        style={{
-                          background: 'var(--ob-jar-warm)',
-                          animation: 'j2-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite',
-                        }}
-                      />
-                    )}
-                    {toDateStamp(latest.createdAt)}
-                    {hasUnread ? ` · ${t('history.new')}` : ''}
+                  <span className="flex flex-col items-start gap-0.5">
+                    <span
+                      className="text-[12px] tracking-[0.06em] text-[var(--fg)]"
+                      style={{ fontFamily: "'Noto Serif JP', serif" }}
+                    >
+                      {t('history.launcher', { count: results.length })}
+                    </span>
+                    <span
+                      className="flex items-center gap-1.5 text-[9px] tracking-[0.2em]"
+                      style={{
+                        fontFamily: 'Inter, sans-serif',
+                        color: hasUnread ? 'var(--ob-jar-warm)' : 'var(--date-color)',
+                      }}
+                    >
+                      {hasUnread && (
+                        <span
+                          className="block h-[5px] w-[5px] rounded-full"
+                          style={{
+                            background: 'var(--ob-jar-warm)',
+                            animation: 'j2-pulse 2.4s cubic-bezier(0.4,0,0.6,1) infinite',
+                          }}
+                        />
+                      )}
+                      {toDateStamp(latest.createdAt)}
+                      {hasUnread ? ` · ${t('history.new')}` : ''}
+                    </span>
                   </span>
-                </span>
-              </button>
-            </div>
-          );
-        })()}
+                </button>
+              </div>
+            );
+          })()}
 
-      {/* Question list (bottom center) */}
-      {!zoomedId && historyQuestionId === null && (
-        <div
-          className="absolute bottom-12 left-1/2 z-[30] flex -translate-x-1/2 flex-col items-center gap-2.5"
-          style={{ animation: 'fadeIn 0.5s ease-out forwards' }}
-        >
+        {/* Question list (bottom center) */}
+        {!zoomedId && historyQuestionId === null && (
           <div
-            className="h-6 w-px"
-            style={{
-              background: 'linear-gradient(to top, rgba(140,133,126,0.3), transparent)',
-            }}
-          />
-          <span
-            className="text-[10px] tracking-[0.3em] text-[var(--date-color)]"
-            style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
+            className="absolute bottom-12 left-1/2 z-[30] flex -translate-x-1/2 flex-col items-center gap-2.5"
+            style={{ animation: 'fadeIn 0.5s ease-out forwards' }}
           >
-            {t('jar.current_questions')}
-          </span>
-          <div className="flex flex-wrap justify-center gap-2.5">
-            {visibleQuestions.map((q) => (
-              <button
-                key={q.id}
-                type="button"
-                // 検証スペックが「問いチップ」を一意に指すための取っ手。
-                // 以前は最初の <button> を押していたが、ズームコントロールが
-                // DOM 上で前に来たため壊れた（順序に依存しない選択子にする）。
-                data-verify-part="question-chip"
-                onClick={() => {
-                  setEditingQuestion(q);
-                  setEditText(q.currentText ?? '');
-                  setTimeout(() => editInputRef.current?.focus(), 100);
-                }}
-                className="rounded-full px-4 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-all hover:-translate-y-0.5"
-                style={{
-                  background: 'linear-gradient(135deg, var(--fg), rgba(140,133,126,0.9))',
-                  color: 'var(--bg)',
-                  fontFamily: "'Noto Serif JP', serif",
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  backdropFilter: 'blur(8px)',
-                  boxShadow: '0 2px 8px rgba(74,69,65,0.15)',
-                }}
-              >
-                {q.currentText}
-              </button>
-            ))}
-          </div>
-          {addAvailable && (
-            <button
-              type="button"
-              onClick={() => {
-                setShowAddModal(true);
-                setTimeout(() => addInputRef.current?.focus(), 100);
+            <div
+              className="h-6 w-px"
+              style={{
+                background: 'linear-gradient(to top, rgba(140,133,126,0.3), transparent)',
               }}
-              className="rounded-full border border-dashed border-[var(--date-color)] px-3 py-1 text-[10px] tracking-[0.1em] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)]"
+            />
+            <span
+              className="text-[10px] tracking-[0.3em] text-[var(--date-color)]"
               style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
             >
-              {t('jar.add_question')}
-            </button>
-          )}
-        </div>
-      )}
+              {t('jar.current_questions')}
+            </span>
+            <div className="flex flex-wrap justify-center gap-2.5">
+              {visibleQuestions.map((q) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  // 検証スペックが「問いチップ」を一意に指すための取っ手。
+                  // 以前は最初の <button> を押していたが、ズームコントロールが
+                  // DOM 上で前に来たため壊れた（順序に依存しない選択子にする）。
+                  data-verify-part="question-chip"
+                  onClick={() => {
+                    setEditingQuestion(q);
+                    setEditText(q.currentText ?? '');
+                    setTimeout(() => editInputRef.current?.focus(), 100);
+                  }}
+                  className="rounded-full px-4 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-all hover:-translate-y-0.5"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--fg), rgba(140,133,126,0.9))',
+                    color: 'var(--bg)',
+                    fontFamily: "'Noto Serif JP', serif",
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    backdropFilter: 'blur(8px)',
+                    boxShadow: '0 2px 8px rgba(74,69,65,0.15)',
+                  }}
+                >
+                  {q.currentText}
+                </button>
+              ))}
+            </div>
+            {addAvailable && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(true);
+                  setTimeout(() => addInputRef.current?.focus(), 100);
+                }}
+                className="rounded-full border border-dashed border-[var(--date-color)] px-3 py-1 text-[10px] tracking-[0.1em] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)]"
+                style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
+              >
+                {t('jar.add_question')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 発酵履歴（Cover Flow）。
+          CanvasViewport の **外側** に敷く。3D の perspective は変形した祖先の中では
+          成立しないので、world ボックスの中に置くと円盤が平たく潰れる。 */}
+        <FermentationCoverFlow
+          questionId={historyQuestionId}
+          questionText={visibleQuestions.find((q) => q.id === historyQuestionId)?.currentText ?? ''}
+          results={historyResults}
+          index={activeHistoryIndex}
+          details={historyDetails}
+          unreadFermentationIds={unreadFermentationIds}
+          innerOverrides={{
+            keywords: overrides.keywords,
+            snippets: overrides.snippets,
+            letters: overrides.letters,
+          }}
+          onInnerDragMove={(type, id, x, y) => handleInnerDragMove(type, id, { jarX: x, jarY: y })}
+          onInnerDragEnd={(type, id, x, y) => handleInnerDragEnd(type, id, { jarX: x, jarY: y })}
+          onIndexChange={handleHistoryIndexChange}
+          onClose={closeHistory}
+          paneOpen={detailOpen}
+          onElementClick={(resultId, type, id, data) => {
+            const question = visibleQuestions.find((q) => q.id === historyQuestionId);
+            const result = historyResults.find((r) => r.id === resultId);
+            handleElementClick(
+              historyQuestionId ?? '',
+              // どの回の結果かが分かるように、見出しに発酵日を添える。
+              result
+                ? `${question?.currentText ?? ''}　／　${toDateStamp(result.createdAt)} の発酵`
+                : (question?.currentText ?? ''),
+              type,
+              id,
+              data,
+            );
+          }}
+          selectedElementId={selectedElementId}
+        />
+      </div>
+
+      {/* 右＝詳細列。円を開いている / 履歴を見ている間はずっと出しておく。
+          中身を選ぶたびに現れたり消えたりすると、そのたびに円の位置が動く。 */}
+      <DetailPane
+        visible={detailColumnVisible}
+        open={detailOpen}
+        onClose={() => {
+          setDetailOpen(false);
+          setSelectedElementId(null);
+        }}
+        questionId={detailQuestionId}
+        questionText={detailQuestion}
+        type={detailType}
+        data={detailData}
+      />
 
       {/* Edit question modal */}
       {editingQuestion && (
@@ -1291,56 +1383,6 @@ export function JarView({
           </div>
         </div>
       )}
-
-      {/* 発酵履歴（Cover Flow）。
-          CanvasViewport の **外側** に敷く。3D の perspective は変形した祖先の中では
-          成立しないので、world ボックスの中に置くと円盤が平たく潰れる。 */}
-      <FermentationCoverFlow
-        questionId={historyQuestionId}
-        questionText={visibleQuestions.find((q) => q.id === historyQuestionId)?.currentText ?? ''}
-        results={historyResults}
-        index={activeHistoryIndex}
-        details={historyDetails}
-        unreadFermentationIds={unreadFermentationIds}
-        innerOverrides={{
-          keywords: overrides.keywords,
-          snippets: overrides.snippets,
-          letters: overrides.letters,
-        }}
-        onInnerDragMove={(type, id, x, y) => handleInnerDragMove(type, id, { jarX: x, jarY: y })}
-        onInnerDragEnd={(type, id, x, y) => handleInnerDragEnd(type, id, { jarX: x, jarY: y })}
-        onIndexChange={handleHistoryIndexChange}
-        onClose={closeHistory}
-        paneOpen={detailOpen}
-        onElementClick={(resultId, type, id, data) => {
-          const question = visibleQuestions.find((q) => q.id === historyQuestionId);
-          const result = historyResults.find((r) => r.id === resultId);
-          handleElementClick(
-            historyQuestionId ?? '',
-            // どの回の結果かが分かるように、見出しに発酵日を添える。
-            result
-              ? `${question?.currentText ?? ''}　／　${toDateStamp(result.createdAt)} の発酵`
-              : (question?.currentText ?? ''),
-            type,
-            id,
-            data,
-          );
-        }}
-        selectedElementId={selectedElementId}
-      />
-
-      {/* Detail pane */}
-      <DetailPane
-        open={detailOpen}
-        onClose={() => {
-          setDetailOpen(false);
-          setSelectedElementId(null);
-        }}
-        questionId={detailQuestionId}
-        questionText={detailQuestion}
-        type={detailType}
-        data={detailData}
-      />
     </div>
   );
 }

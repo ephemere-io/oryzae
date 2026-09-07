@@ -486,7 +486,9 @@
       "header_snippet": "Snippets cut by Oryzae",
       "header_letter": "Observations from L.A.B.",
       "snippet_source_prefix": "Source:",
-      "write_entry": "Write an entry for this question"
+      "write_entry": "Write an entry for this question",
+      "empty_label": "READING",
+      "empty_hint": "Pick a word, an excerpt, or the letter in the circle to read it here."
     },
     "jar": {
       "zoom_close_aria": "Close zoom",
