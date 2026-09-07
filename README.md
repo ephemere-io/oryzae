@@ -120,5 +120,6 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
 | `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 3 層構成 |
+| `docs/glossary.md` | 画面に出る言葉の正（エントリー / 手帳 / 書庫 …）。同じものを 2 つの語で呼ばない |
 | `docs/i18n-guide.md` | apps/client の日英バイリンガル運用（next-intl + Google Sheets SSoT） |
 | `docs/oryzae-study/` | 書斎ホーム（3D ホーム・サイドバー撤廃）の仕様一式。実装時の決着は `60-implementation-notes.md` |

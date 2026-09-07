@@ -3,7 +3,7 @@
 // verify-exempt: WebGL(three.js) の renderer と rAF を持つため孤立描画できない。
 // シーンの規則は scene/*.ts の純関数テストで、実機の見え方はブラウザ確認で担保する。
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { StudyLayout } from '../layout';
 import { staysInStudy } from '../navigation';
 import type { StudyTheme } from '../scene/materials';
@@ -55,6 +55,12 @@ export function StudyCanvas({
 }: StudyCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<StudySceneHandle | null>(null);
+  /** いま触れている指。2 本になったときだけつまみとして扱う。 */
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  /** 指を置いた時点の間隔。 */
+  const pinchStartRef = useRef<number | null>(null);
+  /** つまんだかどうか。離した直後の click を「押した」と誤らないための印。 */
+  const pinchedRef = useRef(false);
 
   // コールバックは ref 経由で読む。props が変わるたびにシーンを作り直すと、
   // 親が再描画しただけで canvas が組み直される。
@@ -128,11 +134,48 @@ export function StudyCanvas({
     handleRef.current?.setState(state);
   }, [state]);
 
+  /**
+   * 2 本指のつまみ。
+   *
+   * 指が 2 本置かれている間だけ間隔を測り、置いた時点との比を scene へ渡す。
+   * 1 本のときは何もしない（そちらは的を押す操作）。
+   */
+  const trackPinchDown = useCallback((pointerId: number, x: number, y: number) => {
+    pointersRef.current.set(pointerId, { x, y });
+    if (pointersRef.current.size !== 2) return;
+    pinchStartRef.current = pointerDistance(pointersRef.current);
+    handleRef.current?.startPinch();
+  }, []);
+
+  const trackPinchMove = useCallback((pointerId: number, x: number, y: number) => {
+    const pointers = pointersRef.current;
+    if (!pointers.has(pointerId)) return;
+    pointers.set(pointerId, { x, y });
+    const start = pinchStartRef.current;
+    if (pointers.size !== 2 || start === null || start === 0) return;
+    pinchedRef.current = true;
+    handleRef.current?.pinchTo(pointerDistance(pointers) / start);
+  }, []);
+
+  const endPinch = useCallback(() => {
+    pointersRef.current.clear();
+    pinchStartRef.current = null;
+  }, []);
+
+  const releasePinch = useCallback((pointerId: number) => {
+    pointersRef.current.delete(pointerId);
+    // 片方だけ離しても、残った指を「新しいつまみの始まり」にはしない。
+    if (pointersRef.current.size < 2) pinchStartRef.current = null;
+  }, []);
+
   return (
     <div
       ref={containerRef}
       className="absolute inset-0"
       // canvas 自体がポインタを受ける。3D の物が的で、ラベルは上に重なる。
+      // 2 本指のつまみを受けるため、ブラウザのページズームには渡さない。
+      style={{ touchAction: 'none' }}
+      onWheel={(event) => handleRef.current?.zoomBy(event.deltaY)}
       onPointerMove={(event) => {
         const handle = handleRef.current;
         if (!handle) return;
@@ -141,8 +184,12 @@ export function StudyCanvas({
           ((event.clientX - rect.left) / rect.width) * 2 - 1,
           -(((event.clientY - rect.top) / rect.height) * 2 - 1),
         );
+        trackPinchMove(event.pointerId, event.clientX, event.clientY);
       }}
-      onPointerLeave={() => handleRef.current?.clearPointer()}
+      onPointerLeave={() => {
+        handleRef.current?.clearPointer();
+        endPinch();
+      }}
       onPointerDown={(event) => {
         // タッチでは pointermove が click より先に来ないことがある。押した位置を
         // 先に入れてから拾う（拾い直しは scene 側でも行う）。
@@ -153,8 +200,25 @@ export function StudyCanvas({
           ((event.clientX - rect.left) / rect.width) * 2 - 1,
           -(((event.clientY - rect.top) / rect.height) * 2 - 1),
         );
+        trackPinchDown(event.pointerId, event.clientX, event.clientY);
       }}
-      onClick={() => handleRef.current?.pick()}
+      onPointerUp={(event) => releasePinch(event.pointerId)}
+      onPointerCancel={(event) => releasePinch(event.pointerId)}
+      onClick={() => {
+        // つまんだ指を離した直後の click は「押した」ではない。
+        if (pinchedRef.current) {
+          pinchedRef.current = false;
+          return;
+        }
+        handleRef.current?.pick();
+      }}
     />
   );
+}
+
+/** 2 点の距離。指が 2 本のときだけ呼ぶ。 */
+function pointerDistance(pointers: Map<number, { x: number; y: number }>): number {
+  const [a, b] = [...pointers.values()];
+  if (!a || !b) return 0;
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }

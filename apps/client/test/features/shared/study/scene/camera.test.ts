@@ -6,6 +6,7 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  clampZoom,
   homeView,
   jarView,
   journalSpreadView,
@@ -13,6 +14,9 @@ import {
   lerpView,
   parallaxOffset,
   shelfView,
+  zoomByPinch,
+  zoomByWheel,
+  zoomedView,
 } from '@/features/shared/study/scene/camera';
 
 const LAYOUTS: StudyLayout[] = [PC_LAYOUT, SP_LAYOUT];
@@ -218,5 +222,78 @@ describe('approach / lerpView', () => {
     const to = boardView(PC_LAYOUT);
     const mid = lerpView(from, to, 0.5);
     expect(mid.position.z).toBeCloseTo((from.position.z + to.position.z) / 2, 10);
+  });
+});
+
+describe('寄り引き（ホームのカメラ）', () => {
+  const VIEW: CameraView = {
+    position: { x: 0, y: 4, z: 12 },
+    target: { x: 0, y: 0, z: 0 },
+  };
+
+  it('等倍なら配置表どおり', () => {
+    expect(zoomedView(VIEW, 1)).toEqual(VIEW);
+  });
+
+  it('倍率を下げると注視点に近づく', () => {
+    const near = zoomedView(VIEW, 0.8);
+    expect(near.position.z).toBeCloseTo(9.6, 5);
+    expect(near.position.y).toBeCloseTo(3.2, 5);
+  });
+
+  it('注視点は動かさない（寄り引きが平行移動を兼ねない）', () => {
+    // 動かせるようにすると、寄り引きだけで部屋の外へ出られてしまう。
+    for (const zoom of [0.5, 1, 2]) {
+      expect(zoomedView(VIEW, zoom).target).toEqual(VIEW.target);
+    }
+  });
+
+  it('上下限を越えない（部屋の外も机の面だけも見せない）', () => {
+    const far = zoomedView(VIEW, 99);
+    const near = zoomedView(VIEW, 0.01);
+    expect(far.position.z).toBeCloseTo(12 * clampZoom(99), 5);
+    expect(near.position.z).toBeCloseTo(12 * clampZoom(0.01), 5);
+    expect(clampZoom(99)).toBeLessThan(99);
+    expect(clampZoom(0.01)).toBeGreaterThan(0.01);
+  });
+
+  it('壊れた倍率は等倍に倒す', () => {
+    expect(clampZoom(Number.NaN)).toBe(1);
+    expect(clampZoom(Number.POSITIVE_INFINITY)).toBe(1);
+  });
+
+  describe('zoomByWheel', () => {
+    it('下へ回すと離れる（ブラウザのページ送りと同じ向き）', () => {
+      expect(zoomByWheel(1, 100)).toBeGreaterThan(1);
+      expect(zoomByWheel(1, -100)).toBeLessThan(1);
+    });
+
+    it('回し続けても上下限を越えない', () => {
+      let zoom = 1;
+      for (let i = 0; i < 500; i += 1) zoom = zoomByWheel(zoom, 100);
+      expect(zoom).toBe(clampZoom(zoom));
+      expect(zoom).toBeLessThanOrEqual(clampZoom(Number.MAX_SAFE_INTEGER));
+    });
+
+    it('壊れた delta では動かさない', () => {
+      expect(zoomByWheel(1.1, Number.NaN)).toBeCloseTo(1.1, 5);
+    });
+  });
+
+  describe('zoomByPinch', () => {
+    it('指を広げると近づく（距離は比の逆数）', () => {
+      expect(zoomByPinch(1, 1.25)).toBeCloseTo(0.8, 5);
+      expect(zoomByPinch(1, 0.8)).toBeCloseTo(1.25, 5);
+    });
+
+    it('置いた時点の倍率から積み上げる（毎回 1 に戻さない）', () => {
+      expect(zoomByPinch(0.9, 1)).toBeCloseTo(0.9, 5);
+    });
+
+    it('比が 0 や負でも落ちない', () => {
+      expect(zoomByPinch(1, 0)).toBe(1);
+      expect(zoomByPinch(1, -2)).toBe(1);
+      expect(zoomByPinch(1, Number.NaN)).toBe(1);
+    });
   });
 });
