@@ -751,6 +751,7 @@
     "fallback_jar": "Open the jar",
     "fallback_journal": "Write an entry",
     "fallback_board": "Open the board",
-    "word_question_gone": "The question is no longer there"
+    "word_question_gone": "The question is no longer there",
+    "questions_timeline": "Question history"
   }
 }

@@ -751,6 +751,7 @@
     "fallback_jar": "병 열기",
     "fallback_journal": "기록 쓰기",
     "fallback_board": "보드 열기",
-    "word_question_gone": "질문이 남아 있지 않습니다"
+    "word_question_gone": "질문이 남아 있지 않습니다",
+    "questions_timeline": "질문의 변천"
   }
 }
