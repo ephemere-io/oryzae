@@ -24,11 +24,14 @@ const INLINE_IMAGE_CLASS = 'inline-photo';
 const EBLOCK_CLASS = 'eblock';
 const VBLOCK_CLASS = 'v-block';
 
-/** 長辺が行方向に沿うときの幅（本文 1 行に対する割合）。 */
-const INLINE_IMAGE_WIDE_RATIO = 0.8;
-/** 長辺が行と直交するときの幅。 */
-const INLINE_IMAGE_NARROW_RATIO = 0.5;
-// 向きが読めないときは INLINE_IMAGE_NARROW_RATIO に倒す（本文を潰さない側）。
+/**
+ * 壊れた値を読んだときに丸める先（本文 1 行に対する割合）。
+ *
+ * 差し込むときの大きさは**写真の向き**から決まるので、ここではない
+ * （`utils/inline-image-placement` の `defaultWidthRatio`）。ここは
+ * data 属性が読めなかったときに写真を失わないための受け皿。
+ */
+const FALLBACK_WIDTH_RATIO = 0.5;
 
 export function isInlineImage(node: Node): node is HTMLImageElement {
   return node instanceof HTMLImageElement && node.classList.contains(INLINE_IMAGE_CLASS);
@@ -97,6 +100,37 @@ function visit(node: Node, state: WalkState): void {
   walk(el, state);
 }
 
+/**
+ * 配置を当てる。**物理方向（left / right）を書かないのが要点。**
+ * inline 軸のマージンで寄せるので、横書きなら左右、縦書きなら上下に効く。
+ */
+function applyPlacementStyle(el: HTMLImageElement, image: InlineImage): void {
+  el.style.display = '';
+  el.style.float = '';
+  el.style.marginInline = '';
+  el.style.marginBlock = '';
+  el.style.verticalAlign = '';
+
+  if (image.layout === 'inline') {
+    el.style.display = 'inline-block';
+    el.style.verticalAlign = 'middle';
+    return;
+  }
+
+  if (image.layout === 'wrap') {
+    el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
+    el.style.marginBlock = '0.25em';
+    el.style.marginInline = '0 0.5em';
+    return;
+  }
+
+  // block（既定）。寄せは inline 軸のマージンで作る。
+  el.style.display = 'block';
+  el.style.marginBlock = '0.5em';
+  el.style.marginInline =
+    image.align === 'center' ? 'auto' : image.align === 'end' ? 'auto 0' : '0 auto';
+}
+
 /** `<img>` の data 属性から保存形式を読む。壊れた値は既定に丸めて写真を失わない。 */
 export function readInlineImageFromElement(el: HTMLImageElement): InlineImage {
   return readInlineImage(el, 0);
@@ -109,6 +143,8 @@ function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
     offset,
     storagePath: el.dataset.storagePath ?? '',
     widthRatio: readRatio(el.dataset.widthRatio),
+    layout: readLayout(el.dataset.layout),
+    align: readAlign(el.dataset.align),
     // 自由変形していないときは書かない（写真本来の比率を使う）。
     ...(Number.isFinite(aspect) && aspect > 0 ? { aspect } : {}),
     ...(Number.isFinite(rotation) && rotation !== 0 ? { rotation } : {}),
@@ -117,8 +153,22 @@ function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
 
 function readRatio(raw: string | undefined): number {
   const n = Number.parseFloat(raw ?? '');
-  if (!Number.isFinite(n)) return INLINE_IMAGE_NARROW_RATIO;
+  if (!Number.isFinite(n)) return FALLBACK_WIDTH_RATIO;
   return Math.min(1, Math.max(0.05, n));
+}
+
+/**
+ * 既定は**独立した行の中央**。
+ *
+ * `inline` / `wrap` は以前の記録のために読めるままにしてあるが、新しく差し込む写真は
+ * すべて block/center で入る（回り込みの細かい設定は道具として置かないことにした）。
+ */
+function readLayout(raw: string | undefined): InlineImage['layout'] {
+  return raw === 'inline' || raw === 'wrap' ? raw : 'block';
+}
+
+function readAlign(raw: string | undefined): InlineImage['align'] {
+  return raw === 'start' || raw === 'end' ? raw : 'center';
 }
 
 /**
@@ -132,6 +182,8 @@ function readRatio(raw: string | undefined): number {
 export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage): void {
   el.dataset.storagePath = image.storagePath;
   el.dataset.widthRatio = String(image.widthRatio);
+  el.dataset.layout = image.layout;
+  el.dataset.align = image.align;
   if (image.aspect) {
     el.dataset.aspect = String(image.aspect);
   } else {
@@ -149,11 +201,7 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   el.style.aspectRatio = image.aspect ? `1 / ${image.aspect}` : '';
   el.style.transform = image.rotation ? `rotate(${image.rotation}deg)` : '';
 
-  // 配置は常に「独立した行の中央」。inline 軸のマージンで寄せるので、
-  // 横書きなら左右中央、縦書きなら上下中央になる（物理方向を書かないのが要点）。
-  el.style.display = 'block';
-  el.style.marginInline = 'auto';
-  el.style.marginBlock = '0.5em';
+  applyPlacementStyle(el, image);
   // 掴んで動かせることを見せる。実際の移動は use-inline-image-selection が扱う。
   el.style.cursor = 'grab';
 }
@@ -180,7 +228,10 @@ export function createInlineImageElement(image: InlineImage, signedUrl: string):
   // contentEditable の中で画像自身が編集対象にならないようにする
   // （これが無いと Chrome が画像内にキャレットを置こうとする）。
   el.contentEditable = 'false';
-  el.draggable = false;
+  // **掴んで動かせる。** 差し込む位置を間違えたときに「消して貼り直す」しか
+  // 手が無いのは、写真1枚のために本文の流れを止めることになる。
+  el.draggable = true;
+  el.style.cursor = 'grab';
   applyInlineImageStyle(el, image);
   return el;
 }
@@ -242,51 +293,4 @@ function replaceCharWithNode(node: Text, offset: number, replacement: Node): voi
   const after = node.splitText(offset);
   after.deleteData(0, 1); // プレースホルダ 1 文字を取り除く
   after.parentNode?.insertBefore(replacement, after);
-}
-
-/**
- * 差し込んだ直後の表示幅を、写真の向きと書字方向から決める。
- *
- * 一律 40% だと、縦書きに縦長の写真を入れたときだけ極端に小さく見える。行の方向と
- * 写真の長辺が揃っているかで決めると、どの組み合わせでも同じくらいの存在感になる:
- *
- * | 書字方向 | 写真   | 長辺の向き | 行に対する幅 |
- * |----------|--------|------------|--------------|
- * | 縦書き   | 縦長   | 行と同じ   | 80%          |
- * | 縦書き   | 横長   | 行と直交   | 50%          |
- * | 横書き   | 縦長   | 行と直交   | 50%          |
- * | 横書き   | 横長   | 行と同じ   | 80%          |
- *
- * つまり「**長辺が行方向に沿うなら 80%、そうでなければ 50%**」の 1 本の規則になる。
- */
-export function defaultWidthRatioFor(
-  naturalWidth: number,
-  naturalHeight: number,
-  isVertical: boolean,
-): number {
-  // 向きが読めない（読み込み前など）ときは、狭いほうに倒して本文を潰さない。
-  if (!naturalWidth || !naturalHeight) return INLINE_IMAGE_NARROW_RATIO;
-  const isPortrait = naturalHeight > naturalWidth;
-  // 縦書きは行が縦に伸びるので、縦長の写真が「行に沿う」側になる。
-  const longEdgeFollowsLine = isVertical ? isPortrait : !isPortrait;
-  return longEdgeFollowsLine ? INLINE_IMAGE_WIDE_RATIO : INLINE_IMAGE_NARROW_RATIO;
-}
-
-/**
- * 写真の実寸を先に読む。差し込むときの既定幅を向きから決めるために要る。
- *
- * 読めなかった場合は 0 を返す。呼び出し側は既定幅にフォールバックして写真自体は差し込む
- * （寸法が分からないことを、写真を入れられない理由にしない）。
- */
-export function loadNaturalSize(src: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    if (!src) {
-      resolve({ width: 0, height: 0 });
-      return;
-    }
-    const probe = new Image();
-    probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
-    probe.onerror = () => resolve({ width: 0, height: 0 });
-    probe.src = src;
-  });
 }

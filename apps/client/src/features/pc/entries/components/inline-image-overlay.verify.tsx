@@ -36,7 +36,14 @@ const RECT: DOMRect = {
 };
 
 function image(over: Partial<InlineImage> = {}): InlineImage {
-  return { offset: 0, storagePath: 'u1/1-photo.jpg', widthRatio: 0.8, ...over };
+  return {
+    offset: 0,
+    storagePath: 'u1/1-photo.jpg',
+    widthRatio: 0.8,
+    layout: 'block',
+    align: 'center',
+    ...over,
+  };
 }
 
 registerUnit<Props>({
