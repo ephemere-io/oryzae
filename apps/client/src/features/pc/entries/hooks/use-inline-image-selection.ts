@@ -27,6 +27,17 @@ import {
  */
 interface UseInlineImageSelectionParams {
   editorRef: React.RefObject<HTMLElement | null>;
+  /**
+   * 本文を包むスクロール要素。**overlay はこの中に、この要素の座標系で描く。**
+   *
+   * 以前は viewport 座標（position: fixed）に描き、スクロールのたびに測り直していた。
+   * だが実際にスクロールするのはこの要素であって本文の要素ではないため、
+   * `editor` に付けた scroll リスナーは一度も発火せず、枠だけが取り残されていた
+   * （scroll はバブルしないので、祖先で拾うこともできない）。
+   *
+   * スクロールする箱の中に、その箱の座標で描けば、追従は**構造的に**保証される。
+   */
+  scrollHostRef: React.RefObject<HTMLElement | null>;
   /** 縦書きか。リサイズの軸の向きが変わる。 */
   isVertical: boolean;
   /** 写真の見た目や位置が確定したとき（ドラッグ終了・回転終了・削除）に呼ぶ。 */
@@ -49,6 +60,7 @@ const DRAG_THRESHOLD_PX = 4;
 
 export function useInlineImageSelection({
   editorRef,
+  scrollHostRef,
   isVertical,
   onCommit,
 }: UseInlineImageSelectionParams) {
@@ -85,29 +97,51 @@ export function useInlineImageSelection({
     target: DropTarget | null;
   } | null>(null);
 
+  /**
+   * viewport 座標を、スクロール要素の内容座標に直す。
+   * この座標で描けば、スクロールしても測り直さずに付いてくる。
+   */
+  const toHostCoords = useCallback(
+    (rect: DOMRect): DOMRect => {
+      const host = scrollHostRef.current;
+      if (!host) return rect;
+      const hostRect = host.getBoundingClientRect();
+      return new DOMRect(
+        rect.left - hostRect.left + host.scrollLeft,
+        rect.top - hostRect.top + host.scrollTop,
+        rect.width,
+        rect.height,
+      );
+    },
+    [scrollHostRef],
+  );
+
   const refresh = useCallback(() => {
     setSelection((s) =>
       s.element
         ? {
             ...s,
             image: readInlineImageFromElement(s.element),
-            rect: s.element.getBoundingClientRect(),
+            rect: toHostCoords(s.element.getBoundingClientRect()),
           }
         : s,
     );
-  }, []);
+  }, [toHostCoords]);
 
   const clear = useCallback(() => {
     setSelection({ element: null, image: null, rect: null });
   }, []);
 
-  const select = useCallback((el: HTMLImageElement) => {
-    setSelection({
-      element: el,
-      image: readInlineImageFromElement(el),
-      rect: el.getBoundingClientRect(),
-    });
-  }, []);
+  const select = useCallback(
+    (el: HTMLImageElement) => {
+      setSelection({
+        element: el,
+        image: readInlineImageFromElement(el),
+        rect: toHostCoords(el.getBoundingClientRect()),
+      });
+    },
+    [toHostCoords],
+  );
 
   /** 移動を打ち切って見た目を戻す。取り消しでも完了でも通る。 */
   const endMove = useCallback(() => {
@@ -146,15 +180,21 @@ export function useInlineImageSelection({
     return () => editor.removeEventListener('pointerdown', onPointerDown);
   }, [editorRef, select, clear]);
 
-  // 選択中に本文がスクロール/リサイズしたら、オーバーレイの位置を追従させる。
+  /**
+   * スクロールでは測り直さない（内容座標に描いてあるので付いてくる）。
+   * 測り直すのは **写真の見た目や本文の折り返しが変わったとき** だけ。
+   */
   useEffect(() => {
-    if (!selection.element) return;
+    const el = selection.element;
+    if (!el) return;
+    const observer = new ResizeObserver(refresh);
+    observer.observe(el);
     const editor = editorRef.current;
+    if (editor) observer.observe(editor); // 本文の折り返しが変われば位置も動く
     window.addEventListener('resize', refresh);
-    editor?.addEventListener('scroll', refresh);
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', refresh);
-      editor?.removeEventListener('scroll', refresh);
     };
   }, [selection.element, editorRef, refresh]);
 
@@ -216,7 +256,7 @@ export function useInlineImageSelection({
         }
         // 落ちる先を毎回測って線で示す。Word の挿入バーと同じ役割。
         move.target = findDropTarget(editor, move.el, e.clientX, e.clientY);
-        setDropRect(move.target?.rect ?? null);
+        setDropRect(move.target ? toHostCoords(move.target.rect) : null);
         e.preventDefault(); // ドラッグ中にテキスト選択が走らないように
         return;
       }
@@ -288,7 +328,7 @@ export function useInlineImageSelection({
       window.removeEventListener('pointercancel', onUp);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [selection.element, editorRef, isVertical, refresh, onCommit, endMove]);
+  }, [selection.element, editorRef, isVertical, refresh, onCommit, endMove, toHostCoords]);
 
   /** 選択中の写真を本文から取り除く。 */
   const removeSelected = useCallback(() => {

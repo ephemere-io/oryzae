@@ -9,6 +9,8 @@
  * なるため。DOM は渡してもらい、イベントは扱わない。
  */
 
+import { caretRangeFromPoint } from './caret-from-point';
+
 export interface DropTarget {
   /** 差し込み先のノードと、その中での位置。 */
   node: Node;
@@ -83,9 +85,16 @@ function isSamePosition(dragged: HTMLElement, target: DropTarget): boolean {
   return children[target.offset] === dragged || children[target.offset - 1] === dragged;
 }
 
+/** キャレットの「厚み」の上限（px）。これを超えるものはキャレットではない。 */
+const MAX_CARET_THICKNESS_PX = 4;
+
 /**
  * キャレット位置の矩形。書字方向に依らず**そのまま線として使える**のが要点で、
  * 横書きなら縦長（縦棒）、縦書きなら横長（横棒）の矩形が返る。
+ *
+ * **要素全体の矩形で代用してはいけない。** 以前は矩形が潰れているとき親要素の矩形を
+ * 借りていたが、キャレットが要素ノード（本文の div 自体など）に落ちると本文全体の
+ * 矩形が返り、画面いっぱいの箱が描かれていた。線として使えないものは返さない。
  */
 function caretRect(node: Node, offset: number): DOMRect | null {
   const range = document.createRange();
@@ -97,11 +106,11 @@ function caretRect(node: Node, offset: number): DOMRect | null {
   }
 
   const rect = range.getBoundingClientRect();
-  // 空行など、潰れた矩形しか取れないことがある。その場合は行の高さを親から借りる。
-  if (rect.width === 0 && rect.height === 0) {
-    const host = node instanceof Element ? node : node.parentElement;
-    return host?.getBoundingClientRect() ?? null;
-  }
+  // キャレットは必ず片方の軸が潰れている。両方に厚みがあるものは、
+  // 行ではなく箱（要素そのもの）を掴んでいる。線として描けないので出さない。
+  if (Math.min(rect.width, rect.height) > MAX_CARET_THICKNESS_PX) return null;
+  // 完全に潰れている（幅も高さも 0）＝ 位置が取れていない。
+  if (rect.width === 0 && rect.height === 0) return null;
   return rect;
 }
 
@@ -110,21 +119,8 @@ interface CaretPoint {
   offset: number;
 }
 
-/**
- * 画面座標のキャレット位置。標準（`caretPositionFromPoint`）と WebKit/Blink
- * （`caretRangeFromPoint`）の両方を見る。どちらも無ければ null。
- */
+/** 画面座標のキャレット位置。API 名のブラウザ差は caret-from-point.ts が吸収する。 */
 function caretFromPoint(x: number, y: number): CaretPoint | null {
-  const doc: Document & {
-    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-  } = document;
-
-  const position = doc.caretPositionFromPoint?.(x, y);
-  if (position) return { node: position.offsetNode, offset: position.offset };
-
-  const range = doc.caretRangeFromPoint?.(x, y);
-  if (range) return { node: range.startContainer, offset: range.startOffset };
-
-  return null;
+  const range = caretRangeFromPoint(x, y);
+  return range ? { node: range.startContainer, offset: range.startOffset } : null;
 }

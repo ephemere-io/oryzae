@@ -10,7 +10,9 @@ import type { ResizeHandle } from '../utils/inline-image-resize';
  *
  * **本文（contentEditable）の中には描かない。** 中に React の要素を混ぜると、
  * ブラウザが編集で書き換えた DOM と React の管理が食い違って本文が壊れる。
- * `position: fixed` で画面座標に重ねるだけにしてある（`rect` は呼び出し側が測る）。
+ * 座標は **スクロールする箱の内容座標**（`position: absolute`）。viewport 座標に固定すると
+ * スクロールのたびに測り直しが要り、測り直しを取りこぼすと枠だけが取り残される
+ * （実際にそうなっていた）。同じ箱の中に同じ座標系で描けば、追従は構造的に保証される。
  *
  * 操作は **サイズ・回転・削除** の 3 つだけに絞ってある。回り込み（float）と寄せの
  * 細かい指定は一度入れたが、項目が多く「全部試さないと意味が分からない」状態になった。
@@ -41,7 +43,7 @@ export function InlineImageDropIndicator({ rect }: { rect: DOMRect | null }) {
     <div
       aria-hidden="true"
       data-testid="inline-image-drop-indicator"
-      className="pointer-events-none fixed z-50 bg-[var(--accent,#3b82f6)]"
+      className="pointer-events-none absolute z-50 bg-[var(--accent,#3b82f6)]"
       style={{
         left: rect.left,
         top: rect.top,
@@ -75,7 +77,7 @@ export function InlineImageOverlay({
 
   return (
     <div
-      className="pointer-events-none fixed z-50"
+      className="pointer-events-none absolute z-50"
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
       {...verifyAttrs({
         unit: 'InlineImageOverlay',
