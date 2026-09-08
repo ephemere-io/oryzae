@@ -314,3 +314,70 @@ describe('defaultWidthRatioFor', () => {
     expect(defaultWidthRatioFor(Number.NaN, 100, false)).toBe(0.5);
   });
 });
+
+/**
+ * 署名 URL が届かなかった写真の扱い。
+ *
+ * 「保存したのに写真が復活しない」という report の切り分けに要る。src を空にすると
+ * `<img>` は**何も描かない**ので、位置は保っているのに消えたようにしか見えない。
+ * 読み込めていないことが分かる状態で残す。
+ */
+describe('署名 URL が無いとき', () => {
+  let editor: HTMLDivElement;
+
+  beforeEach(() => {
+    editor = document.createElement('div');
+    document.body.appendChild(editor);
+  });
+
+  afterEach(() => {
+    editor.remove();
+  });
+
+  it('本文から消さず、読み込めない印を付けて残す', () => {
+    editor.textContent = `あ${INLINE_IMAGE_PLACEHOLDER}い`;
+
+    applyInlineImagesToEditor(
+      editor,
+      [{ offset: 1, storagePath: 'p1', widthRatio: 0.5 }],
+      new Map(), // 署名できなかった
+    );
+
+    const img = editor.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.dataset.unavailable).toBe('true');
+    // src を空文字で持たせると「壊れた画像」を読みに行って余計なリクエストが出る。
+    expect(img?.hasAttribute('src')).toBe(false);
+    // 位置は保つ。次の保存で写真の場所が失われないため。
+    expect(serializeEditorText(editor)).toBe(`あ${INLINE_IMAGE_PLACEHOLDER}い`);
+  });
+
+  it('署名 URL があれば印は付かない', () => {
+    editor.textContent = INLINE_IMAGE_PLACEHOLDER;
+
+    applyInlineImagesToEditor(
+      editor,
+      [{ offset: 0, storagePath: 'p1', widthRatio: 0.5 }],
+      new Map([['p1', 'https://example.test/signed.jpg']]),
+    );
+
+    const img = editor.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('https://example.test/signed.jpg');
+    expect(img?.dataset.unavailable).toBeUndefined();
+  });
+
+  // 復元 → そのまま保存、で写真の情報が落ちないこと。
+  it('読み込めない写真も、保存し直したときに残る', () => {
+    editor.textContent = `${INLINE_IMAGE_PLACEHOLDER}本文`;
+
+    applyInlineImagesToEditor(
+      editor,
+      [{ offset: 0, storagePath: 'p1', widthRatio: 0.75, rotation: 5 }],
+      new Map(),
+    );
+
+    expect(extractInlineImages(editor)).toEqual([
+      { offset: 0, storagePath: 'p1', widthRatio: 0.75, rotation: 5 },
+    ]);
+  });
+});

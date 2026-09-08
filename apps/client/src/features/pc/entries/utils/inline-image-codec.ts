@@ -162,8 +162,21 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
 export function createInlineImageElement(image: InlineImage, signedUrl: string): HTMLImageElement {
   const el = document.createElement('img');
   el.className = INLINE_IMAGE_CLASS;
-  el.src = signedUrl;
   el.alt = '';
+  if (signedUrl) {
+    el.src = signedUrl;
+    el.removeAttribute('data-unavailable');
+  } else {
+    // 署名に失敗した／URL が届いていない写真。src を空のままにすると **何も描かれず**、
+    // 「保存したのに写真が消えた」ようにしか見えない。位置は保っているので、
+    // 読み込めていないことが分かる箱を出す（本文から消してはいけない）。
+    el.removeAttribute('src');
+    el.dataset.unavailable = 'true';
+    el.style.minInlineSize = '4rem';
+    el.style.minBlockSize = '4rem';
+    el.style.border = '1px dashed var(--border-subtle, #ccc)';
+    el.style.background = 'var(--toolbar-hover, rgba(0,0,0,0.04))';
+  }
   // contentEditable の中で画像自身が編集対象にならないようにする
   // （これが無いと Chrome が画像内にキャレットを置こうとする）。
   el.contentEditable = 'false';

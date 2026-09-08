@@ -265,6 +265,11 @@ export function EntryEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
+  /**
+   * 本文を包むスクロール要素。写真の操作 UI はこの中に、この要素の座標系で描く
+   * （viewport 座標だとスクロールで取り残される）。
+   */
+  const scrollHostRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const hasUnsavedChanges = content !== savedContent;
@@ -793,6 +798,7 @@ export function EntryEditor({
 
   const inlineImages = useInlineImageSelection({
     editorRef,
+    scrollHostRef,
     isVertical: settings.writingMode === 'vertical',
     onCommit: commitInlineImageChange,
   });
@@ -1055,10 +1061,15 @@ export function EntryEditor({
           {/* Photo import — 文字として読み込むか、写真として貼るかをモーダルで選ばせる */}
           <button
             type="button"
+            // タイトルを編集している間は本文にキャレットが無い。ここで写真を選べると、
+            // 本文の意図しない場所（＝最後にキャレットがあった場所）へ入ってしまう。
+            disabled={isEditingTitle}
             onClick={() => photoInputRef.current?.click()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={tPhoto('toolbar_button')}
-            aria-label={tPhoto('toolbar_button')}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--date-color)]"
+            data-tooltip={
+              isEditingTitle ? tPhoto('unavailable_in_title') : tPhoto('toolbar_button')
+            }
+            aria-label={isEditingTitle ? tPhoto('unavailable_in_title') : tPhoto('toolbar_button')}
             data-testid="photo-import-trigger"
           >
             <svg
@@ -1329,6 +1340,7 @@ export function EntryEditor({
           />
         )}
         <div
+          ref={scrollHostRef}
           className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
         >
           {/* Snippet selection toolbar */}
@@ -1336,6 +1348,16 @@ export function EntryEditor({
 
           {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
           <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
+
+          {/* 写真の操作 UI。スクロールする箱の**中**に置くことで、スクロールに素で追従する。 */}
+          <InlineImageDropIndicator rect={inlineImages.dropRect} />
+          <InlineImageOverlay
+            rect={inlineImages.selection.rect}
+            image={inlineImages.selection.image}
+            onResizeStart={inlineImages.beginResize}
+            onRotateStart={inlineImages.beginRotate}
+            onRemove={inlineImages.removeSelected}
+          />
 
           <div
             ref={editorRef}
@@ -1390,15 +1412,6 @@ export function EntryEditor({
       </div>
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <InlineImageDropIndicator rect={inlineImages.dropRect} />
-
-      <InlineImageOverlay
-        rect={inlineImages.selection.rect}
-        image={inlineImages.selection.image}
-        onResizeStart={inlineImages.beginResize}
-        onRotateStart={inlineImages.beginRotate}
-        onRemove={inlineImages.removeSelected}
-      />
 
       <PhotoImportModal
         state={photoImport.state}

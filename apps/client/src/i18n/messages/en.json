@@ -515,7 +515,8 @@
     "resize_sw": "Drag bottom-left to resize",
     "resize_w": "Drag left to resize",
     "rotate": "Rotate photo",
-    "elapsed": "{seconds}s elapsed"
+    "elapsed": "{seconds}s elapsed",
+    "unavailable_in_title": "Cannot add a photo while editing the title"
   },
   "fermentation": {
     "detail": {

@@ -515,7 +515,8 @@
     "resize_sw": "左下をドラッグしてサイズ変更",
     "resize_w": "左をドラッグしてサイズ変更",
     "rotate": "写真を回転",
-    "elapsed": "{seconds} 秒経過"
+    "elapsed": "{seconds} 秒経過",
+    "unavailable_in_title": "タイトルの編集中は写真を貼れません"
   },
   "fermentation": {
     "detail": {
