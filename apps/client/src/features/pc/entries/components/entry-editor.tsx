@@ -52,11 +52,10 @@ import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import {
   applyInlineImagesToEditor,
   createInlineImageElement,
-  defaultWidthRatioFor,
   extractInlineImages,
-  loadNaturalSize,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
+import { defaultWidthRatio, loadAspect } from '@/features/pc/entries/utils/inline-image-placement';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
@@ -727,7 +726,7 @@ export function EntryEditor({
    * Range で直接 DOM を挿すと Ctrl+Z で戻せなくなる。
    *
    * 既定は **ブロック・中央**（Notion / Medium と同じ）。写真は独立した行を占め、
-   * 幅は写真の向きと書字方向から決める（`defaultWidthRatioFor`）。行頭に小さく置いても
+   * 幅は写真の向きと書字方向から決める（`defaultWidthRatio`）。行頭に小さく置いても
    * 使い道が無いため、行内配置や寄せは既定にしない。
    *
    * 本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
@@ -742,17 +741,15 @@ export function EntryEditor({
 
       if (el) {
         el.focus();
-        // 実寸を知るために先に読み込む。失敗しても既定幅で差し込み、写真を失わない。
-        const natural = await loadNaturalSize(photo.signedUrl);
+        // 縦横比を先に読む。貼ってから測って直すと、目の前で一度跳ねる。
+        const aspect = await loadAspect(photo.signedUrl);
         const node = createInlineImageElement(
           {
             offset: 0, // 実際の位置は保存時に DOM から数え直す
             storagePath: photo.storagePath,
-            widthRatio: defaultWidthRatioFor(
-              natural.width,
-              natural.height,
-              settings.writingMode === 'vertical',
-            ),
+            widthRatio: defaultWidthRatio(aspect, settings.writingMode === 'vertical'),
+            layout: 'block',
+            align: 'center',
           },
           photo.signedUrl,
         );
