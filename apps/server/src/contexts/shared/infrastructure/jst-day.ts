@@ -1,54 +1,22 @@
 /**
- * JST 日境界のユーティリティ（純粋関数）。
+ * UTC 日と JST 表記のユーティリティ（純粋関数）。
  *
- * Oryzae の運用は JST 基準（発酵 cron は JST 03:00 = UTC 18:00 に走る）なのに、
- * コスト集計だけが UTC 日で切られていた。「8/9 のレポート」が JST 8/10 未明の
- * 発酵を含む、という直感に反するズレが出るため JST 日に統一する。
+ * コストの日次レポートは **UTC 日を 1 つの窓** として切る。Anthropic の cost_report が
+ * UTC 日バケット固定で JST 日に切れないため、実額に合わせて発酵の件数も同じ窓で数える。
+ * 窓を 2 つ（実額は UTC 日・件数は JST 日）にすると、レポート冒頭で毎回その対応関係を
+ * 説明する羽目になり、読む人は「何時から何時の話か」が分からなくなる
+ * （#584 のレポートへの指摘）。
  *
- * 注意: Anthropic の cost_report は UTC 日バケット固定で JST 日に切れない。
- * 実額を並べるときは utcDateKeyOfJstFermentationRun() で対応 UTC 日を求め、
- * 「UTC 基準」であることを表示側で明示すること。
+ * UTC 日 D は JST では「D 9:00 〜 D+1 9:00」。定期発酵（JST 03:00 = UTC 18:00）は
+ * D+1 未明のぶんが窓に入る。表示は jstTimeRangeOfUtcDay() で JST の時刻範囲にして出し、
+ * 「UTC」という語を読む人に見せない。
  */
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** その時刻が JST で何月何日か (YYYY-MM-DD)。 */
-export function toJstDateKey(date: Date): string {
-  return new Date(date.getTime() + JST_OFFSET_MS).toISOString().slice(0, 10);
-}
-
-/** JST 前日の日付キー。日次レポートの対象日。 */
-export function previousJstDateKey(now: Date): string {
-  return toJstDateKey(new Date(now.getTime() - DAY_MS));
-}
-
-/**
- * JST 日 (YYYY-MM-DD) を UTC の ISO 区間に変換する。
- * JST 8/9 = UTC [8/8 15:00:00.000Z, 8/9 14:59:59.999Z]。
- * Supabase の created_at は timestamptz なので、この区間で gte/lte すればよい。
- */
-export function jstDayRangeUtc(dateKey: string): { startIso: string; endIso: string } {
-  const jstMidnightAsUtc = Date.parse(`${dateKey}T00:00:00.000Z`);
-  const start = jstMidnightAsUtc - JST_OFFSET_MS;
-  return {
-    startIso: new Date(start).toISOString(),
-    endIso: new Date(start + DAY_MS - 1).toISOString(),
-  };
-}
-
-/**
- * その JST 日の定期発酵が実際に走った UTC 日を返す。
- *
- * 定期発酵は JST 03:00 (= UTC 前日 18:00) に発火するため、JST 日 D の発酵コストは
- * UTC 日 D-1 に計上される。Anthropic の実額(UTC日バケット)と JST 日のレポートを
- * 突き合わせるための対応付け。
- *
- * 注意: admin からの手動発火やリトライは任意の時刻に走るため、この対応は
- * 「定期発酵ぶんについては正確」という近似である。表示では UTC 日を明示すること。
- */
-export function utcDateKeyOfJstFermentationRun(jstDateKey: string): string {
-  const utcDay = Date.parse(`${jstDateKey}T00:00:00.000Z`) - DAY_MS;
-  return new Date(utcDay).toISOString().slice(0, 10);
+/** その時刻の UTC 日 (YYYY-MM-DD)。 */
+export function toUtcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
 /** UTC 日 (YYYY-MM-DD) を [00:00:00.000Z, 翌日 00:00:00.000Z) の Date 組に変換する。 */
@@ -57,7 +25,19 @@ export function utcDayBounds(dateKey: string): { start: Date; end: Date } {
   return { start, end: new Date(start.getTime() + DAY_MS) };
 }
 
-/** UTC 日 (YYYY-MM-DD) の前日。cost_report の日別バケットを前日比で並べるのに使う。 */
+/**
+ * UTC 日を Supabase の created_at (timestamptz) で絞るための ISO 区間。
+ * gte/lte（両端含む）で使うので、終端は翌日 0:00 の 1ms 手前。
+ */
+export function utcDayRangeIso(dateKey: string): { startIso: string; endIso: string } {
+  const { start, end } = utcDayBounds(dateKey);
+  return { startIso: start.toISOString(), endIso: new Date(end.getTime() - 1).toISOString() };
+}
+
+/**
+ * UTC 日 (YYYY-MM-DD) の前日。
+ * 日次レポートの対象日（実行時刻の直前に閉じた UTC 日）と、前日比の参照に使う。
+ */
 export function previousUtcDateKey(dateKey: string): string {
   return new Date(Date.parse(`${dateKey}T00:00:00.000Z`) - DAY_MS).toISOString().slice(0, 10);
 }
@@ -73,4 +53,20 @@ export function utcMonthBounds(dateKey: string): { start: Date; end: Date; daysI
   const end = new Date(Date.UTC(year, month, 1));
   // UTC には DST が無いので、差を DAY_MS で割れば当月日数がそのまま出る。
   return { start, end, daysInMonth: (end.getTime() - start.getTime()) / DAY_MS };
+}
+
+/** JST の「M/D H:MM」。 */
+function jstClock(date: Date): string {
+  const jst = new Date(date.getTime() + JST_OFFSET_MS);
+  const minutes = String(jst.getUTCMinutes()).padStart(2, '0');
+  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours()}:${minutes}`;
+}
+
+/**
+ * UTC 日を JST の時刻範囲として書く。'2026-09-07' → '9/7 9:00 〜 9/8 9:00 (JST)'。
+ * 「UTC 9/7」と書いても日本の読み手には何時から何時の話か分からない。
+ */
+export function jstTimeRangeOfUtcDay(dateKey: string): string {
+  const { start, end } = utcDayBounds(dateKey);
+  return `${jstClock(start)} 〜 ${jstClock(end)} (JST)`;
 }

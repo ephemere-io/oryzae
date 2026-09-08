@@ -4,7 +4,9 @@ import {
   computeCostFromTokens,
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
+  featureOfModel,
   OCR_MODEL_ID,
+  PHOTO_TRANSCRIPTION_MODEL_ID,
 } from '@/contexts/shared/infrastructure/claude-pricing.js';
 
 describe('computeCostFromTokens', () => {
@@ -76,8 +78,32 @@ describe('価格表とモデルの対応', () => {
 // (anthropic-cost-api.ts)。発酵と OCR が同じモデルになると、その内訳が
 // 用途別として機能しなくなる（混ざって区別できない）。
 describe('用途とモデルの対応', () => {
-  it('発酵と OCR は別モデル（モデル別内訳が用途別内訳として成立する前提）', () => {
-    expect(OCR_MODEL_ID).not.toBe(FERMENTATION_MODEL_ID);
+  it('3 つの用途はすべて別モデル（モデル別内訳が用途別内訳として成立する前提）', () => {
+    // どれか 2 つが同じモデルになると、その 2 つの費用が同じバケットに混ざり、
+    // 用途別の内訳として読めなくなる。3 通りすべてを見る。
+    const ids = [FERMENTATION_MODEL_ID, OCR_MODEL_ID, PHOTO_TRANSCRIPTION_MODEL_ID];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('3 つの用途すべてが名前に読み替えられる', () => {
+    // 読み替えられないモデルは費用が「分類不明」に落ちる。#529 で写真の文字起こしが
+    // 登録漏れになり、管理画面でも費用アラートでも分類されていなかった。
+    expect(featureOfModel(FERMENTATION_MODEL_ID)).toBe('発酵');
+    expect(featureOfModel(OCR_MODEL_ID)).toBe('OCR');
+    expect(featureOfModel(PHOTO_TRANSCRIPTION_MODEL_ID)).toBe('写真の文字起こし');
+  });
+
+  it('用途名は互いに重ならない（内訳が読めなくなるため）', () => {
+    const names = [FERMENTATION_MODEL_ID, OCR_MODEL_ID, PHOTO_TRANSCRIPTION_MODEL_ID].map(
+      featureOfModel,
+    );
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('未登録のモデルは null（分類不明）を返す', () => {
+    // CI や別用途が同じ API キーを使うと未知のモデルが混ざる。
+    // 勝手にどれかの用途へ寄せず、分類不明のまま返す。
+    expect(featureOfModel('claude-haiku-4-5')).toBeNull();
   });
 
   it('OCR のモデルは価格表に載せない（実額から取るので二重管理しない）', async () => {

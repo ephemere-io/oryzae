@@ -5,8 +5,8 @@
  * 月末の見込みを並べて初めて「このままで良いか」が読める。日次レポートが
  * 「$0.1220」とだけ言って何も判断できなかったのがこれを足した理由。
  *
- * 入力は Anthropic cost_report の **UTC 日バケット**（JST 日には切れない）。
- * 呼び出し側は utcDateKeyOfJstFermentationRun() で対応 UTC 日を渡すこと。
+ * 入力は Anthropic cost_report の **UTC 日バケット**。日次レポートは UTC 日を
+ * 1 つの窓にしているので、対象日のキーをそのまま渡す（jst-day.ts）。
  */
 import { previousUtcDateKey, utcMonthBounds } from './jst-day.js';
 
