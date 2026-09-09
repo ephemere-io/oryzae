@@ -116,8 +116,10 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/client-testing-guide.md` | フロントエンドテスト戦略 |
 | `docs/shared-package-guide.md` | `@oryzae/shared` の使用ルール |
 | `docs/entry-backend-guide.md` | Entry コンテキスト実装ガイド |
+| `docs/entry-photo-guide.md` | エントリの写真アップロードと文字起こし（VLM 採用理由・モデル選定・保存先） |
 | `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
 | `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 3 層構成 |
+| `docs/auto-fix-loop-guide.md` | 自動バグ修正ループ（起動経路、自動マージの許可領域、月額予算の守り方） |
 | `docs/i18n-guide.md` | apps/client の日英バイリンガル運用（next-intl + Google Sheets SSoT） |

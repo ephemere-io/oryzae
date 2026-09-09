@@ -1,17 +1,20 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { MAX_OCR_TEXT_LENGTH } from '@oryzae/shared';
 import { generateText } from 'ai';
+import { OCR_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type { OcrGateway, OcrResult } from '../../domain/gateways/ocr.gateway.js';
 
 // provider は発酵分析 (vercel-ai-analysis.gateway.ts) と同じだが、**モデルは別**。
-// あちらは claude-sonnet-4-6、こちらは claude-opus-5 で、揃える必要はない。
-// 手書きの読み取りは誤読がそのままスニペットの中身になるので、精度を優先している。
-// （ID の実在は API に直接投げて 200 を確認済み。型では守れない——AnthropicModelId は
-//   末尾が `(string & {})` なので任意の文字列が通る）
+// あちらは claude-sonnet-4-6、こちらは claude-opus-5。手書きの読み取りは誤読が
+// そのままスニペットの中身になるので、精度を優先している。
+//
+// モデル ID は claude-pricing.ts から取る。ベタ書きしないのは、コストのモデル別内訳が
+// 「どのモデルが OCR か」を知っている必要があるため（実額を用途別に読むのに使う）。
+// 型では守れない——AnthropicModelId は末尾が `(string & {})` なので任意の文字列が通る。
 //
 // OCR は「見えている文字をそのまま書き起こす」だけの単発呼び出しなので、
 // generateObject ではなく generateText で足りる。
-const MODEL = 'claude-opus-5';
+const MODEL = OCR_MODEL_ID;
 
 const PROMPT = `この画像に写っている文字をそのまま書き起こしてください。
 

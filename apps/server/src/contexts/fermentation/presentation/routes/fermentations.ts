@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { rateLimitFermentation } from '../../../shared/presentation/middleware/rate-limit.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
+import { GetJarReadinessUsecase } from '../../application/usecases/get-jar-readiness.usecase.js';
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
 import { ListFermentationResultsByUserUsecase } from '../../application/usecases/list-fermentation-results-by-user.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
@@ -14,6 +16,7 @@ import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-not
 import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
+import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
 
 type Env = {
   Variables: {
@@ -98,6 +101,25 @@ export const fermentations = new Hono<Env>()
     const usecase = new ListFermentationResultsUsecase(repo);
     const results = await usecase.execute(questionId);
     return c.json(results);
+  })
+  // issue #278: 瓶アニメーション用の readiness。**`/:id` より前に置くこと**
+  // (Hono は登録順に照合するので、後ろに置くと `/readiness` が id 扱いになる)。
+  .get('/readiness', async (c) => {
+    const supabase = c.get('supabase');
+    const userId = c.get('userId');
+    // ロケール解決の auth.admin.getUserById だけ service-role が要る (POST / と同じ理由)。
+    const localeResolver = new SupabaseUserLocaleResolver(getSupabaseClient());
+    const usecase = new GetJarReadinessUsecase(
+      new SupabaseQuestionRepository(supabase),
+      new SupabaseEntryRepository(supabase),
+      new SupabaseFermentationRepository(supabase),
+      new SupabaseUserFermentationStateRepository(supabase),
+      localeResolver,
+    );
+
+    // cron が日次で書く user_fermentation_state.readiness_score ではなく、その場で
+    // 評価し直す。エントリを書いた直後に瓶が反応してほしいため (issue #278 受け入れ基準)。
+    return c.json(await usecase.execute(userId));
   })
   .get('/:id', async (c) => {
     const supabase = c.get('supabase');

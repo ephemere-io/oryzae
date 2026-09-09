@@ -64,6 +64,7 @@ function mockEntryRepo(): EntryRepositoryGateway {
     listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
     listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
     countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
+    countCharsByQuestionIdSince: vi.fn().mockResolvedValue(0),
     listByUserIdAndWeek: vi.fn(),
     searchByUserId: vi.fn(),
     save: vi.fn(),

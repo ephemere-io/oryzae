@@ -1,0 +1,144 @@
+name: Auto Merge Deps
+
+# dependabot の依存更新 PR を、CI が全部緑なら自動でマージする。
+# 設計と運用の正は docs/auto-fix-loop-guide.md。
+#
+# この仕組みは **トークン費用が 0 円** である（AI を一切呼ばない）。
+# 「ライブラリのアップデート」という、量は多いが判断の要らない仕事を
+# ここで決定的に捌ききることで、AI の予算を本当に判断が要るバグ修正に残す。
+#
+# なぜ pull_request ではなく schedule なのか:
+# 1. dependabot が起こしたイベントでは GITHUB_TOKEN の扱いが通常と異なり、
+#    マージ権限まわりで踏みやすい。schedule ならリポジトリ自身が起点になり、
+#    権限もシークレットも通常どおりになる
+# 2. GitHub の auto-merge 機能はこのリポジトリで無効（`allow_auto_merge: false`）なので
+#    `gh pr merge --auto` に頼れず、どのみち「緑になってから」を自分で見張る必要がある
+# 3. dependabot は月次なので、1 日 1 回で十分間に合う。PR ごとに起動すると
+#    Actions の無料枠（2,000 分/月、Issue #551）を細かく削る
+
+on:
+  schedule:
+    - cron: '40 21 * * *' # 毎日 06:40 JST
+  workflow_dispatch:
+
+concurrency:
+  group: auto-merge-deps
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  merge:
+    name: 緑の依存更新をマージする
+    if: vars.AUTO_FIX_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      # main のルールセットが 1 承認を要求するため、GITHUB_TOKEN 単体ではマージできない。
+      # AUTO_FIX_TOKEN（Admin 権限の fine-grained PAT）があればそれを使う。
+      GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      # AUTO_FIX_TOKEN を取り違える（Anthropic の API キーを入れる等）と、
+      # この値は GH_TOKEN として全 `gh` 呼び出しに使われるため何もかも失敗する。
+      # `secrets.A || secrets.B` のフォールバックは未設定にしか効かないので、先に確かめる。
+      - name: GitHub トークンの確認
+        env:
+          HAS_CUSTOM_TOKEN: ${{ secrets.AUTO_FIX_TOKEN != '' }}
+        run: |
+          if ! gh api "repos/${REPO}" --jq .full_name > /dev/null 2> err.txt; then
+            if [ "$HAS_CUSTOM_TOKEN" = "true" ]; then
+              echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
+                   "GitHub の fine-grained PAT（github_pat_ で始まる）を入れてください。"
+            else
+              echo "::error::GITHUB_TOKEN で GitHub API を呼べませんでした。"
+            fi
+            sed 's/^/  /' err.txt || true
+            exit 1
+          fi
+
+      - name: 対象を選んでマージする
+        run: |
+          set -euo pipefail
+
+          # dependabot の open な PR を新しい順に見る。
+          gh pr list --repo "$REPO" --state open --limit 30 \
+            --json number,title,author,headRefName \
+            --jq '.[] | select(.author.login == "app/dependabot" or .author.login == "dependabot[bot]")
+                      | [.number, .headRefName, .title] | @tsv' > prs.tsv || true
+
+          if [ ! -s prs.tsv ]; then
+            echo "dependabot の open な PR は無い" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          merged=0
+          skipped=0
+
+          while IFS=$'\t' read -r number branch title; do
+            [ -n "$number" ] || continue
+            echo "── #${number} ${title}"
+
+            # 自動マージしてよいのは、.github/dependabot.yml が
+            # 「更新の種類まで含めて」保証しているグループ PR だけに限る。
+            #
+            #   - minor-and-patch グループ … 設定で minor/patch に限定されている
+            #   - actions グループ         … CI 自身がその新しい action で走った結果が緑である
+            #
+            # 単独の PR（major 昇格・security update）はここに載らない。
+            # 更新の種類を PR タイトルから当てにいくと、いつか静かに major を通すため。
+            case "$title" in
+              *"minor-and-patch group"*|*"the actions group"*) ;;
+              *)
+                echo "  → 対象外（グループ PR ではない。人が見る）"
+                skipped=$((skipped + 1))
+                continue
+                ;;
+            esac
+
+            # 全チェックが終わっていて、全部通っていること。
+            # gh pr checks は 1 つでも pending/failure があれば非ゼロで返る。
+            if ! gh pr checks "$number" --repo "$REPO" > checks.txt 2>&1; then
+              echo "  → まだ緑でない（pending か failure）"
+              sed 's/^/     /' checks.txt || true
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            # チェックが 1 つも無い PR を「緑」とみなさない。
+            # paths フィルタで CI が丸ごと skip された PR を素通ししないため。
+            if [ ! -s checks.txt ]; then
+              echo "  → チェックが 1 件も無いので見送る"
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            state=$(gh pr view "$number" --repo "$REPO" --json mergeable --jq .mergeable)
+            if [ "$state" != "MERGEABLE" ]; then
+              echo "  → マージできない状態（${state}）"
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            # --admin はルールセットの 1 承認要求を bypass するために要る。
+            # 権限が無ければ素の merge に落ちる。
+            if gh pr merge "$number" --repo "$REPO" --squash --delete-branch --admin 2>/dev/null \
+               || gh pr merge "$number" --repo "$REPO" --squash --delete-branch; then
+              echo "  → マージした"
+              merged=$((merged + 1))
+            else
+              echo "  → マージに失敗した"
+              skipped=$((skipped + 1))
+            fi
+          done < prs.tsv
+
+          {
+            echo "### 依存更新の自動マージ"
+            echo ""
+            echo "- マージ: ${merged} 件"
+            echo "- 見送り: ${skipped} 件"
+          } >> "$GITHUB_STEP_SUMMARY"

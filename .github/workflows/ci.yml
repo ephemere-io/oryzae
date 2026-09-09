@@ -66,19 +66,66 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
-  # 検証ハーネスの「挙動確認ビュー」への導線を PR に貼る。
-  # 以前は replay をヘッドレス録画→GIF 化していたが、GIF が巨大（212 probe×~5分＝~100MB）で
-  # GitHub にアップロードできず機能していなかった。Vercel プレビューの /verify を直接開ける
-  # ようにした（verify ルートは VERCEL_ENV=preview で有効）ので、その URL を案内するだけにする。
-  # ゲートではない（合否は Test ジョブの matrix が担保）。
-  verify-demo:
-    name: Verify Preview View (PR comment)
+  # PR 限定の 2 つの仕事を 1 ジョブに畳む。
+  #
+  # 分けていた頃、この 2 つは本題が 5 秒と 7 秒しかないのに、Actions の課金が
+  # **ジョブ単位で分に切り上げ** られるため合計 2 分を払っていた（9 月実測で 106 回 = 約 106 分）。
+  # Issue #551 で lint/type/deps/knip を畳んだのと同じ取りこぼしが、ここに残っていた。
+  #
+  # 中身は 2 つとも変えていない:
+  #   1. 検証ハーネスの「挙動確認ビュー」への導線を PR に貼る（ゲートではない）
+  #   2. 新規追加された client コンポーネントに *.verify.tsx を強制する硬いゲート
+  #
+  # 順番は「ゲートが先、案内が後」。案内側に `!cancelled()` を付けてあるので、
+  # ゲートが落ちても導線コメントは貼られる（分けていた頃の挙動を保つ）。
+  pr-verify:
+    name: Verify (coverage gate + preview links)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     permissions:
       pull-requests: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # 「見た目の実装にはテストを」を CI で強制する硬いゲート。
+      # PR で *新規追加* された client の feature コンポーネントに、隣接 *.verify.tsx が無く、
+      # かつ `// verify-exempt: <理由>` も無ければ落とす。リネーム(#363 のような移設)は -M で除外。
+      # 既存の未カバー部品は「新規追加」ではないので素通り（段階導入を壊さない）。
+      - name: Require *.verify.tsx (or // verify-exempt) for newly-added components
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          MERGE_BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          NEW=$(git diff --diff-filter=A -M --name-only "$MERGE_BASE" HEAD -- 'apps/client/src/features' \
+            | grep -E 'src/features/.*/components/.*\.tsx$' \
+            | grep -vE '\.(verify|test)\.tsx$' || true)
+          fail=0
+          for f in $NEW; do
+            sib="${f%.tsx}.verify.tsx"
+            if [ -f "$sib" ]; then
+              echo "✓ $f"
+            elif grep -q "verify-exempt" "$f"; then
+              echo "→ exempt: $f"
+            else
+              echo "::error file=$f::新規コンポーネントに $sib がありません。検証スペックを追加するか、コンポーネント先頭に '// verify-exempt: <理由>' を記載してください（docs/verify-harness-rollout.md §3）。"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "Verify coverage gate failed."
+            exit 1
+          fi
+          echo "Verify coverage gate passed."
+
+      # 検証ハーネスの「挙動確認ビュー」への導線を PR に貼る。
+      # 以前は replay をヘッドレス録画→GIF 化していたが、GIF が巨大（212 probe×~5分＝~100MB）で
+      # GitHub にアップロードできず機能していなかった。Vercel プレビューの /verify を直接開ける
+      # ようにした（verify ルートは VERCEL_ENV=preview で有効）ので、その URL を案内するだけにする。
+      # ゲートではない（合否は Test ジョブが担保）。
       - name: Sticky comment with preview /verify links
+        if: '!cancelled()'
         uses: actions/github-script@v9
         with:
           script: |
@@ -112,41 +159,3 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
             }
-
-  # 「見た目の実装にはテストを」を CI で強制する硬いゲート。
-  # PR で *新規追加* された client の feature コンポーネントに、隣接 *.verify.tsx が無く、
-  # かつ `// verify-exempt: <理由>` も無ければ落とす。リネーム(#363 のような移設)は -M で除外。
-  # 既存の未カバー部品は「新規追加」ではないので素通り（段階導入を壊さない）。
-  verify-coverage-gate:
-    name: Verify Coverage Gate (new components need *.verify)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Require *.verify.tsx (or // verify-exempt) for newly-added components
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          MERGE_BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
-          NEW=$(git diff --diff-filter=A -M --name-only "$MERGE_BASE" HEAD -- 'apps/client/src/features' \
-            | grep -E 'src/features/.*/components/.*\.tsx$' \
-            | grep -vE '\.(verify|test)\.tsx$' || true)
-          fail=0
-          for f in $NEW; do
-            sib="${f%.tsx}.verify.tsx"
-            if [ -f "$sib" ]; then
-              echo "✓ $f"
-            elif grep -q "verify-exempt" "$f"; then
-              echo "→ exempt: $f"
-            else
-              echo "::error file=$f::新規コンポーネントに $sib がありません。検証スペックを追加するか、コンポーネント先頭に '// verify-exempt: <理由>' を記載してください（docs/verify-harness-rollout.md §3）。"
-              fail=1
-            fi
-          done
-          if [ "$fail" -ne 0 ]; then
-            echo "Verify coverage gate failed."
-            exit 1
-          fi
-          echo "Verify coverage gate passed."
