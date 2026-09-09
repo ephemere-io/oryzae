@@ -259,7 +259,7 @@ export function SpEntryEditor({
         className="flex items-center justify-between px-5 pt-3 pb-1"
         // 書斎が有効な間、左上には「書斎へ戻る」マークが浮く。席を空けないと
         // マークが ⋯ ボタンの上に重なる（変数は (protected)/layout.tsx）。
-        style={{ minHeight: 28, paddingLeft: 'calc(1.25rem + var(--study-back-inset, 0px))' }}
+        style={{ minHeight: 28, paddingLeft: 'max(1.25rem, var(--study-back-inset, 0px))' }}
       >
         {/* 既存エントリだけ削除できる（新規は削除対象が無いので出さない）。 */}
         {entryId ? (
@@ -308,7 +308,7 @@ export function SpEntryEditor({
         // 「書斎へ戻る」マークはヘッダより下まで届く高さがある。左に幅を空けるだけだと
         // タイトルの頭に重なるので、**行そのものを marks の下へ落とす**。
         // マークが出ていない間（フラグ off）は 0 なので、従来どおり詰まったまま。
-        style={{ paddingTop: 'calc(0.5rem + var(--study-back-drop, 0px))' }}
+        style={{ paddingTop: 'max(0.5rem, var(--study-back-drop, 0px))' }}
       />
 
       {/* 問いを結ぶチップ */}

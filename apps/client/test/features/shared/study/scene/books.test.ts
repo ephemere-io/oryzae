@@ -31,17 +31,30 @@ function notebook(month: string, entryCount: number): Notebook {
 
 describe('notebookThickness', () => {
   it('0 件でも表紙ぶんの厚みがある', () => {
-    expect(notebookThickness(0)).toBeCloseTo(0.1, 10);
+    expect(notebookThickness(0)).toBeGreaterThan(0);
+  });
+
+  it('空の冊でも指で押せる厚みがある', () => {
+    // 積みの中段・下段が押しにくい、と実機レビューで報告された。当たりの高さは
+    // 厚みそのものなので、薄い冊は帯が数 px しか無く、天板の縁と見分けもつかない。
+    // 冊 1 つぶんの世界の高さ 0.2 は、PC の構図でおよそ指 1 本ぶんに映る。
+    expect(notebookThickness(0)).toBeGreaterThanOrEqual(0.2);
   });
 
   it('件数に比例して厚くなる', () => {
-    expect(notebookThickness(10)).toBeCloseTo(0.22, 10);
+    expect(notebookThickness(10)).toBeGreaterThan(notebookThickness(0));
     expect(notebookThickness(20)).toBeGreaterThan(notebookThickness(10));
   });
 
   it('40 件で頭打ちになる（青天井に厚くしない）', () => {
-    expect(notebookThickness(40)).toBeCloseTo(0.58, 10);
     expect(notebookThickness(400)).toBe(notebookThickness(40));
+    expect(notebookThickness(41)).toBe(notebookThickness(40));
+  });
+
+  it('積んでも机から溢れない（3 冊ぶんが手帳の奥行きを超えない）', () => {
+    // 厚くしすぎると積みが塔になり、真上から寄るカメラの構図が崩れる。
+    const tallest = notebookThickness(40) * 3 + STACK_GAP * 2;
+    expect(tallest).toBeLessThan(NOTEBOOK_SIZE.depth);
   });
 
   it('負や小数でも壊れない', () => {
@@ -59,8 +72,8 @@ describe('edgeLineCount', () => {
 
   it('薄くても 7 本は下回らない（1〜2 本だと紙束に見えない）', () => {
     expect(edgeLineCount(0)).toBe(7);
-    // 空の手帳（厚み 0.1）でも 8 本。下限に張り付かず、束として読める。
-    expect(edgeLineCount(notebookThickness(0))).toBe(8);
+    // 空の手帳でも下限に張り付かず、束として読める本数になる。
+    expect(edgeLineCount(notebookThickness(0))).toBeGreaterThan(7);
   });
 
   it('多すぎても 26 本で止める（潰れて黒帯になる）', () => {

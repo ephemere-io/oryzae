@@ -713,10 +713,6 @@
   },
   "study": {
     "title": "Study",
-    "status_idle": "Nothing here yet",
-    "status_fermenting": "Fermenting",
-    "status_almost": "Almost ready",
-    "status_completed": "A letter has arrived",
     "label_jar": "JAR",
     "label_journal": "JOURNAL",
     "label_board": "BOARD",
@@ -752,6 +748,7 @@
     "fallback_journal": "Write an entry",
     "fallback_board": "Open the board",
     "word_question_gone": "The question is no longer there",
-    "questions_timeline": "Question history"
+    "questions_timeline": "Question history",
+    "hint_pen": "Write an entry"
   }
 }

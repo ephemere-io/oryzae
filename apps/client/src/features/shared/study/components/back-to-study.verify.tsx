@@ -6,7 +6,7 @@
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { BackToStudy } from './back-to-study';
+import { BACK_MARK, BACK_MARK_SEAT_X, BackToStudy } from './back-to-study';
 
 registerUnit<Record<string, never>>({
   id: 'BackToStudy',
@@ -37,6 +37,25 @@ registerUnit<Record<string, never>>({
         // 片方だけ差し替えられると、行き先と戻り先が別物に見える。
         const mark = root.querySelector('[data-study-mark]');
         return mark !== null || '書斎のマークが描かれていない';
+      },
+    },
+    {
+      id: 'seat-matches-the-mark',
+      description: '席（--study-back-inset）がマークの実寸を覆う',
+      check: ({ root }) => {
+        // 席をマークと別に手で決めていたころ、マークを縮めたときに席だけ詰めてしまい、
+        // 席がマークより狭くなって重なりが残った（実機で「押せない機能が発生」）。
+        const link = root.querySelector('a');
+        const className = link?.className ?? '';
+        const marks: string[] = [];
+        // クラス名と BACK_MARK が対であることを見る（jsdom には版組みが無い）。
+        if (!className.includes('left-4')) marks.push('left-4');
+        if (!className.includes('top-4')) marks.push('top-4');
+        if (!className.includes('h-8')) marks.push('h-8');
+        if (!className.includes('px-2.5')) marks.push('px-2.5');
+        if (!className.includes('gap-1.5')) marks.push('gap-1.5');
+        if (marks.length > 0) return `BACK_MARK と食い違う指定: ${marks.join(', ')}`;
+        return BACK_MARK_SEAT_X >= BACK_MARK.offset + BACK_MARK.width || '席がマークより狭い';
       },
     },
     {

@@ -11,5 +11,5 @@ import { PC_LAYOUT } from '@/features/shared/study/layout';
  * 端末と構図の対応づけはここが持つ。`features/shared/study` は端末を知らない。
  */
 export function PcStudy() {
-  return <StudyHome layout={PC_LAYOUT} showCaption />;
+  return <StudyHome layout={PC_LAYOUT} />;
 }

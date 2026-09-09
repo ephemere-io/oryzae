@@ -27,6 +27,35 @@ import { StudyMark } from './study-mark';
  * ここは常時出ている二次的な導線で、押し損ねても失うものが無い（もう一度押せばよい）。
  * 主要な操作をこの大きさにはしない。
  */
+/**
+ * マークの外形（px）。**席（`--study-back-inset`）はここから決める。**
+ *
+ * 以前は席を手で決めた定数にしていた。マークを 40px から 32px に縮めたときに
+ * 席だけ別に詰めた結果、**席がマークより狭くなって重なりが残った**（実機レビューで
+ * 「押せない機能が発生している」と報告された）。数字を 2 か所で持つと必ずずれる。
+ */
+export const BACK_MARK = {
+  /** 画面の左端・上端からの距離。 */
+  offset: 16,
+  /** 丸の直径（＝高さ）。 */
+  height: 32,
+  /** 文字を畳んだときの幅（アイコン 16 ＋ 左右の余白 10×2 ＋ 文字との間 6）。 */
+  width: 42,
+  /** 隣の操作との最小の間。 */
+  clearance: 8,
+} as const;
+
+/**
+ * 画面の左端から、中身を置き始めてよい x（px）。
+ *
+ * 「マークの幅」ではなく**絶対座標**。読む側は自前の余白に足すのではなく
+ * `max()` で比べる — 足すと、余白の広い画面ほど無駄に食い込む。
+ */
+export const BACK_MARK_SEAT_X = BACK_MARK.offset + BACK_MARK.width + BACK_MARK.clearance;
+
+/** 同じく、中身を置き始めてよい y（px）。左に逃げられない行が読む。 */
+export const BACK_MARK_SEAT_Y = BACK_MARK.offset + BACK_MARK.height + BACK_MARK.clearance;
+
 export function BackToStudy() {
   const t = useTranslations('study');
 
@@ -35,6 +64,8 @@ export function BackToStudy() {
       href="/study"
       {...verifyAttrs({ unit: 'BackToStudy' })}
       aria-label={t('back_to_study')}
+      // 数値は BACK_MARK と対（left-4=16 / h-8=32 / px-2.5=10 / gap-1.5=6）。
+      // どちらかだけ変えると席がずれるので、変えるときは両方。
       className="group fixed left-4 top-4 z-[55] flex h-8 items-center gap-1.5 rounded-full px-2.5 transition-all duration-300"
       style={{
         background: 'rgba(253, 251, 247, 0.72)',

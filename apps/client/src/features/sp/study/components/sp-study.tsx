@@ -12,5 +12,5 @@ import { SP_LAYOUT } from '@/features/shared/study/layout';
  * （競合していた 64px が空いた）。
  */
 export function SpStudy() {
-  return <StudyHome layout={SP_LAYOUT} showCaption />;
+  return <StudyHome layout={SP_LAYOUT} />;
 }
