@@ -185,7 +185,10 @@ const TITLE_COMPACT_ENTER = 64;
 const TITLE_COMPACT_EXIT = 16;
 
 /** 退いているときの題の大きさ（もとの何倍か）。 */
-const TITLE_COMPACT_RATIO = 0.5;
+const TITLE_COMPACT_RATIO = 0.75;
+
+/** 退く／戻るのアニメーションの長さ（ms）。globals.css の .title-sized と揃える。 */
+const TITLE_RESIZE_MS = 200;
 
 /**
  * 描画の前に測るための effect。
@@ -277,6 +280,19 @@ export function EntryEditor({
    * 横書きは題そのものが本文と一緒に流れて画面から出るので、ここは常に false。
    */
   const [titleCompact, setTitleCompact] = useState(false);
+  /**
+   * 大きさの移り変わりをアニメーションさせている最中か。
+   *
+   * 遷移を常時掛けておくと、**打っている最中の些細な寸法の変化まで 200ms かけて動く**。
+   * 動かしたいのは「退く／戻る」の一度きりなので、そのときだけ掛ける。
+   */
+  const [titleResizing, setTitleResizing] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: titleCompact は「変わったこと」だけが引き金で、値そのものは使わない
+  useEffect(() => {
+    setTitleResizing(true);
+    const timer = setTimeout(() => setTitleResizing(false), TITLE_RESIZE_MS + 20);
+    return () => clearTimeout(timer);
+  }, [titleCompact]);
   const [fadeLeft, setFadeLeft] = useState(false);
   // 末尾側だけでなく**先頭側**も切れる。右がぶつ切りだと「まだ続いている」ことが
   // 伝わらず、いま紙のどこにいるのかを見失う。
@@ -1241,8 +1257,20 @@ export function EntryEditor({
     settings.fontFamily,
   ]);
 
-  // 測る前の1回（初回描画）だけ見積もりに倒す。跳ねないよう、同じ係数から出す。
-  const titleThicknessPx = measuredTitleThicknessPx || titleLineBoxPx * titleLines;
+  /**
+   * 何筋使ったか。**測るのはここまで。**
+   *
+   * 測った px をそのまま箱の太さにすると、1字打つごとに数 px 揺れる（書体の詰めや
+   * 端数で測定値がわずかに動くため）。それを遷移がいちいちアニメーションにするので、
+   * 打つたびに題が震えて見えていた——縦書きなら左右、横書きなら上下に。
+   *
+   * 筋の数は打っている間ほとんど変わらない。そこまで丸めてから筋の太さを掛ければ、
+   * 箱は**折り返しが増えたときだけ**動く。
+   */
+  const titleLinesUsed = measuredTitleThicknessPx
+    ? Math.max(1, Math.round(measuredTitleThicknessPx / titleLineBoxPx))
+    : titleLines;
+  const titleThicknessPx = titleLinesUsed * titleLineBoxPx;
   // 本文が空ける場所。**箱ではなく字の端**から測るので、桁を広げても間合いは変わらない。
   const titleReservePx = Math.max(0, titleThicknessPx - titleHalfLeadingPx);
   // 横書きは題が本文の真上に据わるので、紙の上端からの余白と題の厚みぶんを空ける。
@@ -1268,8 +1296,6 @@ export function EntryEditor({
     if (!scroller || prev === 0 || prev === horizontalTitleReservePx) return;
     scroller.scrollTop = Math.max(0, scroller.scrollTop - (prev - horizontalTitleReservePx));
   }, [horizontalTitleReservePx, isVertical]);
-  // 何筋使ったかも測った厚みから逆算する（見積もりの筋数はここでは使わない）。
-  const titleLinesUsed = Math.max(1, Math.round(titleThicknessPx / titleLineBoxPx));
   // **箱は中身に合わせる。** 筋の長さを丸ごと取っていたので、3文字の題でも
   // 画面いっぱいの箱を占めていた。
   //
@@ -1361,7 +1387,7 @@ export function EntryEditor({
       }}
       placeholder={titlePlaceholder}
       aria-label={t('title.placeholder')}
-      className={`title-sized z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleBoxClass}`}
+      className={`z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleResizing ? 'title-sized' : ''} ${titleBoxClass}`}
       style={{ background: 'var(--bg)', ...titleTextStyle }}
     />
   );
@@ -1613,7 +1639,7 @@ export function EntryEditor({
                 data-placeholder={t('placeholder')}
                 // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
                 // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
-                className={`title-inset whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `pb-6 after:block after:content-[''] after:h-[50vh]`}`}
+                className={`${titleResizing ? 'title-inset' : ''} whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `pb-6 after:block after:content-[''] after:h-[50vh]`}`}
                 style={{
                   // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
                   ...(settings.writingMode === 'vertical'
