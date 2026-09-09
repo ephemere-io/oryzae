@@ -3,41 +3,30 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import type { StudyFermentationStatus } from '../types';
 import { StudyMark } from './study-mark';
 
-/** readiness がこれ以上なら「もうすぐ発酵します」に言い換える。 */
-const ALMOST_THRESHOLD = 0.9;
-
 export interface StudyChromeProps {
-  status: StudyFermentationStatus;
-  readiness: number;
   /** アバターに出す 1 文字。 */
   initial: string;
   avatarUrl?: string | null;
-  /** SP は下端にナビがあるのでキャプションを出さない（64px のナビと競合する）。 */
-  showCaption?: boolean;
 }
 
 /**
  * 書斎に浮かぶ最小限の UI（`docs/oryzae-study/00-overview.md`）。
  *
- * サイドバーが消えるかわりに、左上のブランドマークと左下のアバターだけが浮く。
- * 未読の数字バッジは出さない — 手紙が届いたことは**瓶の封**が伝える。
+ * サイドバーが消えるかわりに、左上のマークと左下のアバターだけが浮く。
+ *
+ * **文字は置かない。** 以前は下端に部屋の名前と発酵の状態（「手紙が届いています」等）を
+ * 出していたが、実機レビューで「特に書く必要もない、もう少しすっきりさせたい」と
+ * 報告された。どちらも**物が既に語っている** — 部屋は見えているし、手紙が届いたことは
+ * 瓶の封が伝える（未読の数字バッジを出さないのと同じ理由）。
  */
-export function StudyChrome({
-  status,
-  readiness,
-  initial,
-  avatarUrl,
-  showCaption = true,
-}: StudyChromeProps) {
+export function StudyChrome({ initial, avatarUrl }: StudyChromeProps) {
   const t = useTranslations('study');
-  const statusKey = resolveStatusKey(status, readiness);
 
   return (
     <div
-      {...verifyAttrs({ unit: 'StudyChrome', status, statusKey, showCaption })}
+      {...verifyAttrs({ unit: 'StudyChrome', hasAvatar: Boolean(avatarUrl) })}
       className="pointer-events-none absolute inset-0"
     >
       {/* 左上のマーク。サブ画面では同じ位置に「書斎へ戻る」が出る（layout 側で出し分け）。
@@ -74,39 +63,8 @@ export function StudyChrome({
           </span>
         )}
       </Link>
-
-      {showCaption && (
-        <div data-study-caption className="absolute bottom-7 left-1/2 -translate-x-1/2 text-center">
-          <div
-            className="font-serif text-[13px] tracking-[0.28em]"
-            style={{ color: '#5C4F3F', opacity: 0.75 }}
-          >
-            {t('title')}
-          </div>
-          {/* 「書斎」の下に `STUDY` も出していたが、同じ語が二重に見えると実機レビューで
-              報告された。本文が日本語なので日本語だけ残す。 */}
-          <div className="mt-2 text-[11px]" style={{ color: '#5C4F3F', opacity: 0.6 }}>
-            {t(statusKey)}
-          </div>
-        </div>
-      )}
     </div>
   );
-}
-
-/**
- * 状態から文言を選ぶ。
- *
- * readiness は**数値では出さない**（％表記をしない）。「もうすぐ」だけが 0.9 を境に
- * 言い換わる（00-overview.md「コピー」）。
- */
-export function resolveStatusKey(
-  status: StudyFermentationStatus,
-  readiness: number,
-): 'status_idle' | 'status_fermenting' | 'status_almost' | 'status_completed' {
-  if (status === 'completed') return 'status_completed';
-  if (status === 'idle') return 'status_idle';
-  return readiness >= ALMOST_THRESHOLD ? 'status_almost' : 'status_fermenting';
 }
 
 /** 浮かせる要素に共通の擦りガラス。 */

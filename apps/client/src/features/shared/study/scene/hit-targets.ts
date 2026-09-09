@@ -18,6 +18,13 @@ export interface HitEntry {
   label: 'jar' | 'journal' | 'board' | 'archive' | null;
   /** 手帳と背表紙のツールチップに出す月。 */
   month: string | null;
+  /**
+   * ホバーで出す一言（i18n の鍵の後半）。
+   *
+   * ラベルを持たない的にだけ付ける。ラベルのある的（瓶・手帳・板・棚）は、その
+   * ラベルが濃くなることで「押せる」と分かるので、重ねて言わない。
+   */
+  hint?: 'pen';
 }
 
 /** ヒットボックスの一覧。id から対象を引く。 */
@@ -90,6 +97,22 @@ export function buildHitRegistry(options: {
       });
     });
   }
+
+  /**
+   * 鉛筆。押すと新しいエントリーを書き始める。
+   *
+   * 机の上の物がひととおり押せる中で**鉛筆だけが押せず、存在が浮いていた**
+   * （実機レビュー）。行き先は積みの一番上（当月）と同じ「書く」で、
+   * 物として最も素直に「書く」を指しているのが鉛筆。
+   */
+  registry.add({
+    id: 'pen',
+    target: { kind: 'journal-new' },
+    // ラベルは持たせない。積みの JOURNAL と同じ場所に 2 つ目の注釈が出てしまう。
+    label: null,
+    month: null,
+    hint: 'pen',
+  });
 
   registry.add({ id: 'board', target: { kind: 'board' }, label: 'board', month: null });
 

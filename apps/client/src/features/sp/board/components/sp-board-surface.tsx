@@ -376,8 +376,13 @@ export function SpBoardSurface({
 
       {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。 */}
       <div
-        className="pointer-events-none absolute left-4 top-4 flex items-baseline gap-2"
-        style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
+        className="pointer-events-none absolute top-4 flex items-baseline gap-2"
+        style={{
+          // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと日付に重なる。
+          left: 'max(1rem, var(--study-back-inset, 0px))',
+          color: 'var(--date-color)',
+          fontFamily: 'Inter, sans-serif',
+        }}
       >
         <span className="text-[11px] tracking-[0.16em]">{formatCornerDate(dateKey)}</span>
         <span className="text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>

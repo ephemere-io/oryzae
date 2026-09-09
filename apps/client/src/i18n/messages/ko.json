@@ -713,10 +713,6 @@
   },
   "study": {
     "title": "서재",
-    "status_idle": "아직 아무것도 없습니다",
-    "status_fermenting": "발효 중",
-    "status_almost": "곧 발효됩니다",
-    "status_completed": "편지가 도착했습니다",
     "label_jar": "JAR",
     "label_journal": "JOURNAL",
     "label_board": "BOARD",
@@ -752,6 +748,7 @@
     "fallback_journal": "기록 쓰기",
     "fallback_board": "보드 열기",
     "word_question_gone": "질문이 남아 있지 않습니다",
-    "questions_timeline": "질문의 변천"
+    "questions_timeline": "질문의 변천",
+    "hint_pen": "엔트리를 쓰다"
   }
 }

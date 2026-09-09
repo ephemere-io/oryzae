@@ -718,7 +718,7 @@ export function EntryEditor({
         className={`flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}
         // 書斎が有効な間、左上には「書斎へ戻る」マークが浮く。席を空けないと
         // マークが「新規」ボタンの上に重なって押せなくなる（変数は (protected)/layout.tsx）。
-        style={{ paddingLeft: 'calc(1rem + var(--study-back-inset, 0px))' }}
+        style={{ paddingLeft: 'max(1rem, var(--study-back-inset, 0px))' }}
       >
         <div className="flex items-center gap-2">
           {/* New entry */}
@@ -1075,7 +1075,7 @@ export function EntryEditor({
         className={`border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}
         // 「書斎へ戻る」マークは上端の 2 行にまたがる高さがある。ツールバーだけ空けても
         // この行の左端に重なるので、同じ幅を空ける。
-        style={{ paddingLeft: 'calc(1rem + var(--study-back-inset, 0px))' }}
+        style={{ paddingLeft: 'max(1rem, var(--study-back-inset, 0px))' }}
       >
         <QuestionLinker
           activeQuestions={activeQuestions}

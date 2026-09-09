@@ -52,6 +52,7 @@ import {
   RULES,
   SPINE_LABEL,
   SPREAD_PAGES,
+  STACK_GAP,
   shelfSpineOffsets,
   spineLabelText,
   stackTopY,
@@ -141,6 +142,8 @@ type JarWords = {
   angle: number;
   text: string;
   question: string | null;
+  /** ホバーで大きくする前の寸法。戻すときに要る。 */
+  baseScale: Vector3;
 }[];
 
 export interface HoverInfo {
@@ -154,6 +157,8 @@ export interface HoverInfo {
    * `month` とは同時に立たない。
    */
   word: { text: string; question: string | null } | null;
+  /** ラベルを持たない的（鉛筆）に触れているとき、ホバーで出す一言。 */
+  hint: 'pen' | null;
   /** ツールチップを出す画面座標。 */
   screen: { x: number; y: number };
 }
@@ -197,6 +202,14 @@ export interface StudySceneHandle {
 
 /** 秒。四方の計算で使う。 */
 const MS_PER_SECOND = 1000;
+
+/**
+ * 触れている語を大きくする倍率。
+ *
+ * 的（3D の物）のホバーは 1.02 だが、語は元が小さいので同じ比では気づけない。
+ * 「今どれに触れているのか分からない」という報告への答えなので、はっきり変える。
+ */
+const WORD_HOVER_SCALE = 1.28;
 
 /** 輪郭の呼吸の周期（ms）。 */
 const OUTLINE_BREATH_MS = 4000;
@@ -282,6 +295,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       sealGroup: seal?.group ?? null,
       shelfGroup: books.shelfGroup,
       boardGroup: board.group,
+      penGroup: books.penGroup,
     });
 
     for (const group of groups) scene.add(group);
@@ -508,6 +522,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     // 呼吸と同じ「せわしない」揺れになる（原案は sin(t * 0.3) / cos(t * 0.1)）。
     const seconds = elapsed / MS_PER_SECOND;
     content.jar.words.forEach((word, index) => {
+      // **触れている語は止める。** 漂い続ける的は、狙いを定めているあいだに逃げる
+      // （「結構押しにくい」と実機レビューで報告された）。止めるのはその 1 語だけで、
+      // 周りは漂ったまま — 全部止めると瓶が固まって見える。
+      if (word === hoveredWord) return;
       const bob = Math.sin(seconds * 0.3 + index) * WORD_BOB_AMPLITUDE;
       const orbit = seconds * 0.1 + word.angle;
       word.sprite.position.set(
@@ -608,17 +626,23 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function setHoveredWord(word: JarWords[number] | null): void {
     if (word?.text === hoveredWord?.text) return;
+
+    // 触れていた語を元の大きさへ戻す。**どの語に触れているかが見た目で分からないと、
+    // 押せることも、どれを押しているかも伝わらない**（実機レビュー）。
+    if (hoveredWord) hoveredWord.sprite.scale.copy(hoveredWord.baseScale);
     hoveredWord = word;
     if (!word) {
       // 語から離れたときは、的のホバー（setHovered）が続けて知らせる。
       options.onHoverChange?.(null);
       return;
     }
+    word.sprite.scale.copy(word.baseScale).multiplyScalar(WORD_HOVER_SCALE);
     renderer.domElement.style.cursor = 'pointer';
     options.onHoverChange?.({
       label: null,
       month: null,
       word: { text: word.text, question: word.question },
+      hint: null,
       screen: projectHover(word.sprite),
     });
   }
@@ -658,6 +682,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
             label: entry.label,
             month: entry.month,
             word: null,
+            hint: entry.hint ?? null,
             screen: projectHover(hoveredObject),
           }
         : null,
@@ -988,22 +1013,114 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
     ),
   );
 
-  // 前脚 2 本。床まで伸ばす。
-  for (const x of [-halfWidth + 0.5, halfWidth - 0.5]) {
+  /**
+   * 天板の下に**構造を足す**。
+   *
+   * 以前は天板の輪郭・木端 1 本・線 1 本の脚だけで、引くと「板を棒で支えたちゃぶ台」に
+   * 見える、と実機レビューで報告された。机の高さ（天板 -1.2 / 床 -2.9）は構図が
+   * 依存しているので変えられないが、**下に何が詰まっているか**は足せる。
+   * 幕板・引き出し・板の脚を線で入れると、同じ高さでも「書き物机」として読める。
+   */
+  const apronBottom = edgeBottom - 0.28;
+  const frontZ = zNear - 0.05;
+
+  // 幕板。天板の下に横一本の帯を通すと、板 1 枚には見えなくなる。
+  group.add(
+    lineFrom(
+      [
+        new Vector3(-halfWidth + 0.45, edgeBottom, frontZ),
+        new Vector3(-halfWidth + 0.45, apronBottom, frontZ),
+        new Vector3(halfWidth - 0.45, apronBottom, frontZ),
+        new Vector3(halfWidth - 0.45, edgeBottom, frontZ),
+      ],
+      materials.faint(0.2),
+      own,
+    ),
+  );
+
+  // 左の引き出し。**これが「机」を決める。** 箱を 1 つ置くだけで、卓ではなく机になる。
+  const drawerLeft = -halfWidth + 0.55;
+  const drawerRight = drawerLeft + 2.7;
+  const drawerZ = zNear - 0.15;
+  group.add(
+    lineFrom(
+      [
+        new Vector3(drawerLeft, apronBottom, drawerZ),
+        new Vector3(drawerLeft, layout.floorY + 0.12, drawerZ),
+        new Vector3(drawerRight, layout.floorY + 0.12, drawerZ),
+        new Vector3(drawerRight, apronBottom, drawerZ),
+      ],
+      materials.faint(0.22),
+      own,
+    ),
+  );
+
+  // 引き出し 2 段。仕切りと、その中央に短い引手。
+  const drawerHeight = apronBottom - (layout.floorY + 0.12);
+  for (const step of [1 / 3, 2 / 3]) {
+    const yAt = apronBottom - drawerHeight * step;
     group.add(
       lineFrom(
-        [new Vector3(x, edgeBottom, zNear - 0.2), new Vector3(x, layout.floorY, zNear - 0.2)],
-        materials.faint(0.2),
+        [new Vector3(drawerLeft, yAt, drawerZ), new Vector3(drawerRight, yAt, drawerZ)],
+        materials.faint(0.16),
+        own,
+      ),
+    );
+  }
+  const drawerCenter = (drawerLeft + drawerRight) / 2;
+  for (const step of [1 / 6, 1 / 2, 5 / 6]) {
+    const yAt = apronBottom - drawerHeight * step;
+    group.add(
+      lineFrom(
+        [
+          new Vector3(drawerCenter - 0.34, yAt, drawerZ + 0.02),
+          new Vector3(drawerCenter + 0.34, yAt, drawerZ + 0.02),
+        ],
+        materials.faint(0.26),
         own,
       ),
     );
   }
 
-  // 木目を示唆する長い 1 本。
+  // 右脚は板脚。1 本線だと棒に見え、卓の印象が残る。
+  const legRight = halfWidth - 0.5;
+  const legLeft = legRight - 0.62;
+  group.add(
+    lineFrom(
+      [
+        new Vector3(legLeft, apronBottom, frontZ),
+        new Vector3(legLeft, layout.floorY, frontZ),
+        new Vector3(legRight, layout.floorY, frontZ),
+        new Vector3(legRight, apronBottom, frontZ),
+      ],
+      materials.faint(0.2),
+      own,
+    ),
+  );
+
+  // 奥行きの手掛かり。前面だけだと書割に見えるので、脚の奥行き方向を薄く 2 本。
+  for (const x of [legLeft, drawerRight]) {
+    group.add(
+      lineFrom(
+        [new Vector3(x, layout.floorY, frontZ), new Vector3(x, layout.floorY, zFar + 1.6)],
+        materials.faint(0.08),
+        own,
+      ),
+    );
+  }
+
+  // 木目を示唆する 2 本。
   group.add(
     lineFrom(
       [new Vector3(-halfWidth + 0.8, y, zFar + 1.2), new Vector3(halfWidth - 0.8, y, zFar + 1.6)],
       materials.faint(0.06),
+      own,
+    ),
+  );
+  group.add(
+    lineFrom(
+      [new Vector3(-halfWidth + 1.6, y, zFar + 3.1), new Vector3(halfWidth - 1.2, y, zFar + 3.4)],
+      materials.faint(0.05),
       own,
     ),
   );
@@ -1186,6 +1303,7 @@ function buildJar(
       angle: placement.angle,
       text: placement.word,
       question: questionByWord.get(placement.word) ?? null,
+      baseScale: sprite.scale.clone(),
     });
   }
 
@@ -1261,6 +1379,8 @@ interface BooksParts {
   shelfSpines: Group[];
   /** 棚ごと 1 つの的にするとき（SP）にホバーで拡大するグループ。 */
   shelfGroup: Group;
+  /** 鉛筆。押すと新しいエントリーを書き始める（ホバーで少し持ち上がる）。 */
+  penGroup: Group;
 }
 
 function buildBooks(
@@ -1436,7 +1556,8 @@ function buildBooks(
   });
 
   // ペンは手帳の右脇に単体で寝かせる。本の輪郭に重なると軸だけが見えて何か分からなくなる。
-  group.add(buildPen(layout, materials, own));
+  const penGroup = buildPen(layout, materials, own);
+  group.add(penGroup);
 
   // 奥の棚。
   const shelfGroup = new Group();
@@ -1508,7 +1629,16 @@ function buildBooks(
   });
   group.add(shelfGroup);
 
-  return { group, baseRotationY, topCover, topPages, deskPlacements, shelfSpines, shelfGroup };
+  return {
+    group,
+    baseRotationY,
+    topCover,
+    topPages,
+    deskPlacements,
+    shelfSpines,
+    shelfGroup,
+    penGroup,
+  };
 }
 
 /** 胴＋ペン先の円錐＋バンド 2 本。線画でもペンとして読める最小の構成。 */
@@ -1676,6 +1806,7 @@ function buildHitboxes(options: {
   sealGroup: Group | null;
   shelfGroup: Group;
   boardGroup: Group;
+  penGroup: Group;
 }): Mesh[] {
   const { layout, materials, ownGeometry } = options;
   const boxes: Mesh[] = [];
@@ -1712,12 +1843,15 @@ function buildHitboxes(options: {
   }
 
   // 机の冊はそれぞれを囲む箱。
+  //
+  // 高さに積みの隙間（STACK_GAP）を足す。冊と冊のあいだに当たりの無い帯が残ると、
+  // そこを狙ったつもりの指がすり抜ける。隙間は隣り合う 2 冊で分け合う。
   options.desk.forEach((placement, index) => {
     const world = new Vector3();
     placement.group.getWorldPosition(world);
     box(
       `notebook-${index}`,
-      [NOTEBOOK_SIZE.width, Math.max(placement.thickness, 0.12), NOTEBOOK_SIZE.depth],
+      [NOTEBOOK_SIZE.width, placement.thickness + STACK_GAP, NOTEBOOK_SIZE.depth],
       new Vector3(world.x, world.y + placement.thickness / 2, world.z),
       placement.group,
     );
@@ -1738,6 +1872,20 @@ function buildHitboxes(options: {
       box(`spine-${index}`, [0.3, 1.5, 0.4], new Vector3(world.x, world.y + 0.7, world.z), spine);
     });
   }
+
+  /**
+   * 鉛筆。**物より大きく囲む。**
+   *
+   * 軸の太さは半径 0.055 しかなく、そのまま囲うと矢印でも指でも当たらない
+   * （押せる物の中で鉛筆だけが押せなかった理由の半分はこれ）。物の見た目は
+   * 変えずに、当たりだけ手に馴染む太さにする。
+   */
+  box(
+    'pen',
+    [0.7, 0.5, 2.6],
+    new Vector3(layout.pen.x, layout.pen.y + 0.1, layout.pen.z),
+    options.penGroup,
+  );
 
   // ボードは板より 0.2 大きい箱。
   box(

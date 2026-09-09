@@ -713,10 +713,6 @@
   },
   "study": {
     "title": "書斎",
-    "status_idle": "まだ何もありません",
-    "status_fermenting": "発酵中",
-    "status_almost": "もうすぐ発酵します",
-    "status_completed": "手紙が届いています",
     "label_jar": "JAR",
     "label_journal": "JOURNAL",
     "label_board": "BOARD",
@@ -752,6 +748,7 @@
     "fallback_journal": "エントリーを書く",
     "fallback_board": "ボードを開く",
     "word_question_gone": "問いは残っていません",
-    "questions_timeline": "問いの変遷"
+    "questions_timeline": "問いの変遷",
+    "hint_pen": "エントリーを書く"
   }
 }

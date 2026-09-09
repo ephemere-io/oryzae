@@ -9,7 +9,11 @@ import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unrea
 import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
-import { BackToStudy } from '@/features/shared/study/components/back-to-study';
+import {
+  BACK_MARK_SEAT_X,
+  BACK_MARK_SEAT_Y,
+  BackToStudy,
+} from '@/features/shared/study/components/back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
@@ -46,22 +50,20 @@ const studyMainStyle: MainStyle = {
 };
 
 /**
- * 左上のマーク（BackToStudy）が占める幅。
+ * 左上のマーク（BackToStudy）を避けるための座標。
  *
  * マークはどの画面の上にも浮くので、画面側の左上に操作があるとその上に重なる
- * （エディタの「新規」ボタンがまさにそうだった）。**画面側が席を空けるための変数**で、
- * 読むのは PC/SP のエディタの上端の行だけ。マークが出ていない間は 0px。
+ * （エディタの「新規」ボタン、ボードの上部バー、SP の日付がそうだった）。
+ * **画面側が席を空けるための変数**で、マークが出ていない間は 0px。
  *
- * マーク自体を 40px から 32px へ縮めた（実機レビューで「既存 UI の邪魔になる」）ので、
- * 席も 44px → 34px に詰める。左端 16px + マーク 32px から、隣の操作との最小の間を取る。
+ * 値はマークの外形から導く（`BACK_MARK_SEAT_X` / `_Y`）。手で決めた定数にしていた
+ * ころ、マークを縮めたときに席だけ別に詰めてしまい、席がマークより狭くなって
+ * 重なりが残った。数字を 2 か所で持つと必ずずれる。
+ *
+ * **中身は「絶対座標」。** 読む側は自前の余白に足すのではなく `max()` で比べる。
  */
-const STUDY_BACK_INSET = '34px';
-
-/**
- * マークの下端。左に幅を空けるだけでは足りない行（SP エディタのタイトル）が、
- * ここまで下がって重なりを避ける。マークの高さ（32px）＋上端 16px より内側で足りる。
- */
-const STUDY_BACK_DROP = '20px';
+const STUDY_BACK_INSET = `${BACK_MARK_SEAT_X}px`;
+const STUDY_BACK_DROP = `${BACK_MARK_SEAT_Y}px`;
 
 const studyBackStyle: MainStyle = {
   '--study-back-inset': STUDY_BACK_INSET,

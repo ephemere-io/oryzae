@@ -713,10 +713,6 @@
   },
   "study": {
     "title": "书斋",
-    "status_idle": "还没有任何内容",
-    "status_fermenting": "发酵中",
-    "status_almost": "即将发酵",
-    "status_completed": "信件已送达",
     "label_jar": "JAR",
     "label_journal": "JOURNAL",
     "label_board": "BOARD",
@@ -752,6 +748,7 @@
     "fallback_journal": "写下记录",
     "fallback_board": "打开看板",
     "word_question_gone": "该提问已不存在",
-    "questions_timeline": "提问的变迁"
+    "questions_timeline": "提问的变迁",
+    "hint_pen": "写一篇记录"
   }
 }

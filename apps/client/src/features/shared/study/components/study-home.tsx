@@ -19,6 +19,7 @@ import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
 import { StudyChrome } from './study-chrome';
 import { StudyFallback } from './study-fallback';
+import { StudyHintTooltip } from './study-hint-tooltip';
 import { type LabelKind, StudyLabels } from './study-labels';
 import { StudyTooltip } from './study-tooltip';
 import { StudyWordTooltip } from './study-word-tooltip';
@@ -38,11 +39,9 @@ export interface StudyHomeProps {
    * ここでは端末を判定しない（features/shared の規約）。
    */
   layout: StudyLayout;
-  /** 下端のキャプションを出すか。SP はボトムナビと競合するので出さない。 */
-  showCaption?: boolean;
 }
 
-export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
+export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
   const { api, auth, loading: authLoading } = useAuth();
   const { theme } = useTheme();
@@ -209,11 +208,8 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
       )}
 
       <StudyChrome
-        status={state.fermentation.status}
-        readiness={state.fermentation.readiness}
         initial={initialOf(auth?.user.nickname, auth?.user.email)}
         avatarUrl={auth?.user.avatarUrl}
-        showCaption={showCaption && overlay === null}
       />
 
       {/* その冊に何が入っているかを、開く前に見せる。 */}
@@ -230,6 +226,12 @@ export function StudyHome({ layout, showCaption = true }: StudyHomeProps) {
           current={hover.month === state.now.slice(0, 7)}
           screen={hover.screen}
         />
+      )}
+
+      {/* 鉛筆に触れたとき、押すと何が起きるかを一言で見せる。鉛筆はラベルを持たない
+          （積みの JOURNAL と重なるため）ので、これが唯一の予告になる。 */}
+      {overlay === null && hover?.hint === 'pen' && (
+        <StudyHintTooltip textKey="hint_pen" screen={hover.screen} />
       )}
 
       {/* 瓶の語に触れたとき、その語が出てきた問いを見せる。語だけでは何を指すのか

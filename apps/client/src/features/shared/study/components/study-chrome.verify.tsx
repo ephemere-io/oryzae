@@ -1,99 +1,46 @@
 /**
  * StudyChrome の検証スペック。
  *
- * 書斎に浮かぶ唯一の UI。**readiness を数値で出さない**という規則（00-overview.md
- * 「コピー」）が守られていることを、ここで機械的に見る。
+ * 書斎に浮かぶ唯一の UI。守るのは「**文字を置かない**」— 部屋の名前も発酵の状態も、
+ * 物が既に語っているので UI では言い直さない（実機レビュー: もう少しすっきりさせたい）。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import type { StudyFermentationStatus } from '../types';
 import { StudyChrome } from './study-chrome';
 
 interface Props {
-  status: StudyFermentationStatus;
-  readiness: number;
   initial: string;
   avatarUrl?: string | null;
-  showCaption?: boolean;
 }
 
 registerUnit<Props>({
   id: 'StudyChrome',
   title: 'StudyChrome',
-  description: '書斎のフローティング UI（マーク・アバター・状態キャプション）',
+  description: '書斎のフローティング UI（左上のマークと左下のアバターだけ）',
   kind: 'component',
   render: (props) => withVerifyProviders(<StudyChrome {...props} />),
   fixtures: [
+    { id: 'default', description: 'アバターは頭文字', props: { initial: 'A' } },
     {
-      id: 'idle',
-      description: 'まだ何も無い',
-      props: { status: 'idle', readiness: 0, initial: 'A' },
-    },
-    {
-      id: 'fermenting',
-      description: '発酵中',
-      props: { status: 'fermenting', readiness: 0.45, initial: 'A' },
-    },
-    {
-      id: 'almost',
+      id: 'with-avatar',
       probe: true,
-      description: 'Probe: readiness 0.9 以上で「もうすぐ」に言い換わる',
-      props: { status: 'fermenting', readiness: 0.93, initial: 'A' },
-    },
-    {
-      id: 'completed',
-      description: '手紙が届いている',
-      props: { status: 'completed', readiness: 1, initial: 'A' },
-    },
-    {
-      id: 'sp-no-caption',
-      probe: true,
-      description: 'Probe: SP はキャプションを出さない（下端のナビと競合する）',
-      props: { status: 'fermenting', readiness: 0.5, initial: 'A', showCaption: false },
+      description: 'Probe: 画像があれば頭文字ではなく画像を出す',
+      props: { initial: 'A', avatarUrl: 'https://example.test/a.png' },
     },
   ],
   invariants: [
     {
-      id: 'no-numeric-readiness',
-      description: 'readiness を数値（％や小数）で出さない',
-      check: ({ root, props }) => {
-        const text = root.textContent ?? '';
-        if (text.includes('%')) return '％表記が出ている';
-        const percent = String(Math.round(props.readiness * 100));
-        // 0 と 1 は他の文言に紛れうるので、意味のある値だけを見る。
-        if (props.readiness > 0.01 && text.includes(percent)) {
-          return `readiness の数値 "${percent}" が出ている`;
-        }
-        return true;
-      },
-    },
-    {
-      id: 'status-key-contract',
-      description: '状態語が status と readiness の組から決まる',
-      check: ({ contract, props }) => {
-        const expected =
-          props.status === 'completed'
-            ? 'status_completed'
-            : props.status === 'idle'
-              ? 'status_idle'
-              : props.readiness >= 0.9
-                ? 'status_almost'
-                : 'status_fermenting';
-        return (
-          contract.statusKey === expected ||
-          `statusKey 不一致: expected=${expected} actual=${contract.statusKey}`
-        );
-      },
-    },
-    {
-      id: 'one-name-for-the-room',
-      description: '部屋の名前を二重に出さない（「書斎」と「STUDY」が並ばない）',
+      id: 'no-caption',
+      description: '部屋の名前も状態語も置かない（物が語っているものを言い直さない）',
       check: ({ root }) => {
+        // 以前は下端に「書斎」と「手紙が届いています」を出していた。手紙が届いた
+        // ことは瓶の封が伝える（未読の数字バッジを出さないのと同じ理由）。
         const caption = root.querySelector('[data-study-caption]');
-        if (caption === null) return true;
-        const text = caption.textContent ?? '';
-        return !text.includes('STUDY') || '「書斎」の下に STUDY も出ている';
+        if (caption !== null) return 'キャプションが残っている';
+        // アバターの頭文字以外に読める文字を置かない。
+        const text = (root.textContent ?? '').replace(/\s/g, '');
+        return text.length <= 1 || `文字が残っている: "${text.slice(0, 20)}"`;
       },
     },
     {
@@ -121,14 +68,13 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'caption-toggles',
-      description: 'showCaption=false でキャプションを出さない',
-      // 文言そのもの（以前は 'STUDY'）で見ると、語を変えるたびに検証も壊れる。
-      // 「キャプションという場所があるか」を目印で見る。
+      id: 'avatar-falls-back-to-initial',
+      description: '画像が無ければ頭文字を出す（空の丸にしない）',
       check: ({ root, props }) => {
-        const hasCaption = Boolean(root.querySelector('[data-study-caption]'));
-        const expected = props.showCaption !== false;
-        return hasCaption === expected || `キャプションの出し分けが契約と違う`;
+        const hasImage = root.querySelector('img') !== null;
+        if (props.avatarUrl) return hasImage || '画像があるのに出していない';
+        const text = (root.textContent ?? '').trim();
+        return text.includes(props.initial) || '頭文字が出ていない';
       },
     },
   ],
