@@ -33,6 +33,7 @@ import '@/features/pc/entries/components/photo-import-modal.verify';
 import '@/features/pc/entries/components/question-chip.verify';
 import '@/features/pc/entries/components/question-select-modal.verify';
 import '@/features/pc/entries/components/save-title-modal.verify';
+import '@/features/pc/entries/components/save-transition.verify';
 import '@/features/pc/entries/components/settings-drawer.verify';
 import '@/features/pc/board/components/board-card.verify';
 import '@/features/pc/board/components/card-text-glyph.verify';

@@ -160,6 +160,15 @@ const PAGE_TOP_INSET = 32;
 const TITLE_TO_BODY_GAP = 24;
 
 /**
+ * 横書きだけ、題と本文のあいだを狭く取る。
+ *
+ * 縦書きの 24px は**同じ向きに流れる2本の文字列**を隔てる間合いで、これだけ空けないと
+ * 題の桁が本文の1桁目に見える。横書きの題は見出しとして本文の上に載り、**大きさの差**が
+ * すでに「別のもの」だと言っているので、同じだけ空けると離れて見える。
+ */
+const TITLE_TO_BODY_GAP_HORIZONTAL = 14;
+
+/**
  * 題の筋（縦書きなら桁、横書きなら行）1本ぶんの太さ。字の何倍か。
  *
  * **箱の太さと行の高さが同じ数字を見る**のが肝要。かつて箱が 1.6 倍・行が 1.4 倍で、
@@ -667,7 +676,9 @@ export function EntryEditor({
         userMe.refresh();
 
         if (options.fermentationEnabled && onPickled && editorRef.current && finalContent.trim()) {
-          await runSaveTransition(finalContent, editorRef.current);
+          // **どの瓶へ入るか**を渡す。書いたものはこの問いに納まるので、演出も
+          // その瓶を狙う（渡さないと、画面に見えている瓶のうち近いものになる）。
+          await runSaveTransition(finalContent, editorRef.current, Array.from(linkedIds)[0]);
           onPickled();
         } else if (isNew) {
           router.push(`/entries/${savedId}`);
@@ -1274,7 +1285,7 @@ export function EntryEditor({
   // 本文が空ける場所。**箱ではなく字の端**から測るので、桁を広げても間合いは変わらない。
   const titleReservePx = Math.max(0, titleThicknessPx - titleHalfLeadingPx);
   // 横書きは題が本文の真上に据わるので、紙の上端からの余白と題の厚みぶんを空ける。
-  const horizontalTitleReservePx = PAGE_TOP_INSET + titleReservePx + TITLE_TO_BODY_GAP;
+  const horizontalTitleReservePx = PAGE_TOP_INSET + titleReservePx + TITLE_TO_BODY_GAP_HORIZONTAL;
 
   /**
    * 題が縮んだぶん、スクロールを戻して**読んでいる行を止める**。

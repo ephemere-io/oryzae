@@ -223,6 +223,9 @@ export function QuestionCircle({
       {...circlePointerHandlers}
       {...verifyAttrs({
         unit: 'QuestionCircle',
+        // どの問いの瓶か。漬け込みの演出が**この問いの瓶**を狙って字を飛ばす
+        // （画面の中心にいちばん近い円、では別の瓶に入ってしまう）。
+        questionId,
         zoomed,
         dimmed,
         hasData: Boolean(hasData),

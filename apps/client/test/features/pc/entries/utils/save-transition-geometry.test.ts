@@ -29,13 +29,39 @@ describe('findJarDestination', () => {
     });
   }
 
-  function addUnit(unit: string, rect: { left: number; top: number; w: number; h: number }) {
+  function addUnit(
+    unit: string,
+    rect: { left: number; top: number; w: number; h: number },
+    questionId?: string,
+  ) {
     const el = document.createElement('div');
     el.setAttribute('data-verify-unit', unit);
+    if (questionId) el.setAttribute('data-verify-question-id', questionId);
     document.body.appendChild(el);
     place(el, rect);
     return el;
   }
+
+  // ここが本筋。書いたものはその問いに納まるので、狙いは問いで確定する。
+  it('漬け込んだ問いの瓶を狙う（近さでは選ばない）', () => {
+    // 画面の中心にいちばん近いのは別の問いの瓶。それでも自分の問いへ飛ぶ。
+    addUnit('QuestionCircle', { left: 480, top: 350, w: 60, h: 60 }, 'other');
+    addUnit('QuestionCircle', { left: 20, top: 20, w: 100, h: 100 }, 'mine');
+
+    const d = findJarDestination('mine');
+
+    expect(d.x).toBe(70);
+    expect(d.y).toBe(70);
+  });
+
+  it('その問いの瓶がまだ描かれていなければ、近い瓶に落とす（字を消さない）', () => {
+    addUnit('QuestionCircle', { left: 480, top: 350, w: 60, h: 60 }, 'other');
+
+    const d = findJarDestination('mine');
+
+    expect(d.x).toBe(510);
+    expect(d.y).toBe(380);
+  });
 
   it('瓶（問いの円）があれば、その中心へ吸い込む', () => {
     addUnit('QuestionCircle', { left: 400, top: 200, w: 200, h: 200 });

@@ -26,110 +26,129 @@ import {
  * していたため、左のサイドバーぶんずれ、瓶がどこにあっても同じ場所へ吸い込んでいた。
  * **「変なところにズームアップされて、瓶に入っていくように見えない」**のはこれ。
  *
- * `run(text, editorEl)` は 1.5 秒で resolve する。呼ぶ側はそこで /jar へ移り、
- * 演出は overlay の上でそのまま続く（合計 ~6.5 秒）。
+ * `run(text, editorEl, questionId)` は 1.5 秒で resolve する。呼ぶ側はそこで /jar へ移り、
+ * 演出は overlay の上でそのまま続く（合計 ~6.5 秒）。`questionId` を渡すと、
+ * **その問いの瓶**を狙って字が飛ぶ（渡さないと、見えている瓶のうち近いものになる）。
  */
 export function useSaveTransition() {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const runningRef = useRef(false);
 
-  const run = useCallback((text: string, editorEl: HTMLElement | null): Promise<void> => {
-    if (runningRef.current || !editorEl) return Promise.resolve();
-    runningRef.current = true;
+  const run = useCallback(
+    (text: string, editorEl: HTMLElement | null, questionId?: string): Promise<void> => {
+      if (runningRef.current || !editorEl) return Promise.resolve();
+      runningRef.current = true;
 
-    return new Promise<void>((resolve) => {
-      // 紙の上の字を、いる場所ごと測る。text は保険（測れない環境では演出を出さない）。
-      const placements = text.trim() ? measureCharPlacements(editorEl, MAX_TRANSITION_CHARS) : [];
-      if (placements.length === 0) {
-        runningRef.current = false;
-        resolve();
-        return;
-      }
-
-      const overlay = ensureOverlay(overlayRef);
-      overlay.innerHTML = '';
-      overlay.classList.remove('phase-scatter', 'phase-condense', 'phase-float');
-      overlay.classList.add('active');
-      ensureStyles();
-
-      const style = getComputedStyle(editorEl);
-      const fontSize = Number.parseFloat(style.fontSize);
-      const charEls = placements.map((placement) =>
-        createCharElement(placement, {
-          fontSize,
-          fontFamily: style.fontFamily,
-          color: style.color,
-          overlay,
-        }),
-      );
-
-      // ── 散る。ここは紙の上での話なので、始める前に決められる ──
-      const screenCX = window.innerWidth / 2;
-      const screenCY = window.innerHeight / 2;
-      for (const [i, el] of charEls.entries()) {
-        const placement = placements[i];
-        if (!placement) continue;
-        const dx = placement.x - screenCX;
-        const dy = placement.y - screenCY;
-        const dist = Math.hypot(dx, dy) || 1;
-        const magnitude = 300 + Math.random() * 500;
-        el.style.setProperty('--tx', `${(dx / dist) * magnitude + (Math.random() - 0.5) * 200}px`);
-        el.style.setProperty('--ty', `${(dy / dist) * magnitude + (Math.random() - 0.5) * 200}px`);
-        el.style.setProperty('--r', `${(Math.random() - 0.5) * 720}deg`);
-      }
-
-      // 70% は最後に消える。残りが瓶の中で漂う。
-      const fadeChars = new Set(
-        [...charEls].sort(() => Math.random() - 0.5).slice(0, Math.floor(charEls.length * 0.7)),
-      );
-
-      // タイマーは**片付けない**。演出は 1.5s で紙の画面が消えたあとも瓶の上で
-      // 続くので、アンマウントで止めると途中で終わってしまう。
-
-      // 段1（0s）: 散る
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => overlay.classList.add('phase-scatter'));
-      });
-
-      // 段2（1.5s）: 呼ぶ側が /jar へ移る
-      setTimeout(() => resolve(), 1500);
-
-      // 段3（2s）: 瓶に集まる。**ここで初めて瓶の場所が分かる**（画面が入れ替わったあと）。
-      setTimeout(() => {
-        const destination = findJarDestination();
-        applyDestination(charEls, placements, destination);
-        overlay.classList.remove('phase-scatter');
-        overlay.classList.add('phase-condense');
-      }, 2000);
-
-      // 段4（3.5s）: 漂って、7割は消える
-      setTimeout(() => {
-        overlay.classList.remove('phase-condense');
-        overlay.classList.add('phase-float');
-        for (const el of charEls) {
-          if (fadeChars.has(el)) el.classList.add('st-hidden');
+      return new Promise<void>((resolve) => {
+        // 紙の上の字を、いる場所ごと測る。text は保険（測れない環境では演出を出さない）。
+        // **ここで投げさせない。** 投げると走行中の印が立ったままになり、以後この画面では
+        // 二度と演出が走らなくなる。書いたものは既に保存されているので、
+        // 測れないときは演出だけ静かに諦めるのが正しい。
+        let placements: CharPlacement[] = [];
+        try {
+          placements = text.trim() ? measureCharPlacements(editorEl, MAX_TRANSITION_CHARS) : [];
+        } catch {
+          placements = [];
         }
-        setTimeout(() => {
-          for (const el of charEls) {
-            if (!fadeChars.has(el)) el.classList.add('st-float-anim');
-          }
-        }, 1000);
-      }, 3500);
-
-      // 段5（6.5s）: 片付け
-      setTimeout(() => {
-        overlay.style.transition = 'opacity 1.5s ease';
-        overlay.style.opacity = '0';
-        setTimeout(() => {
-          overlay.classList.remove('active', 'phase-scatter', 'phase-condense', 'phase-float');
-          overlay.style.opacity = '';
-          overlay.style.transition = '';
-          overlay.innerHTML = '';
+        if (placements.length === 0) {
           runningRef.current = false;
-        }, 1500);
-      }, 6500);
-    });
-  }, []);
+          resolve();
+          return;
+        }
+
+        const overlay = ensureOverlay(overlayRef);
+        overlay.innerHTML = '';
+        overlay.classList.remove('phase-scatter', 'phase-condense', 'phase-float');
+        overlay.classList.add('active');
+        ensureStyles();
+
+        const style = getComputedStyle(editorEl);
+        const fontSize = Number.parseFloat(style.fontSize);
+        const charEls = placements.map((placement) =>
+          createCharElement(placement, {
+            fontSize,
+            fontFamily: style.fontFamily,
+            color: style.color,
+            overlay,
+          }),
+        );
+
+        // ── 散る。ここは紙の上での話なので、始める前に決められる ──
+        const screenCX = window.innerWidth / 2;
+        const screenCY = window.innerHeight / 2;
+        for (const [i, el] of charEls.entries()) {
+          const placement = placements[i];
+          if (!placement) continue;
+          const dx = placement.x - screenCX;
+          const dy = placement.y - screenCY;
+          const dist = Math.hypot(dx, dy) || 1;
+          const magnitude = 300 + Math.random() * 500;
+          el.style.setProperty(
+            '--tx',
+            `${(dx / dist) * magnitude + (Math.random() - 0.5) * 200}px`,
+          );
+          el.style.setProperty(
+            '--ty',
+            `${(dy / dist) * magnitude + (Math.random() - 0.5) * 200}px`,
+          );
+          el.style.setProperty('--r', `${(Math.random() - 0.5) * 720}deg`);
+        }
+
+        // 70% は最後に消える。残りが瓶の中で漂う。
+        const fadeChars = new Set(
+          [...charEls].sort(() => Math.random() - 0.5).slice(0, Math.floor(charEls.length * 0.7)),
+        );
+
+        // タイマーは**片付けない**。演出は 1.5s で紙の画面が消えたあとも瓶の上で
+        // 続くので、アンマウントで止めると途中で終わってしまう。
+
+        // 段1（0s）: 散る
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => overlay.classList.add('phase-scatter'));
+        });
+
+        // 段2（1.5s）: 呼ぶ側が /jar へ移る
+        setTimeout(() => resolve(), 1500);
+
+        // 段3（2s）: 瓶に集まる。**ここで初めて瓶の場所が分かる**（画面が入れ替わったあと）。
+        setTimeout(() => {
+          const destination = findJarDestination(questionId);
+          applyDestination(charEls, placements, destination);
+          overlay.classList.remove('phase-scatter');
+          overlay.classList.add('phase-condense');
+        }, 2000);
+
+        // 段4（3.5s）: 漂って、7割は消える
+        setTimeout(() => {
+          overlay.classList.remove('phase-condense');
+          overlay.classList.add('phase-float');
+          for (const el of charEls) {
+            if (fadeChars.has(el)) el.classList.add('st-hidden');
+          }
+          setTimeout(() => {
+            for (const el of charEls) {
+              if (!fadeChars.has(el)) el.classList.add('st-float-anim');
+            }
+          }, 1000);
+        }, 3500);
+
+        // 段5（6.5s）: 片付け
+        setTimeout(() => {
+          overlay.style.transition = 'opacity 1.5s ease';
+          overlay.style.opacity = '0';
+          setTimeout(() => {
+            // 面ごと片付ける。中身を空にするだけだと、演出のたびに使い捨ての div が
+            // body に積み上がっていく（紙の画面は演出の途中で消えるので、
+            // この時点でこの hook はもう居ない）。
+            overlay.remove();
+            overlayRef.current = null;
+            runningRef.current = false;
+          }, 1500);
+        }, 6500);
+      });
+    },
+    [],
+  );
 
   return run;
 }

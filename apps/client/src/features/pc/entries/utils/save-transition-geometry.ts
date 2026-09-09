@@ -33,6 +33,12 @@ function isBlank(char: string): boolean {
  * 演出全体が散漫になる。
  */
 export function measureCharPlacements(editor: HTMLElement, limit: number): CharPlacement[] {
+  const probe = document.createRange();
+  // 組版を持たない環境（テストの DOM など）では Range が矩形を答えられない。
+  // **そこで投げると、演出が二度と走らなくなる**（走行中の印が立ったまま戻らない）。
+  // 測れないなら「飛ばす字は無い」として静かに降りる。
+  if (typeof probe.getBoundingClientRect !== 'function') return [];
+
   const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
   const placements: CharPlacement[] = [];
   const viewWidth = window.innerWidth;
@@ -87,25 +93,38 @@ const MAX_RADIUS = 90;
  * 字が吸い込まれる先。**遷移したあとの画面から探す。**
  *
  * 演出が始まる時点では瓶の画面はまだ無いので、始める前には決められない。
- * 画面の中央を決め打ちにしていたのが元の作りで、左のサイドバーぶんずれるうえ、
- * 瓶が画面のどこにあっても同じ場所へ吸い込んでいた。
  *
  * 探す順番:
- *   1. 瓶そのもの（問いの円）。複数あるときは画面の中心にいちばん近いもの
- *   2. 瓶の画面ぜんたい
- *   3. サイドバーを除いた紙の中央（瓶の画面に着いていないとき）
+ *   1. **漬け込んだ問いの瓶。** 書いたものはその問いに納まるので、狙いはここで確定する
+ *   2. 画面に見えている瓶のうち、いちばん近いもの（問いが分からないとき）
+ *   3. 瓶の画面ぜんたい
+ *   4. サイドバーを除いた紙の中央（瓶の画面に着いていないとき）
+ *
+ * 2 以降は当て推量なので、**1 で決まるのが本筋**。画面の中心を決め打ちにしていた頃は
+ * 左のサイドバーぶんずれ、瓶が画面のどこにあっても同じ場所へ吸い込んでいた。
+ *
+ * @param questionId 漬け込んだ問い。分からなければ省く。
  */
-export function findJarDestination(): Destination {
+export function findJarDestination(questionId?: string): Destination {
   const circles = Array.from(document.querySelectorAll('[data-verify-unit="QuestionCircle"]'));
-  if (circles.length > 0) {
-    const nearest = pickNearestToCenter(circles);
-    if (nearest) return fromRect(nearest);
+
+  if (questionId) {
+    const own = circles.find((el) => el.getAttribute('data-verify-question-id') === questionId);
+    if (own && hasSize(own)) return fromRect(own);
   }
 
+  const nearest = pickNearestToCenter(circles);
+  if (nearest) return fromRect(nearest);
+
   const jar = document.querySelector('[data-verify-unit="JarView"]');
-  if (jar) return fromRect(jar);
+  if (jar && hasSize(jar)) return fromRect(jar);
 
   return contentCenter();
+}
+
+function hasSize(el: Element): boolean {
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
 }
 
 function pickNearestToCenter(elements: Element[]): Element | null {
