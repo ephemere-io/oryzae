@@ -214,7 +214,15 @@ bypass に指定できるのは、組織にインストールされた App・チ
 | 自動マージまで通す | Admin 権限の fine-grained PAT を `AUTO_FIX_TOKEN` に入れる | ループが `--admin` でマージする |
 | PR まで自動化する | 何もしない | 修正とブランチと PR は自動。マージだけ人がする（差分は失われない） |
 
-PAT は「このリポジトリのみ」に絞り、`contents: write` と `pull requests: write` を与える。
+PAT は「このリポジトリのみ」に絞り、**Contents: Read and write** と
+**Pull requests: Read and write** の 2 つだけを与える。それ以上は要らない。
+
+**この PAT をジョブ全体の `GH_TOKEN` にしてはならない。** 一度そうしたところ、
+PAT に issues / actions の権限が無かったため「マージは成功したのに台帳への記録が 403 で落ちる」
+という最悪の形になった（run 34372356525）。費用を使ったのに使用額が計上されないと、
+月額上限が静かに効かなくなる。PAT を使うのはマージの 1 か所だけにして、
+台帳・Issue コメント・E2E の起動は GITHUB_TOKEN に任せる。
+
 期限切れでループが静かに止まらないよう、期限は台帳 Issue に控えておくこと。
 
 ### 組織設定が 1 つ要る
