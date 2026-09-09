@@ -38,25 +38,24 @@ jobs:
       contents: write
       pull-requests: write
     env:
+      # 一覧・チェック確認は GITHUB_TOKEN で足りる。PAT を全体に効かせると、
+      # PAT に無い権限（issues など）を使う箇所が 403 で落ちるので、
+      # マージの 1 行だけで上書きする（下の MERGE_TOKEN）。
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # main のルールセットが 1 承認を要求するため、GITHUB_TOKEN 単体ではマージできない。
-      # AUTO_FIX_TOKEN（Admin 権限の fine-grained PAT）があればそれを使う。
-      GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
+      MERGE_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
     steps:
-      # AUTO_FIX_TOKEN を取り違える（Anthropic の API キーを入れる等）と、
-      # この値は GH_TOKEN として全 `gh` 呼び出しに使われるため何もかも失敗する。
-      # `secrets.A || secrets.B` のフォールバックは未設定にしか効かないので、先に確かめる。
-      - name: GitHub トークンの確認
+      # AUTO_FIX_TOKEN を取り違える（Anthropic の API キーを入れる等）と
+      # マージだけが静かに失敗し続けるので、先に確かめる。
+      - name: マージ用トークンの確認
+        if: ${{ secrets.AUTO_FIX_TOKEN != '' }}
         env:
-          HAS_CUSTOM_TOKEN: ${{ secrets.AUTO_FIX_TOKEN != '' }}
+          GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN }}
         run: |
           if ! gh api "repos/${REPO}" --jq .full_name > /dev/null 2> err.txt; then
-            if [ "$HAS_CUSTOM_TOKEN" = "true" ]; then
-              echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
-                   "GitHub の fine-grained PAT（github_pat_ で始まる）を入れてください。"
-            else
-              echo "::error::GITHUB_TOKEN で GitHub API を呼べませんでした。"
-            fi
+            echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
+                 "GitHub の fine-grained PAT（github_pat_ で始まる）を入れてください。"
             sed 's/^/  /' err.txt || true
             exit 1
           fi
@@ -126,8 +125,8 @@ jobs:
 
             # --admin はルールセットの 1 承認要求を bypass するために要る。
             # 権限が無ければ素の merge に落ちる。
-            if gh pr merge "$number" --repo "$REPO" --squash --delete-branch --admin 2>/dev/null \
-               || gh pr merge "$number" --repo "$REPO" --squash --delete-branch; then
+            if GH_TOKEN="$MERGE_TOKEN" gh pr merge "$number" --repo "$REPO" --squash --delete-branch --admin 2>/dev/null \
+               || GH_TOKEN="$MERGE_TOKEN" gh pr merge "$number" --repo "$REPO" --squash --delete-branch; then
               echo "  → マージした"
               merged=$((merged + 1))
             else
