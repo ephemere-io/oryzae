@@ -10,7 +10,7 @@ import {
   discPlacement,
   ghostJarBox,
   hitTestStage,
-  maxOffsetFrom,
+  railWindow,
 } from '@/features/pc/fermentation/utils/cover-flow-geometry';
 import { toDateStamp } from '@/features/pc/fermentation/utils/history-labels';
 import type { FermentationDetail, FermentationSummary } from '@/features/shared/fermentation/types';
@@ -198,14 +198,13 @@ export function FermentationCoverFlow({
     onPointerDown(e);
   };
 
-  const maxOffset = maxOffsetFrom(clampedIndex, results.length);
   const ghost = ghostJarBox(canvas);
   const active = results[clampedIndex];
   const activeUnread = active ? unreadFermentationIds.has(active.id) : false;
 
   const placements = useMemo(
-    () => results.map((_, i) => discPlacement(i - clampedIndex, maxOffset, canvas)),
-    [results, clampedIndex, maxOffset, canvas],
+    () => results.map((_, i) => discPlacement(i - clampedIndex, canvas)),
+    [results, clampedIndex, canvas],
   );
 
   /**
@@ -238,6 +237,7 @@ export function FermentationCoverFlow({
   );
 
   const activeDetail = active ? (details.get(active.id) ?? null) : null;
+  const rail = railWindow(clampedIndex, results.length);
 
   return (
     <div
@@ -383,9 +383,11 @@ export function FermentationCoverFlow({
             重ねていたが、日付も順序もレールが見せている内容の言い換えでしかなかった。
             走査件数は読む前に要る数字ではないので、もとの記録を並べている詳細側へ譲る。
           */}
-          <div className="absolute bottom-[90px] left-1/2 z-[70] flex -translate-x-1/2 flex-col items-center gap-3.5">
-            {/* 日付レール: 任意の段へ飛ぶ */}
-            <div className="flex items-center gap-1">
+          {/* 器の幅を列に合わせて閉じ込める。中身がどれだけ増えても外へ出さない。 */}
+          <div className="absolute right-0 bottom-[90px] left-0 z-[70] flex flex-col items-center gap-3.5 px-8">
+            {/* 日付レール: 任意の段へ飛ぶ。
+                列からはみ出さないよう、いま見ている段を中央に置いた窓だけを並べる。 */}
+            <div className="flex max-w-full items-center gap-1 overflow-hidden">
               <button
                 type="button"
                 onClick={() => step(-1)}
@@ -395,9 +397,21 @@ export function FermentationCoverFlow({
               >
                 ‹
               </button>
-              {results.map((result, i) => {
+              {rail.hasBefore && (
+                <span
+                  data-verify-part="rail-more"
+                  aria-hidden="true"
+                  className="px-1 text-[10px] tracking-[0.1em] text-[var(--date-color)] opacity-60"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  …
+                </span>
+              )}
+              {results.slice(rail.start, rail.end).map((result, offsetInWindow) => {
+                const i = rail.start + offsetInWindow;
                 const isActive = i === clampedIndex;
                 const isUnread = unreadFermentationIds.has(result.id);
+                // 「最新」は末尾の段だけ。窓が手前で切れている間は出ない。
                 const isNewest = i === results.length - 1;
                 const stamp = toDateStamp(result.createdAt);
                 return (
@@ -454,6 +468,16 @@ export function FermentationCoverFlow({
                   </button>
                 );
               })}
+              {rail.hasAfter && (
+                <span
+                  data-verify-part="rail-more"
+                  aria-hidden="true"
+                  className="px-1 text-[10px] tracking-[0.1em] text-[var(--date-color)] opacity-60"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  …
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => step(1)}
