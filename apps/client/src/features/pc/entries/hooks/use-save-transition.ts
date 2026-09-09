@@ -230,6 +230,9 @@ const TRANSITION_CSS = `
 .st-char {
   position: fixed;
   display: inline-block;
+  /* 箱を字そのものの大きさにする。行送りが乗ると箱が字より高くなり、
+     中心で置いたつもりが数 px 下にずれる（実測 8px）。 */
+  line-height: 1;
   will-change: transform, opacity;
   transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 1s, color 1.5s;
   pointer-events: none;
