@@ -1,17 +1,33 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
+import {
+  type CharPlacement,
+  type Destination,
+  findJarDestination,
+  MAX_TRANSITION_CHARS,
+  measureCharPlacements,
+} from '@/features/pc/entries/utils/save-transition-geometry';
 
 /**
- * Save transition hook: editor → jar view.
+ * 漬け込みの演出: 紙 → 瓶。
  *
- * Reproduces the reference design's 4-phase character animation:
- *   Scatter → Background swap → Condense into jar → Float & fade
+ * 4つの段でできている: 散る → 画面が入れ替わる → 瓶に集まる → 漂って消える。
  *
- * Returns a `run(text, editorEl)` callback that creates a fixed overlay
- * of individual character elements, then drives them through CSS
- * transition phases. The caller is responsible for routing to /jar
- * after the transition completes (~6.5 s) via the returned Promise.
+ * ## 座標は2つとも実測する
+ *
+ * **どこから飛ぶか** … 紙の上の字が実際にいる場所（Range で1字ずつ測る）。
+ * 以前は「1行あたり何字」を幅と font-size から見積もって格子に並べていたが、
+ * 紙が中央寄せになり、題の帯が上に載り、行の高さも設定で変わるので、
+ * 実際の字の位置とまるで合わなくなっていた。**紙に無い場所から字が飛び立っていた。**
+ *
+ * **どこへ吸い込まれるか** … 遷移したあとの画面で瓶を探す。演出が始まる時点では
+ * 瓶の画面はまだ無いので、始める前には決められない。以前は画面の中央を決め打ちに
+ * していたため、左のサイドバーぶんずれ、瓶がどこにあっても同じ場所へ吸い込んでいた。
+ * **「変なところにズームアップされて、瓶に入っていくように見えない」**のはこれ。
+ *
+ * `run(text, editorEl)` は 1.5 秒で resolve する。呼ぶ側はそこで /jar へ移り、
+ * 演出は overlay の上でそのまま続く（合計 ~6.5 秒）。
  */
 export function useSaveTransition() {
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -22,164 +38,71 @@ export function useSaveTransition() {
     runningRef.current = true;
 
     return new Promise<void>((resolve) => {
-      // ── Prepare characters (max ~200 for performance) ──
-      const rawChars = Array.from(text.replace(/[\n\r\t]/g, '').replace(/\s+/g, ' '));
-      const chars =
-        rawChars.length > 200
-          ? rawChars.filter((_, i) => i % Math.ceil(rawChars.length / 200) === 0)
-          : rawChars;
-
-      if (chars.length === 0) {
+      // 紙の上の字を、いる場所ごと測る。text は保険（測れない環境では演出を出さない）。
+      const placements = text.trim() ? measureCharPlacements(editorEl, MAX_TRANSITION_CHARS) : [];
+      if (placements.length === 0) {
         runningRef.current = false;
         resolve();
         return;
       }
 
-      // ── Create overlay ──
-      let overlay = overlayRef.current;
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'save-transition-overlay';
-        document.body.appendChild(overlay);
-        overlayRef.current = overlay;
-      }
+      const overlay = ensureOverlay(overlayRef);
       overlay.innerHTML = '';
       overlay.classList.remove('phase-scatter', 'phase-condense', 'phase-float');
       overlay.classList.add('active');
+      ensureStyles();
 
-      // ── Inject CSS (once) ──
-      if (!document.getElementById('save-transition-styles')) {
-        const style = document.createElement('style');
-        style.id = 'save-transition-styles';
-        style.textContent = TRANSITION_CSS;
-        document.head.appendChild(style);
-      }
+      const style = getComputedStyle(editorEl);
+      const fontSize = Number.parseFloat(style.fontSize);
+      const charEls = placements.map((placement) =>
+        createCharElement(placement, {
+          fontSize,
+          fontFamily: style.fontFamily,
+          color: style.color,
+          overlay,
+        }),
+      );
 
-      // ── Build character DOM ──
-      const editorRect = editorEl.getBoundingClientRect();
-      const fontSize = Number.parseFloat(getComputedStyle(editorEl).fontSize);
-      const isVertical = getComputedStyle(editorEl).writingMode.includes('vertical');
-      const fontFamily = getComputedStyle(editorEl).fontFamily;
-      const color = getComputedStyle(editorEl).color;
-
-      const charEls: HTMLSpanElement[] = [];
-      for (const [i, char] of chars.entries()) {
-        if (char === ' ' || char === '\u3000') continue;
-
-        const el = document.createElement('span');
-        el.className = 'st-char';
-        el.style.fontSize = `${fontSize}px`;
-        el.style.fontFamily = fontFamily;
-        el.style.color = color;
-
-        const inner = document.createElement('span');
-        inner.className = 'st-char-inner';
-        inner.textContent = char;
-        el.appendChild(inner);
-
-        // Approximate position in editor
-        const lineHeight = fontSize * 1.85;
-        let x: number;
-        let y: number;
-        if (isVertical) {
-          const col = Math.floor(i / Math.floor(editorRect.height / lineHeight));
-          const row = i % Math.floor(editorRect.height / lineHeight);
-          x = editorRect.right - (col + 1) * lineHeight;
-          y = editorRect.top + row * fontSize;
-        } else {
-          const row = Math.floor(i / Math.floor(editorRect.width / fontSize));
-          const col = i % Math.floor(editorRect.width / fontSize);
-          x = editorRect.left + col * fontSize;
-          y = editorRect.top + row * lineHeight;
-        }
-
-        el.style.left = `${x}px`;
-        el.style.top = `${y}px`;
-        overlay.appendChild(el);
-        charEls.push(el);
-      }
-
-      // ── Compute animation variables ──
+      // ── 散る。ここは紙の上での話なので、始める前に決められる ──
       const screenCX = window.innerWidth / 2;
       const screenCY = window.innerHeight / 2;
-      const jarCY = screenCY + 40;
-      const jarRadius = 30;
-      const total = charEls.length;
-
-      // 70% will fade out
-      const shuffled = [...charEls].sort(() => Math.random() - 0.5);
-      const fadeChars = new Set(shuffled.slice(0, Math.floor(total * 0.7)));
-
       for (const [i, el] of charEls.entries()) {
-        const rect = el.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-
-        const dx = cx - screenCX;
-        const dy = cy - screenCY;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const nx = dx / dist;
-        const ny = dy / dist;
-
-        // Scatter
-        const scatterMag = 300 + Math.random() * 500;
-        const sx = nx * scatterMag + (Math.random() - 0.5) * 200;
-        const sy = ny * scatterMag + (Math.random() - 0.5) * 200;
-        const sr = (Math.random() - 0.5) * 720;
-
-        // Condense (circle in jar)
-        const angle = (i / total) * Math.PI * 2;
-        const r = jarRadius + (Math.random() - 0.5) * 20;
-        const circleX = Math.cos(angle) * r;
-        const circleY = Math.sin(angle) * r;
-        const circleRot = (angle * 180) / Math.PI + (Math.random() - 0.5) * 30;
-
-        // Float
-        const floatDx = (Math.random() - 0.5) * 20;
-        const floatDy = (Math.random() - 0.5) * 20;
-        const fx = screenCX - cx + circleX + floatDx;
-        const fy = jarCY - cy + circleY + floatDy;
-        const fr = (Math.random() - 0.5) * 30;
-
-        const fdur = 3 + Math.random() * 4;
-        const fdel = Math.random() * 2;
-
-        el.style.setProperty('--tx', `${sx}px`);
-        el.style.setProperty('--ty', `${sy}px`);
-        el.style.setProperty('--r', `${sr}deg`);
-        el.style.setProperty('--cx', `${screenCX - cx + circleX}px`);
-        el.style.setProperty('--cy', `${jarCY - cy + circleY}px`);
-        el.style.setProperty('--cr', `${circleRot}deg`);
-        el.style.setProperty('--fx', `${fx}px`);
-        el.style.setProperty('--fy', `${fy}px`);
-        el.style.setProperty('--fr', `${fr}deg`);
-
-        const innerEl = el.querySelector('.st-char-inner');
-        if (innerEl instanceof HTMLElement) {
-          innerEl.style.setProperty('--fdur', `${fdur}s`);
-          innerEl.style.setProperty('--fdel', `-${fdel}s`);
-        }
+        const placement = placements[i];
+        if (!placement) continue;
+        const dx = placement.x - screenCX;
+        const dy = placement.y - screenCY;
+        const dist = Math.hypot(dx, dy) || 1;
+        const magnitude = 300 + Math.random() * 500;
+        el.style.setProperty('--tx', `${(dx / dist) * magnitude + (Math.random() - 0.5) * 200}px`);
+        el.style.setProperty('--ty', `${(dy / dist) * magnitude + (Math.random() - 0.5) * 200}px`);
+        el.style.setProperty('--r', `${(Math.random() - 0.5) * 720}deg`);
       }
 
-      // ── Animation timeline ──
+      // 70% は最後に消える。残りが瓶の中で漂う。
+      const fadeChars = new Set(
+        [...charEls].sort(() => Math.random() - 0.5).slice(0, Math.floor(charEls.length * 0.7)),
+      );
 
-      // Phase 1 (0s): Scatter
+      // タイマーは**片付けない**。演出は 1.5s で紙の画面が消えたあとも瓶の上で
+      // 続くので、アンマウントで止めると途中で終わってしまう。
+
+      // 段1（0s）: 散る
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          overlay.classList.add('phase-scatter');
-        });
+        requestAnimationFrame(() => overlay.classList.add('phase-scatter'));
       });
 
-      // Phase 2 (1.5s): Resolve — caller navigates to jar
+      // 段2（1.5s）: 呼ぶ側が /jar へ移る
       setTimeout(() => resolve(), 1500);
 
-      // Phase 3 (2s): Condense
+      // 段3（2s）: 瓶に集まる。**ここで初めて瓶の場所が分かる**（画面が入れ替わったあと）。
       setTimeout(() => {
+        const destination = findJarDestination();
+        applyDestination(charEls, placements, destination);
         overlay.classList.remove('phase-scatter');
         overlay.classList.add('phase-condense');
       }, 2000);
 
-      // Phase 4 (3.5s): Float — 70% fade out
+      // 段4（3.5s）: 漂って、7割は消える
       setTimeout(() => {
         overlay.classList.remove('phase-condense');
         overlay.classList.add('phase-float');
@@ -193,7 +116,7 @@ export function useSaveTransition() {
         }, 1000);
       }, 3500);
 
-      // Phase 5 (6.5s): Cleanup
+      // 段5（6.5s）: 片付け
       setTimeout(() => {
         overlay.style.transition = 'opacity 1.5s ease';
         overlay.style.opacity = '0';
@@ -209,6 +132,90 @@ export function useSaveTransition() {
   }, []);
 
   return run;
+}
+
+function ensureOverlay(ref: React.RefObject<HTMLDivElement | null>): HTMLDivElement {
+  const existing = ref.current;
+  if (existing) return existing;
+  const overlay = document.createElement('div');
+  overlay.id = 'save-transition-overlay';
+  document.body.appendChild(overlay);
+  ref.current = overlay;
+  return overlay;
+}
+
+function ensureStyles(): void {
+  if (document.getElementById('save-transition-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'save-transition-styles';
+  style.textContent = TRANSITION_CSS;
+  document.head.appendChild(style);
+}
+
+interface CharStyle {
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  overlay: HTMLElement;
+}
+
+/**
+ * 1字ぶんの要素を、**測った場所そのもの**に置く。
+ *
+ * 中心の座標で測っているので、半分ずらして左上に合わせる。ここを合わせないと
+ * 字が半文字ぶん浮いた状態から飛び立つ。
+ */
+function createCharElement(placement: CharPlacement, style: CharStyle): HTMLSpanElement {
+  const el = document.createElement('span');
+  el.className = 'st-char';
+  el.style.fontSize = `${style.fontSize}px`;
+  el.style.fontFamily = style.fontFamily;
+  el.style.color = style.color;
+  el.style.left = `${placement.x - style.fontSize / 2}px`;
+  el.style.top = `${placement.y - style.fontSize / 2}px`;
+
+  const inner = document.createElement('span');
+  inner.className = 'st-char-inner';
+  inner.textContent = placement.char;
+  el.appendChild(inner);
+
+  style.overlay.appendChild(el);
+  return el;
+}
+
+/** 瓶の場所が決まってから、集まる先と漂う先を配る。 */
+function applyDestination(
+  charEls: HTMLSpanElement[],
+  placements: CharPlacement[],
+  destination: Destination,
+): void {
+  const total = charEls.length;
+  for (const [i, el] of charEls.entries()) {
+    const placement = placements[i];
+    if (!placement) continue;
+
+    // 瓶の中で輪になるように散らす（1点に重ねると1文字の塊にしか見えない）。
+    const angle = (i / total) * Math.PI * 2;
+    const radius = destination.radius + (Math.random() - 0.5) * (destination.radius * 0.6);
+    const circleX = Math.cos(angle) * radius;
+    const circleY = Math.sin(angle) * radius;
+
+    const cx = destination.x - placement.x + circleX;
+    const cy = destination.y - placement.y + circleY;
+
+    el.style.setProperty('--cx', `${cx}px`);
+    el.style.setProperty('--cy', `${cy}px`);
+    el.style.setProperty('--cr', `${(angle * 180) / Math.PI + (Math.random() - 0.5) * 30}deg`);
+    el.style.setProperty('--fx', `${cx + (Math.random() - 0.5) * 20}px`);
+    el.style.setProperty('--fy', `${cy + (Math.random() - 0.5) * 20}px`);
+    el.style.setProperty('--fr', `${(Math.random() - 0.5) * 30}deg`);
+
+    const inner = el.querySelector('.st-char-inner');
+    if (inner instanceof HTMLElement) {
+      inner.style.setProperty('--fdur', `${3 + Math.random() * 4}s`);
+      inner.style.setProperty('--fdel', `-${Math.random() * 2}s`);
+    }
+  }
 }
 
 /** CSS injected once into <head> */
