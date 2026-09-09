@@ -43,6 +43,8 @@ import '@/features/pc/board/components/photo-dialog.verify';
 import '@/features/pc/board/components/snippet-card-content.verify';
 import '@/features/pc/board/components/snippet-dialog.verify';
 import '@/features/pc/fermentation/components/draggable-jar-element.verify';
+import '@/features/pc/fermentation/components/fermentation-cover-flow.verify';
+import '@/features/pc/fermentation/components/history-disc.verify';
 import '@/features/pc/fermentation/components/jar-vessel.verify';
 import '@/features/pc/fermentation/components/pickle-success-modal.verify';
 import '@/features/pc/fermentation/components/question-circle.verify';

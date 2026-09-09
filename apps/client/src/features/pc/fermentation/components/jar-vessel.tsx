@@ -195,12 +195,31 @@ interface JarVesselProps {
   /** 瓶の描画サイズ（px）。JarView のレイアウトに合わせて渡す。 */
   width?: number;
   height?: number;
+  /**
+   * 瓶の中を漂う言葉。**その人の発酵が生んだキーワード**を渡すために開けてある。
+   * 空なら既定の語（発酵 / 記憶 / …）を使う ── 1 件も発酵していない人の瓶を空にしない。
+   * 並び順が top/left/blur の決定的なシードになるので、渡す側で順番を安定させること。
+   */
+  words?: readonly string[];
 }
 
-export function JarVessel({ top = 0, total = 0, width = 420, height = 520 }: JarVesselProps) {
+/** 既定値をリテラルで書くと毎レンダーで別物になり、useMemo が効かなくなる。 */
+const NO_WORDS: readonly string[] = [];
+
+export function JarVessel({
+  top = 0,
+  total = 0,
+  width = 420,
+  height = 520,
+  words = NO_WORDS,
+}: JarVesselProps) {
   const t = useTranslations('fermentation');
   const visuals = jarVisuals(top, total);
-  const allWords = useMemo(() => ALL_WORD_KEYS.map((key) => t(key)), [t]);
+  // key に語そのものを使うので、ここで重複を落としておく（渡された語は同じとは限らない）。
+  const allWords = useMemo(
+    () => [...new Set(words.length > 0 ? words : ALL_WORD_KEYS.map((key) => t(key)))],
+    [words, t],
+  );
   const wordCount = jarParticleCount(top, allWords.length);
   const stops = liquidStops(visuals.warmth);
   // 動きが活発になるほどアニメーションを短く。glow の脈も一緒に速くする。
@@ -291,12 +310,15 @@ export function JarVessel({ top = 0, total = 0, width = 420, height = 520 }: Jar
         fill="none"
         style={{ filter: 'drop-shadow(0 20px 40px rgba(140,133,126,0.15))' }}
       >
-        {/* Glass body */}
+        {/* Glass body.
+          縁は元々 白 0.8 だったが、紙色（--bg #f9f8f4）の地の上ではほぼ消えて
+          瓶の形が読めなかった。輪郭を落として形が立つようにする。濃くしすぎると
+          絵が硬くなるので、0.3 / 1.2px に留める。 */}
         <path
           d={JAR_PATH}
-          fill="rgba(253,251,247,0.2)"
-          stroke="rgba(255,255,255,0.8)"
-          strokeWidth="1.5"
+          fill="rgba(226,194,142,0.05)"
+          stroke="rgba(122,116,64,0.3)"
+          strokeWidth="1.2"
         />
         {/* Fermentation liquid — readiness が低いほど下へ沈み、瓶の輪郭で切り取られて消える */}
         <g clipPath="url(#j2-jarClip)">
@@ -398,7 +420,7 @@ export function JarVessel({ top = 0, total = 0, width = 420, height = 520 }: Jar
           const opacity = 0.3 + (i % 5) * 0.12;
           return (
             <span
-              key={ALL_WORD_KEYS[i]}
+              key={word}
               className={`${FLOAT_CLASSES[i % 3]} pointer-events-none select-none`}
               style={{
                 position: 'absolute',

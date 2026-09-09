@@ -528,8 +528,10 @@
       "header_snippet": "Oryzae 摘选的句子",
       "header_letter": "L.A.B. 的观察记录",
       "snippet_source_prefix": "出处:",
-      "resize_aria": "调整详情面板宽度",
-      "write_entry": "为这个提问写日记"
+      "write_entry": "为这个提问写日记",
+      "empty_label": "READING",
+      "empty_hint": "选择圆中的词语、摘录或信件，就会在这里展开。",
+      "resize_aria": "调整详情栏宽度"
     },
     "jar": {
       "zoom_close_aria": "关闭放大",
@@ -577,6 +579,18 @@
       },
       "canvas_aria": "罐子画布",
       "minimap_aria": "罐子缩略图"
+    },
+    "history": {
+      "ghost_jar_title": "发酵瓶",
+      "back_to_jar": "返回瓶中",
+      "new": "NEW",
+      "newest": "最新",
+      "context": "{date} 的发酵",
+      "prev_aria": "上一次发酵",
+      "next_aria": "下一次发酵",
+      "hint": "用 ← → 键、拖动或滚动翻页 ／ 按 ESC 返回瓶中",
+      "launcher": "回顾 {count} 次发酵",
+      "open_aria": "打开「{question}」的发酵历史"
     }
   },
   "questions": {

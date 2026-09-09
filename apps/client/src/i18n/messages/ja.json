@@ -528,8 +528,10 @@
       "header_snippet": "Oryzae が切り取った文章",
       "header_letter": "L.A.B.による観察記録",
       "snippet_source_prefix": "出典:",
-      "resize_aria": "詳細パネルの幅を変える",
-      "write_entry": "この問いのエントリを書く"
+      "write_entry": "この問いのエントリを書く",
+      "empty_label": "READING",
+      "empty_hint": "円のなかの言葉・抜粋・手紙を選ぶと、ここに開きます。",
+      "resize_aria": "詳細列の幅を変える"
     },
     "jar": {
       "zoom_close_aria": "ズームを閉じる",
@@ -577,6 +579,18 @@
       },
       "canvas_aria": "瓶のキャンバス",
       "minimap_aria": "瓶の俯瞰図"
+    },
+    "history": {
+      "ghost_jar_title": "発酵瓶",
+      "back_to_jar": "瓶にもどる",
+      "new": "NEW",
+      "newest": "最新",
+      "context": "{date} の発酵",
+      "prev_aria": "前の発酵",
+      "next_aria": "次の発酵",
+      "hint": "← → キー・ドラッグ・スクロールでめくる ／ ESC で瓶にもどる",
+      "launcher": "{count}件の発酵をふりかえる",
+      "open_aria": "{question}の発酵履歴をひらく"
     }
   },
   "questions": {

@@ -62,6 +62,15 @@ describe('useUnreadLetters', () => {
     expect([...result.current.unreadQuestionIds].sort()).toEqual(['q1', 'q2']);
   });
 
+  it('未読の手紙そのものの id も返す（発酵履歴の円盤・日付レールの印）', async () => {
+    const { result } = renderHook(() => useUnreadLetters(createApi(LETTERS), false));
+
+    await waitFor(() => expect(result.current.unreadCount).toBe(2));
+    // 問い単位ではどの回が新しいか言えないので、発酵 id でも公開する。
+    // pending の f3 は完了していないので入らない。
+    expect([...result.current.unreadFermentationIds].sort()).toEqual(['f1', 'f2']);
+  });
+
   it('lastSeenAt より前の手紙は数えない（既存ユーザーの既読を引き継ぐ）', async () => {
     localStorage.setItem(LAST_SEEN_KEY, '2026-07-01T00:00:00.000Z');
     const { result } = renderHook(() => useUnreadLetters(createApi(LETTERS), false));
