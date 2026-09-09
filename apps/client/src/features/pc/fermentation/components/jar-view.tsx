@@ -49,6 +49,14 @@ const JAR_WORLD_BOUNDS: Bounds = {
 /** 円へズームする矩形の計算に使う。実体は QuestionCircle 側の定数（二重管理しない）。 */
 const CIRCLE_SIZE = QUESTION_CIRCLE_SIZE;
 
+/**
+ * 「寄せ先」を覚えておく時間（ms）。詳細列の幅の transition（0.45s）を跨ぐ長さにする。
+ *
+ * 押した瞬間に列幅が変わりきっていないので、この間だけ寄せ直し続ける。長く持ちすぎると
+ * その後に自分でパンした視点まで奪ってしまうので、動きが終わる分だけに留める。
+ */
+const FIT_INTENT_MS = 700;
+
 /** 発酵履歴の印を円の下端からどれだけ離すか（world 単位）。 */
 const META_LABEL_GAP = 18;
 /**
@@ -414,6 +422,36 @@ export function JarView({
   });
   const { zoomIn, zoomOut, resetZoom, fitTo } = canvas;
 
+  /**
+   * 直前の「寄せ先」。**列幅が変わりきるまで**、カメラをここへ寄せ直し続ける。
+   *
+   * 詳細列は 0.45s かけて畳まれるので、押した瞬間の `fitTo` は **畳まれる前の幅**で
+   * 倍率を決めてしまう。円を閉じたときにこれが効いていて、列が消えて広がったぶんが
+   * 倍率に入らず、FIT ボタンより一段引いた絵で止まっていた（実測 33% / FIT は 47%）。
+   * 幅が横に効いているあいだは横が、広がりきると縦が制約になる ── その差がまるごと出る。
+   */
+  const fitIntentRef = useRef<Bounds | null>(null);
+  const fitIntentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fitWithIntent = useCallback(
+    (bounds: Bounds) => {
+      fitIntentRef.current = bounds;
+      if (fitIntentTimer.current) clearTimeout(fitIntentTimer.current);
+      fitIntentTimer.current = setTimeout(() => {
+        fitIntentRef.current = null;
+      }, FIT_INTENT_MS);
+      fitTo(bounds);
+    },
+    [fitTo],
+  );
+
+  useEffect(
+    () => () => {
+      if (fitIntentTimer.current) clearTimeout(fitIntentTimer.current);
+    },
+    [],
+  );
+
   // 問いごとの完了済み発酵（古い順）。ユーザー全件を 1 回で取って束ねるので、
   // 円が 3 つでもリクエストは 1 本しか増えない。
   const { byQuestion } = useFermentationHistory(api, authLoading);
@@ -499,9 +537,11 @@ export function JarView({
   useElementResize(
     canvasAreaEl,
     useCallback(() => {
-      const focused = circleBoundsRef.current.focused;
+      // 直前に「ここへ寄せる」と決めた矩形があればそれを優先する。**閉じるときは
+      // 円が無くなるので、これが無いと畳まれて広がったぶんを誰も反映しない。**
+      const target = fitIntentRef.current ?? circleBoundsRef.current.focused;
       // 何も開いていないときは動かさない（自分でパンした視点を勝手に戻さない）。
-      if (focused) fitTo(focused);
+      if (target) fitTo(target);
     }, [fitTo]),
   );
 
@@ -624,7 +664,7 @@ export function JarView({
     setDetailOpen(false);
     setZoomedId(null);
     // 位置は動かさず、カメラだけ引いて世界全体に戻す。
-    fitTo(JAR_WORLD_BOUNDS);
+    fitWithIntent(JAR_WORLD_BOUNDS);
   }
 
   /**
@@ -639,16 +679,16 @@ export function JarView({
   function focusCircle(id: string | null) {
     setZoomedId(id);
     if (id === null) {
-      fitTo(JAR_WORLD_BOUNDS);
+      fitWithIntent(JAR_WORLD_BOUNDS);
       return;
     }
     const index = visibleQuestions.findIndex((q) => q.id === id);
-    if (index >= 0) fitTo(circleFocusBounds(resolvedCirclePositions[index]));
+    if (index >= 0) fitWithIntent(circleFocusBounds(resolvedCirclePositions[index]));
   }
 
   function handleFit() {
     setZoomedId(null);
-    fitTo(JAR_WORLD_BOUNDS);
+    fitWithIntent(JAR_WORLD_BOUNDS);
   }
 
   /**
