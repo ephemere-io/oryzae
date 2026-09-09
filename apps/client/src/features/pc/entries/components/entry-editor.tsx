@@ -1,18 +1,21 @@
 'use client';
 
-import type { EditorEffectsState } from '@oryzae/shared';
+import { ACCEPTED_IMAGE_MIME_TYPES, type EditorEffectsState } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PhotoStrip } from '@/components/ui/photo-strip';
 import {
   type EditorStatus,
   EditorStatusBar,
 } from '@/features/pc/entries/components/editor-status-bar';
 import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
 import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
+import { InlineImageOverlay } from '@/features/pc/entries/components/inline-image-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
+import { PhotoImportModal } from '@/features/pc/entries/components/photo-import-modal';
 import { PickleConfirmModal } from '@/features/pc/entries/components/pickle-confirm-modal';
 import { PickleNudgeModal } from '@/features/pc/entries/components/pickle-nudge-modal';
 import { QuestionLinker } from '@/features/pc/entries/components/question-linker';
@@ -28,6 +31,7 @@ import { useEditorSettings } from '@/features/pc/entries/hooks/use-editor-settin
 import { useEraserTrace } from '@/features/pc/entries/hooks/use-eraser-trace';
 import { useFocusMode } from '@/features/pc/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/pc/entries/hooks/use-ghost-effect';
+import { useInlineImageSelection } from '@/features/pc/entries/hooks/use-inline-image-selection';
 import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-question-sync';
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
@@ -43,8 +47,16 @@ import {
   extractEditorEffects,
 } from '@/features/pc/entries/utils/editor-effects-codec';
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
+import {
+  applyInlineImagesToEditor,
+  createInlineImageElement,
+  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  serializeEditorText,
+} from '@/features/pc/entries/utils/inline-image-codec';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
+import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
+import type { AttachedPhoto } from '@/features/shared/entries/types';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
@@ -70,6 +82,10 @@ interface EntryEditorProps {
    * Issue #332 — see docs/editor-effects-persistence.md.
    */
   initialEffects?: EditorEffectsState | null;
+  /** 既存エントリに添えられている写真のストレージパス。新規は空。 */
+  initialMediaUrls?: string[];
+  /** 上と同じ並びの表示用 署名付き URL。 */
+  initialMediaSignedUrls?: string[];
   createdAt?: string;
   updatedAt?: string;
   api: ApiClient | null;
@@ -116,6 +132,8 @@ export function EntryEditor({
   initialContent = '',
   initialTitle,
   initialEffects = null,
+  initialMediaUrls,
+  initialMediaSignedUrls,
   createdAt: createdAtIso,
   updatedAt: updatedAtIso,
   api,
@@ -128,6 +146,7 @@ export function EntryEditor({
   onPickled,
 }: EntryEditorProps) {
   const t = useTranslations('editor');
+  const tPhoto = useTranslations('photo');
   const locale = useLocale();
   // For existing entries, split first line as title
   const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
@@ -152,6 +171,28 @@ export function EntryEditor({
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [status, setStatus] = useState<EditorStatus>('editing');
+  /**
+   * 添えた写真。パスと表示 URL を **1 本の配列**で持つ。
+   * 2 本に分けると、署名に失敗した写真がある時に index がずれ、
+   * 「n 番目を削除」で別の写真を消してしまう（サーバは穴を空文字で埋めて返す）。
+   */
+  const [photos, setPhotos] = useState<AttachedPhoto[]>(() =>
+    (initialMediaUrls ?? []).map((storagePath, i) => ({
+      storagePath,
+      signedUrl: initialMediaSignedUrls?.[i] ?? '',
+    })),
+  );
+  // 保存に送るパス列。useCallback の依存に載せるので参照を安定させる。
+  const mediaUrls = useMemo(() => photos.map((p) => p.storagePath), [photos]);
+  /**
+   * 連続操作で state 更新の再レンダーを待たずに最新の並びを読むための鏡。
+   * closure の `photos` から次の配列を作ると、前回の save を await している間に
+   * 次の追加/削除が起きたとき古い配列を送ってしまい、サーバー側の media_urls から
+   * 写真が脱落する（ローカルは正しいのでリロードするまで気づけない）。
+   */
+  const photosRef = useRef<AttachedPhoto[]>(photos);
+  photosRef.current = photos;
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   // Issue #319: autosave で初回エントリが作られた際に、ローカルで紐づけ済みの
@@ -354,6 +395,15 @@ export function EntryEditor({
       setSavedContent(p.body);
       if (editorRef.current && p.body) {
         editorRef.current.textContent = p.body;
+        // 写真を先に実体化する。装飾のオフセットは写真を 1 文字として数えているので、
+        // 先に実体化しておけば両者の数え方が一致する（逆順にすると置換に失敗する）。
+        if (effectiveInitialEffects?.inlineImages?.length) {
+          applyInlineImagesToEditor(
+            editorRef.current,
+            effectiveInitialEffects.inlineImages,
+            new Map(photosRef.current.map((ph) => [ph.storagePath, ph.signedUrl])),
+          );
+        }
         if (effectiveInitialEffects?.textSpans?.length) {
           applyTextSpansToEditor(editorRef.current, effectiveInitialEffects.textSpans);
         }
@@ -395,6 +445,7 @@ export function EntryEditor({
       const saveOptions: {
         fermentationEnabled?: boolean;
         effects?: EditorEffectsState | null;
+        mediaUrls?: string[];
       } = {};
       if (options.fermentationEnabled !== undefined) {
         saveOptions.fermentationEnabled = options.fermentationEnabled;
@@ -402,6 +453,8 @@ export function EntryEditor({
       if (editorRef.current) {
         saveOptions.effects = effectsSnapshot;
       }
+      // 添えた写真はエディタが正を持つので毎回同梱する（送らなければサーバーは既存維持）。
+      saveOptions.mediaUrls = mediaUrls;
 
       const savedId = await save(
         finalContent,
@@ -474,6 +527,7 @@ export function EntryEditor({
       t,
       userMe,
       getTracesSnapshot,
+      mediaUrls,
     ],
   );
 
@@ -609,9 +663,9 @@ export function EntryEditor({
   );
 
   const autoSave = useCallback(
-    (contentToSave: string, id?: string) => {
+    (contentToSave: string, id?: string, options?: { mediaUrls?: string[] }) => {
       isAutosavingRef.current = true;
-      return save(contentToSave, id);
+      return save(contentToSave, id, options);
     },
     [save],
   );
@@ -622,7 +676,123 @@ export function EntryEditor({
     entryId: currentEntryId,
     enabled: !!api,
     save: autoSave,
+    mediaUrls,
     onSaved: handleAutosaved,
+  });
+
+  /**
+   * 起こした文字をカーソル位置に差し込む（本文の全置換はしない）。
+   * execCommand を使うのは、contentEditable の undo 履歴とカーソル位置を壊さないため
+   * （onPaste が同じ理由で使っているのと同じ判断）。
+   */
+  const insertTranscript = useCallback((text: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+
+    const selection = window.getSelection();
+    // モーダルを開いている間にカーソルが editor の外へ出ているので、
+    // 選択が editor 内に無ければ末尾に置き直してから差し込む。
+    if (!selection || selection.rangeCount === 0 || !el.contains(selection.anchorNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    const existing = serializeEditorText(el);
+    const lead = existing && !existing.endsWith('\n') ? '\n' : '';
+    document.execCommand('insertText', false, `${lead}${text}`);
+
+    // execCommand の input が React の onInput に届かない場合があるため明示同期する。
+    setContent(serializeEditorText(el));
+    setStatus((s) => (s === 'saved' ? 'editing' : s));
+  }, []);
+
+  /**
+   * 写真を本文のキャレット位置に差し込む。
+   *
+   * `execCommand('insertHTML')` を使うのは、contentEditable の undo 履歴と
+   * キャレット位置を壊さないため（本文への文字挿入で execCommand を使っているのと同じ理由）。
+   * Range で直接 DOM を挿すと Ctrl+Z で戻せなくなる。
+   *
+   * 本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
+   * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
+   */
+  const attachPhoto = useCallback(
+    async (photo: AttachedPhoto) => {
+      const el = editorRef.current;
+      const updated = [...photosRef.current, photo];
+      photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
+      setPhotos(updated);
+
+      if (el) {
+        el.focus();
+        const node = createInlineImageElement(
+          {
+            offset: 0, // 実際の位置は保存時に DOM から数え直す
+            storagePath: photo.storagePath,
+            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+            layout: 'inline',
+            align: 'start',
+          },
+          photo.signedUrl,
+        );
+        document.execCommand('insertHTML', false, node.outerHTML);
+      }
+
+      const nextContent = el ? serializeEditorText(el) : content;
+      setContent(nextContent);
+      const next = updated.map((p) => p.storagePath);
+      const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
+      if (!finalContent.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
+      const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
+      if (savedId) setCurrentEntryId(savedId);
+    },
+    [title, content, currentEntryId, save],
+  );
+
+  const removePhoto = useCallback(
+    async (index: number) => {
+      const updated = photosRef.current.filter((_, i) => i !== index);
+      photosRef.current = updated;
+      setPhotos(updated);
+      const next = updated.map((p) => p.storagePath);
+      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
+      if (!currentEntryId || !finalContent.trim()) return;
+      await save(finalContent, currentEntryId, { mediaUrls: next });
+    },
+    [title, content, currentEntryId, save],
+  );
+
+  const photoImport = usePhotoImport({
+    api,
+    onAttach: attachPhoto,
+    onInsertText: insertTranscript,
+  });
+
+  /**
+   * 写真の見た目が確定したら本文ごと保存する。effects は extractEditorEffects が
+   * DOM から数え直すので、ここでは本文を送るだけでよい。
+   */
+  const commitInlineImageChange = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const nextContent = serializeEditorText(el);
+    setContent(nextContent);
+    setStatus((st) => (st === 'saved' ? 'editing' : st));
+    const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
+    if (!currentEntryId || !finalContent.trim()) return;
+    void save(finalContent, currentEntryId, {
+      mediaUrls: photosRef.current.map((ph) => ph.storagePath),
+    });
+  }, [title, currentEntryId, save]);
+
+  const inlineImages = useInlineImageSelection({
+    editorRef,
+    isVertical: settings.writingMode === 'vertical',
+    onCommit: commitInlineImageChange,
   });
 
   /** Navigate with unsaved-changes guard */
@@ -880,6 +1050,44 @@ export function EntryEditor({
               {voiceStatusMessage(voiceState.reason, t)}
             </span>
           )}
+          {/* Photo import — 文字として読み込むか、写真として貼るかをモーダルで選ばせる */}
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
+            data-tooltip={tPhoto('toolbar_button')}
+            aria-label={tPhoto('toolbar_button')}
+            data-testid="photo-import-trigger"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M18 10.5h.008v.008H18V10.5Zm2.25 6.75V6.75A2.25 2.25 0 0 0 18 4.5H6a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 6 19.5h12a2.25 2.25 0 0 0 2.25-2.25Z"
+              />
+            </svg>
+          </button>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
+            aria-label={tPhoto('modal_title')}
+            tabIndex={-1}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // 同じファイルを選び直しても change が起きるよう毎回リセットする。
+              e.target.value = '';
+              if (file) photoImport.selectFile(file);
+            }}
+          />
           {/* Voice input */}
           <button
             type="button"
@@ -1132,10 +1340,11 @@ export function EntryEditor({
             contentEditable
             suppressContentEditableWarning
             onInput={() => {
-              // innerText を使う理由: contentEditable で Enter キー押下時に
-              // ブラウザが挿入する <br> や <div> を改行として読み取るため。
-              // textContent はこれらを無視し、改行が保存されない。
-              const text = editorRef.current?.innerText ?? '';
+              // serializeEditorText を使う理由: innerText と同じく <br>/<div> を改行として
+              // 読むうえに、本文中の写真をプレースホルダ 1 文字として書き出せる。
+              // innerText は <img> を 1 文字も残さないため、写真の位置が保存できない。
+              const el = editorRef.current;
+              const text = el ? serializeEditorText(el) : '';
               setContent(text);
               if (status === 'saved') setStatus('editing');
             }}
@@ -1147,7 +1356,8 @@ export function EntryEditor({
               // execCommand の input イベントが React の onInput にバブルしない
               // 場合があるため、paste 後に明示的に state を同期する（autosave が
               // content 変化を検知できるようにするため）
-              const updated = editorRef.current?.innerText ?? '';
+              const pasted = editorRef.current;
+              const updated = pasted ? serializeEditorText(pasted) : '';
               setContent(updated);
               if (status === 'saved') setStatus('editing');
             }}
@@ -1176,6 +1386,26 @@ export function EntryEditor({
           />
         </div>
       </div>
+
+      {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
+      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
+
+      <InlineImageOverlay
+        rect={inlineImages.selection.rect}
+        image={inlineImages.selection.image}
+        onResizeStart={inlineImages.beginResize}
+        onLayoutChange={inlineImages.updateLayout}
+        onRemove={inlineImages.removeSelected}
+      />
+
+      <PhotoImportModal
+        state={photoImport.state}
+        onTranscribe={photoImport.transcribe}
+        onAttach={photoImport.attach}
+        onInsertTranscript={photoImport.insertTranscript}
+        onDiscardTranscript={photoImport.discardTranscript}
+        onClose={photoImport.close}
+      />
 
       {/* Stats popup */}
       <StatsPopup

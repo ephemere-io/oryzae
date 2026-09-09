@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { toSafeStorageFileName } from '../../../shared/infrastructure/storage-object-name.js';
 import type { BoardStorageGateway } from '../../domain/gateways/board-storage.gateway.js';
 
 const BUCKET_NAME = 'board-photos';
@@ -10,36 +11,6 @@ const BUCKET_NAME = 'board-photos';
  */
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
-/**
- * ファイル名を storage のキーに使える形に均す。
- *
- * Supabase Storage のキーは限られた ASCII しか受け付けない。日本語のファイル名を
- * そのまま繋ぐと Invalid key で落ち、ユーザーには「追加できませんでした」としか
- * 見えなかった（画像の中身は関係なく、名前だけで失敗する）。
- *
- * 名前は保存先を分けるためだけのもので、意味は caption が持つ。読める形に近づける
- * 努力はせず、安全な文字に置き換えて長さも切る。
- */
-export function toStorageSafeName(fileName: string): string {
-  const dot = fileName.lastIndexOf('.');
-  const rawBase = dot > 0 ? fileName.slice(0, dot) : fileName;
-  const rawExt = dot > 0 ? fileName.slice(dot + 1) : '';
-
-  const base = rawBase
-    .replace(/[^a-zA-Z0-9._-]/g, '-')
-    .replace(/-{2,}/g, '-')
-    .replace(/^[-._]+|[-._]+$/g, '')
-    .slice(0, 60);
-  const ext = rawExt
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 10);
-
-  // 全部落ちることがある（名前が日本語だけの場合）。その時は固定名で置く。
-  const safeBase = base || 'photo';
-  return ext ? `${safeBase}.${ext}` : safeBase;
-}
-
 export class SupabaseBoardStorageGateway implements BoardStorageGateway {
   constructor(private supabase: SupabaseClient) {}
 
@@ -49,7 +20,7 @@ export class SupabaseBoardStorageGateway implements BoardStorageGateway {
     file: ArrayBuffer,
     contentType: string,
   ): Promise<string> {
-    const storagePath = `${userId}/${Date.now()}-${toStorageSafeName(fileName)}`;
+    const storagePath = `${userId}/${Date.now()}-${toSafeStorageFileName(fileName)}`;
     const { error } = await this.supabase.storage
       .from(BUCKET_NAME)
       .upload(storagePath, file, { contentType, upsert: false });

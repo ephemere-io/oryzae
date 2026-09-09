@@ -13,6 +13,11 @@ import type {
 import { Entry } from '../../domain/models/entry.js';
 import { localDayRange, localWeekRange } from '../../domain/services/local-day-range.service.js';
 
+/** PostgREST の既定上限と同じ。これ以上を1回で頼んでも返ってこない。 */
+const PAGE_SIZE = 1000;
+/** `.in()` の ID は URL のクエリ文字列に載るので、1回あたりの個数を抑える。 */
+const ID_CHUNK = 500;
+
 export class SupabaseEntryRepository implements EntryRepositoryGateway {
   constructor(private supabase: SupabaseClient) {}
 
@@ -149,6 +154,41 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     );
   }
 
+  async countCharsByQuestionIdSince(
+    userId: string,
+    questionId: string,
+    sinceIso: string | null,
+  ): Promise<number> {
+    // listByUserId と同じ二段クエリ (PostgREST の埋め込み join より結果が安定する)。
+    // 対象は「その問いに紐づくエントリ」なので、まず link から entry_id を引く。
+    //
+    // **ここは件数を数える経路なので、暗黙の打ち切りが許されない。**
+    // PostgREST は指定しないと既定 1000 行で黙って切る。過去に同じ形でユーザー別コストが
+    // 静かに過少になった (#502)。readiness でこれをやると「書いたのに瓶が育たない」に化ける。
+    const entryIds = await this.fetchAllEntryIdsByQuestion(questionId);
+    if (entryIds.length === 0) return 0;
+
+    // id リストは全部 URL のクエリ文字列に載るので、一度に投げず分割する
+    // (1 チャンク = 最大 ID_CHUNK 行しか返らないので、内側での追加ページングは要らない)。
+    let total = 0;
+    for (let i = 0; i < entryIds.length; i += ID_CHUNK) {
+      const chunk = entryIds.slice(i, i + ID_CHUNK);
+      let query = this.supabase
+        .from('entries')
+        .select('content')
+        .eq('user_id', userId)
+        .in('id', chunk);
+      if (sinceIso) query = query.gt('created_at', sinceIso);
+      const { data, error } = await query;
+      if (error) throw error;
+      total += (data ?? []).reduce(
+        (sum, row: { content: string | null }) => sum + (row.content ? [...row.content].length : 0),
+        0,
+      );
+    }
+    return total;
+  }
+
   async listByUserIdAndWeek(
     userId: string,
     dateKey: string,
@@ -204,6 +244,11 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
   }
 
+  /**
+   * 一覧・検索が候補を絞るための entry_id。**PostgREST 既定の 1000 行で打ち切られる。**
+   * 呼び出し側が別途 `.limit()` を掛ける表示経路なので許容している。
+   * 数を合わせる必要がある経路では `fetchAllEntryIdsByQuestion` を使うこと。
+   */
   private async fetchEntryIdsByQuestion(questionId: string): Promise<string[]> {
     const { data, error } = await this.supabase
       .from('entry_question_links')
@@ -211,6 +256,29 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       .eq('question_id', questionId);
     if (error) throw error;
     return toRecordArray(data ?? []).map((r) => readString(r, 'entry_id'));
+  }
+
+  /**
+   * その問いに紐づく entry_id を **全件** 取る。1000 行を超えても落とさない。
+   *
+   * `.range()` でページングするので `.order()` が必須。順序を指定しないと Postgres が
+   * ページ間で同じ並びを返す保証が無く、行の重複・取りこぼしが起きうる。
+   */
+  private async fetchAllEntryIdsByQuestion(questionId: string): Promise<string[]> {
+    const ids: string[] = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await this.supabase
+        .from('entry_question_links')
+        .select('entry_id')
+        .eq('question_id', questionId)
+        .order('entry_id', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      const rows = toRecordArray(data ?? []);
+      ids.push(...rows.map((r) => readString(r, 'entry_id')));
+      // 満杯でなければ最後のページ。次を引いても空なのでここで止める。
+      if (rows.length < PAGE_SIZE) return ids;
+    }
   }
 
   async save(entry: Entry): Promise<void> {

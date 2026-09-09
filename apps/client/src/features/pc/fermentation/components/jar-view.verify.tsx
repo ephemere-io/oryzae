@@ -38,6 +38,8 @@ interface Props {
   api: ApiClient | null;
   authLoading: boolean;
   questions: QuestionData[];
+  readinessTop?: number;
+  readinessTotal?: number;
   onAddQuestion?: (text: string) => Promise<void>;
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
@@ -124,6 +126,19 @@ registerUnit<Props>({
       probe: true,
       description: 'Probe: 問い4件でもサークルは3件にキャップされる（questionCount=3）',
       props: { api: null, authLoading: false, questions: fourQuestions, onAddQuestion: noopAsync },
+    },
+    {
+      id: 'readiness-bubbling',
+      probe: true,
+      description: 'Probe: readiness が瓶へ素通しで渡る（泡立つ・issue #278）',
+      props: {
+        api: null,
+        authLoading: false,
+        questions: twoQuestions,
+        readinessTop: 1,
+        readinessTotal: 2,
+        onAddQuestion: noopAsync,
+      },
     },
   ],
   invariants: [
@@ -239,6 +254,34 @@ registerUnit<Props>({
           (contract.addAvailable === 'false' && contract.questionCount === '3' && !hasAddBtn) ||
           `expected addAvailable=false & 3 circles & no add button, got addAvailable=${contract.addAvailable}, questionCount=${contract.questionCount}, hasAddBtn=${hasAddBtn}`
         );
+      },
+    },
+    {
+      id: 'readiness-reaches-vessel',
+      description: 'readiness prop が瓶（JarVessel）まで届き、泡の描画数に効く',
+      onlyFixtures: ['readiness-bubbling'],
+      check: ({ root }) => {
+        // JarView は瓶に readiness をそのまま渡すだけ。ここで見たいのは
+        // 「合成の途中で落ちていないか」なので、瓶の契約が動いていれば十分。
+        const vessel = root.querySelector('[data-verify-unit="JarVessel"]');
+        if (!vessel) return 'JarVessel が描画されていない';
+        const bubbles = vessel.getAttribute('data-verify-bubbles') ?? '0';
+        const rendered = vessel.querySelectorAll('[data-jar-bubble]').length;
+        return (
+          (Number(bubbles) > 0 && String(rendered) === bubbles) ||
+          `readiness を渡したのに泡が出ていない（contract=${bubbles} / 描画=${rendered}）`
+        );
+      },
+    },
+    {
+      id: 'vessel-empty-by-default',
+      description: 'readiness 未指定の fixture では瓶は空（既定は 0）',
+      onlyFixtures: ['two-questions'],
+      check: ({ root }) => {
+        const vessel = root.querySelector('[data-verify-unit="JarVessel"]');
+        if (!vessel) return 'JarVessel が描画されていない';
+        const fill = vessel.getAttribute('data-verify-fill-pct');
+        return fill === '0' || `readiness 未指定なのに fillPct=${fill}`;
       },
     },
     {

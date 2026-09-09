@@ -2,7 +2,7 @@ name: Security
 
 # Oryzae は他人の日記を預かるため、セキュリティ検査を独立したワークフローに切り出す。
 # 3 層構成:
-#   1. deterministic-gates / sast / secret-scan — 毎 PR。決定的・無料・API キー不要。ここが本丸。
+#   1. deterministic-gates / sast — 毎 PR。決定的・無料・API キー不要。ここが本丸。
 #   2. claude-review     — 毎 PR。差分に対する意味的レビュー（AI なので確率的、補助）
 #   3. scheduled-audit   — 月2回。リポジトリ全体を監査し Issue に起票（差分レビューが
 #                          構造上見られない「既に main にある問題」を拾う）
@@ -15,7 +15,7 @@ name: Security
 #
 # private 化の影響: GitHub の CodeQL / secret scanning / push protection は
 # private では有料（GitHub Advanced Security）になり使えない。同じ役割を
-# OSS の Semgrep / gitleaks で代替している（下の sast / secret-scan ジョブ）。
+# OSS の Semgrep / gitleaks で代替している（sast ジョブと deterministic-gates の gitleaks ステップ）。
 
 on:
   pull_request:
@@ -55,14 +55,21 @@ jobs:
   # 分単位切り上げの課金で 2 分かかっていた（Issue #551）。1 ジョブに畳む。
   # 「片方が落ちてももう片方の結果が見える」挙動は `!cancelled()` で維持する。
   #
-  # sast(Semgrep=python) と secret-scan(gitleaks=バイナリ) は依存が違うので畳まない。
+  # gitleaks（8s）もここへ畳んだ。独立ジョブのままだと分単位の切り上げで
+  # 丸ごと 1 分を払うことになり、9 月実測で約 107 分をそれだけに使っていた。
+  # sast(Semgrep) だけは python の setup が要るので分けたまま残す。
   # ここは「決定的ゲート」という層の内訳であって、ci.yml 側へは寄せない
   # （セキュリティ検査を独立したワークフローに置く、という上の設計意図を保つため）。
   deterministic-gates:
-    name: Deterministic Security Gates (RLS / 依存監査)
+    name: Deterministic Security Gates (RLS / 依存監査 / secret)
     runs-on: ubuntu-latest
     steps:
+      # gitleaks は履歴全体を舐めるので fetch-depth: 0 が要る。
+      # RLS ゲートと依存監査には不要だが、そのために別ジョブへ切り出すと
+      # 分単位の切り上げで丸ごと 1 分を余計に払うことになる（下の畳んだ理由を参照）。
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -81,6 +88,27 @@ jobs:
       - name: Dependency Audit
         run: pnpm audit --audit-level=high
         if: '!cancelled()'
+
+      # private 化により GitHub の secret scanning / push protection も無効になった
+      # （どちらも private では有料）。SERVICE_ROLE_KEY の漏洩はこのプロダクトで
+      # 最も致命的なので、OSS の gitleaks で最低限 CI 側の検出を維持する。
+      # Action 版は org 利用にライセンスが要るため、バイナリを直接使う。
+      #
+      # 独立ジョブだった頃、本題は 8 秒しかないのに分単位の切り上げで 1 分を払っていた
+      # （9 月実測で 107 回 = 約 107 分）。依存が curl とバイナリだけで
+      # deterministic-gates と衝突しないので、ここへ畳む。
+      - name: Install gitleaks
+        if: '!cancelled()'
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks version
+      - name: Scan git history for secrets
+        if: '!cancelled()'
+        run: ./gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
 
   # 本リポジトリは private なので CodeQL は使えない（private の code scanning は
   # 有料の GitHub Advanced Security / Code Security が必要）。同じ役割を
@@ -107,28 +135,6 @@ jobs:
             --error \
             --metrics off \
             --exclude docs --exclude .tmp --exclude '*.test.ts' --exclude '*.test.tsx'
-
-  # private 化により GitHub の secret scanning / push protection も無効になった
-  # （どちらも private では有料）。SERVICE_ROLE_KEY の漏洩はこのプロダクトで
-  # 最も致命的なので、OSS の gitleaks で最低限 CI 側の検出を維持する。
-  # Action 版は org 利用にライセンスが要るため、バイナリを直接使う。
-  secret-scan:
-    name: Secret Scan (gitleaks)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Install gitleaks
-        env:
-          GITLEAKS_VERSION: 8.30.1
-        run: |
-          curl -sSfL \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz gitleaks
-          ./gitleaks version
-      - name: Scan git history for secrets
-        run: ./gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
 
   # ── 層 2: PR 差分の意味的レビュー（AI・補助）※ 既定では停止 ──────────────
   #
@@ -168,7 +174,7 @@ jobs:
         if: steps.key.outputs.available != 'true'
         run: |
           echo "::notice::ANTHROPIC_API_KEY が無いため Claude セキュリティレビューを skip しました。" \
-               "fork からの PR の場合は想定どおりです。決定的ゲート(deterministic-gates/sast/secret-scan)は実行済みです。"
+               "fork からの PR の場合は想定どおりです。決定的ゲート(deterministic-gates/sast)は実行済みです。"
       - uses: anthropics/claude-code-security-review@main
         if: steps.key.outputs.available == 'true'
         with:
