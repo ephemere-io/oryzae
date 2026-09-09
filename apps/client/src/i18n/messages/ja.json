@@ -488,7 +488,8 @@
       "snippet_source_prefix": "出典:",
       "write_entry": "この問いのエントリを書く",
       "empty_label": "READING",
-      "empty_hint": "円のなかの言葉・抜粋・手紙を選ぶと、ここに開きます。"
+      "empty_hint": "円のなかの言葉・抜粋・手紙を選ぶと、ここに開きます。",
+      "resize_aria": "詳細列の幅を変える"
     },
     "jar": {
       "zoom_close_aria": "ズームを閉じる",
@@ -542,6 +543,7 @@
       "back_to_jar": "瓶にもどる",
       "new": "NEW",
       "newest": "最新",
+      "context": "{date} の発酵",
       "prev_aria": "前の発酵",
       "next_aria": "次の発酵",
       "hint": "← → キー・ドラッグ・スクロールでめくる ／ ESC で瓶にもどる",

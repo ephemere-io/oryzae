@@ -488,7 +488,8 @@
       "snippet_source_prefix": "出处:",
       "write_entry": "为这个提问写日记",
       "empty_label": "READING",
-      "empty_hint": "选择圆中的词语、摘录或信件，就会在这里展开。"
+      "empty_hint": "选择圆中的词语、摘录或信件，就会在这里展开。",
+      "resize_aria": "调整详情栏宽度"
     },
     "jar": {
       "zoom_close_aria": "关闭放大",
@@ -542,6 +543,7 @@
       "back_to_jar": "返回瓶中",
       "new": "NEW",
       "newest": "最新",
+      "context": "{date} 的发酵",
       "prev_aria": "上一次发酵",
       "next_aria": "下一次发酵",
       "hint": "用 ← → 键、拖动或滚动翻页 ／ 按 ESC 返回瓶中",

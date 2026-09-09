@@ -488,7 +488,8 @@
       "snippet_source_prefix": "Source:",
       "write_entry": "Write an entry for this question",
       "empty_label": "READING",
-      "empty_hint": "Pick a word, an excerpt, or the letter in the circle to read it here."
+      "empty_hint": "Pick a word, an excerpt, or the letter in the circle to read it here.",
+      "resize_aria": "Resize detail column"
     },
     "jar": {
       "zoom_close_aria": "Close zoom",
@@ -542,6 +543,7 @@
       "back_to_jar": "Back to the jar",
       "new": "NEW",
       "newest": "LATEST",
+      "context": "Fermented on {date}",
       "prev_aria": "Previous fermentation",
       "next_aria": "Next fermentation",
       "hint": "Flip with ← → keys, drag, or scroll ／ ESC to return to the jar",
