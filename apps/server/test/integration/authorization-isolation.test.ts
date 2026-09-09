@@ -327,6 +327,67 @@ describe.skipIf(!canRun)('認可境界: 他ユーザーのデータが読めな�
       expect([400, 401, 403, 404], `実際のステータス: ${res.status}`).toContain(res.status);
     });
   });
+
+  describe('storage: entry-photos（日記本文に添える写真。#529 で追加）', () => {
+    // board-photos と同じ 3 点を見る。バケットは別物で、ポリシーも 00023 で
+    // 独立に書かれているため、board が緑でもこちらが守られている保証にはならない。
+    //
+    // 00023 は「board-photos の初期設定をコピーしない」と明記して private + 隔離で
+    // 作られている。その意図が実際に効いているかを確かめるのがここ。日記の写真は
+    // board のスニペットよりさらに機微で、漏れれば本文そのものが読まれる。
+    const objectPath = () => `${a.userId}/authz-${Math.random().toString(36).slice(2, 10)}.png`;
+    let uploaded = '';
+
+    beforeAll(async () => {
+      uploaded = objectPath();
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'base64',
+      );
+      const { error } = await a.client.storage
+        .from('entry-photos')
+        .upload(uploaded, png, { contentType: 'image/png' });
+      // 失敗したまま進むと、以下の「読めない」検証が
+      // 「そもそも物が無いから読めない」で素通りする。
+      expect(error, `検証用オブジェクトのアップロードに失敗: ${error?.message}`).toBeNull();
+    });
+
+    afterAll(async () => {
+      if (uploaded) await a.client.storage.from('entry-photos').remove([uploaded]);
+    });
+
+    it('A は自分の写真に署名付き URL を発行できる（検証が有効であることの確認）', async () => {
+      const { data, error } = await a.client.storage
+        .from('entry-photos')
+        .createSignedUrl(uploaded, 60);
+      expect(error).toBeNull();
+      expect(data?.signedUrl).toBeTruthy();
+    });
+
+    it('B は A の写真をダウンロードできない', async () => {
+      const { data, error } = await b.client.storage.from('entry-photos').download(uploaded);
+
+      expect(data).toBeFalsy();
+      expect(error).not.toBeNull();
+      expect(error?.message ?? '', `期待は権限拒否か不存在、実際: ${error?.message}`).toMatch(
+        /not found|unauthorized|denied|forbidden|invalid/i,
+      );
+    });
+
+    it('B は A のフォルダを列挙できない（存在自体を知られない）', async () => {
+      // ダウンロードできなくても一覧が返れば、いつ何枚書いたかは漏れる。
+      const { data } = await b.client.storage.from('entry-photos').list(a.userId);
+
+      expect(data ?? []).toEqual([]);
+    });
+
+    it('署名なしの公開 URL では取得できない（バケットが非公開であること）', async () => {
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/public/entry-photos/${uploaded}`);
+
+      expect(res.ok).toBe(false);
+      expect([400, 401, 403, 404], `実際のステータス: ${res.status}`).toContain(res.status);
+    });
+  });
 });
 
 describe.skipIf(canRun)('認可境界テスト（スキップ）', () => {
