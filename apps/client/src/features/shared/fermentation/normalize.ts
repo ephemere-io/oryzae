@@ -128,7 +128,7 @@ export function normalizeSummaries(input: unknown): FermentationSummary[] {
     ) {
       continue;
     }
-    out.push({ id, questionId, status, createdAt });
+    out.push({ id, questionId, status, createdAt, targetPeriod: str(raw.targetPeriod) });
   }
   return out;
 }

@@ -11,6 +11,7 @@ function makeState(overrides: Partial<UnreadState> = {}): UnreadState {
     ready: true,
     unreadCount: 3,
     unreadQuestionIds: new Set(['q1']),
+    unreadFermentationIds: new Set(['f1', 'f2', 'f3']),
     markQuestionRead: vi.fn(),
     markAllSeen: vi.fn(),
     ...overrides,
@@ -25,6 +26,7 @@ describe('UnreadContext', () => {
     expect(result.current.ready).toBe(false);
     expect(result.current.unreadCount).toBe(0);
     expect(result.current.unreadQuestionIds.size).toBe(0);
+    expect(result.current.unreadFermentationIds.size).toBe(0);
   });
 
   it('provider に渡した値をそのまま配る', () => {
@@ -37,6 +39,7 @@ describe('UnreadContext', () => {
 
     expect(result.current.unreadCount).toBe(3);
     expect([...result.current.unreadQuestionIds]).toEqual(['q1']);
+    expect(result.current.unreadFermentationIds.size).toBe(3);
     result.current.markQuestionRead('q1');
     expect(value.markQuestionRead).toHaveBeenCalledWith('q1');
   });
