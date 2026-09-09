@@ -90,6 +90,19 @@ export interface InboxLetter {
   createdAt: string;
 }
 
+/**
+ * 発酵瓶の readiness（issue #278）。問いごとの readiness の総和なので 0〜問いの数を取る。
+ * 次回発火時刻や残り文字数は **意図的に含めない**（逆算できると「いつ来るか分からない」
+ * という体験が壊れるため、サーバーも返さない）。
+ */
+export interface JarReadiness {
+  /** いちばん進んだ問いの readiness（0〜1）。瓶の演出の段階を決める。 */
+  top: number;
+  /** 全問いの readiness の総和（0〜問いの数）。瓶の賑やかさを決める。 */
+  total: number;
+  questionCount: number;
+}
+
 /** 受信箱が手紙に見出しを付けるために要る問いの最小形。 */
 export interface InboxQuestion {
   id: string;
