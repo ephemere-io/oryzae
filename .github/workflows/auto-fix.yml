@@ -81,15 +81,17 @@ jobs:
       issues: write # 台帳 Issue の更新と、対象 Issue へのコメント
       actions: write # 失敗した run のログを読み、マージ後に E2E を起動する
     env:
-      # ルールセット「Protect main」が main に 1 承認を要求するため、GITHUB_TOKEN では
-      # マージできない（bypass できるのは Admin ロールだけで、github-actions[bot] は Admin ではない。
-      # GitHub Actions 自体をルールセットの bypass に指定することは API が拒否する:
-      # "Actor GitHub Actions integration must be part of the ruleset source or owner organization"）。
+      # 既定は GITHUB_TOKEN。台帳 Issue の読み書き・Issue コメント・E2E の起動は
+      # すべてこれで足りる（下の permissions で issues: write / actions: write を持つ）。
       #
-      # AUTO_FIX_TOKEN（Admin 権限を持つ fine-grained PAT）があればそれを使い、
-      # 無ければ GITHUB_TOKEN のまま動く。後者の場合、修正はブランチと PR までは作られ、
-      # マージだけが人待ちになる（差分は失われない）。
-      GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
+      # **AUTO_FIX_TOKEN を全体に効かせてはいけない。** 一度そうしたところ、
+      # PAT に issues / actions の権限が無かったために「マージは成功したのに
+      # 台帳への記録が 403 で落ちる」という最悪の形になった。
+      # 費用を使ったのに使用額が計上されないと、月額上限が静かに効かなくなる。
+      #
+      # PAT を要るのはマージの 1 か所だけなので、そこだけで上書きする（下の merge ステップ）。
+      # こうすれば PAT に要る権限は Contents と Pull requests の 2 つだけで済む。
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       LEDGER_TITLE: '[auto-fix] 予算台帳と稼働状況'
     steps:
       - uses: actions/checkout@v7
@@ -108,31 +110,24 @@ jobs:
             exit 1
           fi
 
-      # AUTO_FIX_TOKEN は GitHub のトークンであって Anthropic の API キーではない。
-      # 取り違えると被害がマージ失敗に留まらない: この値は GH_TOKEN として
-      # すべての `gh` 呼び出しに使われるため、台帳の読み書きも Issue コメントも壊れ、
-      # 「なぜか全部落ちる」状態になる。しかも `secrets.A || secrets.B` の
-      # フォールバックは未設定のときしか効かず、**間違った値には効かない**。
-      #
-      # だから最初に 1 回だけ叩いて、使えるかどうかを確かめる。
       - name: 作業ディレクトリを用意する
         run: mkdir -p .bot
 
-      - name: GitHub トークンの確認
+      # AUTO_FIX_TOKEN は GitHub のトークンであって Anthropic の API キーではない。
+      # 取り違えても最後のマージまで気づけないと、そこまでの費用が無駄になるので先に確かめる。
+      # 未設定なら何も確認しない（GITHUB_TOKEN で PR まで動く構成として正常）。
+      - name: マージ用トークンの確認
+        if: ${{ secrets.AUTO_FIX_TOKEN != '' }}
         env:
-          HAS_CUSTOM_TOKEN: ${{ secrets.AUTO_FIX_TOKEN != '' }}
+          GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN }}
         run: |
-          # 叩き先は「このリポジトリ自身」にする。`gh api user` は GITHUB_TOKEN
-          # （= インストールトークン）では 403 になるため、既定構成でも通る確認にならない。
+          # 叩き先は「このリポジトリ自身」。fine-grained PAT なら metadata:read が
+          # 自動で付くので、Contents / Pull requests だけの最小権限でもここは通る。
           if ! gh api "repos/${GITHUB_REPOSITORY}" --jq .full_name > .bot/whoami.txt 2> .bot/whoami.err; then
-            if [ "$HAS_CUSTOM_TOKEN" = "true" ]; then
-              echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
-                   "このシークレットに入れるのは **GitHub の fine-grained PAT**（github_pat_ で始まる）です。" \
-                   "Anthropic の API キー（sk-ant-... / ANTHROPIC_API_KEY のほう）ではありません。" \
-                   "シークレットを削除すれば GITHUB_TOKEN で動き、マージだけが人待ちになります。"
-            else
-              echo "::error::GITHUB_TOKEN で GitHub API を呼べませんでした。"
-            fi
+            echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
+                 "このシークレットに入れるのは **GitHub の fine-grained PAT**（github_pat_ で始まる）です。" \
+                 "Anthropic の API キー（sk-ant-... / ANTHROPIC_API_KEY のほう）ではありません。" \
+                 "シークレットを削除すれば GITHUB_TOKEN で動き、マージだけが人待ちになります。"
             sed 's/^/  /' .bot/whoami.err || true
             exit 1
           fi
@@ -583,6 +578,10 @@ jobs:
         env:
           KIND: ${{ steps.task.outputs.kind }}
           ISSUE_NUMBER: ${{ steps.task.outputs.issue_number }}
+          # ここだけ PAT で上書きする。ルールセットの 1 承認要求を bypass できるのは
+          # Admin ロールだけで、github-actions[bot] はそれではないため。
+          # 全体に効かせない理由はジョブ冒頭の env のコメントを参照。
+          GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
