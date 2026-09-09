@@ -79,23 +79,28 @@ const inlineImageSchema = z.object({
    */
   widthRatio: z.number().min(0.05).max(1),
   /**
-   * 回り込み。Word の「文字列の折り返し」に相当するが、**縦書きでも意味が通る名前**にしてある
-   * （Word の「上下」は縦書きだと左右になるため、方向を含む名前は使えない）。
-   *   - `inline` : 文字と同じ流れに置く（大きな 1 文字として振る舞う）
-   *   - `block`  : 独立した行を占める。前後に本文が来る
-   *   - `wrap`   : 本文が写真を避けて回り込む（float 相当）
+   * 配置。**新しく差し込む写真はすべて `block` / `center`**（Notion / Medium と同じ）。
+   *
+   * 値を保存形式に残してあるのは 2 つの理由から:
+   *   - 別の配置で保存された既存の写真をそのまま読めること
+   *   - 「常に左右中央になる」を後から変えるとき、保存形式を作り直さずに済むこと
+   *
+   * 操作 UI には出していない。回り込みと寄せを選ばせたら「項目が多く、全部試さないと
+   * 意味が分からない」状態になったため。戻すときは overlay に足すだけでよい。
    */
-  layout: z.enum(['inline', 'block', 'wrap']),
-  /**
-   * 行方向の寄せ。`block` / `wrap` のときだけ意味を持つ（`inline` は文字の流れが決める）。
-   * `start` / `end` は書字方向に依存しない —— 横書きなら左右、縦書きなら上下になる。
-   */
-  align: z.enum(['start', 'center', 'end']),
+  layout: z.enum(['inline', 'block', 'wrap']).default('block'),
+  /** 行方向の寄せ。書字方向に依存しない（横書きなら左右、縦書きなら上下）。 */
+  align: z.enum(['start', 'center', 'end']).default('center'),
   /**
    * 縦横比の上書き（block 方向 ÷ inline 方向）。辺ハンドルで自由変形したときだけ入る。
    * 未指定なら写真本来の比率を使う（角ハンドルは比率を保つので値を書かない）。
    */
   aspect: z.number().positive().optional(),
+  /**
+   * 傾き（度）。回転ハンドルで付けたときだけ入る。
+   * 写真は独立した行を占めるので、傾けても本文の流れは崩れない。
+   */
+  rotation: z.number().optional(),
 });
 
 export const editorEffectsStateSchema = z.object({

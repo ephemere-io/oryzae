@@ -67,12 +67,18 @@ describe('extractInlineImages', () => {
     editor.innerHTML = `ab${img({
       'data-storage-path': 'u1/1-a.jpg',
       'data-width-ratio': '0.6',
-      'data-layout': 'wrap',
-      'data-align': 'end',
+      'data-rotation': '12',
     })}cd`;
 
     expect(extractInlineImages(editor)).toEqual([
-      { offset: 2, storagePath: 'u1/1-a.jpg', widthRatio: 0.6, layout: 'wrap', align: 'end' },
+      {
+        offset: 2,
+        storagePath: 'u1/1-a.jpg',
+        widthRatio: 0.6,
+        layout: 'block',
+        align: 'center',
+        rotation: 12,
+      },
     ]);
   });
 
@@ -91,10 +97,11 @@ describe('extractInlineImages', () => {
 
   // 壊れた属性で写真ごと落とすと、本文にプレースホルダだけが残って復元不能になる。
   it('属性が壊れていても既定値に丸めて拾う', () => {
-    editor.innerHTML = img({ 'data-width-ratio': 'NaN', 'data-layout': 'bogus', 'data-align': '' });
+    editor.innerHTML = img({ 'data-width-ratio': 'NaN', 'data-rotation': 'bogus' });
 
+    // 壊れた値は捨てず、既定（幅 0.5・独立した行の中央）へ丸めて写真を残す。
     expect(extractInlineImages(editor)).toEqual([
-      { offset: 0, storagePath: '', widthRatio: 0.4, layout: 'inline', align: 'start' },
+      { offset: 0, storagePath: '', widthRatio: 0.5, layout: 'block', align: 'center' },
     ]);
   });
 
@@ -219,14 +226,13 @@ describe('保存と復元の往復', () => {
     expect(after.images.map((i) => i.offset)).toEqual([0, 1]);
   });
 
-  it('表示設定（幅・回り込み・寄せ・比率）が保たれる', () => {
+  it('表示設定（幅・比率・傾き）が保たれる', () => {
     const after = roundTrip(
       img({
         'data-storage-path': 'p1',
         'data-width-ratio': '0.75',
-        'data-layout': 'wrap',
-        'data-align': 'end',
         'data-aspect': '1.5',
+        'data-rotation': '-8',
       }),
     );
 
@@ -234,9 +240,10 @@ describe('保存と復元の往復', () => {
       offset: 0,
       storagePath: 'p1',
       widthRatio: 0.75,
-      layout: 'wrap',
-      align: 'end',
+      layout: 'block',
+      align: 'center',
       aspect: 1.5,
+      rotation: -8,
     });
   });
 
@@ -249,7 +256,7 @@ describe('保存と復元の往復', () => {
 
     applyInlineImagesToEditor(
       restored,
-      [{ offset: 3, storagePath: 'p1', widthRatio: 0.4, layout: 'inline', align: 'start' }],
+      [{ offset: 3, storagePath: 'p1', widthRatio: 0.4, layout: 'block', align: 'center' }],
       new Map(),
     );
 
@@ -266,7 +273,7 @@ describe('保存と復元の往復', () => {
 
     applyInlineImagesToEditor(
       restored,
-      [{ offset: 1, storagePath: 'p1', widthRatio: 0.4, layout: 'inline', align: 'start' }],
+      [{ offset: 1, storagePath: 'p1', widthRatio: 0.4, layout: 'block', align: 'center' }],
       new Map(),
     );
 
@@ -279,6 +286,89 @@ describe('保存と復元の往復', () => {
 function editorHtmlWithImages(): string {
   return (
     `冒頭の文${img({ 'data-storage-path': 'p1', 'data-width-ratio': '0.5' })}` +
-    `つづき<br>改行のあと${img({ 'data-storage-path': 'p2', 'data-layout': 'block' })}おわり`
+    `つづき<br>改行のあと${img({ 'data-storage-path': 'p2', 'data-rotation': '5' })}おわり`
   );
 }
+
+/**
+ * 署名 URL が届かなかった写真の扱い。
+ *
+ * 「保存したのに写真が復活しない」という report の切り分けに要る。src を空にすると
+ * `<img>` は**何も描かない**ので、位置は保っているのに消えたようにしか見えない。
+ * 読み込めていないことが分かる状態で残す。
+ */
+describe('署名 URL が無いとき', () => {
+  let editor: HTMLDivElement;
+
+  beforeEach(() => {
+    editor = document.createElement('div');
+    document.body.appendChild(editor);
+  });
+
+  afterEach(() => {
+    editor.remove();
+  });
+
+  it('本文から消さず、読み込めない印を付けて残す', () => {
+    editor.textContent = `あ${INLINE_IMAGE_PLACEHOLDER}い`;
+
+    applyInlineImagesToEditor(
+      editor,
+      [{ offset: 1, storagePath: 'p1', widthRatio: 0.5, layout: 'block', align: 'center' }],
+      new Map(), // 署名できなかった
+    );
+
+    const img = editor.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.dataset.unavailable).toBe('true');
+    // src を空文字で持たせると「壊れた画像」を読みに行って余計なリクエストが出る。
+    expect(img?.hasAttribute('src')).toBe(false);
+    // 位置は保つ。次の保存で写真の場所が失われないため。
+    expect(serializeEditorText(editor)).toBe(`あ${INLINE_IMAGE_PLACEHOLDER}い`);
+  });
+
+  it('署名 URL があれば印は付かない', () => {
+    editor.textContent = INLINE_IMAGE_PLACEHOLDER;
+
+    applyInlineImagesToEditor(
+      editor,
+      [{ offset: 0, storagePath: 'p1', widthRatio: 0.5, layout: 'block', align: 'center' }],
+      new Map([['p1', 'https://example.test/signed.jpg']]),
+    );
+
+    const img = editor.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('https://example.test/signed.jpg');
+    expect(img?.dataset.unavailable).toBeUndefined();
+  });
+
+  // 復元 → そのまま保存、で写真の情報が落ちないこと。
+  it('読み込めない写真も、保存し直したときに残る', () => {
+    editor.textContent = `${INLINE_IMAGE_PLACEHOLDER}本文`;
+
+    applyInlineImagesToEditor(
+      editor,
+      [
+        {
+          offset: 0,
+          storagePath: 'p1',
+          widthRatio: 0.75,
+          layout: 'block',
+          align: 'center',
+          rotation: 5,
+        },
+      ],
+      new Map(),
+    );
+
+    expect(extractInlineImages(editor)).toEqual([
+      {
+        offset: 0,
+        storagePath: 'p1',
+        widthRatio: 0.75,
+        layout: 'block',
+        align: 'center',
+        rotation: 5,
+      },
+    ]);
+  });
+});

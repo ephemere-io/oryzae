@@ -5,14 +5,16 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PhotoStrip } from '@/components/ui/photo-strip';
 import {
   type EditorStatus,
   EditorStatusBar,
 } from '@/features/pc/entries/components/editor-status-bar';
 import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
 import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
-import { InlineImageOverlay } from '@/features/pc/entries/components/inline-image-overlay';
+import {
+  InlineImageDropIndicator,
+  InlineImageOverlay,
+} from '@/features/pc/entries/components/inline-image-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
 import { PhotoImportModal } from '@/features/pc/entries/components/photo-import-modal';
@@ -50,9 +52,10 @@ import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import {
   applyInlineImagesToEditor,
   createInlineImageElement,
-  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  extractInlineImages,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
+import { defaultWidthRatio, loadAspect } from '@/features/pc/entries/utils/inline-image-placement';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
@@ -261,6 +264,11 @@ export function EntryEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
+  /**
+   * 本文を包むスクロール要素。写真の操作 UI はこの中に、この要素の座標系で描く
+   * （viewport 座標だとスクロールで取り残される）。
+   */
+  const scrollHostRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const hasUnsavedChanges = content !== savedContent;
@@ -717,6 +725,10 @@ export function EntryEditor({
    * キャレット位置を壊さないため（本文への文字挿入で execCommand を使っているのと同じ理由）。
    * Range で直接 DOM を挿すと Ctrl+Z で戻せなくなる。
    *
+   * 既定は **ブロック・中央**（Notion / Medium と同じ）。写真は独立した行を占め、
+   * 幅は写真の向きと書字方向から決める（`defaultWidthRatio`）。行頭に小さく置いても
+   * 使い道が無いため、行内配置や寄せは既定にしない。
+   *
    * 本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
    * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
    */
@@ -729,13 +741,15 @@ export function EntryEditor({
 
       if (el) {
         el.focus();
+        // 縦横比を先に読む。貼ってから測って直すと、目の前で一度跳ねる。
+        const aspect = await loadAspect(photo.signedUrl);
         const node = createInlineImageElement(
           {
             offset: 0, // 実際の位置は保存時に DOM から数え直す
             storagePath: photo.storagePath,
-            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
-            layout: 'inline',
-            align: 'start',
+            widthRatio: defaultWidthRatio(aspect, settings.writingMode === 'vertical'),
+            layout: 'block',
+            align: 'center',
           },
           photo.signedUrl,
         );
@@ -744,26 +758,14 @@ export function EntryEditor({
 
       const nextContent = el ? serializeEditorText(el) : content;
       setContent(nextContent);
-      const next = updated.map((p) => p.storagePath);
       const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
       if (!finalContent.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
-      const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
+      const savedId = await save(finalContent, currentEntryId, {
+        mediaUrls: el ? extractInlineImages(el).map((i) => i.storagePath) : [],
+      });
       if (savedId) setCurrentEntryId(savedId);
     },
-    [title, content, currentEntryId, save],
-  );
-
-  const removePhoto = useCallback(
-    async (index: number) => {
-      const updated = photosRef.current.filter((_, i) => i !== index);
-      photosRef.current = updated;
-      setPhotos(updated);
-      const next = updated.map((p) => p.storagePath);
-      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
-      if (!currentEntryId || !finalContent.trim()) return;
-      await save(finalContent, currentEntryId, { mediaUrls: next });
-    },
-    [title, content, currentEntryId, save],
+    [title, content, currentEntryId, save, settings.writingMode],
   );
 
   const photoImport = usePhotoImport({
@@ -784,13 +786,16 @@ export function EntryEditor({
     setStatus((st) => (st === 'saved' ? 'editing' : st));
     const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
     if (!currentEntryId || !finalContent.trim()) return;
+    // 保存する mediaUrls は **本文にいま入っている写真**から作る。photosRef から作ると、
+    // 本文から消した写真が Storage の参照として残り続ける（孤児になる）。
     void save(finalContent, currentEntryId, {
-      mediaUrls: photosRef.current.map((ph) => ph.storagePath),
+      mediaUrls: extractInlineImages(el).map((i) => i.storagePath),
     });
   }, [title, currentEntryId, save]);
 
   const inlineImages = useInlineImageSelection({
     editorRef,
+    scrollHostRef,
     isVertical: settings.writingMode === 'vertical',
     onCommit: commitInlineImageChange,
   });
@@ -1053,10 +1058,15 @@ export function EntryEditor({
           {/* Photo import — 文字として読み込むか、写真として貼るかをモーダルで選ばせる */}
           <button
             type="button"
+            // タイトルを編集している間は本文にキャレットが無い。ここで写真を選べると、
+            // 本文の意図しない場所（＝最後にキャレットがあった場所）へ入ってしまう。
+            disabled={isEditingTitle}
             onClick={() => photoInputRef.current?.click()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={tPhoto('toolbar_button')}
-            aria-label={tPhoto('toolbar_button')}
+            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--date-color)]"
+            data-tooltip={
+              isEditingTitle ? tPhoto('unavailable_in_title') : tPhoto('toolbar_button')
+            }
+            aria-label={isEditingTitle ? tPhoto('unavailable_in_title') : tPhoto('toolbar_button')}
             data-testid="photo-import-trigger"
           >
             <svg
@@ -1327,6 +1337,7 @@ export function EntryEditor({
           />
         )}
         <div
+          ref={scrollHostRef}
           className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
         >
           {/* Snippet selection toolbar */}
@@ -1334,6 +1345,16 @@ export function EntryEditor({
 
           {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
           <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
+
+          {/* 写真の操作 UI。スクロールする箱の**中**に置くことで、スクロールに素で追従する。 */}
+          <InlineImageDropIndicator rect={inlineImages.dropRect} />
+          <InlineImageOverlay
+            rect={inlineImages.selection.rect}
+            image={inlineImages.selection.image}
+            onResizeStart={inlineImages.beginResize}
+            onRotateStart={inlineImages.beginRotate}
+            onRemove={inlineImages.removeSelected}
+          />
 
           <div
             ref={editorRef}
@@ -1388,15 +1409,6 @@ export function EntryEditor({
       </div>
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
-
-      <InlineImageOverlay
-        rect={inlineImages.selection.rect}
-        image={inlineImages.selection.image}
-        onResizeStart={inlineImages.beginResize}
-        onLayoutChange={inlineImages.updateLayout}
-        onRemove={inlineImages.removeSelected}
-      />
 
       <PhotoImportModal
         state={photoImport.state}

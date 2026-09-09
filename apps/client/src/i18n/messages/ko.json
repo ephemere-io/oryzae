@@ -505,12 +505,6 @@
     "unavailable": "{index}번째 사진을 불러오지 못했습니다",
     "unavailable_short": "불러올 수 없음",
     "error_spend_limit": "AI 사용 한도에 도달했습니다. 당분간 이용할 수 없습니다.",
-    "layout_inline": "글 안에",
-    "layout_block": "블록",
-    "layout_wrap": "글 흐름",
-    "align_start": "시작",
-    "align_center": "가운데",
-    "align_end": "끝",
     "remove_inline": "사진 삭제",
     "resize_nw": "왼쪽 위를 끌어 크기 조절",
     "resize_n": "위쪽을 끌어 크기 조절",
@@ -519,7 +513,10 @@
     "resize_se": "오른쪽 아래를 끌어 크기 조절",
     "resize_s": "아래쪽을 끌어 크기 조절",
     "resize_sw": "왼쪽 아래를 끌어 크기 조절",
-    "resize_w": "왼쪽을 끌어 크기 조절"
+    "resize_w": "왼쪽을 끌어 크기 조절",
+    "rotate": "사진 회전",
+    "elapsed": "{seconds}초 경과",
+    "unavailable_in_title": "제목을 편집하는 중에는 사진을 넣을 수 없습니다"
   },
   "fermentation": {
     "detail": {

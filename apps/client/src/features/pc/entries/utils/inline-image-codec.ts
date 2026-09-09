@@ -24,8 +24,14 @@ const INLINE_IMAGE_CLASS = 'inline-photo';
 const EBLOCK_CLASS = 'eblock';
 const VBLOCK_CLASS = 'v-block';
 
-/** 差し込んだ直後の表示幅（本文 1 行に対する割合）。半分より小さめにして本文を潰さない。 */
-export const DEFAULT_INLINE_IMAGE_WIDTH_RATIO = 0.4;
+/**
+ * 壊れた値を読んだときに丸める先（本文 1 行に対する割合）。
+ *
+ * 差し込むときの大きさは**写真の向き**から決まるので、ここではない
+ * （`utils/inline-image-placement` の `defaultWidthRatio`）。ここは
+ * data 属性が読めなかったときに写真を失わないための受け皿。
+ */
+const FALLBACK_WIDTH_RATIO = 0.5;
 
 export function isInlineImage(node: Node): node is HTMLImageElement {
   return node instanceof HTMLImageElement && node.classList.contains(INLINE_IMAGE_CLASS);
@@ -94,6 +100,37 @@ function visit(node: Node, state: WalkState): void {
   walk(el, state);
 }
 
+/**
+ * 配置を当てる。**物理方向（left / right）を書かないのが要点。**
+ * inline 軸のマージンで寄せるので、横書きなら左右、縦書きなら上下に効く。
+ */
+function applyPlacementStyle(el: HTMLImageElement, image: InlineImage): void {
+  el.style.display = '';
+  el.style.float = '';
+  el.style.marginInline = '';
+  el.style.marginBlock = '';
+  el.style.verticalAlign = '';
+
+  if (image.layout === 'inline') {
+    el.style.display = 'inline-block';
+    el.style.verticalAlign = 'middle';
+    return;
+  }
+
+  if (image.layout === 'wrap') {
+    el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
+    el.style.marginBlock = '0.25em';
+    el.style.marginInline = '0 0.5em';
+    return;
+  }
+
+  // block（既定）。寄せは inline 軸のマージンで作る。
+  el.style.display = 'block';
+  el.style.marginBlock = '0.5em';
+  el.style.marginInline =
+    image.align === 'center' ? 'auto' : image.align === 'end' ? 'auto 0' : '0 auto';
+}
+
 /** `<img>` の data 属性から保存形式を読む。壊れた値は既定に丸めて写真を失わない。 */
 export function readInlineImageFromElement(el: HTMLImageElement): InlineImage {
   return readInlineImage(el, 0);
@@ -101,6 +138,7 @@ export function readInlineImageFromElement(el: HTMLImageElement): InlineImage {
 
 function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
   const aspect = Number.parseFloat(el.dataset.aspect ?? '');
+  const rotation = Number.parseFloat(el.dataset.rotation ?? '');
   return {
     offset,
     storagePath: el.dataset.storagePath ?? '',
@@ -109,21 +147,28 @@ function readInlineImage(el: HTMLImageElement, offset: number): InlineImage {
     align: readAlign(el.dataset.align),
     // 自由変形していないときは書かない（写真本来の比率を使う）。
     ...(Number.isFinite(aspect) && aspect > 0 ? { aspect } : {}),
+    ...(Number.isFinite(rotation) && rotation !== 0 ? { rotation } : {}),
   };
 }
 
 function readRatio(raw: string | undefined): number {
   const n = Number.parseFloat(raw ?? '');
-  if (!Number.isFinite(n)) return DEFAULT_INLINE_IMAGE_WIDTH_RATIO;
+  if (!Number.isFinite(n)) return FALLBACK_WIDTH_RATIO;
   return Math.min(1, Math.max(0.05, n));
 }
 
+/**
+ * 既定は**独立した行の中央**。
+ *
+ * `inline` / `wrap` は以前の記録のために読めるままにしてあるが、新しく差し込む写真は
+ * すべて block/center で入る（回り込みの細かい設定は道具として置かないことにした）。
+ */
 function readLayout(raw: string | undefined): InlineImage['layout'] {
-  return raw === 'block' || raw === 'wrap' ? raw : 'inline';
+  return raw === 'inline' || raw === 'wrap' ? raw : 'block';
 }
 
 function readAlign(raw: string | undefined): InlineImage['align'] {
-  return raw === 'center' || raw === 'end' ? raw : 'start';
+  return raw === 'start' || raw === 'end' ? raw : 'center';
 }
 
 /**
@@ -144,56 +189,49 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   } else {
     el.removeAttribute('data-aspect');
   }
+  if (image.rotation) {
+    el.dataset.rotation = String(image.rotation);
+  } else {
+    el.removeAttribute('data-rotation');
+  }
 
   el.style.inlineSize = `${image.widthRatio * 100}%`;
   // 自由変形したときだけ比率を固定する。既定は写真本来の比率に任せる。
   el.style.blockSize = 'auto';
   el.style.aspectRatio = image.aspect ? `1 / ${image.aspect}` : '';
+  el.style.transform = image.rotation ? `rotate(${image.rotation}deg)` : '';
 
-  applyLayoutStyle(el, image);
-}
-
-function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
-  // 一旦すべて解除してから当てる。モードを切り替えたとき前の指定が残らないように。
-  el.style.display = '';
-  el.style.float = '';
-  el.style.marginInline = '';
-  el.style.marginBlock = '';
-  el.style.verticalAlign = '';
-
-  if (image.layout === 'inline') {
-    // 文字と同じ流れに置く。大きな 1 文字として振る舞う。
-    el.style.display = 'inline-block';
-    el.style.verticalAlign = 'middle';
-    return;
-  }
-
-  if (image.layout === 'block') {
-    // 独立した行を占める。寄せは inline 軸のマージンで作る
-    // （横書きなら左右、縦書きなら上下に効く）。
-    el.style.display = 'block';
-    el.style.marginInline =
-      image.align === 'center' ? 'auto' : image.align === 'end' ? 'auto 0' : '0 auto';
-    return;
-  }
-
-  // wrap: 本文が写真を避けて流れる。物理方向ではなく論理方向で寄せる
-  // （縦書きでは inline-start が上、inline-end が下になる）。
-  el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
-  el.style.marginBlock = '0.25em';
-  el.style.marginInline = '0 0.5em';
+  applyPlacementStyle(el, image);
+  // 掴んで動かせることを見せる。実際の移動は use-inline-image-selection が扱う。
+  el.style.cursor = 'grab';
 }
 
 /** 本文中に置く `<img>` を作る。`src` は署名付き URL（失効するので保存はしない）。 */
 export function createInlineImageElement(image: InlineImage, signedUrl: string): HTMLImageElement {
   const el = document.createElement('img');
   el.className = INLINE_IMAGE_CLASS;
-  el.src = signedUrl;
   el.alt = '';
+  if (signedUrl) {
+    el.src = signedUrl;
+    el.removeAttribute('data-unavailable');
+  } else {
+    // 署名に失敗した／URL が届いていない写真。src を空のままにすると **何も描かれず**、
+    // 「保存したのに写真が消えた」ようにしか見えない。位置は保っているので、
+    // 読み込めていないことが分かる箱を出す（本文から消してはいけない）。
+    el.removeAttribute('src');
+    el.dataset.unavailable = 'true';
+    el.style.minInlineSize = '4rem';
+    el.style.minBlockSize = '4rem';
+    el.style.border = '1px dashed var(--border-subtle, #ccc)';
+    el.style.background = 'var(--toolbar-hover, rgba(0,0,0,0.04))';
+  }
   // contentEditable の中で画像自身が編集対象にならないようにする
   // （これが無いと Chrome が画像内にキャレットを置こうとする）。
   el.contentEditable = 'false';
-  el.draggable = false;
+  // **掴んで動かせる。** 差し込む位置を間違えたときに「消して貼り直す」しか
+  // 手が無いのは、写真1枚のために本文の流れを止めることになる。
+  el.draggable = true;
+  el.style.cursor = 'grab';
   applyInlineImageStyle(el, image);
   return el;
 }

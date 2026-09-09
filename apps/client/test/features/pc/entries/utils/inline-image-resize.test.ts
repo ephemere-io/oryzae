@@ -10,8 +10,8 @@ const START: InlineImage = {
   offset: 0,
   storagePath: 'p',
   widthRatio: 0.4,
-  layout: 'inline',
-  align: 'start',
+  layout: 'block',
+  align: 'center',
 };
 
 /** 行の長さ 1000px、写真は inline 400px × block 300px（4:3）から始める。 */
