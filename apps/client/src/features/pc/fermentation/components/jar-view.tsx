@@ -321,11 +321,11 @@ function QuestionCircleWithData({
       detail={detail}
       zoomed={isZoomed}
       dimmed={isDimmed}
+      // 開いた円では円周の問いを消す。同じ文が上部の見出しに出るので、回り続けると二重になる。
+      showRing={!isZoomed}
       innerOverrides={innerOverrides}
       selectedElementId={selectedElementId}
-      onElementClick={(type, id, data) =>
-        onElementClick(question.id, question.currentText ?? '', type, id, data)
-      }
+      onElementClick={(type, id, data) => onElementClick(question.id, '', type, id, data)}
       onInnerDragMove={(type, id, x, y) => onInnerMove(type, id, { jarX: x, jarY: y })}
       onInnerDragEnd={(type, id, x, y) => onInnerDragEnd(type, id, { jarX: x, jarY: y })}
       circlePointerHandlers={pointerHandlers}
@@ -371,7 +371,8 @@ export function JarView({
   const [detailData, setDetailData] = useState<Record<string, string> | null>(null);
   // サイドバーに出している要素。円の中でも同じものに印を付けるために持つ。
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [detailQuestion, setDetailQuestion] = useState('');
+  /** 詳細列の見出しに添える「どの回か」。問いは入れない（上部に 1 か所）。 */
+  const [detailContext, setDetailContext] = useState('');
   const [detailQuestionId, setDetailQuestionId] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newQuestionText, setNewQuestionText] = useState('');
@@ -562,13 +563,13 @@ export function JarView({
   const handleElementClick = useCallback(
     (
       questionId: string,
-      questionText: string,
+      contextLabel: string,
       type: 'keyword' | 'snippet' | 'letter',
       id: string,
       data: Record<string, string>,
     ) => {
       setDetailQuestionId(questionId);
-      setDetailQuestion(questionText);
+      setDetailContext(contextLabel);
       setDetailType(type);
       setDetailData(data);
       setSelectedElementId(id);
@@ -1060,6 +1061,22 @@ export function JarView({
           </div>
         </CanvasViewport>
 
+        {/* 問いは画面上部の 1 か所だけ。円を開くと円周の問いが消え、ここへ移る
+          （履歴を見ている間は Cover Flow が同じ位置に出すので、ここでは出さない）。 */}
+        {zoomedId !== null && historyQuestionId === null && (
+          <div className="pointer-events-none absolute top-6 left-1/2 z-[30] -translate-x-1/2">
+            <span
+              className="text-[15px] tracking-[0.06em] text-[var(--fg)]"
+              style={{
+                fontFamily: "'Noto Serif JP', serif",
+                animation: 'fadeIn 0.5s ease-out forwards',
+              }}
+            >
+              {visibleQuestions.find((q) => q.id === zoomedId)?.currentText ?? ''}
+            </span>
+          </div>
+        )}
+
         {/*
         円を開いている間の履歴への入口。**world の外＝画面座標**に置く。
 
@@ -1211,14 +1228,11 @@ export function JarView({
           onClose={closeHistory}
           paneOpen={detailOpen}
           onElementClick={(resultId, type, id, data) => {
-            const question = visibleQuestions.find((q) => q.id === historyQuestionId);
             const result = historyResults.find((r) => r.id === resultId);
             handleElementClick(
               historyQuestionId ?? '',
-              // どの回の結果かが分かるように、見出しに発酵日を添える。
-              result
-                ? `${question?.currentText ?? ''}　／　${toDateStamp(result.createdAt)} の発酵`
-                : (question?.currentText ?? ''),
+              // どの回のものかは発酵日だけで足りる。問いは上部の見出しが 1 か所で持つ。
+              result ? t('history.context', { date: toDateStamp(result.createdAt) }) : '',
               type,
               id,
               data,
@@ -1238,7 +1252,7 @@ export function JarView({
           setSelectedElementId(null);
         }}
         questionId={detailQuestionId}
-        questionText={detailQuestion}
+        contextLabel={detailContext}
         type={detailType}
         data={detailData}
       />

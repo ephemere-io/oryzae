@@ -33,7 +33,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   questionId: string;
-  questionText: string;
+  contextLabel: string;
   type: 'keyword' | 'snippet' | 'letter' | null;
   data: {
     keyword?: string;
@@ -62,7 +62,7 @@ registerUnit<Props>({
         open: true,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: 'keyword',
         data: { keyword: '焙煎', description: '香りが立つ瞬間の話。' },
       },
@@ -75,7 +75,7 @@ registerUnit<Props>({
         open: true,
         onClose: noop,
         questionId: 'q-2',
-        questionText: 'いま気がかりなことは？',
+        contextLabel: '2026-05-10 の発酵',
         type: 'snippet',
         data: {
           originalText: '朝のコーヒーが沁みた',
@@ -92,7 +92,7 @@ registerUnit<Props>({
         open: true,
         onClose: noop,
         questionId: 'q-3',
-        questionText: '今日のあなたへ',
+        contextLabel: '2026-06-28 の発酵',
         type: 'letter',
         data: { bodyText: '一行目\n二行目' },
       },
@@ -105,7 +105,7 @@ registerUnit<Props>({
         open: false,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: 'keyword',
         data: { keyword: '焙煎', description: '香りが立つ瞬間の話。' },
       },
@@ -118,7 +118,7 @@ registerUnit<Props>({
         open: false,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: null,
         data: null,
       },
@@ -132,7 +132,7 @@ registerUnit<Props>({
         open: false,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: null,
         data: null,
       },
@@ -146,7 +146,7 @@ registerUnit<Props>({
         open: true,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: 'keyword',
         data: null,
       },
@@ -168,10 +168,39 @@ registerUnit<Props>({
     },
     {
       id: 'width-does-not-follow-content-type',
-      description: '幅は中身の種類で変わらない（渡り歩くたびに隣のキャンバス列が伸び縮みしない）',
+      description:
+        '幅は中身の種類で変わらない（渡り歩くたびに隣のキャンバス列が伸び縮みしない）。変えるのは人が掴んだときだけ',
       check: ({ contract }) =>
         contract.width === '480' ||
-        `type="${contract.type}" で width=${contract.width}（種類に依らず 480 であるべき）`,
+        `type="${contract.type}" で width=${contract.width}（種類に依らず既定の 480 であるべき）`,
+    },
+    {
+      id: 'resize-handle-is-a-labelled-separator',
+      description: '幅の取っ手は名前を持つ separator で、キーボードでも掴める',
+      check: ({ root, contract }) => {
+        const handle = root.querySelector<HTMLElement>('[data-verify-part="resize-handle"]');
+        if (!handle) return '幅の取っ手が描画されていない（リサイズ不可）';
+        if (contract.visible !== 'true') {
+          // 畳んでいる間は置いたまま不活性にする（描画ごと消すと suppression が外れる）。
+          const inert = handle.style.pointerEvents === 'none' && handle.tabIndex === -1;
+          return (
+            inert || `畳んだ列の取っ手が生きている（pointerEvents=${handle.style.pointerEvents}）`
+          );
+        }
+        const role = handle.getAttribute('role');
+        const label = handle.getAttribute('aria-label');
+        const focusable = handle.getAttribute('tabindex') === '0';
+        const now = Number(handle.getAttribute('aria-valuenow'));
+        const min = Number(handle.getAttribute('aria-valuemin'));
+        const max = Number(handle.getAttribute('aria-valuemax'));
+        if (!(role === 'separator' && label && focusable)) {
+          return `role=${role}, aria-label=${label}, tabindex=${handle.getAttribute('tabindex')}`;
+        }
+        if (now !== Number(contract.width)) {
+          return `aria-valuenow=${now} が契約 width=${contract.width} と違う`;
+        }
+        return (now >= min && now <= max) || `width=${now} が範囲 [${min}, ${max}] の外`;
+      },
     },
     {
       id: 'empty-state-iff-not-open',
@@ -182,6 +211,20 @@ registerUnit<Props>({
         return (
           hasEmpty === expectEmpty ||
           `空状態 present=${hasEmpty} だが contract.open="${contract.open}"`
+        );
+      },
+    },
+    {
+      id: 'no-question-in-the-column',
+      description: '問いはこの列に出さない（円周・上部の見出しと合わせて 3 か所に重なっていた）',
+      check: ({ root, props, contract }) => {
+        const context = root.querySelector('[data-verify-part="context"]');
+        const text = context?.textContent ?? '';
+        // 中身を選んでいないときは本文ごと描かないので、この行も出ない。
+        const shouldShow = contract.open === 'true' && props.contextLabel !== '';
+        return (
+          (shouldShow ? text === props.contextLabel : context === null) ||
+          `context="${text}" だが open=${contract.open} / props.contextLabel="${props.contextLabel}"`
         );
       },
     },
@@ -209,19 +252,17 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'question-and-cta-present-when-open',
-      description: '中身を選んでいるときは問い文と「エントリを書く」CTA が出る',
-      check: ({ root, props, contract }) => {
+      id: 'cta-present-when-open',
+      description: '中身を選んでいるときだけ取っ手（× と「エントリを書く」）が出る',
+      check: ({ root, contract }) => {
         const buttons = Array.from(root.querySelectorAll('button'));
         if (contract.open !== 'true') {
           // 未選択のときは取っ手を出さない（押せるものが無い列に × だけ残さない）。
           return buttons.length === 0 || `未選択なのに button が ${buttons.length} 個ある`;
         }
-        const hasQuestion = (root.textContent ?? '').includes(props.questionText);
         // close(×) + write-entry の 2 つ。
         return (
-          (hasQuestion && buttons.length === 2) ||
-          `問い文 present=${hasQuestion} / button数=${buttons.length}（close + write-entry の2つを期待）`
+          buttons.length === 2 || `button数=${buttons.length}（close + write-entry の2つを期待）`
         );
       },
     },

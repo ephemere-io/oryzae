@@ -488,7 +488,8 @@
       "snippet_source_prefix": "출처:",
       "write_entry": "이 질문으로 항목 쓰기",
       "empty_label": "READING",
-      "empty_hint": "원 안의 말·발췌·편지를 고르면 여기에 펼쳐집니다."
+      "empty_hint": "원 안의 말·발췌·편지를 고르면 여기에 펼쳐집니다.",
+      "resize_aria": "상세 열 너비 조절"
     },
     "jar": {
       "zoom_close_aria": "확대 닫기",
@@ -542,6 +543,7 @@
       "back_to_jar": "항아리로 돌아가기",
       "new": "NEW",
       "newest": "최신",
+      "context": "{date}의 발효",
       "prev_aria": "이전 발효",
       "next_aria": "다음 발효",
       "hint": "← → 키·드래그·스크롤로 넘기기 ／ ESC 로 항아리로 돌아가기",
