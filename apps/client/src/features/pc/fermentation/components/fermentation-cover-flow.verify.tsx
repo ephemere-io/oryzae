@@ -102,6 +102,15 @@ const DETAIL: FermentationDetail = {
   ],
 };
 
+/** 20 件超の履歴。レールがはみ出し、円盤が埋もれていた条件（レビュー報告）。 */
+const MANY: FermentationSummary[] = Array.from({ length: 21 }, (_, i) =>
+  summary(
+    `m-${i}`,
+    `2026-${String(4 + Math.floor(i / 8)).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}T02:00:00.000Z`,
+    `WEEK ${14 + i}`,
+  ),
+);
+
 const base = {
   questionText: 'なぜ私は急ぐのが苦手なのか',
   innerOverrides: { keywords: {}, snippets: {}, letters: {} },
@@ -179,6 +188,29 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'many-middle',
+      description: '履歴21件・真ん中を閲覧中（レールは窓で切り、前後に … を出す）',
+      props: {
+        ...base,
+        questionId: 'q-1',
+        results: MANY,
+        index: 10,
+        details: new Map(),
+      },
+    },
+    {
+      id: 'many-latest',
+      probe: true,
+      description: 'Probe: 履歴21件・最新を閲覧中（窓が末尾へ寄り、後ろの … は出ない）',
+      props: {
+        ...base,
+        questionId: 'q-1',
+        results: MANY,
+        index: 20,
+        details: new Map(),
+      },
+    },
+    {
       id: 'single-result',
       probe: true,
       description: 'Probe: 発酵1件（円盤1枚・レール1項目・両端の矢印が同時に無効）',
@@ -242,15 +274,40 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'rail-matches-results',
-      description: '日付レールの項目数が発酵の件数と一致する（飛べない段を作らない）',
+      id: 'rail-is-windowed',
+      description:
+        'レールは 9 件までに切る（全件並べると列からはみ出し、右の詳細列に重なっていた）',
       check: ({ root, contract }) => {
         const rail = root.querySelectorAll('[data-verify-part="rail-item"]').length;
-        const expected = contract.open === 'true' ? Number(contract.total) : 0;
+        const total = Number(contract.total);
+        const expected = contract.open === 'true' ? Math.min(total, 9) : 0;
         return (
-          rail === expected ||
-          `レール項目=${rail} だが expected=${expected}（total=${contract.total}）`
+          rail === expected || `レール項目=${rail} だが expected=${expected}（total=${total}）`
         );
+      },
+    },
+    {
+      id: 'rail-shows-more-when-truncated',
+      description: '切ったぶんは「…」で続きがあることを示す',
+      check: ({ root, contract }) => {
+        const rail = root.querySelectorAll('[data-verify-part="rail-item"]').length;
+        const more = root.querySelectorAll('[data-verify-part="rail-more"]').length;
+        const truncated = contract.open === 'true' && Number(contract.total) > rail;
+        return (
+          (truncated ? more > 0 : more === 0) ||
+          `… の数=${more} だが truncated=${truncated}（total=${contract.total} / 表示=${rail}）`
+        );
+      },
+    },
+    {
+      id: 'active-date-stays-in-the-rail',
+      description: 'いま見ている段は必ずレールの中にある（窓の外に出ると現在地が見えなくなる）',
+      check: ({ root, contract }) => {
+        if (contract.open !== 'true') return true;
+        const active = root.querySelectorAll(
+          '[data-verify-part="rail-item"][data-verify-rail-active="true"]',
+        ).length;
+        return active === 1 || `窓の中の選択中チップ=${active}（1 つであるべき）`;
       },
     },
     {
@@ -332,7 +389,7 @@ registerUnit<Props>({
     {
       id: 'newest-marker-on-the-last-item',
       description: '「最新」の印は右端のチップだけに付く（どちら向きが新しいか常に分かる）',
-      onlyFixtures: ['latest-front', 'middle-front', 'oldest-front'],
+      onlyFixtures: ['latest-front', 'middle-front', 'oldest-front', 'many-latest'],
       check: ({ root }) => {
         const items = [...root.querySelectorAll('[data-verify-part="rail-item"]')];
         const marked = items.filter((el) => (el.textContent ?? '').includes('最新'));

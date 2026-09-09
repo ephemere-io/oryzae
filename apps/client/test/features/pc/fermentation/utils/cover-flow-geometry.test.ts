@@ -5,10 +5,14 @@ import {
   discSize,
   ghostJarBox,
   hitTestStage,
-  maxOffsetFrom,
+  neighbourHalfWidth,
+  neighbourPeek,
+  railWindow,
 } from '@/features/pc/fermentation/utils/cover-flow-geometry';
 
 const WIDE = { width: 1440, height: 900 };
+/** 詳細列（480px）を開いたときのキャンバス列。実機の主戦場。 */
+const COLUMN = { width: 880, height: 830 };
 const NARROW = { width: 420, height: 520 };
 const TALL = { width: 2400, height: 1600 };
 
@@ -18,18 +22,23 @@ function rectAt(index: number, cx: number, size: number, zIndex: number): DiscRe
 }
 
 describe('discSize', () => {
-  it('縦に長い画面では上限 560 で頭打ちになる', () => {
-    expect(discSize(TALL)).toBe(560);
+  it('縦に長い画面では上限 480 で頭打ちになる', () => {
+    expect(discSize(TALL)).toBe(480);
   });
 
-  it('ふつうの横長画面では高さ側（下のクロームを避ける係数）で決まる', () => {
-    // min(1440*0.55, 900*0.52) = min(792, 468)
+  it('ふつうの横長画面では高さ側（下の日付レールを避ける係数）で決まる', () => {
+    // min(1440*0.46, 900*0.52) = min(662, 468)
     expect(discSize(WIDE)).toBeCloseTo(468);
   });
 
+  it('詳細列を開いた列幅では、扇の余地を残すため幅側で決まる', () => {
+    // min(880*0.46, 830*0.52) = min(404.8, 431.6)
+    expect(discSize(COLUMN)).toBeCloseTo(404.8);
+  });
+
   it('狭い画面では幅・高さの小さい方に追従する', () => {
-    // min(420*0.55, 520*0.52) = min(231, 270.4)
-    expect(discSize(NARROW)).toBeCloseTo(231);
+    // min(420*0.46, 520*0.52) = min(193.2, 270.4) → 下限 200 に持ち上がる
+    expect(discSize(NARROW)).toBe(200);
   });
 
   it('極端に小さい画面でも下限 200 を割らない', () => {
@@ -39,7 +48,7 @@ describe('discSize', () => {
 
 describe('discPlacement', () => {
   it('正面は中央・傾きなし・不透明', () => {
-    const p = discPlacement(0, 3, WIDE);
+    const p = discPlacement(0, WIDE);
     expect(p.translateX).toBe(0);
     expect(p.translateZ).toBe(0);
     expect(p.rotateY).toBe(0);
@@ -50,7 +59,7 @@ describe('discPlacement', () => {
   });
 
   it('隣は正面より小さく、奥へ下がり、向こう向きに倒れる', () => {
-    const p = discPlacement(1, 3, WIDE);
+    const p = discPlacement(1, WIDE);
     expect(p.size).toBeLessThan(discSize(WIDE));
     expect(p.translateZ).toBe(-150);
     expect(p.rotateY).toBe(-46);
@@ -59,8 +68,8 @@ describe('discPlacement', () => {
   });
 
   it('左右は x の符号と傾きが反転する', () => {
-    const left = discPlacement(-2, 3, WIDE);
-    const right = discPlacement(2, 3, WIDE);
+    const left = discPlacement(-2, WIDE);
+    const right = discPlacement(2, WIDE);
     expect(left.translateX).toBeCloseTo(-right.translateX);
     expect(left.rotateY).toBeCloseTo(-right.rotateY);
     // 段数が同じなら奥行き・大きさ・不透明度は同じ。
@@ -69,44 +78,42 @@ describe('discPlacement', () => {
     expect(left.opacity).toBe(right.opacity);
   });
 
-  it('段ごとに x が必ず違う（遠い段が団子にならない）', () => {
-    const xs = [1, 2, 3, 4, 5].map((o) => discPlacement(o, 5, WIDE).translateX);
-    const unique = new Set(xs.map((x) => Math.round(x * 1000)));
-    expect(unique.size).toBe(xs.length);
-    // 単調に外側へ伸びる。
+  it('**隣は必ず正面の縁から覗く**（履歴が何件あっても埋まらない）', () => {
+    for (const canvas of [WIDE, COLUMN, NARROW]) {
+      expect(neighbourPeek(canvas)).toBeGreaterThan(0);
+    }
+    // 実機の主戦場では、はっきり見える幅ぶん覗いていること。
+    expect(neighbourPeek(COLUMN)).toBeGreaterThan(120);
+  });
+
+  it('件数に依らず 1 段目の位置は変わらない（増えるほど潰れた旧式の回帰）', () => {
+    // 旧式は maxOffset に反比例して間隔が縮み、21 件で隣が中心 35px まで寄っていた。
+    const one = discPlacement(1, COLUMN).translateX;
+    expect(one).toBeGreaterThan(discSize(COLUMN) / 2 - 120);
+    expect(one).toBeCloseTo(discPlacement(1, COLUMN).translateX);
+  });
+
+  it('2 段目から先は外側へ積み上がる（まだ続いていることを見せる）', () => {
+    const xs = [1, 2, 3, 4].map((o) => discPlacement(o, COLUMN).translateX);
     for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThan(xs[i - 1]);
   });
 
-  it('段が増えるほど 1 段あたりの間隔は詰まる（扇が画面から溢れない）', () => {
-    const few = discPlacement(1, 1, WIDE).translateX;
-    const many = discPlacement(1, 8, WIDE).translateX;
-    expect(many).toBeLessThan(few);
+  it('積み上げは頭打ちして列の外へ出ない', () => {
+    const far = discPlacement(50, COLUMN);
+    // 縁の余白（48px）の内側に収まっていること。
+    expect(far.translateX + neighbourHalfWidth(COLUMN)).toBeLessThanOrEqual(
+      COLUMN.width / 2 - 48 + 0.5,
+    );
   });
 
   it('遠い段でも縮小と不透明度は下限で止まる', () => {
-    const far = discPlacement(20, 20, WIDE);
+    const far = discPlacement(20, WIDE);
     expect(far.scale).toBe(0.5);
     expect(far.opacity).toBeCloseTo(0.34);
   });
 
-  it('狭い画面でも扇の間隔は 0 にならない', () => {
-    expect(discPlacement(1, 6, { width: 320, height: 400 }).translateX).toBeGreaterThan(0);
-  });
-});
-
-describe('maxOffsetFrom', () => {
-  it('端にいるときは反対の端までの距離', () => {
-    expect(maxOffsetFrom(0, 5)).toBe(4);
-    expect(maxOffsetFrom(4, 5)).toBe(4);
-  });
-
-  it('真ん中にいるときは遠い側までの距離', () => {
-    expect(maxOffsetFrom(2, 5)).toBe(2);
-    expect(maxOffsetFrom(1, 5)).toBe(3);
-  });
-
-  it('1 件しかなければ 0', () => {
-    expect(maxOffsetFrom(0, 1)).toBe(0);
+  it('狭い画面でも 1 段目は正面の外に出る', () => {
+    expect(discPlacement(1, { width: 320, height: 400 }).translateX).toBeGreaterThan(0);
   });
 });
 
@@ -165,5 +172,46 @@ describe('ghostJarBox', () => {
   it('キャンバスより高くならない（上下がはみ出さない）', () => {
     const canvas = { width: 1440, height: 500 };
     expect(ghostJarBox(canvas).height).toBeLessThanOrEqual(canvas.height - 120);
+  });
+});
+
+describe('railWindow', () => {
+  it('件数が窓に収まるなら全部見せる（… は出さない）', () => {
+    expect(railWindow(2, 5, 9)).toEqual({ start: 0, end: 5, hasBefore: false, hasAfter: false });
+  });
+
+  it('いま見ている段を中央に置く', () => {
+    const w = railWindow(10, 21, 9);
+    expect(w.end - w.start).toBe(9);
+    // 窓の中で 10 がちょうど真ん中（前後に 4 つずつ）。
+    expect(10 - w.start).toBe(4);
+    expect(w.end - 1 - 10).toBe(4);
+    expect(w).toMatchObject({ hasBefore: true, hasAfter: true });
+  });
+
+  it('先頭に寄ったら窓を内側へ寄せる（窓の半分を空にしない）', () => {
+    const w = railWindow(0, 21, 9);
+    expect(w).toEqual({ start: 0, end: 9, hasBefore: false, hasAfter: true });
+  });
+
+  it('末尾に寄ったら窓を内側へ寄せる', () => {
+    const w = railWindow(20, 21, 9);
+    expect(w).toEqual({ start: 12, end: 21, hasBefore: true, hasAfter: false });
+  });
+
+  it('窓は常に max 件ぶん（件数が足りるかぎり）', () => {
+    for (let i = 0; i < 21; i++) {
+      const w = railWindow(i, 21, 9);
+      expect(w.end - w.start).toBe(9);
+      expect(w.start).toBeGreaterThanOrEqual(0);
+      expect(w.end).toBeLessThanOrEqual(21);
+      // いま見ている段は必ず窓の中にある（飛べない段を選択中にしない）。
+      expect(i).toBeGreaterThanOrEqual(w.start);
+      expect(i).toBeLessThan(w.end);
+    }
+  });
+
+  it('1 件でも成立する', () => {
+    expect(railWindow(0, 1, 9)).toEqual({ start: 0, end: 1, hasBefore: false, hasAfter: false });
   });
 });
