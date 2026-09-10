@@ -3,7 +3,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { StudyMark } from './study-mark';
 
 export interface StudyChromeProps {
   /** アバターに出す 1 文字。 */
@@ -14,12 +13,15 @@ export interface StudyChromeProps {
 /**
  * 書斎に浮かぶ最小限の UI（`docs/oryzae-study/00-overview.md`）。
  *
- * サイドバーが消えるかわりに、左上のマークと左下のアバターだけが浮く。
+ * サイドバーが消えるかわりに、左下のアバターだけが浮く。
  *
- * **文字は置かない。** 以前は下端に部屋の名前と発酵の状態（「手紙が届いています」等）を
- * 出していたが、実機レビューで「特に書く必要もない、もう少しすっきりさせたい」と
- * 報告された。どちらも**物が既に語っている** — 部屋は見えているし、手紙が届いたことは
- * 瓶の封が伝える（未読の数字バッジを出さないのと同じ理由）。
+ * **文字も印も置かない。** 以前は下端に部屋の名前と発酵の状態（「手紙が届いています」等）を
+ * 出していたが「特に書く必要もない」と報告され、次に左上のブランドマークが
+ * 「ずっとボタンのようなものが表示されている」と報告された（PR #570）。
+ *
+ * どちらも**物が既に語っている**。ここは書斎そのもので、部屋は見えている。
+ * 押せるものが並ぶ画面に押せない印を混ぜると、押せるかどうかを毎回試させることになる。
+ * 残すのはアカウントへ行けるアバター 1 つだけ。
  */
 export function StudyChrome({ initial, avatarUrl }: StudyChromeProps) {
   const t = useTranslations('study');
@@ -29,16 +31,6 @@ export function StudyChrome({ initial, avatarUrl }: StudyChromeProps) {
       {...verifyAttrs({ unit: 'StudyChrome', hasAvatar: Boolean(avatarUrl) })}
       className="pointer-events-none absolute inset-0"
     >
-      {/* 左上のマーク。サブ画面では同じ位置に「書斎へ戻る」が出る（layout 側で出し分け）。
-          **同じ絵**にしてあるのは、戻り先が「さっきまで居たこの部屋」だと繋がるようにするため。
-          以前は `o` の一文字で、実機レビューで「意味が分からない」と報告された。 */}
-      <div
-        className="pointer-events-auto absolute left-6 top-6 flex h-10 w-10 items-center justify-center rounded-full"
-        style={glass}
-      >
-        <StudyMark />
-      </div>
-
       {/* 左下のアバター。サイドバーの下端にあったものがそのまま浮く。 */}
       <Link
         href="/account"

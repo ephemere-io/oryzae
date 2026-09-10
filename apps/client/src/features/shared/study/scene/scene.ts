@@ -189,16 +189,28 @@ export interface StudySceneHandle {
 const MS_PER_SECOND = 1000;
 
 /**
- * 憶えておく 1 枚の大きさ。
+ * 憶えておく 1 枚の撮り方。
  *
- * **480px では部屋に見えなかった。** 書斎はほぼ白地に細い線だけで出来ているので、
- * 縮めるとまず線が消え、残るのは「画面がうっすら曇った」という印象になる。部屋だと
- * 分かるのは瓶の輪郭・板の矩形・積みの稜線で、それが残る大きさが要る。
+ * **形式は PNG。JPEG は使わない。** 書斎はほぼ白地に細い黒線だけで出来ていて、
+ * JPEG の周波数変換は**まさにこの形が最も苦手**（線の周りにリンギングが出る）。
+ * 960px の JPEG を Retina で引き伸ばした版は、線が破線と粒に割れて「ガビガビ」と
+ * 報告された。白地が大半なので PNG でもよく縮み、実測で数十 KB に収まる。
  *
- * JPEG にするのは軽さのため（この絵は白地が大半なので、960px でも十数 KB に収まる）。
- * 透過を持てないので、書斎の地の色を先に塗ってから重ねる。
+ * **大きさの上限は 1440。** `renderer.domElement.width` は既にデバイス画素
+ * （pixelRatio 込み、上限 2）なので、1440×900 の画面では 2880×1800 ある。そこから
+ * 960 へ落とすと 3 分の 1 になり、拡大して敷けば線が残らない。等倍まで上げると
+ * `toDataURL` が重くなり、**カメラが動き出すその 1 フレームで引っかかる**ので、
+ * CSS 画素と同じ 1440 で止める（Retina では半分の解像度だが、滲むだけで割れはしない）。
  */
-const CAPTURE = { width: 960, quality: 0.72 } as const;
+const CAPTURE = { maxWidth: 1440 } as const;
+
+/**
+ * `sessionStorage` に置く 1 枚の上限（文字数）。
+ *
+ * 超えたら**憶えない**。地が無くても引き戻しは地の色で成立するので、保存に失敗して
+ * 他の憶えごとを押し出すより、諦めるほうが安全。
+ */
+const CAPTURE_MAX_CHARS = 3_000_000;
 
 /** 輪郭の呼吸の周期（ms）。 */
 const OUTLINE_BREATH_MS = 4000;
@@ -393,19 +405,22 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const source = renderer.domElement;
     if (source.width === 0 || source.height === 0) return null;
 
+    const width = Math.min(source.width, CAPTURE.maxWidth);
     const flat = document.createElement('canvas');
-    flat.width = CAPTURE.width;
-    flat.height = Math.max(1, Math.round((source.height / source.width) * CAPTURE.width));
+    flat.width = width;
+    flat.height = Math.max(1, Math.round((source.height / source.width) * width));
     const context = flat.getContext('2d');
     if (context === null) return null;
 
-    // 書斎は alpha 付きで描いている。JPEG は透過を持てないので、地の色を先に塗る。
+    // 書斎は alpha 付きで描いている。地の色を先に塗ってから重ねる
+    // （透明のまま敷くと、敷いた先の画面が透けて二重写しになる）。
     context.fillStyle = theme === 'dark' ? DARK_PALETTE.solid : LIGHT_PALETTE.solid;
     context.fillRect(0, 0, flat.width, flat.height);
     context.drawImage(source, 0, 0, flat.width, flat.height);
 
     try {
-      return flat.toDataURL('image/jpeg', CAPTURE.quality);
+      const url = flat.toDataURL('image/png');
+      return url.length > CAPTURE_MAX_CHARS ? null : url;
     } catch {
       // 汚れた canvas（外部テクスチャ）なら諦める。いまは自前の描画だけなので通常は来ない。
       return null;

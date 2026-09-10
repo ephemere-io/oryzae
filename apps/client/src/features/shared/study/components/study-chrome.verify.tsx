@@ -44,12 +44,17 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'mark-is-the-room',
-      description: '左上は書斎の縮図（サブ画面の戻るマークと同じ絵）',
+      /**
+       * 左上には何も置かない。`o` の一文字 → 書斎の縮図、と直してきたが、最後は
+       * 「ずっとボタンのようなものが表示されている」と報告された（PR #570）。
+       * ここは書斎そのもので、部屋は見えている。押せる物が並ぶ画面に押せない印を
+       * 混ぜると、押せるかどうかを毎回試させることになる。
+       */
+      id: 'nothing-in-the-corner',
+      description: '左上に印を置かない（ここは部屋そのもので、名乗る必要が無い）',
       check: ({ root }) => {
-        // 以前は `o` の一文字で、何を指すのか読めなかった。
         const mark = root.querySelector('[data-study-mark]');
-        return mark !== null || '左上に書斎のマークが無い';
+        return mark === null || '左上にマークが残っている';
       },
     },
     {
