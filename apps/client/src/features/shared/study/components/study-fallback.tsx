@@ -3,8 +3,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
-import { readStudyBackdrop } from '../backdrop';
 
 export interface StudyFallbackProps {
   /**
@@ -71,34 +69,21 @@ export function StudyFallback({ loading = false }: StudyFallbackProps) {
 }
 
 /**
- * 読み込み中。憶えた部屋があればそれを敷き、無ければ地の色のまま待つ。
+ * 読み込み中。**何も描かない。**
  *
- * 読むのは effect の中（`sessionStorage` はサーバーに無い）。初回描画が地の色なのは
- * 正しく、そこから一段濃くなって本物に繋がる。
+ * ここでも憶えた部屋を敷いていた時期がある。ところが地を出す場所は当時 3 つあり
+ * （このロード表示・`StudyCanvas` の dynamic loading・`StudyHome` 本体）、戻り道では
+ * それが順に入れ替わっていた。**同じ絵でも別々の要素なので、入れ替わるたびに 1
+ * フレーム空く** — それが「戻ると画面がもう 1 回点滅する」の正体だった。
+ *
+ * 地の持ち主は `StudyHome` ただ 1 つにして、ここは場所だけ空けて待つ。
  */
 function StudyLoading() {
-  const [backdrop, setBackdrop] = useState<string | null>(null);
-  useEffect(() => setBackdrop(readStudyBackdrop()), []);
-
   return (
     <div
       {...verifyAttrs({ unit: 'StudyFallback', loading: true, linkCount: 0 })}
-      className="h-full w-full overflow-hidden"
-    >
-      {backdrop === null ? null : (
-        // **薄めない・ぼかさない。** これは「代わりの絵」ではなく部屋そのもので、
-        // three.js が来たら同じ位置に本物が重なる。薄くしておくと、そこで濃さが
-        // 変わってしまい、絵が入れ替わったように見える。
-        // biome-ignore lint/performance/noImgElement: data URL の地。最適化する先が無い
-        <img
-          src={backdrop}
-          alt=""
-          aria-hidden="true"
-          data-study-backdrop
-          className="h-full w-full object-cover"
-        />
-      )}
-    </div>
+      className="h-full w-full"
+    />
   );
 }
 

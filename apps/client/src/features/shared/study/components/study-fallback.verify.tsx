@@ -69,16 +69,15 @@ registerUnit<Props>({
        * 文字も、割り込みとして読まれる。出ていく直前に掴んだ 1 枚だけが、割り込みでは
        * なく「まだ遠い部屋」になる。
        */
-      id: 'loading-shows-only-the-room',
-      description: '読み込み中に出すのは憶えた部屋だけ（別の絵も文字も挟まない）',
+      id: 'loading-draws-nothing',
+      description: '読み込み中は何も描かない（地の持ち主は StudyHome ただ 1 つ）',
       onlyFixtures: ['loading'],
       check: ({ root }) => {
         if (root.querySelector('svg') !== null) return '読み込み中なのに書斎の絵が出ている';
         const text = (root.textContent ?? '').trim();
         if (text.length > 0) return `読み込み中なのに文字が出ている: ${text}`;
-        const images = [...root.querySelectorAll('img')];
-        const stray = images.find((image) => !image.hasAttribute('data-study-backdrop'));
-        return stray === undefined || '憶えた部屋以外の絵が出ている';
+        const images = root.querySelectorAll('img').length;
+        return images === 0 || `読み込み中なのに絵が ${images} 枚出ている`;
       },
     },
     {

@@ -19,7 +19,6 @@ import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
 import { StudyChrome } from './study-chrome';
-import { StudyFallback } from './study-fallback';
 import { StudyHintTooltip } from './study-hint-tooltip';
 import { type LabelKind, StudyLabels } from './study-labels';
 import { StudyTooltip } from './study-tooltip';
@@ -30,7 +29,8 @@ import { StudyTooltip } from './study-tooltip';
  */
 const StudyCanvas = dynamic(() => import('./study-canvas').then((module) => module.StudyCanvas), {
   ssr: false,
-  loading: () => <StudyFallback loading />,
+  // **ここでは何も描かない。** 地は `StudyHome` 本体が 1 枚だけ持つ（下の注釈を参照）。
+  loading: () => null,
 });
 
 export interface StudyHomeProps {
