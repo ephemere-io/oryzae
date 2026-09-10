@@ -158,28 +158,19 @@ describe('useStudyState', () => {
 });
 
 /**
- * 言葉（瓶に浮かぶキーワード）は二段構えで取る: まず手紙の一覧、その各詳細。
- * 一段目が終わった時点を「取得済み」と数えると、二段目の待ち時間だけ言葉がゼロになる。
+ * 経路の速さがそろわない書斎。
+ *
+ * 手帳の月別件数だけ遅らせる。**憶えた書斎が、遅い経路を待つあいだに一度空にならない**
+ * ことを見るための仕掛けで、全部が同時に返ってしまうとその穴が再現しない。
  */
 const WITH_LETTERS: RouteMap = {
   ...HAPPY,
   '/api/v1/fermentations/readiness': {
     body: { readiness: 0.62, eligible: false, nextRunAt: null },
   },
-  // 詳細（/fermentations/:id）。HAPPY の同じ鍵を差し替える（前方一致なので順序が効く）。
-  // 一覧より遅らせるのが肝。実物も「一覧が返ってから詳細を引く」ので、ここが同時に
-  // 返ってしまうと二段構えの穴（言葉がいったん消える）が再現しない。
-  '/api/v1/fermentations/': {
+  '/api/v1/entries/monthly-counts': {
     delayMs: 150,
-    body: {
-      id: 'f-1',
-      questionId: 'q-1',
-      targetPeriod: '2026-08',
-      status: 'completed',
-      keywords: [{ id: 'k-1', keyword: '余白', description: '' }],
-      snippets: [],
-      letter: null,
-    },
+    body: [{ month: '2026-09', count: 11 }],
   },
   '/api/v1/fermentations': {
     body: [
@@ -192,23 +183,22 @@ const WITH_LETTERS: RouteMap = {
 describe('前回の書斎を憶えて即座に出す', () => {
   const USER = 'u-1';
 
-  it('憶えた言葉が、取得の途中でいったん消えない', async () => {
+  it('憶えた手帳が、取得の途中でいったん消えない', async () => {
     // 1 回目: 取得して憶える。
     const first = apiFor(WITH_LETTERS);
     const a = renderHook(() => useStudyState(first.api, false, USER));
     await waitFor(() => expect(a.result.current.loading).toBe(false));
-    // 語は出どころの問いと一緒に運ぶ（瓶の中の語が何を指すか触れて分かるように）。
-    expect(a.result.current.state.words).toEqual([{ text: '余白', question: '続ける意味とは' }]);
+    expect(a.result.current.state.notebooks).toHaveLength(1);
     a.unmount();
 
-    // 2 回目: 描画のたびに言葉の数を記録する。**一度出た言葉が消えないこと**を見る
-    // （実機で「言葉が出た後に消えて、1 秒ほどして また出る」として出ていた）。
+    // 2 回目: 描画のたびに冊数を記録する。**一度出た手帳が消えないこと**を見る
+    // （経路の速さがそろわないと、遅いほうを待つあいだに机が空になる）。
     // 憶えた値を読むのは effect なので、それより前の初回描画がゼロなのは正常。
     const second = apiFor(WITH_LETTERS);
     const seen: number[] = [];
     const b = renderHook(() => {
       const value = useStudyState(second.api, false, USER);
-      seen.push(value.state.words.length);
+      seen.push(value.state.notebooks.length);
       return value;
     });
     await waitFor(() => expect(b.result.current.loading).toBe(false));
@@ -216,7 +206,7 @@ describe('前回の書斎を憶えて即座に出す', () => {
     const firstShown = seen.findIndex((count) => count > 0);
     expect(firstShown).toBeGreaterThanOrEqual(0);
     expect(seen.slice(firstShown).filter((count) => count === 0)).toEqual([]);
-    expect(b.result.current.state.words).toEqual([{ text: '余白', question: '続ける意味とは' }]);
+    expect(b.result.current.state.notebooks).toHaveLength(1);
   });
 
   it('取得が終わったら憶える', async () => {
@@ -263,7 +253,7 @@ describe('前回の書斎を憶えて即座に出す', () => {
     await waitFor(() => expect(b.result.current.loading).toBe(false));
 
     expect(b.result.current.state.notebooks).toEqual(remembered.notebooks);
-    expect(b.result.current.state.words).toEqual(remembered.words);
+    expect(b.result.current.state.entries).toEqual(remembered.entries);
   });
 
   it('届かなかったときは憶えている中身を上書きしない', async () => {
@@ -301,7 +291,7 @@ describe('前回の書斎を憶えて即座に出す', () => {
     const b = renderHook(() => useStudyState(emptiedApi, false, USER));
     await waitFor(() => expect(b.result.current.loading).toBe(false));
 
-    expect(b.result.current.state.words).toEqual([]);
+    expect(b.result.current.state.notebooks).toEqual([]);
     expect(b.result.current.state.entries).toEqual([]);
   });
 

@@ -19,7 +19,6 @@ const REDUCED = { reducedMotion: true, twoStageBoard: false };
 
 const ALL_TARGETS: StudyTarget[] = [
   { kind: 'jar' },
-  { kind: 'letter', fermentationId: 'f', questionId: 'q' },
   { kind: 'journal-new' },
   { kind: 'journal-month', month: '2026-08' },
   { kind: 'archive' },
@@ -41,11 +40,6 @@ describe('planFor', () => {
     const plan = planFor({ kind: 'jar' }, PC);
     expect(plan.steps.map((s) => s.name)).toEqual(['jar-pan']);
     expect(plan.totalMs).toBe(DURATION.jarPan);
-  });
-
-  it('封は瓶と同じパン', () => {
-    const letter = planFor({ kind: 'letter', fermentationId: 'f', questionId: 'q' }, PC);
-    expect(letter).toEqual(planFor({ kind: 'jar' }, PC));
   });
 
   it('手帳は 真上へ → 表紙が開く → 見開きへ の順に始まる', () => {

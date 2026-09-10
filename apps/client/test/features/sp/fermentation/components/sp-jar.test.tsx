@@ -43,7 +43,6 @@ interface RenderOptions {
   jarQuestions?: JarQuestion[];
   loading?: boolean;
   onManageQuestions?: () => void;
-  openLetterFor?: string | null;
 }
 
 function renderJar(api: ApiClient, options: RenderOptions = {}) {
@@ -55,7 +54,6 @@ function renderJar(api: ApiClient, options: RenderOptions = {}) {
           questions={options.jarQuestions ?? questions}
           loading={options.loading ?? false}
           onManageQuestions={options.onManageQuestions ?? vi.fn()}
-          openLetterFor={options.openLetterFor ?? null}
         />
       </UnreadProvider>
     </NextIntlClientProvider>,
@@ -245,36 +243,5 @@ describe('SpJar', () => {
     fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
     expect(screen.queryByTestId('sp-jar-letter')).toBeNull();
     expect(screen.getByRole('button', { name: 'なぜ続けるのか' })).toBeTruthy();
-  });
-
-  describe('書斎の封から来たとき（?letter=）', () => {
-    it('その手紙を持つ問いの円を、手紙を開いた状態で出す', async () => {
-      // 「届いた」ことを 3D の封で見せておいて、押した先で改めて探させない。
-      renderJar(filledApi(), { openLetterFor: 'f1' });
-
-      expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
-    });
-
-    it('知らない発酵 id なら何も開かない（URL を直に叩かれても壊れない）', async () => {
-      renderJar(filledApi(), { openLetterFor: 'unknown' });
-
-      // 円は出るが、手紙は開かない。
-      expect(await screen.findByRole('button', { name: 'なぜ続けるのか' })).toBeTruthy();
-      expect(screen.queryByText('過去のあなたより。')).toBeNull();
-    });
-
-    it('閉じたら開き直さない（合図は一度きり）', async () => {
-      renderJar(filledApi(), { openLetterFor: 'f1' });
-      expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
-
-      // 「閉じる」は円の見出しとシートの両方にある。閉じたいのはシート（最後に開いた層）。
-      const closes = screen.getAllByRole('button', { name: '閉じる' });
-      const sheetClose = closes[closes.length - 1];
-      if (!sheetClose) throw new Error('閉じるボタンが無い');
-      fireEvent.click(sheetClose);
-
-      // 効果が残っていると、閉じた瞬間に開き直って閉じられなくなる。
-      expect(screen.queryByText('過去のあなたより。')).toBeNull();
-    });
   });
 });

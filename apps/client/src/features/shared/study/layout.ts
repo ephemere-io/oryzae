@@ -37,14 +37,25 @@ export interface StudyLayout {
     position: Vec3;
     /** ホーム注視点。 */
     target: Vec3;
+    /**
+     * 寄っても画面の上端から出したくない点（＝絵のいちばん上）。
+     *
+     * **寄り引きの注視点はここから導く**（`zoomTargetRise`）。等倍のときこの点は
+     * 画面の上のほうぎりぎりに写っていて、注視点を据えたまま近づくと**まっさきに
+     * 外へ出る** — 実際「ズームインしていくとボードの上が見切れる」と実機レビューで
+     * 報告された（PR #570）。この点の画面上の高さが変わらないように注視点を持ち上げる
+     * ので、寄るほど視界は上へ動く（利用者が手で上へ引きたくなっていた動きを、
+     * 寄り引きそのものに畳んである）。
+     *
+     * どの層でも「絵の上端」は壁のボードの上辺なので、そこを指す。
+     */
+    frameTop: Vec3;
     near: number;
     far: number;
   };
   /** マウス位置に応じた視点の揺れ。SP は無し。 */
   parallax: { x: number; y: number; lerp: number } | null;
   jar: Vec3;
-  /** 封は瓶の口の上に浮く。 */
-  seal: Vec3;
   board: { position: Vec3; scale: number };
   /** 机に積む手帳の基準位置。 */
   desk: Vec3;
@@ -82,12 +93,13 @@ export const PC_LAYOUT: StudyLayout = {
     fov: 45,
     position: vec3(0, 4, 12),
     target: vec3(0, 0, 0),
+    // ボードの上辺の中央（板の中心 y=2.5 ＋ 高さ 5 の半分）。
+    frameTop: vec3(0.9, 5, -4),
     near: 0.1,
     far: 100,
   },
   parallax: { x: 0.55, y: 0.3, lerp: 0.05 },
   jar: vec3(-4.2, -1.2, 1),
-  seal: vec3(-4.2, 2.85, 1.15),
   board: { position: vec3(0.9, 2.5, -4), scale: 1 },
   desk: vec3(3, -1, 2),
   pen: vec3(2.55, -0.15, -0.1),
@@ -123,6 +135,8 @@ export const SP_LAYOUT: StudyLayout = {
     position: vec3(0, 10.6, 7.8),
     // 注視点を絵の中心より下に置くと全体が上に寄り、下端に余白が残る。
     target: vec3(0, -0.35, -0.7),
+    // ボードの上辺の中央。SP は板を 0.68 に縮めてあるので、高さの半分も同じ比。
+    frameTop: vec3(0, 2.7 + (5 * 0.68) / 2, -4.2),
     near: 0.1,
     far: 100,
   },
@@ -131,7 +145,6 @@ export const SP_LAYOUT: StudyLayout = {
   // 横に使えない。物の並びを x ではなく z（奥行き）に散らす。クオータートップでは
   // 奥行きの差が画面の上下差になるため、ボードが上・瓶が中・手帳が下に積まれる。
   jar: vec3(-1.15, -1.2, -0.2),
-  seal: vec3(-1.15, 2.85, -0.05),
   board: { position: vec3(0, 2.7, -4.2), scale: 0.68 },
   desk: SP_DESK,
   // ペンは積みの左手前。右に置くと画面外に出る。

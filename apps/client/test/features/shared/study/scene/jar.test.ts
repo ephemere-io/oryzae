@@ -10,21 +10,12 @@ import {
   JAR_HEIGHT,
   jarRadiusAt,
   liquidLevel,
-  MAX_WORDS,
   MERIDIAN_COUNT,
   MERIDIAN_OPACITY,
-  MIN_WORD_GAP,
   outlineOpacity,
-  placeWords,
-  SEAL_BASE_Y,
   sampleJarProfile,
-  sealFloat,
   silhouetteBufferSize,
   solveJarSilhouette,
-  WORD_BOB_AMPLITUDE,
-  WORD_ORBIT_RADIUS,
-  WORD_SPRITE_HEIGHT,
-  wordScale,
 } from '@/features/shared/study/scene/jar';
 
 const PROFILE = sampleJarProfile();
@@ -172,103 +163,6 @@ describe('もやと輪郭の呼吸', () => {
   });
 });
 
-describe('placeWords', () => {
-  const WORDS = ['発酵', '沈黙', '手触り', '余白', '記憶', '輪郭', 'あふれ'];
-
-  it('最大 6 語まで（それ以上は出さない）', () => {
-    const placements = placeWords(WORDS, liquidLevel(1));
-    expect(placements.length).toBeLessThanOrEqual(MAX_WORDS);
-  });
-
-  it.each([0, 0.1, 0.3, 0.5, 0.7, 0.9, 1])('readiness %s でも語が重ならない', (readiness) => {
-    // 語ごとに大きさが違うので、行間は**隣り合う 2 語の高さ**から決まる。
-    // 一律の間隔で見ると、大きい語どうしが触れているのを見逃す。
-    const placements = placeWords(WORDS, liquidLevel(readiness));
-    for (let i = 1; i < placements.length; i++) {
-      const gap = placements[i].y - placements[i - 1].y;
-      const touching =
-        (WORD_SPRITE_HEIGHT * placements[i - 1].scale + WORD_SPRITE_HEIGHT * placements[i].scale) /
-        2;
-      expect(gap).toBeGreaterThanOrEqual(touching - 1e-9);
-    }
-  });
-
-  it('語ごとに大きさが変わる（全語が同じ大きさにならない）', () => {
-    const scales = placeWords(WORDS, liquidLevel(1)).map((p) => p.scale);
-    expect(new Set(scales).size).toBeGreaterThan(1);
-  });
-
-  it('同じ語は常に同じ大きさ（組み直しでちらつかない）', () => {
-    // Math.random() で決めると、状態が更新されるたびに大きさが変わって画面が騒がしくなる。
-    expect(wordScale('発酵')).toBe(wordScale('発酵'));
-    expect(wordScale('発酵')).not.toBe(wordScale('沈黙'));
-  });
-
-  it('問いごとのキーワードを全部並べられる', () => {
-    const many = ['あ', 'いい', 'ううう', 'ええ', 'おおお', 'かか', 'きき', 'くく'];
-    // 行間を詰めてでも全部出す（入り切らない語だけを落とす）。
-    expect(placeWords(many, liquidLevel(1)).length).toBeGreaterThanOrEqual(6);
-  });
-
-  it('揺れを足しても隣の語に触れない', () => {
-    // 上下 ±0.045 の揺れは行間より十分小さくないと意味がない。
-    expect(WORD_BOB_AMPLITUDE * 2).toBeLessThan(MIN_WORD_GAP);
-  });
-
-  it('液面が低くても語数が減らない（問いごとのキーワードを全部出す）', () => {
-    // 液面までに収めようとすると、readiness が低いとき 2 語目以降が全部落ちる
-    // （実機で 1 語しか出ていなかった）。入り切らないぶんは瓶の空いた高さへ伸ばす。
-    const shallow = placeWords(WORDS, liquidLevel(0.05)).length;
-    const deep = placeWords(WORDS, liquidLevel(1)).length;
-    expect(shallow).toBe(deep);
-    expect(shallow).toBeGreaterThan(1);
-  });
-
-  it('瓶の口やコルクに重ならない', () => {
-    for (const readiness of [0, 0.2, 0.6, 1]) {
-      for (const placement of placeWords(WORDS, liquidLevel(readiness))) {
-        // 首がくびれ始める手前まで。ここを超えるとコルクに文字が乗る。
-        expect(placement.y).toBeLessThan(2.45);
-        expect(placement.y).toBeGreaterThanOrEqual(0.3);
-      }
-    }
-  });
-
-  it('1 語だけなら範囲の中ほどに置く（底に貼り付かない）', () => {
-    const placements = placeWords(['発酵'], liquidLevel(1));
-    expect(placements).toHaveLength(1);
-    expect(placements[0].y).toBeGreaterThan(0.3);
-  });
-
-  it('語が無ければ空', () => {
-    expect(placeWords([], liquidLevel(1))).toEqual([]);
-  });
-
-  it('液面が低くても必ず 1 語は出す（言葉が漂う見せ方そのものを消さない）', () => {
-    // readiness が低いほど語が減るのは意図どおりだが、0 語になると瓶がただの容器に見える。
-    for (const readiness of [0, 0.05, 0.2]) {
-      expect(placeWords(WORDS, liquidLevel(readiness)).length).toBeGreaterThanOrEqual(1);
-    }
-    expect(placeWords(WORDS, 0).length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('液面が低すぎても落ちない', () => {
-    expect(() => placeWords(WORDS, 0)).not.toThrow();
-  });
-
-  it('方位を黄金角でずらす（少ない語数でも重ならずに散る）', () => {
-    const placements = placeWords(WORDS, liquidLevel(1));
-    for (let i = 1; i < placements.length; i++) {
-      expect(placements[i].angle - placements[i - 1].angle).toBeCloseTo(2.39996, 5);
-    }
-  });
-
-  it('渡した順に並ぶ（語が入れ替わらない）', () => {
-    const placements = placeWords(WORDS, liquidLevel(1));
-    expect(placements.map((p) => p.word)).toEqual(WORDS.slice(0, placements.length));
-  });
-});
-
 describe('solveJarSilhouette', () => {
   const CAMERA = { horizontalDistance: 12, azimuth: 0, y: 4 };
 
@@ -366,28 +260,7 @@ describe('横線を立てないための設定', () => {
   });
 });
 
-describe('言葉の寸法', () => {
-  it('行間の下限がスプライト高さの 1.7 倍', () => {
-    expect(MIN_WORD_GAP).toBeCloseTo(WORD_SPRITE_HEIGHT * 1.7, 10);
-  });
-
-  it('周回半径が胴の内径より小さい（壁を突き抜けない）', () => {
-    // 胴の最大半径は 1.30。周回してもガラスの内側に収まること。
-    expect(WORD_ORBIT_RADIUS).toBeLessThan(0.9);
-    expect(WORD_ORBIT_RADIUS).toBeGreaterThan(0);
-  });
-});
-
-describe('コルクと封', () => {
-  it('封が瓶の口より上に浮く', () => {
-    expect(SEAL_BASE_Y).toBeGreaterThan(JAR_HEIGHT);
-  });
-
-  it('封の揺れが浮遊高さに対して十分小さい（飛んでいるように見えない）', () => {
-    const swing = Math.max(...Array.from({ length: 60 }, (_, i) => sealFloat(i * 0.2).yOffset));
-    expect(swing).toBeLessThan(SEAL_BASE_Y * 0.05);
-  });
-
+describe('コルク', () => {
   it('コルクが口縁に少し沈む', () => {
     // 口縁は 2.94。コルクの中心が 2.99 で高さ 0.38 なので、下端は口の中に入る。
     expect(CORK.y - CORK.height / 2).toBeLessThan(JAR_HEIGHT);
@@ -397,18 +270,5 @@ describe('コルクと封', () => {
     expect(CORK.radiusTop).toBeGreaterThan(CORK.radiusBottom);
     // 口縁の内径 1.0 に対して、下側が入る太さであること。
     expect(CORK.radiusBottom).toBeLessThan(1.0);
-  });
-
-  it('封が上下に揺れ、微小に回る', () => {
-    const at0 = sealFloat(0);
-    expect(at0.yOffset).toBeCloseTo(0, 10);
-    expect(at0.rotationZ).toBeCloseTo(0, 10);
-
-    const samples = Array.from({ length: 60 }, (_, i) => sealFloat(i * 0.2));
-    const ys = samples.map((s) => s.yOffset);
-    expect(Math.max(...ys)).toBeGreaterThan(0.05);
-    expect(Math.min(...ys)).toBeLessThan(-0.05);
-    // 回転は「微小」であること（回りすぎると封に見えない）。
-    for (const sample of samples) expect(Math.abs(sample.rotationZ)).toBeLessThanOrEqual(0.04);
   });
 });

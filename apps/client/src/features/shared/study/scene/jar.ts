@@ -130,8 +130,8 @@ export function bubbleCount(readiness: number, completed: boolean): number {
  *
  * **仕様と原案は「完了時 0＝静止」だが、そこだけ変えている。** 止めきると、
  * 手紙が届いている瓶（＝いちばん見る状態）が壊れているように見えるため。
- * 「静けさ」は泡の数（30 → 4）と浮かぶ封が担っているので、ゆっくり上がっても
- * 発酵中との区別は付く。戻すならここを 0 にすればよい。
+ * 「静けさ」は泡の数（30 → 4）が担っているので、ゆっくり上がっても発酵中との
+ * 区別は付く。戻すならここを 0 にすればよい。
  */
 const COMPLETED_DRIFT = 0.12;
 
@@ -168,142 +168,6 @@ export function outlineOpacity(readiness: number, phase: number): number {
   const wave = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
   return 1 - 0.35 * clamp01(readiness) * wave;
 }
-
-/** 漂う言葉のスプライトの高さ。幅は文字幅の実測から決める（全語同幅にしない）。 */
-export const WORD_SPRITE_HEIGHT = 0.24;
-
-/** 行間の下限＝スプライト高さの 1.7 倍。これを割ると語が重なって灰色の滲みになる。 */
-export const MIN_WORD_GAP = WORD_SPRITE_HEIGHT * 1.7;
-
-/** 黄金角（rad）。方位をこれだけずらすと、少ない語数でも重ならずに散る。 */
-const GOLDEN_ANGLE = 2.39996;
-
-/** 言葉が漂う範囲の下端。 */
-const WORD_BOTTOM = 0.3;
-
-/** 液面からこれだけ下までに収める（液面を突き抜けさせない）。 */
-const WORD_TOP_MARGIN = 0.14;
-
-/**
- * 瓶に入れる言葉の上限。
- *
- * 問いごとの最新キーワードを**全部**浮かべるのが基本だが、描画コストと読みやすさの
- * 両方に天井は要る。問いは生存が最大 3 件、1 発酵あたりのキーワードも数語なので、
- * 実際にここへ当たることはほとんど無い。
- */
-export const MAX_WORDS = 18;
-
-/** 語の大きさの下限・上限（基準を 1 とした倍率）。 */
-const WORD_SCALE_MIN = 0.72;
-const WORD_SCALE_MAX = 1.38;
-
-/**
- * 語ごとの大きさ。
- *
- * **文字列から決める。** `Math.random()` にすると、シーンを組み直すたびに大きさが
- * 変わって画面がちらつく（状態が更新されるたびに組み直すため）。同じ語は常に同じ
- * 大きさになる。
- */
-export function wordScale(word: string): number {
-  let hash = 0;
-  for (let i = 0; i < word.length; i++) {
-    hash = (hash * 31 + word.charCodeAt(i)) % 100000;
-  }
-  return WORD_SCALE_MIN + (hash / 100000) * (WORD_SCALE_MAX - WORD_SCALE_MIN);
-}
-
-export interface WordPlacement {
-  word: string;
-  /** 瓶ローカルの高さ。 */
-  y: number;
-  /** 方位（rad）。 */
-  angle: number;
-  /** 基準に対する大きさの倍率。 */
-  scale: number;
-}
-
-/**
- * 言葉を置ける上限の高さ。
- *
- * 首がくびれ始める手前まで。ここを超えるとコルクに文字が重なる。
- */
-const WORD_CEILING = 2.35;
-
-/** 語を並べるのに要る高さ。行間は隣り合う 2 語の高さから決まる。 */
-function spanBetween(heights: readonly number[], count: number, ratio: number): number {
-  let span = 0;
-  for (let i = 1; i < count; i++) span += ((heights[i - 1] + heights[i]) / 2) * ratio;
-  return span;
-}
-
-/** 行間は隣り合う 2 語の高さから決める。これを下回らせない。 */
-const GAP_RATIO = 1.7;
-
-/** 全部入らないときに詰める下限。ここを割ると隣の語に触れる。 */
-const MIN_GAP_RATIO = 1.15;
-
-/**
- * 漂う言葉の配置。
- *
- * 問いごとの最新キーワードを**全部**並べる。語ごとに大きさが違うので、行間は
- * 隣り合う 2 語の高さから決める（一律の間隔だと、大きい語どうしが触れる）。
- * 全部が入らないときは行間を詰めて収める。詰めても入らない語だけは出さない。
- *
- * 液面が低くても**必ず 1 語は出す**。0 語だと「言葉が漂う」という見せ方そのものが消える。
- */
-export function placeWords(words: readonly string[], level: number): WordPlacement[] {
-  const candidates = words.slice(0, MAX_WORDS);
-  if (candidates.length === 0) return [];
-
-  const heights = candidates.map((word) => WORD_SPRITE_HEIGHT * wordScale(word));
-
-  // まずは液面までに収めたい（言葉は発酵の中にある、という見立て）。
-  const preferredTop = Math.max(WORD_BOTTOM, level - WORD_TOP_MARGIN);
-
-  // **液面で頭打ちにしない。** readiness が低いと液面までの高さが 0.1 ほどしか無く、
-  // そこに収めようとすると 2 語目以降が全部落ちる（実機で 1 語しか出ていなかった）。
-  // 入り切らないぶんは瓶の中の空いている高さへ伸ばす。
-  const neededSpan = spanBetween(heights, heights.length, GAP_RATIO);
-  const top = Math.min(WORD_CEILING, Math.max(preferredTop, WORD_BOTTOM + neededSpan));
-  const available = top - WORD_BOTTOM;
-
-  const spanAt = (ratio: number, count: number): number => spanBetween(heights, count, ratio);
-
-  // まず行間を詰めて全語を収められないか試し、それでも無理なら語数を減らす。
-  let count = candidates.length;
-  let ratio = GAP_RATIO;
-  while (count > 1) {
-    if (spanAt(GAP_RATIO, count) <= available) {
-      ratio = GAP_RATIO;
-      break;
-    }
-    if (spanAt(MIN_GAP_RATIO, count) <= available) {
-      // 詰めれば入る。必要なぶんだけ詰める。
-      ratio = available / (spanAt(1, count) || 1);
-      break;
-    }
-    count--;
-  }
-
-  const placements: WordPlacement[] = [];
-  let y = count === 1 ? WORD_BOTTOM + available / 2 : WORD_BOTTOM;
-  for (let i = 0; i < count; i++) {
-    if (i > 0) y += ((heights[i - 1] + heights[i]) / 2) * ratio;
-    placements.push({
-      word: candidates[i],
-      y,
-      angle: GOLDEN_ANGLE * i,
-      scale: wordScale(candidates[i]),
-    });
-  }
-  return placements;
-}
-
-/** 言葉の上下の揺れ幅。行間より十分小さくないと隣の語に触れる。 */
-export const WORD_BOB_AMPLITUDE = 0.045;
-
-/** 言葉が周回する半径。 */
-export const WORD_ORBIT_RADIUS = 0.16;
 
 export interface SilhouettePoint {
   /** 瓶ローカルの方位（rad）。 */
@@ -429,17 +293,6 @@ export const CORK = {
   grainCount: 6,
   grainOpacity: 0.18,
 } as const;
-
-/** 封の浮遊。0.8s 周期の上下と 0.5s 周期の微小回転。 */
-export function sealFloat(elapsedSeconds: number): { yOffset: number; rotationZ: number } {
-  return {
-    yOffset: Math.sin(elapsedSeconds * 0.8) * 0.07,
-    rotationZ: Math.sin(elapsedSeconds * 0.5) * 0.04,
-  };
-}
-
-/** 封が浮く基準の高さ（瓶の位置からの相対）。 */
-export const SEAL_BASE_Y = 4.05;
 
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;

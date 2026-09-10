@@ -4,7 +4,6 @@ import {
   HitRegistry,
   HOVER_SCALE,
   resolveClickTarget,
-  sealTarget,
 } from '@/features/shared/study/scene/hit-targets';
 import type { Notebook } from '@/features/shared/study/types';
 
@@ -27,7 +26,6 @@ describe('HitRegistry', () => {
     const registry = buildHitRegistry({
       desk: DESK,
       shelf: SHELF,
-      hasLetter: false,
       shelfAsSingleTarget: false,
     });
     registry.clear();
@@ -39,7 +37,6 @@ describe('buildHitRegistry', () => {
   const pc = buildHitRegistry({
     desk: DESK,
     shelf: SHELF,
-    hasLetter: false,
     shelfAsSingleTarget: false,
   });
 
@@ -60,25 +57,14 @@ describe('buildHitRegistry', () => {
     expect(pc.get('spine-1')?.target).toEqual({ kind: 'journal-month', month: '2026-05' });
   });
 
-  it('手紙が無ければ封の的を作らない', () => {
+  it('封は的にしない（書斎から手紙の通知を外した）', () => {
     expect(pc.get('seal')).toBeNull();
-  });
-
-  it('手紙があれば封が別の的になる', () => {
-    const withLetter = buildHitRegistry({
-      desk: DESK,
-      shelf: SHELF,
-      hasLetter: true,
-      shelfAsSingleTarget: false,
-    });
-    expect(withLetter.get('seal')).not.toBeNull();
   });
 
   it('SP は棚ごと 1 つの的（背表紙 1 本は指より細い）', () => {
     const sp = buildHitRegistry({
       desk: DESK,
       shelf: SHELF,
-      hasLetter: false,
       shelfAsSingleTarget: true,
     });
     expect(sp.get('shelf')?.target).toEqual({ kind: 'archive' });
@@ -90,7 +76,6 @@ describe('buildHitRegistry', () => {
     const empty = buildHitRegistry({
       desk: [],
       shelf: [],
-      hasLetter: false,
       shelfAsSingleTarget: false,
     });
     expect(empty.get('jar')).not.toBeNull();
@@ -113,16 +98,6 @@ describe('buildHitRegistry', () => {
   it('id が重複しない', () => {
     const ids = pc.ids();
     expect(new Set(ids).size).toBe(ids.length);
-  });
-});
-
-describe('sealTarget', () => {
-  it('封は手紙を開いた状態の瓶へ行く', () => {
-    expect(sealTarget({ fermentationId: 'f-1', questionId: 'q-2' })).toEqual({
-      kind: 'letter',
-      fermentationId: 'f-1',
-      questionId: 'q-2',
-    });
   });
 });
 
