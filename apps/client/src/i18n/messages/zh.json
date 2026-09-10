@@ -267,19 +267,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "星期日",
-      "day_mon": "星期一",
-      "day_tue": "星期二",
-      "day_wed": "星期三",
-      "day_thu": "星期四",
-      "day_fri": "星期五",
-      "day_sat": "星期六"
-    },
     "canvas": {
       "aria_label": "看板画布"
     },
-    "empty": "此期间暂无内容",
+    "nothing_pinned": "还没有贴上任何内容",
     "lightbox": {
       "aria_label": "照片灯箱",
       "close_aria": "关闭灯箱"
@@ -786,7 +777,7 @@
     },
     "board": {
       "cards": "{count}张",
-      "empty": "今天还没有任何内容",
+      "nothing_pinned": "还没有贴上任何内容",
       "hint": "可以用手指拖动卡片",
       "add_snippet": "创建摘录",
       "add_photo": "添加照片",

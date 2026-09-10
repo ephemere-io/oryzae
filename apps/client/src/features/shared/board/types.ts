@@ -1,4 +1,4 @@
-/** ボード（日付ごとの自由配置ビュー）の共有型（端末非依存）。 */
+/** ボード（1 人に 1 枚のコルクボード）の共有型（端末非依存）。 */
 
 interface SnippetContent {
   text: string;
@@ -58,8 +58,8 @@ export type SnippetOcrResult =
 /**
  * 書斎の壁が読む「いま貼ってあるもの」（`GET /api/v1/board/summary`）。
  *
- * 盤面（1 日・1 週）とは別に、**全期間の総量**を持つ。壁に描くのは上限までだが、
- * ラベルが名乗るのは本当の数（棚が冊数を言うのと同じ）。
+ * 壁に描くのは新しい順に上限までだが、ラベルが名乗るのは本当の数
+ * （棚が冊数を言うのと同じ）。
  */
 export interface BoardSummary {
   total: number;

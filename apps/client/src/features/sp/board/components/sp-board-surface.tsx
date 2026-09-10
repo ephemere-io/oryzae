@@ -18,12 +18,6 @@ const HANDLE_SIZE = 28;
 /** カードをこれより小さくしない（掴めなくなる）。 */
 const MIN_CARD_SIZE = 60;
 
-/** 隅に小さく出す日付。`2026-09-04` → `09.04`。 */
-export function formatCornerDate(dateKey: string): string {
-  const [, month, day] = dateKey.split('-');
-  return month && day ? `${month}.${day}` : dateKey;
-}
-
 /**
  * 画面上の移動量を world の移動量に直す。
  *
@@ -95,7 +89,6 @@ interface ResizeState {
 
 export interface SpBoardSurfaceProps {
   cards: BoardCardData[];
-  dateKey: string;
   /** 盤面を画面に収めるための変換。 */
   viewport: Viewport;
   /** 指の移動で新しい world 座標が決まったとき。 */
@@ -112,7 +105,7 @@ export interface SpBoardSurfaceProps {
 /**
  * SP のボードの見た目と指の操作（`docs/oryzae-study/00-overview.md`「モバイル（SP）」）。
  *
- * **右ペインを置かない。** 縦画面で 400px の側パネルを出すと板がほぼ潰れる。日付と
+ * **右ペインを置かない。** 縦画面で 400px の側パネルを出すと板がほぼ潰れる。
  * カード枚数だけを隅に小さく浮かせ、**カードは指でつかんで動かせる**ようにする。
  * カードの重なりは指で解く前提なので、ズームもパンも与えない — 指の操作は
  * 「カードを動かす」1 つに絞る。
@@ -121,7 +114,6 @@ export interface SpBoardSurfaceProps {
  */
 export function SpBoardSurface({
   cards,
-  dateKey,
   viewport,
   onMove,
   onCommit,
@@ -249,7 +241,6 @@ export function SpBoardSurface({
         unit: 'SpBoardSurface',
         cardCount: visible.length,
         dragging: draggingId !== null,
-        dateKey,
         hasSidePane: false,
         selectedId: selectedId ?? 'none',
       })}
@@ -370,21 +361,20 @@ export function SpBoardSurface({
           className="absolute inset-0 flex items-center justify-center px-8 text-center text-[13px]"
           style={{ color: 'var(--date-color)' }}
         >
-          {t('empty')}
+          {t('nothing_pinned')}
         </p>
       )}
 
-      {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。 */}
+      {/* 隅に枚数だけ。右ペインの代わりはこれで足りる。 */}
       <div
         className="pointer-events-none absolute top-4 flex items-baseline gap-2"
         style={{
-          // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと日付に重なる。
+          // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと枚数に重なる。
           left: '1rem',
           color: 'var(--date-color)',
           fontFamily: 'Inter, sans-serif',
         }}
       >
-        <span className="text-[11px] tracking-[0.16em]">{formatCornerDate(dateKey)}</span>
         <span className="text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>
       </div>
     </div>

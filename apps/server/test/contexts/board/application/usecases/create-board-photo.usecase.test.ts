@@ -20,13 +20,11 @@ beforeEach(() => {
     delete: vi.fn().mockResolvedValue(undefined),
   };
   boardCardRepo = {
-    findByDateAndView: vi.fn().mockResolvedValue([]),
-    findDailyCardsByDateRange: vi.fn().mockResolvedValue([]),
-    findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
-    findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
-    findSoftDeletedRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
+    findByUserId: vi.fn().mockResolvedValue([]),
     findMaxZIndex: vi.fn().mockResolvedValue(-1),
-    saveMany: vi.fn().mockResolvedValue(undefined),
+    countPinnedByType: vi.fn().mockResolvedValue({ snippet: 0, photo: 0 }),
+    findRecentByUserId: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     deleteByRefId: vi.fn().mockResolvedValue(undefined),
@@ -46,7 +44,6 @@ describe('CreateBoardPhotoUsecase', () => {
     fileName: 'test.jpg',
     contentType: 'image/jpeg',
     caption: '朝の風景',
-    dateKey: '2026-04-11',
   };
 
   it('photo と card を同時作成できる', async () => {
@@ -54,7 +51,8 @@ describe('CreateBoardPhotoUsecase', () => {
 
     expect(boardStorage.upload).toHaveBeenCalled();
     expect(boardPhotoRepo.save).toHaveBeenCalled();
-    expect(boardCardRepo.saveMany).toHaveBeenCalled();
+    expect(boardCardRepo.save).toHaveBeenCalled();
+    expect(boardCardRepo.findMaxZIndex).toHaveBeenCalledWith('user-1');
     expect(result.imageUrl).toBe('https://storage.example.com/user-1/photo.jpg');
     expect(result.caption).toBe('朝の風景');
   });

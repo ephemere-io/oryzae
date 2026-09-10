@@ -5,9 +5,6 @@ import type { ApiClient } from '@/lib/api';
 
 interface CreateSnippetPayload {
   text: string;
-  dateKey: string;
-  /** ボードから作るときのみ指定。エディタの選択テキストから作る場合は未指定。 */
-  viewType?: string;
   /**
    * 配置位置（world 座標）。ボードから作るときに「いま見えている場所」を渡す。
    * 省略するとサーバーが従来どおりランダムに散らす（エディタからの作成はこちら）。

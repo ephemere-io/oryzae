@@ -1,11 +1,7 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BoardCardData } from '@/features/shared/board/types';
-import {
-  formatCornerDate,
-  SpBoardSurface,
-  toWorldDelta,
-} from '@/features/sp/board/components/sp-board-surface';
+import { SpBoardSurface, toWorldDelta } from '@/features/sp/board/components/sp-board-surface';
 import { IDENTITY_VIEWPORT } from '@/lib/canvas/viewport';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 
@@ -55,21 +51,10 @@ describe('toWorldDelta', () => {
   });
 });
 
-describe('formatCornerDate', () => {
-  it('YYYY-MM-DD を MM.DD にする', () => {
-    expect(formatCornerDate('2026-09-04')).toBe('09.04');
-  });
-
-  it('壊れた値はそのまま返す（隅の表示が消えない）', () => {
-    expect(formatCornerDate('nope')).toBe('nope');
-  });
-});
-
 describe('SpBoardSurface', () => {
   function renderSurface(overrides: Partial<React.ComponentProps<typeof SpBoardSurface>> = {}) {
     const props = {
       cards: [card('c1'), card('c2', 300, 200)],
-      dateKey: '2026-09-04',
       viewport: IDENTITY_VIEWPORT,
       onMove: vi.fn(),
       onCommit: vi.fn(),
@@ -99,13 +84,13 @@ describe('SpBoardSurface', () => {
     expect(container.querySelectorAll('[data-card-id]')).toHaveLength(1);
   });
 
-  it('隅に日付と枚数を出す', () => {
+  it('隅に枚数を出し、日付は出さない（ボードは 1 人に 1 枚）', () => {
     const { container } = renderSurface();
-    expect(container.textContent).toContain('09.04');
     expect(container.textContent).toContain('2');
+    expect(container.textContent).not.toMatch(/\d{2}\.\d{2}/);
   });
 
-  it('カードが無い日は文言を出す', () => {
+  it('カードが無いときは文言を出す', () => {
     const { container } = renderSurface({ cards: [] });
     expect(container.querySelector('p')).not.toBeNull();
     expect(container.querySelectorAll('[data-card-id]')).toHaveLength(0);

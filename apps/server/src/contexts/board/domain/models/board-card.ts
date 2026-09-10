@@ -1,33 +1,30 @@
 import { err, ok, type Result } from '../../../shared/domain/types/result.js';
 
 const VALID_CARD_TYPES = ['entry', 'snippet', 'photo'] as const;
-const VALID_VIEW_TYPES = ['daily', 'weekly'] as const;
 const MIN_SIZE = 120;
 
 type CardType = (typeof VALID_CARD_TYPES)[number];
-type ViewType = (typeof VALID_VIEW_TYPES)[number];
 
 function isCardType(value: string): value is CardType {
   return value === 'entry' || value === 'snippet' || value === 'photo';
 }
 
-function isViewType(value: string): value is ViewType {
-  return value === 'daily' || value === 'weekly';
-}
-
 type BoardCardError =
   | { type: 'INVALID_CARD_TYPE'; message: string }
-  | { type: 'INVALID_VIEW_TYPE'; message: string }
   | { type: 'INVALID_DIMENSIONS'; message: string }
   | { type: 'MISSING_REF_ID'; message: string };
 
+/**
+ * ボードに貼った 1 枚（付箋・写真の置き場所）。
+ *
+ * ボードは 1 人に 1 枚のコルクボードで、日付や表示単位（日次/週次）ごとの盤面は持たない。
+ * 同じ付箋・写真は 1 枚だけ貼られる（DB の一意制約 `(user_id, ref_id)`）。
+ */
 interface BoardCardProps {
   id: string;
   userId: string;
   cardType: CardType;
   refId: string;
-  dateKey: string;
-  viewType: ViewType;
   x: number;
   y: number;
   rotation: number;
@@ -44,8 +41,6 @@ interface CreateBoardCardParams {
   userId: string;
   cardType: string;
   refId: string;
-  dateKey: string;
-  viewType: string;
   x: number;
   y: number;
   rotation: number;
@@ -59,8 +54,6 @@ export class BoardCard {
   readonly userId: string;
   readonly cardType: CardType;
   readonly refId: string;
-  readonly dateKey: string;
-  readonly viewType: ViewType;
   readonly x: number;
   readonly y: number;
   readonly rotation: number;
@@ -76,8 +69,6 @@ export class BoardCard {
     this.userId = props.userId;
     this.cardType = props.cardType;
     this.refId = props.refId;
-    this.dateKey = props.dateKey;
-    this.viewType = props.viewType;
     this.x = props.x;
     this.y = props.y;
     this.rotation = props.rotation;
@@ -93,17 +84,11 @@ export class BoardCard {
     params: CreateBoardCardParams,
     generateId: () => string,
   ): Result<BoardCard, BoardCardError> {
-    const { cardType, viewType } = params;
+    const { cardType } = params;
     if (!isCardType(cardType)) {
       return err({
         type: 'INVALID_CARD_TYPE',
         message: `Card type must be one of: ${VALID_CARD_TYPES.join(', ')}`,
-      });
-    }
-    if (!isViewType(viewType)) {
-      return err({
-        type: 'INVALID_VIEW_TYPE',
-        message: `View type must be one of: ${VALID_VIEW_TYPES.join(', ')}`,
       });
     }
     if (!params.refId || params.refId.trim().length === 0) {
@@ -119,8 +104,6 @@ export class BoardCard {
         userId: params.userId,
         cardType,
         refId: params.refId,
-        dateKey: params.dateKey,
-        viewType,
         x: params.x,
         y: params.y,
         rotation: params.rotation,
@@ -177,8 +160,6 @@ export class BoardCard {
       userId: this.userId,
       cardType: this.cardType,
       refId: this.refId,
-      dateKey: this.dateKey,
-      viewType: this.viewType,
       x: this.x,
       y: this.y,
       rotation: this.rotation,

@@ -224,10 +224,6 @@ export const completeOnboardingSchema = z.object({
 });
 
 // Board schemas
-export const boardQuerySchema = z.object({
-  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
-
 export const boardCardUpdateSchema = z.object({
   cards: z.array(
     z.object({
@@ -258,8 +254,6 @@ export const boardSnippetCreateSchema = z.object({
   // 上限は定数から引く。ここに数値を直書きしていたせいで、定数だけ動かしても
   // このスキーマが 50 のまま残り、長い本文が 500 で弾かれていた。
   text: z.string().min(1).max(MAX_SNIPPET_TEXT_LENGTH),
-  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  viewType: z.enum(['daily', 'weekly']).optional(),
   x: boardWorldCoordSchema.optional(),
   y: boardWorldCoordSchema.optional(),
 });

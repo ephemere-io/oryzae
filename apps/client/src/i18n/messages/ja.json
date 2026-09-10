@@ -267,19 +267,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "日曜日",
-      "day_mon": "月曜日",
-      "day_tue": "火曜日",
-      "day_wed": "水曜日",
-      "day_thu": "木曜日",
-      "day_fri": "金曜日",
-      "day_sat": "土曜日"
-    },
     "canvas": {
       "aria_label": "Board canvas"
     },
-    "empty": "この期間のデータはありません",
+    "nothing_pinned": "まだ何も貼られていません",
     "lightbox": {
       "aria_label": "Photo lightbox",
       "close_aria": "Close lightbox"
@@ -786,7 +777,7 @@
     },
     "board": {
       "cards": "{count}枚",
-      "empty": "この日はまだ何もありません",
+      "nothing_pinned": "まだ何も貼られていません",
       "hint": "カードは指で動かせます",
       "add_snippet": "スニペットを作成",
       "add_photo": "写真を追加",
