@@ -17,7 +17,6 @@ const STATE: StudyState = {
   now: '2026-09-02',
   unreadCount: 0,
   fermentation: { readiness: 0.4, status: 'fermenting', letters: [] },
-  words: [{ text: '発酵', question: 'なぜ続けているのか' }],
   notebooks: [{ month: '2026-09', entryCount: 3, current: true }],
   entries: [],
   questions: [],
@@ -91,7 +90,6 @@ describe('StudyCanvas', () => {
   it('記録も手紙も無い状態で描画できる', () => {
     const empty: StudyState = {
       ...STATE,
-      words: [],
       notebooks: [],
       fermentation: { readiness: 0, status: 'idle', letters: [] },
     };

@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { placeBoardCards } from '@/features/shared/study/scene/board';
 import { layoutNotebooks } from '@/features/shared/study/scene/books';
-import { liquidLevel, placeWords } from '@/features/shared/study/scene/jar';
 import type {
   StudyBoard,
   StudyEntry,
@@ -107,20 +106,17 @@ function parseBoard(raw: unknown): StudyBoard {
 
 function parsePreset(raw: unknown): StudyState {
   if (!isRecord(raw)) throw new Error('preset is not an object');
-  const { now, unreadCount, words, notebooks } = raw;
+  const { now, unreadCount, notebooks } = raw;
   if (typeof now !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(now)) {
     throw new Error(`now must be YYYY-MM-DD but got ${String(now)}`);
   }
   if (typeof unreadCount !== 'number') throw new Error('unreadCount must be a number');
-  if (!Array.isArray(words)) throw new Error('words must be an array');
   if (!Array.isArray(notebooks)) throw new Error('notebooks must be an array');
 
   return {
     now,
     unreadCount,
     fermentation: parseFermentation(raw.fermentation),
-    // プリセットの JSON は語だけを持つ（出どころの問いは書斎の見た目に関わらない）。
-    words: words.map((word) => ({ text: String(word), question: null })),
     notebooks: notebooks.filter(isRecord).map((notebook) => ({
       month: String(notebook.month ?? ''),
       entryCount: Number(notebook.entryCount ?? 0),
@@ -192,18 +188,6 @@ describe('モックをシーンの計算に通す', () => {
     if (!state) throw new Error(`missing preset ${name}`);
     const { desk } = layoutNotebooks(state.notebooks, state.now);
     expect(desk.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it.each(PRESET_NAMES)('%s: 漂う言葉が重ならない', (name) => {
-    const state = PRESETS.get(name);
-    if (!state) throw new Error(`missing preset ${name}`);
-    const placements = placeWords(
-      state.words.map((word) => word.text),
-      liquidLevel(state.fermentation.readiness),
-    );
-    for (let i = 1; i < placements.length; i++) {
-      expect(placements[i].y).toBeGreaterThan(placements[i - 1].y);
-    }
   });
 
   it.each(PRESET_NAMES)('%s: ボードのカードが板に収まる', (name) => {

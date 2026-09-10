@@ -58,23 +58,12 @@ export class HitRegistry {
 export function buildHitRegistry(options: {
   desk: readonly Notebook[];
   shelf: readonly Notebook[];
-  hasLetter: boolean;
   /** SP は棚ごと 1 つの的にする。 */
   shelfAsSingleTarget: boolean;
 }): HitRegistry {
   const registry = new HitRegistry();
 
   registry.add({ id: 'jar', target: { kind: 'jar' }, label: 'jar', month: null });
-
-  if (options.hasLetter) {
-    // 封は瓶とは別の的。押すと手紙が開いた状態で jar に入る。
-    registry.add({
-      id: 'seal',
-      target: { kind: 'jar' },
-      label: 'jar',
-      month: null,
-    });
-  }
 
   options.desk.forEach((notebook, index) => {
     registry.add({
@@ -117,16 +106,6 @@ export function buildHitRegistry(options: {
   registry.add({ id: 'board', target: { kind: 'board' }, label: 'board', month: null });
 
   return registry;
-}
-
-/**
- * 封の対象を手紙の情報で差し替える。
- *
- * 的を組む時点では手紙の id が要らない（あるか無いかだけ）ので、受信箱が届いてから
- * ここで具体化する。
- */
-export function sealTarget(letter: { fermentationId: string; questionId: string }): StudyTarget {
-  return { kind: 'letter', fermentationId: letter.fermentationId, questionId: letter.questionId };
 }
 
 /**

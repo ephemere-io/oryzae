@@ -21,10 +21,6 @@ export function targetHref(target: StudyTarget): string | null {
   switch (target.kind) {
     case 'jar':
       return '/jar';
-    case 'letter':
-      // 手紙を開いた状態で jar に入る。`/jar` の page がこの値を読み、PC は
-      // サイドバー、SP は円を開いてシートで出す（60-implementation-notes.md §40）。
-      return `/jar?letter=${encodeURIComponent(target.fermentationId)}`;
     case 'journal-new':
       return '/entries/new';
     case 'board':

@@ -6,21 +6,12 @@ import type { BoardCardData } from '@/features/shared/board/types';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useEntryMonthlyCounts } from '@/features/shared/entries/hooks/use-entry-monthly-counts';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
-import { useFermentationKeywords } from '@/features/shared/fermentation/hooks/use-fermentation-keywords';
 import { useFermentationReadiness } from '@/features/shared/fermentation/hooks/use-fermentation-readiness';
-import type { JarWord } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
 import { readStaleCache, writeStaleCache } from '@/lib/stale-cache';
 import { useUnread } from '@/lib/unread-context';
 import { snippetLineCount } from '../scene/board';
-import { MAX_WORDS } from '../scene/jar';
-import type {
-  StudyBoardCard,
-  StudyEntry,
-  StudyFermentationStatus,
-  StudyState,
-  StudyWord,
-} from '../types';
+import type { StudyBoardCard, StudyEntry, StudyFermentationStatus, StudyState } from '../types';
 
 /**
  * 書斎が読む状態を、既存の hook を束ねて作る。
@@ -33,8 +24,8 @@ import type {
  * 取得したものを配っているので、ここで取り直さない（#363 の N+1 解消を維持）。
  */
 /** 憶えてある書斎の形が変わったら上げる。 */
-// 3: 瓶の言葉が「語だけ」から「語 + 出どころの問い」になった（形が変わるので上げる）。
-const CACHE_VERSION = 3;
+// 4: 瓶の言葉と封をやめた（`words` が消えたので、3 以前の形をそのまま流せない）。
+const CACHE_VERSION = 4;
 
 /** 一週間。裏で必ず取り直すので、長くても古い値が居座らない。 */
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -50,9 +41,6 @@ function isCachedStudyState(value: unknown): value is StudyState {
   const state: Record<string, unknown> = { ...value };
   if (typeof state.now !== 'string') return false;
   if (typeof state.unreadCount !== 'number') return false;
-  // 語だけの配列（v2 以前）が混じると、瓶を組むところで text を読めずに落ちる。
-  if (!Array.isArray(state.words)) return false;
-  if (state.words.some((word) => typeof word !== 'object' || word === null)) return false;
   if (!Array.isArray(state.notebooks)) return false;
   if (!Array.isArray(state.entries)) return false;
   if (!Array.isArray(state.questions)) return false;
@@ -100,13 +88,6 @@ export function useStudyState(
   const now = useMemo(() => localDateKey(new Date()), []);
   const { cards, loading: boardLoading } = useBoard(api, now);
 
-  // 瓶に漂う言葉は**問いごとの最新のキーワード**。いま漬けているものではない
-  // （キーワードは発酵完了時に一括保存されるので、発酵中には 1 件も存在しない。
-  // docs/oryzae-study/60-implementation-notes.md §3）。
-  // 受信箱が問いごとに最新 1 通へ畳んでいるので、その全部から集める。
-  const fermentationIds = useMemo(() => letters.map((letter) => letter.fermentationId), [letters]);
-  const { keywords, loading: keywordsLoading } = useFermentationKeywords(api, fermentationIds);
-
   // 憶えてある書斎。**利用者ごとに分ける** — 端末を共有していると、前の人の
   // 記録の冒頭や発酵の言葉がそのまま出てしまう。
   const cacheKey = userId === null ? null : `study:${userId}`;
@@ -131,7 +112,6 @@ export function useStudyState(
       now,
       unreadCount: unread.unreadCount,
       fermentation: { readiness: readiness.readiness, status, letters },
-      words: toStudyWords(keywords, questions).slice(0, MAX_WORDS),
       notebooks: counts.map((count) => ({
         month: count.month,
         entryCount: count.count,
@@ -142,28 +122,10 @@ export function useStudyState(
       questions,
       board: { dateKey: now, viewType: 'daily', cards: cards.map(toStudyBoardCard) },
     };
-  }, [
-    now,
-    unread.unreadCount,
-    readiness.readiness,
-    letters,
-    questions,
-    keywords,
-    counts,
-    entries,
-    cards,
-  ]);
+  }, [now, unread.unreadCount, readiness.readiness, letters, questions, counts, entries, cards]);
 
-  // 言葉は「手紙が届いてから、その詳細を引く」二段構え。ここに入れ忘れると、一段目が
-  // 終わった時点で「取得済み・言葉ゼロ」になり、憶えていた言葉がいったん消えてから
-  // 1 秒ほどして戻る（実機でそう見えていた）。
   const loading =
-    readinessLoading ||
-    lettersLoading ||
-    keywordsLoading ||
-    countsLoading ||
-    entriesLoading ||
-    boardLoading;
+    readinessLoading || lettersLoading || countsLoading || entriesLoading || boardLoading;
 
   /**
    * 取りに行って**届かなかった**か（429・オフライン・500）。
@@ -202,26 +164,6 @@ export function useStudyState(
     // 骨格（瓶と手帳）が決まった時点で出す。
     loading,
   };
-}
-
-/**
- * 瓶に浮かべる語に、出どころの問いの文言を結びつける。
- *
- * 語だけを浮かべていたころ「何を指すのか推測しづらい」と実機レビューで報告された。
- * 問いは受信箱が `/questions` を引くついでに配ってくれるので、ここで引き直さない。
- *
- * 問いが見つからない語も**落とさない**。消された問いから出た語でも、瓶の中で
- * 発酵したことに変わりはない（出どころを出せないだけ）。
- */
-export function toStudyWords(
-  words: readonly JarWord[],
-  questions: readonly { id: string; currentText: string | null }[],
-): StudyWord[] {
-  const textById = new Map(questions.map((question) => [question.id, question.currentText]));
-  return words.map((word) => ({
-    text: word.word,
-    question: textById.get(word.questionId) ?? null,
-  }));
 }
 
 /**

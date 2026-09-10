@@ -10,8 +10,6 @@ import type { InboxLetter } from '@/features/shared/fermentation/types';
 /** 書斎から出ていける先。3D の物と SP のピルが共有する語彙。 */
 export type StudyTarget =
   | { kind: 'jar' }
-  /** 封（＝届いた手紙）。jar へ入り、手紙を開いた状態で見せる。 */
-  | { kind: 'letter'; fermentationId: string; questionId: string }
   /** 当月の手帳。新規執筆へ。 */
   | { kind: 'journal-new' }
   /** 過去月の手帳・棚の背表紙。その月に絞った一覧へ。 */
@@ -33,7 +31,16 @@ export interface StudyFermentation {
   /** 0..1。数値としては画面に出さない（見た目が語る）。 */
   readiness: number;
   status: StudyFermentationStatus;
-  /** 届いた手紙。封をクリックしたときの行き先になる。 */
+  /**
+   * 届いた手紙。
+   *
+   * **書斎はこれを物として描かない。** 以前は瓶の口の上に封を浮かべていたが、
+   * 「押せないうえ、手紙が届いた通知なのかどうかも伝わらない」と実機レビューで
+   * 報告された（PR #570）。手紙に会う場所は瓶の中（`/jar`）の 1 つに戻し、書斎は
+   * 「届いている」ことを瓶の様子（泡が静まる・ラベルの状態語）だけで示す。
+   *
+   * 件数は `deriveStatus` が読む。
+   */
   letters: InboxLetter[];
 }
 
@@ -89,33 +96,11 @@ export interface StudyBoard {
  * 増やすだけになり、profile は `useAuth()` が全画面に配っているものの写しになる
  * （アバターを出すのは 3D ではなくフローティングのクローム側）。
  */
-/**
- * 瓶に浮かぶ 1 語と、その出どころの問い。
- *
- * 語だけを浮かべていたころ「何を指すのか推測しづらい」と実機レビューで報告された。
- * 触れたときに出どころを見せるために、**語と問いを一緒に運ぶ**。
- *
- * `question` が null なのは、問いが消えている（消された・取れなかった）場合。
- * その語は出どころを出さないだけで、浮かぶことは変わらない。
- */
-export interface StudyWord {
-  text: string;
-  question: string | null;
-}
-
 export interface StudyState {
   /** `YYYY-MM-DD`（ローカル暦日）。 */
   now: string;
   unreadCount: number;
   fermentation: StudyFermentation;
-  /**
-   * 瓶の中を漂う言葉。
-   *
-   * **直近に完了した発酵のキーワード**であって、いま漬けているものではない
-   * （キーワードは発酵完了時に一括保存されるため、発酵中には 1 件も存在しない。
-   * 60-implementation-notes.md §3）。
-   */
-  words: StudyWord[];
   notebooks: Notebook[];
   entries: StudyEntry[];
   /**

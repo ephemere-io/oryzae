@@ -73,6 +73,7 @@ import {
   zoomByPinch,
   zoomByWheel,
   zoomedView,
+  zoomTargetRise,
 } from './camera';
 import { buildHitRegistry, type HitId, HOVER_SCALE, resolveClickTarget } from './hit-targets';
 import {
@@ -88,15 +89,9 @@ import {
   MERIDIAN_COUNT,
   MERIDIAN_OPACITY,
   outlineOpacity,
-  placeWords,
-  SEAL_BASE_Y,
   sampleJarProfile,
-  sealFloat,
   silhouetteBufferSize,
   solveJarSilhouette,
-  WORD_BOB_AMPLITUDE,
-  WORD_ORBIT_RADIUS,
-  WORD_SPRITE_HEIGHT,
 } from './jar';
 import {
   createMaterials,
@@ -135,28 +130,9 @@ export interface StudySceneOptions {
   onLeaveStart?: (durationMs: number) => void;
 }
 
-/** 瓶の中を漂う語。位置（漂わせるための基準）と、触れたときに見せる出どころ。 */
-type JarWords = {
-  sprite: Sprite;
-  y: number;
-  angle: number;
-  text: string;
-  question: string | null;
-  /** ホバーで大きくする前の寸法。戻すときに要る。 */
-  baseScale: Vector3;
-}[];
-
 export interface HoverInfo {
   label: 'jar' | 'journal' | 'board' | 'archive' | null;
   month: string | null;
-  /**
-   * 瓶の中の語に触れているとき、その語と出どころの問い。
-   *
-   * 語だけが浮いていると「何を指すのか推測しづらい」（実機レビュー）。触れたときに
-   * 出どころを見せる。的（hitbox）ではなく語そのものに当てているので、`label` や
-   * `month` とは同時に立たない。
-   */
-  word: { text: string; question: string | null } | null;
   /** ラベルを持たない的（鉛筆）に触れているとき、ホバーで出す一言。 */
   hint: 'pen' | null;
   /** ツールチップを出す画面座標。 */
@@ -203,14 +179,6 @@ export interface StudySceneHandle {
 /** 秒。四方の計算で使う。 */
 const MS_PER_SECOND = 1000;
 
-/**
- * 触れている語を大きくする倍率。
- *
- * 的（3D の物）のホバーは 1.02 だが、語は元が小さいので同じ比では気づけない。
- * 「今どれに触れているのか分からない」という報告への答えなので、はっきり変える。
- */
-const WORD_HOVER_SCALE = 1.28;
-
 /** 輪郭の呼吸の周期（ms）。 */
 const OUTLINE_BREATH_MS = 4000;
 
@@ -227,11 +195,9 @@ interface SceneContent {
   textures: CanvasTexture[];
   registry: ReturnType<typeof buildHitRegistry>;
   notebooks: ReturnType<typeof layoutNotebooks>;
-  letter: StudyState['fermentation']['letters'][number] | null;
   groups: Object3D[];
   hitboxes: Mesh[];
   jar: JarParts;
-  seal: { group: Group } | null;
   books: BooksParts;
 }
 
@@ -263,25 +229,20 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     }
 
     const notebooks = layoutNotebooks(state.notebooks, state.now);
-    const completed = state.fermentation.status === 'completed';
-    const letter = state.fermentation.letters[0] ?? null;
 
     const registry = buildHitRegistry({
       desk: notebooks.desk.map((placement) => placement.notebook),
       shelf: notebooks.shelf,
-      hasLetter: completed && letter !== null,
       shelfAsSingleTarget: layout.pillOffsets !== null,
     });
 
     const deskGroup = buildDesk(layout, materials, ownGeometry);
     const floorGroup = buildFloorGrid(layout, materials, ownGeometry);
     const jar = buildJar(state, layout, materials, ownGeometry, textures);
-    const seal = completed && letter !== null ? buildSeal(layout, materials, ownGeometry) : null;
     const books = buildBooks(notebooks, layout, materials, ownGeometry, textures);
     const board = buildBoard(state, layout, materials, ownGeometry);
 
     const groups: Object3D[] = [deskGroup, floorGroup, jar.group, books.group, board.group];
-    if (seal) groups.push(seal.group);
 
     const hitboxes = buildHitboxes({
       layout,
@@ -289,10 +250,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       ownGeometry,
       desk: books.deskPlacements,
       shelf: books.shelfSpines,
-      hasSeal: seal !== null,
       shelfAsSingleTarget: layout.pillOffsets !== null,
       jarGroup: jar.group,
-      sealGroup: seal?.group ?? null,
       shelfGroup: books.shelfGroup,
       boardGroup: board.group,
       penGroup: books.penGroup,
@@ -307,11 +266,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       textures,
       registry,
       notebooks,
-      letter,
       groups,
       hitboxes,
       jar,
-      seal,
       books,
     };
   }
@@ -341,8 +298,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   let hoveredId: HitId | null = null;
   let hoveredObject: Object3D | null = null;
-  /** いま触れている瓶の中の語。的のホバーとは排他（語のほうが優先）。 */
-  let hoveredWord: JarWords[number] | null = null;
   /** ホームの寄り引き。目標へ lerp で寄せる（指を離しても少し滑る）。 */
   let zoom = 1;
   let zoomTarget = 1;
@@ -387,7 +342,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     updateCamera(now, elapsed);
     updateJar(elapsed);
-    updateSeal(elapsed);
     updateHover();
     reportLabels();
 
@@ -425,9 +379,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     parallax.x += (wanted.x - parallax.x) * lerp;
     parallax.y += (wanted.y - parallax.y) * lerp;
 
-    // 寄り引き。注視点は動かさないので、構図は保たれたまま距離だけ変わる。
+    // 寄り引き。近づくぶんだけ注視点が上がる（絵の上端を画面に留めるため）。
     zoom = approach(zoom, zoomTarget, HOME_ZOOM.lerp);
-    const view = zoomedView(homeCamera, zoom);
+    const view = zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom));
 
     camera.position.set(
       view.position.x + parallax.x,
@@ -517,23 +471,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     const phase = (elapsed % OUTLINE_BREATH_MS) / OUTLINE_BREATH_MS;
     content.jar.silhouetteMaterial.opacity = outlineOpacity(readiness, phase) * content.jar.fade;
-
-    // 言葉は上下に揺れながら周回する。**係数は rad/s。** 2π を掛けると 6 倍速くなり、
-    // 呼吸と同じ「せわしない」揺れになる（原案は sin(t * 0.3) / cos(t * 0.1)）。
-    const seconds = elapsed / MS_PER_SECOND;
-    content.jar.words.forEach((word, index) => {
-      // **触れている語は止める。** 漂い続ける的は、狙いを定めているあいだに逃げる
-      // （「結構押しにくい」と実機レビューで報告された）。止めるのはその 1 語だけで、
-      // 周りは漂ったまま — 全部止めると瓶が固まって見える。
-      if (word === hoveredWord) return;
-      const bob = Math.sin(seconds * 0.3 + index) * WORD_BOB_AMPLITUDE;
-      const orbit = seconds * 0.1 + word.angle;
-      word.sprite.position.set(
-        Math.cos(orbit) * WORD_ORBIT_RADIUS,
-        word.y + bob,
-        Math.sin(orbit) * WORD_ORBIT_RADIUS,
-      );
-    });
   }
 
   function updateSilhouette(): void {
@@ -563,15 +500,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     content.jar.silhouette.geometry.setDrawRange(0, count);
   }
 
-  function updateSeal(elapsed: number): void {
-    if (!content.seal) return;
-    const float = sealFloat(elapsed / MS_PER_SECOND);
-    content.seal.group.position.y = layout.jar.y + SEAL_BASE_Y + float.yOffset;
-    content.seal.group.rotation.z = float.rotationZ;
-  }
-
   /**
-   * 瓶（瓶体・中身・コルク・封・輪郭線）の不透明度をまとめて動かす。
+   * 瓶（瓶体・中身・コルク・輪郭線）の不透明度をまとめて動かす。
    *
    * 素材は `initScene` の中で専用インスタンスに clone してある。共有したまま触ると
    * 机やボードまで一緒に消える。
@@ -590,61 +520,16 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         owned.material.needsUpdate = true;
       }
     }
-    const hidden = value <= 0.02;
-    content.jar.group.visible = !hidden;
-    if (content.seal) content.seal.group.visible = !hidden;
+    content.jar.group.visible = value > 0.02;
   }
 
   function updateHover(): void {
     if (transition || settled || !pointerInside) {
-      setHoveredWord(null);
-      setHovered(null, null);
-      return;
-    }
-    // 語は的より**先に**見る。瓶の的は語を丸ごと覆っているので、後にすると
-    // 語には決して触れられない。
-    const word = raycastWord();
-    setHoveredWord(word);
-    if (word) {
       setHovered(null, null);
       return;
     }
     const hit = raycast();
     setHovered(hit.id, hit.object);
-  }
-
-  /** 瓶の中の語に当てる。的（hitbox）ではなくスプライトそのものを見る。 */
-  function raycastWord(): JarWords[number] | null {
-    const jar = content.jar;
-    if (!jar || jar.words.length === 0) return null;
-    raycaster.setFromCamera(pointer, camera);
-    const sprites = jar.words.map((word) => word.sprite);
-    const first = raycaster.intersectObjects(sprites, false)[0];
-    if (!first) return null;
-    return jar.words.find((word) => word.sprite === first.object) ?? null;
-  }
-
-  function setHoveredWord(word: JarWords[number] | null): void {
-    if (word?.text === hoveredWord?.text) return;
-
-    // 触れていた語を元の大きさへ戻す。**どの語に触れているかが見た目で分からないと、
-    // 押せることも、どれを押しているかも伝わらない**（実機レビュー）。
-    if (hoveredWord) hoveredWord.sprite.scale.copy(hoveredWord.baseScale);
-    hoveredWord = word;
-    if (!word) {
-      // 語から離れたときは、的のホバー（setHovered）が続けて知らせる。
-      options.onHoverChange?.(null);
-      return;
-    }
-    word.sprite.scale.copy(word.baseScale).multiplyScalar(WORD_HOVER_SCALE);
-    renderer.domElement.style.cursor = 'pointer';
-    options.onHoverChange?.({
-      label: null,
-      month: null,
-      word: { text: word.text, question: word.question },
-      hint: null,
-      screen: projectHover(word.sprite),
-    });
   }
 
   function raycast(): { id: HitId | null; object: Object3D | null } {
@@ -672,16 +557,12 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     renderer.domElement.style.cursor = id ? 'pointer' : 'default';
 
-    // 語に触れている間は、そちらが知らせている（上書きして消さない）。
-    if (hoveredWord) return;
-
     const entry = content.registry.get(id);
     options.onHoverChange?.(
       entry
         ? {
             label: entry.label,
             month: entry.month,
-            word: null,
             hint: entry.hint ?? null,
             screen: projectHover(hoveredObject),
           }
@@ -749,7 +630,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function clearPointer(): void {
     pointerInside = false;
-    setHoveredWord(null);
     setHovered(null, null);
   }
 
@@ -777,29 +657,11 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function pick(): void {
     if (transition || settled) return;
 
-    // 語を押したときは瓶を開かず、出どころの問いを見せるだけにする。
-    // 指では pointermove が来ないことがあるので、その場で当て直す。
-    const word = raycastWord();
-    if (word) {
-      setHoveredWord(word);
-      return;
-    }
-
     // タッチでは pointermove が click より先に来ないことがある。その場で拾い直す。
     const id = resolveClickTarget(hoveredId, () => raycast().id);
     const entry = content.registry.get(id);
     if (!entry) return;
-
-    // 封は手紙の id を載せて渡す。
-    const target: StudyTarget =
-      id === 'seal' && content.letter
-        ? {
-            kind: 'letter',
-            fermentationId: content.letter.fermentationId,
-            questionId: content.letter.questionId,
-          }
-        : entry.target;
-    options.onPick?.(target);
+    options.onPick?.(entry.target);
   }
 
   function goTo(target: StudyTarget): Promise<void> {
@@ -850,7 +712,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function destinationView(target: StudyTarget): CameraView {
     switch (target.kind) {
       case 'jar':
-      case 'letter':
         return jarView(layout);
       case 'journal-new':
       case 'journal-month':
@@ -979,6 +840,12 @@ function lineFrom(points: Vector3[], material: Material, own: OwnGeometry): Line
 /**
  * 机の天板。表現は最小限 — 輪郭・手前の木端・前脚 2 本・木目を示唆する 1 本だけ。
  * 木端をここだけ濃く引くと、平面が板に見える。
+ *
+ * **一度は天板の下に構造（幕板・引き出し・板脚）を足したが、戻した。**
+ * 「ちゃぶ台のように質素に見える」という指摘への答えとして形を足したところ、次は
+ * 「現実的かつ具体的で稚拙に見える、抽象化されていたころのほうが想像をかき立てた」と
+ * 報告された（PR #570）。引き出しのような**名前のある部品**を線で描くと、絵が
+ * 説明的になり、余白が消える。**ここは線を足して解く場所ではない。**
  */
 function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeometry): Group {
   const group = new Group();
@@ -1013,114 +880,22 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
     ),
   );
 
-  /**
-   * 天板の下に**構造を足す**。
-   *
-   * 以前は天板の輪郭・木端 1 本・線 1 本の脚だけで、引くと「板を棒で支えたちゃぶ台」に
-   * 見える、と実機レビューで報告された。机の高さ（天板 -1.2 / 床 -2.9）は構図が
-   * 依存しているので変えられないが、**下に何が詰まっているか**は足せる。
-   * 幕板・引き出し・板の脚を線で入れると、同じ高さでも「書き物机」として読める。
-   */
-  const apronBottom = edgeBottom - 0.28;
-  const frontZ = zNear - 0.05;
-
-  // 幕板。天板の下に横一本の帯を通すと、板 1 枚には見えなくなる。
-  group.add(
-    lineFrom(
-      [
-        new Vector3(-halfWidth + 0.45, edgeBottom, frontZ),
-        new Vector3(-halfWidth + 0.45, apronBottom, frontZ),
-        new Vector3(halfWidth - 0.45, apronBottom, frontZ),
-        new Vector3(halfWidth - 0.45, edgeBottom, frontZ),
-      ],
-      materials.faint(0.2),
-      own,
-    ),
-  );
-
-  // 左の引き出し。**これが「机」を決める。** 箱を 1 つ置くだけで、卓ではなく机になる。
-  const drawerLeft = -halfWidth + 0.55;
-  const drawerRight = drawerLeft + 2.7;
-  const drawerZ = zNear - 0.15;
-  group.add(
-    lineFrom(
-      [
-        new Vector3(drawerLeft, apronBottom, drawerZ),
-        new Vector3(drawerLeft, layout.floorY + 0.12, drawerZ),
-        new Vector3(drawerRight, layout.floorY + 0.12, drawerZ),
-        new Vector3(drawerRight, apronBottom, drawerZ),
-      ],
-      materials.faint(0.22),
-      own,
-    ),
-  );
-
-  // 引き出し 2 段。仕切りと、その中央に短い引手。
-  const drawerHeight = apronBottom - (layout.floorY + 0.12);
-  for (const step of [1 / 3, 2 / 3]) {
-    const yAt = apronBottom - drawerHeight * step;
+  // 前脚 2 本。床まで伸ばす。
+  for (const x of [-halfWidth + 0.5, halfWidth - 0.5]) {
     group.add(
       lineFrom(
-        [new Vector3(drawerLeft, yAt, drawerZ), new Vector3(drawerRight, yAt, drawerZ)],
-        materials.faint(0.16),
-        own,
-      ),
-    );
-  }
-  const drawerCenter = (drawerLeft + drawerRight) / 2;
-  for (const step of [1 / 6, 1 / 2, 5 / 6]) {
-    const yAt = apronBottom - drawerHeight * step;
-    group.add(
-      lineFrom(
-        [
-          new Vector3(drawerCenter - 0.34, yAt, drawerZ + 0.02),
-          new Vector3(drawerCenter + 0.34, yAt, drawerZ + 0.02),
-        ],
-        materials.faint(0.26),
+        [new Vector3(x, edgeBottom, zNear - 0.2), new Vector3(x, layout.floorY, zNear - 0.2)],
+        materials.faint(0.2),
         own,
       ),
     );
   }
 
-  // 右脚は板脚。1 本線だと棒に見え、卓の印象が残る。
-  const legRight = halfWidth - 0.5;
-  const legLeft = legRight - 0.62;
-  group.add(
-    lineFrom(
-      [
-        new Vector3(legLeft, apronBottom, frontZ),
-        new Vector3(legLeft, layout.floorY, frontZ),
-        new Vector3(legRight, layout.floorY, frontZ),
-        new Vector3(legRight, apronBottom, frontZ),
-      ],
-      materials.faint(0.2),
-      own,
-    ),
-  );
-
-  // 奥行きの手掛かり。前面だけだと書割に見えるので、脚の奥行き方向を薄く 2 本。
-  for (const x of [legLeft, drawerRight]) {
-    group.add(
-      lineFrom(
-        [new Vector3(x, layout.floorY, frontZ), new Vector3(x, layout.floorY, zFar + 1.6)],
-        materials.faint(0.08),
-        own,
-      ),
-    );
-  }
-
-  // 木目を示唆する 2 本。
+  // 木目を示唆する長い 1 本。
   group.add(
     lineFrom(
       [new Vector3(-halfWidth + 0.8, y, zFar + 1.2), new Vector3(halfWidth - 0.8, y, zFar + 1.6)],
       materials.faint(0.06),
-      own,
-    ),
-  );
-  group.add(
-    lineFrom(
-      [new Vector3(-halfWidth + 1.6, y, zFar + 3.1), new Vector3(halfWidth - 1.2, y, zFar + 3.4)],
-      materials.faint(0.05),
       own,
     ),
   );
@@ -1165,7 +940,6 @@ interface JarParts {
   profile: Vector2[];
   level: number;
   bubbles: { mesh: Mesh; speed: number; wobble: number; baseX: number; baseZ: number }[];
-  words: JarWords;
   silhouette: Line;
   silhouettePositions: BufferAttribute;
   silhouetteMaterial: Material & { opacity: number };
@@ -1277,36 +1051,6 @@ function buildJar(
     });
   }
 
-  // 漂う言葉。液面までの高さを実際の語数で割って並べる。
-  const words: JarWords = [];
-  // 語の並べ方は文字列だけで決まる（純粋な採寸）。出どころは語をキーに戻す
-  // — 語は瓶の中で重複しないよう畳んであるので、この対応は一意になる。
-  const questionByWord = new Map(state.words.map((word) => [word.text, word.question]));
-  for (const placement of placeWords(
-    state.words.map((word) => word.text),
-    level,
-  )) {
-    const texture = createTextTexture(placement.word);
-    if (!texture) continue;
-    textures.push(texture);
-    const material = materials.sprite(texture, 0.5);
-    fadeables.push({ material, baseOpacity: 0.5, baseTransparent: material.transparent });
-    const sprite = new Sprite(material);
-    // 幅は文字幅の実測から決め、高さは語ごとの倍率を掛ける（全語同じ大きさにしない）。
-    const height = WORD_SPRITE_HEIGHT * placement.scale;
-    sprite.scale.set((texture.image.width / texture.image.height) * height, height, 1);
-    sprite.position.y = placement.y;
-    group.add(sprite);
-    words.push({
-      sprite,
-      y: placement.y,
-      angle: placement.angle,
-      text: placement.word,
-      question: questionByWord.get(placement.word) ?? null,
-      baseScale: sprite.scale.clone(),
-    });
-  }
-
   // 上部のもや。
   if (hazeVisible(readiness)) {
     const texture = createHazeTexture();
@@ -1330,7 +1074,6 @@ function buildJar(
     profile,
     level,
     bubbles,
-    words,
     silhouette,
     silhouettePositions,
     silhouetteMaterial,
@@ -1340,34 +1083,6 @@ function buildJar(
       for (const owned of fadeables) owned.material.dispose();
     },
   };
-}
-
-function buildSeal(
-  layout: StudyLayout,
-  materials: StudyMaterials,
-  own: OwnGeometry,
-): { group: Group } {
-  const group = new Group();
-  group.position.set(layout.seal.x, layout.jar.y + SEAL_BASE_Y, layout.seal.z);
-  group.rotation.x = -0.5;
-
-  const points = [
-    new Vector3(-0.55, 0, -0.36),
-    new Vector3(0.55, 0, -0.36),
-    new Vector3(0.55, 0, 0.36),
-    new Vector3(-0.55, 0, 0.36),
-    new Vector3(-0.55, 0, -0.36),
-  ];
-  group.add(lineFrom(points, materials.ink, own));
-  // 封緘の折り目。
-  group.add(
-    lineFrom(
-      [new Vector3(-0.55, 0, -0.36), new Vector3(0, 0, 0.1), new Vector3(0.55, 0, -0.36)],
-      materials.faint(0.4),
-      own,
-    ),
-  );
-  return { group };
 }
 
 interface BooksParts {
@@ -1799,11 +1514,9 @@ function buildHitboxes(options: {
   ownGeometry: OwnGeometry;
   desk: { group: Group; topY: number; thickness: number }[];
   shelf: Group[];
-  hasSeal: boolean;
   shelfAsSingleTarget: boolean;
   /** ホバーで拡大する可視グループ。 */
   jarGroup: Group;
-  sealGroup: Group | null;
   shelfGroup: Group;
   boardGroup: Group;
   penGroup: Group;
@@ -1816,9 +1529,12 @@ function buildHitboxes(options: {
     size: [number, number, number],
     position: Vector3,
     visible?: Object3D,
+    /** 当たりを傾ける元。渡すとその world 姿勢をそのまま被せる。 */
+    orientation?: Object3D,
   ): void {
     const mesh = new Mesh(ownGeometry(new BoxGeometry(...size)), materials.hitbox);
     mesh.position.copy(position);
+    if (orientation) orientation.getWorldQuaternion(mesh.quaternion);
     mesh.userData.hitId = id;
     // ホバーで拡大するのは**見えている方**。ヒットボックスを拡大しても何も起きない
     // （原案は `hit.parentGroup` を辿って可視グループを拡大している）。
@@ -1833,14 +1549,6 @@ function buildHitboxes(options: {
     new Vector3(layout.jar.x, layout.jar.y + 1.5, layout.jar.z),
     options.jarGroup,
   );
-
-  if (options.hasSeal) {
-    box(
-      'seal',
-      [1.4, 0.8, 1.0],
-      new Vector3(layout.seal.x, layout.jar.y + SEAL_BASE_Y, layout.seal.z),
-    );
-  }
 
   // 机の冊はそれぞれを囲む箱。
   //
@@ -1879,13 +1587,16 @@ function buildHitboxes(options: {
    * 軸の太さは半径 0.055 しかなく、そのまま囲うと矢印でも指でも当たらない
    * （押せる物の中で鉛筆だけが押せなかった理由の半分はこれ）。物の見た目は
    * 変えずに、当たりだけ手に馴染む太さにする。
+   *
+   * **位置と向きは鉛筆そのものから取る。** `layout.pen` は机（books グループ）の
+   * ローカル座標で、机は world で平行移動したうえ y 軸まわりに回っている。配置表の
+   * 値を world としてそのまま置いていたころ、当たりは鉛筆から 3 world unit 以上
+   * 離れた何も無い場所にあった —「鉛筆はホバーしても何も起きない」の正体がこれ。
+   * 箱の長辺は鉛筆のローカル y（＝軸の向き）に合わせ、姿勢ごと被せる。
    */
-  box(
-    'pen',
-    [0.7, 0.5, 2.6],
-    new Vector3(layout.pen.x, layout.pen.y + 0.1, layout.pen.z),
-    options.penGroup,
-  );
+  const penWorld = new Vector3();
+  options.penGroup.getWorldPosition(penWorld);
+  box('pen', [0.6, 2.6, 0.6], penWorld, options.penGroup, options.penGroup);
 
   // ボードは板より 0.2 大きい箱。
   box(

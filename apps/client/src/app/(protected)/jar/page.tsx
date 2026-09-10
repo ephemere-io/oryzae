@@ -36,13 +36,6 @@ export default function JarPage() {
   const [manageOpen, setManageOpen] = useState(false);
   const searchParams = useSearchParams();
   const justPickled = searchParams.get('justPickled') === '1';
-  /**
-   * 書斎の瓶の上の封から来たとき、その手紙を開いた状態で始める（`?letter=<発酵 id>`）。
-   *
-   * 端末で開き方が違う（PC はサイドバー、SP は円を開いてシート）ので、URL を読むのは
-   * page の仕事にして、開き方は各端末の部品に任せる。
-   */
-  const openLetterFor = searchParams.get('letter');
   const [pickleSuccessOpen, setPickleSuccessOpen] = useState(false);
   const pickleTimerScheduledRef = useRef(false);
 
@@ -84,7 +77,6 @@ export default function JarPage() {
             questions={questions}
             loading={questionsLoading}
             onManageQuestions={() => setManageOpen(true)}
-            openLetterFor={openLetterFor}
           />
           {manageOpen ? (
             <div className="absolute inset-0 z-40 flex flex-col bg-[var(--bg)]">
@@ -112,7 +104,6 @@ export default function JarPage() {
             onAddQuestion={handleAddQuestion}
             onEditQuestion={handleEditQuestion}
             onArchiveQuestion={handleArchiveQuestion}
-            openLetterFor={openLetterFor}
           />
           <PickleSuccessModal
             open={pickleSuccessOpen}

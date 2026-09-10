@@ -14,16 +14,6 @@ describe('targetHref', () => {
     expect(targetHref({ kind: 'board' })).toBe('/board');
   });
 
-  it('封は瓶へ入りつつ、どの手紙かを伝える', () => {
-    const href = targetHref({ kind: 'letter', fermentationId: 'f-1', questionId: 'q-2' });
-    expect(href).toBe('/jar?letter=f-1');
-  });
-
-  it('手紙の id をエスケープする', () => {
-    const href = targetHref({ kind: 'letter', fermentationId: 'a b&c', questionId: 'q' });
-    expect(href).toBe('/jar?letter=a%20b%26c');
-  });
-
   it('過去月と棚は URL を変えない（書斎の中でオーバーレイを開く）', () => {
     // ここを /entries に飛ばすと、既存の一覧画面を作り替えることになる。
     expect(targetHref({ kind: 'journal-month', month: '2026-08' })).toBeNull();
@@ -71,7 +61,6 @@ describe('notebookTarget', () => {
 describe('すべての対象に行き先が定義されている', () => {
   const ALL: StudyTarget[] = [
     { kind: 'jar' },
-    { kind: 'letter', fermentationId: 'f', questionId: 'q' },
     { kind: 'journal-new' },
     { kind: 'journal-month', month: '2026-08' },
     { kind: 'archive' },

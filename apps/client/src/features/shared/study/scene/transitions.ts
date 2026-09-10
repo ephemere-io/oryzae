@@ -63,7 +63,6 @@ export function planFor(target: StudyTarget, options: PlanOptions): TransitionPl
 function rawSteps(target: StudyTarget, options: PlanOptions): TransitionStep[] {
   switch (target.kind) {
     case 'jar':
-    case 'letter':
       // 突っ込まず左へパンする 1 段だけ。
       return [
         { name: 'jar-pan', delayMs: 0, durationMs: DURATION.jarPan, easing: EASING.easeInOutCubic },

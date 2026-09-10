@@ -31,8 +31,6 @@ interface SpQuestionZoomProps {
    */
   positions?: Record<string, ZoomPosition>;
   onMove?: (id: string, position: ZoomPosition) => void;
-  /** 開いた状態で始める（書斎の封から来たとき）。 */
-  autoOpenLetter?: boolean;
 }
 
 /**
@@ -81,7 +79,6 @@ export function SpQuestionZoom({
   onOpenElement,
   positions = {},
   onMove,
-  autoOpenLetter = false,
 }: SpQuestionZoomProps) {
   const t = useTranslations('sp.jar');
   const circleRef = useRef<HTMLDivElement | null>(null);
@@ -107,26 +104,6 @@ export function SpQuestionZoom({
 
   const ring = fitRingText(questionText, size);
   const scale = elementScale(size);
-
-  /**
-   * 書斎の封から来たときは、手紙を開いた状態で始める。
-   *
-   * 手紙の中身を持っているのはここ（`detail`）なので、開く形を組めるのもここだけ。
-   * **1 回だけ**開く — 閉じたあとに開き直らないよう、開いた時点で親が合図を消す。
-   */
-  const openedRef = useRef(false);
-  useEffect(() => {
-    if (!autoOpenLetter || openedRef.current) return;
-    const letter = detail?.letter;
-    if (!letter) return;
-    openedRef.current = true;
-    onOpenElement({
-      kind: 'letter',
-      id: letter.id,
-      bodyText: letter.bodyText,
-      sources: detail?.scannedEntries ?? [],
-    });
-  }, [autoOpenLetter, detail, onOpenElement]);
 
   /** 動かしてあればその位置、無ければ輪の上の既定位置。 */
   const placed = (id: string, fallback: ZoomPosition | undefined): ZoomPosition | undefined =>

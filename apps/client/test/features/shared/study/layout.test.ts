@@ -15,10 +15,6 @@ describe('配置表に共通して成り立つこと', () => {
     expect(layout.floorY).toBeLessThan(layout.deskTop.y);
   });
 
-  it.each(LAYOUTS)('$name: 封が瓶より上に浮く', (layout) => {
-    expect(layout.seal.y).toBeGreaterThan(layout.jar.y);
-  });
-
   it.each(LAYOUTS)('$name: ボードが壁（天板の奥）にある', (layout) => {
     expect(layout.board.position.z).toBeLessThan(layout.deskTop.zNear);
     expect(layout.board.position.y).toBeGreaterThan(layout.deskTop.y);

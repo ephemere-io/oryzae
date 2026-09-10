@@ -24,7 +24,7 @@ registerUnit<Props>({
     {
       id: 'loading',
       probe: true,
-      description: 'Probe: 読み込み中は理由文も行き先も出さない（書斎の絵だけ）',
+      description: 'Probe: 読み込み中は何も描かない（地の色だけ）',
       props: { loading: true },
     },
   ],
@@ -52,12 +52,27 @@ registerUnit<Props>({
     },
     {
       id: 'not-blank',
-      description: '白画面にならない（必ず何かが描かれる）',
+      description: '書斎が出せないときは白画面にならない（必ず何かが描かれる）',
+      onlyFixtures: ['unsupported'],
       check: ({ root }) => {
-        // 読み込み中は文字を持たないので、書斎の絵が出ていることで判定する。
         const hasGlyph = root.querySelector('svg') !== null;
         const hasText = (root.textContent ?? '').trim().length > 0;
         return hasGlyph || hasText || '文字も絵も描かれていない';
+      },
+    },
+    {
+      /**
+       * **読み込み中は絵も出さない。** 「書斎に戻るときだけ謎のアイコンが出る。瓶を
+       * 押したときには出ないのに、戻るときだけ出るのは直感的でない」と実機レビューで
+       * 報告された（PR #570）。出入りは対称でなければならない。
+       */
+      id: 'loading-draws-nothing',
+      description: '読み込み中は絵も文字も出さない（戻り道に 1 画面挟まない）',
+      onlyFixtures: ['loading'],
+      check: ({ root }) => {
+        if (root.querySelector('svg') !== null) return '読み込み中なのに絵が出ている';
+        const text = (root.textContent ?? '').trim();
+        return text.length === 0 || `読み込み中なのに文字が出ている: ${text}`;
       },
     },
     {

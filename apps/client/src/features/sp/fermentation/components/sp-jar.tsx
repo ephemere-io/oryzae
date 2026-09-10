@@ -3,7 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
@@ -31,13 +31,6 @@ interface SpJarProps {
   loading: boolean;
   /** 問いの追加・編集・終了を開く。一覧は page が重ねる（ドメインをまたぐため）。 */
   onManageQuestions: () => void;
-  /**
-   * 開いた状態で入りたい手紙の発酵 id（`/jar?letter=`）。
-   *
-   * 書斎の瓶の上の封を押すとここへ来る。「届いた」ことを 3D で見せておいて、
-   * 押した先で改めて探させるのでは、封を出した意味が無い。
-   */
-  openLetterFor?: string | null;
 }
 
 /**
@@ -50,13 +43,7 @@ interface SpJarProps {
  * 世界だが、SP は片手で持つ画面なので「置き場」を作れない。代わりに軌道の上に
  * 等間隔で並べ、回して選ぶ。
  */
-export function SpJar({
-  api,
-  questions,
-  loading,
-  onManageQuestions,
-  openLetterFor = null,
-}: SpJarProps) {
+export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps) {
   const t = useTranslations('sp.jar');
   const router = useRouter();
   const { letters } = useFermentationInbox(api, false);
@@ -64,12 +51,6 @@ export function SpJar({
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [element, setElement] = useState<SpJarElement | null>(null);
-  /**
-   * 書斎の封から渡された「開いて入りたい手紙」。
-   *
-   * 一度開いたら消す。残したままだと、利用者が閉じた瞬間に効果が再び効いて開き直る。
-   */
-  const [pendingLetter, setPendingLetter] = useState<string | null>(openLetterFor);
 
   /**
    * 円の中で動かした要素の位置（id → 位置）。
@@ -112,19 +93,6 @@ export function SpJar({
   // （問いは生存が最大 3 件なので往復も 3 回に収まる）。
   const fermentationIds = useMemo(() => letters.map((letter) => letter.fermentationId), [letters]);
   const { details } = useFermentationDetails(api, fermentationIds);
-
-  /**
-   * 書斎の封から来たとき、その手紙を持つ問いの円を開く。
-   *
-   * URL が持っているのは**発酵の id** で、円は問いで並んでいる。両方を知っているのは
-   * 受信箱なので、そこで引き直す（受信箱が届くまでは何もしない）。
-   */
-  useEffect(() => {
-    if (pendingLetter === null) return;
-    const letter = letters.find((candidate) => candidate.fermentationId === pendingLetter);
-    if (!letter) return;
-    setOpenId(letter.questionId);
-  }, [pendingLetter, letters]);
 
   const untitled = t('untitled');
   const orbitQuestions = useMemo<OrbitQuestion[]>(() => {
@@ -206,11 +174,8 @@ export function SpJar({
           }}
           positions={{ ...storedPositions, ...positions }}
           onMove={handleMove}
-          autoOpenLetter={pendingLetter !== null}
           onOpenElement={(next) => {
             setElement(next);
-            // 開いたら合図を消す。残したままだと、閉じた瞬間に開き直る。
-            setPendingLetter(null);
             // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
             if (next.kind === 'letter') markQuestionRead(openQuestion.id);
           }}
