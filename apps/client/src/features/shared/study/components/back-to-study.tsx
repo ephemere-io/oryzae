@@ -3,9 +3,10 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { LABEL_STYLE } from '../scene/labels';
 
 /**
- * 画面の下端に小さく浮く「書斎へ戻る」。
+ * 画面の下端に置く「書斎へ戻る」。
  *
  * **引く動作（`PullBackToStudy`）と同じことを、押しても出来るようにするための双子。**
  * 引きは覚えなくてよい代わりに、そこに在ることが見えない。キャンバスを持たない画面
@@ -13,26 +14,26 @@ import { useTranslations } from 'next-intl';
  *
  * ### なぜ左上をやめたか
  *
- * 以前は左上に固定した 32px のマークだった。3 巡のレビューで毎回ここが指摘されている:
+ * 以前は左上に固定した 32px のマークだった。3 巡のレビューで毎回ここが指摘されている
+ * （「既存 UI の邪魔になる」「押せない機能が発生している」「安直すぎる」）。直し方も
+ * 毎回同じで、**画面の側に席を空けさせていた**（`--study-back-inset`）。席を読む場所は
+ * 7 か所まで増え、読み忘れると黙って重なる。左上はどの画面も自分のヘッダーに使いたい
+ * 場所で、そこを共有物が占め続ける限りこの往復は終わらない。**席を配るのをやめ、
+ * 誰も使っていない下端へ移した。**
  *
- *  1. 「ボード / エントリー / 瓶で既存 UI の邪魔になる」
- *  2. 「エントリー画面などで押せない機能が発生している」
- *  3. 「右上に来ている（＝どれが戻る導線か読めない）」「安直すぎる」
+ * ### なぜ箱に入れないか
  *
- * 直し方も毎回同じで、**画面の側に席を空けさせていた**（`--study-back-inset`）。
- * 席を読む場所は 7 か所まで増え、読み忘れると黙って重なる。実際 3 回忘れられている。
- * 左上はどの画面も自分のヘッダーに使いたい場所で、そこを共有物が占め続ける限り、
- * この往復は終わらない。**席を配るのをやめ、誰も使っていない下端へ移した。**
+ * 擦りガラスのピルに入れた版は「ダサい」と報告された。**あれは汎用の操作チップの形**で、
+ * この製品の言葉ではない。書斎の中で行き先を名乗っているのは「3px の点 + 9px の機械
+ * ラベル」（`LABEL_STYLE`）で、これがこの部屋の書体そのもの。出口にも同じ書体を使えば、
+ * 箱を足さずに**部屋の気配**で「あちらへ戻れる」と言える。
  *
- * ### 形
+ * 点の代わりに細い山形を置いているのは、点のままだと部屋の中の的（`• JAR` `• BOARD`）と
+ * 同じ見た目になり「ここが STUDY だ」と読めてしまうから。向きを持たせて「ここから
+ * 出る」にする。
  *
- * 下向きの山形と名前。**この画面から下へ抜ける**という意味で、押すと部屋へ戻る。
- *
- * はじめは印だけを薄く置き、名前はホバーで開いていた。**下端で見落とされた**
- * （実機の指摘）。触れてみるまで何なのか分からないものは、隅では気づかれない。
- * 縦に使える幅は 24px しか無い（パレットの底 876 と画面の下端 900 のあいだ）ので、
- * 目立たせるぶんは**横と濃さ**で稼ぐ — 名前を常時出し、他の浮きものと同じ擦りガラスを
- * 敷いた。横へ伸びるぶんには誰とも取り合わない。
+ * 常時は 0.75、触れると 1.0 になってわずかに浮く。薄い印だけを置いて名前をホバーで
+ * 開く形にしていたころは**下端で見落とされた**（実機の指摘）ので、名前は常時出す。
  */
 export function BackToStudy() {
   const t = useTranslations('study');
@@ -42,55 +43,39 @@ export function BackToStudy() {
       href="/study"
       {...verifyAttrs({ unit: 'BackToStudy' })}
       aria-label={t('back_to_study')}
-      // **下端の縁の中央。** 左右の隅はどの画面も自分の操作に使っている（ボードと瓶は
-      // 倍率とミニマップ、エントリーは保存状態と文字数）。中央も、少し上には浮かぶ
-      // 操作パレット（エントリー 814..876）とツールバー（ボード 810..860）がいる。
-      // 空いているのは**いちばん下の縁だけ**なので、そこへ寝かせる。
-      //
-      // **縦に使える幅は 24px しか無い**（パレットの底 876 と画面の下端 900 のあいだ）。
-      // だから目立たせるぶんは横と濃さで稼ぐ — 名前を常時出し、他の浮きものと同じ
-      // 擦りガラスを敷く。「薄い印が 1 つ」だと下端で見落とされる（実機の指摘）。
+      // 下端の縁の中央。左右の隅はどの画面も自分の操作に使っていて（倍率・ミニマップ・
+      // 保存状態・文字数）、中央も少し上には浮かぶパレット（エントリー 814..876）と
+      // ツールバー（ボード 810..860）がいる。空いているのは 876..900 の帯だけ。
       // 重なり順はサブ画面の浮きものと同じ 55（エディタの 50 より上、モーダルの 60 より下）。
-      className="-translate-x-1/2 fixed bottom-1 left-1/2 z-[55] flex items-center gap-1.5 rounded-full px-3 py-0.5 opacity-80 transition-opacity duration-300 hover:opacity-100"
-      style={glass}
+      className="-translate-x-1/2 fixed bottom-2 left-1/2 z-[55] flex items-center gap-2 opacity-75 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-100"
     >
-      {/* 山形の下に横線を 1 本。**ただの山形にはしない** — エントリーの操作パレットは
-          すぐ上にいて、その右端が「パレットを畳む」の山形を持っている。同じ絵が近くに
-          2 つ並ぶと、どちらがどちらか読めない。線を足すと「ここから下へ抜ける」になる。 */}
+      {/* 細い山形ひとつ。**箱も下線も付けない** — 線 1 本で「ここから下へ抜ける」に足りる。 */}
       <svg
         aria-hidden="true"
-        width="16"
-        height="13"
-        viewBox="0 0 16 13"
+        width="13"
+        height="7"
+        viewBox="0 0 13 7"
         fill="none"
-        style={{ color: '#5C4F3F' }}
+        style={{ color: LABEL_STYLE.dotColor }}
       >
         <path
-          d="M3 2 L8 7 L13 2"
+          d="M1.5 1.5 L6.5 5.5 L11.5 1.5"
           stroke="currentColor"
-          strokeWidth="1.4"
+          strokeWidth="1.1"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <path d="M3.5 10.5 H12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </svg>
-      {/* 名前は常時出す。ホバーで開く形にしていたが、**触れてみるまで何なのか分からない**
-          ので下端で見落とされた。横に伸びるぶんには誰とも取り合わない。 */}
       <span
-        className="whitespace-nowrap text-[9px] uppercase tracking-[0.18em]"
-        style={{ color: '#5C4F3F' }}
+        className="whitespace-nowrap"
+        style={{
+          fontSize: LABEL_STYLE.fontSize,
+          letterSpacing: LABEL_STYLE.letterSpacing,
+          color: LABEL_STYLE.color,
+        }}
       >
         {t('back_to_study')}
       </span>
     </Link>
   );
 }
-
-/** 浮かせる要素に共通の擦りガラス（`StudyChrome` と同じ）。 */
-const glass: React.CSSProperties = {
-  background: 'rgba(253, 251, 247, 0.72)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  border: '1px solid rgba(122, 116, 64, 0.18)',
-  boxShadow: '0 2px 12px rgba(140, 133, 126, 0.14)',
-};
