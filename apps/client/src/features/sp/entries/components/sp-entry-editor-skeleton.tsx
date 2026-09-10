@@ -30,16 +30,14 @@ export function SpEntryEditorSkeleton({
       {/* 保存ステータス行（実物: px-5 pt-3 pb-1 / minHeight 28、右寄せの小さな文字） */}
       <div
         className="flex items-center justify-end px-5 pt-3 pb-1"
-        // 実物と同じだけ「書斎へ戻る」マークの席を空ける（実物は読んでいた）。
-        style={{ minHeight: 28, paddingLeft: 'max(1.25rem, var(--study-back-inset, 0px))' }}
+        style={{ minHeight: 28 }}
         data-skeleton-slot="status"
       >
         <Skeleton className="h-3 w-16" />
       </div>
 
       {/* タイトル（実物: px-5 pt-2 text-2xl leading-snug = 33px） */}
-      {/* 実物と同じく、マークの高さぶん行ごと下へ落とす（左を空けるだけでは頭が重なる）。 */}
-      <div className="px-5" style={{ paddingTop: 'max(0.5rem, var(--study-back-drop, 0px))' }}>
+      <div className="px-5 pt-2">
         <Skeleton className="h-[33px] w-3/4" data-skeleton-slot="title" />
       </div>
 

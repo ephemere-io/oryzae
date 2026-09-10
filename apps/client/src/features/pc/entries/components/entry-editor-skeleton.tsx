@@ -54,10 +54,6 @@ export function EntryEditorSkeleton({
           右=アクション3つ＋日付＋設定）。タイトルは本文側へ移った。 */}
       <div
         className="flex items-center justify-between gap-4 px-4 py-2"
-        // 席は実物と同じだけ空ける。実物のヘッダーは「書斎へ戻る」マークの席
-        // （`--study-back-inset`）を読むので、枠だけ読まないとマークがチップの枠に
-        // 重なり、実物に変わった瞬間に左の並びが横へずれる。
-        style={{ paddingLeft: 'max(1rem, var(--study-back-inset, 0px))' }}
         data-skeleton-slot="toolbar"
       >
         <div className="flex items-center">

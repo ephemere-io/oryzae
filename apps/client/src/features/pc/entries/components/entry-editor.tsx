@@ -1460,10 +1460,7 @@ export function EntryEditor({
             // 左右は本文と同じ縦の線に乗せる（gutterPx）。ヘッダーと本文で
             // 別の数字を使うと、同じ画面に2本の縦線が立つ。
             //
-            // ただし書斎が有効な間は、左上に「書斎へ戻る」マークが浮く。席を空けないと
-            // マークが問いのチップに重なって押せなくなる（変数は (protected)/layout.tsx、
-            // 出ていない間は 0px なので通常は gutterPx がそのまま勝つ）。
-            paddingLeft: `max(${gutterPx}px, var(--study-back-inset, 0px))`,
+            paddingLeft: gutterPx,
             paddingRight: gutterPx,
           }}
         >

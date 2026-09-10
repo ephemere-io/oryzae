@@ -375,7 +375,7 @@ export function BoardView({ api }: BoardViewProps) {
                 // （--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
                 // 書斎が有効な間は左上に「書斎へ戻る」マークが浮くので、その席も避ける
                 // （避けないと日付ナビがマークの下に潜って押せない）。
-                left: `calc(var(--sidebar-width, 0px) + max(${BOARD_INSET}px, var(--study-back-inset, 0px)))`,
+                left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
                 right: BOARD_INSET,
               }}
             >
