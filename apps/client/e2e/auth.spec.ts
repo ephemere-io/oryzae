@@ -5,7 +5,7 @@ const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? 'yukiagatsuma@gmail.com';
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'Test123456';
 
 test.describe('認証フロー', () => {
-  test('ログインして /entries/new にリダイレクト', async ({ page }) => {
+  test('ログインしてホーム（書斎）にリダイレクト', async ({ page }) => {
     await page.goto('/login');
 
     await expect(page.locator('h1')).toHaveText('Oryzae');
@@ -17,8 +17,9 @@ test.describe('認証フロー', () => {
     await page.locator('input[type="password"]').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'ログイン', exact: true }).click();
 
-    await page.waitForURL('**/entries/new**');
-    await expect(page).toHaveURL(/\/entries\/new/);
+    // ホームは既定で書斎（NEXT_PUBLIC_STUDY_HOME を置かなくても出る）。
+    await page.waitForURL('**/study**');
+    await expect(page).toHaveURL(/\/study/);
   });
 
   test('未認証で /entries にアクセスすると /login にリダイレクト', async ({ page }) => {

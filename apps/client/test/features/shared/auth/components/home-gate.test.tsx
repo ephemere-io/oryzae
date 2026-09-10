@@ -64,12 +64,13 @@ describe('HomeGate', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('hash のトークンを受けてログイン状態にし /entries/new へ送る', () => {
+  it('hash のトークンを受けてログイン状態にし、ホーム（書斎）へ送る', () => {
     stubLocation('#access_token=at&refresh_token=rt&type=signup');
     render(<HomeGate />);
 
     expect(setTokens).toHaveBeenCalledWith('at', 'rt');
-    expect(replace).toHaveBeenCalledWith('/entries/new');
+    // ホームは既定で書斎（NEXT_PUBLIC_STUDY_HOME を置かなくても出る）。
+    expect(replace).toHaveBeenCalledWith('/study');
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
@@ -94,11 +95,12 @@ describe('HomeGate', () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it('既ログインなら /entries/new へ送る', () => {
+  it('既ログインならホーム（書斎）へ送る', () => {
     getAccessToken.mockReturnValue('existing-token');
     render(<HomeGate />);
 
-    expect(replace).toHaveBeenCalledWith('/entries/new');
+    // ホームは既定で書斎（NEXT_PUBLIC_STUDY_HOME を置かなくても出る）。
+    expect(replace).toHaveBeenCalledWith('/study');
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
@@ -127,12 +129,13 @@ describe('HomeGate', () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it('PWA から起動したログイン済み利用者はエディタへ送る', () => {
+  it('PWA から起動したログイン済み利用者はホーム（書斎）へ送る', () => {
     setDisplayMode(true);
     getAccessToken.mockReturnValue('existing-token');
     render(<HomeGate />);
 
-    expect(replace).toHaveBeenCalledWith('/entries/new');
+    // ホームは既定で書斎（NEXT_PUBLIC_STUDY_HOME を置かなくても出る）。
+    expect(replace).toHaveBeenCalledWith('/study');
     expect(locationReplace).not.toHaveBeenCalled();
   });
 });
