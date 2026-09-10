@@ -162,7 +162,7 @@ registerUnit<Props>({
       onlyFixtures: ['loading', 'no-questions', 'orbit', 'opened'],
       check: ({ root }) => {
         const text = root.textContent ?? '';
-        return text.includes('問いを整える') || '「問いを整える」ボタンが無い';
+        return text.includes('問いを追加・編集') || '「問いを追加・編集」ボタンが無い';
       },
     },
     {

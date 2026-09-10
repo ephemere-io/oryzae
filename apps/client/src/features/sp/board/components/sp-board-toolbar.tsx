@@ -4,7 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 
 /**
- * SP のボードの道具箱（下部中央に浮かぶ）。
+ * SP のボードの道具箱（盤面の下に**流れの中で**置く）。
  *
  * PC（#524）と同じ考え方で、**選んでいるものに応じて中身が入れ替わる**:
  *  - 何も選んでいない … 作るもの（抜粋 / 写真）
@@ -48,12 +48,11 @@ export function SpBoardToolbar({
   return (
     <div
       {...verifyAttrs({ unit: 'SpBoardToolbar', mode, selectedType: selectedType ?? 'none', busy })}
-      // 盤面の上に浮かせる。カードのつかみ（zIndex 1000）より前、シート（z-30）より後ろ。
-      //
-      // `left-1/2` の絶対配置は「左端から親の右端まで」を幅の上限として畳むので、
-      // 何もしないと画面の半分で語が折り返す（「前面／へ」）。`w-max` で語の幅のまま置き、
-      // translate で中央へ戻す。
-      className="-translate-x-1/2 absolute bottom-6 left-1/2 z-20 flex w-max items-center gap-1 rounded-full p-1"
+      // 盤面の上に浮かせていたが、「画面の一番下に固定で浮かせるのではなく、通常フロー内に
+      // スペースを設けて」と報告された。浮かせると盤面の下端のカードに被り、指で掴めない。
+      // 置き場は `SpBoard` の下端の列で、ここは形だけを持つ。`w-max` で語の幅のまま置く
+      // （縮めると「前面／へ」で折り返す）。
+      className="flex w-max items-center gap-1 rounded-full p-1"
       style={{
         background: 'rgba(253, 251, 247, 0.94)',
         backdropFilter: 'blur(10px)',

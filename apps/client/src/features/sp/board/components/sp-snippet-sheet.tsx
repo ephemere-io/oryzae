@@ -82,8 +82,8 @@ export function SpSnippetSheet({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="shrink-0 text-xs disabled:opacity-40"
-            style={{ color: 'var(--date-color)' }}
+            className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px] disabled:opacity-40"
+            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
           >
             {t('cancel')}
           </button>

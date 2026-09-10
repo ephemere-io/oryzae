@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 import { anchorStyle, useDraggableSurface } from '@/lib/use-draggable-surface';
 import {
   BOARD_INSET,
@@ -106,6 +107,33 @@ function TrashIcon() {
   );
 }
 
+/** 畳んだかどうかを憶える鍵（エントリーの操作パレットとは別に持つ）。 */
+const COLLAPSED_KEY = 'oryzae-board-toolbar-collapsed';
+
+function readStoredCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    // private mode など。畳んでいないものとして出す。
+    return false;
+  }
+}
+
+function persistCollapsed(next: boolean): void {
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0');
+  } catch {
+    // 憶えられないだけ。次に開いたときは開いた状態で出る。
+  }
+}
+
+/** 畳んだつまみの位置。本文領域の下端中央に貼りつく（エントリーと同じ）。 */
+const COLLAPSED_PLACEMENT: React.CSSProperties = {
+  bottom: 0,
+  left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
+  transform: 'translateX(-50%)',
+};
+
 /**
  * ボードの道具箱（Figma / FigJam の UI3 に倣った下部中央フローティングツールバー）。
  *
@@ -128,6 +156,18 @@ export function BoardToolbar({
   onDeleteSelected,
 }: BoardToolbarProps) {
   const t = useTranslations('board.toolbar');
+
+  /**
+   * 畳めるようにする（エントリーの操作パレットと同じ）。盤面の全部を見たいときに
+   * 道具ごと引っ込められないと、下端のカードが道具箱の下に隠れたままになる。
+   * 位置と同じく憶えておく（SSR では読めないので mount 後）。
+   */
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => setCollapsed(readStoredCollapsed()), []);
+  function setCollapsedAndPersist(next: boolean) {
+    setCollapsed(next);
+    persistCollapsed(next);
+  }
 
   const tools: ToolSpec[] = [
     {
@@ -205,6 +245,42 @@ export function BoardToolbar({
     transform: 'translateX(-50%)',
   };
 
+  if (collapsed) {
+    return (
+      <div
+        {...verifyAttrs({
+          unit: 'BoardToolbar',
+          activeTool,
+          mode: 'collapsed',
+          selectedType: selection?.cardType ?? 'none',
+          toolCount: 0,
+          dragging: false,
+          docked: true,
+          collapsed: true,
+        })}
+        className="fixed z-[1600]"
+        style={COLLAPSED_PLACEMENT}
+      >
+        <button
+          type="button"
+          onClick={() => setCollapsedAndPersist(false)}
+          aria-expanded={false}
+          aria-label={t('expand')}
+          className={`flex h-7 w-16 items-center justify-center rounded-t-lg border border-b-0 ${IDLE_HOVER_CLASS}`}
+          style={{
+            background: 'var(--surface-raised)',
+            borderColor: 'var(--surface-raised-border)',
+            color: 'var(--date-color)',
+          }}
+        >
+          <svg {...ICON_PROPS} aria-hidden="true">
+            <path d="m6 15 6-6 6 6" />
+          </svg>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={surface.rootRef}
@@ -216,6 +292,7 @@ export function BoardToolbar({
         toolCount: selection ? cardActions.length : tools.length,
         dragging: surface.dragging,
         docked: surface.anchor === null,
+        collapsed: false,
       })}
       role="toolbar"
       aria-label={selection ? t('aria_label_card') : t('aria_label')}
@@ -300,6 +377,24 @@ export function BoardToolbar({
               </div>
             );
           })}
+
+      {/* 畳む。押しただけで引っ込み、つまみが下端に残る（エントリーと同じ）。 */}
+      <button
+        type="button"
+        data-verify-collapse=""
+        onClick={() => {
+          if (surface.consumeMoved()) return;
+          setCollapsedAndPersist(true);
+        }}
+        aria-expanded={true}
+        aria-label={t('collapse')}
+        className={`${TOOL_BUTTON_CLASS} ${IDLE_HOVER_CLASS} active:scale-95`}
+        style={{ color: 'var(--date-color)' }}
+      >
+        <svg {...ICON_PROPS} aria-hidden="true">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
     </div>
   );
 }

@@ -333,7 +333,9 @@
       "bring_to_front": "移到最前",
       "delete": "删除",
       "open": "打开",
-      "ocr": "从图片读取"
+      "ocr": "从图片读取",
+      "collapse": "收起工具栏",
+      "expand": "展开工具栏"
     },
     "drop_image": "把图片拖到这里"
   },
@@ -737,7 +739,7 @@
       "source_untitled": "无标题记录",
       "no_questions": "还没有提问。可以从下方按钮开始。",
       "spin_hint": "横向滑动即可转动",
-      "manage_questions": "整理提问",
+      "manage_questions": "添加或编辑提问",
       "not_fermented": "这个提问还没有发酵",
       "tap_hint": "点按阅读",
       "selection_reason": "被选中的理由"
@@ -779,8 +781,8 @@
       "cards": "{count}张",
       "empty": "今天还没有任何内容",
       "hint": "可以用手指拖动卡片",
-      "add_snippet": "摘录",
-      "add_photo": "照片",
+      "add_snippet": "创建摘录",
+      "add_photo": "添加照片",
       "edit": "编辑",
       "bring_to_front": "移到前面",
       "remove": "移除",

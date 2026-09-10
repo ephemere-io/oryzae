@@ -333,7 +333,9 @@
       "bring_to_front": "맨 앞으로",
       "delete": "삭제",
       "open": "열기",
-      "ocr": "이미지에서 읽기"
+      "ocr": "이미지에서 읽기",
+      "collapse": "팔레트 접기",
+      "expand": "팔레트 펼치기"
     },
     "drop_image": "여기에 이미지를 놓으세요"
   },
@@ -732,12 +734,12 @@
       "reply": "답장 쓰기",
       "section_letter": "편지",
       "section_keywords": "단어",
-      "section_snippets": "발췌",
+      "section_snippets": "스니펫",
       "section_sources": "바탕이 된 기록",
       "source_untitled": "제목 없는 기록",
       "no_questions": "아직 질문이 없습니다. 아래 버튼에서 시작해 보세요.",
       "spin_hint": "옆으로 밀면 돌아갑니다",
-      "manage_questions": "질문 정리하기",
+      "manage_questions": "질문 추가·편집",
       "not_fermented": "이 질문은 아직 발효되지 않았습니다",
       "tap_hint": "탭하여 읽기",
       "selection_reason": "선택된 이유"
@@ -779,8 +781,8 @@
       "cards": "{count}장",
       "empty": "오늘은 아직 아무것도 없습니다",
       "hint": "카드는 손가락으로 옮길 수 있습니다",
-      "add_snippet": "발췌",
-      "add_photo": "사진",
+      "add_snippet": "스니펫 만들기",
+      "add_photo": "사진 추가",
       "edit": "편집",
       "bring_to_front": "앞으로",
       "remove": "빼기",

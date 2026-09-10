@@ -123,11 +123,11 @@ describe('SpJar', () => {
     expect(screen.getByText(/問いがまだありません/)).toBeTruthy();
   });
 
-  it('「問いを整える」を押すと問いの管理を開く（SP はボトムナビを持たない）', () => {
+  it('「問いを追加・編集」を押すと問いの管理を開く（SP はボトムナビを持たない）', () => {
     const onManageQuestions = vi.fn();
     renderJar(filledApi(), { onManageQuestions });
 
-    fireEvent.click(screen.getByRole('button', { name: '問いを整える' }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.jar.manage_questions }));
     expect(onManageQuestions).toHaveBeenCalled();
   });
 

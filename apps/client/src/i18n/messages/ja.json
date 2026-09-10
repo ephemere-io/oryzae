@@ -333,7 +333,9 @@
       "bring_to_front": "前面へ",
       "delete": "削除",
       "open": "開く",
-      "ocr": "画像から読み取る"
+      "ocr": "画像から読み取る",
+      "collapse": "パレットを畳む",
+      "expand": "パレットを開く"
     },
     "drop_image": "ここに画像をドロップ"
   },
@@ -732,12 +734,12 @@
       "reply": "返事を書く",
       "section_letter": "手紙",
       "section_keywords": "言葉",
-      "section_snippets": "抜粋",
+      "section_snippets": "スニペット",
       "section_sources": "もとになったエントリー",
       "source_untitled": "無題のエントリー",
       "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
       "spin_hint": "横に払うと回ります",
-      "manage_questions": "問いを整える",
+      "manage_questions": "問いを追加・編集",
       "not_fermented": "この問いはまだ発酵していません",
       "tap_hint": "タップして読む",
       "selection_reason": "選ばれた理由"
@@ -779,8 +781,8 @@
       "cards": "{count}枚",
       "empty": "この日はまだ何もありません",
       "hint": "カードは指で動かせます",
-      "add_snippet": "抜粋",
-      "add_photo": "写真",
+      "add_snippet": "スニペットを作成",
+      "add_photo": "写真を追加",
       "edit": "編集",
       "bring_to_front": "前面へ",
       "remove": "外す",
