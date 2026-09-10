@@ -9,7 +9,11 @@ import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unrea
 import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
-import { BackToStudy, STUDY_EXIT_BAND } from '@/features/shared/study/components/back-to-study';
+import {
+  BackToStudy,
+  STUDY_EXIT_BAND,
+  STUDY_EXIT_RESERVE,
+} from '@/features/shared/study/components/back-to-study';
 import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
@@ -35,15 +39,15 @@ function PcShell({
   children,
   studyHome,
   onStudy,
-  exitBand,
+  exitTab,
 }: {
   children: React.ReactNode;
   /** 書斎が唯一のグローバルナビか。真なら左サイドバーを描かない。 */
   studyHome: boolean;
   /** いま書斎ホームそのものか。真ならフッターも外す。 */
   onStudy: boolean;
-  /** 上端に「書斎へ戻る」の帯が出ているか。真なら画面がそのぶん下がる。 */
-  exitBand: boolean;
+  /** 上端に「書斎へ戻る」のタブが掛かっているか。真なら画面は中央だけを空ける。 */
+  exitTab: boolean;
 }) {
   return (
     <div className="flex h-screen overflow-hidden">
@@ -58,24 +62,12 @@ function PcShell({
         // 変数は SidebarProvider が :root へ書くので、描かなくても 80px のまま残る。
         // margin だけ外して変数を残すと、これを読んでいるボードのツールバーと
         // エディタの左端だけが 80px ずれる。
-        style={shellStyle(studyHome, exitBand)}
+        style={shellStyle(studyHome, exitTab)}
       >
-        {/* **帯のぶんだけ下げる。** 浮かせて重ねていたころは、問いのチップが伸びると
-            出口とぶつかった（実機レビュー）。画面の側が席を空ければ重なりようが無い。
-
-            下げるのは padding ではなく **margin**。padding だと箱の位置は動かないので、
-            `absolute inset-0` で敷いている画面（瓶・ロード表示）が帯の下へ潜る
-            （絶対配置が基準にするのは padding box の外側の縁）。margin なら箱ごと
-            下がるので、`absolute inset-0` も `h-full` も揃って従う。
-
-            それでも効かない **fixed の画面**（エントリーのエディタ）は、
-            `.sidebar-anchored` が同じ変数を top で読む。 */}
-        <div
-          className="relative flex-1 overflow-auto"
-          style={{ marginTop: 'var(--study-exit-band, 0px)' }}
-        >
-          {children}
-        </div>
+        {/* PC は画面を下げない。「設定・日付・問いの行をただ下にずらしただけ」と
+            報告された（実機レビュー）。タブは中央にしか高さを持たないので、画面は
+            中央を空けておけば足りる（`--study-exit-reserve`）。 */}
+        <div className="relative flex-1 overflow-auto">{children}</div>
         {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
         {!onStudy && <PageFooter />}
       </main>
@@ -90,17 +82,21 @@ function PcShell({
  *
  * - `--sidebar-width`: サイドバーを描かない間は 0（`SidebarProvider` が :root に
  *   書いた 80px が残ると、これを読んでいるボードのツールバーとエディタの左端だけずれる）
- * - `--study-exit-band`: 上端の帯の高さ。**この subtree の全員が同じ 1 本を読む**ので、
- *   流れの中の画面（padding）と fixed の画面（top）が同じフレームで揃う
+ * - `--study-exit-reserve`: 上端の中央に空けておく幅。「書斎へ戻る」のタブが掛かる席で、
+ *   **画面は下がらない**。いま読むのはエントリーのヘッダー（3 列の真ん中）だけで、
+ *   他の画面は元から中央を使っていない
  */
-function shellStyle(studyHome: boolean, exitBand: boolean): MainStyle {
+function shellStyle(studyHome: boolean, exitTab: boolean): MainStyle {
   return {
     ...(studyHome ? { '--sidebar-width': '0px' } : {}),
-    '--study-exit-band': exitBand ? `${STUDY_EXIT_BAND}px` : '0px',
+    '--study-exit-reserve': exitTab ? `${STUDY_EXIT_RESERVE}px` : '0px',
   };
 }
 
-/** SP のシェルが配る変数。帯の高さは PC と同じ 1 本の名前で持つ。 */
+/**
+ * SP のシェルが配る変数。**SP だけはタブの高さぶん画面を下げる** — SP のヘッダーは
+ * 題を中央に置くので、タブの真下に題が来てしまう。
+ */
 function spShellStyle(exitBand: boolean): MainStyle {
   return { '--study-exit-band': exitBand ? `${STUDY_EXIT_BAND}px` : '0px' };
 }
@@ -189,8 +185,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               className="flex h-[100dvh] flex-col overflow-hidden"
               style={spShellStyle(showBackToStudy)}
             >
-              {/* PC と同じく margin で下げる（padding だと `absolute inset-0` の
-                  画面が帯の下へ潜る）。 */}
+              {/* padding ではなく margin で下げる。padding だと箱の位置が動かず、
+                  `absolute inset-0` で敷いている画面がタブの下へ潜る（絶対配置が
+                  基準にするのは padding box の外側の縁）。 */}
               <main
                 className="relative flex-1 overflow-auto"
                 style={{ marginTop: 'var(--study-exit-band, 0px)' }}
@@ -205,7 +202,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               {!studyHome && <SpBottomNav />}
             </div>
           ) : device === 'pc' ? (
-            <PcShell studyHome={studyHome} onStudy={onStudy} exitBand={showBackToStudy}>
+            <PcShell studyHome={studyHome} onStudy={onStudy} exitTab={showBackToStudy}>
               {content}
             </PcShell>
           ) : null}

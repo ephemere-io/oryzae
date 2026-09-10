@@ -841,7 +841,7 @@
     "hint_jar_fermenting": "発酵が進んでいます",
     "hint_jar_almost": "もうすぐ手紙が届きます",
     "hint_jar_letter": "未読の手紙があります",
-    "hint_jar_read": "読んだ手紙が入っています",
+    "hint_jar_read": "手紙を読み返せます",
     "hint_board_empty": "まだ何も貼っていません",
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",

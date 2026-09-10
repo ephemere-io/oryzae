@@ -841,7 +841,7 @@
     "hint_jar_fermenting": "Fermenting",
     "hint_jar_almost": "A letter is almost ready",
     "hint_jar_letter": "You have an unread letter",
-    "hint_jar_read": "A letter is inside",
+    "hint_jar_read": "Read your letters again",
     "hint_board_empty": "Nothing pinned yet",
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
