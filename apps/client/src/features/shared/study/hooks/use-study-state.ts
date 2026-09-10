@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useBoard } from '@/features/shared/board/hooks/use-board';
+import { useBoardSummary } from '@/features/shared/board/hooks/use-board-summary';
 import type { BoardCardData } from '@/features/shared/board/types';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useEntryMonthlyCounts } from '@/features/shared/entries/hooks/use-entry-monthly-counts';
@@ -24,8 +24,8 @@ import type { StudyBoardCard, StudyEntry, StudyFermentationStatus, StudyState } 
  * 取得したものを配っているので、ここで取り直さない（#363 の N+1 解消を維持）。
  */
 /** 憶えてある書斎の形が変わったら上げる。 */
-// 4: 瓶の言葉と封をやめた（`words` が消えたので、3 以前の形をそのまま流せない）。
-const CACHE_VERSION = 4;
+// 5: 壁が「当日の盤面」から「溜まっている総量」になった（board の形が変わる）。
+const CACHE_VERSION = 5;
 
 /** 一週間。裏で必ず取り直すので、長くても古い値が居座らない。 */
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -95,7 +95,15 @@ export function useStudyState(
   const { entries, loading: entriesLoading, error: entriesError } = useEntries(api);
 
   const now = useMemo(() => localDateKey(new Date()), []);
-  const { cards, loading: boardLoading } = useBoard(api, now);
+  /**
+   * 壁は**溜まってきた量**を映す（当日の盤面ではない）。当日の daily だけを読んでいた
+   * ころは、その日に何も貼っていなければ壁が空で、使っている人の壁ほど空に見えた。
+   */
+  const {
+    summary: board,
+    loading: boardLoading,
+    error: boardError,
+  } = useBoardSummary(api, authLoading);
 
   // 憶えてある書斎。**利用者ごとに分ける** — 端末を共有していると、前の人の
   // 記録の冒頭や発酵の言葉がそのまま出てしまう。
@@ -129,9 +137,9 @@ export function useStudyState(
       })),
       entries: entries.map(toStudyEntry),
       questions,
-      board: { dateKey: now, viewType: 'daily', cards: cards.map(toStudyBoardCard) },
+      board: { total: board.total, cards: board.cards.map(toStudyBoardCard) },
     };
-  }, [now, unread.unreadCount, readinessTop, letters, questions, counts, entries, cards]);
+  }, [now, unread.unreadCount, readinessTop, letters, questions, counts, entries, board]);
 
   const loading =
     readinessLoading || lettersLoading || countsLoading || entriesLoading || boardLoading;
@@ -144,7 +152,8 @@ export function useStudyState(
    * どれか 1 つでも落ちていれば「届かなかった」とみなす — 通信の失敗はまとめて起きる。
    */
   // readiness だけ文字列（メッセージ）で返る。有無だけを見る。
-  const failed = readinessError !== null || lettersError || countsError || entriesError;
+  const failed =
+    readinessError !== null || lettersError || countsError || entriesError || boardError;
 
   // 取り終えたら憶える。次に書斎を開いたとき、取得を待たずに前回の絵が出る。
   // **届かなかったときは上書きしない。** 空の書斎で塗り潰すと、次に開いたときも空になる。

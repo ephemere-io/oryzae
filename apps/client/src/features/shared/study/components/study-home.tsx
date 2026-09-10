@@ -204,7 +204,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
           readiness={state.fermentation.readiness}
           entryCount={currentMonthCount}
           volumeCount={archiveCount}
-          cardCount={state.board.cards.length}
+          cardCount={state.board.total}
           screen={screen}
           onPick={handlePickFromLabel}
         />

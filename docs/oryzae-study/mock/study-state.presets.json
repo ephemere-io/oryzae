@@ -16,8 +16,7 @@
     "notebooks": [],
     "entries": [],
     "board": {
-      "dateKey": "2026-09-02",
-      "viewType": "daily",
+      "total": 0,
       "cards": []
     }
   },
@@ -80,8 +79,7 @@
       }
     ],
     "board": {
-      "dateKey": "2026-09-02",
-      "viewType": "daily",
+      "total": 2,
       "cards": [
         {
           "id": "c-1",
@@ -216,8 +214,7 @@
       }
     ],
     "board": {
-      "dateKey": "2026-09-02",
-      "viewType": "daily",
+      "total": 4,
       "cards": [
         {
           "id": "c-1",
@@ -384,8 +381,7 @@
       }
     ],
     "board": {
-      "dateKey": "2026-09-02",
-      "viewType": "daily",
+      "total": 5,
       "cards": [
         {
           "id": "c-1",
@@ -552,8 +548,7 @@
       }
     ],
     "board": {
-      "dateKey": "2026-09-02",
-      "viewType": "daily",
+      "total": 4,
       "cards": [
         {
           "id": "c-1",
@@ -738,8 +733,7 @@
       }
     ],
     "board": {
-      "dateKey": "2026-09-02",
-      "viewType": "daily",
+      "total": 10,
       "cards": [
         {
           "id": "c-1",

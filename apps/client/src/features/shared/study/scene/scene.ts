@@ -925,14 +925,23 @@ function lineFrom(points: Vector3[], material: Material, own: OwnGeometry): Line
 }
 
 /**
- * 机の天板。表現は最小限 — 輪郭・手前の木端・前脚 2 本・木目を示唆する 1 本だけ。
- * 木端をここだけ濃く引くと、平面が板に見える。
+ * 机の天板と脚。輪郭・手前の木端・脚 4 本・木目を示唆する 1 本。
  *
- * **一度は天板の下に構造（幕板・引き出し・板脚）を足したが、戻した。**
- * 「ちゃぶ台のように質素に見える」という指摘への答えとして形を足したところ、次は
- * 「現実的かつ具体的で稚拙に見える、抽象化されていたころのほうが想像をかき立てた」と
- * 報告された（PR #570）。引き出しのような**名前のある部品**を線で描くと、絵が
- * 説明的になり、余白が消える。**ここは線を足して解く場所ではない。**
+ * ### 足すのは「部品」ではなく「厚み」
+ *
+ * 一度は天板の下に幕板・引き出し・板脚を足し、「現実的かつ具体的で稚拙」と戻した。
+ * 次に「引くと机と脚が簡素で貧弱に見える」と報告された（PR #570）。同じ場所を
+ * 行き来しているように見えるが、**足す軸が違う**。
+ *
+ * 前回足したのは**名前のある部品**（引き出し・幕板）で、絵が説明的になった。今回
+ * 足すのは**いま在るものの厚み**だけ ―
+ *
+ *  - 脚は線 1 本だった。線は太さを持てないので、どう描いても「棒」にしかならない。
+ *    細い箱にすると、部品を増やさずに脚が脚として立つ
+ *  - 奥の脚が無く、机が奥で浮いていた。4 本目まで描くのは足すのではなく**欠けを埋める**
+ *  - 脚が床に着くところに短い線を引く。家具が重く見えるのは、床との接点があるとき
+ *
+ * 引き出しのような**新しい名前**は 1 つも増えていない。ここはそういう場所ではない。
  */
 function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeometry): Group {
   const group = new Group();
@@ -952,8 +961,9 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
     ),
   );
 
-  // 手前の木端（厚み 0.16）。ここだけ濃い。
-  const edgeBottom = y - 0.16;
+  // 手前の木端。ここだけ濃く引くと、平面が板に見える。
+  // 0.16 では脚を立てても板が薄く、卓のままだった。天板の厚みも「厚み」の一部。
+  const edgeBottom = y - 0.24;
   group.add(
     lineFrom(
       [
@@ -967,12 +977,63 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
     ),
   );
 
-  // 前脚 2 本。床まで伸ばす。
-  for (const x of [-halfWidth + 0.5, halfWidth - 0.5]) {
+  /**
+   * 脚 4 本。**線ではなく細い箱**として引く。
+   *
+   * 線は太さを持てないので、1 本引くとどうしても「棒で支えた卓」になる。前面と側面を
+   * 引けば、部品を増やさずに脚が脚として立つ。奥の 2 本まで描くのは、机が奥で浮いて
+   * 見えていた欠けを埋めるため。
+   */
+  const legWidth = 0.34;
+  const legFrontZ = zNear - 0.25;
+  const legBackZ = zFar + 1.1;
+  const legXs = [-halfWidth + 0.7, halfWidth - 0.7];
+
+  for (const x of legXs) {
+    for (const [z, ink] of [
+      [legFrontZ, 0.24],
+      [legBackZ, 0.12],
+    ] as const) {
+      const inner = x < 0 ? x + legWidth : x - legWidth;
+      // 前面（2 本の縦線と、床での底辺）。
+      group.add(
+        lineFrom(
+          [
+            new Vector3(x, edgeBottom, z),
+            new Vector3(x, layout.floorY, z),
+            new Vector3(inner, layout.floorY, z),
+            new Vector3(inner, edgeBottom, z),
+          ],
+          materials.faint(ink),
+          own,
+        ),
+      );
+    }
+
+    // 側面の稜線 1 本。奥行きを示すのに、前と奥を結ぶこの 1 本で足りる。
     group.add(
       lineFrom(
-        [new Vector3(x, edgeBottom, zNear - 0.2), new Vector3(x, layout.floorY, zNear - 0.2)],
-        materials.faint(0.2),
+        [new Vector3(x, layout.floorY, legFrontZ), new Vector3(x, layout.floorY, legBackZ)],
+        materials.faint(0.07),
+        own,
+      ),
+    );
+
+    /**
+     * 床との接点。
+     *
+     * **家具が重く見えるのは、床に着いているときだけ。** 脚の下端に短い線を 1 本
+     * 置くと、同じ高さのまま設置している感じが出る（影を落とさない線画なので、
+     * 接点そのものを描く）。
+     */
+    const inner = x < 0 ? x + legWidth : x - legWidth;
+    group.add(
+      lineFrom(
+        [
+          new Vector3(x - 0.1, layout.floorY, legFrontZ + 0.12),
+          new Vector3(inner + (x < 0 ? 0.1 : -0.1), layout.floorY, legFrontZ + 0.12),
+        ],
+        materials.faint(0.3),
         own,
       ),
     );
