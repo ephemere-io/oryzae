@@ -95,7 +95,9 @@ import {
 } from './jar';
 import {
   createMaterials,
+  DARK_PALETTE,
   fadedMaterialState,
+  LIGHT_PALETTE,
   type StudyMaterials,
   type StudyTheme,
 } from './materials';
@@ -128,6 +130,13 @@ export interface StudySceneOptions {
    * ので、行き先の画面へは切り替わりではなく**溶暗**で入る。
    */
   onLeaveStart?: (durationMs: number) => void;
+  /**
+   * 出ていく直前の書斎を 1 枚の画像（data URL）にして渡す。
+   *
+   * **部屋は消えたのではなく、遠くなっただけ**という見立てを、サブ画面と戻り道で
+   * 保つための地。3D を裏で回し続けずに済むよう、静止画に畳んでから渡す。
+   */
+  onCapture?: (dataUrl: string) => void;
 }
 
 export interface HoverInfo {
@@ -178,6 +187,18 @@ export interface StudySceneHandle {
 
 /** 秒。四方の計算で使う。 */
 const MS_PER_SECOND = 1000;
+
+/**
+ * 憶えておく 1 枚の大きさ。
+ *
+ * **480px では部屋に見えなかった。** 書斎はほぼ白地に細い線だけで出来ているので、
+ * 縮めるとまず線が消え、残るのは「画面がうっすら曇った」という印象になる。部屋だと
+ * 分かるのは瓶の輪郭・板の矩形・積みの稜線で、それが残る大きさが要る。
+ *
+ * JPEG にするのは軽さのため（この絵は白地が大半なので、960px でも十数 KB に収まる）。
+ * 透過を持てないので、書斎の地の色を先に塗ってから重ねる。
+ */
+const CAPTURE = { width: 960, quality: 0.72 } as const;
 
 /** 輪郭の呼吸の周期（ms）。 */
 const OUTLINE_BREATH_MS = 4000;
@@ -308,6 +329,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   /** 出ていくフェードを 1 回だけ知らせるための印。 */
   let leaveAnnounced = false;
+  /**
+   * 次の描画の直後に 1 枚掴む、という予約。
+   *
+   * **描画の後でなければならない。** WebGL の描画バッファは既定で描画のたびに破棄
+   * されるので（`preserveDrawingBuffer` を立てていない）、別のタイミングで
+   * `toDataURL` を呼ぶと真っ白が返る。立てるのは `renderer.render` の直後だけ。
+   */
+  let captureRequested = false;
 
   /** 遷移の状態。`null` ならホーム。 */
   let transition: {
@@ -346,6 +375,41 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     reportLabels();
 
     renderer.render(scene, camera);
+
+    if (captureRequested) {
+      captureRequested = false;
+      const frame = captureFrame();
+      if (frame !== null) options.onCapture?.(frame);
+    }
+  }
+
+  /**
+   * いま描いたフレームを、地に敷ける 1 枚に畳む。
+   *
+   * 掴めない環境（2D コンテキストが取れない・canvas が 0 幅）では null を返す。
+   * 地が無くても遷移そのものは成立するので、ここで諦めても失うものは無い。
+   */
+  function captureFrame(): string | null {
+    const source = renderer.domElement;
+    if (source.width === 0 || source.height === 0) return null;
+
+    const flat = document.createElement('canvas');
+    flat.width = CAPTURE.width;
+    flat.height = Math.max(1, Math.round((source.height / source.width) * CAPTURE.width));
+    const context = flat.getContext('2d');
+    if (context === null) return null;
+
+    // 書斎は alpha 付きで描いている。JPEG は透過を持てないので、地の色を先に塗る。
+    context.fillStyle = theme === 'dark' ? DARK_PALETTE.solid : LIGHT_PALETTE.solid;
+    context.fillRect(0, 0, flat.width, flat.height);
+    context.drawImage(source, 0, 0, flat.width, flat.height);
+
+    try {
+      return flat.toDataURL('image/jpeg', CAPTURE.quality);
+    } catch {
+      // 汚れた canvas（外部テクスチャ）なら諦める。いまは自前の描画だけなので通常は来ない。
+      return null;
+    }
   }
 
   function updateCamera(now: number, elapsed: number): void {
@@ -667,6 +731,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function goTo(target: StudyTarget): Promise<void> {
     if (transition) transition.resolve();
     leaveAnnounced = false;
+    /**
+     * **動き出す前に掴む。**
+     *
+     * 憶えた 1 枚は「戻ってきたときに見える部屋」として使う。遷移の途中で掴むと、
+     * 既に瓶や板へ寄ったあとの絵になり、戻り道の地としては別の景色になってしまう。
+     * ここで掴めば、次の描画＝まだホームに居るフレームが残る。
+     */
+    captureRequested = options.onCapture !== undefined;
     const from = currentView();
     const plan = planFor(target, {
       reducedMotion: options.reducedMotion,

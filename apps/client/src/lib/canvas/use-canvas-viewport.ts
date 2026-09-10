@@ -5,7 +5,10 @@ import {
   type Bounds,
   fitBounds,
   IDENTITY_VIEWPORT,
+  MIN_SCALE,
   normalizeViewport,
+  OVERZOOM_OUT_EVENT,
+  type OverzoomOutDetail,
   type Point,
   panBy,
   type Size,
@@ -332,14 +335,16 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       // トラックパッドのピンチは ctrlKey 付きの wheel として届く。
       if (e.ctrlKey || e.metaKey) {
         const rect = frame.getBoundingClientRect();
-        apply(
-          zoomAt(
-            vpRef.current,
-            e.clientX - rect.left,
-            e.clientY - rect.top,
-            Math.exp(-dy * WHEEL_ZOOM_SENSITIVITY),
-          ),
-        );
+        const factor = Math.exp(-dy * WHEEL_ZOOM_SENSITIVITY);
+        const before = vpRef.current.scale;
+        apply(zoomAt(vpRef.current, e.clientX - rect.left, e.clientY - rect.top, factor));
+
+        // **引く向きなのに倍率が動かなかった** ＝ この画面では吸収しきれなかった引き。
+        // 捨てずに外へ流す（拾う側が何に使うかを決める）。
+        if (factor < 1 && before <= MIN_SCALE && vpRef.current.scale === before) {
+          const detail: OverzoomOutDetail = { excess: 1 - factor };
+          frame.dispatchEvent(new CustomEvent(OVERZOOM_OUT_EVENT, { detail, bubbles: true }));
+        }
         return;
       }
       apply(panBy(vpRef.current, -dx, -dy));

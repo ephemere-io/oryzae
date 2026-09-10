@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
+import { saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
@@ -178,6 +179,9 @@ export function StudyHome({ layout }: StudyHomeProps) {
     >
       <StudyCanvas
         onLeaveStart={setLeaveMs}
+        // 出ていく直前の 1 枚を憶える。戻り道はこれを地にして、部屋が「消えた」のでは
+        // なく「遠くなった」だけに見えるようにする。
+        onCapture={saveStudyBackdrop}
         state={state}
         layout={layout}
         theme={theme}

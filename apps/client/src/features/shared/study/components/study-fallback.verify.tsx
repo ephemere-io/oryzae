@@ -62,17 +62,23 @@ registerUnit<Props>({
     },
     {
       /**
-       * **読み込み中は絵も出さない。** 「書斎に戻るときだけ謎のアイコンが出る。瓶を
-       * 押したときには出ないのに、戻るときだけ出るのは直感的でない」と実機レビューで
-       * 報告された（PR #570）。出入りは対称でなければならない。
+       * **読み込み中に出してよいのは「憶えた部屋そのもの」だけ。**
+       *
+       * 「書斎に戻るときだけ謎のアイコンが出る」と報告された（PR #570）。悪いのは
+       * 読み込み中に何かを出すことではなく、**別の何かを挟むこと**。書斎を模した絵も
+       * 文字も、割り込みとして読まれる。出ていく直前に掴んだ 1 枚だけが、割り込みでは
+       * なく「まだ遠い部屋」になる。
        */
-      id: 'loading-draws-nothing',
-      description: '読み込み中は絵も文字も出さない（戻り道に 1 画面挟まない）',
+      id: 'loading-shows-only-the-room',
+      description: '読み込み中に出すのは憶えた部屋だけ（別の絵も文字も挟まない）',
       onlyFixtures: ['loading'],
       check: ({ root }) => {
-        if (root.querySelector('svg') !== null) return '読み込み中なのに絵が出ている';
+        if (root.querySelector('svg') !== null) return '読み込み中なのに書斎の絵が出ている';
         const text = (root.textContent ?? '').trim();
-        return text.length === 0 || `読み込み中なのに文字が出ている: ${text}`;
+        if (text.length > 0) return `読み込み中なのに文字が出ている: ${text}`;
+        const images = [...root.querySelectorAll('img')];
+        const stray = images.find((image) => !image.hasAttribute('data-study-backdrop'));
+        return stray === undefined || '憶えた部屋以外の絵が出ている';
       },
     },
     {

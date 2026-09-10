@@ -14,6 +14,7 @@ import {
   BACK_MARK_SEAT_Y,
   BackToStudy,
 } from '@/features/shared/study/components/back-to-study';
+import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
@@ -196,6 +197,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             </PcShell>
           ) : null}
           {device !== null && showBackToStudy && <BackToStudy />}
+          {/* 引き切ったキャンバスからさらに引くと、部屋が滲み出て書斎へ戻る。
+              板と瓶（キャンバスを持つ画面）で効く。重ねるのがここなのは、画面そのものに
+              触れずに済ませるため。 */}
+          {device !== null && showBackToStudy && <PullBackToStudy />}
           {showQuestionsLink && <QuestionsLink />}
           {device !== null && shouldShow && (
             <OnboardingFlow onComplete={handleOnboardingComplete} />

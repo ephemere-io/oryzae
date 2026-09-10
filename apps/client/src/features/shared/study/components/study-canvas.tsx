@@ -35,6 +35,8 @@ export interface StudyCanvasProps {
    * `durationMs` かけて 0 にすると、カメラが着くのと同時に消え終わる。
    */
   onLeaveStart?: (durationMs: number) => void;
+  /** 出ていく直前の書斎（data URL）。戻り道の地に使う。 */
+  onCapture?: (dataUrl: string) => void;
 }
 
 /** `prefers-reduced-motion` を読む。SSR とテストでは false に倒す。 */
@@ -52,6 +54,7 @@ export function StudyCanvas({
   onHoverChange,
   onLabelPositions,
   onLeaveStart,
+  onCapture,
 }: StudyCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<StudySceneHandle | null>(null);
@@ -70,8 +73,16 @@ export function StudyCanvas({
     onHoverChange,
     onLabelPositions,
     onLeaveStart,
+    onCapture,
   });
-  callbacks.current = { onNavigate, onOpenOverlay, onHoverChange, onLabelPositions, onLeaveStart };
+  callbacks.current = {
+    onNavigate,
+    onOpenOverlay,
+    onHoverChange,
+    onLabelPositions,
+    onLeaveStart,
+    onCapture,
+  };
 
   // state はレンダーのたびに新しい参照になりうる（取得が落ち着くまで数回変わる）。
   // 最新を ref で渡し、シーンの作り直しは effect の外で行う。
@@ -94,6 +105,7 @@ export function StudyCanvas({
         onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
         onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
         onLeaveStart: (durationMs) => callbacks.current.onLeaveStart?.(durationMs),
+        onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
         onPick: (target) => {
           // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
           // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
