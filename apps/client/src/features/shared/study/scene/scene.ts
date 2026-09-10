@@ -155,7 +155,7 @@ export interface StudySceneOptions {
 }
 
 export interface HoverInfo {
-  label: 'jar' | 'journal' | 'board' | 'archive' | null;
+  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | null;
   month: string | null;
   /** 触れている的が一言を持つとき、その種類。文面は呼び出し側が状態から決める。 */
   hint: HitHint | null;
@@ -168,6 +168,7 @@ export interface LabelPositions {
   journal: ScreenPoint | null;
   board: ScreenPoint | null;
   archive: ScreenPoint | null;
+  pen: ScreenPoint | null;
 }
 
 interface ScreenPoint {
@@ -729,7 +730,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!options.onLabelPositions) return;
     // サブ画面と遷移中はラベルを消す。
     if (transition || settled) {
-      options.onLabelPositions({ jar: null, journal: null, board: null, archive: null });
+      options.onLabelPositions({ jar: null, journal: null, board: null, archive: null, pen: null });
       return;
     }
     const anchors = layout.labelAnchors;
@@ -740,6 +741,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       archive: anchors.archive
         ? toScreen(new Vector3(anchors.archive.x, anchors.archive.y, anchors.archive.z))
         : null,
+      pen: anchors.pen ? toScreen(new Vector3(anchors.pen.x, anchors.pen.y, anchors.pen.z)) : null,
     });
   }
 
