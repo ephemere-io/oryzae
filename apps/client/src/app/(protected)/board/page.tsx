@@ -2,6 +2,7 @@
 
 import { DeviceView } from '@/components/device-view';
 import { BoardView } from '@/features/pc/board/components/board-view';
+import { SpBoard } from '@/features/sp/board/components/sp-board';
 import { useAuth } from '@/lib/auth-context';
 import { BoardRouteLoading } from '../_loading/board-route-loading';
 
@@ -13,5 +14,5 @@ export default function BoardPage() {
   // （ハードリロード時に必ず通る。クライアント遷移では認証解決済みなので素通り）。
   if (authLoading || !api) return <BoardRouteLoading />;
 
-  return <DeviceView pc={<BoardView api={api} />} />;
+  return <DeviceView pc={<BoardView api={api} />} sp={<SpBoard api={api} />} />;
 }

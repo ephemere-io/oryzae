@@ -1,6 +1,8 @@
 /**
  * SpJarSkeleton の検証スペック。
- * エントリ一覧の行と混同されない形（先頭に未読ドットがある受信箱の行）であることを固定する。
+ *
+ * SP の /jar は一覧ではなく「中央の壜と、そのまわりを回る問いの円」。行の枠を置くと
+ * 到着時に画面が丸ごと入れ替わって見えるので、壜と円の位置を先に置く形であることを固定する。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -8,52 +10,71 @@ import { skeletonInvariants } from '@/lib/verify/skeleton-invariants';
 import { SpJarSkeleton } from './sp-jar-skeleton';
 
 interface Props {
-  rows?: number;
+  circles?: number;
 }
 
 registerUnit<Props>({
   id: 'SpJarSkeleton',
   title: 'SpJarSkeleton',
-  description: 'SP 瓶（/jar）のロード枠: ヘッダ ＋ 手紙の行（未読ドット＋問い文＋メタ）',
+  description: 'SP 瓶（/jar）のロード枠: ヘッダ ＋ 中央の壜 ＋ 軌道上の円 ＋ 問いを整えるボタン',
   kind: 'component',
-  render: (props) => <SpJarSkeleton {...props} />,
+  render: (props) => (
+    <div style={{ position: 'relative', width: '390px', height: '640px' }}>
+      <SpJarSkeleton {...props} />
+    </div>
+  ),
   fixtures: [
-    { id: 'default', description: '既定（6行）', props: {} },
+    { id: 'default', description: '既定（円3つ）', props: {} },
     {
-      id: 'zero-rows',
+      id: 'no-circles',
       probe: true,
-      description: 'Probe: 手紙0件でもヘッダは残る（空表示に置き換わるだけ）',
-      props: { rows: 0 },
+      description: 'Probe: 問い0件でも壜とボタンの枠は残る（実画面と同じ）',
+      props: { circles: 0 },
     },
     {
-      id: 'many-rows',
+      id: 'one-circle',
       probe: true,
-      description: 'Probe: 行が多くても形は同じ',
-      props: { rows: 20 },
+      description: 'Probe: 円が1つでも形は同じ',
+      props: { circles: 1 },
     },
   ],
   invariants: [
     ...skeletonInvariants<Props>(),
     {
-      id: 'rows-count-matches',
-      description: '行数が指定どおり',
+      id: 'circle-count-matches',
+      description: '円の数が指定どおり（壜の枠は数に入れない）',
       check: ({ root, props }) => {
-        const rows = root.querySelector('[data-skeleton-slot="rows"]');
-        const expected = props.rows ?? 6;
-        const actual = rows?.childElementCount ?? -1;
-        return actual === expected || `行数が不一致: ${actual} (期待: ${expected})`;
+        const orbit = root.querySelector('[data-skeleton-slot="orbit"]');
+        const expected = props.circles ?? 3;
+        // 直下の子は「壜」＋「円」なので、壜のぶんを差し引く。
+        const actual = (orbit?.childElementCount ?? 0) - 1;
+        return actual === expected || `円の数が不一致: ${actual} (期待: ${expected})`;
       },
     },
     {
-      id: 'each-row-leads-with-dot',
-      description: '各行の先頭に未読ドットの枠がある（エントリ一覧の行とは別の形）',
+      id: 'jar-stays-centered',
+      description: '壜の枠は中央にある（実画面と同じ位置に来ないと到着時に飛ぶ）',
       check: ({ root }) => {
-        const rows = Array.from(root.querySelectorAll('[data-skeleton-slot="rows"] > *'));
-        if (rows.length === 0) return true;
-        const bad = rows.filter(
-          (r) => !r.firstElementChild?.classList.contains('rounded-full'),
+        const jar = root.querySelector('[data-skeleton-slot="jar"]');
+        if (!(jar instanceof HTMLElement)) return '壜の枠が無い';
+        return (
+          (jar.style.left === '50%' && jar.style.top === '47%') ||
+          `壜の枠が中央でない: left=${jar.style.left}, top=${jar.style.top}`
+        );
+      },
+    },
+    {
+      id: 'circles-are-round',
+      description: '円の枠は丸い（一覧の行と見間違えない）',
+      check: ({ root }) => {
+        const circles = Array.from(root.querySelectorAll('[data-skeleton-slot="orbit"] > *')).slice(
+          1,
+        );
+        if (circles.length === 0) return true;
+        const bad = circles.filter(
+          (c) => !c.firstElementChild?.classList.contains('rounded-full'),
         ).length;
-        return bad === 0 || `${bad} 行の先頭にドットの枠が無い`;
+        return bad === 0 || `${bad} 個の枠が丸くない`;
       },
     },
   ],

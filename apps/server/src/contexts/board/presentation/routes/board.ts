@@ -16,6 +16,7 @@ import { DeleteCardUsecase } from '../../application/usecases/delete-card.usecas
 import { ExtractTextFromImageUsecase } from '../../application/usecases/extract-text-from-image.usecase.js';
 import { LoadBoardUsecase } from '../../application/usecases/load-board.usecase.js';
 import { SaveCardPositionsUsecase } from '../../application/usecases/save-card-positions.usecase.js';
+import { SummarizeBoardUsecase } from '../../application/usecases/summarize-board.usecase.js';
 import { UpdateBoardSnippetUsecase } from '../../application/usecases/update-board-snippet.usecase.js';
 import { AnthropicOcrGateway } from '../../infrastructure/ocr/anthropic-ocr.gateway.js';
 import { SupabaseBoardCardRepository } from '../../infrastructure/repositories/supabase-board-card.repository.js';
@@ -37,7 +38,26 @@ const generateId = () => crypto.randomUUID();
 const MULTIPART_OVERHEAD_BYTES = 8 * 1024;
 const MAX_OCR_UPLOAD_BYTES = MAX_OCR_IMAGE_BYTES + MULTIPART_OVERHEAD_BYTES;
 
+/** 書斎の壁に描くカードの上限（client の RENDER_LIMITS.maxBoardCards と同じ）。 */
+const SUMMARY_LIMIT = 30;
+
 export const board = new Hono<Env>()
+  /**
+   * 書斎の壁が読む「いま貼ってあるもの」。**`/:...` より前に置くこと。**
+   *
+   * 盤面（`GET /`）は日付で絞るが、こちらは全期間の新しい順。書斎は 1 日の作業場では
+   * なく、溜まってきた量を映す場所なので、絞ってしまうと使っている人ほど壁が空になる。
+   */
+  .get('/summary', async (c) => {
+    const supabase = c.get('supabase');
+    const usecase = new SummarizeBoardUsecase(
+      new SupabaseBoardCardRepository(supabase),
+      new SupabaseBoardSnippetRepository(supabase),
+      new SupabaseBoardPhotoRepository(supabase),
+      new SupabaseBoardStorageGateway(supabase),
+    );
+    return c.json(await usecase.execute(c.get('userId'), SUMMARY_LIMIT));
+  })
   // GET /api/v1/board?dateKey=YYYY-MM-DD&viewType=daily|weekly
   .get('/', async (c) => {
     const { dateKey } = boardQuerySchema.parse({

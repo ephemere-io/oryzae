@@ -16,6 +16,11 @@ interface SpQuestionsProps {
   rejectQuestion: (id: string) => Promise<void> | void;
   /** 未読の手紙が届いている問いの id（Issue #452）。page が UnreadState から渡す。 */
   unreadQuestionIds?: ReadonlySet<string>;
+  /**
+   * 重ねて開かれているときの閉じ方。SP はボトムナビを持たないので、瓶から重ねて
+   * 開くことがある（そのときだけ閉じるボタンを出す）。単独ページでは渡さない。
+   */
+  onClose?: () => void;
 }
 
 /** 既定値を毎レンダー作らないための空集合。 */
@@ -38,6 +43,7 @@ export function SpQuestions({
   acceptQuestion,
   rejectQuestion,
   unreadQuestionIds = NO_UNREAD,
+  onClose,
 }: SpQuestionsProps) {
   const t = useTranslations('sp.questions');
 
@@ -84,6 +90,7 @@ export function SpQuestions({
         unit: 'SpQuestions',
         loading,
         sheetMode: sheet ? sheet.mode : 'none',
+        closable: onClose !== undefined,
         submitting,
         draftEmpty: !draft.trim(),
         proposedCount: proposed.length,
@@ -93,7 +100,19 @@ export function SpQuestions({
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
       style={{ fontFamily: 'var(--ob-font-serif)' }}
     >
-      <header className="px-5 pt-6 pb-1 text-lg font-medium">{t('title')}</header>
+      <header className="flex items-center justify-between gap-3 px-5 pt-6 pb-1">
+        <span className="text-lg font-medium">{t('title')}</span>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
+            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
+          >
+            {t('close')}
+          </button>
+        ) : null}
+      </header>
       <p className="px-5 pb-2 text-xs leading-relaxed text-[var(--date-color)]">{t('intro')}</p>
 
       {loading ? (

@@ -4,6 +4,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useHomeHref } from '@/features/shared/study/hooks/use-home-href';
 import { getAccessToken, setTokens } from '@/lib/auth';
 
 function parseHashParams(hash: string): Record<string, string> {
@@ -22,7 +23,7 @@ function parseHashParams(hash: string): Record<string, string> {
  * ルート（/）のクライアント専用ゲート。描画は持たず（null）、副作用のみ:
  * - Supabase のメール確認リダイレクト（hash に access/refresh token）を受けてログイン状態にする
  * - Supabase がエラーを返した場合（期限切れ・使用済みリンク）は確認画面へ送って理由を見せる
- * - 既ログインなら /entries/new へ送る
+ * - 既ログインならホーム（書斎ホームが有効なら /study、そうでなければ /entries/new）へ送る
  * - 未ログインならログイン画面へ送る
  *
  * ランディングは別リポジトリの公開サイト（別ドメイン）に移したため、ここは本文を持たない。
@@ -40,8 +41,14 @@ function parseHashParams(hash: string): Record<string, string> {
  */
 export function HomeGate() {
   const router = useRouter();
+  // 行き先の判断は useHomeHref に 1 か所だけ置く（ログインフォームも同じものを使う）。
+  const { href: home, resolved } = useHomeHref();
 
   useEffect(() => {
+    // 手動切替（?study=on / localStorage）を読み終えるまで行き先を決めない。
+    // 待たずに送ると、切替を付けていても従来の入口へ弾かれる。
+    if (!resolved) return;
+
     const hash = window.location.hash;
     if (hash) {
       const params = parseHashParams(hash);
@@ -49,7 +56,7 @@ export function HomeGate() {
       const refreshToken = params.refresh_token;
       if (accessToken && refreshToken) {
         setTokens(accessToken, refreshToken);
-        router.replace('/entries/new');
+        router.replace(home);
         return;
       }
       const errorCode = params.error_code ?? params.error;
@@ -60,14 +67,14 @@ export function HomeGate() {
     }
 
     if (getAccessToken()) {
-      router.replace('/entries/new');
+      router.replace(home);
       return;
     }
 
     // 未ログインはログイン画面へ。ホーム画面のショートカット（古い start_url が
     // ここを指す。Issue #437）から起動した場合も同じ行き先でよい。
     router.replace('/login');
-  }, [router]);
+  }, [router, home, resolved]);
 
   return null;
 }

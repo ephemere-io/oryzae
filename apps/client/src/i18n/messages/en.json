@@ -333,7 +333,9 @@
       "bring_to_front": "Bring to front",
       "delete": "Delete",
       "open": "Open",
-      "ocr": "Read from image"
+      "ocr": "Read from image",
+      "collapse": "Collapse toolbar",
+      "expand": "Expand toolbar"
     },
     "drop_image": "Drop the image here"
   },
@@ -732,19 +734,22 @@
       "questions": "Questions"
     },
     "jar": {
-      "title": "Letters in the jar",
-      "empty": "No letters have arrived yet",
+      "title": "The jar",
       "untitled": "Untitled question",
       "close": "Close",
       "letter_empty": "No letter for this result yet",
       "reply": "Write a reply",
       "section_letter": "Letter",
       "section_keywords": "Words",
-      "section_snippets": "Excerpts",
-      "unread": "Unread",
-      "read": "Read",
+      "section_snippets": "Snippets",
       "section_sources": "From these entries",
-      "source_untitled": "Untitled entry"
+      "source_untitled": "Untitled entry",
+      "no_questions": "No questions yet. Start one with the button below.",
+      "spin_hint": "Swipe sideways to spin",
+      "manage_questions": "Add or edit questions",
+      "not_fermented": "This question hasn't fermented yet",
+      "tap_hint": "Tap to read",
+      "selection_reason": "Why this was chosen"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -776,7 +781,22 @@
       "delete": "Retire this question",
       "cancel": "Cancel",
       "save": "Save",
-      "letter_arrived": "A letter has arrived"
+      "letter_arrived": "A letter has arrived",
+      "close": "Close"
+    },
+    "board": {
+      "cards": "{count} cards",
+      "empty": "Nothing here yet today",
+      "hint": "Drag cards with your finger",
+      "add_snippet": "Create snippet",
+      "add_photo": "Add photo",
+      "edit": "Edit",
+      "bring_to_front": "Bring to front",
+      "remove": "Remove",
+      "cancel": "Cancel",
+      "save": "Save",
+      "resize": "Resize and rotate",
+      "snippet_placeholder": "Something worth keeping"
     }
   },
   "canvas": {
@@ -787,5 +807,54 @@
       "fit_aria": "Fit to content",
       "fit": "Fit"
     }
+  },
+  "study": {
+    "title": "Study",
+    "label_jar": "JAR",
+    "label_journal": "ENTRIES",
+    "label_board": "BOARD",
+    "label_archive": "ARCHIVE",
+    "pill_jar_empty": "Empty",
+    "pill_jar_fermenting": "Fermenting",
+    "pill_jar_almost": "Almost",
+    "pill_jar_letter": "Letter",
+    "pill_entries": "{count} entries",
+    "pill_volumes": "{count} volumes",
+    "pill_cards": "{count} cards",
+    "back_to_study": "BACK TO STUDY",
+    "account": "Account",
+    "list_all": "ALL ENTRIES",
+    "list_month": "{month} ENTRIES",
+    "list_heading_all": "ALL — {count} ENTRIES",
+    "list_heading_month": "{month} — {count} ENTRIES",
+    "list_close": "Close",
+    "list_new_entry": "New entry",
+    "list_empty_month": "No entries this month",
+    "list_loading": "Loading",
+    "list_search_placeholder": "Search entries",
+    "list_load_more": "Load more",
+    "chip_all_questions": "All questions",
+    "question_untitled": "Untitled question",
+    "chip_all": "ALL",
+    "row_chars": "{count} CHARS",
+    "row_pickled": "PICKLED",
+    "tooltip_current": "This month",
+    "tooltip_entries": "{count} entries",
+    "fallback_heading": "The study can't be shown",
+    "fallback_body": "Your browser doesn't support 3D rendering. You can keep using the regular screens.",
+    "fallback_jar": "Open the jar",
+    "fallback_journal": "Write an entry",
+    "fallback_board": "Open the board",
+    "questions_timeline": "Question history",
+    "hint_pen": "Write an entry",
+    "hint_jar_empty": "Nothing steeping yet",
+    "hint_jar_fermenting": "Fermenting",
+    "hint_jar_almost": "A letter is almost ready",
+    "hint_jar_letter": "You have an unread letter",
+    "hint_jar_read": "Read your letters again",
+    "hint_board_empty": "Nothing pinned yet",
+    "hint_board_photos": "{count} photos",
+    "hint_board_snippets": "{count} snippets",
+    "hint_board_both": "{photos} photos · {snippets} snippets"
   }
 }

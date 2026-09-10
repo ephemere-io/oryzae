@@ -14,11 +14,21 @@ import type { ApiClient } from '@/lib/api';
  */
 export function useJarQuestions(api: ApiClient | null, authLoading: boolean) {
   const [questions, setQuestions] = useState<JarQuestion[]>([]);
+  // 「まだ取れていない」と「0 件」は見た目が別（SP の瓶は前者で枠を出し、後者で
+  // 「問いがまだありません」を出す）。取れていないのに 0 件の文言を出すと、
+  // 一瞬「問いを消してしまった」ように見える。
+  const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
     if (!api) return;
-    const res = await api.fetch('/api/v1/questions');
-    if (res.ok) setQuestions(await res.json());
+    try {
+      const res = await api.fetch('/api/v1/questions');
+      if (res.ok) setQuestions(await res.json());
+    } catch {
+      // 取れないだけ。前回の内容を保つ（瓶を空にしない）。ここで投げると effect からの
+      // 呼び出しが unhandled rejection になるので、握って loading だけ下ろす。
+    }
+    setLoading(false);
   }, [api]);
 
   useEffect(() => {
@@ -26,5 +36,5 @@ export function useJarQuestions(api: ApiClient | null, authLoading: boolean) {
     refetch();
   }, [authLoading, refetch]);
 
-  return { questions, refetch };
+  return { questions, loading, refetch };
 }

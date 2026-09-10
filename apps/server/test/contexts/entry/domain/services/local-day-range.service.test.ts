@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  localDateKey,
   localDayRange,
+  localMonthKey,
+  localMonthRange,
   localWeekRange,
 } from '../../../../../src/contexts/entry/domain/services/local-day-range.service.js';
 
@@ -67,5 +70,112 @@ describe('localWeekRange', () => {
       startUtc: '2026-08-10T00:00:00.000Z',
       endUtc: '2026-08-17T00:00:00.000Z',
     });
+  });
+});
+
+/**
+ * 書斎の手帳は「月」で 1 冊になる（docs/oryzae-study）。日で踏んだのと同じズレを
+ * 月でもう一度踏まないことを固定する。
+ */
+describe('localMonthKey', () => {
+  it('オフセット未指定なら UTC の暦月', () => {
+    expect(localMonthKey('2026-08-10T12:00:00.000Z')).toBe('2026-08');
+  });
+
+  it('JST の月初 00:00〜09:00 に書いた記録が前月に落ちない', () => {
+    // JST 2026-09-01 00:50 = 2026-08-31T15:50Z。UTC のまま丸めると 2026-08 になる。
+    expect(localMonthKey('2026-08-31T15:50:00.000Z', JST)).toBe('2026-09');
+    expect(localMonthKey('2026-08-31T15:50:00.000Z')).toBe('2026-08');
+  });
+
+  it('JST の月末深夜が翌月に繰り上がらない', () => {
+    // JST 2026-08-31 23:59 = 2026-08-31T14:59Z
+    expect(localMonthKey('2026-08-31T14:59:00.000Z', JST)).toBe('2026-08');
+  });
+
+  it('年またぎ（JST 1/1 未明）で年も繰り上がる', () => {
+    // JST 2027-01-01 08:00 = 2026-12-31T23:00Z
+    expect(localMonthKey('2026-12-31T23:00:00.000Z', JST)).toBe('2027-01');
+  });
+
+  it('反対符号のオフセット（EST = +300）では月初が前月に戻る', () => {
+    // EST 2026-08-31 20:00 = 2026-09-01T01:00Z
+    expect(localMonthKey('2026-09-01T01:00:00.000Z', 300)).toBe('2026-08');
+  });
+
+  it('月を必ず 2 桁にする（1月が 2026-1 にならない）', () => {
+    expect(localMonthKey('2026-01-15T00:00:00.000Z')).toBe('2026-01');
+  });
+
+  it('壊れた日時は null（集計側がその行だけ捨てられるように）', () => {
+    expect(localMonthKey('not-a-date')).toBeNull();
+    expect(localMonthKey('')).toBeNull();
+  });
+});
+
+describe('localDateKey', () => {
+  it('ローカル暦日で切る（JST の 00:00〜09:00 を前日にしない）', () => {
+    // JST 2026-09-01 00:50 = 2026-08-31T15:50Z
+    expect(localDateKey('2026-08-31T15:50:00.000Z', JST)).toBe('2026-09-01');
+    expect(localDateKey('2026-08-31T15:50:00.000Z')).toBe('2026-08-31');
+  });
+
+  it('localMonthKey と同じ切り方をする（範囲の端が隣の月にならない）', () => {
+    const at = '2026-08-31T15:50:00.000Z';
+    expect(localDateKey(at, JST)?.slice(0, 7)).toBe(localMonthKey(at, JST));
+  });
+
+  it('壊れた日時は null', () => {
+    expect(localDateKey('not-a-date', JST)).toBeNull();
+  });
+});
+
+describe('localMonthRange', () => {
+  it('UTC 基準では月初 00:00 から翌月初 00:00 まで', () => {
+    expect(localMonthRange('2026-06')).toEqual({
+      startUtc: '2026-06-01T00:00:00.000Z',
+      endUtc: '2026-07-01T00:00:00.000Z',
+    });
+  });
+
+  it('JST では 9 時間手前から始まる（月初 00:00〜09:00 の記録を落とさない）', () => {
+    // ここがずれると、6/1 の朝に書いた記録が 5 月の冊に落ちる。
+    expect(localMonthRange('2026-06', -540)).toEqual({
+      startUtc: '2026-05-31T15:00:00.000Z',
+      endUtc: '2026-06-30T15:00:00.000Z',
+    });
+  });
+
+  it('年をまたぐ（12 月の次は翌年 1 月）', () => {
+    expect(localMonthRange('2026-12')).toEqual({
+      startUtc: '2026-12-01T00:00:00.000Z',
+      endUtc: '2027-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('うるう年の 2 月は 29 日ぶん', () => {
+    const { startUtc, endUtc } = localMonthRange('2028-02');
+    expect(startUtc).toBe('2028-02-01T00:00:00.000Z');
+    expect(endUtc).toBe('2028-03-01T00:00:00.000Z');
+  });
+
+  it('件数（localMonthKey）と同じ月の切り方になる', () => {
+    // 手帳の厚みと一覧の件数が食い違わないための不変条件。
+    for (const tz of [0, -540, 300]) {
+      for (const month of ['2026-01', '2026-06', '2026-12']) {
+        const { startUtc, endUtc } = localMonthRange(month, tz);
+        expect(localMonthKey(startUtc, tz)).toBe(month);
+        // 終端は含まないので、1ms 手前が同じ月であること。
+        expect(localMonthKey(new Date(Date.parse(endUtc) - 1).toISOString(), tz)).toBe(month);
+        // 終端そのものは翌月。
+        expect(localMonthKey(endUtc, tz)).not.toBe(month);
+      }
+    }
+  });
+
+  it('形が違えば投げる（空の区間で黙って 0 件にしない）', () => {
+    expect(() => localMonthRange('2026-6')).toThrow();
+    expect(() => localMonthRange('2026-06-01')).toThrow();
+    expect(() => localMonthRange('')).toThrow();
   });
 });

@@ -333,7 +333,9 @@
       "bring_to_front": "前面へ",
       "delete": "削除",
       "open": "開く",
-      "ocr": "画像から読み取る"
+      "ocr": "画像から読み取る",
+      "collapse": "パレットを畳む",
+      "expand": "パレットを開く"
     },
     "drop_image": "ここに画像をドロップ"
   },
@@ -732,19 +734,22 @@
       "questions": "問い"
     },
     "jar": {
-      "title": "瓶に届いた手紙",
-      "empty": "まだ手紙は届いていません",
+      "title": "瓶",
       "untitled": "無題の問い",
       "close": "閉じる",
       "letter_empty": "この結果にはまだ手紙がありません",
       "reply": "返事を書く",
       "section_letter": "手紙",
       "section_keywords": "言葉",
-      "section_snippets": "抜粋",
-      "unread": "未読",
-      "read": "既読",
-      "section_sources": "もとになった記録",
-      "source_untitled": "無題の記録"
+      "section_snippets": "スニペット",
+      "section_sources": "もとになったエントリー",
+      "source_untitled": "無題のエントリー",
+      "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
+      "spin_hint": "横に払うと回ります",
+      "manage_questions": "問いを追加・編集",
+      "not_fermented": "この問いはまだ発酵していません",
+      "tap_hint": "タップして読む",
+      "selection_reason": "選ばれた理由"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -776,7 +781,22 @@
       "delete": "この問いを終える",
       "cancel": "キャンセル",
       "save": "保存",
-      "letter_arrived": "手紙が届いています"
+      "letter_arrived": "手紙が届いています",
+      "close": "閉じる"
+    },
+    "board": {
+      "cards": "{count}枚",
+      "empty": "この日はまだ何もありません",
+      "hint": "カードは指で動かせます",
+      "add_snippet": "スニペットを作成",
+      "add_photo": "写真を追加",
+      "edit": "編集",
+      "bring_to_front": "前面へ",
+      "remove": "外す",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "resize": "大きさと向きを変える",
+      "snippet_placeholder": "書き留めておきたいことを"
     }
   },
   "canvas": {
@@ -787,5 +807,54 @@
       "fit_aria": "全体を表示",
       "fit": "Fit"
     }
+  },
+  "study": {
+    "title": "書斎",
+    "label_jar": "JAR",
+    "label_journal": "ENTRIES",
+    "label_board": "BOARD",
+    "label_archive": "ARCHIVE",
+    "pill_jar_empty": "空",
+    "pill_jar_fermenting": "発酵中",
+    "pill_jar_almost": "もうすぐ",
+    "pill_jar_letter": "手紙",
+    "pill_entries": "{count}件",
+    "pill_volumes": "{count}冊",
+    "pill_cards": "{count}枚",
+    "back_to_study": "書斎に戻る",
+    "account": "アカウント",
+    "list_all": "ALL ENTRIES",
+    "list_month": "{month} ENTRIES",
+    "list_heading_all": "ALL — {count} ENTRIES",
+    "list_heading_month": "{month} — {count} ENTRIES",
+    "list_close": "閉じる",
+    "list_new_entry": "新規作成",
+    "list_empty_month": "この月のエントリーはありません",
+    "list_loading": "読み込み中",
+    "list_search_placeholder": "本文を検索",
+    "list_load_more": "さらに読み込む",
+    "chip_all_questions": "すべての問い",
+    "question_untitled": "無題の問い",
+    "chip_all": "ALL",
+    "row_chars": "{count} CHARS",
+    "row_pickled": "PICKLED",
+    "tooltip_current": "当月",
+    "tooltip_entries": "{count}件のエントリー",
+    "fallback_heading": "書斎を表示できません",
+    "fallback_body": "お使いの環境では 3D 表示に対応していません。これまでどおりの画面からお使いいただけます。",
+    "fallback_jar": "瓶を開く",
+    "fallback_journal": "エントリーを書く",
+    "fallback_board": "ボードを開く",
+    "questions_timeline": "問いの変遷",
+    "hint_pen": "エントリーを書く",
+    "hint_jar_empty": "まだ何も漬かっていません",
+    "hint_jar_fermenting": "発酵が進んでいます",
+    "hint_jar_almost": "もうすぐ手紙が届きます",
+    "hint_jar_letter": "未読の手紙があります",
+    "hint_jar_read": "手紙を読み返せます",
+    "hint_board_empty": "まだ何も貼っていません",
+    "hint_board_photos": "写真{count}件",
+    "hint_board_snippets": "スニペット{count}件",
+    "hint_board_both": "写真{photos}件・スニペット{snippets}件"
   }
 }

@@ -4,6 +4,7 @@ import posthog from 'posthog-js';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { type ApiClient, createApiClient, tryRefreshToken } from '@/lib/api';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/auth';
+import { clearAllStaleCaches } from '@/lib/stale-cache';
 
 interface AuthState {
   accessToken: string;
@@ -217,6 +218,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuth(null);
     setApi(null);
     posthog.reset();
+    // 憶えてある画面の中身（記録の冒頭・発酵の言葉・貼ったカード）を捨てる。
+    // 共有端末で次に使う人へ持ち越さない。
+    clearAllStaleCaches();
   }, []);
 
   const value: AuthContextValue = { auth, api, loading, login, signup, logout };

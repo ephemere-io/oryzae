@@ -1,51 +1,87 @@
 import { verifyAttrs } from '@oryzae/verify';
-import { Skeleton, skeletonKeys } from '@/components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * SP 瓶（SpJar）のスケルトン。
  *
- * SP の /jar は PC の盤面ではなく「届いた発酵（手紙）の受信箱」。行は
- * 未読ドット ＋ 問い文 ＋ 「未読/既読 · 日付」の2段で、エントリ一覧の行とも形が違う
- * （こちらは先頭に必ずドットが入り、行内に ⋯ ボタンが無い）。
+ * SP の /jar は「中央の壜と、そのまわりを回る問いの円」。一覧ではないので、
+ * 行の枠を置くと到着時に画面が丸ごと入れ替わって見える。壜の位置と円の並びを
+ * 先に置いて、実物が来たときに色と文字が乗るだけにする。
  *
  * 2粒度を公開する:
- *  - `SpJarRowsSkeleton` … 行だけ。SpJar 本体がヘッダを実物で描いている最中に使う。
+ *  - `SpJarOrbitSkeleton` … 壜と円だけ。SpJar 本体がヘッダを実物で描いている最中に使う。
  *  - `SpJarSkeleton` … 画面まるごと。ページ遷移/初回描画の枠に使う。
  */
 
-/** 手紙の行だけ（実物: li > button = ドット ＋ 問い文 ＋ メタ、border-b py-4）。 */
-export function SpJarRowsSkeleton({ rows = 6 }: { rows?: number }) {
+/**
+ * 軌道上の円の並び（実物と同じく、手前が大きく奥が小さい）。
+ * 位置は sp-jar-orbit の軌道（中心 52%・横半径 33%・縦半径 58px）を写したもの。
+ */
+const CIRCLE_SLOTS = [
+  { left: '50%', top: '64%', size: 138, opacity: 1 },
+  { left: '83%', top: '46%', size: 100, opacity: 0.62 },
+  { left: '17%', top: '46%', size: 100, opacity: 0.62 },
+];
+
+/** 壜と円だけ（実物: 中央の壜＋軌道上の円）。 */
+export function SpJarOrbitSkeleton({ circles = 3 }: { circles?: number }) {
   return (
-    <div className="flex-1 overflow-hidden px-5" data-skeleton-slot="rows" aria-hidden="true">
-      {skeletonKeys(rows).map((k) => (
+    <div className="relative flex-1 overflow-hidden" data-skeleton-slot="orbit" aria-hidden="true">
+      {/* 壜（実物: 幅 58% / 高さ 62% を中央 47% に置く） */}
+      <div
+        className="absolute"
+        style={{
+          left: '50%',
+          top: '47%',
+          transform: 'translate(-50%, -50%)',
+          width: '62%',
+          height: '68%',
+        }}
+        data-skeleton-slot="jar"
+      >
+        <Skeleton className="h-full w-full rounded-[40%_40%_45%_45%/30%_30%_55%_55%]" />
+      </div>
+
+      {CIRCLE_SLOTS.slice(0, circles).map((slot) => (
         <div
-          key={k}
-          className="flex items-center gap-3 border-b border-[color-mix(in_srgb,var(--fg)_8%,transparent)] py-4"
+          key={`${slot.left}-${slot.top}`}
+          className="absolute"
+          style={{
+            left: slot.left,
+            top: slot.top,
+            width: `${slot.size}px`,
+            height: `${slot.size}px`,
+            marginLeft: `${-slot.size / 2}px`,
+            marginTop: `${-slot.size / 2}px`,
+            opacity: slot.opacity,
+          }}
         >
-          <Skeleton className="h-2 w-2 shrink-0 rounded-full" />
-          <div className="min-w-0 flex-1">
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="mt-1 h-[11px] w-1/3" />
-          </div>
+          <Skeleton className="h-full w-full rounded-full" />
         </div>
       ))}
     </div>
   );
 }
 
-/** 画面まるごと（ヘッダ ＋ 手紙の行）。 */
-export function SpJarSkeleton({ rows = 6 }: { rows?: number }) {
+/** 画面まるごと（ヘッダ ＋ 壜と円 ＋ 下部のボタン）。 */
+export function SpJarSkeleton({ circles = 3 }: { circles?: number }) {
   return (
     <div
       className="relative flex h-full flex-col bg-[var(--bg)]"
       aria-hidden="true"
-      {...verifyAttrs({ unit: 'SpJarSkeleton', slots: 'header,rows', rows })}
+      {...verifyAttrs({ unit: 'SpJarSkeleton', slots: 'header,orbit,jar,manage', circles })}
     >
-      {/* ヘッダ（実物: px-5 pt-6 pb-3 text-lg） */}
-      <div className="px-5 pt-6 pb-3" data-skeleton-slot="header">
+      {/* ヘッダ（実物: px-5 pt-6 pb-2 text-lg・中央寄せ） */}
+      <div className="flex justify-center px-5 pt-6 pb-2" data-skeleton-slot="header">
         <Skeleton className="h-[22px] w-20" />
       </div>
-      <SpJarRowsSkeleton rows={rows} />
+
+      <SpJarOrbitSkeleton circles={circles} />
+
+      {/* 問いを整えるボタン（実物: 下部中央の丸いピル） */}
+      <div className="flex justify-center px-5 pb-7" data-skeleton-slot="manage">
+        <Skeleton className="h-11 w-40 rounded-full" />
+      </div>
     </div>
   );
 }
