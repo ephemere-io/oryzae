@@ -13,14 +13,12 @@ let boardPhotoRepo: BoardPhotoRepositoryGateway;
 let boardStorage: BoardStorageGateway;
 let usecase: SummarizeBoardUsecase;
 
-function card(id: string, refId: string, viewType: 'daily' | 'weekly'): BoardCard {
+function card(id: string, refId: string): BoardCard {
   return BoardCard.fromProps({
     id,
     userId: 'user-1',
     cardType: 'snippet',
     refId,
-    dateKey: '2026-09-11',
-    viewType,
     x: 0,
     y: 0,
     rotation: 0,
@@ -45,15 +43,11 @@ function snippet(id: string): BoardSnippet {
 
 beforeEach(() => {
   boardCardRepo = {
-    findByDateAndView: vi.fn().mockResolvedValue([]),
-    findDailyCardsByDateRange: vi.fn().mockResolvedValue([]),
-    findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
-    findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
-    findSoftDeletedRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
+    findByUserId: vi.fn().mockResolvedValue([]),
     findMaxZIndex: vi.fn().mockResolvedValue(-1),
     countPinnedByType: vi.fn().mockResolvedValue({ snippet: 0, photo: 0 }),
     findRecentByUserId: vi.fn().mockResolvedValue([]),
-    saveMany: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     deleteByRefId: vi.fn().mockResolvedValue(undefined),
@@ -87,7 +81,7 @@ beforeEach(() => {
 
 describe('SummarizeBoardUsecase', () => {
   it('種類ごとの数を返し、総数はその和になる', async () => {
-    boardCardRepo.countPinnedByType = vi.fn().mockResolvedValue({ snippet: 12, photo: 3 });
+    vi.mocked(boardCardRepo.countPinnedByType).mockResolvedValue({ snippet: 12, photo: 3 });
 
     const summary = await usecase.execute('user-1', 30);
 
@@ -95,25 +89,20 @@ describe('SummarizeBoardUsecase', () => {
     expect(boardCardRepo.countPinnedByType).toHaveBeenCalledWith('user-1');
   });
 
-  it('同じ付箋が daily と weekly の両方にあっても、壁には 1 枚だけ出す', async () => {
-    boardCardRepo.findRecentByUserId = vi
-      .fn()
-      .mockResolvedValue([
-        card('card-daily', 'snippet-1', 'daily'),
-        card('card-weekly', 'snippet-1', 'weekly'),
-      ]);
-    boardSnippetRepo.findByIds = vi.fn().mockResolvedValue([snippet('snippet-1')]);
+  it('新しい順に上限まで引いて、そのまま壁に出す', async () => {
+    vi.mocked(boardCardRepo.findRecentByUserId).mockResolvedValue([
+      card('card-2', 'snippet-2'),
+      card('card-1', 'snippet-1'),
+    ]);
+    vi.mocked(boardSnippetRepo.findByIds).mockResolvedValue([
+      snippet('snippet-1'),
+      snippet('snippet-2'),
+    ]);
 
     const summary = await usecase.execute('user-1', 30);
 
-    expect(summary.cards).toHaveLength(1);
-    expect(summary.cards[0]?.refId).toBe('snippet-1');
-  });
-
-  it('畳むぶん多めに取る（上限ちょうどだと重複の多い人の壁が薄くなる）', async () => {
-    await usecase.execute('user-1', 30);
-
-    expect(boardCardRepo.findRecentByUserId).toHaveBeenCalledWith('user-1', 60);
+    expect(boardCardRepo.findRecentByUserId).toHaveBeenCalledWith('user-1', 30);
+    expect(summary.cards.map((c) => c.refId)).toEqual(['snippet-2', 'snippet-1']);
   });
 
   it('何も貼っていなければ 0 と空の壁', async () => {

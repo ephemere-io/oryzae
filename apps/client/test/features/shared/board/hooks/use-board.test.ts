@@ -8,6 +8,22 @@ function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
   return { baseUrl: '', headers: {}, fetch: fetchImpl };
 }
 
+function snippetCard(id: string, createdAt = '2026-04-11T00:00:00Z') {
+  return {
+    id,
+    cardType: 'snippet',
+    refId: `s-${id}`,
+    x: 0,
+    y: 0,
+    rotation: 0,
+    width: 262,
+    height: 120,
+    zIndex: 0,
+    createdAt,
+    content: { text: 'Test' },
+  };
+}
+
 describe('useBoard', () => {
   let apiFetch: ReturnType<typeof vi.fn>;
 
@@ -16,54 +32,35 @@ describe('useBoard', () => {
     apiFetch = vi.fn();
   });
 
-  it('dateKey でボードデータを取得する', async () => {
-    const boardData = {
-      dateKey: '2026-04-11',
-      viewType: 'daily',
-      cards: [
-        {
-          id: 'c-1',
-          cardType: 'snippet',
-          refId: 'e-1',
-          x: 100,
-          y: 200,
-          rotation: 0,
-          width: 340,
-          height: 280,
-          zIndex: 0,
-          createdAt: '2026-04-11T00:00:00Z',
-          content: { text: 'Test' },
-        },
-      ],
-    };
-    apiFetch.mockResolvedValueOnce(mockResponse(true, boardData));
+  it('ボードを取得する（日付・表示単位で絞らない）', async () => {
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, {
+        cards: [snippetCard('c-1', '2026-04-01T00:00:00Z'), snippetCard('c-2')],
+      }),
+    );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.cards).toHaveLength(1);
-    expect(result.current.cards[0].id).toBe('c-1');
-    // ローカル暦日で「その日」を判定させるため tzOffset を必ず添える
-    // （無いとサーバーが UTC 窓とみなし、JST 00:00-09:00 の投稿を取りこぼす）
-    expect(apiFetch).toHaveBeenCalledWith(
-      `/api/v1/board?dateKey=2026-04-11&viewType=daily&tzOffset=${new Date().getTimezoneOffset()}`,
-    );
+    expect(result.current.cards.map((c) => c.id)).toEqual(['c-1', 'c-2']);
+    // ボードは 1 人に 1 枚。どの日・どの単位で見るかというクエリは付けない。
+    expect(apiFetch).toHaveBeenCalledWith('/api/v1/board');
   });
 
   it('api が null の場合はフェッチしない', () => {
-    renderHook(() => useBoard(null, '2026-04-11'));
-    // no error thrown
+    renderHook(() => useBoard(null));
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
   it('API エラー時は cards が空のまま', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -72,48 +69,8 @@ describe('useBoard', () => {
     expect(result.current.cards).toEqual([]);
   });
 
-  it('dateKey 変更で再フェッチする', async () => {
-    const data1 = { dateKey: '2026-04-11', viewType: 'daily', cards: [] };
-    const data2 = {
-      dateKey: '2026-04-12',
-      viewType: 'daily',
-      cards: [
-        {
-          id: 'c-2',
-          cardType: 'snippet',
-          refId: 'e-2',
-          x: 50,
-          y: 50,
-          rotation: 0,
-          width: 340,
-          height: 280,
-          zIndex: 0,
-          createdAt: '2026-04-12T00:00:00Z',
-          content: { text: 'Test' },
-        },
-      ],
-    };
-    apiFetch.mockResolvedValueOnce(mockResponse(true, data1));
-    const api = createMockApi(apiFetch);
-
-    const { result, rerender } = renderHook(({ dateKey }) => useBoard(api, dateKey), {
-      initialProps: { dateKey: '2026-04-11' },
-    });
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.cards).toEqual([]);
-
-    apiFetch.mockResolvedValueOnce(mockResponse(true, data2));
-    rerender({ dateKey: '2026-04-12' });
-
-    await waitFor(() => expect(result.current.cards).toHaveLength(1));
-    expect(result.current.cards[0].id).toBe('c-2');
-  });
-
   it('デフォルトでは作成日時が新しいカードほど高い zIndex を持つ', async () => {
     const boardData = {
-      dateKey: '2026-04-11',
-      viewType: 'daily',
       cards: [
         {
           id: 'c-old',
@@ -146,7 +103,7 @@ describe('useBoard', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, boardData));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -155,78 +112,42 @@ describe('useBoard', () => {
     expect(newCard!.zIndex).toBeGreaterThan(oldCard!.zIndex);
   });
 
-  it('dateKey を高速に切り替えても、古いリクエストの結果で新しい日付の状態を上書きしない', async () => {
-    const stale = {
-      dateKey: '2026-04-11',
-      viewType: 'daily',
-      cards: [
-        {
-          id: 'stale-card',
-          cardType: 'snippet',
-          refId: 'e-stale',
-          x: 0,
-          y: 0,
-          rotation: 0,
-          width: 340,
-          height: 280,
-          zIndex: 0,
-          createdAt: '2026-04-11T00:00:00Z',
-          content: { text: 'Test' },
-        },
-      ],
-    };
-    const fresh = {
-      dateKey: '2026-04-12',
-      viewType: 'daily',
-      cards: [
-        {
-          id: 'fresh-card',
-          cardType: 'snippet',
-          refId: 'e-fresh',
-          x: 0,
-          y: 0,
-          rotation: 0,
-          width: 340,
-          height: 280,
-          zIndex: 0,
-          createdAt: '2026-04-12T00:00:00Z',
-          content: { text: 'Test' },
-        },
-      ],
-    };
+  it('取り直しが重なっても、古いリクエストの結果で新しい状態を上書きしない', async () => {
+    // 作成直後の silent な取り直しと、再試行ボタンの取り直しが重なる等。
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api));
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
     let resolveStale!: (r: Response) => void;
-    const stalePending = new Promise<Response>((res) => {
-      resolveStale = res;
+    apiFetch.mockReturnValueOnce(
+      new Promise<Response>((res) => {
+        resolveStale = res;
+      }),
+    );
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cards: [snippetCard('fresh-card')] }));
+
+    // 1 本目（古い）を投げたまま、2 本目（新しい）を完了させる。
+    let stale: Promise<void> | undefined;
+    act(() => {
+      stale = result.current.refresh();
     });
-    apiFetch.mockReturnValueOnce(stalePending);
-    apiFetch.mockResolvedValueOnce(mockResponse(true, fresh));
-    const api = createMockApi(apiFetch);
-
-    const { result, rerender } = renderHook(({ dateKey }) => useBoard(api, dateKey), {
-      initialProps: { dateKey: '2026-04-11' },
+    await act(async () => {
+      await result.current.refresh();
     });
+    expect(result.current.cards.map((c) => c.id)).toEqual(['fresh-card']);
 
-    // Switch date before the first request resolves.
-    rerender({ dateKey: '2026-04-12' });
-
-    await waitFor(() => {
-      expect(result.current.cards).toHaveLength(1);
-      expect(result.current.cards[0].id).toBe('fresh-card');
+    // 古いほうがあとから返ってきても、新しい状態を上書きしない。
+    await act(async () => {
+      resolveStale(mockResponse(true, { cards: [snippetCard('stale-card')] }));
+      await stale;
     });
-
-    // Now let the stale request resolve — it must NOT overwrite the fresh state.
-    resolveStale(mockResponse(true, stale));
-    await new Promise((r) => setTimeout(r, 0));
-
-    expect(result.current.cards).toHaveLength(1);
-    expect(result.current.cards[0].id).toBe('fresh-card');
+    expect(result.current.cards.map((c) => c.id)).toEqual(['fresh-card']);
+    expect(result.current.loading).toBe(false);
   });
 
   it('ユーザー操作で変更された zIndex はデフォルトソートより優先される', async () => {
     const boardData = {
-      dateKey: '2026-04-11',
-      viewType: 'daily',
       cards: [
         {
           id: 'c-old-dragged',
@@ -260,7 +181,7 @@ describe('useBoard', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, boardData));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -276,7 +197,7 @@ describe('useBoard', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { error: 'boom' }));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.cards).toEqual([]);
@@ -286,7 +207,7 @@ describe('useBoard', () => {
     apiFetch.mockRejectedValueOnce(new Error('network down'));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.cards).toEqual([]);
@@ -295,8 +216,6 @@ describe('useBoard', () => {
   it('壊れたカードは落とし、欠けた座標は既定値に潰す', async () => {
     apiFetch.mockResolvedValueOnce(
       mockResponse(true, {
-        dateKey: '2026-04-11',
-        viewType: 'daily',
         cards: [
           { id: 'ok', cardType: 'snippet', refId: 's-1', content: { text: 'hi' } },
           { cardType: 'snippet', refId: 's-2', content: { text: 'id 無し' } },
@@ -307,7 +226,7 @@ describe('useBoard', () => {
     );
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.cards.map((c) => c.id)).toEqual(['ok']);
@@ -319,8 +238,6 @@ describe('useBoard', () => {
   });
   describe('deleteCard', () => {
     const oneCard = {
-      dateKey: '2026-04-11',
-      viewType: 'daily',
       cards: [{ id: 'c-1', cardType: 'snippet', refId: 's-1', content: { text: 'あ' }, zIndex: 0 }],
     };
 
@@ -330,7 +247,7 @@ describe('useBoard', () => {
         .mockResolvedValueOnce(mockResponse(true, {}));
       const api = createMockApi(apiFetch);
 
-      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      const { result } = renderHook(() => useBoard(api));
       await waitFor(() => expect(result.current.cards).toHaveLength(1));
 
       await act(async () => {
@@ -348,7 +265,7 @@ describe('useBoard', () => {
         .mockResolvedValueOnce(mockResponse(false, {}));
       const api = createMockApi(apiFetch);
 
-      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      const { result } = renderHook(() => useBoard(api));
       await waitFor(() => expect(result.current.cards).toHaveLength(1));
 
       await act(async () => {
@@ -366,7 +283,7 @@ describe('useBoard', () => {
         .mockRejectedValueOnce(new Error('network down'));
       const api = createMockApi(apiFetch);
 
-      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      const { result } = renderHook(() => useBoard(api));
       await waitFor(() => expect(result.current.cards).toHaveLength(1));
 
       await act(async () => {
@@ -382,7 +299,7 @@ describe('useBoard', () => {
       apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
       const api = createMockApi(apiFetch);
 
-      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      const { result } = renderHook(() => useBoard(api));
 
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(result.current.error).toBe(true);
@@ -393,7 +310,7 @@ describe('useBoard', () => {
       apiFetch.mockRejectedValueOnce(new Error('network down'));
       const api = createMockApi(apiFetch);
 
-      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      const { result } = renderHook(() => useBoard(api));
 
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(result.current.error).toBe(true);
@@ -402,8 +319,6 @@ describe('useBoard', () => {
     it('再取得が成功したら error は下りる', async () => {
       apiFetch.mockResolvedValueOnce(mockResponse(false, {})).mockResolvedValueOnce(
         mockResponse(true, {
-          dateKey: '2026-04-11',
-          viewType: 'daily',
           cards: [
             { id: 'c-1', cardType: 'snippet', refId: 's-1', content: { text: 'あ' }, zIndex: 0 },
           ],
@@ -411,7 +326,7 @@ describe('useBoard', () => {
       );
       const api = createMockApi(apiFetch);
 
-      const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+      const { result } = renderHook(() => useBoard(api));
       await waitFor(() => expect(result.current.error).toBe(true));
 
       await act(async () => {
@@ -428,8 +343,6 @@ describe('useBoard', () => {
     // 触っていないカードが作成日時順から外れて手前に固定されていた。
     // ここは「4枚から1枚消して3枚になり、zIndex に 3 が残っている」状況。
     const boardData = {
-      dateKey: '2026-04-11',
-      viewType: 'daily',
       cards: [
         {
           id: 'c-oldest',
@@ -463,7 +376,7 @@ describe('useBoard', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, boardData));
     const api = createMockApi(apiFetch);
 
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     const byId = (id: string) => result.current.cards.find((c) => c.id === id);
@@ -471,13 +384,33 @@ describe('useBoard', () => {
     expect(byId('c-oldest')!.zIndex).toBeLessThan(byId('c-middle')!.zIndex);
     expect(byId('c-middle')!.zIndex).toBeLessThan(byId('c-newest')!.zIndex);
   });
+
+  it('スニペットは本文と置き場所だけを送り、成功したらボードを取り直す', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cards: [] }));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useBoard(api));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { snippetId: 's-1' }));
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cards: [snippetCard('c-1')] }));
+    await act(async () => {
+      await result.current.createSnippet('本文', { x: 10, y: 20 });
+    });
+
+    expect(apiFetch).toHaveBeenCalledWith('/api/v1/board/snippets', {
+      method: 'POST',
+      body: JSON.stringify({ text: '本文', x: 10, y: 20 }),
+    });
+    expect(result.current.cards.map((c) => c.id)).toEqual(['c-1']);
+  });
+
   it('写真の作成が失敗したら投げ返す（黙って閉じさせない）', async () => {
     // 以前は res.ok を見て false なら何もせず返していた。呼び出し側の PhotoDialog は
     // 例外が来たときだけエラーを出すので、失敗が画面に何も残らず
     // 「押しても貼れない」としか見えなかった。
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cards: [] }));
     const api = createMockApi(apiFetch);
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     apiFetch.mockResolvedValueOnce(mockResponse(false, { error: 'boom' }));
@@ -487,14 +420,14 @@ describe('useBoard', () => {
     );
   });
 
-  it('写真の作成に成功したらボードを取り直す', async () => {
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+  it('写真の作成に成功したらボードを取り直す（日付・表示単位は送らない）', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cards: [] }));
     const api = createMockApi(apiFetch);
-    const { result } = renderHook(() => useBoard(api, '2026-04-11'));
+    const { result } = renderHook(() => useBoard(api));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     apiFetch.mockResolvedValueOnce(mockResponse(true, { photoId: 'p-1' }));
-    apiFetch.mockResolvedValueOnce(mockResponse(true, { dateKey: '2026-04-11', cards: [] }));
+    apiFetch.mockResolvedValueOnce(mockResponse(true, { cards: [] }));
     const file = new File(['x'], 'a.png', { type: 'image/png' });
     await act(async () => {
       await result.current.createPhoto(file, 'キャプション', 10, 10);
@@ -503,6 +436,13 @@ describe('useBoard', () => {
     const paths = apiFetch.mock.calls.map((c) => c[0]);
     expect(paths).toContain('/api/v1/board/photos');
     // 作成 → 再取得 の順で2本目以降が飛んでいる
-    expect(paths.filter((p) => p.startsWith('/api/v1/board?')).length).toBeGreaterThanOrEqual(2);
+    expect(paths.filter((p) => p === '/api/v1/board').length).toBeGreaterThanOrEqual(2);
+
+    const body = apiFetch.mock.calls.find((c) => c[0] === '/api/v1/board/photos')?.[1]?.body;
+    expect(body).toBeInstanceOf(FormData);
+    if (body instanceof FormData) {
+      expect(body.has('dateKey')).toBe(false);
+      expect(body.has('viewType')).toBe(false);
+    }
   });
 });

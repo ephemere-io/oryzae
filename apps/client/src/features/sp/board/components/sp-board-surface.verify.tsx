@@ -2,7 +2,7 @@
  * SpBoardSurface の検証スペック。
  *
  * 受け入れ基準（40-acceptance.md「SP のタッチ提示」）が具体的なので、そこを機械的に見る:
- * 右ペインが無い / 日付とカード枚数だけが隅にある / つかんでいる間は最前面へ。
+ * 右ペインが無い / カード枚数だけが隅にある / つかんでいる間は最前面へ。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -13,7 +13,6 @@ import { SpBoardSurface } from './sp-board-surface';
 
 interface Props {
   cards: BoardCardData[];
-  dateKey: string;
   viewport: Viewport;
   onMove: (cardId: string, x: number, y: number) => void;
   onCommit: () => void;
@@ -64,7 +63,7 @@ registerUnit<Props>({
     {
       id: 'cards',
       description: 'カードが3枚',
-      props: { cards: CARDS, dateKey: '2026-09-04', viewport: IDENTITY_VIEWPORT, ...NOOP },
+      props: { cards: CARDS, viewport: IDENTITY_VIEWPORT, ...NOOP },
     },
     {
       id: 'fitted',
@@ -72,7 +71,6 @@ registerUnit<Props>({
       description: 'Probe: 縮小して盤面全体を収めた状態',
       props: {
         cards: CARDS,
-        dateKey: '2026-09-04',
         viewport: { x: 12, y: 20, scale: 0.55 },
         ...NOOP,
       },
@@ -80,8 +78,8 @@ registerUnit<Props>({
     {
       id: 'empty',
       probe: true,
-      description: 'Probe: カードが無い日は空の盤面ではなく文言を出す',
-      props: { cards: [], dateKey: '2026-09-04', viewport: IDENTITY_VIEWPORT, ...NOOP },
+      description: 'Probe: カードが無いときは空の盤面ではなく文言を出す',
+      props: { cards: [], viewport: IDENTITY_VIEWPORT, ...NOOP },
     },
     {
       id: 'selected',
@@ -89,7 +87,6 @@ registerUnit<Props>({
       description: 'Probe: 選んだカードには枠と、角のつまみが出る',
       props: {
         cards: CARDS,
-        dateKey: '2026-09-04',
         viewport: IDENTITY_VIEWPORT,
         selectedId: CARDS[0].id,
         onSelect: () => {},
@@ -103,7 +100,6 @@ registerUnit<Props>({
       description: 'Probe: 縮小してもつまみは指で掴める大きさのまま（逆スケール）',
       props: {
         cards: CARDS,
-        dateKey: '2026-09-04',
         viewport: { x: 12, y: 20, scale: 0.4 },
         selectedId: CARDS[0].id,
         onSelect: () => {},
@@ -151,12 +147,10 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'corner-shows-date-and-count',
-      description: '隅に日付とカード枚数が出る',
-      check: ({ root, props, contract }) => {
+      id: 'corner-shows-count',
+      description: '隅にカード枚数が出る',
+      check: ({ root, contract }) => {
         const text = root.textContent ?? '';
-        const [, month, day] = props.dateKey.split('-');
-        if (!text.includes(`${month}.${day}`)) return '日付が出ていない';
         return text.includes(contract.cardCount ?? '') || '枚数が出ていない';
       },
     },
@@ -174,11 +168,11 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'empty-day-has-message',
+      id: 'empty-board-has-message',
       description: 'カードが 0 枚なら文言を出す',
       check: ({ root, contract }) => {
         if (contract.cardCount !== '0') return true;
-        return Boolean(root.querySelector('p')) || '空の日に文言が出ていない';
+        return Boolean(root.querySelector('p')) || '空のボードに文言が出ていない';
       },
     },
     {

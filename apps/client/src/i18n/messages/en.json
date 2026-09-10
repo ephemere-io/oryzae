@@ -267,19 +267,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "Sunday",
-      "day_mon": "Monday",
-      "day_tue": "Tuesday",
-      "day_wed": "Wednesday",
-      "day_thu": "Thursday",
-      "day_fri": "Friday",
-      "day_sat": "Saturday"
-    },
     "canvas": {
       "aria_label": "Board canvas"
     },
-    "empty": "Nothing here for this period",
+    "nothing_pinned": "Nothing pinned yet",
     "lightbox": {
       "aria_label": "Photo lightbox",
       "close_aria": "Close lightbox"
@@ -787,7 +778,7 @@
     },
     "board": {
       "cards": "{count} cards",
-      "empty": "Nothing here yet today",
+      "nothing_pinned": "Nothing pinned yet",
       "hint": "Drag cards with your finger",
       "add_snippet": "Create snippet",
       "add_photo": "Add photo",
