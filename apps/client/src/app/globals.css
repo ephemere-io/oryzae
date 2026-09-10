@@ -136,9 +136,15 @@ body {
   margin-left: var(--sidebar-width);
 }
 
+/* 画面いっぱいに立つ fixed の面（エントリーのエディタ）。左はサイドバーの幅ぶん、
+ * 上は「書斎へ戻る」の帯のぶんだけ内側から始まる。
+ *
+ * **fixed は祖先の padding では下がらない**ので、流れの中の画面とは別に、ここが同じ
+ * 変数（--study-exit-band）を top で読む。書斎が無効なとき・書斎そのもののときは 0。 */
 .sidebar-anchored {
   transition: left 160ms cubic-bezier(0.32, 0.72, 0, 1);
   left: var(--sidebar-width);
+  top: var(--study-exit-band, 0px);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1016,14 +1016,24 @@ export function JarView({
                     setEditText(q.currentText ?? '');
                     setTimeout(() => editInputRef.current?.focus(), 100);
                   }}
-                  className="rounded-full px-4 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-all hover:-translate-y-0.5"
+                  /**
+                   * 問いのチップ。**エントリー画面の問いチップと同じ言葉で描く。**
+                   *
+                   * 以前は黒いグラデーションで塗った濃いピルだった。アプリの他のどこにも
+                   * 無い色で、「この色は何を意味するのか」が読めない（実機レビュー）。
+                   * 同じもの（結ばれている問い）が画面によって別の見た目で現れていた。
+                   *
+                   * エディタの `QuestionChip` は accent を薄く敷いて縁だけ強めるやり方で、
+                   * 瓶の淡い地の上でも沈まない。書体は瓶のまま（明朝）にして、
+                   * 「問いは声に出して読むもの」という瓶の調子は残す。
+                   */
+                  className="rounded-full border px-4 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-all duration-150 hover:-translate-y-0.5"
                   style={{
-                    background: 'linear-gradient(135deg, var(--fg), rgba(140,133,126,0.9))',
-                    color: 'var(--bg)',
+                    background: 'color-mix(in srgb, var(--accent) 12%, var(--surface-raised))',
+                    color: 'var(--accent)',
                     fontFamily: "'Noto Serif JP', serif",
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    backdropFilter: 'blur(8px)',
-                    boxShadow: '0 2px 8px rgba(74,69,65,0.15)',
+                    borderColor: 'color-mix(in srgb, var(--accent) 34%, transparent)',
+                    boxShadow: '0 1px 6px rgba(74,69,65,0.08)',
                   }}
                 >
                   {q.currentText}

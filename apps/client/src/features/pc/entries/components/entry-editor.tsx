@@ -1436,7 +1436,7 @@ export function EntryEditor({
 
   return (
     <div
-      className="sidebar-anchored fixed top-0 right-0 bottom-0 z-50 flex bg-[var(--bg)]"
+      className="sidebar-anchored fixed right-0 bottom-0 z-50 flex bg-[var(--bg)]"
       {...verifyAttrs({
         unit: 'EntryEditor',
         hasEntry: !!entryId,
@@ -1536,7 +1536,7 @@ export function EntryEditor({
         {/* Ghost layer — must be above editor (z-50) */}
         <div
           ref={ghostLayerRef}
-          className="sidebar-anchored pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden"
+          className="sidebar-anchored pointer-events-none fixed right-0 bottom-0 z-[51] overflow-hidden"
         />
 
         {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}

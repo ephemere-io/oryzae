@@ -4,18 +4,19 @@
  * 「サブ画面から書斎へ戻れる」（40-acceptance.md「ナビゲーション」）。
  *
  * 見るのは**置き場の約束**が中心。左上（3 巡ぶん「既存の操作に被る」）→ 下端（操作
- * パレットの真下で「被りそう・見にくい」）と移してきた経緯があるので、そのどちらへ
- * 戻しても同じことが起きる。いま空いているのは**上端の中央**だけ。
+ * パレットの真下で「被りそう・見にくい」）→ 上端に浮かせて重ねる（問いを 2 つ結ぶと
+ * チップが中央まで伸びて重なる）と移してきた。いまは**上端の帯**で、画面の側が
+ * そのぶん下がる。浮かせて重ねる形に戻すと、伸びる中身のある画面といつか必ずぶつかる。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { BackToStudy } from './back-to-study';
+import { BackToStudy, STUDY_EXIT_BAND } from './back-to-study';
 
 registerUnit<Record<string, never>>({
   id: 'BackToStudy',
   title: 'BackToStudy',
-  description: 'サブ画面の下端に浮く「書斎へ戻る」',
+  description: 'サブ画面の上端に敷く「書斎へ戻る」の帯',
   kind: 'component',
   render: () => withVerifyProviders(<BackToStudy />),
   fixtures: [
@@ -34,16 +35,17 @@ registerUnit<Record<string, never>>({
         Boolean(root.querySelector('a[href="/study"]')) || '/study へのリンクが無い',
     },
     {
-      id: 'sits-at-the-top-center',
-      description: '上端の中央に置く（隅と下端は画面側が使っている）',
+      id: 'is-a-band-across-the-top',
+      description: '上端いっぱいの帯として敷く（重ならないことが置き場の条件）',
       check: ({ root }) => {
-        const className = root.querySelector('a')?.className ?? '';
+        const band = root.querySelector('[data-verify-unit="BackToStudy"]');
+        if (!(band instanceof HTMLElement)) return '帯が無い';
+        const className = band.className;
         const missing: string[] = [];
         if (!className.includes('fixed')) missing.push('fixed');
-        if (!/\btop-/.test(className)) missing.push('top-*');
-        if (!className.includes('left-1/2')) missing.push('left-1/2');
-        if (!className.includes('-translate-x-1/2')) missing.push('-translate-x-1/2');
-        if (missing.length > 0) return `上端の中央になっていない: ${missing.join(', ')}`;
+        if (!className.includes('inset-x-0')) missing.push('inset-x-0');
+        if (!className.includes('top-0')) missing.push('top-0');
+        if (missing.length > 0) return `上端の帯になっていない: ${missing.join(', ')}`;
         // 隅と下端へ戻されていないこと。どちらも一度ぶつかって移した先。
         if (/\b(left-4|right-4|left-6|right-6)\b/.test(className)) {
           return '隅に置き直されている（画面側の操作と取り合いになる）';
@@ -55,8 +57,35 @@ registerUnit<Record<string, never>>({
       },
     },
     {
+      id: 'reserves-its-own-row',
+      description: '帯は自分の高さを持ち、画面はそのぶん下がる',
+      check: ({ root, contract }) => {
+        const band = root.querySelector('[data-verify-unit="BackToStudy"]');
+        if (!(band instanceof HTMLElement)) return '帯が無い';
+        // 高さを公表していないと、シェルが下げる量と食い違っても誰も気づけない。
+        if (contract.bandHeight !== String(STUDY_EXIT_BAND)) {
+          return `公表している高さが違う: ${String(contract.bandHeight)}`;
+        }
+        return (
+          band.style.height === `${STUDY_EXIT_BAND}px` ||
+          `帯の高さが指定されていない: ${band.style.height}`
+        );
+      },
+    },
+    {
+      id: 'only-the-name-is-clickable',
+      description: '帯の余白は押せない（下の画面の操作を奪わない）',
+      check: ({ root }) => {
+        const band = root.querySelector('[data-verify-unit="BackToStudy"]');
+        const bandClass = band instanceof HTMLElement ? band.className : '';
+        if (!bandClass.includes('pointer-events-none')) return '帯全体が当たりを持っている';
+        const link = root.querySelector('a')?.className ?? '';
+        return link.includes('pointer-events-auto') || 'リンクが押せなくなっている';
+      },
+    },
+    {
       id: 'quiet-until-touched',
-      description: '常時は薄く、触れたときだけ濃くなる（下端に居座らない）',
+      description: '常時は薄く、触れたときだけ濃くなる',
       check: ({ root }) => {
         const className = root.querySelector('a')?.className ?? '';
         if (!/\bopacity-\d+/.test(className)) return '常時の薄さが指定されていない';

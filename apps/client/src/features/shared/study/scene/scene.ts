@@ -75,6 +75,7 @@ import {
   zoomedView,
   zoomTargetRise,
 } from './camera';
+import { contentSignature } from './content-signature';
 import {
   buildHitRegistry,
   type HitHint,
@@ -336,6 +337,15 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   /** いま描いている状態。更新時にだけ差し替える。 */
   let currentState = options.state;
+  /**
+   * いま組んである中身の指紋。**同じなら組み直さない。**
+   *
+   * 状態は 5 つの取得が別々に届くので、素直に受けると 1 秒のあいだに何度も部屋を
+   * 作り直す。憶えてある書斎を敷いているときは、あとから届く本物が前回と同じ内容で
+   * あることがほとんどで、その作り直しは絵を 1px も変えないまま 1 フレーム落とす
+   * （戻ってきた直後の「カクカク」の正体）。
+   */
+  let signature = contentSignature(options.state);
   /** 遷移中に届いた更新。手が空いたら反映する。 */
   let pendingState: StudyState | null = null;
   let content = buildContent(currentState);
@@ -908,6 +918,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function applyState(next: StudyState): void {
     pendingState = null;
+    const nextSignature = contentSignature(next);
+    // 絵に出ない部分だけが変わったとき（一覧の記録・問いなど）は、値だけ受け取って
+    // 物はそのまま。組み直すと、触れている物のホバーまで外れる。
+    if (nextSignature === signature) {
+      currentState = next;
+      return;
+    }
+    signature = nextSignature;
     currentState = next;
     disposeContent(content);
     content = buildContent(next);
@@ -1158,7 +1176,8 @@ function buildJar(
   // 液面（瓶の内径に沿ったリング）。
   const levelRadius = jarRadiusAt(profile, level);
   const ringGeometry = own(new RingGeometry(levelRadius * 0.92, levelRadius * 0.96, 48));
-  const ring = new Mesh(ringGeometry, fadeable(materials.xray(0.3).clone()));
+  // 液面のリングも一段薄く（0.3 → 0.22）。もやと合わせて「濃い水」に見えていた。
+  const ring = new Mesh(ringGeometry, fadeable(materials.xray(0.22).clone()));
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = level;
   group.add(ring);
@@ -1785,8 +1804,10 @@ function createHazeTexture(): CanvasTexture | null {
   const context = canvas.getContext('2d');
   if (!context) return null;
 
+  // 中心の濃さは 0.28 → 0.18。掛かる不透明度（`hazeOpacity`）も一緒に下げてある。
+  // 濃い面が 1 か所だけあると、線画の部屋の中でそこだけ「塗り」に見える。
   const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gradient.addColorStop(0, 'rgba(26,25,24,0.28)');
+  gradient.addColorStop(0, 'rgba(26,25,24,0.18)');
   gradient.addColorStop(1, 'rgba(26,25,24,0)');
   context.fillStyle = gradient;
   context.fillRect(0, 0, 128, 128);

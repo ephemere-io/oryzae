@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { STUDY_EXIT_BAND } from './back-to-study';
 
 /**
  * 瓶の画面から「問いの変遷」へ行く導線。
@@ -16,7 +17,9 @@ import { useTranslations } from 'next-intl';
  * 瓶の画面そのもの（`JarView`）には触れない — 今回変えるのはナビゲーションと入口だけ、
  * という前提を守る。出し分けは `(protected)/layout.tsx` が行う。
  *
- * 左上は「書斎へ戻る」の席なので、こちらは右上に置く。
+ * 上端は「書斎へ戻る」の帯の席なので、こちらはその**下**から始める。帯は画面の一部で
+ * （`STUDY_EXIT_BAND`）、この導線は帯の外に置かれるため変数を継がない。出るのは瓶の
+ * 画面だけで、そこでは帯が必ず出ているので、高さを直に足して合わせる。
  */
 export function QuestionsLink() {
   const t = useTranslations('study');
@@ -25,8 +28,9 @@ export function QuestionsLink() {
     <Link
       href="/questions"
       {...verifyAttrs({ unit: 'QuestionsLink' })}
-      className="fixed right-6 top-6 z-[55] flex h-10 items-center gap-2 rounded-full px-4 text-[10px] uppercase tracking-[0.18em] transition-opacity duration-300 hover:opacity-80"
+      className="fixed right-6 z-[55] flex h-10 items-center gap-2 rounded-full px-4 text-[10px] uppercase tracking-[0.18em] transition-opacity duration-300 hover:opacity-80"
       style={{
+        top: STUDY_EXIT_BAND + 10,
         background: 'rgba(253, 251, 247, 0.72)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
