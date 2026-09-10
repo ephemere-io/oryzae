@@ -162,6 +162,13 @@ export function useUnreadLetters(api: ApiClient | null, authLoading: boolean): U
     [unreadLetters],
   );
 
+  // 発酵履歴（Cover Flow）は 1 問いに複数の発酵を並べるので、問い単位の集合では
+  // どの回が新しいのか言えない。手紙そのものの id でも公開する。
+  const unreadFermentationIds = useMemo(
+    () => new Set(unreadLetters.map((l) => l.id)),
+    [unreadLetters],
+  );
+
   const markQuestionRead = useCallback(
     (questionId: string) => {
       // 基準は「今」。ただしサーバ時刻のズレで createdAt が未来になっている手紙が手元に
@@ -194,9 +201,17 @@ export function useUnreadLetters(api: ApiClient | null, authLoading: boolean): U
       ready,
       unreadCount: unreadLetters.length,
       unreadQuestionIds,
+      unreadFermentationIds,
       markQuestionRead,
       markAllSeen,
     }),
-    [ready, unreadLetters.length, unreadQuestionIds, markQuestionRead, markAllSeen],
+    [
+      ready,
+      unreadLetters.length,
+      unreadQuestionIds,
+      unreadFermentationIds,
+      markQuestionRead,
+      markAllSeen,
+    ],
   );
 }

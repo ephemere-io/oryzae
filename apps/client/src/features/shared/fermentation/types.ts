@@ -65,6 +65,11 @@ export interface FermentationSummary {
   questionId: string;
   status: string;
   createdAt: string;
+  /**
+   * 対象期間ラベル（'WEEK 35' 等）。一覧 API は元から返していたが、以前は誰も読んでいなかった。
+   * 発酵履歴（Cover Flow）が円盤ごとの期間表示に使うので拾う。欠損時は空文字。
+   */
+  targetPeriod: string;
 }
 
 /** 瓶ビューでユーザーがドラッグして決めた要素の位置。 */
@@ -88,6 +93,19 @@ export interface InboxLetter {
   questionText: string | null;
   fermentationId: string;
   createdAt: string;
+}
+
+/**
+ * 発酵瓶の readiness（issue #278）。問いごとの readiness の総和なので 0〜問いの数を取る。
+ * 次回発火時刻や残り文字数は **意図的に含めない**（逆算できると「いつ来るか分からない」
+ * という体験が壊れるため、サーバーも返さない）。
+ */
+export interface JarReadiness {
+  /** いちばん進んだ問いの readiness（0〜1）。瓶の演出の段階を決める。 */
+  top: number;
+  /** 全問いの readiness の総和（0〜問いの数）。瓶の賑やかさを決める。 */
+  total: number;
+  questionCount: number;
 }
 
 /** 受信箱が手紙に見出しを付けるために要る問いの最小形。 */

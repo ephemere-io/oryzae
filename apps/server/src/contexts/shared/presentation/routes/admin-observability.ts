@@ -5,7 +5,7 @@ import { type ActualCostResult, fetchActualCost } from '../../infrastructure/ant
 import {
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
-  OCR_MODEL_ID,
+  featureOfModel,
 } from '../../infrastructure/claude-pricing.js';
 import {
   aggregateCost,
@@ -67,11 +67,6 @@ const vercelDeployListSchema = z.object({
  * 「このモデルを使っている機能」であって「その機能のコード」ではない。
  * 画面・通知の文言もそのつもりで書くこと。
  */
-function featureOfModel(model: string): string | null {
-  if (model === FERMENTATION_MODEL_ID) return '発酵';
-  if (model === OCR_MODEL_ID) return 'OCR';
-  return null;
-}
 
 // ── Summary (hub page) ──────────────────────────────────
 

@@ -559,8 +559,10 @@
       "header_snippet": "Snippets cut by Oryzae",
       "header_letter": "Observations from L.A.B.",
       "snippet_source_prefix": "Source:",
-      "resize_aria": "Resize detail panel",
-      "write_entry": "Write an entry for this question"
+      "write_entry": "Write an entry for this question",
+      "empty_label": "READING",
+      "empty_hint": "Pick a word, an excerpt, or the letter in the circle to read it here.",
+      "resize_aria": "Resize detail column"
     },
     "jar": {
       "zoom_close_aria": "Close zoom",
@@ -608,6 +610,18 @@
       },
       "canvas_aria": "Jar canvas",
       "minimap_aria": "Jar minimap"
+    },
+    "history": {
+      "ghost_jar_title": "Fermentation jar",
+      "back_to_jar": "Back to the jar",
+      "new": "NEW",
+      "newest": "LATEST",
+      "context": "Fermented on {date}",
+      "prev_aria": "Previous fermentation",
+      "next_aria": "Next fermentation",
+      "hint": "Flip with ← → keys, drag, or scroll ／ ESC to return to the jar",
+      "launcher": "Look back through {count} fermentations",
+      "open_aria": "Open the fermentation history for {question}"
     }
   },
   "questions": {
