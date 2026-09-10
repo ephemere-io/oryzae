@@ -11,17 +11,14 @@ import { PageLoading } from '@/components/ui/page-loading';
  * BoardView 本体がデータ取得中に出すローダーと同じ `PageLoading` を出して、
  * 「枠 → ローダー → 本体」と表示が二度変わるのを防ぐ。
  *
- * SP 変種は無い（board page も pc のみ）ので、DeviceView の既定どおり SP では
- * 「スマホ未対応」表示にフォールバックする＝実ページと同じ挙動。
+ * SP も同じ理由で `PageLoading`。SP のボードは盤面を開いた時に一度フィットさせるので、
+ * 位置の予告はいっそう当たらない。
  */
 export function BoardRouteLoading() {
-  return (
-    <DeviceView
-      pc={
-        <div className="absolute inset-0">
-          <PageLoading />
-        </div>
-      }
-    />
+  const loading = (
+    <div className="absolute inset-0">
+      <PageLoading />
+    </div>
   );
+  return <DeviceView pc={loading} sp={loading} />;
 }

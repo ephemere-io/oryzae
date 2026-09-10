@@ -8,10 +8,51 @@ import {
 } from '../../../shared/infrastructure/row.js';
 import type {
   EntryListOrder,
+  EntryMonthFilter,
   EntryRepositoryGateway,
+  MonthlyEntryCount,
 } from '../../domain/gateways/entry-repository.gateway.js';
 import { Entry } from '../../domain/models/entry.js';
-import { localDayRange, localWeekRange } from '../../domain/services/local-day-range.service.js';
+import {
+  localDateKey,
+  localDayRange,
+  localMonthKey,
+  localMonthRange,
+  localWeekRange,
+} from '../../domain/services/local-day-range.service.js';
+
+/**
+ * 月で絞る（書斎の一覧）。範囲は `localMonthRange` が決めるので、件数（`localMonthKey`）と
+ * 必ず同じ切り方になる。指定が無ければ素通し。
+ */
+function applyMonthFilter<
+  T extends { gte: (c: string, v: string) => T; lt: (c: string, v: string) => T },
+>(query: T, month: EntryMonthFilter | undefined): T {
+  if (!month) return query;
+  const { startUtc, endUtc } = localMonthRange(month.month, month.tzOffsetMinutes);
+  return query.gte('created_at', startUtc).lt('created_at', endUtc);
+}
+
+/** PostgREST の 1 レスポンス上限。これを超えると黙って打ち切られる。 */
+const MONTHLY_COUNT_PAGE_SIZE = 1000;
+
+/** 辿るページ数の上限。1000 行 × 100 = 10 万件。到達したら黙って返さず投げる。 */
+const MONTHLY_COUNT_MAX_PAGES = 100;
+
+/** 1 か月ぶんの集計の途中経過。 */
+interface MonthTally {
+  count: number;
+  /** ローカル暦日（`YYYY-MM-DD`）。辞書順＝時系列順なので文字列のまま比べる。 */
+  first: string;
+  last: string;
+}
+
+/** 月の集計を新しい月から並べる。`YYYY-MM` は辞書順＝時系列順。 */
+function toSortedMonthlyCounts(tallies: Map<string, MonthTally>): MonthlyEntryCount[] {
+  return [...tallies]
+    .map(([month, tally]) => ({ month, ...tally }))
+    .sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : 0));
+}
 
 /** PostgREST の既定上限と同じ。これ以上を1回で頼んでも返ってこない。 */
 const PAGE_SIZE = 1000;
@@ -41,6 +82,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     limit = 20,
     questionId?: string,
     order: EntryListOrder = 'newest',
+    month?: EntryMonthFilter,
   ): Promise<Entry[]> {
     // created_at の並び順と、それに対応するカーソル比較（昇順=次は cursor より新しい→gt、
     // 降順=次は cursor より古い→lt）。cursor は最後に受け取った entry の created_at 値。
@@ -61,6 +103,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       if (cursor) {
         query = ascending ? query.gt('created_at', cursor) : query.lt('created_at', cursor);
       }
+      query = applyMonthFilter(query, month);
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).map((row: Record<string, unknown>) => this.toDomain(row));
@@ -76,6 +119,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
     if (cursor) {
       query = ascending ? query.gt('created_at', cursor) : query.lt('created_at', cursor);
     }
+    query = applyMonthFilter(query, month);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -152,6 +196,81 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
       (sum, row: { content: string | null }) => sum + (row.content ? [...row.content].length : 0),
       0,
     );
+  }
+
+  async countByMonth(userId: string, tzOffsetMinutes = 0): Promise<MonthlyEntryCount[]> {
+    const counts = new Map<string, MonthTally>();
+    let cursor: string | null = null;
+
+    // `.range()` / `.limit()` 無しで投げると PostgREST 既定の 1000 行で**黙って**打ち切られ、
+    // 古い月ほど件数が少なく見える（エラーにならないので気づけない）。全件読み切る。
+    //
+    // ページングは offset ではなく **id のカーソル**で進める。id は gen_random_uuid() で
+    // 時系列に並ばないため、offset だと読んでいる最中の INSERT が既読ページより前に入り込み、
+    // 以降の行がずれて重複・取りこぼしになる（user-me.ts の selectAllRows と同じ判断）。
+    for (let page = 0; page < MONTHLY_COUNT_MAX_PAGES; page++) {
+      const rows = await this.fetchMonthlyCountPage(userId, cursor);
+
+      let lastId: string | null = null;
+      for (const row of rows) {
+        const id = row.id;
+        if (typeof id === 'string') lastId = id;
+        const createdAt = row.created_at;
+        if (typeof createdAt !== 'string') continue;
+        const month = localMonthKey(createdAt, tzOffsetMinutes);
+        const day = localDateKey(createdAt, tzOffsetMinutes);
+        // 壊れた 1 行で月別集計そのものを失わせない。その行だけ数えずに進む。
+        if (month === null || day === null) continue;
+        const tally = counts.get(month);
+        // 範囲の端は同じ行から同じ切り方で取る（月の鍵と日の鍵がずれないように）。
+        counts.set(
+          month,
+          tally === undefined
+            ? { count: 1, first: day, last: day }
+            : {
+                count: tally.count + 1,
+                first: day < tally.first ? day : tally.first,
+                last: day > tally.last ? day : tally.last,
+              },
+        );
+      }
+
+      if (rows.length < MONTHLY_COUNT_PAGE_SIZE) {
+        return toSortedMonthlyCounts(counts);
+      }
+      if (!lastId) {
+        // カーソルを進められないと同じページを取り続ける。止めて気づけるようにする。
+        throw new Error('entries: could not advance pagination cursor (missing id)');
+      }
+      cursor = lastId;
+    }
+
+    // 上限に達したら**投げる**。黙って部分結果を返すと、このページングが防ぐはずの
+    // 「エラーにならないのに件数が少ない」状態を自分で作ってしまう。
+    throw new Error(
+      `entries: exceeded ${MONTHLY_COUNT_MAX_PAGES * MONTHLY_COUNT_PAGE_SIZE} rows; monthly counts would be incomplete`,
+    );
+  }
+
+  /**
+   * 月別集計の 1 ページ分（id と created_at だけ）。
+   *
+   * countByMonth から切り出しているのは型の都合。カーソルの型が「読んだ行から決まり、
+   * 読む行はカーソルで決まる」循環になり、インライン化すると tsc が row を any に倒す
+   * （TS7022）。戻り値の型を明示してその環を切る。
+   */
+  private async fetchMonthlyCountPage(
+    userId: string,
+    cursor: string | null,
+  ): Promise<Record<string, unknown>[]> {
+    const base = this.supabase.from('entries').select('id, created_at').eq('user_id', userId);
+    const filtered = cursor ? base.gt('id', cursor) : base;
+
+    const { data, error } = await filtered
+      .order('id', { ascending: true })
+      .limit(MONTHLY_COUNT_PAGE_SIZE);
+    if (error) throw error;
+    return toRecordArray(data ?? []);
   }
 
   async countCharsByQuestionIdSince(

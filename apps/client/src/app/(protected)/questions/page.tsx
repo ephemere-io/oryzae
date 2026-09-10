@@ -45,7 +45,7 @@ export default function QuestionsPage() {
       }
       pc={
         <div className="flex min-h-full flex-col">
-          <div className="mx-auto w-full max-w-[800px] flex-1 px-6 pt-6 pb-20">
+          <div className="mx-auto w-full max-w-[800px] flex-1 px-6 pt-12 pb-20">
             <QuestionCreateForm onSubmit={createQuestion} />
 
             <div className="mt-6">

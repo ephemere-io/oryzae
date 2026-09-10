@@ -1,0 +1,851 @@
+{
+  "empty": {
+    "label": "空 — 初回起動",
+    "now": "2026-09-02",
+    "profile": {
+      "nickname": "asuka",
+      "initial": "A"
+    },
+    "unreadCount": 0,
+    "fermentation": {
+      "readiness": 0,
+      "status": "idle",
+      "letters": []
+    },
+    "questions": [],
+    "notebooks": [],
+    "entries": [],
+    "board": {
+      "total": 0,
+      "cards": []
+    }
+  },
+  "starting": {
+    "label": "書き始め — 発酵未達",
+    "now": "2026-09-02",
+    "profile": {
+      "nickname": "asuka",
+      "initial": "A"
+    },
+    "unreadCount": 0,
+    "fermentation": {
+      "readiness": 0.18,
+      "status": "idle",
+      "letters": []
+    },
+    "questions": [
+      {
+        "id": "q-1",
+        "currentText": "なぜ自分は急ぐのが苦手なのか？",
+        "isProposedByOryzae": false
+      }
+    ],
+    "notebooks": [
+      {
+        "month": "2026-09",
+        "entryCount": 3,
+        "current": true
+      }
+    ],
+    "entries": [
+      {
+        "id": "e-1",
+        "createdAt": "2026-09-02T09:26:00+09:00",
+        "excerpt": "日産の新型リーフとボルボのEX30を乗り較べた。",
+        "chars": 612,
+        "linkedQuestions": [],
+        "pickled": false
+      },
+      {
+        "id": "e-2",
+        "createdAt": "2026-09-01T22:04:00+09:00",
+        "excerpt": "一つひとつの文字が紙の上で「確定」されるまでの間が惜しい。",
+        "chars": 288,
+        "linkedQuestions": [
+          {
+            "id": "q-1",
+            "currentText": "なぜ自分は急ぐのが苦手なのか？"
+          }
+        ],
+        "pickled": false
+      },
+      {
+        "id": "e-3",
+        "createdAt": "2026-08-31T07:41:00+09:00",
+        "excerpt": "朝、雨の匂いで目が覚めた。書くことが決まらないまま座っている。",
+        "chars": 154,
+        "linkedQuestions": [],
+        "pickled": false
+      }
+    ],
+    "board": {
+      "total": 2,
+      "cards": [
+        {
+          "id": "c-1",
+          "cardType": "snippet",
+          "x": 180,
+          "y": 160,
+          "rotation": -2,
+          "width": 280,
+          "height": 200,
+          "zIndex": 0,
+          "lines": 4
+        },
+        {
+          "id": "c-2",
+          "cardType": "snippet",
+          "x": 560,
+          "y": 300,
+          "rotation": 1.5,
+          "width": 240,
+          "height": 180,
+          "zIndex": 1,
+          "lines": 3
+        }
+      ]
+    }
+  },
+  "fermenting": {
+    "label": "発酵中 — readiness 中程度",
+    "now": "2026-09-02",
+    "profile": {
+      "nickname": "asuka",
+      "initial": "A"
+    },
+    "unreadCount": 0,
+    "fermentation": {
+      "readiness": 0.52,
+      "status": "fermenting",
+      "letters": []
+    },
+    "questions": [
+      {
+        "id": "q-1",
+        "currentText": "なぜ自分は急ぐのが苦手なのか？",
+        "isProposedByOryzae": false
+      },
+      {
+        "id": "q-2",
+        "currentText": "人にとってジャーナリングを続けることの意味とは何か？",
+        "isProposedByOryzae": true
+      }
+    ],
+    "notebooks": [
+      {
+        "month": "2026-09",
+        "entryCount": 11,
+        "current": true
+      },
+      {
+        "month": "2026-08",
+        "entryCount": 19,
+        "current": false
+      }
+    ],
+    "entries": [
+      {
+        "id": "e-1",
+        "createdAt": "2026-09-02T09:26:00+09:00",
+        "excerpt": "日産の新型リーフとボルボのEX30を乗り較べた。",
+        "chars": 612,
+        "linkedQuestions": [
+          {
+            "id": "q-2",
+            "currentText": "人にとってジャーナリングを続けることの意味とは何か？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-2",
+        "createdAt": "2026-09-01T22:04:00+09:00",
+        "excerpt": "一つひとつの文字が紙の上で「確定」されるまでの間が惜しい。",
+        "chars": 288,
+        "linkedQuestions": [
+          {
+            "id": "q-1",
+            "currentText": "なぜ自分は急ぐのが苦手なのか？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-3",
+        "createdAt": "2026-08-31T07:41:00+09:00",
+        "excerpt": "デジタルデトックスは都市環境、インフラレベルでデザインすべきことなのだろう。",
+        "chars": 431,
+        "linkedQuestions": [],
+        "pickled": false
+      },
+      {
+        "id": "e-4",
+        "createdAt": "2026-08-29T20:12:00+09:00",
+        "excerpt": "非媒介＝immediateな世界、という言葉がリバーサイドキャンプに着いてから浮かんでいた。",
+        "chars": 902,
+        "linkedQuestions": [
+          {
+            "id": "q-2",
+            "currentText": "人にとってジャーナリングを続けることの意味とは何か？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-5",
+        "createdAt": "2026-08-27T06:55:00+09:00",
+        "excerpt": "AIに『牽引』してもらう感覚。行動経済学のいう概念とも似ているようで、異なる。",
+        "chars": 344,
+        "linkedQuestions": [],
+        "pickled": false
+      },
+      {
+        "id": "e-6",
+        "createdAt": "2026-08-24T23:31:00+09:00",
+        "excerpt": "相手と呼応する。社会規範の内面化から脱規範化へ。",
+        "chars": 208,
+        "linkedQuestions": [
+          {
+            "id": "q-1",
+            "currentText": "なぜ自分は急ぐのが苦手なのか？"
+          }
+        ],
+        "pickled": false
+      }
+    ],
+    "board": {
+      "total": 4,
+      "cards": [
+        {
+          "id": "c-1",
+          "cardType": "snippet",
+          "x": 160,
+          "y": 150,
+          "rotation": -2,
+          "width": 280,
+          "height": 220,
+          "zIndex": 0,
+          "lines": 5
+        },
+        {
+          "id": "c-2",
+          "cardType": "snippet",
+          "x": 520,
+          "y": 120,
+          "rotation": 1,
+          "width": 320,
+          "height": 200,
+          "zIndex": 1,
+          "lines": 4
+        },
+        {
+          "id": "c-3",
+          "cardType": "photo",
+          "x": 880,
+          "y": 240,
+          "rotation": -3,
+          "width": 220,
+          "height": 160,
+          "zIndex": 2,
+          "lines": 0
+        },
+        {
+          "id": "c-4",
+          "cardType": "snippet",
+          "x": 420,
+          "y": 470,
+          "rotation": -1,
+          "width": 300,
+          "height": 190,
+          "zIndex": 3,
+          "lines": 4
+        }
+      ]
+    }
+  },
+  "almost": {
+    "label": "発酵直前 — readiness ほぼ満",
+    "now": "2026-09-02",
+    "profile": {
+      "nickname": "asuka",
+      "initial": "A"
+    },
+    "unreadCount": 0,
+    "fermentation": {
+      "readiness": 0.93,
+      "status": "fermenting",
+      "letters": []
+    },
+    "questions": [
+      {
+        "id": "q-1",
+        "currentText": "なぜ自分は急ぐのが苦手なのか？",
+        "isProposedByOryzae": false
+      },
+      {
+        "id": "q-2",
+        "currentText": "人にとってジャーナリングを続けることの意味とは何か？",
+        "isProposedByOryzae": true
+      },
+      {
+        "id": "q-3",
+        "currentText": "手を動かすことは考えることをどう変えるか？",
+        "isProposedByOryzae": false
+      }
+    ],
+    "notebooks": [
+      {
+        "month": "2026-09",
+        "entryCount": 17,
+        "current": true
+      },
+      {
+        "month": "2026-08",
+        "entryCount": 24,
+        "current": false
+      },
+      {
+        "month": "2026-07",
+        "entryCount": 12,
+        "current": false
+      }
+    ],
+    "entries": [
+      {
+        "id": "e-1",
+        "createdAt": "2026-09-02T09:26:00+09:00",
+        "excerpt": "日産の新型リーフとボルボのEX30を乗り較べた。",
+        "chars": 612,
+        "linkedQuestions": [
+          {
+            "id": "q-2",
+            "currentText": "人にとってジャーナリングを続けることの意味とは何か？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-2",
+        "createdAt": "2026-09-02T07:10:00+09:00",
+        "excerpt": "書く速度と考える速度がずれる朝がある。",
+        "chars": 197,
+        "linkedQuestions": [
+          {
+            "id": "q-3",
+            "currentText": "手を動かすことは考えることをどう変えるか？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-3",
+        "createdAt": "2026-09-01T22:04:00+09:00",
+        "excerpt": "一つひとつの文字が紙の上で「確定」されるまでの間が惜しい。",
+        "chars": 288,
+        "linkedQuestions": [
+          {
+            "id": "q-1",
+            "currentText": "なぜ自分は急ぐのが苦手なのか？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-4",
+        "createdAt": "2026-08-31T07:41:00+09:00",
+        "excerpt": "デジタルデトックスは都市環境、インフラレベルでデザインすべきことなのだろう。",
+        "chars": 431,
+        "linkedQuestions": [],
+        "pickled": true
+      },
+      {
+        "id": "e-5",
+        "createdAt": "2026-08-29T20:12:00+09:00",
+        "excerpt": "非媒介＝immediateな世界、という言葉がリバーサイドキャンプに着いてから浮かんでいた。",
+        "chars": 902,
+        "linkedQuestions": [
+          {
+            "id": "q-2",
+            "currentText": "人にとってジャーナリングを続けることの意味とは何か？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-6",
+        "createdAt": "2026-08-27T06:55:00+09:00",
+        "excerpt": "AIに『牽引』してもらう感覚。行動経済学のいう概念とも似ているようで、異なる。",
+        "chars": 344,
+        "linkedQuestions": [],
+        "pickled": false
+      }
+    ],
+    "board": {
+      "total": 5,
+      "cards": [
+        {
+          "id": "c-1",
+          "cardType": "snippet",
+          "x": 150,
+          "y": 140,
+          "rotation": -2,
+          "width": 280,
+          "height": 220,
+          "zIndex": 0,
+          "lines": 5
+        },
+        {
+          "id": "c-2",
+          "cardType": "snippet",
+          "x": 500,
+          "y": 110,
+          "rotation": 1,
+          "width": 320,
+          "height": 200,
+          "zIndex": 1,
+          "lines": 4
+        },
+        {
+          "id": "c-3",
+          "cardType": "photo",
+          "x": 880,
+          "y": 230,
+          "rotation": -3,
+          "width": 220,
+          "height": 160,
+          "zIndex": 2,
+          "lines": 0
+        },
+        {
+          "id": "c-4",
+          "cardType": "snippet",
+          "x": 400,
+          "y": 460,
+          "rotation": -1,
+          "width": 300,
+          "height": 190,
+          "zIndex": 3,
+          "lines": 4
+        },
+        {
+          "id": "c-5",
+          "cardType": "snippet",
+          "x": 820,
+          "y": 520,
+          "rotation": 2,
+          "width": 240,
+          "height": 180,
+          "zIndex": 4,
+          "lines": 3
+        }
+      ]
+    }
+  },
+  "completed": {
+    "label": "発酵完了 — 封が浮かび静か",
+    "now": "2026-09-02",
+    "profile": {
+      "nickname": "asuka",
+      "initial": "A"
+    },
+    "unreadCount": 1,
+    "fermentation": {
+      "readiness": 1,
+      "status": "completed",
+      "letters": [
+        {
+          "questionId": "q-2",
+          "questionText": "人にとってジャーナリングを続けることの意味とは何か？",
+          "fermentationId": "f-1",
+          "createdAt": "2026-09-02T05:00:00+09:00"
+        }
+      ]
+    },
+    "questions": [
+      {
+        "id": "q-1",
+        "currentText": "なぜ自分は急ぐのが苦手なのか？",
+        "isProposedByOryzae": false
+      },
+      {
+        "id": "q-2",
+        "currentText": "人にとってジャーナリングを続けることの意味とは何か？",
+        "isProposedByOryzae": true
+      }
+    ],
+    "notebooks": [
+      {
+        "month": "2026-09",
+        "entryCount": 17,
+        "current": true
+      },
+      {
+        "month": "2026-08",
+        "entryCount": 24,
+        "current": false
+      },
+      {
+        "month": "2026-07",
+        "entryCount": 12,
+        "current": false
+      }
+    ],
+    "entries": [
+      {
+        "id": "e-1",
+        "createdAt": "2026-09-02T09:26:00+09:00",
+        "excerpt": "日産の新型リーフとボルボのEX30を乗り較べた。",
+        "chars": 612,
+        "linkedQuestions": [
+          {
+            "id": "q-2",
+            "currentText": "人にとってジャーナリングを続けることの意味とは何か？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-2",
+        "createdAt": "2026-09-01T22:04:00+09:00",
+        "excerpt": "一つひとつの文字が紙の上で「確定」されるまでの間が惜しい。",
+        "chars": 288,
+        "linkedQuestions": [
+          {
+            "id": "q-1",
+            "currentText": "なぜ自分は急ぐのが苦手なのか？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-3",
+        "createdAt": "2026-08-31T07:41:00+09:00",
+        "excerpt": "デジタルデトックスは都市環境、インフラレベルでデザインすべきことなのだろう。",
+        "chars": 431,
+        "linkedQuestions": [],
+        "pickled": true
+      },
+      {
+        "id": "e-4",
+        "createdAt": "2026-08-29T20:12:00+09:00",
+        "excerpt": "非媒介＝immediateな世界、という言葉がリバーサイドキャンプに着いてから浮かんでいた。",
+        "chars": 902,
+        "linkedQuestions": [
+          {
+            "id": "q-2",
+            "currentText": "人にとってジャーナリングを続けることの意味とは何か？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-5",
+        "createdAt": "2026-08-27T06:55:00+09:00",
+        "excerpt": "AIに『牽引』してもらう感覚。行動経済学のいう概念とも似ているようで、異なる。",
+        "chars": 344,
+        "linkedQuestions": [],
+        "pickled": false
+      }
+    ],
+    "board": {
+      "total": 4,
+      "cards": [
+        {
+          "id": "c-1",
+          "cardType": "snippet",
+          "x": 150,
+          "y": 140,
+          "rotation": -2,
+          "width": 280,
+          "height": 220,
+          "zIndex": 0,
+          "lines": 5
+        },
+        {
+          "id": "c-2",
+          "cardType": "snippet",
+          "x": 500,
+          "y": 110,
+          "rotation": 1,
+          "width": 320,
+          "height": 200,
+          "zIndex": 1,
+          "lines": 4
+        },
+        {
+          "id": "c-3",
+          "cardType": "photo",
+          "x": 880,
+          "y": 230,
+          "rotation": -3,
+          "width": 220,
+          "height": 160,
+          "zIndex": 2,
+          "lines": 0
+        },
+        {
+          "id": "c-4",
+          "cardType": "snippet",
+          "x": 400,
+          "y": 460,
+          "rotation": -1,
+          "width": 300,
+          "height": 190,
+          "zIndex": 3,
+          "lines": 4
+        }
+      ]
+    }
+  },
+  "accumulated": {
+    "label": "蓄積後 — 過去6ヶ月・ボード満杯",
+    "now": "2026-09-02",
+    "profile": {
+      "nickname": "asuka",
+      "initial": "A"
+    },
+    "unreadCount": 0,
+    "fermentation": {
+      "readiness": 0.34,
+      "status": "fermenting",
+      "letters": []
+    },
+    "questions": [
+      {
+        "id": "q-3",
+        "currentText": "手を動かすことは考えることをどう変えるか？",
+        "isProposedByOryzae": false
+      },
+      {
+        "id": "q-4",
+        "currentText": "静けさは何でできているのか？",
+        "isProposedByOryzae": true
+      }
+    ],
+    "notebooks": [
+      {
+        "month": "2026-09",
+        "entryCount": 9,
+        "current": true
+      },
+      {
+        "month": "2026-08",
+        "entryCount": 24,
+        "current": false
+      },
+      {
+        "month": "2026-07",
+        "entryCount": 31,
+        "current": false
+      },
+      {
+        "month": "2026-06",
+        "entryCount": 18,
+        "current": false
+      },
+      {
+        "month": "2026-05",
+        "entryCount": 22,
+        "current": false
+      },
+      {
+        "month": "2026-04",
+        "entryCount": 14,
+        "current": false
+      }
+    ],
+    "entries": [
+      {
+        "id": "e-1",
+        "createdAt": "2026-09-02T09:26:00+09:00",
+        "excerpt": "日産の新型リーフとボルボのEX30を乗り較べた。",
+        "chars": 612,
+        "linkedQuestions": [
+          {
+            "id": "q-3",
+            "currentText": "手を動かすことは考えることをどう変えるか？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-2",
+        "createdAt": "2026-09-01T22:04:00+09:00",
+        "excerpt": "一つひとつの文字が紙の上で「確定」されるまでの間が惜しい。",
+        "chars": 288,
+        "linkedQuestions": [],
+        "pickled": false
+      },
+      {
+        "id": "e-3",
+        "createdAt": "2026-08-31T07:41:00+09:00",
+        "excerpt": "コミュニティの bonding と非合目的的時間について。",
+        "chars": 512,
+        "linkedQuestions": [
+          {
+            "id": "q-4",
+            "currentText": "静けさは何でできているのか？"
+          }
+        ],
+        "pickled": true
+      },
+      {
+        "id": "e-4",
+        "createdAt": "2026-08-29T20:12:00+09:00",
+        "excerpt": "登拝 — 登って挨拶する、という所作の意味を考えていた。",
+        "chars": 742,
+        "linkedQuestions": [],
+        "pickled": true
+      },
+      {
+        "id": "e-5",
+        "createdAt": "2026-08-27T06:55:00+09:00",
+        "excerpt": "死者と講の関係。先達行者から講へ受け渡されるストーリー。",
+        "chars": 388,
+        "linkedQuestions": [
+          {
+            "id": "q-4",
+            "currentText": "静けさは何でできているのか？"
+          }
+        ],
+        "pickled": false
+      },
+      {
+        "id": "e-6",
+        "createdAt": "2026-08-24T23:31:00+09:00",
+        "excerpt": "相手と呼応する。社会規範の内面化から脱規範化へ。",
+        "chars": 208,
+        "linkedQuestions": [],
+        "pickled": true
+      },
+      {
+        "id": "e-7",
+        "createdAt": "2026-08-21T18:02:00+09:00",
+        "excerpt": "メディアビオトープとしての書斎環境について。",
+        "chars": 655,
+        "linkedQuestions": [
+          {
+            "id": "q-3",
+            "currentText": "手を動かすことは考えることをどう変えるか？"
+          }
+        ],
+        "pickled": false
+      }
+    ],
+    "board": {
+      "total": 10,
+      "cards": [
+        {
+          "id": "c-1",
+          "cardType": "snippet",
+          "x": 120,
+          "y": 120,
+          "rotation": -2,
+          "width": 280,
+          "height": 220,
+          "zIndex": 0,
+          "lines": 5
+        },
+        {
+          "id": "c-2",
+          "cardType": "snippet",
+          "x": 460,
+          "y": 100,
+          "rotation": 1,
+          "width": 300,
+          "height": 190,
+          "zIndex": 1,
+          "lines": 4
+        },
+        {
+          "id": "c-3",
+          "cardType": "photo",
+          "x": 830,
+          "y": 130,
+          "rotation": -3,
+          "width": 220,
+          "height": 160,
+          "zIndex": 2,
+          "lines": 0
+        },
+        {
+          "id": "c-4",
+          "cardType": "snippet",
+          "x": 150,
+          "y": 400,
+          "rotation": 2,
+          "width": 260,
+          "height": 200,
+          "zIndex": 3,
+          "lines": 4
+        },
+        {
+          "id": "c-5",
+          "cardType": "snippet",
+          "x": 470,
+          "y": 380,
+          "rotation": -1,
+          "width": 300,
+          "height": 210,
+          "zIndex": 4,
+          "lines": 5
+        },
+        {
+          "id": "c-6",
+          "cardType": "photo",
+          "x": 860,
+          "y": 420,
+          "rotation": 2.5,
+          "width": 240,
+          "height": 170,
+          "zIndex": 5,
+          "lines": 0
+        },
+        {
+          "id": "c-7",
+          "cardType": "snippet",
+          "x": 260,
+          "y": 650,
+          "rotation": -2,
+          "width": 240,
+          "height": 180,
+          "zIndex": 6,
+          "lines": 3
+        },
+        {
+          "id": "c-8",
+          "cardType": "snippet",
+          "x": 620,
+          "y": 640,
+          "rotation": 1.5,
+          "width": 280,
+          "height": 190,
+          "zIndex": 7,
+          "lines": 4
+        },
+        {
+          "id": "c-9",
+          "cardType": "photo",
+          "x": 960,
+          "y": 660,
+          "rotation": -1.5,
+          "width": 200,
+          "height": 150,
+          "zIndex": 8,
+          "lines": 0
+        },
+        {
+          "id": "c-10",
+          "cardType": "snippet",
+          "x": 1080,
+          "y": 330,
+          "rotation": 3,
+          "width": 220,
+          "height": 200,
+          "zIndex": 9,
+          "lines": 4
+        }
+      ]
+    }
+  }
+}

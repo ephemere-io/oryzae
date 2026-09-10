@@ -333,7 +333,9 @@
       "bring_to_front": "移到最前",
       "delete": "删除",
       "open": "打开",
-      "ocr": "从图片读取"
+      "ocr": "从图片读取",
+      "collapse": "收起工具栏",
+      "expand": "展开工具栏"
     },
     "drop_image": "把图片拖到这里"
   },
@@ -725,8 +727,7 @@
       "questions": "提问"
     },
     "jar": {
-      "title": "瓶中收到的信",
-      "empty": "还没有收到信",
+      "title": "瓶",
       "untitled": "无标题提问",
       "close": "关闭",
       "letter_empty": "此结果还没有信",
@@ -734,10 +735,14 @@
       "section_letter": "来信",
       "section_keywords": "词语",
       "section_snippets": "摘录",
-      "unread": "未读",
-      "read": "已读",
       "section_sources": "来源记录",
-      "source_untitled": "无标题记录"
+      "source_untitled": "无标题记录",
+      "no_questions": "还没有提问。可以从下方按钮开始。",
+      "spin_hint": "横向滑动即可转动",
+      "manage_questions": "添加或编辑提问",
+      "not_fermented": "这个提问还没有发酵",
+      "tap_hint": "点按阅读",
+      "selection_reason": "被选中的理由"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -769,7 +774,22 @@
       "delete": "结束这个提问",
       "cancel": "取消",
       "save": "保存",
-      "letter_arrived": "有一封信送到了"
+      "letter_arrived": "有一封信送到了",
+      "close": "关闭"
+    },
+    "board": {
+      "cards": "{count}张",
+      "empty": "今天还没有任何内容",
+      "hint": "可以用手指拖动卡片",
+      "add_snippet": "创建摘录",
+      "add_photo": "添加照片",
+      "edit": "编辑",
+      "bring_to_front": "移到前面",
+      "remove": "移除",
+      "cancel": "取消",
+      "save": "保存",
+      "resize": "改变大小和方向",
+      "snippet_placeholder": "想留下的话"
     }
   },
   "canvas": {
@@ -780,5 +800,54 @@
       "fit_aria": "适应内容",
       "fit": "Fit"
     }
+  },
+  "study": {
+    "title": "书斋",
+    "label_jar": "JAR",
+    "label_journal": "ENTRIES",
+    "label_board": "BOARD",
+    "label_archive": "ARCHIVE",
+    "pill_jar_empty": "空",
+    "pill_jar_fermenting": "发酵中",
+    "pill_jar_almost": "即将",
+    "pill_jar_letter": "信件",
+    "pill_entries": "{count}条",
+    "pill_volumes": "{count}册",
+    "pill_cards": "{count}张",
+    "back_to_study": "返回书斋",
+    "account": "账户",
+    "list_all": "ALL ENTRIES",
+    "list_month": "{month} ENTRIES",
+    "list_heading_all": "ALL — {count} ENTRIES",
+    "list_heading_month": "{month} — {count} ENTRIES",
+    "list_close": "关闭",
+    "list_new_entry": "新建记录",
+    "list_empty_month": "本月没有记录",
+    "list_loading": "加载中",
+    "list_search_placeholder": "搜索正文",
+    "list_load_more": "加载更多",
+    "chip_all_questions": "全部提问",
+    "question_untitled": "无标题提问",
+    "chip_all": "ALL",
+    "row_chars": "{count} CHARS",
+    "row_pickled": "PICKLED",
+    "tooltip_current": "本月",
+    "tooltip_entries": "{count}条记录",
+    "fallback_heading": "无法显示书斋",
+    "fallback_body": "当前环境不支持 3D 显示。您仍可继续使用原有画面。",
+    "fallback_jar": "打开瓶子",
+    "fallback_journal": "写下记录",
+    "fallback_board": "打开看板",
+    "questions_timeline": "提问的变迁",
+    "hint_pen": "写一篇记录",
+    "hint_jar_empty": "还没有腌渍任何东西",
+    "hint_jar_fermenting": "正在发酵",
+    "hint_jar_almost": "信件即将送达",
+    "hint_jar_letter": "有未读的信",
+    "hint_jar_read": "可以重读来信",
+    "hint_board_empty": "还没有贴任何东西",
+    "hint_board_photos": "{count} 张照片",
+    "hint_board_snippets": "{count} 条摘录",
+    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
   }
 }

@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MenuOption, MenuPanel } from '@/components/ui/menu';
+import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
 
 interface QuestionOption {
   id: string;
@@ -21,6 +22,34 @@ interface QuestionChipProps {
    */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+}
+
+/** 列のどちらの端にまだ続きがあるか。 */
+interface RailEdges {
+  start: boolean;
+  end: boolean;
+}
+
+const NO_EDGES: RailEdges = { start: false, end: false };
+
+/** 霞ませる幅（px）。チップ 1 枚の頭が読める程度に留める。 */
+const RAIL_FADE_PX = 24;
+
+function readRailEdges(rail: HTMLElement): RailEdges {
+  // 1px の誤差を見込む（小数の scrollLeft で端に着いても着かないことがある）。
+  return {
+    start: rail.scrollLeft > 1,
+    end: rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1,
+  };
+}
+
+/** あふれている側の端だけを霞ませる。どちらも収まっていれば何もしない。 */
+function railMaskStyle(edges: RailEdges): React.CSSProperties | undefined {
+  if (!edges.start && !edges.end) return undefined;
+  const start = edges.start ? `transparent 0, #000 ${RAIL_FADE_PX}px` : '#000 0';
+  const end = edges.end ? `#000 calc(100% - ${RAIL_FADE_PX}px), transparent 100%` : '#000 100%';
+  const mask = `linear-gradient(to right, ${start}, ${end})`;
+  return { maskImage: mask, WebkitMaskImage: mask };
 }
 
 /**
@@ -58,8 +87,71 @@ export function QuestionChip({
     [onOpenChange],
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
 
   const linked = activeQuestions.filter((q) => linkedQuestionIds.has(q.id));
+
+  /**
+   * 結んだ問いの列は**決まった幅の中で横に流れる**。
+   *
+   * 以前は列が伸び放題で、問いを 2 つ結ぶと画面の中央まで届き、上端に掛かる
+   * 「書斎へ戻る」と重なった（実機レビュー）。行を下へずらす直し方は「ただ
+   * ずらしただけ」と言われたので、列の側を決まった幅に収め、その中で流す。
+   *
+   * 流れていることが見えないと、隠れた問いが「無い」ことになる。**あふれている側の
+   * 端だけを霞ませ**、そこにまだ続きがあると見せる。縦のホイールも横に回す
+   * （マウスには横のホイールが無い）。
+   */
+  const [edges, setEdges] = useState<RailEdges>(NO_EDGES);
+
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const update = () => setEdges(readRailEdges(rail));
+    update();
+    rail.addEventListener('scroll', update, { passive: true });
+    // 幅が変わったら測り直す。ResizeObserver が無い環境（jsdom）では、スクロールと
+    // 結び直しのときだけ測る — 霞みが遅れて付くだけで、列は流れる。
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(rail);
+
+    const onWheel = (event: WheelEvent) => {
+      // トラックパッドの横スワイプはそのまま通す。縦しか持たないホイールだけを横へ。
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      if (rail.scrollWidth <= rail.clientWidth) return;
+      event.preventDefault();
+      rail.scrollLeft += event.deltaY;
+    };
+    rail.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => {
+      rail.removeEventListener('scroll', update);
+      rail.removeEventListener('wheel', onWheel);
+      observer?.disconnect();
+    };
+  }, []);
+
+  /**
+   * いま結んだ問いを見える位置まで送る。列の外に生まれると、押したのに何も
+   * 起きなかったように見える。結んだ本数が変わるたびに霞みも測り直す（列の箱の
+   * 大きさは変わらないので、ResizeObserver は気づかない）。
+   */
+  const previousLinked = useRef<ReadonlySet<string>>(new Set(linkedQuestionIds));
+  useEffect(() => {
+    const rail = railRef.current;
+    const added = [...linkedQuestionIds].find((id) => !previousLinked.current.has(id));
+    previousLinked.current = new Set(linkedQuestionIds);
+    if (!rail) return;
+    setEdges(readRailEdges(rail));
+    if (added === undefined) return;
+    // id を選択子に埋め込まず、並びから探す（`CSS.escape` は jsdom に無い）。
+    const chip = [...rail.children].find(
+      (child) => child instanceof HTMLElement && child.dataset.questionId === added,
+    );
+    if (chip instanceof HTMLElement && typeof chip.scrollIntoView === 'function') {
+      chip.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    }
+  }, [linkedQuestionIds]);
   // 「足す」を隠すのは、**選べる問いを出し切ったときだけ**。
   // 押しても選べるものが無いボタンは「壊れている」と思わせるが、逆に
   // 問いがまだ1つも無いときに隠すと、紐づける入口そのものが消えてしまう
@@ -96,25 +188,9 @@ export function QuestionChip({
     };
   }, [open, setOpen]);
 
-  // CSS カスタムプロパティは React.CSSProperties に含まれないので、`--*` を許す形で広げる。
-  const linkedChipStyle: React.CSSProperties & Record<`--${string}`, string> = {
-    color: 'var(--accent)',
-    '--chip-bg': 'color-mix(in srgb, var(--accent) 14%, var(--surface-raised))',
-    '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 24%, var(--surface-raised))',
-    '--chip-border': 'color-mix(in srgb, var(--accent) 38%, transparent)',
-    '--chip-border-hover': 'color-mix(in srgb, var(--accent) 60%, transparent)',
-  };
-  const addChipStyle: React.CSSProperties & Record<`--${string}`, string> = {
-    color: 'var(--fg)',
-    '--chip-bg': 'var(--surface-raised)',
-    '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 12%, var(--surface-raised))',
-    '--chip-border': 'var(--surface-raised-border)',
-    '--chip-border-hover': 'color-mix(in srgb, var(--accent) 45%, transparent)',
-  };
-  const chipClass =
-    'flex h-8 shrink-0 items-center gap-2 rounded-full border border-[var(--chip-border)] ' +
-    'bg-[var(--chip-bg)] px-3.5 text-[13.5px] font-medium transition-colors duration-150 ' +
-    'hover:border-[var(--chip-border-hover)] hover:bg-[var(--chip-bg-hover)]';
+  // 地・縁・角丸・ホバーはアクションパレットと同じ面（ELEVATED_CHIP_*）。影は付けない。
+  // 結んでいる印は「◦」だけに accent を残す（地まで accent にすると別の部品に見える）。
+  const chipClass = `flex h-9 shrink-0 items-center gap-2 px-4 text-[13.5px] font-medium ${ELEVATED_CHIP_CLASS}`;
 
   return (
     // 器はボタンに張りつく大きさにする（inline-flex）。中央寄せの箱にしていた頃は、
@@ -133,12 +209,23 @@ export function QuestionChip({
       {/* 結ばれている問いは**全部並べる**。以前は先頭だけを出して残りを「+n」に畳んでいたが、
           畳んだ数字からは「どの問いを結んだのか」が分からない。横に余裕がある場所なので、
           そのまま並べ、あふれたら横に流す（縦に折り返すとヘッダーの高さが動く）。 */}
-      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={railRef}
+        className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={railMaskStyle(edges)}
+      >
         {/* チップ**全体**を外すボタンにしない。結んだ問いを確かめようと押しただけで
             消えてしまう（実際にそうなっていた）。外すのは × だけ。 */}
         {linked.map((q) => (
-          <span key={q.id} className={chipClass} style={linkedChipStyle}>
-            <span aria-hidden="true">◦</span>
+          <span
+            key={q.id}
+            data-question-id={q.id}
+            className={chipClass}
+            style={ELEVATED_CHIP_STYLE}
+          >
+            <span aria-hidden="true" style={{ color: 'var(--accent)' }}>
+              ◦
+            </span>
             <span className="whitespace-nowrap">{q.currentText ?? t('untitled')}</span>
             <button
               type="button"
@@ -163,7 +250,7 @@ export function QuestionChip({
             aria-haspopup="menu"
             aria-label={t('empty')}
             className={chipClass}
-            style={addChipStyle}
+            style={ELEVATED_CHIP_STYLE}
           >
             <span aria-hidden="true">+</span>
             {linked.length === 0 && <span className="whitespace-nowrap">{t('empty')}</span>}

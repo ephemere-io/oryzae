@@ -96,6 +96,28 @@ export const CONTROL_FONT = {
   fontFamily: 'Inter, "Noto Sans JP", sans-serif',
 } as const;
 
+/** 浮いた面の角丸。パレットの面（medium）と同じ値。 */
+const ELEVATED_RADIUS = PALETTE_SCALE.medium.panelRadius;
+
+/**
+ * 浮いたチップ（問いのチップ・書斎へ戻るタブ・問いの変遷）の面。パレットの面と同じ地・縁・角丸。
+ *
+ * **影は付けない。** パレットと同じ影を付けた版は「見にくい・気持ち悪い」と報告された
+ * （実機レビュー）。縁の 1 本で面は地から立つ。
+ *
+ * 地は class で持つ。インライン style の背景は `:hover` に必ず勝つので、style に置くと
+ * ホバーで地が沈まなくなる。沈み方はパレットのボタンと同じ（白に黒 5%）。
+ */
+export const ELEVATED_CHIP_CLASS =
+  'border bg-[var(--surface-raised)] transition-colors duration-150 ' +
+  'hover:bg-[color-mix(in_srgb,var(--surface-raised)_95%,black)]';
+
+export const ELEVATED_CHIP_STYLE = {
+  borderColor: 'var(--surface-raised-border)',
+  borderRadius: ELEVATED_RADIUS,
+  color: 'var(--fg)',
+} as const;
+
 /** 面に載るアイコンの寸法。className ではなく width/height 属性に渡す。 */
 export const ICON_SIZE = 18;
 

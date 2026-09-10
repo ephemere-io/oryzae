@@ -3,211 +3,219 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { useFermentationDetail } from '@/features/shared/fermentation/hooks/use-fermentation-detail';
+import { useCallback, useMemo, useState } from 'react';
+import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
+import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
-import type { InboxLetter } from '@/features/shared/fermentation/types';
-import { SpJarRowsSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
+import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
+import type { FermentationDetail, JarLayout } from '@/features/shared/fermentation/types';
+import type { JarQuestion } from '@/features/shared/questions/types';
+import {
+  SpElementSheet,
+  type SpJarElement,
+} from '@/features/sp/fermentation/components/sp-element-sheet';
+import { type OrbitQuestion, SpJarOrbit } from '@/features/sp/fermentation/components/sp-jar-orbit';
+import { SpJarOrbitSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
+import {
+  SpQuestionZoom,
+  type ZoomPosition,
+} from '@/features/sp/fermentation/components/sp-question-zoom';
 import type { ApiClient } from '@/lib/api';
-import { formatMonthDay } from '@/lib/format-date';
 import { useUnread } from '@/lib/unread-context';
 
 interface SpJarProps {
   api: ApiClient | null;
+  /** 壜のまわりを回る問い。取得は page（use-jar-questions）が行う。 */
+  questions: JarQuestion[];
+  /** 問いがまだ取れていない間は「0 件」ではなく枠を出す。 */
+  loading: boolean;
+  /** 問いの追加・編集・終了を開く。一覧は page が重ねる（ドメインをまたぐため）。 */
+  onManageQuestions: () => void;
 }
 
 /**
- * SP 版「瓶」= 発酵の結果を読む場所（Issue #363）。問いごとに、届いた発酵を
- * 一覧（未読/既読を明示）→ タップで 手紙・言葉(keywords)・抜粋(snippets) を読む
- * →「返事を書く」。PC のドラッグ盤面・アニメーションは持たない（モバイル向けに簡略）。
+ * SP 版「瓶」。
+ *
+ * PC と同じ壜を中央に置き、そのまわりを問いの円が回る。指で払うと速く回り、
+ * ひとつタップすると円が画面いっぱいに開いて、中の言葉・抜粋・手紙を読める。
+ *
+ * PC との違いは**盤面を持たないこと**。PC は問いの円を自分で好きな場所へ置ける
+ * 世界だが、SP は片手で持つ画面なので「置き場」を作れない。代わりに軌道の上に
+ * 等間隔で並べ、回して選ぶ。
  */
-export function SpJar({ api }: SpJarProps) {
+export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps) {
   const t = useTranslations('sp.jar');
   const router = useRouter();
-  const { letters, loading } = useFermentationInbox(api, false);
+  const { letters } = useFermentationInbox(api, false);
   const { ready: unreadReady, unreadQuestionIds, markQuestionRead } = useUnread();
-  const [open, setOpen] = useState<InboxLetter | null>(null);
-  const { detail, loading: detailLoading } = useFermentationDetail(
-    api,
-    open?.fermentationId ?? null,
+
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [element, setElement] = useState<SpJarElement | null>(null);
+
+  /**
+   * 円の中で動かした要素の位置（id → 位置）。
+   *
+   * サーバーにも憶える（PC の瓶と同じ `PUT /api/v1/jar/layout`）。置いた場所が端末を
+   * またいで残らないと、動かせる意味が薄い。保存は 500ms まとめ（useJarLayoutSave）。
+   */
+  const [positions, setPositions] = useState<Record<string, ZoomPosition>>({});
+  const { saveLayout } = useJarLayoutSave(api);
+
+  const openQuestion = questions.find((question) => question.id === openId) ?? null;
+  const { detail, loading: detailLoading } = useFermentationForQuestion(api, openQuestion?.id);
+
+  // サーバーが憶えている位置を初期値にする。動かしていない要素は輪の上の既定位置。
+  const storedPositions = useMemo<Record<string, ZoomPosition>>(() => {
+    if (!detail) return {};
+    const out: Record<string, ZoomPosition> = {};
+    const put = (item: { id: string; jarX: number | null; jarY: number | null }) => {
+      if (item.jarX === null || item.jarY === null) return;
+      out[item.id] = { xPercent: item.jarX, yPercent: item.jarY };
+    };
+    for (const keyword of detail.keywords) put(keyword);
+    for (const snippet of detail.snippets) put(snippet);
+    if (detail.letter) put(detail.letter);
+    return out;
+  }, [detail]);
+
+  const handleMove = useCallback(
+    (id: string, position: ZoomPosition) => {
+      setPositions((prev) => {
+        const next = { ...prev, [id]: position };
+        if (detail) saveLayout(toJarLayout(detail, { ...storedPositions, ...next }));
+        return next;
+      });
+    },
+    [detail, storedPositions, saveLayout],
   );
+
+  // 円の中身は**開く前から**見せる。届いた手紙の詳細をまとめて引いておく
+  // （問いは生存が最大 3 件なので往復も 3 回に収まる）。
+  const fermentationIds = useMemo(() => letters.map((letter) => letter.fermentationId), [letters]);
+  const { details } = useFermentationDetails(api, fermentationIds);
+
+  const untitled = t('untitled');
+  const orbitQuestions = useMemo<OrbitQuestion[]>(() => {
+    const letterByQuestion = new Map(letters.map((letter) => [letter.questionId, letter]));
+    return questions.map((question) => {
+      const letter = letterByQuestion.get(question.id);
+      const detail = letter ? details.get(letter.fermentationId) : undefined;
+      return {
+        id: question.id,
+        text: question.currentText ?? untitled,
+        hasLetter: letter !== undefined,
+        unread: unreadReady && unreadQuestionIds.has(question.id),
+        keywords: detail?.keywords.map((keyword) => keyword.keyword) ?? [],
+        snippetCount: detail?.snippets.length ?? 0,
+      };
+    });
+  }, [questions, letters, details, unreadReady, unreadQuestionIds, untitled]);
 
   return (
     <div
-      className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
+      className="relative flex h-full flex-col overflow-hidden bg-[var(--bg)] text-[var(--fg)]"
       style={{ fontFamily: 'var(--ob-font-serif)' }}
       {...verifyAttrs({
         unit: 'SpJar',
         loading,
-        letterCount: letters.length,
-        open: open !== null,
-        unreadCount: unreadReady
-          ? letters.filter((l) => unreadQuestionIds.has(l.questionId)).length
-          : 0,
+        questionCount: orbitQuestions.length,
+        open: openId !== null,
+        element: element?.kind ?? 'none',
+        unreadCount: orbitQuestions.filter((question) => question.unread).length,
       })}
     >
-      <header className="px-5 pt-6 pb-3 text-lg font-medium">{t('title')}</header>
+      {/* 左上は「書斎へ戻る」マークの席なので、見出しは中央に置く
+          （左寄せだとマークの下に潜って読めない）。 */}
+      <header className="px-5 pt-6 pb-2 text-center text-lg font-medium">{t('title')}</header>
 
+      {/* 取得中に「問いがありません」を出すと、一瞬「問いを消してしまった」ように見える。
+          取れていない間は枠のまま待つ。 */}
       {loading ? (
-        <SpJarRowsSkeleton />
-      ) : letters.length === 0 ? (
-        <div className="px-5 py-12 text-center text-sm opacity-50">{t('empty')}</div>
+        <SpJarOrbitSkeleton />
+      ) : orbitQuestions.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 px-10 text-center">
+          <p className="text-sm leading-relaxed opacity-60">{t('no_questions')}</p>
+        </div>
       ) : (
-        <ul className="sp-rise flex-1 overflow-auto px-5">
-          {letters.map((letter) => {
-            // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
-            const unread = unreadReady && unreadQuestionIds.has(letter.questionId);
-            return (
-              <li key={letter.fermentationId}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(letter);
-                    markQuestionRead(letter.questionId);
-                  }}
-                  className="flex w-full items-center gap-3 border-b border-[color-mix(in_srgb,var(--fg)_8%,transparent)] py-4 text-left"
-                >
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: unread ? 'var(--ob-jar-warm)' : 'transparent' }}
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate ${unread ? 'font-medium' : ''}`}>
-                      {letter.questionText ?? t('untitled')}
-                    </span>
-                    <span
-                      className="mt-0.5 block text-[11px]"
-                      style={{ color: 'var(--date-color)' }}
-                    >
-                      {unreadReady ? `${unread ? t('unread') : t('read')} · ` : ''}
-                      {formatMonthDay(letter.createdAt)}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <SpJarOrbit questions={orbitQuestions} onSelect={setOpenId} />
+          <p
+            className="pb-1 text-center text-[11px]"
+            style={{ color: 'var(--date-color)', fontFamily: 'var(--ob-font-sans)' }}
+          >
+            {t('spin_hint')}
+          </p>
+        </>
       )}
 
-      {open ? (
-        <div className="sp-rise absolute inset-0 z-10 flex flex-col bg-[var(--bg)]">
-          <header
-            className="flex items-center justify-between gap-3 px-5 py-4 text-xs"
-            style={{ color: 'var(--date-color)' }}
-          >
-            <span className="truncate">◦ {open.questionText ?? t('untitled')}</span>
-            <button type="button" onClick={() => setOpen(null)} className="shrink-0">
-              {t('close')}
-            </button>
-          </header>
+      <div className="flex justify-center px-5 pb-7 pt-2">
+        <button
+          type="button"
+          onClick={onManageQuestions}
+          className="rounded-full px-6 py-3 text-sm"
+          style={{
+            background: 'var(--ob-card-bg)',
+            border: '1px solid var(--border-subtle)',
+            fontFamily: 'var(--ob-font-sans)',
+          }}
+        >
+          {t('manage_questions')}
+        </button>
+      </div>
 
-          <div className="flex-1 overflow-auto px-6 pb-6">
-            {/* 手紙 */}
-            <SectionLabel>{t('section_letter')}</SectionLabel>
-            <p className="whitespace-pre-wrap text-base leading-loose">
-              {detailLoading ? '' : (detail?.letter?.bodyText ?? t('letter_empty'))}
-            </p>
+      {openQuestion ? (
+        <SpQuestionZoom
+          questionText={openQuestion.currentText ?? untitled}
+          detail={detail}
+          loading={detailLoading}
+          onClose={() => {
+            setOpenId(null);
+            setElement(null);
+          }}
+          positions={{ ...storedPositions, ...positions }}
+          onMove={handleMove}
+          onOpenElement={(next) => {
+            setElement(next);
+            // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
+            if (next.kind === 'letter') markQuestionRead(openQuestion.id);
+          }}
+        />
+      ) : null}
 
-            {/* 言葉（keywords） */}
-            {detail && detail.keywords.length > 0 ? (
-              <>
-                <SectionLabel>{t('section_keywords')}</SectionLabel>
-                <div className="flex flex-wrap gap-2">
-                  {detail.keywords.map((k) => (
-                    <span
-                      key={k.id}
-                      className="rounded-full px-3 py-1 text-xs"
-                      style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}
-                    >
-                      {k.keyword}
-                    </span>
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            {/* 抜粋（snippets） */}
-            {detail && detail.snippets.length > 0 ? (
-              <>
-                <SectionLabel>{t('section_snippets')}</SectionLabel>
-                <div className="flex flex-col gap-3">
-                  {detail.snippets.map((s) => (
-                    <div
-                      key={s.id}
-                      className="rounded-xl p-3"
-                      style={{
-                        background: 'var(--ob-card-bg)',
-                        border: '1px solid var(--border-subtle)',
-                      }}
-                    >
-                      <p className="text-sm leading-relaxed">「{s.originalText}」</p>
-                      <p className="mt-1.5 text-[11px]" style={{ color: 'var(--date-color)' }}>
-                        {formatMonthDay(s.sourceDate)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            {/* もとになった記録（Issue #453: 手紙だけ読んでも何への返事か分からなかった） */}
-            {detail && detail.scannedEntries.length > 0 ? (
-              <>
-                <SectionLabel>{t('section_sources')}</SectionLabel>
-                <ul className="flex flex-col gap-2">
-                  {detail.scannedEntries.map((e) => (
-                    <li key={e.id}>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/entries/${e.id}`)}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left"
-                        style={{
-                          background: 'var(--ob-card-bg)',
-                          border: '1px solid var(--border-subtle)',
-                        }}
-                      >
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          {e.title || t('source_untitled')}
-                        </span>
-                        <span
-                          className="shrink-0 text-[11px]"
-                          style={{ color: 'var(--date-color)' }}
-                        >
-                          {formatMonthDay(e.createdAt)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : null}
-          </div>
-
-          <footer className="px-5 py-4">
-            <button
-              type="button"
-              onClick={() => router.push(`/entries/new?questionId=${open.questionId}`)}
-              className="w-full rounded-full py-3 text-center text-sm font-medium text-white"
-              style={{ background: 'var(--accent)', fontFamily: 'var(--ob-font-sans)' }}
-            >
-              {t('reply')}
-            </button>
-          </footer>
-        </div>
+      {element && openQuestion ? (
+        <SpElementSheet
+          element={element}
+          onClose={() => setElement(null)}
+          onReply={() => router.push(`/entries/new?questionId=${openQuestion.id}`)}
+          onOpenSource={(entryId) => router.push(`/entries/${entryId}`)}
+        />
       ) : null}
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p
-      className="mt-6 mb-2 text-[11px] uppercase tracking-[0.14em] first:mt-2"
-      style={{ color: 'var(--accent)', fontFamily: 'var(--ob-font-sans)' }}
-    >
-      {children}
-    </p>
-  );
+/**
+ * 動かした位置を保存の形に直す。
+ *
+ * サーバーは種類ごとの配列（keywords / snippets / letters）で受ける。ここに載せるのは
+ * **位置が決まっているものだけ**（まだ動かしていない要素は既定の輪の上に居るので、
+ * 座標を持たせない＝次に開いたときも輪の上から始まる）。
+ */
+function toJarLayout(
+  detail: FermentationDetail,
+  positions: Record<string, ZoomPosition>,
+): JarLayout {
+  const pick = (items: readonly { id: string }[]) =>
+    items.flatMap((item) => {
+      const position = positions[item.id];
+      if (!position) return [];
+      return [{ id: item.id, jarX: position.xPercent, jarY: position.yPercent }];
+    });
+
+  return {
+    questions: [],
+    keywords: pick(detail.keywords),
+    snippets: pick(detail.snippets),
+    letters: pick(detail.letter ? [detail.letter] : []),
+  };
 }

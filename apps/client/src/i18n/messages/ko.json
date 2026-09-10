@@ -333,7 +333,9 @@
       "bring_to_front": "맨 앞으로",
       "delete": "삭제",
       "open": "열기",
-      "ocr": "이미지에서 읽기"
+      "ocr": "이미지에서 읽기",
+      "collapse": "팔레트 접기",
+      "expand": "팔레트 펼치기"
     },
     "drop_image": "여기에 이미지를 놓으세요"
   },
@@ -725,19 +727,22 @@
       "questions": "질문"
     },
     "jar": {
-      "title": "병에 도착한 편지",
-      "empty": "아직 편지가 없습니다",
+      "title": "병",
       "untitled": "제목 없는 질문",
       "close": "닫기",
       "letter_empty": "이 결과에는 아직 편지가 없습니다",
       "reply": "답장 쓰기",
       "section_letter": "편지",
       "section_keywords": "단어",
-      "section_snippets": "발췌",
-      "unread": "안 읽음",
-      "read": "읽음",
+      "section_snippets": "스니펫",
       "section_sources": "바탕이 된 기록",
-      "source_untitled": "제목 없는 기록"
+      "source_untitled": "제목 없는 기록",
+      "no_questions": "아직 질문이 없습니다. 아래 버튼에서 시작해 보세요.",
+      "spin_hint": "옆으로 밀면 돌아갑니다",
+      "manage_questions": "질문 추가·편집",
+      "not_fermented": "이 질문은 아직 발효되지 않았습니다",
+      "tap_hint": "탭하여 읽기",
+      "selection_reason": "선택된 이유"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -769,7 +774,22 @@
       "delete": "이 질문 끝내기",
       "cancel": "취소",
       "save": "저장",
-      "letter_arrived": "편지가 도착했습니다"
+      "letter_arrived": "편지가 도착했습니다",
+      "close": "닫기"
+    },
+    "board": {
+      "cards": "{count}장",
+      "empty": "오늘은 아직 아무것도 없습니다",
+      "hint": "카드는 손가락으로 옮길 수 있습니다",
+      "add_snippet": "스니펫 만들기",
+      "add_photo": "사진 추가",
+      "edit": "편집",
+      "bring_to_front": "앞으로",
+      "remove": "빼기",
+      "cancel": "취소",
+      "save": "저장",
+      "resize": "크기와 방향 바꾸기",
+      "snippet_placeholder": "남겨 두고 싶은 것"
     }
   },
   "canvas": {
@@ -780,5 +800,54 @@
       "fit_aria": "전체 보기",
       "fit": "Fit"
     }
+  },
+  "study": {
+    "title": "서재",
+    "label_jar": "JAR",
+    "label_journal": "ENTRIES",
+    "label_board": "BOARD",
+    "label_archive": "ARCHIVE",
+    "pill_jar_empty": "비어 있음",
+    "pill_jar_fermenting": "발효 중",
+    "pill_jar_almost": "곧",
+    "pill_jar_letter": "편지",
+    "pill_entries": "{count}건",
+    "pill_volumes": "{count}권",
+    "pill_cards": "{count}장",
+    "back_to_study": "서재로 돌아가기",
+    "account": "계정",
+    "list_all": "ALL ENTRIES",
+    "list_month": "{month} ENTRIES",
+    "list_heading_all": "ALL — {count} ENTRIES",
+    "list_heading_month": "{month} — {count} ENTRIES",
+    "list_close": "닫기",
+    "list_new_entry": "새로 작성",
+    "list_empty_month": "이 달의 기록이 없습니다",
+    "list_loading": "불러오는 중",
+    "list_search_placeholder": "본문 검색",
+    "list_load_more": "더 불러오기",
+    "chip_all_questions": "모든 질문",
+    "question_untitled": "제목 없는 질문",
+    "chip_all": "ALL",
+    "row_chars": "{count} CHARS",
+    "row_pickled": "PICKLED",
+    "tooltip_current": "이번 달",
+    "tooltip_entries": "{count}건의 기록",
+    "fallback_heading": "서재를 표시할 수 없습니다",
+    "fallback_body": "사용 중인 환경에서는 3D 표시를 지원하지 않습니다. 기존 화면에서 계속 사용하실 수 있습니다.",
+    "fallback_jar": "병 열기",
+    "fallback_journal": "기록 쓰기",
+    "fallback_board": "보드 열기",
+    "questions_timeline": "질문의 변천",
+    "hint_pen": "엔트리를 쓰다",
+    "hint_jar_empty": "아직 담근 것이 없습니다",
+    "hint_jar_fermenting": "발효가 진행 중입니다",
+    "hint_jar_almost": "곧 편지가 도착합니다",
+    "hint_jar_letter": "읽지 않은 편지가 있습니다",
+    "hint_jar_read": "편지를 다시 읽을 수 있습니다",
+    "hint_board_empty": "아직 붙인 것이 없습니다",
+    "hint_board_photos": "사진 {count}건",
+    "hint_board_snippets": "스니펫 {count}건",
+    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건"
   }
 }

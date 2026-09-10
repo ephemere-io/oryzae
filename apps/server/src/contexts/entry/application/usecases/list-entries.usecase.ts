@@ -1,5 +1,6 @@
 import type {
   EntryListOrder,
+  EntryMonthFilter,
   EntryRepositoryGateway,
 } from '../../domain/gateways/entry-repository.gateway.js';
 import type { EntryProps } from '../../domain/models/entry.js';
@@ -13,8 +14,16 @@ export class ListEntriesUsecase {
     limit?: number,
     questionId?: string,
     order?: EntryListOrder,
+    month?: EntryMonthFilter,
   ): Promise<EntryProps[]> {
-    const entries = await this.entryRepo.listByUserId(userId, cursor, limit, questionId, order);
+    const entries = await this.entryRepo.listByUserId(
+      userId,
+      cursor,
+      limit,
+      questionId,
+      order,
+      month,
+    );
     return entries.map((entry) => entry.toProps());
   }
 }

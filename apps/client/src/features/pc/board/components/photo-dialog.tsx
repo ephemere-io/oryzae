@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { readImageDimensions, resizeImage } from '@/lib/image';
 import { useEscapeKey } from '@/lib/use-escape-key';
 
 interface PhotoDialogProps {
@@ -11,12 +12,6 @@ interface PhotoDialogProps {
   initialFile?: File | null;
   onSubmit: (file: File, caption: string, imageWidth: number, imageHeight: number) => Promise<void>;
   onClose: () => void;
-}
-
-interface ResizeResult {
-  blob: Blob;
-  width: number;
-  height: number;
 }
 
 /**
@@ -29,64 +24,6 @@ interface ResizeResult {
  */
 const MAX_UPLOAD_WIDTH = 2400;
 const JPEG_QUALITY = 0.9;
-
-function resizeImage(file: File, maxWidth: number, quality: number): Promise<ResizeResult> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const canvas = document.createElement('canvas');
-      let { width, height } = img;
-      // 上限より小さい画像は縮小しない。ここで再エンコードすると、荒くなるだけで
-      // 得るものが無い（元が JPEG なら二重圧縮、PNG なら不可逆になる）。
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      // JPEG は透明を持てない。canvas の初期値は透明な黒なので、そのまま JPEG に
-      // すると PNG の透明部分が**黒く潰れる**。ロゴやスクリーンショットのように背景が
-      // 抜けている画像だと、貼った瞬間に黒い板になって出てくる。先に白で塗る。
-      if (ctx) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-      }
-      canvas.toBlob(
-        (blob) => resolve({ blob: blob ?? file, width, height }),
-        'image/jpeg',
-        quality,
-      );
-    };
-    // onerror が無いと、デコードできない画像（iPhone の HEIC を Chrome で開いた等）で
-    // onload が永遠に来ず、この Promise が解決しないまま handleSubmit が待ち続ける。
-    // 「アップロード中…」のまま固まり、閉じることもできなくなっていた。
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Failed to decode image'));
-    };
-    img.src = objectUrl;
-  });
-}
-
-function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Failed to load image'));
-    };
-    img.src = objectUrl;
-  });
-}
 
 export function PhotoDialog({ open, initialFile, onSubmit, onClose }: PhotoDialogProps) {
   const t = useTranslations('board.photo_dialog');

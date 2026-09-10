@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/shared/auth/components/google-login-button';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
+import { useHomeHref } from '@/features/shared/study/hooks/use-home-href';
 import { useAuth } from '@/lib/auth-context';
 
 export function LoginForm() {
@@ -18,6 +19,9 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+  // 行き先は HomeGate と同じものを使う。ここで /entries/new を直書きすると、
+  // ?study=on を付けても「ログインした先が書斎にならない」。
+  const { href: home, resolved } = useHomeHref();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +35,9 @@ export function LoginForm() {
       return;
     }
 
-    router.push('/entries/new');
+    // 手動切替はマウント時の effect で読むので、送信までにはまず解決している。
+    // 万一まだなら `/` へ送る（HomeGate が同じ規則で振り分ける）。
+    router.push(resolved ? home : '/');
   }
 
   return (

@@ -41,6 +41,68 @@ export function localDayRange(dateKey: string, tzOffsetMinutes = 0): UtcInstantR
   };
 }
 
+/**
+ * UTC の瞬間（`entries.created_at`）が、利用者のローカル暦では何年何月かを返す（`YYYY-MM`）。
+ *
+ * 書斎の手帳は「月」で 1 冊になる（docs/oryzae-study）。`created_at` を UTC のまま
+ * 月に丸めると、JST の利用者が月初 00:00〜09:00 に書いた記録が**前月の冊に落ちる**
+ * — `localDayRange` が日で踏んだのと同じズレを、月でもう一度踏むことになる。
+ *
+ * `tzOffsetMinutes` の符号は `localDayRange` と同じ（UTC − ローカル の分数。JST は -540）。
+ * 不正な日時は null を返す（呼び出し側が黙って捨てられるように。集計が 1 行落ちることは
+ * あっても、壊れた 1 行で月別集計そのものを失敗させない）。
+ */
+export function localMonthKey(createdAtIso: string, tzOffsetMinutes = 0): string | null {
+  const at = Date.parse(createdAtIso);
+  if (Number.isNaN(at)) return null;
+  // ローカル壁時計 = 実時刻 − offset（JST は -540 分なので +9 時間される）。
+  const local = new Date(at - tzOffsetMinutes * 60_000);
+  const year = local.getUTCFullYear();
+  const month = `${local.getUTCMonth() + 1}`.padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+/**
+ * UTC の瞬間が、利用者のローカル暦では何日かを返す（`YYYY-MM-DD`）。
+ *
+ * 手帳のホバーが言う「この冊は 08.03 – 08.29」の端を決める。**`localMonthKey` と同じ切り方**
+ * でなければならない — ずれると、ある冊の範囲の端が隣の月の日付になる。
+ * 不正な日時は null（呼び出し側がその行だけ捨てる）。
+ */
+export function localDateKey(createdAtIso: string, tzOffsetMinutes = 0): string | null {
+  const at = Date.parse(createdAtIso);
+  if (Number.isNaN(at)) return null;
+  const local = new Date(at - tzOffsetMinutes * 60_000);
+  const year = local.getUTCFullYear();
+  const month = `${local.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${local.getUTCDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * `YYYY-MM` が指すローカル暦月 1 ヶ月ぶんの UTC 区間。
+ *
+ * 書斎の一覧が「その月の記録」を引くのに使う。件数（`countByMonth` → `localMonthKey`）と
+ * **同じ月の切り方**でなければならない。ここがずれると、手帳の厚みが言う件数と一覧の
+ * 件数が食い違う（月初 00:00〜09:00 の記録が、片方では当月・片方では前月に入る）。
+ */
+export function localMonthRange(month: string, tzOffsetMinutes = 0): UtcInstantRange {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new Error(`Invalid month: ${month}`);
+  }
+  const start = localMidnightUtcMs(`${month}-01`, tzOffsetMinutes);
+  // 翌月 1 日のローカル 00:00。年跨ぎは Date の桁上がりに任せる。
+  const [year, monthIndex] = month.split('-').map(Number);
+  const nextYear = monthIndex === 12 ? year + 1 : year;
+  const nextMonth = monthIndex === 12 ? 1 : monthIndex + 1;
+  const nextKey = `${nextYear}-${`${nextMonth}`.padStart(2, '0')}-01`;
+  const end = localMidnightUtcMs(nextKey, tzOffsetMinutes);
+  return {
+    startUtc: new Date(start).toISOString(),
+    endUtc: new Date(end).toISOString(),
+  };
+}
+
 /** `dateKey` を含むローカルの週（月曜始まり）1 週間ぶんの UTC 区間。 */
 export function localWeekRange(dateKey: string, tzOffsetMinutes = 0): UtcInstantRange {
   const start = localMidnightUtcMs(dateKey, tzOffsetMinutes);

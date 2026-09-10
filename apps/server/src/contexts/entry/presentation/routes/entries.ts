@@ -8,6 +8,7 @@ import { CreateEntryUsecase } from '../../application/usecases/create-entry.usec
 import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase.js';
 import { GetEntryUsecase } from '../../application/usecases/get-entry.usecase.js';
 import { ListEntriesUsecase } from '../../application/usecases/list-entries.usecase.js';
+import { ListEntryMonthlyCountsUsecase } from '../../application/usecases/list-entry-monthly-counts.usecase.js';
 import { SearchEntriesUsecase } from '../../application/usecases/search-entries.usecase.js';
 import { TranscribeEntryPhotoUsecase } from '../../application/usecases/transcribe-entry-photo.usecase.js';
 import { UpdateEntryUsecase } from '../../application/usecases/update-entry.usecase.js';
@@ -17,6 +18,7 @@ import { SupabaseEntryRepository } from '../../infrastructure/repositories/supab
 import { SupabaseEntryLinkedQuestionsViewRepository } from '../../infrastructure/repositories/supabase-entry-linked-questions-view.repository.js';
 import { SupabaseEntrySnapshotRepository } from '../../infrastructure/repositories/supabase-entry-snapshot.repository.js';
 import { SupabaseEntryStorageGateway } from '../../infrastructure/storage/supabase-entry-storage.gateway.js';
+import { parseMonth, parseTzOffsetMinutes } from '../params.js';
 
 type Env = {
   Variables: {
@@ -108,6 +110,12 @@ export const entries = new Hono<Env>()
     const questionId = c.req.query('questionId');
     // 作成日のソート順。未知の値は既定の 'newest'（新しい順）に丸める。
     const order = c.req.query('order') === 'oldest' ? 'oldest' : 'newest';
+    // 書斎の一覧（docs/oryzae-study）用の月絞り。tzOffset は件数（monthly-counts）と
+    // 同じものを受ける — 切り方が違うと手帳の厚みと一覧の件数が食い違う。
+    const monthKey = parseMonth(c.req.query('month'));
+    const month = monthKey
+      ? { month: monthKey, tzOffsetMinutes: parseTzOffsetMinutes(c.req.query('tzOffset')) }
+      : undefined;
     const supabase = c.get('supabase');
     const entryRepo = new SupabaseEntryRepository(supabase);
     const parsedLimit = limit ? Number(limit) : undefined;
@@ -127,6 +135,7 @@ export const entries = new Hono<Env>()
           parsedLimit,
           questionId,
           order,
+          month,
         );
 
     // Issue #323: 一覧に紐づく問いを表示。entry-context-isolation を守るため
@@ -141,6 +150,22 @@ export const entries = new Hono<Env>()
       linkedQuestions: linkedByEntry[entry.id] ?? [],
     }));
     return c.json(result);
+  })
+  // 書斎の手帳（docs/oryzae-study）が読む月ごとの件数。
+  //
+  // **`/:id` より前に置くこと。** Hono は登録順に照合するので、後ろに置くと
+  // id="monthly-counts" の 1 件取得として食われ、必ず 404 になる。
+  .get('/monthly-counts', async (c) => {
+    const supabase = c.get('supabase');
+    const usecase = new ListEntryMonthlyCountsUsecase(new SupabaseEntryRepository(supabase));
+
+    // created_at は UTC 保存、「月」は利用者のローカル暦月。オフセットを受けないと
+    // JST の月初 00:00〜09:00 に書いた記録が前月の冊に落ちる。
+    const counts = await usecase.execute(
+      c.get('userId'),
+      parseTzOffsetMinutes(c.req.query('tzOffset')),
+    );
+    return c.json(counts);
   })
   .get('/:id', async (c) => {
     const supabase = c.get('supabase');

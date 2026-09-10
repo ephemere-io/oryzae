@@ -45,3 +45,35 @@ export interface EntryDraft {
   /** 最終編集時のローカル暦日（YYYY-MM-DD）。日付境界の判定に使う。 */
   dateKey: string;
 }
+
+/**
+ * ある月に書かれた記録の件数。`month` は `YYYY-MM`（利用者のローカル暦月であって
+ * UTC の月ではない）。書斎の手帳の厚みと、棚に並ぶ冊数を決める。
+ */
+export interface MonthlyEntryCount {
+  month: string;
+  count: number;
+  /**
+   * その月の最初と最後の記録の日（ローカル暦日 `YYYY-MM-DD`）。サーバーが返さなければ
+   * null（ホバーは件数だけを出す）。
+   */
+  first: string | null;
+  last: string | null;
+}
+
+/** 一覧の行に紐づく問いの最小形（Issue #323 でサーバーが埋め込んで返す）。 */
+export interface EntryLinkedQuestion {
+  id: string;
+  currentText: string | null;
+}
+
+/** 一覧が返す記録 1 件。本文まで含む（一覧は冒頭しか見せないが、行の描画側が決める）。 */
+export interface EntryListItem {
+  id: string;
+  userId: string;
+  content: string;
+  mediaUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+  linkedQuestions: EntryLinkedQuestion[];
+}

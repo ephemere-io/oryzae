@@ -7,6 +7,7 @@ import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
+import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
 import { FermentationCoverFlow } from '@/features/pc/fermentation/components/fermentation-cover-flow';
 import { JarVessel } from '@/features/pc/fermentation/components/jar-vessel';
@@ -1016,15 +1017,19 @@ export function JarView({
                     setEditText(q.currentText ?? '');
                     setTimeout(() => editInputRef.current?.focus(), 100);
                   }}
-                  className="rounded-full px-4 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-all hover:-translate-y-0.5"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--fg), rgba(140,133,126,0.9))',
-                    color: 'var(--bg)',
-                    fontFamily: "'Noto Serif JP', serif",
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    backdropFilter: 'blur(8px)',
-                    boxShadow: '0 2px 8px rgba(74,69,65,0.15)',
-                  }}
+                  /**
+                   * 問いのチップ。**アクションパレットと同じ面（地・縁・角丸）で描く。**
+                   * 影は付けない（付けた版は「見にくい」と報告された）。
+                   *
+                   * 黒いグラデーション → accent を敷いたピル、と 2 度変えたが、どちらも
+                   * エントリーの問いチップ・書斎へ戻るタブ・パレットと影も角丸も違い、
+                   * 同じアプリの部品に見えなかった（実機レビュー）。書体だけは瓶のまま
+                   * （明朝）にして、「問いは声に出して読むもの」という瓶の調子は残す。
+                   *
+                   * ホバーは地が沈むだけ（パレットと同じ）。持ち上げる動きはやめた。
+                   */
+                  className={`flex h-9 items-center px-4 text-[12px] font-medium tracking-[0.06em] ${ELEVATED_CHIP_CLASS}`}
+                  style={{ ...ELEVATED_CHIP_STYLE, fontFamily: "'Noto Serif JP', serif" }}
                 >
                   {q.currentText}
                 </button>

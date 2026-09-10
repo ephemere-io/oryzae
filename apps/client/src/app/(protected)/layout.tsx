@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
@@ -9,6 +9,14 @@ import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unrea
 import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
+import {
+  BackToStudy,
+  STUDY_EXIT_BAND,
+  STUDY_EXIT_RESERVE,
+} from '@/features/shared/study/components/back-to-study';
+import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
+import { QuestionsLink } from '@/features/shared/study/components/questions-link';
+import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
 import { SidebarProvider } from '@/lib/sidebar-context';
@@ -17,22 +25,84 @@ import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
 import { RouteLoading } from './_loading/route-loading';
 
-/** PC のシェル。幅の追従は CSS 変数に任せるので、ここは形だけを持つ。 */
-function PcShell({ children }: { children: React.ReactNode }) {
+// CSS カスタムプロパティは React.CSSProperties に含まれないので、
+// `--*` を許す形で型を広げて宣言する（キャストは使わない）。
+type MainStyle = React.CSSProperties & Record<`--${string}`, string>;
+
+/**
+ * PC のシェル。幅の追従は CSS 変数に任せるので、ここは形だけを持つ。
+ *
+ * 書斎が有効な間だけ構成が変わる（サイドバーを描かない／書斎ホームではフッターも外す）。
+ * フラグ off の間はどの分岐も false になり、従来どおりのシェルになる。
+ */
+function PcShell({
+  children,
+  studyHome,
+  onStudy,
+  exitTab,
+}: {
+  children: React.ReactNode;
+  /** 書斎が唯一のグローバルナビか。真なら左サイドバーを描かない。 */
+  studyHome: boolean;
+  /** いま書斎ホームそのものか。真ならフッターも外す。 */
+  onStudy: boolean;
+  /** 上端に「書斎へ戻る」のタブが掛かっているか。真なら画面は中央だけを空ける。 */
+  exitTab: boolean;
+}) {
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      {/* 書斎が有効な間は左サイドバーを描かない。行き先は 3D の物そのものが持ち、
+          サブ画面からの戻り道は左上のマークが担う。 */}
+      {!studyHome && <Sidebar />}
       {/* 左余白は CSS 変数（--sidebar-width）が配る。サイドバー本体・本文・エディタが
           同じ1本を見るので、掴んで引いても3者が同じフレームで動く。 */}
-      <main className="sidebar-inset flex flex-1 flex-col overflow-hidden">
+      <main
+        className="sidebar-inset flex flex-1 flex-col overflow-hidden"
+        // **サイドバーを描かない間は、その変数もここで 0 にする。**
+        // 変数は SidebarProvider が :root へ書くので、描かなくても 80px のまま残る。
+        // margin だけ外して変数を残すと、これを読んでいるボードのツールバーと
+        // エディタの左端だけが 80px ずれる。
+        style={shellStyle(studyHome, exitTab)}
+      >
+        {/* PC は画面を下げない。「設定・日付・問いの行をただ下にずらしただけ」と
+            報告された（実機レビュー）。タブは中央にしか高さを持たないので、画面は
+            中央を空けておけば足りる（`--study-exit-reserve`）。 */}
         <div className="relative flex-1 overflow-auto">{children}</div>
-        <PageFooter />
+        {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
+        {!onStudy && <PageFooter />}
       </main>
       {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
       <DesktopOnlyOverlay />
     </div>
   );
 }
+
+/**
+ * `<main>` が配る CSS 変数。
+ *
+ * - `--sidebar-width`: サイドバーを描かない間は 0（`SidebarProvider` が :root に
+ *   書いた 80px が残ると、これを読んでいるボードのツールバーとエディタの左端だけずれる）
+ * - `--study-exit-reserve`: 上端の中央に空けておく幅。「書斎へ戻る」のタブが掛かる席で、
+ *   **画面は下がらない**。いま読むのはエントリーのヘッダー（3 列の真ん中）だけで、
+ *   他の画面は元から中央を使っていない
+ */
+function shellStyle(studyHome: boolean, exitTab: boolean): MainStyle {
+  return {
+    ...(studyHome ? { '--sidebar-width': '0px' } : {}),
+    '--study-exit-reserve': exitTab ? `${STUDY_EXIT_RESERVE}px` : '0px',
+  };
+}
+
+/**
+ * SP のシェルが配る変数。**SP だけはタブの高さぶん画面を下げる** — SP のヘッダーは
+ * 題を中央に置くので、タブの真下に題が来てしまう。
+ */
+function spShellStyle(exitBand: boolean): MainStyle {
+  return { '--study-exit-band': exitBand ? `${STUDY_EXIT_BAND}px` : '0px' };
+}
+
+/** 書斎ホームそのもののパス。ここだけサイドバーを外す。 */
+const STUDY_PATH = '/study';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
@@ -42,6 +112,26 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const unread = useUnreadLetters(api, loading);
   const device = useDevice();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // 書斎ホームのときだけ PC シェルの構成が変わる（サイドバーとフッターを外す）。
+  // フラグ off の間はこの分岐が常に false になり、シェルは従来どおり。
+  // 解決前は false 扱いでよい（シェルの見た目が 1 フレーム遅れて変わるだけで、
+  // 後戻りできない判断はしていない）。env で on にしている環境では初回から true。
+  const { enabled: studyHome } = useStudyHome();
+  const onStudy = studyHome && pathname === STUDY_PATH;
+  // 書斎が有効な間、サブ画面の左上にはマークが「書斎へ戻る」として浮く。
+  const showBackToStudy = studyHome && pathname !== STUDY_PATH;
+  /**
+   * 「問いの変遷」への導線を出すか。
+   *
+   * サイドバーを外したことで `/questions` はどこからも行けなくなった。問いの追加と
+   * 編集は瓶の中でできるが、いつ・どう変わってきたかはあの画面にしかない。
+   *
+   * **PC だけ**。SP の瓶には「問いを整える」が下端にあり、そこから同じ画面へ入れる。
+   * 右上にもう 1 つ置くと、同じ行き先の入口が 2 つ並ぶことになる。
+   */
+  const showQuestionsLink = studyHome && device === 'pc' && pathname === '/jar';
 
   // Issue #362/#363: 保護下の children はクライアント専用に描画する（mounted ゲート）。
   // エディタ等の時刻依存・認証依存レンダリングが SSR↔client で食い違う不一致(React #418)
@@ -91,13 +181,37 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
             // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
             // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
-            <div className="flex h-[100dvh] flex-col overflow-hidden">
-              <main className="relative flex-1 overflow-auto">{content}</main>
-              <SpBottomNav />
+            <div
+              className="flex h-[100dvh] flex-col overflow-hidden"
+              style={spShellStyle(showBackToStudy)}
+            >
+              {/* padding ではなく margin で下げる。padding だと箱の位置が動かず、
+                  `absolute inset-0` で敷いている画面がタブの下へ潜る（絶対配置が
+                  基準にするのは padding box の外側の縁）。 */}
+              <main
+                className="relative flex-1 overflow-auto"
+                style={{ marginTop: 'var(--study-exit-band, 0px)' }}
+              >
+                {content}
+              </main>
+              {/* 書斎が有効な間はボトムナビを描かない。PC のサイドバーと同じ扱いで、
+                  書斎そのものが唯一のグローバルナビゲーションになる。
+                  **書斎ホームだけでなく jar / board / entry でも外す**（行き先の画面にだけ
+                  旧ナビが残ると、戻り道が左上のマークとボトムナビで二重になる）。
+                  フラグ off の間は従来どおり全画面に出る。 */}
+              {!studyHome && <SpBottomNav />}
             </div>
           ) : device === 'pc' ? (
-            <PcShell>{content}</PcShell>
+            <PcShell studyHome={studyHome} onStudy={onStudy} exitTab={showBackToStudy}>
+              {content}
+            </PcShell>
           ) : null}
+          {device !== null && showBackToStudy && <BackToStudy />}
+          {/* 引き切ったキャンバスからさらに引くと、部屋が滲み出て書斎へ戻る。
+              板と瓶（キャンバスを持つ画面）で効く。重ねるのがここなのは、画面そのものに
+              触れずに済ませるため。 */}
+          {device !== null && showBackToStudy && <PullBackToStudy />}
+          {showQuestionsLink && <QuestionsLink />}
           {device !== null && shouldShow && (
             <OnboardingFlow onComplete={handleOnboardingComplete} />
           )}

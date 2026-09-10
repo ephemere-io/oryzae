@@ -37,7 +37,12 @@ function byCreatedAtDesc(a: { createdAt: string }, b: { createdAt: string }): nu
  */
 export function useFermentationInbox(api: ApiClient | null, authLoading: boolean) {
   const [letters, setLetters] = useState<InboxLetter[]>([]);
+  // 手紙の見出しを作るために `/questions` も引いている。一覧の絞り込みが同じものを
+  // もう一度取りに行かなくて済むよう、ここから配る（往復を増やさない）。
+  const [questions, setQuestions] = useState<InboxQuestion[]>([]);
   const [loading, setLoading] = useState(true);
+  // 取れなかったのか、本当に 1 通も無いのか。書斎はこれを見て、前回の絵を出すか決める。
+  const [error, setError] = useState(false);
 
   // アンマウント後に setState しないためのフラグ。fetchInbox は refetch としても公開して
   // いるので、effect の cancelled ローカル変数ではなく ref で持つ。
@@ -52,14 +57,19 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
   const fetchInbox = useCallback(async () => {
     if (!api || authLoading) return;
     setLoading(true);
+    setError(false);
     try {
       const [qRes, fRes] = await Promise.all([
         api.fetch('/api/v1/questions'),
         api.fetch('/api/v1/fermentations'),
       ]);
-      if (!mounted.current || !qRes.ok || !fRes.ok) return;
+      if (!mounted.current) return;
+      if (!qRes.ok || !fRes.ok) {
+        setError(true);
+        return;
+      }
 
-      const questions = parseInboxQuestions(await qRes.json());
+      const inboxQuestions = parseInboxQuestions(await qRes.json());
       const completed = normalizeSummaries(await fRes.json()).filter(
         (f) => f.status === 'completed',
       );
@@ -71,7 +81,7 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
         if (!cur || f.createdAt > cur.createdAt) latestByQuestion.set(f.questionId, f);
       }
 
-      const textByQuestionId = new Map(questions.map((q) => [q.id, q.currentText]));
+      const textByQuestionId = new Map(inboxQuestions.map((q) => [q.id, q.currentText]));
       const inbox = [...latestByQuestion.values()].map(
         (latest): InboxLetter => ({
           questionId: latest.questionId,
@@ -82,10 +92,12 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
       );
 
       if (!mounted.current) return;
+      setQuestions(inboxQuestions);
       setLetters(inbox.sort(byCreatedAtDesc));
     } catch {
       // 受信箱が取れなくても瓶は「まだ手紙は届いていません」で成立する。catch が無いと
       // useEffect 内の未処理 rejection になり、loading も true に張り付いていた。
+      if (mounted.current) setError(true);
     } finally {
       if (mounted.current) setLoading(false);
     }
@@ -95,5 +107,5 @@ export function useFermentationInbox(api: ApiClient | null, authLoading: boolean
     fetchInbox();
   }, [fetchInbox]);
 
-  return { letters, loading, refetch: fetchInbox };
+  return { letters, questions, loading, error, refetch: fetchInbox };
 }
