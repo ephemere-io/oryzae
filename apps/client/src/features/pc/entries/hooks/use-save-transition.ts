@@ -1,214 +1,297 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
+import {
+  type CharPlacement,
+  type Destination,
+  findJarDestination,
+  MAX_TRANSITION_CHARS,
+  measureCharPlacements,
+} from '@/features/pc/entries/utils/save-transition-geometry';
 
 /**
- * Save transition hook: editor → jar view.
+ * 漬け込みの演出: 紙 → 瓶。
  *
- * Reproduces the reference design's 4-phase character animation:
- *   Scatter → Background swap → Condense into jar → Float & fade
+ * 4つの段でできている: 散る → 画面が入れ替わる → 瓶に集まる → 漂って消える。
  *
- * Returns a `run(text, editorEl)` callback that creates a fixed overlay
- * of individual character elements, then drives them through CSS
- * transition phases. The caller is responsible for routing to /jar
- * after the transition completes (~6.5 s) via the returned Promise.
+ * ## 座標は2つとも実測する
+ *
+ * **どこから飛ぶか** … 紙の上の字が実際にいる場所（Range で1字ずつ測る）。
+ * 以前は「1行あたり何字」を幅と font-size から見積もって格子に並べていたが、
+ * 紙が中央寄せになり、題の帯が上に載り、行の高さも設定で変わるので、
+ * 実際の字の位置とまるで合わなくなっていた。**紙に無い場所から字が飛び立っていた。**
+ *
+ * **どこへ吸い込まれるか** … 遷移したあとの画面で瓶を探す。演出が始まる時点では
+ * 瓶の画面はまだ無いので、始める前には決められない。以前は画面の中央を決め打ちに
+ * していたため、左のサイドバーぶんずれ、瓶がどこにあっても同じ場所へ吸い込んでいた。
+ * **「変なところにズームアップされて、瓶に入っていくように見えない」**のはこれ。
+ *
+ * `run(text, editorEl, questionId)` は 1.5 秒で resolve する。呼ぶ側はそこで /jar へ移り、
+ * 演出は overlay の上でそのまま続く（合計 ~6.5 秒）。`questionId` を渡すと、
+ * **その問いの瓶**を狙って字が飛ぶ（渡さないと、見えている瓶のうち近いものになる）。
  */
+/**
+ * 瓶が現れるのを待つ上限（ms）。段4（漂う）が 3.5s に始まるので、それより手前で切る。
+ * ここを過ぎても現れないなら、画面の中央へ集めて演出を終える（字を消しはしない）。
+ */
+const JAR_WAIT_MS = 1300;
+const JAR_POLL_MS = 120;
+
+/** 最後に消える字の割合。残りが瓶の中で漂い続ける。 */
+const FADE_RATIO = 0.7;
+
 export function useSaveTransition() {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const runningRef = useRef(false);
 
-  const run = useCallback((text: string, editorEl: HTMLElement | null): Promise<void> => {
-    if (runningRef.current || !editorEl) return Promise.resolve();
-    runningRef.current = true;
+  const run = useCallback(
+    (text: string, editorEl: HTMLElement | null, questionId?: string): Promise<void> => {
+      if (runningRef.current || !editorEl) return Promise.resolve();
+      runningRef.current = true;
 
-    return new Promise<void>((resolve) => {
-      // ── Prepare characters (max ~200 for performance) ──
-      const rawChars = Array.from(text.replace(/[\n\r\t]/g, '').replace(/\s+/g, ' '));
-      const chars =
-        rawChars.length > 200
-          ? rawChars.filter((_, i) => i % Math.ceil(rawChars.length / 200) === 0)
-          : rawChars;
-
-      if (chars.length === 0) {
-        runningRef.current = false;
-        resolve();
-        return;
-      }
-
-      // ── Create overlay ──
-      let overlay = overlayRef.current;
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'save-transition-overlay';
-        document.body.appendChild(overlay);
-        overlayRef.current = overlay;
-      }
-      overlay.innerHTML = '';
-      overlay.classList.remove('phase-scatter', 'phase-condense', 'phase-float');
-      overlay.classList.add('active');
-
-      // ── Inject CSS (once) ──
-      if (!document.getElementById('save-transition-styles')) {
-        const style = document.createElement('style');
-        style.id = 'save-transition-styles';
-        style.textContent = TRANSITION_CSS;
-        document.head.appendChild(style);
-      }
-
-      // ── Build character DOM ──
-      const editorRect = editorEl.getBoundingClientRect();
-      const fontSize = Number.parseFloat(getComputedStyle(editorEl).fontSize);
-      const isVertical = getComputedStyle(editorEl).writingMode.includes('vertical');
-      const fontFamily = getComputedStyle(editorEl).fontFamily;
-      const color = getComputedStyle(editorEl).color;
-
-      const charEls: HTMLSpanElement[] = [];
-      for (const [i, char] of chars.entries()) {
-        if (char === ' ' || char === '\u3000') continue;
-
-        const el = document.createElement('span');
-        el.className = 'st-char';
-        el.style.fontSize = `${fontSize}px`;
-        el.style.fontFamily = fontFamily;
-        el.style.color = color;
-
-        const inner = document.createElement('span');
-        inner.className = 'st-char-inner';
-        inner.textContent = char;
-        el.appendChild(inner);
-
-        // Approximate position in editor
-        const lineHeight = fontSize * 1.85;
-        let x: number;
-        let y: number;
-        if (isVertical) {
-          const col = Math.floor(i / Math.floor(editorRect.height / lineHeight));
-          const row = i % Math.floor(editorRect.height / lineHeight);
-          x = editorRect.right - (col + 1) * lineHeight;
-          y = editorRect.top + row * fontSize;
-        } else {
-          const row = Math.floor(i / Math.floor(editorRect.width / fontSize));
-          const col = i % Math.floor(editorRect.width / fontSize);
-          x = editorRect.left + col * fontSize;
-          y = editorRect.top + row * lineHeight;
+      return new Promise<void>((resolve) => {
+        // 紙の上の字を、いる場所ごと測る。text は保険（測れない環境では演出を出さない）。
+        // **ここで投げさせない。** 投げると走行中の印が立ったままになり、以後この画面では
+        // 二度と演出が走らなくなる。書いたものは既に保存されているので、
+        // 測れないときは演出だけ静かに諦めるのが正しい。
+        let placements: CharPlacement[] = [];
+        try {
+          placements = text.trim() ? measureCharPlacements(editorEl, MAX_TRANSITION_CHARS) : [];
+        } catch {
+          placements = [];
         }
-
-        el.style.left = `${x}px`;
-        el.style.top = `${y}px`;
-        overlay.appendChild(el);
-        charEls.push(el);
-      }
-
-      // ── Compute animation variables ──
-      const screenCX = window.innerWidth / 2;
-      const screenCY = window.innerHeight / 2;
-      const jarCY = screenCY + 40;
-      const jarRadius = 30;
-      const total = charEls.length;
-
-      // 70% will fade out
-      const shuffled = [...charEls].sort(() => Math.random() - 0.5);
-      const fadeChars = new Set(shuffled.slice(0, Math.floor(total * 0.7)));
-
-      for (const [i, el] of charEls.entries()) {
-        const rect = el.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-
-        const dx = cx - screenCX;
-        const dy = cy - screenCY;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const nx = dx / dist;
-        const ny = dy / dist;
-
-        // Scatter
-        const scatterMag = 300 + Math.random() * 500;
-        const sx = nx * scatterMag + (Math.random() - 0.5) * 200;
-        const sy = ny * scatterMag + (Math.random() - 0.5) * 200;
-        const sr = (Math.random() - 0.5) * 720;
-
-        // Condense (circle in jar)
-        const angle = (i / total) * Math.PI * 2;
-        const r = jarRadius + (Math.random() - 0.5) * 20;
-        const circleX = Math.cos(angle) * r;
-        const circleY = Math.sin(angle) * r;
-        const circleRot = (angle * 180) / Math.PI + (Math.random() - 0.5) * 30;
-
-        // Float
-        const floatDx = (Math.random() - 0.5) * 20;
-        const floatDy = (Math.random() - 0.5) * 20;
-        const fx = screenCX - cx + circleX + floatDx;
-        const fy = jarCY - cy + circleY + floatDy;
-        const fr = (Math.random() - 0.5) * 30;
-
-        const fdur = 3 + Math.random() * 4;
-        const fdel = Math.random() * 2;
-
-        el.style.setProperty('--tx', `${sx}px`);
-        el.style.setProperty('--ty', `${sy}px`);
-        el.style.setProperty('--r', `${sr}deg`);
-        el.style.setProperty('--cx', `${screenCX - cx + circleX}px`);
-        el.style.setProperty('--cy', `${jarCY - cy + circleY}px`);
-        el.style.setProperty('--cr', `${circleRot}deg`);
-        el.style.setProperty('--fx', `${fx}px`);
-        el.style.setProperty('--fy', `${fy}px`);
-        el.style.setProperty('--fr', `${fr}deg`);
-
-        const innerEl = el.querySelector('.st-char-inner');
-        if (innerEl instanceof HTMLElement) {
-          innerEl.style.setProperty('--fdur', `${fdur}s`);
-          innerEl.style.setProperty('--fdel', `-${fdel}s`);
-        }
-      }
-
-      // ── Animation timeline ──
-
-      // Phase 1 (0s): Scatter
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          overlay.classList.add('phase-scatter');
-        });
-      });
-
-      // Phase 2 (1.5s): Resolve — caller navigates to jar
-      setTimeout(() => resolve(), 1500);
-
-      // Phase 3 (2s): Condense
-      setTimeout(() => {
-        overlay.classList.remove('phase-scatter');
-        overlay.classList.add('phase-condense');
-      }, 2000);
-
-      // Phase 4 (3.5s): Float — 70% fade out
-      setTimeout(() => {
-        overlay.classList.remove('phase-condense');
-        overlay.classList.add('phase-float');
-        for (const el of charEls) {
-          if (fadeChars.has(el)) el.classList.add('st-hidden');
-        }
-        setTimeout(() => {
-          for (const el of charEls) {
-            if (!fadeChars.has(el)) el.classList.add('st-float-anim');
-          }
-        }, 1000);
-      }, 3500);
-
-      // Phase 5 (6.5s): Cleanup
-      setTimeout(() => {
-        overlay.style.transition = 'opacity 1.5s ease';
-        overlay.style.opacity = '0';
-        setTimeout(() => {
-          overlay.classList.remove('active', 'phase-scatter', 'phase-condense', 'phase-float');
-          overlay.style.opacity = '';
-          overlay.style.transition = '';
-          overlay.innerHTML = '';
+        if (placements.length === 0) {
           runningRef.current = false;
-        }, 1500);
-      }, 6500);
-    });
-  }, []);
+          resolve();
+          return;
+        }
+
+        const overlay = ensureOverlay(overlayRef);
+        overlay.innerHTML = '';
+        overlay.classList.remove('phase-scatter', 'phase-condense', 'phase-float');
+        overlay.classList.add('active');
+        ensureStyles();
+
+        const style = getComputedStyle(editorEl);
+        const fontSize = Number.parseFloat(style.fontSize);
+        const charEls = placements.map((placement) =>
+          createCharElement(placement, {
+            fontSize,
+            fontFamily: style.fontFamily,
+            color: style.color,
+            overlay,
+          }),
+        );
+        centerOnPlacements(charEls, placements);
+
+        // ── 散る。ここは紙の上での話なので、始める前に決められる ──
+        const screenCX = window.innerWidth / 2;
+        const screenCY = window.innerHeight / 2;
+        for (const [i, el] of charEls.entries()) {
+          const placement = placements[i];
+          if (!placement) continue;
+          const dx = placement.x - screenCX;
+          const dy = placement.y - screenCY;
+          const dist = Math.hypot(dx, dy) || 1;
+          const magnitude = 300 + Math.random() * 500;
+          el.style.setProperty(
+            '--tx',
+            `${(dx / dist) * magnitude + (Math.random() - 0.5) * 200}px`,
+          );
+          el.style.setProperty(
+            '--ty',
+            `${(dy / dist) * magnitude + (Math.random() - 0.5) * 200}px`,
+          );
+          el.style.setProperty('--r', `${(Math.random() - 0.5) * 720}deg`);
+        }
+
+        /**
+         * 70% は最後に消える。残りが瓶の中で漂う。
+         *
+         * **残す字は輪の上で均等に選ぶ。** 無作為に選ぶと、残った十数文字が輪の片側に
+         * 偏ることがあり、瓶の中心からずれた塊に見える（「少し右よりになっている」）。
+         * 字は輪の順に並んでいるので、一定の間隔で残せば、残り方も輪のままになる。
+         */
+        const keepEvery = Math.max(1, Math.round(1 / (1 - FADE_RATIO)));
+        const fadeChars = new Set(charEls.filter((_, i) => i % keepEvery !== 0));
+
+        // タイマーは**片付けない**。演出は 1.5s で紙の画面が消えたあとも瓶の上で
+        // 続くので、アンマウントで止めると途中で終わってしまう。
+
+        // 段1（0s）: 散る
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => overlay.classList.add('phase-scatter'));
+        });
+
+        // 段2（1.5s）: 呼ぶ側が /jar へ移る
+        setTimeout(() => resolve(), 1500);
+
+        // 段3（2s）: 瓶に集まる。**ここで初めて瓶の場所が分かる**（画面が入れ替わったあと）。
+        //
+        // ただし瓶の画面は 1.5s に移ったばかりで、問いの取得が終わるまで瓶は描かれない。
+        // 2s の一発勝負で外すと、字は画面の中央へ集まってしまう（「変なところに集まる」）。
+        // **見つかるまで狙い直す**: 集まり始めは 2s のまま（そこで止めると演出が間延びする）、
+        // 瓶が現れたらその場で狙いを付け替える。集まる動きは 1.5s かけて進むので、
+        // 途中で行き先が変わっても不自然には見えない。
+        setTimeout(() => {
+          let destination = findJarDestination(questionId);
+          applyDestination(charEls, placements, destination);
+          overlay.classList.remove('phase-scatter');
+          overlay.classList.add('phase-condense');
+
+          if (destination.foundJar) return;
+          const deadline = Date.now() + JAR_WAIT_MS;
+          const retry = setInterval(() => {
+            destination = findJarDestination(questionId);
+            if (destination.foundJar) {
+              applyDestination(charEls, placements, destination);
+              clearInterval(retry);
+              return;
+            }
+            if (Date.now() >= deadline) clearInterval(retry);
+          }, JAR_POLL_MS);
+        }, 2000);
+
+        // 段4（3.5s）: 漂って、7割は消える
+        setTimeout(() => {
+          overlay.classList.remove('phase-condense');
+          overlay.classList.add('phase-float');
+          for (const el of charEls) {
+            if (fadeChars.has(el)) el.classList.add('st-hidden');
+          }
+          setTimeout(() => {
+            for (const el of charEls) {
+              if (!fadeChars.has(el)) el.classList.add('st-float-anim');
+            }
+          }, 1000);
+        }, 3500);
+
+        // 段5（6.5s）: 片付け
+        setTimeout(() => {
+          overlay.style.transition = 'opacity 1.5s ease';
+          overlay.style.opacity = '0';
+          setTimeout(() => {
+            // 面ごと片付ける。中身を空にするだけだと、演出のたびに使い捨ての div が
+            // body に積み上がっていく（紙の画面は演出の途中で消えるので、
+            // この時点でこの hook はもう居ない）。
+            overlay.remove();
+            overlayRef.current = null;
+            runningRef.current = false;
+          }, 1500);
+        }, 6500);
+      });
+    },
+    [],
+  );
 
   return run;
+}
+
+function ensureOverlay(ref: React.RefObject<HTMLDivElement | null>): HTMLDivElement {
+  const existing = ref.current;
+  if (existing) return existing;
+  const overlay = document.createElement('div');
+  overlay.id = 'save-transition-overlay';
+  document.body.appendChild(overlay);
+  ref.current = overlay;
+  return overlay;
+}
+
+function ensureStyles(): void {
+  if (document.getElementById('save-transition-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'save-transition-styles';
+  style.textContent = TRANSITION_CSS;
+  document.head.appendChild(style);
+}
+
+interface CharStyle {
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  overlay: HTMLElement;
+}
+
+/**
+ * 1字ぶんの要素を、**測った場所そのもの**に置く。
+ *
+ * 中心の座標で測っているので、半分ずらして左上に合わせる。ここを合わせないと
+ * 字が半文字ぶん浮いた状態から飛び立つ。
+ */
+function createCharElement(placement: CharPlacement, style: CharStyle): HTMLSpanElement {
+  const el = document.createElement('span');
+  el.className = 'st-char';
+  el.style.fontSize = `${style.fontSize}px`;
+  el.style.fontFamily = style.fontFamily;
+  el.style.color = style.color;
+  el.style.left = `${placement.x - style.fontSize / 2}px`;
+  el.style.top = `${placement.y - style.fontSize / 2}px`;
+
+  const inner = document.createElement('span');
+  inner.className = 'st-char-inner';
+  inner.textContent = placement.char;
+  el.appendChild(inner);
+
+  style.overlay.appendChild(el);
+  return el;
+}
+
+/**
+ * 置いた字を、**測った場所の真上**に据え直す。
+ *
+ * 置くときは「字の大きさの半分」だけ戻しているが、半角・約物・欧文の字は箱の幅が
+ * 字の大きさと違う。その差の半分がそのまま着地点のずれになる（飛び立つ場所も同じだけずれる）。
+ * 一度だけ測り直して、箱の中心を字の中心に合わせる。
+ *
+ * **読みをまとめてから書く。** 1つずつ読んで書くと、そのたびに組み直しが走る。
+ */
+function centerOnPlacements(charEls: HTMLSpanElement[], placements: CharPlacement[]): void {
+  const rects = charEls.map((el) => el.getBoundingClientRect());
+  for (const [i, el] of charEls.entries()) {
+    const rect = rects[i];
+    const placement = placements[i];
+    if (!rect || !placement) continue;
+    const dx = placement.x - (rect.left + rect.width / 2);
+    const dy = placement.y - (rect.top + rect.height / 2);
+    if (dx === 0 && dy === 0) continue;
+    el.style.left = `${Number.parseFloat(el.style.left) + dx}px`;
+    el.style.top = `${Number.parseFloat(el.style.top) + dy}px`;
+  }
+}
+
+/** 瓶の場所が決まってから、集まる先と漂う先を配る。 */
+function applyDestination(
+  charEls: HTMLSpanElement[],
+  placements: CharPlacement[],
+  destination: Destination,
+): void {
+  const total = charEls.length;
+  for (const [i, el] of charEls.entries()) {
+    const placement = placements[i];
+    if (!placement) continue;
+
+    // 瓶の中で輪になるように散らす（1点に重ねると1文字の塊にしか見えない）。
+    const angle = (i / total) * Math.PI * 2;
+    const radius = destination.radius + (Math.random() - 0.5) * (destination.radius * 0.6);
+    const circleX = Math.cos(angle) * radius;
+    const circleY = Math.sin(angle) * radius;
+
+    const cx = destination.x - placement.x + circleX;
+    const cy = destination.y - placement.y + circleY;
+
+    el.style.setProperty('--cx', `${cx}px`);
+    el.style.setProperty('--cy', `${cy}px`);
+    el.style.setProperty('--cr', `${(angle * 180) / Math.PI + (Math.random() - 0.5) * 30}deg`);
+    el.style.setProperty('--fx', `${cx + (Math.random() - 0.5) * 20}px`);
+    el.style.setProperty('--fy', `${cy + (Math.random() - 0.5) * 20}px`);
+    el.style.setProperty('--fr', `${(Math.random() - 0.5) * 30}deg`);
+
+    const inner = el.querySelector('.st-char-inner');
+    if (inner instanceof HTMLElement) {
+      inner.style.setProperty('--fdur', `${3 + Math.random() * 4}s`);
+      inner.style.setProperty('--fdel', `-${Math.random() * 2}s`);
+    }
+  }
 }
 
 /** CSS injected once into <head> */
@@ -223,6 +306,9 @@ const TRANSITION_CSS = `
 .st-char {
   position: fixed;
   display: inline-block;
+  /* 箱を字そのものの大きさにする。行送りが乗ると箱が字より高くなり、
+     中心で置いたつもりが数 px 下にずれる（実測 8px）。 */
+  line-height: 1;
   will-change: transform, opacity;
   transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 1s, color 1.5s;
   pointer-events: none;

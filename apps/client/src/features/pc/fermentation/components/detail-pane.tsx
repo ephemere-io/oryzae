@@ -230,7 +230,7 @@ export function DetailPane({
               type="button"
               onClick={onClose}
               aria-label={t('detail.close_aria')}
-              className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-lg text-[#6b5c4a] transition-colors hover:bg-[rgba(139,115,85,0.1)]"
+              className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-lg text-[#6b5c4a] transition-colors hover:bg-[var(--hover-wash)]"
             >
               ×
             </button>

@@ -1037,7 +1037,7 @@ export function JarView({
                   setShowAddModal(true);
                   setTimeout(() => addInputRef.current?.focus(), 100);
                 }}
-                className="rounded-full border border-dashed border-[var(--date-color)] px-3 py-1 text-[10px] tracking-[0.1em] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)]"
+                className="rounded-full border border-dashed border-[var(--date-color)] px-3 py-1 text-[10px] tracking-[0.1em] text-[var(--date-color)] transition-all hover:bg-[var(--hover-wash)]"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
                 {t('jar.add_question')}
@@ -1148,7 +1148,7 @@ export function JarView({
                 type="button"
                 disabled={submitting}
                 onClick={() => setEditingQuestion(null)}
-                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)] disabled:opacity-50"
+                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[var(--hover-wash)] disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
                 {t('jar.cancel_edit')}
@@ -1211,7 +1211,7 @@ export function JarView({
                   setShowAddModal(false);
                   setNewQuestionText('');
                 }}
-                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[rgba(140,133,126,0.1)] disabled:opacity-50"
+                className="rounded-full border border-[var(--border-subtle)] bg-transparent px-5 py-2 text-[11px] text-[var(--date-color)] transition-all hover:bg-[var(--hover-wash)] disabled:opacity-50"
                 style={{ fontFamily: "'Noto Sans JP', sans-serif" }}
               >
                 {t('jar.cancel_add')}

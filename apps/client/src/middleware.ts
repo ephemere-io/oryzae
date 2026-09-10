@@ -24,7 +24,12 @@ export function middleware(req: NextRequest) {
   // 手動リロードが必要になる。no-store を外し no-cache（毎回再検証）に保つことで bfcache
   // 適格にする。保護ページは全て client 描画で SSR 出力（HTML/RSC）に私的データを含まない
   // ため、no-store を外しても露出はない。API(/api)・静的資産(_next)は matcher 対象外。
-  // ※ next dev では Next がレンダリング後に上書きし効かない。本番の挙動はプレビューで検証する。
+  //
+  // ※ **この上書きは Vercel 本番では効かない（Issue #407 で実測確定）。** ローカルの
+  // `next start` では bfcache 復元まで成功するが、Vercel は動的ページに no-store を後段で
+  // 再付与するため、本番のネット上のヘッダは修正前と同一になる。無害だが解決にはならない。
+  // 残してあるのは self-host / ローカル本番ビルドでは有効なため。根本解決（PPR/静的シェル化 or
+  // next.config headers() の検証）は #407 で判断する。**この行を足しても直った事にはならない。**
   res.headers.set('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');
 
   // 言語: ?lang= を cookie に固定（既存挙動）

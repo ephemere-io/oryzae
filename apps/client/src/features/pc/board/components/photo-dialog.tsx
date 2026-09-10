@@ -268,7 +268,7 @@ export function PhotoDialog({ open, initialFile, onSubmit, onClose }: PhotoDialo
             width: preview && aspectRatio ? `min(100%, calc(50vh * ${aspectRatio}))` : '100%',
             maxHeight: '50vh',
             borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--toolbar-hover)',
+            backgroundColor: 'var(--hover-wash)',
             overflow: 'hidden',
           }}
         >
@@ -329,7 +329,7 @@ export function PhotoDialog({ open, initialFile, onSubmit, onClose }: PhotoDialo
             type="button"
             onClick={handleClose}
             disabled={uploading}
-            className="rounded-md border px-4 py-2 text-xs transition-colors hover:bg-[var(--toolbar-hover)] disabled:opacity-40"
+            className="rounded-md border px-4 py-2 text-xs transition-colors hover:bg-[var(--hover-wash)] disabled:opacity-40"
             style={{
               borderColor: 'var(--border-subtle)',
               color: 'var(--fg)',

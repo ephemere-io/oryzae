@@ -306,7 +306,7 @@ export function EntryList({
           type="button"
           onClick={loadMore}
           disabled={loading}
-          className="mt-6 self-center rounded-full border border-[var(--border-subtle)] px-5 py-1.5 text-sm text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.06)] disabled:opacity-50"
+          className="mt-6 self-center rounded-full border border-[var(--border-subtle)] px-5 py-1.5 text-sm text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)] disabled:opacity-50"
         >
           {loading ? t('load_more_loading') : t('load_more')}
         </button>

@@ -148,6 +148,13 @@
     "save_hook": {
       "error_save": "저장하지 못했습니다",
       "error_create": "만들지 못했습니다"
+    },
+    "question_chip": {
+      "empty": "물음 연결하기",
+      "untitled": "제목 없는 물음",
+      "none_available": "아직 물음이 없습니다",
+      "linked_count": "{count}개의 물음을 연결함",
+      "unlink_aria": "“{text}” 연결 해제"
     }
   },
   "app": {
@@ -228,8 +235,15 @@
   },
   "sidebar": {
     "nav": {
-      "account": "계정"
-    }
+      "account": "계정",
+      "jar": "항아리",
+      "board": "보드",
+      "list": "목록",
+      "editor": "쓰기",
+      "help": "사용법"
+    },
+    "expand": "사이드바 열기",
+    "collapse": "사이드바 접기"
   },
   "stats": {
     "label": {
@@ -328,7 +342,9 @@
       "editing": "편집 중",
       "saved": "저장됨",
       "saving": "저장 중...",
-      "autosaving": "항목을 자동 저장 중..."
+      "autosaving": "항목을 자동 저장 중...",
+      "saving_now": "저장 중",
+      "saved_moment_ago": "저장했습니다"
     },
     "voice": {
       "error_network": "음성 인식을 사용할 수 없습니다 (Chrome에서 다시 열어 주세요)",
@@ -336,24 +352,18 @@
       "error_unsupported": "이 브라우저는 음성 입력을 지원하지 않습니다"
     },
     "toolbar": {
-      "new_entry": "새 항목",
-      "save": "저장",
       "pickle": "담그기",
-      "list": "목록",
-      "stats": "글쓰기 통계",
       "voice_stop": "음성 입력 중지",
       "voice": "음성 입력",
       "settings": "설정",
-      "writing_horizontal": "가로쓰기로 전환",
-      "writing_vertical": "세로쓰기로 전환",
-      "font_sans": "고딕체로 전환",
-      "font_serif": "명조체로 전환",
+      "fermentation_sidebar_show": "발효 사이드바 열기",
+      "fermentation_sidebar_hide": "발효 사이드바 닫기",
       "fullscreen": "전체 화면",
-      "fermentation_overlay_show": "발효 결과 표시",
-      "fermentation_overlay_hide": "발효 결과 숨기기"
+      "fullscreen_exit": "전체 화면 해제"
     },
     "title": {
       "placeholder": "제목을 입력하세요...",
+      "remaining": "{count}자 남음",
       "add": "제목 추가"
     },
     "placeholder": "오늘은 무엇을 느꼈나요?",
@@ -371,49 +381,46 @@
       "saving": "저장 중..."
     },
     "settings": {
-      "close_aria": "설정 닫기",
-      "section_basic": "기본 설정",
       "font_size": "글자 크기",
       "line_height": "줄 간격",
-      "focus_mode": "집중 모드",
+      "focus_mode": "포커스 모드",
       "section_effects": "이펙트",
-      "time_inscription": "시간 각인",
+      "time_inscription": "시간 내포",
       "ti_font_size": "글자 크기",
       "ti_font_weight": "글자 굵기",
       "ti_pressure_bleed": "압력 번짐",
-      "eraser_trace": "지운 흔적",
-      "amp": "타건음 증폭 (ASMR)",
-      "voice": "음량 각인",
+      "eraser_trace": "지운 자국",
+      "amp": "타건음 증폭",
+      "voice": "음량 내포",
       "ghost": "고스트",
-      "ghost_block": "덩어리 (커밋 시)",
-      "ghost_dust": "먼지 (키 입력마다)",
+      "ghost_block": "덩어리",
+      "ghost_dust": "먼지",
       "ghost_size": "크기",
       "ghost_scatter": "흩어짐",
-      "ghost_blur_start": "초기 블러",
-      "ghost_blur_end": "최종 블러",
+      "ghost_blur_start": "초기 흐림",
+      "ghost_blur_end": "최종 흐림",
       "ghost_duration": "지속 시간",
-      "section_fermentation_overlay": "발효 오버레이",
-      "fermentation_overlay_description": "새 항목에 질문을 연결하면 해당 질문의 최신 발효 결과를 에디터 위에 띄울 수 있습니다. 기본 동작을 선택하세요.",
-      "fermentation_overlay_ask": "표시 전 매번 확인",
-      "fermentation_overlay_always": "항목 화면에서 항상 발효 결과 표시",
-      "fermentation_overlay_never": "항목 화면에서 항상 발효 결과 숨기기",
-      "focus_mode_fades_fermentation": "발효 요소도 함께 숨기기"
+      "section_display": "표시",
+      "writing_vertical": "세로쓰기",
+      "writing_horizontal": "가로쓰기",
+      "font_serif": "명조",
+      "font_sans": "고딕",
+      "heading": "설정",
+      "writing_mode": "쓰기 방향",
+      "font_family": "서체",
+      "time_inscription_mode": "표현 방식",
+      "ghost_mode": "표현 방식",
+      "palette_auto_hide": "쓰는 동안 팔레트 숨기기",
+      "palette_size": "팔레트 크기",
+      "palette_size_small": "작게",
+      "palette_size_medium": "보통",
+      "palette_size_large": "크게"
     },
     "snippet_toolbar": {
       "saving": "저장 중…",
       "saved": "저장했습니다",
       "create": "스니펫 만들기",
       "too_long": "50자 이내"
-    },
-    "stats": {
-      "aria_label": "글쓰기 통계",
-      "reading_time_under_minute": "1분 미만",
-      "reading_time_minutes": "약 {n}분",
-      "heading": "글쓰기 통계",
-      "label_chars": "글자 수",
-      "label_lines": "줄 수",
-      "label_paragraphs": "단락 수",
-      "label_reading_time": "읽는 시간"
     },
     "date": {
       "day_sun": "일요일",
@@ -461,7 +468,7 @@
         "aria_label": "발효 결과 표시 확인",
         "close_aria": "모달 닫기",
         "heading": "이 질문의 발효 결과를 표시하시겠습니까?",
-        "body": "연결한 질문에는 과거 발효 결과가 있습니다. 글을 쓰는 동안 참고할 수 있도록 발췌・키워드・편지를 에디터 위에 띄워 보여드릴 수 있습니다.",
+        "body": "이은 물음에는 지난 발효 프로세스의 결과가 있습니다. 글을 쓰는 동안 스니펫·키워드·편지를 오른쪽 사이드바에 표시할 수 있습니다.",
         "remember_label": "이 선택을 저장하고 다음부터 묻지 않기 (설정에서 변경 가능)",
         "show": "표시",
         "hide": "표시 안 함"
@@ -477,6 +484,30 @@
       "aria_snippet": "발효 발췌 열기",
       "aria_letter": "발효 과정의 편지 열기",
       "letter_badge": "발효 과정의 편지"
+    },
+    "fermentation_sidebar": {
+      "close_aria": "발효 사이드바 닫기",
+      "empty": "이 물음의 발효 결과가 아직 없습니다.",
+      "section_letter": "편지",
+      "section_keywords": "키워드",
+      "section_snippets": "스니펫",
+      "back_aria": "목록으로",
+      "open_aria": "발효 결과 열기",
+      "drag_or_open": "누르면 이유를 읽고 · 끌면 본문에 넣어요",
+      "loading": "불러오는 중…",
+      "question_select_aria": "어떤 물음의 발효를 볼지",
+      "question_select_placeholder": "물음 고르기",
+      "question_unnamed": "(제목 없는 물음)"
+    },
+    "palette": {
+      "move": "팔레트 이동",
+      "collapse": "팔레트 접기",
+      "expand": "팔레트 펼치기",
+      "pickle_needs_body": "본문을 쓰면 담글 수 있습니다",
+      "pickle_needs_question": "물음을 이으면 담글 수 있습니다",
+      "fermentation_needs_question": "물음을 연결하면 지난 발효 결과를 볼 수 있어요",
+      "fermentation_not_ready": "이 물음은 아직 발효되지 않았어요",
+      "fermentation_new_entry_only": "지난 발효 결과는 새로 쓸 때 볼 수 있어요"
     }
   },
   "photo": {
@@ -632,6 +663,7 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
+      "title": "물음을 하나.",
       "body": "지금 가장 마음에 걸리는 것을 짧은 질문의 형태로 적어 보세요. \"왜──\", \"어떻게 하면──\"처럼, 아직 답이 없는 한 문장이면 충분합니다. 언제든 다시 고칠 수 있습니다.",
       "placeholder": "예: 나는 왜 서두르는 것이 서툴까",
       "hint": "이후 Jar에 보관되며, 여기서부터 발효가 시작됩니다.",
