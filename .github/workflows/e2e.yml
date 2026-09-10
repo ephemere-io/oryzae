@@ -8,15 +8,36 @@ name: E2E Tests
 #   - データ蓄積で結果が揺れ（同一コードで 34〜36/38）、ゲートとして信用できなかった
 # これらをまとめて解消する（Issue #490 follow-up）。
 #
-# インスタンスは毎回まっさらなので、全 PR で無条件に実行してよい。
+# インスタンスは毎回まっさらなので、いつ何度実行しても結果は安定する。
 #
-# spec は白紙 DB 前提に揃えてあり、client 38/38 が通る状態。失敗したら
-# ワークフローも落ちる（＝本物のマージゲート）。
+# spec は白紙 DB 前提に揃えてあり、client 38/38 が通る状態。
+#
+# **どこで網を張っているか（2026-09 に変更）**
+# 以前は PR に push するたびに走らせていたが、9 月の Actions 消費 2,051 分のうち
+# 828 分（40%）を E2E が占め、無料枠 2,000 分を 6 日で使い切る主因になっていた。
+# いまは走るタイミングを次に絞っている:
+#   - PR を開いたとき / draft を ready にしたとき / `run-e2e` ラベルを付けたとき
+#   - **main への push（マージ後）** ← 壊れたまま入れば必ずここで気づく
+#   - 週次のフル回帰（月曜 09:00 JST）
+# つまり「マージ前に必ず緑」ではなく「マージ後に必ず検知」に寄せてある。
+# 落ちた main は auto-fix.yml の main-red 経路が拾う（docs/auto-fix-loop-guide.md）。
 
 on:
   push:
     branches: [main]
   pull_request:
+    # 既定の types は [opened, synchronize, reopened]。**synchronize を外している** ので、
+    # PR に push するたびには走らない。
+    #
+    # 理由は実測。9 月の Actions 消費 2,051 分のうち E2E が 828 分（40%）を占め、
+    # そのうち 666 分が PR の 77 回。並列のセッションが 1 本の PR に何度も push するため、
+    # 同じブランチで 19 回走ったこともある。無料枠 2,000 分を 6 日で使い切った主因である。
+    #
+    # 失った網は 2 つで埋める:
+    #   1. main への push で必ず走る（下の push トリガー）。壊れたまま入れば必ず気づく
+    #   2. 直したあと PR で再実行したいときは `run-e2e` ラベルを付ける
+    #      （`gh workflow run e2e.yml --ref <branch>` でも回せる）
+    types: [opened, reopened, ready_for_review, labeled]
     # E2E は 1 push あたりの課金分で最も重い。サーバ/クライアントのコードが
     # 変わらない PR では走らせない（Issue #551）。allowlist なので、
     # ここに挙がっていない領域だけの変更では起動しない。
@@ -56,6 +77,9 @@ jobs:
   e2e:
     name: E2E + Authorization (単一 Supabase)
     runs-on: ubuntu-latest
+    # `labeled` はどのラベルでも発火するので、ここで `run-e2e` だけに絞る。
+    # 絞らないと、ラベルを 1 つ付けるたびに 8 分の E2E が走る。
+    if: github.event.action != 'labeled' || github.event.label.name == 'run-e2e'
     # supabase start（Docker イメージ取得）+ ブラウザ導入 + 本体ビルドで
     # 開始まで 10 分前後かかるうえ、3 つを直列で回すため余裕を持たせる。
     timeout-minutes: 45

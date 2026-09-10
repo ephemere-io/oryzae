@@ -8,9 +8,10 @@ type IdentifierMode = 'ip' | 'user_or_ip' | 'token_or_ip';
 
 const TIER_CONFIG: Record<RateLimitTier, { requests: number; windowMs: number }> = {
   fermentation: { requests: 5, windowMs: 60_000 },
-  // OCR も 1 回ごとに LLM を叩く。発酵分析より一段ゆるいのは、写真を続けて何枚か
-  // 読ませる使い方が自然だから。general(60/分) のままだと、5MB の画像で毎分 60 回
-  // Opus を回せてしまう。
+  // OCR は 1 回ごとに LLM を叩く（board のスニペット生成と、エントリの写真の
+  // 文字起こしが同じティアを共有する）。発酵分析より一段ゆるいのは、写真を続けて
+  // 何枚か読ませる使い方が自然だから。general(60/分) のままだと、5MB の画像で
+  // 毎分 60 回 Opus を回せてしまう。
   ocr: { requests: 15, windowMs: 60_000 },
   auth_strict: { requests: 20, windowMs: 60_000 },
   auth_lenient: { requests: 120, windowMs: 60_000 },

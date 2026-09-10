@@ -1,0 +1,104 @@
+{
+  "_why": "定期巡回は毎回コードベース全体を読ませると費用が青天井になる。1 回 1 スライスに絞り、週ごとに回す。",
+  "_sizing": "初回実行（2026-09-06）で apps/client/src/features/shared（約 49 ファイル）を 1 スライスにしたところ、30 ターン・$0.60 を使い切って中断した。1 スライスは 10〜25 ファイル程度に抑える。スライスを足すと 1 周が長くなり、削ると 1 スライスが重くなって中断する。重くするより多く割るほうが安全である（中断は費用が丸ごと無駄になるため）。",
+  "slices": [
+    {
+      "id": "server-entry",
+      "label": "サーバー: エントリー（日記本体）",
+      "paths": ["apps/server/src/contexts/entry", "apps/server/test/contexts/entry"]
+    },
+    {
+      "id": "server-fermentation",
+      "label": "サーバー: 発酵（LLM 呼び出しとコスト記録）",
+      "paths": ["apps/server/src/contexts/fermentation"]
+    },
+    {
+      "id": "server-question",
+      "label": "サーバー: 問い",
+      "paths": ["apps/server/src/contexts/question"]
+    },
+    {
+      "id": "server-board",
+      "label": "サーバー: ボードとスニペット",
+      "paths": ["apps/server/src/contexts/board"]
+    },
+    {
+      "id": "server-user",
+      "label": "サーバー: ユーザーと分析",
+      "paths": ["apps/server/src/contexts/user", "apps/server/src/contexts/analytics"]
+    },
+    {
+      "id": "server-shared",
+      "label": "サーバー: 共有基盤（認可の急所は変更禁止・読むのは可）",
+      "paths": ["apps/server/src/contexts/shared"]
+    },
+    {
+      "id": "client-shared-auth",
+      "label": "クライアント: 認証・オンボーディング・アカウント（端末非依存）",
+      "paths": [
+        "apps/client/src/features/shared/auth",
+        "apps/client/src/features/shared/onboarding",
+        "apps/client/src/features/shared/account",
+        "apps/client/src/features/shared/user"
+      ]
+    },
+    {
+      "id": "client-shared-entries",
+      "label": "クライアント: エントリーとボードのデータ取得（端末非依存）",
+      "paths": [
+        "apps/client/src/features/shared/entries",
+        "apps/client/src/features/shared/entry-questions",
+        "apps/client/src/features/shared/board"
+      ]
+    },
+    {
+      "id": "client-shared-fermentation",
+      "label": "クライアント: 発酵と問いのデータ取得（端末非依存）",
+      "paths": [
+        "apps/client/src/features/shared/fermentation",
+        "apps/client/src/features/shared/questions"
+      ]
+    },
+    {
+      "id": "client-pc-entries",
+      "label": "クライアント: PC のエントリー編集画面",
+      "paths": ["apps/client/src/features/pc/entries"]
+    },
+    {
+      "id": "client-pc-board",
+      "label": "クライアント: PC のボード・瓶・問い・アカウント",
+      "paths": [
+        "apps/client/src/features/pc/board",
+        "apps/client/src/features/pc/fermentation",
+        "apps/client/src/features/pc/questions",
+        "apps/client/src/features/pc/account",
+        "apps/client/src/features/pc/navigation"
+      ]
+    },
+    {
+      "id": "client-sp",
+      "label": "クライアント: SP（スマートフォン）UI 全体",
+      "paths": ["apps/client/src/features/sp"]
+    },
+    {
+      "id": "admin-users",
+      "label": "管理画面: ユーザー一覧とダッシュボード",
+      "paths": ["apps/admin/src/features/users", "apps/admin/src/features/dashboard"]
+    },
+    {
+      "id": "admin-observability",
+      "label": "管理画面: 発酵・分析・監視・コスト",
+      "paths": [
+        "apps/admin/src/features/fermentations",
+        "apps/admin/src/features/analytics",
+        "apps/admin/src/features/observability",
+        "apps/admin/src/features/cost-tracking"
+      ]
+    },
+    {
+      "id": "shared-package",
+      "label": "共有パッケージ（Zod スキーマと定数）",
+      "paths": ["packages/shared/src"]
+    }
+  ]
+}

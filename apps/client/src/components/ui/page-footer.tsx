@@ -13,12 +13,16 @@ interface FooterEntry {
  *
  * /board は Figma 風の下部中央ツールバー（BoardToolbar）が同じ帯を使う。ステータス表示の
  * ためだけの 36px を残すと道具箱が押し上げられ、キャンバスも削られるので出さない。
+ *
+ * /jar も同じ理由で外した。瓶と発酵履歴はどちらも下部中央に自前の操作面（問いのチップ、
+ * 履歴への入口、日付レール）を持っており、その下にもう一段「FERMENTING」という帯が
+ * 出ていた。押せもしなければ状態も変えない飾りに 36px を割いていたことになる。
+ * 画面に出ている要素にはそれぞれ意味を持たせる、という方針で落とす。
  */
-const HIDDEN_PATHS = ['/board'];
+const HIDDEN_PATHS = ['/board', '/jar'];
 
 function buildEntries(questionsLabel: string): FooterEntry[] {
   return [
-    { match: (p) => p === '/jar', label: 'FERMENTING' },
     { match: (p) => p === '/entries/new' || p.startsWith('/entries/'), label: 'EDITOR' },
     { match: (p) => p === '/entries', label: 'LIST' },
     { match: (p) => p === '/questions', label: questionsLabel },

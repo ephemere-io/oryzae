@@ -15,6 +15,12 @@
  * だから ELEVATED_* を道具以外に使わないこと。
  */
 
+import {
+  HOVER_CLASS,
+  CONTROL_FONT as SHARED_CONTROL_FONT,
+  ELEVATED_PANEL_STYLE as SHARED_ELEVATED_PANEL_STYLE,
+} from '@/components/ui/surface';
+
 /* ---------- 共有の語彙（3つとも同じ） ---------- */
 
 /**
@@ -31,10 +37,17 @@ export const BOARD_INSET = 40;
 /** 操作 UI の文字。小さく・大文字・わずかな字間。 */
 export const CONTROL_TEXT = 'text-[11px] font-medium uppercase tracking-[0.08em]';
 
-/** 押せる物の hover。背景はインライン style で指定しないこと（:hover に勝ってしまう）。 */
-export const IDLE_HOVER_CLASS = 'hover:bg-[var(--toolbar-hover)]';
+/**
+ * 押せる物の hover。**アプリ全体で1つ**（`components/ui/surface` の HOVER_CLASS）。
+ *
+ * 以前はここだけ `--toolbar-hover` という別のトークンを見ていた。値は 1% しか違わないのに、
+ * 同じ「押せる」の手応えに2つの名前があった。背景はインライン style で指定しないこと
+ * （:hover に勝ってしまう）。
+ */
+export const IDLE_HOVER_CLASS = HOVER_CLASS;
 
-export const CONTROL_FONT = { fontFamily: 'Inter, "Noto Sans JP", sans-serif' } as const;
+/** 操作 UI の書体。本文の明朝と混ぜない。 */
+export const CONTROL_FONT = SHARED_CONTROL_FONT;
 
 /* ---------- 上段のバー（日付と表示単位を1行に収める） ---------- */
 
@@ -53,10 +66,10 @@ export const ELEVATED_PANEL_CLASS =
   'fixed z-[1600] flex items-center gap-1 rounded-[13px] border p-1.5 ' +
   'shadow-[0_8px_24px_-6px_rgba(0,0,0,0.22),0_2px_6px_-2px_rgba(0,0,0,0.12)]';
 
+/** 面の地と枠は共通のものを使い、盤面はそこに書体を足すだけにする。 */
 export const ELEVATED_PANEL_STYLE = {
   ...CONTROL_FONT,
-  backgroundColor: 'var(--surface-raised)',
-  borderColor: 'var(--surface-raised-border)',
+  ...SHARED_ELEVATED_PANEL_STYLE,
 } as const;
 
 /** 浮いた面に載る道具。ここだけ 36px と大きく、主役として扱う。 */

@@ -9,23 +9,43 @@
 :root {
   --bg: #f9f8f4;
   --fg: #2d2d2d;
-  --accent: #4a9e8e;
-  --accent-light: rgba(74, 158, 142, 0.08);
+  /* このアプリの緑は**1つ**。以前は accent が青緑(#4a9e8e)、サイドバーとオンボーディングが
+   * セージ(#8ea89c)で、同じ画面に2つの緑が並んでいた（設定パネルのトグルとスライダーが
+   * いちばん目につく）。セージ側に寄せ、文字色として使える濃さまで落としてある
+   * （白地に対して 4.6:1 で、小さなラベルにも使える）。 */
+  --accent: #5a7c6a;
+  --accent-light: rgba(90, 124, 106, 0.08);
   --border-subtle: rgba(0, 0, 0, 0.05);
-  --toolbar-hover: rgba(0, 0, 0, 0.04);
+  /* **押せるものに掛かる地の洗いは、アプリ全体でこの1つだけ。**
+   * 以前は同じ「ホバー」に4種類の色（灰・砂・茶の rgba）が混ざっていて、
+   * どこを触っても手応えの色が違った。押せるかどうかは色の種類ではなく
+   * 「地がわずかに沈むこと」で伝える。 */
+  --hover-wash: rgba(0, 0, 0, 0.05);
   --date-color: #999;
+
+  /* 画面の上に浮く操作面（パレット・ツールバー・盤面のフローティングツールバー）。
+   * 素材は components/ui/surface.ts。light は --bg と影で分離できるが、dark で
+   * --bg をそのまま使うと盤面と同色になり黒い影も効かないので、dark だけ一段明るい。 */
+  --surface-raised: #ffffff;
+  --surface-raised-border: rgba(0, 0, 0, 0.08);
+  /* **書く紙ではない面**（左のサイドバー・右の発酵結果）。紙より一段沈める。
+   * 透けた白に頼っていた頃は、紙とほぼ同じ明るさで境界が読めなかった。 */
+  --surface-sunken: #f2f0ea;
+  --surface-sunken-border: rgba(0, 0, 0, 0.08);
+  /* **いま選ばれている行き先**（サイドバーの項目・発酵の面の切り替え）。
+   * 行ごとに rgba を直書きしていたので、dark で白い内側光がそのまま浮いていた。
+   * 選択の表現はアプリ全体でこの4本だけが持つ。 */
+  --nav-active-fg: #8ea89c;
+  --nav-active-bg: rgba(142, 168, 156, 0.15);
+  --nav-active-border: rgba(142, 168, 156, 0.2);
+  --nav-active-sheen: rgba(255, 255, 255, 0.8);
+
+  /* 面を持たない切り替えの下地（セグメント・表示単位のトラック）。浮いた面とは
+   * 逆向きの表現で、「これは道具ではなく状態の選択」を見た目で言い分ける。 */
+  --track: rgba(0, 0, 0, 0.05);
   --card-snippet: #fffbe0;
   --card-photo: #ffffff;
 
-  /* 盤面から浮いて見せたい面（ボードのフローティングツールバー等）。
-     light では --bg と影で十分に分離できるが、dark で --bg をそのまま使うと
-     盤面と同色になり、黒い影も効かずに沈む。dark 側だけ一段明るくする。 */
-  --surface-raised: #ffffff;
-  --surface-raised-border: rgba(0, 0, 0, 0.08);
-
-  /* 盤面に沈んだ溝（表示単位の切り替えのトラック）。浮いた面とは逆向きの表現で、
-     「これは道具ではなく状態の選択」を見た目で言い分ける。 */
-  --track: rgba(0, 0, 0, 0.05);
   /* 溝の中で選ばれている側。両テーマとも「選択＝溝より明るい」に揃える。
      地の色（--bg）を使うと dark で溝より暗くなり、light と関係が反転していた。 */
   --track-active: #ffffff;
@@ -54,10 +74,12 @@
 [data-theme="dark"] {
   --bg: #1a1a1a;
   --fg: #cccccc;
-  --accent: #5ab8a6;
-  --accent-light: rgba(90, 184, 166, 0.1);
+  --accent: #9cbfae;
+  --accent-light: rgba(156, 191, 174, 0.1);
   --border-subtle: rgba(255, 255, 255, 0.06);
-  --toolbar-hover: rgba(255, 255, 255, 0.06);
+  --hover-wash: rgba(255, 255, 255, 0.07);
+  --surface-sunken: #131313;
+  --surface-sunken-border: rgba(255, 255, 255, 0.1);
   --date-color: #666;
   --card-snippet: #3a3520;
   --card-photo: #2a2a2a;
@@ -66,6 +88,13 @@
   --surface-raised-border: rgba(255, 255, 255, 0.12);
   --track: rgba(255, 255, 255, 0.07);
   --track-active: rgba(255, 255, 255, 0.14);
+
+  /* dark では地が暗いので、白い内側光はほとんど効かせない（light の 0.8 をそのまま
+     使うと、選ばれた行だけが白く霞んで浮き上がっていた）。 */
+  --nav-active-fg: #9cbfae;
+  --nav-active-bg: rgba(156, 191, 174, 0.14);
+  --nav-active-border: rgba(156, 191, 174, 0.24);
+  --nav-active-sheen: rgba(255, 255, 255, 0.04);
 
   --ob-card-bg: #1f1d1a;
   --ob-card-border: rgba(255, 255, 255, 0.08);
@@ -87,6 +116,60 @@ body {
  *
  * base レイヤーに置くのは、`cursor-grab` のようなユーティリティに勝たせるため
  * （ボードのカードは掴んで動かすので pointer にしてはいけない）。 */
+
+/* サイドバーの幅。**この1本だけをサイドバー・本文の左余白・エディタの左端が見る**
+ * （配り方は lib/sidebar-context.tsx）。開閉は2状態だけなので、同じ遷移を3者に掛ければ
+ * 同じフレームで一緒に動く。 */
+:root {
+  --sidebar-width: 80px;
+}
+
+/* 開閉の速さ。linear の 200ms は「等速で長い」ぶん、実際より遅く感じる。
+ * 出だしを速く、終わりで受け止める曲線にして 160ms に詰める。 */
+.sidebar-sized {
+  transition: width 160ms cubic-bezier(0.32, 0.72, 0, 1);
+  width: var(--sidebar-width);
+}
+
+.sidebar-inset {
+  transition: margin-left 160ms cubic-bezier(0.32, 0.72, 0, 1);
+  margin-left: var(--sidebar-width);
+}
+
+.sidebar-anchored {
+  transition: left 160ms cubic-bezier(0.32, 0.72, 0, 1);
+  left: var(--sidebar-width);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-sized,
+  .sidebar-inset,
+  .sidebar-anchored {
+    transition: none;
+  }
+}
+
+/* 題の大きさの移り変わり。読み進めると題は小さくなって脇へ退き、頭に戻れば元に返る
+ * （据え置いたままだと本文に対して存在感が大きく、書く邪魔になる）。
+ * 本文の左端も同じ時間で動かして、題と一緒に一息で収まるようにする。 */
+.title-sized {
+  transition:
+    width 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    height 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    font-size 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.title-inset {
+  transition: right 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-sized,
+  .title-inset {
+    transition: none;
+  }
+}
+
 /* 盤面のカードの中で送れる場所は、送れることが見えるようにする。
    既定のスクロールバーは macOS だと触るまで出ないので、常に細い軌道を見せる。 */
 .board-scroll {
@@ -108,13 +191,17 @@ body {
 }
 
 @layer base {
-  button:not(:disabled),
+  /* aria-disabled も除く。押せない理由をホバーで伝えるボタンは `disabled` 属性を
+     使えない（React が disabled な要素のマウスイベントを止めるため）。 */
+  button:not(:disabled):not([aria-disabled="true"]),
   [role="button"]:not([aria-disabled="true"]),
   summary {
     cursor: pointer;
   }
 
-  button:disabled {
+  button:disabled,
+  button[aria-disabled="true"],
+  [role="button"][aria-disabled="true"] {
     cursor: not-allowed;
   }
 }

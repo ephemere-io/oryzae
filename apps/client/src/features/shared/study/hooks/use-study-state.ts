@@ -67,11 +67,20 @@ export function useStudyState(
   loading: boolean;
 } {
   const unread = useUnread();
+  /**
+   * 瓶の進み具合。
+   *
+   * サーバーが返すのは「いちばん進んだ問い（top）」「総和（total）」「問いの数」で、
+   * 0..1 の 1 本の値ではない（#278）。**書斎の瓶が使うのは top**。問いを 1 つしか
+   * 持たない人でも最後まで到達できる、というのがこの分け方の理由なので、瓶の演出も
+   * 段階を決める側に合わせる（`total` は密度の軸で、書斎は密度を描き分けていない）。
+   */
   const {
-    readiness,
+    data: readiness,
     loading: readinessLoading,
     error: readinessError,
   } = useFermentationReadiness(api, authLoading);
+  const readinessTop = readiness?.top ?? 0;
   const {
     letters,
     questions,
@@ -107,11 +116,11 @@ export function useStudyState(
   }, [cacheKey]);
 
   const live = useMemo<StudyState>(() => {
-    const status = deriveStatus(readiness.readiness, letters.length);
+    const status = deriveStatus(readinessTop, letters.length);
     return {
       now,
       unreadCount: unread.unreadCount,
-      fermentation: { readiness: readiness.readiness, status, letters },
+      fermentation: { readiness: readinessTop, status, letters },
       notebooks: counts.map((count) => ({
         month: count.month,
         entryCount: count.count,
@@ -122,7 +131,7 @@ export function useStudyState(
       questions,
       board: { dateKey: now, viewType: 'daily', cards: cards.map(toStudyBoardCard) },
     };
-  }, [now, unread.unreadCount, readiness.readiness, letters, questions, counts, entries, cards]);
+  }, [now, unread.unreadCount, readinessTop, letters, questions, counts, entries, cards]);
 
   const loading =
     readinessLoading || lettersLoading || countsLoading || entriesLoading || boardLoading;
@@ -134,7 +143,8 @@ export function useStudyState(
    * 憶えていた書斎まで消してしまう（実機で、レート制限に当たった直後にそう見えていた）。
    * どれか 1 つでも落ちていれば「届かなかった」とみなす — 通信の失敗はまとめて起きる。
    */
-  const failed = readinessError || lettersError || countsError || entriesError;
+  // readiness だけ文字列（メッセージ）で返る。有無だけを見る。
+  const failed = readinessError !== null || lettersError || countsError || entriesError;
 
   // 取り終えたら憶える。次に書斎を開いたとき、取得を待たずに前回の絵が出る。
   // **届かなかったときは上書きしない。** 空の書斎で塗り潰すと、次に開いたときも空になる。

@@ -18,7 +18,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-full border border-[var(--border-subtle)] px-5 py-1.5 text-sm text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.06)]"
+          className="rounded-full border border-[var(--border-subtle)] px-5 py-1.5 text-sm text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)]"
         >
           {retryLabel ?? 'Retry'}
         </button>

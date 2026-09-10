@@ -43,6 +43,54 @@ const RATES = {
  */
 export const FERMENTATION_MODEL_ID = 'claude-sonnet-4-6' satisfies keyof typeof RATES;
 
+/**
+ * OCR のモデル。**RATES には載せない。**
+ *
+ * OCR のコストは cost_report の実額をモデル別に割って取る（anthropic-cost-api.ts）。
+ * 自前で単価を持つと二重管理になり、価格改定時に「実額と推定でモデルごとに違う額が
+ * 出る」状態を作る。ここに置く理由は3つだけ:
+ *   1. gateway がモデル ID をベタ書きしないため
+ *   2. 実額のモデル別内訳に「どれが OCR か」のラベルを付けるため
+ *   3. 発酵と別モデルであることをテストで固定するため——**同じモデルになると
+ *      モデル別内訳が用途別内訳として機能しなくなる**（混ざって区別できない）
+ */
+export const OCR_MODEL_ID = 'claude-opus-5';
+
+/**
+ * 写真の文字起こし（entry）のモデル。OCR_MODEL_ID と同じ理由でここに置く。
+ *
+ * board の OCR と別モデルなのは意図的。あちらはスニペット 1 枚で出力が短く
+ * (maxOutputTokens 1024)、誤読がそのままスニペットの中身になるので精度に振れる。
+ * こちらは日記のページ全体を起こすため出力が 4 倍 (4000) あり、同じ Opus にすると
+ * 1 回あたり $0.065 → $0.108 になる。選定根拠は docs/entry-photo-guide.md。
+ *
+ * **用途別の内訳はモデル ID でしか引けない**（Anthropic は用途を知らない）。
+ * ここに登録し featureOfModel が拾えるようにしないと、この機能の費用が
+ * 管理画面でも費用アラートでも「分類不明」に落ちる。実際 #529 で入ったときは
+ * gateway にベタ書きされており、そうなっていた。
+ */
+export const PHOTO_TRANSCRIPTION_MODEL_ID = 'claude-sonnet-5';
+
+/**
+ * モデル ID を用途名に読み替える。未登録なら null（＝分類不明）。
+ *
+ * Anthropic は「用途」を知らない。モデルが分かれているから用途別に読めるだけで、
+ * **同じモデルを他の用途や CI が使えば同じバケットに混ざる**。だから返すのは
+ * 「このモデルを使っている機能」であって「その機能のコード」ではない。
+ * 画面・通知の文言もそのつもりで書くこと。
+ *
+ * モデル ID の定義と同じファイルに置く。以前は admin-observability.ts と
+ * cron-cost-alert.ts に同じ関数が複製されており、#529 で 3 つ目のモデルが
+ * 増えたときにどちらも更新されず、費用が両方で「分類不明」に落ちた。
+ * モデルを足すときに直す場所を 1 つにする。
+ */
+export function featureOfModel(model: string): string | null {
+  if (model === FERMENTATION_MODEL_ID) return '発酵';
+  if (model === OCR_MODEL_ID) return 'OCR';
+  if (model === PHOTO_TRANSCRIPTION_MODEL_ID) return '写真の文字起こし';
+  return null;
+}
+
 /** 上記モデルの単価。推定の根拠を画面に出すためにも使う。 */
 export const FERMENTATION_MODEL_RATE: ModelRate = RATES[FERMENTATION_MODEL_ID];
 

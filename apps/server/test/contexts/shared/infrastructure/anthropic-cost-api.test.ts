@@ -62,6 +62,16 @@ describe('fetchActualCost', () => {
       kind: 'ok',
       totalCostUsd: 1.2345,
       daily: [{ date: '2026-08-08', costUsd: 1.2345 }],
+      // group_by が無い応答（model も cost_type も無い）は受け皿に積む。
+      // 落とすと内訳の合計が総額と合わなくなる。
+      groupingUnavailable: true,
+      byModel: [
+        {
+          model: '(内訳なし)',
+          costUsd: 1.2345,
+          byTokenType: [{ tokenType: '(その他)', costUsd: 1.2345 }],
+        },
+      ],
       truncated: false,
     });
   });
@@ -203,15 +213,39 @@ describe('fetchActualCost', () => {
 
     const result = await fetchActualCost(START, END);
 
-    expect(result).toEqual({ kind: 'ok', totalCostUsd: 0, daily: [], truncated: false });
+    expect(result).toEqual({
+      kind: 'ok',
+      totalCostUsd: 0,
+      daily: [],
+      byModel: [],
+      groupingUnavailable: false,
+      truncated: false,
+    });
   });
 });
 
 describe('formatActualCost', () => {
   it.each<[ActualCostResult, string]>([
-    [{ kind: 'ok', totalCostUsd: 1.2345, daily: [], truncated: false }, '$1.2345'],
     [
-      { kind: 'ok', totalCostUsd: 1.2345, daily: [], truncated: true },
+      {
+        kind: 'ok',
+        totalCostUsd: 1.2345,
+        daily: [],
+        byModel: [],
+        groupingUnavailable: false,
+        truncated: false,
+      },
+      '$1.2345',
+    ],
+    [
+      {
+        kind: 'ok',
+        totalCostUsd: 1.2345,
+        daily: [],
+        byModel: [],
+        groupingUnavailable: false,
+        truncated: true,
+      },
       '$1.2345 (集計打ち切り・過少)',
     ],
     [{ kind: 'not-configured' }, '未設定 (ANTHROPIC_ADMIN_KEY)'],
@@ -270,5 +304,249 @@ describe('fetchActualCost のページング効率', () => {
     expect(new URL(mockFetch.mock.calls[1][0]).searchParams.get('page')).toBe('page_2');
     // amount はセント単位の10進文字列。100 + 250 セント = $3.50。
     expect(result).toMatchObject({ kind: 'ok', totalCostUsd: 3.5, truncated: false });
+  });
+});
+
+// 用途別の内訳を **実額** で出すための中核。ここが効いていないと、
+// 「OCR がいくらか」を自前トークンの推定でしか出せなくなる。
+describe('モデル別の実額内訳', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+    vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  // 配列パラメータは group_by[]。group_by= だと無視され、results が1件に丸められて
+  // model が null になる（= 内訳が黙って出なくなる）。
+  it('group_by[]=description を送る', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: [], has_more: false, next_page: null }));
+
+    await fetchActualCost(START, END);
+
+    const url = new URL(mockFetch.mock.calls[0][0]);
+    expect(url.searchParams.getAll('group_by[]')).toEqual(['description']);
+  });
+
+  it('モデル別に積み上げ、コスト降順で返す', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            starting_at: '2026-08-08T00:00:00Z',
+            results: [
+              // 発酵のモデル
+              {
+                amount: '1.7916',
+                model: 'claude-sonnet-4-6',
+                token_type: 'uncached_input_tokens',
+                cost_type: 'tokens',
+              },
+              {
+                amount: '10.692',
+                model: 'claude-sonnet-4-6',
+                token_type: 'output_tokens',
+                cost_type: 'tokens',
+              },
+              // OCR のモデル
+              {
+                amount: '20.0',
+                model: 'claude-opus-5',
+                token_type: 'uncached_input_tokens',
+                cost_type: 'tokens',
+              },
+            ],
+          },
+        ],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.byModel.map((m) => m.model)).toEqual(['claude-opus-5', 'claude-sonnet-4-6']);
+    expect(result.byModel[0]?.costUsd).toBeCloseTo(0.2, 10);
+    // 1.7916 + 10.692 セント = $0.124836（自前推定と同じ額を実額側から得られる）
+    expect(result.byModel[1]?.costUsd).toBeCloseTo(0.124836, 10);
+  });
+
+  // group_by が効かなくなると「総額は正しいのに内訳だけ静かに消える」。
+  // 実 API で書式を確かめられない以上、実行時に気づける形にしておく。
+  it('内訳が返らなければ groupingUnavailable を立てる', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [{ starting_at: '2026-08-08T00:00:00Z', results: [{ amount: '500' }] }],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.groupingUnavailable).toBe(true);
+    // 総額そのものは正しい（内訳だけが取れていない）
+    expect(result.totalCostUsd).toBeCloseTo(5, 10);
+  });
+
+  it('内訳が1件でも返っていれば立てない', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            starting_at: '2026-08-08T00:00:00Z',
+            results: [
+              { amount: '500', model: 'claude-opus-5', token_type: 'output_tokens' },
+              { amount: '10' },
+            ],
+          },
+        ],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.groupingUnavailable).toBe(false);
+  });
+
+  it('課金ゼロの期間では立てない（内訳が無くて当然）', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [{ starting_at: '2026-08-08T00:00:00Z', results: [] }],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.groupingUnavailable).toBe(false);
+  });
+
+  it('token_type ごとの内訳も返す（キャッシュが混ざれば見える）', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            starting_at: '2026-08-08T00:00:00Z',
+            results: [
+              { amount: '100', model: 'claude-opus-5', token_type: 'uncached_input_tokens' },
+              { amount: '300', model: 'claude-opus-5', token_type: 'output_tokens' },
+              { amount: '10', model: 'claude-opus-5', token_type: 'cache_read_input_tokens' },
+            ],
+          },
+        ],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.byModel[0]?.byTokenType.map((t) => t.tokenType)).toEqual([
+      'output_tokens',
+      'uncached_input_tokens',
+      'cache_read_input_tokens',
+    ]);
+  });
+
+  it('複数バケット・複数ページをまたいで同じモデルをまとめる', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [
+            {
+              starting_at: '2026-08-08T00:00:00Z',
+              results: [{ amount: '100', model: 'claude-opus-5', token_type: 'output_tokens' }],
+            },
+            {
+              starting_at: '2026-08-09T00:00:00Z',
+              results: [{ amount: '200', model: 'claude-opus-5', token_type: 'output_tokens' }],
+            },
+          ],
+          has_more: true,
+          next_page: 'page_2',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [
+            {
+              starting_at: '2026-08-10T00:00:00Z',
+              results: [{ amount: '400', model: 'claude-opus-5', token_type: 'output_tokens' }],
+            },
+          ],
+          has_more: false,
+          next_page: null,
+        }),
+      );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.byModel).toHaveLength(1);
+    expect(result.byModel[0]?.costUsd).toBeCloseTo(7, 10);
+  });
+
+  // トークン以外のコスト（web_search 等）は model が null。落とすと内訳が総額に合わなくなる。
+  it('model が無いコストも cost_type で括って残す', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            starting_at: '2026-08-08T00:00:00Z',
+            results: [
+              { amount: '100', model: 'claude-opus-5', token_type: 'output_tokens' },
+              { amount: '50', model: null, cost_type: 'web_search', token_type: null },
+            ],
+          },
+        ],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    expect(result.byModel.map((m) => m.model)).toContain('(web_search)');
+  });
+
+  // これが崩れると「内訳を全部出した」ように見えて実際は欠けている状態になる。
+  it('内訳の合計は必ず総額と一致する', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            starting_at: '2026-08-08T00:00:00Z',
+            results: [
+              { amount: '1.7916', model: 'claude-sonnet-4-6', token_type: 'uncached_input_tokens' },
+              { amount: '10.692', model: 'claude-sonnet-4-6', token_type: 'output_tokens' },
+              { amount: '20', model: 'claude-opus-5', token_type: 'output_tokens' },
+              { amount: '5', model: null, cost_type: 'web_search' },
+              { amount: '3', model: null },
+            ],
+          },
+        ],
+        has_more: false,
+      }),
+    );
+
+    const result = await fetchActualCost(START, END);
+    if (result.kind !== 'ok') throw new Error('expected ok');
+
+    const sum = result.byModel.reduce((acc, m) => acc + m.costUsd, 0);
+    expect(sum).toBeCloseTo(result.totalCostUsd, 10);
+
+    // token_type の内訳も、そのモデルの合計と一致する
+    for (const model of result.byModel) {
+      const tokenSum = model.byTokenType.reduce((acc, t) => acc + t.costUsd, 0);
+      expect(tokenSum).toBeCloseTo(model.costUsd, 10);
+    }
   });
 });

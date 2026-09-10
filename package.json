@@ -13,6 +13,7 @@
     "test:scripts": "vitest run --config vitest.config.mjs",
     "knip": "knip",
     "check:as": "node scripts/check-type-assertions.test.mjs && node scripts/check-type-assertions.mjs",
+    "check:automation": "node scripts/check-automation-inventory.mjs",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise && pnpm --filter @oryzae/admin dep-cruise",
     "security:rls": "node scripts/check-rls-policies.mjs",
     "i18n:sync": "node apps/client/scripts/build-i18n.mjs --remote",
@@ -21,7 +22,7 @@
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged",
-    "pre-push": "pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip && pnpm check:as && pnpm security:rls"
+    "pre-push": "pnpm typecheck && pnpm lint && pnpm test && pnpm dep-cruise && pnpm knip && pnpm check:as && pnpm security:rls && pnpm check:automation"
   },
   "lint-staged": {
     "!(.claude/**)!(**/docs/**)*.{js,ts,jsx,tsx,json}": "biome check --write"

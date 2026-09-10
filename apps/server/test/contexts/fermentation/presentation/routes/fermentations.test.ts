@@ -1,65 +1,82 @@
-import { describe, expect, it } from 'vitest';
-import {
-  fermentations,
-  toOwnerReadinessView,
-} from '@/contexts/fermentation/presentation/routes/fermentations.js';
+import { Hono } from 'hono';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-describe('toOwnerReadinessView', () => {
-  it('本人向けには readiness / eligible / nextRunAt の 3 つだけを出す', () => {
-    const view = toOwnerReadinessView({
-      readinessScore: 0.5,
-      eligible: false,
-      nextEligibleAt: '2026-09-05T00:00:00.000Z',
-    });
+// supabase-client は import された時点で env チェックが走るので mock で塞ぐ。
+vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
+  getSupabaseClient: () => ({}),
+}));
 
-    expect(view).toEqual({
-      readiness: 0.5,
-      eligible: false,
-      nextRunAt: '2026-09-05T00:00:00.000Z',
-    });
-    // 閾値・文字数・経過時間は本人向けに出さない（admin 版との差はここ）。
-    expect(Object.keys(view).sort()).toEqual(['eligible', 'nextRunAt', 'readiness']);
-  });
+// repository / locale resolver は Supabase を触るだけなので空実装で差し替える。
+vi.mock('@/contexts/question/infrastructure/repositories/supabase-question.repository.js', () => ({
+  SupabaseQuestionRepository: vi.fn(),
+}));
+vi.mock('@/contexts/entry/infrastructure/repositories/supabase-entry.repository.js', () => ({
+  SupabaseEntryRepository: vi.fn(),
+}));
+vi.mock(
+  '@/contexts/fermentation/infrastructure/repositories/supabase-fermentation.repository.js',
+  () => ({ SupabaseFermentationRepository: vi.fn() }),
+);
+vi.mock(
+  '@/contexts/fermentation/infrastructure/repositories/supabase-user-fermentation-state.repository.js',
+  () => ({ SupabaseUserFermentationStateRepository: vi.fn() }),
+);
+vi.mock('@/contexts/fermentation/infrastructure/auth/supabase-user-locale-resolver.js', () => ({
+  SupabaseUserLocaleResolver: vi.fn(),
+}));
 
-  it('readiness を小数第2位に丸める（生の charScore から文字数を逆算させない）', () => {
-    // 1000字閾値で 637 字 → 0.637。丸めないと「637字書いた」がそのまま漏れる。
-    expect(toOwnerReadinessView(evaluationWith(0.637)).readiness).toBe(0.64);
-    expect(toOwnerReadinessView(evaluationWith(0.004)).readiness).toBe(0);
-    expect(toOwnerReadinessView(evaluationWith(0.999)).readiness).toBe(1);
-  });
+const mockJarReadinessExecute = vi.fn();
+vi.mock('@/contexts/fermentation/application/usecases/get-jar-readiness.usecase.js', () => ({
+  GetJarReadinessUsecase: vi.fn().mockImplementation(() => ({
+    execute: (userId: string) => mockJarReadinessExecute(userId),
+  })),
+}));
 
-  it('0 と 1 の端をそのまま通す', () => {
-    expect(toOwnerReadinessView(evaluationWith(0)).readiness).toBe(0);
-    expect(toOwnerReadinessView(evaluationWith(1)).readiness).toBe(1);
-  });
+// `/:id` に落ちてしまったことを検出するための番兵。ここが呼ばれたら route 順が壊れている。
+const mockGetResultExecute = vi.fn();
+vi.mock('@/contexts/fermentation/application/usecases/get-fermentation-result.usecase.js', () => ({
+  GetFermentationResultUsecase: vi.fn().mockImplementation(() => ({
+    execute: (id: string) => mockGetResultExecute(id),
+  })),
+}));
 
-  it('未発酵（時間ゲート無し）では nextRunAt が null になる', () => {
-    const view = toOwnerReadinessView({
-      readinessScore: 0.3,
-      eligible: false,
-      nextEligibleAt: null,
-    });
-    expect(view.nextRunAt).toBeNull();
-  });
-});
+import { fermentations } from '@/contexts/fermentation/presentation/routes/fermentations.js';
 
-describe('fermentations のルート登録順', () => {
-  it('GET /readiness が GET /:id より前に登録されている', () => {
-    // Hono は登録順に照合する。逆だと /readiness が id="readiness" の詳細取得として
-    // 食われ、404 でも 500 でもなく「そんな発酵は無い」応答になって原因が見えにくい。
-    const getPaths = fermentations.routes
-      .filter((route) => route.method === 'GET')
-      .map((route) => route.path);
-
-    const readinessAt = getPaths.indexOf('/readiness');
-    const detailAt = getPaths.indexOf('/:id');
-
-    expect(readinessAt).toBeGreaterThanOrEqual(0);
-    expect(detailAt).toBeGreaterThanOrEqual(0);
-    expect(readinessAt).toBeLessThan(detailAt);
-  });
-});
-
-function evaluationWith(readinessScore: number) {
-  return { readinessScore, eligible: readinessScore >= 1, nextEligibleAt: null };
+/** authMiddleware の代わりに userId / supabase を注いだテスト用アプリ。 */
+function buildApp() {
+  return new Hono()
+    .use('*', async (c, next) => {
+      c.set('userId', 'user-1');
+      c.set('supabase', {});
+      await next();
+    })
+    .route('/api/v1/fermentations', fermentations);
 }
+
+describe('GET /api/v1/fermentations/readiness', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Hono は登録順に照合するので、`/readiness` が `/:id` より後ろに移ると
+  // id="readiness" として詳細取得へ吸われる。順序が壊れたらここで落ちる。
+  it('`/:id` に吸われず readiness usecase が呼ばれる（route 順の回帰ガード）', async () => {
+    mockJarReadinessExecute.mockResolvedValue({ top: 0.9, total: 1.5, questionCount: 3 });
+
+    const res = await buildApp().request('/api/v1/fermentations/readiness');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ top: 0.9, total: 1.5, questionCount: 3 });
+    expect(mockJarReadinessExecute).toHaveBeenCalledWith('user-1');
+    expect(mockGetResultExecute).not.toHaveBeenCalled();
+  });
+
+  it('逆算の材料（lastRunAt / nextEligibleAt）を返さない（issue #278）', async () => {
+    mockJarReadinessExecute.mockResolvedValue({ top: 0.25, total: 0.25, questionCount: 1 });
+
+    const res = await buildApp().request('/api/v1/fermentations/readiness');
+    const body = await res.json();
+
+    expect(Object.keys(body).sort()).toEqual(['questionCount', 'top', 'total']);
+  });
+});

@@ -46,8 +46,9 @@ const ENTRY = {
 };
 
 const HAPPY: RouteMap = {
+  // サーバーが返すのは top / total / questionCount（#278）。瓶は top を使う。
   '/api/v1/fermentations/readiness': {
-    body: { readiness: 0.62, eligible: false, nextRunAt: null },
+    body: { top: 0.62, total: 0.9, questionCount: 2 },
   },
   '/api/v1/fermentations/': { body: { keywords: [{ id: 'k1', keyword: '余白' }] } },
   '/api/v1/fermentations': { body: [] },
@@ -69,7 +70,7 @@ describe('useStudyState', () => {
     expect(calls.some((c) => c.startsWith('/api/v1/board'))).toBe(true);
   });
 
-  it('readiness をそのまま瓶へ渡す', async () => {
+  it('readiness の top をそのまま瓶へ渡す', async () => {
     const { api } = apiFor(HAPPY);
     const { result } = renderHook(() => useStudyState(api, false));
 
@@ -165,8 +166,9 @@ describe('useStudyState', () => {
  */
 const WITH_LETTERS: RouteMap = {
   ...HAPPY,
+  // サーバーが返すのは top / total / questionCount（#278）。瓶は top を使う。
   '/api/v1/fermentations/readiness': {
-    body: { readiness: 0.62, eligible: false, nextRunAt: null },
+    body: { top: 0.62, total: 0.9, questionCount: 2 },
   },
   '/api/v1/entries/monthly-counts': {
     delayMs: 150,

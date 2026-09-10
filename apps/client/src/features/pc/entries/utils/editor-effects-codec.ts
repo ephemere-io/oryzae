@@ -1,4 +1,5 @@
 import type { EditorEffectsState, TextSpanMark } from '@oryzae/shared';
+import { extractInlineImages, isInlineImage } from './inline-image-codec';
 
 /**
  * editor の DOM ↔ `EditorEffectsState` のシリアライズ/デシリアライズ。
@@ -10,6 +11,10 @@ import type { EditorEffectsState, TextSpanMark } from '@oryzae/shared';
  *   - block element (`<div>` 等) は、前にコンテンツがあれば content の前に 1 文字 (`\n`)
  *
  * span (eblock / v-block) はその子テキストの長さ分を消費する。子要素には潜らない。
+ * 本文中に置いた写真（`<img class="inline-photo">`）は 1 文字（U+FFFC）を消費する。
+ *
+ * **この規則は `inline-image-codec.ts` と一致していなければならない。** ずれると
+ * 装飾と写真が別の位置を指す。一致は inline-image-codec.test.ts で固定してある。
  */
 
 const EBLOCK_CLASS = 'eblock';
@@ -32,13 +37,17 @@ export function extractEditorEffects(
 ): EditorEffectsState | null {
   const textSpans = scanTextSpans(editor);
   const tracesSnapshot = eraserTraces && eraserTraces.length > 0 ? eraserTraces : undefined;
+  // 本文中の写真もここで一緒に拾う。呼び出し側が別途集める作りにすると、
+  // 「装飾だけ保存されて写真の位置が落ちる」保存経路が生まれる。
+  const inlineImages = extractInlineImages(editor);
 
-  if (textSpans.length === 0 && !tracesSnapshot) return null;
+  if (textSpans.length === 0 && !tracesSnapshot && inlineImages.length === 0) return null;
 
   return {
     version: 1,
     ...(textSpans.length > 0 ? { textSpans } : {}),
     ...(tracesSnapshot ? { eraserTraces: tracesSnapshot.map((t) => ({ ...t })) } : {}),
+    ...(inlineImages.length > 0 ? { inlineImages } : {}),
   };
 }
 
@@ -89,6 +98,11 @@ function walkScan(node: Node, state: ScanState): void {
 function visitScan(node: Node, state: ScanState): void {
   if (node.nodeType === Node.TEXT_NODE) {
     state.cursor += (node.textContent ?? '').length;
+    return;
+  }
+  // 本文中の写真はプレースホルダ 1 文字分を占める。
+  if (isInlineImage(node)) {
+    state.cursor += 1;
     return;
   }
   if (!(node instanceof HTMLElement)) return;
@@ -186,6 +200,10 @@ function walkLocate(node: Node, state: LocateState): void {
 }
 
 function visitLocate(node: Node, state: LocateState): void {
+  if (isInlineImage(node)) {
+    state.cursor += 1;
+    return;
+  }
   if (node.nodeType === Node.TEXT_NODE) {
     const len = (node.textContent ?? '').length;
     const segStart = state.cursor;

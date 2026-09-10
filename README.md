@@ -114,12 +114,16 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/backend-testing-guide.md` | バックエンドテスト戦略、ガードレール |
 | `docs/client-architecture-guide.md` | Feature-Sliced 構造（ドメイン × reach: shared/pc/sp）、インポートルール、端末出し分け |
 | `docs/client-testing-guide.md` | フロントエンドテスト戦略 |
+| `docs/design-language.md` | 面の重さ・ホバー・選択・寸法・書体の共通語彙（どれをいつ使うか） |
 | `docs/shared-package-guide.md` | `@oryzae/shared` の使用ルール |
 | `docs/entry-backend-guide.md` | Entry コンテキスト実装ガイド |
+| `docs/entry-screen-design.md` | エントリー画面（PC / SP / 一覧）の最終形 UI/UX、エントリーとボードの役割定義 |
+| `docs/entry-photo-guide.md` | エントリの写真アップロードと文字起こし（VLM 採用理由・モデル選定・保存先） |
 | `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
 | `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 3 層構成 |
 | `docs/glossary.md` | 画面に出る言葉の正（エントリー / 手帳 / 書庫 …）。同じものを 2 つの語で呼ばない |
+| `docs/auto-fix-loop-guide.md` | 自動バグ修正ループ（起動経路、自動マージの許可領域、月額予算の守り方） |
 | `docs/i18n-guide.md` | apps/client の日英バイリンガル運用（next-intl + Google Sheets SSoT） |
 | `docs/oryzae-study/` | 書斎ホーム（3D ホーム・サイドバー撤廃）の仕様一式。実装時の決着は `60-implementation-notes.md` |
