@@ -987,16 +987,16 @@ function lineFrom(points: Vector3[], material: Material, own: OwnGeometry): Line
  */
 function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeometry): Group {
   const group = new Group();
-  const { y, halfWidth, zNear, zFar } = layout.deskTop;
+  const { y, xLeft, xRight, zNear, zFar } = layout.deskTop;
 
   group.add(
     lineFrom(
       [
-        new Vector3(-halfWidth, y, zNear),
-        new Vector3(halfWidth, y, zNear),
-        new Vector3(halfWidth, y, zFar),
-        new Vector3(-halfWidth, y, zFar),
-        new Vector3(-halfWidth, y, zNear),
+        new Vector3(xLeft, y, zNear),
+        new Vector3(xRight, y, zNear),
+        new Vector3(xRight, y, zFar),
+        new Vector3(xLeft, y, zFar),
+        new Vector3(xLeft, y, zNear),
       ],
       materials.faint(0.13),
       own,
@@ -1009,10 +1009,10 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
   group.add(
     lineFrom(
       [
-        new Vector3(-halfWidth, y, zNear),
-        new Vector3(-halfWidth, edgeBottom, zNear),
-        new Vector3(halfWidth, edgeBottom, zNear),
-        new Vector3(halfWidth, y, zNear),
+        new Vector3(xLeft, y, zNear),
+        new Vector3(xLeft, edgeBottom, zNear),
+        new Vector3(xRight, edgeBottom, zNear),
+        new Vector3(xRight, y, zNear),
       ],
       materials.faint(0.34),
       own,
@@ -1022,14 +1022,14 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
   // 木目を示唆する長い 1 本。
   group.add(
     lineFrom(
-      [new Vector3(-halfWidth + 0.8, y, zFar + 1.2), new Vector3(halfWidth - 0.8, y, zFar + 1.6)],
+      [new Vector3(xLeft + 0.8, y, zFar + 1.2), new Vector3(xRight - 0.8, y, zFar + 1.6)],
       materials.faint(0.06),
       own,
     ),
   );
 
   // 奥の壁の立ち上がり。
-  for (const x of [-halfWidth, halfWidth]) {
+  for (const x of [xLeft, xRight]) {
     group.add(
       lineFrom([new Vector3(x, y, zFar), new Vector3(x, y + 4, zFar)], materials.faint(0.07), own),
     );

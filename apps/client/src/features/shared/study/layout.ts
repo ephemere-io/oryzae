@@ -21,8 +21,15 @@ interface Vec3 {
 interface DeskLayout {
   /** 天板の高さ。 */
   y: number;
-  /** 天板の左右端。 */
-  halfWidth: number;
+  /**
+   * 天板の左右端。**左右で別に持つ。**
+   *
+   * 中心からの半幅ひとつにしていたころ、右へ余白を足すと左へも同じだけ伸び、
+   * 「特に左側が広い」と報告された。物は左右対称に置かれていない（瓶が左、積みと棚が
+   * 右）ので、板の余白も対称である必要が無い。
+   */
+  xLeft: number;
+  xRight: number;
   /** 天板の手前端・奥端。 */
   zNear: number;
   zFar: number;
@@ -104,10 +111,9 @@ export const PC_LAYOUT: StudyLayout = {
   desk: vec3(3, -1, 2),
   pen: vec3(2.55, -0.15, -0.1),
   shelf: { position: PC_SHELF, scale: 1, tiltX: 0 },
-  // 天板は 2 度広げている（6.6 → 7.9 → 9.2）。棚が右端まで来て「本が机に収まらない」
-  // 「右側をもう少し広げて」と報告されたため。**物の座標は動かさず、板だけを広げる。**
-  // 構図（瓶・積み・棚の位置関係）は設計の一部なので、そちらは動かさない。
-  deskTop: { y: -1.2, halfWidth: 9.2, zNear: 4.3, zFar: -4.6 },
+  // 右は棚のぶんだけ伸ばし（元 6.6 → 8.6）、左は元の幅に近いところへ戻す。
+  // **物の座標は動かさない** — 構図（瓶・積み・棚の位置関係）は設計の一部。
+  deskTop: { y: -1.2, xLeft: -6.2, xRight: 8.6, zNear: 4.3, zFar: -4.6 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.pc,
   labelAnchors: {
@@ -131,7 +137,7 @@ export const PC_LAYOUT: StudyLayout = {
      * 積み（x は 1.7..4.3）の外側へ出し、**手前へ十分に寄せる**。奥のままだと、俯瞰では
      * 画面の上のほうに投影されて棚の絵と混ざる（「もう少し手前に」と再度報告された）。
      */
-    archive: vec3(PC_SHELF.x + 1.7, -1.14, PC_SHELF.z + 2.6),
+    archive: vec3(PC_SHELF.x + 1.7, -1.14, PC_SHELF.z + 2.0),
   },
   pillOffsets: null,
 };
@@ -161,7 +167,7 @@ export const SP_LAYOUT: StudyLayout = {
   pen: vec3(-1.9, -0.15, 1.2),
   // 棚を前傾させると背文字が上を向き、そのまま行き先の予告になる。
   shelf: { position: SP_SHELF, scale: SP_SHELF_SCALE, tiltX: -0.42 },
-  deskTop: { y: -1.2, halfWidth: 3.4, zNear: 4.0, zFar: -4.7 },
+  deskTop: { y: -1.2, xLeft: -3.4, xRight: 3.4, zNear: 4.0, zFar: -4.7 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.sp,
   labelAnchors: {
