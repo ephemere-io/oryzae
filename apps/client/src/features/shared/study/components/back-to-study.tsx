@@ -42,6 +42,8 @@ export const STUDY_EXIT_BAND = STUDY_EXIT_TAB.height;
  *   書斎の色を溶かした専用の地にしていたころ、問いのチップ・パレット・瓶の問いと
  *   角丸も色も違い、同じアプリの部品に見えないと報告された。**影は付けない**
  *   （付けた版は「見にくい・気持ち悪い」と言われた）
+ * - **縁は 4 辺とも付ける。** 上端に貼りついているので上の縁だけ外していたが、
+ *   上側にも付けてほしいと言われた（実機レビュー）。角を丸めないのは上の 2 つだけ
  * - 名前は 12px（9px は「小さすぎる」と言われている）。矢印は付けない
  * - ホバーは地が沈むだけ（パレットと同じ）。伸びる動きはやめた
  * - **集中モードでは消える。** エディタが書いている間にサイドバーを隠す合図
@@ -75,7 +77,7 @@ export function BackToStudy() {
         // 消えている間は押せず、Tab でも止まらない（見えないものに当たらせない）。
         tabIndex={hidden ? -1 : undefined}
         aria-hidden={hidden || undefined}
-        className={`${hidden ? 'pointer-events-none' : 'pointer-events-auto'} relative flex h-8 items-center justify-center border-t-0 ${ELEVATED_CHIP_CLASS}`}
+        className={`${hidden ? 'pointer-events-none' : 'pointer-events-auto'} relative flex h-8 items-center justify-center ${ELEVATED_CHIP_CLASS}`}
         style={{
           ...ELEVATED_CHIP_STYLE,
           width: STUDY_EXIT_TAB.width,
