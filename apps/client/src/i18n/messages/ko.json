@@ -391,7 +391,6 @@
       "ti_pressure_bleed": "압력 번짐",
       "eraser_trace": "지운 자국",
       "amp": "타건음 증폭",
-      "voice": "음량 내포",
       "ghost": "고스트",
       "ghost_block": "덩어리",
       "ghost_dust": "먼지",
@@ -414,7 +413,15 @@
       "palette_size": "팔레트 크기",
       "palette_size_small": "작게",
       "palette_size_medium": "보통",
-      "palette_size_large": "크게"
+      "palette_size_large": "크게",
+      "time_inscription_hint": "쓰는 속도가 글자에 남습니다. 천천히 쓴 글자일수록 크게(또는 굵게) 됩니다.",
+      "time_inscription_mode_hint": "속도를 무엇으로 나타낼지: 크기·굵기·번짐 중에서 고릅니다.",
+      "eraser_trace_hint": "지운 자리에 옅은 흔적이 남았다가 잠시 뒤 사라집니다.",
+      "amp_hint": "마이크로 타건음을 받아, 키를 누르는 순간만 크게 되돌려 줍니다. 헤드폰을 쓰고 사용하세요. 마이크 사용을 허용하지 않으면 아무 일도 일어나지 않습니다.",
+      "amp_denied": "마이크 사용이 허용되지 않아 소리가 나지 않습니다. 주소 표시줄의 자물쇠 아이콘에서 허용해 주세요.",
+      "amp_unsupported": "이 환경에서는 마이크를 쓸 수 없어 소리가 나지 않습니다.",
+      "ghost_hint": "누른 글자의 잔상이 조금 늦게 뒤로 흘러갑니다.",
+      "delete_entry": "이 기록을 지우기"
     },
     "snippet_toolbar": {
       "saving": "저장 중…",

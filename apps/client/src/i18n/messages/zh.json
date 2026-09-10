@@ -391,7 +391,6 @@
       "ti_pressure_bleed": "压力晕染",
       "eraser_trace": "擦除痕迹",
       "amp": "按键音增幅",
-      "voice": "音量内包",
       "ghost": "残影",
       "ghost_block": "块",
       "ghost_dust": "尘",
@@ -414,7 +413,15 @@
       "palette_size": "操作面板大小",
       "palette_size_small": "小",
       "palette_size_medium": "中",
-      "palette_size_large": "大"
+      "palette_size_large": "大",
+      "time_inscription_hint": "书写的速度会留在字里。写得越慢，字越大（或越粗）。",
+      "time_inscription_mode_hint": "用什么表现速度：大小、粗细或晕染。",
+      "eraser_trace_hint": "删除的地方会留下淡淡的痕迹，过一会儿消失。",
+      "amp_hint": "用麦克风拾取敲键声，在按下的瞬间放大回放。请戴耳机使用。未允许使用麦克风时不会有任何反应。",
+      "amp_denied": "未允许使用麦克风，因此没有声音。请从地址栏的锁形图标中允许。",
+      "amp_unsupported": "当前环境无法使用麦克风，因此没有声音。",
+      "ghost_hint": "每次敲键都会有残影稍稍滞后地流过。",
+      "delete_entry": "删除这篇记录"
     },
     "snippet_toolbar": {
       "saving": "保存中…",

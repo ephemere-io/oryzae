@@ -15,6 +15,7 @@ import {
   SHELL_INSET,
   SHELL_ROW_HEIGHT,
 } from '@/components/ui/surface';
+import { DeleteConfirmModal } from '@/features/pc/entries/components/delete-confirm-modal';
 import {
   type EditorStatus,
   EditorStatusBar,
@@ -70,6 +71,7 @@ import {
 } from '@/features/pc/entries/utils/inline-image-codec';
 import { measureTitle, TITLE_MIN_FONT_SIZE } from '@/features/pc/entries/utils/title-metrics';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
+import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
 import type { AttachedPhoto } from '@/features/shared/entries/types';
@@ -436,7 +438,26 @@ export function EntryEditor({
     initialEffects ?? cachedInitialEffects.current ?? null;
 
   useGhostEffect(editorRef, ghostLayerRef, settings);
-  useAmpEffect(settings.ampEnabled);
+  const ampState = useAmpEffect(settings.ampEnabled);
+
+  /**
+   * このエントリーを消す。
+   *
+   * **一覧まで戻らないと消せなかった。** 「これは残さない」と決めるのは書いている
+   * 最中なので、その場に道を置く。消したら書く場所そのものが無くなるので、一覧へ戻す。
+   */
+  const { deleteEntry, deleting } = useDeleteEntry(api);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const savedEntryId = currentEntryId ?? entryId;
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!savedEntryId) return;
+    const ok = await deleteEntry(savedEntryId);
+    if (!ok) return;
+    setDeleteConfirmOpen(false);
+    // 消したものの上に留まらない。**離脱の確認は挟まない**——たったいま
+    // 「消す」と答えた人に「保存しますか」と訊くのは筋が通らない。
+    router.push('/entries');
+  }, [deleteEntry, router, savedEntryId]);
   useTimeInscription(editorRef, settings);
   const { getTracesSnapshot } = useEraserTrace(
     editorRef,
@@ -1520,7 +1541,20 @@ export function EntryEditor({
                 </button>
               )}
             >
-              <SettingsDrawer settings={settings} onChange={updateSettings} />
+              <SettingsDrawer
+                settings={settings}
+                onChange={updateSettings}
+                ampUnavailable={ampState.unavailable}
+                // まだ保存されていないエントリーには消すものが無い。道ごと出さない。
+                onDelete={
+                  savedEntryId
+                    ? () => {
+                        setSettingsOpen(false);
+                        setDeleteConfirmOpen(true);
+                      }
+                    : undefined
+                }
+              />
             </Popover>
           </div>
         </div>
@@ -1815,6 +1849,13 @@ export function EntryEditor({
       />
 
       {/* Browser back/forward confirmation */}
+      <DeleteConfirmModal
+        open={deleteConfirmOpen}
+        deleting={deleting}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => void handleDeleteConfirm()}
+      />
+
       <LeaveConfirmModal
         open={leaveConfirmOpen}
         onCancel={cancelLeaveConfirm}

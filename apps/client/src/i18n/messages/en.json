@@ -391,7 +391,6 @@
       "ti_pressure_bleed": "Pressure bleed",
       "eraser_trace": "Eraser marks",
       "amp": "Keystroke amplification",
-      "voice": "Volume inscription",
       "ghost": "Ghost",
       "ghost_block": "Blocks",
       "ghost_dust": "Dust",
@@ -414,7 +413,15 @@
       "palette_size": "Palette size",
       "palette_size_small": "Small",
       "palette_size_medium": "Medium",
-      "palette_size_large": "Large"
+      "palette_size_large": "Large",
+      "time_inscription_hint": "Your typing speed stays in the letters — slower strokes come out larger (or heavier).",
+      "time_inscription_mode_hint": "How speed is shown: size, weight, or bleed.",
+      "eraser_trace_hint": "Erasing leaves a faint mark where the text was, which fades after a moment.",
+      "amp_hint": "Picks up your keystrokes through the microphone and plays them back louder as you type. Use headphones. Nothing happens unless you allow microphone access.",
+      "amp_denied": "Microphone access is blocked, so nothing plays. Allow it from the lock icon in the address bar.",
+      "amp_unsupported": "This environment has no microphone available, so nothing plays.",
+      "ghost_hint": "An afterimage of each keystroke trails a moment behind it.",
+      "delete_entry": "Delete this entry"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
