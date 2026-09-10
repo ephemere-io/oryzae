@@ -1180,10 +1180,15 @@ y 軸まわりに -0.15 rad 回っている。ところが当たりだけ、配�
 
 | 読む側 | 読み方 |
 | --- | --- |
-| 流れの中の画面（瓶・ボード・一覧・アカウント） | シェルの `padding-top` |
+| 流れの中の画面（瓶・ボード・一覧・アカウント） | シェルの `margin-top` |
 | `fixed` の画面（エントリーのエディタ） | `.sidebar-anchored { top: ... }` |
 
-`fixed` は祖先の padding では下がらないので、この 2 本が要る。`--sidebar-width` が
+**`padding` ではなく `margin`。** padding だと箱の位置が動かないので、`absolute inset-0`
+で敷いている画面（PC の瓶・ロード表示）は帯の下へ潜る — 絶対配置が基準にするのは
+padding box の**外側の縁**だから。margin なら箱ごと下がり、`absolute inset-0` も
+`h-full` も揃って従う。
+
+`fixed` はどちらでも下がらないので、もう 1 本が要る。`--sidebar-width` が
 同じ形で配られているので、読む側の作法もそれに合わせた（`.sidebar-anchored` は
 もともと左をこの方式で決めている）。
 
