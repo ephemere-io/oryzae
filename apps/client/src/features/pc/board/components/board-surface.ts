@@ -15,11 +15,7 @@
  * だから ELEVATED_* を道具以外に使わないこと。
  */
 
-import {
-  HOVER_CLASS,
-  CONTROL_FONT as SHARED_CONTROL_FONT,
-  ELEVATED_PANEL_STYLE as SHARED_ELEVATED_PANEL_STYLE,
-} from '@/components/ui/surface';
+import { HOVER_CLASS, CONTROL_FONT as SHARED_CONTROL_FONT } from '@/components/ui/surface';
 
 /* ---------- 共有の語彙（3つとも同じ） ---------- */
 
@@ -59,22 +55,6 @@ export const CONTROL_FONT = SHARED_CONTROL_FONT;
  * （元は 2 つが別々に fixed で、上と左右で 30px / 下のツールバーだけ 24px とばらついていた）。
  */
 export const TOP_BAR_CLASS = 'fixed z-[1600] flex items-center justify-between gap-4';
-
-/* ---------- 行為: 浮いた面（道具箱だけ） ---------- */
-
-export const ELEVATED_PANEL_CLASS =
-  'fixed z-[1600] flex items-center gap-1 rounded-[13px] border p-1.5 ' +
-  'shadow-[0_8px_24px_-6px_rgba(0,0,0,0.22),0_2px_6px_-2px_rgba(0,0,0,0.12)]';
-
-/** 面の地と枠は共通のものを使い、盤面はそこに書体を足すだけにする。 */
-export const ELEVATED_PANEL_STYLE = {
-  ...CONTROL_FONT,
-  ...SHARED_ELEVATED_PANEL_STYLE,
-} as const;
-
-/** 浮いた面に載る道具。ここだけ 36px と大きく、主役として扱う。 */
-export const TOOL_BUTTON_CLASS =
-  'flex h-9 w-9 items-center justify-center rounded-lg transition-colors';
 
 /* ---------- 状態: 平らなトラック（表示単位の切り替え） ---------- */
 
