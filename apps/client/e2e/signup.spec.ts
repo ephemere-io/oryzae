@@ -69,9 +69,9 @@ test.describe('新規登録', () => {
     // ── アプリの確認ページを踏む（use-email-confirm.ts の経路） ──
     await page.goto(`/auth/confirm?token_hash=${tokenHash}&type=signup`);
 
-    // 確定するとセッションが保存され、書く画面へ送られる。
-    await page.waitForURL('**/entries/new**', { timeout: 30_000 });
-    await expect(page).toHaveURL(/\/entries\/new/);
+    // 確定するとセッションが保存され、ホーム（既定は書斎）へ送られる。
+    await page.waitForURL('**/study**', { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/study/);
 
     // 保護ルートに留まれる＝セッションが本当に確立している。
     await page.goto('/entries');

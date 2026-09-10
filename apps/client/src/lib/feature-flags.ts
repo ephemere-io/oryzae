@@ -29,6 +29,14 @@ export interface FeatureFlagOptions {
   queryParam: string;
   /** 手動切替を憶えておく localStorage のキー。 */
   storageKey: string;
+  /**
+   * PostHog が false を返したら落とすか（既定 true＝段階配信に使う）。
+   *
+   * **全員に配るフラグでは false にする。** PostHog は、フラグが存在しないときや配信の
+   * 対象外のときも読み込み後に false を返す。既定 on のフラグでこれを見ると、PostHog 側の
+   * 設定しだいで全員が黙って off に戻る。
+   */
+  respectPosthog?: boolean;
 }
 
 type Override = boolean | null;
@@ -125,8 +133,8 @@ export function useFeatureFlag(options: FeatureFlagOptions): FeatureFlagState {
     setState({ override: readStoredOverride(options.storageKey), resolved: true });
   }, [options.queryParam, options.storageKey]);
 
-  const enabled =
-    state.override !== null ? state.override : options.envEnabled && posthogEnabled !== false;
+  const posthogAllows = options.respectPosthog === false || posthogEnabled !== false;
+  const enabled = state.override !== null ? state.override : options.envEnabled && posthogAllows;
 
   return { enabled, resolved: state.resolved };
 }
@@ -134,4 +142,13 @@ export function useFeatureFlag(options: FeatureFlagOptions): FeatureFlagState {
 /** `NEXT_PUBLIC_*` の文字列を真偽に。既定は off。 */
 export function isEnvFlagOn(value: string | undefined): boolean {
   return value === 'on' || value === 'true' || value === '1';
+}
+
+/**
+ * 既定 on のフラグを**明示的に**切っているか。未設定は「切っていない」。
+ *
+ * 全員に配るフラグの撤退口。`off` を入れて再デプロイすれば止まる。
+ */
+export function isEnvFlagOff(value: string | undefined): boolean {
+  return value === 'off' || value === 'false' || value === '0';
 }
