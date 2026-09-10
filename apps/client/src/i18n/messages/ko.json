@@ -821,6 +821,7 @@
     "list_heading_all": "ALL — {count} ENTRIES",
     "list_heading_month": "{month} — {count} ENTRIES",
     "list_close": "닫기",
+    "list_new_entry": "새로 작성",
     "list_empty_month": "이 달의 기록이 없습니다",
     "list_loading": "불러오는 중",
     "list_search_placeholder": "본문 검색",

@@ -29,6 +29,7 @@ interface Props {
   selectedMonth: string | null;
   onSelectMonth: (month: string | null) => void;
   onSelectEntry: (entry: StudyEntry) => void;
+  onCreateEntry?: () => void;
   onClose: () => void;
 }
 
@@ -56,6 +57,7 @@ const ENTRIES: StudyEntry[] = [
 const NOOP = {
   onSelectMonth: () => {},
   onSelectEntry: () => {},
+  onCreateEntry: () => {},
   onClose: () => {},
 };
 
@@ -149,6 +151,16 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'offers-a-new-entry',
+      description: '一覧から新しく書き始められる（今月の手帳を開いた先に書く入口がある）',
+      check: ({ root, props }) => {
+        if (!props.onCreateEntry) return true;
+        return (
+          root.querySelector('[data-verify-part="create-entry"]') !== null || '「新規作成」が無い'
+        );
+      },
+    },
     {
       id: 'rows-are-what-was-given',
       description: '渡された記録をそのまま出す（手元でもう一度絞らない）',

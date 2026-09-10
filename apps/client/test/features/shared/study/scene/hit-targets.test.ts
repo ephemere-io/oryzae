@@ -70,8 +70,9 @@ describe('buildHitRegistry', () => {
     expect(pc.get('spine-0')).not.toBeNull();
   });
 
-  it('当月の手帳は新規執筆、過去月はその月の一覧', () => {
-    expect(pc.get('notebook-0')?.target).toEqual({ kind: 'journal-new' });
+  it('手帳はどの冊もその月の一覧（新しく書く入口は鉛筆）', () => {
+    expect(pc.get('notebook-0')?.target).toEqual({ kind: 'journal-month', month: '2026-09' });
+    expect(pc.get('pen')?.target).toEqual({ kind: 'journal-new' });
     expect(pc.get('notebook-1')?.target).toEqual({ kind: 'journal-month', month: '2026-08' });
   });
 

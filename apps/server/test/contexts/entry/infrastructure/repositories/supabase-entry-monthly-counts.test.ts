@@ -71,7 +71,7 @@ describe('SupabaseEntryRepository.countByMonth', () => {
       ]),
     );
 
-    expect(await repo.countByMonth('u1')).toEqual([
+    expect(await repo.countByMonth('u1')).toMatchObject([
       { month: '2026-09', count: 3 },
       { month: '2026-08', count: 1 },
       { month: '2026-07', count: 2 },
@@ -80,7 +80,7 @@ describe('SupabaseEntryRepository.countByMonth', () => {
 
   it('記録が無ければ空配列（机が空になるだけで壊れない）', async () => {
     const repo = new SupabaseEntryRepository(createSupabase([]));
-    expect(await repo.countByMonth('u1')).toEqual([]);
+    expect(await repo.countByMonth('u1')).toMatchObject([]);
   });
 
   it('1000 行を超えても打ち切らずに全件数える', async () => {
@@ -88,7 +88,7 @@ describe('SupabaseEntryRepository.countByMonth', () => {
     const rows = rowsForMonth('2026-09', PAGE_SIZE + 7, 0);
     const repo = new SupabaseEntryRepository(createSupabase(rows));
 
-    expect(await repo.countByMonth('u1')).toEqual([{ month: '2026-09', count: 1007 }]);
+    expect(await repo.countByMonth('u1')).toMatchObject([{ month: '2026-09', count: 1007 }]);
   });
 
   it('ページングを id のカーソルで進める（offset ではない）', async () => {
@@ -99,7 +99,7 @@ describe('SupabaseEntryRepository.countByMonth', () => {
     await repo.countByMonth('u1');
 
     // 1 ページ目は cursor 無し、2 ページ目は直前ページの最大 id から続ける。
-    expect(cursors).toEqual([null, '000999']);
+    expect(cursors).toMatchObject([null, '000999']);
   });
 
   it('tzOffset で月の境界がローカル暦月になる', async () => {
@@ -108,8 +108,24 @@ describe('SupabaseEntryRepository.countByMonth', () => {
       createSupabase([{ id: '000001', created_at: '2026-08-31T15:50:00.000Z' }]),
     );
 
-    expect(await repo.countByMonth('u1')).toEqual([{ month: '2026-08', count: 1 }]);
-    expect(await repo.countByMonth('u1', JST)).toEqual([{ month: '2026-09', count: 1 }]);
+    expect(await repo.countByMonth('u1')).toMatchObject([{ month: '2026-08', count: 1 }]);
+    expect(await repo.countByMonth('u1', JST)).toMatchObject([{ month: '2026-09', count: 1 }]);
+  });
+
+  it('その月の最初と最後の日をローカル暦日で返す', async () => {
+    // JST 2026-09-01 00:50 = 2026-08-31T15:50Z。UTC で切ると 08-31 になり、9 月の冊の
+    // 範囲の端が 8 月の日付になる。
+    const repo = new SupabaseEntryRepository(
+      createSupabase([
+        { id: '000001', created_at: '2026-09-18T05:00:00.000Z' },
+        { id: '000002', created_at: '2026-08-31T15:50:00.000Z' },
+        { id: '000003', created_at: '2026-09-07T01:00:00.000Z' },
+      ]),
+    );
+
+    expect(await repo.countByMonth('u1', JST)).toEqual([
+      { month: '2026-09', count: 3, first: '2026-09-01', last: '2026-09-18' },
+    ]);
   });
 
   it('壊れた created_at の行だけを捨てて集計を続ける', async () => {
@@ -121,6 +137,6 @@ describe('SupabaseEntryRepository.countByMonth', () => {
       ]),
     );
 
-    expect(await repo.countByMonth('u1')).toEqual([{ month: '2026-09', count: 2 }]);
+    expect(await repo.countByMonth('u1')).toMatchObject([{ month: '2026-09', count: 2 }]);
   });
 });

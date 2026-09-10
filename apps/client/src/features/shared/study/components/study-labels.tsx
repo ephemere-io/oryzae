@@ -34,6 +34,8 @@ export interface StudyLabelsProps {
   entryCount: number;
   volumeCount: number;
   cardCount: number;
+  /** 当月（`YYYY-MM`）。ENTRIES のピルは当月の一覧を開く（積みのいちばん上と同じ）。 */
+  currentMonth: string;
   /** canvas の実寸。ピルの押し戻しに使う。 */
   screen: { width: number; height: number };
   onPick: (target: StudyTarget) => void;
@@ -126,7 +128,7 @@ function PcLabels({ layout, positions, hovered }: StudyLabelsProps) {
 
 function SpPills(props: StudyLabelsProps) {
   const t = useTranslations('study');
-  const { layout, positions, screen, onPick } = props;
+  const { layout, positions, screen, onPick, currentMonth } = props;
 
   // ピルの実寸。文字量で変わるので、描画されたものを測って押し戻しに使う。
   const [sizes, setSizes] = useState<Partial<Record<LabelKind, PillSize>>>({});
@@ -169,7 +171,7 @@ function SpPills(props: StudyLabelsProps) {
             key={kind}
             ref={(element) => measure(kind, element)}
             type="button"
-            onClick={() => onPick(targetFor(kind))}
+            onClick={() => onPick(targetFor(kind, currentMonth))}
             className="pointer-events-auto absolute flex items-center gap-1.5 whitespace-nowrap rounded-full px-3"
             style={{
               left: placed.x,
@@ -250,14 +252,14 @@ function labelKey(
  * ラベルを押したときの行き先。
  *
  * **3D の物本体を押したときと同じ行き先**にする（40-acceptance.md「SP のタッチ提示」）。
- * JOURNAL は当月の手帳＝新規執筆、ARCHIVE は棚ごと＝全月の一覧。
+ * ENTRIES は当月の一覧（積みのいちばん上と同じ）、ARCHIVE は棚ごと＝全月の一覧。
  */
-function targetFor(kind: LabelKind): StudyTarget {
+function targetFor(kind: LabelKind, currentMonth: string): StudyTarget {
   switch (kind) {
     case 'jar':
       return { kind: 'jar' };
     case 'journal':
-      return { kind: 'journal-new' };
+      return { kind: 'journal-month', month: currentMonth };
     case 'board':
       return { kind: 'board' };
     case 'archive':

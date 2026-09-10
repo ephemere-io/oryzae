@@ -63,6 +63,23 @@ export function localMonthKey(createdAtIso: string, tzOffsetMinutes = 0): string
 }
 
 /**
+ * UTC の瞬間が、利用者のローカル暦では何日かを返す（`YYYY-MM-DD`）。
+ *
+ * 手帳のホバーが言う「この冊は 08.03 – 08.29」の端を決める。**`localMonthKey` と同じ切り方**
+ * でなければならない — ずれると、ある冊の範囲の端が隣の月の日付になる。
+ * 不正な日時は null（呼び出し側がその行だけ捨てる）。
+ */
+export function localDateKey(createdAtIso: string, tzOffsetMinutes = 0): string | null {
+  const at = Date.parse(createdAtIso);
+  if (Number.isNaN(at)) return null;
+  const local = new Date(at - tzOffsetMinutes * 60_000);
+  const year = local.getUTCFullYear();
+  const month = `${local.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${local.getUTCDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * `YYYY-MM` が指すローカル暦月 1 ヶ月ぶんの UTC 区間。
  *
  * 書斎の一覧が「その月の記録」を引くのに使う。件数（`countByMonth` → `localMonthKey`）と

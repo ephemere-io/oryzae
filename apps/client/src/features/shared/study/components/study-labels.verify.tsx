@@ -21,6 +21,7 @@ interface Props {
   entryCount: number;
   volumeCount: number;
   cardCount: number;
+  currentMonth: string;
   screen: { width: number; height: number };
   onPick: () => void;
 }
@@ -41,6 +42,7 @@ const BASE: Props = {
   entryCount: 9,
   volumeCount: 3,
   cardCount: 10,
+  currentMonth: '2026-09',
   screen: { width: 390, height: 844 },
   onPick: () => {},
 };

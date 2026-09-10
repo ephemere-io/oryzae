@@ -22,7 +22,10 @@ interface StudyState {
   board: { total: number; snippets: number; photos: number; cards: StudyBoardCard[] };
 }
 
-interface Notebook { month: string; entryCount: number; current: boolean }   // month = 'YYYY-MM'
+interface Notebook {                 // month = 'YYYY-MM'
+  month: string; entryCount: number; current: boolean;
+  range?: { first: string; last: string } | null;  // その冊の最初と最後の日（ローカル暦日）
+}
 
 interface StudyEntry {               // use-entries.ts の Entry から派生
   id: string;

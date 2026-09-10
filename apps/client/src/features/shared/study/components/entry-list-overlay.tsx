@@ -40,6 +40,13 @@ export interface EntryListOverlayProps {
   onSelectQuestion?: (questionId: string | null) => void;
   onSelectMonth: (month: string | null) => void;
   onSelectEntry: (entry: StudyEntry) => void;
+  /**
+   * 「新規作成」。一覧から新しく書き始める。
+   *
+   * 当月の手帳を押すと一覧が開くようになったので、書く入口をここにも置く
+   * （鉛筆を押せば直接書き始められるのは変わらない）。
+   */
+  onCreateEntry?: () => void;
   onClose: () => void;
 }
 
@@ -82,6 +89,7 @@ export function EntryListOverlay({
   onSelectQuestion,
   onSelectMonth,
   onSelectEntry,
+  onCreateEntry,
   onClose,
 }: EntryListOverlayProps) {
   const t = useTranslations('study');
@@ -100,6 +108,7 @@ export function EntryListOverlay({
         hasMore,
         questionId: questionId ?? 'all',
         searching: search.length > 0,
+        canCreate: onCreateEntry !== undefined,
       })}
       className="absolute inset-0 z-20 flex items-start justify-center overflow-auto px-6 py-14"
     >
@@ -137,7 +146,7 @@ export function EntryListOverlay({
         </div>
 
         {/* 月チップ。背表紙を狙わなくても月を切り替えられる（SP はこれが唯一の手段）。 */}
-        <div className="mb-5 flex flex-wrap gap-2" data-chip-group="month">
+        <div className="mb-5 flex flex-wrap items-center gap-2" data-chip-group="month">
           <MonthChip
             label={t('chip_all')}
             selected={selectedMonth === null}
@@ -151,6 +160,19 @@ export function EntryListOverlay({
               onClick={() => onSelectMonth(month)}
             />
           ))}
+          {/* 選ぶところの右端に「新規作成」。月を見に来た流れのまま書き始められる。 */}
+          {onCreateEntry && (
+            <button
+              type="button"
+              onClick={onCreateEntry}
+              data-verify-part="create-entry"
+              className="ml-auto flex h-8 items-center gap-1.5 rounded-full px-4 text-[12px] font-medium transition-opacity hover:opacity-90"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              <span aria-hidden="true">＋</span>
+              {t('list_new_entry')}
+            </button>
+          )}
         </div>
 
         {/* 本文の検索。サーバーが絞るので、まだ読み込んでいない古い記録にも当たる。 */}

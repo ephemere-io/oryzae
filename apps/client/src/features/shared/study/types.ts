@@ -49,8 +49,13 @@ export interface Notebook {
   /** `YYYY-MM`（利用者のローカル暦月）。 */
   month: string;
   entryCount: number;
-  /** 当月か。当月の手帳だけが新規執筆の入口になる。 */
+  /** 当月か。 */
   current: boolean;
+  /**
+   * その冊の最初と最後の記録の日（ローカル暦日 `YYYY-MM-DD`）。ホバーの紙が出す。
+   * 分からなければ無し（件数だけを出す）。
+   */
+  range?: { first: string; last: string } | null;
 }
 
 /** 一覧オーバーレイの 1 行。本文全体は持たない。 */

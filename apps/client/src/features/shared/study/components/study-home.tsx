@@ -15,7 +15,6 @@ import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
-import { monthDateRange } from '../scene/books';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -129,7 +128,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
     [overlay, list.entries, state.entries],
   );
 
-  /** JOURNAL のピルに出す件数は**当月**のもの（積み全体ではない）。 */
+  /** ENTRIES のピルに出す件数は**当月**のもの（積み全体ではない）。 */
   const currentMonthCount = useMemo(
     () => state.notebooks.find((notebook) => notebook.current)?.entryCount ?? 0,
     [state.notebooks],
@@ -245,6 +244,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
             entryCount={currentMonthCount}
             volumeCount={archiveCount}
             cardCount={state.board.total}
+            currentMonth={state.now.slice(0, 7)}
             screen={screen}
             onPick={handlePickFromLabel}
           />
@@ -262,10 +262,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
             entryCount={
               state.notebooks.find((notebook) => notebook.month === hover.month)?.entryCount ?? 0
             }
-            range={monthDateRange(
-              state.entries.map((entry) => entry.createdAt),
-              hover.month,
-            )}
+            // 範囲はサーバーが月ごとに数えたときの端（どの月でも出る）。手元の直近
+            // 20 件から作っていたころは、古い月（積みの 3 段目・棚）だけ範囲が出なかった。
+            range={
+              state.notebooks.find((notebook) => notebook.month === hover.month)?.range ?? null
+            }
             current={hover.month === state.now.slice(0, 7)}
             screen={hover.screen}
           />
@@ -292,6 +293,10 @@ export function StudyHome({ layout }: StudyHomeProps) {
           selectedMonth={overlay?.month ?? null}
           onSelectMonth={(month) => setOverlay({ month })}
           onSelectEntry={handleSelectEntry}
+          onCreateEntry={() => {
+            setOverlay(null);
+            router.push('/entries/new');
+          }}
           onClose={() => {
             setOverlay(null);
             // 次に開いたときは素の状態から。絞ったまま閉じると、別の月を開いても

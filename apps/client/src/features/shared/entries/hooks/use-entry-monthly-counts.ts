@@ -6,16 +6,22 @@ import type { ApiClient } from '@/lib/api';
 import { isObject, readJson } from '@/lib/json';
 
 const MONTH_PATTERN = /^\d{4}-\d{2}$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 暦日として読めなければ null（範囲を出さないだけで、件数は使う）。 */
+function readDate(value: unknown): string | null {
+  return typeof value === 'string' && DATE_PATTERN.test(value) ? value : null;
+}
 
 function normalizeCounts(raw: unknown): MonthlyEntryCount[] {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((row): MonthlyEntryCount[] => {
     if (!isObject(row)) return [];
-    const { month, count } = row;
+    const { month, count, first, last } = row;
     // 月の形が違う行は捨てる。手帳の背文字と積みの順序がそのまま壊れるため。
     if (typeof month !== 'string' || !MONTH_PATTERN.test(month)) return [];
     if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) return [];
-    return [{ month, count: Math.floor(count) }];
+    return [{ month, count: Math.floor(count), first: readDate(first), last: readDate(last) }];
   });
 }
 

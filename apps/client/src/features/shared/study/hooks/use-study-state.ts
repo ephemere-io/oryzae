@@ -26,7 +26,8 @@ import type { StudyBoardCard, StudyEntry, StudyFermentationStatus, StudyState } 
 /** 憶えてある書斎の形が変わったら上げる。 */
 // 5: 壁が「当日の盤面」から「溜まっている総量」になった（board の形が変わる）。
 // 6: 壁が種類ごとの数（写真・スニペット）を持つようになった。
-const CACHE_VERSION = 6;
+// 7: 手帳がその月の範囲（最初と最後の日）を持つようになった。
+const CACHE_VERSION = 7;
 
 /** 一週間。裏で必ず取り直すので、長くても古い値が居座らない。 */
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -135,6 +136,10 @@ export function useStudyState(
         entryCount: count.count,
         // 当月かどうかは月から決める（サーバーは「今日」を知らない）。
         current: count.month === now.slice(0, 7),
+        range:
+          count.first !== null && count.last !== null
+            ? { first: count.first, last: count.last }
+            : null,
       })),
       entries: entries.map(toStudyEntry),
       questions,

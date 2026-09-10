@@ -7,6 +7,14 @@ export type EntryListOrder = 'newest' | 'oldest';
 export interface MonthlyEntryCount {
   month: string;
   count: number;
+  /**
+   * その月の最初と最後の記録の日（ローカル暦日 `YYYY-MM-DD`）。
+   *
+   * 書斎の手帳と背表紙のホバーが「08.03 – 08.29」と出すのに使う。クライアントの手元に
+   * ある直近の記録から作っていたころは、古い月ほど範囲が出なかった（実機レビュー）。
+   */
+  first: string;
+  last: string;
 }
 
 /** ローカル暦月で絞るときの指定。月だけでは時差ぶんの境界が決まらない。 */

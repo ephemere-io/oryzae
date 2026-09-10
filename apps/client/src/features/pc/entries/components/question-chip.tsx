@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MenuOption, MenuPanel } from '@/components/ui/menu';
+import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
 
 interface QuestionOption {
   id: string;
@@ -187,25 +188,9 @@ export function QuestionChip({
     };
   }, [open, setOpen]);
 
-  // CSS カスタムプロパティは React.CSSProperties に含まれないので、`--*` を許す形で広げる。
-  const linkedChipStyle: React.CSSProperties & Record<`--${string}`, string> = {
-    color: 'var(--accent)',
-    '--chip-bg': 'color-mix(in srgb, var(--accent) 14%, var(--surface-raised))',
-    '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 24%, var(--surface-raised))',
-    '--chip-border': 'color-mix(in srgb, var(--accent) 38%, transparent)',
-    '--chip-border-hover': 'color-mix(in srgb, var(--accent) 60%, transparent)',
-  };
-  const addChipStyle: React.CSSProperties & Record<`--${string}`, string> = {
-    color: 'var(--fg)',
-    '--chip-bg': 'var(--surface-raised)',
-    '--chip-bg-hover': 'color-mix(in srgb, var(--accent) 12%, var(--surface-raised))',
-    '--chip-border': 'var(--surface-raised-border)',
-    '--chip-border-hover': 'color-mix(in srgb, var(--accent) 45%, transparent)',
-  };
-  const chipClass =
-    'flex h-8 shrink-0 items-center gap-2 rounded-full border border-[var(--chip-border)] ' +
-    'bg-[var(--chip-bg)] px-3.5 text-[13.5px] font-medium transition-colors duration-150 ' +
-    'hover:border-[var(--chip-border-hover)] hover:bg-[var(--chip-bg-hover)]';
+  // 地・縁・影・角丸・ホバーはアクションパレットと同じ面（ELEVATED_CHIP_*）。
+  // 結んでいる印は「◦」だけに accent を残す（地まで accent にすると別の部品に見える）。
+  const chipClass = `flex h-9 shrink-0 items-center gap-2 px-4 text-[13.5px] font-medium ${ELEVATED_CHIP_CLASS}`;
 
   return (
     // 器はボタンに張りつく大きさにする（inline-flex）。中央寄せの箱にしていた頃は、
@@ -226,14 +211,23 @@ export function QuestionChip({
           そのまま並べ、あふれたら横に流す（縦に折り返すとヘッダーの高さが動く）。 */}
       <div
         ref={railRef}
-        className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // 上下に余白を持たせて影の逃げ場を作る（横に流す箱は影まで切ってしまう）。
+        // 負のマージンで行の高さは変えない。
+        className="-my-4 flex min-w-0 items-center gap-1.5 overflow-x-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={railMaskStyle(edges)}
       >
         {/* チップ**全体**を外すボタンにしない。結んだ問いを確かめようと押しただけで
             消えてしまう（実際にそうなっていた）。外すのは × だけ。 */}
         {linked.map((q) => (
-          <span key={q.id} data-question-id={q.id} className={chipClass} style={linkedChipStyle}>
-            <span aria-hidden="true">◦</span>
+          <span
+            key={q.id}
+            data-question-id={q.id}
+            className={chipClass}
+            style={ELEVATED_CHIP_STYLE}
+          >
+            <span aria-hidden="true" style={{ color: 'var(--accent)' }}>
+              ◦
+            </span>
             <span className="whitespace-nowrap">{q.currentText ?? t('untitled')}</span>
             <button
               type="button"
@@ -258,7 +252,7 @@ export function QuestionChip({
             aria-haspopup="menu"
             aria-label={t('empty')}
             className={chipClass}
-            style={addChipStyle}
+            style={ELEVATED_CHIP_STYLE}
           >
             <span aria-hidden="true">+</span>
             {linked.length === 0 && <span className="whitespace-nowrap">{t('empty')}</span>}

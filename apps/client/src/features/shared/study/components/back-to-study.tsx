@@ -3,10 +3,11 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 
 /** 垂れ下がるタブの寸法（px）。 */
-export const STUDY_EXIT_TAB = { width: 156, height: 28 } as const;
+export const STUDY_EXIT_TAB = { width: 156, height: 32 } as const;
 
 /**
  * PC の画面が上端の中央に空けておく幅（px）。タブの幅に左右の息継ぎを足したもの。
@@ -22,22 +23,6 @@ export const STUDY_EXIT_RESERVE = STUDY_EXIT_TAB.width + 32;
  */
 export const STUDY_EXIT_BAND = STUDY_EXIT_TAB.height;
 
-/** 帯とタブの色。書斎のラベルの点（`#A8A381`）を地に溶かしたもの。 */
-const TINT = '#A8A381';
-
-// CSS カスタムプロパティは React.CSSProperties に含まれないので、`--*` を許す形で広げる。
-type TabStyle = React.CSSProperties & Record<`--${string}`, string>;
-
-const TAB_STYLE: TabStyle = {
-  width: STUDY_EXIT_TAB.width,
-  // 淡く（地 24% → 14%・縁 55% → 30%・字は --fg の 70%）。濃い版は「注意を引きすぎる」
-  // と報告された。ページの地と同じ色にはしない — それは「帯になっていない」と言われた版。
-  '--tab-bg': `color-mix(in srgb, ${TINT} 14%, var(--bg))`,
-  '--tab-bg-hover': `color-mix(in srgb, ${TINT} 22%, var(--bg))`,
-  borderColor: `color-mix(in srgb, ${TINT} 30%, transparent)`,
-  color: 'color-mix(in srgb, var(--fg) 70%, transparent)',
-};
-
 /**
  * サブ画面の上端に掛かる「書斎へ戻る」。**上端いっぱいの細い帯と、その中央から
  * 垂れ下がるタブ**でできている。
@@ -49,32 +34,24 @@ const TAB_STYLE: TabStyle = {
  * ### ここまでの経緯
  *
  * 左上のマーク → 下端の中央 → 上端の中央に浮かせた 9px の名前 → 画面を丸ごと下げる帯
- * → **帯とタブ**。
+ * → 帯とタブ（書斎のラベルの色を溶かした地）→ **帯とタブ（パレットと同じ面）**。
  *
- * 画面を下げる帯は「帯になっていない・目立たない」と報告された。地がページと同じ色で
- * 線も引いていなかったので、**構造は帯でも、見た目は前の 9px の名前のまま**だった。
- * しかもエントリーでは「設定・日付・問いの行をただ下にずらしただけ」になった。
+ * 全幅の帯に高さを持たせると、画面を下げるか画面に重なるかしかない。だから高さを
+ * 持つのは中央のタブだけにして、帯は上端に細く走らせる。
  *
- * 全幅の帯に高さを持たせると、画面を下げるか画面に重なるかのどちらかしかない。
- * だから**高さを持つのは中央のタブだけ**にして、帯は上端に 3px 走らせる。帯が
- * 「ここは書斎の中の一室」を言い、タブが「ここを押せば戻れる」を言う。
- *
- * - タブの地は書斎のラベルの点の色（`#A8A381`）を薄く溶かしたもの。ページの地とは
- *   見分けがつくが、注意を引きすぎない（濃い版は「目立ちすぎる」と言われた）
- * - **集中モードでは消える。** エディタが書いている間にサイドバーを隠す合図
- *   （`useSidebarVisibility().hidden`）をそのまま読む。書斎ではこのタブがサイドバーの
- *   代わりなので、同じ合図で退くのが筋
+ * - **面はアクションパレットと同じ**（地・縁・影・角丸・ホバー。`ELEVATED_CHIP_*`）。
+ *   書斎の色を溶かした専用の地にしていたころ、問いのチップ・パレット・瓶の問いと
+ *   影も角丸も色も違い、同じアプリの部品に見えないと報告された
  * - 名前は 12px（9px は「小さすぎる」と言われている）。矢印は付けない
- *   （「矢印と文字の組み合わせが、どこにも出てないデザイン言語」）— 垂れたタブの形が
- *   そのまま「引けば戻る」を言う
- * - 触れるとタブが 3px 伸びる。引き手を少し引いたときの動き
+ * - ホバーは地が沈むだけ（パレットと同じ）。伸びる動きはやめた
+ * - **集中モードでは消える。** エディタが書いている間にサイドバーを隠す合図
+ *   （`useSidebarVisibility().hidden`）をそのまま読む
  *
  * ### 画面の側がすること
  *
  * PC の画面は下がらない。上端の中央 `STUDY_EXIT_RESERVE` だけを空けておく
- * （`--study-exit-reserve`）。どの画面も中央は元から使っておらず、伸びてきたのは
- * エントリーの問いのチップだけだった — あちらは決まった幅の中で横に流れる。
- * SP だけは題を中央に置くので、タブの高さぶん下がる（`--study-exit-band`）。
+ * （`--study-exit-reserve`）。SP だけは題を中央に置くので、タブの高さぶん下がる
+ * （`--study-exit-band`）。
  *
  * 重なり順は 55。掴んで動かせるパレット（1600）より下で、パレットが裏に隠れて
  * 戻せなくなることは無い。
@@ -92,11 +69,14 @@ export function BackToStudy() {
         hidden ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      {/* 上端を走る細い帯。 */}
+      {/* 上端を走る細い帯。タブと同じ地で、下に縁を 1 本だけ引く。 */}
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-[3px]"
-        style={{ background: `color-mix(in srgb, ${TINT} 20%, var(--bg))` }}
+        className="absolute inset-x-0 top-0 h-[3px] border-b"
+        style={{
+          background: 'var(--surface-raised)',
+          borderColor: 'var(--surface-raised-border)',
+        }}
       />
       <Link
         href="/study"
@@ -104,8 +84,14 @@ export function BackToStudy() {
         // 消えている間は押せず、Tab でも止まらない（見えないものに当たらせない）。
         tabIndex={hidden ? -1 : undefined}
         aria-hidden={hidden || undefined}
-        className={`${hidden ? 'pointer-events-none' : 'pointer-events-auto'} relative flex h-7 items-center justify-center rounded-b-lg border border-t-0 bg-[var(--tab-bg)] shadow-[0_2px_6px_rgba(74,69,65,0.05)] transition-all duration-200 hover:h-[31px] hover:bg-[var(--tab-bg-hover)]`}
-        style={TAB_STYLE}
+        className={`${hidden ? 'pointer-events-none' : 'pointer-events-auto'} relative flex h-8 items-center justify-center border-t-0 ${ELEVATED_CHIP_CLASS}`}
+        style={{
+          ...ELEVATED_CHIP_STYLE,
+          width: STUDY_EXIT_TAB.width,
+          // 上端に貼りついているので、角を丸めるのは下の 2 つだけ。
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+        }}
       >
         <span className="whitespace-nowrap text-[12px] font-medium tracking-[0.08em]">
           {t('back_to_study')}
