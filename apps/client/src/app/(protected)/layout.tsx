@@ -62,11 +62,17 @@ function PcShell({
       >
         {/* **帯のぶんだけ下げる。** 浮かせて重ねていたころは、問いのチップが伸びると
             出口とぶつかった（実機レビュー）。画面の側が席を空ければ重なりようが無い。
-            この padding が効かない **fixed の画面**（エントリーのエディタ）は
+
+            下げるのは padding ではなく **margin**。padding だと箱の位置は動かないので、
+            `absolute inset-0` で敷いている画面（瓶・ロード表示）が帯の下へ潜る
+            （絶対配置が基準にするのは padding box の外側の縁）。margin なら箱ごと
+            下がるので、`absolute inset-0` も `h-full` も揃って従う。
+
+            それでも効かない **fixed の画面**（エントリーのエディタ）は、
             `.sidebar-anchored` が同じ変数を top で読む。 */}
         <div
           className="relative flex-1 overflow-auto"
-          style={{ paddingTop: 'var(--study-exit-band, 0px)' }}
+          style={{ marginTop: 'var(--study-exit-band, 0px)' }}
         >
           {children}
         </div>
@@ -183,9 +189,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               className="flex h-[100dvh] flex-col overflow-hidden"
               style={spShellStyle(showBackToStudy)}
             >
+              {/* PC と同じく margin で下げる（padding だと `absolute inset-0` の
+                  画面が帯の下へ潜る）。 */}
               <main
                 className="relative flex-1 overflow-auto"
-                style={{ paddingTop: 'var(--study-exit-band, 0px)' }}
+                style={{ marginTop: 'var(--study-exit-band, 0px)' }}
               >
                 {content}
               </main>
