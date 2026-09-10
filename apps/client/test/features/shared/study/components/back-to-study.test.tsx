@@ -1,6 +1,6 @@
-import { render, within } from '@testing-library/react';
+import { cleanup, render, within } from '@testing-library/react';
 import { useEffect } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { BackToStudy } from '@/features/shared/study/components/back-to-study';
 import { SidebarProvider, useSidebarVisibility } from '@/lib/sidebar-context';
 import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
@@ -32,6 +32,11 @@ function band(container: HTMLElement): HTMLElement {
 }
 
 describe('BackToStudy と集中モード', () => {
+  // 描いた木を毎回外す。このリポジトリの vitest は自動では片付けないので、残すと
+  // テスト環境を畳んだあとに React の予約した更新が走り、`window is not defined` の
+  // 未処理エラーで**全部通っているのに**スイートが失敗扱いになる（push 前に踏んだ）。
+  afterEach(cleanup);
+
   it('ふだんは見えていて押せる', () => {
     const { container } = renderTab(false);
     expect(band(container).className).toContain('opacity-100');
