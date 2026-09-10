@@ -49,8 +49,9 @@ test.describe('SP 体験 (#363)', () => {
     await createSpEntry(page, marker, '初期本文。ここに追記して自動保存を確認する。');
 
     await page.goto('/entries');
-    // SP シェル（ボトムナビ）が出る＝SP として描画されている
-    await expect(page.getByRole('navigation')).toBeVisible();
+    // 保護シェルが出ている（書斎ホームではボトムナビの代わりに「書斎に戻る」が掛かる）。
+    // SP として描画されていることは、下で開く SP エディタの textarea が確かめる。
+    await expect(page.getByRole('link', { name: '書斎に戻る' })).toBeVisible();
 
     const target = page.locator('main li button', { hasText: marker }).first();
     await expect(target).toBeVisible({ timeout: 30_000 });

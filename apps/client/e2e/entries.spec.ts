@@ -86,7 +86,9 @@ test.describe('エントリ管理', () => {
    */
   test('写真を選ぶと取り込みモーダルが開き、取り込み方を選べる', async ({ page }) => {
     await page.goto('/entries/new');
-    await expect(page.getByTestId('photo-import-trigger')).toBeVisible();
+    // 写真の入口はアクションパレットの「写真」（#525 でヘッダーのボタンからパレットへ移った）。
+    // 以前は `photo-import-trigger` の目印を探していて、目印ごと無くなってからずっと落ちていた。
+    await expect(page.getByRole('button', { name: '写真', exact: true })).toBeVisible();
 
     await page
       .locator('input[type="file"]')
