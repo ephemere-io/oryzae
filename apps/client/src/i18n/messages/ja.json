@@ -423,7 +423,8 @@
       "amp_denied": "マイクの使用が許可されていないので鳴りません。ブラウザのアドレスバーの錠前アイコンから許可してください。",
       "amp_unsupported": "この環境ではマイクを使えないので鳴りません。",
       "ghost_hint": "打った字の残像が、少し遅れて後ろに流れる。",
-      "delete_entry": "このエントリーを消す"
+      "delete_entry": "このエントリーを消す",
+      "delete_entry_unsaved": "まだ保存されていないので、消せません。"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
