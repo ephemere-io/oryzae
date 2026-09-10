@@ -393,7 +393,6 @@
       "ti_pressure_bleed": "圧力のにじみ",
       "eraser_trace": "消し跡",
       "amp": "打鍵音の増幅",
-      "voice": "音量内包",
       "ghost": "ゴースト",
       "ghost_block": "塊",
       "ghost_dust": "塵",
@@ -416,7 +415,15 @@
       "palette_size": "パレットの大きさ",
       "palette_size_small": "小",
       "palette_size_medium": "中",
-      "palette_size_large": "大"
+      "palette_size_large": "大",
+      "time_inscription_hint": "書く速さが字に残る。ゆっくり書いた字ほど大きく（または太く）なる。",
+      "time_inscription_mode_hint": "速さを何で表すか。大きさ・太さ・にじみから選ぶ。",
+      "eraser_trace_hint": "消した跡が薄く残る。消した場所に線が引かれ、しばらくして消える。",
+      "amp_hint": "マイクで打鍵音を拾い、キーを打つ瞬間だけ大きくして返す。ヘッドホンを着けて使う。マイクの使用を許可していないと何も起きない。",
+      "amp_denied": "マイクの使用が許可されていないので鳴りません。ブラウザのアドレスバーの錠前アイコンから許可してください。",
+      "amp_unsupported": "この環境ではマイクを使えないので鳴りません。",
+      "ghost_hint": "打った字の残像が、少し遅れて後ろに流れる。",
+      "delete_entry": "このエントリーを消す"
     },
     "snippet_toolbar": {
       "saving": "保存中…",

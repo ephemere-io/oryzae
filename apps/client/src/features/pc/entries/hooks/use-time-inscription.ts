@@ -33,10 +33,18 @@ function applyStyle(
 ) {
   if (mode === 'fontWeight') {
     span.style.fontWeight = String(Math.round(FW_MIN + (FW_MAX - FW_MIN) * t));
-    span.style.fontSize = `${baseFontSize}px`;
+    // 太さで表す型でも、字の大きさは**設定に従わせる**（1em＝いまの本文の大きさ）。
+    span.style.fontSize = '1em';
   } else {
     const scale = FS_MIN + (FS_MAX - FS_MIN) * t;
-    span.style.fontSize = `${(baseFontSize * scale).toFixed(1)}px`;
+    /**
+     * **px ではなく em で書く。**
+     *
+     * 打った瞬間の大きさを px で焼き付けていたので、あとから設定で文字サイズを変えても
+     * この字だけ動かなかった（「文字サイズを変えても変わらない」）。
+     * 保存しているのは速さ（t）から出した**比率**なので、表示も比率で持てばよい。
+     */
+    span.style.fontSize = `${scale.toFixed(3)}em`;
     span.style.fontWeight = '400';
   }
 }

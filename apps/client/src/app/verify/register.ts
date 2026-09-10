@@ -12,6 +12,7 @@
 
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
+import '@/components/ui/help-hint.verify';
 import '@/components/ui/menu.verify';
 import '@/components/ui/nav-row.verify';
 import '@/components/ui/segmented.verify';

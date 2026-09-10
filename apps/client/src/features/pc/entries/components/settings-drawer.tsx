@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { startTransition } from 'react';
+import { HelpHint } from '@/components/ui/help-hint';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import type { PaletteSize } from '@/components/ui/surface';
@@ -27,7 +28,6 @@ export interface EditorSettings {
   timeInscriptionMode: TimeInscriptionMode;
   eraserTraceEnabled: boolean;
   ampEnabled: boolean;
-  voiceEnabled: boolean;
   ghostEnabled: boolean;
   ghostMode: GhostMode;
   ghostSize: number;
@@ -49,7 +49,6 @@ export const DEFAULT_SETTINGS: EditorSettings = {
   timeInscriptionMode: 'fontSize',
   eraserTraceEnabled: false,
   ampEnabled: false,
-  voiceEnabled: false,
   ghostEnabled: false,
   ghostMode: 'block',
   ghostSize: 100,
@@ -62,6 +61,13 @@ export const DEFAULT_SETTINGS: EditorSettings = {
 interface SettingsPanelProps {
   settings: EditorSettings;
   onChange: (patch: Partial<EditorSettings>) => void;
+  /** 打鍵音が鳴らせない理由。null なら黙っている。 */
+  ampUnavailable?: 'denied' | 'unsupported' | null;
+  /**
+   * このエントリーを消す。**まだ保存されていないエントリーでは渡さない**
+   * （消す対象が無いのに消す道だけあると、押した先で何も起きない）。
+   */
+  onDelete?: () => void;
 }
 
 function isTimeInscriptionMode(value: string): value is TimeInscriptionMode {
@@ -102,11 +108,32 @@ function Section({ label, children }: { label: string; children: React.ReactNode
  * 行の高さは 36px で固定する。中身がトグルでもスライダーでも選択でも、
  * 目が同じ間隔で下りていけるようにする。
  */
-function Row({ label, control }: { label: string; control: React.ReactNode }) {
+function Row({ label, control, hint }: { label: string; control: React.ReactNode; hint?: string }) {
   return (
     <div className="flex h-9 items-center justify-between gap-4">
-      <span className="shrink-0 text-[13px] text-[var(--fg)]">{label}</span>
+      <span className="flex shrink-0 items-center gap-1.5 text-[13px] text-[var(--fg)]">
+        {label}
+        {hint && <HelpHint subject={label} text={hint} />}
+      </span>
       <div className="flex min-w-0 flex-1 justify-end">{control}</div>
+    </div>
+  );
+}
+
+/**
+ * ある設定を ON にしたときだけ現れる、その設定の**中身**。
+ *
+ * 以前は親のトグルと同じ位置に並んでいたので、「ゴースト」を入れると出てくる5つの行が
+ * ゴーストの一部なのか別の設定なのか分からなかった。左に線を引いて字下げし、
+ * **親にぶら下がっている**ことを形で言う。
+ */
+function SubSettings({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="ml-1.5 flex flex-col gap-1.5 border-l pl-3"
+      style={{ borderColor: 'var(--border-subtle)' }}
+    >
+      {children}
     </div>
   );
 }
@@ -120,6 +147,7 @@ function SliderRow({
   step,
   display,
   onChange,
+  hint,
 }: {
   id: string;
   label: string;
@@ -129,12 +157,16 @@ function SliderRow({
   step?: number;
   display: string;
   onChange: (v: number) => void;
+  hint?: string;
 }) {
   return (
     <div className="flex h-9 items-center justify-between gap-4">
-      <label htmlFor={id} className="shrink-0 text-[13px] text-[var(--fg)]">
-        {label}
-      </label>
+      <span className="flex shrink-0 items-center gap-1.5">
+        <label htmlFor={id} className="text-[13px] text-[var(--fg)]">
+          {label}
+        </label>
+        {hint && <HelpHint subject={label} text={hint} />}
+      </span>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2.5">
         <input
           id={id}
@@ -164,7 +196,12 @@ function SliderRow({
  * **エクスポート名が SettingsDrawer のままなのは履歴上の理由**（この型ファイルから
  * EditorSettings / DEFAULT_SETTINGS も出ており、参照箇所が広い）。中身はパネル。
  */
-export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
+export function SettingsDrawer({
+  settings,
+  onChange,
+  ampUnavailable = null,
+  onDelete,
+}: SettingsPanelProps) {
   const t = useTranslations('editor.settings');
 
   return (
@@ -272,64 +309,82 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
       </Section>
 
       <Section label={t('section_effects')}>
+        {/* エフェクトは名前だけでは何が起きるか分からない（「時間内包」「音量内包」）。
+            名前を長くすると行が窮屈になるので、知りたい人が触れば出る「？」を隣に置く。 */}
         <Switch
           id="time-inscription"
           label={t('time_inscription')}
+          hint={t('time_inscription_hint')}
           checked={settings.timeInscriptionEnabled}
           onChange={(v) => onChange({ timeInscriptionEnabled: v })}
         />
+        {/* ON にしたときだけ出る「表し方」は、時間内包の中身。字下げしてぶら下げる。 */}
         {settings.timeInscriptionEnabled && (
-          <Row
-            label={t('time_inscription_mode')}
-            control={
-              <Select
-                className="w-36"
-                ariaLabel={t('time_inscription_mode')}
-                value={settings.timeInscriptionMode}
-                options={[
-                  { value: 'fontSize', label: t('ti_font_size') },
-                  { value: 'fontWeight', label: t('ti_font_weight') },
-                  { value: 'pressureBleed', label: t('ti_pressure_bleed') },
-                ]}
-                onChange={(v) => {
-                  if (isTimeInscriptionMode(v)) onChange({ timeInscriptionMode: v });
-                }}
-              />
-            }
-          />
+          <SubSettings>
+            <Row
+              label={t('time_inscription_mode')}
+              hint={t('time_inscription_mode_hint')}
+              control={
+                <Select
+                  className="w-36"
+                  ariaLabel={t('time_inscription_mode')}
+                  value={settings.timeInscriptionMode}
+                  options={[
+                    { value: 'fontSize', label: t('ti_font_size') },
+                    { value: 'fontWeight', label: t('ti_font_weight') },
+                    { value: 'pressureBleed', label: t('ti_pressure_bleed') },
+                  ]}
+                  onChange={(v) => {
+                    if (isTimeInscriptionMode(v)) onChange({ timeInscriptionMode: v });
+                  }}
+                />
+              }
+            />
+          </SubSettings>
         )}
 
         <Switch
           id="eraser-trace"
           label={t('eraser_trace')}
+          hint={t('eraser_trace_hint')}
           checked={settings.eraserTraceEnabled}
           onChange={(v) => onChange({ eraserTraceEnabled: v })}
         />
         <Switch
           id="amp"
           label={t('amp')}
+          hint={t('amp_hint')}
           checked={settings.ampEnabled}
           onChange={(v) => onChange({ ampEnabled: v })}
         />
-        <Switch
-          id="voice"
-          label={t('voice')}
-          checked={settings.voiceEnabled}
-          onChange={(v) => onChange({ voiceEnabled: v })}
-        />
+        {/* **鳴らない理由は黙らない。** 以前はマイクを使えないと何も起きず、
+            押した本人には壊れているのか仕様なのか分からなかった。 */}
+        {settings.ampEnabled && ampUnavailable && (
+          <SubSettings>
+            <p role="status" className="py-1 text-[11px] leading-[1.7] text-[var(--date-color)]">
+              {ampUnavailable === 'denied' ? t('amp_denied') : t('amp_unsupported')}
+            </p>
+          </SubSettings>
+        )}
+        {/* 「音量内包」のトグルはここに置かない。
+            **どこからも読まれていない死んだスイッチだった**（押しても何も起きない）。
+            声で字の大きさが変わる効果そのものは、パレットのマイクが持っている——
+            書いている最中に入り切りするものなので、設定の面ではなく手元にある方がよい。 */}
         <Switch
           id="ghost"
           label={t('ghost')}
+          hint={t('ghost_hint')}
           checked={settings.ghostEnabled}
           onChange={(v) => onChange({ ghostEnabled: v })}
         />
+        {/* ON にしたときだけ出る5つの行は、ゴーストの中身。字下げしてぶら下げる。 */}
         {settings.ghostEnabled && (
-          <>
+          <SubSettings>
             <Row
               label={t('ghost_mode')}
               control={
                 <Segmented
-                  className="w-40"
+                  className="w-36"
                   ariaLabel={t('ghost_mode')}
                   value={settings.ghostMode}
                   options={[
@@ -346,7 +401,7 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
               id="ghost-size"
               label={t('ghost_size')}
               value={settings.ghostSize}
-              min={20}
+              min={50}
               max={200}
               display={`${settings.ghostSize}%`}
               onChange={(v) => onChange({ ghostSize: v })}
@@ -357,7 +412,7 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
               value={settings.ghostScatter}
               min={0}
               max={100}
-              display={`${settings.ghostScatter}%`}
+              display={`${settings.ghostScatter}`}
               onChange={(v) => onChange({ ghostScatter: v })}
             />
             <SliderRow
@@ -366,32 +421,51 @@ export function SettingsDrawer({ settings, onChange }: SettingsPanelProps) {
               value={settings.ghostBlurStart}
               min={0}
               max={20}
-              step={0.5}
-              display={`${settings.ghostBlurStart.toFixed(1)}px`}
+              display={`${settings.ghostBlurStart}`}
               onChange={(v) => onChange({ ghostBlurStart: v })}
             />
             <SliderRow
               id="ghost-blur-end"
               label={t('ghost_blur_end')}
               value={settings.ghostBlurEnd}
-              min={2}
+              min={0}
               max={40}
-              step={0.5}
-              display={`${settings.ghostBlurEnd}px`}
+              display={`${settings.ghostBlurEnd}`}
               onChange={(v) => onChange({ ghostBlurEnd: v })}
             />
             <SliderRow
               id="ghost-duration"
               label={t('ghost_duration')}
               value={settings.ghostDuration}
-              min={30}
-              max={250}
-              display={`${settings.ghostDuration}%`}
+              min={20}
+              max={400}
+              step={10}
+              display={`${settings.ghostDuration}`}
               onChange={(v) => onChange({ ghostDuration: v })}
             />
-          </>
+          </SubSettings>
         )}
       </Section>
+
+      {/* このエントリーを消す。
+          **一覧まで戻らないと消せなかった。** 書いている本人が「これは残さない」と
+          決めるのは書いている最中なので、その場に道を置く。
+          消すのは戻せないので、**他の設定とは離して最後に置き、色でも言い分ける**
+          （並びの途中に赤い行があると、隣を押すつもりで当たる）。 */}
+      {onDelete && (
+        <div
+          className="mt-1 border-t px-5 pt-4 pb-5"
+          style={{ borderColor: 'var(--border-subtle)' }}
+        >
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex h-8 w-full items-center rounded-md px-2 text-left text-[13px] text-red-500 transition-colors hover:bg-[var(--hover-wash)]"
+          >
+            {t('delete_entry')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

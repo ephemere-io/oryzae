@@ -6,3 +6,12 @@ export type VoiceUnavailableReason =
   | 'network' // 認識バックエンド（Chrome は Google サーバー）に到達できない (Brave 等でブロック)
   | 'not-allowed' // マイク権限拒否
   | 'service-not-allowed'; // OS / ブラウザが認識サービスを無効化
+
+/** 打鍵音の増幅が鳴らせない理由。設定パネルの文言出し分けに使う。 */
+export type AmpUnavailableReason = 'denied' | 'unsupported' | null;
+
+/** useAmpEffect が返す状態。 */
+export interface AmpState {
+  /** 鳴らせない理由。null なら鳴っている（か、そもそも切っている）。 */
+  unavailable: AmpUnavailableReason;
+}
