@@ -32,6 +32,45 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
     return toRecordArray(data ?? []).map((row) => this.toDomain(row));
   }
 
+  /**
+   * 全期間の枚数。日付で絞らない（書斎の壁は総量を映す）。
+   *
+   * `head: true` で行を運ばず件数だけ受け取る。壁に出すのは上限 30 枚でも、
+   * 「いくつ溜まっているか」は本当の数で言いたい。
+   */
+  async countByUserId(userId: string): Promise<number> {
+    const { count, error } = await this.supabase
+      .from('board_cards')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .neq('card_type', 'entry');
+
+    if (error) throw error;
+    return count ?? 0;
+  }
+
+  /**
+   * 新しい順に上限まで。
+   *
+   * **weekly と daily の両方が返る。** 同じ付箋が両方に居ることがあり、書斎の壁では
+   * 二重に見える。壁は「どのくらい貼ってあるか」を映す場所なので、ここでは畳まずに
+   * 返し、重なりの扱いは呼び出し側（usecase）に任せる。
+   */
+  async findRecentByUserId(userId: string, limit: number): Promise<BoardCard[]> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .neq('card_type', 'entry')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return toRecordArray(data ?? []).map((row) => this.toDomain(row));
+  }
+
   async findDailyCardsByDateRange(
     userId: string,
     startDate: string,

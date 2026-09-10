@@ -78,15 +78,11 @@ function parseEntries(raw: unknown): StudyEntry[] {
 
 function parseBoard(raw: unknown): StudyBoard {
   if (!isRecord(raw)) throw new Error('board is not an object');
-  const { dateKey, viewType, cards } = raw;
-  if (typeof dateKey !== 'string') throw new Error('board.dateKey must be a string');
-  if (viewType !== 'daily' && viewType !== 'weekly') {
-    throw new Error(`unknown viewType ${String(viewType)}`);
-  }
+  const { total, cards } = raw;
+  if (typeof total !== 'number') throw new Error('board.total must be a number');
   if (!Array.isArray(cards)) throw new Error('board.cards must be an array');
   return {
-    dateKey,
-    viewType,
+    total,
     cards: cards.filter(isRecord).map((card) => {
       const cardType = card.cardType === 'photo' ? 'photo' : 'snippet';
       return {

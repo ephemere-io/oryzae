@@ -54,3 +54,15 @@ export type SnippetOcrResult =
   | { status: 'empty' }
   /** 通信・サーバー側の失敗（サイズ超過・対応外形式・API エラー等）。 */
   | { status: 'failed' };
+
+/**
+ * 書斎の壁が読む「いま貼ってあるもの」（`GET /api/v1/board/summary`）。
+ *
+ * 盤面（1 日・1 週）とは別に、**全期間の総量**を持つ。壁に描くのは上限までだが、
+ * ラベルが名乗るのは本当の数（棚が冊数を言うのと同じ）。
+ */
+export interface BoardSummary {
+  total: number;
+  /** 新しい順。サーバー側で上限まで絞ってある。 */
+  cards: BoardCardData[];
+}

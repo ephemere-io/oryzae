@@ -83,8 +83,14 @@ export interface StudyBoardCard {
 }
 
 export interface StudyBoard {
-  dateKey: string;
-  viewType: 'daily' | 'weekly';
+  /**
+   * いま貼ってある総数（全期間・全 view）。
+   *
+   * **`cards.length` とは別。** 壁に描くのは上限までだが、ラベルが名乗るのは本当の数
+   * （棚が冊数を言うのと同じ）。
+   */
+  total: number;
+  /** 壁に描くカード。新しい順に上限まで。 */
   cards: StudyBoardCard[];
 }
 

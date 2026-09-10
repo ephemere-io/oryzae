@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { anchorStyle, useDraggableSurface } from '@/lib/use-draggable-surface';
 import {
   BOARD_INSET,
   ELEVATED_PANEL_CLASS,
@@ -189,24 +190,41 @@ export function BoardToolbar({
       ]
     : [];
 
+  /**
+   * 掴んで動かせる面。位置は憶える（エントリーの操作パレットと同じ仕組み）。
+   *
+   * ボードは盤面そのものが作業場なので、道具が邪魔になる場所は人によって違う。
+   * 動かせないと、貼りたい場所に道具が居座ったときに逃げ場が無い。
+   */
+  const surface = useDraggableSurface('oryzae-board-toolbar-anchor');
+
+  // 既定は本文領域の下端中央。動かされていればその位置（端からの距離で憶える）。
+  const placement = anchorStyle(surface.anchor) ?? {
+    bottom: BOARD_INSET,
+    left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
+    transform: 'translateX(-50%)',
+  };
+
   return (
     <div
+      ref={surface.rootRef}
       {...verifyAttrs({
         unit: 'BoardToolbar',
         activeTool,
         mode: selection ? 'card' : 'create',
         selectedType: selection?.cardType ?? 'none',
         toolCount: selection ? cardActions.length : tools.length,
+        dragging: surface.dragging,
+        docked: surface.anchor === null,
       })}
       role="toolbar"
       aria-label={selection ? t('aria_label_card') : t('aria_label')}
       className={ELEVATED_PANEL_CLASS}
-      style={{
-        ...ELEVATED_PANEL_STYLE,
-        bottom: BOARD_INSET,
-        left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
-        transform: 'translateX(-50%)',
-      }}
+      style={{ ...ELEVATED_PANEL_STYLE, ...placement }}
+      // 面のどこを掴んでも動かせる。ボタンの上も含む（掴める余白は外周に数 px しか
+      // 無いので、ボタンを避けると「掴んだのに動かない」が起きる）。動いたかどうかは
+      // 距離で見て、動いていればそのあとの click を捨てる。
+      onPointerDown={surface.onPointerDown}
       // 盤面側の deselect（外側クリックで選択解除）まで伝播させない。
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
@@ -216,7 +234,10 @@ export function BoardToolbar({
             <button
               key={action.id}
               type="button"
-              onClick={action.onSelect}
+              onClick={() => {
+                if (surface.consumeMoved()) return;
+                action.onSelect();
+              }}
               data-verify-card-action={action.id}
               className={`flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11px] font-medium transition-colors ${IDLE_HOVER_CLASS} active:scale-95`}
               style={{ color: action.danger ? 'var(--accent)' : 'var(--fg)' }}
@@ -235,7 +256,10 @@ export function BoardToolbar({
               <div key={tool.id} className="group relative">
                 <button
                   type="button"
-                  onClick={tool.onSelect}
+                  onClick={() => {
+                    if (surface.consumeMoved()) return;
+                    tool.onSelect();
+                  }}
                   aria-label={`${tool.label} (${tool.shortcut})`}
                   aria-pressed={isActive}
                   data-verify-tool={tool.id}
