@@ -6,7 +6,7 @@
  * 見るのは**置き場と見え方の約束**。左上（3 巡ぶん「既存の操作に被る」）→ 下端（操作
  * パレットの真下）→ 上端に浮かせた 9px の名前（問いのチップと重なる）→ 画面を下げる帯
  * （地がページと同じ色で「帯になっていない・目立たない」）と移してきた。いまは
- * **上端の細い帯と、中央から垂れるタブ**。
+ * **上端の中央から垂れるタブ**（上端いっぱいの 3px の帯は「いらない」と言われて外した）。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -16,7 +16,7 @@ import { BackToStudy, STUDY_EXIT_TAB } from './back-to-study';
 registerUnit<Record<string, never>>({
   id: 'BackToStudy',
   title: 'BackToStudy',
-  description: 'サブ画面の上端に掛かる「書斎へ戻る」（細い帯 + 垂れるタブ）',
+  description: 'サブ画面の上端の中央に垂れる「書斎へ戻る」のタブ',
   kind: 'component',
   render: () => withVerifyProviders(<BackToStudy />),
   fixtures: [

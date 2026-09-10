@@ -24,8 +24,7 @@ export const STUDY_EXIT_RESERVE = STUDY_EXIT_TAB.width + 32;
 export const STUDY_EXIT_BAND = STUDY_EXIT_TAB.height;
 
 /**
- * サブ画面の上端に掛かる「書斎へ戻る」。**上端いっぱいの細い帯と、その中央から
- * 垂れ下がるタブ**でできている。
+ * サブ画面の上端の中央に垂れ下がる「書斎へ戻る」のタブ。
  *
  * **引く動作（`PullBackToStudy`）と同じことを、押しても出来るようにするための双子。**
  * 引きは覚えなくてよい代わりに、そこに在ることが見えない。キャンバスを持たない画面
@@ -36,8 +35,8 @@ export const STUDY_EXIT_BAND = STUDY_EXIT_TAB.height;
  * 左上のマーク → 下端の中央 → 上端の中央に浮かせた 9px の名前 → 画面を丸ごと下げる帯
  * → 帯とタブ（書斎のラベルの色を溶かした地）→ **帯とタブ（パレットと同じ面）**。
  *
- * 全幅の帯に高さを持たせると、画面を下げるか画面に重なるかしかない。だから高さを
- * 持つのは中央のタブだけにして、帯は上端に細く走らせる。
+ * 全幅の帯に高さを持たせると、画面を下げるか画面に重なるかしかない。だから中央の
+ * タブだけにした。上端いっぱいに走らせていた 3px の帯も「いらない」と言われて外した。
  *
  * - **面はアクションパレットと同じ**（地・縁・角丸・ホバー。`ELEVATED_CHIP_*`）。
  *   書斎の色を溶かした専用の地にしていたころ、問いのチップ・パレット・瓶の問いと
@@ -70,15 +69,6 @@ export function BackToStudy() {
         hidden ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      {/* 上端を走る細い帯。タブと同じ地で、下に縁を 1 本だけ引く。 */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-[3px] border-b"
-        style={{
-          background: 'var(--surface-raised)',
-          borderColor: 'var(--surface-raised-border)',
-        }}
-      />
       <Link
         href="/"
         aria-label={t('back_to_study')}
