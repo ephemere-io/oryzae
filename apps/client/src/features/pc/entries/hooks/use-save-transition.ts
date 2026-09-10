@@ -30,6 +30,16 @@ import {
  * 演出は overlay の上でそのまま続く（合計 ~6.5 秒）。`questionId` を渡すと、
  * **その問いの瓶**を狙って字が飛ぶ（渡さないと、見えている瓶のうち近いものになる）。
  */
+/**
+ * 瓶が現れるのを待つ上限（ms）。段4（漂う）が 3.5s に始まるので、それより手前で切る。
+ * ここを過ぎても現れないなら、画面の中央へ集めて演出を終える（字を消しはしない）。
+ */
+const JAR_WAIT_MS = 1300;
+const JAR_POLL_MS = 120;
+
+/** 最後に消える字の割合。残りが瓶の中で漂い続ける。 */
+const FADE_RATIO = 0.7;
+
 export function useSaveTransition() {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const runningRef = useRef(false);
@@ -72,6 +82,7 @@ export function useSaveTransition() {
             overlay,
           }),
         );
+        centerOnPlacements(charEls, placements);
 
         // ── 散る。ここは紙の上での話なので、始める前に決められる ──
         const screenCX = window.innerWidth / 2;
@@ -94,10 +105,15 @@ export function useSaveTransition() {
           el.style.setProperty('--r', `${(Math.random() - 0.5) * 720}deg`);
         }
 
-        // 70% は最後に消える。残りが瓶の中で漂う。
-        const fadeChars = new Set(
-          [...charEls].sort(() => Math.random() - 0.5).slice(0, Math.floor(charEls.length * 0.7)),
-        );
+        /**
+         * 70% は最後に消える。残りが瓶の中で漂う。
+         *
+         * **残す字は輪の上で均等に選ぶ。** 無作為に選ぶと、残った十数文字が輪の片側に
+         * 偏ることがあり、瓶の中心からずれた塊に見える（「少し右よりになっている」）。
+         * 字は輪の順に並んでいるので、一定の間隔で残せば、残り方も輪のままになる。
+         */
+        const keepEvery = Math.max(1, Math.round(1 / (1 - FADE_RATIO)));
+        const fadeChars = new Set(charEls.filter((_, i) => i % keepEvery !== 0));
 
         // タイマーは**片付けない**。演出は 1.5s で紙の画面が消えたあとも瓶の上で
         // 続くので、アンマウントで止めると途中で終わってしまう。
@@ -111,11 +127,29 @@ export function useSaveTransition() {
         setTimeout(() => resolve(), 1500);
 
         // 段3（2s）: 瓶に集まる。**ここで初めて瓶の場所が分かる**（画面が入れ替わったあと）。
+        //
+        // ただし瓶の画面は 1.5s に移ったばかりで、問いの取得が終わるまで瓶は描かれない。
+        // 2s の一発勝負で外すと、字は画面の中央へ集まってしまう（「変なところに集まる」）。
+        // **見つかるまで狙い直す**: 集まり始めは 2s のまま（そこで止めると演出が間延びする）、
+        // 瓶が現れたらその場で狙いを付け替える。集まる動きは 1.5s かけて進むので、
+        // 途中で行き先が変わっても不自然には見えない。
         setTimeout(() => {
-          const destination = findJarDestination(questionId);
+          let destination = findJarDestination(questionId);
           applyDestination(charEls, placements, destination);
           overlay.classList.remove('phase-scatter');
           overlay.classList.add('phase-condense');
+
+          if (destination.foundJar) return;
+          const deadline = Date.now() + JAR_WAIT_MS;
+          const retry = setInterval(() => {
+            destination = findJarDestination(questionId);
+            if (destination.foundJar) {
+              applyDestination(charEls, placements, destination);
+              clearInterval(retry);
+              return;
+            }
+            if (Date.now() >= deadline) clearInterval(retry);
+          }, JAR_POLL_MS);
         }, 2000);
 
         // 段4（3.5s）: 漂って、7割は消える
@@ -200,6 +234,29 @@ function createCharElement(placement: CharPlacement, style: CharStyle): HTMLSpan
 
   style.overlay.appendChild(el);
   return el;
+}
+
+/**
+ * 置いた字を、**測った場所の真上**に据え直す。
+ *
+ * 置くときは「字の大きさの半分」だけ戻しているが、半角・約物・欧文の字は箱の幅が
+ * 字の大きさと違う。その差の半分がそのまま着地点のずれになる（飛び立つ場所も同じだけずれる）。
+ * 一度だけ測り直して、箱の中心を字の中心に合わせる。
+ *
+ * **読みをまとめてから書く。** 1つずつ読んで書くと、そのたびに組み直しが走る。
+ */
+function centerOnPlacements(charEls: HTMLSpanElement[], placements: CharPlacement[]): void {
+  const rects = charEls.map((el) => el.getBoundingClientRect());
+  for (const [i, el] of charEls.entries()) {
+    const rect = rects[i];
+    const placement = placements[i];
+    if (!rect || !placement) continue;
+    const dx = placement.x - (rect.left + rect.width / 2);
+    const dy = placement.y - (rect.top + rect.height / 2);
+    if (dx === 0 && dy === 0) continue;
+    el.style.left = `${Number.parseFloat(el.style.left) + dx}px`;
+    el.style.top = `${Number.parseFloat(el.style.top) + dy}px`;
+  }
 }
 
 /** 瓶の場所が決まってから、集まる先と漂う先を配る。 */

@@ -1244,21 +1244,29 @@ export function EntryEditor({
     // 見えてしまう（題が一瞬つぶれて開く）。
     const prevTransition = el.style.transition;
     el.style.transition = 'none';
+    // **余白は中身ではない。** scrollWidth / scrollHeight には padding が含まれる。
+    // そのまま厚みにすると「筋が1本多い」と数えてしまう——横書きの題は上に 32px の
+    // 余白を持つので、1行の題が2行ぶんの高さ（150px）になっていた。
+    const box = getComputedStyle(el);
     if (isVertical) {
+      const pad =
+        Number.parseFloat(box.paddingLeft || '0') + Number.parseFloat(box.paddingRight || '0');
       const prev = el.style.width;
       el.style.width = '0px';
-      const next = el.scrollWidth;
+      const next = el.scrollWidth - pad;
       el.style.width = prev;
       el.style.transition = prevTransition;
-      setMeasuredTitleThicknessPx(next);
+      setMeasuredTitleThicknessPx(Math.max(0, next));
       return;
     }
+    const pad =
+      Number.parseFloat(box.paddingTop || '0') + Number.parseFloat(box.paddingBottom || '0');
     const prev = el.style.height;
     el.style.height = '0px';
-    const next = el.scrollHeight;
+    const next = el.scrollHeight - pad;
     el.style.height = prev;
     el.style.transition = prevTransition;
-    setMeasuredTitleThicknessPx(next);
+    setMeasuredTitleThicknessPx(Math.max(0, next));
   }, [
     title,
     titlePlaceholder,
@@ -1286,6 +1294,18 @@ export function EntryEditor({
   const titleReservePx = Math.max(0, titleThicknessPx - titleHalfLeadingPx);
   // 横書きは題が本文の真上に据わるので、紙の上端からの余白と題の厚みぶんを空ける。
   const horizontalTitleReservePx = PAGE_TOP_INSET + titleReservePx + TITLE_TO_BODY_GAP_HORIZONTAL;
+  /**
+   * 縦書きの本文が始まる位置（紙の右端から）。
+   *
+   * 題が1桁のときは題の厚みから逆算すると 136px になるが、それだと**書き出しが題に
+   * 近すぎる**（題と本文が1つの塊に見える）。下限を 140px に取って、題が桁を増やしたら
+   * そこから押し出す。
+   */
+  const VERTICAL_BODY_MIN_RIGHT = 140;
+  const verticalBodyRightPx = Math.max(
+    VERTICAL_BODY_MIN_RIGHT,
+    TITLE_RIGHT_MARGIN + titleReservePx + TITLE_TO_BODY_GAP,
+  );
 
   /**
    * 題が縮んだぶん、スクロールを戻して**読んでいる行を止める**。
@@ -1296,17 +1316,28 @@ export function EntryEditor({
    * （縦書きは題の厚みが本文の**幅**を変えるだけで、行そのものは動かないので要らない。）
    */
   const prevReserveRef = useRef(0);
+  const prevCompactRef = useRef(false);
   useMeasureEffect(() => {
     if (isVertical) {
       prevReserveRef.current = 0;
+      prevCompactRef.current = titleCompact;
       return;
     }
     const scroller = scrollContainerRef.current;
     const prev = prevReserveRef.current;
+    const wasCompact = prevCompactRef.current;
     prevReserveRef.current = horizontalTitleReservePx;
+    prevCompactRef.current = titleCompact;
+
+    // **送り戻すのは「題が退いた／戻った」ときだけ。**
+    //
+    // 題が長くなって行が増えたときにも送り戻すと、本文が題の下へ潜り込む（実測で
+    // 16px 食い込んでいた）。そちらは「題が場所を取った」のだから、本文は下がるのが正しい。
+    // 打ち消してよいのは、こちらが勝手に大きさを変えたときだけ。
+    if (wasCompact === titleCompact) return;
     if (!scroller || prev === 0 || prev === horizontalTitleReservePx) return;
     scroller.scrollTop = Math.max(0, scroller.scrollTop - (prev - horizontalTitleReservePx));
-  }, [horizontalTitleReservePx, isVertical]);
+  }, [horizontalTitleReservePx, isVertical, titleCompact]);
   // **箱は中身に合わせる。** 筋の長さを丸ごと取っていたので、3文字の題でも
   // 画面いっぱいの箱を占めていた。
   //
@@ -1544,7 +1575,7 @@ export function EntryEditor({
                   isVertical
                     ? {
                         // 本文の右端に合わせて置く。題より内側なので、題は薄くならない。
-                        right: `${TITLE_RIGHT_MARGIN + titleReservePx + TITLE_TO_BODY_GAP}px`,
+                        right: `${verticalBodyRightPx}px`,
                         top: 0,
                         bottom: 0,
                         width: '12%',
@@ -1662,7 +1693,7 @@ export function EntryEditor({
                         top: '4%',
                         // 右端は題から逆算する。％で置くと、題の右余白との釣り合いが
                         // 画面幅ごとに変わってしまう。
-                        right: `${TITLE_RIGHT_MARGIN + titleReservePx + TITLE_TO_BODY_GAP}px`,
+                        right: `${verticalBodyRightPx}px`,
                         height: '86%',
                         position: 'absolute',
                         overflowX: 'auto',

@@ -84,6 +84,14 @@ export interface Destination {
   y: number;
   /** 字が集まる輪の半径。瓶の大きさに合わせる。 */
   radius: number;
+  /**
+   * 本物の瓶に当たったか。
+   *
+   * **当たっていないなら、まだ待つ余地がある。** 瓶の画面は遷移した直後で、問いの
+   * 取得が終わるまで瓶は描かれない。そこで諦めて画面の中央へ吸い込むと、
+   * 「変なところに集まる」になる。呼ぶ側はこの印を見て、瓶が現れるのを待てる。
+   */
+  foundJar: boolean;
 }
 
 const MIN_RADIUS = 24;
@@ -117,7 +125,9 @@ export function findJarDestination(questionId?: string): Destination {
   if (nearest) return fromRect(nearest);
 
   const jar = document.querySelector('[data-verify-unit="JarView"]');
-  if (jar && hasSize(jar)) return fromRect(jar);
+  // 瓶の画面はあるが瓶がまだ無い＝取得の途中。位置は画面の中心でよいが、
+  // **まだ当たっていない**ので、呼ぶ側には待つ余地があると伝える。
+  if (jar && hasSize(jar)) return { ...fromRect(jar), foundJar: false };
 
   return contentCenter();
 }
@@ -157,6 +167,7 @@ function fromRect(el: Element): Destination {
     x: clamp(rect.left + rect.width / 2, radius, window.innerWidth - radius),
     y: clamp(rect.top + rect.height / 2, radius, window.innerHeight - radius),
     radius,
+    foundJar: true,
   };
 }
 
@@ -169,6 +180,7 @@ function contentCenter(): Destination {
     x: inset + (window.innerWidth - inset) / 2,
     y: window.innerHeight / 2,
     radius: MIN_RADIUS + 6,
+    foundJar: false,
   };
 }
 
