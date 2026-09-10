@@ -379,7 +379,7 @@ export function SpBoardSurface({
         className="pointer-events-none absolute top-4 flex items-baseline gap-2"
         style={{
           // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと日付に重なる。
-          left: 'max(1rem, var(--study-back-inset, 0px))',
+          left: '1rem',
           color: 'var(--date-color)',
           fontFamily: 'Inter, sans-serif',
         }}

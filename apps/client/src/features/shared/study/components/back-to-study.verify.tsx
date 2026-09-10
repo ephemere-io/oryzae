@@ -1,17 +1,21 @@
 /**
  * BackToStudy の検証スペック。
  *
- * 「マークはサブ画面で BACK TO STUDY として機能する」（40-acceptance.md「ナビゲーション」）。
+ * 「サブ画面から書斎へ戻れる」（40-acceptance.md「ナビゲーション」）。
+ *
+ * 見るのは**置き場の約束**が中心。この部品は 3 巡のレビューで毎回「既存の操作に被る」と
+ * 指摘され続けた場所（左上）から下端へ移した経緯があり、隅へ戻すと同じことが起きる。
+ * どの画面も左右の下隅には自分の操作を置いている（倍率・ミニマップ・保存状態・文字数）。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { BACK_MARK, BACK_MARK_SEAT_X, BackToStudy } from './back-to-study';
+import { BackToStudy } from './back-to-study';
 
 registerUnit<Record<string, never>>({
   id: 'BackToStudy',
   title: 'BackToStudy',
-  description: 'サブ画面の左上に浮く「書斎へ戻る」マーク',
+  description: 'サブ画面の下端に浮く「書斎へ戻る」',
   kind: 'component',
   render: () => withVerifyProviders(<BackToStudy />),
   fixtures: [
@@ -30,32 +34,30 @@ registerUnit<Record<string, never>>({
         Boolean(root.querySelector('a[href="/study"]')) || '/study へのリンクが無い',
     },
     {
-      id: 'mark-is-the-room',
-      description: '書斎の縮図を出す（書斎側の左上マークと同じ絵）',
+      id: 'sits-at-the-bottom-center',
+      description: '下端の中央に置く（左右の隅は画面側が使っている）',
       check: ({ root }) => {
-        // 戻り先が「さっきまで居たあの部屋」だと繋がるよう、両側で同じ絵を使う。
-        // 片方だけ差し替えられると、行き先と戻り先が別物に見える。
-        const mark = root.querySelector('[data-study-mark]');
-        return mark !== null || '書斎のマークが描かれていない';
+        const className = root.querySelector('a')?.className ?? '';
+        const missing: string[] = [];
+        if (!className.includes('fixed')) missing.push('fixed');
+        if (!/\bbottom-/.test(className)) missing.push('bottom-*');
+        if (!className.includes('left-1/2')) missing.push('left-1/2');
+        if (!className.includes('-translate-x-1/2')) missing.push('-translate-x-1/2');
+        if (missing.length > 0) return `下端の中央になっていない: ${missing.join(', ')}`;
+        // 隅へ寄せ直されていないこと。ここが崩れると 3 巡ぶんの指摘に逆戻りする。
+        if (/\b(left-4|right-4|top-4|left-6|right-6|top-6)\b/.test(className)) {
+          return '隅に置き直されている（画面側の操作と取り合いになる）';
+        }
+        return true;
       },
     },
     {
-      id: 'seat-matches-the-mark',
-      description: '席（--study-back-inset）がマークの実寸を覆う',
+      id: 'quiet-until-touched',
+      description: '常時は薄く、触れたときだけ濃くなる（下端に居座らない）',
       check: ({ root }) => {
-        // 席をマークと別に手で決めていたころ、マークを縮めたときに席だけ詰めてしまい、
-        // 席がマークより狭くなって重なりが残った（実機で「押せない機能が発生」）。
-        const link = root.querySelector('a');
-        const className = link?.className ?? '';
-        const marks: string[] = [];
-        // クラス名と BACK_MARK が対であることを見る（jsdom には版組みが無い）。
-        if (!className.includes('left-4')) marks.push('left-4');
-        if (!className.includes('top-4')) marks.push('top-4');
-        if (!className.includes('h-8')) marks.push('h-8');
-        if (!className.includes('px-2.5')) marks.push('px-2.5');
-        if (!className.includes('gap-1.5')) marks.push('gap-1.5');
-        if (marks.length > 0) return `BACK_MARK と食い違う指定: ${marks.join(', ')}`;
-        return BACK_MARK_SEAT_X >= BACK_MARK.offset + BACK_MARK.width || '席がマークより狭い';
+        const className = root.querySelector('a')?.className ?? '';
+        if (!/\bopacity-\d+/.test(className)) return '常時の薄さが指定されていない';
+        return className.includes('hover:opacity-100') || 'ホバーで濃くならない';
       },
     },
     {
