@@ -127,11 +127,31 @@ registerUnit<Props>({
       description: 'PC の既定は控えめ（0.5）で、ホバー中の対象だけ 1.0',
       check: ({ root, props, contract }) => {
         if (contract.mode !== 'pc') return true;
-        const opacities = [...root.querySelectorAll('button')].map((b) => b.style.opacity);
+        // PC のラベルは注釈で、押せる要素ではない（下の pc-labels-are-not-targets）。
+        const opacities = [...root.querySelectorAll('[style*="letter-spacing"]')].map((el) =>
+          el instanceof HTMLElement ? el.style.opacity : '',
+        );
         if (props.hovered === null) {
           return opacities.every((o) => o === '0.5') || `ホバー無しなのに ${opacities.join(',')}`;
         }
         return opacities.includes('1') || 'ホバー中の対象が濃くなっていない';
+      },
+    },
+    {
+      /**
+       * PC のラベルは**注釈であって的ではない**。押せるのは物のほう（瓶・手帳・
+       * 背表紙・鉛筆・板）で、ラベルはその名前を言うだけ。
+       *
+       * 一時期ラベル自体も押せるようにしていて、「文字にホバー効果があるが、文字自体は
+       * クリックさせる必要はない」と報告された。押せるものと押せないものが同じ見た目で
+       * 並ぶと、どれが的なのかを毎回試すことになる。
+       */
+      id: 'pc-labels-are-not-targets',
+      description: 'PC のラベルは押せない（押すのは 3D の物のほう）',
+      check: ({ root, contract }) => {
+        if (contract.mode !== 'pc') return true;
+        const buttons = root.querySelectorAll('button').length;
+        return buttons === 0 || `ラベルが押せる要素になっている（button が ${buttons} 個）`;
       },
     },
     {

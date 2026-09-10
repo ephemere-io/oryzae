@@ -137,6 +137,14 @@ export interface StudySceneOptions {
    * 保つための地。3D を裏で回し続けずに済むよう、静止画に畳んでから渡す。
    */
   onCapture?: (dataUrl: string) => void;
+  /**
+   * 最初の 1 フレームを描き終えたとき（1 度だけ）。
+   *
+   * 戻り道では、憶えた部屋の絵を敷いた上に canvas が乗る。**絵を外してよいのは
+   * canvas が実際に描いたあと**で、それより早く外すと地の色だけの 1 フレームが
+   * 挟まって画面が点滅する。
+   */
+  onReady?: () => void;
 }
 
 export interface HoverInfo {
@@ -367,6 +375,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   let settled: CameraView | null = null;
 
   let frame = 0;
+  /** 最初の描画を 1 度だけ知らせるための印。 */
+  let readyAnnounced = false;
   const startedAt = performance.now();
 
   const homeCamera = homeView(layout);
@@ -390,6 +400,11 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     reportLabels();
 
     renderer.render(scene, camera);
+
+    if (!readyAnnounced) {
+      readyAnnounced = true;
+      options.onReady?.();
+    }
 
     if (captureRequested) {
       captureRequested = false;

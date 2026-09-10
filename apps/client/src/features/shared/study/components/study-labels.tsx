@@ -63,7 +63,17 @@ export function StudyLabels(props: StudyLabelsProps) {
   return isSp ? <SpPills {...props} /> : <PcLabels {...props} />;
 }
 
-function PcLabels({ layout, positions, hovered, onPick }: StudyLabelsProps) {
+/**
+ * PC の対象ラベル。**注釈であって、的ではない。**
+ *
+ * 押せるのは物のほう（瓶・手帳・棚の背表紙・鉛筆・板）で、ラベルはその名前を言うだけ。
+ * 一時期ラベル自体も押せるようにしていたが、「文字にホバー効果があるが、文字自体は
+ * クリックさせる必要はない」と報告された（実機レビュー）。
+ *
+ * 押せるものと押せないものが同じ見た目で並ぶと、どれが的なのかを毎回試すことになる。
+ * ラベルは `pointer-events-none` のまま置き、濃さだけが物のホバーに従う。
+ */
+function PcLabels({ layout, positions, hovered }: StudyLabelsProps) {
   const t = useTranslations('study');
   // 棚（ARCHIVE）を外していた時期がある。ホバーで背表紙のツールチップが出るから、
   // という理由だったが、**ホバーはそこに何かがあると知っている人にしか効かない**。
@@ -81,11 +91,10 @@ function PcLabels({ layout, positions, hovered, onPick }: StudyLabelsProps) {
         if (kind === 'archive' && layout.labelAnchors.archive === null) return null;
 
         return (
-          <button
+          <div
             key={kind}
-            type="button"
-            onClick={() => onPick(targetFor(kind))}
-            className="pointer-events-auto absolute flex items-center gap-1.5 whitespace-nowrap"
+            aria-hidden="true"
+            className="absolute flex items-center gap-1.5 whitespace-nowrap"
             style={{
               left: point.x,
               top: point.y,
@@ -108,7 +117,7 @@ function PcLabels({ layout, positions, hovered, onPick }: StudyLabelsProps) {
               }}
             />
             {t(labelKey(kind))}
-          </button>
+          </div>
         );
       })}
     </div>
