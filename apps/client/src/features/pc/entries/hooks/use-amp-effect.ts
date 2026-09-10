@@ -1,24 +1,29 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { AmpState, AmpUnavailableReason } from '@/features/pc/entries/types';
 
 /**
- * 打鍵音増幅 (Typing Amplifier / ASMR) エフェクト
+ * 打鍵音の増幅。
  *
- * マイクから音声を取得し、オーディオフィルタチェーンを通す。
- * キーを押すたびに gain を瞬間的に上げ、タイピングのクリック音だけが
- * 強調されて聞こえるASMR的な体験を生み出す。
+ * マイクで拾った音を通し、キーを打った瞬間だけ音量を上げて返す。
+ * 自分の打鍵音が耳元で鳴る、という体験を作るためのもの。
  *
- * Audio chain: mic → highpass(350Hz) → highshelf(+8dB@3500Hz) → gain → compressor → speakers
+ * 音の道: マイク → highpass(350Hz) → highshelf(+8dB@3500Hz) → gain → compressor → 出力
  */
-export function useAmpEffect(enabled: boolean) {
+
+export function useAmpEffect(enabled: boolean): AmpState {
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const envelopeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [unavailable, setUnavailable] = useState<AmpUnavailableReason>(null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setUnavailable(null);
+      return;
+    }
 
     let cancelled = false;
 
@@ -51,6 +56,11 @@ export function useAmpEffect(enabled: boolean) {
 
     async function start() {
       if (cancelled) return;
+      // マイクそのものが無い環境（対応していないブラウザ・安全でない接続）。
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setUnavailable('unsupported');
+        return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
@@ -108,8 +118,16 @@ export function useAmpEffect(enabled: boolean) {
 
         window.addEventListener('keydown', handleKey);
         window.addEventListener('keyup', handleKey);
+        setUnavailable(null);
       } catch {
-        // Microphone access denied — silently disable
+        /**
+         * マイクを使わせてもらえなかった。
+         *
+         * **黙って諦めない。** 以前はここで何もせず終わっていたので、押しても何も
+         * 起きず、理由も分からなかった（「押しても特に何も変わらない」）。
+         * 鳴らない理由は、押した本人がいちばん知りたいこと。
+         */
+        setUnavailable('denied');
       }
     }
 
@@ -133,4 +151,6 @@ export function useAmpEffect(enabled: boolean) {
       gainRef.current = null;
     };
   }, [enabled]);
+
+  return { unavailable };
 }
