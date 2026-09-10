@@ -26,9 +26,13 @@ import { useTranslations } from 'next-intl';
  *
  * ### 形
  *
- * 下向きの山形ひとつ。**この画面から下へ抜ける**という意味で、押すと部屋へ戻る。
- * 常時は薄く、触れたときだけ濃くなって名前を出す。引きの出口が主で、これは
- * 「そういえば押しても戻れる」を担保する側なので、主張は控えめでよい。
+ * 下向きの山形と名前。**この画面から下へ抜ける**という意味で、押すと部屋へ戻る。
+ *
+ * はじめは印だけを薄く置き、名前はホバーで開いていた。**下端で見落とされた**
+ * （実機の指摘）。触れてみるまで何なのか分からないものは、隅では気づかれない。
+ * 縦に使える幅は 24px しか無い（パレットの底 876 と画面の下端 900 のあいだ）ので、
+ * 目立たせるぶんは**横と濃さ**で稼ぐ — 名前を常時出し、他の浮きものと同じ擦りガラスを
+ * 敷いた。横へ伸びるぶんには誰とも取り合わない。
  */
 export function BackToStudy() {
   const t = useTranslations('study');
@@ -43,9 +47,12 @@ export function BackToStudy() {
       // 操作パレット（エントリー 814..876）とツールバー（ボード 810..860）がいる。
       // 空いているのは**いちばん下の縁だけ**なので、そこへ寝かせる。
       //
-      // 名前は**横へ**開く。縦に伸ばすとパレットの底に触る。
+      // **縦に使える幅は 24px しか無い**（パレットの底 876 と画面の下端 900 のあいだ）。
+      // だから目立たせるぶんは横と濃さで稼ぐ — 名前を常時出し、他の浮きものと同じ
+      // 擦りガラスを敷く。「薄い印が 1 つ」だと下端で見落とされる（実機の指摘）。
       // 重なり順はサブ画面の浮きものと同じ 55（エディタの 50 より上、モーダルの 60 より下）。
-      className="group -translate-x-1/2 fixed bottom-0 left-1/2 z-[55] flex items-center gap-1.5 px-3 py-1 opacity-45 transition-opacity duration-300 hover:opacity-100"
+      className="-translate-x-1/2 fixed bottom-1 left-1/2 z-[55] flex items-center gap-1.5 rounded-full px-3 py-0.5 opacity-80 transition-opacity duration-300 hover:opacity-100"
+      style={glass}
     >
       {/* 山形の下に横線を 1 本。**ただの山形にはしない** — エントリーの操作パレットは
           すぐ上にいて、その右端が「パレットを畳む」の山形を持っている。同じ絵が近くに
@@ -67,9 +74,10 @@ export function BackToStudy() {
         />
         <path d="M3.5 10.5 H12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       </svg>
-      {/* 名前は触れたときだけ。常時出すと下端に文字が 1 行増える。 */}
+      {/* 名前は常時出す。ホバーで開く形にしていたが、**触れてみるまで何なのか分からない**
+          ので下端で見落とされた。横に伸びるぶんには誰とも取り合わない。 */}
       <span
-        className="max-w-0 overflow-hidden whitespace-nowrap text-[8px] uppercase tracking-[0.2em] transition-all duration-300 group-hover:max-w-[140px]"
+        className="whitespace-nowrap text-[9px] uppercase tracking-[0.18em]"
         style={{ color: '#5C4F3F' }}
       >
         {t('back_to_study')}
@@ -77,3 +85,12 @@ export function BackToStudy() {
     </Link>
   );
 }
+
+/** 浮かせる要素に共通の擦りガラス（`StudyChrome` と同じ）。 */
+const glass: React.CSSProperties = {
+  background: 'rgba(253, 251, 247, 0.72)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  border: '1px solid rgba(122, 116, 64, 0.18)',
+  boxShadow: '0 2px 12px rgba(140, 133, 126, 0.14)',
+};
