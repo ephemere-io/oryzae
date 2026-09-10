@@ -1,6 +1,7 @@
 'use client';
 
-import { type ReactNode, useEffect, useId, useRef } from 'react';
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { LAYER } from './surface';
 
 interface PopoverProps {
   open: boolean;
@@ -20,6 +21,11 @@ interface PopoverProps {
   ariaLabel: string;
 }
 
+/** パネルの下端を、窓の下端から離しておく距離。 */
+const VIEWPORT_MARGIN = 16;
+/** 窓がどれだけ低くても確保する高さ。数行は見えないと、面として読めない。 */
+const MIN_PANEL_HEIGHT = 160;
+
 /**
  * トリガーの真下に開くパネル。
  *
@@ -29,6 +35,18 @@ interface PopoverProps {
  *
  * 位置決めはアンカーからの相対配置に閉じる（portal を使わない）。トリガーとパネルを
  * 同じ relative コンテナに入れるので、外側クリックの判定もこのコンテナ1つで済む。
+ *
+ * ## 重なり
+ *
+ * パネルは**浮いているパレットより手前**に出す（surface の `LAYER`）。パレットは動かせるので
+ * パネルの上に来ることがあり、以前はそのときパネルの下半分が塞がれて、スクロールも
+ * 一番下の操作（「このエントリーを消す」）も届かなかった。
+ *
+ * ## 高さ
+ *
+ * **窓に残っている分だけ**使い、越える分はパネルの中でスクロールする。以前は 70vh 固定で、
+ * 背の高い窓でも下の3割を空けたまま中身が切れていた（Mac はスクロールバーを隠すので、
+ * 続きがあることも分からない）。ヘッダーの高さを足し引きせず、開いた位置から測る。
  */
 export function Popover({
   open,
@@ -40,7 +58,9 @@ export function Popover({
   ariaLabel,
 }: PopoverProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -60,6 +80,20 @@ export function Popover({
     };
   }, [open, onOpenChange]);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    function fit() {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const top = panel.getBoundingClientRect().top;
+      setMaxHeight(Math.max(MIN_PANEL_HEIGHT, window.innerHeight - top - VIEWPORT_MARGIN));
+    }
+    fit();
+    // 全画面の出入りも resize として届く。
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [open]);
+
   return (
     <div ref={rootRef} className="relative">
       {trigger({
@@ -70,12 +104,15 @@ export function Popover({
       })}
       {open && (
         <div
+          ref={panelRef}
           id={panelId}
           role="dialog"
           aria-label={ariaLabel}
-          className={`absolute top-full z-[70] mt-2 max-h-[70vh] overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] shadow-xl ${
+          // overscroll-contain: 端まで来ても、後ろの本文をスクロールさせない。
+          className={`absolute top-full mt-2 overflow-y-auto overscroll-contain rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] shadow-xl ${
             align === 'right' ? 'right-0' : 'left-0'
           } ${panelClassName}`}
+          style={{ zIndex: LAYER.popover, maxHeight: maxHeight ?? '70vh' }}
         >
           {children}
         </div>

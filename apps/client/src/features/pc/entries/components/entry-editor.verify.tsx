@@ -218,6 +218,23 @@ registerUnit<Props>({
         `expected settingsOpen=true after click, got "${contract.settingsOpen}"`,
     },
     {
+      id: 'settings-panel-above-palette',
+      // パレットは動かせるので、設定パネルの上に来ることがある。以前はそのときパネルの
+      // 下半分が塞がれ、スクロールも「このエントリーを消す」も届かなかった。
+      description: '設定パネルはパレットより手前に出る（重なっても下に潜らない）',
+      onlyFixtures: ['settings-open'],
+      check: ({ root }) => {
+        const panel = root.querySelector<HTMLElement>('[role="dialog"]');
+        const palette = root.querySelector<HTMLElement>('[data-verify-unit="EntryActionPalette"]');
+        if (!panel) return '設定パネルが無い';
+        if (!palette) return 'パレットが無い';
+        return (
+          Number(panel.style.zIndex) > Number(palette.style.zIndex) ||
+          `設定パネル z=${panel.style.zIndex} がパレット z=${palette.style.zIndex} の下にある`
+        );
+      },
+    },
+    {
       id: 'question-select-opened-after-click',
       description: '問い未紐付で漬込クリック後は questionSelectOpen=true',
       onlyFixtures: ['question-select-open'],
