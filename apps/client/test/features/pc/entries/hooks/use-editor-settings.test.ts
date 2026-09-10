@@ -6,8 +6,8 @@ import { useEditorSettings } from '@/features/pc/entries/hooks/use-editor-settin
 const FONT_SIZE_KEY = 'oryzae-editor-font-size';
 const LINE_HEIGHT_KEY = 'oryzae-editor-line-height';
 const FOCUS_MODE_KEY = 'oryzae-editor-focus-mode';
-const FERMENTATION_OVERLAY_KEY = 'oryzae-editor-fermentation-overlay-preference';
-const FOCUS_FADES_FERMENTATION_KEY = 'oryzae-editor-focus-mode-fades-fermentation';
+const PALETTE_AUTO_HIDE_KEY = 'oryzae-editor-palette-auto-hide';
+const PALETTE_SIZE_KEY = 'oryzae-editor-palette-size';
 
 describe('useEditorSettings', () => {
   beforeEach(() => {
@@ -158,80 +158,59 @@ describe('useEditorSettings', () => {
     expect(window.localStorage.getItem(LINE_HEIGHT_KEY)).toBe('1.8');
   });
 
-  // --- Issue #329: fermentationOverlayPreference ---
-
-  it('fermentationOverlayPreference のデフォルトは "ask"', () => {
+  // アクションパレットを書いている間は隠すか。既定は隠す（原則1: 文字に道具を被せない）。
+  it('paletteAutoHide の既定は true（書き始めたら道具は引く）', () => {
     const { result } = renderHook(() => useEditorSettings());
-    expect(result.current[0].fermentationOverlayPreference).toBe('ask');
+    expect(result.current[0].paletteAutoHide).toBe(true);
   });
 
-  it('localStorage に保存された "always" を初期化時に読み込む', () => {
-    window.localStorage.setItem(FERMENTATION_OVERLAY_KEY, 'always');
-    const { result } = renderHook(() => useEditorSettings());
-    expect(result.current[0].fermentationOverlayPreference).toBe('always');
-  });
-
-  it('localStorage に保存された "never" を初期化時に読み込む', () => {
-    window.localStorage.setItem(FERMENTATION_OVERLAY_KEY, 'never');
-    const { result } = renderHook(() => useEditorSettings());
-    expect(result.current[0].fermentationOverlayPreference).toBe('never');
-  });
-
-  it('不正な fermentationOverlayPreference は無視されデフォルトに戻る', () => {
-    window.localStorage.setItem(FERMENTATION_OVERLAY_KEY, 'invalid');
-    const { result } = renderHook(() => useEditorSettings());
-    expect(result.current[0].fermentationOverlayPreference).toBe('ask');
-  });
-
-  it('fermentationOverlayPreference を更新すると localStorage に永続化される', () => {
+  it('paletteAutoHide を切ると localStorage に永続化される', () => {
     const { result } = renderHook(() => useEditorSettings());
     act(() => {
-      result.current[1]({ fermentationOverlayPreference: 'always' });
+      result.current[1]({ paletteAutoHide: false });
     });
-    expect(result.current[0].fermentationOverlayPreference).toBe('always');
-    expect(window.localStorage.getItem(FERMENTATION_OVERLAY_KEY)).toBe('always');
+    expect(result.current[0].paletteAutoHide).toBe(false);
+    expect(window.localStorage.getItem(PALETTE_AUTO_HIDE_KEY)).toBe('false');
   });
 
-  it('fermentationOverlayPreference は再マウント越しに保持される', () => {
+  it('paletteAutoHide は再マウント越しに保持される', () => {
     const first = renderHook(() => useEditorSettings());
     act(() => {
-      first.result.current[1]({ fermentationOverlayPreference: 'never' });
+      first.result.current[1]({ paletteAutoHide: false });
     });
     first.unmount();
 
     const second = renderHook(() => useEditorSettings());
-    expect(second.result.current[0].fermentationOverlayPreference).toBe('never');
+    expect(second.result.current[0].paletteAutoHide).toBe(false);
   });
 
-  // Issue #350: フォーカスモードで発酵要素も透明化するかの設定。
-  it('focusModeFadesFermentation の既定は true（書いている間は本文だけ残る）', () => {
+  // 道具の大きさ。既定は medium（以前の実寸は small にあたり、道具として小さすぎた）。
+  it('paletteSize の既定は medium', () => {
     const { result } = renderHook(() => useEditorSettings());
-    expect(result.current[0].focusModeFadesFermentation).toBe(true);
+    expect(result.current[0].paletteSize).toBe('medium');
   });
 
-  it('focusModeFadesFermentation を切ると localStorage に永続化される', () => {
-    const { result } = renderHook(() => useEditorSettings());
-    act(() => {
-      result.current[1]({ focusModeFadesFermentation: false });
-    });
-    expect(result.current[0].focusModeFadesFermentation).toBe(false);
-    expect(window.localStorage.getItem(FOCUS_FADES_FERMENTATION_KEY)).toBe('false');
-  });
-
-  it('focusModeFadesFermentation は再マウント越しに保持される', () => {
+  it('paletteSize を変えると localStorage に永続化され、再マウント越しに残る', () => {
     const first = renderHook(() => useEditorSettings());
     act(() => {
-      first.result.current[1]({ focusModeFadesFermentation: false });
+      first.result.current[1]({ paletteSize: 'large' });
     });
+    expect(window.localStorage.getItem(PALETTE_SIZE_KEY)).toBe('large');
     first.unmount();
 
     const second = renderHook(() => useEditorSettings());
-    expect(second.result.current[0].focusModeFadesFermentation).toBe(false);
+    expect(second.result.current[0].paletteSize).toBe('large');
   });
 
-  it('壊れた focusModeFadesFermentation は無視して既定に戻す', () => {
-    window.localStorage.setItem(FOCUS_FADES_FERMENTATION_KEY, 'maybe');
+  it('壊れた paletteSize は無視して既定に戻す', () => {
+    window.localStorage.setItem(PALETTE_SIZE_KEY, 'enormous');
     const { result } = renderHook(() => useEditorSettings());
-    expect(result.current[0].focusModeFadesFermentation).toBe(true);
+    expect(result.current[0].paletteSize).toBe('medium');
+  });
+
+  it('壊れた paletteAutoHide は無視して既定に戻す', () => {
+    window.localStorage.setItem(PALETTE_AUTO_HIDE_KEY, 'sometimes');
+    const { result } = renderHook(() => useEditorSettings());
+    expect(result.current[0].paletteAutoHide).toBe(true);
   });
 });

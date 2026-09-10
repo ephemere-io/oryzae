@@ -18,9 +18,11 @@ import {
   useEntryQuestions,
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
+import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
 import { SpConfirmSheet } from './sp-confirm-sheet';
+import { SpFermentationDrawer } from './sp-fermentation-drawer';
 import { SpPhotoImportSheet } from './sp-photo-import-sheet';
 
 interface SpEntryEditorProps {
@@ -93,6 +95,9 @@ export function SpEntryEditor({
   const [entryId, setEntryId] = useState<string | undefined>(resolvedEntryId);
   // サーバ保存済み（entryId あり）なら保存済み表示、未保存の復元ドラフトは「編集中」表示にする。
   const [lastSavedBody, setLastSavedBody] = useState(resolvedEntryId ? init.body : '');
+  // Issue #510: タイトルだけ変えたときも「編集中」にする（本文だけ見ていると、
+  // 未保存のタイトルを抱えたまま「保存済み」と表示してしまう）。
+  const [lastSavedTitle, setLastSavedTitle] = useState(resolvedEntryId ? init.title.trim() : '');
   const [pickling, setPickling] = useState(false);
   const [pickled, setPickled] = useState(false);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(
@@ -100,6 +105,13 @@ export function SpEntryEditor({
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Issue #466 の SP 版: 紐づけた問いに完了済みの発酵があれば、下からのドロワーで出す。
+  // 本文の上には重ねない（docs/entry-screen-design.md 原則1）。
+  const [fermentDrawerOpen, setFermentDrawerOpen] = useState(false);
+  const { detail: fermentationDetail } = useFermentationForQuestion(
+    api,
+    selectedQuestionId ?? undefined,
+  );
   /**
    * 添えた写真。パスと表示 URL を **1 本の配列**で持つ。
    * 2 本に分けると、署名に失敗した写真がある時に index がずれ、
@@ -152,9 +164,10 @@ export function SpEntryEditor({
     entryId,
     save,
     mediaUrls,
-    onSaved: (id, savedBody) => {
+    onSaved: (id, savedBody, savedTitle) => {
       setEntryId(id);
       setLastSavedBody(savedBody);
+      setLastSavedTitle(savedTitle);
     },
     enabled: api != null,
   });
@@ -237,7 +250,7 @@ export function SpEntryEditor({
     }
   }, [entryId, selectedQuestionId, linkQuestion]);
 
-  const dirty = body !== lastSavedBody;
+  const dirty = body !== lastSavedBody || title.trim() !== lastSavedTitle;
   const hasBody = !!body.trim();
   const statusText = saving
     ? t('status_saving')
@@ -332,6 +345,7 @@ export function SpEntryEditor({
         composingQuestion,
         pickling,
         deleteOpen,
+        hasFermentation: fermentationDetail !== null,
       })}
     >
       {/* 保存ステータス（右・常設）＋ 既存エントリの削除トリガー（左・⋯）。 */}
@@ -607,6 +621,15 @@ export function SpEntryEditor({
           </div>
         </div>
       ) : null}
+
+      {/* Issue #466（SP 版）: 発酵結果は本文に重ねず、下からのドロワーに集約する。 */}
+      {fermentationDetail && (
+        <SpFermentationDrawer
+          detail={fermentationDetail}
+          open={fermentDrawerOpen}
+          onOpenChange={setFermentDrawerOpen}
+        />
+      )}
 
       <SpConfirmSheet
         open={deleteOpen}
