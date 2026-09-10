@@ -7,44 +7,53 @@ export type EditorStatus = 'editing' | 'saved' | 'saving' | 'autosaving';
 
 interface EditorStatusBarProps {
   status: EditorStatus;
-  charCount: number;
+  /** 直近の保存が完了した時刻（epoch ms）。まだ一度も保存していなければ null。 */
+  lastSavedAt?: number | null;
 }
 
-export function EditorStatusBar({ status, charCount }: EditorStatusBarProps) {
+/**
+ * 左下の小さな処理表示。
+ *
+ * 以前はここが画面幅いっぱいの帯で、保存状態・文字数・「あと何字で漬け込みの目安」を
+ * 並べていた。**どれも書いている最中に読む必要が無い**ものだった:
+ *
+ *  - 文字数は、見せたところで書き手の判断が変わらない
+ *  - 「あと何字」は条件の説明であって、条件そのものはボタンの活性/非活性が伝えればよく、
+ *    理由はパレットのツールチップで足りる
+ *
+ * 残すのは「いま裏で何が起きているか」だけ。保存という**目に見えない処理**は、
+ * 起きていることが分からないと不安になるので、そこだけ小さく灯す。
+ * 何も起きていないときは何も出さない（無言が既定）。
+ */
+export function EditorStatusBar({ status, lastSavedAt = null }: EditorStatusBarProps) {
   const t = useTranslations('editor.status');
-  const statusLabel = t(status);
 
   const isInFlight = status === 'saving' || status === 'autosaving';
-  const fillPct = Math.min(100, (charCount / 2000) * 100);
+  const showSaved = status === 'saved' && lastSavedAt !== null;
+  const label = isInFlight ? t('saving_now') : showSaved ? t('saved_moment_ago') : '';
 
   return (
     <div
-      className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-1.5 text-xs text-[var(--date-color)]"
+      // 位置は**エントリー画面の中**で決める（absolute）。fixed だと画面全体が基準になり、
+      // 左のサイドバーの上に重なる。
+      className="pointer-events-none absolute bottom-4 left-6 z-[40] flex items-center gap-1.5 text-[11px] text-[var(--date-color)] transition-opacity duration-500"
+      style={{ opacity: label ? 1 : 0 }}
+      aria-live="polite"
       {...verifyAttrs({
         unit: 'EditorStatusBar',
         status,
-        charCount,
         inFlight: isInFlight,
-        fillPct,
+        everSaved: lastSavedAt !== null,
+        visible: Boolean(label),
       })}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className={`inline-block h-1.5 w-1.5 rounded-full ${
-            status === 'saved' ? 'bg-emerald-500' : isInFlight ? 'bg-amber-500' : 'bg-zinc-400'
-          }`}
-        />
-        <span>{statusLabel}</span>
-      </div>
-      <div className="flex justify-center">
-        <div className="h-1 w-24 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
-          <div
-            className="h-full rounded-full bg-zinc-400 transition-all duration-300"
-            style={{ width: `${fillPct}%` }}
-          />
-        </div>
-      </div>
-      <span>{charCount} CHARS</span>
+      <span
+        aria-hidden="true"
+        className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+          isInFlight ? 'animate-pulse bg-amber-500' : 'bg-emerald-500'
+        }`}
+      />
+      <span>{label}</span>
     </div>
   );
 }

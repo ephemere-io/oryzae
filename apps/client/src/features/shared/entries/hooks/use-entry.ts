@@ -67,14 +67,21 @@ export function useEntry(id: string, api: ApiClient | null, authLoading: boolean
 
   useEffect(() => {
     if (authLoading || !api) return;
+    let cancelled = false;
+    setLoading(true);
 
     api.fetch(`/api/v1/entries/${id}`).then(async (res) => {
+      if (cancelled) return;
       if (res.ok) {
         const next = normalizeEntryDetail(await readJson(res));
-        if (next) setEntry(next);
+        if (!cancelled && next) setEntry(next);
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [api, authLoading, id]);
 
   return { entry, loading };

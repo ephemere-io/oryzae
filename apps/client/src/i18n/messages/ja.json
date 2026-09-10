@@ -148,6 +148,13 @@
     "save_hook": {
       "error_save": "保存に失敗しました",
       "error_create": "作成に失敗しました"
+    },
+    "question_chip": {
+      "empty": "問いを紐づける",
+      "untitled": "無題の問い",
+      "none_available": "まだ問いがありません",
+      "linked_count": "{count}つの問いを紐づけている",
+      "unlink_aria": "「{text}」の紐づけを外す"
     }
   },
   "app": {
@@ -228,8 +235,15 @@
   },
   "sidebar": {
     "nav": {
-      "account": "アカウント"
-    }
+      "account": "アカウント",
+      "jar": "瓶",
+      "board": "ボード",
+      "list": "一覧",
+      "editor": "書く",
+      "help": "使い方"
+    },
+    "expand": "サイドバーを開く",
+    "collapse": "サイドバーを畳む"
   },
   "stats": {
     "label": {
@@ -328,7 +342,9 @@
       "editing": "編集中",
       "saved": "保存済み",
       "saving": "保存中...",
-      "autosaving": "エントリーを自動保存中..."
+      "autosaving": "エントリーを自動保存中...",
+      "saving_now": "保存しています",
+      "saved_moment_ago": "保存しました"
     },
     "voice": {
       "error_network": "音声認識が利用できません（Chrome で開き直してください）",
@@ -336,24 +352,18 @@
       "error_unsupported": "このブラウザは音声入力に対応していません"
     },
     "toolbar": {
-      "new_entry": "新規エントリ",
-      "save": "保存する",
       "pickle": "漬け込む",
-      "list": "一覧",
-      "stats": "執筆統計",
       "voice_stop": "音声入力停止",
       "voice": "音声入力",
       "settings": "設定",
-      "writing_horizontal": "横書きに切替",
-      "writing_vertical": "縦書きに切替",
-      "font_sans": "ゴシックに切替",
-      "font_serif": "明朝に切替",
+      "fermentation_sidebar_show": "発酵結果のサイドバーを開く",
+      "fermentation_sidebar_hide": "発酵結果のサイドバーを閉じる",
       "fullscreen": "フルスクリーン",
-      "fermentation_overlay_show": "発酵結果を表示する",
-      "fermentation_overlay_hide": "発酵結果を非表示にする"
+      "fullscreen_exit": "フルスクリーンを解除"
     },
     "title": {
       "placeholder": "タイトルを入力...",
+      "remaining": "残り{count}字",
       "add": "タイトルを追加"
     },
     "placeholder": "今日は何を感じましたか？",
@@ -371,49 +381,46 @@
       "saving": "保存中..."
     },
     "settings": {
-      "close_aria": "設定を閉じる",
-      "section_basic": "基本設定",
       "font_size": "文字サイズ",
-      "line_height": "行間サイズ",
+      "line_height": "行間",
       "focus_mode": "フォーカスモード",
       "section_effects": "エフェクト",
       "time_inscription": "時間内包",
-      "ti_font_size": "文字サイズ",
-      "ti_font_weight": "文字太さ",
-      "ti_pressure_bleed": "圧力にじみ",
+      "ti_font_size": "文字の大きさ",
+      "ti_font_weight": "文字の太さ",
+      "ti_pressure_bleed": "圧力のにじみ",
       "eraser_trace": "消し跡",
-      "amp": "打鍵音増幅（ASMR）",
+      "amp": "打鍵音の増幅",
       "voice": "音量内包",
       "ghost": "ゴースト",
-      "ghost_block": "塊（コミット時）",
-      "ghost_dust": "塵（キー毎）",
+      "ghost_block": "塊",
+      "ghost_dust": "塵",
       "ghost_size": "サイズ",
-      "ghost_scatter": "散乱",
-      "ghost_blur_start": "初期ブラー",
-      "ghost_blur_end": "最終ブラー",
+      "ghost_scatter": "散らばり",
+      "ghost_blur_start": "初期ぼかし",
+      "ghost_blur_end": "最終ぼかし",
       "ghost_duration": "持続時間",
-      "section_fermentation_overlay": "発酵オーバーレイ",
-      "fermentation_overlay_description": "新規エントリで問いを紐付けたとき、その問いの最新の発酵結果をエディタ上に重ねて表示できます。表示／非表示の挙動を選んでください。",
-      "fermentation_overlay_ask": "表示前に毎回確認する",
-      "fermentation_overlay_always": "エントリ画面で発酵プロセスを常に表示する",
-      "fermentation_overlay_never": "エントリ画面で発酵プロセスを常に表示しない",
-      "focus_mode_fades_fermentation": "発酵要素も一緒に隠す"
+      "section_display": "表示",
+      "writing_vertical": "縦書き",
+      "writing_horizontal": "横書き",
+      "font_serif": "明朝",
+      "font_sans": "ゴシック",
+      "heading": "設定",
+      "writing_mode": "書字方向",
+      "font_family": "書体",
+      "time_inscription_mode": "表し方",
+      "ghost_mode": "出し方",
+      "palette_auto_hide": "書いている間はパレットを隠す",
+      "palette_size": "パレットの大きさ",
+      "palette_size_small": "小",
+      "palette_size_medium": "中",
+      "palette_size_large": "大"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
       "saved": "保存しました",
       "create": "スニペット化",
       "too_long": "50文字以内"
-    },
-    "stats": {
-      "aria_label": "執筆統計",
-      "reading_time_under_minute": "1分未満",
-      "reading_time_minutes": "約{n}分",
-      "heading": "執筆統計",
-      "label_chars": "文字数",
-      "label_lines": "行数",
-      "label_paragraphs": "段落数",
-      "label_reading_time": "読了時間"
     },
     "date": {
       "day_sun": "日曜日",
@@ -461,7 +468,7 @@
         "aria_label": "発酵結果の表示確認",
         "close_aria": "モーダルを閉じる",
         "heading": "この問いの発酵結果を表示しますか？",
-        "body": "紐付けた問いには、過去に行われた発酵プロセスの結果があります。執筆の参考になるよう、エディタ上にスニペット・キーワード・手紙を重ねて表示できます。",
+        "body": "紐付けた問いには、過去に行われた発酵プロセスの結果があります。執筆の参考になるよう、スニペット・キーワード・手紙を右のサイドバーに表示できます。",
         "remember_label": "この選択を保存し、次回からは確認しない（設定画面で変更可能）",
         "show": "表示する",
         "hide": "表示しない"
@@ -477,6 +484,30 @@
       "aria_snippet": "発酵スニペットを開く",
       "aria_letter": "発酵プロセスからの手紙を開く",
       "letter_badge": "発酵プロセスからの手紙"
+    },
+    "fermentation_sidebar": {
+      "close_aria": "発酵サイドバーを閉じる",
+      "empty": "この問いの発酵結果はまだありません。",
+      "section_letter": "手紙",
+      "section_keywords": "キーワード",
+      "section_snippets": "スニペット",
+      "back_aria": "一覧に戻る",
+      "open_aria": "発酵結果を開く",
+      "drag_or_open": "押すと理由が読める・掴むと本文へ入る",
+      "loading": "読み込んでいます…",
+      "question_select_aria": "どの問いの発酵を見るか",
+      "question_select_placeholder": "問いを選ぶ",
+      "question_unnamed": "（無題の問い）"
+    },
+    "palette": {
+      "move": "パレットを移動",
+      "collapse": "パレットを畳む",
+      "expand": "パレットを開く",
+      "pickle_needs_body": "本文を書くと漬け込めます",
+      "pickle_needs_question": "問いを結ぶと漬け込めます",
+      "fermentation_needs_question": "問いを紐づけると、前回の発酵結果が見られます",
+      "fermentation_not_ready": "この問いはまだ発酵していません",
+      "fermentation_new_entry_only": "前回の発酵結果は、新しく書くときに見られます"
     }
   },
   "photo": {
@@ -522,8 +553,10 @@
       "header_snippet": "Oryzae が切り取った文章",
       "header_letter": "L.A.B.による観察記録",
       "snippet_source_prefix": "出典:",
-      "resize_aria": "詳細パネルの幅を変える",
-      "write_entry": "この問いのエントリを書く"
+      "write_entry": "この問いのエントリを書く",
+      "empty_label": "READING",
+      "empty_hint": "円のなかの言葉・抜粋・手紙を選ぶと、ここに開きます。",
+      "resize_aria": "詳細列の幅を変える"
     },
     "jar": {
       "zoom_close_aria": "ズームを閉じる",
@@ -571,6 +604,18 @@
       },
       "canvas_aria": "瓶のキャンバス",
       "minimap_aria": "瓶の俯瞰図"
+    },
+    "history": {
+      "ghost_jar_title": "発酵瓶",
+      "back_to_jar": "瓶にもどる",
+      "new": "NEW",
+      "newest": "最新",
+      "context": "{date} の発酵",
+      "prev_aria": "前の発酵",
+      "next_aria": "次の発酵",
+      "hint": "← → キー・ドラッグ・スクロールでめくる ／ ESC で瓶にもどる",
+      "launcher": "{count}件の発酵をふりかえる",
+      "open_aria": "{question}の発酵履歴をひらく"
     }
   },
   "questions": {
@@ -612,6 +657,7 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
+      "title": "問いを、ひとつ。",
       "body": "あなたが今いちばん考えていることを、短い問いの形にしてみてください。「なぜ──」「どうすれば──」、答えのまだない一文で構いません。後からいつでも編集できます。",
       "placeholder": "例: なぜ自分は急ぐのが苦手なのだろう",
       "hint": "あとで Jar に保管され、ここから発酵が始まります。",

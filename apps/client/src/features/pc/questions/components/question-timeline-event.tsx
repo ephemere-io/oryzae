@@ -101,7 +101,7 @@ export function QuestionTimelineEvent({
               <button
                 type="button"
                 onClick={() => onReject(id)}
-                className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
+                className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)]"
               >
                 {t('reject')}
               </button>
@@ -110,7 +110,7 @@ export function QuestionTimelineEvent({
             <button
               type="button"
               onClick={() => onUnarchive(id)}
-              className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
+              className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)]"
             >
               {t('unarchive')}
             </button>
@@ -118,7 +118,7 @@ export function QuestionTimelineEvent({
             <button
               type="button"
               onClick={() => onArchive(id)}
-              className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.1)]"
+              className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)]"
             >
               {t('archive')}
             </button>

@@ -49,7 +49,7 @@ export function EntryKebabMenu({ onDeleteClick }: EntryKebabMenuProps) {
           e.stopPropagation();
           setOpen((prev) => !prev);
         }}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--date-color)] transition-colors hover:bg-[rgba(200,180,140,0.08)] hover:text-[var(--fg)]"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
       >
         <svg
           className="h-4 w-4"
@@ -81,7 +81,7 @@ export function EntryKebabMenu({ onDeleteClick }: EntryKebabMenuProps) {
               setOpen(false);
               onDeleteClick();
             }}
-            className="block w-full px-4 py-2 text-left text-xs transition-colors hover:bg-[rgba(200,180,140,0.08)]"
+            className="block w-full px-4 py-2 text-left text-xs transition-colors hover:bg-[var(--hover-wash)]"
             style={{ color: 'var(--fg)' }}
           >
             {t('delete')}

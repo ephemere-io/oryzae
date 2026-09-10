@@ -148,6 +148,13 @@
     "save_hook": {
       "error_save": "保存失败",
       "error_create": "创建失败"
+    },
+    "question_chip": {
+      "empty": "关联提问",
+      "untitled": "无标题的问题",
+      "none_available": "还没有问题",
+      "linked_count": "已关联 {count} 个提问",
+      "unlink_aria": "取消关联“{text}”"
     }
   },
   "app": {
@@ -228,8 +235,15 @@
   },
   "sidebar": {
     "nav": {
-      "account": "账户"
-    }
+      "account": "账户",
+      "jar": "罐",
+      "board": "画板",
+      "list": "列表",
+      "editor": "书写",
+      "help": "使用说明"
+    },
+    "expand": "展开侧边栏",
+    "collapse": "收起侧边栏"
   },
   "stats": {
     "label": {
@@ -328,7 +342,9 @@
       "editing": "编辑中",
       "saved": "已保存",
       "saving": "保存中...",
-      "autosaving": "日记自动保存中..."
+      "autosaving": "日记自动保存中...",
+      "saving_now": "正在保存",
+      "saved_moment_ago": "已保存"
     },
     "voice": {
       "error_network": "无法使用语音识别（请在 Chrome 中重新打开）",
@@ -336,24 +352,18 @@
       "error_unsupported": "此浏览器不支持语音输入"
     },
     "toolbar": {
-      "new_entry": "新建日记",
-      "save": "保存",
       "pickle": "入瓮",
-      "list": "列表",
-      "stats": "写作统计",
       "voice_stop": "停止语音输入",
       "voice": "语音输入",
       "settings": "设置",
-      "writing_horizontal": "切换为横排",
-      "writing_vertical": "切换为竖排",
-      "font_sans": "切换为黑体",
-      "font_serif": "切换为宋体",
+      "fermentation_sidebar_show": "打开发酵侧边栏",
+      "fermentation_sidebar_hide": "关闭发酵侧边栏",
       "fullscreen": "全屏",
-      "fermentation_overlay_show": "显示发酵结果",
-      "fermentation_overlay_hide": "隐藏发酵结果"
+      "fullscreen_exit": "退出全屏"
     },
     "title": {
       "placeholder": "请输入标题...",
+      "remaining": "还剩 {count} 字",
       "add": "添加标题"
     },
     "placeholder": "今天有什么感受？",
@@ -371,49 +381,46 @@
       "saving": "保存中..."
     },
     "settings": {
-      "close_aria": "关闭设置",
-      "section_basic": "基本设置",
-      "font_size": "字号",
-      "line_height": "行间距",
+      "font_size": "文字大小",
+      "line_height": "行距",
       "focus_mode": "专注模式",
       "section_effects": "效果",
-      "time_inscription": "时间内置",
-      "ti_font_size": "字号",
-      "ti_font_weight": "字重",
+      "time_inscription": "时间内包",
+      "ti_font_size": "文字大小",
+      "ti_font_weight": "文字粗细",
       "ti_pressure_bleed": "压力晕染",
       "eraser_trace": "擦除痕迹",
-      "amp": "打字声放大（ASMR）",
-      "voice": "音量内置",
-      "ghost": "幽影",
-      "ghost_block": "成块（提交时）",
-      "ghost_dust": "粒尘（每键）",
+      "amp": "按键音增幅",
+      "voice": "音量内包",
+      "ghost": "残影",
+      "ghost_block": "块",
+      "ghost_dust": "尘",
       "ghost_size": "大小",
       "ghost_scatter": "散布",
       "ghost_blur_start": "初始模糊",
       "ghost_blur_end": "最终模糊",
       "ghost_duration": "持续时间",
-      "section_fermentation_overlay": "发酵叠加",
-      "fermentation_overlay_description": "为新条目关联问题时，可以在编辑器上浮动显示该问题的最新发酵结果。请选择默认行为。",
-      "fermentation_overlay_ask": "每次询问后再显示",
-      "fermentation_overlay_always": "在条目编辑界面始终显示发酵结果",
-      "fermentation_overlay_never": "在条目编辑界面始终不显示发酵结果",
-      "focus_mode_fades_fermentation": "同时隐藏发酵元素"
+      "section_display": "显示",
+      "writing_vertical": "竖排",
+      "writing_horizontal": "横排",
+      "font_serif": "明朝体",
+      "font_sans": "黑体",
+      "heading": "设置",
+      "writing_mode": "书写方向",
+      "font_family": "字体",
+      "time_inscription_mode": "表现方式",
+      "ghost_mode": "呈现方式",
+      "palette_auto_hide": "书写时隐藏面板",
+      "palette_size": "操作面板大小",
+      "palette_size_small": "小",
+      "palette_size_medium": "中",
+      "palette_size_large": "大"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
       "saved": "已保存",
       "create": "做成摘录",
       "too_long": "不超过 50 字"
-    },
-    "stats": {
-      "aria_label": "写作统计",
-      "reading_time_under_minute": "不到 1 分钟",
-      "reading_time_minutes": "约 {n} 分钟",
-      "heading": "写作统计",
-      "label_chars": "字数",
-      "label_lines": "行数",
-      "label_paragraphs": "段落数",
-      "label_reading_time": "阅读时间"
     },
     "date": {
       "day_sun": "星期日",
@@ -461,7 +468,7 @@
         "aria_label": "发酵结果显示确认",
         "close_aria": "关闭对话框",
         "heading": "显示该问题的发酵结果吗？",
-        "body": "你关联的提问已有过往的发酵结果。我们可以将片段、关键词与信件作为参考浮动展示在编辑器上方。",
+        "body": "你关联的问题有过往发酵流程的结果。写作时可以在右侧边栏显示其摘录、关键词和信。",
         "remember_label": "记住此选择，下次不再询问（可在设置中更改）",
         "show": "显示",
         "hide": "不显示"
@@ -477,6 +484,30 @@
       "aria_snippet": "打开发酵片段",
       "aria_letter": "打开发酵过程的信件",
       "letter_badge": "来自发酵过程的信件"
+    },
+    "fermentation_sidebar": {
+      "close_aria": "关闭发酵侧边栏",
+      "empty": "这个问题还没有发酵结果。",
+      "section_letter": "信",
+      "section_keywords": "关键词",
+      "section_snippets": "摘录",
+      "back_aria": "返回列表",
+      "open_aria": "展开发酵结果",
+      "drag_or_open": "点击查看理由 · 拖入正文",
+      "loading": "正在读取…",
+      "question_select_aria": "查看哪个提问的发酵",
+      "question_select_placeholder": "选择提问",
+      "question_unnamed": "（无标题提问）"
+    },
+    "palette": {
+      "move": "移动面板",
+      "collapse": "收起面板",
+      "expand": "展开面板",
+      "pickle_needs_body": "写点内容后即可腌渍",
+      "pickle_needs_question": "关联问题后即可腌渍",
+      "fermentation_needs_question": "关联提问后，可查看上次的发酵结果",
+      "fermentation_not_ready": "这个提问还没有发酵",
+      "fermentation_new_entry_only": "上次的发酵结果会在书写新条目时显示"
     }
   },
   "photo": {
@@ -522,8 +553,10 @@
       "header_snippet": "Oryzae 摘选的句子",
       "header_letter": "L.A.B. 的观察记录",
       "snippet_source_prefix": "出处:",
-      "resize_aria": "调整详情面板宽度",
-      "write_entry": "为这个提问写日记"
+      "write_entry": "为这个提问写日记",
+      "empty_label": "READING",
+      "empty_hint": "选择圆中的词语、摘录或信件，就会在这里展开。",
+      "resize_aria": "调整详情栏宽度"
     },
     "jar": {
       "zoom_close_aria": "关闭放大",
@@ -571,6 +604,18 @@
       },
       "canvas_aria": "罐子画布",
       "minimap_aria": "罐子缩略图"
+    },
+    "history": {
+      "ghost_jar_title": "发酵瓶",
+      "back_to_jar": "返回瓶中",
+      "new": "NEW",
+      "newest": "最新",
+      "context": "{date} 的发酵",
+      "prev_aria": "上一次发酵",
+      "next_aria": "下一次发酵",
+      "hint": "用 ← → 键、拖动或滚动翻页 ／ 按 ESC 返回瓶中",
+      "launcher": "回顾 {count} 次发酵",
+      "open_aria": "打开「{question}」的发酵历史"
     }
   },
   "questions": {
@@ -612,6 +657,7 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
+      "title": "先写下一个提问。",
       "body": "请把此刻最在意的事化为一句简短的提问。「为什么──」「怎样才能──」，一句尚无答案的话即可。之后随时可以编辑。",
       "placeholder": "例: 我为什么不擅长着急",
       "hint": "它会被存进 Jar，发酵从这里开始。",

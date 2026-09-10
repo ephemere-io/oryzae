@@ -266,7 +266,7 @@ export function SnippetDialog({
               style={{
                 aspectRatio: '4 / 3',
                 borderColor: dragging ? 'var(--accent)' : 'var(--border-subtle)',
-                backgroundColor: dragging ? 'var(--accent-light)' : 'var(--toolbar-hover)',
+                backgroundColor: dragging ? 'var(--accent-light)' : 'var(--hover-wash)',
                 overflow: 'hidden',
               }}
             >
@@ -384,7 +384,7 @@ export function SnippetDialog({
             // 読み取り結果が届くと、リセット後の state に着弾して次に開いたダイアログへ
             // 混入する。PhotoDialog のキャンセルが disabled={uploading} なのと揃える。
             disabled={busy}
-            className="rounded-md border px-4 py-2 text-xs transition-colors hover:bg-[var(--toolbar-hover)] disabled:opacity-40 disabled:hover:bg-transparent"
+            className="rounded-md border px-4 py-2 text-xs transition-colors hover:bg-[var(--hover-wash)] disabled:opacity-40 disabled:hover:bg-transparent"
             style={{
               borderColor: 'var(--border-subtle)',
               color: 'var(--fg)',

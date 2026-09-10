@@ -11,18 +11,28 @@ import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
-import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
+import { SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
 import { RouteLoading } from './_loading/route-loading';
 
-// CSS カスタムプロパティは React.CSSProperties に含まれないので、
-// `--*` を許す形で型を広げて宣言する（キャストは使わない）。
-const mainStyle: React.CSSProperties & Record<`--${string}`, string> = {
-  marginLeft: SIDEBAR_WIDTH,
-  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-};
+/** PC のシェル。幅の追従は CSS 変数に任せるので、ここは形だけを持つ。 */
+function PcShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      {/* 左余白は CSS 変数（--sidebar-width）が配る。サイドバー本体・本文・エディタが
+          同じ1本を見るので、掴んで引いても3者が同じフレームで動く。 */}
+      <main className="sidebar-inset flex flex-1 flex-col overflow-hidden">
+        <div className="relative flex-1 overflow-auto">{children}</div>
+        <PageFooter />
+      </main>
+      {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
+      <DesktopOnlyOverlay />
+    </div>
+  );
+}
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
@@ -86,15 +96,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               <SpBottomNav />
             </div>
           ) : device === 'pc' ? (
-            <div className="flex h-screen overflow-hidden">
-              <Sidebar />
-              <main className="flex flex-1 flex-col overflow-hidden" style={mainStyle}>
-                <div className="relative flex-1 overflow-auto">{content}</div>
-                <PageFooter />
-              </main>
-              {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
-              <DesktopOnlyOverlay />
-            </div>
+            <PcShell>{content}</PcShell>
           ) : null}
           {device !== null && shouldShow && (
             <OnboardingFlow onComplete={handleOnboardingComplete} />
