@@ -821,6 +821,7 @@
     "list_heading_all": "ALL — {count} ENTRIES",
     "list_heading_month": "{month} — {count} ENTRIES",
     "list_close": "Close",
+    "list_new_entry": "New entry",
     "list_empty_month": "No entries this month",
     "list_loading": "Loading",
     "list_search_placeholder": "Search entries",

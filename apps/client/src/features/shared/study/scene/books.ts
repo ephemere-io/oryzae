@@ -220,24 +220,6 @@ export function shelfSpineOffsets(count: number, shelfWidth = 2.6): number[] {
   return Array.from({ length: count }, (_, i) => start + step * i);
 }
 
-/**
- * ホバー時のツールチップに出す日付の範囲。
- *
- * その月の記録の最古・最新から作る。記録が無い月は null（件数だけを出す）。
- * `createdAt` は ISO 文字列。
- */
-export function monthDateRange(
-  createdAts: readonly string[],
-  month: string,
-): { first: string; last: string } | null {
-  const inMonth = createdAts
-    .filter((iso) => iso.slice(0, 7) === month)
-    .map((iso) => iso.slice(0, 10))
-    .sort();
-  if (inMonth.length === 0) return null;
-  return { first: inMonth[0], last: inMonth[inMonth.length - 1] };
-}
-
 function clampInt(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   if (value < min) return min;

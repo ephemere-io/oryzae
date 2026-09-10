@@ -26,16 +26,34 @@ describe('useEntryMonthlyCounts', () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.counts).toEqual([
+    expect(result.current.counts).toMatchObject([
       { month: '2026-09', count: 11 },
       { month: '2026-08', count: 4 },
+    ]);
+  });
+
+  it('その月の最初と最後の日を読む（形が違えば null で、件数は残す）', async () => {
+    const { result } = renderHook(() =>
+      useEntryMonthlyCounts(
+        apiReturning([
+          { month: '2026-09', count: 3, first: '2026-09-01', last: '2026-09-18' },
+          { month: '2026-08', count: 2, first: '8/3', last: null },
+        ]),
+        false,
+      ),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.counts).toEqual([
+      { month: '2026-09', count: 3, first: '2026-09-01', last: '2026-09-18' },
+      { month: '2026-08', count: 2, first: null, last: null },
     ]);
   });
 
   it('取得に失敗しても空配列（机が空になるだけ）', async () => {
     const { result } = renderHook(() => useEntryMonthlyCounts(apiReturning([], false), false));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.counts).toEqual([]);
+    expect(result.current.counts).toMatchObject([]);
   });
 
   it('月の形が違う行だけを捨てる', async () => {
@@ -53,7 +71,7 @@ describe('useEntryMonthlyCounts', () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.counts).toEqual([
+    expect(result.current.counts).toMatchObject([
       { month: '2026-09', count: 3 },
       { month: '2026-08', count: 2 },
     ]);
@@ -72,7 +90,7 @@ describe('useEntryMonthlyCounts', () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.counts).toEqual([{ month: '2026-07', count: 2 }]);
+    expect(result.current.counts).toMatchObject([{ month: '2026-07', count: 2 }]);
   });
 
   it('配列でないレスポンスでも落ちない', async () => {
@@ -81,7 +99,7 @@ describe('useEntryMonthlyCounts', () => {
         useEntryMonthlyCounts(apiReturning(body), false),
       );
       await waitFor(() => expect(result.current.loading).toBe(false));
-      expect(result.current.counts).toEqual([]);
+      expect(result.current.counts).toMatchObject([]);
       unmount();
     }
   });

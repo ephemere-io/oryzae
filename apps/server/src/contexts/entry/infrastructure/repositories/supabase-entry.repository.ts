@@ -14,6 +14,7 @@ import type {
 } from '../../domain/gateways/entry-repository.gateway.js';
 import { Entry } from '../../domain/models/entry.js';
 import {
+  localDateKey,
   localDayRange,
   localMonthKey,
   localMonthRange,
@@ -38,10 +39,18 @@ const MONTHLY_COUNT_PAGE_SIZE = 1000;
 /** 辿るページ数の上限。1000 行 × 100 = 10 万件。到達したら黙って返さず投げる。 */
 const MONTHLY_COUNT_MAX_PAGES = 100;
 
+/** 1 か月ぶんの集計の途中経過。 */
+interface MonthTally {
+  count: number;
+  /** ローカル暦日（`YYYY-MM-DD`）。辞書順＝時系列順なので文字列のまま比べる。 */
+  first: string;
+  last: string;
+}
+
 /** 月の集計を新しい月から並べる。`YYYY-MM` は辞書順＝時系列順。 */
-function toSortedMonthlyCounts(counts: Map<string, number>): MonthlyEntryCount[] {
-  return [...counts]
-    .map(([month, count]) => ({ month, count }))
+function toSortedMonthlyCounts(tallies: Map<string, MonthTally>): MonthlyEntryCount[] {
+  return [...tallies]
+    .map(([month, tally]) => ({ month, ...tally }))
     .sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : 0));
 }
 
@@ -190,7 +199,7 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
   }
 
   async countByMonth(userId: string, tzOffsetMinutes = 0): Promise<MonthlyEntryCount[]> {
-    const counts = new Map<string, number>();
+    const counts = new Map<string, MonthTally>();
     let cursor: string | null = null;
 
     // `.range()` / `.limit()` 無しで投げると PostgREST 既定の 1000 行で**黙って**打ち切られ、
@@ -209,9 +218,21 @@ export class SupabaseEntryRepository implements EntryRepositoryGateway {
         const createdAt = row.created_at;
         if (typeof createdAt !== 'string') continue;
         const month = localMonthKey(createdAt, tzOffsetMinutes);
+        const day = localDateKey(createdAt, tzOffsetMinutes);
         // 壊れた 1 行で月別集計そのものを失わせない。その行だけ数えずに進む。
-        if (month === null) continue;
-        counts.set(month, (counts.get(month) ?? 0) + 1);
+        if (month === null || day === null) continue;
+        const tally = counts.get(month);
+        // 範囲の端は同じ行から同じ切り方で取る（月の鍵と日の鍵がずれないように）。
+        counts.set(
+          month,
+          tally === undefined
+            ? { count: 1, first: day, last: day }
+            : {
+                count: tally.count + 1,
+                first: day < tally.first ? day : tally.first,
+                last: day > tally.last ? day : tally.last,
+              },
+        );
       }
 
       if (rows.length < MONTHLY_COUNT_PAGE_SIZE) {

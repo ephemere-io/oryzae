@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  localDateKey,
   localDayRange,
   localMonthKey,
   localMonthRange,
@@ -109,6 +110,23 @@ describe('localMonthKey', () => {
   it('壊れた日時は null（集計側がその行だけ捨てられるように）', () => {
     expect(localMonthKey('not-a-date')).toBeNull();
     expect(localMonthKey('')).toBeNull();
+  });
+});
+
+describe('localDateKey', () => {
+  it('ローカル暦日で切る（JST の 00:00〜09:00 を前日にしない）', () => {
+    // JST 2026-09-01 00:50 = 2026-08-31T15:50Z
+    expect(localDateKey('2026-08-31T15:50:00.000Z', JST)).toBe('2026-09-01');
+    expect(localDateKey('2026-08-31T15:50:00.000Z')).toBe('2026-08-31');
+  });
+
+  it('localMonthKey と同じ切り方をする（範囲の端が隣の月にならない）', () => {
+    const at = '2026-08-31T15:50:00.000Z';
+    expect(localDateKey(at, JST)?.slice(0, 7)).toBe(localMonthKey(at, JST));
+  });
+
+  it('壊れた日時は null', () => {
+    expect(localDateKey('not-a-date', JST)).toBeNull();
   });
 });
 

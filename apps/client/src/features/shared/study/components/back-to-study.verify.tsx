@@ -49,14 +49,14 @@ registerUnit<Record<string, never>>({
       },
     },
     {
-      id: 'tab-stands-out',
-      description: 'タブはページの地から浮く色を持つ（地と同じ色では「帯になっていない」）',
+      id: 'tab-uses-the-palette-surface',
+      description: 'タブはアクションパレットと同じ面（地・影）で描く',
       check: ({ root }) => {
         const tab = root.querySelector('a');
         if (!(tab instanceof HTMLElement)) return 'タブが無い';
-        const background = tab.style.getPropertyValue('--tab-bg');
-        if (background === '') return 'タブの地が指定されていない';
-        return background.trim() !== 'var(--bg)' || 'タブの地がページと同じ色になっている';
+        if (!tab.className.includes('bg-[var(--surface-raised)]'))
+          return 'タブの地がパレットと違う';
+        return tab.style.boxShadow !== '' || 'タブに影が無い（パレットと同じ影を持つ）';
       },
     },
     {

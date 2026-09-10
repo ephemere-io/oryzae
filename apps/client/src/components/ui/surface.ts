@@ -96,6 +96,35 @@ export const CONTROL_FONT = {
   fontFamily: 'Inter, "Noto Sans JP", sans-serif',
 } as const;
 
+/**
+ * 浮いた面の影。`ELEVATED_PANEL_CLASS` と同じ値を style で使うためのもの。
+ *
+ * **浮いているものは全部これ 1 つの影を持つ。** 書斎へ戻るタブ・問いを結ぶチップ・
+ * アクションパレット・瓶の「現在の問い」が別々の影・角丸・色で描かれていて、
+ * 同じアプリの部品に見えないと報告された（実機レビュー）。
+ */
+const ELEVATED_SHADOW = '0 8px 24px -6px rgba(0,0,0,0.22), 0 2px 6px -2px rgba(0,0,0,0.12)';
+
+/** 浮いた面の角丸。パレットの面（medium）と同じ値。 */
+const ELEVATED_RADIUS = PALETTE_SCALE.medium.panelRadius;
+
+/**
+ * 浮いたチップ（問いのチップ・書斎へ戻るタブ）の面。パレットの面と同じ地・縁・影・角丸。
+ *
+ * 地は class で持つ。インライン style の背景は `:hover` に必ず勝つので、style に置くと
+ * ホバーで地が沈まなくなる。沈み方はパレットのボタンと同じ（白に黒 5%）。
+ */
+export const ELEVATED_CHIP_CLASS =
+  'border bg-[var(--surface-raised)] transition-colors duration-150 ' +
+  'hover:bg-[color-mix(in_srgb,var(--surface-raised)_95%,black)]';
+
+export const ELEVATED_CHIP_STYLE = {
+  borderColor: 'var(--surface-raised-border)',
+  borderRadius: ELEVATED_RADIUS,
+  boxShadow: ELEVATED_SHADOW,
+  color: 'var(--fg)',
+} as const;
+
 /** 面に載るアイコンの寸法。className ではなく width/height 属性に渡す。 */
 export const ICON_SIZE = 18;
 

@@ -7,6 +7,7 @@ import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
+import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
 import { DetailPane } from '@/features/pc/fermentation/components/detail-pane';
 import { FermentationCoverFlow } from '@/features/pc/fermentation/components/fermentation-cover-flow';
 import { JarVessel } from '@/features/pc/fermentation/components/jar-vessel';
@@ -1017,24 +1018,17 @@ export function JarView({
                     setTimeout(() => editInputRef.current?.focus(), 100);
                   }}
                   /**
-                   * 問いのチップ。**エントリー画面の問いチップと同じ言葉で描く。**
+                   * 問いのチップ。**アクションパレットと同じ面（地・縁・影・角丸）で描く。**
                    *
-                   * 以前は黒いグラデーションで塗った濃いピルだった。アプリの他のどこにも
-                   * 無い色で、「この色は何を意味するのか」が読めない（実機レビュー）。
-                   * 同じもの（結ばれている問い）が画面によって別の見た目で現れていた。
+                   * 黒いグラデーション → accent を敷いたピル、と 2 度変えたが、どちらも
+                   * エントリーの問いチップ・書斎へ戻るタブ・パレットと影も角丸も違い、
+                   * 同じアプリの部品に見えなかった（実機レビュー）。書体だけは瓶のまま
+                   * （明朝）にして、「問いは声に出して読むもの」という瓶の調子は残す。
                    *
-                   * エディタの `QuestionChip` は accent を薄く敷いて縁だけ強めるやり方で、
-                   * 瓶の淡い地の上でも沈まない。書体は瓶のまま（明朝）にして、
-                   * 「問いは声に出して読むもの」という瓶の調子は残す。
+                   * ホバーは地が沈むだけ（パレットと同じ）。持ち上げる動きはやめた。
                    */
-                  className="rounded-full border px-4 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-all duration-150 hover:-translate-y-0.5"
-                  style={{
-                    background: 'color-mix(in srgb, var(--accent) 12%, var(--surface-raised))',
-                    color: 'var(--accent)',
-                    fontFamily: "'Noto Serif JP', serif",
-                    borderColor: 'color-mix(in srgb, var(--accent) 34%, transparent)',
-                    boxShadow: '0 1px 6px rgba(74,69,65,0.08)',
-                  }}
+                  className={`flex h-9 items-center px-4 text-[12px] font-medium tracking-[0.06em] ${ELEVATED_CHIP_CLASS}`}
+                  style={{ ...ELEVATED_CHIP_STYLE, fontFamily: "'Noto Serif JP', serif" }}
                 >
                   {q.currentText}
                 </button>

@@ -53,6 +53,12 @@ export interface EntryDraft {
 export interface MonthlyEntryCount {
   month: string;
   count: number;
+  /**
+   * その月の最初と最後の記録の日（ローカル暦日 `YYYY-MM-DD`）。サーバーが返さなければ
+   * null（ホバーは件数だけを出す）。
+   */
+  first: string | null;
+  last: string | null;
 }
 
 /** 一覧の行に紐づく問いの最小形（Issue #323 でサーバーが埋め込んで返す）。 */

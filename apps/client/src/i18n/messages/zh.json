@@ -821,6 +821,7 @@
     "list_heading_all": "ALL — {count} ENTRIES",
     "list_heading_month": "{month} — {count} ENTRIES",
     "list_close": "关闭",
+    "list_new_entry": "新建记录",
     "list_empty_month": "本月没有记录",
     "list_loading": "加载中",
     "list_search_placeholder": "搜索正文",

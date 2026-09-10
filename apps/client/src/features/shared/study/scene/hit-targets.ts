@@ -73,7 +73,7 @@ export function buildHitRegistry(options: {
   options.desk.forEach((notebook, index) => {
     registry.add({
       id: `notebook-${index}`,
-      target: notebookTarget(notebook.month, notebook.current),
+      target: notebookTarget(notebook.month),
       label: 'journal',
       month: notebook.month,
     });

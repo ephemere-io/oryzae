@@ -9,7 +9,6 @@ import {
   EDGE_LINE_OPACITIES,
   edgeLineCount,
   layoutNotebooks,
-  monthDateRange,
   NOTEBOOK_SIZE,
   notebookThickness,
   RULES,
@@ -359,31 +358,5 @@ describe('shelfSpineOffsets', () => {
 describe('spineLabelText', () => {
   it('YYYY-MM を 2026.06 の表記にする', () => {
     expect(spineLabelText('2026-06')).toBe('2026.06');
-  });
-});
-
-describe('monthDateRange', () => {
-  const CREATED = [
-    '2026-09-01T10:00:00.000Z',
-    '2026-09-02T02:00:00.000Z',
-    '2026-08-20T02:00:00.000Z',
-  ];
-
-  it('その月の最古・最新から範囲を作る', () => {
-    expect(monthDateRange(CREATED, '2026-09')).toEqual({
-      first: '2026-09-01',
-      last: '2026-09-02',
-    });
-  });
-
-  it('記録が無い月は null（件数だけを出す）', () => {
-    expect(monthDateRange(CREATED, '2026-07')).toBeNull();
-  });
-
-  it('1 件なら最古と最新が同じ', () => {
-    expect(monthDateRange(CREATED, '2026-08')).toEqual({
-      first: '2026-08-20',
-      last: '2026-08-20',
-    });
   });
 });
