@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
+import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { rateLimitFermentation } from '../../../shared/presentation/middleware/rate-limit.js';
-import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
+import { GetJarReadinessUsecase } from '../../application/usecases/get-jar-readiness.usecase.js';
 import { ListFermentationResultsUsecase } from '../../application/usecases/list-fermentation-results.usecase.js';
 import { ListFermentationResultsByUserUsecase } from '../../application/usecases/list-fermentation-results-by-user.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
@@ -32,42 +33,6 @@ const runFermentationSchema = z.object({
 });
 
 const generateId = () => crypto.randomUUID();
-
-/**
- * 本人に見せる発酵の進み具合。
- *
- * admin 版（GET /admin/fermentations/readiness/:userId）は threshold / charsCurrent /
- * hoursElapsed まで返すが、本人向けはこの 3 つに絞る。書斎の瓶は readiness を数値では
- * 出さない（進み具合は見た目が語る）ので UI に要らないうえ、発火閾値そのものを
- * 晒さずに済む。
- */
-export interface OwnerReadinessView {
-  /** 0..1。小数第2位まで（= 永続化カラム numeric(3,2) と同じ粒度）。 */
-  readiness: number;
-  /** 文字数・経過時間の両方を満たしていて、次の cron で発火しうるか。 */
-  eligible: boolean;
-  /** 次に発火しうる時刻。未発酵（時間ゲートが無い）なら null。 */
-  nextRunAt: string | null;
-}
-
-/**
- * usecase の評価結果を本人向けの形に落とす。
- *
- * readiness を丸めるのは見た目のためではなく、`charScore = 文字数 / 閾値` の生の浮動小数が
- * **書いた文字数をほぼそのまま逆算できる**ため。永続化カラムと同じ小数第2位に揃えて、
- * API から出る粒度を DB に載っている粒度より細かくしない。
- */
-export function toOwnerReadinessView(evaluation: {
-  readinessScore: number;
-  eligible: boolean;
-  nextEligibleAt: string | null;
-}): OwnerReadinessView {
-  return {
-    readiness: Math.round(evaluation.readinessScore * 100) / 100,
-    eligible: evaluation.eligible,
-    nextRunAt: evaluation.nextEligibleAt,
-  };
-}
 
 export const fermentations = new Hono<Env>()
   .post('/', rateLimitFermentation(), async (c) => {
@@ -137,24 +102,24 @@ export const fermentations = new Hono<Env>()
     const results = await usecase.execute(questionId);
     return c.json(results);
   })
-  // 書斎の瓶（docs/oryzae-study）が読む進み具合。admin と同じ評価ロジックを本人向けに開く。
-  //
-  // **`/:id` より前に置くこと。** Hono は登録順に照合するので、後ろに置くと
-  // id="readiness" の詳細取得として食われる。
+  // issue #278: 瓶アニメーション用の readiness。**`/:id` より前に置くこと**
+  // (Hono は登録順に照合するので、後ろに置くと `/readiness` が id 扱いになる)。
   .get('/readiness', async (c) => {
     const supabase = c.get('supabase');
-    const usecase = new GetFermentationReadinessUsecase(
-      // entries も user_fermentation_state も own-data の RLS があるため、
-      // 本人の JWT で作ったクライアントで足りる（service role は要らない）。
+    const userId = c.get('userId');
+    // ロケール解決の auth.admin.getUserById だけ service-role が要る (POST / と同じ理由)。
+    const localeResolver = new SupabaseUserLocaleResolver(getSupabaseClient());
+    const usecase = new GetJarReadinessUsecase(
+      new SupabaseQuestionRepository(supabase),
       new SupabaseEntryRepository(supabase),
+      new SupabaseFermentationRepository(supabase),
       new SupabaseUserFermentationStateRepository(supabase),
-      // ロケール解決だけは auth.admin.getUserById ＝ service role が要る。
-      // このファイルは dep-cruise の service-role-client-containment 許可リスト内。
-      new SupabaseUserLocaleResolver(getSupabaseClient()),
+      localeResolver,
     );
 
-    const evaluation = await usecase.execute(c.get('userId'));
-    return c.json(toOwnerReadinessView(evaluation));
+    // cron が日次で書く user_fermentation_state.readiness_score ではなく、その場で
+    // 評価し直す。エントリを書いた直後に瓶が反応してほしいため (issue #278 受け入れ基準)。
+    return c.json(await usecase.execute(userId));
   })
   .get('/:id', async (c) => {
     const supabase = c.get('supabase');

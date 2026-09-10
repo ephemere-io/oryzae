@@ -28,6 +28,7 @@ function makeUnread(overrides: Partial<UnreadState> = {}): UnreadState {
     ready: false,
     unreadCount: 0,
     unreadQuestionIds: new Set(),
+    unreadFermentationIds: new Set(),
     markQuestionRead: vi.fn(),
     markAllSeen: vi.fn(),
     ...overrides,

@@ -65,6 +65,11 @@ export interface FermentationSummary {
   questionId: string;
   status: string;
   createdAt: string;
+  /**
+   * 対象期間ラベル（'WEEK 35' 等）。一覧 API は元から返していたが、以前は誰も読んでいなかった。
+   * 発酵履歴（Cover Flow）が円盤ごとの期間表示に使うので拾う。欠損時は空文字。
+   */
+  targetPeriod: string;
 }
 
 /** 瓶ビューでユーザーがドラッグして決めた要素の位置。 */
@@ -90,23 +95,21 @@ export interface InboxLetter {
   createdAt: string;
 }
 
+/**
+ * 発酵瓶の readiness（issue #278）。問いごとの readiness の総和なので 0〜問いの数を取る。
+ * 次回発火時刻や残り文字数は **意図的に含めない**（逆算できると「いつ来るか分からない」
+ * という体験が壊れるため、サーバーも返さない）。
+ */
+export interface JarReadiness {
+  /** いちばん進んだ問いの readiness（0〜1）。瓶の演出の段階を決める。 */
+  top: number;
+  /** 全問いの readiness の総和（0〜問いの数）。瓶の賑やかさを決める。 */
+  total: number;
+  questionCount: number;
+}
+
 /** 受信箱が手紙に見出しを付けるために要る問いの最小形。 */
 export interface InboxQuestion {
   id: string;
   currentText: string | null;
-}
-
-/**
- * 発酵の進み具合（`GET /api/v1/fermentations/readiness`）。
- *
- * サーバーが cron の発火条件そのものから計算した値。UI 側で条件を再実装しない
- * （再実装するとサーバーの条件が変わった時点で嘘になる）。
- */
-export interface FermentationReadiness {
-  /** 0..1。**数値としては画面に出さない**（進み具合は瓶の見た目が語る）。 */
-  readiness: number;
-  /** 文字数・経過時間の両方を満たしていて、次の cron で発火しうるか。 */
-  eligible: boolean;
-  /** 次に発火しうる時刻。未発酵（時間ゲートが無い）なら null。 */
-  nextRunAt: string | null;
 }

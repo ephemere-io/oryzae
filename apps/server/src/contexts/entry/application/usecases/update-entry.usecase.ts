@@ -7,7 +7,8 @@ import { EntryNotFoundError, EntryValidationError } from '../errors/entry.errors
 
 interface UpdateEntryInput {
   content: string;
-  mediaUrls: string[];
+  // undefined → 既存値を維持 / 配列 → 差し替え（effects と同じ扱い）
+  mediaUrls?: string[];
   editorType: string;
   editorVersion: string;
   extension: Record<string, unknown>;

@@ -5,9 +5,15 @@
  * （open / type / data）から決まる。useRouter / useTranslations はどちらも withVerifyProviders
  * が供給するため、props を渡すだけで fetch ゼロの孤立検証ができる（covered）。
  *
- * このパネルは null を返さない（open=false でも DOM に残り `right: -400` で画面外へスライドする）。
- * よって open=false も有効な fixture で、契約 `open` は常に読める。スライド位置は React が
- * `right:0` を `'0'`（px 無し）で描くため `=== '0px'` 比較は脆い。Number.parseInt の符号で判定する。
+ * この面は null を返さない（visible=false でも DOM に残り、幅 0 へ畳む）。よって
+ * visible/open どちらの false も有効な fixture で、契約は常に読める。
+ *
+ * 状態が 2 段ある。`visible` は **列そのもの**（円を開いている / 履歴を見ている間ずっと）、
+ * `open` は **中身が選ばれているか**。選ぶたびに列が出入りすると隣のキャンバス列の幅が
+ * 変わって円が動くので、この 2 つは分けてある。invariant はその分離を縛る。
+ *
+ * 幅は種類で変えない。言葉・抜粋・手紙を渡り歩くのが主な使われ方なので、種類ごとに
+ * 変えると選ぶたびに円が動く。
  *
  * 契約 `type`（keyword/snippet/letter/none）が本文ブロックの discriminator。verifyAttrs は
  * null を落とすため type=null は 'none' に正規化して常に読めるようにしている。
@@ -23,10 +29,11 @@ import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { DetailPane } from './detail-pane';
 
 interface Props {
+  visible: boolean;
   open: boolean;
   onClose: () => void;
   questionId: string;
-  questionText: string;
+  contextLabel: string;
   type: 'keyword' | 'snippet' | 'letter' | null;
   data: {
     keyword?: string;
@@ -51,10 +58,11 @@ registerUnit<Props>({
       id: 'keyword-open',
       description: '開いていてキーワード詳細を表示（h3 にキーワード、本文に説明）',
       props: {
+        visible: true,
         open: true,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: 'keyword',
         data: { keyword: '焙煎', description: '香りが立つ瞬間の話。' },
       },
@@ -63,10 +71,11 @@ registerUnit<Props>({
       id: 'snippet-open',
       description: '開いていてスニペット詳細を表示（引用 + 出典 + 選定理由）',
       props: {
+        visible: true,
         open: true,
         onClose: noop,
         questionId: 'q-2',
-        questionText: 'いま気がかりなことは？',
+        contextLabel: '2026-05-10 の発酵',
         type: 'snippet',
         data: {
           originalText: '朝のコーヒーが沁みた',
@@ -79,24 +88,53 @@ registerUnit<Props>({
       id: 'letter-open',
       description: '開いていてレター（観察記録）本文を表示',
       props: {
+        visible: true,
         open: true,
         onClose: noop,
         questionId: 'q-3',
-        questionText: '今日のあなたへ',
+        contextLabel: '2026-06-28 の発酵',
         type: 'letter',
         data: { bodyText: '一行目\n二行目' },
       },
     },
     {
       id: 'closed',
-      description: '閉じている（type=keyword でも画面外へスライドして待機する）',
+      description: '列は出ているが未選択（type/data が残っていても本文は出さない）',
       props: {
+        visible: true,
         open: false,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: 'keyword',
         data: { keyword: '焙煎', description: '香りが立つ瞬間の話。' },
+      },
+    },
+    {
+      id: 'column-empty',
+      description: '列は出ているが中身は未選択（空状態の案内が出る）',
+      props: {
+        visible: true,
+        open: false,
+        onClose: noop,
+        questionId: 'q-1',
+        contextLabel: '2026-06-28 の発酵',
+        type: null,
+        data: null,
+      },
+    },
+    {
+      id: 'column-collapsed',
+      probe: true,
+      description: 'Probe: 問いの中に居ない（列ごと幅 0 に畳む。キャンバスが全幅に戻る）',
+      props: {
+        visible: false,
+        open: false,
+        onClose: noop,
+        questionId: 'q-1',
+        contextLabel: '2026-06-28 の発酵',
+        type: null,
+        data: null,
       },
     },
     {
@@ -104,10 +142,11 @@ registerUnit<Props>({
       probe: true,
       description: 'Probe: type=keyword でも data=null なら本文ブロックを描かない（crash しない）',
       props: {
+        visible: true,
         open: true,
         onClose: noop,
         questionId: 'q-1',
-        questionText: '最近うれしかったことは？',
+        contextLabel: '2026-06-28 の発酵',
         type: 'keyword',
         data: null,
       },
@@ -115,75 +154,89 @@ registerUnit<Props>({
   ],
   invariants: [
     {
-      id: 'slide-position-reflects-open',
-      description: '契約 open=true なら right>=0（表示）、false なら right<0（画面外）',
+      id: 'column-width-follows-visible',
+      description: '列の幅は contract.visible で決まる（畳むと 0、開くと固定幅）',
       check: ({ root, contract }) => {
         const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
-        const right = Number.parseInt(el?.style.right ?? '', 10);
-        const isOpen = contract.open === 'true';
-        const onScreen = right >= 0;
+        const width = Number.parseInt(el?.style.width ?? '', 10);
+        const expected = contract.visible === 'true' ? Number(contract.width) : 0;
         return (
-          isOpen === onScreen ||
-          `contract.open="${contract.open}" だが style.right="${el?.style.right}"（parseInt=${right}）`
+          width === expected ||
+          `visible="${contract.visible}" では幅 ${expected} を期待したが ${width}`
         );
       },
     },
     {
-      id: 'closed-offset-equals-own-width',
+      id: 'width-does-not-follow-content-type',
       description:
-        '閉じているときは自分の幅ぶんだけ右へ逃がす（幅が可変なので固定値で逃がすと隙間が残る）',
-      onlyFixtures: ['closed'],
-      check: ({ root, contract }) => {
-        const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
-        const right = Number.parseInt(el?.style.right ?? '', 10);
-        const width = Number(contract.width);
-        return (
-          right === -width ||
-          `right=${right} だが幅は ${width}。差の ${width + right}px ぶん画面に残る。`
-        );
-      },
+        '幅は中身の種類で変わらない（渡り歩くたびに隣のキャンバス列が伸び縮みしない）。変えるのは人が掴んだときだけ',
+      check: ({ contract }) =>
+        contract.width === '480' ||
+        `type="${contract.type}" で width=${contract.width}（種類に依らず既定の 480 であるべき）`,
     },
     {
       id: 'resize-handle-is-a-labelled-separator',
       description: '幅の取っ手は名前を持つ separator で、キーボードでも掴める',
-      check: ({ root }) => {
-        const handle = root.querySelector('[data-verify-part="resize-handle"]');
+      check: ({ root, contract }) => {
+        const handle = root.querySelector<HTMLElement>('[data-verify-part="resize-handle"]');
         if (!handle) return '幅の取っ手が描画されていない（リサイズ不可）';
+        if (contract.visible !== 'true') {
+          // 畳んでいる間は置いたまま不活性にする（描画ごと消すと suppression が外れる）。
+          const inert = handle.style.pointerEvents === 'none' && handle.tabIndex === -1;
+          return (
+            inert || `畳んだ列の取っ手が生きている（pointerEvents=${handle.style.pointerEvents}）`
+          );
+        }
         const role = handle.getAttribute('role');
         const label = handle.getAttribute('aria-label');
         const focusable = handle.getAttribute('tabindex') === '0';
+        const now = Number(handle.getAttribute('aria-valuenow'));
+        const min = Number(handle.getAttribute('aria-valuemin'));
+        const max = Number(handle.getAttribute('aria-valuemax'));
+        if (!(role === 'separator' && label && focusable)) {
+          return `role=${role}, aria-label=${label}, tabindex=${handle.getAttribute('tabindex')}`;
+        }
+        if (now !== Number(contract.width)) {
+          return `aria-valuenow=${now} が契約 width=${contract.width} と違う`;
+        }
+        return (now >= min && now <= max) || `width=${now} が範囲 [${min}, ${max}] の外`;
+      },
+    },
+    {
+      id: 'empty-state-iff-not-open',
+      description: '中身が未選択なら空状態を出す。選ばれていれば本文を出す',
+      check: ({ root, contract }) => {
+        const hasEmpty = Boolean(root.querySelector('[data-verify-part="empty"]'));
+        const expectEmpty = contract.open === 'false';
         return (
-          (role === 'separator' && Boolean(label) && focusable) ||
-          `role=${role}, aria-label=${label}, tabindex=${handle.getAttribute('tabindex')}`
+          hasEmpty === expectEmpty ||
+          `空状態 present=${hasEmpty} だが contract.open="${contract.open}"`
         );
       },
     },
     {
-      id: 'width-matches-handle-range-and-style',
-      description: '契約 width が実寸・aria-valuenow・上下限のすべてと整合する',
-      check: ({ root, contract }) => {
-        const el = root.querySelector<HTMLElement>('[data-verify-unit="DetailPane"]');
-        const handle = root.querySelector('[data-verify-part="resize-handle"]');
-        if (!handle) return '幅の取っ手が描画されていない';
-        const width = Number(contract.width);
-        const styleWidth = Number.parseInt(el?.style.width ?? '', 10);
-        const now = Number(handle.getAttribute('aria-valuenow'));
-        const min = Number(handle.getAttribute('aria-valuemin'));
-        const max = Number(handle.getAttribute('aria-valuemax'));
-        if (styleWidth !== width) return `style.width=${styleWidth} が契約 width=${width} と違う`;
-        if (now !== width) return `aria-valuenow=${now} が契約 width=${width} と違う`;
-        if (!(min < max)) return `上下限が不正: min=${min}, max=${max}`;
+      id: 'no-question-in-the-column',
+      description: '問いはこの列に出さない（円周・上部の見出しと合わせて 3 か所に重なっていた）',
+      check: ({ root, props, contract }) => {
+        const context = root.querySelector('[data-verify-part="context"]');
+        const text = context?.textContent ?? '';
+        // 中身を選んでいないときは本文ごと描かないので、この行も出ない。
+        const shouldShow = contract.open === 'true' && props.contextLabel !== '';
         return (
-          (width >= min && width <= max) || `width=${width} が範囲 [${min}, ${max}] の外に出ている`
+          (shouldShow ? text === props.contextLabel : context === null) ||
+          `context="${text}" だが open=${contract.open} / props.contextLabel="${props.contextLabel}"`
         );
       },
     },
     {
       id: 'body-block-matches-type',
       description:
-        '本文ブロックは契約 type と一致する（keyword→h3 / snippet→blockquote / letter→whitespace-pre-wrap、data 無しは描かない）',
+        '中身を選んでいるとき、本文ブロックは契約 type と一致する（keyword→h3 / snippet→blockquote / letter→whitespace-pre-wrap。未選択・data 無しは描かない）',
       check: ({ root, contract }) => {
-        const hasData = contract.hasData === 'true';
+        // 中身を選んでいないときは本文を出さない（列は空状態を見せる）。type/data が
+        // 前の選択のまま残っていても、それを描いてはいけない。
+        const isOpen = contract.open === 'true';
+        const hasData = isOpen && contract.hasData === 'true';
         const hasKeyword = Boolean(root.querySelector('h3'));
         const hasSnippet = Boolean(root.querySelector('blockquote'));
         const hasLetter = Boolean(root.querySelector('.whitespace-pre-wrap'));
@@ -199,16 +252,17 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'question-and-cta-always-present',
-      description: '問い文と「エントリを書く」CTA は open/type/data に依らず常に描画される',
-      check: ({ root, props }) => {
-        const text = root.textContent ?? '';
-        const hasQuestion = text.includes(props.questionText);
+      id: 'cta-present-when-open',
+      description: '中身を選んでいるときだけ取っ手（× と「エントリを書く」）が出る',
+      check: ({ root, contract }) => {
         const buttons = Array.from(root.querySelectorAll('button'));
-        const hasCta = buttons.length === 2;
+        if (contract.open !== 'true') {
+          // 未選択のときは取っ手を出さない（押せるものが無い列に × だけ残さない）。
+          return buttons.length === 0 || `未選択なのに button が ${buttons.length} 個ある`;
+        }
+        // close(×) + write-entry の 2 つ。
         return (
-          (hasQuestion && hasCta) ||
-          `問い文 present=${hasQuestion} / button数=${buttons.length}（close + write-entry の2つを期待）`
+          buttons.length === 2 || `button数=${buttons.length}（close + write-entry の2つを期待）`
         );
       },
     },

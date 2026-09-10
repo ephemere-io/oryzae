@@ -125,9 +125,23 @@ Claude の応答完了時に `.claude/hooks/run-tests-on-stop.sh` が `pnpm type
 
 ## フロントエンド変更時の検証
 
-`apps/client` / `apps/admin` の UI を変更したら、報告前に必ず Chrome DevTools MCP で実機確認する。Stop hook の vitest は表示・操作までは検証しない。
+Stop hook の vitest は表示・操作までは検証しないので、UI を変えたら実機で見るのが望ましい。
+ただし **「報告前に必ず」という硬いゲートにはしない**（2026-09 に緩和）。理由は 2 つ:
+
+- 並列セッションが常時 2〜3 本動いており、dev サーバーを立てる余地が無いことが多い。
+  このマシンはメモリ枯渇で複数回落ちている（`~/.claude-personal/CLAUDE.md`）
+- 「必ず」にすると、確認できない状況で作業が止まるか、形だけ確認して報告することになる
+
+**やるかどうかは Claude が判断し、やらなかったときは報告にそう書く。**
+「確認していない」と書いてあれば人が判断できる。黙って省くのだけは駄目。
+
+見るなら:
 
 - `/auto-qa` skill を呼ぶ、または `mcp__chrome-devtools__*` を直接使う
 - dev server (`pnpm --filter @oryzae/client dev` or `admin`) を立てて `navigate_page` → 該当フロー実行 → `take_screenshot`
 - `list_console_messages` でエラーが出てないかも確認
 - スクリーンショット保存先は `.tmp/screenshots/`
+- **起動前に `lsof -iTCP:<port> -sTCP:LISTEN` と `pgrep -fl "next|vite"` で既存を確認し、用が済んだら止める**
+
+判断の目安: ユーザーに見える `apps/client` の画面・導線を変えたときは見る価値が高い。
+`apps/admin` の静的な表示や、データ取得を伴わない差分は、型とテストで足りることが多い。

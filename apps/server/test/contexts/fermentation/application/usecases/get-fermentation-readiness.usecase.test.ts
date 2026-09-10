@@ -16,6 +16,7 @@ function buildEntryRepo(totalChars: number): EntryRepositoryGateway {
     listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
     listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
     countCharsByUserIdSince: vi.fn().mockResolvedValue(totalChars),
+    countCharsByQuestionIdSince: vi.fn().mockResolvedValue(0),
     listByUserIdAndWeek: vi.fn(),
     searchByUserId: vi.fn(),
     save: vi.fn(),

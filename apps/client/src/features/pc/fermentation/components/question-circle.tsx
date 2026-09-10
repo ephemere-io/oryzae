@@ -56,6 +56,33 @@ interface QuestionCircleProps {
   onActivate: () => void;
   /** True while the circle is being dragged — disables the zoom transition for snappy follow. */
   isDraggingCircle: boolean;
+  /**
+   * 直径（world / px）。既定は瓶のキャンバス上の {@link QUESTION_CIRCLE_SIZE}。
+   * 発酵履歴の円盤は画面の実寸から直径を出すので、そこだけ差し替える。
+   */
+  size?: number;
+  /**
+   * 円周を回る問いテキスト。発酵履歴では画面上部に問いが出るので消す（同じ文が二重に出る）。
+   */
+  showRing?: boolean;
+  /**
+   * 中の要素をドラッグで動かせるか（既定 true = 従来どおりズーム中だけ動かせる）。
+   * 発酵履歴の円盤は 3D で倒して重ねてあり、getBoundingClientRect が歪むので掴ませない。
+   */
+  elementsDraggable?: boolean;
+  /**
+   * 中の要素の大きさを、素の寸法の何倍にするか。
+   *
+   * 省略時は従来どおり直径から出した `--el-scale`（`transform` 経由）に任せる。
+   * 値を渡すと **その倍率をそのまま**適用し、`--el-scale` は 1 に倒して噛ませない
+   * （掛け算になって意図した大きさから外れるため）。
+   *
+   * 倍率を `transform` ではなく独立した `scale` プロパティで効かせるのは、中の要素に
+   * 浮遊アニメ（`j2-float-*`）が当たっているから。キーフレームは `transform` を丸ごと
+   * 書き換えるうえアニメーションはインライン指定より強いので、`transform` 経由の倍率は
+   * 浮いている間に落ちうる。独立プロパティなら animated transform と合成される。
+   */
+  elementScale?: number;
   style?: React.CSSProperties;
 }
 
@@ -189,10 +216,13 @@ export function QuestionCircle({
   circlePointerHandlers,
   onActivate,
   isDraggingCircle,
+  size = QUESTION_CIRCLE_SIZE,
+  showRing = true,
+  elementsDraggable = true,
+  elementScale,
   style,
 }: QuestionCircleProps) {
   const hasData = detail && detail.status === 'completed';
-  const size = QUESTION_CIRCLE_SIZE;
   const circleRef = useRef<HTMLDivElement | null>(null);
 
   // リングは textPath なので、円周に収まらない分は描かれず末尾が黙って切れる。
@@ -203,10 +233,9 @@ export function QuestionCircle({
     const circumference = Math.PI * (size - 24);
     const fitted = circumference / (ringChars * (1 + RING_TRACKING));
     return Math.round(Math.min(size * RING_FONT_RATIO, fitted));
-    // size はモジュール定数なので依存に入れない（myceliumHtml と同じ扱い）。
-  }, [ringChars]);
+  }, [ringChars, size]);
 
-  const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId]);
+  const myceliumHtml = useMemo(() => generateMyceliumPaths(size, questionId), [questionId, size]);
 
   // Rendered (capped) counts — matches the .slice() limits below so the DOM contract
   // never claims more elements than are actually drawn.
@@ -223,6 +252,9 @@ export function QuestionCircle({
       {...circlePointerHandlers}
       {...verifyAttrs({
         unit: 'QuestionCircle',
+        // どの問いの瓶か。漬け込みの演出が**この問いの瓶**を狙って字を飛ばす
+        // （画面の中心にいちばん近い円、では別の瓶に入ってしまう）。
+        questionId,
         zoomed,
         dimmed,
         hasData: Boolean(hasData),
@@ -231,6 +263,9 @@ export function QuestionCircle({
         hasLetter,
         ringFontSize,
         ringChars,
+        showRing,
+        size,
+        elementScale: elementScale ?? 'auto',
         selectedElementId: selectedElementId ?? 'none',
       })}
       role={zoomed ? undefined : 'button'}
@@ -273,7 +308,11 @@ export function QuestionCircle({
         //
         // 値は円の直径に連動させる。重なるかどうかは「要素の実寸 / 直径」で決まるので、
         // 直径 700 のとき 0.65 で重なりが解けた比率を、直径を変えても保つ。
-        '--el-scale': String(Math.round((size / 700) * 0.65 * 100) / 100),
+        //
+        // elementScale を渡された場合はそちらが倍率の主になるので、ここは 1 に倒す
+        // （両方効くと掛け算になり、指定した倍率にならない）。
+        '--el-scale':
+          elementScale != null ? '1' : String(Math.round((size / 700) * 0.65 * 100) / 100),
       }}
     >
       {/* Circle keyframes */}
@@ -288,7 +327,10 @@ export function QuestionCircle({
         }
       `}</style>
 
-      {/* Circle glow */}
+      {/* Circle glow.
+          飾りなのでクリックを拾わせない。`inset: -10%` で円より 1 割ぶん外へはみ出す一方、
+          開いた円は z-55 まで上がるため、円の下に置いた発酵履歴の入口（z-4）の中央を
+          この見えない面が覆って押せなくしていた。 */}
       <div
         style={{
           position: 'absolute',
@@ -297,44 +339,48 @@ export function QuestionCircle({
           background: 'rgba(217,180,143,0.05)',
           filter: 'blur(30px)',
           animation: 'j2-pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
+          pointerEvents: 'none',
         }}
       />
 
-      {/* Rotating question text ring */}
-      <div
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          width: '100%',
-          height: '100%',
-          animation: 'spin 120s linear infinite',
-          pointerEvents: 'none',
-        }}
-      >
-        <svg aria-hidden="true" viewBox={`0 0 ${size} ${size}`} className="h-full w-full">
-          <path
-            id={`ring-${questionId}`}
-            d={`M ${size / 2},${size / 2} m ${-(size / 2 - 12)},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${size - 24},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${-(size - 24)},0`}
-            fill="transparent"
-          />
-          <text
-            style={{
-              fontFamily: "'Noto Serif JP', serif",
-              // 円に比例させる（元は直径 280 に対して 9px）。ただし長い問いは
-              // それだと円周に収まらず末尾が切れるので、収まる大きさまで落とす。
-              fontSize: `${ringFontSize}px`,
-              letterSpacing: `${RING_TRACKING}em`,
-              fill: '#7A3B3F',
-              opacity: 0.6,
-            }}
-          >
-            <textPath href={`#ring-${questionId}`} startOffset="0%">
-              {questionText} &bull;{' '}
-            </textPath>
-          </text>
-        </svg>
-      </div>
+      {/* Rotating question text ring.
+          発酵履歴の円盤では出さない（画面上部に同じ問いが出るので二重になる）。 */}
+      {showRing && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: '100%',
+            height: '100%',
+            animation: 'spin 120s linear infinite',
+            pointerEvents: 'none',
+          }}
+        >
+          <svg aria-hidden="true" viewBox={`0 0 ${size} ${size}`} className="h-full w-full">
+            <path
+              id={`ring-${questionId}`}
+              d={`M ${size / 2},${size / 2} m ${-(size / 2 - 12)},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${size - 24},0 a ${size / 2 - 12},${size / 2 - 12} 0 1,1 ${-(size - 24)},0`}
+              fill="transparent"
+            />
+            <text
+              style={{
+                fontFamily: "'Noto Serif JP', serif",
+                // 円に比例させる（元は直径 280 に対して 9px）。ただし長い問いは
+                // それだと円周に収まらず末尾が切れるので、収まる大きさまで落とす。
+                fontSize: `${ringFontSize}px`,
+                letterSpacing: `${RING_TRACKING}em`,
+                fill: '#7A3B3F',
+                opacity: 0.6,
+              }}
+            >
+              <textPath href={`#ring-${questionId}`} startOffset="0%">
+                {questionText} &bull;{' '}
+              </textPath>
+            </text>
+          </svg>
+        </div>
+      )}
 
       {/* Mycelium lines (counter-rotating) */}
       <div
@@ -386,7 +432,7 @@ export function QuestionCircle({
                 <DraggableJarElement
                   key={kw.id}
                   containerRef={circleRef}
-                  enabled={zoomed}
+                  enabled={zoomed && elementsDraggable}
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
@@ -400,6 +446,7 @@ export function QuestionCircle({
                   className={FLOAT_CLASSES[i % 3]}
                   style={{
                     transform: 'scale(var(--el-scale))',
+                    scale: elementScale,
                     transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
@@ -444,7 +491,7 @@ export function QuestionCircle({
                 <DraggableJarElement
                   key={s.id}
                   containerRef={circleRef}
-                  enabled={zoomed}
+                  enabled={zoomed && elementsDraggable}
                   x={pos.jarX}
                   y={pos.jarY}
                   onClickWithoutDrag={() =>
@@ -459,6 +506,7 @@ export function QuestionCircle({
                   className={FLOAT_CLASSES[(i + 1) % 3]}
                   style={{
                     transform: 'scale(var(--el-scale))',
+                    scale: elementScale,
                     transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
@@ -529,7 +577,7 @@ export function QuestionCircle({
                   <DraggableJarElement
                     key={letter.id}
                     containerRef={circleRef}
-                    enabled={zoomed}
+                    enabled={zoomed && elementsDraggable}
                     x={pos.jarX}
                     y={pos.jarY}
                     onClickWithoutDrag={() =>
@@ -540,6 +588,7 @@ export function QuestionCircle({
                     className="j2-float-2"
                     style={{
                       transform: 'scale(var(--el-scale))',
+                      scale: elementScale,
                       transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
                   >

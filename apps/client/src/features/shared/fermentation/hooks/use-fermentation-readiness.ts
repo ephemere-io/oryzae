@@ -1,66 +1,61 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { FermentationReadiness } from '@/features/shared/fermentation/types';
+import { useCallback, useEffect, useState } from 'react';
+import type { JarReadiness } from '@/features/shared/fermentation/types';
 import type { ApiClient } from '@/lib/api';
-import { isObject, readJson } from '@/lib/json';
-
-/** 取得できなかったときの見た目＝「まだ何も起きていない瓶」。 */
-const IDLE: FermentationReadiness = { readiness: 0, eligible: false, nextRunAt: null };
-
-function normalizeReadiness(raw: unknown): FermentationReadiness {
-  if (!isObject(raw)) return IDLE;
-  const { readiness, eligible, nextRunAt } = raw;
-  // 0..1 の外や NaN は「まだ何もない」に倒す。液面や泡の数がそのまま壊れるため。
-  const value =
-    typeof readiness === 'number' && Number.isFinite(readiness)
-      ? Math.min(1, Math.max(0, readiness))
-      : 0;
-  return {
-    readiness: value,
-    eligible: eligible === true,
-    nextRunAt: typeof nextRunAt === 'string' ? nextRunAt : null,
-  };
-}
+import { readJson, readNumberField } from '@/lib/json';
 
 /**
- * 書斎の瓶が読む進み具合。
+ * 発酵瓶の readiness を取得する（issue #278）。端末非依存。
  *
- * 取れなければ `idle` の見た目（泡 4 つ・液面最小）で出す。書斎は部分的な失敗で
- * 落とさない（10-data-contract.md「失敗時の扱い」）。
+ * 返るのは「いちばん進んだ問い（top）」「総和（total）」「問いの数」だけ。次回発火時刻や
+ * 残り文字数はサーバーが返さない（「いつ来るか分からない」ことが体験の芯なので、
+ * 逆算の材料を client に置かない）。
+ *
+ * サーバーは cron が日次で書く値ではなくリクエスト時に評価し直すので、マウントのたびに
+ * 最新になる。漬け込み直後は `/jar` へ遷移してこのページがマウントされるため、
+ * 追加の再取得を仕込まなくてもエントリ追加が瓶に反映される。
  */
-export function useFermentationReadiness(
-  api: ApiClient | null,
-  authLoading: boolean,
-): { readiness: FermentationReadiness; loading: boolean; error: boolean } {
-  const [readiness, setReadiness] = useState<FermentationReadiness>(IDLE);
+export function useFermentationReadiness(api: ApiClient | null, authLoading: boolean) {
+  const [data, setData] = useState<JarReadiness | null>(null);
   const [loading, setLoading] = useState(true);
-  // 取れなかったのか、本当に何も無いのか。書斎はこれを見て、前回の絵を出すか決める。
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!api || authLoading) return;
-    let cancelled = false;
-
-    async function load(client: ApiClient): Promise<void> {
-      try {
-        const res = await client.fetch('/api/v1/fermentations/readiness');
-        if (cancelled) return;
-        if (res.ok) setReadiness(normalizeReadiness(await readJson(res)));
-        else setError(true);
-      } catch {
-        // 瓶は idle の見た目で出る。書斎そのものは壊さない。
-        if (!cancelled) setError(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const refresh = useCallback(async () => {
+    // 認証確定前は loading のまま待つ。確定して api が無い（未ログイン）なら取得は諦める。
+    if (authLoading) return;
+    if (!api) {
+      setLoading(false);
+      return;
     }
-
-    load(api);
-    return () => {
-      cancelled = true;
-    };
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.fetch('/api/v1/fermentations/readiness');
+      if (!res.ok) {
+        setError('readiness の取得に失敗しました');
+        return;
+      }
+      const body = await readJson(res);
+      // 形が違えば既定値へ倒す（normalize.ts と同じ「厳しい方に寄せる」方針）。
+      // readiness が取れなくても瓶は「空の瓶」として成立するので、0 が安全な既定値。
+      setData({
+        top: readNumberField(body, 'top', 0),
+        total: readNumberField(body, 'total', 0),
+        questionCount: readNumberField(body, 'questionCount', 0),
+      });
+    } catch {
+      // 取れなくても瓶は描ける。catch が無いと effect 内の未処理 rejection になり、
+      // loading も true に張り付く（use-fermentation-inbox と同じ判断）。
+      setError('readiness の取得に失敗しました');
+    } finally {
+      setLoading(false);
+    }
   }, [api, authLoading]);
 
-  return { readiness, loading, error };
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { data, loading, error, refresh };
 }

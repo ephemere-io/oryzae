@@ -18,7 +18,7 @@ import { QuestionsLink } from '@/features/shared/study/components/questions-link
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
-import { SIDEBAR_WIDTH, SidebarProvider } from '@/lib/sidebar-context';
+import { SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { useDevice } from '@/lib/use-device';
@@ -28,26 +28,50 @@ import { RouteLoading } from './_loading/route-loading';
 // `--*` を許す形で型を広げて宣言する（キャストは使わない）。
 type MainStyle = React.CSSProperties & Record<`--${string}`, string>;
 
-const mainStyle: MainStyle = {
-  marginLeft: SIDEBAR_WIDTH,
-  '--sidebar-width': `${SIDEBAR_WIDTH}px`,
-};
-
 /**
- * 書斎が有効な間はサイドバーを描かず、本文を全幅にする。
+ * PC のシェル。幅の追従は CSS 変数に任せるので、ここは形だけを持つ。
  *
- * **書斎ホームだけでなく jar / board / entry でも外す。** 書斎が「唯一のグローバル
- * ナビゲーション」（00-overview.md）である以上、行き先の画面にだけ旧ナビが残るのは
- * 半端で、戻り道が左上のマーク（BackToStudy）と左のサイドバーで二重になる。
- *
- * **`--sidebar-width` も 0 にすること。** この変数はボードとエディタが読んでいて
- * （board-view のツールバー位置、board-toolbar の中央寄せ、entry-editor の左端）、
- * margin だけ外して変数を残すと、サイドバーの無い画面で中身が 80px ずれる。
+ * 書斎が有効な間だけ構成が変わる（サイドバーを描かない／書斎ホームではフッターも外す）。
+ * フラグ off の間はどの分岐も false になり、従来どおりのシェルになる。
  */
-const studyMainStyle: MainStyle = {
-  marginLeft: 0,
-  '--sidebar-width': '0px',
-};
+function PcShell({
+  children,
+  studyHome,
+  onStudy,
+  backStyle,
+}: {
+  children: React.ReactNode;
+  /** 書斎が唯一のグローバルナビか。真なら左サイドバーを描かない。 */
+  studyHome: boolean;
+  /** いま書斎ホームそのものか。真ならフッターも外す。 */
+  onStudy: boolean;
+  /** 「書斎へ戻る」マークの席（`--study-back-*`）。出ていない間は undefined。 */
+  backStyle?: MainStyle;
+}) {
+  return (
+    <div className="flex h-screen overflow-hidden">
+      {/* 書斎が有効な間は左サイドバーを描かない。行き先は 3D の物そのものが持ち、
+          サブ画面からの戻り道は左上のマークが担う。 */}
+      {!studyHome && <Sidebar />}
+      {/* 左余白は CSS 変数（--sidebar-width）が配る。サイドバー本体・本文・エディタが
+          同じ1本を見るので、掴んで引いても3者が同じフレームで動く。 */}
+      <main
+        className="sidebar-inset flex flex-1 flex-col overflow-hidden"
+        // **サイドバーを描かない間は、その変数もここで 0 にする。**
+        // 変数は SidebarProvider が :root へ書くので、描かなくても 80px のまま残る。
+        // margin だけ外して変数を残すと、これを読んでいるボードのツールバーと
+        // エディタの左端だけが 80px ずれる。
+        style={studyHome ? { ...backStyle, '--sidebar-width': '0px' } : backStyle}
+      >
+        <div className="relative flex-1 overflow-auto">{children}</div>
+        {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
+        {!onStudy && <PageFooter />}
+      </main>
+      {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
+      <DesktopOnlyOverlay />
+    </div>
+  );
+}
 
 /**
  * 左上のマーク（BackToStudy）を避けるための座標。
@@ -163,27 +187,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               {!studyHome && <SpBottomNav />}
             </div>
           ) : device === 'pc' ? (
-            <div className="flex h-screen overflow-hidden">
-              {/* 書斎が有効な間は左サイドバーを描かない。行き先は 3D の物そのものが持ち、
-                  サブ画面からの戻り道は左上のマークが担う。 */}
-              {!studyHome && <Sidebar />}
-              <main
-                className="flex flex-1 flex-col overflow-hidden"
-                style={
-                  showBackToStudy
-                    ? { ...(studyHome ? studyMainStyle : mainStyle), ...studyBackStyle }
-                    : studyHome
-                      ? studyMainStyle
-                      : mainStyle
-                }
-              >
-                <div className="relative flex-1 overflow-auto">{content}</div>
-                {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
-                {!onStudy && <PageFooter />}
-              </main>
-              {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
-              <DesktopOnlyOverlay />
-            </div>
+            <PcShell
+              studyHome={studyHome}
+              onStudy={onStudy}
+              backStyle={showBackToStudy ? studyBackStyle : undefined}
+            >
+              {content}
+            </PcShell>
           ) : null}
           {device !== null && showBackToStudy && <BackToStudy />}
           {showQuestionsLink && <QuestionsLink />}

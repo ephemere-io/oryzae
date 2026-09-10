@@ -108,9 +108,14 @@ export class Entry {
     return new Entry(props);
   }
 
+  /**
+   * 本文（と任意で写真・エフェクト）を差し替えた新しい Entry を返す。
+   * `mediaUrls` / `effects` は undefined なら既存値を維持する — 自動保存のように
+   * 本文しか知らない呼び出し元が、写真や装飾を巻き添えで消さないようにするため。
+   */
   withContent(
     content: string,
-    mediaUrls: string[],
+    mediaUrls?: string[],
     effects?: EditorEffectsState | null,
   ): Result<Entry, EntryError> {
     const validationError = Entry.validateContent(content);
@@ -120,7 +125,7 @@ export class Entry {
       new Entry({
         ...this.toProps(),
         content,
-        mediaUrls,
+        mediaUrls: mediaUrls === undefined ? this.mediaUrls : mediaUrls,
         effects: effects === undefined ? this.effects : effects,
         updatedAt: new Date().toISOString(),
       }),

@@ -1,23 +1,29 @@
 'use client';
 
+import { ACCEPTED_IMAGE_MIME_TYPES } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
+import { PhotoStrip } from '@/components/ui/photo-strip';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
-import type { EntryDraft } from '@/features/shared/entries/types';
+import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
+import type { AttachedPhoto, EntryDraft } from '@/features/shared/entries/types';
 import {
   useActiveQuestions,
   useEntryQuestions,
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
+import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
 import { SpConfirmSheet } from './sp-confirm-sheet';
+import { SpFermentationDrawer } from './sp-fermentation-drawer';
+import { SpPhotoImportSheet } from './sp-photo-import-sheet';
 
 interface SpEntryEditorProps {
   api: ApiClient | null;
@@ -27,6 +33,10 @@ interface SpEntryEditorProps {
   initialEntryId?: string;
   /** 既存エントリの本文（先頭行=タイトル）。新規は空。 */
   initialContent?: string;
+  /** 既存エントリに添えられている写真のストレージパス。新規は空。 */
+  initialMediaUrls?: string[];
+  /** 上と同じ並びの表示用 署名付き URL。 */
+  initialMediaSignedUrls?: string[];
   /**
    * 書きかけドラフトの退避/復元を有効にするか（既定 true）。
    * 孤立検証（verify）では localStorage が fixture をまたいで漏れるため false にする。
@@ -55,10 +65,13 @@ export function SpEntryEditor({
   initialQuestionId = null,
   initialEntryId,
   initialContent = '',
+  initialMediaUrls,
+  initialMediaSignedUrls,
   persistDraft = true,
 }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
   const tDelete = useTranslations('entries.delete_modal');
+  const tPhoto = useTranslations('photo');
   const router = useRouter();
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const { save, saving, error } = useSaveEntry(api, null);
@@ -82,6 +95,9 @@ export function SpEntryEditor({
   const [entryId, setEntryId] = useState<string | undefined>(resolvedEntryId);
   // サーバ保存済み（entryId あり）なら保存済み表示、未保存の復元ドラフトは「編集中」表示にする。
   const [lastSavedBody, setLastSavedBody] = useState(resolvedEntryId ? init.body : '');
+  // Issue #510: タイトルだけ変えたときも「編集中」にする（本文だけ見ていると、
+  // 未保存のタイトルを抱えたまま「保存済み」と表示してしまう）。
+  const [lastSavedTitle, setLastSavedTitle] = useState(resolvedEntryId ? init.title.trim() : '');
   const [pickling, setPickling] = useState(false);
   const [pickled, setPickled] = useState(false);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(
@@ -89,6 +105,30 @@ export function SpEntryEditor({
   );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // Issue #466 の SP 版: 紐づけた問いに完了済みの発酵があれば、下からのドロワーで出す。
+  // 本文の上には重ねない（docs/entry-screen-design.md 原則1）。
+  const [fermentDrawerOpen, setFermentDrawerOpen] = useState(false);
+  const { detail: fermentationDetail } = useFermentationForQuestion(
+    api,
+    selectedQuestionId ?? undefined,
+  );
+  /**
+   * 添えた写真。パスと表示 URL を **1 本の配列**で持つ。
+   * 2 本に分けると、署名に失敗した写真がある時に index がずれ、
+   * 「n 番目を削除」で別の写真を消してしまう（サーバは穴を空文字で埋めて返す）。
+   */
+  const [photos, setPhotos] = useState<AttachedPhoto[]>(() =>
+    (initialMediaUrls ?? []).map((storagePath, i) => ({
+      storagePath,
+      signedUrl: initialMediaSignedUrls?.[i] ?? '',
+    })),
+  );
+  const mediaUrls = useMemo(() => photos.map((p) => p.storagePath), [photos]);
+  /** PC と同じ理由の鏡。await をまたぐ連続操作で古い配列を送らないため。 */
+  const photosRef = useRef<AttachedPhoto[]>(photos);
+  photosRef.current = photos;
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Issue #314: 問いが1つも無いと、シートが「ありません」を出すだけで手詰まりだった。
   // その場で問いを立てられるようにする（PC は #316 の QuestionSelectModal で既に可能）。
@@ -123,11 +163,64 @@ export function SpEntryEditor({
     body,
     entryId,
     save,
-    onSaved: (id, savedBody) => {
+    mediaUrls,
+    onSaved: (id, savedBody, savedTitle) => {
       setEntryId(id);
       setLastSavedBody(savedBody);
+      setLastSavedTitle(savedTitle);
     },
     enabled: api != null,
+  });
+
+  /** 起こした文字をカーソル位置に差し込む（本文の全置換はしない）。 */
+  function insertAtCursor(text: string) {
+    const el = bodyRef.current;
+    const at = el ? (el.selectionStart ?? body.length) : body.length;
+    const before = body.slice(0, at);
+    const after = body.slice(at);
+    // 直前が改行でなければ改行を足して、既存の文と地続きにならないようにする。
+    const lead = before && !before.endsWith('\n') ? '\n' : '';
+    const next = `${before}${lead}${text}${after}`;
+    setBody(next);
+    // 差し込んだ直後にカーソルを末尾へ運ぶ（続きを書き始められるように）。
+    requestAnimationFrame(() => {
+      const target = bodyRef.current;
+      if (!target) return;
+      const caret = before.length + lead.length + text.length;
+      target.focus();
+      target.setSelectionRange(caret, caret);
+    });
+  }
+
+  /**
+   * 写真を添える。本文が未保存でも写真だけ先に確定させたいので、ここで明示的に保存する
+   * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
+   */
+  async function attachPhoto(photo: AttachedPhoto) {
+    const updated = [...photosRef.current, photo];
+    photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
+    setPhotos(updated);
+    const next = updated.map((p) => p.storagePath);
+    const content = title.trim() ? `${title.trim()}\n${body}` : body;
+    if (!content.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
+    const saved = await save(content, entryId, { mediaUrls: next });
+    if (saved) setEntryId(saved);
+  }
+
+  async function removePhoto(index: number) {
+    const updated = photosRef.current.filter((_, i) => i !== index);
+    photosRef.current = updated;
+    setPhotos(updated);
+    const next = updated.map((p) => p.storagePath);
+    const content = title.trim() ? `${title.trim()}\n${body}` : body;
+    if (!entryId || !content.trim()) return;
+    await save(content, entryId, { mediaUrls: next });
+  }
+
+  const photoImport = usePhotoImport({
+    api,
+    onAttach: attachPhoto,
+    onInsertText: insertAtCursor,
   });
 
   // 問いはエントリ作成後（entryId 確定後）に一度だけ紐づける。
@@ -157,7 +250,7 @@ export function SpEntryEditor({
     }
   }, [entryId, selectedQuestionId, linkQuestion]);
 
-  const dirty = body !== lastSavedBody;
+  const dirty = body !== lastSavedBody || title.trim() !== lastSavedTitle;
   const hasBody = !!body.trim();
   const statusText = saving
     ? t('status_saving')
@@ -215,7 +308,7 @@ export function SpEntryEditor({
     }
     setPickling(true);
     const content = title.trim() ? `${title.trim()}\n${body}` : body;
-    const saved = await save(content, entryId, { fermentationEnabled: true });
+    const saved = await save(content, entryId, { fermentationEnabled: true, mediaUrls });
     setPickling(false);
     if (saved) {
       setPickled(true);
@@ -252,6 +345,7 @@ export function SpEntryEditor({
         composingQuestion,
         pickling,
         deleteOpen,
+        hasFermentation: fermentationDetail !== null,
       })}
     >
       {/* 保存ステータス（右・常設）＋ 既存エントリの削除トリガー（左・⋯）。 */}
@@ -331,10 +425,36 @@ export function SpEntryEditor({
             ? `◦ ${selectedQuestion.currentText ?? t('question_untitled')}`
             : `+ ${t('question_link')}`}
         </button>
+
+        {/* 写真を取り込む。押すと端末のカメラ/ライブラリが開く。 */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          aria-label={tPhoto('toolbar_button')}
+          className="ml-2 rounded-full px-3 py-1.5 text-xs"
+          style={{ color: 'var(--date-color)', border: '1px dashed var(--border-subtle)' }}
+        >
+          {`+ ${tPhoto('toolbar_button')}`}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
+          aria-label={tPhoto('modal_title')}
+          tabIndex={-1}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // 同じファイルを選び直しても change が起きるよう毎回リセットする。
+            e.target.value = '';
+            if (file) photoImport.selectFile(file);
+          }}
+        />
       </div>
 
       {/* 本文（タイトルから広い余白＋ゆったり行間）。指摘: 余白が欲しい。 */}
       <textarea
+        ref={bodyRef}
         // biome-ignore lint/a11y/noAutofocus: 縦長フォーカスエディタは開いた瞬間に書き始められることが要件
         autoFocus
         value={body}
@@ -343,6 +463,18 @@ export function SpEntryEditor({
         aria-label={t('body_placeholder')}
         className="mt-6 w-full flex-1 resize-none bg-transparent px-5 pb-4 text-base outline-none placeholder:opacity-30"
         style={{ lineHeight: 2 }}
+      />
+
+      {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
+      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
+
+      <SpPhotoImportSheet
+        state={photoImport.state}
+        onTranscribe={photoImport.transcribe}
+        onAttach={photoImport.attach}
+        onInsertTranscript={photoImport.insertTranscript}
+        onDiscardTranscript={photoImport.discardTranscript}
+        onClose={photoImport.close}
       />
 
       {/* 発酵させる CTA（保存済み＝entryId 確定後のみ）。
@@ -495,6 +627,15 @@ export function SpEntryEditor({
           </div>
         </div>
       ) : null}
+
+      {/* Issue #466（SP 版）: 発酵結果は本文に重ねず、下からのドロワーに集約する。 */}
+      {fermentationDetail && (
+        <SpFermentationDrawer
+          detail={fermentationDetail}
+          open={fermentDrawerOpen}
+          onOpenChange={setFermentDrawerOpen}
+        />
+      )}
 
       <SpConfirmSheet
         open={deleteOpen}

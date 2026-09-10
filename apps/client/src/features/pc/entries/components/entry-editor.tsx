@@ -1,39 +1,58 @@
 'use client';
 
-import type { EditorEffectsState } from '@oryzae/shared';
+import { ACCEPTED_IMAGE_MIME_TYPES, type EditorEffectsState } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { PhotoStrip } from '@/components/ui/photo-strip';
+import { Popover } from '@/components/ui/popover';
+import {
+  CONTROL_FONT,
+  ICON_SIZE,
+  ICON_STROKE_WIDTH,
+  paletteScale,
+  SHELL_INSET,
+  SHELL_ROW_HEIGHT,
+} from '@/components/ui/surface';
 import {
   type EditorStatus,
   EditorStatusBar,
 } from '@/features/pc/entries/components/editor-status-bar';
-import { FermentationDisplayPromptModal } from '@/features/pc/entries/components/fermentation-display-prompt-modal';
-import { FermentationOverlay } from '@/features/pc/entries/components/fermentation-overlay';
+import {
+  EntryActionPalette,
+  type PaletteAction,
+} from '@/features/pc/entries/components/entry-action-palette';
+import {
+  FermentationSidebar,
+  type SidebarQuestion,
+} from '@/features/pc/entries/components/fermentation-sidebar';
+import { InlineImageOverlay } from '@/features/pc/entries/components/inline-image-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
+import { PhotoImportModal } from '@/features/pc/entries/components/photo-import-modal';
 import { PickleConfirmModal } from '@/features/pc/entries/components/pickle-confirm-modal';
 import { PickleNudgeModal } from '@/features/pc/entries/components/pickle-nudge-modal';
-import { QuestionLinker } from '@/features/pc/entries/components/question-linker';
+import { QuestionChip } from '@/features/pc/entries/components/question-chip';
 import { QuestionSelectModal } from '@/features/pc/entries/components/question-select-modal';
 import { SaveTitleModal } from '@/features/pc/entries/components/save-title-modal';
 import { SettingsDrawer } from '@/features/pc/entries/components/settings-drawer';
 import { SnippetToolbar } from '@/features/pc/entries/components/snippet-toolbar';
-import { StatsPopup } from '@/features/pc/entries/components/stats-popup';
-import { UnsavedChangesModal } from '@/features/pc/entries/components/unsaved-changes-modal';
 import { useAmpEffect } from '@/features/pc/entries/hooks/use-amp-effect';
 import { useBrowserNavGuard } from '@/features/pc/entries/hooks/use-browser-nav-guard';
 import { useEditorSettings } from '@/features/pc/entries/hooks/use-editor-settings';
 import { useEraserTrace } from '@/features/pc/entries/hooks/use-eraser-trace';
 import { useFocusMode } from '@/features/pc/entries/hooks/use-focus-mode';
 import { useGhostEffect } from '@/features/pc/entries/hooks/use-ghost-effect';
+import { useInlineImageSelection } from '@/features/pc/entries/hooks/use-inline-image-selection';
 import { useLinkQuestionSync } from '@/features/pc/entries/hooks/use-link-question-sync';
 import { usePressureBleed } from '@/features/pc/entries/hooks/use-pressure-bleed';
 import { useSaveTransition } from '@/features/pc/entries/hooks/use-save-transition';
 import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscription';
+import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
+import { caretRangeFromPoint } from '@/features/pc/entries/utils/caret-from-point';
 import {
   loadCachedEffects,
   saveCachedEffects,
@@ -43,8 +62,17 @@ import {
   extractEditorEffects,
 } from '@/features/pc/entries/utils/editor-effects-codec';
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
+import {
+  applyInlineImagesToEditor,
+  createInlineImageElement,
+  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  serializeEditorText,
+} from '@/features/pc/entries/utils/inline-image-codec';
+import { measureTitle, TITLE_MIN_FONT_SIZE } from '@/features/pc/entries/utils/title-metrics';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
+import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
+import type { AttachedPhoto } from '@/features/shared/entries/types';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
@@ -70,6 +98,10 @@ interface EntryEditorProps {
    * Issue #332 — see docs/editor-effects-persistence.md.
    */
   initialEffects?: EditorEffectsState | null;
+  /** 既存エントリに添えられている写真のストレージパス。新規は空。 */
+  initialMediaUrls?: string[];
+  /** 上と同じ並びの表示用 署名付き URL。 */
+  initialMediaSignedUrls?: string[];
   createdAt?: string;
   updatedAt?: string;
   api: ApiClient | null;
@@ -104,6 +136,98 @@ function voiceStatusMessage(
   }
 }
 
+/**
+ * 縦書きのとき、題の右にとる余白と、題と本文のあいだの間。
+ *
+ * 以前は題を右端から 32px に置き、本文の右端は 85%（％指定）だったため、
+ * **右の余白 32px に対して題と本文のあいだが 117px** と逆転していた。
+ * 紙の右肩に題が乗っているのではなく、題だけが宙に浮いて見える。
+ * 両方を px で持ち、本文の右端をここから逆算する。
+ */
+const TITLE_RIGHT_MARGIN = 64;
+
+/** 横書きの題の上に取る余白。題は上端から置き、この分だけ内側へ下げる。 */
+/**
+ * 紙の上端から1行目（＝題）までの余白。
+ *
+ * 横書きの題は**紙の1行目**なので、上に載る帯ではなく本文と同じ流れの中にある。
+ * 書き出しの前に息を置くための余白。
+ *
+ * ヘッダーがすでに 78px（上下の余白 + 行の高さ）を使っているので、ここに大きな数字を
+ * 置くと題が紙の真ん中まで落ちる。ヘッダーと題は**同じ紙の上端**にあるものとして扱う。
+ */
+const PAGE_TOP_INSET = 32;
+const TITLE_TO_BODY_GAP = 24;
+
+/**
+ * 横書きだけ、題と本文のあいだを狭く取る。
+ *
+ * 縦書きの 24px は**同じ向きに流れる2本の文字列**を隔てる間合いで、これだけ空けないと
+ * 題の桁が本文の1桁目に見える。横書きの題は見出しとして本文の上に載り、**大きさの差**が
+ * すでに「別のもの」だと言っているので、同じだけ空けると離れて見える。
+ */
+const TITLE_TO_BODY_GAP_HORIZONTAL = 19;
+
+/**
+ * 題の筋（縦書きなら桁、横書きなら行）1本ぶんの太さ。字の何倍か。
+ *
+ * **箱の太さと行の高さが同じ数字を見る**のが肝要。かつて箱が 1.6 倍・行が 1.4 倍で、
+ * その差 0.2 倍 × 筋の数が、そのまま題と本文のあいだの空きになって現れていた
+ * （筋が増えるほど広がる＝「長く打つと余白が入る」）。
+ *
+ * **縦書きだけ広い。** 日本語入力の変換候補は縦書きだと桁の**脇**に開くので、
+ * 桁が字の幅ぎりぎりだと候補が字に重なって打てなくなる。2.0 で解消することを
+ * 一度確認しており（PR #525 レビュー）、1.6 に絞ったら再発した。ここは戻さない。
+ * 横書きの候補は行の下に開くので、見出しとして詰めて組んでよい。
+ */
+const TITLE_LINE_BOX_VERTICAL = 2.0;
+const TITLE_LINE_BOX_HORIZONTAL = 1.4;
+
+/**
+ * 退く／戻るのしきい値（px）。**1本ではなく2本持つ。**
+ *
+ * 題が退くと本文の場所が広がり、そのぶんスクロール位置を戻して読んでいる行を止める。
+ * しきい値が1本だと、戻した先がしきい値の手前になって題がまた開き、開いたぶん
+ * また送られて…と行ったり来たりする。入る線と出る線を離して、その往復を作らない。
+ */
+const TITLE_COMPACT_ENTER = 64;
+const TITLE_COMPACT_EXIT = 16;
+
+/** 退いているときの題の大きさ（もとの何倍か）。 */
+const TITLE_COMPACT_RATIO = 0.75;
+
+/** 退く／戻るのアニメーションの長さ（ms）。globals.css の .title-sized と揃える。 */
+const TITLE_RESIZE_MS = 200;
+
+/**
+ * 描画の前に測るための effect。
+ *
+ * 題の箱は**中身を測ってから**決めるので、描かれたあとに測ると1フレーム遅れ、
+ * 打つたびに箱が跳ねて見える。SSR では layout effect が使えないので、そこだけ逃がす
+ * （エディタは mount 後にしか描かれないため実害は無いが、検証ページは SSR される）。
+ */
+const useMeasureEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+/**
+ * 題に打てる長さの上限。
+ *
+ * 制限そのものが目的ではない（一度は外した）。だが**上限が無いと見切れる**——
+ * 3筋に収める規則がある以上、字を下限まで落としてもなお入らない長さが必ず存在する。
+ * 見切れた題は端的に美しくないので、そこへ辿り着けないようにする。
+ *
+ * 60 字は「標準的な画面（桁の高さ 588px）で 3 筋に 27px で収まる長さ」。本文と同じ
+ * 32px よりは小さくなるが、読める大きさは保てる。題としても十分に長い。
+ */
+const TITLE_MAX_LENGTH = 60;
+
+/**
+ * 残り字数を出し始める距離。
+ *
+ * 常に出しておくと、書く前から数を意識させることになる（題は書き手のもので、
+ * 入力欄のものではない）。**打ち止めが見えてきてから**そっと言う。
+ */
+const TITLE_REMAINING_THRESHOLD = 15;
+
 /** Extract title (first line) and body from stored content */
 function splitTitleBody(raw: string): { title: string; body: string } {
   const idx = raw.indexOf('\n');
@@ -116,6 +240,8 @@ export function EntryEditor({
   initialContent = '',
   initialTitle,
   initialEffects = null,
+  initialMediaUrls,
+  initialMediaSignedUrls,
   createdAt: createdAtIso,
   updatedAt: updatedAtIso,
   api,
@@ -128,13 +254,20 @@ export function EntryEditor({
   onPickled,
 }: EntryEditorProps) {
   const t = useTranslations('editor');
+  const tPhoto = useTranslations('photo');
   const locale = useLocale();
   // For existing entries, split first line as title
   const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
+  // Issue #510: 未保存判定に**タイトルも**含める。本文だけを見ていると、タイトルだけ変えた
+  // 状態が「保存済み」に見え、離脱ガードも素通りしてしまう。
+  const [savedTitle, setSavedTitle] = useState(
+    (entryId ? (initialTitle ?? parsed.title) : '').trim(),
+  );
   const [settings, updateSettings] = useEditorSettings(locale);
+  const isVertical = settings.writingMode === 'vertical';
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveModalMode, setSaveModalMode] = useState<'save' | 'pickle'>('save');
@@ -144,14 +277,63 @@ export function EntryEditor({
   // Issue #316: 保存成功直後に出すガイドモーダル
   const [pickleNudgeOpen, setPickleNudgeOpen] = useState(false);
   const [linkQuestionNudgeOpen, setLinkQuestionNudgeOpen] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [draftTitle, setDraftTitle] = useState('');
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(entryId);
-  const [statsOpen, setStatsOpen] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
-  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
+  /**
+   * 題が退いているか。
+   *
+   * 縦書きの題は据え置き（消すと「何を書いているのか」が分からなくなる、と一度戻した）
+   * だが、据え置いたままだと本文に対して**存在感が大きすぎて書く邪魔になる**。
+   * 読み進めているあいだは小さくして脇へ退かせ、頭に戻れば元の大きさに返す。
+   *
+   * 横書きは題そのものが本文と一緒に流れて画面から出るので、ここは常に false。
+   */
+  const [titleCompact, setTitleCompact] = useState(false);
+  /**
+   * 大きさの移り変わりをアニメーションさせている最中か。
+   *
+   * 遷移を常時掛けておくと、**打っている最中の些細な寸法の変化まで 200ms かけて動く**。
+   * 動かしたいのは「退く／戻る」の一度きりなので、そのときだけ掛ける。
+   */
+  const [titleResizing, setTitleResizing] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: titleCompact は「変わったこと」だけが引き金で、値そのものは使わない
+  useEffect(() => {
+    setTitleResizing(true);
+    const timer = setTimeout(() => setTitleResizing(false), TITLE_RESIZE_MS + 20);
+    return () => clearTimeout(timer);
+  }, [titleCompact]);
   const [fadeLeft, setFadeLeft] = useState(false);
+  // 末尾側だけでなく**先頭側**も切れる。右がぶつ切りだと「まだ続いている」ことが
+  // 伝わらず、いま紙のどこにいるのかを見失う。
+  const [fadeRight, setFadeRight] = useState(false);
+  // 縦書きの題が使える桁の高さ（実測）。題の字の大きさを字数から決めるのに要る。
+  const [editorAreaHeight, setEditorAreaHeight] = useState(0);
   const [status, setStatus] = useState<EditorStatus>('editing');
+  // Issue #360: ステータスバーが「いつ保存されたか」を語り続けるための基準時刻。
+  // 保存ボタンを廃した（原則2）ので、保存が起きている事実はこの帯だけが伝える。
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  /**
+   * 添えた写真。パスと表示 URL を **1 本の配列**で持つ。
+   * 2 本に分けると、署名に失敗した写真がある時に index がずれ、
+   * 「n 番目を削除」で別の写真を消してしまう（サーバは穴を空文字で埋めて返す）。
+   */
+  const [photos, setPhotos] = useState<AttachedPhoto[]>(() =>
+    (initialMediaUrls ?? []).map((storagePath, i) => ({
+      storagePath,
+      signedUrl: initialMediaSignedUrls?.[i] ?? '',
+    })),
+  );
+  // 保存に送るパス列。useCallback の依存に載せるので参照を安定させる。
+  const mediaUrls = useMemo(() => photos.map((p) => p.storagePath), [photos]);
+  /**
+   * 連続操作で state 更新の再レンダーを待たずに最新の並びを読むための鏡。
+   * closure の `photos` から次の配列を作ると、前回の save を await している間に
+   * 次の追加/削除が起きたとき古い配列を送ってしまい、サーバー側の media_urls から
+   * 写真が脱落する（ローカルは正しいのでリロードするまで気づけない）。
+   */
+  const photosRef = useRef<AttachedPhoto[]>(photos);
+  photosRef.current = photos;
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
   // Issue #319: autosave で初回エントリが作られた際に、ローカルで紐づけ済みの
@@ -161,48 +343,37 @@ export function EntryEditor({
     link: onLinkQuestion,
   });
 
-  // Issue #329: 新規エントリで紐付けた問いに発酵結果がある場合のオーバーレイ表示制御。
-  // 既存エントリでは表示しない (執筆中の判断材料として使うため新規限定)。
-  const isNewEntry = !entryId;
-  const firstLinkedQuestionId = isNewEntry ? Array.from(linkedIds)[0] : undefined;
-  const { detail: fermentationOverlayDetail } = useFermentationForQuestion(
-    api,
-    firstLinkedQuestionId,
-  );
-  const [overlayVisible, setOverlayVisible] = useState(false);
-  const [overlayPromptOpen, setOverlayPromptOpen] = useState(false);
-  const promptedForQuestionRef = useRef<string | null>(null);
+  // Issue #329 → #466: 紐付けた問いに発酵結果があれば、右のサイドバーに出す。
+  //
+  // 以前は**新規エントリだけ**に限っていた（執筆中の判断材料という位置づけだった）。
+  // だが一覧から既存のエントリを開くと、パレットの発酵ボタンが理由もなく死んだままになる。
+  // 書き足すときにも前回の発酵結果は読みたいので、新旧を問わず結んだ問いから引く。
+  // 面が見せるのは**問い1つぶん**の発酵。問いは複数結べるので、どれを見るかは面の中で選ぶ。
+  // 選んでいた問いを外したときは、残っている先頭へ落とす（外した問いの結果を出したままに
+  // しない、が第一。選び直しを促して手を止めるほどのことではない）。
+  const linkedQuestionList: SidebarQuestion[] = Array.from(linkedIds).map((id) => ({
+    id,
+    text:
+      activeQuestions.find((q) => q.id === id)?.currentText ??
+      t('fermentation_sidebar.question_unnamed'),
+  }));
+  const [pickedFermentQuestionId, setPickedFermentQuestionId] = useState<string | null>(null);
+  const selectedFermentQuestionId =
+    pickedFermentQuestionId && linkedIds.has(pickedFermentQuestionId)
+      ? pickedFermentQuestionId
+      : (Array.from(linkedIds)[0] ?? null);
+  const { detail: fermentationOverlayDetail, loading: fermentationLoading } =
+    useFermentationForQuestion(api, selectedFermentQuestionId ?? undefined);
+  // 発酵結果は**閉じた状態で始まり、パレットの操作でだけ開く**。
+  // 以前はエントリーを開いた瞬間に「出しますか？」と訊いていたが、書きに来た人の手を
+  // いきなり止める問いだった。出したいときに出せるなら、訊く必要がない。
+  const [fermentSidebarOpen, setFermentSidebarOpen] = useState(false);
   useEffect(() => {
-    if (!fermentationOverlayDetail) {
-      setOverlayVisible(false);
-      setOverlayPromptOpen(false);
-      promptedForQuestionRef.current = null;
-      return;
-    }
-    if (promptedForQuestionRef.current === fermentationOverlayDetail.questionId) return;
-    promptedForQuestionRef.current = fermentationOverlayDetail.questionId;
-    if (settings.fermentationOverlayPreference === 'always') {
-      setOverlayVisible(true);
-      setOverlayPromptOpen(false);
-    } else if (settings.fermentationOverlayPreference === 'never') {
-      setOverlayVisible(false);
-      setOverlayPromptOpen(false);
-    } else {
-      setOverlayPromptOpen(true);
-    }
-  }, [fermentationOverlayDetail, settings.fermentationOverlayPreference]);
-  const handleOverlayPromptChoose = useCallback(
-    (display: boolean, remember: boolean) => {
-      setOverlayVisible(display);
-      setOverlayPromptOpen(false);
-      if (remember) {
-        updateSettings({ fermentationOverlayPreference: display ? 'always' : 'never' });
-      }
-    },
-    [updateSettings],
-  );
-  const toggleOverlay = useCallback(() => {
-    setOverlayVisible((v) => !v);
+    // 問いを外した／別の問いに移ったら、前の発酵結果を出したままにしない。
+    if (!fermentationOverlayDetail) setFermentSidebarOpen(false);
+  }, [fermentationOverlayDetail]);
+  const toggleFermentSidebar = useCallback(() => {
+    setFermentSidebarOpen((v) => !v);
   }, []);
   const [dateStr, setDateStr] = useState(() => {
     const now = new Date();
@@ -216,16 +387,14 @@ export function EntryEditor({
   // Issue #316: 保存成功直後のナッジ表示判定に使う
   const userMe = useUserMe(api);
   const router = useRouter();
-  // 左端はサイドバーの幅に合わせる。**定数ではなく CSS 変数を読む** —
-  // 書斎が有効な間はサイドバーを描かないので、80px を決め打ちにすると左に隙間が残る。
-  // 変数は (protected)/layout.tsx が <main> に生やしていて、既定は 0px。
-  const sidebarWidth = 'var(--sidebar-width, 0px)';
   const editorRef = useRef<HTMLDivElement>(null);
+  // 横書きでスクロールする外枠（縦書きでは editor 自身がスクローラ）。Issue #364。
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const ghostLayerRef = useRef<HTMLDivElement>(null);
   const traceCanvasRef = useRef<HTMLCanvasElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const hasUnsavedChanges = content !== savedContent;
+  const hasUnsavedChanges = content !== savedContent || title.trim() !== savedTitle;
   const {
     open: leaveConfirmOpen,
     cancel: cancelLeaveConfirm,
@@ -239,11 +408,7 @@ export function EntryEditor({
     questionSelectOpen ||
     pickleNudgeOpen ||
     linkQuestionNudgeOpen ||
-    isEditingTitle ||
-    statsOpen ||
-    pendingNavPath !== null ||
-    leaveConfirmOpen ||
-    overlayPromptOpen;
+    leaveConfirmOpen;
   const uiVisible = useFocusMode({
     enabled: settings.focusModeEnabled,
     forceVisible: anyOverlayOpen,
@@ -253,6 +418,7 @@ export function EntryEditor({
     uiVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
   }`;
 
+  // 左端は CSS 変数（--sidebar-width）が配る。掴んで引いている間も再描画が起きない。
   const { setHidden: setSidebarHidden } = useSidebarVisibility();
   useEffect(() => {
     setSidebarHidden(!uiVisible);
@@ -306,20 +472,60 @@ export function EntryEditor({
     if (saving) setStatus(isAutosavingRef.current ? 'autosaving' : 'saving');
   }, [saving]);
 
+  // 本文領域の高さを測る（縦書きの題は、この高さに収まる大きさで組む）。
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    function measure() {
+      const box = scrollContainerRef.current;
+      if (box) setEditorAreaHeight(box.clientHeight);
+    }
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // Track scroll position of editor to show/hide end-side fade overlay
   useEffect(() => {
-    const el = editorRef.current;
-    if (!el || settings.writingMode !== 'vertical') {
+    // 縦書きは本文自身がスクローラ、横書きは外枠。**どちらにも掛ける**——
+    // 切れている端が見えないと、紙のどこにいるのか分からなくなる。
+    const el = isVertical ? editorRef.current : scrollContainerRef.current;
+    if (!el) {
       setFadeLeft(false);
+      setFadeRight(false);
       return;
     }
     function updateFade() {
       if (!el) return;
-      const { scrollLeft, scrollWidth, clientWidth } = el;
-      const maxScroll = scrollWidth - clientWidth;
-      // vertical-rl: scrollLeft=0 at start (rightmost/beginning), goes negative when scrolled left
-      // End-side fade: show when not scrolled all the way to the end
-      setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
+      if (isVertical) {
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        const maxScroll = scrollWidth - clientWidth;
+        // 読み進めたら題は退く。**紙の頭にいるあいだは大きいまま**——そこは
+        // 題を決める場所なので、小さくすると打ちにくい。
+        setTitleCompact((was) =>
+          was
+            ? Math.abs(scrollLeft) > TITLE_COMPACT_EXIT
+            : Math.abs(scrollLeft) > TITLE_COMPACT_ENTER,
+        );
+        // vertical-rl: 先頭（右端）で scrollLeft=0、左へ進むと負。
+        // 末尾側（左）は、まだ最後まで来ていないときに掛ける。
+        setFadeLeft(maxScroll > 5 && Math.abs(scrollLeft) < maxScroll - 5);
+        // 先頭側（右）は、書き出しから離れたときに掛ける。**左だけフェードして右が
+        // ぶつ切り**だと、右にまだ続いていることが伝わらない。
+        setFadeRight(Math.abs(scrollLeft) > 5);
+        return;
+      }
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      // 横書きも縦書きと同じ。題は据え置いたまま、読み進めたら小さくなって場所を返す。
+      setTitleCompact((was) =>
+        was ? scrollTop > TITLE_COMPACT_EXIT : scrollTop > TITLE_COMPACT_ENTER,
+      );
+      const maxScroll = scrollHeight - clientHeight;
+      // 横書きは上下。末尾側（下）と先頭側（上）に、縦書きと同じ扱いで掛ける。
+      setFadeLeft(maxScroll > 5 && scrollTop < maxScroll - 5);
+      setFadeRight(scrollTop > 5);
     }
     updateFade();
     el.addEventListener('scroll', updateFade);
@@ -334,7 +540,7 @@ export function EntryEditor({
       el.removeEventListener('scroll', updateFade);
       ro?.disconnect();
     };
-  }, [settings.writingMode]);
+  }, [isVertical]);
 
   // Warn before browser close with unsaved changes
   useEffect(() => {
@@ -355,8 +561,18 @@ export function EntryEditor({
       setTitle(p.title);
       setContent(p.body);
       setSavedContent(p.body);
+      setSavedTitle(p.title.trim());
       if (editorRef.current && p.body) {
         editorRef.current.textContent = p.body;
+        // 写真を先に実体化する。装飾のオフセットは写真を 1 文字として数えているので、
+        // 先に実体化しておけば両者の数え方が一致する（逆順にすると置換に失敗する）。
+        if (effectiveInitialEffects?.inlineImages?.length) {
+          applyInlineImagesToEditor(
+            editorRef.current,
+            effectiveInitialEffects.inlineImages,
+            new Map(photosRef.current.map((ph) => [ph.storagePath, ph.signedUrl])),
+          );
+        }
         if (effectiveInitialEffects?.textSpans?.length) {
           applyTextSpansToEditor(editorRef.current, effectiveInitialEffects.textSpans);
         }
@@ -364,6 +580,7 @@ export function EntryEditor({
     } else {
       setContent(initialContentStable);
       setSavedContent(initialContentStable);
+      setSavedTitle('');
       if (editorRef.current && initialContentStable) {
         editorRef.current.textContent = initialContentStable;
       }
@@ -398,6 +615,7 @@ export function EntryEditor({
       const saveOptions: {
         fermentationEnabled?: boolean;
         effects?: EditorEffectsState | null;
+        mediaUrls?: string[];
       } = {};
       if (options.fermentationEnabled !== undefined) {
         saveOptions.fermentationEnabled = options.fermentationEnabled;
@@ -405,6 +623,8 @@ export function EntryEditor({
       if (editorRef.current) {
         saveOptions.effects = effectsSnapshot;
       }
+      // 添えた写真はエディタが正を持つので毎回同梱する（送らなければサーバーは既存維持）。
+      saveOptions.mediaUrls = mediaUrls;
 
       const savedId = await save(
         finalContent,
@@ -416,12 +636,13 @@ export function EntryEditor({
         saveCachedEffects(savedId, effectsSnapshot);
         setTitle(newTitle.trim());
         setSavedContent(content);
+        setSavedTitle(newTitle.trim());
         setCurrentEntryId(savedId);
         setSaveModalOpen(false);
         setPickleConfirmOpen(false);
         setQuestionSelectOpen(false);
-        setIsEditingTitle(false);
         setStatus('saved');
+        setLastSavedAt(Date.now());
         const created = createdAtIso ? new Date(createdAtIso) : new Date();
         setDateStr(formatEntryDate(created, new Date(), t));
         if (isNew && onLinkQuestion) {
@@ -455,7 +676,9 @@ export function EntryEditor({
         userMe.refresh();
 
         if (options.fermentationEnabled && onPickled && editorRef.current && finalContent.trim()) {
-          await runSaveTransition(finalContent, editorRef.current);
+          // **どの瓶へ入るか**を渡す。書いたものはこの問いに納まるので、演出も
+          // その瓶を狙う（渡さないと、画面に見えている瓶のうち近いものになる）。
+          await runSaveTransition(finalContent, editorRef.current, Array.from(linkedIds)[0]);
           onPickled();
         } else if (isNew) {
           router.push(`/entries/${savedId}`);
@@ -477,6 +700,7 @@ export function EntryEditor({
       t,
       userMe,
       getTracesSnapshot,
+      mediaUrls,
     ],
   );
 
@@ -554,50 +778,32 @@ export function EntryEditor({
     ],
   );
 
-  const startTitleEdit = useCallback(() => {
-    setDraftTitle(title);
-    setIsEditingTitle(true);
-  }, [title]);
-
-  const cancelTitleEdit = useCallback(() => {
-    setIsEditingTitle(false);
-    setDraftTitle('');
-  }, []);
-
+  /**
+   * タイトルは常時入力できる。以前は「押すと入力に変わるボタン」だったが、
+   * タイトルは入力欄であってボタンではない。押して初めて編集できる形は、
+   * 入力欄であることを隠しているだけだった。
+   *
+   * 本文と同じく、確定は保存に任せる（autosave が content = title\nbody を書く）。
+   * 既存エントリでフォーカスを外したときだけ、その場で確定させる。
+   */
   const commitTitleEdit = useCallback(() => {
-    const trimmed = draftTitle.trim();
+    const trimmed = title.trim();
+    if (trimmed === savedTitle) return;
     const targetId = currentEntryId ?? entryId;
-    if (targetId) {
-      if (trimmed !== title) {
-        handleSaveWithTitle(trimmed);
-      } else {
-        setIsEditingTitle(false);
-      }
-    } else {
-      setTitle(trimmed);
-      setIsEditingTitle(false);
-    }
-  }, [draftTitle, currentEntryId, entryId, handleSaveWithTitle, title]);
-
-  useEffect(() => {
-    if (isEditingTitle) {
-      const t = setTimeout(() => {
-        titleInputRef.current?.focus();
-        titleInputRef.current?.select();
-      }, 0);
-      return () => clearTimeout(t);
-    }
-  }, [isEditingTitle]);
+    if (targetId) handleSaveWithTitle(trimmed);
+  }, [title, savedTitle, currentEntryId, entryId, handleSaveWithTitle]);
 
   const handleAutosaved = useCallback(
-    async (newId: string, savedBody: string) => {
+    async (newId: string, savedBody: string, autosavedTitle: string) => {
       // Track the id locally so subsequent autosaves PUT instead of POST.
       // URL stays the same — the 新規エントリ button and browser refresh
       // continue to behave as if the user is still composing.
       const wasNew = currentEntryId !== newId;
       if (wasNew) setCurrentEntryId(newId);
       setSavedContent(savedBody);
+      setSavedTitle(autosavedTitle);
       setStatus('saved');
+      setLastSavedAt(Date.now());
       isAutosavingRef.current = false;
       setTimeout(() => setStatus('editing'), 2000);
 
@@ -612,9 +818,9 @@ export function EntryEditor({
   );
 
   const autoSave = useCallback(
-    (contentToSave: string, id?: string) => {
+    (contentToSave: string, id?: string, options?: { mediaUrls?: string[] }) => {
       isAutosavingRef.current = true;
-      return save(contentToSave, id);
+      return save(contentToSave, id, options);
     },
     [save],
   );
@@ -625,40 +831,132 @@ export function EntryEditor({
     entryId: currentEntryId,
     enabled: !!api,
     save: autoSave,
+    mediaUrls,
     onSaved: handleAutosaved,
   });
 
-  /** Navigate with unsaved-changes guard */
-  const guardedNavigate = useCallback(
-    (path: string) => {
-      if (hasUnsavedChanges) {
-        setPendingNavPath(path);
-      } else {
-        router.push(path);
+  // 「保存せずに移動しますか？」の確認は廃止した。
+  // 画面内の移動導線（一覧 / 新規エントリ）をサイドバーへ寄せてヘッダーから外したため、
+  // このコンポーネントは遷移を握らなくなった。加えて Issue #510 で、タブが隠れたとき・
+  // ページを離れるとき・アンマウント時に必ず保存が走るようになったので、
+  // 「未保存のまま失う」経路そのものが無い。原則2（保存は常に自動）とも、
+  // 移動のたびに保存を尋ねるモーダルは噛み合わない。
+  // ブラウザの戻る/進む・タブを閉じる操作は useBrowserNavGuard + LeaveConfirmModal が担う。
+
+  /**
+   * 起こした文字をカーソル位置に差し込む（本文の全置換はしない）。
+   * execCommand を使うのは、contentEditable の undo 履歴とカーソル位置を壊さないため
+   * （onPaste が同じ理由で使っているのと同じ判断）。
+   */
+  const insertTranscript = useCallback((text: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+
+    const selection = window.getSelection();
+    // モーダルを開いている間にカーソルが editor の外へ出ているので、
+    // 選択が editor 内に無ければ末尾に置き直してから差し込む。
+    if (!selection || selection.rangeCount === 0 || !el.contains(selection.anchorNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    const existing = serializeEditorText(el);
+    const lead = existing && !existing.endsWith('\n') ? '\n' : '';
+    document.execCommand('insertText', false, `${lead}${text}`);
+
+    // execCommand の input が React の onInput に届かない場合があるため明示同期する。
+    setContent(serializeEditorText(el));
+    setStatus((s) => (s === 'saved' ? 'editing' : s));
+  }, []);
+
+  /**
+   * 写真を本文のキャレット位置に差し込む。
+   *
+   * `execCommand('insertHTML')` を使うのは、contentEditable の undo 履歴と
+   * キャレット位置を壊さないため（本文への文字挿入で execCommand を使っているのと同じ理由）。
+   * Range で直接 DOM を挿すと Ctrl+Z で戻せなくなる。
+   *
+   * 本文が未保存でも写真だけ先に確定させたいのでここで明示保存する
+   * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
+   */
+  const attachPhoto = useCallback(
+    async (photo: AttachedPhoto) => {
+      const el = editorRef.current;
+      const updated = [...photosRef.current, photo];
+      photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
+      setPhotos(updated);
+
+      if (el) {
+        el.focus();
+        const node = createInlineImageElement(
+          {
+            offset: 0, // 実際の位置は保存時に DOM から数え直す
+            storagePath: photo.storagePath,
+            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+            layout: 'inline',
+            align: 'start',
+          },
+          photo.signedUrl,
+        );
+        document.execCommand('insertHTML', false, node.outerHTML);
       }
+
+      const nextContent = el ? serializeEditorText(el) : content;
+      setContent(nextContent);
+      const next = updated.map((p) => p.storagePath);
+      const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
+      if (!finalContent.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
+      const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
+      if (savedId) setCurrentEntryId(savedId);
     },
-    [hasUnsavedChanges, router],
+    [title, content, currentEntryId, save],
   );
 
-  const handleUnsavedSave = useCallback(() => {
-    if (!entryId && !title.trim()) {
-      setSaveModalMode('save');
-      setSaveModalOpen(true);
-    } else {
-      handleSaveWithTitle(title);
-      if (pendingNavPath) {
-        const path = pendingNavPath;
-        setPendingNavPath(null);
-        setTimeout(() => router.push(path), 300);
-      }
-    }
-  }, [entryId, handleSaveWithTitle, pendingNavPath, router, title]);
+  const removePhoto = useCallback(
+    async (index: number) => {
+      const updated = photosRef.current.filter((_, i) => i !== index);
+      photosRef.current = updated;
+      setPhotos(updated);
+      const next = updated.map((p) => p.storagePath);
+      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
+      if (!currentEntryId || !finalContent.trim()) return;
+      await save(finalContent, currentEntryId, { mediaUrls: next });
+    },
+    [title, content, currentEntryId, save],
+  );
 
-  const handleUnsavedDiscard = useCallback(() => {
-    const path = pendingNavPath;
-    setPendingNavPath(null);
-    if (path) router.push(path);
-  }, [pendingNavPath, router]);
+  const photoImport = usePhotoImport({
+    api,
+    onAttach: attachPhoto,
+    onInsertText: insertTranscript,
+  });
+
+  /**
+   * 写真の見た目が確定したら本文ごと保存する。effects は extractEditorEffects が
+   * DOM から数え直すので、ここでは本文を送るだけでよい。
+   */
+  const commitInlineImageChange = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const nextContent = serializeEditorText(el);
+    setContent(nextContent);
+    setStatus((st) => (st === 'saved' ? 'editing' : st));
+    const finalContent = title.trim() ? `${title.trim()}\n${nextContent}` : nextContent;
+    if (!currentEntryId || !finalContent.trim()) return;
+    void save(finalContent, currentEntryId, {
+      mediaUrls: photosRef.current.map((ph) => ph.storagePath),
+    });
+  }, [title, currentEntryId, save]);
+
+  const inlineImages = useInlineImageSelection({
+    editorRef,
+    isVertical: settings.writingMode === 'vertical',
+    onCommit: commitInlineImageChange,
+  });
 
   const handleLink = useCallback(
     async (questionId: string) => {
@@ -689,516 +987,818 @@ export function EntryEditor({
     [currentEntryId, entryId, onUnlinkQuestion],
   );
 
-  function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      document.documentElement.requestFullscreen();
+  /**
+   * いま全画面かどうか。**自分で持たず、ブラウザに訊く。**
+   *
+   * 全画面は押した結果とは限らない——Esc・F11・OS 側の操作でも入るし抜ける。
+   * 自前の boolean を持つと、そこで抜けたときにアイコンだけが取り残されて
+   * 「戻る道具が見当たらない」状態になる。
+   */
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    function sync() {
+      setIsFullscreen(document.fullscreenElement !== null);
     }
-  }
+    sync();
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
 
-  const charCount = content.length;
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      // 拒否されうる（すでに抜けている等）。落とさずに諦める。
+      void document.exitFullscreen().catch(() => {});
+    } else {
+      void document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  // Issue #311: 執筆がノッている間、手をキーボードから離さずに済むようにする。
+  // ⌘S は「保存」だが、保存ボタンを廃した（原則2）今は「いま確定させる」操作にあたる。
+  // ⌘F はブラウザのページ内検索を奪うが、エディタ内での検索より漬け込みのほうが要る。
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        handleSaveClick();
+      } else if (key === 'f') {
+        e.preventDefault();
+        handlePickleClick();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSaveClick, handlePickleClick]);
+
+  useTypewriterScroll({
+    editorRef,
+    scrollContainerRef,
+    writingMode: settings.writingMode,
+    enabled: true,
+  });
+
+  // 題は**動かさない**。読み進めても消さない。
+  //
+  // 一度は本文と一緒に流して消していた（「いま文章のどこにいるか分からない」への対応）。
+  // だが消してみると、今度は**何のエントリーを書いているのかという大文脈**が失われた。
+  // 位置の手がかりは本文の側（末尾の余白・端のフェード）で示せるが、
+  // 題は他のどこにも出ていないので、ここから消すと戻る先が無くなる。
+
+  // パレットの操作。押せないものは非活性にして、理由はホバーで出す
+  // （「あと何字」を常時表示しない代わり）。
+  // アイコンもボタンと一緒に大きくする。ボタンだけ大きくすると、道具が太っただけに見える。
+  const paletteIconSize = paletteScale(settings.paletteSize).icon;
+  const paletteIcon = (children: React.ReactNode) => (
+    <svg
+      aria-hidden="true"
+      width={paletteIconSize}
+      height={paletteIconSize}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={ICON_STROKE_WIDTH}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+
+  // パレットは**本文に対してすることだけ**を持つ（声で書く・漬け込む・広く見る）。
+  // 「問いを結ぶ」はここに置かない。エントリーの身元（日付・問い）はヘッダーが持ち、
+  // 同じ操作の入口が2か所にあると、どちらが本体か分からなくなる。
+  const paletteActions: PaletteAction[] = [
+    {
+      id: 'voice',
+      label: voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice'),
+      active: voiceActive,
+      icon: paletteIcon(
+        <>
+          <rect x="9" y="2.5" width="6" height="11" rx="3" />
+          <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 20v2" />
+        </>,
+      ),
+      onSelect: () => setVoiceActive((v) => !v),
+    },
+    {
+      // 写真。押すとファイル選択が開き、選んだあと「文字として読み込む / 写真として貼る」を
+      // モーダルで選ぶ（本文への差し込み方は usePhotoImport が持つ）。
+      id: 'photo',
+      label: tPhoto('toolbar_button'),
+      icon: paletteIcon(
+        <>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="m3 16 5-5a2 2 0 0 1 2.8 0l5.2 5.2M14 13l1.6-1.6a2 2 0 0 1 2.8 0L21 14.5" />
+          <circle cx="16" cy="9" r="1" />
+        </>,
+      ),
+      onSelect: () => photoInputRef.current?.click(),
+    },
+    {
+      id: 'pickle',
+      label: t('toolbar.pickle'),
+      disabledReason: !content.trim() ? t('palette.pickle_needs_body') : undefined,
+      icon: paletteIcon(
+        <>
+          <path d="M9 3h6M8 7h8l-.6 11a2 2 0 0 1-2 1.9H10.6a2 2 0 0 1-2-1.9L8 7Z" />
+          <path d="M8.4 12c1.5-.8 2.6-.8 3.6 0s2.1.8 3.6 0" strokeOpacity=".55" />
+        </>,
+      ),
+      onSelect: handlePickleClick,
+    },
+    {
+      id: 'fullscreen',
+      // **同じボタンが逆のことをするなら、見た目も逆にする。** 入るときは外向きの矢、
+      // 出るときは内向きの矢。名前も一緒に変える（読み上げも同じ道を通る）。
+      label: isFullscreen ? t('toolbar.fullscreen_exit') : t('toolbar.fullscreen'),
+      icon: paletteIcon(
+        isFullscreen ? (
+          <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+        ) : (
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        ),
+      ),
+      onSelect: toggleFullscreen,
+    },
+  ];
+
+  // 発酵結果の出し入れは**常にここに置く**。出せるものが無いときだけ非活性にして、
+  // 理由をホバーで言う。押せるときだけ現れる作りだと、そもそもこの操作があることに
+  // 気づけない（「パレットに発酵の表示切替が無い」と言われた）。
+  //
+  // 面は問いを紐づけていれば開ける（中身が無ければ「まだ発酵していません」と言う）。
+  // 押せないのは、開く先そのものが無いとき＝問いを紐づけていないときだけ。
+  const fermentationReason =
+    linkedIds.size === 0 ? t('palette.fermentation_needs_question') : undefined;
+
+  paletteActions.push({
+    id: 'fermentation',
+    label: fermentSidebarOpen
+      ? t('toolbar.fermentation_sidebar_hide')
+      : t('toolbar.fermentation_sidebar_show'),
+    active: fermentSidebarOpen,
+    disabledReason: fermentationReason,
+    icon: paletteIcon(
+      <>
+        <path d="M9 3.75v3.75M15 3.75v3.75M7.5 7.5h9a1.5 1.5 0 0 1 1.5 1.5v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V9a1.5 1.5 0 0 1 1.5-1.5Z" />
+        <path d="M9 12.75h6M9 15.75h4.5" />
+      </>,
+    ),
+    onSelect: toggleFermentSidebar,
+  });
+
+  // 書いている間はパレットも一緒に消す（ヘッダーや処理表示と同じ挙動）。
+  // 常に出しておきたい人のために設定で切れる。
+  const paletteVisible = settings.paletteAutoHide ? uiVisible : true;
+
+  // 横書きの左右余白。**ヘッダーと同じ縦の線**に乗せる（SHELL_INSET の倍）。
+  // 以前は px-[15%] で、1512px の画面だと本文の左端が 295px、「問いを結ぶ」の左端が
+  // 104px と、同じ画面の中で2本の別の縦線が立っていた。ここを1本に揃える。
+  const gutterPx = SHELL_INSET * 2;
+  // 縦書きの題が使える桁の高さ。字の大きさを字数から決めるのに要る。
+  // 測れないうち（初回描画・jsdom）は画面高からの概算に倒す。
+  const titleColumnHeightPx = editorAreaHeight * 0.86;
+  // 1行の長さの上限。日本語は 30〜40 字で読みやすさが頭打ちになるので 34 字で切る
+  // （文字サイズを上げても行が伸び続けないよう、px ではなく文字数で持つ）。
+  const measurePx = settings.fontSize * 34;
+
+  /**
+   * 横書きの紙の列。**題と本文が同じ1本の列に乗る**。
+   *
+   * 左端に寄せていたので、広い画面では右に何も無い帯が残り、紙が左に片寄って見えた。
+   * 読む場所は目の正面にあるほうがよいので、余った幅は左右へ等しく配る。
+   */
+  const horizontalColumnStyle: React.CSSProperties = {
+    maxWidth: `${measurePx + gutterPx * 2}px`,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    paddingLeft: `${gutterPx}px`,
+    paddingRight: `${gutterPx}px`,
+  };
+
+  // タイトルの置き場。縦書きは本文（left:6% / width:79%）のすぐ右へ縦組みで、
+  // 横書きは本文の上に、**本文と同じ左端から**。
+  //
+  // 縦書きの題は**紙の右肩**に置く。本や原稿用紙と同じで、題は本文の始まりより外側に立つ。
+  //
+  // 題の右余白と、題と本文のあいだの間は px で持つ（TITLE_RIGHT_MARGIN /
+  // TITLE_TO_BODY_GAP）。本文の右端はそこから逆算する。
+  // 横書きの題は**上端から**置く（余白は padding で作る）。top を空けると、その隙間を
+  // 本文が通り抜けて題の上に文字が覗く。
+  const titleBoxClass = isVertical ? 'absolute top-[4%]' : 'absolute top-0';
+  // 横書きではタイトルが本文の真上に重なるので、本文側に**タイトルの実高さぶん**の
+  // 上余白を空ける。文字サイズは設定で変わるため固定値では足りず、その都度計算する。
+  //
+  // 題と本文の**大きさの差**をはっきりつける（1.15 倍では差が読めず、ただの1行に見えた）。
+  // 縦書きは題が本文の隣に立つので差が効く。横書きは見出しとして上に載るのでもう少し強く。
+  //
+  // **長い題ほど小さくする。** 固定倍率だと、長い題が桁からはみ出して見切れた。
+  // 箱の長さは「いま見えている文字」で決める。空のときに中身の 0 文字で組むと、
+  // **置き文字（「タイトルを入力」）が1文字ぶんの箱に閉じ込められて「タ」しか出ない**。
+  const titlePlaceholder = t('title.placeholder');
+  const titleLength = Math.max(title.length || titlePlaceholder.length, 1);
+  // **縦書きも横書きも同じ規則で組む。** 筋（縦書きなら桁、横書きなら行）を最大3本まで
+  // 増やし、それでも入らなければ字を落とす。決めるのは utils/title-metrics。
+  // 字数に上限は設けない——題の長さは書き手が決めることで、入力欄が決めることではない。
+  //
+  // 1筋に使える長さは、縦書きなら桁の高さ、横書きなら1行の幅。
+  const titleLineLength = isVertical ? titleColumnHeightPx : measurePx;
+  const titleMetrics = measureTitle({
+    length: titleLength,
+    // 横書きの題は見出しとして本文の上に載るので、一回り大きいところから始める。
+    baseFontSize: isVertical ? settings.fontSize : Math.round(settings.fontSize * 1.3),
+    lineLength: titleLineLength,
+  });
+  const titleFontSize = titleMetrics.fontSize;
+  const titleLines = titleMetrics.lines;
+  const titleLineBox = isVertical ? TITLE_LINE_BOX_VERTICAL : TITLE_LINE_BOX_HORIZONTAL;
+  // 退いているあいだの大きさ。measureTitle が決めた「収まる大きさ」から更に落とす。
+  const titleRenderFontSize = titleCompact
+    ? Math.max(TITLE_MIN_FONT_SIZE, Math.round(titleFontSize * TITLE_COMPACT_RATIO))
+    : titleFontSize;
+  const titleLineBoxPx = Math.round(titleRenderFontSize * titleLineBox);
+  /**
+   * いちばん本文寄りの筋に残る、字の外側の空き。
+   *
+   * 筋の中で字は真ん中に置かれるので、桁を広く取ると字の外側に半分ずつ空きが残る。
+   * **目に見える間合いは字と字のあいだ**なので、本文の位置を決めるときはこの半分を
+   * 差し引く。差し引かないと、桁を広げたぶんだけ間合いが広がって見える。
+   */
+  const titleHalfLeadingPx = Math.round(((titleLineBox - 1) / 2) * titleRenderFontSize);
+
+  /**
+   * 題が実際に占めた厚み。**予測ではなく測る。**
+   *
+   * 「1筋に何字入るか」の見積もりは必ずどこかでずれる（半角混じり・約物・書体差）。
+   * ずれて筋を1本多く数えると、その1本ぶんが丸ごと題と本文のあいだの空きになって出る。
+   * 箱をいったん 0 にして中身の広がりを読めば、折り返しは実物そのものなので
+   * ずれようがない——**題がどれだけ長くても、本文との間は常に同じ**になる。
+   */
+  const [measuredTitleThicknessPx, setMeasuredTitleThicknessPx] = useState(0);
+  useMeasureEffect(() => {
+    const el = titleInputRef.current;
+    if (!el) return;
+    // 測るあいだだけ遷移を止める。0 にして戻す動きが、そのままアニメーションとして
+    // 見えてしまう（題が一瞬つぶれて開く）。
+    const prevTransition = el.style.transition;
+    el.style.transition = 'none';
+    // **余白は中身ではない。** scrollWidth / scrollHeight には padding が含まれる。
+    // そのまま厚みにすると「筋が1本多い」と数えてしまう——横書きの題は上に 32px の
+    // 余白を持つので、1行の題が2行ぶんの高さ（150px）になっていた。
+    const box = getComputedStyle(el);
+    if (isVertical) {
+      const pad =
+        Number.parseFloat(box.paddingLeft || '0') + Number.parseFloat(box.paddingRight || '0');
+      const prev = el.style.width;
+      el.style.width = '0px';
+      const next = el.scrollWidth - pad;
+      el.style.width = prev;
+      el.style.transition = prevTransition;
+      setMeasuredTitleThicknessPx(Math.max(0, next));
+      return;
+    }
+    const pad =
+      Number.parseFloat(box.paddingTop || '0') + Number.parseFloat(box.paddingBottom || '0');
+    const prev = el.style.height;
+    el.style.height = '0px';
+    const next = el.scrollHeight - pad;
+    el.style.height = prev;
+    el.style.transition = prevTransition;
+    setMeasuredTitleThicknessPx(Math.max(0, next));
+  }, [
+    title,
+    titlePlaceholder,
+    titleRenderFontSize,
+    titleLineLength,
+    isVertical,
+    settings.fontFamily,
+  ]);
+
+  /**
+   * 何筋使ったか。**測るのはここまで。**
+   *
+   * 測った px をそのまま箱の太さにすると、1字打つごとに数 px 揺れる（書体の詰めや
+   * 端数で測定値がわずかに動くため）。それを遷移がいちいちアニメーションにするので、
+   * 打つたびに題が震えて見えていた——縦書きなら左右、横書きなら上下に。
+   *
+   * 筋の数は打っている間ほとんど変わらない。そこまで丸めてから筋の太さを掛ければ、
+   * 箱は**折り返しが増えたときだけ**動く。
+   */
+  const titleLinesUsed = measuredTitleThicknessPx
+    ? Math.max(1, Math.round(measuredTitleThicknessPx / titleLineBoxPx))
+    : titleLines;
+  const titleThicknessPx = titleLinesUsed * titleLineBoxPx;
+  // 本文が空ける場所。**箱ではなく字の端**から測るので、桁を広げても間合いは変わらない。
+  const titleReservePx = Math.max(0, titleThicknessPx - titleHalfLeadingPx);
+  // 横書きは題が本文の真上に据わるので、紙の上端からの余白と題の厚みぶんを空ける。
+  const horizontalTitleReservePx = PAGE_TOP_INSET + titleReservePx + TITLE_TO_BODY_GAP_HORIZONTAL;
+  /**
+   * 縦書きの本文が始まる位置（紙の右端から）。
+   *
+   * 題が1桁のときは題の厚みから逆算すると 136px になるが、それだと**書き出しが題に
+   * 近すぎる**（題と本文が1つの塊に見える）。下限を 140px に取って、題が桁を増やしたら
+   * そこから押し出す。
+   */
+  const VERTICAL_BODY_MIN_RIGHT = 140;
+  const verticalBodyRightPx = Math.max(
+    VERTICAL_BODY_MIN_RIGHT,
+    TITLE_RIGHT_MARGIN + titleReservePx + TITLE_TO_BODY_GAP,
+  );
+
+  /**
+   * 題が縮んだぶん、スクロールを戻して**読んでいる行を止める**。
+   *
+   * 横書きの題は本文の上に据わっていて、本文はその厚みぶん下がっている。題が小さく
+   * なると本文が上へ動くので、読んでいた行が飛ぶ。動いた量だけ送り戻せば、目の前の
+   * 行はその場に留まったまま、上の題だけが静かに小さくなる。
+   * （縦書きは題の厚みが本文の**幅**を変えるだけで、行そのものは動かないので要らない。）
+   */
+  const prevReserveRef = useRef(0);
+  const prevCompactRef = useRef(false);
+  useMeasureEffect(() => {
+    if (isVertical) {
+      prevReserveRef.current = 0;
+      prevCompactRef.current = titleCompact;
+      return;
+    }
+    const scroller = scrollContainerRef.current;
+    const prev = prevReserveRef.current;
+    const wasCompact = prevCompactRef.current;
+    prevReserveRef.current = horizontalTitleReservePx;
+    prevCompactRef.current = titleCompact;
+
+    // **送り戻すのは「題が退いた／戻った」ときだけ。**
+    //
+    // 題が長くなって行が増えたときにも送り戻すと、本文が題の下へ潜り込む（実測で
+    // 16px 食い込んでいた）。そちらは「題が場所を取った」のだから、本文は下がるのが正しい。
+    // 打ち消してよいのは、こちらが勝手に大きさを変えたときだけ。
+    if (wasCompact === titleCompact) return;
+    if (!scroller || prev === 0 || prev === horizontalTitleReservePx) return;
+    scroller.scrollTop = Math.max(0, scroller.scrollTop - (prev - horizontalTitleReservePx));
+  }, [horizontalTitleReservePx, isVertical, titleCompact]);
+  // **箱は中身に合わせる。** 筋の長さを丸ごと取っていたので、3文字の題でも
+  // 画面いっぱいの箱を占めていた。
+  //
+  // ただし縮めるのは**1筋のあいだだけ**。筋の数で均等に割ると、折り返した瞬間に
+  // 長さが半分になって厚みが倍になり、題が飛び跳ねて見える（「急に2行目になる」）。
+  // 2筋目に入ったら開いているぶん全部を使う——紙と同じで、1筋目を最後まで書き切ってから
+  // 次の筋へ移る。そうすれば折り返しで動くのは厚みだけになる。
+  const titleUsedLengthPx =
+    titleLinesUsed === 1
+      ? Math.min(
+          titleLineLength,
+          titleLength * titleRenderFontSize + Math.round(titleRenderFontSize * 0.6),
+        )
+      : titleLineLength;
+  const titleTextStyle: React.CSSProperties = {
+    ...(isVertical
+      ? {
+          width: `${titleThicknessPx}px`,
+          height: `${titleUsedLengthPx}px`,
+          right: `${TITLE_RIGHT_MARGIN}px`,
+        }
+      : {
+          // 横書きの題は**行いっぱい**を占める。文字の幅ぶんだけにすると、その横を
+          // 本文が同じ高さで流れて見える。
+          // **本文と同じ列に乗せる。** 本文は中央に置かれているので、題を左端に
+          // 固定すると列がずれ、列の右側で本文が題の脇をすり抜けて見える。
+          left: 0,
+          right: 0,
+          marginInline: 'auto',
+          maxWidth: `${measurePx + gutterPx * 2}px`,
+          paddingLeft: `${gutterPx}px`,
+          paddingRight: `${gutterPx}px`,
+          height: `${PAGE_TOP_INSET + titleThicknessPx}px`,
+          paddingTop: `${PAGE_TOP_INSET}px`,
+          // 据え置いた題の下を本文が通るので、地を敷いて透けないようにする。
+          background: 'var(--bg)',
+        }),
+    fontSize: `${titleRenderFontSize}px`,
+    // 箱の太さと同じ数字。ずれるとその差が題と本文のあいだの空きになる。
+    lineHeight: titleLineBox,
+    fontFamily:
+      settings.fontFamily === 'serif' ? "'Noto Serif JP', serif" : "'Noto Sans JP', sans-serif",
+    writingMode: isVertical ? 'vertical-rl' : 'horizontal-tb',
+    textOrientation: isVertical ? 'mixed' : undefined,
+  };
+
+  /**
+   * 題。**置き場所は書字方向で変わる**。
+   *
+   * 縦書き … スクローラの外に立てる。本文自身が横スクローラなので、中に入れると
+   *          本文と一緒に流れてしまう。紙の右肩に据え置く。
+   * 横書き … Notion と同じで、**紙の1行目として本文と一緒に上へ流れる**。
+   *          据え置くと、読み進めた先でも題が上を占め続け、そのぶん紙が狭くなる。
+   *
+   * **textarea であって input ではない。** input は1行しか持てないので、長い題を
+   * 折り返せず、縮めるか見切れるかの二択になる。
+   */
+  // 残りは**上限の手前に来たときだけ**言う。0 になってから初めて打てなくなるより、
+  // 近づいていることが先に見えているほうが、書き手は言葉を選び直せる。
+  //
+  // **題から手が離れたら消す。** 打ち止めが近いことは打っている本人にだけ要る話で、
+  // 読み返しているときに残っていると、ただの余計な数字になる。
+  const [titleFocused, setTitleFocused] = useState(false);
+  const titleRemaining = TITLE_MAX_LENGTH - title.length;
+  const showTitleRemaining = titleFocused && titleRemaining <= TITLE_REMAINING_THRESHOLD;
+  const titleRemainingLabel = t('title.remaining', { count: titleRemaining });
+
+  const titleField = (
+    <textarea
+      ref={titleInputRef}
+      rows={1}
+      // 上限は「3筋に、本文と同じ大きさで収まる長さ」から導く。恣意的な数字では
+      // なく**紙が受け取れる量**そのものなので、ここを超えると必ず見切れる。
+      maxLength={TITLE_MAX_LENGTH}
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      onKeyDown={(e) => {
+        // IME 変換確定の Enter は無視する（日本語入力の途中で確定されてしまう）。
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          editorRef.current?.focus();
+        }
+      }}
+      onFocus={() => setTitleFocused(true)}
+      onBlur={() => {
+        setTitleFocused(false);
+        commitTitleEdit();
+      }}
+      placeholder={titlePlaceholder}
+      aria-label={t('title.placeholder')}
+      className={`z-[12] resize-none overflow-hidden border-none text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] ${titleResizing ? 'title-sized' : ''} ${titleBoxClass}`}
+      style={{ background: 'var(--bg)', ...titleTextStyle }}
+    />
+  );
 
   return (
     <div
-      className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-[var(--bg)] transition-[left] duration-200 ease-linear"
-      style={{ left: sidebarWidth }}
+      className="sidebar-anchored fixed top-0 right-0 bottom-0 z-50 flex bg-[var(--bg)]"
       {...verifyAttrs({
         unit: 'EntryEditor',
         hasEntry: !!entryId,
         hasBody: content.trim().length > 0,
         settingsOpen,
-        statsOpen,
         saveModalOpen,
         questionSelectOpen,
       })}
     >
-      {/* Top toolbar */}
-      <div
-        className={`flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}
-        // 書斎が有効な間、左上には「書斎へ戻る」マークが浮く。席を空けないと
-        // マークが「新規」ボタンの上に重なって押せなくなる（変数は (protected)/layout.tsx）。
-        style={{ paddingLeft: 'max(1rem, var(--study-back-inset, 0px))' }}
-      >
-        <div className="flex items-center gap-2">
-          {/* New entry */}
-          <button
-            type="button"
-            onClick={() => guardedNavigate('/entries/new')}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.new_entry')}
-            aria-label={t('toolbar.new_entry')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-              />
-            </svg>
-          </button>
-          {/* Save */}
-          <button
-            type="button"
-            onClick={handleSaveClick}
-            disabled={saving || !content.trim()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip={t('toolbar.save')}
-            aria-label={t('toolbar.save')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
-              />
-            </svg>
-          </button>
-          {/* Pickle */}
-          <button
-            type="button"
-            onClick={handlePickleClick}
-            disabled={saving || !content.trim()}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)] disabled:opacity-30"
-            data-tooltip={t('toolbar.pickle')}
-            aria-label={t('toolbar.pickle')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 4.5h12M7.5 4.5v-2a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v2M5 8.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-11Z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 11v5M12 11v5M15 11v5" />
-            </svg>
-          </button>
-          {/* List */}
-          <button
-            type="button"
-            onClick={() => guardedNavigate('/entries')}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.list')}
-            aria-label={t('toolbar.list')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
-              />
-            </svg>
-          </button>
-          {/* Stats */}
-          <button
-            type="button"
-            onClick={() => setStatsOpen((v) => !v)}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.stats')}
-            aria-label={t('toolbar.stats')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="currentColor"
-              stroke="none"
-              viewBox="0 0 24 24"
-            >
-              <rect x="4" y="14" width="4" height="7" />
-              <rect x="10" y="10" width="4" height="11" />
-              <rect x="16" y="3" width="4" height="18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Date + inline title (title sits directly under the date) */}
-        <div className="flex min-w-0 flex-col items-center gap-0.5">
-          <span className="text-xs text-zinc-400">{dateStr}</span>
-          {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              onKeyDown={(e) => {
-                // IME 変換確定の Enter / Escape は無視する（日本語入力途中で確定されてしまう不具合の対策）
-                if (e.nativeEvent.isComposing) return;
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitTitleEdit();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  cancelTitleEdit();
-                }
-              }}
-              onBlur={commitTitleEdit}
-              maxLength={100}
-              placeholder={t('title.placeholder')}
-              aria-label={t('title.placeholder')}
-              className="w-[240px] max-w-full border-none bg-transparent text-center text-sm text-[var(--fg)] outline-none"
+      {/* 紙の側（ヘッダー + 本文）。発酵の面はこの列の**外**に並べる——中に入れると
+          ヘッダーの下からしか始まらず、画面の縦いっぱいに立たない。 */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
+          左＝問い、右＝アクションコーナー ＋ 日付 ＋ 設定。
+          「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。 */}
+        <div
+          className={`flex items-center justify-between gap-6 ${fadeClass}`}
+          style={{
+            paddingTop: SHELL_INSET,
+            paddingBottom: SHELL_INSET / 2,
+            // 左右は本文と同じ縦の線に乗せる（gutterPx）。ヘッダーと本文で
+            // 別の数字を使うと、同じ画面に2本の縦線が立つ。
+            //
+            // ただし書斎が有効な間は、左上に「書斎へ戻る」マークが浮く。席を空けないと
+            // マークが問いのチップに重なって押せなくなる（変数は (protected)/layout.tsx、
+            // 出ていない間は 0px なので通常は gutterPx がそのまま勝つ）。
+            paddingLeft: `max(${gutterPx}px, var(--study-back-inset, 0px))`,
+            paddingRight: gutterPx,
+          }}
+        >
+          {/* 左: 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
+            チップの中心が瓶アイコンの中心と同じ線に乗るようにする。 */}
+          {/* flex-1 が要る。**基準幅が中身のままだと縮まず**、結ばれた問いが増えたぶん
+              そのまま右へはみ出して、日付や設定の下に潜り込む。 */}
+          <div className="flex min-w-0 flex-1 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
+            <QuestionChip
+              activeQuestions={activeQuestions}
+              linkedQuestionIds={linkedIds}
+              onLink={handleLink}
+              onUnlink={handleUnlink}
             />
-          ) : (
-            <button
-              type="button"
-              onClick={startTitleEdit}
-              className="max-w-full cursor-pointer truncate border-none bg-transparent text-sm transition-colors hover:text-[var(--fg)]"
-              style={{ color: title ? 'var(--fg)' : 'var(--date-color)' }}
+          </div>
+
+          {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
+          <div className="flex shrink-0 items-center gap-3" style={{ height: SHELL_ROW_HEIGHT }}>
+            {/* 日付は設定ボタンのすぐ左に、小さく。 */}
+            <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>
+
+            {/* 設定。押すと真下にパネルが開く（背景は暗転しない・外側クリックで閉じる）。 */}
+            <Popover
+              open={settingsOpen}
+              onOpenChange={setSettingsOpen}
+              ariaLabel={t('settings.heading')}
+              panelClassName="w-[19rem]"
+              trigger={(triggerProps) => (
+                <button
+                  type="button"
+                  {...triggerProps}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--date-color)] transition-colors hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
+                  data-tooltip={t('toolbar.settings')}
+                  // 画面の一番上にあるボタンなので、既定の「上に出す」だと窓の外へ切れる。
+                  data-tooltip-pos="bottom"
+                  aria-label={t('toolbar.settings')}
+                >
+                  <svg
+                    aria-hidden="true"
+                    width={ICON_SIZE}
+                    height={ICON_SIZE}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={ICON_STROKE_WIDTH}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                    />
+                  </svg>
+                </button>
+              )}
             >
-              {title || t('title.add')}
-            </button>
-          )}
+              <SettingsDrawer settings={settings} onChange={updateSettings} />
+            </Popover>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {voiceState.unavailable && (
-            <span
-              className="text-xs text-red-500"
-              role="status"
-              data-testid="voice-unavailable-notice"
-            >
-              {voiceStatusMessage(voiceState.reason, t)}
-            </span>
-          )}
-          {/* Voice input */}
-          <button
-            type="button"
-            onClick={() => setVoiceActive((v) => !v)}
-            className={`rounded-md p-1.5 transition-all ${
-              voiceActive
-                ? 'text-red-500'
-                : 'text-[var(--date-color)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]'
-            }`}
-            data-tooltip={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-            aria-label={voiceActive ? t('toolbar.voice_stop') : t('toolbar.voice')}
-          >
-            <svg
-              aria-hidden="true"
-              className={`h-5 w-5 ${voiceActive ? 'animate-pulse' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-            >
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
-            </svg>
-          </button>
-          {/* Issue #329: Fermentation overlay toggle — visible when a completed result exists */}
-          {fermentationOverlayDetail && (
-            <button
-              type="button"
-              onClick={toggleOverlay}
-              aria-pressed={overlayVisible}
-              className={`rounded-md p-1.5 transition-all hover:bg-[var(--toolbar-hover)] ${
-                overlayVisible
-                  ? 'text-emerald-600'
-                  : 'text-[var(--date-color)] hover:text-[var(--fg)]'
-              }`}
-              data-tooltip={
-                overlayVisible
-                  ? t('toolbar.fermentation_overlay_hide')
-                  : t('toolbar.fermentation_overlay_show')
-              }
-              aria-label={
-                overlayVisible
-                  ? t('toolbar.fermentation_overlay_hide')
-                  : t('toolbar.fermentation_overlay_show')
-              }
-              data-testid="fermentation-overlay-toggle"
-            >
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 3.75v3.75M15 3.75v3.75M7.5 7.5h9a1.5 1.5 0 0 1 1.5 1.5v9a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V9a1.5 1.5 0 0 1 1.5-1.5Zm1.5 5.25h6m-6 3h4.5"
-                />
-              </svg>
-            </button>
-          )}
-          {/* Settings */}
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(!settingsOpen)}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.settings')}
-            aria-label={t('toolbar.settings')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-              />
-            </svg>
-          </button>
-          {/* Writing direction toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              updateSettings({
-                writingMode: settings.writingMode === 'vertical' ? 'horizontal' : 'vertical',
-              })
-            }
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={
-              settings.writingMode === 'vertical'
-                ? t('toolbar.writing_horizontal')
-                : t('toolbar.writing_vertical')
-            }
-            aria-label={
-              settings.writingMode === 'vertical'
-                ? t('toolbar.writing_horizontal')
-                : t('toolbar.writing_vertical')
-            }
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-            >
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="18" x2="20" y2="18" />
-            </svg>
-          </button>
-          {/* Font toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              updateSettings({
-                fontFamily: settings.fontFamily === 'serif' ? 'sans' : 'serif',
-              })
-            }
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={
-              settings.fontFamily === 'serif' ? t('toolbar.font_sans') : t('toolbar.font_serif')
-            }
-            aria-label={
-              settings.fontFamily === 'serif' ? t('toolbar.font_sans') : t('toolbar.font_serif')
-            }
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="currentColor"
-              stroke="none"
-              viewBox="0 0 24 24"
-            >
-              <text
-                x="12"
-                y="17"
-                textAnchor="middle"
-                fontSize="16"
-                fontWeight="600"
-                fontFamily="serif"
-              >
-                T
-              </text>
-            </svg>
-          </button>
-          {/* Fullscreen */}
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="rounded-md p-1.5 text-[var(--date-color)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--fg)]"
-            data-tooltip={t('toolbar.fullscreen')}
-            aria-label={t('toolbar.fullscreen')}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Question linker */}
-      <div
-        className={`border-b border-[var(--border-subtle)] px-4 py-2 ${fadeClass}`}
-        // 「書斎へ戻る」マークは上端の 2 行にまたがる高さがある。ツールバーだけ空けても
-        // この行の左端に重なるので、同じ幅を空ける。
-        style={{ paddingLeft: 'max(1rem, var(--study-back-inset, 0px))' }}
-      >
-        <QuestionLinker
-          activeQuestions={activeQuestions}
-          linkedQuestionIds={linkedIds}
-          onLink={handleLink}
-          onUnlink={handleUnlink}
-        />
-      </div>
-
-      {/* Settings drawer */}
-      <SettingsDrawer
-        open={settingsOpen}
-        settings={settings}
-        onChange={updateSettings}
-        onClose={() => setSettingsOpen(false)}
-      />
-
-      {/* Error display */}
-      {error && (
-        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Ghost layer — must be above editor (z-50) */}
-      <div
-        ref={ghostLayerRef}
-        className="pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden transition-[left] duration-200 ease-linear"
-        style={{ left: sidebarWidth }}
-      />
-
-      {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
-      <div className="relative flex-1">
-        {/* Issue #329: 発酵オーバーレイ。エディタ領域に重ねて表示。pointer-events は子要素のみで
-            受け取るため、執筆エリアの入力を妨げない。 */}
-        {/* Issue #350: 基本 UI が透明化するのにここだけ残っていた。設定で切れる。
-            pointer-events は fadeClass 側が透明時に殺すので、消えている間は掴めない。 */}
-        {overlayVisible && fermentationOverlayDetail && (
-          <div className={settings.focusModeFadesFermentation ? fadeClass : undefined}>
-            <FermentationOverlay detail={fermentationOverlayDetail} />
+        {/* Error display */}
+        {error && (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
+            {error}
           </div>
         )}
-        {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
-        {settings.writingMode === 'vertical' && fadeLeft && (
-          <div
-            className="pointer-events-none absolute top-0 bottom-0 z-[10] transition-opacity duration-300"
-            style={{
-              left: 0,
-              width: '18%',
-              background: 'linear-gradient(to right, var(--bg), transparent)',
-            }}
-          />
-        )}
+
+        {/* Ghost layer — must be above editor (z-50) */}
         <div
-          className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
-        >
-          {/* Snippet selection toolbar */}
-          <SnippetToolbar editorRef={editorRef} api={api} />
+          ref={ghostLayerRef}
+          className="sidebar-anchored pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden"
+        />
 
-          {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
-          <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
+        {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}
+        <div className="flex min-h-0 flex-1">
+          {/* Editor area — outer wrapper (no overflow) holds fade overlay; inner div scrolls */}
+          <div className="relative flex-1">
+            {/* End-side fade for vertical mode — appears only when content is clipped at the end */}
+            {/* 切れている端に掛ける半透明。**両端とも**掛けて、そちらにまだ続いていることを
+                伝える（片側だけだと、ぶつ切りの側で場所の感覚を見失う）。
+                縦書きは左右、横書きは上下。 */}
+            {fadeLeft && (
+              <div
+                className="pointer-events-none absolute z-[10] transition-opacity duration-300"
+                style={
+                  isVertical
+                    ? {
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '18%',
+                        background: 'linear-gradient(to right, var(--bg), transparent)',
+                      }
+                    : {
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: '14%',
+                        background: 'linear-gradient(to top, var(--bg), transparent)',
+                      }
+                }
+              />
+            )}
+            {fadeRight && (
+              <div
+                className="pointer-events-none absolute z-[10] transition-opacity duration-300"
+                style={
+                  isVertical
+                    ? {
+                        // 本文の右端に合わせて置く。題より内側なので、題は薄くならない。
+                        right: `${verticalBodyRightPx}px`,
+                        top: 0,
+                        bottom: 0,
+                        width: '12%',
+                        background: 'linear-gradient(to left, var(--bg), transparent)',
+                      }
+                    : {
+                        // 題のすぐ下から始める。離して置くと、何もないところに帯が
+                        // 浮いて見える（「奇妙なスリット」）。
+                        left: 0,
+                        right: 0,
+                        top: `${PAGE_TOP_INSET + titleThicknessPx}px`,
+                        height: '8%',
+                        background: 'linear-gradient(to bottom, var(--bg), transparent)',
+                      }
+                }
+              />
+            )}
+            {/* 題は**据え置く**（縦横とも）。読み進めても消さない——題は他のどこにも
+                出ていないので、ここから消すと「何を書いているのか」が分からなくなる。
+                代わりに、読み進めているあいだは小さくなって場所を返す。 */}
+            {titleField}
+            {showTitleRemaining && (
+              <span
+                className="pointer-events-none absolute z-[12] whitespace-nowrap text-[11px] text-[var(--date-color)]"
+                style={{
+                  // **紙の右上の隅。** 題の真下に置くと本文との間合いに割り込み、
+                  // 題のすぐ上だと題にくっついて読みづらい。題から離して隅へ逃がす。
+                  //
+                  // 右端は**ヘッダーと同じ縦の線**（gutterPx）に乗せる。題の右余白
+                  // （TITLE_RIGHT_MARGIN）に合わせると、日付や設定より内側に落ちて
+                  // 同じ画面に2本の縦線が立つ。
+                  right: `${gutterPx}px`,
+                  top: 0,
+                  ...CONTROL_FONT,
+                }}
+              >
+                {titleRemainingLabel}
+              </span>
+            )}
 
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={() => {
-              // innerText を使う理由: contentEditable で Enter キー押下時に
-              // ブラウザが挿入する <br> や <div> を改行として読み取るため。
-              // textContent はこれらを無視し、改行が保存されない。
-              const text = editorRef.current?.innerText ?? '';
-              setContent(text);
-              if (status === 'saved') setStatus('editing');
-            }}
-            onPaste={(e) => {
-              e.preventDefault();
-              const text = e.clipboardData.getData('text/plain');
-              if (!text) return;
-              document.execCommand('insertText', false, text);
-              // execCommand の input イベントが React の onInput にバブルしない
-              // 場合があるため、paste 後に明示的に state を同期する（autosave が
-              // content 変化を検知できるようにするため）
-              const updated = editorRef.current?.innerText ?? '';
-              setContent(updated);
-              if (status === 'saved') setStatus('editing');
-            }}
-            data-placeholder={t('placeholder')}
-            className={`whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : 'min-h-full px-[15%] py-6'}`}
-            style={{
-              ...(settings.writingMode === 'vertical'
-                ? {
-                    left: '6%',
-                    top: '4%',
-                    width: '79%',
-                    height: '86%',
-                    position: 'absolute',
-                    overflowX: 'auto',
+            <div
+              ref={scrollContainerRef}
+              className={`absolute inset-0 ${settings.writingMode === 'vertical' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
+            >
+              {/* Snippet selection toolbar */}
+              <SnippetToolbar editorRef={editorRef} api={api} />
+
+              {/* Eraser trace canvas — position/size set by useEraserTrace to overlay the editor box exactly */}
+              <canvas ref={traceCanvasRef} className="pointer-events-none absolute z-[1]" />
+
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => {
+                  // innerText を使う理由: contentEditable で Enter キー押下時に
+                  // ブラウザが挿入する <br> や <div> を改行として読み取るため。
+                  // textContent はこれらを無視し、改行が保存されない。
+                  const text = editorRef.current?.innerText ?? '';
+                  setContent(text);
+                  if (status === 'saved') setStatus('editing');
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData('text/plain');
+                  if (!text) return;
+                  document.execCommand('insertText', false, text);
+                  // execCommand の input イベントが React の onInput にバブルしない
+                  // 場合があるため、paste 後に明示的に state を同期する（autosave が
+                  // content 変化を検知できるようにするため）
+                  const updated = editorRef.current?.innerText ?? '';
+                  setContent(updated);
+                  if (status === 'saved') setStatus('editing');
+                }}
+                // ドロップを受け付ける宣言。**これが無いと drop は発火しない**
+                // （dragover の既定動作がドロップを拒否する）。
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes('text/plain')) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                }}
+                // 発酵の面から言葉を引き込む経路（キーワード・断片のドラッグ）。
+                // **ブラウザ任せの drop では state が置いていかれる**——paste と同じ理由で、
+                // DOM だけが変わって content が古いまま残り、自動保存が変化に気づかない。
+                // 落ちる位置はブラウザのキャレットに従い、挿入と同期はこちらで持つ。
+                onDrop={(e) => {
+                  const text = e.dataTransfer.getData('text/plain');
+                  if (!text) return;
+                  e.preventDefault();
+                  // 落とした場所に入れる。API 名がブラウザで割れているので utils を通す。
+                  const dropped = caretRangeFromPoint(e.clientX, e.clientY);
+                  if (dropped && editorRef.current?.contains(dropped.startContainer)) {
+                    const selection = window.getSelection();
+                    selection?.removeAllRanges();
+                    selection?.addRange(dropped);
                   }
-                : {}),
-              fontSize: `${settings.fontSize}px`,
-              lineHeight: settings.lineHeight,
-              writingMode: settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
-              textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
-              fontFamily:
-                settings.fontFamily === 'serif'
-                  ? "'Noto Serif JP', serif"
-                  : "'Noto Sans JP', sans-serif",
-            }}
-          />
+                  editorRef.current?.focus();
+                  document.execCommand('insertText', false, text);
+                  const updated = editorRef.current?.innerText ?? '';
+                  setContent(updated);
+                  if (status === 'saved') setStatus('editing');
+                }}
+                data-placeholder={t('placeholder')}
+                // Issue #207: 縦書きと同じく横書きにも末尾へ半画面ぶんの余白を置く。
+                // 最後の行が画面の下端に貼りついたままにならず、キャレットが中央に留まれる（#364）。
+                className={`${titleResizing ? 'title-inset' : ''} whitespace-pre-wrap bg-transparent focus:outline-none empty:before:text-zinc-400 empty:before:content-[attr(data-placeholder)] ${settings.writingMode === 'vertical' ? `absolute inset-0 after:block after:content-[''] after:w-[50vw]` : `pb-6 after:block after:content-[''] after:h-[50vh]`}`}
+                style={{
+                  // 横書きはタイトルが上に重なるので、その高さぶんを空ける（縦書きは横に並ぶので不要）。
+                  ...(settings.writingMode === 'vertical'
+                    ? {}
+                    : { ...horizontalColumnStyle, paddingTop: `${horizontalTitleReservePx}px` }),
+                  ...(settings.writingMode === 'vertical'
+                    ? {
+                        left: '6%',
+                        top: '4%',
+                        // 右端は題から逆算する。％で置くと、題の右余白との釣り合いが
+                        // 画面幅ごとに変わってしまう。
+                        right: `${verticalBodyRightPx}px`,
+                        height: '86%',
+                        position: 'absolute',
+                        overflowX: 'auto',
+                      }
+                    : {}),
+                  fontSize: `${settings.fontSize}px`,
+                  lineHeight: settings.lineHeight,
+                  writingMode:
+                    settings.writingMode === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
+                  textOrientation: settings.writingMode === 'vertical' ? 'mixed' : undefined,
+                  fontFamily:
+                    settings.fontFamily === 'serif'
+                      ? "'Noto Serif JP', serif"
+                      : "'Noto Sans JP', sans-serif",
+                }}
+              />
+            </div>
+
+            {/* 音声入力が使えない環境の告知。ボタン自体はヘッダーのアクションコーナーへ移した。 */}
+            {voiceState.unavailable && (
+              <div className={`absolute right-6 bottom-6 z-[20] ${fadeClass}`}>
+                <span
+                  className="rounded bg-[var(--bg)] px-2 py-1 text-xs text-red-500 shadow"
+                  role="status"
+                  data-testid="voice-unavailable-notice"
+                >
+                  {voiceStatusMessage(voiceState.reason, t)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Stats popup */}
-      <StatsPopup
-        open={statsOpen}
-        charCount={charCount}
-        content={content}
-        onClose={() => setStatsOpen(false)}
+      {/* Issue #466: 発酵結果は本文に重ねず、右の面に集約する。
+          面は**画面の縦いっぱい**に立てる（ヘッダーの下から始めない）。
+          余計なラッパーで包まないこと——包むと中身ぶんの高さしか持たない。 */}
+      {/* **問いを紐づけていれば必ず縁を出す。** 発酵結果があるときだけ現れる作りだと、
+          開閉できる面があること自体に気づけない（結果が無い＝面ごと存在しない、に見える）。
+          中身が無いときは開いた先で「まだ発酵していません」と言う。
+          畳んでいるときも縁は残す（開き直す場所が画面の反対側だけだと遠い）。 */}
+      {linkedIds.size > 0 && (
+        <FermentationSidebar
+          detail={fermentationOverlayDetail}
+          questions={linkedQuestionList}
+          selectedQuestionId={selectedFermentQuestionId}
+          onSelectQuestion={setPickedFermentQuestionId}
+          loading={fermentationLoading}
+          collapsed={!fermentSidebarOpen}
+          onToggle={() => setFermentSidebarOpen((v) => !v)}
+        />
+      )}
+
+      {/* 写真を選ぶための隠し入力。押すのはパレットの「写真」。 */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
+        aria-label={tPhoto('modal_title')}
+        tabIndex={-1}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          // 同じファイルを選び直しても change が起きるよう毎回リセットする。
+          e.target.value = '';
+          if (file) photoImport.selectFile(file);
+        }}
+      />
+
+      {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
+      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
+
+      <InlineImageOverlay
+        rect={inlineImages.selection.rect}
+        image={inlineImages.selection.image}
+        onResizeStart={inlineImages.beginResize}
+        onLayoutChange={inlineImages.updateLayout}
+        onRemove={inlineImages.removeSelected}
+      />
+
+      <PhotoImportModal
+        state={photoImport.state}
+        onTranscribe={photoImport.transcribe}
+        onAttach={photoImport.attach}
+        onInsertTranscript={photoImport.insertTranscript}
+        onDiscardTranscript={photoImport.discardTranscript}
+        onClose={photoImport.close}
+      />
+
+      {/* 操作はすべてここに集める（問いを結ぶ・写真・音声・漬け込む・発酵・全画面）。
+          本文に被らせないやり方は「場所を空ける」ではなく「振る舞い」で解く:
+          書いている間は uiVisible が false になって一緒に消え、掴んで動かせ、畳める。 */}
+      <EntryActionPalette
+        actions={paletteActions}
+        visible={paletteVisible}
+        size={settings.paletteSize}
       />
 
       {/* Status bar */}
       <div className={fadeClass}>
-        <EditorStatusBar status={status} charCount={charCount} />
+        <EditorStatusBar status={status} lastSavedAt={lastSavedAt} />
       </div>
 
       {/* Save title modal — shared between 保存する and 漬け込む */}
@@ -1214,24 +1814,8 @@ export function EntryEditor({
         }
         onSave={(t) => {
           handleSaveWithTitle(t, saveModalMode === 'pickle' ? { fermentationEnabled: true } : {});
-          if (pendingNavPath) {
-            const path = pendingNavPath;
-            setPendingNavPath(null);
-            setTimeout(() => router.push(path), 300);
-          }
         }}
-        onClose={() => {
-          setSaveModalOpen(false);
-          setPendingNavPath(null);
-        }}
-      />
-
-      {/* Unsaved changes modal */}
-      <UnsavedChangesModal
-        open={pendingNavPath !== null && !saveModalOpen}
-        onSave={handleUnsavedSave}
-        onDiscard={handleUnsavedDiscard}
-        onClose={() => setPendingNavPath(null)}
+        onClose={() => setSaveModalOpen(false)}
       />
 
       {/* Browser back/forward confirmation */}
@@ -1270,13 +1854,6 @@ export function EntryEditor({
       <LinkQuestionNudgeModal
         open={linkQuestionNudgeOpen}
         onClose={() => setLinkQuestionNudgeOpen(false)}
-      />
-
-      {/* Issue #329: 発酵結果フローティング表示の確認モーダル */}
-      <FermentationDisplayPromptModal
-        open={overlayPromptOpen}
-        onChoose={handleOverlayPromptChoose}
-        onClose={() => setOverlayPromptOpen(false)}
       />
     </div>
   );

@@ -37,6 +37,7 @@ describe('ListEntriesUsecase', () => {
       listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
       countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
       countByMonth: vi.fn().mockResolvedValue([]),
+      countCharsByQuestionIdSince: vi.fn().mockResolvedValue(0),
       listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
       searchByUserId: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue(undefined),
