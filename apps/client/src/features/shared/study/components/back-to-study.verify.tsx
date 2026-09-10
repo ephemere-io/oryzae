@@ -50,13 +50,14 @@ registerUnit<Record<string, never>>({
     },
     {
       id: 'tab-uses-the-palette-surface',
-      description: 'タブはアクションパレットと同じ面（地・影）で描く',
+      description: 'タブはアクションパレットと同じ面（地・縁）で描き、影は付けない',
       check: ({ root }) => {
         const tab = root.querySelector('a');
         if (!(tab instanceof HTMLElement)) return 'タブが無い';
         if (!tab.className.includes('bg-[var(--surface-raised)]'))
           return 'タブの地がパレットと違う';
-        return tab.style.boxShadow !== '' || 'タブに影が無い（パレットと同じ影を持つ）';
+        // 影は「見にくい・気持ち悪い」と報告されて外した。付け直さない。
+        return tab.style.boxShadow === '' || `タブに影が付いている: ${tab.style.boxShadow}`;
       },
     },
     {

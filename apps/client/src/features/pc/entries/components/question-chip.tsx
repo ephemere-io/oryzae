@@ -188,7 +188,7 @@ export function QuestionChip({
     };
   }, [open, setOpen]);
 
-  // 地・縁・影・角丸・ホバーはアクションパレットと同じ面（ELEVATED_CHIP_*）。
+  // 地・縁・角丸・ホバーはアクションパレットと同じ面（ELEVATED_CHIP_*）。影は付けない。
   // 結んでいる印は「◦」だけに accent を残す（地まで accent にすると別の部品に見える）。
   const chipClass = `flex h-9 shrink-0 items-center gap-2 px-4 text-[13.5px] font-medium ${ELEVATED_CHIP_CLASS}`;
 
@@ -211,9 +211,7 @@ export function QuestionChip({
           そのまま並べ、あふれたら横に流す（縦に折り返すとヘッダーの高さが動く）。 */}
       <div
         ref={railRef}
-        // 上下に余白を持たせて影の逃げ場を作る（横に流す箱は影まで切ってしまう）。
-        // 負のマージンで行の高さは変えない。
-        className="-my-4 flex min-w-0 items-center gap-1.5 overflow-x-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={railMaskStyle(edges)}
       >
         {/* チップ**全体**を外すボタンにしない。結んだ問いを確かめようと押しただけで
