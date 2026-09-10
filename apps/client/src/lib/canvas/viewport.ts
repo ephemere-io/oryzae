@@ -42,6 +42,22 @@ export interface Bounds {
 }
 
 /** 表示倍率の下限・上限。Figma（2%〜256%）より狭く、ジャーナルの用途に絞る。 */
+/**
+ * 「これ以上引けないのに、まだ引こうとした」を知らせるイベント。
+ *
+ * キャンバスは最小倍率で頭打ちになり、そこから先の引きは**どこにも行き場が無い**。
+ * その余りを捨てずに上へ流す。何に使うか（＝どこへ出るのか）はここでは決めない —
+ * `lib/` はドメインを知らないので、拾う側が決める。
+ *
+ * `bubbles: true` で投げるので、window で 1 か所だけ聞けば全キャンバスぶん拾える。
+ * `detail.excess` は 0 より大きい実数で、1 回の操作でどれだけ引こうとしたか。
+ */
+export const OVERZOOM_OUT_EVENT = 'oryzae:canvas-overzoom-out';
+
+export interface OverzoomOutDetail {
+  excess: number;
+}
+
 export const MIN_SCALE = 0.2;
 export const MAX_SCALE = 3;
 

@@ -22,6 +22,7 @@ import '@/features/sp/board/components/sp-board-toolbar.verify';
 import '@/features/sp/board/components/sp-snippet-sheet.verify';
 import '@/features/shared/study/components/back-to-study.verify';
 import '@/features/shared/study/components/entry-list-overlay.verify';
+import '@/features/shared/study/components/pull-back-to-study.verify';
 import '@/features/shared/study/components/questions-link.verify';
 import '@/features/shared/study/components/study-fallback.verify';
 import '@/features/shared/study/components/study-hint-tooltip.verify';

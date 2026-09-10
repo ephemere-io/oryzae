@@ -3,6 +3,8 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
+import { readStudyBackdrop } from '../backdrop';
 
 export interface StudyFallbackProps {
   /**
@@ -20,25 +22,23 @@ export interface StudyFallbackProps {
  * WebGL 非対応と、three.js の読み込み中の両方で使う。**3 つの行き先を `<a>` で出す**の
  * が肝で、白画面にしないだけでなく「ここから先へ行ける」ことを保つ。
  *
- * **読み込み中は何も描かない（地の色だけ）。** はじめは 3 つのリンクを出していて
- * 「謎の 3 つの選択肢が一瞬現れて消える」と報告され、次に絵だけを残したところ
- * 「書斎に戻るときだけ謎のアイコンが出る。瓶を押したときには出ないのに、戻るときだけ
- * 出るのは直感的でない」と報告された（PR #570）。
+ * **読み込み中に出すのは「憶えた部屋そのもの」だけ。**
  *
- * **出入りは非対称であってはならない。** 書斎から出ていくときは溶暗だけで、絵も文字も
- * 割り込まない。戻るときも同じにする — three.js を読み込んでいる数百 ms は、利用者に
- * とっては「戻っている途中」でしかなく、そこに別の絵を挟むと 1 画面増えたように見える。
+ * はじめは 3 つのリンクを出していて「謎の 3 つの選択肢が一瞬現れて消える」と報告され、
+ * 次に書斎を模した絵だけを残したところ「戻るときだけ謎のアイコンが出る」と報告された
+ * （PR #570）。**どちらも「別の何か」を挟んでいたのが問題**で、読み込み中に何かを
+ * 出すこと自体が悪いわけではない。
+ *
+ * 出ていく直前に掴んだ 1 枚（`backdrop.ts`）を敷くと、割り込みではなく**まだ遠い部屋**
+ * になる。three.js が来たら同じ位置に本物が重なるので、絵は入れ替わらず、ただ手前に
+ * 寄ってくる。憶えていない（初回・別タブ）ときだけ地の色のまま待つ — そこで代わりの
+ * 絵を出すと、また「別の何か」に戻ってしまう。
  */
 export function StudyFallback({ loading = false }: StudyFallbackProps) {
   const t = useTranslations('study');
 
   if (loading) {
-    return (
-      <div
-        {...verifyAttrs({ unit: 'StudyFallback', loading, linkCount: 0 })}
-        className="h-full w-full"
-      />
-    );
+    return <StudyLoading />;
   }
 
   return (
@@ -65,6 +65,38 @@ export function StudyFallback({ loading = false }: StudyFallbackProps) {
           <FallbackLink href="/entries/new" label={t('fallback_journal')} />
           <FallbackLink href="/board" label={t('fallback_board')} />
         </nav>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 読み込み中。憶えた部屋があればそれを敷き、無ければ地の色のまま待つ。
+ *
+ * 読むのは effect の中（`sessionStorage` はサーバーに無い）。初回描画が地の色なのは
+ * 正しく、そこから一段濃くなって本物に繋がる。
+ */
+function StudyLoading() {
+  const [backdrop, setBackdrop] = useState<string | null>(null);
+  useEffect(() => setBackdrop(readStudyBackdrop()), []);
+
+  return (
+    <div
+      {...verifyAttrs({ unit: 'StudyFallback', loading: true, linkCount: 0 })}
+      className="h-full w-full overflow-hidden"
+    >
+      {backdrop === null ? null : (
+        // **薄めない・ぼかさない。** これは「代わりの絵」ではなく部屋そのもので、
+        // three.js が来たら同じ位置に本物が重なる。薄くしておくと、そこで濃さが
+        // 変わってしまい、絵が入れ替わったように見える。
+        // biome-ignore lint/performance/noImgElement: data URL の地。最適化する先が無い
+        <img
+          src={backdrop}
+          alt=""
+          aria-hidden="true"
+          data-study-backdrop
+          className="h-full w-full object-cover"
+        />
       )}
     </div>
   );
