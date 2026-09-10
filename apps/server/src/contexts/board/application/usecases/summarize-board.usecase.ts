@@ -12,6 +12,9 @@ export interface BoardSummary {
    * いるか」は本当の数で言いたい（棚が冊数を言うのと同じ）。
    */
   total: number;
+  /** 内訳。書斎のホバーが「写真 3 件・スニペット 12 件」と名乗るのに使う。 */
+  snippets: number;
+  photos: number;
   /** 新しい順。上限まで。 */
   cards: CardResponse[];
 }
@@ -56,6 +59,12 @@ export class SummarizeBoardUsecase {
       unique.slice(0, limit),
     );
 
-    return { total: await this.boardCardRepo.countByUserId(userId), cards };
+    const counts = await this.boardCardRepo.countPinnedByType(userId);
+    return {
+      total: counts.snippet + counts.photo,
+      snippets: counts.snippet,
+      photos: counts.photo,
+      cards,
+    };
   }
 }

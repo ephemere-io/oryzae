@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
+import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
@@ -270,10 +271,10 @@ export function StudyHome({ layout }: StudyHomeProps) {
           />
         )}
 
-        {/* 鉛筆に触れたとき、押すと何が起きるかを一言で見せる。鉛筆はラベルを持たない
-          （積みの JOURNAL と重なるため）ので、これが唯一の予告になる。 */}
-        {overlay === null && hover?.hint === 'pen' && (
-          <StudyHintTooltip textKey="hint_pen" screen={hover.screen} />
+        {/* 的に触れたとき、そこに何があるかを一言で見せる。ラベルは名前しか言わない
+          （`BOARD` だけでは何が貼ってあるか分からない）ので、内訳はここが言う。 */}
+        {overlay === null && hover?.hint != null && (
+          <StudyHintTooltip {...studyHint(hover.hint, state)} screen={hover.screen} />
         )}
 
         <EntryListOverlay

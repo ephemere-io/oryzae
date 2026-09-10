@@ -9,6 +9,7 @@ import {
 import type {
   BoardCardRepositoryGateway,
   CardPositionUpdate,
+  PinnedCounts,
 } from '../../domain/gateways/board-card-repository.gateway.js';
 import { BoardCard } from '../../domain/models/board-card.js';
 
@@ -33,21 +34,35 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
   }
 
   /**
-   * 全期間の枚数。日付で絞らない（書斎の壁は総量を映す）。
+   * 全期間の枚数を種類ごとに。日付で絞らない（書斎の壁は総量を映す）。
    *
-   * `head: true` で行を運ばず件数だけ受け取る。壁に出すのは上限 30 枚でも、
-   * 「いくつ溜まっているか」は本当の数で言いたい。
+   * 件数だけを受け取る `head: true` ではなく `card_type` と `ref_id` を運ぶ。
+   * **同じ付箋が daily と weekly の両方に居る**ことがあり、行を数えると壁に見えている
+   * 枚数より多い数を名乗ってしまうため、ref で畳んでから数える（壁に描く側も
+   * 同じ基準で畳んでいる）。運ぶのは短い文字列 2 つだけで、1 人ぶんの上限は
+   * 実測で数十枚。
    */
-  async countByUserId(userId: string): Promise<number> {
-    const { count, error } = await this.supabase
+  async countPinnedByType(userId: string): Promise<PinnedCounts> {
+    const { data, error } = await this.supabase
       .from('board_cards')
-      .select('id', { count: 'exact', head: true })
+      .select('card_type, ref_id')
       .eq('user_id', userId)
       .eq('is_deleted', false)
       .neq('card_type', 'entry');
 
     if (error) throw error;
-    return count ?? 0;
+
+    const seen = new Set<string>();
+    const counts: PinnedCounts = { snippet: 0, photo: 0 };
+    for (const row of toRecordArray(data ?? [])) {
+      const cardType = readEnum(row, 'card_type', CARD_TYPES);
+      const key = `${cardType}:${readString(row, 'ref_id')}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (cardType === 'snippet') counts.snippet += 1;
+      if (cardType === 'photo') counts.photo += 1;
+    }
+    return counts;
   }
 
   /**

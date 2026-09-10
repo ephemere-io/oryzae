@@ -802,7 +802,7 @@
   "study": {
     "title": "서재",
     "label_jar": "JAR",
-    "label_journal": "JOURNAL",
+    "label_journal": "ENTRIES",
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "pill_jar_empty": "비어 있음",
@@ -836,6 +836,15 @@
     "fallback_journal": "기록 쓰기",
     "fallback_board": "보드 열기",
     "questions_timeline": "질문의 변천",
-    "hint_pen": "엔트리를 쓰다"
+    "hint_pen": "엔트리를 쓰다",
+    "hint_jar_empty": "아직 담근 것이 없습니다",
+    "hint_jar_fermenting": "발효가 진행 중입니다",
+    "hint_jar_almost": "곧 편지가 도착합니다",
+    "hint_jar_letter": "읽지 않은 편지가 있습니다",
+    "hint_jar_read": "읽은 편지가 들어 있습니다",
+    "hint_board_empty": "아직 붙인 것이 없습니다",
+    "hint_board_photos": "사진 {count}건",
+    "hint_board_snippets": "스니펫 {count}건",
+    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건"
   }
 }

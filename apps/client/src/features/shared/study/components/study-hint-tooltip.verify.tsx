@@ -1,8 +1,9 @@
 /**
  * StudyHintTooltip の検証スペック。
  *
- * ラベルを持たない的（鉛筆）の唯一の予告なので、守るのは「**訳された言葉が出る**」
- * ことと「指やカーソルを奪わない」こと。
+ * 名前しか言わないラベルの代わりに中身を告げる 1 行なので、守るのは
+ * 「**訳された言葉が出る**」ことと「指やカーソルを奪わない」こと。
+ * 数を差し込む鍵（板の内訳）は、鍵がそのまま見えていないかで一緒に守られる。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -11,6 +12,7 @@ import { StudyHintTooltip } from './study-hint-tooltip';
 
 interface Props {
   textKey: string;
+  values?: Record<string, number>;
   screen: { x: number; y: number };
 }
 
@@ -19,7 +21,7 @@ const AT = { x: 160, y: 90 };
 registerUnit<Props>({
   id: 'StudyHintTooltip',
   title: 'StudyHintTooltip',
-  description: 'ラベルを持たない的に触れたとき、押すと何が起きるかを一言で出す',
+  description: '的に触れたとき、そこに何があるかを一言で出す',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
@@ -29,6 +31,16 @@ registerUnit<Props>({
     ),
   fixtures: [
     { id: 'pen', description: '鉛筆に触れている', props: { textKey: 'hint_pen', screen: AT } },
+    {
+      id: 'board',
+      description: '板に触れている（内訳を差し込む）',
+      props: { textKey: 'hint_board_both', values: { photos: 3, snippets: 12 }, screen: AT },
+    },
+    {
+      id: 'jar-letter',
+      description: '瓶に触れている（未読の手紙がある）',
+      props: { textKey: 'hint_jar_letter', screen: AT },
+    },
     {
       id: 'far-right',
       probe: true,

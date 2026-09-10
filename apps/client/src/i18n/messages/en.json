@@ -802,7 +802,7 @@
   "study": {
     "title": "Study",
     "label_jar": "JAR",
-    "label_journal": "JOURNAL",
+    "label_journal": "ENTRIES",
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "pill_jar_empty": "Empty",
@@ -836,6 +836,15 @@
     "fallback_journal": "Write an entry",
     "fallback_board": "Open the board",
     "questions_timeline": "Question history",
-    "hint_pen": "Write an entry"
+    "hint_pen": "Write an entry",
+    "hint_jar_empty": "Nothing steeping yet",
+    "hint_jar_fermenting": "Fermenting",
+    "hint_jar_almost": "A letter is almost ready",
+    "hint_jar_letter": "You have an unread letter",
+    "hint_jar_read": "A letter is inside",
+    "hint_board_empty": "Nothing pinned yet",
+    "hint_board_photos": "{count} photos",
+    "hint_board_snippets": "{count} snippets",
+    "hint_board_both": "{photos} photos · {snippets} snippets"
   }
 }

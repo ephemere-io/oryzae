@@ -63,6 +63,9 @@ export type SnippetOcrResult =
  */
 export interface BoardSummary {
   total: number;
+  /** 内訳。書斎のホバーが「写真 3 件・スニペット 12 件」と名乗るのに使う。 */
+  snippets: number;
+  photos: number;
   /** 新しい順。サーバー側で上限まで絞ってある。 */
   cards: BoardCardData[];
 }

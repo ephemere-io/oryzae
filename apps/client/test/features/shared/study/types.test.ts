@@ -6,6 +6,7 @@ import { placeBoardCards } from '@/features/shared/study/scene/board';
 import { layoutNotebooks } from '@/features/shared/study/scene/books';
 import type {
   StudyBoard,
+  StudyBoardCard,
   StudyEntry,
   StudyFermentation,
   StudyFermentationStatus,
@@ -81,22 +82,32 @@ function parseBoard(raw: unknown): StudyBoard {
   const { total, cards } = raw;
   if (typeof total !== 'number') throw new Error('board.total must be a number');
   if (!Array.isArray(cards)) throw new Error('board.cards must be an array');
+
+  const parsed: StudyBoardCard[] = cards.filter(isRecord).map((card) => {
+    const cardType = card.cardType === 'photo' ? 'photo' : 'snippet';
+    return {
+      id: String(card.id ?? ''),
+      cardType,
+      x: Number(card.x ?? 0),
+      y: Number(card.y ?? 0),
+      rotation: Number(card.rotation ?? 0),
+      width: Number(card.width ?? 0),
+      height: Number(card.height ?? 0),
+      zIndex: Number(card.zIndex ?? 0),
+      lines: Number(card.lines ?? 1),
+    };
+  });
+
+  // 内訳はプリセットが持っていれば使い、無ければ壁に出ているカードから数える
+  // （プリセットは「見た目」を固定するためのもので、総量までは書いていない）。
+  const count = (type: 'snippet' | 'photo') =>
+    parsed.filter((card) => card.cardType === type).length;
+
   return {
     total,
-    cards: cards.filter(isRecord).map((card) => {
-      const cardType = card.cardType === 'photo' ? 'photo' : 'snippet';
-      return {
-        id: String(card.id ?? ''),
-        cardType,
-        x: Number(card.x ?? 0),
-        y: Number(card.y ?? 0),
-        rotation: Number(card.rotation ?? 0),
-        width: Number(card.width ?? 0),
-        height: Number(card.height ?? 0),
-        zIndex: Number(card.zIndex ?? 0),
-        lines: Number(card.lines ?? 1),
-      };
-    }),
+    snippets: typeof raw.snippets === 'number' ? raw.snippets : count('snippet'),
+    photos: typeof raw.photos === 'number' ? raw.photos : count('photo'),
+    cards: parsed,
   };
 }
 

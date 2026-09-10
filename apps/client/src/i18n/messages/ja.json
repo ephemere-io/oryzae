@@ -802,7 +802,7 @@
   "study": {
     "title": "書斎",
     "label_jar": "JAR",
-    "label_journal": "JOURNAL",
+    "label_journal": "ENTRIES",
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "pill_jar_empty": "空",
@@ -836,6 +836,15 @@
     "fallback_journal": "エントリーを書く",
     "fallback_board": "ボードを開く",
     "questions_timeline": "問いの変遷",
-    "hint_pen": "エントリーを書く"
+    "hint_pen": "エントリーを書く",
+    "hint_jar_empty": "まだ何も漬かっていません",
+    "hint_jar_fermenting": "発酵が進んでいます",
+    "hint_jar_almost": "もうすぐ手紙が届きます",
+    "hint_jar_letter": "未読の手紙があります",
+    "hint_jar_read": "読んだ手紙が入っています",
+    "hint_board_empty": "まだ何も貼っていません",
+    "hint_board_photos": "写真{count}件",
+    "hint_board_snippets": "スニペット{count}件",
+    "hint_board_both": "写真{photos}件・スニペット{snippets}件"
   }
 }
