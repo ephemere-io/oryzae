@@ -333,7 +333,9 @@
       "bring_to_front": "Bring to front",
       "delete": "Delete",
       "open": "Open",
-      "ocr": "Read from image"
+      "ocr": "Read from image",
+      "collapse": "Collapse toolbar",
+      "expand": "Expand toolbar"
     },
     "drop_image": "Drop the image here"
   },
@@ -732,12 +734,12 @@
       "reply": "Write a reply",
       "section_letter": "Letter",
       "section_keywords": "Words",
-      "section_snippets": "Excerpts",
+      "section_snippets": "Snippets",
       "section_sources": "From these entries",
       "source_untitled": "Untitled entry",
       "no_questions": "No questions yet. Start one with the button below.",
       "spin_hint": "Swipe sideways to spin",
-      "manage_questions": "Tend your questions",
+      "manage_questions": "Add or edit questions",
       "not_fermented": "This question hasn't fermented yet",
       "tap_hint": "Tap to read",
       "selection_reason": "Why this was chosen"
@@ -779,8 +781,8 @@
       "cards": "{count} cards",
       "empty": "Nothing here yet today",
       "hint": "Drag cards with your finger",
-      "add_snippet": "Snippet",
-      "add_photo": "Photo",
+      "add_snippet": "Create snippet",
+      "add_photo": "Add photo",
       "edit": "Edit",
       "bring_to_front": "Bring to front",
       "remove": "Remove",

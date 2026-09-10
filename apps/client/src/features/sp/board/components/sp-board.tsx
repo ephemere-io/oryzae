@@ -219,30 +219,36 @@ export function SpBoard({ api }: SpBoardProps) {
   if (error) return <ErrorState message={t('error_message')} onRetry={refresh} />;
 
   return (
-    <div ref={frameRef} className="relative h-full w-full">
-      <SpBoardSurface
-        cards={cards}
-        dateKey={dateKey}
-        viewport={viewport}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        onMove={handleMove}
-        onTransform={handleTransform}
-        onCommit={handleCommit}
-      />
+    <div ref={frameRef} className="relative flex h-full w-full flex-col">
+      {/* 盤面は残りの高さいっぱい。道具箱はその下に**流れの中で**置く（浮かせると
+          盤面の下端のカードに被り、指で掴めなくなる — 実機レビュー）。 */}
+      <div className="relative min-h-0 flex-1">
+        <SpBoardSurface
+          cards={cards}
+          dateKey={dateKey}
+          viewport={viewport}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onMove={handleMove}
+          onTransform={handleTransform}
+          onCommit={handleCommit}
+        />
+      </div>
 
-      <SpBoardToolbar
-        selectedType={selected?.cardType ?? null}
-        busy={busy}
-        onEdit={() => setSheetOpen(true)}
-        onBringToFront={handleBringToFront}
-        onDelete={handleDelete}
-        onCreateSnippet={() => {
-          setSelectedId(null);
-          setSheetOpen(true);
-        }}
-        onCreatePhoto={() => fileRef.current?.click()}
-      />
+      <div className="flex shrink-0 justify-center px-4 pt-2 pb-5">
+        <SpBoardToolbar
+          selectedType={selected?.cardType ?? null}
+          busy={busy}
+          onEdit={() => setSheetOpen(true)}
+          onBringToFront={handleBringToFront}
+          onDelete={handleDelete}
+          onCreateSnippet={() => {
+            setSelectedId(null);
+            setSheetOpen(true);
+          }}
+          onCreatePhoto={() => fileRef.current?.click()}
+        />
+      </div>
 
       <SpSnippetSheet
         open={sheetOpen}

@@ -128,8 +128,8 @@ export function SpQuestionZoom({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 text-xs"
-          style={{ color: 'var(--date-color)' }}
+          className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
+          style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
         >
           {t('close')}
         </button>
@@ -177,7 +177,8 @@ export function SpQuestionZoom({
                       fontSize: `${ring.fontSize}px`,
                       letterSpacing: `${RING_TRACKING}em`,
                       fill: '#7A3B3F',
-                      opacity: 0.7,
+                      // 0.7 だと淡い円の地に沈んで「中身が見にくい」と報告された。
+                      opacity: 0.9,
                     }}
                   >
                     {/* 経路は 6 時から時計回り。その中央（12 時）に問いを合わせて、
@@ -231,11 +232,12 @@ export function SpQuestionZoom({
               }
             >
               <span
-                className="block whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px]"
+                className="block whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium"
                 style={{
                   background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
                   color: 'var(--fg)',
-                  border: '1px solid rgba(255,255,255,0.5)',
+                  // 白い縁だと淡い円の地との境が消える。茶の縁で輪郭を立てる。
+                  border: '1px solid rgba(122,90,60,0.28)',
                   boxShadow: '0 4px 12px rgba(217,180,143,0.3)',
                   letterSpacing: '0.08em',
                 }}
@@ -264,11 +266,14 @@ export function SpQuestionZoom({
               }
             >
               <span
-                className="block w-[92px] rounded-xl px-2.5 py-2 text-[11px] leading-snug"
+                className="block w-[104px] rounded-xl px-2.5 py-2 text-[12px] leading-snug"
                 style={{
-                  background: 'rgba(253,251,247,0.85)',
-                  border: '1px solid rgba(255,255,255,0.7)',
-                  boxShadow: '0 4px 16px rgba(140,133,126,0.10)',
+                  // 半透明の白に白い縁で、円の淡い地と見分けがつかなかった。地を不透明に
+                  // して縁を立て、字も 11px → 12px にする。
+                  background: 'var(--surface-raised)',
+                  color: 'var(--fg)',
+                  border: '1px solid rgba(122,116,64,0.28)',
+                  boxShadow: '0 4px 14px rgba(140,133,126,0.16)',
                   display: '-webkit-box',
                   WebkitBoxOrient: 'vertical',
                   WebkitLineClamp: 2,

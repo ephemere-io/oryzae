@@ -80,8 +80,8 @@ export function SpElementSheet({ element, onClose, onReply, onOpenSource }: SpEl
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 text-xs"
-            style={{ color: 'var(--date-color)' }}
+            className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
+            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
           >
             {t('close')}
           </button>
