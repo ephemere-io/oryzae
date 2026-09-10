@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
 
 /**
  * 瓶の画面から「問いの変遷」へ行く導線。
@@ -17,6 +18,9 @@ import { useTranslations } from 'next-intl';
  * という前提を守る。出し分けは `(protected)/layout.tsx` が行う。
  *
  * 上端の中央は「書斎へ戻る」のタブの席なので、こちらは右上に置く。
+ *
+ * 面は書斎へ戻るタブ・問いのチップ・パレットと同じ（`ELEVATED_CHIP_*`。影は付けない）。
+ * 以前は半透明の紙に擦りガラスと影で、同じ画面の部品と別の言葉になっていた。
  */
 export function QuestionsLink() {
   const t = useTranslations('study');
@@ -25,15 +29,8 @@ export function QuestionsLink() {
     <Link
       href="/questions"
       {...verifyAttrs({ unit: 'QuestionsLink' })}
-      className="fixed right-6 top-6 z-[55] flex h-10 items-center gap-2 rounded-full px-4 text-[10px] uppercase tracking-[0.18em] transition-opacity duration-300 hover:opacity-80"
-      style={{
-        background: 'rgba(253, 251, 247, 0.72)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        border: '1px solid rgba(122, 116, 64, 0.18)',
-        boxShadow: '0 2px 12px rgba(140, 133, 126, 0.14)',
-        color: '#5C4F3F',
-      }}
+      className={`fixed right-6 top-6 z-[55] flex h-9 items-center gap-2 px-4 text-[12px] font-medium tracking-[0.08em] ${ELEVATED_CHIP_CLASS}`}
+      style={ELEVATED_CHIP_STYLE}
     >
       {/* 問いが積み重なっていく形。3 本の横線を長さ違いで重ねる。 */}
       <svg
@@ -42,7 +39,8 @@ export function QuestionsLink() {
         height="14"
         viewBox="0 0 14 14"
         fill="none"
-        style={{ color: '#8EA89C' }}
+        // 色を持つのは印だけ（問いのチップの「◦」と同じ accent）。
+        style={{ color: 'var(--accent)' }}
       >
         <path
           d="M2 3.5H12M2 7H9M2 10.5H6"
