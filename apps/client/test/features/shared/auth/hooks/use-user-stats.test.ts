@@ -2,16 +2,16 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useUserStats } from '@/features/shared/auth/hooks/use-user-stats';
 import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
+// 最小限のスタブ（`{ ok, json } as Response`）をやめて本物を組む。api client は
+// `headers` と `clone()` を使う（同じ GET を短いあいだ憶えるため）ので、
+// 欠けたスタブでは実物と挙動がずれる。helpers/response.ts の注記も参照。
+import { jsonResponse } from '../../../../helpers/response';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 function mockResponse(ok: boolean, body: unknown): Response {
-  return {
-    ok,
-    json: () => Promise.resolve(body),
-    status: ok ? 200 : 500,
-  } as Response; // @type-assertion-allowed: テスト用の最小限 Response スタブ
+  return jsonResponse(body, ok ? 200 : 500);
 }
 
 describe('useUserStats', () => {

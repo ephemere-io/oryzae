@@ -9,7 +9,7 @@ import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unrea
 import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
 import type { OnboardingResult } from '@/features/shared/onboarding/types';
-import { BackToStudy } from '@/features/shared/study/components/back-to-study';
+import { BackToStudy, STUDY_EXIT_BAND } from '@/features/shared/study/components/back-to-study';
 import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
@@ -35,12 +35,15 @@ function PcShell({
   children,
   studyHome,
   onStudy,
+  exitBand,
 }: {
   children: React.ReactNode;
   /** 書斎が唯一のグローバルナビか。真なら左サイドバーを描かない。 */
   studyHome: boolean;
   /** いま書斎ホームそのものか。真ならフッターも外す。 */
   onStudy: boolean;
+  /** 上端に「書斎へ戻る」の帯が出ているか。真なら画面がそのぶん下がる。 */
+  exitBand: boolean;
 }) {
   return (
     <div className="flex h-screen overflow-hidden">
@@ -55,9 +58,18 @@ function PcShell({
         // 変数は SidebarProvider が :root へ書くので、描かなくても 80px のまま残る。
         // margin だけ外して変数を残すと、これを読んでいるボードのツールバーと
         // エディタの左端だけが 80px ずれる。
-        style={studyHome ? SIDEBARLESS : undefined}
+        style={shellStyle(studyHome, exitBand)}
       >
-        <div className="relative flex-1 overflow-auto">{children}</div>
+        {/* **帯のぶんだけ下げる。** 浮かせて重ねていたころは、問いのチップが伸びると
+            出口とぶつかった（実機レビュー）。画面の側が席を空ければ重なりようが無い。
+            この padding が効かない **fixed の画面**（エントリーのエディタ）は
+            `.sidebar-anchored` が同じ変数を top で読む。 */}
+        <div
+          className="relative flex-1 overflow-auto"
+          style={{ paddingTop: 'var(--study-exit-band, 0px)' }}
+        >
+          {children}
+        </div>
         {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
         {!onStudy && <PageFooter />}
       </main>
@@ -67,8 +79,25 @@ function PcShell({
   );
 }
 
-/** サイドバーを描かない間の `<main>`。幅の変数を 0 に上書きする。 */
-const SIDEBARLESS: MainStyle = { '--sidebar-width': '0px' };
+/**
+ * `<main>` が配る CSS 変数。
+ *
+ * - `--sidebar-width`: サイドバーを描かない間は 0（`SidebarProvider` が :root に
+ *   書いた 80px が残ると、これを読んでいるボードのツールバーとエディタの左端だけずれる）
+ * - `--study-exit-band`: 上端の帯の高さ。**この subtree の全員が同じ 1 本を読む**ので、
+ *   流れの中の画面（padding）と fixed の画面（top）が同じフレームで揃う
+ */
+function shellStyle(studyHome: boolean, exitBand: boolean): MainStyle {
+  return {
+    ...(studyHome ? { '--sidebar-width': '0px' } : {}),
+    '--study-exit-band': exitBand ? `${STUDY_EXIT_BAND}px` : '0px',
+  };
+}
+
+/** SP のシェルが配る変数。帯の高さは PC と同じ 1 本の名前で持つ。 */
+function spShellStyle(exitBand: boolean): MainStyle {
+  return { '--study-exit-band': exitBand ? `${STUDY_EXIT_BAND}px` : '0px' };
+}
 
 /** 書斎ホームそのもののパス。ここだけサイドバーを外す。 */
 const STUDY_PATH = '/study';
@@ -150,8 +179,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
             // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
             // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
-            <div className="flex h-[100dvh] flex-col overflow-hidden">
-              <main className="relative flex-1 overflow-auto">{content}</main>
+            <div
+              className="flex h-[100dvh] flex-col overflow-hidden"
+              style={spShellStyle(showBackToStudy)}
+            >
+              <main
+                className="relative flex-1 overflow-auto"
+                style={{ paddingTop: 'var(--study-exit-band, 0px)' }}
+              >
+                {content}
+              </main>
               {/* 書斎が有効な間はボトムナビを描かない。PC のサイドバーと同じ扱いで、
                   書斎そのものが唯一のグローバルナビゲーションになる。
                   **書斎ホームだけでなく jar / board / entry でも外す**（行き先の画面にだけ
@@ -160,7 +197,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               {!studyHome && <SpBottomNav />}
             </div>
           ) : device === 'pc' ? (
-            <PcShell studyHome={studyHome} onStudy={onStudy}>
+            <PcShell studyHome={studyHome} onStudy={onStudy} exitBand={showBackToStudy}>
               {content}
             </PcShell>
           ) : null}

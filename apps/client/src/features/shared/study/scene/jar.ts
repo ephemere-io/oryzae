@@ -150,8 +150,16 @@ export function hazeVisible(readiness: number): boolean {
   return clamp01(readiness) > 0.2;
 }
 
+/**
+ * もやの濃さ。
+ *
+ * **薄めに振ってある。** 0.25..0.65 だったころ、引きで見たときに瓶の中身が
+ * 「濃い水が入っている」ように見えると報告された（実機レビュー）。この部屋の絵は
+ * 線画で、面を濃く塗るのはここだけ。溜まっている感じは液面のリングと泡が言うので、
+ * もやは気配の側に置く。
+ */
 export function hazeOpacity(readiness: number): number {
-  return 0.25 + clamp01(readiness) * 0.4;
+  return 0.16 + clamp01(readiness) * 0.24;
 }
 
 /** もやの高さ。液面より上に置くが、口から溢れさせない。 */
