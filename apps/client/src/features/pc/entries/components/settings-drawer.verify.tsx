@@ -38,7 +38,6 @@ const boundaryStress: EditorSettings = {
   timeInscriptionMode: 'pressureBleed',
   eraserTraceEnabled: true,
   ampEnabled: true,
-  voiceEnabled: true,
   ghostEnabled: true,
   ghostMode: 'block',
   ghostSize: 200,
