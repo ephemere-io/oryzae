@@ -82,16 +82,17 @@ export function Popover({
 
   useLayoutEffect(() => {
     if (!open) return;
-    function fit() {
+    // `fit` という名前は Biome がテストの `fit`（focused test）と取り違える。
+    function fitToWindow() {
       const panel = panelRef.current;
       if (!panel) return;
       const top = panel.getBoundingClientRect().top;
       setMaxHeight(Math.max(MIN_PANEL_HEIGHT, window.innerHeight - top - VIEWPORT_MARGIN));
     }
-    fit();
+    fitToWindow();
     // 全画面の出入りも resize として届く。
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
+    window.addEventListener('resize', fitToWindow);
+    return () => window.removeEventListener('resize', fitToWindow);
   }, [open]);
 
   return (
