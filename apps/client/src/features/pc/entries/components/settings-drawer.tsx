@@ -2,11 +2,11 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { startTransition } from 'react';
+import { startTransition, useId } from 'react';
 import { HelpHint } from '@/components/ui/help-hint';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
-import type { PaletteSize } from '@/components/ui/surface';
+import { DISABLED_CLASS, type PaletteSize } from '@/components/ui/surface';
 import { Switch } from '@/components/ui/switch';
 
 type WritingMode = 'vertical' | 'horizontal';
@@ -64,10 +64,11 @@ interface SettingsPanelProps {
   /** 打鍵音が鳴らせない理由。null なら黙っている。 */
   ampUnavailable?: 'denied' | 'unsupported' | null;
   /**
-   * このエントリーを消す。**まだ保存されていないエントリーでは渡さない**
-   * （消す対象が無いのに消す道だけあると、押した先で何も起きない）。
+   * このエントリーを消す。**まだ保存されていないときは `null`**——行は出したまま押せなくし、
+   * 理由を添える。以前は行ごと隠していたので、どこにあるのか分からず、面の下に
+   * 隠れているのかとスクロールを探すことになった。
    */
-  onDelete?: () => void;
+  onDelete: (() => void) | null;
 }
 
 function isTimeInscriptionMode(value: string): value is TimeInscriptionMode {
@@ -203,6 +204,7 @@ export function SettingsDrawer({
   onDelete,
 }: SettingsPanelProps) {
   const t = useTranslations('editor.settings');
+  const deleteNoteId = useId();
 
   return (
     // 見出し（「設定」）は置かない。歯車を押して開いた面なので、何の面かは自明。
@@ -214,6 +216,7 @@ export function SettingsDrawer({
         unit: 'SettingsDrawer',
         timeInscriptionEnabled: settings.timeInscriptionEnabled,
         ghostEnabled: settings.ghostEnabled,
+        deletable: onDelete !== null,
       })}
     >
       <Section label={t('section_display')}>
@@ -451,21 +454,29 @@ export function SettingsDrawer({
           **一覧まで戻らないと消せなかった。** 書いている本人が「これは残さない」と
           決めるのは書いている最中なので、その場に道を置く。
           消すのは戻せないので、**他の設定とは離して最後に置き、色でも言い分ける**
-          （並びの途中に赤い行があると、隣を押すつもりで当たる）。 */}
-      {onDelete && (
-        <div
-          className="mt-1 border-t px-5 pt-4 pb-5"
-          style={{ borderColor: 'var(--border-subtle)' }}
+          （並びの途中に赤い行があると、隣を押すつもりで当たる）。
+          **保存前でも行は出す。** 押せなくして理由を添える——隠すと、どこにあるのか分からない。 */}
+      <div className="mt-1 border-t px-5 pt-4 pb-5" style={{ borderColor: 'var(--border-subtle)' }}>
+        <button
+          type="button"
+          onClick={onDelete ?? undefined}
+          disabled={onDelete === null}
+          aria-describedby={onDelete === null ? deleteNoteId : undefined}
+          className={`flex h-8 w-full items-center rounded-md px-2 text-left text-[13px] text-red-500 transition-colors ${
+            onDelete === null ? DISABLED_CLASS : 'hover:bg-[var(--hover-wash)]'
+          }`}
         >
-          <button
-            type="button"
-            onClick={onDelete}
-            className="flex h-8 w-full items-center rounded-md px-2 text-left text-[13px] text-red-500 transition-colors hover:bg-[var(--hover-wash)]"
+          {t('delete_entry')}
+        </button>
+        {onDelete === null && (
+          <p
+            id={deleteNoteId}
+            className="mt-1 px-2 text-[11px] leading-[1.7] text-pretty text-[var(--date-color)]"
           >
-            {t('delete_entry')}
-          </button>
-        </div>
-      )}
+            {t('delete_entry_unsaved')}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

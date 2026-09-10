@@ -423,7 +423,8 @@
       "amp_denied": "Microphone access is blocked, so nothing plays. Allow it from the lock icon in the address bar.",
       "amp_unsupported": "This environment has no microphone available, so nothing plays.",
       "ghost_hint": "An afterimage of each keystroke trails a moment behind it.",
-      "delete_entry": "Delete this entry"
+      "delete_entry": "Delete this entry",
+      "delete_entry_unsaved": "Can't delete yet — this entry hasn't been saved."
     },
     "snippet_toolbar": {
       "saving": "Saving…",

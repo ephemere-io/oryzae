@@ -423,7 +423,8 @@
       "amp_denied": "마이크 사용이 허용되지 않아 소리가 나지 않습니다. 주소 표시줄의 자물쇠 아이콘에서 허용해 주세요.",
       "amp_unsupported": "이 환경에서는 마이크를 쓸 수 없어 소리가 나지 않습니다.",
       "ghost_hint": "누른 글자의 잔상이 조금 늦게 뒤로 흘러갑니다.",
-      "delete_entry": "이 기록을 지우기"
+      "delete_entry": "이 기록을 지우기",
+      "delete_entry_unsaved": "아직 저장되지 않아 지울 수 없습니다."
     },
     "snippet_toolbar": {
       "saving": "저장 중…",

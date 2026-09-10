@@ -423,7 +423,8 @@
       "amp_denied": "未允许使用麦克风，因此没有声音。请从地址栏的锁形图标中允许。",
       "amp_unsupported": "当前环境无法使用麦克风，因此没有声音。",
       "ghost_hint": "每次敲键都会有残影稍稍滞后地流过。",
-      "delete_entry": "删除这篇记录"
+      "delete_entry": "删除这篇记录",
+      "delete_entry_unsaved": "还没有保存，暂时无法删除。"
     },
     "snippet_toolbar": {
       "saving": "保存中…",
