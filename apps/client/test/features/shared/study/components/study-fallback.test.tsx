@@ -19,11 +19,13 @@ const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAA
  * 報告された（PR #570）。出してよいのは、出ていく直前に掴んだ部屋そのものだけ。
  */
 describe('StudyFallback', () => {
-  it('読み込み中、憶えた部屋があればそれを敷く', () => {
+  it('読み込み中は、憶えた部屋があっても何も出さない', () => {
+    // 地を出す場所が 3 つ（このロード表示・dynamic の loading・StudyHome 本体）あり、
+    // 戻り道で順に入れ替わっていた。同じ絵でも別々の要素なので、入れ替わるたびに
+    // 1 フレーム空く ―「戻ると画面がもう 1 回点滅する」の正体。持ち主は StudyHome だけ。
     saveStudyBackdrop(PIXEL);
     const { container } = render(withVerifyProviders(<StudyFallback loading />));
-    const backdrop = container.querySelector('img[data-study-backdrop]');
-    expect(backdrop?.getAttribute('src')).toBe(PIXEL);
+    expect(container.querySelector('img')).toBeNull();
   });
 
   it('読み込み中、憶えていなければ何も出さない', () => {
