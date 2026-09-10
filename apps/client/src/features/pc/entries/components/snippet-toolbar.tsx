@@ -15,14 +15,6 @@ const SAVED_DISPLAY_MS = 1200;
 
 type Status = 'idle' | 'saving' | 'saved';
 
-function getTodayKey(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 // verify-exempt: 描画が外部 editorRef への実テキスト選択に依存する。visible=false の間は null を返し（DOM契約要素が出ない）、visible は handleSelection 経由でのみ true になるが、それには window.getSelection()/getRangeAt(0)/getBoundingClientRect() が必要で jsdom では再現不可。editorRef は本体外のため孤立描画では選択対象が存在せず、act も click/type/wait のみで selectionchange/Range を作れない。唯一の回避策（Range/Selection の monkeypatch）は register 経由で実ブラウザの /verify dashboard・matrix 双方に読み込まれグローバル汚染するため不可。
 export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
   const postSnippet = useCreateSnippet(api);
@@ -115,7 +107,7 @@ export function SnippetToolbar({ editorRef, api }: SnippetToolbarProps) {
 
     setStatus('saving');
     try {
-      await postSnippet({ text: selectedText, dateKey: getTodayKey() });
+      await postSnippet({ text: selectedText });
       window.getSelection()?.removeAllRanges();
       setStatus('saved');
       if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);

@@ -37,17 +37,8 @@ const JPEG_QUALITY = 0.9;
 /** 新しいカードの既定の大きさ（world）。中身が入れば伸びる。 */
 const NEW_CARD_SIZE = { width: 262, height: 120 };
 
-/** ローカル暦日の `YYYY-MM-DD`。 */
-function todayKey(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = `${now.getMonth() + 1}`.padStart(2, '0');
-  const day = `${now.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 /**
- * SP のボード画面。
+ * SP のボード画面。PC と同じ、1 人に 1 枚のコルクボード（日付も表示単位も持たない）。
  *
  * 盤面は開いたときに一度だけ全体が入る倍率へ合わせる。world 座標は無制限なので、
  * 合わせないと画面外のカードに指が届かない。合わせ直しは**しない** — カードを
@@ -58,7 +49,6 @@ function todayKey(): string {
  */
 export function SpBoard({ api }: SpBoardProps) {
   const t = useTranslations('board');
-  const [dateKey] = useState(todayKey);
   const {
     cards,
     setCards,
@@ -69,7 +59,7 @@ export function SpBoard({ api }: SpBoardProps) {
     updateSnippet,
     createPhoto,
     deleteCard,
-  } = useBoard(api, dateKey, 'daily');
+  } = useBoard(api);
   const { savePositions } = useBoardSave(api);
 
   const frameRef = useRef<HTMLDivElement>(null);
@@ -225,7 +215,6 @@ export function SpBoard({ api }: SpBoardProps) {
       <div className="relative min-h-0 flex-1">
         <SpBoardSurface
           cards={cards}
-          dateKey={dateKey}
           viewport={viewport}
           selectedId={selectedId}
           onSelect={setSelectedId}

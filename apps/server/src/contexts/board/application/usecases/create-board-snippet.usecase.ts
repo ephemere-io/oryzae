@@ -6,8 +6,6 @@ import { BoardCardValidationError, BoardSnippetValidationError } from '../errors
 
 interface CreateBoardSnippetInput {
   text: string;
-  dateKey: string;
-  viewType?: 'daily' | 'weekly';
   /**
    * 配置位置（world 座標）。クライアントが「いま見えている場所」を渡す。
    *
@@ -83,18 +81,15 @@ export class CreateBoardSnippetUsecase {
     const x = input.x ?? Math.floor(Math.random() * 741) + 60;
     const y = input.y ?? Math.floor(Math.random() * 541) + 60;
     const rotation = Math.round((Math.random() * 10 - 5) * 10) / 10;
-    const vt = input.viewType ?? 'daily';
 
     // New cards should appear on top of existing ones
-    const maxZ = await this.boardCardRepo.findMaxZIndex(userId, input.dateKey, vt);
+    const maxZ = await this.boardCardRepo.findMaxZIndex(userId);
 
     const cardResult = BoardCard.create(
       {
         userId,
         cardType: 'snippet',
         refId: snippet.id,
-        dateKey: input.dateKey,
-        viewType: vt,
         x,
         y,
         rotation,
@@ -110,7 +105,7 @@ export class CreateBoardSnippetUsecase {
     const card = cardResult.value;
 
     await this.boardSnippetRepo.save(snippet);
-    await this.boardCardRepo.saveMany([card]);
+    await this.boardCardRepo.save(card);
 
     return {
       snippetId: snippet.id,
