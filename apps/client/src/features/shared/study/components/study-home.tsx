@@ -202,7 +202,16 @@ export function StudyHome({ layout }: StudyHomeProps) {
       <div
         className="absolute inset-0"
         style={{
-          opacity: leaveMs !== null ? 0 : entered ? 1 : 0,
+          /**
+           * **地を敷いているあいだは、溶暗で入らない。**
+           *
+           * 入りの溶暗（0 → 1）は「サブ画面から戻ったときに書斎が唐突に現れない」ため
+           * のものだが、憶えた部屋を敷いているなら**部屋はもう出ている**。両方を同時に
+           * 走らせると、canvas がまだ薄いうちに地が引いて画面が一度白茶け、それが
+           * 点滅に見えていた（実機レビュー）。地があるときは等倍で置き、地のほうだけを
+           * 引かせる。
+           */
+          opacity: leaveMs !== null ? 0 : entered || backdrop !== null ? 1 : 0,
           transition: `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
         }}
       >

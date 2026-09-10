@@ -22,8 +22,10 @@ describe('配置表に共通して成り立つこと', () => {
 
   it.each(LAYOUTS)('$name: 瓶と手帳が天板の左右に収まる', (layout) => {
     // 物が天板からはみ出すと「机の上に置いてある」という前提が崩れる。
-    expect(Math.abs(layout.jar.x)).toBeLessThanOrEqual(layout.deskTop.halfWidth);
-    expect(Math.abs(layout.desk.x)).toBeLessThanOrEqual(layout.deskTop.halfWidth);
+    expect(layout.jar.x).toBeGreaterThanOrEqual(layout.deskTop.xLeft);
+    expect(layout.jar.x).toBeLessThanOrEqual(layout.deskTop.xRight);
+    expect(layout.desk.x).toBeGreaterThanOrEqual(layout.deskTop.xLeft);
+    expect(layout.desk.x).toBeLessThanOrEqual(layout.deskTop.xRight);
   });
 
   it.each(LAYOUTS)('$name: 天板の手前端が奥端より手前にある', (layout) => {
@@ -75,7 +77,8 @@ describe('PC と SP の構図の違い', () => {
   });
 
   it('SP の天板は PC より狭い', () => {
-    expect(SP_LAYOUT.deskTop.halfWidth).toBeLessThan(PC_LAYOUT.deskTop.halfWidth);
+    const width = (l: StudyLayout) => l.deskTop.xRight - l.deskTop.xLeft;
+    expect(width(SP_LAYOUT)).toBeLessThan(width(PC_LAYOUT));
   });
 
   it('SP はパララックスを持たない', () => {
@@ -121,7 +124,7 @@ describe('PC と SP の構図の違い', () => {
     // 手前の積みへ落ちてきて、3 冊に重なって出ていた（実機レビュー）。
     expect(archive.x).toBeGreaterThan(PC_LAYOUT.desk.x + 2);
     // 広げた天板の内側には収める。
-    expect(archive.x).toBeLessThan(PC_LAYOUT.deskTop.halfWidth);
+    expect(archive.x).toBeLessThan(PC_LAYOUT.deskTop.xRight);
   });
 
   it('SP の JOURNAL ラベルは積みの右脇に逃がす（表紙に文字が乗らない）', () => {
