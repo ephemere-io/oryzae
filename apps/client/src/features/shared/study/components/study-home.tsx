@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
-import { saveStudyBackdrop } from '../backdrop';
+import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
@@ -78,6 +78,17 @@ export function StudyHome({ layout }: StudyHomeProps) {
    */
   const [entered, setEntered] = useState(false);
   const [leaveMs, setLeaveMs] = useState<number | null>(null);
+  /**
+   * 戻り道に敷く「憶えた部屋」と、canvas が最初の 1 フレームを描いたか。
+   *
+   * **絵を外してよいのは canvas が実際に描いたあと。** 以前は three.js の読み込みが
+   * 終わった時点で絵ごと差し替えていたので、canvas が 1 フレーム目を描くまでの間に
+   * 地の色だけが見え、戻るたびに画面が点滅していた（実機レビュー）。
+   */
+  const [backdrop, setBackdrop] = useState<string | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
+
+  useEffect(() => setBackdrop(readStudyBackdrop()), []);
 
   useEffect(() => {
     // 次のフレームで立てる。マウントと同じフレームだと transition が走らない。
@@ -169,100 +180,123 @@ export function StudyHome({ layout }: StudyHomeProps) {
   );
 
   return (
-    <div
-      ref={rootRef}
-      className="absolute inset-0 overflow-hidden"
-      style={{
-        opacity: leaveMs !== null ? 0 : entered ? 1 : 0,
-        transition: `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
-      }}
-    >
-      <StudyCanvas
-        onLeaveStart={setLeaveMs}
-        // 出ていく直前の 1 枚を憶える。戻り道はこれを地にして、部屋が「消えた」のでは
-        // なく「遠くなった」だけに見えるようにする。
-        onCapture={saveStudyBackdrop}
-        state={state}
-        layout={layout}
-        theme={theme}
-        onNavigate={handleNavigate}
-        onOpenOverlay={handleOpenOverlay}
-        onLabelPositions={setLabelPositions}
-        onHoverChange={(hovered) => {
-          setHoveredLabel(hovered?.label ?? null);
-          setHover(hovered);
-        }}
-      />
+    <div ref={rootRef} className="absolute inset-0 overflow-hidden">
+      {/* 憶えた部屋。**溶暗の外側に置く。** 中に入れると、書斎が opacity 0 から
+          現れるあいだ地まで一緒に薄くなり、そこで点滅が起きる。canvas が最初の
+          1 フレームを描いたら消す。 */}
+      {backdrop === null ? null : (
+        // biome-ignore lint/performance/noImgElement: data URL の地。最適化する先が無い
+        <img
+          src={backdrop}
+          alt=""
+          aria-hidden="true"
+          data-study-backdrop
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{
+            opacity: canvasReady ? 0 : 1,
+            transition: `opacity ${BACKDROP_FADE_MS}ms ease-out`,
+          }}
+        />
+      )}
 
-      {/* 一覧を開いている間はラベルを消す（サブ画面と遷移中も scene 側が消す）。 */}
-      {overlay === null && (
-        <StudyLabels
+      <div
+        className="absolute inset-0"
+        style={{
+          opacity: leaveMs !== null ? 0 : entered ? 1 : 0,
+          transition: `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
+        }}
+      >
+        <StudyCanvas
+          onLeaveStart={setLeaveMs}
+          onReady={() => setCanvasReady(true)}
+          // 出ていく直前の 1 枚を憶える。戻り道はこれを地にして、部屋が「消えた」のでは
+          // なく「遠くなった」だけに見えるようにする。
+          onCapture={saveStudyBackdrop}
+          state={state}
           layout={layout}
-          positions={labelPositions}
-          hovered={hoveredLabel}
-          status={state.fermentation.status}
-          readiness={state.fermentation.readiness}
-          entryCount={currentMonthCount}
-          volumeCount={archiveCount}
-          cardCount={state.board.total}
-          screen={screen}
-          onPick={handlePickFromLabel}
+          theme={theme}
+          onNavigate={handleNavigate}
+          onOpenOverlay={handleOpenOverlay}
+          onLabelPositions={setLabelPositions}
+          onHoverChange={(hovered) => {
+            setHoveredLabel(hovered?.label ?? null);
+            setHover(hovered);
+          }}
         />
-      )}
 
-      <StudyChrome
-        initial={initialOf(auth?.user.nickname, auth?.user.email)}
-        avatarUrl={auth?.user.avatarUrl}
-      />
+        {/* 一覧を開いている間はラベルを消す（サブ画面と遷移中も scene 側が消す）。 */}
+        {overlay === null && (
+          <StudyLabels
+            layout={layout}
+            positions={labelPositions}
+            hovered={hoveredLabel}
+            status={state.fermentation.status}
+            readiness={state.fermentation.readiness}
+            entryCount={currentMonthCount}
+            volumeCount={archiveCount}
+            cardCount={state.board.total}
+            screen={screen}
+            onPick={handlePickFromLabel}
+          />
+        )}
 
-      {/* その冊に何が入っているかを、開く前に見せる。 */}
-      {overlay === null && hover?.month && (
-        <StudyTooltip
-          month={hover.month}
-          entryCount={
-            state.notebooks.find((notebook) => notebook.month === hover.month)?.entryCount ?? 0
-          }
-          range={monthDateRange(
-            state.entries.map((entry) => entry.createdAt),
-            hover.month,
-          )}
-          current={hover.month === state.now.slice(0, 7)}
-          screen={hover.screen}
+        <StudyChrome
+          initial={initialOf(auth?.user.nickname, auth?.user.email)}
+          avatarUrl={auth?.user.avatarUrl}
         />
-      )}
 
-      {/* 鉛筆に触れたとき、押すと何が起きるかを一言で見せる。鉛筆はラベルを持たない
+        {/* その冊に何が入っているかを、開く前に見せる。 */}
+        {overlay === null && hover?.month && (
+          <StudyTooltip
+            month={hover.month}
+            entryCount={
+              state.notebooks.find((notebook) => notebook.month === hover.month)?.entryCount ?? 0
+            }
+            range={monthDateRange(
+              state.entries.map((entry) => entry.createdAt),
+              hover.month,
+            )}
+            current={hover.month === state.now.slice(0, 7)}
+            screen={hover.screen}
+          />
+        )}
+
+        {/* 鉛筆に触れたとき、押すと何が起きるかを一言で見せる。鉛筆はラベルを持たない
           （積みの JOURNAL と重なるため）ので、これが唯一の予告になる。 */}
-      {overlay === null && hover?.hint === 'pen' && (
-        <StudyHintTooltip textKey="hint_pen" screen={hover.screen} />
-      )}
+        {overlay === null && hover?.hint === 'pen' && (
+          <StudyHintTooltip textKey="hint_pen" screen={hover.screen} />
+        )}
 
-      <EntryListOverlay
-        open={overlay !== null}
-        entries={overlayEntries}
-        loading={list.loading && list.entries.length === 0}
-        hasMore={list.hasMore}
-        onLoadMore={list.loadMore}
-        search={listSearch}
-        onSearchChange={setListSearch}
-        questions={state.questions}
-        questionId={listQuestionId}
-        onSelectQuestion={setListQuestionId}
-        months={months}
-        selectedMonth={overlay?.month ?? null}
-        onSelectMonth={(month) => setOverlay({ month })}
-        onSelectEntry={handleSelectEntry}
-        onClose={() => {
-          setOverlay(null);
-          // 次に開いたときは素の状態から。絞ったまま閉じると、別の月を開いても
-          // 前の検索語が効いていて「記録が無い」ように見える。
-          setListSearch('');
-          setListQuestionId(null);
-        }}
-      />
+        <EntryListOverlay
+          open={overlay !== null}
+          entries={overlayEntries}
+          loading={list.loading && list.entries.length === 0}
+          hasMore={list.hasMore}
+          onLoadMore={list.loadMore}
+          search={listSearch}
+          onSearchChange={setListSearch}
+          questions={state.questions}
+          questionId={listQuestionId}
+          onSelectQuestion={setListQuestionId}
+          months={months}
+          selectedMonth={overlay?.month ?? null}
+          onSelectMonth={(month) => setOverlay({ month })}
+          onSelectEntry={handleSelectEntry}
+          onClose={() => {
+            setOverlay(null);
+            // 次に開いたときは素の状態から。絞ったまま閉じると、別の月を開いても
+            // 前の検索語が効いていて「記録が無い」ように見える。
+            setListSearch('');
+            setListQuestionId(null);
+          }}
+        />
+      </div>
     </div>
   );
 }
+
+/** 憶えた部屋を消すのにかける時間（ms）。canvas が描いたあと、静かに引く。 */
+const BACKDROP_FADE_MS = 320;
 
 /** 位置が届く前の初期値。 */
 const EMPTY_LABELS: LabelPositions = { jar: null, journal: null, board: null, archive: null };

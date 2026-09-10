@@ -37,6 +37,8 @@ export interface StudyCanvasProps {
   onLeaveStart?: (durationMs: number) => void;
   /** 出ていく直前の書斎（data URL）。戻り道の地に使う。 */
   onCapture?: (dataUrl: string) => void;
+  /** 最初の 1 フレームを描き終えたとき。敷いてある地を外してよい合図。 */
+  onReady?: () => void;
 }
 
 /** `prefers-reduced-motion` を読む。SSR とテストでは false に倒す。 */
@@ -55,6 +57,7 @@ export function StudyCanvas({
   onLabelPositions,
   onLeaveStart,
   onCapture,
+  onReady,
 }: StudyCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<StudySceneHandle | null>(null);
@@ -74,6 +77,7 @@ export function StudyCanvas({
     onLabelPositions,
     onLeaveStart,
     onCapture,
+    onReady,
   });
   callbacks.current = {
     onNavigate,
@@ -82,6 +86,7 @@ export function StudyCanvas({
     onLabelPositions,
     onLeaveStart,
     onCapture,
+    onReady,
   };
 
   // state はレンダーのたびに新しい参照になりうる（取得が落ち着くまで数回変わる）。
@@ -106,6 +111,7 @@ export function StudyCanvas({
         onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
         onLeaveStart: (durationMs) => callbacks.current.onLeaveStart?.(durationMs),
         onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
+        onReady: () => callbacks.current.onReady?.(),
         onPick: (target) => {
           // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
           // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
