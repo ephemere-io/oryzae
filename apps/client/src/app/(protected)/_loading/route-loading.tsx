@@ -8,6 +8,7 @@ import { EntriesRouteLoading } from './entries-route-loading';
 import { EntryEditorRouteLoading } from './entry-editor-route-loading';
 import { JarRouteLoading } from './jar-route-loading';
 import { QuestionsRouteLoading } from './questions-route-loading';
+import { StudyRouteLoading } from './study-route-loading';
 
 /**
  * パスから「その画面のロード表示」を引く。
@@ -30,6 +31,8 @@ import { QuestionsRouteLoading } from './questions-route-loading';
  * 何も出さないより悪い。
  */
 export function resolveRouteLoading(pathname: string): ReactElement | null {
+  // ルート（/）は書斎。
+  if (pathname === '/') return <StudyRouteLoading />;
   if (pathname === '/entries') return <EntriesRouteLoading />;
   if (pathname === '/entries/new') return <EntryEditorRouteLoading />;
   if (pathname.startsWith('/entries/')) return <EntryEditorRouteLoading existing />;

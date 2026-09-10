@@ -136,7 +136,7 @@ export function useOauthCallback(): { error: AuthFlowError | null } {
  * トークンを認証コンテキストが読めず /login に弾かれる（#363 S1 Context 化の回帰修正）。
  *
  * 行き先を `/entries/new` と書かず `/` にするのは、ホームがどこかを知っているのが
- * `HomeGate`（= `useHomeHref`）1 か所だから。ここは effect の中でフラグの解決を
+ * `/`（書斎。止めていれば `/entries/new` へ送る）1 か所だから。ここは effect の中でフラグの解決を
  * 待てる場所ではないうえ、どうせ全画面遷移なので `/` を 1 枚挟む損が無い。
  */
 function finish(): void {
