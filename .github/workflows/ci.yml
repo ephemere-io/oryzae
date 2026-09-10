@@ -50,6 +50,11 @@ jobs:
       - name: Dead Code Detection (Knip)
         run: pnpm knip
         if: '!cancelled()'
+      # 「勝手に回るもの」の一覧（admin の /observability/automation）が実態とずれていないか。
+      # ワークフローを足して一覧に書き忘れても何も壊れないので、気づけるのはここだけ。
+      - name: Automation Inventory (自動実行の一覧が実態と一致するか)
+        run: pnpm check:automation
+        if: '!cancelled()'
 
   # test だけは分けたまま残す。168 秒あるので checks に畳むと 23 秒の静的検査の結果まで
   # 待たされることになり、しかも別ジョブのままでも課金分は変わらない（畳む得が無い）。

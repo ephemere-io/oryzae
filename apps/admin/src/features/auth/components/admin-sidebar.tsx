@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  Bot,
   DollarSign,
   Eye,
   FlaskConical,
@@ -27,6 +28,9 @@ const NAV_ITEMS = [
   { href: '/costs', label: 'Costs', icon: DollarSign },
   { href: '/analytics', label: 'Analytics', icon: Activity },
   { href: '/observability', label: 'Observability', icon: Eye },
+  // 「勝手に回っているもの」の一覧。Observability の配下にあるが、
+  // 探しに行くものではなく気づくべきものなので、サイドバーにも出す。
+  { href: '/observability/automation', label: 'Automation', icon: Bot },
 ];
 
 export function AdminSidebar() {
