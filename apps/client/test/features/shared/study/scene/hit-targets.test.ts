@@ -33,6 +33,29 @@ describe('HitRegistry', () => {
   });
 });
 
+describe('ホバーで出す一言', () => {
+  const registry = buildHitRegistry({
+    desk: DESK,
+    shelf: SHELF,
+    shelfAsSingleTarget: false,
+  });
+
+  it('瓶と板は一言を持つ（ラベルは名前しか言わない）', () => {
+    expect(registry.get('jar')?.hint).toBe('jar');
+    expect(registry.get('board')?.hint).toBe('board');
+  });
+
+  it('鉛筆はラベルを持たないぶん、一言が唯一の予告になる', () => {
+    expect(registry.get('pen')?.label).toBeNull();
+    expect(registry.get('pen')?.hint).toBe('pen');
+  });
+
+  it('手帳と背表紙は一言を持たない（月ごとの紙が別に出る）', () => {
+    expect(registry.get('notebook-0')?.hint).toBeUndefined();
+    expect(registry.get('spine-0')?.hint).toBeUndefined();
+  });
+});
+
 describe('buildHitRegistry', () => {
   const pc = buildHitRegistry({
     desk: DESK,

@@ -75,7 +75,13 @@ import {
   zoomedView,
   zoomTargetRise,
 } from './camera';
-import { buildHitRegistry, type HitId, HOVER_SCALE, resolveClickTarget } from './hit-targets';
+import {
+  buildHitRegistry,
+  type HitHint,
+  type HitId,
+  HOVER_SCALE,
+  resolveClickTarget,
+} from './hit-targets';
 import {
   bubbleCount,
   bubbleSpeed,
@@ -150,8 +156,8 @@ export interface StudySceneOptions {
 export interface HoverInfo {
   label: 'jar' | 'journal' | 'board' | 'archive' | null;
   month: string | null;
-  /** ラベルを持たない的（鉛筆）に触れているとき、ホバーで出す一言。 */
-  hint: 'pen' | null;
+  /** 触れている的が一言を持つとき、その種類。文面は呼び出し側が状態から決める。 */
+  hint: HitHint | null;
   /** ツールチップを出す画面座標。 */
   screen: { x: number; y: number };
 }

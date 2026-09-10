@@ -20,7 +20,7 @@ const STATE: StudyState = {
   notebooks: [{ month: '2026-09', entryCount: 3, current: true }],
   entries: [],
   questions: [],
-  board: { total: 0, cards: [] },
+  board: { total: 0, snippets: 0, photos: 0, cards: [] },
 };
 
 function renderCanvas(overrides: Partial<React.ComponentProps<typeof StudyCanvas>> = {}) {

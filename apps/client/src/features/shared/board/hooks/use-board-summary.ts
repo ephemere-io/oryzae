@@ -6,7 +6,12 @@ import type { BoardSummary } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
 import { isObject, readJson } from '@/lib/json';
 
-const EMPTY: BoardSummary = { total: 0, cards: [] };
+const EMPTY: BoardSummary = { total: 0, snippets: 0, photos: 0, cards: [] };
+
+/** 数として読めなければ 0。書斎は部分的な欠けで落とさない。 */
+function readCount(value: unknown): number {
+  return typeof value === 'number' && value >= 0 ? value : 0;
+}
 
 /**
  * 書斎の壁が読む「いま貼ってあるもの」（`GET /api/v1/board/summary`）。
@@ -42,7 +47,9 @@ export function useBoardSummary(
         if (cancelled) return;
         const raw = isObject(body) ? body : {};
         setSummary({
-          total: typeof raw.total === 'number' && raw.total >= 0 ? raw.total : 0,
+          total: readCount(raw.total),
+          snippets: readCount(raw.snippets),
+          photos: readCount(raw.photos),
           cards: normalizeBoardCards(raw.cards),
         });
       } catch {

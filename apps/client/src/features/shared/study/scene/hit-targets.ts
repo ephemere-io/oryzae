@@ -11,6 +11,16 @@ import type { Notebook, StudyTarget } from '../types';
 /** ヒットボックスに貼る識別子。`Object3D.userData.hitId` に入れる。 */
 export type HitId = string;
 
+/**
+ * ホバーで出す一言の種類。
+ *
+ * 中身を数えて言える的にだけ付ける。**ラベルは名前しか言わない** — `BOARD` と出ている
+ * だけでは中に何が貼ってあるか分からず、実機レビューで「ボードにホバーしても何も
+ * 出ない」と報告された。手帳と背表紙は月ごとの `StudyTooltip` が別に出るので、
+ * ここには入れない（同じ場所に 2 枚出てしまう）。
+ */
+export type HitHint = 'pen' | 'jar' | 'board';
+
 export interface HitEntry {
   id: HitId;
   target: StudyTarget;
@@ -18,13 +28,8 @@ export interface HitEntry {
   label: 'jar' | 'journal' | 'board' | 'archive' | null;
   /** 手帳と背表紙のツールチップに出す月。 */
   month: string | null;
-  /**
-   * ホバーで出す一言（i18n の鍵の後半）。
-   *
-   * ラベルを持たない的にだけ付ける。ラベルのある的（瓶・手帳・板・棚）は、その
-   * ラベルが濃くなることで「押せる」と分かるので、重ねて言わない。
-   */
-  hint?: 'pen';
+  /** ホバーで出す一言。出す文面は呼び出し側が状態から決める。 */
+  hint?: HitHint;
 }
 
 /** ヒットボックスの一覧。id から対象を引く。 */
@@ -63,7 +68,7 @@ export function buildHitRegistry(options: {
 }): HitRegistry {
   const registry = new HitRegistry();
 
-  registry.add({ id: 'jar', target: { kind: 'jar' }, label: 'jar', month: null });
+  registry.add({ id: 'jar', target: { kind: 'jar' }, label: 'jar', month: null, hint: 'jar' });
 
   options.desk.forEach((notebook, index) => {
     registry.add({
@@ -103,7 +108,13 @@ export function buildHitRegistry(options: {
     hint: 'pen',
   });
 
-  registry.add({ id: 'board', target: { kind: 'board' }, label: 'board', month: null });
+  registry.add({
+    id: 'board',
+    target: { kind: 'board' },
+    label: 'board',
+    month: null,
+    hint: 'board',
+  });
 
   return registry;
 }

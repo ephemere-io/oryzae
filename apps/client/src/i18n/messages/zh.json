@@ -802,7 +802,7 @@
   "study": {
     "title": "书斋",
     "label_jar": "JAR",
-    "label_journal": "JOURNAL",
+    "label_journal": "ENTRIES",
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "pill_jar_empty": "空",
@@ -836,6 +836,15 @@
     "fallback_journal": "写下记录",
     "fallback_board": "打开看板",
     "questions_timeline": "提问的变迁",
-    "hint_pen": "写一篇记录"
+    "hint_pen": "写一篇记录",
+    "hint_jar_empty": "还没有腌渍任何东西",
+    "hint_jar_fermenting": "正在发酵",
+    "hint_jar_almost": "信件即将送达",
+    "hint_jar_letter": "有未读的信",
+    "hint_jar_read": "里面有读过的信",
+    "hint_board_empty": "还没有贴任何东西",
+    "hint_board_photos": "{count} 张照片",
+    "hint_board_snippets": "{count} 条摘录",
+    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
   }
 }

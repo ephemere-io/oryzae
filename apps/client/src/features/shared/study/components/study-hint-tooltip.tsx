@@ -6,21 +6,25 @@ import { useTranslations } from 'next-intl';
 export interface StudyHintTooltipProps {
   /** `study` 配下の鍵（`hint_pen` など）。 */
   textKey: string;
+  /** ICU に差し込む数（「写真 3 件」の 3）。数を持たない鍵もある。 */
+  values?: Record<string, number>;
   /** 貼り付ける画面座標。 */
   screen: { x: number; y: number };
 }
 
 /**
- * ラベルを持たない的に触れたとき、押すと何が起きるかを一言で出す。
+ * 的に触れたとき、そこに何があるかを一言で出す。
  *
- * 瓶・手帳・板・棚は自分の名前（`JAR` / `JOURNAL` / …）を持っていて、ホバーで濃くなる。
- * **鉛筆にはそれを持たせられない** — 積みのすぐ脇にあるので、`JOURNAL` の隣にもう 1 つ
- * 注釈が出ると、どちらがどの物の名前か読めなくなる。代わりに、触れたときだけ出す。
+ * ラベル（`JAR` / `BOARD` / …）は**名前しか言わない**。名前だけでは中に何が
+ * 貼ってあるか開くまで分からず、実機レビューで「ボードにホバーしても何も出ない」と
+ * 報告された。鉛筆はそもそもラベルを持てない（積みの隣に 2 つ目の注釈が出ると、
+ * どちらがどの物の名前か読めなくなる）ので、こちらが唯一の予告になる。
  *
  * 手帳のツールチップ（`StudyTooltip`）と分けてあるのは、出すものが違うから。
- * あちらは「その冊に何が入っているか」で、こちらは「押すと何が起きるか」。
+ * あちらは月と件数と日付の範囲を並べる紙で、こちらは 1 行。
+ * 文面を決めるのは `hints.ts`（純関数）で、ここは描くだけ。
  */
-export function StudyHintTooltip({ textKey, screen }: StudyHintTooltipProps) {
+export function StudyHintTooltip({ textKey, values, screen }: StudyHintTooltipProps) {
   const t = useTranslations('study');
 
   return (
@@ -37,7 +41,7 @@ export function StudyHintTooltip({ textKey, screen }: StudyHintTooltipProps) {
         color: '#5C4F3F',
       }}
     >
-      {t(textKey)}
+      {t(textKey, values)}
     </div>
   );
 }
