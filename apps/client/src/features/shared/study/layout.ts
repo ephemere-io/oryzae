@@ -104,7 +104,9 @@ export const PC_LAYOUT: StudyLayout = {
   desk: vec3(3, -1, 2),
   pen: vec3(2.55, -0.15, -0.1),
   shelf: { position: PC_SHELF, scale: 1, tiltX: 0 },
-  deskTop: { y: -1.2, halfWidth: 6.6, zNear: 4.3, zFar: -4.6 },
+  // 天板は widen 済み（6.6 → 7.9）。棚が右端まで来て「本が机に収まらない」と
+  // 報告されたため。物の座標は動かさず、板だけを広げて余白を作る。
+  deskTop: { y: -1.2, halfWidth: 7.9, zNear: 4.3, zFar: -4.6 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.pc,
   labelAnchors: {
@@ -121,7 +123,13 @@ export const PC_LAYOUT: StudyLayout = {
      *
      * 位置は他の 2 つと同じ考え方で、机の面（y ≈ -1.14）の少し手前。
      */
-    archive: vec3(PC_SHELF.x, -1.14, PC_SHELF.z + 1.25),
+    /**
+     * **積みの右へ逃がす。** `PC_SHELF.x` の真下に置いていたころ、俯瞰では棚（奥・高い）
+     * の注釈が手前の手帳の積みに重なって出ていた（実機で「アーカイブの文字が 3 冊に
+     * 被る」と報告）。奥にある物のラベルは、画面では手前の物の上に落ちてくる。
+     * 積み（x は 1.7..4.3）の外側へ出し、手前へも少し寄せる。
+     */
+    archive: vec3(PC_SHELF.x + 1.7, -1.14, PC_SHELF.z + 0.4),
   },
   pillOffsets: null,
 };

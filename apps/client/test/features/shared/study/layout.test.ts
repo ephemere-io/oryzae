@@ -110,14 +110,18 @@ describe('PC と SP の構図の違い', () => {
     }
   });
 
-  it('PC の棚のラベルは机の面の、棚より手前', () => {
+  it('PC の棚のラベルは机の面の、棚より手前かつ積みの外', () => {
     const archive = PC_LAYOUT.labelAnchors.archive;
     if (archive === null) throw new Error('PC の棚のラベルが無い');
     // 机の天板の高さ。瓶・手帳のラベルと同じ面に並ぶ。
     expect(archive.y).toBeCloseTo(PC_LAYOUT.labelAnchors.jar.y, 5);
     // 棚そのものに重ならないよう、手前（z が大きい側）へ出す。
     expect(archive.z).toBeGreaterThan(PC_LAYOUT.shelf.position.z);
-    expect(archive.x).toBeCloseTo(PC_LAYOUT.shelf.position.x, 5);
+    // **手帳の積みより右。** 棚の真下に置いていたころ、俯瞰では奥にある棚の注釈が
+    // 手前の積みへ落ちてきて、3 冊に重なって出ていた（実機レビュー）。
+    expect(archive.x).toBeGreaterThan(PC_LAYOUT.desk.x + 2);
+    // 広げた天板の内側には収める。
+    expect(archive.x).toBeLessThan(PC_LAYOUT.deskTop.halfWidth);
   });
 
   it('SP の JOURNAL ラベルは積みの右脇に逃がす（表紙に文字が乗らない）', () => {
