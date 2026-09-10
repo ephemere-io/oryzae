@@ -1,10 +1,14 @@
 'use client';
 
+import { HelpHint } from '@/components/ui/help-hint';
+
 interface SwitchProps {
   id: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  /** 名前だけでは何が起きるか分からないとき、隣に「？」を出して説明する。 */
+  hint?: string;
 }
 
 /**
@@ -13,13 +17,16 @@ interface SwitchProps {
  * `role="switch"` を持つボタン1つで表現する。設定パネルの行は「ラベル ⟷ コントロール」で
  * 揃えたいので、ラベルまで含めて1行を構成する。
  */
-export function Switch({ id, checked, onChange, label }: SwitchProps) {
+export function Switch({ id, checked, onChange, label, hint }: SwitchProps) {
   return (
     // 行の高さは設定パネルの Row と揃える（32px）。目が同じ間隔で下りていける。
     <div className="flex h-8 items-center justify-between gap-3">
-      <label htmlFor={id} className="cursor-pointer text-[13px] text-[var(--fg)]">
-        {label}
-      </label>
+      <span className="flex items-center gap-1.5">
+        <label htmlFor={id} className="cursor-pointer text-[13px] text-[var(--fg)]">
+          {label}
+        </label>
+        {hint && <HelpHint subject={label} text={hint} />}
+      </span>
       <button
         type="button"
         id={id}

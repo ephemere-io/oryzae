@@ -265,9 +265,13 @@ function decorateSpan(span: HTMLSpanElement, mark: TextSpanMark): void {
     span.dataset.mode = mark.mode;
     if (mark.mode === 'fontWeight') {
       span.style.fontWeight = String(Math.round(300 + (700 - 300) * mark.t));
+      span.style.fontSize = '1em';
     } else {
+      // **16px 決め打ちだった。** 開き直すと、その人の文字サイズ設定に関わらず
+      // 時間内包の字だけ 16px 前後で戻っていた。保存しているのは比率なので、
+      // 表示も比率（em）で持つ。こうすると設定を変えたときも一緒に動く。
       const scale = 0.8 + (1.35 - 0.8) * mark.t;
-      span.style.fontSize = `${(16 * scale).toFixed(1)}px`;
+      span.style.fontSize = `${scale.toFixed(3)}em`;
     }
     return;
   }
