@@ -21,7 +21,6 @@ interface Props {
   entryCount: number;
   volumeCount: number;
   cardCount: number;
-  currentMonth: string;
   screen: { width: number; height: number };
   onPick: () => void;
 }
@@ -31,6 +30,7 @@ const POSITIONS: Partial<Record<LabelKind, LabelPoint>> = {
   journal: { x: 250, y: 600, visible: true },
   board: { x: 195, y: 180, visible: true },
   archive: { x: 320, y: 330, visible: true },
+  pen: { x: 300, y: 560, visible: true },
 };
 
 const BASE: Props = {
@@ -42,7 +42,6 @@ const BASE: Props = {
   entryCount: 9,
   volumeCount: 3,
   cardCount: 10,
-  currentMonth: '2026-09',
   screen: { width: 390, height: 844 },
   onPick: () => {},
 };
@@ -158,15 +157,16 @@ registerUnit<Props>({
     },
     {
       id: 'every-target-announces-itself',
-      description: '4 つの的すべてが名乗る（黙っている的を作らない）',
-      check: ({ root }) => {
+      description: 'すべての的が名乗る（黙っている的を作らない）',
+      check: ({ root, contract }) => {
         // 棚だけラベルを出していなかった（ホバーで背表紙のツールチップが出るから、
         // という理由）。ホバーは**そこに何かがあると知っている人にしか効かない**ので、
         // 過去の記録を全部持っている棚へ辿り着けなくなっていた（実機レビュー）。
         const text = root.textContent ?? '';
-        const missing = ['JAR', 'ENTRIES', 'BOARD', 'ARCHIVE'].filter(
-          (label) => !text.includes(label),
-        );
+        // 鉛筆の NEW は PC だけ（SP は ENTRIES のピルがそのまま新規執筆）。
+        const names = ['JAR', 'ENTRIES', 'BOARD', 'ARCHIVE'];
+        const expected = contract.mode === 'pc' ? [...names, 'NEW'] : names;
+        const missing = expected.filter((label) => !text.includes(label));
         return missing.length === 0 || `名乗っていない的: ${missing.join(', ')}`;
       },
     },

@@ -815,6 +815,7 @@
     "label_journal": "ENTRIES",
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
+    "label_pen": "NEW",
     "pill_jar_empty": "空",
     "pill_jar_fermenting": "发酵中",
     "pill_jar_almost": "即将",

@@ -49,9 +49,9 @@ describe('overlayScope', () => {
 });
 
 describe('notebookTarget', () => {
-  it('どの冊もその月の一覧を開く（当月も。今月の一覧を見る方法が無かった）', () => {
-    expect(notebookTarget('2026-09')).toEqual({ kind: 'journal-month', month: '2026-09' });
-    expect(notebookTarget('2026-08')).toEqual({ kind: 'journal-month', month: '2026-08' });
+  it('当月（積みのいちばん上）は新規執筆、過去月はその月の一覧', () => {
+    expect(notebookTarget('2026-09', true)).toEqual({ kind: 'journal-new' });
+    expect(notebookTarget('2026-08', false)).toEqual({ kind: 'journal-month', month: '2026-08' });
   });
 });
 
