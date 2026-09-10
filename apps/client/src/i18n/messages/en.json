@@ -148,6 +148,13 @@
     "save_hook": {
       "error_save": "Failed to save",
       "error_create": "Failed to create"
+    },
+    "question_chip": {
+      "empty": "Link a question",
+      "untitled": "Untitled question",
+      "none_available": "No questions yet",
+      "linked_count": "{count} questions linked",
+      "unlink_aria": "Unlink “{text}”"
     }
   },
   "app": {
@@ -228,8 +235,15 @@
   },
   "sidebar": {
     "nav": {
-      "account": "Account"
-    }
+      "account": "Account",
+      "jar": "Jar",
+      "board": "Board",
+      "list": "Entries",
+      "editor": "Write",
+      "help": "Help"
+    },
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar"
   },
   "stats": {
     "label": {
@@ -328,7 +342,9 @@
       "editing": "Editing",
       "saved": "Saved",
       "saving": "Saving...",
-      "autosaving": "Auto-saving entry..."
+      "autosaving": "Auto-saving entry...",
+      "saving_now": "Saving",
+      "saved_moment_ago": "Saved"
     },
     "voice": {
       "error_network": "Voice recognition is unavailable (please reopen in Chrome)",
@@ -336,24 +352,18 @@
       "error_unsupported": "This browser does not support voice input"
     },
     "toolbar": {
-      "new_entry": "New entry",
-      "save": "Save",
       "pickle": "Pickle",
-      "list": "List",
-      "stats": "Writing stats",
       "voice_stop": "Stop voice input",
       "voice": "Voice input",
       "settings": "Settings",
-      "writing_horizontal": "Switch to horizontal",
-      "writing_vertical": "Switch to vertical",
-      "font_sans": "Switch to gothic (sans)",
-      "font_serif": "Switch to mincho (serif)",
+      "fermentation_sidebar_show": "Open the fermentation sidebar",
+      "fermentation_sidebar_hide": "Close the fermentation sidebar",
       "fullscreen": "Fullscreen",
-      "fermentation_overlay_show": "Show fermentation result",
-      "fermentation_overlay_hide": "Hide fermentation result"
+      "fullscreen_exit": "Exit fullscreen"
     },
     "title": {
       "placeholder": "Enter a title...",
+      "remaining": "{count} left",
       "add": "Add a title"
     },
     "placeholder": "What did you feel today?",
@@ -371,49 +381,46 @@
       "saving": "Saving..."
     },
     "settings": {
-      "close_aria": "Close settings",
-      "section_basic": "Basics",
-      "font_size": "Font size",
-      "line_height": "Line height",
+      "font_size": "Text size",
+      "line_height": "Line spacing",
       "focus_mode": "Focus mode",
       "section_effects": "Effects",
       "time_inscription": "Time inscription",
-      "ti_font_size": "Font size",
-      "ti_font_weight": "Font weight",
+      "ti_font_size": "Letter size",
+      "ti_font_weight": "Letter weight",
       "ti_pressure_bleed": "Pressure bleed",
-      "eraser_trace": "Eraser trace",
-      "amp": "Keystroke amplification (ASMR)",
-      "voice": "Voice inscription",
+      "eraser_trace": "Eraser marks",
+      "amp": "Keystroke amplification",
+      "voice": "Volume inscription",
       "ghost": "Ghost",
-      "ghost_block": "Block (on commit)",
-      "ghost_dust": "Dust (per key)",
+      "ghost_block": "Blocks",
+      "ghost_dust": "Dust",
       "ghost_size": "Size",
       "ghost_scatter": "Scatter",
       "ghost_blur_start": "Initial blur",
       "ghost_blur_end": "Final blur",
       "ghost_duration": "Duration",
-      "section_fermentation_overlay": "Fermentation overlay",
-      "fermentation_overlay_description": "When you link a question to a new entry, the latest fermentation result for that question can float over the editor. Choose how this should behave.",
-      "fermentation_overlay_ask": "Ask before showing",
-      "fermentation_overlay_always": "Always show fermentation result on entry screen",
-      "fermentation_overlay_never": "Never show fermentation result on entry screen",
-      "focus_mode_fades_fermentation": "Also hide fermentation elements"
+      "section_display": "Display",
+      "writing_vertical": "Vertical",
+      "writing_horizontal": "Horizontal",
+      "font_serif": "Serif",
+      "font_sans": "Sans",
+      "heading": "Settings",
+      "writing_mode": "Writing direction",
+      "font_family": "Typeface",
+      "time_inscription_mode": "Shown as",
+      "ghost_mode": "Shown as",
+      "palette_auto_hide": "Hide the palette while writing",
+      "palette_size": "Palette size",
+      "palette_size_small": "Small",
+      "palette_size_medium": "Medium",
+      "palette_size_large": "Large"
     },
     "snippet_toolbar": {
       "saving": "Saving…",
       "saved": "Saved",
       "create": "Make snippet",
       "too_long": "Max. 50 characters"
-    },
-    "stats": {
-      "aria_label": "Writing stats",
-      "reading_time_under_minute": "Under 1 min",
-      "reading_time_minutes": "About {n} min",
-      "heading": "Writing stats",
-      "label_chars": "Characters",
-      "label_lines": "Lines",
-      "label_paragraphs": "Paragraphs",
-      "label_reading_time": "Reading time"
     },
     "date": {
       "day_sun": "Sunday",
@@ -461,7 +468,7 @@
         "aria_label": "Fermentation result display confirmation",
         "close_aria": "Close modal",
         "heading": "Show this question's fermentation result?",
-        "body": "The question you linked has a past fermentation result. We can float its snippets, keywords, and letter over the editor as reference while you write.",
+        "body": "The question you linked has results from a past fermentation. Its snippets, keywords, and letter can appear in the sidebar on the right while you write.",
         "remember_label": "Remember this choice; don't ask next time (changeable in settings)",
         "show": "Show",
         "hide": "Don't show"
@@ -477,6 +484,30 @@
       "aria_snippet": "Open fermentation snippet",
       "aria_letter": "Open letter from the fermentation process",
       "letter_badge": "Letter from the fermentation process"
+    },
+    "fermentation_sidebar": {
+      "close_aria": "Close the fermentation sidebar",
+      "empty": "No fermentation results for this question yet.",
+      "section_letter": "Letter",
+      "section_keywords": "Keywords",
+      "section_snippets": "Snippets",
+      "back_aria": "Back to list",
+      "open_aria": "Open fermentation",
+      "drag_or_open": "Click to read why · drag into the entry",
+      "loading": "Loading…",
+      "question_select_aria": "Which question to view",
+      "question_select_placeholder": "Choose a question",
+      "question_unnamed": "(Untitled question)"
+    },
+    "palette": {
+      "move": "Move the palette",
+      "collapse": "Collapse the palette",
+      "expand": "Expand the palette",
+      "pickle_needs_body": "Write something to pickle it",
+      "pickle_needs_question": "Link a question to pickle it",
+      "fermentation_needs_question": "Link a question to see its last fermentation",
+      "fermentation_not_ready": "This question has not fermented yet",
+      "fermentation_new_entry_only": "Past fermentation shows while writing a new entry"
     }
   },
   "photo": {
@@ -522,8 +553,10 @@
       "header_snippet": "Snippets cut by Oryzae",
       "header_letter": "Observations from L.A.B.",
       "snippet_source_prefix": "Source:",
-      "resize_aria": "Resize detail panel",
-      "write_entry": "Write an entry for this question"
+      "write_entry": "Write an entry for this question",
+      "empty_label": "READING",
+      "empty_hint": "Pick a word, an excerpt, or the letter in the circle to read it here.",
+      "resize_aria": "Resize detail column"
     },
     "jar": {
       "zoom_close_aria": "Close zoom",
@@ -571,6 +604,18 @@
       },
       "canvas_aria": "Jar canvas",
       "minimap_aria": "Jar minimap"
+    },
+    "history": {
+      "ghost_jar_title": "Fermentation jar",
+      "back_to_jar": "Back to the jar",
+      "new": "NEW",
+      "newest": "LATEST",
+      "context": "Fermented on {date}",
+      "prev_aria": "Previous fermentation",
+      "next_aria": "Next fermentation",
+      "hint": "Flip with ← → keys, drag, or scroll ／ ESC to return to the jar",
+      "launcher": "Look back through {count} fermentations",
+      "open_aria": "Open the fermentation history for {question}"
     }
   },
   "questions": {
@@ -612,6 +657,7 @@
     },
     "step_question": {
       "eyebrow": "02 — Question",
+      "title": "One question.",
       "body": "Try shaping what you're most preoccupied with into a short question. \"Why…\", \"How might I…\" — a sentence whose answer you don't have yet is plenty. You can edit it any time.",
       "placeholder": "e.g. Why am I bad at hurrying?",
       "hint": "It will be stored in the Jar — fermentation starts here.",

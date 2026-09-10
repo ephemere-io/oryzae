@@ -257,6 +257,13 @@ describe('barrenStreak — 直らないまま回り続けるのを止める', ()
     expect(barrenStreak(withRuns('aborted', 'gates-failed', 'blocked'))).toBe(3);
   });
 
+  // ゲートは通ったのにマージできなかった場合。原因はコードではなく権限や競合だが、
+  // 費用を払って何も入らないことに変わりはないので止める側に数える。
+  it('マージだけ失敗した実行（merge-failed）も数える', () => {
+    expect(barrenStreak(withRuns('merged:#1', 'merge-failed', 'merge-failed'))).toBe(2);
+    expect(barrenStreak(withRuns('merge-failed', 'merge-failed', 'merged:#2'))).toBe(0);
+  });
+
   it('月をまたいでも連続とみなす', () => {
     const ledger = {
       version: 1,

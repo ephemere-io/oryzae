@@ -193,7 +193,37 @@ Claude Sonnet 5 は $2.00 / MTok（入力）・$10.00 / MTok（出力）、キ�
 | `AUTO_FIX_MODEL` | `claude-sonnet-5` | 使うモデル |
 | `AUTO_FIX_EFFORT` | `medium` | 思考の深さ（`low`〜`max`）。`aborted` が続くならさらに下げる |
 
-必要なシークレットは `ANTHROPIC_API_KEY` のみ（定期セキュリティ監査と共用）。
+必要なシークレットは `ANTHROPIC_API_KEY`（定期セキュリティ監査と共用）と、
+自動マージまで通すなら `AUTO_FIX_TOKEN`。
+
+### `AUTO_FIX_TOKEN` が要る理由
+
+main のルールセット「Protect main」が **1 承認** を要求する
+（public 化した 2026-09-07 に有効化された。private の無料プランでは効いていなかった）。
+bypass できるのは Admin ロールだけで、`github-actions[bot]` は Admin ではないため、
+`GITHUB_TOKEN` では自分の PR をマージできない。
+
+**GitHub Actions をルールセットの bypass に足すことはできない。** API が拒否する:
+`Actor GitHub Actions integration must be part of the ruleset source or owner organization`。
+bypass に指定できるのは、組織にインストールされた App・チーム・リポジトリロールだけである。
+
+したがって選択肢は 2 つ:
+
+| | 設定 | 挙動 |
+|---|---|---|
+| 自動マージまで通す | Admin 権限の fine-grained PAT を `AUTO_FIX_TOKEN` に入れる | ループが `--admin` でマージする |
+| PR まで自動化する | 何もしない | 修正とブランチと PR は自動。マージだけ人がする（差分は失われない） |
+
+PAT は「このリポジトリのみ」に絞り、**Contents: Read and write** と
+**Pull requests: Read and write** の 2 つだけを与える。それ以上は要らない。
+
+**この PAT をジョブ全体の `GH_TOKEN` にしてはならない。** 一度そうしたところ、
+PAT に issues / actions の権限が無かったため「マージは成功したのに台帳への記録が 403 で落ちる」
+という最悪の形になった（run 34372356525）。費用を使ったのに使用額が計上されないと、
+月額上限が静かに効かなくなる。PAT を使うのはマージの 1 か所だけにして、
+台帳・Issue コメント・E2E の起動は GITHUB_TOKEN に任せる。
+
+期限切れでループが静かに止まらないよう、期限は台帳 Issue に控えておくこと。
 
 ### 組織設定が 1 つ要る
 
@@ -236,9 +266,10 @@ Issue に `auto-fix` ラベルを付ける。次の巡回、またはラベル�
 | `no-fix` | 探したが直す価値のあるものが無かった | 正常。巡回では普通に起きる |
 | `blocked` | 差分は出たが許可領域外だった | 続くならスライスか指示を見直す |
 | `gates-failed` | 差分は出たがガードレールに落ちた | 続くなら指示か対象が悪い |
+| `merge-failed` | ゲートは通ったが、権限や競合でマージできなかった | 修正自体は正しい。`AUTO_FIX_TOKEN` を確認する（差分は PR に残っている） |
 | `aborted` | 1 回あたりの上限に当たって打ち切られた | 最も高い結末（満額かかって成果ゼロ）。対象を小さくするか effort を下げる |
 
-`blocked` / `gates-failed` / `aborted` が 3 回続くとサーキットブレーカーが働いて停止する。
+`blocked` / `gates-failed` / `merge-failed` / `aborted` が 3 回続くとサーキットブレーカーが働いて停止する。
 原因を直してから、台帳 Issue に成果のある実行が 1 件積まれれば自動で解除される
 （すぐ解除したい場合は台帳 Issue を閉じる。次回に新しい台帳が作られる＝当月の使用額もリセットされる点に注意）。
 

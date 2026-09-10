@@ -36,7 +36,7 @@ export function PhotoCardContent({ content, captionHidden = false }: PhotoCardCo
           minHeight: 0,
           objectFit: 'contain',
           display: 'block',
-          backgroundColor: 'var(--toolbar-hover)',
+          backgroundColor: 'var(--hover-wash)',
         }}
       />
       {content.caption && !captionHidden && (

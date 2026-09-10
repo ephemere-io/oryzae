@@ -95,6 +95,20 @@ function buildRows(data: ObservabilitySummary): ToolRow[] {
       href: '/observability/deploys',
       externalUrl: 'https://vercel.com',
     },
+    // 外部ツールではないが、ここに並べる。「勝手に動いているものを見に行く場所」が
+    // Observability である以上、CI や自動修正ループが載っていないのは抜けである。
+    //
+    // 件数はあえてここで数えない。admin は feature 間の import を禁じており
+    // （dep-cruise の feature-isolation）、observability から automation を読むと違反になる。
+    // 数はリンク先のページが自分で出す。
+    {
+      id: 'automation',
+      name: '自動実行',
+      category: 'Automation',
+      metric: 'CI・E2E・監査・依存更新・自動修正',
+      href: '/observability/automation',
+      externalUrl: 'https://github.com/ephemere-io/oryzae/actions',
+    },
   ];
 }
 

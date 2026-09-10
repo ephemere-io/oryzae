@@ -32,7 +32,9 @@ test.describe('エントリ管理', () => {
     if (await firstEntry.isVisible()) {
       await firstEntry.click();
       await page.waitForURL(/\/entries\/.+/);
-      await expect(page.locator('textarea, [contenteditable="true"]')).toBeVisible();
+      // 本文を指す。題も textarea になったので `textarea, [contenteditable]` では
+      // 2つに当たって落ちる（本文は contentEditable、題は textarea）。
+      await expect(page.locator('[contenteditable="true"]')).toBeVisible();
     }
   });
 

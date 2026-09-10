@@ -81,6 +81,16 @@ jobs:
       issues: write # 台帳 Issue の更新と、対象 Issue へのコメント
       actions: write # 失敗した run のログを読み、マージ後に E2E を起動する
     env:
+      # 既定は GITHUB_TOKEN。台帳 Issue の読み書き・Issue コメント・E2E の起動は
+      # すべてこれで足りる（下の permissions で issues: write / actions: write を持つ）。
+      #
+      # **AUTO_FIX_TOKEN を全体に効かせてはいけない。** 一度そうしたところ、
+      # PAT に issues / actions の権限が無かったために「マージは成功したのに
+      # 台帳への記録が 403 で落ちる」という最悪の形になった。
+      # 費用を使ったのに使用額が計上されないと、月額上限が静かに効かなくなる。
+      #
+      # PAT を要るのはマージの 1 か所だけなので、そこだけで上書きする（下の merge ステップ）。
+      # こうすれば PAT に要る権限は Contents と Pull requests の 2 つだけで済む。
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       LEDGER_TITLE: '[auto-fix] 予算台帳と稼働状況'
     steps:
@@ -102,6 +112,26 @@ jobs:
 
       - name: 作業ディレクトリを用意する
         run: mkdir -p .bot
+
+      # AUTO_FIX_TOKEN は GitHub のトークンであって Anthropic の API キーではない。
+      # 取り違えても最後のマージまで気づけないと、そこまでの費用が無駄になるので先に確かめる。
+      # 未設定なら何も確認しない（GITHUB_TOKEN で PR まで動く構成として正常）。
+      - name: マージ用トークンの確認
+        if: ${{ secrets.AUTO_FIX_TOKEN != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN }}
+        run: |
+          # 叩き先は「このリポジトリ自身」。fine-grained PAT なら metadata:read が
+          # 自動で付くので、Contents / Pull requests だけの最小権限でもここは通る。
+          if ! gh api "repos/${GITHUB_REPOSITORY}" --jq .full_name > .bot/whoami.txt 2> .bot/whoami.err; then
+            echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
+                 "このシークレットに入れるのは **GitHub の fine-grained PAT**（github_pat_ で始まる）です。" \
+                 "Anthropic の API キー（sk-ant-... / ANTHROPIC_API_KEY のほう）ではありません。" \
+                 "シークレットを削除すれば GITHUB_TOKEN で動き、マージだけが人待ちになります。"
+            sed 's/^/  /' .bot/whoami.err || true
+            exit 1
+          fi
+          echo "gh が見ているリポジトリ: $(cat .bot/whoami.txt)"
 
       # ── 何を直すかを決める ────────────────────────────────────────────
       #
@@ -548,6 +578,10 @@ jobs:
         env:
           KIND: ${{ steps.task.outputs.kind }}
           ISSUE_NUMBER: ${{ steps.task.outputs.issue_number }}
+          # ここだけ PAT で上書きする。ルールセットの 1 承認要求を bypass できるのは
+          # Admin ロールだけで、github-actions[bot] はそれではないため。
+          # 全体に効かせない理由はジョブ冒頭の env のコメントを参照。
+          GH_TOKEN: ${{ secrets.AUTO_FIX_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -614,15 +648,22 @@ jobs:
           echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
 
           # 作成直後は GitHub 側の mergeable 判定が済んでいないことがあるので数回試す。
+          # --admin はルールセットの 1 承認要求を bypass するために要る（AUTO_FIX_TOKEN が
+          # Admin のときだけ通る）。権限が無ければ素の merge に落として、そちらも駄目なら諦める。
           for attempt in 1 2 3 4 5; do
-            if gh pr merge "$branch" --squash --delete-branch; then
+            if gh pr merge "$branch" --squash --delete-branch --admin 2>/dev/null \
+               || gh pr merge "$branch" --squash --delete-branch; then
               echo "マージした: $url" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             echo "マージ待ち（${attempt} 回目）"
             sleep 10
           done
-          echo "::error::PR は作成したがマージできなかった: $url"
+          # ここに来るのはほぼ「ルールセットの 1 承認要求を bypass できるトークンが無い」場合。
+          # 差分はブランチと PR に残っているので、人がマージすれば拾える。
+          echo "::error::PR は作成したがマージできなかった: $url" \
+               "AUTO_FIX_TOKEN（Admin 権限の fine-grained PAT）を設定すると自動マージできる。" \
+               "設定しない場合、このループは「修正して PR を出すところまで」動く（docs/auto-fix-loop-guide.md）。"
           exit 1
 
       # マージした変更は push イベントの CI を起動しない（GITHUB_TOKEN の再帰防止）。
@@ -652,12 +693,18 @@ jobs:
         run: |
           set -euo pipefail
 
+          # ゲート落ちとマージ失敗を混ぜない。原因が違えば直し方も違うのに、
+          # 台帳に同じ名前で並ぶと「何が起きているか」が読めなくなる。
+          #   gates-failed … 修正が間違っていた → 指示や対象の選び方を見直す
+          #   merge-failed … 修正は正しかったが権限や競合で入らなかった → 設定を見直す
           case "${{ steps.diff.outputs.verdict }}" in
             auto-merge)
-              if [ "${{ steps.gates.outcome }}" = "success" ] && [ "${{ steps.merge.outcome }}" = "success" ]; then
+              if [ "${{ steps.gates.outcome }}" != "success" ]; then
+                result="gates-failed"
+              elif [ "${{ steps.merge.outcome }}" = "success" ]; then
                 result="merged:#${{ steps.merge.outputs.number }}"
               else
-                result="gates-failed"
+                result="merge-failed"
               fi
               ;;
             blocked) result="blocked" ;;

@@ -20,6 +20,12 @@ export interface UnreadState {
   /** 未読の手紙が届いている問いの id（Issue #452: 問い一覧にも印を出す）。 */
   unreadQuestionIds: ReadonlySet<string>;
   /**
+   * 未読の手紙（＝完了発酵）そのものの id。
+   * 発酵履歴（Cover Flow）は 1 問いに複数の発酵を並べるので、問い単位では
+   * どの回が新しいのかを言えない。円盤・日付レールの印はこちらを見る。
+   */
+  unreadFermentationIds: ReadonlySet<string>;
+  /**
    * その問いに今届いている手紙を既読にする（Issue #447）。
    * 受信箱は問いごとに最新1通しか出さないので、既読の単位も問いに揃える。
    */
@@ -33,6 +39,7 @@ const EMPTY: UnreadState = {
   ready: false,
   unreadCount: 0,
   unreadQuestionIds: new Set(),
+  unreadFermentationIds: new Set(),
   markQuestionRead: () => {},
   markAllSeen: () => {},
 };

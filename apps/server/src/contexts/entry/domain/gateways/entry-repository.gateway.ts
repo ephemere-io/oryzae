@@ -22,6 +22,14 @@ export interface EntryRepositoryGateway {
   // 文字数閾値判定用。fermentation_enabled に関わらず全エントリの文字数を合算する
   // (issue 文 "書いた全てのエントリーの合計文字数" の素直な解釈)。
   countCharsByUserIdSince(userId: string, sinceIso: string | null): Promise<number>;
+  // issue #278: 問い単位 readiness 用。指定の問いに紐づくエントリのうち sinceIso より後に
+  // 作られたものの文字数を合算する (sinceIso が null なら全期間)。
+  // 問い単位の閾値判定なので countCharsByUserIdSince と同じくコードポイント単位で数える。
+  countCharsByQuestionIdSince(
+    userId: string,
+    questionId: string,
+    sinceIso: string | null,
+  ): Promise<number>;
   listByUserIdAndWeek(userId: string, dateKey: string, tzOffsetMinutes?: number): Promise<Entry[]>;
   // Issue #331: questionId が与えられたら、その問いに紐づく entry の中から検索する
   searchByUserId(
