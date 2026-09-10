@@ -191,18 +191,21 @@ const MS_PER_SECOND = 1000;
 /**
  * 憶えておく 1 枚の撮り方。
  *
- * **形式は PNG。JPEG は使わない。** 書斎はほぼ白地に細い黒線だけで出来ていて、
- * JPEG の周波数変換は**まさにこの形が最も苦手**（線の周りにリンギングが出る）。
- * 960px の JPEG を Retina で引き伸ばした版は、線が破線と粒に割れて「ガビガビ」と
- * 報告された。白地が大半なので PNG でもよく縮み、実測で数十 KB に収まる。
+ * ### 拡大も縮小もしない
  *
- * **大きさの上限は 1440。** `renderer.domElement.width` は既にデバイス画素
- * （pixelRatio 込み、上限 2）なので、1440×900 の画面では 2880×1800 ある。そこから
- * 960 へ落とすと 3 分の 1 になり、拡大して敷けば線が残らない。等倍まで上げると
- * `toDataURL` が重くなり、**カメラが動き出すその 1 フレームで引っかかる**ので、
- * CSS 画素と同じ 1440 で止める（Retina では半分の解像度だが、滲むだけで割れはしない）。
+ * 「押すと画面がガビガビになる」の正体は**拡大縮小そのもの**だった。書斎は 1px の
+ * 細線で出来ていて、線画は縮小 → 拡大の往復に耐えない（線が破線と粒に割れる）。
+ * はじめは 960px の JPEG で撮っていて、JPEG のリンギングと 3 倍の引き伸ばしが
+ * 重なっていた。PNG にしてリンギングは消えたが、**引き伸ばしのほうが主犯**だった。
+ *
+ * `renderer.domElement.width` は既にデバイス画素（pixelRatio 込み、上限 2）。敷く先も
+ * 同じ画面なので、**そのままの大きさで撮れば 1:1 になり、再標本化そのものが起きない**。
+ * 上限はごく大きな画面（4K を超える窓）への保険で、そこだけは縮めて諦める。
+ *
+ * 形式は PNG。JPEG の周波数変換は白地に細い黒線という形が最も苦手で、線の周りに
+ * リンギングが出る。白地が大半なので PNG でもよく縮む。
  */
-const CAPTURE = { maxWidth: 1440 } as const;
+const CAPTURE = { maxWidth: 3840 } as const;
 
 /**
  * `sessionStorage` に置く 1 枚の上限（文字数）。
@@ -390,27 +393,39 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     if (captureRequested) {
       captureRequested = false;
-      const frame = captureFrame();
-      if (frame !== null) options.onCapture?.(frame);
+      captureFrame((frame) => {
+        if (frame !== null) options.onCapture?.(frame);
+      });
     }
   }
 
   /**
-   * いま描いたフレームを、地に敷ける 1 枚に畳む。
+   * いま描いたフレームを 1 枚の画像にする。
    *
-   * 掴めない環境（2D コンテキストが取れない・canvas が 0 幅）では null を返す。
-   * 地が無くても遷移そのものは成立するので、ここで諦めても失うものは無い。
+   * **画素を取るのは同期、符号化は非同期。** 描画バッファは次のフレームで捨てられる
+   * ので、`drawImage` でこの場に写し取る必要がある（これは GPU の転送なので速い）。
+   * 一方 PNG の符号化は等倍だと重く、その場でやるとカメラが動き出す 1 フレームが
+   * 引っかかる。`toBlob` に渡して符号化だけ後回しにする。
+   *
+   * 撮れない環境（2D コンテキストが取れない・canvas が 0 幅・符号化に失敗）では
+   * null を返す。地が無くても遷移そのものは成立するので、諦めても失うものは無い。
    */
-  function captureFrame(): string | null {
+  function captureFrame(done: (dataUrl: string | null) => void): void {
     const source = renderer.domElement;
-    if (source.width === 0 || source.height === 0) return null;
+    if (source.width === 0 || source.height === 0) {
+      done(null);
+      return;
+    }
 
     const width = Math.min(source.width, CAPTURE.maxWidth);
     const flat = document.createElement('canvas');
     flat.width = width;
     flat.height = Math.max(1, Math.round((source.height / source.width) * width));
     const context = flat.getContext('2d');
-    if (context === null) return null;
+    if (context === null) {
+      done(null);
+      return;
+    }
 
     // 書斎は alpha 付きで描いている。地の色を先に塗ってから重ねる
     // （透明のまま敷くと、敷いた先の画面が透けて二重写しになる）。
@@ -419,11 +434,22 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     context.drawImage(source, 0, 0, flat.width, flat.height);
 
     try {
-      const url = flat.toDataURL('image/png');
-      return url.length > CAPTURE_MAX_CHARS ? null : url;
+      flat.toBlob((blob) => {
+        if (blob === null) {
+          done(null);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const url = typeof reader.result === 'string' ? reader.result : null;
+          done(url !== null && url.length <= CAPTURE_MAX_CHARS ? url : null);
+        };
+        reader.onerror = () => done(null);
+        reader.readAsDataURL(blob);
+      }, 'image/png');
     } catch {
       // 汚れた canvas（外部テクスチャ）なら諦める。いまは自前の描画だけなので通常は来ない。
-      return null;
+      done(null);
     }
   }
 
@@ -925,23 +951,24 @@ function lineFrom(points: Vector3[], material: Material, own: OwnGeometry): Line
 }
 
 /**
- * 机の天板と脚。輪郭・手前の木端・脚 4 本・木目を示唆する 1 本。
+ * 机の天板。**輪郭・手前の木端・木目 1 本だけ。脚は描かない。**
  *
- * ### 足すのは「部品」ではなく「厚み」
+ * ### 脚をやめた経緯
  *
- * 一度は天板の下に幕板・引き出し・板脚を足し、「現実的かつ具体的で稚拙」と戻した。
- * 次に「引くと机と脚が簡素で貧弱に見える」と報告された（PR #570）。同じ場所を
- * 行き来しているように見えるが、**足す軸が違う**。
+ * 3 度いじって 3 度とも外している場所:
  *
- * 前回足したのは**名前のある部品**（引き出し・幕板）で、絵が説明的になった。今回
- * 足すのは**いま在るものの厚み**だけ ―
+ *  1. 線 1 本の前脚 2 本 → 「ちゃぶ台のように質素」
+ *  2. 幕板・引き出し・板の脚 → 「現実的かつ具体的で稚拙」
+ *  3. 細い箱の脚 4 本 + 接地 → 「貧しい感じ。いっそ生やさない方がいい」
  *
- *  - 脚は線 1 本だった。線は太さを持てないので、どう描いても「棒」にしかならない。
- *    細い箱にすると、部品を増やさずに脚が脚として立つ
- *  - 奥の脚が無く、机が奥で浮いていた。4 本目まで描くのは足すのではなく**欠けを埋める**
- *  - 脚が床に着くところに短い線を引く。家具が重く見えるのは、床との接点があるとき
+ * **俯瞰の構図では脚が絵にならない。** 天板をほぼ真上から見ているので、脚は天板の
+ * 下から短く覗くだけになり、どう描いても「棒」か「未熟なデッサン」に見える。3 で
+ * 「足の付け根が机の底辺ラインより上に出ている」と言われたのがまさにそれで、脚の面は
+ * 木端より奥（`zNear` より内側）にあるため、俯瞰では木端の線より上に投影される。
+ * 遠近法としては正しいが、絵としては透けているようにしか見えない。
  *
- * 引き出しのような**新しい名前**は 1 つも増えていない。ここはそういう場所ではない。
+ * 描かなければ、天板は「面」として素直に読める。宙に浮いて見える心配は、床の格子と
+ * 奥の壁の立ち上がりが受け持っている。**ここは線を足して解く場所ではない。**
  */
 function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeometry): Group {
   const group = new Group();
@@ -962,8 +989,8 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
   );
 
   // 手前の木端。ここだけ濃く引くと、平面が板に見える。
-  // 0.16 では脚を立てても板が薄く、卓のままだった。天板の厚みも「厚み」の一部。
-  const edgeBottom = y - 0.24;
+  // 脚を描かなくなったので、厚みはこの 1 本が全部を担う。薄すぎると紙に見える。
+  const edgeBottom = y - 0.22;
   group.add(
     lineFrom(
       [
@@ -976,68 +1003,6 @@ function buildDesk(layout: StudyLayout, materials: StudyMaterials, own: OwnGeome
       own,
     ),
   );
-
-  /**
-   * 脚 4 本。**線ではなく細い箱**として引く。
-   *
-   * 線は太さを持てないので、1 本引くとどうしても「棒で支えた卓」になる。前面と側面を
-   * 引けば、部品を増やさずに脚が脚として立つ。奥の 2 本まで描くのは、机が奥で浮いて
-   * 見えていた欠けを埋めるため。
-   */
-  const legWidth = 0.34;
-  const legFrontZ = zNear - 0.25;
-  const legBackZ = zFar + 1.1;
-  const legXs = [-halfWidth + 0.7, halfWidth - 0.7];
-
-  for (const x of legXs) {
-    for (const [z, ink] of [
-      [legFrontZ, 0.24],
-      [legBackZ, 0.12],
-    ] as const) {
-      const inner = x < 0 ? x + legWidth : x - legWidth;
-      // 前面（2 本の縦線と、床での底辺）。
-      group.add(
-        lineFrom(
-          [
-            new Vector3(x, edgeBottom, z),
-            new Vector3(x, layout.floorY, z),
-            new Vector3(inner, layout.floorY, z),
-            new Vector3(inner, edgeBottom, z),
-          ],
-          materials.faint(ink),
-          own,
-        ),
-      );
-    }
-
-    // 側面の稜線 1 本。奥行きを示すのに、前と奥を結ぶこの 1 本で足りる。
-    group.add(
-      lineFrom(
-        [new Vector3(x, layout.floorY, legFrontZ), new Vector3(x, layout.floorY, legBackZ)],
-        materials.faint(0.07),
-        own,
-      ),
-    );
-
-    /**
-     * 床との接点。
-     *
-     * **家具が重く見えるのは、床に着いているときだけ。** 脚の下端に短い線を 1 本
-     * 置くと、同じ高さのまま設置している感じが出る（影を落とさない線画なので、
-     * 接点そのものを描く）。
-     */
-    const inner = x < 0 ? x + legWidth : x - legWidth;
-    group.add(
-      lineFrom(
-        [
-          new Vector3(x - 0.1, layout.floorY, legFrontZ + 0.12),
-          new Vector3(inner + (x < 0 ? 0.1 : -0.1), layout.floorY, legFrontZ + 0.12),
-        ],
-        materials.faint(0.3),
-        own,
-      ),
-    );
-  }
 
   // 木目を示唆する長い 1 本。
   group.add(
