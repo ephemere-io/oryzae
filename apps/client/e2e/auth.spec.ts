@@ -17,9 +17,8 @@ test.describe('認証フロー', () => {
     await page.locator('input[type="password"]').fill(TEST_PASSWORD);
     await page.getByRole('button', { name: 'ログイン', exact: true }).click();
 
-    // ホームは既定で書斎（NEXT_PUBLIC_STUDY_HOME を置かなくても出る）。
-    await page.waitForURL('**/study**');
-    await expect(page).toHaveURL(/\/study/);
+    // ホームは既定で書斎＝ルート（/）。
+    await page.waitForURL((url) => url.pathname === '/');
   });
 
   test('未認証で /entries にアクセスすると /login にリダイレクト', async ({ page }) => {

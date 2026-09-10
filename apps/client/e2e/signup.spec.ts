@@ -70,8 +70,7 @@ test.describe('新規登録', () => {
     await page.goto(`/auth/confirm?token_hash=${tokenHash}&type=signup`);
 
     // 確定するとセッションが保存され、ホーム（既定は書斎）へ送られる。
-    await page.waitForURL('**/study**', { timeout: 30_000 });
-    await expect(page).toHaveURL(/\/study/);
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 30_000 });
 
     // 保護ルートに留まれる＝セッションが本当に確立している。
     await page.goto('/entries');

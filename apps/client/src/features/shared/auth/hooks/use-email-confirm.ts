@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import posthog from 'posthog-js';
 import { useEffect, useState } from 'react';
 import type { AuthFlowError, AuthSession } from '@/features/shared/auth/types';
@@ -27,9 +27,9 @@ function isEmailOtpType(value: string): value is EmailOtpType {
 /**
  * 種別ごとの既定遷移先（`next` が無いとき）。
  *
- * 既定が `/` なのは、ホームがどこか（書斎か従来の入口か）を知っているのが
- * `HomeGate`（= `useHomeHref`）1 か所だから。ここで `/entries/new` と書くと、
- * 書斎ホームが有効な人だけ着地が食い違う。
+ * 既定が `/` なのは、`/` が書斎そのもので、書斎を止めていれば従来の入口へ送るから
+ * （`app/(protected)/page.tsx`）。ここで `/entries/new` と書くと、書斎の人だけ着地が
+ * 食い違う。
  */
 function defaultNextFor(type: EmailOtpType): string {
   switch (type) {
@@ -61,13 +61,12 @@ function isAuthSession(value: unknown): value is AuthSession {
 
 export function useEmailConfirm(): { error: AuthFlowError | null } {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [error, setError] = useState<AuthFlowError | null>(null);
 
   useEffect(() => {
     async function handle() {
       // Supabase が hash でエラーを返したケース（期限切れ・使用済みリンク）。
-      // ルート（/）の HomeGate がここへ回してくるので、通信はせず理由だけ見せる。
+      // ルート（/）が hash を読んでここへ回してくるので、通信はせず理由だけ見せる。
       if (searchParams.get('auth_error')) {
         setError('auth_failed');
         return;
@@ -99,10 +98,13 @@ export function useEmailConfirm(): { error: AuthFlowError | null } {
 
       setTokens(data.session.accessToken, data.session.refreshToken);
       posthog.identify(data.user.id, { email: data.user.email });
-      router.push(next ?? defaultNextFor(typeParam));
+      // **読み込み直して入る。** 認証（AuthProvider）はマウント時にしか復元しないので、
+      // アプリ内の遷移で保護画面へ入ると「未ログイン」に見えてログイン画面へ戻される
+      // （OAuth の完了を全画面遷移にしているのと同じ理由）。
+      window.location.assign(next ?? defaultNextFor(typeParam));
     }
     handle();
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   return { error };
 }
