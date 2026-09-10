@@ -39,10 +39,6 @@ export function PullBackToStudy() {
   useEffect(() => setBackdrop(readStudyBackdrop()), []);
 
   useEffect(() => {
-    // 憶えた部屋が無ければ、そもそも受けない。滲ませる絵が無いまま引けてしまうと、
-    // 手応えの無いまま画面が変わる。
-    if (backdrop === null) return;
-
     let frame = 0;
     let lastEventAt = 0;
 
@@ -90,42 +86,48 @@ export function PullBackToStudy() {
       window.removeEventListener(OVERZOOM_OUT_EVENT, onOverzoom);
       cancelAnimationFrame(frame);
     };
-  }, [router, backdrop]);
+  }, [router]);
 
   /**
-   * **憶えた部屋が無くても、層と契約は出す。**
+   * **憶えた部屋が無くても引きは効かせる。**
    *
-   * 「何も描かない」で返すと `data-verify-*` ごと消え、検証ハーネスから見て
-   * 「表面が無い」＝読めるものが無いユニットになる。効いていない状態も状態なので、
-   * `armed` として名乗る。空の層は透明で当たりも持たないので、下の操作は何も奪わない。
+   * はじめは「絵が無いなら仕掛けごと出さない」にしていた。ところがそうすると、
+   * 別タブで直に開いた人にとっては**引いても本当に何も起きない**。手応えが無い状態と
+   * 「効かない」は見分けが付かないので、いちばん悪い出方になる。絵が無いときは
+   * 書斎の地の色だけを敷いて、引けること自体は同じように伝える。
+   *
+   * 層と契約は常に出す。「何も描かない」で返すと `data-verify-*` ごと消え、検証
+   * ハーネスから見て読めるものが無いユニットになる。空の層は透明で当たりも持たない
+   * ので、下の操作は何も奪わない。
    */
   return (
     <div
       {...verifyAttrs({
         unit: 'PullBackToStudy',
-        armed: backdrop !== null,
+        remembered: backdrop !== null,
         pulling: progress > 0,
       })}
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-[54] overflow-hidden"
-      style={{ opacity: progress }}
+      style={{ opacity: progress, background: backdrop === null ? STUDY_GROUND : undefined }}
     >
       {backdrop === null ? null : (
-        <>
-          {/* 引くほど部屋が近づく。引き始めは少し寄った状態から、引き切ると等倍へ。 */}
-          {/* biome-ignore lint/performance/noImgElement: data URL の地。最適化する先が無い */}
-          <img
-            src={backdrop}
-            alt=""
-            data-study-backdrop
-            className="h-full w-full object-cover"
-            style={{
-              transform: `scale(${PULL_BACK.startScale - (PULL_BACK.startScale - 1) * progress})`,
-              filter: `blur(${PULL_BACK.startBlurPx * (1 - progress)}px)`,
-            }}
-          />
-        </>
+        // 引くほど部屋が近づく。引き始めは少し寄った状態から、引き切ると等倍へ。
+        // biome-ignore lint/performance/noImgElement: data URL の地。最適化する先が無い
+        <img
+          src={backdrop}
+          alt=""
+          data-study-backdrop
+          className="h-full w-full object-cover"
+          style={{
+            transform: `scale(${PULL_BACK.startScale - (PULL_BACK.startScale - 1) * progress})`,
+            filter: `blur(${PULL_BACK.startBlurPx * (1 - progress)}px)`,
+          }}
+        />
       )}
     </div>
   );
 }
+
+/** 書斎の地の色（`LIGHT_PALETTE.solid`）。憶えた絵が無いときはこれだけを敷く。 */
+const STUDY_GROUND = '#FDFCF9';

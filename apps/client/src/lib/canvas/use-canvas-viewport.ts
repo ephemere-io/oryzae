@@ -5,8 +5,8 @@ import {
   type Bounds,
   fitBounds,
   IDENTITY_VIEWPORT,
-  MIN_SCALE,
   normalizeViewport,
+  OVERZOOM_ARM_SCALE,
   OVERZOOM_OUT_EVENT,
   type OverzoomOutDetail,
   type Point,
@@ -339,9 +339,10 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
         const before = vpRef.current.scale;
         apply(zoomAt(vpRef.current, e.clientX - rect.left, e.clientY - rect.top, factor));
 
-        // **引く向きなのに倍率が動かなかった** ＝ この画面では吸収しきれなかった引き。
-        // 捨てずに外へ流す（拾う側が何に使うかを決める）。
-        if (factor < 1 && before <= MIN_SCALE && vpRef.current.scale === before) {
+        // 引く向きの操作を、**引き切る手前から**外へ流す（拾う側が何に使うかを決める）。
+        // 最小で頭打ちになってからだけ流していたころは、そこへ辿り着くまでの長い引きの
+        // あいだ何も起きず、「効かない」と読まれた。
+        if (factor < 1 && before <= OVERZOOM_ARM_SCALE) {
           const detail: OverzoomOutDetail = { excess: 1 - factor };
           frame.dispatchEvent(new CustomEvent(OVERZOOM_OUT_EVENT, { detail, bubbles: true }));
         }
