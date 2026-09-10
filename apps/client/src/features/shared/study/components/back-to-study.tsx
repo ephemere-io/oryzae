@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useSidebarVisibility } from '@/lib/sidebar-context';
 
 /** 垂れ下がるタブの寸法（px）。 */
 export const STUDY_EXIT_TAB = { width: 156, height: 28 } as const;
@@ -29,10 +30,12 @@ type TabStyle = React.CSSProperties & Record<`--${string}`, string>;
 
 const TAB_STYLE: TabStyle = {
   width: STUDY_EXIT_TAB.width,
-  '--tab-bg': `color-mix(in srgb, ${TINT} 24%, var(--bg))`,
-  '--tab-bg-hover': `color-mix(in srgb, ${TINT} 36%, var(--bg))`,
-  borderColor: `color-mix(in srgb, ${TINT} 55%, transparent)`,
-  color: 'var(--fg)',
+  // 淡く（地 24% → 14%・縁 55% → 30%・字は --fg の 70%）。濃い版は「注意を引きすぎる」
+  // と報告された。ページの地と同じ色にはしない — それは「帯になっていない」と言われた版。
+  '--tab-bg': `color-mix(in srgb, ${TINT} 14%, var(--bg))`,
+  '--tab-bg-hover': `color-mix(in srgb, ${TINT} 22%, var(--bg))`,
+  borderColor: `color-mix(in srgb, ${TINT} 30%, transparent)`,
+  color: 'color-mix(in srgb, var(--fg) 70%, transparent)',
 };
 
 /**
@@ -56,8 +59,11 @@ const TAB_STYLE: TabStyle = {
  * だから**高さを持つのは中央のタブだけ**にして、帯は上端に 3px 走らせる。帯が
  * 「ここは書斎の中の一室」を言い、タブが「ここを押せば戻れる」を言う。
  *
- * - タブの地は書斎のラベルの点の色（`#A8A381`）を溶かしたもの。ページの地から
- *   はっきり浮く色で、しかも書斎の外の語彙を持ち込まない
+ * - タブの地は書斎のラベルの点の色（`#A8A381`）を薄く溶かしたもの。ページの地とは
+ *   見分けがつくが、注意を引きすぎない（濃い版は「目立ちすぎる」と言われた）
+ * - **集中モードでは消える。** エディタが書いている間にサイドバーを隠す合図
+ *   （`useSidebarVisibility().hidden`）をそのまま読む。書斎ではこのタブがサイドバーの
+ *   代わりなので、同じ合図で退くのが筋
  * - 名前は 12px（9px は「小さすぎる」と言われている）。矢印は付けない
  *   （「矢印と文字の組み合わせが、どこにも出てないデザイン言語」）— 垂れたタブの形が
  *   そのまま「引けば戻る」を言う
@@ -75,23 +81,30 @@ const TAB_STYLE: TabStyle = {
  */
 export function BackToStudy() {
   const t = useTranslations('study');
+  // 集中モード（エディタが書いている間にまわりを消す）。サイドバーと同じ合図で退く。
+  const { hidden } = useSidebarVisibility();
 
   return (
     // 帯そのものは触らない。押せるのはタブだけ。
     <div
-      {...verifyAttrs({ unit: 'BackToStudy', tabWidth: STUDY_EXIT_TAB.width })}
-      className="pointer-events-none fixed inset-x-0 top-0 z-[55] flex justify-center"
+      {...verifyAttrs({ unit: 'BackToStudy', tabWidth: STUDY_EXIT_TAB.width, hidden })}
+      className={`pointer-events-none fixed inset-x-0 top-0 z-[55] flex justify-center transition-opacity duration-300 ${
+        hidden ? 'opacity-0' : 'opacity-100'
+      }`}
     >
       {/* 上端を走る細い帯。 */}
       <div
         aria-hidden="true"
         className="absolute inset-x-0 top-0 h-[3px]"
-        style={{ background: `color-mix(in srgb, ${TINT} 36%, var(--bg))` }}
+        style={{ background: `color-mix(in srgb, ${TINT} 20%, var(--bg))` }}
       />
       <Link
         href="/study"
         aria-label={t('back_to_study')}
-        className="pointer-events-auto relative flex h-7 items-center justify-center rounded-b-lg border border-t-0 bg-[var(--tab-bg)] shadow-[0_2px_8px_rgba(74,69,65,0.10)] transition-all duration-200 hover:h-[31px] hover:bg-[var(--tab-bg-hover)]"
+        // 消えている間は押せず、Tab でも止まらない（見えないものに当たらせない）。
+        tabIndex={hidden ? -1 : undefined}
+        aria-hidden={hidden || undefined}
+        className={`${hidden ? 'pointer-events-none' : 'pointer-events-auto'} relative flex h-7 items-center justify-center rounded-b-lg border border-t-0 bg-[var(--tab-bg)] shadow-[0_2px_6px_rgba(74,69,65,0.05)] transition-all duration-200 hover:h-[31px] hover:bg-[var(--tab-bg-hover)]`}
         style={TAB_STYLE}
       >
         <span className="whitespace-nowrap text-[12px] font-medium tracking-[0.08em]">
