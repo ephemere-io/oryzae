@@ -74,12 +74,19 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'disarmed-without-backdrop',
-      description: '憶えた部屋が無ければ効かない（滲ませる絵が無いまま画面を変えない）',
+      /**
+       * 憶えた絵が無くても**引きは効く**。仕掛けごと出さない形にしていたら、別タブで
+       * 直に開いた人にとっては引いても本当に何も起きなかった。手応えの無い状態と
+       * 「効かない」は見分けが付かない。
+       */
+      id: 'works-without-backdrop',
+      description: '憶えた部屋が無くても層は出る（絵の代わりに地の色を敷く）',
       onlyFixtures: ['no-backdrop'],
       // 契約は DOM の属性なので、値は必ず文字列で届く（`false` ではなく `'false'`）。
       check: ({ root, contract }) => {
-        if (contract.armed !== 'false') return `地が無いのに armed=${String(contract.armed)}`;
+        if (contract.remembered !== 'false') {
+          return `地が無いのに remembered=${String(contract.remembered)}`;
+        }
         const image = root.querySelector('img[data-study-backdrop]');
         return image === null || '地が無いのに絵が出ている';
       },
