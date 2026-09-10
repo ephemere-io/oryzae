@@ -9,6 +9,7 @@ import {
 import type {
   BoardCardRepositoryGateway,
   CardPositionUpdate,
+  PinnedCounts,
 } from '../../domain/gateways/board-card-repository.gateway.js';
 import { BoardCard } from '../../domain/models/board-card.js';
 
@@ -27,6 +28,59 @@ export class SupabaseBoardCardRepository implements BoardCardRepositoryGateway {
       .eq('view_type', viewType)
       .eq('is_deleted', false)
       .order('z_index', { ascending: true });
+
+    if (error) throw error;
+    return toRecordArray(data ?? []).map((row) => this.toDomain(row));
+  }
+
+  /**
+   * 全期間の枚数を種類ごとに。日付で絞らない（書斎の壁は総量を映す）。
+   *
+   * 件数だけを受け取る `head: true` ではなく `card_type` と `ref_id` を運ぶ。
+   * **同じ付箋が daily と weekly の両方に居る**ことがあり、行を数えると壁に見えている
+   * 枚数より多い数を名乗ってしまうため、ref で畳んでから数える（壁に描く側も
+   * 同じ基準で畳んでいる）。運ぶのは短い文字列 2 つだけで、1 人ぶんの上限は
+   * 実測で数十枚。
+   */
+  async countPinnedByType(userId: string): Promise<PinnedCounts> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('card_type, ref_id')
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .neq('card_type', 'entry');
+
+    if (error) throw error;
+
+    const seen = new Set<string>();
+    const counts: PinnedCounts = { snippet: 0, photo: 0 };
+    for (const row of toRecordArray(data ?? [])) {
+      const cardType = readEnum(row, 'card_type', CARD_TYPES);
+      const key = `${cardType}:${readString(row, 'ref_id')}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (cardType === 'snippet') counts.snippet += 1;
+      if (cardType === 'photo') counts.photo += 1;
+    }
+    return counts;
+  }
+
+  /**
+   * 新しい順に上限まで。
+   *
+   * **weekly と daily の両方が返る。** 同じ付箋が両方に居ることがあり、書斎の壁では
+   * 二重に見える。壁は「どのくらい貼ってあるか」を映す場所なので、ここでは畳まずに
+   * 返し、重なりの扱いは呼び出し側（usecase）に任せる。
+   */
+  async findRecentByUserId(userId: string, limit: number): Promise<BoardCard[]> {
+    const { data, error } = await this.supabase
+      .from('board_cards')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .neq('card_type', 'entry')
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
     if (error) throw error;
     return toRecordArray(data ?? []).map((row) => this.toDomain(row));

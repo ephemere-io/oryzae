@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectDeviceFromUA, isDevice, resolveDevice } from '@/lib/device';
+import { detectDeviceFromUA, isDevice, parseDeviceRequest, resolveDevice } from '@/lib/device';
 
 describe('detectDeviceFromUA', () => {
   it('モバイル UA は sp', () => {
@@ -64,5 +64,23 @@ describe('resolveDevice', () => {
 
   it('pref も UA も無ければ pc にフォールバックする', () => {
     expect(resolveDevice(null, null)).toBe('pc');
+  });
+});
+
+describe('parseDeviceRequest', () => {
+  it('端末名はその指示として読む', () => {
+    expect(parseDeviceRequest('pc')).toBe('pc');
+    expect(parseDeviceRequest('sp')).toBe('sp');
+  });
+
+  it('auto は「解除」（切替に入る道だけを作らない）', () => {
+    expect(parseDeviceRequest('auto')).toBe('auto');
+  });
+
+  it('知らない値・未指定は指示なし', () => {
+    expect(parseDeviceRequest('tablet')).toBeNull();
+    expect(parseDeviceRequest('')).toBeNull();
+    expect(parseDeviceRequest(null)).toBeNull();
+    expect(parseDeviceRequest(undefined)).toBeNull();
   });
 });

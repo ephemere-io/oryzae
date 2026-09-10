@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'vitest';
+import {
+  notebookTarget,
+  overlayScope,
+  staysInStudy,
+  targetHref,
+} from '@/features/shared/study/navigation';
+import type { StudyTarget } from '@/features/shared/study/types';
+
+describe('targetHref', () => {
+  it('瓶・新規執筆・ボードは既存の画面へ行く', () => {
+    expect(targetHref({ kind: 'jar' })).toBe('/jar');
+    expect(targetHref({ kind: 'journal-new' })).toBe('/entries/new');
+    expect(targetHref({ kind: 'board' })).toBe('/board');
+  });
+
+  it('過去月と棚は URL を変えない（書斎の中でオーバーレイを開く）', () => {
+    // ここを /entries に飛ばすと、既存の一覧画面を作り替えることになる。
+    expect(targetHref({ kind: 'journal-month', month: '2026-08' })).toBeNull();
+    expect(targetHref({ kind: 'archive' })).toBeNull();
+  });
+});
+
+describe('staysInStudy', () => {
+  it('オーバーレイで完結する対象だけ true', () => {
+    expect(staysInStudy({ kind: 'journal-month', month: '2026-08' })).toBe(true);
+    expect(staysInStudy({ kind: 'archive' })).toBe(true);
+    expect(staysInStudy({ kind: 'jar' })).toBe(false);
+    expect(staysInStudy({ kind: 'journal-new' })).toBe(false);
+    expect(staysInStudy({ kind: 'board' })).toBe(false);
+  });
+});
+
+describe('overlayScope', () => {
+  it('過去月はその月に絞る', () => {
+    expect(overlayScope({ kind: 'journal-month', month: '2026-08' })).toEqual({
+      month: '2026-08',
+    });
+  });
+
+  it('棚は全月（SP は棚ごと 1 つの的）', () => {
+    expect(overlayScope({ kind: 'archive' })).toEqual({ month: null });
+  });
+
+  it('画面へ出ていく対象は絞り込みを持たない', () => {
+    expect(overlayScope({ kind: 'jar' })).toBeNull();
+    expect(overlayScope({ kind: 'board' })).toBeNull();
+  });
+});
+
+describe('notebookTarget', () => {
+  it('どの冊もその月の一覧を開く（当月も。今月の一覧を見る方法が無かった）', () => {
+    expect(notebookTarget('2026-09')).toEqual({ kind: 'journal-month', month: '2026-09' });
+    expect(notebookTarget('2026-08')).toEqual({ kind: 'journal-month', month: '2026-08' });
+  });
+});
+
+describe('すべての対象に行き先が定義されている', () => {
+  const ALL: StudyTarget[] = [
+    { kind: 'jar' },
+    { kind: 'journal-new' },
+    { kind: 'journal-month', month: '2026-08' },
+    { kind: 'archive' },
+    { kind: 'board' },
+  ];
+
+  it('href か overlayScope のどちらか一方を必ず持つ', () => {
+    for (const target of ALL) {
+      const href = targetHref(target);
+      const scope = overlayScope(target);
+      expect(href === null, target.kind).toBe(scope !== null);
+    }
+  });
+});

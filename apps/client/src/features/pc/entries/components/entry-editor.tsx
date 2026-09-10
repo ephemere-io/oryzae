@@ -1450,24 +1450,29 @@ export function EntryEditor({
           ヘッダーの下からしか始まらず、画面の縦いっぱいに立たない。 */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
-          左＝問い、右＝アクションコーナー ＋ 日付 ＋ 設定。
-          「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。 */}
+          左＝問い、中央＝空ける、右＝日付 ＋ 設定。
+          「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。
+
+          **3 列にして中央を空ける。** 上端の中央には「書斎へ戻る」のタブが掛かる
+          （`--study-exit-reserve`。書斎が無効なら 0）。問いのチップは左の列の中で
+          横に流れるので、何本結んでも中央へは届かない。以前は左の列が伸び放題で、
+          問いを 2 つ結ぶと出口と重なった（実機レビュー）。 */}
         <div
-          className={`flex items-center justify-between gap-6 ${fadeClass}`}
+          className={`grid items-center gap-6 ${fadeClass}`}
           style={{
+            gridTemplateColumns: 'minmax(0, 1fr) var(--study-exit-reserve, 0px) minmax(0, 1fr)',
             paddingTop: SHELL_INSET,
             paddingBottom: SHELL_INSET / 2,
             // 左右は本文と同じ縦の線に乗せる（gutterPx）。ヘッダーと本文で
             // 別の数字を使うと、同じ画面に2本の縦線が立つ。
+            //
             paddingLeft: gutterPx,
             paddingRight: gutterPx,
           }}
         >
           {/* 左: 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
             チップの中心が瓶アイコンの中心と同じ線に乗るようにする。 */}
-          {/* flex-1 が要る。**基準幅が中身のままだと縮まず**、結ばれた問いが増えたぶん
-              そのまま右へはみ出して、日付や設定の下に潜り込む。 */}
-          <div className="flex min-w-0 flex-1 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
+          <div className="flex min-w-0 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
             <QuestionChip
               activeQuestions={activeQuestions}
               linkedQuestionIds={linkedIds}
@@ -1476,8 +1481,14 @@ export function EntryEditor({
             />
           </div>
 
+          {/* 中央: 何も置かない（上のタブの席）。 */}
+          <div aria-hidden="true" />
+
           {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
-          <div className="flex shrink-0 items-center gap-3" style={{ height: SHELL_ROW_HEIGHT }}>
+          <div
+            className="flex min-w-0 items-center justify-end gap-3"
+            style={{ height: SHELL_ROW_HEIGHT }}
+          >
             {/* 日付は設定ボタンのすぐ左に、小さく。 */}
             <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>
 

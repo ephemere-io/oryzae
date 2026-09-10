@@ -36,6 +36,7 @@ describe('ListEntriesUsecase', () => {
       listFermentationEnabledByUserIdAndDate: vi.fn().mockResolvedValue([]),
       listFermentationEnabledByUserIdSince: vi.fn().mockResolvedValue([]),
       countCharsByUserIdSince: vi.fn().mockResolvedValue(0),
+      countByMonth: vi.fn().mockResolvedValue([]),
       countCharsByQuestionIdSince: vi.fn().mockResolvedValue(0),
       listByUserIdAndWeek: vi.fn().mockResolvedValue([]),
       searchByUserId: vi.fn().mockResolvedValue([]),
@@ -56,6 +57,7 @@ describe('ListEntriesUsecase', () => {
     expect(result).toEqual([entryProps1, entryProps2]);
     expect(entryRepo.listByUserId).toHaveBeenCalledWith(
       'user-1',
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -82,6 +84,7 @@ describe('ListEntriesUsecase', () => {
       10,
       undefined,
       undefined,
+      undefined,
     );
   });
 
@@ -96,6 +99,7 @@ describe('ListEntriesUsecase', () => {
       undefined,
       undefined,
       'q-1',
+      undefined,
       undefined,
     );
   });
@@ -112,6 +116,24 @@ describe('ListEntriesUsecase', () => {
       undefined,
       undefined,
       'oldest',
+      undefined,
+    );
+  });
+
+  // 書斎の一覧（docs/oryzae-study）: 古い月を選んでも、その月の記録が出ること。
+  it('month を repo に渡す', async () => {
+    vi.mocked(entryRepo.listByUserId).mockResolvedValue([Entry.fromProps(entryProps1)]);
+
+    const month = { month: '2026-04', tzOffsetMinutes: -540 };
+    await usecase.execute('user-1', undefined, undefined, undefined, undefined, month);
+
+    expect(entryRepo.listByUserId).toHaveBeenCalledWith(
+      'user-1',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      month,
     );
   });
 });

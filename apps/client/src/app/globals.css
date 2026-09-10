@@ -330,6 +330,17 @@ body {
   animation: spFade 0.2s ease-out both;
 }
 
+/* 問いの円の外周を回る文字。円そのものは軌道を回るので、こちらは
+   「気配」の速さに留める（速いと読めない）。 */
+@keyframes sp-orbit-ring {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sp-rise,
   .sp-sheet,
