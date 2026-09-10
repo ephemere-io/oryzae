@@ -95,7 +95,21 @@ export interface Destination {
 }
 
 const MIN_RADIUS = 24;
-const MAX_RADIUS = 90;
+const MAX_RADIUS = 120;
+
+/**
+ * 瓶の胴の中心が、瓶の絵の中でどこにあるか（高さに対する割合）。
+ *
+ * 瓶はフラスコの形をしていて、上は細い首、下がふくらんだ胴。**言葉が漂うのは胴**で、
+ * 箱の真ん中は首にあたる。箱の中心へ吸い込むと、瓶の口のあたりで字が止まって見える。
+ *
+ * 0.71 は瓶の輪郭（jar-vessel の JAR_PATH、viewBox 0 0 480 600）から出した値:
+ * 胴は y≈270〜580 に広がるので、その中心 y≈425 を高さ 600 で割る。
+ */
+const VESSEL_BODY_CENTER_Y = 0.71;
+
+/** 胴の幅が瓶の幅に占める割合（JAR_PATH の x≈70〜410 を 480 で割る）。 */
+const VESSEL_BODY_WIDTH_RATIO = 0.71;
 
 /**
  * 字が吸い込まれる先。**遷移したあとの画面から探す。**
@@ -103,10 +117,11 @@ const MAX_RADIUS = 90;
  * 演出が始まる時点では瓶の画面はまだ無いので、始める前には決められない。
  *
  * 探す順番:
- *   1. **漬け込んだ問いの瓶。** 書いたものはその問いに納まるので、狙いはここで確定する
- *   2. 画面に見えている瓶のうち、いちばん近いもの（問いが分からないとき）
- *   3. 瓶の画面ぜんたい
- *   4. サイドバーを除いた紙の中央（瓶の画面に着いていないとき）
+ *   1. **発酵瓶そのもの。** 書いたものが納まる先で、使う人が「瓶」と呼ぶのはこれ
+ *   2. 漬け込んだ問いの円（瓶がまだ描かれていないとき）
+ *   3. 見えている問いの円のうち、いちばん近いもの
+ *   4. 瓶の画面ぜんたい
+ *   5. サイドバーを除いた紙の中央（瓶の画面に着いていないとき）
  *
  * 2 以降は当て推量なので、**1 で決まるのが本筋**。画面の中心を決め打ちにしていた頃は
  * 左のサイドバーぶんずれ、瓶が画面のどこにあっても同じ場所へ吸い込んでいた。
@@ -114,6 +129,9 @@ const MAX_RADIUS = 90;
  * @param questionId 漬け込んだ問い。分からなければ省く。
  */
 export function findJarDestination(questionId?: string): Destination {
+  const vessel = document.querySelector('[data-verify-unit="JarVessel"]');
+  if (vessel && hasSize(vessel)) return fromVessel(vessel);
+
   const circles = Array.from(document.querySelectorAll('[data-verify-unit="QuestionCircle"]'));
 
   if (questionId) {
@@ -130,6 +148,24 @@ export function findJarDestination(questionId?: string): Destination {
   if (jar && hasSize(jar)) return { ...fromRect(jar), foundJar: false };
 
   return contentCenter();
+}
+
+/**
+ * 瓶の**胴**の中心を狙う。
+ *
+ * 箱の中心はフラスコの首にあたるので、そこへ吸い込むと「瓶の口で止まった」ように見える。
+ * 言葉が漂うのは胴なので、そちらへ落とす。
+ */
+function fromVessel(el: Element): Destination {
+  const rect = el.getBoundingClientRect();
+  const bodyWidth = rect.width * VESSEL_BODY_WIDTH_RATIO;
+  const radius = clamp(bodyWidth * 0.42, MIN_RADIUS, MAX_RADIUS);
+  return {
+    x: clamp(rect.left + rect.width / 2, radius, window.innerWidth - radius),
+    y: clamp(rect.top + rect.height * VESSEL_BODY_CENTER_Y, radius, window.innerHeight - radius),
+    radius,
+    foundJar: true,
+  };
 }
 
 function hasSize(el: Element): boolean {

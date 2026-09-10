@@ -57,16 +57,19 @@ function SaveTransitionStage({ text, jar }: Props) {
         {text}
       </div>
 
-      {/* 瓶。本物の問いの円と同じ印を付ける——演出はこの印を探して吸い込み先を決める。 */}
+      {/* 瓶。本物と同じ印を付ける——演出はこの印を探して吸い込み先を決める。
+          縦横比も本物に合わせる（500 : 620）。狙うのは箱の中心ではなく**胴**なので、
+          比率がずれると当たりどころも変わる。 */}
       {jar && (
         <div
-          data-verify-unit="QuestionCircle"
-          className="absolute rounded-full border-2"
+          data-verify-unit="JarVessel"
+          className="absolute border-2"
           style={{
             left: jar.left,
             top: jar.top,
             width: jar.size,
-            height: jar.size,
+            height: Math.round((jar.size * 620) / 500),
+            borderRadius: '40% 40% 45% 45% / 20% 20% 60% 60%',
             borderColor: 'var(--accent)',
             background: 'color-mix(in srgb, var(--accent) 8%, transparent)',
           }}

@@ -42,6 +42,37 @@ describe('findJarDestination', () => {
     return el;
   }
 
+  // ここが本筋。使う人が「瓶」と呼ぶのは発酵瓶そのもの。
+  it('発酵瓶があれば、その**胴**を狙う（箱の中心＝首ではない）', () => {
+    // 瓶の絵は上が細い首、下がふくらんだ胴。言葉が漂うのは胴。
+    addUnit('JarVessel', { left: 200, top: 100, w: 500, h: 620 });
+
+    const d = findJarDestination();
+
+    expect(d.x).toBe(450); // 横は箱の中心のまま
+    expect(d.y).toBeCloseTo(100 + 620 * 0.71, 1); // 縦は胴の中心（箱の中心 410 より下）
+    expect(d.y).toBeGreaterThan(100 + 620 / 2);
+  });
+
+  it('発酵瓶は問いの円より優先する', () => {
+    addUnit('QuestionCircle', { left: 480, top: 350, w: 60, h: 60 }, 'mine');
+    addUnit('JarVessel', { left: 0, top: 0, w: 500, h: 620 });
+
+    const d = findJarDestination('mine');
+
+    expect(d.x).toBe(250);
+  });
+
+  it('輪は瓶の胴に収まる大きさになる（1点に重ねない・はみ出さない）', () => {
+    addUnit('JarVessel', { left: 200, top: 100, w: 500, h: 620 });
+
+    const d = findJarDestination();
+
+    // 胴の幅（500 × 0.71 = 355）の半分より内側。
+    expect(d.radius).toBeGreaterThan(24);
+    expect(d.radius).toBeLessThan((500 * 0.71) / 2);
+  });
+
   // ここが本筋。書いたものはその問いに納まるので、狙いは問いで確定する。
   it('漬け込んだ問いの瓶を狙う（近さでは選ばない）', () => {
     // 画面の中心にいちばん近いのは別の問いの瓶。それでも自分の問いへ飛ぶ。

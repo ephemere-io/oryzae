@@ -166,7 +166,7 @@ const TITLE_TO_BODY_GAP = 24;
  * 題の桁が本文の1桁目に見える。横書きの題は見出しとして本文の上に載り、**大きさの差**が
  * すでに「別のもの」だと言っているので、同じだけ空けると離れて見える。
  */
-const TITLE_TO_BODY_GAP_HORIZONTAL = 14;
+const TITLE_TO_BODY_GAP_HORIZONTAL = 19;
 
 /**
  * 題の筋（縦書きなら桁、横書きなら行）1本ぶんの太さ。字の何倍か。
