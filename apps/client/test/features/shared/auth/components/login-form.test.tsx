@@ -64,11 +64,21 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('LoginForm', () => {
-  it('書斎ホームが off なら従来の入口へ送る', async () => {
+  it('書斎を止めている端末（?study=off）なら従来の入口へ送る', async () => {
+    // 既定は書斎なので、従来の入口は撤退口（?study=off）の下でだけ通る。
+    setSearch('?study=off');
     renderForm();
     await submit();
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/entries/new'));
+  });
+
+  it('何も付けていなければ、ログインした先は書斎（既定で全員に書斎ホーム）', async () => {
+    // ここが本題。プレビューで確認を始められるかどうかが、この 1 本にかかっている。
+    renderForm();
+    await submit();
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/study'));
   });
 
   it('?study=on を付けて開いていれば、ログインした先が書斎になる', async () => {

@@ -2,6 +2,12 @@
 
 ## フラグ
 
+> **2026-09: 既定で全員に出すことにした。** `NEXT_PUBLIC_STUDY_HOME` は置かなくても on
+> （`off` / `false` / `0` を入れたときだけ止まる）。PostHog は見ない — PostHog はフラグが
+> 無いときや配信の対象外のときも false を返すので、見ていると PostHog 側の設定しだいで
+> 全員が黙って off に戻る。端末ごとの `?study=on|off|auto` は残っていて env より優先する。
+> 以下は段階配信で進めていたころの記録。
+
 リポジトリに機能フラグの仕組みは無い（`NEXT_PUBLIC_*` は SITE_URL / DOCS_SITE_URL /
 POSTHOG_KEY のみ）。PostHog は入っているので、2段構えにする。
 
@@ -53,8 +59,8 @@ const enabled = override !== null ? override : envEnabled && posthogEnabled !== 
 
 ## 撤退
 
-`NEXT_PUBLIC_STUDY_HOME=off` を入れて再デプロイするだけで元に戻る（1〜5 のコミットは
-画面に出ないため残しても無害）。緊急時は PostHog フラグを切るだけでも止まる。
+`NEXT_PUBLIC_STUDY_HOME=off` を入れて再デプロイするだけで元に戻る。**既定 on にしたので、
+PostHog フラグを切っても止まらない**（書斎は PostHog を見ていない）。
 
 ただし **`?study=on` を触った端末は憶えたまま**なので、配信の停止だけでは戻らない。
 その端末は `?study=auto` を開いて切替を捨てる。

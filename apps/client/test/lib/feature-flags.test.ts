@@ -1,10 +1,15 @@
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isEnvFlagOn, useFeatureFlag } from '@/lib/feature-flags';
+import { isEnvFlagOff, isEnvFlagOn, useFeatureFlag } from '@/lib/feature-flags';
 
-// PostHog は provider を張らないと undefined を返す。ここではそれで十分
-// （「まだ分からない」を off に倒さない、という既定の挙動そのもの）。
-vi.mock('posthog-js/react', () => ({ useFeatureFlagEnabled: () => undefined }));
+// PostHog は provider を張らないと undefined を返す。既定はそれにしておき
+// （「まだ分からない」を off に倒さない、という既定の挙動そのもの）、
+// false を返す場合だけテストの中で差し替える。
+const posthog = vi.hoisted(() => {
+  const holder: { value: boolean | undefined } = { value: undefined };
+  return holder;
+});
+vi.mock('posthog-js/react', () => ({ useFeatureFlagEnabled: () => posthog.value }));
 
 const OPTIONS = {
   key: 'study-home',
@@ -20,6 +25,7 @@ function setSearch(search: string): void {
 beforeEach(() => {
   localStorage.clear();
   setSearch('');
+  posthog.value = undefined;
 });
 
 afterEach(cleanup);
@@ -160,5 +166,47 @@ describe('isEnvFlagOn', () => {
     expect(isEnvFlagOn('')).toBe(false);
     expect(isEnvFlagOn('off')).toBe(false);
     expect(isEnvFlagOn('yes')).toBe(false);
+  });
+});
+
+describe('PostHog の扱い', () => {
+  it('既定では PostHog が false を返すと落とす（段階配信）', () => {
+    posthog.value = false;
+    const { result } = renderHook(() => useFeatureFlag({ ...OPTIONS, envEnabled: true }));
+    expect(result.current.enabled).toBe(false);
+  });
+
+  it('respectPosthog: false なら PostHog の false で落とさない（全員に配るフラグ）', () => {
+    // PostHog はフラグが無いときや配信の対象外のときも false を返す。既定 on のフラグで
+    // これを見ると、PostHog 側の設定しだいで全員が黙って off に戻る。
+    posthog.value = false;
+    const { result } = renderHook(() =>
+      useFeatureFlag({ ...OPTIONS, envEnabled: true, respectPosthog: false }),
+    );
+    expect(result.current.enabled).toBe(true);
+  });
+
+  it('respectPosthog: false でも手動切替は効く', async () => {
+    setSearch('?study=off');
+    const { result } = renderHook(() =>
+      useFeatureFlag({ ...OPTIONS, envEnabled: true, respectPosthog: false }),
+    );
+    await waitFor(() => expect(result.current.resolved).toBe(true));
+    expect(result.current.enabled).toBe(false);
+  });
+});
+
+describe('isEnvFlagOff', () => {
+  it('off / false / 0 だけを「明示的に切っている」とみなす', () => {
+    expect(isEnvFlagOff('off')).toBe(true);
+    expect(isEnvFlagOff('false')).toBe(true);
+    expect(isEnvFlagOff('0')).toBe(true);
+  });
+
+  it('未設定・on・その他は切っていない（既定 on のフラグは出る）', () => {
+    expect(isEnvFlagOff(undefined)).toBe(false);
+    expect(isEnvFlagOff('')).toBe(false);
+    expect(isEnvFlagOff('on')).toBe(false);
+    expect(isEnvFlagOff('yes')).toBe(false);
   });
 });

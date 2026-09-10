@@ -13,7 +13,8 @@ export const test = base.extend<{ authenticated: void }>({
       await page.locator('input[type="password"]').fill(TEST_PASSWORD);
       // 「Google でログイン」とも部分一致するため exact で「ログイン」ボタンを特定する。
       await page.getByRole('button', { name: 'ログイン', exact: true }).click();
-      await page.waitForURL('**/entries**');
+      // ログイン後はホームへ。既定は書斎（/study）、書斎を止めていれば /entries/new。
+      await page.waitForURL(/\/(study|entries)/);
       await use();
     },
     { auto: false },
