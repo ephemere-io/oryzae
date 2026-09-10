@@ -841,7 +841,7 @@
     "hint_jar_fermenting": "발효가 진행 중입니다",
     "hint_jar_almost": "곧 편지가 도착합니다",
     "hint_jar_letter": "읽지 않은 편지가 있습니다",
-    "hint_jar_read": "읽은 편지가 들어 있습니다",
+    "hint_jar_read": "편지를 다시 읽을 수 있습니다",
     "hint_board_empty": "아직 붙인 것이 없습니다",
     "hint_board_photos": "사진 {count}건",
     "hint_board_snippets": "스니펫 {count}건",

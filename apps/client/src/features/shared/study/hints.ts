@@ -36,6 +36,11 @@ export function studyHint(hint: HitHint, state: StudyState): StudyHint {
  * 瓶は溜まり具合を液面で見せているが、「手紙が届いた」ことだけは見た目では言えない
  * （泡が静まるだけ）。ラベルの状態語（`pill_jar_*`）と同じ段階分けにしつつ、
  * 未読があるときはそれを先に言う。
+ *
+ * 読み終えた手紙しか無いときは「手紙を読み返せます」。「読んだ手紙が入っています」は
+ * 状態の報告にとどまっていて、押すと何が起きるのかを言っていなかった（実機レビューで
+ * 差し替えを求められた）。件数は出さない — 受信箱は問いごとに最新 1 通しか持たず、
+ * 数えると実際に届いた通数より少なく名乗ってしまう。
  */
 function jarHintKey(state: StudyState): string {
   if (state.unreadCount > 0) return 'hint_jar_letter';

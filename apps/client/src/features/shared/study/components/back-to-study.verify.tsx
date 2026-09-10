@@ -3,20 +3,20 @@
  *
  * 「サブ画面から書斎へ戻れる」（40-acceptance.md「ナビゲーション」）。
  *
- * 見るのは**置き場の約束**が中心。左上（3 巡ぶん「既存の操作に被る」）→ 下端（操作
- * パレットの真下で「被りそう・見にくい」）→ 上端に浮かせて重ねる（問いを 2 つ結ぶと
- * チップが中央まで伸びて重なる）と移してきた。いまは**上端の帯**で、画面の側が
- * そのぶん下がる。浮かせて重ねる形に戻すと、伸びる中身のある画面といつか必ずぶつかる。
+ * 見るのは**置き場と見え方の約束**。左上（3 巡ぶん「既存の操作に被る」）→ 下端（操作
+ * パレットの真下）→ 上端に浮かせた 9px の名前（問いのチップと重なる）→ 画面を下げる帯
+ * （地がページと同じ色で「帯になっていない・目立たない」）と移してきた。いまは
+ * **上端の細い帯と、中央から垂れるタブ**。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { BackToStudy, STUDY_EXIT_BAND } from './back-to-study';
+import { BackToStudy, STUDY_EXIT_TAB } from './back-to-study';
 
 registerUnit<Record<string, never>>({
   id: 'BackToStudy',
   title: 'BackToStudy',
-  description: 'サブ画面の上端に敷く「書斎へ戻る」の帯',
+  description: 'サブ画面の上端に掛かる「書斎へ戻る」（細い帯 + 垂れるタブ）',
   kind: 'component',
   render: () => withVerifyProviders(<BackToStudy />),
   fixtures: [
@@ -35,66 +35,70 @@ registerUnit<Record<string, never>>({
         Boolean(root.querySelector('a[href="/study"]')) || '/study へのリンクが無い',
     },
     {
-      id: 'is-a-band-across-the-top',
-      description: '上端いっぱいの帯として敷く（重ならないことが置き場の条件）',
+      id: 'hangs-from-the-top-edge',
+      description: '上端に掛ける（隅と下端は画面側が使っている）',
       check: ({ root }) => {
         const band = root.querySelector('[data-verify-unit="BackToStudy"]');
         if (!(band instanceof HTMLElement)) return '帯が無い';
         const className = band.className;
-        const missing: string[] = [];
-        if (!className.includes('fixed')) missing.push('fixed');
-        if (!className.includes('inset-x-0')) missing.push('inset-x-0');
-        if (!className.includes('top-0')) missing.push('top-0');
-        if (missing.length > 0) return `上端の帯になっていない: ${missing.join(', ')}`;
-        // 隅と下端へ戻されていないこと。どちらも一度ぶつかって移した先。
-        if (/\b(left-4|right-4|left-6|right-6)\b/.test(className)) {
-          return '隅に置き直されている（画面側の操作と取り合いになる）';
-        }
-        if (/\bbottom-/.test(className)) {
+        const missing = ['fixed', 'inset-x-0', 'top-0'].filter((c) => !className.includes(c));
+        if (missing.length > 0) return `上端に掛かっていない: ${missing.join(', ')}`;
+        if (/\bbottom-/.test(className))
           return '下端に置き直されている（操作パレットの真下になる）';
-        }
         return true;
       },
     },
     {
-      id: 'reserves-its-own-row',
-      description: '帯は自分の高さを持ち、画面はそのぶん下がる',
+      id: 'tab-stands-out',
+      description: 'タブはページの地から浮く色を持つ（地と同じ色では「帯になっていない」）',
+      check: ({ root }) => {
+        const tab = root.querySelector('a');
+        if (!(tab instanceof HTMLElement)) return 'タブが無い';
+        const background = tab.style.getPropertyValue('--tab-bg');
+        if (background === '') return 'タブの地が指定されていない';
+        return background.trim() !== 'var(--bg)' || 'タブの地がページと同じ色になっている';
+      },
+    },
+    {
+      id: 'name-is-readable',
+      description: '名前は 12px 以上（9px は「小さすぎる」と報告された）',
+      check: ({ root }) => {
+        const label = root.querySelector('a span');
+        const className = label?.className ?? '';
+        const match = /text-\[(\d+(?:\.\d+)?)px\]/.exec(className);
+        if (!match) return '文字の大きさが指定されていない';
+        return Number(match[1]) >= 12 || `名前が小さい: ${match[1]}px`;
+      },
+    },
+    {
+      id: 'publishes-its-width',
+      description: 'タブの幅を公表する（PC の画面はこの幅だけ中央を空ける）',
       check: ({ root, contract }) => {
-        const band = root.querySelector('[data-verify-unit="BackToStudy"]');
-        if (!(band instanceof HTMLElement)) return '帯が無い';
-        // 高さを公表していないと、シェルが下げる量と食い違っても誰も気づけない。
-        if (contract.bandHeight !== String(STUDY_EXIT_BAND)) {
-          return `公表している高さが違う: ${String(contract.bandHeight)}`;
+        if (contract.tabWidth !== String(STUDY_EXIT_TAB.width)) {
+          return `公表している幅が違う: ${String(contract.tabWidth)}`;
         }
+        const tab = root.querySelector('a');
+        if (!(tab instanceof HTMLElement)) return 'タブが無い';
         return (
-          band.style.height === `${STUDY_EXIT_BAND}px` ||
-          `帯の高さが指定されていない: ${band.style.height}`
+          tab.style.width === `${STUDY_EXIT_TAB.width}px` ||
+          `タブの幅が公表と違う: ${tab.style.width}`
         );
       },
     },
     {
-      id: 'only-the-name-is-clickable',
-      description: '帯の余白は押せない（下の画面の操作を奪わない）',
+      id: 'only-the-tab-is-clickable',
+      description: '帯は押せず、タブだけが押せる（下の画面の操作を奪わない）',
       check: ({ root }) => {
         const band = root.querySelector('[data-verify-unit="BackToStudy"]');
         const bandClass = band instanceof HTMLElement ? band.className : '';
         if (!bandClass.includes('pointer-events-none')) return '帯全体が当たりを持っている';
-        const link = root.querySelector('a')?.className ?? '';
-        return link.includes('pointer-events-auto') || 'リンクが押せなくなっている';
-      },
-    },
-    {
-      id: 'quiet-until-touched',
-      description: '常時は薄く、触れたときだけ濃くなる',
-      check: ({ root }) => {
-        const className = root.querySelector('a')?.className ?? '';
-        if (!/\bopacity-\d+/.test(className)) return '常時の薄さが指定されていない';
-        return className.includes('hover:opacity-100') || 'ホバーで濃くならない';
+        const tab = root.querySelector('a')?.className ?? '';
+        return tab.includes('pointer-events-auto') || 'タブが押せなくなっている';
       },
     },
     {
       id: 'has-accessible-name',
-      description: 'アイコンだけでも名前が読める',
+      description: '名前が読める',
       check: ({ root }) => {
         const link = root.querySelector('a');
         return Boolean(link?.getAttribute('aria-label')) || 'aria-label が無い';

@@ -841,7 +841,7 @@
     "hint_jar_fermenting": "正在发酵",
     "hint_jar_almost": "信件即将送达",
     "hint_jar_letter": "有未读的信",
-    "hint_jar_read": "里面有读过的信",
+    "hint_jar_read": "可以重读来信",
     "hint_board_empty": "还没有贴任何东西",
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
