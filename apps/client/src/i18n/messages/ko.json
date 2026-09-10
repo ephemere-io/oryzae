@@ -812,7 +812,7 @@
     "pill_entries": "{count}건",
     "pill_volumes": "{count}권",
     "pill_cards": "{count}장",
-    "back_to_study": "BACK TO STUDY",
+    "back_to_study": "서재로 돌아가기",
     "account": "계정",
     "list_all": "ALL ENTRIES",
     "list_month": "{month} ENTRIES",
