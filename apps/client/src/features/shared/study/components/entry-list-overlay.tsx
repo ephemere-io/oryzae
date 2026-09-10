@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
+import { useRef } from 'react';
 import { useEscapeKey } from '@/lib/use-escape-key';
 import { spineLabelText } from '../scene/books';
 import type { StudyEntry } from '../types';
@@ -95,9 +96,19 @@ export function EntryListOverlay({
   const t = useTranslations('study');
   useEscapeKey(open, onClose);
 
+  /**
+   * 外側（紙の外）を押したら閉じる。**押し始めも外だったときだけ。**
+   *
+   * click の的だけを見ると、検索欄で文字を選んで紙の外で指を離したときにも
+   * 閉じてしまう（その click は共通の祖先＝外側に届く）。押し始めた場所を憶えておく。
+   */
+  const pressedOutside = useRef(false);
+
   if (!open) return null;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: 外側を押して閉じるのは補助で、閉じる操作そのものは ✕ ボタンと Esc が担う
+    // biome-ignore lint/a11y/useKeyWithClickEvents: キーボードでは Esc で閉じる（useEscapeKey）
     <div
       {...verifyAttrs({
         unit: 'EntryListOverlay',
@@ -111,6 +122,13 @@ export function EntryListOverlay({
         canCreate: onCreateEntry !== undefined,
       })}
       className="absolute inset-0 z-20 flex items-start justify-center overflow-auto px-6 py-14"
+      onPointerDown={(event) => {
+        pressedOutside.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        if (pressedOutside.current && event.target === event.currentTarget) onClose();
+        pressedOutside.current = false;
+      }}
     >
       <div
         className="w-full max-w-[720px] rounded-xl p-6"
