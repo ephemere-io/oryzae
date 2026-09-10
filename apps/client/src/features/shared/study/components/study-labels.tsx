@@ -14,7 +14,10 @@ import {
 import type { StudyFermentationStatus, StudyTarget } from '../types';
 
 /** どの対象のラベルか。 */
-export type LabelKind = 'jar' | 'journal' | 'board' | 'archive';
+export type LabelKind = 'jar' | 'journal' | 'board' | 'archive' | 'pen';
+
+/** SP のピルになる対象。鉛筆は入らない（SP は ENTRIES のピルがそのまま新規執筆）。 */
+type PillKind = Exclude<LabelKind, 'pen'>;
 
 export interface LabelPoint {
   x: number;
@@ -34,8 +37,6 @@ export interface StudyLabelsProps {
   entryCount: number;
   volumeCount: number;
   cardCount: number;
-  /** 当月（`YYYY-MM`）。ENTRIES のピルは当月の一覧を開く（積みのいちばん上と同じ）。 */
-  currentMonth: string;
   /** canvas の実寸。ピルの押し戻しに使う。 */
   screen: { width: number; height: number };
   onPick: (target: StudyTarget) => void;
@@ -80,7 +81,8 @@ function PcLabels({ layout, positions, hovered }: StudyLabelsProps) {
   // 棚（ARCHIVE）を外していた時期がある。ホバーで背表紙のツールチップが出るから、
   // という理由だったが、**ホバーはそこに何かがあると知っている人にしか効かない**。
   // 過去の記録を全部持っている的だけが黙っている状態になっていた（実機レビュー）。
-  const kinds: LabelKind[] = ['jar', 'journal', 'board', 'archive'];
+  // 鉛筆は「NEW」（オーナーの依頼）。積みの ENTRIES と同じ書体で、鉛筆の真下に出す。
+  const kinds: LabelKind[] = ['jar', 'journal', 'board', 'archive', 'pen'];
 
   return (
     <div
@@ -91,6 +93,7 @@ function PcLabels({ layout, positions, hovered }: StudyLabelsProps) {
         const point = positions[kind];
         if (!point || !point.visible) return null;
         if (kind === 'archive' && layout.labelAnchors.archive === null) return null;
+        if (kind === 'pen' && layout.labelAnchors.pen === null) return null;
 
         return (
           <div
@@ -128,7 +131,7 @@ function PcLabels({ layout, positions, hovered }: StudyLabelsProps) {
 
 function SpPills(props: StudyLabelsProps) {
   const t = useTranslations('study');
-  const { layout, positions, screen, onPick, currentMonth } = props;
+  const { layout, positions, screen, onPick } = props;
 
   // ピルの実寸。文字量で変わるので、描画されたものを測って押し戻しに使う。
   const [sizes, setSizes] = useState<Partial<Record<LabelKind, PillSize>>>({});
@@ -148,7 +151,7 @@ function SpPills(props: StudyLabelsProps) {
   const offsets = layout.pillOffsets;
   if (offsets === null) return null;
 
-  const kinds: LabelKind[] = ['jar', 'journal', 'board', 'archive'];
+  const kinds: PillKind[] = ['jar', 'journal', 'board', 'archive'];
 
   return (
     <div
@@ -171,7 +174,7 @@ function SpPills(props: StudyLabelsProps) {
             key={kind}
             ref={(element) => measure(kind, element)}
             type="button"
-            onClick={() => onPick(targetFor(kind, currentMonth))}
+            onClick={() => onPick(targetFor(kind))}
             className="pointer-events-auto absolute flex items-center gap-1.5 whitespace-nowrap rounded-full px-3"
             style={{
               left: placed.x,
@@ -218,7 +221,7 @@ function SpPills(props: StudyLabelsProps) {
 
 function stateWord(
   props: StudyLabelsProps,
-  kind: LabelKind,
+  kind: PillKind,
   t: ReturnType<typeof useTranslations<'study'>>,
 ): string {
   switch (kind) {
@@ -235,7 +238,7 @@ function stateWord(
 
 function labelKey(
   kind: LabelKind,
-): 'label_jar' | 'label_journal' | 'label_board' | 'label_archive' {
+): 'label_jar' | 'label_journal' | 'label_board' | 'label_archive' | 'label_pen' {
   switch (kind) {
     case 'jar':
       return 'label_jar';
@@ -245,6 +248,8 @@ function labelKey(
       return 'label_board';
     case 'archive':
       return 'label_archive';
+    case 'pen':
+      return 'label_pen';
   }
 }
 
@@ -252,14 +257,14 @@ function labelKey(
  * ラベルを押したときの行き先。
  *
  * **3D の物本体を押したときと同じ行き先**にする（40-acceptance.md「SP のタッチ提示」）。
- * ENTRIES は当月の一覧（積みのいちばん上と同じ）、ARCHIVE は棚ごと＝全月の一覧。
+ * ENTRIES は当月の手帳（積みのいちばん上）＝新規執筆、ARCHIVE は棚ごと＝全月の一覧。
  */
-function targetFor(kind: LabelKind, currentMonth: string): StudyTarget {
+function targetFor(kind: PillKind): StudyTarget {
   switch (kind) {
     case 'jar':
       return { kind: 'jar' };
     case 'journal':
-      return { kind: 'journal-month', month: currentMonth };
+      return { kind: 'journal-new' };
     case 'board':
       return { kind: 'board' };
     case 'archive':

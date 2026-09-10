@@ -244,7 +244,6 @@ export function StudyHome({ layout }: StudyHomeProps) {
             entryCount={currentMonthCount}
             volumeCount={archiveCount}
             cardCount={state.board.total}
-            currentMonth={state.now.slice(0, 7)}
             screen={screen}
             onPick={handlePickFromLabel}
           />
@@ -314,7 +313,13 @@ export function StudyHome({ layout }: StudyHomeProps) {
 const BACKDROP_FADE_MS = 320;
 
 /** 位置が届く前の初期値。 */
-const EMPTY_LABELS: LabelPositions = { jar: null, journal: null, board: null, archive: null };
+const EMPTY_LABELS: LabelPositions = {
+  jar: null,
+  journal: null,
+  board: null,
+  archive: null,
+  pen: null,
+};
 
 /** アバターに出す 1 文字。 */
 function initialOf(nickname?: string | null, email?: string | null): string {

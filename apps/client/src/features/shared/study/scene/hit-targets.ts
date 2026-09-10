@@ -25,7 +25,7 @@ export interface HitEntry {
   id: HitId;
   target: StudyTarget;
   /** ホバー時にラベルを濃くする対象（PC）。 */
-  label: 'jar' | 'journal' | 'board' | 'archive' | null;
+  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | null;
   /** 手帳と背表紙のツールチップに出す月。 */
   month: string | null;
   /** ホバーで出す一言。出す文面は呼び出し側が状態から決める。 */
@@ -73,7 +73,7 @@ export function buildHitRegistry(options: {
   options.desk.forEach((notebook, index) => {
     registry.add({
       id: `notebook-${index}`,
-      target: notebookTarget(notebook.month),
+      target: notebookTarget(notebook.month, notebook.current),
       label: 'journal',
       month: notebook.month,
     });
@@ -102,8 +102,10 @@ export function buildHitRegistry(options: {
   registry.add({
     id: 'pen',
     target: { kind: 'journal-new' },
-    // ラベルは持たせない。積みの JOURNAL と同じ場所に 2 つ目の注釈が出てしまう。
-    label: null,
+    // 鉛筆の真下に「NEW」を出す（オーナーの依頼）。以前はラベルを持たせず、触れたときの
+    // 一言だけで知らせていた — 積みの ENTRIES と同じ場所に 2 つ目の注釈が出るのを避けて。
+    // NEW は積みではなく鉛筆の手前に置くので、ENTRIES とは離れる。
+    label: 'pen',
     month: null,
     hint: 'pen',
   });
