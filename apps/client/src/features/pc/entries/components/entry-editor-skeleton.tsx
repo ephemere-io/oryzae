@@ -53,6 +53,11 @@ export function EntryEditorSkeleton({
       {/* ツールバー（実物: border-b px-4 py-2、左5アイコン / 中央 日付+タイトル / 右5アイコン） */}
       <div
         className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2"
+        // **席は実物と同じだけ空ける。** 実物のツールバーは「書斎へ戻る」マークの席
+        // （`--study-back-inset`）を読むのに、枠だけ読んでいなかった。読み込み中は
+        // マークが枠の 1 つ目のアイコンに重なり、実物に変わった瞬間に左の並びが
+        // 横へずれる — 枠の役目（実物と同じ位置に置く）がそこだけ破れていた。
+        style={{ paddingLeft: 'max(1rem, var(--study-back-inset, 0px))' }}
         data-skeleton-slot="toolbar"
       >
         <ToolbarIconsSkeleton count={5} />
