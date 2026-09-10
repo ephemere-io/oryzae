@@ -9,7 +9,8 @@ test.describe('ナビゲーション', () => {
   test('サブ画面の「書斎に戻る」で書斎へ戻る', async ({ page }) => {
     await page.goto('/board');
     await page.getByRole('link', { name: '書斎に戻る' }).click();
-    await expect(page).toHaveURL(/\/study/);
+    // 書斎はルート（/）。
+    await page.waitForURL((url) => url.pathname === '/');
   });
 
   // 撤退口（`?study=off`）では従来のサイドバーで動く。書斎を止めたときに

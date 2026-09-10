@@ -80,7 +80,7 @@ export function BackToStudy() {
         }}
       />
       <Link
-        href="/study"
+        href="/"
         aria-label={t('back_to_study')}
         // 消えている間は押せず、Tab でも止まらない（見えないものに当たらせない）。
         tabIndex={hidden ? -1 : undefined}

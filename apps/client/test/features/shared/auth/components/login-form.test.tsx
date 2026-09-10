@@ -78,7 +78,7 @@ describe('LoginForm', () => {
     renderForm();
     await submit();
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/study'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
   });
 
   it('?study=on を付けて開いていれば、ログインした先が書斎になる', async () => {
@@ -87,7 +87,7 @@ describe('LoginForm', () => {
     renderForm();
     await submit();
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/study'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
   });
 
   it('前に ?study=on を触った端末は、付け直さなくても書斎へ送られる', async () => {
@@ -95,7 +95,7 @@ describe('LoginForm', () => {
     renderForm();
     await submit();
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/study'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
   });
 
   it('ログインに失敗したら遷移しない', async () => {

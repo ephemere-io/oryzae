@@ -7,6 +7,7 @@ import { useEmailConfirm } from '@/features/shared/auth/hooks/use-email-confirm'
  * hook は文言ではなくエラーコードを返し、page が i18n で解決する。
  */
 const push = vi.fn();
+const assign = vi.fn();
 let params = new URLSearchParams();
 
 vi.mock('next/navigation', () => ({
@@ -32,8 +33,14 @@ describe('useEmailConfirm', () => {
     vi.clearAllMocks();
     localStorage.clear();
     params = new URLSearchParams();
+    // 確定後は読み込み直して入る（window.location.assign）。jsdom の location は
+    // 再定義できないので丸ごと差し替える。
+    vi.stubGlobal('location', { assign });
   });
-  afterEach(() => localStorage.clear());
+  afterEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
 
   it('auth_error が付いていれば auth_failed（通信しない）', async () => {
     // ルート（/）の HomeGate が Supabase の #error=... をここへ回してくる経路。
@@ -44,7 +51,7 @@ describe('useEmailConfirm', () => {
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(push).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('token_hash / type が無ければ invalid_link（通信しない）', async () => {
@@ -67,7 +74,7 @@ describe('useEmailConfirm', () => {
 
     renderHook(() => useEmailConfirm());
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/reset-password'));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/reset-password'));
     expect(localStorage.getItem('oryzae_access_token')).toBe('at');
   });
 
@@ -77,7 +84,7 @@ describe('useEmailConfirm', () => {
 
     renderHook(() => useEmailConfirm());
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/entries/new'));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/entries/new'));
   });
 
   it('検証に失敗したら auth_failed（遷移しない）', async () => {
@@ -87,7 +94,7 @@ describe('useEmailConfirm', () => {
     const { result } = renderHook(() => useEmailConfirm());
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
-    expect(push).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('レスポンスの形が壊れていたら auth_failed', async () => {
@@ -109,6 +116,6 @@ describe('useEmailConfirm', () => {
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
     expect(localStorage.getItem('oryzae_access_token')).toBeNull();
-    expect(push).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 });

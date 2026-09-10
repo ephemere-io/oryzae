@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
 import { Sidebar } from '@/features/pc/navigation/components/sidebar';
+import { useRootHashHandoff } from '@/features/shared/auth/hooks/use-root-hash-handoff';
 import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
 import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
 import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
@@ -101,8 +102,8 @@ function spShellStyle(exitBand: boolean): MainStyle {
   return { '--study-exit-band': exitBand ? `${STUDY_EXIT_BAND}px` : '0px' };
 }
 
-/** 書斎ホームそのもののパス。ここだけサイドバーを外す。 */
-const STUDY_PATH = '/study';
+/** 書斎ホームそのもののパス（ルート）。ここだけサイドバーを外す。 */
+const STUDY_PATH = '/';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
@@ -113,6 +114,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const device = useDevice();
   const router = useRouter();
   const pathname = usePathname();
+  // ルート（/）に届いたメールリンクの hash を、ログインへ送る判断より先に読む。
+  // 以前は / の HomeGate が持っていた。/ が書斎（保護ルート）になったので、ここが引き継ぐ。
+  const rootHashHandoff = useRootHashHandoff(pathname === STUDY_PATH);
 
   // 書斎ホームのときだけ PC シェルの構成が変わる（サイドバーとフッターを外す）。
   // フラグ off の間はこの分岐が常に false になり、シェルは従来どおり。
@@ -154,10 +158,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   );
 
   useEffect(() => {
-    if (!loading && !auth) {
+    // hash の引き継ぎ中（読み込み直し・確認画面への回送）はログインへ送らない。
+    // 送ると、期限切れリンクの理由を見せる前にログイン画面へ流してしまう。
+    if (!loading && !auth && !rootHashHandoff.current) {
       router.push('/login');
     }
-  }, [loading, auth, router]);
+  }, [loading, auth, router, rootHashHandoff]);
 
   // Not authenticated and not loading → redirect in progress
   if (!loading && !auth) return null;

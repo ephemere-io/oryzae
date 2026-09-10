@@ -23,16 +23,16 @@ registerUnit<Record<string, never>>({
     {
       id: 'default',
       probe: true,
-      description: 'Probe: /study へのリンクとして機能する',
+      description: 'Probe: 書斎（/）へのリンクとして機能する',
       props: {},
     },
   ],
   invariants: [
     {
       id: 'links-to-study',
-      description: '/study へ行ける',
+      description: '書斎（/）へ行ける',
       check: ({ root }) =>
-        Boolean(root.querySelector('a[href="/study"]')) || '/study へのリンクが無い',
+        Boolean(root.querySelector('a[href="/"]')) || '書斎（/）へのリンクが無い',
     },
     {
       id: 'hangs-from-the-top-edge',

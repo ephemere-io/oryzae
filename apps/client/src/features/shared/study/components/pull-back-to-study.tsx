@@ -61,7 +61,7 @@ export function PullBackToStudy() {
       if (next >= 1) {
         // 着いた。以降の引きは受けない（連打で二重に遷移させない）。
         leavingRef.current = true;
-        router.push('/study');
+        router.push('/');
       }
     }
 

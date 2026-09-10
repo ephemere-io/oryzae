@@ -3,7 +3,7 @@
 import { StudyFallback } from '@/features/shared/study/components/study-fallback';
 
 /**
- * `/study` のロード表示。
+ * `/`（書斎）のロード表示。
  *
  * 書斎は 3D の一枚絵で、並ぶコンテンツが無い。スケルトンで枠を予告しても意味が無いので、
  * **書斎の静止表現をそのまま出す**（WebGL 非対応のときと同じもの）。読み込みが終われば
