@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EntryListOverlay,
@@ -123,6 +123,61 @@ describe('EntryListOverlay', () => {
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  function renderOpen(onClose: () => void) {
+    return render(
+      withVerifyProviders(
+        <EntryListOverlay
+          open
+          entries={ENTRIES}
+          months={['2026-09']}
+          selectedMonth={null}
+          onSelectMonth={vi.fn()}
+          onSelectEntry={vi.fn()}
+          onClose={onClose}
+        />,
+      ),
+    );
+  }
+
+  function backdropOf(container: HTMLElement): HTMLElement {
+    const element = container.querySelector('[data-verify-unit="EntryListOverlay"]');
+    if (!(element instanceof HTMLElement)) throw new Error('一覧が無い');
+    return element;
+  }
+
+  it('紙の外を押すと閉じる', () => {
+    const onClose = vi.fn();
+    const { container } = renderOpen(onClose);
+    const backdrop = backdropOf(container);
+
+    fireEvent.pointerDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('紙の中を押しても閉じない', () => {
+    const onClose = vi.fn();
+    const { container } = renderOpen(onClose);
+    const heading = container.querySelector('h2');
+    if (!(heading instanceof HTMLElement)) throw new Error('見出しが無い');
+
+    fireEvent.pointerDown(heading);
+    fireEvent.click(heading);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('押し始めが紙の中なら、外で離しても閉じない（検索欄で文字を選ぶ操作）', () => {
+    const onClose = vi.fn();
+    const { container } = renderOpen(onClose);
+    const heading = container.querySelector('h2');
+    if (!(heading instanceof HTMLElement)) throw new Error('見出しが無い');
+
+    fireEvent.pointerDown(heading);
+    // 離した場所の共通の祖先＝外側に click が届く。
+    fireEvent.click(backdropOf(container));
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('閉じているときは Esc を拾わない', () => {
