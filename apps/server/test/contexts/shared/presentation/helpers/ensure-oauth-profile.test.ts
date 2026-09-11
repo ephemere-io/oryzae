@@ -115,16 +115,16 @@ describe('extractOAuthAvatarUrl', () => {
 });
 
 describe('resolveMaxUserCountForOAuth', () => {
-  it('未設定なら 105', () => {
-    expect(resolveMaxUserCountForOAuth({})).toBe(105);
+  it('未設定なら 200', () => {
+    expect(resolveMaxUserCountForOAuth({})).toBe(200);
   });
   it('正の整数文字列をパース', () => {
     expect(resolveMaxUserCountForOAuth({ MAX_USER_COUNT: '250' })).toBe(250);
   });
-  it('非数値・0以下は 105', () => {
-    expect(resolveMaxUserCountForOAuth({ MAX_USER_COUNT: 'abc' })).toBe(105);
-    expect(resolveMaxUserCountForOAuth({ MAX_USER_COUNT: '0' })).toBe(105);
-    expect(resolveMaxUserCountForOAuth({ MAX_USER_COUNT: '-5' })).toBe(105);
+  it('非数値・0以下は 200', () => {
+    expect(resolveMaxUserCountForOAuth({ MAX_USER_COUNT: 'abc' })).toBe(200);
+    expect(resolveMaxUserCountForOAuth({ MAX_USER_COUNT: '0' })).toBe(200);
+    expect(resolveMaxUserCountForOAuth({ MAX_USER_COUNT: '-5' })).toBe(200);
   });
 });
 
@@ -177,7 +177,7 @@ describe('ensureOAuthProfile', () => {
 
     expect(result.status).toBe('capacity_reached');
     if (result.status === 'capacity_reached') {
-      // 明示的に渡した limit がそのまま返る（既定値 105 とは独立）
+      // 明示的に渡した limit がそのまま返る（既定値 200 とは独立）
       expect(result.limit).toBe(100);
     }
     expect(deleteUser).toHaveBeenCalledWith('late_user_id');

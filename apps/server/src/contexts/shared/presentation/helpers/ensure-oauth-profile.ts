@@ -12,7 +12,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
  * ため、capacity 上限 env の読みと profiles 件数取得は inline で実装する。
  */
 
-const DEFAULT_LIMIT = 105;
+const DEFAULT_LIMIT = 200;
 
 interface EnsureOAuthProfileSuccess {
   status: 'ok';
@@ -48,7 +48,7 @@ export function extractOAuthAvatarUrl(user: User): string | null {
 }
 
 /**
- * MAX_USER_COUNT を解決する。空・非数値・0以下なら 100 にフォールバック。
+ * MAX_USER_COUNT を解決する。空・非数値・0以下なら 200 にフォールバック。
  *
  * 同等関数が `user/application/config/signup-cap.ts` にあるが shared 層からは
  * import できないため重複している（Issue #300 で意図的に分離した経緯）。
