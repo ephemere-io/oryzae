@@ -4,7 +4,7 @@ import { DEFAULT_MAX_USER_COUNT } from '../../domain/policies/signup-capacity.po
  * MAX_USER_COUNT 環境変数を解決する。
  *
  * Vercel/Supabase 等の env で運用変更できる。
- * 値が未設定・非数値・0 以下のいずれかなら DEFAULT_MAX_USER_COUNT (= 105) を返す。
+ * 値が未設定・非数値・0 以下のいずれかなら DEFAULT_MAX_USER_COUNT (= 200) を返す。
  */
 export function resolveMaxUserCount(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.MAX_USER_COUNT;
