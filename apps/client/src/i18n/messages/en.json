@@ -496,6 +496,8 @@
       "letter_badge": "Letter from the fermentation process"
     },
     "fermentation_sidebar": {
+      "heading": "Fermentation",
+      "letter_open": "Read the letter",
       "close_aria": "Close the fermentation sidebar",
       "empty": "No fermentation results for this question yet.",
       "section_letter": "Letter",
@@ -702,6 +704,8 @@
   },
   "sp": {
     "editor": {
+      "palette_aria": "Editor actions",
+      "dismiss_keyboard": "Hide keyboard",
       "title_placeholder": "Title (optional)",
       "body_placeholder": "Write what you feel, just as it is.",
       "status_editing": "Editing",
@@ -728,6 +732,7 @@
       "delete": "Delete"
     },
     "nav": {
+      "back": "Back",
       "write": "Write",
       "jar": "Jar",
       "list": "List",
@@ -735,8 +740,8 @@
       "questions": "Questions"
     },
     "jar": {
-      "title": "The jar",
       "untitled": "Untitled question",
+      "map_aria": "Jar map",
       "close": "Close",
       "letter_empty": "No letter for this result yet",
       "reply": "Write a reply",
@@ -746,10 +751,8 @@
       "section_sources": "From these entries",
       "source_untitled": "Untitled entry",
       "no_questions": "No questions yet. Start one with the button below.",
-      "spin_hint": "Swipe sideways to spin",
       "manage_questions": "Add or edit questions",
       "not_fermented": "This question hasn't fermented yet",
-      "tap_hint": "Tap to read",
       "selection_reason": "Why this was chosen"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
@@ -797,6 +800,12 @@
       "cancel": "Cancel",
       "save": "Save",
       "resize": "Resize and rotate",
+      "tool_snippet": "Snippet",
+      "tool_read_image": "Read image",
+      "tool_photo": "Photo",
+      "open": "Open",
+      "read_image": "Read text from a photo",
+      "lightbox_close": "Close",
       "snippet_placeholder": "Something worth keeping"
     }
   },
@@ -836,6 +845,9 @@
     "list_search_placeholder": "Search entries",
     "list_load_more": "Load more",
     "chip_all_questions": "All questions",
+    "filter_all_months": "All months",
+    "filter_month_aria": "Filter by month",
+    "filter_question_aria": "Filter by question",
     "question_untitled": "Untitled question",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",

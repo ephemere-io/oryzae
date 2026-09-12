@@ -124,7 +124,7 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(16);
       },
     },
@@ -140,7 +140,7 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(16);
       },
     },
@@ -156,7 +156,7 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(16);
       },
     },
@@ -171,7 +171,7 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(48);
       },
     },
@@ -208,7 +208,7 @@ registerUnit<Props>({
       id: 'ferment-cta-iff-hasentry',
       description: '発酵 CTA は hasEntry=true（entryId 確定）のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasCta = Boolean(root.querySelector('.mx-4 button'));
+        const hasCta = Boolean(root.querySelector('button[data-palette-action="ferment"]'));
         const expectEntry = contract.hasEntry === 'true';
         return (
           hasCta === expectEntry ||
@@ -285,10 +285,11 @@ registerUnit<Props>({
       description: '発酵 CTA 送信中は pickling=true でボタンが disabled',
       onlyFixtures: ['pickling'],
       check: ({ root, contract }) => {
-        const btn = root.querySelector<HTMLButtonElement>('.mx-4 button');
+        const btn = root.querySelector('button[data-palette-action="ferment"]');
+        const locked = btn?.getAttribute('aria-disabled') === 'true';
         return (
-          (contract.pickling === 'true' && btn?.disabled === true) ||
-          `expected pickling=true & disabled, got pickling=${contract.pickling}, disabled=${btn?.disabled}`
+          (contract.pickling === 'true' && locked) ||
+          `expected pickling=true & locked, got pickling=${contract.pickling}, locked=${locked}`
         );
       },
     },
@@ -348,7 +349,9 @@ registerUnit<Props>({
       id: 'delete-sheet-iff-open',
       description: '削除確認シート（fixed オーバーレイ）は deleteOpen=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasSheet = Boolean(root.querySelector('.fixed'));
+        // パレットも fixed なので、確認シートは契約で見分ける。
+        const sheet = root.querySelector('[data-verify-unit="SpConfirmSheet"]');
+        const hasSheet = sheet?.getAttribute('data-verify-open') === 'true';
         const expectOpen = contract.deleteOpen === 'true';
         return (
           hasSheet === expectOpen ||
@@ -361,10 +364,11 @@ registerUnit<Props>({
       description: '既存エントリで ⋯ を押すと deleteOpen=true になり確認シートが現れる',
       onlyFixtures: ['delete-open'],
       check: ({ root, contract }) => {
-        const hasSheet = Boolean(root.querySelector('.fixed'));
+        const sheet = root.querySelector('[data-verify-unit="SpConfirmSheet"]');
+        const hasSheet = sheet?.getAttribute('data-verify-open') === 'true';
         return (
           (contract.deleteOpen === 'true' && hasSheet) ||
-          `⋯ 押下後 deleteOpen=true & シート表示のはずだが deleteOpen=${contract.deleteOpen}, sheet=${hasSheet}`
+          `削除を押した後 deleteOpen=true & シート表示のはずだが deleteOpen=${contract.deleteOpen}, sheet=${hasSheet}`
         );
       },
     },

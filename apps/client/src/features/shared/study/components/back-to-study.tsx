@@ -18,19 +18,16 @@ export const STUDY_EXIT_TAB = { width: 156, height: 32 } as const;
 export const STUDY_EXIT_RESERVE = STUDY_EXIT_TAB.width + 32;
 
 /**
- * SP の画面が下がる高さ（px）。SP のヘッダーは題を中央に置くので、タブの真下に
- * 題が来る。SP だけはタブの高さぶん画面を下げる。
- */
-export const STUDY_EXIT_BAND = STUDY_EXIT_TAB.height;
-
-/**
- * サブ画面の上端の中央に垂れ下がる「書斎へ戻る」のタブ。
+ * PC のサブ画面の上端の中央に垂れ下がる「書斎へ戻る」のタブ。
  *
  * **引く動作（`PullBackToStudy`）と同じことを、押しても出来るようにするための双子。**
  * 引きは覚えなくてよい代わりに、そこに在ることが見えない。キャンバスを持たない画面
  * （エントリー）には引きの軸すら無い。だから見える出口も 1 つ要る。
  *
- * ### ここまでの経緯
+ * **SP はこれを使わない。** SP の戻り道は上段の左端の正円（`features/sp/navigation` の
+ * `SpTopBar`）。上端に垂らした版も下端の帯に載せた版も、題と競り合う・ダサいと言われた。
+ *
+ * ### ここまでの経緯（PC）
  *
  * 左上のマーク → 下端の中央 → 上端の中央に浮かせた 9px の名前 → 画面を丸ごと下げる帯
  * → 帯とタブ（書斎のラベルの色を溶かした地）→ **帯とタブ（パレットと同じ面）**。
@@ -52,8 +49,7 @@ export const STUDY_EXIT_BAND = STUDY_EXIT_TAB.height;
  * ### 画面の側がすること
  *
  * PC の画面は下がらない。上端の中央 `STUDY_EXIT_RESERVE` だけを空けておく
- * （`--study-exit-reserve`）。SP だけは題を中央に置くので、タブの高さぶん下がる
- * （`--study-exit-band`）。
+ * （`--study-exit-reserve`）。
  *
  * 重なり順は 55。掴んで動かせるパレット（1600）より下で、パレットが裏に隠れて
  * 戻せなくなることは無い。

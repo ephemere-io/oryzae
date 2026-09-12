@@ -496,6 +496,8 @@
       "letter_badge": "来自发酵过程的信件"
     },
     "fermentation_sidebar": {
+      "heading": "发酵结果",
+      "letter_open": "阅读来信",
       "close_aria": "关闭发酵侧边栏",
       "empty": "这个问题还没有发酵结果。",
       "section_letter": "信",
@@ -702,6 +704,8 @@
   },
   "sp": {
     "editor": {
+      "palette_aria": "编辑操作",
+      "dismiss_keyboard": "收起键盘",
       "title_placeholder": "标题（可选）",
       "body_placeholder": "把此刻的感受，如实写下。",
       "status_editing": "编辑中",
@@ -728,6 +732,7 @@
       "delete": "删除"
     },
     "nav": {
+      "back": "返回",
       "write": "书写",
       "jar": "瓶",
       "list": "列表",
@@ -735,8 +740,8 @@
       "questions": "提问"
     },
     "jar": {
-      "title": "瓶",
       "untitled": "无标题提问",
+      "map_aria": "罐子地图",
       "close": "关闭",
       "letter_empty": "此结果还没有信",
       "reply": "写回信",
@@ -746,10 +751,8 @@
       "section_sources": "来源记录",
       "source_untitled": "无标题记录",
       "no_questions": "还没有提问。可以从下方按钮开始。",
-      "spin_hint": "横向滑动即可转动",
       "manage_questions": "添加或编辑提问",
       "not_fermented": "这个提问还没有发酵",
-      "tap_hint": "点按阅读",
       "selection_reason": "被选中的理由"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
@@ -797,6 +800,12 @@
       "cancel": "取消",
       "save": "保存",
       "resize": "改变大小和方向",
+      "tool_snippet": "摘录",
+      "tool_read_image": "识别",
+      "tool_photo": "照片",
+      "open": "打开",
+      "read_image": "从照片识别文字",
+      "lightbox_close": "关闭",
       "snippet_placeholder": "想留下的话"
     }
   },
@@ -836,6 +845,9 @@
     "list_search_placeholder": "搜索正文",
     "list_load_more": "加载更多",
     "chip_all_questions": "全部提问",
+    "filter_all_months": "所有月份",
+    "filter_month_aria": "按月份筛选",
+    "filter_question_aria": "按提问筛选",
     "question_untitled": "无标题提问",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",

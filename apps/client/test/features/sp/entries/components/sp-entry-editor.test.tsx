@@ -165,17 +165,88 @@ describe('SpEntryEditor', () => {
     );
     renderEditor(createMockApi(apiFetch));
 
-    fireEvent.click(screen.getByRole('button', { name: /問い/ }));
+    // 題の下の「+ 問いを結ぶ」の行（パレットの問いボタンとは名前が違う）。
+    fireEvent.click(
+      screen.getByRole('button', { name: `+ ${jaMessages.sp.editor.question_link}` }),
+    );
     const questionItem = await screen.findByRole('button', { name: 'なぜ書くのか' });
     fireEvent.click(questionItem);
 
-    // 選択後、チップに「◦ なぜ書くのか」と反映される（シートは閉じる）
-    await waitFor(() => expect(screen.getByRole('button', { name: /なぜ書くのか/ })).toBeTruthy());
+    // 選択後、題の下の行に「◦ なぜ書くのか」と反映される（シートは閉じる）
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '◦ なぜ書くのか' })).toBeTruthy(),
+    );
+  });
+
+  /** 紐づけ済みの問いが 1 つ（q1）、選べる問いが 2 つ（q1 / q2）ある既存エントリ。 */
+  function linkedApi(): ReturnType<typeof vi.fn> {
+    return vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(
+          jsonResponse([
+            { id: 'q1', currentText: 'なぜ続けるのか' },
+            { id: 'q2', currentText: '手放せないものは何か' },
+          ]),
+        );
+      if (url === '/api/v1/entries/e1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      return Promise.resolve(jsonResponse([]));
+    });
+  }
+
+  it('問いを付け替えると、前の紐づけを外してから次を結ぶ', async () => {
+    // 旧実装は選択を差し替えるだけで DELETE を投げず、サーバーには両方が紐づいたまま
+    // チップには 1 つしか出なかった（PC は unlink を持っている）。
+    const fetchImpl = linkedApi();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '◦ なぜ続けるのか' }));
+    fireEvent.click(await screen.findByRole('button', { name: '手放せないものは何か' }));
+
+    await waitFor(() =>
+      expect(fetchImpl).toHaveBeenCalledWith(
+        '/api/v1/entries/e1/questions/q1',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+    await waitFor(() =>
+      expect(fetchImpl).toHaveBeenCalledWith(
+        '/api/v1/entries/e1/questions/q2',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    expect(await screen.findByText('◦ 手放せないものは何か')).toBeTruthy();
+  });
+
+  it('選んでいる問いをもう一度押すと外れ、紐づけも解除される', async () => {
+    const fetchImpl = linkedApi();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '◦ なぜ続けるのか' }));
+    // シートの中の「選んでいる」行（チップと同じ文言なので pressed で見分ける）。
+    fireEvent.click(await screen.findByRole('button', { name: /なぜ続けるのか/, pressed: true }));
+
+    await waitFor(() =>
+      expect(fetchImpl).toHaveBeenCalledWith(
+        '/api/v1/entries/e1/questions/q1',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+    expect(await screen.findByText(`+ ${jaMessages.sp.editor.question_link}`)).toBeTruthy();
   });
 
   it('問いが無いときは空状態を表示する', async () => {
     renderEditor(createMockApi(apiFetch));
-    fireEvent.click(screen.getByRole('button', { name: /問い/ }));
+    // 題の下の「+ 問いを結ぶ」の行（パレットの問いボタンとは名前が違う）。
+    fireEvent.click(
+      screen.getByRole('button', { name: `+ ${jaMessages.sp.editor.question_link}` }),
+    );
     expect(await screen.findByText(/立てている問いがありません/)).toBeTruthy();
   });
   it('問いがゼロでも「納める」から問いをその場で立てられる（Issue #314）', async () => {

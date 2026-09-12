@@ -496,6 +496,8 @@
       "letter_badge": "発酵プロセスからの手紙"
     },
     "fermentation_sidebar": {
+      "heading": "発酵の結果",
+      "letter_open": "手紙を読む",
       "close_aria": "発酵サイドバーを閉じる",
       "empty": "この問いの発酵結果はまだありません。",
       "section_letter": "手紙",
@@ -702,6 +704,8 @@
   },
   "sp": {
     "editor": {
+      "palette_aria": "エディタの操作",
+      "dismiss_keyboard": "キーボードを閉じる",
       "title_placeholder": "タイトル（任意）",
       "body_placeholder": "いま感じていることを、そのまま。",
       "status_editing": "編集中",
@@ -728,6 +732,7 @@
       "delete": "削除"
     },
     "nav": {
+      "back": "戻る",
       "write": "書く",
       "jar": "瓶",
       "list": "一覧",
@@ -735,8 +740,8 @@
       "questions": "問い"
     },
     "jar": {
-      "title": "瓶",
       "untitled": "無題の問い",
+      "map_aria": "瓶の地図",
       "close": "閉じる",
       "letter_empty": "この結果にはまだ手紙がありません",
       "reply": "返事を書く",
@@ -746,10 +751,8 @@
       "section_sources": "もとになったエントリー",
       "source_untitled": "無題のエントリー",
       "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
-      "spin_hint": "横に払うと回ります",
       "manage_questions": "問いを追加・編集",
       "not_fermented": "この問いはまだ発酵していません",
-      "tap_hint": "タップして読む",
       "selection_reason": "選ばれた理由"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
@@ -797,6 +800,12 @@
       "cancel": "キャンセル",
       "save": "保存",
       "resize": "大きさと向きを変える",
+      "tool_snippet": "スニペット",
+      "tool_read_image": "読み取る",
+      "tool_photo": "写真",
+      "open": "開く",
+      "read_image": "写真から文字を読み取る",
+      "lightbox_close": "閉じる",
       "snippet_placeholder": "書き留めておきたいことを"
     }
   },
@@ -836,6 +845,9 @@
     "list_search_placeholder": "本文を検索",
     "list_load_more": "さらに読み込む",
     "chip_all_questions": "すべての問い",
+    "filter_all_months": "すべての月",
+    "filter_month_aria": "月で絞り込む",
+    "filter_question_aria": "問いで絞り込む",
     "question_untitled": "無題の問い",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",

@@ -4,6 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
+import type { CanvasSurface } from '@/lib/canvas/use-canvas-viewport';
 import { toTransform, type Viewport, worldToScreen } from '@/lib/canvas/viewport';
 
 /** つかんでいる間だけ最前面へ。 */
@@ -98,6 +99,14 @@ export interface SpBoardSurfaceProps {
   dateKey: string;
   /** 盤面を画面に収めるための変換。 */
   viewport: Viewport;
+  /**
+   * パン・ズームの hook（`useCanvasViewport`）。渡すと frame / world の ref を hook が
+   * 持ち、**2 本指で寄り引き・空白の 1 本指でパン**できる。省略時（孤立検証・テスト）は
+   * `viewport` の transform を自分で書く。
+   */
+  canvas?: CanvasSurface;
+  /** 倍率の影響を受けない画面空間の UI（ズームの段階ボタン等）。 */
+  overlay?: React.ReactNode;
   /** 指の移動で新しい world 座標が決まったとき。 */
   onMove: (cardId: string, x: number, y: number) => void;
   /** 指を離したとき（保存はここで投げる）。 */
@@ -114,8 +123,11 @@ export interface SpBoardSurfaceProps {
  *
  * **右ペインを置かない。** 縦画面で 400px の側パネルを出すと板がほぼ潰れる。日付と
  * カード枚数だけを隅に小さく浮かせ、**カードは指でつかんで動かせる**ようにする。
- * カードの重なりは指で解く前提なので、ズームもパンも与えない — 指の操作は
- * 「カードを動かす」1 つに絞る。
+ *
+ * 指の操作は 3 つ: カードの上の 1 本指は**動かす**、空白の 1 本指は**パン**、
+ * 2 本指は**寄り引き**（`useCanvasViewport` が持つ。PC のボードと同じ手）。以前は
+ * 開いたときに 1 回収めるだけでズームもパンも無く、カードが増えると縮尺が下がって
+ * 読めなくなった。
  *
  * データ取得と初期フィットは `sp-board.tsx` が持つ。ここは渡されたものを描くだけ。
  */
@@ -123,6 +135,8 @@ export function SpBoardSurface({
   cards,
   dateKey,
   viewport,
+  canvas,
+  overlay,
   onMove,
   onCommit,
   selectedId = null,
@@ -133,6 +147,8 @@ export function SpBoardSurface({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
+  /** frame の上に置かれている指。2 本になったらカードの操作を手放す（寄り引きに譲る）。 */
+  const pointersRef = useRef(new Set<number>());
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>, card: BoardCardData) => {
@@ -202,6 +218,31 @@ export function SpBoardSurface({
     [onCommit],
   );
 
+  /**
+   * 2 本目の指が降りたら、カードの操作を手放して寄り引きに譲る。
+   *
+   * 掴んだまま 2 本目が来ると、hook はピンチを始めるが、カードも 1 本目に付いて動き
+   * 続ける（盤面が寄りながらカードも流れる）。動かしかけた分は元の位置へ戻す。
+   */
+  const trackPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      pointersRef.current.add(event.pointerId);
+      if (pointersRef.current.size < 2) return;
+      const drag = dragRef.current;
+      if (drag) {
+        dragRef.current = null;
+        setDraggingId(null);
+        if (drag.moved >= TAP_SLOP) onMove(drag.cardId, drag.originX, drag.originY);
+      }
+      resizeRef.current = null;
+    },
+    [onMove],
+  );
+
+  const trackPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(event.pointerId);
+  }, []);
+
   /** 角のつまみ。中心から指への向きと距離で、回転と大きさを同時に決める。 */
   const handleResizeMove = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
@@ -252,17 +293,32 @@ export function SpBoardSurface({
         dateKey,
         hasSidePane: false,
         selectedId: selectedId ?? 'none',
+        pannable: canvas !== undefined,
       })}
+      ref={canvas?.frameRef}
       className="relative h-full w-full overflow-hidden"
-      style={{ backgroundColor: 'var(--bg)' }}
+      style={{
+        backgroundColor: 'var(--bg)',
+        // 指の操作はこの中で完結させる（ブラウザのスクロール・ページ拡大に取られない）。
+        touchAction: 'none',
+        overscrollBehavior: 'none',
+      }}
       // 板の何も無いところを押したら選択を解く（PC の盤面と同じ）。
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onSelect?.(null);
       }}
+      onPointerDownCapture={trackPointerDown}
+      onPointerUpCapture={trackPointerEnd}
+      onPointerCancelCapture={trackPointerEnd}
     >
+      {/* world。transform を書くのは hook（あれば）。無ければ viewport から自分で書く。 */}
       <div
+        ref={canvas?.worldRef}
         className="absolute left-0 top-0"
-        style={{ transform: toTransform(viewport), transformOrigin: '0 0' }}
+        style={{
+          transformOrigin: '0 0',
+          ...(canvas ? {} : { transform: toTransform(viewport) }),
+        }}
       >
         {visible.map((card) => {
           const isDragging = draggingId === card.id;
@@ -270,6 +326,8 @@ export function SpBoardSurface({
             <div
               key={card.id}
               data-card-id={card.id}
+              // カードの上で始まった指はパンにしない（hook はこの印で辞退する）。
+              data-canvas-no-pan=""
               onPointerDown={(event) => handlePointerDown(event, card)}
               onPointerMove={handlePointerMove}
               onPointerUp={endDrag}
@@ -322,6 +380,7 @@ export function SpBoardSurface({
                 type="button"
                 aria-label={t('resize')}
                 data-testid="sp-board-handle"
+                data-canvas-no-pan=""
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -367,7 +426,7 @@ export function SpBoardSurface({
 
       {visible.length === 0 && (
         <p
-          className="absolute inset-0 flex items-center justify-center px-8 text-center text-[13px]"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px]"
           style={{ color: 'var(--date-color)' }}
         >
           {t('empty')}
@@ -377,16 +436,14 @@ export function SpBoardSurface({
       {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。 */}
       <div
         className="pointer-events-none absolute top-4 flex items-baseline gap-2"
-        style={{
-          // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと日付に重なる。
-          left: '1rem',
-          color: 'var(--date-color)',
-          fontFamily: 'Inter, sans-serif',
-        }}
+        style={{ left: '1rem', color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
       >
         <span className="text-[11px] tracking-[0.16em]">{formatCornerDate(dateKey)}</span>
         <span className="text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>
       </div>
+
+      {/* 画面空間の UI。この上ではパンを始めない。 */}
+      {overlay ? <div data-canvas-no-pan="">{overlay}</div> : null}
     </div>
   );
 }
@@ -394,7 +451,8 @@ export function SpBoardSurface({
 /**
  * カードの中身。PC の意味的ズーム（引いたら中身を落とす）は持たない。
  *
- * SP は盤面を一度フィットさせたきり倍率が変わらないので、出し分ける段階が無い。
+ * 寄れるようになったので字は本文と同じ 15px に戻してもよいが、全体を収めた縮尺で
+ * 読めることを優先し、少し大きめのままにしてある。
  */
 function SpBoardCardContent({ card }: { card: BoardCardData }) {
   if (card.cardType === 'photo' && 'imageUrl' in card.content) {
@@ -411,8 +469,6 @@ function SpBoardCardContent({ card }: { card: BoardCardData }) {
   }
   if ('text' in card.content) {
     return (
-      // 盤面は縮小して全体を映すので、カードの中の文字は**縮尺のぶん割り増して**おかないと
-      // 実機で読めない（12px は板の縮尺が乗ると 6〜7px 相当になる）。
       <p
         className="h-full overflow-hidden whitespace-pre-wrap p-2.5 text-[17px]"
         style={{ color: 'var(--fg)', lineHeight: 1.6 }}

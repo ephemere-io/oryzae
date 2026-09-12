@@ -496,6 +496,8 @@
       "letter_badge": "발효 과정의 편지"
     },
     "fermentation_sidebar": {
+      "heading": "발효 결과",
+      "letter_open": "편지 읽기",
       "close_aria": "발효 사이드바 닫기",
       "empty": "이 물음의 발효 결과가 아직 없습니다.",
       "section_letter": "편지",
@@ -702,6 +704,8 @@
   },
   "sp": {
     "editor": {
+      "palette_aria": "편집 도구",
+      "dismiss_keyboard": "키보드 닫기",
       "title_placeholder": "제목 (선택)",
       "body_placeholder": "지금 느끼는 것을 그대로.",
       "status_editing": "편집 중",
@@ -728,6 +732,7 @@
       "delete": "삭제"
     },
     "nav": {
+      "back": "뒤로",
       "write": "쓰기",
       "jar": "병",
       "list": "목록",
@@ -735,8 +740,8 @@
       "questions": "질문"
     },
     "jar": {
-      "title": "병",
       "untitled": "제목 없는 질문",
+      "map_aria": "병 지도",
       "close": "닫기",
       "letter_empty": "이 결과에는 아직 편지가 없습니다",
       "reply": "답장 쓰기",
@@ -746,10 +751,8 @@
       "section_sources": "바탕이 된 기록",
       "source_untitled": "제목 없는 기록",
       "no_questions": "아직 질문이 없습니다. 아래 버튼에서 시작해 보세요.",
-      "spin_hint": "옆으로 밀면 돌아갑니다",
       "manage_questions": "질문 추가·편집",
       "not_fermented": "이 질문은 아직 발효되지 않았습니다",
-      "tap_hint": "탭하여 읽기",
       "selection_reason": "선택된 이유"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
@@ -797,6 +800,12 @@
       "cancel": "취소",
       "save": "저장",
       "resize": "크기와 방향 바꾸기",
+      "tool_snippet": "스니펫",
+      "tool_read_image": "읽기",
+      "tool_photo": "사진",
+      "open": "열기",
+      "read_image": "사진에서 글자 읽기",
+      "lightbox_close": "닫기",
       "snippet_placeholder": "남겨 두고 싶은 것"
     }
   },
@@ -836,6 +845,9 @@
     "list_search_placeholder": "본문 검색",
     "list_load_more": "더 불러오기",
     "chip_all_questions": "모든 질문",
+    "filter_all_months": "모든 달",
+    "filter_month_aria": "달로 좁히기",
+    "filter_question_aria": "질문으로 좁히기",
     "question_untitled": "제목 없는 질문",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
