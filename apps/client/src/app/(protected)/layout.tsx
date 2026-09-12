@@ -95,11 +95,16 @@ function shellStyle(studyHome: boolean, exitTab: boolean): MainStyle {
 }
 
 /**
- * SP のシェルが配る変数。**SP だけはタブの高さぶん画面を下げる** — SP のヘッダーは
- * 題を中央に置くので、タブの真下に題が来てしまう。
+ * SP のシェルが配る変数。**SP は下端に「書斎へ戻る」の帯を置く**ので、そのぶん画面を
+ * 上で終わらせる。帯はホームインジケータの上に載るので safe-area も含める
+ * （上端に置いていたころは題と競り合い、下げた帯に境界が無かった）。
  */
 function spShellStyle(exitBand: boolean): MainStyle {
-  return { '--study-exit-band': exitBand ? `${STUDY_EXIT_BAND}px` : '0px' };
+  return {
+    '--study-exit-band': exitBand
+      ? `calc(${STUDY_EXIT_BAND}px + env(safe-area-inset-bottom, 0px))`
+      : '0px',
+  };
 }
 
 /** 書斎ホームそのもののパス（ルート）。ここだけサイドバーを外す。 */
@@ -191,12 +196,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               className="flex h-[100dvh] flex-col overflow-hidden"
               style={spShellStyle(showBackToStudy)}
             >
-              {/* padding ではなく margin で下げる。padding だと箱の位置が動かず、
-                  `absolute inset-0` で敷いている画面がタブの下へ潜る（絶対配置が
+              {/* padding ではなく margin で空ける。padding だと箱の寸法が変わらず、
+                  `absolute inset-0` で敷いている画面が帯の下へ潜る（絶対配置が
                   基準にするのは padding box の外側の縁）。 */}
               <main
                 className="relative flex-1 overflow-auto"
-                style={{ marginTop: 'var(--study-exit-band, 0px)' }}
+                style={{ marginBottom: 'var(--study-exit-band, 0px)' }}
               >
                 {content}
               </main>
@@ -212,7 +217,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               {content}
             </PcShell>
           ) : null}
-          {device !== null && showBackToStudy && <BackToStudy />}
+          {/* PC は上端のタブ、SP は下端の帯（親指の届く側。上端は題と競り合う）。 */}
+          {device !== null && showBackToStudy && (
+            <BackToStudy placement={device === 'sp' ? 'bottom' : 'top'} />
+          )}
           {/* 引き切ったキャンバスからさらに引くと、部屋が滲み出て書斎へ戻る。
               板と瓶（キャンバスを持つ画面）で効く。重ねるのがここなのは、画面そのものに
               触れずに済ませるため。 */}
