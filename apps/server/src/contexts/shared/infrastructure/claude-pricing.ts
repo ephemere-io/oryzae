@@ -72,6 +72,20 @@ export const OCR_MODEL_ID = 'claude-opus-5';
 export const PHOTO_TRANSCRIPTION_MODEL_ID = 'claude-sonnet-5';
 
 /**
+ * ニュースレターの下書き生成（issue #614）のモデル。OCR / 文字起こしと同じ理由でここに置く。
+ *
+ * **他の 3 用途と別モデルであることが要件**（下のテストが固定している）。
+ * 用途別の内訳はモデル ID でしか引けないので、発酵と同じモデルを使うと
+ * 「月 1 回の下書き生成」の費用が発酵の費用に混ざって二度と分けられない。
+ *
+ * 現行世代で空いているのが Haiku 4.5 だから、という消極的な理由だけではない。
+ * この呼び出しは **admin が読んで書き直す前提の下書き** を 1 回作るだけで、
+ * 素材も PR のタイトルと本文という短いテキストに限られる。最上位モデルの
+ * 出力品質が要る場面ではなく、むしろ何度か作り直す使い方になるので安いほうが良い。
+ */
+export const NEWSLETTER_MODEL_ID = 'claude-haiku-4-5';
+
+/**
  * モデル ID を用途名に読み替える。未登録なら null（＝分類不明）。
  *
  * Anthropic は「用途」を知らない。モデルが分かれているから用途別に読めるだけで、
@@ -88,6 +102,7 @@ export function featureOfModel(model: string): string | null {
   if (model === FERMENTATION_MODEL_ID) return '発酵';
   if (model === OCR_MODEL_ID) return 'OCR';
   if (model === PHOTO_TRANSCRIPTION_MODEL_ID) return '写真の文字起こし';
+  if (model === NEWSLETTER_MODEL_ID) return 'ニュースレター下書き';
   return null;
 }
 

@@ -9,6 +9,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
+  Mail,
   Moon,
   Sun,
   Users,
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: '/fermentations', label: 'Fermentations', icon: FlaskConical },
   { href: '/costs', label: 'Costs', icon: DollarSign },
   { href: '/analytics', label: 'Analytics', icon: Activity },
+  { href: '/newsletters', label: 'Newsletter', icon: Mail },
   { href: '/observability', label: 'Observability', icon: Eye },
   // 「勝手に回っているもの」の一覧。Observability の配下にあるが、
   // 探しに行くものではなく気づくべきものなので、サイドバーにも出す。
