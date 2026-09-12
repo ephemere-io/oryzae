@@ -181,6 +181,51 @@ module.exports = {
       to: { path: '^src/contexts/user/presentation' },
     },
 
+    // === Newsletter context isolation ===
+    {
+      name: 'newsletter-context-isolation',
+      comment: 'newsletter context must not import from other contexts (except shared)',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter' },
+      to: {
+        path: '^src/contexts/',
+        pathNot: ['^src/contexts/newsletter', '^src/contexts/shared'],
+      },
+    },
+
+    // === DDD layer rules for newsletter ===
+    {
+      name: 'newsletter-domain-isolation',
+      comment: 'newsletter domain must not depend on other layers',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/domain' },
+      to: { path: '^src/contexts/newsletter/(application|infrastructure|presentation)' },
+    },
+    {
+      name: 'newsletter-application-no-infra',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/application' },
+      to: { path: '^src/contexts/newsletter/infrastructure' },
+    },
+    {
+      name: 'newsletter-application-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/application' },
+      to: { path: '^src/contexts/newsletter/presentation' },
+    },
+    {
+      name: 'newsletter-infra-no-application',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/infrastructure' },
+      to: { path: '^src/contexts/newsletter/application' },
+    },
+    {
+      name: 'newsletter-infra-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/infrastructure' },
+      to: { path: '^src/contexts/newsletter/presentation' },
+    },
+
     // === Analytics context isolation ===
     {
       name: 'analytics-context-isolation',
