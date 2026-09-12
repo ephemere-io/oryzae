@@ -121,7 +121,9 @@ export function EntryListOverlay({
         searching: search.length > 0,
         canCreate: onCreateEntry !== undefined,
       })}
-      className="absolute inset-0 z-20 flex items-start justify-center overflow-auto px-6 py-14"
+      // 幅で形を変える（端末では判定しない）。狭ければ紙は全幅・全高のシートになり、
+      // 月チップは横に流れ、行の字は指で読める大きさになる（`@max-lg` = 512px 以下）。
+      className="@container absolute inset-0 z-20 flex items-start justify-center overflow-auto px-6 py-14 @max-lg:p-0"
       onPointerDown={(event) => {
         pressedOutside.current = event.target === event.currentTarget;
       }}
@@ -131,16 +133,18 @@ export function EntryListOverlay({
       }}
     >
       <div
-        className="w-full max-w-[720px] rounded-xl p-6"
+        className="w-full max-w-[720px] rounded-xl p-6 @max-lg:min-h-full @max-lg:max-w-none @max-lg:rounded-none @max-lg:px-5 @max-lg:pt-4 @max-lg:pb-10"
         style={{
           background: '#fdfbf7',
           border: '1px solid rgba(122,116,64,0.18)',
           boxShadow: '0 12px 48px rgba(140,133,126,0.18)',
         }}
       >
-        <div className="mb-5 flex items-center justify-between">
+        {/* 見出しの行に「新規作成」と ✕。月チップの列に置いていたころは、月が 3 つを
+            超えて折り返すとボタンが 2 行目の右端に落ちて「位置がずれて」見えた。 */}
+        <div className="mb-5 flex items-center gap-2">
           <h2
-            className="text-[10px] font-medium uppercase tracking-[0.2em]"
+            className="min-w-0 flex-1 truncate text-[10px] font-medium uppercase tracking-[0.2em]"
             style={{ color: '#8C857E', fontFamily: 'Inter, sans-serif' }}
           >
             {selectedMonth === null
@@ -152,19 +156,40 @@ export function EntryListOverlay({
                     count: entries.length,
                   })}
           </h2>
+          {onCreateEntry && (
+            <button
+              type="button"
+              onClick={onCreateEntry}
+              data-verify-part="create-entry"
+              className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[12px] font-medium transition-opacity hover:opacity-90"
+              style={{
+                background: 'var(--accent)',
+                color: '#fff',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              <span aria-hidden="true">＋</span>
+              {t('list_new_entry')}
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
             aria-label={t('list_close')}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[13px] transition-colors hover:bg-[rgba(140,133,126,0.12)]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] transition-colors hover:bg-[rgba(140,133,126,0.12)]"
             style={{ color: '#8C857E' }}
           >
             ✕
           </button>
         </div>
 
-        {/* 月チップ。背表紙を狙わなくても月を切り替えられる（SP はこれが唯一の手段）。 */}
-        <div className="mb-5 flex flex-wrap items-center gap-2" data-chip-group="month">
+        {/* 月チップ。背表紙を狙わなくても月を切り替えられる（SP はこれが唯一の手段）。
+            狭い幅では折り返さず横に流す（折り返すと 2〜3 段の塊になる）。 */}
+        <div
+          className="mb-5 flex flex-wrap items-center gap-2 @max-lg:-mx-5 @max-lg:flex-nowrap @max-lg:overflow-x-auto @max-lg:px-5 @max-lg:pb-1"
+          style={{ scrollbarWidth: 'none' }}
+          data-chip-group="month"
+        >
           <MonthChip
             label={t('chip_all')}
             selected={selectedMonth === null}
@@ -178,19 +203,6 @@ export function EntryListOverlay({
               onClick={() => onSelectMonth(month)}
             />
           ))}
-          {/* 選ぶところの右端に「新規作成」。月を見に来た流れのまま書き始められる。 */}
-          {onCreateEntry && (
-            <button
-              type="button"
-              onClick={onCreateEntry}
-              data-verify-part="create-entry"
-              className="ml-auto flex h-8 items-center gap-1.5 rounded-full px-4 text-[12px] font-medium transition-opacity hover:opacity-90"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
-              <span aria-hidden="true">＋</span>
-              {t('list_new_entry')}
-            </button>
-          )}
         </div>
 
         {/* 本文の検索。サーバーが絞るので、まだ読み込んでいない古い記録にも当たる。 */}
@@ -200,7 +212,8 @@ export function EntryListOverlay({
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={t('list_search_placeholder')}
             aria-label={t('list_search_placeholder')}
-            className="mb-4 w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+            // 狭い幅では 16px にする（iOS はそれ未満の入力欄に触れると画面ごと拡大する）。
+            className="mb-4 w-full rounded-lg px-3 py-2 text-[13px] outline-none @max-lg:py-2.5 @max-lg:text-[16px]"
             style={{
               background: 'rgba(140,133,126,0.06)',
               border: '1px solid rgba(122,116,64,0.14)',
@@ -209,16 +222,19 @@ export function EntryListOverlay({
           />
         )}
 
-        {/* 問いで絞る。問いが 1 つも無ければ行ごと出さない（空の帯が残らない）。 */}
+        {/* 問いで絞る。問いが 1 つも無ければ行ごと出さない（空の帯が残らない）。
+            問いは人の言葉なので月チップ（機械ラベル）の形を流用しない: 大文字化も字間も
+            掛けず、1 行に収めて長ければ末尾を省く（折り返すと丸い塊になる）。 */}
         {onSelectQuestion && questions.length > 0 && (
           <div className="mb-5 flex flex-wrap gap-2" data-chip-group="question">
-            <MonthChip
+            <QuestionChip
               label={t('chip_all_questions')}
               selected={questionId === null}
+              control
               onClick={() => onSelectQuestion(null)}
             />
             {questions.map((question) => (
-              <MonthChip
+              <QuestionChip
                 key={question.id}
                 label={question.currentText ?? t('question_untitled')}
                 selected={questionId === question.id}
@@ -245,21 +261,25 @@ export function EntryListOverlay({
                 <button
                   type="button"
                   onClick={() => onSelectEntry(entry)}
-                  className="flex w-full flex-col gap-1 border-t px-1 py-3 text-left transition-colors hover:bg-[rgba(140,133,126,0.06)]"
+                  className="flex w-full flex-col gap-1 border-t px-1 py-3 text-left transition-colors hover:bg-[rgba(140,133,126,0.06)] @max-lg:py-3.5"
                   style={{ borderColor: 'rgba(122,116,64,0.12)' }}
                 >
                   <div className="flex items-baseline gap-3">
                     <span
-                      className="text-[10px] tracking-[0.12em]"
+                      className="text-[10px] tracking-[0.12em] @max-lg:text-[11px]"
                       style={{ color: '#A8A381', fontFamily: 'Inter, sans-serif' }}
                     >
                       {formatRowDate(entry.createdAt)}
                     </span>
-                    <span className="flex-1 truncate text-[13px]" style={{ color: '#4A4541' }}>
+                    <span
+                      className="flex-1 truncate text-[13px] @max-lg:text-[14px]"
+                      style={{ color: '#4A4541' }}
+                    >
                       {entry.excerpt}
                     </span>
+                    {/* 字数は狭い幅では出さない（1 行の幅を抜粋に使う）。 */}
                     <span
-                      className="text-[9px] uppercase tracking-[0.14em]"
+                      className="text-[9px] uppercase tracking-[0.14em] @max-lg:hidden"
                       style={{ color: '#A8A381', fontFamily: 'Inter, sans-serif' }}
                     >
                       {t('row_chars', { count: entry.chars })}
@@ -267,7 +287,7 @@ export function EntryListOverlay({
                   </div>
 
                   {(entry.linkedQuestions.length > 0 || entry.pickled) && (
-                    <div className="flex flex-wrap items-center gap-2 pl-[42px]">
+                    <div className="flex flex-wrap items-center gap-2 pl-[42px] @max-lg:pl-[46px]">
                       {entry.linkedQuestions.map((question) => (
                         <span
                           key={question.id}
@@ -313,6 +333,16 @@ export function EntryListOverlay({
   );
 }
 
+/** 塗り分けはどのチップも同じ（選ばれている＝塗る）。 */
+function chipStyle(selected: boolean): React.CSSProperties {
+  return {
+    color: selected ? '#fdfbf7' : '#8C857E',
+    background: selected ? '#8EA89C' : 'transparent',
+    border: `1px solid ${selected ? '#8EA89C' : 'rgba(122,116,64,0.22)'}`,
+  };
+}
+
+/** 月の機械ラベル（`ALL` / `2026.09`）。狭い幅では横に流れるので縮めない。 */
 function MonthChip({
   label,
   selected,
@@ -327,12 +357,39 @@ function MonthChip({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors"
+      className="shrink-0 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors @max-lg:px-3.5 @max-lg:py-1.5 @max-lg:text-[11px]"
+      style={{ fontFamily: 'Inter, sans-serif', ...chipStyle(selected) }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/**
+ * 問いのチップ。人の言葉なので本文の書体のまま、1 行に収める。
+ * `control` は「すべての問い」のようなアプリの言葉（道具の書体で出す）。
+ */
+function QuestionChip({
+  label,
+  selected,
+  control = false,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  control?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      title={label}
+      className="max-w-full truncate rounded-full px-3 py-1 text-[12px] transition-colors @max-lg:py-1.5 @max-lg:text-[13px]"
       style={{
-        fontFamily: 'Inter, sans-serif',
-        color: selected ? '#fdfbf7' : '#8C857E',
-        background: selected ? '#8EA89C' : 'transparent',
-        border: `1px solid ${selected ? '#8EA89C' : 'rgba(122,116,64,0.22)'}`,
+        ...(control ? { fontFamily: 'Inter, "Noto Sans JP", sans-serif' } : {}),
+        ...chipStyle(selected),
       }}
     >
       {label}

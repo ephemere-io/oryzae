@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { PhotoStrip } from '@/components/ui/photo-strip';
+import { CONTROL_FONT, ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
@@ -156,7 +157,7 @@ export function SpEntryEditor({
     saveDraft({ entryId, title, body, questionId: selectedQuestionId });
   }, [draftEnabled, pickled, title, body, entryId, selectedQuestionId, saveDraft, clearDraft]);
 
-  const { linkedQuestions, linkQuestion } = useEntryQuestions(api, entryId);
+  const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, entryId);
 
   useAutosaveEntry({
     title,
@@ -278,6 +279,24 @@ export function SpEntryEditor({
     setSheetOpen(true);
   }
 
+  /**
+   * 問いを選ぶ・外す・付け替える。
+   *
+   * 以前は選択を `null` にするだけで、**サーバーの紐づけは残ったまま**だった。別の問いを
+   * 選ぶと両方が紐づき、チップには 1 つしか出ない（PC は unlink を持っている）。
+   * 紐づけ済み（`linkAttemptedRef` がその問い）なら先に外し、次の問いは下の effect が
+   * entryId 確定後に結ぶ。
+   */
+  function selectQuestion(nextId: string | null) {
+    const previous = selectedQuestionId;
+    if (previous !== null && previous !== nextId && linkAttemptedRef.current === previous) {
+      linkAttemptedRef.current = null;
+      if (entryId) unlinkQuestion(previous);
+    }
+    setSelectedQuestionId(nextId);
+    setSheetOpen(false);
+  }
+
   // 問いを立てて、そのまま選択状態にする。紐づけは下の effect が entryId 確定後に行う。
   async function handleCreateQuestion() {
     const text = newQuestionText.trim();
@@ -375,6 +394,7 @@ export function SpEntryEditor({
           aria-live="polite"
           className="flex items-center gap-1.5 text-xs"
           style={{
+            ...CONTROL_FONT,
             color: error ? 'var(--ob-jar-warm)' : 'var(--accent)',
             opacity: statusText || error ? 1 : 0,
           }}
@@ -399,25 +419,25 @@ export function SpEntryEditor({
         className="w-full bg-transparent px-5 pt-2 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
       />
 
-      {/* 問いを結ぶチップ */}
-      <div className="px-5 pt-4">
+      {/* 問いを結ぶチップと写真。面は PC のチップ・パレット・「書斎に戻る」と同じ
+          （ELEVATED_CHIP）。破線のピルを inline で並べていたころは、問いが長いと
+          2 つ目が次の行に落ちて揃わなかった。 */}
+      <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
         <button
           type="button"
           onClick={openQuestionSheet}
-          className="max-w-full truncate rounded-full px-3 py-1.5 text-xs"
-          style={
-            selectedQuestion
-              ? {
-                  background: 'var(--accent-light)',
-                  color: 'var(--accent)',
-                  border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
-                }
-              : { color: 'var(--date-color)', border: '1px dashed var(--border-subtle)' }
-          }
+          className={`flex h-8 min-w-0 max-w-full items-center px-3 text-[12px] font-medium ${ELEVATED_CHIP_CLASS}`}
+          style={{
+            ...ELEVATED_CHIP_STYLE,
+            ...CONTROL_FONT,
+            ...(selectedQuestion ? {} : { color: 'var(--date-color)' }),
+          }}
         >
-          {selectedQuestion
-            ? `◦ ${selectedQuestion.currentText ?? t('question_untitled')}`
-            : `+ ${t('question_link')}`}
+          <span className="truncate">
+            {selectedQuestion
+              ? `◦ ${selectedQuestion.currentText ?? t('question_untitled')}`
+              : `+ ${t('question_link')}`}
+          </span>
         </button>
 
         {/* 写真を取り込む。押すと端末のカメラ/ライブラリが開く。 */}
@@ -425,8 +445,8 @@ export function SpEntryEditor({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           aria-label={tPhoto('toolbar_button')}
-          className="ml-2 rounded-full px-3 py-1.5 text-xs"
-          style={{ color: 'var(--date-color)', border: '1px dashed var(--border-subtle)' }}
+          className={`flex h-8 shrink-0 items-center whitespace-nowrap px-3 text-[12px] font-medium ${ELEVATED_CHIP_CLASS}`}
+          style={{ ...ELEVATED_CHIP_STYLE, ...CONTROL_FONT, color: 'var(--date-color)' }}
         >
           {`+ ${tPhoto('toolbar_button')}`}
         </button>
@@ -489,7 +509,7 @@ export function SpEntryEditor({
                 pickling || pickled
                   ? 'none'
                   : '0 8px 20px -8px color-mix(in srgb, var(--ob-jar-warm) 60%, transparent)',
-              fontFamily: 'var(--ob-font-sans)',
+              ...CONTROL_FONT,
             }}
           >
             {pickling ? (
@@ -529,8 +549,12 @@ export function SpEntryEditor({
             onClick={() => setSheetOpen(false)}
             className="sp-fade flex-1 bg-black/30"
           />
-          <div className="sp-sheet max-h-[60%] overflow-auto rounded-t-2xl bg-[var(--bg)] pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
-            <div className="px-5 py-4 text-sm font-medium opacity-70">
+          {/* 60% だとキーボードが出た瞬間に一覧が隠れた。85% まで使う。 */}
+          <div className="sp-sheet max-h-[85%] overflow-auto rounded-t-2xl bg-[var(--bg)] pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
+            <div
+              className="px-5 py-4 text-[11px] uppercase tracking-[0.14em]"
+              style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
+            >
               {t('question_sheet_title')}
             </div>
             {composingQuestion ? (
@@ -590,16 +614,18 @@ export function SpEntryEditor({
                       <li key={q.id}>
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedQuestionId(selected ? null : q.id);
-                            setSheetOpen(false);
-                          }}
-                          className="flex w-full items-center justify-between px-5 py-3 text-left text-base hover:bg-[color-mix(in_srgb,var(--fg)_6%,transparent)]"
+                          onClick={() => selectQuestion(selected ? null : q.id)}
+                          className="flex min-h-[48px] w-full items-center justify-between px-5 py-3 text-left text-base hover:bg-[color-mix(in_srgb,var(--fg)_6%,transparent)]"
+                          aria-pressed={selected}
                         >
                           <span className="truncate">
                             {q.currentText ?? t('question_untitled')}
                           </span>
-                          {selected ? <span className="ml-3 shrink-0">✓</span> : null}
+                          {selected ? (
+                            <span className="ml-3 shrink-0" style={{ color: 'var(--accent)' }}>
+                              ✓
+                            </span>
+                          ) : null}
                         </button>
                       </li>
                     );
@@ -611,8 +637,8 @@ export function SpEntryEditor({
                     setCreateQuestionFailed(false);
                     setComposeRequested(true);
                   }}
-                  className="w-full px-5 py-3 text-left text-base"
-                  style={{ color: 'var(--accent)' }}
+                  className="min-h-[48px] w-full px-5 py-3 text-left text-[15px] font-medium"
+                  style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
                 >
                   {t('question_new')}
                 </button>
