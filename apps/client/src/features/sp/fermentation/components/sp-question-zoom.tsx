@@ -2,10 +2,12 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { CONTROL_FONT } from '@/components/ui/surface';
+import { useState } from 'react';
+import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import type { SpJarElement } from '@/features/sp/fermentation/components/sp-element-sheet';
 import { formatMonthDay } from '@/lib/format-date';
+import { useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
 
 interface SpQuestionZoomProps {
   questionText: string;
@@ -15,30 +17,18 @@ interface SpQuestionZoomProps {
   onOpenElement: (element: SpJarElement) => void;
 }
 
-/** 見出しの円の直径。画面幅の 6 割、ただし大きな端末で膨らみすぎない。 */
-const HEADING_SIZE = 'min(60vw, 236px)';
-
-/** 問いの字の大きさ。長い問い（上限 64 字）は 1 段小さくして円に収める。 */
-const LONG_QUESTION_CHARS = 36;
-
 /** その人の言葉（問い・言葉・抜粋）の書体。道具の字（`CONTROL_FONT`）と混ぜない。 */
 const SERIF_FONT = "'Noto Serif JP', serif";
 
 /**
- * 問いの円をひとつ開いた画面。**円は「器」ではなく「見出し」。**
+ * シャーレを押した先。**上に問いが 1 行、下に手紙・言葉・抜粋の一覧。**
  *
- * 以前は開いた円の中に言葉・抜粋・手紙を輪の上に並べ、本文はシートで読ませていた。
- * 312px の円に 104px の抜粋カードを 4 枚・言葉を 6 つ置くと、12 時と 6 時で重なり、
- * 3 時と 9 時では円の外へはみ出し、抜粋は 14 字で切れて「見切れて読めない」と
- * 報告された。長い問いは輪が 3 重になって 6 時側は逆さ文字、最外輪は画面幅で切れた。
+ * 項目を押すと `SpElementSheet`（高さを変えられるセミモーダル）で全文を読む。
+ * 一覧は縦に伸びるだけなので、数が増えても重ならず切れない。
  *
- * いまは上に小さな円（問いはその中に折り返して書く）、下に手紙・言葉・抜粋の
- * **普通の縦リスト**。抜粋は 3 行まで読め、数が増えても縦に伸びるだけで重ならない。
- * 行を押すと `SpElementSheet` で全文を読む（手紙は全画面の読み面）。輪に並べる配置は、
- * 軌道の円の「中身の予告」（`SpJarOrbit`）にだけ残す。
- *
- * 円の中で要素を動かして位置を憶える仕組みは SP から外した。リストに置き場は無く、
- * 動かす意味が消えたため（PC の瓶は引き続き `PUT /api/v1/jar/layout` に憶える）。
+ * 「戻る」は上段（`SpTopBar`）の左端の正円が担う。この画面が出ている間だけ
+ * 上段の戻るを横取りして、書斎ではなく地図へ戻す（`useSpBackHandler`）。
+ * 上段が無い場所（孤立検証・テスト）では自前の戻るを出す。
  */
 export function SpQuestionZoom({
   questionText,
@@ -48,6 +38,11 @@ export function SpQuestionZoom({
   onOpenElement,
 }: SpQuestionZoomProps) {
   const t = useTranslations('sp.jar');
+  const tNav = useTranslations('sp.nav');
+  const { mounted } = useSpChrome();
+  useSpBackHandler(mounted ? onClose : null);
+  /** 長い問いは 1 行に畳む。押すと全文（もう一度押すと戻る）。 */
+  const [expanded, setExpanded] = useState(false);
 
   const keywords = detail?.keywords ?? [];
   const snippets = detail?.snippets ?? [];
@@ -65,50 +60,57 @@ export function SpQuestionZoom({
         snippetCount: snippets.length,
         hasLetter: letter !== null,
         empty,
+        expanded,
+        ownBack: !mounted,
       })}
     >
-      <header className="flex items-center justify-end px-5 py-4">
+      {/* 問いの行。上段の直下、画面のいちばん上。 */}
+      <header
+        className="flex shrink-0 items-start gap-2 border-b px-3 pt-2 pb-3"
+        style={{ borderColor: 'var(--border-subtle)' }}
+      >
+        {!mounted ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={tNav('back')}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+            style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
+          >
+            <svg
+              aria-hidden="true"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={ICON_STROKE_WIDTH + 0.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />
+            </svg>
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={onClose}
-          className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
-          style={{ ...CONTROL_FONT, color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
-        >
-          {t('close')}
-        </button>
-      </header>
-
-      {/* 見出しの円。問いは輪ではなく中に書く（輪は 6 時側が逆さになり、長いと画面幅で切れる）。 */}
-      <div className="flex shrink-0 justify-center px-6">
-        <div
-          className="flex items-center justify-center rounded-full"
-          style={{
-            width: HEADING_SIZE,
-            height: HEADING_SIZE,
-            background:
-              'radial-gradient(circle at 50% 42%, rgba(253,251,247,0.85), rgba(253,251,247,0.2))',
-            border: '1px solid rgba(226,194,142,0.5)',
-            boxShadow: '0 8px 40px rgba(140,133,126,0.12)',
-          }}
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          title={questionText}
+          className="min-h-[44px] min-w-0 flex-1 px-2 text-left"
         >
           <h2
             data-question-heading
-            className="m-0 px-7 text-center font-medium leading-relaxed"
-            style={{
-              fontFamily: SERIF_FONT,
-              fontSize: questionText.length > LONG_QUESTION_CHARS ? 14 : 16,
-              color: '#7A3B3F',
-              letterSpacing: '0.04em',
-              textWrap: 'balance',
-            }}
+            className={`m-0 text-[16px] font-medium leading-relaxed ${expanded ? '' : 'truncate'}`}
+            style={{ fontFamily: SERIF_FONT, color: 'var(--fg)', letterSpacing: '0.02em' }}
           >
             {questionText}
           </h2>
-        </div>
-      </div>
+        </button>
+      </header>
 
-      {/* 中身。読める大きさで縦に並べる。行を押すと全文（手紙は全画面）。 */}
-      <div className="min-h-0 flex-1 overflow-auto px-5 pt-6 pb-8">
+      {/* 一覧。行を押すと全文（セミモーダル）。 */}
+      <div className="min-h-0 flex-1 overflow-auto px-5 pt-4 pb-8">
         {loading ? (
           <p className="py-8 text-center text-xs" style={{ color: 'var(--date-color)' }}>
             …

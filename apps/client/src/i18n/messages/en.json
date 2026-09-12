@@ -704,6 +704,8 @@
   },
   "sp": {
     "editor": {
+      "palette_aria": "Editor actions",
+      "dismiss_keyboard": "Hide keyboard",
       "title_placeholder": "Title (optional)",
       "body_placeholder": "Write what you feel, just as it is.",
       "status_editing": "Editing",
@@ -730,6 +732,7 @@
       "delete": "Delete"
     },
     "nav": {
+      "back": "Back",
       "write": "Write",
       "jar": "Jar",
       "list": "List",
@@ -738,6 +741,7 @@
     },
     "jar": {
       "untitled": "Untitled question",
+      "map_aria": "Jar map",
       "close": "Close",
       "letter_empty": "No letter for this result yet",
       "reply": "Write a reply",
@@ -841,6 +845,9 @@
     "list_search_placeholder": "Search entries",
     "list_load_more": "Load more",
     "chip_all_questions": "All questions",
+    "filter_all_months": "All months",
+    "filter_month_aria": "Filter by month",
+    "filter_question_aria": "Filter by question",
     "question_untitled": "Untitled question",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",

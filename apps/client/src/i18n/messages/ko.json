@@ -704,6 +704,8 @@
   },
   "sp": {
     "editor": {
+      "palette_aria": "편집 도구",
+      "dismiss_keyboard": "키보드 닫기",
       "title_placeholder": "제목 (선택)",
       "body_placeholder": "지금 느끼는 것을 그대로.",
       "status_editing": "편집 중",
@@ -730,6 +732,7 @@
       "delete": "삭제"
     },
     "nav": {
+      "back": "뒤로",
       "write": "쓰기",
       "jar": "병",
       "list": "목록",
@@ -738,6 +741,7 @@
     },
     "jar": {
       "untitled": "제목 없는 질문",
+      "map_aria": "병 지도",
       "close": "닫기",
       "letter_empty": "이 결과에는 아직 편지가 없습니다",
       "reply": "답장 쓰기",
@@ -841,6 +845,9 @@
     "list_search_placeholder": "본문 검색",
     "list_load_more": "더 불러오기",
     "chip_all_questions": "모든 질문",
+    "filter_all_months": "모든 달",
+    "filter_month_aria": "달로 좁히기",
+    "filter_question_aria": "질문으로 좁히기",
     "question_untitled": "제목 없는 질문",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
