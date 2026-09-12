@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import type { QuestionItem } from '@/features/shared/questions/types';
 import { SpQuestionsCardsSkeleton } from '@/features/sp/questions/components/sp-questions-skeleton';
+import { useSpBackHandler } from '@/lib/sp-chrome-context';
 
 interface SpQuestionsProps {
   questions: QuestionItem[];
@@ -47,6 +48,8 @@ export function SpQuestions({
   onClose,
 }: SpQuestionsProps) {
   const t = useTranslations('sp.questions');
+  // 瓶から重ねて開いている間は、上段の「戻る」も書斎ではなくこの画面を閉じる。
+  useSpBackHandler(onClose ?? null);
 
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [draft, setDraft] = useState('');
