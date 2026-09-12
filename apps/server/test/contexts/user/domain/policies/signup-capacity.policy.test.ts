@@ -5,8 +5,8 @@ import {
 } from '@/contexts/user/domain/policies/signup-capacity.policy';
 
 describe('signup-capacity.policy', () => {
-  it('DEFAULT_MAX_USER_COUNT は 105', () => {
-    expect(DEFAULT_MAX_USER_COUNT).toBe(105);
+  it('DEFAULT_MAX_USER_COUNT は 200', () => {
+    expect(DEFAULT_MAX_USER_COUNT).toBe(200);
   });
 
   describe('computeSignupAvailability', () => {
