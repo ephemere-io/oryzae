@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  * 先に置いて、実物が来たときに色と文字が乗るだけにする。
  *
  * 2粒度を公開する:
- *  - `SpJarOrbitSkeleton` … 壜と円だけ。SpJar 本体がヘッダを実物で描いている最中に使う。
+ *  - `SpJarOrbitSkeleton` … 壜と円だけ。SpJar 本体がボタンを実物で描いている最中に使う。
  *  - `SpJarSkeleton` … 画面まるごと。ページ遷移/初回描画の枠に使う。
  */
 
@@ -63,24 +63,19 @@ export function SpJarOrbitSkeleton({ circles = 3 }: { circles?: number }) {
   );
 }
 
-/** 画面まるごと（ヘッダ ＋ 壜と円 ＋ 下部のボタン）。 */
+/** 画面まるごと（壜と円 ＋ 下部のボタン。見出しは実物にも無い）。 */
 export function SpJarSkeleton({ circles = 3 }: { circles?: number }) {
   return (
     <div
       className="relative flex h-full flex-col bg-[var(--bg)]"
       aria-hidden="true"
-      {...verifyAttrs({ unit: 'SpJarSkeleton', slots: 'header,orbit,jar,manage', circles })}
+      {...verifyAttrs({ unit: 'SpJarSkeleton', slots: 'orbit,jar,manage', circles })}
     >
-      {/* ヘッダ（実物: px-5 pt-6 pb-2 text-lg・中央寄せ） */}
-      <div className="flex justify-center px-5 pt-6 pb-2" data-skeleton-slot="header">
-        <Skeleton className="h-[22px] w-20" />
-      </div>
-
       <SpJarOrbitSkeleton circles={circles} />
 
-      {/* 問いを整えるボタン（実物: 下部中央の丸いピル） */}
-      <div className="flex justify-center px-5 pb-7" data-skeleton-slot="manage">
-        <Skeleton className="h-11 w-40 rounded-full" />
+      {/* 問いを追加・編集するボタン（実物: 下部中央のチップ、角丸 16） */}
+      <div className="flex justify-center px-5 pb-6 pt-2" data-skeleton-slot="manage">
+        <Skeleton className="h-11 w-40 rounded-2xl" />
       </div>
     </div>
   );
