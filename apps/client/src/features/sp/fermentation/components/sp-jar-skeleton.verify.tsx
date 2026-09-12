@@ -16,7 +16,7 @@ interface Props {
 registerUnit<Props>({
   id: 'SpJarSkeleton',
   title: 'SpJarSkeleton',
-  description: 'SP 瓶（/jar）のロード枠: ヘッダ ＋ 中央の壜 ＋ 軌道上の円 ＋ 問いを整えるボタン',
+  description: 'SP 瓶（/jar）のロード枠: 中央の壜 ＋ 軌道上の円 ＋ 問いを追加・編集するボタン',
   kind: 'component',
   render: (props) => (
     <div style={{ position: 'relative', width: '390px', height: '640px' }}>
