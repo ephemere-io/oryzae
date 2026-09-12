@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { CONTROL_FONT } from '@/components/ui/surface';
 import type { QuestionItem } from '@/features/shared/questions/types';
 import { SpQuestionsCardsSkeleton } from '@/features/sp/questions/components/sp-questions-skeleton';
 
@@ -77,7 +78,7 @@ export function SpQuestions({
   }
 
   async function remove() {
-    if (!sheet || sheet.mode !== 'edit' || submitting) return;
+    if (sheet?.mode !== 'edit' || submitting) return;
     setSubmitting(true);
     await archiveQuestion(sheet.id);
     setSubmitting(false);
@@ -98,7 +99,6 @@ export function SpQuestions({
         unreadCount: active.filter((q) => unreadQuestionIds.has(q.id)).length,
       })}
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
-      style={{ fontFamily: 'var(--ob-font-serif)' }}
     >
       <header className="flex items-center justify-between gap-3 px-5 pt-6 pb-1">
         <span className="text-lg font-medium">{t('title')}</span>
@@ -107,13 +107,18 @@ export function SpQuestions({
             type="button"
             onClick={onClose}
             className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
-            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
+            style={{ ...CONTROL_FONT, color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
           >
             {t('close')}
           </button>
         ) : null}
       </header>
-      <p className="px-5 pb-2 text-xs leading-relaxed text-[var(--date-color)]">{t('intro')}</p>
+      <p
+        className="px-5 pb-2 text-xs leading-relaxed text-[var(--date-color)]"
+        style={CONTROL_FONT}
+      >
+        {t('intro')}
+      </p>
 
       {loading ? (
         <SpQuestionsCardsSkeleton />
@@ -123,8 +128,8 @@ export function SpQuestions({
           {proposed.length > 0 ? (
             <div className="mb-4">
               <p
-                className="mb-2 text-[11px] uppercase tracking-[0.1em]"
-                style={{ color: 'var(--accent)' }}
+                className="mb-2 text-[11px] uppercase tracking-[0.14em]"
+                style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
               >
                 {t('proposed')}
               </p>
@@ -143,8 +148,8 @@ export function SpQuestions({
                       type="button"
                       disabled={submitting}
                       onClick={() => acceptQuestion(q.id)}
-                      className="rounded-full px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                      style={{ background: 'var(--accent)' }}
+                      className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                      style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
                     >
                       {t('accept')}
                     </button>
@@ -152,8 +157,9 @@ export function SpQuestions({
                       type="button"
                       disabled={submitting}
                       onClick={() => rejectQuestion(q.id)}
-                      className="rounded-full px-4 py-1.5 text-xs disabled:opacity-50"
+                      className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-xs disabled:opacity-50"
                       style={{
+                        ...CONTROL_FONT,
                         color: 'var(--date-color)',
                         border: '1px solid var(--border-subtle)',
                       }}
@@ -177,8 +183,8 @@ export function SpQuestions({
                 onClick={() => openEdit(q.id, q.currentText ?? '')}
                 className="relative mb-3 block w-full rounded-2xl p-4 text-left"
                 style={{
-                  background: 'var(--ob-card-bg)',
-                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--surface-raised)',
+                  border: '1px solid var(--surface-raised-border)',
                 }}
               >
                 <span className="block pr-6 text-[15px] leading-relaxed">
@@ -222,7 +228,11 @@ export function SpQuestions({
             type="button"
             onClick={openAdd}
             className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-medium"
-            style={{ border: '1.5px dashed var(--border-subtle)', color: 'var(--accent)' }}
+            style={{
+              ...CONTROL_FONT,
+              border: '1.5px dashed var(--surface-raised-border)',
+              color: 'var(--accent)',
+            }}
           >
             <svg
               width="17"
@@ -250,8 +260,11 @@ export function SpQuestions({
             onClick={() => setSheet(null)}
             className="flex-1 bg-black/30"
           />
-          <div className="rounded-t-2xl bg-[var(--bg)] px-5 pt-5 pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
-            <p className="mb-3 text-sm font-medium">
+          <div className="sp-sheet rounded-t-2xl bg-[var(--bg)] px-5 pt-5 pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
+            <p
+              className="mb-3 text-[11px] uppercase tracking-[0.14em]"
+              style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
+            >
               {sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
             </p>
             <textarea
@@ -266,27 +279,15 @@ export function SpQuestions({
               className="w-full resize-none rounded-xl bg-transparent p-3 text-base outline-none"
               style={{ border: '1px solid var(--border-subtle)', lineHeight: 1.7 }}
             />
-            <div className="mt-3 flex items-center gap-2">
-              {sheet.mode === 'edit' ? (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={remove}
-                  className="mr-auto rounded-full px-4 py-2 text-xs disabled:opacity-50"
-                  style={{
-                    color: 'var(--ob-jar-warm)',
-                    border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
-                  }}
-                >
-                  {t('delete')}
-                </button>
-              ) : null}
+            {/* 保存とキャンセルは右寄せで 1 行（縮めない: 幅が足りないと「保／存」に割れた）。
+                「終える」は破壊的な操作なので、同じ行に並べず下に離す。 */}
+            <div className="mt-3 flex items-center justify-end gap-2">
               <button
                 type="button"
                 disabled={submitting}
                 onClick={() => setSheet(null)}
-                className="rounded-full px-4 py-2 text-xs disabled:opacity-50"
-                style={{ color: 'var(--date-color)' }}
+                className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-4 text-[13px] disabled:opacity-50"
+                style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
               >
                 {t('cancel')}
               </button>
@@ -294,12 +295,27 @@ export function SpQuestions({
                 type="button"
                 disabled={submitting || !draft.trim()}
                 onClick={submit}
-                className="rounded-full px-5 py-2 text-xs font-bold text-white disabled:opacity-50"
-                style={{ background: 'var(--accent)' }}
+                className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-5 text-[13px] font-medium text-white disabled:opacity-50"
+                style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
               >
                 {t('save')}
               </button>
             </div>
+            {sheet.mode === 'edit' ? (
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={remove}
+                className="mt-4 min-h-[40px] w-full whitespace-nowrap rounded-full text-[13px] disabled:opacity-50"
+                style={{
+                  ...CONTROL_FONT,
+                  color: 'var(--ob-jar-warm)',
+                  border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
+                }}
+              >
+                {t('delete')}
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
