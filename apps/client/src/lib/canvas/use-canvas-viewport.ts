@@ -64,6 +64,11 @@ export interface CanvasViewportOptions {
    * 「選択に寄る」（Shift+2）で収める world 矩形を返す。選択が無ければ null。
    */
   getSelectionBounds?: () => Bounds | null;
+  /**
+   * `fitTo` / 初期フィットで中身のまわりに残す余白（px）。既定は `fitBounds` の 64。
+   * 縦画面（幅 390）で 64 を両側に取ると中身が 262px に潰れるので、SP は小さくする。
+   */
+  fitPadding?: number;
 }
 
 export interface CanvasSurface {
@@ -132,6 +137,8 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   // 渡してもキーボードのリスナを張り直さずに済ませるため。
   const getContentBoundsRef = useRef(options.getContentBounds);
   getContentBoundsRef.current = options.getContentBounds;
+  const fitPaddingRef = useRef(options.fitPadding);
+  fitPaddingRef.current = options.fitPadding;
   const getSelectionBoundsRef = useRef(options.getSelectionBounds);
   getSelectionBoundsRef.current = options.getSelectionBounds;
 
@@ -255,7 +262,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       }
       const size = frameSize();
       if (size.width === 0 || size.height === 0) return;
-      apply(fitBounds(bounds, size));
+      apply(fitBounds(bounds, size, fitPaddingRef.current));
     },
     [apply, frameSize, resetZoom],
   );
@@ -290,7 +297,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
             return;
           }
         } else {
-          vpRef.current = fitBounds(bounds, size);
+          vpRef.current = fitBounds(bounds, size, fitPaddingRef.current);
         }
       }
 
@@ -388,14 +395,17 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
         const now = twoFingerState();
         if (pinch && pinch.dist > 0) {
           const rect = frame.getBoundingClientRect();
+          const factor = now.dist / pinch.dist;
+          const before = vpRef.current.scale;
           // 2本指の中点を軸に拡大し、中点の移動ぶんだけ平行移動する。
-          const zoomed = zoomAt(
-            vpRef.current,
-            now.midX - rect.left,
-            now.midY - rect.top,
-            now.dist / pinch.dist,
-          );
+          const zoomed = zoomAt(vpRef.current, now.midX - rect.left, now.midY - rect.top, factor);
           apply(panBy(zoomed, now.midX - pinch.midX, now.midY - pinch.midY));
+          // ホイールと同じく、引き切る手前からのつまみを外へ流す（SP の「引くと書斎へ戻る」）。
+          // ここが無いと、指で引く画面ではその仕掛けが一度も発火しない。
+          if (factor < 1 && before <= OVERZOOM_ARM_SCALE) {
+            const detail: OverzoomOutDetail = { excess: 1 - factor };
+            frame.dispatchEvent(new CustomEvent(OVERZOOM_OUT_EVENT, { detail, bubbles: true }));
+          }
         }
         pinch = now;
         return;
