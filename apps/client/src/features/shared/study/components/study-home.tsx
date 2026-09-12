@@ -278,6 +278,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
         )}
 
         <EntryListOverlay
+          variant={layout.listPresentation}
           open={overlay !== null}
           entries={overlayEntries}
           loading={list.loading && list.entries.length === 0}

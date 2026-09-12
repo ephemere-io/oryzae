@@ -235,13 +235,14 @@ describe('SpJar', () => {
     expect(await screen.findByText(jaMessages.sp.jar.not_fermented)).toBeTruthy();
   });
 
-  it('閉じると軌道に戻る', async () => {
+  it('戻ると地図に戻る', async () => {
     renderJar(filledApi());
 
     openCircle('なぜ続けるのか');
     await screen.findByTestId('sp-jar-letter');
 
-    fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    // 上段（SpTopBar）の外なので、問いの画面が自前の戻るを出す。
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.nav.back }));
     expect(screen.queryByTestId('sp-jar-letter')).toBeNull();
     expect(screen.getByRole('button', { name: 'なぜ続けるのか' })).toBeTruthy();
   });

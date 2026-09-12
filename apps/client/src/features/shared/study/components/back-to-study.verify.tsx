@@ -1,41 +1,30 @@
 /**
- * BackToStudy の検証スペック。
+ * BackToStudy の検証スペック（PC のサブ画面の上端に垂れる「書斎へ戻る」）。
  *
  * 「サブ画面から書斎へ戻れる」（40-acceptance.md「ナビゲーション」）。
  *
  * 見るのは**置き場と見え方の約束**。左上（3 巡ぶん「既存の操作に被る」）→ 下端（操作
  * パレットの真下）→ 上端に浮かせた 9px の名前（問いのチップと重なる）→ 画面を下げる帯
  * （地がページと同じ色で「帯になっていない・目立たない」）と移してきた。いまは
- * **PC は上端の中央から垂れるタブ、SP は下端の帯に載るチップ**（SP の上端は題と競り合い、
- * 下げた帯に境界が無かった）。
+ * **上端の中央から垂れるタブ**（PC だけ。SP は上段の左端の正円 `SpTopBar`）。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { BackToStudy, STUDY_EXIT_TAB, type StudyExitPlacement } from './back-to-study';
+import { BackToStudy, STUDY_EXIT_TAB } from './back-to-study';
 
-interface Props {
-  placement?: StudyExitPlacement;
-}
-
-registerUnit<Props>({
+registerUnit<Record<string, never>>({
   id: 'BackToStudy',
   title: 'BackToStudy',
-  description: 'サブ画面の縁に掛かる「書斎へ戻る」（PC は上端のタブ、SP は下端の帯）',
+  description: 'PC のサブ画面の上端の中央に垂れる「書斎へ戻る」のタブ',
   kind: 'component',
-  render: (props) => withVerifyProviders(<BackToStudy {...props} />),
+  render: () => withVerifyProviders(<BackToStudy />),
   fixtures: [
     {
       id: 'default',
       probe: true,
-      description: 'Probe: 上端のタブとして、書斎（/）へのリンクとして機能する',
+      description: 'Probe: 書斎（/）へのリンクとして機能する',
       props: {},
-    },
-    {
-      id: 'bottom',
-      probe: true,
-      description: 'Probe: SP の下端の帯。沈んだ面の上にチップが載る',
-      props: { placement: 'bottom' },
     },
   ],
   invariants: [
@@ -46,35 +35,16 @@ registerUnit<Props>({
         Boolean(root.querySelector('a[href="/"]')) || '書斎（/）へのリンクが無い',
     },
     {
-      id: 'hangs-from-the-declared-edge',
-      description: '公表した縁に掛ける（上端: 隅と下端は画面側が使う／下端: 親指の届く側）',
-      check: ({ root, contract }) => {
+      id: 'hangs-from-the-top-edge',
+      description: '上端に掛ける（隅と下端は画面側が使っている）',
+      check: ({ root }) => {
         const band = root.querySelector('[data-verify-unit="BackToStudy"]');
         if (!(band instanceof HTMLElement)) return '帯が無い';
         const className = band.className;
-        const edge = contract.placement === 'bottom' ? 'bottom-0' : 'top-0';
-        const other = contract.placement === 'bottom' ? /\btop-0\b/ : /\bbottom-0\b/;
-        const missing = ['fixed', 'inset-x-0', edge].filter((c) => !className.includes(c));
-        if (missing.length > 0) return `${edge} に掛かっていない: ${missing.join(', ')}`;
-        if (other.test(className)) return '反対の縁にも掛かっている';
-        return true;
-      },
-    },
-    {
-      id: 'bottom-band-is-a-sunken-surface',
-      description: '下端の帯は「沈んだ面」（一段暗い地 + 上の境界線 1 本）で、safe-area を含む',
-      check: ({ root, contract }) => {
-        const band = root.querySelector('[data-verify-unit="BackToStudy"]');
-        if (!(band instanceof HTMLElement)) return '帯が無い';
-        if (contract.placement !== 'bottom') {
-          // 上端のタブは帯を持たない（3px の帯は「いらない」と言われて外した）。
-          return band.style.background === '' || '上端に帯の地が付いている';
-        }
-        if (!band.style.background.includes('--surface-sunken')) return '帯の地が沈んだ面でない';
-        if (!band.style.borderTop.includes('--surface-sunken-border'))
-          return '帯の上に境界線が無い';
-        if (!band.style.height.includes('safe-area-inset-bottom'))
-          return '帯が safe-area を含んでいない';
+        const missing = ['fixed', 'inset-x-0', 'top-0'].filter((c) => !className.includes(c));
+        if (missing.length > 0) return `上端に掛かっていない: ${missing.join(', ')}`;
+        if (/\bbottom-/.test(className))
+          return '下端に置き直されている（操作パレットの真下になる）';
         return true;
       },
     },

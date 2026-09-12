@@ -5,9 +5,8 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { PhotoStrip } from '@/components/ui/photo-strip';
-import { CONTROL_FONT, ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
+import { CONTROL_FONT } from '@/components/ui/surface';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
@@ -22,7 +21,9 @@ import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
+import { useSpChrome, useSpStatus } from '@/lib/sp-chrome-context';
 import { SpConfirmSheet } from './sp-confirm-sheet';
+import { SP_EDITOR_PALETTE_HEIGHT, SpEditorPalette } from './sp-editor-palette';
 import { SpFermentationDrawer } from './sp-fermentation-drawer';
 import { SpPhotoImportSheet } from './sp-photo-import-sheet';
 
@@ -260,6 +261,12 @@ export function SpEntryEditor({
       : dirty
         ? t('status_editing')
         : t('status_saved');
+  // 状態は上段（SpTopBar）の中央へ。発酵を始めたらそれを最優先で言う。
+  const chrome = useSpChrome();
+  useSpStatus(
+    error ?? (pickled ? t('pickled') : statusText),
+    error ? 'error' : saving ? 'saving' : 'ok',
+  );
 
   // 紐付け済みの問いが終了（アーカイブ）されていると activeQuestions に載らない。
   // その場合もチップには出したいので、紐付け側からも探す。
@@ -350,7 +357,10 @@ export function SpEntryEditor({
   return (
     <div
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
-      style={{ fontFamily: 'var(--ob-font-serif)' }}
+      // 下端はキーボード上のパレットのぶん空ける（fixed なので流れの中には無い）。
+      style={{
+        paddingBottom: `calc(${SP_EDITOR_PALETTE_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
+      }}
       {...verifyAttrs({
         unit: 'SpEntryEditor',
         hasBody,
@@ -367,104 +377,63 @@ export function SpEntryEditor({
         hasFermentation: fermentationDetail !== null,
       })}
     >
-      {/* 保存ステータス（右・常設）＋ 既存エントリの削除トリガー（左・⋯）。 */}
-      <header
-        className="flex items-center justify-between px-5 pt-3 pb-1"
-        style={{ minHeight: 28 }}
-      >
-        {/* 既存エントリだけ削除できる（新規は削除対象が無いので出さない）。 */}
-        {entryId ? (
-          <button
-            type="button"
-            onClick={() => setDeleteOpen(true)}
-            aria-label={t('delete')}
-            className="-ml-2 p-2 text-[var(--date-color)]"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <title>more</title>
-              <circle cx="12" cy="5" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="12" cy="19" r="1.6" />
-            </svg>
-          </button>
-        ) : (
-          <span aria-hidden="true" />
-        )}
-        <span
+      {/* 保存の状態は上段（SpTopBar）の中央に出す。上段が無い場所（孤立検証・テスト）では
+          ここに小さく出す。削除・写真・発酵はキーボード上のパレットへ。 */}
+      {!chrome.mounted ? (
+        <p
           aria-live="polite"
-          className="flex items-center gap-1.5 text-xs"
+          className="px-5 pt-3 text-xs"
           style={{
             ...CONTROL_FONT,
             color: error ? 'var(--ob-jar-warm)' : 'var(--accent)',
             opacity: statusText || error ? 1 : 0,
           }}
         >
-          {saving ? (
-            <span
-              className="inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
-              aria-hidden="true"
-            />
-          ) : statusText && !error ? (
-            <span aria-hidden="true">✓</span>
-          ) : null}
-          {error || statusText || ' '}
-        </span>
-      </header>
+          {error || statusText || ' '}
+        </p>
+      ) : null}
 
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder={t('title_placeholder')}
         aria-label={t('title_placeholder')}
-        className="w-full bg-transparent px-5 pt-2 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
+        className="w-full bg-transparent px-5 pt-3 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
       />
 
-      {/* 問いを結ぶチップと写真。面は PC のチップ・パレット・「書斎に戻る」と同じ
-          （ELEVATED_CHIP）。破線のピルを inline で並べていたころは、問いが長いと
-          2 つ目が次の行に落ちて揃わなかった。 */}
-      <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
-        <button
-          type="button"
-          onClick={openQuestionSheet}
-          className={`flex h-8 min-w-0 max-w-full items-center px-3 text-[12px] font-medium ${ELEVATED_CHIP_CLASS}`}
-          style={{
-            ...ELEVATED_CHIP_STYLE,
-            ...CONTROL_FONT,
-            ...(selectedQuestion ? {} : { color: 'var(--date-color)' }),
-          }}
-        >
-          <span className="truncate">
-            {selectedQuestion
-              ? `◦ ${selectedQuestion.currentText ?? t('question_untitled')}`
-              : `+ ${t('question_link')}`}
-          </span>
-        </button>
-
-        {/* 写真を取り込む。押すと端末のカメラ/ライブラリが開く。 */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          aria-label={tPhoto('toolbar_button')}
-          className={`flex h-8 shrink-0 items-center whitespace-nowrap px-3 text-[12px] font-medium ${ELEVATED_CHIP_CLASS}`}
-          style={{ ...ELEVATED_CHIP_STYLE, ...CONTROL_FONT, color: 'var(--date-color)' }}
-        >
-          {`+ ${tPhoto('toolbar_button')}`}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
-          aria-label={tPhoto('modal_title')}
-          tabIndex={-1}
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            // 同じファイルを選び直しても change が起きるよう毎回リセットする。
-            e.target.value = '';
-            if (file) photoImport.selectFile(file);
-          }}
-        />
-      </div>
+      {/* 結んでいる問い。題の下の 1 行（Notion の見出し下のプロパティと同じ席）。
+          面は持たず、◦ と本文の書体で。押すと問いを選ぶ。 */}
+      <button
+        type="button"
+        onClick={openQuestionSheet}
+        className="mx-5 mt-2 flex min-h-[32px] max-w-[calc(100%-2.5rem)] items-center text-left text-[13px]"
+        style={
+          selectedQuestion
+            ? { color: 'var(--fg)' }
+            : { ...CONTROL_FONT, color: 'var(--date-color)' }
+        }
+      >
+        <span className="truncate">
+          {selectedQuestion
+            ? `◦ ${selectedQuestion.currentText ?? t('question_untitled')}`
+            : `+ ${t('question_link')}`}
+        </span>
+      </button>
+      {/* 写真を取り込む入口（実体）。押すのはパレットの写真ボタン。 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
+        aria-label={tPhoto('modal_title')}
+        tabIndex={-1}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          // 同じファイルを選び直しても change が起きるよう毎回リセットする。
+          e.target.value = '';
+          if (file) photoImport.selectFile(file);
+        }}
+      />
 
       {/* 本文（タイトルから広い余白＋ゆったり行間）。指摘: 余白が欲しい。 */}
       <textarea
@@ -491,55 +460,44 @@ export function SpEntryEditor({
         onClose={photoImport.close}
       />
 
-      {/* 発酵させる CTA（保存済み＝entryId 確定後のみ）。
-          バナー全体を1つの大きなボタンにして、シンプルで押しやすく（指摘対応）。 */}
-      {entryId ? (
-        <div className="sp-rise mx-4 mb-4">
-          <button
-            type="button"
-            onClick={handlePickle}
-            disabled={pickling || pickled}
-            aria-label={t('ferment_title')}
-            className="flex w-full items-center justify-center gap-2.5 rounded-2xl px-5 py-4 text-white transition-opacity disabled:cursor-default"
-            style={{
-              background: pickled
-                ? 'color-mix(in srgb, var(--ob-jar-warm) 45%, var(--bg))'
-                : 'var(--ob-jar-warm)',
-              boxShadow:
-                pickling || pickled
-                  ? 'none'
-                  : '0 8px 20px -8px color-mix(in srgb, var(--ob-jar-warm) 60%, transparent)',
-              ...CONTROL_FONT,
-            }}
-          >
-            {pickling ? (
-              <span
-                className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
-                aria-hidden="true"
-              />
-            ) : (
-              <svg
-                className="h-5 w-5 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                aria-hidden="true"
-              >
-                <path d={JAR_ICON_PATH} strokeLinejoin="round" />
-                {/* 中身（発酵しているもの）の水位。胴の幅に合わせる。 */}
-                <path d="M6.6 14.4c1.8.8 3.6.8 5.4 0s3.6-.8 5.4 0" strokeOpacity=".55" />
-              </svg>
-            )}
-            <span className="text-[15px] font-bold">
-              {pickling ? t('pickling') : pickled ? t('pickled') : t('ferment_title')}
-            </span>
-          </button>
-          {!pickled ? (
-            <p className="mt-2 text-center text-xs leading-snug opacity-55">{t('ferment_sub')}</p>
-          ) : null}
-        </div>
-      ) : null}
+      {/* 操作はキーボードの真上のパレットに集める（Notion のキーボードツールバーの席）。
+          発酵は保存済み（entryId 確定後）のときだけ並ぶ。 */}
+      <SpEditorPalette
+        actions={[
+          {
+            id: 'question',
+            label: selectedQuestion
+              ? t('question_selected', {
+                  label: selectedQuestion.currentText ?? t('question_untitled'),
+                })
+              : t('question_link'),
+            active: selectedQuestion !== undefined,
+            onSelect: openQuestionSheet,
+          },
+          {
+            id: 'photo',
+            label: tPhoto('toolbar_button'),
+            onSelect: () => fileInputRef.current?.click(),
+          },
+          ...(entryId
+            ? [
+                {
+                  id: 'ferment' as const,
+                  label: pickled ? t('pickled') : t('ferment_title'),
+                  busy: pickling,
+                  disabledReason: pickled ? t('pickled') : undefined,
+                  onSelect: handlePickle,
+                },
+                {
+                  id: 'delete' as const,
+                  label: t('delete'),
+                  tone: 'danger' as const,
+                  onSelect: () => setDeleteOpen(true),
+                },
+              ]
+            : []),
+        ]}
+      />
 
       {sheetOpen ? (
         <div className="absolute inset-0 z-10 flex flex-col justify-end">

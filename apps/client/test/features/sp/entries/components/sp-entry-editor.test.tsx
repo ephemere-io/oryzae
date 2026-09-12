@@ -165,12 +165,17 @@ describe('SpEntryEditor', () => {
     );
     renderEditor(createMockApi(apiFetch));
 
-    fireEvent.click(screen.getByRole('button', { name: /問い/ }));
+    // 題の下の「+ 問いを結ぶ」の行（パレットの問いボタンとは名前が違う）。
+    fireEvent.click(
+      screen.getByRole('button', { name: `+ ${jaMessages.sp.editor.question_link}` }),
+    );
     const questionItem = await screen.findByRole('button', { name: 'なぜ書くのか' });
     fireEvent.click(questionItem);
 
-    // 選択後、チップに「◦ なぜ書くのか」と反映される（シートは閉じる）
-    await waitFor(() => expect(screen.getByRole('button', { name: /なぜ書くのか/ })).toBeTruthy());
+    // 選択後、題の下の行に「◦ なぜ書くのか」と反映される（シートは閉じる）
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '◦ なぜ書くのか' })).toBeTruthy(),
+    );
   });
 
   /** 紐づけ済みの問いが 1 つ（q1）、選べる問いが 2 つ（q1 / q2）ある既存エントリ。 */
@@ -238,7 +243,10 @@ describe('SpEntryEditor', () => {
 
   it('問いが無いときは空状態を表示する', async () => {
     renderEditor(createMockApi(apiFetch));
-    fireEvent.click(screen.getByRole('button', { name: /問い/ }));
+    // 題の下の「+ 問いを結ぶ」の行（パレットの問いボタンとは名前が違う）。
+    fireEvent.click(
+      screen.getByRole('button', { name: `+ ${jaMessages.sp.editor.question_link}` }),
+    );
     expect(await screen.findByText(/立てている問いがありません/)).toBeTruthy();
   });
   it('問いがゼロでも「納める」から問いをその場で立てられる（Issue #314）', async () => {

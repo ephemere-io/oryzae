@@ -85,6 +85,14 @@ export interface StudyLayout {
   };
   /** SP のピルだけが使う画面座標オフセット（px）。PC は null。 */
   pillOffsets: { jar: Vec2; journal: Vec2; board: Vec2; archive: Vec2 } | null;
+  /**
+   * 手帳を開いた先の一覧の見せ方。
+   *
+   * `paper` は机の上にかぶさる紙（幅 720px、月と問いはチップで一覧できる）。
+   * `mobile` は全画面の一覧で、月と問いはドロップダウンに畳む（狭い画面では、
+   * 選択肢を並べる場所より本文を読む場所に幅を使う）。構図の一部なのでここに持つ。
+   */
+  listPresentation: 'paper' | 'mobile';
 }
 
 interface Vec2 {
@@ -99,7 +107,12 @@ function vec3(x: number, y: number, z: number): Vec3 {
 const PC_SHELF = vec3(4.9, -1.2, -3.2);
 const SP_SHELF = vec3(2.0, -1.2, -2.6);
 const SP_SHELF_SCALE = 0.72;
-const SP_DESK = vec3(0.95, -1, 2.7);
+/**
+ * 積みは天板の手前端（`deskTop.zNear`）に収める。z = 2.7 に置いていたころ、手帳の手前
+ * （奥行き 3.4 の半分 + 回転ぶんで z ≈ 4.6）とペンの端（z ≈ 4.5）が天板の手前端 4.0 を
+ * 越えて「ペンと本が机からはみ出ている」と報告された（投影計算でも確認）。
+ */
+const SP_DESK = vec3(0.95, -1, 2.0);
 
 export const PC_LAYOUT: StudyLayout = {
   name: 'pc',
@@ -154,6 +167,7 @@ export const PC_LAYOUT: StudyLayout = {
     pen: vec3(5.4, -1.14, 3.7),
   },
   pillOffsets: null,
+  listPresentation: 'paper',
 };
 
 export const SP_LAYOUT: StudyLayout = {
@@ -177,11 +191,11 @@ export const SP_LAYOUT: StudyLayout = {
   jar: vec3(-1.15, -1.2, -0.2),
   board: { position: vec3(0, 2.7, -4.2), scale: 0.68 },
   desk: SP_DESK,
-  // ペンは積みの左手前。右に置くと画面外に出る。
-  pen: vec3(-1.9, -0.15, 1.2),
+  // ペンは積みの左手前。右に置くと画面外に出る。端（z ≈ 3.6）が天板の中に収まる位置。
+  pen: vec3(-1.9, -0.15, 0.9),
   // 棚を前傾させると背文字が上を向き、そのまま行き先の予告になる。
   shelf: { position: SP_SHELF, scale: SP_SHELF_SCALE, tiltX: -0.42 },
-  deskTop: { y: -1.2, xLeft: -3.4, xRight: 3.4, zNear: 4.0, zFar: -4.7 },
+  deskTop: { y: -1.2, xLeft: -3.4, xRight: 3.4, zNear: 4.3, zFar: -4.7 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.sp,
   labelAnchors: {
@@ -203,4 +217,5 @@ export const SP_LAYOUT: StudyLayout = {
     board: { x: -92, y: 40 },
     archive: { x: 10, y: -16 },
   },
+  listPresentation: 'mobile',
 };
