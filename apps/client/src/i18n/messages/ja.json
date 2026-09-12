@@ -496,6 +496,8 @@
       "letter_badge": "発酵プロセスからの手紙"
     },
     "fermentation_sidebar": {
+      "heading": "発酵の結果",
+      "letter_open": "手紙を読む",
       "close_aria": "発酵サイドバーを閉じる",
       "empty": "この問いの発酵結果はまだありません。",
       "section_letter": "手紙",
@@ -735,7 +737,6 @@
       "questions": "問い"
     },
     "jar": {
-      "title": "瓶",
       "untitled": "無題の問い",
       "close": "閉じる",
       "letter_empty": "この結果にはまだ手紙がありません",
@@ -746,10 +747,8 @@
       "section_sources": "もとになったエントリー",
       "source_untitled": "無題のエントリー",
       "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
-      "spin_hint": "横に払うと回ります",
       "manage_questions": "問いを追加・編集",
       "not_fermented": "この問いはまだ発酵していません",
-      "tap_hint": "タップして読む",
       "selection_reason": "選ばれた理由"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
@@ -797,6 +796,12 @@
       "cancel": "キャンセル",
       "save": "保存",
       "resize": "大きさと向きを変える",
+      "tool_snippet": "スニペット",
+      "tool_read_image": "読み取る",
+      "tool_photo": "写真",
+      "open": "開く",
+      "read_image": "写真から文字を読み取る",
+      "lightbox_close": "閉じる",
       "snippet_placeholder": "書き留めておきたいことを"
     }
   },
