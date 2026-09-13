@@ -28,7 +28,7 @@ import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
 import { readImageDimensions, resizeImage } from '@/lib/image';
-import { placePalette, useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
+import { placeInSlot, useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
 import { SpBoardSurface } from './sp-board-surface';
 import { SpSnippetComposer, type SpSnippetOcrStatus } from './sp-snippet-composer';
 
@@ -406,7 +406,7 @@ export function SpBoard({ api }: SpBoardProps) {
       {/* 操作の列は殻の下端（エントリー・瓶と同じ部品）。PC（#524）と同じく、
           **選んでいるものに応じて中身が入れ替わる**: 何も選んでいなければ作るもの、
           カードを選んでいればそのカードにできること。 */}
-      {placePalette(
+      {placeInSlot(
         sheetOpen ? (
           <SpSnippetComposer
             open={sheetOpen}

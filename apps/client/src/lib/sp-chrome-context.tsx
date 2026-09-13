@@ -37,6 +37,12 @@ interface SpChromeValue {
    */
   paletteSlot: HTMLElement | null;
   setPaletteSlot: (element: HTMLElement | null) => void;
+  /**
+   * 上段の右端（画面ごとの設定）の席。エディタなら本文の見た目の設定。無い画面では空のまま。
+   * アカウントへのリンクは置かない（書斎のアバターが担う）。
+   */
+  actionSlot: HTMLElement | null;
+  setActionSlot: (element: HTMLElement | null) => void;
   /** 殻が追従しているビジュアルビューポート。測れるまで null。 */
   viewport: VisualViewportBox | null;
   /** ソフトキーボードが出ているか（パレットの「閉じる」の出し入れに使う）。 */
@@ -51,6 +57,8 @@ const SpChromeContext = createContext<SpChromeValue>({
   setStatus: () => {},
   paletteSlot: null,
   setPaletteSlot: () => {},
+  actionSlot: null,
+  setActionSlot: () => {},
   viewport: null,
   keyboardOpen: false,
 });
@@ -65,6 +73,7 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
   const [back, setBackState] = useState<(() => void) | null>(null);
   const [status, setStatus] = useState<SpChromeStatus | null>(null);
   const [paletteSlot, setPaletteSlot] = useState<HTMLElement | null>(null);
+  const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const viewport = useVisualViewport();
 
   // 関数を state に入れるときは updater と取り違えないよう包む。
@@ -81,10 +90,12 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
       setStatus,
       paletteSlot,
       setPaletteSlot,
+      actionSlot,
+      setActionSlot,
       viewport,
       keyboardOpen: viewport?.keyboardOpen ?? false,
     }),
-    [back, setBack, status, paletteSlot, viewport],
+    [back, setBack, status, paletteSlot, actionSlot, viewport],
   );
   return <SpChromeContext.Provider value={value}>{children}</SpChromeContext.Provider>;
 }
@@ -94,13 +105,14 @@ export function useSpChrome(): SpChromeValue {
 }
 
 /**
- * 下端の操作の列を殻の席へ置く。席が無ければ（Provider の外・孤立検証）その場に描く。
+ * 画面の部品を殻の席（下端の操作の列・上段の右端）へ置く。席が無ければ（Provider の外・
+ * 孤立検証）その場に描く。
  *
  * portal にするのは、列の中身（状態・押したときの手）を画面が持ったまま、描く場所だけを
  * 殻の下端に移すため。state で殻へ渡すと、毎描画で作り直される要素が state を揺らし続ける。
  */
-export function placePalette(palette: ReactNode, slot: HTMLElement | null): ReactNode {
-  return slot ? createPortal(palette, slot) : palette;
+export function placeInSlot(node: ReactNode, slot: HTMLElement | null): ReactNode {
+  return slot ? createPortal(node, slot) : node;
 }
 
 /** 画面が出ている間だけ「戻る」を横取りする。`null` を渡せば横取りしない。 */

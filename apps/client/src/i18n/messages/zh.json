@@ -730,14 +730,21 @@
       "ferment_sub": "静待片刻，AI 的来信将会送达",
       "delete": "删除",
       "question_unlink": "取消关联“{label}”",
-      "question_search_placeholder": "查找问题"
+      "question_search_placeholder": "查找问题",
+      "settings_title": "显示设置",
+      "settings_letter_spacing": "字距",
+      "settings_size_small": "小",
+      "settings_size_medium": "中",
+      "settings_size_large": "大",
+      "settings_spacing_tight": "紧凑",
+      "settings_spacing_normal": "标准",
+      "settings_spacing_wide": "宽松"
     },
     "nav": {
       "back": "返回",
       "write": "书写",
       "jar": "瓶",
       "list": "列表",
-      "account": "账户",
       "questions": "提问",
       "dismiss_keyboard": "收起键盘"
     },

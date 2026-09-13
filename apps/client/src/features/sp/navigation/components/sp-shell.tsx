@@ -10,7 +10,6 @@ import { SpTopBar } from './sp-top-bar';
 interface SpShellProps {
   /** 上段（戻る・状態・設定）を出すか。書斎ホームでは出さない。 */
   topBar: boolean;
-  showSettings: boolean;
   /** 旧ボトムナビ（書斎が無効な間だけ）。 */
   bottomNav: boolean;
   children: ReactNode;
@@ -26,7 +25,7 @@ interface SpShellProps {
  * 下端の列は画面の側が `paletteSlot` へ portal で差し込む（`useSpChrome().paletteSlot`）。
  * 殻は席を用意するだけで、中身は知らない。
  */
-export function SpShell({ topBar, showSettings, bottomNav, children }: SpShellProps) {
+export function SpShell({ topBar, bottomNav, children }: SpShellProps) {
   const { viewport, setPaletteSlot } = useSpChrome();
 
   return (
@@ -34,7 +33,7 @@ export function SpShell({ topBar, showSettings, bottomNav, children }: SpShellPr
       className={`flex flex-col overflow-hidden bg-[var(--bg)] ${viewport ? 'fixed inset-x-0' : 'h-[100dvh]'}`}
       style={viewport ? { top: viewport.top, height: viewport.height } : undefined}
     >
-      {topBar && <SpTopBar showSettings={showSettings} />}
+      {topBar && <SpTopBar />}
       <main
         className="relative min-h-0 flex-1 overflow-auto"
         // 本文の端まで引いても殻の外（ブラウザの引っ張り更新）へ伝えない。

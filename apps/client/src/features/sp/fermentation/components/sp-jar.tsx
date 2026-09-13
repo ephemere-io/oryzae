@@ -18,7 +18,7 @@ import { type MapQuestion, SpJarMap } from '@/features/sp/fermentation/component
 import { SpJarMapSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
 import { SpQuestionZoom } from '@/features/sp/fermentation/components/sp-question-zoom';
 import type { ApiClient } from '@/lib/api';
-import { placePalette, useSpChrome } from '@/lib/sp-chrome-context';
+import { placeInSlot, useSpChrome } from '@/lib/sp-chrome-context';
 import { useUnread } from '@/lib/unread-context';
 
 interface SpJarProps {
@@ -112,7 +112,7 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
       {/* 問いの管理へ。殻の下端の列（エントリー・ボードと同じ部品）に置く。
           以前は右下の正円だったが、3 画面で同じ部品にする（オーナーの指示）。 */}
       {!openQuestion &&
-        placePalette(
+        placeInSlot(
           <ActionPalette
             ariaLabel={t('palette_aria')}
             actions={[

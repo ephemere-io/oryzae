@@ -1,0 +1,134 @@
+'use client';
+
+import { verifyAttrs } from '@oryzae/verify';
+import { useTranslations } from 'next-intl';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { Segmented } from '@/components/ui/segmented';
+import { CONTROL_FONT } from '@/components/ui/surface';
+import type {
+  EditorDisplay,
+  EditorFontFamily,
+  EditorScale,
+  EditorSpacing,
+} from '@/features/shared/entries/types';
+
+interface SpEditorSettingsSheetProps {
+  open: boolean;
+  display: EditorDisplay;
+  onChange: (patch: Partial<EditorDisplay>) => void;
+  onClose: () => void;
+}
+
+function toFontFamily(value: string): EditorFontFamily {
+  return value === 'sans' ? 'sans' : 'serif';
+}
+function toScale(value: string): EditorScale {
+  return value === 'small' || value === 'large' ? value : 'medium';
+}
+function toSpacing(value: string): EditorSpacing {
+  return value === 'tight' || value === 'wide' ? value : 'normal';
+}
+
+/**
+ * エディタの設定（SP）。上段の右端の歯車から開く。
+ *
+ * 出すのは**本文の見た目**だけ: 書体・文字サイズ・行間・字間。PC の設定にあるエフェクト
+ * （消し跡・圧力にじみ）はポインタ前提で指では成立しないので出さない。打鍵の間や声で
+ * 変わるもの（時間内包・音量内包）は SP でも成立しうるが、没入の補助として PC で
+ * 育てたものなので、SP に出すかはオーナーの判断待ち（作業指示 B6）。
+ *
+ * 以前の右端の歯車は**アカウント画面**に飛んでいた。設定は画面ごとに違うものなので、
+ * 画面が自分の設定を右端に差し込む（`useSpChrome().actionSlot`）。
+ */
+export function SpEditorSettingsSheet({
+  open,
+  display,
+  onChange,
+  onClose,
+}: SpEditorSettingsSheetProps) {
+  const t = useTranslations('sp.editor');
+  const tPc = useTranslations('editor.settings');
+
+  return (
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      ariaLabel={t('settings_title')}
+      label={t('settings_title')}
+      closeLabel={t('close')}
+      detents={[0.5, 0.92]}
+      initialDetent={0}
+    >
+      <div
+        {...verifyAttrs({
+          unit: 'SpEditorSettingsSheet',
+          fontFamily: display.fontFamily,
+          fontSize: display.fontSize,
+          lineHeight: display.lineHeight,
+          letterSpacing: display.letterSpacing,
+        })}
+        className="flex flex-col gap-5 pt-2"
+        style={CONTROL_FONT}
+      >
+        <Row label={tPc('font_family')}>
+          <Segmented
+            ariaLabel={tPc('font_family')}
+            value={display.fontFamily}
+            onChange={(value) => onChange({ fontFamily: toFontFamily(value) })}
+            options={[
+              { value: 'serif', label: tPc('font_serif') },
+              { value: 'sans', label: tPc('font_sans') },
+            ]}
+          />
+        </Row>
+        <Row label={tPc('font_size')}>
+          <Segmented
+            ariaLabel={tPc('font_size')}
+            value={display.fontSize}
+            onChange={(value) => onChange({ fontSize: toScale(value) })}
+            options={[
+              { value: 'small', label: t('settings_size_small') },
+              { value: 'medium', label: t('settings_size_medium') },
+              { value: 'large', label: t('settings_size_large') },
+            ]}
+          />
+        </Row>
+        <Row label={tPc('line_height')}>
+          <Segmented
+            ariaLabel={tPc('line_height')}
+            value={display.lineHeight}
+            onChange={(value) => onChange({ lineHeight: toSpacing(value) })}
+            options={spacingOptions(t)}
+          />
+        </Row>
+        <Row label={t('settings_letter_spacing')}>
+          <Segmented
+            ariaLabel={t('settings_letter_spacing')}
+            value={display.letterSpacing}
+            onChange={(value) => onChange({ letterSpacing: toSpacing(value) })}
+            options={spacingOptions(t)}
+          />
+        </Row>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function spacingOptions(t: ReturnType<typeof useTranslations<'sp.editor'>>) {
+  return [
+    { value: 'tight', label: t('settings_spacing_tight') },
+    { value: 'normal', label: t('settings_spacing_normal') },
+    { value: 'wide', label: t('settings_spacing_wide') },
+  ];
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[12px]" style={{ color: 'var(--date-color)' }}>
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}

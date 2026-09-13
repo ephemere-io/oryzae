@@ -181,11 +181,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                   操作の列。殻はビジュアルビューポートに追従する（キーボードの上に列が来る）。
                   書斎が有効な間はボトムナビを描かない（書斎そのものが唯一のグローバルナビ。
                   jar / board / entry にも残さない — 戻り道が上段と二重になる）。 */}
-              <SpShell
-                topBar={showBackToStudy}
-                showSettings={pathname !== '/account'}
-                bottomNav={!studyHome}
-              >
+              <SpShell topBar={showBackToStudy} bottomNav={!studyHome}>
                 {content}
               </SpShell>
             </SpChromeProvider>

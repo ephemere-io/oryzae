@@ -8,9 +8,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActionPalette } from '@/components/ui/action-palette';
 import { FermentIcon, PhotoIcon, TrashIcon } from '@/components/ui/palette-icons';
 import { PhotoStrip } from '@/components/ui/photo-strip';
+import { GearIcon, RoundButton } from '@/components/ui/round-button';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
+import {
+  SP_EDITOR_TYPOGRAPHY,
+  useEditorDisplay,
+} from '@/features/shared/entries/hooks/use-editor-display';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
@@ -24,8 +29,9 @@ import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
-import { placePalette, useSpBackHandler, useSpChrome, useSpStatus } from '@/lib/sp-chrome-context';
+import { placeInSlot, useSpBackHandler, useSpChrome, useSpStatus } from '@/lib/sp-chrome-context';
 import { SpConfirmSheet } from './sp-confirm-sheet';
+import { SpEditorSettingsSheet } from './sp-editor-settings-sheet';
 import { SpFermentationDrawer } from './sp-fermentation-drawer';
 import { SpPhotoImportSheet } from './sp-photo-import-sheet';
 
@@ -114,6 +120,15 @@ export function SpEntryEditor({
     return first ? [first] : [];
   });
   const [pickerOpen, setPickerOpen] = useState(false);
+  // 本文の見た目（書体・文字サイズ・行間・字間）。上段の右端の歯車から開く。
+  const [display, updateDisplay] = useEditorDisplay();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const bodyStyle = {
+    fontFamily: SP_EDITOR_TYPOGRAPHY.fontFamily[display.fontFamily],
+    fontSize: SP_EDITOR_TYPOGRAPHY.fontSize[display.fontSize],
+    lineHeight: SP_EDITOR_TYPOGRAPHY.lineHeight[display.lineHeight],
+    letterSpacing: SP_EDITOR_TYPOGRAPHY.letterSpacing[display.letterSpacing],
+  };
   const [deleteOpen, setDeleteOpen] = useState(false);
   // Issue #466 の SP 版: 紐づけた問いに完了済みの発酵があれば、下からのドロワーで出す。
   // 本文の上には重ねない（docs/entry-screen-design.md 原則1）。
@@ -380,7 +395,7 @@ export function SpEntryEditor({
       {!chrome.mounted ? (
         <p
           aria-live="polite"
-          className="px-5 pt-3 text-xs"
+          className="px-6 pt-3 text-xs"
           style={{
             ...CONTROL_FONT,
             color: error ? 'var(--ob-jar-warm)' : 'var(--accent)',
@@ -396,12 +411,13 @@ export function SpEntryEditor({
         onChange={(e) => setTitle(e.target.value)}
         placeholder={t('title_placeholder')}
         aria-label={t('title_placeholder')}
-        className="w-full bg-transparent px-5 pt-3 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
+        className="w-full bg-transparent px-6 pt-3 text-2xl font-medium leading-snug outline-none placeholder:opacity-25"
+        style={{ fontFamily: bodyStyle.fontFamily, letterSpacing: bodyStyle.letterSpacing }}
       />
 
       {/* 結んでいる問い。題の下の行（Notion の見出し下のプロパティと同じ席）。
           面は持たず、◦ と本文の書体で。複数結べる。× で外す。「+ 問いを結ぶ」でその場に選び手が開く。 */}
-      <div className="mx-5 mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <div className="mx-6 mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
         {selectedQuestions.map((question) => (
           <span key={question.id} className="flex max-w-full items-center">
             <button
@@ -435,7 +451,7 @@ export function SpEntryEditor({
         </button>
       </div>
       {pickerOpen ? (
-        <div className="mx-5 mt-2">
+        <div className="mx-6 mt-2">
           <QuestionPicker
             questions={activeQuestions}
             selectedIds={selectedQuestionIds}
@@ -472,8 +488,8 @@ export function SpEntryEditor({
         onChange={(e) => setBody(e.target.value)}
         placeholder={t('body_placeholder')}
         aria-label={t('body_placeholder')}
-        className="mt-6 w-full flex-1 resize-none bg-transparent px-5 pb-4 text-base outline-none placeholder:opacity-30"
-        style={{ lineHeight: 2 }}
+        className="mt-6 w-full flex-1 resize-none bg-transparent px-6 pb-4 outline-none placeholder:opacity-30"
+        style={bodyStyle}
       />
 
       {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
@@ -491,7 +507,7 @@ export function SpEntryEditor({
       {/* 操作は殻の下端の列に集める（キーボードが出ればその真上。Notion のキーボード
           ツールバーの席）。問いを結ぶのは題の下の行が担うので列には置かない。
           発酵は保存済み（entryId 確定後）のときだけ並ぶ。 */}
-      {placePalette(
+      {placeInSlot(
         <ActionPalette
           ariaLabel={t('palette_aria')}
           keyboardOpen={chrome.keyboardOpen}
@@ -526,6 +542,22 @@ export function SpEntryEditor({
         />,
         chrome.paletteSlot,
       )}
+
+      {/* 上段の右端に、この画面の設定（本文の見た目）。席が無ければ（孤立検証）出さない。 */}
+      {chrome.actionSlot
+        ? placeInSlot(
+            <RoundButton ariaLabel={t('settings_title')} onClick={() => setSettingsOpen(true)}>
+              <GearIcon />
+            </RoundButton>,
+            chrome.actionSlot,
+          )
+        : null}
+      <SpEditorSettingsSheet
+        open={settingsOpen}
+        display={display}
+        onChange={updateDisplay}
+        onClose={() => setSettingsOpen(false)}
+      />
 
       {/* Issue #466（SP 版）: 発酵結果は本文に重ねず、下からのドロワーに集約する。 */}
       {fermentationDetail && (

@@ -77,3 +77,18 @@ export interface EntryListItem {
   updatedAt: string;
   linkedQuestions: EntryLinkedQuestion[];
 }
+
+// ---- 本文の見た目の設定（`hooks/use-editor-display.ts`）----
+
+export type EditorFontFamily = 'serif' | 'sans';
+/** 大きさと間隔は端末に依らない 3 段。px への写像は端末が決める。 */
+export type EditorScale = 'small' | 'medium' | 'large';
+export type EditorSpacing = 'tight' | 'normal' | 'wide';
+
+/** 本文の見た目の設定。エフェクト（時間内包など）はここに入れない。 */
+export interface EditorDisplay {
+  fontFamily: EditorFontFamily;
+  fontSize: EditorScale;
+  lineHeight: EditorSpacing;
+  letterSpacing: EditorSpacing;
+}
