@@ -806,6 +806,8 @@
       "open": "Open",
       "read_image": "Read text from a photo",
       "lightbox_close": "Close",
+      "prev_day": "Previous day",
+      "next_day": "Next day",
       "snippet_placeholder": "Something worth keeping"
     }
   },

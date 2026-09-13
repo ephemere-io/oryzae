@@ -45,6 +45,16 @@ function todayKey(): string {
   return `${year}-${month}-${day}`;
 }
 
+/** `YYYY-MM-DD` をローカル暦日で前後へ動かす。月末・年末をまたいでも Date が繰り上げる。 */
+function shiftDateKey(dateKey: string, offset: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  if (!year || !month || !day) return dateKey;
+  const next = new Date(year, month - 1, day + offset);
+  const mm = `${next.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${next.getDate()}`.padStart(2, '0');
+  return `${next.getFullYear()}-${mm}-${dd}`;
+}
+
 /** 見えているカード全体の world 矩形。無ければ null。 */
 function boundsOf(cards: readonly BoardCardData[]): Bounds | null {
   return unionBounds(
@@ -73,7 +83,7 @@ function isAllowedOcrImage(file: File): boolean {
  */
 export function SpBoard({ api }: SpBoardProps) {
   const t = useTranslations('board');
-  const [dateKey] = useState(todayKey);
+  const [dateKey, setDateKey] = useState(todayKey);
   const {
     cards,
     setCards,
@@ -98,6 +108,13 @@ export function SpBoard({ api }: SpBoardProps) {
   });
   const { fitTo, frameSize } = canvas;
   const fittedRef = useRef(false);
+
+  /** 前の日・次の日へ。日が変われば盤面は別物なので、選択を解いて収め直す。 */
+  const shiftDay = useCallback((offset: -1 | 1) => {
+    setSelectedId(null);
+    fittedRef.current = false;
+    setDateKey((key) => shiftDateKey(key, offset));
+  }, []);
 
   const photoRef = useRef<HTMLInputElement>(null);
   const ocrInputRef = useRef<HTMLInputElement>(null);
@@ -293,6 +310,7 @@ export function SpBoard({ api }: SpBoardProps) {
         <SpBoardSurface
           cards={cards}
           dateKey={dateKey}
+          onShiftDay={shiftDay}
           viewport={canvas.viewport}
           canvas={canvas}
           selectedId={selectedId}

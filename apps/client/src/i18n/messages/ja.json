@@ -806,6 +806,8 @@
       "open": "開く",
       "read_image": "写真から文字を読み取る",
       "lightbox_close": "閉じる",
+      "prev_day": "前の日",
+      "next_day": "次の日",
       "snippet_placeholder": "書き留めておきたいことを"
     }
   },
