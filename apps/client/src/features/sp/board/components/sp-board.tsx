@@ -1,7 +1,7 @@
 'use client';
 
 // verify-exempt: データ取得（use-board）・パンズームの hook・画像の読み取りを束ねる容れ物。
-// 見た目と指の操作は sp-board-surface / components/ui/action-palette / sp-snippet-sheet の verify が検証する。
+// 見た目と指の操作は sp-board-surface / components/ui/action-palette / sp-snippet-composer の verify が検証する。
 
 import { MAX_OCR_IMAGE_BYTES, OCR_ALLOWED_IMAGE_TYPES } from '@oryzae/shared';
 import { useTranslations } from 'next-intl';
@@ -28,9 +28,9 @@ import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
 import { readImageDimensions, resizeImage } from '@/lib/image';
-import { placePalette, useSpChrome } from '@/lib/sp-chrome-context';
+import { placePalette, useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
 import { SpBoardSurface } from './sp-board-surface';
-import { type SpSnippetOcrStatus, SpSnippetSheet } from './sp-snippet-sheet';
+import { SpSnippetComposer, type SpSnippetOcrStatus } from './sp-snippet-composer';
 
 export interface SpBoardProps {
   api: ApiClient;
@@ -45,6 +45,15 @@ const JPEG_QUALITY = 0.9;
 
 /** 新しいカードの既定の大きさ（world）。中身が入れば伸びる。 */
 const NEW_CARD_SIZE = { width: 262, height: 120 };
+
+/**
+ * カードが 1 枚も無い日に「全体」として見せる範囲（world）。
+ *
+ * 開いた直後が等倍だと、画面に入るのはカード 1 枚分の面で「寄りすぎて何も見えない」
+ *（実機レビュー）。開いたときは常に FIT の状態にする。カードがあればカード全部、
+ * 無ければこの範囲。縦画面なので縦長（3:4）。新しいカードはこの真ん中に生まれる。
+ */
+const BOARD_HOME: Bounds = { x: 0, y: 0, width: 1080, height: 1440 };
 
 /** ローカル暦日の `YYYY-MM-DD`。 */
 function todayKey(): string {
@@ -117,7 +126,8 @@ export function SpBoard({ api }: SpBoardProps) {
 
   const canvas = useCanvasViewport({
     fitPadding: FIT_PADDING,
-    getContentBounds: () => boundsOf(cardsRef.current),
+    defaultFitBounds: BOARD_HOME,
+    getContentBounds: () => boundsOf(cardsRef.current) ?? BOARD_HOME,
   });
   const { fitTo, frameSize } = canvas;
   const fittedRef = useRef(false);
@@ -147,10 +157,10 @@ export function SpBoard({ api }: SpBoardProps) {
   );
 
   // 初期フィット。frame の採寸ができるまで（レイアウト確定を待って）数フレーム粘る。
+  // カードが無い日も BOARD_HOME に収める（等倍のまま開かない）。
   useEffect(() => {
     if (fittedRef.current || loading) return;
-    const bounds = boundsOf(cards);
-    if (!bounds) return;
+    const bounds = boundsOf(cards) ?? BOARD_HOME;
 
     let frame = 0;
     let tries = 0;
@@ -167,6 +177,24 @@ export function SpBoard({ api }: SpBoardProps) {
     attempt();
     return () => cancelAnimationFrame(frame);
   }, [cards, loading, fitTo, frameSize]);
+
+  /**
+   * 貼ったカードを見せる。
+   *
+   * 貼り終わると画面の外に置かれていて「どこに行ったか分からない」（実機レビュー）。
+   * 作る前に印を立て、取得し直した一覧に知らないカードが現れたら、それを選んで全体を収め直す。
+   */
+  const revealPendingRef = useRef(false);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const known = knownIdsRef.current;
+    const fresh = cards.filter((card) => !known.has(card.id));
+    knownIdsRef.current = new Set(cards.map((card) => card.id));
+    if (!revealPendingRef.current || fresh.length === 0 || known.size === 0) return;
+    revealPendingRef.current = false;
+    setSelectedId(fresh[fresh.length - 1].id);
+    fitTo(boundsOf(cards) ?? BOARD_HOME);
+  }, [cards, fitTo]);
 
   const handleMove = useCallback(
     (cardId: string, x: number, y: number) => {
@@ -210,6 +238,8 @@ export function SpBoard({ api }: SpBoardProps) {
     setOcrStatus('idle');
     setOcrText(null);
   }, []);
+  // 書いている間は、上段の戻るが欄を閉じる（書斎へは戻らない）。
+  useSpBackHandler(sheetOpen ? closeSheet : null);
 
   const handleSubmitSnippet = useCallback(
     async (text: string) => {
@@ -218,6 +248,7 @@ export function SpBoard({ api }: SpBoardProps) {
         if (selected && selected.cardType === 'snippet') {
           await updateSnippet(selected.refId, text);
         } else {
+          revealPendingRef.current = true;
           await createSnippet(text, placement());
         }
         closeSheet();
@@ -240,6 +271,7 @@ export function SpBoard({ api }: SpBoardProps) {
         const upload = new File([resized.blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, {
           type: 'image/jpeg',
         });
+        revealPendingRef.current = true;
         await createPhoto(upload, '', width, height, placement());
       } catch {
         // 読めない画像（HEIC 等）や通信の失敗。盤面に専用のエラー表示が無いので、
@@ -338,6 +370,16 @@ export function SpBoard({ api }: SpBoardProps) {
       {/* 盤面は残りの高さいっぱい。道具箱はその下に**流れの中で**置く（浮かせると
           盤面の下端のカードに被り、指で掴めなくなる — 実機レビュー）。 */}
       <div className="relative min-h-0 flex-1">
+        {/* 書いている間は盤面を押すと欄を閉じる（暗くはしない。メッセージアプリの作法）。 */}
+        {sheetOpen ? (
+          <button
+            type="button"
+            aria-label={tSp('cancel')}
+            onClick={busy || ocrStatus === 'reading' ? undefined : closeSheet}
+            className="absolute inset-0 z-20"
+            style={{ background: 'transparent' }}
+          />
+        ) : null}
         <SpBoardSurface
           cards={cards}
           dateKey={dateKey}
@@ -355,7 +397,7 @@ export function SpBoard({ api }: SpBoardProps) {
               onZoomIn={canvas.zoomIn}
               onZoomOut={canvas.zoomOut}
               onReset={canvas.resetZoom}
-              onFit={() => fitTo(boundsOf(cardsRef.current))}
+              onFit={() => fitTo(boundsOf(cardsRef.current) ?? BOARD_HOME)}
             />
           }
         />
@@ -365,96 +407,98 @@ export function SpBoard({ api }: SpBoardProps) {
           **選んでいるものに応じて中身が入れ替わる**: 何も選んでいなければ作るもの、
           カードを選んでいればそのカードにできること。 */}
       {placePalette(
-        <ActionPalette
-          ariaLabel={tSp('palette_aria')}
-          keyboardOpen={chrome.keyboardOpen}
-          dismissKeyboardLabel={tNav('dismiss_keyboard')}
-          actions={
-            selected === null
-              ? [
-                  {
-                    id: 'snippet',
-                    label: tSp('add_snippet'),
-                    caption: tSp('tool_snippet'),
-                    icon: <SnippetIcon />,
-                    busy,
-                    onSelect: () => {
-                      setSelectedId(null);
-                      setSheetOpen(true);
+        sheetOpen ? (
+          <SpSnippetComposer
+            open={sheetOpen}
+            mode={editingSnippet ? 'edit' : 'create'}
+            initialText={sheetInitialText}
+            saving={busy}
+            ocrStatus={ocrStatus}
+            fromImage={ocrText !== null}
+            onPickImage={pickOcrImage}
+            onSubmit={handleSubmitSnippet}
+            onClose={closeSheet}
+          />
+        ) : (
+          <ActionPalette
+            ariaLabel={tSp('palette_aria')}
+            keyboardOpen={chrome.keyboardOpen}
+            dismissKeyboardLabel={tNav('dismiss_keyboard')}
+            actions={
+              selected === null
+                ? [
+                    {
+                      id: 'snippet',
+                      label: tSp('add_snippet'),
+                      caption: tSp('tool_snippet'),
+                      icon: <SnippetIcon />,
+                      busy,
+                      onSelect: () => {
+                        setSelectedId(null);
+                        setSheetOpen(true);
+                      },
                     },
-                  },
-                  {
-                    id: 'read-image',
-                    label: tSp('read_image'),
-                    caption: tSp('tool_read_image'),
-                    icon: <ScanTextIcon />,
-                    busy,
-                    onSelect: pickOcrImage,
-                  },
-                  {
-                    id: 'photo',
-                    label: tSp('add_photo'),
-                    caption: tSp('tool_photo'),
-                    icon: <PhotoIcon />,
-                    busy,
-                    onSelect: () => photoRef.current?.click(),
-                  },
-                ]
-              : [
-                  // 写真は本文を持たないので編集を出さない。開くは写真だけ（スニペットの全文は編集で読める）。
-                  ...(selected.cardType === 'snippet'
-                    ? [
-                        {
-                          id: 'edit',
-                          label: tSp('edit'),
-                          icon: <SnippetIcon />,
-                          onSelect: () => setSheetOpen(true),
-                        },
-                      ]
-                    : [
-                        {
-                          id: 'open',
-                          label: tSp('open'),
-                          icon: <OpenIcon />,
-                          onSelect: handleOpen,
-                        },
-                      ]),
-                  {
-                    id: 'front',
-                    label: tSp('bring_to_front'),
-                    icon: <BringToFrontIcon />,
-                    onSelect: handleBringToFront,
-                  },
-                  {
-                    id: 'back',
-                    label: tSp('send_to_back'),
-                    icon: <SendToBackIcon />,
-                    onSelect: handleSendToBack,
-                  },
-                  {
-                    id: 'delete',
-                    label: tSp('remove'),
-                    icon: <TrashIcon />,
-                    tone: 'danger' as const,
-                    onSelect: handleDelete,
-                  },
-                ]
-          }
-        />,
+                    {
+                      id: 'read-image',
+                      label: tSp('read_image'),
+                      caption: tSp('tool_read_image'),
+                      icon: <ScanTextIcon />,
+                      busy,
+                      onSelect: pickOcrImage,
+                    },
+                    {
+                      id: 'photo',
+                      label: tSp('add_photo'),
+                      caption: tSp('tool_photo'),
+                      icon: <PhotoIcon />,
+                      busy,
+                      onSelect: () => photoRef.current?.click(),
+                    },
+                  ]
+                : [
+                    // 写真は本文を持たないので編集を出さない。開くは写真だけ（スニペットの全文は編集で読める）。
+                    ...(selected.cardType === 'snippet'
+                      ? [
+                          {
+                            id: 'edit',
+                            label: tSp('edit'),
+                            icon: <SnippetIcon />,
+                            onSelect: () => setSheetOpen(true),
+                          },
+                        ]
+                      : [
+                          {
+                            id: 'open',
+                            label: tSp('open'),
+                            icon: <OpenIcon />,
+                            onSelect: handleOpen,
+                          },
+                        ]),
+                    {
+                      id: 'front',
+                      label: tSp('bring_to_front'),
+                      icon: <BringToFrontIcon />,
+                      onSelect: handleBringToFront,
+                    },
+                    {
+                      id: 'back',
+                      label: tSp('send_to_back'),
+                      icon: <SendToBackIcon />,
+                      onSelect: handleSendToBack,
+                    },
+                    {
+                      id: 'delete',
+                      label: tSp('remove'),
+                      icon: <TrashIcon />,
+                      tone: 'danger' as const,
+                      onSelect: handleDelete,
+                    },
+                  ]
+            }
+          />
+        ),
         chrome.paletteSlot,
       )}
-
-      <SpSnippetSheet
-        open={sheetOpen}
-        mode={editingSnippet ? 'edit' : 'create'}
-        initialText={sheetInitialText}
-        saving={busy}
-        ocrStatus={ocrStatus}
-        fromImage={ocrText !== null}
-        onPickImage={pickOcrImage}
-        onSubmit={handleSubmitSnippet}
-        onClose={closeSheet}
-      />
 
       {/* 写真を大きく見る。右ペインが無い SP では、これが唯一の「開く」。 */}
       {lightbox ? (

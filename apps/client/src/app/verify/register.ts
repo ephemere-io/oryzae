@@ -21,7 +21,7 @@ import '@/components/ui/select.verify';
 import '@/features/sp/navigation/components/sp-top-bar.verify';
 import '@/features/shared/auth/components/reset-password-form.verify';
 import '@/features/sp/board/components/sp-board-surface.verify';
-import '@/features/sp/board/components/sp-snippet-sheet.verify';
+import '@/features/sp/board/components/sp-snippet-composer.verify';
 import '@/features/shared/study/components/back-to-study.verify';
 import '@/features/shared/study/components/entry-list-overlay.verify';
 import '@/features/shared/study/components/pull-back-to-study.verify';
