@@ -705,8 +705,7 @@
   "sp": {
     "editor": {
       "palette_aria": "편집 도구",
-      "dismiss_keyboard": "키보드 닫기",
-      "title_placeholder": "제목 (선택)",
+      "title_placeholder": "제목",
       "body_placeholder": "지금 느끼는 것을 그대로.",
       "status_editing": "편집 중",
       "status_saving": "저장 중…",
@@ -737,7 +736,8 @@
       "jar": "병",
       "list": "목록",
       "account": "계정",
-      "questions": "질문"
+      "questions": "질문",
+      "dismiss_keyboard": "키보드 닫기"
     },
     "jar": {
       "untitled": "제목 없는 질문",
@@ -753,7 +753,8 @@
       "no_questions": "아직 질문이 없습니다. 아래 버튼에서 시작해 보세요.",
       "manage_questions": "질문 추가·편집",
       "not_fermented": "이 질문은 아직 발효되지 않았습니다",
-      "selection_reason": "선택된 이유"
+      "selection_reason": "선택된 이유",
+      "palette_aria": "병 작업"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -808,7 +809,9 @@
       "lightbox_close": "닫기",
       "prev_day": "이전 날",
       "next_day": "다음 날",
-      "snippet_placeholder": "남겨 두고 싶은 것"
+      "snippet_placeholder": "남겨 두고 싶은 것",
+      "palette_aria": "보드 작업",
+      "send_to_back": "맨 뒤로"
     }
   },
   "canvas": {

@@ -1,14 +1,24 @@
 'use client';
 
 // verify-exempt: データ取得（use-board）・パンズームの hook・画像の読み取りを束ねる容れ物。
-// 見た目と指の操作は sp-board-surface / sp-board-toolbar / sp-snippet-sheet の verify が検証する。
+// 見た目と指の操作は sp-board-surface / components/ui/action-palette / sp-snippet-sheet の verify が検証する。
 
 import { MAX_OCR_IMAGE_BYTES, OCR_ALLOWED_IMAGE_TYPES } from '@oryzae/shared';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActionPalette } from '@/components/ui/action-palette';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { ErrorState } from '@/components/ui/error-state';
 import { PageLoading } from '@/components/ui/page-loading';
+import {
+  BringToFrontIcon,
+  OpenIcon,
+  PhotoIcon,
+  ScanTextIcon,
+  SendToBackIcon,
+  SnippetIcon,
+  TrashIcon,
+} from '@/components/ui/palette-icons';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
@@ -18,8 +28,8 @@ import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
 import { readImageDimensions, resizeImage } from '@/lib/image';
+import { placePalette, useSpChrome } from '@/lib/sp-chrome-context';
 import { SpBoardSurface } from './sp-board-surface';
-import { SpBoardToolbar } from './sp-board-toolbar';
 import { type SpSnippetOcrStatus, SpSnippetSheet } from './sp-snippet-sheet';
 
 export interface SpBoardProps {
@@ -83,6 +93,9 @@ function isAllowedOcrImage(file: File): boolean {
  */
 export function SpBoard({ api }: SpBoardProps) {
   const t = useTranslations('board');
+  const tSp = useTranslations('sp.board');
+  const tNav = useTranslations('sp.nav');
+  const chrome = useSpChrome();
   const [dateKey, setDateKey] = useState(todayKey);
   const {
     cards,
@@ -284,6 +297,24 @@ export function SpBoard({ api }: SpBoardProps) {
     );
   }, [selected, setCards, savePositions]);
 
+  /**
+   * 背面へ。前面へと対で、選んだものを他の全部の下に置く。
+   *
+   * zIndex は負にしない（描画順の比較はできるが、並びを保存する側の前提が崩れる）。
+   * 最下段が 0 なら全体を 1 つ上げてから 0 に置く。
+   */
+  const handleSendToBack = useCallback(() => {
+    if (!selected) return;
+    const bottom = Math.min(...cardsRef.current.map((card) => card.zIndex));
+    const lift = bottom <= 0 ? 1 : 0;
+    const place = (card: BoardCardData): BoardCardData =>
+      card.id === selected.id
+        ? { ...card, zIndex: Math.max(0, bottom - 1 + lift), userPositioned: true }
+        : { ...card, zIndex: card.zIndex + lift };
+    setCards((previous) => previous.map(place));
+    savePositions(cardsRef.current.filter((card) => !card.removing).map(place));
+  }, [selected, setCards, savePositions]);
+
   const handleDelete = useCallback(async () => {
     if (!selected) return;
     setSelectedId(null);
@@ -330,22 +361,88 @@ export function SpBoard({ api }: SpBoardProps) {
         />
       </div>
 
-      <div className="flex shrink-0 justify-center px-4 pt-2 pb-4">
-        <SpBoardToolbar
-          selectedType={selected?.cardType ?? null}
-          busy={busy}
-          onEdit={() => setSheetOpen(true)}
-          onOpen={handleOpen}
-          onBringToFront={handleBringToFront}
-          onDelete={handleDelete}
-          onCreateSnippet={() => {
-            setSelectedId(null);
-            setSheetOpen(true);
-          }}
-          onReadImage={pickOcrImage}
-          onCreatePhoto={() => photoRef.current?.click()}
-        />
-      </div>
+      {/* 操作の列は殻の下端（エントリー・瓶と同じ部品）。PC（#524）と同じく、
+          **選んでいるものに応じて中身が入れ替わる**: 何も選んでいなければ作るもの、
+          カードを選んでいればそのカードにできること。 */}
+      {placePalette(
+        <ActionPalette
+          ariaLabel={tSp('palette_aria')}
+          keyboardOpen={chrome.keyboardOpen}
+          dismissKeyboardLabel={tNav('dismiss_keyboard')}
+          actions={
+            selected === null
+              ? [
+                  {
+                    id: 'snippet',
+                    label: tSp('add_snippet'),
+                    caption: tSp('tool_snippet'),
+                    icon: <SnippetIcon />,
+                    busy,
+                    onSelect: () => {
+                      setSelectedId(null);
+                      setSheetOpen(true);
+                    },
+                  },
+                  {
+                    id: 'read-image',
+                    label: tSp('read_image'),
+                    caption: tSp('tool_read_image'),
+                    icon: <ScanTextIcon />,
+                    busy,
+                    onSelect: pickOcrImage,
+                  },
+                  {
+                    id: 'photo',
+                    label: tSp('add_photo'),
+                    caption: tSp('tool_photo'),
+                    icon: <PhotoIcon />,
+                    busy,
+                    onSelect: () => photoRef.current?.click(),
+                  },
+                ]
+              : [
+                  // 写真は本文を持たないので編集を出さない。開くは写真だけ（スニペットの全文は編集で読める）。
+                  ...(selected.cardType === 'snippet'
+                    ? [
+                        {
+                          id: 'edit',
+                          label: tSp('edit'),
+                          icon: <SnippetIcon />,
+                          onSelect: () => setSheetOpen(true),
+                        },
+                      ]
+                    : [
+                        {
+                          id: 'open',
+                          label: tSp('open'),
+                          icon: <OpenIcon />,
+                          onSelect: handleOpen,
+                        },
+                      ]),
+                  {
+                    id: 'front',
+                    label: tSp('bring_to_front'),
+                    icon: <BringToFrontIcon />,
+                    onSelect: handleBringToFront,
+                  },
+                  {
+                    id: 'back',
+                    label: tSp('send_to_back'),
+                    icon: <SendToBackIcon />,
+                    onSelect: handleSendToBack,
+                  },
+                  {
+                    id: 'delete',
+                    label: tSp('remove'),
+                    icon: <TrashIcon />,
+                    tone: 'danger' as const,
+                    onSelect: handleDelete,
+                  },
+                ]
+          }
+        />,
+        chrome.paletteSlot,
+      )}
 
       <SpSnippetSheet
         open={sheetOpen}

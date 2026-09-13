@@ -705,8 +705,7 @@
   "sp": {
     "editor": {
       "palette_aria": "Editor actions",
-      "dismiss_keyboard": "Hide keyboard",
-      "title_placeholder": "Title (optional)",
+      "title_placeholder": "Title",
       "body_placeholder": "Write what you feel, just as it is.",
       "status_editing": "Editing",
       "status_saving": "Saving…",
@@ -737,7 +736,8 @@
       "jar": "Jar",
       "list": "List",
       "account": "Account",
-      "questions": "Questions"
+      "questions": "Questions",
+      "dismiss_keyboard": "Hide keyboard"
     },
     "jar": {
       "untitled": "Untitled question",
@@ -753,7 +753,8 @@
       "no_questions": "No questions yet. Start one with the button below.",
       "manage_questions": "Add or edit questions",
       "not_fermented": "This question hasn't fermented yet",
-      "selection_reason": "Why this was chosen"
+      "selection_reason": "Why this was chosen",
+      "palette_aria": "Jar actions"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -808,7 +809,9 @@
       "lightbox_close": "Close",
       "prev_day": "Previous day",
       "next_day": "Next day",
-      "snippet_placeholder": "Something worth keeping"
+      "snippet_placeholder": "Something worth keeping",
+      "palette_aria": "Board actions",
+      "send_to_back": "Send to back"
     }
   },
   "canvas": {

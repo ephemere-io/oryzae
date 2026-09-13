@@ -14,33 +14,65 @@ import { describe, expect, it } from 'vitest';
  */
 
 const LAYOUT = join(process.cwd(), 'src', 'app', '(protected)', 'layout.tsx');
+const SP_SHELL = join(
+  process.cwd(),
+  'src',
+  'features',
+  'sp',
+  'navigation',
+  'components',
+  'sp-shell.tsx',
+);
 
-/** 旧ナビの部品。フラグ off のときだけ描いてよい。 */
+/**
+ * 旧ナビの部品。フラグ off のときだけ描いてよい。
+ *
+ * `Sidebar` は layout が直接 `!studyHome &&` で守る。`SpBottomNav` は SP の殻（`SpShell`）が
+ * `bottomNav &&` で守り、layout が `bottomNav={!studyHome}` を渡す。分岐が 2 か所に分かれるので
+ * 両方を読む。
+ */
 const OLD_NAVIGATION = ['Sidebar', 'SpBottomNav'];
 
 function layoutSource(): string {
   return readFileSync(LAYOUT, 'utf8');
 }
 
-describe('書斎が有効な間、旧ナビを描かない', () => {
-  it.each(OLD_NAVIGATION)('%s は !studyHome のときだけ描く', (component) => {
-    const lines = layoutSource()
-      .split('\n')
-      .filter((line) => line.includes(`<${component} `) || line.includes(`<${component}/`));
+function jsxLines(source: string, component: string): string[] {
+  return source
+    .split('\n')
+    .filter((line) => line.includes(`<${component} `) || line.includes(`<${component}/`));
+}
 
-    expect(lines.length, `${component} が layout に無い`).toBeGreaterThan(0);
+describe('書斎が有効な間、旧ナビを描かない', () => {
+  it('Sidebar は layout で !studyHome のときだけ描く', () => {
+    const lines = jsxLines(layoutSource(), 'Sidebar');
+    expect(lines.length, 'Sidebar が layout に無い').toBeGreaterThan(0);
     for (const line of lines) {
-      expect(line, `${component} がフラグで守られていない: ${line.trim()}`).toContain(
-        '!studyHome &&',
-      );
+      expect(line, `Sidebar がフラグで守られていない: ${line.trim()}`).toContain('!studyHome &&');
     }
   });
 
-  it('旧ナビは layout 以外から描かれない（検証スペックを除く）', () => {
+  it('SpBottomNav は殻で bottomNav のときだけ描き、layout は !studyHome を渡す', () => {
+    const lines = jsxLines(readFileSync(SP_SHELL, 'utf8'), 'SpBottomNav');
+    expect(lines.length, 'SpBottomNav が殻に無い').toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line, `SpBottomNav がフラグで守られていない: ${line.trim()}`).toContain(
+        'bottomNav &&',
+      );
+    }
+    expect(layoutSource(), 'layout が殻に !studyHome を渡していない').toContain(
+      'bottomNav={!studyHome}',
+    );
+  });
+
+  it('旧ナビは layout と殻以外から描かれない（検証スペックを除く）', () => {
     // どこか別の画面が直接置いていると、layout の分岐をすり抜ける。
     const src = join(process.cwd(), 'src');
     const hits = grepJsx(src, OLD_NAVIGATION).filter(
-      (hit) => !hit.file.endsWith('.verify.tsx') && !hit.file.endsWith('layout.tsx'),
+      (hit) =>
+        !hit.file.endsWith('.verify.tsx') &&
+        !hit.file.endsWith('layout.tsx') &&
+        !hit.file.endsWith('sp-shell.tsx'),
     );
     expect(hits.map((hit) => `${hit.file}: ${hit.line}`)).toEqual([]);
   });

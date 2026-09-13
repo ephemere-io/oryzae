@@ -158,11 +158,11 @@ registerUnit<Props>({
     },
     {
       id: 'manage-button-always-present',
-      description: '問いの管理へ入る口は常にある（SP はボトムナビを持たない唯一の入口）',
-      onlyFixtures: ['loading', 'no-questions', 'orbit', 'opened'],
+      description: '問いの管理へ入る口は地図の間ずっとある（問いを開いている間は列を畳む）',
+      onlyFixtures: ['loading', 'no-questions', 'orbit'],
       check: ({ root }) => {
-        // 右下の正円。文字は置かないので名前（aria-label）で見る。
-        const fab = root.querySelector('button[data-manage-questions]');
+        // 下端の列（殻が無い孤立検証では画面の中に描かれる）。
+        const fab = root.querySelector('button[data-palette-action="questions"]');
         return (
           fab?.getAttribute('aria-label') === '問いを追加・編集' ||
           '「問いを追加・編集」の正円が無い'

@@ -705,8 +705,7 @@
   "sp": {
     "editor": {
       "palette_aria": "エディタの操作",
-      "dismiss_keyboard": "キーボードを閉じる",
-      "title_placeholder": "タイトル（任意）",
+      "title_placeholder": "タイトル",
       "body_placeholder": "いま感じていることを、そのまま。",
       "status_editing": "編集中",
       "status_saving": "保存中…",
@@ -737,7 +736,8 @@
       "jar": "瓶",
       "list": "一覧",
       "account": "アカウント",
-      "questions": "問い"
+      "questions": "問い",
+      "dismiss_keyboard": "キーボードを閉じる"
     },
     "jar": {
       "untitled": "無題の問い",
@@ -753,7 +753,8 @@
       "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
       "manage_questions": "問いを追加・編集",
       "not_fermented": "この問いはまだ発酵していません",
-      "selection_reason": "選ばれた理由"
+      "selection_reason": "選ばれた理由",
+      "palette_aria": "瓶の操作"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -808,7 +809,9 @@
       "lightbox_close": "閉じる",
       "prev_day": "前の日",
       "next_day": "次の日",
-      "snippet_placeholder": "書き留めておきたいことを"
+      "snippet_placeholder": "書き留めておきたいことを",
+      "palette_aria": "ボードの操作",
+      "send_to_back": "背面へ"
     }
   },
   "canvas": {

@@ -1709,3 +1709,19 @@ three.js の投影で天板・瓶（真の輪郭込み）・手帳・棚・ピ�
 ### 「左端の数ピクセル」
 
 コードにその UI は無い。左端からの右スワイプで書斎へ戻るのは iOS Safari の履歴バック。
+
+## 65. SP の殻をビジュアルビューポートに追従させ、下端の操作の列を 3 画面で同じ部品に
+
+実機の指摘（`docs/work/2026-09-13-sp-polish.md` B3・D1・E3・D10）。
+
+- **`fixed; bottom: キーボード高` をやめた。** iOS はキャレットを見せるためにレイアウトビューポートごと
+  動かすので、`fixed` の列がスクロールで本文の下へ潜っていた。殻（`SpShell`）を `visualViewport` の
+  位置と高さに置く（`lib/visual-viewport.ts`）。殻の下端が常にキーボードの上端になり、列は流れの中に
+  置くだけでよい。測れるまでは `100dvh`
+- 列は `components/ui/action-palette.tsx` に 1 つ。画面は `placePalette(<ActionPalette/>, chrome.paletteSlot)`
+  で殻の席へ portal する。席が無ければ（孤立検証）その場に描く。state で殻へ渡さないのは、
+  毎描画で作り直される要素が state を揺らすため
+- エントリーの列から「問いを結ぶ」を外した（題の下の行が担う）。ボードの列に「背面へ」を足した。
+  瓶の右下の正円は列に移した（3 画面で同じ部品にする、というオーナーの指示）
+- `sp-editor-palette.tsx` と `sp-board-toolbar.tsx` は削除
+

@@ -4,7 +4,8 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
-import { ICON_STROKE_WIDTH } from '@/components/ui/surface';
+import { ActionPalette } from '@/components/ui/action-palette';
+import { PlusIcon } from '@/components/ui/palette-icons';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import type { JarQuestion } from '@/features/shared/questions/types';
@@ -16,6 +17,7 @@ import { type MapQuestion, SpJarMap } from '@/features/sp/fermentation/component
 import { SpJarMapSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
 import { SpQuestionZoom } from '@/features/sp/fermentation/components/sp-question-zoom';
 import type { ApiClient } from '@/lib/api';
+import { placePalette, useSpChrome } from '@/lib/sp-chrome-context';
 import { useUnread } from '@/lib/unread-context';
 
 interface SpJarProps {
@@ -43,6 +45,7 @@ interface SpJarProps {
  */
 export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps) {
   const t = useTranslations('sp.jar');
+  const chrome = useSpChrome();
   const router = useRouter();
   const { letters } = useFermentationInbox(api, false);
   const { ready: unreadReady, unreadQuestionIds, markQuestionRead } = useUnread();
@@ -92,31 +95,23 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
         </div>
       )}
 
-      {/* 問いの管理へ。右下の正円（地図アプリの定位置）。文字は置かず、名前は読み上げに。 */}
-      <button
-        type="button"
-        onClick={onManageQuestions}
-        aria-label={t('manage_questions')}
-        data-manage-questions
-        className="absolute bottom-5 right-5 z-10 flex h-14 w-14 items-center justify-center rounded-full text-white transition-transform active:scale-95"
-        style={{
-          background: 'var(--accent)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.12)',
-        }}
-      >
-        <svg
-          aria-hidden="true"
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={ICON_STROKE_WIDTH + 0.4}
-          strokeLinecap="round"
-        >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
+      {/* 問いの管理へ。殻の下端の列（エントリー・ボードと同じ部品）に置く。
+          以前は右下の正円だったが、3 画面で同じ部品にする（オーナーの指示）。 */}
+      {!openQuestion &&
+        placePalette(
+          <ActionPalette
+            ariaLabel={t('palette_aria')}
+            actions={[
+              {
+                id: 'questions',
+                label: t('manage_questions'),
+                icon: <PlusIcon />,
+                onSelect: onManageQuestions,
+              },
+            ]}
+          />,
+          chrome.paletteSlot,
+        )}
 
       {openQuestion ? (
         <SpQuestionZoom
