@@ -730,14 +730,21 @@
       "ferment_sub": "時間をおくと、AI からの手紙が届きます",
       "delete": "削除",
       "question_unlink": "「{label}」を外す",
-      "question_search_placeholder": "問いを探す"
+      "question_search_placeholder": "問いを探す",
+      "settings_title": "表示の設定",
+      "settings_letter_spacing": "字間",
+      "settings_size_small": "小",
+      "settings_size_medium": "中",
+      "settings_size_large": "大",
+      "settings_spacing_tight": "詰める",
+      "settings_spacing_normal": "標準",
+      "settings_spacing_wide": "広げる"
     },
     "nav": {
       "back": "戻る",
       "write": "書く",
       "jar": "瓶",
       "list": "一覧",
-      "account": "アカウント",
       "questions": "問い",
       "dismiss_keyboard": "キーボードを閉じる"
     },

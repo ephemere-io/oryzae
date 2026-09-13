@@ -730,14 +730,21 @@
       "ferment_sub": "Give it time — a letter from the AI will arrive",
       "delete": "Delete",
       "question_unlink": "Unlink “{label}”",
-      "question_search_placeholder": "Find a question"
+      "question_search_placeholder": "Find a question",
+      "settings_title": "Display settings",
+      "settings_letter_spacing": "Letter spacing",
+      "settings_size_small": "Small",
+      "settings_size_medium": "Medium",
+      "settings_size_large": "Large",
+      "settings_spacing_tight": "Tight",
+      "settings_spacing_normal": "Normal",
+      "settings_spacing_wide": "Wide"
     },
     "nav": {
       "back": "Back",
       "write": "Write",
       "jar": "Jar",
       "list": "List",
-      "account": "Account",
       "questions": "Questions",
       "dismiss_keyboard": "Hide keyboard"
     },

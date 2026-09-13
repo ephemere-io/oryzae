@@ -730,14 +730,21 @@
       "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다",
       "delete": "삭제",
       "question_unlink": "“{label}” 연결 해제",
-      "question_search_placeholder": "질문 찾기"
+      "question_search_placeholder": "질문 찾기",
+      "settings_title": "표시 설정",
+      "settings_letter_spacing": "자간",
+      "settings_size_small": "작게",
+      "settings_size_medium": "보통",
+      "settings_size_large": "크게",
+      "settings_spacing_tight": "좁게",
+      "settings_spacing_normal": "보통",
+      "settings_spacing_wide": "넓게"
     },
     "nav": {
       "back": "뒤로",
       "write": "쓰기",
       "jar": "병",
       "list": "목록",
-      "account": "계정",
       "questions": "질문",
       "dismiss_keyboard": "키보드 닫기"
     },
