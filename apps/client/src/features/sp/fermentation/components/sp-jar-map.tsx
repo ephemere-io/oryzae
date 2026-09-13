@@ -99,11 +99,12 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
     active: boolean;
   } | null>(null);
   const canvas = useCanvasViewport({
-    // 世界の箱を縦長に変えたので鍵も変える（前の箱で保存した位置を復元すると外を見る）。
-    storageKey: 'jar-sp-portrait',
+    // 倍率と位置は持ち越さない。開くたびに壜と円が全部入る HOME に収める（ボードと同じ「開いた直後は全体」）。
     defaultFitBounds: HOME,
     fitPadding: 16,
-    getContentBounds: () => WORLD,
+    // 「全体」は HOME（壜と既定の席の円が入る窓）。殻の高さが測り直されて frame が変わると hook が
+    // ここへ収め直すので、世界全体（WORLD）を返すと壜が小さくなる。
+    getContentBounds: () => HOME,
   });
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -179,7 +180,11 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
                 if (!drag.active) {
                   if (Math.abs(dx) + Math.abs(dy) <= TAP_SLOP) return;
                   drag.active = true;
-                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  try {
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  } catch {
+                    // 既に離れた指や合成イベントでは NotFoundError になる。掴めなくても動きは追える。
+                  }
                   setDraggingId(drag.id);
                 }
                 const scale = canvas.viewport.scale || 1;

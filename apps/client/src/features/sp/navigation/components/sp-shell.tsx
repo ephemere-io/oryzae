@@ -26,7 +26,7 @@ interface SpShellProps {
  * 殻は席を用意するだけで、中身は知らない。
  */
 export function SpShell({ topBar, bottomNav, children }: SpShellProps) {
-  const { viewport, setPaletteSlot } = useSpChrome();
+  const { viewport, setPaletteSlot, setOverlaySlot } = useSpChrome();
 
   return (
     <div
@@ -43,6 +43,12 @@ export function SpShell({ topBar, bottomNav, children }: SpShellProps) {
       </main>
       <div ref={setPaletteSlot} className="shrink-0" data-sp-palette-slot />
       {bottomNav && <SpBottomNav />}
+      {/* 画面全体に重ねるもの（シート・確認）の席。空のときは指を通す。 */}
+      <div
+        ref={setOverlaySlot}
+        data-sp-overlay-slot
+        className="pointer-events-none absolute inset-0 z-30"
+      />
     </div>
   );
 }
