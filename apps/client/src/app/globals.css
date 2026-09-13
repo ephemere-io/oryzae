@@ -112,6 +112,26 @@ body {
   overscroll-behavior: none;
 }
 
+/* SP の上段に見出しが上がるときの動き（Notion のモバイルと同じ、短いフェードと数 px の上がり）。 */
+@keyframes sp-heading-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sp-heading-in {
+  animation: sp-heading-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-heading-in {
+    animation: none;
+  }
+}
+
 /* Tailwind v4 の Preflight は button を `cursor: default` にする（v3 までは
  * ブラウザ既定の pointer だった）。そのためアプリ全体でボタンが「押せる物」に
  * 見えなくなっていた。<a> は pointer のままなので、リンクとボタンで挙動が食い違う。

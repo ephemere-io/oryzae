@@ -13,6 +13,7 @@ import {
   SpChromeProvider,
   useSpBackHandler,
   useSpChrome,
+  useSpHeading,
   useSpStatus,
 } from '@/lib/sp-chrome-context';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
@@ -24,13 +25,16 @@ interface Props {
   status?: string;
   /** 画面が右端の席に設定を差し込んでいる状態を再現する。 */
   withAction?: boolean;
+  /** 本文側のタイトルが隠れて、見出しが上段に上がっている状態。 */
+  heading?: string;
 }
 
 const noop = () => {};
 
-function Screen({ overrideBack = false, status = '', withAction = false }: Props) {
+function Screen({ overrideBack = false, status = '', withAction = false, heading }: Props) {
   useSpBackHandler(overrideBack ? noop : null);
   useSpStatus(status, 'ok');
+  useSpHeading(heading ?? null);
   const { actionSlot } = useSpChrome();
   if (!withAction) return null;
   return placeInSlot(
@@ -73,6 +77,11 @@ registerUnit<Props>({
       description: '中央に状態（保存しました）',
       props: { status: '保存しました' },
     },
+    {
+      id: 'with-heading',
+      description: 'タイトルが隠れている間は中央に見出し（状態より優先。区切り線が出る）',
+      props: { status: '保存しました', heading: 'ロボティクスエンジニアになるための道' },
+    },
   ],
   invariants: [
     {
@@ -101,6 +110,15 @@ registerUnit<Props>({
       onlyFixtures: ['with-action'],
       check: ({ root }) =>
         root.querySelector('[data-sp-action-slot] button') !== null || '席に設定が入っていない',
+    },
+    {
+      id: 'heading-beats-ok-status',
+      description: '見出しがあれば中央は見出し（保存済みの状態より優先）',
+      onlyFixtures: ['with-heading'],
+      check: ({ root, contract }) =>
+        (contract.hasHeading === 'true' &&
+          (root.querySelector('[data-sp-heading]')?.textContent ?? '').includes('ロボティクス')) ||
+        `hasHeading=${contract.hasHeading}, 見出し=${root.querySelector('[data-sp-heading]')?.textContent}`,
     },
     {
       id: 'status-in-center',

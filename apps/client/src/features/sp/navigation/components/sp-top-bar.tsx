@@ -22,7 +22,9 @@ const SP_TOP_BAR_HEIGHT = 48;
 export function SpTopBar() {
   const t = useTranslations('study');
   const tNav = useTranslations('sp.nav');
-  const { back, status, setActionSlot } = useSpChrome();
+  const { back, status, heading, setActionSlot } = useSpChrome();
+  // 見出しが載っていれば見出し。保存中・失敗だけは状態が勝つ（見出しより急ぎ）。
+  const showHeading = heading !== null && (status === null || status.tone === 'ok');
 
   return (
     <header
@@ -30,12 +32,16 @@ export function SpTopBar() {
         unit: 'SpTopBar',
         overridesBack: back !== null,
         hasStatus: status !== null,
+        hasHeading: showHeading,
       })}
       className="flex shrink-0 items-center gap-2 px-4"
       style={{
         ...CONTROL_FONT,
         height: `calc(${SP_TOP_BAR_HEIGHT}px + env(safe-area-inset-top, 0px))`,
         paddingTop: 'env(safe-area-inset-top, 0px)',
+        // 見出しが上がっている間だけ、本文との境に細い線（Notion と同じ）。
+        borderBottom: `1px solid ${showHeading ? 'var(--surface-raised-border)' : 'transparent'}`,
+        transition: 'border-color 150ms ease',
       }}
     >
       {back ? (
@@ -48,13 +54,23 @@ export function SpTopBar() {
         </RoundButton>
       )}
 
-      <span
-        aria-live="polite"
-        className="min-w-0 flex-1 truncate text-center text-[12px]"
-        style={{ color: statusColor(status?.tone) }}
-      >
-        {status ? `${status.tone === 'ok' ? '✓ ' : ''}${status.text}` : ''}
-      </span>
+      {showHeading ? (
+        <span
+          data-sp-heading
+          className="sp-heading-in min-w-0 flex-1 truncate text-center text-[13px] font-medium"
+          style={{ color: 'var(--fg)', fontFamily: "'Noto Serif JP', serif" }}
+        >
+          {heading}
+        </span>
+      ) : (
+        <span
+          aria-live="polite"
+          className="min-w-0 flex-1 truncate text-center text-[12px]"
+          style={{ color: statusColor(status?.tone) }}
+        >
+          {status ? `${status.tone === 'ok' ? '✓ ' : ''}${status.text}` : ''}
+        </span>
+      )}
 
       {/* 右端の席。画面が portal で差し込む。空でも幅を持ち、中央の状態が左右対称に収まる。 */}
       <div

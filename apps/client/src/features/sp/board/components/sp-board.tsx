@@ -388,6 +388,12 @@ export function SpBoard({ api }: SpBoardProps) {
           canvas={canvas}
           selectedId={selectedId}
           onSelect={setSelectedId}
+          // 同じカードを続けて押したら開く。スニペットは編集の欄へ（PC のダブルクリックと同じ）。
+          onOpen={(id) => {
+            setSelectedId(id);
+            const card = cardsRef.current.find((it) => it.id === id);
+            if (card?.cardType === 'snippet') setSheetOpen(true);
+          }}
           onMove={handleMove}
           onTransform={handleTransform}
           onCommit={handleCommit}
