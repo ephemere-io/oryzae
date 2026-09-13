@@ -157,6 +157,21 @@
       "unlink_aria": "Unlink “{text}”"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "Choose a question",
+      "empty": "You have no open questions yet. Write one here.",
+      "new": "+ Write a new question",
+      "new_placeholder": "Write a question (e.g. What did I notice today?)",
+      "create": "Use this question",
+      "creating": "Creating…",
+      "create_failed": "Couldn't create the question. Please try again.",
+      "back_to_list": "← Pick from existing questions",
+      "search_placeholder": "Find a question",
+      "untitled": "Untitled question",
+      "close": "Close"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "Something went wrong",
@@ -454,10 +469,6 @@
       "aria_label": "Question selection dialog",
       "heading": "Link a question to this entry",
       "body": "To pickle and ferment, an entry must be linked to one question. Pick an existing question or write a new one here.",
-      "mode_pick": "Pick existing",
-      "mode_create": "Write new",
-      "pick_placeholder": "Choose a question...",
-      "create_placeholder": "Write a question (e.g. What did I notice today?)",
       "cancel": "Cancel",
       "confirm": "Link and pickle",
       "saving": "Pickling..."
@@ -714,14 +725,6 @@
       "question": "Question",
       "question_selected": "Question: {label}",
       "question_untitled": "Untitled question",
-      "question_sheet_title": "Choose a question",
-      "question_empty": "You have no open questions yet. Write one here.",
-      "question_new": "+ Write a new question",
-      "question_new_placeholder": "Write a question (e.g. What did I notice today?)",
-      "question_create": "Use this question",
-      "question_creating": "Creating…",
-      "question_create_failed": "Couldn't create the question. Please try again.",
-      "question_back_to_list": "← Pick from existing questions",
       "close": "Close",
       "pickle": "Pickle",
       "pickling": "Sealing…",
@@ -731,7 +734,6 @@
       "ferment_sub": "Give it time — a letter from the AI will arrive",
       "delete": "Delete",
       "question_unlink": "Unlink “{label}”",
-      "question_search_placeholder": "Find a question",
       "settings_title": "Display settings",
       "settings_letter_spacing": "Letter spacing",
       "settings_size_small": "Small",

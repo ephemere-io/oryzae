@@ -157,6 +157,21 @@
       "unlink_aria": "“{text}” 연결 해제"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "질문 선택",
+      "empty": "아직 세운 질문이 없습니다. 여기서 하나 적어 보세요.",
+      "new": "+ 새 질문 쓰기",
+      "new_placeholder": "질문을 쓰세요 (예: 오늘의 작은 발견은?)",
+      "create": "이 질문으로 하기",
+      "creating": "만드는 중…",
+      "create_failed": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+      "back_to_list": "← 기존 질문에서 고르기",
+      "search_placeholder": "질문 찾기",
+      "untitled": "제목 없는 질문",
+      "close": "닫기"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "오류가 발생했습니다",
@@ -454,10 +469,6 @@
       "aria_label": "질문 선택 대화상자",
       "heading": "이 항목에 질문 연결",
       "body": "담가서 발효시키려면 항목에 질문을 하나 연결해야 합니다. 기존 질문을 고르거나 새로 작성하세요.",
-      "mode_pick": "기존에서 선택",
-      "mode_create": "새로 작성",
-      "pick_placeholder": "질문 선택...",
-      "create_placeholder": "질문을 작성하세요 (예: 오늘 작은 발견은?)",
       "cancel": "취소",
       "confirm": "연결 후 담그기",
       "saving": "담그는 중..."
@@ -714,14 +725,6 @@
       "question": "질문",
       "question_selected": "질문: {label}",
       "question_untitled": "제목 없는 질문",
-      "question_sheet_title": "질문 선택",
-      "question_empty": "아직 세운 질문이 없습니다. 여기서 하나 적어 보세요.",
-      "question_new": "+ 새 질문 쓰기",
-      "question_new_placeholder": "질문을 쓰세요 (예: 오늘의 작은 발견은?)",
-      "question_create": "이 질문으로 하기",
-      "question_creating": "만드는 중…",
-      "question_create_failed": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
-      "question_back_to_list": "← 기존 질문에서 고르기",
       "close": "닫기",
       "pickle": "병에 담그기",
       "pickling": "담는 중…",
@@ -731,7 +734,6 @@
       "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다",
       "delete": "삭제",
       "question_unlink": "“{label}” 연결 해제",
-      "question_search_placeholder": "질문 찾기",
       "settings_title": "표시 설정",
       "settings_letter_spacing": "자간",
       "settings_size_small": "작게",

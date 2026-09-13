@@ -1,161 +1,133 @@
 /**
- * QuestionSelectModal の検証スペック（A 移植）。
- * 問い紐付けモーダル。open=true で描画されるダイアログを孤立検証する。
- * - 既存の問いがあれば pick モード（select 表示）、無ければ create モード（input 表示）。
- * - 内部 state（mode / canConfirm）を DOM 契約として公表し、
- *   「select 表示が mode×availableCount と一致」「submit の disabled が契約と一致」を検証する。
- * - act fixture で pick→create 切替＋入力まで再生し、canConfirm が立つことを確認する。
+ * QuestionSelectModal の検証スペック。
+ *
+ * 中身は SP と同じ選び手（QuestionPicker）。見るのは: 行の数が問いの数、結んでいる行に印、
+ * 結んだ問いが無ければ「紐付けて漬け込む」は押せない、問いが無ければ書く欄で始まる。
  */
 
 import { registerUnit } from '@oryzae/verify';
+import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { QuestionSelectModal } from './question-select-modal';
 
-interface QuestionOption {
-  id: string;
-  currentText: string | null;
-}
-
-interface QuestionSelectModalProps {
-  open: boolean;
+interface Props {
   saving: boolean;
-  activeQuestions: QuestionOption[];
-  linkedQuestionIds: Set<string>;
-  onConfirm: (args: { existingId: string | null; newQuestionText: string | null }) => void;
-  onClose: () => void;
+  activeQuestions: LinkedQuestion[];
+  linkedQuestionIds: string[];
 }
 
 const noop = () => {};
 
-const SAMPLE_QUESTIONS: QuestionOption[] = [
+const SAMPLE_QUESTIONS: LinkedQuestion[] = [
   { id: 'q1', currentText: '今日の小さな発見は？' },
   { id: 'q2', currentText: '今いちばん気になっていることは？' },
 ];
 
-registerUnit<QuestionSelectModalProps>({
+registerUnit<Props>({
   id: 'QuestionSelectModal',
   title: 'QuestionSelectModal',
-  description: 'エントリに問いを紐付けるモーダル（既存から選ぶ / 新規で書く）。',
+  description: '問いを結んで漬け込むモーダル（SP と同じ選び手。複数結べる・その場で書ける）。',
   kind: 'component',
-  render: (props) => withVerifyProviders(<QuestionSelectModal {...props} />),
+  render: (props) =>
+    withVerifyProviders(
+      <QuestionSelectModal
+        open
+        saving={props.saving}
+        activeQuestions={props.activeQuestions}
+        linkedQuestionIds={new Set(props.linkedQuestionIds)}
+        onToggle={noop}
+        onCreate={() => Promise.resolve('q-new')}
+        onProceed={noop}
+        onClose={noop}
+      />,
+    ),
   fixtures: [
     {
-      id: 'pick',
-      description: '既存の問いから選ぶ（pick モード・select 表示）',
-      props: {
-        open: true,
-        saving: false,
-        activeQuestions: SAMPLE_QUESTIONS,
-        linkedQuestionIds: new Set<string>(),
-        onConfirm: noop,
-        onClose: noop,
-      },
+      id: 'none-linked',
+      description: '問いはあるがどれも結んでいない（漬け込むは押せない）',
+      props: { saving: false, activeQuestions: SAMPLE_QUESTIONS, linkedQuestionIds: [] },
+    },
+    {
+      id: 'one-linked',
+      description: '1 つ結んでいる（漬け込める）',
+      props: { saving: false, activeQuestions: SAMPLE_QUESTIONS, linkedQuestionIds: ['q1'] },
     },
     {
       id: 'create-empty',
-      description: '選べる問いが無く新規作成へフォールバック（create モード・input 表示）',
-      props: {
-        open: true,
-        saving: false,
-        activeQuestions: [],
-        linkedQuestionIds: new Set<string>(),
-        onConfirm: noop,
-        onClose: noop,
-      },
+      description: '選べる問いが無く、書く欄で始まる',
+      props: { saving: false, activeQuestions: [], linkedQuestionIds: [] },
     },
     {
       id: 'saving',
-      description: '漬け込み中（saving=true で submit が無効）',
-      props: {
-        open: true,
-        saving: true,
-        activeQuestions: SAMPLE_QUESTIONS,
-        linkedQuestionIds: new Set<string>(),
-        onConfirm: noop,
-        onClose: noop,
-      },
-    },
-    {
-      id: 'switch-and-type',
-      description: 'pick から create へ切替えて入力 → canConfirm が立つ',
-      props: {
-        open: true,
-        saving: false,
-        activeQuestions: SAMPLE_QUESTIONS,
-        linkedQuestionIds: new Set<string>(),
-        onConfirm: noop,
-        onClose: noop,
-      },
-      act: async (ctx) => {
-        await ctx.click('input[value="create"]');
-        await ctx.wait(16);
-        await ctx.type('input[type="text"]', '今日の小さな発見');
-        await ctx.wait(16);
-      },
+      description: '漬け込み中（結んでいても submit は無効）',
+      props: { saving: true, activeQuestions: SAMPLE_QUESTIONS, linkedQuestionIds: ['q1'] },
     },
     {
       id: 'null-and-long-text',
       probe: true,
-      description:
-        'Probe: currentText=null の問いと約2000字の問いが混在しても option 描画が崩れない',
+      description: 'Probe: currentText=null の問いと約2000字の問いが混在しても行が崩れない',
       props: {
-        open: true,
         saving: false,
         activeQuestions: [
           { id: 'q-null', currentText: null },
           { id: 'q-long', currentText: 'あ'.repeat(2000) },
         ],
-        linkedQuestionIds: new Set<string>(),
-        onConfirm: noop,
-        onClose: noop,
+        linkedQuestionIds: [],
       },
     },
   ],
   invariants: [
     {
-      id: 'select-shown-matches-mode',
-      description: 'select の表示が「pick モード かつ availableCount>0」と一致する',
+      id: 'picker-inside',
+      description: '中身は共有の選び手（QuestionPicker）',
+      check: ({ root }) =>
+        Boolean(root.querySelector('[data-verify-unit="QuestionPicker"]')) ||
+        'QuestionPicker が見つからない',
+    },
+    {
+      id: 'rows-match-questions',
+      description: '書く欄でなければ、行の数が問いの数と一致する',
       check: ({ root, contract }) => {
-        const hasSelect = Boolean(root.querySelector('select'));
-        const shouldShowSelect = contract.mode === 'pick' && Number(contract.availableCount) > 0;
+        if (contract.composing === 'true') return true;
+        const rows = root.querySelectorAll('li button[aria-pressed]').length;
         return (
-          hasSelect === shouldShowSelect ||
-          `select 表示=${hasSelect} だが mode=${contract.mode} availableCount=${contract.availableCount} → 期待=${shouldShowSelect}`
+          rows === Number(contract.questionCount) ||
+          `行 ${rows} 件だが問いは ${contract.questionCount} 件`
+        );
+      },
+    },
+    {
+      id: 'pressed-matches-linked',
+      description: '印の付いた行の数が結んでいる数と一致する',
+      check: ({ root, contract }) => {
+        if (contract.composing === 'true') return true;
+        const pressed = root.querySelectorAll('li button[aria-pressed="true"]').length;
+        return (
+          pressed === Number(contract.linkedCount) ||
+          `印 ${pressed} 件だが結んでいるのは ${contract.linkedCount} 件`
         );
       },
     },
     {
       id: 'submit-disabled-matches-contract',
-      description: 'submit ボタンの disabled が (saving || !canConfirm) と一致する',
+      description: 'submit ボタンの disabled が (saving || !canProceed) と一致する',
       check: ({ root, contract }) => {
         const btn = root.querySelector<HTMLButtonElement>('button[type="submit"]');
         if (!btn) return 'submit ボタンが見つからない';
-        const expectedDisabled = contract.saving === 'true' || contract.canConfirm === 'false';
+        const expectedDisabled = contract.saving === 'true' || contract.canProceed === 'false';
         return (
           btn.disabled === expectedDisabled ||
-          `submit.disabled=${btn.disabled} だが契約上の期待=${expectedDisabled} (saving=${contract.saving}, canConfirm=${contract.canConfirm})`
+          `submit.disabled=${btn.disabled} だが契約上の期待=${expectedDisabled} (saving=${contract.saving}, canProceed=${contract.canProceed})`
         );
       },
     },
     {
-      id: 'pick-cannot-confirm-without-selection',
-      description: 'pick モード初期は未選択なので canConfirm=false',
-      onlyFixtures: ['pick'],
-      check: ({ contract }) =>
-        contract.canConfirm === 'false' ||
-        `pick 初期で canConfirm=${contract.canConfirm}（false を期待）`,
-    },
-    {
-      id: 'type-enables-confirm-in-create-mode',
-      description: 'create へ切替えて入力後は mode=create かつ canConfirm=true',
-      onlyFixtures: ['switch-and-type'],
-      check: ({ contract }) => {
-        if (contract.mode !== 'create') return `切替後 mode=${contract.mode}（create を期待）`;
-        return (
-          contract.canConfirm === 'true' ||
-          `入力後 canConfirm=${contract.canConfirm}（true を期待）`
-        );
-      },
+      id: 'compose-when-no-questions',
+      description: '問いが無ければ書く欄で始まる',
+      onlyFixtures: ['create-empty'],
+      check: ({ root, contract }) =>
+        (contract.composing === 'true' && Boolean(root.querySelector('input[type="text"]'))) ||
+        `composing=${contract.composing} で書く欄が無い`,
     },
   ],
 });

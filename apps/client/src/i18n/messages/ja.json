@@ -157,6 +157,21 @@
       "unlink_aria": "「{text}」の紐づけを外す"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "問いを選ぶ",
+      "empty": "立てている問いがありません。ここで1つ書きましょう。",
+      "new": "+ 新しく問いを書く",
+      "new_placeholder": "問いを書く（例: 今日の小さな発見は？）",
+      "create": "この問いにする",
+      "creating": "作成中…",
+      "create_failed": "問いを作れませんでした。もう一度お試しください。",
+      "back_to_list": "← 既存の問いから選ぶ",
+      "search_placeholder": "問いを探す",
+      "untitled": "無題の問い",
+      "close": "閉じる"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "エラーが発生しました",
@@ -454,10 +469,6 @@
       "aria_label": "問い選択ダイアログ",
       "heading": "このエントリに問いを紐付ける",
       "body": "漬け込んで発酵させるには、エントリに問いを 1 つ紐付ける必要があります。既存の問いを選ぶか、新しい問いをその場で書いてください。",
-      "mode_pick": "既存の問いから選ぶ",
-      "mode_create": "新しく書く",
-      "pick_placeholder": "問いを選択...",
-      "create_placeholder": "問いを書く (例: 今日の小さな発見は？)",
       "cancel": "キャンセル",
       "confirm": "紐付けて漬け込む",
       "saving": "漬け込み中..."
@@ -714,14 +725,6 @@
       "question": "問い",
       "question_selected": "問い: {label}",
       "question_untitled": "無題の問い",
-      "question_sheet_title": "問いを選ぶ",
-      "question_empty": "立てている問いがありません。ここで1つ書きましょう。",
-      "question_new": "+ 新しく問いを書く",
-      "question_new_placeholder": "問いを書く（例: 今日の小さな発見は？）",
-      "question_create": "この問いにする",
-      "question_creating": "作成中…",
-      "question_create_failed": "問いを作れませんでした。もう一度お試しください。",
-      "question_back_to_list": "← 既存の問いから選ぶ",
       "close": "閉じる",
       "pickle": "瓶に漬ける",
       "pickling": "納めています…",
@@ -731,7 +734,6 @@
       "ferment_sub": "時間をおくと、AI からの手紙が届きます",
       "delete": "削除",
       "question_unlink": "「{label}」を外す",
-      "question_search_placeholder": "問いを探す",
       "settings_title": "表示の設定",
       "settings_letter_spacing": "字間",
       "settings_size_small": "小",
