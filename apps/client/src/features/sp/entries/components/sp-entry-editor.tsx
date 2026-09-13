@@ -29,7 +29,13 @@ import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
-import { placeInSlot, useSpBackHandler, useSpChrome, useSpStatus } from '@/lib/sp-chrome-context';
+import {
+  placeInSlot,
+  useSpBackHandler,
+  useSpChrome,
+  useSpHeading,
+  useSpStatus,
+} from '@/lib/sp-chrome-context';
 import { SpConfirmSheet } from './sp-confirm-sheet';
 import { SpEditorSettingsSheet } from './sp-editor-settings-sheet';
 import { SpFermentationDrawer } from './sp-fermentation-drawer';
@@ -123,6 +129,27 @@ export function SpEntryEditor({
   // 本文の見た目（書体・文字サイズ・行間・字間）。上段の右端の歯車から開く。
   const [display, updateDisplay] = useEditorDisplay();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /**
+   * 題が上段の下に隠れているか。隠れている間だけ、上段の中央に題を出す（Notion のモバイル:
+   * 本文をスクロールすると見出しが上段に上がり、題が全部見えると消える）。
+   * 見張るのは殻の本文（`main`）の中での見え方。殻が無い場所（孤立検証）では窓に対して。
+   */
+  const titleRef = useRef<HTMLInputElement>(null);
+  const [titleHidden, setTitleHidden] = useState(false);
+  useEffect(() => {
+    const element = titleRef.current;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1];
+        if (entry) setTitleHidden(entry.intersectionRatio < 1);
+      },
+      { root: element.closest('main'), threshold: [1] },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useSpHeading(titleHidden && title.trim() ? title.trim() : null);
   const bodyStyle = {
     fontFamily: SP_EDITOR_TYPOGRAPHY.fontFamily[display.fontFamily],
     fontSize: SP_EDITOR_TYPOGRAPHY.fontSize[display.fontSize],
@@ -407,6 +434,7 @@ export function SpEntryEditor({
       ) : null}
 
       <input
+        ref={titleRef}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder={t('title_placeholder')}

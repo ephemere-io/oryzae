@@ -32,6 +32,12 @@ interface SpChromeValue {
   status: SpChromeStatus | null;
   setStatus: (status: SpChromeStatus | null) => void;
   /**
+   * 上段の中央に出す見出し。本文側のタイトルが上段の下に隠れている間だけ、画面が載せる
+   * （Notion のモバイル: スクロールでタイトルが上段に上がり、戻れば消える）。
+   */
+  heading: string | null;
+  setHeading: (heading: string | null) => void;
+  /**
    * 下端の操作の列（パレット）の席。画面はここへ `createPortal` で差し込む。
    * 席が無ければ（Provider の外・孤立検証）画面が自分の中に描く。
    */
@@ -55,6 +61,8 @@ const SpChromeContext = createContext<SpChromeValue>({
   setBack: () => {},
   status: null,
   setStatus: () => {},
+  heading: null,
+  setHeading: () => {},
   paletteSlot: null,
   setPaletteSlot: () => {},
   actionSlot: null,
@@ -72,6 +80,7 @@ const SpChromeContext = createContext<SpChromeValue>({
 export function SpChromeProvider({ children }: { children: React.ReactNode }) {
   const [back, setBackState] = useState<(() => void) | null>(null);
   const [status, setStatus] = useState<SpChromeStatus | null>(null);
+  const [heading, setHeading] = useState<string | null>(null);
   const [paletteSlot, setPaletteSlot] = useState<HTMLElement | null>(null);
   const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const viewport = useVisualViewport();
@@ -88,6 +97,8 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
       setBack,
       status,
       setStatus,
+      heading,
+      setHeading,
       paletteSlot,
       setPaletteSlot,
       actionSlot,
@@ -95,7 +106,7 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
       viewport,
       keyboardOpen: viewport?.keyboardOpen ?? false,
     }),
-    [back, setBack, status, paletteSlot, actionSlot, viewport],
+    [back, setBack, status, heading, paletteSlot, actionSlot, viewport],
   );
   return <SpChromeContext.Provider value={value}>{children}</SpChromeContext.Provider>;
 }
@@ -122,6 +133,15 @@ export function useSpBackHandler(handler: (() => void) | null): void {
     setBack(handler);
     return () => setBack(null);
   }, [handler, setBack]);
+}
+
+/** 本文側のタイトルが隠れている間だけ、上段の中央に見出しを出す。`null` なら出さない。 */
+export function useSpHeading(heading: string | null): void {
+  const { setHeading } = useSpChrome();
+  useEffect(() => {
+    setHeading(heading);
+    return () => setHeading(null);
+  }, [heading, setHeading]);
 }
 
 /** 画面が出ている間、上段の中央に状態を出す。空文字なら何も出さない。 */

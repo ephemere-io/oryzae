@@ -13,6 +13,9 @@ const DRAGGING_Z = 1000;
 /** これ以上動いたら「動かした」。それ未満なら「選んだ」。 */
 const TAP_SLOP = 6;
 
+/** 2 回目のタップがこの間に来たらダブルタップ（ms）。 */
+const DOUBLE_TAP_MS = 320;
+
 /** 角のつまみの大きさ（画面上の px）。指で掴める最小限。 */
 const HANDLE_SIZE = 28;
 
@@ -116,6 +119,8 @@ export interface SpBoardSurfaceProps {
   /** 選んでいるカード。`null` なら何も選んでいない。 */
   selectedId?: string | null;
   onSelect?: (cardId: string | null) => void;
+  /** 同じカードを続けて 2 回押したとき（ダブルタップ）。スニペットなら編集を開く。 */
+  onOpen?: (cardId: string) => void;
   /** 角のつまみで回転と大きさが決まったとき。 */
   onTransform?: (cardId: string, next: { rotation: number; width: number; height: number }) => void;
 }
@@ -144,6 +149,7 @@ export function SpBoardSurface({
   onCommit,
   selectedId = null,
   onSelect,
+  onOpen,
   onTransform,
 }: SpBoardSurfaceProps) {
   const t = useTranslations('sp.board');
@@ -190,17 +196,32 @@ export function SpBoardSurface({
     [onMove, viewport.scale],
   );
 
+  /** 直前のタップ。同じカードを DOUBLE_TAP_MS 以内にもう一度押したら「開く」。 */
+  const lastTapRef = useRef<{ cardId: string; at: number } | null>(null);
   const endDrag = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
       dragRef.current = null;
       setDraggingId(null);
-      // 動かしていなければ「選んだ」。動かしたなら位置を保存する。
-      if (drag.moved < TAP_SLOP) onSelect?.(drag.cardId);
-      else onCommit();
+      // 動かしたなら位置を保存する。
+      if (drag.moved >= TAP_SLOP) {
+        lastTapRef.current = null;
+        onCommit();
+        return;
+      }
+      // 動かしていなければ「選んだ」。同じカードを続けて押したら「開く」（PC のダブルクリック）。
+      const now = performance.now();
+      const last = lastTapRef.current;
+      if (last && last.cardId === drag.cardId && now - last.at < DOUBLE_TAP_MS) {
+        lastTapRef.current = null;
+        onOpen?.(drag.cardId);
+        return;
+      }
+      lastTapRef.current = { cardId: drag.cardId, at: now };
+      onSelect?.(drag.cardId);
     },
-    [onCommit, onSelect],
+    [onCommit, onSelect, onOpen],
   );
 
   /**
