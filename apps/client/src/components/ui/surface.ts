@@ -118,6 +118,26 @@ export const ELEVATED_CHIP_STYLE = {
   color: 'var(--fg)',
 } as const;
 
+/**
+ * 入力欄（`Input`）と選択（`Select`）の共通の面。**同じ画面に並ぶ 2 つは同じ高さ・角丸・枠・地・
+ * フォーカスの輪**（shadcn の Input / Select と同じ作法）。
+ *
+ * `md` は指の高さ 44px と 16px の字（16px 未満の欄に触れると iOS が画面ごと拡大する）。
+ * `sm` は PC の詰めた面（28px・13px）。
+ */
+export type FieldSize = 'sm' | 'md';
+
+export const FIELD_CLASS: Record<FieldSize, string> = {
+  sm: 'h-7 rounded-md px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
+  md: 'h-11 rounded-xl px-3.5 text-[16px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
+};
+
+export const FIELD_STYLE = {
+  background: 'var(--surface-sunken)',
+  border: '1px solid var(--surface-sunken-border)',
+  color: 'var(--fg)',
+} as const;
+
 /** 面に載るアイコンの寸法。className ではなく width/height 属性に渡す。 */
 export const ICON_SIZE = 18;
 
