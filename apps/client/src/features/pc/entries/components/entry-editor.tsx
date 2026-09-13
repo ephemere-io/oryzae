@@ -338,6 +338,16 @@ export function EntryEditor({
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAutosavingRef = useRef(false);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set(initialLinkedIds));
+  // その場で立てた問い。activeQuestions（ページ取得）には即座に現れないので、選び手の行と
+  // 面の文言のために手元でも覚えておく（SP と同じ）。
+  const [createdQuestions, setCreatedQuestions] = useState<QuestionOption[]>([]);
+  const pickableQuestions = useMemo(
+    () => [
+      ...activeQuestions,
+      ...createdQuestions.filter((created) => !activeQuestions.some((q) => q.id === created.id)),
+    ],
+    [activeQuestions, createdQuestions],
+  );
   // Issue #319: autosave で初回エントリが作られた際に、ローカルで紐づけ済みの
   // questionId を DB に永続化する flush ヘルパー。
   const { flushPending: flushPendingLinks } = useLinkQuestionSync({
@@ -356,7 +366,7 @@ export function EntryEditor({
   const linkedQuestionList: SidebarQuestion[] = Array.from(linkedIds).map((id) => ({
     id,
     text:
-      activeQuestions.find((q) => q.id === id)?.currentText ??
+      pickableQuestions.find((q) => q.id === id)?.currentText ??
       t('fermentation_sidebar.question_unnamed'),
   }));
   const [pickedFermentQuestionId, setPickedFermentQuestionId] = useState<string | null>(null);
@@ -763,41 +773,15 @@ export function EntryEditor({
     handleSaveWithTitle(title, { fermentationEnabled: true });
   }, [handleSaveWithTitle, title]);
 
-  // タイトルあり/なし × 問いなしケース: 問いを選択 (or 新規作成) してから漬け込む
-  const handleQuestionSelectAndPickle = useCallback(
-    async (args: { existingId: string | null; newQuestionText: string | null }) => {
-      let questionId = args.existingId;
-      if (!questionId && args.newQuestionText) {
-        questionId = await createQuestion(args.newQuestionText);
-      }
-      if (!questionId) return;
-
-      // ローカル state に追加 (新規エントリの場合は handleSaveWithTitle 内で
-      // server side のリンクが行われる)
-      const nextLinked = new Set(linkedIds);
-      nextLinked.add(questionId);
-      setLinkedIds(nextLinked);
-
-      // 既存エントリの場合は即座にサーバ側でリンクする
-      const targetId = currentEntryId ?? entryId;
-      if (targetId && onLinkQuestion) {
-        await onLinkQuestion(targetId, questionId);
-      }
-
-      setQuestionSelectOpen(false);
-      // 漬け込みを実行 (タイトル未設定なら本文先頭行が title として後から解釈される)
-      handleSaveWithTitle(title, { fermentationEnabled: true });
-    },
-    [
-      createQuestion,
-      linkedIds,
-      currentEntryId,
-      entryId,
-      onLinkQuestion,
-      handleSaveWithTitle,
-      title,
-    ],
-  );
+  // タイトルあり/なし × 問いなしケース: 問いを結んでから漬け込む。
+  // 結ぶ／外す／立てるはモーダルの中で即時に済ませる（handleLink / handleUnlink、下）。
+  // ここは「漬ける」を押したときだけ。結んだ問いが無ければ何もしない（ボタンも活性でない）。
+  const handleQuestionSelectAndPickle = useCallback(() => {
+    if (linkedIds.size === 0) return;
+    setQuestionSelectOpen(false);
+    // 漬け込みを実行 (タイトル未設定なら本文先頭行が title として後から解釈される)
+    handleSaveWithTitle(title, { fermentationEnabled: true });
+  }, [linkedIds, handleSaveWithTitle, title]);
 
   /**
    * タイトルは常時入力できる。以前は「押すと入力に変わるボタン」だったが、
@@ -1006,6 +990,29 @@ export function EntryEditor({
       }
     },
     [currentEntryId, entryId, onUnlinkQuestion],
+  );
+
+  // 問い選択モーダル（共有の選び手）から: 行を押すたびに結ぶ／外す。SP と同じ。
+  const handleQuestionToggle = useCallback(
+    (questionId: string) => {
+      if (linkedIds.has(questionId)) {
+        void handleUnlink(questionId);
+      } else {
+        void handleLink(questionId);
+      }
+    },
+    [linkedIds, handleLink, handleUnlink],
+  );
+  // その場で問いを立てて、すぐ結ぶ。
+  const handleQuestionCreate = useCallback(
+    async (text: string): Promise<string | null> => {
+      const id = await createQuestion(text);
+      if (!id) return null;
+      setCreatedQuestions((prev) => [...prev, { id, currentText: text }]);
+      await handleLink(id);
+      return id;
+    },
+    [createQuestion, handleLink],
   );
 
   /**
@@ -1495,7 +1502,7 @@ export function EntryEditor({
             チップの中心が瓶アイコンの中心と同じ線に乗るようにする。 */}
           <div className="flex min-w-0 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
             <QuestionChip
-              activeQuestions={activeQuestions}
+              activeQuestions={pickableQuestions}
               linkedQuestionIds={linkedIds}
               onLink={handleLink}
               onUnlink={handleUnlink}
@@ -1890,9 +1897,11 @@ export function EntryEditor({
       <QuestionSelectModal
         open={questionSelectOpen}
         saving={saving}
-        activeQuestions={activeQuestions}
+        activeQuestions={pickableQuestions}
         linkedQuestionIds={linkedIds}
-        onConfirm={handleQuestionSelectAndPickle}
+        onToggle={handleQuestionToggle}
+        onCreate={handleQuestionCreate}
+        onProceed={handleQuestionSelectAndPickle}
         onClose={() => setQuestionSelectOpen(false)}
       />
 

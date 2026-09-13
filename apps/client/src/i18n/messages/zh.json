@@ -157,6 +157,21 @@
       "unlink_aria": "取消关联“{text}”"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "选择提问",
+      "empty": "还没有正在思考的问题。在这里写一个吧。",
+      "new": "+ 写一个新问题",
+      "new_placeholder": "写下问题（例如：今天有什么小发现？）",
+      "create": "就用这个问题",
+      "creating": "创建中…",
+      "create_failed": "未能创建问题，请再试一次。",
+      "back_to_list": "← 从已有问题中选择",
+      "search_placeholder": "查找问题",
+      "untitled": "无标题提问",
+      "close": "关闭"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "发生错误",
@@ -454,10 +469,6 @@
       "aria_label": "问题选择对话框",
       "heading": "为此条目关联一个问题",
       "body": "要入瓮并发酵，需要给条目关联一个问题。请从已有问题中选择，或在此输入新问题。",
-      "mode_pick": "选已有",
-      "mode_create": "新建",
-      "pick_placeholder": "请选择问题...",
-      "create_placeholder": "写一个问题（例：今天的小发现是？）",
       "cancel": "取消",
       "confirm": "关联并入瓮",
       "saving": "入瓮中..."
@@ -714,14 +725,6 @@
       "question": "提问",
       "question_selected": "提问：{label}",
       "question_untitled": "无标题提问",
-      "question_sheet_title": "选择提问",
-      "question_empty": "还没有正在思考的问题。在这里写一个吧。",
-      "question_new": "+ 写一个新问题",
-      "question_new_placeholder": "写下问题（例如：今天有什么小发现？）",
-      "question_create": "就用这个问题",
-      "question_creating": "创建中…",
-      "question_create_failed": "未能创建问题，请再试一次。",
-      "question_back_to_list": "← 从已有问题中选择",
       "close": "关闭",
       "pickle": "放入瓶中",
       "pickling": "封入中…",
@@ -731,7 +734,6 @@
       "ferment_sub": "静待片刻，AI 的来信将会送达",
       "delete": "删除",
       "question_unlink": "取消关联“{label}”",
-      "question_search_placeholder": "查找问题",
       "settings_title": "显示设置",
       "settings_letter_spacing": "字距",
       "settings_size_small": "小",

@@ -18,7 +18,8 @@ export interface QuestionPickerProps {
   /** 書く欄を出しているか（問いが 1 つも無ければ呼び出し側が true にする）。 */
   composing: boolean;
   onComposingChange: (composing: boolean) => void;
-  onClose: () => void;
+  /** 右上の「閉じる」。モーダルの中（PC）では足元のキャンセルが閉じるので省く。 */
+  onClose?: () => void;
 }
 
 /** これ以上あれば探す欄を出す。 */
@@ -42,7 +43,7 @@ export function QuestionPicker({
   onComposingChange,
   onClose,
 }: QuestionPickerProps) {
-  const t = useTranslations('sp.editor');
+  const t = useTranslations('entry_questions.picker');
   const [search, setSearch] = useState('');
   const [newText, setNewText] = useState('');
   const [creating, setCreating] = useState(false);
@@ -76,7 +77,7 @@ export function QuestionPicker({
         questionCount: questions.length,
         selectedCount: selectedIds.length,
       })}
-      aria-label={t('question_sheet_title')}
+      aria-label={t('title')}
       className="flex flex-col overflow-hidden rounded-2xl border"
       style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
     >
@@ -85,30 +86,32 @@ export function QuestionPicker({
           className="text-[11px] uppercase tracking-[0.14em]"
           style={{ color: 'var(--accent)' }}
         >
-          {t('question_sheet_title')}
+          {t('title')}
         </span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t('close')}
-          className="min-h-[36px] shrink-0 rounded-full border px-3.5 text-[13px]"
-          style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
-        >
-          {t('close')}
-        </button>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t('close')}
+            className="min-h-[36px] shrink-0 rounded-full border px-3.5 text-[13px]"
+            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
+          >
+            {t('close')}
+          </button>
+        ) : null}
       </div>
 
       {composing ? (
         <div className="flex flex-col gap-2 px-4 pb-4">
           {questions.length === 0 ? (
-            <p className="pb-1 text-[13px] leading-relaxed opacity-60">{t('question_empty')}</p>
+            <p className="pb-1 text-[13px] leading-relaxed opacity-60">{t('empty')}</p>
           ) : null}
           <div className="flex items-center gap-2">
             <Input
               value={newText}
               onChange={setNewText}
-              placeholder={t('question_new_placeholder')}
-              ariaLabel={t('question_new_placeholder')}
+              placeholder={t('new_placeholder')}
+              ariaLabel={t('new_placeholder')}
               size="md"
               autoFocus
               className="min-w-0 flex-1"
@@ -121,12 +124,12 @@ export function QuestionPicker({
               className="h-11 shrink-0 rounded-xl px-4 text-[14px] font-medium disabled:opacity-40"
               style={{ background: 'var(--accent)', color: 'var(--bg)' }}
             >
-              {creating ? t('question_creating') : t('question_create')}
+              {creating ? t('creating') : t('create')}
             </button>
           </div>
           {createFailed ? (
             <p className="text-[12px]" style={{ color: 'var(--ob-jar-warm)' }}>
-              {t('question_create_failed')}
+              {t('create_failed')}
             </p>
           ) : null}
           {questions.length > 0 ? (
@@ -135,7 +138,7 @@ export function QuestionPicker({
               onClick={() => onComposingChange(false)}
               className="self-start py-1 text-[13px] opacity-60"
             >
-              {t('question_back_to_list')}
+              {t('back_to_list')}
             </button>
           ) : null}
         </div>
@@ -147,8 +150,8 @@ export function QuestionPicker({
                 type="search"
                 value={search}
                 onChange={setSearch}
-                placeholder={t('question_search_placeholder')}
-                ariaLabel={t('question_search_placeholder')}
+                placeholder={t('search_placeholder')}
+                ariaLabel={t('search_placeholder')}
                 size="md"
               />
             </div>
@@ -170,7 +173,7 @@ export function QuestionPicker({
                     }}
                   >
                     <span className="min-w-0 truncate">
-                      {question.currentText ?? t('question_untitled')}
+                      {question.currentText ?? t('untitled')}
                     </span>
                     <span
                       aria-hidden="true"
@@ -211,7 +214,7 @@ export function QuestionPicker({
             className="min-h-[44px] w-full px-4 py-2 text-left text-[14px] font-medium"
             style={{ color: 'var(--accent)' }}
           >
-            {t('question_new')}
+            {t('new')}
           </button>
         </>
       )}

@@ -72,6 +72,7 @@ export function SpEditorSettingsSheet({
       >
         <Row label={tPc('font_family')}>
           <Segmented
+            size="md"
             ariaLabel={tPc('font_family')}
             value={display.fontFamily}
             onChange={(value) => onChange({ fontFamily: toFontFamily(value) })}
@@ -83,6 +84,7 @@ export function SpEditorSettingsSheet({
         </Row>
         <Row label={tPc('font_size')}>
           <Segmented
+            size="md"
             ariaLabel={tPc('font_size')}
             value={display.fontSize}
             onChange={(value) => onChange({ fontSize: toScale(value) })}
@@ -95,6 +97,7 @@ export function SpEditorSettingsSheet({
         </Row>
         <Row label={tPc('line_height')}>
           <Segmented
+            size="md"
             ariaLabel={tPc('line_height')}
             value={display.lineHeight}
             onChange={(value) => onChange({ lineHeight: toSpacing(value) })}
@@ -103,6 +106,7 @@ export function SpEditorSettingsSheet({
         </Row>
         <Row label={t('settings_letter_spacing')}>
           <Segmented
+            size="md"
             ariaLabel={t('settings_letter_spacing')}
             value={display.letterSpacing}
             onChange={(value) => onChange({ letterSpacing: toSpacing(value) })}

@@ -265,9 +265,11 @@ describe('SpEntryEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
 
     // 行き止まりではなく、その場で書く入力欄が出る。
-    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    const input = await screen.findByPlaceholderText(
+      jaMessages.entry_questions.picker.new_placeholder,
+    );
     fireEvent.change(input, { target: { value: '今日は何に驚いたか' } });
-    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.entry_questions.picker.create }));
 
     // 作った問いが即チップに出る（作りたては /questions にも紐付けにも載らないため、
     // ローカルに覚えていないと「+ 問いを結ぶ」に戻って見える）。
@@ -299,13 +301,17 @@ describe('SpEntryEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
-    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    const input = await screen.findByPlaceholderText(
+      jaMessages.entry_questions.picker.new_placeholder,
+    );
     fireEvent.change(input, { target: { value: '通らない問い' } });
-    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.entry_questions.picker.create }));
 
-    expect(await screen.findByText(jaMessages.sp.editor.question_create_failed)).toBeTruthy();
+    expect(await screen.findByText(jaMessages.entry_questions.picker.create_failed)).toBeTruthy();
     // 書いた内容を失わないよう入力欄は残す。
-    expect(screen.getByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText(jaMessages.entry_questions.picker.new_placeholder),
+    ).toBeTruthy();
   });
 
   it('問いの取得が遅れてシートを先に開いても、届いたら一覧に切り替わる（Issue #314）', async () => {
@@ -327,12 +333,14 @@ describe('SpEntryEditor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
     expect(
-      await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder),
+      await screen.findByPlaceholderText(jaMessages.entry_questions.picker.new_placeholder),
     ).toBeTruthy();
 
     resolveQuestions?.(jsonResponse([{ id: 'q1', currentText: '後から届いた問い' }]));
 
     expect(await screen.findByText('後から届いた問い')).toBeTruthy();
-    expect(screen.queryByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeNull();
+    expect(
+      screen.queryByPlaceholderText(jaMessages.entry_questions.picker.new_placeholder),
+    ).toBeNull();
   });
 });
