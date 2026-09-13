@@ -13,6 +13,7 @@ import { type LabelKind, type LabelPoint, StudyLabels } from './study-labels';
 
 interface Props {
   layout: StudyLayout;
+  counting?: boolean;
   positions: Partial<Record<LabelKind, LabelPoint | null>>;
   hovered: LabelKind | null;
   questionCount: number;
@@ -51,6 +52,11 @@ registerUnit<Props>({
   render: (props) => withVerifyProviders(<StudyLabels {...props} />),
   fixtures: [
     { id: 'sp-default', description: 'SP・問い 4 つ', props: BASE },
+    {
+      id: 'sp-counting',
+      description: 'SP・数がまだ本当の数でない（取得中）— 0 ではなく骨組み',
+      props: { ...BASE, counting: true },
+    },
     {
       id: 'sp-many',
       description: 'SP・数が大きい（ピルが広がっても画面に収まる）',

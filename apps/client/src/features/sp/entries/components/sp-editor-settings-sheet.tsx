@@ -17,6 +17,15 @@ interface SpEditorSettingsSheetProps {
   display: EditorDisplay;
   onChange: (patch: Partial<EditorDisplay>) => void;
   onClose: () => void;
+  /**
+   * このエントリーを削除する（確認は呼び出し側）。無ければ行を出さない（まだ保存されていない新規）。
+   *
+   * 削除をここに置く理由: パレットは書いている最中に何度も押す手（写真・漬け込む）の席で、
+   * 同じ列に取り返しのつかない操作を並べると指の癖で押してしまう。Notion のモバイルは右上の
+   * 「…」の中、iOS の設定画面はシートの末尾に赤字で離して置く。この画面の右上は「この画面の設定」
+   * なので、その末尾に離して置く（オーナーの指摘: パレットから消せるのはどうか）。
+   */
+  onDelete?: () => void;
 }
 
 function toFontFamily(value: string): EditorFontFamily {
@@ -45,6 +54,7 @@ export function SpEditorSettingsSheet({
   display,
   onChange,
   onClose,
+  onDelete,
 }: SpEditorSettingsSheetProps) {
   const t = useTranslations('sp.editor');
   const tPc = useTranslations('editor.settings');
@@ -56,7 +66,8 @@ export function SpEditorSettingsSheet({
       ariaLabel={t('settings_title')}
       label={t('settings_title')}
       closeLabel={t('close')}
-      detents={[0.5, 0.92]}
+      // 中身の高さで止まる（4 段の設定と削除で 6 割ほど）。それ以上に開かず、下へ引けば閉じる。
+      detents={['content']}
       initialDetent={0}
     >
       <div
@@ -66,6 +77,7 @@ export function SpEditorSettingsSheet({
           fontSize: display.fontSize,
           lineHeight: display.lineHeight,
           letterSpacing: display.letterSpacing,
+          canDelete: onDelete !== undefined,
         })}
         className="flex flex-col gap-5 pt-2"
         style={CONTROL_FONT}
@@ -113,6 +125,26 @@ export function SpEditorSettingsSheet({
             options={spacingOptions(t)}
           />
         </Row>
+        {onDelete ? (
+          // 破壊的な操作は設定から離して末尾に（iOS の設定画面の作法）。押すと確認シートへ。
+          <div
+            className="mt-3 flex flex-col gap-1 border-t pt-4"
+            style={{ borderColor: 'var(--border-subtle)' }}
+          >
+            <button
+              type="button"
+              onClick={onDelete}
+              data-settings-delete
+              className="min-h-[44px] w-full rounded-xl text-left text-[15px]"
+              style={{ color: 'var(--ob-jar-warm)' }}
+            >
+              {t('settings_delete_entry')}
+            </button>
+            <span className="text-[12px]" style={{ color: 'var(--date-color)' }}>
+              {t('settings_delete_hint')}
+            </span>
+          </div>
+        ) : null}
       </div>
     </BottomSheet>
   );

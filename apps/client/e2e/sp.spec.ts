@@ -22,11 +22,16 @@ async function createSpEntry(
   await expect(page.getByText('保存しました')).toBeVisible({ timeout: 15_000 });
 }
 
-/** 開いているエントリを SP の削除フローで消す（テストが自分の後始末をする）。 */
+/**
+ * 開いているエントリを SP の削除フローで消す（テストが自分の後始末をする）。
+ * 削除はパレットではなく、右上の設定シートの末尾（書いている最中に押す列に破壊的な操作を置かない）。
+ * 消したら書斎（/）へ戻る。
+ */
 async function deleteOpenSpEntry(page: import('@playwright/test').Page): Promise<void> {
-  await page.getByRole('button', { name: '削除' }).click();
+  await page.getByRole('button', { name: '表示の設定' }).click();
+  await page.getByRole('button', { name: 'このエントリーを削除' }).click();
   await page.getByRole('button', { name: '削除する' }).click();
-  await page.waitForURL(/\/entries$/, { timeout: 15_000 });
+  await page.waitForURL(/\/$/, { timeout: 15_000 });
 }
 
 /** SP を強制する device-pref cookie を仕込む（middleware が UA より優先して読む）。 */

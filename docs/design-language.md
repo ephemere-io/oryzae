@@ -41,6 +41,16 @@
 
 ---
 
+### 指の端末の「押した印」
+
+指には hover が無い。代わりに**押している間の状態**を必ず作る。タップから 100ms 以内に見た目が
+変わらないと「効いたのか」が分からない（Apple HIG / Material とも 100ms が基準）。
+部品ごとに足すと漏れるので、`app/globals.css` の `@media (hover: none)` で押せるものすべて
+（`button` / `a` / `[role=button]`）に一律で付ける: 80ms で `scale(0.97)` + 減光。OS の灰色の四角
+（tap highlight）は消す。掴んで動かすものや自前の印を持つものは `data-no-press` で外す。
+iOS Safari は `touchstart` の listener が 1 つも無いと `:active` を出さないので、SP の殻が空の
+listener を張っている。
+
 ## 3. 選ぶことの伝え方 — 軸ごとに1つ
 
 同じ「選ぶ」でも、**選んで移る**のか**状態を切り替える**のかで形が違う。

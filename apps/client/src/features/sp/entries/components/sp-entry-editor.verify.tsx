@@ -178,7 +178,8 @@ registerUnit<Props>({
     {
       id: 'delete-open',
       probe: true,
-      description: 'Probe: 既存エントリで ⋯（削除）を押すと削除確認シートが開く（deleteOpen=true）',
+      description:
+        'Probe: 既存エントリで右上の設定 → 末尾の「このエントリーを削除」で削除確認シートが開く（deleteOpen=true）',
       props: {
         api: null,
         initialEntryId: 'entry-1',
@@ -186,7 +187,9 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        ctx.click('button[aria-label="削除"]');
+        await ctx.click('button[aria-label="表示の設定"]');
+        await ctx.wait(32);
+        await ctx.click('[data-settings-delete]');
         await ctx.wait(16);
       },
     },
@@ -334,14 +337,21 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'delete-trigger-iff-hasentry',
-      description: '削除トリガー（⋯ aria-label=削除）は hasEntry=true のときだけ描画される',
+      id: 'delete-not-in-palette',
+      description:
+        '削除はパレットに並ばない（書いている最中に何度も押す列に、取り返しのつかない操作を置かない）',
+      check: ({ root }) =>
+        !root.querySelector('[data-palette-action="delete"]') || 'パレットに削除がある',
+    },
+    {
+      id: 'delete-row-iff-settings-open-and-hasentry',
+      description: '削除の行は、設定シートが開いていて hasEntry=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasTrigger = Boolean(root.querySelector('button[aria-label="削除"]'));
-        const expectEntry = contract.hasEntry === 'true';
+        const hasRow = Boolean(root.querySelector('[data-settings-delete]'));
+        const expectRow = contract.settingsOpen === 'true' && contract.hasEntry === 'true';
         return (
-          hasTrigger === expectEntry ||
-          `削除トリガー present=${hasTrigger} だが contract.hasEntry="${contract.hasEntry}"`
+          hasRow === expectRow ||
+          `削除の行 present=${hasRow} だが settingsOpen=${contract.settingsOpen} hasEntry=${contract.hasEntry}`
         );
       },
     },

@@ -67,6 +67,11 @@ export function useStudyState(
 ): {
   state: StudyState;
   loading: boolean;
+  /**
+   * ピルの数が「本当の数」か。取得中で前回の絵も無いとき、失敗して前回の絵も無いときは false。
+   * false の間に 0 を出すと「無い」と読まれる（実機で「全部 0 件」）。数の代わりに骨組みを出す。
+   */
+  countsKnown: boolean;
 } {
   const unread = useUnread();
   /**
@@ -193,6 +198,7 @@ export function useStudyState(
     // 書斎は部分的な失敗で落とさない。全部そろうまで待つのではなく、
     // 骨格（瓶と手帳）が決まった時点で出す。
     loading,
+    countsKnown: (!loading && !failed) || cached !== null,
   };
 }
 
