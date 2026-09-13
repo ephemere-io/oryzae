@@ -57,6 +57,12 @@ interface SpChromeValue {
    */
   overlaySlot: HTMLElement | null;
   setOverlaySlot: (element: HTMLElement | null) => void;
+  /**
+   * 本文の下に居座る非モーダルのシート（`DockSheet`）の席。本文と下端の列の間。
+   * ここに置いたものの高さぶん本文（`main`）が縮む（流れの中に居る）。
+   */
+  dockSlot: HTMLElement | null;
+  setDockSlot: (element: HTMLElement | null) => void;
   /** 殻が追従しているビジュアルビューポート。測れるまで null。 */
   viewport: VisualViewportBox | null;
   /** ソフトキーボードが出ているか（パレットの「閉じる」の出し入れに使う）。 */
@@ -77,6 +83,8 @@ const SpChromeContext = createContext<SpChromeValue>({
   setActionSlot: () => {},
   overlaySlot: null,
   setOverlaySlot: () => {},
+  dockSlot: null,
+  setDockSlot: () => {},
   viewport: null,
   keyboardOpen: false,
 });
@@ -94,6 +102,7 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
   const [paletteSlot, setPaletteSlot] = useState<HTMLElement | null>(null);
   const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const [overlaySlot, setOverlaySlot] = useState<HTMLElement | null>(null);
+  const [dockSlot, setDockSlot] = useState<HTMLElement | null>(null);
   const viewport = useVisualViewport();
 
   // 関数を state に入れるときは updater と取り違えないよう包む。
@@ -116,10 +125,12 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
       setActionSlot,
       overlaySlot,
       setOverlaySlot,
+      dockSlot,
+      setDockSlot,
       viewport,
       keyboardOpen: viewport?.keyboardOpen ?? false,
     }),
-    [back, setBack, status, heading, paletteSlot, actionSlot, overlaySlot, viewport],
+    [back, setBack, status, heading, paletteSlot, actionSlot, overlaySlot, dockSlot, viewport],
   );
   return <SpChromeContext.Provider value={value}>{children}</SpChromeContext.Provider>;
 }

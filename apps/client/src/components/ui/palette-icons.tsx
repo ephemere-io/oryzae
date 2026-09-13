@@ -98,6 +98,16 @@ export function PlusIcon() {
   );
 }
 
+/** 発酵の結果（手紙）。エントリーのパレットでドックを出し入れする。 */
+export function LetterIcon() {
+  return (
+    <svg {...iconProps()} aria-hidden="true">
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="m3.5 7.5 8.5 6 8.5-6" />
+    </svg>
+  );
+}
+
 export function KeyboardDownIcon() {
   return (
     <svg {...iconProps()} aria-hidden="true">

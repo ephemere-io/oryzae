@@ -103,13 +103,43 @@
   --ob-ink-mute: #98918a;
 }
 
+/* 端まで引いてもブラウザの引っ張り更新（pull-to-refresh）やページの跳ね返りにしない。
+   SP のシートの空白を下に引くと Safari が再読み込みしていた。アプリの殻の中で完結させる。
+   **Chrome は body、Safari は html を見る**ので両方に付ける（body だけでは iOS で効かなかった）。 */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
-  /* 端まで引いてもブラウザの引っ張り更新（pull-to-refresh）やページの跳ね返りにしない。
-     SP のシートの空白を下に引くと Safari が再読み込みしていた。アプリの殻の中で完結させる。 */
-  overscroll-behavior: none;
+}
+
+/* 指の端末の「押した印」。
+   タップから 100ms 以内に見た目が変わらないと「効いたのか」が分からず、応答が遅く感じる
+   （Apple HIG / Material とも 100ms を基準にする）。指には hover が無いので、押している間の
+   状態を必ず作る。部品ごとに足すと漏れるので、押せるものすべてに一律で付ける。
+   OS の灰色の四角（tap highlight）は消し、自前の印（少し沈む + 地の色）に揃える。
+   `data-no-press` で外せる（掴んで動かすもの・自前の印を持つもの）。 */
+@media (hover: none) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not([data-no-press]):not(:disabled),
+  a:not([data-no-press]),
+  [role="button"]:not([data-no-press]) {
+    transition-property: transform, background-color, opacity;
+    transition-duration: 80ms;
+    transition-timing-function: ease-out;
+  }
+  button:not([data-no-press]):not(:disabled):active,
+  a:not([data-no-press]):active,
+  [role="button"]:not([data-no-press]):active {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
 }
 
 /* SP の上段に見出しが上がるときの動き（Notion のモバイルと同じ、短いフェードと数 px の上がり）。 */

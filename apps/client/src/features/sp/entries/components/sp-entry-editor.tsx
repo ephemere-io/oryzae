@@ -1,12 +1,13 @@
 'use client';
 
-import { ACCEPTED_IMAGE_MIME_TYPES } from '@oryzae/shared';
+import { ACCEPTED_IMAGE_MIME_TYPES, type EditorEffectsState } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActionPalette } from '@/components/ui/action-palette';
-import { FermentIcon, PhotoIcon, TrashIcon } from '@/components/ui/palette-icons';
+import { ActionPalette, type PaletteAction } from '@/components/ui/action-palette';
+import type { DockDetent } from '@/components/ui/dock-sheet';
+import { FermentIcon, LetterIcon, PhotoIcon } from '@/components/ui/palette-icons';
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import { GearIcon, RoundButton } from '@/components/ui/round-button';
 import { CONTROL_FONT } from '@/components/ui/surface';
@@ -18,8 +19,22 @@ import {
 } from '@/features/shared/entries/hooks/use-editor-display';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { useEntryDraft } from '@/features/shared/entries/hooks/use-entry-draft';
+import {
+  clearEntryLocalCopy,
+  readEntryLocalCopy,
+  useEntryLocalCopy,
+} from '@/features/shared/entries/hooks/use-entry-local-copy';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
 import type { AttachedPhoto, EntryDraft } from '@/features/shared/entries/types';
+import {
+  buildEffectsWithPhotos,
+  insertPhotoAt,
+  joinBodySegments,
+  removePhotoAt,
+  restoreInlinePhotos,
+  splitBodyAtPhotos,
+  trimOrphanPlaceholders,
+} from '@/features/shared/entries/utils/inline-photos';
 import { QuestionPicker } from '@/features/shared/entry-questions/components/question-picker';
 import {
   useActiveQuestions,
@@ -36,51 +51,60 @@ import {
   useSpHeading,
   useSpStatus,
 } from '@/lib/sp-chrome-context';
+import { useOnlineStatus } from '@/lib/use-online-status';
+import { SpBodyEditor, type SpBodyEditorHandle } from './sp-body-editor';
 import { SpConfirmSheet } from './sp-confirm-sheet';
 import { SpEditorSettingsSheet } from './sp-editor-settings-sheet';
-import { SpFermentationDrawer } from './sp-fermentation-drawer';
+import { SpFermentationDock } from './sp-fermentation-dock';
 import { SpPhotoImportSheet } from './sp-photo-import-sheet';
 
 interface SpEntryEditorProps {
   api: ApiClient | null;
-  /** 手紙への返事など、URL の questionId を初期紐づけする（内省ループの接続）。 */
+  /** 問い一覧から「この問いで書く」で遷移してきた場合の初期問い。 */
   initialQuestionId?: string | null;
-  /** 既存エントリを編集するとき。新規作成時は undefined。 */
+  /** 既存エントリを開く場合の id（自動保存が更新に切り替わる）。 */
   initialEntryId?: string;
-  /** 既存エントリの本文（先頭行=タイトル）。新規は空。 */
+  /** 既存エントリ本文（タイトル/本文を分けて初期化する）。 */
   initialContent?: string;
-  /** 既存エントリに添えられている写真のストレージパス。新規は空。 */
+  /** 保存された装飾と本文の中の写真（PC と同じ形式）。SP は写真の位置だけを使い、他は持ち越す。 */
+  initialEffects?: EditorEffectsState | null;
+  /** サーバーの最終更新（ISO）。端末の写しがこれより新しければ写しから始める。 */
+  initialUpdatedAt?: string;
+  /** 既存エントリに添えられた写真のストレージパス。 */
   initialMediaUrls?: string[];
-  /** 上と同じ並びの表示用 署名付き URL。 */
+  /** 表示用の署名付き URL（`initialMediaUrls` と同じ順・同じ数）。 */
   initialMediaSignedUrls?: string[];
-  /**
-   * 書きかけドラフトの退避/復元を有効にするか（既定 true）。
-   * 孤立検証（verify）では localStorage が fixture をまたいで漏れるため false にする。
-   */
+  /** ドラフト（localStorage）に退避/復元するか。verify などで無効化する。 */
   persistDraft?: boolean;
 }
 
-/** content の先頭行をタイトル、残りを本文に分ける（エディタの保存形式）。 */
+/** 先頭行をタイトル、残りを本文として分割する（保存形式と対応）。 */
 function splitTitleBody(raw: string): { title: string; body: string } {
   const idx = raw.indexOf('\n');
   if (idx === -1) return { title: '', body: raw };
   return { title: raw.slice(0, idx), body: raw.slice(idx + 1) };
 }
 
+/** 保存形式（先頭行＝タイトル）。 */
+function composeContent(title: string, body: string): string {
+  return title.trim() ? `${title.trim()}\n${body}` : body;
+}
+
 /**
- * SP 版「書く」エディタ（Issue #363）。軽量・キャプチャ特化。
- * 縦長1カラム・全画面フォーカス・任意タイトル＋本文・自動保存。データの振る舞いは
- * features/shared の hook を PC と共有する。
+ * SP「書く」画面。縦長・フォーカスで書き始められることを最優先にする。
  *
- * 仕様（インタビューで確定）: 演出/音声入力/スニペット/設定/文字数/発酵オーバーレイ/
- * 離脱ガードは持たない。下部バーに 小さなステータス・問い紐づけ・保存後の「瓶に漬ける」。
- * 瓶に漬けた後の自動遷移は持たない（インタビューで不要と確定）。
+ * 本文は**文のブロックと写真のブロックの列**（`SpBodyEditor`）。写真は本文の中の
+ * カーソル位置に入り、保存形式は PC と同じ（U+FFFC + `effects.inlineImages`）。
+ * 結んだ問いの発酵の結果は本文の下の非モーダルのドック（`SpFermentationDock`）で
+ * 「見ながら書く」。電波が無ければ端末の写しに残し、戻ったら送る。
  */
 export function SpEntryEditor({
   api,
   initialQuestionId = null,
   initialEntryId,
   initialContent = '',
+  initialEffects = null,
+  initialUpdatedAt,
   initialMediaUrls,
   initialMediaSignedUrls,
   persistDraft = true,
@@ -89,32 +113,85 @@ export function SpEntryEditor({
   const tDelete = useTranslations('entries.delete_modal');
   const tPhoto = useTranslations('photo');
   const tNav = useTranslations('sp.nav');
+  const tSidebar = useTranslations('editor.fermentation_sidebar');
   const router = useRouter();
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const { save, saving, error } = useSaveEntry(api, null);
   const activeQuestions = useActiveQuestions(api, false);
   const { load: loadDraft, save: saveDraft, clear: clearDraft } = useEntryDraft();
+  const online = useOnlineStatus();
 
   // ドラフト退避/復元は「素の新規フロー」だけで行う（既存編集・問い返信は対象外）。
   const draftEnabled = persistDraft && !initialEntryId && !initialQuestionId;
   // マウント時に一度だけ、新鮮なドラフトがあれば書きかけを復元する（+ 押し直しでの再開）。
   const [restored] = useState<EntryDraft | null>(() => (draftEnabled ? loadDraft() : null));
 
+  /**
+   * 端末の写し（オフラインの保険）。既存エントリで、サーバーの内容より新しく中身が違えば、
+   * 写しから始めて自動保存に送らせる（電波が戻る前に閉じても続きから）。
+   */
+  const [localCopy] = useState(() => {
+    if (!initialEntryId || !persistDraft) return null;
+    const copy = readEntryLocalCopy(initialEntryId);
+    if (!copy || copy.content === initialContent) return null;
+    if (initialUpdatedAt && copy.updatedAt <= Date.parse(initialUpdatedAt)) return null;
+    return copy;
+  });
+
+  /** 添えた写真（保存順 = mediaUrls）。パスと表示 URL を 1 本の配列で持つ（署名失敗で index がずれないように）。 */
+  const [photos, setPhotos] = useState<AttachedPhoto[]>(() => {
+    const paths = localCopy?.mediaUrls ?? initialMediaUrls ?? [];
+    const signedByPath = new Map(
+      (initialMediaUrls ?? []).map((path, i) => [path, initialMediaSignedUrls?.[i] ?? '']),
+    );
+    return paths.map((storagePath) => ({
+      storagePath,
+      signedUrl: signedByPath.get(storagePath) ?? '',
+    }));
+  });
+
   // 既存エントリ編集なら content を タイトル/本文 に割って初期化（autosave は entryId 有りで更新）。
-  const init = initialEntryId
-    ? splitTitleBody(initialContent)
-    : restored
-      ? { title: restored.title, body: restored.body }
-      : { title: '', body: initialContent };
+  // 本文の中の写真は effects から復元し、対応の無いプレースホルダは落とす。
+  // **写しがあっても、まずサーバーの内容で始める**: 自動保存は最初の内容を「保存済み」の基準にするので、
+  // 写しを最初から入れると差が無いと見なされて送られない。写しは下の effect で入れ替える。
+  const [initial] = useState(() => {
+    if (initialEntryId) {
+      const split = splitTitleBody(initialContent);
+      const { body, images } = restoreInlinePhotos(split.body, initialEffects, photos);
+      return { title: split.title, body, images };
+    }
+    if (restored) {
+      return {
+        title: restored.title,
+        body: restoreInlinePhotos(restored.body, null, []).body,
+        images: [],
+      };
+    }
+    return { title: '', body: initialContent, images: [] };
+  });
   const resolvedEntryId = initialEntryId ?? restored?.entryId;
-  const [title, setTitle] = useState(init.title);
-  const [body, setBody] = useState(init.body);
+  const [title, setTitle] = useState(initial.title);
+  const [body, setBody] = useState(initial.body);
+  /** 本文の中の写真（置き順）。数は本文のプレースホルダの数と同じ。 */
+  const [inlinePhotos, setInlinePhotos] = useState<AttachedPhoto[]>(initial.images);
   const [entryId, setEntryId] = useState<string | undefined>(resolvedEntryId);
   // サーバ保存済み（entryId あり）なら保存済み表示、未保存の復元ドラフトは「編集中」表示にする。
-  const [lastSavedBody, setLastSavedBody] = useState(resolvedEntryId ? init.body : '');
-  // Issue #510: タイトルだけ変えたときも「編集中」にする（本文だけ見ていると、
-  // 未保存のタイトルを抱えたまま「保存済み」と表示してしまう）。
-  const [lastSavedTitle, setLastSavedTitle] = useState(resolvedEntryId ? init.title.trim() : '');
+  const [lastSavedBody, setLastSavedBody] = useState(resolvedEntryId ? initial.body : '');
+  const [lastSavedTitle, setLastSavedTitle] = useState(resolvedEntryId ? initial.title.trim() : '');
+  // 端末の写しがサーバーより新しければ、それに入れ替える（差ができるので自動保存が送る）。
+  // biome-ignore lint/correctness/useExhaustiveDependencies: マウント時に一度だけ入れ替える（写しは開いた時点のもの）
+  useEffect(() => {
+    if (!localCopy) return;
+    const split = splitTitleBody(localCopy.content);
+    const images = localCopy.inlinePaths.map((storagePath) => ({
+      storagePath,
+      signedUrl: photos.find((photo) => photo.storagePath === storagePath)?.signedUrl ?? '',
+    }));
+    const nextBody = trimOrphanPlaceholders(split.body, images.length);
+    setTitle(split.title);
+    setBody(nextBody);
+    setInlinePhotos(images.slice(0, splitBodyAtPhotos(nextBody).length - 1));
+  }, []);
   const [pickling, setPickling] = useState(false);
   const [pickled, setPickled] = useState(false);
   /**
@@ -150,29 +227,6 @@ export function SpEntryEditor({
     return () => observer.disconnect();
   }, []);
   useSpHeading(titleHidden && title.trim() ? title.trim() : null);
-  // 本文は書いた分だけ伸ばす。textarea の中でスクロールさせると殻の本文が動かず、題も隠れない。
-  // 書体が後から届くと行の高さが変わるので、fonts.ready と幅の変化でも測り直す。
-  // 測り直す契機（本文と見た目の設定）を 1 つの鍵にまとめる。
-  const growKey = `${body.length}:${display.fontFamily}:${display.fontSize}:${display.lineHeight}:${display.letterSpacing}`;
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
-    const grow = () => {
-      el.dataset.growKey = growKey;
-      el.style.height = 'auto';
-      el.style.height = `${el.scrollHeight}px`;
-    };
-    grow();
-    let cancelled = false;
-    document.fonts?.ready.then(() => {
-      if (!cancelled) grow();
-    });
-    window.addEventListener('resize', grow);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('resize', grow);
-    };
-  }, [growKey]);
   const bodyStyle = {
     fontFamily: SP_EDITOR_TYPOGRAPHY.fontFamily[display.fontFamily],
     fontSize: SP_EDITOR_TYPOGRAPHY.fontSize[display.fontSize],
@@ -180,38 +234,47 @@ export function SpEntryEditor({
     letterSpacing: SP_EDITOR_TYPOGRAPHY.letterSpacing[display.letterSpacing],
   };
   const [deleteOpen, setDeleteOpen] = useState(false);
-  // Issue #466 の SP 版: 紐づけた問いに完了済みの発酵があれば、下からのドロワーで出す。
-  // 本文の上には重ねない（docs/entry-screen-design.md 原則1）。
-  const [fermentDrawerOpen, setFermentDrawerOpen] = useState(false);
-  const { detail: fermentationDetail } = useFermentationForQuestion(api, selectedQuestionIds[0]);
-  /**
-   * 添えた写真。パスと表示 URL を **1 本の配列**で持つ。
-   * 2 本に分けると、署名に失敗した写真がある時に index がずれ、
-   * 「n 番目を削除」で別の写真を消してしまう（サーバは穴を空文字で埋めて返す）。
-   */
-  const [photos, setPhotos] = useState<AttachedPhoto[]>(() =>
-    (initialMediaUrls ?? []).map((storagePath, i) => ({
-      storagePath,
-      signedUrl: initialMediaSignedUrls?.[i] ?? '',
-    })),
-  );
+
   const mediaUrls = useMemo(() => photos.map((p) => p.storagePath), [photos]);
   /** PC と同じ理由の鏡。await をまたぐ連続操作で古い配列を送らないため。 */
   const photosRef = useRef<AttachedPhoto[]>(photos);
   photosRef.current = photos;
-  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const inlineRef = useRef<AttachedPhoto[]>(inlinePhotos);
+  inlineRef.current = inlinePhotos;
+  const bodyTextRef = useRef(body);
+  bodyTextRef.current = body;
+  const bodyEditorRef = useRef<SpBodyEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const inlinePaths = useMemo(() => inlinePhotos.map((p) => p.storagePath), [inlinePhotos]);
+  /** 本文の中に居ない写真（PC の旧形式・添付だけ）。今までどおり本文の下に積む。 */
+  const loosePhotos = useMemo(
+    () => photos.filter((photo) => !inlinePaths.includes(photo.storagePath)),
+    [photos, inlinePaths],
+  );
+
+  /**
+   * 保存は必ず effects（本文の中の写真の位置）を添える。自動保存も明示の保存も同じ口を通る。
+   * PC の装飾（textSpans 等）は `initialEffects` から持ち越す。
+   */
+  const saveWithEffects = useCallback(
+    (
+      content: string,
+      id?: string,
+      options?: { mediaUrls?: string[]; fermentationEnabled?: boolean },
+    ) =>
+      save(content, id, {
+        ...options,
+        effects: buildEffectsWithPhotos(bodyTextRef.current, inlineRef.current, initialEffects),
+      }),
+    [save, initialEffects],
+  );
 
   // Issue #314: 問いが1つも無いと、シートが「ありません」を出すだけで手詰まりだった。
   // その場で問いを立てられるようにする（PC は #316 の QuestionSelectModal で既に可能）。
   const createQuestion = useCreateQuestion(api);
   // 「書く」に切り替えたい意思だけを持ち、モードは activeQuestions から導出する。
-  // 開いた時点の件数で固定すると、問いの取得が終わる前にシートを開いた場合に
-  // 一覧が来ても入力欄のままになる（選べる問いがあるのに選べない）。
   const [composeRequested, setComposeRequested] = useState(false);
-  // 作りたての問いは activeQuestions（マウント時に一度取るだけ）にも linkedQuestions
-  // （紐づけ POST の往復後に入る）にも即座には現れない。チップのラベルが
-  // 「問いを結ぶ」に戻って見えるのを避けるため、ここで覚えておく。
+  // 作りたての問いは activeQuestions にも linkedQuestions にも即座には現れない。ここで覚えておく。
   const [createdQuestions, setCreatedQuestions] = useState<LinkedQuestion[]>([]);
 
   // 書きかけ（タイトル/本文/問い/entryId）を localStorage に退避する。内容が空になればクリア。
@@ -228,11 +291,11 @@ export function SpEntryEditor({
 
   const { linkedQuestions, linkQuestion, unlinkQuestion } = useEntryQuestions(api, entryId);
 
-  useAutosaveEntry({
+  const { retrying } = useAutosaveEntry({
     title,
     body,
     entryId,
-    save,
+    save: saveWithEffects,
     mediaUrls,
     onSaved: (id, savedBody, savedTitle) => {
       setEntryId(id);
@@ -242,49 +305,104 @@ export function SpEntryEditor({
     enabled: api != null,
   });
 
+  // 端末の写し: サーバーに届いていない間だけ置き、届いたら消す（id のあるエントリ）。
+  useEntryLocalCopy({
+    entryId: persistDraft ? entryId : undefined,
+    content: composeContent(title, body),
+    mediaUrls,
+    inlinePaths,
+    savedContent: composeContent(lastSavedTitle, lastSavedBody),
+  });
+
   /** 起こした文字をカーソル位置に差し込む（本文の全置換はしない）。 */
   function insertAtCursor(text: string) {
-    const el = bodyRef.current;
-    const at = el ? (el.selectionStart ?? body.length) : body.length;
-    const before = body.slice(0, at);
-    const after = body.slice(at);
+    const segments = splitBodyAtPhotos(body);
+    const caret = bodyEditorRef.current?.caret() ?? {
+      segment: segments.length - 1,
+      offset: (segments[segments.length - 1] ?? '').length,
+    };
+    const current = segments[caret.segment] ?? '';
+    const at = Math.min(caret.offset, current.length);
+    const before = current.slice(0, at);
+    const after = current.slice(at);
     // 直前が改行でなければ改行を足して、既存の文と地続きにならないようにする。
     const lead = before && !before.endsWith('\n') ? '\n' : '';
-    const next = `${before}${lead}${text}${after}`;
-    setBody(next);
+    const next = [...segments];
+    next[caret.segment] = `${before}${lead}${text}${after}`;
+    setBody(joinBodySegments(next));
     // 差し込んだ直後にカーソルを末尾へ運ぶ（続きを書き始められるように）。
-    requestAnimationFrame(() => {
-      const target = bodyRef.current;
-      if (!target) return;
-      const caret = before.length + lead.length + text.length;
-      target.focus();
-      target.setSelectionRange(caret, caret);
-    });
+    bodyEditorRef.current?.focusSegment(caret.segment, before.length + lead.length + text.length);
   }
 
   /**
-   * 写真を添える。本文が未保存でも写真だけ先に確定させたいので、ここで明示的に保存する
-   * （自動保存は本文が一定量変わるまで走らないため、貼っただけでは永続化されない）。
+   * 写真を**いまのカーソル位置**に置く（Notion のモバイルと同じ）。文がそこで 2 つに割れ、
+   * 次の文にカーソルが移る。本文が未保存でも写真だけ先に確定させたいので、ここで明示的に保存する。
    */
   async function attachPhoto(photo: AttachedPhoto) {
-    const updated = [...photosRef.current, photo];
-    photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
-    setPhotos(updated);
-    const next = updated.map((p) => p.storagePath);
-    const content = title.trim() ? `${title.trim()}\n${body}` : body;
+    const segments = splitBodyAtPhotos(bodyTextRef.current);
+    const caret = bodyEditorRef.current?.caret() ?? {
+      segment: segments.length - 1,
+      offset: (segments[segments.length - 1] ?? '').length,
+    };
+    const inserted = insertPhotoAt(segments, caret.segment, caret.offset);
+    const nextBody = joinBodySegments(inserted.segments);
+    const nextInline = [...inlineRef.current];
+    nextInline.splice(inserted.imageIndex, 0, photo);
+    const nextPhotos = [...photosRef.current, photo];
+    photosRef.current = nextPhotos;
+    inlineRef.current = nextInline;
+    bodyTextRef.current = nextBody;
+    setPhotos(nextPhotos);
+    setInlinePhotos(nextInline);
+    setBody(nextBody);
+    bodyEditorRef.current?.focusSegment(inserted.imageIndex + 1, 0);
+
+    const content = composeContent(title, nextBody);
     if (!content.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
-    const saved = await save(content, entryId, { mediaUrls: next });
-    if (saved) setEntryId(saved);
+    const saved = await saveWithEffects(content, entryId, {
+      mediaUrls: nextPhotos.map((p) => p.storagePath),
+    });
+    if (saved) {
+      setEntryId(saved);
+      setLastSavedBody(nextBody);
+      setLastSavedTitle(title.trim());
+    }
   }
 
-  async function removePhoto(index: number) {
-    const updated = photosRef.current.filter((_, i) => i !== index);
-    photosRef.current = updated;
-    setPhotos(updated);
-    const next = updated.map((p) => p.storagePath);
-    const content = title.trim() ? `${title.trim()}\n${body}` : body;
+  /** 本文の中の写真を抜く（添付ごと）。前後の文が繋がる。 */
+  async function removeInlinePhoto(index: number) {
+    const target = inlineRef.current[index];
+    if (!target) return;
+    const nextBody = joinBodySegments(removePhotoAt(splitBodyAtPhotos(bodyTextRef.current), index));
+    const nextInline = inlineRef.current.filter((_, i) => i !== index);
+    const nextPhotos = photosRef.current.filter((p) => p.storagePath !== target.storagePath);
+    photosRef.current = nextPhotos;
+    inlineRef.current = nextInline;
+    bodyTextRef.current = nextBody;
+    setPhotos(nextPhotos);
+    setInlinePhotos(nextInline);
+    setBody(nextBody);
+    const content = composeContent(title, nextBody);
     if (!entryId || !content.trim()) return;
-    await save(content, entryId, { mediaUrls: next });
+    const saved = await saveWithEffects(content, entryId, {
+      mediaUrls: nextPhotos.map((p) => p.storagePath),
+    });
+    if (saved) {
+      setLastSavedBody(nextBody);
+      setLastSavedTitle(title.trim());
+    }
+  }
+
+  /** 本文の下に積んである（本文の中に居ない）写真を外す。 */
+  async function removeLoosePhoto(index: number) {
+    const target = loosePhotos[index];
+    if (!target) return;
+    const nextPhotos = photosRef.current.filter((p) => p.storagePath !== target.storagePath);
+    photosRef.current = nextPhotos;
+    setPhotos(nextPhotos);
+    const content = composeContent(title, body);
+    if (!entryId || !content.trim()) return;
+    await saveWithEffects(content, entryId, { mediaUrls: nextPhotos.map((p) => p.storagePath) });
   }
 
   const photoImport = usePhotoImport({
@@ -294,20 +412,14 @@ export function SpEntryEditor({
   });
 
   // 問いはエントリ作成後（entryId 確定後）に一度だけ紐づける。
-  // 保存前に選んでいた場合も、autosave でエントリが出来た時点で紐づく。
   const linkAttemptedRef = useRef(new Set<string>());
 
   // Issue #448: 既存エントリを一覧から開くと、紐づいている問いがチップに出ていなかった。
-  // 選択状態の初期値は URL の questionId と復元ドラフトしか見ておらず、サーバの
-  // 紐付け（linkedQuestions）を無視していたため。取得できたら一度だけ埋める。
-  // ユーザーが既に選んでいる場合は上書きしない。復元した問いは紐付け済みなので、
-  // 下の紐づけ effect が再 POST しないよう linkAttemptedRef にも印を付ける。
   const questionSeededRef = useRef(false);
   useEffect(() => {
     if (questionSeededRef.current) return;
     if (linkedQuestions.length === 0) return;
     questionSeededRef.current = true;
-    // URL や復元で既に問いを持っていれば、サーバーの紐づけで上書きしない。
     if (selectedQuestionIds.length > 0) return;
     for (const linked of linkedQuestions) linkAttemptedRef.current.add(linked.id);
     setSelectedQuestionIds(linkedQuestions.map((linked) => linked.id));
@@ -325,22 +437,25 @@ export function SpEntryEditor({
 
   const dirty = body !== lastSavedBody || title.trim() !== lastSavedTitle;
   const hasBody = !!body.trim();
+  // 電波が無い（または送れず再送待ち）の間は「端末に保存」と言う。書いたものは写しに残っている。
+  const offlineHold = dirty && (!online || retrying);
   const statusText = saving
     ? t('status_saving')
     : !hasBody
       ? ''
-      : dirty
-        ? t('status_editing')
-        : t('status_saved');
+      : offlineHold
+        ? t('status_offline')
+        : dirty
+          ? t('status_editing')
+          : t('status_saved');
   // 状態は上段（SpTopBar）の中央へ。発酵を始めたらそれを最優先で言う。
   const chrome = useSpChrome();
   useSpStatus(
     error ?? (pickled ? t('pickled') : statusText),
-    error ? 'error' : saving ? 'saving' : 'ok',
+    error ? 'error' : saving || offlineHold ? 'saving' : 'ok',
   );
 
   // 紐付け済みの問いが終了（アーカイブ）されていると activeQuestions に載らない。
-  // その場合もチップには出したいので、紐付け側からも探す。
   const selectedQuestions: LinkedQuestion[] = selectedQuestionIds.map(
     (id) =>
       activeQuestions.find((q) => q.id === id) ??
@@ -351,7 +466,6 @@ export function SpEntryEditor({
   // 選べる問いが無ければ入力欄、あれば一覧。取得が遅れて届いても自動で一覧に切り替わる。
   const composingQuestion = composeRequested || activeQuestions.length === 0;
 
-  // 開くたび、一覧のモードに戻す（前回の状態を持ち越さない）。
   function openQuestionPicker() {
     setComposeRequested(false);
     setPickerOpen(true);
@@ -360,12 +474,7 @@ export function SpEntryEditor({
   // 開いている間は、上段の戻るが選び手を閉じる（書斎へは戻らない）。
   useSpBackHandler(pickerOpen ? closePicker : null);
 
-  /**
-   * 問いを結ぶ／外す。**複数結べる**（PC と同じ）。
-   *
-   * 外すときは、紐づけ済み（`linkAttemptedRef` にある）ならサーバーの紐づけも解く。
-   * 結ぶときは選択に足すだけで、紐づけは entryId 確定後の effect が行う。選び手は閉じない。
-   */
+  /** 問いを結ぶ／外す。**複数結べる**（PC と同じ）。 */
   function toggleQuestion(id: string) {
     if (selectedQuestionIds.includes(id)) {
       if (linkAttemptedRef.current.has(id)) {
@@ -378,7 +487,6 @@ export function SpEntryEditor({
     setSelectedQuestionIds((previous) => [...previous, id]);
   }
 
-  // 問いを立てて、そのまま結ぶ。紐づけは上の effect が entryId 確定後に行う。
   async function handleCreateQuestion(text: string): Promise<string | null> {
     const id = await createQuestion(text);
     if (!id) return null;
@@ -388,19 +496,48 @@ export function SpEntryEditor({
     return id;
   }
 
+  /**
+   * 発酵の結果（結んだ最初の問いの、最新の完了した発酵）。
+   *
+   * **見ながら書く**: 本文の下の非モーダルのドック。書いている間（キーボードが出ている間）は
+   * 覗く段（1 行）に固定し、覗く段を押せばフォーカスを外して半分へ（読む）。パレットで出し入れ。
+   */
+  const { detail: fermentationDetail, loading: fermentationLoading } = useFermentationForQuestion(
+    api,
+    selectedQuestionIds[0],
+  );
+  const resultAvailable = fermentationDetail !== null || fermentationLoading;
+  const [resultOpen, setResultOpen] = useState(true);
+  const [resultDetent, setResultDetent] = useState<DockDetent>('peek');
+  useEffect(() => {
+    if (chrome.keyboardOpen) setResultDetent('peek');
+  }, [chrome.keyboardOpen]);
+  const blurEditor = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, []);
+  const toggleResult = useCallback(() => {
+    if (resultOpen && resultDetent !== 'peek') {
+      setResultOpen(false);
+      return;
+    }
+    if (!resultOpen) setResultOpen(true);
+    blurEditor();
+    setResultDetent('half');
+  }, [resultOpen, resultDetent, blurEditor]);
+
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
-    // Issue #450: 問いに紐づいていないエントリは発酵ループに入らない。走査対象は
-    // 「active な問いに紐づいたエントリ」だけなので（scheduled-fermentation.usecase）、
-    // このまま押せると「漬けたのに何も届かない」になる。PC（#316）と同じく、先に問いを
-    // 決めてもらう。タイトルは発酵に使われない（本文だけを読む）ので任意のままでよい。
+    // Issue #450: 問いに紐づいていないエントリは発酵ループに入らない。先に問いを決めてもらう。
     if (selectedQuestionIds.length === 0) {
       openQuestionPicker();
       return;
     }
     setPickling(true);
-    const content = title.trim() ? `${title.trim()}\n${body}` : body;
-    const saved = await save(content, entryId, { fermentationEnabled: true, mediaUrls });
+    const saved = await saveWithEffects(composeContent(title, body), entryId, {
+      fermentationEnabled: true,
+      mediaUrls,
+    });
     setPickling(false);
     if (saved) {
       setPickled(true);
@@ -408,18 +545,58 @@ export function SpEntryEditor({
     }
   }
 
-  // 確認シートで「削除する」→ API 削除が成功したら一覧へ戻る（フル遷移は不要・SPA で十分）。
+  // 確認シートで「削除する」→ API 削除が成功したら書斎へ戻る。
   async function handleDelete() {
     if (!entryId) return;
     const ok = await deleteEntry(entryId);
     if (ok) {
       clearDraft();
+      clearEntryLocalCopy(entryId);
       // SP に一覧の画面は無い（一覧は書斎の手帳から開く）。消したら書斎へ。
       router.push('/');
     } else {
       setDeleteOpen(false);
     }
   }
+
+  const paletteActions: PaletteAction[] = [
+    {
+      id: 'photo',
+      label: tPhoto('toolbar_button'),
+      icon: <PhotoIcon />,
+      onSelect: () => fileInputRef.current?.click(),
+    },
+    ...(entryId
+      ? [
+          {
+            id: 'ferment',
+            // PC と同じ語（「瓶に納めて発酵させる」は列に長すぎた）。漬けた後は「発酵中」。
+            label: pickled ? t('ferment_done_short') : t('ferment_title'),
+            icon: <FermentIcon />,
+            busy: pickling,
+            disabledReason: pickled ? t('pickled') : undefined,
+            onSelect: handlePickle,
+          },
+        ]
+      : []),
+    ...(resultAvailable
+      ? [
+          {
+            id: 'result',
+            label: tSidebar('heading'),
+            icon: <LetterIcon />,
+            active: resultOpen,
+            onSelect: toggleResult,
+          },
+        ]
+      : []),
+  ];
+
+  const gear = (
+    <RoundButton ariaLabel={t('settings_title')} onClick={() => setSettingsOpen(true)}>
+      <GearIcon />
+    </RoundButton>
+  );
 
   return (
     <div
@@ -431,19 +608,21 @@ export function SpEntryEditor({
         hasBody,
         dirty,
         hasEntry: !!entryId,
-        // Issue #448: 一覧から開いたときの復元の回帰を捕まえる。
-        // Issue #450: 問いの有無で「納める」の挙動が変わる（無ければ問い選択を開く）。
         hasQuestion: selectedQuestionIds.length > 0,
         pickerOpen,
-        // Issue #314: 問いがゼロでも行き止まりにならないこと（入力欄が出ること）を捕まえる。
         composingQuestion,
         pickling,
         deleteOpen,
+        settingsOpen,
+        offline: offlineHold,
+        inlinePhotoCount: inlinePhotos.length,
         hasFermentation: fermentationDetail !== null,
+        resultOpen: resultAvailable && resultOpen,
+        resultDetent,
       })}
     >
       {/* 保存の状態は上段（SpTopBar）の中央に出す。上段が無い場所（孤立検証・テスト）では
-          ここに小さく出す。削除・写真・発酵はキーボード上のパレットへ。 */}
+          ここに小さく出す。 */}
       {!chrome.mounted ? (
         <p
           aria-live="polite"
@@ -468,8 +647,7 @@ export function SpEntryEditor({
         style={{ fontFamily: bodyStyle.fontFamily, letterSpacing: bodyStyle.letterSpacing }}
       />
 
-      {/* 結んでいる問い。題の下の行（Notion の見出し下のプロパティと同じ席）。
-          面は持たず、◦ と本文の書体で。複数結べる。× で外す。「+ 問いを結ぶ」でその場に選び手が開く。 */}
+      {/* 結んでいる問い。題の下の行（Notion の見出し下のプロパティと同じ席）。複数結べる。× で外す。 */}
       <div className="mx-6 mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
         {selectedQuestions.map((question) => (
           <span key={question.id} className="flex max-w-full items-center">
@@ -532,22 +710,27 @@ export function SpEntryEditor({
         }}
       />
 
-      {/* 本文（タイトルから広い余白＋ゆったり行間）。指摘: 余白が欲しい。 */}
-      <textarea
-        ref={bodyRef}
-        // biome-ignore lint/a11y/noAutofocus: 縦長フォーカスエディタは開いた瞬間に書き始められることが要件
-        autoFocus
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder={t('body_placeholder')}
-        aria-label={t('body_placeholder')}
-        className="mt-6 min-h-[50vh] w-full resize-none overflow-hidden bg-transparent px-6 pb-4 outline-none placeholder:opacity-30"
-        style={bodyStyle}
-      />
+      {/* 本文（タイトルから広い余白＋ゆったり行間）。文のブロックと写真のブロックの列。 */}
+      <div className="mt-6">
+        <SpBodyEditor
+          ref={bodyEditorRef}
+          value={body}
+          images={inlinePhotos}
+          onChange={setBody}
+          onRemoveImage={(index) => void removeInlinePhoto(index)}
+          placeholder={t('body_placeholder')}
+          ariaLabel={t('body_placeholder')}
+          style={bodyStyle}
+          autoFocus
+        />
+      </div>
 
-      {/* 添えた写真。本文の下に全幅で積む（紙の続き。本文の途中には差し込めない —
-          textarea は画像を描けない。docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} variant="blocks" />
+      {/* 本文の中に居ない写真（旧形式）。本文の下に全幅で積む。 */}
+      <PhotoStrip
+        urls={loosePhotos.map((p) => p.signedUrl)}
+        onRemove={(index) => void removeLoosePhoto(index)}
+        variant="blocks"
+      />
 
       <SpPhotoImportSheet
         state={photoImport.state}
@@ -558,69 +741,46 @@ export function SpEntryEditor({
         onClose={photoImport.close}
       />
 
-      {/* 操作は殻の下端の列に集める（キーボードが出ればその真上。Notion のキーボード
-          ツールバーの席）。問いを結ぶのは題の下の行が担うので列には置かない。
-          発酵は保存済み（entryId 確定後）のときだけ並ぶ。 */}
+      {/* 操作は殻の下端の列に集める（キーボードが出ればその真上）。問いを結ぶのは題の下の行が担う。
+          発酵は保存済み（entryId 確定後）のときだけ並ぶ。**削除は並べない**（書いている最中に
+          何度も押す手の列に、取り返しのつかない操作を置かない）。設定シートの末尾にある。 */}
       {placeInSlot(
         <ActionPalette
           ariaLabel={t('palette_aria')}
           keyboardOpen={chrome.keyboardOpen}
           dismissKeyboardLabel={tNav('dismiss_keyboard')}
-          actions={[
-            {
-              id: 'photo',
-              label: tPhoto('toolbar_button'),
-              icon: <PhotoIcon />,
-              onSelect: () => fileInputRef.current?.click(),
-            },
-            ...(entryId
-              ? [
-                  {
-                    id: 'ferment',
-                    label: pickled ? t('pickled') : t('ferment_title'),
-                    icon: <FermentIcon />,
-                    busy: pickling,
-                    disabledReason: pickled ? t('pickled') : undefined,
-                    onSelect: handlePickle,
-                  },
-                  {
-                    id: 'delete',
-                    label: t('delete'),
-                    icon: <TrashIcon />,
-                    tone: 'danger' as const,
-                    onSelect: () => setDeleteOpen(true),
-                  },
-                ]
-              : []),
-          ]}
+          actions={paletteActions}
         />,
         chrome.paletteSlot,
       )}
 
-      {/* 上段の右端に、この画面の設定（本文の見た目）。席が無ければ（孤立検証）出さない。 */}
-      {chrome.actionSlot
-        ? placeInSlot(
-            <RoundButton ariaLabel={t('settings_title')} onClick={() => setSettingsOpen(true)}>
-              <GearIcon />
-            </RoundButton>,
-            chrome.actionSlot,
-          )
-        : null}
+      {/* 上段の右端に、この画面の設定（本文の見た目と、末尾に削除）。殻の外（孤立検証）ではその場に。 */}
+      {chrome.mounted ? (chrome.actionSlot ? placeInSlot(gear, chrome.actionSlot) : null) : gear}
       <SpEditorSettingsSheet
         open={settingsOpen}
         display={display}
         onChange={updateDisplay}
         onClose={() => setSettingsOpen(false)}
+        onDelete={
+          entryId
+            ? () => {
+                setSettingsOpen(false);
+                setDeleteOpen(true);
+              }
+            : undefined
+        }
       />
 
-      {/* Issue #466（SP 版）: 発酵結果は本文に重ねず、下からのドロワーに集約する。 */}
-      {fermentationDetail && (
-        <SpFermentationDrawer
-          detail={fermentationDetail}
-          open={fermentDrawerOpen}
-          onOpenChange={setFermentDrawerOpen}
-        />
-      )}
+      {/* 発酵の結果: 本文の下の非モーダルのドック（見ながら書く）。 */}
+      <SpFermentationDock
+        open={resultAvailable && resultOpen}
+        detent={resultDetent}
+        onDetentChange={setResultDetent}
+        onPeekTap={blurEditor}
+        questionText={selectedQuestions[0]?.currentText ?? t('question_untitled')}
+        detail={fermentationDetail}
+        loading={fermentationLoading}
+      />
 
       <SpConfirmSheet
         open={deleteOpen}

@@ -35,6 +35,11 @@ export interface StudyLabelsProps {
   entryCount: number;
   volumeCount: number;
   cardCount: number;
+  /**
+   * 数がまだ本当の数でない（取得中で前回の絵も無い）。true の間は数の代わりに骨組みを出す。
+   * 0 を出すと「無い」と読まれる（実機で「全部 0 件」と見えた）。
+   */
+  counting?: boolean;
   /** canvas の実寸。ピルの押し戻しに使う。 */
   screen: { width: number; height: number };
   onPick: (target: StudyTarget) => void;
@@ -153,7 +158,12 @@ function SpPills(props: StudyLabelsProps) {
 
   return (
     <div
-      {...verifyAttrs({ unit: 'StudyLabels', mode: 'sp', pillCount: kinds.length })}
+      {...verifyAttrs({
+        unit: 'StudyLabels',
+        mode: 'sp',
+        pillCount: kinds.length,
+        counting: props.counting ?? false,
+      })}
       className="pointer-events-none absolute inset-0"
     >
       {kinds.map((kind) => {
@@ -207,7 +217,17 @@ function SpPills(props: StudyLabelsProps) {
             >
               {t(labelKey(kind))}
             </span>
-            <span style={{ fontSize: 11, color: '#5C4F3F' }}>{stateWord(props, kind, t)}</span>
+            {props.counting ? (
+              // 数の骨組み。語（JAR 等）は出し、数だけ待つ。
+              <span
+                aria-hidden="true"
+                data-pill-counting
+                className="inline-block h-3 w-9 animate-pulse rounded-full"
+                style={{ background: 'rgba(92,79,63,0.14)' }}
+              />
+            ) : (
+              <span style={{ fontSize: 11, color: '#5C4F3F' }}>{stateWord(props, kind, t)}</span>
+            )}
             {/* 末尾の `›` とピル形状の 2 つで押せることを示す。 */}
             <span style={{ fontSize: 12, color: '#A8A381' }}>›</span>
           </button>

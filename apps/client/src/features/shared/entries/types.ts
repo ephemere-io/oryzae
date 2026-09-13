@@ -33,6 +33,21 @@ export interface PhotoImportState {
   transcript: string | null;
 }
 
+/**
+ * 端末の写し（オフラインの保険）。id のあるエントリの、サーバーに届いていない内容。
+ * `useEntryLocalCopy` が置き、サーバーが同じ内容を保存できたら消す。
+ */
+export interface EntryLocalCopy {
+  entryId: string;
+  /** 保存形式（先頭行＝タイトル）。 */
+  content: string;
+  mediaUrls: string[];
+  /** 本文の中の写真（U+FFFC）の置き順の storagePath。復元で本文と対にする。 */
+  inlinePaths: string[];
+  /** 最終編集時刻（epoch ms）。サーバーの updatedAt と比べる。 */
+  updatedAt: number;
+}
+
 /** 書きかけの退避データ（localStorage に置き、再開時に復元する）。 */
 export interface EntryDraft {
   /** 自動保存で既にエントリが作成済みならその id（再開時は同じエントリを更新＝重複作成を防ぐ）。 */

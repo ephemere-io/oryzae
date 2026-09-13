@@ -131,11 +131,10 @@ UI 上では対応済み —— 取り込みモーダル／シートで、操作
 
 ## いまやっていないこと（既知の宿題）
 
-- **本文の途中に写真を差し込む表示**。いまは本文の下にまとめて並べる。本文の途中に食い込ませる
-  には `content` にプレースホルダを埋め、PC の contentEditable の直列化を `innerText` から
-  専用シリアライザに差し替える必要がある（`editor-effects-codec.ts` の DOM walk に相乗りする
-  形になる）。SP は textarea なので画像を描けず、編集中はチップ表示・閲覧時に画像化という
-  二段構えが要る。
+- ~~本文の途中に写真を差し込む表示~~ → **済み**。PC は contentEditable の中に `<img>`（`inline-image-codec.ts`）、
+  SP は本文をプレースホルダで切った「文のブロックと写真のブロックの列」（`sp-body-editor.tsx`、
+  純関数は `features/shared/entries/utils/inline-photos.ts`）。保存形式はどちらも `content` の
+  U+FFFC + `effects.inlineImages`。本文の中に居ない写真（旧形式）だけ本文の下に並べる。
 - **管理画面での機能別コスト内訳**。月次合計は発酵と文字起こしを足した概算で出しているが、
   分けて見る画面はまだ無い（データは別テーブルなので分離自体はすぐできる）。
 - **Storage の孤児ファイル回収**。写真ストリップから削除すると `media_urls` からは外れるが、

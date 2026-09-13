@@ -45,7 +45,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
   const { api, auth, loading: authLoading } = useAuth();
   const { theme } = useTheme();
-  const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
+  const { state, countsKnown } = useStudyState(api, authLoading, auth?.user.id ?? null);
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
@@ -243,6 +243,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
             entryCount={currentMonthCount}
             volumeCount={archiveCount}
             cardCount={state.board.total}
+            counting={!countsKnown}
             screen={screen}
             onPick={handlePickFromLabel}
           />

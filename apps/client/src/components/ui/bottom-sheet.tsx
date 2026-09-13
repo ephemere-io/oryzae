@@ -16,12 +16,19 @@ export interface BottomSheetProps {
   /**
    * 止まる高さ（親の高さに対する比、小さい順）。既定は 45% と 92%。
    * Google マップのシートと同じで、つまみを引けばこの間を行き来する。
+   * `'content'` は**中身の高さ**（上限 92%）。設定のように中身が短いシートは、これ 1 つにすると
+   * 中身より大きく開かない（実機で、空白だらけのシートの空白を引いて再読み込みが起きていた）。
    */
-  detents?: readonly number[];
+  detents?: readonly Detent[];
   /** 最初に止まる段（`detents` の添字）。 */
   initialDetent?: number;
   children: React.ReactNode;
 }
+
+type Detent = number | 'content';
+
+/** `'content'` の段の上限（親の高さに対する比）。 */
+const CONTENT_MAX_FRACTION = 0.92;
 
 /** いちばん低い段からこれ以上（px）引き下げたら閉じる。 */
 const CLOSE_PULL = 80;
@@ -79,6 +86,10 @@ export function BottomSheet({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [detent, setDetent] = useState(initialDetent);
   const [dragging, setDragging] = useState(false);
+  /** `'content'` の段の実測（親に対する比）。測れるまで null。 */
+  const [contentFraction, setContentFraction] = useState<number | null>(null);
+  /** 中身がスクロールするか。しないなら指の動きを中身に渡さない（文書へ連鎖して引っ張り更新になる）。 */
+  const [contentScrollable, setContentScrollable] = useState(false);
   /** 開いた直後は画面の下に居て、次のフレームで段へ上がる（出てくる動き）。 */
   const [entered, setEntered] = useState(false);
   const dragRef = useRef<Drag | null>(null);
@@ -100,8 +111,42 @@ export function BottomSheet({
     return () => cancelAnimationFrame(frame);
   }, [open, initialDetent]);
 
-  const maxFraction = Math.max(...detents);
-  const maxIndex = detents.indexOf(maxFraction);
+  const hasContentDetent = detents.includes('content');
+  const numericMax = detents.reduce<number>(
+    (max, d) => (typeof d === 'number' ? Math.max(max, d) : max),
+    0,
+  );
+  /** 段を比に解く。`'content'` は測った値（測れるまでは数値の段の最大か 0.5）。 */
+  const resolved: readonly number[] = detents.map((d) =>
+    typeof d === 'number' ? d : (contentFraction ?? (numericMax || 0.5)),
+  );
+  const maxFraction = Math.max(...resolved);
+  const maxIndex = resolved.indexOf(maxFraction);
+  /** シートの箱の高さを中身で決めるか（数値の段が無い、または content がいちばん高い）。 */
+  const sizedByContent = hasContentDetent && numericMax <= (contentFraction ?? 0);
+
+  // 中身の高さ（content の段）と、中身がスクロールするかを測る。開いている間だけ。
+  useEffect(() => {
+    if (!open || typeof ResizeObserver === 'undefined') return;
+    const sheet = sheetRef.current;
+    const content = contentRef.current;
+    if (!sheet || !content) return;
+    const measure = () => {
+      const root = rootRef.current?.clientHeight ?? 0;
+      if (hasContentDetent && root > 0) {
+        // つまみの行 + 中身の自然な高さ。中身がスクロール容器なので scrollHeight が自然な高さ。
+        const handle = sheet.querySelector<HTMLElement>('[data-sheet-handle]');
+        const natural = (handle?.offsetHeight ?? 0) + content.scrollHeight;
+        setContentFraction(Math.min(CONTENT_MAX_FRACTION, natural / root));
+      }
+      setContentScrollable(content.scrollHeight > content.clientHeight + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(content);
+    for (const child of Array.from(content.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, [open, hasContentDetent]);
   /** 段の位置。自身の高さに対する % なので、親の採寸を待たずに描ける。 */
   const percentTransform = useCallback(
     (fraction: number) =>
@@ -122,12 +167,12 @@ export function BottomSheet({
       dragRef.current = {
         pointerId: event.pointerId,
         startY: event.clientY,
-        startOffset: offsetOf(detents[detent] ?? detents[0] ?? 0.5),
+        startOffset: offsetOf(resolved[detent] ?? resolved[0] ?? 0.5),
         active: false,
         fromContent: Boolean(target && contentRef.current?.contains(target)),
       };
     },
-    [detent, detents, offsetOf],
+    [detent, resolved, offsetOf],
   );
 
   const onPointerMove = useCallback(
@@ -178,7 +223,7 @@ export function BottomSheet({
         height,
       );
       const current = height > 0 ? maxFraction - offset / height : maxFraction;
-      const lowest = Math.min(...detents);
+      const lowest = Math.min(...resolved);
 
       setDragging(false);
 
@@ -190,7 +235,7 @@ export function BottomSheet({
       // 離した高さにいちばん近い段へ。
       let best = 0;
       let bestDistance = Number.POSITIVE_INFINITY;
-      detents.forEach((fraction, index) => {
+      resolved.forEach((fraction, index) => {
         const distance = Math.abs(fraction - current);
         if (distance < bestDistance) {
           bestDistance = distance;
@@ -200,22 +245,30 @@ export function BottomSheet({
       // 段へ収まる動きは transition に任せる。段が変わらないと React は style を書き直さない
       // ので、ここで自分で段の値を書く（書かないと離した位置に留まる）。
       sheet.style.transition = reduced ? 'none' : SNAP_TRANSITION;
-      sheet.style.transform = percentTransform(detents[best] ?? maxFraction);
+      sheet.style.transform = percentTransform(resolved[best] ?? maxFraction);
       setDetent(best);
     },
-    [detents, maxFraction, onClose, percentTransform, reduced, rootHeight],
+    [resolved, maxFraction, onClose, percentTransform, reduced, rootHeight],
   );
 
   if (!open) return null;
 
-  const fraction = detents[detent] ?? detents[0] ?? 0.5;
-  // 引いている間は要素の style を直接書く（React は再描画しない）。
-  const restingTransform = entered ? percentTransform(fraction) : 'translate3d(0, 100%, 0)';
+  const fraction = resolved[detent] ?? resolved[0] ?? 0.5;
+  // 引いている間は要素の style を直接書く（React は再描画しない）。content の段は測れるまで下に居る。
+  const measured = !hasContentDetent || contentFraction !== null;
+  const restingTransform =
+    entered && measured ? percentTransform(fraction) : 'translate3d(0, 100%, 0)';
 
   return placeInSlot(
     <div
       ref={rootRef}
-      {...verifyAttrs({ unit: 'BottomSheet', detent, dragging })}
+      {...verifyAttrs({
+        unit: 'BottomSheet',
+        detent,
+        dragging,
+        sizedByContent,
+        contentScrollable,
+      })}
       className="pointer-events-auto absolute inset-0 z-30 flex flex-col justify-end overflow-hidden"
     >
       {/* 背景。押したら閉じる（シートの外は「戻る」）。 */}
@@ -237,7 +290,10 @@ export function BottomSheet({
         aria-label={ariaLabel}
         className="relative flex flex-col overflow-hidden rounded-t-3xl"
         style={{
-          height: `${maxFraction * 100}%`,
+          // 中身で決めるときは自然な高さ（上限つき）。数値の段があればいちばん高い段の高さ。
+          ...(sizedByContent
+            ? { height: 'auto', maxHeight: `${CONTENT_MAX_FRACTION * 100}%` }
+            : { height: `${maxFraction * 100}%` }),
           background: 'var(--bg)',
           boxShadow: '0 -8px 32px rgba(140,133,126,0.18)',
           transform: restingTransform,
@@ -279,11 +335,15 @@ export function BottomSheet({
           </div>
         </div>
 
-        {/* 中身。スクロール容器なので、この中では pan-y が効く。端で外へ伝えない。 */}
+        {/* 中身。スクロールするときだけ pan-y（中で普通にスクロールできる）。しないときは none —
+            pan-y のままだと指の動きが文書へ連鎖して Safari の引っ張り更新になる（実機）。 */}
         <div
           ref={contentRef}
           className="min-h-0 flex-1 overflow-auto px-6 pb-8"
-          style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+          style={{
+            touchAction: contentScrollable ? 'pan-y' : 'none',
+            overscrollBehavior: 'contain',
+          }}
         >
           {children}
         </div>

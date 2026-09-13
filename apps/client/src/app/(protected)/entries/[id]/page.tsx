@@ -40,6 +40,8 @@ export default function EntryDetailPage() {
           api={api}
           initialEntryId={entry.id}
           initialContent={entry.content}
+          initialEffects={entry.effects}
+          initialUpdatedAt={entry.updatedAt}
           initialMediaUrls={entry.mediaUrls}
           initialMediaSignedUrls={entry.mediaSignedUrls}
         />
