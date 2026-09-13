@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { ActionPalette } from '@/components/ui/action-palette';
 import { PlusIcon } from '@/components/ui/palette-icons';
-import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
+import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarQuestion } from '@/features/shared/questions/types';
@@ -56,7 +56,38 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
   const [element, setElement] = useState<SpJarElement | null>(null);
 
   const openQuestion = questions.find((question) => question.id === openId) ?? null;
-  const { detail, loading: detailLoading } = useFermentationForQuestion(api, openQuestion?.id);
+
+  /**
+   * 問いごとの最新の手紙（完了した発酵）。受信箱（`letters`）から引く。
+   *
+   * **地図を開いた時点で中身を先読みする。** 以前は円を押してから「一覧 → 詳細」と 2 往復して
+   * いて、問いの画面が長く空だった（実機レビュー）。手紙の id は受信箱にあるので、詳細だけを
+   * まとめて取っておけば、押した瞬間に出る。取り直しは無い（`useFermentationDetails` が覚える）。
+   */
+  const latestLetterByQuestion = useMemo(() => {
+    const latest = new Map<string, { fermentationId: string; createdAt: string }>();
+    for (const letter of letters) {
+      const current = latest.get(letter.questionId);
+      if (!current || letter.createdAt > current.createdAt) {
+        latest.set(letter.questionId, {
+          fermentationId: letter.fermentationId,
+          createdAt: letter.createdAt,
+        });
+      }
+    }
+    return latest;
+  }, [letters]);
+  const letterIds = useMemo(
+    () => [...latestLetterByQuestion.values()].map((entry) => entry.fermentationId),
+    [latestLetterByQuestion],
+  );
+  const { details, loading: detailsLoading } = useFermentationDetails(api, letterIds);
+  const openFermentationId = openQuestion
+    ? (latestLetterByQuestion.get(openQuestion.id)?.fermentationId ?? null)
+    : null;
+  const detail = openFermentationId ? (details.get(openFermentationId) ?? null) : null;
+  const detailLoading =
+    openFermentationId !== null && !details.has(openFermentationId) && detailsLoading;
 
   const untitled = t('untitled');
   const mapQuestions = useMemo<MapQuestion[]>(() => {

@@ -3,11 +3,13 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { Skeleton, skeletonKeys } from '@/components/ui/skeleton';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import type { SpJarElement } from '@/features/sp/fermentation/components/sp-element-sheet';
 import { formatMonthDay } from '@/lib/format-date';
 import { useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
+import { useDelayedTrue } from '@/lib/use-delayed';
 
 interface SpQuestionZoomProps {
   questionText: string;
@@ -48,6 +50,7 @@ export function SpQuestionZoom({
   const snippets = detail?.snippets ?? [];
   const letter = detail?.letter ?? null;
   const empty = !loading && keywords.length === 0 && snippets.length === 0 && letter === null;
+  const showSkeleton = useDelayedTrue(loading);
 
   return (
     <div
@@ -111,11 +114,8 @@ export function SpQuestionZoom({
 
       {/* 一覧。行を押すと全文（セミモーダル）。 */}
       <div className="min-h-0 flex-1 overflow-auto px-5 pt-4 pb-8">
-        {loading ? (
-          <p className="py-8 text-center text-xs" style={{ color: 'var(--date-color)' }}>
-            …
-          </p>
-        ) : null}
+        {/* 読み込み中は、いずれ出る形（見出しと行）を先に置く。一瞬で返るなら出さない。 */}
+        {showSkeleton ? <QuestionZoomSkeleton /> : null}
 
         {empty ? (
           <p
@@ -313,5 +313,21 @@ function LetterIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/** 読み込み中の骨組み。手紙 1 行・言葉 3 行・抜粋 2 行の、実物と同じ並び。 */
+function QuestionZoomSkeleton() {
+  return (
+    <div aria-hidden="true" data-skeleton-slot="question-zoom" className="flex flex-col gap-6">
+      {[1, 3, 2].map((rows, index) => (
+        <div key={skeletonKeys(3)[index]} className="flex flex-col gap-3">
+          <Skeleton className="h-3 w-12" />
+          {skeletonKeys(rows).map((key) => (
+            <Skeleton key={key} className="h-5 w-full" />
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

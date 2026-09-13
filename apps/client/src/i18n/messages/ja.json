@@ -335,7 +335,8 @@
       "open": "開く",
       "ocr": "画像から読み取る",
       "collapse": "パレットを畳む",
-      "expand": "パレットを開く"
+      "expand": "パレットを開く",
+      "send_to_back": "背面へ"
     },
     "drop_image": "ここに画像をドロップ"
   },
@@ -820,7 +821,8 @@
       "next_day": "次の日",
       "snippet_placeholder": "書き留めておきたいことを",
       "palette_aria": "ボードの操作",
-      "send_to_back": "背面へ"
+      "send_to_back": "背面へ",
+      "ocr_wait_note": "写真の文字を読み取っています。大きい写真だと 10 秒ほどかかります。"
     }
   },
   "canvas": {

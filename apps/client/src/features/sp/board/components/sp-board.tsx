@@ -29,7 +29,7 @@ import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
 import { readImageDimensions, resizeImage } from '@/lib/image';
 import { placeInSlot, useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
-import { SpBoardSurface } from './sp-board-surface';
+import { type PendingCard, SpBoardSurface } from './sp-board-surface';
 import { SpSnippetComposer, type SpSnippetOcrStatus } from './sp-snippet-composer';
 
 export interface SpBoardProps {
@@ -45,6 +45,12 @@ const JPEG_QUALITY = 0.9;
 
 /** 新しいカードの既定の大きさ（world）。中身が入れば伸びる。 */
 const NEW_CARD_SIZE = { width: 262, height: 120 };
+
+/** 写真の仮のカードの長辺（world）。PC の新しい写真と同じ。 */
+const NEW_PHOTO_SIZE = 220;
+
+/** 貼れなかった仮のカードを見せておく時間（ms）。 */
+const PENDING_FAILED_MS = 4000;
 
 /**
  * カードが 1 枚も無い日に「全体」として見せる範囲（world）。
@@ -146,6 +152,8 @@ export function SpBoard({ api }: SpBoardProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
+  // 貼っている最中の仮のカード。選んだ瞬間に置き、貼り終わったら実物と入れ替える。
+  const [pending, setPending] = useState<PendingCard | null>(null);
 
   // 画像から読み取った下書き。シートが閉じれば捨てる。
   const [ocrStatus, setOcrStatus] = useState<SpSnippetOcrStatus>('idle');
@@ -262,22 +270,56 @@ export function SpBoard({ api }: SpBoardProps) {
   const handlePickPhoto = useCallback(
     async (file: File) => {
       setBusy(true);
+      // 選んだ瞬間に、いま見えている真ん中へ仮のカードを置く（縮小・送信を待たせない）。
+      const previewUrl = URL.createObjectURL(file);
+      const spot = placement();
+      setPending({
+        x: spot.x,
+        y: spot.y,
+        width: NEW_PHOTO_SIZE,
+        height: NEW_PHOTO_SIZE,
+        previewUrl,
+        failed: false,
+      });
+      let failed = false;
       try {
         const [{ width, height }, resized] = await Promise.all([
           readImageDimensions(file),
           resizeImage(file, MAX_UPLOAD_WIDTH, JPEG_QUALITY),
         ]);
+        // 寸法が分かったら仮のカードを写真の比に合わせる。
+        const ratio = width > 0 && height > 0 ? height / width : 1;
+        setPending((current) =>
+          current
+            ? {
+                ...current,
+                width: ratio >= 1 ? NEW_PHOTO_SIZE / ratio : NEW_PHOTO_SIZE,
+                height: ratio >= 1 ? NEW_PHOTO_SIZE : NEW_PHOTO_SIZE * ratio,
+              }
+            : current,
+        );
         // 縮小後の Blob を同じ名前の File に戻す（サーバーは拡張子を見る）。
         const upload = new File([resized.blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, {
           type: 'image/jpeg',
         });
         revealPendingRef.current = true;
-        await createPhoto(upload, '', width, height, placement());
+        await createPhoto(upload, '', width, height, spot);
       } catch {
-        // 読めない画像（HEIC 等）や通信の失敗。盤面に専用のエラー表示が無いので、
-        // 「カードが増えない」ことを結果として見せる。固まらないことだけを守る。
+        // 読めない画像（HEIC 等）や通信の失敗。仮のカードを薄くしてしばらく残し、
+        // 「貼れなかった」ことを見せる（盤面に専用のエラー表示は無い）。固まらないことだけを守る。
+        failed = true;
       } finally {
         setBusy(false);
+        if (failed) {
+          setPending((current) => (current ? { ...current, failed: true } : current));
+          window.setTimeout(() => {
+            setPending(null);
+            URL.revokeObjectURL(previewUrl);
+          }, PENDING_FAILED_MS);
+        } else {
+          setPending(null);
+          URL.revokeObjectURL(previewUrl);
+        }
       }
     },
     [createPhoto, placement],
@@ -388,6 +430,7 @@ export function SpBoard({ api }: SpBoardProps) {
           canvas={canvas}
           selectedId={selectedId}
           onSelect={setSelectedId}
+          pending={pending}
           // 同じカードを続けて押したら開く。スニペットは編集の欄へ（PC のダブルクリックと同じ）。
           onOpen={(id) => {
             setSelectedId(id);

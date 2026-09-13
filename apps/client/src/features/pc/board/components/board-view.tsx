@@ -254,6 +254,21 @@ export function BoardView({ api }: BoardViewProps) {
     savePositions(next);
   }, [selectedCard, cards, setCards, savePositions]);
 
+  /** 選択中のカードを最背面へ。前面へと対。zIndex は負にせず、最下段なら全体を 1 つ上げる。 */
+  const handleSendToBack = useCallback(() => {
+    if (!selectedCard) return;
+    const minZ = cards.reduce((min, c) => Math.min(min, c.zIndex), Number.POSITIVE_INFINITY);
+    if (selectedCard.zIndex === minZ) return;
+    const lift = minZ <= 0 ? 1 : 0;
+    const next = cards.map((c) =>
+      c.id === selectedCard.id
+        ? { ...c, zIndex: Math.max(0, minZ - 1 + lift), userPositioned: true }
+        : { ...c, zIndex: c.zIndex + lift },
+    );
+    setCards(next);
+    savePositions(next);
+  }, [selectedCard, cards, setCards, savePositions]);
+
   const handleDeleteCard = useCallback(
     (cardId: string) => {
       const card = cards.find((c) => c.id === cardId);
@@ -481,6 +496,7 @@ export function BoardView({ api }: BoardViewProps) {
         selection={selectedCard ? { cardType: selectedCard.cardType } : null}
         onOpenSelected={handleOpenSelected}
         onBringSelectedToFront={handleBringToFront}
+        onSendSelectedToBack={handleSendToBack}
         onDeleteSelected={() => selectedCard && handleDeleteCard(selectedCard.id)}
       />
 

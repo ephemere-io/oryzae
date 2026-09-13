@@ -335,7 +335,8 @@
       "open": "Open",
       "ocr": "Read from image",
       "collapse": "Collapse toolbar",
-      "expand": "Expand toolbar"
+      "expand": "Expand toolbar",
+      "send_to_back": "Send to back"
     },
     "drop_image": "Drop the image here"
   },
@@ -820,7 +821,8 @@
       "next_day": "Next day",
       "snippet_placeholder": "Something worth keeping",
       "palette_aria": "Board actions",
-      "send_to_back": "Send to back"
+      "send_to_back": "Send to back",
+      "ocr_wait_note": "Reading the text in the photo. Large photos can take about 10 seconds."
     }
   },
   "canvas": {
