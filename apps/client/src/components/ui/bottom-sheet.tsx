@@ -2,6 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { placeInSlot, useSpChrome } from '@/lib/sp-chrome-context';
 import { CONTROL_FONT } from './surface';
 
 export interface BottomSheetProps {
@@ -82,6 +83,8 @@ export function BottomSheet({
   const [entered, setEntered] = useState(false);
   const dragRef = useRef<Drag | null>(null);
   const [reduced, setReduced] = useState(false);
+  // SP の殻の中なら、殻の箱に重ねる（本文が伸びる画面で内容の末尾に出ないように）。
+  const { overlaySlot } = useSpChrome();
 
   useEffect(() => setReduced(prefersReducedMotion()), []);
 
@@ -146,7 +149,11 @@ export function BottomSheet({
           }
         }
         drag.active = true;
-        event.currentTarget.setPointerCapture?.(event.pointerId);
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // 既に離れた指や合成イベントでは NotFoundError になる。掴めなくても動きは追える。
+        }
         sheet.style.transition = 'none';
         setDragging(true);
       }
@@ -205,11 +212,11 @@ export function BottomSheet({
   // 引いている間は要素の style を直接書く（React は再描画しない）。
   const restingTransform = entered ? percentTransform(fraction) : 'translate3d(0, 100%, 0)';
 
-  return (
+  return placeInSlot(
     <div
       ref={rootRef}
       {...verifyAttrs({ unit: 'BottomSheet', detent, dragging })}
-      className="absolute inset-0 z-30 flex flex-col justify-end overflow-hidden"
+      className="pointer-events-auto absolute inset-0 z-30 flex flex-col justify-end overflow-hidden"
     >
       {/* 背景。押したら閉じる（シートの外は「戻る」）。 */}
       <button
@@ -281,6 +288,7 @@ export function BottomSheet({
           {children}
         </div>
       </section>
-    </div>
+    </div>,
+    overlaySlot,
   );
 }

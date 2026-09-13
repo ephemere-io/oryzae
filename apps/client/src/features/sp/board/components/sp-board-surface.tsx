@@ -179,7 +179,11 @@ export function SpBoardSurface({
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>, card: BoardCardData) => {
       // 掴んだ指を最後まで追う。指が要素の外へ出ても pointermove が届く。
-      event.currentTarget.setPointerCapture?.(event.pointerId);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // 既に離れた指や合成イベントでは NotFoundError になる。掴めなくても動きは追える。
+      }
       dragRef.current = {
         cardId: card.id,
         pointerId: event.pointerId,
@@ -464,7 +468,11 @@ export function SpBoardSurface({
                 data-canvas-no-pan=""
                 onPointerDown={(event) => {
                   event.stopPropagation();
-                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  try {
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  } catch {
+                    // 既に離れた指や合成イベントでは NotFoundError になる。掴めなくても動きは追える。
+                  }
                   const center = cardCenterOnScreen(event.currentTarget, card, viewport);
                   if (!center) return;
                   const dx = event.clientX - center.x;

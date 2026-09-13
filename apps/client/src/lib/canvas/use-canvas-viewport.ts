@@ -254,6 +254,13 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
     apply(zoomTo(vpRef.current, 1, size.width / 2, size.height / 2));
   }, [apply, frameSize]);
 
+  /**
+   * 直近の「収めた」結果。frame の大きさが変わったとき、利用者がまだ動かしていなければ
+   * 同じ範囲に収め直す（下の ResizeObserver）。殻がビジュアルビューポートに合わせて高さを
+   * 測り直したあとや、端末の向きが変わったあとに、収めたはずの絵が小さいまま残らないように。
+   */
+  const lastFitRef = useRef<{ bounds: Bounds; vp: Viewport } | null>(null);
+
   const fitTo = useCallback(
     (bounds: Bounds | null) => {
       if (!bounds) {
@@ -262,7 +269,9 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       }
       const size = frameSize();
       if (size.width === 0 || size.height === 0) return;
-      apply(fitBounds(bounds, size, fitPaddingRef.current));
+      const next = fitBounds(bounds, size, fitPaddingRef.current);
+      lastFitRef.current = { bounds, vp: next };
+      apply(next);
     },
     [apply, frameSize, resetZoom],
   );
@@ -298,6 +307,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
           }
         } else {
           vpRef.current = fitBounds(bounds, size, fitPaddingRef.current);
+          lastFitRef.current = { bounds, vp: vpRef.current };
         }
       }
 
@@ -316,6 +326,27 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   useLayoutEffect(() => {
     if (frameEl) paint();
   }, [frameEl, paint]);
+
+  // frame の大きさが変わったら、利用者がまだ動かしていない（直近の収めた結果のまま）なら収め直す。
+  useEffect(() => {
+    if (!frameEl || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      const last = lastFitRef.current;
+      if (!last) return;
+      const current = vpRef.current;
+      if (current.x !== last.vp.x || current.y !== last.vp.y || current.scale !== last.vp.scale) {
+        return;
+      }
+      const size = frameSize();
+      if (size.width === 0 || size.height === 0) return;
+      const next = fitBounds(last.bounds, size, fitPaddingRef.current);
+      if (next.scale === current.scale && next.x === current.x && next.y === current.y) return;
+      lastFitRef.current = { bounds: last.bounds, vp: next };
+      apply(next);
+    });
+    observer.observe(frameEl);
+    return () => observer.disconnect();
+  }, [frameEl, frameSize, apply]);
 
   // 初期化が終わるまでは保存しない。
   // frame が現れるまで初期化は走らないので、その前に等倍を書き込むと

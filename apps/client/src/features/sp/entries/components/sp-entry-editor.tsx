@@ -150,6 +150,29 @@ export function SpEntryEditor({
     return () => observer.disconnect();
   }, []);
   useSpHeading(titleHidden && title.trim() ? title.trim() : null);
+  // 本文は書いた分だけ伸ばす。textarea の中でスクロールさせると殻の本文が動かず、題も隠れない。
+  // 書体が後から届くと行の高さが変わるので、fonts.ready と幅の変化でも測り直す。
+  // 測り直す契機（本文と見た目の設定）を 1 つの鍵にまとめる。
+  const growKey = `${body.length}:${display.fontFamily}:${display.fontSize}:${display.lineHeight}:${display.letterSpacing}`;
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const grow = () => {
+      el.dataset.growKey = growKey;
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    grow();
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) grow();
+    });
+    window.addEventListener('resize', grow);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('resize', grow);
+    };
+  }, [growKey]);
   const bodyStyle = {
     fontFamily: SP_EDITOR_TYPOGRAPHY.fontFamily[display.fontFamily],
     fontSize: SP_EDITOR_TYPOGRAPHY.fontSize[display.fontSize],
@@ -400,7 +423,9 @@ export function SpEntryEditor({
 
   return (
     <div
-      className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
+      // 高さは中身で決める（min-h-full）。本文が伸びれば殻の本文（main）がスクロールし、題が上段の下へ
+      // 隠れて見出しが上がる。h-full だと textarea の中だけがスクロールして、題は永遠に見えたまま。
+      className="relative flex min-h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
       {...verifyAttrs({
         unit: 'SpEntryEditor',
         hasBody,
@@ -516,7 +541,7 @@ export function SpEntryEditor({
         onChange={(e) => setBody(e.target.value)}
         placeholder={t('body_placeholder')}
         aria-label={t('body_placeholder')}
-        className="mt-6 w-full flex-1 resize-none bg-transparent px-6 pb-4 outline-none placeholder:opacity-30"
+        className="mt-6 min-h-[50vh] w-full resize-none overflow-hidden bg-transparent px-6 pb-4 outline-none placeholder:opacity-30"
         style={bodyStyle}
       />
 

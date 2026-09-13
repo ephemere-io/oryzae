@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -49,6 +50,13 @@ interface SpChromeValue {
    */
   actionSlot: HTMLElement | null;
   setActionSlot: (element: HTMLElement | null) => void;
+  /**
+   * 画面全体に重ねるもの（シート・確認）の席。殻の箱と同じ大きさ。
+   * 画面の中で `absolute inset-0` にすると、本文が伸びる画面（エディタ）では内容の高さいっぱいに
+   * 広がって、シートが画面の外（内容の末尾）に出る。殻の箱に重ねれば常に見えている範囲に出る。
+   */
+  overlaySlot: HTMLElement | null;
+  setOverlaySlot: (element: HTMLElement | null) => void;
   /** 殻が追従しているビジュアルビューポート。測れるまで null。 */
   viewport: VisualViewportBox | null;
   /** ソフトキーボードが出ているか（パレットの「閉じる」の出し入れに使う）。 */
@@ -67,6 +75,8 @@ const SpChromeContext = createContext<SpChromeValue>({
   setPaletteSlot: () => {},
   actionSlot: null,
   setActionSlot: () => {},
+  overlaySlot: null,
+  setOverlaySlot: () => {},
   viewport: null,
   keyboardOpen: false,
 });
@@ -83,6 +93,7 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
   const [heading, setHeading] = useState<string | null>(null);
   const [paletteSlot, setPaletteSlot] = useState<HTMLElement | null>(null);
   const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
+  const [overlaySlot, setOverlaySlot] = useState<HTMLElement | null>(null);
   const viewport = useVisualViewport();
 
   // 関数を state に入れるときは updater と取り違えないよう包む。
@@ -103,10 +114,12 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
       setPaletteSlot,
       actionSlot,
       setActionSlot,
+      overlaySlot,
+      setOverlaySlot,
       viewport,
       keyboardOpen: viewport?.keyboardOpen ?? false,
     }),
-    [back, setBack, status, heading, paletteSlot, actionSlot, viewport],
+    [back, setBack, status, heading, paletteSlot, actionSlot, overlaySlot, viewport],
   );
   return <SpChromeContext.Provider value={value}>{children}</SpChromeContext.Provider>;
 }
@@ -126,13 +139,23 @@ export function placeInSlot(node: ReactNode, slot: HTMLElement | null): ReactNod
   return slot ? createPortal(node, slot) : node;
 }
 
-/** 画面が出ている間だけ「戻る」を横取りする。`null` を渡せば横取りしない。 */
+/**
+ * 画面が出ている間だけ「戻る」を横取りする。`null` を渡せば横取りしない。
+ *
+ * 手は ref に持ち、登録するのは**有無が変わったときだけ**。描画のたびに新しい関数を渡されても
+ * Provider の state を書き換えない（書き換えると Provider → 画面 → 新しい関数 → 登録、と
+ * 無限に回る。上段の席を使う画面が Provider を読むようになって実際に起きた）。
+ */
 export function useSpBackHandler(handler: (() => void) | null): void {
   const { setBack } = useSpChrome();
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+  const active = handler !== null;
   useEffect(() => {
-    setBack(handler);
+    if (!active) return;
+    setBack(() => handlerRef.current?.());
     return () => setBack(null);
-  }, [handler, setBack]);
+  }, [active, setBack]);
 }
 
 /** 本文側のタイトルが隠れている間だけ、上段の中央に見出しを出す。`null` なら出さない。 */
