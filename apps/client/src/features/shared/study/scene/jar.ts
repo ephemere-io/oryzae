@@ -240,6 +240,11 @@ export function solveJarSilhouette(
   const bottomLeft = ascending[0];
   loop.push(...arcBetween(bottomRight, bottomLeft, closingArcSegments));
   loop.push(...ascending);
+  // 上端も近側の弧で閉じる。LineLoop に任せると最上段の左右を**弦**で結び、俯瞰では
+  // その弦が口の中を横切って見える（実機 SP で「蓋の周りの線が汚い」の一因だった）。
+  const topLeft = ascending[ascending.length - 1];
+  const topRight = descending[0];
+  loop.push(...arcBetween(topLeft, topRight, closingArcSegments));
   return loop;
 }
 
@@ -286,7 +291,8 @@ function arcBetween(
  * 毎フレーム解き直すので、確保は一度きりにして `setDrawRange` で使う分だけ描く。
  */
 export function silhouetteBufferSize(profileLength: number, closingArcSegments = 15): number {
-  return profileLength * 2 + closingArcSegments + 2;
+  // 左右の枝 + 上下を閉じる弧 2 本。
+  return profileLength * 2 + closingArcSegments * 2 + 2;
 }
 
 /** コルクの寸法（21-3d-parameters.md）。塗りはブランドのクリームで、テラコッタは使わない。 */
@@ -301,6 +307,20 @@ export const CORK = {
   grainCount: 6,
   grainOpacity: 0.18,
 } as const;
+
+/**
+ * コルクの母線（瓶ローカル、下から上へ）。
+ *
+ * 円柱の側面は稜線を持たないので `EdgesGeometry` では上下の縁しか線にならず、俯瞰では
+ * 側面がクリームの塊に見えていた。瓶と同じ `solveJarSilhouette` で輪郭を解くための母線。
+ */
+export function corkProfile(): Vector2[] {
+  const half = CORK.height / 2;
+  return [
+    new Vector2(CORK.radiusBottom, CORK.y - half),
+    new Vector2(CORK.radiusTop, CORK.y + half),
+  ];
+}
 
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;

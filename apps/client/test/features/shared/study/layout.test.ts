@@ -91,9 +91,19 @@ describe('PC と SP の構図の違い', () => {
     expect(PC_LAYOUT.shelf.tiltX).toBe(0);
   });
 
-  it('SP のペンは積みの左手前（右だと画面外に出る）', () => {
-    expect(SP_LAYOUT.pen.x).toBeLessThan(0);
-    expect(PC_LAYOUT.pen.x).toBeGreaterThan(0);
+  it('SP は鉛筆を置かず、机は当月の 1 冊だけ（2 段目以降は指で押し分けられない）', () => {
+    expect(SP_LAYOUT.pen).toBeNull();
+    expect(SP_LAYOUT.deskNotebooks).toBe(1);
+    expect(PC_LAYOUT.pen).not.toBeNull();
+    expect(PC_LAYOUT.deskNotebooks).toBe(3);
+  });
+
+  it('SP の棚は天板の右辺の内側に収まる', () => {
+    // 半幅 1.3 × scale に yaw（−0.35）ぶんの張り出しを見込む。
+    const halfWidth = 1.3 * SP_LAYOUT.shelf.scale;
+    const halfDepth = 0.55 * SP_LAYOUT.shelf.scale;
+    const reach = halfWidth * Math.cos(0.35) + halfDepth * Math.sin(0.35);
+    expect(SP_LAYOUT.shelf.position.x + reach).toBeLessThan(SP_LAYOUT.deskTop.xRight - 0.2);
   });
 
   it('ピルのオフセットを持つのは SP だけ（PC はホバーで注釈が濃くなる）', () => {
@@ -127,11 +137,16 @@ describe('PC と SP の構図の違い', () => {
     expect(archive.x).toBeLessThan(PC_LAYOUT.deskTop.xRight);
   });
 
-  it('SP の JOURNAL ラベルは積みの右脇に逃がす（表紙に文字が乗らない）', () => {
-    // PC と同じ「机の手前端」に置くと、SP では手帳の表紙の上に重なる。
-    expect(SP_LAYOUT.labelAnchors.journal.x).toBeGreaterThan(SP_LAYOUT.desk.x);
-    // 左脇はペンがいるので使えない。
-    expect(SP_LAYOUT.labelAnchors.journal.x).toBeGreaterThan(SP_LAYOUT.pen.x);
+  it('SP の ENTRIES ラベルは手帳の手前辺の先（1 冊なので表紙に文字が乗らない）', () => {
+    // 奥行き 3.4 の半分 + 回転ぶん ≈ 1.9 より手前。
+    expect(SP_LAYOUT.labelAnchors.journal.z).toBeGreaterThanOrEqual(SP_LAYOUT.desk.z + 1.9);
+  });
+
+  it('SP の ARCHIVE ラベルは棚の手前の机の面（棚の上だと背表紙の頭に乗る）', () => {
+    const archive = SP_LAYOUT.labelAnchors.archive;
+    if (archive === null) throw new Error('SP の棚のラベルが無い');
+    expect(archive.y).toBeCloseTo(SP_LAYOUT.labelAnchors.jar.y, 5);
+    expect(archive.z).toBeGreaterThan(SP_LAYOUT.shelf.position.z);
   });
 
   it('SP はボードと棚を縮める', () => {

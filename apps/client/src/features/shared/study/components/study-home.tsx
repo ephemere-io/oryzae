@@ -10,7 +10,7 @@ import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
-import { DURATION, RENDER_LIMITS } from '../constants';
+import { DURATION } from '../constants';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
@@ -137,12 +137,12 @@ export function StudyHome({ layout }: StudyHomeProps) {
   /**
    * ARCHIVE のピルに出す冊数は**棚に入っている月**の数。
    *
-   * 全月を数えると、机に積んである 3 冊まで「書庫の冊数」に混ざる（実機で
+   * 全月を数えると、机に積んである冊（PC 3・SP 1）まで「書庫の冊数」に混ざる（実機で
    * 「5 volumes」と出ているのに棚には 2 本しか無い、という食い違いになっていた）。
    */
   const archiveCount = useMemo(
-    () => Math.max(0, state.notebooks.length - RENDER_LIMITS.deskNotebooks),
-    [state.notebooks],
+    () => Math.max(0, state.notebooks.length - layout.deskNotebooks),
+    [state.notebooks, layout.deskNotebooks],
   );
 
   const handleNavigate = useCallback(
@@ -239,8 +239,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
             layout={layout}
             positions={labelPositions}
             hovered={hoveredLabel}
-            status={state.fermentation.status}
-            readiness={state.fermentation.readiness}
+            questionCount={state.questions.length}
             entryCount={currentMonthCount}
             volumeCount={archiveCount}
             cardCount={state.board.total}

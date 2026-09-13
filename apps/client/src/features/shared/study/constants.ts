@@ -200,7 +200,7 @@ export const RENDER_LIMITS = {
   maxBoardCards: 30,
   /** devicePixelRatio の上限。 */
   maxPixelRatio: 2,
-  /** 机に積む手帳の冊数（当月＋直近 2 ヶ月）。 */
+  /** 机に積む手帳の冊数の既定（当月＋直近 2 ヶ月）。SP は配置表 `deskNotebooks` で 1 にする。 */
   deskNotebooks: 3,
   /** 棚に並べる背表紙の本数。超えたら間隔を詰める。 */
   shelfSpines: 3,

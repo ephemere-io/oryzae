@@ -4,14 +4,8 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import type { StudyLayout } from '../layout';
-import {
-  clampPillToScreen,
-  jarPillStateKey,
-  LABEL_STYLE,
-  PILL_MIN_HEIGHT,
-  type PillSize,
-} from '../scene/labels';
-import type { StudyFermentationStatus, StudyTarget } from '../types';
+import { clampPillToScreen, LABEL_STYLE, PILL_MIN_HEIGHT, type PillSize } from '../scene/labels';
+import type { StudyTarget } from '../types';
 
 /** どの対象のラベルか。 */
 export type LabelKind = 'jar' | 'journal' | 'board' | 'archive' | 'pen';
@@ -31,9 +25,13 @@ export interface StudyLabelsProps {
   positions: Partial<Record<LabelKind, LabelPoint | null>>;
   /** ホバー中の対象（PC）。SP は常に null。 */
   hovered: LabelKind | null;
-  /** ピルに添える状態。 */
-  status: StudyFermentationStatus;
-  readiness: number;
+  /**
+   * ピルに添える数。JAR は生きている問いの数。
+   *
+   * 以前は JAR だけ状態語（空 / 発酵中 / もうすぐ / 手紙）だったが、PC にそういう表示名は無く
+   * 他の 3 つは数なので、JAR も数に揃えた。瓶の様子は瓶の見た目（泡・もや）が語る。
+   */
+  questionCount: number;
   entryCount: number;
   volumeCount: number;
   cardCount: number;
@@ -226,7 +224,7 @@ function stateWord(
 ): string {
   switch (kind) {
     case 'jar':
-      return t(jarPillStateKey(props.status, props.readiness));
+      return t('pill_questions', { count: props.questionCount });
     case 'journal':
       return t('pill_entries', { count: props.entryCount });
     case 'archive':
