@@ -335,7 +335,8 @@
       "open": "열기",
       "ocr": "이미지에서 읽기",
       "collapse": "팔레트 접기",
-      "expand": "팔레트 펼치기"
+      "expand": "팔레트 펼치기",
+      "send_to_back": "맨 뒤로"
     },
     "drop_image": "여기에 이미지를 놓으세요"
   },
@@ -820,7 +821,8 @@
       "next_day": "다음 날",
       "snippet_placeholder": "남겨 두고 싶은 것",
       "palette_aria": "보드 작업",
-      "send_to_back": "맨 뒤로"
+      "send_to_back": "맨 뒤로",
+      "ocr_wait_note": "사진의 글자를 읽고 있습니다. 큰 사진은 10초 정도 걸릴 수 있습니다."
     }
   },
   "canvas": {

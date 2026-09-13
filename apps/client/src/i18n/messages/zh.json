@@ -335,7 +335,8 @@
       "open": "打开",
       "ocr": "从图片读取",
       "collapse": "收起工具栏",
-      "expand": "展开工具栏"
+      "expand": "展开工具栏",
+      "send_to_back": "置于底层"
     },
     "drop_image": "把图片拖到这里"
   },
@@ -820,7 +821,8 @@
       "next_day": "后一天",
       "snippet_placeholder": "想留下的话",
       "palette_aria": "看板操作",
-      "send_to_back": "置于底层"
+      "send_to_back": "置于底层",
+      "ocr_wait_note": "正在读取照片中的文字。大图可能需要约 10 秒。"
     }
   },
   "canvas": {

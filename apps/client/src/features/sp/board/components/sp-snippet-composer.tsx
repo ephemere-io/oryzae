@@ -83,17 +83,21 @@ export function SpSnippetComposer({
   const canSubmit = trimmed.length > 0 && !tooLong && !saving && !reading;
   const locked = saving || reading;
   const note =
-    ocrStatus === 'empty'
-      ? tOcr('ocr_empty')
-      : ocrStatus === 'failed'
-        ? tOcr('ocr_failed', { maxMb: Math.round(MAX_OCR_IMAGE_BYTES / 1024 / 1024) })
-        : fromImage
-          ? tOcr('ocr_note')
-          : tooLong
-            ? tOcr('too_long', { max: MAX_SNIPPET_TEXT_LENGTH })
-            : null;
+    ocrStatus === 'reading'
+      ? t('ocr_wait_note')
+      : ocrStatus === 'empty'
+        ? tOcr('ocr_empty')
+        : ocrStatus === 'failed'
+          ? tOcr('ocr_failed', { maxMb: Math.round(MAX_OCR_IMAGE_BYTES / 1024 / 1024) })
+          : fromImage
+            ? tOcr('ocr_note')
+            : tooLong
+              ? tOcr('too_long', { max: MAX_SNIPPET_TEXT_LENGTH })
+              : null;
   const noteTone =
-    fromImage && ocrStatus === 'idle' && !tooLong ? 'var(--date-color)' : 'var(--ob-jar-warm)';
+    ocrStatus === 'reading' || (fromImage && ocrStatus === 'idle' && !tooLong)
+      ? 'var(--date-color)'
+      : 'var(--ob-jar-warm)';
 
   return (
     <div

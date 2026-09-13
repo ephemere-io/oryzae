@@ -97,6 +97,17 @@ interface ResizeState {
   startHeight: number;
 }
 
+export interface PendingCard {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 選んだ写真の object URL。読めない写真なら null（枠だけ）。 */
+  previewUrl: string | null;
+  /** 送れなかった。しばらく見せてから消す。 */
+  failed: boolean;
+}
+
 export interface SpBoardSurfaceProps {
   cards: BoardCardData[];
   dateKey: string;
@@ -121,6 +132,11 @@ export interface SpBoardSurfaceProps {
   onSelect?: (cardId: string | null) => void;
   /** 同じカードを続けて 2 回押したとき（ダブルタップ）。スニペットなら編集を開く。 */
   onOpen?: (cardId: string) => void;
+  /**
+   * 貼っている最中の仮のカード（world）。選んだ瞬間に置き、貼り終わったら実物と入れ替える。
+   * 無いと、選んでから数秒間なにも起きず「押しても貼れない」に見える。
+   */
+  pending?: PendingCard | null;
   /** 角のつまみで回転と大きさが決まったとき。 */
   onTransform?: (cardId: string, next: { rotation: number; width: number; height: number }) => void;
 }
@@ -150,6 +166,7 @@ export function SpBoardSurface({
   selectedId = null,
   onSelect,
   onOpen,
+  pending = null,
   onTransform,
 }: SpBoardSurfaceProps) {
   const t = useTranslations('sp.board');
@@ -394,6 +411,45 @@ export function SpBoardSurface({
             </div>
           );
         })}
+        {pending ? (
+          <div
+            data-pending-card
+            data-pending-failed={pending.failed}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: pending.x,
+              top: pending.y,
+              width: pending.width,
+              height: pending.height,
+              borderRadius: 8,
+              overflow: 'hidden',
+              pointerEvents: 'none',
+              opacity: pending.failed ? 0.45 : 1,
+              background: 'var(--surface-raised)',
+              boxShadow: '0 8px 24px rgba(140,133,126,0.18)',
+            }}
+          >
+            {pending.previewUrl ? (
+              // biome-ignore lint/performance/noImgElement: 選んだ写真の object URL（一時）
+              <img
+                src={pending.previewUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                style={{ filter: 'blur(6px)', opacity: 0.55 }}
+              />
+            ) : null}
+            {/* 進んでいる印。写真の上に薄い紙をかぶせて脈打つ。 */}
+            <div
+              className={pending.failed ? '' : 'animate-pulse'}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'color-mix(in srgb, var(--bg) 45%, transparent)',
+              }}
+            />
+          </div>
+        ) : null}
 
         {/* 角のつまみ。カードの外（右下）に浮かせる。カードの中に置くと本文に重なる。 */}
         {onTransform &&

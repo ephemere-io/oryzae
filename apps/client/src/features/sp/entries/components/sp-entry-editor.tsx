@@ -520,8 +520,9 @@ export function SpEntryEditor({
         style={bodyStyle}
       />
 
-      {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
+      {/* 添えた写真。本文の下に全幅で積む（紙の続き。本文の途中には差し込めない —
+          textarea は画像を描けない。docs/entry-photo-guide.md）。 */}
+      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} variant="blocks" />
 
       <SpPhotoImportSheet
         state={photoImport.state}

@@ -91,15 +91,9 @@ export function SpPhotoImportSheet({
                   {t('transcript_empty')}
                 </p>
               )
-            ) : state.previewUrl ? (
-              // biome-ignore lint/performance/noImgElement: object URL のプレビュー。next/image は blob: を扱えない。
-              <img
-                src={state.previewUrl}
-                alt={t('preview_alt')}
-                className="mt-3 max-h-[40vh] w-full rounded-xl object-contain"
-                style={{ background: 'var(--toolbar-hover)' }}
-              />
             ) : null}
+            {/* 選んだ写真の大きなプレビューは出さない。OS の選択で見たばかりの写真を
+                もう一度見せる理由が無く、二択（読み込む／置く）が下に押し出されていた（実機レビュー）。 */}
 
             <div className="mt-5 flex flex-col gap-2">
               {showTranscript ? (

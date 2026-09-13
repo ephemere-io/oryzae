@@ -27,6 +27,7 @@ interface Props {
   selection: { cardType: 'snippet' | 'photo' } | null;
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
+  onSendSelectedToBack: () => void;
   onDeleteSelected: () => void;
   onEditSelectedOnCard?: () => void;
 }
@@ -42,6 +43,7 @@ const base: Props = {
   selection: null,
   onOpenSelected: noop,
   onBringSelectedToFront: noop,
+  onSendSelectedToBack: noop,
   onDeleteSelected: noop,
   onEditSelectedOnCard: noop,
 };
@@ -145,7 +147,7 @@ registerUnit<Props>({
         if (!props.selection) return true;
         const ids = toolIds(root);
         const actions = actionIds(root);
-        const expected = 'delete,front,open';
+        const expected = 'back,delete,front,open';
         return (
           (actions.join(',') === expected && ids.length === 0) ||
           `選択モードの構造が崩れている: actions=[${actions.join(', ')}] tools=[${ids.join(', ')}]`
