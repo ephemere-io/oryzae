@@ -5,6 +5,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
@@ -348,7 +349,8 @@ export function SpEntryEditor({
     const ok = await deleteEntry(entryId);
     if (ok) {
       clearDraft();
-      router.push('/entries');
+      // SP に一覧の画面は無い（一覧は書斎の手帳から開く）。消したら書斎へ。
+      router.push('/');
     } else {
       setDeleteOpen(false);
     }
@@ -499,22 +501,18 @@ export function SpEntryEditor({
         ]}
       />
 
+      {/* 問いを選ぶ。高さを変えられるセミモーダル（キーボードが出るので高い段から）。 */}
       {sheetOpen ? (
-        <div className="absolute inset-0 z-10 flex flex-col justify-end">
-          <button
-            type="button"
-            aria-label={t('close')}
-            onClick={() => setSheetOpen(false)}
-            className="sp-fade flex-1 bg-black/30"
-          />
-          {/* 60% だとキーボードが出た瞬間に一覧が隠れた。85% まで使う。 */}
-          <div className="sp-sheet max-h-[85%] overflow-auto rounded-t-2xl bg-[var(--bg)] pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
-            <div
-              className="px-5 py-4 text-[11px] uppercase tracking-[0.14em]"
-              style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
-            >
-              {t('question_sheet_title')}
-            </div>
+        <BottomSheet
+          open
+          onClose={() => setSheetOpen(false)}
+          ariaLabel={t('question_sheet_title')}
+          label={t('question_sheet_title')}
+          closeLabel={t('close')}
+          detents={[0.6, 0.92]}
+          initialDetent={1}
+        >
+          <div className="-mx-6">
             {composingQuestion ? (
               <div className="px-5 pb-2">
                 {activeQuestions.length === 0 ? (
@@ -603,7 +601,7 @@ export function SpEntryEditor({
               </>
             )}
           </div>
-        </div>
+        </BottomSheet>
       ) : null}
 
       {/* Issue #466（SP 版）: 発酵結果は本文に重ねず、下からのドロワーに集約する。 */}

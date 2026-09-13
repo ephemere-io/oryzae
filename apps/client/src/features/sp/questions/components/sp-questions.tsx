@@ -3,10 +3,11 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import type { QuestionItem } from '@/features/shared/questions/types';
 import { SpQuestionsCardsSkeleton } from '@/features/sp/questions/components/sp-questions-skeleton';
-import { useSpBackHandler } from '@/lib/sp-chrome-context';
+import { useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
 
 interface SpQuestionsProps {
   questions: QuestionItem[];
@@ -20,7 +21,8 @@ interface SpQuestionsProps {
   unreadQuestionIds?: ReadonlySet<string>;
   /**
    * 重ねて開かれているときの閉じ方。SP はボトムナビを持たないので、瓶から重ねて
-   * 開くことがある（そのときだけ閉じるボタンを出す）。単独ページでは渡さない。
+   * 開くことがある。上段（SpTopBar）の中では戻るがこれを担い、上段が無い場所では
+   * 閉じるボタンを出す。単独ページでは渡さない。
    */
   onClose?: () => void;
 }
@@ -35,6 +37,9 @@ type Sheet = { mode: 'add' } | { mode: 'edit'; id: string };
  * Oryzae からの提案の受け入れ／見送りを行う。データ取得・更新は page が
  * features/shared/questions/hooks/use-questions で行い、ここは props で受ける
  * （PC の QuestionTimeline と同じ presentational 構成。二重フェッチを避ける）。
+ *
+ * 追加・編集は高さを変えられるセミモーダル（`BottomSheet`）。キーボードが出るので
+ * 高い段から開く。
  */
 export function SpQuestions({
   questions,
@@ -48,6 +53,7 @@ export function SpQuestions({
   onClose,
 }: SpQuestionsProps) {
   const t = useTranslations('sp.questions');
+  const { mounted } = useSpChrome();
   // 瓶から重ねて開いている間は、上段の「戻る」も書斎ではなくこの画面を閉じる。
   useSpBackHandler(onClose ?? null);
 
@@ -103,9 +109,10 @@ export function SpQuestions({
       })}
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
     >
-      <header className="flex items-center justify-between gap-3 px-5 pt-6 pb-1">
+      <header className="flex items-center justify-between gap-3 px-5 pt-5 pb-1">
         <span className="text-lg font-medium">{t('title')}</span>
-        {onClose ? (
+        {/* 上段が無い場所（孤立検証・テスト）だけ、自前の閉じるを出す。 */}
+        {onClose && !mounted ? (
           <button
             type="button"
             onClick={onClose}
@@ -196,7 +203,7 @@ export function SpQuestions({
                 {hasUnreadLetter ? (
                   <span
                     className="mt-2 flex items-center gap-1.5 text-[11px]"
-                    style={{ color: 'var(--ob-jar-warm)' }}
+                    style={{ ...CONTROL_FONT, color: 'var(--ob-jar-warm)' }}
                   >
                     <span
                       className="h-1.5 w-1.5 rounded-full"
@@ -254,73 +261,62 @@ export function SpQuestions({
         </div>
       )}
 
-      {/* 追加 / 編集 ボトムシート */}
+      {/* 追加 / 編集。キーボードが出るので高い段から開く。 */}
       {sheet ? (
-        <div className="absolute inset-0 z-10 flex flex-col justify-end">
-          <button
-            type="button"
-            aria-label={t('cancel')}
-            onClick={() => setSheet(null)}
-            className="flex-1 bg-black/30"
+        <BottomSheet
+          open
+          onClose={() => setSheet(null)}
+          ariaLabel={sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
+          label={sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
+          closeLabel={t('cancel')}
+          detents={[0.6, 0.92]}
+          initialDetent={1}
+        >
+          <textarea
+            // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件
+            autoFocus
+            aria-label={t('placeholder')}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            maxLength={64}
+            rows={3}
+            placeholder={t('placeholder')}
+            className="w-full resize-none rounded-xl p-3 text-base outline-none"
+            style={{
+              background: 'var(--surface-raised)',
+              border: '1px solid var(--surface-raised-border)',
+              lineHeight: 1.7,
+            }}
           />
-          <div className="sp-sheet rounded-t-2xl bg-[var(--bg)] px-5 pt-5 pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
-            <p
-              className="mb-3 text-[11px] uppercase tracking-[0.14em]"
-              style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
+          {/* 保存は右寄せの 1 つ（キャンセルはシートの見出しにある）。 */}
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              disabled={submitting || !draft.trim()}
+              onClick={submit}
+              className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-5 text-[13px] font-medium text-white disabled:opacity-50"
+              style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
             >
-              {sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
-            </p>
-            <textarea
-              // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件
-              autoFocus
-              aria-label={t('placeholder')}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              maxLength={64}
-              rows={3}
-              placeholder={t('placeholder')}
-              className="w-full resize-none rounded-xl bg-transparent p-3 text-base outline-none"
-              style={{ border: '1px solid var(--border-subtle)', lineHeight: 1.7 }}
-            />
-            {/* 保存とキャンセルは右寄せで 1 行（縮めない: 幅が足りないと「保／存」に割れた）。
-                「終える」は破壊的な操作なので、同じ行に並べず下に離す。 */}
-            <div className="mt-3 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setSheet(null)}
-                className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-4 text-[13px] disabled:opacity-50"
-                style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={submitting || !draft.trim()}
-                onClick={submit}
-                className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-5 text-[13px] font-medium text-white disabled:opacity-50"
-                style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
-              >
-                {t('save')}
-              </button>
-            </div>
-            {sheet.mode === 'edit' ? (
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={remove}
-                className="mt-4 min-h-[40px] w-full whitespace-nowrap rounded-full text-[13px] disabled:opacity-50"
-                style={{
-                  ...CONTROL_FONT,
-                  color: 'var(--ob-jar-warm)',
-                  border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
-                }}
-              >
-                {t('delete')}
-              </button>
-            ) : null}
+              {t('save')}
+            </button>
           </div>
-        </div>
+          {/* 「終える」は破壊的な操作なので、保存の行から離して下に。 */}
+          {sheet.mode === 'edit' ? (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={remove}
+              className="mt-6 min-h-[40px] w-full whitespace-nowrap rounded-full text-[13px] disabled:opacity-50"
+              style={{
+                ...CONTROL_FONT,
+                color: 'var(--ob-jar-warm)',
+                border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
+              }}
+            >
+              {t('delete')}
+            </button>
+          ) : null}
+        </BottomSheet>
       ) : null}
     </div>
   );

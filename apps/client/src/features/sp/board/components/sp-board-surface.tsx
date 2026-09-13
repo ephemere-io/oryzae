@@ -97,6 +97,8 @@ interface ResizeState {
 export interface SpBoardSurfaceProps {
   cards: BoardCardData[];
   dateKey: string;
+  /** 前の日（-1）・次の日（+1）へ。渡さなければ日付は表示だけ。 */
+  onShiftDay?: (offset: -1 | 1) => void;
   /** 盤面を画面に収めるための変換。 */
   viewport: Viewport;
   /**
@@ -134,6 +136,7 @@ export interface SpBoardSurfaceProps {
 export function SpBoardSurface({
   cards,
   dateKey,
+  onShiftDay,
   viewport,
   canvas,
   overlay,
@@ -294,6 +297,7 @@ export function SpBoardSurface({
         hasSidePane: false,
         selectedId: selectedId ?? 'none',
         pannable: canvas !== undefined,
+        canShiftDay: onShiftDay !== undefined,
       })}
       ref={canvas?.frameRef}
       className="relative h-full w-full overflow-hidden"
@@ -433,18 +437,57 @@ export function SpBoardSurface({
         </p>
       )}
 
-      {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。 */}
+      {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。日付の両脇で前後の日へ。 */}
       <div
-        className="pointer-events-none absolute top-4 flex items-baseline gap-2"
-        style={{ left: '1rem', color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
+        data-canvas-no-pan=""
+        className="pointer-events-none absolute top-3 flex items-center gap-1"
+        style={{ left: '0.5rem', color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
       >
+        {onShiftDay ? (
+          <button
+            type="button"
+            aria-label={t('prev_day')}
+            onClick={() => onShiftDay(-1)}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full"
+          >
+            <ChevronIcon direction="left" />
+          </button>
+        ) : null}
         <span className="text-[11px] tracking-[0.16em]">{formatCornerDate(dateKey)}</span>
-        <span className="text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>
+        {onShiftDay ? (
+          <button
+            type="button"
+            aria-label={t('next_day')}
+            onClick={() => onShiftDay(1)}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full"
+          >
+            <ChevronIcon direction="right" />
+          </button>
+        ) : null}
+        <span className="ml-1 text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>
       </div>
 
       {/* 画面空間の UI。この上ではパンを始めない。 */}
       {overlay ? <div data-canvas-no-pan="">{overlay}</div> : null}
     </div>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={direction === 'left' ? 'm14.5 6-6 6 6 6' : 'm9.5 6 6 6-6 6'} />
+    </svg>
   );
 }
 

@@ -4,7 +4,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
-import { CONTROL_FONT, ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
+import { ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import type { JarQuestion } from '@/features/shared/questions/types';
@@ -39,7 +39,7 @@ interface SpJarProps {
  * SP の違いは円の中に中身を並べないことだけで、構造は PC を踏襲する。
  *
  * **画面に文字を置かない。** 見出しや説明文は上段（SpTopBar）と地図が語る。
- * 残すのは問いの管理へ入るボタンだけ。
+ * 問いの管理へ入る口は右下の正円（地図アプリの定位置）。
  */
 export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps) {
   const t = useTranslations('sp.jar');
@@ -92,17 +92,31 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
         </div>
       )}
 
-      {/* 問いの管理へ。面はパレット・上段の正円と同じ系統（ELEVATED_CHIP）。 */}
-      <div className="flex shrink-0 justify-center px-5 pt-2 pb-6">
-        <button
-          type="button"
-          onClick={onManageQuestions}
-          className={`flex min-h-[44px] items-center px-6 text-[13px] font-medium tracking-[0.06em] ${ELEVATED_CHIP_CLASS}`}
-          style={{ ...ELEVATED_CHIP_STYLE, ...CONTROL_FONT }}
+      {/* 問いの管理へ。右下の正円（地図アプリの定位置）。文字は置かず、名前は読み上げに。 */}
+      <button
+        type="button"
+        onClick={onManageQuestions}
+        aria-label={t('manage_questions')}
+        data-manage-questions
+        className="absolute bottom-5 right-5 z-10 flex h-14 w-14 items-center justify-center rounded-full text-white transition-transform active:scale-95"
+        style={{
+          background: 'var(--accent)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.12)',
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          width="26"
+          height="26"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={ICON_STROKE_WIDTH + 0.4}
+          strokeLinecap="round"
         >
-          {t('manage_questions')}
-        </button>
-      </div>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
 
       {openQuestion ? (
         <SpQuestionZoom

@@ -72,9 +72,9 @@ export function SpJarSkeleton({ circles = 3 }: { circles?: number }) {
     >
       <SpJarMapSkeleton circles={circles} />
 
-      {/* 問いを追加・編集するボタン（実物: 下部中央のチップ、角丸 16） */}
-      <div className="flex justify-center px-5 pb-6 pt-2" data-skeleton-slot="manage">
-        <Skeleton className="h-11 w-40 rounded-2xl" />
+      {/* 問いを追加・編集する正円（実物: 右下の 56px） */}
+      <div className="absolute bottom-5 right-5" data-skeleton-slot="manage">
+        <Skeleton className="h-14 w-14 rounded-full" />
       </div>
     </div>
   );

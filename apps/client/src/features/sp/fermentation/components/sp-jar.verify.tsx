@@ -161,8 +161,12 @@ registerUnit<Props>({
       description: '問いの管理へ入る口は常にある（SP はボトムナビを持たない唯一の入口）',
       onlyFixtures: ['loading', 'no-questions', 'orbit', 'opened'],
       check: ({ root }) => {
-        const text = root.textContent ?? '';
-        return text.includes('問いを追加・編集') || '「問いを追加・編集」ボタンが無い';
+        // 右下の正円。文字は置かないので名前（aria-label）で見る。
+        const fab = root.querySelector('button[data-manage-questions]');
+        return (
+          fab?.getAttribute('aria-label') === '問いを追加・編集' ||
+          '「問いを追加・編集」の正円が無い'
+        );
       },
     },
     {

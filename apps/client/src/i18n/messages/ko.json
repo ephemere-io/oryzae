@@ -806,6 +806,8 @@
       "open": "열기",
       "read_image": "사진에서 글자 읽기",
       "lightbox_close": "닫기",
+      "prev_day": "이전 날",
+      "next_day": "다음 날",
       "snippet_placeholder": "남겨 두고 싶은 것"
     }
   },

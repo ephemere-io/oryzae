@@ -806,6 +806,8 @@
       "open": "打开",
       "read_image": "从照片识别文字",
       "lightbox_close": "关闭",
+      "prev_day": "前一天",
+      "next_day": "后一天",
       "snippet_placeholder": "想留下的话"
     }
   },
