@@ -10,7 +10,7 @@
     "apps/client": {
       "next": true,
       "vitest": true,
-      "entry": ["sentry.*.config.ts"],
+      "entry": ["sentry.*.config.ts", "scripts/preview-study-layout.mjs"],
       "ignore": ["public/sw.js"]
     },
     "apps/admin": {
