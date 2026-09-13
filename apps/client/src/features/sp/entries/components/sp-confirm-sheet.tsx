@@ -47,7 +47,7 @@ export function SpConfirmSheet({
             className="sp-fade flex-1 bg-black/30"
           />
           <div
-            className="sp-sheet rounded-t-2xl bg-[var(--bg)] px-5 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
+            className="sp-sheet rounded-t-2xl bg-[var(--surface-raised)] px-5 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
             style={{ fontFamily: 'var(--ob-font-sans)' }}
           >
             <p

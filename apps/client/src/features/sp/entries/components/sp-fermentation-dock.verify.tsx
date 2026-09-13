@@ -139,7 +139,7 @@ registerUnit<Props>({
       id: 'snippets-limited-below-full',
       description: '全画面でなければ抜粋は 3 件まで',
       check: ({ root, contract }) => {
-        const items = root.querySelectorAll('li').length;
+        const items = root.querySelectorAll('li[data-snippet]').length;
         if (contract.detent === 'full') return true;
         return items <= 3 || `抜粋 ${items} 件（3 件まで）`;
       },

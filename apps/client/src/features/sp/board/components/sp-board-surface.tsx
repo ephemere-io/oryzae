@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
+import { CanvasGrid } from '@/components/ui/canvas-grid';
 import type { BoardCardData } from '@/features/shared/board/types';
 import type { CanvasSurface } from '@/lib/canvas/use-canvas-viewport';
 import { toTransform, type Viewport, worldToScreen } from '@/lib/canvas/viewport';
@@ -357,6 +358,8 @@ export function SpBoardSurface({
       onPointerUpCapture={trackPointerEnd}
       onPointerCancelCapture={trackPointerEnd}
     >
+      {/* コルクボードの質感（PC と同じ）。frame に敷き、world に貼り付いて見える。 */}
+      {canvas ? <CanvasGrid canvas={canvas} variant="cork" opacity={1} /> : null}
       {/* world。transform を書くのは hook（あれば）。無ければ viewport から自分で書く。 */}
       <div
         ref={canvas?.worldRef}
@@ -525,8 +528,15 @@ export function SpBoardSurface({
       {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。日付の両脇で前後の日へ。 */}
       <div
         data-canvas-no-pan=""
-        className="pointer-events-none absolute top-3 flex items-center gap-1"
-        style={{ left: '0.5rem', color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
+        // コルクの地でも読めるよう、白い面（ピル）に乗せる。
+        className="pointer-events-none absolute top-3 flex items-center gap-1 rounded-full py-0.5 pr-3"
+        style={{
+          left: '0.5rem',
+          color: 'var(--date-color)',
+          fontFamily: 'Inter, sans-serif',
+          background: 'var(--surface-raised)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        }}
       >
         {onShiftDay ? (
           <button

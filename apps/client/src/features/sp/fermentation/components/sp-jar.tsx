@@ -3,10 +3,11 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActionPalette } from '@/components/ui/action-palette';
 import { PlusIcon } from '@/components/ui/palette-icons';
 import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
+import { useFermentationHistory } from '@/features/shared/fermentation/hooks/use-fermentation-history';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarQuestion } from '@/features/shared/questions/types';
@@ -77,17 +78,48 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
     }
     return latest;
   }, [letters]);
-  const letterIds = useMemo(
-    () => [...latestLetterByQuestion.values()].map((entry) => entry.fermentationId),
-    [latestLetterByQuestion],
+  /**
+   * 問いごとの、これまでの発酵（新しい順）。PC の履歴（cover flow）の SP 版で、問いの画面の
+   * 上に日付の帯として並べ、押せばその回の手紙・言葉・抜粋に切り替わる。
+   */
+  const { byQuestion: historyByQuestion } = useFermentationHistory(api, false);
+  /** 履歴で選んだ回。null なら最新。問いを変えれば最新に戻る。 */
+  const [historyPick, setHistoryPick] = useState<string | null>(null);
+  const openHistory = useMemo(
+    () =>
+      openQuestion
+        ? [...(historyByQuestion.get(openQuestion.id) ?? [])]
+            .reverse()
+            .map((summary) => ({ fermentationId: summary.id, createdAt: summary.createdAt }))
+        : [],
+    [openQuestion, historyByQuestion],
   );
+  // 先読みは最新の手紙。開いている問いはこれまでの回も取っておく（帯を押した瞬間に出る）。
+  const letterIds = useMemo(() => {
+    const ids = [...latestLetterByQuestion.values()].map((entry) => entry.fermentationId);
+    for (const item of openHistory) {
+      if (!ids.includes(item.fermentationId)) ids.push(item.fermentationId);
+    }
+    return ids;
+  }, [latestLetterByQuestion, openHistory]);
   const { details, loading: detailsLoading } = useFermentationDetails(api, letterIds);
-  const openFermentationId = openQuestion
+  const latestFermentationId = openQuestion
     ? (latestLetterByQuestion.get(openQuestion.id)?.fermentationId ?? null)
     : null;
+  const openFermentationId =
+    historyPick && openHistory.some((item) => item.fermentationId === historyPick)
+      ? historyPick
+      : latestFermentationId;
   const detail = openFermentationId ? (details.get(openFermentationId) ?? null) : null;
   const detailLoading =
     openFermentationId !== null && !details.has(openFermentationId) && detailsLoading;
+  // Issue #447: 既読は「その手紙を開いたか」。手紙は問いの画面に最初から出るので、最新の手紙が
+  // 画面に出た時点で読んだことにする。
+  useEffect(() => {
+    if (!openQuestion || !detail?.letter) return;
+    if (openFermentationId !== latestFermentationId) return;
+    markQuestionRead(openQuestion.id);
+  }, [openQuestion, detail, openFermentationId, latestFermentationId, markQuestionRead]);
 
   const untitled = t('untitled');
   const mapQuestions = useMemo<MapQuestion[]>(() => {
@@ -126,7 +158,10 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
         <div className="relative min-h-0 flex-1">
           <SpJarMap
             questions={mapQuestions}
-            onSelect={setOpenId}
+            onSelect={(id) => {
+              setOpenId(id);
+              setHistoryPick(null);
+            }}
             // 置き直した円は PC と同じ API で保存する（動かした 1 つだけを送る。サーバーは項目ごとに更新）。
             onMove={(id, position) =>
               saveLayout({
@@ -163,6 +198,11 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
           questionText={openQuestion.currentText ?? untitled}
           detail={detail}
           loading={detailLoading}
+          history={openHistory}
+          selectedFermentationId={openFermentationId}
+          onSelectFermentation={setHistoryPick}
+          onReply={() => router.push(`/entries/new?questionId=${openQuestion.id}`)}
+          onOpenSource={(entryId) => router.push(`/entries/${entryId}`)}
           onClose={() => {
             setOpenId(null);
             setElement(null);

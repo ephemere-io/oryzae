@@ -15,6 +15,14 @@ interface SpQuestionZoomProps {
   questionText: string;
   detail: FermentationDetail | null;
   loading: boolean;
+  /** これまでの発酵（新しい順）。2 回以上あれば日付の帯を出す（PC の履歴の SP 版）。 */
+  history?: readonly { fermentationId: string; createdAt: string }[];
+  selectedFermentationId?: string | null;
+  onSelectFermentation?: (fermentationId: string) => void;
+  /** 手紙に返事を書く（新規エントリーへ）。 */
+  onReply?: () => void;
+  /** 手紙のもとになった記録を開く。 */
+  onOpenSource?: (entryId: string) => void;
   onClose: () => void;
   onOpenElement: (element: SpJarElement) => void;
 }
@@ -36,6 +44,11 @@ export function SpQuestionZoom({
   questionText,
   detail,
   loading,
+  history = [],
+  selectedFermentationId = null,
+  onSelectFermentation,
+  onReply,
+  onOpenSource,
   onClose,
   onOpenElement,
 }: SpQuestionZoomProps) {
@@ -65,6 +78,7 @@ export function SpQuestionZoom({
         empty,
         expanded,
         ownBack: !mounted,
+        historyCount: history.length,
       })}
     >
       {/* 問いの行。上段の直下、画面のいちばん上。 */}
@@ -112,6 +126,39 @@ export function SpQuestionZoom({
         </button>
       </header>
 
+      {/* これまでの発酵（新しい順）。押せばその回に切り替わる。PC の履歴（cover flow）の SP 版。 */}
+      {history.length > 1 ? (
+        <div
+          data-history-strip
+          className="flex shrink-0 items-center gap-2 overflow-x-auto px-4 py-2"
+          style={{ ...CONTROL_FONT, scrollbarWidth: 'none' }}
+        >
+          <span className="shrink-0 text-[11px]" style={{ color: 'var(--date-color)' }}>
+            {t('history')}
+          </span>
+          {history.map((item, index) => {
+            const active = item.fermentationId === selectedFermentationId;
+            return (
+              <button
+                key={item.fermentationId}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onSelectFermentation?.(item.fermentationId)}
+                className="shrink-0 rounded-full border px-3 py-1.5 text-[12px] tracking-[0.04em]"
+                style={{
+                  borderColor: active ? 'var(--accent)' : 'var(--border-subtle)',
+                  background: active ? 'var(--accent)' : 'transparent',
+                  color: active ? 'var(--bg)' : 'var(--fg)',
+                }}
+              >
+                {index === 0 ? `${t('history_latest')} · ` : ''}
+                {formatMonthDay(item.createdAt)}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {/* 一覧。行を押すと全文（セミモーダル）。 */}
       <div className="min-h-0 flex-1 overflow-auto px-5 pt-4 pb-8">
         {/* 読み込み中は、いずれ出る形（見出しと行）を先に置く。一瞬で返るなら出さない。 */}
@@ -128,46 +175,71 @@ export function SpQuestionZoom({
 
         {letter ? (
           <Section label={t('section_letter')}>
-            <Row
-              testId="sp-jar-letter"
-              ariaLabel={t('section_letter')}
-              onClick={() =>
-                onOpenElement({
-                  kind: 'letter',
-                  id: letter.id,
-                  bodyText: letter.bodyText,
-                  sources: detail?.scannedEntries ?? [],
-                })
-              }
+            {/* 手紙は最初から本文を出す（もう一度押さないと読めないのは不便、と実機レビュー）。 */}
+            <article
+              data-testid="sp-jar-letter"
+              aria-label={t('section_letter')}
+              className="flex flex-col gap-3 py-1"
             >
-              <span
-                className="flex shrink-0 items-center justify-center rounded-full"
-                style={{
-                  width: 40,
-                  height: 40,
-                  background: 'linear-gradient(135deg, #FFFFFF, #FBF1EE)',
-                  border: '1.5px solid rgba(122,59,63,0.45)',
-                }}
-              >
-                <LetterIcon />
-              </span>
-              <span className="min-w-0 flex-1">
+              {detail?.targetPeriod ? (
                 <span
-                  className="block text-[15px] leading-snug"
-                  style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
+                  className="text-[11px] tracking-[0.08em]"
+                  style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
                 >
-                  {t('section_letter')}
+                  {detail.targetPeriod.replace('-', '.')}
                 </span>
-                {detail?.targetPeriod ? (
+              ) : null}
+              <p
+                className="m-0 whitespace-pre-wrap text-[15px] leading-[1.95]"
+                style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
+              >
+                {letter.bodyText}
+              </p>
+              {/* もとになった記録（Issue #453: 何に対する返事かが分かる）。無ければ出さない。 */}
+              {(detail?.scannedEntries.length ?? 0) > 0 ? (
+                <div className="flex flex-col gap-1">
                   <span
-                    className="mt-0.5 block text-[11px] tracking-[0.08em]"
+                    className="text-[11px] uppercase tracking-[0.12em]"
                     style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
                   >
-                    {detail.targetPeriod.replace('-', '.')}
+                    {t('section_sources')}
                   </span>
-                ) : null}
-              </span>
-            </Row>
+                  <ul className="flex flex-col">
+                    {(detail?.scannedEntries ?? []).map((source) => (
+                      <li key={source.id}>
+                        <button
+                          type="button"
+                          onClick={() => onOpenSource?.(source.id)}
+                          className="flex min-h-[40px] w-full items-center justify-between gap-3 text-left text-[14px]"
+                          style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
+                        >
+                          <span className="min-w-0 truncate">
+                            {source.title || t('source_untitled')}
+                          </span>
+                          <span
+                            className="shrink-0 text-[11px]"
+                            style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                          >
+                            {formatMonthDay(source.createdAt)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {onReply ? (
+                <button
+                  type="button"
+                  data-letter-reply
+                  onClick={onReply}
+                  className="min-h-[44px] self-start rounded-full px-5 text-[14px] font-medium"
+                  style={{ ...CONTROL_FONT, background: 'var(--accent)', color: 'var(--bg)' }}
+                >
+                  {t('reply')}
+                </button>
+              ) : null}
+            </article>
           </Section>
         ) : null}
 
@@ -285,34 +357,6 @@ function Row({ onClick, testId, ariaLabel, children }: RowProps) {
         </span>
       </button>
     </li>
-  );
-}
-
-function LetterIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="18"
-      height="18"
-      viewBox="0 0 16 16"
-      fill="none"
-      style={{ color: '#7A3B3F' }}
-    >
-      <path
-        d="M1 4L8 9L15 4"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M1 4V12H15V4"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 

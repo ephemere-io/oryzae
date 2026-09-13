@@ -734,6 +734,17 @@
       "ferment_title": "漬け込む",
       "ferment_done_short": "発酵中",
       "result_read_full": "全文を読む",
+      "photo_width": "幅",
+      "photo_width_small": "小",
+      "photo_width_medium": "中",
+      "photo_width_large": "大",
+      "photo_align": "寄せ",
+      "photo_wrap": "回り込み",
+      "photo_wrap_on": "あり",
+      "photo_wrap_off": "なし",
+      "photo_remove": "外す",
+      "photo_done": "完了",
+      "photo_selected": "写真を選んでいます",
       "ferment_sub": "時間をおくと、AI からの手紙が届きます",
       "delete": "削除",
       "question_unlink": "「{label}」を外す",
@@ -771,7 +782,11 @@
       "manage_questions": "問いを追加・編集",
       "not_fermented": "この問いはまだ発酵していません",
       "selection_reason": "選ばれた理由",
-      "palette_aria": "瓶の操作"
+      "palette_aria": "瓶の操作",
+      "letter_badge": "手紙",
+      "letter_badge_unread": "新しい手紙",
+      "history": "これまで",
+      "history_latest": "最新"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -889,6 +904,9 @@
     "hint_board_empty": "まだ何も貼っていません",
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
-    "hint_board_both": "写真{photos}件・スニペット{snippets}件"
+    "hint_board_both": "写真{photos}件・スニペット{snippets}件",
+    "list_row_actions": "操作",
+    "list_open": "開く",
+    "list_delete": "削除"
   }
 }

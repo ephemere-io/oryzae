@@ -12,8 +12,9 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import type { AttachedPhoto } from '@/features/shared/entries/types';
+import type { InlinePhoto } from '@/features/shared/entries/types';
 import { joinBodySegments, splitBodyAtPhotos } from '@/features/shared/entries/utils/inline-photos';
+import { scrollCaretIntoView } from '../utils/caret-into-view';
 
 export interface SpBodyEditorHandle {
   /** いまのカーソル（文の添字と、その文の中の位置）。フォーカスが無ければ最後に触った場所。 */
@@ -25,14 +26,17 @@ export interface SpBodyEditorHandle {
 interface SpBodyEditorProps {
   /** 本文。写真の位置は U+FFFC（`inline-photos.ts`）。 */
   value: string;
-  /** 本文の中の写真（置き順）。数はプレースホルダの数と同じ。 */
-  images: readonly AttachedPhoto[];
+  /** 本文の中の写真（置き順、見た目つき）。数はプレースホルダの数と同じ。 */
+  images: readonly InlinePhoto[];
   onChange: (value: string) => void;
   /**
    * 写真を抜く（置き順の添字）。本文の繋ぎ直し（`removePhotoAt`）と写真の一覧の更新は呼び出し側が
    * 一度に行う（別々に更新すると、途中の描画で数が食い違う）。ここはカーソルの置き場を手配するだけ。
    */
   onRemoveImage: (index: number) => void;
+  /** 選んでいる写真（縁取り。パレットが写真の操作に切り替わる）。 */
+  selectedImage: number | null;
+  onSelectImage: (index: number | null) => void;
   placeholder: string;
   ariaLabel: string;
   /** 本文の見た目（書体・大きさ・行間・字間）。 */
@@ -43,18 +47,35 @@ interface SpBodyEditorProps {
 /**
  * SP の本文。**文のブロックと写真のブロックの列**（Notion のモバイルと同じ）。
  *
- * textarea は画像を描けない。本文をプレースホルダで切り、文ごとに伸びる textarea、間に全幅の写真を
- * 置く。書き手には 1 枚の紙に見える（枠も余白も持たない）。写真は右上の × か、直後の文の先頭で
- * BackSpace で抜ける（Notion と同じ）。
+ * textarea は画像を描けない。本文をプレースホルダで切り、文ごとに伸びる textarea、間に写真を
+ * 置く。書き手には 1 枚の紙に見える（枠も余白も持たない）。写真は × か、直後の文の先頭で
+ * BackSpace で抜ける（Notion と同じ）。写真を押すと選ばれ、見た目（幅・寄せ・回り込み）は
+ * 呼び出し側のパレットで変える。
+ *
+ * **カーソルはどんな状況でも見せる。** ブラウザの「入力欄を見せるスクロール」は箱を見せるだけで、
+ * 写真の直後の長い文ではカーソルの行が隠れた。フォーカス・入力・選択・キーボードの出入り・本文の
+ * 高さの変化のたびに、カーソルの行を殻の本文の見えている範囲へ入れる（`caret-into-view.ts`）。
  *
  * 保存形式は PC と同じ（本文の U+FFFC + `effects.inlineImages`）。ここは描くだけで、形式の往復は
  * `features/shared/entries/utils/inline-photos.ts`。
  */
 export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(function SpBodyEditor(
-  { value, images, onChange, onRemoveImage, placeholder, ariaLabel, style, autoFocus },
+  {
+    value,
+    images,
+    onChange,
+    onRemoveImage,
+    selectedImage,
+    onSelectImage,
+    placeholder,
+    ariaLabel,
+    style,
+    autoFocus,
+  },
   ref,
 ) {
   const t = useTranslations('photo');
+  const tSp = useTranslations('sp.editor');
   const segments = useMemo(() => splitBodyAtPhotos(value), [value]);
   const areaRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const activeRef = useRef<{ segment: number; offset: number } | null>(null);
@@ -71,6 +92,7 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
     el.focus();
     el.setSelectionRange(at, at);
     activeRef.current = { segment: pending.segment, offset: at };
+    requestAnimationFrame(() => scrollCaretIntoView(el));
   }, []);
 
   useImperativeHandle(
@@ -95,6 +117,27 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
     applyPendingFocus();
   }, [segments]);
 
+  // キーボードの出入り（ビジュアルビューポート）や本文の箱の変化でも、カーソルの行を見せ直す。
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const reveal = () => {
+      const active = document.activeElement;
+      if (active instanceof HTMLTextAreaElement && areaRefs.current.includes(active)) {
+        requestAnimationFrame(() => scrollCaretIntoView(active));
+      }
+    };
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', reveal);
+    const main = areaRefs.current[0]?.closest('main');
+    const observer =
+      main && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(reveal) : null;
+    if (main && observer) observer.observe(main);
+    return () => {
+      viewport?.removeEventListener('resize', reveal);
+      observer?.disconnect();
+    };
+  }, []);
+
   function updateSegment(index: number, text: string) {
     const next = [...segments];
     next[index] = text;
@@ -108,6 +151,7 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
   function removeImage(index: number) {
     const before = segments[index] ?? '';
     pendingFocusRef.current = { segment: index, offset: before.length };
+    onSelectImage(null);
     onRemoveImage(index);
   }
 
@@ -117,6 +161,7 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
         unit: 'SpBodyEditor',
         segmentCount: segments.length,
         imageCount: images.length,
+        selectedImage: selectedImage ?? 'none',
       })}
       className="flex flex-col"
     >
@@ -130,6 +175,9 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
               <PhotoBlock
                 image={image}
                 index={index - 1}
+                selected={selectedImage === index - 1}
+                selectedLabel={tSp('photo_selected')}
+                onSelect={() => onSelectImage(selectedImage === index - 1 ? null : index - 1)}
                 onRemove={() => removeImage(index - 1)}
                 removeLabel={t('remove', { index })}
                 alt={t('attached_alt', { index })}
@@ -143,6 +191,9 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
               value={text}
               onChange={(next) => updateSegment(index, next)}
               onCaret={(el) => track(index, el)}
+              onFocusIn={() => {
+                if (selectedImage !== null) onSelectImage(null);
+              }}
               onBackspaceAtStart={index > 0 ? () => removeImage(index - 1) : undefined}
               placeholder={segments.length === 1 ? placeholder : ''}
               ariaLabel={segments.length === 1 ? ariaLabel : `${ariaLabel} ${index + 1}`}
@@ -162,6 +213,7 @@ interface GrowingTextareaProps {
   value: string;
   onChange: (value: string) => void;
   onCaret: (el: HTMLTextAreaElement) => void;
+  onFocusIn: () => void;
   onBackspaceAtStart?: () => void;
   placeholder: string;
   ariaLabel: string;
@@ -177,6 +229,7 @@ const GrowingTextarea = forwardRef<HTMLTextAreaElement, GrowingTextareaProps>(
       value,
       onChange,
       onCaret,
+      onFocusIn,
       onBackspaceAtStart,
       placeholder,
       ariaLabel,
@@ -208,6 +261,12 @@ const GrowingTextarea = forwardRef<HTMLTextAreaElement, GrowingTextareaProps>(
       };
     }, [growKey]);
 
+    /** カーソルを追い、行を見せる（描画が終わってから）。 */
+    const follow = (el: HTMLTextAreaElement) => {
+      onCaret(el);
+      requestAnimationFrame(() => scrollCaretIntoView(el));
+    };
+
     return (
       <textarea
         ref={(el) => {
@@ -220,12 +279,15 @@ const GrowingTextarea = forwardRef<HTMLTextAreaElement, GrowingTextareaProps>(
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
-          onCaret(e.target);
+          follow(e.target);
         }}
-        onSelect={(e) => onCaret(e.currentTarget)}
-        onFocus={(e) => onCaret(e.currentTarget)}
-        onClick={(e) => onCaret(e.currentTarget)}
-        onKeyUp={(e) => onCaret(e.currentTarget)}
+        onSelect={(e) => follow(e.currentTarget)}
+        onFocus={(e) => {
+          onFocusIn();
+          follow(e.currentTarget);
+        }}
+        onClick={(e) => follow(e.currentTarget)}
+        onKeyUp={(e) => follow(e.currentTarget)}
         onKeyDown={(e) => {
           if (
             e.key === 'Backspace' &&
@@ -246,48 +308,85 @@ const GrowingTextarea = forwardRef<HTMLTextAreaElement, GrowingTextareaProps>(
   },
 );
 
+/** 寄せを、PC の block と同じ margin で作る（左 / 中央 / 右）。 */
+function marginFor(align: InlinePhoto['align']): string {
+  if (align === 'center') return '0 auto';
+  if (align === 'end') return '0 0 0 auto';
+  return '0 auto 0 0';
+}
+
 function PhotoBlock({
   image,
   index,
+  selected,
+  selectedLabel,
+  onSelect,
   onRemove,
   removeLabel,
   alt,
   unavailable,
 }: {
-  image: AttachedPhoto | undefined;
+  image: InlinePhoto | undefined;
   index: number;
+  selected: boolean;
+  selectedLabel: string;
+  onSelect: () => void;
   onRemove: () => void;
   removeLabel: string;
   alt: string;
   unavailable: string;
 }) {
+  const widthRatio = image?.widthRatio ?? 1;
+  const align = image?.align ?? 'start';
   return (
-    <figure data-body-photo={index} className="relative my-3 px-6">
-      {image?.signedUrl ? (
-        // biome-ignore lint/performance/noImgElement: Storage の署名付き URL。next/image の loader 設定なしに扱う
-        <img
-          src={image.signedUrl}
-          alt={alt}
-          className="block w-full rounded-2xl object-cover"
-          style={{ border: '1px solid var(--border-subtle)', maxHeight: '70vw' }}
-        />
-      ) : (
-        <div
-          role="img"
-          aria-label={unavailable}
-          className="flex h-32 w-full items-center justify-center rounded-2xl text-[11px]"
-          style={{
-            border: '1px dashed var(--border-subtle)',
-            color: 'var(--date-color)',
-            background: 'var(--toolbar-hover)',
-          }}
-        >
-          {unavailable}
-        </div>
-      )}
+    <figure data-body-photo={index} data-selected={selected} className="relative my-3 px-6">
       <button
         type="button"
-        onClick={onRemove}
+        data-no-press
+        onClick={onSelect}
+        aria-pressed={selected}
+        aria-label={selected ? selectedLabel : alt}
+        className="block rounded-2xl text-left"
+        style={{
+          width: `${widthRatio * 100}%`,
+          margin: marginFor(align),
+          outline: selected ? '2px solid var(--accent)' : 'none',
+          outlineOffset: 3,
+        }}
+      >
+        {image?.signedUrl ? (
+          // biome-ignore lint/performance/noImgElement: Storage の署名付き URL。next/image の loader 設定なしに扱う
+          <img
+            src={image.signedUrl}
+            alt=""
+            className="block w-full rounded-2xl object-cover"
+            style={{
+              border: '1px solid var(--border-subtle)',
+              maxHeight: '70vw',
+              ...(image.aspect ? { aspectRatio: `1 / ${image.aspect}` } : {}),
+            }}
+          />
+        ) : (
+          <div
+            role="img"
+            aria-label={unavailable}
+            className="flex h-32 w-full items-center justify-center rounded-2xl text-[11px]"
+            style={{
+              border: '1px dashed var(--border-subtle)',
+              color: 'var(--date-color)',
+              background: 'var(--toolbar-hover)',
+            }}
+          >
+            {unavailable}
+          </div>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
         aria-label={removeLabel}
         className="absolute right-8 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[15px] leading-none text-white"
         style={{ background: 'rgba(0,0,0,0.45)' }}

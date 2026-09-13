@@ -2,7 +2,8 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
@@ -51,6 +52,11 @@ export interface EntryListOverlayProps {
    * （鉛筆を押せば直接書き始められるのは変わらない）。
    */
   onCreateEntry?: () => void;
+  /**
+   * 行の「…」から消す（確認はここで出す）。成功なら true。無ければ「…」を出さない。
+   * PC の一覧には行ごとの削除があり、SP にも同じ操作が要る（実機レビュー）。
+   */
+  onDeleteEntry?: (entryId: string) => Promise<boolean>;
   onClose: () => void;
   /**
    * 見せ方。`paper`（既定）は机にかぶさる紙、`mobile` は全画面の一覧。
@@ -108,11 +114,22 @@ export function EntryListOverlay({
   onSelectMonth,
   onSelectEntry,
   onCreateEntry,
+  onDeleteEntry,
   onClose,
   variant = 'paper',
 }: EntryListOverlayProps) {
   const t = useTranslations('study');
   useEscapeKey(open, onClose);
+
+  /** 「…」を押した行。行の操作（開く・削除）のシート。 */
+  const [actionFor, setActionFor] = useState<StudyEntry | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const tDelete = useTranslations('entries.delete_modal');
+  const closeActions = () => {
+    setActionFor(null);
+    setConfirmingDelete(false);
+  };
 
   /**
    * 外側（紙の外）を押したら閉じる。**押し始めも外だったときだけ。**
@@ -135,6 +152,8 @@ export function EntryListOverlay({
     questionId: questionId ?? 'all',
     searching: search.length > 0,
     canCreate: onCreateEntry !== undefined,
+    canDelete: onDeleteEntry !== undefined,
+    actionFor: actionFor?.id ?? 'none',
   });
 
   const rows = loading ? (
@@ -152,7 +171,12 @@ export function EntryListOverlay({
       {entries.map((entry) => (
         <li key={entry.id}>
           {variant === 'mobile' ? (
-            <MobileRow entry={entry} onClick={() => onSelectEntry(entry)} />
+            <MobileRow
+              entry={entry}
+              onClick={() => onSelectEntry(entry)}
+              onMore={onDeleteEntry ? () => setActionFor(entry) : undefined}
+              moreLabel={t('list_row_actions')}
+            />
           ) : (
             <PaperRow entry={entry} onClick={() => onSelectEntry(entry)} />
           )}
@@ -183,7 +207,8 @@ export function EntryListOverlay({
       <div
         {...contract}
         className="absolute inset-0 z-20 flex flex-col"
-        style={{ background: 'var(--bg)', color: 'var(--fg)' }}
+        // 一覧は白い面。ベージュ（`--bg`）は紙の画面（エントリー・瓶・ボード）だけに使う（実機レビュー）。
+        style={{ background: 'var(--surface-raised)', color: 'var(--fg)' }}
       >
         {/* 上段: 左に閉じる、右に新規作成（SP の他の画面と同じ正円）。 */}
         <div
@@ -270,6 +295,75 @@ export function EntryListOverlay({
           {rows}
           {loadMore}
         </div>
+
+        {/* 行の「…」: 開く・削除。削除は同じシートの中で確認する。 */}
+        {actionFor ? (
+          <BottomSheet
+            open
+            onClose={closeActions}
+            ariaLabel={t('list_row_actions')}
+            label={actionFor.excerpt}
+            closeLabel={t('list_close')}
+            detents={['content']}
+          >
+            <div className="flex flex-col gap-2 pt-1" style={CONTROL_FONT} data-row-actions>
+              {confirmingDelete ? (
+                <>
+                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--fg)' }}>
+                    {tDelete('body')}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    data-row-delete-confirm
+                    onClick={async () => {
+                      if (!onDeleteEntry) return;
+                      setDeleting(true);
+                      const ok = await onDeleteEntry(actionFor.id);
+                      setDeleting(false);
+                      if (ok) closeActions();
+                    }}
+                    className="min-h-[48px] rounded-xl text-[15px] font-medium disabled:opacity-50"
+                    style={{ background: 'var(--ob-jar-warm)', color: '#fff' }}
+                  >
+                    {tDelete('confirm')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(false)}
+                    className="min-h-[48px] rounded-xl text-[15px]"
+                    style={{ color: 'var(--fg)', background: 'var(--surface-sunken)' }}
+                  >
+                    {tDelete('cancel')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeActions();
+                      onSelectEntry(actionFor);
+                    }}
+                    className="min-h-[48px] rounded-xl text-[15px]"
+                    style={{ color: 'var(--fg)', background: 'var(--surface-sunken)' }}
+                  >
+                    {t('list_open')}
+                  </button>
+                  <button
+                    type="button"
+                    data-row-delete
+                    onClick={() => setConfirmingDelete(true)}
+                    className="min-h-[48px] rounded-xl text-[15px]"
+                    style={{ color: 'var(--ob-jar-warm)', background: 'var(--surface-sunken)' }}
+                  >
+                    {t('list_delete')}
+                  </button>
+                </>
+              )}
+            </div>
+          </BottomSheet>
+        ) : null}
       </div>
     );
   }
@@ -447,30 +541,54 @@ function PaperRow({ entry, onClick }: { entry: StudyEntry; onClick: () => void }
  * 全画面の 1 行（SP）。**抜粋を主役に**、日付・問い・PICKLED は 2 行目に小さく。
  * 字数は出さない（狭い幅では 1 行を抜粋に使う）。
  */
-function MobileRow({ entry, onClick }: { entry: StudyEntry; onClick: () => void }) {
+function MobileRow({
+  entry,
+  onClick,
+  onMore,
+  moreLabel,
+}: {
+  entry: StudyEntry;
+  onClick: () => void;
+  /** 行の操作（開く・削除）。無ければ「…」を出さない。 */
+  onMore?: () => void;
+  moreLabel: string;
+}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-[56px] w-full flex-col justify-center gap-1 border-b py-3 text-left"
-      style={{ borderColor: 'var(--border-subtle)' }}
-    >
-      <span className="block truncate text-[15px] leading-snug" style={{ color: 'var(--fg)' }}>
-        {entry.excerpt}
-      </span>
-      <span
-        className="flex min-w-0 items-center gap-2 text-[11px]"
-        style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+    <div className="flex items-stretch border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-h-[56px] min-w-0 flex-1 flex-col justify-center gap-1 py-3 text-left"
       >
-        <span className="shrink-0 tracking-[0.1em]">{formatRowDate(entry.createdAt)}</span>
-        {entry.linkedQuestions[0] ? (
-          <span className="min-w-0 truncate" style={{ color: 'var(--accent)' }}>
-            ◦ {entry.linkedQuestions[0].currentText ?? ''}
-          </span>
-        ) : null}
-        {entry.pickled && <PickledBadge />}
-      </span>
-    </button>
+        <span className="block truncate text-[15px] leading-snug" style={{ color: 'var(--fg)' }}>
+          {entry.excerpt}
+        </span>
+        <span
+          className="flex min-w-0 items-center gap-2 text-[11px]"
+          style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+        >
+          <span className="shrink-0 tracking-[0.1em]">{formatRowDate(entry.createdAt)}</span>
+          {entry.linkedQuestions[0] ? (
+            <span className="min-w-0 truncate" style={{ color: 'var(--accent)' }}>
+              ◦ {entry.linkedQuestions[0].currentText ?? ''}
+            </span>
+          ) : null}
+          {entry.pickled && <PickledBadge />}
+        </span>
+      </button>
+      {onMore ? (
+        <button
+          type="button"
+          onClick={onMore}
+          aria-label={moreLabel}
+          data-row-more
+          className="flex w-11 shrink-0 items-center justify-center rounded-full text-[18px] leading-none"
+          style={{ color: 'var(--date-color)' }}
+        >
+          ⋯
+        </button>
+      ) : null}
+    </div>
   );
 }
 

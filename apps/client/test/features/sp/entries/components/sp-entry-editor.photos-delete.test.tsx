@@ -57,7 +57,7 @@ describe('SpEntryEditor: 本文の中の写真と、削除の席', () => {
     const areas = screen.getAllByRole<HTMLTextAreaElement>('textbox');
     // 題の input + 文 2 つ
     expect(areas.map((a) => a.value)).toEqual(['題', '前の文', '後の文']);
-    expect(screen.getByRole('img').getAttribute('src')).toBe('https://signed/1');
+    expect(document.querySelector('figure img')?.getAttribute('src')).toBe('https://signed/1');
     // 本文の中に居るので、下の写真の並び（旧形式）には出ない
     expect(screen.queryByRole('list')).toBeNull();
   });

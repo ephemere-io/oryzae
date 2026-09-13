@@ -3,7 +3,7 @@ import {
   INLINE_IMAGE_PLACEHOLDER,
   type InlineImage,
 } from '@oryzae/shared';
-import type { AttachedPhoto } from '../types';
+import type { AttachedPhoto, InlinePhoto } from '../types';
 
 /**
  * 本文の中の写真（端末非依存の純関数）。
@@ -18,6 +18,11 @@ const PHOTO_PLACEHOLDER = INLINE_IMAGE_PLACEHOLDER;
 
 /** SP で置いた写真の既定（全幅の 1 枚）。PC で開いても同じ位置に block として出る。 */
 const SP_INLINE_DEFAULTS = { widthRatio: 1, layout: 'block', align: 'start' } as const;
+
+/** 添えた写真を、本文の中の 1 枚（既定の見た目）にする。 */
+export function toInlinePhoto(photo: AttachedPhoto): InlinePhoto {
+  return { ...photo, ...SP_INLINE_DEFAULTS };
+}
 
 /** 本文をプレースホルダで切る。写真 n 枚なら文は n+1 個（空文字も残す）。 */
 export function splitBodyAtPhotos(body: string): string[] {
@@ -81,13 +86,13 @@ export function restoreInlinePhotos(
   body: string,
   effects: EditorEffectsState | null | undefined,
   photos: readonly AttachedPhoto[],
-): { body: string; images: AttachedPhoto[] } {
+): { body: string; images: InlinePhoto[] } {
   const byOffset = new Map<number, InlineImage>();
   for (const image of effects?.inlineImages ?? []) byOffset.set(image.offset, image);
   const signedByPath = new Map(photos.map((photo) => [photo.storagePath, photo.signedUrl]));
 
   let out = '';
-  const images: AttachedPhoto[] = [];
+  const images: InlinePhoto[] = [];
   for (let i = 0; i < body.length; i++) {
     const ch = body[i];
     if (ch !== PHOTO_PLACEHOLDER) {
@@ -99,6 +104,10 @@ export function restoreInlinePhotos(
     images.push({
       storagePath: image.storagePath,
       signedUrl: signedByPath.get(image.storagePath) ?? '',
+      widthRatio: image.widthRatio,
+      layout: image.layout,
+      align: image.align,
+      ...(image.aspect ? { aspect: image.aspect } : {}),
     });
     out += PHOTO_PLACEHOLDER;
   }
@@ -108,29 +117,29 @@ export function restoreInlinePhotos(
 /**
  * 保存形式を組む: 本文のプレースホルダの位置を数え直し、置き順の写真と対にする。
  *
- * PC で置いた写真の見た目（`widthRatio` / `layout` / `align` / `aspect`）は、同じ写真なら持ち越す。
- * SP で置いた写真は全幅の block。`previous` の他の項目（`textSpans` 等）は触らず持ち越す
+ * 写真の見た目（`widthRatio` / `layout` / `align` / `aspect`）は写真自身が持つ（PC で置いたものは
+ * 復元のときに写してある）。`previous` の他の項目（`textSpans` 等）は触らず持ち越す
  * （SP は装飾を描かないが、消してはいけない）。写真も装飾も無ければ null。
  */
 export function buildEffectsWithPhotos(
   body: string,
-  images: readonly AttachedPhoto[],
+  images: readonly InlinePhoto[],
   previous: EditorEffectsState | null | undefined,
 ): EditorEffectsState | null {
   const offsets = photoOffsets(body);
-  const previousByPath = new Map<string, InlineImage>();
-  for (const image of previous?.inlineImages ?? []) previousByPath.set(image.storagePath, image);
 
   const inlineImages: InlineImage[] = [];
   offsets.forEach((offset, index) => {
     const photo = images[index];
     if (!photo) return;
-    const kept = previousByPath.get(photo.storagePath);
-    inlineImages.push(
-      kept
-        ? { ...kept, offset }
-        : { offset, storagePath: photo.storagePath, ...SP_INLINE_DEFAULTS },
-    );
+    inlineImages.push({
+      offset,
+      storagePath: photo.storagePath,
+      widthRatio: photo.widthRatio,
+      layout: photo.layout,
+      align: photo.align,
+      ...(photo.aspect ? { aspect: photo.aspect } : {}),
+    });
   });
 
   const rest: Omit<EditorEffectsState, 'version' | 'inlineImages'> = {};

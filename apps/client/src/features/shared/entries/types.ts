@@ -19,6 +19,18 @@ export interface AttachedPhoto {
 }
 
 /**
+ * 本文の中に置いた写真（置き順の 1 枚）。見た目は PC の `InlineImage` と同じ語彙で持ち、保存では
+ * `effects.inlineImages` の offset と対にする（`utils/inline-photos.ts`）。
+ */
+export interface InlinePhoto extends AttachedPhoto {
+  /** 行幅に対する割合（0.05〜1）。SP の既定は 1（全幅）。 */
+  widthRatio: number;
+  layout: 'inline' | 'block' | 'wrap';
+  align: 'start' | 'center' | 'end';
+  aspect?: number;
+}
+
+/**
  * 写真取り込みモーダル/シートに映す状態（usePhotoImport が持つ）。
  * PC・SP の表示部品はこれを props で受け取るだけの純表示にしてある。
  */

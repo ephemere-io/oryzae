@@ -8,6 +8,7 @@ import {
   removePhotoAt,
   restoreInlinePhotos,
   splitBodyAtPhotos,
+  toInlinePhoto,
   trimOrphanPlaceholders,
 } from '@/features/shared/entries/utils/inline-photos';
 
@@ -68,7 +69,15 @@ describe('inline-photos（本文の中の写真、PC と同じ保存形式）', 
       [{ storagePath: 'p/1.jpg', signedUrl: 'https://signed/1' }],
     );
     expect(restored).toBe(`x${P}yz`);
-    expect(images).toEqual([{ storagePath: 'p/1.jpg', signedUrl: 'https://signed/1' }]);
+    expect(images).toEqual([
+      {
+        storagePath: 'p/1.jpg',
+        signedUrl: 'https://signed/1',
+        widthRatio: 0.4,
+        layout: 'inline',
+        align: 'start',
+      },
+    ]);
   });
 
   it('復元: effects が無ければプレースホルダを全部落とす', () => {
@@ -78,7 +87,7 @@ describe('inline-photos（本文の中の写真、PC と同じ保存形式）', 
   it('保存形式: 位置を数え直し、SP で置いた写真は全幅の block', () => {
     const effects = buildEffectsWithPhotos(
       `一${P}二`,
-      [{ storagePath: 'p/new.jpg', signedUrl: '' }],
+      [toInlinePhoto({ storagePath: 'p/new.jpg', signedUrl: '' })],
       null,
     );
     expect(effects).toEqual({
@@ -89,7 +98,7 @@ describe('inline-photos（本文の中の写真、PC と同じ保存形式）', 
     });
   });
 
-  it('保存形式: PC で置いた写真の見た目と、装飾（textSpans）は持ち越す', () => {
+  it('保存形式: 写真自身の見た目（PC で置いたもの）と、装飾（textSpans）は持ち越す', () => {
     const previous = {
       version: 1 as const,
       textSpans: [{ start: 0, end: 1, kind: 'eblock', payload: {} }],
@@ -107,7 +116,16 @@ describe('inline-photos（本文の中の写真、PC と同じ保存形式）', 
     // 本文を書き足して写真が後ろへずれた
     const effects = buildEffectsWithPhotos(
       `追記${P}`,
-      [{ storagePath: 'p/pc.jpg', signedUrl: '' }],
+      [
+        {
+          storagePath: 'p/pc.jpg',
+          signedUrl: '',
+          widthRatio: 0.4,
+          layout: 'wrap',
+          align: 'end',
+          aspect: 1.5,
+        },
+      ],
       // @type-assertion-allowed: テストの前回 effects。textSpans の payload 型は共有スキーマの詳細で、ここでは持ち越されることだけを見る
       previous as never,
     );

@@ -2,7 +2,6 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
 import { type DockDetent, DockSheet } from '@/components/ui/dock-sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CONTROL_FONT } from '@/components/ui/surface';
@@ -29,9 +28,10 @@ const MAX_SNIPPETS_HALF = 3;
  * PC では手紙・言葉・抜粋が本文の横に居て、目だけが行き来する。スマホには横が無いので、往復は上下で
  * 作る: 本文の下に非モーダルの `DockSheet`。
  * - **覗く**（1 行）: 問いと、いちばん目立つ言葉。書いている間（キーボードが出ている間）はここ
- * - **半分**: 手紙の冒頭・言葉の chips・抜粋 3 件。本文の上半分は見えたまま
- * - **全画面**: 手紙の全文と抜粋の全文
- * 覗く段を押せば半分へ（読む）、本文を押せばまた覗く段へ（書く）。消すのはパレットの「発酵の結果」。
+ * - **半分**: 手紙の冒頭・言葉（説明つき）・抜粋 3 件（理由つき）。本文の上半分は見えたまま
+ * - **全画面**: 手紙の全文と抜粋の全部
+ * 言葉の説明と抜粋の理由は**最初から出す**（押して出す段を作らない。実機レビュー）。
+ * 覗く段を押せば半分へ（読む）、本文を押せばまた覗く段へ（書く）。出す／消すはパレットの「発酵の結果」。
  */
 export function SpFermentationDock({
   open,
@@ -44,8 +44,6 @@ export function SpFermentationDock({
 }: SpFermentationDockProps) {
   const t = useTranslations('editor.fermentation_sidebar');
   const tSp = useTranslations('sp.editor');
-  const [openKeyword, setOpenKeyword] = useState<string | null>(null);
-  const [openSnippet, setOpenSnippet] = useState<string | null>(null);
 
   const keywords = detail?.keywords.slice(0, MAX_KEYWORDS) ?? [];
   const snippets = detail?.snippets ?? [];
@@ -132,70 +130,59 @@ export function SpFermentationDock({
 
           {keywords.length > 0 ? (
             <Section label={t('section_keywords')}>
-              <div className="flex flex-wrap gap-1.5">
+              <ul className="flex flex-col gap-2.5">
                 {keywords.map((kw) => (
-                  <button
-                    key={kw.id}
-                    type="button"
-                    aria-pressed={openKeyword === kw.id}
-                    onClick={() => setOpenKeyword((prev) => (prev === kw.id ? null : kw.id))}
-                    className="min-h-[36px] rounded-full px-3 text-[13px]"
-                    style={{
-                      ...CONTROL_FONT,
-                      background:
-                        openKeyword === kw.id
-                          ? 'var(--accent)'
-                          : 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
-                      color: openKeyword === kw.id ? 'var(--bg)' : 'var(--fg)',
-                    }}
-                  >
-                    {kw.keyword}
-                  </button>
+                  <li key={kw.id} className="flex flex-col gap-0.5">
+                    <span
+                      className="self-start rounded-full px-3 py-1 text-[13px]"
+                      style={{
+                        ...CONTROL_FONT,
+                        background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
+                        color: 'var(--fg)',
+                      }}
+                    >
+                      {kw.keyword}
+                    </span>
+                    {kw.description ? (
+                      <span className="px-1 text-[13px] leading-relaxed opacity-75">
+                        {kw.description}
+                      </span>
+                    ) : null}
+                  </li>
                 ))}
-              </div>
-              {openKeyword ? (
-                <p className="mt-2 text-[13px] leading-relaxed opacity-75">
-                  {keywords.find((kw) => kw.id === openKeyword)?.description}
-                </p>
-              ) : null}
+              </ul>
             </Section>
           ) : null}
 
           {shownSnippets.length > 0 ? (
             <Section label={t('section_snippets')}>
               <ul className="flex flex-col gap-2">
-                {shownSnippets.map((snippet) => {
-                  const opened = openSnippet === snippet.id;
-                  return (
-                    <li key={snippet.id}>
-                      <button
-                        type="button"
-                        aria-expanded={opened}
-                        onClick={() => setOpenSnippet(opened ? null : snippet.id)}
-                        className="w-full rounded-xl border px-3 py-2.5 text-left"
-                        style={{ borderColor: 'var(--border-subtle)' }}
-                      >
-                        <span
-                          className={`block text-[13px] leading-relaxed ${opened || detent === 'full' ? '' : 'line-clamp-3'}`}
-                          style={{ fontFamily: "'Noto Serif JP', serif" }}
-                        >
-                          {snippet.originalText}
-                        </span>
-                        <span
-                          className="mt-1 block text-[11px]"
-                          style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                        >
-                          {snippet.sourceDate.slice(0, 10)}
-                        </span>
-                      </button>
-                      {opened ? (
-                        <p className="mt-1.5 px-1 text-[12px] leading-relaxed opacity-75">
-                          {snippet.selectionReason}
-                        </p>
-                      ) : null}
-                    </li>
-                  );
-                })}
+                {shownSnippets.map((snippet) => (
+                  <li
+                    key={snippet.id}
+                    data-snippet
+                    className="rounded-xl border px-3 py-2.5"
+                    style={{ borderColor: 'var(--border-subtle)' }}
+                  >
+                    <p
+                      className={`text-[13px] leading-relaxed ${detent === 'full' ? '' : 'line-clamp-4'}`}
+                      style={{ fontFamily: "'Noto Serif JP', serif" }}
+                    >
+                      {snippet.originalText}
+                    </p>
+                    {snippet.selectionReason ? (
+                      <p className="mt-1.5 text-[12px] leading-relaxed opacity-70">
+                        {snippet.selectionReason}
+                      </p>
+                    ) : null}
+                    <p
+                      className="mt-1 text-[11px]"
+                      style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                    >
+                      {snippet.sourceDate.slice(0, 10)}
+                    </p>
+                  </li>
+                ))}
               </ul>
               {detent !== 'full' && snippets.length > shownSnippets.length ? (
                 <button
