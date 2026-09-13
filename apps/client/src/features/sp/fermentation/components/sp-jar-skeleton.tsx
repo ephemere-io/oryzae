@@ -27,15 +27,15 @@ const CIRCLE_SLOTS = [
 export function SpJarMapSkeleton({ circles = 3 }: { circles?: number }) {
   return (
     <div className="relative flex-1 overflow-hidden" data-skeleton-slot="orbit" aria-hidden="true">
-      {/* 壜（実物: 初期表示で幅の 33% ほどを中央に） */}
+      {/* 壜（実物: 初期表示で幅の 6 割ほどを中央に） */}
       <div
         className="absolute"
         style={{
           left: '50%',
           top: '47%',
           transform: 'translate(-50%, -50%)',
-          width: '34%',
-          height: '40%',
+          width: '58%',
+          height: '44%',
         }}
         data-skeleton-slot="jar"
       >

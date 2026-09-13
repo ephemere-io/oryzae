@@ -107,6 +107,9 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
+  /* 端まで引いてもブラウザの引っ張り更新（pull-to-refresh）やページの跳ね返りにしない。
+     SP のシートの空白を下に引くと Safari が再読み込みしていた。アプリの殻の中で完結させる。 */
+  overscroll-behavior: none;
 }
 
 /* Tailwind v4 の Preflight は button を `cursor: default` にする（v3 までは
