@@ -4,7 +4,7 @@
  * 即 null・activeQuestions は []・autosave は enabled=false）。router 依存も無い。よって
  * `api=null` を渡せば fetch ゼロの純レンダリングになり、props だけで孤立検証できる。
  *
- * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / hasQuestion / sheetOpen
+ * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / hasQuestion / pickerOpen
  * ＋発酵 CTA の pickling。saving / pickled は到達しない（api=null では fetch せず save も即
  * null・never-resolve でも save が解決せず pickled が立たない）ため、定数になる属性は
  * 契約に載せない。hasQuestion は Issue #450 で分岐条件になったので載せる（問い未選択で
@@ -92,7 +92,7 @@ registerUnit<Props>({
     },
     {
       id: 'sheet-open',
-      description: '問いチップを押すと問い選択シートが開く（sheetOpen=true）',
+      description: '「+ 問いを結ぶ」を押すとその場に選び手が開く（pickerOpen=true）',
       props: { api: null, persistDraft: false },
       act: async (ctx) => {
         await ctx.click('button');
@@ -221,7 +221,7 @@ registerUnit<Props>({
       description:
         'Issue #314: 問い作成モードでシートが開いているなら、必ず入力欄がある（行き止まりにしない）',
       check: ({ root, contract }) => {
-        if (contract.sheetOpen !== 'true' || contract.composingQuestion !== 'true') return true;
+        if (contract.pickerOpen !== 'true' || contract.composingQuestion !== 'true') return true;
         // タイトル入力と取り違えないよう、問い入力の aria-label で特定する。
         const input = root.querySelector('input[aria-label^="問いを書く"]');
         return (
@@ -232,13 +232,13 @@ registerUnit<Props>({
     },
     {
       id: 'sheet-present-iff-open',
-      description: '問い選択シート（閉じるボタン）は sheetOpen=true のときだけ描画される',
+      description: '選び手（閉じるボタン）は pickerOpen=true のときだけ描画される',
       check: ({ root, contract }) => {
         const hasSheet = Boolean(root.querySelector('button[aria-label="閉じる"]'));
-        const expectOpen = contract.sheetOpen === 'true';
+        const expectOpen = contract.pickerOpen === 'true';
         return (
           hasSheet === expectOpen ||
-          `sheet present=${hasSheet} だが contract.sheetOpen="${contract.sheetOpen}"`
+          `sheet present=${hasSheet} だが contract.pickerOpen="${contract.pickerOpen}"`
         );
       },
     },
@@ -248,9 +248,9 @@ registerUnit<Props>({
       onlyFixtures: ['empty'],
       check: ({ contract }) =>
         (contract.hasBody === 'false' &&
-          contract.sheetOpen === 'false' &&
+          contract.pickerOpen === 'false' &&
           contract.hasEntry === 'false') ||
-        `expected empty/collapsed, got hasBody=${contract.hasBody}, sheetOpen=${contract.sheetOpen}, hasEntry=${contract.hasEntry}`,
+        `expected empty/collapsed, got hasBody=${contract.hasBody}, pickerOpen=${contract.pickerOpen}, hasEntry=${contract.hasEntry}`,
     },
     {
       id: 'editing-after-typing',
@@ -300,8 +300,8 @@ registerUnit<Props>({
       check: ({ contract }) =>
         (contract.hasQuestion === 'false' &&
           contract.pickling === 'false' &&
-          contract.sheetOpen === 'true') ||
-        `expected hasQuestion=false & pickling=false & sheetOpen=true, got hasQuestion=${contract.hasQuestion}, pickling=${contract.pickling}, sheetOpen=${contract.sheetOpen}`,
+          contract.pickerOpen === 'true') ||
+        `expected hasQuestion=false & pickling=false & pickerOpen=true, got hasQuestion=${contract.hasQuestion}, pickling=${contract.pickling}, pickerOpen=${contract.pickerOpen}`,
     },
     {
       id: 'question-empty-offers-composer',
@@ -311,10 +311,10 @@ registerUnit<Props>({
       check: ({ root, contract }) => {
         const input = root.querySelector('input[aria-label^="問いを書く"]');
         return (
-          (contract.sheetOpen === 'true' &&
+          (contract.pickerOpen === 'true' &&
             contract.composingQuestion === 'true' &&
             Boolean(input)) ||
-          `expected sheetOpen=true & composingQuestion=true & 入力欄あり, got sheetOpen=${contract.sheetOpen}, composingQuestion=${contract.composingQuestion}, input=${Boolean(input)}`
+          `expected pickerOpen=true & composingQuestion=true & 入力欄あり, got pickerOpen=${contract.pickerOpen}, composingQuestion=${contract.composingQuestion}, input=${Boolean(input)}`
         );
       },
     },

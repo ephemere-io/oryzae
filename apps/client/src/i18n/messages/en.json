@@ -728,7 +728,9 @@
       "question_link": "Link a question",
       "ferment_title": "Seal in the jar to ferment",
       "ferment_sub": "Give it time — a letter from the AI will arrive",
-      "delete": "Delete"
+      "delete": "Delete",
+      "question_unlink": "Unlink “{label}”",
+      "question_search_placeholder": "Find a question"
     },
     "nav": {
       "back": "Back",

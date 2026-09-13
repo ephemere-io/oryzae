@@ -728,7 +728,9 @@
       "question_link": "关联提问",
       "ferment_title": "封入瓶中发酵",
       "ferment_sub": "静待片刻，AI 的来信将会送达",
-      "delete": "删除"
+      "delete": "删除",
+      "question_unlink": "取消关联“{label}”",
+      "question_search_placeholder": "查找问题"
     },
     "nav": {
       "back": "返回",

@@ -728,7 +728,9 @@
       "question_link": "질문 연결",
       "ferment_title": "항아리에 담아 발효시키기",
       "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다",
-      "delete": "삭제"
+      "delete": "삭제",
+      "question_unlink": "“{label}” 연결 해제",
+      "question_search_placeholder": "질문 찾기"
     },
     "nav": {
       "back": "뒤로",
