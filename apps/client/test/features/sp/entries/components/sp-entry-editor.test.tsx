@@ -194,9 +194,7 @@ describe('SpEntryEditor', () => {
     });
   }
 
-  it('問いを付け替えると、前の紐づけを外してから次を結ぶ', async () => {
-    // 旧実装は選択を差し替えるだけで DELETE を投げず、サーバーには両方が紐づいたまま
-    // チップには 1 つしか出なかった（PC は unlink を持っている）。
+  it('別の問いも結べる（前の紐づけは残る。PC と同じく複数）', async () => {
     const fetchImpl = linkedApi();
     render(
       <NextIntlClientProvider locale="ja" messages={jaMessages}>
@@ -208,17 +206,17 @@ describe('SpEntryEditor', () => {
 
     await waitFor(() =>
       expect(fetchImpl).toHaveBeenCalledWith(
-        '/api/v1/entries/e1/questions/q1',
-        expect.objectContaining({ method: 'DELETE' }),
-      ),
-    );
-    await waitFor(() =>
-      expect(fetchImpl).toHaveBeenCalledWith(
         '/api/v1/entries/e1/questions/q2',
         expect.objectContaining({ method: 'POST' }),
       ),
     );
+    expect(fetchImpl).not.toHaveBeenCalledWith(
+      '/api/v1/entries/e1/questions/q1',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    // 両方が題の下に並ぶ。
     expect(await screen.findByText('◦ 手放せないものは何か')).toBeTruthy();
+    expect(screen.getByText('◦ なぜ続けるのか')).toBeTruthy();
   });
 
   it('選んでいる問いをもう一度押すと外れ、紐づけも解除される', async () => {
