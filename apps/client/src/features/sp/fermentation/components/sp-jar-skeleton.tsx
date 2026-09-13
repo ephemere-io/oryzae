@@ -62,20 +62,15 @@ export function SpJarMapSkeleton({ circles = 3 }: { circles?: number }) {
   );
 }
 
-/** 画面まるごと（壜と円 ＋ 下部のボタン。見出しは実物にも無い）。 */
+/** 画面まるごと（壜と円。下端の操作の列は殻の席に実物が出る。見出しは実物にも無い）。 */
 export function SpJarSkeleton({ circles = 3 }: { circles?: number }) {
   return (
     <div
       className="relative flex h-full flex-col bg-[var(--bg)]"
       aria-hidden="true"
-      {...verifyAttrs({ unit: 'SpJarSkeleton', slots: 'orbit,jar,manage', circles })}
+      {...verifyAttrs({ unit: 'SpJarSkeleton', slots: 'orbit,jar', circles })}
     >
       <SpJarMapSkeleton circles={circles} />
-
-      {/* 問いを追加・編集する正円（実物: 右下の 56px） */}
-      <div className="absolute bottom-5 right-5" data-skeleton-slot="manage">
-        <Skeleton className="h-14 w-14 rounded-full" />
-      </div>
     </div>
   );
 }

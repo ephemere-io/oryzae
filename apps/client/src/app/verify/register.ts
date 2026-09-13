@@ -12,16 +12,15 @@
 
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
+import '@/components/ui/action-palette.verify';
 import '@/components/ui/help-hint.verify';
 import '@/components/ui/menu.verify';
 import '@/components/ui/nav-row.verify';
 import '@/components/ui/segmented.verify';
 import '@/components/ui/select.verify';
-import '@/features/sp/entries/components/sp-editor-palette.verify';
 import '@/features/sp/navigation/components/sp-top-bar.verify';
 import '@/features/shared/auth/components/reset-password-form.verify';
 import '@/features/sp/board/components/sp-board-surface.verify';
-import '@/features/sp/board/components/sp-board-toolbar.verify';
 import '@/features/sp/board/components/sp-snippet-sheet.verify';
 import '@/features/shared/study/components/back-to-study.verify';
 import '@/features/shared/study/components/entry-list-overlay.verify';

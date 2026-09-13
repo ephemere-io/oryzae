@@ -39,7 +39,7 @@ describe('SpEntryEditor', () => {
 
   it('タイトルと本文のプレースホルダを表示する', () => {
     renderEditor(createMockApi(apiFetch));
-    expect(screen.getByPlaceholderText('タイトル（任意）')).toBeTruthy();
+    expect(screen.getByPlaceholderText('タイトル')).toBeTruthy();
     expect(screen.getByPlaceholderText('いま感じていることを、そのまま。')).toBeTruthy();
   });
 

@@ -5,7 +5,9 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActionPalette } from '@/components/ui/action-palette';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { FermentIcon, PhotoIcon, TrashIcon } from '@/components/ui/palette-icons';
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
@@ -22,9 +24,8 @@ import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
-import { useSpChrome, useSpStatus } from '@/lib/sp-chrome-context';
+import { placePalette, useSpChrome, useSpStatus } from '@/lib/sp-chrome-context';
 import { SpConfirmSheet } from './sp-confirm-sheet';
-import { SP_EDITOR_PALETTE_HEIGHT, SpEditorPalette } from './sp-editor-palette';
 import { SpFermentationDrawer } from './sp-fermentation-drawer';
 import { SpPhotoImportSheet } from './sp-photo-import-sheet';
 
@@ -75,6 +76,7 @@ export function SpEntryEditor({
   const t = useTranslations('sp.editor');
   const tDelete = useTranslations('entries.delete_modal');
   const tPhoto = useTranslations('photo');
+  const tNav = useTranslations('sp.nav');
   const router = useRouter();
   const { deleteEntry, deleting } = useDeleteEntry(api);
   const { save, saving, error } = useSaveEntry(api, null);
@@ -359,10 +361,6 @@ export function SpEntryEditor({
   return (
     <div
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
-      // 下端はキーボード上のパレットのぶん空ける（fixed なので流れの中には無い）。
-      style={{
-        paddingBottom: `calc(${SP_EDITOR_PALETTE_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
-      }}
       {...verifyAttrs({
         unit: 'SpEntryEditor',
         hasBody,
@@ -462,44 +460,44 @@ export function SpEntryEditor({
         onClose={photoImport.close}
       />
 
-      {/* 操作はキーボードの真上のパレットに集める（Notion のキーボードツールバーの席）。
+      {/* 操作は殻の下端の列に集める（キーボードが出ればその真上。Notion のキーボード
+          ツールバーの席）。問いを結ぶのは題の下の行が担うので列には置かない。
           発酵は保存済み（entryId 確定後）のときだけ並ぶ。 */}
-      <SpEditorPalette
-        actions={[
-          {
-            id: 'question',
-            label: selectedQuestion
-              ? t('question_selected', {
-                  label: selectedQuestion.currentText ?? t('question_untitled'),
-                })
-              : t('question_link'),
-            active: selectedQuestion !== undefined,
-            onSelect: openQuestionSheet,
-          },
-          {
-            id: 'photo',
-            label: tPhoto('toolbar_button'),
-            onSelect: () => fileInputRef.current?.click(),
-          },
-          ...(entryId
-            ? [
-                {
-                  id: 'ferment' as const,
-                  label: pickled ? t('pickled') : t('ferment_title'),
-                  busy: pickling,
-                  disabledReason: pickled ? t('pickled') : undefined,
-                  onSelect: handlePickle,
-                },
-                {
-                  id: 'delete' as const,
-                  label: t('delete'),
-                  tone: 'danger' as const,
-                  onSelect: () => setDeleteOpen(true),
-                },
-              ]
-            : []),
-        ]}
-      />
+      {placePalette(
+        <ActionPalette
+          ariaLabel={t('palette_aria')}
+          keyboardOpen={chrome.keyboardOpen}
+          dismissKeyboardLabel={tNav('dismiss_keyboard')}
+          actions={[
+            {
+              id: 'photo',
+              label: tPhoto('toolbar_button'),
+              icon: <PhotoIcon />,
+              onSelect: () => fileInputRef.current?.click(),
+            },
+            ...(entryId
+              ? [
+                  {
+                    id: 'ferment',
+                    label: pickled ? t('pickled') : t('ferment_title'),
+                    icon: <FermentIcon />,
+                    busy: pickling,
+                    disabledReason: pickled ? t('pickled') : undefined,
+                    onSelect: handlePickle,
+                  },
+                  {
+                    id: 'delete',
+                    label: t('delete'),
+                    icon: <TrashIcon />,
+                    tone: 'danger' as const,
+                    onSelect: () => setDeleteOpen(true),
+                  },
+                ]
+              : []),
+          ]}
+        />,
+        chrome.paletteSlot,
+      )}
 
       {/* 問いを選ぶ。高さを変えられるセミモーダル（キーボードが出るので高い段から）。 */}
       {sheetOpen ? (

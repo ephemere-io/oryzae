@@ -1,6 +1,16 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
+import { useVisualViewport, type VisualViewportBox } from './visual-viewport';
 
 /** 上段の中央に出す短い状態。文字と色味だけ（ノードを渡すと毎描画で入れ替わってしまう）。 */
 export interface SpChromeStatus {
@@ -21,6 +31,16 @@ interface SpChromeValue {
   setBack: (handler: (() => void) | null) => void;
   status: SpChromeStatus | null;
   setStatus: (status: SpChromeStatus | null) => void;
+  /**
+   * 下端の操作の列（パレット）の席。画面はここへ `createPortal` で差し込む。
+   * 席が無ければ（Provider の外・孤立検証）画面が自分の中に描く。
+   */
+  paletteSlot: HTMLElement | null;
+  setPaletteSlot: (element: HTMLElement | null) => void;
+  /** 殻が追従しているビジュアルビューポート。測れるまで null。 */
+  viewport: VisualViewportBox | null;
+  /** ソフトキーボードが出ているか（パレットの「閉じる」の出し入れに使う）。 */
+  keyboardOpen: boolean;
 }
 
 const SpChromeContext = createContext<SpChromeValue>({
@@ -29,6 +49,10 @@ const SpChromeContext = createContext<SpChromeValue>({
   setBack: () => {},
   status: null,
   setStatus: () => {},
+  paletteSlot: null,
+  setPaletteSlot: () => {},
+  viewport: null,
+  keyboardOpen: false,
 });
 
 /**
@@ -40,6 +64,8 @@ const SpChromeContext = createContext<SpChromeValue>({
 export function SpChromeProvider({ children }: { children: React.ReactNode }) {
   const [back, setBackState] = useState<(() => void) | null>(null);
   const [status, setStatus] = useState<SpChromeStatus | null>(null);
+  const [paletteSlot, setPaletteSlot] = useState<HTMLElement | null>(null);
+  const viewport = useVisualViewport();
 
   // 関数を state に入れるときは updater と取り違えないよう包む。
   const setBack = useCallback((handler: (() => void) | null) => {
@@ -47,14 +73,34 @@ export function SpChromeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ mounted: true, back, setBack, status, setStatus }),
-    [back, setBack, status],
+    () => ({
+      mounted: true,
+      back,
+      setBack,
+      status,
+      setStatus,
+      paletteSlot,
+      setPaletteSlot,
+      viewport,
+      keyboardOpen: viewport?.keyboardOpen ?? false,
+    }),
+    [back, setBack, status, paletteSlot, viewport],
   );
   return <SpChromeContext.Provider value={value}>{children}</SpChromeContext.Provider>;
 }
 
 export function useSpChrome(): SpChromeValue {
   return useContext(SpChromeContext);
+}
+
+/**
+ * 下端の操作の列を殻の席へ置く。席が無ければ（Provider の外・孤立検証）その場に描く。
+ *
+ * portal にするのは、列の中身（状態・押したときの手）を画面が持ったまま、描く場所だけを
+ * 殻の下端に移すため。state で殻へ渡すと、毎描画で作り直される要素が state を揺らし続ける。
+ */
+export function placePalette(palette: ReactNode, slot: HTMLElement | null): ReactNode {
+  return slot ? createPortal(palette, slot) : palette;
 }
 
 /** 画面が出ている間だけ「戻る」を横取りする。`null` を渡せば横取りしない。 */

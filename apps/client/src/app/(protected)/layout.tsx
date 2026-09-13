@@ -14,8 +14,7 @@ import { BackToStudy, STUDY_EXIT_RESERVE } from '@/features/shared/study/compone
 import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
-import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
-import { SpTopBar } from '@/features/sp/navigation/components/sp-top-bar';
+import { SpShell } from '@/features/sp/navigation/components/sp-shell';
 import { useAuth } from '@/lib/auth-context';
 import { SidebarProvider } from '@/lib/sidebar-context';
 import { SpChromeProvider } from '@/lib/sp-chrome-context';
@@ -178,18 +177,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
             // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
             <SpChromeProvider>
-              <div className="flex h-[100dvh] flex-col overflow-hidden">
-                {/* サブ画面の上段: 左端に正円の戻る、右端に正円の設定（Notion のモバイルの骨格）。
-                    書斎ホームでは出さない（書斎そのものが唯一のグローバルナビ）。 */}
-                {showBackToStudy && <SpTopBar showSettings={pathname !== '/account'} />}
-                <main className="relative flex-1 overflow-auto">{content}</main>
-                {/* 書斎が有効な間はボトムナビを描かない。PC のサイドバーと同じ扱いで、
-                    書斎そのものが唯一のグローバルナビゲーションになる。
-                    **書斎ホームだけでなく jar / board / entry でも外す**（行き先の画面にだけ
-                    旧ナビが残ると、戻り道が上段とボトムナビで二重になる）。
-                    フラグ off の間は従来どおり全画面に出る。 */}
-                {!studyHome && <SpBottomNav />}
-              </div>
+              {/* 殻: 上段（サブ画面だけ。左端に正円の戻る、右端に正円の設定）・本文・下端の
+                  操作の列。殻はビジュアルビューポートに追従する（キーボードの上に列が来る）。
+                  書斎が有効な間はボトムナビを描かない（書斎そのものが唯一のグローバルナビ。
+                  jar / board / entry にも残さない — 戻り道が上段と二重になる）。 */}
+              <SpShell
+                topBar={showBackToStudy}
+                showSettings={pathname !== '/account'}
+                bottomNav={!studyHome}
+              >
+                {content}
+              </SpShell>
             </SpChromeProvider>
           ) : device === 'pc' ? (
             <PcShell studyHome={studyHome} onStudy={onStudy} exitTab={showBackToStudy}>

@@ -705,8 +705,7 @@
   "sp": {
     "editor": {
       "palette_aria": "编辑操作",
-      "dismiss_keyboard": "收起键盘",
-      "title_placeholder": "标题（可选）",
+      "title_placeholder": "标题",
       "body_placeholder": "把此刻的感受，如实写下。",
       "status_editing": "编辑中",
       "status_saving": "保存中…",
@@ -737,7 +736,8 @@
       "jar": "瓶",
       "list": "列表",
       "account": "账户",
-      "questions": "提问"
+      "questions": "提问",
+      "dismiss_keyboard": "收起键盘"
     },
     "jar": {
       "untitled": "无标题提问",
@@ -753,7 +753,8 @@
       "no_questions": "还没有提问。可以从下方按钮开始。",
       "manage_questions": "添加或编辑提问",
       "not_fermented": "这个提问还没有发酵",
-      "selection_reason": "被选中的理由"
+      "selection_reason": "被选中的理由",
+      "palette_aria": "罐子操作"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -808,7 +809,9 @@
       "lightbox_close": "关闭",
       "prev_day": "前一天",
       "next_day": "后一天",
-      "snippet_placeholder": "想留下的话"
+      "snippet_placeholder": "想留下的话",
+      "palette_aria": "看板操作",
+      "send_to_back": "置于底层"
     }
   },
   "canvas": {
