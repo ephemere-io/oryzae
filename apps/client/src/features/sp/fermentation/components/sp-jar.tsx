@@ -8,6 +8,7 @@ import { ActionPalette } from '@/components/ui/action-palette';
 import { PlusIcon } from '@/components/ui/palette-icons';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
+import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarQuestion } from '@/features/shared/questions/types';
 import {
   SpElementSheet,
@@ -48,6 +49,7 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
   const chrome = useSpChrome();
   const router = useRouter();
   const { letters } = useFermentationInbox(api, false);
+  const { saveLayout } = useJarLayoutSave(api);
   const { ready: unreadReady, unreadQuestionIds, markQuestionRead } = useUnread();
 
   const [openId, setOpenId] = useState<string | null>(null);
@@ -91,7 +93,19 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
         </div>
       ) : (
         <div className="relative min-h-0 flex-1">
-          <SpJarMap questions={mapQuestions} onSelect={setOpenId} />
+          <SpJarMap
+            questions={mapQuestions}
+            onSelect={setOpenId}
+            // 置き直した円は PC と同じ API で保存する（動かした 1 つだけを送る。サーバーは項目ごとに更新）。
+            onMove={(id, position) =>
+              saveLayout({
+                questions: [{ id, jarX: position.jarX, jarY: position.jarY }],
+                keywords: [],
+                snippets: [],
+                letters: [],
+              })
+            }
+          />
         </div>
       )}
 

@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { JarBottle } from '@/features/shared/fermentation/components/jar-bottle';
@@ -25,43 +25,53 @@ export interface MapQuestion {
 interface SpJarMapProps {
   questions: MapQuestion[];
   onSelect: (questionId: string) => void;
+  /** 円を掴んで置き直したとき（世界の 0–100%）。無ければ動かせない。 */
+  onMove?: (questionId: string, position: { jarX: number; jarY: number }) => void;
 }
 
 /**
- * 瓶の世界の大きさ（world 単位）。**PC と同じ箱**にする。
+ * 瓶の世界の大きさ（world 単位）。**縦画面なので縦長**。
  *
- * DB の 0–100 の座標が「この箱の %」であることは端末で変わらない。同じ箱にしておけば、
- * PC で動かした円が SP でも同じ場所に居る。
+ * 以前は PC と同じ横長の箱（2300×1440）だった。縦画面では世界の幅で倍率が決まるので
+ * 壜が画面幅の 1/4 にしかならず「小さすぎる」と言われた。DB の 0–100 の座標は
+ * 「箱の %」なので、箱の比が変わっても右上の円は右上に居る（PC と同じ側に同じ順で並ぶ）。
  */
-const WORLD: Bounds = { x: 0, y: 0, width: 2300, height: 1440 };
+const WORLD: Bounds = { x: 0, y: 0, width: 1440, height: 2300 };
 
-/** 壜の大きさ（world）。PC の `JarVessel` と同じ。 */
-const BOTTLE = { width: 500, height: 620 } as const;
+/** 壜の大きさ（world）。初期表示（HOME を 390px に収めた倍率 ≈ 0.32）で画面幅の 6 割。 */
+const BOTTLE = { width: 720, height: 900 } as const;
 
 /**
  * 円の直径（world）。PC の 420 より小さい。
  *
  * SP では円の中に言葉やアイコンを並べない（縦画面で潰れて分からなくなる）ので、
- * 問いが 3 行で読める大きさで足りる。初期表示（下の HOME を 390px に収めた倍率 ≈ 0.26）
- * で画面上 90px 前後。寄れば大きく読める。
+ * 問いが 3 行で読める大きさで足りる。初期表示（下の HOME を 390px に収めた倍率 ≈ 0.32）
+ * で画面上 110px 前後。寄れば大きく読める。
  */
 const CIRCLE = 340;
 
-/** 位置が無い問いの既定の席（PC と同じ）。 */
+/** 位置が無い問いの既定の席。壜（中央）を避けて上下左右に散らす。 */
 const FALLBACK: readonly { x: number; y: number }[] = [
-  { x: 80, y: 22 },
-  { x: 72, y: 72 },
-  { x: 14, y: 46 },
+  { x: 78, y: 22 },
+  { x: 22, y: 30 },
+  { x: 80, y: 70 },
+  { x: 20, y: 78 },
+  { x: 50, y: 10 },
+  { x: 50, y: 90 },
 ];
 
 /**
- * 最初に見せる範囲。世界全体（2300 幅）を 390px に収めると壜が 80px にしかならないので、
- * 中央の 1500×1040 を収める。外にある円へは指で寄り引きして行く。
+ * 最初に見せる範囲。壜と、既定の席の円が全部入る縦長の窓。
+ * 縁ぎりぎりに置かれた円へは指で寄り引きして行く。
  */
-const HOME: Bounds = { x: 400, y: 200, width: 1500, height: 1040 };
+const HOME: Bounds = { x: 100, y: 120, width: 1240, height: 2060 };
 
-/** これ以上動いたらタップではなくパン／ピンチ（px）。 */
+/** これ以上動いたらタップではなく掴んで動かす（px）。 */
 const TAP_SLOP = 8;
+
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, Math.round(value * 10) / 10));
+}
 
 /**
  * SP の瓶の「地図」。**PC と同じ構造**: 中央に壜、まわりにシャーレ（問いの円）、
@@ -71,10 +81,26 @@ const TAP_SLOP = 8;
  * 地図を踏襲してほしい」と言われた。SP の違いは**円の中に中身を並べないこと**だけ。
  * 円は小さく、問いだけを書く。押した先（`SpQuestionZoom`）で手紙・言葉・抜粋を読む。
  */
-export function SpJarMap({ questions, onSelect }: SpJarMapProps) {
+export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
   const t = useTranslations('sp.jar');
+  /**
+   * 掴んで動かした円の位置（%）。取得し直すまでの間、こちらを優先する。
+   * 保存は離したときに親へ渡す（PC と同じく、保存は debounce つき）。
+   */
+  const [moved, setMoved] = useState<Record<string, { jarX: number; jarY: number }>>({});
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragRef = useRef<{
+    id: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    active: boolean;
+  } | null>(null);
   const canvas = useCanvasViewport({
-    storageKey: 'jar-sp',
+    // 世界の箱を縦長に変えたので鍵も変える（前の箱で保存した位置を復元すると外を見る）。
+    storageKey: 'jar-sp-portrait',
     defaultFitBounds: HOME,
     fitPadding: 16,
     getContentBounds: () => WORLD,
@@ -117,8 +143,12 @@ export function SpJarMap({ questions, onSelect }: SpJarMapProps) {
 
         {questions.map((question, index) => {
           const fallback = FALLBACK[index % FALLBACK.length] ?? FALLBACK[0];
-          const x = ((question.jarX ?? fallback.x) / 100) * WORLD.width;
-          const y = ((question.jarY ?? fallback.y) / 100) * WORLD.height;
+          const placed = moved[question.id];
+          const percentX = placed?.jarX ?? question.jarX ?? fallback.x;
+          const percentY = placed?.jarY ?? question.jarY ?? fallback.y;
+          const x = (percentX / 100) * WORLD.width;
+          const y = (percentY / 100) * WORLD.height;
+          const dragging = draggingId === question.id;
           return (
             <button
               key={question.id}
@@ -129,6 +159,52 @@ export function SpJarMap({ questions, onSelect }: SpJarMapProps) {
               data-canvas-no-pan=""
               onPointerDown={(event) => {
                 pointerRef.current = { x: event.clientX, y: event.clientY };
+                if (!onMove) return;
+                dragRef.current = {
+                  id: question.id,
+                  pointerId: event.pointerId,
+                  startX: event.clientX,
+                  startY: event.clientY,
+                  originX: x,
+                  originY: y,
+                  active: false,
+                };
+              }}
+              // 掴んで動かす。スロップを越えたら円が指に付いてくる（PC のシャーレと同じ）。
+              onPointerMove={(event) => {
+                const drag = dragRef.current;
+                if (!drag || drag.pointerId !== event.pointerId) return;
+                const dx = event.clientX - drag.startX;
+                const dy = event.clientY - drag.startY;
+                if (!drag.active) {
+                  if (Math.abs(dx) + Math.abs(dy) <= TAP_SLOP) return;
+                  drag.active = true;
+                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  setDraggingId(drag.id);
+                }
+                const scale = canvas.viewport.scale || 1;
+                const worldX = drag.originX + dx / scale;
+                const worldY = drag.originY + dy / scale;
+                setMoved((previous) => ({
+                  ...previous,
+                  [drag.id]: {
+                    jarX: clampPercent((worldX / WORLD.width) * 100),
+                    jarY: clampPercent((worldY / WORLD.height) * 100),
+                  },
+                }));
+              }}
+              onPointerUp={(event) => {
+                const drag = dragRef.current;
+                if (!drag || drag.pointerId !== event.pointerId) return;
+                dragRef.current = null;
+                if (!drag.active) return;
+                setDraggingId(null);
+                const position = moved[drag.id];
+                if (position && onMove) onMove(drag.id, position);
+              }}
+              onPointerCancel={() => {
+                dragRef.current = null;
+                setDraggingId(null);
               }}
               onClick={(event) => {
                 // 指が動いていたらピンチ／パンの余韻。開かない。
@@ -148,14 +224,21 @@ export function SpJarMap({ questions, onSelect }: SpJarMapProps) {
                 top: y - CIRCLE / 2,
                 width: CIRCLE,
                 height: CIRCLE,
+                // 壜と同じ紙と麹の色（PC の壜の `rgba(226,194,142)`）。以前は縁と字がえんじ色で、
+                // 壜と同じ画面の物に見えなかった（実機レビュー）。
                 background:
-                  'radial-gradient(circle at 50% 45%, rgba(253,251,247,0.92), rgba(253,251,247,0.55))',
-                border: `${question.unread ? 4 : 2}px solid ${
-                  question.unread ? 'rgba(122,59,63,0.55)' : 'rgba(226,194,142,0.7)'
-                }`,
-                boxShadow: question.unread
-                  ? '0 0 0 18px rgba(217,180,143,0.16), 0 24px 60px rgba(140,133,126,0.16)'
-                  : '0 18px 50px rgba(140,133,126,0.12)',
+                  'radial-gradient(circle at 50% 42%, rgba(255,255,255,0.9), rgba(253,251,247,0.6))',
+                border: `${question.unread ? 4 : 2}px solid rgba(226,194,142,${
+                  question.unread ? 1 : 0.7
+                })`,
+                boxShadow: dragging
+                  ? '0 0 0 12px rgba(226,194,142,0.18), 0 32px 70px rgba(140,133,126,0.28)'
+                  : question.unread
+                    ? '0 0 0 18px rgba(226,194,142,0.16), 0 24px 60px rgba(140,133,126,0.16)'
+                    : '0 18px 50px rgba(140,133,126,0.12)',
+                transform: dragging ? 'scale(1.04)' : undefined,
+                transition: dragging ? 'none' : 'box-shadow 200ms ease, transform 200ms ease',
+                zIndex: dragging ? 2 : undefined,
                 touchAction: 'none',
               }}
             >
@@ -165,7 +248,8 @@ export function SpJarMap({ questions, onSelect }: SpJarMapProps) {
                   fontFamily: "'Noto Serif JP', serif",
                   fontSize: 40,
                   lineHeight: 1.35,
-                  color: '#7A3B3F',
+                  color: 'var(--fg)',
+                  opacity: 0.85,
                   letterSpacing: '0.04em',
                   display: '-webkit-box',
                   WebkitBoxOrient: 'vertical',

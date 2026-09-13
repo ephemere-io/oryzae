@@ -22,27 +22,46 @@ export interface BottomSheetProps {
   children: React.ReactNode;
 }
 
-/** これより下へ引き下げたら閉じる（px）。 */
+/** いちばん低い段からこれ以上（px）引き下げたら閉じる。 */
 const CLOSE_PULL = 80;
 
-/** つまみを引いた距離がこれ未満なら「押した」扱い（段を変えない）。 */
+/** これ未満の動きは押したとみなす（px）。 */
 const DRAG_SLOP = 4;
+
+/** 段へ収まる動き。vaul（shadcn の Drawer）と同じ曲線。 */
+const SNAP_TRANSITION = 'transform 420ms cubic-bezier(0.32, 0.72, 0, 1)';
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+interface Drag {
+  pointerId: number;
+  startY: number;
+  /** 掴んだ時点の、いちばん高い段からの下がり（px）。 */
+  startOffset: number;
+  /** スロップを越えて本当に引き始めたか。 */
+  active: boolean;
+  /** 中身（スクロールする領域）の上で掴んだか。 */
+  fromContent: boolean;
+}
+
 /**
- * 下から出て、**つまみで高さを変えられる**セミモーダル（Google マップの作法）。
+ * 下から出るシート。高さは段（detent）で止まり、つまみか中身を引いて段を変える。
  *
- * - 段（detents）の間を指で行き来し、離した位置に近い段へ寄る
- * - いちばん低い段からさらに引き下げると閉じる。背景を押しても閉じる
- * - 中身は常にスクロールできる。引くのはつまみと見出しの行だけ（中身のスクロールと
- *   取り合わない）
+ * ### 動かし方（vaul / iOS のシートと同じ）
  *
- * `absolute inset-0` で親（`position: relative`）を覆うので、画面全体ではなく
- * 置いた画面の中で開く（SP のシェルの上段は隠さない）。
+ * - 位置は **`transform` だけ**で動かす。以前は引いている間 `height` を毎フレーム書き換えて
+ *   いて、レイアウトが走ってカクついた。シートの高さはいちばん高い段に固定し、下へ
+ *   ずらして低い段を作る。引いている間は React を通さず要素の style を直接書く
+ * - シート自体は `touch-action: none`（指の動きはこちらが受ける）。中身のスクロール領域は
+ *   スクロール容器なので、その中では `pan-y` が効いて普通にスクロールできる
+ * - 中身の上で引いたとき: 中身が先頭（`scrollTop === 0`）で下へ引けばシートを下げ、
+ *   いちばん高い段でなければ上へ引いてシートを上げる。それ以外は中身に任せる
+ * - 中身は `overscroll-behavior: contain`。端まで引いても外（ブラウザの引っ張り更新）へ
+ *   伝えない。ブラウザの更新が走っていたのはこれが無かったため
+ * - いちばん低い段からさらに引き下げたら閉じる。離せば近い段へ収まる
  */
 export function BottomSheet({
   open,
@@ -55,60 +74,109 @@ export function BottomSheet({
   children,
 }: BottomSheetProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const sheetRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const [detent, setDetent] = useState(initialDetent);
-  /** 引いている最中の高さ（px）。null なら段の高さ。 */
-  const [dragHeight, setDragHeight] = useState<number | null>(null);
-  const dragRef = useRef<{ pointerId: number; startY: number; startHeight: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  /** 開いた直後は画面の下に居て、次のフレームで段へ上がる（出てくる動き）。 */
+  const [entered, setEntered] = useState(false);
+  const dragRef = useRef<Drag | null>(null);
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => setReduced(prefersReducedMotion()), []);
 
-  // 開き直すたびに最初の段へ戻す。
+  // 開き直すたびに最初の段へ戻し、下から出てくる。
   useEffect(() => {
-    if (open) {
-      setDetent(initialDetent);
-      setDragHeight(null);
+    if (!open) {
+      setEntered(false);
+      return;
     }
+    setDetent(initialDetent);
+    setDragging(false);
+    const frame = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(frame);
   }, [open, initialDetent]);
 
+  const maxFraction = Math.max(...detents);
+  const maxIndex = detents.indexOf(maxFraction);
+  /** 段の位置。自身の高さに対する % なので、親の採寸を待たずに描ける。 */
+  const percentTransform = useCallback(
+    (fraction: number) =>
+      `translate3d(0, ${(((maxFraction - fraction) / maxFraction) * 100).toFixed(3)}%, 0)`,
+    [maxFraction],
+  );
   const rootHeight = useCallback(() => rootRef.current?.clientHeight ?? 0, []);
+  /** 段 → いちばん高い段からの下がり（px）。 */
+  const offsetOf = useCallback(
+    (fraction: number) => (maxFraction - fraction) * rootHeight(),
+    [maxFraction, rootHeight],
+  );
 
-  const onHandlePointerDown = useCallback(
+  const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
-      const height = rootHeight();
-      if (height === 0) return;
-      event.currentTarget.setPointerCapture?.(event.pointerId);
+      if (event.button !== 0 && event.pointerType === 'mouse') return;
+      const target = event.target instanceof Node ? event.target : null;
       dragRef.current = {
         pointerId: event.pointerId,
         startY: event.clientY,
-        startHeight: (detents[detent] ?? detents[0] ?? 0.5) * height,
+        startOffset: offsetOf(detents[detent] ?? detents[0] ?? 0.5),
+        active: false,
+        fromContent: Boolean(target && contentRef.current?.contains(target)),
       };
     },
-    [detent, detents, rootHeight],
+    [detent, detents, offsetOf],
   );
 
-  const onHandlePointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const dy = event.clientY - drag.startY;
-    if (Math.abs(dy) < DRAG_SLOP) return;
-    setDragHeight(Math.max(0, drag.startHeight - dy));
-  }, []);
-
-  const onHandlePointerEnd = useCallback(
+  const onPointerMove = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       const drag = dragRef.current;
+      const sheet = sheetRef.current;
+      if (!drag || !sheet || drag.pointerId !== event.pointerId) return;
+      const dy = event.clientY - drag.startY;
+
+      if (!drag.active) {
+        if (Math.abs(dy) < DRAG_SLOP) return;
+        if (drag.fromContent) {
+          const content = contentRef.current;
+          const atTop = !content || content.scrollTop <= 0;
+          // 中身に任せる: 先頭でないのに下へ、いちばん高い段で上へ。
+          if ((dy > 0 && !atTop) || (dy < 0 && detent === maxIndex)) {
+            dragRef.current = null;
+            return;
+          }
+        }
+        drag.active = true;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        sheet.style.transition = 'none';
+        setDragging(true);
+      }
+
+      const next = Math.min(Math.max(drag.startOffset + dy, 0), rootHeight());
+      sheet.style.transform = `translate3d(0, ${next}px, 0)`;
+    },
+    [detent, maxIndex, rootHeight],
+  );
+
+  const onPointerEnd = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      const sheet = sheetRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
       dragRef.current = null;
-      const height = rootHeight();
-      const dy = event.clientY - drag.startY;
-      setDragHeight(null);
-      if (Math.abs(dy) < DRAG_SLOP || height === 0) return;
+      if (!drag.active || !sheet) return;
 
-      const current = drag.startHeight - dy;
-      const lowest = (detents[0] ?? 0.5) * height;
+      const height = rootHeight();
+      const offset = Math.min(
+        Math.max(drag.startOffset + (event.clientY - drag.startY), 0),
+        height,
+      );
+      const current = height > 0 ? maxFraction - offset / height : maxFraction;
+      const lowest = Math.min(...detents);
+
+      setDragging(false);
+
       // いちばん低い段からさらに引き下げたら閉じる。
-      if (current < lowest - CLOSE_PULL) {
+      if (height > 0 && current * height < lowest * height - CLOSE_PULL) {
         onClose();
         return;
       }
@@ -116,27 +184,32 @@ export function BottomSheet({
       let best = 0;
       let bestDistance = Number.POSITIVE_INFINITY;
       detents.forEach((fraction, index) => {
-        const distance = Math.abs(fraction * height - current);
+        const distance = Math.abs(fraction - current);
         if (distance < bestDistance) {
           bestDistance = distance;
           best = index;
         }
       });
+      // 段へ収まる動きは transition に任せる。段が変わらないと React は style を書き直さない
+      // ので、ここで自分で段の値を書く（書かないと離した位置に留まる）。
+      sheet.style.transition = reduced ? 'none' : SNAP_TRANSITION;
+      sheet.style.transform = percentTransform(detents[best] ?? maxFraction);
       setDetent(best);
     },
-    [detents, onClose, rootHeight],
+    [detents, maxFraction, onClose, percentTransform, reduced, rootHeight],
   );
 
   if (!open) return null;
 
   const fraction = detents[detent] ?? detents[0] ?? 0.5;
-  const height = dragHeight === null ? `${fraction * 100}%` : `${dragHeight}px`;
+  // 引いている間は要素の style を直接書く（React は再描画しない）。
+  const restingTransform = entered ? percentTransform(fraction) : 'translate3d(0, 100%, 0)';
 
   return (
     <div
       ref={rootRef}
-      {...verifyAttrs({ unit: 'BottomSheet', detent, dragging: dragHeight !== null })}
-      className="absolute inset-0 z-30 flex flex-col justify-end"
+      {...verifyAttrs({ unit: 'BottomSheet', detent, dragging })}
+      className="absolute inset-0 z-30 flex flex-col justify-end overflow-hidden"
     >
       {/* 背景。押したら閉じる（シートの外は「戻る」）。 */}
       <button
@@ -144,33 +217,37 @@ export function BottomSheet({
         aria-label={closeLabel}
         onClick={onClose}
         className="absolute inset-0"
-        style={{ background: 'color-mix(in srgb, var(--fg) 28%, transparent)' }}
+        style={{
+          background: 'color-mix(in srgb, var(--fg) 28%, transparent)',
+          opacity: entered ? 1 : 0,
+          transition: reduced ? 'none' : 'opacity 260ms ease-out',
+        }}
       />
 
       <section
+        ref={sheetRef}
         role="dialog"
         aria-label={ariaLabel}
         className="relative flex flex-col overflow-hidden rounded-t-3xl"
         style={{
-          height,
-          maxHeight: '100%',
+          height: `${maxFraction * 100}%`,
           background: 'var(--bg)',
           boxShadow: '0 -8px 32px rgba(140,133,126,0.18)',
-          transition:
-            dragHeight === null && !reduced
-              ? 'height 260ms cubic-bezier(0.22, 1, 0.36, 1)'
-              : 'none',
+          transform: restingTransform,
+          transition: reduced || dragging ? 'none' : SNAP_TRANSITION,
+          willChange: 'transform',
+          touchAction: 'none',
         }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
       >
-        {/* つまみと見出しの行。ここを引くと高さが変わる。 */}
+        {/* つまみと見出しの行。 */}
         <div
           data-sheet-handle
           className="flex shrink-0 select-none flex-col items-center px-5 pt-2 pb-2"
-          style={{ touchAction: 'none', cursor: 'grab' }}
-          onPointerDown={onHandlePointerDown}
-          onPointerMove={onHandlePointerMove}
-          onPointerUp={onHandlePointerEnd}
-          onPointerCancel={onHandlePointerEnd}
+          style={{ cursor: 'grab' }}
         >
           <span
             aria-hidden="true"
@@ -195,7 +272,14 @@ export function BottomSheet({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto px-6 pb-8">{children}</div>
+        {/* 中身。スクロール容器なので、この中では pan-y が効く。端で外へ伝えない。 */}
+        <div
+          ref={contentRef}
+          className="min-h-0 flex-1 overflow-auto px-6 pb-8"
+          style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+        >
+          {children}
+        </div>
       </section>
     </div>
   );
