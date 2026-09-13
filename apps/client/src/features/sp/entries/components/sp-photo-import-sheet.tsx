@@ -54,7 +54,7 @@ export function SpPhotoImportSheet({
             className="sp-fade flex-1 bg-black/30"
           />
           <div
-            className="sp-sheet max-h-[80vh] overflow-auto rounded-t-2xl bg-[var(--bg)] px-5 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
+            className="sp-sheet max-h-[80vh] overflow-auto rounded-t-2xl bg-[var(--surface-raised)] px-5 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
             style={{ fontFamily: 'var(--ob-font-sans)' }}
           >
             <p
@@ -122,8 +122,9 @@ export function SpPhotoImportSheet({
                     type="button"
                     onClick={onTranscribe}
                     disabled={busy || !state.previewUrl}
-                    className="flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-white disabled:opacity-50"
-                    style={{ background: 'var(--accent)' }}
+                    // 「読み込む」と「置く」は対等な二択。片方だけ濃いと、そちらが正解に見える（実機レビュー）。
+                    className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium disabled:opacity-50"
+                    style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
                   >
                     {state.status === 'transcribing' ? (
                       <span
@@ -137,8 +138,8 @@ export function SpPhotoImportSheet({
                     type="button"
                     onClick={onAttach}
                     disabled={busy || !state.previewUrl}
-                    className="rounded-xl py-3 text-sm text-[var(--fg)] disabled:opacity-50"
-                    style={{ border: '1px solid var(--border-subtle)' }}
+                    className="flex min-h-[48px] items-center justify-center rounded-xl py-3 text-sm font-medium disabled:opacity-50"
+                    style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
                   >
                     {state.status === 'uploading' ? t('attaching') : t('attach')}
                   </button>

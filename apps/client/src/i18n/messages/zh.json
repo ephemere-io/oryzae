@@ -734,6 +734,17 @@
       "ferment_title": "腌制",
       "ferment_done_short": "发酵中",
       "result_read_full": "阅读全文",
+      "photo_width": "宽度",
+      "photo_width_small": "小",
+      "photo_width_medium": "中",
+      "photo_width_large": "大",
+      "photo_align": "对齐",
+      "photo_wrap": "环绕",
+      "photo_wrap_on": "开",
+      "photo_wrap_off": "关",
+      "photo_remove": "移除",
+      "photo_done": "完成",
+      "photo_selected": "已选中照片",
       "ferment_sub": "静待片刻，AI 的来信将会送达",
       "delete": "删除",
       "question_unlink": "取消关联“{label}”",
@@ -771,7 +782,11 @@
       "manage_questions": "添加或编辑提问",
       "not_fermented": "这个提问还没有发酵",
       "selection_reason": "被选中的理由",
-      "palette_aria": "罐子操作"
+      "palette_aria": "罐子操作",
+      "letter_badge": "来信",
+      "letter_badge_unread": "新来信",
+      "history": "过往",
+      "history_latest": "最新"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -889,6 +904,9 @@
     "hint_board_empty": "还没有贴任何东西",
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
-    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
+    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
+    "list_row_actions": "操作",
+    "list_open": "打开",
+    "list_delete": "删除"
   }
 }

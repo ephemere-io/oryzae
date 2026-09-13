@@ -8,7 +8,7 @@
 import { INLINE_IMAGE_PLACEHOLDER } from '@oryzae/shared';
 import { registerUnit } from '@oryzae/verify';
 import { useState } from 'react';
-import type { AttachedPhoto } from '@/features/shared/entries/types';
+import type { InlinePhoto } from '@/features/shared/entries/types';
 import {
   joinBodySegments,
   removePhotoAt,
@@ -19,7 +19,7 @@ import { SpBodyEditor } from './sp-body-editor';
 
 interface Props {
   value: string;
-  images: AttachedPhoto[];
+  images: InlinePhoto[];
 }
 
 const P = INLINE_IMAGE_PLACEHOLDER;
@@ -29,6 +29,7 @@ const PIXEL =
 function Harness({ value: initial, images: initialImages }: Props) {
   const [value, setValue] = useState(initial);
   const [images, setImages] = useState(initialImages);
+  const [selected, setSelected] = useState<number | null>(null);
   return (
     <div style={{ width: 390 }}>
       <SpBodyEditor
@@ -39,6 +40,8 @@ function Harness({ value: initial, images: initialImages }: Props) {
           setImages((prev) => prev.filter((_, i) => i !== index));
           setValue((prev) => joinBodySegments(removePhotoAt(splitBodyAtPhotos(prev), index)));
         }}
+        selectedImage={selected}
+        onSelectImage={setSelected}
         placeholder="いま感じていることを、そのまま。"
         ariaLabel="本文"
         style={{ fontFamily: "'Noto Serif JP', serif", fontSize: 16, lineHeight: 1.9 }}
@@ -65,23 +68,51 @@ registerUnit<Props>({
       props: {
         value: `朝の光。\n${P}昼はよく歩いた。\n${P}`,
         images: [
-          { storagePath: 'p/1.jpg', signedUrl: PIXEL },
-          { storagePath: 'p/2.jpg', signedUrl: PIXEL },
+          {
+            storagePath: 'p/1.jpg',
+            signedUrl: PIXEL,
+            widthRatio: 1,
+            layout: 'block',
+            align: 'start',
+          },
+          {
+            storagePath: 'p/2.jpg',
+            signedUrl: PIXEL,
+            widthRatio: 0.4,
+            layout: 'block',
+            align: 'end',
+          },
         ],
       },
     },
     {
       id: 'photo-unavailable',
       description: '署名できなかった写真は枠だけ残す',
-      props: { value: `前${P}後`, images: [{ storagePath: 'p/x.jpg', signedUrl: '' }] },
+      props: {
+        value: `前${P}後`,
+        images: [
+          { storagePath: 'p/x.jpg', signedUrl: '', widthRatio: 1, layout: 'block', align: 'start' },
+        ],
+      },
     },
     {
       id: 'remove-by-button',
       probe: true,
       description: 'Probe: × で写真を抜くと前後の文が 1 つに繋がる',
-      props: { value: `前${P}後`, images: [{ storagePath: 'p/1.jpg', signedUrl: PIXEL }] },
+      props: {
+        value: `前${P}後`,
+        images: [
+          {
+            storagePath: 'p/1.jpg',
+            signedUrl: PIXEL,
+            widthRatio: 1,
+            layout: 'block',
+            align: 'start',
+          },
+        ],
+      },
       act: async (ctx) => {
-        await ctx.click('figure button');
+        await ctx.click('figure button[aria-label^="1 枚目の写真を削除"]');
         await ctx.wait(16);
       },
     },

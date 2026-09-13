@@ -6,6 +6,7 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
@@ -61,6 +62,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
    * なく、手帳のホバーに出す日付の範囲を作るためのもの）。手元で月に絞ると、20 件より
    * 古い月が必ず空になる。月・問い・検索の絞り込みも、続きの読み込みもサーバーに任せる。
    */
+  const { deleteEntry } = useDeleteEntry(api);
   const list = useEntries(
     overlay === null ? null : api,
     listSearch.trim() === '' ? undefined : listSearch.trim(),
@@ -293,6 +295,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
           selectedMonth={overlay?.month ?? null}
           onSelectMonth={(month) => setOverlay({ month })}
           onSelectEntry={handleSelectEntry}
+          onDeleteEntry={async (entryId) => {
+            const ok = await deleteEntry(entryId);
+            if (ok) list.removeEntry(entryId);
+            return ok;
+          }}
           onCreateEntry={() => {
             setOverlay(null);
             router.push('/entries/new');

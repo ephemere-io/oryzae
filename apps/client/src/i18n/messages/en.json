@@ -734,6 +734,17 @@
       "ferment_title": "Pickle",
       "ferment_done_short": "Fermenting",
       "result_read_full": "Read in full",
+      "photo_width": "Width",
+      "photo_width_small": "S",
+      "photo_width_medium": "M",
+      "photo_width_large": "L",
+      "photo_align": "Align",
+      "photo_wrap": "Wrap",
+      "photo_wrap_on": "On",
+      "photo_wrap_off": "Off",
+      "photo_remove": "Remove",
+      "photo_done": "Done",
+      "photo_selected": "Photo selected",
       "ferment_sub": "Give it time — a letter from the AI will arrive",
       "delete": "Delete",
       "question_unlink": "Unlink “{label}”",
@@ -771,7 +782,11 @@
       "manage_questions": "Add or edit questions",
       "not_fermented": "This question hasn't fermented yet",
       "selection_reason": "Why this was chosen",
-      "palette_aria": "Jar actions"
+      "palette_aria": "Jar actions",
+      "letter_badge": "Letter",
+      "letter_badge_unread": "New letter",
+      "history": "Past",
+      "history_latest": "Latest"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -889,6 +904,9 @@
     "hint_board_empty": "Nothing pinned yet",
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
-    "hint_board_both": "{photos} photos · {snippets} snippets"
+    "hint_board_both": "{photos} photos · {snippets} snippets",
+    "list_row_actions": "Actions",
+    "list_open": "Open",
+    "list_delete": "Delete"
   }
 }

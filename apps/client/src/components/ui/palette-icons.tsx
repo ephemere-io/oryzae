@@ -108,6 +108,36 @@ export function LetterIcon() {
   );
 }
 
+/** 写真の寄せ（左 / 中央 / 右）。向きは値で変わる。 */
+export function AlignIcon({ align }: { align: 'start' | 'center' | 'end' }) {
+  const x = align === 'center' ? 7 : align === 'end' ? 11 : 3;
+  return (
+    <svg {...iconProps()} aria-hidden="true">
+      <path d="M3 5h18M3 19h18" strokeOpacity=".45" />
+      <rect x={x} y="8" width="10" height="8" rx="1.5" />
+    </svg>
+  );
+}
+
+/** 写真の回り込み（文字が写真を避けて流れる）。 */
+export function WrapIcon() {
+  return (
+    <svg {...iconProps()} aria-hidden="true">
+      <rect x="3" y="6" width="8" height="8" rx="1.5" />
+      <path d="M14 7h7M14 11h7M3 17h18" strokeOpacity=".55" />
+    </svg>
+  );
+}
+
+/** 完了（写真の操作を終える）。 */
+export function CheckIcon() {
+  return (
+    <svg {...iconProps()} aria-hidden="true">
+      <path d="m5 12 5 5L20 7" />
+    </svg>
+  );
+}
+
 export function KeyboardDownIcon() {
   return (
     <svg {...iconProps()} aria-hidden="true">

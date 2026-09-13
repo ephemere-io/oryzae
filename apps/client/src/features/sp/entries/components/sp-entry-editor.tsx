@@ -7,7 +7,15 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActionPalette, type PaletteAction } from '@/components/ui/action-palette';
 import type { DockDetent } from '@/components/ui/dock-sheet';
-import { FermentIcon, LetterIcon, PhotoIcon } from '@/components/ui/palette-icons';
+import {
+  AlignIcon,
+  CheckIcon,
+  FermentIcon,
+  LetterIcon,
+  PhotoIcon,
+  TrashIcon,
+  WrapIcon,
+} from '@/components/ui/palette-icons';
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import { GearIcon, RoundButton } from '@/components/ui/round-button';
 import { CONTROL_FONT } from '@/components/ui/surface';
@@ -25,7 +33,7 @@ import {
   useEntryLocalCopy,
 } from '@/features/shared/entries/hooks/use-entry-local-copy';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
-import type { AttachedPhoto, EntryDraft } from '@/features/shared/entries/types';
+import type { AttachedPhoto, EntryDraft, InlinePhoto } from '@/features/shared/entries/types';
 import {
   buildEffectsWithPhotos,
   insertPhotoAt,
@@ -33,6 +41,7 @@ import {
   removePhotoAt,
   restoreInlinePhotos,
   splitBodyAtPhotos,
+  toInlinePhoto,
   trimOrphanPlaceholders,
 } from '@/features/shared/entries/utils/inline-photos';
 import { QuestionPicker } from '@/features/shared/entry-questions/components/question-picker';
@@ -172,8 +181,10 @@ export function SpEntryEditor({
   const resolvedEntryId = initialEntryId ?? restored?.entryId;
   const [title, setTitle] = useState(initial.title);
   const [body, setBody] = useState(initial.body);
-  /** 本文の中の写真（置き順）。数は本文のプレースホルダの数と同じ。 */
-  const [inlinePhotos, setInlinePhotos] = useState<AttachedPhoto[]>(initial.images);
+  /** 本文の中の写真（置き順、見た目つき）。数は本文のプレースホルダの数と同じ。 */
+  const [inlinePhotos, setInlinePhotos] = useState<InlinePhoto[]>(initial.images);
+  /** 選んでいる写真（パレットが写真の操作に切り替わる）。 */
+  const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [entryId, setEntryId] = useState<string | undefined>(resolvedEntryId);
   // サーバ保存済み（entryId あり）なら保存済み表示、未保存の復元ドラフトは「編集中」表示にする。
   const [lastSavedBody, setLastSavedBody] = useState(resolvedEntryId ? initial.body : '');
@@ -183,10 +194,16 @@ export function SpEntryEditor({
   useEffect(() => {
     if (!localCopy) return;
     const split = splitTitleBody(localCopy.content);
-    const images = localCopy.inlinePaths.map((storagePath) => ({
-      storagePath,
-      signedUrl: photos.find((photo) => photo.storagePath === storagePath)?.signedUrl ?? '',
-    }));
+    // 写しは見た目を持たない。サーバーの effects に同じ写真があればその見た目、無ければ既定。
+    const known = new Map(initial.images.map((image) => [image.storagePath, image]));
+    const images = localCopy.inlinePaths.map(
+      (storagePath) =>
+        known.get(storagePath) ??
+        toInlinePhoto({
+          storagePath,
+          signedUrl: photos.find((photo) => photo.storagePath === storagePath)?.signedUrl ?? '',
+        }),
+    );
     const nextBody = trimOrphanPlaceholders(split.body, images.length);
     setTitle(split.title);
     setBody(nextBody);
@@ -239,7 +256,7 @@ export function SpEntryEditor({
   /** PC と同じ理由の鏡。await をまたぐ連続操作で古い配列を送らないため。 */
   const photosRef = useRef<AttachedPhoto[]>(photos);
   photosRef.current = photos;
-  const inlineRef = useRef<AttachedPhoto[]>(inlinePhotos);
+  const inlineRef = useRef<InlinePhoto[]>(inlinePhotos);
   inlineRef.current = inlinePhotos;
   const bodyTextRef = useRef(body);
   bodyTextRef.current = body;
@@ -347,7 +364,7 @@ export function SpEntryEditor({
     const inserted = insertPhotoAt(segments, caret.segment, caret.offset);
     const nextBody = joinBodySegments(inserted.segments);
     const nextInline = [...inlineRef.current];
-    nextInline.splice(inserted.imageIndex, 0, photo);
+    nextInline.splice(inserted.imageIndex, 0, toInlinePhoto(photo));
     const nextPhotos = [...photosRef.current, photo];
     photosRef.current = nextPhotos;
     inlineRef.current = nextInline;
@@ -391,6 +408,22 @@ export function SpEntryEditor({
       setLastSavedBody(nextBody);
       setLastSavedTitle(title.trim());
     }
+  }
+
+  /**
+   * 選んでいる写真の見た目を変える（幅・寄せ・回り込み）。値は PC と同じ `InlineImage` の語彙。
+   * すぐ保存する（自動保存は本文の変化しか見ていない）。
+   */
+  async function updateSelectedPhoto(patch: Partial<InlinePhoto>) {
+    if (selectedPhoto === null) return;
+    const nextInline = inlineRef.current.map((image, i) =>
+      i === selectedPhoto ? { ...image, ...patch } : image,
+    );
+    inlineRef.current = nextInline;
+    setInlinePhotos(nextInline);
+    const content = composeContent(title, bodyTextRef.current);
+    if (!entryId || !content.trim()) return;
+    await saveWithEffects(content, entryId, { mediaUrls });
   }
 
   /** 本文の下に積んである（本文の中に居ない）写真を外す。 */
@@ -509,22 +542,25 @@ export function SpEntryEditor({
   const resultAvailable = fermentationDetail !== null || fermentationLoading;
   const [resultOpen, setResultOpen] = useState(true);
   const [resultDetent, setResultDetent] = useState<DockDetent>('peek');
+  // キーボードが出たとき、設定を開いたときは覗く段へ（本文が見える面積を残す。設定の 1 段と
+  // 結果の半分が同時に立つと本文が消えていた）。
   useEffect(() => {
-    if (chrome.keyboardOpen) setResultDetent('peek');
-  }, [chrome.keyboardOpen]);
+    if (chrome.keyboardOpen || settingsOpen) setResultDetent('peek');
+  }, [chrome.keyboardOpen, settingsOpen]);
   const blurEditor = useCallback(() => {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   }, []);
+  // 出ていれば消す、消えていれば半分で出す。段の切り替えはつまみと指に任せる（ボタンは 1 つの意味だけ）。
   const toggleResult = useCallback(() => {
-    if (resultOpen && resultDetent !== 'peek') {
+    if (resultOpen) {
       setResultOpen(false);
       return;
     }
-    if (!resultOpen) setResultOpen(true);
+    setResultOpen(true);
     blurEditor();
     setResultDetent('half');
-  }, [resultOpen, resultDetent, blurEditor]);
+  }, [resultOpen, blurEditor]);
 
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
@@ -558,6 +594,79 @@ export function SpEntryEditor({
       setDeleteOpen(false);
     }
   }
+
+  const selected = selectedPhoto === null ? null : (inlinePhotos[selectedPhoto] ?? null);
+  const widthLabel = (ratio: number) =>
+    ratio <= 0.45
+      ? t('photo_width_small')
+      : ratio <= 0.75
+        ? t('photo_width_medium')
+        : t('photo_width_large');
+  const nextWidth = (ratio: number) => (ratio <= 0.45 ? 0.7 : ratio <= 0.75 ? 1 : 0.4);
+  const alignLabel = (align: InlinePhoto['align']) =>
+    align === 'center'
+      ? tPhoto('align_center')
+      : align === 'end'
+        ? tPhoto('align_end')
+        : tPhoto('align_start');
+  const nextAlign = (align: InlinePhoto['align']): InlinePhoto['align'] =>
+    align === 'start' ? 'center' : align === 'center' ? 'end' : 'start';
+  /**
+   * 写真を選んでいる間のパレット。押すたびに値が巡る（幅 小→中→大、寄せ 左→中央→右）。
+   * 回り込みは PC と同じ `layout: 'wrap'` で保存する（PC では文字が回り込む。SP の本文は textarea
+   * なので幅と寄せとして描く）。
+   */
+  const photoActions: PaletteAction[] = selected
+    ? [
+        {
+          id: 'photo-width',
+          label: `${t('photo_width')} ${widthLabel(selected.widthRatio)}`,
+          caption: `${t('photo_width')} · ${widthLabel(selected.widthRatio)}`,
+          icon: <PhotoIcon />,
+          onSelect: () => void updateSelectedPhoto({ widthRatio: nextWidth(selected.widthRatio) }),
+        },
+        {
+          id: 'photo-align',
+          label: `${t('photo_align')} ${alignLabel(selected.align)}`,
+          caption: `${t('photo_align')} · ${alignLabel(selected.align)}`,
+          icon: <AlignIcon align={selected.align} />,
+          disabledReason: selected.widthRatio >= 1 ? t('photo_width_large') : undefined,
+          onSelect: () => void updateSelectedPhoto({ align: nextAlign(selected.align) }),
+        },
+        {
+          id: 'photo-wrap',
+          label: `${t('photo_wrap')} ${selected.layout === 'wrap' ? t('photo_wrap_on') : t('photo_wrap_off')}`,
+          caption: `${t('photo_wrap')} · ${selected.layout === 'wrap' ? t('photo_wrap_on') : t('photo_wrap_off')}`,
+          icon: <WrapIcon />,
+          active: selected.layout === 'wrap',
+          onSelect: () =>
+            void updateSelectedPhoto({
+              layout: selected.layout === 'wrap' ? 'block' : 'wrap',
+              // 回り込みは幅いっぱいでは成立しない。全幅なら半分に。
+              ...(selected.layout !== 'wrap' && selected.widthRatio >= 1
+                ? { widthRatio: 0.4 }
+                : {}),
+            }),
+        },
+        {
+          id: 'photo-remove',
+          label: t('photo_remove'),
+          icon: <TrashIcon />,
+          tone: 'danger' as const,
+          onSelect: () => {
+            const index = selectedPhoto;
+            setSelectedPhoto(null);
+            if (index !== null) void removeInlinePhoto(index);
+          },
+        },
+        {
+          id: 'photo-done',
+          label: t('photo_done'),
+          icon: <CheckIcon />,
+          onSelect: () => setSelectedPhoto(null),
+        },
+      ]
+    : [];
 
   const paletteActions: PaletteAction[] = [
     {
@@ -616,6 +725,7 @@ export function SpEntryEditor({
         settingsOpen,
         offline: offlineHold,
         inlinePhotoCount: inlinePhotos.length,
+        selectedPhoto: selectedPhoto ?? 'none',
         hasFermentation: fermentationDetail !== null,
         resultOpen: resultAvailable && resultOpen,
         resultDetent,
@@ -718,6 +828,8 @@ export function SpEntryEditor({
           images={inlinePhotos}
           onChange={setBody}
           onRemoveImage={(index) => void removeInlinePhoto(index)}
+          selectedImage={selectedPhoto}
+          onSelectImage={setSelectedPhoto}
           placeholder={t('body_placeholder')}
           ariaLabel={t('body_placeholder')}
           style={bodyStyle}
@@ -749,7 +861,7 @@ export function SpEntryEditor({
           ariaLabel={t('palette_aria')}
           keyboardOpen={chrome.keyboardOpen}
           dismissKeyboardLabel={tNav('dismiss_keyboard')}
-          actions={paletteActions}
+          actions={selected ? photoActions : paletteActions}
         />,
         chrome.paletteSlot,
       )}

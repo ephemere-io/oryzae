@@ -166,13 +166,13 @@ registerUnit<Props>({
     },
     {
       id: 'rows-match-contract',
-      description: '押せる行の数が契約（手紙＋言葉＋抜粋）と一致する（上限で落とさない）',
+      description:
+        '押せる行の数が契約（言葉＋抜粋）と一致する（上限で落とさない。手紙は行でなく本文）',
       check: ({ root, contract }) => {
-        const rows = root.querySelectorAll('[data-verify-unit="SpQuestionZoom"] li button').length;
-        const expected =
-          Number(contract.keywordCount) +
-          Number(contract.snippetCount) +
-          (contract.hasLetter === 'true' ? 1 : 0);
+        const rows = root.querySelectorAll(
+          '[data-verify-unit="SpQuestionZoom"] li button:not([data-testid="sp-jar-letter"] button)',
+        ).length;
+        const expected = Number(contract.keywordCount) + Number(contract.snippetCount);
         return rows === expected || `押せる行=${rows}（期待: ${expected}）`;
       },
     },
@@ -207,11 +207,12 @@ registerUnit<Props>({
     },
     {
       id: 'body-text-stays-in-the-reader',
-      description: '手紙の本文と言葉の説明はここに出さない（読むのは行を押した先）',
-      check: ({ root }) => {
+      description:
+        '手紙の本文はここで読める。言葉の説明は行を押した先（実機レビュー: 手紙は最初から）',
+      check: ({ root, contract }) => {
         const text = root.textContent ?? '';
-        const leaked = [LETTER_BODY, KEYWORD_DESCRIPTION].filter((body) => text.includes(body));
-        return leaked.length === 0 || `リストに本文が出ている: ${leaked.join(' / ')}`;
+        if (contract.hasLetter === 'true' && !text.includes(LETTER_BODY)) return '手紙の本文が無い';
+        return !text.includes(KEYWORD_DESCRIPTION) || '言葉の説明がリストに出ている';
       },
     },
     {

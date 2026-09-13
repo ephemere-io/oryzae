@@ -52,7 +52,7 @@ const BOTTLE = { width: 960, height: 1200 } as const;
  * 問いが 3 行で読める大きさで足りる。初期表示（下の HOME を 390×739 に収めた倍率 ≈ 0.28）
  * で画面上 95px 前後。寄れば大きく読める。
  */
-const CIRCLE = 340;
+const CIRCLE = 400;
 
 /**
  * 位置が無い問いの既定の席。壜（中央、y 28〜72%）を避けて上下左右に散らす。
@@ -71,7 +71,7 @@ const FALLBACK: readonly { x: number; y: number }[] = [
  * 最初に見せる範囲。壜と、既定の席の円が全部入る縦長の窓。
  * 縁ぎりぎりに置かれた円へは指で寄り引きして行く。
  */
-const HOME: Bounds = { x: 90, y: 40, width: 1270, height: 2560 };
+const HOME: Bounds = { x: 40, y: 40, width: 1360, height: 2560 };
 
 /** これ以上動いたらタップではなく掴んで動かす（px）。 */
 const TAP_SLOP = 8;
@@ -271,20 +271,29 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
               >
                 {question.text}
               </span>
+              {/* 手紙の印は言葉で（「手紙が届いています」は問いの一覧を開かないと見えなかった）。
+                  未読なら「新しい手紙」、読んだら「手紙」。円の下端の帯。 */}
               {question.hasLetter ? (
                 <span
                   aria-hidden="true"
                   data-letter-mark
-                  className="absolute flex items-center justify-center rounded-full"
+                  className="absolute flex items-center justify-center gap-2 rounded-full"
                   style={{
-                    right: 18,
-                    bottom: 18,
-                    width: 72,
-                    height: 72,
+                    left: '50%',
+                    bottom: 26,
+                    transform: 'translateX(-50%)',
+                    height: 60,
+                    padding: '0 22px 0 14px',
+                    fontFamily: 'Inter, "Noto Sans JP", sans-serif',
+                    fontSize: 30,
+                    letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap',
+                    color: '#7A3B3F',
                     background: question.unread
                       ? 'linear-gradient(135deg, #FFFFFF, #FBF1EE)'
                       : 'rgba(253,251,247,0.9)',
                     border: `3px solid rgba(122,59,63,${question.unread ? 0.5 : 0.25})`,
+                    opacity: question.unread ? 1 : 0.7,
                   }}
                 >
                   <svg
@@ -310,6 +319,7 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
                       strokeLinejoin="round"
                     />
                   </svg>
+                  {question.unread ? t('letter_badge_unread') : t('letter_badge')}
                 </span>
               ) : null}
             </button>

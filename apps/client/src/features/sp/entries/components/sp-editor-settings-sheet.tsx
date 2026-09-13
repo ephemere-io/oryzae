@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { DockSheet } from '@/components/ui/dock-sheet';
 import { Segmented } from '@/components/ui/segmented';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import type {
@@ -38,16 +38,18 @@ function toSpacing(value: string): EditorSpacing {
   return value === 'tight' || value === 'wide' ? value : 'normal';
 }
 
+const noop = () => {};
+
 /**
  * エディタの設定（SP）。上段の右端の歯車から開く。
  *
- * 出すのは**本文の見た目**だけ: 書体・文字サイズ・行間・字間。PC の設定にあるエフェクト
- * （消し跡・圧力にじみ）はポインタ前提で指では成立しないので出さない。打鍵の間や声で
- * 変わるもの（時間内包・音量内包）は SP でも成立しうるが、没入の補助として PC で
- * 育てたものなので、SP に出すかはオーナーの判断待ち（作業指示 B6）。
+ * **非モーダルのドック**（`DockSheet`、中身の高さの 1 段）。暗転しないので、段を押した結果
+ * （行間・文字サイズ・書体）が上の本文でそのまま見える（実機レビュー: 設定を変えたらこうなる、を
+ * 確かめたい）。行は「ラベル + 段」を横に並べて低くし、本文が見える面積を残す。
+ * 下へ引くか「閉じる」で閉じる。
  *
- * 以前の右端の歯車は**アカウント画面**に飛んでいた。設定は画面ごとに違うものなので、
- * 画面が自分の設定を右端に差し込む（`useSpChrome().actionSlot`）。
+ * 出すのは**本文の見た目**だけ: 書体・文字サイズ・行間・字間。PC の設定にあるエフェクト
+ * （消し跡・圧力にじみ）はポインタ前提で指では成立しないので出さない。
  */
 export function SpEditorSettingsSheet({
   open,
@@ -60,15 +62,15 @@ export function SpEditorSettingsSheet({
   const tPc = useTranslations('editor.settings');
 
   return (
-    <BottomSheet
+    <DockSheet
       open={open}
+      detent="half"
+      detents={['half']}
+      heights={{ half: 'content' }}
+      onDetentChange={noop}
+      dismissible
       onClose={onClose}
       ariaLabel={t('settings_title')}
-      label={t('settings_title')}
-      closeLabel={t('close')}
-      // 中身の高さで止まる（4 段の設定と削除で 6 割ほど）。それ以上に開かず、下へ引けば閉じる。
-      detents={['content']}
-      initialDetent={0}
     >
       <div
         {...verifyAttrs({
@@ -79,9 +81,25 @@ export function SpEditorSettingsSheet({
           letterSpacing: display.letterSpacing,
           canDelete: onDelete !== undefined,
         })}
-        className="flex flex-col gap-5 pt-2"
+        className="flex flex-col gap-3"
         style={CONTROL_FONT}
       >
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className="text-[11px] uppercase tracking-[0.14em]"
+            style={{ color: 'var(--accent)' }}
+          >
+            {t('settings_title')}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
+            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
+          >
+            {t('close')}
+          </button>
+        </div>
         <Row label={tPc('font_family')}>
           <Segmented
             size="md"
@@ -127,26 +145,18 @@ export function SpEditorSettingsSheet({
         </Row>
         {onDelete ? (
           // 破壊的な操作は設定から離して末尾に（iOS の設定画面の作法）。押すと確認シートへ。
-          <div
-            className="mt-3 flex flex-col gap-1 border-t pt-4"
-            style={{ borderColor: 'var(--border-subtle)' }}
+          <button
+            type="button"
+            onClick={onDelete}
+            data-settings-delete
+            className="mt-1 min-h-[44px] w-full border-t pt-3 text-left text-[15px]"
+            style={{ color: 'var(--ob-jar-warm)', borderColor: 'var(--border-subtle)' }}
           >
-            <button
-              type="button"
-              onClick={onDelete}
-              data-settings-delete
-              className="min-h-[44px] w-full rounded-xl text-left text-[15px]"
-              style={{ color: 'var(--ob-jar-warm)' }}
-            >
-              {t('settings_delete_entry')}
-            </button>
-            <span className="text-[12px]" style={{ color: 'var(--date-color)' }}>
-              {t('settings_delete_hint')}
-            </span>
-          </div>
+            {t('settings_delete_entry')}
+          </button>
         ) : null}
       </div>
-    </BottomSheet>
+    </DockSheet>
   );
 }
 
@@ -158,13 +168,14 @@ function spacingOptions(t: ReturnType<typeof useTranslations<'sp.editor'>>) {
   ];
 }
 
+/** ラベルと段を横に並べる（行を低くして、上の本文が見える面積を残す）。 */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[12px]" style={{ color: 'var(--date-color)' }}>
+    <div className="flex items-center gap-3">
+      <span className="w-16 shrink-0 text-[12px]" style={{ color: 'var(--date-color)' }}>
         {label}
       </span>
-      {children}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }

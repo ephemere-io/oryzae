@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JarQuestion } from '@/features/shared/questions/types';
@@ -159,20 +159,18 @@ describe('SpJar', () => {
     expect(await screen.findByText('埋めない時間。')).toBeTruthy();
   });
 
-  it('手紙をタップすると本文と「返事を書く」が出る', async () => {
+  it('手紙は最初から本文が出ていて、「返事を書く」で新規エントリーへ', async () => {
     renderJar(filledApi());
 
     openCircle('なぜ続けるのか');
-    // 手紙は円の中央。アクセシブル名を持たないので、封筒のボタンを位置で拾う。
-    const letterButton = await screen.findByTestId('sp-jar-letter');
-    fireEvent.click(letterButton);
-
+    // 手紙はもう一度押さなくても読める（実機レビュー）。
+    await screen.findByTestId('sp-jar-letter');
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '返事を書く' }));
     expect(push).toHaveBeenCalledWith('/entries/new?questionId=q1');
   });
 
-  it('手紙を開くと「もとになった記録」が出て、タップでそのエントリへ行く（Issue #453）', async () => {
+  it('手紙の下に「もとになった記録」が出て、タップでそのエントリへ行く（Issue #453）', async () => {
     const api = filledApi(
       detailJson({
         scannedEntries: [
@@ -184,7 +182,7 @@ describe('SpJar', () => {
     renderJar(api);
 
     openCircle('なぜ続けるのか');
-    fireEvent.click(await screen.findByTestId('sp-jar-letter'));
+    await screen.findByTestId('sp-jar-letter');
 
     // 手紙だけでは「何に対する返事か」が分からなかった。
     expect(await screen.findByText('朝の光')).toBeTruthy();
@@ -199,31 +197,22 @@ describe('SpJar', () => {
     renderJar(filledApi());
 
     openCircle('なぜ続けるのか');
-    fireEvent.click(await screen.findByTestId('sp-jar-letter'));
+    await screen.findByTestId('sp-jar-letter');
 
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
     expect(screen.queryByText(jaMessages.sp.jar.section_sources)).toBeNull();
   });
 
-  it('手紙を開いたときにその問いを既読にする（Issue #447）', async () => {
+  it('手紙が画面に出た時点でその問いを既読にする（Issue #447）', async () => {
     const unread = makeUnread({ ready: true, unreadQuestionIds: new Set(['q1']) });
     renderJar(filledApi(), { unread });
 
-    openCircle('なぜ続けるのか');
-    fireEvent.click(await screen.findByTestId('sp-jar-letter'));
-
-    // 旧実装は瓶を開いた時刻で一括既読にしていたため、開いた手紙が未読のまま残っていた。
-    expect(unread.markQuestionRead).toHaveBeenCalledWith('q1');
-  });
-
-  it('円を開いただけでは既読にしない（読んだのは手紙を開いたとき）', async () => {
-    const unread = makeUnread({ ready: true, unreadQuestionIds: new Set(['q1']) });
-    renderJar(filledApi(), { unread });
-
+    // 旧実装は瓶を開いた時刻で一括既読にしていた。いまは手紙が最初から出るので、
+    // 「その手紙が画面に出た」ことを読んだ印にする。
+    expect(unread.markQuestionRead).not.toHaveBeenCalled();
     openCircle('なぜ続けるのか');
     await screen.findByTestId('sp-jar-letter');
-
-    expect(unread.markQuestionRead).not.toHaveBeenCalled();
+    await waitFor(() => expect(unread.markQuestionRead).toHaveBeenCalledWith('q1'));
   });
 
   it('発酵がまだなら円の中でそう伝える', async () => {

@@ -734,6 +734,17 @@
       "ferment_title": "담그기",
       "ferment_done_short": "발효 중",
       "result_read_full": "전문 읽기",
+      "photo_width": "너비",
+      "photo_width_small": "소",
+      "photo_width_medium": "중",
+      "photo_width_large": "대",
+      "photo_align": "정렬",
+      "photo_wrap": "둘러싸기",
+      "photo_wrap_on": "켬",
+      "photo_wrap_off": "끔",
+      "photo_remove": "빼기",
+      "photo_done": "완료",
+      "photo_selected": "사진을 선택 중",
       "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다",
       "delete": "삭제",
       "question_unlink": "“{label}” 연결 해제",
@@ -771,7 +782,11 @@
       "manage_questions": "질문 추가·편집",
       "not_fermented": "이 질문은 아직 발효되지 않았습니다",
       "selection_reason": "선택된 이유",
-      "palette_aria": "병 작업"
+      "palette_aria": "병 작업",
+      "letter_badge": "편지",
+      "letter_badge_unread": "새 편지",
+      "history": "지난 회",
+      "history_latest": "최신"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -889,6 +904,9 @@
     "hint_board_empty": "아직 붙인 것이 없습니다",
     "hint_board_photos": "사진 {count}건",
     "hint_board_snippets": "스니펫 {count}건",
-    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건"
+    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건",
+    "list_row_actions": "작업",
+    "list_open": "열기",
+    "list_delete": "삭제"
   }
 }
