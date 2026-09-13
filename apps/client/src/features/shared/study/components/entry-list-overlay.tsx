@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useRef } from 'react';
+import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { useEscapeKey } from '@/lib/use-escape-key';
@@ -233,6 +234,7 @@ export function EntryListOverlay({
               onChange={(value) => onSelectMonth(value === ALL ? null : value)}
               ariaLabel={t('filter_month_aria')}
               className="min-w-0 flex-1"
+              size="md"
             />
             {onSelectQuestion && questions.length > 0 ? (
               <Select
@@ -247,22 +249,19 @@ export function EntryListOverlay({
                 onChange={(value) => onSelectQuestion(value === ALL ? null : value)}
                 ariaLabel={t('filter_question_aria')}
                 className="min-w-0 flex-1"
+                size="md"
               />
             ) : null}
           </div>
           {onSearchChange ? (
-            <input
+            // 検索欄はドロップダウンと同じ面（高さ・角丸・枠・地）。
+            <Input
+              type="search"
               value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
+              onChange={onSearchChange}
               placeholder={t('list_search_placeholder')}
-              aria-label={t('list_search_placeholder')}
-              // 16px 未満の入力欄に触れると iOS が画面ごと拡大する。
-              className="w-full rounded-lg px-3 py-2 text-[16px] outline-none"
-              style={{
-                background: 'var(--surface-sunken)',
-                border: '1px solid var(--surface-sunken-border)',
-                color: 'var(--fg)',
-              }}
+              ariaLabel={t('list_search_placeholder')}
+              size="md"
             />
           ) : null}
         </div>
