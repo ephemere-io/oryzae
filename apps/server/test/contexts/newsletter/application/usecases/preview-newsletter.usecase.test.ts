@@ -27,6 +27,7 @@ function mockAudience(count: number): NewsletterAudienceGateway {
   return {
     countRecipients: vi.fn().mockResolvedValue(count),
     listRecipients: vi.fn(),
+    listTestRecipients: vi.fn(),
   };
 }
 

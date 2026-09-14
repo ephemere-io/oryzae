@@ -16,6 +16,8 @@ export interface NewsletterPreview {
   recipientCount: number;
   /** すでに送信済みか。画面側で送信ボタンを出すかの判断に使う。 */
   sendable: boolean;
+  /** 最後にテスト配信した時刻。null なら未テスト（確認画面が警告を出す）。 */
+  testSentAt: string | null;
 }
 
 /**
@@ -52,6 +54,7 @@ export class PreviewNewsletterUsecase {
       text: renderNewsletterText(content),
       recipientCount,
       sendable: newsletter.status === 'draft' && recipientCount > 0,
+      testSentAt: newsletter.testSentAt,
     };
   }
 }

@@ -167,6 +167,17 @@ const FOOTER_LINES = [
  * 他のフッター行に混ぜると、止めたい人が探すことになる。探させると
  * 迷惑メール報告のほうが早くなり、送信ドメイン全体の到達率が落ちる。
  */
+/**
+ * テスト配信の件名に付ける印。
+ *
+ * 受信箱で本番配信と見分けられないと、「届いた」のがテストなのか本番なのか
+ * 分からなくなる（そして本番を二度撃つ）。本文は本番と同一にして、件名だけ
+ * 印を付ける。
+ */
+export function withTestSubjectPrefix(subject: string): string {
+  return `[テスト配信] ${subject}`;
+}
+
 const UNSUBSCRIBE_LABEL = 'このお知らせの配信を停止する';
 const UNSUBSCRIBE_NOTE = '（停止してもアカウントと日記はそのまま残ります）';
 

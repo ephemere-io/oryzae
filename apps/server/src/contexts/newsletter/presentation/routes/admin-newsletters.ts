@@ -9,6 +9,7 @@ import { GetNewsletterUsecase } from '../../application/usecases/get-newsletter.
 import { ListNewslettersUsecase } from '../../application/usecases/list-newsletters.usecase.js';
 import { PreviewNewsletterUsecase } from '../../application/usecases/preview-newsletter.usecase.js';
 import { SendNewsletterUsecase } from '../../application/usecases/send-newsletter.usecase.js';
+import { SendNewsletterTestUsecase } from '../../application/usecases/send-newsletter-test.usecase.js';
 import { UpdateNewsletterUsecase } from '../../application/usecases/update-newsletter.usecase.js';
 import {
   MAX_NEWSLETTER_BODY_LENGTH,
@@ -110,6 +111,26 @@ export const adminNewsletters = new Hono<Env>()
       new SupabaseNewsletterAudience(supabase),
     );
     return c.json({ data: await usecase.execute(c.req.param('id')) });
+  })
+  // 本番配信の前に運営者だけへ送る。status を動かさないので何度でも撃てる。
+  // 宛先が運営者に固定されているぶん、本番のような 2 段階確認は要らない。
+  .post('/:id/send-test', async (c) => {
+    const supabase = c.get('adminSupabase');
+    const usecase = new SendNewsletterTestUsecase(
+      new SupabaseNewsletterRepository(supabase),
+      new SupabaseNewsletterAudience(supabase),
+      new ResendBulkEmailSender(),
+      new HmacUnsubscribeToken(),
+    );
+
+    const result = await usecase.execute(c.req.param('id'));
+    console.info('[admin-newsletters] test send finished', {
+      newsletterId: result.newsletter.id,
+      sent: result.sent,
+      delivered: result.delivered,
+      failed: result.failed,
+    });
+    return c.json({ data: result });
   })
   .post('/:id/send', async (c) => {
     sendSchema.parse(await c.req.json());

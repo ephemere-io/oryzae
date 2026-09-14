@@ -30,6 +30,7 @@ const newsletter = {
   sentCount: 3,
   failedCount: 0,
   lastError: null,
+  testSentAt: null,
   sentAt: '2026-09-12T00:00:00.000Z',
   createdAt: '2026-09-11T00:00:00.000Z',
   updatedAt: '2026-09-12T00:00:00.000Z',
@@ -42,6 +43,7 @@ const preview = {
   text: '今月の更新\n\n本文',
   recipientCount: 3,
   sendable: true,
+  testSentAt: null,
 };
 
 describe('useNewsletterSend', () => {
@@ -116,6 +118,64 @@ describe('useNewsletterSend', () => {
     expect(result.current.error).toBeNull();
   });
 
+  // ここを取り違えると、テストのつもりで全員に配信してしまう。
+  it('テスト配信は /send-test を叩き、本番の /send は叩かない', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse({
+        ok: true,
+        body: {
+          data: {
+            newsletter: {
+              ...newsletter,
+              status: 'draft',
+              sentAt: null,
+              sentCount: 0,
+              testSentAt: '2026-09-14T07:30:00.000Z',
+            },
+            sent: true,
+            delivered: 2,
+            failed: 0,
+            recipients: ['admin1@example.com', 'admin2@example.com'],
+          },
+        },
+      }),
+    );
+
+    const { result } = renderHook(() => useNewsletterSend());
+    await act(async () => {
+      await result.current.sendTest('nl-1');
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/admin/newsletters/nl-1/send-test',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(result.current.testResult?.recipients).toEqual([
+      'admin1@example.com',
+      'admin2@example.com',
+    ]);
+    // 本番送信の結果は動かない（同じ枠で扱わない）。
+    expect(result.current.result).toBeNull();
+  });
+
+  it('テスト配信の失敗はサーバーの文言を出し、結果を残さない', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse({
+        ok: false,
+        status: 400,
+        body: { error: 'テスト配信の宛先がいません' },
+      }),
+    );
+
+    const { result } = renderHook(() => useNewsletterSend());
+    await act(async () => {
+      await result.current.sendTest('nl-1');
+    });
+
+    expect(result.current.error).toBe('テスト配信の宛先がいません');
+    expect(result.current.testResult).toBeNull();
+  });
+
   it('4xx はサーバーの文言をそのまま出す', async () => {
     mockFetch.mockResolvedValueOnce(
       mockResponse({ ok: false, status: 400, body: { error: 'この配信はすでに送信済みです' } }),
@@ -156,6 +216,7 @@ describe('useNewsletterSend', () => {
 
     expect(result.current.preview).toBeNull();
     expect(result.current.result).toBeNull();
+    expect(result.current.testResult).toBeNull();
     expect(result.current.error).toBeNull();
   });
 });

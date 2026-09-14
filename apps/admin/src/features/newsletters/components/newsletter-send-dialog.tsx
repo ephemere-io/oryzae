@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FlaskConical, Send } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,17 +10,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { formatSendSkipReason, type NewsletterPreview, type SendResult } from '../types';
+import {
+  formatSendSkipReason,
+  type NewsletterPreview,
+  type SendResult,
+  type TestSendResult,
+} from '../types';
+
+function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat('ja-JP', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Asia/Tokyo',
+  }).format(date);
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   preview: NewsletterPreview | null;
   result: SendResult | null;
+  testResult: TestSendResult | null;
   loadingPreview: boolean;
   sending: boolean;
+  testSending: boolean;
   error: string | null;
   onSend: () => void;
+  onSendTest: () => void;
 }
 
 /**
@@ -39,13 +57,20 @@ export function NewsletterSendDialog({
   onOpenChange,
   preview,
   result,
+  testResult,
   loadingPreview,
   sending,
+  testSending,
   error,
   onSend,
+  onSendTest,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [format, setFormat] = useState<'html' | 'text'>('html');
+
+  // 直前に撃ったテストの結果を優先する（プレビューは開いた時点の値なので、
+  // ダイアログを開いたままテスト配信すると古いままになる）。
+  const testedAt = testResult?.newsletter.testSentAt ?? preview?.testSentAt ?? null;
 
   function handleOpenChange(next: boolean) {
     // 開き直したときに確認済みの状態が残っていると、1 クリックで送れてしまう。
@@ -138,6 +163,42 @@ export function NewsletterSendDialog({
                 </span>
               </div>
             )}
+
+            {/* 本番の前に運営者だけへ送って受信確認する。何度でも撃てる。 */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+              <div className="text-xs">
+                {testedAt ? (
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    テスト配信済み（{formatDateTime(testedAt)}）
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    まだテスト配信していません。先に自分たちへ送って受信確認を。
+                  </span>
+                )}
+                {testResult && (
+                  <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    {testResult.sent
+                      ? `${testResult.delivered} 件送信: ${testResult.recipients.join(', ')}`
+                      : `送信されず (${formatSendSkipReason(testResult.reason)})`}
+                    {testResult.sent && testResult.failed > 0 && (
+                      <span className="text-destructive"> · 失敗 {testResult.failed}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onSendTest}
+                disabled={testSending || sending || !preview.sendable}
+              >
+                <FlaskConical className={`mr-1.5 h-3 w-3 ${testSending ? 'animate-pulse' : ''}`} />
+                {testSending ? '送信中...' : 'テスト配信'}
+              </Button>
+            </div>
 
             <div className="flex items-center justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => handleOpenChange(false)}>
