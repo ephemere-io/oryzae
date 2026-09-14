@@ -647,6 +647,16 @@
       "hint": "Flip with ← → keys, drag, or scroll ／ ESC to return to the jar",
       "launcher": "Look back through {count} fermentations",
       "open_aria": "Open the fermentation history for {question}"
+    },
+    "reading": {
+      "section_letter": "Letter",
+      "section_keywords": "Keywords",
+      "section_snippets": "Snippets",
+      "selection_reason": "Why this was chosen",
+      "reply_to": "Replying to this letter",
+      "reply": "Write a reply to this letter",
+      "sources": "Entries this letter came from",
+      "source_untitled": "Untitled entry"
     }
   },
   "questions": {
@@ -730,10 +740,10 @@
       "close": "Close",
       "pickle": "Pickle",
       "pickling": "Sealing…",
-      "pickled": "Fermentation started ✓",
+      "pickled": "Pickled in the jar",
       "question_link": "Link a question",
       "ferment_title": "Pickle",
-      "ferment_done_short": "Fermenting",
+      "ferment_done_short": "Pickled",
       "result_read_full": "Read in full",
       "photo_width": "Width",
       "photo_width_small": "S",
@@ -757,7 +767,8 @@
       "settings_size_large": "Large",
       "settings_spacing_tight": "Tight",
       "settings_spacing_normal": "Normal",
-      "settings_spacing_wide": "Wide"
+      "settings_spacing_wide": "Wide",
+      "pickled_note": "This entry is in the jar. Anything you add before fermentation starts goes in too, with no need to press again."
     },
     "nav": {
       "back": "Back",

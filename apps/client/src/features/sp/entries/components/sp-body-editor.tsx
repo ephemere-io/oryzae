@@ -22,7 +22,12 @@ import {
 } from '@/features/shared/entries/utils/inline-image-codec';
 import { photoOffsets } from '@/features/shared/entries/utils/inline-photos';
 import { caretRect, dropRangeAt, movePhotoTo } from '../utils/photo-drop';
-import { revealRect, scrollParent } from '../utils/reveal-in-scroller';
+import {
+  liftToMiddle,
+  revealRect,
+  scrollContainerOf,
+  scrollParent,
+} from '../utils/reveal-in-scroller';
 
 /** 本文の中身（保存形式の本文と、置き順の写真）。 */
 export interface SpBodySnapshot {
@@ -143,7 +148,7 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
 ) {
   const t = useTranslations('photo');
   const editorRef = useRef<HTMLDivElement | null>(null);
-  const markerRef = useRef<HTMLDivElement | null>(null);
+  const ghostRef = useRef<HTMLImageElement | null>(null);
   /** 最後に本文の中にあったカーソル（シートや写真の選択でフォーカスが外れても、そこへ戻す）。 */
   const savedRangeRef = useRef<Range | null>(null);
   /** 掴んで動かしたあとの click（指を離した点で起きる）を、選択の切り替えに使わない。 */
@@ -255,7 +260,7 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
     syncMarks(editor, serializeEditorText(editor), photosIn(editor));
   }, [selectedImage, syncMarks]);
 
-  // 本文の中のカーソルを覚える。キーボードの出入りでカーソルの行を見せ直す。
+  // 本文の中のカーソルを覚える。
   useEffect(() => {
     const remember = () => {
       const editor = editorRef.current;
@@ -264,16 +269,44 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
       const range = selection.getRangeAt(0);
       if (editor.contains(range.startContainer)) savedRangeRef.current = range.cloneRange();
     };
-    const reveal = () => {
-      if (document.activeElement === editorRef.current) requestAnimationFrame(revealCaret);
-    };
     document.addEventListener('selectionchange', remember);
-    window.visualViewport?.addEventListener('resize', reveal);
+    return () => document.removeEventListener('selectionchange', remember);
+  }, []);
+
+  /**
+   * キーボードが出て殻の本文の箱が縮んだら、カーソルの行を見えている範囲の真ん中まで送る。
+   *
+   * きっかけは**箱の大きさ**（`ResizeObserver`）。ビジュアルビューポートの resize の時点では殻の高さが
+   * まだ変わっておらず、見せ直しても縮んだあとの箱では隠れた（押した行にキーボードが覆いかぶさり、
+   * 1 文字打つまで見えなかった。実機レビュー）。広がったとき（キーボードが閉じた）は動かさない。
+   */
+  useEffect(() => {
+    const editor = editorRef.current;
+    const container = editor ? scrollContainerOf(editor) : null;
+    if (!editor || !container || typeof ResizeObserver === 'undefined') return;
+    let lastHeight = container.clientHeight;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      const height = container.clientHeight;
+      const shrank = height < lastHeight;
+      lastHeight = height;
+      if (!shrank || document.activeElement !== editor) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+        if (!editor.contains(range.startContainer)) return;
+        const rect = caretRect(range);
+        if (rect) liftToMiddle(editor, rect);
+      });
+    });
+    observer.observe(container);
     return () => {
-      document.removeEventListener('selectionchange', remember);
-      window.visualViewport?.removeEventListener('resize', reveal);
+      observer.disconnect();
+      cancelAnimationFrame(frame);
     };
-  }, [revealCaret]);
+  }, []);
 
   useImperativeHandle(
     ref,
@@ -352,58 +385,77 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
     [caretRange, placeCaret, emit, revealCaret, insertPlain],
   );
 
-  /** 選んでいる写真を指で掴んで動かす。 */
+  /**
+   * 選んでいる写真を指で掴んで動かす。
+   *
+   * - **写真そのものを、動かしている間ずっと落とす先へ入れ直す**（半透明の置き場所）。文字はその場で
+   *   回り込み直すので、離したらどうなるかが見える。以前は指の下に細い線を出すだけで、置いたあとに文字が
+   *   どうずれるか分からなかった（実機レビュー）
+   * - 指に付いてくるのは小さな写し。指の少し上に出す（指で隠れない）
+   * - 入れ直しは、指が置き場所の箱から出たとき、かつ前に入れ直した点から半行ぶん以上動いたときだけ。
+   *   入れ直しで文字がずれ、指の下の文字の位置が行き来して写真が震えるのを防ぐ（半行は本文の行の高さから）
+   * - 本文の見えている範囲の端（1 行ぶん）に寄せると、寄せた深さに比例して本文を送る。速さは**時間あたり**
+   *   （深さいっぱいで、見えている高さの半分を 1 秒）。フレームあたりで送っていた頃は速すぎて合わせにくかった
+   */
   function startDrag(event: React.PointerEvent<HTMLDivElement>, photo: HTMLImageElement) {
     const editor = editorRef.current;
-    const marker = markerRef.current;
-    if (!editor || !marker) return;
+    const ghost = ghostRef.current;
+    const host = editor?.parentElement;
+    if (!editor || !ghost || !host) return;
     event.preventDefault();
     const scroller = scrollParent(editor);
-    const origin = photo.getBoundingClientRect();
-    const start = { x: event.clientX, y: event.clientY, scroll: scroller?.scrollTop ?? 0 };
     const pointerId = event.pointerId;
+    const lineHeight =
+      Number.parseFloat(getComputedStyle(editor).lineHeight) ||
+      photo.getBoundingClientRect().height;
     let point = { x: event.clientX, y: event.clientY };
-    let drop: Range | null = null;
+    let lastPlaced = { ...point };
+    let moved = false;
     let frame = 0;
+    let scrolledAt: number | null = null;
 
-    /** 指が写真の元の箱の外にあるか（中で離したなら、動かさずに押しただけ）。 */
-    const outside = () =>
-      point.x < origin.left ||
-      point.x > origin.right ||
-      point.y < origin.top ||
-      point.y > origin.bottom;
+    ghost.src = photo.currentSrc || photo.src;
+    ghost.hidden = false;
+    photo.setAttribute('data-dragging', '');
 
-    const paint = () => {
+    /** 指の点へ写真を入れ直す（置き場所の箱の外で、前の点から半行以上動いていれば）。 */
+    const place = (force: boolean) => {
+      const box = photo.getBoundingClientRect();
+      const inside =
+        point.x >= box.left && point.x <= box.right && point.y >= box.top && point.y <= box.bottom;
+      if (inside) return;
+      if (!force && Math.hypot(point.x - lastPlaced.x, point.y - lastPlaced.y) < lineHeight / 2)
+        return;
+      const range = dropRangeAt(editor, point.x, point.y);
+      if (range && movePhotoTo(photo, range)) {
+        moved = true;
+        lastPlaced = { ...point };
+      }
+    };
+
+    const paint = (now: number) => {
       frame = 0;
-      const scroll = scroller?.scrollTop ?? 0;
-      // 本文が送られた分も足す（写真は本文と一緒に動くので、指の下に留めるには送り量を打ち消す）。
-      photo.style.translate = `${point.x - start.x}px ${point.y - start.y + (scroll - start.scroll)}px`;
-      drop = outside() ? dropRangeAt(editor, point.x, point.y) : null;
-      const rect = drop ? caretRect(drop, point.y) : null;
-      if (rect) {
-        const host = editor.getBoundingClientRect();
-        marker.hidden = false;
-        marker.style.insetInlineStart = `${rect.left - host.left}px`;
-        marker.style.insetBlockStart = `${rect.top - host.top}px`;
-        marker.style.blockSize = `${rect.height}px`;
-      } else {
-        marker.hidden = true;
+      const origin = host.getBoundingClientRect();
+      ghost.style.insetInlineStart = `${point.x - origin.left}px`;
+      ghost.style.insetBlockStart = `${point.y - origin.top}px`;
+      place(false);
+      if (!scroller) return;
+      const band = scroller.getBoundingClientRect();
+      const depth =
+        point.y < band.top + lineHeight
+          ? (point.y - (band.top + lineHeight)) / lineHeight
+          : point.y > band.bottom - lineHeight
+            ? (point.y - (band.bottom - lineHeight)) / lineHeight
+            : 0;
+      if (depth === 0) {
+        scrolledAt = null;
+        return;
       }
-      // 本文の見えている範囲の上端・下端（1 行ぶん）に寄せたら、寄せた深さだけ本文を送る。
-      if (scroller) {
-        const box = scroller.getBoundingClientRect();
-        const line = rect?.height ?? origin.height;
-        const depth =
-          point.y < box.top + line
-            ? point.y - (box.top + line)
-            : point.y > box.bottom - line
-              ? point.y - (box.bottom - line)
-              : 0;
-        if (depth !== 0) {
-          scroller.scrollBy({ top: depth });
-          frame = requestAnimationFrame(paint);
-        }
-      }
+      const elapsed = scrolledAt === null ? 0 : now - scrolledAt;
+      scrolledAt = now;
+      const ratio = Math.max(-1, Math.min(1, depth));
+      scroller.scrollBy({ top: (ratio * scroller.clientHeight * elapsed) / 2000 });
+      frame = requestAnimationFrame(paint);
     };
 
     const move = (e: PointerEvent) => {
@@ -411,31 +463,29 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
       point = { x: e.clientX, y: e.clientY };
       if (!frame) frame = requestAnimationFrame(paint);
     };
-    const finish = (commit: boolean) => (e: PointerEvent) => {
+    const finish = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
       window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
       if (frame) cancelAnimationFrame(frame);
       point = { x: e.clientX, y: e.clientY };
-      const target = commit && outside() ? dropRangeAt(editor, point.x, point.y) : null;
-      photo.style.translate = '';
+      place(true);
+      ghost.hidden = true;
+      ghost.removeAttribute('src');
       photo.removeAttribute('data-dragging');
-      marker.hidden = true;
-      if (commit && outside()) suppressClickRef.current = true;
-      if (!target || !movePhotoTo(photo, target)) return;
+      if (!moved) return;
+      // 動かしたあとの click（指を離した点で起きる）を、選択の切り替えに使わない。
+      suppressClickRef.current = true;
       emit();
       const index = photosIn(editor).indexOf(photo);
       onSelectRef.current(index >= 0 ? index : null);
       requestAnimationFrame(() => revealRect(editor, photo.getBoundingClientRect()));
     };
-    const up = finish(true);
-    const cancel = finish(false);
 
-    photo.setAttribute('data-dragging', '');
     window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
   }
 
   return (
@@ -494,14 +544,15 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
           onSelectRef.current(selectedRef.current === index ? null : index);
         }}
       />
-      {/* 掴んだ写真を落とす先（文字の位置の縦線）。 */}
-      <div
-        ref={markerRef}
+      {/* 掴んだ写真の小さな写し（指の少し上に付いてくる）。 */}
+      {/* biome-ignore lint/performance/noImgElement: 本文の中の写真（署名付き URL）をそのまま写す。next/image の loader を通さない */}
+      <img
+        ref={ghostRef}
         hidden
+        alt=""
         aria-hidden="true"
-        data-photo-drop-marker
-        className="pointer-events-none absolute w-0.5 rounded-full"
-        style={{ background: 'var(--accent)' }}
+        data-photo-ghost
+        className="oz-photo-ghost"
       />
     </div>
   );

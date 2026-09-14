@@ -647,6 +647,16 @@
       "hint": "← → キー・ドラッグ・スクロールでめくる ／ ESC で瓶にもどる",
       "launcher": "{count}件の発酵をふりかえる",
       "open_aria": "{question}の発酵履歴をひらく"
+    },
+    "reading": {
+      "section_letter": "手紙",
+      "section_keywords": "キーワード",
+      "section_snippets": "スニペット",
+      "selection_reason": "選ばれた理由",
+      "reply_to": "この手紙への返事",
+      "reply": "この手紙に返事を書く",
+      "sources": "この手紙のもとになったエントリー",
+      "source_untitled": "無題のエントリー"
     }
   },
   "questions": {
@@ -730,10 +740,10 @@
       "close": "閉じる",
       "pickle": "瓶に漬ける",
       "pickling": "納めています…",
-      "pickled": "発酵を始めました ✓",
+      "pickled": "瓶に漬けました",
       "question_link": "問いを結ぶ",
       "ferment_title": "漬け込む",
-      "ferment_done_short": "発酵中",
+      "ferment_done_short": "漬けてある",
       "result_read_full": "全文を読む",
       "photo_width": "幅",
       "photo_width_small": "小",
@@ -757,7 +767,8 @@
       "settings_size_large": "大",
       "settings_spacing_tight": "詰める",
       "settings_spacing_normal": "標準",
-      "settings_spacing_wide": "広げる"
+      "settings_spacing_wide": "広げる",
+      "pickled_note": "瓶に漬けてあります。発酵が始まるまでの書き足しも、押し直さずに一緒に漬かります。"
     },
     "nav": {
       "back": "戻る",

@@ -170,8 +170,9 @@ function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
 
   if (image.layout === 'block') {
     // 独立した行を占める。寄せは inline 軸のマージンで作る
-    // （横書きなら左右、縦書きなら上下に効く）。
+    // （横書きなら左右、縦書きなら上下に効く）。前後の行との間は半行ぶん空ける。
     el.style.display = 'block';
+    el.style.marginBlock = '0.5em';
     el.style.marginInline =
       image.align === 'center' ? 'auto' : image.align === 'end' ? 'auto 0' : '0 auto';
     return;
@@ -180,9 +181,10 @@ function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
   // wrap: 本文が写真を避けて流れる。物理方向ではなく論理方向で寄せる
   // （縦書きでは inline-start が上、inline-end が下になる）。
   el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
-  el.style.marginBlock = '0.25em';
-  // 文字との間の余白は、文字が流れる側（寄せと反対側）に置く。
-  el.style.marginInline = image.align === 'end' ? '0.5em 0' : '0 0.5em';
+  // 上下と、文字が流れる側（寄せと反対側）を空ける。狭いと写真の縁に文字が貼り付いて読みにくかった
+  // （実機レビュー）。字の大きさに比例させる（em）。
+  el.style.marginBlock = '0.5em';
+  el.style.marginInline = image.align === 'end' ? '1em 0' : '0 1em';
 }
 
 /** 本文中に置く `<img>` を作る。`src` は署名付き URL（失効するので保存はしない）。 */

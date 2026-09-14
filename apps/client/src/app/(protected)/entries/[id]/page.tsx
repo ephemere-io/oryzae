@@ -42,6 +42,7 @@ export default function EntryDetailPage() {
           initialContent={entry.content}
           initialEffects={entry.effects}
           initialUpdatedAt={entry.updatedAt}
+          initialFermentationEnabled={entry.fermentationEnabled}
           initialMediaUrls={entry.mediaUrls}
           initialMediaSignedUrls={entry.mediaSignedUrls}
         />

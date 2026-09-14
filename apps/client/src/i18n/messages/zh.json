@@ -647,6 +647,16 @@
       "hint": "用 ← → 键、拖动或滚动翻页 ／ 按 ESC 返回瓶中",
       "launcher": "回顾 {count} 次发酵",
       "open_aria": "打开「{question}」的发酵历史"
+    },
+    "reading": {
+      "section_letter": "信",
+      "section_keywords": "关键词",
+      "section_snippets": "摘录",
+      "selection_reason": "被选中的理由",
+      "reply_to": "回复这封信",
+      "reply": "给这封信写回信",
+      "sources": "这封信的来源记录",
+      "source_untitled": "无标题记录"
     }
   },
   "questions": {
@@ -730,10 +740,10 @@
       "close": "关闭",
       "pickle": "放入瓶中",
       "pickling": "封入中…",
-      "pickled": "已开始发酵 ✓",
+      "pickled": "已放进瓶里腌制",
       "question_link": "关联提问",
       "ferment_title": "腌制",
-      "ferment_done_short": "发酵中",
+      "ferment_done_short": "已腌制",
       "result_read_full": "阅读全文",
       "photo_width": "宽度",
       "photo_width_small": "小",
@@ -757,7 +767,8 @@
       "settings_size_large": "大",
       "settings_spacing_tight": "紧凑",
       "settings_spacing_normal": "标准",
-      "settings_spacing_wide": "宽松"
+      "settings_spacing_wide": "宽松",
+      "pickled_note": "已放进瓶里。发酵开始前补写的内容也会一起腌制，无需再按一次。"
     },
     "nav": {
       "back": "返回",

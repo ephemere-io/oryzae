@@ -109,6 +109,10 @@ export function Sheet({
   const backdropRef = useRef<HTMLButtonElement | null>(null);
   /** 最後に止まった位置（指で止めたものも、呼び出し側が頼んだものも）。 */
   const settledRef = useRef<Position | null>(null);
+  /** 閉じる動き: 閉じ直しを 1 回使ったか、（閉じ直してから）動いたか。 */
+  const closingRef = useRef<{ retried: boolean; moved: boolean } | null>(null);
+  /** スクロールの見張りを 1 回走らせる（閉じる動きを頼んだ直後に、止まっていても気づけるように）。 */
+  const kickRef = useRef<(() => void) | null>(null);
   const latest = useRef({
     detent,
     detents,
@@ -130,9 +134,10 @@ export function Sheet({
     dismissible,
   };
 
-  // 開く／閉じるの切り替え。閉じるときは消さずに閉じる動きへ。
+  // 開く／閉じるの切り替え。閉じるときは消さずに閉じる動きへ。閉じる途中で開けば、その場から開き直す。
   useEffect(() => {
     if (open) {
+      closingRef.current = null;
       setPresent(true);
       setPhase('opening');
     } else {
@@ -184,12 +189,12 @@ export function Sheet({
     latest.current.onClosed?.();
   }, []);
 
-  // 開く: 閉の位置（scrollTop 0）から頼まれた段へスクロールで上がる。
+  // 開く: 閉の位置（scrollTop 0）から頼まれた段へスクロールで上がる。閉じる途中で開き直したときは、
+  // いまの位置から上がる（下まで落としてから上げ直さない）。
   useLayoutEffect(() => {
     if (!present || phase !== 'opening') return;
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    scroller.scrollTop = 0;
     const frame = requestAnimationFrame(() => scrollToPosition(latest.current.detent));
     return () => cancelAnimationFrame(frame);
   }, [present, phase, scrollToPosition]);
@@ -203,7 +208,9 @@ export function Sheet({
       finishClose();
       return;
     }
+    closingRef.current = { retried: false, moved: false };
     scrollToPosition('closed');
+    kickRef.current?.();
   }, [present, phase, scrollToPosition, targetOf, finishClose]);
 
   // 呼び出し側が段を変えたら、その段へ動く（指で止めた段の通知の折り返しでは動かない）。
@@ -237,15 +244,40 @@ export function Sheet({
         backdropRef.current.style.opacity = String(Math.min(1, visible / scroller.clientHeight));
       }
       if (top !== lastTop) {
+        if (!Number.isNaN(lastTop) && closingRef.current) closingRef.current.moved = true;
         lastTop = top;
         frame = requestAnimationFrame(check);
         return;
       }
       const current = latest.current;
-      // 閉の位置は、閉じる動きの最中と、指で払って閉じられるときだけ止まる先として数える
-      // （開く前の scrollTop 0 を「閉じた」と取り違えない）。
-      const closable =
-        current.phase === 'closing' || (current.phase === 'open' && current.dismissible);
+      if (current.phase === 'closing') {
+        // 1px 未満の差は同じ位置（スクロール位置は小数になる）。
+        if (Math.abs(targetOf('closed') - top) < 1) {
+          finishClose();
+          return;
+        }
+        // 閉の位置に届かずに止まった（指で止めた・吸着に引き戻された・滑らかな送りが途切れた）。
+        // 1 回だけ閉じ直す。閉じ直しても動いたあとで止まるなら、その場で閉じ終える（閉じると
+        // 決まったシートが画面に残り続けるのが最悪なので）。まだ一度も動いていないなら待つ。
+        const closing = closingRef.current;
+        if (!closing) return;
+        if (!closing.retried) {
+          closing.retried = true;
+          closing.moved = false;
+          scrollToPosition('closed');
+          lastTop = Number.NaN;
+          frame = requestAnimationFrame(check);
+          return;
+        }
+        if (closing.moved) {
+          scroller.scrollTop = targetOf('closed');
+          finishClose();
+        }
+        return;
+      }
+      // 閉の位置は、指で払って閉じられるときだけ止まる先として数える（開く前の scrollTop 0 を
+      // 「閉じた」と取り違えない）。閉じる動きの最中は上で済ませている。
+      const closable = current.phase === 'open' && current.dismissible;
       const candidates: Position[] = closable
         ? ['closed', ...current.detents]
         : [...current.detents];
@@ -261,13 +293,7 @@ export function Sheet({
       if (!settled && current.detents.includes('full') && top > targetOf('full')) settled = 'full';
       if (!settled) return;
       if (settled === 'closed') {
-        if (current.phase === 'closing') finishClose();
-        else current.onRequestClose?.();
-        return;
-      }
-      if (current.phase === 'closing') {
-        // 閉じる動きが指で止められて段に残った。閉じる向きをやり直す。
-        scrollToPosition('closed');
+        current.onRequestClose?.();
         return;
       }
       settledRef.current = settled;
@@ -281,12 +307,14 @@ export function Sheet({
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(check);
     };
+    kickRef.current = onScroll;
     scroller.addEventListener('scroll', onScroll, { passive: true });
     // 容器の大きさが変わった（キーボード・回転）ときも、止まっている段の見えている高さを知らせ直す。
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => onScroll());
     observer?.observe(scroller);
     return () => {
+      kickRef.current = null;
       scroller.removeEventListener('scroll', onScroll);
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
@@ -313,7 +341,8 @@ export function Sheet({
           type="button"
           aria-label={backdropLabel ?? ariaLabel}
           onClick={() => latest.current.onRequestClose?.()}
-          className="pointer-events-auto absolute inset-0"
+          // 閉じる動きの間は指を下の画面へ通す。閉じ終わりが遅れても、見えない暗幕が押下を吸わない。
+          className={`${phase === 'closing' ? 'pointer-events-none' : 'pointer-events-auto'} absolute inset-0`}
           style={{ background: 'color-mix(in srgb, var(--fg) 28%, transparent)', opacity: 0 }}
         />
       ) : null}

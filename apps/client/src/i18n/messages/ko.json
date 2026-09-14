@@ -647,6 +647,16 @@
       "hint": "← → 키·드래그·스크롤로 넘기기 ／ ESC 로 항아리로 돌아가기",
       "launcher": "{count}번의 발효를 되돌아보기",
       "open_aria": "{question}의 발효 이력 열기"
+    },
+    "reading": {
+      "section_letter": "편지",
+      "section_keywords": "키워드",
+      "section_snippets": "스니펫",
+      "selection_reason": "선택된 이유",
+      "reply_to": "이 편지에 대한 답장",
+      "reply": "이 편지에 답장 쓰기",
+      "sources": "이 편지의 바탕이 된 기록",
+      "source_untitled": "제목 없는 기록"
     }
   },
   "questions": {
@@ -730,10 +740,10 @@
       "close": "닫기",
       "pickle": "병에 담그기",
       "pickling": "담는 중…",
-      "pickled": "발효를 시작했습니다 ✓",
+      "pickled": "병에 담갔습니다",
       "question_link": "질문 연결",
       "ferment_title": "담그기",
-      "ferment_done_short": "발효 중",
+      "ferment_done_short": "담가 둠",
       "result_read_full": "전문 읽기",
       "photo_width": "너비",
       "photo_width_small": "소",
@@ -757,7 +767,8 @@
       "settings_size_large": "크게",
       "settings_spacing_tight": "좁게",
       "settings_spacing_normal": "보통",
-      "settings_spacing_wide": "넓게"
+      "settings_spacing_wide": "넓게",
+      "pickled_note": "병에 담가 두었습니다. 발효가 시작되기 전에 덧붙인 내용도 다시 누르지 않아도 함께 담깁니다."
     },
     "nav": {
       "back": "뒤로",

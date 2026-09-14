@@ -147,16 +147,27 @@ describe('SpJar', () => {
     expect(screen.getByText(/うまく言えない/)).toBeTruthy();
   });
 
-  it('言葉をタップすると意味が読める', async () => {
+  it('キーワードの説明とスニペットの理由は、押さなくても最初から読める（重なるシートを開かない）', async () => {
     const api = filledApi(
-      detailJson({ keywords: [{ id: 'k1', keyword: '余白', description: '埋めない時間。' }] }),
+      detailJson({
+        keywords: [{ id: 'k1', keyword: '余白', description: '埋めない時間。' }],
+        snippets: [
+          {
+            id: 's1',
+            originalText: 'うまく言えない',
+            sourceDate: '2024-02-01',
+            selectionReason: '言いよどみが続く。',
+          },
+        ],
+      }),
     );
     renderJar(api);
 
     openCircle('なぜ続けるのか');
-    fireEvent.click(await screen.findByText('余白'));
 
     expect(await screen.findByText('埋めない時間。')).toBeTruthy();
+    expect(screen.getByText('言いよどみが続く。')).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('手紙は最初から本文が出ていて、「返事を書く」で新規エントリーへ', async () => {
@@ -164,9 +175,10 @@ describe('SpJar', () => {
 
     openCircle('なぜ続けるのか');
     // 手紙はもう一度押さなくても読める（実機レビュー）。
-    await screen.findByTestId('sp-jar-letter');
+    await screen.findByTestId('reading-letter');
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '返事を書く' }));
+    // 足元の返事は、何への返事かを言う（手紙の書き出しを引く）。
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.fermentation.reading.reply }));
     expect(push).toHaveBeenCalledWith('/entries/new?questionId=q1');
   });
 
@@ -182,12 +194,12 @@ describe('SpJar', () => {
     renderJar(api);
 
     openCircle('なぜ続けるのか');
-    await screen.findByTestId('sp-jar-letter');
+    await screen.findByTestId('reading-letter');
 
     // 手紙だけでは「何に対する返事か」が分からなかった。
     expect(await screen.findByText('朝の光')).toBeTruthy();
     // 見出しが無い記録もフォールバックで出す（開けなくならないように）。
-    expect(screen.getByText(jaMessages.sp.jar.source_untitled)).toBeTruthy();
+    expect(screen.getByText(jaMessages.fermentation.reading.source_untitled)).toBeTruthy();
 
     fireEvent.click(screen.getByText('朝の光'));
     expect(push).toHaveBeenCalledWith('/entries/e1');
@@ -197,10 +209,10 @@ describe('SpJar', () => {
     renderJar(filledApi());
 
     openCircle('なぜ続けるのか');
-    await screen.findByTestId('sp-jar-letter');
+    await screen.findByTestId('reading-letter');
 
     expect(await screen.findByText('過去のあなたより。')).toBeTruthy();
-    expect(screen.queryByText(jaMessages.sp.jar.section_sources)).toBeNull();
+    expect(screen.queryByText(jaMessages.fermentation.reading.sources)).toBeNull();
   });
 
   it('手紙が画面に出た時点でその問いを既読にする（Issue #447）', async () => {
@@ -211,7 +223,7 @@ describe('SpJar', () => {
     // 「その手紙が画面に出た」ことを読んだ印にする。
     expect(unread.markQuestionRead).not.toHaveBeenCalled();
     openCircle('なぜ続けるのか');
-    await screen.findByTestId('sp-jar-letter');
+    await screen.findByTestId('reading-letter');
     await waitFor(() => expect(unread.markQuestionRead).toHaveBeenCalledWith('q1'));
   });
 
@@ -228,11 +240,11 @@ describe('SpJar', () => {
     renderJar(filledApi());
 
     openCircle('なぜ続けるのか');
-    await screen.findByTestId('sp-jar-letter');
+    await screen.findByTestId('reading-letter');
 
     // 上段（SpTopBar）の外なので、問いの画面が自前の戻るを出す。
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.nav.back }));
-    expect(screen.queryByTestId('sp-jar-letter')).toBeNull();
+    expect(screen.queryByTestId('reading-letter')).toBeNull();
     expect(screen.getByRole('button', { name: 'なぜ続けるのか' })).toBeTruthy();
   });
 });
