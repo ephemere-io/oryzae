@@ -42,11 +42,17 @@ describe('CreateQuestionUsecase', () => {
     expect(transactionRepo.append).toHaveBeenCalledTimes(1);
   });
 
-  it('アクティブ問いが 3 つなら QuestionLimitExceededError を throw する', async () => {
-    vi.mocked(questionRepo.countActiveByUserId).mockResolvedValue(3);
+  it('アクティブ問いが 4 つならまだ作れる（上限は 5、#430）', async () => {
+    vi.mocked(questionRepo.countActiveByUserId).mockResolvedValue(4);
+
+    await expect(usecase.execute('user-1', { string: 'Fifth' })).resolves.toBeTruthy();
+  });
+
+  it('アクティブ問いが 5 つなら QuestionLimitExceededError を throw する', async () => {
+    vi.mocked(questionRepo.countActiveByUserId).mockResolvedValue(5);
 
     await expect(usecase.execute('user-1', { string: 'Too many' })).rejects.toThrow(
-      'Maximum of 3 active questions',
+      'Maximum of 5 active questions',
     );
 
     expect(questionRepo.save).not.toHaveBeenCalled();

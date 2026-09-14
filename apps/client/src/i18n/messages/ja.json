@@ -169,7 +169,8 @@
       "back_to_list": "← 既存の問いから選ぶ",
       "search_placeholder": "問いを探す",
       "untitled": "無題の問い",
-      "close": "閉じる"
+      "close": "閉じる",
+      "limit": "問いは {max} つまでです。瓶で問いを終えると、新しく立てられます。"
     }
   },
   "app": {
@@ -819,7 +820,8 @@
       "cancel": "キャンセル",
       "save": "保存",
       "letter_arrived": "手紙が届いています",
-      "close": "閉じる"
+      "close": "閉じる",
+      "limit": "問いは {max} つまでです。瓶で問いを終えると、新しく立てられます。"
     },
     "board": {
       "cards": "{count}枚",

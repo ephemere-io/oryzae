@@ -78,4 +78,17 @@ describe('SpQuestions', () => {
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.delete }));
     expect(props.archiveQuestion).toHaveBeenCalledWith('q1');
   });
+
+  it('生きている問いが上限（5）なら「立てる」を出さず、理由を出す（#430）', () => {
+    renderQ({
+      questions: ['q1', 'q2', 'q3', 'q4', 'q5'].map((id) => q(id, `問い ${id}`)),
+    });
+    expect(screen.queryByRole('button', { name: jaMessages.sp.questions.add })).toBeNull();
+    expect(screen.getByText(jaMessages.sp.questions.limit.replace('{max}', '5'))).toBeTruthy();
+  });
+
+  it('4 つならまだ「立てる」を出す', () => {
+    renderQ({ questions: ['q1', 'q2', 'q3', 'q4'].map((id) => q(id, `問い ${id}`)) });
+    expect(screen.getByRole('button', { name: jaMessages.sp.questions.add })).toBeTruthy();
+  });
 });

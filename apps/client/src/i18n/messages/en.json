@@ -169,7 +169,8 @@
       "back_to_list": "← Pick from existing questions",
       "search_placeholder": "Find a question",
       "untitled": "Untitled question",
-      "close": "Close"
+      "close": "Close",
+      "limit": "You can keep up to {max} questions. Finish one in the jar to add a new one."
     }
   },
   "app": {
@@ -819,7 +820,8 @@
       "cancel": "Cancel",
       "save": "Save",
       "letter_arrived": "A letter has arrived",
-      "close": "Close"
+      "close": "Close",
+      "limit": "You can keep up to {max} questions. Finish one in the jar to add a new one."
     },
     "board": {
       "cards": "{count} cards",

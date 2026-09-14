@@ -542,25 +542,38 @@ export function SpEntryEditor({
   const resultAvailable = fermentationDetail !== null || fermentationLoading;
   const [resultOpen, setResultOpen] = useState(true);
   const [resultDetent, setResultDetent] = useState<DockDetent>('peek');
-  // キーボードが出たとき、設定を開いたときは覗く段へ（本文が見える面積を残す。設定の 1 段と
-  // 結果の半分が同時に立つと本文が消えていた）。
+  // 設定を開いたときは覗く段へ（設定の 1 段と結果の半分が同時に立つと本文が消えていた）。
   useEffect(() => {
-    if (chrome.keyboardOpen || settingsOpen) setResultDetent('peek');
-  }, [chrome.keyboardOpen, settingsOpen]);
+    if (settingsOpen) setResultDetent('peek');
+  }, [settingsOpen]);
+  /**
+   * 見えているか。**キーボードが出ている間は出さない**（書こうとすると結果が被さってきて打ちづらい、
+   * とレビュー）。キーボードを閉じれば覗く段で戻る。出したいときはパレットの「発酵の結果」
+   * （押すとキーボードを閉じて半分で出す）。
+   */
+  const resultVisible = resultAvailable && resultOpen && !chrome.keyboardOpen;
+  const wasKeyboardOpen = useRef(false);
+  useEffect(() => {
+    if (chrome.keyboardOpen) wasKeyboardOpen.current = true;
+    else if (wasKeyboardOpen.current) {
+      wasKeyboardOpen.current = false;
+      setResultDetent('peek');
+    }
+  }, [chrome.keyboardOpen]);
   const blurEditor = useCallback(() => {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   }, []);
   // 出ていれば消す、消えていれば半分で出す。段の切り替えはつまみと指に任せる（ボタンは 1 つの意味だけ）。
   const toggleResult = useCallback(() => {
-    if (resultOpen) {
+    if (resultVisible) {
       setResultOpen(false);
       return;
     }
     setResultOpen(true);
     blurEditor();
     setResultDetent('half');
-  }, [resultOpen, blurEditor]);
+  }, [resultVisible, blurEditor]);
 
   async function handlePickle() {
     if (!entryId || pickling || pickled) return;
@@ -694,7 +707,7 @@ export function SpEntryEditor({
             id: 'result',
             label: tSidebar('heading'),
             icon: <LetterIcon />,
-            active: resultOpen,
+            active: resultVisible,
             onSelect: toggleResult,
           },
         ]
@@ -727,7 +740,7 @@ export function SpEntryEditor({
         inlinePhotoCount: inlinePhotos.length,
         selectedPhoto: selectedPhoto ?? 'none',
         hasFermentation: fermentationDetail !== null,
-        resultOpen: resultAvailable && resultOpen,
+        resultOpen: resultVisible,
         resultDetent,
       })}
     >
@@ -850,7 +863,12 @@ export function SpEntryEditor({
         onAttach={photoImport.attach}
         onInsertTranscript={photoImport.insertTranscript}
         onDiscardTranscript={photoImport.discardTranscript}
-        onClose={photoImport.close}
+        onClose={() => {
+          photoImport.close();
+          // 写真の選択で iOS はキーボードを閉じる。やめたら元のカーソルへ戻す。
+          const caret = bodyEditorRef.current?.caret();
+          if (caret) bodyEditorRef.current?.focusSegment(caret.segment, caret.offset);
+        }}
       />
 
       {/* 操作は殻の下端の列に集める（キーボードが出ればその真上）。問いを結ぶのは題の下の行が担う。
@@ -885,7 +903,7 @@ export function SpEntryEditor({
 
       {/* 発酵の結果: 本文の下の非モーダルのドック（見ながら書く）。 */}
       <SpFermentationDock
-        open={resultAvailable && resultOpen}
+        open={resultVisible}
         detent={resultDetent}
         onDetentChange={setResultDetent}
         onPeekTap={blurEditor}

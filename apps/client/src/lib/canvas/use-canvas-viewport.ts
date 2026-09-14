@@ -434,7 +434,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
           // ホイールと同じく、引き切る手前からのつまみを外へ流す（SP の「引くと書斎へ戻る」）。
           // ここが無いと、指で引く画面ではその仕掛けが一度も発火しない。
           if (factor < 1 && before <= OVERZOOM_ARM_SCALE) {
-            const detail: OverzoomOutDetail = { excess: 1 - factor };
+            const detail: OverzoomOutDetail = { excess: 1 - factor, input: 'pinch' };
             frame.dispatchEvent(new CustomEvent(OVERZOOM_OUT_EVENT, { detail, bubbles: true }));
           }
         }

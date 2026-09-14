@@ -84,6 +84,9 @@ export function ActionPalette({
               if (disabled) return;
               action.onSelect();
             }}
+            // 押しても本文のフォーカスを落とさない（キーボードが一度引っ込んでまた出る、をやめる）。
+            onPointerDown={(event) => event.preventDefault()}
+            onMouseDown={(event) => event.preventDefault()}
             className={`relative flex min-w-[60px] flex-col items-center justify-center gap-1 whitespace-nowrap rounded-xl px-2 transition-colors active:scale-95 ${
               disabled ? 'opacity-40' : 'hover:bg-[var(--hover-wash)]'
             }`}

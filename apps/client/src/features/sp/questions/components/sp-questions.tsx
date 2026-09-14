@@ -1,5 +1,6 @@
 'use client';
 
+import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -67,6 +68,8 @@ export function SpQuestions({
   const active = questions.filter(
     (q) => !q.isArchived && !(q.isProposedByOryzae && !q.isValidatedByUser),
   );
+  // 上限（#430）なら「立てる」を出さず、理由を言う。押せるのに何も起きない、をやめる（レビュー）。
+  const atLimit = active.length >= MAX_ACTIVE_QUESTIONS;
 
   function openAdd() {
     setDraft('');
@@ -105,6 +108,7 @@ export function SpQuestions({
         draftEmpty: !draft.trim(),
         proposedCount: proposed.length,
         activeCount: active.length,
+        atLimit,
         unreadCount: active.filter((q) => unreadQuestionIds.has(q.id)).length,
       })}
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
@@ -234,30 +238,44 @@ export function SpQuestions({
             <p className="py-10 text-center text-sm opacity-50">{t('empty')}</p>
           ) : null}
 
-          <button
-            type="button"
-            onClick={openAdd}
-            className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-medium"
-            style={{
-              ...CONTROL_FONT,
-              border: '1.5px dashed var(--surface-raised-border)',
-              color: 'var(--accent)',
-            }}
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
+          {atLimit ? (
+            <p
+              data-question-limit
+              className="mt-1 rounded-2xl px-4 py-3.5 text-center text-[13px] leading-relaxed"
+              style={{
+                ...CONTROL_FONT,
+                color: 'var(--date-color)',
+                background: 'var(--surface-sunken)',
+              }}
             >
-              <title>add</title>
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
-            {t('add')}
-          </button>
+              {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={openAdd}
+              className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-medium"
+              style={{
+                ...CONTROL_FONT,
+                border: '1.5px dashed var(--surface-raised-border)',
+                color: 'var(--accent)',
+              }}
+            >
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <title>add</title>
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+              {t('add')}
+            </button>
+          )}
         </div>
       )}
 

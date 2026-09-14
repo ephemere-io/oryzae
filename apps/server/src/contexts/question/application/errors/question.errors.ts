@@ -1,3 +1,4 @@
+import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import {
   NotFoundError,
   ValidationError,
@@ -13,7 +14,7 @@ export class QuestionValidationError extends ValidationError {}
 
 export class QuestionLimitExceededError extends ValidationError {
   constructor() {
-    super('Maximum of 3 active questions per user');
+    super(`Maximum of ${MAX_ACTIVE_QUESTIONS} active questions per user`);
   }
 }
 

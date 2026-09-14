@@ -31,6 +31,8 @@
   /* **書く紙ではない面**（左のサイドバー・右の発酵結果）。紙より一段沈める。
    * 透けた白に頼っていた頃は、紙とほぼ同じ明るさで境界が読めなかった。 */
   --surface-sunken: #f2f0ea;
+  /* ボードの地（淡いコルク。粒は CanvasGrid が重ねる）。 */
+  --board-ground: #f1eadf;
   --surface-sunken-border: rgba(0, 0, 0, 0.08);
   /* **いま選ばれている行き先**（サイドバーの項目・発酵の面の切り替え）。
    * 行ごとに rgba を直書きしていたので、dark で白い内側光がそのまま浮いていた。
@@ -79,6 +81,7 @@
   --border-subtle: rgba(255, 255, 255, 0.06);
   --hover-wash: rgba(255, 255, 255, 0.07);
   --surface-sunken: #131313;
+  --board-ground: #211d18;
   --surface-sunken-border: rgba(255, 255, 255, 0.1);
   --date-color: #666;
   --card-snippet: #3a3520;

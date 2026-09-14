@@ -1,5 +1,6 @@
 'use client';
 
+import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -205,17 +206,28 @@ export function QuestionPicker({
               );
             })}
           </ul>
-          <button
-            type="button"
-            onClick={() => {
-              setCreateFailed(false);
-              onComposingChange(true);
-            }}
-            className="min-h-[44px] w-full px-4 py-2 text-left text-[14px] font-medium"
-            style={{ color: 'var(--accent)' }}
-          >
-            {t('new')}
-          </button>
+          {questions.length >= MAX_ACTIVE_QUESTIONS ? (
+            // 上限（#430）。書いても作れないので、書く欄を開かせない。
+            <p
+              data-question-limit
+              className="px-4 py-3 text-[12px] leading-relaxed"
+              style={{ color: 'var(--date-color)' }}
+            >
+              {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setCreateFailed(false);
+                onComposingChange(true);
+              }}
+              className="min-h-[44px] w-full px-4 py-2 text-left text-[14px] font-medium"
+              style={{ color: 'var(--accent)' }}
+            >
+              {t('new')}
+            </button>
+          )}
         </>
       )}
     </section>

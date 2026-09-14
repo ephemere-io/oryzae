@@ -1,5 +1,12 @@
 export const MAX_CONTENT_LENGTH = 100_000;
 export const MAX_QUESTION_STRING_LENGTH = 64;
+/**
+ * 生きている（アーカイブしていない）問いの上限。ユーザーあたり。
+ * 3 から 5 へ（#430）。瓶が寄り引きできるようになり、円が 5 つでも読める。発酵の計算量が
+ * 問いの数に比例するので、段階的に上げる。サーバーが作成・提案の承認・アーカイブ解除で強制し、
+ * クライアントは上限の人に「立てる」を出さない。
+ */
+export const MAX_ACTIVE_QUESTIONS = 5;
 
 // Board
 export const MAX_SNIPPET_TEXT_LENGTH = 2000;
