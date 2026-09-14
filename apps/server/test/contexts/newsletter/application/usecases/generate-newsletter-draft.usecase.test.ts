@@ -16,7 +16,8 @@ function newsletter(subject: string, sentAt: string | null): Newsletter {
   if (!created.success) throw new Error('unreachable');
   if (!sentAt) return created.value;
 
-  const started = created.value.withSendingStarted(1);
+  // 本番送信はテスト配信済みが前提（domain のゲート）。
+  const started = created.value.withTestSent().withSendingStarted(1);
   if (!started.success) throw new Error('unreachable');
   return started.value.withSendCompleted({ sentCount: 1, failedCount: 0 }, () => new Date(sentAt));
 }

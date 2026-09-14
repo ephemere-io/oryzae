@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  formatBlockedReason,
   formatSendSkipReason,
   type NewsletterPreview,
   type SendResult,
@@ -153,14 +154,10 @@ export function NewsletterSendDialog({
               )}
             </div>
 
-            {!preview.sendable && (
+            {preview.blockedReason && (
               <div className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
-                  {preview.recipientCount === 0
-                    ? '宛先が 0 名のため送信できません。'
-                    : 'この配信はすでに送信済みです。'}
-                </span>
+                <span>{formatBlockedReason(preview.blockedReason)}</span>
               </div>
             )}
 
@@ -175,7 +172,7 @@ export function NewsletterSendDialog({
                 ) : (
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                    まだテスト配信していません。先に自分たちへ送って受信確認を。
+                    まだテスト配信していません。送信するには先にこちらを。
                   </span>
                 )}
                 {testResult && (
@@ -193,7 +190,9 @@ export function NewsletterSendDialog({
                 variant="outline"
                 size="sm"
                 onClick={onSendTest}
-                disabled={testSending || sending || !preview.sendable}
+                // 未テストだから送信が塞がっている、という状態でこそ押したいボタン。
+                // preview.sendable では判断しない（それだと永久に押せなくなる）。
+                disabled={testSending || sending || preview.blockedReason === 'already-sent'}
               >
                 <FlaskConical className={`mr-1.5 h-3 w-3 ${testSending ? 'animate-pulse' : ''}`} />
                 {testSending ? '送信中...' : 'テスト配信'}

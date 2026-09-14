@@ -20,7 +20,21 @@ function mockTokens(): UnsubscribeTokenGateway {
   };
 }
 
+/**
+ * 本番送信の対象は **テスト配信済みの下書き**（domain のゲート）。
+ * 未テストで送ろうとするケースは下の describe で別に見る。
+ */
 function draft(): Newsletter {
+  const result = Newsletter.create(
+    { subject: '今月の更新', bodyMarkdown: '本文です。', createdBy: 'admin-1' },
+    () => 'nl-1',
+  );
+  if (!result.success) throw new Error('unreachable');
+  return result.value.withTestSent();
+}
+
+/** まだテスト配信していない下書き。 */
+function untestedDraft(): Newsletter {
   const result = Newsletter.create(
     { subject: '今月の更新', bodyMarkdown: '本文です。', createdBy: 'admin-1' },
     () => 'nl-1',
@@ -163,6 +177,22 @@ describe('SendNewsletterUsecase', () => {
 
     await expect(usecase.execute('nl-1')).rejects.toThrow('すでに送信済み');
     expect(sender.sendBulk).not.toHaveBeenCalled();
+  });
+
+  // 実際に届く形を一度も見ないまま全員に配信する経路を塞ぐ。
+  it('テスト配信していない下書きは送らない', async () => {
+    const { repository, saved } = mockRepository(untestedDraft());
+    const sender: BulkEmailSenderGateway = { sendBulk: vi.fn() };
+    const usecase = new SendNewsletterUsecase(
+      repository,
+      mockAudience(recipients),
+      sender,
+      mockTokens(),
+    );
+
+    await expect(usecase.execute('nl-1')).rejects.toThrow('まだテスト配信していません');
+    expect(sender.sendBulk).not.toHaveBeenCalled();
+    expect(saved).toHaveLength(0);
   });
 
   it('宛先が 0 名なら送らない', async () => {

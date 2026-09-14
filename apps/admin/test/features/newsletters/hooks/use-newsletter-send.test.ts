@@ -43,7 +43,8 @@ const preview = {
   text: '今月の更新\n\n本文',
   recipientCount: 3,
   sendable: true,
-  testSentAt: null,
+  blockedReason: null,
+  testSentAt: '2026-09-14T07:30:00.000Z',
 };
 
 describe('useNewsletterSend', () => {

@@ -142,7 +142,7 @@ describe('SendNewsletterTestUsecase', () => {
   });
 
   it('送信済みの配信はテストできない（もう文面を変えられない）', async () => {
-    const started = draft().withSendingStarted(2);
+    const started = draft().withTestSent().withSendingStarted(2);
     if (!started.success) throw new Error('unreachable');
     const sent = started.value.withSendCompleted({ sentCount: 2, failedCount: 0 });
 

@@ -15,7 +15,7 @@ function draft(): Newsletter {
 }
 
 function sentNewsletter(): Newsletter {
-  const started = draft().withSendingStarted(3);
+  const started = draft().withTestSent().withSendingStarted(3);
   if (!started.success) throw new Error('unreachable');
   return started.value.withSendCompleted({ sentCount: 3, failedCount: 0 });
 }
