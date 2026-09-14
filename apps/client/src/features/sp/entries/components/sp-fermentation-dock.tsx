@@ -20,7 +20,6 @@ interface SpFermentationDockProps {
 }
 
 const MAX_KEYWORDS = 6;
-const MAX_SNIPPETS_HALF = 3;
 
 /**
  * 発酵の結果を**見ながら書く**ためのドック（SP）。
@@ -28,8 +27,9 @@ const MAX_SNIPPETS_HALF = 3;
  * PC では手紙・言葉・抜粋が本文の横に居て、目だけが行き来する。スマホには横が無いので、往復は上下で
  * 作る: 本文の下に非モーダルの `DockSheet`。
  * - **覗く**（1 行）: 問いと、いちばん目立つ言葉。書いている間（キーボードが出ている間）はここ
- * - **半分**: 手紙の冒頭・言葉（説明つき）・抜粋 3 件（理由つき）。本文の上半分は見えたまま
- * - **全画面**: 手紙の全文と抜粋の全部
+ * - **半分**: 本文の上半分は見えたまま、手紙・言葉（説明つき）・抜粋（理由つき）を読む
+ * - **全画面**: そのまま同じ指で下へ読み進める
+ * 中身は段で変えない（段ごとに高さが変わると、スクロールの途中で伸び縮みして吸着がやり直しになる）。
  * 言葉の説明と抜粋の理由は**最初から出す**（押して出す段を作らない。実機レビュー）。
  * 覗く段を押せば半分へ（読む）、本文を押せばまた覗く段へ（書く）。出す／消すはパレットの「発酵の結果」。
  */
@@ -47,7 +47,6 @@ export function SpFermentationDock({
 
   const keywords = detail?.keywords.slice(0, MAX_KEYWORDS) ?? [];
   const snippets = detail?.snippets ?? [];
-  const shownSnippets = detent === 'full' ? snippets : snippets.slice(0, MAX_SNIPPETS_HALF);
   const letter = detail?.letter?.bodyText ?? null;
   const empty =
     !loading &&
@@ -61,19 +60,17 @@ export function SpFermentationDock({
       onDetentChange={onDetentChange}
       onPeekTap={onPeekTap}
       ariaLabel={t('heading')}
+      contract={verifyAttrs({
+        unit: 'SpFermentationDock',
+        detent,
+        loading,
+        empty,
+        keywordCount: keywords.length,
+        snippetCount: snippets.length,
+        hasLetter: letter !== null,
+      })}
       peek={
-        <span
-          className="flex w-full min-w-0 items-center gap-2"
-          {...verifyAttrs({
-            unit: 'SpFermentationDock',
-            detent,
-            loading,
-            empty,
-            keywordCount: keywords.length,
-            snippetCount: snippets.length,
-            hasLetter: letter !== null,
-          })}
-        >
+        <span className="flex w-full min-w-0 items-center gap-2">
           <span
             className="shrink-0 text-[11px] uppercase tracking-[0.14em]"
             style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
@@ -110,7 +107,7 @@ export function SpFermentationDock({
           {letter !== null ? (
             <Section label={t('section_letter')}>
               <p
-                className={`whitespace-pre-wrap text-[14px] leading-[1.9] ${detent === 'full' ? '' : 'line-clamp-4'}`}
+                className="whitespace-pre-wrap text-[14px] leading-[1.9]"
                 style={{ fontFamily: "'Noto Serif JP', serif" }}
               >
                 {letter}
@@ -154,10 +151,10 @@ export function SpFermentationDock({
             </Section>
           ) : null}
 
-          {shownSnippets.length > 0 ? (
+          {snippets.length > 0 ? (
             <Section label={t('section_snippets')}>
               <ul className="flex flex-col gap-2">
-                {shownSnippets.map((snippet) => (
+                {snippets.map((snippet) => (
                   <li
                     key={snippet.id}
                     data-snippet
@@ -165,7 +162,7 @@ export function SpFermentationDock({
                     style={{ borderColor: 'var(--border-subtle)' }}
                   >
                     <p
-                      className={`text-[13px] leading-relaxed ${detent === 'full' ? '' : 'line-clamp-4'}`}
+                      className="text-[13px] leading-relaxed"
                       style={{ fontFamily: "'Noto Serif JP', serif" }}
                     >
                       {snippet.originalText}
@@ -184,16 +181,6 @@ export function SpFermentationDock({
                   </li>
                 ))}
               </ul>
-              {detent !== 'full' && snippets.length > shownSnippets.length ? (
-                <button
-                  type="button"
-                  onClick={() => onDetentChange('full')}
-                  className="mt-1 self-start py-1 text-[13px]"
-                  style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
-                >
-                  {tSp('result_read_full')}
-                </button>
-              ) : null}
             </Section>
           ) : null}
         </div>

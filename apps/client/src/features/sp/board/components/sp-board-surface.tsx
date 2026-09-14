@@ -358,8 +358,8 @@ export function SpBoardSurface({
       onPointerUpCapture={trackPointerEnd}
       onPointerCancelCapture={trackPointerEnd}
     >
-      {/* コルクボードの質感（PC と同じ）。frame に敷き、world に貼り付いて見える。 */}
-      {canvas ? <CanvasGrid canvas={canvas} variant="cork" opacity={1} /> : null}
+      {/* 模造紙の方眼（PC のボード・書斎と同じ）。frame に敷き、world に貼り付いて見える。 */}
+      {canvas ? <CanvasGrid canvas={canvas} /> : null}
       {/* world。transform を書くのは hook（あれば）。無ければ viewport から自分で書く。 */}
       <div
         ref={canvas?.worldRef}
@@ -528,15 +528,8 @@ export function SpBoardSurface({
       {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。日付の両脇で前後の日へ。 */}
       <div
         data-canvas-no-pan=""
-        // コルクの地でも読めるよう、白い面（ピル）に乗せる。
-        className="pointer-events-none absolute top-3 flex items-center gap-1 rounded-full py-0.5 pr-3"
-        style={{
-          left: '0.5rem',
-          color: 'var(--date-color)',
-          fontFamily: 'Inter, sans-serif',
-          background: 'var(--surface-raised)',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-        }}
+        className="pointer-events-none absolute top-3 flex items-center gap-1"
+        style={{ left: '0.5rem', color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
       >
         {onShiftDay ? (
           <button

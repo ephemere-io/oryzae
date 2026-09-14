@@ -3,14 +3,14 @@
 import type { InlineImage } from '@oryzae/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  applyInlineImageStyle,
-  isInlineImage,
-  readInlineImageFromElement,
-} from '@/features/pc/entries/utils/inline-image-codec';
-import {
   type ResizeHandle,
   resizeInlineImage,
 } from '@/features/pc/entries/utils/inline-image-resize';
+import {
+  applyInlineImageStyle,
+  isInlineImage,
+  readInlineImageFromElement,
+} from '@/features/shared/entries/utils/inline-image-codec';
 
 /**
  * 本文中の写真の選択とリサイズを扱う。

@@ -15,7 +15,7 @@
  * （question-create-form の neverResolve と同型。autosave は body 無変更＝delta 0 で発火しない）。
  */
 
-import { registerUnit } from '@oryzae/verify';
+import { type ActContext, registerUnit } from '@oryzae/verify';
 import type { ApiClient } from '@/lib/api';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpEntryEditor } from './sp-entry-editor';
@@ -26,6 +26,14 @@ interface Props {
   initialEntryId?: string;
   initialContent?: string;
   persistDraft?: boolean;
+}
+
+/** 本文（contentEditable）に書く。`ctx.type` は input の value を前提にするので、ここで文字を入れて input を起こす。 */
+function typeBody(ctx: ActContext, text: string): void {
+  const body = ctx.root.querySelector('[data-sp-body]');
+  if (!body) throw new Error('本文（data-sp-body）が無い');
+  body.textContent = text;
+  body.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 // 解決しない fetch を持つ ApiClient（pickle 中状態を保持する。as 不要で型を満たす）。
@@ -76,7 +84,7 @@ registerUnit<Props>({
       description: '本文を入力すると編集中（dirty=true・hasBody=true）になる',
       props: { api: null, persistDraft: false },
       act: async (ctx) => {
-        await ctx.type('textarea', 'いま感じていること');
+        typeBody(ctx, 'いま感じていること');
         await ctx.wait(16);
       },
     },
@@ -105,7 +113,7 @@ registerUnit<Props>({
       description: 'Probe: 空白だけの本文は hasBody=false 扱い（保存ステータスを出さない）',
       props: { api: null, persistDraft: false },
       act: async (ctx) => {
-        await ctx.type('textarea', '     ');
+        typeBody(ctx, '     ');
         await ctx.wait(16);
       },
     },
@@ -196,14 +204,14 @@ registerUnit<Props>({
   ],
   invariants: [
     {
-      id: 'hasbody-reflects-textarea',
-      description: 'contract.hasBody が本文 textarea の trim 結果を反映する',
+      id: 'hasbody-reflects-body',
+      description: 'contract.hasBody が本文（contentEditable）の trim 結果を反映する',
       check: ({ root, contract }) => {
-        const ta = root.querySelector<HTMLTextAreaElement>('textarea');
-        const actuallyHasBody = (ta?.value ?? '').trim().length > 0;
+        const text = root.querySelector('[data-sp-body]')?.textContent ?? '';
+        const actuallyHasBody = text.trim().length > 0;
         return (
           contract.hasBody === String(actuallyHasBody) ||
-          `contract.hasBody="${contract.hasBody}" だが textarea.value="${ta?.value}"（trim 後 hasBody=${actuallyHasBody}）`
+          `contract.hasBody="${contract.hasBody}" だが本文="${text}"（trim 後 hasBody=${actuallyHasBody}）`
         );
       },
     },

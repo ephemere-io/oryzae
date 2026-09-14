@@ -53,7 +53,6 @@ import { useTimeInscription } from '@/features/pc/entries/hooks/use-time-inscrip
 import { useTypewriterScroll } from '@/features/pc/entries/hooks/use-typewriter-scroll';
 import { useVoiceDynamics } from '@/features/pc/entries/hooks/use-voice-dynamics';
 import type { VoiceUnavailableReason } from '@/features/pc/entries/types';
-import { caretRangeFromPoint } from '@/features/pc/entries/utils/caret-from-point';
 import {
   loadCachedEffects,
   saveCachedEffects,
@@ -63,18 +62,19 @@ import {
   extractEditorEffects,
 } from '@/features/pc/entries/utils/editor-effects-codec';
 import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
-import {
-  applyInlineImagesToEditor,
-  createInlineImageElement,
-  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
-  serializeEditorText,
-} from '@/features/pc/entries/utils/inline-image-codec';
 import { measureTitle, TITLE_MIN_FONT_SIZE } from '@/features/pc/entries/utils/title-metrics';
 import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
 import type { AttachedPhoto } from '@/features/shared/entries/types';
+import { caretRangeFromPoint } from '@/features/shared/entries/utils/caret-from-point';
+import {
+  applyInlineImagesToEditor,
+  createInlineImageElement,
+  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  serializeEditorText,
+} from '@/features/shared/entries/utils/inline-image-codec';
 import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';

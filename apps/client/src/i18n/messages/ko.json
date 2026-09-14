@@ -751,7 +751,6 @@
       "question_unlink": "“{label}” 연결 해제",
       "settings_title": "표시 설정",
       "settings_delete_entry": "이 기록 삭제",
-      "settings_delete_hint": "되돌릴 수 없습니다. 확인 후 삭제합니다.",
       "settings_letter_spacing": "자간",
       "settings_size_small": "작게",
       "settings_size_medium": "보통",

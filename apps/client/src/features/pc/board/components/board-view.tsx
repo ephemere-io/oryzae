@@ -76,12 +76,6 @@ function todayKey(): string {
   return `${y}-${m}-${day}`;
 }
 
-/** コルクの地に置く道具の面（白いピル）。 */
-const CORK_PILL_STYLE = {
-  background: 'var(--surface-raised)',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-} as const;
-
 export function BoardView({ api }: BoardViewProps) {
   const t = useTranslations('board');
   const [dateKey, setDateKey] = useState(todayKey);
@@ -382,8 +376,7 @@ export function BoardView({ api }: BoardViewProps) {
         onPointerMove={handleFramePointerMove}
         onPointerUp={onPointerUp}
         onClick={deselect}
-        // 模造紙の方眼ではなくコルクボード（PC も SP も同じ質感。実機レビュー）。
-        background={<CanvasGrid canvas={canvas} variant="cork" opacity={1} />}
+        background={<CanvasGrid canvas={canvas} />}
         overlay={
           // 操作 UI の上ではパンを始めない。
           <div data-canvas-no-pan="">
@@ -401,13 +394,8 @@ export function BoardView({ api }: BoardViewProps) {
                 right: BOARD_INSET,
               }}
             >
-              {/* コルクの地でも読めるよう、白い面（ピル）に乗せる。 */}
-              <span className="rounded-full px-2 py-0.5" style={CORK_PILL_STYLE}>
-                <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
-              </span>
-              <span className="rounded-full px-1 py-0.5" style={CORK_PILL_STYLE}>
-                <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
-              </span>
+              <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
+              <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
             </div>
             <CanvasZoomControls
               scale={scale}

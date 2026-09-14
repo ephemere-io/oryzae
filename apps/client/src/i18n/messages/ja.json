@@ -751,7 +751,6 @@
       "question_unlink": "「{label}」を外す",
       "settings_title": "表示の設定",
       "settings_delete_entry": "このエントリーを削除",
-      "settings_delete_hint": "取り消せません。確認してから消します。",
       "settings_letter_spacing": "字間",
       "settings_size_small": "小",
       "settings_size_medium": "中",

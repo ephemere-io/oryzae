@@ -2,12 +2,8 @@ import { INLINE_IMAGE_PLACEHOLDER } from '@oryzae/shared';
 import { describe, expect, it } from 'vitest';
 import {
   buildEffectsWithPhotos,
-  insertPhotoAt,
-  joinBodySegments,
   photoOffsets,
-  removePhotoAt,
   restoreInlinePhotos,
-  splitBodyAtPhotos,
   toInlinePhoto,
   trimOrphanPlaceholders,
 } from '@/features/shared/entries/utils/inline-photos';
@@ -15,45 +11,9 @@ import {
 const P = INLINE_IMAGE_PLACEHOLDER;
 
 describe('inline-photos（本文の中の写真、PC と同じ保存形式）', () => {
-  it('切って繋ぐと元に戻る（空の文も残す）', () => {
-    const body = `一行目${P}二行目${P}`;
-    const segments = splitBodyAtPhotos(body);
-    expect(segments).toEqual(['一行目', '二行目', '']);
-    expect(joinBodySegments(segments)).toBe(body);
-  });
-
   it('プレースホルダの位置を昇順で返す', () => {
     expect(photoOffsets(`ab${P}c${P}`)).toEqual([2, 4]);
     expect(photoOffsets('abc')).toEqual([]);
-  });
-
-  it('カーソル位置に差すと文が 2 つに割れ、写真はその間', () => {
-    const { segments, imageIndex } = insertPhotoAt(['今日は雨。明日は晴れ。'], 0, 5);
-    expect(segments).toEqual(['今日は雨。\n', '明日は晴れ。']);
-    expect(imageIndex).toBe(0);
-    expect(joinBodySegments(segments)).toBe(`今日は雨。\n${P}明日は晴れ。`);
-  });
-
-  it('文末に差すと後ろの文は空。直前の改行は増やさない', () => {
-    const { segments } = insertPhotoAt(['書き終えた\n'], 0, 6);
-    expect(segments).toEqual(['書き終えた\n', '']);
-  });
-
-  it('2 枚目は前の写真の後の文に差せる', () => {
-    const first = insertPhotoAt(['ab', 'cd'], 1, 1);
-    expect(first.segments).toEqual(['ab', 'c\n', 'd']);
-    expect(first.imageIndex).toBe(1);
-  });
-
-  it('写真を抜くと前後の文が繋がる（改行を 1 つ挟む）', () => {
-    expect(removePhotoAt(['前', '後'], 0)).toEqual(['前\n後']);
-    expect(removePhotoAt(['前\n', '後'], 0)).toEqual(['前\n後']);
-    expect(removePhotoAt(['', '後'], 0)).toEqual(['後']);
-    expect(removePhotoAt(['a', 'b', 'c'], 1)).toEqual(['a', 'b\nc']);
-  });
-
-  it('範囲外の写真を抜こうとしても文は変わらない', () => {
-    expect(removePhotoAt(['a', 'b'], 5)).toEqual(['a', 'b']);
   });
 
   it('復元: effects の offset と一致するプレースホルダだけ写真になり、対応の無いものは落ちる', () => {

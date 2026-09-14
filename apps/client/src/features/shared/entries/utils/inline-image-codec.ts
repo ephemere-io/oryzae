@@ -181,7 +181,8 @@ function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
   // （縦書きでは inline-start が上、inline-end が下になる）。
   el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
   el.style.marginBlock = '0.25em';
-  el.style.marginInline = '0 0.5em';
+  // 文字との間の余白は、文字が流れる側（寄せと反対側）に置く。
+  el.style.marginInline = image.align === 'end' ? '0.5em 0' : '0 0.5em';
 }
 
 /** 本文中に置く `<img>` を作る。`src` は署名付き URL（失効するので保存はしない）。 */

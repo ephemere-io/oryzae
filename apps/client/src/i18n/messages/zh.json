@@ -751,7 +751,6 @@
       "question_unlink": "取消关联“{label}”",
       "settings_title": "显示设置",
       "settings_delete_entry": "删除这篇记录",
-      "settings_delete_hint": "无法撤销。删除前会再次确认。",
       "settings_letter_spacing": "字距",
       "settings_size_small": "小",
       "settings_size_medium": "中",

@@ -36,11 +36,8 @@ import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import
 import type { AttachedPhoto, EntryDraft, InlinePhoto } from '@/features/shared/entries/types';
 import {
   buildEffectsWithPhotos,
-  insertPhotoAt,
-  joinBodySegments,
-  removePhotoAt,
+  photoOffsets,
   restoreInlinePhotos,
-  splitBodyAtPhotos,
   toInlinePhoto,
   trimOrphanPlaceholders,
 } from '@/features/shared/entries/utils/inline-photos';
@@ -61,7 +58,7 @@ import {
   useSpStatus,
 } from '@/lib/sp-chrome-context';
 import { useOnlineStatus } from '@/lib/use-online-status';
-import { SpBodyEditor, type SpBodyEditorHandle } from './sp-body-editor';
+import { SpBodyEditor, type SpBodyEditorHandle, type SpBodySnapshot } from './sp-body-editor';
 import { SpConfirmSheet } from './sp-confirm-sheet';
 import { SpEditorSettingsSheet } from './sp-editor-settings-sheet';
 import { SpFermentationDock } from './sp-fermentation-dock';
@@ -102,8 +99,8 @@ function composeContent(title: string, body: string): string {
 /**
  * SP「書く」画面。縦長・フォーカスで書き始められることを最優先にする。
  *
- * 本文は**文のブロックと写真のブロックの列**（`SpBodyEditor`）。写真は本文の中の
- * カーソル位置に入り、保存形式は PC と同じ（U+FFFC + `effects.inlineImages`）。
+ * 本文は PC と同じ土台の contentEditable（`SpBodyEditor`）。写真は本文の中のカーソル位置に入り、
+ * 文字が回り込み、指で掴んで動かせる。保存形式は PC と同じ（U+FFFC + `effects.inlineImages`）。
  * 結んだ問いの発酵の結果は本文の下の非モーダルのドック（`SpFermentationDock`）で
  * 「見ながら書く」。電波が無ければ端末の写しに残し、戻ったら送る。
  */
@@ -189,6 +186,7 @@ export function SpEntryEditor({
   // サーバ保存済み（entryId あり）なら保存済み表示、未保存の復元ドラフトは「編集中」表示にする。
   const [lastSavedBody, setLastSavedBody] = useState(resolvedEntryId ? initial.body : '');
   const [lastSavedTitle, setLastSavedTitle] = useState(resolvedEntryId ? initial.title.trim() : '');
+  const bodyEditorRef = useRef<SpBodyEditorHandle | null>(null);
   // 端末の写しがサーバーより新しければ、それに入れ替える（差ができるので自動保存が送る）。
   // biome-ignore lint/correctness/useExhaustiveDependencies: マウント時に一度だけ入れ替える（写しは開いた時点のもの）
   useEffect(() => {
@@ -206,8 +204,8 @@ export function SpEntryEditor({
     );
     const nextBody = trimOrphanPlaceholders(split.body, images.length);
     setTitle(split.title);
-    setBody(nextBody);
-    setInlinePhotos(images.slice(0, splitBodyAtPhotos(nextBody).length - 1));
+    // 本文の DOM を入れ替える（本文と写真の state は、入れ替えの知らせで揃う）。
+    bodyEditorRef.current?.setContent(nextBody, images.slice(0, photoOffsets(nextBody).length));
   }, []);
   const [pickling, setPickling] = useState(false);
   const [pickled, setPickled] = useState(false);
@@ -260,7 +258,6 @@ export function SpEntryEditor({
   inlineRef.current = inlinePhotos;
   const bodyTextRef = useRef(body);
   bodyTextRef.current = body;
-  const bodyEditorRef = useRef<SpBodyEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlinePaths = useMemo(() => inlinePhotos.map((p) => p.storagePath), [inlinePhotos]);
   /** 本文の中に居ない写真（PC の旧形式・添付だけ）。今までどおり本文の下に積む。 */
@@ -331,48 +328,42 @@ export function SpEntryEditor({
     savedContent: composeContent(lastSavedTitle, lastSavedBody),
   });
 
+  /**
+   * 本文が変わった（書いた・写真を置いた／動かした／抜いた）。本文と写真の state を揃える。
+   * 本文から消えた写真（BackSpace で消した等）は、添えた写真からも外す（本文の下に積み直さない）。
+   */
+  const handleBodyChange = useCallback((snapshot: SpBodySnapshot) => {
+    const gone = inlineRef.current.filter(
+      (before) => !snapshot.images.some((image) => image.storagePath === before.storagePath),
+    );
+    bodyTextRef.current = snapshot.body;
+    inlineRef.current = snapshot.images;
+    setBody(snapshot.body);
+    setInlinePhotos(snapshot.images);
+    setSelectedPhoto((index) => (index !== null && index >= snapshot.images.length ? null : index));
+    if (gone.length === 0) return;
+    const nextPhotos = photosRef.current.filter(
+      (photo) => !gone.some((image) => image.storagePath === photo.storagePath),
+    );
+    photosRef.current = nextPhotos;
+    setPhotos(nextPhotos);
+  }, []);
+
   /** 起こした文字をカーソル位置に差し込む（本文の全置換はしない）。 */
   function insertAtCursor(text: string) {
-    const segments = splitBodyAtPhotos(body);
-    const caret = bodyEditorRef.current?.caret() ?? {
-      segment: segments.length - 1,
-      offset: (segments[segments.length - 1] ?? '').length,
-    };
-    const current = segments[caret.segment] ?? '';
-    const at = Math.min(caret.offset, current.length);
-    const before = current.slice(0, at);
-    const after = current.slice(at);
-    // 直前が改行でなければ改行を足して、既存の文と地続きにならないようにする。
-    const lead = before && !before.endsWith('\n') ? '\n' : '';
-    const next = [...segments];
-    next[caret.segment] = `${before}${lead}${text}${after}`;
-    setBody(joinBodySegments(next));
-    // 差し込んだ直後にカーソルを末尾へ運ぶ（続きを書き始められるように）。
-    bodyEditorRef.current?.focusSegment(caret.segment, before.length + lead.length + text.length);
+    bodyEditorRef.current?.insertText(text);
   }
 
   /**
-   * 写真を**いまのカーソル位置**に置く（Notion のモバイルと同じ）。文がそこで 2 つに割れ、
-   * 次の文にカーソルが移る。本文が未保存でも写真だけ先に確定させたいので、ここで明示的に保存する。
+   * 写真を**いまのカーソル位置**に置く（Notion のモバイルと同じ）。カーソルは写真の直後へ。
+   * 本文が未保存でも写真だけ先に確定させたいので、ここで明示的に保存する。
    */
   async function attachPhoto(photo: AttachedPhoto) {
-    const segments = splitBodyAtPhotos(bodyTextRef.current);
-    const caret = bodyEditorRef.current?.caret() ?? {
-      segment: segments.length - 1,
-      offset: (segments[segments.length - 1] ?? '').length,
-    };
-    const inserted = insertPhotoAt(segments, caret.segment, caret.offset);
-    const nextBody = joinBodySegments(inserted.segments);
-    const nextInline = [...inlineRef.current];
-    nextInline.splice(inserted.imageIndex, 0, toInlinePhoto(photo));
     const nextPhotos = [...photosRef.current, photo];
     photosRef.current = nextPhotos;
-    inlineRef.current = nextInline;
-    bodyTextRef.current = nextBody;
     setPhotos(nextPhotos);
-    setInlinePhotos(nextInline);
-    setBody(nextBody);
-    bodyEditorRef.current?.focusSegment(inserted.imageIndex + 1, 0);
+    const nextBody =
+      bodyEditorRef.current?.insertPhoto(toInlinePhoto(photo)).body ?? bodyTextRef.current;
 
     const content = composeContent(title, nextBody);
     if (!content.trim()) return; // 本文が空のうちは保存できない。次の保存で一緒に載る。
@@ -386,23 +377,14 @@ export function SpEntryEditor({
     }
   }
 
-  /** 本文の中の写真を抜く（添付ごと）。前後の文が繋がる。 */
+  /** 本文の中の写真を抜く（添付ごと。添えた写真の一覧は本文の変化の知らせで揃う）。 */
   async function removeInlinePhoto(index: number) {
-    const target = inlineRef.current[index];
-    if (!target) return;
-    const nextBody = joinBodySegments(removePhotoAt(splitBodyAtPhotos(bodyTextRef.current), index));
-    const nextInline = inlineRef.current.filter((_, i) => i !== index);
-    const nextPhotos = photosRef.current.filter((p) => p.storagePath !== target.storagePath);
-    photosRef.current = nextPhotos;
-    inlineRef.current = nextInline;
-    bodyTextRef.current = nextBody;
-    setPhotos(nextPhotos);
-    setInlinePhotos(nextInline);
-    setBody(nextBody);
+    if (!inlineRef.current[index]) return;
+    const nextBody = bodyEditorRef.current?.removeImage(index).body ?? bodyTextRef.current;
     const content = composeContent(title, nextBody);
     if (!entryId || !content.trim()) return;
     const saved = await saveWithEffects(content, entryId, {
-      mediaUrls: nextPhotos.map((p) => p.storagePath),
+      mediaUrls: photosRef.current.map((p) => p.storagePath),
     });
     if (saved) {
       setLastSavedBody(nextBody);
@@ -414,13 +396,11 @@ export function SpEntryEditor({
    * 選んでいる写真の見た目を変える（幅・寄せ・回り込み）。値は PC と同じ `InlineImage` の語彙。
    * すぐ保存する（自動保存は本文の変化しか見ていない）。
    */
-  async function updateSelectedPhoto(patch: Partial<InlinePhoto>) {
+  async function updateSelectedPhoto(
+    patch: Partial<Pick<InlinePhoto, 'widthRatio' | 'layout' | 'align'>>,
+  ) {
     if (selectedPhoto === null) return;
-    const nextInline = inlineRef.current.map((image, i) =>
-      i === selectedPhoto ? { ...image, ...patch } : image,
-    );
-    inlineRef.current = nextInline;
-    setInlinePhotos(nextInline);
+    bodyEditorRef.current?.updateImage(selectedPhoto, patch);
     const content = composeContent(title, bodyTextRef.current);
     if (!entryId || !content.trim()) return;
     await saveWithEffects(content, entryId, { mediaUrls });
@@ -622,12 +602,20 @@ export function SpEntryEditor({
       : align === 'end'
         ? tPhoto('align_end')
         : tPhoto('align_start');
-  const nextAlign = (align: InlinePhoto['align']): InlinePhoto['align'] =>
-    align === 'start' ? 'center' : align === 'center' ? 'end' : 'start';
+  // 回り込みは左右どちらかに寄せる（中央は文字が流れる側が無い）。それ以外は 左→中央→右。
+  const nextAlign = (photo: InlinePhoto): InlinePhoto['align'] =>
+    photo.layout === 'wrap'
+      ? photo.align === 'end'
+        ? 'start'
+        : 'end'
+      : photo.align === 'start'
+        ? 'center'
+        : photo.align === 'center'
+          ? 'end'
+          : 'start';
   /**
    * 写真を選んでいる間のパレット。押すたびに値が巡る（幅 小→中→大、寄せ 左→中央→右）。
-   * 回り込みは PC と同じ `layout: 'wrap'` で保存する（PC では文字が回り込む。SP の本文は textarea
-   * なので幅と寄せとして描く）。
+   * 回り込みは PC と同じ `layout: 'wrap'`（float。文字が写真の横を流れる）。位置は写真を掴んで動かす。
    */
   const photoActions: PaletteAction[] = selected
     ? [
@@ -644,7 +632,7 @@ export function SpEntryEditor({
           caption: `${t('photo_align')} · ${alignLabel(selected.align)}`,
           icon: <AlignIcon align={selected.align} />,
           disabledReason: selected.widthRatio >= 1 ? t('photo_width_large') : undefined,
-          onSelect: () => void updateSelectedPhoto({ align: nextAlign(selected.align) }),
+          onSelect: () => void updateSelectedPhoto({ align: nextAlign(selected) }),
         },
         {
           id: 'photo-wrap',
@@ -655,6 +643,10 @@ export function SpEntryEditor({
           onSelect: () =>
             void updateSelectedPhoto({
               layout: selected.layout === 'wrap' ? 'block' : 'wrap',
+              // 中央寄せのまま回り込みにすると左に寄る。見た目と表示を揃えて左にする。
+              ...(selected.layout !== 'wrap' && selected.align === 'center'
+                ? { align: 'start' as const }
+                : {}),
               // 回り込みは幅いっぱいでは成立しない。全幅なら半分に。
               ...(selected.layout !== 'wrap' && selected.widthRatio >= 1
                 ? { widthRatio: 0.4 }
@@ -715,7 +707,8 @@ export function SpEntryEditor({
   ];
 
   const gear = (
-    <RoundButton ariaLabel={t('settings_title')} onClick={() => setSettingsOpen(true)}>
+    // 押すたびに開く／閉じる（開いている間に押したら閉じる。実機レビュー）。
+    <RoundButton ariaLabel={t('settings_title')} onClick={() => setSettingsOpen((value) => !value)}>
       <GearIcon />
     </RoundButton>
   );
@@ -833,14 +826,13 @@ export function SpEntryEditor({
         }}
       />
 
-      {/* 本文（タイトルから広い余白＋ゆったり行間）。文のブロックと写真のブロックの列。 */}
+      {/* 本文（タイトルから広い余白＋ゆったり行間）。写真は本文の中。 */}
       <div className="mt-6">
         <SpBodyEditor
           ref={bodyEditorRef}
-          value={body}
-          images={inlinePhotos}
-          onChange={setBody}
-          onRemoveImage={(index) => void removeInlinePhoto(index)}
+          initialBody={initial.body}
+          initialImages={initial.images}
+          onChange={handleBodyChange}
           selectedImage={selectedPhoto}
           onSelectImage={setSelectedPhoto}
           placeholder={t('body_placeholder')}
@@ -866,8 +858,7 @@ export function SpEntryEditor({
         onClose={() => {
           photoImport.close();
           // 写真の選択で iOS はキーボードを閉じる。やめたら元のカーソルへ戻す。
-          const caret = bodyEditorRef.current?.caret();
-          if (caret) bodyEditorRef.current?.focusSegment(caret.segment, caret.offset);
+          bodyEditorRef.current?.focus();
         }}
       />
 

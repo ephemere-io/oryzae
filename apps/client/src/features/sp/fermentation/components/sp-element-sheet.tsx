@@ -41,10 +41,15 @@ const SERIF_FONT = "'Noto Serif JP', serif";
  * 一覧の項目（言葉・抜粋・手紙）の中身を読むセミモーダル。
  *
  * Google マップのシートと同じで、**つまみで高さを変えられ、中がスクロールする**
- * （`BottomSheet`）。手紙は長いので最初から高い段で開き、言葉と抜粋は低い段から。
+ * （`BottomSheet`）。手紙は長いので最初から全画面で開き、言葉と抜粋は中身の高さで開く（短い言葉が
+ * 半分の高さの白い面に浮いていた）。
  * 以前は 76% 固定のシートで「6 割しか開かず調整もできない」と言われ、次に手紙だけ
  * 全画面にしたが、「セミモーダルで大きさを変えられるように」と直された。
  */
+/** 手紙は半分と全画面、言葉と抜粋は中身の高さと全画面。 */
+const LETTER_DETENTS = ['half', 'full'] as const;
+const ITEM_DETENTS = ['content', 'full'] as const;
+
 export function SpElementSheet({ element, onClose, onReply, onOpenSource }: SpElementSheetProps) {
   const t = useTranslations('sp.jar');
 
@@ -66,7 +71,8 @@ export function SpElementSheet({ element, onClose, onReply, onOpenSource }: SpEl
         ariaLabel={label}
         label={label}
         closeLabel={t('close')}
-        initialDetent={element.kind === 'letter' ? 1 : 0}
+        detents={element.kind === 'letter' ? LETTER_DETENTS : ITEM_DETENTS}
+        initialDetent={element.kind === 'letter' ? 'full' : 'content'}
       >
         {element.kind === 'keyword' ? (
           <>

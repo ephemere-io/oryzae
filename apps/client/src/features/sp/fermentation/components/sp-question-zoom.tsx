@@ -195,50 +195,6 @@ export function SpQuestionZoom({
               >
                 {letter.bodyText}
               </p>
-              {/* もとになった記録（Issue #453: 何に対する返事かが分かる）。無ければ出さない。 */}
-              {(detail?.scannedEntries.length ?? 0) > 0 ? (
-                <div className="flex flex-col gap-1">
-                  <span
-                    className="text-[11px] uppercase tracking-[0.12em]"
-                    style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                  >
-                    {t('section_sources')}
-                  </span>
-                  <ul className="flex flex-col">
-                    {(detail?.scannedEntries ?? []).map((source) => (
-                      <li key={source.id}>
-                        <button
-                          type="button"
-                          onClick={() => onOpenSource?.(source.id)}
-                          className="flex min-h-[40px] w-full items-center justify-between gap-3 text-left text-[14px]"
-                          style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
-                        >
-                          <span className="min-w-0 truncate">
-                            {source.title || t('source_untitled')}
-                          </span>
-                          <span
-                            className="shrink-0 text-[11px]"
-                            style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                          >
-                            {formatMonthDay(source.createdAt)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {onReply ? (
-                <button
-                  type="button"
-                  data-letter-reply
-                  onClick={onReply}
-                  className="min-h-[44px] self-start rounded-full px-5 text-[14px] font-medium"
-                  style={{ ...CONTROL_FONT, background: 'var(--accent)', color: 'var(--bg)' }}
-                >
-                  {t('reply')}
-                </button>
-              ) : null}
             </article>
           </Section>
         ) : null}
@@ -307,6 +263,61 @@ export function SpQuestionZoom({
               </Row>
             ))}
           </Section>
+        ) : null}
+
+        {/* 元になったエントリーと返事は重要なので**いちばん下**に（手紙・言葉・抜粋を読み終えた先。
+            実機レビュー）。手紙が無ければ出さない。 */}
+        {letter ? (
+          <footer
+            data-letter-footer
+            className="mt-2 flex flex-col gap-3 border-t pt-5"
+            style={{ borderColor: 'var(--border-subtle)' }}
+          >
+            {/* もとになった記録（Issue #453: 何に対する返事かが分かる）。無ければ出さない。 */}
+            {(detail?.scannedEntries.length ?? 0) > 0 ? (
+              <div className="flex flex-col gap-1">
+                <span
+                  className="text-[11px] uppercase tracking-[0.12em]"
+                  style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                >
+                  {t('section_sources')}
+                </span>
+                <ul className="flex flex-col">
+                  {(detail?.scannedEntries ?? []).map((source) => (
+                    <li key={source.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenSource?.(source.id)}
+                        className="flex min-h-[40px] w-full items-center justify-between gap-3 text-left text-[14px]"
+                        style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
+                      >
+                        <span className="min-w-0 truncate">
+                          {source.title || t('source_untitled')}
+                        </span>
+                        <span
+                          className="shrink-0 text-[11px]"
+                          style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                        >
+                          {formatMonthDay(source.createdAt)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {onReply ? (
+              <button
+                type="button"
+                data-letter-reply
+                onClick={onReply}
+                className="min-h-[44px] self-start rounded-full px-5 text-[14px] font-medium"
+                style={{ ...CONTROL_FONT, background: 'var(--accent)', color: 'var(--bg)' }}
+              >
+                {t('reply')}
+              </button>
+            ) : null}
+          </footer>
         ) : null}
       </div>
     </div>

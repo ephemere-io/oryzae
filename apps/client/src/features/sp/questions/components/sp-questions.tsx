@@ -287,8 +287,8 @@ export function SpQuestions({
           ariaLabel={sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
           label={sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
           closeLabel={t('cancel')}
-          detents={[0.6, 0.92]}
-          initialDetent={1}
+          detents={['content', 'full']}
+          initialDetent="content"
         >
           <textarea
             // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件

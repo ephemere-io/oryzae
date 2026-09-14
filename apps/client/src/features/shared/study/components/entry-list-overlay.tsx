@@ -212,11 +212,12 @@ export function EntryListOverlay({
       >
         {/* 上段: 左に閉じる、右に新規作成（SP の他の画面と同じ正円）。 */}
         <div
-          className="flex shrink-0 items-center gap-2 px-2"
+          // 上段は殻の上段（SpTopBar）と同じ余白で。以前は高さ 48px に 44px の正円を詰めていて、
+          // 「×」「＋」の上がほとんど空いていなかった（実機レビュー）。
+          className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-2"
           style={{
             ...CONTROL_FONT,
-            height: 'calc(48px + env(safe-area-inset-top, 0px))',
-            paddingTop: 'env(safe-area-inset-top, 0px)',
+            paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))',
           }}
         >
           <button
@@ -248,8 +249,8 @@ export function EntryListOverlay({
         </div>
 
         {/* 絞り込み: 月と問いはドロップダウンに畳む（一覧に並べない）。1 行に収める。 */}
-        <div className="flex shrink-0 flex-col gap-2 px-4 pt-1 pb-3">
-          <div className="flex gap-2" data-filter-group>
+        <div className="flex shrink-0 flex-col gap-3 px-5 pt-3 pb-4">
+          <div className="flex gap-3" data-filter-group>
             <Select
               value={selectedMonth ?? ALL}
               options={[
@@ -291,7 +292,7 @@ export function EntryListOverlay({
           ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto px-4 pb-10">
+        <div className="min-h-0 flex-1 overflow-auto px-5 pb-10">
           {rows}
           {loadMore}
         </div>
@@ -305,6 +306,7 @@ export function EntryListOverlay({
             label={actionFor.excerpt}
             closeLabel={t('list_close')}
             detents={['content']}
+            initialDetent="content"
           >
             <div className="flex flex-col gap-2 pt-1" style={CONTROL_FONT} data-row-actions>
               {confirmingDelete ? (
@@ -558,7 +560,7 @@ function MobileRow({
       <button
         type="button"
         onClick={onClick}
-        className="flex min-h-[56px] min-w-0 flex-1 flex-col justify-center gap-1 py-3 text-left"
+        className="flex min-h-[64px] min-w-0 flex-1 flex-col justify-center gap-1.5 py-4 text-left"
       >
         <span className="block truncate text-[15px] leading-snug" style={{ color: 'var(--fg)' }}>
           {entry.excerpt}
