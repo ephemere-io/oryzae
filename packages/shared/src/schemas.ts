@@ -208,6 +208,13 @@ export const profileUpdateSchema = z.object({
     .regex(/^[a-zA-Z0-9_-]+$/)
     .optional(),
   avatarUrl: z.string().nullable().optional(),
+  /**
+   * お知らせメールの配信停止 (Issue #614)。true = 受け取らない。
+   *
+   * メール内のリンクからも同じ値を切り替えられる（あちらはログイン不要の
+   * 署名付きトークン経由）。設定画面とメールのどちらから変えても同じ 1 列を見る。
+   */
+  newsletterOptOut: z.boolean().optional(),
 });
 
 export const changePasswordSchema = z.object({

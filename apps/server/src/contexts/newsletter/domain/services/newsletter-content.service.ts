@@ -139,13 +139,36 @@ const SUPPORT_URL = `${APP_URL}/support`;
 const PRIVACY_URL = `${APP_URL}/privacy`;
 const CONTACT_EMAIL = 'oryzae@ephemere.io';
 
+/** 配信停止ページ。`?token=` に本人証明を載せる（`UnsubscribeTokenGateway`）。 */
+export function buildUnsubscribeUrl(token: string): string {
+  return `${APP_URL}/unsubscribe?token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * プレビュー用の URL。
+ *
+ * 管理画面のプレビューにも配信停止リンクを**出す**（出さないと、実際に届く
+ * メールと見えているものがずれる）。ただし署名の無い token を載せるので、
+ * 押しても誰も配信停止にならない。
+ */
+export const PREVIEW_UNSUBSCRIBE_URL = buildUnsubscribeUrl('preview');
+
 const FOOTER_LINES = [
   'このメールは Oryzae に登録されている方へお送りしています。',
   `ヘルプ・FAQ: ${SUPPORT_URL}`,
   `プライバシーポリシー: ${PRIVACY_URL}`,
-  `配信停止・お問い合わせ: ${CONTACT_EMAIL}`,
+  `お問い合わせ: ${CONTACT_EMAIL}`,
   '— Oryzae / Ferment Media Research',
 ];
+
+/**
+ * 配信停止の案内。フッターの中でも**リンクとして独立させる**。
+ *
+ * 他のフッター行に混ぜると、止めたい人が探すことになる。探させると
+ * 迷惑メール報告のほうが早くなり、送信ドメイン全体の到達率が落ちる。
+ */
+const UNSUBSCRIBE_LABEL = 'このお知らせの配信を停止する';
+const UNSUBSCRIBE_NOTE = '（停止してもアカウントと日記はそのまま残ります）';
 
 /**
  * 受信箱の一覧に出るプレビュー文（preheader）。
@@ -193,10 +216,20 @@ function renderBlockHtml(block: Block): string {
  * インラインスタイルのみ（`<style>` は Gmail に落とされる）。幅は 600px で
  * 固定し、それより狭い画面では `max-width` で縮む。
  */
-export function renderNewsletterHtml(params: { subject: string; bodyMarkdown: string }): string {
+export function renderNewsletterHtml(params: {
+  subject: string;
+  bodyMarkdown: string;
+  /** 受信者ごとの配信停止 URL。`buildUnsubscribeUrl` で作る。 */
+  unsubscribeUrl: string;
+}): string {
   const blocks = parseNewsletterBody(params.bodyMarkdown);
 
   const body = blocks.map(renderBlockHtml).join('\n      ');
+
+  const unsubscribe =
+    `<p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#8a8279;">` +
+    `<a href="${escapeHtml(params.unsubscribeUrl)}" style="color:#8a6d3b;text-decoration:underline;">${escapeHtml(UNSUBSCRIBE_LABEL)}</a>` +
+    `<br />${escapeHtml(UNSUBSCRIBE_NOTE)}</p>`;
 
   const footer = FOOTER_LINES.map(
     (line) =>
@@ -219,6 +252,7 @@ export function renderNewsletterHtml(params: { subject: string; bodyMarkdown: st
       <p style="margin:0 0 24px;font-size:12px;letter-spacing:0.08em;color:#8a8279;">ORYZAE</p>
       ${body}
       <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e0d8;">
+        ${unsubscribe}
         ${footer}
       </div>
       </div>
@@ -251,8 +285,22 @@ function renderBlockText(block: Block): string {
   }
 }
 
-export function renderNewsletterText(params: { subject: string; bodyMarkdown: string }): string {
+export function renderNewsletterText(params: {
+  subject: string;
+  bodyMarkdown: string;
+  unsubscribeUrl: string;
+}): string {
   const body = parseNewsletterBody(params.bodyMarkdown).map(renderBlockText).join('\n\n');
 
-  return [params.subject, '', body, '', '———', ...FOOTER_LINES].join('\n');
+  return [
+    params.subject,
+    '',
+    body,
+    '',
+    '———',
+    `${UNSUBSCRIBE_LABEL}: ${params.unsubscribeUrl}`,
+    UNSUBSCRIBE_NOTE,
+    '',
+    ...FOOTER_LINES,
+  ].join('\n');
 }

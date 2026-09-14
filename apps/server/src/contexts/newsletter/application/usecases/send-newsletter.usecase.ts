@@ -4,12 +4,21 @@ import type {
 } from '../../domain/gateways/bulk-email-sender.gateway.js';
 import type { NewsletterAudienceGateway } from '../../domain/gateways/newsletter-audience.gateway.js';
 import type { NewsletterRepositoryGateway } from '../../domain/gateways/newsletter-repository.gateway.js';
+import {
+  type UnsubscribeTokenGateway,
+  UnsubscribeTokenUnavailableError,
+} from '../../domain/gateways/unsubscribe-token.gateway.js';
 import type { NewsletterProps } from '../../domain/models/newsletter.js';
 import {
+  buildUnsubscribeUrl,
   renderNewsletterHtml,
   renderNewsletterText,
 } from '../../domain/services/newsletter-content.service.js';
-import { NewsletterNotFoundError, NewsletterValidationError } from '../errors/newsletter.errors.js';
+import {
+  NewsletterNotFoundError,
+  NewsletterUnsubscribeUnavailableError,
+  NewsletterValidationError,
+} from '../errors/newsletter.errors.js';
 
 export interface SendNewsletterResult {
   newsletter: NewsletterProps;
@@ -46,6 +55,7 @@ export class SendNewsletterUsecase {
     private repository: NewsletterRepositoryGateway,
     private audience: NewsletterAudienceGateway,
     private sender: BulkEmailSenderGateway,
+    private tokens: UnsubscribeTokenGateway,
   ) {}
 
   async execute(id: string): Promise<SendNewsletterResult> {
@@ -54,19 +64,36 @@ export class SendNewsletterUsecase {
 
     const recipients = await this.audience.listRecipients();
 
+    // 宛先ごとの配信停止リンクを **送信状態にする前に** 全部作る。
+    // 署名鍵が無ければここで落ちるので、status は draft のまま動かない
+    // （止める口の無いメールを送るくらいなら、送らないほうがよい）。
+    let messages: BulkEmailMessage[];
+    try {
+      messages = recipients.map((recipient) => {
+        const unsubscribeUrl = buildUnsubscribeUrl(this.tokens.issue(recipient.userId));
+        const content = {
+          subject: newsletter.subject,
+          bodyMarkdown: newsletter.bodyMarkdown,
+          unsubscribeUrl,
+        };
+        return {
+          to: recipient.email,
+          subject: newsletter.subject,
+          html: renderNewsletterHtml(content),
+          text: renderNewsletterText(content),
+          unsubscribeUrl,
+        };
+      });
+    } catch (error) {
+      if (error instanceof UnsubscribeTokenUnavailableError) {
+        throw new NewsletterUnsubscribeUnavailableError(error.message);
+      }
+      throw error;
+    }
+
     const started = newsletter.withSendingStarted(recipients.length);
     if (!started.success) throw new NewsletterValidationError(started.error.message);
     await this.repository.save(started.value);
-
-    const content = { subject: newsletter.subject, bodyMarkdown: newsletter.bodyMarkdown };
-    const html = renderNewsletterHtml(content);
-    const text = renderNewsletterText(content);
-    const messages: BulkEmailMessage[] = recipients.map((recipient) => ({
-      to: recipient.email,
-      subject: newsletter.subject,
-      html,
-      text,
-    }));
 
     let outcome: Awaited<ReturnType<BulkEmailSenderGateway['sendBulk']>>;
     try {

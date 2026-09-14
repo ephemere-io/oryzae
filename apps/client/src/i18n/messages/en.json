@@ -231,6 +231,12 @@
     "links": {
       "privacy": "Privacy Policy",
       "support": "Help & Support"
+    },
+    "newsletter": {
+      "label": "Announcement emails",
+      "description": "Occasional updates about new features, sent to your registered address.",
+      "receive": "Receive",
+      "error": "Could not save. Please try again in a moment."
     }
   },
   "sidebar": {
@@ -858,5 +864,18 @@
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
     "hint_board_both": "{photos} photos · {snippets} snippets"
+  },
+  "newsletter": {
+    "unsubscribe": {
+      "working": "Working…",
+      "done_title": "You have been unsubscribed",
+      "done_body": "You will no longer receive announcement emails from Oryzae.",
+      "account_kept": "Your account and journal entries are untouched. Emails about your own journal, such as fermentation notices, still arrive as before.",
+      "undo": "Actually, keep sending them",
+      "resumed_title": "Subscription resumed",
+      "resumed_body": "Announcement emails will arrive again.",
+      "error_title": "Something went wrong",
+      "error_fallback": "You can also change this from your account settings after signing in."
+    }
   }
 }

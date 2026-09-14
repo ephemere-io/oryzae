@@ -231,6 +231,12 @@
     "links": {
       "privacy": "プライバシーポリシー",
       "support": "ヘルプ・サポート"
+    },
+    "newsletter": {
+      "label": "お知らせメール",
+      "description": "新機能のお知らせなどを、登録しているメールアドレスにお送りします。",
+      "receive": "受け取る",
+      "error": "保存できませんでした。時間をおいてもう一度お試しください。"
     }
   },
   "sidebar": {
@@ -858,5 +864,18 @@
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
     "hint_board_both": "写真{photos}件・スニペット{snippets}件"
+  },
+  "newsletter": {
+    "unsubscribe": {
+      "working": "処理しています…",
+      "done_title": "配信を停止しました",
+      "done_body": "今後、Oryzae からのお知らせメールは届きません。",
+      "account_kept": "アカウントと日記はそのまま残ります。発酵のお知らせなど、日記に関するメールはこれまでどおり届きます。",
+      "undo": "やっぱり受け取る",
+      "resumed_title": "配信を再開しました",
+      "resumed_body": "お知らせメールがまた届くようになります。",
+      "error_title": "処理できませんでした",
+      "error_fallback": "ログインしてアカウント設定からも切り替えられます。"
+    }
   }
 }

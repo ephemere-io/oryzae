@@ -9,6 +9,8 @@ import type {
 const BATCH_SIZE = 100;
 /** バッチ間の間隔 (ms)。Resend の既定レート上限に当てないための保険。 */
 const BATCH_INTERVAL_MS = 600;
+/** List-Unsubscribe の mailto: 退路（POST 非対応クライアント向け）。 */
+const UNSUBSCRIBE_MAILTO = 'oryzae@ephemere.io';
 
 function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -63,6 +65,14 @@ export class ResendBulkEmailSender implements BulkEmailSenderGateway {
         subject: message.subject,
         html: message.html,
         text: message.text,
+        headers: {
+          // RFC 8058 のワンクリック配信停止。この 2 つが揃っていると、
+          // Gmail / Yahoo は受信箱の上部に「配信停止」ボタンを出し、押された
+          // ときに URL へ POST する（利用者はページを開かずに止められる）。
+          // mailto: も併記するのは、POST に対応しないクライアント向けの退路。
+          'List-Unsubscribe': `<${message.unsubscribeUrl}>, <mailto:${UNSUBSCRIBE_MAILTO}?subject=unsubscribe>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
       }));
 
       let response: Response;

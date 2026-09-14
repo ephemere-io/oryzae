@@ -7,6 +7,7 @@ import { cronFermentation } from './contexts/fermentation/presentation/routes/cr
 import { fermentations } from './contexts/fermentation/presentation/routes/fermentations.js';
 import { jarLayout } from './contexts/fermentation/presentation/routes/jar-layout.js';
 import { adminNewsletters } from './contexts/newsletter/presentation/routes/admin-newsletters.js';
+import { newsletterSubscription } from './contexts/newsletter/presentation/routes/newsletter-subscription.js';
 import { adminQuestions } from './contexts/question/presentation/routes/admin-questions.js';
 import { entryQuestions } from './contexts/question/presentation/routes/entry-questions.js';
 import { questions } from './contexts/question/presentation/routes/questions.js';
@@ -39,6 +40,12 @@ const app = new Hono()
   // signupRoutes (POST /signup, GET /signup/availability) — Issue #300
   .route('/api/v1/auth/signup', signupRoutes)
   .route('/api/v1/auth', authRoutes)
+  // 配信停止はログイン不要（メールのリンク / RFC 8058 のワンクリック）。
+  // authMiddleware より **前** に置く。認証を挟むと「もう読みたくない人」が
+  // 止められなくなり、迷惑メール報告のほうが早くなる。本人性は署名済み
+  // トークンだけで担保する（contexts/newsletter/.../newsletter-subscription.ts）。
+  .use('/api/v1/newsletter/*', rateLimitGeneral())
+  .route('/api/v1/newsletter', newsletterSubscription)
   .use('/api/v1/admin/*', adminAuthMiddleware)
   .route('/api/v1/admin/dashboard', adminDashboard)
   .route('/api/v1/admin/users', adminUsers)
