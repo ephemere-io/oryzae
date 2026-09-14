@@ -55,6 +55,11 @@ export interface Bounds {
 export const OVERZOOM_OUT_EVENT = 'oryzae:canvas-overzoom-out';
 
 export interface OverzoomOutDetail {
+  /**
+   * どの入力か。指のつまみは 1 回で動かせる距離が短く（指の開き幅で頭打ち）、ホイールより
+   * 大きく進めないと届かない。拾う側が進め方を変える。
+   */
+  input?: 'wheel' | 'pinch';
   excess: number;
 }
 

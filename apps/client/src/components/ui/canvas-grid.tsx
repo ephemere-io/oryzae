@@ -24,11 +24,14 @@ const CORK_TILE = 160;
 const CORK_NOISE = `url("data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns='http://www.w3.org/2000/svg' width='${CORK_TILE}' height='${CORK_TILE}'>` +
     `<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' seed='7' stitchTiles='stitch'/>` +
-    `<feColorMatrix values='0 0 0 0 0.40  0 0 0 0 0.26  0 0 0 0 0.12  0 0 0 0.42 0'/></filter>` +
+    `<feColorMatrix values='0 0 0 0 0.40  0 0 0 0 0.26  0 0 0 0 0.12  0 0 0 0.16 0'/></filter>` +
     `<rect width='${CORK_TILE}' height='${CORK_TILE}' filter='url(#n)'/></svg>`,
 )}")`;
-/** コルクの地の色（板そのもの）。 */
-const CORK_BASE = '#D3B48C';
+/**
+ * コルクの地の色（板そのもの）。**淡く**。濃い茶は全体の UI から浮いた（レビュー）。質感は粒で出し、
+ * 色は書斎の地に寄せる。テーマで変わるのでトークン（`--board-ground`）。
+ */
+const CORK_BASE = 'var(--board-ground)';
 
 /**
  * キャンバスの方眼背景。
@@ -77,7 +80,7 @@ export function CanvasGrid({
               // コルクボード: 板の色の上に粒を重ね、縁を少し落として厚みを出す。
               backgroundColor: CORK_BASE,
               backgroundImage: CORK_NOISE,
-              boxShadow: 'inset 0 0 120px rgba(90,60,30,0.18)',
+              boxShadow: 'inset 0 0 120px rgba(90,60,30,0.06)',
               opacity,
             }
           : {

@@ -4,6 +4,8 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import type { PhotoImportState } from '@/features/shared/entries/types';
 
+import { placeInSlot, useSpChrome } from '@/lib/sp-chrome-context';
+
 interface SpPhotoImportSheetProps {
   state: PhotoImportState;
   onTranscribe: () => void;
@@ -29,6 +31,7 @@ export function SpPhotoImportSheet({
   onClose,
 }: SpPhotoImportSheetProps) {
   const t = useTranslations('photo');
+  const { overlaySlot } = useSpChrome();
 
   const busy = state.status !== 'idle';
   const showTranscript = state.transcript !== null;
@@ -44,119 +47,126 @@ export function SpPhotoImportSheet({
         hasPreview: state.previewUrl !== null,
       })}
     >
-      {state.open ? (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <button
-            type="button"
-            aria-label={t('cancel')}
-            onClick={busy ? undefined : onClose}
-            disabled={busy}
-            className="sp-fade flex-1 bg-black/30"
-          />
-          <div
-            className="sp-sheet max-h-[80vh] overflow-auto rounded-t-2xl bg-[var(--surface-raised)] px-5 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
-            style={{ fontFamily: 'var(--ob-font-sans)' }}
-          >
-            <p
-              className="text-base font-medium text-[var(--fg)]"
-              style={{ fontFamily: 'var(--ob-font-serif)' }}
+      {state.open
+        ? placeInSlot(
+            // SP の殻の中なら、殻の overlay の席（ビジュアルビューポートに追従）に出す。`fixed` はレイアウト
+            // ビューポート基準で、キーボードの出入りの途中に開くと画面の上の方に浮いた（レビュー）。
+            <div
+              className={`${overlaySlot ? 'pointer-events-auto absolute' : 'fixed'} inset-0 z-50 flex flex-col justify-end`}
             >
-              {showTranscript ? t('transcript_heading') : t('modal_title')}
-            </p>
-
-            {/* 写真が外部 AI に送られることを操作の前に明示する（docs/entry-photo-guide.md）。 */}
-            {!showTranscript ? (
-              <p className="mt-1.5 text-[11px] leading-snug text-[var(--date-color)]">
-                {t('ai_notice')}
-              </p>
-            ) : null}
-
-            {state.error ? (
-              <p className="mt-2 text-sm leading-relaxed text-[var(--ob-jar-warm)]">
-                {state.error}
-              </p>
-            ) : null}
-
-            {showTranscript ? (
-              state.transcript ? (
-                <pre
-                  data-testid="sp-photo-transcript"
-                  className="mt-3 max-h-[40vh] overflow-auto whitespace-pre-wrap rounded-xl p-3 text-sm leading-relaxed text-[var(--fg)]"
-                  style={{ background: 'var(--toolbar-hover)' }}
+              <button
+                type="button"
+                aria-label={t('cancel')}
+                onClick={busy ? undefined : onClose}
+                disabled={busy}
+                className="sp-fade flex-1 bg-black/30"
+              />
+              <div
+                className="sp-sheet max-h-[80vh] overflow-auto rounded-t-2xl bg-[var(--surface-raised)] px-5 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
+                style={{ fontFamily: 'var(--ob-font-sans)' }}
+              >
+                <p
+                  className="text-base font-medium text-[var(--fg)]"
+                  style={{ fontFamily: 'var(--ob-font-serif)' }}
                 >
-                  {state.transcript}
-                </pre>
-              ) : (
-                <p className="mt-3 text-sm leading-relaxed text-[var(--date-color)]">
-                  {t('transcript_empty')}
+                  {showTranscript ? t('transcript_heading') : t('modal_title')}
                 </p>
-              )
-            ) : null}
-            {/* 選んだ写真の大きなプレビューは出さない。OS の選択で見たばかりの写真を
+
+                {/* 写真が外部 AI に送られることを操作の前に明示する（docs/entry-photo-guide.md）。 */}
+                {!showTranscript ? (
+                  <p className="mt-1.5 text-[11px] leading-snug text-[var(--date-color)]">
+                    {t('ai_notice')}
+                  </p>
+                ) : null}
+
+                {state.error ? (
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--ob-jar-warm)]">
+                    {state.error}
+                  </p>
+                ) : null}
+
+                {showTranscript ? (
+                  state.transcript ? (
+                    <pre
+                      data-testid="sp-photo-transcript"
+                      className="mt-3 max-h-[40vh] overflow-auto whitespace-pre-wrap rounded-xl p-3 text-sm leading-relaxed text-[var(--fg)]"
+                      style={{ background: 'var(--toolbar-hover)' }}
+                    >
+                      {state.transcript}
+                    </pre>
+                  ) : (
+                    <p className="mt-3 text-sm leading-relaxed text-[var(--date-color)]">
+                      {t('transcript_empty')}
+                    </p>
+                  )
+                ) : null}
+                {/* 選んだ写真の大きなプレビューは出さない。OS の選択で見たばかりの写真を
                 もう一度見せる理由が無く、二択（読み込む／置く）が下に押し出されていた（実機レビュー）。 */}
 
-            <div className="mt-5 flex flex-col gap-2">
-              {showTranscript ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={onInsertTranscript}
-                    disabled={!state.transcript}
-                    className="rounded-xl py-3 text-sm font-medium text-white disabled:opacity-50"
-                    style={{ background: 'var(--accent)' }}
-                  >
-                    {t('insert')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onDiscardTranscript}
-                    className="rounded-xl py-3 text-sm text-[var(--fg)]"
-                    style={{ border: '1px solid var(--border-subtle)' }}
-                  >
-                    {t('back')}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={onTranscribe}
-                    disabled={busy || !state.previewUrl}
-                    // 「読み込む」と「置く」は対等な二択。片方だけ濃いと、そちらが正解に見える（実機レビュー）。
-                    className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium disabled:opacity-50"
-                    style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
-                  >
-                    {state.status === 'transcribing' ? (
-                      <span
-                        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-                        aria-hidden="true"
-                      />
-                    ) : null}
-                    {state.status === 'transcribing' ? t('transcribing') : t('transcribe')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onAttach}
-                    disabled={busy || !state.previewUrl}
-                    className="flex min-h-[48px] items-center justify-center rounded-xl py-3 text-sm font-medium disabled:opacity-50"
-                    style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
-                  >
-                    {state.status === 'uploading' ? t('attaching') : t('attach')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={busy}
-                    className="rounded-xl py-3 text-sm text-[var(--date-color)] disabled:opacity-50"
-                  >
-                    {t('cancel')}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
+                <div className="mt-5 flex flex-col gap-2">
+                  {showTranscript ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onInsertTranscript}
+                        disabled={!state.transcript}
+                        className="rounded-xl py-3 text-sm font-medium text-white disabled:opacity-50"
+                        style={{ background: 'var(--accent)' }}
+                      >
+                        {t('insert')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onDiscardTranscript}
+                        className="rounded-xl py-3 text-sm text-[var(--fg)]"
+                        style={{ border: '1px solid var(--border-subtle)' }}
+                      >
+                        {t('back')}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onTranscribe}
+                        disabled={busy || !state.previewUrl}
+                        // 「読み込む」と「置く」は対等な二択。片方だけ濃いと、そちらが正解に見える（実機レビュー）。
+                        className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium disabled:opacity-50"
+                        style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
+                      >
+                        {state.status === 'transcribing' ? (
+                          <span
+                            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                            aria-hidden="true"
+                          />
+                        ) : null}
+                        {state.status === 'transcribing' ? t('transcribing') : t('transcribe')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onAttach}
+                        disabled={busy || !state.previewUrl}
+                        className="flex min-h-[48px] items-center justify-center rounded-xl py-3 text-sm font-medium disabled:opacity-50"
+                        style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
+                      >
+                        {state.status === 'uploading' ? t('attaching') : t('attach')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={busy}
+                        className="rounded-xl py-3 text-sm text-[var(--date-color)] disabled:opacity-50"
+                      >
+                        {t('cancel')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>,
+            overlaySlot,
+          )
+        : null}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
 import type { QuestionProps } from '../../domain/models/question.js';
 import { QuestionLimitExceededError, QuestionNotFoundError } from '../errors/question.errors.js';
@@ -10,7 +11,7 @@ export class UnarchiveQuestionUsecase {
     if (!question) throw new QuestionNotFoundError(questionId);
 
     const activeCount = await this.questionRepo.countActiveByUserId(question.userId);
-    if (activeCount >= 3) throw new QuestionLimitExceededError();
+    if (activeCount >= MAX_ACTIVE_QUESTIONS) throw new QuestionLimitExceededError();
 
     const unarchived = question.withUnarchived();
     await this.questionRepo.save(unarchived);

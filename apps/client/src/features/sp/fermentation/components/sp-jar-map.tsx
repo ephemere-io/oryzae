@@ -52,7 +52,7 @@ const BOTTLE = { width: 960, height: 1200 } as const;
  * 問いが 3 行で読める大きさで足りる。初期表示（下の HOME を 390×739 に収めた倍率 ≈ 0.28）
  * で画面上 95px 前後。寄れば大きく読める。
  */
-const CIRCLE = 400;
+const CIRCLE = 480;
 
 /**
  * 位置が無い問いの既定の席。壜（中央、y 28〜72%）を避けて上下左右に散らす。
@@ -255,10 +255,11 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
               }}
             >
               <span
-                className="block px-8"
+                className="block px-10"
                 style={{
                   fontFamily: "'Noto Serif JP', serif",
-                  fontSize: 40,
+                  // 開いた直後（倍率 ≈ 0.26）で画面上 12.5px。円の中が狭い・字が小さい、とレビュー。
+                  fontSize: 48,
                   lineHeight: 1.35,
                   color: 'var(--fg)',
                   opacity: 0.85,

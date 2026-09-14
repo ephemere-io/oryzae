@@ -337,24 +337,27 @@ interface RowProps {
 }
 
 /** 紙の上の 1 行。面は持たず、罫 1 本と末尾の › で押せることを示す。 */
+/**
+ * 押せる行。**行そのものをボタンの面にする**（白い面・角丸・枠）。
+ *
+ * 以前は右端に `›` を置いていたが、iOS の `›` は「右へ 1 階層進む」の印で、押すと下からシートが
+ * 上がる挙動と食い違っていた（レビュー）。押した先はシートなので、行は「押せる面」として見せる。
+ */
 function Row({ onClick, testId, ariaLabel, children }: RowProps) {
   return (
-    <li className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+    <li className="mb-2">
       <button
         type="button"
         onClick={onClick}
         data-testid={testId}
         aria-label={ariaLabel}
-        className="flex min-h-[52px] w-full items-center gap-3 py-3 text-left"
+        className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-4 py-3 text-left"
+        style={{
+          background: 'var(--surface-raised)',
+          borderColor: 'var(--surface-raised-border)',
+        }}
       >
         {children}
-        <span
-          aria-hidden="true"
-          className="shrink-0 text-[18px] leading-none"
-          style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-        >
-          ›
-        </span>
       </button>
     </li>
   );

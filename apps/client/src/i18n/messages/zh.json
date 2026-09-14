@@ -169,7 +169,8 @@
       "back_to_list": "← 从已有问题中选择",
       "search_placeholder": "查找问题",
       "untitled": "无标题提问",
-      "close": "关闭"
+      "close": "关闭",
+      "limit": "提问最多 {max} 个。在瓶中结束一个提问后即可新建。"
     }
   },
   "app": {
@@ -819,7 +820,8 @@
       "cancel": "取消",
       "save": "保存",
       "letter_arrived": "有一封信送到了",
-      "close": "关闭"
+      "close": "关闭",
+      "limit": "提问最多 {max} 个。在瓶中结束一个提问后即可新建。"
     },
     "board": {
       "cards": "{count}张",

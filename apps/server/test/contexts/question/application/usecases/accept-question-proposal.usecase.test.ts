@@ -84,8 +84,8 @@ describe('AcceptQuestionProposalUsecase', () => {
     });
 
     vi.mocked(questionRepo.findById).mockResolvedValue(proposedQuestion);
-    vi.mocked(questionRepo.countActiveByUserId).mockResolvedValue(3);
+    vi.mocked(questionRepo.countActiveByUserId).mockResolvedValue(5);
 
-    await expect(usecase.execute('q-1')).rejects.toThrow('Maximum of 3 active questions');
+    await expect(usecase.execute('q-1')).rejects.toThrow('Maximum of 5 active questions');
   });
 });
