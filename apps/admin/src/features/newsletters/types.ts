@@ -29,6 +29,7 @@ export const newsletterPreviewSchema = z.object({
   text: z.string(),
   recipientCount: z.number(),
   sendable: z.boolean(),
+  blockedReason: z.enum(['already-sent', 'not-tested', 'no-recipients']).nullable(),
   testSentAt: z.string().nullable(),
 });
 
@@ -67,6 +68,20 @@ export const generateDraftResultSchema = z.object({
 });
 
 export type GenerateDraftResult = z.infer<typeof generateDraftResultSchema>;
+
+/** 送信ボタンを押せない理由を画面の言葉にする（server の blockedReason に対応）。 */
+export function formatBlockedReason(
+  reason: NonNullable<NewsletterPreview['blockedReason']>,
+): string {
+  switch (reason) {
+    case 'already-sent':
+      return 'この配信はすでに送信済みです。';
+    case 'not-tested':
+      return 'まだテスト配信していません。先に「テスト配信」を押して受信を確認してください。';
+    case 'no-recipients':
+      return '宛先が 0 名のため送信できません。';
+  }
+}
 
 /** 送信されなかった理由を画面の言葉にする（server の BulkSendOutcome.reason に対応）。 */
 export function formatSendSkipReason(reason: string | undefined): string {

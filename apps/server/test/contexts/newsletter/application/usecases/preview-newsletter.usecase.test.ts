@@ -4,7 +4,12 @@ import type { NewsletterAudienceGateway } from '@/contexts/newsletter/domain/gat
 import type { NewsletterRepositoryGateway } from '@/contexts/newsletter/domain/gateways/newsletter-repository.gateway.js';
 import { Newsletter } from '@/contexts/newsletter/domain/models/newsletter.js';
 
+/** テスト配信済みの下書き（本番送信できる状態）。 */
 function draft(): Newsletter {
+  return untestedDraft().withTestSent();
+}
+
+function untestedDraft(): Newsletter {
   const result = Newsletter.create(
     { subject: '今月の更新', bodyMarkdown: '本文です。', createdBy: 'admin-1' },
     () => 'nl-1',
@@ -55,9 +60,32 @@ describe('PreviewNewsletterUsecase', () => {
     expect(audience.countRecipients).toHaveBeenCalledTimes(1);
   });
 
-  it('宛先が 0 名なら送信不可にする', async () => {
+  it('宛先が 0 名なら送信不可にし、理由を返す', async () => {
     const usecase = new PreviewNewsletterUsecase(mockRepository(draft()), mockAudience(0));
-    expect((await usecase.execute('nl-1')).sendable).toBe(false);
+    const preview = await usecase.execute('nl-1');
+
+    expect(preview.sendable).toBe(false);
+    expect(preview.blockedReason).toBe('no-recipients');
+  });
+
+  // 画面が理由を推測すると、サーバーが実際に弾く理由とずれる。
+  it('未テストなら送信不可にし、理由を返す', async () => {
+    const usecase = new PreviewNewsletterUsecase(mockRepository(untestedDraft()), mockAudience(5));
+    const preview = await usecase.execute('nl-1');
+
+    expect(preview.sendable).toBe(false);
+    expect(preview.blockedReason).toBe('not-tested');
+    expect(preview.testSentAt).toBeNull();
+    // プレビュー自体は見られる（見ないとテストする気にもならない）。
+    expect(preview.html).toContain('本文です。');
+  });
+
+  it('送信できる状態なら blockedReason は null', async () => {
+    const usecase = new PreviewNewsletterUsecase(mockRepository(draft()), mockAudience(5));
+    const preview = await usecase.execute('nl-1');
+
+    expect(preview.sendable).toBe(true);
+    expect(preview.blockedReason).toBeNull();
   });
 
   it('送信済みは送信不可にする（プレビューは見られる）', async () => {
@@ -69,6 +97,7 @@ describe('PreviewNewsletterUsecase', () => {
     const preview = await usecase.execute('nl-1');
 
     expect(preview.sendable).toBe(false);
+    expect(preview.blockedReason).toBe('already-sent');
     expect(preview.html).toContain('本文です。');
   });
 

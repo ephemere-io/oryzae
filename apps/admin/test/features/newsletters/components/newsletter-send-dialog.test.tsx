@@ -30,7 +30,8 @@ const preview: NewsletterPreview = {
   text: '今月の更新\n\n本文です。',
   recipientCount: 137,
   sendable: true,
-  testSentAt: null,
+  blockedReason: null,
+  testSentAt: '2026-09-14T07:30:00.000Z',
 };
 
 function renderDialog(overrides?: {
@@ -103,7 +104,9 @@ describe('NewsletterSendDialog', () => {
   });
 
   it('宛先が 0 名なら送信ボタンを押せない', () => {
-    renderDialog({ preview: { ...preview, recipientCount: 0, sendable: false } });
+    renderDialog({
+      preview: { ...preview, recipientCount: 0, sendable: false, blockedReason: 'no-recipients' },
+    });
 
     const button = screen.getByRole('button', { name: /送信する/ });
     expect(button.hasAttribute('disabled')).toBe(true);
@@ -111,7 +114,7 @@ describe('NewsletterSendDialog', () => {
   });
 
   it('送信済みは送信ボタンを押せない', () => {
-    renderDialog({ preview: { ...preview, sendable: false } });
+    renderDialog({ preview: { ...preview, sendable: false, blockedReason: 'already-sent' } });
 
     expect(screen.getByRole('button', { name: /送信する/ }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(/すでに送信済みです/)).toBeDefined();
@@ -122,15 +125,39 @@ describe('NewsletterSendDialog', () => {
     expect(screen.getByRole('button', { name: /送信中/ }).hasAttribute('disabled')).toBe(true);
   });
 
-  it('未テストなら警告を出す（本番の前に自分たちへ送らせる）', () => {
-    renderDialog();
-    expect(screen.getByText(/まだテスト配信していません/)).toBeDefined();
-  });
-
   it('テスト済みならその時刻を出す', () => {
-    renderDialog({ preview: { ...preview, testSentAt: '2026-09-14T07:30:00.000Z' } });
+    renderDialog();
     expect(screen.getByText(/テスト配信済み/)).toBeDefined();
     expect(screen.queryByText(/まだテスト配信していません/)).toBeNull();
+  });
+
+  // ここが緩むと、実際に届く形を一度も見ないまま全員に配信できてしまう。
+  it('未テストなら送信ボタンを押せない', () => {
+    renderDialog({
+      preview: { ...preview, sendable: false, blockedReason: 'not-tested', testSentAt: null },
+    });
+
+    expect(screen.getByRole('button', { name: /送信する/ }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText(/先に「テスト配信」を押して受信を確認/)).toBeDefined();
+  });
+
+  // 未テストで塞がれている状態でこそ押したいボタンなので、ここは生きている必要がある。
+  it('未テストで送信が塞がれていても、テスト配信ボタンは押せる', () => {
+    const { onSendTest } = renderDialog({
+      preview: { ...preview, sendable: false, blockedReason: 'not-tested', testSentAt: null },
+    });
+
+    const testButton = screen.getByRole('button', { name: /テスト配信/ });
+    expect(testButton.hasAttribute('disabled')).toBe(false);
+
+    fireEvent.click(testButton);
+    expect(onSendTest).toHaveBeenCalledTimes(1);
+  });
+
+  it('送信済みならテスト配信も押せない（もう文面を変えられない）', () => {
+    renderDialog({ preview: { ...preview, sendable: false, blockedReason: 'already-sent' } });
+
+    expect(screen.getByRole('button', { name: /テスト配信/ }).hasAttribute('disabled')).toBe(true);
   });
 
   it('テスト配信ボタンは 1 クリックで撃てる（宛先が運営者に固定されているため）', () => {

@@ -46,7 +46,8 @@ export type NewsletterIssue =
   | { kind: 'body-empty'; message: string }
   | { kind: 'body-too-long'; message: string }
   | { kind: 'not-editable'; message: string }
-  | { kind: 'not-sendable'; message: string };
+  | { kind: 'not-sendable'; message: string }
+  | { kind: 'not-tested'; message: string };
 
 interface NewsletterContent {
   subject: string;
@@ -164,19 +165,33 @@ export class Newsletter {
     const issue = validateContent(content);
     if (issue) return err(issue);
 
+    // 本文を変えたら、前のテスト配信は「いま送られるもの」を確かめていない。
+    // 印を残すと、別の文面を確認しただけでゲートが通ってしまう。
+    const changed =
+      content.subject.trim() !== this.subject || content.bodyMarkdown !== this.bodyMarkdown;
+
     return ok(
       new Newsletter({
         ...this.toProps(),
         subject: content.subject.trim(),
         bodyMarkdown: content.bodyMarkdown,
+        testSentAt: changed ? null : this.testSentAt,
         updatedAt: now().toISOString(),
       }),
     );
   }
 
   /**
-   * 送信開始。宛先が 0 名のときは開始させない —— 「送ったつもりで誰にも
-   * 届いていない」配信が sent として履歴に残るのを防ぐ。
+   * 送信開始。
+   *
+   * 3 つの条件を満たさないと始めない:
+   *
+   * - まだ送信していない（sent / sending を弾く = 二重送信の防波堤）
+   * - **テスト配信済み**。本番配信は取り消せないので、実際に届く形を一度は
+   *   目で見てからにする。本文を変えると印は消える（`withContent`）ので、
+   *   「テストしたあと書き換えて送る」も塞がる
+   * - 宛先が 1 名以上。「送ったつもりで誰にも届いていない」配信が sent として
+   *   履歴に残るのを防ぐ
    */
   withSendingStarted(
     recipientCount: number,
@@ -187,6 +202,12 @@ export class Newsletter {
     }
     if (this.status === 'sending') {
       return err({ kind: 'not-sendable', message: 'この配信は送信中です' });
+    }
+    if (this.testSentAt === null) {
+      return err({
+        kind: 'not-tested',
+        message: 'まだテスト配信していません。先に運営者へ送って受信確認してください',
+      });
     }
     if (recipientCount <= 0) {
       return err({ kind: 'not-sendable', message: '宛先が 0 名です' });
