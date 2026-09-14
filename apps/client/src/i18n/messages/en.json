@@ -751,7 +751,6 @@
       "question_unlink": "Unlink “{label}”",
       "settings_title": "Display settings",
       "settings_delete_entry": "Delete this entry",
-      "settings_delete_hint": "Cannot be undone. You will be asked to confirm.",
       "settings_letter_spacing": "Letter spacing",
       "settings_size_small": "Small",
       "settings_size_medium": "Medium",

@@ -44,18 +44,29 @@ export function SpShell({ topBar, bottomNav, children }: SpShellProps) {
       style={viewport ? { top: viewport.top, height: viewport.height } : undefined}
     >
       {topBar && <SpTopBar />}
-      <main
-        // 画面が入れ替わったら短く現れる（220ms・ease-out、reduce 設定では無効）。押してから
-        // 次の画面が「置かれた」ことを目で追えるようにする。鍵は path（同じ画面の再描画では動かない）。
-        key={pathname}
-        className="sp-rise relative min-h-0 flex-1 overflow-auto"
-        // 本文の端まで引いても殻の外（ブラウザの引っ張り更新）へ伝えない。
-        style={{ overscrollBehavior: 'contain' }}
-      >
-        {children}
-      </main>
-      {/* 本文の下に居座る非モーダルのシート（発酵の結果など）の席。本文と列の間で、高さは中身が持つ。 */}
-      <div ref={setDockSlot} className="relative z-20 flex shrink-0 flex-col" data-sp-dock-slot />
+      {/* 本文と、本文の上に重なる非モーダルのシート（発酵の結果・設定）の層。同じ箱なので、シートは
+          下端の操作の列を覆わない。シートが止まった段の高さは `--sp-dock-inset` で本文の余白になる。 */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <main
+          // 画面が入れ替わったら短く現れる（220ms・ease-out、reduce 設定では無効）。押してから
+          // 次の画面が「置かれた」ことを目で追えるようにする。鍵は path（同じ画面の再描画では動かない）。
+          key={pathname}
+          className="sp-rise relative min-h-0 flex-1 overflow-auto"
+          style={{
+            // 本文の端まで引いても殻の外（ブラウザの引っ張り更新）へ伝えない。
+            overscrollBehavior: 'contain',
+            paddingBottom: 'var(--sp-dock-inset, 0px)',
+            scrollPaddingBottom: 'var(--sp-dock-inset, 0px)',
+          }}
+        >
+          {children}
+        </main>
+        <div
+          ref={setDockSlot}
+          className="pointer-events-none absolute inset-0 z-20"
+          data-sp-dock-slot
+        />
+      </div>
       <div ref={setPaletteSlot} className="shrink-0" data-sp-palette-slot />
       {bottomNav && <SpBottomNav />}
       {/* 画面全体に重ねるもの（シート・確認）の席。空のときは指を通す。 */}

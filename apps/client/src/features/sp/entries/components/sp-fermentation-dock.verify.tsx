@@ -136,12 +136,14 @@ registerUnit<Props>({
   ],
   invariants: [
     {
-      id: 'snippets-limited-below-full',
-      description: '全画面でなければ抜粋は 3 件まで',
+      id: 'snippets-all-listed',
+      description: '抜粋は段に関わらず全部並ぶ（段で中身の高さを変えない）',
       check: ({ root, contract }) => {
         const items = root.querySelectorAll('li[data-snippet]').length;
-        if (contract.detent === 'full') return true;
-        return items <= 3 || `抜粋 ${items} 件（3 件まで）`;
+        return (
+          items === Number(contract.snippetCount) ||
+          `抜粋 ${items} 件（契約 ${contract.snippetCount}）`
+        );
       },
     },
     {

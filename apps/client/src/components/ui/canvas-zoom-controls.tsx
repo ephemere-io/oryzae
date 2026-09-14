@@ -53,12 +53,7 @@ export function CanvasZoomControls({
         onClick={onZoomOut}
         disabled={atMin}
         className={btnBase}
-        style={{
-          borderColor: 'var(--border-subtle)',
-          color: 'var(--date-color)',
-          // 地がコルク（ボード）でも読めるよう、白い面に乗せる。
-          background: 'var(--surface-raised)',
-        }}
+        style={{ borderColor: 'var(--border-subtle)', color: 'var(--date-color)' }}
       >
         −
       </button>
@@ -67,12 +62,7 @@ export function CanvasZoomControls({
         aria-label={t('reset_aria')}
         onClick={onReset}
         className="min-w-[46px] rounded-full border px-2 py-1 text-[10px] tabular-nums tracking-[0.1em] transition-colors"
-        style={{
-          borderColor: 'var(--border-subtle)',
-          color: 'var(--date-color)',
-          // 地がコルク（ボード）でも読めるよう、白い面に乗せる。
-          background: 'var(--surface-raised)',
-        }}
+        style={{ borderColor: 'var(--border-subtle)', color: 'var(--date-color)' }}
       >
         {percent}%
       </button>
@@ -82,12 +72,7 @@ export function CanvasZoomControls({
         onClick={onZoomIn}
         disabled={atMax}
         className={btnBase}
-        style={{
-          borderColor: 'var(--border-subtle)',
-          color: 'var(--date-color)',
-          // 地がコルク（ボード）でも読めるよう、白い面に乗せる。
-          background: 'var(--surface-raised)',
-        }}
+        style={{ borderColor: 'var(--border-subtle)', color: 'var(--date-color)' }}
       >
         ＋
       </button>
@@ -96,12 +81,7 @@ export function CanvasZoomControls({
         aria-label={t('fit_aria')}
         onClick={onFit}
         className="rounded-full border px-2.5 py-1 text-[9px] uppercase tracking-[0.15em] transition-colors"
-        style={{
-          borderColor: 'var(--border-subtle)',
-          color: 'var(--date-color)',
-          // 地がコルク（ボード）でも読めるよう、白い面に乗せる。
-          background: 'var(--surface-raised)',
-        }}
+        style={{ borderColor: 'var(--border-subtle)', color: 'var(--date-color)' }}
       >
         {t('fit')}
       </button>

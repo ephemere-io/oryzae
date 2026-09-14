@@ -40,7 +40,7 @@ describe('SpEntryEditor', () => {
   it('タイトルと本文のプレースホルダを表示する', () => {
     renderEditor(createMockApi(apiFetch));
     expect(screen.getByPlaceholderText('タイトル')).toBeTruthy();
-    expect(screen.getByPlaceholderText('いま感じていることを、そのまま。')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'いま感じていることを、そのまま。' })).toBeTruthy();
   });
 
   it('保存前は発酵 CTA（納める）を出さない（entryId 未確定）', () => {
@@ -152,7 +152,9 @@ describe('SpEntryEditor', () => {
       </NextIntlClientProvider>,
     );
     expect(screen.getByDisplayValue('既存タイトル')).toBeTruthy();
-    expect(screen.getByDisplayValue('既存の本文')).toBeTruthy();
+    expect(
+      screen.getByRole('textbox', { name: jaMessages.sp.editor.body_placeholder }).textContent,
+    ).toBe('既存の本文');
   });
 
   it('問いシートに active questions を表示し、選ぶとチップに反映する', async () => {

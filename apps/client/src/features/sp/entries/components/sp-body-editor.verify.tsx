@@ -1,45 +1,34 @@
 /**
  * SpBodyEditor の検証スペック。
  *
- * 見るのは: 文の数 = 写真の数 + 1、写真は全幅のブロック、× か直後の文の先頭の BackSpace で抜けて
- * 前後の文が繋がる。
+ * 見るのは: 写真は本文の中の `<img>`（数は本文のプレースホルダの数と同じ）、回り込みは float、
+ * 押した写真に縁取り、空の本文に案内。指で掴んで動かすのは実機（caretRangeFromPoint が要る）。
  */
 
 import { INLINE_IMAGE_PLACEHOLDER } from '@oryzae/shared';
 import { registerUnit } from '@oryzae/verify';
 import { useState } from 'react';
 import type { InlinePhoto } from '@/features/shared/entries/types';
-import {
-  joinBodySegments,
-  removePhotoAt,
-  splitBodyAtPhotos,
-} from '@/features/shared/entries/utils/inline-photos';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpBodyEditor } from './sp-body-editor';
 
 interface Props {
-  value: string;
+  body: string;
   images: InlinePhoto[];
 }
 
 const P = INLINE_IMAGE_PLACEHOLDER;
 const PIXEL =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><rect width="320" height="200" fill="%23d9b48f"/></svg>';
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="%23d9b48f"/></svg>';
 
-function Harness({ value: initial, images: initialImages }: Props) {
-  const [value, setValue] = useState(initial);
-  const [images, setImages] = useState(initialImages);
+function Harness({ body, images }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   return (
     <div style={{ width: 390 }}>
       <SpBodyEditor
-        value={value}
-        images={images}
-        onChange={setValue}
-        onRemoveImage={(index) => {
-          setImages((prev) => prev.filter((_, i) => i !== index));
-          setValue((prev) => joinBodySegments(removePhotoAt(splitBodyAtPhotos(prev), index)));
-        }}
+        initialBody={body}
+        initialImages={images}
+        onChange={() => {}}
         selectedImage={selected}
         onSelectImage={setSelected}
         placeholder="いま感じていることを、そのまま。"
@@ -50,23 +39,31 @@ function Harness({ value: initial, images: initialImages }: Props) {
   );
 }
 
+const LONG =
+  '昼はよく歩いた。川沿いの道は風が強くて、帽子を押さえながら橋を二つ渡った。帰りにパン屋に寄ると、いつもの丸いパンが売り切れていた。';
+
 registerUnit<Props>({
   id: 'SpBodyEditor',
   title: 'SpBodyEditor',
-  description: 'SP の本文（文のブロックと写真のブロックの列）',
+  description: 'SP の本文（contentEditable。写真は本文の中、回り込み・掴んで移動）',
   kind: 'component',
   render: (props) => withVerifyProviders(<Harness {...props} />),
   fixtures: [
     {
+      id: 'empty',
+      description: '空の本文は案内を出す',
+      props: { body: '', images: [] },
+    },
+    {
       id: 'text-only',
-      description: '写真なし（textarea 1 つ）',
-      props: { value: '今日は雨。', images: [] },
+      description: '写真なし',
+      props: { body: '今日は雨。', images: [] },
     },
     {
       id: 'with-photos',
-      description: '写真 2 枚が文の間に',
+      description: '全幅の写真と、右に寄せて回り込ませた小さい写真',
       props: {
-        value: `朝の光。\n${P}昼はよく歩いた。\n${P}`,
+        body: `朝の光。\n${P}${P}${LONG}${LONG}`,
         images: [
           {
             storagePath: 'p/1.jpg',
@@ -79,7 +76,7 @@ registerUnit<Props>({
             storagePath: 'p/2.jpg',
             signedUrl: PIXEL,
             widthRatio: 0.4,
-            layout: 'block',
+            layout: 'wrap',
             align: 'end',
           },
         ],
@@ -89,57 +86,86 @@ registerUnit<Props>({
       id: 'photo-unavailable',
       description: '署名できなかった写真は枠だけ残す',
       props: {
-        value: `前${P}後`,
+        body: `前${P}後`,
         images: [
           { storagePath: 'p/x.jpg', signedUrl: '', widthRatio: 1, layout: 'block', align: 'start' },
         ],
       },
     },
     {
-      id: 'remove-by-button',
+      id: 'select-photo',
       probe: true,
-      description: 'Probe: × で写真を抜くと前後の文が 1 つに繋がる',
+      description: 'Probe: 写真を押すと選ばれ、縁取りが付く',
       props: {
-        value: `前${P}後`,
+        body: `前${P}後`,
         images: [
           {
             storagePath: 'p/1.jpg',
             signedUrl: PIXEL,
-            widthRatio: 1,
-            layout: 'block',
+            widthRatio: 0.7,
+            layout: 'wrap',
             align: 'start',
           },
         ],
       },
       act: async (ctx) => {
-        await ctx.click('figure button[aria-label^="1 枚目の写真を削除"]');
+        await ctx.click('img.inline-photo');
         await ctx.wait(16);
       },
     },
   ],
   invariants: [
     {
-      id: 'segments-are-images-plus-one',
-      description: '文（textarea）の数は写真の数 + 1',
+      id: 'photos-in-body',
+      description: '写真は本文の中の <img>（数は本文のプレースホルダの数と同じ）',
+      check: ({ root, props }) => {
+        const body = root.querySelector('[data-sp-body]');
+        const photos = body?.querySelectorAll('img.inline-photo').length ?? -1;
+        const expected = [...props.body].filter((ch) => ch === P).length;
+        return photos === expected || `本文の中の写真 ${photos} 枚（期待 ${expected}）`;
+      },
+    },
+    {
+      id: 'wrap-is-float',
+      description: '回り込みの写真は float（文字が横を流れる）、それ以外は float しない',
+      check: ({ root }) => {
+        for (const img of root.querySelectorAll<HTMLImageElement>('img.inline-photo')) {
+          const floats = img.style.float !== '' && img.style.float !== 'none';
+          if ((img.dataset.layout === 'wrap') !== floats) {
+            return `layout=${img.dataset.layout} なのに float=${JSON.stringify(img.style.float)}`;
+          }
+        }
+        return true;
+      },
+    },
+    {
+      id: 'selected-outlined',
+      description: '選んだ写真だけに縁取りの印',
       check: ({ root, contract }) => {
-        const areas = root.querySelectorAll('textarea').length;
-        const figures = root.querySelectorAll('figure').length;
+        const marked = [...root.querySelectorAll('img.inline-photo')].map((img) =>
+          img.hasAttribute('data-selected'),
+        );
+        const expected = contract.selectedImage === 'none' ? -1 : Number(contract.selectedImage);
         return (
-          (areas === figures + 1 && String(figures) === contract.imageCount) ||
-          `textarea ${areas} / 写真 ${figures}（契約 ${contract.imageCount}）`
+          marked.every((on, index) => on === (index === expected)) ||
+          `印 ${JSON.stringify(marked)} / 契約 ${contract.selectedImage}`
         );
       },
     },
     {
-      id: 'removed-merges',
-      description: '× のあとは写真が無く、文が 1 つ',
-      onlyFixtures: ['remove-by-button'],
-      check: ({ root }) => {
-        const areas = root.querySelectorAll<HTMLTextAreaElement>('textarea');
-        return (
-          (areas.length === 1 && areas[0]?.value === '前\n後') ||
-          `textarea ${areas.length} 件、値 ${JSON.stringify(areas[0]?.value)}`
-        );
+      id: 'probe-selects',
+      description: '押した写真が選ばれている',
+      onlyFixtures: ['select-photo'],
+      check: ({ contract }) =>
+        contract.selectedImage === '0' || `selectedImage=${contract.selectedImage}`,
+    },
+    {
+      id: 'placeholder-when-empty',
+      description: '空の本文だけに案内の印',
+      check: ({ root, props }) => {
+        const empty = root.querySelector<HTMLElement>('[data-sp-body]')?.dataset.empty;
+        const expected = String(props.body === '' && props.images.length === 0);
+        return empty === expected || `data-empty=${empty}（期待 ${expected}）`;
       },
     },
   ],

@@ -31,8 +31,6 @@
   /* **書く紙ではない面**（左のサイドバー・右の発酵結果）。紙より一段沈める。
    * 透けた白に頼っていた頃は、紙とほぼ同じ明るさで境界が読めなかった。 */
   --surface-sunken: #f2f0ea;
-  /* ボードの地（淡いコルク。粒は CanvasGrid が重ねる）。 */
-  --board-ground: #f1eadf;
   --surface-sunken-border: rgba(0, 0, 0, 0.08);
   /* **いま選ばれている行き先**（サイドバーの項目・発酵の面の切り替え）。
    * 行ごとに rgba を直書きしていたので、dark で白い内側光がそのまま浮いていた。
@@ -81,7 +79,6 @@
   --border-subtle: rgba(255, 255, 255, 0.06);
   --hover-wash: rgba(255, 255, 255, 0.07);
   --surface-sunken: #131313;
-  --board-ground: #211d18;
   --surface-sunken-border: rgba(255, 255, 255, 0.1);
   --date-color: #666;
   --card-snippet: #3a3520;
@@ -118,6 +115,84 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
+}
+
+/* シート（components/ui/sheet.tsx）。動きはネイティブのスクロールと CSS scroll-snap で、ここは見た目の補い。 */
+.oz-sheet-scroller {
+  scrollbar-width: none;
+}
+.oz-sheet-scroller::-webkit-scrollbar {
+  display: none;
+}
+/* iOS Safari は `pointer-events: none` の親（スクロール容器）へ縦のスクロールを伝えない。シートの面を
+   横のスクロール容器にして、1px だけ横にはみ出させると、縦の払いが親へ伝わる
+   （https://viliket.github.io/posts/native-like-bottom-sheets-on-the-web/ の回避策）。 */
+.oz-sheet-pass {
+  overflow-x: scroll;
+  overscroll-behavior-x: none;
+  scrollbar-width: none;
+}
+.oz-sheet-pass::-webkit-scrollbar {
+  display: none;
+}
+.oz-sheet-pass::after {
+  content: "";
+  display: block;
+  width: calc(100% + 1px);
+  height: 1px;
+}
+
+/* SP の本文（contentEditable）。写真は本文の中の <img class="inline-photo">（PC と同じ codec）。 */
+.oz-sp-body {
+  position: relative;
+  /* 回り込み（float）の写真を本文の箱の中に収める。 */
+  display: flow-root;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 空のときの案内。カーソルの位置を押し出さないよう、流れの外に置く。 */
+.oz-sp-body[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  inset-inline: 0;
+  padding-inline: inherit;
+  opacity: 0.3;
+  pointer-events: none;
+}
+.oz-sp-body img.inline-photo {
+  box-sizing: border-box;
+  max-block-size: 70vh;
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* 署名できなかった写真は枠だけ残す（位置と数を保つ）。 */
+.oz-sp-body img.inline-photo[src=""] {
+  min-block-size: 6rem;
+  border-style: dashed;
+  border-color: var(--surface-sunken-border);
+  background: var(--surface-sunken);
+}
+/* 選んだ写真は掴める（指で本文をスクロールさせない）。 */
+.oz-sp-body img.inline-photo[data-selected] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  touch-action: none;
+  cursor: grab;
+}
+/* 掴んでいる間は指の下を本文に通す（落とす先の文字の位置を測るため）。 */
+.oz-sp-body img.inline-photo[data-dragging] {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.8;
+  cursor: grabbing;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--fg) 22%, transparent);
 }
 
 /* 指の端末の「押した印」。

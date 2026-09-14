@@ -228,8 +228,6 @@ function SpPills(props: StudyLabelsProps) {
             ) : (
               <span style={{ fontSize: 11, color: '#5C4F3F' }}>{stateWord(props, kind, t)}</span>
             )}
-            {/* 末尾の `›` とピル形状の 2 つで押せることを示す。 */}
-            <span style={{ fontSize: 12, color: '#A8A381' }}>›</span>
           </button>
         );
       })}

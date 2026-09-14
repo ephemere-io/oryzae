@@ -2,7 +2,9 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { DockSheet } from '@/components/ui/dock-sheet';
+import { useEffect, useState } from 'react';
+import { type DockDetent, DockSheet } from '@/components/ui/dock-sheet';
+import { TrashIcon } from '@/components/ui/palette-icons';
 import { Segmented } from '@/components/ui/segmented';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import type {
@@ -38,8 +40,6 @@ function toSpacing(value: string): EditorSpacing {
   return value === 'tight' || value === 'wide' ? value : 'normal';
 }
 
-const noop = () => {};
-
 /**
  * エディタの設定（SP）。上段の右端の歯車から開く。
  *
@@ -60,14 +60,18 @@ export function SpEditorSettingsSheet({
 }: SpEditorSettingsSheetProps) {
   const t = useTranslations('sp.editor');
   const tPc = useTranslations('editor.settings');
+  const [detent, setDetent] = useState<DockDetent>('content');
+  useEffect(() => {
+    if (open) setDetent('content');
+  }, [open]);
 
   return (
     <DockSheet
       open={open}
-      detent="half"
-      detents={['half']}
-      heights={{ half: 'content' }}
-      onDetentChange={noop}
+      detent={detent}
+      // 中身の高さで開き、上へ持ち上げれば全画面（実機レビュー: 持ち上げても全体にならない）。
+      detents={['content', 'full']}
+      onDetentChange={setDetent}
       dismissible
       onClose={onClose}
       ariaLabel={t('settings_title')}
@@ -145,15 +149,9 @@ export function SpEditorSettingsSheet({
         </Row>
         {onDelete ? (
           // 破壊的な操作は設定から離して末尾に（iOS の設定画面の作法）。押すと確認シートへ。
-          <button
-            type="button"
-            onClick={onDelete}
-            data-settings-delete
-            className="mt-1 min-h-[44px] w-full border-t pt-3 text-left text-[15px]"
-            style={{ color: 'var(--ob-jar-warm)', borderColor: 'var(--border-subtle)' }}
-          >
-            {t('settings_delete_entry')}
-          </button>
+          <div className="mt-2 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+            <DangerButton onClick={onDelete} label={t('settings_delete_entry')} />
+          </div>
         ) : null}
       </div>
     </DockSheet>
@@ -177,5 +175,29 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       </span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
+  );
+}
+
+/**
+ * 取り返しのつかない操作のボタン（エントリーの削除）。赤い 1 行の文字だけでは押せるものに見えなかった
+ * （実機レビュー）。淡い赤の面・枠・ゴミ箱のアイコン・全幅で「押せる、けれど重い」と伝える。PC の設定の
+ * 引き出しも同じ見た目（`pc/entries/components/settings-drawer.tsx`）。
+ */
+function DangerButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-settings-delete
+      className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border text-[15px] font-medium"
+      style={{
+        color: 'var(--ob-jar-warm)',
+        borderColor: 'color-mix(in srgb, var(--ob-jar-warm) 35%, transparent)',
+        background: 'color-mix(in srgb, var(--ob-jar-warm) 8%, transparent)',
+      }}
+    >
+      <TrashIcon />
+      {label}
+    </button>
   );
 }

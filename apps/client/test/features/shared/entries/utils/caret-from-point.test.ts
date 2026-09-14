@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { caretRangeFromPoint } from '@/features/pc/entries/utils/caret-from-point';
+import { caretRangeFromPoint } from '@/features/shared/entries/utils/caret-from-point';
 
 /**
  * 「落とした場所に入れる」ための座標→キャレット変換。**API 名がブラウザで割れている**ので、

@@ -5,7 +5,7 @@ import {
   applyInlineImagesToEditor,
   extractInlineImages,
   serializeEditorText,
-} from '@/features/pc/entries/utils/inline-image-codec';
+} from '@/features/shared/entries/utils/inline-image-codec';
 
 function img(attrs: Record<string, string> = {}): string {
   const data = Object.entries(attrs)

@@ -18,7 +18,7 @@ async function createSpEntry(
 ): Promise<void> {
   await page.goto('/entries/new');
   await page.locator('input').first().fill(title);
-  await page.locator('textarea').fill(body);
+  await page.locator('[data-sp-body]').fill(body);
   await expect(page.getByText('保存しました')).toBeVisible({ timeout: 15_000 });
 }
 
@@ -55,7 +55,7 @@ test.describe('SP 体験 (#363)', () => {
 
     await page.goto('/entries');
     // 保護シェルが出ている（書斎ホームではボトムナビの代わりに「書斎に戻る」が掛かる）。
-    // SP として描画されていることは、下で開く SP エディタの textarea が確かめる。
+    // SP として描画されていることは、下で開く SP エディタの本文（data-sp-body）が確かめる。
     await expect(page.getByRole('link', { name: '書斎に戻る' })).toBeVisible();
 
     const target = page.locator('main li button', { hasText: marker }).first();
@@ -64,19 +64,21 @@ test.describe('SP 体験 (#363)', () => {
 
     await page.waitForURL(/\/entries\/.+/);
 
-    // SP エディタの本文 textarea に既存 content が pre-fill される
-    const body = page.locator('textarea');
+    // SP エディタの本文（contentEditable）に既存 content が pre-fill される
+    const body = page.locator('[data-sp-body]');
     await expect(body).toBeVisible();
-    await expect(body).not.toHaveValue('');
+    await expect(body).not.toBeEmpty();
 
     // 編集（10文字以上の差分で autosave がトリガ）→「保存しました」になる
-    const current = await body.inputValue();
+    const current = await body.innerText();
     await body.fill(`${current} 【e2e-autosave-check】`);
     await expect(page.getByText('保存しました')).toBeVisible({ timeout: 10_000 });
 
     // 再読込しても編集が永続している（backend に保存された）
     await page.reload();
-    await expect(page.locator('textarea')).toHaveValue(/e2e-autosave-check/, { timeout: 10_000 });
+    await expect(page.locator('[data-sp-body]')).toContainText('e2e-autosave-check', {
+      timeout: 10_000,
+    });
 
     await deleteOpenSpEntry(page);
   });
@@ -93,7 +95,7 @@ test.describe('SP 体験 (#363)', () => {
     const nlMarker = `sp-nl-roundtrip-${Date.now()}`;
     await page.locator('input').first().fill(nlMarker);
 
-    const body = page.locator('textarea');
+    const body = page.locator('[data-sp-body]');
     await body.click();
     await page.keyboard.type('1行目');
     await page.keyboard.press('Enter');
@@ -109,8 +111,8 @@ test.describe('SP 体験 (#363)', () => {
     await page.waitForURL(/\/entries\/.+/);
 
     await expect(page.locator('input').first()).toHaveValue(nlMarker);
-    const reopened = page.locator('textarea');
-    const text = await reopened.inputValue();
+    const reopened = page.locator('[data-sp-body]');
+    const text = await reopened.innerText();
     expect(text).toContain('1行目');
     expect(text).toContain('2行目');
     expect(text).toContain('3行目');
