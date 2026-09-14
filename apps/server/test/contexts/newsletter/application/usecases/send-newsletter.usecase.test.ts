@@ -48,6 +48,7 @@ function mockAudience(recipients: NewsletterRecipient[]): NewsletterAudienceGate
   return {
     countRecipients: vi.fn().mockResolvedValue(recipients.length),
     listRecipients: vi.fn().mockResolvedValue(recipients),
+    listTestRecipients: vi.fn().mockResolvedValue([]),
   };
 }
 

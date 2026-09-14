@@ -1,11 +1,27 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NewsletterSendDialog } from '@/features/newsletters/components/newsletter-send-dialog';
-import type { NewsletterPreview } from '@/features/newsletters/types';
+import type { Newsletter, NewsletterPreview, TestSendResult } from '@/features/newsletters/types';
 
 // vitest の globals を切ってあるので自動 cleanup が走らない。
 // 明示しないと Dialog の portal が document.body に残り、次のテストで二重に見つかる。
 afterEach(cleanup);
+
+const newsletterFixture: Newsletter = {
+  id: 'nl-1',
+  subject: '今月の更新',
+  bodyMarkdown: '本文',
+  status: 'draft',
+  createdBy: 'admin-1',
+  recipientCount: 0,
+  sentCount: 0,
+  failedCount: 0,
+  lastError: null,
+  testSentAt: null,
+  sentAt: null,
+  createdAt: '2026-09-14T00:00:00.000Z',
+  updatedAt: '2026-09-14T00:00:00.000Z',
+};
 
 const preview: NewsletterPreview = {
   id: 'nl-1',
@@ -14,27 +30,35 @@ const preview: NewsletterPreview = {
   text: '今月の更新\n\n本文です。',
   recipientCount: 137,
   sendable: true,
+  testSentAt: null,
 };
 
 function renderDialog(overrides?: {
   preview?: NewsletterPreview | null;
   onSend?: () => void;
+  onSendTest?: () => void;
   sending?: boolean;
+  testSending?: boolean;
+  testResult?: TestSendResult | null;
 }) {
   const onSend = overrides?.onSend ?? vi.fn();
+  const onSendTest = overrides?.onSendTest ?? vi.fn();
   render(
     <NewsletterSendDialog
       open
       onOpenChange={vi.fn()}
       preview={overrides?.preview === undefined ? preview : overrides.preview}
       result={null}
+      testResult={overrides?.testResult ?? null}
       loadingPreview={false}
       sending={overrides?.sending ?? false}
+      testSending={overrides?.testSending ?? false}
       error={null}
       onSend={onSend}
+      onSendTest={onSendTest}
     />,
   );
-  return { onSend };
+  return { onSend, onSendTest };
 }
 
 describe('NewsletterSendDialog', () => {
@@ -95,6 +119,47 @@ describe('NewsletterSendDialog', () => {
 
   it('送信中は二度押しできない', () => {
     renderDialog({ sending: true });
+    expect(screen.getByRole('button', { name: /送信中/ }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('未テストなら警告を出す（本番の前に自分たちへ送らせる）', () => {
+    renderDialog();
+    expect(screen.getByText(/まだテスト配信していません/)).toBeDefined();
+  });
+
+  it('テスト済みならその時刻を出す', () => {
+    renderDialog({ preview: { ...preview, testSentAt: '2026-09-14T07:30:00.000Z' } });
+    expect(screen.getByText(/テスト配信済み/)).toBeDefined();
+    expect(screen.queryByText(/まだテスト配信していません/)).toBeNull();
+  });
+
+  it('テスト配信ボタンは 1 クリックで撃てる（宛先が運営者に固定されているため）', () => {
+    const { onSendTest, onSend } = renderDialog();
+
+    fireEvent.click(screen.getByRole('button', { name: /テスト配信/ }));
+
+    expect(onSendTest).toHaveBeenCalledTimes(1);
+    // 本番送信は巻き込まない。
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('テスト配信の結果に実際の宛先を出す（届かないときの切り分け材料）', () => {
+    renderDialog({
+      testResult: {
+        newsletter: { ...newsletterFixture, testSentAt: '2026-09-14T07:30:00.000Z' },
+        sent: true,
+        delivered: 2,
+        failed: 0,
+        recipients: ['admin1@example.com', 'admin2@example.com'],
+      },
+    });
+
+    expect(screen.getByText(/admin1@example.com, admin2@example.com/)).toBeDefined();
+  });
+
+  it('テスト配信中は本番送信を押せない（取り違え防止）', () => {
+    renderDialog({ testSending: true });
+    expect(screen.getByRole('button', { name: /送信する/ }).hasAttribute('disabled')).toBe(false);
     expect(screen.getByRole('button', { name: /送信中/ }).hasAttribute('disabled')).toBe(true);
   });
 });

@@ -73,6 +73,40 @@ export class SupabaseNewsletterAudience implements NewsletterAudienceGateway {
     return recipients;
   }
 
+  /**
+   * テスト配信の宛先 = **運営者**（`user_metadata.is_admin === true`）。
+   *
+   * メールアドレスを直接持たないのは意図的。名簿をコードに焼くと、担当が
+   * 増えた / アドレスを変えたときに黙って届かなくなる（そして気づくのは
+   * 本番配信の後）。`is_admin` は adminAuthMiddleware が管理画面の認可に
+   * 使っている値と同じなので、**管理画面に入れる人＝テストを受け取る人** が
+   * 定義として一致する。
+   *
+   * 配信停止は見ない。テスト配信は運営が自分の意思で撃つもので、購読の話ではない。
+   */
+  async listTestRecipients(): Promise<NewsletterRecipient[]> {
+    const recipients: NewsletterRecipient[] = [];
+
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const { data, error } = await this.supabase.auth.admin.listUsers({
+        page,
+        perPage: PER_PAGE,
+      });
+      if (error) throw error;
+
+      const users = data?.users ?? [];
+      for (const user of users) {
+        if (!user.email) continue;
+        if (user.user_metadata?.is_admin !== true) continue;
+        recipients.push({ userId: user.id, email: user.email });
+      }
+
+      if (users.length < PER_PAGE) break;
+    }
+
+    return recipients;
+  }
+
   private async fetchOptedOutUserIds(): Promise<Set<string>> {
     const { data, error } = await this.supabase
       .from('profiles')

@@ -30,10 +30,41 @@
    ↓ 保存（status = draft）
 [admin] 「送信する…」→ GET /:id/preview
    ↓ 実際に届く HTML + その時点の宛先数
+[admin] 「テスト配信」→ 運営者だけに送って受信確認（任意・何度でも）
 [admin] 「送信する」→「本当に N 名へ送る」（2 段階）
    ↓ POST /:id/send { confirm: true }
 [server] 宛先を数える → status = sending で保存 → Resend batch → status = sent
 ```
+
+### 本番の前にテスト配信する
+
+```
+[admin] 「テスト配信」→ POST /:id/send-test
+   ↓ 運営者（is_admin）だけへ、件名に [テスト配信] を付けて送る
+[admin] 受信箱で表示・リンク・到達を確認
+   ↓ 問題なければ
+[admin] 「送信する」→「本当に N 名へ送る」
+```
+
+テスト配信は **status を動かさない**。`sending` にも `sent` にもしないので
+何度でもやり直せるし、そのあと普通に本番配信できる。記録するのは `test_sent_at`
+だけで、確認画面に「テスト配信済み / まだテストしていません」として出る。
+
+**宛先はメールアドレスではなく `user_metadata.is_admin` で引く。** 名簿をコードに
+焼くと、担当が増えた / アドレスを変えたときに黙って届かなくなる（そして気づくのは
+本番配信の後）。`is_admin` は `adminAuthMiddleware` が管理画面の認可に使う値と
+同じなので、**管理画面に入れる人＝テストを受け取る人** が定義として一致する。
+
+本文は本番と完全に同一で、**配信停止リンクも本物**（署名済みトークン）を載せる
+—— そこを差し替えるとリンクが本当に効くかを確かめられない。押すと運営者自身が
+配信停止になるが、そのページの「やっぱり受け取る」で戻せる。
+
+件名にだけ `[テスト配信]` を付けるのは、受信箱で本番と見分けるため。区別が
+付かないと「届いた」のがテストなのか本番なのか分からず、本番を二度撃つ。
+
+`listTestRecipients()` を `listRecipients()` と**別メソッド**にしてあるのは、
+同じメソッドに引数で分岐を足すと引数 1 つの間違いで全員に飛ぶため。型で分けて
+おけば取り違えようがない。
 
 ### 二重送信をどう塞いでいるか
 
@@ -212,6 +243,7 @@ domain/
 application/usecases/
   create / update / delete / get / list
   preview-newsletter.usecase.ts            HTML + テキスト + 宛先数
+  send-newsletter-test.usecase.ts          運営者だけへのテスト配信（status を動かさない）
   send-newsletter.usecase.ts               状態遷移つきの送信
   generate-newsletter-draft.usecase.ts     PR → LLM → 下書き
 infrastructure/
@@ -250,12 +282,16 @@ script が混ざっても動かない。
 読み間違えられる。現在値が読めていない間はトグル自体を出さない（仮の既定値を
 触らせると、本人の意図と違う値がそのまま保存される）。
 
-### DB（`supabase/migrations/00024_create_newsletters.sql`）
+### DB（`supabase/migrations/00024`, `00025`）
 
 `newsletters` は運営者が書く文章でユーザー単位の行という概念が無いため、RLS は
 **service_role だけ**に閉じる（admin API は `adminAuthMiddleware` が `is_admin` を
 検証したうえで service role クライアントを渡す）。`profiles.newsletter_opt_out`
 を同じ migration で追加している。
+
+`00025` は `newsletters.test_sent_at` を足すだけ。`sent_at` と別の欄にしてあるのは、
+テストは何度でもやり直せる一方で本番配信は 1 回きりだから —— 同じ欄を使うと
+「テストしただけなのに配信済みに見える」状態が作れてしまう。
 
 ---
 

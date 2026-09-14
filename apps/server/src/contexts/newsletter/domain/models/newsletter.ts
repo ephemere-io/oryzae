@@ -30,6 +30,11 @@ export interface NewsletterProps {
   failedCount: number;
   /** 送信が落ちたときの理由。次の送信開始でクリアする。 */
   lastError: string | null;
+  /**
+   * 最後に運営者へテスト配信した時刻。本番配信とは独立で、何度でも更新される。
+   * null = まだ一度もテストしていない。
+   */
+  testSentAt: string | null;
   sentAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -81,6 +86,7 @@ export class Newsletter {
   readonly sentCount: number;
   readonly failedCount: number;
   readonly lastError: string | null;
+  readonly testSentAt: string | null;
   readonly sentAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -95,6 +101,7 @@ export class Newsletter {
     this.sentCount = props.sentCount;
     this.failedCount = props.failedCount;
     this.lastError = props.lastError;
+    this.testSentAt = props.testSentAt;
     this.sentAt = props.sentAt;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
@@ -127,6 +134,7 @@ export class Newsletter {
         sentCount: 0,
         failedCount: 0,
         lastError: null,
+        testSentAt: null,
         sentAt: null,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -228,6 +236,22 @@ export class Newsletter {
     });
   }
 
+  /**
+   * 運営者へのテスト配信を記録する。
+   *
+   * **status は動かさない。** テスト配信は配信ではないので、これを sent にすると
+   * 本番配信ができなくなる。逆に、テストしたことを残さないと「送ったつもりで
+   * 本番を撃つ」経路ができる。
+   */
+  withTestSent(now: () => Date = () => new Date()): Newsletter {
+    const timestamp = now().toISOString();
+    return new Newsletter({
+      ...this.toProps(),
+      testSentAt: timestamp,
+      updatedAt: timestamp,
+    });
+  }
+
   toProps(): NewsletterProps {
     return {
       id: this.id,
@@ -239,6 +263,7 @@ export class Newsletter {
       sentCount: this.sentCount,
       failedCount: this.failedCount,
       lastError: this.lastError,
+      testSentAt: this.testSentAt,
       sentAt: this.sentAt,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,

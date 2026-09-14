@@ -32,6 +32,7 @@ const draft = {
   sentCount: 0,
   failedCount: 0,
   lastError: null,
+  testSentAt: null,
   sentAt: null,
   createdAt: '2026-09-11T00:00:00.000Z',
   updatedAt: '2026-09-11T00:00:00.000Z',

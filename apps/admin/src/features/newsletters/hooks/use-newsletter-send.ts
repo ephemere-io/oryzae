@@ -10,10 +10,13 @@ import {
   newsletterPreviewSchema,
   type SendResult,
   sendResultSchema,
+  type TestSendResult,
+  testSendResultSchema,
 } from '../types';
 
 const previewResponseSchema = z.object({ data: newsletterPreviewSchema });
 const sendResponseSchema = z.object({ data: sendResultSchema });
+const testSendResponseSchema = z.object({ data: testSendResultSchema });
 
 /**
  * 送信の直前に見るもの（HTML プレビュー・宛先数）と、送信そのもの。
@@ -24,8 +27,10 @@ const sendResponseSchema = z.object({ data: sendResultSchema });
 export function useNewsletterSend() {
   const [preview, setPreview] = useState<NewsletterPreview | null>(null);
   const [result, setResult] = useState<SendResult | null>(null);
+  const [testResult, setTestResult] = useState<TestSendResult | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [sending, setSending] = useState(false);
+  const [testSending, setTestSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadPreview = useCallback(async (id: string): Promise<boolean> => {
@@ -56,6 +61,44 @@ export function useNewsletterSend() {
     setPreview(body.data);
     setLoadingPreview(false);
     return true;
+  }, []);
+
+  /**
+   * 運営者だけへのテスト配信。
+   *
+   * 本番送信 (`send`) と **state を分けてある** —— 同じ sending / result を
+   * 共有すると、テストの結果を見ながら本番のボタンを押す流れで取り違える。
+   */
+  const sendTest = useCallback(async (id: string): Promise<TestSendResult | null> => {
+    const token = getAccessToken();
+    if (!token) return null;
+
+    setTestSending(true);
+    setError(null);
+    setTestResult(null);
+
+    const api = createApiClient(token);
+    const res = await api.fetch(`/api/v1/admin/newsletters/${id}/send-test`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      setError(await readErrorMessage(res, 'テスト配信に失敗しました'));
+      setTestSending(false);
+      return null;
+    }
+
+    const body = await parseJson(res, testSendResponseSchema);
+    if (!body) {
+      setError('テスト配信の結果を読み取れませんでした。受信箱を確認してください。');
+      setTestSending(false);
+      return null;
+    }
+
+    setTestResult(body.data);
+    setTestSending(false);
+    return body.data;
   }, []);
 
   const send = useCallback(async (id: string): Promise<SendResult | null> => {
@@ -95,8 +138,21 @@ export function useNewsletterSend() {
   const reset = useCallback(() => {
     setPreview(null);
     setResult(null);
+    setTestResult(null);
     setError(null);
   }, []);
 
-  return { preview, result, loadPreview, send, loadingPreview, sending, error, reset };
+  return {
+    preview,
+    result,
+    testResult,
+    loadPreview,
+    send,
+    sendTest,
+    loadingPreview,
+    sending,
+    testSending,
+    error,
+    reset,
+  };
 }

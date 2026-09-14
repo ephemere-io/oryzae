@@ -13,6 +13,7 @@ export const newsletterSchema = z.object({
   sentCount: z.number(),
   failedCount: z.number(),
   lastError: z.string().nullable(),
+  testSentAt: z.string().nullable(),
   sentAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -28,9 +29,22 @@ export const newsletterPreviewSchema = z.object({
   text: z.string(),
   recipientCount: z.number(),
   sendable: z.boolean(),
+  testSentAt: z.string().nullable(),
 });
 
 export type NewsletterPreview = z.infer<typeof newsletterPreviewSchema>;
+
+/** server の SendNewsletterTestResult に対応。テスト配信だけは宛先を返す。 */
+export const testSendResultSchema = z.object({
+  newsletter: newsletterSchema,
+  sent: z.boolean(),
+  reason: z.string().optional(),
+  delivered: z.number(),
+  failed: z.number(),
+  recipients: z.array(z.string()),
+});
+
+export type TestSendResult = z.infer<typeof testSendResultSchema>;
 
 export const sendResultSchema = z.object({
   newsletter: newsletterSchema,

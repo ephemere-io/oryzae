@@ -71,6 +71,15 @@ export default function NewslettersPage() {
     await send.loadPreview(selected.id);
   }
 
+  async function handleSendTest() {
+    if (!selected) return;
+    const result = await send.sendTest(selected.id);
+    if (!result) return;
+    // テスト配信済みの印 (testSentAt) が付くので、選択中も一覧も入れ替える。
+    setSelected(result.newsletter);
+    await refresh();
+  }
+
   async function handleSend() {
     if (!selected) return;
     const result = await send.send(selected.id);
@@ -181,10 +190,13 @@ export default function NewslettersPage() {
         onOpenChange={handleSendDialogChange}
         preview={send.preview}
         result={send.result}
+        testResult={send.testResult}
         loadingPreview={send.loadingPreview}
         sending={send.sending}
+        testSending={send.testSending}
         error={send.error}
         onSend={handleSend}
+        onSendTest={handleSendTest}
       />
     </div>
   );
