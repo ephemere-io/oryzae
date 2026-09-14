@@ -6,6 +6,7 @@ import {
   type FermentationCostRow,
   fetchFermentationCostRows,
   resolveUserEmails,
+  resolveUserNicknames,
 } from '@/contexts/shared/infrastructure/fermentation-cost-query.js';
 
 // claude-pricing: input $3 / output $15 per 1M tokens
@@ -209,5 +210,51 @@ describe('resolveUserEmails', () => {
     expect(listUsers).toHaveBeenCalledTimes(2);
     expect(map.size).toBe(1001);
     expect(map.get('u1000')).toBe('u1000@test.com');
+  });
+});
+
+describe('resolveUserNicknames', () => {
+  function profilesClient(result: { data: unknown; error: { message: string } | null }) {
+    const inFn = vi.fn().mockResolvedValue(result);
+    const select = vi.fn().mockReturnValue({ in: inFn });
+    const from = vi.fn().mockReturnValue({ select });
+    // @type-assertion-allowed: テスト用の最小 Supabase from/select/in スタブ
+    const client = { from } as unknown as SupabaseClient;
+    return { client, from, select, inFn };
+  }
+
+  it('requests only the given ids from profiles and maps id → nickname', async () => {
+    const { client, from, select, inFn } = profilesClient({
+      data: [
+        { id: 'u1', nickname: 'あきら' },
+        { id: 'u2', nickname: 'ばば' },
+      ],
+      error: null,
+    });
+
+    const map = await resolveUserNicknames(client, ['u1', 'u2']);
+
+    expect(from).toHaveBeenCalledWith('profiles');
+    expect(select).toHaveBeenCalledWith('id, nickname');
+    expect(inFn).toHaveBeenCalledWith('id', ['u1', 'u2']);
+    expect(map.get('u1')).toBe('あきら');
+    expect(map.get('u2')).toBe('ばば');
+  });
+
+  it('does not query when there is nobody to resolve', async () => {
+    const { client, from } = profilesClient({ data: [], error: null });
+
+    const map = await resolveUserNicknames(client, []);
+
+    expect(from).not.toHaveBeenCalled();
+    expect(map.size).toBe(0);
+  });
+
+  it('degrades to an empty map on a query error (the report must still go out)', async () => {
+    const { client } = profilesClient({ data: null, error: { message: 'permission denied' } });
+
+    const map = await resolveUserNicknames(client, ['u1']);
+
+    expect(map.size).toBe(0);
   });
 });

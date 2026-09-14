@@ -16,6 +16,8 @@ import {
   aggregateCost,
   type CostAggregate,
   fetchFermentationCostRows,
+  resolveUserEmails,
+  resolveUserNicknames,
   type UserCostAggregate,
 } from '../../infrastructure/fermentation-cost-query.js';
 import {
@@ -196,18 +198,52 @@ function buildFermentationField(aggregate: CostAggregate): DiscordField {
 }
 
 /**
- * ユーザー別内訳。Discord は内部運用チャンネルだが、既存の発酵 cron 通知が
- * userId.slice(0, 8) 表記なのに合わせ、メールアドレスは送らない。
- * メール付きの内訳は admin の /costs 画面で見られる。
+ * userId → 表示名「nickname (email)」。片方しか無ければある方。両方無ければ載せない
+ * （呼び出し側が ID の先頭 8 桁に縮退する）。
+ *
+ * 解決に失敗してもレポートは出す。名前が取れないより、レポートが来ない方が困る。
+ * listUsers はページングで最大 20 往復するので一括で引き、profiles は対象だけ引く。
+ */
+async function resolveUserLabels(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  byUser: UserCostAggregate[],
+): Promise<Map<string, string>> {
+  const labels = new Map<string, string>();
+  const targets = byUser.slice(0, TOP_USER_COUNT).map((u) => u.userId);
+  if (targets.length === 0) return labels;
+  try {
+    const [emails, nicknames] = await Promise.all([
+      resolveUserEmails(supabase),
+      resolveUserNicknames(supabase, targets),
+    ]);
+    for (const userId of targets) {
+      const nickname = nicknames.get(userId) ?? '';
+      const email = emails.get(userId) ?? '';
+      const label = nickname && email ? `${nickname} (${email})` : nickname || email;
+      if (label) labels.set(userId, label);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[cron-cost-alert] user lookup failed', { error: message });
+  }
+  return labels;
+}
+
+/**
+ * ユーザー別内訳。誰の発酵かは名前（profiles.nickname）とメールで書く。
+ * 旧版は userId の先頭 8 桁だったが、それでは誰か分からない（#591 のレポートへの指摘）。
+ * Discord は内部運用チャンネルで、載せるのは本人を特定する最低限の情報だけ
+ * （日記本文は載せない）。admin の /costs 画面がメールを出しているのと同じ扱い。
  *
  * 末尾の注記は「なぜここだけ推定なのか」の説明。実額と並んだときに、注記の無い
  * 推定値は「意味の分からない2つ目の金額」にしか見えない。
  */
-function formatUserBreakdown(byUser: UserCostAggregate[]): string {
+function formatUserBreakdown(byUser: UserCostAggregate[], labels: Map<string, string>): string {
   if (byUser.length === 0) return 'この日の発酵は 0 件';
   const top = byUser.slice(0, TOP_USER_COUNT);
   const lines = top.map(
-    (u) => `${u.userId.slice(0, 8)}  ${usd(u.estimatedCostUsd)}  ${u.fermentationCount} 件`,
+    (u) =>
+      `${labels.get(u.userId) ?? u.userId.slice(0, 8)}  ${usd(u.estimatedCostUsd)}  ${u.fermentationCount} 件`,
   );
   const rest = byUser.length - top.length;
   if (rest > 0) lines.push(`…他 ${rest} 名`);
@@ -370,9 +406,10 @@ export const cronCostAlert = new Hono()
       fields.push(buildFermentationField(aggregate));
       // 0 件の日はユーザー別も 0 の再掲にしかならない（発酵 0 件で伝わる）。
       if (aggregate.fermentationCount > 0) {
+        const labels = await resolveUserLabels(supabase, aggregate.byUser);
         fields.push({
           name: `ユーザー別（推定・上位${TOP_USER_COUNT}）`,
-          value: formatUserBreakdown(aggregate.byUser),
+          value: formatUserBreakdown(aggregate.byUser, labels),
           inline: false,
         });
       }
