@@ -43,7 +43,7 @@ function toSpacing(value: string): EditorSpacing {
 /**
  * エディタの設定（SP）。上段の右端の歯車から開く。
  *
- * **非モーダルのドック**（`DockSheet`、中身の高さの 1 段）。暗転しないので、段を押した結果
+ * **非モーダルのドック**（`DockSheet`、半分と全画面）。暗転しないので、段を押した結果
  * （行間・文字サイズ・書体）が上の本文でそのまま見える（実機レビュー: 設定を変えたらこうなる、を
  * 確かめたい）。行は「ラベル + 段」を横に並べて低くし、本文が見える面積を残す。
  * 下へ引くか「閉じる」で閉じる。
@@ -60,17 +60,18 @@ export function SpEditorSettingsSheet({
 }: SpEditorSettingsSheetProps) {
   const t = useTranslations('sp.editor');
   const tPc = useTranslations('editor.settings');
-  const [detent, setDetent] = useState<DockDetent>('content');
+  const [detent, setDetent] = useState<DockDetent>('half');
   useEffect(() => {
-    if (open) setDetent('content');
+    if (open) setDetent('half');
   }, [open]);
 
   return (
     <DockSheet
       open={open}
       detent={detent}
-      // 中身の高さで開き、上へ持ち上げれば全画面（実機レビュー: 持ち上げても全体にならない）。
-      detents={['content', 'full']}
+      // 半分で開き（上の本文で変化が見える）、持ち上げれば全画面。中身の高さの段だけにしていた頃は、
+      // 下げると閉じるしかなく、半分に置けなかった（実機レビュー）。
+      detents={['half', 'full']}
       onDetentChange={setDetent}
       dismissible
       onClose={onClose}

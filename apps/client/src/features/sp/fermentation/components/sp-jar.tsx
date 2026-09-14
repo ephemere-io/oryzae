@@ -11,10 +11,6 @@ import { useFermentationHistory } from '@/features/shared/fermentation/hooks/use
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarQuestion } from '@/features/shared/questions/types';
-import {
-  SpElementSheet,
-  type SpJarElement,
-} from '@/features/sp/fermentation/components/sp-element-sheet';
 import { type MapQuestion, SpJarMap } from '@/features/sp/fermentation/components/sp-jar-map';
 import { SpJarMapSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
 import { SpQuestionZoom } from '@/features/sp/fermentation/components/sp-question-zoom';
@@ -36,8 +32,7 @@ interface SpJarProps {
  * SP 版「瓶」。
  *
  * **PC と同じ 2D の地図**（中央に壜、まわりにシャーレ）を指で寄り引きして見る。
- * シャーレを押すと問いの画面（上に問いが 1 行、下に手紙・言葉・抜粋の一覧）へ移り、
- * 項目を押すと高さを変えられるセミモーダルで読む。
+ * シャーレを押すと問いの画面（上に問いが 1 行、下に手紙・キーワード・スニペットを読む流れ）へ移る。
  *
  * 壜のまわりを円が自走で回る形は「回る必要性が分からない」と言われてやめた。
  * SP の違いは円の中に中身を並べないことだけで、構造は PC を踏襲する。
@@ -54,7 +49,6 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
   const { ready: unreadReady, unreadQuestionIds, markQuestionRead } = useUnread();
 
   const [openId, setOpenId] = useState<string | null>(null);
-  const [element, setElement] = useState<SpJarElement | null>(null);
 
   const openQuestion = questions.find((question) => question.id === openId) ?? null;
 
@@ -142,7 +136,6 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
         loading,
         questionCount: mapQuestions.length,
         open: openId !== null,
-        element: element?.kind ?? 'none',
         unreadCount: mapQuestions.filter((question) => question.unread).length,
       })}
     >
@@ -203,24 +196,7 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
           onSelectFermentation={setHistoryPick}
           onReply={() => router.push(`/entries/new?questionId=${openQuestion.id}`)}
           onOpenSource={(entryId) => router.push(`/entries/${entryId}`)}
-          onClose={() => {
-            setOpenId(null);
-            setElement(null);
-          }}
-          onOpenElement={(next) => {
-            setElement(next);
-            // Issue #447: 既読は「瓶を開いた時刻」ではなく「その手紙を開いたか」で決める。
-            if (next.kind === 'letter') markQuestionRead(openQuestion.id);
-          }}
-        />
-      ) : null}
-
-      {element && openQuestion ? (
-        <SpElementSheet
-          element={element}
-          onClose={() => setElement(null)}
-          onReply={() => router.push(`/entries/new?questionId=${openQuestion.id}`)}
-          onOpenSource={(entryId) => router.push(`/entries/${entryId}`)}
+          onClose={() => setOpenId(null)}
         />
       ) : null}
     </div>

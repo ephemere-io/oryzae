@@ -185,14 +185,25 @@ body {
   touch-action: none;
   cursor: grab;
 }
-/* 掴んでいる間は指の下を本文に通す（落とす先の文字の位置を測るため）。 */
+/* 掴んでいる間、写真は「置き場所」（半透明・点線の縁）。指の下を本文に通す（落とす先の文字の位置を測るため）。 */
 .oz-sp-body img.inline-photo[data-dragging] {
-  position: relative;
-  z-index: 1;
   pointer-events: none;
-  opacity: 0.8;
+  opacity: 0.35;
+  outline-style: dashed;
   cursor: grabbing;
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--fg) 22%, transparent);
+}
+/* 掴んだ写真の小さな写し。指の点を下端の中央にして、指の少し上に出す（指で隠れない）。 */
+.oz-photo-ghost {
+  position: absolute;
+  z-index: 2;
+  inline-size: 30%;
+  max-block-size: 30svh;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  translate: -50% calc(-100% - 1.5rem);
+  pointer-events: none;
+  opacity: 0.92;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--fg) 24%, transparent);
 }
 
 /* 指の端末の「押した印」。

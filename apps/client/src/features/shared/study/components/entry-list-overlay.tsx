@@ -298,16 +298,16 @@ export function EntryListOverlay({
         </div>
 
         {/* 行の「…」: 開く・削除。削除は同じシートの中で確認する。 */}
-        {actionFor ? (
-          <BottomSheet
-            open
-            onClose={closeActions}
-            ariaLabel={t('list_row_actions')}
-            label={actionFor.excerpt}
-            closeLabel={t('list_close')}
-            detents={['content']}
-            initialDetent="content"
-          >
+        <BottomSheet
+          open={actionFor !== null}
+          onClose={closeActions}
+          ariaLabel={t('list_row_actions')}
+          label={actionFor?.excerpt}
+          closeLabel={t('list_close')}
+          detents={['content']}
+          initialDetent="content"
+        >
+          {actionFor ? (
             <div className="flex flex-col gap-2 pt-1" style={CONTROL_FONT} data-row-actions>
               {confirmingDelete ? (
                 <>
@@ -364,8 +364,8 @@ export function EntryListOverlay({
                 </>
               )}
             </div>
-          </BottomSheet>
-        ) : null}
+          ) : null}
+        </BottomSheet>
       </div>
     );
   }

@@ -5,8 +5,8 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Skeleton, skeletonKeys } from '@/components/ui/skeleton';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
+import { FermentationReading } from '@/features/shared/fermentation/components/fermentation-reading';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
-import type { SpJarElement } from '@/features/sp/fermentation/components/sp-element-sheet';
 import { formatMonthDay } from '@/lib/format-date';
 import { useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
 import { useDelayedTrue } from '@/lib/use-delayed';
@@ -24,17 +24,17 @@ interface SpQuestionZoomProps {
   /** 手紙のもとになった記録を開く。 */
   onOpenSource?: (entryId: string) => void;
   onClose: () => void;
-  onOpenElement: (element: SpJarElement) => void;
 }
 
 /** その人の言葉（問い・言葉・抜粋）の書体。道具の字（`CONTROL_FONT`）と混ぜない。 */
 const SERIF_FONT = "'Noto Serif JP', serif";
 
 /**
- * シャーレを押した先。**上に問いが 1 行、下に手紙・言葉・抜粋の一覧。**
+ * シャーレを押した先。**上に問いが 1 行、下に手紙・キーワード・スニペットを読む流れ。**
  *
- * 項目を押すと `SpElementSheet`（高さを変えられるセミモーダル）で全文を読む。
- * 一覧は縦に伸びるだけなので、数が増えても重ならず切れない。
+ * 中身はエントリーの「発酵の結果」と同じ `FermentationReading`。項目を押して重なるシートで読む形
+ * （モーダルインモーダル）はやめた: 閉じたあと開けなくなることがあり、そもそも最初の画面で説明と
+ * 理由まで読めれば足りる（実機レビュー）。縦に伸びるだけなので、数が増えても重ならず切れない。
  *
  * 「戻る」は上段（`SpTopBar`）の左端の正円が担う。この画面が出ている間だけ
  * 上段の戻るを横取りして、書斎ではなく地図へ戻す（`useSpBackHandler`）。
@@ -50,7 +50,6 @@ export function SpQuestionZoom({
   onReply,
   onOpenSource,
   onClose,
-  onOpenElement,
 }: SpQuestionZoomProps) {
   const t = useTranslations('sp.jar');
   const tNav = useTranslations('sp.nav');
@@ -159,8 +158,8 @@ export function SpQuestionZoom({
         </div>
       ) : null}
 
-      {/* 一覧。行を押すと全文（セミモーダル）。 */}
-      <div className="min-h-0 flex-1 overflow-auto px-5 pt-4 pb-8">
+      {/* 読む流れ。エントリーの「発酵の結果」と同じ部品（言葉の説明・抜粋の理由まで最初から並ぶ）。 */}
+      <div className="min-h-0 flex-1 overflow-auto px-5 pt-4 pb-10">
         {/* 読み込み中は、いずれ出る形（見出しと行）を先に置く。一瞬で返るなら出さない。 */}
         {showSkeleton ? <QuestionZoomSkeleton /> : null}
 
@@ -173,204 +172,11 @@ export function SpQuestionZoom({
           </p>
         ) : null}
 
-        {letter ? (
-          <Section label={t('section_letter')}>
-            {/* 手紙は最初から本文を出す（もう一度押さないと読めないのは不便、と実機レビュー）。 */}
-            <article
-              data-testid="sp-jar-letter"
-              aria-label={t('section_letter')}
-              className="flex flex-col gap-3 py-1"
-            >
-              {detail?.targetPeriod ? (
-                <span
-                  className="text-[11px] tracking-[0.08em]"
-                  style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                >
-                  {detail.targetPeriod.replace('-', '.')}
-                </span>
-              ) : null}
-              <p
-                className="m-0 whitespace-pre-wrap text-[15px] leading-[1.95]"
-                style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
-              >
-                {letter.bodyText}
-              </p>
-            </article>
-          </Section>
-        ) : null}
-
-        {keywords.length > 0 ? (
-          <Section label={t('section_keywords')}>
-            {keywords.map((keyword) => (
-              <Row
-                key={keyword.id}
-                onClick={() =>
-                  onOpenElement({
-                    kind: 'keyword',
-                    id: keyword.id,
-                    keyword: keyword.keyword,
-                    description: keyword.description,
-                  })
-                }
-              >
-                <span
-                  className="min-w-0 flex-1 text-[15px] leading-snug"
-                  style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
-                >
-                  {keyword.keyword}
-                </span>
-              </Row>
-            ))}
-          </Section>
-        ) : null}
-
-        {snippets.length > 0 ? (
-          <Section label={t('section_snippets')}>
-            {snippets.map((snippet) => (
-              <Row
-                key={snippet.id}
-                onClick={() =>
-                  onOpenElement({
-                    kind: 'snippet',
-                    id: snippet.id,
-                    originalText: snippet.originalText,
-                    sourceDate: snippet.sourceDate,
-                    selectionReason: snippet.selectionReason,
-                  })
-                }
-              >
-                <span className="min-w-0 flex-1">
-                  <span
-                    className="block text-[14px] leading-relaxed"
-                    style={{
-                      fontFamily: SERIF_FONT,
-                      color: 'var(--fg)',
-                      display: '-webkit-box',
-                      WebkitBoxOrient: 'vertical',
-                      WebkitLineClamp: 3,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    「{snippet.originalText}」
-                  </span>
-                  <span
-                    className="mt-1 block text-[11px] tracking-[0.06em]"
-                    style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                  >
-                    {formatMonthDay(snippet.sourceDate)}
-                  </span>
-                </span>
-              </Row>
-            ))}
-          </Section>
-        ) : null}
-
-        {/* 元になったエントリーと返事は重要なので**いちばん下**に（手紙・言葉・抜粋を読み終えた先。
-            実機レビュー）。手紙が無ければ出さない。 */}
-        {letter ? (
-          <footer
-            data-letter-footer
-            className="mt-2 flex flex-col gap-3 border-t pt-5"
-            style={{ borderColor: 'var(--border-subtle)' }}
-          >
-            {/* もとになった記録（Issue #453: 何に対する返事かが分かる）。無ければ出さない。 */}
-            {(detail?.scannedEntries.length ?? 0) > 0 ? (
-              <div className="flex flex-col gap-1">
-                <span
-                  className="text-[11px] uppercase tracking-[0.12em]"
-                  style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                >
-                  {t('section_sources')}
-                </span>
-                <ul className="flex flex-col">
-                  {(detail?.scannedEntries ?? []).map((source) => (
-                    <li key={source.id}>
-                      <button
-                        type="button"
-                        onClick={() => onOpenSource?.(source.id)}
-                        className="flex min-h-[40px] w-full items-center justify-between gap-3 text-left text-[14px]"
-                        style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
-                      >
-                        <span className="min-w-0 truncate">
-                          {source.title || t('source_untitled')}
-                        </span>
-                        <span
-                          className="shrink-0 text-[11px]"
-                          style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                        >
-                          {formatMonthDay(source.createdAt)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {onReply ? (
-              <button
-                type="button"
-                data-letter-reply
-                onClick={onReply}
-                className="min-h-[44px] self-start rounded-full px-5 text-[14px] font-medium"
-                style={{ ...CONTROL_FONT, background: 'var(--accent)', color: 'var(--bg)' }}
-              >
-                {t('reply')}
-              </button>
-            ) : null}
-          </footer>
+        {detail && !empty ? (
+          <FermentationReading detail={detail} onReply={onReply} onOpenSource={onOpenSource} />
         ) : null}
       </div>
     </div>
-  );
-}
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-5">
-      <p
-        className="mb-1 text-[11px] uppercase tracking-[0.14em]"
-        style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
-      >
-        {label}
-      </p>
-      <ul className="m-0 list-none p-0">{children}</ul>
-    </section>
-  );
-}
-
-interface RowProps {
-  onClick: () => void;
-  /** 文字を持たない行（手紙）を掴むための目印。 */
-  testId?: string;
-  /** 中身が絵だけの行に名前を与える（読み上げで「ボタン」としか言われなくなる）。 */
-  ariaLabel?: string;
-  children: React.ReactNode;
-}
-
-/** 紙の上の 1 行。面は持たず、罫 1 本と末尾の › で押せることを示す。 */
-/**
- * 押せる行。**行そのものをボタンの面にする**（白い面・角丸・枠）。
- *
- * 以前は右端に `›` を置いていたが、iOS の `›` は「右へ 1 階層進む」の印で、押すと下からシートが
- * 上がる挙動と食い違っていた（レビュー）。押した先はシートなので、行は「押せる面」として見せる。
- */
-function Row({ onClick, testId, ariaLabel, children }: RowProps) {
-  return (
-    <li className="mb-2">
-      <button
-        type="button"
-        onClick={onClick}
-        data-testid={testId}
-        aria-label={ariaLabel}
-        className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-4 py-3 text-left"
-        style={{
-          background: 'var(--surface-raised)',
-          borderColor: 'var(--surface-raised-border)',
-        }}
-      >
-        {children}
-      </button>
-    </li>
   );
 }
 

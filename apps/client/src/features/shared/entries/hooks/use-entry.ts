@@ -4,7 +4,7 @@ import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/share
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiClient } from '@/lib/api';
-import { isObject, readJson, readStringField } from '@/lib/json';
+import { isObject, readBooleanField, readJson, readStringField } from '@/lib/json';
 
 interface EntryDetail {
   id: string;
@@ -14,6 +14,8 @@ interface EntryDetail {
   /** 表示用の署名付き URL（1時間で失効するので保存してはいけない）。 */
   mediaSignedUrls: string[];
   effects: EditorEffectsState | null;
+  /** 瓶に漬けてあるか（「漬け込む」を押した）。発酵はその時点の本文で行われる。 */
+  fermentationEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,6 +54,7 @@ function normalizeEntryDetail(input: unknown): EntryDetail | null {
     mediaUrls: readStringArray(entry, 'mediaUrls'),
     mediaSignedUrls: readStringArray(input, 'mediaSignedUrls'),
     effects: parsedEffects.success ? parsedEffects.data : null,
+    fermentationEnabled: readBooleanField(entry, 'fermentationEnabled', false),
     createdAt: readStringField(entry, 'createdAt') ?? '',
     updatedAt: readStringField(entry, 'updatedAt') ?? '',
   };

@@ -62,11 +62,15 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  clampPan,
   homeView,
   jarView,
   journalSpreadView,
   journalTopView,
   lerpView,
+  type PanOffset,
+  panFromDrag,
+  pannedView,
   parallaxOffset,
   shelfView,
   zoomByPinch,
@@ -194,6 +198,10 @@ export interface StudySceneHandle {
   startPinch(): void;
   /** 2 本指の間隔の比（置いた時点を 1 とする）。 */
   pinchTo(ratio: number): void;
+  /** 1 本指（マウス）で引き始めた。以後の移動はここを基準にする。 */
+  startPan(): void;
+  /** 引き始めからの指の移動（画面の px）。机の上を平行に動く（ホームのみ）。 */
+  panBy(dx: number, dy: number): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
   /** 遷移中・サブ画面ではラベルを消す。 */
@@ -365,6 +373,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   let zoomTarget = 1;
   /** 2 本指を置いた時点の倍率。 */
   let pinchBase = 1;
+  /** 机の上の平行移動（いま・目標・引き始め）。 */
+  let pan: PanOffset = { x: 0, z: 0 };
+  let panTarget: PanOffset = { x: 0, z: 0 };
+  let panBase: PanOffset = { x: 0, z: 0 };
 
   const parallax = { x: 0, y: 0 };
 
@@ -519,7 +531,12 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     // 寄り引き。近づくぶんだけ注視点が上がる（絵の上端を画面に留めるため）。
     zoom = approach(zoom, zoomTarget, HOME_ZOOM.lerp);
-    const view = zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom));
+    // 平行移動も同じ速さで追う（指を離しても少し滑る）。
+    pan = {
+      x: approach(pan.x, panTarget.x, HOME_ZOOM.lerp),
+      z: approach(pan.z, panTarget.z, HOME_ZOOM.lerp),
+    };
+    const view = pannedView(zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom)), pan);
 
     camera.position.set(
       view.position.x + parallax.x,
@@ -790,6 +807,18 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     zoomTarget = zoomByPinch(pinchBase, ratio);
   }
 
+  function startPan(): void {
+    if (transition || settled) return;
+    panBase = panTarget;
+  }
+
+  function panBy(dx: number, dy: number): void {
+    if (transition || settled) return;
+    const view = zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom));
+    const delta = panFromDrag(view, camera.fov, container.clientHeight, { dx, dy });
+    panTarget = clampPan(layout, { x: panBase.x + delta.x, z: panBase.z + delta.z });
+  }
+
   function pick(): void {
     if (transition || settled) return;
 
@@ -940,6 +969,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     zoomBy,
     startPinch,
     pinchTo,
+    startPan,
+    panBy,
     pick,
     isBusy: () => transition !== null || settled !== null,
     dispose,

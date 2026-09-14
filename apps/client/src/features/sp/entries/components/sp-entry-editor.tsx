@@ -76,6 +76,8 @@ interface SpEntryEditorProps {
   initialEffects?: EditorEffectsState | null;
   /** サーバーの最終更新（ISO）。端末の写しがこれより新しければ写しから始める。 */
   initialUpdatedAt?: string;
+  /** 既に瓶に漬けてあるか（開き直したエントリー）。 */
+  initialFermentationEnabled?: boolean;
   /** 既存エントリに添えられた写真のストレージパス。 */
   initialMediaUrls?: string[];
   /** 表示用の署名付き URL（`initialMediaUrls` と同じ順・同じ数）。 */
@@ -111,6 +113,7 @@ export function SpEntryEditor({
   initialContent = '',
   initialEffects = null,
   initialUpdatedAt,
+  initialFermentationEnabled = false,
   initialMediaUrls,
   initialMediaSignedUrls,
   persistDraft = true,
@@ -208,7 +211,13 @@ export function SpEntryEditor({
     bodyEditorRef.current?.setContent(nextBody, images.slice(0, photoOffsets(nextBody).length));
   }, []);
   const [pickling, setPickling] = useState(false);
-  const [pickled, setPickled] = useState(false);
+  /**
+   * 瓶に漬けてあるか。「漬け込む」はエントリーに印を付けるだけで、発酵は日に 1 回の見回りが**その時点の
+   * 本文で**行う。だから押したあとの書き足しも一緒に漬かる（押し直しは要らない）。それを画面で言う。
+   */
+  const [pickled, setPickled] = useState(initialFermentationEnabled);
+  /** いま押したところか。次に書き足すまで、上段の状態で「瓶に漬けました」と言う。 */
+  const [justPickled, setJustPickled] = useState(false);
   /**
    * 結んでいる問い。**複数**（PC と同じ。以前は 1 つに限っていて、別の問いを選ぶと前のを外していた）。
    * URL の問い、または復元したドラフトの問いから始める。
@@ -463,8 +472,12 @@ export function SpEntryEditor({
           : t('status_saved');
   // 状態は上段（SpTopBar）の中央へ。発酵を始めたらそれを最優先で言う。
   const chrome = useSpChrome();
+  // 押した直後だけ「瓶に漬けました」。書き足せば保存の状態に戻る（漬けてあることは題の下の行が言い続ける）。
+  useEffect(() => {
+    if (dirty) setJustPickled(false);
+  }, [dirty]);
   useSpStatus(
-    error ?? (pickled ? t('pickled') : statusText),
+    error ?? (justPickled ? t('pickled') : statusText),
     error ? 'error' : saving || offlineHold ? 'saving' : 'ok',
   );
 
@@ -570,6 +583,7 @@ export function SpEntryEditor({
     setPickling(false);
     if (saved) {
       setPickled(true);
+      setJustPickled(true);
       clearDraft(); // 発酵させたら確定。書きかけドラフトは破棄する。
     }
   }
@@ -684,11 +698,13 @@ export function SpEntryEditor({
       ? [
           {
             id: 'ferment',
-            // PC と同じ語（「瓶に納めて発酵させる」は列に長すぎた）。漬けた後は「発酵中」。
+            // PC と同じ語（「瓶に納めて発酵させる」は列に長すぎた）。漬けた後は「漬けてある」（「発酵中」は
+            // いま発酵しているように読め、書き足したら押し直すのかが分からなかった。実機レビュー）。
             label: pickled ? t('ferment_done_short') : t('ferment_title'),
             icon: <FermentIcon />,
             busy: pickling,
-            disabledReason: pickled ? t('pickled') : undefined,
+            active: pickled,
+            disabledReason: pickled ? t('pickled_note') : undefined,
             onSelect: handlePickle,
           },
         ]
@@ -797,6 +813,21 @@ export function SpEntryEditor({
           {`+ ${t('question_link')}`}
         </button>
       </div>
+      {/* 漬けてあること。書き足したら押し直すのか、に答える 1 行（結んだ問いの下）。 */}
+      {pickled ? (
+        <p
+          data-pickled-note
+          className="mx-6 mt-1.5 flex items-start gap-2 text-[12px] leading-relaxed"
+          style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+        >
+          <span
+            aria-hidden="true"
+            className="mt-[0.55em] inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: 'var(--accent)' }}
+          />
+          <span>{t('pickled_note')}</span>
+        </p>
+      ) : null}
       {pickerOpen ? (
         <div className="mx-6 mt-2">
           <QuestionPicker

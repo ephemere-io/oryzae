@@ -139,7 +139,7 @@ registerUnit<Props>({
       id: 'snippets-all-listed',
       description: '抜粋は段に関わらず全部並ぶ（段で中身の高さを変えない）',
       check: ({ root, contract }) => {
-        const items = root.querySelectorAll('li[data-snippet]').length;
+        const items = root.querySelectorAll('[data-reading-item="snippet"]').length;
         return (
           items === Number(contract.snippetCount) ||
           `抜粋 ${items} 件（契約 ${contract.snippetCount}）`

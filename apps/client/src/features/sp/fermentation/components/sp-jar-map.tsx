@@ -230,7 +230,9 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
                 }
                 onSelect(question.id);
               }}
-              className="absolute flex items-center justify-center rounded-full text-center"
+              // 問いの文字と手紙の印を 1 本の縦の流れにして、円の中で縦に中央揃え（印を円の下端に
+              // 絶対配置していた頃は、小さく下に寄って見えた。実機レビュー）。
+              className="absolute flex flex-col items-center justify-center gap-6 rounded-full text-center"
               style={{
                 left: x - CIRCLE / 2,
                 top: y - CIRCLE / 2,
@@ -255,7 +257,8 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
               }}
             >
               <span
-                className="block px-10"
+                // 手紙の印と縦に並ぶときは、円の上下の狭いところに字が掛からないよう左右を詰める。
+                className={`block ${question.hasLetter ? 'px-14' : 'px-10'}`}
                 style={{
                   fontFamily: "'Noto Serif JP', serif",
                   // 開いた直後（倍率 ≈ 0.26）で画面上 12.5px。円の中が狭い・字が小さい、とレビュー。
@@ -273,20 +276,17 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
                 {question.text}
               </span>
               {/* 手紙の印は言葉で（「手紙が届いています」は問いの一覧を開かないと見えなかった）。
-                  未読なら「新しい手紙」、読んだら「手紙」。円の下端の帯。 */}
+                  未読なら「新しい手紙」、読んだら「手紙」。問いの文字のすぐ下。 */}
               {question.hasLetter ? (
                 <span
                   aria-hidden="true"
                   data-letter-mark
-                  className="absolute flex items-center justify-center gap-2 rounded-full"
+                  className="flex shrink-0 items-center justify-center gap-3 rounded-full"
                   style={{
-                    left: '50%',
-                    bottom: 26,
-                    transform: 'translateX(-50%)',
-                    height: 60,
-                    padding: '0 22px 0 14px',
+                    height: 96,
+                    padding: '0 36px 0 28px',
                     fontFamily: 'Inter, "Noto Sans JP", sans-serif',
-                    fontSize: 30,
+                    fontSize: 44,
                     letterSpacing: '0.04em',
                     whiteSpace: 'nowrap',
                     color: '#7A3B3F',
@@ -299,8 +299,8 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
                 >
                   <svg
                     aria-hidden="true"
-                    width="34"
-                    height="34"
+                    width="50"
+                    height="50"
                     viewBox="0 0 16 16"
                     fill="none"
                     style={{ color: '#7A3B3F', opacity: question.unread ? 1 : 0.55 }}

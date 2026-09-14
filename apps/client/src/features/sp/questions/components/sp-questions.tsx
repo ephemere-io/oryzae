@@ -280,62 +280,64 @@ export function SpQuestions({
       )}
 
       {/* 追加 / 編集。キーボードが出るので高い段から開く。 */}
-      {sheet ? (
-        <BottomSheet
-          open
-          onClose={() => setSheet(null)}
-          ariaLabel={sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
-          label={sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
-          closeLabel={t('cancel')}
-          detents={['content', 'full']}
-          initialDetent="content"
-        >
-          <textarea
-            // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件
-            autoFocus
-            aria-label={t('placeholder')}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            maxLength={64}
-            rows={3}
-            placeholder={t('placeholder')}
-            className="w-full resize-none rounded-xl p-3 text-base outline-none"
-            style={{
-              background: 'var(--surface-raised)',
-              border: '1px solid var(--surface-raised-border)',
-              lineHeight: 1.7,
-            }}
-          />
-          {/* 保存は右寄せの 1 つ（キャンセルはシートの見出しにある）。 */}
-          <div className="mt-3 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              disabled={submitting || !draft.trim()}
-              onClick={submit}
-              className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-5 text-[13px] font-medium text-white disabled:opacity-50"
-              style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
-            >
-              {t('save')}
-            </button>
-          </div>
-          {/* 「終える」は破壊的な操作なので、保存の行から離して下に。 */}
-          {sheet.mode === 'edit' ? (
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={remove}
-              className="mt-6 min-h-[40px] w-full whitespace-nowrap rounded-full text-[13px] disabled:opacity-50"
+      <BottomSheet
+        open={sheet !== null}
+        onClose={() => setSheet(null)}
+        ariaLabel={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
+        label={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
+        closeLabel={t('cancel')}
+        detents={['content', 'full']}
+        initialDetent="content"
+      >
+        {sheet ? (
+          <>
+            <textarea
+              // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件
+              autoFocus
+              aria-label={t('placeholder')}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={64}
+              rows={3}
+              placeholder={t('placeholder')}
+              className="w-full resize-none rounded-xl p-3 text-base outline-none"
               style={{
-                ...CONTROL_FONT,
-                color: 'var(--ob-jar-warm)',
-                border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--surface-raised-border)',
+                lineHeight: 1.7,
               }}
-            >
-              {t('delete')}
-            </button>
-          ) : null}
-        </BottomSheet>
-      ) : null}
+            />
+            {/* 保存は右寄せの 1 つ（キャンセルはシートの見出しにある）。 */}
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={submitting || !draft.trim()}
+                onClick={submit}
+                className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-5 text-[13px] font-medium text-white disabled:opacity-50"
+                style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
+              >
+                {t('save')}
+              </button>
+            </div>
+            {/* 「終える」は破壊的な操作なので、保存の行から離して下に。 */}
+            {sheet.mode === 'edit' ? (
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={remove}
+                className="mt-6 min-h-[40px] w-full whitespace-nowrap rounded-full text-[13px] disabled:opacity-50"
+                style={{
+                  ...CONTROL_FONT,
+                  color: 'var(--ob-jar-warm)',
+                  border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
+                }}
+              >
+                {t('delete')}
+              </button>
+            ) : null}
+          </>
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }

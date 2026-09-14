@@ -92,6 +92,17 @@ registerUnit<Props>({
   ],
   invariants: [
     {
+      id: 'shows-chosen-photo',
+      description: '選んだ写真をシートの中に一度見せる（文字起こしの確認では出さない）',
+      check: ({ root, contract }) => {
+        if (contract.open !== 'true') return true;
+        const img = root.querySelector('[data-photo-preview] img');
+        if (contract.hasTranscript === 'true') return img === null || '確認の画面に写真が出ている';
+        if (contract.hasPreview !== 'true') return true;
+        return img !== null || '選んだ写真が出ていない';
+      },
+    },
+    {
       id: 'closed-renders-no-sheet',
       description: 'open=false ならシート本体を出さない（契約ルートだけ残る）',
       check: ({ root, contract }) => {

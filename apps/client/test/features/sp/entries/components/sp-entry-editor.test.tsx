@@ -345,4 +345,24 @@ describe('SpEntryEditor', () => {
       screen.queryByPlaceholderText(jaMessages.entry_questions.picker.new_placeholder),
     ).toBeNull();
   });
+
+  it('漬けてあるエントリーは、書き足しても押し直さなくてよいことを題の下で言い、「漬けてある」を押せなくする', () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor
+          api={createMockApi(apiFetch)}
+          initialEntryId="e1"
+          initialContent="題\n本文"
+          initialFermentationEnabled
+          persistDraft={false}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(jaMessages.sp.editor.pickled_note)).toBeTruthy();
+    const ferment = document.querySelector('[data-palette-action="ferment"]');
+    expect(ferment?.textContent).toContain(jaMessages.sp.editor.ferment_done_short);
+    expect(ferment?.getAttribute('aria-disabled')).toBe('true');
+    // 開き直しただけでは「瓶に漬けました」（押した直後の知らせ）は出さない。
+    expect(screen.queryByText(jaMessages.sp.editor.pickled)).toBeNull();
+  });
 });

@@ -3,8 +3,8 @@
  *
  * detail / loading は props なので、状態機械（読込中 / 発酵前 / 中身あり）を props だけで
  * 再現できる。ここで守るのは「**円は見出し、中身はリスト**」という設計:
- * 問いは円の中に全文が書かれ、手紙・言葉・抜粋は縦のリストに読める大きさで並び、
- * 行を押して全文を読む。数が増えても縦に伸びるだけで、重ならず・切れない。
+ * 問いは見出しに全文が書かれ、手紙・キーワード・スニペットは縦の流れに読める大きさで並ぶ。
+ * キーワードの説明とスニペットの理由まで最初から出ていて、押して重なるシートは無い。
  *
  * i18n（sp.jar）依存のため withVerifyProviders で包む。
  */
@@ -19,7 +19,6 @@ interface Props {
   detail: FermentationDetail | null;
   loading: boolean;
   onClose: () => void;
-  onOpenElement: () => void;
 }
 
 const noop = () => {};
@@ -80,12 +79,13 @@ const LONG_QUESTION =
 registerUnit<Props>({
   id: 'SpQuestionZoom',
   title: 'SpQuestionZoom',
-  description: '開いた問いの円。上に見出しの円、下に手紙・言葉・抜粋のリスト（行を押して全文）。',
+  description:
+    '開いた問い。上に見出し、下に手紙・キーワード・スニペットを読む流れ（エントリーの発酵の結果と同じ部品）。',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
       <div style={{ position: 'relative', width: '390px', height: '640px' }}>
-        <SpQuestionZoom {...props} onOpenElement={props.onOpenElement} />
+        <SpQuestionZoom {...props} />
       </div>,
     ),
   fixtures: [
@@ -97,7 +97,6 @@ registerUnit<Props>({
         detail: filled,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
@@ -109,7 +108,6 @@ registerUnit<Props>({
         detail: null,
         loading: true,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
@@ -121,7 +119,6 @@ registerUnit<Props>({
         detail: null,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
@@ -133,7 +130,6 @@ registerUnit<Props>({
         detail: filled,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
@@ -145,7 +141,6 @@ registerUnit<Props>({
         detail: many,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
   ],
@@ -165,15 +160,16 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'rows-match-contract',
-      description:
-        '押せる行の数が契約（言葉＋抜粋）と一致する（上限で落とさない。手紙は行でなく本文）',
+      id: 'items-match-contract',
+      description: '並ぶ項目の数が契約（キーワード＋スニペット）と一致し、項目を押して開く面が無い',
       check: ({ root, contract }) => {
-        const rows = root.querySelectorAll(
-          '[data-verify-unit="SpQuestionZoom"] li button:not([data-testid="sp-jar-letter"] button)',
-        ).length;
+        const items = root.querySelectorAll('[data-reading-item]').length;
+        const buttons = root.querySelectorAll('[data-reading-item] button').length;
         const expected = Number(contract.keywordCount) + Number(contract.snippetCount);
-        return rows === expected || `押せる行=${rows}（期待: ${expected}）`;
+        return (
+          (items === expected && buttons === 0) ||
+          `項目=${items}（期待: ${expected}）、項目の中のボタン=${buttons}`
+        );
       },
     },
     {
@@ -196,23 +192,27 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'letter-row-is-findable',
-      description: '手紙の行は文字を持たなくても掴める（読み上げにも名前が出る）',
+      id: 'letter-is-findable',
+      description: '手紙は名前つきで掴める（読み上げにも名前が出る）',
       onlyFixtures: ['filled', 'long-question'],
       check: ({ root }) => {
-        const row = root.querySelector('[data-testid="sp-jar-letter"]');
-        if (!(row instanceof HTMLElement)) return '手紙の行が無い';
-        return Boolean(row.getAttribute('aria-label')) || '手紙の行に名前が無い';
+        const letter = root.querySelector('[data-testid="reading-letter"]');
+        if (!(letter instanceof HTMLElement)) return '手紙が無い';
+        return Boolean(letter.getAttribute('aria-label')) || '手紙に名前が無い';
       },
     },
     {
-      id: 'body-text-stays-in-the-reader',
+      id: 'reads-in-place',
       description:
-        '手紙の本文はここで読める。言葉の説明は行を押した先（実機レビュー: 手紙は最初から）',
+        '手紙の本文もキーワードの説明もここで読める（押して重なるシートで読む形はやめた）',
       check: ({ root, contract }) => {
         const text = root.textContent ?? '';
         if (contract.hasLetter === 'true' && !text.includes(LETTER_BODY)) return '手紙の本文が無い';
-        return !text.includes(KEYWORD_DESCRIPTION) || '言葉の説明がリストに出ている';
+        if (contract.keywordCount !== '0' && root.querySelector('[data-reading-item]')) {
+          const described = text.includes(KEYWORD_DESCRIPTION) || !text.includes('感謝');
+          return described || 'キーワードの説明が出ていない';
+        }
+        return true;
       },
     },
     {

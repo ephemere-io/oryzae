@@ -100,8 +100,25 @@ export function SpPhotoImportSheet({
                     </p>
                   )
                 ) : null}
-                {/* 選んだ写真の大きなプレビューは出さない。OS の選択で見たばかりの写真を
-                もう一度見せる理由が無く、二択（読み込む／置く）が下に押し出されていた（実機レビュー）。 */}
+                {/* 選んだ写真を一度見せる（どの写真を取り込むのかを確かめてから選ぶ。実機レビュー）。
+                    高さは画面の 3 割までにして、二択（読み込む／置く）が親指の届く所から押し出されないように。
+                    縮めている間は同じ場所に枠を置く（出てきたときに二択が跳ねない）。 */}
+                {!showTranscript ? (
+                  <div
+                    data-photo-preview
+                    className="mt-3 flex min-h-[8rem] items-center justify-center overflow-hidden rounded-xl"
+                    style={{ background: 'var(--surface-sunken)' }}
+                  >
+                    {state.previewUrl ? (
+                      // biome-ignore lint/performance/noImgElement: object URL のプレビュー。next/image は blob: を扱えない
+                      <img
+                        src={state.previewUrl}
+                        alt={t('preview_alt')}
+                        className="block max-h-[30svh] max-w-full object-contain"
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="mt-5 flex flex-col gap-2">
                   {showTranscript ? (
