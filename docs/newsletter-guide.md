@@ -65,11 +65,69 @@
 
 ### 配信停止
 
-`profiles.newsletter_opt_out` を立てる。UI はまだ無く、メール本文フッターの
-連絡先（`oryzae@ephemere.io`）に来た申し出を運営が手で反映する運用。
+止める口は **3 つ**あり、どれも同じ `profiles.newsletter_opt_out` 1 列を見る。
+
+| 経路 | ログイン | 仕組み |
+| --- | --- | --- |
+| メール本文のリンク | 不要 | `/unsubscribe?token=…`（署名付き） |
+| 受信箱の「配信停止」ボタン | 不要 | `List-Unsubscribe` ヘッダ（RFC 8058） |
+| アカウント設定のトグル | 必要 | `PATCH /api/v1/auth/profile` |
 
 Auth の `user_metadata` ではなく `profiles` に置いたのは、`user_metadata` が
 ユーザー自身の触れる場所と同じで「止めたはずが戻っている」事故を作りうるため。
+
+#### なぜログイン不要にするのか
+
+配信停止をするのは「もう読みたくない」人で、その人はログインしない。ログインを
+挟むと実質「止められない」に等しくなり、**迷惑メール報告のほうが早くなる**。
+報告が積もると送信ドメイン全体の到達率が落ちるので、これは礼儀の話であると同時に
+実利の話でもある。Gmail / Yahoo の一括送信者要件（RFC 8058）も認証を挟まない
+エンドポイントを前提にしている。
+
+#### 本人性をどう担保するか
+
+`user_id` を HMAC-SHA256 で署名したトークン（`HmacUnsubscribeToken`）。
+
+```
+token = base64url(user_id) + "." + base64url(HMAC(secret, "newsletter-unsubscribe:v1:" + user_id))
+```
+
+- **`user_id` をリクエストから受け取らない。** 受け取れる形にすると
+  「他人の id を入れて止める」が成立する
+- **署名対象に用途を混ぜる**（`newsletter-unsubscribe:v1:`）。同じ鍵を将来ほかの
+  用途に使ったとき、片方のトークンをもう片方に持ち込めないようにする
+- **有効期限を付けない。** 半年前のメールを掘り出して押すことが普通にある。
+  期限切れで押せないリンクは、止める口が無いのと同じ。代わりに「押しても失う
+  ものが無い」（配信の可否が変わるだけ）ようにしてある
+- **まとめて失効させたいときは `NEWSLETTER_UNSUBSCRIBE_SECRET` を替える**
+- 「トークンが壊れている」と「その利用者がもういない」は**同じ応答**にする。
+  公開エンドポイントなので、応答の差から実在する id を探れる経路を作らない
+
+#### なぜ POST だけなのか
+
+GET で状態が変わる作りだと、メールクライアントやセキュリティスキャナの
+**リンク先読み**（Outlook SafeLinks 等）で、本人が押していないのに配信停止になる。
+
+利用者への約束は「クリックするだけで解除」なので、ページ側で確認ボタンを
+足すのではなく、**開いた時点で JS が POST する**。先読みは JS を実行しないので
+誤作動せず、利用者から見れば 1 回クリックしただけのまま。
+
+押し間違い（と万一の誤作動）から戻れるよう、停止後の画面に「やっぱり受け取る」を
+置いてある（同じトークンで `POST /resubscribe`）。
+
+#### service role を使う理由
+
+メールのリンクから来るのでユーザー JWT が存在せず、RLS を認可境界にできない。
+`newsletter-subscription.ts` を dep-cruiser の `service-role-client-containment`
+許可リストに入れてある。安全性の根拠は「書き込み先の行を決めるのは HMAC 検証済み
+トークンから取り出した `user_id` **だけ**」で、リクエスト本文の値をクエリ条件へ
+渡す経路が無いこと。更新対象も `profiles.newsletter_opt_out` の 1 列のみ。
+
+#### 送信前に fail-closed
+
+署名鍵が無いと配信停止リンクを作れない。そのとき **送信そのものを 400 で止める**
+（`NewsletterUnsubscribeUnavailableError`）。状態は `draft` のまま動かないので、
+鍵を設定すればそのまま送れる。止める口の無い一斉メールを送るくらいなら送らない。
 
 ### アドレスを漏らさない
 
@@ -159,10 +217,13 @@ application/usecases/
 infrastructure/
   repositories/supabase-newsletter.repository.ts
   audience/supabase-newsletter-audience.ts
-  email/resend-bulk-email-sender.ts        Resend batch（100 通/リクエスト）
+  email/resend-bulk-email-sender.ts        Resend batch（100 通/リクエスト）+ List-Unsubscribe
   github/github-changelog-source.ts
   llm/vercel-ai-newsletter-draft.gateway.ts
-presentation/routes/admin-newsletters.ts   /api/v1/admin/newsletters
+  unsubscribe/hmac-unsubscribe-token.ts    配信停止リンクの署名 / 検証
+presentation/routes/
+  admin-newsletters.ts                     /api/v1/admin/newsletters（要 admin）
+  newsletter-subscription.ts               /api/v1/newsletter/{un,re}subscribe（認証不要）
 ```
 
 ### 管理画面（`apps/admin/src/features/newsletters`）
@@ -174,6 +235,20 @@ presentation/routes/admin-newsletters.ts   /api/v1/admin/newsletters
 プレビューは `<iframe srcDoc sandbox="">` に閉じ込める。メールの HTML は admin
 画面と無関係の CSS を持つので直接差し込むと画面が壊れるし、sandbox なら万一
 script が混ざっても動かない。
+
+### 利用者向け（`apps/client`）
+
+| 置き場 | 役割 |
+| --- | --- |
+| `app/unsubscribe/page.tsx` | 配信停止ページ（**保護ルートの外**） |
+| `features/shared/newsletter/` | 停止・再開のフック / 表示部品 / 型 |
+| `features/shared/account/components/newsletter-subscription-*.tsx` | 設定画面のトグル |
+
+トグルを `features/shared` に置いたのは、PC と SP で体験が変わらないため
+（`pc/` と `sp/` に別々に書くと必ずコピーになる）。表示は「**受け取る**」を ON に
+する —— 保存しているのは opt-**out** だが、二重否定のチェックボックスは必ず
+読み間違えられる。現在値が読めていない間はトグル自体を出さない（仮の既定値を
+触らせると、本人の意図と違う値がそのまま保存される）。
 
 ### DB（`supabase/migrations/00024_create_newsletters.sql`）
 
@@ -191,6 +266,7 @@ script が混ざっても動かない。
 | `RESEND_API_KEY` | 送信が `{ sent: false, reason: 'no-api-key' }` で止まる（`sent` にはならない） |
 | `EMAIL_FROM` | 既定の `noreply@mail.oryzae.ephemere.io` を使う |
 | `EMAIL_ENABLED=false` | 送信が `reason: 'disabled'` で止まる（dev 用） |
+| `NEWSLETTER_UNSUBSCRIBE_SECRET` | **送信が 400 で止まる**（配信停止リンクを作れないため） |
 | `GITHUB_TOKEN` | 下書き生成だけが 400 になる。配信そのものは動く |
 | `GITHUB_REPO` | 既定 `ephemere-io/oryzae` |
 

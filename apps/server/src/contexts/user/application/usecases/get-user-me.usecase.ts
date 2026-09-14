@@ -7,6 +7,8 @@ interface UserMeView {
   nickname: string;
   avatarUrl: string | null;
   onboardingCompleted: boolean;
+  /** お知らせメールの配信停止 (Issue #614)。アカウント設定のトグルが読む。 */
+  newsletterOptOut: boolean;
   /** 一度でも漬け込んだエントリがあるか (Issue #316 ガイドモーダル用) */
   hasPickled: boolean;
   /** 一度でもエントリに問いを紐付けたことがあるか (Issue #316 ガイドモーダル用) */
@@ -42,6 +44,7 @@ export class GetUserMeUsecase {
       nickname: props.nickname,
       avatarUrl: props.avatarUrl,
       onboardingCompleted: props.onboardingCompleted,
+      newsletterOptOut: props.newsletterOptOut,
       hasPickled,
       hasLinkedQuestion,
     };

@@ -8,6 +8,7 @@ function messages(count: number): BulkEmailMessage[] {
     subject: '今月の更新',
     html: '<p>本文</p>',
     text: '本文',
+    unsubscribeUrl: `https://oryzae.ephemere.io/unsubscribe?token=tok-${i}`,
   }));
 }
 
@@ -122,6 +123,22 @@ describe('ResendBulkEmailSender', () => {
     if (!result.sent) return;
     expect(result.delivered).toBe(0);
     expect(result.failures.map((f) => f.error)).toEqual(['ECONNRESET', 'ECONNRESET']);
+  });
+
+  // RFC 8058。Gmail / Yahoo はこのヘッダがあると受信箱の上部に配信停止ボタンを出す。
+  // 本文のリンクを探させるより確実で、迷惑メール報告の代わりに押してもらえる。
+  it('List-Unsubscribe ヘッダを宛先ごとのリンクで付ける', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
+
+    await run(new ResendBulkEmailSender(), messages(2));
+
+    const payload = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body ?? '[]'));
+    expect(payload[0].headers['List-Unsubscribe']).toBe(
+      '<https://oryzae.ephemere.io/unsubscribe?token=tok-0>, <mailto:oryzae@ephemere.io?subject=unsubscribe>',
+    );
+    expect(payload[1].headers['List-Unsubscribe']).toContain('token=tok-1');
+    // ワンクリック配信停止の宣言。これが無いとボタンは出ない。
+    expect(payload[0].headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
   });
 
   it('EMAIL_FROM をそのまま差出人に使う', async () => {

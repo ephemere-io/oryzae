@@ -3,6 +3,15 @@ export interface BulkEmailMessage {
   subject: string;
   html: string;
   text: string;
+  /**
+   * この受信者の配信停止 URL。本文のリンクと同じものを
+   * `List-Unsubscribe` ヘッダにも載せる（RFC 8058）。
+   *
+   * ヘッダを付けると Gmail / Yahoo が受信箱の上部に「配信停止」ボタンを出す。
+   * 本文のリンクを探させるより確実で、迷惑メール報告の代わりに押してもらえる
+   * ——報告が積もると送信ドメイン全体の到達率が落ちるので、これは実利でもある。
+   */
+  unsubscribeUrl: string;
 }
 
 export interface BulkEmailFailure {

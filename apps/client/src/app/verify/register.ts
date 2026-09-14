@@ -92,6 +92,8 @@ import '@/features/pc/navigation/components/sidebar.verify';
 import '@/features/shared/auth/components/signup-form.verify';
 // 画面ごとのロード枠（スケルトン）
 import '@/features/pc/account/components/account-page-skeleton.verify';
+import '@/features/shared/account/components/newsletter-subscription-toggle.verify';
+import '@/features/shared/newsletter/components/unsubscribe-panel.verify';
 import '@/features/pc/account/components/writing-stats-skeleton.verify';
 import '@/features/pc/entries/components/entry-editor-skeleton.verify';
 import '@/features/pc/entries/components/entry-list-skeleton.verify';

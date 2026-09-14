@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPreheader,
+  buildUnsubscribeUrl,
   escapeHtml,
   parseNewsletterBody,
   renderNewsletterHtml,
   renderNewsletterText,
 } from '@/contexts/newsletter/domain/services/newsletter-content.service.js';
+
+const UNSUBSCRIBE_URL = buildUnsubscribeUrl('tok-123');
 
 describe('parseNewsletterBody', () => {
   it('空行で段落を切る', () => {
@@ -60,7 +63,7 @@ describe('escapeHtml', () => {
 
 describe('renderNewsletterHtml', () => {
   const render = (bodyMarkdown: string, subject = '件名') =>
-    renderNewsletterHtml({ subject, bodyMarkdown });
+    renderNewsletterHtml({ subject, bodyMarkdown, unsubscribeUrl: UNSUBSCRIBE_URL });
 
   it('本文に書かれた HTML をそのまま出さない（メールに script を差し込ませない）', () => {
     const html = render('<script>alert(1)</script> と書いた');
@@ -107,11 +110,29 @@ describe('renderNewsletterHtml', () => {
     expect(render('一行目\n二行目')).toContain('一行目<br />二行目');
   });
 
-  it('フッターに配信停止の連絡先を必ず入れる', () => {
+  it('フッターに配信停止リンクと問い合わせ先を必ず入れる', () => {
     const html = render('本文');
+    expect(html).toContain(`href="${UNSUBSCRIBE_URL}"`);
+    expect(html).toContain('このお知らせの配信を停止する');
     expect(html).toContain('oryzae@ephemere.io');
-    expect(html).toContain('配信停止');
     expect(html).toContain('https://oryzae.ephemere.io/privacy');
+  });
+
+  // 止める口が本文のどこかに紛れていると、探すより迷惑メール報告のほうが早くなる。
+  it('配信停止はリンクとして独立させる（他のフッター行に混ぜない）', () => {
+    const html = render('本文');
+    expect(html).toContain('<a href="https://oryzae.ephemere.io/unsubscribe?token=tok-123"');
+    expect(html).toContain('アカウントと日記はそのまま残ります');
+  });
+
+  it('配信停止 URL もエスケープする（属性から抜けさせない）', () => {
+    const html = renderNewsletterHtml({
+      subject: '件名',
+      bodyMarkdown: '本文',
+      unsubscribeUrl: 'https://oryzae.ephemere.io/unsubscribe?token=a"onmouseover="x',
+    });
+    expect(html).not.toContain('onmouseover="x"');
+    expect(html).toContain('&quot;onmouseover=&quot;x');
   });
 
   it('CSS は inline のみ（Gmail が style 要素を落とすため）', () => {
@@ -124,6 +145,7 @@ describe('renderNewsletterText', () => {
     const text = renderNewsletterText({
       subject: '件名',
       bodyMarkdown: '詳しくは [こちら](https://oryzae.ephemere.io/support) へ',
+      unsubscribeUrl: UNSUBSCRIBE_URL,
     });
     expect(text).toContain('こちら (https://oryzae.ephemere.io/support)');
   });
@@ -132,6 +154,7 @@ describe('renderNewsletterText', () => {
     const text = renderNewsletterText({
       subject: '件名',
       bodyMarkdown: '**重要**\n\n- ひとつ\n- ふたつ',
+      unsubscribeUrl: UNSUBSCRIBE_URL,
     });
     expect(text).toContain('重要');
     expect(text).not.toContain('**');
@@ -140,13 +163,30 @@ describe('renderNewsletterText', () => {
   });
 
   it('件名で始まり、フッターで終わる', () => {
-    const text = renderNewsletterText({ subject: '今月の更新', bodyMarkdown: '本文' });
+    const text = renderNewsletterText({
+      subject: '今月の更新',
+      bodyMarkdown: '本文',
+      unsubscribeUrl: UNSUBSCRIBE_URL,
+    });
     expect(text.startsWith('今月の更新')).toBe(true);
     expect(text.trimEnd().endsWith('— Oryzae / Ferment Media Research')).toBe(true);
   });
 
+  it('テキスト版にも配信停止 URL を素のまま載せる', () => {
+    const text = renderNewsletterText({
+      subject: '件名',
+      bodyMarkdown: '本文',
+      unsubscribeUrl: UNSUBSCRIBE_URL,
+    });
+    expect(text).toContain(UNSUBSCRIBE_URL);
+  });
+
   it('HTML はエスケープしない（テキストでは実体参照が読めないため）', () => {
-    const text = renderNewsletterText({ subject: '件名', bodyMarkdown: '5 < 10 です' });
+    const text = renderNewsletterText({
+      subject: '件名',
+      bodyMarkdown: '5 < 10 です',
+      unsubscribeUrl: UNSUBSCRIBE_URL,
+    });
     expect(text).toContain('5 < 10 です');
     expect(text).not.toContain('&lt;');
   });

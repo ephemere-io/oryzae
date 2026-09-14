@@ -30,3 +30,23 @@ export class NewsletterNoChangesError extends ValidationError {
 
 /** GitHub / LLM など外部が使えない状態。設定漏れを含む。 */
 export class NewsletterChangelogUnavailableError extends ValidationError {}
+
+/**
+ * 配信停止リンクのトークンが不正、または対象の利用者がもういない。
+ *
+ * 両方を同じエラーにしているのは、応答の差から実在する user_id を
+ * 探れないようにするため（公開エンドポイント）。
+ */
+export class NewsletterInvalidUnsubscribeTokenError extends ValidationError {
+  constructor() {
+    super('このリンクは無効です。お手数ですが設定画面から変更してください。');
+  }
+}
+
+/**
+ * 配信停止リンクを作れない（署名鍵が無い）ため送信できない。
+ *
+ * 止める口の無い一斉配信は、受け取った人に迷惑メール報告以外の選択肢を
+ * 残さない。送る前に落とす。
+ */
+export class NewsletterUnsubscribeUnavailableError extends ValidationError {}

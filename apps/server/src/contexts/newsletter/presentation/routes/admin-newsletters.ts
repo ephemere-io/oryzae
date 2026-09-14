@@ -22,6 +22,7 @@ import {
 } from '../../infrastructure/github/github-changelog-source.js';
 import { VercelAiNewsletterDraftGateway } from '../../infrastructure/llm/vercel-ai-newsletter-draft.gateway.js';
 import { SupabaseNewsletterRepository } from '../../infrastructure/repositories/supabase-newsletter.repository.js';
+import { HmacUnsubscribeToken } from '../../infrastructure/unsubscribe/hmac-unsubscribe-token.js';
 
 type Env = {
   Variables: {
@@ -118,6 +119,7 @@ export const adminNewsletters = new Hono<Env>()
       new SupabaseNewsletterRepository(supabase),
       new SupabaseNewsletterAudience(supabase),
       new ResendBulkEmailSender(),
+      new HmacUnsubscribeToken(),
     );
 
     const result = await usecase.execute(c.req.param('id'));

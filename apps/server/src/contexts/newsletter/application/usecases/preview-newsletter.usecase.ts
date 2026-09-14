@@ -1,6 +1,7 @@
 import type { NewsletterAudienceGateway } from '../../domain/gateways/newsletter-audience.gateway.js';
 import type { NewsletterRepositoryGateway } from '../../domain/gateways/newsletter-repository.gateway.js';
 import {
+  PREVIEW_UNSUBSCRIBE_URL,
   renderNewsletterHtml,
   renderNewsletterText,
 } from '../../domain/services/newsletter-content.service.js';
@@ -34,7 +35,14 @@ export class PreviewNewsletterUsecase {
     const newsletter = await this.repository.findById(id);
     if (!newsletter) throw new NewsletterNotFoundError(id);
 
-    const content = { subject: newsletter.subject, bodyMarkdown: newsletter.bodyMarkdown };
+    // 配信停止リンクは受信者ごとに違うが、プレビューには署名の無いダミーを載せる
+    // （出さないと、実際に届くメールと見えているものがずれる）。押しても誰も
+    // 配信停止にはならない。
+    const content = {
+      subject: newsletter.subject,
+      bodyMarkdown: newsletter.bodyMarkdown,
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
+    };
     const recipientCount = await this.audience.countRecipients();
 
     return {
