@@ -135,6 +135,8 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
                 <span>
                   <strong>Active</strong>: 直近 {ACTIVE_WINDOW_DAYS} 日以内にエントリーを書いた
                   <br />
+                  <span className="text-muted-foreground">　＝ MAU（Monthly Active User）</span>
+                  <br />
                   <strong>Dormant</strong>: エントリーはあるが {ACTIVE_WINDOW_DAYS}{' '}
                   日以上書いていない
                   <br />
