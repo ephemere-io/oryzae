@@ -28,8 +28,6 @@ import {
   Raycaster,
   RingGeometry,
   Scene,
-  Shape,
-  ShapeGeometry,
   SphereGeometry,
   Sprite,
   Vector2,
@@ -116,11 +114,13 @@ import {
   type StudyTheme,
 } from './materials';
 import {
-  MEMO_DOT,
+  MEMO_FONT,
   MEMO_FONT_PX,
+  MEMO_FONT_WEIGHT,
   MEMO_PAPER,
-  MEMO_TAPE,
+  MEMO_PIN,
   MEMO_TEXT,
+  MEMO_TEXT_DROP,
   MEMO_TILT,
   type MemoLine,
   memoHitSize,
@@ -1769,9 +1769,9 @@ interface MemoParts {
 /**
  * 壁のメモ（`docs/oryzae-study/00-overview.md`「壁のメモ」）。
  *
- * 他の物と同じ線画で組む — 紙の面（`solid`）と墨の輪郭、下辺だけ破れた紙、
- * 半透明のテープ、そして背表紙と同じ明朝の文字。行頭にはラベルと同じ役の小さな点。
- * 机に置く構図（SP）では紙ごと寝かせ、テープは付けない。
+ * 板のカードと同じ描き方 — 紙の面（`solid`）と `faint(0.4)` の輪郭だけ。壁の紙は
+ * 画鋲 1 つで真っ直ぐ留め、文字は扉の紙と同じ和文ゴシック（`MEMO_FONT`）で左揃え。
+ * 机に置く構図（SP）では紙ごと寝かせ、画鋲は付けない。
  */
 function buildMemo(
   layout: StudyLayout,
@@ -1791,64 +1791,57 @@ function buildMemo(
   group.position.set(placement.position.x, placement.position.y, placement.position.z);
   // 机の紙は面を上に向けて寝かせる（ローカル +y が奥、+z が上になる）。傾きは面の中の回転。
   group.rotation.set(surface === 'desk' ? -Math.PI / 2 : 0, 0, MEMO_TILT[surface]);
-  // 触れたときの一言は紙の上辺の上に（既定の 0.85 だとテープに被る）。
+  // 触れたときの一言は紙の上辺の上に（既定の 0.85 だと紙に被る）。
   group.userData.tooltipRise = surface === 'wall' ? paper.height / 2 + 0.3 : 0.6;
 
-  // 紙。面と輪郭に同じ点列を使う（破れが面と線でずれない）。
+  // 紙。面と輪郭に同じ点列を使う（板のカードと同じ）。
   const outline = paperOutline(paper);
-  const shape = new Shape();
-  outline.forEach((point, index) => {
-    if (index === 0) shape.moveTo(point.x, point.y);
-    else shape.lineTo(point.x, point.y);
-  });
-  shape.closePath();
-  group.add(new Mesh(own(new ShapeGeometry(shape)), materials.solid));
+  group.add(new Mesh(own(new PlaneGeometry(paper.width, paper.height)), materials.solid));
   group.add(
-    new LineLoop(
-      own(new BufferGeometry().setFromPoints(outline.map((p) => new Vector3(p.x, p.y, 0.002)))),
+    lineFrom(
+      [...outline, outline[0] ?? { x: 0, y: 0 }].map((p) => new Vector3(p.x, p.y, 0.002)),
       materials.faint(0.4),
+      own,
     ),
   );
 
-  // テープ。紙の上辺をまたいで壁に留まる。置いた紙には要らない。
+  // 画鋲。上辺の中央の少し下に、正面から見た円を 1 つ。
   if (surface === 'wall') {
-    const tape = new Group();
-    tape.position.set(0, paper.height / 2 - 0.02, 0.006);
-    tape.rotation.z = MEMO_TAPE.tilt;
-    const tapeGeometry = own(new PlaneGeometry(MEMO_TAPE.width, MEMO_TAPE.height));
-    tape.add(new Mesh(tapeGeometry, materials.tape));
-    tape.add(new LineSegments(own(new EdgesGeometry(tapeGeometry)), materials.faint(0.16)));
-    group.add(tape);
+    const pin = new Mesh(
+      own(new CircleGeometry(MEMO_PIN.radius, 24)),
+      materials.inkFill(MEMO_PIN.opacity),
+    );
+    pin.position.set(0, paper.height / 2 - MEMO_PIN.fromTop, 0.006);
+    group.add(pin);
   }
 
-  // 行。左揃え、行頭に点。文字は背表紙と同じ書体・墨で、面の向きに従う。
+  // 行。左揃え。文字は面の向きに従う（スプライトにしない）。
   const parts: MemoParts = { group, surface, lines: [] };
-  const ys = memoLineYs(lines.length, text.gap);
+  const ys = memoLineYs(lines.length, text.gap, MEMO_TEXT_DROP[surface]);
   lines.forEach((line, index) => {
     const y = ys[index] ?? 0;
     const left = -paper.width / 2 + text.inset;
 
-    const dot = new Mesh(
-      own(new CircleGeometry(MEMO_DOT.radius, 16)),
-      materials.inkFill(MEMO_DOT.opacity),
-    );
-    dot.position.set(left, y, 0.004);
-    group.add(dot);
-
-    const texture = createTextTexture(line.text, MEMO_FONT_PX, materials.inkColor);
     const anchor = new Object3D();
     anchor.position.set(0, y, 0.004);
     group.add(anchor);
     parts.lines.push({ id: line.id, anchor });
+
+    const texture = createTextTexture(
+      line.text,
+      MEMO_FONT_PX,
+      materials.inkColor,
+      `${MEMO_FONT_WEIGHT} ${MEMO_FONT}`,
+    );
     if (texture === null) return;
     textures.push(texture);
 
     const width = memoLineWidth(texture.image, text.lineHeight);
     const face = new Mesh(
       own(new PlaneGeometry(width, text.lineHeight)),
-      materials.text(texture, 0.9),
+      materials.text(texture, 0.92),
     );
-    face.position.set(left + MEMO_DOT.gap + width / 2, y, 0.004);
+    face.position.set(left + width / 2, y, 0.004);
     group.add(face);
   });
 
@@ -1982,15 +1975,25 @@ function buildHitboxes(options: {
 
 /**
  * 文字を描いたテクスチャ。幅は `measureText` の実測から決める（全語同幅にしない）。
+ * 書体は既定で明朝（背表紙・瓶の言葉）。アプリの言葉（壁のメモ）はゴシックを渡す。
  *
  * canvas が取れない環境（SSR・古い端末）では null を返し、呼び出し側がその語を諦める。
  */
-function createTextTexture(text: string, fontPx = 48, color = '#1A1918'): CanvasTexture | null {
+function createTextTexture(
+  text: string,
+  fontPx = 48,
+  color = '#1A1918',
+  face = '"Hiragino Mincho ProN", "Yu Mincho", serif',
+): CanvasTexture | null {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) return null;
 
-  const font = `${fontPx}px "Hiragino Mincho ProN", "Yu Mincho", serif`;
+  // `face` は書体名の並び。先頭に太さ（`500 ...`）を置いてもよい（CSS の font 略記と同じ順）。
+  const weightMatch = face.match(/^(\d{3})\s+(.*)$/);
+  const font = weightMatch
+    ? `${weightMatch[1]} ${fontPx}px ${weightMatch[2]}`
+    : `${fontPx}px ${face}`;
   context.font = font;
   const width = Math.ceil(context.measureText(text).width) + fontPx * 0.4;
   const height = Math.ceil(fontPx * 1.4);
