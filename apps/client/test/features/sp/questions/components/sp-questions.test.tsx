@@ -72,11 +72,23 @@ describe('SpQuestions', () => {
     expect(props.acceptQuestion).toHaveBeenCalledWith('p1');
   });
 
-  it('問いをタップ→終える（アーカイブ）できる', () => {
+  it('問いをタップ→アーカイブは、確かめてからアーカイブする（1 回押しただけでは消えない）', () => {
     const props = renderQ();
     fireEvent.click(screen.getByText('なぜ書くのか'));
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.delete }));
+    expect(props.archiveQuestion).not.toHaveBeenCalled();
+    expect(screen.getByText(jaMessages.sp.questions.archive_confirm_title)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive_confirm }));
     expect(props.archiveQuestion).toHaveBeenCalledWith('q1');
+  });
+
+  it('確かめで「やめる」を押せばアーカイブしない', () => {
+    const props = renderQ();
+    fireEvent.click(screen.getByText('なぜ書くのか'));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.delete }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive_cancel }));
+    expect(props.archiveQuestion).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: jaMessages.sp.questions.delete })).toBeTruthy();
   });
 
   it('生きている問いが上限（5）なら「立てる」を出さず、理由を出す（#430）', () => {

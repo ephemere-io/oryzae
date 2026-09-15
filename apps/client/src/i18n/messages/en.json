@@ -170,7 +170,7 @@
       "search_placeholder": "Find a question",
       "untitled": "Untitled question",
       "close": "Close",
-      "limit": "You can have up to {max} questions. End one in your question list to start a new one.",
+      "limit": "You can have up to {max} questions. Archive one in your question list to start a new one.",
       "manage": "Open question list"
     }
   },
@@ -817,7 +817,7 @@
     },
     "questions": {
       "title": "Questions",
-      "intro": "Grow, reword, or retire the questions you are sitting with.",
+      "intro": "Grow, rewrite, or archive the questions you are living with.",
       "untitled": "Untitled question",
       "proposed": "Suggested by Oryzae",
       "accept": "Accept",
@@ -827,12 +827,16 @@
       "sheet_add": "New question",
       "sheet_edit": "Edit question",
       "placeholder": "Write a question",
-      "delete": "Retire this question",
+      "delete": "Archive this question",
       "cancel": "Cancel",
       "save": "Save",
       "letter_arrived": "A letter has arrived",
       "close": "Close",
-      "limit": "You can have up to {max} questions. Tap a question above and choose “End this question” to make room."
+      "limit": "You can have up to {max} questions. Tap a question above and choose “Archive this question” to make room.",
+      "archive_confirm_title": "Archive this question?",
+      "archive_confirm_body": "It leaves the jar and your question list. You can restore it from the question list on PC.",
+      "archive_confirm": "Archive",
+      "archive_cancel": "Cancel"
     },
     "board": {
       "cards": "{count} cards",

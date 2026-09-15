@@ -145,7 +145,6 @@ export function SpBoard({ api }: SpBoardProps) {
     setDateKey((key) => shiftDateKey(key, offset));
   }, []);
 
-  const photoRef = useRef<HTMLInputElement>(null);
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -493,7 +492,12 @@ export function SpBoard({ api }: SpBoardProps) {
                       caption: tSp('tool_read_image'),
                       icon: <ScanTextIcon />,
                       busy,
-                      onSelect: pickOcrImage,
+                      onSelect: () => setSelectedId(null),
+                      // 押した指がそのまま選び手の input に当たる（iOS のメニューがボタンから出る）。
+                      file: {
+                        accept: OCR_ALLOWED_IMAGE_TYPES.join(','),
+                        onFile: (file) => void handleOcrFile(file),
+                      },
                     },
                     {
                       id: 'photo',
@@ -501,7 +505,8 @@ export function SpBoard({ api }: SpBoardProps) {
                       caption: tSp('tool_photo'),
                       icon: <PhotoIcon />,
                       busy,
-                      onSelect: () => photoRef.current?.click(),
+                      onSelect: () => {},
+                      file: { accept: 'image/*', onFile: handlePickPhoto },
                     },
                   ]
                 : [
@@ -581,19 +586,6 @@ export function SpBoard({ api }: SpBoardProps) {
         </div>
       ) : null}
 
-      {/* 写真は端末の写真アプリ／カメラから選ぶ。SP に貼り付けもドロップも無い。 */}
-      <input
-        ref={photoRef}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          // 同じ写真をもう一度選べるように空にしておく（value が同じだと change が来ない）。
-          event.target.value = '';
-          if (file) handlePickPhoto(file);
-        }}
-      />
       {/* 画像から文字を読み取る。写真として貼るのとは別の入口（意図が違う）。 */}
       <input
         ref={ocrInputRef}

@@ -19,7 +19,13 @@ const noop = () => {};
 
 const CREATE: PaletteAction[] = [
   { id: 'snippet', label: 'スニペット', icon: <SnippetIcon />, onSelect: noop },
-  { id: 'photo', label: '写真', icon: <PhotoIcon />, onSelect: noop },
+  {
+    id: 'photo',
+    label: '写真',
+    icon: <PhotoIcon />,
+    onSelect: noop,
+    file: { accept: 'image/*', onFile: noop },
+  },
 ];
 
 const CARD: PaletteAction[] = [
@@ -85,11 +91,27 @@ registerUnit<Props>({
       description: '並べた数だけ押せる列がある',
       check: ({ root, contract }) => {
         const count = root.querySelectorAll(
-          'button[data-palette-action]:not([data-palette-action="dismiss-keyboard"])',
+          '[data-palette-action]:not([data-palette-action="dismiss-keyboard"])',
         ).length;
         return (
           String(count) === contract.actionCount ||
           `列=${count} だが contract.actionCount="${contract.actionCount}"`
+        );
+      },
+    },
+    {
+      id: 'file-action-is-the-input',
+      description:
+        '写真を選ぶ操作は、押した指がそのまま input[type=file] に当たる（iOS のメニューがボタンから出る）',
+      onlyFixtures: ['create', 'keyboard'],
+      check: ({ root }) => {
+        const cell = root.querySelector('[data-palette-action="photo"]');
+        const input = cell?.querySelector('input[type="file"]');
+        if (!(input instanceof HTMLInputElement)) return '写真の操作に input[type=file] が無い';
+        if (input.getAttribute('aria-label') !== '写真') return '写真の input に名前が無い';
+        return (
+          (input.className.includes('absolute') && input.className.includes('inset-0')) ||
+          'input がボタンの箱に重なっていない'
         );
       },
     },

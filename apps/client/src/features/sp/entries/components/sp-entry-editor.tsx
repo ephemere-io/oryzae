@@ -267,7 +267,6 @@ export function SpEntryEditor({
   inlineRef.current = inlinePhotos;
   const bodyTextRef = useRef(body);
   bodyTextRef.current = body;
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlinePaths = useMemo(() => inlinePhotos.map((p) => p.storagePath), [inlinePhotos]);
   /** 本文の中に居ない写真（PC の旧形式・添付だけ）。今までどおり本文の下に積む。 */
   const loosePhotos = useMemo(
@@ -692,11 +691,11 @@ export function SpEntryEditor({
       id: 'photo',
       label: tPhoto('toolbar_button'),
       icon: <PhotoIcon />,
-      // 写真の選択を開くと iOS はキーボードを閉じる。先に本文からフォーカスを外して、閉じた状態で開く
-      // （キーボードが出ていた高さのまま取り込みシートが浮くのを防ぐ。やめたらカーソルは元に戻す）。
-      onSelect: () => {
-        blurEditor();
-        fileInputRef.current?.click();
+      onSelect: () => {},
+      // 押した指がそのまま選び手の input に当たる（iOS のメニューがボタンから出る）。
+      file: {
+        accept: ACCEPTED_IMAGE_MIME_TYPES.join(','),
+        onFile: (file) => void photoImport.selectFile(file),
       },
     },
     ...(entryId
@@ -846,22 +845,6 @@ export function SpEntryEditor({
           />
         </div>
       ) : null}
-      {/* 写真を取り込む入口（実体）。押すのはパレットの写真ボタン。 */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
-        aria-label={tPhoto('modal_title')}
-        tabIndex={-1}
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          // 同じファイルを選び直しても change が起きるよう毎回リセットする。
-          e.target.value = '';
-          if (file) photoImport.selectFile(file);
-        }}
-      />
-
       {/* 本文（タイトルから広い余白＋ゆったり行間）。写真は本文の中。 */}
       <div className="mt-6">
         <SpBodyEditor

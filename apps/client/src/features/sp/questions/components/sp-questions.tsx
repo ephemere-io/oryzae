@@ -61,6 +61,11 @@ export function SpQuestions({
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * アーカイブの確かめ中か。1 回押しただけでアーカイブされ、押し間違えたら取り返しがつかない感じが
+   * した（レビュー）。同じシートの中で「アーカイブしますか？」を挟む。
+   */
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
 
   const proposed = questions.filter(
     (q) => q.isProposedByOryzae && !q.isValidatedByUser && !q.isArchived,
@@ -72,10 +77,12 @@ export function SpQuestions({
   const atLimit = active.length >= MAX_ACTIVE_QUESTIONS;
 
   function openAdd() {
+    setConfirmingArchive(false);
     setDraft('');
     setSheet({ mode: 'add' });
   }
   function openEdit(id: string, text: string) {
+    setConfirmingArchive(false);
     setDraft(text);
     setSheet({ mode: 'edit', id });
   }
@@ -94,6 +101,7 @@ export function SpQuestions({
     setSubmitting(true);
     await archiveQuestion(sheet.id);
     setSubmitting(false);
+    setConfirmingArchive(false);
     setSheet(null);
   }
 
@@ -319,12 +327,49 @@ export function SpQuestions({
                 {t('save')}
               </button>
             </div>
-            {/* 「終える」は破壊的な操作なので、保存の行から離して下に。 */}
-            {sheet.mode === 'edit' ? (
+            {/* アーカイブは保存の行から離して下に。押したら同じ場所で確かめる。 */}
+            {sheet.mode === 'edit' && confirmingArchive ? (
+              <div
+                data-archive-confirm
+                className="mt-6 flex flex-col gap-2 rounded-2xl p-4"
+                style={{ ...CONTROL_FONT, background: 'var(--surface-sunken)' }}
+              >
+                <p className="m-0 text-[14px] font-medium" style={{ color: 'var(--fg)' }}>
+                  {t('archive_confirm_title')}
+                </p>
+                <p
+                  className="m-0 text-[12px] leading-relaxed"
+                  style={{ color: 'var(--date-color)' }}
+                >
+                  {t('archive_confirm_body')}
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setConfirmingArchive(false)}
+                    className="min-h-[44px] flex-1 rounded-full text-[13px] disabled:opacity-50"
+                    style={{ color: 'var(--fg)', background: 'var(--surface-raised)' }}
+                  >
+                    {t('archive_cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    data-archive-confirm-yes
+                    disabled={submitting}
+                    onClick={remove}
+                    className="min-h-[44px] flex-1 rounded-full text-[13px] font-medium text-white disabled:opacity-50"
+                    style={{ background: 'var(--ob-jar-warm)' }}
+                  >
+                    {t('archive_confirm')}
+                  </button>
+                </div>
+              </div>
+            ) : sheet.mode === 'edit' ? (
               <button
                 type="button"
                 disabled={submitting}
-                onClick={remove}
+                onClick={() => setConfirmingArchive(true)}
                 className="mt-6 min-h-[40px] w-full whitespace-nowrap rounded-full text-[13px] disabled:opacity-50"
                 style={{
                   ...CONTROL_FONT,
