@@ -37,6 +37,7 @@ import '@/features/pc/entries/components/entry-card.verify';
 import '@/features/pc/entries/components/entry-kebab-menu.verify';
 import '@/features/pc/entries/components/entry-list.verify';
 import '@/features/pc/entries/components/fermentation-sidebar.verify';
+import '@/features/pc/entries/components/inline-image-drop-indicator.verify';
 import '@/features/pc/entries/components/inline-image-overlay.verify';
 import '@/features/pc/entries/components/leave-confirm-modal.verify';
 import '@/features/pc/entries/components/link-question-nudge-modal.verify';
