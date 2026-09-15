@@ -14,6 +14,7 @@ import type { OnboardingResult } from '@/features/shared/onboarding/types';
 import { BackToStudy, STUDY_EXIT_BAND } from '@/features/shared/study/components/back-to-study';
 import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
+import { StudyIcon } from '@/features/shared/study/components/study-icon';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
@@ -120,7 +121,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const backLink = useMemo(
     () =>
       showBackToStudy
-        ? { href: STUDY_PATH, label: tStudy('title'), ariaLabel: tStudy('back_to_study') }
+        ? {
+            href: STUDY_PATH,
+            label: tStudy('title'),
+            ariaLabel: tStudy('back_to_study'),
+            icon: <StudyIcon />,
+          }
         : null,
     [showBackToStudy, tStudy],
   );

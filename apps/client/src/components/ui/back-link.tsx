@@ -3,7 +3,9 @@
 import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import {
-  HOVER_CLASS,
+  ELEVATED_CHIP_CLASS,
+  ELEVATED_CHIP_STYLE,
+  HEADER_CHIP_CLASS,
   ICON_STROKE_WIDTH,
   SHELL_INSET,
   SHELL_ROW_HEIGHT,
@@ -11,7 +13,7 @@ import {
 import { useBackLink } from '@/lib/back-link-context';
 
 /**
- * 画面の左上の「‹ 書斎」。行き先と文言は `BackLinkProvider` から受け取り、無ければ描かない。
+ * 画面の左上の「‹ 書斎」。行き先・文言・記号は `BackLinkProvider` から受け取り、無ければ描かない。
  *
  * ### なぜ浮かせずにヘッダーへ入れるのか
  *
@@ -31,11 +33,10 @@ import { useBackLink } from '@/lib/back-link-context';
  *
  * ### 見た目
  *
- * 面も縁も持たない。名前と山形だけの文字で、ホバーで地が沈む（`HOVER_CLASS`）。
- * 問いのチップや「問いの変遷」と同じ面にすると、道具が 1 つ増えたように見える。
- * 出口は道具ではなく、画面の見出しの一部として読ませる。
- *
- * 見える名前は行き先だけ（「書斎」）。iOS の戻ると同じで、山形が「戻る」を言う。
+ * **隣に並ぶ「問いを紐づける」と同じボタン**（寸法 `HEADER_CHIP_CLASS`・面 `ELEVATED_CHIP_*`）
+ * で、縁だけを深い緑（`--accent`）にする。面を持たない文字だけの版は「問いを紐づける」と
+ * 並ぶと別の部品に見えた（オーナーの判断）。並びは「‹ 書斎 ＋ 書斎の絵」。絵を山形の隣に
+ * 置くと記号が 2 つ続いて窮屈なので、名前の後ろに添える。絵の色も縁と同じ緑。
  */
 export function BackLink({ placement = 'inline' }: { placement?: 'inline' | 'corner' }) {
   const target = useBackLink();
@@ -45,11 +46,9 @@ export function BackLink({ placement = 'inline' }: { placement?: 'inline' | 'cor
     <Link
       href={target.href}
       aria-label={target.ariaLabel}
-      {...verifyAttrs({ unit: 'BackLink', placement })}
-      // 山形の左に 6px の遊びを持たせ、そのぶん外へ出す。字と山形が行の縦線に乗り、
-      // ホバーの地だけが線の外へはみ出す。高さは問いのチップ（36px）と揃える。
-      className={`-ml-1.5 flex h-9 shrink-0 items-center gap-1 rounded-full pr-3 pl-1.5 text-[13px] tracking-[0.06em] ${HOVER_CLASS}`}
-      style={{ color: 'var(--fg)' }}
+      {...verifyAttrs({ unit: 'BackLink', placement, hasIcon: Boolean(target.icon) })}
+      className={`${HEADER_CHIP_CLASS} ${ELEVATED_CHIP_CLASS}`}
+      style={{ ...ELEVATED_CHIP_STYLE, borderColor: 'var(--accent)' }}
     >
       <svg
         aria-hidden="true"
@@ -61,10 +60,27 @@ export function BackLink({ placement = 'inline' }: { placement?: 'inline' | 'cor
         strokeWidth={ICON_STROKE_WIDTH}
         strokeLinecap="round"
         strokeLinejoin="round"
+        // 山形の描画は 24 の枠の 9〜15 にしか無く、左右に 6px ずつ空きがある。
+        // そのぶん詰めて、縁から山形・山形から名前の見た目の間隔を余白と揃える。
+        className="-mx-1.5 shrink-0"
       >
         <path d="m15 18-6-6 6-6" />
       </svg>
-      <span className="whitespace-nowrap">{target.label}</span>
+      {/* **字だけ 1px 上げる。** 日本語の字面は行の箱の中で下に寄るので、中央揃えだと
+          山形より 0.75px 低く見える（画素で測った。1px 上げると差は 0.25px）。
+          0.5px は画素に丸められて効かない。 */}
+      <span className="relative -top-px whitespace-nowrap">{target.label}</span>
+      {target.icon ? (
+        // 絵の枠の左右に空きがある（左 4px・右 2px）。名前に寄せ、縁までの見た目の余白を
+        // 山形の側と揃える。
+        <span
+          aria-hidden="true"
+          className="-mr-0.5 -ml-1 flex shrink-0"
+          style={{ color: 'var(--accent)' }}
+        >
+          {target.icon}
+        </span>
+      ) : null}
     </Link>
   );
 
