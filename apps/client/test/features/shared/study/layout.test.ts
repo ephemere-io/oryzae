@@ -104,14 +104,19 @@ describe('ヘルプのメモの置き場', () => {
     expect(memo.position.y - MEMO_PAPER.wall.height / 2).toBeGreaterThan(PC_LAYOUT.jar.y + 2);
   });
 
-  it('PC の板は右へ寄せ、積みと棚は離してある（被り気味の指摘への答え）', () => {
-    // 板の左に紙 1 枚ぶん（2.0）以上の壁を空ける。
+  it('PC の板は右へ寄せ、積みと棚は奥行きで離してある（被り気味の指摘への答え）', () => {
+    // 板の左に紙 1 枚ぶん以上の壁を空ける。
     const boardLeft = PC_LAYOUT.board.position.x - (8 * PC_LAYOUT.board.scale) / 2;
-    expect(boardLeft - PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(MEMO_PAPER.wall.width + 1);
-    // 棚は積みの右上に重ならないよう、積みより 4 以上右。
-    expect(PC_LAYOUT.shelf.position.x - PC_LAYOUT.desk.x).toBeGreaterThan(4);
-    // 棚は天板の中。
-    expect(PC_LAYOUT.shelf.position.x + 1.5).toBeLessThan(PC_LAYOUT.deskTop.xRight);
+    expect(boardLeft - PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(MEMO_PAPER.wall.width + 0.5);
+    // 積みは机の右寄り（「本とペンをもう少し右に」）、棚はさらに右で壁際。
+    expect(PC_LAYOUT.desk.x).toBeGreaterThan(2.5);
+    expect(PC_LAYOUT.shelf.position.x - PC_LAYOUT.desk.x).toBeGreaterThan(3);
+    expect(PC_LAYOUT.shelf.position.z).toBeLessThan(PC_LAYOUT.desk.z - 5);
+    // 棚は天板の中（台の半幅 1.4）。
+    expect(PC_LAYOUT.shelf.position.x + 1.4).toBeLessThan(PC_LAYOUT.deskTop.xRight);
+    // 天板は物の外側にぎりぎりの余白（瓶 -4.0 ± 1.3 が左端を決める）。
+    expect(PC_LAYOUT.deskTop.xLeft).toBeLessThan(PC_LAYOUT.jar.x - 1.3);
+    expect(PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(PC_LAYOUT.jar.x - 2.0);
   });
 
   it('SP は机の手前に置く（壁に余白が無い）', () => {

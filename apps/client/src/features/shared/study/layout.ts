@@ -111,9 +111,9 @@ function vec3(x: number, y: number, z: number): Vec3 {
  * 台が重なって「エントリーとアーカイブが被り気味」と報告された。積みを左へ（3 → 1.6）、
  * 棚を右へ（4.9 → 5.8）動かして、画面上で分かれるようにする。
  */
-const PC_SHELF = vec3(5.8, -1.2, -3.2);
-/** 机の積み。棚から離すため左へ寄せた（上の注釈）。 */
-const PC_DESK = vec3(1.6, -1, 2);
+const PC_SHELF = vec3(6.0, -1.2, -4.0);
+/** 机の積み。棚とは奥行きで分け（棚は壁際へ）、積みは右のまま手前に置く。 */
+const PC_DESK = vec3(2.8, -1, 2.1);
 const SP_SHELF = vec3(2.0, -1.2, -2.6);
 const SP_SHELF_SCALE = 0.72;
 const SP_DESK = vec3(0.95, -1, 2.7);
@@ -127,29 +127,36 @@ export const PC_LAYOUT: StudyLayout = {
      * ころは板の上辺が画面の上端ぴったりに写っていて、少しでも寄ると切れた
      * （「ボードの上側が切れる」— 実機レビュー）。上辺の上に余白を残す。
      */
-    position: vec3(0, 4.3, 12.6),
-    target: vec3(0, 0.45, 0),
-    // ボードの上辺の中央（板の中心 y=2.5 ＋ 高さ 5 の半分）。
-    frameTop: vec3(1.7, 5, -4),
+    position: vec3(0.6, 4.1, 11.5),
+    target: vec3(0.6, 0.45, 0),
+    // ボードの上辺の中央（板の中心 y=2.4 ＋ 高さ 5 の半分）。
+    frameTop: vec3(1.5, 4.9, -4),
     near: 0.1,
     far: 100,
   },
   parallax: { x: 0.55, y: 0.3, lerp: 0.05 },
-  jar: vec3(-4.2, -1.2, 1),
-  /** 板は右へ（0.9 → 1.7）。左の壁にメモを貼る場所を空ける（オーナーの依頼）。 */
-  board: { position: vec3(1.7, 2.5, -4), scale: 1 },
+  jar: vec3(-3.4, -1.2, 1),
+  /**
+   * 板は右へ（0.9 → 1.5）。左の壁にメモを貼る場所を空ける（オーナーの依頼）。
+   * 少し下げる（2.5 → 2.4）のは、カメラを寄せても上辺の上に余白を残すため。
+   */
+  board: { position: vec3(1.5, 2.4, -4), scale: 1 },
   desk: PC_DESK,
   pen: vec3(2.55, -0.15, -0.1),
   shelf: { position: PC_SHELF, scale: 1, tiltX: 0 },
   // 右は棚のぶんだけ伸ばし（元 6.6 → 8.6）、左は元の幅に近いところへ戻す。
   // **物の座標は動かさない** — 構図（瓶・積み・棚の位置関係）は設計の一部。
-  deskTop: { y: -1.2, xLeft: -6.2, xRight: 8.6, zNear: 4.3, zFar: -4.6 },
+  /**
+   * 天板は物の外側にぎりぎり余白を残す幅（「余りすぎ」と報告された。物を寄せて机も詰める）。
+   * 左は瓶（-4.0 ± 1.3）、右は棚（6.0 ± 1.4）、手前は積み（z 2.1 + 1.7）が決める。
+   */
+  deskTop: { y: -1.2, xLeft: -4.9, xRight: 7.6, zNear: 4.1, zFar: -4.7 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.pc,
   labelAnchors: {
-    jar: vec3(-4.2, -1.14, 2.7),
+    jar: vec3(-3.4, -1.14, 2.7),
     journal: vec3(PC_DESK.x, -1.14, 4.12),
-    board: vec3(1.7, -0.28, -4.05),
+    board: vec3(1.5, -0.28, -4.05),
     /**
      * 棚（過去の手帳）。**当初は出していなかった** — ホバーすれば背表紙の
      * ツールチップが出るから、という理由だった。
@@ -167,7 +174,7 @@ export const PC_LAYOUT: StudyLayout = {
      * 積み（x は 1.7..4.3）の外側へ出し、**手前へ十分に寄せる**。奥のままだと、俯瞰では
      * 画面の上のほうに投影されて棚の絵と混ざる（「もう少し手前に」と再度報告された）。
      */
-    archive: vec3(PC_SHELF.x + 1.5, -1.14, PC_SHELF.z + 2.0),
+    archive: vec3(PC_SHELF.x + 0.4, -1.14, PC_SHELF.z + 2.4),
     /**
      * 鉛筆の真下（画面では鉛筆のすぐ下）。鉛筆は積みの右脇に前後向きで寝ていて、中心は
      * 机ローカル (2.55, -0.15, -0.1) を積みの向き（-0.15 rad）で回した world ≈
@@ -183,8 +190,8 @@ export const PC_LAYOUT: StudyLayout = {
    * の真上の壁になり、瓶（天板から 3.4）の上を視線が通るので手前の瓶には隠れない。
    * 高さは板の上寄り（板は y 0..5）。
    */
-  memo: { position: vec3(-4.3, 2.9, -4), surface: 'wall' },
-  focusBounds: { x: [-5, 6], y: [-1.2, 4.5], z: [-3, 3] },
+  memo: { position: vec3(-3.9, 2.8, -4), surface: 'wall' },
+  focusBounds: { x: [-4.5, 6], y: [-1.2, 4.5], z: [-3, 3] },
 };
 
 export const SP_LAYOUT: StudyLayout = {

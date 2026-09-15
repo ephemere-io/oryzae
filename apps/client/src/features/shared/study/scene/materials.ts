@@ -65,8 +65,6 @@ export interface StudyMaterials {
   solid: MeshBasicMaterial;
   paper: MeshBasicMaterial;
   cork: MeshBasicMaterial;
-  /** セロハンテープ。コルクと同じ生成りを半透明にしたもの。 */
-  tape: MeshBasicMaterial;
   ink: LineBasicMaterial;
   grid: LineBasicMaterial;
   /** 床の格子。気配だけ残す濃度。 */
@@ -148,14 +146,6 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
       polygonOffsetUnits: 1,
     }),
   );
-  const tape = own(
-    new MeshBasicMaterial({
-      color: palette.cork,
-      transparent: true,
-      opacity: 0.5,
-      depthWrite: false,
-    }),
-  );
   const ink = own(new LineBasicMaterial({ color: palette.ink }));
   const grid = own(new LineBasicMaterial({ color: palette.grid }));
   const gridFaint = own(
@@ -172,7 +162,6 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
     solid,
     paper,
     cork,
-    tape,
     ink,
     grid,
     gridFaint,
