@@ -117,6 +117,8 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
     // 「100%」は壜とまわりの円が収まる姿。PC の「world 1 = 1px」を使うと、100% で壜が画面いっぱいに
     // なった（実機レビュー）。
     referenceBounds: HOME,
+    // 引けるのは 100% の半分まで。そこからさらに引くと書斎へ戻る（88% ですぐ戻っていた。実機レビュー）。
+    minZoom: 0.5,
     fitPadding: 16,
     // 「全体」は HOME（壜と既定の席の円が入る窓）。殻の高さが測り直されて frame が変わると hook が
     // ここへ収め直すので、世界全体（WORLD）を返すと壜が小さくなる。
@@ -140,6 +142,7 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
             <CanvasZoomControls
               scale={canvas.viewport.scale}
               referenceScale={canvas.referenceScale}
+              scaleBounds={canvas.scaleBounds}
               onZoomIn={canvas.zoomIn}
               onZoomOut={canvas.zoomOut}
               onReset={canvas.resetZoom}
@@ -272,14 +275,22 @@ export function SpJarMap({ questions, onSelect, onMove }: SpJarMapProps) {
                 data-circle-content
                 // 幅は円の直径に対する割合で決める（円の大きさを変えても字の入り方が変わらない）。印と縦に
                 // 並ぶときは、かたまりの上下が円の狭いところに掛かるので細くする。字と印の間は字の高さで取る。
+                // 手紙の印があるときは、上に問いの半行ぶんの余白を足す（かたまりが 4 分の 1 行ぶん下がる）。濃い問いの
+                // 行が上、淡い印が下にあるので、形の中心を円の中心に揃えても重さは上に寄り、上に寄って見えた
+                // （実機レビュー: 計算上合っていても気持ち下に）。量は数値でなく問いの行の高さ（`lh`）で決める。
                 className="flex flex-col items-center"
-                style={{ width: question.hasLetter ? '74%' : '80%', gap: '0.9em', fontSize: 48 }}
+                style={{
+                  width: question.hasLetter ? '74%' : '80%',
+                  gap: '0.9em',
+                  fontSize: 48,
+                  lineHeight: 1.35,
+                  paddingBlockStart: question.hasLetter ? '0.5lh' : undefined,
+                }}
               >
                 <span
                   className="block"
                   style={{
                     fontFamily: "'Noto Serif JP', serif",
-                    lineHeight: 1.35,
                     color: 'var(--fg)',
                     opacity: 0.85,
                     letterSpacing: '0.04em',

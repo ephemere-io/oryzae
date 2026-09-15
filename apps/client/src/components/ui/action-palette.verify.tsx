@@ -76,7 +76,7 @@ registerUnit<Props>({
     {
       id: 'press-locked',
       probe: true,
-      description: 'Probe: 押せない列を押しても何も起きず、列は残る',
+      description: 'Probe: 押せない列を押すと理由が出て、列は残る',
       props: { actions: CARD, keyboardOpen: true },
       act: async (ctx) => {
         await ctx.click('button[data-palette-action="locked"]');
@@ -84,8 +84,26 @@ registerUnit<Props>({
         await ctx.wait(16);
       },
     },
+    {
+      id: 'hint',
+      description: '押せない操作を押すと、理由がパレットの上に 1 行で出る',
+      props: { actions: CARD, keyboardOpen: false },
+      act: async (ctx) => {
+        await ctx.click('button[data-palette-action="locked"]');
+        await ctx.wait(16);
+      },
+    },
   ],
   invariants: [
+    {
+      id: 'disabled-press-says-why',
+      description: '押せない操作を押したら、その理由が見える（読み上げだけにしない）',
+      onlyFixtures: ['hint'],
+      check: ({ root }) => {
+        const hint = root.querySelector('[data-palette-hint]');
+        return (hint?.textContent ?? '').includes('漬け込み済み') || '理由が出ていない';
+      },
+    },
     {
       id: 'one-button-per-action',
       description: '並べた数だけ押せる列がある',

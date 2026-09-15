@@ -76,7 +76,7 @@ registerUnit<Props>({
   fixtures: [
     {
       id: 'empty',
-      description: '新規・本文空（保存ステータスは非表示、発酵 CTA も出ない）',
+      description: '新規・本文空（保存ステータスは非表示、発酵 CTA は並ぶが押せない）',
       props: { api: null, persistDraft: false },
     },
     {
@@ -197,7 +197,7 @@ registerUnit<Props>({
       act: async (ctx) => {
         await ctx.click('button[aria-label="表示の設定"]');
         await ctx.wait(32);
-        await ctx.click('[data-settings-delete]');
+        await ctx.click('[data-row-action="delete-entry"]');
         await ctx.wait(16);
       },
     },
@@ -216,15 +216,16 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'ferment-cta-iff-hasentry',
-      description: '発酵 CTA は hasEntry=true（entryId 確定）のときだけ描画される',
+      id: 'ferment-cta-always',
+      description:
+        '発酵 CTA は最初から並ぶ（実機レビュー）。本文も保存も無いうちは押せない（押すと理由が出る）',
       check: ({ root, contract }) => {
-        const hasCta = Boolean(root.querySelector('button[data-palette-action="ferment"]'));
-        const expectEntry = contract.hasEntry === 'true';
-        return (
-          hasCta === expectEntry ||
-          `発酵 CTA present=${hasCta} だが contract.hasEntry="${contract.hasEntry}"`
-        );
+        const cta = root.querySelector('button[data-palette-action="ferment"]');
+        if (!cta) return '発酵 CTA が無い';
+        if (contract.hasBody === 'false' && contract.hasEntry === 'false') {
+          return cta.getAttribute('aria-disabled') === 'true' || '本文が無いのに押せる';
+        }
+        return true;
       },
     },
     {
@@ -243,9 +244,9 @@ registerUnit<Props>({
     },
     {
       id: 'sheet-present-iff-open',
-      description: '選び手（閉じるボタン）は pickerOpen=true のときだけ描画される',
+      description: '選び手は pickerOpen=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasSheet = Boolean(root.querySelector('button[aria-label="閉じる"]'));
+        const hasSheet = Boolean(root.querySelector('[data-verify-unit="QuestionPicker"]'));
         const expectOpen = contract.pickerOpen === 'true';
         return (
           hasSheet === expectOpen ||
@@ -255,7 +256,7 @@ registerUnit<Props>({
     },
     {
       id: 'default-collapsed-empty',
-      description: '初期状態は本文空・シート閉・発酵 CTA 無し',
+      description: '初期状態は本文空・シート閉・保存前',
       onlyFixtures: ['empty'],
       check: ({ contract }) =>
         (contract.hasBody === 'false' &&
@@ -353,9 +354,14 @@ registerUnit<Props>({
     },
     {
       id: 'delete-row-iff-settings-open-and-hasentry',
-      description: '削除の行は、設定シートが開いていて hasEntry=true のときだけ描画される',
+      description:
+        '削除の行は、設定シートが開いていて hasEntry=true のときだけ描画される（引っ込む動きの途中は数えない）',
       check: ({ root, contract }) => {
-        const hasRow = Boolean(root.querySelector('[data-settings-delete]'));
+        const hasRow = Boolean(
+          root.querySelector(
+            '[data-sheet-phase]:not([data-sheet-phase="closing"]) [data-row-action="delete-entry"]',
+          ),
+        );
         const expectRow = contract.settingsOpen === 'true' && contract.hasEntry === 'true';
         return (
           hasRow === expectRow ||

@@ -88,6 +88,8 @@ describe('zoomAt', () => {
   it('倍率が範囲外に出ない', () => {
     expect(zoomAt({ x: 0, y: 0, scale: 1 }, 0, 0, 1000).scale).toBe(MAX_SCALE);
     expect(zoomAt({ x: 0, y: 0, scale: 1 }, 0, 0, 0.0001).scale).toBe(MIN_SCALE);
+    // 画面ごとの上限と下限（SP の瓶は 100% を基準に下限を決める）。
+    expect(zoomAt({ x: 0, y: 0, scale: 0.2 }, 0, 0, 0.1, { min: 0.1, max: 3 }).scale).toBe(0.1);
   });
 
   it('往復ズームで元のビューポートに戻る', () => {

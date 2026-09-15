@@ -161,12 +161,12 @@
     "picker": {
       "title": "Link a question",
       "empty": "You have no open questions yet. Write one here.",
-      "new": "+ Write a new question",
+      "new": "Write a new question",
       "new_placeholder": "Write a question (e.g. What did I notice today?)",
       "create": "Use this question",
       "creating": "Creating…",
       "create_failed": "Couldn't create the question. Please try again.",
-      "back_to_list": "← Pick from existing questions",
+      "back_to_list": "Pick from existing questions",
       "search_placeholder": "Find a question",
       "untitled": "Untitled question",
       "close": "Close",
@@ -774,7 +774,8 @@
       "result_not_fermented": "This question has not fermented yet.",
       "result_latest": "Latest",
       "result_question_aria": "Which question to show",
-      "result_round_aria": "Which fermentation to show"
+      "result_round_aria": "Which fermentation to show",
+      "ferment_needs_body": "Write something to pickle this entry"
     },
     "nav": {
       "back": "Back",
@@ -796,13 +797,12 @@
       "section_sources": "From these entries",
       "source_untitled": "Untitled entry",
       "no_questions": "No questions yet. Start one with the button below.",
-      "manage_questions": "Add or edit questions",
+      "manage_questions": "Questions",
       "not_fermented": "This question hasn't fermented yet",
       "selection_reason": "Why this was chosen",
       "palette_aria": "Jar actions",
       "letter_badge": "Letter",
       "letter_badge_unread": "New letter",
-      "history": "Past",
       "history_latest": "Latest"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
@@ -832,19 +832,19 @@
       "sheet_add": "New question",
       "sheet_edit": "Edit question",
       "placeholder": "Write a question",
-      "delete": "Archive this question",
       "cancel": "Cancel",
       "save": "Save",
       "letter_arrived": "A letter has arrived",
       "close": "Close",
-      "limit": "You can have up to {max} questions. Tap a question above and choose “Archive this question” to make room.",
+      "limit": "You can have up to {max} questions. Tap a question above and choose “Archive” to make room.",
       "archive_confirm_title": "Archive this question?",
       "archive_confirm_body": "You can bring it back from “Archived questions” at the bottom of this screen.",
       "archive_confirm": "Archive",
       "archive_cancel": "Cancel",
       "archived_section": "Archived questions ({count})",
       "unarchive": "Restore",
-      "unarchive_limit": "You can have up to {max} questions. Archive one to restore this."
+      "unarchive_limit": "You can have up to {max} questions. Archive one to restore this.",
+      "archive": "Archive"
     },
     "board": {
       "cards": "{count} cards",

@@ -44,7 +44,7 @@ const MAX_RETRIES = 5;
 // 打ち間違いの1文字でエントリが生えないための最小限。**短い記録を弾く値にしてはいけない**
 // （「今日は疲れた」で終える人がいる。Issue #510 はまさにそれが消える話だった）。
 // 数えるのはタイトル + 本文（composeContent の結果）。
-const DEFAULT_MIN_CREATE_CHARS = 2;
+export const DEFAULT_MIN_CREATE_CHARS = 2;
 
 /** エディタの保存形式（先頭行＝タイトル）。 */
 function composeContent(title: string, body: string): string {

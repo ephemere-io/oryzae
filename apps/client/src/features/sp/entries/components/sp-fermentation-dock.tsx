@@ -156,8 +156,8 @@ export function SpFermentationDock({
                 onClick={() => onRoundChange(item.id)}
                 data-result-round={item.id}
               >
-                {index === 0 ? `${t('result_latest')} · ` : ''}
-                {formatMonthDay(item.createdAt)}
+                {/* 最初は「最新」だけ、ほかは日付（「これまで」などの前置きは言わない。実機レビュー）。 */}
+                {index === 0 ? t('result_latest') : formatMonthDay(item.createdAt)}
               </Chip>
             ))}
           </Chips>

@@ -381,4 +381,16 @@ describe('SpEntryEditor', () => {
     expect(picker).not.toBeNull();
     expect(picker?.textContent).not.toContain(jaMessages.entry_questions.picker.title);
   });
+
+  it('「漬け込む」は書く前から並び、押すと書けば漬け込めることを言う', () => {
+    renderEditor(createMockApi(apiFetch));
+    const ferment = document.querySelector('[data-palette-action="ferment"]');
+    expect(ferment).not.toBeNull();
+    expect(ferment?.getAttribute('aria-disabled')).toBe('true');
+    expect(document.querySelector('[data-palette-hint]')).toBeNull();
+    if (ferment instanceof HTMLElement) fireEvent.click(ferment);
+    expect(document.querySelector('[data-palette-hint]')?.textContent).toBe(
+      jaMessages.sp.editor.ferment_needs_body,
+    );
+  });
 });

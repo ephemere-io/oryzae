@@ -4,6 +4,7 @@ import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { ActionRow } from '@/components/ui/action-row';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import type { QuestionItem } from '@/features/shared/questions/types';
@@ -44,10 +45,6 @@ type Sheet = { mode: 'add' } | { mode: 'edit'; id: string };
  * 追加・編集は高さを変えられるセミモーダル（`BottomSheet`）。キーボードが出るので
  * 高い段から開く。
  */
-/** シートの操作のボタン。見出しの「キャンセル」と同じ高さ・角丸・字で揃える（保存・確かめ）。 */
-const SHEET_BUTTON =
-  'min-h-[40px] shrink-0 whitespace-nowrap rounded-full border px-4 text-[13px] disabled:opacity-50';
-
 export function SpQuestions({
   questions,
   loading,
@@ -361,25 +358,8 @@ export function SpQuestions({
         ariaLabel={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
         label={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
         closeLabel={t('cancel')}
-        action={
-          sheet ? (
-            <button
-              type="button"
-              data-question-save
-              disabled={submitting || !draft.trim()}
-              onClick={submit}
-              className={`${SHEET_BUTTON} font-medium`}
-              style={{
-                ...CONTROL_FONT,
-                color: '#fff',
-                background: 'var(--accent)',
-                borderColor: 'var(--accent)',
-              }}
-            >
-              {t('save')}
-            </button>
-          ) : null
-        }
+        // キャンセルは操作の行に固める（見出しには名前だけ）。
+        closeInHeader={false}
         detents={['content', 'full']}
         initialDetent="content"
       >
@@ -402,77 +382,95 @@ export function SpQuestions({
               }}
             />
             {/*
-              アーカイブは取り返しのつく破壊的な操作。保存・キャンセル（見出しに並ぶ）から離して、中身のいちばん
-              下に文字だけで置く。押すと同じ場所が確かめに変わる（面を敷かない。以前は灰色の面が急に出た）。
+              操作は書く欄のすぐ下の 1 行に固める（左上中心主義: 左からいちばん押してほしい「保存」、「キャンセル」、
+              押されたくない「アーカイブ」は右端）。以前は保存とキャンセルが見出し、アーカイブが離れた下、と散っていた。
+              アーカイブは同じ行が確かめに変わる（面を敷かない）。
             */}
-            {sheet.mode === 'edit' ? (
-              confirmingArchive ? (
-                <div data-archive-confirm className="mt-5 flex flex-col gap-3" style={CONTROL_FONT}>
-                  <div className="flex flex-col gap-1">
-                    <p className="m-0 text-[14px] font-medium" style={{ color: 'var(--fg)' }}>
-                      {t('archive_confirm_title')}
-                    </p>
-                    <p
-                      className="m-0 text-[12px] leading-relaxed"
-                      style={{ color: 'var(--date-color)' }}
-                    >
-                      {t('archive_confirm_body')}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => setConfirmingArchive(false)}
-                      className={SHEET_BUTTON}
-                      style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
-                    >
-                      {t('archive_cancel')}
-                    </button>
-                    <button
-                      type="button"
-                      data-archive-confirm-yes
-                      disabled={submitting}
-                      onClick={remove}
-                      className={`${SHEET_BUTTON} font-medium`}
-                      style={{
-                        color: '#fff',
-                        background: 'var(--ob-jar-warm)',
-                        borderColor: 'var(--ob-jar-warm)',
-                      }}
-                    >
-                      {t('archive_confirm')}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  data-archive-question
-                  disabled={submitting}
-                  onClick={() => setConfirmingArchive(true)}
-                  className="-ml-1 mt-4 flex min-h-[44px] items-center gap-2 px-1 text-[13px] disabled:opacity-50"
-                  style={{ ...CONTROL_FONT, color: 'var(--ob-jar-warm)' }}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    aria-hidden="true"
+            {sheet.mode === 'edit' && confirmingArchive ? (
+              <div data-archive-confirm className="mt-4 flex flex-col gap-3" style={CONTROL_FONT}>
+                <div className="flex flex-col gap-1">
+                  <p className="m-0 text-[14px] font-medium" style={{ color: 'var(--fg)' }}>
+                    {t('archive_confirm_title')}
+                  </p>
+                  <p
+                    className="m-0 text-[12px] leading-relaxed"
+                    style={{ color: 'var(--date-color)' }}
                   >
-                    <title>archive</title>
-                    <path d="M4 7h16v3H4zM6 10v9h12v-9M10 14h4" strokeLinejoin="round" />
-                  </svg>
-                  {t('delete')}
-                </button>
-              )
-            ) : null}
+                    {t('archive_confirm_body')}
+                  </p>
+                </div>
+                <ActionRow
+                  actions={[
+                    {
+                      id: 'archive-cancel',
+                      label: t('archive_cancel'),
+                      tone: 'secondary',
+                      disabled: submitting,
+                      onSelect: () => setConfirmingArchive(false),
+                    },
+                    {
+                      id: 'archive-confirm',
+                      label: t('archive_confirm'),
+                      tone: 'danger',
+                      disabled: submitting,
+                      icon: <ArchiveIcon />,
+                      onSelect: remove,
+                    },
+                  ]}
+                />
+              </div>
+            ) : (
+              <div className="mt-4">
+                <ActionRow
+                  actions={[
+                    {
+                      id: 'save',
+                      label: t('save'),
+                      tone: 'primary',
+                      disabled: submitting || !draft.trim(),
+                      onSelect: submit,
+                    },
+                    {
+                      id: 'cancel',
+                      label: t('cancel'),
+                      tone: 'secondary',
+                      onSelect: () => setSheet(null),
+                    },
+                    ...(sheet.mode === 'edit'
+                      ? [
+                          {
+                            id: 'archive',
+                            label: t('archive'),
+                            tone: 'danger' as const,
+                            disabled: submitting,
+                            icon: <ArchiveIcon />,
+                            onSelect: () => setConfirmingArchive(true),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
+            )}
           </>
         ) : null}
       </BottomSheet>
     </div>
+  );
+}
+
+function ArchiveIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16v3H4zM6 10v9h12v-9M10 14h4" strokeLinejoin="round" />
+    </svg>
   );
 }

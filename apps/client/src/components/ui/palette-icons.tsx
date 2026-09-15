@@ -42,8 +42,8 @@ export function TrashIcon() {
   );
 }
 
-/** 書く・直す（鉛筆）。問いの追加・編集のように「足す」だけでなく「直す」も含む入口にも使う。 */
-export function PencilIcon() {
+/** 書く（鉛筆）。 */
+function PencilIcon() {
   return (
     <svg {...iconProps()} aria-hidden="true">
       <path d="M12 20h9" />
@@ -55,6 +55,21 @@ export function PencilIcon() {
 /** スニペットを書く（鉛筆と同じ絵）。 */
 export function SnippetIcon() {
   return <PencilIcon />;
+}
+
+/**
+ * 問いの一覧（行の並び）。追加・編集・アーカイブ・戻すをする画面への入口。＋（追加だけ）や鉛筆（編集だけ）では
+ * 入口の中身を言い切れなかった（実機レビュー）。
+ */
+export function QuestionListIcon() {
+  return (
+    <svg {...iconProps()} aria-hidden="true">
+      <path d="M9 6h11M9 12h11M9 18h11" />
+      <circle cx="4.5" cy="6" r="1" />
+      <circle cx="4.5" cy="12" r="1" />
+      <circle cx="4.5" cy="18" r="1" />
+    </svg>
+  );
 }
 
 export function ScanTextIcon() {

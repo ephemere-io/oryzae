@@ -122,7 +122,7 @@ registerUnit<Props>({
         const buttons = Array.from(ctx.root.querySelectorAll('button'));
         buttons.find((b) => b.querySelector('title')?.textContent === 'edit')?.click();
         await ctx.wait(16);
-        await ctx.click('[data-archive-question]');
+        await ctx.click('[data-row-action="archive"]');
         await ctx.wait(16);
       },
     },
@@ -160,7 +160,7 @@ registerUnit<Props>({
         await ctx.wait(16);
         await ctx.type('textarea', '今日の問い');
         await ctx.wait(16);
-        await ctx.click('[data-question-save]');
+        await ctx.click('[data-row-action="save"]');
         await ctx.wait(16);
       },
     },
@@ -181,17 +181,35 @@ registerUnit<Props>({
   ],
   invariants: [
     {
-      id: 'save-sits-beside-cancel',
-      description: '保存はシートの見出しでキャンセルの隣に、同じ高さで並ぶ',
+      id: 'actions-in-one-row',
+      description:
+        '操作は 1 行に固まる（左から保存・キャンセル、アーカイブは右端）。同じ高さで、見出しには閉じるが無い',
       onlyFixtures: ['add-sheet', 'edit-sheet'],
-      check: ({ root }) => {
-        const save = root.querySelector<HTMLElement>('[data-question-save]');
-        const cancel = save?.previousElementSibling;
-        if (!save || !(cancel instanceof HTMLElement)) return '保存の隣にキャンセルが無い';
-        return (
-          Math.abs(save.getBoundingClientRect().height - cancel.getBoundingClientRect().height) <
-            1 || '保存とキャンセルの高さが違う'
-        );
+      check: ({ root, contract }) => {
+        const save = root.querySelector<HTMLElement>('[data-row-action="save"]');
+        const cancel = root.querySelector<HTMLElement>('[data-row-action="cancel"]');
+        if (!save || !cancel) return '保存かキャンセルが無い';
+        if (save.parentElement !== cancel.parentElement) return '保存とキャンセルが別の行にある';
+        const header = root.querySelector('[data-sheet-header]');
+        if ((header?.querySelectorAll('button').length ?? 0) > 0) {
+          return '見出しにボタンがある（操作が 2 か所に散る）';
+        }
+        const archive = root.querySelector<HTMLElement>('[data-row-action="archive"]');
+        if (contract.sheetMode === 'edit' && archive?.parentElement !== save.parentElement) {
+          return 'アーカイブが同じ行に無い';
+        }
+        const a = save.getBoundingClientRect();
+        const b = cancel.getBoundingClientRect();
+        // 配置を持たない環境（jsdom）では並びの形は測れない。ここまで（同じ行にあること）だけを見る。
+        if (a.width === 0) return true;
+        if (a.left >= b.left) return '保存がキャンセルより右にある（左上中心主義に反する）';
+        if (Math.abs(a.height - b.height) >= 1) return '保存とキャンセルの高さが違う';
+        if (contract.sheetMode === 'edit' && archive) {
+          const c = archive.getBoundingClientRect();
+          if (Math.abs(c.top - a.top) >= 1) return 'アーカイブが折り返して別の行にある';
+          if (c.left <= b.left) return 'アーカイブが右端に無い';
+        }
+        return true;
       },
     },
     {
@@ -235,7 +253,7 @@ registerUnit<Props>({
       description: '保存ボタンの disabled が contract（draftEmpty || submitting）と一致する',
       onlyFixtures: ['add-sheet', 'edit-sheet', 'submitting', 'whitespace-only'],
       check: ({ root, contract }) => {
-        const saveBtn = root.querySelector<HTMLButtonElement>('[data-question-save]');
+        const saveBtn = root.querySelector<HTMLButtonElement>('[data-row-action="save"]');
         const expectedDisabled = contract.draftEmpty === 'true' || contract.submitting === 'true';
         return (
           saveBtn?.disabled === expectedDisabled ||
@@ -279,7 +297,7 @@ registerUnit<Props>({
       description: '送信中は submitting=true で保存ボタンが disabled（多重送信不可）',
       onlyFixtures: ['submitting'],
       check: ({ root, contract }) => {
-        const saveBtn = root.querySelector<HTMLButtonElement>('[data-question-save]');
+        const saveBtn = root.querySelector<HTMLButtonElement>('[data-row-action="save"]');
         return (
           (contract.submitting === 'true' && saveBtn?.disabled === true) ||
           `expected submitting=true & disabled, got submitting=${contract.submitting}, disabled=${saveBtn?.disabled}`
@@ -291,7 +309,7 @@ registerUnit<Props>({
       description: '空白のみ入力でも draftEmpty=true のままで保存ボタンは disabled',
       onlyFixtures: ['whitespace-only'],
       check: ({ root, contract }) => {
-        const saveBtn = root.querySelector<HTMLButtonElement>('[data-question-save]');
+        const saveBtn = root.querySelector<HTMLButtonElement>('[data-row-action="save"]');
         return (
           (contract.draftEmpty === 'true' && saveBtn?.disabled === true) ||
           `expected draftEmpty=true & disabled after whitespace, got draftEmpty=${contract.draftEmpty}, disabled=${saveBtn?.disabled}`

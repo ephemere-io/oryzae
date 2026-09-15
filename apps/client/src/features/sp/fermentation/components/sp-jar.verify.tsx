@@ -163,10 +163,7 @@ registerUnit<Props>({
       check: ({ root }) => {
         // 下端の列（殻が無い孤立検証では画面の中に描かれる）。
         const fab = root.querySelector('button[data-palette-action="questions"]');
-        return (
-          fab?.getAttribute('aria-label') === '問いを追加・編集' ||
-          '「問いを追加・編集」の正円が無い'
-        );
+        return fab?.getAttribute('aria-label') === '問いの一覧' || '「問いの一覧」の入口が無い';
       },
     },
     {

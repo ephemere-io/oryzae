@@ -161,12 +161,12 @@
     "picker": {
       "title": "질문 연결",
       "empty": "아직 세운 질문이 없습니다. 여기서 하나 적어 보세요.",
-      "new": "+ 새 질문 쓰기",
+      "new": "새 질문 쓰기",
       "new_placeholder": "질문을 쓰세요 (예: 오늘의 작은 발견은?)",
       "create": "이 질문으로 하기",
       "creating": "만드는 중…",
       "create_failed": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
-      "back_to_list": "← 기존 질문에서 고르기",
+      "back_to_list": "기존 질문에서 고르기",
       "search_placeholder": "질문 찾기",
       "untitled": "제목 없는 질문",
       "close": "닫기",
@@ -774,7 +774,8 @@
       "result_not_fermented": "이 질문은 아직 발효되지 않았습니다.",
       "result_latest": "최신",
       "result_question_aria": "어떤 질문의 결과를 볼지",
-      "result_round_aria": "언제의 결과를 볼지"
+      "result_round_aria": "언제의 결과를 볼지",
+      "ferment_needs_body": "본문을 쓰면 담글 수 있습니다"
     },
     "nav": {
       "back": "뒤로",
@@ -796,13 +797,12 @@
       "section_sources": "바탕이 된 기록",
       "source_untitled": "제목 없는 기록",
       "no_questions": "아직 질문이 없습니다. 아래 버튼에서 시작해 보세요.",
-      "manage_questions": "질문 추가·편집",
+      "manage_questions": "질문 목록",
       "not_fermented": "이 질문은 아직 발효되지 않았습니다",
       "selection_reason": "선택된 이유",
       "palette_aria": "병 작업",
       "letter_badge": "편지",
       "letter_badge_unread": "새 편지",
-      "history": "지난 회",
       "history_latest": "최신"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
@@ -832,19 +832,19 @@
       "sheet_add": "새 질문",
       "sheet_edit": "질문 편집",
       "placeholder": "질문 쓰기",
-      "delete": "이 질문 보관하기",
       "cancel": "취소",
       "save": "저장",
       "letter_arrived": "편지가 도착했습니다",
       "close": "닫기",
-      "limit": "질문은 {max}개까지입니다. 위의 질문을 누르고 「이 질문 보관하기」를 고르면 새로 세울 수 있습니다.",
+      "limit": "질문은 {max}개까지입니다. 위의 질문을 누르고 「보관」을 고르면 새로 세울 수 있습니다.",
       "archive_confirm_title": "이 질문을 보관할까요?",
       "archive_confirm_body": "보관한 질문은 이 화면 맨 아래의 「보관한 질문」에서 되돌릴 수 있습니다.",
       "archive_confirm": "보관하기",
       "archive_cancel": "그만두기",
       "archived_section": "보관한 질문 ({count})",
       "unarchive": "되돌리기",
-      "unarchive_limit": "질문은 {max}개까지입니다. 하나를 보관하면 되돌릴 수 있습니다."
+      "unarchive_limit": "질문은 {max}개까지입니다. 하나를 보관하면 되돌릴 수 있습니다.",
+      "archive": "보관"
     },
     "board": {
       "cards": "{count}장",

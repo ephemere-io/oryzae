@@ -2,20 +2,20 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Skeleton, skeletonKeys } from '@/components/ui/skeleton';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { FermentationReading } from '@/features/shared/fermentation/components/fermentation-reading';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { formatMonthDay } from '@/lib/format-date';
-import { useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
+import { useSpBackHandler, useSpChrome, useSpHeading } from '@/lib/sp-chrome-context';
 import { useDelayedTrue } from '@/lib/use-delayed';
 
 interface SpQuestionZoomProps {
   questionText: string;
   detail: FermentationDetail | null;
   loading: boolean;
-  /** これまでの発酵（新しい順）。2 回以上あれば日付の帯を出す（PC の履歴の SP 版）。 */
+  /** これまでの発酵（新しい順）。2 回以上あれば日付のチップを出す（PC の履歴の SP 版）。 */
   history?: readonly { fermentationId: string; createdAt: string }[];
   selectedFermentationId?: string | null;
   onSelectFermentation?: (fermentationId: string) => void;
@@ -30,15 +30,16 @@ interface SpQuestionZoomProps {
 const SERIF_FONT = "'Noto Serif JP', serif";
 
 /**
- * シャーレを押した先。**上に問いが 1 行、下に手紙・キーワード・スニペットを読む流れ。**
+ * シャーレを押した先。**上に問いを題として全文、下に手紙・キーワード・スニペットを読む流れ。**
  *
- * 中身はエントリーの「発酵の結果」と同じ `FermentationReading`。項目を押して重なるシートで読む形
- * （モーダルインモーダル）はやめた: 閉じたあと開けなくなることがあり、そもそも最初の画面で説明と
- * 理由まで読めれば足りる（実機レビュー）。縦に伸びるだけなので、数が増えても重ならず切れない。
+ * 題の出し方は**エントリーの題と同じ**: いちばん上まで戻れば全文で大きく、スクロールして題が上段の下に隠れたら
+ * 上段の中央に 1 行で上がる（`useSpHeading`）。以前は問いを 1 行に畳み、押すと全文、という別の作りで、エントリーと
+ * 振る舞いが揃っていなかった（実機レビュー）。
  *
- * 「戻る」は上段（`SpTopBar`）の左端の正円が担う。この画面が出ている間だけ
- * 上段の戻るを横取りして、書斎ではなく地図へ戻す（`useSpBackHandler`）。
- * 上段が無い場所（孤立検証・テスト）では自前の戻るを出す。
+ * 中身はエントリーの「発酵の結果」と同じ `FermentationReading`（キーワードとスニペットは押すとその場で開く）。
+ *
+ * 「戻る」は上段（`SpTopBar`）の左端の正円が担う。この画面が出ている間だけ上段の戻るを横取りして、書斎ではなく
+ * 地図へ戻す（`useSpBackHandler`）。上段が無い場所（孤立検証・テスト）では自前の戻るを出す。
  */
 export function SpQuestionZoom({
   questionText,
@@ -55,8 +56,25 @@ export function SpQuestionZoom({
   const tNav = useTranslations('sp.nav');
   const { mounted } = useSpChrome();
   useSpBackHandler(mounted ? onClose : null);
-  /** 長い問いは 1 行に畳む。押すと全文（もう一度押すと戻る）。 */
-  const [expanded, setExpanded] = useState(false);
+
+  // 題が読む流れの上端より上へ隠れているか。隠れている間だけ上段に題を出す（エントリーと同じ）。
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [titleHidden, setTitleHidden] = useState(false);
+  useEffect(() => {
+    const element = titleRef.current;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1];
+        if (entry) setTitleHidden(entry.intersectionRatio < 1);
+      },
+      { root: scrollRef.current, threshold: [1] },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useSpHeading(titleHidden ? questionText : null);
 
   const keywords = detail?.keywords ?? [];
   const snippets = detail?.snippets ?? [];
@@ -75,17 +93,13 @@ export function SpQuestionZoom({
         snippetCount: snippets.length,
         hasLetter: letter !== null,
         empty,
-        expanded,
+        titleHidden,
         ownBack: !mounted,
         historyCount: history.length,
       })}
     >
-      {/* 問いの行。上段の直下、画面のいちばん上。 */}
-      <header
-        className="flex shrink-0 items-start gap-2 border-b px-3 pt-2 pb-3"
-        style={{ borderColor: 'var(--border-subtle)' }}
-      >
-        {!mounted ? (
+      {!mounted ? (
+        <header className="flex shrink-0 px-3 pt-2">
           <button
             type="button"
             onClick={onClose}
@@ -107,79 +121,72 @@ export function SpQuestionZoom({
               <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />
             </svg>
           </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-          title={questionText}
-          className="min-h-[44px] min-w-0 flex-1 px-2 text-left"
-        >
-          <h2
-            data-question-heading
-            className={`m-0 text-[16px] font-medium leading-relaxed ${expanded ? '' : 'truncate'}`}
-            style={{ fontFamily: SERIF_FONT, color: 'var(--fg)', letterSpacing: '0.02em' }}
-          >
-            {questionText}
-          </h2>
-        </button>
-      </header>
-
-      {/* これまでの発酵（新しい順）。押せばその回に切り替わる。PC の履歴（cover flow）の SP 版。 */}
-      {history.length > 1 ? (
-        <div
-          data-history-strip
-          className="flex shrink-0 items-center gap-2 overflow-x-auto px-4 py-2"
-          style={{ ...CONTROL_FONT, scrollbarWidth: 'none' }}
-        >
-          <span className="shrink-0 text-[11px]" style={{ color: 'var(--date-color)' }}>
-            {t('history')}
-          </span>
-          {history.map((item, index) => {
-            const active = item.fermentationId === selectedFermentationId;
-            return (
-              <button
-                key={item.fermentationId}
-                type="button"
-                aria-pressed={active}
-                onClick={() => onSelectFermentation?.(item.fermentationId)}
-                className="shrink-0 rounded-full border px-3 py-1.5 text-[12px] tracking-[0.04em]"
-                style={{
-                  borderColor: active ? 'var(--accent)' : 'var(--border-subtle)',
-                  background: active ? 'var(--accent)' : 'transparent',
-                  color: active ? 'var(--bg)' : 'var(--fg)',
-                }}
-              >
-                {index === 0 ? `${t('history_latest')} · ` : ''}
-                {formatMonthDay(item.createdAt)}
-              </button>
-            );
-          })}
-        </div>
+        </header>
       ) : null}
 
-      {/* 読む流れ。エントリーの「発酵の結果」と同じ部品。キーワードとスニペットは押すとその場で開く。 */}
-      <div className="min-h-0 flex-1 overflow-auto px-5 pt-4 pb-10">
-        {/* 読み込み中は、いずれ出る形（見出しと行）を先に置く。一瞬で返るなら出さない。 */}
-        {showSkeleton ? <QuestionZoomSkeleton /> : null}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto pb-10">
+        {/* 題（エントリーの題と同じ大きさ・余白）。全文を折り返して出す。 */}
+        <h1
+          ref={titleRef}
+          data-question-heading
+          className="m-0 px-6 pt-3 text-2xl font-medium leading-snug"
+          style={{ fontFamily: SERIF_FONT, color: 'var(--fg)', letterSpacing: '0.02em' }}
+        >
+          {questionText}
+        </h1>
 
-        {empty ? (
-          <p
-            className="px-6 py-8 text-center text-sm leading-relaxed"
-            style={{ color: 'var(--date-color)' }}
+        {/* 発酵の回（新しい順）。最初は「最新」、ほかは日付。押せばその回に切り替わる（PC の履歴の SP 版）。 */}
+        {history.length > 1 ? (
+          <div
+            data-history-strip
+            className="flex items-center gap-2 overflow-x-auto px-6 pt-4"
+            style={{ ...CONTROL_FONT, scrollbarWidth: 'none' }}
           >
-            {t('not_fermented')}
-          </p>
+            {history.map((item, index) => {
+              const active = item.fermentationId === selectedFermentationId;
+              return (
+                <button
+                  key={item.fermentationId}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onSelectFermentation?.(item.fermentationId)}
+                  className="shrink-0 rounded-full border px-3 py-1.5 text-[12px] tracking-[0.04em]"
+                  style={{
+                    borderColor: active ? 'var(--accent)' : 'var(--border-subtle)',
+                    background: active ? 'var(--accent)' : 'transparent',
+                    color: active ? 'var(--bg)' : 'var(--fg)',
+                  }}
+                >
+                  {index === 0 ? t('history_latest') : formatMonthDay(item.createdAt)}
+                </button>
+              );
+            })}
+          </div>
         ) : null}
 
-        {detail && !empty ? (
-          <FermentationReading
-            detail={detail}
-            reveal="tap"
-            onReply={onReply}
-            onOpenSource={onOpenSource}
-          />
-        ) : null}
+        {/* 読む流れ。エントリーの「発酵の結果」と同じ部品。キーワードとスニペットは押すとその場で開く。 */}
+        <div className="px-5 pt-5">
+          {/* 読み込み中は、いずれ出る形（見出しと行）を先に置く。一瞬で返るなら出さない。 */}
+          {showSkeleton ? <QuestionZoomSkeleton /> : null}
+
+          {empty ? (
+            <p
+              className="px-6 py-8 text-center text-sm leading-relaxed"
+              style={{ color: 'var(--date-color)' }}
+            >
+              {t('not_fermented')}
+            </p>
+          ) : null}
+
+          {detail && !empty ? (
+            <FermentationReading
+              detail={detail}
+              reveal="tap"
+              onReply={onReply}
+              onOpenSource={onOpenSource}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );

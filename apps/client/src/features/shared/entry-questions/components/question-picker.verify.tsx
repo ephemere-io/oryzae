@@ -89,7 +89,7 @@ registerUnit<Props>({
       description: '上限いっぱいでは、問いの一覧への入口がある（言うだけで辿れない、をやめた）',
       onlyFixtures: ['at-limit'],
       check: ({ root }) => {
-        const link = root.querySelector('[data-question-manage]');
+        const link = root.querySelector('[data-row-action="manage"]');
         return link?.getAttribute('href') === '/questions' || '問いの一覧への入口が無い';
       },
     },

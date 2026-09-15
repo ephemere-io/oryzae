@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import { ActionPalette } from '@/components/ui/action-palette';
-import { PencilIcon } from '@/components/ui/palette-icons';
+import { QuestionListIcon } from '@/components/ui/palette-icons';
 import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import { useFermentationHistory } from '@/features/shared/fermentation/hooks/use-fermentation-history';
 import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-fermentation-inbox';
@@ -178,8 +178,8 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
               {
                 id: 'questions',
                 label: t('manage_questions'),
-                // 追加だけでなく編集・アーカイブもする入口なので、＋ではなく鉛筆（オーナーの指示）。
-                icon: <PencilIcon />,
+                // 追加・編集・アーカイブ・戻すをする一覧への入口（オーナーの指示で言葉とアイコンを一覧に）。
+                icon: <QuestionListIcon />,
                 onSelect: onManageQuestions,
               },
             ]}

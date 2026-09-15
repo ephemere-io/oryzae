@@ -75,7 +75,7 @@ describe('SpQuestions', () => {
   it('問いをタップ→アーカイブは、確かめてからアーカイブする（1 回押しただけでは消えない）', () => {
     const props = renderQ();
     fireEvent.click(screen.getByText('なぜ書くのか'));
-    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.delete }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive }));
     expect(props.archiveQuestion).not.toHaveBeenCalled();
     expect(screen.getByText(jaMessages.sp.questions.archive_confirm_title)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive_confirm }));
@@ -85,10 +85,10 @@ describe('SpQuestions', () => {
   it('確かめで「やめる」を押せばアーカイブしない', () => {
     const props = renderQ();
     fireEvent.click(screen.getByText('なぜ書くのか'));
-    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.delete }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive }));
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive_cancel }));
     expect(props.archiveQuestion).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: jaMessages.sp.questions.delete })).toBeTruthy();
+    expect(screen.getByRole('button', { name: jaMessages.sp.questions.archive })).toBeTruthy();
   });
 
   it('アーカイブした問いは、開いて「戻す」で戻せる', () => {

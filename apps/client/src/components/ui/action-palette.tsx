@@ -1,7 +1,7 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { KeyboardDownIcon } from './palette-icons';
 import { CONTROL_FONT } from './surface';
 
@@ -22,7 +22,7 @@ export interface PaletteAction {
    * レビュー）。ボタンと同じ箱に input を重ねれば、メニューはボタンから出る。
    */
   file?: { accept: string; onFile: (file: File) => void };
-  /** 押せない理由。あれば押せない（理由は読み上げに添える）。 */
+  /** 押せない理由。あれば押せない（半透明）。押すと理由がパレットの上に出る（読み上げにも添える）。 */
   disabledReason?: string;
   /**
    * いま効いている状態。**色だけで言う**（アクセントの色）。右上に点も添えていたが、色と点の 2 段で
@@ -65,12 +65,26 @@ export function ActionPalette({
   keyboardOpen = false,
   dismissKeyboardLabel,
 }: ActionPaletteProps) {
+  /**
+   * 押せない操作を押したときに出す理由（パレットの上に 1 行）。以前は理由を読み上げにしか持たず、押しても
+   * 何も起きなかった（実機レビュー: 押したときに分かるように）。出てしばらくして消える（CSS の animation の
+   * 終わりで消す）。同じ操作を続けて押しても出し直せるよう、押した回数を鍵にする。
+   */
+  const [hint, setHint] = useState<{ text: string; count: number } | null>(null);
+  const showHint = (text: string) =>
+    setHint((previous) => ({ text, count: (previous?.count ?? 0) + 1 }));
+
   return (
     <div
-      {...verifyAttrs({ unit: 'ActionPalette', actionCount: actions.length, keyboardOpen })}
+      {...verifyAttrs({
+        unit: 'ActionPalette',
+        actionCount: actions.length,
+        keyboardOpen,
+        hint: hint !== null,
+      })}
       role="toolbar"
       aria-label={ariaLabel}
-      className="flex shrink-0 items-stretch gap-1 px-2"
+      className="relative flex shrink-0 items-stretch gap-1 px-2"
       style={{
         ...CONTROL_FONT,
         height: ACTION_PALETTE_HEIGHT,
@@ -81,43 +95,43 @@ export function ActionPalette({
         borderTop: '1px solid var(--surface-raised-border)',
       }}
     >
+      {hint ? (
+        <p
+          key={hint.count}
+          role="status"
+          data-palette-hint
+          className="oz-palette-hint pointer-events-none absolute bottom-full left-1/2 z-[25] mb-2 w-max max-w-[calc(100%-1rem)] rounded-full px-3.5 py-2 text-center text-[12px] leading-snug"
+          style={{ background: 'var(--fg)', color: 'var(--bg)' }}
+          onAnimationEnd={() => setHint(null)}
+        >
+          {hint.text}
+        </p>
+      ) : null}
       {actions.map((action) => {
         const disabled = Boolean(action.disabledReason) || Boolean(action.busy);
         const { file } = action;
-        if (file) {
+        // 押せない写真の操作はふつうのボタンとして描く（押せば理由が出る。input は指を受けてしまう）。
+        if (file && !disabled) {
           return (
             <div
               key={action.id}
               data-palette-action={action.id}
-              className={`relative flex min-w-[60px] flex-col items-center justify-center gap-1 whitespace-nowrap rounded-xl px-2 transition-colors has-[:active]:scale-95 ${
-                disabled ? 'opacity-40' : 'hover:bg-[var(--hover-wash)]'
-              }`}
+              className="relative flex min-w-[60px] flex-col items-center justify-center gap-1 whitespace-nowrap rounded-xl px-2 transition-colors hover:bg-[var(--hover-wash)] has-[:active]:scale-95"
               style={{ color: 'var(--fg)' }}
             >
-              {action.busy ? (
-                <span
-                  className="inline-block h-[22px] w-[22px] animate-spin rounded-full border-2 border-current border-t-transparent"
-                  aria-hidden="true"
-                />
-              ) : (
-                action.icon
-              )}
+              {action.icon}
               <span aria-hidden="true" className="text-[10px] leading-none tracking-[0.04em]">
                 {action.caption ?? action.label}
               </span>
               <input
                 type="file"
                 accept={file.accept}
-                aria-label={
-                  action.disabledReason
-                    ? `${action.label}（${action.disabledReason}）`
-                    : action.label
-                }
-                disabled={disabled}
+                aria-label={action.label}
                 data-palette-file
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 onClick={() => {
-                  if (!disabled) action.onSelect();
+                  setHint(null);
+                  action.onSelect();
                 }}
                 onChange={(event) => {
                   const picked = event.target.files?.[0];
@@ -139,7 +153,12 @@ export function ActionPalette({
             aria-disabled={disabled}
             data-palette-action={action.id}
             onClick={() => {
+              if (action.disabledReason) {
+                showHint(action.disabledReason);
+                return;
+              }
               if (disabled) return;
+              setHint(null);
               action.onSelect();
             }}
             // 押しても本文のフォーカスを落とさない（キーボードが一度引っ込んでまた出る、をやめる）。

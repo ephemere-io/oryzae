@@ -6,8 +6,6 @@ import { RoundButton } from '@/components/ui/round-button';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { useSpChrome } from '@/lib/sp-chrome-context';
 
-const SP_TOP_BAR_HEIGHT = 48;
-
 /**
  * SP のサブ画面の上段（Notion のモバイルの骨格）。
  *
@@ -18,6 +16,10 @@ const SP_TOP_BAR_HEIGHT = 48;
  *   歯車がマイページに飛ぶのは謎」と実機レビュー。アカウントは書斎のアバターが担う
  *
  * 外側の余白は 16px（Notion のモバイルと同じ）。以前の 8px は縁に近すぎた。
+ *
+ * 高さは固定の値でなく**正円のボタンの高さ + 上下の余白**で決める。高さを 48px に固定していた頃は 44px の
+ * ボタンの上下に 2px しか残らず、題が上がって下に線が出たとき、ボタンの下が詰まって見えた（実機レビュー）。
+ * 下の余白を上より広くとり、線との間をあける。
  */
 export function SpTopBar() {
   const t = useTranslations('study');
@@ -34,11 +36,10 @@ export function SpTopBar() {
         hasStatus: status !== null,
         hasHeading: showHeading,
       })}
-      className="flex shrink-0 items-center gap-2 px-4"
+      className="flex shrink-0 items-center gap-2 px-4 pb-2"
       style={{
         ...CONTROL_FONT,
-        height: `calc(${SP_TOP_BAR_HEIGHT}px + env(safe-area-inset-top, 0px))`,
-        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.25rem)',
         // 見出しが上がっている間だけ、本文との境に細い線（Notion と同じ）。
         borderBottom: `1px solid ${showHeading ? 'var(--surface-raised-border)' : 'transparent'}`,
         transition: 'border-color 150ms ease',

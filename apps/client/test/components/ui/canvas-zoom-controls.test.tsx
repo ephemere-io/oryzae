@@ -13,6 +13,7 @@ function renderControls(
   scale: number,
   handlers: Partial<Record<string, () => void>> = {},
   referenceScale?: number,
+  scaleBounds?: { min: number; max: number },
 ) {
   const noop = () => {};
   return render(
@@ -24,6 +25,7 @@ function renderControls(
         onReset={handlers.onReset ?? noop}
         onFit={handlers.onFit ?? noop}
         referenceScale={referenceScale}
+        scaleBounds={scaleBounds}
       />
     </NextIntlClientProvider>,
   );
@@ -53,6 +55,14 @@ describe('CanvasZoomControls', () => {
     cleanup();
     renderControls(0.52, {}, 0.26);
     expect(reset().textContent?.trim()).toBe('200%');
+  });
+
+  it('上限と下限を渡されたら、それで押せる／押せないを決める（SP の瓶は 100% の半分まで引ける）', () => {
+    renderControls(0.2, {}, 0.23, { min: 0.115, max: 3 });
+    expect(zoomOut().disabled).toBe(false);
+    cleanup();
+    renderControls(0.115, {}, 0.23, { min: 0.115, max: 3 });
+    expect(zoomOut().disabled).toBe(true);
   });
 
   it('端数の倍率は四捨五入して表示する', () => {

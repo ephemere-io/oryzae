@@ -161,12 +161,12 @@
     "picker": {
       "title": "問いを結ぶ",
       "empty": "立てている問いがありません。ここで1つ書きましょう。",
-      "new": "+ 新しく問いを書く",
+      "new": "新しく問いを書く",
       "new_placeholder": "問いを書く（例: 今日の小さな発見は？）",
       "create": "この問いにする",
       "creating": "作成中…",
       "create_failed": "問いを作れませんでした。もう一度お試しください。",
-      "back_to_list": "← 既存の問いから選ぶ",
+      "back_to_list": "既存の問いから選ぶ",
       "search_placeholder": "問いを探す",
       "untitled": "無題の問い",
       "close": "閉じる",
@@ -774,7 +774,8 @@
       "result_not_fermented": "この問いはまだ発酵していません。",
       "result_latest": "最新",
       "result_question_aria": "どの問いの結果を見るか",
-      "result_round_aria": "いつの結果を見るか"
+      "result_round_aria": "いつの結果を見るか",
+      "ferment_needs_body": "本文を書くと漬け込めます"
     },
     "nav": {
       "back": "戻る",
@@ -796,13 +797,12 @@
       "section_sources": "もとになったエントリー",
       "source_untitled": "無題のエントリー",
       "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
-      "manage_questions": "問いを追加・編集",
+      "manage_questions": "問いの一覧",
       "not_fermented": "この問いはまだ発酵していません",
       "selection_reason": "選ばれた理由",
       "palette_aria": "瓶の操作",
       "letter_badge": "手紙",
       "letter_badge_unread": "新しい手紙",
-      "history": "これまで",
       "history_latest": "最新"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
@@ -832,19 +832,19 @@
       "sheet_add": "新しい問い",
       "sheet_edit": "問いを編集",
       "placeholder": "問いを書く",
-      "delete": "この問いをアーカイブする",
       "cancel": "キャンセル",
       "save": "保存",
       "letter_arrived": "手紙が届いています",
       "close": "閉じる",
-      "limit": "問いは {max} つまでです。上の問いを押して「この問いをアーカイブする」を選ぶと、新しく立てられます。",
+      "limit": "問いは {max} つまでです。上の問いを押して「アーカイブ」を選ぶと、新しく立てられます。",
       "archive_confirm_title": "この問いをアーカイブしますか？",
       "archive_confirm_body": "アーカイブした問いは、この画面のいちばん下の「アーカイブした問い」から戻せます。",
       "archive_confirm": "アーカイブする",
       "archive_cancel": "やめる",
       "archived_section": "アーカイブした問い（{count}）",
       "unarchive": "戻す",
-      "unarchive_limit": "問いは {max} つまでです。1 つアーカイブすると戻せます。"
+      "unarchive_limit": "問いは {max} つまでです。1 つアーカイブすると戻せます。",
+      "archive": "アーカイブ"
     },
     "board": {
       "cards": "{count}枚",

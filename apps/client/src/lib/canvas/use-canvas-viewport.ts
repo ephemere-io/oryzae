@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   type Bounds,
+  DEFAULT_SCALE_BOUNDS,
   fitBounds,
   IDENTITY_VIEWPORT,
+  MAX_SCALE,
   normalizeViewport,
-  OVERZOOM_ARM_SCALE,
+  OVERZOOM_ARM_RATIO,
   OVERZOOM_OUT_EVENT,
   type OverzoomOutDetail,
   type Point,
   panBy,
+  type ScaleBounds,
   type Size,
   screenToWorld,
   toTransform,
@@ -78,6 +81,14 @@ export interface CanvasViewportOptions {
    * なった（実機レビュー）。縦画面では、壜とまわりの円が収まる姿こそが「等倍」。
    */
   referenceBounds?: Bounds;
+  /**
+   * 引ける下限を「100%」に対する割合で決める（`referenceBounds` と一緒に使う）。
+   *
+   * 下限と「書斎へ戻る」を知らせ始める倍率は、既定では world 1 = 1px を基準にした固定の値（20% / 32%）。
+   * SP の瓶は 100% が 0.23 倍ほどで、開いた直後から「戻る」の知らせが始まり、88% より下へ引けなかった
+   * （実機レビュー: 88% ですぐ書斎へ戻る）。これを渡すと、下限も知らせ始めも 100% を基準に決まる。
+   */
+  minZoom?: number;
 }
 
 export interface CanvasSurface {
@@ -110,6 +121,8 @@ export interface CanvasSurface {
    * 倍率の表示（`CanvasZoomControls`）はこれを基準に割る。
    */
   referenceScale: number;
+  /** 倍率の上限と下限（`minZoom` を渡していれば 100% が基準）。倍率の表示の押せる／押せないに使う。 */
+  scaleBounds: ScaleBounds;
   fitTo: (bounds: Bounds | null) => void;
   /**
    * ビューポートが DOM に反映されるたびに呼ばれる購読。解除関数を返す。
@@ -157,6 +170,8 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   getSelectionBoundsRef.current = options.getSelectionBounds;
   const referenceBoundsRef = useRef(options.referenceBounds);
   referenceBoundsRef.current = options.referenceBounds;
+  const minZoomRef = useRef(options.minZoom);
+  minZoomRef.current = options.minZoom;
 
   // frame は **state で持つ**（ただの ref ではない）。
   //
@@ -221,10 +236,28 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
     syncViewport();
   }, [syncViewport]);
 
+  /**
+   * いまの frame の大きさでの倍率の上限と下限。`minZoom` があれば「100%」の窓を収めた倍率が基準。
+   * ジェスチャのたびに測る（frame の大きさはキーボードや回転で変わり、描画の値は 1 拍遅れる）。
+   */
+  const currentBounds = useCallback((): ScaleBounds => {
+    const reference = referenceBoundsRef.current;
+    const minZoom = minZoomRef.current;
+    const rect = frameEl?.getBoundingClientRect();
+    if (!reference || minZoom === undefined || !rect || rect.width === 0 || rect.height === 0) {
+      return DEFAULT_SCALE_BOUNDS;
+    }
+    const size = { width: rect.width, height: rect.height };
+    return {
+      min: fitBounds(reference, size, fitPaddingRef.current).scale * minZoom,
+      max: MAX_SCALE,
+    };
+  }, [frameEl]);
+
   /** ビューポートを更新する唯一の入口。DOM は次フレーム、state は静止後に追従する。 */
   const apply = useCallback(
     (next: Viewport) => {
-      vpRef.current = normalizeViewport(next);
+      vpRef.current = normalizeViewport(next, currentBounds());
       if (rafRef.current === null) {
         rafRef.current = requestAnimationFrame(() => {
           rafRef.current = null;
@@ -234,7 +267,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       if (commitTimerRef.current !== null) clearTimeout(commitTimerRef.current);
       commitTimerRef.current = setTimeout(commit, COMMIT_IDLE_MS);
     },
-    [paint, commit],
+    [paint, commit, currentBounds],
   );
 
   /** frame の矩形。未マウント時は null（jsdom もここを通る）。 */
@@ -264,9 +297,9 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   const zoomByStep = useCallback(
     (factor: number) => {
       const size = frameSize();
-      apply(zoomAt(vpRef.current, size.width / 2, size.height / 2, factor));
+      apply(zoomAt(vpRef.current, size.width / 2, size.height / 2, factor, currentBounds()));
     },
-    [apply, frameSize],
+    [apply, frameSize, currentBounds],
   );
 
   const zoomIn = useCallback(() => zoomByStep(ZOOM_STEP), [zoomByStep]);
@@ -408,12 +441,13 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
         const rect = frame.getBoundingClientRect();
         const factor = Math.exp(-dy * WHEEL_ZOOM_SENSITIVITY);
         const before = vpRef.current.scale;
-        apply(zoomAt(vpRef.current, e.clientX - rect.left, e.clientY - rect.top, factor));
+        const bounds = currentBounds();
+        apply(zoomAt(vpRef.current, e.clientX - rect.left, e.clientY - rect.top, factor, bounds));
 
         // 引く向きの操作を、**引き切る手前から**外へ流す（拾う側が何に使うかを決める）。
         // 最小で頭打ちになってからだけ流していたころは、そこへ辿り着くまでの長い引きの
         // あいだ何も起きず、「効かない」と読まれた。
-        if (factor < 1 && before <= OVERZOOM_ARM_SCALE) {
+        if (factor < 1 && before <= bounds.min * OVERZOOM_ARM_RATIO) {
           const detail: OverzoomOutDetail = { excess: 1 - factor };
           frame.dispatchEvent(new CustomEvent(OVERZOOM_OUT_EVENT, { detail, bubbles: true }));
         }
@@ -424,7 +458,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
 
     frame.addEventListener('wheel', onWheel, { passive: false });
     return () => frame.removeEventListener('wheel', onWheel);
-  }, [apply, frameEl]);
+  }, [apply, frameEl, currentBounds]);
 
   // ── パン（背景 / space+ドラッグ / 中ボタン）と 2本指ピンチ ──────────
   //
@@ -462,11 +496,18 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
           const factor = now.dist / pinch.dist;
           const before = vpRef.current.scale;
           // 2本指の中点を軸に拡大し、中点の移動ぶんだけ平行移動する。
-          const zoomed = zoomAt(vpRef.current, now.midX - rect.left, now.midY - rect.top, factor);
+          const bounds = currentBounds();
+          const zoomed = zoomAt(
+            vpRef.current,
+            now.midX - rect.left,
+            now.midY - rect.top,
+            factor,
+            bounds,
+          );
           apply(panBy(zoomed, now.midX - pinch.midX, now.midY - pinch.midY));
           // ホイールと同じく、引き切る手前からのつまみを外へ流す（SP の「引くと書斎へ戻る」）。
           // ここが無いと、指で引く画面ではその仕掛けが一度も発火しない。
-          if (factor < 1 && before <= OVERZOOM_ARM_SCALE) {
+          if (factor < 1 && before <= bounds.min * OVERZOOM_ARM_RATIO) {
             const detail: OverzoomOutDetail = { excess: 1 - factor, input: 'pinch' };
             frame.dispatchEvent(new CustomEvent(OVERZOOM_OUT_EVENT, { detail, bubbles: true }));
           }
@@ -552,7 +593,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       frame.removeEventListener('pointerdown', onPointerDownCapture, { capture: true });
       detachWindow();
     };
-  }, [apply, frameEl]);
+  }, [apply, frameEl, currentBounds]);
 
   // ── space 押下中はパンモード（Figma と同じ） ───────────────────────
   useEffect(() => {
@@ -624,11 +665,17 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
     };
   }, []);
 
-  const { referenceBounds, fitPadding } = options;
+  const { referenceBounds, fitPadding, minZoom } = options;
+  const measured = frameDims.width > 0 && frameDims.height > 0;
   const referenceScale =
-    referenceBounds && frameDims.width > 0 && frameDims.height > 0
-      ? fitBounds(referenceBounds, frameDims, fitPadding).scale
-      : 1;
+    referenceBounds && measured ? fitBounds(referenceBounds, frameDims, fitPadding).scale : 1;
+  const scaleBounds = useMemo<ScaleBounds>(
+    () =>
+      minZoom !== undefined && referenceBounds && measured
+        ? { min: referenceScale * minZoom, max: MAX_SCALE }
+        : DEFAULT_SCALE_BOUNDS,
+    [minZoom, referenceBounds, measured, referenceScale],
+  );
 
   const frameRef = useCallback((el: HTMLDivElement | null) => {
     setFrameEl(el);
@@ -648,6 +695,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       resetZoom,
       fitTo,
       referenceScale,
+      scaleBounds,
       subscribe,
     }),
     [
@@ -662,6 +710,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       resetZoom,
       fitTo,
       referenceScale,
+      scaleBounds,
       subscribe,
     ],
   );

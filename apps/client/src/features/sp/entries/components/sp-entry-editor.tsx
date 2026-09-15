@@ -19,7 +19,10 @@ import {
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import { GearIcon, RoundButton } from '@/components/ui/round-button';
 import { CONTROL_FONT } from '@/components/ui/surface';
-import { useAutosaveEntry } from '@/features/shared/entries/hooks/use-autosave-entry';
+import {
+  DEFAULT_MIN_CREATE_CHARS,
+  useAutosaveEntry,
+} from '@/features/shared/entries/hooks/use-autosave-entry';
 import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import {
   SP_EDITOR_TYPOGRAPHY,
@@ -597,13 +600,25 @@ export function SpEntryEditor({
     setResultDetent('half');
   }, [resultVisible, blurEditor]);
 
+  /**
+   * 「漬け込む」は最初から並べる（実機レビュー: 最初からパレットにあってよい）。書く前（自動保存がエントリーを
+   * 作れる文字数に届く前）は押せず、押すと理由が出る。書いたあと、自動保存がエントリーを作り終える前に押したら、
+   * 作り終えるのを待ってから漬ける（押したのに何も起きない、にしない）。
+   */
+  const canPickle = composeContent(title, body).trim().length >= DEFAULT_MIN_CREATE_CHARS;
+  const [pickleRequested, setPickleRequested] = useState(false);
   async function handlePickle() {
-    if (!entryId || pickling || pickled) return;
+    if (pickling || pickled || !canPickle) return;
     // Issue #450: 問いに紐づいていないエントリは発酵ループに入らない。先に問いを決めてもらう。
     if (selectedQuestionIds.length === 0) {
       openQuestionPicker();
       return;
     }
+    if (!entryId) {
+      setPickleRequested(true);
+      return;
+    }
+    setPickleRequested(false);
     setPickling(true);
     const saved = await saveWithEffects(composeContent(title, body), entryId, {
       fermentationEnabled: true,
@@ -616,6 +631,12 @@ export function SpEntryEditor({
       clearDraft(); // 発酵させたら確定。書きかけドラフトは破棄する。
     }
   }
+
+  const handlePickleRef = useRef(handlePickle);
+  handlePickleRef.current = handlePickle;
+  useEffect(() => {
+    if (pickleRequested && entryId) void handlePickleRef.current();
+  }, [pickleRequested, entryId]);
 
   // 確認シートで「削除する」→ API 削除が成功したら書斎へ戻る。
   async function handleDelete() {
@@ -728,21 +749,21 @@ export function SpEntryEditor({
         onFile: (file) => void photoImport.selectFile(file),
       },
     },
-    ...(entryId
-      ? [
-          {
-            id: 'ferment',
-            // PC と同じ語（「瓶に納めて発酵させる」は列に長すぎた）。漬けた後は「漬けてある」（「発酵中」は
-            // いま発酵しているように読め、書き足したら押し直すのかが分からなかった。実機レビュー）。
-            label: pickled ? t('ferment_done_short') : t('ferment_title'),
-            icon: <FermentIcon />,
-            busy: pickling,
-            active: pickled,
-            disabledReason: pickled ? t('pickled_note') : undefined,
-            onSelect: handlePickle,
-          },
-        ]
-      : []),
+    {
+      id: 'ferment',
+      // PC と同じ語（「瓶に納めて発酵させる」は列に長すぎた）。漬けた後は「漬けてある」（「発酵中」は
+      // いま発酵しているように読め、書き足したら押し直すのかが分からなかった。実機レビュー）。
+      label: pickled ? t('ferment_done_short') : t('ferment_title'),
+      icon: <FermentIcon />,
+      busy: pickling || pickleRequested,
+      active: pickled,
+      disabledReason: pickled
+        ? t('pickled_note')
+        : !canPickle
+          ? t('ferment_needs_body')
+          : undefined,
+      onSelect: () => void handlePickle(),
+    },
     // 問いを結ぶ前から出す（押すと、結ぶと何が出るかと、結ぶ入口が出る）。
     {
       id: 'result',
