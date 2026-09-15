@@ -144,6 +144,23 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('text-align:center');
   });
 
+  // ロゴだけだと押せることが伝わらない。メールの中の画像は装飾と思われる。
+  it('ロゴに「押せる」と分かる文言を添え、下線付きのリンクにする', () => {
+    const html = render('本文');
+
+    expect(html).toContain('Oryzae を開く');
+    expect(html).toContain('text-decoration:underline');
+  });
+
+  it('文言もロゴと同じトップページへ飛ばす', () => {
+    const html = render('本文');
+    const label = html.indexOf('Oryzae を開く');
+
+    // 文言の直前の a の href がトップページであること。
+    const anchor = html.lastIndexOf('<a href=', label);
+    expect(html.slice(anchor, anchor + 40)).toContain('href="https://oryzae.ephemere.io"');
+  });
+
   // 画像は既定でブロックされることが多い。そのとき alt だけが手がかりになる。
   it('ロゴに alt を入れる', () => {
     expect(render('本文')).toContain('alt="Oryzae"');
@@ -164,6 +181,25 @@ describe('renderNewsletterHtml', () => {
 
     expect(html).not.toContain('icon.svg');
     expect(html).not.toContain('data:image');
+  });
+
+  it('ロゴの文言は本文の言語に合わせる', () => {
+    const cases: Array<[Parameters<typeof renderNewsletterHtml>[0]['locale'], string]> = [
+      ['ja', 'Oryzae を開く'],
+      ['en', 'Open Oryzae'],
+      ['zh', '打开 Oryzae'],
+      ['ko', 'Oryzae 열기'],
+    ];
+
+    for (const [locale, label] of cases) {
+      const html = renderNewsletterHtml({
+        subject: '件名',
+        bodyMarkdown: '本文',
+        unsubscribeUrl: UNSUBSCRIBE_URL,
+        locale,
+      });
+      expect(html).toContain(label);
+    }
   });
 
   it('ロゴは配信停止リンクより前に出す（フッターの頭）', () => {
