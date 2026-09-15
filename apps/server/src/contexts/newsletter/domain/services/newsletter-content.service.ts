@@ -197,6 +197,14 @@ interface FooterCopy {
   lines: string[];
   unsubscribeLabel: string;
   unsubscribeNote: string;
+  /**
+   * ロゴに添える文言。
+   *
+   * ロゴだけだと**押せることが伝わらない**。メールの中の画像は装飾であることが
+   * 多く、リンクだと思われない。下線付きの短い動作の言葉を添えて、リンクである
+   * ことを形で示す。
+   */
+  openAppLabel: string;
 }
 
 const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
@@ -211,6 +219,7 @@ const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
     ],
     unsubscribeLabel: 'このお知らせの配信を停止する',
     unsubscribeNote: '（停止してもアカウントと日記はそのまま残ります）',
+    openAppLabel: 'Oryzae を開く',
   },
   en: {
     htmlLang: 'en',
@@ -223,6 +232,7 @@ const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
     ],
     unsubscribeLabel: 'Unsubscribe from these announcements',
     unsubscribeNote: '(Your account and journal entries stay exactly as they are.)',
+    openAppLabel: 'Open Oryzae',
   },
   zh: {
     htmlLang: 'zh',
@@ -235,6 +245,7 @@ const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
     ],
     unsubscribeLabel: '停止接收此类通知邮件',
     unsubscribeNote: '（停止后，您的账户和日记将原样保留。）',
+    openAppLabel: '打开 Oryzae',
   },
   ko: {
     htmlLang: 'ko',
@@ -247,6 +258,7 @@ const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
     ],
     unsubscribeLabel: '이 안내 메일 수신 중지',
     unsubscribeNote: '(중지해도 계정과 일기는 그대로 남아 있습니다.)',
+    openAppLabel: 'Oryzae 열기',
   },
 };
 
@@ -317,12 +329,17 @@ export function renderNewsletterHtml(params: {
   //   - `display:block` — 画像下のベースライン分の隙間を消す
   //   - `alt` を入れる。**画像は既定でブロックされることが多く**、そのとき
   //     ここだけが手がかりになる
+  //
+  // ロゴと文言は **別々の a** にしてある。画像を包む a の中に block 要素を入れると
+  // Outlook が崩すため。中央寄せは親の text-align に任せる。
   const logo =
     `<div style="text-align:center;margin:0 0 16px;">` +
-    `<a href="${APP_URL}" style="display:inline-block;text-decoration:none;">` +
+    `<a href="${APP_URL}" style="text-decoration:none;">` +
     `<img src="${LOGO_URL}" alt="Oryzae" width="40" height="40" ` +
-    `style="display:block;width:40px;height:40px;border:0;outline:none;border-radius:8px;" />` +
-    `</a></div>`;
+    `style="display:inline-block;width:40px;height:40px;border:0;outline:none;border-radius:8px;vertical-align:middle;" />` +
+    `</a><br />` +
+    `<a href="${APP_URL}" style="display:inline-block;margin-top:6px;font-size:12px;line-height:1.7;color:#8a6d3b;text-decoration:underline;">${escapeHtml(copy.openAppLabel)}</a>` +
+    `</div>`;
 
   const unsubscribe =
     `<p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#8a8279;">` +
