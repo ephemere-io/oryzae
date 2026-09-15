@@ -27,6 +27,14 @@ interface Props {
   translating: boolean;
   testSending: boolean;
   testResult: TestSendResult | null;
+  /**
+   * 直前の操作が失敗した理由。
+   *
+   * **ここで出さないと失敗が見えない。** 翻訳もテスト配信もこの画面のボタンから
+   * 撃つので、エラーの行き先もこの画面に要る（以前ダイアログにしか無く、押しても
+   * 何も起きないように見える状態を作った）。
+   */
+  error: string | null;
   /** 送信済み（もう何もできない）。 */
   readOnly: boolean;
   /** 未保存の新規下書き。 */
@@ -53,6 +61,7 @@ export function NewsletterDeliveryChecklist({
   translating,
   testSending,
   testResult,
+  error,
   readOnly,
   unsaved,
   onTranslate,
@@ -89,6 +98,12 @@ export function NewsletterDeliveryChecklist({
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         配信の準備
       </p>
+
+      {error && (
+        <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {error}
+        </div>
+      )}
 
       <Step
         index={1}
