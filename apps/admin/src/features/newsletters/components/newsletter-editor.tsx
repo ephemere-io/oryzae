@@ -27,6 +27,8 @@ interface Props {
   translating: boolean;
   testSending: boolean;
   testResult: TestSendResult | null;
+  /** 翻訳・テスト配信が失敗した理由。チェックリストに出す。 */
+  deliveryError: string | null;
   onTranslate: () => void;
   onSendTest: () => void;
 }
@@ -46,6 +48,7 @@ export function NewsletterEditor({
   translating,
   testSending,
   testResult,
+  deliveryError,
   onTranslate,
   onSendTest,
 }: Props) {
@@ -136,6 +139,7 @@ export function NewsletterEditor({
         translating={translating}
         testSending={testSending}
         testResult={testResult}
+        error={deliveryError}
         readOnly={readOnly}
         unsaved={newsletter === null}
         onTranslate={onTranslate}

@@ -30,6 +30,7 @@ function renderChecklist(overrides?: {
   unsaved?: boolean;
   translating?: boolean;
   testSending?: boolean;
+  error?: string | null;
 }) {
   const onTranslate = vi.fn();
   const onSendTest = vi.fn();
@@ -41,6 +42,7 @@ function renderChecklist(overrides?: {
       translating={overrides?.translating ?? false}
       testSending={overrides?.testSending ?? false}
       testResult={null}
+      error={overrides?.error ?? null}
       readOnly={overrides?.readOnly ?? false}
       unsaved={overrides?.unsaved ?? false}
       onTranslate={onTranslate}
@@ -121,6 +123,16 @@ describe('NewsletterDeliveryChecklist', () => {
 
     expect(screen.getByRole('button', { name: /送信する…/ }).hasAttribute('disabled')).toBe(false);
     expect(screen.getByText(/102 名へ送ります/)).toBeDefined();
+  });
+
+  // 押しても何も起きないように見えるのが最悪。実際そうなって報告を受けた。
+  it('翻訳・テスト配信の失敗をこの画面に出す', () => {
+    renderChecklist({
+      error:
+        'NEWSLETTER_UNSUBSCRIBE_SECRET が未設定です。配信停止リンクを作れないため送信できません。',
+    });
+
+    expect(screen.getByText(/NEWSLETTER_UNSUBSCRIBE_SECRET が未設定です/)).toBeDefined();
   });
 
   it('それぞれのボタンが自分の操作だけを呼ぶ', () => {

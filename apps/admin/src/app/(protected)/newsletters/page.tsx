@@ -204,6 +204,7 @@ export default function NewslettersPage() {
             translating={send.translating}
             testSending={send.testSending}
             testResult={send.testResult}
+            deliveryError={send.error}
             onTranslate={handleTranslate}
             onSendTest={handleSendTest}
           />
