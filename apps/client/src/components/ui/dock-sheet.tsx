@@ -8,16 +8,13 @@ import { Sheet, type SheetDetent } from './sheet';
 export type DockDetent = SheetDetent;
 
 export interface DockSheetProps {
-  /** 出ているか。false にすると閉じる動きのあとで消える。 */
+  /** 出ているか（パレットのボタンが決める）。false にすると引っ込む動きのあとで消える。指では消えない。 */
   open: boolean;
   detent: DockDetent;
   onDetentChange: (detent: DockDetent) => void;
   ariaLabel: string;
   /** 使う段（低い順）。既定は覗く・半分・全画面。 */
   detents?: readonly DockDetent[];
-  /** 下へ払いきって閉じられるか。閉じたら `onClose`。 */
-  dismissible?: boolean;
-  onClose?: () => void;
   /** 上に貼り付く見出しの行の中身（つまみは部品が描く）。 */
   peek?: ReactNode;
   /** いちばん低い段で見出しの行を押したとき（呼び出し側がフォーカスを外す、等）。 */
@@ -36,6 +33,7 @@ const INSETS = new WeakMap<HTMLElement, Map<symbol, number>>();
  * 本文の上に重なる**非モーダル**のシート（Google マップの「場所」のシート）。動きは `Sheet`。
  *
  * - 暗転しない。シートの外（容器の空き）は指を通すので、上の本文はそのまま触れて読める
+ * - **出す／消すはボタン、指は高さだけ**（一番低い段より下へは引っ込まない）
  * - 殻のドックの層（本文と同じ箱。下端の操作の列は覆わない）に出る
  * - 段に止まるたびに、見えている高さを本文の `padding-bottom` / `scroll-padding-bottom` に渡す
  *   （CSS 変数 `--sp-dock-inset`）。本文の末尾やカーソルの行がシートの下に隠れない
@@ -47,8 +45,6 @@ export function DockSheet({
   onDetentChange,
   ariaLabel,
   detents = PEEK_FIRST,
-  dismissible = false,
-  onClose,
   peek,
   onPeekTap,
   contract,
@@ -82,8 +78,6 @@ export function DockSheet({
       detents={detents}
       detent={detent}
       onDetentChange={onDetentChange}
-      dismissible={dismissible}
-      onRequestClose={onClose}
       onClosed={() => setInset(0)}
       modal={false}
       ariaLabel={ariaLabel}

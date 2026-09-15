@@ -132,6 +132,14 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'can-zoom-out-from-100',
+      description: '開いた直後（100%）から引ける（下限は 100% の半分。88% で頭打ちにしない）',
+      check: ({ root }) => {
+        const zoom = root.querySelector('[data-verify-unit="CanvasZoomControls"]');
+        return zoom?.getAttribute('data-verify-at-min') === 'false' || '開いた直後に引けない';
+      },
+    },
+    {
       id: 'has-grid',
       description: '模造紙の方眼が敷かれている（PC の瓶と同じ）',
       check: ({ root }) =>

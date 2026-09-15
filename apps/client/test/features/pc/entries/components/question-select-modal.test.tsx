@@ -98,7 +98,7 @@ describe('QuestionSelectModal (Issue #316 → SP と同じ選び手)', () => {
 
   it('問いがあっても「新しく問いを書く」で書く欄に切り替わる', () => {
     setup();
-    fireEvent.click(screen.getByText('+ 新しく問いを書く'));
+    fireEvent.click(screen.getByText('新しく問いを書く'));
     expect(screen.getByPlaceholderText(/問いを書く/)).toBeTruthy();
   });
 

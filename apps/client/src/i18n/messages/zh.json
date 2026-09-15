@@ -161,12 +161,12 @@
     "picker": {
       "title": "关联提问",
       "empty": "还没有正在思考的问题。在这里写一个吧。",
-      "new": "+ 写一个新问题",
+      "new": "写一个新问题",
       "new_placeholder": "写下问题（例如：今天有什么小发现？）",
       "create": "就用这个问题",
       "creating": "创建中…",
       "create_failed": "未能创建问题，请再试一次。",
-      "back_to_list": "← 从已有问题中选择",
+      "back_to_list": "从已有问题中选择",
       "search_placeholder": "查找问题",
       "untitled": "无标题提问",
       "close": "关闭",
@@ -774,7 +774,8 @@
       "result_not_fermented": "这个问题还没有发酵。",
       "result_latest": "最新",
       "result_question_aria": "看哪个问题的结果",
-      "result_round_aria": "看哪一次的结果"
+      "result_round_aria": "看哪一次的结果",
+      "ferment_needs_body": "写下正文后就能腌制"
     },
     "nav": {
       "back": "返回",
@@ -796,13 +797,12 @@
       "section_sources": "来源记录",
       "source_untitled": "无标题记录",
       "no_questions": "还没有提问。可以从下方按钮开始。",
-      "manage_questions": "添加或编辑提问",
+      "manage_questions": "提问列表",
       "not_fermented": "这个提问还没有发酵",
       "selection_reason": "被选中的理由",
       "palette_aria": "罐子操作",
       "letter_badge": "来信",
       "letter_badge_unread": "新来信",
-      "history": "过往",
       "history_latest": "最新"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
@@ -832,19 +832,19 @@
       "sheet_add": "新的提问",
       "sheet_edit": "编辑提问",
       "placeholder": "写下提问",
-      "delete": "归档这个问题",
       "cancel": "取消",
       "save": "保存",
       "letter_arrived": "有一封信送到了",
       "close": "关闭",
-      "limit": "问题最多 {max} 个。点上面的问题并选择「归档这个问题」，就能提出新的问题。",
+      "limit": "问题最多 {max} 个。点上面的问题并选择「归档」，就能提出新的问题。",
       "archive_confirm_title": "要归档这个问题吗？",
       "archive_confirm_body": "归档的问题可以在本页面最下方的「已归档的问题」里恢复。",
       "archive_confirm": "归档",
       "archive_cancel": "取消",
       "archived_section": "已归档的问题（{count}）",
       "unarchive": "恢复",
-      "unarchive_limit": "问题最多 {max} 个。归档一个后就能恢复。"
+      "unarchive_limit": "问题最多 {max} 个。归档一个后就能恢复。",
+      "archive": "归档"
     },
     "board": {
       "cards": "{count}张",

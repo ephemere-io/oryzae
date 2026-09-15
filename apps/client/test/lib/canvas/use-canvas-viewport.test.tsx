@@ -375,6 +375,36 @@ describe('useCanvasViewport', () => {
       expect(readViewport().scale).toBeCloseTo(0.5, 6);
     });
 
+    it('minZoom を渡すと、引ける下限は 100% の割合になる', async () => {
+      function MinZoomHarness() {
+        const canvas = useCanvasViewport({
+          defaultFitBounds: HOME,
+          referenceBounds: HOME,
+          fitPadding: 0,
+          minZoom: 0.5,
+        });
+        return (
+          <CanvasViewport canvas={canvas} ariaLabel="test canvas">
+            <button type="button" data-testid="zoom-out" onClick={canvas.zoomOut}>
+              out
+            </button>
+          </CanvasViewport>
+        );
+      }
+      render(<MinZoomHarness />);
+      stubFrameRect();
+      await flushFrame();
+      await flushFrame();
+      for (let i = 0; i < 10; i += 1) {
+        act(() => {
+          screen.getByTestId('zoom-out').click();
+        });
+      }
+      await flushFrame();
+      // 100% は 0.5 倍。下限はその半分の 0.25（固定の下限 0.2 まで行かない）。
+      expect(readViewport().scale).toBeCloseTo(0.25, 6);
+    });
+
     it('窓を渡さなければ基準は 1（world 1 = 1px）', async () => {
       function PlainHarness() {
         const canvas = useCanvasViewport();

@@ -391,7 +391,8 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
    * - **写真そのものを、動かしている間ずっと落とす先へ入れ直す**（半透明の置き場所）。文字はその場で
    *   回り込み直すので、離したらどうなるかが見える。以前は指の下に細い線を出すだけで、置いたあとに文字が
    *   どうずれるか分からなかった（実機レビュー）
-   * - 指に付いてくるのは小さな写し。指の少し上に出す（指で隠れない）
+   * - 指に付いてくるのは小さな写し。**掴んだ点が写しの同じ点に来る**（iOS のドラッグと同じ）。指の上に浮かせて
+   *   いた頃は、動かすほど指から離れて見えた（実機レビュー）
    * - 入れ直しは、指が置き場所の箱から出たとき、かつ前に入れ直した点から半行ぶん以上動いたときだけ。
    *   入れ直しで文字がずれ、指の下の文字の位置が行き来して写真が震えるのを防ぐ（半行は本文の行の高さから）
    * - 本文の見えている範囲の端（1 行ぶん）に寄せると、寄せた深さに比例して本文を送る。速さは**時間あたり**
@@ -414,6 +415,12 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
     let frame = 0;
     let scrolledAt: number | null = null;
 
+    // 掴んだ点（写真の中の割合）。写しの同じ点を指の下に置く。
+    const grabbed = photo.getBoundingClientRect();
+    const ratio = (offset: number, size: number) =>
+      size > 0 ? Math.min(100, Math.max(0, (offset / size) * 100)) : 50;
+    ghost.style.setProperty('--grab-x', `${ratio(point.x - grabbed.left, grabbed.width)}%`);
+    ghost.style.setProperty('--grab-y', `${ratio(point.y - grabbed.top, grabbed.height)}%`);
     ghost.src = photo.currentSrc || photo.src;
     ghost.hidden = false;
     photo.setAttribute('data-dragging', '');
@@ -435,10 +442,11 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
 
     const paint = (now: number) => {
       frame = 0;
+      // 先に写真を入れ直し、そのあとで写しを置く（入れ直しで本文がずれても、写しは指の下に居る）。
+      place(false);
       const origin = host.getBoundingClientRect();
       ghost.style.insetInlineStart = `${point.x - origin.left}px`;
       ghost.style.insetBlockStart = `${point.y - origin.top}px`;
-      place(false);
       if (!scroller) return;
       const band = scroller.getBoundingClientRect();
       const depth =
@@ -544,7 +552,7 @@ export const SpBodyEditor = forwardRef<SpBodyEditorHandle, SpBodyEditorProps>(fu
           onSelectRef.current(selectedRef.current === index ? null : index);
         }}
       />
-      {/* 掴んだ写真の小さな写し（指の少し上に付いてくる）。 */}
+      {/* 掴んだ写真の小さな写し（掴んだ点が指の下に付いてくる）。 */}
       {/* biome-ignore lint/performance/noImgElement: 本文の中の写真（署名付き URL）をそのまま写す。next/image の loader を通さない */}
       <img
         ref={ghostRef}

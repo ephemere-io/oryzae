@@ -2,7 +2,8 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { ActionRow } from '@/components/ui/action-row';
 import { type DockDetent, DockSheet } from '@/components/ui/dock-sheet';
 import { TrashIcon } from '@/components/ui/palette-icons';
 import { Segmented } from '@/components/ui/segmented';
@@ -46,7 +47,7 @@ function toSpacing(value: string): EditorSpacing {
  * **非モーダルのドック**（`DockSheet`、半分と全画面）。暗転しないので、段を押した結果
  * （行間・文字サイズ・書体）が上の本文でそのまま見える（実機レビュー: 設定を変えたらこうなる、を
  * 確かめたい）。行は「ラベル + 段」を横に並べて低くし、本文が見える面積を残す。
- * 下へ引くか「閉じる」で閉じる。
+ * 出す／消すは上段の歯車と「閉じる」。指でシートを下げても消えない（高さだけ。実機レビュー）。
  *
  * 出すのは**本文の見た目**だけ: 書体・文字サイズ・行間・字間。PC の設定にあるエフェクト
  * （消し跡・圧力にじみ）はポインタ前提で指では成立しないので出さない。
@@ -61,9 +62,12 @@ export function SpEditorSettingsSheet({
   const t = useTranslations('sp.editor');
   const tPc = useTranslations('editor.settings');
   const [detent, setDetent] = useState<DockDetent>('half');
-  useEffect(() => {
+  // 開くたびに半分から（開いた描画のうちに戻す）。
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) setDetent('half');
-  }, [open]);
+  }
 
   return (
     <DockSheet
@@ -73,8 +77,6 @@ export function SpEditorSettingsSheet({
       // 下げると閉じるしかなく、半分に置けなかった（実機レビュー）。
       detents={['half', 'full']}
       onDetentChange={setDetent}
-      dismissible
-      onClose={onClose}
       ariaLabel={t('settings_title')}
     >
       <div
@@ -89,22 +91,12 @@ export function SpEditorSettingsSheet({
         className="flex flex-col gap-3"
         style={CONTROL_FONT}
       >
-        <div className="flex items-center justify-between gap-3">
-          <span
-            className="text-[11px] uppercase tracking-[0.14em]"
-            style={{ color: 'var(--accent)' }}
-          >
-            {t('settings_title')}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
-            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
-          >
-            {t('close')}
-          </button>
-        </div>
+        <span
+          className="text-[11px] uppercase tracking-[0.14em]"
+          style={{ color: 'var(--accent)' }}
+        >
+          {t('settings_title')}
+        </span>
         <Row label={tPc('font_family')}>
           <Segmented
             size="md"
@@ -148,12 +140,26 @@ export function SpEditorSettingsSheet({
             options={spacingOptions(t)}
           />
         </Row>
-        {onDelete ? (
-          // 破壊的な操作は設定から離して末尾に（iOS の設定画面の作法）。押すと確認シートへ。
-          <div className="mt-2 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
-            <DangerButton onClick={onDelete} label={t('settings_delete_entry')} />
-          </div>
-        ) : null}
+        {/* 操作は末尾の 1 行に固める（問いの編集のシートと同じ並び。左上中心主義: 左に「閉じる」、押されたくない
+            「削除」は右端）。削除は本文の見た目の段から離す（iOS の設定画面の作法）。押すと確認シートへ。 */}
+        <div className="mt-2 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+          <ActionRow
+            actions={[
+              { id: 'close', label: t('close'), tone: 'secondary', onSelect: onClose },
+              ...(onDelete
+                ? [
+                    {
+                      id: 'delete-entry',
+                      label: t('settings_delete_entry'),
+                      tone: 'danger' as const,
+                      icon: <TrashIcon />,
+                      onSelect: onDelete,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </div>
       </div>
     </DockSheet>
   );
@@ -176,29 +182,5 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       </span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
-  );
-}
-
-/**
- * 取り返しのつかない操作のボタン（エントリーの削除）。赤い 1 行の文字だけでは押せるものに見えなかった
- * （実機レビュー）。淡い赤の面・枠・ゴミ箱のアイコン・全幅で「押せる、けれど重い」と伝える。PC の設定の
- * 引き出しも同じ見た目（`pc/entries/components/settings-drawer.tsx`）。
- */
-function DangerButton({ onClick, label }: { onClick: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      data-settings-delete
-      className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border text-[15px] font-medium"
-      style={{
-        color: 'var(--ob-jar-warm)',
-        borderColor: 'color-mix(in srgb, var(--ob-jar-warm) 35%, transparent)',
-        background: 'color-mix(in srgb, var(--ob-jar-warm) 8%, transparent)',
-      }}
-    >
-      <TrashIcon />
-      {label}
-    </button>
   );
 }

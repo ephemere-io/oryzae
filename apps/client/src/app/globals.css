@@ -120,6 +120,23 @@ body {
 /* シート（components/ui/sheet.tsx）。動きはネイティブのスクロールと CSS scroll-snap で、ここは見た目の補い。 */
 .oz-sheet-scroller {
   scrollbar-width: none;
+  /* 出す／消すは容器ごと下へずらす（高さの段はスクロールが担うので、ここは出入りだけ）。曲線は iOS のシート。 */
+  transition: translate 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.oz-sheet-scroller[data-shown="false"] {
+  translate: 0 100%;
+}
+.oz-sheet-backdrop {
+  transition: opacity 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.oz-sheet-backdrop[data-shown="false"] {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oz-sheet-scroller,
+  .oz-sheet-backdrop {
+    transition: none;
+  }
 }
 .oz-sheet-scroller::-webkit-scrollbar {
   display: none;
@@ -233,7 +250,8 @@ body {
   }
 }
 
-/* 掴んだ写真の小さな写し。指の点を下端の中央にして、指の少し上に出す（指で隠れない）。 */
+/* 掴んだ写真の写し。**掴んだ点が写しの同じ点に来る**（`--grab-x` / `--grab-y` は写真の中の割合）。iOS の
+   ドラッグと同じく指の下に付いてくる。以前は指の上に浮かせていて、動かすほど指から離れて見えた（実機レビュー）。 */
 .oz-photo-ghost {
   position: absolute;
   z-index: 2;
@@ -241,10 +259,28 @@ body {
   max-block-size: 30svh;
   object-fit: cover;
   border-radius: 0.75rem;
-  translate: -50% calc(-100% - 1.5rem);
+  translate: calc(var(--grab-x, 50%) * -1) calc(var(--grab-y, 50%) * -1);
   pointer-events: none;
   opacity: 0.92;
   box-shadow: 0 12px 32px color-mix(in srgb, var(--fg) 24%, transparent);
+}
+
+/* 押せない操作を押したときの理由（パレットの上に 1 行）。出て、読めるあいだ留まり、消える。終わりで部品が外す。 */
+.oz-palette-hint {
+  translate: -50% 0;
+  animation: oz-palette-hint 2.6s ease-out both;
+}
+@keyframes oz-palette-hint {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* 指の端末の「押した印」。
