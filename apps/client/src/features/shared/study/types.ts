@@ -16,7 +16,12 @@ export type StudyTarget =
   | { kind: 'journal-month'; month: string }
   /** 棚ごと（SP）。全月の一覧へ。 */
   | { kind: 'archive' }
-  | { kind: 'board' };
+  | { kind: 'board' }
+  /**
+   * 壁のメモの 1 行。公開サイト（別ドメイン）へ**新しいタブ**で出る。
+   * カメラは動かさない — 部屋の外への案内であって、部屋の中の行き先ではない。
+   */
+  | { kind: 'external'; href: string };
 
 /**
  * 瓶の見た目を決める発酵の状態。

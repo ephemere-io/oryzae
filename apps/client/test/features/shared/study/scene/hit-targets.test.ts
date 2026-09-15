@@ -3,6 +3,7 @@ import {
   buildHitRegistry,
   HitRegistry,
   HOVER_SCALE,
+  memoHitId,
   resolveClickTarget,
 } from '@/features/shared/study/scene/hit-targets';
 import type { Notebook } from '@/features/shared/study/types';
@@ -122,6 +123,44 @@ describe('buildHitRegistry', () => {
   it('id が重複しない', () => {
     const ids = pc.ids();
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  describe('壁のメモ', () => {
+    const MEMO = [
+      { id: 'help', text: 'ヘルプ', href: 'https://docs.example/support' },
+      { id: 'contact', text: 'お問い合わせ', href: 'https://docs.example/support#contact' },
+      { id: 'docs', text: 'Docs', href: 'https://docs.example/' },
+    ] as const;
+    const withMemo = buildHitRegistry({
+      desk: DESK,
+      shelf: SHELF,
+      shelfAsSingleTarget: false,
+      memo: MEMO,
+    });
+
+    it('1 行ずつが的になり、それぞれ自分の URL へ出る', () => {
+      for (const line of MEMO) {
+        const entry = withMemo.get(memoHitId(line.id));
+        expect(entry?.target).toEqual({ kind: 'external', href: line.href });
+      }
+    });
+
+    it('ラベルは持たず（紙に名前が書いてある）、一言で中身を言う', () => {
+      expect(withMemo.get('memo-help')?.label).toBeNull();
+      expect(withMemo.get('memo-help')?.hint).toBe('memo-help');
+      expect(withMemo.get('memo-contact')?.hint).toBe('memo-contact');
+      expect(withMemo.get('memo-docs')?.hint).toBe('memo-docs');
+    });
+
+    it('メモを渡さない構図では的も無い', () => {
+      expect(pc.get('memo-help')).toBeNull();
+    });
+
+    it('他の的と id が重ならない', () => {
+      const ids = withMemo.ids();
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toHaveLength(pc.ids().length + MEMO.length);
+    });
   });
 });
 

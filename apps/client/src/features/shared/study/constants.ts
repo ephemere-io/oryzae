@@ -68,7 +68,8 @@ export const OPEN_BUDGET_MS = 1000;
  * 机の面だけになって行き先を見失う。
  */
 export const HOME_ZOOM = {
-  min: 0.72,
+  /** 寄れる限度。壁のメモの字（ホームで 15px ほど）を読めるところまで。 */
+  min: 0.55,
   max: 1.35,
   /** ホイールの delta 1 あたりの倍率変化。 */
   wheelStep: 0.0012,

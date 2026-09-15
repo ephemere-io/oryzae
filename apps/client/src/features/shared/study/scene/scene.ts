@@ -12,6 +12,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
+  CircleGeometry,
   CylinderGeometry,
   EdgesGeometry,
   Group,
@@ -27,6 +28,8 @@ import {
   Raycaster,
   RingGeometry,
   Scene,
+  Shape,
+  ShapeGeometry,
   SphereGeometry,
   Sprite,
   Vector2,
@@ -63,17 +66,20 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  controlledView,
+  type HomeControl,
+  homeControl,
   homeView,
   jarView,
   journalSpreadView,
   journalTopView,
   lerpView,
+  panByPixels,
   parallaxOffset,
   shelfView,
   zoomByPinch,
   zoomByWheel,
-  zoomedView,
-  zoomTargetRise,
+  zoomTowardPointer,
 } from './camera';
 import { contentSignature } from './content-signature';
 import {
@@ -81,6 +87,7 @@ import {
   type HitHint,
   type HitId,
   HOVER_SCALE,
+  memoHitId,
   resolveClickTarget,
 } from './hit-targets';
 import {
@@ -109,6 +116,19 @@ import {
   type StudyTheme,
 } from './materials';
 import {
+  MEMO_DOT,
+  MEMO_FONT_PX,
+  MEMO_PAPER,
+  MEMO_TAPE,
+  MEMO_TEXT,
+  MEMO_TILT,
+  type MemoLine,
+  memoHitSize,
+  memoLineWidth,
+  memoLineYs,
+  paperOutline,
+} from './memo';
+import {
   isPlanDone,
   leaveFadeDuration,
   leaveFadeStart,
@@ -124,6 +144,11 @@ export interface StudySceneOptions {
   layout: StudyLayout;
   theme: StudyTheme;
   reducedMotion: boolean;
+  /**
+   * 壁のメモの行（文面は訳済み、URL は組み済み）。scene は React も i18n も知らないので、
+   * 描く文字は外から渡す。配置表がメモを持たない構図では描かない。
+   */
+  memo: readonly MemoLine[];
   /** ホバーが変わったとき（PC のラベル濃度とカーソル）。 */
   onHoverChange?: (hovered: HoverInfo | null) => void;
   /** 3D の物が押されたとき。 */
@@ -169,8 +194,6 @@ export interface LabelPositions {
   board: ScreenPoint | null;
   archive: ScreenPoint | null;
   pen: ScreenPoint | null;
-  /** 壁のメモ。ラベルと違って遠近で大きさが変わるので、尺も一緒に渡す。 */
-  memo: MemoPoint | null;
 }
 
 interface ScreenPoint {
@@ -178,17 +201,6 @@ interface ScreenPoint {
   y: number;
   /** カメラの後ろに回ったら false。 */
   visible: boolean;
-}
-
-interface MemoPoint extends ScreenPoint {
-  /**
-   * その場所での 1 world unit の画面上の長さ（px）。
-   *
-   * メモは「壁に貼ってある紙」であって注釈ではないので、寄れば近づくぶん大きく見える
-   * べき。透視スケールをかけないラベルと同じ仕組みに乗せつつ、尺だけを添えて
-   * HTML 側で `scale()` させる（`help-memo.ts` の `memoScale`）。
-   */
-  pxPerUnit: number;
 }
 
 export interface StudySceneHandle {
@@ -201,12 +213,18 @@ export interface StudySceneHandle {
   setPointer(x: number, y: number): void;
   /** ポインタが canvas から外れた。 */
   clearPointer(): void;
-  /** ホイールで寄り引きする（ホームのみ）。 */
+  /** ホイールで寄り引きする（ホームのみ）。いまのポインタの下へ向かって寄る。 */
   zoomBy(deltaY: number): void;
-  /** 2 本指を置いた。以後の比はここを基準にする。 */
-  startPinch(): void;
+  /** 2 本指を置いた。以後の比はここを基準にし、`anchor`（-1..1）の下へ向かって寄る。 */
+  startPinch(anchor?: { x: number; y: number }): void;
   /** 2 本指の間隔の比（置いた時点を 1 とする）。 */
   pinchTo(ratio: number): void;
+  /** つかんで動かし始めた（カーソルを握りにする）。 */
+  beginDrag(): void;
+  /** つかんだまま動かした分（画面の px）。ホームだけで効く。 */
+  dragBy(dx: number, dy: number): void;
+  /** 離した。 */
+  endDrag(): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
   /** 遷移中・サブ画面ではラベルを消す。 */
@@ -295,10 +313,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     const notebooks = layoutNotebooks(state.notebooks, state.now);
 
+    const memoLines = layout.memo === null ? [] : options.memo;
+
     const registry = buildHitRegistry({
       desk: notebooks.desk.map((placement) => placement.notebook),
       shelf: notebooks.shelf,
       shelfAsSingleTarget: layout.pillOffsets !== null,
+      memo: memoLines,
     });
 
     const deskGroup = buildDesk(layout, materials, ownGeometry);
@@ -306,8 +327,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const jar = buildJar(state, layout, materials, ownGeometry, textures);
     const books = buildBooks(notebooks, layout, materials, ownGeometry, textures);
     const board = buildBoard(state, layout, materials, ownGeometry);
+    const memo = buildMemo(layout, materials, ownGeometry, textures, memoLines);
 
     const groups: Object3D[] = [deskGroup, floorGroup, jar.group, books.group, board.group];
+    if (memo !== null) groups.push(memo.group);
 
     const hitboxes = buildHitboxes({
       layout,
@@ -320,6 +343,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       shelfGroup: books.shelfGroup,
       boardGroup: board.group,
       penGroup: books.penGroup,
+      memo,
     });
 
     for (const group of groups) scene.add(group);
@@ -372,11 +396,18 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   let hoveredId: HitId | null = null;
   let hoveredObject: Object3D | null = null;
-  /** ホームの寄り引き。目標へ lerp で寄せる（指を離しても少し滑る）。 */
-  let zoom = 1;
+  /**
+   * ホームの操作（注視点と倍率）。倍率は `zoomTarget` へ lerp で寄せる（指を離しても
+   * 少し滑る）。寄り引きの支点は `zoomAnchor`（-1..1）— ホイールならそのときのカーソル、
+   * つまみなら 2 本指の中点。
+   */
+  let control: HomeControl = homeControl(layout);
   let zoomTarget = 1;
+  const zoomAnchor = new Vector2(0, 0);
   /** 2 本指を置いた時点の倍率。 */
   let pinchBase = 1;
+  /** つかんで動かしている間。パララックスを止め、カーソルを握りにする。 */
+  let dragging = false;
 
   const parallax = { x: 0, y: 0 };
 
@@ -522,16 +553,19 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     // ホームだけ呼吸とパララックスが乗る。**遷移中と遷移待ちの間は乗せない** —
     // tween 完了直後に揺らぎが復帰すると y が一段跳ぶ（着地がカクッと見える原因）。
-    const wanted = pointerInside
-      ? parallaxOffset(layout, { x: pointer.x, y: pointer.y })
-      : { x: 0, y: 0 };
+    // つかんで動かしている間はパララックスも止める（引いた向きと喧嘩する）。
+    const wanted =
+      pointerInside && !dragging
+        ? parallaxOffset(layout, { x: pointer.x, y: pointer.y })
+        : { x: 0, y: 0 };
     const lerp = layout.parallax?.lerp ?? 0;
     parallax.x += (wanted.x - parallax.x) * lerp;
     parallax.y += (wanted.y - parallax.y) * lerp;
 
-    // 寄り引き。近づくぶんだけ注視点が上がる（絵の上端を画面に留めるため）。
-    zoom = approach(zoom, zoomTarget, HOME_ZOOM.lerp);
-    const view = zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom));
+    // 寄り引き。支点（カーソルの下の点）が画面上で動かないように注視点も寄る。
+    const nextZoom = approach(control.zoom, zoomTarget, HOME_ZOOM.lerp);
+    control = zoomTowardPointer(layout, control, nextZoom, zoomAnchor, aspectOf(container));
+    const view = controlledView(layout, control);
 
     camera.position.set(
       view.position.x + parallax.x,
@@ -705,7 +739,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     hoveredObject = object;
     if (hoveredObject) hoveredObject.scale.setScalar(baseScaleOf(hoveredObject) * HOVER_SCALE);
 
-    renderer.domElement.style.cursor = id ? 'pointer' : 'default';
+    renderer.domElement.style.cursor = cursorFor(id);
 
     const entry = content.registry.get(id);
     options.onHoverChange?.(
@@ -733,8 +767,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!object) return { x: 0, y: 0 };
     const world = new Vector3();
     object.getWorldPosition(world);
-    // ツールチップは対象の少し上に出す。
-    world.y += 0.85;
+    // ツールチップは対象の少し上に出す。背の高い物は自分の高さを持つ（壁のメモは紙の上辺の上）。
+    const rise = object.userData.tooltipRise;
+    world.y += typeof rise === 'number' ? rise : 0.85;
     const point = toScreen(world);
     return { x: point.x, y: point.y };
   }
@@ -743,14 +778,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!options.onLabelPositions) return;
     // サブ画面と遷移中はラベルを消す。
     if (transition || settled) {
-      options.onLabelPositions({
-        jar: null,
-        journal: null,
-        board: null,
-        archive: null,
-        pen: null,
-        memo: null,
-      });
+      options.onLabelPositions({ jar: null, journal: null, board: null, archive: null, pen: null });
       return;
     }
     const anchors = layout.labelAnchors;
@@ -762,21 +790,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         ? toScreen(new Vector3(anchors.archive.x, anchors.archive.y, anchors.archive.z))
         : null,
       pen: anchors.pen ? toScreen(new Vector3(anchors.pen.x, anchors.pen.y, anchors.pen.z)) : null,
-      memo: layout.memo ? projectMemo(layout.memo.position) : null,
     });
-  }
-
-  /**
-   * メモの中心と、そこでの 1 world unit の画面上の長さ。
-   *
-   * 尺は中心から面に沿って +x へ 1 動かした点を同じように投影し、画面上の距離で取る
-   * （壁でも机でも x は面の中）。カメラの寄り引き・パララックスで毎フレーム変わるので、
-   * ここで一緒に測る。
-   */
-  function projectMemo(anchor: { x: number; y: number; z: number }): MemoPoint {
-    const center = toScreen(new Vector3(anchor.x, anchor.y, anchor.z));
-    const right = toScreen(new Vector3(anchor.x + 1, anchor.y, anchor.z));
-    return { ...center, pxPerUnit: Math.hypot(right.x - center.x, right.y - center.y) };
   }
 
   /**
@@ -814,16 +828,57 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function zoomBy(deltaY: number): void {
     if (transition || settled) return;
     zoomTarget = zoomByWheel(zoomTarget, deltaY);
+    // 支点はいまのカーソル。canvas の外から来たホイールは中央へ。
+    if (pointerInside) zoomAnchor.copy(pointer);
+    else zoomAnchor.set(0, 0);
   }
 
-  function startPinch(): void {
+  function startPinch(anchor?: { x: number; y: number }): void {
     if (transition || settled) return;
     pinchBase = zoomTarget;
+    if (anchor) zoomAnchor.set(anchor.x, anchor.y);
+    else zoomAnchor.set(0, 0);
   }
 
   function pinchTo(ratio: number): void {
     if (transition || settled) return;
     zoomTarget = zoomByPinch(pinchBase, ratio);
+  }
+
+  /**
+   * つかんで動かす。**ホームだけ。** 空いている所をつかんで左右上下へ引くと絵が付いてくる
+   * （オーナーの依頼: 「押せないところをクリックして持っていったら画面が動くように」）。
+   * 動かした分は注視点に畳み、部屋の外へは出ない（`clampFocus`）。
+   */
+  function beginDrag(): void {
+    if (transition || settled) return;
+    dragging = true;
+    renderer.domElement.style.cursor = cursorFor(hoveredId);
+  }
+
+  function dragBy(dx: number, dy: number): void {
+    if (transition || settled || !dragging) return;
+    control = panByPixels(
+      layout,
+      control,
+      { x: dx, y: dy },
+      { width: container.clientWidth, height: container.clientHeight },
+    );
+  }
+
+  function endDrag(): void {
+    dragging = false;
+    renderer.domElement.style.cursor = cursorFor(hoveredId);
+  }
+
+  /**
+   * カーソル。的の上は指、空いている所は手（つかめる）。つかんでいる間は握り。
+   * サブ画面と遷移中は素のまま（何もつかめない）。
+   */
+  function cursorFor(id: HitId | null): string {
+    if (transition || settled) return 'default';
+    if (dragging) return 'grabbing';
+    return id ? 'pointer' : 'grab';
   }
 
   function pick(): void {
@@ -900,6 +955,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         return shelfView(layout);
       case 'board':
         return layout.pillOffsets !== null ? boardCloseView(layout) : boardView(layout);
+      case 'external':
+        // 部屋の外へ出る対象はカメラを動かさない（`study-canvas` が goTo を呼ばない）。
+        // 万一呼ばれてもその場に留まる。
+        return currentView();
     }
   }
 
@@ -976,6 +1035,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     zoomBy,
     startPinch,
     pinchTo,
+    beginDrag,
+    dragBy,
+    endDrag,
     pick,
     isBusy: () => transition !== null || settled !== null,
     dispose,
@@ -1518,7 +1580,11 @@ function buildBooks(
     spine.add(spineBody);
 
     // 背表紙には年月を刷る。棚が「本が並んでいる場所」だと一目で分かる。
-    const texture = createTextTexture(spineLabelText(notebook.month), SPINE_LABEL.fontPx);
+    const texture = createTextTexture(
+      spineLabelText(notebook.month),
+      SPINE_LABEL.fontPx,
+      materials.inkColor,
+    );
     if (texture) {
       textures.push(texture);
       const sprite = new Sprite(materials.sprite(texture, SPINE_LABEL.opacity));
@@ -1693,6 +1759,102 @@ function buildBoard(
   return { group };
 }
 
+interface MemoParts {
+  group: Group;
+  surface: 'wall' | 'desk';
+  /** 行ごとの当たりの基準（行の中心）。 */
+  lines: { id: MemoLine['id']; anchor: Object3D }[];
+}
+
+/**
+ * 壁のメモ（`docs/oryzae-study/00-overview.md`「壁のメモ」）。
+ *
+ * 他の物と同じ線画で組む — 紙の面（`solid`）と墨の輪郭、下辺だけ破れた紙、
+ * 半透明のテープ、そして背表紙と同じ明朝の文字。行頭にはラベルと同じ役の小さな点。
+ * 机に置く構図（SP）では紙ごと寝かせ、テープは付けない。
+ */
+function buildMemo(
+  layout: StudyLayout,
+  materials: StudyMaterials,
+  own: OwnGeometry,
+  textures: CanvasTexture[],
+  lines: readonly MemoLine[],
+): MemoParts | null {
+  const placement = layout.memo;
+  if (placement === null || lines.length === 0) return null;
+
+  const { surface } = placement;
+  const paper = MEMO_PAPER[surface];
+  const text = MEMO_TEXT[surface];
+
+  const group = new Group();
+  group.position.set(placement.position.x, placement.position.y, placement.position.z);
+  // 机の紙は面を上に向けて寝かせる（ローカル +y が奥、+z が上になる）。傾きは面の中の回転。
+  group.rotation.set(surface === 'desk' ? -Math.PI / 2 : 0, 0, MEMO_TILT[surface]);
+  // 触れたときの一言は紙の上辺の上に（既定の 0.85 だとテープに被る）。
+  group.userData.tooltipRise = surface === 'wall' ? paper.height / 2 + 0.3 : 0.6;
+
+  // 紙。面と輪郭に同じ点列を使う（破れが面と線でずれない）。
+  const outline = paperOutline(paper);
+  const shape = new Shape();
+  outline.forEach((point, index) => {
+    if (index === 0) shape.moveTo(point.x, point.y);
+    else shape.lineTo(point.x, point.y);
+  });
+  shape.closePath();
+  group.add(new Mesh(own(new ShapeGeometry(shape)), materials.solid));
+  group.add(
+    new LineLoop(
+      own(new BufferGeometry().setFromPoints(outline.map((p) => new Vector3(p.x, p.y, 0.002)))),
+      materials.faint(0.4),
+    ),
+  );
+
+  // テープ。紙の上辺をまたいで壁に留まる。置いた紙には要らない。
+  if (surface === 'wall') {
+    const tape = new Group();
+    tape.position.set(0, paper.height / 2 - 0.02, 0.006);
+    tape.rotation.z = MEMO_TAPE.tilt;
+    const tapeGeometry = own(new PlaneGeometry(MEMO_TAPE.width, MEMO_TAPE.height));
+    tape.add(new Mesh(tapeGeometry, materials.tape));
+    tape.add(new LineSegments(own(new EdgesGeometry(tapeGeometry)), materials.faint(0.16)));
+    group.add(tape);
+  }
+
+  // 行。左揃え、行頭に点。文字は背表紙と同じ書体・墨で、面の向きに従う。
+  const parts: MemoParts = { group, surface, lines: [] };
+  const ys = memoLineYs(lines.length, text.gap);
+  lines.forEach((line, index) => {
+    const y = ys[index] ?? 0;
+    const left = -paper.width / 2 + text.inset;
+
+    const dot = new Mesh(
+      own(new CircleGeometry(MEMO_DOT.radius, 16)),
+      materials.inkFill(MEMO_DOT.opacity),
+    );
+    dot.position.set(left, y, 0.004);
+    group.add(dot);
+
+    const texture = createTextTexture(line.text, MEMO_FONT_PX, materials.inkColor);
+    const anchor = new Object3D();
+    anchor.position.set(0, y, 0.004);
+    group.add(anchor);
+    parts.lines.push({ id: line.id, anchor });
+    if (texture === null) return;
+    textures.push(texture);
+
+    const width = memoLineWidth(texture.image, text.lineHeight);
+    const face = new Mesh(
+      own(new PlaneGeometry(width, text.lineHeight)),
+      materials.text(texture, 0.9),
+    );
+    face.position.set(left + MEMO_DOT.gap + width / 2, y, 0.004);
+    group.add(face);
+  });
+
+  return parts;
+}
+
 /**
  * 当たり判定は見た目のメッシュではなく**不可視のヒットボックス**で取る。
  * 線だけの物はレイキャストに引っかからないため。
@@ -1709,6 +1871,8 @@ function buildHitboxes(options: {
   shelfGroup: Group;
   boardGroup: Group;
   penGroup: Group;
+  /** 壁のメモ。行ごとの的を持つ。null は置いていない構図。 */
+  memo: MemoParts | null;
 }): Mesh[] {
   const { layout, materials, ownGeometry } = options;
   const boxes: Mesh[] = [];
@@ -1799,6 +1963,20 @@ function buildHitboxes(options: {
     options.boardGroup,
   );
 
+  /**
+   * 壁のメモは**行ごと**に的を持つ（行き先が 3 つある）。ホバーで持ち上がるのは
+   * 紙ごと — 1 行だけ 2% 大きくしても見えない。どの行に触れているかは一言が言う。
+   * 箱は紙と同じ姿勢で被せる（机に寝かせた紙では箱も寝る）。
+   */
+  if (options.memo !== null) {
+    const memo = options.memo;
+    for (const line of memo.lines) {
+      const world = new Vector3();
+      line.anchor.getWorldPosition(world);
+      box(memoHitId(line.id), memoHitSize(memo.surface), world, memo.group, memo.group);
+    }
+  }
+
   return boxes;
 }
 
@@ -1807,7 +1985,7 @@ function buildHitboxes(options: {
  *
  * canvas が取れない環境（SSR・古い端末）では null を返し、呼び出し側がその語を諦める。
  */
-function createTextTexture(text: string, fontPx = 48): CanvasTexture | null {
+function createTextTexture(text: string, fontPx = 48, color = '#1A1918'): CanvasTexture | null {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) return null;
@@ -1824,7 +2002,7 @@ function createTextTexture(text: string, fontPx = 48): CanvasTexture | null {
   context.font = font;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillStyle = '#1A1918';
+  context.fillStyle = color;
   context.fillText(text, canvas.width / 2, canvas.height / 2);
 
   const texture = new CanvasTexture(canvas);
