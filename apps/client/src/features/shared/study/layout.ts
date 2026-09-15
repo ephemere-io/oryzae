@@ -85,6 +85,20 @@ export interface StudyLayout {
   };
   /** SP のピルだけが使う画面座標オフセット（px）。PC は null。 */
   pillOffsets: { jar: Vec2; journal: Vec2; board: Vec2; archive: Vec2 } | null;
+  /**
+   * メモ（ヘルプ・お問い合わせ・Docs への導線）の中心と、貼る面。null は置かない。
+   *
+   * 3D の物ではなく、ラベルと同じ「3D 座標に貼り付く HTML」（`StudyHelpMemo`）。
+   * 行き先が 3 つあり、どれも別ドメインの公開サイトなので、canvas の当たりで拾うより
+   * 紙の上に本物のリンクを並べるほうが素直（押せる・読める・訳せる）。
+   *
+   * ラベルと違って**遠近で大きさが変わる**。壁に貼ってある紙であって注釈ではないので、
+   * 寄れば近づくぶん大きくなる（scene が 1 world unit の画面上の長さを毎フレーム添える）。
+   *
+   * `surface` は壁（テープで貼る・正対）か机（置く・寝かせる）か。PC は板の左隣の壁、
+   * SP は壁に余白が無いので机の手前に置く。
+   */
+  memo: { position: Vec3; surface: 'wall' | 'desk' } | null;
 }
 
 interface Vec2 {
@@ -154,6 +168,14 @@ export const PC_LAYOUT: StudyLayout = {
     pen: vec3(5.4, -1.14, 3.7),
   },
   pillOffsets: null,
+  /**
+   * ボードの左隣の壁（オーナーの依頼）。板は x = 0.9 ± 4 なので左端は -3.1。紙の幅は
+   * 等倍で 2.3 world unit ほど（`help-memo.ts`）なので、中心を -4.7 に置くと板との間に
+   * 0.45 空く。高さは板の上寄り（板は y 0..5）だが、板の上辺（＝絵の上端）より下げて
+   * テープが画面の上端に触れないようにする。瓶（天板から 3.4）の上を視線が通るので
+   * 手前の瓶には隠れない。
+   */
+  memo: { position: vec3(-4.7, 3.0, -4), surface: 'wall' },
 };
 
 export const SP_LAYOUT: StudyLayout = {
@@ -203,4 +225,14 @@ export const SP_LAYOUT: StudyLayout = {
     board: { x: -92, y: 40 },
     archive: { x: 10, y: -16 },
   },
+  /**
+   * SP は壁に余白が無い。板の左は画面の外（板は 0.68 倍でも x ±2.72、画面に入る壁は
+   * ±3.6 ほど）で、板の下は BOARD・ARCHIVE のピルと瓶の口で埋まっている（実機で確認 —
+   * 壁の左下に貼ると BOARD のピルと瓶に重なった）。
+   *
+   * 机の手前左、鉛筆の左の空きに**置く**。鉛筆は積みの左手前（world x ≈ -0.8）に寝て
+   * いるので、その左（天板の左端 -3.4 まで）が空いている。JAR のピルは瓶の手前
+   * （z ≈ 1.25）に出るので、それより手前に置いて重ねない。
+   */
+  memo: { position: vec3(-2.24, -1.19, 3.05), surface: 'desk' },
 };

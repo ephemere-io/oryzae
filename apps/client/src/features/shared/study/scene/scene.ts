@@ -169,6 +169,8 @@ export interface LabelPositions {
   board: ScreenPoint | null;
   archive: ScreenPoint | null;
   pen: ScreenPoint | null;
+  /** 壁のメモ。ラベルと違って遠近で大きさが変わるので、尺も一緒に渡す。 */
+  memo: MemoPoint | null;
 }
 
 interface ScreenPoint {
@@ -176,6 +178,17 @@ interface ScreenPoint {
   y: number;
   /** カメラの後ろに回ったら false。 */
   visible: boolean;
+}
+
+interface MemoPoint extends ScreenPoint {
+  /**
+   * その場所での 1 world unit の画面上の長さ（px）。
+   *
+   * メモは「壁に貼ってある紙」であって注釈ではないので、寄れば近づくぶん大きく見える
+   * べき。透視スケールをかけないラベルと同じ仕組みに乗せつつ、尺だけを添えて
+   * HTML 側で `scale()` させる（`help-memo.ts` の `memoScale`）。
+   */
+  pxPerUnit: number;
 }
 
 export interface StudySceneHandle {
@@ -730,7 +743,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!options.onLabelPositions) return;
     // サブ画面と遷移中はラベルを消す。
     if (transition || settled) {
-      options.onLabelPositions({ jar: null, journal: null, board: null, archive: null, pen: null });
+      options.onLabelPositions({
+        jar: null,
+        journal: null,
+        board: null,
+        archive: null,
+        pen: null,
+        memo: null,
+      });
       return;
     }
     const anchors = layout.labelAnchors;
@@ -742,7 +762,21 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         ? toScreen(new Vector3(anchors.archive.x, anchors.archive.y, anchors.archive.z))
         : null,
       pen: anchors.pen ? toScreen(new Vector3(anchors.pen.x, anchors.pen.y, anchors.pen.z)) : null,
+      memo: layout.memo ? projectMemo(layout.memo.position) : null,
     });
+  }
+
+  /**
+   * メモの中心と、そこでの 1 world unit の画面上の長さ。
+   *
+   * 尺は中心から面に沿って +x へ 1 動かした点を同じように投影し、画面上の距離で取る
+   * （壁でも机でも x は面の中）。カメラの寄り引き・パララックスで毎フレーム変わるので、
+   * ここで一緒に測る。
+   */
+  function projectMemo(anchor: { x: number; y: number; z: number }): MemoPoint {
+    const center = toScreen(new Vector3(anchor.x, anchor.y, anchor.z));
+    const right = toScreen(new Vector3(anchor.x + 1, anchor.y, anchor.z));
+    return { ...center, pxPerUnit: Math.hypot(right.x - center.x, right.y - center.y) };
   }
 
   /**

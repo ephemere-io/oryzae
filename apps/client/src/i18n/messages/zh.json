@@ -857,6 +857,13 @@
     "hint_board_empty": "还没有贴任何东西",
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
-    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
+    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
+    "memo_title": "HELP",
+    "memo_help_caption": "有不明白的地方时",
+    "memo_help": "帮助",
+    "memo_contact_caption": "想要联系我们时",
+    "memo_contact": "联系我们",
+    "memo_docs_caption": "了解 Oryzae 的体验",
+    "memo_docs": "Docs"
   }
 }
