@@ -8,9 +8,35 @@ interface SnippetContent {
 
 interface SnippetCardContentProps {
   content: SnippetContent;
+  /** カードの幅（world）。文字の大きさをこれに追随させる。 */
+  cardWidth?: number;
 }
 
-export function SnippetCardContent({ content }: SnippetCardContentProps) {
+/** 既定のカード幅。ここで従来どおり 14px になる。 */
+const DEFAULT_CARD_WIDTH = 262;
+const DEFAULT_FONT_SIZE = 14;
+/** 小さくしても読める下限と、1 枚が見出しにならない上限。 */
+const MIN_FONT_SIZE = 12;
+const MAX_FONT_SIZE = 40;
+
+/**
+ * カードの幅から本文の文字の大きさを出す。
+ *
+ * **枠を広げたら文字も大きくなる。** 固定サイズだと、引いて全体を見たときに文字だけが
+ * 潰れて読めず、「大きくしたのに読めないまま」になっていた（レビュー指摘）。カードを
+ * 大きくするという操作が、そのまま「読みやすくする」に繋がるようにする。
+ */
+export function snippetFontSize(cardWidth: number): number {
+  const scaled = (cardWidth / DEFAULT_CARD_WIDTH) * DEFAULT_FONT_SIZE;
+  return Math.round(Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, scaled)));
+}
+
+export function SnippetCardContent({
+  content,
+  cardWidth = DEFAULT_CARD_WIDTH,
+}: SnippetCardContentProps) {
+  const fontSize = snippetFontSize(cardWidth);
+
   return (
     <div
       className="flex h-full flex-col p-6"
@@ -18,16 +44,21 @@ export function SnippetCardContent({ content }: SnippetCardContentProps) {
         unit: 'SnippetCardContent',
         textLen: content.text.length,
         empty: content.text.length === 0,
+        fontSize,
       })}
     >
       {/* エントリと同じ体裁の小さな見出しだけにする。
           以前は光る点＋枠付きバッジ（✦ Snippet）を出していたが、他の種類には
           無いのでスニペットだけ賑やかになっていた。カードの地色（黄）で種類は
-          十分に分かる。 */}
+          十分に分かる。見出しも本文に合わせて大きくする（本文だけ育つと釣り合わない）。 */}
       <div className="mb-2 flex shrink-0 items-center pb-2">
         <span
-          className="text-[9px] uppercase tracking-[0.2em]"
-          style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
+          className="uppercase tracking-[0.2em]"
+          style={{
+            color: 'var(--date-color)',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: Math.max(9, Math.round(fontSize * 0.64)),
+          }}
         >
           Snippet
         </span>
@@ -40,8 +71,8 @@ export function SnippetCardContent({ content }: SnippetCardContentProps) {
           両立しないうえ、読めない倍率では下の CardTextGlyph に丸ごと入れ替わるので、
           中間倍率だけのために描画を削っても得るものが無い。 */}
       <p
-        className="board-scroll min-h-0 flex-1 overflow-auto whitespace-pre-wrap text-sm"
-        style={{ color: 'var(--fg)', lineHeight: 1.8 }}
+        className="board-scroll min-h-0 flex-1 overflow-auto whitespace-pre-wrap"
+        style={{ color: 'var(--fg)', lineHeight: 1.8, fontSize }}
       >
         {content.text}
       </p>
