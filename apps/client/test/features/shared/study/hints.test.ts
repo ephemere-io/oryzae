@@ -79,3 +79,11 @@ describe('studyHint（板）', () => {
     expect(studyHint('board', BASE)).toEqual({ textKey: 'hint_board_empty' });
   });
 });
+
+describe('studyHint（壁のメモ）', () => {
+  it('行ごとに、そこで何ができるかを言う（紙は名前しか書いていない）', () => {
+    expect(studyHint('memo-help', BASE)).toEqual({ textKey: 'hint_memo_help' });
+    expect(studyHint('memo-contact', BASE)).toEqual({ textKey: 'hint_memo_contact' });
+    expect(studyHint('memo-docs', BASE)).toEqual({ textKey: 'hint_memo_docs' });
+  });
+});

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PC_LAYOUT, SP_LAYOUT, type StudyLayout } from '@/features/shared/study/layout';
+import { MEMO_PAPER } from '@/features/shared/study/scene/memo';
 
 const LAYOUTS: StudyLayout[] = [PC_LAYOUT, SP_LAYOUT];
 
@@ -48,10 +49,86 @@ describe('配置表に共通して成り立つこと', () => {
     expect(layout.viewDistance.board).toBeGreaterThan(0);
   });
 
+  it.each(LAYOUTS)('$name: 注視点の可動域がホームの注視点を含み、天板の幅を越えない', (layout) => {
+    const bounds = layout.focusBounds;
+    const home = layout.camera.target;
+    expect(bounds.x[0]).toBeLessThanOrEqual(home.x);
+    expect(bounds.x[1]).toBeGreaterThanOrEqual(home.x);
+    expect(bounds.y[0]).toBeLessThanOrEqual(home.y);
+    expect(bounds.y[1]).toBeGreaterThanOrEqual(home.y);
+    expect(bounds.z[0]).toBeLessThanOrEqual(home.z);
+    expect(bounds.z[1]).toBeGreaterThanOrEqual(home.z);
+    expect(bounds.x[0]).toBeGreaterThanOrEqual(layout.deskTop.xLeft);
+    expect(bounds.x[1]).toBeLessThanOrEqual(layout.deskTop.xRight);
+  });
+
   it.each(LAYOUTS)('$name: 主要ラベルが対応する物の近くに置かれている', (layout) => {
     // アンカーが対象から離れると「何のラベルか」が読めなくなる。
     expect(Math.abs(layout.labelAnchors.jar.x - layout.jar.x)).toBeLessThan(1);
     expect(Math.abs(layout.labelAnchors.board.x - layout.board.position.x)).toBeLessThan(1);
+  });
+
+  it.each(LAYOUTS)('$name: ヘルプのメモがどちらの構図にもある', (layout) => {
+    // 書斎から公開サイトへ出ていく唯一の導線。片方の端末だけ黙っていてはいけない。
+    expect(layout.memo).not.toBeNull();
+  });
+
+  it.each(LAYOUTS)(
+    '$name: メモは机の左側にある（瓶の側。積み・棚・鉛筆の側ではない）',
+    (layout) => {
+      const memo = layout.memo;
+      if (memo === null) throw new Error('メモが無い');
+      expect(memo.position.x).toBeLessThan(0);
+      expect(memo.position.x).toBeGreaterThanOrEqual(layout.deskTop.xLeft);
+    },
+  );
+});
+
+describe('ヘルプのメモの置き場', () => {
+  it('PC は板の左隣の壁に貼る（板と同じ奥行き・板の面の外・紙の幅ぶん離す）', () => {
+    // 「ボードの左隣あたりに、壁に紙をテープで貼ったような感じで」（オーナーの依頼）。
+    const memo = PC_LAYOUT.memo;
+    if (memo === null) throw new Error('PC のメモが無い');
+    expect(memo.surface).toBe('wall');
+    expect(memo.position.z).toBeCloseTo(PC_LAYOUT.board.position.z, 5);
+    const boardLeft = PC_LAYOUT.board.position.x - (8 * PC_LAYOUT.board.scale) / 2;
+    // 紙（幅 2.0）が板に重ならず、間に余白が残る。
+    expect(memo.position.x + MEMO_PAPER.wall.width / 2).toBeLessThan(boardLeft - 0.3);
+    // 天板の中（壁は天板の幅までしか無い）。
+    expect(memo.position.x - MEMO_PAPER.wall.width / 2).toBeGreaterThan(PC_LAYOUT.deskTop.xLeft);
+    // 紙の上辺が板の上辺（＝絵の上端）を越えない。
+    expect(memo.position.y + MEMO_PAPER.wall.height / 2).toBeLessThanOrEqual(
+      PC_LAYOUT.camera.frameTop.y,
+    );
+    // 瓶の上を視線が通る高さ（瓶は天板から 3.4）。
+    expect(memo.position.y - MEMO_PAPER.wall.height / 2).toBeGreaterThan(PC_LAYOUT.jar.y + 2);
+  });
+
+  it('PC の板は右へ寄せ、積みと棚は奥行きで離してある（被り気味の指摘への答え）', () => {
+    // 板の左に紙 1 枚ぶん以上の壁を空ける。
+    const boardLeft = PC_LAYOUT.board.position.x - (8 * PC_LAYOUT.board.scale) / 2;
+    expect(boardLeft - PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(MEMO_PAPER.wall.width + 0.5);
+    // 積みは机の右寄り（「本とペンをもう少し右に」）、棚はさらに右で壁際。
+    expect(PC_LAYOUT.desk.x).toBeGreaterThan(2.5);
+    expect(PC_LAYOUT.shelf.position.x - PC_LAYOUT.desk.x).toBeGreaterThan(3);
+    expect(PC_LAYOUT.shelf.position.z).toBeLessThan(PC_LAYOUT.desk.z - 5);
+    // 棚は天板の中（台の半幅 1.4）。
+    expect(PC_LAYOUT.shelf.position.x + 1.4).toBeLessThan(PC_LAYOUT.deskTop.xRight);
+    // 天板は物の外側にぎりぎりの余白（瓶 -4.0 ± 1.3 が左端を決める）。
+    expect(PC_LAYOUT.deskTop.xLeft).toBeLessThan(PC_LAYOUT.jar.x - 1.3);
+    expect(PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(PC_LAYOUT.jar.x - 2.0);
+  });
+
+  it('SP は机の手前に置く（壁に余白が無い）', () => {
+    // 板の左は画面の外、板の下は BOARD・ARCHIVE のピルと瓶の口で埋まっている（実機）。
+    const memo = SP_LAYOUT.memo;
+    if (memo === null) throw new Error('SP のメモが無い');
+    expect(memo.surface).toBe('desk');
+    expect(memo.position.y).toBeCloseTo(SP_LAYOUT.deskTop.y, 1);
+    // 天板の中。鉛筆（積みの左手前）よりさらに左で、JAR のピル（瓶の手前 z ≈ 1.25）より手前。
+    expect(memo.position.z).toBeLessThan(SP_LAYOUT.deskTop.zNear);
+    expect(memo.position.z).toBeGreaterThan(SP_LAYOUT.labelAnchors.jar.z + 1);
+    expect(memo.position.x).toBeLessThan(SP_LAYOUT.pen.x);
   });
 });
 

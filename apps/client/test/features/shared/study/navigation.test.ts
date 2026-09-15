@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  leavesForOutside,
   notebookTarget,
   overlayScope,
   staysInStudy,
@@ -18,6 +19,21 @@ describe('targetHref', () => {
     // ここを /entries に飛ばすと、既存の一覧画面を作り替えることになる。
     expect(targetHref({ kind: 'journal-month', month: '2026-08' })).toBeNull();
     expect(targetHref({ kind: 'archive' })).toBeNull();
+  });
+
+  it('壁のメモの行は公開サイトの絶対 URL をそのまま返す', () => {
+    const href = 'https://docs.oryzae.ephemere.io/support#contact';
+    expect(targetHref({ kind: 'external', href })).toBe(href);
+  });
+});
+
+describe('leavesForOutside', () => {
+  it('部屋の外へ出るのは external だけ（カメラを動かさず新しいタブで開く）', () => {
+    expect(leavesForOutside({ kind: 'external', href: 'https://example.com/' })).toBe(true);
+    expect(leavesForOutside({ kind: 'jar' })).toBe(false);
+    expect(leavesForOutside({ kind: 'archive' })).toBe(false);
+    // 外へ出る対象は書斎の中で完結する対象でもない。
+    expect(staysInStudy({ kind: 'external', href: 'https://example.com/' })).toBe(false);
   });
 });
 
@@ -62,6 +78,7 @@ describe('すべての対象に行き先が定義されている', () => {
     { kind: 'journal-month', month: '2026-08' },
     { kind: 'archive' },
     { kind: 'board' },
+    { kind: 'external', href: 'https://docs.oryzae.ephemere.io/' },
   ];
 
   it('href か overlayScope のどちらか一方を必ず持つ', () => {

@@ -857,6 +857,12 @@
     "hint_board_empty": "まだ何も貼っていません",
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
-    "hint_board_both": "写真{photos}件・スニペット{snippets}件"
+    "hint_board_both": "写真{photos}件・スニペット{snippets}件",
+    "memo_help": "ヘルプ",
+    "memo_contact": "お問い合わせ",
+    "memo_docs": "Docs",
+    "hint_memo_help": "使い方とよくある質問",
+    "hint_memo_contact": "メールで問い合わせる",
+    "hint_memo_docs": "Oryzae の考え方と発酵のしくみ"
   }
 }

@@ -5,9 +5,11 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
+import { docsHref } from '@/lib/docs-site';
 import { useTheme } from '@/lib/theme-context';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
@@ -15,6 +17,7 @@ import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
+import type { MemoLine } from '../scene/memo';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -43,9 +46,24 @@ export interface StudyHomeProps {
 
 export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
+  const t = useTranslations('study');
   const { api, auth, loading: authLoading } = useAuth();
   const { theme } = useTheme();
   const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
+
+  /**
+   * 壁のメモの行。紙は名前しか書かず（ヘルプ・お問い合わせ・Docs）、何ができるかは
+   * 触れたときの一言（`hints.ts`）が言う。行き先はどれも公開サイト（別ドメイン）で、
+   * お問い合わせは `/support` の中の節、Docs は LP そのもの。
+   */
+  const memo = useMemo<MemoLine[]>(
+    () => [
+      { id: 'help', text: t('memo_help'), href: docsHref('/support') },
+      { id: 'contact', text: t('memo_contact'), href: docsHref('/support#contact') },
+      { id: 'docs', text: t('memo_docs'), href: docsHref('/') },
+    ],
+    [t],
+  );
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
@@ -158,6 +176,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
     setOverlay(overlayScope(target));
   }, []);
 
+  /** 部屋の外（公開サイト）へ。書斎を閉じずに新しいタブで開く。 */
+  const handleOpenExternal = useCallback((href: string) => {
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }, []);
+
   const handleSelectEntry = useCallback(
     (entry: StudyEntry) => {
       setOverlay(null);
@@ -224,8 +247,10 @@ export function StudyHome({ layout }: StudyHomeProps) {
           state={state}
           layout={layout}
           theme={theme}
+          memo={memo}
           onNavigate={handleNavigate}
           onOpenOverlay={handleOpenOverlay}
+          onOpenExternal={handleOpenExternal}
           onLabelPositions={setLabelPositions}
           onHoverChange={(hovered) => {
             setHoveredLabel(hovered?.label ?? null);

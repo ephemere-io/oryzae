@@ -25,10 +25,19 @@ export function targetHref(target: StudyTarget): string | null {
       return '/entries/new';
     case 'board':
       return '/board';
+    case 'external':
+      return target.href;
     case 'journal-month':
     case 'archive':
       return null;
   }
+}
+
+/** 部屋の外（別ドメイン）へ出る対象か。カメラは動かさず、新しいタブで開く。 */
+export function leavesForOutside(
+  target: StudyTarget,
+): target is { kind: 'external'; href: string } {
+  return target.kind === 'external';
 }
 
 /** 書斎の中で完結する対象か（＝カメラは動くが URL は変わらない）。 */
