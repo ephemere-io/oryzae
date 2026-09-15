@@ -83,13 +83,35 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('>こちら</a>');
   });
 
-  it('http/https 以外のリンクは a 要素にしない（javascript: を作らせない）', () => {
-    for (const url of ['javascript:alert(1)', 'data:text/html,x', '/relative/path']) {
+  it('許可していないスキームのリンクは a 要素にしない（javascript: を作らせない）', () => {
+    for (const url of [
+      'javascript:alert(1)',
+      'data:text/html,x',
+      'vbscript:msgbox(1)',
+      'file:///etc/passwd',
+      '/relative/path',
+    ]) {
       const html = render(`[押す](${url})`);
       expect(html).not.toContain(`href="${url}"`);
       // リンクにならなかった場合は素のテキストとして残る
       expect(html).toContain('[押す]');
     }
+  });
+
+  // お知らせメールのフッターに問い合わせ先を置くのはごく普通の書き方。
+  // ここを塞いでいたせいで、記法のまま届いた。
+  it('mailto: をリンクにする', () => {
+    const html = render('ご不明な点は [お問い合わせ](mailto:oryzae@ephemere.io) まで');
+
+    expect(html).toContain('<a href="mailto:oryzae@ephemere.io"');
+    expect(html).toContain('>お問い合わせ</a>');
+    expect(html).not.toContain('[お問い合わせ]');
+  });
+
+  it('mailto: の件名つきもそのまま href に載せる', () => {
+    const html = render('[質問する](mailto:oryzae@ephemere.io?subject=Oryzae)');
+
+    expect(html).toContain('href="mailto:oryzae@ephemere.io?subject=Oryzae"');
   });
 
   it('**太字** を strong にする', () => {
@@ -222,6 +244,19 @@ describe('renderNewsletterText', () => {
       locale: 'ja',
     });
     expect(text).toContain('こちら (https://oryzae.ephemere.io/support)');
+  });
+
+  // 「お問い合わせ (mailto:oryzae@ephemere.io)」は読み手には邪魔なだけ。
+  it('mailto: はスキームを落として住所だけ出す', () => {
+    const text = renderNewsletterText({
+      subject: '件名',
+      bodyMarkdown: 'ご不明な点は [お問い合わせ](mailto:oryzae@ephemere.io) まで',
+      unsubscribeUrl: UNSUBSCRIBE_URL,
+      locale: 'ja',
+    });
+
+    expect(text).toContain('お問い合わせ (oryzae@ephemere.io)');
+    expect(text).not.toContain('(mailto:');
   });
 
   it('太字の記号を落とし、箇条書きを ・ にする', () => {
