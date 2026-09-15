@@ -170,7 +170,7 @@
       "search_placeholder": "問いを探す",
       "untitled": "無題の問い",
       "close": "閉じる",
-      "limit": "問いは {max} つまでです。問いの一覧で 1 つ終えると、新しく立てられます。",
+      "limit": "問いは {max} つまでです。問いの一覧で 1 つアーカイブすると、新しく立てられます。",
       "manage": "問いの一覧を開く"
     }
   },
@@ -817,7 +817,7 @@
     },
     "questions": {
       "title": "問い",
-      "intro": "いま向き合っている問いを、育て、書き換え、終えられます。",
+      "intro": "いま向き合っている問いを、育て、書き換え、アーカイブできます。",
       "untitled": "無題の問い",
       "proposed": "Oryzae からの提案",
       "accept": "受け入れる",
@@ -827,12 +827,16 @@
       "sheet_add": "新しい問い",
       "sheet_edit": "問いを編集",
       "placeholder": "問いを書く",
-      "delete": "この問いを終える",
+      "delete": "この問いをアーカイブする",
       "cancel": "キャンセル",
       "save": "保存",
       "letter_arrived": "手紙が届いています",
       "close": "閉じる",
-      "limit": "問いは {max} つまでです。上の問いを押して「この問いを終える」を選ぶと、新しく立てられます。"
+      "limit": "問いは {max} つまでです。上の問いを押して「この問いをアーカイブする」を選ぶと、新しく立てられます。",
+      "archive_confirm_title": "この問いをアーカイブしますか？",
+      "archive_confirm_body": "瓶と問いの一覧から外れます。PC の問いの一覧から復元できます。",
+      "archive_confirm": "アーカイブする",
+      "archive_cancel": "やめる"
     },
     "board": {
       "cards": "{count}枚",

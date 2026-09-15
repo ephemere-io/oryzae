@@ -170,7 +170,7 @@
       "search_placeholder": "查找问题",
       "untitled": "无标题提问",
       "close": "关闭",
-      "limit": "问题最多 {max} 个。在问题列表里结束一个，就能提出新的问题。",
+      "limit": "问题最多 {max} 个。在问题列表里归档一个，就能提出新的问题。",
       "manage": "打开问题列表"
     }
   },
@@ -817,7 +817,7 @@
     },
     "questions": {
       "title": "提问",
-      "intro": "培育、改写或结束你正在面对的提问。",
+      "intro": "可以培养、改写、归档你正在面对的问题。",
       "untitled": "无标题提问",
       "proposed": "Oryzae 的建议",
       "accept": "接受",
@@ -827,12 +827,16 @@
       "sheet_add": "新的提问",
       "sheet_edit": "编辑提问",
       "placeholder": "写下提问",
-      "delete": "结束这个提问",
+      "delete": "归档这个问题",
       "cancel": "取消",
       "save": "保存",
       "letter_arrived": "有一封信送到了",
       "close": "关闭",
-      "limit": "问题最多 {max} 个。点上面的问题并选择「结束这个问题」，就能提出新的问题。"
+      "limit": "问题最多 {max} 个。点上面的问题并选择「归档这个问题」，就能提出新的问题。",
+      "archive_confirm_title": "要归档这个问题吗？",
+      "archive_confirm_body": "它会从瓶子和问题列表中移出。可以在 PC 的问题列表里恢复。",
+      "archive_confirm": "归档",
+      "archive_cancel": "取消"
     },
     "board": {
       "cards": "{count}张",

@@ -209,10 +209,7 @@ registerUnit<Props>({
         const description = [...root.querySelectorAll('.oz-disclosure')].find((region) =>
           (region.textContent ?? '').includes(KEYWORD_DESCRIPTION),
         );
-        return (
-          (description !== undefined && description.hasAttribute('inert')) ||
-          'キーワードの説明が、押す前から開いている'
-        );
+        return description?.hasAttribute('inert') || 'キーワードの説明が、押す前から開いている';
       },
     },
     {

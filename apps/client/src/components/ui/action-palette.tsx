@@ -13,7 +13,15 @@ export interface PaletteAction {
   /** 目に見える短い名前。無ければ `label`。 */
   caption?: string;
   icon: ReactNode;
+  /** 押したとき。`file` の操作では、選び手を開く直前に呼ぶ。 */
   onSelect: () => void;
+  /**
+   * 押すと端末の写真・ファイルの選び手を開く。**押した指がそのままボタンの上の `<input type="file">` に
+   * 当たる**ようにする。iOS は「写真ライブラリ／写真を撮る／ファイルを選択」のメニューを input の位置に
+   * 出すので、隠した input を JS で叩くと、input の居る場所（画面の上のほう）にメニューが浮いた（実機
+   * レビュー）。ボタンと同じ箱に input を重ねれば、メニューはボタンから出る。
+   */
+  file?: { accept: string; onFile: (file: File) => void };
   /** 押せない理由。あれば押せない（理由は読み上げに添える）。 */
   disabledReason?: string;
   /** いま効いている状態。印を添える。 */
@@ -71,6 +79,52 @@ export function ActionPalette({
     >
       {actions.map((action) => {
         const disabled = Boolean(action.disabledReason) || Boolean(action.busy);
+        const { file } = action;
+        if (file) {
+          return (
+            <div
+              key={action.id}
+              data-palette-action={action.id}
+              className={`relative flex min-w-[60px] flex-col items-center justify-center gap-1 whitespace-nowrap rounded-xl px-2 transition-colors has-[:active]:scale-95 ${
+                disabled ? 'opacity-40' : 'hover:bg-[var(--hover-wash)]'
+              }`}
+              style={{ color: 'var(--fg)' }}
+            >
+              {action.busy ? (
+                <span
+                  className="inline-block h-[22px] w-[22px] animate-spin rounded-full border-2 border-current border-t-transparent"
+                  aria-hidden="true"
+                />
+              ) : (
+                action.icon
+              )}
+              <span aria-hidden="true" className="text-[10px] leading-none tracking-[0.04em]">
+                {action.caption ?? action.label}
+              </span>
+              <input
+                type="file"
+                accept={file.accept}
+                aria-label={
+                  action.disabledReason
+                    ? `${action.label}（${action.disabledReason}）`
+                    : action.label
+                }
+                disabled={disabled}
+                data-palette-file
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
+                onClick={() => {
+                  if (!disabled) action.onSelect();
+                }}
+                onChange={(event) => {
+                  const picked = event.target.files?.[0];
+                  // 同じファイルを選び直しても change が起きるよう毎回空にする。
+                  event.target.value = '';
+                  if (picked) file.onFile(picked);
+                }}
+              />
+            </div>
+          );
+        }
         return (
           <button
             key={action.id}
