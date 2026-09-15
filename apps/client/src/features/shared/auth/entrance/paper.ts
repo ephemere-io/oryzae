@@ -10,7 +10,7 @@
  * ラベルも入力欄もボタンも明朝になっていた（「古めかしくて見にくい」の主因）。
  */
 
-/** 紙そのもの（PC は扉の右に立てる 1 枚、SP は下から敷く 1 枚）。 */
+/** 紙そのもの（PC は扉の右に立てる 1 枚、SP は画面の下に浮かせる 1 枚）。 */
 export const PAPER_STYLE = {
   background: 'rgba(253, 251, 247, 0.92)',
   backdropFilter: 'blur(14px)',
@@ -18,7 +18,7 @@ export const PAPER_STYLE = {
   border: '1px solid rgba(122, 116, 64, 0.18)',
 } as const;
 
-/** PC の紙だけが持つ影。SP の紙は画面の下端に接しているので浮かせない。 */
+/** 紙の影。PC も SP も、紙は地（扉の部屋）から浮いている。 */
 export const PAPER_SHADOW =
   '0 40px 90px -50px rgba(74, 70, 50, 0.32), 0 12px 32px -20px rgba(74, 70, 50, 0.18)';
 
