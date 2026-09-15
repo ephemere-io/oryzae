@@ -16,6 +16,8 @@ interface SpQuestionsProps {
   createQuestion: (text: string) => Promise<void> | void;
   editQuestion: (id: string, text: string) => Promise<void> | void;
   archiveQuestion: (id: string) => Promise<void> | void;
+  /** アーカイブした問いを戻す。無ければ戻す一覧を出さない。 */
+  unarchiveQuestion?: (id: string) => Promise<void> | void;
   acceptQuestion: (id: string) => Promise<void> | void;
   rejectQuestion: (id: string) => Promise<void> | void;
   /** 未読の手紙が届いている問いの id（Issue #452）。page が UnreadState から渡す。 */
@@ -42,12 +44,17 @@ type Sheet = { mode: 'add' } | { mode: 'edit'; id: string };
  * 追加・編集は高さを変えられるセミモーダル（`BottomSheet`）。キーボードが出るので
  * 高い段から開く。
  */
+/** シートの操作のボタン。見出しの「キャンセル」と同じ高さ・角丸・字で揃える（保存・確かめ）。 */
+const SHEET_BUTTON =
+  'min-h-[40px] shrink-0 whitespace-nowrap rounded-full border px-4 text-[13px] disabled:opacity-50';
+
 export function SpQuestions({
   questions,
   loading,
   createQuestion,
   editQuestion,
   archiveQuestion,
+  unarchiveQuestion,
   acceptQuestion,
   rejectQuestion,
   unreadQuestionIds = NO_UNREAD,
@@ -73,6 +80,9 @@ export function SpQuestions({
   const active = questions.filter(
     (q) => !q.isArchived && !(q.isProposedByOryzae && !q.isValidatedByUser),
   );
+  const archived = questions.filter((q) => q.isArchived);
+  /** アーカイブした問いの一覧を開いているか（ふだんは畳む）。 */
+  const [archivedOpen, setArchivedOpen] = useState(false);
   // 上限（#430）なら「立てる」を出さず、理由を言う。押せるのに何も起きない、をやめる（レビュー）。
   const atLimit = active.length >= MAX_ACTIVE_QUESTIONS;
 
@@ -284,6 +294,63 @@ export function SpQuestions({
               {t('add')}
             </button>
           )}
+          {/* アーカイブした問い。畳んでおき、開けば戻せる（アーカイブを取り返しのつく操作にする）。 */}
+          {unarchiveQuestion && archived.length > 0 ? (
+            <div className="mt-6 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+              <button
+                type="button"
+                data-archived-toggle
+                aria-expanded={archivedOpen}
+                onClick={() => setArchivedOpen((value) => !value)}
+                className="flex min-h-[44px] w-full items-center justify-between text-left text-[13px]"
+                style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+              >
+                <span>{t('archived_section', { count: archived.length })}</span>
+                <span aria-hidden="true" className="oz-disclosure-mark" data-open={archivedOpen} />
+              </button>
+              {archivedOpen ? (
+                <ul className="m-0 flex list-none flex-col p-0" data-archived-list>
+                  {atLimit ? (
+                    <li
+                      className="pb-2 text-[12px] leading-relaxed"
+                      style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                    >
+                      {t('unarchive_limit', { max: MAX_ACTIVE_QUESTIONS })}
+                    </li>
+                  ) : null}
+                  {archived.map((q) => (
+                    <li
+                      key={q.id}
+                      className="flex items-center justify-between gap-3 border-b py-3 last:border-b-0"
+                      style={{ borderColor: 'var(--border-subtle)' }}
+                    >
+                      <span className="min-w-0 flex-1 text-[14px] leading-relaxed opacity-70">
+                        {q.currentText ?? t('untitled')}
+                      </span>
+                      <button
+                        type="button"
+                        data-unarchive={q.id}
+                        disabled={submitting || atLimit}
+                        onClick={async () => {
+                          setSubmitting(true);
+                          await unarchiveQuestion(q.id);
+                          setSubmitting(false);
+                        }}
+                        className="min-h-[36px] shrink-0 rounded-full border px-4 text-[12px] disabled:opacity-40"
+                        style={{
+                          ...CONTROL_FONT,
+                          color: 'var(--accent)',
+                          borderColor: 'color-mix(in srgb, var(--accent) 40%, transparent)',
+                        }}
+                      >
+                        {t('unarchive')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -294,6 +361,25 @@ export function SpQuestions({
         ariaLabel={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
         label={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
         closeLabel={t('cancel')}
+        action={
+          sheet ? (
+            <button
+              type="button"
+              data-question-save
+              disabled={submitting || !draft.trim()}
+              onClick={submit}
+              className={`${SHEET_BUTTON} font-medium`}
+              style={{
+                ...CONTROL_FONT,
+                color: '#fff',
+                background: 'var(--accent)',
+                borderColor: 'var(--accent)',
+              }}
+            >
+              {t('save')}
+            </button>
+          ) : null
+        }
         detents={['content', 'full']}
         initialDetent="content"
       >
@@ -315,70 +401,74 @@ export function SpQuestions({
                 lineHeight: 1.7,
               }}
             />
-            {/* 保存は右寄せの 1 つ（キャンセルはシートの見出しにある）。 */}
-            <div className="mt-3 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                disabled={submitting || !draft.trim()}
-                onClick={submit}
-                className="min-h-[40px] shrink-0 whitespace-nowrap rounded-full px-5 text-[13px] font-medium text-white disabled:opacity-50"
-                style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
-              >
-                {t('save')}
-              </button>
-            </div>
-            {/* アーカイブは保存の行から離して下に。押したら同じ場所で確かめる。 */}
-            {sheet.mode === 'edit' && confirmingArchive ? (
-              <div
-                data-archive-confirm
-                className="mt-6 flex flex-col gap-2 rounded-2xl p-4"
-                style={{ ...CONTROL_FONT, background: 'var(--surface-sunken)' }}
-              >
-                <p className="m-0 text-[14px] font-medium" style={{ color: 'var(--fg)' }}>
-                  {t('archive_confirm_title')}
-                </p>
-                <p
-                  className="m-0 text-[12px] leading-relaxed"
-                  style={{ color: 'var(--date-color)' }}
-                >
-                  {t('archive_confirm_body')}
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => setConfirmingArchive(false)}
-                    className="min-h-[44px] flex-1 rounded-full text-[13px] disabled:opacity-50"
-                    style={{ color: 'var(--fg)', background: 'var(--surface-raised)' }}
-                  >
-                    {t('archive_cancel')}
-                  </button>
-                  <button
-                    type="button"
-                    data-archive-confirm-yes
-                    disabled={submitting}
-                    onClick={remove}
-                    className="min-h-[44px] flex-1 rounded-full text-[13px] font-medium text-white disabled:opacity-50"
-                    style={{ background: 'var(--ob-jar-warm)' }}
-                  >
-                    {t('archive_confirm')}
-                  </button>
+            {/*
+              アーカイブは取り返しのつく破壊的な操作。保存・キャンセル（見出しに並ぶ）から離して、中身のいちばん
+              下に文字だけで置く。押すと同じ場所が確かめに変わる（面を敷かない。以前は灰色の面が急に出た）。
+            */}
+            {sheet.mode === 'edit' ? (
+              confirmingArchive ? (
+                <div data-archive-confirm className="mt-5 flex flex-col gap-3" style={CONTROL_FONT}>
+                  <div className="flex flex-col gap-1">
+                    <p className="m-0 text-[14px] font-medium" style={{ color: 'var(--fg)' }}>
+                      {t('archive_confirm_title')}
+                    </p>
+                    <p
+                      className="m-0 text-[12px] leading-relaxed"
+                      style={{ color: 'var(--date-color)' }}
+                    >
+                      {t('archive_confirm_body')}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => setConfirmingArchive(false)}
+                      className={SHEET_BUTTON}
+                      style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
+                    >
+                      {t('archive_cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      data-archive-confirm-yes
+                      disabled={submitting}
+                      onClick={remove}
+                      className={`${SHEET_BUTTON} font-medium`}
+                      style={{
+                        color: '#fff',
+                        background: 'var(--ob-jar-warm)',
+                        borderColor: 'var(--ob-jar-warm)',
+                      }}
+                    >
+                      {t('archive_confirm')}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : sheet.mode === 'edit' ? (
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setConfirmingArchive(true)}
-                className="mt-6 min-h-[40px] w-full whitespace-nowrap rounded-full text-[13px] disabled:opacity-50"
-                style={{
-                  ...CONTROL_FONT,
-                  color: 'var(--ob-jar-warm)',
-                  border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
-                }}
-              >
-                {t('delete')}
-              </button>
+              ) : (
+                <button
+                  type="button"
+                  data-archive-question
+                  disabled={submitting}
+                  onClick={() => setConfirmingArchive(true)}
+                  className="-ml-1 mt-4 flex min-h-[44px] items-center gap-2 px-1 text-[13px] disabled:opacity-50"
+                  style={{ ...CONTROL_FONT, color: 'var(--ob-jar-warm)' }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    aria-hidden="true"
+                  >
+                    <title>archive</title>
+                    <path d="M4 7h16v3H4zM6 10v9h12v-9M10 14h4" strokeLinejoin="round" />
+                  </svg>
+                  {t('delete')}
+                </button>
+              )
             ) : null}
           </>
         ) : null}

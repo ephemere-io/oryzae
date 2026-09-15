@@ -91,8 +91,10 @@ registerUnit<Props>({
       check: ({ root }) => {
         const circle = root.querySelector('button[data-question-id]');
         if (!circle) return true;
+        const content = circle.querySelector('[data-circle-content]');
+        if (!content) return '円の中身のかたまりが無い';
         // 中身は「問いの文」と「手紙の印」の 2 種まで。
-        return circle.children.length <= 2 || `円の中に ${circle.children.length} 個の要素がある`;
+        return content.children.length <= 2 || `円の中に ${content.children.length} 個の要素がある`;
       },
     },
     {
@@ -103,6 +105,39 @@ registerUnit<Props>({
         const expected = props.questions.filter((q) => q.hasLetter).length;
         return marks === expected || `印=${marks}（期待: ${expected}）`;
       },
+    },
+    {
+      id: 'content-centered',
+      description: '問いの文字と手紙の印のかたまりの中心が、円の中心に来る',
+      check: ({ root }) => {
+        const off = [...root.querySelectorAll<HTMLElement>('button[data-question-id]')].filter(
+          (circle) => {
+            const content = circle.querySelector('[data-circle-content]');
+            if (!content) return true;
+            const a = circle.getBoundingClientRect();
+            const b = content.getBoundingClientRect();
+            return Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) > 1;
+          },
+        );
+        return off.length === 0 || `${off.length} 個の円で中身が中心からずれている`;
+      },
+    },
+    {
+      id: 'opens-at-100',
+      description: '開いた直後（壜とまわりの円が収まる姿）が 100%',
+      check: ({ root }) => {
+        const zoom = root.querySelector('[data-verify-unit="CanvasZoomControls"]');
+        const percent = zoom?.getAttribute('data-verify-percent');
+        return percent === '100' || `開いた直後の倍率の表示が ${percent}%`;
+      },
+    },
+    {
+      id: 'has-grid',
+      description: '模造紙の方眼が敷かれている（PC の瓶と同じ）',
+      check: ({ root }) =>
+        [...root.querySelectorAll<HTMLElement>('[aria-hidden="true"]')].some((el) =>
+          el.style.backgroundImage.includes('linear-gradient'),
+        ) || '方眼が無い',
     },
     {
       id: 'has-zoom-controls',

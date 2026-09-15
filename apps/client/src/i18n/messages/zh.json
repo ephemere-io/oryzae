@@ -839,9 +839,12 @@
       "close": "关闭",
       "limit": "问题最多 {max} 个。点上面的问题并选择「归档这个问题」，就能提出新的问题。",
       "archive_confirm_title": "要归档这个问题吗？",
-      "archive_confirm_body": "它会从瓶子和问题列表中移出。可以在 PC 的问题列表里恢复。",
+      "archive_confirm_body": "归档的问题可以在本页面最下方的「已归档的问题」里恢复。",
       "archive_confirm": "归档",
-      "archive_cancel": "取消"
+      "archive_cancel": "取消",
+      "archived_section": "已归档的问题（{count}）",
+      "unarchive": "恢复",
+      "unarchive_limit": "问题最多 {max} 个。归档一个后就能恢复。"
     },
     "board": {
       "cards": "{count}张",

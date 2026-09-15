@@ -376,7 +376,7 @@ export function Sheet({
           role="dialog"
           aria-modal={modal ? true : undefined}
           aria-label={ariaLabel}
-          className="pointer-events-auto relative rounded-t-3xl border-t"
+          className="pointer-events-auto relative flex flex-col rounded-t-3xl border-t"
           style={{
             // 全画面の段を持つシートは容器と同じ高さを持つ（全画面で面が下まで届く）。
             minHeight: has('full') ? '100%' : undefined,
@@ -430,6 +430,11 @@ export function Sheet({
               }}
             />
           </div>
+          {/* 中身の下の空き（全画面の段を持つシートで、中身が短いとき）。ここも指を容器へ通す。iOS は
+              `pointer-events: none` の容器へ、ふつうの要素に触れた指のスクロールを渡さない。以前は見出しと
+              中身だけが通していて、「アーカイブする」の下の空きを引いてもシートが縮まなかった（実機レビュー）。
+              中身の高さの印を狂わせないよう、中身の箱とは別の兄弟で埋める。 */}
+          <div aria-hidden="true" data-sheet-fill className="oz-sheet-pass min-h-0 flex-1" />
         </section>
       </div>
     </div>,
