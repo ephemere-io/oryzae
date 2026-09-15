@@ -78,9 +78,9 @@ registerUnit<Props>({
     },
     {
       id: 'error-present-iff-haserror',
-      description: 'エラー文（赤背景の <p>）は hasError=true のときだけ描画される',
+      description: 'エラー文（role="alert" の <p>）は hasError=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasErrorEl = Boolean(root.querySelector('p.text-red-600'));
+        const hasErrorEl = Boolean(root.querySelector('p[role="alert"]'));
         const expectError = contract.hasError === 'true';
         return (
           hasErrorEl === expectError ||
