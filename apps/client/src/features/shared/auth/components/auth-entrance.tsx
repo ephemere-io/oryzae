@@ -36,6 +36,9 @@ const APPEAR_MS = 800;
 /** 入るとき、紙が先に退くまで（ms）。扉が開き始める前に視界を空ける。 */
 const PAPER_RETREAT_MS = 360;
 
+/** SP の紙の中身が入れ替わったとき、外枠の高さを寄せる長さ（ms）。 */
+const PAPER_RESIZE_MS = 380;
+
 /**
  * 認証画面の地。**書斎の手前の扉**を 3D で置き、その前に紙（フォーム）を 1 枚置く。
  *
@@ -85,6 +88,26 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   const handleReady = useCallback(() => setReady(true), []);
 
   const sheet = layout.panel === 'sheet';
+
+  /**
+   * SP の紙の中身の高さ。**紙の外枠はこの値へ transition で寄せる。**
+   *
+   * 中身は入り方だけ → 入力欄まで → 認証中、と入れ替わる。高さを中身に任せると紙が
+   * 一瞬で伸び縮みし、下端の余白ごと跳ねて見えた（実機レビュー）。外枠の高さだけを
+   * 動かし、下の余白と位置は据え置く。`height: auto` は transition できないので、中身を測って渡す。
+   * 最初の 1 回（null → 値）は `auto` からなので動かない。
+   */
+  const paperRef = useRef<HTMLDivElement>(null);
+  const [paperHeight, setPaperHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const element = paperRef.current;
+    if (!sheet || element === null) return;
+    const observer = new ResizeObserver(() => setPaperHeight(element.offsetHeight));
+    observer.observe(element);
+    setPaperHeight(element.offsetHeight);
+    return () => observer.disconnect();
+  }, [sheet]);
 
   useEffect(() => {
     const element = windowRef.current;
@@ -160,8 +183,8 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
 
         {sheet ? (
           <>
-            {/* 扉を見せる窓。紙はこの下から始まり、キーボードと一緒にスクロールする。
-                窓は余りを引き受けて伸びる — 中身の短い紙（認証中など）は画面の下端に座り、
+            {/* 扉を見せる窓。紙はこの下にあり、キーボードと一緒にスクロールする。
+                窓は余りを引き受けて伸びる — 中身の短い紙（認証中など）は画面の下に座り、
                 空白のまま下まで垂れない。 */}
             <div
               ref={windowRef}
@@ -169,22 +192,37 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
               className="flex-1"
               style={{ minHeight: SHEET_WINDOW_MIN }}
             />
-            <main
-              className="relative z-10 rounded-t-[24px] px-6 pt-6"
+            {/* 紙は画面の下端に貼り付けず、左右と下に余白を取って浮かせる。退くときは
+                余白ごと画面の下へ滑り出る。 */}
+            <div
+              className="relative z-10 px-3"
               style={{
-                ...PAPER_FONT,
-                // **擦りガラスにしない。** 紙は扉の足元に重なるので、透かすと上端に扉の線が
-                // ぼやけて滲み、汚れに見える（実機で確認）。紙の色で塗り、上端の縁と影だけで立てる。
-                background: '#fdfbf7',
-                borderTop: PAPER_STYLE.border,
-                boxShadow: '0 -18px 40px -28px rgba(74, 70, 50, 0.28)',
-                paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
-                transform: leaving === null ? 'translateY(0)' : 'translateY(105%)',
+                paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+                transform: leaving === null ? 'translateY(0)' : 'translateY(calc(100% + 24px))',
                 transition: `transform ${PAPER_RETREAT_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
               }}
             >
-              <div className="mx-auto w-full max-w-[420px]">{children}</div>
-            </main>
+              <main
+                className="mx-auto w-full max-w-[440px] overflow-hidden rounded-[28px]"
+                style={{
+                  ...PAPER_FONT,
+                  // **擦りガラスにしない。** 紙は扉の足元に重なるので、透かすと縁に扉の線が
+                  // ぼやけて滲み、汚れに見える（実機で確認）。紙の色で塗り、縁と影で浮かせる。
+                  background: '#fdfbf7',
+                  border: PAPER_STYLE.border,
+                  boxShadow: PAPER_SHADOW,
+                  height: paperHeight ?? undefined,
+                  transition:
+                    paperHeight === null || reducedMotion
+                      ? undefined
+                      : `height ${PAPER_RESIZE_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+                }}
+              >
+                <div ref={paperRef} className="px-6 py-6">
+                  {children}
+                </div>
+              </main>
+            </div>
           </>
         ) : (
           <main className="relative z-10 flex flex-1 items-center justify-center px-6 py-16 md:justify-end md:pr-[max(40px,8vw)]">
