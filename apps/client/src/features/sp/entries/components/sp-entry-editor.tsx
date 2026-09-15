@@ -692,7 +692,12 @@ export function SpEntryEditor({
       id: 'photo',
       label: tPhoto('toolbar_button'),
       icon: <PhotoIcon />,
-      onSelect: () => fileInputRef.current?.click(),
+      // 写真の選択を開くと iOS はキーボードを閉じる。先に本文からフォーカスを外して、閉じた状態で開く
+      // （キーボードが出ていた高さのまま取り込みシートが浮くのを防ぐ。やめたらカーソルは元に戻す）。
+      onSelect: () => {
+        blurEditor();
+        fileInputRef.current?.click();
+      },
     },
     ...(entryId
       ? [

@@ -37,6 +37,7 @@ describe('useVisualViewport（ビジュアルビューポートに追従する�
   afterEach(() => {
     vi.restoreAllMocks();
     defineVisualViewport(undefined);
+    document.body.innerHTML = '';
   });
 
   function flushFrame() {
@@ -54,6 +55,9 @@ describe('useVisualViewport（ビジュアルビューポートに追従する�
   });
 
   it('キーボードで 120px 以上縮めば keyboardOpen=true、offsetTop も追従する', () => {
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    textarea.focus();
     const { result } = renderHook(() => useVisualViewport());
     flushFrame();
 
@@ -64,6 +68,20 @@ describe('useVisualViewport（ビジュアルビューポートに追従する�
     });
     flushFrame();
     expect(result.current).toEqual({ top: 40, height: 500, keyboardOpen: true });
+  });
+
+  it('キーボードほど縮んだまま文字を打つ所にフォーカスが無ければ、閉じたあとの古い値として全高に戻す', () => {
+    // iOS は写真の選択でキーボードを閉じたとき、ビジュアルビューポートの高さを戻さないことがある。
+    // そのまま殻を縮めると、写真の取り込みシートが画面の上のほうに浮いた（レビュー）。
+    const { result } = renderHook(() => useVisualViewport());
+    flushFrame();
+    viewport.height = 500;
+    viewport.offsetTop = 40;
+    act(() => {
+      document.dispatchEvent(new Event('focusout'));
+    });
+    flushFrame();
+    expect(result.current).toEqual({ top: 0, height: 844, keyboardOpen: false });
   });
 
   it('ツールバーの出入り程度（120px 未満）はキーボードとみなさない', () => {
@@ -80,6 +98,9 @@ describe('useVisualViewport（ビジュアルビューポートに追従する�
   });
 
   it('連続する resize / scroll は 1 フレームにまとめる（setState は最後の 1 回）', () => {
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    textarea.focus();
     const { result } = renderHook(() => useVisualViewport());
     flushFrame();
 
@@ -108,5 +129,10 @@ describe('useVisualViewport（ビジュアルビューポートに追従する�
     unmount();
     expect(remove).toHaveBeenCalledWith('resize', expect.any(Function));
     expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function));
+    // フォーカスの出入りの listener も残さない。
+    const removeDocument = vi.spyOn(document, 'removeEventListener');
+    const second = renderHook(() => useVisualViewport());
+    second.unmount();
+    expect(removeDocument).toHaveBeenCalledWith('focusout', expect.any(Function));
   });
 });

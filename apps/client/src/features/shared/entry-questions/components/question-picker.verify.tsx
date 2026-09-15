@@ -22,6 +22,13 @@ const QUESTIONS: LinkedQuestion[] = [
   { id: 'q-3', currentText: null },
 ];
 
+/** 上限いっぱい（MAX_ACTIVE_QUESTIONS = 5）。 */
+const FULL: LinkedQuestion[] = [
+  ...QUESTIONS,
+  { id: 'q-4', currentText: '何を手放したいのか' },
+  { id: 'q-5', currentText: '誰に読んでほしいのか' },
+];
+
 const noop = () => {};
 
 registerUnit<Props>({
@@ -60,6 +67,12 @@ registerUnit<Props>({
       props: { questions: [], selectedIds: [], composing: true },
     },
     {
+      id: 'at-limit',
+      probe: true,
+      description: 'Probe: 上限いっぱいなら書く欄を出さず、どこで終えるかと、そこへの入口を出す',
+      props: { questions: FULL, selectedIds: [], composing: false },
+    },
+    {
       id: 'toggle',
       probe: true,
       description: 'Probe: 行を押しても選び手は閉じない（複数選べる）',
@@ -71,6 +84,15 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'limit-offers-the-way',
+      description: '上限いっぱいでは、問いの一覧への入口がある（言うだけで辿れない、をやめた）',
+      onlyFixtures: ['at-limit'],
+      check: ({ root }) => {
+        const link = root.querySelector('[data-question-manage]');
+        return link?.getAttribute('href') === '/questions' || '問いの一覧への入口が無い';
+      },
+    },
     {
       id: 'rows-match-questions',
       description: '行の数が問いの数と一致する（探していないとき）',

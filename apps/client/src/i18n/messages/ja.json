@@ -170,7 +170,8 @@
       "search_placeholder": "問いを探す",
       "untitled": "無題の問い",
       "close": "閉じる",
-      "limit": "問いは {max} つまでです。瓶で問いを終えると、新しく立てられます。"
+      "limit": "問いは {max} つまでです。問いの一覧で 1 つ終えると、新しく立てられます。",
+      "manage": "問いの一覧を開く"
     }
   },
   "app": {
@@ -653,10 +654,10 @@
       "section_keywords": "キーワード",
       "section_snippets": "スニペット",
       "selection_reason": "選ばれた理由",
-      "reply_to": "この手紙への返事",
       "reply": "この手紙に返事を書く",
       "sources": "この手紙のもとになったエントリー",
-      "source_untitled": "無題のエントリー"
+      "source_untitled": "無題のエントリー",
+      "open_detail": "開いて読む"
     }
   },
   "questions": {
@@ -831,7 +832,7 @@
       "save": "保存",
       "letter_arrived": "手紙が届いています",
       "close": "閉じる",
-      "limit": "問いは {max} つまでです。瓶で問いを終えると、新しく立てられます。"
+      "limit": "問いは {max} つまでです。上の問いを押して「この問いを終える」を選ぶと、新しく立てられます。"
     },
     "board": {
       "cards": "{count}枚",

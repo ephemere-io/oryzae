@@ -71,7 +71,7 @@ export function PullBackToStudy() {
       router.push('/');
     }
 
-    /** 指を離したとき、半分以上引いていれば書斎へ着かせる（戻れそうで戻れない、をやめる）。 */
+    /** 指を離したとき、はっきり引いていれば（`commitOnRelease` 以上）書斎へ着かせる（戻れそうで戻れない、をやめる）。 */
     function onRelease(): void {
       if (leavingRef.current || !pinchingRef.current) return;
       pinchingRef.current = false;

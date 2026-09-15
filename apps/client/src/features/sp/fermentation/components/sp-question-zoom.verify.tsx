@@ -161,15 +161,11 @@ registerUnit<Props>({
     },
     {
       id: 'items-match-contract',
-      description: '並ぶ項目の数が契約（キーワード＋スニペット）と一致し、項目を押して開く面が無い',
+      description: '並ぶ項目の数が契約（キーワード＋スニペット）と一致する（上限で落とさない）',
       check: ({ root, contract }) => {
         const items = root.querySelectorAll('[data-reading-item]').length;
-        const buttons = root.querySelectorAll('[data-reading-item] button').length;
         const expected = Number(contract.keywordCount) + Number(contract.snippetCount);
-        return (
-          (items === expected && buttons === 0) ||
-          `項目=${items}（期待: ${expected}）、項目の中のボタン=${buttons}`
-        );
+        return items === expected || `項目=${items}（期待: ${expected}）`;
       },
     },
     {
@@ -204,15 +200,19 @@ registerUnit<Props>({
     {
       id: 'reads-in-place',
       description:
-        '手紙の本文もキーワードの説明もここで読める（押して重なるシートで読む形はやめた）',
+        '手紙の本文はここで読める。キーワードの説明は行を押すとその場で開く（閉じている間は inert。重なるシートは無い）',
       check: ({ root, contract }) => {
         const text = root.textContent ?? '';
         if (contract.hasLetter === 'true' && !text.includes(LETTER_BODY)) return '手紙の本文が無い';
-        if (contract.keywordCount !== '0' && root.querySelector('[data-reading-item]')) {
-          const described = text.includes(KEYWORD_DESCRIPTION) || !text.includes('感謝');
-          return described || 'キーワードの説明が出ていない';
-        }
-        return true;
+        if (root.querySelector('[role="dialog"]')) return '重なるシートが出ている';
+        if (contract.keywordCount === '0' || !text.includes(KEYWORD_DESCRIPTION)) return true;
+        const description = [...root.querySelectorAll('.oz-disclosure')].find((region) =>
+          (region.textContent ?? '').includes(KEYWORD_DESCRIPTION),
+        );
+        return (
+          (description !== undefined && description.hasAttribute('inert')) ||
+          'キーワードの説明が、押す前から開いている'
+        );
       },
     },
     {

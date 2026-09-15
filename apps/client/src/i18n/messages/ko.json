@@ -170,7 +170,8 @@
       "search_placeholder": "질문 찾기",
       "untitled": "제목 없는 질문",
       "close": "닫기",
-      "limit": "질문은 {max}개까지입니다. 항아리에서 질문을 마치면 새로 세울 수 있습니다."
+      "limit": "질문은 {max}개까지입니다. 질문 목록에서 하나를 끝내면 새로 세울 수 있습니다.",
+      "manage": "질문 목록 열기"
     }
   },
   "app": {
@@ -653,10 +654,10 @@
       "section_keywords": "키워드",
       "section_snippets": "스니펫",
       "selection_reason": "선택된 이유",
-      "reply_to": "이 편지에 대한 답장",
       "reply": "이 편지에 답장 쓰기",
       "sources": "이 편지의 바탕이 된 기록",
-      "source_untitled": "제목 없는 기록"
+      "source_untitled": "제목 없는 기록",
+      "open_detail": "열어서 읽기"
     }
   },
   "questions": {
@@ -831,7 +832,7 @@
       "save": "저장",
       "letter_arrived": "편지가 도착했습니다",
       "close": "닫기",
-      "limit": "질문은 {max}개까지입니다. 항아리에서 질문을 마치면 새로 세울 수 있습니다."
+      "limit": "질문은 {max}개까지입니다. 위의 질문을 누르고 「이 질문 끝내기」를 고르면 새로 세울 수 있습니다."
     },
     "board": {
       "cards": "{count}장",

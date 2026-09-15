@@ -170,7 +170,8 @@
       "search_placeholder": "Find a question",
       "untitled": "Untitled question",
       "close": "Close",
-      "limit": "You can keep up to {max} questions. Finish one in the jar to add a new one."
+      "limit": "You can have up to {max} questions. End one in your question list to start a new one.",
+      "manage": "Open question list"
     }
   },
   "app": {
@@ -653,10 +654,10 @@
       "section_keywords": "Keywords",
       "section_snippets": "Snippets",
       "selection_reason": "Why this was chosen",
-      "reply_to": "Replying to this letter",
       "reply": "Write a reply to this letter",
       "sources": "Entries this letter came from",
-      "source_untitled": "Untitled entry"
+      "source_untitled": "Untitled entry",
+      "open_detail": "Open to read"
     }
   },
   "questions": {
@@ -831,7 +832,7 @@
       "save": "Save",
       "letter_arrived": "A letter has arrived",
       "close": "Close",
-      "limit": "You can keep up to {max} questions. Finish one in the jar to add a new one."
+      "limit": "You can have up to {max} questions. Tap a question above and choose “End this question” to make room."
     },
     "board": {
       "cards": "{count} cards",
