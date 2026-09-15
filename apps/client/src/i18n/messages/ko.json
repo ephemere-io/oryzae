@@ -522,9 +522,8 @@
   },
   "photo": {
     "toolbar_button": "사진",
-    "modal_title": "사진 가져오기",
-    "modal_description": "글자로 읽어들이거나, 사진 그대로 붙일 수 있습니다.",
-    "ai_notice": "'글자로 읽어들이기'를 선택하면 사진이 AI(Anthropic의 Claude)로 전송됩니다.",
+    "modal_title": "이 사진을 넣을까요?",
+    "ai_notice": "「글자로 읽기」를 고르면 사진이 외부 API로 전송됩니다.",
     "preview_alt": "가져올 사진 미리보기",
     "transcribe": "글자로 읽어들이기",
     "transcribing": "읽는 중…",
@@ -571,7 +570,8 @@
     "wrap_off": "끔",
     "done": "완료",
     "align_needs_room": "가득 찬 너비에서는 정렬할 수 없습니다",
-    "selected": "사진을 선택했습니다"
+    "selected": "사진을 선택했습니다",
+    "choose_file": "사진 고르기"
   },
   "fermentation": {
     "detail": {

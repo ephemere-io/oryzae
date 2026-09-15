@@ -522,9 +522,8 @@
   },
   "photo": {
     "toolbar_button": "Photo",
-    "modal_title": "Add a photo",
-    "modal_description": "Read it as text, or attach the photo as it is.",
-    "ai_notice": "Choosing \"Read as text\" sends the photo to an AI (Claude, by Anthropic).",
+    "modal_title": "Add this photo?",
+    "ai_notice": "\"Read as text\" sends the photo to an external API.",
     "preview_alt": "Preview of the photo to add",
     "transcribe": "Read as text",
     "transcribing": "Reading…",
@@ -571,7 +570,8 @@
     "wrap_off": "Off",
     "done": "Done",
     "align_needs_room": "A full-width photo has nothing to align to",
-    "selected": "Photo selected"
+    "selected": "Photo selected",
+    "choose_file": "Choose a photo"
   },
   "fermentation": {
     "detail": {

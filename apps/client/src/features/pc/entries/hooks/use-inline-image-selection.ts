@@ -68,6 +68,8 @@ export function useInlineImageSelection({
     image: null,
     rect: null,
   });
+  /** 掴んで運んでいる最中、いま落ちる先（文字の間）。運んでいなければ null。 */
+  const [dropHint, setDropHint] = useState<DOMRect | null>(null);
 
   // ドラッグ中の情報。再描画に関係しないので ref に置く。
   const dragRef = useRef<{
@@ -82,6 +84,7 @@ export function useInlineImageSelection({
   /** 写真そのものを掴んで、本文の別の場所へ移している最中。 */
   const moveRef = useRef<{
     el: HTMLImageElement;
+    pointerId: number;
     startX: number;
     startY: number;
     moved: boolean;
@@ -123,7 +126,21 @@ export function useInlineImageSelection({
       if (target instanceof Node && isInlineImage(target)) {
         select(target);
         // ここから動かせば移動、動かさなければただの選択。どちらかは pointermove が決める。
-        moveRef.current = { el: target, startX: e.clientX, startY: e.clientY, moved: false };
+        moveRef.current = {
+          el: target,
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          moved: false,
+        };
+        // **掴んだ写真にポインタを結びつける。** これが無いと、写真の外へ出た瞬間に
+        // カーソルが文字選択の I ビームに変わり、運んでいる最中に見た目が崩れる。
+        // （jsdom には無い API なので、在ることを確かめてから呼ぶ）
+        try {
+          target.setPointerCapture?.(e.pointerId);
+        } catch {
+          // 結びつけられない環境（レイアウトの無いテスト等）。運ぶこと自体はできる。
+        }
         // 写真の上にキャレットを置かせない（Chrome は画像の中に入れようとする）。
         e.preventDefault();
         return;
@@ -169,21 +186,21 @@ export function useInlineImageSelection({
   );
 
   /**
-   * 掴んだ写真を、指した文字の位置へ移す。
+   * 指した場所の「文字の間」。本文の外や写真自身の中を指していれば null。
    *
-   * **同じ要素を入れ直す**（消して作り直さない）。作り直すと `src` の読み直しで一瞬消え、
-   * 選択も外れる。`insertNode` は同じノードなら元の場所から抜いて入れ直してくれる。
+   * 落ちる先の線を出すのにも、実際に落とすのにも同じものを使う。**見えている線と
+   * 落ちる場所を別々に計算すると、見た目と結果がずれる。**
    */
-  const dropAt = useCallback(
-    (el: HTMLImageElement, x: number, y: number) => {
+  const dropTargetAt = useCallback(
+    (el: HTMLImageElement, x: number, y: number): Range | null => {
       const editor = editorRef.current;
-      if (!editor) return;
+      if (!editor) return null;
       const range = caretRangeFromPoint(x, y);
-      if (!range) return;
-      if (!editor.contains(range.startContainer)) return;
+      if (!range) return null;
+      if (!editor.contains(range.startContainer)) return null;
       // 自分自身の中には落とせない（落とし先が消えることになる）。
-      if (el.contains(range.startContainer)) return;
-      range.insertNode(el);
+      if (el.contains(range.startContainer)) return null;
+      return range;
     },
     [editorRef],
   );
@@ -221,6 +238,14 @@ export function useInlineImageSelection({
         // 掴んでいることを見た目で言う（薄くなる）。CSS は globals.css。
         move.el.dataset.dragging = 'true';
       }
+      // いま離したらどこへ入るかを見せる。
+      const target = dropTargetAt(move.el, e.clientX, e.clientY);
+      // 実寸を測れない環境（レイアウトの無いテスト）では線を出さない。
+      setDropHint(
+        target && typeof target.getBoundingClientRect === 'function'
+          ? target.getBoundingClientRect()
+          : null,
+      );
     };
 
     const onUp = (e: PointerEvent) => {
@@ -233,8 +258,17 @@ export function useInlineImageSelection({
       moveRef.current = null;
       if (!move) return;
       move.el.removeAttribute('data-dragging');
+      setDropHint(null);
+      try {
+        if (move.el.hasPointerCapture?.(move.pointerId)) {
+          move.el.releasePointerCapture(move.pointerId);
+        }
+      } catch {
+        // 結びつけていなければ外すものも無い。
+      }
       if (!move.moved) return; // 動かしていない＝ただ選んだだけ
-      dropAt(move.el, e.clientX, e.clientY);
+      const target = dropTargetAt(move.el, e.clientX, e.clientY);
+      if (target) target.insertNode(move.el);
       // **入れ直したら測り直す。** これが無いと、枠だけが元の位置に取り残される。
       refresh();
       onCommit();
@@ -246,7 +280,7 @@ export function useInlineImageSelection({
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [selection.element, editorRef, isVertical, refresh, onCommit, dropAt]);
+  }, [selection.element, editorRef, isVertical, refresh, onCommit, dropTargetAt]);
 
   /** レイアウト（ブロック / 回り込み）・寄せ・幅を変える。 */
   const updateLayout = useCallback(
@@ -269,5 +303,5 @@ export function useInlineImageSelection({
     onCommit();
   }, [selection.element, clear, onCommit]);
 
-  return { selection, beginResize, updateLayout, removeSelected, clear, refresh };
+  return { selection, dropHint, beginResize, updateLayout, removeSelected, clear, refresh };
 }

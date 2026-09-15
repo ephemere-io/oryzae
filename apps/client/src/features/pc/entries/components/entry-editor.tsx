@@ -27,6 +27,7 @@ import {
   FermentationSidebar,
   type SidebarQuestion,
 } from '@/features/pc/entries/components/fermentation-sidebar';
+import { InlineImageDropIndicator } from '@/features/pc/entries/components/inline-image-drop-indicator';
 import { InlineImageOverlay } from '@/features/pc/entries/components/inline-image-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
@@ -1902,7 +1903,7 @@ export function EntryEditor({
         ref={photoInputRef}
         type="file"
         accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
-        aria-label={tPhoto('modal_title')}
+        aria-label={tPhoto('choose_file')}
         tabIndex={-1}
         className="hidden"
         onChange={(e) => {
@@ -1918,6 +1919,9 @@ export function EntryEditor({
         image={inlineImages.selection.image}
         onResizeStart={inlineImages.beginResize}
       />
+
+      {/* 掴んで運んでいる最中、落ちる先の文字の間に線を出す。 */}
+      <InlineImageDropIndicator rect={inlineImages.dropHint} />
 
       <PhotoImportModal
         state={photoImport.state}

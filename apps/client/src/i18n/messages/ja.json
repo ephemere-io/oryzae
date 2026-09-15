@@ -522,9 +522,8 @@
   },
   "photo": {
     "toolbar_button": "写真",
-    "modal_title": "写真を取り込む",
-    "modal_description": "文字として読み込むか、写真としてそのまま貼るかを選べます。",
-    "ai_notice": "「文字として読み込む」を選ぶと、写真は AI（Anthropic の Claude）に送られます。",
+    "modal_title": "この写真を取り込みますか？",
+    "ai_notice": "「文字として読み込む」を選ぶと、写真は外部の API に送られます。",
     "preview_alt": "取り込む写真のプレビュー",
     "transcribe": "文字として読み込む",
     "transcribing": "読み取り中…",
@@ -571,7 +570,8 @@
     "wrap_off": "なし",
     "done": "完了",
     "align_needs_room": "幅いっぱいのときは寄せられません",
-    "selected": "写真を選んでいます"
+    "selected": "写真を選んでいます",
+    "choose_file": "写真を選ぶ"
   },
   "fermentation": {
     "detail": {
