@@ -22,6 +22,7 @@ interface Props {
   createQuestion: (text: string) => Promise<void> | void;
   editQuestion: (id: string, text: string) => Promise<void> | void;
   archiveQuestion: (id: string) => Promise<void> | void;
+  unarchiveQuestion?: (id: string) => Promise<void> | void;
   acceptQuestion: (id: string) => Promise<void> | void;
   rejectQuestion: (id: string) => Promise<void> | void;
 }
@@ -50,12 +51,22 @@ const activeItem: QuestionItem = {
   ...TIMESTAMPS,
 };
 
+const archivedItem: QuestionItem = {
+  id: 'q-archived',
+  currentText: '去年の春に考えていたことは？',
+  isArchived: true,
+  isProposedByOryzae: false,
+  isValidatedByUser: true,
+  ...TIMESTAMPS,
+};
+
 const baseProps = (overrides: Partial<Props> = {}): Props => ({
   questions: [proposedItem, activeItem],
   loading: false,
   createQuestion: noop,
   editQuestion: noop,
   archiveQuestion: noop,
+  unarchiveQuestion: noop,
   acceptQuestion: noop,
   rejectQuestion: noop,
   ...overrides,
@@ -103,6 +114,42 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'archive-confirm',
+      description:
+        '編集シートで「この問いをアーカイブする」を押すと、同じ場所が確かめに変わる（面を敷かない）',
+      props: baseProps(),
+      act: async (ctx) => {
+        const buttons = Array.from(ctx.root.querySelectorAll('button'));
+        buttons.find((b) => b.querySelector('title')?.textContent === 'edit')?.click();
+        await ctx.wait(16);
+        await ctx.click('[data-row-action="archive"]');
+        await ctx.wait(16);
+      },
+    },
+    {
+      id: 'archived-list',
+      description: 'アーカイブした問いを開くと「戻す」が並ぶ',
+      props: baseProps({ questions: [activeItem, archivedItem] }),
+      act: async (ctx) => {
+        await ctx.click('[data-archived-toggle]');
+        await ctx.wait(16);
+      },
+    },
+    {
+      id: 'archived-at-limit',
+      description: '生きている問いが上限なら「戻す」は押せず、理由を言う',
+      props: baseProps({
+        questions: [
+          ...['a', 'b', 'c', 'd', 'e'].map((id) => ({ ...activeItem, id: `q-${id}` })),
+          archivedItem,
+        ],
+      }),
+      act: async (ctx) => {
+        await ctx.click('[data-archived-toggle]');
+        await ctx.wait(16);
+      },
+    },
+    {
       id: 'submitting',
       description: '保存中（in-flight）は保存ボタンが disabled になり多重送信を防ぐ',
       props: baseProps({ createQuestion: neverResolve }),
@@ -113,7 +160,7 @@ registerUnit<Props>({
         await ctx.wait(16);
         await ctx.type('textarea', '今日の問い');
         await ctx.wait(16);
-        await ctx.click('textarea ~ div button:last-child');
+        await ctx.click('[data-row-action="save"]');
         await ctx.wait(16);
       },
     },
@@ -134,6 +181,62 @@ registerUnit<Props>({
   ],
   invariants: [
     {
+      id: 'actions-in-one-row',
+      description:
+        '操作は 1 行に固まる（左から保存・キャンセル、アーカイブは右端）。同じ高さで、見出しには閉じるが無い',
+      onlyFixtures: ['add-sheet', 'edit-sheet'],
+      check: ({ root, contract }) => {
+        const save = root.querySelector<HTMLElement>('[data-row-action="save"]');
+        const cancel = root.querySelector<HTMLElement>('[data-row-action="cancel"]');
+        if (!save || !cancel) return '保存かキャンセルが無い';
+        if (save.parentElement !== cancel.parentElement) return '保存とキャンセルが別の行にある';
+        const header = root.querySelector('[data-sheet-header]');
+        if ((header?.querySelectorAll('button').length ?? 0) > 0) {
+          return '見出しにボタンがある（操作が 2 か所に散る）';
+        }
+        const archive = root.querySelector<HTMLElement>('[data-row-action="archive"]');
+        if (contract.sheetMode === 'edit' && archive?.parentElement !== save.parentElement) {
+          return 'アーカイブが同じ行に無い';
+        }
+        const a = save.getBoundingClientRect();
+        const b = cancel.getBoundingClientRect();
+        // 配置を持たない環境（jsdom）では並びの形は測れない。ここまで（同じ行にあること）だけを見る。
+        if (a.width === 0) return true;
+        if (a.left >= b.left) return '保存がキャンセルより右にある（左上中心主義に反する）';
+        if (Math.abs(a.height - b.height) >= 1) return '保存とキャンセルの高さが違う';
+        if (contract.sheetMode === 'edit' && archive) {
+          const c = archive.getBoundingClientRect();
+          if (Math.abs(c.top - a.top) >= 1) return 'アーカイブが折り返して別の行にある';
+          if (c.left <= b.left) return 'アーカイブが右端に無い';
+        }
+        return true;
+      },
+    },
+    {
+      id: 'archive-confirm-without-surface',
+      description: 'アーカイブの確かめは面（背景色）を敷かない',
+      onlyFixtures: ['archive-confirm'],
+      check: ({ root }) => {
+        const confirm = root.querySelector<HTMLElement>('[data-archive-confirm]');
+        if (!confirm) return '確かめが出ていない';
+        const bg = getComputedStyle(confirm).backgroundColor;
+        return bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent' || `確かめに面がある: ${bg}`;
+      },
+    },
+    {
+      id: 'archived-offers-restore',
+      description: 'アーカイブした問いを開くと、問いごとに「戻す」がある。上限なら押せない',
+      onlyFixtures: ['archived-list', 'archived-at-limit'],
+      check: ({ root, contract }) => {
+        const restore = root.querySelector<HTMLButtonElement>('[data-unarchive="q-archived"]');
+        if (!restore) return '「戻す」が無い';
+        const expected = contract.atLimit === 'true';
+        return (
+          restore.disabled === expected || `戻す disabled=${restore.disabled}, 上限=${expected}`
+        );
+      },
+    },
+    {
       id: 'sheet-open-iff-textarea-present',
       description: 'sheetMode が none でないとき、かつそのときだけ textarea が描画される',
       check: ({ root, contract }) => {
@@ -150,10 +253,7 @@ registerUnit<Props>({
       description: '保存ボタンの disabled が contract（draftEmpty || submitting）と一致する',
       onlyFixtures: ['add-sheet', 'edit-sheet', 'submitting', 'whitespace-only'],
       check: ({ root, contract }) => {
-        const buttons = Array.from(
-          root.querySelectorAll<HTMLButtonElement>('textarea ~ div button'),
-        );
-        const saveBtn = buttons[buttons.length - 1];
+        const saveBtn = root.querySelector<HTMLButtonElement>('[data-row-action="save"]');
         const expectedDisabled = contract.draftEmpty === 'true' || contract.submitting === 'true';
         return (
           saveBtn?.disabled === expectedDisabled ||
@@ -197,10 +297,7 @@ registerUnit<Props>({
       description: '送信中は submitting=true で保存ボタンが disabled（多重送信不可）',
       onlyFixtures: ['submitting'],
       check: ({ root, contract }) => {
-        const buttons = Array.from(
-          root.querySelectorAll<HTMLButtonElement>('textarea ~ div button'),
-        );
-        const saveBtn = buttons[buttons.length - 1];
+        const saveBtn = root.querySelector<HTMLButtonElement>('[data-row-action="save"]');
         return (
           (contract.submitting === 'true' && saveBtn?.disabled === true) ||
           `expected submitting=true & disabled, got submitting=${contract.submitting}, disabled=${saveBtn?.disabled}`
@@ -212,10 +309,7 @@ registerUnit<Props>({
       description: '空白のみ入力でも draftEmpty=true のままで保存ボタンは disabled',
       onlyFixtures: ['whitespace-only'],
       check: ({ root, contract }) => {
-        const buttons = Array.from(
-          root.querySelectorAll<HTMLButtonElement>('textarea ~ div button'),
-        );
-        const saveBtn = buttons[buttons.length - 1];
+        const saveBtn = root.querySelector<HTMLButtonElement>('[data-row-action="save"]');
         return (
           (contract.draftEmpty === 'true' && saveBtn?.disabled === true) ||
           `expected draftEmpty=true & disabled after whitespace, got draftEmpty=${contract.draftEmpty}, disabled=${saveBtn?.disabled}`

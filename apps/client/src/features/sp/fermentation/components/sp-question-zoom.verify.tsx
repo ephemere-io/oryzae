@@ -2,15 +2,15 @@
  * SpQuestionZoom の検証スペック（円をひとつ開いた画面）。
  *
  * detail / loading は props なので、状態機械（読込中 / 発酵前 / 中身あり）を props だけで
- * 再現できる。ここで守るのは「**円の中で中身を読ませない**」という設計そのもの:
- * 言葉・抜粋・手紙はすべて押せる要素であって、本文はここに出ない。
+ * 再現できる。ここで守るのは「**円は見出し、中身はリスト**」という設計:
+ * 問いは見出しに全文が書かれ、手紙・キーワード・スニペットは縦の流れに読める大きさで並ぶ。
+ * キーワードの説明とスニペットの理由まで最初から出ていて、押して重なるシートは無い。
  *
  * i18n（sp.jar）依存のため withVerifyProviders で包む。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
-import { textPathFitsInvariant } from '@/lib/verify/text-path-invariant';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpQuestionZoom } from './sp-question-zoom';
 
@@ -19,13 +19,13 @@ interface Props {
   detail: FermentationDetail | null;
   loading: boolean;
   onClose: () => void;
-  onOpenElement: () => void;
 }
 
 const noop = () => {};
 
 const LETTER_BODY = 'あなたの言葉から、静かな喜びが立ち上っています。';
 const KEYWORD_DESCRIPTION = '小さなことに気づく力。';
+const SNIPPET_TEXT = '朝の光がきれいだった';
 
 const filled: FermentationDetail = {
   id: 'f-1',
@@ -42,7 +42,7 @@ const filled: FermentationDetail = {
     {
       id: 's-1',
       snippetType: 'core',
-      originalText: '朝の光がきれいだった',
+      originalText: SNIPPET_TEXT,
       sourceDate: '2026-06-18T00:00:00.000Z',
       selectionReason: '同じ光景が三度出てくる。',
       jarX: null,
@@ -79,12 +79,13 @@ const LONG_QUESTION =
 registerUnit<Props>({
   id: 'SpQuestionZoom',
   title: 'SpQuestionZoom',
-  description: '開いた問いの円。言葉・抜粋・手紙がそれぞれ押せる（読むのはシート側）。',
+  description:
+    '開いた問い。上に見出し、下に手紙・キーワード・スニペットを読む流れ（エントリーの発酵の結果と同じ部品）。',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
       <div style={{ position: 'relative', width: '390px', height: '640px' }}>
-        <SpQuestionZoom {...props} onOpenElement={props.onOpenElement} />
+        <SpQuestionZoom {...props} />
       </div>,
     ),
   fixtures: [
@@ -96,7 +97,6 @@ registerUnit<Props>({
         detail: filled,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
@@ -108,103 +108,109 @@ registerUnit<Props>({
         detail: null,
         loading: true,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
       id: 'not-fermented',
       probe: true,
-      description: 'Probe: 発酵前は空の円ではなく理由を出す',
+      description: 'Probe: 発酵前は空のリストではなく理由を出す',
       props: {
         questionText: '最近うれしかったことは？',
         detail: null,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
       id: 'long-question',
       probe: true,
-      description: 'Probe: 上限いっぱい（64 字）の問いも、輪を増やして全文を出す',
+      description: 'Probe: 上限いっぱい（64 字）の問いも、見出しの円の中に全文が出る',
       props: {
         questionText: LONG_QUESTION,
         detail: filled,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
     {
       id: 'overflow',
       probe: true,
-      description: 'Probe: 言葉9・抜粋7 でも上限までしか置かない（指で選び分けられる数）',
+      description: 'Probe: 言葉9・抜粋7 でも全部並ぶ（リストは縦に伸びるだけで重ならない）',
       props: {
         questionText: '最近うれしかったことは？',
         detail: many,
         loading: false,
         onClose: noop,
-        onOpenElement: noop,
       },
     },
   ],
   invariants: [
-    textPathFitsInvariant(),
     {
-      id: 'question-is-never-cut',
-      description: '問いは切らない（どの問いを開いているかを語る場所なので）',
-      check: ({ root }) => {
-        const folded = Array.from(root.querySelectorAll('textPath'))
-          .map((path) => path.textContent ?? '')
-          .filter((text) => text.endsWith('…'));
-        return folded.length === 0 || `${folded.length} 個の問いが畳まれている`;
+      id: 'question-reads-whole',
+      description: '問いは見出しの円の中に全文が出る（切らない・輪にしない）',
+      check: ({ root, props }) => {
+        const heading = root.querySelector('[data-question-heading]');
+        if (!(heading instanceof HTMLElement)) return '見出しの円に問いが無い';
+        const text = (heading.textContent ?? '').trim();
+        if (text !== props.questionText.trim()) {
+          return `問いが全文でない（${text.length}/${props.questionText.length} 字）`;
+        }
+        // 輪（textPath）は軌道の円だけのもの。開いた画面に残っていたら設計が戻っている。
+        return root.querySelector('textPath') === null || '開いた画面に輪の文字が残っている';
       },
     },
     {
-      id: 'long-question-reads-whole',
-      description: '上限いっぱいの問いも、輪をつなぐと全文になる',
-      onlyFixtures: ['long-question'],
-      check: ({ root }) => {
-        const rings = Array.from(root.querySelectorAll('textPath'));
-        // 円は採寸してから描く（`size > 0`）。版組みの無い jsdom では輪が出ないので、
-        // そこでは判定できない。輪の分け方そのものは ring-text.test.ts が見ている。
-        if (rings.length === 0) return true;
-        const read = rings.map((path) => path.textContent ?? '').join('');
-        return (
-          read === LONG_QUESTION || `全文にならない（${read.length}/${LONG_QUESTION.length} 字）`
-        );
-      },
-    },
-    {
-      id: 'element-buttons-match-contract',
-      description: '押せる要素の数が契約（言葉＋抜粋＋手紙）と一致する',
+      id: 'items-match-contract',
+      description: '並ぶ項目の数が契約（キーワード＋スニペット）と一致する（上限で落とさない）',
       check: ({ root, contract }) => {
-        const buttons = root.querySelectorAll('[data-verify-unit="SpQuestionZoom"] button').length;
-        // header の閉じるボタン + 言葉 + 抜粋 + 手紙。
-        const expected =
-          1 +
-          Number(contract.keywordCount) +
-          Number(contract.snippetCount) +
-          (contract.hasLetter === 'true' ? 1 : 0);
-        return buttons === expected || `押せる要素=${buttons}（期待: ${expected}）`;
+        const items = root.querySelectorAll('[data-reading-item]').length;
+        const expected = Number(contract.keywordCount) + Number(contract.snippetCount);
+        return items === expected || `項目=${items}（期待: ${expected}）`;
       },
     },
     {
-      id: 'body-text-stays-out-of-the-circle',
-      description: '円の中に本文を出さない（読むのはシート側の仕事）',
+      id: 'shows-everything',
+      description:
+        '数が多くても全部並べる（以前は言葉 6・抜粋 4 で切っていて、残りが見えなかった）',
+      onlyFixtures: ['overflow'],
+      check: ({ contract, props }) =>
+        (Number(contract.keywordCount) === (props.detail?.keywords.length ?? 0) &&
+          Number(contract.snippetCount) === (props.detail?.snippets.length ?? 0)) ||
+        `落としている: 言葉=${contract.keywordCount}, 抜粋=${contract.snippetCount}`,
+    },
+    {
+      id: 'snippet-text-is-readable-in-place',
+      description: '抜粋は行の中で本文が読める（開かないと読めない、をやめた）',
+      onlyFixtures: ['filled'],
       check: ({ root }) => {
         const text = root.textContent ?? '';
-        const leaked = [LETTER_BODY, KEYWORD_DESCRIPTION].filter((body) => text.includes(body));
-        return leaked.length === 0 || `円の中に本文が出ている: ${leaked.join(' / ')}`;
+        return text.includes(SNIPPET_TEXT) || '抜粋の本文がリストに出ていない';
       },
     },
     {
-      id: 'caps-elements',
-      description: '数が多くても置く数に上限がある（重なって選べなくなる）',
-      onlyFixtures: ['overflow'],
-      check: ({ contract }) =>
-        (Number(contract.keywordCount) <= 6 && Number(contract.snippetCount) <= 4) ||
-        `上限を超えている: 言葉=${contract.keywordCount}, 抜粋=${contract.snippetCount}`,
+      id: 'letter-is-findable',
+      description: '手紙は名前つきで掴める（読み上げにも名前が出る）',
+      onlyFixtures: ['filled', 'long-question'],
+      check: ({ root }) => {
+        const letter = root.querySelector('[data-testid="reading-letter"]');
+        if (!(letter instanceof HTMLElement)) return '手紙が無い';
+        return Boolean(letter.getAttribute('aria-label')) || '手紙に名前が無い';
+      },
+    },
+    {
+      id: 'reads-in-place',
+      description:
+        '手紙の本文はここで読める。キーワードの説明は行を押すとその場で開く（閉じている間は inert。重なるシートは無い）',
+      check: ({ root, contract }) => {
+        const text = root.textContent ?? '';
+        if (contract.hasLetter === 'true' && !text.includes(LETTER_BODY)) return '手紙の本文が無い';
+        if (root.querySelector('[role="dialog"]')) return '重なるシートが出ている';
+        if (contract.keywordCount === '0' || !text.includes(KEYWORD_DESCRIPTION)) return true;
+        const description = [...root.querySelectorAll('.oz-disclosure')].find((region) =>
+          (region.textContent ?? '').includes(KEYWORD_DESCRIPTION),
+        );
+        return description?.hasAttribute('inert') || 'キーワードの説明が、押す前から開いている';
+      },
     },
     {
       id: 'loading-is-not-empty',
@@ -220,7 +226,7 @@ registerUnit<Props>({
     },
     {
       id: 'not-fermented-explains-itself',
-      description: '発酵前は空の円ではなく理由を出す',
+      description: '発酵前は空のリストではなく理由を出す',
       onlyFixtures: ['not-fermented'],
       check: ({ root, contract }) => {
         const shown = (root.textContent ?? '').includes('まだ発酵していません');

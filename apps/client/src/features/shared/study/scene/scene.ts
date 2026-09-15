@@ -25,7 +25,6 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   Raycaster,
-  RingGeometry,
   Scene,
   SphereGeometry,
   Sprite,
@@ -63,11 +62,15 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  clampPan,
   homeView,
   jarView,
   journalSpreadView,
   journalTopView,
   lerpView,
+  type PanOffset,
+  panFromDrag,
+  pannedView,
   parallaxOffset,
   shelfView,
   zoomByPinch,
@@ -87,6 +90,7 @@ import {
   bubbleCount,
   bubbleSpeed,
   CORK,
+  corkProfile,
   EDGES_THRESHOLD_DEG,
   hazeOpacity,
   hazeVisible,
@@ -194,6 +198,10 @@ export interface StudySceneHandle {
   startPinch(): void;
   /** 2 本指の間隔の比（置いた時点を 1 とする）。 */
   pinchTo(ratio: number): void;
+  /** 1 本指（マウス）で引き始めた。以後の移動はここを基準にする。 */
+  startPan(): void;
+  /** 引き始めからの指の移動（画面の px）。机の上を平行に動く（ホームのみ）。 */
+  panBy(dx: number, dy: number): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
   /** 遷移中・サブ画面ではラベルを消す。 */
@@ -280,12 +288,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       return geometry;
     }
 
-    const notebooks = layoutNotebooks(state.notebooks, state.now);
+    const notebooks = layoutNotebooks(state.notebooks, state.now, layout.deskNotebooks);
 
     const registry = buildHitRegistry({
       desk: notebooks.desk.map((placement) => placement.notebook),
       shelf: notebooks.shelf,
       shelfAsSingleTarget: layout.pillOffsets !== null,
+      pen: layout.pen !== null,
     });
 
     const deskGroup = buildDesk(layout, materials, ownGeometry);
@@ -364,6 +373,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   let zoomTarget = 1;
   /** 2 本指を置いた時点の倍率。 */
   let pinchBase = 1;
+  /** 机の上の平行移動（いま・目標・引き始め）。 */
+  let pan: PanOffset = { x: 0, z: 0 };
+  let panTarget: PanOffset = { x: 0, z: 0 };
+  let panBase: PanOffset = { x: 0, z: 0 };
 
   const parallax = { x: 0, y: 0 };
 
@@ -518,7 +531,12 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     // 寄り引き。近づくぶんだけ注視点が上がる（絵の上端を画面に留めるため）。
     zoom = approach(zoom, zoomTarget, HOME_ZOOM.lerp);
-    const view = zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom));
+    // 平行移動も同じ速さで追う（指を離しても少し滑る）。
+    pan = {
+      x: approach(pan.x, panTarget.x, HOME_ZOOM.lerp),
+      z: approach(pan.z, panTarget.z, HOME_ZOOM.lerp),
+    };
+    const view = pannedView(zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom)), pan);
 
     camera.position.set(
       view.position.x + parallax.x,
@@ -615,26 +633,23 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     content.jar.group.getWorldPosition(jarWorld);
     const dx = camera.position.x - jarWorld.x;
     const dz = camera.position.z - jarWorld.z;
-
-    const points = solveJarSilhouette(content.jar.profile, {
+    const view = {
       horizontalDistance: Math.hypot(dx, dz),
       azimuth: Math.atan2(dx, dz),
       y: camera.position.y - jarWorld.y,
-    });
-
-    const positions = content.jar.silhouettePositions;
-    const count = Math.min(points.length, positions.count);
-    for (let i = 0; i < count; i++) {
-      const point = points[i];
-      positions.setXYZ(
-        i,
-        Math.sin(point.angle) * point.radius,
-        point.y,
-        Math.cos(point.angle) * point.radius,
-      );
-    }
-    positions.needsUpdate = true;
-    content.jar.silhouette.geometry.setDrawRange(0, count);
+    };
+    writeSilhouette(
+      content.jar.profile,
+      view,
+      content.jar.silhouette,
+      content.jar.silhouettePositions,
+    );
+    writeSilhouette(
+      content.jar.corkProfile,
+      view,
+      content.jar.corkSilhouette,
+      content.jar.corkSilhouettePositions,
+    );
   }
 
   /**
@@ -792,6 +807,18 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     zoomTarget = zoomByPinch(pinchBase, ratio);
   }
 
+  function startPan(): void {
+    if (transition || settled) return;
+    panBase = panTarget;
+  }
+
+  function panBy(dx: number, dy: number): void {
+    if (transition || settled) return;
+    const view = zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom));
+    const delta = panFromDrag(view, camera.fov, container.clientHeight, { dx, dy });
+    panTarget = clampPan(layout, { x: panBase.x + delta.x, z: panBase.z + delta.z });
+  }
+
   function pick(): void {
     if (transition || settled) return;
 
@@ -942,6 +969,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     zoomBy,
     startPinch,
     pinchTo,
+    startPan,
+    panBy,
     pick,
     isBusy: () => transition !== null || settled !== null,
     dispose,
@@ -1097,10 +1126,17 @@ interface JarParts {
   silhouette: Line;
   silhouettePositions: BufferAttribute;
   silhouetteMaterial: Material & { opacity: number };
+  /** コルクの輪郭。瓶と同じ解法で毎フレーム解く。 */
+  corkProfile: Vector2[];
+  corkSilhouette: Line;
+  corkSilhouettePositions: BufferAttribute;
   fadeables: FadeableMaterial[];
   fade: number;
   disposeFadeables(): void;
 }
+
+/** 液面の線の分割数。 */
+const LEVEL_SEGMENTS = 64;
 
 function buildJar(
   state: StudyState,
@@ -1154,11 +1190,13 @@ function buildJar(
   const silhouetteGeometry = own(new BufferGeometry());
   const silhouettePositions = new BufferAttribute(new Float32Array(capacity * 3), 3);
   silhouetteGeometry.setAttribute('position', silhouettePositions);
-  const silhouetteMaterial = fadeable(materials.xray(1).clone());
+  // **深度あり**で描く。以前は中身と同じ `xray`（深度無視）だったが、SP の俯瞰では輪郭の
+  // 遠側が蓋と口の後ろを通り、それが蓋の上に描かれて「蓋の周りの線が汚い」になっていた。
+  // 面には polygonOffset が入っているので、面の上に乗った線は深度ありでも負けない。
+  const silhouetteMaterial = fadeable(materials.faint(1).clone());
   const silhouette = new LineLoop(silhouetteGeometry, silhouetteMaterial);
   // 頂点を毎フレーム書き換えるので、既定の bounding sphere は当てにならない。
   silhouette.frustumCulled = false;
-  silhouette.renderOrder = 5;
   group.add(silhouette);
 
   // コルク。塗りはクリーム（テラコッタは使わない）。
@@ -1175,14 +1213,36 @@ function buildJar(
     ).translateY(CORK.y),
   );
 
-  // 液面（瓶の内径に沿ったリング）。
-  const levelRadius = jarRadiusAt(profile, level);
-  const ringGeometry = own(new RingGeometry(levelRadius * 0.92, levelRadius * 0.96, 48));
-  // 液面のリングも一段薄く（0.3 → 0.22）。もやと合わせて「濃い水」に見えていた。
-  const ring = new Mesh(ringGeometry, fadeable(materials.xray(0.22).clone()));
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = level;
-  group.add(ring);
+  // コルクの輪郭。円柱の側面は稜線を持たないので、瓶と同じ解法で毎フレーム解く。
+  const corkProfilePoints = corkProfile();
+  const corkSilhouetteGeometry = own(new BufferGeometry());
+  const corkSilhouettePositions = new BufferAttribute(
+    new Float32Array(silhouetteBufferSize(corkProfilePoints.length) * 3),
+    3,
+  );
+  corkSilhouetteGeometry.setAttribute('position', corkSilhouettePositions);
+  const corkSilhouette = new LineLoop(corkSilhouetteGeometry, fadeable(materials.ink.clone()));
+  corkSilhouette.frustumCulled = false;
+  group.add(corkSilhouette);
+
+  // 液面（瓶の内径に沿った 1 本の線）。
+  // 以前は幅のある環（半径の 0.92〜0.96）だったが、SP の俯瞰では環の幅がそのまま見えて太い灰の輪に
+  // なり、瓶の中に器があるように読めた。線なら PC の低い視点でも SP の俯瞰でも同じ 1 本で、
+  // 濃さも視点で変わらない（環のころは 0.22 まで薄めていた）。
+  const levelRadius = jarRadiusAt(profile, level) * 0.94;
+  const levelPoints: Vector3[] = [];
+  for (let i = 0; i < LEVEL_SEGMENTS; i++) {
+    const angle = (i / LEVEL_SEGMENTS) * Math.PI * 2;
+    levelPoints.push(
+      new Vector3(Math.sin(angle) * levelRadius, level, Math.cos(angle) * levelRadius),
+    );
+  }
+  group.add(
+    new LineLoop(
+      own(new BufferGeometry().setFromPoints(levelPoints)),
+      fadeable(materials.xray(0.3).clone()),
+    ),
+  );
 
   // 泡。**球**にする。平らなリングだと向きによって線に潰れ、沈んだ点にしか見えない。
   const bubbles: { mesh: Mesh; speed: number; wobble: number; baseX: number; baseZ: number }[] = [];
@@ -1232,12 +1292,37 @@ function buildJar(
     silhouette,
     silhouettePositions,
     silhouetteMaterial,
+    corkProfile: corkProfilePoints,
+    corkSilhouette,
+    corkSilhouettePositions,
     fadeables,
     fade: 1,
     disposeFadeables(): void {
       for (const owned of fadeables) owned.material.dispose();
     },
   };
+}
+
+/** 母線の輪郭を解いて頂点バッファへ書く。バッファは確保済みで、使う分だけ描く。 */
+function writeSilhouette(
+  profile: readonly Vector2[],
+  view: { horizontalDistance: number; azimuth: number; y: number },
+  line: Line,
+  positions: BufferAttribute,
+): void {
+  const points = solveJarSilhouette(profile, view);
+  const count = Math.min(points.length, positions.count);
+  for (let i = 0; i < count; i++) {
+    const point = points[i];
+    positions.setXYZ(
+      i,
+      Math.sin(point.angle) * point.radius,
+      point.y,
+      Math.cos(point.angle) * point.radius,
+    );
+  }
+  positions.needsUpdate = true;
+  line.geometry.setDrawRange(0, count);
 }
 
 interface BooksParts {
@@ -1249,8 +1334,8 @@ interface BooksParts {
   shelfSpines: Group[];
   /** 棚ごと 1 つの的にするとき（SP）にホバーで拡大するグループ。 */
   shelfGroup: Group;
-  /** 鉛筆。押すと新しいエントリーを書き始める（ホバーで少し持ち上がる）。 */
-  penGroup: Group;
+  /** 鉛筆。押すと新しいエントリーを書き始める。SP は置かない（null）。 */
+  penGroup: Group | null;
 }
 
 function buildBooks(
@@ -1426,16 +1511,22 @@ function buildBooks(
   });
 
   // ペンは手帳の右脇に単体で寝かせる。本の輪郭に重なると軸だけが見えて何か分からなくなる。
-  const penGroup = buildPen(layout, materials, own);
-  group.add(penGroup);
+  // SP は置かない（`layout.pen` が null）。机に当月の 1 冊しか無く、書く入口は ENTRIES のピルが担う。
+  const penGroup = layout.pen === null ? null : buildPen(layout.pen, materials, own);
+  if (penGroup !== null) group.add(penGroup);
 
-  // 奥の棚。
+  // 奥の棚。**配置表の `shelf.position` は world の位置。** 棚は机グループ（y 回転
+  // baseRotationY）の子なので、机の回転の逆を掛けてから置く。逆を掛けずに `shelf − desk` を
+  // そのまま置いていたころは実際の位置が x で 0.7 ほどずれ、SP の棚の当たりとラベルが配置表の
+  // 値を world と信じて外れていた（棚の右端が天板からはみ出て見えたのも同じ原因）。
   const shelfGroup = new Group();
-  shelfGroup.position.set(
-    layout.shelf.position.x - layout.desk.x,
-    layout.shelf.position.y - layout.desk.y + (layout.shelf.tiltX !== 0 ? 0.22 : 0),
-    layout.shelf.position.z - layout.desk.z,
-  );
+  shelfGroup.position
+    .set(
+      layout.shelf.position.x - layout.desk.x,
+      layout.shelf.position.y - layout.desk.y + (layout.shelf.tiltX !== 0 ? 0.22 : 0),
+      layout.shelf.position.z - layout.desk.z,
+    )
+    .applyAxisAngle(new Vector3(0, 1, 0), -baseRotationY);
   shelfGroup.rotation.y = -0.35 - baseRotationY;
   shelfGroup.rotation.x = layout.shelf.tiltX;
   shelfGroup.scale.setScalar(layout.shelf.scale);
@@ -1512,9 +1603,13 @@ function buildBooks(
 }
 
 /** 胴＋ペン先の円錐＋バンド 2 本。線画でもペンとして読める最小の構成。 */
-function buildPen(layout: StudyLayout, materials: StudyMaterials, own: OwnGeometry): Group {
+function buildPen(
+  position: { x: number; y: number; z: number },
+  materials: StudyMaterials,
+  own: OwnGeometry,
+): Group {
   const pen = new Group();
-  pen.position.set(layout.pen.x, layout.pen.y, layout.pen.z);
+  pen.position.set(position.x, position.y, position.z);
   pen.rotation.x = Math.PI / 2;
   pen.rotation.y = 0.3;
 
@@ -1674,7 +1769,7 @@ function buildHitboxes(options: {
   jarGroup: Group;
   shelfGroup: Group;
   boardGroup: Group;
-  penGroup: Group;
+  penGroup: Group | null;
 }): Mesh[] {
   const { layout, materials, ownGeometry } = options;
   const boxes: Mesh[] = [];
@@ -1722,10 +1817,13 @@ function buildHitboxes(options: {
 
   if (options.shelfAsSingleTarget) {
     // SP は棚ごと 1 つの的。背表紙 1 本は指より細く、当たりを広げると隣の月を拾う。
+    // 位置は棚そのものから取る（鉛筆と同じ理由。配置表の値を world と信じて外れていた）。
+    const shelfWorld = new Vector3();
+    options.shelfGroup.getWorldPosition(shelfWorld);
     box(
       'shelf',
       [2.8, 2.0, 1.2],
-      new Vector3(layout.shelf.position.x, layout.shelf.position.y + 0.9, layout.shelf.position.z),
+      new Vector3(shelfWorld.x, shelfWorld.y + 0.9, shelfWorld.z),
       options.shelfGroup,
     );
   } else {
@@ -1749,9 +1847,11 @@ function buildHitboxes(options: {
    * 離れた何も無い場所にあった —「鉛筆はホバーしても何も起きない」の正体がこれ。
    * 箱の長辺は鉛筆のローカル y（＝軸の向き）に合わせ、姿勢ごと被せる。
    */
-  const penWorld = new Vector3();
-  options.penGroup.getWorldPosition(penWorld);
-  box('pen', [0.6, 2.6, 0.6], penWorld, options.penGroup, options.penGroup);
+  if (options.penGroup !== null) {
+    const penWorld = new Vector3();
+    options.penGroup.getWorldPosition(penWorld);
+    box('pen', [0.6, 2.6, 0.6], penWorld, options.penGroup, options.penGroup);
+  }
 
   // ボードは板より 0.2 大きい箱。
   box(

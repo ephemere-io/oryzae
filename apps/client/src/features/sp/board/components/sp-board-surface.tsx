@@ -3,7 +3,9 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
+import { CanvasGrid } from '@/components/ui/canvas-grid';
 import type { BoardCardData } from '@/features/shared/board/types';
+import type { CanvasSurface } from '@/lib/canvas/use-canvas-viewport';
 import { toTransform, type Viewport, worldToScreen } from '@/lib/canvas/viewport';
 
 /** つかんでいる間だけ最前面へ。 */
@@ -11,6 +13,9 @@ const DRAGGING_Z = 1000;
 
 /** これ以上動いたら「動かした」。それ未満なら「選んだ」。 */
 const TAP_SLOP = 6;
+
+/** 2 回目のタップがこの間に来たらダブルタップ（ms）。 */
+const DOUBLE_TAP_MS = 320;
 
 /** 角のつまみの大きさ（画面上の px）。指で掴める最小限。 */
 const HANDLE_SIZE = 28;
@@ -93,11 +98,32 @@ interface ResizeState {
   startHeight: number;
 }
 
+export interface PendingCard {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 選んだ写真の object URL。読めない写真なら null（枠だけ）。 */
+  previewUrl: string | null;
+  /** 送れなかった。しばらく見せてから消す。 */
+  failed: boolean;
+}
+
 export interface SpBoardSurfaceProps {
   cards: BoardCardData[];
   dateKey: string;
+  /** 前の日（-1）・次の日（+1）へ。渡さなければ日付は表示だけ。 */
+  onShiftDay?: (offset: -1 | 1) => void;
   /** 盤面を画面に収めるための変換。 */
   viewport: Viewport;
+  /**
+   * パン・ズームの hook（`useCanvasViewport`）。渡すと frame / world の ref を hook が
+   * 持ち、**2 本指で寄り引き・空白の 1 本指でパン**できる。省略時（孤立検証・テスト）は
+   * `viewport` の transform を自分で書く。
+   */
+  canvas?: CanvasSurface;
+  /** 倍率の影響を受けない画面空間の UI（ズームの段階ボタン等）。 */
+  overlay?: React.ReactNode;
   /** 指の移動で新しい world 座標が決まったとき。 */
   onMove: (cardId: string, x: number, y: number) => void;
   /** 指を離したとき（保存はここで投げる）。 */
@@ -105,6 +131,13 @@ export interface SpBoardSurfaceProps {
   /** 選んでいるカード。`null` なら何も選んでいない。 */
   selectedId?: string | null;
   onSelect?: (cardId: string | null) => void;
+  /** 同じカードを続けて 2 回押したとき（ダブルタップ）。スニペットなら編集を開く。 */
+  onOpen?: (cardId: string) => void;
+  /**
+   * 貼っている最中の仮のカード（world）。選んだ瞬間に置き、貼り終わったら実物と入れ替える。
+   * 無いと、選んでから数秒間なにも起きず「押しても貼れない」に見える。
+   */
+  pending?: PendingCard | null;
   /** 角のつまみで回転と大きさが決まったとき。 */
   onTransform?: (cardId: string, next: { rotation: number; width: number; height: number }) => void;
 }
@@ -114,30 +147,44 @@ export interface SpBoardSurfaceProps {
  *
  * **右ペインを置かない。** 縦画面で 400px の側パネルを出すと板がほぼ潰れる。日付と
  * カード枚数だけを隅に小さく浮かせ、**カードは指でつかんで動かせる**ようにする。
- * カードの重なりは指で解く前提なので、ズームもパンも与えない — 指の操作は
- * 「カードを動かす」1 つに絞る。
+ *
+ * 指の操作は 3 つ: カードの上の 1 本指は**動かす**、空白の 1 本指は**パン**、
+ * 2 本指は**寄り引き**（`useCanvasViewport` が持つ。PC のボードと同じ手）。以前は
+ * 開いたときに 1 回収めるだけでズームもパンも無く、カードが増えると縮尺が下がって
+ * 読めなくなった。
  *
  * データ取得と初期フィットは `sp-board.tsx` が持つ。ここは渡されたものを描くだけ。
  */
 export function SpBoardSurface({
   cards,
   dateKey,
+  onShiftDay,
   viewport,
+  canvas,
+  overlay,
   onMove,
   onCommit,
   selectedId = null,
   onSelect,
+  onOpen,
+  pending = null,
   onTransform,
 }: SpBoardSurfaceProps) {
   const t = useTranslations('sp.board');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
+  /** frame の上に置かれている指。2 本になったらカードの操作を手放す（寄り引きに譲る）。 */
+  const pointersRef = useRef(new Set<number>());
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>, card: BoardCardData) => {
       // 掴んだ指を最後まで追う。指が要素の外へ出ても pointermove が届く。
-      event.currentTarget.setPointerCapture?.(event.pointerId);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // 既に離れた指や合成イベントでは NotFoundError になる。掴めなくても動きは追える。
+      }
       dragRef.current = {
         cardId: card.id,
         pointerId: event.pointerId,
@@ -171,17 +218,32 @@ export function SpBoardSurface({
     [onMove, viewport.scale],
   );
 
+  /** 直前のタップ。同じカードを DOUBLE_TAP_MS 以内にもう一度押したら「開く」。 */
+  const lastTapRef = useRef<{ cardId: string; at: number } | null>(null);
   const endDrag = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
       dragRef.current = null;
       setDraggingId(null);
-      // 動かしていなければ「選んだ」。動かしたなら位置を保存する。
-      if (drag.moved < TAP_SLOP) onSelect?.(drag.cardId);
-      else onCommit();
+      // 動かしたなら位置を保存する。
+      if (drag.moved >= TAP_SLOP) {
+        lastTapRef.current = null;
+        onCommit();
+        return;
+      }
+      // 動かしていなければ「選んだ」。同じカードを続けて押したら「開く」（PC のダブルクリック）。
+      const now = performance.now();
+      const last = lastTapRef.current;
+      if (last && last.cardId === drag.cardId && now - last.at < DOUBLE_TAP_MS) {
+        lastTapRef.current = null;
+        onOpen?.(drag.cardId);
+        return;
+      }
+      lastTapRef.current = { cardId: drag.cardId, at: now };
+      onSelect?.(drag.cardId);
     },
-    [onCommit, onSelect],
+    [onCommit, onSelect, onOpen],
   );
 
   /**
@@ -201,6 +263,31 @@ export function SpBoardSurface({
     },
     [onCommit],
   );
+
+  /**
+   * 2 本目の指が降りたら、カードの操作を手放して寄り引きに譲る。
+   *
+   * 掴んだまま 2 本目が来ると、hook はピンチを始めるが、カードも 1 本目に付いて動き
+   * 続ける（盤面が寄りながらカードも流れる）。動かしかけた分は元の位置へ戻す。
+   */
+  const trackPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      pointersRef.current.add(event.pointerId);
+      if (pointersRef.current.size < 2) return;
+      const drag = dragRef.current;
+      if (drag) {
+        dragRef.current = null;
+        setDraggingId(null);
+        if (drag.moved >= TAP_SLOP) onMove(drag.cardId, drag.originX, drag.originY);
+      }
+      resizeRef.current = null;
+    },
+    [onMove],
+  );
+
+  const trackPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(event.pointerId);
+  }, []);
 
   /** 角のつまみ。中心から指への向きと距離で、回転と大きさを同時に決める。 */
   const handleResizeMove = useCallback(
@@ -252,17 +339,35 @@ export function SpBoardSurface({
         dateKey,
         hasSidePane: false,
         selectedId: selectedId ?? 'none',
+        pannable: canvas !== undefined,
+        canShiftDay: onShiftDay !== undefined,
       })}
+      ref={canvas?.frameRef}
       className="relative h-full w-full overflow-hidden"
-      style={{ backgroundColor: 'var(--bg)' }}
+      style={{
+        backgroundColor: 'var(--bg)',
+        // 指の操作はこの中で完結させる（ブラウザのスクロール・ページ拡大に取られない）。
+        touchAction: 'none',
+        overscrollBehavior: 'none',
+      }}
       // 板の何も無いところを押したら選択を解く（PC の盤面と同じ）。
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onSelect?.(null);
       }}
+      onPointerDownCapture={trackPointerDown}
+      onPointerUpCapture={trackPointerEnd}
+      onPointerCancelCapture={trackPointerEnd}
     >
+      {/* 模造紙の方眼（PC のボード・書斎と同じ）。frame に敷き、world に貼り付いて見える。 */}
+      {canvas ? <CanvasGrid canvas={canvas} /> : null}
+      {/* world。transform を書くのは hook（あれば）。無ければ viewport から自分で書く。 */}
       <div
+        ref={canvas?.worldRef}
         className="absolute left-0 top-0"
-        style={{ transform: toTransform(viewport), transformOrigin: '0 0' }}
+        style={{
+          transformOrigin: '0 0',
+          ...(canvas ? {} : { transform: toTransform(viewport) }),
+        }}
       >
         {visible.map((card) => {
           const isDragging = draggingId === card.id;
@@ -270,6 +375,8 @@ export function SpBoardSurface({
             <div
               key={card.id}
               data-card-id={card.id}
+              // カードの上で始まった指はパンにしない（hook はこの印で辞退する）。
+              data-canvas-no-pan=""
               onPointerDown={(event) => handlePointerDown(event, card)}
               onPointerMove={handlePointerMove}
               onPointerUp={endDrag}
@@ -311,6 +418,45 @@ export function SpBoardSurface({
             </div>
           );
         })}
+        {pending ? (
+          <div
+            data-pending-card
+            data-pending-failed={pending.failed}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: pending.x,
+              top: pending.y,
+              width: pending.width,
+              height: pending.height,
+              borderRadius: 8,
+              overflow: 'hidden',
+              pointerEvents: 'none',
+              opacity: pending.failed ? 0.45 : 1,
+              background: 'var(--surface-raised)',
+              boxShadow: '0 8px 24px rgba(140,133,126,0.18)',
+            }}
+          >
+            {pending.previewUrl ? (
+              // biome-ignore lint/performance/noImgElement: 選んだ写真の object URL（一時）
+              <img
+                src={pending.previewUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                style={{ filter: 'blur(6px)', opacity: 0.55 }}
+              />
+            ) : null}
+            {/* 進んでいる印。写真の上に薄い紙をかぶせて脈打つ。 */}
+            <div
+              className={pending.failed ? '' : 'animate-pulse'}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'color-mix(in srgb, var(--bg) 45%, transparent)',
+              }}
+            />
+          </div>
+        ) : null}
 
         {/* 角のつまみ。カードの外（右下）に浮かせる。カードの中に置くと本文に重なる。 */}
         {onTransform &&
@@ -322,9 +468,14 @@ export function SpBoardSurface({
                 type="button"
                 aria-label={t('resize')}
                 data-testid="sp-board-handle"
+                data-canvas-no-pan=""
                 onPointerDown={(event) => {
                   event.stopPropagation();
-                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  try {
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  } catch {
+                    // 既に離れた指や合成イベントでは NotFoundError になる。掴めなくても動きは追える。
+                  }
                   const center = cardCenterOnScreen(event.currentTarget, card, viewport);
                   if (!center) return;
                   const dx = event.clientX - center.x;
@@ -367,34 +518,72 @@ export function SpBoardSurface({
 
       {visible.length === 0 && (
         <p
-          className="absolute inset-0 flex items-center justify-center px-8 text-center text-[13px]"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px]"
           style={{ color: 'var(--date-color)' }}
         >
           {t('empty')}
         </p>
       )}
 
-      {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。 */}
+      {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。日付の両脇で前後の日へ。 */}
       <div
-        className="pointer-events-none absolute top-4 flex items-baseline gap-2"
-        style={{
-          // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと日付に重なる。
-          left: '1rem',
-          color: 'var(--date-color)',
-          fontFamily: 'Inter, sans-serif',
-        }}
+        data-canvas-no-pan=""
+        className="pointer-events-none absolute top-3 flex items-center gap-1"
+        style={{ left: '0.5rem', color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
       >
+        {onShiftDay ? (
+          <button
+            type="button"
+            aria-label={t('prev_day')}
+            onClick={() => onShiftDay(-1)}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full"
+          >
+            <ChevronIcon direction="left" />
+          </button>
+        ) : null}
         <span className="text-[11px] tracking-[0.16em]">{formatCornerDate(dateKey)}</span>
-        <span className="text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>
+        {onShiftDay ? (
+          <button
+            type="button"
+            aria-label={t('next_day')}
+            onClick={() => onShiftDay(1)}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full"
+          >
+            <ChevronIcon direction="right" />
+          </button>
+        ) : null}
+        <span className="ml-1 text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>
       </div>
+
+      {/* 画面空間の UI。この上ではパンを始めない。 */}
+      {overlay ? <div data-canvas-no-pan="">{overlay}</div> : null}
     </div>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={direction === 'left' ? 'm14.5 6-6 6 6 6' : 'm9.5 6 6 6-6 6'} />
+    </svg>
   );
 }
 
 /**
  * カードの中身。PC の意味的ズーム（引いたら中身を落とす）は持たない。
  *
- * SP は盤面を一度フィットさせたきり倍率が変わらないので、出し分ける段階が無い。
+ * 寄れるようになったので字は本文と同じ 15px に戻してもよいが、全体を収めた縮尺で
+ * 読めることを優先し、少し大きめのままにしてある。
  */
 function SpBoardCardContent({ card }: { card: BoardCardData }) {
   if (card.cardType === 'photo' && 'imageUrl' in card.content) {
@@ -411,8 +600,6 @@ function SpBoardCardContent({ card }: { card: BoardCardData }) {
   }
   if ('text' in card.content) {
     return (
-      // 盤面は縮小して全体を映すので、カードの中の文字は**縮尺のぶん割り増して**おかないと
-      // 実機で読めない（12px は板の縮尺が乗ると 6〜7px 相当になる）。
       <p
         className="h-full overflow-hidden whitespace-pre-wrap p-2.5 text-[17px]"
         style={{ color: 'var(--fg)', lineHeight: 1.6 }}

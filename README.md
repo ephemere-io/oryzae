@@ -106,7 +106,8 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 
 ## Design Docs
 
-設計判断の正はすべて `docs/` 配下にあります。
+設計判断の正はすべて `docs/` 配下にあります。索引と、ストック（規約）/ フロー（時点の判断）の分け方は
+[`docs/README.md`](docs/README.md) と [`docs/docs-policy.md`](docs/docs-policy.md)。下の表はストックの抜粋です。
 
 | ドキュメント | 内容 |
 |---|---|

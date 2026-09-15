@@ -328,6 +328,99 @@ describe('useCanvasViewport', () => {
     });
   });
 
+  describe('「100%」の窓（referenceBounds）', () => {
+    // SP の瓶は世界の大きさが決まっていて、world 1 = 1px の等倍だと壜が画面いっぱいになる（実機レビュー）。
+    // 壜とまわりの円が収まる窓を「100%」にする。
+    const HOME = { x: 0, y: 0, width: 1600, height: 1200 };
+
+    function ReferenceHarness() {
+      const canvas = useCanvasViewport({
+        defaultFitBounds: HOME,
+        referenceBounds: HOME,
+        fitPadding: 0,
+      });
+      return (
+        <CanvasViewport canvas={canvas} ariaLabel="test canvas">
+          <span data-testid="reference">{canvas.referenceScale}</span>
+          <button type="button" data-testid="zoom-in" onClick={canvas.zoomIn}>
+            in
+          </button>
+          <button type="button" data-testid="reset" onClick={canvas.resetZoom}>
+            reset
+          </button>
+        </CanvasViewport>
+      );
+    }
+
+    it('基準の倍率は窓を画面に収めた倍率で、リセットはその窓に戻す', async () => {
+      render(<ReferenceHarness />);
+      stubFrameRect();
+      await flushFrame();
+      await flushFrame();
+
+      // 1600x1200 を 800x600 に余白なしで収める倍率は 0.5。
+      expect(Number(screen.getByTestId('reference').textContent)).toBeCloseTo(0.5, 6);
+      expect(readViewport().scale).toBeCloseTo(0.5, 6);
+
+      act(() => {
+        screen.getByTestId('zoom-in').click();
+      });
+      await flushFrame();
+      expect(readViewport().scale).toBeGreaterThan(0.5);
+
+      act(() => {
+        screen.getByTestId('reset').click();
+      });
+      await flushFrame();
+      expect(readViewport().scale).toBeCloseTo(0.5, 6);
+    });
+
+    it('minZoom を渡すと、引ける下限は 100% の割合になる', async () => {
+      function MinZoomHarness() {
+        const canvas = useCanvasViewport({
+          defaultFitBounds: HOME,
+          referenceBounds: HOME,
+          fitPadding: 0,
+          minZoom: 0.5,
+        });
+        return (
+          <CanvasViewport canvas={canvas} ariaLabel="test canvas">
+            <button type="button" data-testid="zoom-out" onClick={canvas.zoomOut}>
+              out
+            </button>
+          </CanvasViewport>
+        );
+      }
+      render(<MinZoomHarness />);
+      stubFrameRect();
+      await flushFrame();
+      await flushFrame();
+      for (let i = 0; i < 10; i += 1) {
+        act(() => {
+          screen.getByTestId('zoom-out').click();
+        });
+      }
+      await flushFrame();
+      // 100% は 0.5 倍。下限はその半分の 0.25（固定の下限 0.2 まで行かない）。
+      expect(readViewport().scale).toBeCloseTo(0.25, 6);
+    });
+
+    it('窓を渡さなければ基準は 1（world 1 = 1px）', async () => {
+      function PlainHarness() {
+        const canvas = useCanvasViewport();
+        return (
+          <CanvasViewport canvas={canvas} ariaLabel="test canvas">
+            <span data-testid="reference">{canvas.referenceScale}</span>
+          </CanvasViewport>
+        );
+      }
+      render(<PlainHarness />);
+      stubFrameRect();
+      await flushFrame();
+      expect(screen.getByTestId('reference').textContent).toBe('1');
+    });
+  });
+
   describe('キーボードショートカット', () => {
     function press(key: string, init: KeyboardEventInit = {}) {
       act(() => {

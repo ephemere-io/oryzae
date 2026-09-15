@@ -28,6 +28,7 @@ describe('useEntry', () => {
       content: 'hello',
       mediaUrls: ['user-1/a.jpg'],
       effects: null,
+      fermentationEnabled: true,
       createdAt: '2024-01-01',
       updatedAt: '2024-01-01',
     };

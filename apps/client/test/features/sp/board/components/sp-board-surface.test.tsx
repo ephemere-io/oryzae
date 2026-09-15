@@ -123,6 +123,37 @@ describe('SpBoardSurface', () => {
     expect(onMove).toHaveBeenCalledWith('c1', 30, 60);
   });
 
+  it('同じカードを続けて 2 回押すと「開く」（1 回目は選ぶだけ）', () => {
+    const onSelect = vi.fn();
+    const onOpen = vi.fn();
+    const { container } = renderSurface({ onSelect, onOpen });
+    const target = container.querySelector('[data-card-id="c1"]');
+    if (!(target instanceof HTMLElement)) throw new Error('missing card');
+
+    target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 10, clientY: 10 }));
+    target.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 10, clientY: 10 }));
+    expect(onSelect).toHaveBeenCalledWith('c1');
+    expect(onOpen).not.toHaveBeenCalled();
+
+    target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 11, clientY: 10 }));
+    target.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, clientX: 11, clientY: 10 }));
+    expect(onOpen).toHaveBeenCalledWith('c1');
+  });
+
+  it('動かした後の指は「開く」に数えない', () => {
+    const onOpen = vi.fn();
+    const { container } = renderSurface({ onOpen });
+    const target = container.querySelector('[data-card-id="c1"]');
+    if (!(target instanceof HTMLElement)) throw new Error('missing card');
+
+    target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 10, clientY: 10 }));
+    target.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 60, clientY: 10 }));
+    target.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 60, clientY: 10 }));
+    target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 60, clientY: 10 }));
+    target.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, clientX: 60, clientY: 10 }));
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('縮小表示では移動量を倍率で割る', () => {
     const onMove = vi.fn();
     const { container } = renderSurface({ onMove, viewport: { x: 0, y: 0, scale: 0.5 } });

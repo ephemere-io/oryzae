@@ -73,17 +73,3 @@ function clamp(value: number, min: number, max: number): number {
   if (value > max) return max;
   return value;
 }
-
-/**
- * SP のピルに添える状態語のキー。
- *
- * readiness は SP でも**数値にしない**（「コピー」の規則に従う）。
- */
-export function jarPillStateKey(
-  status: 'idle' | 'fermenting' | 'completed',
-  readiness: number,
-): 'pill_jar_empty' | 'pill_jar_fermenting' | 'pill_jar_almost' | 'pill_jar_letter' {
-  if (status === 'completed') return 'pill_jar_letter';
-  if (status === 'idle') return 'pill_jar_empty';
-  return readiness >= 0.9 ? 'pill_jar_almost' : 'pill_jar_fermenting';
-}

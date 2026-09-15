@@ -157,6 +157,23 @@
       "unlink_aria": "取消关联“{text}”"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "关联提问",
+      "empty": "还没有正在思考的问题。在这里写一个吧。",
+      "new": "写一个新问题",
+      "new_placeholder": "写下问题（例如：今天有什么小发现？）",
+      "create": "就用这个问题",
+      "creating": "创建中…",
+      "create_failed": "未能创建问题，请再试一次。",
+      "back_to_list": "从已有问题中选择",
+      "search_placeholder": "查找问题",
+      "untitled": "无标题提问",
+      "close": "关闭",
+      "limit": "问题最多 {max} 个。在问题列表里归档一个，就能提出新的问题。",
+      "manage": "打开问题列表"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "发生错误",
@@ -335,7 +352,8 @@
       "open": "打开",
       "ocr": "从图片读取",
       "collapse": "收起工具栏",
-      "expand": "展开工具栏"
+      "expand": "展开工具栏",
+      "send_to_back": "置于底层"
     },
     "drop_image": "把图片拖到这里"
   },
@@ -453,10 +471,6 @@
       "aria_label": "问题选择对话框",
       "heading": "为此条目关联一个问题",
       "body": "要入瓮并发酵，需要给条目关联一个问题。请从已有问题中选择，或在此输入新问题。",
-      "mode_pick": "选已有",
-      "mode_create": "新建",
-      "pick_placeholder": "请选择问题...",
-      "create_placeholder": "写一个问题（例：今天的小发现是？）",
       "cancel": "取消",
       "confirm": "关联并入瓮",
       "saving": "入瓮中..."
@@ -496,6 +510,8 @@
       "letter_badge": "来自发酵过程的信件"
     },
     "fermentation_sidebar": {
+      "heading": "发酵结果",
+      "letter_open": "阅读来信",
       "close_aria": "关闭发酵侧边栏",
       "empty": "这个问题还没有发酵结果。",
       "section_letter": "信",
@@ -632,6 +648,16 @@
       "hint": "用 ← → 键、拖动或滚动翻页 ／ 按 ESC 返回瓶中",
       "launcher": "回顾 {count} 次发酵",
       "open_aria": "打开「{question}」的发酵历史"
+    },
+    "reading": {
+      "section_letter": "信",
+      "section_keywords": "关键词",
+      "section_snippets": "摘录",
+      "selection_reason": "被选中的理由",
+      "reply": "给这封信写回信",
+      "sources": "这封信的来源记录",
+      "source_untitled": "无标题记录",
+      "open_detail": "展开阅读"
     }
   },
   "questions": {
@@ -702,41 +728,66 @@
   },
   "sp": {
     "editor": {
-      "title_placeholder": "标题（可选）",
+      "palette_aria": "编辑操作",
+      "title_placeholder": "标题",
       "body_placeholder": "把此刻的感受，如实写下。",
       "status_editing": "编辑中",
       "status_saving": "保存中…",
       "status_saved": "已保存",
+      "status_offline": "离线 · 已保存在此设备",
       "question": "提问",
       "question_selected": "提问：{label}",
       "question_untitled": "无标题提问",
-      "question_sheet_title": "选择提问",
-      "question_empty": "还没有正在思考的问题。在这里写一个吧。",
-      "question_new": "+ 写一个新问题",
-      "question_new_placeholder": "写下问题（例如：今天有什么小发现？）",
-      "question_create": "就用这个问题",
-      "question_creating": "创建中…",
-      "question_create_failed": "未能创建问题，请再试一次。",
-      "question_back_to_list": "← 从已有问题中选择",
       "close": "关闭",
       "pickle": "放入瓶中",
       "pickling": "封入中…",
-      "pickled": "已开始发酵 ✓",
+      "pickled": "已放进瓶里腌制",
       "question_link": "关联提问",
-      "ferment_title": "封入瓶中发酵",
+      "ferment_title": "腌制",
+      "ferment_done_short": "已腌制",
+      "photo_width": "宽度",
+      "photo_width_small": "小",
+      "photo_width_medium": "中",
+      "photo_width_large": "大",
+      "photo_align": "对齐",
+      "photo_wrap": "环绕",
+      "photo_wrap_on": "开",
+      "photo_wrap_off": "关",
+      "photo_remove": "移除",
+      "photo_done": "完成",
+      "photo_selected": "已选中照片",
       "ferment_sub": "静待片刻，AI 的来信将会送达",
-      "delete": "删除"
+      "delete": "删除",
+      "question_unlink": "取消关联“{label}”",
+      "settings_title": "显示设置",
+      "settings_delete_entry": "删除这篇记录",
+      "settings_letter_spacing": "字距",
+      "settings_size_small": "小",
+      "settings_size_medium": "中",
+      "settings_size_large": "大",
+      "settings_spacing_tight": "紧凑",
+      "settings_spacing_normal": "标准",
+      "settings_spacing_wide": "宽松",
+      "pickled_note": "已放进瓶里。发酵开始前补写的内容也会一起腌制，无需再按一次。",
+      "result_no_question": "关联一个问题后，发酵结果会显示在这里",
+      "result_no_question_body": "为这篇记录关联问题后，就能一边看那个问题的信、关键词和摘录一边写。",
+      "result_not_fermented": "这个问题还没有发酵。",
+      "result_latest": "最新",
+      "result_question_aria": "看哪个问题的结果",
+      "result_round_aria": "看哪一次的结果",
+      "ferment_needs_body": "写下正文后就能腌制"
     },
     "nav": {
+      "back": "返回",
       "write": "书写",
       "jar": "瓶",
       "list": "列表",
-      "account": "账户",
-      "questions": "提问"
+      "questions": "提问",
+      "dismiss_keyboard": "收起键盘"
     },
     "jar": {
-      "title": "瓶",
       "untitled": "无标题提问",
+      "map_aria": "罐子地图",
       "close": "关闭",
       "letter_empty": "此结果还没有信",
       "reply": "写回信",
@@ -746,11 +797,13 @@
       "section_sources": "来源记录",
       "source_untitled": "无标题记录",
       "no_questions": "还没有提问。可以从下方按钮开始。",
-      "spin_hint": "横向滑动即可转动",
-      "manage_questions": "添加或编辑提问",
+      "manage_questions": "提问列表",
       "not_fermented": "这个提问还没有发酵",
-      "tap_hint": "点按阅读",
-      "selection_reason": "被选中的理由"
+      "selection_reason": "被选中的理由",
+      "palette_aria": "罐子操作",
+      "letter_badge": "来信",
+      "letter_badge_unread": "新来信",
+      "history_latest": "最新"
     },
     "unsupported": "此页面尚未支持手机，请使用电脑访问。",
     "list": {
@@ -769,7 +822,7 @@
     },
     "questions": {
       "title": "提问",
-      "intro": "培育、改写或结束你正在面对的提问。",
+      "intro": "可以培养、改写、归档你正在面对的问题。",
       "untitled": "无标题提问",
       "proposed": "Oryzae 的建议",
       "accept": "接受",
@@ -779,11 +832,19 @@
       "sheet_add": "新的提问",
       "sheet_edit": "编辑提问",
       "placeholder": "写下提问",
-      "delete": "结束这个提问",
       "cancel": "取消",
       "save": "保存",
       "letter_arrived": "有一封信送到了",
-      "close": "关闭"
+      "close": "关闭",
+      "limit": "问题最多 {max} 个。点上面的问题并选择「归档」，就能提出新的问题。",
+      "archive_confirm_title": "要归档这个问题吗？",
+      "archive_confirm_body": "归档的问题可以在本页面最下方的「已归档的问题」里恢复。",
+      "archive_confirm": "归档",
+      "archive_cancel": "取消",
+      "archived_section": "已归档的问题（{count}）",
+      "unarchive": "恢复",
+      "unarchive_limit": "问题最多 {max} 个。归档一个后就能恢复。",
+      "archive": "归档"
     },
     "board": {
       "cards": "{count}张",
@@ -797,7 +858,18 @@
       "cancel": "取消",
       "save": "保存",
       "resize": "改变大小和方向",
-      "snippet_placeholder": "想留下的话"
+      "tool_snippet": "摘录",
+      "tool_read_image": "识别",
+      "tool_photo": "照片",
+      "open": "打开",
+      "read_image": "从照片识别文字",
+      "lightbox_close": "关闭",
+      "prev_day": "前一天",
+      "next_day": "后一天",
+      "snippet_placeholder": "想留下的话",
+      "palette_aria": "看板操作",
+      "send_to_back": "置于底层",
+      "ocr_wait_note": "正在读取照片中的文字。大图可能需要约 10 秒。"
     }
   },
   "canvas": {
@@ -816,10 +888,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "pill_jar_empty": "空",
-    "pill_jar_fermenting": "发酵中",
-    "pill_jar_almost": "即将",
-    "pill_jar_letter": "信件",
+    "pill_questions": "{count}个问题",
     "pill_entries": "{count}条",
     "pill_volumes": "{count}册",
     "pill_cards": "{count}张",
@@ -836,6 +905,9 @@
     "list_search_placeholder": "搜索正文",
     "list_load_more": "加载更多",
     "chip_all_questions": "全部提问",
+    "filter_all_months": "所有月份",
+    "filter_month_aria": "按月份筛选",
+    "filter_question_aria": "按提问筛选",
     "question_untitled": "无标题提问",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
@@ -857,6 +929,9 @@
     "hint_board_empty": "还没有贴任何东西",
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
-    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
+    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
+    "list_row_actions": "操作",
+    "list_open": "打开",
+    "list_delete": "删除"
   }
 }

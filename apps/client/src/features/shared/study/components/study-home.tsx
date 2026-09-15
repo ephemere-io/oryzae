@@ -6,11 +6,12 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeleteEntry } from '@/features/shared/entries/hooks/use-delete-entry';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
-import { DURATION, RENDER_LIMITS } from '../constants';
+import { DURATION } from '../constants';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
@@ -45,7 +46,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
   const { api, auth, loading: authLoading } = useAuth();
   const { theme } = useTheme();
-  const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
+  const { state, countsKnown } = useStudyState(api, authLoading, auth?.user.id ?? null);
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
@@ -61,6 +62,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
    * なく、手帳のホバーに出す日付の範囲を作るためのもの）。手元で月に絞ると、20 件より
    * 古い月が必ず空になる。月・問い・検索の絞り込みも、続きの読み込みもサーバーに任せる。
    */
+  const { deleteEntry } = useDeleteEntry(api);
   const list = useEntries(
     overlay === null ? null : api,
     listSearch.trim() === '' ? undefined : listSearch.trim(),
@@ -137,12 +139,12 @@ export function StudyHome({ layout }: StudyHomeProps) {
   /**
    * ARCHIVE のピルに出す冊数は**棚に入っている月**の数。
    *
-   * 全月を数えると、机に積んである 3 冊まで「書庫の冊数」に混ざる（実機で
+   * 全月を数えると、机に積んである冊（PC 3・SP 1）まで「書庫の冊数」に混ざる（実機で
    * 「5 volumes」と出ているのに棚には 2 本しか無い、という食い違いになっていた）。
    */
   const archiveCount = useMemo(
-    () => Math.max(0, state.notebooks.length - RENDER_LIMITS.deskNotebooks),
-    [state.notebooks],
+    () => Math.max(0, state.notebooks.length - layout.deskNotebooks),
+    [state.notebooks, layout.deskNotebooks],
   );
 
   const handleNavigate = useCallback(
@@ -239,11 +241,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
             layout={layout}
             positions={labelPositions}
             hovered={hoveredLabel}
-            status={state.fermentation.status}
-            readiness={state.fermentation.readiness}
+            questionCount={state.questions.length}
             entryCount={currentMonthCount}
             volumeCount={archiveCount}
             cardCount={state.board.total}
+            counting={!countsKnown}
             screen={screen}
             onPick={handlePickFromLabel}
           />
@@ -278,6 +280,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
         )}
 
         <EntryListOverlay
+          variant={layout.listPresentation}
           open={overlay !== null}
           entries={overlayEntries}
           loading={list.loading && list.entries.length === 0}
@@ -292,6 +295,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
           selectedMonth={overlay?.month ?? null}
           onSelectMonth={(month) => setOverlay({ month })}
           onSelectEntry={handleSelectEntry}
+          onDeleteEntry={async (entryId) => {
+            const ok = await deleteEntry(entryId);
+            if (ok) list.removeEntry(entryId);
+            return ok;
+          }}
           onCreateEntry={() => {
             setOverlay(null);
             router.push('/entries/new');

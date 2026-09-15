@@ -158,11 +158,12 @@ registerUnit<Props>({
     },
     {
       id: 'manage-button-always-present',
-      description: '問いの管理へ入る口は常にある（SP はボトムナビを持たない唯一の入口）',
-      onlyFixtures: ['loading', 'no-questions', 'orbit', 'opened'],
+      description: '問いの管理へ入る口は地図の間ずっとある（問いを開いている間は列を畳む）',
+      onlyFixtures: ['loading', 'no-questions', 'orbit'],
       check: ({ root }) => {
-        const text = root.textContent ?? '';
-        return text.includes('問いを追加・編集') || '「問いを追加・編集」ボタンが無い';
+        // 下端の列（殻が無い孤立検証では画面の中に描かれる）。
+        const fab = root.querySelector('button[data-palette-action="questions"]');
+        return fab?.getAttribute('aria-label') === '問いの一覧' || '「問いの一覧」の入口が無い';
       },
     },
     {

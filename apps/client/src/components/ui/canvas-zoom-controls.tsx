@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { MAX_SCALE, MIN_SCALE } from '@/lib/canvas/viewport';
+import { DEFAULT_SCALE_BOUNDS, type ScaleBounds } from '@/lib/canvas/viewport';
 
 interface CanvasZoomControlsProps {
   scale: number;
@@ -12,6 +12,10 @@ interface CanvasZoomControlsProps {
   onReset: () => void;
   /** 中身全体が収まるようにズーム。 */
   onFit: () => void;
+  /** 「100%」とする倍率（`CanvasSurface.referenceScale`）。既定は 1（world 1 = 1px）。 */
+  referenceScale?: number;
+  /** 倍率の上限と下限（`CanvasSurface.scaleBounds`）。既定は固定の 20%〜300%。 */
+  scaleBounds?: ScaleBounds;
 }
 
 /** 端数で上限・下限判定がぶれないように、比較にだけ使う許容誤差。 */
@@ -35,11 +39,13 @@ export function CanvasZoomControls({
   onZoomOut,
   onReset,
   onFit,
+  referenceScale = 1,
+  scaleBounds = DEFAULT_SCALE_BOUNDS,
 }: CanvasZoomControlsProps) {
   const t = useTranslations('canvas.zoom');
-  const atMin = scale <= MIN_SCALE + SCALE_EPSILON;
-  const atMax = scale >= MAX_SCALE - SCALE_EPSILON;
-  const percent = Math.round(scale * 100);
+  const atMin = scale <= scaleBounds.min + SCALE_EPSILON;
+  const atMax = scale >= scaleBounds.max - SCALE_EPSILON;
+  const percent = Math.round((scale / referenceScale) * 100);
 
   return (
     <div

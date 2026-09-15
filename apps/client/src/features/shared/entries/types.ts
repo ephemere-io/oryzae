@@ -19,6 +19,18 @@ export interface AttachedPhoto {
 }
 
 /**
+ * 本文の中に置いた写真（置き順の 1 枚）。見た目は PC の `InlineImage` と同じ語彙で持ち、保存では
+ * `effects.inlineImages` の offset と対にする（`utils/inline-photos.ts`）。
+ */
+export interface InlinePhoto extends AttachedPhoto {
+  /** 行幅に対する割合（0.05〜1）。SP の既定は 1（全幅）。 */
+  widthRatio: number;
+  layout: 'inline' | 'block' | 'wrap';
+  align: 'start' | 'center' | 'end';
+  aspect?: number;
+}
+
+/**
  * 写真取り込みモーダル/シートに映す状態（usePhotoImport が持つ）。
  * PC・SP の表示部品はこれを props で受け取るだけの純表示にしてある。
  */
@@ -31,6 +43,21 @@ export interface PhotoImportState {
   error: string;
   /** 文字起こし結果。null なら未実行。空文字は「文字が写っていなかった」。 */
   transcript: string | null;
+}
+
+/**
+ * 端末の写し（オフラインの保険）。id のあるエントリの、サーバーに届いていない内容。
+ * `useEntryLocalCopy` が置き、サーバーが同じ内容を保存できたら消す。
+ */
+export interface EntryLocalCopy {
+  entryId: string;
+  /** 保存形式（先頭行＝タイトル）。 */
+  content: string;
+  mediaUrls: string[];
+  /** 本文の中の写真（U+FFFC）の置き順の storagePath。復元で本文と対にする。 */
+  inlinePaths: string[];
+  /** 最終編集時刻（epoch ms）。サーバーの updatedAt と比べる。 */
+  updatedAt: number;
 }
 
 /** 書きかけの退避データ（localStorage に置き、再開時に復元する）。 */
@@ -76,4 +103,19 @@ export interface EntryListItem {
   createdAt: string;
   updatedAt: string;
   linkedQuestions: EntryLinkedQuestion[];
+}
+
+// ---- 本文の見た目の設定（`hooks/use-editor-display.ts`）----
+
+export type EditorFontFamily = 'serif' | 'sans';
+/** 大きさと間隔は端末に依らない 3 段。px への写像は端末が決める。 */
+export type EditorScale = 'small' | 'medium' | 'large';
+export type EditorSpacing = 'tight' | 'normal' | 'wide';
+
+/** 本文の見た目の設定。エフェクト（時間内包など）はここに入れない。 */
+export interface EditorDisplay {
+  fontFamily: EditorFontFamily;
+  fontSize: EditorScale;
+  lineHeight: EditorSpacing;
+  letterSpacing: EditorSpacing;
 }

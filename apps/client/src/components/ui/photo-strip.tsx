@@ -11,6 +11,12 @@ interface PhotoStripProps {
   urls: string[];
   /** 渡すと各写真に削除ボタンが出る。閲覧専用なら省略する。index は urls と対応する。 */
   onRemove?: (index: number) => void;
+  /**
+   * `thumbnails`（既定）は小さな正方形の並び（PC の下端）。`blocks` は本文の下に全幅で積む
+   * （SP。左下の小さなプレビューは「貼った」と分からない、と実機レビュー。紙の続きとして
+   * 上下に挟まる置き方に揃える）。
+   */
+  variant?: 'thumbnails' | 'blocks';
 }
 
 /**
@@ -19,14 +25,16 @@ interface PhotoStripProps {
  * 本文の途中に食い込ませる表示ではなく、本文の下にまとめて並べる段階のもの
  * （経緯と今後は docs/entry-photo-guide.md「いまやっていないこと」を参照）。
  */
-export function PhotoStrip({ urls, onRemove }: PhotoStripProps) {
+export function PhotoStrip({ urls, onRemove, variant = 'thumbnails' }: PhotoStripProps) {
   const t = useTranslations('photo');
 
   if (urls.length === 0) return null;
+  const blocks = variant === 'blocks';
 
   return (
     <ul
-      className="flex flex-wrap gap-2 px-4 py-3"
+      data-photo-strip={variant}
+      className={blocks ? 'flex flex-col gap-4 px-6 pb-6' : 'flex flex-wrap gap-2 px-4 py-3'}
       aria-label={t('attached_label', { count: urls.length })}
     >
       {urls.map((url, index) => (
@@ -37,15 +45,24 @@ export function PhotoStrip({ urls, onRemove }: PhotoStripProps) {
             <img
               src={url}
               alt={t('attached_alt', { index: index + 1 })}
-              className="h-20 w-20 rounded-md object-cover"
-              style={{ border: '1px solid var(--border-subtle)' }}
+              className={
+                blocks
+                  ? 'block w-full rounded-2xl object-cover'
+                  : 'h-20 w-20 rounded-md object-cover'
+              }
+              style={{
+                border: '1px solid var(--border-subtle)',
+                ...(blocks ? { maxHeight: '70vw' } : {}),
+              }}
             />
           ) : (
             // 署名できなかった写真。枠だけ残して並びを保つ（消すと index がずれる）。
             <div
               role="img"
               aria-label={t('unavailable', { index: index + 1 })}
-              className="flex h-20 w-20 items-center justify-center rounded-md text-[10px] leading-tight"
+              className={`flex items-center justify-center rounded-md text-[10px] leading-tight ${
+                blocks ? 'h-32 w-full rounded-2xl' : 'h-20 w-20'
+              }`}
               style={{
                 border: '1px dashed var(--border-subtle)',
                 color: 'var(--date-color)',
@@ -60,8 +77,10 @@ export function PhotoStrip({ urls, onRemove }: PhotoStripProps) {
               type="button"
               onClick={() => onRemove(index)}
               aria-label={t('remove', { index: index + 1 })}
-              className="-right-1.5 -top-1.5 absolute flex h-5 w-5 items-center justify-center rounded-full text-white"
-              style={{ background: 'var(--date-color)' }}
+              className={`absolute flex items-center justify-center rounded-full text-white ${
+                blocks ? 'top-2 right-2 h-8 w-8' : '-right-1.5 -top-1.5 h-5 w-5'
+              }`}
+              style={{ background: blocks ? 'rgba(26,25,24,0.55)' : 'var(--date-color)' }}
             >
               <svg
                 width="10"

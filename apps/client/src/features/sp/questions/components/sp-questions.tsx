@@ -1,10 +1,15 @@
 'use client';
 
+import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { ActionRow } from '@/components/ui/action-row';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { CONTROL_FONT } from '@/components/ui/surface';
 import type { QuestionItem } from '@/features/shared/questions/types';
 import { SpQuestionsCardsSkeleton } from '@/features/sp/questions/components/sp-questions-skeleton';
+import { useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
 
 interface SpQuestionsProps {
   questions: QuestionItem[];
@@ -12,13 +17,16 @@ interface SpQuestionsProps {
   createQuestion: (text: string) => Promise<void> | void;
   editQuestion: (id: string, text: string) => Promise<void> | void;
   archiveQuestion: (id: string) => Promise<void> | void;
+  /** アーカイブした問いを戻す。無ければ戻す一覧を出さない。 */
+  unarchiveQuestion?: (id: string) => Promise<void> | void;
   acceptQuestion: (id: string) => Promise<void> | void;
   rejectQuestion: (id: string) => Promise<void> | void;
   /** 未読の手紙が届いている問いの id（Issue #452）。page が UnreadState から渡す。 */
   unreadQuestionIds?: ReadonlySet<string>;
   /**
    * 重ねて開かれているときの閉じ方。SP はボトムナビを持たないので、瓶から重ねて
-   * 開くことがある（そのときだけ閉じるボタンを出す）。単独ページでは渡さない。
+   * 開くことがある。上段（SpTopBar）の中では戻るがこれを担い、上段が無い場所では
+   * 閉じるボタンを出す。単独ページでは渡さない。
    */
   onClose?: () => void;
 }
@@ -33,6 +41,9 @@ type Sheet = { mode: 'add' } | { mode: 'edit'; id: string };
  * Oryzae からの提案の受け入れ／見送りを行う。データ取得・更新は page が
  * features/shared/questions/hooks/use-questions で行い、ここは props で受ける
  * （PC の QuestionTimeline と同じ presentational 構成。二重フェッチを避ける）。
+ *
+ * 追加・編集は高さを変えられるセミモーダル（`BottomSheet`）。キーボードが出るので
+ * 高い段から開く。
  */
 export function SpQuestions({
   questions,
@@ -40,16 +51,25 @@ export function SpQuestions({
   createQuestion,
   editQuestion,
   archiveQuestion,
+  unarchiveQuestion,
   acceptQuestion,
   rejectQuestion,
   unreadQuestionIds = NO_UNREAD,
   onClose,
 }: SpQuestionsProps) {
   const t = useTranslations('sp.questions');
+  const { mounted } = useSpChrome();
+  // 瓶から重ねて開いている間は、上段の「戻る」も書斎ではなくこの画面を閉じる。
+  useSpBackHandler(onClose ?? null);
 
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * アーカイブの確かめ中か。1 回押しただけでアーカイブされ、押し間違えたら取り返しがつかない感じが
+   * した（レビュー）。同じシートの中で「アーカイブしますか？」を挟む。
+   */
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
 
   const proposed = questions.filter(
     (q) => q.isProposedByOryzae && !q.isValidatedByUser && !q.isArchived,
@@ -57,12 +77,19 @@ export function SpQuestions({
   const active = questions.filter(
     (q) => !q.isArchived && !(q.isProposedByOryzae && !q.isValidatedByUser),
   );
+  const archived = questions.filter((q) => q.isArchived);
+  /** アーカイブした問いの一覧を開いているか（ふだんは畳む）。 */
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  // 上限（#430）なら「立てる」を出さず、理由を言う。押せるのに何も起きない、をやめる（レビュー）。
+  const atLimit = active.length >= MAX_ACTIVE_QUESTIONS;
 
   function openAdd() {
+    setConfirmingArchive(false);
     setDraft('');
     setSheet({ mode: 'add' });
   }
   function openEdit(id: string, text: string) {
+    setConfirmingArchive(false);
     setDraft(text);
     setSheet({ mode: 'edit', id });
   }
@@ -77,10 +104,11 @@ export function SpQuestions({
   }
 
   async function remove() {
-    if (!sheet || sheet.mode !== 'edit' || submitting) return;
+    if (sheet?.mode !== 'edit' || submitting) return;
     setSubmitting(true);
     await archiveQuestion(sheet.id);
     setSubmitting(false);
+    setConfirmingArchive(false);
     setSheet(null);
   }
 
@@ -95,25 +123,31 @@ export function SpQuestions({
         draftEmpty: !draft.trim(),
         proposedCount: proposed.length,
         activeCount: active.length,
+        atLimit,
         unreadCount: active.filter((q) => unreadQuestionIds.has(q.id)).length,
       })}
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
-      style={{ fontFamily: 'var(--ob-font-serif)' }}
     >
-      <header className="flex items-center justify-between gap-3 px-5 pt-6 pb-1">
+      <header className="flex items-center justify-between gap-3 px-5 pt-5 pb-1">
         <span className="text-lg font-medium">{t('title')}</span>
-        {onClose ? (
+        {/* 上段が無い場所（孤立検証・テスト）だけ、自前の閉じるを出す。 */}
+        {onClose && !mounted ? (
           <button
             type="button"
             onClick={onClose}
             className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
-            style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
+            style={{ ...CONTROL_FONT, color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
           >
             {t('close')}
           </button>
         ) : null}
       </header>
-      <p className="px-5 pb-2 text-xs leading-relaxed text-[var(--date-color)]">{t('intro')}</p>
+      <p
+        className="px-5 pb-2 text-xs leading-relaxed text-[var(--date-color)]"
+        style={CONTROL_FONT}
+      >
+        {t('intro')}
+      </p>
 
       {loading ? (
         <SpQuestionsCardsSkeleton />
@@ -123,8 +157,8 @@ export function SpQuestions({
           {proposed.length > 0 ? (
             <div className="mb-4">
               <p
-                className="mb-2 text-[11px] uppercase tracking-[0.1em]"
-                style={{ color: 'var(--accent)' }}
+                className="mb-2 text-[11px] uppercase tracking-[0.14em]"
+                style={{ ...CONTROL_FONT, color: 'var(--accent)' }}
               >
                 {t('proposed')}
               </p>
@@ -143,8 +177,8 @@ export function SpQuestions({
                       type="button"
                       disabled={submitting}
                       onClick={() => acceptQuestion(q.id)}
-                      className="rounded-full px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                      style={{ background: 'var(--accent)' }}
+                      className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                      style={{ ...CONTROL_FONT, background: 'var(--accent)' }}
                     >
                       {t('accept')}
                     </button>
@@ -152,8 +186,9 @@ export function SpQuestions({
                       type="button"
                       disabled={submitting}
                       onClick={() => rejectQuestion(q.id)}
-                      className="rounded-full px-4 py-1.5 text-xs disabled:opacity-50"
+                      className="min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-xs disabled:opacity-50"
                       style={{
+                        ...CONTROL_FONT,
                         color: 'var(--date-color)',
                         border: '1px solid var(--border-subtle)',
                       }}
@@ -177,8 +212,8 @@ export function SpQuestions({
                 onClick={() => openEdit(q.id, q.currentText ?? '')}
                 className="relative mb-3 block w-full rounded-2xl p-4 text-left"
                 style={{
-                  background: 'var(--ob-card-bg)',
-                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--surface-raised)',
+                  border: '1px solid var(--surface-raised-border)',
                 }}
               >
                 <span className="block pr-6 text-[15px] leading-relaxed">
@@ -187,7 +222,7 @@ export function SpQuestions({
                 {hasUnreadLetter ? (
                   <span
                     className="mt-2 flex items-center gap-1.5 text-[11px]"
-                    style={{ color: 'var(--ob-jar-warm)' }}
+                    style={{ ...CONTROL_FONT, color: 'var(--ob-jar-warm)' }}
                   >
                     <span
                       className="h-1.5 w-1.5 rounded-full"
@@ -218,42 +253,118 @@ export function SpQuestions({
             <p className="py-10 text-center text-sm opacity-50">{t('empty')}</p>
           ) : null}
 
-          <button
-            type="button"
-            onClick={openAdd}
-            className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-medium"
-            style={{ border: '1.5px dashed var(--border-subtle)', color: 'var(--accent)' }}
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
+          {atLimit ? (
+            <p
+              data-question-limit
+              className="mt-1 rounded-2xl px-4 py-3.5 text-center text-[13px] leading-relaxed"
+              style={{
+                ...CONTROL_FONT,
+                color: 'var(--date-color)',
+                background: 'var(--surface-sunken)',
+              }}
             >
-              <title>add</title>
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
-            {t('add')}
-          </button>
+              {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={openAdd}
+              className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-medium"
+              style={{
+                ...CONTROL_FONT,
+                border: '1.5px dashed var(--surface-raised-border)',
+                color: 'var(--accent)',
+              }}
+            >
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <title>add</title>
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+              {t('add')}
+            </button>
+          )}
+          {/* アーカイブした問い。畳んでおき、開けば戻せる（アーカイブを取り返しのつく操作にする）。 */}
+          {unarchiveQuestion && archived.length > 0 ? (
+            <div className="mt-6 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+              <button
+                type="button"
+                data-archived-toggle
+                aria-expanded={archivedOpen}
+                onClick={() => setArchivedOpen((value) => !value)}
+                className="flex min-h-[44px] w-full items-center justify-between text-left text-[13px]"
+                style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+              >
+                <span>{t('archived_section', { count: archived.length })}</span>
+                <span aria-hidden="true" className="oz-disclosure-mark" data-open={archivedOpen} />
+              </button>
+              {archivedOpen ? (
+                <ul className="m-0 flex list-none flex-col p-0" data-archived-list>
+                  {atLimit ? (
+                    <li
+                      className="pb-2 text-[12px] leading-relaxed"
+                      style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                    >
+                      {t('unarchive_limit', { max: MAX_ACTIVE_QUESTIONS })}
+                    </li>
+                  ) : null}
+                  {archived.map((q) => (
+                    <li
+                      key={q.id}
+                      className="flex items-center justify-between gap-3 border-b py-3 last:border-b-0"
+                      style={{ borderColor: 'var(--border-subtle)' }}
+                    >
+                      <span className="min-w-0 flex-1 text-[14px] leading-relaxed opacity-70">
+                        {q.currentText ?? t('untitled')}
+                      </span>
+                      <button
+                        type="button"
+                        data-unarchive={q.id}
+                        disabled={submitting || atLimit}
+                        onClick={async () => {
+                          setSubmitting(true);
+                          await unarchiveQuestion(q.id);
+                          setSubmitting(false);
+                        }}
+                        className="min-h-[36px] shrink-0 rounded-full border px-4 text-[12px] disabled:opacity-40"
+                        style={{
+                          ...CONTROL_FONT,
+                          color: 'var(--accent)',
+                          borderColor: 'color-mix(in srgb, var(--accent) 40%, transparent)',
+                        }}
+                      >
+                        {t('unarchive')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
 
-      {/* 追加 / 編集 ボトムシート */}
-      {sheet ? (
-        <div className="absolute inset-0 z-10 flex flex-col justify-end">
-          <button
-            type="button"
-            aria-label={t('cancel')}
-            onClick={() => setSheet(null)}
-            className="flex-1 bg-black/30"
-          />
-          <div className="rounded-t-2xl bg-[var(--bg)] px-5 pt-5 pb-6 shadow-[0_-8px_24px_rgba(0,0,0,0.15)]">
-            <p className="mb-3 text-sm font-medium">
-              {sheet.mode === 'add' ? t('sheet_add') : t('sheet_edit')}
-            </p>
+      {/* 追加 / 編集。キーボードが出るので高い段から開く。 */}
+      <BottomSheet
+        open={sheet !== null}
+        onClose={() => setSheet(null)}
+        ariaLabel={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
+        label={sheet?.mode === 'edit' ? t('sheet_edit') : t('sheet_add')}
+        closeLabel={t('cancel')}
+        // キャンセルは操作の行に固める（見出しには名前だけ）。
+        closeInHeader={false}
+        detents={['content', 'full']}
+        initialDetent="content"
+      >
+        {sheet ? (
+          <>
             <textarea
               // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件
               autoFocus
@@ -263,46 +374,103 @@ export function SpQuestions({
               maxLength={64}
               rows={3}
               placeholder={t('placeholder')}
-              className="w-full resize-none rounded-xl bg-transparent p-3 text-base outline-none"
-              style={{ border: '1px solid var(--border-subtle)', lineHeight: 1.7 }}
+              className="w-full resize-none rounded-xl p-3 text-base outline-none"
+              style={{
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--surface-raised-border)',
+                lineHeight: 1.7,
+              }}
             />
-            <div className="mt-3 flex items-center gap-2">
-              {sheet.mode === 'edit' ? (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={remove}
-                  className="mr-auto rounded-full px-4 py-2 text-xs disabled:opacity-50"
-                  style={{
-                    color: 'var(--ob-jar-warm)',
-                    border: '1px solid color-mix(in srgb, var(--ob-jar-warm) 30%, transparent)',
-                  }}
-                >
-                  {t('delete')}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setSheet(null)}
-                className="rounded-full px-4 py-2 text-xs disabled:opacity-50"
-                style={{ color: 'var(--date-color)' }}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={submitting || !draft.trim()}
-                onClick={submit}
-                className="rounded-full px-5 py-2 text-xs font-bold text-white disabled:opacity-50"
-                style={{ background: 'var(--accent)' }}
-              >
-                {t('save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            {/*
+              操作は書く欄のすぐ下の 1 行に固める（左上中心主義: 左からいちばん押してほしい「保存」、「キャンセル」、
+              押されたくない「アーカイブ」は右端）。以前は保存とキャンセルが見出し、アーカイブが離れた下、と散っていた。
+              アーカイブは同じ行が確かめに変わる（面を敷かない）。
+            */}
+            {sheet.mode === 'edit' && confirmingArchive ? (
+              <div data-archive-confirm className="mt-4 flex flex-col gap-3" style={CONTROL_FONT}>
+                <div className="flex flex-col gap-1">
+                  <p className="m-0 text-[14px] font-medium" style={{ color: 'var(--fg)' }}>
+                    {t('archive_confirm_title')}
+                  </p>
+                  <p
+                    className="m-0 text-[12px] leading-relaxed"
+                    style={{ color: 'var(--date-color)' }}
+                  >
+                    {t('archive_confirm_body')}
+                  </p>
+                </div>
+                <ActionRow
+                  actions={[
+                    {
+                      id: 'archive-cancel',
+                      label: t('archive_cancel'),
+                      tone: 'secondary',
+                      disabled: submitting,
+                      onSelect: () => setConfirmingArchive(false),
+                    },
+                    {
+                      id: 'archive-confirm',
+                      label: t('archive_confirm'),
+                      tone: 'danger',
+                      disabled: submitting,
+                      icon: <ArchiveIcon />,
+                      onSelect: remove,
+                    },
+                  ]}
+                />
+              </div>
+            ) : (
+              <div className="mt-4">
+                <ActionRow
+                  actions={[
+                    {
+                      id: 'save',
+                      label: t('save'),
+                      tone: 'primary',
+                      disabled: submitting || !draft.trim(),
+                      onSelect: submit,
+                    },
+                    {
+                      id: 'cancel',
+                      label: t('cancel'),
+                      tone: 'secondary',
+                      onSelect: () => setSheet(null),
+                    },
+                    ...(sheet.mode === 'edit'
+                      ? [
+                          {
+                            id: 'archive',
+                            label: t('archive'),
+                            tone: 'danger' as const,
+                            disabled: submitting,
+                            icon: <ArchiveIcon />,
+                            onSelect: () => setConfirmingArchive(true),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
+            )}
+          </>
+        ) : null}
+      </BottomSheet>
     </div>
+  );
+}
+
+function ArchiveIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16v3H4zM6 10v9h12v-9M10 14h4" strokeLinejoin="round" />
+    </svg>
   );
 }

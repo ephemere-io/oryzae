@@ -39,8 +39,8 @@ describe('SpEntryEditor', () => {
 
   it('タイトルと本文のプレースホルダを表示する', () => {
     renderEditor(createMockApi(apiFetch));
-    expect(screen.getByPlaceholderText('タイトル（任意）')).toBeTruthy();
-    expect(screen.getByPlaceholderText('いま感じていることを、そのまま。')).toBeTruthy();
+    expect(screen.getByPlaceholderText('タイトル')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'いま感じていることを、そのまま。' })).toBeTruthy();
   });
 
   it('保存前は発酵 CTA（納める）を出さない（entryId 未確定）', () => {
@@ -152,7 +152,9 @@ describe('SpEntryEditor', () => {
       </NextIntlClientProvider>,
     );
     expect(screen.getByDisplayValue('既存タイトル')).toBeTruthy();
-    expect(screen.getByDisplayValue('既存の本文')).toBeTruthy();
+    expect(
+      screen.getByRole('textbox', { name: jaMessages.sp.editor.body_placeholder }).textContent,
+    ).toBe('既存の本文');
   });
 
   it('問いシートに active questions を表示し、選ぶとチップに反映する', async () => {
@@ -165,17 +167,86 @@ describe('SpEntryEditor', () => {
     );
     renderEditor(createMockApi(apiFetch));
 
-    fireEvent.click(screen.getByRole('button', { name: /問い/ }));
+    // 題の下の「+ 問いを結ぶ」の行（パレットの問いボタンとは名前が違う）。
+    fireEvent.click(
+      screen.getByRole('button', { name: `+ ${jaMessages.sp.editor.question_link}` }),
+    );
     const questionItem = await screen.findByRole('button', { name: 'なぜ書くのか' });
     fireEvent.click(questionItem);
 
-    // 選択後、チップに「◦ なぜ書くのか」と反映される（シートは閉じる）
-    await waitFor(() => expect(screen.getByRole('button', { name: /なぜ書くのか/ })).toBeTruthy());
+    // 選択後、題の下の行に「◦ なぜ書くのか」と反映される（シートは閉じる）
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '◦ なぜ書くのか' })).toBeTruthy(),
+    );
+  });
+
+  /** 紐づけ済みの問いが 1 つ（q1）、選べる問いが 2 つ（q1 / q2）ある既存エントリ。 */
+  function linkedApi(): ReturnType<typeof vi.fn> {
+    return vi.fn((url: string) => {
+      if (url === '/api/v1/questions')
+        return Promise.resolve(
+          jsonResponse([
+            { id: 'q1', currentText: 'なぜ続けるのか' },
+            { id: 'q2', currentText: '手放せないものは何か' },
+          ]),
+        );
+      if (url === '/api/v1/entries/e1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      return Promise.resolve(jsonResponse([]));
+    });
+  }
+
+  it('別の問いも結べる（前の紐づけは残る。PC と同じく複数）', async () => {
+    const fetchImpl = linkedApi();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '◦ なぜ続けるのか' }));
+    fireEvent.click(await screen.findByRole('button', { name: '手放せないものは何か' }));
+
+    await waitFor(() =>
+      expect(fetchImpl).toHaveBeenCalledWith(
+        '/api/v1/entries/e1/questions/q2',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    expect(fetchImpl).not.toHaveBeenCalledWith(
+      '/api/v1/entries/e1/questions/q1',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    // 両方が題の下に並ぶ。
+    expect(await screen.findByText('◦ 手放せないものは何か')).toBeTruthy();
+    expect(screen.getByText('◦ なぜ続けるのか')).toBeTruthy();
+  });
+
+  it('選んでいる問いをもう一度押すと外れ、紐づけも解除される', async () => {
+    const fetchImpl = linkedApi();
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor api={createMockApi(fetchImpl)} initialEntryId="e1" initialContent="本文" />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '◦ なぜ続けるのか' }));
+    // シートの中の「選んでいる」行（チップと同じ文言なので pressed で見分ける）。
+    fireEvent.click(await screen.findByRole('button', { name: /なぜ続けるのか/, pressed: true }));
+
+    await waitFor(() =>
+      expect(fetchImpl).toHaveBeenCalledWith(
+        '/api/v1/entries/e1/questions/q1',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+    expect(await screen.findByText(`+ ${jaMessages.sp.editor.question_link}`)).toBeTruthy();
   });
 
   it('問いが無いときは空状態を表示する', async () => {
     renderEditor(createMockApi(apiFetch));
-    fireEvent.click(screen.getByRole('button', { name: /問い/ }));
+    // 題の下の「+ 問いを結ぶ」の行（パレットの問いボタンとは名前が違う）。
+    fireEvent.click(
+      screen.getByRole('button', { name: `+ ${jaMessages.sp.editor.question_link}` }),
+    );
     expect(await screen.findByText(/立てている問いがありません/)).toBeTruthy();
   });
   it('問いがゼロでも「納める」から問いをその場で立てられる（Issue #314）', async () => {
@@ -196,9 +267,11 @@ describe('SpEntryEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
 
     // 行き止まりではなく、その場で書く入力欄が出る。
-    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    const input = await screen.findByPlaceholderText(
+      jaMessages.entry_questions.picker.new_placeholder,
+    );
     fireEvent.change(input, { target: { value: '今日は何に驚いたか' } });
-    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.entry_questions.picker.create }));
 
     // 作った問いが即チップに出る（作りたては /questions にも紐付けにも載らないため、
     // ローカルに覚えていないと「+ 問いを結ぶ」に戻って見える）。
@@ -230,13 +303,17 @@ describe('SpEntryEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
-    const input = await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder);
+    const input = await screen.findByPlaceholderText(
+      jaMessages.entry_questions.picker.new_placeholder,
+    );
     fireEvent.change(input, { target: { value: '通らない問い' } });
-    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.question_create }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.entry_questions.picker.create }));
 
-    expect(await screen.findByText(jaMessages.sp.editor.question_create_failed)).toBeTruthy();
+    expect(await screen.findByText(jaMessages.entry_questions.picker.create_failed)).toBeTruthy();
     // 書いた内容を失わないよう入力欄は残す。
-    expect(screen.getByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText(jaMessages.entry_questions.picker.new_placeholder),
+    ).toBeTruthy();
   });
 
   it('問いの取得が遅れてシートを先に開いても、届いたら一覧に切り替わる（Issue #314）', async () => {
@@ -258,12 +335,62 @@ describe('SpEntryEditor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
     expect(
-      await screen.findByPlaceholderText(jaMessages.sp.editor.question_new_placeholder),
+      await screen.findByPlaceholderText(jaMessages.entry_questions.picker.new_placeholder),
     ).toBeTruthy();
 
     resolveQuestions?.(jsonResponse([{ id: 'q1', currentText: '後から届いた問い' }]));
 
     expect(await screen.findByText('後から届いた問い')).toBeTruthy();
-    expect(screen.queryByPlaceholderText(jaMessages.sp.editor.question_new_placeholder)).toBeNull();
+    expect(
+      screen.queryByPlaceholderText(jaMessages.entry_questions.picker.new_placeholder),
+    ).toBeNull();
+  });
+
+  it('漬けてあるエントリーは、書き足しても押し直さなくてよいことを題の下で言い、「漬けてある」を押せなくする', () => {
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor
+          api={createMockApi(apiFetch)}
+          initialEntryId="e1"
+          initialContent="題\n本文"
+          initialFermentationEnabled
+          persistDraft={false}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(jaMessages.sp.editor.pickled_note)).toBeTruthy();
+    const ferment = document.querySelector('[data-palette-action="ferment"]');
+    expect(ferment?.textContent).toContain(jaMessages.sp.editor.ferment_done_short);
+    expect(ferment?.getAttribute('aria-disabled')).toBe('true');
+    // 開き直しただけでは「瓶に漬けました」（押した直後の知らせ）は出さない。
+    expect(screen.queryByText(jaMessages.sp.editor.pickled)).toBeNull();
+  });
+
+  it('問いを結ぶ前から「発酵の結果」を押せ、結ぶと何が出るかと結ぶ入口を出す', async () => {
+    renderEditor(createMockApi(apiFetch));
+    const result = document.querySelector('[data-palette-action="result"]');
+    expect(result).not.toBeNull();
+    // 状態は色だけで言う（右上の点を出さない）。
+    expect(result?.querySelector('span.absolute')).toBeNull();
+    expect(await screen.findByText(jaMessages.sp.editor.result_no_question_body)).toBeTruthy();
+    fireEvent.click(
+      await screen.findByRole('button', { name: jaMessages.sp.editor.question_link }),
+    );
+    // 選び手が開き、中で「問いを結ぶ／選ぶ」と言い直さない。
+    const picker = document.querySelector('[data-verify-unit="QuestionPicker"]');
+    expect(picker).not.toBeNull();
+    expect(picker?.textContent).not.toContain(jaMessages.entry_questions.picker.title);
+  });
+
+  it('「漬け込む」は書く前から並び、押すと書けば漬け込めることを言う', () => {
+    renderEditor(createMockApi(apiFetch));
+    const ferment = document.querySelector('[data-palette-action="ferment"]');
+    expect(ferment).not.toBeNull();
+    expect(ferment?.getAttribute('aria-disabled')).toBe('true');
+    expect(document.querySelector('[data-palette-hint]')).toBeNull();
+    if (ferment instanceof HTMLElement) fireEvent.click(ferment);
+    expect(document.querySelector('[data-palette-hint]')?.textContent).toBe(
+      jaMessages.sp.editor.ferment_needs_body,
+    );
   });
 });
