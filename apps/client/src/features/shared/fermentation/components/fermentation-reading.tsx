@@ -15,6 +15,8 @@ interface FermentationReadingProps {
    * - `tap`: 行を押すと、その場で開く（瓶で読む。窓を 1 つずつ開ける楽しみ）
    */
   reveal?: 'all' | 'tap';
+  /** スニペットの下に元の日付を出すか。回ごとに日付を選ぶ画面（エントリーの中）では出さない。 */
+  sourceDates?: boolean;
   /** 手紙に返事を書く。無ければ足元の返事を出さない（その問いのエントリーを書いている最中など）。 */
   onReply?: () => void;
   /** 手紙のもとになったエントリーを開く。無ければ一覧を出さない。 */
@@ -38,6 +40,7 @@ const SERIF_FONT = "'Noto Serif JP', serif";
 export function FermentationReading({
   detail,
   reveal = 'all',
+  sourceDates = true,
   onReply,
   onOpenSource,
 }: FermentationReadingProps) {
@@ -145,12 +148,14 @@ export function FermentationReading({
                     >
                       「{snippet.originalText}」
                     </p>
-                    <span
-                      className="mt-1 block text-[11px] tracking-[0.06em]"
-                      style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                    >
-                      {formatMonthDay(snippet.sourceDate)}
-                    </span>
+                    {sourceDates ? (
+                      <span
+                        className="mt-1 block text-[11px] tracking-[0.06em]"
+                        style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                      >
+                        {formatMonthDay(snippet.sourceDate)}
+                      </span>
+                    ) : null}
                   </>
                 )}
               >

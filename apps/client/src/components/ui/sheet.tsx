@@ -66,7 +66,7 @@ function prefersReducedMotion(): boolean {
  * 段は**要素の位置**が決める（数値を持たない）:
  * - 閉: spacer の上端（scrollTop 0 でシートは容器の下に隠れる）
  * - 半分: 容器の子の印（`top: 50%`）
- * - 覗く: 見出しの行と同じ格子の升に置いた印（下端揃え）＝見出しの行の高さ
+ * - 覗く: 見出しの行と同じ升の中の印（`top: calc(100% - 100cqh)`、上端揃え）＝見出しの行の高さ
  * - 中身: シートの中の印（`top: calc(min(100%, 100cqh) - 100cqh)`、上端揃え）＝中身の高さ、容器より高ければ
  *   全画面。上端揃えにしているのは、WebKit が「高さ 0 の要素の下端揃え」を吸着先として数えないため
  *   （Chromium は数える。下端揃えで書いていた頃、Safari では中身の段が無く全画面へ吸い寄せられた）
@@ -111,6 +111,8 @@ export function Sheet({
   const settledRef = useRef<Position | null>(null);
   /** 閉じる動き: 閉じ直しを 1 回使ったか、（閉じ直してから）動いたか。 */
   const closingRef = useRef<{ retried: boolean; moved: boolean } | null>(null);
+  /** 閉じる動きの途中から開き直しているか（開くときに閉の位置へ戻さない）。 */
+  const resumingRef = useRef(false);
   /** スクロールの見張りを 1 回走らせる（閉じる動きを頼んだ直後に、止まっていても気づけるように）。 */
   const kickRef = useRef<(() => void) | null>(null);
   const latest = useRef({
@@ -137,6 +139,8 @@ export function Sheet({
   // 開く／閉じるの切り替え。閉じるときは消さずに閉じる動きへ。閉じる途中で開けば、その場から開き直す。
   useEffect(() => {
     if (open) {
+      // 閉じる動きの途中から開き直すなら、いまの位置から上がる（下まで落としてから上げ直さない）。
+      resumingRef.current = closingRef.current !== null;
       closingRef.current = null;
       setPresent(true);
       setPhase('opening');
@@ -151,21 +155,20 @@ export function Sheet({
     if (!scroller) return 0;
     if (position === 'closed') return 0;
     const top = scroller.getBoundingClientRect().top;
-    const inContent = (el: Element | null, edge: 'top' | 'bottom') => {
+    // 印はすべて上端揃え（WebKit は下端揃えの吸着先を数え落とすことがある）。上端の位置を測る。
+    const inContent = (el: Element | null) => {
       if (!el) return 0;
-      const rect = el.getBoundingClientRect();
-      return (edge === 'top' ? rect.top : rect.bottom) - top + scroller.scrollTop;
+      return el.getBoundingClientRect().top - top + scroller.scrollTop;
     };
-    const height = scroller.clientHeight;
     switch (position) {
       case 'half':
-        return inContent(halfRef.current, 'top');
+        return inContent(halfRef.current);
       case 'peek':
-        return inContent(peekRef.current, 'bottom') - height;
+        return inContent(peekRef.current);
       case 'content':
-        return inContent(contentRef.current, 'top');
+        return inContent(contentRef.current);
       case 'full':
-        return inContent(sheetRef.current, 'top');
+        return inContent(sheetRef.current);
     }
   }, []);
 
@@ -195,6 +198,10 @@ export function Sheet({
     if (!present || phase !== 'opening') return;
     const scroller = scrollerRef.current;
     if (!scroller) return;
+    // 新しく開くときは閉の位置から。WebKit は吸着の容器を描いた直後に、自分で選んだ吸着先（半分など）へ
+    // 置くことがあり、そこから段へ送ると覗く段に届かず半分で止まった。
+    if (!resumingRef.current) scroller.scrollTop = 0;
+    resumingRef.current = false;
     const frame = requestAnimationFrame(() => scrollToPosition(latest.current.detent));
     return () => cancelAnimationFrame(frame);
   }, [present, phase, scrollToPosition]);
@@ -275,12 +282,10 @@ export function Sheet({
         }
         return;
       }
-      // 閉の位置は、指で払って閉じられるときだけ止まる先として数える（開く前の scrollTop 0 を
-      // 「閉じた」と取り違えない）。閉じる動きの最中は上で済ませている。
-      const closable = current.phase === 'open' && current.dismissible;
-      const candidates: Position[] = closable
-        ? ['closed', ...current.detents]
-        : [...current.detents];
+      // 閉の位置は開き終わってから止まる先として数える（開く前の scrollTop 0 を「閉じた」と取り違えない）。
+      // 閉じる動きの最中は上で済ませている。
+      const candidates: Position[] =
+        current.phase === 'open' ? ['closed', ...current.detents] : [...current.detents];
       let settled: Position | null = null;
       for (const candidate of candidates) {
         // 1px 未満の差は同じ位置（スクロール位置は小数になる）。
@@ -293,7 +298,9 @@ export function Sheet({
       if (!settled && current.detents.includes('full') && top > targetOf('full')) settled = 'full';
       if (!settled) return;
       if (settled === 'closed') {
-        current.onRequestClose?.();
+        // 払って閉じられるシートは閉じる。閉じられない板（発酵の結果）は、いちばん低い段へ戻す。
+        if (current.dismissible) current.onRequestClose?.();
+        else scrollToPosition(current.detents[0] ?? 'peek');
         return;
       }
       settledRef.current = settled;
@@ -324,8 +331,6 @@ export function Sheet({
   if (!present) return null;
 
   const has = (d: SheetDetent) => detents.includes(d);
-  /** 閉の段を吸着の候補にするか。閉じられない板は、開き終わるまでと閉じる間だけ。 */
-  const closedSnap = dismissible || phase !== 'open';
 
   return placeInSlot(
     <div
@@ -355,11 +360,10 @@ export function Sheet({
           containerType: 'size',
         }}
       >
-        {/* 閉の位置。scrollTop 0 でシートは容器の下に隠れている。 */}
-        <div
-          aria-hidden="true"
-          style={{ height: '100%', scrollSnapAlign: closedSnap ? 'start' : 'none' }}
-        />
+        {/* 閉の位置。scrollTop 0 でシートは容器の下に隠れている。**吸着先の組は開いている間に変えない。**
+            WebKit は吸着先の組が変わると、いまの段に居ても別の段（半分）へ吸着し直す（最小の再現で確認）。
+            閉じられない板でも閉の位置は吸着先のままにし、そこへ払われたら低い段へ戻す。 */}
+        <div aria-hidden="true" style={{ height: '100%', scrollSnapAlign: 'start' }} />
         {/* 半分の段の印。容器の子の `top: 50%` は容器の高さの半分。 */}
         <div
           ref={halfRef}
@@ -383,12 +387,19 @@ export function Sheet({
           }}
         >
           <div className="relative grid">
-            {/* 覗く段の印。見出しの行と同じ升に置き、下端揃えで吸着する＝見出しの行の高さ。 */}
-            <div
-              ref={peekRef}
-              aria-hidden="true"
-              style={{ gridArea: '1 / 1', scrollSnapAlign: has('peek') ? 'end' : 'none' }}
-            />
+            {/* 覗く段の印。見出しの行と同じ升（高さ＝見出しの行）に置いた箱の中で、「見出しの行の下端から容器の
+                高さぶん上」に置き、上端揃えで吸着する＝見出しの行だけが見える。下端揃えにしていた頃、WebKit は
+                吸着の候補が変わったとき（開き終わり）の吸着し直しでこの段を数えず、半分へ跳ねた。 */}
+            <div aria-hidden="true" className="relative" style={{ gridArea: '1 / 1' }}>
+              <div
+                ref={peekRef}
+                className="absolute left-0 h-0 w-px"
+                style={{
+                  top: 'calc(100% - 100cqh)',
+                  scrollSnapAlign: has('peek') ? 'start' : 'none',
+                }}
+              />
+            </div>
             {/* biome-ignore lint/a11y/useKeyWithClickEvents: 見出しの行を押すのは段の切り替えの近道。同じことはつまみを引いてもできる */}
             {/* biome-ignore lint/a11y/noStaticElementInteractions: 同上（中のボタンは各自のキーボード操作を持つ） */}
             <div

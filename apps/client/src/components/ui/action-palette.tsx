@@ -24,7 +24,11 @@ export interface PaletteAction {
   file?: { accept: string; onFile: (file: File) => void };
   /** 押せない理由。あれば押せない（理由は読み上げに添える）。 */
   disabledReason?: string;
-  /** いま効いている状態。印を添える。 */
+  /**
+   * いま効いている状態。**色だけで言う**（アクセントの色）。右上に点も添えていたが、色と点の 2 段で
+   * 重みを付けることになり、押したあとに謎の点が出るように見えた（オーナーの指示）。押せない状態は
+   * `disabledReason` の半透明で言う（「漬けてある」は色 + 半透明）。
+   */
   active?: boolean;
   /** 送信中など、一時的に押せない。 */
   busy?: boolean;
@@ -164,13 +168,6 @@ export function ActionPalette({
             <span className="text-[10px] leading-none tracking-[0.04em]">
               {action.caption ?? action.label}
             </span>
-            {action.active ? (
-              <span
-                aria-hidden="true"
-                className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full"
-                style={{ background: 'var(--accent)' }}
-              />
-            ) : null}
           </button>
         );
       })}

@@ -127,12 +127,17 @@ export const ELEVATED_CHIP_STYLE = {
  */
 export type FieldSize = 'sm' | 'md';
 
+/**
+ * 入力欄の面。`appearance-none` は iOS の検索欄（`type="search"`）が自前の見た目と書体を当て、
+ * プレースホルダだけ別の書体に見えていたのを外すため（実機レビュー）。書体は親から受け継ぐ。
+ */
 export const FIELD_CLASS: Record<FieldSize, string> = {
-  sm: 'h-7 rounded-md px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
-  md: 'h-11 rounded-xl px-3.5 text-[16px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
+  sm: 'h-7 appearance-none rounded-md px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
+  md: 'h-11 appearance-none rounded-xl px-3.5 text-[16px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
 };
 
 export const FIELD_STYLE = {
+  fontFamily: 'inherit',
   background: 'var(--surface-sunken)',
   border: '1px solid var(--surface-sunken-border)',
   color: 'var(--fg)',

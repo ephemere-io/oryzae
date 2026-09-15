@@ -42,13 +42,19 @@ export function TrashIcon() {
   );
 }
 
-export function SnippetIcon() {
+/** 書く・直す（鉛筆）。問いの追加・編集のように「足す」だけでなく「直す」も含む入口にも使う。 */
+export function PencilIcon() {
   return (
     <svg {...iconProps()} aria-hidden="true">
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </svg>
   );
+}
+
+/** スニペットを書く（鉛筆と同じ絵）。 */
+export function SnippetIcon() {
+  return <PencilIcon />;
 }
 
 export function ScanTextIcon() {
@@ -86,14 +92,6 @@ export function SendToBackIcon() {
     <svg {...iconProps()} aria-hidden="true">
       <path d="m3 10 9 5 9-5" />
       <path d="M12 21 3 16l9-5 9 5-9 5Z" />
-    </svg>
-  );
-}
-
-export function PlusIcon() {
-  return (
-    <svg {...iconProps()} aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
