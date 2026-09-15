@@ -29,6 +29,9 @@ export default function NewslettersPage() {
     setBodyMarkdown(newsletter.bodyMarkdown);
     setGenerated(null);
     mutations.resetError();
+    // 配信の準備（翻訳の有無・テスト済みか・宛先数）はサーバーが決める。
+    // 開いた時点で読みに行き、エディタ画面のチェックリストに出す。
+    send.loadPreview(newsletter.id);
   }
 
   function startNewDraft() {
@@ -37,6 +40,7 @@ export default function NewslettersPage() {
     setBodyMarkdown('');
     setGenerated(null);
     mutations.resetError();
+    send.reset();
   }
 
   async function handleSave() {
@@ -46,6 +50,8 @@ export default function NewslettersPage() {
       : await mutations.create(content);
     if (!saved) return;
     setSelected(saved);
+    // 本文を書き換えると翻訳もテストの印も落ちる（サーバー側）。準備状態を読み直す。
+    await send.loadPreview(saved.id);
     await refresh();
   }
 
@@ -65,26 +71,28 @@ export default function NewslettersPage() {
     await refresh();
   }
 
-  async function handleOpenSend() {
+  function handleOpenSend() {
     if (!selected) return;
+    // プレビューはエディタ画面で既に読んである。ここでは開くだけ。
     setSendOpen(true);
-    await send.loadPreview(selected.id);
   }
 
   async function handleTranslate() {
     if (!selected) return;
     const result = await send.translate(selected.id);
     if (!result) return;
-    // 翻訳の有無でプレビューの送信可否が変わるので、開いたまま読み直す。
+    // 翻訳し直すとテストの印が落ちる（届くものが変わるため）。準備状態を読み直す。
     await send.loadPreview(selected.id);
+    await refresh();
   }
 
   async function handleSendTest() {
     if (!selected) return;
     const result = await send.sendTest(selected.id);
     if (!result) return;
-    // テスト配信済みの印 (testSentAt) が付くので、選択中も一覧も入れ替える。
+    // テスト配信済みの印 (testSentAt) が付くので、選択中も準備状態も入れ替える。
     setSelected(result.newsletter);
+    await send.loadPreview(selected.id);
     await refresh();
   }
 
@@ -99,7 +107,9 @@ export default function NewslettersPage() {
 
   function handleSendDialogChange(open: boolean) {
     setSendOpen(open);
-    if (!open) send.reset();
+    // reset するとエディタ画面のチェックリストまで空になる。閉じるだけにして、
+    // 送信結果だけ捨てる（次に開いたとき前回の結果が残らないように）。
+    if (!open && selected) send.loadPreview(selected.id);
   }
 
   return (
@@ -189,6 +199,13 @@ export default function NewslettersPage() {
             onDelete={handleDelete}
             onOpenSend={handleOpenSend}
             saving={mutations.saving}
+            preview={send.preview}
+            loadingPreview={send.loadingPreview}
+            translating={send.translating}
+            testSending={send.testSending}
+            testResult={send.testResult}
+            onTranslate={handleTranslate}
+            onSendTest={handleSendTest}
           />
         </section>
       </div>
@@ -201,12 +218,8 @@ export default function NewslettersPage() {
         testResult={send.testResult}
         loadingPreview={send.loadingPreview}
         sending={send.sending}
-        testSending={send.testSending}
-        translating={send.translating}
         error={send.error}
         onSend={handleSend}
-        onSendTest={handleSendTest}
-        onTranslate={handleTranslate}
       />
     </div>
   );

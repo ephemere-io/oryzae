@@ -88,6 +88,13 @@ export class TranslateNewsletterUsecase {
       translated.push(locale);
     }
 
+    // 訳し直した＝届くものが変わったので、テスト配信の確認をやり直させる。
+    // 日本語だけ見た状態で英訳を足し、そのまま送れると、英語話者に何が届くのか
+    // 誰も見ていないまま配信することになる。
+    if (translated.length > 0) {
+      await this.repository.save(newsletter.withTestInvalidated());
+    }
+
     return { translated, skipped, recipientCountByLocale };
   }
 }
