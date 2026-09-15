@@ -41,9 +41,19 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
 }
 
-/** href に置いてよい URL か。エスケープ後の文字列を受け取る前提。 */
+/**
+ * href に置いてよい URL か。エスケープ後の文字列を受け取る前提。
+ *
+ * **スキームの許可リストが安全性の本体。** 弾きたいのは `javascript:` `data:`
+ * `vbscript:` `file:` のように、押した先で何かが起きうるもの。受信側クライアントが
+ * どう扱うかに依存したくない。
+ *
+ * `mailto:` は許可する。メールクライアントの宛先が埋まるだけで、何も実行されない。
+ * お知らせメールのフッターに問い合わせ先を置くのはごく普通の書き方で、ここを塞ぐと
+ * `[お問い合わせ](mailto:...)` が変換されずに記法のまま届く（実際そうなった）。
+ */
 function isSafeUrl(url: string): boolean {
-  return /^https?:\/\/[^\s]+$/i.test(url);
+  return /^(?:https?:\/\/|mailto:)[^\s]+$/i.test(url);
 }
 
 /** エスケープ済みテキストにインライン記法を適用する。 */
@@ -399,9 +409,20 @@ export function renderNewsletterHtml(params: {
  * HTML を読まない / 読めない受信環境のために必ず併送する。HTML だけのメールは
  * スパム判定の材料にもなる。
  */
-/** テキスト版では href が読めないので、リンクは「文字 (URL)」に開く。 */
+/**
+ * テキスト版では href が読めないので、リンクは「文字 (URL)」に開く。
+ *
+ * `mailto:` はスキームを落として住所だけ出す。テキストで
+ * 「お問い合わせ (mailto:oryzae@ephemere.io)」と出ても読み手には邪魔なだけで、
+ * アドレスそのものが見えていれば用は足りる。
+ */
 function stripInline(text: string): string {
-  return text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '$1 ($2)').replace(/\*\*([^*]+)\*\*/g, '$1');
+  return text
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label: string, url: string) => {
+      const shown = /^mailto:/i.test(url) ? url.slice('mailto:'.length) : url;
+      return `${label} (${shown})`;
+    })
+    .replace(/\*\*([^*]+)\*\*/g, '$1');
 }
 
 function renderBlockText(block: Block): string {
