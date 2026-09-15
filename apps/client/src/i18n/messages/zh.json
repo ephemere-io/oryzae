@@ -159,7 +159,7 @@
   },
   "entry_questions": {
     "picker": {
-      "title": "选择提问",
+      "title": "关联提问",
       "empty": "还没有正在思考的问题。在这里写一个吧。",
       "new": "+ 写一个新问题",
       "new_placeholder": "写下问题（例如：今天有什么小发现？）",
@@ -745,7 +745,6 @@
       "question_link": "关联提问",
       "ferment_title": "腌制",
       "ferment_done_short": "已腌制",
-      "result_read_full": "阅读全文",
       "photo_width": "宽度",
       "photo_width_small": "小",
       "photo_width_medium": "中",
@@ -769,7 +768,13 @@
       "settings_spacing_tight": "紧凑",
       "settings_spacing_normal": "标准",
       "settings_spacing_wide": "宽松",
-      "pickled_note": "已放进瓶里。发酵开始前补写的内容也会一起腌制，无需再按一次。"
+      "pickled_note": "已放进瓶里。发酵开始前补写的内容也会一起腌制，无需再按一次。",
+      "result_no_question": "关联一个问题后，发酵结果会显示在这里",
+      "result_no_question_body": "为这篇记录关联问题后，就能一边看那个问题的信、关键词和摘录一边写。",
+      "result_not_fermented": "这个问题还没有发酵。",
+      "result_latest": "最新",
+      "result_question_aria": "看哪个问题的结果",
+      "result_round_aria": "看哪一次的结果"
     },
     "nav": {
       "back": "返回",

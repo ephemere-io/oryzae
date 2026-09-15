@@ -1,8 +1,8 @@
 /**
  * SpFermentationDock の検証スペック。
  *
- * 見るのは: 覗く段は 1 行、半分で手紙の冒頭・言葉・抜粋、全画面で全部、取得中は骨組み、
- * 無ければ「まだ無い」。段の出し入れは制御 props なので fixture で与える。
+ * 見るのは: 覗く段は問いと日付の 1 行（「発酵の結果」の見出しは出さない）、結んだ問いが複数なら問いを、
+ * 発酵が複数回なら日付を上で選べる、抜粋ごとの日付は出さない、問いが無ければ結ぶ入口、取得中は骨組み。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -10,13 +10,29 @@ import { useState } from 'react';
 import type { DockDetent } from '@/components/ui/dock-sheet';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { SpFermentationDock } from './sp-fermentation-dock';
+import { type DockQuestion, type DockRound, SpFermentationDock } from './sp-fermentation-dock';
 
 interface Props {
   detent: DockDetent;
   detail: FermentationDetail | null;
   loading: boolean;
+  questions: DockQuestion[];
+  rounds: DockRound[];
 }
+
+const ONE_QUESTION: DockQuestion[] = [
+  { id: 'q-1', text: '自分は人生をどのように肯定するのだろう' },
+];
+const TWO_QUESTIONS: DockQuestion[] = [
+  ...ONE_QUESTION,
+  { id: 'q-2', text: '死ぬまでに時間を費やしたいこととは？' },
+];
+const ONE_ROUND: DockRound[] = [{ id: 'ferm-1', createdAt: '2026-09-14T00:00:00.000Z' }];
+const THREE_ROUNDS: DockRound[] = [
+  ...ONE_ROUND,
+  { id: 'ferm-0', createdAt: '2026-08-30T00:00:00.000Z' },
+  { id: 'ferm-00', createdAt: '2026-08-16T00:00:00.000Z' },
+];
 
 const NO_JAR_POS = { jarX: null, jarY: null };
 
@@ -67,6 +83,8 @@ const FULL = makeDetail({
 
 function Harness(props: Props) {
   const [detent, setDetent] = useState<DockDetent>(props.detent);
+  const [questionId, setQuestionId] = useState<string | null>(props.questions[0]?.id ?? null);
+  const [roundId, setRoundId] = useState<string | null>(props.rounds[0]?.id ?? null);
   return (
     <div
       style={{
@@ -82,9 +100,15 @@ function Harness(props: Props) {
         open
         detent={detent}
         onDetentChange={setDetent}
-        questionText="自分は人生をどのように肯定するのだろう"
+        questions={props.questions}
+        questionId={questionId}
+        onQuestionChange={setQuestionId}
+        rounds={props.rounds}
+        roundId={roundId}
+        onRoundChange={setRoundId}
         detail={props.detail}
         loading={props.loading}
+        onLinkQuestion={() => {}}
       />
     </div>
   );
@@ -100,34 +124,86 @@ registerUnit<Props>({
     {
       id: 'peek',
       description: '覗く段（1 行）',
-      props: { detent: 'peek', detail: FULL, loading: false },
+      props: {
+        detent: 'peek',
+        detail: FULL,
+        loading: false,
+        questions: ONE_QUESTION,
+        rounds: ONE_ROUND,
+      },
     },
     {
       id: 'half',
       description: '半分（手紙の冒頭・言葉・抜粋 3 件）',
-      props: { detent: 'half', detail: FULL, loading: false },
+      props: {
+        detent: 'half',
+        detail: FULL,
+        loading: false,
+        questions: TWO_QUESTIONS,
+        rounds: THREE_ROUNDS,
+      },
     },
     {
       id: 'full',
       description: '全画面（全文・抜粋 4 件）',
-      props: { detent: 'full', detail: FULL, loading: false },
+      props: {
+        detent: 'full',
+        detail: FULL,
+        loading: false,
+        questions: ONE_QUESTION,
+        rounds: THREE_ROUNDS,
+      },
     },
     {
       id: 'loading',
       description: '取得中は骨組み',
-      props: { detent: 'half', detail: null, loading: true },
+      props: { detent: 'half', detail: null, loading: true, questions: ONE_QUESTION, rounds: [] },
     },
     {
       id: 'empty',
       probe: true,
       description: 'Probe: 結果が無ければ「まだ無い」だけ（行き止まりにしない）',
-      props: { detent: 'half', detail: makeDetail({}), loading: false },
+      props: {
+        detent: 'half',
+        detail: makeDetail({}),
+        loading: false,
+        questions: ONE_QUESTION,
+        rounds: ONE_ROUND,
+      },
+    },
+    {
+      id: 'no-question',
+      probe: true,
+      description: 'Probe: 問いを結ぶ前でも出て、結ぶと何が出るかと結ぶ入口を出す',
+      props: { detent: 'half', detail: null, loading: false, questions: [], rounds: [] },
+    },
+    {
+      id: 'pick-older-round',
+      probe: true,
+      description: 'Probe: 日付を押すとその回を見る',
+      props: {
+        detent: 'half',
+        detail: FULL,
+        loading: false,
+        questions: TWO_QUESTIONS,
+        rounds: THREE_ROUNDS,
+      },
+      act: async (ctx) => {
+        await ctx.click('[data-result-round="ferm-0"]');
+        await ctx.wait(16);
+      },
     },
     {
       id: 'peek-tap-opens',
       probe: true,
       description: 'Probe: 覗く段を押すと半分へ',
-      props: { detent: 'peek', detail: FULL, loading: false },
+      props: {
+        detent: 'peek',
+        detail: FULL,
+        loading: false,
+        questions: ONE_QUESTION,
+        rounds: ONE_ROUND,
+      },
       act: async (ctx) => {
         await ctx.click('[data-dock-peek]');
         await ctx.wait(16);
@@ -135,6 +211,59 @@ registerUnit<Props>({
     },
   ],
   invariants: [
+    {
+      id: 'no-redundant-heading',
+      description: '覗く段に「発酵の結果」の見出しを出さない（パレットの名前の繰り返し）',
+      check: ({ root }) => {
+        const peek = root.querySelector('[data-dock-peek]');
+        const heading = [...(peek?.querySelectorAll('*') ?? [])].some(
+          (el) => (el.textContent ?? '').trim() === '発酵の結果',
+        );
+        return !heading || '覗く段に「発酵の結果」の見出しがある';
+      },
+    },
+    {
+      id: 'pickers-when-many',
+      description: '結んだ問いが複数なら問いを、発酵が複数回なら日付を選べる',
+      check: ({ root, props }) => {
+        const questionChips = root.querySelectorAll('[data-result-question]').length;
+        const roundChips = root.querySelectorAll('[data-result-round]').length;
+        const wantQuestions = props.questions.length > 1 ? props.questions.length : 0;
+        const wantRounds =
+          props.questions.length > 0 && props.rounds.length > 1 ? props.rounds.length : 0;
+        return (
+          (questionChips === wantQuestions && roundChips === wantRounds) ||
+          `問い ${questionChips}（期待 ${wantQuestions}）/ 日付 ${roundChips}（期待 ${wantRounds}）`
+        );
+      },
+    },
+    {
+      id: 'no-snippet-dates',
+      description: '抜粋ごとの日付は出さない（日付は上で回ごとに選ぶ）',
+      check: ({ root }) => {
+        const dated = [...root.querySelectorAll('[data-reading-item="snippet"]')].filter((item) =>
+          /\d+月\d+日/.test(item.textContent ?? ''),
+        ).length;
+        return dated === 0 || `日付のある抜粋 ${dated}`;
+      },
+    },
+    {
+      id: 'no-question-offers-link',
+      description: '問いが無ければ、結ぶ入口を出す',
+      onlyFixtures: ['no-question'],
+      check: ({ root, contract }) =>
+        (contract.state === 'no-question' &&
+          root.querySelector('[data-result-link-question]') !== null) ||
+        `state=${contract.state}`,
+    },
+    {
+      id: 'round-picked',
+      description: '押した日付の回が選ばれている',
+      onlyFixtures: ['pick-older-round'],
+      check: ({ root }) =>
+        root.querySelector('[data-result-round="ferm-0"]')?.getAttribute('aria-pressed') ===
+          'true' || '押した日付が選ばれていない',
+    },
     {
       id: 'snippets-all-listed',
       description: '抜粋は段に関わらず全部並ぶ（段で中身の高さを変えない）',

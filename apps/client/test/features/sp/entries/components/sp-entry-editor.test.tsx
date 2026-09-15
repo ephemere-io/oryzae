@@ -365,4 +365,20 @@ describe('SpEntryEditor', () => {
     // 開き直しただけでは「瓶に漬けました」（押した直後の知らせ）は出さない。
     expect(screen.queryByText(jaMessages.sp.editor.pickled)).toBeNull();
   });
+
+  it('問いを結ぶ前から「発酵の結果」を押せ、結ぶと何が出るかと結ぶ入口を出す', async () => {
+    renderEditor(createMockApi(apiFetch));
+    const result = document.querySelector('[data-palette-action="result"]');
+    expect(result).not.toBeNull();
+    // 状態は色だけで言う（右上の点を出さない）。
+    expect(result?.querySelector('span.absolute')).toBeNull();
+    expect(await screen.findByText(jaMessages.sp.editor.result_no_question_body)).toBeTruthy();
+    fireEvent.click(
+      await screen.findByRole('button', { name: jaMessages.sp.editor.question_link }),
+    );
+    // 選び手が開き、中で「問いを結ぶ／選ぶ」と言い直さない。
+    const picker = document.querySelector('[data-verify-unit="QuestionPicker"]');
+    expect(picker).not.toBeNull();
+    expect(picker?.textContent).not.toContain(jaMessages.entry_questions.picker.title);
+  });
 });

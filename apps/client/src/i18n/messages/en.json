@@ -159,7 +159,7 @@
   },
   "entry_questions": {
     "picker": {
-      "title": "Choose a question",
+      "title": "Link a question",
       "empty": "You have no open questions yet. Write one here.",
       "new": "+ Write a new question",
       "new_placeholder": "Write a question (e.g. What did I notice today?)",
@@ -745,7 +745,6 @@
       "question_link": "Link a question",
       "ferment_title": "Pickle",
       "ferment_done_short": "Pickled",
-      "result_read_full": "Read in full",
       "photo_width": "Width",
       "photo_width_small": "S",
       "photo_width_medium": "M",
@@ -769,7 +768,13 @@
       "settings_spacing_tight": "Tight",
       "settings_spacing_normal": "Normal",
       "settings_spacing_wide": "Wide",
-      "pickled_note": "This entry is in the jar. Anything you add before fermentation starts goes in too, with no need to press again."
+      "pickled_note": "This entry is in the jar. Anything you add before fermentation starts goes in too, with no need to press again.",
+      "result_no_question": "Link a question to see fermentation results here",
+      "result_no_question_body": "Link a question to this entry to write while reading its letter, keywords, and snippets.",
+      "result_not_fermented": "This question has not fermented yet.",
+      "result_latest": "Latest",
+      "result_question_aria": "Which question to show",
+      "result_round_aria": "Which fermentation to show"
     },
     "nav": {
       "back": "Back",

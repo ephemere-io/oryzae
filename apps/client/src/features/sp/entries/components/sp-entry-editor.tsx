@@ -47,7 +47,8 @@ import {
   useEntryQuestions,
 } from '@/features/shared/entry-questions/hooks/use-entry-questions';
 import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
-import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks/use-fermentation-for-question';
+import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
+import { useFermentationHistory } from '@/features/shared/fermentation/hooks/use-fermentation-history';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import type { ApiClient } from '@/lib/api';
 import {
@@ -522,28 +523,57 @@ export function SpEntryEditor({
   }
 
   /**
-   * 発酵の結果（結んだ最初の問いの、最新の完了した発酵）。
+   * 発酵の結果。**どの問いの・いつの**結果かを選べる（結んだ問いが複数でも、発酵が何回あっても）。
+   * 以前は結んだ最初の問いの最新の 1 回しか見られなかった（レビュー）。
    *
-   * **見ながら書く**: 本文の下の非モーダルのドック。書いている間（キーボードが出ている間）は
-   * 覗く段（1 行）に固定し、覗く段を押せばフォーカスを外して半分へ（読む）。パレットで出し入れ。
+   * **見ながら書く**: 本文の下の非モーダルのドック。問いを結ぶ前から出し、結ぶと何が出るかを言う。
+   * 書いている間（キーボードが出ている間）は出さず、覗く段を押せばフォーカスを外して半分へ（読む）。
    */
-  const { detail: fermentationDetail, loading: fermentationLoading } = useFermentationForQuestion(
+  const { byQuestion: fermentationsByQuestion, loading: historyLoading } = useFermentationHistory(
     api,
-    selectedQuestionIds[0],
+    false,
   );
-  const resultAvailable = fermentationDetail !== null || fermentationLoading;
+  const [resultQuestionPick, setResultQuestionPick] = useState<string | null>(null);
+  const resultQuestionId =
+    resultQuestionPick && selectedQuestionIds.includes(resultQuestionPick)
+      ? resultQuestionPick
+      : (selectedQuestionIds[0] ?? null);
+  const resultRounds = useMemo(
+    () =>
+      [...(resultQuestionId ? (fermentationsByQuestion.get(resultQuestionId) ?? []) : [])]
+        .reverse()
+        .map((summary) => ({ id: summary.id, createdAt: summary.createdAt })),
+    [fermentationsByQuestion, resultQuestionId],
+  );
+  const [resultRoundPick, setResultRoundPick] = useState<string | null>(null);
+  const resultRoundId =
+    resultRoundPick && resultRounds.some((round) => round.id === resultRoundPick)
+      ? resultRoundPick
+      : (resultRounds[0]?.id ?? null);
+  const resultDetailIds = useMemo(() => (resultRoundId ? [resultRoundId] : []), [resultRoundId]);
+  const { details: fermentationDetails, loading: detailsLoading } = useFermentationDetails(
+    api,
+    resultDetailIds,
+  );
+  const fermentationDetail = resultRoundId
+    ? (fermentationDetails.get(resultRoundId) ?? null)
+    : null;
+  const fermentationLoading =
+    resultQuestionId !== null &&
+    (historyLoading ||
+      (resultRoundId !== null && !fermentationDetails.has(resultRoundId) && detailsLoading));
   const [resultOpen, setResultOpen] = useState(true);
   const [resultDetent, setResultDetent] = useState<DockDetent>('peek');
-  // 設定を開いたときは覗く段へ（設定の 1 段と結果の半分が同時に立つと本文が消えていた）。
+  // 設定や問いの選び手を開いたときは覗く段へ（結果の半分が重なると、設定の段や選び手が隠れた）。
   useEffect(() => {
-    if (settingsOpen) setResultDetent('peek');
-  }, [settingsOpen]);
+    if (settingsOpen || pickerOpen) setResultDetent('peek');
+  }, [settingsOpen, pickerOpen]);
   /**
    * 見えているか。**キーボードが出ている間は出さない**（書こうとすると結果が被さってきて打ちづらい、
    * とレビュー）。キーボードを閉じれば覗く段で戻る。出したいときはパレットの「発酵の結果」
    * （押すとキーボードを閉じて半分で出す）。
    */
-  const resultVisible = resultAvailable && resultOpen && !chrome.keyboardOpen;
+  const resultVisible = resultOpen && !chrome.keyboardOpen;
   const wasKeyboardOpen = useRef(false);
   useEffect(() => {
     if (chrome.keyboardOpen) wasKeyboardOpen.current = true;
@@ -713,17 +743,14 @@ export function SpEntryEditor({
           },
         ]
       : []),
-    ...(resultAvailable
-      ? [
-          {
-            id: 'result',
-            label: tSidebar('heading'),
-            icon: <LetterIcon />,
-            active: resultVisible,
-            onSelect: toggleResult,
-          },
-        ]
-      : []),
+    // 問いを結ぶ前から出す（押すと、結ぶと何が出るかと、結ぶ入口が出る）。
+    {
+      id: 'result',
+      label: tSidebar('heading'),
+      icon: <LetterIcon />,
+      active: resultVisible,
+      onSelect: toggleResult,
+    },
   ];
 
   const gear = (
@@ -817,6 +844,20 @@ export function SpEntryEditor({
           {`+ ${t('question_link')}`}
         </button>
       </div>
+      {/* 問いを結ぶ選び手は、押した行（結んだ問いと「問いを結ぶ」）のすぐ下に開く（オーナーの指示）。 */}
+      {pickerOpen ? (
+        <div className="mx-6 mt-2">
+          <QuestionPicker
+            questions={activeQuestions}
+            selectedIds={selectedQuestionIds}
+            onToggle={toggleQuestion}
+            onCreate={handleCreateQuestion}
+            composing={composingQuestion}
+            onComposingChange={setComposeRequested}
+            onClose={closePicker}
+          />
+        </div>
+      ) : null}
       {/* 漬けてあること。書き足したら押し直すのか、に答える 1 行（結んだ問いの下）。 */}
       {pickled ? (
         <p
@@ -831,19 +872,6 @@ export function SpEntryEditor({
           />
           <span>{t('pickled_note')}</span>
         </p>
-      ) : null}
-      {pickerOpen ? (
-        <div className="mx-6 mt-2">
-          <QuestionPicker
-            questions={activeQuestions}
-            selectedIds={selectedQuestionIds}
-            onToggle={toggleQuestion}
-            onCreate={handleCreateQuestion}
-            composing={composingQuestion}
-            onComposingChange={setComposeRequested}
-            onClose={closePicker}
-          />
-        </div>
       ) : null}
       {/* 本文（タイトルから広い余白＋ゆったり行間）。写真は本文の中。 */}
       <div className="mt-6">
@@ -917,9 +945,25 @@ export function SpEntryEditor({
         detent={resultDetent}
         onDetentChange={setResultDetent}
         onPeekTap={blurEditor}
-        questionText={selectedQuestions[0]?.currentText ?? t('question_untitled')}
+        questions={selectedQuestions.map((question) => ({
+          id: question.id,
+          text: question.currentText ?? t('question_untitled'),
+        }))}
+        questionId={resultQuestionId}
+        onQuestionChange={(id) => {
+          setResultQuestionPick(id);
+          setResultRoundPick(null);
+        }}
+        rounds={resultRounds}
+        roundId={resultRoundId}
+        onRoundChange={setResultRoundPick}
         detail={fermentationDetail}
         loading={fermentationLoading}
+        onLinkQuestion={() => {
+          blurEditor();
+          setResultDetent('peek');
+          openQuestionPicker();
+        }}
       />
 
       <SpConfirmSheet

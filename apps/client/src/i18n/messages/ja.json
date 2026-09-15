@@ -159,7 +159,7 @@
   },
   "entry_questions": {
     "picker": {
-      "title": "問いを選ぶ",
+      "title": "問いを結ぶ",
       "empty": "立てている問いがありません。ここで1つ書きましょう。",
       "new": "+ 新しく問いを書く",
       "new_placeholder": "問いを書く（例: 今日の小さな発見は？）",
@@ -745,7 +745,6 @@
       "question_link": "問いを結ぶ",
       "ferment_title": "漬け込む",
       "ferment_done_short": "漬けてある",
-      "result_read_full": "全文を読む",
       "photo_width": "幅",
       "photo_width_small": "小",
       "photo_width_medium": "中",
@@ -769,7 +768,13 @@
       "settings_spacing_tight": "詰める",
       "settings_spacing_normal": "標準",
       "settings_spacing_wide": "広げる",
-      "pickled_note": "瓶に漬けてあります。発酵が始まるまでの書き足しも、押し直さずに一緒に漬かります。"
+      "pickled_note": "瓶に漬けてあります。発酵が始まるまでの書き足しも、押し直さずに一緒に漬かります。",
+      "result_no_question": "問いを結ぶと、発酵の結果がここに出ます",
+      "result_no_question_body": "このエントリーに問いを結ぶと、その問いの手紙・キーワード・スニペットを見ながら書けます。",
+      "result_not_fermented": "この問いはまだ発酵していません。",
+      "result_latest": "最新",
+      "result_question_aria": "どの問いの結果を見るか",
+      "result_round_aria": "いつの結果を見るか"
     },
     "nav": {
       "back": "戻る",

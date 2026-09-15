@@ -83,14 +83,10 @@ export function QuestionPicker({
       className="flex flex-col overflow-hidden rounded-2xl border"
       style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
     >
-      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-1">
-        <span
-          className="text-[11px] uppercase tracking-[0.14em]"
-          style={{ color: 'var(--accent)' }}
-        >
-          {t('title')}
-        </span>
-        {onClose ? (
+      {/* 見出しは出さない。開いた入口（「問いを結ぶ」）と同じ言葉を中でもう一度言っていた（オーナーの指示）。
+          名前は読み上げ（aria-label）にだけ残す。 */}
+      {onClose ? (
+        <div className="flex items-center justify-end px-4 pt-3 pb-1">
           <button
             type="button"
             onClick={onClose}
@@ -100,8 +96,8 @@ export function QuestionPicker({
           >
             {t('close')}
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {composing ? (
         <div className="flex flex-col gap-2 px-4 pb-4">
@@ -167,19 +163,17 @@ export function QuestionPicker({
                     type="button"
                     aria-pressed={on}
                     onClick={() => onToggle(question.id)}
-                    className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-2 text-left hover:bg-[var(--hover-wash)]"
-                    style={{
-                      fontFamily: "'Noto Serif JP', serif",
-                      fontSize: 15,
-                      color: 'var(--fg)',
-                    }}
+                    // 問いは折り返して全文を出す（1 行で切ると長い問いが読めなかった）。字は選び手の他の字
+                    // （見出し・検索欄）と同じ書体で一回り小さく（大きく見えた。実機レビュー）。
+                    className="flex min-h-[44px] w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-[14px] leading-snug hover:bg-[var(--hover-wash)]"
+                    style={{ color: 'var(--fg)' }}
                   >
-                    <span className="min-w-0 truncate">
+                    <span className="min-w-0 flex-1 break-words">
                       {question.currentText ?? t('untitled')}
                     </span>
                     <span
                       aria-hidden="true"
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border"
+                      className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full border"
                       style={{
                         borderColor: on ? 'var(--accent)' : 'var(--border-subtle)',
                         background: on ? 'var(--accent)' : 'transparent',
