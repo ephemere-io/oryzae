@@ -37,6 +37,12 @@ export interface EntranceLayout {
   panel: 'side' | 'sheet';
 }
 
+/**
+ * 見えている窓の高さが変わったとき（SP で紙が伸び縮みしたとき）に構図を寄せる速さ
+ * （1 フレームあたり）。切り替えずに寄せるのは、扉が一瞬で縮むと別の場面に飛んだように見えるため。
+ */
+export const FRAME_SETTLE_LERP = 0.14;
+
 function vec3(x: number, y: number, z: number): Vec3 {
   return { x, y, z };
 }
@@ -60,11 +66,18 @@ export const ENTRANCE_PC_LAYOUT: EntranceLayout = {
 export const ENTRANCE_SP_LAYOUT: EntranceLayout = {
   name: 'sp',
   camera: {
-    // 縦画面は下の 6 割を紙が覆う。扉と敷物を上の窓（画面の上 4 割）に収めるため、
-    // 引いて見下ろし、注視点を床より下に置いて扉を画面の上へ持ち上げる。
-    fov: 52,
-    position: vec3(0, 3.6, 18),
-    target: vec3(0, -2.9, 0),
+    // **紙の上の窓に対する構図**（`setFrame`）。窓の高さに扉と敷物が 7 割ほどで収まる距離。
+    //
+    // 正面から見ると扉は厚みも隙間も写らず、壁に描いた長方形（入口のアイコン）に読める
+    // （実機レビュー「扉感がない」）。**右斜め前から見る** — 枠の奥行きと扉板の厚み、
+    // 奥へ開いた隙間が見え、左手の棚まで一続きの前室になる。
+    //
+    // **見下ろさない**（ほぼ水平）。見下ろすと扉の縦の線がすぼまって、扉が傾いて見える。
+    // 扉を窓のどこに置くかは `setFrame` のレンズシフトが受け持つので、仰角で調整しなくてよい。
+    // 注視点を扉の中心より少し上に置き、右上の言語のピルと扉の上端が重ならない余白を取る。
+    fov: 50,
+    position: vec3(2.2, 2.7, 8.3),
+    target: vec3(-0.5, 2.55, 0),
     near: 0.1,
     far: 100,
   },

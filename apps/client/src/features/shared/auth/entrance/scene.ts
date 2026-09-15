@@ -45,7 +45,7 @@ import {
   walkProgress,
   walkView,
 } from './door';
-import type { EntranceLayout } from './layout';
+import { type EntranceLayout, FRAME_SETTLE_LERP } from './layout';
 
 export interface EntranceSceneOptions {
   container: HTMLElement;
@@ -60,6 +60,14 @@ export interface EntranceSceneHandle {
   setWaiting(waiting: boolean): void;
   /** 扉を押し開けて奥へ歩く。`plan.totalMs` 経ったら resolve する。 */
   enter(plan: EnterPlan): Promise<void>;
+  /**
+   * 画面の上から何 px が見えているか（その下は紙が覆っている）。
+   *
+   * 構図は**見えている窓に対して**組む。窓が縮めば扉は窓の中で小さくなり、窓からは
+   * はみ出さない。窓の下の canvas は同じ構図をそのまま下へ延ばして描く（レンズシフト）。
+   * 呼ばなければ canvas 全体が窓。
+   */
+  setFrame(visibleHeight: number): void;
   /** 画面上のポインタ位置（-1..1）。パララックスに使う。 */
   setPointer(x: number, y: number): void;
   clearPointer(): void;
@@ -125,6 +133,12 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     resolve: () => void;
   } | null = null;
 
+  /** 見えている窓の高さ（px）。null は canvas 全体。目標へ毎フレーム寄せる。 */
+  let frameHeight: number | null = null;
+  let frameTarget: number | null = null;
+  /** canvas の大きさが変わった。窓の高さが同じでも投影を組み直す。 */
+  let projectionDirty = true;
+
   let frame = 0;
   let readyAnnounced = false;
   const startedAt = performance.now();
@@ -145,6 +159,7 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
       applyView(camera, restingView(now - startedAt));
     }
 
+    updateFrame();
     renderer.render(scene, camera);
 
     if (!readyAnnounced) {
@@ -171,6 +186,33 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
       },
       target: { ...home.target },
     };
+  }
+
+  /**
+   * 見えている窓に合わせて投影を組み直す。
+   *
+   * 縦の画角と縦横比を**窓**のものにし、`setViewOffset` で canvas の残り（紙の下）へ
+   * 延ばす。こうすると扉の大きさと位置は窓の高さに対して決まり、紙が伸び縮みしても
+   * 扉が紙の下へ潜らない。窓が canvas と同じ高さなら、ふつうの投影に戻す。
+   */
+  function updateFrame(): void {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    if (width === 0 || height === 0) return;
+    const target = Math.min(height, Math.max(1, frameTarget ?? height));
+    // 最初の 1 回は寄せずに合わせる。読み込んだ直後に扉が縮んでいく動きを見せない。
+    const next = frameHeight === null ? target : approach(frameHeight, target, FRAME_SETTLE_LERP);
+    const settled = Math.abs(next - target) < 0.5 ? target : next;
+    if (settled === frameHeight && !projectionDirty) return;
+    frameHeight = settled;
+    projectionDirty = false;
+    camera.aspect = width / settled;
+    if (settled >= height) {
+      camera.clearViewOffset();
+    } else {
+      camera.setViewOffset(width, settled, 0, 0, width, height);
+    }
+    camera.updateProjectionMatrix();
   }
 
   function currentView(): CameraView {
@@ -206,6 +248,14 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     });
   }
 
+  function setFrame(visibleHeight: number): void {
+    // `Infinity` は「canvas 全体」（紙が退いたとき）。updateFrame が canvas の高さに丸める。
+    // 捨ててよいのは NaN だけ — 以前 `isFinite` で弾いていて、紙が退いても扉が上の窓に
+    // 小さく残ったまま歩き出していた。
+    if (Number.isNaN(visibleHeight)) return;
+    frameTarget = visibleHeight;
+  }
+
   function setPointer(x: number, y: number): void {
     pointer.x = Math.max(-1, Math.min(1, x));
     pointer.y = Math.max(-1, Math.min(1, y));
@@ -222,9 +272,9 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     const width = container.clientWidth;
     const height = container.clientHeight;
     if (width === 0 || height === 0) return;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    // 投影は次のフレームの updateFrame が窓に合わせて組み直す。
+    projectionDirty = true;
   });
   resizeObserver.observe(container);
 
@@ -241,7 +291,7 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     while (container.firstChild) container.removeChild(container.firstChild);
   }
 
-  return { setWaiting, enter, setPointer, clearPointer, dispose };
+  return { setWaiting, enter, setFrame, setPointer, clearPointer, dispose };
 }
 
 // ============================================================================

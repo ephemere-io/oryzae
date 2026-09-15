@@ -15,9 +15,36 @@
 
 | 状態 | 扉 | 紙（フォーム） |
 | --- | --- | --- |
-| 待っている | わずかに開いていて（`DOOR_ANGLE.rest`）、隙間から奥の格子と書斎の気配が覗く | PC は扉の右に 1 枚立てる / SP は下から敷く |
+| 待っている | わずかに開いていて（`DOOR_ANGLE.rest`）、隙間から奥の格子と書斎の気配が覗く | PC は扉の右に 1 枚立てる / SP は下から敷く（2 段。下記） |
 | 送信中・認証中 | 取っ手に手を掛けたくらい開く（`waiting`）。失敗したら閉じ直す | そのまま |
 | 入れた | 紙が退く → 扉を押し開ける → 敷居をまたいで奥へ歩く → 溶ける（`enterPlan`） | 退く |
+
+### SP の紙は 2 段
+
+最初の版は PC と同じく全部を 1 枚に並べ、「紙が下にはみ出して『ログイン』が見切れる」
+「扉が小さく正面向きで扉感が無い」と差し戻された（PR #624 の実機レビュー）。
+
+- **選ぶ:** 名前・「Google でログイン」・「メールアドレスでログイン」・下端の一文だけ。扉は画面の半分以上を取る
+- **入力中:** 左上の正円の「戻る」と入力欄・送信ボタン。下端の一文と登録枠の表示は省いて紙を短くする。
+  開いた同じタップの中で最初の入力欄に focus を渡す（iOS はそうしないとキーボードを出さない）
+- 判定は端末ではなく紙の置き方（`EntranceControls.compact`）。PC の紙と検証ハーネスでは常に全部を出す
+
+### 扉は「見えている窓」に合わせて置く
+
+SP の扉の構図は画面全体ではなく**紙の上の窓**に対して組む（`EntranceSceneHandle.setFrame`）。
+窓の高さを測って渡し、scene は縦の画角をその窓に合わせ、`setViewOffset` で紙の下へ延ばす
+（レンズシフト）。紙が伸びれば扉は窓の中で小さくなり、紙の下には潜らない。端末の背の高さにも依らない。
+
+SP のカメラは**右斜め前・ほぼ水平**。正面からだと枠の奥行きも扉の隙間も写らず、
+見下ろすと縦の線がすぼまって扉が傾いて見える。
+
+### 書体
+
+紙の文字は和文を先頭にする（ヒラギノ → Noto Sans JP）。アプリ共通の `CONTROL_FONT` は Inter が先頭で、
+「Google でログイン」のように欧文と仮名が隣り合うと大きさと並びが揃わず崩れて見えた。
+和文には字間を付けない（「ロ グ イ ン」とばらける）。
+
+### その他
 
 - 物は**扉・敷物・低い棚と一輪挿し**だけ。棚は「前室」であることを言う唯一の物で、線を足して部屋を説明しない
 - 扉の名札は空けておく。名乗るのは紙のほう
@@ -35,6 +62,7 @@ features/shared/auth/
   components/auth-entrance.tsx   地（3D）と紙の置き方・溶暗・EntranceContext の提供
   components/entrance-canvas.tsx three.js の入れ物（dynamic import・ssr: false）
   components/auth-status.tsx     通り道の画面の紙（認証中 / 失敗）
+  components/paper-back-button.tsx  SP の紙の左上の「戻る」
   entrance/layout.ts             カメラの配置表
   entrance/door.ts               扉の寸法・開き・歩いて入る段取り（純関数）
   entrance/scene.ts              three.js の組み立て（素材は書斎の createMaterials を共有）
@@ -47,8 +75,9 @@ features/shared/auth/
 
 ### フォームと扉の約束
 
-フォームは扉の実体を知らない。`useEntrance()` の 2 つだけを呼ぶ。
+フォームは扉の実体を知らない。`useEntrance()` の 3 つだけを使う。
 
+- `compact` — 紙が狭いか（SP の 2 段を出すか）
 - `setWaiting(true/false)` — 送信の前後
 - `await enter()` — 認証が通ったあと、**行き先へ移る前**。溶け切ってから resolve する
 
@@ -59,5 +88,5 @@ features/shared/auth/
 
 ## 変えていないもの
 
-- 文言（i18n のキー）。E2E が見ている `h1 = Oryzae`・プレースホルダ・ボタン名・`combobox "Language"` はそのまま
+- 既存の文言。足したキーは `auth.{login,signup}.email_open` / `email_back` の 4 つ（4 言語。Spreadsheet への反映が要る）。E2E が見ている `h1 = Oryzae`・プレースホルダ・ボタン名・`combobox "Language"` はそのまま
 - 認証の通信とセッション確定の手順

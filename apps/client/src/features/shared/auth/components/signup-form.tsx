@@ -4,8 +4,10 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { GoogleLoginButton } from '@/features/shared/auth/components/google-login-button';
+import { PaperBackButton } from '@/features/shared/auth/components/paper-back-button';
 import { useEntrance } from '@/features/shared/auth/entrance/context';
 import {
   BRAND_CLASS,
@@ -48,6 +50,17 @@ export function SignupForm() {
   const entrance = useEntrance();
   // Issue #300: Research Preview の登録枠状況をマウント時に取得
   const { availability } = useSignupAvailability();
+  const nicknameRef = useRef<HTMLInputElement>(null);
+  // SP の紙では入り方（Google / メールアドレス）を先に選ぶ（LoginForm と同じ理由）。
+  const [emailOpen, setEmailOpen] = useState(false);
+  const choosing = entrance.compact && !emailOpen;
+  const typing = entrance.compact && emailOpen;
+
+  function openEmail() {
+    // タップの処理の中で focus しないと、iOS はキーボードを出さない。
+    flushSync(() => setEmailOpen(true));
+    nicknameRef.current?.focus();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,106 +147,124 @@ export function SignupForm() {
         hasError: Boolean(error),
       })}
     >
-      <header className="mb-2 flex flex-col gap-3">
-        <h1 className={BRAND_CLASS} style={SERIF_FONT}>
-          Oryzae
-        </h1>
-        <p className={LEAD_CLASS}>{t('subheading')}</p>
-        {availability && !availability.capacityReached && (
-          <p className={`-mt-1 ${HELP_CLASS}`}>
-            {t('capacity_remaining', {
-              remaining: availability.remaining,
-              max: availability.limit,
-            })}
-          </p>
-        )}
+      <header className="mb-2 flex items-start gap-3">
+        {typing && <PaperBackButton label={t('email_back')} onClick={() => setEmailOpen(false)} />}
+        <div className="flex flex-col gap-3">
+          <h1 className={BRAND_CLASS} style={SERIF_FONT}>
+            Oryzae
+          </h1>
+          <p className={LEAD_CLASS}>{t('subheading')}</p>
+          {availability && !availability.capacityReached && !typing && (
+            <p className={`-mt-1 ${HELP_CLASS}`}>
+              {t('capacity_remaining', {
+                remaining: availability.remaining,
+                max: availability.limit,
+              })}
+            </p>
+          )}
+        </div>
       </header>
 
-      <GoogleLoginButton />
+      {typing ? null : <GoogleLoginButton />}
 
-      <div className="flex items-center gap-3">
-        <div className={DIVIDER_LINE_CLASS} />
-        <span className={DIVIDER_TEXT_CLASS}>{t('divider_or')}</span>
-        <div className={DIVIDER_LINE_CLASS} />
-      </div>
-
-      {error && (
-        <p role="alert" className={ERROR_CLASS}>
-          {error}
-        </p>
+      {entrance.compact ? null : (
+        <div className="flex items-center gap-3">
+          <div className={DIVIDER_LINE_CLASS} />
+          <span className={DIVIDER_TEXT_CLASS}>{t('divider_or')}</span>
+          <div className={DIVIDER_LINE_CLASS} />
+        </div>
       )}
 
-      <label className="flex flex-col gap-2">
-        <span className={LABEL_CLASS}>{t('nickname_label')}</span>
-        <input
-          type="text"
-          aria-label={t('nickname_label')}
-          value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
-          required
-          minLength={2}
-          maxLength={30}
-          pattern="^[a-zA-Z0-9_-]+$"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          placeholder="my_nickname"
-          className={INPUT_CLASS}
-        />
-        <span className={HELP_CLASS}>{t('nickname_help')}</span>
-      </label>
+      {choosing && (
+        <button type="button" onClick={openEmail} className={PRIMARY_BUTTON_CLASS}>
+          {t('email_open')}
+        </button>
+      )}
 
-      <label className="flex flex-col gap-2">
-        <span className={LABEL_CLASS}>{t('email_label')}</span>
-        <input
-          type="email"
-          aria-label={t('email_label')}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-          className={INPUT_CLASS}
-        />
-      </label>
+      {/* 入力欄は選ぶ前も DOM に置いて隠す。開いた同じタップの中で focus を渡すため。 */}
+      <div hidden={choosing} className={`flex flex-col ${typing ? 'gap-4' : 'gap-5'}`}>
+        {error && (
+          <p role="alert" className={ERROR_CLASS}>
+            {error}
+          </p>
+        )}
 
-      <label className="flex flex-col gap-2">
-        <span className={LABEL_CLASS}>{t('password_label')}</span>
-        <input
-          type="password"
-          aria-label={t('password_label')}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-          autoComplete="new-password"
-          className={INPUT_CLASS}
-        />
-      </label>
+        <label className="flex flex-col gap-2">
+          <span className={LABEL_CLASS}>{t('nickname_label')}</span>
+          <input
+            ref={nicknameRef}
+            type="text"
+            aria-label={t('nickname_label')}
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            required
+            minLength={2}
+            maxLength={30}
+            pattern="^[a-zA-Z0-9_-]+$"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="my_nickname"
+            className={INPUT_CLASS}
+          />
+          <span className={HELP_CLASS}>{t('nickname_help')}</span>
+        </label>
 
-      <label className="flex flex-col gap-2">
-        <span className={LABEL_CLASS}>{t('confirm_label')}</span>
-        <input
-          type="password"
-          aria-label={t('confirm_label')}
-          value={passwordConfirm}
-          onChange={(e) => setPasswordConfirm(e.target.value)}
-          required
-          minLength={6}
-          autoComplete="new-password"
-          className={INPUT_CLASS}
-        />
-      </label>
+        <label className="flex flex-col gap-2">
+          <span className={LABEL_CLASS}>{t('email_label')}</span>
+          <input
+            type="email"
+            aria-label={t('email_label')}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className={INPUT_CLASS}
+          />
+        </label>
 
-      <button type="submit" disabled={loading} className={`mt-1 ${PRIMARY_BUTTON_CLASS}`}>
-        {loading ? t('submit_loading') : t('submit')}
-      </button>
+        <label className="flex flex-col gap-2">
+          <span className={LABEL_CLASS}>{t('password_label')}</span>
+          <input
+            type="password"
+            aria-label={t('password_label')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            autoComplete="new-password"
+            className={INPUT_CLASS}
+          />
+        </label>
 
-      <p className={`text-center ${FOOT_CLASS}`}>
-        {t('have_account_prefix')}{' '}
-        <Link href="/login" className={INLINE_LINK_CLASS}>
-          {t('login_link')}
-        </Link>
-      </p>
+        <label className="flex flex-col gap-2">
+          <span className={LABEL_CLASS}>{t('confirm_label')}</span>
+          <input
+            type="password"
+            aria-label={t('confirm_label')}
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+            required
+            minLength={6}
+            autoComplete="new-password"
+            className={INPUT_CLASS}
+          />
+        </label>
+
+        <button type="submit" disabled={loading} className={`mt-1 ${PRIMARY_BUTTON_CLASS}`}>
+          {loading ? t('submit_loading') : t('submit')}
+        </button>
+      </div>
+
+      {/* 入力中（SP の紙）は出さない。紙を短くして送信ボタンを画面に残す。戻れば出る。 */}
+      {typing ? null : (
+        <p className={`text-center ${FOOT_CLASS}`}>
+          {t('have_account_prefix')}{' '}
+          <Link href="/login" className={INLINE_LINK_CLASS}>
+            {t('login_link')}
+          </Link>
+        </p>
+      )}
     </form>
   );
 }
