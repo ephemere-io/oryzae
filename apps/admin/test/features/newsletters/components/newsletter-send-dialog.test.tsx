@@ -1,27 +1,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NewsletterSendDialog } from '@/features/newsletters/components/newsletter-send-dialog';
-import type { Newsletter, NewsletterPreview, TestSendResult } from '@/features/newsletters/types';
+import type { NewsletterPreview, TestSendResult } from '@/features/newsletters/types';
 
 // vitest の globals を切ってあるので自動 cleanup が走らない。
 // 明示しないと Dialog の portal が document.body に残り、次のテストで二重に見つかる。
 afterEach(cleanup);
-
-const newsletterFixture: Newsletter = {
-  id: 'nl-1',
-  subject: '今月の更新',
-  bodyMarkdown: '本文',
-  status: 'draft',
-  createdBy: 'admin-1',
-  recipientCount: 0,
-  sentCount: 0,
-  failedCount: 0,
-  lastError: null,
-  testSentAt: null,
-  sentAt: null,
-  createdAt: '2026-09-14T00:00:00.000Z',
-  updatedAt: '2026-09-14T00:00:00.000Z',
-};
 
 const preview: NewsletterPreview = {
   id: 'nl-1',
@@ -50,16 +34,10 @@ const preview: NewsletterPreview = {
 function renderDialog(overrides?: {
   preview?: NewsletterPreview | null;
   onSend?: () => void;
-  onSendTest?: () => void;
   sending?: boolean;
-  testSending?: boolean;
-  translating?: boolean;
   testResult?: TestSendResult | null;
-  onTranslate?: () => void;
 }) {
   const onSend = overrides?.onSend ?? vi.fn();
-  const onSendTest = overrides?.onSendTest ?? vi.fn();
-  const onTranslate = overrides?.onTranslate ?? vi.fn();
   render(
     <NewsletterSendDialog
       open
@@ -69,15 +47,11 @@ function renderDialog(overrides?: {
       testResult={overrides?.testResult ?? null}
       loadingPreview={false}
       sending={overrides?.sending ?? false}
-      testSending={overrides?.testSending ?? false}
-      translating={overrides?.translating ?? false}
       error={null}
       onSend={onSend}
-      onSendTest={onSendTest}
-      onTranslate={onTranslate}
     />,
   );
-  return { onSend, onSendTest, onTranslate };
+  return { onSend };
 }
 
 describe('NewsletterSendDialog', () => {
@@ -143,65 +117,7 @@ describe('NewsletterSendDialog', () => {
     expect(screen.getByRole('button', { name: /送信中/ }).hasAttribute('disabled')).toBe(true);
   });
 
-  it('テスト済みならその時刻を出す', () => {
-    renderDialog();
-    expect(screen.getByText(/テスト配信済み/)).toBeDefined();
-    expect(screen.queryByText(/まだテスト配信していません/)).toBeNull();
-  });
-
-  // ここが緩むと、実際に届く形を一度も見ないまま全員に配信できてしまう。
-  it('未テストなら送信ボタンを押せない', () => {
-    renderDialog({
-      preview: { ...preview, sendable: false, blockedReason: 'not-tested', testSentAt: null },
-    });
-
-    expect(screen.getByRole('button', { name: /送信する/ }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByText(/先に「テスト配信」を押して受信を確認/)).toBeDefined();
-  });
-
   // 未テストで塞がれている状態でこそ押したいボタンなので、ここは生きている必要がある。
-  it('未テストで送信が塞がれていても、テスト配信ボタンは押せる', () => {
-    const { onSendTest } = renderDialog({
-      preview: { ...preview, sendable: false, blockedReason: 'not-tested', testSentAt: null },
-    });
-
-    const testButton = screen.getByRole('button', { name: /テスト配信/ });
-    expect(testButton.hasAttribute('disabled')).toBe(false);
-
-    fireEvent.click(testButton);
-    expect(onSendTest).toHaveBeenCalledTimes(1);
-  });
-
-  it('送信済みならテスト配信も押せない（もう文面を変えられない）', () => {
-    renderDialog({ preview: { ...preview, sendable: false, blockedReason: 'already-sent' } });
-
-    expect(screen.getByRole('button', { name: /テスト配信/ }).hasAttribute('disabled')).toBe(true);
-  });
-
-  it('テスト配信ボタンは 1 クリックで撃てる（宛先が運営者に固定されているため）', () => {
-    const { onSendTest, onSend } = renderDialog();
-
-    fireEvent.click(screen.getByRole('button', { name: /テスト配信/ }));
-
-    expect(onSendTest).toHaveBeenCalledTimes(1);
-    // 本番送信は巻き込まない。
-    expect(onSend).not.toHaveBeenCalled();
-  });
-
-  it('テスト配信の結果に実際の宛先を出す（届かないときの切り分け材料）', () => {
-    renderDialog({
-      testResult: {
-        newsletter: { ...newsletterFixture, testSentAt: '2026-09-14T07:30:00.000Z' },
-        sent: true,
-        delivered: 2,
-        failed: 0,
-        recipients: ['admin1@example.com', 'admin2@example.com'],
-        locales: ['ja', 'en'],
-      },
-    });
-
-    expect(screen.getByText(/admin1@example.com, admin2@example.com/)).toBeDefined();
-  });
 
   // 日本語だけ見て送ると、英語版が崩れていても気づけない。
   it('言語ごとに宛先数を出し、切り替えるとその言語の本文が出る', () => {
@@ -244,46 +160,7 @@ describe('NewsletterSendDialog', () => {
     });
 
     expect(screen.getByRole('button', { name: /送信する/ }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByText(/翻訳が必要: English/)).toBeDefined();
-  });
-
-  it('翻訳が揃っていればその旨を出す', () => {
-    renderDialog();
-    expect(screen.getByText(/宛先がいる言語の翻訳は揃っています/)).toBeDefined();
-  });
-
-  it('「翻訳を作成」を押すと翻訳だけが走る（本番送信は巻き込まない）', () => {
-    const { onTranslate, onSend } = renderDialog();
-
-    fireEvent.click(screen.getByRole('button', { name: /翻訳を作成/ }));
-
-    expect(onTranslate).toHaveBeenCalledTimes(1);
-    expect(onSend).not.toHaveBeenCalled();
-  });
-
-  it('翻訳中はテスト配信を押せない（同じ下書きを同時に触らせない）', () => {
-    renderDialog({ translating: true });
-    expect(screen.getByRole('button', { name: /テスト配信/ }).hasAttribute('disabled')).toBe(true);
-  });
-
-  it('テスト配信の結果にどの言語版を送ったかを出す', () => {
-    renderDialog({
-      testResult: {
-        newsletter: { ...newsletterFixture, testSentAt: '2026-09-14T07:30:00.000Z' },
-        sent: true,
-        delivered: 4,
-        failed: 0,
-        recipients: ['admin1@example.com'],
-        locales: ['ja', 'en'],
-      },
-    });
-
-    expect(screen.getByText(/\(ja\/en\)/)).toBeDefined();
-  });
-
-  it('テスト配信中は本番送信を押せない（取り違え防止）', () => {
-    renderDialog({ testSending: true });
-    expect(screen.getByRole('button', { name: /送信する/ }).hasAttribute('disabled')).toBe(false);
-    expect(screen.getByRole('button', { name: /送信中/ }).hasAttribute('disabled')).toBe(true);
+    // 理由はサーバーの blockedReason をそのまま文言にする（画面で推測しない）。
+    expect(screen.getByText(/宛先がいる言語の翻訳が揃っていません/)).toBeDefined();
   });
 });

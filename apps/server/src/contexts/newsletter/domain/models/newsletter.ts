@@ -273,6 +273,23 @@ export class Newsletter {
     });
   }
 
+  /**
+   * テスト配信の確認をやり直させる。
+   *
+   * 翻訳を作り直したときに使う。**翻訳は「実際に届くもの」を変える。**
+   * 日本語だけ確認した状態で英訳を足し、そのまま送れてしまうと、英語話者に
+   * 何が届くのか誰も見ていないことになる。本文を書き換えたとき
+   * （`withContent`）と同じ理由で印を落とす。
+   */
+  withTestInvalidated(now: () => Date = () => new Date()): Newsletter {
+    if (this.testSentAt === null) return this;
+    return new Newsletter({
+      ...this.toProps(),
+      testSentAt: null,
+      updatedAt: now().toISOString(),
+    });
+  }
+
   toProps(): NewsletterProps {
     return {
       id: this.id,

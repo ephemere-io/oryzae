@@ -1,8 +1,9 @@
 'use client';
 
-import { Send, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Newsletter } from '../types';
+import type { Newsletter, NewsletterPreview, TestSendResult } from '../types';
+import { NewsletterDeliveryChecklist } from './newsletter-delivery-checklist';
 
 // server の domain と同じ上限。超えた状態で保存を押させない（往復して初めて
 // 弾かれると、長い本文を書いたあとで気づくことになる）。
@@ -20,6 +21,14 @@ interface Props {
   onDelete: () => void;
   onOpenSend: () => void;
   saving: boolean;
+  /** 配信の準備（翻訳・テスト配信・送信）の状態。 */
+  preview: NewsletterPreview | null;
+  loadingPreview: boolean;
+  translating: boolean;
+  testSending: boolean;
+  testResult: TestSendResult | null;
+  onTranslate: () => void;
+  onSendTest: () => void;
 }
 
 export function NewsletterEditor({
@@ -32,6 +41,13 @@ export function NewsletterEditor({
   onDelete,
   onOpenSend,
   saving,
+  preview,
+  loadingPreview,
+  translating,
+  testSending,
+  testResult,
+  onTranslate,
+  onSendTest,
 }: Props) {
   // 送信済み・送信中は読み取り専用。届いた文面と画面が食い違わないようにする。
   const readOnly = newsletter !== null && newsletter.status !== 'draft';
@@ -100,44 +116,32 @@ export function NewsletterEditor({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={onSave} disabled={!canSave}>
-            {saving ? '保存中...' : '下書きを保存'}
-          </Button>
-          {newsletter && !readOnly && (
-            <Button variant="ghost" size="sm" onClick={onDelete} disabled={saving}>
-              <Trash2 className="mr-1.5 h-3 w-3" />
-              削除
-            </Button>
-          )}
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onOpenSend}
-          // 未保存の下書きは送れない。画面のテキストではなく保存済みの本文が送られる
-          // ため、「見ているものと違うものが届く」状態を作らない。
-          disabled={newsletter === null || readOnly}
-          title={
-            newsletter === null
-              ? 'まず下書きを保存してください'
-              : readOnly
-                ? 'この配信は送信済みです'
-                : undefined
-          }
-        >
-          <Send className="mr-1.5 h-3 w-3" />
-          送信する…
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={onSave} disabled={!canSave}>
+          {saving ? '保存中...' : '下書きを保存'}
         </Button>
+        {newsletter && !readOnly && (
+          <Button variant="ghost" size="sm" onClick={onDelete} disabled={saving}>
+            <Trash2 className="mr-1.5 h-3 w-3" />
+            削除
+          </Button>
+        )}
       </div>
 
-      {readOnly && (
-        <p className="text-[11px] text-muted-foreground">
-          送信済みの配信は編集できません。内容を変えるには新しい下書きを作ってください。
-        </p>
-      )}
+      {/* 翻訳 → テスト配信 → 送信。**ダイアログの中に隠さない。**
+          「送信する」の中に取り消せる操作を入れると、押すのをためらわせる。 */}
+      <NewsletterDeliveryChecklist
+        preview={preview}
+        loadingPreview={loadingPreview}
+        translating={translating}
+        testSending={testSending}
+        testResult={testResult}
+        readOnly={readOnly}
+        unsaved={newsletter === null}
+        onTranslate={onTranslate}
+        onSendTest={onSendTest}
+        onOpenSend={onOpenSend}
+      />
     </div>
   );
 }
