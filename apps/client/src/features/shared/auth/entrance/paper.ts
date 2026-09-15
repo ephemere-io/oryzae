@@ -23,9 +23,19 @@ export const PAPER_SHADOW =
   '0 40px 90px -50px rgba(74, 70, 50, 0.32), 0 12px 32px -20px rgba(74, 70, 50, 0.18)';
 
 /**
- * 名前と見出しの書体（明朝）。それ以外の文字は紙（`AuthEntrance`）の根に当てた
- * `CONTROL_FONT` を継ぐ。
+ * 紙の上の文字（アプリの言葉）の書体。紙の根に 1 度だけ当て、中は継がせる。
+ *
+ * **和文の書体を先頭に置く。** アプリ共通の `CONTROL_FONT` は Inter が先頭で、日本語の
+ * 文は字ごとに Inter と Noto Sans JP が混ざる。紙の文はほぼ日本語なので、
+ * 「Google でログイン」のように欧文と仮名が隣り合うと大きさと並びが揃わず、崩れて見えた
+ * （実機レビュー）。ヒラギノ（Apple 端末。読み込みを待たずに出る）→ Noto Sans JP の順にし、
+ * 欧文も同じ書体の中の字形で揃える。
  */
+export const PAPER_FONT = {
+  fontFamily: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif',
+} as const;
+
+/** 名前と見出しの書体（明朝）。 */
 export const SERIF_FONT = { fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif' } as const;
 
 /** フォーム全体の縦の並び。 */
@@ -35,14 +45,18 @@ export const PAPER_STACK_CLASS = 'flex flex-col gap-5 text-[#2d2d2d]';
 export const BRAND_CLASS = 'text-[30px] font-medium leading-none tracking-[0.02em] text-[#2b2a28]';
 
 /** 名前ではない見出し（「パスワードをリセット」など）。`SERIF_FONT` と組む。 */
-export const HEADING_CLASS =
-  'text-[22px] font-medium leading-snug tracking-[0.02em] text-[#2b2a28]';
+export const HEADING_CLASS = 'text-[22px] font-medium leading-snug text-[#2b2a28]';
 
 /** 見出しの下の一文。 */
 export const LEAD_CLASS = 'text-[14px] leading-relaxed text-[#8c857e]';
 
-/** 入力欄のラベル。 */
-export const LABEL_CLASS = 'text-[12px] font-medium tracking-[0.04em] text-[#6b6358]';
+/**
+ * 入力欄のラベル。
+ *
+ * **和文に字間を付けない。** 付けていた頃は「ロ グ イ ン」「パ ス ワ ー ド」とばらけ、
+ * 崩れて見えた（実機レビュー）。欧文の大文字の注釈（書斎の `JAR` など）とは違う。
+ */
+export const LABEL_CLASS = 'text-[13px] font-medium text-[#6b6358]';
 
 /** ラベルの下の補足。 */
 export const HELP_CLASS = 'text-[12px] text-[#a39b90]';
@@ -58,7 +72,7 @@ export const INPUT_CLASS =
 
 /** 主の操作（ログイン・作成）。墨の一色。 */
 export const PRIMARY_BUTTON_CLASS =
-  'h-12 w-full rounded-full bg-[#2b2a28] text-[15px] font-medium tracking-[0.06em] text-[#fdfbf7] ' +
+  'h-12 w-full rounded-full bg-[#2b2a28] text-[15px] font-semibold text-[#fdfbf7] ' +
   'transition-colors duration-150 hover:bg-[#1a1918] disabled:cursor-default disabled:opacity-50';
 
 /** 副の操作（Google で続ける・ログインに戻る）。紙に縁だけ。 */

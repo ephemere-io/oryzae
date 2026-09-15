@@ -48,7 +48,7 @@ export function LocaleSwitcher() {
         onChange={handleChange}
         disabled={isPending}
         aria-label="Language"
-        className="h-full cursor-pointer appearance-none rounded-full bg-transparent pr-8 pl-8 text-[12px] tracking-[0.04em] outline-none focus-visible:ring-2 focus-visible:ring-[rgba(122,116,64,0.3)] disabled:opacity-50"
+        className="h-full cursor-pointer appearance-none rounded-full bg-transparent pr-8 pl-8 text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-[rgba(122,116,64,0.3)] disabled:opacity-50"
       >
         {LOCALE_OPTIONS.map((option) => (
           <option key={option.locale} value={option.locale}>

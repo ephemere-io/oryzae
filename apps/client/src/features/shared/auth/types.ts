@@ -27,6 +27,14 @@ export type AuthActionResult = { ok: true } | { ok: false; error: string };
  * 扉が無い場所（検証ハーネス・テスト・WebGL 非対応）では何もせずにすぐ返る。
  */
 export interface EntranceControls {
+  /**
+   * 紙が狭いか（SP の下から敷く紙）。
+   *
+   * 真なら、フォームは最初に**入り方だけ**（Google / メールアドレス）を出し、入力欄は
+   * 選んでから開く。全部を一度に並べると紙が画面の下にはみ出し、送信ボタンが見切れて、
+   * 扉も押し潰されて小さくなる。端末の判定ではなく、紙の置き方から決まる。
+   */
+  compact: boolean;
   /** 送信中・認証中か。扉が少し大きく開く。失敗したら false に戻して閉じ直す。 */
   setWaiting(waiting: boolean): void;
   /**

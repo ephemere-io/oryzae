@@ -27,7 +27,7 @@ describe('useLeaveThroughEntrance', () => {
   it('書斎へ向かうなら扉を開けて入る', async () => {
     const enter = vi.fn(() => Promise.resolve());
     const { result } = renderHook(() => useLeaveThroughEntrance(), {
-      wrapper: withControls({ setWaiting: vi.fn(), enter }),
+      wrapper: withControls({ compact: false, setWaiting: vi.fn(), enter }),
     });
 
     await result.current('/');
@@ -37,7 +37,7 @@ describe('useLeaveThroughEntrance', () => {
   it('扉の手前の画面へ戻るなら入らない', async () => {
     const enter = vi.fn(() => Promise.resolve());
     const { result } = renderHook(() => useLeaveThroughEntrance(), {
-      wrapper: withControls({ setWaiting: vi.fn(), enter }),
+      wrapper: withControls({ compact: false, setWaiting: vi.fn(), enter }),
     });
 
     await result.current('/reset-password');

@@ -7,11 +7,10 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
-import { CONTROL_FONT } from '@/components/ui/surface';
 import { EntranceContext } from '../entrance/context';
 import { type EnterPlan, enterPlan } from '../entrance/door';
 import type { EntranceLayout } from '../entrance/layout';
-import { PAPER_SHADOW, PAPER_STYLE } from '../entrance/paper';
+import { PAPER_FONT, PAPER_SHADOW, PAPER_STYLE } from '../entrance/paper';
 import { isPassage } from '../entrance/passage';
 import type { EntranceSceneHandle } from '../entrance/scene';
 import type { EntranceControls } from '../types';
@@ -68,14 +67,41 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
     setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }, []);
 
+  /**
+   * SP で扉を見せる窓（紙の上の余白）。**高さを測って扉の構図に渡す。**
+   *
+   * 紙の高さは中身（入り方だけ / 入力欄まで / 認証中）で変わり、画面の高さも端末で違う。
+   * 構図を画面全体に対して決めていた頃は、紙が伸びると扉の下半分が紙に潜り、
+   * 背の低い端末では扉ごと切れていた（実機レビュー）。
+   */
+  const windowRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<number | null>(null);
+
   const handleSceneHandle = useCallback((handle: EntranceSceneHandle | null) => {
     handleRef.current = handle;
     handle?.setWaiting(waitingRef.current);
+    if (frameRef.current !== null) handle?.setFrame(frameRef.current);
   }, []);
   const handleReady = useCallback(() => setReady(true), []);
 
+  const sheet = layout.panel === 'sheet';
+
+  useEffect(() => {
+    const element = windowRef.current;
+    if (!sheet || element === null) return;
+    const report = () => {
+      frameRef.current = element.offsetHeight;
+      handleRef.current?.setFrame(element.offsetHeight);
+    };
+    const observer = new ResizeObserver(report);
+    observer.observe(element);
+    report();
+    return () => observer.disconnect();
+  }, [sheet]);
+
   const controls = useMemo<EntranceControls>(
     () => ({
+      compact: sheet,
       setWaiting: (waiting) => {
         waitingRef.current = waiting;
         handleRef.current?.setWaiting(waiting);
@@ -85,13 +111,13 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
         // 扉が無い（WebGL 非対応・まだ届いていない）ときは溶かすだけにする。
         const plan = enterPlan(reducedMotion || handle === null);
         setLeaving(plan);
+        // 紙が退くので、窓は画面全体に戻る。扉は歩きながら画面の中央へ寄ってくる。
+        handle?.setFrame(Number.POSITIVE_INFINITY);
         return handle === null ? wait(plan.totalMs) : handle.enter(plan);
       },
     }),
-    [reducedMotion],
+    [reducedMotion, sheet],
   );
-
-  const sheet = layout.panel === 'sheet';
 
   return (
     <EntranceContext.Provider value={controls}>
@@ -137,17 +163,22 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             {/* 扉を見せる窓。紙はこの下から始まり、キーボードと一緒にスクロールする。
                 窓は余りを引き受けて伸びる — 中身の短い紙（認証中など）は画面の下端に座り、
                 空白のまま下まで垂れない。 */}
-            <div aria-hidden="true" className="flex-1" style={{ minHeight: SHEET_WINDOW }} />
+            <div
+              ref={windowRef}
+              aria-hidden="true"
+              className="flex-1"
+              style={{ minHeight: SHEET_WINDOW_MIN }}
+            />
             <main
-              className="relative z-10 rounded-t-[24px] px-6 pt-8"
+              className="relative z-10 rounded-t-[24px] px-6 pt-6"
               style={{
-                ...CONTROL_FONT,
+                ...PAPER_FONT,
                 // **擦りガラスにしない。** 紙は扉の足元に重なるので、透かすと上端に扉の線が
                 // ぼやけて滲み、汚れに見える（実機で確認）。紙の色で塗り、上端の縁と影だけで立てる。
                 background: '#fdfbf7',
                 borderTop: PAPER_STYLE.border,
                 boxShadow: '0 -18px 40px -28px rgba(74, 70, 50, 0.28)',
-                paddingBottom: 'max(32px, env(safe-area-inset-bottom))',
+                paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
                 transform: leaving === null ? 'translateY(0)' : 'translateY(105%)',
                 transition: `transform ${PAPER_RETREAT_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
               }}
@@ -161,7 +192,7 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
               className="w-full max-w-[400px] rounded-[20px] px-9 py-10"
               style={{
                 ...PAPER_STYLE,
-                ...CONTROL_FONT,
+                ...PAPER_FONT,
                 boxShadow: PAPER_SHADOW,
                 opacity: leaving === null ? 1 : 0,
                 transform: leaving === null ? 'translateY(0)' : 'translateY(12px)',
@@ -178,12 +209,12 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
 }
 
 /**
- * SP で扉を見せる窓の高さ。
+ * SP で扉を見せる窓の最低の高さ。
  *
- * 画面の 4 割。ただし背の低い画面（横向き・小さな端末）では紙を優先して縮め、
- * 背の高い画面でも扉ばかりが大きくならないよう上限を置く。
+ * 窓の高さは紙の残りで決まり（`flex-1`）、扉はその窓に収まるよう構図を合わせる。
+ * 入力欄の多い紙（登録）でも扉の気配が消えないよう、最低限だけ残す。
  */
-const SHEET_WINDOW = 'clamp(200px, 40svh, 380px)';
+const SHEET_WINDOW_MIN = 'clamp(72px, 12svh, 140px)';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

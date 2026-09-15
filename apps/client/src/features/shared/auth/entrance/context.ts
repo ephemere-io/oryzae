@@ -11,6 +11,7 @@ import { staysAtEntrance } from './passage';
  * 解決しないと、ログイン後の遷移がいつまでも起きない。
  */
 const NO_ENTRANCE: EntranceControls = {
+  compact: false,
   setWaiting: () => {},
   enter: () => Promise.resolve(),
 };
