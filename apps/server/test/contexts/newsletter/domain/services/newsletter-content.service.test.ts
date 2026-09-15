@@ -136,6 +136,42 @@ describe('renderNewsletterHtml', () => {
     expect(html).toContain('&quot;onmouseover=&quot;x');
   });
 
+  it('フッターの頭に、トップページへのリンクにしたロゴを中央で出す', () => {
+    const html = render('本文');
+
+    expect(html).toContain('<a href="https://oryzae.ephemere.io"');
+    expect(html).toContain('src="https://oryzae.ephemere.io/icon-192"');
+    expect(html).toContain('text-align:center');
+  });
+
+  // 画像は既定でブロックされることが多い。そのとき alt だけが手がかりになる。
+  it('ロゴに alt を入れる', () => {
+    expect(render('本文')).toContain('alt="Oryzae"');
+  });
+
+  // Outlook は CSS の寸法を無視し、リンクした画像に枠線を描く。
+  it('ロゴの寸法を属性でも指定し、枠線を消す', () => {
+    const html = render('本文');
+
+    expect(html).toContain('width="40"');
+    expect(html).toContain('height="40"');
+    expect(html).toContain('border:0');
+  });
+
+  // Gmail は SVG もデータ URI も表示しない。
+  it('ロゴは公開 URL の PNG（SVG / データ URI を使わない）', () => {
+    const html = render('本文');
+
+    expect(html).not.toContain('icon.svg');
+    expect(html).not.toContain('data:image');
+  });
+
+  it('ロゴは配信停止リンクより前に出す（フッターの頭）', () => {
+    const html = render('本文');
+
+    expect(html.indexOf('alt="Oryzae"')).toBeLessThan(html.indexOf('このお知らせの配信を停止する'));
+  });
+
   it('CSS は inline のみ（Gmail が style 要素を落とすため）', () => {
     expect(render('本文')).not.toContain('<style');
   });
