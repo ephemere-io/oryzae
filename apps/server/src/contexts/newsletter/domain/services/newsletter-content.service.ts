@@ -141,6 +141,15 @@ const SUPPORT_URL = `${APP_URL}/support`;
 const PRIVACY_URL = `${APP_URL}/privacy`;
 const CONTACT_EMAIL = 'oryzae@ephemere.io';
 
+/**
+ * フッター頭に置くロゴ。PWA アイコンの PNG を流用する。
+ *
+ * **SVG は使えない。** Gmail は `<img src="*.svg">` を表示しない。データ URI も
+ * 同様に落とされるので、公開 URL の PNG 以外に選択肢が無い。192px の実寸を
+ * 40px で出すので、高 DPI でも粗くならない。
+ */
+const LOGO_URL = `${APP_URL}/icon-192`;
+
 /** 配信停止ページ。`?token=` に本人証明を載せる（`UnsubscribeTokenGateway`）。 */
 export function buildUnsubscribeUrl(token: string): string {
   return `${APP_URL}/unsubscribe?token=${encodeURIComponent(token)}`;
@@ -300,6 +309,21 @@ export function renderNewsletterHtml(params: {
 
   const body = blocks.map(renderBlockHtml).join('\n      ');
 
+  // フッターの頭のロゴ。押すとトップページへ。
+  //
+  // メール向けの作法をいくつか踏んでいる:
+  //   - width / height を **属性でも** 指定する（Outlook は CSS の寸法を無視する）
+  //   - `border:0` — リンクした画像に枠線を描くクライアントがある
+  //   - `display:block` — 画像下のベースライン分の隙間を消す
+  //   - `alt` を入れる。**画像は既定でブロックされることが多く**、そのとき
+  //     ここだけが手がかりになる
+  const logo =
+    `<div style="text-align:center;margin:0 0 16px;">` +
+    `<a href="${APP_URL}" style="display:inline-block;text-decoration:none;">` +
+    `<img src="${LOGO_URL}" alt="Oryzae" width="40" height="40" ` +
+    `style="display:block;width:40px;height:40px;border:0;outline:none;border-radius:8px;" />` +
+    `</a></div>`;
+
   const unsubscribe =
     `<p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#8a8279;">` +
     `<a href="${escapeHtml(params.unsubscribeUrl)}" style="color:#8a6d3b;text-decoration:underline;">${escapeHtml(copy.unsubscribeLabel)}</a>` +
@@ -328,6 +352,7 @@ export function renderNewsletterHtml(params: {
       <p style="margin:0 0 24px;font-size:12px;letter-spacing:0.08em;color:#8a8279;">ORYZAE</p>
       ${body}
       <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e0d8;">
+        ${logo}
         ${unsubscribe}
         ${footer}
       </div>
