@@ -1556,14 +1556,15 @@ export function EntryEditor({
                 settings={settings}
                 onChange={updateSettings}
                 ampUnavailable={ampState.unavailable}
-                // まだ保存されていないエントリーには消すものが無い。道ごと出さない。
+                // まだ保存されていないエントリーには消すものが無い。行は出したまま押せなくする
+                // （隠すと、どこにあるのか分からない）。
                 onDelete={
                   savedEntryId
                     ? () => {
                         setSettingsOpen(false);
                         setDeleteConfirmOpen(true);
                       }
-                    : undefined
+                    : null
                 }
               />
             </Popover>

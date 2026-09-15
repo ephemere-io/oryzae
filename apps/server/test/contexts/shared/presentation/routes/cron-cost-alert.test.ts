@@ -22,11 +22,21 @@ const supabaseState: {
   error: { message: string } | null;
   shouldThrow: boolean;
   capturedRange: { gte?: string; lte?: string };
+  /** auth.admin.listUsers の応答（1 ページ目）。 */
+  users: { id: string; email: string | null }[];
+  /** profiles テーブルの応答。 */
+  profiles: { id: string; nickname: string }[];
+  listUsersShouldThrow: boolean;
+  listUsersCalls: number;
 } = {
   rows: [],
   error: null,
   shouldThrow: false,
   capturedRange: {},
+  users: [],
+  profiles: [],
+  listUsersShouldThrow: false,
+  listUsersCalls: 0,
 };
 
 vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
@@ -53,7 +63,28 @@ vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
         return Promise.resolve({ data: from === 0 ? supabaseState.rows : [], error: null });
       },
     };
-    return { from: () => ({ select: () => builder }) };
+    const profiles = {
+      select: () => ({
+        in: () => Promise.resolve({ data: supabaseState.profiles, error: null }),
+      }),
+    };
+    return {
+      from: (table: string) => (table === 'profiles' ? profiles : { select: () => builder }),
+      auth: {
+        admin: {
+          listUsers: ({ page }: { page: number }) => {
+            supabaseState.listUsersCalls++;
+            if (supabaseState.listUsersShouldThrow) {
+              return Promise.reject(new Error('listUsers down'));
+            }
+            return Promise.resolve({
+              data: { users: page === 1 ? supabaseState.users : [] },
+              error: null,
+            });
+          },
+        },
+      },
+    };
   },
 }));
 
@@ -137,6 +168,10 @@ describe('cronCostAlert', () => {
     supabaseState.error = null;
     supabaseState.shouldThrow = false;
     supabaseState.capturedRange = {};
+    supabaseState.users = [];
+    supabaseState.profiles = [];
+    supabaseState.listUsersShouldThrow = false;
+    supabaseState.listUsersCalls = 0;
     vi.stubEnv('CRON_SECRET', SECRET);
     vi.stubEnv('ANTHROPIC_ADMIN_KEY', '');
     // コスト cron は JST 10:00 (= UTC 01:00) 実行 → 対象は直前に閉じた UTC 日 (8/8)
@@ -261,26 +296,75 @@ describe('cronCostAlert', () => {
     });
   });
 
-  it('includes a per-user cost breakdown', async () => {
-    supabaseState.rows = [
+  // 「ユーザー ID ではなく名前を出してほしい。メールでもいい」への対応。
+  describe('ユーザー別（誰の発酵か）', () => {
+    const threeRuns = () => [
       fermentation({ user_id: 'aaaaaaaa-1111', input_tokens: 100_000, output_tokens: 0 }),
       fermentation({ user_id: 'bbbbbbbb-2222', input_tokens: 300_000, output_tokens: 0 }),
       fermentation({ user_id: 'aaaaaaaa-1111', input_tokens: 100_000, output_tokens: 0 }),
     ];
 
-    const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
-    const body = await res.json();
+    it('名前 (メール) で書き、ID は出さない', async () => {
+      supabaseState.rows = threeRuns();
+      supabaseState.users = [
+        { id: 'aaaaaaaa-1111', email: 'akira@example.com' },
+        { id: 'bbbbbbbb-2222', email: 'baba@example.com' },
+      ];
+      supabaseState.profiles = [
+        { id: 'aaaaaaaa-1111', nickname: 'あきら' },
+        { id: 'bbbbbbbb-2222', nickname: 'ばば' },
+      ];
 
-    expect(body.userCount).toBe(2);
-    const breakdown = fieldValue('ユーザー別（推定・上位5）') ?? '';
-    // コスト降順。b が $0.90、a が 2件で $0.60。
-    expect(breakdown.indexOf('bbbbbbbb')).toBeLessThan(breakdown.indexOf('aaaaaaaa'));
-    expect(breakdown).toContain('$0.9000');
-    expect(breakdown).toContain('2 件');
-    // なぜここだけ推定なのかを内訳自身が説明する（実額と並ぶと区別がつかないため）
-    expect(breakdown).toContain('実額はユーザー別に取れないため');
-    // メールアドレスは Discord に送らない（既存の cron 通知の慣習に合わせる）
-    expect(breakdown).not.toContain('@');
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const body = await res.json();
+
+      expect(body.userCount).toBe(2);
+      const breakdown = fieldValue('ユーザー別（推定・上位5）') ?? '';
+      // コスト降順。b が $0.90、a が 2件で $0.60。
+      expect(breakdown).toContain('ばば (baba@example.com)  $0.9000  1 件');
+      expect(breakdown).toContain('あきら (akira@example.com)  $0.6000  2 件');
+      expect(breakdown.indexOf('ばば')).toBeLessThan(breakdown.indexOf('あきら'));
+      expect(breakdown).not.toContain('aaaaaaaa');
+      expect(breakdown).not.toContain('bbbbbbbb');
+      // なぜここだけ推定なのかを内訳自身が説明する（実額と並ぶと区別がつかないため）
+      expect(breakdown).toContain('実額はユーザー別に取れないため');
+    });
+
+    it('名前が無ければメールだけ、メールも無ければ ID の先頭 8 桁に縮退する', async () => {
+      supabaseState.rows = threeRuns();
+      // a はメールのみ（profiles 無し）、b はどちらも無い
+      supabaseState.users = [{ id: 'aaaaaaaa-1111', email: 'akira@example.com' }];
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const breakdown = fieldValue('ユーザー別（推定・上位5）') ?? '';
+      expect(breakdown).toContain('akira@example.com  $0.6000  2 件');
+      expect(breakdown).toContain('bbbbbbbb  $0.9000  1 件');
+    });
+
+    it('ユーザーの解決に失敗してもレポートは出す（ID 表記に縮退）', async () => {
+      supabaseState.rows = threeRuns();
+      supabaseState.listUsersShouldThrow = true;
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      expect(res.status).toBe(200);
+      const breakdown = fieldValue('ユーザー別（推定・上位5）') ?? '';
+      expect(breakdown).toContain('bbbbbbbb  $0.9000  1 件');
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[cron-cost-alert] user lookup failed',
+        expect.objectContaining({ error: 'listUsers down' }),
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('発酵 0 件の日はユーザー一覧を引かない（listUsers は最大 20 往復する）', async () => {
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      expect(supabaseState.listUsersCalls).toBe(0);
+    });
   });
 
   it('surfaces fermentations whose tokens were never stored', async () => {

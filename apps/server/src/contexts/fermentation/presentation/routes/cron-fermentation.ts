@@ -16,6 +16,7 @@ import { SupabaseUserLocaleResolver } from '../../infrastructure/auth/supabase-u
 import { ResendEmailNotifier } from '../../infrastructure/email/resend-email-notifier.js';
 import { createSupabaseVerifiedEmailResolver } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
+import { listActiveUserIds } from '../../infrastructure/repositories/supabase-active-user-ids.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
 import { summarizeFailureReasons } from '../summarize-failure-reasons.js';
@@ -42,18 +43,6 @@ export const cronFermentation = new Hono()
     const localeResolver = new SupabaseUserLocaleResolver(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
 
-    const listActiveUserIds = async (): Promise<string[]> => {
-      // Get distinct user_ids from entries table (users who have written at least once)
-      const { data, error } = await supabase.from('entries').select('user_id').limit(1000);
-
-      if (error) throw error;
-
-      const uniqueUserIds = [
-        ...new Set((data ?? []).map((row: { user_id: string }) => row.user_id)),
-      ];
-      return uniqueUserIds;
-    };
-
     const digestUsecase = new SendFermentationDigestUsecase(
       new ResendEmailNotifier(),
       createSupabaseVerifiedEmailResolver(supabase),
@@ -69,7 +58,7 @@ export const cronFermentation = new Hono()
       localeResolver,
       llmGateway,
       generateId,
-      listActiveUserIds,
+      () => listActiveUserIds(supabase),
       (userId, titles, language) =>
         digestUsecase.execute({ userId, questionTitles: titles, language }),
       // 失敗の瞬間に即通知。末尾の summary は処理が重く Vercel に kill されると

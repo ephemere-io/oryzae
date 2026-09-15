@@ -43,6 +43,7 @@
       "!**/node_modules",
       "!**/dist",
       "!**/.next",
+      "!**/.vercel",
       "!**/coverage",
       "!**/pnpm-lock.yaml",
       "!**/docs",

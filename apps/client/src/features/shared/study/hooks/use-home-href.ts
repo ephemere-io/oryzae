@@ -5,7 +5,7 @@ import { useStudyHome } from './use-study-home-flag';
 /**
  * ログイン後の行き先（＝このアプリの「ホーム」）。
  *
- * 書斎ホームが有効なら `/study`、そうでなければ `/entries/new`。**この判断を持つ場所は
+ * 書斎ホームが有効なら `/`（ルート＝書斎）、そうでなければ `/entries/new`。**この判断を持つ場所は
  * ここ 1 つ**にする。以前は `HomeGate` だけがフラグを見て、ログインフォームは
  * `/entries/new` を直書きしていた。その結果 `?study=on` を付けてプレビューを開いても、
  * 未ログイン → `/login` → ログイン → 従来の入口、となって書斎に入れなかった
@@ -26,5 +26,5 @@ interface HomeHref {
 
 export function useHomeHref(): HomeHref {
   const { enabled, resolved } = useStudyHome();
-  return { href: enabled ? '/study' : '/entries/new', resolved };
+  return { href: enabled ? '/' : '/entries/new', resolved };
 }

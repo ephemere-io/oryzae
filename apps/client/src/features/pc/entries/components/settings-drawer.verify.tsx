@@ -17,6 +17,8 @@ import { DEFAULT_SETTINGS, type EditorSettings, SettingsDrawer } from './setting
 interface Props {
   settings: EditorSettings;
   onChange: (patch: Partial<EditorSettings>) => void;
+  /** まだ保存されていないエントリーでは null（行は出るが押せない）。 */
+  onDelete: (() => void) | null;
 }
 
 const noop = () => {};
@@ -57,19 +59,26 @@ registerUnit<Props>({
     {
       id: 'default',
       description: '初期設定（エフェクト無効 → 最小ツリー）',
-      props: { settings: DEFAULT_SETTINGS, onChange: noop },
+      props: { settings: DEFAULT_SETTINGS, onChange: noop, onDelete: noop },
     },
     {
       id: 'all-effects-on',
       description: '時間内包＋ゴースト有効 → 表し方 Select と Slider 群が出現',
-      props: { settings: allEffectsOn, onChange: noop },
+      props: { settings: allEffectsOn, onChange: noop, onDelete: noop },
     },
     {
       id: 'boundary-stress',
       probe: true,
       description:
         'Probe: 全トグルON＋数値が上限（fontSize48 / ghostSize200 / blur極大）でもレイアウトが崩れない',
-      props: { settings: boundaryStress, onChange: noop },
+      props: { settings: boundaryStress, onChange: noop, onDelete: noop },
+    },
+    {
+      id: 'unsaved-entry',
+      probe: true,
+      description:
+        'Probe: まだ保存されていないエントリー — 「このエントリーを消す」は出たまま押せず、理由が添えてある',
+      props: { settings: DEFAULT_SETTINGS, onChange: noop, onDelete: null },
     },
   ],
   invariants: [
@@ -142,6 +151,24 @@ registerUnit<Props>({
           .reduce((max, text) => Math.max(max, text.length), 0);
         return (
           longest <= 24 || `パネル内に ${longest} 文字の文がある（設定の一覧に散文は置かない）`
+        );
+      },
+    },
+    {
+      id: 'delete-is-always-findable',
+      // 以前は保存前だと行ごと隠していて、どこにあるのか、面の下に隠れているのかが分からなかった。
+      description: '「このエントリーを消す」は常にある。押せないときは理由が添えてある',
+      check: ({ root, contract }) => {
+        const btn = Array.from(root.querySelectorAll('button')).find((b) =>
+          b.textContent?.includes('このエントリーを消す'),
+        );
+        if (!btn) return '「このエントリーを消す」が無い';
+        if (contract.deletable === 'true') return !btn.disabled || '保存済みなのに押せない';
+        if (!btn.disabled) return '保存前なのに押せてしまう';
+        const note = btn.getAttribute('aria-describedby');
+        return (
+          (note !== null && root.ownerDocument.getElementById(note) !== null) ||
+          '押せない理由が添えられていない'
         );
       },
     },
