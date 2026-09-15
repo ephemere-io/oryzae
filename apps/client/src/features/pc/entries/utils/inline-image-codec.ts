@@ -146,9 +146,13 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   }
 
   el.style.inlineSize = `${image.widthRatio * 100}%`;
-  // 自由変形したときだけ比率を固定する。既定は写真本来の比率に任せる。
+  // 自由変形したときだけ形を固定する。既定は写真本来の比率に任せる。
+  //
+  // `aspect-ratio` は**物理（幅 ÷ 高さ）**で、保存している `aspect` も同じ物理の比。
+  // ここに論理（block ÷ inline）の比を入れると、縦書きで縦横が入れ替わる
+  // （右の辺を引くと幅が 566px → 124px と逆に潰れていた）。
   el.style.blockSize = 'auto';
-  el.style.aspectRatio = image.aspect ? `1 / ${image.aspect}` : '';
+  el.style.aspectRatio = image.aspect ? String(image.aspect) : '';
 
   applyLayoutStyle(el, image);
 }

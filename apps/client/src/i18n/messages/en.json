@@ -560,7 +560,18 @@
     "resize_se": "Drag bottom-right to resize",
     "resize_s": "Drag bottom to resize",
     "resize_sw": "Drag bottom-left to resize",
-    "resize_w": "Drag left to resize"
+    "resize_w": "Drag left to resize",
+    "width": "Width",
+    "width_small": "Small",
+    "width_medium": "Medium",
+    "width_large": "Large",
+    "align": "Align",
+    "wrap": "Text wrap",
+    "wrap_on": "On",
+    "wrap_off": "Off",
+    "done": "Done",
+    "align_needs_room": "A full-width photo has nothing to align to",
+    "selected": "Photo selected"
   },
   "fermentation": {
     "detail": {

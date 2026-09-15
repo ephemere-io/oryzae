@@ -141,36 +141,36 @@ export function PhotoImportModal({
             </>
           ) : (
             <>
+              {/* **二択は対等に置く。** 片方だけ濃い色だと、そちらが正解に見える
+                  （SP の実機レビューで同じ指摘があり、#616 で同じ地に揃えた）。
+                  キャンセルは「やめる」で性質が違うので、**地を持たせず字の色を落として**
+                  下がらせる。枠や色で強く描くと、緑の塗りと同じく目立ってしまう。 */}
               <button
                 type="button"
                 onClick={onClose}
                 disabled={busy}
-                className="rounded-md border px-4 py-2 text-xs disabled:opacity-40"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--fg)',
-                  backgroundColor: 'var(--bg)',
-                }}
+                className="rounded-md px-4 py-2 text-xs disabled:opacity-40"
+                style={{ color: 'var(--date-color)' }}
               >
                 {t('cancel')}
               </button>
               <button
                 type="button"
-                onClick={onAttach}
+                onClick={onTranscribe}
                 disabled={busy || !state.previewUrl}
-                className="rounded-md border px-4 py-2 text-xs disabled:opacity-40"
-                style={{ borderColor: 'var(--border-subtle)', color: 'var(--fg)' }}
+                className="rounded-md px-4 py-2 text-xs font-medium disabled:opacity-40"
+                style={{ backgroundColor: 'var(--surface-sunken)', color: 'var(--fg)' }}
               >
-                {state.status === 'uploading' ? t('attaching') : t('attach')}
+                {state.status === 'transcribing' ? t('transcribing') : t('transcribe')}
               </button>
               <button
                 type="button"
-                onClick={onTranscribe}
+                onClick={onAttach}
                 disabled={busy || !state.previewUrl}
-                className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
-                style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
+                className="rounded-md px-4 py-2 text-xs font-medium disabled:opacity-40"
+                style={{ backgroundColor: 'var(--surface-sunken)', color: 'var(--fg)' }}
               >
-                {state.status === 'transcribing' ? t('transcribing') : t('transcribe')}
+                {state.status === 'uploading' ? t('attaching') : t('attach')}
               </button>
             </>
           )}

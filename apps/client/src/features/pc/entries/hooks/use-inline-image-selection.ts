@@ -2,6 +2,7 @@
 
 import type { InlineImage } from '@oryzae/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { caretRangeFromPoint } from '@/features/pc/entries/utils/caret-from-point';
 import {
   applyInlineImageStyle,
   isInlineImage,
@@ -13,7 +14,7 @@ import {
 } from '@/features/pc/entries/utils/inline-image-resize';
 
 /**
- * 本文中の写真の選択とリサイズを扱う。
+ * 本文中の写真の選択・移動・リサイズを扱う。
  *
  * DOM を直接触るのは、本文が contentEditable だから。写真を React で描くと、
  * ブラウザが編集で書き換えた DOM と React の仮想 DOM が食い違って本文が壊れる。
@@ -22,7 +23,7 @@ import {
  */
 interface UseInlineImageSelectionParams {
   editorRef: React.RefObject<HTMLElement | null>;
-  /** 縦書きか。リサイズの軸の向きが変わる。 */
+  /** 縦書きか。「行に対する割合」が高さのことになる。 */
   isVertical: boolean;
   /** 写真の見た目が確定したとき（ドラッグ終了・レイアウト変更）に呼ぶ。 */
   onCommit: () => void;
@@ -35,6 +36,26 @@ interface InlineImageSelection {
   image: InlineImage | null;
   /** 画面上の位置（オーバーレイを重ねるのに使う）。 */
   rect: DOMRect | null;
+}
+
+/** 掴んだと見なす距離（px）。これ未満は「選ぶためのクリック」として扱う。 */
+const DRAG_THRESHOLD_PX = 6;
+
+/**
+ * 1 行の長さ（px）。**枠ではなく中身の箱**を測る。
+ *
+ * `clientWidth` は余白（padding）を含む。横書きの本文は左右に余白を持つので、それを
+ * 行の長さだと思って割合を出すと、指した量より小さくしか伸びない（実測で、右の辺を
+ * 80px 引いて 45px しか伸びず、そのぶん高さが 15px 縮んだ）。`inline-size: 40%` が
+ * 割合を解決する相手は中身の箱なので、こちらもそれに合わせる。
+ */
+function measureLineLength(editor: HTMLElement, isVertical: boolean): number {
+  const style = getComputedStyle(editor);
+  const padding = isVertical
+    ? Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+    : Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+  const box = isVertical ? editor.clientHeight : editor.clientWidth;
+  return Math.max(0, box - (Number.isFinite(padding) ? padding : 0));
 }
 
 export function useInlineImageSelection({
@@ -54,8 +75,16 @@ export function useInlineImageSelection({
     startX: number;
     startY: number;
     start: InlineImage;
-    startInlinePx: number;
-    startBlockPx: number;
+    startWidthPx: number;
+    startHeightPx: number;
+  } | null>(null);
+
+  /** 写真そのものを掴んで、本文の別の場所へ移している最中。 */
+  const moveRef = useRef<{
+    el: HTMLImageElement;
+    startX: number;
+    startY: number;
+    moved: boolean;
   } | null>(null);
 
   /** 選択中の写真の位置をもう一度測る。ドラッグ中やスクロール後に呼ぶ。 */
@@ -93,6 +122,10 @@ export function useInlineImageSelection({
       // EventTarget は Node とは限らない（window 等も来る）。絞ってから判定する。
       if (target instanceof Node && isInlineImage(target)) {
         select(target);
+        // ここから動かせば移動、動かさなければただの選択。どちらかは pointermove が決める。
+        moveRef.current = { el: target, startX: e.clientX, startY: e.clientY, moved: false };
+        // 写真の上にキャレットを置かせない（Chrome は画像の中に入れようとする）。
+        e.preventDefault();
         return;
       }
       clear();
@@ -125,44 +158,86 @@ export function useInlineImageSelection({
         startX: e.clientX,
         startY: e.clientY,
         start: readInlineImageFromElement(el),
-        // 画面の縦横ではなく、本文の inline / block 軸に直して持つ。
-        startInlinePx: isVertical ? rect.height : rect.width,
-        startBlockPx: isVertical ? rect.width : rect.height,
+        // 画面で見たままの寸法を渡す。軸の読み替えは resizeInlineImage の中だけで行う。
+        startWidthPx: rect.width,
+        startHeightPx: rect.height,
       };
       e.preventDefault();
       e.stopPropagation();
     },
-    [selection.element, isVertical],
+    [selection.element],
+  );
+
+  /**
+   * 掴んだ写真を、指した文字の位置へ移す。
+   *
+   * **同じ要素を入れ直す**（消して作り直さない）。作り直すと `src` の読み直しで一瞬消え、
+   * 選択も外れる。`insertNode` は同じノードなら元の場所から抜いて入れ直してくれる。
+   */
+  const dropAt = useCallback(
+    (el: HTMLImageElement, x: number, y: number) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const range = caretRangeFromPoint(x, y);
+      if (!range) return;
+      if (!editor.contains(range.startContainer)) return;
+      // 自分自身の中には落とせない（落とし先が消えることになる）。
+      if (el.contains(range.startContainer)) return;
+      range.insertNode(el);
+    },
+    [editorRef],
   );
 
   useEffect(() => {
-    if (!selection.element) return;
-
     const onMove = (e: PointerEvent) => {
+      // ① ハンドルを掴んでいる（大きさを変える）
       const drag = dragRef.current;
-      const el = selection.element;
       const editor = editorRef.current;
-      if (!drag || !el || !editor) return;
+      if (drag && selection.element && editor) {
+        const next = resizeInlineImage({
+          start: drag.start,
+          handle: drag.handle,
+          dx: e.clientX - drag.startX,
+          dy: e.clientY - drag.startY,
+          editorInlineSize: measureLineLength(editor, isVertical),
+          startWidthPx: drag.startWidthPx,
+          startHeightPx: drag.startHeightPx,
+          isVertical,
+        });
+        applyInlineImageStyle(selection.element, { ...drag.start, ...next });
+        refresh();
+        return;
+      }
 
-      const next = resizeInlineImage({
-        start: drag.start,
-        handle: drag.handle,
-        dx: e.clientX - drag.startX,
-        dy: e.clientY - drag.startY,
-        // 1 行の長さ。縦書きなら editor の高さ。
-        editorInlineSize: isVertical ? editor.clientHeight : editor.clientWidth,
-        startInlinePx: drag.startInlinePx,
-        startBlockPx: drag.startBlockPx,
-        isVertical,
-      });
-      applyInlineImageStyle(el, { ...drag.start, ...next });
-      refresh();
+      // ② 写真そのものを掴んでいる（位置を変える）
+      const move = moveRef.current;
+      if (!move) return;
+      const far =
+        Math.abs(e.clientX - move.startX) > DRAG_THRESHOLD_PX ||
+        Math.abs(e.clientY - move.startY) > DRAG_THRESHOLD_PX;
+      if (!far) return;
+      if (!move.moved) {
+        move.moved = true;
+        // 掴んでいることを見た目で言う（薄くなる）。CSS は globals.css。
+        move.el.dataset.dragging = 'true';
+      }
     };
 
-    const onUp = () => {
-      if (!dragRef.current) return;
-      dragRef.current = null;
-      onCommit(); // 保存はドラッグ終了の 1 回だけ。移動中に毎回保存すると保存が詰まる。
+    const onUp = (e: PointerEvent) => {
+      if (dragRef.current) {
+        dragRef.current = null;
+        onCommit(); // 保存はドラッグ終了の 1 回だけ。移動中に毎回保存すると保存が詰まる。
+        return;
+      }
+      const move = moveRef.current;
+      moveRef.current = null;
+      if (!move) return;
+      move.el.removeAttribute('data-dragging');
+      if (!move.moved) return; // 動かしていない＝ただ選んだだけ
+      dropAt(move.el, e.clientX, e.clientY);
+      // **入れ直したら測り直す。** これが無いと、枠だけが元の位置に取り残される。
+      refresh();
+      onCommit();
     };
 
     window.addEventListener('pointermove', onMove);
@@ -171,11 +246,11 @@ export function useInlineImageSelection({
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [selection.element, editorRef, isVertical, refresh, onCommit]);
+  }, [selection.element, editorRef, isVertical, refresh, onCommit, dropAt]);
 
-  /** レイアウト（行内 / ブロック / 回り込み）と寄せを変える。 */
+  /** レイアウト（ブロック / 回り込み）・寄せ・幅を変える。 */
   const updateLayout = useCallback(
-    (patch: Partial<Pick<InlineImage, 'layout' | 'align'>>) => {
+    (patch: Partial<Pick<InlineImage, 'layout' | 'align' | 'widthRatio'>>) => {
       const el = selection.element;
       if (!el) return;
       applyInlineImageStyle(el, { ...readInlineImageFromElement(el), ...patch });
@@ -194,5 +269,5 @@ export function useInlineImageSelection({
     onCommit();
   }, [selection.element, clear, onCommit]);
 
-  return { selection, beginResize, updateLayout, removeSelected, clear };
+  return { selection, beginResize, updateLayout, removeSelected, clear, refresh };
 }

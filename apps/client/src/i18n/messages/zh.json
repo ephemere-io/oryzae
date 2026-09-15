@@ -560,7 +560,18 @@
     "resize_se": "拖动右下角调整大小",
     "resize_s": "拖动下边调整大小",
     "resize_sw": "拖动左下角调整大小",
-    "resize_w": "拖动左边调整大小"
+    "resize_w": "拖动左边调整大小",
+    "width": "宽度",
+    "width_small": "小",
+    "width_medium": "中",
+    "width_large": "大",
+    "align": "对齐",
+    "wrap": "文字环绕",
+    "wrap_on": "开",
+    "wrap_off": "关",
+    "done": "完成",
+    "align_needs_room": "整行宽度时无法对齐",
+    "selected": "已选中照片"
   },
   "fermentation": {
     "detail": {
