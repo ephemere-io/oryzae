@@ -99,6 +99,8 @@ function createApp() {
 
 const SECRET = 'test-cron-secret';
 const validHeaders = { Authorization: `Bearer ${SECRET}` };
+/** 請求額の欄。スコープ（org 全体の実額）は欄の名前に置いている。 */
+const ACTUAL_FIELD = '請求額（Anthropic の org 全体の実額）';
 
 function fermentation(overrides: Partial<FermentationRow> = {}): FermentationRow {
   return {
@@ -319,10 +321,10 @@ describe('cronCostAlert', () => {
       const body = await res.json();
 
       expect(body.userCount).toBe(2);
-      const breakdown = fieldValue('ユーザー別（推定・上位5）') ?? '';
+      const breakdown = fieldValue('ユーザー別（推定）') ?? '';
       // コスト降順。b が $0.90、a が 2件で $0.60。
-      expect(breakdown).toContain('ばば (baba@example.com)  $0.9000  1 件');
-      expect(breakdown).toContain('あきら (akira@example.com)  $0.6000  2 件');
+      expect(breakdown).toContain('ばば (baba@example.com): $0.9000（1 件）');
+      expect(breakdown).toContain('あきら (akira@example.com): $0.6000（2 件）');
       expect(breakdown.indexOf('ばば')).toBeLessThan(breakdown.indexOf('あきら'));
       expect(breakdown).not.toContain('aaaaaaaa');
       expect(breakdown).not.toContain('bbbbbbbb');
@@ -337,9 +339,29 @@ describe('cronCostAlert', () => {
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
-      const breakdown = fieldValue('ユーザー別（推定・上位5）') ?? '';
-      expect(breakdown).toContain('akira@example.com  $0.6000  2 件');
-      expect(breakdown).toContain('bbbbbbbb  $0.9000  1 件');
+      const breakdown = fieldValue('ユーザー別（推定）') ?? '';
+      expect(breakdown).toContain('akira@example.com: $0.6000（2 件）');
+      expect(breakdown).toContain('bbbbbbbb: $0.9000（1 件）');
+    });
+
+    it('11 人以上の日は上位 10 人に絞り、欄名にそう書く', async () => {
+      supabaseState.rows = Array.from({ length: 11 }, (_, i) =>
+        fermentation({
+          user_id: `user-${String(i).padStart(2, '0')}`,
+          input_tokens: (11 - i) * 10_000,
+          output_tokens: 0,
+        }),
+      );
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      // 全員載る日は「上位」と書かない（載っていない人がいるように読めるため）
+      expect(fieldValue('ユーザー別（推定）')).toBeUndefined();
+      const breakdown = fieldValue('ユーザー別（推定・上位10）') ?? '';
+      expect(breakdown).toContain('user-00: $0.3300（1 件）');
+      expect(breakdown).toContain('user-09: $0.0600（1 件）');
+      expect(breakdown).not.toContain('user-10:');
+      expect(breakdown).toContain('…他 1 名');
     });
 
     it('ユーザーの解決に失敗してもレポートは出す（ID 表記に縮退）', async () => {
@@ -350,8 +372,8 @@ describe('cronCostAlert', () => {
       const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
       expect(res.status).toBe(200);
-      const breakdown = fieldValue('ユーザー別（推定・上位5）') ?? '';
-      expect(breakdown).toContain('bbbbbbbb  $0.9000  1 件');
+      const breakdown = fieldValue('ユーザー別（推定）') ?? '';
+      expect(breakdown).toContain('bbbbbbbb: $0.9000（1 件）');
       expect(errorSpy).toHaveBeenCalledWith(
         '[cron-cost-alert] user lookup failed',
         expect.objectContaining({ error: 'listUsers down' }),
@@ -405,7 +427,7 @@ describe('cronCostAlert', () => {
       // group_by が無い応答なので内訳は受け皿に入る（総額と一致する）
       byModel: [{ model: '(内訳なし)', costUsd: 0.465, feature: null }],
     });
-    expect(fieldValue('請求額')).toContain('$0.4650');
+    expect(fieldValue(ACTUAL_FIELD)).toContain('$0.4650');
   });
 
   it('says the admin key is unset rather than reporting $0', async () => {
@@ -415,8 +437,8 @@ describe('cronCostAlert', () => {
     const body = await res.json();
 
     expect(body.actualCost).toEqual({ status: 'not-configured' });
-    expect(fieldValue('請求額')).toContain('取得できません（ANTHROPIC_ADMIN_KEY 未設定）');
-    expect(fieldValue('請求額')).not.toContain('$0');
+    expect(fieldValue(ACTUAL_FIELD)).toContain('取得できません（ANTHROPIC_ADMIN_KEY 未設定）');
+    expect(fieldValue(ACTUAL_FIELD)).not.toContain('$0');
     // 実額が無い日は月累計・見込みを出さない（推定を実額のように読ませない）
     expect(fieldValue('今月の累計と見込み')).toBeUndefined();
     expect(mockFetch).not.toHaveBeenCalled();
@@ -487,11 +509,11 @@ describe('cronCostAlert', () => {
       const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
       const body = await res.json();
 
-      const value = fieldValue('請求額') ?? '';
-      expect(value).toContain('OCR (claude-opus-5)  $0.1881');
-      expect(value).toContain('発酵 (claude-sonnet-4-6)  $0.1248');
-      // 金額（1 行目）→ 内訳の順
-      expect(value.indexOf('$0.3129')).toBeLessThan(value.indexOf('OCR'));
+      const value = fieldValue(ACTUAL_FIELD) ?? '';
+      // 「合計: 金額」の配下に「用途: 金額」をぶら下げる。親子が字形で分かる
+      expect(value).toContain(
+        '合計: $0.3129\n├ OCR (claude-opus-5): $0.1881\n└ 発酵 (claude-sonnet-4-6): $0.1248',
+      );
 
       expect(body.actualCost.byModel).toEqual([
         { model: 'claude-opus-5', costUsd: 0.1881, feature: 'OCR' },
@@ -511,9 +533,9 @@ describe('cronCostAlert', () => {
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
-      const value = fieldValue('請求額') ?? '';
-      expect(value).toContain('写真の文字起こし (claude-sonnet-5)  $0.6029');
-      expect(value).toContain('claude-haiku-4-5-20251001  $0.0013  ← 用途不明');
+      const value = fieldValue(ACTUAL_FIELD) ?? '';
+      expect(value).toContain('├ 写真の文字起こし (claude-sonnet-5): $0.6029');
+      expect(value).toContain('└ claude-haiku-4-5-20251001: $0.0013 ← 用途不明');
     });
 
     it('知らないモデルは用途を決めつけず、その旨を添える', async () => {
@@ -526,8 +548,8 @@ describe('cronCostAlert', () => {
       const body = await res.json();
 
       // $1 以上は 2 桁。$5.0000 の下 2 桁は読む人にとって意味を持たない
-      expect(fieldValue('請求額')).toContain(
-        'some-other-model  $5.00  ← 用途不明（アプリ外の利用か登録漏れ）',
+      expect(fieldValue(ACTUAL_FIELD)).toContain(
+        '└ some-other-model: $5.00 ← 用途不明（アプリ外の利用か登録漏れ）',
       );
       expect(body.actualCost.byModel[0].feature).toBeNull();
     });
@@ -543,21 +565,21 @@ describe('cronCostAlert', () => {
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
-      const value = fieldValue('請求額') ?? '';
-      expect(value).toContain('(web_search)  $0.0500');
-      expect(value).not.toContain('(web_search)  $0.0500  ←');
+      const value = fieldValue(ACTUAL_FIELD) ?? '';
+      expect(value).toContain('└ (web_search): $0.0500');
+      expect(value).not.toContain('(web_search): $0.0500 ←');
     });
 
-    it('内訳が取れなかったときは、その旨を出す（総額は正しいと添える）', async () => {
+    it('内訳が取れなかったときは、その旨を出す（合計は正しいと添える）', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
       // group_by が効かない応答（model も cost_type も無い）
       mockFetch.mockResolvedValueOnce(costReportResponse([{ amount: '500' }]));
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
-      const value = fieldValue('請求額') ?? '';
+      const value = fieldValue(ACTUAL_FIELD) ?? '';
       expect(value).toContain('group_by が効いていない可能性');
-      expect(value).toContain('総額は正しい値です');
+      expect(value).toContain('合計は正しい値です');
     });
 
     it('確認先として管理画面と Anthropic Console のリンクを付ける', async () => {
@@ -569,9 +591,9 @@ describe('cronCostAlert', () => {
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
       // 通知だけで数字の裏取りに行けること（Console はモデル別 + API キー別に割れる）
-      const value = fieldValue('請求額') ?? '';
+      const value = fieldValue(ACTUAL_FIELD) ?? '';
       expect(value).toContain(
-        '[管理画面で確認](https://oryzae-admin.vercel.app/observability/spend)',
+        '確認先: [管理画面](https://oryzae-admin.vercel.app/observability/spend)',
       );
       expect(value).toContain('[Anthropic Console](https://platform.claude.com/cost)');
     });
@@ -581,9 +603,9 @@ describe('cronCostAlert', () => {
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
-      expect(fieldValue('請求額')).not.toContain('←');
+      expect(fieldValue(ACTUAL_FIELD)).not.toContain('←');
       // 確認先は実額が取れない日にも要る（管理画面で状況を見に行ける）
-      expect(fieldValue('請求額')).toContain('[管理画面で確認]');
+      expect(fieldValue(ACTUAL_FIELD)).toContain('確認先: [管理画面]');
       expect(fieldValue('推定コスト（発酵のみ・実額の代用）')).toContain('$0.4500');
     });
   });
@@ -618,8 +640,9 @@ describe('cronCostAlert', () => {
       expect((await res.json()).notices).toEqual([]);
       expect(fieldValue('要確認')).toBeUndefined();
       expect(fieldValue('推定の計算根拠')).toBeUndefined();
-      // スコープの違いは引き算ではなく1行の注記で伝える
-      expect(fieldValue('請求額')).toContain('org 全体の実額');
+      // スコープ（org 全体の実額）は引き算や注記ではなく、欄の名前で伝える
+      expect(lastEmbed().fields?.some((f) => f.name === ACTUAL_FIELD)).toBe(true);
+      expect(fieldValue(ACTUAL_FIELD)).toContain('※ 同じモデルを CI などが使えば');
     });
 
     it('推定が実額とズレた日だけ、両方の数字と計算根拠を出す', async () => {
@@ -663,7 +686,9 @@ describe('cronCostAlert', () => {
       // 8 日で $0.50 → 1日 $0.0625 → 31 日で $1.9375
       expect(body.projectedMonthEndCost).toBeCloseTo(1.9375, 6);
 
-      expect(fieldValue('請求額')?.startsWith('$0.2000（前日 $0.1000 +100%）\n')).toBe(true);
+      expect(fieldValue(ACTUAL_FIELD)?.startsWith('合計: $0.2000（前日 $0.1000 +100%）\n')).toBe(
+        true,
+      );
       expect(fieldValue('今月の累計と見込み')).toBe(
         '8 日分の累計 $0.5000\nこのペースだと月末に $1.94（1 日平均 $0.0625 × 31 日）',
       );
@@ -699,7 +724,7 @@ describe('cronCostAlert', () => {
       const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
       expect((await res.json()).previousDayCost).toBeNull();
-      expect(fieldValue('請求額')?.startsWith('$0.2000（前日 データなし）\n')).toBe(true);
+      expect(fieldValue(ACTUAL_FIELD)?.startsWith('合計: $0.2000（前日 データなし）\n')).toBe(true);
     });
 
     it('月ぶんの取得に失敗しても、その日のレポートは出す', async () => {
@@ -715,7 +740,7 @@ describe('cronCostAlert', () => {
       expect(res.status).toBe(200);
       expect(body.actualCost.costUsd).toBeCloseTo(0.2, 6);
       expect(body.monthToDateCost).toBeNull();
-      expect(fieldValue('請求額')?.startsWith('$0.2000\n')).toBe(true);
+      expect(fieldValue(ACTUAL_FIELD)?.startsWith('合計: $0.2000\n')).toBe(true);
       expect(fieldValue('今月の累計と見込み')).toBeUndefined();
     });
   });
@@ -742,7 +767,7 @@ describe('cronCostAlert', () => {
 
       expect(res.status).toBe(200);
       expect(fieldValue('発酵')).toBe('0 件');
-      expect(fieldValue('ユーザー別（推定・上位5）')).toBeUndefined();
+      expect(fieldValue('ユーザー別（推定）')).toBeUndefined();
       // 0 件の日に計算根拠（すべて 0 の式）を出しても読むものが無い
       expect(fieldValue('推定の計算根拠')).toBeUndefined();
     });
