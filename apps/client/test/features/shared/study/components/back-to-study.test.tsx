@@ -49,7 +49,8 @@ describe('BackToStudy と集中モード', () => {
     // エディタが書いている間にまわりを消す演出で、タブだけが残っていた（実機レビュー）。
     const { container } = renderTab(true);
     expect(band(container).className).toContain('opacity-0');
-    const tab = container.querySelector('a[href="/study"]');
+    // 書斎はルート（/）。
+    const tab = container.querySelector('a[href="/"]');
     expect(tab?.className).toContain('pointer-events-none');
     expect(tab?.getAttribute('tabindex')).toBe('-1');
     expect(tab?.getAttribute('aria-hidden')).toBe('true');

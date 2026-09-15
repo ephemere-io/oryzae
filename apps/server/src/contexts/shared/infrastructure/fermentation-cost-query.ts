@@ -12,6 +12,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeCostFromTokens } from './claude-pricing.js';
+import { readString, toRecordArray } from './row.js';
 
 /** Supabase の1リクエスト上限。これを超える分はページングで取り切る。 */
 const PAGE_SIZE = 1000;
@@ -210,4 +211,22 @@ export async function resolveUserEmails(supabase: SupabaseClient): Promise<Map<s
     if (users.length < 1000) break;
   }
   return emailMap;
+}
+
+/**
+ * user_id → profiles.nickname の解決。listUsers と違い、対象ユーザーだけを引ける。
+ * 取れなくても通知は出したいので、失敗は空の Map に落とす（呼び出し側が縮退する）。
+ */
+export async function resolveUserNicknames(
+  supabase: SupabaseClient,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const nicknameMap = new Map<string, string>();
+  if (userIds.length === 0) return nicknameMap;
+  const { data, error } = await supabase.from('profiles').select('id, nickname').in('id', userIds);
+  if (error || !data) return nicknameMap;
+  for (const row of toRecordArray(data, 'profiles')) {
+    nicknameMap.set(readString(row, 'id'), readString(row, 'nickname'));
+  }
+  return nicknameMap;
 }

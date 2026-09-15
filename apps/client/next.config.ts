@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
   // ため、消すのではなく 301 で恒久転送する。検索評価も移設先へ引き継ぐ。
   async redirects() {
     return [
+      // 書斎はルート（/）に移した。古い /study のリンク・ブックマークを生かす。
+      { source: '/study', destination: '/', permanent: false },
       { source: '/privacy', destination: `${DOCS_SITE_URL}/privacy`, permanent: true },
       { source: '/support', destination: `${DOCS_SITE_URL}/support`, permanent: true },
     ];

@@ -10,6 +10,7 @@ import {
   ELEVATED_PANEL_STYLE,
   HOVER_CLASS,
   ICON_STROKE_WIDTH,
+  LAYER,
   type PaletteSize,
   paletteScale,
   TOOL_BUTTON_CLASS,
@@ -121,9 +122,13 @@ export function FloatingPalette({
   // 定位置は本文領域（サイドバーを除いた部分）の下端中央。動かされていればその位置。
   // 畳んでいるあいだは常に下端へ戻る（つまみは端に貼りついているのが自然）。
   const docked = collapsed || surface.anchor === null;
-  const placement: React.CSSProperties = docked
-    ? { bottom: collapsed ? 0 : dockBottom, ...CONTENT_CENTERED_STYLE }
-    : (anchorStyle(surface.anchor) ?? {});
+  const placement: React.CSSProperties = {
+    // 重なりの順は surface の LAYER が持つ（開いた設定パネルがこの下に潜らないように）。
+    zIndex: LAYER.palette,
+    ...(docked
+      ? { bottom: collapsed ? 0 : dockBottom, ...CONTENT_CENTERED_STYLE }
+      : (anchorStyle(surface.anchor) ?? {})),
+  };
 
   const attrs = verifyAttrs({
     ...contract,
@@ -133,7 +138,7 @@ export function FloatingPalette({
     docked,
   });
 
-  const wrapperClass = `fixed z-[1600] transition-opacity duration-300 ${
+  const wrapperClass = `fixed transition-opacity duration-300 ${
     visible ? 'opacity-100' : 'pointer-events-none opacity-0'
   }`;
 

@@ -75,7 +75,14 @@ export interface StudyLayout {
   /** 遷移先へ寄るときの距離。 */
   viewDistance: { jar: number; journal: number; board: number };
   /** 対象ラベルの world アンカー。 */
-  labelAnchors: { jar: Vec3; journal: Vec3; board: Vec3; archive: Vec3 | null };
+  labelAnchors: {
+    jar: Vec3;
+    journal: Vec3;
+    board: Vec3;
+    archive: Vec3 | null;
+    /** 鉛筆の「NEW」。PC だけ（SP は ENTRIES のピルがそのまま新規執筆になる）。 */
+    pen: Vec3 | null;
+  };
   /** SP のピルだけが使う画面座標オフセット（px）。PC は null。 */
   pillOffsets: { jar: Vec2; journal: Vec2; board: Vec2; archive: Vec2 } | null;
 }
@@ -138,6 +145,13 @@ export const PC_LAYOUT: StudyLayout = {
      * 画面の上のほうに投影されて棚の絵と混ざる（「もう少し手前に」と再度報告された）。
      */
     archive: vec3(PC_SHELF.x + 1.7, -1.14, PC_SHELF.z + 2.0),
+    /**
+     * 鉛筆の真下（画面では鉛筆のすぐ下）。鉛筆は積みの右脇に前後向きで寝ていて、中心は
+     * 机ローカル (2.55, -0.15, -0.1) を積みの向き（-0.15 rad）で回した world ≈ (5.54, -1.15,
+     * 2.28)、手前の端は z ≈ 3.2。その少し手前の机の面に置く。積みの ENTRIES（x = 3）とは
+     * 2.4 離れるので重ならない。
+     */
+    pen: vec3(5.4, -1.14, 3.7),
   },
   pillOffsets: null,
 };
@@ -180,6 +194,8 @@ export const SP_LAYOUT: StudyLayout = {
     // 瓶の上に乗る（実機で確認）。俯瞰では「板の直下」を板の座標系で取る必要がある。
     board: vec3(0, 1.5, -4.0),
     archive: vec3(SP_SHELF.x, SP_SHELF.y + 2.1 * SP_SHELF_SCALE, SP_SHELF.z),
+    // SP は ENTRIES のピルがそのまま新規執筆なので、NEW のピルは足さない（同じ行き先が 2 つ並ぶ）。
+    pen: null,
   },
   pillOffsets: {
     jar: { x: -28, y: 26 },
