@@ -11,12 +11,15 @@ import {
   type SendResult,
   sendResultSchema,
   type TestSendResult,
+  type TranslateResult,
   testSendResultSchema,
+  translateResultSchema,
 } from '../types';
 
 const previewResponseSchema = z.object({ data: newsletterPreviewSchema });
 const sendResponseSchema = z.object({ data: sendResultSchema });
 const testSendResponseSchema = z.object({ data: testSendResultSchema });
+const translateResponseSchema = z.object({ data: translateResultSchema });
 
 /**
  * 送信の直前に見るもの（HTML プレビュー・宛先数）と、送信そのもの。
@@ -28,9 +31,11 @@ export function useNewsletterSend() {
   const [preview, setPreview] = useState<NewsletterPreview | null>(null);
   const [result, setResult] = useState<SendResult | null>(null);
   const [testResult, setTestResult] = useState<TestSendResult | null>(null);
+  const [translateResult, setTranslateResult] = useState<TranslateResult | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [sending, setSending] = useState(false);
   const [testSending, setTestSending] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadPreview = useCallback(async (id: string): Promise<boolean> => {
@@ -61,6 +66,43 @@ export function useNewsletterSend() {
     setPreview(body.data);
     setLoadingPreview(false);
     return true;
+  }, []);
+
+  /**
+   * 宛先がいる言語へ翻訳する。
+   *
+   * 原文が変わっていない言語は訳し直さない（サーバー側で判定）。押すたびに
+   * 全言語へ課金される作りにはしていない。
+   */
+  const translate = useCallback(async (id: string): Promise<TranslateResult | null> => {
+    const token = getAccessToken();
+    if (!token) return null;
+
+    setTranslating(true);
+    setError(null);
+
+    const api = createApiClient(token);
+    const res = await api.fetch(`/api/v1/admin/newsletters/${id}/translate`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      setError(await readErrorMessage(res, '翻訳に失敗しました'));
+      setTranslating(false);
+      return null;
+    }
+
+    const body = await parseJson(res, translateResponseSchema);
+    if (!body) {
+      setError('翻訳の結果を読み取れませんでした。プレビューを開き直して確認してください。');
+      setTranslating(false);
+      return null;
+    }
+
+    setTranslateResult(body.data);
+    setTranslating(false);
+    return body.data;
   }, []);
 
   /**
@@ -139,6 +181,7 @@ export function useNewsletterSend() {
     setPreview(null);
     setResult(null);
     setTestResult(null);
+    setTranslateResult(null);
     setError(null);
   }, []);
 
@@ -146,12 +189,15 @@ export function useNewsletterSend() {
     preview,
     result,
     testResult,
+    translateResult,
     loadPreview,
     send,
     sendTest,
+    translate,
     loadingPreview,
     sending,
     testSending,
+    translating,
     error,
     reset,
   };

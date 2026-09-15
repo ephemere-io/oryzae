@@ -42,6 +42,13 @@ const preview = {
   html: '<html><body>本文</body></html>',
   text: '今月の更新\n\n本文',
   recipientCount: 3,
+  locales: [
+    { locale: 'ja', recipientCount: 3, subject: '今月の更新', html: '<p>本文</p>', text: '本文' },
+    { locale: 'en', recipientCount: 0, subject: null, html: null, text: null },
+    { locale: 'zh', recipientCount: 0, subject: null, html: null, text: null },
+    { locale: 'ko', recipientCount: 0, subject: null, html: null, text: null },
+  ],
+  missingTranslations: [],
   sendable: true,
   blockedReason: null,
   testSentAt: '2026-09-14T07:30:00.000Z',
@@ -75,7 +82,14 @@ describe('useNewsletterSend', () => {
       mockResponse({
         ok: true,
         body: {
-          data: { newsletter, sent: true, delivered: 3, failed: 0, failureReasons: [] },
+          data: {
+            newsletter,
+            sent: true,
+            delivered: 3,
+            failed: 0,
+            sentByLocale: { ja: 3 },
+            failureReasons: [],
+          },
         },
       }),
     );
@@ -103,6 +117,7 @@ describe('useNewsletterSend', () => {
             reason: 'no-api-key',
             delivered: 0,
             failed: 0,
+            sentByLocale: {},
             failureReasons: [],
           },
         },
@@ -137,6 +152,7 @@ describe('useNewsletterSend', () => {
             delivered: 2,
             failed: 0,
             recipients: ['admin1@example.com', 'admin2@example.com'],
+            locales: ['ja'],
           },
         },
       }),
@@ -175,6 +191,34 @@ describe('useNewsletterSend', () => {
 
     expect(result.current.error).toBe('テスト配信の宛先がいません');
     expect(result.current.testResult).toBeNull();
+  });
+
+  it('翻訳は /translate を叩き、結果の言語を保持する', async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockResponse({
+        ok: true,
+        body: {
+          data: {
+            translated: ['en'],
+            skipped: ['zh'],
+            recipientCountByLocale: { ja: 94, en: 7, zh: 1, ko: 0 },
+          },
+        },
+      }),
+    );
+
+    const { result } = renderHook(() => useNewsletterSend());
+    await act(async () => {
+      await result.current.translate('nl-1');
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/admin/newsletters/nl-1/translate',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(result.current.translateResult?.translated).toEqual(['en']);
+    // 原文が変わっていない言語は訳し直さない（サーバー側の判定）。
+    expect(result.current.translateResult?.skipped).toEqual(['zh']);
   });
 
   it('4xx はサーバーの文言をそのまま出す', async () => {
@@ -218,6 +262,7 @@ describe('useNewsletterSend', () => {
     expect(result.current.preview).toBeNull();
     expect(result.current.result).toBeNull();
     expect(result.current.testResult).toBeNull();
+    expect(result.current.translateResult).toBeNull();
     expect(result.current.error).toBeNull();
   });
 });

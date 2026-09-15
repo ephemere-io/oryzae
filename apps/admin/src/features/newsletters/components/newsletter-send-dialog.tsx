@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, FlaskConical, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FlaskConical, Languages, Send } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +13,8 @@ import {
 import {
   formatBlockedReason,
   formatSendSkipReason,
+  LOCALE_LABELS,
+  type NewsletterLocale,
   type NewsletterPreview,
   type SendResult,
   type TestSendResult,
@@ -37,9 +39,11 @@ interface Props {
   loadingPreview: boolean;
   sending: boolean;
   testSending: boolean;
+  translating: boolean;
   error: string | null;
   onSend: () => void;
   onSendTest: () => void;
+  onTranslate: () => void;
 }
 
 /**
@@ -62,16 +66,21 @@ export function NewsletterSendDialog({
   loadingPreview,
   sending,
   testSending,
+  translating,
   error,
   onSend,
   onSendTest,
+  onTranslate,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [format, setFormat] = useState<'html' | 'text'>('html');
+  // どの言語版を見ているか。既定は原文。
+  const [locale, setLocale] = useState<NewsletterLocale>('ja');
 
   // 直前に撃ったテストの結果を優先する（プレビューは開いた時点の値なので、
   // ダイアログを開いたままテスト配信すると古いままになる）。
   const testedAt = testResult?.newsletter.testSentAt ?? preview?.testSentAt ?? null;
+  const shown = preview?.locales.find((l) => l.locale === locale) ?? null;
 
   function handleOpenChange(next: boolean) {
     // 開き直したときに確認済みの状態が残っていると、1 クリックで送れてしまう。
@@ -134,24 +143,84 @@ export function NewsletterSendDialog({
               </div>
             </div>
 
+            {/* 言語ごとに実際に届くものを見る。日本語だけ見て送ると、英語版が
+                崩れていても気づけない。宛先 0 名の言語も並べる（存在は見せる）。 */}
+            <div className="flex flex-wrap items-center gap-1">
+              {preview.locales.map((entry) => {
+                const missing = entry.html === null;
+                return (
+                  <button
+                    key={entry.locale}
+                    type="button"
+                    onClick={() => setLocale(entry.locale)}
+                    className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                      locale === entry.locale
+                        ? 'bg-foreground text-background'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {LOCALE_LABELS[entry.locale]}
+                    <span className="ml-1 font-mono text-[10px] opacity-70">
+                      {entry.recipientCount}
+                    </span>
+                    {missing && entry.recipientCount > 0 && (
+                      <span className="ml-1 text-destructive">!</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="text-sm">
               <span className="text-muted-foreground">件名: </span>
-              <span className="font-medium">{preview.subject}</span>
+              <span className="font-medium">{shown?.subject ?? preview.subject}</span>
             </div>
 
             <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-border">
-              {format === 'html' ? (
+              {shown?.html == null ? (
+                <p className="flex h-[46vh] items-center justify-center px-6 text-center text-xs text-muted-foreground">
+                  この言語の翻訳がまだありません。「翻訳を作成」を押すと、宛先がいる言語ぶんが作られます。
+                </p>
+              ) : format === 'html' ? (
                 <iframe
                   title="メールのプレビュー"
-                  srcDoc={preview.html}
+                  srcDoc={shown.html}
                   sandbox=""
                   className="h-[46vh] w-full bg-white"
                 />
               ) : (
                 <pre className="h-[46vh] overflow-auto bg-background p-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
-                  {preview.text}
+                  {shown.text}
                 </pre>
               )}
+            </div>
+
+            {/* 翻訳の状態と作成ボタン。テスト配信の前に置くのは、翻訳 → テスト →
+                本番の順に進んでほしいから（テストは用意できている言語ぶんを送る）。 */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+              <div className="text-xs">
+                {preview.missingTranslations.length === 0 ? (
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    宛先がいる言語の翻訳は揃っています
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    翻訳が必要:{' '}
+                    {preview.missingTranslations.map((l) => LOCALE_LABELS[l]).join(' / ')}
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onTranslate}
+                disabled={translating || sending || testSending}
+              >
+                <Languages className={`mr-1.5 h-3 w-3 ${translating ? 'animate-pulse' : ''}`} />
+                {translating ? '翻訳中...' : '翻訳を作成'}
+              </Button>
             </div>
 
             {preview.blockedReason && (
@@ -178,7 +247,7 @@ export function NewsletterSendDialog({
                 {testResult && (
                   <div className="mt-1 font-mono text-[11px] text-muted-foreground">
                     {testResult.sent
-                      ? `${testResult.delivered} 件送信: ${testResult.recipients.join(', ')}`
+                      ? `${testResult.delivered} 件送信 (${testResult.locales.join('/')}): ${testResult.recipients.join(', ')}`
                       : `送信されず (${formatSendSkipReason(testResult.reason)})`}
                     {testResult.sent && testResult.failed > 0 && (
                       <span className="text-destructive"> · 失敗 {testResult.failed}</span>
@@ -192,7 +261,9 @@ export function NewsletterSendDialog({
                 onClick={onSendTest}
                 // 未テストだから送信が塞がっている、という状態でこそ押したいボタン。
                 // preview.sendable では判断しない（それだと永久に押せなくなる）。
-                disabled={testSending || sending || preview.blockedReason === 'already-sent'}
+                disabled={
+                  testSending || sending || translating || preview.blockedReason === 'already-sent'
+                }
               >
                 <FlaskConical className={`mr-1.5 h-3 w-3 ${testSending ? 'animate-pulse' : ''}`} />
                 {testSending ? '送信中...' : 'テスト配信'}
@@ -230,6 +301,13 @@ export function NewsletterSendDialog({
                     <span className="text-destructive"> / {result.failed} 名は失敗</span>
                   )}
                 </p>
+                {Object.keys(result.sentByLocale).length > 0 && (
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {Object.entries(result.sentByLocale)
+                      .map(([l, n]) => `${l}: ${n}`)
+                      .join(' · ')}
+                  </p>
+                )}
                 {result.failureReasons.length > 0 && (
                   <ul className="space-y-0.5 font-mono text-xs text-muted-foreground">
                     {result.failureReasons.map((failure) => (

@@ -10,6 +10,7 @@ import { ListNewslettersUsecase } from '../../application/usecases/list-newslett
 import { PreviewNewsletterUsecase } from '../../application/usecases/preview-newsletter.usecase.js';
 import { SendNewsletterUsecase } from '../../application/usecases/send-newsletter.usecase.js';
 import { SendNewsletterTestUsecase } from '../../application/usecases/send-newsletter-test.usecase.js';
+import { TranslateNewsletterUsecase } from '../../application/usecases/translate-newsletter.usecase.js';
 import { UpdateNewsletterUsecase } from '../../application/usecases/update-newsletter.usecase.js';
 import {
   MAX_NEWSLETTER_BODY_LENGTH,
@@ -22,7 +23,9 @@ import {
   GithubChangelogUnavailableError,
 } from '../../infrastructure/github/github-changelog-source.js';
 import { VercelAiNewsletterDraftGateway } from '../../infrastructure/llm/vercel-ai-newsletter-draft.gateway.js';
+import { VercelAiNewsletterTranslatorGateway } from '../../infrastructure/llm/vercel-ai-newsletter-translator.gateway.js';
 import { SupabaseNewsletterRepository } from '../../infrastructure/repositories/supabase-newsletter.repository.js';
+import { SupabaseNewsletterTranslationRepository } from '../../infrastructure/repositories/supabase-newsletter-translation.repository.js';
 import { HmacUnsubscribeToken } from '../../infrastructure/unsubscribe/hmac-unsubscribe-token.js';
 
 type Env = {
@@ -109,8 +112,28 @@ export const adminNewsletters = new Hono<Env>()
     const usecase = new PreviewNewsletterUsecase(
       new SupabaseNewsletterRepository(supabase),
       new SupabaseNewsletterAudience(supabase),
+      new SupabaseNewsletterTranslationRepository(supabase),
     );
     return c.json({ data: await usecase.execute(c.req.param('id')) });
+  })
+  // 宛先がいる言語へ訳す。原文が変わっていない言語は訳し直さない（同じ内容に
+  // 二度払わない）。翻訳が揃うまで本番送信はゲートで止まる。
+  .post('/:id/translate', async (c) => {
+    const supabase = c.get('adminSupabase');
+    const usecase = new TranslateNewsletterUsecase(
+      new SupabaseNewsletterRepository(supabase),
+      new SupabaseNewsletterTranslationRepository(supabase),
+      new SupabaseNewsletterAudience(supabase),
+      new VercelAiNewsletterTranslatorGateway(),
+    );
+
+    const result = await usecase.execute(c.req.param('id'));
+    console.info('[admin-newsletters] translate finished', {
+      newsletterId: c.req.param('id'),
+      translated: result.translated,
+      skipped: result.skipped,
+    });
+    return c.json({ data: result });
   })
   // 本番配信の前に運営者だけへ送る。status を動かさないので何度でも撃てる。
   // 宛先が運営者に固定されているぶん、本番のような 2 段階確認は要らない。
@@ -121,6 +144,7 @@ export const adminNewsletters = new Hono<Env>()
       new SupabaseNewsletterAudience(supabase),
       new ResendBulkEmailSender(),
       new HmacUnsubscribeToken(),
+      new SupabaseNewsletterTranslationRepository(supabase),
     );
 
     const result = await usecase.execute(c.req.param('id'));
@@ -141,6 +165,7 @@ export const adminNewsletters = new Hono<Env>()
       new SupabaseNewsletterAudience(supabase),
       new ResendBulkEmailSender(),
       new HmacUnsubscribeToken(),
+      new SupabaseNewsletterTranslationRepository(supabase),
     );
 
     const result = await usecase.execute(c.req.param('id'));

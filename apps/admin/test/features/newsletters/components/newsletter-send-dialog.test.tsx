@@ -29,6 +29,19 @@ const preview: NewsletterPreview = {
   html: '<html><body><p>本文です。</p></body></html>',
   text: '今月の更新\n\n本文です。',
   recipientCount: 137,
+  locales: [
+    {
+      locale: 'ja',
+      recipientCount: 129,
+      subject: '今月の更新',
+      html: '<p>本文です。</p>',
+      text: '本文です。',
+    },
+    { locale: 'en', recipientCount: 7, subject: 'This month', html: '<p>Body.</p>', text: 'Body.' },
+    { locale: 'zh', recipientCount: 1, subject: '本月更新', html: '<p>正文。</p>', text: '正文。' },
+    { locale: 'ko', recipientCount: 0, subject: null, html: null, text: null },
+  ],
+  missingTranslations: [],
   sendable: true,
   blockedReason: null,
   testSentAt: '2026-09-14T07:30:00.000Z',
@@ -40,10 +53,13 @@ function renderDialog(overrides?: {
   onSendTest?: () => void;
   sending?: boolean;
   testSending?: boolean;
+  translating?: boolean;
   testResult?: TestSendResult | null;
+  onTranslate?: () => void;
 }) {
   const onSend = overrides?.onSend ?? vi.fn();
   const onSendTest = overrides?.onSendTest ?? vi.fn();
+  const onTranslate = overrides?.onTranslate ?? vi.fn();
   render(
     <NewsletterSendDialog
       open
@@ -54,12 +70,14 @@ function renderDialog(overrides?: {
       loadingPreview={false}
       sending={overrides?.sending ?? false}
       testSending={overrides?.testSending ?? false}
+      translating={overrides?.translating ?? false}
       error={null}
       onSend={onSend}
       onSendTest={onSendTest}
+      onTranslate={onTranslate}
     />,
   );
-  return { onSend, onSendTest };
+  return { onSend, onSendTest, onTranslate };
 }
 
 describe('NewsletterSendDialog', () => {
@@ -178,10 +196,89 @@ describe('NewsletterSendDialog', () => {
         delivered: 2,
         failed: 0,
         recipients: ['admin1@example.com', 'admin2@example.com'],
+        locales: ['ja', 'en'],
       },
     });
 
     expect(screen.getByText(/admin1@example.com, admin2@example.com/)).toBeDefined();
+  });
+
+  // 日本語だけ見て送ると、英語版が崩れていても気づけない。
+  it('言語ごとに宛先数を出し、切り替えるとその言語の本文が出る', () => {
+    renderDialog();
+
+    // 既定は原文（日本語）。
+    expect(screen.getByTitle('メールのプレビュー').getAttribute('srcdoc')).toContain('本文です。');
+
+    fireEvent.click(screen.getByRole('button', { name: /English/ }));
+    expect(screen.getByTitle('メールのプレビュー').getAttribute('srcdoc')).toContain('Body.');
+    expect(screen.getByText('This month')).toBeDefined();
+  });
+
+  it('宛先が 0 名の言語も並べる（存在を隠さない）', () => {
+    renderDialog();
+    expect(screen.getByRole('button', { name: /한국어/ })).toBeDefined();
+  });
+
+  it('翻訳が無い言語に切り替えたら、作り方を案内する', () => {
+    renderDialog();
+
+    fireEvent.click(screen.getByRole('button', { name: /한국어/ }));
+
+    expect(screen.queryByTitle('メールのプレビュー')).toBeNull();
+    expect(screen.getByText(/この言語の翻訳がまだありません/)).toBeDefined();
+  });
+
+  // 原文にフォールバックすると「英語のつもりが日本語で届いた」が黙って起きる。
+  it('宛先がいる言語の翻訳が無ければ送信ボタンを押せない', () => {
+    renderDialog({
+      preview: {
+        ...preview,
+        sendable: false,
+        blockedReason: 'translations-missing',
+        missingTranslations: ['en'],
+        locales: preview.locales.map((l) =>
+          l.locale === 'en' ? { ...l, subject: null, html: null, text: null } : l,
+        ),
+      },
+    });
+
+    expect(screen.getByRole('button', { name: /送信する/ }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText(/翻訳が必要: English/)).toBeDefined();
+  });
+
+  it('翻訳が揃っていればその旨を出す', () => {
+    renderDialog();
+    expect(screen.getByText(/宛先がいる言語の翻訳は揃っています/)).toBeDefined();
+  });
+
+  it('「翻訳を作成」を押すと翻訳だけが走る（本番送信は巻き込まない）', () => {
+    const { onTranslate, onSend } = renderDialog();
+
+    fireEvent.click(screen.getByRole('button', { name: /翻訳を作成/ }));
+
+    expect(onTranslate).toHaveBeenCalledTimes(1);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('翻訳中はテスト配信を押せない（同じ下書きを同時に触らせない）', () => {
+    renderDialog({ translating: true });
+    expect(screen.getByRole('button', { name: /テスト配信/ }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('テスト配信の結果にどの言語版を送ったかを出す', () => {
+    renderDialog({
+      testResult: {
+        newsletter: { ...newsletterFixture, testSentAt: '2026-09-14T07:30:00.000Z' },
+        sent: true,
+        delivered: 4,
+        failed: 0,
+        recipients: ['admin1@example.com'],
+        locales: ['ja', 'en'],
+      },
+    });
+
+    expect(screen.getByText(/\(ja\/en\)/)).toBeDefined();
   });
 
   it('テスト配信中は本番送信を押せない（取り違え防止）', () => {

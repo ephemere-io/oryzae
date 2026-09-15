@@ -30,6 +30,7 @@
    ↓ 保存（status = draft）
 [admin] 「送信する…」→ GET /:id/preview
    ↓ 実際に届く HTML + その時点の宛先数
+[admin] 「翻訳を作成」→ 宛先がいる言語へ翻訳（**必須**）
 [admin] 「テスト配信」→ 運営者だけに送って受信確認（**必須**・何度でも可）
 [admin] 「送信する」→「本当に N 名へ送る」（2 段階）
    ↓ POST /:id/send { confirm: true }
@@ -188,6 +189,69 @@ BCC でまとめると受信者同士にアドレスが見える。誰が Oryzae
 
 ---
 
+## 言語ごとに翻訳して配信する
+
+運営者は**日本語だけ書く**。配信時に受信者の言語へ訳したものを送る。
+
+```
+[admin] 日本語で書く
+[admin] 「翻訳を作成」→ POST /:id/translate
+   ↓ 宛先がいる言語ぶんだけ訳して保存（原文が変わっていない言語は訳し直さない）
+[admin] プレビューで言語タブを切り替えて確認
+[admin] 「テスト配信」→ 用意できている言語版を全部、運営者へ 1 通ずつ
+[admin] 「送信する」→ 各自の言語で届く
+```
+
+### 誰の言語をどう決めるか
+
+`user_metadata.locale`（`ja` / `en` / `zh` / `ko`）。signup 時にクライアントの
+`useLocale()` が保存し、OAuth 経由でも更新される。
+
+**未設定・想定外の値は日本語（原文）に倒す。** 英語に倒す案もあるが、それは
+「日本語話者が言語を設定していない」場合に、これまで日本語で届いていた人へ急に
+英語を送ることになる。判別できないときは翻訳を挟まない＝運営者が書いたものを
+そのまま届けるほうが、外れ方が小さい。
+
+### 翻訳は言語ごとに 1 つ
+
+200 人に送るのに 200 回訳す必要はない。`newsletter_translations` は
+`(newsletter_id, locale)` が主キーで、1 配信につき最大 3 行。宛先が増えても
+翻訳の費用は増えない。
+
+**宛先が 0 名の言語は訳さない。** 韓国語の登録者が 1 人もいないのに韓国語を
+訳すと、誰も読まない文章に払い続けることになる。
+
+### 古い翻訳を配らない
+
+翻訳は「どの原文から訳したか」（`source_subject` / `source_body_markdown`）を
+丸ごと持っている。「翻訳済み」フラグだけだと、原文を書き換えたあとも翻訳済みに
+見えてしまい、**日本語だけ直った配信が他言語には古い文面で届く**。原文を控えて
+おけば、いまの本文と突き合わせるだけで古さが分かる（無効化の書き込みが要らない）。
+
+古い翻訳は「無い」のと同じ扱いで、送信ゲート（`translations-missing`）が止める。
+
+### 原文にフォールバックしない
+
+翻訳が無い / 古い言語の受信者がいたら **送信そのものを止める**。原文を代わりに
+送ると「英語のつもりが日本語で届いた」が黙って起きる。
+
+### フッターは訳さない
+
+フッターと配信停止の案内は `newsletter-content.service.ts` が言語ごとの固定文を
+持っている（`FOOTER_COPY`）。LLM に毎回訳させると配信ごとに言い回しが揺れるし、
+**配信停止の文言が翻訳事故で意味を変えるとそのまま害になる**（「停止する」が
+「再開する」になる類）。`<html lang>` も言語に合わせる。
+
+本文だけ訳してフッターを日本語のままにすると、英語話者にとって「止め方が読めない
+メール」になる。止める口が読めないのは、止める口が無いのとほぼ同じ。
+
+### テスト配信は全言語ぶん届く
+
+用意できている言語版を**すべて**運営者へ送る（件名は `[テスト配信/en]` の形）。
+1 言語ずつ確認していると、訳が崩れている言語に気づかないまま本番を撃つ。
+
+---
+
 ## 本文の記法
 
 `newsletter-content.service.ts` が Markdown の**サブセット**だけを解釈する:
@@ -255,12 +319,15 @@ Anthropic は用途を知らないので、費用の用途別内訳はモデル 
 ```
 domain/
   models/newsletter.ts                     状態遷移（draft → sending → sent）と検証
-  services/newsletter-content.service.ts   Markdown サブセット → HTML / テキスト
+  services/newsletter-content.service.ts   Markdown サブセット → HTML / テキスト（言語別フッター）
+  services/newsletter-delivery.service.ts  言語ごとにどの文面を送るか / 翻訳の古さ判定
+  models/newsletter-locale.ts              配信先の言語と、未設定時の倒し方
   gateways/                                repository / audience / bulk-email / changelog / draft-generator
 application/usecases/
   create / update / delete / get / list
   preview-newsletter.usecase.ts            HTML + テキスト + 宛先数
   send-newsletter-test.usecase.ts          運営者だけへのテスト配信（status を動かさない）
+  translate-newsletter.usecase.ts          宛先がいる言語へ翻訳（原文が同じなら訳し直さない）
   send-newsletter.usecase.ts               状態遷移つきの送信
   generate-newsletter-draft.usecase.ts     PR → LLM → 下書き
 infrastructure/
@@ -270,6 +337,7 @@ infrastructure/
   github/github-changelog-source.ts
   llm/vercel-ai-newsletter-draft.gateway.ts
   unsubscribe/hmac-unsubscribe-token.ts    配信停止リンクの署名 / 検証
+  llm/vercel-ai-newsletter-translator.gateway.ts
 presentation/routes/
   admin-newsletters.ts                     /api/v1/admin/newsletters（要 admin）
   newsletter-subscription.ts               /api/v1/newsletter/{un,re}subscribe（認証不要）
@@ -299,7 +367,7 @@ script が混ざっても動かない。
 読み間違えられる。現在値が読めていない間はトグル自体を出さない（仮の既定値を
 触らせると、本人の意図と違う値がそのまま保存される）。
 
-### DB（`supabase/migrations/00024`, `00025`）
+### DB（`supabase/migrations/00024`, `00025`, `00026`）
 
 `newsletters` は運営者が書く文章でユーザー単位の行という概念が無いため、RLS は
 **service_role だけ**に閉じる（admin API は `adminAuthMiddleware` が `is_admin` を
@@ -309,6 +377,9 @@ script が混ざっても動かない。
 `00025` は `newsletters.test_sent_at` を足すだけ。`sent_at` と別の欄にしてあるのは、
 テストは何度でもやり直せる一方で本番配信は 1 回きりだから —— 同じ欄を使うと
 「テストしただけなのに配信済みに見える」状態が作れてしまう。
+
+`00026` は `newsletter_translations`（`newsletter_id` + `locale` が主キー）。
+日本語は原文そのものなので入らず、`CHECK` で構造的に弾いている。
 
 ---
 

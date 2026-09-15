@@ -2,7 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   NewsletterAudienceGateway,
   NewsletterRecipient,
+  RecipientCountByLocale,
 } from '../../domain/gateways/newsletter-audience.gateway.js';
+import { resolveNewsletterLocale } from '../../domain/models/newsletter-locale.js';
 
 const PER_PAGE = 1000;
 /**
@@ -36,8 +38,14 @@ export class SupabaseNewsletterAudience implements NewsletterAudienceGateway {
    * 代用すると、確認済み判定と配信停止が反映されず **画面の人数と実際の
    * 送信数がずれる**。ずれた数字を確認画面に出すくらいなら同じ経路で数える。
    */
-  async countRecipients(): Promise<number> {
-    return (await this.listRecipients()).length;
+  async countRecipientsByLocale(): Promise<RecipientCountByLocale> {
+    // 0 の言語も含めて必ず全キーを埋める（画面が「ko 0 名」と出せるように）。
+    const counts: RecipientCountByLocale = { ja: 0, en: 0, zh: 0, ko: 0 };
+
+    for (const recipient of await this.listRecipients()) {
+      counts[recipient.locale] += 1;
+    }
+    return counts;
   }
 
   async listRecipients(): Promise<NewsletterRecipient[]> {
@@ -56,7 +64,11 @@ export class SupabaseNewsletterAudience implements NewsletterAudienceGateway {
         if (!user.email) continue;
         if (!user.email_confirmed_at) continue;
         if (optedOut.has(user.id)) continue;
-        recipients.push({ userId: user.id, email: user.email });
+        recipients.push({
+          userId: user.id,
+          email: user.email,
+          locale: resolveNewsletterLocale(user.user_metadata?.locale),
+        });
       }
 
       if (users.length < PER_PAGE) return recipients;
@@ -98,7 +110,11 @@ export class SupabaseNewsletterAudience implements NewsletterAudienceGateway {
       for (const user of users) {
         if (!user.email) continue;
         if (user.user_metadata?.is_admin !== true) continue;
-        recipients.push({ userId: user.id, email: user.email });
+        recipients.push({
+          userId: user.id,
+          email: user.email,
+          locale: resolveNewsletterLocale(user.user_metadata?.locale),
+        });
       }
 
       if (users.length < PER_PAGE) break;
