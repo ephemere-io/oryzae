@@ -194,9 +194,17 @@ export function withTestSubjectPrefix(subject: string, locale: NewsletterLocale)
 interface FooterCopy {
   /** `<html lang>` に入れる値。読み上げと受信側の自動翻訳の判定に効く。 */
   htmlLang: string;
-  lines: string[];
+  /**
+   * 「なぜこれが届いているか」。**配信停止の直前に置く。**
+   *
+   * 「登録しているから届く」→「止めるならここ」の順に読める。理由と手段が
+   * 離れていると、心当たりのない人が理由だけ読んで止め方を探すことになる。
+   */
+  receiptLine: string;
   unsubscribeLabel: string;
   unsubscribeNote: string;
+  /** 連絡先・ポリシー・署名。配信停止のあとに続く。 */
+  lines: string[];
   /**
    * ロゴに添える文言。
    *
@@ -210,8 +218,8 @@ interface FooterCopy {
 const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
   ja: {
     htmlLang: 'ja',
+    receiptLine: 'このメールは Oryzae に登録されている方へお送りしています。',
     lines: [
-      'このメールは Oryzae に登録されている方へお送りしています。',
       `ヘルプ・FAQ: ${SUPPORT_URL}`,
       `プライバシーポリシー: ${PRIVACY_URL}`,
       `お問い合わせ: ${CONTACT_EMAIL}`,
@@ -223,8 +231,8 @@ const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
   },
   en: {
     htmlLang: 'en',
+    receiptLine: 'You are receiving this because you have an Oryzae account.',
     lines: [
-      'You are receiving this because you have an Oryzae account.',
       `Help & FAQ: ${SUPPORT_URL}`,
       `Privacy: ${PRIVACY_URL}`,
       `Contact: ${CONTACT_EMAIL}`,
@@ -236,8 +244,8 @@ const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
   },
   zh: {
     htmlLang: 'zh',
+    receiptLine: '您收到这封邮件，是因为您注册了 Oryzae。',
     lines: [
-      '您收到这封邮件，是因为您注册了 Oryzae。',
       `帮助与常见问题: ${SUPPORT_URL}`,
       `隐私政策: ${PRIVACY_URL}`,
       `联系我们: ${CONTACT_EMAIL}`,
@@ -249,8 +257,8 @@ const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
   },
   ko: {
     htmlLang: 'ko',
+    receiptLine: 'Oryzae에 가입하신 분께 보내 드리는 메일입니다.',
     lines: [
-      'Oryzae에 가입하신 분께 보내 드리는 메일입니다.',
       `도움말 및 FAQ: ${SUPPORT_URL}`,
       `개인정보 보호정책: ${PRIVACY_URL}`,
       `문의: ${CONTACT_EMAIL}`,
@@ -341,8 +349,13 @@ export function renderNewsletterHtml(params: {
     `<a href="${APP_URL}" style="display:inline-block;margin-top:6px;font-size:12px;line-height:1.7;color:#8a6d3b;text-decoration:underline;">${escapeHtml(copy.openAppLabel)}</a>` +
     `</div>`;
 
+  // 「なぜ届いているか」→「止め方」の順。理由と手段を隣に置く。
+  const receipt =
+    `<p style="margin:0 0 14px;font-size:12px;line-height:1.7;color:#8a8279;">` +
+    `${escapeHtml(copy.receiptLine)}</p>`;
+
   const unsubscribe =
-    `<p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#8a8279;">` +
+    `<p style="margin:0 0 14px;font-size:12px;line-height:1.7;color:#8a8279;">` +
     `<a href="${escapeHtml(params.unsubscribeUrl)}" style="color:#8a6d3b;text-decoration:underline;">${escapeHtml(copy.unsubscribeLabel)}</a>` +
     `<br />${escapeHtml(copy.unsubscribeNote)}</p>`;
 
@@ -370,6 +383,7 @@ export function renderNewsletterHtml(params: {
       ${body}
       <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e0d8;">
         ${logo}
+        ${receipt}
         ${unsubscribe}
         ${footer}
       </div>
@@ -418,6 +432,8 @@ export function renderNewsletterText(params: {
     body,
     '',
     '———',
+    copy.receiptLine,
+    '',
     `${copy.unsubscribeLabel}: ${params.unsubscribeUrl}`,
     copy.unsubscribeNote,
     '',

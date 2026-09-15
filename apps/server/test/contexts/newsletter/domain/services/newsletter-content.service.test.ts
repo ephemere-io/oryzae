@@ -237,6 +237,20 @@ describe('renderNewsletterText', () => {
     expect(text).toContain('・ふたつ');
   });
 
+  it('テキスト版も 受信理由 → 配信停止 の順に並ぶ', () => {
+    const text = renderNewsletterText({
+      subject: '件名',
+      bodyMarkdown: '本文',
+      unsubscribeUrl: UNSUBSCRIBE_URL,
+      locale: 'ja',
+    });
+
+    expect(text.indexOf('登録されている方へお送りしています')).toBeLessThan(
+      text.indexOf('このお知らせの配信を停止する'),
+    );
+    expect(text.indexOf('このお知らせの配信を停止する')).toBeLessThan(text.indexOf('ヘルプ・FAQ'));
+  });
+
   it('件名で始まり、フッターで終わる', () => {
     const text = renderNewsletterText({
       subject: '今月の更新',
