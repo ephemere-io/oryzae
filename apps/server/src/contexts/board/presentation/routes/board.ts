@@ -1,6 +1,5 @@
 import {
   boardCardUpdateSchema,
-  boardQuerySchema,
   boardSnippetCreateSchema,
   boardSnippetUpdateSchema,
   MAX_OCR_IMAGE_BYTES,
@@ -45,8 +44,7 @@ export const board = new Hono<Env>()
   /**
    * 書斎の壁が読む「いま貼ってあるもの」。**`/:...` より前に置くこと。**
    *
-   * 盤面（`GET /`）は日付で絞るが、こちらは全期間の新しい順。書斎は 1 日の作業場では
-   * なく、溜まってきた量を映す場所なので、絞ってしまうと使っている人ほど壁が空になる。
+   * 盤面（`GET /`）が全部を重なり順に返すのに対し、こちらは新しい順に上限まで。
    */
   .get('/summary', async (c) => {
     const supabase = c.get('supabase');
@@ -58,12 +56,8 @@ export const board = new Hono<Env>()
     );
     return c.json(await usecase.execute(c.get('userId'), SUMMARY_LIMIT));
   })
-  // GET /api/v1/board?dateKey=YYYY-MM-DD&viewType=daily|weekly
+  // GET /api/v1/board — その人のボード（1 人に 1 枚。日付・表示単位では絞らない）
   .get('/', async (c) => {
-    const { dateKey } = boardQuerySchema.parse({
-      dateKey: c.req.query('dateKey'),
-    });
-    const viewType = c.req.query('viewType') === 'weekly' ? 'weekly' : 'daily';
     const supabase = c.get('supabase');
     const boardCardRepo = new SupabaseBoardCardRepository(supabase);
     const boardSnippetRepo = new SupabaseBoardSnippetRepository(supabase);
@@ -74,10 +68,9 @@ export const board = new Hono<Env>()
       boardSnippetRepo,
       boardPhotoRepo,
       boardStorage,
-      generateId,
     );
 
-    const result = await usecase.execute(c.get('userId'), dateKey, viewType);
+    const result = await usecase.execute(c.get('userId'));
     return c.json(result);
   })
 
@@ -177,17 +170,12 @@ export const board = new Hono<Env>()
     }
 
     const caption = typeof body.caption === 'string' ? body.caption : '';
-    const dateKey = typeof body.dateKey === 'string' ? body.dateKey : '';
-    const viewType = body.viewType === 'weekly' ? 'weekly' : 'daily';
     const imageWidth = parseDimension(body.imageWidth);
     const imageHeight = parseDimension(body.imageHeight);
     // 配置位置（world 座標）。multipart なので文字列で届く。
     // 壊れた値は無視してサーバー既定のランダム配置に落とす。
     const x = parseWorldCoord(body.x);
     const y = parseWorldCoord(body.y);
-    if (!dateKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return c.json({ error: 'Invalid dateKey' }, 400);
-    }
     if (caption.length > MAX_PHOTO_CAPTION_LENGTH) {
       return c.json(
         { error: `Caption must be ${MAX_PHOTO_CAPTION_LENGTH} characters or less` },
@@ -212,8 +200,6 @@ export const board = new Hono<Env>()
       fileName: file.name,
       contentType: file.type,
       caption,
-      dateKey,
-      viewType,
       imageWidth,
       imageHeight,
       x,

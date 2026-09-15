@@ -10,8 +10,6 @@ interface CreateBoardPhotoInput {
   fileName: string;
   contentType: string;
   caption: string;
-  dateKey: string;
-  viewType?: 'daily' | 'weekly';
   imageWidth?: number;
   imageHeight?: number;
   /**
@@ -98,10 +96,9 @@ export class CreateBoardPhotoUsecase {
     const x = input.x ?? Math.floor(Math.random() * 741) + 60;
     const y = input.y ?? Math.floor(Math.random() * 541) + 60;
     const rotation = Math.round((Math.random() * 10 - 5) * 10) / 10;
-    const vt = input.viewType ?? 'daily';
 
     // New cards should appear on top of existing ones
-    const maxZ = await this.boardCardRepo.findMaxZIndex(userId, input.dateKey, vt);
+    const maxZ = await this.boardCardRepo.findMaxZIndex(userId);
 
     const { width, height } = computeCardDimensions(input.imageWidth, input.imageHeight);
 
@@ -110,8 +107,6 @@ export class CreateBoardPhotoUsecase {
         userId,
         cardType: 'photo',
         refId: photo.id,
-        dateKey: input.dateKey,
-        viewType: vt,
         x,
         y,
         rotation,
@@ -128,7 +123,7 @@ export class CreateBoardPhotoUsecase {
 
     // 4. Persist
     await this.boardPhotoRepo.save(photo);
-    await this.boardCardRepo.saveMany([card]);
+    await this.boardCardRepo.save(card);
 
     const imageUrl = await this.boardStorage.getSignedUrl(storagePath);
 

@@ -16,10 +16,8 @@ function readCount(value: unknown): number {
 /**
  * 書斎の壁が読む「いま貼ってあるもの」（`GET /api/v1/board/summary`）。
  *
- * **盤面（`use-board`）とは別の口を叩く。** あちらは 1 日・1 週の作業場で、日付と
- * view で絞る。書斎の壁は溜まってきた量そのものを映すので絞らない — 当日の daily だけを
- * 映していたころは、その日に何も貼っていなければ壁が空で、**使っている人の壁ほど
- * 空に見える**という逆の絵になっていた。
+ * **盤面（`use-board`）とは別の口を叩く。** あちらはボードの全部を重なり順で返すが、
+ * こちらは新しい順に上限まで。壁に描くのは上限までで、ラベルが名乗るのは本当の数。
  *
  * 取れなければ空で出す。書斎は部分的な失敗で落とさない（10-data-contract.md）。
  */
@@ -50,7 +48,11 @@ export function useBoardSummary(
           total: readCount(raw.total),
           snippets: readCount(raw.snippets),
           photos: readCount(raw.photos),
-          cards: normalizeBoardCards(raw.cards),
+          // normalizeBoardCards は**封筒ごと**（`{ cards: [...] }`）受け取る。
+          // ここで `raw.cards`（配列そのもの）を渡していたため、中の `input.cards` が
+          // 常に undefined になり、**壁のカードが必ず 0 枚**になっていた
+          // （数と内訳だけが出て、写真も付箋も貼られていない壁になる）。
+          cards: normalizeBoardCards(raw),
         });
       } catch {
         if (!cancelled) setError(true);
