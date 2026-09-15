@@ -858,12 +858,11 @@
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
     "hint_board_both": "{photos} photos · {snippets} snippets",
-    "memo_title": "HELP",
-    "memo_help_caption": "When something's unclear",
     "memo_help": "Help",
-    "memo_contact_caption": "To get in touch",
     "memo_contact": "Contact",
-    "memo_docs_caption": "About the Oryzae experience",
-    "memo_docs": "Docs"
+    "memo_docs": "Docs",
+    "hint_memo_help": "How to use, and frequent questions",
+    "hint_memo_contact": "Get in touch by email",
+    "hint_memo_docs": "The idea behind Oryzae and how fermentation works"
   }
 }

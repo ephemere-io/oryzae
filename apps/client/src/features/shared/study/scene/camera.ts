@@ -112,85 +112,198 @@ export function clampZoom(value: number): number {
   return Math.min(HOME_ZOOM.max, Math.max(HOME_ZOOM.min, value));
 }
 
+interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
 /**
- * 注視点からの距離を `zoom` 倍にし、注視点を `targetRise` だけ持ち上げた view。
+ * ホームで利用者が動かせる分（`docs/oryzae-study/00-overview.md`「ホームのカメラ操作」）。
  *
- * **注視点を自由には動かさない。** 動かせるようにすると寄り引きが平行移動を兼ね、
- * 部屋の外へ出られてしまう。動かしてよいのは**縦だけ**で、量は倍率から決まる
- * （`zoomTargetRise`）— 利用者が手で決める余地は無く、構図は保たれたままになる。
+ * カメラは**注視点からホームの向きに `zoom` 倍の距離**に置く。向きは配置表のまま
+ * （オービットはしない — 構図は設計の一部）。利用者に渡すのは 2 つだけ:
  *
- * 持ち上げるのは、注視点を据えたまま近づくと**絵の上端（ボードの上辺）が
- * まっさきに画面から出る**ため。カメラも同じだけ上がるので、視線の向きは変わらない。
+ * - **寄り引き**（`zoom`）。ホイール／つまみ。**カーソルの下の点へ向かって**寄る
+ *   （`zoomTowardPointer`）。以前は注視点を据えたまま近づき、絵の上端が出ないよう注視点を
+ *   持ち上げていたが、「寄ると変な軌道で動く」と報告された。地図と同じ「指した所へ寄る」に
+ *   すれば、どこを見たいかは利用者が決められる
+ * - **パン**（`focus`）。空いている所をつかんで動かす（`panByPixels`）
+ *
+ * 注視点は `clampFocus` で部屋の中に留める。部屋の外へは出られない。
  */
-export function zoomedView(view: CameraView, zoom: number, targetRise = 0): CameraView {
-  const factor = clampZoom(zoom);
-  const rise = Number.isFinite(targetRise) ? targetRise : 0;
-  const { position, target } = view;
+export interface HomeControl {
+  focus: Vec3;
+  zoom: number;
+}
+
+/** 配置表どおりのホーム。 */
+export function homeControl(layout: StudyLayout): HomeControl {
+  return { focus: { ...layout.camera.target }, zoom: 1 };
+}
+
+/** ホームのカメラが注視点から見てどこにあるか（向きと距離）。 */
+function homeOffset(layout: StudyLayout): Vec3 {
   return {
-    position: {
-      x: target.x + (position.x - target.x) * factor,
-      y: target.y + rise + (position.y - target.y) * factor,
-      z: target.z + (position.z - target.z) * factor,
-    },
-    target: { x: target.x, y: target.y + rise, z: target.z },
+    x: layout.camera.position.x - layout.camera.target.x,
+    y: layout.camera.position.y - layout.camera.target.y,
+    z: layout.camera.position.z - layout.camera.target.z,
   };
 }
 
 /**
- * 寄ったときに注視点を持ち上げる量。
- *
- * **`layout.camera.frameTop` の画面上の高さが変わらない量**を解く。等倍のときこの点は
- * 画面の上のほうぎりぎりに写っているので、注視点を据えたまま近づくと真っ先に外へ出る
- * （「ズームインしていくとボードの上が見切れる」— PR #570 の実機レビュー）。
- *
- * カメラ位置は `P(f) = T + rise + D·f`（`D` はホームの注視点からの差、`f` は倍率）。
- * カメラの上方向 `up` は `D` と直交するので、`frameTop` までのベクトル `V` の
- * 上成分と前成分の比は
- *
- *     r(f) = (up·W − rise·up_y) / (fwd·W − rise·fwd_y + f·|D|)      （W = frameTop − T）
- *
- * になる。これを等倍のときの比 `r(1)` と等しく置いて `rise` について解く。
- * 結果は `f` の一次式なので、寄り引きに滑らかに追従する。
- *
- * **引く側（f > 1）では持ち上げない。** 引けば上端はさらに内側へ入るので、
- * ここで下げると今度は絵が上に寄って下端に余白が残る。
+ * 操作を view に組む。注視点は `focus`、カメラはそこからホームの向きに `zoom` 倍の距離。
+ * 向きが変わらないので、寄り引きは常に注視点へ真っ直ぐ進む。
  */
-export function zoomTargetRise(layout: StudyLayout, zoom: number): number {
-  const factor = clampZoom(zoom);
-  if (factor >= 1) return 0;
-
-  const target = layout.camera.target;
-  const offset = {
-    x: layout.camera.position.x - target.x,
-    y: layout.camera.position.y - target.y,
-    z: layout.camera.position.z - target.z,
+export function controlledView(layout: StudyLayout, control: HomeControl): CameraView {
+  const offset = homeOffset(layout);
+  const factor = clampZoom(control.zoom);
+  const focus = clampFocus(layout, control.focus);
+  return {
+    position: {
+      x: focus.x + offset.x * factor,
+      y: focus.y + offset.y * factor,
+      z: focus.z + offset.z * factor,
+    },
+    target: focus,
   };
-  const distance = Math.hypot(offset.x, offset.y, offset.z);
-  if (distance <= 1e-6) return 0;
+}
 
-  // 前方向は注視点へ向かう単位ベクトル。上方向はそれと直交し、world の上に近いほう。
-  const forward = { x: -offset.x / distance, y: -offset.y / distance, z: -offset.z / distance };
-  const up = orthonormalUp(forward);
-  if (up === null) return 0;
+/**
+ * 画面の基底。カメラから見た右・上の単位ベクトルと、注視点の奥行きでの半画面の大きさ。
+ *
+ * `up` は `lookAt` が組むのと同じ（world の上から前方向の成分を抜いたもの）なので、
+ * ここで求めた右・上に沿って注視点を動かせば、画面上では真横・真上に動く。
+ */
+export function screenFrame(
+  layout: StudyLayout,
+  control: HomeControl,
+  aspect: number,
+): { right: Vec3; up: Vec3; halfWidth: number; halfHeight: number } {
+  const view = controlledView(layout, control);
+  const forward = normalize({
+    x: view.target.x - view.position.x,
+    y: view.target.y - view.position.y,
+    z: view.target.z - view.position.z,
+  });
+  const up = orthonormalUp(forward) ?? { x: 0, y: 1, z: 0 };
+  const right = cross(forward, up);
+  const distance = Math.hypot(
+    view.position.x - view.target.x,
+    view.position.y - view.target.y,
+    view.position.z - view.target.z,
+  );
+  const halfHeight = distance * Math.tan(((layout.camera.fov / 2) * Math.PI) / 180);
+  const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  return { right, up, halfWidth: halfHeight * safeAspect, halfHeight };
+}
 
-  const w = {
-    x: layout.camera.frameTop.x - target.x,
-    y: layout.camera.frameTop.y - target.y,
-    z: layout.camera.frameTop.z - target.z,
+/**
+ * ポインタ（-1..1 の画面座標）の下にある、**注視点と同じ奥行き**の点。
+ * 寄り引きの支点にする。中央なら注視点そのもの。
+ */
+export function pointUnderPointer(
+  layout: StudyLayout,
+  control: HomeControl,
+  pointer: { x: number; y: number },
+  aspect: number,
+): Vec3 {
+  const frame = screenFrame(layout, control, aspect);
+  const focus = clampFocus(layout, control.focus);
+  const px = clampSigned(pointer.x) * frame.halfWidth;
+  const py = clampSigned(pointer.y) * frame.halfHeight;
+  return {
+    x: focus.x + frame.right.x * px + frame.up.x * py,
+    y: focus.y + frame.right.y * px + frame.up.y * py,
+    z: focus.z + frame.right.z * px + frame.up.z * py,
   };
-  const upW = up.x * w.x + up.y * w.y + up.z * w.z;
-  const forwardW = forward.x * w.x + forward.y * w.y + forward.z * w.z;
+}
 
-  const restRatio = forwardW + distance;
-  if (Math.abs(restRatio) <= 1e-6) return 0;
-  const ratio = upW / restRatio;
+/**
+ * カーソルの下の点へ向かって寄り引きする。
+ *
+ * カーソルの下の点 Q が**画面上で動かない**ように注視点を Q へ寄せる（倍率の比で）。
+ * 寄るとき（比 < 1）は Q に近づき、引くとき（比 > 1）は Q から遠ざかる。
+ * 中央で回せばただの寄り引き。
+ */
+export function zoomTowardPointer(
+  layout: StudyLayout,
+  control: HomeControl,
+  nextZoom: number,
+  pointer: { x: number; y: number },
+  aspect: number,
+): HomeControl {
+  const before = clampZoom(control.zoom);
+  const after = clampZoom(nextZoom);
+  if (before === after) return { focus: clampFocus(layout, control.focus), zoom: after };
 
-  const denominator = ratio * forward.y - up.y;
-  if (Math.abs(denominator) <= 1e-6) return 0;
+  const anchor = pointUnderPointer(layout, control, pointer, aspect);
+  const focus = clampFocus(layout, control.focus);
+  const ratio = after / before;
+  return {
+    focus: clampFocus(layout, {
+      x: anchor.x + (focus.x - anchor.x) * ratio,
+      y: anchor.y + (focus.y - anchor.y) * ratio,
+      z: anchor.z + (focus.z - anchor.z) * ratio,
+    }),
+    zoom: after,
+  };
+}
 
-  const rise = (ratio * (forwardW + factor * distance) - upW) / denominator;
-  // 数値誤差で下がる向きに出ることがある。持ち上げる以外はしない。
-  return rise > 0 ? rise : 0;
+/**
+ * ドラッグ（画面の px）で注視点を平行移動する。
+ *
+ * 右へ引けば絵が右へ付いてくる（カメラは左へ動く）。量は注視点の奥行きでの
+ * 1px あたりの world 長さから決めるので、寄っているほど細かく動く。
+ */
+export function panByPixels(
+  layout: StudyLayout,
+  control: HomeControl,
+  delta: { x: number; y: number },
+  viewport: { width: number; height: number },
+): HomeControl {
+  if (!Number.isFinite(delta.x) || !Number.isFinite(delta.y)) return control;
+  if (!(viewport.height > 0) || !(viewport.width > 0)) return control;
+
+  const frame = screenFrame(layout, control, viewport.width / viewport.height);
+  const worldPerPx = (2 * frame.halfHeight) / viewport.height;
+  const dx = delta.x * worldPerPx;
+  const dy = delta.y * worldPerPx;
+  const focus = clampFocus(layout, control.focus);
+  return {
+    focus: clampFocus(layout, {
+      x: focus.x - frame.right.x * dx + frame.up.x * dy,
+      y: focus.y - frame.right.y * dx + frame.up.y * dy,
+      z: focus.z - frame.right.z * dx + frame.up.z * dy,
+    }),
+    zoom: clampZoom(control.zoom),
+  };
+}
+
+/** 注視点を部屋の中に留める。壊れた値はホームの注視点に倒す。 */
+export function clampFocus(layout: StudyLayout, focus: Vec3): Vec3 {
+  const bounds = layout.focusBounds;
+  const home = layout.camera.target;
+  return {
+    x: clampOr(focus.x, bounds.x[0], bounds.x[1], home.x),
+    y: clampOr(focus.y, bounds.y[0], bounds.y[1], home.y),
+    z: clampOr(focus.z, bounds.z[0], bounds.z[1], home.z),
+  };
+}
+
+function clampOr(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+function normalize(v: Vec3): Vec3 {
+  const length = Math.hypot(v.x, v.y, v.z);
+  if (length <= 1e-9) return { x: 0, y: 0, z: -1 };
+  return { x: v.x / length, y: v.y / length, z: v.z / length };
+}
+
+function cross(a: Vec3, b: Vec3): Vec3 {
+  return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
 }
 
 /**
@@ -198,11 +311,7 @@ export function zoomTargetRise(layout: StudyLayout, zoom: number): number {
  *
  * `lookAt` が組む上方向と同じもの。真上・真下を向いていて作れないときは null。
  */
-function orthonormalUp(forward: {
-  x: number;
-  y: number;
-  z: number;
-}): { x: number; y: number; z: number } | null {
+function orthonormalUp(forward: Vec3): Vec3 | null {
   const dot = forward.y;
   const up = { x: -forward.x * dot, y: 1 - forward.y * dot, z: -forward.z * dot };
   const length = Math.hypot(up.x, up.y, up.z);
@@ -233,8 +342,8 @@ export function zoomByPinch(base: number, ratio: number): number {
 /**
  * マウス位置に応じたパララックス。`pointer` は -1..1 に正規化した画面座標。
  *
- * オービットは与えない。寄り引き（`zoomedView`）だけは利用者に渡すが、構図
- * （物の位置関係）は壊せない。
+ * オービットは与えない。利用者に渡すのは寄り引きとパン（`HomeControl`）で、
+ * 構図（物の位置関係と見る向き）は壊せない。
  */
 export function parallaxOffset(
   layout: StudyLayout,

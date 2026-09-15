@@ -7,18 +7,24 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  clampFocus,
   clampZoom,
+  controlledView,
+  type HomeControl,
+  homeControl,
   homeView,
   jarView,
   journalSpreadView,
   journalTopView,
   lerpView,
+  panByPixels,
   parallaxOffset,
+  pointUnderPointer,
+  screenFrame,
   shelfView,
   zoomByPinch,
   zoomByWheel,
-  zoomedView,
-  zoomTargetRise,
+  zoomTowardPointer,
 } from '@/features/shared/study/scene/camera';
 
 const LAYOUTS: StudyLayout[] = [PC_LAYOUT, SP_LAYOUT];
@@ -227,48 +233,83 @@ describe('approach / lerpView', () => {
   });
 });
 
-describe('寄り引き（ホームのカメラ）', () => {
-  const VIEW: CameraView = {
-    position: { x: 0, y: 4, z: 12 },
-    target: { x: 0, y: 0, z: 0 },
+/** 画面上の位置（-1..1）。`view` から見た world の点がどこに写るか。 */
+function projectOnScreen(
+  layout: StudyLayout,
+  view: CameraView,
+  point: { x: number; y: number; z: number },
+): { x: number; y: number } {
+  const forward = normalize({
+    x: view.target.x - view.position.x,
+    y: view.target.y - view.position.y,
+    z: view.target.z - view.position.z,
+  });
+  const dot = forward.y;
+  const up = normalize({ x: -forward.x * dot, y: 1 - forward.y * dot, z: -forward.z * dot });
+  const right = {
+    x: forward.y * up.z - forward.z * up.y,
+    y: forward.z * up.x - forward.x * up.z,
+    z: forward.x * up.y - forward.y * up.x,
   };
+  const v = {
+    x: point.x - view.position.x,
+    y: point.y - view.position.y,
+    z: point.z - view.position.z,
+  };
+  const depth = forward.x * v.x + forward.y * v.y + forward.z * v.z;
+  const halfFov = Math.tan(((layout.camera.fov / 2) * Math.PI) / 180);
+  return {
+    x: (right.x * v.x + right.y * v.y + right.z * v.z) / depth / halfFov,
+    y: (up.x * v.x + up.y * v.y + up.z * v.z) / depth / halfFov,
+  };
+}
 
-  it('等倍なら配置表どおり', () => {
-    expect(zoomedView(VIEW, 1)).toEqual(VIEW);
+function normalize(v: { x: number; y: number; z: number }) {
+  const length = Math.hypot(v.x, v.y, v.z);
+  return { x: v.x / length, y: v.y / length, z: v.z / length };
+}
+
+/** 端末らしい画面。PC は横長、SP は縦長（構図がそれぞれの画面に合わせてある）。 */
+function viewportOf(layout: StudyLayout): { width: number; height: number } {
+  return layout.name === 'sp' ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+}
+function aspectOf(layout: StudyLayout): number {
+  const viewport = viewportOf(layout);
+  return viewport.width / viewport.height;
+}
+
+describe('ホームのカメラ操作（HomeControl）', () => {
+  it.each(LAYOUTS)('$name: 等倍・ホームの注視点なら配置表どおり', (layout) => {
+    expect(controlledView(layout, homeControl(layout))).toEqual(homeView(layout));
   });
 
-  it('倍率を下げると注視点に近づく', () => {
-    const near = zoomedView(VIEW, 0.8);
-    expect(near.position.z).toBeCloseTo(9.6, 5);
-    expect(near.position.y).toBeCloseTo(3.2, 5);
+  it.each(LAYOUTS)('$name: 倍率を下げると注視点に近づき、向きは変わらない', (layout) => {
+    const home = homeView(layout);
+    const near = controlledView(layout, { focus: home.target, zoom: 0.8 });
+    expect(distance(near)).toBeCloseTo(distance(home) * 0.8, 5);
+    expect(near.target).toEqual(home.target);
+    // 向き（注視点 → カメラ）はホームと平行。
+    const a = normalize({
+      x: home.position.x - home.target.x,
+      y: home.position.y - home.target.y,
+      z: home.position.z - home.target.z,
+    });
+    const b = normalize({
+      x: near.position.x - near.target.x,
+      y: near.position.y - near.target.y,
+      z: near.position.z - near.target.z,
+    });
+    expect(b.x).toBeCloseTo(a.x, 6);
+    expect(b.y).toBeCloseTo(a.y, 6);
+    expect(b.z).toBeCloseTo(a.z, 6);
   });
 
-  it('注視点は横に動かさない（寄り引きが平行移動を兼ねない）', () => {
-    // 横へ動かせるようにすると、寄り引きだけで部屋の外へ出られてしまう。
-    for (const zoom of [0.5, 1, 2]) {
-      const view = zoomedView(VIEW, zoom, 1.3);
-      expect(view.target.x).toBe(VIEW.target.x);
-      expect(view.target.z).toBe(VIEW.target.z);
-    }
-  });
-
-  it('持ち上げるぶんはカメラも一緒に上がる（視線の向きが変わらない）', () => {
-    const risen = zoomedView(VIEW, 0.8, 1.3);
-    const flat = zoomedView(VIEW, 0.8);
-    expect(risen.target.y - flat.target.y).toBeCloseTo(1.3, 10);
-    expect(risen.position.y - flat.position.y).toBeCloseTo(1.3, 10);
-    expect(risen.position.z).toBeCloseTo(flat.position.z, 10);
-  });
-
-  it('壊れた持ち上げ量は 0 として扱う', () => {
-    expect(zoomedView(VIEW, 0.8, Number.NaN)).toEqual(zoomedView(VIEW, 0.8));
-  });
-
-  it('上下限を越えない（部屋の外も机の面だけも見せない）', () => {
-    const far = zoomedView(VIEW, 99);
-    const near = zoomedView(VIEW, 0.01);
-    expect(far.position.z).toBeCloseTo(12 * clampZoom(99), 5);
-    expect(near.position.z).toBeCloseTo(12 * clampZoom(0.01), 5);
+  it.each(LAYOUTS)('$name: 上下限を越えない（部屋の外も机の面だけも見せない）', (layout) => {
+    const home = homeView(layout);
+    const far = controlledView(layout, { focus: home.target, zoom: 99 });
+    const near = controlledView(layout, { focus: home.target, zoom: 0.01 });
+    expect(distance(far)).toBeCloseTo(distance(home) * clampZoom(99), 5);
+    expect(distance(near)).toBeCloseTo(distance(home) * clampZoom(0.01), 5);
     expect(clampZoom(99)).toBeLessThan(99);
     expect(clampZoom(0.01)).toBeGreaterThan(0.01);
   });
@@ -276,6 +317,155 @@ describe('寄り引き（ホームのカメラ）', () => {
   it('壊れた倍率は等倍に倒す', () => {
     expect(clampZoom(Number.NaN)).toBe(1);
     expect(clampZoom(Number.POSITIVE_INFINITY)).toBe(1);
+  });
+
+  it.each(LAYOUTS)('$name: 注視点は部屋の中に留まる（clampFocus）', (layout) => {
+    const bounds = layout.focusBounds;
+    const far = clampFocus(layout, { x: 999, y: -999, z: 999 });
+    expect(far).toEqual({ x: bounds.x[1], y: bounds.y[0], z: bounds.z[1] });
+    // 壊れた値はホームの注視点へ。
+    const broken = clampFocus(layout, { x: Number.NaN, y: Number.NaN, z: Number.NaN });
+    expect(broken).toEqual(layout.camera.target);
+    // ホームの注視点はそもそも箱の中（等倍で動かない）。
+    expect(clampFocus(layout, layout.camera.target)).toEqual(layout.camera.target);
+  });
+
+  it.each(LAYOUTS)('$name: 画面の基底は互いに直交する単位ベクトル', (layout) => {
+    const frame = screenFrame(layout, homeControl(layout), aspectOf(layout));
+    expect(Math.hypot(frame.right.x, frame.right.y, frame.right.z)).toBeCloseTo(1, 6);
+    expect(Math.hypot(frame.up.x, frame.up.y, frame.up.z)).toBeCloseTo(1, 6);
+    const dot =
+      frame.right.x * frame.up.x + frame.right.y * frame.up.y + frame.right.z * frame.up.z;
+    expect(dot).toBeCloseTo(0, 6);
+    // 右は world の +x 寄り、上は world の +y 寄り（左右上下が裏返っていない）。
+    expect(frame.right.x).toBeGreaterThan(0.9);
+    expect(frame.up.y).toBeGreaterThan(0.5);
+    expect(frame.halfWidth).toBeCloseTo(frame.halfHeight * aspectOf(layout), 6);
+  });
+
+  describe('pointUnderPointer', () => {
+    it.each(LAYOUTS)('$name: 中央は注視点そのもの', (layout) => {
+      const control = homeControl(layout);
+      expect(pointUnderPointer(layout, control, { x: 0, y: 0 }, aspectOf(layout))).toEqual(
+        control.focus,
+      );
+    });
+
+    it.each(LAYOUTS)('$name: 求めた点は実際にその画面位置に写る', (layout) => {
+      const control = homeControl(layout);
+      const view = controlledView(layout, control);
+      for (const pointer of [
+        { x: 0.6, y: 0.3 },
+        { x: -0.8, y: -0.5 },
+        { x: 1, y: 1 },
+      ]) {
+        const point = pointUnderPointer(layout, control, pointer, aspectOf(layout));
+        const onScreen = projectOnScreen(layout, view, point);
+        expect(onScreen.x / aspectOf(layout)).toBeCloseTo(pointer.x, 5);
+        expect(onScreen.y).toBeCloseTo(pointer.y, 5);
+      }
+    });
+  });
+
+  describe('zoomTowardPointer — カーソルの下へ寄る', () => {
+    it.each(LAYOUTS)('$name: 中央で回せばただの寄り引き（注視点は動かない）', (layout) => {
+      const control = homeControl(layout);
+      const next = zoomTowardPointer(layout, control, 0.8, { x: 0, y: 0 }, aspectOf(layout));
+      expect(next.zoom).toBeCloseTo(0.8, 6);
+      expect(next.focus.x).toBeCloseTo(control.focus.x, 6);
+      expect(next.focus.y).toBeCloseTo(control.focus.y, 6);
+      expect(next.focus.z).toBeCloseTo(control.focus.z, 6);
+    });
+
+    it.each(LAYOUTS)('$name: カーソルの下の点が画面上で動かない', (layout) => {
+      const control = homeControl(layout);
+      const pointer = { x: 0.5, y: 0.4 };
+      const anchor = pointUnderPointer(layout, control, pointer, aspectOf(layout));
+      const before = projectOnScreen(layout, controlledView(layout, control), anchor);
+      const next = zoomTowardPointer(layout, control, 0.75, pointer, aspectOf(layout));
+      const after = projectOnScreen(layout, controlledView(layout, next), anchor);
+      expect(after.x).toBeCloseTo(before.x, 4);
+      expect(after.y).toBeCloseTo(before.y, 4);
+    });
+
+    it.each(LAYOUTS)('$name: 寄るとカーソルの側へ注視点が動き、引くと戻る', (layout) => {
+      const control = homeControl(layout);
+      const aspect = aspectOf(layout);
+      const near = zoomTowardPointer(layout, control, 0.7, { x: 0.9, y: 0 }, aspect);
+      expect(near.focus.x).toBeGreaterThan(control.focus.x);
+      const back = zoomTowardPointer(layout, near, 1, { x: 0.9, y: 0 }, aspect);
+      expect(back.focus.x).toBeCloseTo(control.focus.x, 4);
+    });
+
+    it.each(LAYOUTS)('$name: 倍率が変わらなければ注視点も動かない', (layout) => {
+      const control: HomeControl = { focus: { ...layout.camera.target, x: 1 }, zoom: 0.9 };
+      const same = zoomTowardPointer(layout, control, 0.9, { x: 1, y: 1 }, aspectOf(layout));
+      expect(same.focus).toEqual(control.focus);
+      expect(same.zoom).toBe(0.9);
+    });
+
+    it.each(LAYOUTS)('$name: 端で寄り続けても部屋の外へ出ない', (layout) => {
+      let control = homeControl(layout);
+      for (let i = 0; i < 40; i++) {
+        control = zoomTowardPointer(
+          layout,
+          control,
+          control.zoom * 0.9,
+          { x: 1, y: 1 },
+          aspectOf(layout),
+        );
+      }
+      const bounds = layout.focusBounds;
+      expect(control.focus.x).toBeLessThanOrEqual(bounds.x[1]);
+      expect(control.focus.y).toBeLessThanOrEqual(bounds.y[1]);
+      expect(control.zoom).toBe(HOME_ZOOM.min);
+    });
+  });
+
+  describe('panByPixels — つかんで動かす', () => {
+    it.each(LAYOUTS)('$name: 右へ引くと絵が右へ付いてくる（注視点は左へ）', (layout) => {
+      const control = homeControl(layout);
+      const next = panByPixels(layout, control, { x: 120, y: 0 }, viewportOf(layout));
+      expect(next.focus.x).toBeLessThan(control.focus.x);
+      expect(next.zoom).toBe(control.zoom);
+    });
+
+    it.each(LAYOUTS)('$name: 下へ引くと絵が下へ付いてくる（注視点は上へ）', (layout) => {
+      const control = homeControl(layout);
+      const next = panByPixels(layout, control, { x: 0, y: 80 }, viewportOf(layout));
+      expect(next.focus.y).toBeGreaterThan(control.focus.y);
+    });
+
+    it.each(LAYOUTS)('$name: 引いた px のぶんだけ画面上で動く（1px = 1px）', (layout) => {
+      const control = homeControl(layout);
+      const viewport = viewportOf(layout);
+      const delta = { x: 90, y: -60 };
+      const next = panByPixels(layout, control, delta, viewport);
+      // 元の注視点は、動かしたあとの view では delta ぶんずれて写る。
+      const onScreen = projectOnScreen(layout, controlledView(layout, next), control.focus);
+      const halfH = viewport.height / 2;
+      expect(onScreen.x * halfH).toBeCloseTo(delta.x, 3);
+      expect(onScreen.y * halfH).toBeCloseTo(-delta.y, 3);
+    });
+
+    it.each(LAYOUTS)('$name: 引き続けても部屋の外へ出ない', (layout) => {
+      let control = homeControl(layout);
+      for (let i = 0; i < 100; i++) {
+        control = panByPixels(layout, control, { x: -400, y: 400 }, viewportOf(layout));
+      }
+      const bounds = layout.focusBounds;
+      expect(control.focus.x).toBeLessThanOrEqual(bounds.x[1]);
+      expect(control.focus.y).toBeGreaterThanOrEqual(bounds.y[0]);
+    });
+
+    it('壊れた delta や 0 の画面では動かさない', () => {
+      const control = homeControl(PC_LAYOUT);
+      const viewport = viewportOf(PC_LAYOUT);
+      expect(panByPixels(PC_LAYOUT, control, { x: Number.NaN, y: 0 }, viewport)).toBe(control);
+      expect(panByPixels(PC_LAYOUT, control, { x: 10, y: 0 }, { width: 0, height: 0 })).toBe(
+        control,
+      );
+    });
   });
 
   describe('zoomByWheel', () => {
@@ -315,91 +505,13 @@ describe('寄り引き（ホームのカメラ）', () => {
 });
 
 /**
- * 寄ると絵の上端（ボードの上辺）が画面から出ていた、への答え。
- *
- * ここで見るのは「上端の**画面上の高さ**が倍率によらず変わらない」こと。角度そのものを
- * 焼き込むと配置表を動かすたびにテストが嘘になるので、`frameTop` から解き直して比べる。
+ * 等倍で絵の上端（ボードの上辺 = `frameTop`）が画面に**余白つきで**入っていること。
+ * 上端ぴったりに置いていたころ、少し寄るだけで「ボードの上側が切れる」と報告された。
  */
-describe('zoomTargetRise', () => {
-  /** `frameTop` がカメラの上方向・前方向に対して作る比（＝画面上の高さ）。 */
-  function frameTopRatio(layout: StudyLayout, zoom: number): number {
-    const view = zoomedView(homeView(layout), zoom, zoomTargetRise(layout, zoom));
-    const forward = normalize({
-      x: view.target.x - view.position.x,
-      y: view.target.y - view.position.y,
-      z: view.target.z - view.position.z,
-    });
-    // lookAt が組む上方向（world の上から前方向の成分を抜いたもの）。
-    const dot = forward.y;
-    const up = normalize({ x: -forward.x * dot, y: 1 - forward.y * dot, z: -forward.z * dot });
-    const top = layout.camera.frameTop;
-    const v = {
-      x: top.x - view.position.x,
-      y: top.y - view.position.y,
-      z: top.z - view.position.z,
-    };
-    return (
-      (up.x * v.x + up.y * v.y + up.z * v.z) / (forward.x * v.x + forward.y * v.y + forward.z * v.z)
-    );
-  }
-
-  function normalize(v: { x: number; y: number; z: number }) {
-    const length = Math.hypot(v.x, v.y, v.z);
-    return { x: v.x / length, y: v.y / length, z: v.z / length };
-  }
-
-  it.each(LAYOUTS)('$name: 等倍では持ち上げない（既定の構図を変えない）', (layout) => {
-    expect(zoomTargetRise(layout, 1)).toBe(0);
-  });
-
-  it.each(LAYOUTS)('$name: 引く側では持ち上げない', (layout) => {
-    expect(zoomTargetRise(layout, HOME_ZOOM.max)).toBe(0);
-    expect(zoomTargetRise(layout, 1.1)).toBe(0);
-  });
-
-  it.each(LAYOUTS)('$name: 寄るほど持ち上がる', (layout) => {
-    const mid = zoomTargetRise(layout, 0.85);
-    const near = zoomTargetRise(layout, HOME_ZOOM.min);
-    expect(mid).toBeGreaterThan(0);
-    expect(near).toBeGreaterThan(mid);
-  });
-
-  it.each(LAYOUTS)('$name: 寄っても絵の上端が画面上の同じ高さに留まる', (layout) => {
-    const atRest = frameTopRatio(layout, 1);
-    for (const zoom of [0.95, 0.85, HOME_ZOOM.min]) {
-      expect(frameTopRatio(layout, zoom)).toBeCloseTo(atRest, 6);
-    }
-  });
-
-  it.each(LAYOUTS)('$name: 持ち上げなければ上端は外へ出ていく（直した中身の確認）', (layout) => {
-    const atRest = frameTopRatio(layout, 1);
-    const view = zoomedView(homeView(layout), HOME_ZOOM.min);
-    const forward = normalize({
-      x: view.target.x - view.position.x,
-      y: view.target.y - view.position.y,
-      z: view.target.z - view.position.z,
-    });
-    const dot = forward.y;
-    const up = normalize({ x: -forward.x * dot, y: 1 - forward.y * dot, z: -forward.z * dot });
-    const top = layout.camera.frameTop;
-    const v = {
-      x: top.x - view.position.x,
-      y: top.y - view.position.y,
-      z: top.z - view.position.z,
-    };
-    const naive =
-      (up.x * v.x + up.y * v.y + up.z * v.z) /
-      (forward.x * v.x + forward.y * v.y + forward.z * v.z);
-    expect(naive).toBeGreaterThan(atRest);
-  });
-
-  it.each(LAYOUTS)('$name: 等倍で上端が画面に入っている（そもそも見えていること）', (layout) => {
-    // 縦の半画角。ここを超えていたら、寄る前から切れている。
-    const halfFov = Math.tan(((layout.camera.fov / 2) * Math.PI) / 180);
-    expect(frameTopRatio(layout, 1)).toBeLessThan(halfFov);
-  });
-
-  it('壊れた倍率でも持ち上げない', () => {
-    expect(zoomTargetRise(PC_LAYOUT, Number.NaN)).toBe(0);
+describe('ホームの構図', () => {
+  it.each(LAYOUTS)('$name: 絵の上端が画面の上端から 5% 以上内側にある', (layout) => {
+    const onScreen = projectOnScreen(layout, homeView(layout), layout.camera.frameTop);
+    expect(onScreen.y).toBeLessThan(0.95);
+    expect(onScreen.y).toBeGreaterThan(0);
   });
 });
