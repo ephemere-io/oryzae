@@ -53,6 +53,48 @@ describe('配置表に共通して成り立つこと', () => {
     expect(Math.abs(layout.labelAnchors.jar.x - layout.jar.x)).toBeLessThan(1);
     expect(Math.abs(layout.labelAnchors.board.x - layout.board.position.x)).toBeLessThan(1);
   });
+
+  it.each(LAYOUTS)('$name: ヘルプのメモがどちらの構図にもある', (layout) => {
+    // 書斎から公開サイトへ出ていく唯一の導線。片方の端末だけ黙っていてはいけない。
+    expect(layout.memo).not.toBeNull();
+  });
+
+  it.each(LAYOUTS)(
+    '$name: メモは机の左側にある（瓶の側。積み・棚・鉛筆の側ではない）',
+    (layout) => {
+      const memo = layout.memo;
+      if (memo === null) throw new Error('メモが無い');
+      expect(memo.position.x).toBeLessThan(0);
+      expect(memo.position.x).toBeGreaterThanOrEqual(layout.deskTop.xLeft);
+    },
+  );
+});
+
+describe('ヘルプのメモの置き場', () => {
+  it('PC は板の左隣の壁に貼る（板と同じ奥行き・板の面の外）', () => {
+    // 「ボードの左隣あたりに、壁に紙をテープで貼ったような感じで」（オーナーの依頼）。
+    const memo = PC_LAYOUT.memo;
+    if (memo === null) throw new Error('PC のメモが無い');
+    expect(memo.surface).toBe('wall');
+    expect(memo.position.z).toBeCloseTo(PC_LAYOUT.board.position.z, 5);
+    const halfW = (8 * PC_LAYOUT.board.scale) / 2;
+    expect(memo.position.x).toBeLessThan(PC_LAYOUT.board.position.x - halfW);
+    // 板の上辺（＝絵の上端）より下。上辺に揃えるとテープが画面の上端に触れる。
+    expect(memo.position.y).toBeLessThan(PC_LAYOUT.camera.frameTop.y);
+    expect(memo.position.y).toBeGreaterThan(PC_LAYOUT.deskTop.y);
+  });
+
+  it('SP は机の手前に置く（壁に余白が無い）', () => {
+    // 板の左は画面の外、板の下は BOARD・ARCHIVE のピルと瓶の口で埋まっている（実機）。
+    const memo = SP_LAYOUT.memo;
+    if (memo === null) throw new Error('SP のメモが無い');
+    expect(memo.surface).toBe('desk');
+    expect(memo.position.y).toBeCloseTo(SP_LAYOUT.deskTop.y, 1);
+    // 天板の中。鉛筆（積みの左手前）よりさらに左で、JAR のピル（瓶の手前 z ≈ 1.25）より手前。
+    expect(memo.position.z).toBeLessThan(SP_LAYOUT.deskTop.zNear);
+    expect(memo.position.z).toBeGreaterThan(SP_LAYOUT.labelAnchors.jar.z + 1);
+    expect(memo.position.x).toBeLessThan(SP_LAYOUT.pen.x);
+  });
 });
 
 describe('PC と SP の構図の違い', () => {

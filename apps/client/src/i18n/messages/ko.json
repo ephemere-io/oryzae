@@ -857,6 +857,13 @@
     "hint_board_empty": "아직 붙인 것이 없습니다",
     "hint_board_photos": "사진 {count}건",
     "hint_board_snippets": "스니펫 {count}건",
-    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건"
+    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건",
+    "memo_title": "HELP",
+    "memo_help_caption": "모르는 것이 있을 때",
+    "memo_help": "도움말",
+    "memo_contact_caption": "문의하고 싶을 때",
+    "memo_contact": "문의하기",
+    "memo_docs_caption": "Oryzae의 경험에 대해",
+    "memo_docs": "Docs"
   }
 }

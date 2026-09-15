@@ -19,6 +19,7 @@ import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
 import { StudyChrome } from './study-chrome';
+import { StudyHelpMemo } from './study-help-memo';
 import { StudyHintTooltip } from './study-hint-tooltip';
 import { type LabelKind, StudyLabels } from './study-labels';
 import { StudyTooltip } from './study-tooltip';
@@ -249,6 +250,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
           />
         )}
 
+        {/* ヘルプへのメモ（壁に貼る／机に置く）。ラベルと同じく一覧の間は消す。 */}
+        {overlay === null && layout.memo !== null && (
+          <StudyHelpMemo point={labelPositions.memo} surface={layout.memo.surface} />
+        )}
+
         <StudyChrome
           initial={initialOf(auth?.user.nickname, auth?.user.email)}
           avatarUrl={auth?.user.avatarUrl}
@@ -319,6 +325,7 @@ const EMPTY_LABELS: LabelPositions = {
   board: null,
   archive: null,
   pen: null,
+  memo: null,
 };
 
 /** アバターに出す 1 文字。 */
