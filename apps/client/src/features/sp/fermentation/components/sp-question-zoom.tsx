@@ -158,7 +158,7 @@ export function SpQuestionZoom({
         </div>
       ) : null}
 
-      {/* 読む流れ。エントリーの「発酵の結果」と同じ部品（言葉の説明・抜粋の理由まで最初から並ぶ）。 */}
+      {/* 読む流れ。エントリーの「発酵の結果」と同じ部品。キーワードとスニペットは押すとその場で開く。 */}
       <div className="min-h-0 flex-1 overflow-auto px-5 pt-4 pb-10">
         {/* 読み込み中は、いずれ出る形（見出しと行）を先に置く。一瞬で返るなら出さない。 */}
         {showSkeleton ? <QuestionZoomSkeleton /> : null}
@@ -173,7 +173,12 @@ export function SpQuestionZoom({
         ) : null}
 
         {detail && !empty ? (
-          <FermentationReading detail={detail} onReply={onReply} onOpenSource={onOpenSource} />
+          <FermentationReading
+            detail={detail}
+            reveal="tap"
+            onReply={onReply}
+            onOpenSource={onOpenSource}
+          />
         ) : null}
       </div>
     </div>

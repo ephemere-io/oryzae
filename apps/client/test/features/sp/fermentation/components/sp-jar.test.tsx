@@ -147,7 +147,7 @@ describe('SpJar', () => {
     expect(screen.getByText(/うまく言えない/)).toBeTruthy();
   });
 
-  it('キーワードの説明とスニペットの理由は、押さなくても最初から読める（重なるシートを開かない）', async () => {
+  it('キーワードとスニペットは押すとその場で開き、説明と理由が読める（重なるシートを開かない）', async () => {
     const api = filledApi(
       detailJson({
         keywords: [{ id: 'k1', keyword: '余白', description: '埋めない時間。' }],
@@ -165,8 +165,19 @@ describe('SpJar', () => {
 
     openCircle('なぜ続けるのか');
 
-    expect(await screen.findByText('埋めない時間。')).toBeTruthy();
-    expect(screen.getByText('言いよどみが続く。')).toBeTruthy();
+    const keyword = (await screen.findByText('余白')).closest('button');
+    if (!keyword) throw new Error('キーワードの行がボタンでない');
+    // 押す前は閉じている（窓を開ける楽しみ。全部出ていると文字量に圧倒される、とレビュー）。
+    expect(keyword.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByText('埋めない時間。').closest('[inert]')).not.toBeNull();
+    fireEvent.click(keyword);
+    expect(keyword.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('埋めない時間。').closest('[inert]')).toBeNull();
+
+    const snippet = screen.getByText(/うまく言えない/).closest('button');
+    if (!snippet) throw new Error('スニペットの行がボタンでない');
+    fireEvent.click(snippet);
+    expect(screen.getByText('言いよどみが続く。').closest('[inert]')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

@@ -170,7 +170,8 @@
       "search_placeholder": "查找问题",
       "untitled": "无标题提问",
       "close": "关闭",
-      "limit": "提问最多 {max} 个。在瓶中结束一个提问后即可新建。"
+      "limit": "问题最多 {max} 个。在问题列表里结束一个，就能提出新的问题。",
+      "manage": "打开问题列表"
     }
   },
   "app": {
@@ -653,10 +654,10 @@
       "section_keywords": "关键词",
       "section_snippets": "摘录",
       "selection_reason": "被选中的理由",
-      "reply_to": "回复这封信",
       "reply": "给这封信写回信",
       "sources": "这封信的来源记录",
-      "source_untitled": "无标题记录"
+      "source_untitled": "无标题记录",
+      "open_detail": "展开阅读"
     }
   },
   "questions": {
@@ -831,7 +832,7 @@
       "save": "保存",
       "letter_arrived": "有一封信送到了",
       "close": "关闭",
-      "limit": "提问最多 {max} 个。在瓶中结束一个提问后即可新建。"
+      "limit": "问题最多 {max} 个。点上面的问题并选择「结束这个问题」，就能提出新的问题。"
     },
     "board": {
       "cards": "{count}张",

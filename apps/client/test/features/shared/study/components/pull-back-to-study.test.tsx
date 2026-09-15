@@ -25,10 +25,12 @@ describe('PullBackToStudy（引いて書斎へ）', () => {
   beforeEach(() => push.mockClear());
   afterEach(cleanup);
 
-  it('指のつまみはホイールより大きく進み、1 回で着ける', () => {
+  it('指のつまみはホイールより大きく進み、はっきり 1 回つまんで離せば着ける', () => {
     render(<PullBackToStudy />);
-    // ln(2.2) ≈ 0.79 ぶんのつまみを細かく送る
+    // ln(2.2) ≈ 0.79 ぶんのつまみを細かく送る。つまんでいる途中では着かず（軽いつまみで戻らない）、離すと着く。
     for (let i = 0; i < 20; i++) overzoom(0.04, 'pinch');
+    expect(push).not.toHaveBeenCalled();
+    release();
     expect(push).toHaveBeenCalledWith('/');
   });
 
@@ -38,7 +40,7 @@ describe('PullBackToStudy（引いて書斎へ）', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('つまみを離した時点で半分以上なら着く（戻れそうで戻れない、をやめる）', () => {
+  it('つまみを離した時点で commitOnRelease 以上なら着く（戻れそうで戻れない、をやめる）', () => {
     render(<PullBackToStudy />);
     const steps = Math.ceil(PULL_BACK.commitOnRelease / (0.05 * PULL_BACK.pinchGain));
     for (let i = 0; i < steps; i++) overzoom(0.05, 'pinch');
@@ -47,7 +49,7 @@ describe('PullBackToStudy（引いて書斎へ）', () => {
     expect(push).toHaveBeenCalledWith('/');
   });
 
-  it('半分に届かず離したら着かない', () => {
+  it('commitOnRelease に届かず離したら着かない（戻したくない軽いつまみで戻らない）', () => {
     render(<PullBackToStudy />);
     overzoom(0.05, 'pinch');
     release();

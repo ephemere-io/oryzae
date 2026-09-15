@@ -49,7 +49,6 @@ export function SpFermentationDock({
   const empty =
     !loading &&
     (detail === null || (keywords.length === 0 && snippets.length === 0 && letter === null));
-  const headline = keywords[0]?.keyword ?? null;
 
   return (
     <DockSheet
@@ -79,7 +78,8 @@ export function SpFermentationDock({
             <Skeleton className="h-3 w-32 rounded-full" />
           ) : (
             <span className="min-w-0 truncate text-[13px]" style={{ color: 'var(--fg)' }}>
-              {empty ? t('empty') : (headline ?? questionText)}
+              {/* 何の結果かは問いで言う。先頭のキーワードを出していた頃は「なぜその言葉？」になった（レビュー）。 */}
+              {empty ? t('empty') : questionText}
             </span>
           )}
         </span>
@@ -95,12 +95,6 @@ export function SpFermentationDock({
         <p className="pt-2 text-[13px] opacity-60">{t('empty')}</p>
       ) : detail ? (
         <div className="flex flex-col gap-4 pt-1">
-          <p
-            className="truncate text-[12px]"
-            style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-          >
-            {questionText}
-          </p>
           {/* 瓶の問いの画面と同じ読む流れ（字と見出しを揃える。返事と出典は書いている最中なので出さない）。 */}
           <FermentationReading detail={detail} />
         </div>

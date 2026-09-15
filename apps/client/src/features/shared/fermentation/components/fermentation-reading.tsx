@@ -2,13 +2,19 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
 import { formatMonthDay } from '@/lib/format-date';
 
 interface FermentationReadingProps {
   detail: FermentationDetail;
+  /**
+   * キーワードの説明とスニペットの「選ばれた理由」の出し方。
+   * - `all`: 最初から全部並べる（書きながら見る。一覧性が要る）
+   * - `tap`: 行を押すと、その場で開く（瓶で読む。窓を 1 つずつ開ける楽しみ）
+   */
+  reveal?: 'all' | 'tap';
   /** 手紙に返事を書く。無ければ足元の返事を出さない（その問いのエントリーを書いている最中など）。 */
   onReply?: () => void;
   /** 手紙のもとになったエントリーを開く。無ければ一覧を出さない。 */
@@ -21,14 +27,20 @@ const SERIF_FONT = "'Noto Serif JP', serif";
 /**
  * 発酵の結果を**読む**ための 1 本の縦の流れ（手紙・キーワード・スニペット、足元に返事）。
  *
- * 瓶の問いの画面と、エントリーの「発酵の結果」のシートが同じこの部品を使う（実機レビュー: 2 つの字と
- * 見出しがばらばらだった）。項目を押して別のシートで読む形（モーダルインモーダル）はやめ、キーワードの
- * 説明とスニペットの「選ばれた理由」まで最初から並べる。
+ * 瓶の問いの画面と、エントリーの「発酵の結果」のシートが同じこの部品を使う（字と見出しを揃える）。
+ * 項目を押して別のシートで読む形（モーダルインモーダル）はやめた。瓶では行を押すと**その場で開く**
+ * （`reveal="tap"`。全部出ていると「文字量が多い」と感じ、押して開けるほうがアドベントカレンダーの窓の
+ * ように楽しい、とレビュー）。エントリーの中は書きながら見渡すので最初から全部（`reveal="all"`）。
  *
- * 足元の返事は、何への返事かが分かるように**手紙の書き出しを引く**（一番下の「返事を書く」が一番上の
- * 手紙のことだと読み取れなかった）。
+ * 足元の返事は「この手紙に返事を書く」と言う。手紙の書き出しを引いて見せていたが、上の手紙と同じ中身の
+ * 繰り返しで「？」になった（レビュー）。
  */
-export function FermentationReading({ detail, onReply, onOpenSource }: FermentationReadingProps) {
+export function FermentationReading({
+  detail,
+  reveal = 'all',
+  onReply,
+  onOpenSource,
+}: FermentationReadingProps) {
   const t = useTranslations('fermentation.reading');
   const letter = detail.letter?.bodyText ?? null;
   const sources = onOpenSource ? detail.scannedEntries : [];
@@ -39,6 +51,7 @@ export function FermentationReading({ detail, onReply, onOpenSource }: Fermentat
       className="flex flex-col gap-7"
       {...verifyAttrs({
         unit: 'FermentationReading',
+        reveal,
         hasLetter: letter !== null,
         keywordCount: detail.keywords.length,
         snippetCount: detail.snippets.length,
@@ -75,16 +88,23 @@ export function FermentationReading({ detail, onReply, onOpenSource }: Fermentat
         <Section label={t('section_keywords')}>
           <ul className="m-0 flex list-none flex-col p-0">
             {detail.keywords.map((keyword) => (
-              <Item key={keyword.id} marker="keyword">
-                <p
-                  className="m-0 text-[16px] leading-snug"
-                  style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
-                >
-                  {keyword.keyword}
-                </p>
+              <Item
+                key={keyword.id}
+                marker="keyword"
+                reveal={keyword.description ? reveal : 'all'}
+                openLabel={t('open_detail')}
+                summary={() => (
+                  <p
+                    className="m-0 text-[16px] leading-snug"
+                    style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
+                  >
+                    {keyword.keyword}
+                  </p>
+                )}
+              >
                 {keyword.description ? (
                   <p
-                    className="m-0 mt-1.5 whitespace-pre-wrap text-[14px] leading-[1.85]"
+                    className="m-0 pt-1.5 whitespace-pre-wrap text-[14px] leading-[1.85]"
                     style={{ fontFamily: SERIF_FONT, color: 'var(--fg)', opacity: 0.78 }}
                   >
                     {keyword.description}
@@ -100,21 +120,42 @@ export function FermentationReading({ detail, onReply, onOpenSource }: Fermentat
         <Section label={t('section_snippets')}>
           <ul className="m-0 flex list-none flex-col p-0">
             {detail.snippets.map((snippet) => (
-              <Item key={snippet.id} marker="snippet">
-                <p
-                  className="m-0 whitespace-pre-wrap text-[15px] leading-[1.9]"
-                  style={{ fontFamily: SERIF_FONT, color: 'var(--fg)' }}
-                >
-                  「{snippet.originalText}」
-                </p>
-                <span
-                  className="mt-1 block text-[11px] tracking-[0.06em]"
-                  style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-                >
-                  {formatMonthDay(snippet.sourceDate)}
-                </span>
+              <Item
+                key={snippet.id}
+                marker="snippet"
+                reveal={snippet.selectionReason ? reveal : 'all'}
+                openLabel={t('open_detail')}
+                summary={(open) => (
+                  <>
+                    <p
+                      className="m-0 whitespace-pre-wrap text-[15px] leading-[1.9]"
+                      style={{
+                        fontFamily: SERIF_FONT,
+                        color: 'var(--fg)',
+                        // 閉じている間は 2 行に畳む（開けば全文）。
+                        ...(open
+                          ? {}
+                          : {
+                              display: '-webkit-box',
+                              WebkitBoxOrient: 'vertical',
+                              WebkitLineClamp: 2,
+                              overflow: 'hidden',
+                            }),
+                      }}
+                    >
+                      「{snippet.originalText}」
+                    </p>
+                    <span
+                      className="mt-1 block text-[11px] tracking-[0.06em]"
+                      style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+                    >
+                      {formatMonthDay(snippet.sourceDate)}
+                    </span>
+                  </>
+                )}
+              >
                 {snippet.selectionReason ? (
-                  <div className="mt-2.5">
+                  <div className="pt-2.5">
                     <SmallLabel>{t('selection_reason')}</SmallLabel>
                     <p
                       className="m-0 mt-1 whitespace-pre-wrap text-[14px] leading-[1.85]"
@@ -130,30 +171,12 @@ export function FermentationReading({ detail, onReply, onOpenSource }: Fermentat
         </Section>
       ) : null}
 
-      {showFooter && letter !== null ? (
+      {showFooter ? (
         <footer
           data-letter-footer
           className="flex flex-col gap-4 border-t pt-5"
           style={{ borderColor: 'var(--border-subtle)' }}
         >
-          {/* 何への返事か: 手紙の書き出しを引く。 */}
-          <div data-letter-echo className="flex flex-col gap-1">
-            <SmallLabel>{t('reply_to')}</SmallLabel>
-            <p
-              className="m-0 text-[14px] leading-relaxed"
-              style={{
-                fontFamily: SERIF_FONT,
-                color: 'var(--date-color)',
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: 2,
-                overflow: 'hidden',
-              }}
-            >
-              「{letter}」
-            </p>
-          </div>
-
           {sources.length > 0 ? (
             <div className="flex flex-col">
               <SmallLabel>{t('sources')}</SmallLabel>
@@ -225,15 +248,58 @@ function SmallLabel({ children }: { children: ReactNode }) {
   );
 }
 
-/** 並びの 1 つ。罫で区切る（面は持たない。白いシートの上でもベージュの紙の上でも同じに見える）。 */
-function Item({ marker, children }: { marker: 'keyword' | 'snippet'; children: ReactNode }) {
+interface ItemProps {
+  marker: 'keyword' | 'snippet';
+  reveal: 'all' | 'tap';
+  /** 開く印の読み上げ名。 */
+  openLabel: string;
+  /** いつも見えている部分（開いているかを受け取る）。 */
+  summary: (open: boolean) => ReactNode;
+  /** 開くと見える部分（`reveal="all"` なら最初から）。 */
+  children: ReactNode;
+}
+
+/**
+ * 並びの 1 つ。罫で区切る（面は持たない。白いシートの上でもベージュの紙の上でも同じに見える）。
+ *
+ * `reveal="tap"` なら行全体がボタンで、押すとその場で開く。開く動きは CSS（`grid-template-rows`
+ * の 0fr → 1fr、`globals.css` の `.oz-disclosure`）で、高さを測らない。閉じている中身は `inert`。
+ */
+function Item({ marker, reveal, openLabel, summary, children }: ItemProps) {
+  const [open, setOpen] = useState(false);
+  const regionId = useId();
+  const className = 'border-b py-3.5 first:pt-1 last:border-b-0 last:pb-0';
+  const style = { borderColor: 'var(--border-subtle)' };
+
+  if (reveal === 'all') {
+    return (
+      <li data-reading-item={marker} className={className} style={style}>
+        {summary(true)}
+        {children}
+      </li>
+    );
+  }
+
   return (
-    <li
-      data-reading-item={marker}
-      className="border-b py-3.5 first:pt-1 last:border-b-0 last:pb-0"
-      style={{ borderColor: 'var(--border-subtle)' }}
-    >
-      {children}
+    <li data-reading-item={marker} data-open={open} className={className} style={style}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={regionId}
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-[44px] w-full items-start gap-3 text-left"
+      >
+        <span className="min-w-0 flex-1">{summary(open)}</span>
+        <span
+          aria-hidden="true"
+          title={openLabel}
+          className="oz-disclosure-mark"
+          data-open={open}
+        />
+      </button>
+      <div id={regionId} className="oz-disclosure" data-open={open} inert={!open}>
+        <div className="min-h-0 overflow-hidden">{children}</div>
+      </div>
     </li>
   );
 }

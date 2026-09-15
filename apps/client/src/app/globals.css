@@ -192,6 +192,47 @@ body {
   outline-style: dashed;
   cursor: grabbing;
 }
+/* その場で開く行（発酵の結果を瓶で読む）。高さを測らず、格子の行の 0fr → 1fr で開く。 */
+.oz-disclosure {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms ease-out;
+}
+.oz-disclosure[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+/* 開く印（＋ が回って × になる）。iOS の「›」は右へ進む印なので使わない。 */
+.oz-disclosure-mark {
+  position: relative;
+  flex-shrink: 0;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin-block-start: 0.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  transition: rotate 220ms ease-out;
+}
+.oz-disclosure-mark::before,
+.oz-disclosure-mark::after {
+  content: "";
+  position: absolute;
+  inset: 50% 25% auto;
+  block-size: 1px;
+  background: var(--date-color);
+}
+.oz-disclosure-mark::after {
+  rotate: 90deg;
+}
+.oz-disclosure-mark[data-open="true"] {
+  rotate: 45deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oz-disclosure,
+  .oz-disclosure-mark {
+    transition: none;
+  }
+}
+
 /* 掴んだ写真の小さな写し。指の点を下端の中央にして、指の少し上に出す（指で隠れない）。 */
 .oz-photo-ghost {
   position: absolute;

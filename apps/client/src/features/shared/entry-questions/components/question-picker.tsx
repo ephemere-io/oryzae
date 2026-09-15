@@ -2,6 +2,7 @@
 
 import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
@@ -208,13 +209,20 @@ export function QuestionPicker({
           </ul>
           {questions.length >= MAX_ACTIVE_QUESTIONS ? (
             // 上限（#430）。書いても作れないので、書く欄を開かせない。
-            <p
-              data-question-limit
-              className="px-4 py-3 text-[12px] leading-relaxed"
-              style={{ color: 'var(--date-color)' }}
-            >
-              {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
-            </p>
+            <div data-question-limit className="flex flex-col items-start gap-1 px-4 py-3">
+              <p className="m-0 text-[12px] leading-relaxed" style={{ color: 'var(--date-color)' }}>
+                {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
+              </p>
+              {/* どこで終えるのかを言うだけでは辿れなかった（レビュー）。そこへの入口を置く。 */}
+              <Link
+                href="/questions"
+                data-question-manage
+                className="min-h-[36px] py-2 text-[13px] font-medium underline underline-offset-4"
+                style={{ color: 'var(--accent)' }}
+              >
+                {t('manage')}
+              </Link>
+            </div>
           ) : (
             <button
               type="button"
