@@ -208,7 +208,7 @@ export function BoardCard({
           className="absolute inset-0"
           style={{ opacity: TEXT_OPACITY }}
         >
-          <SnippetCardContent content={card.content} />
+          <SnippetCardContent content={card.content} cardWidth={card.width} />
         </div>
       )}
       {card.cardType === 'photo' && isPhotoContent(card.content) && (

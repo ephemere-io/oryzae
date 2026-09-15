@@ -163,4 +163,42 @@ describe('LoadBoardUsecase', () => {
 
     expect(result.cards).toHaveLength(0);
   });
+
+  it('同じ付箋の行が複数あっても 1 枚だけ返す（00025 を流す前でも二重に見せない）', async () => {
+    // 日付ごと・日次/週次ごとに盤面が分かれていたころは、同じ付箋が複数の行に居た。
+    // 畳まないと同じ付箋・写真が 2〜3 枚に見え、1 枚剥がすと実体ごと消えて
+    // 残りのカードが 404 になる（「消したのに戻ってきた」に見える）。
+    const placed = BoardCard.fromProps({
+      id: 'card-placed',
+      userId: 'user-1',
+      cardType: 'snippet',
+      refId: 'snippet-1',
+      x: 900,
+      y: 100,
+      rotation: 0,
+      width: 262,
+      height: 120,
+      zIndex: 7,
+      userPositioned: true,
+      createdAt: '2026-04-11T00:00:00Z',
+      updatedAt: '2026-04-11T00:00:00Z',
+    });
+    const copy = BoardCard.fromProps({
+      ...placed.toProps(),
+      id: 'card-copy',
+      x: 100,
+      userPositioned: false,
+      updatedAt: '2026-09-01T00:00:00Z',
+    });
+
+    vi.mocked(boardCardRepo.findByUserId).mockResolvedValue([copy, placed]);
+    vi.mocked(boardSnippetRepo.findByIds).mockResolvedValue([snippet('snippet-1', '同じ付箋')]);
+
+    const result = await usecase.execute('user-1');
+
+    expect(result.cards).toHaveLength(1);
+    // 残すのは「利用者が自分で置いた行」（00025 の畳み方と同じ規準）
+    expect(result.cards[0].id).toBe('card-placed');
+    expect(result.cards[0].x).toBe(900);
+  });
 });

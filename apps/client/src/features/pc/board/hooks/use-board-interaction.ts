@@ -189,25 +189,31 @@ export function useBoardInteraction(
   const onPointerUp = useCallback(() => {
     const state = stateRef.current;
     if (state) {
-      // **実際に動かしたときだけ**前面に出す。startDrag は pointerdown の時点で
-      // type='drag' を立てるので、ここで didDrag を見ないと「選ぶために1回押した」
-      // だけでカードが最前面へ飛び、しかも userPositioned が立って自動整列からも
-      // 外れてしまう（選択のつもりが並び順を書き換えていた）。
-      if (state.type === 'drag' && didDragRef.current) {
-        zCounterRef.current += 1;
-        // ここが「利用者が自分で位置を決めた」瞬間。フラグを立てて保存に乗せることで、
-        // 次回以降の自動整列（applyDefaultZOrder）の対象から外れる。
-        updateCard(state.cardId, { zIndex: zCounterRef.current, userPositioned: true });
-        onInteractionEnd();
-      } else if (state.type !== 'drag') {
+      if (state.type === 'drag') {
+        // **押しただけでも前面に出す。** 以前は「実際に動かしたときだけ」にしていたが、
+        // カードが重なっていると、下のカードを押しても埋もれたままで読めなかった
+        // （レビュー: 「クリックしたら前面に出るようにしてほしい」）。掘り出す操作が
+        // 掴んで動かすことしか無いのは、重ねて貼る板として使いにくい。
+        //
+        // ただし**既に最前面のカードを押しただけ**のときは何もしない。盤面に変化が
+        // 無いのに保存要求を出すと、選ぶたびに PUT が飛ぶ。
+        const card = cards.find((c) => c.id === state.cardId);
+        const alreadyFront = card !== undefined && cards.every((c) => c.zIndex <= card.zIndex);
+        if (didDragRef.current || !alreadyFront) {
+          zCounterRef.current += 1;
+          // ここが「利用者が自分で位置を決めた」瞬間。フラグを立てて保存に乗せることで、
+          // 次回以降の自動整列（applyDefaultZOrder）の対象から外れる。
+          updateCard(state.cardId, { zIndex: zCounterRef.current, userPositioned: true });
+          onInteractionEnd();
+        }
+      } else {
         // 回転・リサイズは動いた分がそのまま結果なので、従来どおり保存する。
         onInteractionEnd();
       }
-      // 動かしていない click では保存要求を出さない（盤面に変化が無いため）。
     }
     stateRef.current = null;
     setDraggingId(null);
-  }, [updateCard, onInteractionEnd]);
+  }, [cards, updateCard, onInteractionEnd]);
 
   const deselect = useCallback(() => {
     setSelectedId(null);
