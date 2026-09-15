@@ -27,6 +27,8 @@
  * 作れないようにするため（受信側クライアントがどう扱うかに依存したくない）。
  */
 
+import type { NewsletterLocale } from '../models/newsletter-locale.js';
+
 const HTML_ESCAPES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -153,33 +155,91 @@ export function buildUnsubscribeUrl(token: string): string {
  */
 export const PREVIEW_UNSUBSCRIBE_URL = buildUnsubscribeUrl('preview');
 
-const FOOTER_LINES = [
-  'このメールは Oryzae に登録されている方へお送りしています。',
-  `ヘルプ・FAQ: ${SUPPORT_URL}`,
-  `プライバシーポリシー: ${PRIVACY_URL}`,
-  `お問い合わせ: ${CONTACT_EMAIL}`,
-  '— Oryzae / Ferment Media Research',
-];
-
-/**
- * 配信停止の案内。フッターの中でも**リンクとして独立させる**。
- *
- * 他のフッター行に混ぜると、止めたい人が探すことになる。探させると
- * 迷惑メール報告のほうが早くなり、送信ドメイン全体の到達率が落ちる。
- */
 /**
  * テスト配信の件名に付ける印。
  *
  * 受信箱で本番配信と見分けられないと、「届いた」のがテストなのか本番なのか
  * 分からなくなる（そして本番を二度撃つ）。本文は本番と同一にして、件名だけ
- * 印を付ける。
+ * 印を付ける。言語も入れるのは、運営者が言語ごとに 1 通ずつ受け取るため
+ * （どれがどれか分からないと確認にならない）。
  */
-export function withTestSubjectPrefix(subject: string): string {
-  return `[テスト配信] ${subject}`;
+export function withTestSubjectPrefix(subject: string, locale: NewsletterLocale): string {
+  return `[テスト配信/${locale}] ${subject}`;
 }
 
-const UNSUBSCRIBE_LABEL = 'このお知らせの配信を停止する';
-const UNSUBSCRIBE_NOTE = '（停止してもアカウントと日記はそのまま残ります）';
+/**
+ * フッターと配信停止の案内は **本文と同じ言語で出す**。
+ *
+ * 本文だけ訳してここを日本語のままにすると、英語話者にとって「止め方が読めない
+ * メール」になる。止める口が読めないのは、止める口が無いのとほぼ同じで、
+ * 迷惑メール報告のほうが早くなる。
+ *
+ * この 4 言語ぶんは運営が書いた固定文で、**LLM には訳させない**。毎回訳すと
+ * 配信ごとに言い回しが揺れるし、配信停止の文言が翻訳事故で意味を変えると
+ * そのまま害になる（「停止する」が「再開する」になる類）。
+ *
+ * 配信停止の案内をフッターの他の行に混ぜず独立させているのは、止めたい人に
+ * 探させないため。探させると迷惑メール報告のほうが早くなり、送信ドメイン全体の
+ * 到達率が落ちる。
+ */
+interface FooterCopy {
+  /** `<html lang>` に入れる値。読み上げと受信側の自動翻訳の判定に効く。 */
+  htmlLang: string;
+  lines: string[];
+  unsubscribeLabel: string;
+  unsubscribeNote: string;
+}
+
+const FOOTER_COPY: Record<NewsletterLocale, FooterCopy> = {
+  ja: {
+    htmlLang: 'ja',
+    lines: [
+      'このメールは Oryzae に登録されている方へお送りしています。',
+      `ヘルプ・FAQ: ${SUPPORT_URL}`,
+      `プライバシーポリシー: ${PRIVACY_URL}`,
+      `お問い合わせ: ${CONTACT_EMAIL}`,
+      '— Oryzae / Ferment Media Research',
+    ],
+    unsubscribeLabel: 'このお知らせの配信を停止する',
+    unsubscribeNote: '（停止してもアカウントと日記はそのまま残ります）',
+  },
+  en: {
+    htmlLang: 'en',
+    lines: [
+      'You are receiving this because you have an Oryzae account.',
+      `Help & FAQ: ${SUPPORT_URL}`,
+      `Privacy: ${PRIVACY_URL}`,
+      `Contact: ${CONTACT_EMAIL}`,
+      '— Oryzae / Ferment Media Research',
+    ],
+    unsubscribeLabel: 'Unsubscribe from these announcements',
+    unsubscribeNote: '(Your account and journal entries stay exactly as they are.)',
+  },
+  zh: {
+    htmlLang: 'zh',
+    lines: [
+      '您收到这封邮件，是因为您注册了 Oryzae。',
+      `帮助与常见问题: ${SUPPORT_URL}`,
+      `隐私政策: ${PRIVACY_URL}`,
+      `联系我们: ${CONTACT_EMAIL}`,
+      '— Oryzae / Ferment Media Research',
+    ],
+    unsubscribeLabel: '停止接收此类通知邮件',
+    unsubscribeNote: '（停止后，您的账户和日记将原样保留。）',
+  },
+  ko: {
+    htmlLang: 'ko',
+    lines: [
+      'Oryzae에 가입하신 분께 보내 드리는 메일입니다.',
+      `도움말 및 FAQ: ${SUPPORT_URL}`,
+      `개인정보 보호정책: ${PRIVACY_URL}`,
+      `문의: ${CONTACT_EMAIL}`,
+      '— Oryzae / Ferment Media Research',
+    ],
+    unsubscribeLabel: '이 안내 메일 수신 중지',
+    unsubscribeNote: '(중지해도 계정과 일기는 그대로 남아 있습니다.)',
+  },
+};
 
 /**
  * 受信箱の一覧に出るプレビュー文（preheader）。
@@ -232,25 +292,30 @@ export function renderNewsletterHtml(params: {
   bodyMarkdown: string;
   /** 受信者ごとの配信停止 URL。`buildUnsubscribeUrl` で作る。 */
   unsubscribeUrl: string;
+  /** 本文の言語。フッターと配信停止の案内をこの言語で出す。 */
+  locale: NewsletterLocale;
 }): string {
+  const copy = FOOTER_COPY[params.locale];
   const blocks = parseNewsletterBody(params.bodyMarkdown);
 
   const body = blocks.map(renderBlockHtml).join('\n      ');
 
   const unsubscribe =
     `<p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#8a8279;">` +
-    `<a href="${escapeHtml(params.unsubscribeUrl)}" style="color:#8a6d3b;text-decoration:underline;">${escapeHtml(UNSUBSCRIBE_LABEL)}</a>` +
-    `<br />${escapeHtml(UNSUBSCRIBE_NOTE)}</p>`;
+    `<a href="${escapeHtml(params.unsubscribeUrl)}" style="color:#8a6d3b;text-decoration:underline;">${escapeHtml(copy.unsubscribeLabel)}</a>` +
+    `<br />${escapeHtml(copy.unsubscribeNote)}</p>`;
 
-  const footer = FOOTER_LINES.map(
-    (line) =>
-      `<p style="margin:0 0 4px;font-size:12px;line-height:1.7;color:#8a8279;">${renderInline(escapeHtml(line))}</p>`,
-  ).join('\n        ');
+  const footer = copy.lines
+    .map(
+      (line) =>
+        `<p style="margin:0 0 4px;font-size:12px;line-height:1.7;color:#8a8279;">${renderInline(escapeHtml(line))}</p>`,
+    )
+    .join('\n        ');
 
   const preheader = escapeHtml(buildPreheader(params.bodyMarkdown));
 
   return `<!doctype html>
-<html lang="ja">
+<html lang="${copy.htmlLang}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -300,7 +365,9 @@ export function renderNewsletterText(params: {
   subject: string;
   bodyMarkdown: string;
   unsubscribeUrl: string;
+  locale: NewsletterLocale;
 }): string {
+  const copy = FOOTER_COPY[params.locale];
   const body = parseNewsletterBody(params.bodyMarkdown).map(renderBlockText).join('\n\n');
 
   return [
@@ -309,9 +376,9 @@ export function renderNewsletterText(params: {
     body,
     '',
     '———',
-    `${UNSUBSCRIBE_LABEL}: ${params.unsubscribeUrl}`,
-    UNSUBSCRIBE_NOTE,
+    `${copy.unsubscribeLabel}: ${params.unsubscribeUrl}`,
+    copy.unsubscribeNote,
     '',
-    ...FOOTER_LINES,
+    ...copy.lines,
   ].join('\n');
 }

@@ -4,18 +4,22 @@ import type {
 } from '../../domain/gateways/bulk-email-sender.gateway.js';
 import type { NewsletterAudienceGateway } from '../../domain/gateways/newsletter-audience.gateway.js';
 import type { NewsletterRepositoryGateway } from '../../domain/gateways/newsletter-repository.gateway.js';
+import type { NewsletterTranslationRepositoryGateway } from '../../domain/gateways/newsletter-translation-repository.gateway.js';
 import {
   type UnsubscribeTokenGateway,
   UnsubscribeTokenUnavailableError,
 } from '../../domain/gateways/unsubscribe-token.gateway.js';
 import type { NewsletterProps } from '../../domain/models/newsletter.js';
+import type { NewsletterLocale } from '../../domain/models/newsletter-locale.js';
 import {
   buildUnsubscribeUrl,
   renderNewsletterHtml,
   renderNewsletterText,
 } from '../../domain/services/newsletter-content.service.js';
+import { resolveLocalizedContent } from '../../domain/services/newsletter-delivery.service.js';
 import {
   NewsletterNotFoundError,
+  NewsletterTranslationMissingError,
   NewsletterUnsubscribeUnavailableError,
   NewsletterValidationError,
 } from '../errors/newsletter.errors.js';
@@ -27,6 +31,8 @@ export interface SendNewsletterResult {
   reason?: 'disabled' | 'no-api-key';
   delivered: number;
   failed: number;
+  /** 言語ごとに何通組み立てたか。翻訳版が届いたことの確認に使う。 */
+  sentByLocale: Partial<Record<NewsletterLocale, number>>;
   /**
    * 失敗の内訳。宛先は伏せて理由だけを数える。
    * 「誰に届かなかったか」は admin 画面にも残さない（送信ログに個人を並べない）。
@@ -45,6 +51,12 @@ export interface SendNewsletterResult {
  * （行ロックではないので厳密な排他ではないが、人が押すボタン由来の
  * 二度押しはこれで塞がる。）
  *
+ * ## 言語ごとに文面を変える
+ *
+ * 受信者の `user_metadata.locale` に合わせ、日本語話者には原文を、それ以外には
+ * 翻訳を送る。**翻訳が無い / 原文より古い言語が 1 つでもあれば送信しない。**
+ * 原文にフォールバックすると「英語のつもりが日本語で届いた」が黙って起きる。
+ *
  * ## 途中で落ちたら
  *
  * sending のまま残すと、その配信は以後永久に送れなくなる。例外は握らず
@@ -56,6 +68,7 @@ export class SendNewsletterUsecase {
     private audience: NewsletterAudienceGateway,
     private sender: BulkEmailSenderGateway,
     private tokens: UnsubscribeTokenGateway,
+    private translations: NewsletterTranslationRepositoryGateway,
   ) {}
 
   async execute(id: string): Promise<SendNewsletterResult> {
@@ -63,22 +76,29 @@ export class SendNewsletterUsecase {
     if (!newsletter) throw new NewsletterNotFoundError(id);
 
     const recipients = await this.audience.listRecipients();
+    const source = { subject: newsletter.subject, bodyMarkdown: newsletter.bodyMarkdown };
+    const translations = await this.translations.listByNewsletterId(id);
 
-    // 宛先ごとの配信停止リンクを **送信状態にする前に** 全部作る。
-    // 署名鍵が無ければここで落ちるので、status は draft のまま動かない
-    // （止める口の無いメールを送るくらいなら、送らないほうがよい）。
+    // 宛先ごとの文面と配信停止リンクを **送信状態にする前に** 全部組み立てる。
+    // 翻訳漏れも署名鍵の不足も、ここで落ちれば status は draft のまま動かない。
     let messages: BulkEmailMessage[];
+    const sentByLocale: Partial<Record<NewsletterLocale, number>> = {};
     try {
       messages = recipients.map((recipient) => {
+        const localized = resolveLocalizedContent(recipient.locale, source, translations);
+        if (!localized) throw new NewsletterTranslationMissingError(recipient.locale);
+
         const unsubscribeUrl = buildUnsubscribeUrl(this.tokens.issue(recipient.userId));
         const content = {
-          subject: newsletter.subject,
-          bodyMarkdown: newsletter.bodyMarkdown,
+          subject: localized.subject,
+          bodyMarkdown: localized.bodyMarkdown,
           unsubscribeUrl,
+          locale: recipient.locale,
         };
+        sentByLocale[recipient.locale] = (sentByLocale[recipient.locale] ?? 0) + 1;
         return {
           to: recipient.email,
-          subject: newsletter.subject,
+          subject: localized.subject,
           html: renderNewsletterHtml(content),
           text: renderNewsletterText(content),
           unsubscribeUrl,
@@ -115,6 +135,7 @@ export class SendNewsletterUsecase {
         reason: outcome.reason,
         delivered: 0,
         failed: 0,
+        sentByLocale: {},
         failureReasons: [],
       };
     }
@@ -135,6 +156,7 @@ export class SendNewsletterUsecase {
       sent: true,
       delivered: outcome.delivered,
       failed: outcome.failures.length,
+      sentByLocale,
       failureReasons: [...reasonCounts.entries()]
         .map(([reason, count]) => ({ reason, count }))
         .sort((a, b) => b.count - a.count),

@@ -63,7 +63,7 @@ describe('escapeHtml', () => {
 
 describe('renderNewsletterHtml', () => {
   const render = (bodyMarkdown: string, subject = '件名') =>
-    renderNewsletterHtml({ subject, bodyMarkdown, unsubscribeUrl: UNSUBSCRIBE_URL });
+    renderNewsletterHtml({ subject, bodyMarkdown, unsubscribeUrl: UNSUBSCRIBE_URL, locale: 'ja' });
 
   it('本文に書かれた HTML をそのまま出さない（メールに script を差し込ませない）', () => {
     const html = render('<script>alert(1)</script> と書いた');
@@ -130,6 +130,7 @@ describe('renderNewsletterHtml', () => {
       subject: '件名',
       bodyMarkdown: '本文',
       unsubscribeUrl: 'https://oryzae.ephemere.io/unsubscribe?token=a"onmouseover="x',
+      locale: 'ja',
     });
     expect(html).not.toContain('onmouseover="x"');
     expect(html).toContain('&quot;onmouseover=&quot;x');
@@ -146,6 +147,7 @@ describe('renderNewsletterText', () => {
       subject: '件名',
       bodyMarkdown: '詳しくは [こちら](https://oryzae.ephemere.io/support) へ',
       unsubscribeUrl: UNSUBSCRIBE_URL,
+      locale: 'ja',
     });
     expect(text).toContain('こちら (https://oryzae.ephemere.io/support)');
   });
@@ -155,6 +157,7 @@ describe('renderNewsletterText', () => {
       subject: '件名',
       bodyMarkdown: '**重要**\n\n- ひとつ\n- ふたつ',
       unsubscribeUrl: UNSUBSCRIBE_URL,
+      locale: 'ja',
     });
     expect(text).toContain('重要');
     expect(text).not.toContain('**');
@@ -167,6 +170,7 @@ describe('renderNewsletterText', () => {
       subject: '今月の更新',
       bodyMarkdown: '本文',
       unsubscribeUrl: UNSUBSCRIBE_URL,
+      locale: 'ja',
     });
     expect(text.startsWith('今月の更新')).toBe(true);
     expect(text.trimEnd().endsWith('— Oryzae / Ferment Media Research')).toBe(true);
@@ -177,6 +181,7 @@ describe('renderNewsletterText', () => {
       subject: '件名',
       bodyMarkdown: '本文',
       unsubscribeUrl: UNSUBSCRIBE_URL,
+      locale: 'ja',
     });
     expect(text).toContain(UNSUBSCRIBE_URL);
   });
@@ -186,6 +191,7 @@ describe('renderNewsletterText', () => {
       subject: '件名',
       bodyMarkdown: '5 < 10 です',
       unsubscribeUrl: UNSUBSCRIBE_URL,
+      locale: 'ja',
     });
     expect(text).toContain('5 < 10 です');
     expect(text).not.toContain('&lt;');

@@ -22,14 +22,37 @@ export const newsletterSchema = z.object({
 export type Newsletter = z.infer<typeof newsletterSchema>;
 export type NewsletterStatus = Newsletter['status'];
 
+const newsletterLocaleSchema = z.enum(['ja', 'en', 'zh', 'ko']);
+export type NewsletterLocale = z.infer<typeof newsletterLocaleSchema>;
+
+/** 画面に出す言語名。運営者が読むので日本語表記。 */
+export const LOCALE_LABELS: Record<NewsletterLocale, string> = {
+  ja: '日本語',
+  en: 'English',
+  zh: '简体中文',
+  ko: '한국어',
+};
+
+const localePreviewSchema = z.object({
+  locale: newsletterLocaleSchema,
+  recipientCount: z.number(),
+  subject: z.string().nullable(),
+  html: z.string().nullable(),
+  text: z.string().nullable(),
+});
+
 export const newsletterPreviewSchema = z.object({
   id: z.string(),
   subject: z.string(),
   html: z.string(),
   text: z.string(),
   recipientCount: z.number(),
+  locales: z.array(localePreviewSchema),
+  missingTranslations: z.array(z.enum(['en', 'zh', 'ko'])),
   sendable: z.boolean(),
-  blockedReason: z.enum(['already-sent', 'not-tested', 'no-recipients']).nullable(),
+  blockedReason: z
+    .enum(['already-sent', 'not-tested', 'translations-missing', 'no-recipients'])
+    .nullable(),
   testSentAt: z.string().nullable(),
 });
 
@@ -43,6 +66,7 @@ export const testSendResultSchema = z.object({
   delivered: z.number(),
   failed: z.number(),
   recipients: z.array(z.string()),
+  locales: z.array(newsletterLocaleSchema),
 });
 
 export type TestSendResult = z.infer<typeof testSendResultSchema>;
@@ -53,6 +77,7 @@ export const sendResultSchema = z.object({
   reason: z.string().optional(),
   delivered: z.number(),
   failed: z.number(),
+  sentByLocale: z.record(newsletterLocaleSchema, z.number()),
   failureReasons: z.array(z.object({ reason: z.string(), count: z.number() })),
 });
 
@@ -69,6 +94,15 @@ export const generateDraftResultSchema = z.object({
 
 export type GenerateDraftResult = z.infer<typeof generateDraftResultSchema>;
 
+/** server の TranslateNewsletterResult に対応。 */
+export const translateResultSchema = z.object({
+  translated: z.array(z.enum(['en', 'zh', 'ko'])),
+  skipped: z.array(z.enum(['en', 'zh', 'ko'])),
+  recipientCountByLocale: z.record(newsletterLocaleSchema, z.number()),
+});
+
+export type TranslateResult = z.infer<typeof translateResultSchema>;
+
 /** 送信ボタンを押せない理由を画面の言葉にする（server の blockedReason に対応）。 */
 export function formatBlockedReason(
   reason: NonNullable<NewsletterPreview['blockedReason']>,
@@ -78,6 +112,8 @@ export function formatBlockedReason(
       return 'この配信はすでに送信済みです。';
     case 'not-tested':
       return 'まだテスト配信していません。先に「テスト配信」を押して受信を確認してください。';
+    case 'translations-missing':
+      return '宛先がいる言語の翻訳が揃っていません。「翻訳を作成」を押してください。';
     case 'no-recipients':
       return '宛先が 0 名のため送信できません。';
   }

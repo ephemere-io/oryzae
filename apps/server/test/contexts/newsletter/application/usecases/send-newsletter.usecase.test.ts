@@ -6,6 +6,10 @@ import type {
   NewsletterRecipient,
 } from '@/contexts/newsletter/domain/gateways/newsletter-audience.gateway.js';
 import type { NewsletterRepositoryGateway } from '@/contexts/newsletter/domain/gateways/newsletter-repository.gateway.js';
+import type {
+  NewsletterTranslation,
+  NewsletterTranslationRepositoryGateway,
+} from '@/contexts/newsletter/domain/gateways/newsletter-translation-repository.gateway.js';
 import {
   type UnsubscribeTokenGateway,
   UnsubscribeTokenUnavailableError,
@@ -24,6 +28,17 @@ function mockTokens(): UnsubscribeTokenGateway {
  * 本番送信の対象は **テスト配信済みの下書き**（domain のゲート）。
  * 未テストで送ろうとするケースは下の describe で別に見る。
  */
+
+/** 翻訳リポジトリのスタブ。既定は「翻訳なし」。 */
+function mockTranslations(
+  items: NewsletterTranslation[] = [],
+): NewsletterTranslationRepositoryGateway {
+  return {
+    listByNewsletterId: vi.fn().mockResolvedValue(items),
+    save: vi.fn(),
+  };
+}
+
 function draft(): Newsletter {
   const result = Newsletter.create(
     { subject: '今月の更新', bodyMarkdown: '本文です。', createdBy: 'admin-1' },
@@ -60,15 +75,20 @@ function mockRepository(initial: Newsletter | null) {
 
 function mockAudience(recipients: NewsletterRecipient[]): NewsletterAudienceGateway {
   return {
-    countRecipients: vi.fn().mockResolvedValue(recipients.length),
+    countRecipientsByLocale: vi.fn().mockResolvedValue({
+      ja: recipients.filter((r) => r.locale === 'ja').length,
+      en: recipients.filter((r) => r.locale === 'en').length,
+      zh: 0,
+      ko: 0,
+    }),
     listRecipients: vi.fn().mockResolvedValue(recipients),
     listTestRecipients: vi.fn().mockResolvedValue([]),
   };
 }
 
 const recipients: NewsletterRecipient[] = [
-  { userId: 'u1', email: 'a@example.com' },
-  { userId: 'u2', email: 'b@example.com' },
+  { userId: 'u1', email: 'a@example.com', locale: 'ja' },
+  { userId: 'u2', email: 'b@example.com', locale: 'ja' },
 ];
 
 describe('SendNewsletterUsecase', () => {
@@ -82,6 +102,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     const result = await usecase.execute('nl-1');
@@ -105,7 +126,13 @@ describe('SendNewsletterUsecase', () => {
       sendBulk: vi.fn().mockResolvedValue({ sent: true, delivered: 2, failures: [] }),
     };
     const tokens = mockTokens();
-    const usecase = new SendNewsletterUsecase(repository, mockAudience(recipients), sender, tokens);
+    const usecase = new SendNewsletterUsecase(
+      repository,
+      mockAudience(recipients),
+      sender,
+      tokens,
+      mockTranslations(),
+    );
 
     await usecase.execute('nl-1');
 
@@ -132,7 +159,13 @@ describe('SendNewsletterUsecase', () => {
       }),
       verify: vi.fn(),
     };
-    const usecase = new SendNewsletterUsecase(repository, mockAudience(recipients), sender, tokens);
+    const usecase = new SendNewsletterUsecase(
+      repository,
+      mockAudience(recipients),
+      sender,
+      tokens,
+      mockTranslations(),
+    );
 
     await expect(usecase.execute('nl-1')).rejects.toThrow('NEWSLETTER_UNSUBSCRIBE_SECRET');
     expect(sender.sendBulk).not.toHaveBeenCalled();
@@ -150,6 +183,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     await usecase.execute('nl-1');
@@ -173,6 +207,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     await expect(usecase.execute('nl-1')).rejects.toThrow('すでに送信済み');
@@ -188,6 +223,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     await expect(usecase.execute('nl-1')).rejects.toThrow('まだテスト配信していません');
@@ -198,7 +234,13 @@ describe('SendNewsletterUsecase', () => {
   it('宛先が 0 名なら送らない', async () => {
     const { repository } = mockRepository(draft());
     const sender: BulkEmailSenderGateway = { sendBulk: vi.fn() };
-    const usecase = new SendNewsletterUsecase(repository, mockAudience([]), sender, mockTokens());
+    const usecase = new SendNewsletterUsecase(
+      repository,
+      mockAudience([]),
+      sender,
+      mockTokens(),
+      mockTranslations(),
+    );
 
     await expect(usecase.execute('nl-1')).rejects.toThrow('宛先が 0 名');
     expect(sender.sendBulk).not.toHaveBeenCalled();
@@ -212,6 +254,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     await expect(usecase.execute('missing')).rejects.toThrow('Newsletter not found');
@@ -227,6 +270,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     const result = await usecase.execute('nl-1');
@@ -248,6 +292,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     await expect(usecase.execute('nl-1')).rejects.toThrow('network down');
@@ -274,6 +319,7 @@ describe('SendNewsletterUsecase', () => {
       mockAudience(recipients),
       sender,
       mockTokens(),
+      mockTranslations(),
     );
 
     const result = await usecase.execute('nl-1');

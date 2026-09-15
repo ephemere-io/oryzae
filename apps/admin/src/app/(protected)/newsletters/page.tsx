@@ -71,6 +71,14 @@ export default function NewslettersPage() {
     await send.loadPreview(selected.id);
   }
 
+  async function handleTranslate() {
+    if (!selected) return;
+    const result = await send.translate(selected.id);
+    if (!result) return;
+    // 翻訳の有無でプレビューの送信可否が変わるので、開いたまま読み直す。
+    await send.loadPreview(selected.id);
+  }
+
   async function handleSendTest() {
     if (!selected) return;
     const result = await send.sendTest(selected.id);
@@ -194,9 +202,11 @@ export default function NewslettersPage() {
         loadingPreview={send.loadingPreview}
         sending={send.sending}
         testSending={send.testSending}
+        translating={send.translating}
         error={send.error}
         onSend={handleSend}
         onSendTest={handleSendTest}
+        onTranslate={handleTranslate}
       />
     </div>
   );
