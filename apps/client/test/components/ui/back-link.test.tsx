@@ -32,6 +32,31 @@ describe('BackLink', () => {
     expect(link.textContent).toBe('書斎');
   });
 
+  it('行き先の絵は名前の後ろに付け、読み上げには出さない', () => {
+    const { container } = render(
+      <BackLinkProvider value={{ ...STUDY, icon: <svg data-testid="study-icon" /> }}>
+        <BackLink />
+      </BackLinkProvider>,
+    );
+    const link = within(container).getByRole('link', { name: '書斎に戻る' });
+    const icon = within(container).getByTestId('study-icon');
+    // 並びは「山形 → 名前 → 絵」。
+    expect(link.lastElementChild?.contains(icon)).toBe(true);
+    expect(icon.parentElement?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('縁だけ深い緑にする（面と寸法は問いのチップと同じ）', () => {
+    const { container } = render(
+      <BackLinkProvider value={STUDY}>
+        <BackLink />
+      </BackLinkProvider>,
+    );
+    const link = within(container).getByRole('link', { name: '書斎に戻る' });
+    expect(link.style.borderColor).toBe('var(--accent)');
+    expect(link.className).toContain('bg-[var(--surface-raised)]');
+    expect(link.className).toContain('h-9');
+  });
+
   it('inline はヘッダーの流れに並ぶだけで、自分では位置を持たない', () => {
     const { container } = render(
       <BackLinkProvider value={STUDY}>
