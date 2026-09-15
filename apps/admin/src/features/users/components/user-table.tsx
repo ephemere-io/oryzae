@@ -15,6 +15,13 @@ import {
 import { Tooltip } from '@/components/ui/tooltip';
 import type { AdminUser } from '../hooks/use-users';
 import { compareUsers, type SortDir, type UserSortKey } from '../sort';
+import {
+  ACTIVE_WINDOW_DAYS,
+  deriveUserStatus,
+  USER_STATUS_LABELS,
+  type UserStatus,
+  type UserStatusFilter,
+} from '../status';
 
 function formatDate(iso: string | null): string {
   if (!iso) return '-';
@@ -31,9 +38,12 @@ function getInitials(email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
 
-function isActive(user: AdminUser): boolean {
-  return user.entryCount > 0 || user.fermentationTotal > 0;
-}
+/** 状態バッジの点の色。active だけが目に留まるようにしてある。 */
+const STATUS_DOT_CLASS: Record<UserStatus, string> = {
+  active: 'bg-green-500',
+  dormant: 'bg-amber-500/60',
+  never: 'bg-muted-foreground/40',
+};
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-30" />;
@@ -48,7 +58,7 @@ interface UserTableProps {
   users: AdminUser[];
   onUserClick?: (userId: string) => void;
   searchQuery?: string;
-  statusFilter?: 'all' | 'active' | 'inactive';
+  statusFilter?: UserStatusFilter;
 }
 
 export function UserTable({ users, onUserClick, searchQuery, statusFilter }: UserTableProps) {
@@ -65,25 +75,28 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
   }
 
   const filtered = useMemo(() => {
-    let result = users;
+    // 判定時刻は 1 レンダー内で固定する。行ごとに new Date() を呼ぶと、窓の境界を
+    // またいだ瞬間にフィルタとバッジ表示が食い違いうる。
+    const now = new Date();
+    let result = users.map((user) => ({ user, status: deriveUserStatus(user, now) }));
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((u) => u.email.toLowerCase().includes(q) || u.id.includes(q));
+      result = result.filter(
+        ({ user }) => user.email.toLowerCase().includes(q) || user.id.includes(q),
+      );
     }
 
-    if (statusFilter === 'active') {
-      result = result.filter(isActive);
-    } else if (statusFilter === 'inactive') {
-      result = result.filter((u) => !isActive(u));
+    if (statusFilter && statusFilter !== 'all') {
+      result = result.filter(({ status }) => status === statusFilter);
     }
 
-    return [...result].sort((a, b) => compareUsers(a, b, sortKey, sortDir));
+    return [...result].sort((a, b) => compareUsers(a.user, b.user, sortKey, sortDir));
   }, [users, searchQuery, statusFilter, sortKey, sortDir]);
 
-  const totalEntries = filtered.reduce((sum, u) => sum + u.entryCount, 0);
-  const totalQuestions = filtered.reduce((sum, u) => sum + u.questionCount, 0);
-  const totalFermentations = filtered.reduce((sum, u) => sum + u.fermentationTotal, 0);
+  const totalEntries = filtered.reduce((sum, { user }) => sum + user.entryCount, 0);
+  const totalQuestions = filtered.reduce((sum, { user }) => sum + user.questionCount, 0);
+  const totalFermentations = filtered.reduce((sum, { user }) => sum + user.fermentationTotal, 0);
 
   function SortableHead({
     label,
@@ -120,13 +133,16 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
             <Tooltip
               content={
                 <span>
-                  <strong>Active</strong>: エントリーを 1 件以上書いた、または発酵が 1 件以上ある
+                  <strong>Active</strong>: 直近 {ACTIVE_WINDOW_DAYS} 日以内にエントリーを書いた
                   <br />
-                  <strong>Inactive</strong>: そのどちらも無い
+                  <strong>Dormant</strong>: エントリーはあるが {ACTIVE_WINDOW_DAYS}{' '}
+                  日以上書いていない
+                  <br />
+                  <strong>Never</strong>: エントリーが 1 件も無い
                   <br />
                   <span className="text-muted-foreground">
-                    ※ 期間の条件は無く、登録以降の累計で判定します。最近使っているかは
-                    「最終活動」列を見てください
+                    ※ 発酵は cron による自動実行で本人の利用を表さないため、判定に含めません
+                    （「最終活動」列と同じ基準）
                   </span>
                 </span>
               }
@@ -139,7 +155,7 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filtered.map((user) => (
+        {filtered.map(({ user, status }) => (
           <TableRow
             key={user.id}
             className={onUserClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
@@ -180,9 +196,9 @@ export function UserTable({ users, onUserClick, searchQuery, statusFilter }: Use
             <TableCell>
               <span className="inline-flex items-center gap-1.5 text-sm">
                 <span
-                  className={`inline-block h-1.5 w-1.5 rounded-full ${isActive(user) ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT_CLASS[status]}`}
                 />
-                {isActive(user) ? 'Active' : 'Inactive'}
+                {USER_STATUS_LABELS[status]}
               </span>
             </TableCell>
           </TableRow>
