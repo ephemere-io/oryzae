@@ -129,9 +129,9 @@ registerUnit<Props>({
     },
     {
       id: 'error-banner-iff-has-error',
-      description: 'エラー文言（赤バナー）は hasError=true のときだけ描画される',
+      description: 'エラー文言（role="alert" のバナー）は hasError=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasBanner = Boolean(root.querySelector('p.text-red-600'));
+        const hasBanner = Boolean(root.querySelector('p[role="alert"]'));
         const expectError = contract.hasError === 'true';
         return (
           hasBanner === expectError ||
