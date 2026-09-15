@@ -21,6 +21,11 @@ export interface BottomSheetProps {
   /** 見出し（左上の小さなラベル）。 */
   label?: string;
   closeLabel: string;
+  /**
+   * 見出しの右、閉じるの隣に並べる主の操作（保存など）。やめる・決めるを同じ場所・同じ大きさで並べる
+   * （iOS のシートの見出しと同じ）。キーボードが出ていても隠れない。
+   */
+  action?: ReactNode;
   /** 止まる段。既定は半分と全画面。中身が短いシートは `['content']`。 */
   detents?: readonly SheetDetent[];
   /** 最初に止まる段。 */
@@ -44,6 +49,7 @@ export function BottomSheet({
   ariaLabel,
   label,
   closeLabel,
+  action,
   detents = ['half', 'full'],
   initialDetent = 'half',
   children,
@@ -52,8 +58,8 @@ export function BottomSheet({
   const [detent, setDetent] = useState<SheetDetent>(initialDetent);
 
   // 閉じる動きの間は、最後に開いていたときの中身と見出しを描く（呼び出し側の中身はもう無い）。
-  const shown = useRef({ children, label, ariaLabel });
-  if (open) shown.current = { children, label, ariaLabel };
+  const shown = useRef({ children, label, ariaLabel, action });
+  if (open) shown.current = { children, label, ariaLabel, action };
 
   useEffect(() => {
     if (open) setDetent(initialDetent);
@@ -90,14 +96,17 @@ export function BottomSheet({
             >
               {shown.current.label ?? ''}
             </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
-              style={{ ...CONTROL_FONT, color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
-            >
-              {closeLabel}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
+                style={{ ...CONTROL_FONT, color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
+              >
+                {closeLabel}
+              </button>
+              {shown.current.action}
+            </div>
           </div>
         </div>
       }

@@ -839,9 +839,12 @@
       "close": "Close",
       "limit": "You can have up to {max} questions. Tap a question above and choose “Archive this question” to make room.",
       "archive_confirm_title": "Archive this question?",
-      "archive_confirm_body": "It leaves the jar and your question list. You can restore it from the question list on PC.",
+      "archive_confirm_body": "You can bring it back from “Archived questions” at the bottom of this screen.",
       "archive_confirm": "Archive",
-      "archive_cancel": "Cancel"
+      "archive_cancel": "Cancel",
+      "archived_section": "Archived questions ({count})",
+      "unarchive": "Restore",
+      "unarchive_limit": "You can have up to {max} questions. Archive one to restore this."
     },
     "board": {
       "cards": "{count} cards",

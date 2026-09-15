@@ -12,6 +12,8 @@ interface CanvasZoomControlsProps {
   onReset: () => void;
   /** 中身全体が収まるようにズーム。 */
   onFit: () => void;
+  /** 「100%」とする倍率（`CanvasSurface.referenceScale`）。既定は 1（world 1 = 1px）。 */
+  referenceScale?: number;
 }
 
 /** 端数で上限・下限判定がぶれないように、比較にだけ使う許容誤差。 */
@@ -35,11 +37,12 @@ export function CanvasZoomControls({
   onZoomOut,
   onReset,
   onFit,
+  referenceScale = 1,
 }: CanvasZoomControlsProps) {
   const t = useTranslations('canvas.zoom');
   const atMin = scale <= MIN_SCALE + SCALE_EPSILON;
   const atMax = scale >= MAX_SCALE - SCALE_EPSILON;
-  const percent = Math.round(scale * 100);
+  const percent = Math.round((scale / referenceScale) * 100);
 
   return (
     <div

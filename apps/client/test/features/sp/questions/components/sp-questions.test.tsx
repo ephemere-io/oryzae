@@ -91,6 +91,47 @@ describe('SpQuestions', () => {
     expect(screen.getByRole('button', { name: jaMessages.sp.questions.delete })).toBeTruthy();
   });
 
+  it('アーカイブした問いは、開いて「戻す」で戻せる', () => {
+    const unarchiveQuestion = vi.fn();
+    renderQ({
+      questions: [q('q1', 'なぜ書くのか'), q('a1', '去年の問い', { isArchived: true })],
+      unarchiveQuestion,
+    });
+    expect(screen.queryByText('去年の問い')).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: jaMessages.sp.questions.archived_section.replace('{count}', '1'),
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.unarchive }));
+    expect(unarchiveQuestion).toHaveBeenCalledWith('a1');
+  });
+
+  it('生きている問いが上限なら「戻す」は押せず、理由を出す', () => {
+    renderQ({
+      questions: [
+        ...['q1', 'q2', 'q3', 'q4', 'q5'].map((id) => q(id, `問い ${id}`)),
+        q('a1', '去年の問い', { isArchived: true }),
+      ],
+      unarchiveQuestion: vi.fn(),
+    });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: jaMessages.sp.questions.archived_section.replace('{count}', '1'),
+      }),
+    );
+    const restore = screen.getByRole('button', { name: jaMessages.sp.questions.unarchive });
+    expect(restore).toHaveProperty('disabled', true);
+    expect(
+      screen.getByText(jaMessages.sp.questions.unarchive_limit.replace('{max}', '5')),
+    ).toBeTruthy();
+  });
+
+  it('戻す手段を渡されなければ、アーカイブした問いの一覧を出さない', () => {
+    renderQ({ questions: [q('q1', 'なぜ書くのか'), q('a1', '去年の問い', { isArchived: true })] });
+    expect(screen.queryByText(/アーカイブした問い/)).toBeNull();
+  });
+
   it('生きている問いが上限（5）なら「立てる」を出さず、理由を出す（#430）', () => {
     renderQ({
       questions: ['q1', 'q2', 'q3', 'q4', 'q5'].map((id) => q(id, `問い ${id}`)),

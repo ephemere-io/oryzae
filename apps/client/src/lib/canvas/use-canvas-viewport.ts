@@ -69,6 +69,15 @@ export interface CanvasViewportOptions {
    * 縦画面（幅 390）で 64 を両側に取ると中身が 262px に潰れるので、SP は小さくする。
    */
   fitPadding?: number;
+  /**
+   * 「100%」とみなす窓（world 矩形）。**世界の大きさが決まっていて、等倍が画面の大きさと関係の無い
+   * 画面**（SP の瓶）で使う。渡すと、倍率の基準（`referenceScale`）がこの窓を画面に収めた倍率になり、
+   * 「等倍に戻す」はこの窓に収める。
+   *
+   * 以前 SP の瓶は PC と同じ「world 1 = 1px」を 100% としていて、100% に戻すと壜が画面いっぱいに
+   * なった（実機レビュー）。縦画面では、壜とまわりの円が収まる姿こそが「等倍」。
+   */
+  referenceBounds?: Bounds;
 }
 
 export interface CanvasSurface {
@@ -96,6 +105,11 @@ export interface CanvasSurface {
   /** 等倍に戻し、`bounds` があればその中心へ寄せる。 */
   resetZoom: () => void;
   /** `bounds`（world 矩形）が画面に収まるまでズーム。null なら等倍リセット。 */
+  /**
+   * 「100%」の倍率。`referenceBounds` を渡していればそれを画面に収めた倍率、無ければ 1。
+   * 倍率の表示（`CanvasZoomControls`）はこれを基準に割る。
+   */
+  referenceScale: number;
   fitTo: (bounds: Bounds | null) => void;
   /**
    * ビューポートが DOM に反映されるたびに呼ばれる購読。解除関数を返す。
@@ -141,6 +155,8 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   fitPaddingRef.current = options.fitPadding;
   const getSelectionBoundsRef = useRef(options.getSelectionBounds);
   getSelectionBoundsRef.current = options.getSelectionBounds;
+  const referenceBoundsRef = useRef(options.referenceBounds);
+  referenceBoundsRef.current = options.referenceBounds;
 
   // frame は **state で持つ**（ただの ref ではない）。
   //
@@ -152,6 +168,13 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   const worldRef = useRef<HTMLDivElement | null>(null);
 
   const [viewport, setViewport] = useState<Viewport>(IDENTITY_VIEWPORT);
+  /** frame の大きさ（「100%」の倍率を出すため）。採寸のたびに更新する。 */
+  const [frameDims, setFrameDims] = useState<Size>({ width: 0, height: 0 });
+  const measureFrame = useCallback((size: Size) => {
+    setFrameDims((prev) =>
+      prev.width === size.width && prev.height === size.height ? prev : size,
+    );
+  }, []);
   const [isPanning, setIsPanning] = useState(false);
 
   /** 描画の真実。state はここから遅れて追従するスナップショット。 */
@@ -249,17 +272,25 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   const zoomIn = useCallback(() => zoomByStep(ZOOM_STEP), [zoomByStep]);
   const zoomOut = useCallback(() => zoomByStep(1 / ZOOM_STEP), [zoomByStep]);
 
-  const resetZoom = useCallback(() => {
-    const size = frameSize();
-    apply(zoomTo(vpRef.current, 1, size.width / 2, size.height / 2));
-  }, [apply, frameSize]);
-
   /**
    * 直近の「収めた」結果。frame の大きさが変わったとき、利用者がまだ動かしていなければ
    * 同じ範囲に収め直す（下の ResizeObserver）。殻がビジュアルビューポートに合わせて高さを
    * 測り直したあとや、端末の向きが変わったあとに、収めたはずの絵が小さいまま残らないように。
    */
   const lastFitRef = useRef<{ bounds: Bounds; vp: Viewport } | null>(null);
+
+  /** 等倍に戻す。「100%」の窓があればそこへ収める（`referenceBounds`）。 */
+  const resetZoom = useCallback(() => {
+    const size = frameSize();
+    const reference = referenceBoundsRef.current;
+    if (reference && size.width > 0 && size.height > 0) {
+      const next = fitBounds(reference, size, fitPaddingRef.current);
+      lastFitRef.current = { bounds: reference, vp: next };
+      apply(next);
+      return;
+    }
+    apply(zoomTo(vpRef.current, 1, size.width / 2, size.height / 2));
+  }, [apply, frameSize]);
 
   const fitTo = useCallback(
     (bounds: Bounds | null) => {
@@ -306,6 +337,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
             return;
           }
         } else {
+          measureFrame(size);
           vpRef.current = fitBounds(bounds, size, fitPaddingRef.current);
           lastFitRef.current = { bounds, vp: vpRef.current };
         }
@@ -320,7 +352,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
     return () => {
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [frameEl, storageKey, paint, frameSize, syncViewport]);
+  }, [frameEl, storageKey, paint, frameSize, syncViewport, measureFrame]);
 
   // frame が現れる前に paint しても DOM が無いので、付いた直後に一度描き直す。
   useLayoutEffect(() => {
@@ -331,6 +363,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
   useEffect(() => {
     if (!frameEl || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => {
+      measureFrame(frameSize());
       const last = lastFitRef.current;
       if (!last) return;
       const current = vpRef.current;
@@ -346,7 +379,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
     });
     observer.observe(frameEl);
     return () => observer.disconnect();
-  }, [frameEl, frameSize, apply]);
+  }, [frameEl, frameSize, apply, measureFrame]);
 
   // 初期化が終わるまでは保存しない。
   // frame が現れるまで初期化は走らないので、その前に等倍を書き込むと
@@ -591,6 +624,12 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
     };
   }, []);
 
+  const { referenceBounds, fitPadding } = options;
+  const referenceScale =
+    referenceBounds && frameDims.width > 0 && frameDims.height > 0
+      ? fitBounds(referenceBounds, frameDims, fitPadding).scale
+      : 1;
+
   const frameRef = useCallback((el: HTMLDivElement | null) => {
     setFrameEl(el);
   }, []);
@@ -608,6 +647,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       zoomOut,
       resetZoom,
       fitTo,
+      referenceScale,
       subscribe,
     }),
     [
@@ -621,6 +661,7 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
       zoomOut,
       resetZoom,
       fitTo,
+      referenceScale,
       subscribe,
     ],
   );

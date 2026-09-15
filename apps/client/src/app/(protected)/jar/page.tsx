@@ -21,6 +21,7 @@ export default function JarPage() {
     createQuestion,
     editQuestion,
     archiveQuestion,
+    unarchiveQuestion,
     acceptQuestion,
     rejectQuestion,
   } = useQuestions(api);
@@ -71,6 +72,11 @@ export default function JarPage() {
     await refetchQuestions();
   }
 
+  async function handleUnarchiveQuestion(id: string) {
+    await unarchiveQuestion(id);
+    await refetchQuestions();
+  }
+
   // 端末で出し分け（URL は /jar のまま）。DeviceView が判定前/未対応を安全に処理。
   return (
     <DeviceView
@@ -90,6 +96,7 @@ export default function JarPage() {
                 createQuestion={handleAddQuestion}
                 editQuestion={handleEditQuestion}
                 archiveQuestion={handleArchiveQuestion}
+                unarchiveQuestion={handleUnarchiveQuestion}
                 acceptQuestion={acceptQuestion}
                 rejectQuestion={rejectQuestion}
                 unreadQuestionIds={unreadQuestionIds}

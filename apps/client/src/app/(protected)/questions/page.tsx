@@ -38,6 +38,7 @@ export default function QuestionsPage() {
           createQuestion={createQuestion}
           editQuestion={editQuestion}
           archiveQuestion={archiveQuestion}
+          unarchiveQuestion={unarchiveQuestion}
           acceptQuestion={acceptQuestion}
           rejectQuestion={rejectQuestion}
           unreadQuestionIds={unreadQuestionIds}
