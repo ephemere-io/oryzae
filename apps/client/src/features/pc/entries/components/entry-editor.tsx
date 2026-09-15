@@ -5,6 +5,7 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { BackLink } from '@/components/ui/back-link';
 import { PhotoStrip } from '@/components/ui/photo-strip';
 import { Popover } from '@/components/ui/popover';
 import {
@@ -1471,17 +1472,15 @@ export function EntryEditor({
           ヘッダーの下からしか始まらず、画面の縦いっぱいに立たない。 */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ヘッダー。**区切り線は引かない**（Notion のように、紙とヘッダーを線で切らない）。
-          左＝問い、中央＝空ける、右＝日付 ＋ 設定。
+          左＝書斎へ戻る ＋ 問い、右＝日付 ＋ 設定。
           「一覧」「新規エントリ」はサイドバーのメニューと重複するので置かない。
 
-          **3 列にして中央を空ける。** 上端の中央には「書斎へ戻る」のタブが掛かる
-          （`--study-exit-reserve`。書斎が無効なら 0）。問いのチップは左の列の中で
-          横に流れるので、何本結んでも中央へは届かない。以前は左の列が伸び放題で、
-          問いを 2 つ結ぶと出口と重なった（実機レビュー）。 */}
+          **出口はこの行の先頭に並べる**（`BackLink`。書斎が無効なら描かれない）。上に
+          浮かせないので、問いのチップを何本結んでも出口と重なりようが無い。 */}
         <div
           className={`grid items-center gap-6 ${fadeClass}`}
           style={{
-            gridTemplateColumns: 'minmax(0, 1fr) var(--study-exit-reserve, 0px) minmax(0, 1fr)',
+            gridTemplateColumns: 'minmax(0, 1fr) auto',
             paddingTop: SHELL_INSET,
             paddingBottom: SHELL_INSET / 2,
             // 左右は本文と同じ縦の線に乗せる（gutterPx）。ヘッダーと本文で
@@ -1491,9 +1490,10 @@ export function EntryEditor({
             paddingRight: gutterPx,
           }}
         >
-          {/* 左: 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
+          {/* 左: 書斎へ戻る → 問いを結ぶ。行の高さはサイドバーの項目と同じ 48px にして、
             チップの中心が瓶アイコンの中心と同じ線に乗るようにする。 */}
-          <div className="flex min-w-0 items-center" style={{ height: SHELL_ROW_HEIGHT }}>
+          <div className="flex min-w-0 items-center gap-3" style={{ height: SHELL_ROW_HEIGHT }}>
+            <BackLink />
             <QuestionChip
               activeQuestions={activeQuestions}
               linkedQuestionIds={linkedIds}
@@ -1501,9 +1501,6 @@ export function EntryEditor({
               onUnlink={handleUnlink}
             />
           </div>
-
-          {/* 中央: 何も置かない（上のタブの席）。 */}
-          <div aria-hidden="true" />
 
           {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
           <div
