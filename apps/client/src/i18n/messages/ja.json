@@ -560,7 +560,18 @@
     "resize_se": "右下をドラッグしてサイズ変更",
     "resize_s": "下をドラッグしてサイズ変更",
     "resize_sw": "左下をドラッグしてサイズ変更",
-    "resize_w": "左をドラッグしてサイズ変更"
+    "resize_w": "左をドラッグしてサイズ変更",
+    "width": "幅",
+    "width_small": "小",
+    "width_medium": "中",
+    "width_large": "大",
+    "align": "寄せ",
+    "wrap": "回り込み",
+    "wrap_on": "あり",
+    "wrap_off": "なし",
+    "done": "完了",
+    "align_needs_room": "幅いっぱいのときは寄せられません",
+    "selected": "写真を選んでいます"
   },
   "fermentation": {
     "detail": {

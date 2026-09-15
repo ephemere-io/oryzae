@@ -14,7 +14,7 @@ const START: InlineImage = {
   align: 'start',
 };
 
-/** 行の長さ 1000px、写真は inline 400px × block 300px（4:3）から始める。 */
+/** 行の長さ 1000px、写真は画面上で 幅 400 × 高さ 300（4:3）から始める。 */
 function resize(over: Partial<Parameters<typeof resizeInlineImage>[0]>) {
   return resizeInlineImage({
     start: START,
@@ -22,11 +22,16 @@ function resize(over: Partial<Parameters<typeof resizeInlineImage>[0]>) {
     dx: 0,
     dy: 0,
     editorInlineSize: 1000,
-    startInlinePx: 400,
-    startBlockPx: 300,
+    startWidthPx: 400,
+    startHeightPx: 300,
     isVertical: false,
     ...over,
   });
+}
+
+/** 縦書き。行の長さ 1000px（＝ editor の高さ）、写真は 幅 300 × 高さ 400。 */
+function resizeVertical(over: Partial<Parameters<typeof resizeInlineImage>[0]>) {
+  return resize({ isVertical: true, startWidthPx: 300, startHeightPx: 400, ...over });
 }
 
 describe('isCornerHandle', () => {
@@ -38,69 +43,75 @@ describe('isCornerHandle', () => {
   });
 });
 
-describe('resizeInlineImage（横書き）', () => {
-  it('右下を右へ引くと大きくなる', () => {
+/**
+ * **掴んだ辺を外へ引けば大きく、内へ引けば小さく。** ここが崩れると
+ * 「右へ引いたのに左へ潰れる」になる（実際にそうなっていた）。
+ */
+describe('掴んだ向きと伸び方', () => {
+  it('右の辺を右へ引くと幅が増える', () => {
     // 400px → 500px = 行の 50%
-    expect(resize({ handle: 'se', dx: 100 }).widthRatio).toBeCloseTo(0.5);
+    expect(resize({ handle: 'e', dx: 100 }).widthRatio).toBeCloseTo(0.5);
   });
 
-  it('左上を右へ引くと小さくなる（掴んだ向きと逆）', () => {
-    expect(resize({ handle: 'nw', dx: 100 }).widthRatio).toBeCloseTo(0.3);
+  it('左の辺を左へ引いても幅が増える（外へ引けば大きい）', () => {
+    expect(resize({ handle: 'w', dx: -100 }).widthRatio).toBeCloseTo(0.5);
   });
 
-  it('角ハンドルは縦横比を変えない', () => {
+  it('右の辺を左へ引くと幅が減る', () => {
+    expect(resize({ handle: 'e', dx: -100 }).widthRatio).toBeCloseTo(0.3);
+  });
+
+  it('縦書きでも、右の辺を右へ引けば幅が増える（行の割合は高さなので変わらない）', () => {
+    const result = resizeVertical({ handle: 'e', dx: 100 });
+
+    // 行に対する割合＝高さ 400px は動かない。
+    expect(result.widthRatio).toBeCloseTo(0.4);
+    // 幅 300 → 400、高さ 400 のままなので 1:1。
+    expect(result.aspect).toBeCloseTo(1);
+  });
+
+  it('縦書きで左の辺を左へ引いても幅が増える', () => {
+    expect(resizeVertical({ handle: 'w', dx: -100 }).aspect).toBeCloseTo(1);
+  });
+});
+
+describe('形（aspect）の扱い', () => {
+  it('角ハンドルは形を変えない', () => {
     expect(resize({ handle: 'se', dx: 100 }).aspect).toBeUndefined();
   });
 
-  it('辺（東）は inline だけ伸ばし、比率を確定させる', () => {
-    const result = resize({ handle: 'e', dx: 100 });
-
-    expect(result.widthRatio).toBeCloseTo(0.5);
-    // block 300px は据え置きなので 300/500 = 0.6
-    expect(result.aspect).toBeCloseTo(0.6);
+  it('角ハンドルは行に沿う辺の伸びで全体を拡げる', () => {
+    expect(resize({ handle: 'se', dx: 100 }).widthRatio).toBeCloseTo(0.5);
+    expect(resize({ handle: 'nw', dx: 100 }).widthRatio).toBeCloseTo(0.3);
   });
 
-  it('辺（南）は block だけ伸ばす（幅は変わらない）', () => {
+  it('縦書きの角ハンドルは、縦のドラッグで拡げる（横は形を保つので見ない）', () => {
+    expect(resizeVertical({ handle: 'se', dy: 100 }).widthRatio).toBeCloseTo(0.5);
+    expect(resizeVertical({ handle: 'se', dx: 100 }).widthRatio).toBeCloseTo(0.4);
+  });
+
+  it('辺ハンドルは掴んだ軸だけを伸ばす（もう片方は動かない）', () => {
+    // 下の辺を下へ 150px。高さ 300 → 450、幅 400 は据え置き。
     const result = resize({ handle: 's', dy: 150 });
 
-    expect(result.widthRatio).toBeCloseTo(0.4);
-    // block 300 → 450、inline 400 のままなので 450/400
-    expect(result.aspect).toBeCloseTo(1.125);
+    expect(result.widthRatio).toBeCloseTo(0.4); // 幅は変わらない
+    expect(result.aspect).toBeCloseTo(400 / 450);
+  });
+
+  it('保存する形は「幅 ÷ 高さ」（画面で見たままの比）', () => {
+    const result = resize({ handle: 'e', dx: 100 });
+    expect(result.aspect).toBeCloseTo(500 / 300);
+  });
+
+  it('縦書きで下の辺を下へ引くと、高さだけが伸びる', () => {
+    const result = resizeVertical({ handle: 's', dy: 100 });
+
+    expect(result.widthRatio).toBeCloseTo(0.5); // 高さ 400 → 500 = 行の 50%
+    expect(result.aspect).toBeCloseTo(300 / 500); // 幅 300 は据え置き
   });
 });
 
-/**
- * 縦書きでは inline 軸が画面の Y、block 軸が画面の X（しかも右→左）。
- * ここを取り違えると「右へ引いたのに縦に伸びる」「逆向きに縮む」になる。
- */
-describe('resizeInlineImage（縦書き）', () => {
-  it('下へ引くと大きくなる（inline 軸が画面の Y）', () => {
-    const result = resize({ isVertical: true, handle: 'se', dy: 100 });
-    expect(result.widthRatio).toBeCloseTo(0.5);
-  });
-
-  it('横へ引いても inline 幅は変わらない（角）', () => {
-    const result = resize({ isVertical: true, handle: 'se', dx: 100 });
-    expect(result.widthRatio).toBeCloseTo(0.4);
-  });
-
-  it('辺（南）は縦書きでは inline を伸ばす', () => {
-    const result = resize({ isVertical: true, handle: 's', dy: 100 });
-
-    expect(result.widthRatio).toBeCloseTo(0.5);
-    expect(result.aspect).toBeCloseTo(0.6);
-  });
-
-  // 縦書きは行が右から左へ進むので、block 軸は左方向が「伸びる」。
-  it('辺（西）を左へ引くと block が伸びる', () => {
-    const result = resize({ isVertical: true, handle: 'w', dx: -150 });
-
-    expect(result.widthRatio).toBeCloseTo(0.4);
-    expect(result.aspect).toBeCloseTo(1.125);
-  });
-});
-
-describe('resizeInlineImage の下限・上限', () => {
+describe('下限・上限', () => {
   it('行幅を超えて広げられない', () => {
     expect(resize({ handle: 'se', dx: 5000 }).widthRatio).toBe(1);
   });
@@ -109,9 +120,18 @@ describe('resizeInlineImage の下限・上限', () => {
     expect(resize({ handle: 'se', dx: -5000 }).widthRatio).toBe(0.05);
   });
 
+  // 行幅で頭打ちになったとき、形をドラッグ量から出すと高さだけが飛ぶ。
+  it('行幅で止まったとき、形は止まった幅から出す', () => {
+    const result = resize({ handle: 'e', dx: 5000 });
+
+    expect(result.widthRatio).toBe(1);
+    expect(result.aspect).toBeCloseTo(1000 / 300);
+  });
+
   // 初期化前などで実寸が取れないことがある。そこで NaN を返すと写真が消える。
   it('実寸が取れないときは元の値を返す', () => {
-    expect(resize({ startInlinePx: 0, dx: 100 })).toEqual({ widthRatio: 0.4 });
+    expect(resize({ startWidthPx: 0, dx: 100 })).toEqual({ widthRatio: 0.4 });
+    expect(resize({ startHeightPx: 0, dx: 100 })).toEqual({ widthRatio: 0.4 });
     expect(resize({ editorInlineSize: 0, dx: 100 })).toEqual({ widthRatio: 0.4 });
   });
 });
