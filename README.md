@@ -120,6 +120,7 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/entry-screen-design.md` | エントリー画面（PC / SP / 一覧）の最終形 UI/UX、エントリーとボードの役割定義 |
 | `docs/entry-photo-guide.md` | エントリの写真アップロードと文字起こし（VLM 採用理由・モデル選定・保存先） |
 | `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
+| `docs/newsletter-guide.md` | 登録使用者への一斉配信（送信前の確認、宛先の決め方、PR からの下書き生成） |
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
 | `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 3 層構成 |

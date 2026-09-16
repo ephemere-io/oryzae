@@ -231,6 +231,12 @@
     "links": {
       "privacy": "隐私政策",
       "support": "帮助与支持"
+    },
+    "newsletter": {
+      "label": "通知邮件",
+      "description": "我们会将新功能等通知发送到您注册的邮箱地址。",
+      "receive": "接收",
+      "error": "保存失败。请稍后再试。"
     }
   },
   "sidebar": {
@@ -858,5 +864,18 @@
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
     "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
+  },
+  "newsletter": {
+    "unsubscribe": {
+      "working": "处理中…",
+      "done_title": "已停止订阅",
+      "done_body": "今后您将不会收到来自 Oryzae 的通知邮件。",
+      "account_kept": "您的账户和日记将原样保留。与日记相关的邮件（例如发酵通知）仍会照常送达。",
+      "undo": "还是继续接收",
+      "resumed_title": "已恢复订阅",
+      "resumed_body": "通知邮件将会再次送达。",
+      "error_title": "无法完成处理",
+      "error_fallback": "登录后也可以在账户设置中更改。"
+    }
   }
 }
