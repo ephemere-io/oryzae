@@ -35,6 +35,11 @@ describe('externalHref', () => {
     expect(href?.endsWith('/support')).toBe(true);
   });
 
+  it('アプリの言語を ?lang= で公開サイトへ渡す（向こうはブラウザの言語で開いてしまう）', () => {
+    expect(externalHref({ kind: 'memo' }, 'ja')).toMatch(/\/support\?lang=ja$/);
+    expect(externalHref({ kind: 'memo' }, 'en')).toMatch(/\/support\?lang=en$/);
+  });
+
   it('他の対象は外へ出ない', () => {
     expect(externalHref({ kind: 'jar' })).toBeNull();
     expect(externalHref({ kind: 'board' })).toBeNull();
