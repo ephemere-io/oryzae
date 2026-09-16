@@ -146,7 +146,15 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   return (
     <EntranceContext.Provider value={controls}>
       <div
-        className="relative flex min-h-[100svh] flex-1 flex-col"
+        /**
+         * 高さは **`100svh`（ツールバーを除いた表示領域）を下限に、中身で伸びる**。
+         *
+         * `flex-1` を付けていたころは、`<body>`（`h-full` = ツールバーの裏まで含む大きい方の
+         * ビューポート）いっぱいに伸びていた。下端に置いた紙はその底に着くので、実機の Safari
+         * では**下のツールバーの裏に隠れて**「サインアップ」の行が見えなかった（実機レビュー）。
+         * 伸ばすのをやめると、紙は見えている画面の底に座る。
+         */
+        className="relative flex min-h-[100svh] flex-col"
         style={{
           opacity: leaving === null ? 1 : 0,
           transition:
