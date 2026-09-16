@@ -94,7 +94,8 @@ export default function JarPage() {
             onManageQuestions={() => setManageOpen((open) => !open)}
           />
           {manageOpen ? (
-            <div className="absolute inset-0 z-40 flex flex-col bg-[var(--bg)]">
+            // 本文の中で瓶に重ねる（殻のシートより上には来ない。`main` が重なりを閉じている）。
+            <div className="absolute inset-0 z-10 flex flex-col bg-[var(--bg)]">
               <SpQuestions
                 questions={allQuestions}
                 loading={allQuestionsLoading}
