@@ -157,7 +157,7 @@ const ACTUAL_FIELD_NAME = '請求額（Anthropic の org 全体の実額）';
  *
  *   合計: $0.3263（前日 $0.0325 +903%）
  *   ├ 発酵 (claude-sonnet-4-6): $0.2939
- *   └ OCR (claude-opus-5): $0.0325
+ *   └ OCR + 写真の文字起こし (claude-sonnet-5): $0.0325
  *   ※ 同じモデルを CI などが使えば、その分も同じ行に混ざる
  *   確認先: 管理画面・Anthropic Console
  *

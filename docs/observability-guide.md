@@ -65,14 +65,21 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 ### 用途別の内訳は **実額** で出す（推定しない）
 
 `cost_report` を `group_by[]=description` で取ると、各 result に `model` /
-`token_type` / `service_tier` が入る。Oryzae は用途ごとに別モデルを使っている
-（発酵 = `claude-sonnet-4-6`、OCR = `claude-opus-5`）ので、
-**モデル別の内訳がそのまま用途別の実額**になる。
+`token_type` / `service_tier` が入る。発酵と画像の文字起こしでモデルが違うので、
+**モデル別の内訳がおおむね用途別の実額**になる。
 
 | 用途 | モデル | 実額の取得元 |
 |---|---|---|
 | 発酵 | `claude-sonnet-4-6` | `cost_report` のモデル別内訳 |
-| OCR | `claude-opus-5` | 同上 |
+| board の OCR | `claude-sonnet-5` | 同上（写真の文字起こしと同じ行） |
+| 写真の文字起こし | `claude-sonnet-5` | 同上（board の OCR と同じ行） |
+
+**「おおむね」なのは 1:1 ではないから。** board の OCR は 2026-09-16 に
+`claude-opus-5` からランニングコスト優先で `claude-sonnet-5` に下げ、写真の
+文字起こしと同じモデルになった。この 2 つは以後 1 行に混ざり、分けて読めない。
+`featureOfModel` は該当する用途をすべて連ねて返す（`OCR + 写真の文字起こし`）ので、
+**混ざっていることは画面と通知の文言に出る**。分けて見たくなったら、どちらかを
+別モデルに戻すか、Anthropic Console で Workspace を分けること。
 
 自前でトークンを記録して単価を掛ける必要はない。実額のほうがキャッシュ読み書き・
 値引き・課金丸めも反映済みで**正確**でもある（`token_type` に `cache_read` /
@@ -86,8 +93,13 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
    `workspace_id` を足せば Oryzae アプリだけの実額が取れる）。
    画面・通知の文言は「そのモデルを使っている機能」と書き、
    「その機能のコスト」と言い切らないこと。
-2. **発酵と OCR が同じモデルになると割れなくなる。**
-   `claude-pricing.test.ts` が `OCR_MODEL_ID !== FERMENTATION_MODEL_ID` を固定している。
+2. **発酵だけは他の用途と別モデルを保つ。**
+   `cron-cost-alert.ts` は「発酵モデルの実額」を拾って推定と突き合わせ、乖離率を出す。
+   画像系と同じモデルになるとその額に別用途が混ざり、乖離率が意味を失う。
+   `claude-pricing.test.ts` が `FERMENTATION_MODEL_ID` が他の 2 つと異なることを固定している。
+   画像系どうし（OCR と写真の文字起こし）が混ざるのは、上記のとおり許容した判断。
+   なお CI の auto-fix ループ（`.github/workflows/auto-fix.yml`）も既定が
+   `claude-sonnet-5` なので、同じ API キーを使う限りその分も同じ行に入る。
 3. **`group_by[]` の書式を間違えると黙って内訳が消える。**
    `group_by=` だと無視され `model` が null になる。`anthropic-cost-api.test.ts` が
    クエリに `group_by[]=description` が載ることを固定している。

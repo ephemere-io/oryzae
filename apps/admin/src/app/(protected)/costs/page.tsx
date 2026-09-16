@@ -125,15 +125,16 @@ export default function CostsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-medium">発酵のコスト内訳（推定）</h1>
-          {/* このページは発酵1件ごとの推定（保存トークン × 価格表）。OCR は
-              別モデル・別テーブルなのでここには出ない。実請求額と、OCR を含む
-              推定合計は /observability/spend（Anthropic cost_report）を参照する。 */}
+          {/* このページは発酵1件ごとの推定（保存トークン × 価格表）。画像の文字起こし
+              （board の OCR・写真の文字起こし）は別モデル・別テーブルなのでここには
+              出ない。実請求額と、それらを含む合計は /observability/spend
+              （Anthropic cost_report）を参照する。 */}
           <span className="text-sm text-muted-foreground">
             {pagination.total} 件<span className="mx-1.5 text-border">|</span>
             ページ内推定合計:{' '}
             <span className="font-mono text-foreground">${grandTotal.toFixed(4)}</span>
             <span className="mx-1.5 text-border">|</span>
-            <span title="OCR は別モデル（claude-opus-5）で、このページには含まれません">
+            <span title="画像の文字起こし（OCR・写真）は別モデル（claude-sonnet-5）で、このページには含まれません">
               発酵のみ
             </span>
           </span>
