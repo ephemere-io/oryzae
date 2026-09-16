@@ -120,6 +120,8 @@ export function Sheet({
    * 送り（`scrollToDetent`）のたびに false に戻し、容器に指が触れたら true にする。
    */
   const byFingerRef = useRef(false);
+  /** いま指が触れているか。触れている間は、部品の側から段へ置き直さない（指と綱引きしない）。 */
+  const touchingRef = useRef(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   /**
    * スクロール容器の要素（state）。席（殻のドックの層）が後から用意されると、シートは同じ部品のまま**別の要素に
@@ -220,6 +222,8 @@ export function Sheet({
     const floor = inContent(peekRef.current);
     // 中身の段が見出しの行より低い＝測れていない。何も出ないくらいなら、いちばん高い段に出す。
     if (position === 'content' && at <= floor) return full;
+    // どの段も閉の位置には置かない（印がひとつも測れない環境では `full` も 0 なのでそのまま）。
+    if (at < 1 && floor < 1) return full;
     return Math.max(at, floor);
   }, []);
 
@@ -259,7 +263,7 @@ export function Sheet({
     let tries = 0;
     const tick = () => {
       const current = scrollerRef.current;
-      if (!current || latest.current.phase === 'closing' || byFingerRef.current) return;
+      if (!current || latest.current.phase === 'closing' || touchingRef.current) return;
       const target = targetOf(latest.current.detent);
       if (Math.abs(current.scrollTop - target) > 1) current.scrollTop = target;
       tries += 1;
@@ -402,12 +406,24 @@ export function Sheet({
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(check);
     };
-    // 指が容器に触れたら、そこから先の位置は指が決めたもの（払いきりで閉じてよい）。
-    const onPointerDown = () => {
+    /**
+     * 指が容器に触れたら、そこから先の位置は指が決めたもの（払いきりで閉じてよい）。
+     *
+     * **`touchstart` だけを見る（`pointerdown` は見ない）。** iOS は指を離したあと、そのとき指の下に
+     * ある要素へ**合成の pointer/mouse イベント**を送る。一覧のアイテムを押して出したシートは、まさに
+     * その指の下に出てくるので、`pointerdown` まで数えると「出た瞬間に指で触られた」ことになり、段へ
+     * 置き直す処理（`ensureAtDetent`）が丸ごと止まって容器の下に居たままになる。touch は合成されない。
+     */
+    const onTouchStart = () => {
+      touchingRef.current = true;
       byFingerRef.current = true;
     };
-    scroller.addEventListener('pointerdown', onPointerDown, { passive: true });
-    scroller.addEventListener('touchstart', onPointerDown, { passive: true });
+    const onTouchEnd = () => {
+      touchingRef.current = false;
+    };
+    scroller.addEventListener('touchstart', onTouchStart, { passive: true });
+    scroller.addEventListener('touchend', onTouchEnd, { passive: true });
+    scroller.addEventListener('touchcancel', onTouchEnd, { passive: true });
     scroller.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
@@ -429,8 +445,9 @@ export function Sheet({
           });
     observer?.observe(scroller);
     return () => {
-      scroller.removeEventListener('pointerdown', onPointerDown);
-      scroller.removeEventListener('touchstart', onPointerDown);
+      scroller.removeEventListener('touchstart', onTouchStart);
+      scroller.removeEventListener('touchend', onTouchEnd);
+      scroller.removeEventListener('touchcancel', onTouchEnd);
       scroller.removeEventListener('scroll', onScroll);
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
