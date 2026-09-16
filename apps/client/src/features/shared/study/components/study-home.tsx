@@ -5,7 +5,6 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
@@ -16,7 +15,6 @@ import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
-import { readStudyNoteDismissed, saveStudyNoteDismissed } from '../note';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -45,25 +43,9 @@ export interface StudyHomeProps {
 
 export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
-  const t = useTranslations('study');
   const { api, auth, loading: authLoading } = useAuth();
   const { theme } = useTheme();
   const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
-
-  /**
-   * 卓上のメモ。初めて来た人の机に 1 枚だけ置いてあり、「使い方とお問い合わせは左下の
-   * アカウントから」と書いてある。はがしたら（この端末では）二度と置かない。
-   *
-   * 初回描画では「置いてある」で始める。localStorage は effect でしか読めず、SSR と
-   * 最初の描画は同じ絵でなければならない。scene は effect の中で組まれるので、その時点
-   * では読み終えている。
-   */
-  const [noteDismissed, setNoteDismissed] = useState(false);
-  useEffect(() => setNoteDismissed(readStudyNoteDismissed()), []);
-  const note = useMemo<string[]>(
-    () => (noteDismissed ? [] : [t('note_line_1'), t('note_line_2'), t('note_line_3')]),
-    [noteDismissed, t],
-  );
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
   const [overlay, setOverlay] = useState<{ month: string | null } | null>(null);
@@ -176,12 +158,6 @@ export function StudyHome({ layout }: StudyHomeProps) {
     setOverlay(overlayScope(target));
   }, []);
 
-  /** メモをはがした。憶えておき、次に来たときは置かない。 */
-  const handleDismissNote = useCallback(() => {
-    saveStudyNoteDismissed();
-    setNoteDismissed(true);
-  }, []);
-
   const handleSelectEntry = useCallback(
     (entry: StudyEntry) => {
       setOverlay(null);
@@ -248,10 +224,8 @@ export function StudyHome({ layout }: StudyHomeProps) {
           state={state}
           layout={layout}
           theme={theme}
-          note={note}
           onNavigate={handleNavigate}
           onOpenOverlay={handleOpenOverlay}
-          onDismissNote={handleDismissNote}
           onLabelPositions={setLabelPositions}
           onHoverChange={(hovered) => {
             setHoveredLabel(hovered?.label ?? null);
@@ -345,6 +319,7 @@ const EMPTY_LABELS: LabelPositions = {
   board: null,
   archive: null,
   pen: null,
+  memo: null,
 };
 
 /** アバターに出す 1 文字。 */

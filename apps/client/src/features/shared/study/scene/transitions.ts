@@ -91,8 +91,8 @@ function rawSteps(target: StudyTarget, options: PlanOptions): TransitionStep[] {
     case 'board':
       return boardSteps(options.twoStageBoard);
 
-    case 'note':
-      // 卓上のメモはカメラを動かさない（はがれるだけ）。段取りは空（呼ばれても即座に終わる）。
+    case 'memo':
+      // メモ帳はカメラを動かさない（アバターと同じく、そのまま移る）。段取りは空。
       return [];
   }
 }

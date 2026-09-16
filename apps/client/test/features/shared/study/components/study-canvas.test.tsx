@@ -29,7 +29,6 @@ function renderCanvas(overrides: Partial<React.ComponentProps<typeof StudyCanvas
       state={STATE}
       layout={PC_LAYOUT}
       theme="light"
-      note={[]}
       onNavigate={vi.fn()}
       {...overrides}
     />,

@@ -33,7 +33,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { EASING, HOME_ZOOM, RENDER_LIMITS } from '../constants';
+import { HOME_ZOOM, RENDER_LIMITS } from '../constants';
 import type { StudyLayout } from '../layout';
 import type { StudyState, StudyTarget } from '../types';
 import { BOARD_FACE, BOARD_GRID_SPACING, PHOTO_INNER_INSET, placeBoardCards } from './board';
@@ -84,7 +84,7 @@ import {
   type HitHint,
   type HitId,
   HOVER_SCALE,
-  NOTE_HIT_ID,
+  MEMO_HIT_ID,
   resolveClickTarget,
 } from './hit-targets';
 import {
@@ -113,17 +113,13 @@ import {
   type StudyTheme,
 } from './materials';
 import {
-  NOTE_FONT_PX,
-  NOTE_PAPER,
-  NOTE_PEEL,
-  NOTE_TEXT,
-  NOTE_TILT,
-  noteHitSize,
-  noteLineWidth,
-  noteLineYs,
-  noteOutline,
-  peelPose,
-} from './note';
+  MEMO_PAD,
+  MEMO_PAD_BINDING,
+  MEMO_PAD_RULES,
+  MEMO_PAD_TILT,
+  memoPadHitSize,
+  memoPadRuleZs,
+} from './memo-pad';
 import {
   isPlanDone,
   leaveFadeDuration,
@@ -140,11 +136,6 @@ export interface StudySceneOptions {
   layout: StudyLayout;
   theme: StudyTheme;
   reducedMotion: boolean;
-  /**
-   * 卓上のメモの文面（訳済み、1 要素 = 1 行）。空なら置かない（はがしたあと、または
-   * 配置表がメモを持たない構図）。scene は React も i18n も知らないので、描く文字は外から渡す。
-   */
-  note: readonly string[];
   /** ホバーが変わったとき（PC のラベル濃度とカーソル）。 */
   onHoverChange?: (hovered: HoverInfo | null) => void;
   /** 3D の物が押されたとき。 */
@@ -176,7 +167,7 @@ export interface StudySceneOptions {
 }
 
 export interface HoverInfo {
-  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | null;
+  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | 'memo' | null;
   month: string | null;
   /** 触れている的が一言を持つとき、その種類。文面は呼び出し側が状態から決める。 */
   hint: HitHint | null;
@@ -190,6 +181,8 @@ export interface LabelPositions {
   board: ScreenPoint | null;
   archive: ScreenPoint | null;
   pen: ScreenPoint | null;
+  /** メモ帳の `MEMO`。配置表がメモ帳を持たない構図では null。 */
+  memo: ScreenPoint | null;
 }
 
 interface ScreenPoint {
@@ -223,8 +216,6 @@ export interface StudySceneHandle {
   endDrag(): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
-  /** 卓上のメモをはがす。持ち上がりながら薄くなって消え、以後は組み直しても置かない。 */
-  dismissNote(): void;
   /** 遷移中・サブ画面ではラベルを消す。 */
   isBusy(): boolean;
   dispose(): void;
@@ -271,8 +262,6 @@ const OUTLINE_BREATH_MS = 4000;
  * renderer ごと捨てていたのが原因で、あわせて遷移中のカメラも巻き戻っていた。
  */
 interface SceneContent {
-  /** 卓上のメモ。無ければ null。 */
-  note: NoteParts | null;
   materials: StudyMaterials;
   geometries: BufferGeometry[];
   textures: CanvasTexture[];
@@ -313,13 +302,11 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     const notebooks = layoutNotebooks(state.notebooks, state.now);
 
-    const noteLines = layout.note === null || noteDismissed ? [] : options.note;
-
     const registry = buildHitRegistry({
       desk: notebooks.desk.map((placement) => placement.notebook),
       shelf: notebooks.shelf,
       shelfAsSingleTarget: layout.pillOffsets !== null,
-      note: noteLines.length > 0,
+      memo: layout.memo !== null,
     });
 
     const deskGroup = buildDesk(layout, materials, ownGeometry);
@@ -327,10 +314,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const jar = buildJar(state, layout, materials, ownGeometry, textures);
     const books = buildBooks(notebooks, layout, materials, ownGeometry, textures);
     const board = buildBoard(state, layout, materials, ownGeometry);
-    const note = buildNote(layout, materials, ownGeometry, textures, noteLines);
+    const memo = buildMemoPad(layout, materials, ownGeometry);
 
     const groups: Object3D[] = [deskGroup, floorGroup, jar.group, books.group, board.group];
-    if (note !== null) groups.push(note.group);
+    if (memo !== null) groups.push(memo);
 
     const hitboxes = buildHitboxes({
       layout,
@@ -343,14 +330,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       shelfGroup: books.shelfGroup,
       boardGroup: board.group,
       penGroup: books.penGroup,
-      note,
+      memoGroup: memo,
     });
 
     for (const group of groups) scene.add(group);
     for (const hitbox of hitboxes) scene.add(hitbox);
 
     return {
-      note,
       materials,
       geometries,
       textures,
@@ -373,14 +359,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     current.materials.dispose();
     current.registry.clear();
   }
-
-  /**
-   * 卓上のメモをはがしたか。はがしたら、以後の組み直しでも置かない（状態の更新で
-   * 部屋を作り直すたびに戻ってきては、はがした意味が無い）。
-   */
-  let noteDismissed = false;
-  /** はがしている途中。始めた時刻を持ち、終わったら物を外す。 */
-  let peeling: { startedAt: number } | null = null;
 
   /** いま描いている状態。更新時にだけ差し替える。 */
   let currentState = options.state;
@@ -466,7 +444,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     updateCamera(now, elapsed);
     updateJar(elapsed);
-    updatePeel(now);
     updateHover();
     reportLabels();
 
@@ -717,54 +694,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     content.jar.group.visible = value > 0.02;
   }
 
-  /**
-   * はがす。持ち上がりながら薄くなり、終わったら物と当たりを外す。
-   * 動きを減らす設定では即座に外す。
-   */
-  function dismissNote(): void {
-    const note = content.note;
-    if (note === null || noteDismissed) return;
-    noteDismissed = true;
-    if (hoveredId === NOTE_HIT_ID) setHovered(null, null);
-    if (options.reducedMotion) {
-      removeNote();
-      return;
-    }
-    peeling = { startedAt: performance.now() };
-  }
-
-  function updatePeel(now: number): void {
-    if (peeling === null) return;
-    const note = content.note;
-    if (note === null) {
-      peeling = null;
-      return;
-    }
-    const raw = Math.min(1, (now - peeling.startedAt) / NOTE_PEEL.durationMs);
-    const pose = peelPose(EASING.easeOutCubic(raw));
-    note.group.position.y = note.restY + pose.rise;
-    for (const material of note.fadeables)
-      material.opacity = material.userData.baseOpacity * pose.opacity;
-    if (raw >= 1) {
-      peeling = null;
-      removeNote();
-    }
-  }
-
-  /** メモの物と当たりを scene から外す。素材と形は content の破棄でまとめて捨てる。 */
-  function removeNote(): void {
-    const note = content.note;
-    if (note === null) return;
-    scene.remove(note.group);
-    content.groups = content.groups.filter((group) => group !== note.group);
-    for (const hitbox of content.hitboxes) {
-      if (hitbox.userData.hitId === NOTE_HIT_ID) scene.remove(hitbox);
-    }
-    content.hitboxes = content.hitboxes.filter((hitbox) => hitbox.userData.hitId !== NOTE_HIT_ID);
-    content.registry.clear();
-    content.note = null;
-  }
-
   function updateHover(): void {
     if (transition || settled || !pointerInside) {
       setHovered(null, null);
@@ -825,7 +754,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!object) return { x: 0, y: 0 };
     const world = new Vector3();
     object.getWorldPosition(world);
-    // ツールチップは対象の少し上に出す。低い物は自分の高さを持つ（卓上のメモは 0.55）。
+    // ツールチップは対象の少し上に出す。低い物は自分の高さを持つ（メモ帳は 0.6）。
     const rise = object.userData.tooltipRise;
     world.y += typeof rise === 'number' ? rise : 0.85;
     const point = toScreen(world);
@@ -836,7 +765,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!options.onLabelPositions) return;
     // サブ画面と遷移中はラベルを消す。
     if (transition || settled) {
-      options.onLabelPositions({ jar: null, journal: null, board: null, archive: null, pen: null });
+      options.onLabelPositions({
+        jar: null,
+        journal: null,
+        board: null,
+        archive: null,
+        pen: null,
+        memo: null,
+      });
       return;
     }
     const anchors = layout.labelAnchors;
@@ -848,6 +784,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         ? toScreen(new Vector3(anchors.archive.x, anchors.archive.y, anchors.archive.z))
         : null,
       pen: anchors.pen ? toScreen(new Vector3(anchors.pen.x, anchors.pen.y, anchors.pen.z)) : null,
+      memo: anchors.memo
+        ? toScreen(new Vector3(anchors.memo.x, anchors.memo.y, anchors.memo.z))
+        : null,
     });
   }
 
@@ -1013,8 +952,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         return shelfView(layout);
       case 'board':
         return layout.pillOffsets !== null ? boardCloseView(layout) : boardView(layout);
-      case 'note':
-        // 卓上のメモはカメラを動かさない（`study-canvas` が goTo を呼ばない）。
+      case 'memo':
+        // メモ帳はカメラを動かさない（`study-canvas` が goTo を呼ばない）。
         // 万一呼ばれてもその場に留まる。
         return currentView();
     }
@@ -1097,7 +1036,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     dragBy,
     endDrag,
     pick,
-    dismissNote,
     isBusy: () => transition !== null || settled !== null,
     dispose,
   };
@@ -1818,103 +1756,94 @@ function buildBoard(
   return { group };
 }
 
-interface NoteParts {
-  group: Group;
-  /** 置いてあるときの高さ。はがすときはここから持ち上がる。 */
-  restY: number;
-  /** はがすときに薄くする素材（このメモ専用に複製したもの）。 */
-  fadeables: Material[];
-}
-
 /**
- * 卓上のメモ（`docs/oryzae-study/00-overview.md`「卓上のメモ」）。
+ * メモ帳（`docs/oryzae-study/00-overview.md`「メモ帳」）。
  *
- * 板のカードと同じ描き方 — 紙の面（`solid`）と `faint(0.4)` の輪郭だけ — で、机に寝かせて
- * 置く。文字は手紙と同じ明朝を左揃えで。素材は薄くして消せるようにこのメモ専用に複製する
- * （共有のまま触ると机やボードまで一緒に消える）。
+ * 手帳の束と同じ作り — 面と稜線の箱に、小口の薄い罫を三方に。上の 1 枚には板の
+ * スニペットカードと同じ「罫線 n 本」を引き、奥の辺に綴じの線を 1 本。**文字は描かない。**
+ * 書斎の中でしゃべるのは本人の言葉と年月だけで、この物が何かはラベル（`MEMO`）が名乗り、
+ * 中身は触れたときの一言が言う。
  */
-function buildNote(
+function buildMemoPad(
   layout: StudyLayout,
   materials: StudyMaterials,
   own: OwnGeometry,
-  textures: CanvasTexture[],
-  lines: readonly string[],
-): NoteParts | null {
-  const placement = layout.note;
-  if (placement === null || lines.length === 0) return null;
+): Group | null {
+  const placement = layout.memo;
+  if (placement === null) return null;
 
   const scale = placement.scale;
-  const width = NOTE_PAPER.width * scale;
-  const height = NOTE_PAPER.height * scale;
-  const lineHeight = NOTE_TEXT.lineHeight * scale;
+  const width = MEMO_PAD.width * scale;
+  const depth = MEMO_PAD.depth * scale;
+  const thickness = MEMO_PAD.thickness * scale;
 
   const group = new Group();
   group.position.set(placement.position.x, placement.position.y, placement.position.z);
-  // 面を上に向けて寝かせる（ローカル +y が奥、+z が上になる）。傾きは面の中の回転。
-  group.rotation.set(-Math.PI / 2, 0, NOTE_TILT);
-  // 触れたときの一言は紙の奥の辺の上に。
-  group.userData.tooltipRise = 0.55;
+  group.rotation.y = MEMO_PAD_TILT;
+  // 触れたときの一言は束の少し上に。
+  group.userData.tooltipRise = 0.6;
 
-  const fadeables: Material[] = [];
-  function fadeable<T extends Material>(material: T): T {
-    material.userData.baseOpacity = material.opacity;
-    fadeables.push(material);
-    return material;
-  }
-  const paperMaterial = fadeable(materials.solid.clone());
-  paperMaterial.transparent = true;
-  const edgeMaterial = fadeable(materials.faint(0.4).clone());
-  materials.adopt(paperMaterial, edgeMaterial);
+  // 束。面と稜線の 1 組（後ろが透けない）。
+  const block = lineArt(new BoxGeometry(width, thickness, depth), materials, own);
+  block.position.y = thickness / 2;
+  group.add(block);
 
-  /**
-   * 紙を透明扱いにすると透明キューに入り、**カメラからの距離順**で描かれる。奥側の行は
-   * 紙の中心より遠いので紙より先に描かれ、紙に塗り潰されて消えた（実機で 1 行目が無かった）。
-   * 紙の上に乗る物は `renderOrder` で紙より後に回す（距離順より優先される）。
-   */
-  const ON_PAPER = 1;
-
-  // 紙。面と輪郭に同じ点列を使う（板のカードと同じ）。
-  const outline = noteOutline(scale);
-  group.add(new Mesh(own(new PlaneGeometry(width, height)), paperMaterial));
-  const edge = lineFrom(
-    [...outline, outline[0] ?? { x: 0, y: 0 }].map((p) => new Vector3(p.x, p.y, 0.002)),
-    edgeMaterial,
-    own,
-  );
-  edge.renderOrder = ON_PAPER;
-  group.add(edge);
-
-  // 行。左揃え。文字は面の向きに従う（スプライトにしない）。
-  const ys = noteLineYs(lines.length, NOTE_TEXT.gap * scale);
-  const rendered = lines.map((line) => createTextTexture(line, NOTE_FONT_PX, materials.inkColor));
-  /**
-   * いちばん長い行が紙に入る大きさに全行を揃える。和文は 11 文字で収まるが、英語の
-   * 「under your account, bottom left.」は同じ字の大きさだと紙からはみ出た（実機）。
-   * 行ごとに縮めると大きさが揃わないので、全行に同じ比をかける。
-   */
-  const available = width - NOTE_TEXT.inset * scale * 2;
-  const widest = Math.max(
-    0,
-    ...rendered.map((texture) => (texture ? noteLineWidth(texture.image, lineHeight) : 0)),
-  );
-  const fit = widest > available ? available / widest : 1;
-  const fittedLineHeight = lineHeight * fit;
-
-  rendered.forEach((texture, index) => {
-    if (texture === null) return;
-    textures.push(texture);
-    const y = ys[index] ?? 0;
-    const lineWidth = noteLineWidth(texture.image, fittedLineHeight);
-    const face = new Mesh(
-      own(new PlaneGeometry(lineWidth, fittedLineHeight)),
-      fadeable(materials.text(texture, 0.92)),
+  // 小口の罫。綴じ（奥）を除く三方に、束の面より外側へ。手帳と同じ規則（本数は厚みから、
+  // 端は不揃い、濃度は 2 段を交互に）。
+  const halfW = width / 2 + 0.002;
+  const halfD = depth / 2 + 0.002;
+  const lines = edgeLineCount(thickness);
+  for (let i = 0; i < lines; i++) {
+    const y = thickness * ((i + 1) / (lines + 1));
+    const jitter = (i % 3) * EDGE_LINE_JITTER;
+    const material = materials.faint(EDGE_LINE_OPACITIES[i % 2]);
+    // 右・左（小口）
+    group.add(
+      lineFrom(
+        [new Vector3(halfW - jitter, y, -halfD), new Vector3(halfW - jitter, y, halfD)],
+        material,
+        own,
+      ),
     );
-    face.position.set(-width / 2 + NOTE_TEXT.inset * scale + lineWidth / 2, y, 0.004);
-    face.renderOrder = ON_PAPER;
-    group.add(face);
-  });
+    group.add(
+      lineFrom(
+        [new Vector3(-halfW + jitter, y, -halfD), new Vector3(-halfW + jitter, y, halfD)],
+        material,
+        own,
+      ),
+    );
+    // 手前（地）
+    group.add(
+      lineFrom(
+        [new Vector3(-halfW, y, halfD - jitter), new Vector3(halfW, y, halfD - jitter)],
+        material,
+        own,
+      ),
+    );
+  }
 
-  return { group, restY: placement.position.y, fadeables };
+  // 上の 1 枚。綴じの線 1 本と、罫線（板のスニペットカードと同じ抽象）。
+  const top = thickness + 0.002;
+  const bindingZ = -depth / 2 + MEMO_PAD_BINDING.inset * scale;
+  group.add(
+    lineFrom(
+      [new Vector3(-width / 2, top, bindingZ), new Vector3(width / 2, top, bindingZ)],
+      materials.faint(MEMO_PAD_BINDING.opacity),
+      own,
+    ),
+  );
+  const ruleHalfW = (width * MEMO_PAD_RULES.widthRatio) / 2;
+  for (const z of memoPadRuleZs(MEMO_PAD_RULES.count, MEMO_PAD.depth, scale)) {
+    group.add(
+      lineFrom(
+        [new Vector3(-ruleHalfW, top, z), new Vector3(ruleHalfW, top, z)],
+        materials.faint(MEMO_PAD_RULES.opacity),
+        own,
+      ),
+    );
+  }
+
+  return group;
 }
 
 /**
@@ -1933,8 +1862,8 @@ function buildHitboxes(options: {
   shelfGroup: Group;
   boardGroup: Group;
   penGroup: Group;
-  /** 卓上のメモ。紙ごと 1 つの的。null は置いていない（またははがした）。 */
-  note: NoteParts | null;
+  /** メモ帳。束ごと 1 つの的（ホバーで束が持ち上がる）。null は置いていない構図。 */
+  memoGroup: Group | null;
 }): Mesh[] {
   const { layout, materials, ownGeometry } = options;
   const boxes: Mesh[] = [];
@@ -2025,16 +1954,17 @@ function buildHitboxes(options: {
     options.boardGroup,
   );
 
-  // 卓上のメモは紙ごと 1 つの的。紙と同じ姿勢（寝かせた）で被せる。
-  if (options.note !== null) {
+  // メモ帳は束ごと 1 つの的。鉛筆と同じく物より一回り大きく囲み、束の向きに合わせる。
+  if (options.memoGroup !== null && layout.memo !== null) {
     const world = new Vector3();
-    options.note.group.getWorldPosition(world);
+    options.memoGroup.getWorldPosition(world);
+    world.y += memoPadHitSize(layout.memo.scale)[1] / 2;
     box(
-      NOTE_HIT_ID,
-      noteHitSize(layout.note?.scale ?? 1),
+      MEMO_HIT_ID,
+      memoPadHitSize(layout.memo.scale),
       world,
-      options.note.group,
-      options.note.group,
+      options.memoGroup,
+      options.memoGroup,
     );
   }
 
@@ -2043,7 +1973,7 @@ function buildHitboxes(options: {
 
 /**
  * 文字を描いたテクスチャ。幅は `measureText` の実測から決める（全語同幅にしない）。
- * 書体は既定で明朝（背表紙・瓶の言葉・卓上のメモ）。太さ付きの書体名も渡せる。
+ * 書体は既定で明朝（背表紙・瓶の言葉）。太さ付きの書体名も渡せる。
  *
  * canvas が取れない環境（SSR・古い端末）では null を返し、呼び出し側がその語を諦める。
  */
