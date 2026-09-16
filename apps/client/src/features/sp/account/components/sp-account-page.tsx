@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { NewsletterSubscriptionSection } from '@/features/shared/account/components/newsletter-subscription-section';
 import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
 import type { AccountUser } from '@/features/shared/account/types';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
@@ -81,6 +82,7 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
         <div className="flex flex-col gap-5">
           <ThemeRow />
           <LanguageRow />
+          <NewsletterSubscriptionSection />
 
           {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
           <a

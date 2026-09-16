@@ -181,6 +181,51 @@ module.exports = {
       to: { path: '^src/contexts/user/presentation' },
     },
 
+    // === Newsletter context isolation ===
+    {
+      name: 'newsletter-context-isolation',
+      comment: 'newsletter context must not import from other contexts (except shared)',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter' },
+      to: {
+        path: '^src/contexts/',
+        pathNot: ['^src/contexts/newsletter', '^src/contexts/shared'],
+      },
+    },
+
+    // === DDD layer rules for newsletter ===
+    {
+      name: 'newsletter-domain-isolation',
+      comment: 'newsletter domain must not depend on other layers',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/domain' },
+      to: { path: '^src/contexts/newsletter/(application|infrastructure|presentation)' },
+    },
+    {
+      name: 'newsletter-application-no-infra',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/application' },
+      to: { path: '^src/contexts/newsletter/infrastructure' },
+    },
+    {
+      name: 'newsletter-application-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/application' },
+      to: { path: '^src/contexts/newsletter/presentation' },
+    },
+    {
+      name: 'newsletter-infra-no-application',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/infrastructure' },
+      to: { path: '^src/contexts/newsletter/application' },
+    },
+    {
+      name: 'newsletter-infra-no-presentation',
+      severity: 'error',
+      from: { path: '^src/contexts/newsletter/infrastructure' },
+      to: { path: '^src/contexts/newsletter/presentation' },
+    },
+
     // === Analytics context isolation ===
     {
       name: 'analytics-context-isolation',
@@ -239,6 +284,11 @@ module.exports = {
           '^src/contexts/fermentation/presentation/routes/cron-fermentation\\.ts$',
           // auth.admin.getUserById / メール送信先解決に service role が必須
           '^src/contexts/fermentation/presentation/routes/fermentations\\.ts$',
+          // 配信停止 (#614): メールのリンクから来るのでユーザー JWT が存在せず、
+          // RLS を認可境界にできない。書き込み先の行を決めるのは HMAC 検証済み
+          // トークンから取り出した user_id **だけ** で、リクエスト本文の値を
+          // クエリ条件へ渡す経路は無い。更新対象も profiles.newsletter_opt_out の 1 列。
+          '^src/contexts/newsletter/presentation/routes/newsletter-subscription\\.ts$',
         ],
       },
       to: { path: '^src/contexts/shared/infrastructure/supabase-client\\.ts$' },

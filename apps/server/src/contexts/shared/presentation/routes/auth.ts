@@ -454,6 +454,8 @@ export const authRoutes = new Hono()
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (body.nickname) updateData.nickname = body.nickname;
     if (body.avatarUrl !== undefined) updateData.avatar_url = body.avatarUrl;
+    // Issue #614: お知らせメールの配信停止。メール内リンクからも同じ列を切り替える。
+    if (body.newsletterOptOut !== undefined) updateData.newsletter_opt_out = body.newsletterOptOut;
 
     const { error } = await serviceSupabase.from('profiles').update(updateData).eq('id', user.id);
 
