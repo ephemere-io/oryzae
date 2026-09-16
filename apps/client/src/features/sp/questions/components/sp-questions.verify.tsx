@@ -220,7 +220,10 @@ registerUnit<Props>({
         const confirm = root.querySelector<HTMLElement>('[data-archive-confirm]');
         if (!confirm) return '確かめが出ていない';
         const bg = getComputedStyle(confirm).backgroundColor;
-        return bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent' || `確かめに面がある: ${bg}`;
+        // 空文字は「まだ描かれていない（値が取れない）」。面を敷いていないことだけを見る。
+        return (
+          !bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent' || `確かめに面がある: ${bg}`
+        );
       },
     },
     {

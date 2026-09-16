@@ -3,7 +3,7 @@
 import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActionRow } from '@/components/ui/action-row';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { CONTROL_FONT } from '@/components/ui/surface';
@@ -14,11 +14,12 @@ import { useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
 interface SpQuestionsProps {
   questions: QuestionItem[];
   loading: boolean;
-  createQuestion: (text: string) => Promise<void> | void;
-  editQuestion: (id: string, text: string) => Promise<void> | void;
-  archiveQuestion: (id: string) => Promise<void> | void;
+  /** 送れたか（`false` なら失敗として画面に出す。何も返さないものは成功とみなす）。 */
+  createQuestion: (text: string) => Promise<boolean | void> | boolean | void;
+  editQuestion: (id: string, text: string) => Promise<boolean | void> | boolean | void;
+  archiveQuestion: (id: string) => Promise<boolean | void> | boolean | void;
   /** アーカイブした問いを戻す。無ければ戻す一覧を出さない。 */
-  unarchiveQuestion?: (id: string) => Promise<void> | void;
+  unarchiveQuestion?: (id: string) => Promise<boolean | void> | boolean | void;
   acceptQuestion: (id: string) => Promise<void> | void;
   rejectQuestion: (id: string) => Promise<void> | void;
   /** 未読の手紙が届いている問いの id（Issue #452）。page が UnreadState から渡す。 */
@@ -66,10 +67,24 @@ export function SpQuestions({
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   /**
+   * 送れなかった（通信が落ちた・サーバーが断った）。**シートは閉じない**で理由を出す。以前は送信中のまま戻らず、
+   * 何を押しても動かない画面になった（実機レビュー: 保存を押したら画面が変わらない）。
+   */
+  const [failed, setFailed] = useState(false);
+  /**
    * アーカイブの確かめ中か。1 回押しただけでアーカイブされ、押し間違えたら取り返しがつかない感じが
    * した（レビュー）。同じシートの中で「アーカイブしますか？」を挟む。
    */
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  /**
+   * シートを開いた瞬間に書く欄へフォーカスを移す。**`autoFocus` は使わない**: ブラウザはフォーカスした要素を
+   * 見せようとして祖先（シートのスクロール容器）を勝手に送るので、シートが出る前に画面が跳ねた（実機レビュー:
+   * ピュンと上に行ってからシートが出る）。`preventScroll` で送らせない。
+   */
+  const draftRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (sheet) draftRef.current?.focus({ preventScroll: true });
+  }, [sheet]);
 
   const proposed = questions.filter(
     (q) => q.isProposedByOryzae && !q.isValidatedByUser && !q.isArchived,
@@ -85,29 +100,46 @@ export function SpQuestions({
 
   function openAdd() {
     setConfirmingArchive(false);
+    setFailed(false);
     setDraft('');
     setSheet({ mode: 'add' });
   }
   function openEdit(id: string, text: string) {
     setConfirmingArchive(false);
+    setFailed(false);
     setDraft(text);
     setSheet({ mode: 'edit', id });
   }
 
+  /** 送って、送れたらシートを閉じる。失敗しても必ず送信中を解く（固まらせない）。 */
+  async function run(action: () => Promise<boolean | void> | boolean | void) {
+    setSubmitting(true);
+    setFailed(false);
+    try {
+      return (await action()) !== false;
+    } catch {
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function submit() {
     if (!draft.trim() || submitting || !sheet) return;
-    setSubmitting(true);
-    if (sheet.mode === 'add') await createQuestion(draft.trim());
-    else await editQuestion(sheet.id, draft.trim());
-    setSubmitting(false);
-    setSheet(null);
+    const ok = await run(() =>
+      sheet.mode === 'add' ? createQuestion(draft.trim()) : editQuestion(sheet.id, draft.trim()),
+    );
+    if (ok) setSheet(null);
+    else setFailed(true);
   }
 
   async function remove() {
     if (sheet?.mode !== 'edit' || submitting) return;
-    setSubmitting(true);
-    await archiveQuestion(sheet.id);
-    setSubmitting(false);
+    const ok = await run(() => archiveQuestion(sheet.id));
+    if (!ok) {
+      setFailed(true);
+      return;
+    }
     setConfirmingArchive(false);
     setSheet(null);
   }
@@ -328,11 +360,7 @@ export function SpQuestions({
                         type="button"
                         data-unarchive={q.id}
                         disabled={submitting || atLimit}
-                        onClick={async () => {
-                          setSubmitting(true);
-                          await unarchiveQuestion(q.id);
-                          setSubmitting(false);
-                        }}
+                        onClick={() => void run(() => unarchiveQuestion(q.id))}
                         className="min-h-[36px] shrink-0 rounded-full border px-4 text-[12px] disabled:opacity-40"
                         style={{
                           ...CONTROL_FONT,
@@ -366,8 +394,7 @@ export function SpQuestions({
         {sheet ? (
           <>
             <textarea
-              // biome-ignore lint/a11y/noAutofocus: シートを開いた瞬間に書き始められることが要件
-              autoFocus
+              ref={draftRef}
               aria-label={t('placeholder')}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -381,6 +408,15 @@ export function SpQuestions({
                 lineHeight: 1.7,
               }}
             />
+            {failed ? (
+              <p
+                data-save-failed
+                className="m-0 pt-2 text-[12px] leading-relaxed"
+                style={{ ...CONTROL_FONT, color: 'var(--ob-jar-warm)' }}
+              >
+                {t('save_failed')}
+              </p>
+            ) : null}
             {/*
               操作は書く欄のすぐ下の 1 行に固める（左上中心主義: 左からいちばん押してほしい「保存」、「キャンセル」、
               押されたくない「アーカイブ」は右端）。以前は保存とキャンセルが見出し、アーカイブが離れた下、と散っていた。

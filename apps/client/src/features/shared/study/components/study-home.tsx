@@ -160,9 +160,12 @@ export function StudyHome({ layout }: StudyHomeProps) {
     setOverlay(overlayScope(target));
   }, []);
 
+  /**
+   * 一覧から記録を開く。**一覧を閉じてから移らない**（閉じると書斎が一瞬見えて、そこからまた画面が変わる。
+   * 実機レビュー）。移った先が描かれたときに一覧ごと消える。
+   */
   const handleSelectEntry = useCallback(
     (entry: StudyEntry) => {
-      setOverlay(null);
       router.push(`/entries/${entry.id}`);
     },
     [router],

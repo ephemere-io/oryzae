@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 interface QuestionCreateFormProps {
-  onSubmit: (text: string) => Promise<void>;
+  /** 送れたかを返してもよい（この欄はいまのところ見ない）。 */
+  onSubmit: (text: string) => Promise<boolean | void>;
 }
 
 export function QuestionCreateForm({ onSubmit }: QuestionCreateFormProps) {

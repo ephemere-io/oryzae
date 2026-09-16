@@ -24,15 +24,19 @@ export interface QuestionPickerProps {
   onClose?: () => void;
 }
 
-/** これ以上あれば探す欄を出す。 */
-const SEARCH_THRESHOLD = 4;
+/**
+ * 問い（その人の言葉）の書体。道具の字（`CONTROL_FONT`）と混ぜない。エントリーの本文と同じ明朝で、
+ * 選び手の中でも「自分の言葉を選んでいる」ことが見た目で続く（実機レビュー: 画面の中で書体が 2 つに割れていた）。
+ */
+const SERIF_FONT = "'Noto Serif JP', serif";
 
 /**
  * 問いを結ぶ選び手。**その場で開く**（暗転するモーダルでも下から出るシートでもない）。
  *
- * shadcn の Combobox / Command の作法: 探す欄 → チェック付きの行（押すたびに結ぶ／外す、
- * 開いたままで複数選べる）。**操作（新しく問いを書く・閉じる）は足元の 1 行に固める**（`ActionRow`、左上中心主義で
- * 左から）。以前は「閉じる」が右上、「新しく問いを書く」が一覧の末尾の文字で、同じ性質の操作が散っていた（実機レビュー）。
+ * チェック付きの行（押すたびに結ぶ／外す、開いたままで複数選べる）と、足元の操作の 1 行だけ（`ActionRow`、
+ * 左上中心主義で左から）。**探す欄は置かない**: 問いは最大 5 つ（`MAX_ACTIVE_QUESTIONS`）で、探すより全部見える
+ * ほうが早い（実機レビュー）。以前は「閉じる」が右上、「新しく問いを書く」が一覧の末尾の文字で、同じ性質の操作が
+ * 散っていた。
  *
  * PC と SP で同じ部品にするために `features/shared` に置く（端末は判定しない）。
  */
@@ -46,15 +50,10 @@ export function QuestionPicker({
   onClose,
 }: QuestionPickerProps) {
   const t = useTranslations('entry_questions.picker');
-  const [search, setSearch] = useState('');
   const [newText, setNewText] = useState('');
   const [creating, setCreating] = useState(false);
   const [createFailed, setCreateFailed] = useState(false);
 
-  const query = search.trim();
-  const visible = query
-    ? questions.filter((question) => (question.currentText ?? '').includes(query))
-    : questions;
   const selected = new Set(selectedIds);
   const atLimit = questions.length >= MAX_ACTIVE_QUESTIONS;
   const closeAction: RowAction[] = onClose
@@ -85,12 +84,15 @@ export function QuestionPicker({
       })}
       aria-label={t('title')}
       className="flex flex-col overflow-hidden rounded-2xl border"
-      style={{ ...ELEVATED_PANEL_STYLE, ...CONTROL_FONT }}
+      // 中の字は本文と同じ明朝（問いは「その人の言葉」）。道具の字は操作の行と案内だけが持つ。
+      style={{ ...ELEVATED_PANEL_STYLE, fontFamily: SERIF_FONT }}
     >
       {composing ? (
         <div className="flex flex-col gap-2 px-4 pt-4 pb-4">
           {questions.length === 0 ? (
-            <p className="pb-1 text-[13px] leading-relaxed opacity-60">{t('empty')}</p>
+            <p className="pb-1 text-[13px] leading-relaxed opacity-60" style={CONTROL_FONT}>
+              {t('empty')}
+            </p>
           ) : null}
           <Input
             value={newText}
@@ -101,7 +103,7 @@ export function QuestionPicker({
             autoFocus
           />
           {createFailed ? (
-            <p className="text-[12px]" style={{ color: 'var(--ob-jar-warm)' }}>
+            <p className="text-[12px]" style={{ ...CONTROL_FONT, color: 'var(--ob-jar-warm)' }}>
               {t('create_failed')}
             </p>
           ) : null}
@@ -132,20 +134,8 @@ export function QuestionPicker({
         </div>
       ) : (
         <>
-          {questions.length >= SEARCH_THRESHOLD ? (
-            <div className="px-4 pt-3 pb-1">
-              <Input
-                type="search"
-                value={search}
-                onChange={setSearch}
-                placeholder={t('search_placeholder')}
-                ariaLabel={t('search_placeholder')}
-                size="md"
-              />
-            </div>
-          ) : null}
-          <ul className="max-h-[40vh] overflow-auto py-1">
-            {visible.map((question) => {
+          <ul className="max-h-[40vh] overflow-auto py-1 pt-2">
+            {questions.map((question) => {
               const on = selected.has(question.id);
               return (
                 <li key={question.id}>
@@ -153,8 +143,7 @@ export function QuestionPicker({
                     type="button"
                     aria-pressed={on}
                     onClick={() => onToggle(question.id)}
-                    // 問いは折り返して全文を出す（1 行で切ると長い問いが読めなかった）。字は選び手の他の字
-                    // （見出し・検索欄）と同じ書体で一回り小さく（大きく見えた。実機レビュー）。
+                    // 問いは折り返して全文を出す（1 行で切ると長い問いが読めなかった）。書体は本文と同じ明朝。
                     className="flex min-h-[44px] w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-[14px] leading-snug hover:bg-[var(--hover-wash)]"
                     style={{ color: 'var(--fg)' }}
                   >
@@ -196,7 +185,7 @@ export function QuestionPicker({
             <p
               data-question-limit
               className="m-0 px-4 pt-2 text-[12px] leading-relaxed"
-              style={{ color: 'var(--date-color)' }}
+              style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
             >
               {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
             </p>

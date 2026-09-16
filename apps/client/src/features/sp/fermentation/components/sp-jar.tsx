@@ -24,8 +24,13 @@ interface SpJarProps {
   questions: JarQuestion[];
   /** 問いがまだ取れていない間は「0 件」ではなく枠を出す。 */
   loading: boolean;
-  /** 問いの追加・編集・終了を開く。一覧は page が重ねる（ドメインをまたぐため）。 */
+  /**
+   * 問いの一覧を開く／閉じる。一覧は page が重ねる（ドメインをまたぐため）。**押すたびに入れ替える**
+   * （パレットの操作は「押す／押さない ＝ 出す／出さない」。実機レビュー）。
+   */
   onManageQuestions: () => void;
+  /** 一覧が開いているか。開いている間はパレットの「問いの一覧」が効いている色になる。 */
+  manageOpen?: boolean;
 }
 
 /**
@@ -40,7 +45,13 @@ interface SpJarProps {
  * **画面に文字を置かない。** 見出しや説明文は上段（SpTopBar）と地図が語る。
  * 問いの管理へ入る口は右下の正円（地図アプリの定位置）。
  */
-export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps) {
+export function SpJar({
+  api,
+  questions,
+  loading,
+  onManageQuestions,
+  manageOpen = false,
+}: SpJarProps) {
   const t = useTranslations('sp.jar');
   const chrome = useSpChrome();
   const router = useRouter();
@@ -134,6 +145,7 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
       {...verifyAttrs({
         unit: 'SpJar',
         loading,
+        manageOpen,
         questionCount: mapQuestions.length,
         open: openId !== null,
         unreadCount: mapQuestions.filter((question) => question.unread).length,
@@ -178,6 +190,8 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
               {
                 id: 'questions',
                 label: t('manage_questions'),
+                // 開いている間は効いている色。もう一度押すと閉じて瓶に戻る。
+                active: manageOpen,
                 // 追加・編集・アーカイブ・戻すをする一覧への入口（オーナーの指示で言葉とアイコンを一覧に）。
                 icon: <QuestionListIcon />,
                 onSelect: onManageQuestions,
