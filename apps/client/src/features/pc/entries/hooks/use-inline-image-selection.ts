@@ -152,6 +152,18 @@ export function useInlineImageSelection({
     return () => editor.removeEventListener('pointerdown', onPointerDown);
   }, [editorRef, select, clear]);
 
+  // 選んでいる写真は Esc でも外せる。**押して外す道はパレットに置かない**
+  // （道具が増えるほど、どれが本題か分からなくなる）。本文のどこかを押せば外れるが、
+  // キーボードだけで辿っている人にはその道が無い。
+  useEffect(() => {
+    if (!selection.element) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clear();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selection.element, clear]);
+
   // 選択中に本文がスクロール/リサイズしたら、オーバーレイの位置を追従させる。
   useEffect(() => {
     if (!selection.element) return;

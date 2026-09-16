@@ -560,7 +560,7 @@
     "resize_s": "Drag bottom to resize",
     "resize_sw": "Drag bottom-left to resize",
     "resize_w": "Drag left to resize",
-    "width": "Width",
+    "size": "Size",
     "width_small": "Small",
     "width_medium": "Medium",
     "width_large": "Large",
@@ -568,7 +568,6 @@
     "wrap": "Text wrap",
     "wrap_on": "On",
     "wrap_off": "Off",
-    "done": "Done",
     "align_needs_room": "A full-width photo has nothing to align to",
     "selected": "Photo selected",
     "choose_file": "Choose a photo"

@@ -560,7 +560,7 @@
     "resize_s": "아래쪽을 끌어 크기 조절",
     "resize_sw": "왼쪽 아래를 끌어 크기 조절",
     "resize_w": "왼쪽을 끌어 크기 조절",
-    "width": "너비",
+    "size": "크기",
     "width_small": "작게",
     "width_medium": "보통",
     "width_large": "크게",
@@ -568,7 +568,6 @@
     "wrap": "글 감싸기",
     "wrap_on": "켬",
     "wrap_off": "끔",
-    "done": "완료",
     "align_needs_room": "가득 찬 너비에서는 정렬할 수 없습니다",
     "selected": "사진을 선택했습니다",
     "choose_file": "사진 고르기"

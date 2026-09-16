@@ -560,7 +560,7 @@
     "resize_s": "下をドラッグしてサイズ変更",
     "resize_sw": "左下をドラッグしてサイズ変更",
     "resize_w": "左をドラッグしてサイズ変更",
-    "width": "幅",
+    "size": "サイズ",
     "width_small": "小",
     "width_medium": "中",
     "width_large": "大",
@@ -568,7 +568,6 @@
     "wrap": "回り込み",
     "wrap_on": "あり",
     "wrap_off": "なし",
-    "done": "完了",
     "align_needs_room": "幅いっぱいのときは寄せられません",
     "selected": "写真を選んでいます",
     "choose_file": "写真を選ぶ"

@@ -4,6 +4,7 @@ import { extractEditorEffects } from '@/features/pc/entries/utils/editor-effects
 import {
   applyInlineImagesToEditor,
   extractInlineImages,
+  inlineImageWidthRatio,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
 
@@ -94,7 +95,7 @@ describe('extractInlineImages', () => {
     editor.innerHTML = img({ 'data-width-ratio': 'NaN', 'data-layout': 'bogus', 'data-align': '' });
 
     expect(extractInlineImages(editor)).toEqual([
-      { offset: 0, storagePath: '', widthRatio: 0.4, layout: 'inline', align: 'start' },
+      { offset: 0, storagePath: '', widthRatio: 0.5, layout: 'inline', align: 'start' },
     ]);
   });
 
@@ -273,6 +274,47 @@ describe('保存と復元の往復', () => {
     expect(extractInlineImages(restored)).toHaveLength(1);
     expect(serializeEditorText(restored)).toBe(`あ${INLINE_IMAGE_PLACEHOLDER}い`);
     restored.remove();
+  });
+});
+
+/**
+ * 差し込む大きさは写真の向きで決まる。**縦書きに横長を広く置くと紙をまたぐ**ので、
+ * 長辺が行と直交するときだけ狭くする（レビュー #626）。
+ */
+describe('inlineImageWidthRatio', () => {
+  const portrait = { naturalWidth: 600, naturalHeight: 900 };
+  const landscape = { naturalWidth: 900, naturalHeight: 600 };
+
+  it('縦書き × 縦長 — 長辺が行と同じ向きなので広く', () => {
+    expect(inlineImageWidthRatio({ ...portrait, isVertical: true })).toBe(0.8);
+  });
+
+  it('縦書き × 横長 — 長辺が行と直交するので狭く', () => {
+    expect(inlineImageWidthRatio({ ...landscape, isVertical: true })).toBe(0.5);
+  });
+
+  it('横書き × 縦長 — 長辺が行と直交するので狭く', () => {
+    expect(inlineImageWidthRatio({ ...portrait, isVertical: false })).toBe(0.5);
+  });
+
+  it('横書き × 横長 — 長辺が行と同じ向きなので広く', () => {
+    expect(inlineImageWidthRatio({ ...landscape, isVertical: false })).toBe(0.8);
+  });
+
+  it('正方形は行に沿うものとして扱う', () => {
+    const square = { naturalWidth: 800, naturalHeight: 800 };
+    expect(inlineImageWidthRatio({ ...square, isVertical: true })).toBe(0.8);
+    expect(inlineImageWidthRatio({ ...square, isVertical: false })).toBe(0.8);
+  });
+
+  // 署名切れなどで実寸が測れないことがある。そこで広いほうに倒すと、縦長が画面を覆う。
+  it('実寸が測れないときは狭いほうに倒す', () => {
+    expect(inlineImageWidthRatio({ naturalWidth: 0, naturalHeight: 0, isVertical: false })).toBe(
+      0.5,
+    );
+    expect(
+      inlineImageWidthRatio({ naturalWidth: Number.NaN, naturalHeight: 900, isVertical: true }),
+    ).toBe(0.5);
   });
 });
 

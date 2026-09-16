@@ -140,4 +140,23 @@ describe('useInlineImageSelection', () => {
     expect(result.current.selection.element).toBeNull();
     expect(onCommit).toHaveBeenCalledTimes(1);
   });
+
+  // パレットから「完了」を外したので、押して外す道は「写真以外を押す」だけになる。
+  // キーボードだけで辿っている人のために Esc を残してある。
+  it('Esc でも選択が外れる', () => {
+    const { result } = setup();
+
+    act(() => {
+      photo.dispatchEvent(pointer('pointerdown', 10, 10));
+    });
+    expect(result.current.selection.element).toBe(photo);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+
+    expect(result.current.selection.element).toBeNull();
+    // 外しただけでは保存は走らない（見た目は変わっていない）。
+    expect(onCommit).not.toHaveBeenCalled();
+  });
 });
