@@ -14,7 +14,6 @@ import type { EntranceLayout } from '../entrance/layout';
 import { PAPER_FONT, PAPER_SHADOW, PAPER_STYLE } from '../entrance/paper';
 import { isPassage } from '../entrance/passage';
 import type { EntranceSceneHandle } from '../entrance/scene';
-import { watchHiddenBottomHeight } from '../entrance/viewport';
 import type { EntranceControls } from '../types';
 
 /**
@@ -66,18 +65,10 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   const [ready, setReady] = useState(false);
   const [leaving, setLeaving] = useState<EnterPlan | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
-  /**
-   * いま下に隠れている高さ（px）。ブラウザのツールバーが画面に重なっているぶん
-   * （`viewport.ts` の注釈）。重なりが無ければ 0。
-   */
-  const [hiddenBottom, setHiddenBottom] = useState(0);
-
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }, []);
-
-  useEffect(() => watchHiddenBottomHeight(setHiddenBottom), []);
 
   /**
    * SP で扉を見せる窓（紙の上の余白）。**高さを測って扉の構図に渡す。**
@@ -155,14 +146,21 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
     <EntranceContext.Provider value={controls}>
       <div
         /**
-         * 高さは **`100svh`（ツールバーを除いた表示領域）を下限に、中身で伸びる**。
+         * 高さの下限は **`svh` と `dvh` の小さい方**＝いま見えている高さを超えない。
          *
-         * `flex-1` を付けていたころは、`<body>`（`h-full` = ツールバーの裏まで含む大きい方の
-         * ビューポート）いっぱいに伸びていた。下端に置いた紙はその底に着くので、実機の Safari
-         * では**下のツールバーの裏に隠れて**「サインアップ」の行が見えなかった（実機レビュー）。
-         * 伸ばすのをやめると、紙は見えている画面の底に座る。
+         * `svh` だけでは足りない。実機の Dia（iPhone 15 Pro）で測ると
+         * `100svh = 793` / `100dvh = 717` / `innerHeight = 717` で、**`svh` の方が
+         * 実際の表示領域より 76px 大きい**。その分だけ紙が下にはみ出し、ツールバーの裏に
+         * 隠れていた（iOS の一部ブラウザは `svh` を画面の高さのまま返す）。
+         *
+         * `dvh` だけにもしない。Safari では読み進めるとツールバーが畳まれて `dvh` が伸び、
+         * 紙の位置が動いてしまう。小さい方を取れば、**どちらのブラウザでも見えている中に収まり、
+         * かつ動かない**。
+         *
+         * `<body>`（`h-full` = ツールバーの裏まで含む）いっぱいに伸ばさないこと（`flex-1` を
+         * 付けない）も引き続き要る。伸ばすと下端の紙がその底に着いてしまう。
          */
-        className="relative flex min-h-[100svh] flex-col"
+        className="relative flex min-h-[min(100svh,100dvh)] flex-col"
         style={{
           opacity: leaving === null ? 1 : 0,
           transition:
@@ -215,10 +213,7 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             <div
               className="relative z-10 px-3"
               style={{
-                // 下の余白 = **紙の余白（12px か端末の安全域）＋ 下に隠れている高さ**。
-                // 隠れているぶんと「どちらか大きい方」にすると、紙が隠れの縁にぴったり接して
-                // 余白が無くなる。隠れているぶんはあくまで下駄として足す。
-                paddingBottom: `calc(max(12px, env(safe-area-inset-bottom)) + ${hiddenBottom}px)`,
+                paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
                 transform: leaving === null ? 'translateY(0)' : 'translateY(calc(100% + 24px))',
                 transition: `transform ${PAPER_RETREAT_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
               }}
@@ -275,8 +270,9 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
  *
  * 窓の高さは紙の残りで決まり（`flex-1`）、扉はその窓に収まるよう構図を合わせる。
  * 入力欄の多い紙（登録）でも扉の気配が消えないよう、最低限だけ残す。
+ * 高さの単位は根と同じ「小さい方」で揃える（`svh` だけだと実際より大きく見積もる端末がある）。
  */
-const SHEET_WINDOW_MIN = 'clamp(72px, 12svh, 140px)';
+const SHEET_WINDOW_MIN = 'clamp(72px, min(12svh, 12dvh), 140px)';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
