@@ -294,7 +294,7 @@ describe('renderNewsletterText', () => {
       locale: 'ja',
     });
     expect(text.startsWith('今月の更新')).toBe(true);
-    expect(text.trimEnd().endsWith('— Oryzae / Ferment Media Research')).toBe(true);
+    expect(text.trimEnd().endsWith('— Oryzae')).toBe(true);
   });
 
   it('テキスト版にも配信停止 URL を素のまま載せる', () => {
