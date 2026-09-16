@@ -48,7 +48,7 @@ export const ENTER_TIMING = {
   doorMs: 700,
   /** 扉が開き始めてから歩き出すまで。開くのを待ち切らずに重ねる。 */
   walkDelayMs: 140,
-  /** 敷居をまたいで奥へ抜けるまで。 */
+  /** 扉の正面（敷居の手前）へ寄り着くまで。 */
   walkMs: 980,
   /**
    * 歩き終わりに、書斎へ受け渡すためだけの短い溶暗（ms）。
@@ -63,10 +63,12 @@ export const ENTER_TIMING = {
   /**
    * 歩き終わりの何 ms 前に、書斎へ渡す 1 枚を撮るか。
    *
-   * 撮った絵は書斎が読み込まれるまでの地になる（`study/backdrop.ts`）。**早めに撮る** —
-   * PNG の符号化と保存に少しかかるので、間に合わないと書斎が地の色から始まってしまう。
+   * 撮った絵は書斎が読み込まれるまでの地になる（`study/backdrop.ts`）。画素はその場で
+   * 掴むので、この前倒しは **PNG の符号化と保存が navigation に間に合う**ためのもの。
+   * 長く取りすぎると、まだ扉から遠い絵を渡してしまう（`walkProgress` は着きで減速する
+   * ので、この長さなら扉の正面まで来ている）。
    */
-  captureLeadMs: 420,
+  captureLeadMs: 300,
 } as const;
 
 export interface EnterPlan {
@@ -121,22 +123,24 @@ export function doorAngleWhileEntering(plan: EnterPlan, from: number, elapsedMs:
 /**
  * 歩いて入る道のりの進み（0..1、イージング済み）。
  *
- * 出だしはゆっくり、敷居の手前で速くなって奥へ抜ける。**着地で減速させない** —
- * 奥はもう溶けているので、止まる場所を見せる必要が無い。
+ * 出だしも着きもゆるやか。**着きで減速する**のが肝で、止まった絵がそのまま書斎へ渡す 1 枚に
+ * なる（`captureLeadMs`）。最後まで加速していると、渡す 1 枚と最後のフレームがずれる。
  */
 export function walkProgress(plan: EnterPlan, elapsedMs: number): number {
-  const p = progress(elapsedMs - plan.walkDelayMs, plan.walkMs);
-  return EASING.easeInOutCubic(p) * 0.35 + p ** 2 * 0.65;
+  return EASING.easeInOutCubic(progress(elapsedMs - plan.walkDelayMs, plan.walkMs));
 }
 
 /**
- * 奥へ抜けた先の view。扉の中心線（x = 0）の上を、目の高さのまま奥へ。
+ * 歩き着く先。**扉の正面、枠がまだ絵に収まっているところで止まる。**
  *
- * 目の高さは扉の中ほどより少し下。高いままだと枠の上辺に頭をぶつける軌道になる。
+ * 抜けるところまで歩かせていた頃は、開いた扉板と枠がカメラのすぐ脇まで来て、画面を縦に
+ * 横切る線だけが残った — 「書斎に入る直前に柱みたいなのが見える」と報告された（PR #624）。
+ * 寄りすぎると扉は扉に見えない。扉が扉として読めるところで止め、続きは書斎の側の寄り
+ * （`study/constants.ts` の `ARRIVAL`）に渡す。
  */
-export const THROUGH_VIEW: CameraView = {
-  position: { x: 0, y: DOOR.height * 0.44, z: -2.2 },
-  target: { x: 0, y: DOOR.height * 0.42, z: -12 },
+export const THRESHOLD_VIEW: CameraView = {
+  position: { x: 0, y: DOOR.height * 0.44, z: 5 },
+  target: { x: 0, y: DOOR.height * 0.4, z: -8 },
 };
 
 /** 待っているときの view（配置表どおり）。 */
@@ -149,29 +153,22 @@ export function homeEntranceView(layout: EntranceLayout): CameraView {
 
 /** 歩いて入る途中の view。`from` は歩き出した時点の view（揺れを含む）。 */
 export function walkView(from: CameraView, t: number): CameraView {
-  return lerpView(from, THROUGH_VIEW, clamp01(t));
+  return lerpView(from, THRESHOLD_VIEW, clamp01(t));
 }
 
 /**
- * カメラが扉の開口の内側を通るか。
+ * その view が、壁ではなく扉の開口を覗いているか。
  *
- * 壁の面（z = 0）をまたぐ瞬間に、開口（枠の内側）の中にいなければ壁を突き抜けている。
- * 構図を変えたときに軌道が壁に当たっていないかを、テストで確かめるために置いている。
+ * カメラは敷居の手前で止まるので、確かめるのは**位置**ではなく**視線**。壁の面（z = 0）を
+ * どこで通るかを出して、開口の内側かを見る。構図を変えたときに、壁を見つめて終わって
+ * いないかをテストで押さえるために置いている。
  */
-export function crossesThroughDoorway(from: CameraView, samples = 200): boolean {
-  let previous = walkView(from, 0).position;
-  for (let i = 1; i <= samples; i++) {
-    const current = walkView(from, i / samples).position;
-    if (previous.z >= 0 && current.z < 0) {
-      const ratio = previous.z / (previous.z - current.z);
-      const x = previous.x + (current.x - previous.x) * ratio;
-      const y = previous.y + (current.y - previous.y) * ratio;
-      const insideX = Math.abs(x) < DOOR.width / 2 - 0.05;
-      const insideY = y > 0.05 && y < DOOR.height - 0.05;
-      return insideX && insideY;
-    }
-    previous = current;
-  }
-  // 壁をまたがない軌道は「通っていない」。
-  return false;
+export function looksThroughDoorway(view: CameraView): boolean {
+  const { position, target } = view;
+  // 壁の手前にいて、奥を見ている。
+  if (position.z <= 0 || target.z >= position.z) return false;
+  const ratio = position.z / (position.z - target.z);
+  const x = position.x + (target.x - position.x) * ratio;
+  const y = position.y + (target.y - position.y) * ratio;
+  return Math.abs(x) < DOOR.width / 2 - 0.05 && y > 0.05 && y < DOOR.height - 0.05;
 }

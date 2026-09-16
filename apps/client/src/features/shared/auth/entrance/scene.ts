@@ -19,6 +19,7 @@ import {
   Group,
   LatheGeometry,
   Line,
+  type LineBasicMaterial,
   LineSegments,
   type Material,
   Mesh,
@@ -30,7 +31,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { RENDER_LIMITS } from '@/features/shared/study/constants';
+import { clamp01, RENDER_LIMITS } from '@/features/shared/study/constants';
 import { approach, breathOffset, type CameraView } from '@/features/shared/study/scene/camera';
 import { captureRenderedFrame } from '@/features/shared/study/scene/capture';
 import { sampleJarProfile } from '@/features/shared/study/scene/jar';
@@ -94,6 +95,22 @@ export interface EntranceSceneHandle {
   dispose(): void;
 }
 
+/**
+ * 入るときに、奥の書斎がどこまで濃くなるか（待っている間の何倍か）。
+ *
+ * 濃くしすぎると、待っている段階との差ではなく「別の部屋に切り替わった」に見える。
+ * 書斎の本線（不透明）には届かせない。
+ */
+const GLIMPSE_REVEAL = 3.4;
+
+/** 扉の向こうの気配。濃さだけを外から動かせる。 */
+interface StudyGlimpse {
+  group: Group;
+  /** 入っている最中の濃さ。`t` は歩きの進み（0..1）。 */
+  reveal(t: number): void;
+  dispose(): void;
+}
+
 /** 壁の広がり。どの構図でも画面の外まで続く幅と高さ。 */
 const WALL = { halfWidth: 18, height: 11 } as const;
 
@@ -127,7 +144,8 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
   scene.add(buildWall(materials, own));
   scene.add(buildFrame(materials, own));
   scene.add(buildDoormat(materials, own));
-  scene.add(buildStudyGlimpse(materials, own));
+  const glimpse = buildStudyGlimpse(materials, own);
+  scene.add(glimpse.group);
   scene.add(buildCabinet(materials, own, layout, options.sprig));
   const door = buildDoor(materials, own);
   scene.add(door);
@@ -175,8 +193,11 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
 
     if (entering) {
       const elapsed = now - entering.startedAt;
+      const walked = walkProgress(entering.plan, elapsed);
       door.rotation.y = doorAngleWhileEntering(entering.plan, entering.fromAngle, elapsed);
-      applyView(camera, walkView(entering.fromView, walkProgress(entering.plan, elapsed)));
+      applyView(camera, walkView(entering.fromView, walked));
+      // 近づくにつれて、奥の書斎が見えてくる。
+      glimpse.reveal(walked);
       // 歩き終わりの手前で 1 枚だけ撮る（書斎が読み込まれるまでの地）。
       if (
         !entering.captured &&
@@ -326,6 +347,7 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     cancelAnimationFrame(frame);
     resizeObserver.disconnect();
     for (const geometry of geometries) geometry.dispose();
+    glimpse.dispose();
     materials.dispose();
     renderer.dispose();
     // dispose() だけでは WebGL のコンテキストが解放されない（書斎の scene.ts と同じ理由）。
@@ -569,12 +591,24 @@ function buildDoormat(materials: StudyMaterials, own: OwnGeometry): Group {
  * 扉の向こうに覗く書斎の気配。**机の天板と瓶の輪郭だけを、ごく薄く。**
  *
  * 待っている間は扉の隙間からわずかに見え、押し開けると正面に来る。ここで書斎の物を
- * 描き込むと、入る前に部屋を見せてしまう — 見せるのは「何かがある」までにする。
+ * 描き込むと、入る前に部屋を見せてしまう — 待っている間に見せるのは「何かがある」まで。
+ *
+ * **入るときだけ濃くする**（`reveal`）。歩き着いたところで画面は扉枠でいっぱいになり、
+ * その中が空だと、残るのは縦に走る線だけ — 「柱みたいなのが見える」と報告された
+ * （PR #624）。近づくほど奥が見えてくれば、最後の 1 枚は「扉の向こうの書斎」になり、
+ * そのまま書斎へ渡せる。
  */
-function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): Group {
+function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): StudyGlimpse {
   const group = new Group();
-  const line = materials.faint(0.14);
-  const faint = materials.faint(0.08);
+  const shades: { material: LineBasicMaterial; base: number }[] = [];
+  /** 待っている間の濃さで 1 本。`reveal` でまとめて濃くするので、共有の材は使わない。 */
+  function shade(opacity: number): LineBasicMaterial {
+    const material = materials.faint(opacity).clone();
+    shades.push({ material, base: opacity });
+    return material;
+  }
+  const line = shade(0.14);
+  const faint = shade(0.08);
 
   // 奥の壁の足元と、壁のボード。
   group.add(lineFrom([new Vector3(-7, 0, -11), new Vector3(7, 0, -11)], faint, own));
@@ -623,7 +657,16 @@ function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): Group {
   }
   group.add(jar);
 
-  return group;
+  return {
+    group,
+    reveal(t: number): void {
+      const gain = 1 + (GLIMPSE_REVEAL - 1) * clamp01(t);
+      for (const shade of shades) shade.material.opacity = shade.base * gain;
+    },
+    dispose(): void {
+      for (const shade of shades) shade.material.dispose();
+    },
+  };
 }
 
 /**

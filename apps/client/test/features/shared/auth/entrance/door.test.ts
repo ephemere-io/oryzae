@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  crossesThroughDoorway,
+  DOOR,
   DOOR_ANGLE,
   doorAngleWhileEntering,
   ENTER_TIMING,
   enterPlan,
   homeEntranceView,
-  THROUGH_VIEW,
+  looksThroughDoorway,
+  THRESHOLD_VIEW,
   walkProgress,
   walkView,
 } from '@/features/shared/auth/entrance/door';
@@ -23,19 +24,17 @@ describe('enterPlan', () => {
     // 以前は歩きの後半（約 0.4 秒）をかけて地の色へ溶かしていて、扉をくぐった先が
     // 白く飛んで「ブツ切れ」と報告された（PR #624）。溶暗は画面が入れ替わる一瞬を隠すだけにする。
     const plan = enterPlan(false);
-    const from = homeEntranceView(ENTRANCE_PC_LAYOUT);
-
-    let crossedAt = plan.totalMs;
-    for (let t = 0; t <= plan.totalMs; t += 5) {
-      if (walkView(from, walkProgress(plan, t)).position.z < 0) {
-        crossedAt = t;
-        break;
-      }
-    }
-
     expect(plan.fadeMs).toBeLessThanOrEqual(250);
-    // 敷居をまたぐところまでは、まだ溶け始めていない（空間が続いて見える）。
-    expect(plan.fadeStartMs).toBeGreaterThan(crossedAt * 0.8);
+    // 溶かし始めるのは、もう扉の前に着いているところ。
+    expect(walkProgress(plan, plan.fadeStartMs)).toBeGreaterThan(0.9);
+  });
+
+  it('書斎へ渡す 1 枚は、ほとんど止まったところで撮る', () => {
+    // 撮った 1 枚は書斎が読み込まれるまでの地になる。動いている途中で撮ると、最後の
+    // フレームと渡す絵がずれて、切り替わりが飛んで見える。
+    const plan = enterPlan(false);
+    const captureAt = plan.totalMs - ENTER_TIMING.captureLeadMs;
+    expect(walkProgress(plan, captureAt)).toBeGreaterThan(0.85);
   });
 
   it('待たされていると感じる長さにしない（1.2 秒以内）', () => {
@@ -103,14 +102,32 @@ describe('walkProgress', () => {
 });
 
 describe('歩いて入る軌道', () => {
+  const plan = enterPlan(false);
+
   it.each([
     ['PC', ENTRANCE_PC_LAYOUT],
     ['SP', ENTRANCE_SP_LAYOUT],
-  ])('%s: 待っている位置から、壁ではなく扉の開口を通って奥へ抜ける', (_, layout) => {
-    expect(crossesThroughDoorway(homeEntranceView(layout))).toBe(true);
+  ])('%s: 歩き着くまで壁の手前にいて、最後は開口を覗いている', (_, layout) => {
+    // 壁を抜けるところまで歩かせていた頃は、枠や扉板がカメラのすぐ脇を通って画面を
+    // 縦に横切り、「書斎に入る直前に柱みたいなのが見える」と報告された（PR #624）。
+    const from = homeEntranceView(layout);
+    for (let t = 0; t <= 1.0001; t += 0.02) {
+      expect(walkView(from, t).position.z).toBeGreaterThan(0);
+    }
+    // 後半はずっと、壁ではなく開口の中を見ている。
+    for (let t = 0.6; t <= 1.0001; t += 0.02) {
+      expect(looksThroughDoorway(walkView(from, t))).toBe(true);
+    }
   });
 
-  it('パララックスで揺れた位置から歩き出しても開口を通る', () => {
+  it('着く先は扉の正面。扉が扉として読める距離で止まる', () => {
+    expect(THRESHOLD_VIEW.position.x).toBe(0);
+    // 壁の手前（くぐらない）。扉の丈より遠くで止めれば、枠が絵に収まって扉に見える。
+    // 寄りすぎると、開いた扉板と枠だけが画面を縦に横切って「柱」になる。
+    expect(THRESHOLD_VIEW.position.z).toBeGreaterThan(DOOR.height);
+  });
+
+  it('パララックスで揺れた位置から歩き出しても開口を覗いて終わる', () => {
     const home = homeEntranceView(ENTRANCE_PC_LAYOUT);
     const parallax = ENTRANCE_PC_LAYOUT.parallax;
     if (parallax === null) throw new Error('PC はパララックスを持つ');
@@ -124,21 +141,22 @@ describe('歩いて入る軌道', () => {
           },
           target: home.target,
         };
-        expect(crossesThroughDoorway(from)).toBe(true);
+        expect(looksThroughDoorway(walkView(from, walkProgress(plan, plan.totalMs)))).toBe(true);
       }
     }
   });
 
-  it('壁をまたがない軌道は「通った」と数えない', () => {
-    // 始めから壁の奥にいる（終点と同じ側）ので、壁の面を一度も越えない。
-    expect(crossesThroughDoorway(THROUGH_VIEW)).toBe(false);
-  });
-
-  it('開口の外（壁）を通る軌道は通ったと数えない', () => {
-    const farRight = {
+  it('壁を見ている view は「開口を覗いている」と数えない', () => {
+    const wall = {
       position: { x: 40, y: 3, z: 12 },
       target: { x: 40, y: 2, z: 0 },
     };
-    expect(crossesThroughDoorway(farRight)).toBe(false);
+    expect(looksThroughDoorway(wall)).toBe(false);
+  });
+
+  it('壁の奥にいる view は数えない', () => {
+    expect(
+      looksThroughDoorway({ position: { x: 0, y: 2, z: -2 }, target: { x: 0, y: 2, z: -12 } }),
+    ).toBe(false);
   });
 });
