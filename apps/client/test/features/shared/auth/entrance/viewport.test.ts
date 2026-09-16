@@ -1,70 +1,111 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  overlayToolbarInset,
-  type ViewportSnapshot,
+  hiddenBottomHeight,
+  watchHiddenBottomHeight,
 } from '@/features/shared/auth/entrance/viewport';
 
-/** iPhone 15 Pro（縦）。画面は 393 × 852pt。 */
-const IPHONE_SCREEN = { screenWidth: 393, screenHeight: 852 };
+/**
+ * 下に隠れている高さは **実測**（`visualViewport`）で出す。
+ *
+ * 決め打ちの割合をやめた理由は `viewport.ts` の注釈のとおり。ここでは
+ * 「重なっているブラウザ」「よけるブラウザ」「教えてくれない環境」を作って確かめる。
+ */
 
-function snapshot(overrides: Partial<ViewportSnapshot> = {}): ViewportSnapshot {
+/** `visualViewport` を差し替える。返り値で resize を起こせる。 */
+function stubVisualViewport(height: number, offsetTop = 0) {
+  const listeners = new Map<string, Set<() => void>>();
+  const viewport = {
+    height,
+    offsetTop,
+    addEventListener: (type: string, handler: () => void) => {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)?.add(handler);
+    },
+    removeEventListener: (type: string, handler: () => void) => {
+      listeners.get(type)?.delete(handler);
+    },
+  };
+  vi.stubGlobal('visualViewport', viewport);
+  Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true });
   return {
-    innerWidth: 393,
-    innerHeight: 852,
-    ...IPHONE_SCREEN,
-    coarsePointer: true,
-    standalone: false,
-    ...overrides,
+    resize(next: number) {
+      viewport.height = next;
+      for (const handler of listeners.get('resize') ?? []) handler();
+    },
+    listenerCount: () =>
+      (listeners.get('resize')?.size ?? 0) + (listeners.get('scroll')?.size ?? 0),
   };
 }
 
-describe('overlayToolbarInset', () => {
-  it('アプリ内ブラウザ（ツールバーが画面に重なる）では、その高さぶんを空ける', () => {
-    // Dia は Web ビューを画面いっぱい（852）に置き、ツールバーを上に重ねる。
-    // svh も safe-area も画面の高さのままなので、ページからは隠れているのが分からない。
-    const inset = overlayToolbarInset(snapshot());
+function setInnerHeight(height: number): void {
+  Object.defineProperty(window, 'innerHeight', { value: height, configurable: true });
+}
 
-    // 実測のツールバーは 76pt（スクリーンショットから）。それを覆える大きさであること。
-    expect(inset).toBeGreaterThanOrEqual(76);
-    // 覆えれば十分で、それ以上空けると下が間延びする。
-    expect(inset).toBeLessThan(120);
+afterEach(() => {
+  vi.unstubAllGlobals();
+  Object.defineProperty(window, 'visualViewport', { value: undefined, configurable: true });
+  document.body.innerHTML = '';
+});
+
+describe('hiddenBottomHeight', () => {
+  it('ツールバーが重なっているぶんを、見えている領域との差で出す', () => {
+    // 画面いっぱい（852）に描いていて、見えているのは 776 = ツールバー 76 が重なっている。
+    setInnerHeight(852);
+    stubVisualViewport(776);
+
+    expect(hiddenBottomHeight()).toBe(76);
   });
 
-  it('ふつうのブラウザ（自分でツールバーをよける）では何も空けない', () => {
-    // Safari は下のツールバーぶんを引いた高さを innerHeight / svh として教えてくれる。
-    expect(overlayToolbarInset(snapshot({ innerHeight: 750 }))).toBe(0);
+  it('ブラウザが自分でよけているなら 0（Safari など）', () => {
+    setInnerHeight(750);
+    stubVisualViewport(750);
+
+    expect(hiddenBottomHeight()).toBe(0);
   });
 
-  it('ホーム画面から開いた PWA では何も空けない（ツールバーが無い）', () => {
-    expect(overlayToolbarInset(snapshot({ standalone: true }))).toBe(0);
+  it('表示領域が上へずれている（拡大）ぶんも下に隠れる', () => {
+    setInnerHeight(852);
+    stubVisualViewport(700, 40);
+
+    expect(hiddenBottomHeight()).toBe(112);
   });
 
-  it('マウスの環境では何も空けない（全画面表示のブラウザを誤検出しない）', () => {
-    expect(
-      overlayToolbarInset(
-        snapshot({
-          coarsePointer: false,
-          innerWidth: 1512,
-          innerHeight: 982,
-          screenWidth: 1512,
-          screenHeight: 982,
-        }),
-      ),
-    ).toBe(0);
+  it('`visualViewport` が無い環境では 0（何も足さない）', () => {
+    setInnerHeight(852);
+
+    expect(hiddenBottomHeight()).toBe(0);
+  });
+});
+
+describe('watchHiddenBottomHeight', () => {
+  it('すぐ 1 回知らせ、表示領域が変わるたびに知らせる', () => {
+    setInnerHeight(852);
+    const viewport = stubVisualViewport(852);
+    const seen: number[] = [];
+
+    const stop = watchHiddenBottomHeight((height) => seen.push(height));
+    expect(seen).toEqual([0]);
+
+    viewport.resize(776);
+    expect(seen).toEqual([0, 76]);
+
+    stop();
+    expect(viewport.listenerCount()).toBe(0);
   });
 
-  it('横向きでも、その向きの画面の辺で見分ける（iOS の screen は回しても入れ替わらない）', () => {
-    const landscape = snapshot({ innerWidth: 852, innerHeight: 393 });
-    expect(overlayToolbarInset(landscape)).toBeGreaterThan(0);
-    // 横向きで高さの割合を見積もるので、縦向きより小さくなる。
-    expect(overlayToolbarInset(landscape)).toBeLessThan(overlayToolbarInset(snapshot()));
+  it('入力中（キーボードが出ている間）は更新しない', () => {
+    setInnerHeight(852);
+    const viewport = stubVisualViewport(852);
+    const input = document.createElement('input');
+    document.body.append(input);
+    const seen: number[] = [];
+    const stop = watchHiddenBottomHeight((height) => seen.push(height));
 
-    // 横向きでブラウザがよけている場合は 0。
-    expect(overlayToolbarInset(snapshot({ innerWidth: 852, innerHeight: 330 }))).toBe(0);
-  });
+    input.focus();
+    // キーボードが出て表示領域が大きく縮む。ここで紙を持ち上げると二重に動く。
+    viewport.resize(420);
 
-  it('画面の大きさが分からない環境では何もしない', () => {
-    expect(overlayToolbarInset(snapshot({ screenWidth: 0, screenHeight: 0 }))).toBe(0);
-    expect(overlayToolbarInset(snapshot({ innerHeight: 0 }))).toBe(0);
+    expect(seen).toEqual([0]);
+    stop();
   });
 });
