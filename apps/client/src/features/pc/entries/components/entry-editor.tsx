@@ -5,7 +5,6 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { PhotoStrip } from '@/components/ui/photo-strip';
 import { Popover } from '@/components/ui/popover';
 import {
   CONTROL_FONT,
@@ -28,6 +27,7 @@ import {
   FermentationSidebar,
   type SidebarQuestion,
 } from '@/features/pc/entries/components/fermentation-sidebar';
+import { InlineImageDropIndicator } from '@/features/pc/entries/components/inline-image-drop-indicator';
 import { InlineImageOverlay } from '@/features/pc/entries/components/inline-image-overlay';
 import { LeaveConfirmModal } from '@/features/pc/entries/components/leave-confirm-modal';
 import { LinkQuestionNudgeModal } from '@/features/pc/entries/components/link-question-nudge-modal';
@@ -66,7 +66,10 @@ import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import {
   applyInlineImagesToEditor,
   createInlineImageElement,
-  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+  extractInlineImages,
+  INLINE_IMAGE_WIDTH_ACROSS_LINE,
+  INLINE_IMAGE_WIDTH_ALONG_LINE,
+  inlineImageWidthRatio,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
 import { measureTitle, TITLE_MIN_FONT_SIZE } from '@/features/pc/entries/utils/title-metrics';
@@ -79,6 +82,7 @@ import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
 import type { ApiClient } from '@/lib/api';
+import { measureImageSize } from '@/lib/resize-image';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 
 interface AuthState {
@@ -911,15 +915,26 @@ export function EntryEditor({
       photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
       setPhotos(updated);
 
+      // **大きさは写真の向きで決める。** 長辺が行と同じ向きなら広く、直交すれば狭く
+      // （縦書きに横長を広く置くと、1 枚で紙をまたぐ）。差し込む前に測っておく——
+      // 差し込んだ直後に await を挟むと、待っている間にキャレットが動く。
+      const size = await measureImageSize(photo.signedUrl);
+
       if (el) {
         el.focus();
         const node = createInlineImageElement(
           {
             offset: 0, // 実際の位置は保存時に DOM から数え直す
             storagePath: photo.storagePath,
-            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
-            layout: 'inline',
-            align: 'start',
+            widthRatio: inlineImageWidthRatio({
+              naturalWidth: size?.width ?? 0,
+              naturalHeight: size?.height ?? 0,
+              isVertical,
+            }),
+            // 既定は**ブロックで中央**。行の中に小さく挟まるより、1 枚の絵として
+            // 置くほうが「写真を貼る」という動機に合う（#587 のレビューでも同じ指摘）。
+            layout: 'block',
+            align: 'center',
           },
           photo.signedUrl,
         );
@@ -934,20 +949,7 @@ export function EntryEditor({
       const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
       if (savedId) setCurrentEntryId(savedId);
     },
-    [title, content, currentEntryId, save],
-  );
-
-  const removePhoto = useCallback(
-    async (index: number) => {
-      const updated = photosRef.current.filter((_, i) => i !== index);
-      photosRef.current = updated;
-      setPhotos(updated);
-      const next = updated.map((p) => p.storagePath);
-      const finalContent = title.trim() ? `${title.trim()}\n${content}` : content;
-      if (!currentEntryId || !finalContent.trim()) return;
-      await save(finalContent, currentEntryId, { mediaUrls: next });
-    },
-    [title, content, currentEntryId, save],
+    [title, content, currentEntryId, save, isVertical],
   );
 
   const photoImport = usePhotoImport({
@@ -1170,9 +1172,125 @@ export function EntryEditor({
     onSelect: toggleFermentSidebar,
   });
 
+  /**
+   * 写真を選んでいるあいだ、**パレットの中身をその写真の操作に入れ替える**。
+   *
+   * 以前は写真の右横に小さな面が浮いて「行内 / ブロック / 回り込み」を出していた。
+   * 本文に被るうえ、道具が画面の 2 か所（パレットとその面）に割れていた。
+   * SP（#616）と同じく、同じ列の中身だけを差し替える。
+   *
+   * 「行内」はここから外した。写真は 1 枚の絵として置くか、文字を回り込ませるかの
+   * どちらかで、行の中に文字として挟む形は選ぶ場面が無かった（SP も同じ判断）。
+   */
+  const selectedPhoto = inlineImages.selection.image;
+
+  /**
+   * 大きさは 3 段階を巡る。**差し込んだときの大きさがそのまま段になっている**
+   * （小＝行と直交、中＝行と同じ向き。どちらも写真の向きから決まる値）。
+   */
+  function nextWidthRatio(ratio: number): number {
+    if (ratio <= 0.65) return INLINE_IMAGE_WIDTH_ALONG_LINE;
+    if (ratio <= 0.9) return 1;
+    return INLINE_IMAGE_WIDTH_ACROSS_LINE;
+  }
+  function widthName(ratio: number): string {
+    if (ratio <= 0.65) return tPhoto('width_small');
+    if (ratio <= 0.9) return tPhoto('width_medium');
+    return tPhoto('width_large');
+  }
+  function alignName(align: 'start' | 'center' | 'end'): string {
+    if (align === 'center') return tPhoto('align_center');
+    return align === 'end' ? tPhoto('align_end') : tPhoto('align_start');
+  }
+
+  /** 選んでいる写真を本文から外し、エントリーの持ち物からも落とす。 */
+  function removeSelectedPhoto(): void {
+    const editor = editorRef.current;
+    const path = inlineImages.selection.element?.dataset.storagePath;
+    // 同じ写真を 2 か所に置いていることがある。他にも使っていれば持ち物は残す。
+    const uses =
+      editor && path ? extractInlineImages(editor).filter((i) => i.storagePath === path).length : 0;
+    if (path && uses <= 1) {
+      // **先に落としてから外す。** 外した拍子に走る保存が、古い一覧を送らないように。
+      const updated = photosRef.current.filter((ph) => ph.storagePath !== path);
+      photosRef.current = updated;
+      setPhotos(updated);
+    }
+    inlineImages.removeSelected();
+  }
+
+  const photoActions: PaletteAction[] = selectedPhoto
+    ? [
+        {
+          id: 'photo-size',
+          label: `${tPhoto('size')} · ${widthName(selectedPhoto.widthRatio)}`,
+          icon: paletteIcon(<path d="M4 7v10M20 7v10M7 12h10M9 9l-2 3 2 3M15 9l2 3-2 3" />),
+          onSelect: () =>
+            inlineImages.updateLayout({ widthRatio: nextWidthRatio(selectedPhoto.widthRatio) }),
+        },
+        {
+          id: 'photo-align',
+          label: `${tPhoto('align')} · ${alignName(selectedPhoto.align)}`,
+          // 幅いっぱいの写真には寄る先が無い。押せなくして理由を出す。
+          disabledReason: selectedPhoto.widthRatio >= 1 ? tPhoto('align_needs_room') : undefined,
+          icon: paletteIcon(<path d="M4 6h16M4 10h10M4 14h16M4 18h10" />),
+          onSelect: () => {
+            // **巡りは常に 始め→中央→終わり。** 回り込みのときだけ中央を飛ばしていたので、
+            // 一度回り込ませると差し込んだときの中央へ戻れなかった。
+            const align =
+              selectedPhoto.align === 'start'
+                ? ('center' as const)
+                : selectedPhoto.align === 'center'
+                  ? ('end' as const)
+                  : ('start' as const);
+            inlineImages.updateLayout({
+              align,
+              // 中央に置くと、文字が流れ込む側が左右どちらにも残らない。回り込みは外す。
+              // 行内のままでも寄せは効かない（文字の流れが位置を決める）ので、同じく塊にする。
+              ...(align === 'center' || selectedPhoto.layout === 'inline'
+                ? { layout: 'block' as const }
+                : {}),
+            });
+          },
+        },
+        {
+          id: 'photo-wrap',
+          label: `${tPhoto('wrap')} · ${selectedPhoto.layout === 'wrap' ? tPhoto('wrap_on') : tPhoto('wrap_off')}`,
+          active: selectedPhoto.layout === 'wrap',
+          icon: paletteIcon(
+            <>
+              <rect x="3" y="5" width="9" height="8" rx="1" />
+              <path d="M14 6h7M14 9h7M14 12h7M3 16h18M3 19h12" />
+            </>,
+          ),
+          onSelect: () => {
+            const on = selectedPhoto.layout !== 'wrap';
+            inlineImages.updateLayout({
+              layout: on ? 'wrap' : 'block',
+              // 中央寄せのまま回り込みにすると寄る先が無い。見た目と揃えて始めへ。
+              ...(on && selectedPhoto.align === 'center' ? { align: 'start' as const } : {}),
+              // 幅いっぱいでは文字が回り込む隙間が無い。いちばん小さい段に落とす。
+              ...(on && selectedPhoto.widthRatio >= 1
+                ? { widthRatio: INLINE_IMAGE_WIDTH_ACROSS_LINE }
+                : {}),
+            });
+          },
+        },
+        {
+          id: 'photo-remove',
+          label: tPhoto('remove_inline'),
+          icon: paletteIcon(
+            <path d="M6 7h12M10 7V5h4v2M10 11v6M14 11v6M7 7l.8 12a2 2 0 0 0 2 1.9h4.4a2 2 0 0 0 2-1.9L17 7" />,
+          ),
+          onSelect: removeSelectedPhoto,
+        },
+      ]
+    : [];
+
   // 書いている間はパレットも一緒に消す（ヘッダーや処理表示と同じ挙動）。
   // 常に出しておきたい人のために設定で切れる。
-  const paletteVisible = settings.paletteAutoHide ? uiVisible : true;
+  // **写真を選んでいるあいだは消さない**（書いている途中に選ぶので、消えると操作が消える）。
+  const paletteVisible = selectedPhoto ? true : settings.paletteAutoHide ? uiVisible : true;
 
   // 横書きの左右余白。**ヘッダーと同じ縦の線**に乗せる（SHELL_INSET の倍）。
   // 以前は px-[15%] で、1512px の画面だと本文の左端が 295px、「問いを結ぶ」の左端が
@@ -1798,7 +1916,7 @@ export function EntryEditor({
         ref={photoInputRef}
         type="file"
         accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
-        aria-label={tPhoto('modal_title')}
+        aria-label={tPhoto('choose_file')}
         tabIndex={-1}
         className="hidden"
         onChange={(e) => {
@@ -1809,16 +1927,14 @@ export function EntryEditor({
         }}
       />
 
-      {/* 添えた写真。本文の途中ではなく下にまとめて並べる（docs/entry-photo-guide.md）。 */}
-      <PhotoStrip urls={photos.map((p) => p.signedUrl)} onRemove={removePhoto} />
-
       <InlineImageOverlay
         rect={inlineImages.selection.rect}
         image={inlineImages.selection.image}
         onResizeStart={inlineImages.beginResize}
-        onLayoutChange={inlineImages.updateLayout}
-        onRemove={inlineImages.removeSelected}
       />
+
+      {/* 掴んで運んでいる最中、落ちる先の文字の間に線を出す。 */}
+      <InlineImageDropIndicator rect={inlineImages.dropHint} />
 
       <PhotoImportModal
         state={photoImport.state}
@@ -1833,7 +1949,7 @@ export function EntryEditor({
           本文に被らせないやり方は「場所を空ける」ではなく「振る舞い」で解く:
           書いている間は uiVisible が false になって一緒に消え、掴んで動かせ、畳める。 */}
       <EntryActionPalette
-        actions={paletteActions}
+        actions={selectedPhoto ? photoActions : paletteActions}
         visible={paletteVisible}
         size={settings.paletteSize}
       />

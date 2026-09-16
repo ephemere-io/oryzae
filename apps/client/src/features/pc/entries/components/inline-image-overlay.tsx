@@ -6,27 +6,35 @@ import { useTranslations } from 'next-intl';
 import type { ResizeHandle } from '../utils/inline-image-resize';
 
 /**
- * 選択中の写真に重ねる操作 UI。Word の画像選択に倣って 8 ハンドルとレイアウト切替を出す。
+ * 選択中の写真に重ねる枠と、大きさを変える 8 点。
  *
  * **本文（contentEditable）の中には描かない。** 中に React の要素を混ぜると、
  * ブラウザが編集で書き換えた DOM と React の管理が食い違って本文が壊れる。
  * `position: fixed` で画面座標に重ねるだけにしてある（`rect` は呼び出し側が測る）。
+ *
+ * **操作（幅・寄せ・回り込み・外す）はここに置かない。** 以前は写真の右横に小さな面が
+ * 浮いていて、本文に被るうえ、同じ「道具」が画面に 2 か所（パレットとこの面）できていた。
+ * 写真を選んでいるあいだは**パレットの中身がその写真の操作に入れ替わる**（SP と同じ）。
+ * ここに残すのは、掴んで直に変えるもの＝大きさだけ。
  */
 
-/** 画面上の位置。書字方向によらず見た目どおりに置く。 */
-const HANDLES: { handle: ResizeHandle; style: React.CSSProperties; cursor: string }[] = [
-  { handle: 'nw', style: { insetInlineStart: -4, insetBlockStart: -4 }, cursor: 'nwse-resize' },
-  { handle: 'n', style: { insetInlineStart: '50%', insetBlockStart: -4 }, cursor: 'ns-resize' },
-  { handle: 'ne', style: { insetInlineEnd: -4, insetBlockStart: -4 }, cursor: 'nesw-resize' },
-  { handle: 'e', style: { insetInlineEnd: -4, insetBlockStart: '50%' }, cursor: 'ew-resize' },
-  { handle: 'se', style: { insetInlineEnd: -4, insetBlockEnd: -4 }, cursor: 'nwse-resize' },
-  { handle: 's', style: { insetInlineStart: '50%', insetBlockEnd: -4 }, cursor: 'ns-resize' },
-  { handle: 'sw', style: { insetInlineStart: -4, insetBlockEnd: -4 }, cursor: 'nesw-resize' },
-  { handle: 'w', style: { insetInlineStart: -4, insetBlockStart: '50%' }, cursor: 'ew-resize' },
+/**
+ * 画面上の位置。**箱に対する割合**で置く（0% / 50% / 100%）。丸はそこから自分の半分だけ
+ * 戻して中心を合わせる（`-translate-x-1/2 -translate-y-1/2`）。
+ *
+ * 以前は端からの固定値 `-4px` と、その戻しの両方が効いていて、**8点すべてが左上へ
+ * きっかり 4px ずれていた**（実測）。位置を数字で持たず、箱の割合から出す。
+ */
+const HANDLES: { handle: ResizeHandle; left: string; top: string; cursor: string }[] = [
+  { handle: 'nw', left: '0%', top: '0%', cursor: 'nwse-resize' },
+  { handle: 'n', left: '50%', top: '0%', cursor: 'ns-resize' },
+  { handle: 'ne', left: '100%', top: '0%', cursor: 'nesw-resize' },
+  { handle: 'e', left: '100%', top: '50%', cursor: 'ew-resize' },
+  { handle: 'se', left: '100%', top: '100%', cursor: 'nwse-resize' },
+  { handle: 's', left: '50%', top: '100%', cursor: 'ns-resize' },
+  { handle: 'sw', left: '0%', top: '100%', cursor: 'nesw-resize' },
+  { handle: 'w', left: '0%', top: '50%', cursor: 'ew-resize' },
 ];
-
-const LAYOUTS: InlineImage['layout'][] = ['inline', 'block', 'wrap'];
-const ALIGNS: InlineImage['align'][] = ['start', 'center', 'end'];
 
 interface InlineImageOverlayProps {
   /** 選択中の写真の画面上の位置。null なら何も描かない。 */
@@ -34,17 +42,9 @@ interface InlineImageOverlayProps {
   /** 選択中の写真の設定。 */
   image: InlineImage | null;
   onResizeStart: (handle: ResizeHandle, e: React.PointerEvent) => void;
-  onLayoutChange: (patch: Partial<Pick<InlineImage, 'layout' | 'align'>>) => void;
-  onRemove: () => void;
 }
 
-export function InlineImageOverlay({
-  rect,
-  image,
-  onResizeStart,
-  onLayoutChange,
-  onRemove,
-}: InlineImageOverlayProps) {
+export function InlineImageOverlay({ rect, image, onResizeStart }: InlineImageOverlayProps) {
   const t = useTranslations('photo');
   if (!rect || !image) return null;
 
@@ -62,7 +62,7 @@ export function InlineImageOverlay({
       {/* 選択枠 */}
       <div className="absolute inset-0 border-2 border-[var(--accent,#3b82f6)]" />
 
-      {HANDLES.map(({ handle, style, cursor }) => (
+      {HANDLES.map(({ handle, left, top, cursor }) => (
         <button
           key={handle}
           type="button"
@@ -70,59 +70,9 @@ export function InlineImageOverlay({
           data-handle={handle}
           onPointerDown={(e) => onResizeStart(handle, e)}
           className="pointer-events-auto absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-[var(--accent,#3b82f6)]"
-          style={{ ...style, cursor }}
+          style={{ left, top, cursor }}
         />
       ))}
-
-      {/* レイアウト操作。Word の「レイアウトオプション」に相当する位置（右上の外側）に置く。 */}
-      <div className="pointer-events-auto absolute left-full top-0 ml-2 flex flex-col gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] p-1 shadow-md">
-        <div className="flex gap-1">
-          {LAYOUTS.map((layout) => (
-            <button
-              key={layout}
-              type="button"
-              onClick={() => onLayoutChange({ layout })}
-              aria-pressed={image.layout === layout}
-              className={`rounded px-1.5 py-1 text-[11px] whitespace-nowrap ${
-                image.layout === layout
-                  ? 'bg-[var(--toolbar-hover)] text-[var(--fg)]'
-                  : 'text-[var(--date-color)]'
-              }`}
-            >
-              {t(`layout_${layout}`)}
-            </button>
-          ))}
-        </div>
-
-        {/* 寄せは行内では効かない（文字の流れが位置を決める）ので出さない。 */}
-        {image.layout !== 'inline' && (
-          <div className="flex gap-1">
-            {ALIGNS.map((align) => (
-              <button
-                key={align}
-                type="button"
-                onClick={() => onLayoutChange({ align })}
-                aria-pressed={image.align === align}
-                className={`rounded px-1.5 py-1 text-[11px] whitespace-nowrap ${
-                  image.align === align
-                    ? 'bg-[var(--toolbar-hover)] text-[var(--fg)]'
-                    : 'text-[var(--date-color)]'
-                }`}
-              >
-                {t(`align_${align}`)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={onRemove}
-          className="rounded px-1.5 py-1 text-[11px] text-red-500 hover:bg-[var(--toolbar-hover)]"
-        >
-          {t('remove_inline')}
-        </button>
-      </div>
     </div>
   );
 }

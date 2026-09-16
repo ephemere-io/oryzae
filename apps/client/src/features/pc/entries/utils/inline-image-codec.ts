@@ -24,8 +24,43 @@ const INLINE_IMAGE_CLASS = 'inline-photo';
 const EBLOCK_CLASS = 'eblock';
 const VBLOCK_CLASS = 'v-block';
 
-/** 差し込んだ直後の表示幅（本文 1 行に対する割合）。半分より小さめにして本文を潰さない。 */
-export const DEFAULT_INLINE_IMAGE_WIDTH_RATIO = 0.4;
+/**
+ * 差し込んだ直後の表示幅（本文 1 行に対する割合）。
+ *
+ * **長辺が行と同じ向きなら広く、直交するなら狭く。** 縦書きに縦長の写真を置くと、
+ * 長辺は行と同じ向き（上下）なので幅を広く取っても本文は潰れない。逆に縦書きへ横長を
+ * 置くと、長辺が行と直交して（左右に）伸びるので、同じ割合では紙をまたいでしまう。
+ *
+ * | 書字方向 | 写真 | 長辺の向き | 割合 |
+ * | --- | --- | --- | --- |
+ * | 縦書き | 縦長 | 行と同じ | 0.8 |
+ * | 縦書き | 横長 | 行と直交 | 0.5 |
+ * | 横書き | 縦長 | 行と直交 | 0.5 |
+ * | 横書き | 横長 | 行と同じ | 0.8 |
+ */
+export const INLINE_IMAGE_WIDTH_ALONG_LINE = 0.8;
+export const INLINE_IMAGE_WIDTH_ACROSS_LINE = 0.5;
+
+/** 壊れた値を読んだときに倒す先。**小さいほうに倒す**（大きすぎて紙を覆うより害が小さい）。 */
+const DEFAULT_INLINE_IMAGE_WIDTH_RATIO = INLINE_IMAGE_WIDTH_ACROSS_LINE;
+
+/**
+ * 差し込む写真の幅を、写真の向きと書字方向から決める。
+ *
+ * 実寸が測れないことがある（署名切れ・読み込み失敗）。そのときは狭いほうに倒す
+ * ——縦長を広い割合で置くと、1 枚で画面を覆ってしまうため。
+ */
+export function inlineImageWidthRatio(params: {
+  naturalWidth: number;
+  naturalHeight: number;
+  isVertical: boolean;
+}): number {
+  const { naturalWidth, naturalHeight, isVertical } = params;
+  if (!(naturalWidth > 0) || !(naturalHeight > 0)) return INLINE_IMAGE_WIDTH_ACROSS_LINE;
+  // 行に沿う辺はどちらか。縦書きの行は上下に伸びるので、比べる相手が入れ替わる。
+  const alongLine = isVertical ? naturalHeight >= naturalWidth : naturalWidth >= naturalHeight;
+  return alongLine ? INLINE_IMAGE_WIDTH_ALONG_LINE : INLINE_IMAGE_WIDTH_ACROSS_LINE;
+}
 
 export function isInlineImage(node: Node): node is HTMLImageElement {
   return node instanceof HTMLImageElement && node.classList.contains(INLINE_IMAGE_CLASS);
@@ -146,9 +181,13 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   }
 
   el.style.inlineSize = `${image.widthRatio * 100}%`;
-  // 自由変形したときだけ比率を固定する。既定は写真本来の比率に任せる。
+  // 自由変形したときだけ形を固定する。既定は写真本来の比率に任せる。
+  //
+  // `aspect-ratio` は**物理（幅 ÷ 高さ）**で、保存している `aspect` も同じ物理の比。
+  // ここに論理（block ÷ inline）の比を入れると、縦書きで縦横が入れ替わる
+  // （右の辺を引くと幅が 566px → 124px と逆に潰れていた）。
   el.style.blockSize = 'auto';
-  el.style.aspectRatio = image.aspect ? `1 / ${image.aspect}` : '';
+  el.style.aspectRatio = image.aspect ? String(image.aspect) : '';
 
   applyLayoutStyle(el, image);
 }

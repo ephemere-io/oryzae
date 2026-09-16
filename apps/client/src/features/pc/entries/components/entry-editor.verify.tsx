@@ -114,8 +114,50 @@ registerUnit<Props>({
         await ctx.wait(16);
       },
     },
+    {
+      id: 'photo-selected',
+      description: '本文の写真を押すと、パレットの中身が写真の操作に入れ替わる',
+      props: { api: null, auth: null, initialContent: '写真を置いた本文' },
+      act: async ({ root, wait }) => {
+        const editor = root.querySelector<HTMLElement>('div[contenteditable="true"]');
+        if (!editor) throw new Error('本文が見つからない');
+        // 本文は contentEditable なので、写真は DOM に直に置く（React は本文を描かない）。
+        const img = editor.ownerDocument.createElement('img');
+        img.className = 'inline-photo';
+        // 本文に置く写真は飾りとして扱う（本文が写真の説明を兼ねる）。本番の
+        // createInlineImageElement と同じく、空の alt を必ず付ける。
+        img.alt = '';
+        img.dataset.storagePath = 'u1/1-photo.jpg';
+        img.dataset.widthRatio = '0.4';
+        img.dataset.layout = 'block';
+        img.dataset.align = 'center';
+        editor.appendChild(img);
+        // jsdom には PointerEvent が無い。型名だけ合わせた MouseEvent で代用する。
+        img.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+        await wait(16);
+      },
+    },
   ],
   invariants: [
+    {
+      id: 'palette-swaps-for-the-photo',
+      // 写真の操作は**パレットの中身の差し替え**で出す。写真の横に別の面を浮かせると、
+      // 本文に被るうえ、道具が画面の 2 か所に割れる。
+      description: '写真を選んでいるあいだ、パレットは写真の操作になる',
+      onlyFixtures: ['photo-selected'],
+      check: ({ root }) => {
+        const ids = Array.from(root.querySelectorAll('[data-palette-action]')).map((el) =>
+          el.getAttribute('data-palette-action'),
+        );
+        const want = ['photo-size', 'photo-align', 'photo-wrap', 'photo-remove'];
+        const missing = want.filter((id) => !ids.includes(id));
+        if (missing.length > 0) return `写真の操作が出ていない: ${missing.join(' / ')}`;
+        return (
+          !ids.includes('pickle') ||
+          `本文の操作が残っている（入れ替わっていない）: ${ids.join(' / ')}`
+        );
+      },
+    },
     {
       id: 'no-save-button-in-toolbar',
       description: '「保存する」ボタンが存在しない（Issue #314 原則2: 押すボタンは漬け込むだけ）',

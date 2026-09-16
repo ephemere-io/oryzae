@@ -56,6 +56,29 @@ async function decode(file: File): Promise<ImageBitmap> {
   }
 }
 
+/**
+ * 表示用 URL から写真の実寸を測る。**測れなければ null。**
+ *
+ * 置く大きさを写真の向きから決めるのに要る（縦長か横長かで、行に対する割合を変える）。
+ * 署名切れや通信の失敗で読めないことがあるので、そのときは呼ぶ側が既定に倒せるように
+ * 例外ではなく null を返す——写真が貼れないより、大きさが既定のほうがましである。
+ */
+export async function measureImageSize(
+  url: string,
+): Promise<{ width: number; height: number } | null> {
+  if (!url) return null;
+  try {
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = url;
+    await image.decode();
+    if (!(image.naturalWidth > 0) || !(image.naturalHeight > 0)) return null;
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  } catch {
+    return null;
+  }
+}
+
 /** 拡張子を .jpg に揃える（中身が JPEG になっているため）。 */
 function toJpegName(original: string): string {
   const base = original.replace(/\.[^./\\]+$/, '');
