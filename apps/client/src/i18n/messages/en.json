@@ -167,7 +167,6 @@
       "creating": "Creating…",
       "create_failed": "Couldn't create the question. Please try again.",
       "back_to_list": "Pick from existing questions",
-      "search_placeholder": "Find a question",
       "untitled": "Untitled question",
       "close": "Close",
       "limit": "You can have up to {max} questions. Archive one in your question list to start a new one.",
@@ -844,7 +843,8 @@
       "archived_section": "Archived questions ({count})",
       "unarchive": "Restore",
       "unarchive_limit": "You can have up to {max} questions. Archive one to restore this.",
-      "archive": "Archive"
+      "archive": "Archive",
+      "save_failed": "Could not save. Please try again."
     },
     "board": {
       "cards": "{count} cards",

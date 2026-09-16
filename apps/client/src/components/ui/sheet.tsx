@@ -103,6 +103,9 @@ export function Sheet({
   const [phase, setPhase] = useState<Phase>('entering');
   const presentRef = useRef(present);
   presentRef.current = present;
+  /** 出したいか（`open`）。state の phase より 1 拍早い。容器の大きさが変わったときの判断に使う。 */
+  const openRef = useRef(open);
+  openRef.current = open;
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   /**
    * スクロール容器の要素（state）。席（殻のドックの層）が後から用意されると、シートは同じ部品のまま**別の要素に
@@ -297,17 +300,20 @@ export function Sheet({
     };
     scroller.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-    // 容器の大きさが変わった（キーボード・回転・描いた直後の配置）ら、止まっていた段へ置き直し、見えている高さを
-    // 知らせ直す。段の位置は容器の高さで変わるので、置き直さないとブラウザの吸着が近い別の段へ寄せてしまう
-    // （全画面の先を読み進めている間は動かさない）。
+    // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
+    // 置き直す。段の位置は容器の高さで決まるので、スクロール位置をそのまま残すと、同じ位置が別の段の位置に
+    // なってしまう（キーボードが閉じた瞬間に、全画面が中くらいに・少し小さい段が全画面に化けた。実機レビュー）。
+    // 消している最中（`open` が false）は触らない。全画面の先を読み進めている間も動かさない。
     const observer =
       typeof ResizeObserver === 'undefined'
         ? null
         : new ResizeObserver(() => {
-            const settled = settledRef.current;
-            const readingOn = settled === 'full' && scroller.scrollTop >= targetOf('full') - 1;
-            if (latest.current.phase === 'open' && settled && !readingOn) {
-              scrollToDetent(settled, 'instant');
+            const wanted = latest.current.detent;
+            const readingOn =
+              settledRef.current === 'full' && scroller.scrollTop >= targetOf('full') - 1;
+            if (openRef.current && latest.current.phase !== 'closing' && !readingOn) {
+              settledRef.current = wanted;
+              scrollToDetent(wanted, 'instant');
             }
             onScroll();
           });

@@ -167,7 +167,6 @@
       "creating": "만드는 중…",
       "create_failed": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
       "back_to_list": "기존 질문에서 고르기",
-      "search_placeholder": "질문 찾기",
       "untitled": "제목 없는 질문",
       "close": "닫기",
       "limit": "질문은 {max}개까지입니다. 질문 목록에서 하나를 보관하면 새로 세울 수 있습니다.",
@@ -844,7 +843,8 @@
       "archived_section": "보관한 질문 ({count})",
       "unarchive": "되돌리기",
       "unarchive_limit": "질문은 {max}개까지입니다. 하나를 보관하면 되돌릴 수 있습니다.",
-      "archive": "보관"
+      "archive": "보관",
+      "save_failed": "저장하지 못했습니다. 다시 시도해 주세요."
     },
     "board": {
       "cards": "{count}장",

@@ -167,7 +167,6 @@
       "creating": "创建中…",
       "create_failed": "未能创建问题，请再试一次。",
       "back_to_list": "从已有问题中选择",
-      "search_placeholder": "查找问题",
       "untitled": "无标题提问",
       "close": "关闭",
       "limit": "问题最多 {max} 个。在问题列表里归档一个，就能提出新的问题。",
@@ -844,7 +843,8 @@
       "archived_section": "已归档的问题（{count}）",
       "unarchive": "恢复",
       "unarchive_limit": "问题最多 {max} 个。归档一个后就能恢复。",
-      "archive": "归档"
+      "archive": "归档",
+      "save_failed": "没能保存，请再试一次。"
     },
     "board": {
       "cards": "{count}张",

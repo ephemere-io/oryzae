@@ -58,23 +58,27 @@ export default function JarPage() {
   }, [justPickled, router]);
 
   async function handleAddQuestion(text: string) {
-    await createQuestion(text);
+    const ok = await createQuestion(text);
     await refetchQuestions();
+    return ok;
   }
 
   async function handleEditQuestion(id: string, text: string) {
-    await editQuestion(id, text);
+    const ok = await editQuestion(id, text);
     await refetchQuestions();
+    return ok;
   }
 
   async function handleArchiveQuestion(id: string) {
-    await archiveQuestion(id);
+    const ok = await archiveQuestion(id);
     await refetchQuestions();
+    return ok;
   }
 
   async function handleUnarchiveQuestion(id: string) {
-    await unarchiveQuestion(id);
+    const ok = await unarchiveQuestion(id);
     await refetchQuestions();
+    return ok;
   }
 
   // 端末で出し分け（URL は /jar のまま）。DeviceView が判定前/未対応を安全に処理。
@@ -86,7 +90,8 @@ export default function JarPage() {
             api={api}
             questions={questions}
             loading={questionsLoading}
-            onManageQuestions={() => setManageOpen(true)}
+            manageOpen={manageOpen}
+            onManageQuestions={() => setManageOpen((open) => !open)}
           />
           {manageOpen ? (
             <div className="absolute inset-0 z-40 flex flex-col bg-[var(--bg)]">

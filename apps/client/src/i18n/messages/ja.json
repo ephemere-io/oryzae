@@ -167,7 +167,6 @@
       "creating": "作成中…",
       "create_failed": "問いを作れませんでした。もう一度お試しください。",
       "back_to_list": "既存の問いから選ぶ",
-      "search_placeholder": "問いを探す",
       "untitled": "無題の問い",
       "close": "閉じる",
       "limit": "問いは {max} つまでです。問いの一覧で 1 つアーカイブすると、新しく立てられます。",
@@ -844,7 +843,8 @@
       "archived_section": "アーカイブした問い（{count}）",
       "unarchive": "戻す",
       "unarchive_limit": "問いは {max} つまでです。1 つアーカイブすると戻せます。",
-      "archive": "アーカイブ"
+      "archive": "アーカイブ",
+      "save_failed": "保存できませんでした。もう一度お試しください。"
     },
     "board": {
       "cards": "{count}枚",

@@ -25,6 +25,7 @@ interface Props {
   questions: JarQuestion[];
   loading: boolean;
   onManageQuestions: () => void;
+  manageOpen?: boolean;
 }
 
 const questions: JarQuestion[] = [
@@ -120,6 +121,20 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'manage-open',
+      description: '問いの一覧を開いている間は、パレットの「問いの一覧」が効いている色になる',
+      props: {
+        api: filledApi,
+        questions,
+        loading: false,
+        onManageQuestions: noop,
+        manageOpen: true,
+      },
+      act: async (ctx) => {
+        await ctx.wait(32);
+      },
+    },
+    {
       id: 'opened',
       probe: true,
       description: 'Probe: 円をタップすると開く（open=true・中の要素が並ぶ）',
@@ -164,6 +179,24 @@ registerUnit<Props>({
         // 下端の列（殻が無い孤立検証では画面の中に描かれる）。
         const fab = root.querySelector('button[data-palette-action="questions"]');
         return fab?.getAttribute('aria-label') === '問いの一覧' || '「問いの一覧」の入口が無い';
+      },
+    },
+    {
+      id: 'manage-shows-open-state',
+      description:
+        '一覧を開いている間だけ、パレットの「問いの一覧」が効いている色（押すと閉じる目印）',
+      onlyFixtures: ['orbit', 'manage-open'],
+      check: ({ root, contract }) => {
+        const fab = root.querySelector('button[data-palette-action="questions"]');
+        if (!(fab instanceof HTMLElement)) return '「問いの一覧」が無い';
+        const accent = getComputedStyle(document.documentElement)
+          .getPropertyValue('--accent')
+          .trim();
+        const active = fab.style.color.includes('accent') || fab.style.color === accent;
+        return (
+          active === (contract.manageOpen === 'true') ||
+          `効いている色=${active} だが manageOpen=${contract.manageOpen}`
+        );
       },
     },
     {

@@ -343,10 +343,8 @@ export function EntryListOverlay({
                 <>
                   <button
                     type="button"
-                    onClick={() => {
-                      closeActions();
-                      onSelectEntry(actionFor);
-                    }}
+                    // 開くときはシートを閉じない（閉じると一覧が一瞬見えて、そこから画面が変わる）。
+                    onClick={() => onSelectEntry(actionFor)}
                     className="min-h-[48px] rounded-xl text-[15px]"
                     style={{ color: 'var(--fg)', background: 'var(--surface-sunken)' }}
                   >

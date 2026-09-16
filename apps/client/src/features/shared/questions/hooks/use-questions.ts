@@ -40,42 +40,46 @@ export function useQuestions(api: ApiClient | null) {
 
   const createQuestion = useCallback(
     async (text: string) => {
-      if (!api || !text.trim()) return;
-      await api.fetch('/api/v1/questions', {
+      if (!api || !text.trim()) return false;
+      const res = await api.fetch('/api/v1/questions', {
         method: 'POST',
         body: JSON.stringify({ string: text }),
       });
       await fetchQuestions();
+      return res.ok;
     },
     [api, fetchQuestions],
   );
 
   const editQuestion = useCallback(
     async (id: string, text: string) => {
-      if (!api || !text.trim()) return;
-      await api.fetch(`/api/v1/questions/${id}`, {
+      if (!api || !text.trim()) return false;
+      const res = await api.fetch(`/api/v1/questions/${id}`, {
         method: 'PUT',
         body: JSON.stringify({ string: text }),
       });
       await fetchQuestions();
+      return res.ok;
     },
     [api, fetchQuestions],
   );
 
   const archiveQuestion = useCallback(
     async (id: string) => {
-      if (!api) return;
-      await api.fetch(`/api/v1/questions/${id}/archive`, { method: 'POST' });
+      if (!api) return false;
+      const res = await api.fetch(`/api/v1/questions/${id}/archive`, { method: 'POST' });
       await fetchQuestions();
+      return res.ok;
     },
     [api, fetchQuestions],
   );
 
   const unarchiveQuestion = useCallback(
     async (id: string) => {
-      if (!api) return;
-      await api.fetch(`/api/v1/questions/${id}/unarchive`, { method: 'POST' });
+      if (!api) return false;
+      const res = await api.fetch(`/api/v1/questions/${id}/unarchive`, { method: 'POST' });
       await fetchQuestions();
+      return res.ok;
     },
     [api, fetchQuestions],
   );

@@ -114,9 +114,10 @@ interface JarViewProps {
    */
   readinessTop?: number;
   readinessTotal?: number;
-  onAddQuestion?: (text: string) => Promise<void>;
-  onEditQuestion?: (id: string, text: string) => Promise<void>;
-  onArchiveQuestion?: (id: string) => Promise<void>;
+  /** 送れたかを返してもよい（PC はいまのところ見ない）。 */
+  onAddQuestion?: (text: string) => Promise<boolean | void>;
+  onEditQuestion?: (id: string, text: string) => Promise<boolean | void>;
+  onArchiveQuestion?: (id: string) => Promise<boolean | void>;
 }
 
 /**
