@@ -13,7 +13,7 @@ const FOOTER_JA =
   'ヘルプ・FAQ: https://oryzae.ephemere.io/support\n' +
   'プライバシーポリシー: https://oryzae.ephemere.io/privacy\n' +
   'お問い合わせ: oryzae@ephemere.io\n\n' +
-  '— Oryzae / Ferment Media Research';
+  '— Oryzae';
 
 const FOOTER_EN =
   '\n\n———\nThis is an automatic notification from Oryzae,\n' +
@@ -21,7 +21,7 @@ const FOOTER_EN =
   'Help & FAQ: https://oryzae.ephemere.io/support\n' +
   'Privacy: https://oryzae.ephemere.io/privacy\n' +
   'Contact: oryzae@ephemere.io\n\n' +
-  '— Oryzae / Ferment Media Research';
+  '— Oryzae';
 
 describe('SendFermentationDigestUsecase', () => {
   it('returns { sent: false, reason: "no-titles" } when there are no question titles', async () => {

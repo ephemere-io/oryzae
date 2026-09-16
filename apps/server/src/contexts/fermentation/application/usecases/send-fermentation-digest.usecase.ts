@@ -35,7 +35,7 @@ const FOOTER_JA = [
   `プライバシーポリシー: ${PRIVACY_URL}`,
   `お問い合わせ: ${CONTACT_EMAIL}`,
   '',
-  '— Oryzae / Ferment Media Research',
+  '— Oryzae',
 ].join('\n');
 
 const FOOTER_EN = [
@@ -49,7 +49,7 @@ const FOOTER_EN = [
   `Privacy: ${PRIVACY_URL}`,
   `Contact: ${CONTACT_EMAIL}`,
   '',
-  '— Oryzae / Ferment Media Research',
+  '— Oryzae',
 ].join('\n');
 
 // issue #279: ユーザー言語に合わせて subject / body を切り替える。
