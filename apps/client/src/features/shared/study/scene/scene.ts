@@ -1886,14 +1886,27 @@ function buildNote(
 
   // 行。左揃え。文字は面の向きに従う（スプライトにしない）。
   const ys = noteLineYs(lines.length, NOTE_TEXT.gap * scale);
-  lines.forEach((line, index) => {
-    const y = ys[index] ?? 0;
-    const texture = createTextTexture(line, NOTE_FONT_PX, materials.inkColor);
+  const rendered = lines.map((line) => createTextTexture(line, NOTE_FONT_PX, materials.inkColor));
+  /**
+   * いちばん長い行が紙に入る大きさに全行を揃える。和文は 11 文字で収まるが、英語の
+   * 「under your account, bottom left.」は同じ字の大きさだと紙からはみ出た（実機）。
+   * 行ごとに縮めると大きさが揃わないので、全行に同じ比をかける。
+   */
+  const available = width - NOTE_TEXT.inset * scale * 2;
+  const widest = Math.max(
+    0,
+    ...rendered.map((texture) => (texture ? noteLineWidth(texture.image, lineHeight) : 0)),
+  );
+  const fit = widest > available ? available / widest : 1;
+  const fittedLineHeight = lineHeight * fit;
+
+  rendered.forEach((texture, index) => {
     if (texture === null) return;
     textures.push(texture);
-    const lineWidth = noteLineWidth(texture.image, lineHeight);
+    const y = ys[index] ?? 0;
+    const lineWidth = noteLineWidth(texture.image, fittedLineHeight);
     const face = new Mesh(
-      own(new PlaneGeometry(lineWidth, lineHeight)),
+      own(new PlaneGeometry(lineWidth, fittedLineHeight)),
       fadeable(materials.text(texture, 0.92)),
     );
     face.position.set(-width / 2 + NOTE_TEXT.inset * scale + lineWidth / 2, y, 0.004);
