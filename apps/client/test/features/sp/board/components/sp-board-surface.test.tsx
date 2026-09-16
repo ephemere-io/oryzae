@@ -1,8 +1,8 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BoardCardData } from '@/features/shared/board/types';
-import { SpBoardSurface, toWorldDelta } from '@/features/sp/board/components/sp-board-surface';
-import { IDENTITY_VIEWPORT } from '@/lib/canvas/viewport';
+import { SpBoardSurface } from '@/features/sp/board/components/sp-board-surface';
+import type { CanvasSurface } from '@/lib/canvas/use-canvas-viewport';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 
 afterEach(cleanup);
@@ -24,38 +24,32 @@ function card(id: string, x = 0, y = 0): BoardCardData {
   };
 }
 
-describe('toWorldDelta', () => {
-  it('等倍なら指の移動量がそのまま world の移動量', () => {
-    expect(toWorldDelta(100, 1)).toBe(100);
-  });
-
-  it('縮小して表示しているぶんだけ world では大きく動く', () => {
-    // 0.5 倍で表示 → 画面 50px の移動は world では 100px。
-    // ここを割らないとカードが指から離れていく。
-    expect(toWorldDelta(50, 0.5)).toBe(100);
-  });
-
-  it('拡大表示では world の移動が小さくなる', () => {
-    expect(toWorldDelta(100, 2)).toBe(50);
-  });
-
-  it('負の方向も同じ', () => {
-    expect(toWorldDelta(-40, 0.5)).toBe(-80);
-  });
-
-  it('scale が 0 や不正でも 0 を返す（カードが飛ばない）', () => {
-    expect(toWorldDelta(100, 0)).toBe(0);
-    expect(toWorldDelta(100, -1)).toBe(0);
-    expect(toWorldDelta(100, Number.NaN)).toBe(0);
-    expect(toWorldDelta(Number.NaN, 1)).toBe(0);
-  });
-});
+/**
+ * 盤面（`useCanvasViewport`）の代わり。倍率だけを持たせて、指の移動が world に
+ * どう届くかを見る。jsdom では frame の矩形が 0 なので、画面座標をそのまま倍率で割る。
+ */
+function stubCanvas(scale = 1): CanvasSurface {
+  return {
+    viewport: { x: 0, y: 0, scale },
+    isPanning: false,
+    frameRef: () => {},
+    worldRef: { current: null },
+    toWorld: (clientX: number, clientY: number) => ({ x: clientX / scale, y: clientY / scale }),
+    centerWorld: () => ({ x: 0, y: 0 }),
+    frameSize: () => ({ width: 390, height: 560 }),
+    zoomIn: () => {},
+    zoomOut: () => {},
+    resetZoom: () => {},
+    fitTo: () => {},
+    subscribe: () => () => {},
+  };
+}
 
 describe('SpBoardSurface', () => {
   function renderSurface(overrides: Partial<React.ComponentProps<typeof SpBoardSurface>> = {}) {
     const props = {
       cards: [card('c1'), card('c2', 300, 200)],
-      viewport: IDENTITY_VIEWPORT,
+      canvas: stubCanvas(),
       onMove: vi.fn(),
       onCommit: vi.fn(),
       ...overrides,
@@ -96,6 +90,13 @@ describe('SpBoardSurface', () => {
     expect(container.querySelectorAll('[data-card-id]')).toHaveLength(0);
   });
 
+  it('カードは盤面のパンを辞退する（掴んだらカードが動く）', () => {
+    const { container } = renderSurface();
+    for (const element of container.querySelectorAll('[data-card-id]')) {
+      expect(element.hasAttribute('data-canvas-no-pan')).toBe(true);
+    }
+  });
+
   it('指の移動で新しい world 座標を通知する', () => {
     const onMove = vi.fn();
     const { container } = renderSurface({ onMove });
@@ -110,12 +111,13 @@ describe('SpBoardSurface', () => {
 
   it('縮小表示では移動量を倍率で割る', () => {
     const onMove = vi.fn();
-    const { container } = renderSurface({ onMove, viewport: { x: 0, y: 0, scale: 0.5 } });
+    const { container } = renderSurface({ onMove, canvas: stubCanvas(0.5) });
     const target = container.querySelector('[data-card-id="c1"]');
     if (!(target instanceof HTMLElement)) throw new Error('missing card');
     target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0 }));
     target.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 50, clientY: 0 }));
 
+    // 画面 50px の移動は、0.5 倍で表示している world では 100px。
     expect(onMove).toHaveBeenCalledWith('c1', 100, 0);
   });
 
@@ -180,6 +182,35 @@ describe('SpBoardSurface', () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
+  it('タップしたカードを前面へ出す（重なった下のカードを掘り出せる）', () => {
+    const onRaise = vi.fn();
+    const onSelect = vi.fn();
+    const { container } = renderSurface({ onRaise, onSelect });
+    const target = container.querySelector('[data-card-id="c1"]');
+    if (!(target instanceof HTMLElement)) throw new Error('missing card');
+
+    target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0 }));
+    target.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 0, clientY: 0 }));
+
+    expect(onSelect).toHaveBeenCalledWith('c1');
+    expect(onRaise).toHaveBeenCalledWith('c1');
+  });
+
+  it('掴んで運んだときは前面へ出さない（位置の保存だけ）', () => {
+    const onRaise = vi.fn();
+    const onCommit = vi.fn();
+    const { container } = renderSurface({ onRaise, onCommit });
+    const target = container.querySelector('[data-card-id="c1"]');
+    if (!(target instanceof HTMLElement)) throw new Error('missing card');
+
+    target.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0 }));
+    target.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 40, clientY: 40 }));
+    target.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 40, clientY: 40 }));
+
+    expect(onRaise).not.toHaveBeenCalled();
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
   it('指がキャンセルされても掴んだままにしない（勝手に選ばない）', () => {
     const onCommit = vi.fn();
     const onSelect = vi.fn();
@@ -204,6 +235,20 @@ describe('SpBoardSurface', () => {
       if (!(element instanceof HTMLElement)) continue;
       expect(element.style.touchAction).toBe('none');
     }
+  });
+
+  it('枠が広いカードほど本文の文字が大きい', () => {
+    // 盤面ごと縮めて映すので、固定サイズだと引いたときに本文だけ先に潰れる。
+    const { container } = renderSurface({
+      cards: [card('c1'), { ...card('c2', 300, 200), width: 524 }],
+    });
+    const paragraphs = [...container.querySelectorAll('[data-card-id] p')];
+    const sizes = paragraphs.map((p) =>
+      p instanceof HTMLElement ? Number.parseFloat(p.style.fontSize) : Number.NaN,
+    );
+
+    expect(sizes[0]).toBe(17);
+    expect(sizes[1]).toBe(34);
   });
 });
 

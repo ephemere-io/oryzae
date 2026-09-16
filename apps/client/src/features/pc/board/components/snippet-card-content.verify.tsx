@@ -6,8 +6,9 @@
  */
 
 import { registerUnit } from '@oryzae/verify';
+import { snippetFontSize } from '@/features/shared/board/card-text';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
-import { SnippetCardContent, snippetFontSize } from './snippet-card-content';
+import { SnippetCardContent } from './snippet-card-content';
 
 interface Props {
   content: { text: string };
@@ -80,7 +81,7 @@ registerUnit<Props>({
       id: 'font-size-follows-card-width',
       description: '文字の大きさがカードの幅に追随する（下限・上限で止まる）',
       check: ({ contract, props }) => {
-        const expected = snippetFontSize(props.cardWidth ?? 262);
+        const expected = snippetFontSize(props.cardWidth ?? 262, 14);
         return (
           contract.fontSize === String(expected) ||
           `fontSize 不一致: cardWidth=${props.cardWidth ?? 262} → 期待 ${expected}, contract=${contract.fontSize}`

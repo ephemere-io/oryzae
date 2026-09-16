@@ -1,6 +1,7 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
+import { snippetFontSize } from '@/features/shared/board/card-text';
 
 interface SnippetContent {
   text: string;
@@ -12,30 +13,15 @@ interface SnippetCardContentProps {
   cardWidth?: number;
 }
 
-/** 既定のカード幅。ここで従来どおり 14px になる。 */
+/** 既定のカード幅と、そのときの文字の大きさ。 */
 const DEFAULT_CARD_WIDTH = 262;
-const DEFAULT_FONT_SIZE = 14;
-/** 小さくしても読める下限と、1 枚が見出しにならない上限。 */
-const MIN_FONT_SIZE = 12;
-const MAX_FONT_SIZE = 40;
-
-/**
- * カードの幅から本文の文字の大きさを出す。
- *
- * **枠を広げたら文字も大きくなる。** 固定サイズだと、引いて全体を見たときに文字だけが
- * 潰れて読めず、「大きくしたのに読めないまま」になっていた（レビュー指摘）。カードを
- * 大きくするという操作が、そのまま「読みやすくする」に繋がるようにする。
- */
-export function snippetFontSize(cardWidth: number): number {
-  const scaled = (cardWidth / DEFAULT_CARD_WIDTH) * DEFAULT_FONT_SIZE;
-  return Math.round(Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, scaled)));
-}
+const BASE_FONT_SIZE = 14;
 
 export function SnippetCardContent({
   content,
   cardWidth = DEFAULT_CARD_WIDTH,
 }: SnippetCardContentProps) {
-  const fontSize = snippetFontSize(cardWidth);
+  const fontSize = snippetFontSize(cardWidth, BASE_FONT_SIZE);
 
   return (
     <div
