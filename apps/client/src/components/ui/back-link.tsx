@@ -33,10 +33,16 @@ import { useBackLink } from '@/lib/back-link-context';
  *
  * ### 見た目
  *
- * **隣に並ぶ「問いを紐づける」と同じボタン**（寸法 `HEADER_CHIP_CLASS`・面 `ELEVATED_CHIP_*`）
- * で、縁だけを深い緑（`--accent`）にする。面を持たない文字だけの版は「問いを紐づける」と
- * 並ぶと別の部品に見えた（オーナーの判断）。並びは「‹ 書斎 ＋ 書斎の絵」。絵を山形の隣に
- * 置くと記号が 2 つ続いて窮屈なので、名前の後ろに添える。絵の色も縁と同じ緑。
+ * **隣に並ぶ「問いを紐づける」と同じボタン**（寸法 `HEADER_CHIP_CLASS`・面 `ELEVATED_CHIP_*`）。
+ * 縁も同じ。面を持たない文字だけの版は「問いを紐づける」と並ぶと別の部品に見えた
+ * （オーナーの判断）。
+ *
+ * **深い緑（`--accent`）は使わない。** この案件では深い緑は「いまアクティブ」を言う色
+ * （選択中の縁・アクションパレット）なので、常に出ているものに既定で付けない。縁を緑に
+ * した版は「気持ち悪い」と言われた。
+ *
+ * 並びは「‹ 書斎 ＋ 書斎の絵」。絵を山形の隣に置くと記号が 2 つ続いて窮屈なので、名前の
+ * 後ろに添える。**絵の色は名前と同じ**（currentColor）。
  */
 export function BackLink({ placement = 'inline' }: { placement?: 'inline' | 'corner' }) {
   const target = useBackLink();
@@ -48,7 +54,7 @@ export function BackLink({ placement = 'inline' }: { placement?: 'inline' | 'cor
       aria-label={target.ariaLabel}
       {...verifyAttrs({ unit: 'BackLink', placement, hasIcon: Boolean(target.icon) })}
       className={`${HEADER_CHIP_CLASS} ${ELEVATED_CHIP_CLASS}`}
-      style={{ ...ELEVATED_CHIP_STYLE, borderColor: 'var(--accent)' }}
+      style={ELEVATED_CHIP_STYLE}
     >
       <svg
         aria-hidden="true"
@@ -72,12 +78,8 @@ export function BackLink({ placement = 'inline' }: { placement?: 'inline' | 'cor
       <span className="relative -top-px whitespace-nowrap">{target.label}</span>
       {target.icon ? (
         // 絵の枠の左右に空きがある（左 4px・右 2px）。名前に寄せ、縁までの見た目の余白を
-        // 山形の側と揃える。
-        <span
-          aria-hidden="true"
-          className="-mr-0.5 -ml-1 flex shrink-0"
-          style={{ color: 'var(--accent)' }}
-        >
+        // 山形の側と揃える。**色は名前と同じ**（currentColor を継ぐ）。
+        <span aria-hidden="true" className="-mr-0.5 -ml-1 flex shrink-0">
           {target.icon}
         </span>
       ) : null}

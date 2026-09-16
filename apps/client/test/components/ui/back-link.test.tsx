@@ -45,16 +45,18 @@ describe('BackLink', () => {
     expect(icon.parentElement?.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('縁だけ深い緑にする（面と寸法は問いのチップと同じ）', () => {
+  it('問いのチップと同じボタン（縁も同じ）で、深い緑は使わない', () => {
     const { container } = render(
-      <BackLinkProvider value={STUDY}>
+      <BackLinkProvider value={{ ...STUDY, icon: <svg data-testid="study-icon" /> }}>
         <BackLink />
       </BackLinkProvider>,
     );
     const link = within(container).getByRole('link', { name: '書斎に戻る' });
-    expect(link.style.borderColor).toBe('var(--accent)');
+    expect(link.style.borderColor).toBe('var(--surface-raised-border)');
     expect(link.className).toContain('bg-[var(--surface-raised)]');
     expect(link.className).toContain('h-9');
+    // 深い緑は「いまアクティブ」を言う色。常に出ている出口には付けない。
+    expect(link.outerHTML).not.toContain('--accent');
   });
 
   it('inline はヘッダーの流れに並ぶだけで、自分では位置を持たない', () => {
