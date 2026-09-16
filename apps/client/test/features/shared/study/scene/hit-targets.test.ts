@@ -3,7 +3,7 @@ import {
   buildHitRegistry,
   HitRegistry,
   HOVER_SCALE,
-  memoHitId,
+  NOTE_HIT_ID,
   resolveClickTarget,
 } from '@/features/shared/study/scene/hit-targets';
 import type { Notebook } from '@/features/shared/study/types';
@@ -125,41 +125,38 @@ describe('buildHitRegistry', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  describe('壁のメモ', () => {
-    const MEMO = [
-      { id: 'help', text: 'ヘルプ', href: 'https://docs.example/support' },
-      { id: 'contact', text: 'お問い合わせ', href: 'https://docs.example/support#contact' },
-      { id: 'docs', text: 'Docs', href: 'https://docs.example/' },
-    ] as const;
-    const withMemo = buildHitRegistry({
+  describe('卓上のメモ', () => {
+    const withNote = buildHitRegistry({
       desk: DESK,
       shelf: SHELF,
       shelfAsSingleTarget: false,
-      memo: MEMO,
+      note: true,
     });
 
-    it('1 行ずつが的になり、それぞれ自分の URL へ出る', () => {
-      for (const line of MEMO) {
-        const entry = withMemo.get(memoHitId(line.id));
-        expect(entry?.target).toEqual({ kind: 'external', href: line.href });
-      }
+    it('紙ごと 1 つの的で、押すとはがれる（行き先は無い）', () => {
+      expect(withNote.get(NOTE_HIT_ID)?.target).toEqual({ kind: 'note' });
     });
 
-    it('ラベルは持たず（紙に名前が書いてある）、一言で中身を言う', () => {
-      expect(withMemo.get('memo-help')?.label).toBeNull();
-      expect(withMemo.get('memo-help')?.hint).toBe('memo-help');
-      expect(withMemo.get('memo-contact')?.hint).toBe('memo-contact');
-      expect(withMemo.get('memo-docs')?.hint).toBe('memo-docs');
+    it('ラベルは持たず（文面が紙に書いてある）、一言は「はがす」', () => {
+      expect(withNote.get(NOTE_HIT_ID)?.label).toBeNull();
+      expect(withNote.get(NOTE_HIT_ID)?.hint).toBe('note');
     });
 
-    it('メモを渡さない構図では的も無い', () => {
-      expect(pc.get('memo-help')).toBeNull();
+    it('置いていない（はがした）ときは的も無い', () => {
+      expect(pc.get(NOTE_HIT_ID)).toBeNull();
+      const dismissed = buildHitRegistry({
+        desk: DESK,
+        shelf: SHELF,
+        shelfAsSingleTarget: false,
+        note: false,
+      });
+      expect(dismissed.get(NOTE_HIT_ID)).toBeNull();
     });
 
     it('他の的と id が重ならない', () => {
-      const ids = withMemo.ids();
+      const ids = withNote.ids();
       expect(new Set(ids).size).toBe(ids.length);
-      expect(ids).toHaveLength(pc.ids().length + MEMO.length);
+      expect(ids).toHaveLength(pc.ids().length + 1);
     });
   });
 });

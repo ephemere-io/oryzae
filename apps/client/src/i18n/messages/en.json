@@ -858,11 +858,9 @@
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
     "hint_board_both": "{photos} photos · {snippets} snippets",
-    "memo_help": "Help",
-    "memo_contact": "Contact",
-    "memo_docs": "Docs",
-    "hint_memo_help": "How to use, and frequent questions",
-    "hint_memo_contact": "Get in touch by email",
-    "hint_memo_docs": "The idea behind Oryzae and how fermentation works"
+    "note_line_1": "Welcome to your study.",
+    "note_line_2": "Help and contact are",
+    "note_line_3": "under your account, bottom left.",
+    "hint_note": "Remove this note"
   }
 }

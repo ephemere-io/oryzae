@@ -9,7 +9,6 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
-import { docsHref } from '@/lib/docs-site';
 import { useTheme } from '@/lib/theme-context';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
@@ -17,7 +16,7 @@ import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
-import type { MemoLine } from '../scene/memo';
+import { readStudyNoteDismissed, saveStudyNoteDismissed } from '../note';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -52,17 +51,18 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
 
   /**
-   * 壁のメモの行。紙は名前しか書かず（ヘルプ・お問い合わせ・Docs）、何ができるかは
-   * 触れたときの一言（`hints.ts`）が言う。行き先はどれも公開サイト（別ドメイン）で、
-   * お問い合わせは `/support` の中の節、Docs は LP そのもの。
+   * 卓上のメモ。初めて来た人の机に 1 枚だけ置いてあり、「使い方とお問い合わせは左下の
+   * アカウントから」と書いてある。はがしたら（この端末では）二度と置かない。
+   *
+   * 初回描画では「置いてある」で始める。localStorage は effect でしか読めず、SSR と
+   * 最初の描画は同じ絵でなければならない。scene は effect の中で組まれるので、その時点
+   * では読み終えている。
    */
-  const memo = useMemo<MemoLine[]>(
-    () => [
-      { id: 'help', text: t('memo_help'), href: docsHref('/support') },
-      { id: 'contact', text: t('memo_contact'), href: docsHref('/support#contact') },
-      { id: 'docs', text: t('memo_docs'), href: docsHref('/') },
-    ],
-    [t],
+  const [noteDismissed, setNoteDismissed] = useState(false);
+  useEffect(() => setNoteDismissed(readStudyNoteDismissed()), []);
+  const note = useMemo<string[]>(
+    () => (noteDismissed ? [] : [t('note_line_1'), t('note_line_2'), t('note_line_3')]),
+    [noteDismissed, t],
   );
 
   // 一覧オーバーレイは書斎の中で開く（URL は変わらない）。
@@ -176,9 +176,10 @@ export function StudyHome({ layout }: StudyHomeProps) {
     setOverlay(overlayScope(target));
   }, []);
 
-  /** 部屋の外（公開サイト）へ。書斎を閉じずに新しいタブで開く。 */
-  const handleOpenExternal = useCallback((href: string) => {
-    window.open(href, '_blank', 'noopener,noreferrer');
+  /** メモをはがした。憶えておき、次に来たときは置かない。 */
+  const handleDismissNote = useCallback(() => {
+    saveStudyNoteDismissed();
+    setNoteDismissed(true);
   }, []);
 
   const handleSelectEntry = useCallback(
@@ -247,10 +248,10 @@ export function StudyHome({ layout }: StudyHomeProps) {
           state={state}
           layout={layout}
           theme={theme}
-          memo={memo}
+          note={note}
           onNavigate={handleNavigate}
           onOpenOverlay={handleOpenOverlay}
-          onOpenExternal={handleOpenExternal}
+          onDismissNote={handleDismissNote}
           onLabelPositions={setLabelPositions}
           onHoverChange={(hovered) => {
             setHoveredLabel(hovered?.label ?? null);

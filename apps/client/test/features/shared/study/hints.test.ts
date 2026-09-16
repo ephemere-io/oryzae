@@ -80,10 +80,8 @@ describe('studyHint（板）', () => {
   });
 });
 
-describe('studyHint（壁のメモ）', () => {
-  it('行ごとに、そこで何ができるかを言う（紙は名前しか書いていない）', () => {
-    expect(studyHint('memo-help', BASE)).toEqual({ textKey: 'hint_memo_help' });
-    expect(studyHint('memo-contact', BASE)).toEqual({ textKey: 'hint_memo_contact' });
-    expect(studyHint('memo-docs', BASE)).toEqual({ textKey: 'hint_memo_docs' });
+describe('studyHint（卓上のメモ）', () => {
+  it('押すと何が起きるか（はがす）だけを言う。文面は紙に書いてある', () => {
+    expect(studyHint('note', BASE)).toEqual({ textKey: 'hint_note' });
   });
 });

@@ -25,24 +25,26 @@ export function targetHref(target: StudyTarget): string | null {
       return '/entries/new';
     case 'board':
       return '/board';
-    case 'external':
-      return target.href;
     case 'journal-month':
     case 'archive':
+    case 'note':
       return null;
   }
 }
 
-/** 部屋の外（別ドメイン）へ出る対象か。カメラは動かさず、新しいタブで開く。 */
-export function leavesForOutside(
-  target: StudyTarget,
-): target is { kind: 'external'; href: string } {
-  return target.kind === 'external';
+/**
+ * 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。
+ *
+ * 卓上のメモも URL を変えないが、一覧は開かない（押すとはがれるだけ）。
+ * `targetHref === null` で判定すると、メモを押したときに一覧が開いてしまう。
+ */
+export function staysInStudy(target: StudyTarget): boolean {
+  return target.kind === 'journal-month' || target.kind === 'archive';
 }
 
-/** 書斎の中で完結する対象か（＝カメラは動くが URL は変わらない）。 */
-export function staysInStudy(target: StudyTarget): boolean {
-  return targetHref(target) === null;
+/** 卓上のメモか。押すとはがれるだけで、画面もカメラも動かさない。 */
+export function isNote(target: StudyTarget): target is { kind: 'note' } {
+  return target.kind === 'note';
 }
 
 /**
