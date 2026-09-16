@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { hiddenBottomHeight } from '@/features/shared/auth/entrance/viewport';
 
 /**
  * その端末・そのブラウザが返すビューポートの値を並べて見せる（プレビュー限定）。
  *
- * 下のツールバーを**重ねて描く**ブラウザでは、`100svh` も `env(safe-area-inset-bottom)` も
- * 隠れている高さを教えてくれない（`features/shared/auth/entrance/viewport.ts` の注釈）。
- * どの値なら分かるのかは端末で実際に測るしかないので、実機で開いて読むための画面。
+ * ブラウザによって、`100svh` が実際の表示領域より大きいことがある（実機の Dia では
+ * `100svh = 793` に対して `innerHeight = 100dvh = 717`）。どの値が当てになるのかは
+ * 端末で実際に測るしかないので、実機で開いて読むための画面。
  *
  * 画面のいちばん下に帯を敷いてある。**帯が全部見えていれば**、このブラウザは
  * 見えている領域を正しく教えている。
@@ -29,8 +28,8 @@ export function ViewportReadout() {
         ['100svh', `${probe('100svh')}`],
         ['100dvh', `${probe('100dvh')}`],
         ['100lvh', `${probe('100lvh')}`],
+        ['min(100svh, 100dvh)（認証画面が使う）', `${probe('min(100svh, 100dvh)')}`],
         ['env(safe-area-inset-bottom)', `${probe('env(safe-area-inset-bottom)')}`],
-        ['下に隠れている高さ（実測）', `${hiddenBottomHeight()}`],
         ['scrollHeight', `${document.documentElement.scrollHeight}`],
         ['devicePixelRatio', `${window.devicePixelRatio}`],
       ]);
@@ -47,7 +46,7 @@ export function ViewportReadout() {
   }, []);
 
   return (
-    <div className="min-h-[100svh] bg-[#f9f8f4] p-5 text-[13px] text-[#2d2d2d]">
+    <div className="min-h-[min(100svh,100dvh)] bg-[#f9f8f4] p-5 text-[13px] text-[#2d2d2d]">
       <h1 className="mb-3 text-[15px] font-medium">ビューポートの実測</h1>
       <table className="w-full border-collapse">
         <tbody>
