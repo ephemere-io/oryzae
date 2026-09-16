@@ -1,81 +1,73 @@
+'use client';
+
 /**
- * 画面の下に**重なっている**ブラウザのツールバーぶんを見積もる。
+ * **見えていない下端**（ブラウザのツールバーが重なっているぶん）を実測する。
  *
- * ### なぜ CSS だけで避けられないか
+ * ### なぜ CSS だけでは足りないか
  *
- * Safari は下のツールバーぶんを差し引いた高さを `100svh` として教えてくれる。ところが
- * アプリ内ブラウザ（Dia など）は、Web ビューを**画面いっぱいに置いたうえでツールバーを
- * その上に重ねて**描く。`svh` も `dvh` も `env(safe-area-inset-bottom)` も画面の高さのままで、
- * ページからは「下の数十 px が隠れている」ことが分からない。実機の Dia で、紙の下端
- * （「サインアップ」の行）がツールバーに隠れた（実機レビュー 2026-09-17）。
+ * 下のツールバーを持つブラウザは 2 通りある。
  *
- * ### どう見分けるか
+ * 1. 自分でよけるもの（Safari など）: ツールバーぶんを引いた高さを `100svh` で教えてくれる
+ * 2. 重ねて描くもの（アプリ内ブラウザ。実機の Dia で確認）: Web ビューを画面いっぱいに置き、
+ *    ツールバーをその上に重ねる。**`100svh` を無視して常に大きい方の高さ**を返すブラウザが
+ *    あり（iOS の Firefox・Brave・DuckDuckGo などで知られた挙動）、
+ *    `env(safe-area-inset-bottom)` にもツールバーは現れない
  *
- * **ビューポートが画面ぴったりを覆っているか**を見る。ふつうのブラウザは自分のツールバーを
- * よけた高さを持つので、画面より小さい。ホーム画面に追加した PWA（`standalone`）と、
- * マウスの環境は対象外。
+ * 2 で頼れるのは `visualViewport`（いま実際に見えている領域）だけ。レイアウトの高さ
+ * （`window.innerHeight`）との差が、**下に隠れている高さ**そのものになる。
  *
- * 高さはブラウザが教えてくれないので、画面の高さに対する割合で見積もる。実測（iPhone 15 Pro・
- * Dia）で 852pt のうち 76pt = 8.9% だったので、少し余裕を持たせた割合を使う。
+ * **値を決め打ちしない。** ブラウザが何も教えてくれない環境では 0 になり、画面は
+ * 今までどおりに出る（隠れる可能性は残るが、当てずっぽうの余白を全員に配るよりよい）。
  */
 
-/** 見分けに使う、そのときの画面の状態。 */
-export interface ViewportSnapshot {
-  innerWidth: number;
-  innerHeight: number;
-  screenWidth: number;
-  screenHeight: number;
-  /** 指で触る環境か（`pointer: coarse`）。 */
-  coarsePointer: boolean;
-  /** ホーム画面から開いた PWA か（`display-mode: standalone`）。 */
-  standalone: boolean;
+/**
+ * いま下に隠れている高さ（px）。重なりが無ければ 0。
+ *
+ * `visualViewport.offsetTop` を足すのは、拡大などで表示領域が上へずれているとき、
+ * 下に隠れる量がその分だけ増えるため。
+ */
+export function hiddenBottomHeight(): number {
+  if (typeof window === 'undefined') return 0;
+  const viewport = window.visualViewport;
+  if (!viewport) return 0;
+  const hidden = window.innerHeight - (viewport.height + viewport.offsetTop);
+  // 1px 以下は丸め誤差。
+  return hidden > 1 ? Math.round(hidden) : 0;
 }
 
 /**
- * ビューポートが画面を覆っているとみなす許容（px）。
- * ぴったり一致しない端末（1px の丸め・細い枠）を取りこぼさないための幅。
- */
-const COVERS_SCREEN_SLACK = 8;
-
-/**
- * 重なっているツールバーの高さの見積もり（画面の高さに対する割合）。
+ * 隠れている高さを見張る。返り値を呼ぶと止まる。
  *
- * 実測 8.9%（iPhone 15 Pro の Dia）に余裕を足したもの。**これ以上大きくしない** —
- * ツールバーが無い環境まで下が間延びする。
+ * **キーボードが出ている間は更新しない。** キーボードも `visualViewport` を縮めるので、
+ * そのまま追うと紙がキーボードの上へ跳ね上がり、ブラウザ自身のスクロールと二重に動く。
+ * 入力欄から離れたときの値で足りる。
  */
-const OVERLAY_TOOLBAR_RATIO = 0.11;
+export function watchHiddenBottomHeight(onChange: (height: number) => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const viewport = window.visualViewport;
 
-/**
- * 下に重なっているツールバーぶんの高さ（px）。重なっていなければ 0。
- *
- * 呼ぶのは**開いたときの 1 回だけ**にすること。スクロールでツールバーが畳まれるたびに
- * 測り直すと、紙が上下に跳ねる。
- */
-export function overlayToolbarInset(snapshot: ViewportSnapshot): number {
-  if (!snapshot.coarsePointer || snapshot.standalone) return 0;
-  if (snapshot.screenHeight <= 0 || snapshot.innerHeight <= 0) return 0;
+  const report = () => {
+    if (isEditing()) return;
+    onChange(hiddenBottomHeight());
+  };
 
-  // 縦と横で、画面のどちらの辺が「高さ」かが変わる（iOS の screen は回しても入れ替わらない）。
-  const portrait = snapshot.innerHeight >= snapshot.innerWidth;
-  const screenSide = portrait
-    ? Math.max(snapshot.screenHeight, snapshot.screenWidth)
-    : Math.min(snapshot.screenHeight, snapshot.screenWidth);
-
-  // 画面より小さい＝ブラウザが自分でツールバーをよけている（Safari など）。何もしない。
-  if (snapshot.innerHeight < screenSide - COVERS_SCREEN_SLACK) return 0;
-
-  return Math.round(snapshot.innerHeight * OVERLAY_TOOLBAR_RATIO);
+  report();
+  viewport?.addEventListener('resize', report);
+  viewport?.addEventListener('scroll', report);
+  window.addEventListener('orientationchange', report);
+  return () => {
+    viewport?.removeEventListener('resize', report);
+    viewport?.removeEventListener('scroll', report);
+    window.removeEventListener('orientationchange', report);
+  };
 }
 
-/** いまの画面から見積もる。ブラウザの外（SSR・テスト）では 0。 */
-export function measureOverlayToolbarInset(): number {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 0;
-  return overlayToolbarInset({
-    innerWidth: window.innerWidth,
-    innerHeight: window.innerHeight,
-    screenWidth: window.screen?.width ?? 0,
-    screenHeight: window.screen?.height ?? 0,
-    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
-    standalone: window.matchMedia('(display-mode: standalone)').matches,
-  });
+/** いま文字を入力しているか（キーボードが出ている可能性がある）。 */
+function isEditing(): boolean {
+  const active = document.activeElement;
+  return (
+    active instanceof HTMLInputElement ||
+    active instanceof HTMLTextAreaElement ||
+    (active instanceof HTMLElement && active.isContentEditable)
+  );
 }

@@ -14,7 +14,7 @@ import type { EntranceLayout } from '../entrance/layout';
 import { PAPER_FONT, PAPER_SHADOW, PAPER_STYLE } from '../entrance/paper';
 import { isPassage } from '../entrance/passage';
 import type { EntranceSceneHandle } from '../entrance/scene';
-import { measureOverlayToolbarInset } from '../entrance/viewport';
+import { watchHiddenBottomHeight } from '../entrance/viewport';
 import type { EntranceControls } from '../types';
 
 /**
@@ -67,18 +67,17 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   const [leaving, setLeaving] = useState<EnterPlan | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   /**
-   * 画面の下に**重なっている**ブラウザのツールバーぶん（px）。`viewport.ts` の注釈を参照。
-   *
-   * 開いたときに 1 回だけ測る。スクロールのたびに測り直すと、ツールバーが畳まれる
-   * たびに紙が跳ねる。
+   * いま下に隠れている高さ（px）。ブラウザのツールバーが画面に重なっているぶん
+   * （`viewport.ts` の注釈）。重なりが無ければ 0。
    */
-  const [toolbarInset, setToolbarInset] = useState(0);
+  const [hiddenBottom, setHiddenBottom] = useState(0);
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    setToolbarInset(measureOverlayToolbarInset());
   }, []);
+
+  useEffect(() => watchHiddenBottomHeight(setHiddenBottom), []);
 
   /**
    * SP で扉を見せる窓（紙の上の余白）。**高さを測って扉の構図に渡す。**
@@ -216,8 +215,10 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             <div
               className="relative z-10 px-3"
               style={{
-                // 下の余白は **12px / 端末の安全域 / 重なっているツールバー** のいちばん大きいもの。
-                paddingBottom: `max(12px, env(safe-area-inset-bottom), ${toolbarInset}px)`,
+                // 下の余白 = **紙の余白（12px か端末の安全域）＋ 下に隠れている高さ**。
+                // 隠れているぶんと「どちらか大きい方」にすると、紙が隠れの縁にぴったり接して
+                // 余白が無くなる。隠れているぶんはあくまで下駄として足す。
+                paddingBottom: `calc(max(12px, env(safe-area-inset-bottom)) + ${hiddenBottom}px)`,
                 transform: leaving === null ? 'translateY(0)' : 'translateY(calc(100% + 24px))',
                 transition: `transform ${PAPER_RETREAT_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
               }}
