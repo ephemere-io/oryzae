@@ -2,23 +2,24 @@
  * SpBoardSurface の検証スペック。
  *
  * 受け入れ基準（40-acceptance.md「SP のタッチ提示」）が具体的なので、そこを機械的に見る:
- * 右ペインが無い / 日付とカード枚数だけが隅にある / つかんでいる間は最前面へ。
+ * 右ペインが無い / カード枚数だけが隅にある / つかんでいる間は最前面へ。
+ *
+ * 盤面のパン・ピンチは `useCanvasViewport`（PC のボードと同じ）が持つので、ここでは
+ * hook を実際に張った容れ物で描く。ネットワークもデータ取得も無い純粋な部品のまま。
  */
 
 import { registerUnit } from '@oryzae/verify';
+import { snippetFontSize } from '@/features/shared/board/card-text';
 import type { BoardCardData } from '@/features/shared/board/types';
-import { IDENTITY_VIEWPORT, type Viewport } from '@/lib/canvas/viewport';
+import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpBoardSurface } from './sp-board-surface';
 
 interface Props {
   cards: BoardCardData[];
-  dateKey: string;
-  viewport: Viewport;
-  onMove: (cardId: string, x: number, y: number) => void;
-  onCommit: () => void;
   selectedId?: string | null;
   onSelect?: (cardId: string | null) => void;
+  onRaise?: (cardId: string) => void;
   onTransform?: (cardId: string, next: { rotation: number; width: number; height: number }) => void;
 }
 
@@ -45,43 +46,40 @@ const CARDS: BoardCardData[] = [
   { ...snippet('c3', 60, 420, ''), zIndex: 2 },
 ];
 
-const NOOP = { onMove: () => {}, onCommit: () => {} };
+const WIDE: BoardCardData[] = [
+  { ...snippet('wide', 40, 60, '枠を広げたカード。文字も大きくなる。'), width: 524, height: 240 },
+];
+
+/** 盤面（パン・ズーム）を張ってから部品を描く容れ物。 */
+function SurfaceWithCanvas(props: Props) {
+  const canvas = useCanvasViewport();
+  return <SpBoardSurface {...props} canvas={canvas} onMove={() => {}} onCommit={() => {}} />;
+}
 
 registerUnit<Props>({
   id: 'SpBoardSurface',
   title: 'SpBoardSurface',
-  description: 'SP のボード（右ペイン無し・指でカードを動かす）',
+  description: 'SP のボード（右ペイン無し・指でカードを動かす・2 本指で寄り引き）',
   kind: 'component',
   // 盤面は h-full で親に従うので、器の大きさを決めないと live mount が潰れて何も見えない。
   // iPhone の縦画面（390×560 ≒ 上下の余白を除いた分）を器にする。
   render: (props) =>
     withVerifyProviders(
       <div style={{ width: '390px', height: '560px', position: 'relative' }}>
-        <SpBoardSurface {...props} />
+        <SurfaceWithCanvas {...props} />
       </div>,
     ),
   fixtures: [
     {
       id: 'cards',
       description: 'カードが3枚',
-      props: { cards: CARDS, dateKey: '2026-09-04', viewport: IDENTITY_VIEWPORT, ...NOOP },
-    },
-    {
-      id: 'fitted',
-      probe: true,
-      description: 'Probe: 縮小して盤面全体を収めた状態',
-      props: {
-        cards: CARDS,
-        dateKey: '2026-09-04',
-        viewport: { x: 12, y: 20, scale: 0.55 },
-        ...NOOP,
-      },
+      props: { cards: CARDS },
     },
     {
       id: 'empty',
       probe: true,
-      description: 'Probe: カードが無い日は空の盤面ではなく文言を出す',
-      props: { cards: [], dateKey: '2026-09-04', viewport: IDENTITY_VIEWPORT, ...NOOP },
+      description: 'Probe: カードが無いときは空の盤面ではなく文言を出す',
+      props: { cards: [] },
     },
     {
       id: 'selected',
@@ -89,27 +87,16 @@ registerUnit<Props>({
       description: 'Probe: 選んだカードには枠と、角のつまみが出る',
       props: {
         cards: CARDS,
-        dateKey: '2026-09-04',
-        viewport: IDENTITY_VIEWPORT,
         selectedId: CARDS[0].id,
         onSelect: () => {},
         onTransform: () => {},
-        ...NOOP,
       },
     },
     {
-      id: 'selected-scaled',
+      id: 'wide-card',
       probe: true,
-      description: 'Probe: 縮小してもつまみは指で掴める大きさのまま（逆スケール）',
-      props: {
-        cards: CARDS,
-        dateKey: '2026-09-04',
-        viewport: { x: 12, y: 20, scale: 0.4 },
-        selectedId: CARDS[0].id,
-        onSelect: () => {},
-        onTransform: () => {},
-        ...NOOP,
-      },
+      description: 'Probe: 枠を広げたカードは本文の文字も大きい（引いても読める）',
+      props: { cards: WIDE },
     },
   ],
   invariants: [
@@ -124,15 +111,15 @@ registerUnit<Props>({
     },
     {
       id: 'handle-keeps-finger-size',
-      description: 'つまみは盤面の倍率によらず、画面上で同じ大きさになる',
-      onlyFixtures: ['selected', 'selected-scaled'],
-      check: ({ root, props }) => {
+      description: 'つまみの大きさは盤面の倍率で割り戻してある（指に対して一定に保つ）',
+      onlyFixtures: ['selected'],
+      check: ({ root }) => {
         const handle = root.querySelector('[data-testid="sp-board-handle"]');
         if (!(handle instanceof HTMLElement)) return 'つまみが無い';
-        // world 上の寸法 × 倍率 ＝ 画面上の寸法。逆スケールしていれば一定になる。
-        const onScreen = Number.parseFloat(handle.style.width) * props.viewport.scale;
+        // world に置いた要素なので、CSS 側で `--vp-scale` で割らないと倍率ごと拡縮される。
         return (
-          Math.abs(onScreen - 28) < 0.5 || `画面上のつまみが ${onScreen.toFixed(1)}px（期待: 28px）`
+          handle.style.width.includes('--vp-scale') ||
+          `つまみの幅が倍率に追随していない: ${handle.style.width}`
         );
       },
     },
@@ -151,34 +138,63 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'corner-shows-date-and-count',
-      description: '隅に日付とカード枚数が出る',
-      check: ({ root, props, contract }) => {
-        const text = root.textContent ?? '';
-        const [, month, day] = props.dateKey.split('-');
-        if (!text.includes(`${month}.${day}`)) return '日付が出ていない';
-        return text.includes(contract.cardCount ?? '') || '枚数が出ていない';
-      },
-    },
-    {
-      id: 'cards-are-touch-draggable',
-      description: 'カードが touch-action: none を持つ（指の操作が移動に使われる）',
-      check: ({ root }) => {
-        for (const card of root.querySelectorAll('[data-card-id]')) {
-          if (!(card instanceof HTMLElement)) continue;
-          if (card.style.touchAction !== 'none') {
-            return `touch-action が ${card.style.touchAction || '未設定'}`;
+      id: 'snippet-font-follows-card-width',
+      description: '本文の文字の大きさがカードの幅に追随する（枠を広げたら読みやすくなる）',
+      check: ({ root, props }) => {
+        for (const card of props.cards) {
+          if (card.cardType !== 'snippet') continue;
+          const paragraph = root.querySelector(`[data-card-id="${card.id}"] p`);
+          if (!(paragraph instanceof HTMLElement)) continue;
+          const expected = `${snippetFontSize(card.width, 17)}px`;
+          if (paragraph.style.fontSize !== expected) {
+            return `幅 ${card.width} の本文が ${paragraph.style.fontSize}（期待: ${expected}）`;
           }
         }
         return true;
       },
     },
     {
-      id: 'empty-day-has-message',
+      id: 'corner-shows-count',
+      description: '隅にカード枚数が出る',
+      check: ({ root, contract }) => {
+        const text = root.textContent ?? '';
+        return text.includes(contract.cardCount ?? '') || '枚数が出ていない';
+      },
+    },
+    {
+      id: 'cards-take-the-finger',
+      description: 'カードは指の操作を受け、盤面のパンを辞退する（掴んだらカードが動く）',
+      check: ({ root }) => {
+        for (const card of root.querySelectorAll('[data-card-id]')) {
+          if (!(card instanceof HTMLElement)) continue;
+          if (card.style.touchAction !== 'none') {
+            return `touch-action が ${card.style.touchAction || '未設定'}`;
+          }
+          if (!card.hasAttribute('data-canvas-no-pan')) {
+            return 'カードが data-canvas-no-pan を持たない（掴むと盤面が動く）';
+          }
+        }
+        return true;
+      },
+    },
+    {
+      id: 'board-owns-the-pinch',
+      description: '盤面が touch-action: none を持つ（ピンチをブラウザに奪われない）',
+      check: ({ root }) => {
+        const frame = root.querySelector('[role="application"]');
+        if (!(frame instanceof HTMLElement)) return '盤面（role=application）が無い';
+        return (
+          frame.style.touchAction === 'none' ||
+          `盤面の touch-action が ${frame.style.touchAction || '未設定'}`
+        );
+      },
+    },
+    {
+      id: 'empty-board-has-message',
       description: 'カードが 0 枚なら文言を出す',
       check: ({ root, contract }) => {
         if (contract.cardCount !== '0') return true;
-        return Boolean(root.querySelector('p')) || '空の日に文言が出ていない';
+        return Boolean(root.querySelector('p')) || '空のボードに文言が出ていない';
       },
     },
     {

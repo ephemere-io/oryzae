@@ -46,15 +46,16 @@ function deletePath(cardId: string, cardType: string, refId: string): string {
   return `/api/v1/board/cards/${cardId}`;
 }
 
-export function useBoard(
-  api: ApiClient | null,
-  dateKey: string,
-  viewType: 'daily' | 'weekly' = 'daily',
-) {
+/**
+ * ボード（1 人に 1 枚のコルクボード）の取得と操作。
+ *
+ * 日付も表示単位（日次/週次）も持たない。いつ貼ったものでも、貼ってあるものは全部出る。
+ */
+export function useBoard(api: ApiClient | null) {
   const [cards, setCards] = useState<BoardCardData[]>([]);
   const [loading, setLoading] = useState(true);
   // 取得失敗を surface する（use-entries と同じ形）。これが無いと失敗が「空の盤面」に
-  // なり、利用者には「この日は何も無い」と区別がつかない。
+  // なり、利用者には「まだ何も貼っていない」と区別がつかない。
   const [error, setError] = useState(false);
   const postSnippet = useCreateSnippet(api);
   const requestIdRef = useRef(0);
@@ -73,14 +74,8 @@ export function useBoard(
       const requestId = ++requestIdRef.current;
       if (!options?.silent) setLoading(true);
       setError(false);
-      // ローカル暦日で「その日」を判定させるためオフセットを送る。これが無いとサーバーは
-      // dateKey を UTC の 00:00〜24:00 とみなし、JST 00:00〜09:00 に書いたエントリが
-      // 当日のボードに出ない（Issue: ボードの日付境界）。
-      const tzOffset = new Date().getTimezoneOffset();
       try {
-        const res = await api.fetch(
-          `/api/v1/board?dateKey=${dateKey}&viewType=${viewType}&tzOffset=${tzOffset}`,
-        );
+        const res = await api.fetch('/api/v1/board');
         if (requestId !== requestIdRef.current) return;
         if (res.ok) {
           const data: unknown = await res.json();
@@ -99,7 +94,7 @@ export function useBoard(
         if (requestId === requestIdRef.current && !options?.silent) setLoading(false);
       }
     },
-    [api, dateKey, viewType],
+    [api],
   );
 
   useEffect(() => {
@@ -108,11 +103,11 @@ export function useBoard(
 
   const createSnippet = useCallback(
     async (text: string, placement?: CardPlacement) => {
-      if (await postSnippet({ text, dateKey, viewType, ...placement })) {
+      if (await postSnippet({ text, ...placement })) {
         await fetchBoard({ silent: true });
       }
     },
-    [postSnippet, dateKey, viewType, fetchBoard],
+    [postSnippet, fetchBoard],
   );
 
   const updateSnippet = useCallback(
@@ -174,8 +169,6 @@ export function useBoard(
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caption', caption);
-      formData.append('dateKey', dateKey);
-      formData.append('viewType', viewType);
       if (imageWidth && imageHeight) {
         formData.append('imageWidth', String(imageWidth));
         formData.append('imageHeight', String(imageHeight));
@@ -196,7 +189,7 @@ export function useBoard(
       }
       await fetchBoard({ silent: true });
     },
-    [api, dateKey, viewType, fetchBoard],
+    [api, fetchBoard],
   );
 
   return {

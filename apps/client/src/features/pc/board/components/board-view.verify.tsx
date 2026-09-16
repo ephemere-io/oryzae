@@ -1,21 +1,20 @@
 /**
  * BoardView の検証スペック（A 移植・PC 版ボード合成）。
  *
- * BoardView は viewType・各ダイアログ開閉を自前 state で持ち、子（BoardDateNav /
- * BoardViewSwitch / BoardToolbar / SnippetDialog / PhotoDialog / BoardCard）を束ねる feature。
+ * BoardView は各ダイアログの開閉を自前 state で持ち、子（BoardToolbar / SnippetDialog /
+ * PhotoDialog / BoardCard）を束ねる feature。
  * データ取得は useBoard(api) / useBoardSave(api) に閉じており、いずれも api 越しの
  * fetch でしか cards を増やさない。よって「解決しない fetch を持つ ApiClient」を渡せば
  * ネットワーク0・cards は常に空のまま孤立検証できる。
  * router は useRouter を使うが withVerifyProviders の no-op mock で供給される。
  *
- * 公表する契約は実際に変化する状態のみ: viewType（右上のセグメント切り替え）と、
- * snippetOpen / photoOpen（ツールバーで開くダイアログ）。cards は seam が無く常に空なので
- * カード内容は契約に載せない。loading は never-resolve では true で固定・showLoader は
- * 250ms タイマー依存のため、どちらも契約・invariant に載せない
+ * 公表する契約は実際に変化する状態のみ: snippetOpen / photoOpen（ツールバーで開くダイアログ）。
+ * cards は seam が無く常に空なのでカード内容は契約に載せない。loading は never-resolve では
+ * true で固定・showLoader は 250ms タイマー依存のため、どちらも契約・invariant に載せない
  * （sp-entry-editor の「定数・タイマー揺れは契約に載せない」と同方針）。
  *
  * i18n（board）依存のため withVerifyProviders（NextIntlClientProvider）で包む。
- * 道具は data-verify-tool、表示単位は data-verify-view-option で一意に押せる。
+ * 道具は data-verify-tool で一意に押せる。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -37,19 +36,20 @@ const neverResolveApi: ApiClient = {
 
 const SNIPPET_BTN = '[data-verify-unit="BoardToolbar"] button[data-verify-tool="snippet"]';
 const PHOTO_BTN = '[data-verify-unit="BoardToolbar"] button[data-verify-tool="photo"]';
-const WEEKLY_BTN = '[data-verify-unit="BoardViewSwitch"] button[data-verify-view-option="weekly"]';
+/** スニペット作成の暗幕。押すと閉じる（中の form はクリックを止めている）。 */
+const SNIPPET_BACKDROP = '[data-verify-unit="SnippetDialog"][role="dialog"]';
 
 registerUnit<Props>({
   id: 'BoardView',
   title: 'BoardView',
   description:
-    'PC 版ボード合成（日付ナビ＋下部ツールバー＋カードキャンバス＋スニペット/写真ダイアログ）。',
+    'PC 版ボード合成（1 人に 1 枚のコルクボード。下部ツールバー＋カードキャンバス＋スニペット/写真ダイアログ）。',
   kind: 'feature',
   render: (props) => withVerifyProviders(<BoardView {...props} />),
   fixtures: [
     {
       id: 'default',
-      description: '初期表示（daily・ダイアログ閉・カード0枚）',
+      description: '初期表示（ダイアログ閉・カード0枚）',
       props: { api: neverResolveApi },
     },
     {
@@ -71,13 +71,15 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'weekly',
+      id: 'snippet-closed',
       probe: true,
       description:
-        'Probe: Weekly セグメントを押しても契約が viewType=weekly に追従しダイアログは閉のまま',
+        'Probe: スニペット作成を開いて暗幕で閉じると、ダイアログも道具の押下表示も残らない',
       props: { api: neverResolveApi },
       act: async (ctx) => {
-        await ctx.click(WEEKLY_BTN);
+        await ctx.click(SNIPPET_BTN);
+        await ctx.wait(16);
+        await ctx.click(SNIPPET_BACKDROP);
         await ctx.wait(16);
       },
     },
@@ -131,20 +133,11 @@ registerUnit<Props>({
         contract.percent === '100' || `初期倍率が等倍でない: percent=${contract.percent}`,
     },
     {
-      id: 'viewtype-agrees-across-children',
-      description: 'BoardView / BoardDateNav / BoardViewSwitch の viewType 契約が三者で一致する',
-      check: ({ root, contract }) => {
-        const nav = root
-          .querySelector('[data-verify-unit="BoardDateNav"]')
-          ?.getAttribute('data-verify-view-type');
-        const sw = root
-          .querySelector('[data-verify-unit="BoardViewSwitch"]')
-          ?.getAttribute('data-verify-view-type');
-        return (
-          (contract.viewType === nav && contract.viewType === sw) ||
-          `viewType 不一致: BoardView="${contract.viewType}" / BoardDateNav="${nav}" / BoardViewSwitch="${sw}"`
-        );
-      },
+      id: 'no-date-or-view-controls',
+      description: '日付ナビ・表示単位（日次/週次）の切り替えを持たない（ボードは 1 人に 1 枚）',
+      check: ({ root }) =>
+        root.querySelector('[data-verify-nav], [data-verify-view-option]') === null ||
+        '日付ナビか表示単位の切り替えが描かれている',
     },
     {
       id: 'toolbar-active-tool-matches-open-dialog',
@@ -166,24 +159,12 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'default-collapsed',
-      description: '初期表示は daily・両ダイアログ閉',
-      onlyFixtures: ['default'],
+      id: 'collapsed-when-nothing-open',
+      description: '初期表示と、開いて閉じた後は、両ダイアログ閉',
+      onlyFixtures: ['default', 'snippet-closed'],
       check: ({ contract }) =>
-        (contract.viewType === 'daily' &&
-          contract.snippetOpen === 'false' &&
-          contract.photoOpen === 'false') ||
-        `expected daily/collapsed, got viewType=${contract.viewType}, snippetOpen=${contract.snippetOpen}, photoOpen=${contract.photoOpen}`,
-    },
-    {
-      id: 'weekly-after-toggle',
-      description: 'Weekly セグメント押下後は viewType=weekly でダイアログは閉のまま',
-      onlyFixtures: ['weekly'],
-      check: ({ contract }) =>
-        (contract.viewType === 'weekly' &&
-          contract.snippetOpen === 'false' &&
-          contract.photoOpen === 'false') ||
-        `expected weekly/collapsed, got viewType=${contract.viewType}, snippetOpen=${contract.snippetOpen}, photoOpen=${contract.photoOpen}`,
+        (contract.snippetOpen === 'false' && contract.photoOpen === 'false') ||
+        `expected collapsed, got snippetOpen=${contract.snippetOpen}, photoOpen=${contract.photoOpen}`,
     },
   ],
 });

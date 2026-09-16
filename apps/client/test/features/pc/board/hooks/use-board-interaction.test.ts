@@ -274,25 +274,31 @@ describe('useBoardInteraction', () => {
     expect(result.current.selectedId).toBe('a');
   });
 
-  it('動かさずに離しただけでは前面に出さない（選択のつもりが並び順を変えない）', () => {
-    // startDrag は pointerdown の時点で type='drag' を立てる。didDrag を見ずに
-    // z を上げていたため、選ぶために1回押しただけでカードが最前面へ飛び、
-    // userPositioned まで立って自動整列からも外れていた。
+  it('押しただけでも前面に出す（重なった下のカードを掘り出せる）', () => {
+    // 以前は「実際に動かしたときだけ」前面に出していた。重なっている板では、下の
+    // カードを押しても埋もれたままで読めない（レビュー指摘）ため、押した時点で出す。
     const { result } = setup();
 
     act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    const raised = latest(onCardsChange, 'a');
+    expect(result.current.didDrag()).toBe(false);
+    // 既存の最大 z(1) より手前へ。動かしていないので位置は変わらない。
+    expect(raised?.zIndex).toBeGreaterThan(1);
+    expect(raised?.x).toBe(100);
+    expect(raised?.userPositioned).toBe(true);
+    expect(onInteractionEnd).toHaveBeenCalled();
+  });
+
+  it('既に最前面のカードを押しただけなら、並びも保存も動かさない', () => {
+    // 盤面に変化が無いのに保存要求を出すと、選ぶたびに PUT が飛ぶ。
+    const { result } = setup();
+
+    act(() => result.current.startDrag('b', 10, 10));
     act(() => result.current.onPointerUp());
 
     expect(onCardsChange).not.toHaveBeenCalled();
-    expect(result.current.didDrag()).toBe(false);
-  });
-
-  it('動かさずに離しただけでは保存要求も出さない（盤面に変化が無いため）', () => {
-    const { result } = setup();
-
-    act(() => result.current.startDrag('a', 10, 10));
-    act(() => result.current.onPointerUp());
-
     expect(onInteractionEnd).not.toHaveBeenCalled();
   });
 
@@ -304,7 +310,8 @@ describe('useBoardInteraction', () => {
     act(() => result.current.onPointerUp());
 
     expect(result.current.didDrag()).toBe(false);
-    expect(onInteractionEnd).not.toHaveBeenCalled();
+    // 前面へは出るが、位置は押したときのまま。
+    expect(latest(onCardsChange, 'a')?.x).toBe(100);
   });
 
   it('実際に動かしたら前面に出し、利用者が置いたものとして印を付ける', () => {

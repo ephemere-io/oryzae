@@ -21,33 +21,20 @@ test.describe('ボード画面', () => {
     await page.waitForSelector('[role="application"]');
   });
 
-  test('ボード画面が表示される（日付ナビ＋下部ツールバー）', async ({ page }) => {
-    await expect(page.locator('button[data-verify-view-option="daily"]')).toBeVisible();
+  test('ボード画面が表示される（下部ツールバー。日付・表示単位の切り替えは無い）', async ({
+    page,
+  }) => {
     await expect(page.locator('[role="toolbar"]')).toBeVisible();
     await expect(page.locator('button[data-verify-tool="snippet"]')).toBeVisible();
     await expect(page.locator('button[data-verify-tool="photo"]')).toBeVisible();
+    // ボードは 1 人に 1 枚のコルクボード。日付を送る・日次/週次を切り替える操作は持たない。
+    await expect(page.locator('[data-verify-unit="BoardDateNav"]')).toHaveCount(0);
+    await expect(page.locator('[data-verify-unit="BoardViewSwitch"]')).toHaveCount(0);
   });
 
   test('不要になった要素（フッター・カード数）が出ない', async ({ page }) => {
     await expect(page.locator('footer')).toHaveCount(0);
     await expect(page.getByText(/\d+ CARDS/)).toHaveCount(0);
-  });
-
-  test('日付ナビゲーションで前日/翌日に切り替えできる', async ({ page }) => {
-    // 日付は BoardDateNav が公表する契約（data-verify-date-key）で見る。
-    // 以前はクラス名（tracking-wider）で拾っていたが、見た目を変えるたびに
-    // 壊れるうえ、何を見ているのかも読み取れなかった。
-    const nav = page.locator('[data-verify-unit="BoardDateNav"]');
-    const dateKey = () => nav.getAttribute('data-verify-date-key');
-    const initial = await dateKey();
-
-    await page.click('button[data-verify-nav="prev"]');
-    await page.waitForTimeout(500);
-    expect(await dateKey()).not.toBe(initial);
-
-    await page.click('button[data-verify-nav="next"]');
-    await page.waitForTimeout(500);
-    expect(await dateKey()).toBe(initial);
   });
 
   test('ツールバーからスニペットを作成できる', async ({ page }) => {
@@ -83,11 +70,7 @@ test.describe('ボード画面', () => {
   test('押せる要素にポインタカーソルが出る', async ({ page }) => {
     // Tailwind v4 の Preflight が button を cursor:default にする。押せる物が
     // 押せるように見えないと操作が伝わらないので、globals.css で戻している。
-    for (const sel of [
-      'button[data-verify-tool="snippet"]',
-      'button[data-verify-view-option="daily"]',
-      'button[data-verify-nav="next"]',
-    ]) {
+    for (const sel of ['button[data-verify-tool="snippet"]', 'button[data-verify-tool="photo"]']) {
       const cursor = await page.locator(sel).evaluate((el) => getComputedStyle(el).cursor);
       expect(cursor, sel).toBe('pointer');
     }

@@ -6,7 +6,7 @@ import { type CardResponse, hydrateBoardCards } from '../hydrate-board-cards.js'
 
 export interface BoardSummary {
   /**
-   * いま貼ってある総数（全期間・全 view）。
+   * いま貼ってある総数。
    *
    * **`cards.length` とは別に返す。** 壁に描くのは上限までだが、「どのくらい溜まって
    * いるか」は本当の数で言いたい（棚が冊数を言うのと同じ）。
@@ -22,13 +22,8 @@ export interface BoardSummary {
 /**
  * 書斎の壁が読む「いま貼ってあるもの」（`docs/oryzae-study`）。
  *
- * **日付で絞らない。** 盤面（`/board`）は 1 日・1 週の作業場だが、書斎の壁はそこに
- * 溜まってきた量そのものを映す — 棚が冊数を、瓶が液面を映すのと同じ見立て。当日の
- * daily だけを映していたころは、その日に何も貼っていなければ壁が空で、**使っている
- * 人の壁ほど空に見える**という逆の絵になっていた。
- *
- * 同じ付箋が daily と weekly の両方に居ることがある。壁では二重に見えても構わない
- * ものではないので、**`refId` で畳んでから**返す（数えるほうも同じ基準にする）。
+ * 書斎の壁は、ボードに溜まってきた量そのものを映す — 棚が冊数を、瓶が液面を映すのと
+ * 同じ見立て。ボード自体が 1 人に 1 枚なので、ここも期間では絞らない。
  */
 export class SummarizeBoardUsecase {
   constructor(
@@ -39,16 +34,7 @@ export class SummarizeBoardUsecase {
   ) {}
 
   async execute(userId: string, limit: number): Promise<BoardSummary> {
-    // 畳むぶん多めに取る。上限ちょうどだけ引くと、重複が多い人は壁が薄くなる。
-    const raw = await this.boardCardRepo.findRecentByUserId(userId, limit * 2);
-
-    const seen = new Set<string>();
-    const unique = raw.filter((card) => {
-      const key = `${card.cardType}:${card.refId}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const recent = await this.boardCardRepo.findRecentByUserId(userId, limit);
 
     const cards = await hydrateBoardCards(
       {
@@ -56,7 +42,7 @@ export class SummarizeBoardUsecase {
         photoRepo: this.boardPhotoRepo,
         storage: this.boardStorage,
       },
-      unique.slice(0, limit),
+      recent,
     );
 
     const counts = await this.boardCardRepo.countPinnedByType(userId);

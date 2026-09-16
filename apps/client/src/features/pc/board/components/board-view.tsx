@@ -24,10 +24,7 @@ import {
   DETAIL_THRESHOLD_FULL,
   DETAIL_THRESHOLD_TITLE,
 } from './board-card';
-import { BoardDateNav } from './board-date-nav';
-import { BOARD_INSET, TOP_BAR_CLASS } from './board-surface';
 import { BoardToolbar } from './board-toolbar';
-import { BoardViewSwitch } from './board-view-switch';
 import { PhotoDialog } from './photo-dialog';
 import { SnippetDialog } from './snippet-dialog';
 
@@ -68,18 +65,14 @@ function cardBounds(card: BoardCardData): Bounds {
   return { x: card.x, y: card.y, width: card.width, height: card.height };
 }
 
-function todayKey(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
+/**
+ * PC のボード画面。1 人に 1 枚のコルクボードに、付箋と写真を貼っていく。
+ *
+ * 日付を送る・日次/週次を切り替えるといった「見方」は持たない。いつ貼ったものでも
+ * 同じ 1 枚の上にある。
+ */
 export function BoardView({ api }: BoardViewProps) {
   const t = useTranslations('board');
-  const [dateKey, setDateKey] = useState(todayKey);
-  const [viewType, setViewType] = useState<'daily' | 'weekly'>('daily');
   const [snippetDialog, setSnippetDialog] = useState<{
     open: boolean;
     snippetId?: string;
@@ -103,7 +96,7 @@ export function BoardView({ api }: BoardViewProps) {
     updateSnippet,
     createPhoto,
     deleteCard,
-  } = useBoard(api, dateKey, viewType);
+  } = useBoard(api);
   const { savePositions } = useBoardSave(api);
 
   // ショートカット（Shift+1/2）から最新のカード・選択を読むための箱。
@@ -338,7 +331,6 @@ export function BoardView({ api }: BoardViewProps) {
     <div
       {...verifyAttrs({
         unit: 'BoardView',
-        viewType,
         snippetOpen: snippetDialog.open,
         photoOpen: photoDialogOpen,
         percent: Math.round(scale * 100),
@@ -365,23 +357,6 @@ export function BoardView({ api }: BoardViewProps) {
         overlay={
           // 操作 UI の上ではパンを始めない。
           <div data-canvas-no-pan="">
-            {/* 上段バー: 左端に日付、右端に表示単位。1本のバーの両端に置くことで、
-                左右に散らばって見えないようにする。 */}
-            <div
-              className={TOP_BAR_CLASS}
-              style={{
-                top: BOARD_INSET,
-                // 左端はサイドバー幅ぶん寄せる
-                // （--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
-                // 書斎が有効な間は左上に「書斎へ戻る」マークが浮くので、その席も避ける
-                // （避けないと日付ナビがマークの下に潜って押せない）。
-                left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
-                right: BOARD_INSET,
-              }}
-            >
-              <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
-              <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
-            </div>
             <CanvasZoomControls
               scale={scale}
               onZoomIn={zoomIn}
@@ -394,7 +369,7 @@ export function BoardView({ api }: BoardViewProps) {
                 二度変わらないよう、盤面のロード表示は1種類に揃える。 */}
             {showLoader && <PageLoading />}
 
-            {/* 取得に失敗したまま盤面が空だと「この日は何も無い」と区別がつかないので、
+            {/* 取得に失敗したまま盤面が空だと「まだ何も貼っていない」と区別がつかないので、
                 空表示ではなく理由と再試行を出す。カードが残っているときは（更新失敗でも
                 盤面は使えるので）そのまま表示を続ける。 */}
             {!loading && error && cards.length === 0 && (
@@ -412,7 +387,7 @@ export function BoardView({ api }: BoardViewProps) {
                 className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
                 style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
               >
-                {t('empty')}
+                {t('nothing_pinned')}
               </div>
             )}
 
