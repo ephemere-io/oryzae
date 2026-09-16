@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  externalHref,
+  movesWithoutCamera,
   notebookTarget,
   overlayScope,
   staysInStudy,
@@ -18,6 +20,41 @@ describe('targetHref', () => {
     // ここを /entries に飛ばすと、既存の一覧画面を作り替えることになる。
     expect(targetHref({ kind: 'journal-month', month: '2026-08' })).toBeNull();
     expect(targetHref({ kind: 'archive' })).toBeNull();
+  });
+
+  it('メモ帳はアプリの中の行き先を持たない（外へ出る）', () => {
+    expect(targetHref({ kind: 'memo' })).toBeNull();
+  });
+});
+
+describe('externalHref', () => {
+  it('メモ帳は公開サイトのヘルプ（使い方・お問い合わせの 1 枚）へ。絶対 URL', () => {
+    const href = externalHref({ kind: 'memo' });
+    expect(href).not.toBeNull();
+    expect(href?.startsWith('http')).toBe(true);
+    expect(href?.endsWith('/support')).toBe(true);
+  });
+
+  it('アプリの言語を ?lang= で公開サイトへ渡す（向こうはブラウザの言語で開いてしまう）', () => {
+    expect(externalHref({ kind: 'memo' }, 'ja')).toMatch(/\/support\?lang=ja$/);
+    expect(externalHref({ kind: 'memo' }, 'en')).toMatch(/\/support\?lang=en$/);
+  });
+
+  it('他の対象は外へ出ない', () => {
+    expect(externalHref({ kind: 'jar' })).toBeNull();
+    expect(externalHref({ kind: 'board' })).toBeNull();
+    expect(externalHref({ kind: 'archive' })).toBeNull();
+  });
+});
+
+describe('movesWithoutCamera', () => {
+  it('メモ帳だけ true。文房具であって場所ではないので、寄っていく芝居を挟まない', () => {
+    expect(movesWithoutCamera({ kind: 'memo' })).toBe(true);
+    expect(movesWithoutCamera({ kind: 'jar' })).toBe(false);
+    expect(movesWithoutCamera({ kind: 'board' })).toBe(false);
+    expect(movesWithoutCamera({ kind: 'archive' })).toBe(false);
+    // 一覧を開く対象でもない。
+    expect(staysInStudy({ kind: 'memo' })).toBe(false);
   });
 });
 
@@ -62,13 +99,15 @@ describe('すべての対象に行き先が定義されている', () => {
     { kind: 'journal-month', month: '2026-08' },
     { kind: 'archive' },
     { kind: 'board' },
+    { kind: 'memo' },
   ];
 
-  it('href か overlayScope のどちらか一方を必ず持つ', () => {
+  it('アプリの中の href、外の href、overlayScope のいずれか 1 つを必ず持つ', () => {
     for (const target of ALL) {
-      const href = targetHref(target);
-      const scope = overlayScope(target);
-      expect(href === null, target.kind).toBe(scope !== null);
+      const inside = targetHref(target) !== null;
+      const outside = externalHref(target) !== null;
+      const overlay = overlayScope(target) !== null;
+      expect([inside, outside, overlay].filter(Boolean), target.kind).toHaveLength(1);
     }
   });
 });

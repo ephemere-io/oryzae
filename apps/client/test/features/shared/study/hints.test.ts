@@ -79,3 +79,9 @@ describe('studyHint（板）', () => {
     expect(studyHint('board', BASE)).toEqual({ textKey: 'hint_board_empty' });
   });
 });
+
+describe('studyHint（メモ帳）', () => {
+  it('物は黙っているので、中身（使い方とお問い合わせがアカウントにある）を一言が言う', () => {
+    expect(studyHint('memo', BASE)).toEqual({ textKey: 'hint_memo' });
+  });
+});

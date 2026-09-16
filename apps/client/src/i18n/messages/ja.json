@@ -816,6 +816,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
+    "label_memo": "MEMO",
     "pill_jar_empty": "空",
     "pill_jar_fermenting": "発酵中",
     "pill_jar_almost": "もうすぐ",
@@ -823,6 +824,7 @@
     "pill_entries": "{count}件",
     "pill_volumes": "{count}冊",
     "pill_cards": "{count}枚",
+    "pill_memo": "ヘルプ",
     "back_to_study": "書斎に戻る",
     "account": "アカウント",
     "list_all": "ALL ENTRIES",
@@ -857,6 +859,7 @@
     "hint_board_empty": "まだ何も貼っていません",
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
-    "hint_board_both": "写真{photos}件・スニペット{snippets}件"
+    "hint_board_both": "写真{photos}件・スニペット{snippets}件",
+    "hint_memo": "使い方とお問い合わせ"
   }
 }

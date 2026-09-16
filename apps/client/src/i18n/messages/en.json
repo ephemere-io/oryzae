@@ -816,6 +816,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
+    "label_memo": "MEMO",
     "pill_jar_empty": "Empty",
     "pill_jar_fermenting": "Fermenting",
     "pill_jar_almost": "Almost",
@@ -823,6 +824,7 @@
     "pill_entries": "{count} entries",
     "pill_volumes": "{count} volumes",
     "pill_cards": "{count} cards",
+    "pill_memo": "Help",
     "back_to_study": "BACK TO STUDY",
     "account": "Account",
     "list_all": "ALL ENTRIES",
@@ -857,6 +859,7 @@
     "hint_board_empty": "Nothing pinned yet",
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
-    "hint_board_both": "{photos} photos · {snippets} snippets"
+    "hint_board_both": "{photos} photos · {snippets} snippets",
+    "hint_memo": "Help and contact"
   }
 }

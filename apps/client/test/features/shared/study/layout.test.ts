@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PC_LAYOUT, SP_LAYOUT, type StudyLayout } from '@/features/shared/study/layout';
+import { MEMO_PAD } from '@/features/shared/study/scene/memo-pad';
 
 const LAYOUTS: StudyLayout[] = [PC_LAYOUT, SP_LAYOUT];
 
@@ -48,10 +49,80 @@ describe('配置表に共通して成り立つこと', () => {
     expect(layout.viewDistance.board).toBeGreaterThan(0);
   });
 
+  it.each(LAYOUTS)('$name: 注視点の可動域がホームの注視点を含み、天板の幅を越えない', (layout) => {
+    const bounds = layout.focusBounds;
+    const home = layout.camera.target;
+    expect(bounds.x[0]).toBeLessThanOrEqual(home.x);
+    expect(bounds.x[1]).toBeGreaterThanOrEqual(home.x);
+    expect(bounds.y[0]).toBeLessThanOrEqual(home.y);
+    expect(bounds.y[1]).toBeGreaterThanOrEqual(home.y);
+    expect(bounds.z[0]).toBeLessThanOrEqual(home.z);
+    expect(bounds.z[1]).toBeGreaterThanOrEqual(home.z);
+    expect(bounds.x[0]).toBeGreaterThanOrEqual(layout.deskTop.xLeft);
+    expect(bounds.x[1]).toBeLessThanOrEqual(layout.deskTop.xRight);
+  });
+
   it.each(LAYOUTS)('$name: 主要ラベルが対応する物の近くに置かれている', (layout) => {
     // アンカーが対象から離れると「何のラベルか」が読めなくなる。
     expect(Math.abs(layout.labelAnchors.jar.x - layout.jar.x)).toBeLessThan(1);
     expect(Math.abs(layout.labelAnchors.board.x - layout.board.position.x)).toBeLessThan(1);
+  });
+
+  it.each(LAYOUTS)('$name: メモ帳がどちらの構図にもあり、机の面に置いてある', (layout) => {
+    const memo = layout.memo;
+    if (memo === null) throw new Error('メモ帳が無い');
+    expect(memo.position.y).toBeCloseTo(layout.deskTop.y, 5);
+    const halfW = (MEMO_PAD.width * memo.scale) / 2 + 0.3;
+    expect(memo.position.x - halfW).toBeGreaterThan(layout.deskTop.xLeft);
+    expect(memo.position.x + halfW).toBeLessThan(layout.deskTop.xRight);
+    expect(memo.position.z + (MEMO_PAD.depth * memo.scale) / 2).toBeLessThan(layout.deskTop.zNear);
+    expect(memo.scale).toBeGreaterThan(0);
+    expect(memo.scale).toBeLessThanOrEqual(1);
+    // 名乗るラベルの置き場も持つ（物は黙っている）。
+    expect(layout.labelAnchors.memo).not.toBeNull();
+  });
+});
+
+describe('メモ帳の置き場', () => {
+  it('PC は積みの左隣、瓶との間の空いた面', () => {
+    const memo = PC_LAYOUT.memo;
+    if (memo === null) throw new Error('PC のメモ帳が無い');
+    // 瓶（-3.4 ± 1.3）と積み（2.8、左端 ≈ 1.3）の間。
+    expect(memo.position.x - MEMO_PAD.width / 2).toBeGreaterThan(PC_LAYOUT.jar.x + 1.3);
+    expect(memo.position.x + MEMO_PAD.width / 2).toBeLessThan(PC_LAYOUT.desk.x - 1.4);
+    // 手前の列（積みと同じくらい）。
+    expect(memo.position.z).toBeGreaterThan(PC_LAYOUT.jar.z + 1);
+    // ラベルは束の手前の机の面。JAR と ENTRIES のどちらとも 2 以上離す。
+    const label = PC_LAYOUT.labelAnchors.memo;
+    if (label === null) throw new Error('ラベルが無い');
+    expect(label.x - PC_LAYOUT.labelAnchors.jar.x).toBeGreaterThan(2);
+    expect(PC_LAYOUT.labelAnchors.journal.x - label.x).toBeGreaterThan(2);
+  });
+
+  it('SP は机の手前左、鉛筆の左に縮めて置く', () => {
+    const memo = SP_LAYOUT.memo;
+    if (memo === null) throw new Error('SP のメモ帳が無い');
+    expect(memo.scale).toBeLessThan(1);
+    expect(memo.position.x + (MEMO_PAD.width * memo.scale) / 2).toBeLessThan(SP_LAYOUT.pen.x + 0.9);
+    // JAR のピル（瓶の手前 z ≈ 1.25）より手前。
+    expect(memo.position.z).toBeGreaterThan(SP_LAYOUT.labelAnchors.jar.z + 1);
+    // SP はピルで名乗るので、そのオフセットも持つ。
+    expect(SP_LAYOUT.pillOffsets?.memo).toBeDefined();
+  });
+
+  it('PC の板は右へ寄せ、積みと棚は奥行きで離してある（被り気味の指摘への答え）', () => {
+    // 板は机の左端から離れている（左の壁が空く）。
+    const boardLeft = PC_LAYOUT.board.position.x - (8 * PC_LAYOUT.board.scale) / 2;
+    expect(boardLeft - PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(2);
+    // 積みは机の右寄り（「本とペンをもう少し右に」）、棚はさらに右で壁際。
+    expect(PC_LAYOUT.desk.x).toBeGreaterThan(2.5);
+    expect(PC_LAYOUT.shelf.position.x - PC_LAYOUT.desk.x).toBeGreaterThan(3);
+    expect(PC_LAYOUT.shelf.position.z).toBeLessThan(PC_LAYOUT.desk.z - 5);
+    // 棚は天板の中（台の半幅 1.4）。
+    expect(PC_LAYOUT.shelf.position.x + 1.4).toBeLessThan(PC_LAYOUT.deskTop.xRight);
+    // 天板は物の外側にぎりぎりの余白（瓶 ± 1.3 が左端を決める）。
+    expect(PC_LAYOUT.deskTop.xLeft).toBeLessThan(PC_LAYOUT.jar.x - 1.3);
+    expect(PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(PC_LAYOUT.jar.x - 2.0);
   });
 });
 

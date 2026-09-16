@@ -816,6 +816,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
+    "label_memo": "MEMO",
     "pill_jar_empty": "비어 있음",
     "pill_jar_fermenting": "발효 중",
     "pill_jar_almost": "곧",
@@ -823,6 +824,7 @@
     "pill_entries": "{count}건",
     "pill_volumes": "{count}권",
     "pill_cards": "{count}장",
+    "pill_memo": "도움말",
     "back_to_study": "서재로 돌아가기",
     "account": "계정",
     "list_all": "ALL ENTRIES",
@@ -857,6 +859,7 @@
     "hint_board_empty": "아직 붙인 것이 없습니다",
     "hint_board_photos": "사진 {count}건",
     "hint_board_snippets": "스니펫 {count}건",
-    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건"
+    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건",
+    "hint_memo": "사용법과 문의"
   }
 }

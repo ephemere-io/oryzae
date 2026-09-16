@@ -816,6 +816,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
+    "label_memo": "MEMO",
     "pill_jar_empty": "空",
     "pill_jar_fermenting": "发酵中",
     "pill_jar_almost": "即将",
@@ -823,6 +824,7 @@
     "pill_entries": "{count}条",
     "pill_volumes": "{count}册",
     "pill_cards": "{count}张",
+    "pill_memo": "帮助",
     "back_to_study": "返回书斋",
     "account": "账户",
     "list_all": "ALL ENTRIES",
@@ -857,6 +859,7 @@
     "hint_board_empty": "还没有贴任何东西",
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
-    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
+    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
+    "hint_memo": "使用方法与联系方式"
   }
 }

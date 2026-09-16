@@ -473,6 +473,7 @@ function Divider() {
 
 export function AccountPage({ user, onLogout }: AccountPageProps) {
   const t = useTranslations('account');
+  const locale = useLocale();
   const { updateProfile: saveProfile } = useAccountApi();
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
@@ -582,7 +583,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
 
           {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
           <a
-            href={docsHref('/support')}
+            href={docsHref('/support', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm underline-offset-2 transition-colors hover:underline"
@@ -592,7 +593,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
           </a>
 
           <a
-            href={docsHref('/privacy')}
+            href={docsHref('/privacy', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm underline-offset-2 transition-colors hover:underline"

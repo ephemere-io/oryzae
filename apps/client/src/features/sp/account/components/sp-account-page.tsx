@@ -30,6 +30,7 @@ interface SpAccountPageProps {
  */
 export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
   const t = useTranslations('account');
+  const locale = useLocale();
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
 
@@ -84,7 +85,7 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
 
           {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
           <a
-            href={docsHref('/support')}
+            href={docsHref('/support', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm"
@@ -93,7 +94,7 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
             {t('links.support')} →
           </a>
           <a
-            href={docsHref('/privacy')}
+            href={docsHref('/privacy', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm"
