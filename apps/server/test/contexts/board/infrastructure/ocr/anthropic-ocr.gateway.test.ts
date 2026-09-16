@@ -56,7 +56,7 @@ describe('AnthropicOcrGateway.extractText', () => {
     // ここが守れるのは「発酵分析とは別枠で明示的に選んだモデルを、加工せず渡している」
     // ことだけ。ID そのものの正しさは型では守れない（AnthropicModelId は末尾が
     // `(string & {})` なので任意の文字列が通る）。綴りの誤りは実行時にしか出ない。
-    expect(__INTERNAL.MODEL).toBe('claude-opus-5');
+    expect(__INTERNAL.MODEL).toBe('claude-sonnet-5');
   });
 
   it('トークン使用量をそのまま返す（将来コストを記録するときの取り出し口）', async () => {

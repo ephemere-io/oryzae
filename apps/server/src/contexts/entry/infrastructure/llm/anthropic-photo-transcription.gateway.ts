@@ -20,11 +20,10 @@ import type {
  *
  * 選定理由とコスト比較は docs/entry-photo-guide.md を参照。
  *
- * **board の OCR (board/infrastructure/ocr/anthropic-ocr.gateway.ts) は claude-opus-5 で、
- * ここと違うのは意図的**。あちらはスニペット 1 枚を切り出す用途で、誤読がそのまま
- * スニペットの中身になるうえ 1 回あたりの入力が小さいので精度に振れる。こちらは日記の
- * ページ全体を起こすため呼び出しあたりの単価が効き、定型タスクである文字起こしに
- * Opus の推論力は要らないと判断している。揃えるなら、両方のコスト影響を見てから。
+ * **board の OCR (board/infrastructure/ocr/anthropic-ocr.gateway.ts) も 2026-09-16 から
+ * 同じ claude-sonnet-5**。あちらは精度を理由に claude-opus-5 だったが、ランニング
+ * コストを優先して揃えた。そのため実額のモデル別内訳では 2 つの用途が 1 行に混ざる
+ * （featureOfModel が両方の名前を返す）。片方だけモデルを替えれば自然に分かれる。
  */
 // 価格表から引く。ベタ書きすると featureOfModel の読み替え表と食い違い、
 // この機能の費用が「分類不明」に落ちる（board の OCR gateway と同じ形）。
