@@ -860,6 +860,6 @@
     "hint_board_photos": "사진 {count}건",
     "hint_board_snippets": "스니펫 {count}건",
     "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건",
-    "hint_memo": "사용법과 문의 — 계정에서"
+    "hint_memo": "사용법과 문의"
   }
 }

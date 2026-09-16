@@ -860,6 +860,6 @@
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
     "hint_board_both": "写真{photos}件・スニペット{snippets}件",
-    "hint_memo": "使い方とお問い合わせ — アカウントから"
+    "hint_memo": "使い方とお問い合わせ"
   }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  externalHref,
   movesWithoutCamera,
   notebookTarget,
   overlayScope,
@@ -21,8 +22,23 @@ describe('targetHref', () => {
     expect(targetHref({ kind: 'archive' })).toBeNull();
   });
 
-  it('メモ帳はアカウントへ（使い方とお問い合わせの入口がそこにある）', () => {
-    expect(targetHref({ kind: 'memo' })).toBe('/account');
+  it('メモ帳はアプリの中の行き先を持たない（外へ出る）', () => {
+    expect(targetHref({ kind: 'memo' })).toBeNull();
+  });
+});
+
+describe('externalHref', () => {
+  it('メモ帳は公開サイトのヘルプ（使い方・お問い合わせの 1 枚）へ。絶対 URL', () => {
+    const href = externalHref({ kind: 'memo' });
+    expect(href).not.toBeNull();
+    expect(href?.startsWith('http')).toBe(true);
+    expect(href?.endsWith('/support')).toBe(true);
+  });
+
+  it('他の対象は外へ出ない', () => {
+    expect(externalHref({ kind: 'jar' })).toBeNull();
+    expect(externalHref({ kind: 'board' })).toBeNull();
+    expect(externalHref({ kind: 'archive' })).toBeNull();
   });
 });
 
@@ -81,11 +97,12 @@ describe('すべての対象に行き先が定義されている', () => {
     { kind: 'memo' },
   ];
 
-  it('href か overlayScope のどちらか一方を必ず持つ', () => {
+  it('アプリの中の href、外の href、overlayScope のいずれか 1 つを必ず持つ', () => {
     for (const target of ALL) {
-      const href = targetHref(target);
-      const scope = overlayScope(target);
-      expect(href === null, target.kind).toBe(scope !== null);
+      const inside = targetHref(target) !== null;
+      const outside = externalHref(target) !== null;
+      const overlay = overlayScope(target) !== null;
+      expect([inside, outside, overlay].filter(Boolean), target.kind).toHaveLength(1);
     }
   });
 });

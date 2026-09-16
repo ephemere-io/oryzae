@@ -4,6 +4,7 @@
  * 純関数。ルーティングそのものは呼び出し側（page）が持つ。
  */
 
+import { docsHref } from '@/lib/docs-site';
 import type { StudyTarget } from './types';
 
 /**
@@ -25,18 +26,32 @@ export function targetHref(target: StudyTarget): string | null {
       return '/entries/new';
     case 'board':
       return '/board';
-    case 'memo':
-      // メモ帳はアカウントへ。使い方とお問い合わせ（公開サイト）への入口がそこにある。
-      return '/account';
     case 'journal-month':
     case 'archive':
+    case 'memo':
       return null;
   }
 }
 
-/** 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。 */
+/**
+ * 部屋の外（公開サイト、別ドメイン）の行き先。無ければ null。
+ *
+ * メモ帳はヘルプの入口なので、押した先はヘルプそのもの — 使い方・よくある質問・
+ * お問い合わせを 1 枚にまとめた `/support`。アカウント経由にすると 1 手多いだけだった。
+ * 新しいタブで開く（書斎を閉じない）。
+ */
+export function externalHref(target: StudyTarget): string | null {
+  return target.kind === 'memo' ? docsHref('/support') : null;
+}
+
+/**
+ * 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。
+ *
+ * メモ帳も URL を変えないが一覧は開かない（外へ出る）。`targetHref === null` で判定すると
+ * メモ帳を押したときに一覧が開いてしまう。
+ */
 export function staysInStudy(target: StudyTarget): boolean {
-  return targetHref(target) === null;
+  return target.kind === 'journal-month' || target.kind === 'archive';
 }
 
 /**
