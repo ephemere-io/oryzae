@@ -11,11 +11,11 @@ export interface OcrResult {
   /**
    * 発酵分析の LlmAnalysisResult と同じ形。将来コストを記録するときの取り出し口。
    *
-   * ⚠️ **`claude-pricing.ts` の calculateCost() をそのまま当てないこと。** あちらは
-   * 単一モデル前提で claude-sonnet-4-6 の単価しか持たない。OCR は別モデル
-   * （claude-opus-5）で動いているので、そのまま通すと単価が何倍もずれた金額を
-   * 「正しい数字」として出してしまい、しかも何も失敗しないので気づけない。
-   * 記録するなら、先に単価表を複数モデル対応にすること。
+   * ⚠️ **`claude-pricing.ts` の computeCostFromTokens() をそのまま当てないこと。**
+   * あちらは単一モデル前提で claude-sonnet-4-6 ($3 / $15) の単価しか持たない。OCR は
+   * 別モデルの claude-sonnet-5 ($2 / $10) で動いているので、そのまま通すと 1.5 倍に
+   * 水増しした金額を「正しい数字」として出してしまい、しかも何も失敗しないので
+   * 気づけない。記録するなら、先に単価表を複数モデル対応にすること。
    */
   usage: { inputTokens: number; outputTokens: number };
 }

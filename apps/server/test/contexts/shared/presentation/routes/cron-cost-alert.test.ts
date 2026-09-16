@@ -502,7 +502,7 @@ describe('cronCostAlert', () => {
       mockFetch.mockResolvedValueOnce(
         costReportResponse([
           { amount: '12.4836', model: 'claude-sonnet-4-6', token_type: 'output_tokens' },
-          { amount: '18.81', model: 'claude-opus-5', token_type: 'output_tokens' },
+          { amount: '18.81', model: 'claude-sonnet-5', token_type: 'output_tokens' },
         ]),
       );
 
@@ -510,13 +510,14 @@ describe('cronCostAlert', () => {
       const body = await res.json();
 
       const value = fieldValue(ACTUAL_FIELD) ?? '';
-      // 「合計: 金額」の配下に「用途: 金額」をぶら下げる。親子が字形で分かる
+      // 「合計: 金額」の配下に「用途: 金額」をぶら下げる。親子が字形で分かる。
+      // sonnet-5 は board の OCR と写真の文字起こしの両方なので、用途名が連なる
       expect(value).toContain(
-        '合計: $0.3129\n├ OCR (claude-opus-5): $0.1881\n└ 発酵 (claude-sonnet-4-6): $0.1248',
+        '合計: $0.3129\n├ OCR + 写真の文字起こし (claude-sonnet-5): $0.1881\n└ 発酵 (claude-sonnet-4-6): $0.1248',
       );
 
       expect(body.actualCost.byModel).toEqual([
-        { model: 'claude-opus-5', costUsd: 0.1881, feature: 'OCR' },
+        { model: 'claude-sonnet-5', costUsd: 0.1881, feature: 'OCR + 写真の文字起こし' },
         { model: 'claude-sonnet-4-6', costUsd: 0.124836, feature: '発酵' },
       ]);
     });
@@ -534,7 +535,7 @@ describe('cronCostAlert', () => {
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
       const value = fieldValue(ACTUAL_FIELD) ?? '';
-      expect(value).toContain('├ 写真の文字起こし (claude-sonnet-5): $0.6029');
+      expect(value).toContain('├ OCR + 写真の文字起こし (claude-sonnet-5): $0.6029');
       expect(value).toContain('└ claude-haiku-4-5-20251001: $0.0013 ← 用途不明');
     });
 
@@ -627,11 +628,11 @@ describe('cronCostAlert', () => {
     it('推定が実額と合っている日は、突き合わせも計算根拠も出さない', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
       supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
-      // 発酵モデル $0.1248 / OCR モデル $0.1881。推定 $0.124836 は前者と比べる。
+      // 発酵モデル $0.1248 / 画像系モデル $0.1881。推定 $0.124836 は前者と比べる。
       mockFetch.mockResolvedValueOnce(
         costReportResponse([
           { amount: '12.4836', model: 'claude-sonnet-4-6', token_type: 'output_tokens' },
-          { amount: '18.81', model: 'claude-opus-5', token_type: 'output_tokens' },
+          { amount: '18.81', model: 'claude-sonnet-5', token_type: 'output_tokens' },
         ]),
       );
 
