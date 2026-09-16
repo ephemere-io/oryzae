@@ -4,6 +4,7 @@
 
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect } from 'react';
+import { SheetProbe } from '@/components/ui/sheet-probe';
 import { useSpChrome } from '@/lib/sp-chrome-context';
 import { SpBottomNav } from './sp-bottom-nav';
 import { SpTopBar } from './sp-top-bar';
@@ -79,6 +80,8 @@ export function SpShell({ topBar, bottomNav, children }: SpShellProps) {
         data-sp-overlay-slot
         className="pointer-events-none absolute inset-0 z-30"
       />
+      {/* 実機の調査用の計器（`?sheetprobe=1` のときだけ）。原因が分かったら消す。 */}
+      <SheetProbe />
     </div>
   );
 }

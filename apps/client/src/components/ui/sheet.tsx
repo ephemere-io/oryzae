@@ -196,16 +196,31 @@ export function Sheet({
       if (!el) return 0;
       return el.getBoundingClientRect().top - top + scroller.scrollTop;
     };
-    switch (position) {
-      case 'half':
-        return inContent(halfRef.current);
-      case 'peek':
-        return inContent(peekRef.current);
-      case 'content':
-        return inContent(contentRef.current);
-      case 'full':
-        return inContent(sheetRef.current);
-    }
+    // 面の上端＝いちばん高い段。ここは印を測らずに決まる（閉の位置の空きは容器と同じ高さ）ので、
+    // **いつでも正しい**。他の段が測れなかったときの逃げ場にする。
+    const full = inContent(sheetRef.current);
+    const marked = () => {
+      switch (position) {
+        case 'half':
+          return inContent(halfRef.current);
+        case 'peek':
+          return inContent(peekRef.current);
+        case 'content':
+          return inContent(contentRef.current);
+        case 'full':
+          return full;
+      }
+    };
+    const at = marked();
+    if (position === 'full') return at;
+    // **測れなかった印は閉の位置（0）と見分けがつかない。** 中身の段は測った高さ（見出し + 中身）に
+    // 依るので、測る前や測れなかったときに 0 が返り、開いたのに画面の外に置かれる（実機レビュー:
+    // 一覧のアイテムを押しても何も出てこない）。どの段も「見出しの行が見える」より低くはならないので、
+    // 覗く段の印を下限にする（これは測った高さに依らない）。
+    const floor = inContent(peekRef.current);
+    // 中身の段が見出しの行より低い＝測れていない。何も出ないくらいなら、いちばん高い段に出す。
+    if (position === 'content' && at <= floor) return full;
+    return Math.max(at, floor);
   }, []);
 
   const scrollToDetent = useCallback(
@@ -433,15 +448,28 @@ export function Sheet({
     if (!inner || !section || !content || typeof ResizeObserver === 'undefined') return;
     const header = section.querySelector('[data-sheet-header]');
     const measure = () => {
-      const height = (header?.getBoundingClientRect().height ?? 0) + content.scrollHeight;
-      section.style.setProperty('--oz-sheet-content', `${Math.round(height)}px`);
+      const height = Math.round(
+        (header?.getBoundingClientRect().height ?? 0) + content.scrollHeight,
+      );
+      // **測れないとき（0）は書かない。** 0 を書くと中身の段の吸着先が閉の位置と重なり、開いたのに
+      // 画面の外に居ることになる。変数が無ければ既定の `100%`（＝面の上端＝いちばん高い段）が使われる。
+      if (height <= 0) {
+        section.style.removeProperty('--oz-sheet-content');
+        return;
+      }
+      if (section.style.getPropertyValue('--oz-sheet-content') === `${height}px`) return;
+      section.style.setProperty('--oz-sheet-content', `${height}px`);
+      // 段の位置が変わった。**置き直さないと、測る前の位置に取り残される。** 指で触っている間は触らない。
+      if (latest.current.phase === 'open' && !byFingerRef.current) {
+        scrollToDetent(settledRef.current ?? latest.current.detent, 'instant');
+      }
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(content);
     if (header) observer.observe(header);
     return () => observer.disconnect();
-  }, [innerEl]);
+  }, [innerEl, scrollToDetent]);
 
   // 中身の箱: 先頭に戻りきって指が離れるまで、シートへスクロールを渡さない（渡すと同じ指で縮む）。
   useEffect(() => {
