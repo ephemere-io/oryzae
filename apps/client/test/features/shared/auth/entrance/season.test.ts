@@ -76,34 +76,57 @@ describe('microSeasonIndex', () => {
 });
 
 describe('entranceSprig', () => {
-  it('どの候でも枝は成り立つ（葉は 0..3・先に付くのは 1 つまで）', () => {
-    for (let index = 0; index < MICRO_SEASON_COUNT; index++) {
-      const sprig = entranceSprig(index);
-      expect(sprig.leaves).toBeGreaterThanOrEqual(0);
-      expect(sprig.leaves).toBeLessThanOrEqual(3);
-      const tips = [sprig.bud, sprig.blossom, sprig.berry].filter(Boolean).length;
-      expect(tips).toBeLessThanOrEqual(1);
-      expect(sprig.reach).toBeGreaterThan(0.8);
-      expect(sprig.reach).toBeLessThanOrEqual(1);
+  it('節気ごとに花材が替わる（24 種。ここが「季節が分かる」の正体）', () => {
+    const names = new Set<string>();
+    for (let term = 0; term < 24; term++) names.add(entranceSprig(term * 3).name);
+    // 葉の枚数だけを増減させていたころは「あまりにも地味」と差し戻された（PR #624）。
+    expect(names.size).toBe(24);
+  });
+
+  it('同じ節気の 3 つの候は同じ花材（変わるのは咲き具合・丈・本数）', () => {
+    for (let term = 0; term < 24; term++) {
+      const steps = [0, 1, 2].map((step) => entranceSprig(term * 3 + step));
+      expect(new Set(steps.map((sprig) => sprig.name)).size).toBe(1);
+      expect(new Set(steps.map((sprig) => sprig.form)).size).toBe(1);
+      // 3 つが完全に同じだと、候が進んでも何も起きない。
+      expect(new Set(steps.map((sprig) => JSON.stringify(sprig))).size).toBeGreaterThan(1);
     }
   });
 
-  it('春は蕾から花へ、夏は葉が茂り、秋は実、冬は枝だけ', () => {
-    expect(entranceSprig(TERM.立春 * 3)).toMatchObject({ bud: true, leaves: 0 });
-    expect(entranceSprig(TERM.春分 * 3)).toMatchObject({ blossom: true });
-    expect(entranceSprig(TERM.夏至 * 3)).toMatchObject({ leaves: 3, blossom: false });
-    expect(entranceSprig(TERM.立秋 * 3)).toMatchObject({ berry: true });
-    expect(entranceSprig(TERM.冬至 * 3)).toMatchObject({ leaves: 0, berry: false });
-    // 大寒の末候には次の春の蕾が付く。
-    expect(entranceSprig(TERM.大寒 * 3 + 2)).toMatchObject({ bud: true });
+  it('どの候でも描ける値に収まっている', () => {
+    for (let index = 0; index < MICRO_SEASON_COUNT; index++) {
+      const sprig = entranceSprig(index);
+      expect(sprig.name.length).toBeGreaterThan(0);
+      expect(sprig.stems).toBeGreaterThanOrEqual(1);
+      expect(sprig.stems).toBeLessThanOrEqual(4);
+      expect(sprig.height).toBeGreaterThan(0.4);
+      expect(sprig.height).toBeLessThan(1.6);
+      expect(sprig.bloom).toBeGreaterThanOrEqual(0);
+      expect(sprig.bloom).toBeLessThanOrEqual(1);
+      expect(sprig.petals).toBeGreaterThanOrEqual(0);
+      expect(sprig.leaves).toBeGreaterThanOrEqual(0);
+      expect(sprig.leaves).toBeLessThanOrEqual(4);
+      expect(sprig.berries).toBeGreaterThanOrEqual(0);
+      expect(sprig.berries).toBeLessThanOrEqual(6);
+      // まっすぐ立てない（生け花ではなく標本に見える）。
+      expect(sprig.lean).toBeGreaterThan(0);
+    }
   });
 
-  it('同じ節気の中でも、候ごとに伸びだけが少し変わる（微妙な差）', () => {
-    const [first, second, third] = [0, 1, 2].map((step) => entranceSprig(TERM.夏至 * 3 + step));
-    expect(first.reach).toBeLessThan(second.reach);
-    expect(second.reach).toBeLessThan(third.reach);
-    // 形は変えない。
-    expect({ ...first, reach: 0 }).toEqual({ ...third, reach: 0 });
+  it('季節の草花が季節どおりに巡る', () => {
+    expect(entranceSprig(0).name).toBe('梅'); // 立春
+    expect(entranceSprig(3 * 3).name).toBe('桜'); // 春分
+    expect(entranceSprig(9 * 3).name).toBe('笹'); // 夏至
+    expect(entranceSprig(12 * 3).name).toBe('芒'); // 立秋
+    expect(entranceSprig(17 * 3).name).toBe('紅葉'); // 霜降
+    expect(entranceSprig(20 * 3).name).toBe('松'); // 大雪
+    expect(entranceSprig(23 * 3).name).toBe('椿'); // 大寒
+  });
+
+  it('候が進むと同じ花材の蕾が開く（時間の経過として読める）', () => {
+    // 立春の梅。初候はほぼ蕾、末候はほころんでいる。
+    const [first, , last] = [0, 1, 2].map((step) => entranceSprig(step));
+    expect(first.bloom).toBeLessThan(last.bloom);
   });
 
   it('範囲の外の値でも巡って収まる（年をまたいでも壊れない）', () => {

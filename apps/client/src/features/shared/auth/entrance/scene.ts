@@ -743,70 +743,301 @@ function buildVase(
   ];
   group.add(lineFrom(outline, materials.ink, own));
 
-  // 枝。カメラに向いた面の上で、少し右へ傾いて伸びる。姿は季節（候）で変わる。
+  // 草花はカメラに向いた面の上に描く（花器の口を原点にした 2 次元）。
   const along = (u: number, y: number) => new Vector3(Math.sin(side) * u, y, Math.cos(side) * u);
-  const reach = sprig.reach;
-  const stem = [
-    along(0, 0.62),
-    along(0.03 * reach, 0.62 + 0.28 * reach),
-    along(0.12 * reach, 0.62 + 0.56 * reach),
-    along(0.26 * reach, 0.62 + 0.8 * reach),
-    along(0.36 * reach, 0.62 + 0.93 * reach),
-  ];
-  const tip = stem[stem.length - 1];
-  group.add(lineFrom(stem, materials.faint(0.6), own));
-
-  /** 枝に付く小さな輪郭（葉・蕾・花・実）。楕円を傾けて置く。 */
-  function sprout(
-    u: number,
-    y: number,
-    tilt: number,
-    size: { long: number; short: number },
-    opacity: number,
-  ): void {
-    const points: Vector3[] = [];
-    for (let i = 0; i <= 16; i++) {
-      const t = (i / 16) * Math.PI * 2;
-      const lx = Math.cos(t) * size.long;
-      const ly = Math.sin(t) * size.short;
-      const rx = lx * Math.cos(tilt) - ly * Math.sin(tilt);
-      const ry = lx * Math.sin(tilt) + ly * Math.cos(tilt);
-      points.push(along(u + rx + Math.cos(tilt) * size.long, y + ry + Math.sin(tilt) * size.long));
-    }
-    group.add(lineFrom(points, materials.faint(opacity), own));
-  }
-
-  // 葉。枝の根元から順に、姿が持っている枚数だけ。
-  const leaves: [number, number, number][] = [
-    [0.03 * reach, 0.62 + 0.3 * reach, 0.9],
-    [0.13 * reach, 0.62 + 0.58 * reach, -0.5],
-    [0.27 * reach, 0.62 + 0.81 * reach, 0.7],
-  ];
-  for (const [u, y, tilt] of leaves.slice(0, sprig.leaves)) {
-    sprout(u, y, tilt, { long: 0.11, short: 0.035 }, 0.45);
-  }
-
-  // 蕾・花・実は枝の先。同時には 1 つしか付かない（`entranceSprig`）。
-  const tipU = 0.36 * reach;
-  const tipY = tip.y;
-  if (sprig.bud) sprout(tipU, tipY, 1.2, { long: 0.045, short: 0.03 }, 0.5);
-  if (sprig.blossom) {
-    sprout(tipU, tipY, 0, { long: 0.07, short: 0.065 }, 0.5);
-    // 花びらの気配。輪郭の内側に短い線を 3 本。
-    for (const angle of [0.5, 1.6, 2.7]) {
-      group.add(
-        lineFrom(
-          [
-            along(tipU + 0.07, tipY + 0.07),
-            along(tipU + 0.07 + Math.cos(angle) * 0.05, tipY + 0.07 + Math.sin(angle) * 0.05),
-          ],
-          materials.faint(0.3),
-          own,
-        ),
-      );
-    }
-  }
-  if (sprig.berry) sprout(tipU - 0.02, tipY - 0.06, -1.4, { long: 0.038, short: 0.036 }, 0.55);
+  drawSprig(group, materials, own, along, VASE_MOUTH_Y, sprig);
 
   return group;
+}
+
+/** 花器の口の高さ（草花はここから立ち上がる）。 */
+const VASE_MOUTH_Y = 0.63;
+
+/** 面の上の点（u = 横、y = 縦）。`along` が world へ移す。 */
+interface Flat {
+  u: number;
+  y: number;
+}
+
+type Along = (u: number, y: number) => Vector3;
+
+/**
+ * 一輪挿しに挿さった草花を描く（`entrance/season.ts` の `Sprig`）。
+ *
+ * **一種を投げ入れた姿**にする。整えず、まっすぐ立てず、余白を残す — 川瀬敏郎の
+ * 「一日一花」の見え方に倣っている（`season.ts` の注釈）。線は細く、葉と花は枝より薄い。
+ */
+function drawSprig(
+  group: Group,
+  materials: StudyMaterials,
+  own: OwnGeometry,
+  along: Along,
+  mouthY: number,
+  sprig: Sprig,
+): void {
+  const stemInk = materials.faint(0.62);
+  const leafInk = materials.faint(0.45);
+  const flowerInk = materials.faint(0.52);
+
+  const draw = (points: Flat[], material: Material) => {
+    group.add(
+      lineFrom(
+        points.map((p) => along(p.u, p.y)),
+        material,
+        own,
+      ),
+    );
+  };
+
+  for (let index = 0; index < Math.max(1, sprig.stems); index++) {
+    const spread = index - (sprig.stems - 1) / 2;
+    const lean = sprig.lean + spread * 0.28;
+    const height = sprig.height * (1 - Math.abs(spread) * 0.14);
+    const stem = stemPath(sprig.form, lean, height, mouthY, index);
+    draw(stem, stemInk);
+
+    const tip = stem[stem.length - 1];
+    const direction = headingAt(stem);
+
+    if (sprig.form === 'needle') drawNeedles(draw, stem, stemInk);
+    if (sprig.form === 'plume') drawPlume(draw, tip, direction, sprig.bloom, flowerInk);
+    if (sprig.form === 'broadleaf') drawBroadLeaf(draw, tip, direction, leafInk);
+
+    // 葉・実・花は 1 本目にだけ付ける（何本も同じ物が付くと作り物に見える）。
+    if (index > 0) continue;
+
+    for (let leaf = 0; leaf < sprig.leaves; leaf++) {
+      const at = pointAt(stem, 0.34 + leaf * 0.19);
+      const tilt = (leaf % 2 === 0 ? 1 : -1) * 0.8 + direction * 0.2;
+      drawLeaf(draw, at, tilt, sprig.leafShape ?? 'oval', leafInk);
+    }
+
+    for (let berry = 0; berry < sprig.berries; berry++) {
+      const at = pointAt(stem, 0.46 + berry * 0.12);
+      drawBerry(draw, at, flowerInk);
+    }
+
+    if (sprig.petals > 0) {
+      drawFlower(draw, tip, direction, sprig, flowerInk);
+      // 枝物は先だけでなく、途中にもひとつ咲かせる（一輪では寂しい）。
+      if (sprig.form === 'branch' && sprig.bloom > 0.5) {
+        drawFlower(draw, pointAt(stem, 0.62), direction + 0.6, sprig, flowerInk);
+      }
+    }
+  }
+}
+
+/**
+ * 茎・枝の道筋。姿の型ごとに曲がり方が違う。
+ *
+ * 2 次ベジエ 1 本で描き、枝だけ節で小さく折る。**まっすぐ立てない** — 立てると
+ * 生け花ではなく標本に見える。
+ */
+function stemPath(
+  form: Sprig['form'],
+  lean: number,
+  height: number,
+  mouthY: number,
+  index: number,
+): Flat[] {
+  const tip = { u: Math.sin(lean) * height, y: mouthY + Math.cos(lean) * height };
+  // 制御点の置き方で「しなり」が決まる。草は上の方でしなり、花はほぼ直線。
+  const bend =
+    form === 'grass' || form === 'plume'
+      ? { u: 0.12, y: 0.82 }
+      : form === 'vine'
+        ? { u: 0.75, y: 0.55 }
+        : form === 'flower'
+          ? { u: 0.38, y: 0.52 }
+          : { u: 0.18, y: 0.6 };
+  const control = { u: tip.u * bend.u, y: mouthY + (tip.y - mouthY) * bend.y };
+
+  const points: Flat[] = [];
+  const steps = 22;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const inverse = 1 - t;
+    let u = inverse ** 2 * 0 + 2 * inverse * t * control.u + t ** 2 * tip.u;
+    let y = inverse ** 2 * mouthY + 2 * inverse * t * control.y + t ** 2 * tip.y;
+    // つるはうねる。枝は節で小さく折れる。
+    if (form === 'vine') u += Math.sin(t * Math.PI * 2.4 + index) * 0.06 * t;
+    if (form === 'branch') {
+      u += Math.sin(t * Math.PI * 3) * 0.022;
+      y += Math.cos(t * Math.PI * 3) * 0.012;
+    }
+    points.push({ u, y });
+  }
+  return points;
+}
+
+/** 先端での向き（rad）。付ける物の傾きに使う。 */
+function headingAt(path: Flat[]): number {
+  const last = path[path.length - 1];
+  const before = path[Math.max(0, path.length - 3)];
+  return Math.atan2(last.y - before.y, last.u - before.u);
+}
+
+/** 道筋の途中の点（t は 0..1）。 */
+function pointAt(path: Flat[], t: number): Flat {
+  const clamped = Math.max(0, Math.min(1, t));
+  return path[Math.round(clamped * (path.length - 1))];
+}
+
+/** 閉じた輪郭を作る（葉・花びら・実）。 */
+function ellipsePoints(at: Flat, tilt: number, long: number, short: number): Flat[] {
+  const points: Flat[] = [];
+  for (let i = 0; i <= 18; i++) {
+    const angle = (i / 18) * Math.PI * 2;
+    const x = Math.cos(angle) * long + long;
+    const y = Math.sin(angle) * short;
+    points.push({
+      u: at.u + x * Math.cos(tilt) - y * Math.sin(tilt),
+      y: at.y + x * Math.sin(tilt) + y * Math.cos(tilt),
+    });
+  }
+  return points;
+}
+
+function drawLeaf(
+  draw: (points: Flat[], material: Material) => void,
+  at: Flat,
+  tilt: number,
+  shape: NonNullable<Sprig['leafShape']>,
+  material: Material,
+): void {
+  if (shape === 'lobed') {
+    // 楓。**小さく、葉柄を付ける** — 大きく描くと切れ込みが花びらに見える。
+    const stalk = 0.045;
+    const base = { u: at.u + Math.cos(tilt) * stalk, y: at.y + Math.sin(tilt) * stalk };
+    draw([at, base], material);
+    const points: Flat[] = [];
+    for (let i = 0; i <= 40; i++) {
+      const angle = (i / 40) * Math.PI * 2;
+      const radius = 0.05 * (0.74 + 0.26 * Math.cos(5 * angle));
+      const x = Math.cos(angle) * radius + 0.05;
+      const y = Math.sin(angle) * radius;
+      points.push({
+        u: base.u + x * Math.cos(tilt) - y * Math.sin(tilt),
+        y: base.y + x * Math.sin(tilt) + y * Math.cos(tilt),
+      });
+    }
+    draw(points, material);
+    return;
+  }
+  const long = shape === 'narrow' ? 0.15 : 0.1;
+  const short = shape === 'narrow' ? 0.018 : 0.036;
+  draw(ellipsePoints(at, tilt, long, short), material);
+}
+
+function drawBerry(
+  draw: (points: Flat[], material: Material) => void,
+  at: Flat,
+  material: Material,
+): void {
+  draw(ellipsePoints({ u: at.u - 0.026, y: at.y - 0.03 }, 0, 0.026, 0.026), material);
+}
+
+/**
+ * 花。蕾のうちは閉じた 1 枚、開くほど花びらが広がる。
+ *
+ * `petals === 1` は釣鐘（蛍袋）。下を向いて垂れる。
+ */
+function drawFlower(
+  draw: (points: Flat[], material: Material) => void,
+  at: Flat,
+  heading: number,
+  sprig: Sprig,
+  material: Material,
+): void {
+  const open = Math.max(0, Math.min(1, sprig.bloom));
+  if (sprig.petals === 1) {
+    draw(ellipsePoints({ u: at.u, y: at.y - 0.11 }, Math.PI / 2, 0.055, 0.035), material);
+    return;
+  }
+  if (open < 0.34) {
+    // 蕾。枝の先に細い粒が付く。
+    draw(ellipsePoints(at, heading, 0.05, 0.026), material);
+    return;
+  }
+  const length = 0.045 + 0.055 * open;
+  const width = sprig.petals >= 6 ? 0.012 : 0.022;
+  // 花びらが 3 枚以下（菖蒲）は**垂れる**。放射させるとプロペラに見える。
+  const droops = sprig.petals <= 3;
+  for (let petal = 0; petal < sprig.petals; petal++) {
+    const angle = droops
+      ? heading - Math.PI / 2 + (petal - (sprig.petals - 1) / 2) * 0.85
+      : heading + (petal / sprig.petals) * Math.PI * 2;
+    draw(ellipsePoints(at, angle, length, width), material);
+  }
+}
+
+/** 穂（芒・土筆）。先から短い線が開く。 */
+function drawPlume(
+  draw: (points: Flat[], material: Material) => void,
+  tip: Flat,
+  heading: number,
+  bloom: number,
+  material: Material,
+): void {
+  const open = 0.2 + 0.8 * Math.max(0, Math.min(1, bloom));
+  const count = 7;
+  for (let i = 0; i < count; i++) {
+    const spread = (i / (count - 1) - 0.5) * 1.5 * open;
+    const angle = heading + spread;
+    const length = 0.12 + 0.1 * open;
+    draw(
+      [tip, { u: tip.u + Math.cos(angle) * length, y: tip.y + Math.sin(angle) * length }],
+      material,
+    );
+  }
+}
+
+/** 松の針。茎に沿って短い線が並ぶ。 */
+function drawNeedles(
+  draw: (points: Flat[], material: Material) => void,
+  stem: Flat[],
+  material: Material,
+): void {
+  for (let i = 6; i < stem.length; i += 3) {
+    const at = stem[i];
+    const before = stem[i - 1];
+    const heading = Math.atan2(at.y - before.y, at.u - before.u);
+    for (const side of [0.55, -0.55]) {
+      const angle = heading + side;
+      draw([at, { u: at.u + Math.cos(angle) * 0.1, y: at.y + Math.sin(angle) * 0.1 }], material);
+    }
+  }
+}
+
+/** 大きな一枚（蓮の葉）。茎の先から葉脈が広がる。 */
+function drawBroadLeaf(
+  draw: (points: Flat[], material: Material) => void,
+  tip: Flat,
+  heading: number,
+  material: Material,
+): void {
+  const radius = 0.18;
+  const center = { u: tip.u + Math.cos(heading) * radius, y: tip.y + Math.sin(heading) * radius };
+  const points: Flat[] = [];
+  for (let i = 0; i <= 36; i++) {
+    const angle = (i / 36) * Math.PI * 2;
+    // 茎の付け根だけ浅く切れ込む（真円だと皿に見える）。
+    const r = radius * (1 - 0.12 * Math.exp(-(((angle - (heading + Math.PI)) / 0.45) ** 2)));
+    points.push({ u: center.u + Math.cos(angle) * r, y: center.y + Math.sin(angle) * r * 0.66 });
+  }
+  draw(points, material);
+  // 葉脈は**茎の先から**広がる。中心から引くと葉が宙に浮いて見える。
+  for (const spread of [-0.6, 0, 0.6]) {
+    const angle = heading + spread;
+    draw(
+      [
+        tip,
+        {
+          u: tip.u + Math.cos(angle) * radius * 1.5,
+          y: tip.y + Math.sin(angle) * radius * 1.1,
+        },
+      ],
+      material,
+    );
+  }
 }

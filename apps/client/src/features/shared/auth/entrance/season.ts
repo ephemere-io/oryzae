@@ -1,16 +1,28 @@
 /**
- * 七十二候（しちじゅうにこう）で、扉の前の一輪挿しの枝を変える。
+ * 七十二候（しちじゅうにこう）で、扉の前の一輪挿しに挿さる草花を替える。
  *
  * 「書斎の方で七十二候に合わせて微妙に装飾が変わるのをやってみたい。この入口にもできると
- * 楽しい」（PR #624 のレビュー）への最初の一歩。**変えるのは枝 1 本だけ**にしてある —
- * 部屋の作りを季節で変え始めると、世界観の設計（扉や置き物の必然性）と衝突する。
- * 枝は生き物なので、季節で姿が変わっても部屋の意味は変わらない。
+ * 楽しい」（PR #624 のレビュー）への答え。
  *
- * 日付 → 太陽黄経 → 候（5° ごと・72 個）と辿る。暦の表を持たないのは、表は年ごとに
- * 作り直しが要るため。黄経は近似式で数分の誤差が出るが、候の切り替わりが数分ずれるだけで
- * 見た目に影響しない。
+ * ### 何を替えるか
  *
- * 時刻の扱いは端末の時計そのまま（利用者の季節感に合わせる）。
+ * **節気（15 日ごと・24 回）で花材そのものを替える。** はじめは葉の枚数だけを増減させていたが、
+ * 「あまりにも地味」と差し戻された。梅・猫柳・桜・菖蒲・笹・蓮・芒・桔梗・紅葉・松・椿…と
+ * 姿の違う草花が巡れば、開くたびに季節が分かる。候（5 日ごと・72 回）では、同じ花材のまま
+ * 蕾が開き、丈が伸び、傾きが変わる — **同じ花の時間の経過**として読める差にする。
+ *
+ * ### 何を替えないか
+ *
+ * 扉・棚・敷物・花器は季節で変えない。変えるのは挿さっている草花だけ。部屋の作りを動かし
+ * 始めると、置いてある物の必然性（世界観デザイン）と衝突する。
+ *
+ * ### 姿勢
+ *
+ * 川瀬敏郎の「一日一花」に倣い、**一種を一輪挿しに投げ入れた姿**にする。枯れ枝・実だけの枝・
+ * 穂だけの芒も花材として扱い、整えず、まっすぐ立てず、余白を残す。
+ *
+ * 日付 → 太陽黄経 → 候（5° ごと・72 個）と辿る。暦の表を持たないのは、表が年ごとに作り直しに
+ * なるため。黄経は近似式で数分の誤差が出るが、候の切り替わりが数分ずれるだけで見た目に影響しない。
  */
 
 /** 候の数。二十四節気 × 3。 */
@@ -56,7 +68,7 @@ export function solarLongitude(date: Date): number {
   return normalizeDegrees(meanLongitude + center);
 }
 
-/** いまが何番目の候か（0 = 立春の初候「東風解凍」、71 = 大寒の末候「鶏始乳」）。 */
+/** いまが何番目の候か（0 = 立春の初候、71 = 大寒の末候）。 */
 export function microSeasonIndex(date: Date): number {
   const fromRisshun = normalizeDegrees(solarLongitude(date) - RISSHUN_LONGITUDE);
   const index = Math.floor(fromRisshun / DEGREES_PER_MICRO_SEASON);
@@ -64,52 +76,346 @@ export function microSeasonIndex(date: Date): number {
   return index % MICRO_SEASON_COUNT;
 }
 
-/** 一輪挿しに挿してある枝の姿。 */
+/**
+ * 姿の型。**線画で描き分けられる最小の数**に絞ってある。
+ *
+ * - `branch`: 木の枝（梅・桜・紅葉・実の枝）。節で折れ曲がり、葉や花や実が付く
+ * - `flower`: 草花の茎（菖蒲・桔梗・彼岸花）。まっすぐ立ち、先に花、根元に細い葉
+ * - `grass`: 草・笹（複数の細い葉が弧を描く）
+ * - `plume`: 穂のある草（芒）。`grass` の先に穂が開く
+ * - `needle`: 松。茎に短い針が並ぶ
+ * - `broadleaf`: 大きな一枚（蓮の葉）
+ * - `vine`: つる（藤・朝顔）。うねりながら垂れる
+ */
+type SprigForm = 'branch' | 'flower' | 'grass' | 'plume' | 'needle' | 'broadleaf' | 'vine';
+
+/** 一輪挿しに挿さっている草花。値は花器の口を原点にした world unit と rad。 */
 export interface Sprig {
-  /** 葉の数（0..3）。 */
+  /** 花材の名前（注釈とテストのため。画面には出さない）。 */
+  name: string;
+  form: SprigForm;
+  /** 茎・枝の本数。 */
+  stems: number;
+  /** 花器の口からの丈。 */
+  height: number;
+  /** 傾き（rad）。正で右へ。まっすぐ立てない。 */
+  lean: number;
+  /** 咲き具合（0 = 蕾 / 1 = 満開）。花を持たない姿では 0。 */
+  bloom: number;
+  /** 花びらの数（0 なら花を付けない）。 */
+  petals: number;
+  /** 葉の枚数。 */
   leaves: number;
-  /** 蕾。まだ開いていない。 */
-  bud: boolean;
-  /** 花。 */
-  blossom: boolean;
-  /** 実。 */
-  berry: boolean;
+  /** 実の数。 */
+  berries: number;
   /**
-   * 枝の伸び（0..1）。同じ節気の中でも初候・次候・末候で少しだけ変わる。
-   * 「微妙に変わる」を、形ではなく寸法で出すための 1 本。
+   * 葉の形。省くと丸みのある葉（`oval`）。
+   * `narrow` は細長い葉（菖蒲・笹）、`lobed` は切れ込みのある葉（楓）。
    */
-  reach: number;
+  leafShape?: 'oval' | 'narrow' | 'lobed';
 }
 
-/**
- * 候から枝の姿を決める。
- *
- * 二十四節気（候 3 つ）を単位に、冬は枝だけ → 春は蕾から花へ → 夏は葉が茂る →
- * 秋は実を付けて葉を落とす、と巡る。候ごとの違いは伸びの 0.04 だけで、
- * 並べて比べなければ気づかない程度にする。
- */
+/** 節気ごとの花材。`step`（初候 0 / 次候 1 / 末候 2）で同じ花材の時間が進む。 */
+type TermSprig = (step: number) => Sprig;
+
+/** 節気 24 の花材。並びは立春から。 */
+const TERMS: TermSprig[] = [
+  // 立春: 白梅。固い蕾がほころび始める。
+  (step) => ({
+    name: '梅',
+    form: 'branch',
+    stems: 1,
+    height: 1.0 + step * 0.03,
+    lean: 0.5,
+    bloom: 0.12 + step * 0.22,
+    petals: 5,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 雨水: 猫柳。銀色の花穂が枝に並ぶ。
+  (step) => ({
+    name: '猫柳',
+    form: 'branch',
+    stems: 1,
+    height: 1.12 + step * 0.04,
+    lean: 0.62,
+    bloom: 0,
+    petals: 0,
+    leaves: 0,
+    berries: 3 + step,
+  }),
+  // 啓蟄: 土筆。短い穂が土から伸びる。
+  (step) => ({
+    name: '土筆',
+    form: 'plume',
+    stems: 2 + (step > 1 ? 1 : 0),
+    height: 0.6 + step * 0.06,
+    lean: 0.18,
+    bloom: 0.3 + step * 0.2,
+    petals: 0,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 春分: 桜。ひと枝に花が開く。
+  (step) => ({
+    name: '桜',
+    form: 'branch',
+    stems: 1,
+    height: 1.16 + step * 0.03,
+    lean: 0.72,
+    bloom: 0.55 + step * 0.22,
+    petals: 5,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 清明: 山吹。花のあとに若葉が追いつく。
+  (step) => ({
+    name: '山吹',
+    form: 'branch',
+    stems: 1,
+    height: 1.2,
+    lean: 0.85,
+    bloom: 1,
+    petals: 5,
+    leaves: 1 + step,
+    berries: 0,
+  }),
+  // 穀雨: 藤。房が垂れる。
+  (step) => ({
+    name: '藤',
+    form: 'vine',
+    stems: 1,
+    height: 1.05 + step * 0.05,
+    lean: 0.5,
+    bloom: 0.5 + step * 0.25,
+    petals: 4,
+    leaves: 2,
+    berries: 0,
+  }),
+  // 立夏: 青楓。葉だけの枝。
+  (step) => ({
+    name: '青楓',
+    form: 'branch',
+    stems: 1,
+    height: 1.14 + step * 0.04,
+    lean: 0.66,
+    bloom: 0,
+    petals: 0,
+    leaves: 2 + step,
+    berries: 0,
+    leafShape: 'lobed',
+  }),
+  // 小満: 菖蒲。細い葉と立つ花。
+  (step) => ({
+    name: '菖蒲',
+    form: 'flower',
+    stems: 1,
+    height: 1.24,
+    lean: 0.12,
+    bloom: 0.35 + step * 0.3,
+    petals: 3,
+    leaves: 2,
+    berries: 0,
+    leafShape: 'narrow',
+  }),
+  // 芒種: 蛍袋。俯いた釣鐘。
+  (step) => ({
+    name: '蛍袋',
+    form: 'flower',
+    stems: 1 + (step > 1 ? 1 : 0),
+    height: 1.0,
+    lean: 0.34,
+    bloom: 0.45 + step * 0.2,
+    petals: 1,
+    leaves: 1,
+    berries: 0,
+  }),
+  // 夏至: 笹。葉が弧を描く。
+  (step) => ({
+    name: '笹',
+    form: 'grass',
+    stems: 3 + (step > 1 ? 1 : 0),
+    height: 1.2 + step * 0.04,
+    lean: 0.3,
+    bloom: 0,
+    petals: 0,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 小暑: 朝顔。つるを伸ばして一輪。
+  (step) => ({
+    name: '朝顔',
+    form: 'vine',
+    stems: 1,
+    height: 1.1,
+    lean: 0.42,
+    bloom: 0.6 + step * 0.2,
+    petals: 5,
+    leaves: 2,
+    berries: 0,
+  }),
+  // 大暑: 蓮の葉。大きな一枚。
+  (step) => ({
+    name: '蓮の葉',
+    form: 'broadleaf',
+    stems: 1,
+    height: 0.86 + step * 0.05,
+    lean: 0.24,
+    bloom: 0,
+    petals: 0,
+    leaves: 1,
+    berries: 0,
+  }),
+  // 立秋: 芒。穂が開く。
+  (step) => ({
+    name: '芒',
+    form: 'plume',
+    stems: 2,
+    height: 1.3 + step * 0.05,
+    lean: 0.55,
+    bloom: 0.4 + step * 0.25,
+    petals: 0,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 処暑: 桔梗。星形の花。
+  (step) => ({
+    name: '桔梗',
+    form: 'flower',
+    stems: 1,
+    height: 1.06,
+    lean: 0.2,
+    bloom: 0.3 + step * 0.35,
+    petals: 5,
+    leaves: 2,
+    berries: 0,
+  }),
+  // 白露: 萩。枝垂れて小さな花。
+  (step) => ({
+    name: '萩',
+    form: 'vine',
+    stems: 1,
+    height: 1.12,
+    lean: 0.7,
+    bloom: 0.5 + step * 0.2,
+    petals: 3,
+    leaves: 3,
+    berries: 0,
+  }),
+  // 秋分: 彼岸花。細い花びらが放射する。
+  (step) => ({
+    name: '彼岸花',
+    form: 'flower',
+    stems: 1,
+    height: 1.08,
+    lean: 0.16,
+    bloom: 0.5 + step * 0.25,
+    petals: 6,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 寒露: 実の枝（七竈）。
+  (step) => ({
+    name: '実の枝',
+    form: 'branch',
+    stems: 1,
+    height: 1.1,
+    lean: 0.68,
+    bloom: 0,
+    petals: 0,
+    leaves: 2 - (step > 1 ? 1 : 0),
+    berries: 3 + step,
+  }),
+  // 霜降: 紅葉。葉を残した枝。
+  (step) => ({
+    name: '紅葉',
+    form: 'branch',
+    stems: 1,
+    height: 1.05,
+    lean: 0.6,
+    bloom: 0,
+    petals: 0,
+    leaves: 3 - step,
+    berries: 0,
+    leafShape: 'lobed',
+  }),
+  // 立冬: 枯れ枝。残った葉が 1 枚。
+  (step) => ({
+    name: '枯れ枝',
+    form: 'branch',
+    stems: 1,
+    height: 1.0 - step * 0.02,
+    lean: 0.78,
+    bloom: 0,
+    petals: 0,
+    leaves: step > 1 ? 0 : 1,
+    berries: 0,
+  }),
+  // 小雪: 山茶花。冬に咲く。
+  (step) => ({
+    name: '山茶花',
+    form: 'branch',
+    stems: 1,
+    height: 0.98,
+    lean: 0.55,
+    bloom: 0.5 + step * 0.25,
+    petals: 5,
+    leaves: 2,
+    berries: 0,
+  }),
+  // 大雪: 松。針が並ぶ。
+  (step) => ({
+    name: '松',
+    form: 'needle',
+    stems: 1 + (step > 1 ? 1 : 0),
+    height: 1.02 + step * 0.03,
+    lean: 0.46,
+    bloom: 0,
+    petals: 0,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 冬至: 千両。赤い実と葉。
+  (step) => ({
+    name: '千両',
+    form: 'branch',
+    stems: 1,
+    height: 0.96,
+    lean: 0.4,
+    bloom: 0,
+    petals: 0,
+    leaves: 2,
+    berries: 3 + step,
+  }),
+  // 小寒: 蝋梅。細い花びらが透ける。
+  (step) => ({
+    name: '蝋梅',
+    form: 'branch',
+    stems: 1,
+    height: 1.04,
+    lean: 0.62,
+    bloom: 0.45 + step * 0.2,
+    petals: 6,
+    leaves: 0,
+    berries: 0,
+  }),
+  // 大寒: 椿。固い蕾が春を待つ。
+  (step) => ({
+    name: '椿',
+    form: 'branch',
+    stems: 1,
+    height: 0.94,
+    lean: 0.5,
+    bloom: 0.15 + step * 0.15,
+    petals: 5,
+    leaves: 2,
+    berries: 0,
+  }),
+];
+
+/** その候に挿さっている草花。範囲の外の候でも一年を巡って収まる。 */
 export function entranceSprig(index: number): Sprig {
   const season = ((index % MICRO_SEASON_COUNT) + MICRO_SEASON_COUNT) % MICRO_SEASON_COUNT;
-  /** 節気（0 = 立春 … 23 = 大寒）。 */
-  const term = Math.floor(season / 3);
-  /** 初候 0 / 次候 1 / 末候 2。 */
-  const step = season % 3;
-  const reach = 0.92 + step * 0.04;
-
-  // 立春・雨水: 枝に蕾だけ。
-  if (term <= 1) return { leaves: 0, bud: true, blossom: false, berry: false, reach };
-  // 啓蟄・春分: 花が開く。
-  if (term <= 3) return { leaves: 1, bud: false, blossom: true, berry: false, reach };
-  // 清明・穀雨: 花が残り、葉が増える。
-  if (term <= 5) return { leaves: 2, bud: false, blossom: true, berry: false, reach };
-  // 立夏〜大暑: 葉が茂る。
-  if (term <= 11) return { leaves: 3, bud: false, blossom: false, berry: false, reach };
-  // 立秋〜白露: 茂ったまま、実を付ける。
-  if (term <= 14) return { leaves: 3, bud: false, blossom: false, berry: true, reach };
-  // 秋分〜霜降: 葉を落とし始める。
-  if (term <= 17) return { leaves: 2, bud: false, blossom: false, berry: true, reach };
-  // 立冬・小雪: 残り 1 枚。
-  if (term <= 19) return { leaves: 1, bud: false, blossom: false, berry: false, reach };
-  // 大雪〜大寒: 枝だけ。末の大寒には次の蕾が付く。
-  return { leaves: 0, bud: term === 23, blossom: false, berry: false, reach };
+  const term = TERMS[Math.floor(season / 3)] ?? TERMS[0];
+  return term(season % 3);
 }
