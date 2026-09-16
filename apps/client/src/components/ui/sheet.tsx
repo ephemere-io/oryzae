@@ -115,6 +115,11 @@ export function Sheet({
   /** 出したいか（`open`）。state の phase より 1 拍早い。容器の大きさが変わったときの判断に使う。 */
   const openRef = useRef(open);
   openRef.current = open;
+  /**
+   * いまの位置が**指で動かした結果か**。閉じるのは指で払いきったときだけで、部品が段へ送った結果では閉じない。
+   * 送り（`scrollToDetent`）のたびに false に戻し、容器に指が触れたら true にする。
+   */
+  const byFingerRef = useRef(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   /**
    * スクロール容器の要素（state）。席（殻のドックの層）が後から用意されると、シートは同じ部品のまま**別の要素に
@@ -207,6 +212,8 @@ export function Sheet({
     (position: SheetDetent, behavior: 'smooth' | 'instant') => {
       const scroller = scrollerRef.current;
       if (!scroller) return;
+      // ここから先の位置は部品が決めたもの（指ではない）。
+      byFingerRef.current = false;
       const top = targetOf(position);
       if (typeof scroller.scrollTo !== 'function') {
         scroller.scrollTop = top;
@@ -215,10 +222,12 @@ export function Sheet({
       const reduced =
         typeof window !== 'undefined' &&
         window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      scroller.scrollTo({
-        top,
-        behavior: behavior === 'smooth' && !reduced ? 'smooth' : 'instant',
-      });
+      if (behavior === 'instant' || reduced) {
+        // 直接代入がいちばん確実（`scrollTo` は吸着やアニメーションの都合で効かないことがある）。
+        scroller.scrollTop = top;
+        return;
+      }
+      scroller.scrollTo({ top, behavior: 'smooth' });
     },
     [targetOf],
   );
@@ -304,10 +313,16 @@ export function Sheet({
       }
       const current = latest.current;
       if (current.phase === 'closing') return;
-      // 閉の位置（容器の下）に着いた＝指で払いきった。出ているときだけ、かつ**採寸できる場所でだけ**数える
-      // （配置の無い環境では位置がいつも 0 で、開いた瞬間に閉じたことになる）。
-      if (current.dismissible && current.phase === 'open' && scroller.clientHeight > 0 && top < 1) {
-        current.onRequestClose?.();
+      // 閉の位置（容器の下）に着いた。**指で払いきったときだけ閉じる。**
+      // 部品が送った結果として 0 に居るなら、それは段へ置けていないということなので、頼まれている段へ戻す
+      // （実機レビュー: 一覧からシートを開いても何も出てこない、を二度と起こさない保険）。
+      // 配置の無い環境（テスト）では位置がいつも 0 なので、採寸できるときだけ数える。
+      if (current.phase === 'open' && scroller.clientHeight > 0 && top < 1) {
+        if (current.dismissible && byFingerRef.current) {
+          current.onRequestClose?.();
+          return;
+        }
+        scrollToDetent(current.detent, 'instant');
         return;
       }
       let settled: SheetDetent | null = null;
@@ -339,6 +354,12 @@ export function Sheet({
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(check);
     };
+    // 指が容器に触れたら、そこから先の位置は指が決めたもの（払いきりで閉じてよい）。
+    const onPointerDown = () => {
+      byFingerRef.current = true;
+    };
+    scroller.addEventListener('pointerdown', onPointerDown, { passive: true });
+    scroller.addEventListener('touchstart', onPointerDown, { passive: true });
     scroller.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
@@ -360,6 +381,8 @@ export function Sheet({
           });
     observer?.observe(scroller);
     return () => {
+      scroller.removeEventListener('pointerdown', onPointerDown);
+      scroller.removeEventListener('touchstart', onPointerDown);
       scroller.removeEventListener('scroll', onScroll);
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
