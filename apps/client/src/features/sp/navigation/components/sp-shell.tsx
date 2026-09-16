@@ -51,7 +51,11 @@ export function SpShell({ topBar, bottomNav, children }: SpShellProps) {
           // 画面が入れ替わったら短く現れる（220ms・ease-out、reduce 設定では無効）。押してから
           // 次の画面が「置かれた」ことを目で追えるようにする。鍵は path（同じ画面の再描画では動かない）。
           key={pathname}
-          className="sp-rise relative min-h-0 flex-1 overflow-auto"
+          // isolate: 本文の重なりをここで閉じる。**画面が重ねる層（瓶の上の問いの一覧など）が、殻のドック・
+          // シート・下端の列より上に来ないように。** 以前は `sp-rise` の動きがたまたま重なりの文脈を作っていて、
+          // 動きを止める設定や動き終わりの扱いが違うブラウザでは、重ねた画面がシートを覆った（実機レビュー:
+          // 問いの一覧からセミモーダルが出てこない）。
+          className="sp-rise relative isolate min-h-0 flex-1 overflow-auto"
           style={{
             // 本文の端まで引いても殻の外（ブラウザの引っ張り更新）へ伝えない。
             overscrollBehavior: 'contain',
