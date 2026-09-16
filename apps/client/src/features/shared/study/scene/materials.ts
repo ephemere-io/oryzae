@@ -75,11 +75,11 @@ export interface StudyMaterials {
   xray(opacity: number): LineBasicMaterial;
   /** 当たり判定用の見えない面。 */
   hitbox: MeshBasicMaterial;
-  /** 墨で塗る小さな面（行頭の点など）。同じ濃さは 1 つを使い回す。 */
-  inkFill(opacity: number): MeshBasicMaterial;
   sprite(map: Texture, opacity: number): SpriteMaterial;
   /** 面に貼る文字テクスチャ（スプライトと違い、面の向きに従う）。 */
   text(map: Texture, opacity: number): MeshBasicMaterial;
+  /** 外で複製した素材を預かる（`dispose` でまとめて捨てるため）。 */
+  adopt(...materials: Material[]): void;
   dispose(): void;
 }
 
@@ -155,7 +155,6 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
 
   const faintCache = new Map<string, LineBasicMaterial>();
   const xrayCache = new Map<string, LineBasicMaterial>();
-  const inkFillCache = new Map<string, MeshBasicMaterial>();
 
   return {
     inkColor: palette.ink,
@@ -194,16 +193,6 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
       xrayCache.set(key, material);
       return material;
     },
-    inkFill(opacity: number): MeshBasicMaterial {
-      const key = opacityKey(opacity);
-      const cached = inkFillCache.get(key);
-      if (cached) return cached;
-      const material = own(
-        new MeshBasicMaterial({ color: palette.ink, transparent: true, opacity }),
-      );
-      inkFillCache.set(key, material);
-      return material;
-    },
     sprite(map: Texture, opacity: number): SpriteMaterial {
       // スプライトは 1 枚ごとにテクスチャが違うのでキャッシュしない。
       return own(
@@ -228,12 +217,14 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
         }),
       );
     },
+    adopt(...materials: Material[]): void {
+      for (const material of materials) own(material);
+    },
     dispose(): void {
       for (const material of owned) material.dispose();
       owned.length = 0;
       faintCache.clear();
       xrayCache.clear();
-      inkFillCache.clear();
     },
   };
 }

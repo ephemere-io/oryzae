@@ -858,11 +858,9 @@
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
     "hint_board_both": "写真{photos}件・スニペット{snippets}件",
-    "memo_help": "ヘルプ",
-    "memo_contact": "お問い合わせ",
-    "memo_docs": "Docs",
-    "hint_memo_help": "使い方とよくある質問",
-    "hint_memo_contact": "メールで問い合わせる",
-    "hint_memo_docs": "Oryzae の考え方と発酵のしくみ"
+    "note_line_1": "ようこそ、書斎へ。",
+    "note_line_2": "使い方や問い合わせは",
+    "note_line_3": "左下のアカウントから。",
+    "hint_note": "はがす"
   }
 }

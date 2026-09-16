@@ -858,11 +858,9 @@
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
     "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
-    "memo_help": "帮助",
-    "memo_contact": "联系我们",
-    "memo_docs": "Docs",
-    "hint_memo_help": "使用方法与常见问题",
-    "hint_memo_contact": "通过邮件联系我们",
-    "hint_memo_docs": "Oryzae 的理念与发酵机制"
+    "note_line_1": "欢迎来到书斋。",
+    "note_line_2": "使用方法与联系方式",
+    "note_line_3": "在左下角的账户里。",
+    "hint_note": "撕下"
   }
 }

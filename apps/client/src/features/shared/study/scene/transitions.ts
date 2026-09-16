@@ -91,8 +91,8 @@ function rawSteps(target: StudyTarget, options: PlanOptions): TransitionStep[] {
     case 'board':
       return boardSteps(options.twoStageBoard);
 
-    case 'external':
-      // 部屋の外へ出る対象はカメラを動かさない。段取りは空（呼ばれても即座に終わる）。
+    case 'note':
+      // 卓上のメモはカメラを動かさない（はがれるだけ）。段取りは空（呼ばれても即座に終わる）。
       return [];
   }
 }

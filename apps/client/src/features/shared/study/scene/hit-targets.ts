@@ -7,7 +7,6 @@
 
 import { notebookTarget } from '../navigation';
 import type { Notebook, StudyTarget } from '../types';
-import type { MemoLine } from './memo';
 
 /** ヒットボックスに貼る識別子。`Object3D.userData.hitId` に入れる。 */
 export type HitId = string;
@@ -20,7 +19,7 @@ export type HitId = string;
  * 出ない」と報告された。手帳と背表紙は月ごとの `StudyTooltip` が別に出るので、
  * ここには入れない（同じ場所に 2 枚出てしまう）。
  */
-export type HitHint = 'pen' | 'jar' | 'board' | 'memo-help' | 'memo-contact' | 'memo-docs';
+export type HitHint = 'pen' | 'jar' | 'board' | 'note';
 
 export interface HitEntry {
   id: HitId;
@@ -66,8 +65,8 @@ export function buildHitRegistry(options: {
   shelf: readonly Notebook[];
   /** SP は棚ごと 1 つの的にする。 */
   shelfAsSingleTarget: boolean;
-  /** 壁のメモの行。無ければメモを置いていない構図。 */
-  memo?: readonly MemoLine[];
+  /** 卓上のメモが置いてあるか（はがしたら無い）。 */
+  note?: boolean;
 }): HitRegistry {
   const registry = new HitRegistry();
 
@@ -122,26 +121,24 @@ export function buildHitRegistry(options: {
   });
 
   /**
-   * 壁のメモ。**1 行ずつが的。** 紙は名前（ヘルプ・お問い合わせ・Docs）しか言わないので、
-   * 触れたときの一言が「そこで何ができるか」を補う（ラベルと同じ分担）。
+   * 卓上のメモ。紙ごと 1 つの的で、押すとはがれる。文面は紙に書いてあるので
+   * ラベルは持たず、触れたときの一言は「はがす」とだけ言う。
    */
-  for (const line of options.memo ?? []) {
+  if (options.note) {
     registry.add({
-      id: memoHitId(line.id),
-      target: { kind: 'external', href: line.href },
+      id: NOTE_HIT_ID,
+      target: { kind: 'note' },
       label: null,
       month: null,
-      hint: `memo-${line.id}`,
+      hint: 'note',
     });
   }
 
   return registry;
 }
 
-/** メモの行のヒット id。scene のヒットボックスと登録簿で同じものを使う。 */
-export function memoHitId(line: MemoLine['id']): HitId {
-  return `memo-${line}`;
-}
+/** 卓上のメモのヒット id。scene のヒットボックスと登録簿で同じものを使う。 */
+export const NOTE_HIT_ID: HitId = 'note';
 
 /**
  * クリック時に採る対象を決める。
