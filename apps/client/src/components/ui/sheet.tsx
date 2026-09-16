@@ -21,8 +21,17 @@ export interface SheetProps {
   detent: SheetDetent;
   /** 指で動かして別の段に止まったとき。 */
   onDetentChange: (detent: SheetDetent) => void;
-  /** 暗幕を押したとき（モーダル）。呼び出し側は `open` を false にする。 */
+  /**
+   * 閉じたいとき（暗幕を押した・いちばん低い段からさらに下へ引いた）。呼び出し側は `open` を false にする。
+   */
   onRequestClose?: () => void;
+  /**
+   * いちばん低い段からさらに下へ引いたら閉じるか。**モーダルのシートだけ true**（iOS のシートと同じ）。
+   * パレットや歯車で出し入れする板（発酵の結果・設定）は false で、指では消えない。
+   *
+   * 吸着先の組は描いている間に変えない（WebKit が別の段へ吸着し直す）ので、閉の吸着先はこの値で固定する。
+   */
+  dismissible?: boolean;
   /** 引っ込む動きが終わって消えたとき。 */
   onClosed?: () => void;
   /** モーダル（暗幕あり・外を押すと閉じる）か。 */
@@ -55,10 +64,9 @@ type Phase = 'entering' | 'open' | 'closing';
  *
  * ### 役割を分ける: 出す／消すはボタン、高さは指
  *
- * - **指（スクロール）は高さだけを変える。** 一番低い段より下には止まれない。下まで引いても、離せばブラウザの吸着で
- *   一番低い段へ戻る。以前は閉の位置（容器の下）も吸着先に持ち、そこへ着いたら閉じる（閉じられない板は JS で
- *   送り返す）作りで、iOS では送り返しが効かずに消えたまま残った。パレットは緑のままなのに結果が無い、になった
- *   （実機レビュー: 押す／押さないで出す／出さない、指では高さ）
+ * - **指（スクロール）は高さを変える。** パレットや歯車で出し入れする板（`dismissible: false`）は一番低い段より
+ *   下に止まれない（下まで引いても離せば戻る）。モーダルのシート（`dismissible: true`）だけ、いちばん低い段から
+ *   さらに引くと閉じる（iOS のシートと同じ）
  * - **出す／消すは `open`**（パレットや歯車のボタン、暗幕、キャンセル）。動きはシートの容器を下へずらす CSS の
  *   transition（`.oz-sheet-scroller[data-shown]`）。消える動きの終わりは transition の完了で知る
  *
@@ -88,6 +96,7 @@ export function Sheet({
   detent,
   onDetentChange,
   onRequestClose,
+  dismissible = false,
   onClosed,
   modal,
   backdropLabel,
@@ -117,6 +126,17 @@ export function Sheet({
     scrollerRef.current = element;
     setScrollerEl(element);
   }, []);
+  /**
+   * 中身の箱（シートの中でスクロールするところ）。**高さを変える指と、中身を読む指を分ける**ために、容器とは別の
+   * スクロール容器にしてある。1 つの容器で両方を担っていた頃は、中身を読み終えて下へ戻すとそのままシートが縮んだ
+   * （実機レビュー: 内部のスクロールが尽きた瞬間に連動して小さくなる）。
+   */
+  const [innerEl, setInnerEl] = useState<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
+  const attachInner = useCallback((element: HTMLDivElement | null) => {
+    innerRef.current = element;
+    setInnerEl(element);
+  }, []);
   const sheetRef = useRef<HTMLElement | null>(null);
   const halfRef = useRef<HTMLDivElement | null>(null);
   const peekRef = useRef<HTMLDivElement | null>(null);
@@ -132,8 +152,18 @@ export function Sheet({
     onClosed,
     onSettle,
     phase,
+    dismissible,
   });
-  latest.current = { detent, detents, onDetentChange, onRequestClose, onClosed, onSettle, phase };
+  latest.current = {
+    detent,
+    detents,
+    onDetentChange,
+    onRequestClose,
+    onClosed,
+    onSettle,
+    phase,
+    dismissible,
+  };
 
   // 出す／消す。消すときは消さずに引っ込む動きへ。引っ込む途中で出せば、その場から戻る（transition が折り返す）。
   useEffect(() => {
@@ -274,6 +304,12 @@ export function Sheet({
       }
       const current = latest.current;
       if (current.phase === 'closing') return;
+      // 閉の位置（容器の下）に着いた＝指で払いきった。出ているときだけ、かつ**採寸できる場所でだけ**数える
+      // （配置の無い環境では位置がいつも 0 で、開いた瞬間に閉じたことになる）。
+      if (current.dismissible && current.phase === 'open' && scroller.clientHeight > 0 && top < 1) {
+        current.onRequestClose?.();
+        return;
+      }
       let settled: SheetDetent | null = null;
       for (const candidate of current.detents) {
         // 1px 未満の差は同じ位置（スクロール位置は小数になる）。
@@ -282,9 +318,14 @@ export function Sheet({
           break;
         }
       }
-      // 全画面の先（中身を読み進めた位置）も全画面の段に居る。
-      if (!settled && current.detents.includes('full') && top > targetOf('full')) settled = 'full';
       if (!settled) return;
+      // **いちばん高い段に着いたときだけ中身が動く。** 低い段では指はシートの高さに使う（同じ指で中身まで
+      // 流れると、読み終えて戻したときにシートが縮んでしまう）。
+      const inner = innerRef.current;
+      if (inner) {
+        const atTop = top >= scroller.scrollHeight - scroller.clientHeight - 1;
+        inner.style.overflowY = atTop ? 'auto' : 'hidden';
+      }
       // 知らせるのは指で**別の段へ**動かしたときだけ。前に止まっていた段にまだ居るだけ（頼まれた段へ送り始める
       // 前の一瞬）を「指で戻した」と取り違えると、頼まれた段を打ち消してしまう。
       const previous = settledRef.current;
@@ -325,6 +366,70 @@ export function Sheet({
     };
   }, [present, targetOf, scrollerEl, scrollToDetent]);
 
+  /**
+   * 中身の段の吸着先は「見出し + 中身の高さ」。シートは容器と同じ高さなので、CSS だけでは中身の高さが分からない。
+   * 測って CSS 変数（`--oz-sheet-content`）に渡し、**吸着そのものはブラウザに任せる**（JS で段へ送らない）。
+   */
+  useEffect(() => {
+    const inner = innerEl;
+    const section = sheetRef.current;
+    const content = inner?.firstElementChild;
+    if (!inner || !section || !content || typeof ResizeObserver === 'undefined') return;
+    const header = section.querySelector('[data-sheet-header]');
+    const measure = () => {
+      const height = (header?.getBoundingClientRect().height ?? 0) + content.scrollHeight;
+      section.style.setProperty('--oz-sheet-content', `${Math.round(height)}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(content);
+    if (header) observer.observe(header);
+    return () => observer.disconnect();
+  }, [innerEl]);
+
+  // 中身の箱: 先頭に戻りきって指が離れるまで、シートへスクロールを渡さない（渡すと同じ指で縮む）。
+  useEffect(() => {
+    const inner = innerEl;
+    if (!inner) return;
+    let touching = false;
+    let frame = 0;
+    let lastTop = Number.NaN;
+    /** 指が離れていて、先頭に戻りきっているときだけ、次の指をシートへ渡す。 */
+    const settle = () => {
+      frame = 0;
+      if (inner.scrollTop !== lastTop) {
+        lastTop = inner.scrollTop;
+        frame = requestAnimationFrame(settle);
+        return;
+      }
+      inner.style.overscrollBehaviorY = !touching && inner.scrollTop <= 0 ? 'auto' : 'contain';
+    };
+    const onScroll = () => {
+      // 動き出した時点でシートへは渡さない（この指のうちに先頭へ戻っても縮ませない）。
+      inner.style.overscrollBehaviorY = 'contain';
+      if (!frame) frame = requestAnimationFrame(settle);
+    };
+    const onDown = () => {
+      touching = true;
+    };
+    const onUp = () => {
+      touching = false;
+      lastTop = Number.NaN;
+      if (!frame) frame = requestAnimationFrame(settle);
+    };
+    inner.addEventListener('scroll', onScroll, { passive: true });
+    inner.addEventListener('pointerdown', onDown);
+    inner.addEventListener('pointerup', onUp);
+    inner.addEventListener('pointercancel', onUp);
+    return () => {
+      inner.removeEventListener('scroll', onScroll);
+      inner.removeEventListener('pointerdown', onDown);
+      inner.removeEventListener('pointerup', onUp);
+      inner.removeEventListener('pointercancel', onUp);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [innerEl]);
+
   if (!present) return null;
 
   const has = (d: SheetDetent) => detents.includes(d);
@@ -363,8 +468,11 @@ export function Sheet({
           containerType: 'size',
         }}
       >
-        {/* 容器の高さの空き。吸着先ではない（ここに止まれない＝指では消えない）。 */}
-        <div aria-hidden="true" style={{ height: '100%' }} />
+        {/* 容器の高さの空き。閉の位置。払って閉じられるシートだけ、ここが吸着先になる。 */}
+        <div
+          aria-hidden="true"
+          style={{ height: '100%', scrollSnapAlign: dismissible ? 'start' : 'none' }}
+        />
         {/* 半分の段の印。容器の子の `top: 50%` は容器の高さの半分。 */}
         <div
           ref={halfRef}
@@ -379,15 +487,17 @@ export function Sheet({
           aria-label={ariaLabel}
           className={`${visualPhase === 'closing' ? 'pointer-events-none' : 'pointer-events-auto'} relative flex flex-col rounded-t-3xl border-t`}
           style={{
-            // 全画面の段を持つシートは容器と同じ高さを持つ（全画面で面が下まで届く）。
-            minHeight: has('full') ? '100%' : undefined,
+            // シートは容器と同じ高さ（全画面で面が下まで届く。低い段では下半分が画面の外に出るだけ）。
+            // **高さを固定するから、中身がはみ出しても伸びない**＝容器のスクロールは段の切り替えだけを担う。
+            height: '100%',
             background: 'var(--surface-raised)',
             borderColor: 'var(--surface-raised-border)',
             boxShadow: '0 -8px 32px rgba(140,133,126,0.18)',
             scrollSnapAlign: has('full') ? 'start' : 'none',
           }}
         >
-          <div className="relative grid">
+          {/* 見出しの升（覗く段の印を同じ升に重ねる）。 */}
+          <div className="relative grid shrink-0">
             {/* 覗く段の印。見出しの行と同じ升（高さ＝見出しの行）に置いた箱の中で、「見出しの行の下端から容器の
                 高さぶん上」に置き、上端揃えで吸着する＝見出しの行だけが見える。 */}
             <div aria-hidden="true" className="relative" style={{ gridArea: '1 / 1' }}>
@@ -415,25 +525,29 @@ export function Sheet({
             >
               {header}
             </div>
-            <div className="oz-sheet-pass" style={{ gridRow: 2 }}>
-              {children}
-            </div>
-            {/* 中身の段の印。「中身の下端（容器より高ければ容器の高さ）から容器の高さぶん上」に置き、上端揃えで
-                吸着する＝シートの中身の下端が容器の下端に来る。 */}
-            <div
-              ref={contentRef}
-              aria-hidden="true"
-              className="absolute left-0 h-0 w-px"
-              style={{
-                top: 'calc(min(100%, 100cqh) - 100cqh)',
-                scrollSnapAlign: has('content') ? 'start' : 'none',
-              }}
-            />
           </div>
-          {/* 中身の下の空き（全画面の段を持つシートで、中身が短いとき）。ここも指を容器へ通す。iOS は
-              `pointer-events: none` の容器へ、ふつうの要素に触れた指のスクロールを渡さない。
-              中身の高さの印を狂わせないよう、中身の箱とは別の兄弟で埋める。 */}
-          <div aria-hidden="true" data-sheet-fill className="oz-sheet-pass min-h-0 flex-1" />
+          {/* 中身の箱。シートの残りを全部取る。いちばん高い段に着くまでは `overflow-y: hidden`（指はシートの
+              高さに使う）。着いたら `auto` になり、先頭に戻って指を離すまでシートへスクロールを渡さない
+              （上の effect）。`oz-sheet-pass` は iOS で指を容器へ通すため。 */}
+          <div
+            ref={attachInner}
+            data-sheet-content
+            className="oz-sheet-pass min-h-0 flex-1"
+            style={{ overflowY: 'hidden', overscrollBehaviorY: 'auto' }}
+          >
+            <div>{children}</div>
+          </div>
+          {/* 中身の段の印。「見出し + 中身の高さ（容器より高ければ容器の高さ）から容器の高さぶん上」に置き、
+              上端揃えで吸着する＝中身の下端が容器の下端に来る。高さは測って CSS 変数で渡す。 */}
+          <div
+            ref={contentRef}
+            aria-hidden="true"
+            className="absolute left-0 h-0 w-px"
+            style={{
+              top: 'calc(min(var(--oz-sheet-content, 100%), 100cqh) - 100cqh)',
+              scrollSnapAlign: has('content') ? 'start' : 'none',
+            }}
+          />
         </section>
       </div>
     </div>,
