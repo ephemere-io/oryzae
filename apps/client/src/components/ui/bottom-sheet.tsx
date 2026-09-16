@@ -10,9 +10,8 @@ export interface BottomSheetProps {
   /** 開いているか。呼び出し側が持つ（中身が無くなったら false）。 */
   open: boolean;
   /**
-   * 閉じたいとき（閉じる・暗幕）。**押した時点で呼ぶ**ので、呼び出し側はここで `open` を false にする。
-   * 引っ込む動きの間は、最後に開いていたときの中身を部品が描き続ける。指でシートを下げても閉じない
-   * （指は高さだけ。実機レビュー）。
+   * 閉じたいとき（閉じる・暗幕・いちばん低い段からさらに下へ引いた）。**押した時点で呼ぶ**ので、呼び出し側は
+   * ここで `open` を false にする。引っ込む動きの間は、最後に開いていたときの中身を部品が描き続ける。
    */
   onClose: () => void;
   /** 引っ込む動きが終わって消えたとき。 */
@@ -38,6 +37,8 @@ export interface BottomSheetProps {
 /**
  * 下から出る**モーダル**のシート（暗幕あり・外を押すと閉じる）。動きは `Sheet`（出入りは CSS の transition、
  * 高さはネイティブのスクロールと CSS scroll-snap）。SP の殻の中なら殻の overlay の席に出る。
+ *
+ * 閉じるのは、閉じるボタン・暗幕・**いちばん低い段からさらに下へ引いたとき**。
  *
  * **開いているかは呼び出し側が持ち、部品は常に描いておく**（`<BottomSheet open={item !== null}>`）。
  * 引っ込む途中で `open` が true に戻れば、その場から出し直す。
@@ -74,6 +75,8 @@ export function BottomSheet({
       detent={detent}
       onDetentChange={setDetent}
       onRequestClose={onClose}
+      // いちばん低い段からさらに引いたら閉じる（iOS のシートと同じ。実機レビュー）。
+      dismissible
       onClosed={onClosed}
       modal
       backdropLabel={closeLabel}
