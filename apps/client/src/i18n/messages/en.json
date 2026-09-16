@@ -860,6 +860,6 @@
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
     "hint_board_both": "{photos} photos · {snippets} snippets",
-    "hint_memo": "Help and contact — under your account"
+    "hint_memo": "Help and contact"
   }
 }

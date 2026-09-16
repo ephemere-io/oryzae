@@ -860,6 +860,6 @@
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
     "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
-    "hint_memo": "使用方法与联系方式 — 在账户里"
+    "hint_memo": "使用方法与联系方式"
   }
 }

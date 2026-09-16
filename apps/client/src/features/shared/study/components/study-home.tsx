@@ -14,7 +14,7 @@ import { DURATION, RENDER_LIMITS } from '../constants';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
-import { overlayScope, staysInStudy, targetHref } from '../navigation';
+import { externalHref, overlayScope, staysInStudy, targetHref } from '../navigation';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -147,6 +147,12 @@ export function StudyHome({ layout }: StudyHomeProps) {
 
   const handleNavigate = useCallback(
     (target: StudyTarget) => {
+      // 部屋の外（公開サイト）は新しいタブで開く。書斎は閉じない。
+      const outside = externalHref(target);
+      if (outside !== null) {
+        window.open(outside, '_blank', 'noopener,noreferrer');
+        return;
+      }
       const href = targetHref(target);
       // カメラが着いてから URL を変える。書斎はこの時点でもう消えている（溶暗）。
       if (href !== null) router.push(href);
