@@ -4,7 +4,11 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MenuOption, MenuPanel } from '@/components/ui/menu';
-import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
+import {
+  ELEVATED_CHIP_CLASS,
+  ELEVATED_CHIP_STYLE,
+  HEADER_CHIP_CLASS,
+} from '@/components/ui/surface';
 
 interface QuestionOption {
   id: string;
@@ -190,7 +194,8 @@ export function QuestionChip({
 
   // 地・縁・角丸・ホバーはアクションパレットと同じ面（ELEVATED_CHIP_*）。影は付けない。
   // 結んでいる印は「◦」だけに accent を残す（地まで accent にすると別の部品に見える）。
-  const chipClass = `flex h-9 shrink-0 items-center gap-2 px-4 text-[13.5px] font-medium ${ELEVATED_CHIP_CLASS}`;
+  // 寸法は隣の「‹ 書斎」（BackLink）と共有する（HEADER_CHIP_CLASS）。
+  const chipClass = `${HEADER_CHIP_CLASS} ${ELEVATED_CHIP_CLASS}`;
 
   return (
     // 器はボタンに張りつく大きさにする（inline-flex）。中央寄せの箱にしていた頃は、

@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { DeviceView } from '@/components/device-view';
+import { BackLink } from '@/components/ui/back-link';
 import { ErrorState } from '@/components/ui/error-state';
 import { QuestionCreateForm } from '@/features/pc/questions/components/question-create-form';
 import { QuestionTimeline } from '@/features/pc/questions/components/question-timeline';
@@ -45,6 +46,8 @@ export default function QuestionsPage() {
       }
       pc={
         <div className="flex min-h-full flex-col">
+          {/* 左上の出口（書斎が無効なら描かれない）。本文の列は中央に寄っているので隅に置く。 */}
+          <BackLink placement="corner" />
           <div className="mx-auto w-full max-w-[800px] flex-1 px-6 pt-12 pb-20">
             <QuestionCreateForm onSubmit={createQuestion} />
 

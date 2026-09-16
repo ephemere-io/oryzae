@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
+import { BackLink } from '@/components/ui/back-link';
 import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
 import type { AccountUser } from '@/features/shared/account/types';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
@@ -489,6 +490,9 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
       {...verifyAttrs({ unit: 'AccountPage', hasAvatar: Boolean(user.avatarUrl), isOAuthOnly })}
       className="mx-auto max-w-2xl px-6 py-12"
     >
+      {/* 左上の出口（書斎が無効なら描かれない）。本文の列は中央に寄っているので隅に置く。 */}
+      <BackLink placement="corner" />
+
       {/* Page title */}
       <h1 className={sectionHeadingClass} style={sectionHeadingStyle}>
         Account

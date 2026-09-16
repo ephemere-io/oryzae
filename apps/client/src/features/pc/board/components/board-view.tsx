@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BackLink } from '@/components/ui/back-link';
 import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
@@ -365,21 +366,24 @@ export function BoardView({ api }: BoardViewProps) {
         overlay={
           // 操作 UI の上ではパンを始めない。
           <div data-canvas-no-pan="">
-            {/* 上段バー: 左端に日付、右端に表示単位。1本のバーの両端に置くことで、
-                左右に散らばって見えないようにする。 */}
+            {/* 上段バー: 左端に書斎へ戻る ＋ 日付、右端に表示単位。1本のバーの両端に
+                置くことで、左右に散らばって見えないようにする。 */}
             <div
               className={TOP_BAR_CLASS}
               style={{
                 top: BOARD_INSET,
                 // 左端はサイドバー幅ぶん寄せる
                 // （--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
-                // 書斎が有効な間は左上に「書斎へ戻る」マークが浮くので、その席も避ける
-                // （避けないと日付ナビがマークの下に潜って押せない）。
                 left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
                 right: BOARD_INSET,
               }}
             >
-              <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
+              {/* 出口は日付と同じ行の先頭に並べる（書斎が無効なら描かれない）。日付ナビの
+                  山形と隣り合うので、間を広めに取って別の塊に見せる。 */}
+              <div className="flex min-w-0 items-center gap-6">
+                <BackLink />
+                <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
+              </div>
               <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
             </div>
             <CanvasZoomControls
