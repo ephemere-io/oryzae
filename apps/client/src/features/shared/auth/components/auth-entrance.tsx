@@ -14,6 +14,7 @@ import type { EntranceLayout } from '../entrance/layout';
 import { PAPER_FONT, PAPER_SHADOW, PAPER_STYLE } from '../entrance/paper';
 import { isPassage } from '../entrance/passage';
 import type { EntranceSceneHandle } from '../entrance/scene';
+import { measureOverlayToolbarInset } from '../entrance/viewport';
 import type { EntranceControls } from '../types';
 
 /**
@@ -65,10 +66,18 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   const [ready, setReady] = useState(false);
   const [leaving, setLeaving] = useState<EnterPlan | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  /**
+   * 画面の下に**重なっている**ブラウザのツールバーぶん（px）。`viewport.ts` の注釈を参照。
+   *
+   * 開いたときに 1 回だけ測る。スクロールのたびに測り直すと、ツールバーが畳まれる
+   * たびに紙が跳ねる。
+   */
+  const [toolbarInset, setToolbarInset] = useState(0);
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    setToolbarInset(measureOverlayToolbarInset());
   }, []);
 
   /**
@@ -207,7 +216,8 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             <div
               className="relative z-10 px-3"
               style={{
-                paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+                // 下の余白は **12px / 端末の安全域 / 重なっているツールバー** のいちばん大きいもの。
+                paddingBottom: `max(12px, env(safe-area-inset-bottom), ${toolbarInset}px)`,
                 transform: leaving === null ? 'translateY(0)' : 'translateY(calc(100% + 24px))',
                 transition: `transform ${PAPER_RETREAT_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
               }}
