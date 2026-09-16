@@ -66,8 +66,10 @@ import { formatEntryDate } from '@/features/pc/entries/utils/format-entry-date';
 import {
   applyInlineImagesToEditor,
   createInlineImageElement,
-  DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
   extractInlineImages,
+  INLINE_IMAGE_WIDTH_ACROSS_LINE,
+  INLINE_IMAGE_WIDTH_ALONG_LINE,
+  inlineImageWidthRatio,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
 import { measureTitle, TITLE_MIN_FONT_SIZE } from '@/features/pc/entries/utils/title-metrics';
@@ -80,6 +82,7 @@ import { useFermentationForQuestion } from '@/features/shared/fermentation/hooks
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
 import { useUserMe } from '@/features/shared/user/hooks/use-user-me';
 import type { ApiClient } from '@/lib/api';
+import { measureImageSize } from '@/lib/resize-image';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 
 interface AuthState {
@@ -912,13 +915,22 @@ export function EntryEditor({
       photosRef.current = updated; // 再レンダーを待たずに次の操作へ反映する
       setPhotos(updated);
 
+      // **大きさは写真の向きで決める。** 長辺が行と同じ向きなら広く、直交すれば狭く
+      // （縦書きに横長を広く置くと、1 枚で紙をまたぐ）。差し込む前に測っておく——
+      // 差し込んだ直後に await を挟むと、待っている間にキャレットが動く。
+      const size = await measureImageSize(photo.signedUrl);
+
       if (el) {
         el.focus();
         const node = createInlineImageElement(
           {
             offset: 0, // 実際の位置は保存時に DOM から数え直す
             storagePath: photo.storagePath,
-            widthRatio: DEFAULT_INLINE_IMAGE_WIDTH_RATIO,
+            widthRatio: inlineImageWidthRatio({
+              naturalWidth: size?.width ?? 0,
+              naturalHeight: size?.height ?? 0,
+              isVertical,
+            }),
             // 既定は**ブロックで中央**。行の中に小さく挟まるより、1 枚の絵として
             // 置くほうが「写真を貼る」という動機に合う（#587 のレビューでも同じ指摘）。
             layout: 'block',
@@ -937,7 +949,7 @@ export function EntryEditor({
       const savedId = await save(finalContent, currentEntryId, { mediaUrls: next });
       if (savedId) setCurrentEntryId(savedId);
     },
-    [title, content, currentEntryId, save],
+    [title, content, currentEntryId, save, isVertical],
   );
 
   const photoImport = usePhotoImport({
@@ -1172,15 +1184,18 @@ export function EntryEditor({
    */
   const selectedPhoto = inlineImages.selection.image;
 
-  /** 幅は 3 段階を巡る（小 0.4 → 中 0.7 → 大 1.0）。刻みは SP と同じ。 */
+  /**
+   * 大きさは 3 段階を巡る。**差し込んだときの大きさがそのまま段になっている**
+   * （小＝行と直交、中＝行と同じ向き。どちらも写真の向きから決まる値）。
+   */
   function nextWidthRatio(ratio: number): number {
-    if (ratio <= 0.55) return 0.7;
-    if (ratio <= 0.85) return 1;
-    return 0.4;
+    if (ratio <= 0.65) return INLINE_IMAGE_WIDTH_ALONG_LINE;
+    if (ratio <= 0.9) return 1;
+    return INLINE_IMAGE_WIDTH_ACROSS_LINE;
   }
   function widthName(ratio: number): string {
-    if (ratio <= 0.55) return tPhoto('width_small');
-    if (ratio <= 0.85) return tPhoto('width_medium');
+    if (ratio <= 0.65) return tPhoto('width_small');
+    if (ratio <= 0.9) return tPhoto('width_medium');
     return tPhoto('width_large');
   }
   function alignName(align: 'start' | 'center' | 'end'): string {
@@ -1207,8 +1222,8 @@ export function EntryEditor({
   const photoActions: PaletteAction[] = selectedPhoto
     ? [
         {
-          id: 'photo-width',
-          label: `${tPhoto('width')} · ${widthName(selectedPhoto.widthRatio)}`,
+          id: 'photo-size',
+          label: `${tPhoto('size')} · ${widthName(selectedPhoto.widthRatio)}`,
           icon: paletteIcon(<path d="M4 7v10M20 7v10M7 12h10M9 9l-2 3 2 3M15 9l2 3-2 3" />),
           onSelect: () =>
             inlineImages.updateLayout({ widthRatio: nextWidthRatio(selectedPhoto.widthRatio) }),
@@ -1219,22 +1234,24 @@ export function EntryEditor({
           // 幅いっぱいの写真には寄る先が無い。押せなくして理由を出す。
           disabledReason: selectedPhoto.widthRatio >= 1 ? tPhoto('align_needs_room') : undefined,
           icon: paletteIcon(<path d="M4 6h16M4 10h10M4 14h16M4 18h10" />),
-          onSelect: () =>
+          onSelect: () => {
+            // **巡りは常に 始め→中央→終わり。** 回り込みのときだけ中央を飛ばしていたので、
+            // 一度回り込ませると差し込んだときの中央へ戻れなかった。
+            const align =
+              selectedPhoto.align === 'start'
+                ? ('center' as const)
+                : selectedPhoto.align === 'center'
+                  ? ('end' as const)
+                  : ('start' as const);
             inlineImages.updateLayout({
-              // 回り込みのときは「始め / 終わり」だけ（中央には文字が流れる側が無い）。
-              align:
-                selectedPhoto.layout === 'wrap'
-                  ? selectedPhoto.align === 'start'
-                    ? 'end'
-                    : 'start'
-                  : selectedPhoto.align === 'start'
-                    ? 'center'
-                    : selectedPhoto.align === 'center'
-                      ? 'end'
-                      : 'start',
-              // 行内のままでは寄せが効かない（文字の流れが位置を決める）。
-              ...(selectedPhoto.layout === 'inline' ? { layout: 'block' as const } : {}),
-            }),
+              align,
+              // 中央に置くと、文字が流れ込む側が左右どちらにも残らない。回り込みは外す。
+              // 行内のままでも寄せは効かない（文字の流れが位置を決める）ので、同じく塊にする。
+              ...(align === 'center' || selectedPhoto.layout === 'inline'
+                ? { layout: 'block' as const }
+                : {}),
+            });
+          },
         },
         {
           id: 'photo-wrap',
@@ -1253,7 +1270,9 @@ export function EntryEditor({
               // 中央寄せのまま回り込みにすると寄る先が無い。見た目と揃えて始めへ。
               ...(on && selectedPhoto.align === 'center' ? { align: 'start' as const } : {}),
               // 幅いっぱいでは文字が回り込む隙間が無い。いちばん小さい段に落とす。
-              ...(on && selectedPhoto.widthRatio >= 1 ? { widthRatio: 0.4 } : {}),
+              ...(on && selectedPhoto.widthRatio >= 1
+                ? { widthRatio: INLINE_IMAGE_WIDTH_ACROSS_LINE }
+                : {}),
             });
           },
         },
@@ -1264,12 +1283,6 @@ export function EntryEditor({
             <path d="M6 7h12M10 7V5h4v2M10 11v6M14 11v6M7 7l.8 12a2 2 0 0 0 2 1.9h4.4a2 2 0 0 0 2-1.9L17 7" />,
           ),
           onSelect: removeSelectedPhoto,
-        },
-        {
-          id: 'photo-done',
-          label: tPhoto('done'),
-          icon: paletteIcon(<path d="m5 13 4 4 10-10" />),
-          onSelect: inlineImages.clear,
         },
       ]
     : [];

@@ -149,7 +149,7 @@ registerUnit<Props>({
         const ids = Array.from(root.querySelectorAll('[data-palette-action]')).map((el) =>
           el.getAttribute('data-palette-action'),
         );
-        const want = ['photo-width', 'photo-align', 'photo-wrap', 'photo-remove', 'photo-done'];
+        const want = ['photo-size', 'photo-align', 'photo-wrap', 'photo-remove'];
         const missing = want.filter((id) => !ids.includes(id));
         if (missing.length > 0) return `写真の操作が出ていない: ${missing.join(' / ')}`;
         return (
