@@ -104,7 +104,7 @@ registerUnit<Props>({
       id: 'error-shown-iff-haserror',
       description: 'エラーメッセージは contract.hasError=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const errorShown = Boolean(root.querySelector('p.text-red-600'));
+        const errorShown = Boolean(root.querySelector('p[role="alert"]'));
         const expectError = contract.hasError === 'true';
         // invalid 状態の invalid_link も赤文字 p だが、その状態は hasError=false で
         // 評価しないよう state=form の fixture のみがこの分岐に乗る点に注意。

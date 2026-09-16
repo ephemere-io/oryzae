@@ -163,4 +163,27 @@ describe('useOauthCallback', () => {
 
     await waitFor(() => expect(result.current.error).toBe('capacity_reached'));
   });
+  it('確定したら、読み込み直す前に beforeLeave（扉を開けて入る）を / で待つ', async () => {
+    params = new URLSearchParams({ code: 'c1' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(true, session));
+    // 解決させずに止めておく。止まっている間は location.assign に進まない
+    // （jsdom の assign は差し替えられないので、手前で止めて順序を確かめる）。
+    const beforeLeave = vi.fn(() => new Promise<void>(() => {}));
+
+    renderHook(() => useOauthCallback(beforeLeave));
+
+    await waitFor(() => expect(beforeLeave).toHaveBeenCalledWith('/'));
+    expect(localStorage.getItem('oryzae_access_token')).toBe('at');
+  });
+
+  it('通らなかったら beforeLeave を呼ばない（扉は開かない）', async () => {
+    params = new URLSearchParams({ code: 'c1' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(false, {}, 400));
+    const beforeLeave = vi.fn(() => Promise.resolve());
+
+    const { result } = renderHook(() => useOauthCallback(beforeLeave));
+
+    await waitFor(() => expect(result.current.error).toBe('auth_failed'));
+    expect(beforeLeave).not.toHaveBeenCalled();
+  });
 });

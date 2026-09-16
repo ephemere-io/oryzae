@@ -87,6 +87,36 @@ describe('useEmailConfirm', () => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/entries/new'));
   });
 
+  it('移る前に beforeLeave（扉を開けて入る）を行き先つきで待ち、済んでから移る', async () => {
+    params = new URLSearchParams({ token_hash: 'th', type: 'signup' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(true, session));
+    let finishWalking: () => void = () => {};
+    const beforeLeave = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishWalking = resolve;
+        }),
+    );
+
+    renderHook(() => useEmailConfirm(beforeLeave));
+
+    await waitFor(() => expect(beforeLeave).toHaveBeenCalledWith('/'));
+    // 歩き終えるまでは読み込み直さない（先に移ると扉が開く前に画面が変わる）。
+    expect(assign).not.toHaveBeenCalled();
+    finishWalking();
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+  });
+
+  it('beforeLeave が失敗しても移る（演出のために入口を塞がない）', async () => {
+    params = new URLSearchParams({ token_hash: 'th', type: 'signup' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(true, session));
+    const beforeLeave = vi.fn(() => Promise.reject(new Error('webgl lost')));
+
+    renderHook(() => useEmailConfirm(beforeLeave));
+
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+  });
+
   it('検証に失敗したら auth_failed（遷移しない）', async () => {
     params = new URLSearchParams({ token_hash: 'th', type: 'signup' });
     vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(false));

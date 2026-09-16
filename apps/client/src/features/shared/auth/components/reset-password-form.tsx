@@ -5,6 +5,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Suspense, useEffect, useState } from 'react';
+import {
+  ERROR_CLASS,
+  HEADING_CLASS,
+  INPUT_CLASS,
+  LABEL_CLASS,
+  LEAD_CLASS,
+  PAPER_STACK_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECONDARY_BUTTON_CLASS,
+  SERIF_FONT,
+} from '@/features/shared/auth/entrance/paper';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { useAuthActions } from '@/features/shared/auth/hooks/use-auth-actions';
 import { getAccessToken } from '@/lib/auth';
@@ -29,20 +40,20 @@ function ResetPasswordHandler() {
   }, []);
 
   if (!tokenChecked) {
-    return <p className="text-sm text-center text-zinc-500">{t('loading')}</p>;
+    return <p className={LEAD_CLASS}>{t('loading')}</p>;
   }
 
   if (!accessToken) {
     return (
       <div
-        className="flex flex-col gap-4 text-center"
+        className={PAPER_STACK_CLASS}
         {...verifyAttrs({ unit: 'ResetPasswordForm', state: 'invalid', hasError: false })}
       >
-        <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{t('invalid_link')}</p>
-        <Link
-          href="/forgot-password"
-          className="text-sm font-medium text-zinc-900 dark:text-zinc-100"
-        >
+        <h1 className={HEADING_CLASS} style={SERIF_FONT}>
+          {t('heading')}
+        </h1>
+        <p className={ERROR_CLASS}>{t('invalid_link')}</p>
+        <Link href="/forgot-password" className={SECONDARY_BUTTON_CLASS}>
           {t('back_link')}
         </Link>
       </div>
@@ -77,16 +88,24 @@ function ResetPasswordHandler() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-4"
+      className={PAPER_STACK_CLASS}
       {...verifyAttrs({ unit: 'ResetPasswordForm', state: 'form', hasError: Boolean(error) })}
     >
-      <h1 className="text-2xl font-bold text-center">{t('heading')}</h1>
-      <p className="text-sm text-center text-zinc-500">{t('subheading')}</p>
+      <header className="mb-2 flex flex-col gap-3">
+        <h1 className={HEADING_CLASS} style={SERIF_FONT}>
+          {t('heading')}
+        </h1>
+        <p className={LEAD_CLASS}>{t('subheading')}</p>
+      </header>
 
-      {error && <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>}
+      {error && (
+        <p role="alert" className={ERROR_CLASS}>
+          {error}
+        </p>
+      )}
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">{t('password_label')}</span>
+      <label className="flex flex-col gap-2">
+        <span className={LABEL_CLASS}>{t('password_label')}</span>
         <input
           type="password"
           aria-label={t('password_label')}
@@ -94,12 +113,13 @@ function ResetPasswordHandler() {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900"
+          autoComplete="new-password"
+          className={INPUT_CLASS}
         />
       </label>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">{t('confirm_label')}</span>
+      <label className="flex flex-col gap-2">
+        <span className={LABEL_CLASS}>{t('confirm_label')}</span>
         <input
           type="password"
           aria-label={t('confirm_label')}
@@ -107,15 +127,12 @@ function ResetPasswordHandler() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
           minLength={6}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900"
+          autoComplete="new-password"
+          className={INPUT_CLASS}
         />
       </label>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-      >
+      <button type="submit" disabled={loading} className={`mt-1 ${PRIMARY_BUTTON_CLASS}`}>
         {loading ? t('submit_loading') : t('submit')}
       </button>
     </form>
@@ -124,7 +141,7 @@ function ResetPasswordHandler() {
 
 function ResetPasswordFallback() {
   const t = useTranslations('auth.reset_password');
-  return <p className="text-sm text-center text-zinc-500">{t('loading')}</p>;
+  return <p className={LEAD_CLASS}>{t('loading')}</p>;
 }
 
 export function ResetPasswordForm() {

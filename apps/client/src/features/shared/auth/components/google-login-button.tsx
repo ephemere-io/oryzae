@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { SECONDARY_BUTTON_CLASS } from '@/features/shared/auth/entrance/paper';
 import { useAuthActions } from '@/features/shared/auth/hooks/use-auth-actions';
 
 function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
@@ -38,9 +39,9 @@ export function GoogleLoginButton() {
       type="button"
       onClick={handleClick}
       disabled={loading}
-      className="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      className={SECONDARY_BUTTON_CLASS}
     >
-      <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+      <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" aria-hidden="true">
         <path
           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
           fill="#4285F4"

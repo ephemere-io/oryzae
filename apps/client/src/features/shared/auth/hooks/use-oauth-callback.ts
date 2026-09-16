@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import posthog from 'posthog-js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AuthFlowError, AuthSession } from '@/features/shared/auth/types';
 import { createApiClient } from '@/lib/api';
 import { setTokens } from '@/lib/auth';
@@ -68,9 +68,18 @@ function isAuthSession(value: unknown): value is AuthSession {
   return 'refreshToken' in session && typeof session.refreshToken === 'string';
 }
 
-export function useOauthCallback(): { error: AuthFlowError | null } {
+export function useOauthCallback(
+  /**
+   * `/` へ読み込み直す**直前**に待つもの（認証画面の扉を開けて入る演出）。
+   * 行き先を受け取り、解決したら移る。失敗しても移る — 演出のために入口を塞がない。
+   */
+  beforeLeave?: (destination: string) => Promise<void>,
+): { error: AuthFlowError | null } {
   const searchParams = useSearchParams();
   const [error, setError] = useState<AuthFlowError | null>(null);
+  // effect を searchParams だけで回すため、関数は ref で読む（毎描画で新しい参照になりうる）。
+  const beforeLeaveRef = useRef(beforeLeave);
+  beforeLeaveRef.current = beforeLeave;
 
   useEffect(() => {
     async function handleCallback() {
@@ -95,7 +104,7 @@ export function useOauthCallback(): { error: AuthFlowError | null } {
         }
         setTokens(data.session.accessToken, data.session.refreshToken);
         posthog.identify(data.user.id, { email: data.user.email });
-        finish();
+        await finish(beforeLeaveRef.current);
         return;
       }
 
@@ -117,7 +126,7 @@ export function useOauthCallback(): { error: AuthFlowError | null } {
         if (isAuthUser(data)) {
           posthog.identify(data.user.id, { email: data.user.email });
         }
-        finish();
+        await finish(beforeLeaveRef.current);
         return;
       }
 
@@ -130,6 +139,8 @@ export function useOauthCallback(): { error: AuthFlowError | null } {
   return { error };
 }
 
+const HOME = '/';
+
 /**
  * OAuth 完了はフルページ遷移で確定させる。router.push（アプリ内遷移）だと root の
  * AuthProvider が再マウントされず restoreSession が再実行されないため、保存した
@@ -139,6 +150,7 @@ export function useOauthCallback(): { error: AuthFlowError | null } {
  * `/`（書斎。止めていれば `/entries/new` へ送る）1 か所だから。ここは effect の中でフラグの解決を
  * 待てる場所ではないうえ、どうせ全画面遷移なので `/` を 1 枚挟む損が無い。
  */
-function finish(): void {
-  window.location.assign('/');
+async function finish(beforeLeave?: (destination: string) => Promise<void>): Promise<void> {
+  await beforeLeave?.(HOME).catch(() => undefined);
+  window.location.assign(HOME);
 }
