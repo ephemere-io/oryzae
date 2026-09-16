@@ -3,7 +3,7 @@
 import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ActionRow } from '@/components/ui/action-row';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { CONTROL_FONT } from '@/components/ui/surface';
@@ -76,15 +76,6 @@ export function SpQuestions({
    * した（レビュー）。同じシートの中で「アーカイブしますか？」を挟む。
    */
   const [confirmingArchive, setConfirmingArchive] = useState(false);
-  /**
-   * シートを開いた瞬間に書く欄へフォーカスを移す。**`autoFocus` は使わない**: ブラウザはフォーカスした要素を
-   * 見せようとして祖先（シートのスクロール容器）を勝手に送るので、シートが出る前に画面が跳ねた（実機レビュー:
-   * ピュンと上に行ってからシートが出る）。`preventScroll` で送らせない。
-   */
-  const draftRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (sheet) draftRef.current?.focus({ preventScroll: true });
-  }, [sheet]);
 
   const proposed = questions.filter(
     (q) => q.isProposedByOryzae && !q.isValidatedByUser && !q.isArchived,
@@ -394,7 +385,12 @@ export function SpQuestions({
         {sheet ? (
           <>
             <textarea
-              ref={draftRef}
+              // 開いた瞬間に書き始められることが要件。**effect では当てない**: iOS は指の操作と地続きでない
+              // フォーカスでキーボードを出さない（effect で当てていた版ではキーボードが出なかった）。
+              // 描画時に当てれば指の操作の続きとして扱われる。シートは高さが決まっていて中身は別のスクロール
+              // 容器なので、フォーカスで祖先が送られて画面が跳ねることはもう無い。
+              // biome-ignore lint/a11y/noAutofocus: 上記のとおり、開いた瞬間に書けることが要件
+              autoFocus
               aria-label={t('placeholder')}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
