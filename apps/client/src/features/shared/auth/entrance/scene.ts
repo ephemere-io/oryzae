@@ -32,13 +32,19 @@ import {
 } from 'three';
 import { RENDER_LIMITS } from '@/features/shared/study/constants';
 import { approach, breathOffset, type CameraView } from '@/features/shared/study/scene/camera';
+import { captureRenderedFrame } from '@/features/shared/study/scene/capture';
 import { sampleJarProfile } from '@/features/shared/study/scene/jar';
-import { createMaterials, type StudyMaterials } from '@/features/shared/study/scene/materials';
+import {
+  createMaterials,
+  LIGHT_PALETTE,
+  type StudyMaterials,
+} from '@/features/shared/study/scene/materials';
 import {
   DOOR,
   DOOR_ANGLE,
   DOOR_SETTLE_LERP,
   doorAngleWhileEntering,
+  ENTER_TIMING,
   type EnterPlan,
   FRAME,
   homeEntranceView,
@@ -46,13 +52,27 @@ import {
   walkView,
 } from './door';
 import { type EntranceLayout, FRAME_SETTLE_LERP } from './layout';
+import type { Sprig } from './season';
 
 export interface EntranceSceneOptions {
   container: HTMLElement;
   layout: EntranceLayout;
   reducedMotion: boolean;
+  /**
+   * 一輪挿しに挿してある枝の姿（`season.ts`）。いまの候（七十二候）から決まる。
+   * 部屋の作りは季節で変えない — 変えるのは枝 1 本だけ。
+   */
+  sprig: Sprig;
   /** 最初の 1 フレームを描き終えたとき（1 度だけ）。地から扉を浮かび上がらせる合図。 */
   onReady?: () => void;
+  /**
+   * 奥へ歩いている途中の 1 枚（data URL）。**書斎が読み込まれるまでの地**にする。
+   *
+   * 画面が入れ替わる一瞬、以前はここで地の色だけが見えていた（「ホワイトアウトして
+   * ブツ切れ」— PR #624 のレビュー）。扉の側で撮った部屋を敷いておけば、書斎の canvas が
+   * 描き始めるまで部屋が見えたままになる。
+   */
+  onCapture?: (dataUrl: string) => void;
 }
 
 export interface EntranceSceneHandle {
@@ -108,7 +128,7 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
   scene.add(buildFrame(materials, own));
   scene.add(buildDoormat(materials, own));
   scene.add(buildStudyGlimpse(materials, own));
-  scene.add(buildCabinet(materials, own, layout));
+  scene.add(buildCabinet(materials, own, layout, options.sprig));
   const door = buildDoor(materials, own);
   scene.add(door);
 
@@ -130,8 +150,12 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     startedAt: number;
     fromAngle: number;
     fromView: CameraView;
+    /** 書斎へ渡す 1 枚を撮ったか（1 回だけ）。 */
+    captured: boolean;
     resolve: () => void;
   } | null = null;
+  /** 次の描画の直後に 1 枚掴む、という予約。 */
+  let captureRequested = false;
 
   /** 見えている窓の高さ（px）。null は canvas 全体。目標へ毎フレーム寄せる。 */
   let frameHeight: number | null = null;
@@ -153,6 +177,15 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
       const elapsed = now - entering.startedAt;
       door.rotation.y = doorAngleWhileEntering(entering.plan, entering.fromAngle, elapsed);
       applyView(camera, walkView(entering.fromView, walkProgress(entering.plan, elapsed)));
+      // 歩き終わりの手前で 1 枚だけ撮る（書斎が読み込まれるまでの地）。
+      if (
+        !entering.captured &&
+        options.onCapture !== undefined &&
+        elapsed >= entering.plan.totalMs - ENTER_TIMING.captureLeadMs
+      ) {
+        entering.captured = true;
+        captureRequested = true;
+      }
     } else {
       doorAngle = approach(doorAngle, doorTarget, DOOR_SETTLE_LERP);
       door.rotation.y = doorAngle;
@@ -161,6 +194,14 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
 
     updateFrame();
     renderer.render(scene, camera);
+
+    // **描画の直後だけ**撮れる（描画バッファは次のフレームで捨てられる）。
+    if (captureRequested) {
+      captureRequested = false;
+      captureRenderedFrame(renderer, LIGHT_PALETTE.solid, (dataUrl) => {
+        if (dataUrl !== null) options.onCapture?.(dataUrl);
+      });
+    }
 
     if (!readyAnnounced) {
       readyAnnounced = true;
@@ -238,6 +279,7 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
         plan,
         startedAt: performance.now(),
         fromAngle: doorAngle,
+        captured: false,
         // 揺れを含んだ今の view から歩き出す。ホームから始めると 1 フレーム跳ぶ。
         fromView: currentView(),
         resolve,
@@ -591,7 +633,12 @@ function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): Group {
  * 前室には、帰ってきた手が物を置く高さの面がある。書斎が瓶と手帳で語るのと同じく、
  * ここも物 1 つで語り、線を足して部屋を説明しない。
  */
-function buildCabinet(materials: StudyMaterials, own: OwnGeometry, layout: EntranceLayout): Group {
+function buildCabinet(
+  materials: StudyMaterials,
+  own: OwnGeometry,
+  layout: EntranceLayout,
+  sprig: Sprig,
+): Group {
   const group = new Group();
   // 扉の枠（外端 x = -1.3）から少し離し、PC の構図で左端に切れない位置と幅。
   const cabinet = { x: -2.8, width: 1.5, height: 1.02, depth: 0.52 };
@@ -638,10 +685,13 @@ function buildCabinet(materials: StudyMaterials, own: OwnGeometry, layout: Entra
   }
 
   const vaseLocal = { x: 0.36, z: cabinet.depth * 0.5 };
-  const vase = buildVase(materials, own, layout, {
-    x: cabinet.x + vaseLocal.x,
-    z: group.position.z + vaseLocal.z,
-  });
+  const vase = buildVase(
+    materials,
+    own,
+    layout,
+    { x: cabinet.x + vaseLocal.x, z: group.position.z + vaseLocal.z },
+    sprig,
+  );
   vase.position.set(vaseLocal.x, cabinet.height + 0.11, vaseLocal.z);
   group.add(vase);
 
@@ -674,6 +724,8 @@ function buildVase(
   layout: EntranceLayout,
   /** 花瓶の world 上の位置（輪郭の向きを決めるためだけに使う）。 */
   world: { x: number; z: number },
+  /** 挿してある枝の姿（季節）。 */
+  sprig: Sprig,
 ): Group {
   const group = new Group();
   const profile = VASE_PROFILE.map(([r, y]) => new Vector2(r, y));
@@ -691,35 +743,70 @@ function buildVase(
   ];
   group.add(lineFrom(outline, materials.ink, own));
 
-  // 枝。カメラに向いた面の上で、少し右へ傾いて伸びる。
+  // 枝。カメラに向いた面の上で、少し右へ傾いて伸びる。姿は季節（候）で変わる。
   const along = (u: number, y: number) => new Vector3(Math.sin(side) * u, y, Math.cos(side) * u);
+  const reach = sprig.reach;
   const stem = [
     along(0, 0.62),
-    along(0.03, 0.9),
-    along(0.12, 1.18),
-    along(0.26, 1.42),
-    along(0.36, 1.55),
+    along(0.03 * reach, 0.62 + 0.28 * reach),
+    along(0.12 * reach, 0.62 + 0.56 * reach),
+    along(0.26 * reach, 0.62 + 0.8 * reach),
+    along(0.36 * reach, 0.62 + 0.93 * reach),
   ];
+  const tip = stem[stem.length - 1];
   group.add(lineFrom(stem, materials.faint(0.6), own));
 
-  // 葉。枝の途中に 3 枚、小さな紡錘形の輪郭で。
-  const leaves: [number, number, number][] = [
-    [0.03, 0.92, 0.9],
-    [0.13, 1.2, -0.5],
-    [0.27, 1.43, 0.7],
-  ];
-  for (const [u, y, tilt] of leaves) {
+  /** 枝に付く小さな輪郭（葉・蕾・花・実）。楕円を傾けて置く。 */
+  function sprout(
+    u: number,
+    y: number,
+    tilt: number,
+    size: { long: number; short: number },
+    opacity: number,
+  ): void {
     const points: Vector3[] = [];
     for (let i = 0; i <= 16; i++) {
       const t = (i / 16) * Math.PI * 2;
-      const lx = Math.cos(t) * 0.11;
-      const ly = Math.sin(t) * 0.035;
+      const lx = Math.cos(t) * size.long;
+      const ly = Math.sin(t) * size.short;
       const rx = lx * Math.cos(tilt) - ly * Math.sin(tilt);
       const ry = lx * Math.sin(tilt) + ly * Math.cos(tilt);
-      points.push(along(u + rx + Math.cos(tilt) * 0.1, y + ry + Math.sin(tilt) * 0.1));
+      points.push(along(u + rx + Math.cos(tilt) * size.long, y + ry + Math.sin(tilt) * size.long));
     }
-    group.add(lineFrom(points, materials.faint(0.45), own));
+    group.add(lineFrom(points, materials.faint(opacity), own));
   }
+
+  // 葉。枝の根元から順に、姿が持っている枚数だけ。
+  const leaves: [number, number, number][] = [
+    [0.03 * reach, 0.62 + 0.3 * reach, 0.9],
+    [0.13 * reach, 0.62 + 0.58 * reach, -0.5],
+    [0.27 * reach, 0.62 + 0.81 * reach, 0.7],
+  ];
+  for (const [u, y, tilt] of leaves.slice(0, sprig.leaves)) {
+    sprout(u, y, tilt, { long: 0.11, short: 0.035 }, 0.45);
+  }
+
+  // 蕾・花・実は枝の先。同時には 1 つしか付かない（`entranceSprig`）。
+  const tipU = 0.36 * reach;
+  const tipY = tip.y;
+  if (sprig.bud) sprout(tipU, tipY, 1.2, { long: 0.045, short: 0.03 }, 0.5);
+  if (sprig.blossom) {
+    sprout(tipU, tipY, 0, { long: 0.07, short: 0.065 }, 0.5);
+    // 花びらの気配。輪郭の内側に短い線を 3 本。
+    for (const angle of [0.5, 1.6, 2.7]) {
+      group.add(
+        lineFrom(
+          [
+            along(tipU + 0.07, tipY + 0.07),
+            along(tipU + 0.07 + Math.cos(angle) * 0.05, tipY + 0.07 + Math.sin(angle) * 0.05),
+          ],
+          materials.faint(0.3),
+          own,
+        ),
+      );
+    }
+  }
+  if (sprig.berry) sprout(tipU - 0.02, tipY - 0.06, -1.4, { long: 0.038, short: 0.036 }, 0.55);
 
   return group;
 }

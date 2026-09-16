@@ -51,19 +51,29 @@ export const ENTER_TIMING = {
   /** 敷居をまたいで奥へ抜けるまで。 */
   walkMs: 980,
   /**
-   * 歩きの何割まで来たら溶かし始めるか。
+   * 歩き終わりに、書斎へ受け渡すためだけの短い溶暗（ms）。
    *
-   * 敷居をまたぐ（カメラが壁の面を越える）より前に消え始めていないと、枠が視界いっぱいに
-   * 広がって「扉にぶつかった」ように見える。
+   * **白く飛ばさない。** 以前は歩きの後半（約 0.4 秒）をかけて地の色へ溶かしていて、
+   * 「せっかく空間性を表現しているのに、ここでホワイトアウトしてブツ切れになる」と
+   * 報告された（PR #624 のレビュー）。いまは歩いたまま書斎へ渡し、向こうでカメラが
+   * 入り口から寄って止まる（`study/constants.ts` の `ARRIVAL`）。ここに残すのは、
+   * 画面が入れ替わる 1 瞬を隠すぶんだけ。
    */
-  fadeFromWalkRatio: 0.6,
+  handoverMs: 180,
+  /**
+   * 歩き終わりの何 ms 前に、書斎へ渡す 1 枚を撮るか。
+   *
+   * 撮った絵は書斎が読み込まれるまでの地になる（`study/backdrop.ts`）。**早めに撮る** —
+   * PNG の符号化と保存に少しかかるので、間に合わないと書斎が地の色から始まってしまう。
+   */
+  captureLeadMs: 420,
 } as const;
 
 export interface EnterPlan {
   doorMs: number;
   walkDelayMs: number;
   walkMs: number;
-  /** 画面全体を地の色へ溶かし始める時刻。 */
+  /** 書斎へ受け渡すための短い溶暗を始める時刻。 */
   fadeStartMs: number;
   fadeMs: number;
   /** ここで行き先へ移ってよい。 */
@@ -90,10 +100,8 @@ export function enterPlan(reducedMotion: boolean): EnterPlan {
     };
   }
   const walkEnd = ENTER_TIMING.walkDelayMs + ENTER_TIMING.walkMs;
-  const fadeStartMs = Math.round(
-    ENTER_TIMING.walkDelayMs + ENTER_TIMING.walkMs * ENTER_TIMING.fadeFromWalkRatio,
-  );
   const totalMs = Math.max(ENTER_TIMING.doorMs, walkEnd);
+  const fadeStartMs = Math.max(0, totalMs - ENTER_TIMING.handoverMs);
   return {
     doorMs: ENTER_TIMING.doorMs,
     walkDelayMs: ENTER_TIMING.walkDelayMs,

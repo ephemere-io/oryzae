@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
+import { saveStudyBackdrop } from '@/features/shared/study/backdrop';
 import { EntranceContext } from '../entrance/context';
 import { type EnterPlan, enterPlan } from '../entrance/door';
 import type { EntranceLayout } from '../entrance/layout';
@@ -44,8 +45,8 @@ const PAPER_RESIZE_MS = 380;
  *
  * - 待っている間: 扉はわずかに開いていて、隙間から奥の書斎の気配が覗く
  * - 送信中: 扉が少し大きく開く（`EntranceControls.setWaiting`）。失敗すれば閉じ直す
- * - 入れたら: 紙が退き、扉を押し開けて奥へ歩き、地の色に溶ける（`enter`）。
- *   書斎は同じ地の色から現れるので、ログインの前後が 1 つの廊下の続きになる
+ * - 入れたら: 紙が退き、扉を押し開けて奥へ歩き、**最後の 1 枚を書斎へ渡す**（`enter`）。
+ *   書斎はその絵の上にカメラが入ってきて止まるので、ログインの前後が 1 つの廊下の続きになる
  *
  * レイアウトに置くので、ログイン ↔ 登録 ↔ パスワード再設定を行き来しても扉は作り直さない。
  */
@@ -164,6 +165,7 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             reducedMotion={reducedMotion}
             onHandle={handleSceneHandle}
             onReady={handleReady}
+            onCapture={saveStudyBackdrop}
           />
         </div>
 
@@ -225,7 +227,10 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             </div>
           </>
         ) : (
-          <main className="relative z-10 flex flex-1 items-center justify-center px-6 py-16 md:justify-end md:pr-[max(40px,8vw)]">
+          // 紙は**常に右端**。画面幅で中央と右を切り替えていたころ、Brave では切り替えが効かず
+          // 紙が中央に来て扉に被った（PR #624 のレビュー）。PC の構図は扉が左・紙が右で一組なので、
+          // 幅で置き場を変える理由がそもそも無い。狭い窓でも紙は 400px + 余白で収まる。
+          <main className="relative z-10 flex flex-1 items-center justify-end px-6 py-16 pr-[max(24px,8vw)]">
             <div
               className="w-full max-w-[400px] rounded-[20px] px-9 py-10"
               style={{

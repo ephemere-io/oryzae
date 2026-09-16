@@ -39,6 +39,8 @@ export interface StudyCanvasProps {
   onCapture?: (dataUrl: string) => void;
   /** 最初の 1 フレームを描き終えたとき。敷いてある地を外してよい合図。 */
   onReady?: () => void;
+  /** 扉（認証画面）から入ってきた直後か。真ならカメラが入り口から寄って止まる。 */
+  arrival?: boolean;
 }
 
 /** `prefers-reduced-motion` を読む。SSR とテストでは false に倒す。 */
@@ -51,6 +53,7 @@ export function StudyCanvas({
   state,
   layout,
   theme,
+  arrival,
   onNavigate,
   onOpenOverlay,
   onHoverChange,
@@ -94,6 +97,10 @@ export function StudyCanvas({
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // 入ってきたかどうかはマウントの瞬間だけの話。effect の条件に入れると、
+  // 定置の途中で値が変わったときにシーンごと作り直してしまう。
+  const arrivalRef = useRef(arrival);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -106,6 +113,7 @@ export function StudyCanvas({
         state: stateRef.current,
         layout,
         theme,
+        arrival: arrivalRef.current,
         reducedMotion: prefersReducedMotion(),
         onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
         onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
