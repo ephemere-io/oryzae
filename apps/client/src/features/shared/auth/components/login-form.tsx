@@ -25,6 +25,7 @@ import {
   SERIF_FONT,
 } from '@/features/shared/auth/entrance/paper';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
+import { markStudyArrivalFor } from '@/features/shared/study/arrival';
 import { useHomeHref } from '@/features/shared/study/hooks/use-home-href';
 import { useAuth } from '@/lib/auth-context';
 
@@ -75,11 +76,14 @@ export function LoginForm() {
       return;
     }
 
-    // 扉を開けて奥へ歩き、地の色に溶け切ってから移る。先に移ると扉が開く前に画面が変わる。
-    await entrance.enter();
     // 手動切替はマウント時の effect で読むので、送信までにはまず解決している。
     // 万一まだなら `/` へ送る（HomeGate が同じ規則で振り分ける）。
-    router.push(resolved ? home : '/');
+    const next = resolved ? home : '/';
+    // 行き先が書斎なら、向こうでカメラが入り口から寄って止まる（白く飛ばさない）。
+    markStudyArrivalFor(next);
+    // 扉を開けて奥へ歩き切ってから移る。先に移ると扉が開く前に画面が変わる。
+    await entrance.enter();
+    router.push(next);
   }
 
   return (

@@ -19,10 +19,12 @@ describe('enterPlan', () => {
     expect(plan.fadeStartMs + plan.fadeMs).toBe(plan.totalMs);
   });
 
-  it('敷居をまたぐより前に溶け始める（枠に顔をぶつけて見えない）', () => {
+  it('歩いている間はずっと見えていて、溶けるのは受け渡しのぶんだけ', () => {
+    // 以前は歩きの後半（約 0.4 秒）をかけて地の色へ溶かしていて、扉をくぐった先が
+    // 白く飛んで「ブツ切れ」と報告された（PR #624）。溶暗は画面が入れ替わる一瞬を隠すだけにする。
     const plan = enterPlan(false);
     const from = homeEntranceView(ENTRANCE_PC_LAYOUT);
-    // 壁の面（z = 0）を越える時刻を探す。
+
     let crossedAt = plan.totalMs;
     for (let t = 0; t <= plan.totalMs; t += 5) {
       if (walkView(from, walkProgress(plan, t)).position.z < 0) {
@@ -30,7 +32,10 @@ describe('enterPlan', () => {
         break;
       }
     }
-    expect(plan.fadeStartMs).toBeLessThan(crossedAt);
+
+    expect(plan.fadeMs).toBeLessThanOrEqual(250);
+    // 敷居をまたぐところまでは、まだ溶け始めていない（空間が続いて見える）。
+    expect(plan.fadeStartMs).toBeGreaterThan(crossedAt * 0.8);
   });
 
   it('待たされていると感じる長さにしない（1.2 秒以内）', () => {

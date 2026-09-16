@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext } from 'react';
+import { markStudyArrivalFor } from '@/features/shared/study/arrival';
 import type { EntranceControls } from '../types';
 import { staysAtEntrance } from './passage';
 
@@ -30,7 +31,12 @@ export function useEntrance(): EntranceControls {
 export function useLeaveThroughEntrance(): (destination: string) => Promise<void> {
   const { enter } = useEntrance();
   return useCallback(
-    (destination: string) => (staysAtEntrance(destination) ? Promise.resolve() : enter()),
+    (destination: string) => {
+      if (staysAtEntrance(destination)) return Promise.resolve();
+      // 歩いて入った先が書斎なら、向こうでカメラが入り口から寄って止まる。
+      markStudyArrivalFor(destination);
+      return enter();
+    },
     [enter],
   );
 }

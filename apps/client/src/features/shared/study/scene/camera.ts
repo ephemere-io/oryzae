@@ -6,6 +6,7 @@
  */
 
 import {
+  ARRIVAL,
   BREATH,
   HOME_ZOOM,
   SP_BOARD_CLOSE_RATIO,
@@ -24,6 +25,31 @@ export function homeView(layout: StudyLayout): CameraView {
   return {
     position: { ...layout.camera.position },
     target: { ...layout.camera.target },
+  };
+}
+
+/**
+ * 扉から入ってきた直後の view。ここからホームへ寄って止まる（`ARRIVAL`）。
+ *
+ * 注視点はホームと同じ。**位置だけ**が低く・遠くにある — 注視点まで動かすと、部屋の
+ * どこを見ているかが変わって「別の場所から別の場所へ飛んだ」ように見える。
+ */
+export function arrivalView(layout: StudyLayout): CameraView {
+  const { position, target } = homeView(layout);
+  const offset = {
+    x: position.x - target.x,
+    y: position.y - target.y,
+    z: position.z - target.z,
+  };
+  // 高さと水平は別に扱う。ひとまとめに倍率をかけると、SP のように高い構図では
+  // 「低くする」ぶんだけ全体が近づいてしまう。
+  return {
+    position: {
+      x: target.x + offset.x * ARRIVAL.distanceScale,
+      y: target.y + offset.y * ARRIVAL.riseRatio,
+      z: target.z + offset.z * ARRIVAL.distanceScale,
+    },
+    target: { ...target },
   };
 }
 

@@ -33,7 +33,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { HOME_ZOOM, RENDER_LIMITS } from '../constants';
+import { ARRIVAL, EASING, HOME_ZOOM, progress, RENDER_LIMITS } from '../constants';
 import type { StudyLayout } from '../layout';
 import type { StudyState, StudyTarget } from '../types';
 import { BOARD_FACE, BOARD_GRID_SPACING, PHOTO_INNER_INSET, placeBoardCards } from './board';
@@ -59,6 +59,7 @@ import {
 } from './books';
 import {
   approach,
+  arrivalView,
   boardCloseView,
   boardView,
   breathOffset,
@@ -75,6 +76,7 @@ import {
   zoomedView,
   zoomTargetRise,
 } from './camera';
+import { captureRenderedFrame } from './capture';
 import { contentSignature } from './content-signature';
 import {
   buildHitRegistry,
@@ -152,6 +154,14 @@ export interface StudySceneOptions {
    * 挟まって画面が点滅する。
    */
   onReady?: () => void;
+  /**
+   * 扉（認証画面）から入ってきた直後か。
+   *
+   * 真なら、ホームにいきなり置かず**入り口から寄って止まる**（`ARRIVAL`）。呼び出し側は
+   * 同時に画面のフェードインをやめる — 溶けながら動くと、白く飛んでから現れる元の
+   * 見え方に戻ってしまう。
+   */
+  arrival?: boolean;
 }
 
 export interface HoverInfo {
@@ -203,33 +213,6 @@ export interface StudySceneHandle {
 
 /** 秒。四方の計算で使う。 */
 const MS_PER_SECOND = 1000;
-
-/**
- * 憶えておく 1 枚の撮り方。
- *
- * ### 拡大も縮小もしない
- *
- * 「押すと画面がガビガビになる」の正体は**拡大縮小そのもの**だった。書斎は 1px の
- * 細線で出来ていて、線画は縮小 → 拡大の往復に耐えない（線が破線と粒に割れる）。
- * はじめは 960px の JPEG で撮っていて、JPEG のリンギングと 3 倍の引き伸ばしが
- * 重なっていた。PNG にしてリンギングは消えたが、**引き伸ばしのほうが主犯**だった。
- *
- * `renderer.domElement.width` は既にデバイス画素（pixelRatio 込み、上限 2）。敷く先も
- * 同じ画面なので、**そのままの大きさで撮れば 1:1 になり、再標本化そのものが起きない**。
- * 上限はごく大きな画面（4K を超える窓）への保険で、そこだけは縮めて諦める。
- *
- * 形式は PNG。JPEG の周波数変換は白地に細い黒線という形が最も苦手で、線の周りに
- * リンギングが出る。白地が大半なので PNG でもよく縮む。
- */
-const CAPTURE = { maxWidth: 3840 } as const;
-
-/**
- * `sessionStorage` に置く 1 枚の上限（文字数）。
- *
- * 超えたら**憶えない**。地が無くても引き戻しは地の色で成立するので、保存に失敗して
- * 他の憶えごとを押し出すより、諦めるほうが安全。
- */
-const CAPTURE_MAX_CHARS = 3_000_000;
 
 /** 輪郭の呼吸の周期（ms）。 */
 const OUTLINE_BREATH_MS = 4000;
@@ -397,7 +380,16 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   const startedAt = performance.now();
 
   const homeCamera = homeView(layout);
-  applyView(camera, homeCamera);
+  /**
+   * 入ってきた直後の定置。`null` なら最初からホーム。
+   *
+   * 動きを減らす設定では置かない（`prefers-reduced-motion`）。
+   */
+  let arrival: { from: CameraView; startedAt: number } | null =
+    options.arrival === true && !options.reducedMotion
+      ? { from: arrivalView(layout), startedAt: performance.now() }
+      : null;
+  applyView(camera, arrival === null ? homeCamera : arrival.from);
 
   // ---- 動かす ------------------------------------------------------------
 
@@ -431,58 +423,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     }
   }
 
-  /**
-   * いま描いたフレームを 1 枚の画像にする。
-   *
-   * **画素を取るのは同期、符号化は非同期。** 描画バッファは次のフレームで捨てられる
-   * ので、`drawImage` でこの場に写し取る必要がある（これは GPU の転送なので速い）。
-   * 一方 PNG の符号化は等倍だと重く、その場でやるとカメラが動き出す 1 フレームが
-   * 引っかかる。`toBlob` に渡して符号化だけ後回しにする。
-   *
-   * 撮れない環境（2D コンテキストが取れない・canvas が 0 幅・符号化に失敗）では
-   * null を返す。地が無くても遷移そのものは成立するので、諦めても失うものは無い。
-   */
   function captureFrame(done: (dataUrl: string | null) => void): void {
-    const source = renderer.domElement;
-    if (source.width === 0 || source.height === 0) {
-      done(null);
-      return;
-    }
-
-    const width = Math.min(source.width, CAPTURE.maxWidth);
-    const flat = document.createElement('canvas');
-    flat.width = width;
-    flat.height = Math.max(1, Math.round((source.height / source.width) * width));
-    const context = flat.getContext('2d');
-    if (context === null) {
-      done(null);
-      return;
-    }
-
-    // 書斎は alpha 付きで描いている。地の色を先に塗ってから重ねる
-    // （透明のまま敷くと、敷いた先の画面が透けて二重写しになる）。
-    context.fillStyle = theme === 'dark' ? DARK_PALETTE.solid : LIGHT_PALETTE.solid;
-    context.fillRect(0, 0, flat.width, flat.height);
-    context.drawImage(source, 0, 0, flat.width, flat.height);
-
-    try {
-      flat.toBlob((blob) => {
-        if (blob === null) {
-          done(null);
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          const url = typeof reader.result === 'string' ? reader.result : null;
-          done(url !== null && url.length <= CAPTURE_MAX_CHARS ? url : null);
-        };
-        reader.onerror = () => done(null);
-        reader.readAsDataURL(blob);
-      }, 'image/png');
-    } catch {
-      // 汚れた canvas（外部テクスチャ）なら諦める。いまは自前の描画だけなので通常は来ない。
-      done(null);
-    }
+    // 撮り方の約束は `scene/capture.ts` に集めてある（扉の画面と同じものを使う）。
+    captureRenderedFrame(
+      renderer,
+      theme === 'dark' ? DARK_PALETTE.solid : LIGHT_PALETTE.solid,
+      done,
+    );
   }
 
   function updateCamera(now: number, elapsed: number): void {
@@ -504,6 +451,15 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (settled) {
       // サブ画面に入っている間は動かさない。
       applyView(camera, settled);
+      return;
+    }
+
+    // 扉から入ってきた直後は、入り口からホームへ寄って止まる。着いてから揺らぎを乗せる
+    // （寄っている最中に呼吸とパララックスを混ぜると、止まる位置が定まらない）。
+    if (arrival !== null) {
+      const walked = progress(now - arrival.startedAt, ARRIVAL.durationMs);
+      applyView(camera, lerpView(arrival.from, homeCamera, EASING.easeOutCubic(walked)));
+      if (walked >= 1) arrival = null;
       return;
     }
 

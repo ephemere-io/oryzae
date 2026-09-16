@@ -5,10 +5,11 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
+import { takeStudyArrival } from '../arrival';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
 import { studyHint } from '../hints';
@@ -77,6 +78,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
    *   行き先の画面は同じ地の色の上に現れる
    */
   const [entered, setEntered] = useState(false);
+  /**
+   * 扉から入ってきた直後か。**入りの溶暗をやめる**代わりに、カメラが入り口から寄って止まる
+   * （`arrival.ts`）。溶けながら動かすと、白く飛んでから現れる元の見え方に戻る。
+   */
+  const [arrival, setArrival] = useState(false);
   const [leaveMs, setLeaveMs] = useState<number | null>(null);
   /**
    * 戻り道に敷く「憶えた部屋」と、canvas が最初の 1 フレームを描いたか。
@@ -89,6 +95,14 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const [canvasReady, setCanvasReady] = useState(false);
 
   useEffect(() => setBackdrop(readStudyBackdrop()), []);
+
+  useLayoutEffect(() => {
+    // 描く前に決める。1 フレームでも溶暗の側で描くと、そこで画面が白く飛ぶ。
+    if (takeStudyArrival()) {
+      setArrival(true);
+      setEntered(true);
+    }
+  }, []);
 
   useEffect(() => {
     // 次のフレームで立てる。マウントと同じフレームだと transition が走らない。
@@ -212,10 +226,12 @@ export function StudyHome({ layout }: StudyHomeProps) {
            * 引かせる。
            */
           opacity: leaveMs !== null ? 0 : entered || backdrop !== null ? 1 : 0,
-          transition: `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
+          // 扉から入ってきたときは溶暗を持たない（定置が受け持つ）。
+          transition: arrival ? undefined : `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
         }}
       >
         <StudyCanvas
+          arrival={arrival}
           onLeaveStart={setLeaveMs}
           onReady={() => setCanvasReady(true)}
           // 出ていく直前の 1 枚を憶える。戻り道はこれを地にして、部屋が「消えた」のでは
