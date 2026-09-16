@@ -232,6 +232,27 @@ export function Sheet({
     [targetOf],
   );
 
+  /**
+   * 頼まれている段に**確実に置く**。出る動き（`translate` の transition）が走っている間、iOS は容器の
+   * `scrollTop` の指定を受け付けないことがある。払いきりで閉じられるシートは閉の位置（0）も吸着先なので、
+   * 受け付けられなかったときにブラウザが段へ引き上げてくれず、**開いたのに画面の外に居る**（実機レビュー:
+   * 一覧のアイテムを押しても何も出てこない）。出る動きのあいだ、指が触れていなければ置き直し続ける。
+   */
+  const ensureAtDetent = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    let tries = 0;
+    const tick = () => {
+      const current = scrollerRef.current;
+      if (!current || latest.current.phase === 'closing' || byFingerRef.current) return;
+      const target = targetOf(latest.current.detent);
+      if (Math.abs(current.scrollTop - target) > 1) current.scrollTop = target;
+      tries += 1;
+      if (tries < 24) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [targetOf]);
+
   // 描いた直後: 容器の下に隠したまま頼まれた段へ置き、それから出す（容器が下からずれて上がる）。
   useLayoutEffect(() => {
     if (!present || phase !== 'entering' || !scrollerEl) return;
@@ -240,7 +261,8 @@ export function Sheet({
     scrollToDetent(latest.current.detent, 'instant');
     settledRef.current = latest.current.detent;
     setPhase('open');
-  }, [present, phase, scrollToDetent, scrollerEl]);
+    ensureAtDetent();
+  }, [present, phase, scrollToDetent, scrollerEl, ensureAtDetent]);
 
   // 出ている間に別の要素へ描き直された（席が後から用意された）ら、止まっていた段へ置き直す。
   useLayoutEffect(() => {
@@ -275,6 +297,17 @@ export function Sheet({
       cancelled = true;
     };
   }, [present, phase]);
+
+  // 出る動きが終わったら、もう一度だけ段を確かめる（動きの最中に受け付けられなかった指定の取りこぼし）。
+  useEffect(() => {
+    const scroller = scrollerEl;
+    if (!scroller || phase !== 'open') return;
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target === scroller && event.propertyName === 'translate') ensureAtDetent();
+    };
+    scroller.addEventListener('transitionend', onEnd);
+    return () => scroller.removeEventListener('transitionend', onEnd);
+  }, [scrollerEl, phase, ensureAtDetent]);
 
   // 呼び出し側が段を変えたら、その段へ動く（指で止めた段の通知の折り返しでは動かない）。
   useEffect(() => {
