@@ -38,10 +38,11 @@ export function targetHref(target: StudyTarget): string | null {
  *
  * メモ帳はヘルプの入口なので、押した先はヘルプそのもの — 使い方・よくある質問・
  * お問い合わせを 1 枚にまとめた `/support`。アカウント経由にすると 1 手多いだけだった。
- * 新しいタブで開く（書斎を閉じない）。
+ * 新しいタブで開く（書斎を閉じない）。`locale` はアプリの現在の言語（公開サイトへ `?lang=`
+ * で渡す。渡さないと向こうはブラウザの言語で開く）。
  */
-export function externalHref(target: StudyTarget): string | null {
-  return target.kind === 'memo' ? docsHref('/support') : null;
+export function externalHref(target: StudyTarget, locale?: string): string | null {
+  return target.kind === 'memo' ? docsHref('/support', locale) : null;
 }
 
 /**

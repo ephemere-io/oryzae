@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { usePathname } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { NavRow } from '@/components/ui/nav-row';
@@ -70,6 +70,7 @@ const NAV_ITEMS: NavItem[] = [
  */
 export function Sidebar() {
   const t = useTranslations('sidebar');
+  const locale = useLocale();
   const pathname = usePathname();
   const { auth } = useAuth();
   const { unreadCount } = useUnread();
@@ -160,7 +161,7 @@ export function Sidebar() {
         {/* 使い方は別ドメインの公開サイトにある（Issue #532 で切り出した）。
             アプリの外へ出るので、新しいタブに開く。 */}
         <NavRow
-          href={docsHref('/support')}
+          href={docsHref('/support', locale)}
           external
           label={t('nav.help')}
           collapsed={collapsed}
