@@ -3,7 +3,7 @@ import {
   buildHitRegistry,
   HitRegistry,
   HOVER_SCALE,
-  NOTE_HIT_ID,
+  MEMO_HIT_ID,
   resolveClickTarget,
 } from '@/features/shared/study/scene/hit-targets';
 import type { Notebook } from '@/features/shared/study/types';
@@ -125,36 +125,29 @@ describe('buildHitRegistry', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  describe('卓上のメモ', () => {
-    const withNote = buildHitRegistry({
+  describe('メモ帳', () => {
+    const withMemo = buildHitRegistry({
       desk: DESK,
       shelf: SHELF,
       shelfAsSingleTarget: false,
-      note: true,
+      memo: true,
     });
 
-    it('紙ごと 1 つの的で、押すとはがれる（行き先は無い）', () => {
-      expect(withNote.get(NOTE_HIT_ID)?.target).toEqual({ kind: 'note' });
+    it('束ごと 1 つの的で、押すとアカウントへ', () => {
+      expect(withMemo.get(MEMO_HIT_ID)?.target).toEqual({ kind: 'memo' });
     });
 
-    it('ラベルは持たず（文面が紙に書いてある）、一言は「はがす」', () => {
-      expect(withNote.get(NOTE_HIT_ID)?.label).toBeNull();
-      expect(withNote.get(NOTE_HIT_ID)?.hint).toBe('note');
+    it('ラベル MEMO を名乗り、触れると一言が中身を言う（物は黙っている）', () => {
+      expect(withMemo.get(MEMO_HIT_ID)?.label).toBe('memo');
+      expect(withMemo.get(MEMO_HIT_ID)?.hint).toBe('memo');
     });
 
-    it('置いていない（はがした）ときは的も無い', () => {
-      expect(pc.get(NOTE_HIT_ID)).toBeNull();
-      const dismissed = buildHitRegistry({
-        desk: DESK,
-        shelf: SHELF,
-        shelfAsSingleTarget: false,
-        note: false,
-      });
-      expect(dismissed.get(NOTE_HIT_ID)).toBeNull();
+    it('置いていない構図では的も無い', () => {
+      expect(pc.get(MEMO_HIT_ID)).toBeNull();
     });
 
     it('他の的と id が重ならない', () => {
-      const ids = withNote.ids();
+      const ids = withMemo.ids();
       expect(new Set(ids).size).toBe(ids.length);
       expect(ids).toHaveLength(pc.ids().length + 1);
     });

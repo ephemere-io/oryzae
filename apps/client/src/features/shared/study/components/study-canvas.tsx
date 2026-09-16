@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { StudyLayout } from '../layout';
-import { isNote, staysInStudy } from '../navigation';
+import { movesWithoutCamera, staysInStudy } from '../navigation';
 import type { StudyTheme } from '../scene/materials';
 import {
   type HoverInfo,
@@ -19,8 +19,6 @@ export interface StudyCanvasProps {
   state: StudyState;
   layout: StudyLayout;
   theme: StudyTheme;
-  /** 卓上のメモの文面（訳済み、1 要素 = 1 行）。空なら置かない。scene は i18n を知らない。 */
-  note: readonly string[];
   /**
    * カメラが着いてから呼ばれる。ここで `router.push` する。
    *
@@ -30,8 +28,6 @@ export interface StudyCanvasProps {
   onNavigate: (target: StudyTarget) => void;
   /** 書斎の中で完結する対象（過去月・棚）。一覧オーバーレイを開く。 */
   onOpenOverlay?: (target: StudyTarget) => void;
-  /** 卓上のメモをはがした。呼び出し側が憶える（次に来たときは置かない）。 */
-  onDismissNote?: () => void;
   onHoverChange?: (hovered: HoverInfo | null) => void;
   onLabelPositions?: (positions: LabelPositions) => void;
   /**
@@ -61,10 +57,8 @@ export function StudyCanvas({
   state,
   layout,
   theme,
-  note,
   onNavigate,
   onOpenOverlay,
-  onDismissNote,
   onHoverChange,
   onLabelPositions,
   onLeaveStart,
@@ -97,7 +91,6 @@ export function StudyCanvas({
   const callbacks = useRef({
     onNavigate,
     onOpenOverlay,
-    onDismissNote,
     onHoverChange,
     onLabelPositions,
     onLeaveStart,
@@ -107,17 +100,12 @@ export function StudyCanvas({
   callbacks.current = {
     onNavigate,
     onOpenOverlay,
-    onDismissNote,
     onHoverChange,
     onLabelPositions,
     onLeaveStart,
     onCapture,
     onReady,
   };
-
-  // メモの文面は locale が変わらない限り同じ。作り直しの引き金にはしない（下の effect）。
-  const noteRef = useRef(note);
-  noteRef.current = note;
 
   // state はレンダーのたびに新しい参照になりうる（取得が落ち着くまで数回変わる）。
   // 最新を ref で渡し、シーンの作り直しは effect の外で行う。
@@ -136,7 +124,6 @@ export function StudyCanvas({
         state: stateRef.current,
         layout,
         theme,
-        note: noteRef.current,
         reducedMotion: prefersReducedMotion(),
         onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
         onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
@@ -144,10 +131,10 @@ export function StudyCanvas({
         onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
         onReady: () => callbacks.current.onReady?.(),
         onPick: (target) => {
-          // 卓上のメモは押すとはがれるだけ。カメラも画面も動かさない。
-          if (isNote(target)) {
-            handle.dismissNote();
-            callbacks.current.onDismissNote?.();
+          // メモ帳は「場所」ではなく文房具。寄っていく芝居を挟まず、アバターと同じく
+          // そのまま画面を移す。
+          if (movesWithoutCamera(target)) {
+            callbacks.current.onNavigate(target);
             return;
           }
           // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。

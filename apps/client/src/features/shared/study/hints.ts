@@ -4,7 +4,7 @@
  * ラベルは**名前しか言わない**（`BOARD`）。それだけでは中に何が貼ってあるか開くまで
  * 分からず、実機レビューで「ボードにホバーしても何も出ない」と報告された。手帳と
  * 背表紙は月ごとの `StudyTooltip` を別に持っているので、ここは持たない的だけを扱う。
- * 卓上のメモは文面が紙に書いてあるので、一言は「はがす」とだけ言う（押すと何が起きるか）。
+ * メモ帳は文字を持たない物なので、一言が「使い方とお問い合わせはアカウントから」と言う。
  *
  * i18n の鍵と差し込む数を返すだけの純関数。描くのは `StudyHintTooltip`。
  */
@@ -28,8 +28,8 @@ export function studyHint(hint: HitHint, state: StudyState): StudyHint {
       return { textKey: jarHintKey(state) };
     case 'board':
       return boardHint(state);
-    case 'note':
-      return { textKey: 'hint_note' };
+    case 'memo':
+      return { textKey: 'hint_memo' };
   }
 }
 

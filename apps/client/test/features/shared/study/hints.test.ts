@@ -80,8 +80,8 @@ describe('studyHint（板）', () => {
   });
 });
 
-describe('studyHint（卓上のメモ）', () => {
-  it('押すと何が起きるか（はがす）だけを言う。文面は紙に書いてある', () => {
-    expect(studyHint('note', BASE)).toEqual({ textKey: 'hint_note' });
+describe('studyHint（メモ帳）', () => {
+  it('物は黙っているので、中身（使い方とお問い合わせがアカウントにある）を一言が言う', () => {
+    expect(studyHint('memo', BASE)).toEqual({ textKey: 'hint_memo' });
   });
 });

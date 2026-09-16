@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PC_LAYOUT, SP_LAYOUT, type StudyLayout } from '@/features/shared/study/layout';
-import { NOTE_PAPER } from '@/features/shared/study/scene/note';
+import { MEMO_PAD } from '@/features/shared/study/scene/memo-pad';
 
 const LAYOUTS: StudyLayout[] = [PC_LAYOUT, SP_LAYOUT];
 
@@ -68,44 +68,46 @@ describe('配置表に共通して成り立つこと', () => {
     expect(Math.abs(layout.labelAnchors.board.x - layout.board.position.x)).toBeLessThan(1);
   });
 
-  it.each(LAYOUTS)('$name: 卓上のメモがどちらの構図にもあり、机の面に置いてある', (layout) => {
-    // 初めて来た人の机に 1 枚。片方の端末だけ黙っていてはいけない。
-    const note = layout.note;
-    if (note === null) throw new Error('メモが無い');
-    expect(note.position.y).toBeCloseTo(layout.deskTop.y, 1);
-    expect(note.position.x - (NOTE_PAPER.width * note.scale) / 2).toBeGreaterThan(
-      layout.deskTop.xLeft,
-    );
-    expect(note.position.x + (NOTE_PAPER.width * note.scale) / 2).toBeLessThan(
-      layout.deskTop.xRight,
-    );
-    expect(note.position.z).toBeLessThan(layout.deskTop.zNear);
-    expect(note.scale).toBeGreaterThan(0);
-    expect(note.scale).toBeLessThanOrEqual(1);
+  it.each(LAYOUTS)('$name: メモ帳がどちらの構図にもあり、机の面に置いてある', (layout) => {
+    const memo = layout.memo;
+    if (memo === null) throw new Error('メモ帳が無い');
+    expect(memo.position.y).toBeCloseTo(layout.deskTop.y, 5);
+    const halfW = (MEMO_PAD.width * memo.scale) / 2 + 0.3;
+    expect(memo.position.x - halfW).toBeGreaterThan(layout.deskTop.xLeft);
+    expect(memo.position.x + halfW).toBeLessThan(layout.deskTop.xRight);
+    expect(memo.position.z + (MEMO_PAD.depth * memo.scale) / 2).toBeLessThan(layout.deskTop.zNear);
+    expect(memo.scale).toBeGreaterThan(0);
+    expect(memo.scale).toBeLessThanOrEqual(1);
+    // 名乗るラベルの置き場も持つ（物は黙っている）。
+    expect(layout.labelAnchors.memo).not.toBeNull();
   });
 });
 
-describe('卓上のメモの置き場', () => {
-  it('PC は瓶と積みの間の空いた面（壁には貼らない）', () => {
-    // 「私室に運営の世界が異物として入る」— 壁の案内は差し戻された。机の上の 1 枚にする。
-    const note = PC_LAYOUT.note;
-    if (note === null) throw new Error('PC のメモが無い');
-    const half = (NOTE_PAPER.width * note.scale) / 2;
-    expect(note.position.x - half).toBeGreaterThan(PC_LAYOUT.jar.x + 1.3);
-    expect(note.position.x + half).toBeLessThan(PC_LAYOUT.desk.x - 1.3);
-    // 手前寄り（瓶より手前、積みと同じくらい）。
-    expect(note.position.z).toBeGreaterThan(PC_LAYOUT.jar.z);
+describe('メモ帳の置き場', () => {
+  it('PC は積みの左隣、瓶との間の空いた面', () => {
+    const memo = PC_LAYOUT.memo;
+    if (memo === null) throw new Error('PC のメモ帳が無い');
+    // 瓶（-3.4 ± 1.3）と積み（2.8、左端 ≈ 1.3）の間。
+    expect(memo.position.x - MEMO_PAD.width / 2).toBeGreaterThan(PC_LAYOUT.jar.x + 1.3);
+    expect(memo.position.x + MEMO_PAD.width / 2).toBeLessThan(PC_LAYOUT.desk.x - 1.4);
+    // 手前の列（積みと同じくらい）。
+    expect(memo.position.z).toBeGreaterThan(PC_LAYOUT.jar.z + 1);
+    // ラベルは束の手前の机の面。JAR と ENTRIES のどちらとも 2 以上離す。
+    const label = PC_LAYOUT.labelAnchors.memo;
+    if (label === null) throw new Error('ラベルが無い');
+    expect(label.x - PC_LAYOUT.labelAnchors.jar.x).toBeGreaterThan(2);
+    expect(PC_LAYOUT.labelAnchors.journal.x - label.x).toBeGreaterThan(2);
   });
 
   it('SP は机の手前左、鉛筆の左に縮めて置く', () => {
-    const note = SP_LAYOUT.note;
-    if (note === null) throw new Error('SP のメモが無い');
-    expect(note.scale).toBeLessThan(1);
-    expect(note.position.x + (NOTE_PAPER.width * note.scale) / 2).toBeLessThan(
-      SP_LAYOUT.pen.x + 0.9,
-    );
+    const memo = SP_LAYOUT.memo;
+    if (memo === null) throw new Error('SP のメモ帳が無い');
+    expect(memo.scale).toBeLessThan(1);
+    expect(memo.position.x + (MEMO_PAD.width * memo.scale) / 2).toBeLessThan(SP_LAYOUT.pen.x + 0.9);
     // JAR のピル（瓶の手前 z ≈ 1.25）より手前。
-    expect(note.position.z).toBeGreaterThan(SP_LAYOUT.labelAnchors.jar.z + 1);
+    expect(memo.position.z).toBeGreaterThan(SP_LAYOUT.labelAnchors.jar.z + 1);
+    // SP はピルで名乗るので、そのオフセットも持つ。
+    expect(SP_LAYOUT.pillOffsets?.memo).toBeDefined();
   });
 
   it('PC の板は右へ寄せ、積みと棚は奥行きで離してある（被り気味の指摘への答え）', () => {

@@ -25,26 +25,28 @@ export function targetHref(target: StudyTarget): string | null {
       return '/entries/new';
     case 'board':
       return '/board';
+    case 'memo':
+      // メモ帳はアカウントへ。使い方とお問い合わせ（公開サイト）への入口がそこにある。
+      return '/account';
     case 'journal-month':
     case 'archive':
-    case 'note':
       return null;
   }
 }
 
-/**
- * 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。
- *
- * 卓上のメモも URL を変えないが、一覧は開かない（押すとはがれるだけ）。
- * `targetHref === null` で判定すると、メモを押したときに一覧が開いてしまう。
- */
+/** 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。 */
 export function staysInStudy(target: StudyTarget): boolean {
-  return target.kind === 'journal-month' || target.kind === 'archive';
+  return targetHref(target) === null;
 }
 
-/** 卓上のメモか。押すとはがれるだけで、画面もカメラも動かさない。 */
-export function isNote(target: StudyTarget): target is { kind: 'note' } {
-  return target.kind === 'note';
+/**
+ * カメラを動かさずに移る対象か。
+ *
+ * メモ帳は瓶や板のような「場所」ではなく文房具なので、寄っていく芝居を挟まない。
+ * アバターと同じく、そのまま画面を移す。
+ */
+export function movesWithoutCamera(target: StudyTarget): boolean {
+  return target.kind === 'memo';
 }
 
 /**

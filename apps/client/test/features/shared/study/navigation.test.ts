@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  isNote,
+  movesWithoutCamera,
   notebookTarget,
   overlayScope,
   staysInStudy,
@@ -21,18 +21,19 @@ describe('targetHref', () => {
     expect(targetHref({ kind: 'archive' })).toBeNull();
   });
 
-  it('卓上のメモは行き先を持たない（押すとはがれるだけ）', () => {
-    expect(targetHref({ kind: 'note' })).toBeNull();
+  it('メモ帳はアカウントへ（使い方とお問い合わせの入口がそこにある）', () => {
+    expect(targetHref({ kind: 'memo' })).toBe('/account');
   });
 });
 
-describe('isNote', () => {
-  it('卓上のメモだけ true。一覧も開かず、カメラも動かさない', () => {
-    expect(isNote({ kind: 'note' })).toBe(true);
-    expect(isNote({ kind: 'jar' })).toBe(false);
-    expect(isNote({ kind: 'archive' })).toBe(false);
-    // `targetHref === null` で一覧を開く判定にすると、メモを押したときに一覧が開く。
-    expect(staysInStudy({ kind: 'note' })).toBe(false);
+describe('movesWithoutCamera', () => {
+  it('メモ帳だけ true。文房具であって場所ではないので、寄っていく芝居を挟まない', () => {
+    expect(movesWithoutCamera({ kind: 'memo' })).toBe(true);
+    expect(movesWithoutCamera({ kind: 'jar' })).toBe(false);
+    expect(movesWithoutCamera({ kind: 'board' })).toBe(false);
+    expect(movesWithoutCamera({ kind: 'archive' })).toBe(false);
+    // 一覧を開く対象でもない。
+    expect(staysInStudy({ kind: 'memo' })).toBe(false);
   });
 });
 
@@ -77,6 +78,7 @@ describe('すべての対象に行き先が定義されている', () => {
     { kind: 'journal-month', month: '2026-08' },
     { kind: 'archive' },
     { kind: 'board' },
+    { kind: 'memo' },
   ];
 
   it('href か overlayScope のどちらか一方を必ず持つ', () => {
@@ -85,10 +87,5 @@ describe('すべての対象に行き先が定義されている', () => {
       const scope = overlayScope(target);
       expect(href === null, target.kind).toBe(scope !== null);
     }
-  });
-
-  it('卓上のメモだけは、どちらも持たない（はがれるだけ）', () => {
-    expect(targetHref({ kind: 'note' })).toBeNull();
-    expect(overlayScope({ kind: 'note' })).toBeNull();
   });
 });
