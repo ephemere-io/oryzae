@@ -8,14 +8,15 @@
  * 移してきた。いまは**各画面のヘッダーの先頭**。浮かせて席を空けさせる作りに戻ると、
  * また重なりと読み忘れの往復になる。
  *
- * 見た目は隣の「問いを紐づける」と同じボタンで、縁だけ深い緑（オーナーの判断）。
+ * 見た目は隣の「問いを紐づける」と**同じボタン**（縁も同じ）。深い緑はこの案件では
+ * 「いまアクティブ」を言う色なので、常に出ている出口には付けない（オーナーの判断）。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { BackLinkProvider } from '@/lib/back-link-context';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { BackLink } from './back-link';
-import { ELEVATED_CHIP_CLASS, HEADER_CHIP_CLASS } from './surface';
+import { ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE, HEADER_CHIP_CLASS } from './surface';
 
 interface Props {
   placement: 'inline' | 'corner';
@@ -77,8 +78,8 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'wears-the-question-chip-with-a-green-edge',
-      description: '「問いを紐づける」と同じボタン（寸法と面）で、縁だけ深い緑',
+      id: 'wears-the-question-chip',
+      description: '「問いを紐づける」と同じボタン（寸法・面・縁）',
       check: ({ root }) => {
         const link = root.querySelector('a');
         if (!(link instanceof HTMLElement)) return 'リンクが無い';
@@ -87,7 +88,21 @@ registerUnit<Props>({
         const missing = expected.filter((c) => !classes.includes(c));
         if (missing.length > 0)
           return `問いのチップと同じボタンになっていない: ${missing.join(' ')}`;
-        return link.style.borderColor === 'var(--accent)' || '縁が深い緑（--accent）になっていない';
+        return (
+          link.style.borderColor === ELEVATED_CHIP_STYLE.borderColor ||
+          '縁が問いのチップと違う色になっている'
+        );
+      },
+    },
+    {
+      id: 'keeps-the-deep-green-for-active',
+      description: '深い緑（--accent）を既定で使わない。この案件では「いまアクティブ」の色',
+      check: ({ root }) => {
+        const painted = [...root.querySelectorAll('a, a *')].filter((el) => {
+          const style = el.getAttribute('style') ?? '';
+          return style.includes('--accent');
+        });
+        return painted.length === 0 || '縁か字か絵が深い緑になっている';
       },
     },
     {
