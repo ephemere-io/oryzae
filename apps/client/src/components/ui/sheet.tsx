@@ -11,6 +11,8 @@ import { placeInSlot } from '@/lib/sp-chrome-context';
  * - `full`: シートの上端が容器の上端。そこから先は同じ指のまま中身が流れる
  */
 export type SheetDetent = 'peek' | 'half' | 'content' | 'full';
+/** 段はこの 4 つだけ（吸着先の付け外しで全部を回すのに使う）。 */
+const ALL_DETENTS: SheetDetent[] = ['peek', 'half', 'content', 'full'];
 
 export interface SheetProps {
   /** 出したいか。false にすると下へ引っ込む動きのあとで消える（`onClosed`）。 */
@@ -115,13 +117,6 @@ export function Sheet({
   /** 出したいか（`open`）。state の phase より 1 拍早い。容器の大きさが変わったときの判断に使う。 */
   const openRef = useRef(open);
   openRef.current = open;
-  /**
-   * いまの位置が**指で動かした結果か**。閉じるのは指で払いきったときだけで、部品が段へ送った結果では閉じない。
-   * 送り（`scrollToDetent`）のたびに false に戻し、容器に指が触れたら true にする。
-   */
-  const byFingerRef = useRef(false);
-  /** いま指が触れているか。触れている間は、部品の側から段へ置き直さない（指と綱引きしない）。 */
-  const touchingRef = useRef(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   /**
    * スクロール容器の要素（state）。席（殻のドックの層）が後から用意されると、シートは同じ部品のまま**別の要素に
@@ -148,6 +143,8 @@ export function Sheet({
   const halfRef = useRef<HTMLDivElement | null>(null);
   const peekRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  /** 閉の位置の空き。指が触れている間だけ吸着先にする（既定は吸着先にしない）。 */
+  const closedRef = useRef<HTMLDivElement | null>(null);
   const backdropRef = useRef<HTMLButtonElement | null>(null);
   /** 最後に止まった段（指で止めたものも、呼び出し側が頼んだものも）。 */
   const settledRef = useRef<SheetDetent | null>(null);
@@ -186,6 +183,47 @@ export function Sheet({
       setPhase('closing');
     }
   }, [open]);
+
+  /** 段 → その位置の印。 */
+  const markerOf = useCallback((position: SheetDetent): HTMLElement | null => {
+    switch (position) {
+      case 'half':
+        return halfRef.current;
+      case 'peek':
+        return peekRef.current;
+      case 'content':
+        return contentRef.current;
+      case 'full':
+        return sheetRef.current;
+    }
+  }, []);
+
+  /**
+   * **出すときは、行き先の段だけを吸着先にする。** 吸着はブラウザがやるので、行き先がひとつしか無ければ
+   * 必ずそこに着く（JS で位置を押し込まない。iOS は `scrollTop` の指定を受け付けないことがある）。
+   * 着いたら `null` で全部の段に戻す。
+   */
+  const setLanding = useCallback(
+    (landing: SheetDetent | null) => {
+      for (const position of ALL_DETENTS) {
+        const marker = markerOf(position);
+        if (!marker) continue;
+        const on = landing ? position === landing : latest.current.detents.includes(position);
+        marker.style.scrollSnapAlign = on ? 'start' : 'none';
+      }
+    },
+    [markerOf],
+  );
+
+  /**
+   * 閉の位置を吸着先にするか。**指が触れている間だけ true。** 払いきりで閉じられるシート
+   * （`dismissible`）だけが対象で、板（パレットで出し入れするもの）はいつでも吸着先にしない。
+   */
+  const setClosedSnap = useCallback((on: boolean) => {
+    const closed = closedRef.current;
+    if (!closed) return;
+    closed.style.scrollSnapAlign = on && latest.current.dismissible ? 'start' : 'none';
+  }, []);
 
   /** 段 → そこに止まるときの scrollTop。印の位置を測る。 */
   const targetOf = useCallback((position: SheetDetent): number => {
@@ -231,8 +269,6 @@ export function Sheet({
     (position: SheetDetent, behavior: 'smooth' | 'instant') => {
       const scroller = scrollerRef.current;
       if (!scroller) return;
-      // ここから先の位置は部品が決めたもの（指ではない）。
-      byFingerRef.current = false;
       const top = targetOf(position);
       if (typeof scroller.scrollTo !== 'function') {
         scroller.scrollTop = top;
@@ -251,37 +287,19 @@ export function Sheet({
     [targetOf],
   );
 
-  /**
-   * 頼まれている段に**確実に置く**。出る動き（`translate` の transition）が走っている間、iOS は容器の
-   * `scrollTop` の指定を受け付けないことがある。払いきりで閉じられるシートは閉の位置（0）も吸着先なので、
-   * 受け付けられなかったときにブラウザが段へ引き上げてくれず、**開いたのに画面の外に居る**（実機レビュー:
-   * 一覧のアイテムを押しても何も出てこない）。出る動きのあいだ、指が触れていなければ置き直し続ける。
-   */
-  const ensureAtDetent = useCallback(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    let tries = 0;
-    const tick = () => {
-      const current = scrollerRef.current;
-      if (!current || latest.current.phase === 'closing' || touchingRef.current) return;
-      const target = targetOf(latest.current.detent);
-      if (Math.abs(current.scrollTop - target) > 1) current.scrollTop = target;
-      tries += 1;
-      if (tries < 24) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [targetOf]);
-
   // 描いた直後: 容器の下に隠したまま頼まれた段へ置き、それから出す（容器が下からずれて上がる）。
   useLayoutEffect(() => {
     if (!present || phase !== 'entering' || !scrollerEl) return;
     // 段の印を測る（この読み取りで、隠れた位置の見た目が確定する。確定する前に出すと transition が始まらず、
     // いきなり出る）。
+    // 閉の位置は吸着先にしない（指が触れたときだけ吸着先になる）。出るたびに確かめる。
+    setClosedSnap(false);
+    // 行き先だけを吸着先にして、ブラウザに吸わせる。`scrollTop` の指定は効けば速いというだけの後押し。
+    setLanding(latest.current.detent);
     scrollToDetent(latest.current.detent, 'instant');
     settledRef.current = latest.current.detent;
     setPhase('open');
-    ensureAtDetent();
-  }, [present, phase, scrollToDetent, scrollerEl, ensureAtDetent]);
+  }, [present, phase, scrollToDetent, scrollerEl, setClosedSnap, setLanding]);
 
   // 出ている間に別の要素へ描き直された（席が後から用意された）ら、止まっていた段へ置き直す。
   useLayoutEffect(() => {
@@ -316,17 +334,6 @@ export function Sheet({
       cancelled = true;
     };
   }, [present, phase]);
-
-  // 出る動きが終わったら、もう一度だけ段を確かめる（動きの最中に受け付けられなかった指定の取りこぼし）。
-  useEffect(() => {
-    const scroller = scrollerEl;
-    if (!scroller || phase !== 'open') return;
-    const onEnd = (event: TransitionEvent) => {
-      if (event.target === scroller && event.propertyName === 'translate') ensureAtDetent();
-    };
-    scroller.addEventListener('transitionend', onEnd);
-    return () => scroller.removeEventListener('transitionend', onEnd);
-  }, [scrollerEl, phase, ensureAtDetent]);
 
   // 呼び出し側が段を変えたら、その段へ動く（指で止めた段の通知の折り返しでは動かない）。
   useEffect(() => {
@@ -365,16 +372,11 @@ export function Sheet({
       }
       const current = latest.current;
       if (current.phase === 'closing') return;
-      // 閉の位置（容器の下）に着いた。**指で払いきったときだけ閉じる。**
-      // 部品が送った結果として 0 に居るなら、それは段へ置けていないということなので、頼まれている段へ戻す
-      // （実機レビュー: 一覧からシートを開いても何も出てこない、を二度と起こさない保険）。
+      // 閉の位置で止まった。ここは**指が触れている間だけ**吸着先なので、止まれるのは払いきったときだけ。
+      // 吸着先は外さずに閉じる（外すとその場で段へ引き戻され、閉じる前に跳ね上がる）。
       // 配置の無い環境（テスト）では位置がいつも 0 なので、採寸できるときだけ数える。
       if (current.phase === 'open' && scroller.clientHeight > 0 && top < 1) {
-        if (current.dismissible && byFingerRef.current) {
-          current.onRequestClose?.();
-          return;
-        }
-        scrollToDetent(current.detent, 'instant');
+        current.onRequestClose?.();
         return;
       }
       let settled: SheetDetent | null = null;
@@ -386,6 +388,10 @@ export function Sheet({
         }
       }
       if (!settled) return;
+      // 段に着いた＝指の用は済んだ。閉の位置を吸着先から外す（出ているシートが勝手にそこへ行かない）。
+      setClosedSnap(false);
+      // 行き先に着いたら、全部の段を吸着先に戻す（ここから先は指で段を選べる）。
+      if (settled === current.detent) setLanding(null);
       // **いちばん高い段に着いたときだけ中身が動く。** 低い段では指はシートの高さに使う（同じ指で中身まで
       // 流れると、読み終えて戻したときにシートが縮んでしまう）。
       const inner = innerRef.current;
@@ -407,19 +413,18 @@ export function Sheet({
       if (!frame) frame = requestAnimationFrame(check);
     };
     /**
-     * 指が容器に触れたら、そこから先の位置は指が決めたもの（払いきりで閉じてよい）。
+     * **指が触れている間だけ、閉の位置を吸着先にする。** 払いきって閉じられるのは指だけ、という規則を
+     * 「そこに止まれるのは指が触れているときだけ」という**構造**で表す（JS で位置を押し込まない）。
      *
-     * **`touchstart` だけを見る（`pointerdown` は見ない）。** iOS は指を離したあと、そのとき指の下に
-     * ある要素へ**合成の pointer/mouse イベント**を送る。一覧のアイテムを押して出したシートは、まさに
-     * その指の下に出てくるので、`pointerdown` まで数えると「出た瞬間に指で触られた」ことになり、段へ
-     * 置き直す処理（`ensureAtDetent`）が丸ごと止まって容器の下に居たままになる。touch は合成されない。
+     * `touchstart` だけを見る（`pointerdown` は見ない）。iOS は指を離したあと、そのとき指の下にある
+     * 要素へ**合成の pointer/mouse イベント**を送るので、出たばかりのシートが触られたことになる。
      */
     const onTouchStart = () => {
-      touchingRef.current = true;
-      byFingerRef.current = true;
+      setClosedSnap(true);
     };
     const onTouchEnd = () => {
-      touchingRef.current = false;
+      // 離しただけでは外さない（惰性で滑っている間も吸着先が要る）。止まったときに外す。
+      onScroll();
     };
     scroller.addEventListener('touchstart', onTouchStart, { passive: true });
     scroller.addEventListener('touchend', onTouchEnd, { passive: true });
@@ -452,7 +457,7 @@ export function Sheet({
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [present, targetOf, scrollerEl, scrollToDetent]);
+  }, [present, targetOf, scrollerEl, scrollToDetent, setClosedSnap, setLanding]);
 
   /**
    * 中身の段の吸着先は「見出し + 中身の高さ」。シートは容器と同じ高さなので、CSS だけでは中身の高さが分からない。
@@ -477,7 +482,7 @@ export function Sheet({
       if (section.style.getPropertyValue('--oz-sheet-content') === `${height}px`) return;
       section.style.setProperty('--oz-sheet-content', `${height}px`);
       // 段の位置が変わった。**置き直さないと、測る前の位置に取り残される。** 指で触っている間は触らない。
-      if (latest.current.phase === 'open' && !byFingerRef.current) {
+      if (latest.current.phase === 'open') {
         scrollToDetent(settledRef.current ?? latest.current.detent, 'instant');
       }
     };
@@ -564,15 +569,20 @@ export function Sheet({
         data-shown={shown}
         className="oz-sheet-scroller absolute inset-0 overflow-y-auto"
         style={{
-          scrollSnapType: 'y mandatory',
+          // 閉じる動きの間は吸着を切る（閉じると決めたあとに段へ引き戻されない）。
+          scrollSnapType: visualPhase === 'closing' ? 'none' : 'y mandatory',
           overscrollBehavior: 'contain',
           containerType: 'size',
         }}
       >
-        {/* 容器の高さの空き。閉の位置。払って閉じられるシートだけ、ここが吸着先になる。 */}
+        {/* 容器の高さの空き＝閉の位置。**既定では吸着先にしない。**
+            吸着先にしてあると、iOS は出た瞬間にいちばん近い吸着先＝ここを選んでそのまま留まる
+            （実機: 押しても何も出てこない。計器の実測 `st=0 top=717 cv=272px`）。
+            払って閉じられるシートでは、**指が触れている間だけ**吸着先にする（下の effect）。 */}
         <div
+          ref={closedRef}
           aria-hidden="true"
-          style={{ height: '100%', scrollSnapAlign: dismissible ? 'start' : 'none' }}
+          style={{ height: '100%', scrollSnapAlign: 'none' }}
         />
         {/* 半分の段の印。容器の子の `top: 50%` は容器の高さの半分。 */}
         <div
