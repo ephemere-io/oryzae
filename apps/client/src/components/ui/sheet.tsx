@@ -335,6 +335,24 @@ export function Sheet({
     };
   }, [present, phase]);
 
+  // 出る動きが終わったら、行き先だけの吸着を解いて全部の段に戻す。**着いたかどうかを待たない**:
+  // ブラウザが配置のときに吸い付くとスクロールの通知が来ないことがあり、そこで待つと解けないまま
+  // 段を変えられなくなる（実機レビュー: 出てきたものの大きさを変えられない）。
+  useEffect(() => {
+    const scroller = scrollerEl;
+    if (!scroller || phase !== 'open') return;
+    const release = () => setLanding(null);
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target === scroller && event.propertyName === 'translate') release();
+    };
+    scroller.addEventListener('transitionend', onEnd);
+    // 動きが無い環境（動きを減らす設定・transition が走らない場合）でも必ず解く。
+    const running = scroller.getAnimations?.() ?? [];
+    if (running.length === 0) release();
+    else Promise.all(running.map((a) => a.finished)).then(release, () => {});
+    return () => scroller.removeEventListener('transitionend', onEnd);
+  }, [scrollerEl, phase, setLanding]);
+
   // 呼び出し側が段を変えたら、その段へ動く（指で止めた段の通知の折り返しでは動かない）。
   useEffect(() => {
     if (!present || phase !== 'open') return;
@@ -420,6 +438,10 @@ export function Sheet({
      * 要素へ**合成の pointer/mouse イベント**を送るので、出たばかりのシートが触られたことになる。
      */
     const onTouchStart = () => {
+      // 指が触れた＝これから段を選ぶ。**行き先だけの吸着を解いて、全部の段を吸着先に戻す。**
+      // （出したときの吸着は「行き先だけ」に絞ってある。解き忘れると段を変えられない＝
+      //   実機レビュー: 下から出てきたものの大きさを変えられない）
+      setLanding(null);
       setClosedSnap(true);
     };
     const onTouchEnd = () => {
