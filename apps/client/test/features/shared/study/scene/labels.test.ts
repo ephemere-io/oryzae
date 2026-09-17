@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampPillToScreen,
-  jarPillStateKey,
   LABEL_STYLE,
   PILL_MIN_HEIGHT,
 } from '@/features/shared/study/scene/labels';
@@ -56,23 +55,6 @@ describe('clampPillToScreen', () => {
     const placed = clampPillToScreen({ x: Number.NaN, y: Number.NaN }, { x: 0, y: 0 }, PILL, TALL);
     expect(Number.isFinite(placed.x)).toBe(true);
     expect(Number.isFinite(placed.y)).toBe(true);
-  });
-});
-
-describe('jarPillStateKey', () => {
-  it('状態語が瓶の様子と対応する', () => {
-    expect(jarPillStateKey('idle', 0)).toBe('pill_jar_empty');
-    expect(jarPillStateKey('fermenting', 0.4)).toBe('pill_jar_fermenting');
-    expect(jarPillStateKey('completed', 1)).toBe('pill_jar_letter');
-  });
-
-  it('readiness 0.9 以上で「もうすぐ」', () => {
-    expect(jarPillStateKey('fermenting', 0.89)).toBe('pill_jar_fermenting');
-    expect(jarPillStateKey('fermenting', 0.9)).toBe('pill_jar_almost');
-  });
-
-  it('手紙が届いていれば readiness より優先する', () => {
-    expect(jarPillStateKey('completed', 0.2)).toBe('pill_jar_letter');
   });
 });
 

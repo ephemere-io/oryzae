@@ -157,6 +157,22 @@
       "unlink_aria": "“{text}” 연결 해제"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "질문 연결",
+      "empty": "아직 세운 질문이 없습니다. 여기서 하나 적어 보세요.",
+      "new": "새 질문 쓰기",
+      "new_placeholder": "질문을 쓰세요 (예: 오늘의 작은 발견은?)",
+      "create": "이 질문으로 하기",
+      "creating": "만드는 중…",
+      "create_failed": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+      "back_to_list": "기존 질문에서 고르기",
+      "untitled": "제목 없는 질문",
+      "close": "닫기",
+      "limit": "질문은 {max}개까지입니다. 질문 목록에서 하나를 보관하면 새로 세울 수 있습니다.",
+      "manage": "질문 목록 열기"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "오류가 발생했습니다",
@@ -335,7 +351,8 @@
       "open": "열기",
       "ocr": "이미지에서 읽기",
       "collapse": "팔레트 접기",
-      "expand": "팔레트 펼치기"
+      "expand": "팔레트 펼치기",
+      "send_to_back": "맨 뒤로"
     },
     "drop_image": "여기에 이미지를 놓으세요"
   },
@@ -453,10 +470,6 @@
       "aria_label": "질문 선택 대화상자",
       "heading": "이 항목에 질문 연결",
       "body": "담가서 발효시키려면 항목에 질문을 하나 연결해야 합니다. 기존 질문을 고르거나 새로 작성하세요.",
-      "mode_pick": "기존에서 선택",
-      "mode_create": "새로 작성",
-      "pick_placeholder": "질문 선택...",
-      "create_placeholder": "질문을 작성하세요 (예: 오늘 작은 발견은?)",
       "cancel": "취소",
       "confirm": "연결 후 담그기",
       "saving": "담그는 중..."
@@ -496,6 +509,8 @@
       "letter_badge": "발효 과정의 편지"
     },
     "fermentation_sidebar": {
+      "heading": "발효 결과",
+      "letter_open": "편지 읽기",
       "close_aria": "발효 사이드바 닫기",
       "empty": "이 물음의 발효 결과가 아직 없습니다.",
       "section_letter": "편지",
@@ -632,6 +647,16 @@
       "hint": "← → 키·드래그·스크롤로 넘기기 ／ ESC 로 항아리로 돌아가기",
       "launcher": "{count}번의 발효를 되돌아보기",
       "open_aria": "{question}의 발효 이력 열기"
+    },
+    "reading": {
+      "section_letter": "편지",
+      "section_keywords": "키워드",
+      "section_snippets": "스니펫",
+      "selection_reason": "선택된 이유",
+      "reply": "이 편지에 답장 쓰기",
+      "sources": "이 편지의 바탕이 된 기록",
+      "source_untitled": "제목 없는 기록",
+      "open_detail": "열어서 읽기"
     }
   },
   "questions": {
@@ -702,41 +727,66 @@
   },
   "sp": {
     "editor": {
-      "title_placeholder": "제목 (선택)",
+      "palette_aria": "편집 도구",
+      "title_placeholder": "제목",
       "body_placeholder": "지금 느끼는 것을 그대로.",
       "status_editing": "편집 중",
       "status_saving": "저장 중…",
       "status_saved": "저장됨",
+      "status_offline": "오프라인 · 이 기기에 저장됨",
       "question": "질문",
       "question_selected": "질문: {label}",
       "question_untitled": "제목 없는 질문",
-      "question_sheet_title": "질문 선택",
-      "question_empty": "아직 세운 질문이 없습니다. 여기서 하나 적어 보세요.",
-      "question_new": "+ 새 질문 쓰기",
-      "question_new_placeholder": "질문을 쓰세요 (예: 오늘의 작은 발견은?)",
-      "question_create": "이 질문으로 하기",
-      "question_creating": "만드는 중…",
-      "question_create_failed": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
-      "question_back_to_list": "← 기존 질문에서 고르기",
       "close": "닫기",
       "pickle": "병에 담그기",
       "pickling": "담는 중…",
-      "pickled": "발효를 시작했습니다 ✓",
+      "pickled": "병에 담갔습니다",
       "question_link": "질문 연결",
-      "ferment_title": "항아리에 담아 발효시키기",
+      "ferment_title": "담그기",
+      "ferment_done_short": "담가 둠",
+      "photo_width": "너비",
+      "photo_width_small": "소",
+      "photo_width_medium": "중",
+      "photo_width_large": "대",
+      "photo_align": "정렬",
+      "photo_wrap": "둘러싸기",
+      "photo_wrap_on": "켬",
+      "photo_wrap_off": "끔",
+      "photo_remove": "빼기",
+      "photo_done": "완료",
+      "photo_selected": "사진을 선택 중",
       "ferment_sub": "시간이 지나면 AI의 편지가 도착합니다",
-      "delete": "삭제"
+      "delete": "삭제",
+      "question_unlink": "“{label}” 연결 해제",
+      "settings_title": "표시 설정",
+      "settings_delete_entry": "이 기록 삭제",
+      "settings_letter_spacing": "자간",
+      "settings_size_small": "작게",
+      "settings_size_medium": "보통",
+      "settings_size_large": "크게",
+      "settings_spacing_tight": "좁게",
+      "settings_spacing_normal": "보통",
+      "settings_spacing_wide": "넓게",
+      "pickled_note": "병에 담가 두었습니다. 발효가 시작되기 전에 덧붙인 내용도 다시 누르지 않아도 함께 담깁니다.",
+      "result_no_question": "질문을 연결하면 발효 결과가 여기에 나옵니다",
+      "result_no_question_body": "이 기록에 질문을 연결하면 그 질문의 편지·키워드·스니펫을 보면서 쓸 수 있습니다.",
+      "result_not_fermented": "이 질문은 아직 발효되지 않았습니다.",
+      "result_latest": "최신",
+      "result_question_aria": "어떤 질문의 결과를 볼지",
+      "result_round_aria": "언제의 결과를 볼지",
+      "ferment_needs_body": "본문을 쓰면 담글 수 있습니다"
     },
     "nav": {
+      "back": "뒤로",
       "write": "쓰기",
       "jar": "병",
       "list": "목록",
-      "account": "계정",
-      "questions": "질문"
+      "questions": "질문",
+      "dismiss_keyboard": "키보드 닫기"
     },
     "jar": {
-      "title": "병",
       "untitled": "제목 없는 질문",
+      "map_aria": "병 지도",
       "close": "닫기",
       "letter_empty": "이 결과에는 아직 편지가 없습니다",
       "reply": "답장 쓰기",
@@ -746,11 +796,13 @@
       "section_sources": "바탕이 된 기록",
       "source_untitled": "제목 없는 기록",
       "no_questions": "아직 질문이 없습니다. 아래 버튼에서 시작해 보세요.",
-      "spin_hint": "옆으로 밀면 돌아갑니다",
-      "manage_questions": "질문 추가·편집",
+      "manage_questions": "질문 목록",
       "not_fermented": "이 질문은 아직 발효되지 않았습니다",
-      "tap_hint": "탭하여 읽기",
-      "selection_reason": "선택된 이유"
+      "selection_reason": "선택된 이유",
+      "palette_aria": "병 작업",
+      "letter_badge": "편지",
+      "letter_badge_unread": "새 편지",
+      "history_latest": "최신"
     },
     "unsupported": "이 화면은 아직 모바일을 지원하지 않습니다. PC에서 이용해 주세요.",
     "list": {
@@ -769,7 +821,7 @@
     },
     "questions": {
       "title": "질문",
-      "intro": "지금 마주한 질문을 키우고, 고쳐 쓰고, 끝낼 수 있습니다.",
+      "intro": "지금 마주한 질문을 키우고, 고쳐 쓰고, 보관할 수 있습니다.",
       "untitled": "제목 없는 질문",
       "proposed": "Oryzae의 제안",
       "accept": "받아들이기",
@@ -779,11 +831,20 @@
       "sheet_add": "새 질문",
       "sheet_edit": "질문 편집",
       "placeholder": "질문 쓰기",
-      "delete": "이 질문 끝내기",
       "cancel": "취소",
       "save": "저장",
       "letter_arrived": "편지가 도착했습니다",
-      "close": "닫기"
+      "close": "닫기",
+      "limit": "질문은 {max}개까지입니다. 위의 질문을 누르고 「보관」을 고르면 새로 세울 수 있습니다.",
+      "archive_confirm_title": "이 질문을 보관할까요?",
+      "archive_confirm_body": "보관한 질문은 이 화면 맨 아래의 「보관한 질문」에서 되돌릴 수 있습니다.",
+      "archive_confirm": "보관하기",
+      "archive_cancel": "그만두기",
+      "archived_section": "보관한 질문 ({count})",
+      "unarchive": "되돌리기",
+      "unarchive_limit": "질문은 {max}개까지입니다. 하나를 보관하면 되돌릴 수 있습니다.",
+      "archive": "보관",
+      "save_failed": "저장하지 못했습니다. 다시 시도해 주세요."
     },
     "board": {
       "cards": "{count}장",
@@ -797,7 +858,18 @@
       "cancel": "취소",
       "save": "저장",
       "resize": "크기와 방향 바꾸기",
-      "snippet_placeholder": "남겨 두고 싶은 것"
+      "tool_snippet": "스니펫",
+      "tool_read_image": "읽기",
+      "tool_photo": "사진",
+      "open": "열기",
+      "read_image": "사진에서 글자 읽기",
+      "lightbox_close": "닫기",
+      "prev_day": "이전 날",
+      "next_day": "다음 날",
+      "snippet_placeholder": "남겨 두고 싶은 것",
+      "palette_aria": "보드 작업",
+      "send_to_back": "맨 뒤로",
+      "ocr_wait_note": "사진의 글자를 읽고 있습니다. 큰 사진은 10초 정도 걸릴 수 있습니다."
     }
   },
   "canvas": {
@@ -816,10 +888,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "pill_jar_empty": "비어 있음",
-    "pill_jar_fermenting": "발효 중",
-    "pill_jar_almost": "곧",
-    "pill_jar_letter": "편지",
+    "pill_questions": "질문 {count}개",
     "pill_entries": "{count}건",
     "pill_volumes": "{count}권",
     "pill_cards": "{count}장",
@@ -836,6 +905,9 @@
     "list_search_placeholder": "본문 검색",
     "list_load_more": "더 불러오기",
     "chip_all_questions": "모든 질문",
+    "filter_all_months": "모든 달",
+    "filter_month_aria": "달로 좁히기",
+    "filter_question_aria": "질문으로 좁히기",
     "question_untitled": "제목 없는 질문",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
@@ -857,6 +929,9 @@
     "hint_board_empty": "아직 붙인 것이 없습니다",
     "hint_board_photos": "사진 {count}건",
     "hint_board_snippets": "스니펫 {count}건",
-    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건"
+    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건",
+    "list_row_actions": "작업",
+    "list_open": "열기",
+    "list_delete": "삭제"
   }
 }

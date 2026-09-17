@@ -9,7 +9,12 @@ import { MAX_SCALE, MIN_SCALE } from '@/lib/canvas/viewport';
 // ユーザーは上限に張り付いたまま押せるボタンを押し続け、操作が効かない画面に見える。
 // jest-dom は入れていないので素の DOM で assert する。
 
-function renderControls(scale: number, handlers: Partial<Record<string, () => void>> = {}) {
+function renderControls(
+  scale: number,
+  handlers: Partial<Record<string, () => void>> = {},
+  referenceScale?: number,
+  scaleBounds?: { min: number; max: number },
+) {
   const noop = () => {};
   return render(
     <NextIntlClientProvider locale="ja" messages={jaMessages}>
@@ -19,6 +24,8 @@ function renderControls(scale: number, handlers: Partial<Record<string, () => vo
         onZoomOut={handlers.onZoomOut ?? noop}
         onReset={handlers.onReset ?? noop}
         onFit={handlers.onFit ?? noop}
+        referenceScale={referenceScale}
+        scaleBounds={scaleBounds}
       />
     </NextIntlClientProvider>,
   );
@@ -40,6 +47,22 @@ describe('CanvasZoomControls', () => {
   it('倍率を整数パーセントで表示する', () => {
     renderControls(1);
     expect(reset().textContent?.trim()).toBe('100%');
+  });
+
+  it('「100%」の倍率を渡されたら、それを基準に表示する（SP の瓶）', () => {
+    renderControls(0.26, {}, 0.26);
+    expect(reset().textContent?.trim()).toBe('100%');
+    cleanup();
+    renderControls(0.52, {}, 0.26);
+    expect(reset().textContent?.trim()).toBe('200%');
+  });
+
+  it('上限と下限を渡されたら、それで押せる／押せないを決める（SP の瓶は 100% の半分まで引ける）', () => {
+    renderControls(0.2, {}, 0.23, { min: 0.115, max: 3 });
+    expect(zoomOut().disabled).toBe(false);
+    cleanup();
+    renderControls(0.115, {}, 0.23, { min: 0.115, max: 3 });
+    expect(zoomOut().disabled).toBe(true);
   });
 
   it('端数の倍率は四捨五入して表示する', () => {

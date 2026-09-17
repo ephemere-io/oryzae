@@ -31,6 +31,7 @@ interface Props {
   onSelectEntry: (entry: StudyEntry) => void;
   onCreateEntry?: () => void;
   onClose: () => void;
+  variant?: 'paper' | 'mobile';
 }
 
 function entry(id: string, createdAt: string, overrides: Partial<StudyEntry> = {}): StudyEntry {
@@ -149,8 +150,55 @@ registerUnit<Props>({
         ...NOOP,
       },
     },
+    {
+      id: 'mobile',
+      probe: true,
+      description:
+        'Probe: 全画面の一覧（SP）。月と問いはドロップダウンに畳み、上段は閉じると新規作成の正円',
+      props: {
+        variant: 'mobile',
+        open: true,
+        entries: ENTRIES,
+        months: ['2026-09', '2026-08', '2026-07', '2026-06'],
+        selectedMonth: null,
+        search: '',
+        onSearchChange: () => {},
+        questions: [
+          { id: 'q1', currentText: '続ける意味とは' },
+          { id: 'q2', currentText: null },
+        ],
+        questionId: 'q1',
+        onSelectQuestion: () => {},
+        ...NOOP,
+      },
+    },
   ],
   invariants: [
+    {
+      id: 'mobile-folds-filters-into-dropdowns',
+      description: '全画面の一覧では、月と問いをチップで並べずドロップダウンに畳む',
+      onlyFixtures: ['mobile'],
+      check: ({ root }) => {
+        const chips = root.querySelectorAll('[data-chip-group]').length;
+        if (chips > 0) return `チップの帯が ${chips} 本残っている`;
+        const boxes = root.querySelectorAll('[role="combobox"]').length;
+        return boxes === 2 || `ドロップダウンが ${boxes} 個（期待: 月と問いの 2 個）`;
+      },
+    },
+    {
+      id: 'mobile-round-buttons',
+      description: '全画面の一覧の上段は、左に閉じる・右に新規作成の正円',
+      onlyFixtures: ['mobile'],
+      check: ({ root }) => {
+        const close = root.querySelector('button[aria-label="閉じる"]');
+        const create = root.querySelector('[data-verify-part="create-entry"]');
+        if (!(close instanceof HTMLElement) || !(create instanceof HTMLElement))
+          return '閉じるか新規作成が無い';
+        const round = (el: HTMLElement) =>
+          el.classList.contains('rounded-full') && el.classList.contains('h-11');
+        return (round(close) && round(create)) || '上段のボタンが正円でない';
+      },
+    },
     {
       id: 'offers-a-new-entry',
       description: '一覧から新しく書き始められる（今月の手帳を開いた先に書く入口がある）',
@@ -225,6 +273,7 @@ registerUnit<Props>({
     {
       id: 'all-chip-always-present',
       description: 'ALL チップが常にある（全月へ戻れる）',
+      onlyFixtures: ['all', 'month', 'empty-month', 'has-more', 'with-tools', 'loading-month'],
       check: ({ root }) => {
         const labels = [...root.querySelectorAll('button[aria-pressed]')].map((b) =>
           b.textContent?.trim(),
@@ -235,6 +284,7 @@ registerUnit<Props>({
     {
       id: 'one-chip-selected',
       description: '月のチップは常にちょうど 1 つ塗られている',
+      onlyFixtures: ['all', 'month', 'empty-month', 'has-more', 'with-tools', 'loading-month'],
       check: ({ root }) => {
         // 問いのチップも同じ形なので、月の帯に限って数える。
         const pressed = root.querySelectorAll(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface AutosaveOptions {
   mediaUrls?: string[];
@@ -34,10 +34,17 @@ interface UseAutosaveEntryParams {
 }
 
 const DEFAULT_DEBOUNCE_MS = 2000;
+/**
+ * 保存に失敗したあとの再送の間隔（ms）。3 回目以降は最後の値。
+ * 電波が無いときに毎秒叩かない・戻ったら 1 分以内には届く、の間を取る。`online` の合図が来れば待たない。
+ */
+const RETRY_DELAYS_MS = [10_000, 30_000, 60_000] as const;
+/** これ以上続けて失敗したら、次の入力まで再送を止める（サーバーが拒む内容を送り続けない）。 */
+const MAX_RETRIES = 5;
 // 打ち間違いの1文字でエントリが生えないための最小限。**短い記録を弾く値にしてはいけない**
 // （「今日は疲れた」で終える人がいる。Issue #510 はまさにそれが消える話だった）。
 // 数えるのはタイトル + 本文（composeContent の結果）。
-const DEFAULT_MIN_CREATE_CHARS = 2;
+export const DEFAULT_MIN_CREATE_CHARS = 2;
 
 /** エディタの保存形式（先頭行＝タイトル）。 */
 function composeContent(title: string, body: string): string {
@@ -65,6 +72,10 @@ function composeContent(title: string, body: string): string {
  * 保存の頻度は debounce（既定 2 秒）が抑える。
  *
  * しきい値は「新規作成」にだけ残す（`minCreateChars`）。更新は差分があれば必ず保存する。
+ *
+ * **失敗したら再送する**（オフラインの保険の片割れ。もう片方は `useEntryLocalCopy`）。
+ * 10s → 30s → 60s で再送し、`online` の合図が来たら待たずに送る。5 回続けて失敗したら次の入力まで止める。
+ * 戻り値の `retrying` が true の間、画面は「オフライン・この端末に保存」と言える。
  */
 export function useAutosaveEntry({
   title,
@@ -76,8 +87,12 @@ export function useAutosaveEntry({
   debounceMs = DEFAULT_DEBOUNCE_MS,
   minCreateChars = DEFAULT_MIN_CREATE_CHARS,
   mediaUrls,
-}: UseAutosaveEntryParams) {
+}: UseAutosaveEntryParams): { retrying: boolean } {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 失敗したあとの再送。回数で間隔を伸ばす。
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const failuresRef = useRef(0);
+  const [retrying, setRetrying] = useState(false);
   // 保存中に次の保存が重ならないようにする（同じ内容を 2 回書かない）。
   const inFlightRef = useRef(false);
   // 進行中の保存そのもの。離脱時はこれを待ってから書き直す（下記 saveNow の force を参照）。
@@ -113,6 +128,14 @@ export function useAutosaveEntry({
   }
 
   const scheduleRef = useRef<() => void>(() => {});
+  const scheduleRetryRef = useRef<() => void>(() => {});
+
+  const clearRetry = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
 
   /**
    * @param force 離脱時の書き出し。**しきい値を無視して書く**。
@@ -158,6 +181,8 @@ export function useAutosaveEntry({
           current.mediaUrls === undefined ? undefined : { mediaUrls: current.mediaUrls },
         );
         if (!savedId) return false;
+        failuresRef.current = 0;
+        setRetrying(false);
         lastSavedContentRef.current = content;
         prevEntryIdRef.current = savedId;
         onSavedRef.current?.(savedId, current.body, current.title.trim());
@@ -174,10 +199,15 @@ export function useAutosaveEntry({
     inFlightPromiseRef.current = run;
     const saved = await run;
 
-    // **保存できなかったら追いかけない。** 失敗すると lastSavedContent は前のままなので、
+    // **保存できなかったらその場では追いかけない。** 失敗すると lastSavedContent は前のままなので、
     // 「まだ差がある」という判定が永久に真になる。離脱時はその場で呼び直す作りなので、
-    // ここを抜けないと同じ内容を無限に送り続けることになる。
-    if (!saved) return;
+    // ここを抜けないと同じ内容を無限に送り続けることになる。代わりに間隔を空けて再送する。
+    if (!saved) {
+      failuresRef.current += 1;
+      setRetrying(true);
+      if (!force) scheduleRetryRef.current();
+      return;
+    }
 
     // 保存している間に書き進めていたら、その分をもう一度追いかける
     // （そうしないと「保存中に打った最後の数文字」が次の入力まで残らない）。
@@ -191,12 +221,45 @@ export function useAutosaveEntry({
 
   const schedule = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    // 新しい入力が来たら、失敗の数え直し（内容が変わったので、また試す価値がある）。
+    failuresRef.current = 0;
+    clearRetry();
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       void saveNow();
     }, latestRef.current.debounceMs);
-  }, [saveNow]);
+  }, [saveNow, clearRetry]);
   scheduleRef.current = schedule;
+
+  const scheduleRetry = useCallback(() => {
+    clearRetry();
+    if (failuresRef.current > MAX_RETRIES) return;
+    const delay =
+      RETRY_DELAYS_MS[Math.min(failuresRef.current, RETRY_DELAYS_MS.length) - 1] ??
+      RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      void saveNow();
+    }, delay);
+  }, [saveNow, clearRetry]);
+  scheduleRetryRef.current = scheduleRetry;
+
+  // 電波が戻ったら待たずに送る。外れるときは再送の予約も片付ける。
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return;
+    const onOnline = () => {
+      if (retryTimerRef.current || failuresRef.current > 0) {
+        clearRetry();
+        failuresRef.current = 0;
+        void saveNow();
+      }
+    };
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      clearRetry();
+    };
+  }, [enabled, saveNow, clearRetry]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -236,4 +299,6 @@ export function useAutosaveEntry({
       flush();
     };
   }, [enabled, saveNow]);
+
+  return { retrying };
 }

@@ -12,6 +12,7 @@ import { Select } from './select';
 
 interface Props {
   value: string;
+  size?: 'sm' | 'md';
 }
 
 const OPTIONS = [
@@ -29,11 +30,22 @@ registerUnit<Props>({
   kind: 'component',
   render: (props) => (
     <div className="w-64 p-6">
-      <Select ariaLabel="時間の表し方" value={props.value} options={OPTIONS} onChange={() => {}} />
+      <Select
+        ariaLabel="時間の表し方"
+        value={props.value}
+        size={props.size}
+        options={OPTIONS}
+        onChange={() => {}}
+      />
     </div>
   ),
   fixtures: [
     { id: 'closed', description: '閉じている', props: { value: 'fontSize' } },
+    {
+      id: 'md',
+      description: 'md（指の高さ。Input と同じ面）',
+      props: { value: 'fontSize', size: 'md' },
+    },
     {
       id: 'open',
       description: '開いている（3行）',

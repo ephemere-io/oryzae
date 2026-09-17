@@ -1,27 +1,36 @@
 'use client';
 
-// verify-exempt: データ取得（use-board）と初期フィットの採寸を担う容れ物。
-// 見た目と指の操作は sp-board-surface.verify.tsx が検証する。
+// verify-exempt: データ取得（use-board）・パンズームの hook・画像の読み取りを束ねる容れ物。
+// 見た目と指の操作は sp-board-surface / components/ui/action-palette / sp-snippet-composer の verify が検証する。
 
+import { MAX_OCR_IMAGE_BYTES, OCR_ALLOWED_IMAGE_TYPES } from '@oryzae/shared';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActionPalette } from '@/components/ui/action-palette';
+import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { ErrorState } from '@/components/ui/error-state';
 import { PageLoading } from '@/components/ui/page-loading';
+import {
+  BringToFrontIcon,
+  OpenIcon,
+  PhotoIcon,
+  ScanTextIcon,
+  SendToBackIcon,
+  SnippetIcon,
+  TrashIcon,
+} from '@/components/ui/palette-icons';
+import { CONTROL_FONT } from '@/components/ui/surface';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
+import { useOcrSnippetText } from '@/features/shared/board/hooks/use-ocr-snippet-text';
 import type { BoardCardData, CardPlacement } from '@/features/shared/board/types';
 import type { ApiClient } from '@/lib/api';
-import {
-  fitBounds,
-  IDENTITY_VIEWPORT,
-  unionBounds,
-  type Viewport,
-  viewportCenterWorld,
-} from '@/lib/canvas/viewport';
+import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
+import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
 import { readImageDimensions, resizeImage } from '@/lib/image';
-import { SpBoardSurface } from './sp-board-surface';
-import { SpBoardToolbar } from './sp-board-toolbar';
-import { SpSnippetSheet } from './sp-snippet-sheet';
+import { placeInSlot, useSpBackHandler, useSpChrome } from '@/lib/sp-chrome-context';
+import { type PendingCard, SpBoardSurface } from './sp-board-surface';
+import { SpSnippetComposer, type SpSnippetOcrStatus } from './sp-snippet-composer';
 
 export interface SpBoardProps {
   api: ApiClient;
@@ -37,6 +46,21 @@ const JPEG_QUALITY = 0.9;
 /** 新しいカードの既定の大きさ（world）。中身が入れば伸びる。 */
 const NEW_CARD_SIZE = { width: 262, height: 120 };
 
+/** 写真の仮のカードの長辺（world）。PC の新しい写真と同じ。 */
+const NEW_PHOTO_SIZE = 220;
+
+/** 貼れなかった仮のカードを見せておく時間（ms）。 */
+const PENDING_FAILED_MS = 4000;
+
+/**
+ * カードが 1 枚も無い日に「全体」として見せる範囲（world）。
+ *
+ * 開いた直後が等倍だと、画面に入るのはカード 1 枚分の面で「寄りすぎて何も見えない」
+ *（実機レビュー）。開いたときは常に FIT の状態にする。カードがあればカード全部、
+ * 無ければこの範囲。縦画面なので縦長（3:4）。新しいカードはこの真ん中に生まれる。
+ */
+const BOARD_HOME: Bounds = { x: 0, y: 0, width: 1080, height: 1440 };
+
 /** ローカル暦日の `YYYY-MM-DD`。 */
 function todayKey(): string {
   const now = new Date();
@@ -46,19 +70,48 @@ function todayKey(): string {
   return `${year}-${month}-${day}`;
 }
 
+/** `YYYY-MM-DD` をローカル暦日で前後へ動かす。月末・年末をまたいでも Date が繰り上げる。 */
+function shiftDateKey(dateKey: string, offset: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  if (!year || !month || !day) return dateKey;
+  const next = new Date(year, month - 1, day + offset);
+  const mm = `${next.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${next.getDate()}`.padStart(2, '0');
+  return `${next.getFullYear()}-${mm}-${dd}`;
+}
+
+/** 見えているカード全体の world 矩形。無ければ null。 */
+function boundsOf(cards: readonly BoardCardData[]): Bounds | null {
+  return unionBounds(
+    cards
+      .filter((card) => !card.removing)
+      .map((card) => ({ x: card.x, y: card.y, width: card.width, height: card.height })),
+  );
+}
+
+function isAllowedOcrImage(file: File): boolean {
+  return OCR_ALLOWED_IMAGE_TYPES.some((allowed) => allowed === file.type);
+}
+
 /**
  * SP のボード画面。
  *
- * 盤面は開いたときに一度だけ全体が入る倍率へ合わせる。world 座標は無制限なので、
- * 合わせないと画面外のカードに指が届かない。合わせ直しは**しない** — カードを
- * 動かすたびに再フィットすると盤面が飛び跳ねる。
+ * 盤面は PC と同じ `useCanvasViewport` の上に置く: 2 本指で寄り引き、空白の 1 本指でパン、
+ * 引き切ってさらにつまむと書斎へ戻る（`PullBackToStudy`）。開いたときに一度だけ全体が
+ * 入る倍率へ合わせ、以後は合わせ直さない（カードを動かすたびに再フィットすると盤面が
+ * 飛び跳ねる）。
  *
  * 作る・直すは PC（#524）と同じ「下部中央の道具箱が、選んでいるものに応じて
- * 入れ替わる」形。道具の実体は SP 用に作り直してある（reach 分離と、指の当たりの大きさ）。
+ * 入れ替わる」形。**画像から読み取る**もここに戻した（写真を撮るのはスマホの側）。
+ * 端末の写真アプリを開く `<input type="file">` は、押した指の中で開かないと iOS が
+ * 拒むので、このコンポーネントが持って道具箱とシートの両方から同期的に叩く。
  */
 export function SpBoard({ api }: SpBoardProps) {
   const t = useTranslations('board');
-  const [dateKey] = useState(todayKey);
+  const tSp = useTranslations('sp.board');
+  const tNav = useTranslations('sp.nav');
+  const chrome = useSpChrome();
+  const [dateKey, setDateKey] = useState(todayKey);
   const {
     cards,
     setCards,
@@ -71,43 +124,84 @@ export function SpBoard({ api }: SpBoardProps) {
     deleteCard,
   } = useBoard(api, dateKey, 'daily');
   const { savePositions } = useBoardSave(api);
-
-  const frameRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [viewport, setViewport] = useState<Viewport>(IDENTITY_VIEWPORT);
-  const fittedRef = useRef(false);
-
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const ocr = useOcrSnippetText(api);
 
   // 保存は掴んでいる間ではなく離した時に投げる。最新の配置を読むための箱。
   const cardsRef = useRef<BoardCardData[]>([]);
   cardsRef.current = cards;
+
+  const canvas = useCanvasViewport({
+    fitPadding: FIT_PADDING,
+    defaultFitBounds: BOARD_HOME,
+    getContentBounds: () => boundsOf(cardsRef.current) ?? BOARD_HOME,
+  });
+  const { fitTo, frameSize } = canvas;
+  const fittedRef = useRef(false);
+
+  /** 前の日・次の日へ。日が変われば盤面は別物なので、選択を解いて収め直す。 */
+  const shiftDay = useCallback((offset: -1 | 1) => {
+    setSelectedId(null);
+    fittedRef.current = false;
+    setDateKey((key) => shiftDateKey(key, offset));
+  }, []);
+
+  const ocrInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [lightbox, setLightbox] = useState<{ imageUrl: string; caption: string } | null>(null);
+  // 貼っている最中の仮のカード。選んだ瞬間に置き、貼り終わったら実物と入れ替える。
+  const [pending, setPending] = useState<PendingCard | null>(null);
+
+  // 画像から読み取った下書き。シートが閉じれば捨てる。
+  const [ocrStatus, setOcrStatus] = useState<SpSnippetOcrStatus>('idle');
+  const [ocrText, setOcrText] = useState<string | null>(null);
 
   const selected = useMemo(
     () => cards.find((card) => card.id === selectedId) ?? null,
     [cards, selectedId],
   );
 
+  // 初期フィット。frame の採寸ができるまで（レイアウト確定を待って）数フレーム粘る。
+  // カードが無い日も BOARD_HOME に収める（等倍のまま開かない）。
   useEffect(() => {
-    const frame = frameRef.current;
-    if (!frame || fittedRef.current || loading) return;
+    if (fittedRef.current || loading) return;
+    const bounds = boundsOf(cards) ?? BOARD_HOME;
 
-    const visible = cards.filter((card) => !card.removing);
-    if (visible.length === 0) return;
+    let frame = 0;
+    let tries = 0;
+    const attempt = () => {
+      if (fittedRef.current) return;
+      const size = frameSize();
+      if (size.width === 0 || size.height === 0) {
+        if (tries++ < 60) frame = requestAnimationFrame(attempt);
+        return;
+      }
+      fitTo(bounds);
+      fittedRef.current = true;
+    };
+    attempt();
+    return () => cancelAnimationFrame(frame);
+  }, [cards, loading, fitTo, frameSize]);
 
-    const bounds = unionBounds(
-      visible.map((card) => ({ x: card.x, y: card.y, width: card.width, height: card.height })),
-    );
-    if (!bounds) return;
-
-    const size = { width: frame.clientWidth, height: frame.clientHeight };
-    if (size.width === 0 || size.height === 0) return;
-
-    setViewport(fitBounds(bounds, size, FIT_PADDING));
-    fittedRef.current = true;
-  }, [cards, loading]);
+  /**
+   * 貼ったカードを見せる。
+   *
+   * 貼り終わると画面の外に置かれていて「どこに行ったか分からない」（実機レビュー）。
+   * 作る前に印を立て、取得し直した一覧に知らないカードが現れたら、それを選んで全体を収め直す。
+   */
+  const revealPendingRef = useRef(false);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const known = knownIdsRef.current;
+    const fresh = cards.filter((card) => !known.has(card.id));
+    knownIdsRef.current = new Set(cards.map((card) => card.id));
+    if (!revealPendingRef.current || fresh.length === 0 || known.size === 0) return;
+    revealPendingRef.current = false;
+    setSelectedId(fresh[fresh.length - 1].id);
+    fitTo(boundsOf(cards) ?? BOARD_HOME);
+  }, [cards, fitTo]);
 
   const handleMove = useCallback(
     (cardId: string, x: number, y: number) => {
@@ -141,15 +235,18 @@ export function SpBoard({ api }: SpBoardProps) {
   }, [savePositions]);
 
   /** 新しいカードを置く場所＝いま見えている真ん中。遠くを見ていても画面内に生まれる。 */
-  const placement = useCallback((): CardPlacement | undefined => {
-    const frame = frameRef.current;
-    if (!frame) return undefined;
-    const center = viewportCenterWorld(viewport, {
-      width: frame.clientWidth,
-      height: frame.clientHeight,
-    });
+  const placement = useCallback((): CardPlacement => {
+    const center = canvas.centerWorld();
     return { x: center.x - NEW_CARD_SIZE.width / 2, y: center.y - NEW_CARD_SIZE.height / 2 };
-  }, [viewport]);
+  }, [canvas]);
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setOcrStatus('idle');
+    setOcrText(null);
+  }, []);
+  // 書いている間は、上段の戻るが欄を閉じる（書斎へは戻らない）。
+  useSpBackHandler(sheetOpen ? closeSheet : null);
 
   const handleSubmitSnippet = useCallback(
     async (text: string) => {
@@ -158,37 +255,101 @@ export function SpBoard({ api }: SpBoardProps) {
         if (selected && selected.cardType === 'snippet') {
           await updateSnippet(selected.refId, text);
         } else {
+          revealPendingRef.current = true;
           await createSnippet(text, placement());
         }
-        setSheetOpen(false);
+        closeSheet();
       } finally {
         setBusy(false);
       }
     },
-    [selected, updateSnippet, createSnippet, placement],
+    [selected, updateSnippet, createSnippet, placement, closeSheet],
   );
 
   const handlePickPhoto = useCallback(
     async (file: File) => {
       setBusy(true);
+      // 選んだ瞬間に、いま見えている真ん中へ仮のカードを置く（縮小・送信を待たせない）。
+      const previewUrl = URL.createObjectURL(file);
+      const spot = placement();
+      setPending({
+        x: spot.x,
+        y: spot.y,
+        width: NEW_PHOTO_SIZE,
+        height: NEW_PHOTO_SIZE,
+        previewUrl,
+        failed: false,
+      });
+      let failed = false;
       try {
         const [{ width, height }, resized] = await Promise.all([
           readImageDimensions(file),
           resizeImage(file, MAX_UPLOAD_WIDTH, JPEG_QUALITY),
         ]);
+        // 寸法が分かったら仮のカードを写真の比に合わせる。
+        const ratio = width > 0 && height > 0 ? height / width : 1;
+        setPending((current) =>
+          current
+            ? {
+                ...current,
+                width: ratio >= 1 ? NEW_PHOTO_SIZE / ratio : NEW_PHOTO_SIZE,
+                height: ratio >= 1 ? NEW_PHOTO_SIZE : NEW_PHOTO_SIZE * ratio,
+              }
+            : current,
+        );
         // 縮小後の Blob を同じ名前の File に戻す（サーバーは拡張子を見る）。
         const upload = new File([resized.blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, {
           type: 'image/jpeg',
         });
-        await createPhoto(upload, '', width, height, placement());
+        revealPendingRef.current = true;
+        await createPhoto(upload, '', width, height, spot);
       } catch {
-        // 読めない画像（HEIC 等）や通信の失敗。盤面に専用のエラー表示が無いので、
-        // 「カードが増えない」ことを結果として見せる。固まらないことだけを守る。
+        // 読めない画像（HEIC 等）や通信の失敗。仮のカードを薄くしてしばらく残し、
+        // 「貼れなかった」ことを見せる（盤面に専用のエラー表示は無い）。固まらないことだけを守る。
+        failed = true;
       } finally {
         setBusy(false);
+        if (failed) {
+          setPending((current) => (current ? { ...current, failed: true } : current));
+          window.setTimeout(() => {
+            setPending(null);
+            URL.revokeObjectURL(previewUrl);
+          }, PENDING_FAILED_MS);
+        } else {
+          setPending(null);
+          URL.revokeObjectURL(previewUrl);
+        }
       }
     },
     [createPhoto, placement],
+  );
+
+  /** 端末の写真アプリを開く。押した指の中で呼ぶこと（後から呼ぶと iOS が拒む）。 */
+  const pickOcrImage = useCallback(() => {
+    setSelectedId(null);
+    ocrInputRef.current?.click();
+  }, []);
+
+  const handleOcrFile = useCallback(
+    async (file: File) => {
+      setSelectedId(null);
+      setSheetOpen(true);
+      if (!isAllowedOcrImage(file) || file.size > MAX_OCR_IMAGE_BYTES) {
+        // 送る前に弾く。サーバーも同じ条件で 400 を返すが、往復を待たせない。
+        setOcrStatus('failed');
+        return;
+      }
+      setOcrStatus('reading');
+      const result = await ocr(file);
+      if (result.status === 'ok') {
+        // 読み取り結果はそのまま貼らず、シートの欄に載せて直してから保存する。
+        setOcrText(result.text);
+        setOcrStatus('idle');
+        return;
+      }
+      setOcrStatus(result.status);
+    },
+    [ocr],
   );
 
   const handleBringToFront = useCallback(() => {
@@ -209,70 +370,232 @@ export function SpBoard({ api }: SpBoardProps) {
     );
   }, [selected, setCards, savePositions]);
 
+  /**
+   * 背面へ。前面へと対で、選んだものを他の全部の下に置く。
+   *
+   * zIndex は負にしない（描画順の比較はできるが、並びを保存する側の前提が崩れる）。
+   * 最下段が 0 なら全体を 1 つ上げてから 0 に置く。
+   */
+  const handleSendToBack = useCallback(() => {
+    if (!selected) return;
+    const bottom = Math.min(...cardsRef.current.map((card) => card.zIndex));
+    const lift = bottom <= 0 ? 1 : 0;
+    const place = (card: BoardCardData): BoardCardData =>
+      card.id === selected.id
+        ? { ...card, zIndex: Math.max(0, bottom - 1 + lift), userPositioned: true }
+        : { ...card, zIndex: card.zIndex + lift };
+    setCards((previous) => previous.map(place));
+    savePositions(cardsRef.current.filter((card) => !card.removing).map(place));
+  }, [selected, setCards, savePositions]);
+
   const handleDelete = useCallback(async () => {
     if (!selected) return;
     setSelectedId(null);
     await deleteCard(selected.id, selected.cardType, selected.refId);
   }, [selected, deleteCard]);
 
+  const handleOpen = useCallback(() => {
+    if (selected?.cardType !== 'photo' || !('imageUrl' in selected.content)) return;
+    setLightbox({ imageUrl: selected.content.imageUrl, caption: selected.content.caption });
+  }, [selected]);
+
   if (loading && cards.length === 0) return <PageLoading />;
   if (error) return <ErrorState message={t('error_message')} onRetry={refresh} />;
 
+  const editingSnippet = selected !== null && selected.cardType === 'snippet';
+  const sheetInitialText =
+    editingSnippet && 'text' in selected.content ? selected.content.text : (ocrText ?? '');
+
   return (
-    <div ref={frameRef} className="relative flex h-full w-full flex-col">
+    <div className="relative flex h-full w-full flex-col">
       {/* 盤面は残りの高さいっぱい。道具箱はその下に**流れの中で**置く（浮かせると
           盤面の下端のカードに被り、指で掴めなくなる — 実機レビュー）。 */}
       <div className="relative min-h-0 flex-1">
+        {/* 書いている間は盤面を押すと欄を閉じる（暗くはしない。メッセージアプリの作法）。 */}
+        {sheetOpen ? (
+          <button
+            type="button"
+            aria-label={tSp('cancel')}
+            onClick={busy || ocrStatus === 'reading' ? undefined : closeSheet}
+            className="absolute inset-0 z-20"
+            style={{ background: 'transparent' }}
+          />
+        ) : null}
         <SpBoardSurface
           cards={cards}
           dateKey={dateKey}
-          viewport={viewport}
+          onShiftDay={shiftDay}
+          viewport={canvas.viewport}
+          canvas={canvas}
           selectedId={selectedId}
           onSelect={setSelectedId}
+          pending={pending}
+          // 同じカードを続けて押したら開く。スニペットは編集の欄へ（PC のダブルクリックと同じ）。
+          onOpen={(id) => {
+            setSelectedId(id);
+            const card = cardsRef.current.find((it) => it.id === id);
+            if (card?.cardType === 'snippet') setSheetOpen(true);
+          }}
           onMove={handleMove}
           onTransform={handleTransform}
           onCommit={handleCommit}
+          overlay={
+            <CanvasZoomControls
+              scale={canvas.viewport.scale}
+              onZoomIn={canvas.zoomIn}
+              onZoomOut={canvas.zoomOut}
+              onReset={canvas.resetZoom}
+              onFit={() => fitTo(boundsOf(cardsRef.current) ?? BOARD_HOME)}
+            />
+          }
         />
       </div>
 
-      <div className="flex shrink-0 justify-center px-4 pt-2 pb-5">
-        <SpBoardToolbar
-          selectedType={selected?.cardType ?? null}
-          busy={busy}
-          onEdit={() => setSheetOpen(true)}
-          onBringToFront={handleBringToFront}
-          onDelete={handleDelete}
-          onCreateSnippet={() => {
-            setSelectedId(null);
-            setSheetOpen(true);
-          }}
-          onCreatePhoto={() => fileRef.current?.click()}
-        />
-      </div>
+      {/* 操作の列は殻の下端（エントリー・瓶と同じ部品）。PC（#524）と同じく、
+          **選んでいるものに応じて中身が入れ替わる**: 何も選んでいなければ作るもの、
+          カードを選んでいればそのカードにできること。 */}
+      {placeInSlot(
+        sheetOpen ? (
+          <SpSnippetComposer
+            open={sheetOpen}
+            mode={editingSnippet ? 'edit' : 'create'}
+            initialText={sheetInitialText}
+            saving={busy}
+            ocrStatus={ocrStatus}
+            fromImage={ocrText !== null}
+            onPickImage={pickOcrImage}
+            onSubmit={handleSubmitSnippet}
+            onClose={closeSheet}
+          />
+        ) : (
+          <ActionPalette
+            ariaLabel={tSp('palette_aria')}
+            keyboardOpen={chrome.keyboardOpen}
+            dismissKeyboardLabel={tNav('dismiss_keyboard')}
+            actions={
+              selected === null
+                ? [
+                    {
+                      id: 'snippet',
+                      label: tSp('add_snippet'),
+                      caption: tSp('tool_snippet'),
+                      icon: <SnippetIcon />,
+                      busy,
+                      onSelect: () => {
+                        setSelectedId(null);
+                        setSheetOpen(true);
+                      },
+                    },
+                    {
+                      id: 'read-image',
+                      label: tSp('read_image'),
+                      caption: tSp('tool_read_image'),
+                      icon: <ScanTextIcon />,
+                      busy,
+                      onSelect: () => setSelectedId(null),
+                      // 押した指がそのまま選び手の input に当たる（iOS のメニューがボタンから出る）。
+                      file: {
+                        accept: OCR_ALLOWED_IMAGE_TYPES.join(','),
+                        onFile: (file) => void handleOcrFile(file),
+                      },
+                    },
+                    {
+                      id: 'photo',
+                      label: tSp('add_photo'),
+                      caption: tSp('tool_photo'),
+                      icon: <PhotoIcon />,
+                      busy,
+                      onSelect: () => {},
+                      file: { accept: 'image/*', onFile: handlePickPhoto },
+                    },
+                  ]
+                : [
+                    // 写真は本文を持たないので編集を出さない。開くは写真だけ（スニペットの全文は編集で読める）。
+                    ...(selected.cardType === 'snippet'
+                      ? [
+                          {
+                            id: 'edit',
+                            label: tSp('edit'),
+                            icon: <SnippetIcon />,
+                            onSelect: () => setSheetOpen(true),
+                          },
+                        ]
+                      : [
+                          {
+                            id: 'open',
+                            label: tSp('open'),
+                            icon: <OpenIcon />,
+                            onSelect: handleOpen,
+                          },
+                        ]),
+                    {
+                      id: 'front',
+                      label: tSp('bring_to_front'),
+                      icon: <BringToFrontIcon />,
+                      onSelect: handleBringToFront,
+                    },
+                    {
+                      id: 'back',
+                      label: tSp('send_to_back'),
+                      icon: <SendToBackIcon />,
+                      onSelect: handleSendToBack,
+                    },
+                    {
+                      id: 'delete',
+                      label: tSp('remove'),
+                      icon: <TrashIcon />,
+                      tone: 'danger' as const,
+                      onSelect: handleDelete,
+                    },
+                  ]
+            }
+          />
+        ),
+        chrome.paletteSlot,
+      )}
 
-      <SpSnippetSheet
-        open={sheetOpen}
-        initialText={
-          selected && selected.cardType === 'snippet' && 'text' in selected.content
-            ? selected.content.text
-            : ''
-        }
-        saving={busy}
-        onSubmit={handleSubmitSnippet}
-        onClose={() => setSheetOpen(false)}
-      />
+      {/* 写真を大きく見る。右ペインが無い SP では、これが唯一の「開く」。 */}
+      {lightbox ? (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: 閉じるボタンがキーボードの道。背景の click は補助
+        <div
+          role="dialog"
+          aria-label={t('lightbox.aria_label')}
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.88)' }}
+          onClick={() => setLightbox(null)}
+        >
+          {/* biome-ignore lint/performance/noImgElement: Supabase storage の署名付き URL */}
+          <img
+            src={lightbox.imageUrl}
+            alt={lightbox.caption}
+            className="max-h-full max-w-full object-contain"
+            draggable={false}
+          />
+          {lightbox.caption ? (
+            <p className="mt-3 text-center text-sm text-white/75">{lightbox.caption}</p>
+          ) : null}
+          <button
+            type="button"
+            aria-label={t('lightbox.close_aria')}
+            onClick={() => setLightbox(null)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full text-white"
+            style={{ ...CONTROL_FONT, background: 'rgba(255,255,255,0.14)' }}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
-      {/* 写真は端末の写真アプリ／カメラから選ぶ。SP に貼り付けもドロップも無い。 */}
+      {/* 画像から文字を読み取る。写真として貼るのとは別の入口（意図が違う）。 */}
       <input
-        ref={fileRef}
+        ref={ocrInputRef}
         type="file"
-        accept="image/*"
+        accept={OCR_ALLOWED_IMAGE_TYPES.join(',')}
         hidden
         onChange={(event) => {
           const file = event.target.files?.[0];
-          // 同じ写真をもう一度選べるように空にしておく（value が同じだと change が来ない）。
           event.target.value = '';
-          if (file) handlePickPhoto(file);
+          if (file) handleOcrFile(file);
         }}
       />
     </div>

@@ -18,6 +18,7 @@ interface BoardToolbarProps {
   selection: { cardType: 'snippet' | 'photo' } | null;
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
+  onSendSelectedToBack: () => void;
   onDeleteSelected: () => void;
 }
 
@@ -100,6 +101,15 @@ function FrontIcon({ size }: { size: number }) {
   );
 }
 
+function BackIcon({ size }: { size: number }) {
+  return (
+    <svg {...iconProps(size)} aria-hidden="true">
+      <path d="m3 10 9 5 9-5" />
+      <path d="M12 21 3 16l9-5 9 5-9 5Z" />
+    </svg>
+  );
+}
+
 function TrashIcon({ size }: { size: number }) {
   return (
     <svg {...iconProps(size)} aria-hidden="true">
@@ -127,6 +137,7 @@ export function BoardToolbar({
   selection,
   onOpenSelected,
   onBringSelectedToFront,
+  onSendSelectedToBack,
   onDeleteSelected,
 }: BoardToolbarProps) {
   const t = useTranslations('board.toolbar');
@@ -176,6 +187,13 @@ export function BoardToolbar({
           label: t('bring_to_front'),
           onSelect: onBringSelectedToFront,
           icon: (size: number) => <FrontIcon size={size} />,
+          danger: false,
+        },
+        {
+          id: 'back' as const,
+          label: t('send_to_back'),
+          onSelect: onSendSelectedToBack,
+          icon: (size: number) => <BackIcon size={size} />,
           danger: false,
         },
         {

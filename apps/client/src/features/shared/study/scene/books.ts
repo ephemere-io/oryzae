@@ -175,17 +175,19 @@ export interface NotebookLayoutResult {
  * 机は当月を一番上に、直近 2 ヶ月を下に積む。それ以前は棚へ（直 3 ヶ月分）。
  * 3 ヶ月を超えたら棚は詰めて表示する（間隔を縮める。スクロールも省略記号も出さない）。
  */
-export function layoutNotebooks(notebooks: readonly Notebook[], now: string): NotebookLayoutResult {
+export function layoutNotebooks(
+  notebooks: readonly Notebook[],
+  now: string,
+  /** 机に積む冊数。PC は当月＋直近 2 ヶ月、SP は当月の 1 冊だけ（配置表 `deskNotebooks`）。 */
+  deskCount: number = RENDER_LIMITS.deskNotebooks,
+): NotebookLayoutResult {
   // 新しい月から並べる。サーバーの順序に依存しない。
   const sorted = [...withCurrentNotebook(notebooks, now)].sort((a, b) =>
     a.month < b.month ? 1 : a.month > b.month ? -1 : 0,
   );
 
-  const deskNotebooks = sorted.slice(0, RENDER_LIMITS.deskNotebooks);
-  const shelf = sorted.slice(
-    RENDER_LIMITS.deskNotebooks,
-    RENDER_LIMITS.deskNotebooks + RENDER_LIMITS.shelfSpines,
-  );
+  const deskNotebooks = sorted.slice(0, deskCount);
+  const shelf = sorted.slice(deskCount, deskCount + RENDER_LIMITS.shelfSpines);
 
   // 積みは下から作る。一番古い冊が底で、当月が天。
   const bottomUp = [...deskNotebooks].reverse();

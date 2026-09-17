@@ -1,23 +1,22 @@
 /**
  * StudyLabels の検証スペック。
  *
- * SP のピルは受け入れ基準が具体的（44px 以上・4 つ常時・状態語つき・数値の readiness を
- * 出さない）なので、そこを機械的に見る（40-acceptance.md「SP のタッチ提示」）。
+ * SP のピルは受け入れ基準が具体的（44px 以上・4 つ常時・数つき・readiness の数値を出さない）
+ * なので、そこを機械的に見る（40-acceptance.md「SP のタッチ提示」）。
  */
 
 import { registerUnit } from '@oryzae/verify';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { PC_LAYOUT, SP_LAYOUT, type StudyLayout } from '../layout';
 import { PILL_MIN_HEIGHT } from '../scene/labels';
-import type { StudyFermentationStatus } from '../types';
 import { type LabelKind, type LabelPoint, StudyLabels } from './study-labels';
 
 interface Props {
   layout: StudyLayout;
+  counting?: boolean;
   positions: Partial<Record<LabelKind, LabelPoint | null>>;
   hovered: LabelKind | null;
-  status: StudyFermentationStatus;
-  readiness: number;
+  questionCount: number;
   entryCount: number;
   volumeCount: number;
   cardCount: number;
@@ -37,8 +36,7 @@ const BASE: Props = {
   layout: SP_LAYOUT,
   positions: POSITIONS,
   hovered: null,
-  status: 'fermenting',
-  readiness: 0.45,
+  questionCount: 4,
   entryCount: 9,
   volumeCount: 3,
   cardCount: 10,
@@ -53,11 +51,16 @@ registerUnit<Props>({
   kind: 'component',
   render: (props) => withVerifyProviders(<StudyLabels {...props} />),
   fixtures: [
-    { id: 'sp-fermenting', description: 'SP・発酵中', props: BASE },
+    { id: 'sp-default', description: 'SP・問い 4 つ', props: BASE },
     {
-      id: 'sp-completed',
-      description: 'SP・手紙が届いている',
-      props: { ...BASE, status: 'completed', readiness: 1 },
+      id: 'sp-counting',
+      description: 'SP・数がまだ本当の数でない（取得中）— 0 ではなく骨組み',
+      props: { ...BASE, counting: true },
+    },
+    {
+      id: 'sp-many',
+      description: 'SP・数が大きい（ピルが広がっても画面に収まる）',
+      props: { ...BASE, questionCount: 12, entryCount: 128, volumeCount: 24, cardCount: 300 },
     },
     {
       id: 'sp-narrow',
@@ -100,14 +103,9 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'no-numeric-readiness',
-      description: 'SP でも readiness を数値（％）で出さない',
-      check: ({ root, props }) => {
-        const text = root.textContent ?? '';
-        if (text.includes('%')) return '％表記が出ている';
-        const percent = String(Math.round(props.readiness * 100));
-        return !text.includes(percent) || `readiness の数値 "${percent}" が出ている`;
-      },
+      id: 'no-percent',
+      description: 'SP でも readiness を数値（％）で出さない（ピルは数だけ）',
+      check: ({ root }) => !(root.textContent ?? '').includes('%') || '％表記が出ている',
     },
     {
       id: 'pills-inside-screen',
