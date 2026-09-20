@@ -321,6 +321,7 @@
       "snippet": "Create snippet",
       "photo": "Paste image",
       "aria_label_card": "Actions for the selected card",
+      "selected_count": "{count} selected",
       "bring_to_front": "Bring to front",
       "delete": "Delete",
       "open": "Open",

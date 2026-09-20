@@ -321,6 +321,7 @@
       "snippet": "스니펫 만들기",
       "photo": "이미지 붙여넣기",
       "aria_label_card": "선택한 카드 작업",
+      "selected_count": "{count}장",
       "bring_to_front": "맨 앞으로",
       "delete": "삭제",
       "open": "열기",

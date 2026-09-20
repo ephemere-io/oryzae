@@ -22,8 +22,12 @@ interface BoardToolbarProps {
   /** 画像から文字を読み取ってスニペットにする。作成ダイアログを画像タブで開く。 */
   onReadImage: () => void;
   onAddPhoto: () => void;
-  /** 選択中のカード。null なら作成系の道具を出す。 */
-  selection: { cardType: 'snippet' | 'photo' } | null;
+  /**
+   * 選択中のカード。null なら作成系の道具を出す。
+   * `count` が 2 以上のときは「開く」を出さない（複数を一度には開けない）。
+   * `cardType` は 1 枚のときだけ意味を持つ。
+   */
+  selection: { count: number; cardType: 'snippet' | 'photo' | null } | null;
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
   onDeleteSelected: () => void;
@@ -100,15 +104,24 @@ export function BoardToolbar({
   // カードを選んでいる間は、作る道具ではなく「そのカードにできること」を出す。
   // 操作の名前は種別で変えない。同じ形の操作に別々の言葉を当てると、
   // 「これは違う何かなのでは」と読ませてしまう。
+  const multiple = (selection?.count ?? 0) > 1;
+
   const cardActions = selection
     ? [
-        {
-          id: 'open' as const,
-          label: t('open'),
-          onSelect: onOpenSelected,
-          icon: (size: number) => <OpenIcon size={size} />,
-          danger: false,
-        },
+        // 「開く」だけは 1 枚のときにしか意味がない（複数のカードを同時には開けない）。
+        // 押せないボタンを灰色で残すのではなく、**出さない**。押せるのに何も起きない
+        // ボタンは、押してみるまで理由が分からない。
+        ...(multiple
+          ? []
+          : [
+              {
+                id: 'open' as const,
+                label: t('open'),
+                onSelect: onOpenSelected,
+                icon: (size: number) => <OpenIcon size={size} />,
+                danger: false,
+              },
+            ]),
         {
           id: 'front' as const,
           label: t('bring_to_front'),
@@ -133,6 +146,7 @@ export function BoardToolbar({
         activeTool,
         mode: selection ? 'card' : 'create',
         selectedType: selection?.cardType ?? 'none',
+        selectedCount: selection?.count ?? 0,
         toolCount: selection ? cardActions.length : tools.length,
       }}
       storage={STORAGE}
@@ -145,8 +159,19 @@ export function BoardToolbar({
       isolateEvents
     >
       {({ scale, consumeMoved }) =>
-        selection
-          ? cardActions.map((action) => (
+        selection ? (
+          <>
+            {/* 何枚に効くのかを、押す前に見せる。 */}
+            {multiple && (
+              <span
+                data-verify-part="selected-count"
+                className="flex shrink-0 items-center px-2 text-[11px] tabular-nums"
+                style={{ color: 'var(--date-color)' }}
+              >
+                {t('selected_count', { count: selection.count })}
+              </span>
+            )}
+            {cardActions.map((action) => (
               <button
                 key={action.id}
                 type="button"
@@ -165,56 +190,59 @@ export function BoardToolbar({
                 {action.icon(scale.icon)}
                 {action.label}
               </button>
-            ))
-          : tools.map((tool) => {
-              const isActive = activeTool === tool.id;
-              return (
-                <div key={tool.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (consumeMoved()) return;
-                      tool.onSelect();
-                    }}
-                    aria-label={`${tool.label} (${tool.shortcut})`}
-                    aria-pressed={isActive}
-                    data-verify-tool={tool.id}
-                    // 非アクティブ時は背景をインラインで指定しない。インライン style は
-                    // CSS の :hover に必ず勝つため、指定すると hover が効かなくなる。
-                    className={`${TOOL_BUTTON_CLASS} ${isActive ? '' : HOVER_CLASS}`}
-                    style={{
-                      height: scale.button,
-                      width: scale.button,
-                      borderRadius: scale.buttonRadius,
-                      ...(isActive
-                        ? { backgroundColor: 'var(--accent)', color: '#fff' }
-                        : { color: 'var(--fg)' }),
-                    }}
-                  >
-                    {tool.icon(scale.icon)}
-                  </button>
+            ))}
+          </>
+        ) : (
+          tools.map((tool) => {
+            const isActive = activeTool === tool.id;
+            return (
+              <div key={tool.id} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (consumeMoved()) return;
+                    tool.onSelect();
+                  }}
+                  aria-label={`${tool.label} (${tool.shortcut})`}
+                  aria-pressed={isActive}
+                  data-verify-tool={tool.id}
+                  // 非アクティブ時は背景をインラインで指定しない。インライン style は
+                  // CSS の :hover に必ず勝つため、指定すると hover が効かなくなる。
+                  className={`${TOOL_BUTTON_CLASS} ${isActive ? '' : HOVER_CLASS}`}
+                  style={{
+                    height: scale.button,
+                    width: scale.button,
+                    borderRadius: scale.buttonRadius,
+                    ...(isActive
+                      ? { backgroundColor: 'var(--accent)', color: '#fff' }
+                      : { color: 'var(--fg)' }),
+                  }}
+                >
+                  {tool.icon(scale.icon)}
+                </button>
 
-                  {/* ツールチップ（ラベル＋ショートカット）。常に DOM には置き、hover でだけ
+                {/* ツールチップ（ラベル＋ショートカット）。常に DOM には置き、hover でだけ
                       見せる（描画契約として検証できるようにするため）。aria-hidden なのは、
                       同じ文言をボタンの aria-label が既に持っており、読み上げが二重になるため。 */}
-                  <span
-                    aria-hidden="true"
-                    data-verify-tooltip={tool.id}
-                    className="pointer-events-none absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ backgroundColor: 'var(--fg)', color: 'var(--bg)' }}
+                <span
+                  aria-hidden="true"
+                  data-verify-tooltip={tool.id}
+                  className="pointer-events-none absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{ backgroundColor: 'var(--fg)', color: 'var(--bg)' }}
+                >
+                  {tool.label}
+                  {/* キーであることが形で分かるように枠で囲う。 */}
+                  <kbd
+                    className="rounded border px-1 font-sans text-[10px] leading-[1.4]"
+                    style={{ borderColor: 'currentColor', opacity: 0.55 }}
                   >
-                    {tool.label}
-                    {/* キーであることが形で分かるように枠で囲う。 */}
-                    <kbd
-                      className="rounded border px-1 font-sans text-[10px] leading-[1.4]"
-                      style={{ borderColor: 'currentColor', opacity: 0.55 }}
-                    >
-                      {tool.shortcut}
-                    </kbd>
-                  </span>
-                </div>
-              );
-            })
+                    {tool.shortcut}
+                  </kbd>
+                </span>
+              </div>
+            );
+          })
+        )
       }
     </FloatingPalette>
   );

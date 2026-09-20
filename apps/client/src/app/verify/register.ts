@@ -54,6 +54,7 @@ import '@/features/pc/board/components/board-toolbar.verify';
 import '@/features/pc/board/components/photo-card-content.verify';
 import '@/features/pc/board/components/photo-dialog.verify';
 import '@/features/pc/board/components/snippet-card-content.verify';
+import '@/features/pc/board/components/selection-frame.verify';
 import '@/features/pc/board/components/snippet-dialog.verify';
 import '@/features/pc/fermentation/components/draggable-jar-element.verify';
 import '@/features/pc/fermentation/components/fermentation-cover-flow.verify';

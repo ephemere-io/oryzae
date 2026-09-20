@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardCardData } from '@/features/shared/board/types';
-import { frontZIndex, raiseToFront } from '@/features/shared/board/z-order';
+import { frontZIndex, raiseManyToFront, raiseToFront } from '@/features/shared/board/z-order';
 
 /**
  * 「前面へ出す」規則は PC と SP の両方がここを通る。
@@ -79,5 +79,57 @@ describe('raiseToFront', () => {
 
   it('既に最前面なら null（呼び出し側は何もしない）', () => {
     expect(raiseToFront(LIVED_IN, 'pinned-old')).toBeNull();
+  });
+});
+
+describe('raiseManyToFront', () => {
+  it('選んだ複数枚を、互いの重なり順を保ったまま前面へ出す', () => {
+    // auto-3 が auto-1 の上にある関係（写真の上に付箋、のような重ね方）を崩さない。
+    const next = raiseManyToFront(LIVED_IN, ['auto-3', 'auto-1']);
+    expect(next).not.toBeNull();
+    const one = next?.find((c) => c.id === 'auto-1');
+    const three = next?.find((c) => c.id === 'auto-3');
+    expect(one?.zIndex).toBe(501);
+    expect(three?.zIndex).toBe(502);
+    expect(one?.zIndex ?? 0).toBeLessThan(three?.zIndex ?? 0);
+    // 選んでいないカードは触らない
+    expect(next?.find((c) => c.id === 'pinned-old')?.zIndex).toBe(500);
+    expect(next?.find((c) => c.id === 'auto-2')?.zIndex).toBe(1);
+  });
+
+  it('利用者が置いた印を、選んだ全部に付ける', () => {
+    const next = raiseManyToFront(LIVED_IN, ['auto-1', 'auto-2']);
+    expect(
+      next
+        ?.filter((c) => c.userPositioned)
+        .map((c) => c.id)
+        .sort(),
+    ).toEqual(['auto-1', 'auto-2', 'pinned-old']);
+  });
+
+  it('選んだ全部が既に他より上なら null', () => {
+    const board = [card('low', 1), card('high-a', 8), card('high-b', 9)];
+    expect(raiseManyToFront(board, ['high-a', 'high-b'])).toBeNull();
+  });
+
+  it('1 枚だけ選んでいるときは 1 枚用の規則に委ねる', () => {
+    expect(raiseManyToFront(LIVED_IN, ['pinned-old'])).toBeNull();
+    expect(raiseManyToFront(LIVED_IN, ['auto-1'])?.find((c) => c.id === 'auto-1')?.zIndex).toBe(
+      501,
+    );
+  });
+
+  it('全部選んでいるときは並べ直さない（上下は変わらない）', () => {
+    expect(
+      raiseManyToFront(
+        LIVED_IN,
+        LIVED_IN.map((c) => c.id),
+      ),
+    ).toBeNull();
+  });
+
+  it('知らない id が混じっていても落ちない', () => {
+    const next = raiseManyToFront(LIVED_IN, ['auto-1', 'missing']);
+    expect(next?.find((c) => c.id === 'auto-1')?.zIndex).toBe(501);
   });
 });
