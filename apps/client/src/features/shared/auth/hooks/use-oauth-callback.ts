@@ -1,11 +1,10 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import posthog from 'posthog-js';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { AuthFlowError, AuthSession } from '@/features/shared/auth/types';
 import { createApiClient } from '@/lib/api';
-import { setTokens } from '@/lib/auth';
+import { useAuth } from '@/lib/auth-context';
 
 /**
  * OAuth コールバックの確定処理（端末非依存）。
@@ -76,10 +75,16 @@ export function useOauthCallback(
   beforeLeave?: (destination: string) => Promise<void>,
 ): { error: AuthFlowError | null } {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { adoptSession } = useAuth();
   const [error, setError] = useState<AuthFlowError | null>(null);
   // effect を searchParams だけで回すため、関数は ref で読む（毎描画で新しい参照になりうる）。
   const beforeLeaveRef = useRef(beforeLeave);
   beforeLeaveRef.current = beforeLeave;
+  const adoptRef = useRef(adoptSession);
+  adoptRef.current = adoptSession;
+  const pushRef = useRef(router.push);
+  pushRef.current = router.push;
 
   useEffect(() => {
     async function handleCallback() {
@@ -102,9 +107,9 @@ export function useOauthCallback(
           setError('auth_failed');
           return;
         }
-        setTokens(data.session.accessToken, data.session.refreshToken);
-        posthog.identify(data.user.id, { email: data.user.email });
-        await finish(beforeLeaveRef.current);
+        // 文脈に載せる。載れば読み込み直さずに入れる（`AuthContextValue.adoptSession`）。
+        const adopted = adoptRef.current(data);
+        await finish(beforeLeaveRef.current, adopted ? pushRef.current : null);
         return;
       }
 
@@ -113,7 +118,8 @@ export function useOauthCallback(
       const accessToken = params.access_token;
       const refreshToken = params.refresh_token;
       if (accessToken && refreshToken) {
-        setTokens(accessToken, refreshToken);
+        const tokens = { accessToken, refreshToken };
+        // profile 作成・枠チェックのため、まずこのトークンで呼ぶ。
         const res = await createApiClient(accessToken).fetch('/api/v1/auth/oauth/finalize', {
           method: 'POST',
           body: JSON.stringify({ locale }),
@@ -123,10 +129,8 @@ export function useOauthCallback(
           return;
         }
         const data: unknown = await res.json();
-        if (isAuthUser(data)) {
-          posthog.identify(data.user.id, { email: data.user.email });
-        }
-        await finish(beforeLeaveRef.current);
+        const adopted = adoptRef.current(data, tokens);
+        await finish(beforeLeaveRef.current, adopted ? pushRef.current : null);
         return;
       }
 
@@ -142,15 +146,22 @@ export function useOauthCallback(
 const HOME = '/';
 
 /**
- * OAuth 完了はフルページ遷移で確定させる。router.push（アプリ内遷移）だと root の
- * AuthProvider が再マウントされず restoreSession が再実行されないため、保存した
- * トークンを認証コンテキストが読めず /login に弾かれる（#363 S1 Context 化の回帰修正）。
+ * 扉を開けて入ってから、書斎へ移る。
+ *
+ * **文脈に載せられたならアプリ内遷移**（`push`）。以前は必ず読み込み直していた —
+ * `router.push` だと root の AuthProvider が再マウントされず `restoreSession` も走らないため、
+ * 保存したトークンを認証コンテキストが読めず `/login` に弾かれていた（#363 の回帰修正）。
+ * いまは `adoptSession` がその場で文脈に載せるので、読み込み直す理由が無い。載せられ
+ * なかったとき（応答の形が違う）だけ、従来どおり読み込み直して復元に任せる。
  *
  * 行き先を `/entries/new` と書かず `/` にするのは、ホームがどこかを知っているのが
- * `/`（書斎。止めていれば `/entries/new` へ送る）1 か所だから。ここは effect の中でフラグの解決を
- * 待てる場所ではないうえ、どうせ全画面遷移なので `/` を 1 枚挟む損が無い。
+ * `/`（書斎。止めていれば `/entries/new` へ送る）1 か所だから。
  */
-async function finish(beforeLeave?: (destination: string) => Promise<void>): Promise<void> {
+async function finish(
+  beforeLeave?: (destination: string) => Promise<void>,
+  push?: ((destination: string) => void) | null,
+): Promise<void> {
   await beforeLeave?.(HOME).catch(() => undefined);
-  window.location.assign(HOME);
+  if (push) push(HOME);
+  else window.location.assign(HOME);
 }

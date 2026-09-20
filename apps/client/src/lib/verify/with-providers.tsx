@@ -55,6 +55,8 @@ const noopAuth: AuthContextValue = {
   login: async () => null,
   signup: async () => null,
   logout: noop,
+  // 孤立検証では外から認証を載せることがない。
+  adoptSession: () => false,
 };
 
 export function withVerifyProviders(node: ReactNode) {
