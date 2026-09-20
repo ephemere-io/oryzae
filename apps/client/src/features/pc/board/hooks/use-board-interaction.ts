@@ -84,6 +84,18 @@ export function useBoardInteraction(
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const stateRef = useRef<InteractionState>(null);
   const didDragRef = useRef(false);
+  /**
+   * 直前の操作で**実際に何かが動いたか**（掴んで動かした・回した・伸ばした）。
+   *
+   * 指を離した位置が掴んだ要素の外だと、ブラウザは `click` を**共通の親**＝盤面に
+   * 送る。盤面の click は「空きを押した＝選択解除」なので、そのままだと
+   * **大きさを変え終えた瞬間に選択が消える**（実ビルドで踏んだ: つまみから 200px
+   * 離して離すと、枠も道具箱も消えた）。動かした後始末の click は数えない。
+   *
+   * 「押しただけ」では立てない。押しただけの click はカード自身が止めるので盤面には
+   * 届かず、ここを立ててしまうと**次に空きを押したときの解除が 1 回効かなくなる**。
+   */
+  const movedRef = useRef(false);
   const zCounterRef = useRef(cards.length > 0 ? Math.max(...cards.map((c) => c.zIndex)) + 1 : 100);
 
   /** ちょうど 1 枚のときだけ id。「開く」「回す」はこれが無いと始まらない。 */
@@ -128,6 +140,7 @@ export function useBoardInteraction(
 
       setSelectedIds(ids);
       didDragRef.current = false;
+      movedRef.current = false;
 
       if (!ids.includes(cardId)) {
         stateRef.current = null;
@@ -150,6 +163,7 @@ export function useBoardInteraction(
       const card = cards.find((c) => c.id === cardId);
       if (!card) return;
       const startAngle = Math.atan2(pointerY - centerY, pointerX - centerX) * (180 / Math.PI);
+      movedRef.current = false;
       stateRef.current = {
         type: 'rotate',
         cardId,
@@ -173,6 +187,7 @@ export function useBoardInteraction(
       if (starts.length === 0) return;
       const box = selectionBounds(cards, ids);
       if (box === null) return;
+      movedRef.current = false;
 
       stateRef.current = {
         type: 'resize',
@@ -200,17 +215,20 @@ export function useBoardInteraction(
         const thresholdWorld = DRAG_THRESHOLD_PX / scale;
         if (!didDragRef.current && Math.abs(dx) + Math.abs(dy) < thresholdWorld) return;
         didDragRef.current = true;
+        movedRef.current = true;
         setDraggingId(state.ids.length === 1 ? state.ids[0] : null);
         // 掴んだ時点の位置に差分を足す（前フレームからの差ではないので、取りこぼしても
         // ずれが積み上がらない）。
         applyGeometry(state.starts.map((g) => ({ ...g, x: g.x + dx, y: g.y + dy })));
       } else if (state.type === 'rotate') {
+        movedRef.current = true;
         const currentAngle =
           Math.atan2(pointerY - state.centerY, pointerX - state.centerX) * (180 / Math.PI);
         const delta = currentAngle - state.startAngle;
         const rotation = Math.round((state.cardStartRotation + delta) * 10) / 10;
         updateCard(state.cardId, { rotation });
       } else if (state.type === 'resize') {
+        movedRef.current = true;
         const dx = pointerX - state.startX;
         const dy = pointerY - state.startY;
 
@@ -319,6 +337,16 @@ export function useBoardInteraction(
 
   const didDrag = () => didDragRef.current;
 
+  /**
+   * 盤面の click が「掴んで動かした後始末」なら true。**一度読むと戻る。**
+   * 盤面側はこれが true の click では選択を解除しない。
+   */
+  const consumeGestureEnd = () => {
+    const moved = movedRef.current;
+    movedRef.current = false;
+    return moved;
+  };
+
   /** 選んでいるカードを囲む world 矩形（2 枚以上のときだけ）。 */
   const groupBounds = useMemo(
     () => (selectedIds.length > 1 ? selectionBounds(cards, selectedIds) : null),
@@ -339,5 +367,6 @@ export function useBoardInteraction(
     deselect,
     getInteractionType,
     didDrag,
+    consumeGestureEnd,
   };
 }

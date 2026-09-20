@@ -572,3 +572,56 @@ describe('useBoardInteraction（保存に渡る配列）', () => {
     expect(onInteractionEnd).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 「掴んで動かした直後の click」を選択解除に数えない口。
+ *
+ * 指を離した位置が掴んだ要素の外だと、ブラウザは click を**共通の親**＝盤面に送る。
+ * 盤面の click は「空きを押した＝選択解除」なので、数えると**大きさを変え終えた
+ * 瞬間に選択が消える**（実ビルドで踏んだ）。逆に「押しただけ」で立ててしまうと、
+ * 次に空きを押したときの解除が 1 回効かなくなる。両方を固める。
+ */
+describe('useBoardInteraction（動かした直後の click）', () => {
+  it('掴んで動かしたあとは、盤面の click を数えない', () => {
+    const s = setup([makeCard({ id: 'a' })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(60, 40));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(true);
+  });
+
+  it('大きさを変えたあとも数えない（群の枠の角を離した直後）', () => {
+    const s = setup([makeCard({ id: 'a' }), makeCard({ id: 'b', x: 400 })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startResize(null, 'se', 0, 0));
+    act(() => s.view.result.current.onPointerMove(120, 80));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(true);
+  });
+
+  it('押しただけなら数えない（次に空きを押したとき、解除が効かなくならない）', () => {
+    const s = setup([makeCard({ id: 'a' })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(false);
+  });
+
+  it('一度読むと戻る（次の click では解除が効く）', () => {
+    const s = setup([makeCard({ id: 'a' })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(60, 40));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(true);
+    expect(s.view.result.current.consumeGestureEnd()).toBe(false);
+  });
+});
