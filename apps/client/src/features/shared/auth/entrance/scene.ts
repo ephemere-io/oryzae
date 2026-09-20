@@ -79,8 +79,14 @@ export interface EntranceSceneOptions {
 export interface EntranceSceneHandle {
   /** 送信中・認証中か。扉が少し大きく開く。 */
   setWaiting(waiting: boolean): void;
-  /** 扉を押し開けて奥へ歩く。`plan.totalMs` 経ったら resolve する。 */
-  enter(plan: EnterPlan): Promise<void>;
+  /**
+   * 扉を押し開けて奥へ歩く。**歩き切って、渡す 1 枚が撮れたら** resolve する。
+   *
+   * 返すのはその 1 枚（data URL）。撮れなかった環境では null。呼び出し側はこれを画面の
+   * 上に敷いてから行き先へ移る（`study/handover.ts`）。**撮れる前に移ると、敷く絵が
+   * 無いまま画面が入れ替わり、そこが白く飛ぶ。**
+   */
+  enter(plan: EnterPlan): Promise<string | null>;
   /**
    * 画面の上から何 px が見えているか（その下は紙が覆っている）。
    *
@@ -110,6 +116,14 @@ interface StudyGlimpse {
   reveal(t: number): void;
   dispose(): void;
 }
+
+/**
+ * 歩き終わってから、渡す 1 枚が撮れるのを待つ上限（ms）。
+ *
+ * 待つあいだ、画面には歩き着いた最後のフレームが出たままになる（溶暗はしない）。
+ * 撮れなければ諦めて進む — 地が無くても遷移そのものは成立する。
+ */
+const CAPTURE_GRACE_MS = 700;
 
 /** 壁の広がり。どの構図でも画面の外まで続く幅と高さ。 */
 const WALL = { halfWidth: 18, height: 11 } as const;
@@ -168,9 +182,15 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     startedAt: number;
     fromAngle: number;
     fromView: CameraView;
-    /** 書斎へ渡す 1 枚を撮ったか（1 回だけ）。 */
+    /** 書斎へ渡す 1 枚を撮り始めたか（1 回だけ）。 */
     captured: boolean;
-    resolve: () => void;
+    /** 撮れた 1 枚。符号化が終わるまでは null。 */
+    image: string | null;
+    /** 歩き切ったか。 */
+    walked: boolean;
+    /** 撮れるのを待つ猶予が尽きたか。 */
+    graceOver: boolean;
+    settle: (image: string | null) => void;
   } | null = null;
   /** 次の描画の直後に 1 枚掴む、という予約。 */
   let captureRequested = false;
@@ -220,7 +240,12 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     if (captureRequested) {
       captureRequested = false;
       captureRenderedFrame(renderer, LIGHT_PALETTE.solid, (dataUrl) => {
-        if (dataUrl !== null) options.onCapture?.(dataUrl);
+        if (dataUrl === null) return;
+        options.onCapture?.(dataUrl);
+        if (entering !== null) {
+          entering.image = dataUrl;
+          settleEnter();
+        }
       });
     }
 
@@ -293,22 +318,51 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     doorTarget = waiting ? DOOR_ANGLE.waiting : DOOR_ANGLE.rest;
   }
 
-  function enter(plan: EnterPlan): Promise<void> {
-    if (entering) return new Promise((resolve) => setTimeout(resolve, plan.totalMs));
-    return new Promise<void>((resolve) => {
+  function enter(plan: EnterPlan): Promise<string | null> {
+    if (entering) return new Promise((resolve) => setTimeout(() => resolve(null), plan.totalMs));
+    return new Promise<string | null>((resolve) => {
+      let settled = false;
       entering = {
         plan,
         startedAt: performance.now(),
         fromAngle: doorAngle,
         captured: false,
+        image: null,
+        walked: false,
+        graceOver: false,
         // 揺れを含んだ今の view から歩き出す。ホームから始めると 1 フレーム跳ぶ。
         fromView: currentView(),
-        resolve,
+        settle: (image) => {
+          if (settled) return;
+          settled = true;
+          resolve(image);
+        },
       };
-      // rAF に頼らず時間で解決する。タブが裏に回ると rAF は止まるが、ログイン自体は
+      // rAF に頼らず時間で進める。タブが裏に回ると rAF は止まるが、ログイン自体は
       // 済んでいるので、行き先へ進むのを止めてはいけない。
-      setTimeout(resolve, plan.totalMs);
+      setTimeout(() => {
+        if (entering === null) return;
+        entering.walked = true;
+        settleEnter();
+      }, plan.totalMs);
+      setTimeout(() => {
+        if (entering === null) return;
+        entering.graceOver = true;
+        settleEnter();
+      }, plan.totalMs + CAPTURE_GRACE_MS);
     });
+  }
+
+  /**
+   * 歩き切っていて、1 枚が撮れている（か、待つ猶予が尽きた）なら返す。
+   *
+   * PNG の符号化は端末によって数百 ms かかる。以前は歩き終わりで即返していたので、
+   * 実機に近い条件では**撮れる前に画面が入れ替わり**、敷く絵が無いまま白が見えていた。
+   */
+  function settleEnter(): void {
+    if (entering === null || !entering.walked) return;
+    if (entering.image === null && !entering.graceOver) return;
+    entering.settle(entering.image);
   }
 
   function setFrame(visibleHeight: number): void {

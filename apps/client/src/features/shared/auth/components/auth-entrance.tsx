@@ -7,12 +7,14 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
+import { markStudyArrivalFor } from '@/features/shared/study/arrival';
 import { saveStudyBackdrop } from '@/features/shared/study/backdrop';
+import { beginStudyHandoverFor } from '@/features/shared/study/handover';
 import { EntranceContext } from '../entrance/context';
 import { type EnterPlan, enterPlan } from '../entrance/door';
 import type { EntranceLayout } from '../entrance/layout';
 import { PAPER_FONT, PAPER_SHADOW, PAPER_STYLE } from '../entrance/paper';
-import { isPassage } from '../entrance/passage';
+import { isPassage, staysAtEntrance } from '../entrance/passage';
 import type { EntranceSceneHandle } from '../entrance/scene';
 import type { EntranceControls } from '../types';
 
@@ -87,6 +89,20 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   }, []);
   const handleReady = useCallback(() => setReady(true), []);
 
+  /**
+   * 撮れた 1 枚の**復号**。渡す前にここまで済ませる。
+   *
+   * 敷くのは歩き切った直後なので、そこで初めて復号が走ると 1 フレームだけ絵が出ず、
+   * そのフレームで下の白が見える。
+   */
+  const decodedRef = useRef<Promise<void> | null>(null);
+  const handleCapture = useCallback((dataUrl: string) => {
+    saveStudyBackdrop(dataUrl);
+    const image = new window.Image();
+    image.src = dataUrl;
+    decodedRef.current = image.decode().catch(() => undefined);
+  }, []);
+
   const sheet = layout.panel === 'sheet';
 
   /**
@@ -129,14 +145,37 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
         waitingRef.current = waiting;
         handleRef.current?.setWaiting(waiting);
       },
-      enter: () => {
+      /**
+       * 扉をくぐって行き先へ。**渡す支度までをここで済ませる。**
+       *
+       * 定置の印（`markStudyArrivalFor`）と、最後の 1 枚を画面の上に敷くこと
+       * （`beginStudyHandoverFor`）は、どちらも「扉をくぐった」に付いて回る。呼び出し側に
+       * 配ると、新しい入口が増えたときに片方だけ忘れる。
+       */
+      enter: async (destination) => {
+        // 扉の手前の画面へ戻るだけなら、扉は動かさない（`staysAtEntrance` の注釈）。
+        if (staysAtEntrance(destination)) return;
+        markStudyArrivalFor(destination);
         const handle = handleRef.current;
         // 扉が無い（WebGL 非対応・まだ届いていない）ときは溶かすだけにする。
         const plan = enterPlan(reducedMotion || handle === null);
         setLeaving(plan);
+        if (handle === null) {
+          // 渡す 1 枚も無い。溶け切るのを待って、そのまま移る。
+          await wait(plan.totalMs);
+          return;
+        }
         // 紙が退くので、窓は画面全体に戻る。扉は歩きながら画面の中央へ寄ってくる。
-        handle?.setFrame(Number.POSITIVE_INFINITY);
-        return handle === null ? wait(plan.totalMs) : handle.enter(plan);
+        handle.setFrame(Number.POSITIVE_INFINITY);
+        // 歩き切って、渡す 1 枚が撮れるまで待つ（`EntranceSceneHandle.enter`）。
+        const image = await handle.enter(plan);
+        // 復号まで済ませてから敷く（`handleCapture`）。
+        await decodedRef.current;
+        // 撮れた絵を画面の上に敷く。ここから先、下で何が入れ替わっても見えない。
+        beginStudyHandoverFor(destination, image);
+        // **敷いた絵が実際に描かれるまで待ってから返す。** 同じ tick で移ると、絵が出る前に
+        // 扉が外れ、その 1〜2 フレームだけ地の色が見える（実機の録画で 2 コマ確認）。
+        await afterPaint();
       },
     }),
     [reducedMotion, sheet],
@@ -179,7 +218,7 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             reducedMotion={reducedMotion}
             onHandle={handleSceneHandle}
             onReady={handleReady}
-            onCapture={saveStudyBackdrop}
+            onCapture={handleCapture}
           />
         </div>
 
@@ -273,6 +312,18 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
  * 高さの単位は根と同じ「小さい方」で揃える（`svh` だけだと実際より大きく見積もる端末がある）。
  */
 const SHEET_WINDOW_MIN = 'clamp(72px, min(12svh, 12dvh), 140px)';
+
+/**
+ * 次の描画が終わるまで待つ。
+ *
+ * rAF のコールバックは**その回の描画の前**に走るので、2 回待って初めて「1 回描かれた」
+ * ことになる。
+ */
+function afterPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

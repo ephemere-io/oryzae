@@ -5,6 +5,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { PostHogProvider } from '@/components/posthog-provider';
 import { ServiceWorkerRegister } from '@/components/service-worker-register';
+import { StudyHandover } from '@/features/shared/study/components/study-handover';
 import { AuthProvider } from '@/lib/auth-context';
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 import { type Device, isDevice } from '@/lib/device';
@@ -126,6 +127,9 @@ export default async function RootLayout({
             </AuthProvider>
           </PostHogProvider>
         </NextIntlClientProvider>
+        {/* 扉から書斎へ渡すあいだ、部屋を画面の上に敷いておく 1 枚。**ルーターの外に置く** —
+            画面が入れ替わっても外れないので、途中のロード表示や mount 待ちが見えない。 */}
+        <StudyHandover />
         <ServiceWorkerRegister />
       </body>
     </html>

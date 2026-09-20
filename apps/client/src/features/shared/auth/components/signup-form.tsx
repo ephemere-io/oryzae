@@ -84,7 +84,7 @@ export function SignupForm() {
 
     // If session was returned (email confirmation disabled), go to entries
     if (auth) {
-      await entrance.enter();
+      await entrance.enter('/entries');
       router.push('/entries');
       return;
     }

@@ -1,9 +1,7 @@
 'use client';
 
-import { createContext, useCallback, useContext } from 'react';
-import { markStudyArrivalFor } from '@/features/shared/study/arrival';
+import { createContext, useContext } from 'react';
 import type { EntranceControls } from '../types';
-import { staysAtEntrance } from './passage';
 
 /**
  * 扉が無いときの操作。**待たせずにすぐ返す。**
@@ -25,18 +23,10 @@ export function useEntrance(): EntranceControls {
 }
 
 /**
- * 認証が済んで行き先へ移る直前に呼ぶもの。書斎へ向かうなら扉を開けて入り、
- * 扉の手前の画面へ戻るなら何もしない（`staysAtEntrance` の注釈）。
+ * 認証が済んで行き先へ移る直前に呼ぶもの。書斎へ向かうなら扉を開けて入り、扉の手前の
+ * 画面へ戻るなら何もしない — その判断も、渡す支度も `enter` の側が持つ
+ * （`AuthEntrance` の `enter` の注釈）。
  */
 export function useLeaveThroughEntrance(): (destination: string) => Promise<void> {
-  const { enter } = useEntrance();
-  return useCallback(
-    (destination: string) => {
-      if (staysAtEntrance(destination)) return Promise.resolve();
-      // 歩いて入った先が書斎なら、向こうでカメラが入り口から寄って止まる。
-      markStudyArrivalFor(destination);
-      return enter();
-    },
-    [enter],
-  );
+  return useEntrance().enter;
 }

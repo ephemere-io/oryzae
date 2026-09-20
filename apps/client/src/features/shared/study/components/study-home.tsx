@@ -12,6 +12,7 @@ import { useTheme } from '@/lib/theme-context';
 import { takeStudyArrival } from '../arrival';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
+import { endStudyHandover } from '../handover';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
@@ -233,7 +234,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
         <StudyCanvas
           arrival={arrival}
           onLeaveStart={setLeaveMs}
-          onReady={() => setCanvasReady(true)}
+          onReady={() => {
+            setCanvasReady(true);
+            // 扉から渡された 1 枚を引く合図。描けたこの瞬間まで、画面は部屋のままだった。
+            endStudyHandover();
+          }}
           // 出ていく直前の 1 枚を憶える。戻り道はこれを地にして、部屋が「消えた」のでは
           // なく「遠くなった」だけに見えるようにする。
           onCapture={saveStudyBackdrop}
