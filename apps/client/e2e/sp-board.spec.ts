@@ -84,6 +84,24 @@ test.describe('SP のボード（指で触る）', () => {
     await page.waitForTimeout(1200);
   });
 
+  test('操作の列が画面からはみ出さない', async ({ page }) => {
+    // 実測で見つけた壊れ方: `box-sizing: content-box` のまま左右に余白を足していたため、
+    // 幅いっぱいの列が画面より 16px 広くなっていた。親の overflow に隠れて見た目には
+    // 出ないが、囲いが変わった瞬間に横へずれる。数値ではなく**関係**を見る。
+    const width = page.viewportSize()?.width ?? 0;
+    const box = await page.locator('[data-verify-unit="SpBoardToolbar"]').boundingBox();
+    expect(box, '操作の列が無い').not.toBeNull();
+    expect(box?.width ?? 0).toBeLessThanOrEqual(width);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+
+    // ページ自体も横に伸びていない（指で左右に振れると盤面の操作と食い合う）。
+    const scroll = await page.evaluate(() => ({
+      inner: window.innerWidth,
+      doc: document.documentElement.scrollWidth,
+    }));
+    expect(scroll.doc).toBeLessThanOrEqual(scroll.inner);
+  });
+
   test('盤面がピンチを受け取り、ブラウザのページズームには渡さない', async ({ page }) => {
     // touch-action: none が外れると、iOS Safari はピンチをタブ一覧に使ってしまう。
     const frame = page.locator('[role="application"]').first();

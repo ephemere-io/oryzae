@@ -146,8 +146,12 @@ export function SpBoardToolbar({
       className="flex w-full shrink-0 items-stretch justify-center gap-1 px-2"
       style={{
         ...CONTROL_FONT,
-        height: PALETTE_HEIGHT,
-        boxSizing: 'content-box',
+        // 高さは「列 56px ＋ ホームインジケータぶん」。border-box のまま扱うので、
+        // 横は px-2 を足しても画面幅を超えない（content-box にすると左右の余白が
+        // 幅に加算され、列が画面より 16px 広くなる。親の overflow に隠れて
+        // 気づきにくいが、囲いが変わった瞬間に横へずれる）。
+        boxSizing: 'border-box',
+        minHeight: `calc(${PALETTE_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
         // ホームインジケータの上に載せる。
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         background: 'var(--surface-raised)',
