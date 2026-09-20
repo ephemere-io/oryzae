@@ -789,7 +789,8 @@
       "save": "저장",
       "resize": "크기와 방향 바꾸기",
       "snippet_placeholder": "남겨 두고 싶은 것",
-      "fit_all": "전체 보기"
+      "snippet_caption": "발췌",
+      "photo_caption": "사진"
     }
   },
   "canvas": {

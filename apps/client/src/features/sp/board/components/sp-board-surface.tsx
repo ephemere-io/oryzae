@@ -3,8 +3,10 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
+import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
+import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
 import { snippetFontSize } from '@/features/shared/board/card-text';
 import type { BoardCardData } from '@/features/shared/board/types';
 import type { CanvasSurface } from '@/lib/canvas/use-canvas-viewport';
@@ -26,6 +28,12 @@ const MIN_CARD_SIZE = 60;
  * カードの幅に追随する（`snippetFontSize`）。
  */
 const SP_BASE_FONT_SIZE = 17;
+
+/**
+ * 俯瞰の大きさ。PC（148×100）のままだと、390px の画面では場所を取りすぎる
+ * （実機レビュー: 「もう少し小さく」）。
+ */
+const MINIMAP_SIZE = { width: 96, height: 64 };
 
 /**
  * 画面 px で一定に見せたい寸法（枠線・つまみ）。
@@ -114,6 +122,8 @@ export interface SpBoardSurfaceProps {
   /** 選んでいるカード。`null` なら何も選んでいない。 */
   selectedId?: string | null;
   onSelect?: (cardId: string | null) => void;
+  /** 盤面左下の FIT（貼ってあるもの全部が入るところまで引く）。 */
+  onFit: () => void;
   /**
    * タップしたカードを前面へ。
    *
@@ -143,6 +153,7 @@ export function SpBoardSurface({
   canvas,
   onMove,
   onCommit,
+  onFit,
   selectedId = null,
   onSelect,
   onRaise,
@@ -284,6 +295,9 @@ export function SpBoardSurface({
         canvas={canvas}
         ariaLabel={tBoard('canvas.aria_label')}
         style={{ backgroundColor: 'var(--bg)' }}
+        // 方眼（PC の盤面と同じ背景）。板の上で位置が掴めるように、寄り引きしても
+        // 目盛りの間隔が破綻しない形で敷く。
+        background={<CanvasGrid canvas={canvas} />}
         // 板の何も無いところを押したら選択を解く（PC の盤面と同じ）。
         onClick={() => onSelect?.(null)}
         overlay={
@@ -310,13 +324,24 @@ export function SpBoardSurface({
                 {t('cards', { count: visible.length })}
               </span>
             </div>
-            {/* 俯瞰（PC の盤面と同じ部品）。寄って動き回れるようになった代わりに、
-                いま板のどこに居るのかが分からなくなった（実機レビュー: 「全体マップが
-                なくなった。中央から離れると迷子になりそう」）。 */}
+            {/* 寄り引きは PC の盤面と同じ操作（左下に − / 100% / + / FIT）。
+                盤面に対する操作は盤面の中に置き、貼ってあるものへの操作（道具の列）と
+                混ぜない。「全体を見る」を道具の列に置いていたのはここへ移した。 */}
+            <CanvasZoomControls
+              scale={canvas.viewport.scale}
+              onZoomIn={canvas.zoomIn}
+              onZoomOut={canvas.zoomOut}
+              onReset={canvas.resetZoom}
+              onFit={onFit}
+            />
+            {/* 俯瞰（PC の盤面と同じ部品を一回り小さく）。寄って動き回れるようになった
+                代わりに、いま板のどこに居るのかが分からなくなった（実機レビュー:
+                「全体マップがなくなった。中央から離れると迷子になりそう」）。 */}
             {visible.length > 0 && (
               <CanvasMinimap
                 canvas={canvas}
                 ariaLabel={tBoard('minimap.aria_label')}
+                size={MINIMAP_SIZE}
                 items={visible.map((card) => ({
                   id: card.id,
                   x: card.x,

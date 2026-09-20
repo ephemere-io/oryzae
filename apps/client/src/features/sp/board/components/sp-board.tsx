@@ -77,7 +77,7 @@ export function SpBoard({ api }: SpBoardProps) {
   cardsRef.current = cards;
 
   const canvas = useCanvasViewport({
-    // 「全体を見る」（道具箱・キーボード）で収める範囲。
+    // 盤面左下の FIT（とキーボードの全体表示）で収める範囲。
     getContentBounds: () =>
       unionBounds(cardsRef.current.filter((card) => !card.removing).map(cardBounds)),
   });
@@ -253,24 +253,24 @@ export function SpBoard({ api }: SpBoardProps) {
           onMove={handleMove}
           onTransform={handleTransform}
           onCommit={handleCommit}
+          onFit={handleFitAll}
         />
       </div>
 
-      <div className="flex shrink-0 justify-center px-4 pt-2 pb-5">
-        <SpBoardToolbar
-          selectedType={selected?.cardType ?? null}
-          busy={busy}
-          onEdit={() => setSheetOpen(true)}
-          onBringToFront={handleBringToFront}
-          onDelete={handleDelete}
-          onCreateSnippet={() => {
-            setSelectedId(null);
-            setSheetOpen(true);
-          }}
-          onCreatePhoto={() => fileRef.current?.click()}
-          onFitAll={handleFitAll}
-        />
-      </div>
+      {/* 操作の列は盤面の下に**流れの中で**置く（浮かせると下端のカードに被って
+          指で掴めない — 実機レビュー）。列そのものが幅いっぱいの面を持つ。 */}
+      <SpBoardToolbar
+        selectedType={selected?.cardType ?? null}
+        busy={busy}
+        onEdit={() => setSheetOpen(true)}
+        onBringToFront={handleBringToFront}
+        onDelete={handleDelete}
+        onCreateSnippet={() => {
+          setSelectedId(null);
+          setSheetOpen(true);
+        }}
+        onCreatePhoto={() => fileRef.current?.click()}
+      />
 
       <SpSnippetSheet
         open={sheetOpen}

@@ -789,7 +789,8 @@
       "save": "Save",
       "resize": "Resize and rotate",
       "snippet_placeholder": "Something worth keeping",
-      "fit_all": "Fit all"
+      "snippet_caption": "Snippet",
+      "photo_caption": "Photo"
     }
   },
   "canvas": {
