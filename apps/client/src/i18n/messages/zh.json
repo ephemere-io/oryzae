@@ -789,8 +789,9 @@
       "save": "保存",
       "resize": "改变大小和方向",
       "snippet_placeholder": "想留下的话",
-      "snippet_caption": "摘录",
-      "photo_caption": "照片"
+      "palette_aria": "看板操作",
+      "tool_snippet": "摘录",
+      "tool_photo": "照片"
     }
   },
   "canvas": {

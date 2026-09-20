@@ -50,7 +50,7 @@ registerUnit<Props>({
     },
     {
       id: 'snippet-selected',
-      description: '抜粋を選んでいる（編集 / 前面へ / 外す）',
+      description: 'スニペットを選んでいる（編集 / 前面へ / 外す）',
       props: { selectedType: 'snippet', ...ACTIONS },
     },
     {
@@ -77,7 +77,7 @@ registerUnit<Props>({
     },
     {
       id: 'edit-only-for-snippets',
-      description: '「編集」は抜粋のときだけ出す（写真に本文は無い）',
+      description: '「編集」はスニペットのときだけ出す（写真に本文は無い）',
       check: ({ root, props }) => {
         const shown = (root.textContent ?? '').includes('編集');
         return (
@@ -91,7 +91,7 @@ registerUnit<Props>({
       description: '作るものと、カードにできることが同時に並ばない',
       check: ({ root }) => {
         const text = root.textContent ?? '';
-        const creating = text.includes('抜粋') || text.includes('写真');
+        const creating = text.includes('スニペット') || text.includes('写真');
         const acting = text.includes('外す');
         return !(creating && acting) || '作るものとカードの操作が同時に出ている';
       },

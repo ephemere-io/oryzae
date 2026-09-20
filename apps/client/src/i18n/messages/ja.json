@@ -789,8 +789,9 @@
       "save": "保存",
       "resize": "大きさと向きを変える",
       "snippet_placeholder": "書き留めておきたいことを",
-      "snippet_caption": "抜粋",
-      "photo_caption": "写真"
+      "palette_aria": "ボードの操作",
+      "tool_snippet": "スニペット",
+      "tool_photo": "写真"
     }
   },
   "canvas": {

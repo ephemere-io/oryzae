@@ -22,8 +22,12 @@ import { CONTROL_FONT } from '@/components/ui/surface';
  * 添えた下端の列**にする（#616 の `ActionPalette` と同じ形）。
  *
  * PC（#524）と同じく、**選んでいるものに応じて中身が入れ替わる**:
- *  - 何も選んでいない … 作るもの（抜粋 / 写真）
+ *  - 何も選んでいない … 作るもの（スニペット / 写真）
  *  - カードを選んでいる … そのカードにできること（編集 / 前面へ / 外す）
+ *
+ * 名前は PC と #616 に合わせる。PC の道具箱は「スニペットを作成」、#616 の `ActionPalette`
+ * は短い名前を「スニペット」と出している。同じ物を SP だけ「抜粋」と呼ばない
+ * （同じ機能が端末で違う名前になると、説明も問い合わせも噛み合わなくなる）。
  *
  * 寄り引き（− / 100% / + / FIT）はここではなく盤面の左下（`CanvasZoomControls`）。
  * 盤面に対する操作と、貼ってあるものに対する操作を混ぜない。
@@ -82,7 +86,7 @@ export function SpBoardToolbar({
           {
             id: 'snippet',
             label: t('add_snippet'),
-            caption: t('snippet_caption'),
+            caption: t('tool_snippet'),
             icon: <SnippetIcon size={ICON_SIZE} />,
             onSelect: onCreateSnippet,
             disabled: busy,
@@ -91,7 +95,7 @@ export function SpBoardToolbar({
           {
             id: 'photo',
             label: t('add_photo'),
-            caption: t('photo_caption'),
+            caption: t('tool_photo'),
             icon: <PhotoIcon size={ICON_SIZE} />,
             onSelect: onCreatePhoto,
             disabled: busy,
@@ -138,7 +142,7 @@ export function SpBoardToolbar({
         actionCount: actions.length,
       })}
       role="toolbar"
-      aria-label={mode === 'create' ? t('add_snippet') : t('edit')}
+      aria-label={t('palette_aria')}
       className="flex w-full shrink-0 items-stretch justify-center gap-1 px-2"
       style={{
         ...CONTROL_FONT,

@@ -789,8 +789,9 @@
       "save": "저장",
       "resize": "크기와 방향 바꾸기",
       "snippet_placeholder": "남겨 두고 싶은 것",
-      "snippet_caption": "발췌",
-      "photo_caption": "사진"
+      "palette_aria": "보드 조작",
+      "tool_snippet": "스니펫",
+      "tool_photo": "사진"
     }
   },
   "canvas": {
