@@ -19,28 +19,20 @@ describe('useEntrance', () => {
     const { result } = renderHook(() => useEntrance());
     expect(() => result.current.setWaiting(true)).not.toThrow();
     // 解決しないと、ログイン後の遷移がいつまでも起きない。
-    await expect(result.current.enter()).resolves.toBeUndefined();
+    await expect(result.current.enter('/')).resolves.toBeUndefined();
   });
 });
 
 describe('useLeaveThroughEntrance', () => {
-  it('書斎へ向かうなら扉を開けて入る', async () => {
+  it('行き先をそのまま扉に渡す', async () => {
+    // 行き先ごとの判断（扉の手前へ戻るだけか・書斎へ渡すか）は扉の側が持つ
+    // （`AuthEntrance` の `enter`）。呼び出し側は行き先を伝えるだけでよい。
     const enter = vi.fn(() => Promise.resolve());
     const { result } = renderHook(() => useLeaveThroughEntrance(), {
       wrapper: withControls({ compact: false, setWaiting: vi.fn(), enter }),
     });
 
     await result.current('/');
-    expect(enter).toHaveBeenCalledTimes(1);
-  });
-
-  it('扉の手前の画面へ戻るなら入らない', async () => {
-    const enter = vi.fn(() => Promise.resolve());
-    const { result } = renderHook(() => useLeaveThroughEntrance(), {
-      wrapper: withControls({ compact: false, setWaiting: vi.fn(), enter }),
-    });
-
-    await result.current('/reset-password');
-    expect(enter).not.toHaveBeenCalled();
+    expect(enter).toHaveBeenCalledWith('/');
   });
 });
