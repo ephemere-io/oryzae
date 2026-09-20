@@ -76,7 +76,8 @@ const geometryOf = (card: BoardCardData): CardGeometry => ({
 export function useBoardInteraction(
   cards: BoardCardData[],
   onCardsChange: (cards: BoardCardData[]) => void,
-  onInteractionEnd: () => void,
+  /** 操作を終えた時点の配列。**これをそのまま保存する**（呼び出し側の state は古い）。 */
+  onInteractionEnd: (cards: BoardCardData[]) => void,
   scale = 1,
 ) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -252,61 +253,61 @@ export function useBoardInteraction(
 
   const onPointerUp = useCallback(() => {
     const state = stateRef.current;
-    if (state) {
-      if (state.type === 'drag') {
-        // **押しただけでも前面に出す。** 以前は「実際に動かしたときだけ」にしていたが、
-        // カードが重なっていると、下のカードを押しても埋もれたままで読めなかった
-        // （レビュー: 「クリックしたら前面に出るようにしてほしい」）。掘り出す操作が
-        // 掴んで動かすことしか無いのは、重ねて貼る板として使いにくい。
-        //
-        // ただし**既に最前面のカードを押しただけ**のときは何もしない。盤面に変化が
-        // 無いのに保存要求を出すと、選ぶたびに PUT が飛ぶ。
-        // 採番の規則は `features/shared/board/z-order` に 1 つだけ置いてある
-        // （SP の盤面も同じものを呼ぶ。別々に持っていたころ、PC だけが古い採番のまま
-        // 「クリックしても埋もれたまま」になっていた）。
-        //
-        // 複数選んでいるときは前面へ出さない。まとめて掴んだだけで重なり順が変わると、
-        // 並べた関係が意図せず動く（前面へ出したいときは道具箱から明示的に呼ぶ）。
-        const single = state.ids.length === 1 ? state.ids[0] : null;
-        const zIndex = single === null ? null : frontZIndex(cards, single, zCounterRef.current);
-        if (zIndex !== null) zCounterRef.current = zIndex;
-
-        if (zIndex !== null || didDragRef.current) {
-          if (single !== null && !didDragRef.current) {
-            // ここが「利用者が自分で位置を決めた」瞬間。フラグを立てて保存に乗せることで、
-            // 次回以降の自動整列（applyDefaultZOrder）の対象から外れる。
-            updateCard(single, { ...(zIndex === null ? {} : { zIndex }), userPositioned: true });
-          } else {
-            // 動かした分は onPointerMove が既に反映している。ここでは印だけ付ける。
-            onCardsChange(
-              cards.map((card) =>
-                state.ids.includes(card.id)
-                  ? {
-                      ...card,
-                      ...(zIndex !== null && card.id === single ? { zIndex } : {}),
-                      userPositioned: true,
-                    }
-                  : card,
-              ),
-            );
-          }
-          onInteractionEnd();
-        }
-      } else {
-        // 回転・リサイズは動いた分がそのまま結果なので、従来どおり保存する。
-        if (state.type === 'resize') {
-          onCardsChange(
-            cards.map((card) =>
-              state.ids.includes(card.id) ? { ...card, userPositioned: true } : card,
-            ),
-          );
-        }
-        onInteractionEnd();
-      }
-    }
     stateRef.current = null;
     setDraggingId(null);
-  }, [cards, updateCard, onCardsChange, onInteractionEnd]);
+    if (state === null) return;
+
+    // 保存には**いま作った配列をそのまま渡す**。`onInteractionEnd()` を引数なしで呼んで
+    // 呼び出し側の state を読ませていたころは、直前の `onCardsChange` がまだ再レンダー
+    // されておらず、**前面へ出した z が保存に乗らなかった**（画面では前に出るのに、
+    // 次に開くと埋もれ直す）。何を保存するかは、それを作った側が渡す。
+    const commit = (next: BoardCardData[]) => {
+      onCardsChange(next);
+      onInteractionEnd(next);
+    };
+
+    /** 触ったカードに「利用者が自分で置いた」印を付ける（自動整列の対象から外す）。 */
+    const marked = (ids: readonly string[], zIndex: number | null, zTarget: string | null) =>
+      cards.map((card) =>
+        ids.includes(card.id)
+          ? {
+              ...card,
+              ...(zIndex !== null && card.id === zTarget ? { zIndex } : {}),
+              userPositioned: true,
+            }
+          : card,
+      );
+
+    if (state.type === 'drag') {
+      // **押しただけでも前面に出す。** 以前は「実際に動かしたときだけ」にしていたが、
+      // カードが重なっていると、下のカードを押しても埋もれたままで読めなかった
+      // （レビュー: 「クリックしたら前面に出るようにしてほしい」）。掘り出す操作が
+      // 掴んで動かすことしか無いのは、重ねて貼る板として使いにくい。
+      //
+      // ただし**既に最前面のカードを押しただけ**のときは何もしない。盤面に変化が
+      // 無いのに保存要求を出すと、選ぶたびに PUT が飛ぶ。
+      // 採番の規則は `features/shared/board/z-order` に 1 つだけ置いてある
+      // （SP の盤面も同じものを呼ぶ。別々に持っていたころ、PC だけが古い採番のまま
+      // 「クリックしても埋もれたまま」になっていた）。
+      //
+      // 複数選んでいるときは前面へ出さない。まとめて掴んだだけで重なり順が変わると、
+      // 並べた関係が意図せず動く（前面へ出したいときは道具箱から明示的に呼ぶ）。
+      const single = state.ids.length === 1 ? state.ids[0] : null;
+      const zIndex = single === null ? null : frontZIndex(cards, single, zCounterRef.current);
+      if (zIndex !== null) zCounterRef.current = zIndex;
+
+      // 盤面に何も変化が無いなら保存要求も出さない（選ぶたびに PUT を飛ばさない）。
+      if (zIndex === null && !didDragRef.current) return;
+
+      // 動かした分は onPointerMove が既に反映している。ここでは z と印を足すだけ。
+      commit(marked(state.ids, zIndex, single));
+      return;
+    }
+
+    // 回転・リサイズは動いた分がそのまま結果。印だけ付けて保存する。
+    const ids = state.type === 'rotate' ? [state.cardId] : state.ids;
+    commit(marked(ids, null, null));
+  }, [cards, onCardsChange, onInteractionEnd]);
 
   const deselect = useCallback(() => {
     setSelectedIds([]);

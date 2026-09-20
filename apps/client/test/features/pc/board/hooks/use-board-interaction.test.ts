@@ -513,3 +513,62 @@ describe('useBoardInteraction（複数選択）', () => {
     });
   });
 });
+
+/**
+ * 保存に渡る配列。
+ *
+ * **画面が変わったのに保存に乗らない**という壊れ方は、その場では見えない（次に開いた
+ * ときに戻る）。実ビルドで踏んだ: 前面へ出した z が保存から漏れ、リロードで埋もれ直す。
+ * 原因は「保存する配列を呼び出し側の state から読んでいた」こと（setCards はまだ
+ * 反映されていない）。いまは hook が作った配列をそのまま渡す契約なので、そこを固める。
+ */
+describe('useBoardInteraction（保存に渡る配列）', () => {
+  it('前面へ出した z が、保存に渡る配列に入っている', () => {
+    const cards = [makeCard({ id: 'a', zIndex: 1 }), makeCard({ id: 'b', zIndex: 7 })];
+    const onInteractionEnd = vi.fn();
+    const { result } = renderHook(() => useBoardInteraction(cards, () => {}, onInteractionEnd));
+
+    // 埋もれている 'a' を押しただけ（動かさない）
+    act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    expect(onInteractionEnd).toHaveBeenCalledTimes(1);
+    const saved: BoardCardData[] = onInteractionEnd.mock.calls[0][0];
+    const a = saved.find((c) => c.id === 'a');
+    expect(a?.zIndex).toBeGreaterThan(7);
+    expect(a?.userPositioned).toBe(true);
+  });
+
+  it('動かしたあとの位置と印が、保存に渡る配列に入っている', () => {
+    const s = setup([makeCard({ id: 'a', x: 0, y: 0 })]);
+    const saved: BoardCardData[][] = [];
+    const view = renderHook(
+      ({ current }: { current: BoardCardData[] }) =>
+        useBoardInteraction(
+          current,
+          () => {},
+          (next) => saved.push(next),
+        ),
+      { initialProps: { current: s.cards } },
+    );
+
+    act(() => view.result.current.startDrag('a', 0, 0));
+    act(() => view.result.current.onPointerMove(40, 25));
+    act(() => view.result.current.onPointerUp());
+
+    const last = saved.at(-1);
+    expect(last?.find((c) => c.id === 'a')?.userPositioned).toBe(true);
+  });
+
+  it('何も変わっていないときは保存要求を出さない（選ぶたびに PUT を飛ばさない）', () => {
+    const cards = [makeCard({ id: 'a', zIndex: 9 }), makeCard({ id: 'b', zIndex: 1 })];
+    const onInteractionEnd = vi.fn();
+    const { result } = renderHook(() => useBoardInteraction(cards, () => {}, onInteractionEnd));
+
+    // 既に最前面の 'a' を押しただけ
+    act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    expect(onInteractionEnd).not.toHaveBeenCalled();
+  });
+});

@@ -135,9 +135,14 @@ export function BoardView({ api }: BoardViewProps) {
     [setCards],
   );
 
-  const handleInteractionEnd = useCallback(() => {
-    savePositions(cards);
-  }, [cards, savePositions]);
+  // 保存するのは **hook が作った配列**。ここで state の `cards` を読むと、直前の
+  // setCards がまだ反映されておらず、前面へ出した z が保存から漏れる。
+  const handleInteractionEnd = useCallback(
+    (next: BoardCardData[]) => {
+      savePositions(next);
+    },
+    [savePositions],
+  );
 
   const {
     selectedIds,

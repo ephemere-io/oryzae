@@ -95,6 +95,10 @@ export function SelectionFrame({ bounds, count, onResizeStart }: SelectionFrameP
             data-canvas-no-pan=""
             data-verify-handle={corner}
             onPointerDown={handleDown(corner)}
+            // 離したときの click を盤面まで上げない。盤面の click は「空きを押した＝
+            // 選択解除」なので、上げると**大きさを変え終えた瞬間に選択が外れる**
+            // （実ビルドで踏んだ）。カード側は BoardCard の onClick が同じことをしている。
+            onClick={(e) => e.stopPropagation()}
             style={style}
           />
         );

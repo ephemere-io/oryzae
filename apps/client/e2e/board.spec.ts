@@ -273,6 +273,24 @@ test.describe('ボードの複数選択', () => {
     expect(two.dx).toBe(one.dx);
     expect(two.dy).toBe(one.dy);
 
+    // 群の角を掴んで大きさを変える。**離したときに選択が外れない**ことまで見る
+    // （つまみの click が盤面に届くと、盤面は「空きを押した＝選択解除」と受け取る。
+    //  実ビルドで踏んだ壊れ方）。
+    const handle = page.locator('[data-verify-unit="SelectionFrame"] [data-verify-handle="se"]');
+    const hb = await handle.boundingBox();
+    expect(hb).not.toBeNull();
+    if (!hb) return;
+    const widthBefore = await cardOne.evaluate((el) => Number.parseFloat(el.style.width));
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 + 160, hb.y + hb.height / 2 + 100, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+
+    await expect(frame).toHaveCount(1);
+    const widthAfter = await cardOne.evaluate((el) => Number.parseFloat(el.style.width));
+    expect(widthAfter).toBeGreaterThan(widthBefore);
+
     // まとめて消す。片付けも兼ねる（この盤面は本人のアカウントに残るため）。
     await page.locator('button[data-verify-card-action="delete"]').click();
     await expect(page.getByText(first)).toHaveCount(0, { timeout: 15_000 });
