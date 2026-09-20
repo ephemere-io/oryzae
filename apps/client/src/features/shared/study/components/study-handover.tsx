@@ -23,6 +23,8 @@ import {
 export function StudyHandover() {
   const [image, setImage] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  /** 敷いた絵が、まだ前へ進んでいる最中か（下の `PUSH` の注釈）。 */
+  const [pushing, setPushing] = useState(false);
 
   useEffect(() => {
     const stop = subscribeStudyHandover(() => {
@@ -40,6 +42,24 @@ export function StudyHandover() {
     if (pending !== null) setImage(pending);
     return stop;
   }, []);
+
+  /**
+   * 敷いた瞬間から、**絵をそのまま前へ進める**。
+   *
+   * 扉の側は歩いて着き、書斎はまだ描けていない。その間ずっと静止画だと、歩きが止まって
+   * から別の絵へ溶けることになり、「一瞬切れる」と読める（実機レビュー）。撮った絵は
+   * 歩いていた目線そのものなので、わずかに寄せ続ければ**歩き続けている**ように見える。
+   * 書斎の側も寄りながら現れる（`ARRIVAL`）ので、溶けるあいだも動きが途切れない。
+   */
+  useEffect(() => {
+    if (image === null) return;
+    // 次のフレームで始める（同じフレームだと transition が走らない）。
+    const id = requestAnimationFrame(() => setPushing(true));
+    return () => {
+      cancelAnimationFrame(id);
+      setPushing(false);
+    };
+  }, [image]);
 
   // 引き終わったら外す。
   useEffect(() => {
@@ -77,13 +97,28 @@ export function StudyHandover() {
       aria-hidden="true"
       data-study-handover
       className="pointer-events-none fixed inset-0 z-50 h-full w-full object-cover"
-      style={{ opacity: leaving ? 0 : 1, transition: `opacity ${FADE_MS}ms ease-out` }}
+      style={{
+        opacity: leaving ? 0 : 1,
+        transform: `scale(${pushing ? PUSH.scale : 1})`,
+        // 扉の開口は画面のほぼ中央。少し上を中心にすると、床ではなく奥へ進んで見える。
+        transformOrigin: '50% 44%',
+        transition: `opacity ${FADE_MS}ms ease-out, transform ${PUSH.ms}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+      }}
     />
   );
 }
 
 /** 引くのにかける時間（ms）。書斎はもう描けているので、静かに退く。 */
 const FADE_MS = 320;
+
+/**
+ * 敷いた絵を前へ進める量と長さ。
+ *
+ * **止まって見えない程度に、ごく静かに。** 大きく寄せると、撮った 1 枚を拡大したことが
+ * 分かってしまう（線が太る）。出だしは速く、着きは緩く（`cubic-bezier`）で、書斎の側の
+ * 定置（`ARRIVAL`）と同じ減速にそろえる。
+ */
+const PUSH = { scale: 1.055, ms: 1400 } as const;
 
 /**
  * 引く合図を待つ上限（ms）。

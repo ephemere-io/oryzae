@@ -175,8 +175,10 @@ describe('arrivalView（扉から入ってきた直後）', () => {
     expect(arrival.position.y).toBeGreaterThan(home.target.y);
     // 水平には少し手前から寄る（高さは別に下げるので、直線距離では測らない）。
     expect(horizontalDistance(arrival)).toBeGreaterThan(horizontalDistance(home));
-    // 動かしすぎない。「入ってきて止まった」に見える範囲。
-    expect(horizontalDistance(arrival)).toBeLessThan(horizontalDistance(home) * 1.3);
+    // 溶けているあいだも動きが見える程度には、離れて始める（1.1 倍では止まって見えた）。
+    expect(horizontalDistance(arrival)).toBeGreaterThan(horizontalDistance(home) * 1.2);
+    // かといって動かしすぎない。「入ってきて止まった」であって「飛んできた」ではない。
+    expect(horizontalDistance(arrival)).toBeLessThan(horizontalDistance(home) * 1.5);
   });
 
   it.each(LAYOUTS)('$name: 定置し終えるとホームそのものになる', (layout) => {
