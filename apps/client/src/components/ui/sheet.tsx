@@ -390,10 +390,17 @@ export function Sheet({
       }
       const current = latest.current;
       if (current.phase === 'closing') return;
-      // 閉の位置で止まった。ここは**指が触れている間だけ**吸着先なので、止まれるのは払いきったときだけ。
+      // 閉の位置に居る。**閉の位置が吸着先になっているときだけ**閉じる。
+      // 吸着先でないのに 0 に居るのは、行き過ぎて端に当たっているだけ（ブラウザがこれから段へ引き上げる）。
+      // ここで閉じてしまうと、高い段から大きく払っただけで途中の段を飛ばして消える（実機レビュー）。
       // 吸着先は外さずに閉じる（外すとその場で段へ引き戻され、閉じる前に跳ね上がる）。
       // 配置の無い環境（テスト）では位置がいつも 0 なので、採寸できるときだけ数える。
-      if (current.phase === 'open' && scroller.clientHeight > 0 && top < 1) {
+      if (
+        current.phase === 'open' &&
+        scroller.clientHeight > 0 &&
+        top < 1 &&
+        closedRef.current?.style.scrollSnapAlign === 'start'
+      ) {
         current.onRequestClose?.();
         return;
       }
@@ -442,7 +449,14 @@ export function Sheet({
       // （出したときの吸着は「行き先だけ」に絞ってある。解き忘れると段を変えられない＝
       //   実機レビュー: 下から出てきたものの大きさを変えられない）
       setLanding(null);
-      setClosedSnap(true);
+      // 閉の位置が吸着先になるのは、**いちばん低い段に居るときに指が触れたときだけ**。
+      // どこからでも吸着先にすると、高い段から大きく払っただけで途中の段を飛ばして閉じる
+      // （実機レビュー: 下げようとすると一気に消える）。段は 1 回の払いで 1 つずつ。
+      const lowest = latest.current.detents.reduce(
+        (a, b) => (targetOf(a) <= targetOf(b) ? a : b),
+        latest.current.detents[0] ?? 'full',
+      );
+      setClosedSnap(Math.abs(scroller.scrollTop - targetOf(lowest)) < 2);
     };
     const onTouchEnd = () => {
       // 離しただけでは外さない（惰性で滑っている間も吸着先が要る）。止まったときに外す。

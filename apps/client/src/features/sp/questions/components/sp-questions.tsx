@@ -379,7 +379,10 @@ export function SpQuestions({
         closeLabel={t('cancel')}
         // キャンセルは操作の行に固める（見出しには名前だけ）。
         closeInHeader={false}
-        detents={['content', 'full']}
+        // 段は 3 つ（覗く／中身／全画面）。エントリーの「発酵の結果」と同じ数え方にする。
+        // **中身の段を最小にしない**: 最小の段から下に払うと閉じるので、2 段だと「出た大きさから
+        // 下に払う＝いきなり消える」になり、段階的に小さくできない（実機レビュー）。
+        detents={['peek', 'content', 'full']}
         initialDetent="content"
       >
         {sheet ? (
