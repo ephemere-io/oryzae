@@ -96,17 +96,24 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const [backdrop, setBackdrop] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
 
-  useEffect(() => {
-    traceMark('書斎 mount');
-    setBackdrop(readStudyBackdrop());
-  }, []);
+  /** 扉から入ってきたか。同じ commit の中で読むので、state ではなくこちらを見る。 */
+  const throughDoorRef = useRef(false);
 
   useLayoutEffect(() => {
     // 描く前に決める。1 フレームでも溶暗の側で描くと、そこで画面が白く飛ぶ。
     if (takeStudyArrival()) {
+      throughDoorRef.current = true;
       setArrival(true);
       setEntered(true);
     }
+  }, []);
+
+  useEffect(() => {
+    traceMark('書斎 mount');
+    // **扉から入ってきたときは、ここには敷かない。** 同じ 1 枚がルーターの上に敷かれていて
+    // （`StudyHandover`）、そちらは寄りながら退く。ここにも置くと、その下で同じ絵が静止した
+    // まま残り、溶けるあいだ二重写しになる。
+    if (!throughDoorRef.current) setBackdrop(readStudyBackdrop());
   }, []);
 
   useEffect(() => {
