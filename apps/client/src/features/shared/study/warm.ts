@@ -16,3 +16,12 @@
 export function warmStudy(): void {
   void import('./components/study-canvas').catch(() => undefined);
 }
+
+/** 書斎のパス。ここへ向かうときだけ用意する。 */
+const STUDY_PATH = '/';
+
+/** 行き先が書斎なら用意しておく。扉をくぐると決まった時点で呼ぶ。 */
+export function warmStudyFor(destination: string): void {
+  if (destination !== STUDY_PATH) return;
+  warmStudy();
+}

@@ -10,6 +10,7 @@ import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 import { markStudyArrivalFor } from '@/features/shared/study/arrival';
 import { saveStudyBackdrop } from '@/features/shared/study/backdrop';
 import { beginStudyHandoverFor } from '@/features/shared/study/handover';
+import { warmStudyFor } from '@/features/shared/study/warm';
 import { traceMark } from '@/lib/trace';
 import { EntranceContext } from '../entrance/context';
 import { type EnterPlan, enterPlan } from '../entrance/door';
@@ -157,6 +158,9 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
         // 扉の手前の画面へ戻るだけなら、扉は動かさない（`staysAtEntrance` の注釈）。
         if (staysAtEntrance(destination)) return;
         markStudyArrivalFor(destination);
+        // 歩いているあいだに書斎を読み始める。着いてから読み始めると、その間ずっと
+        // 渡した 1 枚が静止したままになる（実機の計測で約 0.9 秒）。
+        warmStudyFor(destination);
         const handle = handleRef.current;
         // 扉が無い（WebGL 非対応・まだ届いていない）ときは溶かすだけにする。
         const plan = enterPlan(reducedMotion || handle === null);

@@ -10,10 +10,9 @@ import { useOauthCallback } from '@/features/shared/auth/hooks/use-oauth-callbac
 let params = new URLSearchParams();
 
 /**
- * 成功パスは window.location.assign によるフルページ遷移で終わる。jsdom は実遷移できず
- * location.assign も差し替え不可（non-configurable）なので、遷移そのものは検証せず
- * 「トークン保存まで到達したか」で担保する。保留中の継続がテスト終了後に走ると
- * 環境破棄後に window を触ってしまうため、各テストの最後で明示的に流し切る。
+ * 成功パスは**アプリ内遷移**で終わる（`adoptSession` が認証を文脈に載せるので、読み込み
+ * 直す必要が無い）。ここでは「認証を載せたか」「どこへ移したか」で担保する。保留中の継続が
+ * テスト終了後に走ると環境破棄後に window を触ってしまうため、各テストの最後で流し切る。
  */
 async function flushPending(): Promise<void> {
   await act(async () => {
@@ -21,9 +20,16 @@ async function flushPending(): Promise<void> {
   });
 }
 
+const { push, adoptSession } = vi.hoisted(() => ({
+  push: vi.fn(),
+  adoptSession: vi.fn(() => true),
+}));
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => params,
+  useRouter: () => ({ push }),
 }));
+vi.mock('@/lib/auth-context', () => ({ useAuth: () => ({ adoptSession }) }));
 vi.mock('posthog-js', () => ({ default: { identify: vi.fn() } }));
 
 function mockFetch(ok: boolean, body: unknown = {}, status = ok ? 200 : 400) {
@@ -41,6 +47,7 @@ const session = {
 describe('useOauthCallback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    adoptSession.mockReturnValue(true);
     localStorage.clear();
     params = new URLSearchParams();
     window.location.hash = '';
@@ -68,7 +75,8 @@ describe('useOauthCallback', () => {
     const [url, init] = fetchSpy.mock.calls[0];
     expect(String(url)).toContain('/api/v1/auth/oauth/callback');
     expect(init?.body).toBe(JSON.stringify({ code: 'c1', locale: 'en' }));
-    await waitFor(() => expect(localStorage.getItem('oryzae_access_token')).toBe('at'));
+    await waitFor(() => expect(adoptSession).toHaveBeenCalledWith(session));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
     await flushPending();
   });
 
@@ -112,7 +120,7 @@ describe('useOauthCallback', () => {
     const { result } = renderHook(() => useOauthCallback());
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
-    expect(localStorage.getItem('oryzae_access_token')).toBeNull();
+    expect(adoptSession).not.toHaveBeenCalled();
   });
 
   it('PKCE: session のトークンが文字列でなければ auth_failed', async () => {
@@ -124,7 +132,7 @@ describe('useOauthCallback', () => {
     const { result } = renderHook(() => useOauthCallback());
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
-    expect(localStorage.getItem('oryzae_access_token')).toBeNull();
+    expect(adoptSession).not.toHaveBeenCalled();
   });
 
   it('implicit: session が無くてもハッシュのトークンで完了する（finalize は user だけ返す）', async () => {
@@ -137,7 +145,13 @@ describe('useOauthCallback', () => {
 
     await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
     expect(result.current.error).toBeNull();
-    expect(localStorage.getItem('oryzae_access_token')).toBe('at2');
+    // hash から来たトークンを添えて載せる（応答に session が無いため）。
+    await waitFor(() =>
+      expect(adoptSession).toHaveBeenCalledWith(
+        { user: { id: 'u1', email: 'a@example.com' } },
+        { accessToken: 'at2', refreshToken: 'rt2' },
+      ),
+    );
     await flushPending();
   });
 
@@ -149,7 +163,7 @@ describe('useOauthCallback', () => {
 
     await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
     expect(String(fetchSpy.mock.calls[0][0])).toContain('/api/v1/auth/oauth/finalize');
-    expect(localStorage.getItem('oryzae_access_token')).toBe('at2');
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
     await flushPending();
   });
 
@@ -163,17 +177,32 @@ describe('useOauthCallback', () => {
 
     await waitFor(() => expect(result.current.error).toBe('capacity_reached'));
   });
-  it('確定したら、読み込み直す前に beforeLeave（扉を開けて入る）を / で待つ', async () => {
+  it('確定したら、移る前に beforeLeave（扉を開けて入る）を / で待つ', async () => {
     params = new URLSearchParams({ code: 'c1' });
     vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(true, session));
-    // 解決させずに止めておく。止まっている間は location.assign に進まない
-    // （jsdom の assign は差し替えられないので、手前で止めて順序を確かめる）。
+    // 解決させずに止めておく。止まっている間は行き先へ移らない。
     const beforeLeave = vi.fn(() => new Promise<void>(() => {}));
 
     renderHook(() => useOauthCallback(beforeLeave));
 
     await waitFor(() => expect(beforeLeave).toHaveBeenCalledWith('/'));
-    expect(localStorage.getItem('oryzae_access_token')).toBe('at');
+    expect(adoptSession).toHaveBeenCalledWith(session);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('文脈に載せられなければ、読み込み直して復元に任せる', async () => {
+    // 応答の形が違って載せられないとき。アプリ内遷移だと「未ログイン」に見えて
+    // ログイン画面へ弾かれるので、その場合だけ従来どおり読み込み直す。
+    params = new URLSearchParams({ code: 'c1' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(true, session));
+    adoptSession.mockReturnValue(false);
+    const beforeLeave = vi.fn(() => Promise.resolve());
+
+    renderHook(() => useOauthCallback(beforeLeave));
+
+    await waitFor(() => expect(beforeLeave).toHaveBeenCalledWith('/'));
+    await flushPending();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('通らなかったら beforeLeave を呼ばない（扉は開かない）', async () => {

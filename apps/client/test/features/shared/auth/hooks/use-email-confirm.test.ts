@@ -6,7 +6,10 @@ import { useEmailConfirm } from '@/features/shared/auth/hooks/use-email-confirm'
  * Issue #490: `app/(auth)/auth/confirm/page.tsx` の直叩きを共有 hook へ移した分の担保。
  * hook は文言ではなくエラーコードを返し、page が i18n で解決する。
  */
-const push = vi.fn();
+const { push, adoptSession } = vi.hoisted(() => ({
+  push: vi.fn(),
+  adoptSession: vi.fn(() => true),
+}));
 const assign = vi.fn();
 let params = new URLSearchParams();
 
@@ -14,6 +17,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
   useSearchParams: () => params,
 }));
+vi.mock('@/lib/auth-context', () => ({ useAuth: () => ({ adoptSession }) }));
 vi.mock('posthog-js', () => ({ default: { identify: vi.fn() } }));
 
 function mockFetch(ok: boolean, body: unknown = {}) {
@@ -33,7 +37,8 @@ describe('useEmailConfirm', () => {
     vi.clearAllMocks();
     localStorage.clear();
     params = new URLSearchParams();
-    // 確定後は読み込み直して入る（window.location.assign）。jsdom の location は
+    adoptSession.mockReturnValue(true);
+    // 載せられなかったときだけ読み込み直す（window.location.assign）。jsdom の location は
     // 再定義できないので丸ごと差し替える。
     vi.stubGlobal('location', { assign });
   });
@@ -51,7 +56,7 @@ describe('useEmailConfirm', () => {
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(assign).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('token_hash / type が無ければ invalid_link（通信しない）', async () => {
@@ -74,8 +79,8 @@ describe('useEmailConfirm', () => {
 
     renderHook(() => useEmailConfirm());
 
-    await waitFor(() => expect(assign).toHaveBeenCalledWith('/reset-password'));
-    expect(localStorage.getItem('oryzae_access_token')).toBe('at');
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/reset-password'));
+    expect(adoptSession).toHaveBeenCalled();
   });
 
   it('next があればそちらを優先する', async () => {
@@ -84,7 +89,7 @@ describe('useEmailConfirm', () => {
 
     renderHook(() => useEmailConfirm());
 
-    await waitFor(() => expect(assign).toHaveBeenCalledWith('/entries/new'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/entries/new'));
   });
 
   it('移る前に beforeLeave（扉を開けて入る）を行き先つきで待ち、済んでから移る', async () => {
@@ -101,10 +106,10 @@ describe('useEmailConfirm', () => {
     renderHook(() => useEmailConfirm(beforeLeave));
 
     await waitFor(() => expect(beforeLeave).toHaveBeenCalledWith('/'));
-    // 歩き終えるまでは読み込み直さない（先に移ると扉が開く前に画面が変わる）。
-    expect(assign).not.toHaveBeenCalled();
+    // 歩き終えるまでは移らない（先に移ると扉が開く前に画面が変わる）。
+    expect(push).not.toHaveBeenCalled();
     finishWalking();
-    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
   });
 
   it('beforeLeave が失敗しても移る（演出のために入口を塞がない）', async () => {
@@ -114,7 +119,18 @@ describe('useEmailConfirm', () => {
 
     renderHook(() => useEmailConfirm(beforeLeave));
 
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
+  });
+
+  it('文脈に載せられなければ、読み込み直して復元に任せる', async () => {
+    adoptSession.mockReturnValue(false);
+    params = new URLSearchParams({ token_hash: 't', type: 'signup' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch(true, session));
+
+    renderHook(() => useEmailConfirm());
+
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('検証に失敗したら auth_failed（遷移しない）', async () => {
@@ -145,7 +161,7 @@ describe('useEmailConfirm', () => {
     const { result } = renderHook(() => useEmailConfirm());
 
     await waitFor(() => expect(result.current.error).toBe('auth_failed'));
-    expect(localStorage.getItem('oryzae_access_token')).toBeNull();
-    expect(assign).not.toHaveBeenCalled();
+    expect(adoptSession).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
   });
 });
