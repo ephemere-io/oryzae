@@ -79,6 +79,20 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'count-does-not-sit-on-a-handle',
+      description: '枚数は四隅に置かない（つまみの席なので、重なると数字が読めない）',
+      // 実ビルドで踏んだ: 左上に出していたら `nw` のつまみが数字の上に完全に乗った。
+      // jsdom に版組みは無いので、「辺の中央に置く」という**置き方**そのものを見る。
+      check: ({ root }) => {
+        const badge = root.querySelector('[data-verify-part="count"]');
+        if (!(badge instanceof HTMLElement)) return '枚数が無い';
+        return (
+          badge.style.left === '50%' ||
+          `枚数が角に寄っている（left=${badge.style.left || '未指定'}）`
+        );
+      },
+    },
+    {
       id: 'handles-do-not-start-pan',
       description: 'つまみを掴んでも盤面は動かない（data-canvas-no-pan）',
       check: ({ root }) => {

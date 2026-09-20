@@ -53,16 +53,22 @@ export function SelectionFrame({ bounds, count, onResizeStart }: SelectionFrameP
       }}
     >
       {/* 枚数。選んだつもりの数と合っているかを確かめる手がかり。
-          読み上げには出さない——同じ枚数を道具箱が文字で持っており、二重になる。 */}
+          読み上げには出さない——同じ枚数を道具箱が文字で持っており、二重になる。
+
+          **上辺の中央**に置く。左上に出していたころは、同じ角にある `nw` のつまみが
+          数字の上に完全に乗って読めなかった（実ビルドで確認）。四隅はつまみの席なので、
+          文字は辺の真ん中という空いている場所に出す。 */}
       <span
         data-verify-part="count"
         aria-hidden="true"
-        className="absolute whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] leading-none tracking-[0.04em]"
+        className="absolute whitespace-nowrap rounded-full px-2 py-1 text-[12px] font-medium leading-none tracking-[0.04em]"
         style={{
-          top: 0,
-          left: 0,
-          transform: `translateY(-100%) ${INVERSE_SCALE}`,
-          transformOrigin: 'bottom left',
+          bottom: '100%',
+          left: '50%',
+          // 枠の上端に下辺を合わせ、倍率に負けない分だけ上に離す。
+          marginBottom: hairline(6),
+          transform: `translateX(-50%) ${INVERSE_SCALE}`,
+          transformOrigin: 'bottom center',
           backgroundColor: 'var(--accent)',
           color: '#fff',
         }}
