@@ -789,8 +789,9 @@
       "save": "Save",
       "resize": "Resize and rotate",
       "snippet_placeholder": "Something worth keeping",
-      "snippet_caption": "Snippet",
-      "photo_caption": "Photo"
+      "palette_aria": "Board actions",
+      "tool_snippet": "Snippet",
+      "tool_photo": "Photo"
     }
   },
   "canvas": {
