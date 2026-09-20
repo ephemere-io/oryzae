@@ -29,6 +29,8 @@ export interface SpBoardToolbarProps {
   onDelete?: () => void;
   onCreateSnippet?: () => void;
   onCreatePhoto?: () => void;
+  /** 貼ってあるもの全部が入るところまで引く（寄ったまま迷子にならないように）。 */
+  onFitAll?: () => void;
   /** 何かを作っている最中（連打で二重に作らせない）。 */
   busy?: boolean;
 }
@@ -40,6 +42,7 @@ export function SpBoardToolbar({
   onDelete,
   onCreateSnippet,
   onCreatePhoto,
+  onFitAll,
   busy = false,
 }: SpBoardToolbarProps) {
   const t = useTranslations('sp.board');
@@ -63,8 +66,8 @@ export function SpBoardToolbar({
     >
       {mode === 'create' ? (
         <>
-          <ToolButton label={t('add_snippet')} onClick={onCreateSnippet} disabled={busy} />
-          <ToolButton label={t('add_photo')} onClick={onCreatePhoto} disabled={busy} />
+          <ToolButton label={t('add_snippet')} onClick={onCreateSnippet} disabled={busy} creates />
+          <ToolButton label={t('add_photo')} onClick={onCreatePhoto} disabled={busy} creates />
         </>
       ) : (
         <>
@@ -74,6 +77,10 @@ export function SpBoardToolbar({
           <ToolButton label={t('remove')} onClick={onDelete} tone="danger" />
         </>
       )}
+      {/* 「全体を見る」は**どちらの顔でも出す**。寄ったまま遠くへ行くと戻り方が
+          分からなくなるので、カードを選んでいる最中でも戻れる必要がある。
+          作っている最中でも押せる（見回すことは二重作成を招かない）。 */}
+      <ToolButton label={t('fit_all')} onClick={onFitAll} />
     </div>
   );
 }
@@ -83,16 +90,20 @@ function ToolButton({
   onClick,
   disabled = false,
   tone = 'normal',
+  creates = false,
 }: {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   tone?: 'normal' | 'danger';
+  /** 新しいものを作る道具か（作っている最中は押せなくする対象）。 */
+  creates?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      data-verify-creates={creates ? '' : undefined}
       disabled={disabled || onClick === undefined}
       className="whitespace-nowrap rounded-full px-4 py-2.5 text-[13px] transition-opacity disabled:opacity-40"
       style={{

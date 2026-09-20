@@ -291,6 +291,18 @@ describe('useBoardInteraction', () => {
     expect(onInteractionEnd).toHaveBeenCalled();
   });
 
+  it('前のセッションで手前に置いたカード（z が大きい）より上に出す', () => {
+    // 採番をマウント時の値からしか進めていなかったころは、保存済みの大きな z より
+    // 下に潜り、PC で「クリックしても埋もれたまま」に見えていた（実機レビュー指摘）。
+    cards = [card('a', 0), { ...card('b', 500), userPositioned: true }];
+    const { result } = setup();
+
+    act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    expect(latest(onCardsChange, 'a')?.zIndex).toBeGreaterThan(500);
+  });
+
   it('既に最前面のカードを押しただけなら、並びも保存も動かさない', () => {
     // 盤面に変化が無いのに保存要求を出すと、選ぶたびに PUT が飛ぶ。
     const { result } = setup();

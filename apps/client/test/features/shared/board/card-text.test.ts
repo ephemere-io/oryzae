@@ -13,8 +13,11 @@ describe('snippetFontSize', () => {
     expect(snippetFontSize(393, 14)).toBe(21);
   });
 
-  it('上限で止まる（1 枚が見出しにならない）', () => {
-    expect(snippetFontSize(5000, 17)).toBe(44);
+  it('上限は設けない（枠を広げたぶんだけ大きくなる）', () => {
+    // 一度は 44px で頭打ちにしたが、「広げたのに大きくならない」と指摘されて外した。
+    // カードを大きくしたのは利用者なので、その意図をそのまま反映する。
+    expect(snippetFontSize(5000, 17)).toBe(324);
+    expect(snippetFontSize(1048, 14)).toBe(56);
   });
 
   it('下限で止まる（小さくしても読める大きさを残す）', () => {

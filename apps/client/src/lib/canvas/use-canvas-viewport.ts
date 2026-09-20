@@ -388,14 +388,19 @@ export function useCanvasViewport(options: CanvasViewportOptions = {}): CanvasSu
         const now = twoFingerState();
         if (pinch && pinch.dist > 0) {
           const rect = frame.getBoundingClientRect();
+          const factor = now.dist / pinch.dist;
+          const before = vpRef.current.scale;
           // 2本指の中点を軸に拡大し、中点の移動ぶんだけ平行移動する。
-          const zoomed = zoomAt(
-            vpRef.current,
-            now.midX - rect.left,
-            now.midY - rect.top,
-            now.dist / pinch.dist,
-          );
+          const zoomed = zoomAt(vpRef.current, now.midX - rect.left, now.midY - rect.top, factor);
           apply(panBy(zoomed, now.midX - pinch.midX, now.midY - pinch.midY));
+
+          // 引く向きの余りを外へ流すのは**ホイールと同じ**。指のピンチでも
+          // 「引き切ってさらにつまむと書斎へ戻る」が効くようにする
+          // （実機レビュー: 盤面がピンチを受け取るようになった途端、指では戻れなくなった）。
+          if (factor < 1 && before <= OVERZOOM_ARM_SCALE) {
+            const detail: OverzoomOutDetail = { excess: 1 - factor };
+            frame.dispatchEvent(new CustomEvent(OVERZOOM_OUT_EVENT, { detail, bubbles: true }));
+          }
         }
         pinch = now;
         return;

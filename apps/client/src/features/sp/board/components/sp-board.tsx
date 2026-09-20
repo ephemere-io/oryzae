@@ -222,6 +222,17 @@ export function SpBoard({ api }: SpBoardProps) {
     if (selected) raiseToFront(selected.id);
   }, [selected, raiseToFront]);
 
+  /**
+   * 貼ってあるもの全部が入るところまで引く。
+   *
+   * 寄って歩き回れるようにした代わりに、遠くへ行くと戻り方が分からなくなった
+   * （実機レビュー: 「中央から離れると迷子になりそう」）。隅の俯瞰と対で、
+   * 1 回で全部を視界に戻せるようにする。
+   */
+  const handleFitAll = useCallback(() => {
+    canvas.fitTo(unionBounds(cardsRef.current.filter((card) => !card.removing).map(cardBounds)));
+  }, [canvas]);
+
   const handleDelete = useCallback(async () => {
     if (!selected) return;
     setSelectedId(null);
@@ -260,6 +271,7 @@ export function SpBoard({ api }: SpBoardProps) {
             setSheetOpen(true);
           }}
           onCreatePhoto={() => fileRef.current?.click()}
+          onFitAll={handleFitAll}
         />
       </div>
 

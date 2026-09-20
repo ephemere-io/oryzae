@@ -788,7 +788,8 @@
       "cancel": "取消",
       "save": "保存",
       "resize": "改变大小和方向",
-      "snippet_placeholder": "想留下的话"
+      "snippet_placeholder": "想留下的话",
+      "fit_all": "查看全部"
     }
   },
   "canvas": {
