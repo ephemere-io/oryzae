@@ -49,6 +49,28 @@ const DRAG_THRESHOLD_PX = 6;
  * 80px 引いて 45px しか伸びず、そのぶん高さが 15px 縮んだ）。`inline-size: 40%` が
  * 割合を解決する相手は中身の箱なので、こちらもそれに合わせる。
  */
+/**
+ * 選択枠を置く位置。**本文の見えている範囲からはみ出したら null**（枠を出さない）。
+ *
+ * 枠は `position: fixed` で本文の外に描いている。本文は自分で
+ * スクロールするので、写真だけが本文の枠外へ流れても、重ねた枠は画面に残る。
+ * 実機レビューでは、写真を選んだままスクロールすると枠が宙に浮いて見えていた（#626）。
+ * 写真そのものは本文の箱に切り取られるので、枠も同じところで切る。
+ */
+function visibleRect(el: HTMLElement, editor: HTMLElement | null): DOMRect | null {
+  const rect = el.getBoundingClientRect();
+  if (!editor) return rect;
+  const box = editor.getBoundingClientRect();
+  // レイアウトの無い環境（jsdom）では全部 0 になる。そこで隠すと何も検証できない。
+  if (box.width === 0 && box.height === 0) return rect;
+  const hidden =
+    rect.bottom <= box.top ||
+    rect.top >= box.bottom ||
+    rect.right <= box.left ||
+    rect.left >= box.right;
+  return hidden ? null : rect;
+}
+
 function measureLineLength(editor: HTMLElement, isVertical: boolean): number {
   const style = getComputedStyle(editor);
   const padding = isVertical
@@ -97,23 +119,26 @@ export function useInlineImageSelection({
         ? {
             ...s,
             image: readInlineImageFromElement(s.element),
-            rect: s.element.getBoundingClientRect(),
+            rect: visibleRect(s.element, editorRef.current),
           }
         : s,
     );
-  }, []);
+  }, [editorRef]);
 
   const clear = useCallback(() => {
     setSelection({ element: null, image: null, rect: null });
   }, []);
 
-  const select = useCallback((el: HTMLImageElement) => {
-    setSelection({
-      element: el,
-      image: readInlineImageFromElement(el),
-      rect: el.getBoundingClientRect(),
-    });
-  }, []);
+  const select = useCallback(
+    (el: HTMLImageElement) => {
+      setSelection({
+        element: el,
+        image: readInlineImageFromElement(el),
+        rect: visibleRect(el, editorRef.current),
+      });
+    },
+    [editorRef],
+  );
 
   // 写真をクリックしたら選ぶ。本文の他の場所を触ったら外す。
   useEffect(() => {
@@ -164,17 +189,21 @@ export function useInlineImageSelection({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [selection.element, clear]);
 
-  // 選択中に本文がスクロール/リサイズしたら、オーバーレイの位置を追従させる。
+  // 選択中に画面がスクロール/リサイズしたら、オーバーレイの位置を追従させる。
+  //
+  // **捕捉フェーズで window に付ける。** scroll は上に伝わらないので、本文の要素にだけ
+  // 付けていると、本文を包む箱のほうがスクロールしたときに何も起きない。実際、横書きでは
+  // スクロールするのは本文ではなく外側の箱で、枠だけが画面に取り残されていた（#626）。
+  // 捕捉フェーズなら、どの要素がスクロールしても window で拾える。
   useEffect(() => {
     if (!selection.element) return;
-    const editor = editorRef.current;
     window.addEventListener('resize', refresh);
-    editor?.addEventListener('scroll', refresh);
+    window.addEventListener('scroll', refresh, true);
     return () => {
       window.removeEventListener('resize', refresh);
-      editor?.removeEventListener('scroll', refresh);
+      window.removeEventListener('scroll', refresh, true);
     };
-  }, [selection.element, editorRef, refresh]);
+  }, [selection.element, refresh]);
 
   /** ハンドルを掴んだ。ここから pointermove で追う。 */
   const beginResize = useCallback(

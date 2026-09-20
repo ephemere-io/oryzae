@@ -14,6 +14,21 @@ function pointer(type: string, x: number, y: number): MouseEvent {
   return new MouseEvent(type, { bubbles: true, clientX: x, clientY: y });
 }
 
+/** jsdom はレイアウトを持たないので、位置は自分で作って渡す。 */
+function rect(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    x: left,
+    y: top,
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    toJSON: () => ({}),
+  };
+}
+
 describe('useInlineImageSelection', () => {
   let editor: HTMLDivElement;
   let photo: HTMLImageElement;
@@ -139,6 +154,59 @@ describe('useInlineImageSelection', () => {
     expect(editor.querySelector('img.inline-photo')).toBeNull();
     expect(result.current.selection.element).toBeNull();
     expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * 選択枠は `position: fixed` で本文の外に描いている。**scroll は上に伝わらない**ので、
+   * 本文の要素にだけ耳を付けていると、本文を包む箱がスクロールしたときに何も起きず、
+   * 枠だけが画面に取り残される（実機レビュー #626 のスクリーンショット）。
+   */
+  it('本文を包む箱がスクロールしても枠が追いかける', () => {
+    const scroller = document.createElement('div');
+    editor.replaceWith(scroller);
+    scroller.appendChild(editor);
+    document.body.appendChild(scroller);
+
+    let top = 200;
+    photo.getBoundingClientRect = () => rect(100, top, 240, 180);
+
+    const { result } = setup();
+    act(() => {
+      photo.dispatchEvent(pointer('pointerdown', 110, 210));
+    });
+    expect(result.current.selection.rect?.top).toBe(200);
+
+    // 箱が 120px ぶんスクロールした（scroll はバブルしないので、箱の上で起きる）。
+    top = 80;
+    act(() => {
+      scroller.dispatchEvent(new Event('scroll'));
+    });
+
+    expect(result.current.selection.rect?.top).toBe(80);
+    scroller.remove();
+  });
+
+  // 写真そのものは本文の箱に切り取られるが、重ねた枠は fixed なので切り取られない。
+  it('写真が本文の見える範囲から出たら枠を消す', () => {
+    editor.getBoundingClientRect = () => rect(0, 100, 800, 400);
+    let top = 200;
+    photo.getBoundingClientRect = () => rect(100, top, 240, 180);
+
+    const { result } = setup();
+    act(() => {
+      photo.dispatchEvent(pointer('pointerdown', 110, 210));
+    });
+    expect(result.current.selection.rect).not.toBeNull();
+
+    // 本文の上端より上へ流れた。
+    top = -300;
+    act(() => {
+      window.dispatchEvent(new Event('scroll'));
+    });
+
+    expect(result.current.selection.rect).toBeNull();
+    // 選んでいること自体は続く（パレットの操作は残る）。
+    expect(result.current.selection.element).toBe(photo);
   });
 
   // パレットから「完了」を外したので、押して外す道は「写真以外を押す」だけになる。
