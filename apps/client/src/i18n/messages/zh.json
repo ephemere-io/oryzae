@@ -789,7 +789,8 @@
       "save": "保存",
       "resize": "改变大小和方向",
       "snippet_placeholder": "想留下的话",
-      "fit_all": "查看全部"
+      "snippet_caption": "摘录",
+      "photo_caption": "照片"
     }
   },
   "canvas": {

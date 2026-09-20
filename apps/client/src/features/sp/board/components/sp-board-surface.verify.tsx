@@ -53,7 +53,15 @@ const WIDE: BoardCardData[] = [
 /** 盤面（パン・ズーム）を張ってから部品を描く容れ物。 */
 function SurfaceWithCanvas(props: Props) {
   const canvas = useCanvasViewport();
-  return <SpBoardSurface {...props} canvas={canvas} onMove={() => {}} onCommit={() => {}} />;
+  return (
+    <SpBoardSurface
+      {...props}
+      canvas={canvas}
+      onMove={() => {}}
+      onCommit={() => {}}
+      onFit={() => {}}
+    />
+  );
 }
 
 registerUnit<Props>({

@@ -52,6 +52,7 @@ describe('SpBoardSurface', () => {
       canvas: stubCanvas(),
       onMove: vi.fn(),
       onCommit: vi.fn(),
+      onFit: vi.fn(),
       ...overrides,
     };
     return { ...render(withVerifyProviders(<SpBoardSurface {...props} />)), props };

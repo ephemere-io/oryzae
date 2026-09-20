@@ -29,7 +29,6 @@ const ACTIONS = {
   onDelete: noop,
   onCreateSnippet: noop,
   onCreatePhoto: noop,
-  onFitAll: noop,
 };
 
 registerUnit<Props>({
@@ -105,8 +104,8 @@ registerUnit<Props>({
       check: ({ root }) => {
         const bar = root.querySelector('[data-verify-unit="SpBoardToolbar"]');
         if (!(bar instanceof HTMLElement)) return '道具箱が無い';
-        // left-1/2 の絶対配置は「親の右端まで」を幅の上限にするため、w-max が要る。
-        if (!bar.classList.contains('w-max')) return '道具箱が親の半分の幅に畳まれる';
+        // 下端の列は画面の幅いっぱい（#616 の ActionPalette と同じ形）。
+        if (!bar.classList.contains('w-full')) return '道具の列が幅いっぱいに敷かれていない';
         const wrapped = [...root.querySelectorAll('button')].filter(
           (button) => !button.classList.contains('whitespace-nowrap'),
         );
@@ -114,12 +113,27 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'actions-are-icon-plus-caption',
+      description: 'PC と同じ絵（アイコン）に、短い名前を添える（スマホにはホバーが無い）',
+      check: ({ root }) => {
+        const buttons = [...root.querySelectorAll('button[data-palette-action]')];
+        if (buttons.length === 0) return '道具が 1 つも無い';
+        for (const button of buttons) {
+          if (!button.querySelector('svg'))
+            return `${button.getAttribute('aria-label')} に絵が無い`;
+          const caption = button.querySelector('span')?.textContent ?? '';
+          if (caption.trim() === '') return `${button.getAttribute('aria-label')} に名前が無い`;
+        }
+        return true;
+      },
+    },
+    {
       id: 'busy-disables-creation',
       description: '作っている最中は、作る道具だけを押せなくする',
       onlyFixtures: ['busy'],
       check: ({ root }) => {
-        // 止めるのは**作る道具だけ**。見回す道具（全体を見る）は作っている最中でも
-        // 押せてよい — 二重に作る原因にならないし、待っている間ほど見たくなる。
+        // 止めるのは**作る道具だけ**。カードにできること（前面へ・外す）や盤面の
+        // 寄り引きは、作っている最中でも押せてよい（二重に作る原因にならない）。
         const creating = [...root.querySelectorAll('button[data-verify-creates]')].filter(
           (element): element is HTMLButtonElement => element instanceof HTMLButtonElement,
         );

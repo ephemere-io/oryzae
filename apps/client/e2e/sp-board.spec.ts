@@ -119,12 +119,13 @@ test.describe('SP のボード（指で触る）', () => {
     expect(await worldTransform(page)).not.toBe(before);
   });
 
-  test('「全体を見る」で引いて、貼ってあるものが視界に入る', async ({ page }) => {
+  test('盤面左下の FIT で引いて、貼ってあるものが視界に入る', async ({ page }) => {
     const marker = `E2E全体-${Date.now()}`;
     await createSnippet(page, marker);
 
     const before = await worldTransform(page);
-    await page.getByRole('button', { name: '全体を見る' }).tap();
+    // 寄り引きは PC と同じ操作（− / 100% / + / FIT）が盤面の左下にある。
+    await page.getByRole('button', { name: '全体を表示' }).tap();
     await page.waitForTimeout(600);
 
     expect(await worldTransform(page)).not.toBe(before);

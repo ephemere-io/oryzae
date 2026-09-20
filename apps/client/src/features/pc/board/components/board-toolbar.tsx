@@ -2,7 +2,15 @@
 
 import { useTranslations } from 'next-intl';
 import { FloatingPalette } from '@/components/ui/floating-palette';
-import { HOVER_CLASS, ICON_STROKE_WIDTH, TOOL_BUTTON_CLASS } from '@/components/ui/surface';
+import {
+  BringToFrontIcon,
+  OpenIcon,
+  PhotoIcon,
+  ScanTextIcon,
+  SnippetIcon,
+  TrashIcon,
+} from '@/components/ui/palette-icons';
+import { HOVER_CLASS, TOOL_BUTTON_CLASS } from '@/components/ui/surface';
 import { BOARD_INSET } from './board-surface';
 
 /** ツールバーで選べる道具。'none' はどのダイアログも開いていない状態。 */
@@ -35,78 +43,8 @@ const STORAGE = {
   collapsed: 'oryzae-board-toolbar-collapsed',
 } as const;
 
-// アイコンの寸法は面の大きさの段に従う（エントリーの操作パレットと同じ）。
-// aria-hidden は各 <svg> に直接書く。スプレッドに含めると a11y lint が見抜けない。
-function iconProps(size: number) {
-  return {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: ICON_STROKE_WIDTH,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
-  } as const;
-}
-
-function SnippetIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
-function PhotoIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <polyline points="21 15 16 10 5 21" />
-    </svg>
-  );
-}
-
-/** 画像から文字を読み取る。枠の中に字がある形で「写真そのもの」と区別する。 */
-function ScanTextIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M3 8V5a2 2 0 0 1 2-2h3" />
-      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-      <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
-      <path d="M7 10h10M7 14h6" />
-    </svg>
-  );
-}
-
-function OpenIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M7 17 17 7" />
-      <path d="M9 7h8v8" />
-    </svg>
-  );
-}
-
-function FrontIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M12 3 3 8l9 5 9-5-9-5Z" />
-      <path d="m3 14 9 5 9-5" />
-    </svg>
-  );
-}
-
-function TrashIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
-    </svg>
-  );
-}
+// アイコンは `components/ui/palette-icons` に置いてある（SP の道具の列と同じ絵を使う。
+// reach をまたいで import できないので、絵そのものは端末非依存の場所に置く）。
 
 /**
  * ボードの道具箱。**面そのものはエントリーの操作パレットと同じ `FloatingPalette`。**
@@ -175,7 +113,7 @@ export function BoardToolbar({
           id: 'front' as const,
           label: t('bring_to_front'),
           onSelect: onBringSelectedToFront,
-          icon: (size: number) => <FrontIcon size={size} />,
+          icon: (size: number) => <BringToFrontIcon size={size} />,
           danger: false,
         },
         {
