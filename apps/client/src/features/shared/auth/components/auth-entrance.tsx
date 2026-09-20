@@ -10,6 +10,7 @@ import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 import { markStudyArrivalFor } from '@/features/shared/study/arrival';
 import { saveStudyBackdrop } from '@/features/shared/study/backdrop';
 import { beginStudyHandoverFor } from '@/features/shared/study/handover';
+import { traceMark } from '@/lib/trace';
 import { EntranceContext } from '../entrance/context';
 import { type EnterPlan, enterPlan } from '../entrance/door';
 import type { EntranceLayout } from '../entrance/layout';
@@ -165,17 +166,21 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
           await wait(plan.totalMs);
           return;
         }
+        traceMark('扉を開き始める');
         // 紙が退くので、窓は画面全体に戻る。扉は歩きながら画面の中央へ寄ってくる。
         handle.setFrame(Number.POSITIVE_INFINITY);
         // 歩き切って、渡す 1 枚が撮れるまで待つ（`EntranceSceneHandle.enter`）。
         const image = await handle.enter(plan);
+        traceMark(image === null ? '歩き終わり（撮れず）' : '歩き終わり・撮影完了');
         // 復号まで済ませてから敷く（`handleCapture`）。
         await decodedRef.current;
         // 撮れた絵を画面の上に敷く。ここから先、下で何が入れ替わっても見えない。
         beginStudyHandoverFor(destination, image);
+        traceMark('地を敷いた');
         // **敷いた絵が実際に描かれるまで待ってから返す。** 同じ tick で移ると、絵が出る前に
         // 扉が外れ、その 1〜2 フレームだけ地の色が見える（実機の録画で 2 コマ確認）。
         await afterPaint();
+        traceMark('地が描かれた');
       },
     }),
     [reducedMotion, sheet],

@@ -26,7 +26,9 @@ import {
 } from '@/features/shared/auth/entrance/paper';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { useHomeHref } from '@/features/shared/study/hooks/use-home-href';
+import { warmStudy } from '@/features/shared/study/warm';
 import { useAuth } from '@/lib/auth-context';
+import { traceMark } from '@/lib/trace';
 
 export function LoginForm() {
   const t = useTranslations('auth.login');
@@ -64,8 +66,11 @@ export function LoginForm() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    traceMark('ログイン送信');
     // 確かめている間、扉に手を掛けておく。通らなければ閉じ直す。
     entrance.setWaiting(true);
+    // 確かめているあいだに、書斎を読み始める（歩き終わりに間に合わせる）。
+    warmStudy();
 
     const err = await login(identifier, password);
     if (err) {
@@ -75,12 +80,14 @@ export function LoginForm() {
       return;
     }
 
+    traceMark('認証OK');
     // 手動切替はマウント時の effect で読むので、送信までにはまず解決している。
     // 万一まだなら `/` へ送る（HomeGate が同じ規則で振り分ける）。
     const next = resolved ? home : '/';
     // 扉を開けて奥へ歩き切ってから移る。先に移ると扉が開く前に画面が変わる。
     // 定置の印と、最後の 1 枚を敷くのは扉の側（`AuthEntrance` の `enter`）。
     await entrance.enter(next);
+    traceMark('画面を移す');
     router.push(next);
   }
 

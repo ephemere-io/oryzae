@@ -3,6 +3,7 @@
 // verify-exempt: ルーターの上に敷く地。遷移と sessionStorage が前提で、孤立して描くと常に空。
 
 import { useEffect, useState } from 'react';
+import { traceMark } from '@/lib/trace';
 import {
   endStudyHandover,
   studyHandoverImage,
@@ -44,6 +45,7 @@ export function StudyHandover() {
   useEffect(() => {
     if (!leaving || image === null) return;
     const id = window.setTimeout(() => {
+      traceMark('地を外した');
       setImage(null);
       setLeaving(false);
     }, FADE_MS);
