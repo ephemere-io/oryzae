@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
+import { frontZIndex } from '@/features/shared/board/z-order';
 
 type InteractionType = 'drag' | 'rotate' | 'resize';
 type ResizeCorner = 'se' | 'sw' | 'ne' | 'nw';
@@ -197,17 +198,18 @@ export function useBoardInteraction(
         //
         // ただし**既に最前面のカードを押しただけ**のときは何もしない。盤面に変化が
         // 無いのに保存要求を出すと、選ぶたびに PUT が飛ぶ。
-        const card = cards.find((c) => c.id === state.cardId);
-        const alreadyFront = card !== undefined && cards.every((c) => c.zIndex <= card.zIndex);
-        if (didDragRef.current || !alreadyFront) {
-          // 採番は**いまの盤面の最大値から**採る。マウント時に決めた値だけを進めていた
-          // ころは、前のセッションで手前に置いたカード（z が大きいまま保存されている）
-          // より下に潜ることがあり、「クリックしても埋もれたまま」に見えていた。
-          const top = cards.reduce((max, c) => Math.max(max, c.zIndex), 0);
-          zCounterRef.current = Math.max(zCounterRef.current, top) + 1;
+        // 採番の規則は `features/shared/board/z-order` に 1 つだけ置いてある
+        // （SP の盤面も同じものを呼ぶ。別々に持っていたころ、PC だけが古い採番のまま
+        // 「クリックしても埋もれたまま」になっていた）。
+        const zIndex = frontZIndex(cards, state.cardId, zCounterRef.current);
+        if (zIndex !== null) zCounterRef.current = zIndex;
+        if (zIndex !== null || didDragRef.current) {
           // ここが「利用者が自分で位置を決めた」瞬間。フラグを立てて保存に乗せることで、
           // 次回以降の自動整列（applyDefaultZOrder）の対象から外れる。
-          updateCard(state.cardId, { zIndex: zCounterRef.current, userPositioned: true });
+          updateCard(state.cardId, {
+            ...(zIndex === null ? {} : { zIndex }),
+            userPositioned: true,
+          });
           onInteractionEnd();
         }
       } else {

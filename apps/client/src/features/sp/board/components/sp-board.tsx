@@ -10,6 +10,7 @@ import { PageLoading } from '@/components/ui/page-loading';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
 import type { BoardCardData, CardPlacement } from '@/features/shared/board/types';
+import { raiseToFront } from '@/features/shared/board/z-order';
 import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { unionBounds } from '@/lib/canvas/viewport';
@@ -201,26 +202,22 @@ export function SpBoard({ api }: SpBoardProps) {
    * 下のカードに触れても埋もれたままだと読めない（実機レビュー指摘）。
    * 既に最前面なら何もしない — 触るたびに保存要求が飛ぶのを避ける。
    */
-  const raiseToFront = useCallback(
+  const raiseCard = useCallback(
     (cardId: string) => {
-      const current = cardsRef.current;
-      const top = Math.max(0, ...current.map((card) => card.zIndex));
-      const target = current.find((card) => card.id === cardId);
-      if (!target || target.zIndex >= top) return;
+      // 採番の規則は PC の盤面と共有している（`features/shared/board/z-order`）。
+      const next = raiseToFront(cardsRef.current, cardId);
+      if (next === null) return;
 
-      const raise = (card: BoardCardData): BoardCardData =>
-        card.id === cardId ? { ...card, zIndex: top + 1, userPositioned: true } : card;
-
-      setCards((previous) => previous.map(raise));
-      // setCards は次のレンダーで反映されるので、保存は最新の配列を自分で作って渡す。
-      savePositions(current.filter((card) => !card.removing).map(raise));
+      setCards(next);
+      // setCards は次のレンダーで反映されるので、保存は作った配列をそのまま渡す。
+      savePositions(next.filter((card) => !card.removing));
     },
     [setCards, savePositions],
   );
 
   const handleBringToFront = useCallback(() => {
-    if (selected) raiseToFront(selected.id);
-  }, [selected, raiseToFront]);
+    if (selected) raiseCard(selected.id);
+  }, [selected, raiseCard]);
 
   /**
    * 貼ってあるもの全部が入るところまで引く。
@@ -252,7 +249,7 @@ export function SpBoard({ api }: SpBoardProps) {
           canvas={canvas}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          onRaise={raiseToFront}
+          onRaise={raiseCard}
           onMove={handleMove}
           onTransform={handleTransform}
           onCommit={handleCommit}
