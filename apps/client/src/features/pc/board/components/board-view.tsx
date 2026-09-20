@@ -156,6 +156,7 @@ export function BoardView({ api }: BoardViewProps) {
     onPointerUp,
     deselect,
     didDrag,
+    consumeGestureEnd,
   } = useBoardInteraction(cards, handleCardsChange, handleInteractionEnd, scale);
 
   cardsRef.current = cards;
@@ -381,7 +382,13 @@ export function BoardView({ api }: BoardViewProps) {
         style={{ backgroundColor: 'var(--bg)' }}
         onPointerMove={handleFramePointerMove}
         onPointerUp={onPointerUp}
-        onClick={deselect}
+        // 空きを押したら選択を解除する。ただし**掴んで動かした直後の click** は数えない。
+        // 指を離した位置が掴んだ要素の外だと、ブラウザは click を共通の親＝この盤面に
+        // 送るので、そのままだと「大きさを変え終えた瞬間に選択が消える」。
+        onClick={() => {
+          if (consumeGestureEnd()) return;
+          deselect();
+        }}
         background={<CanvasGrid canvas={canvas} />}
         overlay={
           // 操作 UI の上ではパンを始めない。
