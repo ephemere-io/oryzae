@@ -200,7 +200,11 @@ export function useBoardInteraction(
         const card = cards.find((c) => c.id === state.cardId);
         const alreadyFront = card !== undefined && cards.every((c) => c.zIndex <= card.zIndex);
         if (didDragRef.current || !alreadyFront) {
-          zCounterRef.current += 1;
+          // 採番は**いまの盤面の最大値から**採る。マウント時に決めた値だけを進めていた
+          // ころは、前のセッションで手前に置いたカード（z が大きいまま保存されている）
+          // より下に潜ることがあり、「クリックしても埋もれたまま」に見えていた。
+          const top = cards.reduce((max, c) => Math.max(max, c.zIndex), 0);
+          zCounterRef.current = Math.max(zCounterRef.current, top) + 1;
           // ここが「利用者が自分で位置を決めた」瞬間。フラグを立てて保存に乗せることで、
           // 次回以降の自動整列（applyDefaultZOrder）の対象から外れる。
           updateCard(state.cardId, { zIndex: zCounterRef.current, userPositioned: true });

@@ -29,6 +29,7 @@ const ACTIONS = {
   onDelete: noop,
   onCreateSnippet: noop,
   onCreatePhoto: noop,
+  onFitAll: noop,
 };
 
 registerUnit<Props>({
@@ -114,11 +115,17 @@ registerUnit<Props>({
     },
     {
       id: 'busy-disables-creation',
-      description: '作っている最中は押せない',
+      description: '作っている最中は、作る道具だけを押せなくする',
       onlyFixtures: ['busy'],
       check: ({ root }) => {
-        const enabled = [...root.querySelectorAll('button')].filter((b) => !b.disabled).length;
-        return enabled === 0 || `${enabled} 個のボタンがまだ押せる`;
+        // 止めるのは**作る道具だけ**。見回す道具（全体を見る）は作っている最中でも
+        // 押せてよい — 二重に作る原因にならないし、待っている間ほど見たくなる。
+        const creating = [...root.querySelectorAll('button[data-verify-creates]')].filter(
+          (element): element is HTMLButtonElement => element instanceof HTMLButtonElement,
+        );
+        if (creating.length === 0) return '作る道具が見つからない';
+        const enabled = creating.filter((button) => !button.disabled).length;
+        return enabled === 0 || `${enabled} 個の作る道具がまだ押せる`;
       },
     },
   ],

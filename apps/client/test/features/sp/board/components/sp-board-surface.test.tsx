@@ -237,6 +237,16 @@ describe('SpBoardSurface', () => {
     }
   });
 
+  it('隅に俯瞰（全体マップ）を出す（寄ったまま迷子にならないように）', () => {
+    const { container } = renderSurface();
+    expect(container.querySelector('[data-verify-unit="CanvasMinimap"]')).not.toBeNull();
+  });
+
+  it('カードが無いときは俯瞰を出さない（映すものが無い）', () => {
+    const { container } = renderSurface({ cards: [] });
+    expect(container.querySelector('[data-verify-unit="CanvasMinimap"]')).toBeNull();
+  });
+
   it('枠が広いカードほど本文の文字が大きい', () => {
     // 盤面ごと縮めて映すので、固定サイズだと引いたときに本文だけ先に潰れる。
     const { container } = renderSurface({

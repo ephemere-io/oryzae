@@ -788,7 +788,8 @@
       "cancel": "취소",
       "save": "저장",
       "resize": "크기와 방향 바꾸기",
-      "snippet_placeholder": "남겨 두고 싶은 것"
+      "snippet_placeholder": "남겨 두고 싶은 것",
+      "fit_all": "전체 보기"
     }
   },
   "canvas": {

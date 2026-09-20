@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
+import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { snippetFontSize } from '@/features/shared/board/card-text';
 import type { BoardCardData } from '@/features/shared/board/types';
@@ -309,6 +310,22 @@ export function SpBoardSurface({
                 {t('cards', { count: visible.length })}
               </span>
             </div>
+            {/* 俯瞰（PC の盤面と同じ部品）。寄って動き回れるようになった代わりに、
+                いま板のどこに居るのかが分からなくなった（実機レビュー: 「全体マップが
+                なくなった。中央から離れると迷子になりそう」）。 */}
+            {visible.length > 0 && (
+              <CanvasMinimap
+                canvas={canvas}
+                ariaLabel={tBoard('minimap.aria_label')}
+                items={visible.map((card) => ({
+                  id: card.id,
+                  x: card.x,
+                  y: card.y,
+                  width: card.width,
+                  height: card.height,
+                }))}
+              />
+            )}
           </>
         }
       >
