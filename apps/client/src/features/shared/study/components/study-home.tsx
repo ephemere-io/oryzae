@@ -9,6 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
+import { traceMark } from '@/lib/trace';
 import { takeStudyArrival } from '../arrival';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
@@ -95,7 +96,10 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const [backdrop, setBackdrop] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
 
-  useEffect(() => setBackdrop(readStudyBackdrop()), []);
+  useEffect(() => {
+    traceMark('書斎 mount');
+    setBackdrop(readStudyBackdrop());
+  }, []);
 
   useLayoutEffect(() => {
     // 描く前に決める。1 フレームでも溶暗の側で描くと、そこで画面が白く飛ぶ。
@@ -235,6 +239,7 @@ export function StudyHome({ layout }: StudyHomeProps) {
           arrival={arrival}
           onLeaveStart={setLeaveMs}
           onReady={() => {
+            traceMark('書斎の 1 フレーム目');
             setCanvasReady(true);
             // 扉から渡された 1 枚を引く合図。描けたこの瞬間まで、画面は部屋のままだった。
             endStudyHandover();
