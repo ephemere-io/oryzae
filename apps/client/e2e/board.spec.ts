@@ -190,3 +190,108 @@ test.describe('ボード画面', () => {
     await deleteEntriesByMarker(page, unique);
   });
 });
+
+/**
+ * 複数選択（Shift クリック）。
+ *
+ * 「選べたつもりで 1 枚しか動いていない」が目で見て分かりにくい壊れ方なので、
+ * 2 枚作って**両方が同じだけ動いた**ことを数で確かめる。
+ */
+test.describe('ボードの複数選択', () => {
+  test.beforeEach(async ({ authenticated: _, page }) => {
+    await page.goto('/board');
+    await page.waitForSelector('[role="application"]');
+  });
+
+  /** スニペットを 1 枚作り、その本文を返す。 */
+  async function createSnippet(page: import('@playwright/test').Page, text: string) {
+    await page.click('button[data-verify-tool="snippet"]');
+    await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
+    await page.fill('textarea[placeholder*="テキスト"]', text);
+    await page.getByRole('button', { name: '作成', exact: true }).click();
+    await expect(page.getByText(text)).toBeVisible({ timeout: 15_000 });
+  }
+
+  /** カードの左上（world 座標）。動いた量をここで測る。 */
+  async function positions(page: import('@playwright/test').Page, ids: string[]) {
+    return page.evaluate((wanted) => {
+      const out: Record<string, { x: number; y: number }> = {};
+      for (const el of document.querySelectorAll('[data-card-id]')) {
+        const text = el.textContent ?? '';
+        const hit = wanted.find((w) => text.includes(w));
+        if (hit && el instanceof HTMLElement) {
+          out[hit] = { x: Number.parseFloat(el.style.left), y: Number.parseFloat(el.style.top) };
+        }
+      }
+      return out;
+    }, ids);
+  }
+
+  test('Shift で 2 枚選び、まとめて動かせる（開くは出ない）', async ({ page }) => {
+    const first = `E2E群1-${Date.now()}`;
+    const second = `E2E群2-${Date.now()}`;
+    await createSnippet(page, first);
+    await createSnippet(page, second);
+
+    const cardOne = page.locator('[data-card-id]').filter({ hasText: first });
+    const cardTwo = page.locator('[data-card-id]').filter({ hasText: second });
+
+    await cardOne.click({ force: true });
+    await cardTwo.click({ force: true, modifiers: ['Shift'] });
+
+    // 群の枠が出て、枚数が 2
+    const frame = page.locator('[data-verify-unit="SelectionFrame"]');
+    await expect(frame).toHaveCount(1);
+    await expect(frame).toHaveAttribute('data-verify-count', '2');
+
+    // 「開く」は出さない（複数を一度には開けない）。前面へ・削除は出る。
+    await expect(page.locator('button[data-verify-card-action="open"]')).toHaveCount(0);
+    await expect(page.locator('button[data-verify-card-action="front"]')).toHaveCount(1);
+    await expect(page.locator('button[data-verify-card-action="delete"]')).toHaveCount(1);
+
+    const before = await positions(page, [first, second]);
+
+    // 選択の中の 1 枚を掴んで動かす → 群ごと同じだけ動く
+    const box = await cardOne.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 40, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+
+    const after = await positions(page, [first, second]);
+    const moved = (id: string) => ({
+      dx: Math.round(after[id].x - before[id].x),
+      dy: Math.round(after[id].y - before[id].y),
+    });
+    const one = moved(first);
+    const two = moved(second);
+    expect(one.dx).toBeGreaterThan(0);
+    // 2 枚が同じだけ動く（片方だけ抜けていくと、並べた関係が壊れる）
+    expect(two.dx).toBe(one.dx);
+    expect(two.dy).toBe(one.dy);
+
+    // まとめて消す。片付けも兼ねる（この盤面は本人のアカウントに残るため）。
+    await page.locator('button[data-verify-card-action="delete"]').click();
+    await expect(page.getByText(first)).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByText(second)).toHaveCount(0, { timeout: 15_000 });
+  });
+
+  test('カードの上に削除のバツは出さない（消す手は道具箱の 1 か所）', async ({ page }) => {
+    const text = `E2Eバツ-${Date.now()}`;
+    await createSnippet(page, text);
+
+    const card = page.locator('[data-card-id]').filter({ hasText: text });
+    await card.click({ force: true });
+
+    await expect(page.locator('[aria-label="Delete card"]')).toHaveCount(0);
+    // 代わりに角のつまみが 4 隅そろっている
+    await expect(card.locator('[data-verify-handle]')).toHaveCount(4);
+
+    // 片付け（この盤面は本人のアカウントに残るため）
+    await page.locator('button[data-verify-card-action="delete"]').click();
+    await expect(page.getByText(text)).toHaveCount(0, { timeout: 15_000 });
+  });
+});

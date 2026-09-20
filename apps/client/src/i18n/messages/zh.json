@@ -321,6 +321,7 @@
       "snippet": "创建摘录",
       "photo": "粘贴图片",
       "aria_label_card": "所选卡片的操作",
+      "selected_count": "{count}张",
       "bring_to_front": "移到最前",
       "delete": "删除",
       "open": "打开",

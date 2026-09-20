@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useCallback, useRef } from 'react';
 import type { BoardCardData } from '@/features/shared/board/types';
+import { HANDLE_SIZE, hairline, INVERSE_SCALE } from './board-surface';
 import { CardTextGlyph } from './card-text-glyph';
 import { PhotoCardContent } from './photo-card-content';
 import { SnippetCardContent } from './snippet-card-content';
@@ -18,8 +19,11 @@ interface BoardCardProps {
   /** 既定は 'full'（キャンバス外で単体表示するとき用）。 */
   detail?: CardDetail;
   isSelected: boolean;
+  /** つまみ（回転・大きさ）を出すか。複数選んでいる間は群の枠に譲る。 */
+  showHandles: boolean;
   isDragging: boolean;
-  onPointerDown: (cardId: string, x: number, y: number) => void;
+  /** `additive` は Shift 押下。選択に足す／外す（1 枚だけ選び直さない）。 */
+  onPointerDown: (cardId: string, x: number, y: number, additive: boolean) => void;
   onRotateStart: (
     cardId: string,
     centerX: number,
@@ -28,7 +32,6 @@ interface BoardCardProps {
     pointerY: number,
   ) => void;
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
-  onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
 }
 
@@ -40,22 +43,6 @@ function isPhotoContent(
   content: BoardCardData['content'],
 ): content is { imageUrl: string; caption: string } {
   return 'imageUrl' in content;
-}
-
-/**
- * ズームしても見た目の大きさを保つための逆スケール。
- *
- * カードは world 空間にあるため transform でまるごと拡縮される。操作ハンドルや枠線まで
- * 一緒に拡縮すると、引いたときは豆粒で掴めず、寄ったときは巨大な塊になる。`--vp-scale`
- * （CanvasViewport が publish する現在の倍率）で割り戻すことで、再レンダリングなしに
- * 画面上の見かけの大きさを一定にする。キャンバスの外で単体表示されたときは fallback の
- * 1 が効くので、そのままの寸法で描かれる。
- */
-const INVERSE_SCALE = 'scale(calc(1 / var(--vp-scale, 1)))';
-
-/** 画面 px 固定のヘアライン。倍率によらず 1px / 1.5px に見せる。 */
-function hairline(px: number): string {
-  return `calc(${px}px / var(--vp-scale, 1))`;
 }
 
 /**
@@ -83,11 +70,11 @@ export function BoardCard({
   card,
   detail = 'full',
   isSelected,
+  showHandles,
   isDragging,
   onPointerDown,
   onRotateStart,
   onResizeStart,
-  onDelete,
   onClick,
 }: BoardCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -95,7 +82,7 @@ export function BoardCard({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.stopPropagation();
-      onPointerDown(card.id, e.clientX, e.clientY);
+      onPointerDown(card.id, e.clientX, e.clientY, e.shiftKey);
     },
     [card.id, onPointerDown],
   );
@@ -136,6 +123,7 @@ export function BoardCard({
         cardType: card.cardType,
         detail,
         selected: isSelected,
+        handles: showHandles,
         dragging: isDragging,
         rotation: card.rotation,
         removing: Boolean(card.removing),
@@ -215,42 +203,15 @@ export function BoardCard({
         <PhotoCardContent content={card.content} captionHidden={detail === 'block'} />
       )}
 
-      {/* Handles - visible only when selected */}
-      {isSelected && (
+      {/* つまみは 1 枚だけ選んでいるときに出す。複数選んでいるときは、群を囲む枠
+          （SelectionFrame）が代わりに持つ——カードごとに角が出ていると、どれを掴めば
+          群ごと変わるのか分からない。 */}
+      {isSelected && showHandles && (
         <>
-          {/* Delete button */}
-          <button
-            type="button"
-            aria-label="Delete card"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(card.id);
-            }}
-            className="absolute flex items-center justify-center rounded-full"
-            style={{
-              top: -8,
-              right: -8,
-              width: 22,
-              height: 22,
-              backgroundColor: 'var(--bg)',
-              border: '1.5px solid rgba(200,80,80,0.5)',
-              cursor: 'pointer',
-              zIndex: 10,
-              transform: INVERSE_SCALE,
-            }}
-          >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              stroke="rgba(200,80,80,0.7)"
-              strokeWidth="1.5"
-              aria-hidden="true"
-            >
-              <line x1="2" y1="2" x2="8" y2="8" />
-              <line x1="8" y1="2" x2="2" y2="8" />
-            </svg>
-          </button>
+          {/* 右上に削除（バツ）は置かない。同じ操作が道具箱にあり、消す手が 2 つに
+              割れていた。加えて、バツが右上を塞いでいたせいで**リサイズのつまみが
+              3 隅しか無かった**（`ne` が欠けていた）。角は 4 つとも大きさを変える手に
+              使い、消すのは道具箱の 1 か所に寄せる。 */}
 
           {/* Rotate handle */}
           <div
@@ -288,12 +249,12 @@ export function BoardCard({
             </svg>
           </div>
 
-          {/* Resize handles */}
-          {(['se', 'sw', 'nw'] as const).map((corner) => {
+          {/* Resize handles（4 隅）。 */}
+          {(['se', 'sw', 'ne', 'nw'] as const).map((corner) => {
             const style: React.CSSProperties = {
               position: 'absolute',
-              width: 18,
-              height: 18,
+              width: HANDLE_SIZE,
+              height: HANDLE_SIZE,
               backgroundColor: 'var(--bg)',
               border: '1.5px solid var(--accent)',
               borderRadius: 2,
@@ -306,7 +267,14 @@ export function BoardCard({
             if (corner.includes('w')) style.left = -10;
             style.cursor = `${corner}-resize`;
 
-            return <div key={corner} onPointerDown={handleResizeDown(corner)} style={style} />;
+            return (
+              <div
+                key={corner}
+                data-verify-handle={corner}
+                onPointerDown={handleResizeDown(corner)}
+                style={style}
+              />
+            );
           })}
         </>
       )}

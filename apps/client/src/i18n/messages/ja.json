@@ -321,6 +321,7 @@
       "snippet": "スニペットを作成",
       "photo": "画像を貼り付け",
       "aria_label_card": "選択中のカードの操作",
+      "selected_count": "{count}枚",
       "bring_to_front": "前面へ",
       "delete": "削除",
       "open": "開く",

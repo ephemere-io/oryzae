@@ -44,3 +44,38 @@ export function raiseToFront(
     card.id === cardId ? { ...card, zIndex, userPositioned: true } : card,
   );
 }
+
+/**
+ * 選んでいる複数枚を、**互いの重なり順を保ったまま**まとめて前面へ出した配列。
+ * 既に全部が他より上なら `null`（呼び出し側は何もしない＝保存要求も出さない）。
+ *
+ * 群の中の順番まで揃えてしまうと、重ねて作った関係（写真の上に付箋）が崩れる。
+ * 並べ直すのは「他のカードとの上下」だけにする。
+ */
+export function raiseManyToFront(
+  cards: readonly BoardCardData[],
+  ids: readonly string[],
+): BoardCardData[] | null {
+  const chosen = cards.filter((card) => ids.includes(card.id));
+  if (chosen.length === 0) return null;
+  if (chosen.length === 1) return raiseToFront(cards, chosen[0].id);
+
+  const others = cards.filter((card) => !ids.includes(card.id));
+  if (others.length === 0) return null;
+
+  const highestOther = others.reduce((max, card) => Math.max(max, card.zIndex), 0);
+  const lowestChosen = chosen.reduce((min, card) => Math.min(min, card.zIndex), Number.MAX_VALUE);
+  if (lowestChosen > highestOther) return null;
+
+  const top = cards.reduce((max, card) => Math.max(max, card.zIndex), 0);
+  const renumbered = new Map(
+    [...chosen]
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .map((card, index) => [card.id, top + 1 + index]),
+  );
+
+  return cards.map((card) => {
+    const zIndex = renumbered.get(card.id);
+    return zIndex === undefined ? card : { ...card, zIndex, userPositioned: true };
+  });
+}

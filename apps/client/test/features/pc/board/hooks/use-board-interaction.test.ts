@@ -394,3 +394,122 @@ describe('useBoardInteraction', () => {
     expect(result.current.didDrag()).toBe(false);
   });
 });
+
+/**
+ * 複数選択。**Shift で足す／外す、選択の中を掴んだら群ごと動く**が要点。
+ *
+ * 目で見ると「なんとなく動いた」までしか分からない（どのカードがどれだけずれたのかを
+ * 追えない）ので、関係を数で固定する。
+ */
+describe('useBoardInteraction（複数選択）', () => {
+  const two = () => [
+    makeCard({ id: 'a', x: 0, y: 0, width: 200, height: 100, zIndex: 1 }),
+    makeCard({ id: 'b', x: 300, y: 200, width: 200, height: 100, zIndex: 2 }),
+  ];
+
+  it('Shift で押すと選択に足される', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+
+    expect(s.view.result.current.selectedIds).toEqual(['a', 'b']);
+  });
+
+  it('複数選んでいる間は selectedId が null（「開く」を出さないための唯一の根拠）', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+
+    expect(s.view.result.current.selectedId).toBeNull();
+  });
+
+  it('Shift で既に選んでいるカードを押すと外れ、そのまま動き出さない', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    expect(s.view.result.current.selectedIds).toEqual(['a']);
+
+    // 外した直後に指を動かしても、外したカードは動かない
+    act(() => s.view.result.current.onPointerMove(100, 100));
+    expect(s.cards.find((c) => c.id === 'b')?.x).toBe(300);
+  });
+
+  it('選択の中を（Shift 無しで）掴むと、選択を保ったまま群ごと動く', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(50, 30));
+
+    expect(s.view.result.current.selectedIds).toEqual(['a', 'b']);
+    expect(s.cards.find((c) => c.id === 'a')).toMatchObject({ x: 50, y: 30 });
+    expect(s.cards.find((c) => c.id === 'b')).toMatchObject({ x: 350, y: 230 });
+  });
+
+  it('選択の外を（Shift 無しで）掴むと、その 1 枚だけの選択に戻る', () => {
+    const s = setup([...two(), makeCard({ id: 'c', x: 900, y: 900 })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startDrag('c', 0, 0));
+
+    expect(s.view.result.current.selectedIds).toEqual(['c']);
+  });
+
+  it('群の枠の角を引くと、反対の角を固定したまま等方に伸びる', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    // 囲みは 0,0 - 500,300。右下を掴んで縦横とも 2 倍の位置まで引く
+    act(() => s.view.result.current.startResize(null, 'se', 500, 300));
+    act(() => s.view.result.current.onPointerMove(1000, 600));
+
+    const a = s.cards.find((c) => c.id === 'a');
+    const b = s.cards.find((c) => c.id === 'b');
+    // 左上（固定点）は動かない
+    expect(a).toMatchObject({ x: 0, y: 0, width: 400, height: 200 });
+    // 間隔も一緒に伸びる
+    expect(b).toMatchObject({ x: 600, y: 400 });
+  });
+
+  it('まとめて掴んで離しても重なり順は変わらない（並べた関係を勝手に動かさない）', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(50, 50));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.cards.find((c) => c.id === 'a')?.zIndex).toBe(1);
+    expect(s.cards.find((c) => c.id === 'b')?.zIndex).toBe(2);
+    // 動かしたことは保存に乗せる（次の取得で自動整列に巻き込まれないように）
+    expect(s.cards.every((c) => c.userPositioned)).toBe(true);
+  });
+
+  it('群の枠は 2 枚以上選んでいるときだけ出る', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    expect(s.view.result.current.groupBounds).toBeNull();
+
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    expect(s.view.result.current.groupBounds).toEqual({
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 300,
+    });
+  });
+});

@@ -16,3 +16,25 @@
  * （以前は上と左右が 30px、下のツールバーだけ 24px でばらついていた）。
  */
 export const BOARD_INSET = 40;
+
+/**
+ * ズームしても見た目の大きさを保つための逆スケール。
+ *
+ * 盤面の中身は world 空間にあるため transform でまるごと拡縮される。操作ハンドルや
+ * 枠線まで一緒に拡縮すると、引いたときは豆粒で掴めず、寄ったときは巨大な塊になる。
+ * `--vp-scale`（CanvasViewport が publish する現在の倍率）で割り戻すことで、
+ * 再レンダリングなしに画面上の見かけの大きさを一定にする。キャンバスの外で
+ * 単体表示されたときは fallback の 1 が効くので、そのままの寸法で描かれる。
+ *
+ * カード 1 枚のつまみ（`board-card`）と、複数選択の枠（`selection-frame`）が
+ * 同じ値を見る。**ばらけると、同じ盤面の上でつまみの大きさだけが食い違う。**
+ */
+export const INVERSE_SCALE = 'scale(calc(1 / var(--vp-scale, 1)))';
+
+/** 画面 px 固定のヘアライン。倍率によらず指定した太さに見せる。 */
+export function hairline(px: number): string {
+  return `calc(${px}px / var(--vp-scale, 1))`;
+}
+
+/** 角のつまみの一辺（画面 px）。カードの角と群の枠で揃える。 */
+export const HANDLE_SIZE = 18;
