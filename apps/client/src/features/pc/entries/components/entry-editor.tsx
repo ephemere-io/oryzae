@@ -67,9 +67,10 @@ import {
   applyInlineImagesToEditor,
   createInlineImageElement,
   extractInlineImages,
-  INLINE_IMAGE_WIDTH_ACROSS_LINE,
-  INLINE_IMAGE_WIDTH_ALONG_LINE,
+  inlineImageSizeStepIndex,
+  inlineImageSizeSteps,
   inlineImageWidthRatio,
+  isInlineImageAlongLine,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
 import { measureTitle, TITLE_MIN_FONT_SIZE } from '@/features/pc/entries/utils/title-metrics';
@@ -1185,18 +1186,29 @@ export function EntryEditor({
   const selectedPhoto = inlineImages.selection.image;
 
   /**
-   * 大きさは 3 段階を巡る。**差し込んだときの大きさがそのまま段になっている**
-   * （小＝行と直交、中＝行と同じ向き。どちらも写真の向きから決まる値）。
+   * 大きさの 3 段は**写真の向きごとに違う**。長辺が行と同じ向きなら 0.4 / 0.6 / 1.0、
+   * 直交するならその半分（0.2 / 0.3 / 0.5）。差し込んだときの大きさが必ず「中」になる。
+   *
+   * 以前は 0.5 / 0.8 / 1.0 の固定 3 段で、同じ既定値なのに縦長なら「中」・横長なら「小」と
+   * 名前が食い違っていた。向きは、自由変形していればその比、していなければ写真の実寸で見る。
    */
+  const selectedAlongLine = isInlineImageAlongLine(
+    selectedPhoto?.aspect
+      ? { naturalWidth: selectedPhoto.aspect, naturalHeight: 1, isVertical }
+      : {
+          naturalWidth: inlineImages.selection.element?.naturalWidth ?? 0,
+          naturalHeight: inlineImages.selection.element?.naturalHeight ?? 0,
+          isVertical,
+        },
+  );
+  const sizeSteps = inlineImageSizeSteps(selectedAlongLine);
+  const sizeNames = [tPhoto('width_small'), tPhoto('width_medium'), tPhoto('width_large')];
+
   function nextWidthRatio(ratio: number): number {
-    if (ratio <= 0.65) return INLINE_IMAGE_WIDTH_ALONG_LINE;
-    if (ratio <= 0.9) return 1;
-    return INLINE_IMAGE_WIDTH_ACROSS_LINE;
+    return sizeSteps[(inlineImageSizeStepIndex(ratio, sizeSteps) + 1) % sizeSteps.length];
   }
   function widthName(ratio: number): string {
-    if (ratio <= 0.65) return tPhoto('width_small');
-    if (ratio <= 0.9) return tPhoto('width_medium');
-    return tPhoto('width_large');
+    return sizeNames[inlineImageSizeStepIndex(ratio, sizeSteps)];
   }
   function alignName(align: 'start' | 'center' | 'end'): string {
     if (align === 'center') return tPhoto('align_center');
@@ -1270,9 +1282,7 @@ export function EntryEditor({
               // 中央寄せのまま回り込みにすると寄る先が無い。見た目と揃えて始めへ。
               ...(on && selectedPhoto.align === 'center' ? { align: 'start' as const } : {}),
               // 幅いっぱいでは文字が回り込む隙間が無い。いちばん小さい段に落とす。
-              ...(on && selectedPhoto.widthRatio >= 1
-                ? { widthRatio: INLINE_IMAGE_WIDTH_ACROSS_LINE }
-                : {}),
+              ...(on && selectedPhoto.widthRatio >= 1 ? { widthRatio: sizeSteps[0] } : {}),
             });
           },
         },

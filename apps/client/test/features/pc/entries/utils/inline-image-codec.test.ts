@@ -2,8 +2,11 @@ import { INLINE_IMAGE_PLACEHOLDER, type InlineImage } from '@oryzae/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { extractEditorEffects } from '@/features/pc/entries/utils/editor-effects-codec';
 import {
+  applyInlineImageStyle,
   applyInlineImagesToEditor,
   extractInlineImages,
+  inlineImageSizeStepIndex,
+  inlineImageSizeSteps,
   inlineImageWidthRatio,
   serializeEditorText,
 } from '@/features/pc/entries/utils/inline-image-codec';
@@ -95,7 +98,7 @@ describe('extractInlineImages', () => {
     editor.innerHTML = img({ 'data-width-ratio': 'NaN', 'data-layout': 'bogus', 'data-align': '' });
 
     expect(extractInlineImages(editor)).toEqual([
-      { offset: 0, storagePath: '', widthRatio: 0.5, layout: 'inline', align: 'start' },
+      { offset: 0, storagePath: '', widthRatio: 0.3, layout: 'inline', align: 'start' },
     ]);
   });
 
@@ -280,41 +283,118 @@ describe('保存と復元の往復', () => {
 /**
  * 差し込む大きさは写真の向きで決まる。**縦書きに横長を広く置くと紙をまたぐ**ので、
  * 長辺が行と直交するときだけ狭くする（レビュー #626）。
+ *
+ * 値は実機レビューで 0.8 / 0.5 から 0.6 / 0.3 へ下げた（縦書きに縦長を置くと
+ * 「小」でも中〜大に見えていた）。直交するときは行に沿うときの半分。
  */
 describe('inlineImageWidthRatio', () => {
   const portrait = { naturalWidth: 600, naturalHeight: 900 };
   const landscape = { naturalWidth: 900, naturalHeight: 600 };
 
   it('縦書き × 縦長 — 長辺が行と同じ向きなので広く', () => {
-    expect(inlineImageWidthRatio({ ...portrait, isVertical: true })).toBe(0.8);
+    expect(inlineImageWidthRatio({ ...portrait, isVertical: true })).toBe(0.6);
   });
 
   it('縦書き × 横長 — 長辺が行と直交するので狭く', () => {
-    expect(inlineImageWidthRatio({ ...landscape, isVertical: true })).toBe(0.5);
+    expect(inlineImageWidthRatio({ ...landscape, isVertical: true })).toBe(0.3);
   });
 
   it('横書き × 縦長 — 長辺が行と直交するので狭く', () => {
-    expect(inlineImageWidthRatio({ ...portrait, isVertical: false })).toBe(0.5);
+    expect(inlineImageWidthRatio({ ...portrait, isVertical: false })).toBe(0.3);
   });
 
   it('横書き × 横長 — 長辺が行と同じ向きなので広く', () => {
-    expect(inlineImageWidthRatio({ ...landscape, isVertical: false })).toBe(0.8);
+    expect(inlineImageWidthRatio({ ...landscape, isVertical: false })).toBe(0.6);
   });
 
   it('正方形は行に沿うものとして扱う', () => {
     const square = { naturalWidth: 800, naturalHeight: 800 };
-    expect(inlineImageWidthRatio({ ...square, isVertical: true })).toBe(0.8);
-    expect(inlineImageWidthRatio({ ...square, isVertical: false })).toBe(0.8);
+    expect(inlineImageWidthRatio({ ...square, isVertical: true })).toBe(0.6);
+    expect(inlineImageWidthRatio({ ...square, isVertical: false })).toBe(0.6);
   });
 
   // 署名切れなどで実寸が測れないことがある。そこで広いほうに倒すと、縦長が画面を覆う。
   it('実寸が測れないときは狭いほうに倒す', () => {
     expect(inlineImageWidthRatio({ naturalWidth: 0, naturalHeight: 0, isVertical: false })).toBe(
-      0.5,
+      0.3,
     );
     expect(
       inlineImageWidthRatio({ naturalWidth: Number.NaN, naturalHeight: 900, isVertical: true }),
-    ).toBe(0.5);
+    ).toBe(0.3);
+  });
+});
+
+/**
+ * 大きさの 3 段。**差し込んだ大きさが必ず「中」になる**のが要点。
+ * 以前は 0.5 / 0.8 / 1.0 の固定 3 段で、同じ既定値が縦長なら「中」・横長なら「小」に化けていた。
+ */
+describe('inlineImageSizeSteps', () => {
+  it('行に沿う写真は 0.4 / 0.6 / 1.0', () => {
+    expect(inlineImageSizeSteps(true)).toEqual([0.4, 0.6, 1]);
+  });
+
+  it('行と直交する写真はその半分', () => {
+    expect(inlineImageSizeSteps(false)).toEqual([0.2, 0.3, 0.5]);
+  });
+
+  it('中は差し込んだときの大きさと一致する', () => {
+    const portrait = { naturalWidth: 600, naturalHeight: 900 };
+    expect(inlineImageSizeSteps(true)[1]).toBe(
+      inlineImageWidthRatio({ ...portrait, isVertical: true }),
+    );
+    expect(inlineImageSizeSteps(false)[1]).toBe(
+      inlineImageWidthRatio({ ...portrait, isVertical: false }),
+    );
+  });
+
+  // 自由変形した後は段の値からずれる。いちばん近い段の名前で呼ぶ。
+  it('段から外れた割合はいちばん近い段として数える', () => {
+    const steps = inlineImageSizeSteps(true);
+    expect(inlineImageSizeStepIndex(0.42, steps)).toBe(0);
+    expect(inlineImageSizeStepIndex(0.58, steps)).toBe(1);
+    expect(inlineImageSizeStepIndex(0.95, steps)).toBe(2);
+  });
+});
+
+/**
+ * 写真のまわりの余白。**上下左右とも同じ**にする（#626 のレビュー）。
+ * 以前は block のとき 0、wrap のとき辺ごとにばらばらで、縦書きで写真の右に
+ * 来た文字が張りついて見えていた。
+ */
+describe('写真のまわりの余白', () => {
+  function styled(over: Partial<InlineImage>): HTMLImageElement {
+    const el = document.createElement('img');
+    applyInlineImageStyle(el, {
+      offset: 0,
+      storagePath: 'p1',
+      widthRatio: 0.6,
+      layout: 'block',
+      align: 'center',
+      ...over,
+    });
+    return el;
+  }
+
+  it('block は文字の側（block 軸）に余白を置く', () => {
+    expect(styled({ layout: 'block' }).style.marginBlock).toBe('1em');
+  });
+
+  it('回り込みも同じ余白を四辺に置く', () => {
+    const el = styled({ layout: 'wrap', align: 'start' });
+    expect(el.style.marginBlock).toBe('1em');
+    expect(el.style.marginInline).toBe('1em');
+  });
+
+  // `0 auto` だと寄せた先の端に写真が貼りつく（縦書き・始め寄せで紙の上辺に食い込んでいた）。
+  it('寄せる側にも余白を残す（0 で詰めない）', () => {
+    expect(styled({ layout: 'block', align: 'start' }).style.marginInline).toBe('1em auto');
+    expect(styled({ layout: 'block', align: 'end' }).style.marginInline).toBe('auto 1em');
+  });
+
+  // 行いっぱい（100%）に四辺の余白を足すと、そのぶんだけ行からはみ出す。
+  it('行いっぱいでも余白のぶんだけ天井を下げる', () => {
+    // CSS 側は `calc(100% - 2 * 1em)` と書くが、ブラウザが掛け算を畳んでから返す。
+    expect(styled({ widthRatio: 1 }).style.maxInlineSize).toBe('calc(100% - 2em)');
   });
 });
 

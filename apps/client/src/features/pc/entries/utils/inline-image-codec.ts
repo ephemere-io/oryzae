@@ -25,7 +25,7 @@ const EBLOCK_CLASS = 'eblock';
 const VBLOCK_CLASS = 'v-block';
 
 /**
- * 差し込んだ直後の表示幅（本文 1 行に対する割合）。
+ * 差し込んだ直後の表示幅（本文 1 行に対する割合）＝**大きさの「中」**。
  *
  * **長辺が行と同じ向きなら広く、直交するなら狭く。** 縦書きに縦長の写真を置くと、
  * 長辺は行と同じ向き（上下）なので幅を広く取っても本文は潰れない。逆に縦書きへ横長を
@@ -33,33 +33,85 @@ const VBLOCK_CLASS = 'v-block';
  *
  * | 書字方向 | 写真 | 長辺の向き | 割合 |
  * | --- | --- | --- | --- |
- * | 縦書き | 縦長 | 行と同じ | 0.8 |
- * | 縦書き | 横長 | 行と直交 | 0.5 |
- * | 横書き | 縦長 | 行と直交 | 0.5 |
- * | 横書き | 横長 | 行と同じ | 0.8 |
+ * | 縦書き | 縦長 | 行と同じ | 0.6 |
+ * | 縦書き | 横長 | 行と直交 | 0.3 |
+ * | 横書き | 縦長 | 行と直交 | 0.3 |
+ * | 横書き | 横長 | 行と同じ | 0.6 |
+ *
+ * 以前は 0.8 / 0.5 だった。縦書きに縦長を置くと「小」でも中〜大に見える、という
+ * 実機レビューを受けて下げてある（#626）。**直交するときは行に沿うときの半分**。
  */
-export const INLINE_IMAGE_WIDTH_ALONG_LINE = 0.8;
-export const INLINE_IMAGE_WIDTH_ACROSS_LINE = 0.5;
+const INLINE_IMAGE_WIDTH_ALONG_LINE = 0.6;
+const INLINE_IMAGE_WIDTH_ACROSS_LINE = INLINE_IMAGE_WIDTH_ALONG_LINE / 2;
+
+/**
+ * 大きさの 3 段（小 / 中 / 大）。**中が差し込んだときの大きさ**で、そこから上下に開く。
+ *
+ * 段を写真の向きごとに持つのが要点。以前は 0.5 / 0.8 / 1.0 という固定の 3 段で、
+ * 「差し込んだ大きさ」が縦長なら中、横長なら小に化けていた（同じ既定値なのに
+ * 名前が違う）。向きから出した中を真ん中に置けば、どの写真でも中から始まる。
+ *
+ * 行に沿うときは 0.4 / 0.6 / 1.0（大＝行いっぱい）、直交するときはその半分。
+ */
+const INLINE_IMAGE_SIZE_STEP_FACTORS = [2 / 3, 1, 5 / 3] as const;
+
+/**
+ * 写真の四辺に置く余白。**上下左右とも同じ**にする（#626 のレビュー）。
+ *
+ * 以前は block のとき 0、wrap のとき 上 0 / 下 0.5em / 左右 0.25em と辺ごとにばらばらで、
+ * 縦書きでは写真の右に来た文字が張りついて見えていた（実測で隙間は 7px＝行間の
+ * 半分だけ、つまり余白は実質ゼロ）。1em は本文の 1 文字ぶん。字を大きくすれば
+ * 余白も一緒に育つので、どの文字サイズでも同じ間合いになる。
+ */
+const INLINE_IMAGE_GUTTER = '1em';
 
 /** 壊れた値を読んだときに倒す先。**小さいほうに倒す**（大きすぎて紙を覆うより害が小さい）。 */
 const DEFAULT_INLINE_IMAGE_WIDTH_RATIO = INLINE_IMAGE_WIDTH_ACROSS_LINE;
 
 /**
- * 差し込む写真の幅を、写真の向きと書字方向から決める。
+ * 長辺が行と同じ向きか。縦書きの行は上下に伸びるので、比べる相手が入れ替わる。
  *
- * 実寸が測れないことがある（署名切れ・読み込み失敗）。そのときは狭いほうに倒す
+ * 実寸が測れないことがある（署名切れ・読み込み失敗）。そのときは「直交」に倒す
  * ——縦長を広い割合で置くと、1 枚で画面を覆ってしまうため。
  */
+export function isInlineImageAlongLine(params: {
+  naturalWidth: number;
+  naturalHeight: number;
+  isVertical: boolean;
+}): boolean {
+  const { naturalWidth, naturalHeight, isVertical } = params;
+  if (!(naturalWidth > 0) || !(naturalHeight > 0)) return false;
+  return isVertical ? naturalHeight >= naturalWidth : naturalWidth >= naturalHeight;
+}
+
+/** 差し込む写真の幅（＝「中」）を、写真の向きと書字方向から決める。 */
 export function inlineImageWidthRatio(params: {
   naturalWidth: number;
   naturalHeight: number;
   isVertical: boolean;
 }): number {
-  const { naturalWidth, naturalHeight, isVertical } = params;
-  if (!(naturalWidth > 0) || !(naturalHeight > 0)) return INLINE_IMAGE_WIDTH_ACROSS_LINE;
-  // 行に沿う辺はどちらか。縦書きの行は上下に伸びるので、比べる相手が入れ替わる。
-  const alongLine = isVertical ? naturalHeight >= naturalWidth : naturalWidth >= naturalHeight;
-  return alongLine ? INLINE_IMAGE_WIDTH_ALONG_LINE : INLINE_IMAGE_WIDTH_ACROSS_LINE;
+  return isInlineImageAlongLine(params)
+    ? INLINE_IMAGE_WIDTH_ALONG_LINE
+    : INLINE_IMAGE_WIDTH_ACROSS_LINE;
+}
+
+/** その写真の 小 / 中 / 大。中は `inlineImageWidthRatio` と同じ値になる。 */
+export function inlineImageSizeSteps(alongLine: boolean): [number, number, number] {
+  const base = alongLine ? INLINE_IMAGE_WIDTH_ALONG_LINE : INLINE_IMAGE_WIDTH_ACROSS_LINE;
+  // 0.1 刻みに丸める。掛け算の端数（0.39999…）がそのまま data 属性に載ると、
+  // 次に読んだとき「どの段か」が決まらなくなる。
+  const step = (factor: number) => Math.min(1, Math.round(base * factor * 10) / 10);
+  const [small, medium, large] = INLINE_IMAGE_SIZE_STEP_FACTORS;
+  return [step(small), step(medium), step(large)];
+}
+
+/** いまの割合がどの段にいちばん近いか（0=小 / 1=中 / 2=大）。自由変形した後でも決まる。 */
+export function inlineImageSizeStepIndex(ratio: number, steps: readonly number[]): number {
+  let best = 0;
+  for (let i = 1; i < steps.length; i++) {
+    if (Math.abs(steps[i] - ratio) < Math.abs(steps[best] - ratio)) best = i;
+  }
+  return best;
 }
 
 export function isInlineImage(node: Node): node is HTMLImageElement {
@@ -181,6 +233,9 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   }
 
   el.style.inlineSize = `${image.widthRatio * 100}%`;
+  // **余白のぶんだけ天井を下げる。** 行いっぱい（100%）に四辺の余白を足すと、
+  // その 2 つぶんだけ行からはみ出す（縦書きなら紙の上下に食い込む）。
+  el.style.maxInlineSize = `calc(100% - 2 * ${INLINE_IMAGE_GUTTER})`;
   // 自由変形したときだけ形を固定する。既定は写真本来の比率に任せる。
   //
   // `aspect-ratio` は**物理（幅 ÷ 高さ）**で、保存している `aspect` も同じ物理の比。
@@ -204,23 +259,34 @@ function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
     // 文字と同じ流れに置く。大きな 1 文字として振る舞う。
     el.style.display = 'inline-block';
     el.style.verticalAlign = 'middle';
+    el.style.marginInline = INLINE_IMAGE_GUTTER;
     return;
   }
+
+  // 文字との間合いは block 軸（横書きなら上下、縦書きなら左右）。ここが
+  // 「写真の隣の行」との隙間になるので、どのレイアウトでも同じ値を置く。
+  el.style.marginBlock = INLINE_IMAGE_GUTTER;
 
   if (image.layout === 'block') {
     // 独立した行を占める。寄せは inline 軸のマージンで作る
     // （横書きなら左右、縦書きなら上下に効く）。
+    //
+    // 寄せる側にも同じ余白を残す。`0 auto` のように 0 を置くと、寄せた先の端に
+    // 写真が貼りつく（縦書き・始め寄せで紙の上辺に食い込んでいた）。
     el.style.display = 'block';
     el.style.marginInline =
-      image.align === 'center' ? 'auto' : image.align === 'end' ? 'auto 0' : '0 auto';
+      image.align === 'center'
+        ? 'auto'
+        : image.align === 'end'
+          ? `auto ${INLINE_IMAGE_GUTTER}`
+          : `${INLINE_IMAGE_GUTTER} auto`;
     return;
   }
 
   // wrap: 本文が写真を避けて流れる。物理方向ではなく論理方向で寄せる
   // （縦書きでは inline-start が上、inline-end が下になる）。
   el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
-  el.style.marginBlock = '0.25em';
-  el.style.marginInline = '0 0.5em';
+  el.style.marginInline = INLINE_IMAGE_GUTTER;
 }
 
 /** 本文中に置く `<img>` を作る。`src` は署名付き URL（失効するので保存はしない）。 */
