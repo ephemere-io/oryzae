@@ -46,6 +46,25 @@ export interface SheetProps {
 }
 
 /**
+ * いちばん低い段より上に積む空きの高さ（容器の高さ − 段の高さ）。段の高さは要素で決まる:
+ * 覗く＝見出しの行、中身＝見出し + 中身（容器より高ければ容器）、半分＝容器の半分、全画面＝容器。
+ * 測る高さは容器の CSS 変数（`--oz-sheet-header` / `--oz-sheet-content`）から継ぐ。
+ * `detents` は低い順に並べる約束（DockSheet も `detents[0]` を最低の段として扱う）。
+ */
+function spaceAbove(lowest: SheetDetent | undefined): string {
+  switch (lowest) {
+    case 'peek':
+      return 'calc(100cqh - var(--oz-sheet-header, 0px))';
+    case 'content':
+      return 'calc(100cqh - min(var(--oz-sheet-content, 100cqh), 100cqh))';
+    case 'half':
+      return '50cqh';
+    default:
+      return '0px';
+  }
+}
+
+/**
  * - `entering`: 描いた直後。容器の下に隠したまま、頼まれた段へ置く
  * - `open`: 出ている
  * - `closing`: 下へ引っ込む動きの途中
@@ -67,9 +86,10 @@ type Phase = 'entering' | 'open' | 'closing';
  *
  * ### 高さはネイティブのスクロールと CSS scroll-snap で動かす
  *
- * 画面いっぱいのスクロール容器（`scroll-snap-type: y mandatory`）の中に、容器の高さの空き（spacer）と
- * シートを縦に積む。指の追従・慣性・減速・段への吸着は**ブラウザのスクロールそのもの**で、JS は指の動きを
- * 受けない。
+ * 画面いっぱいのスクロール容器（`scroll-snap-type: y mandatory`）の中に、空き（spacer）とシートを縦に積む。
+ * 空きの高さは**「容器 − いちばん低い段」**なので、スクロール位置 0 ＝ いちばん低い段。それより下は無い
+ * （閉の位置はスクロール空間に存在しない）。指の追従・慣性・減速・段への吸着は**ブラウザのスクロールそのもの**で、
+ * JS は指の動きを受けない。
  *
  * 段は**要素の位置**が決める（数値を持たない）:
  * - 半分: 容器の子の印（`top: 50%`）
@@ -104,6 +124,13 @@ export function Sheet({
 }: SheetProps) {
   const [present, setPresent] = useState(open);
   const [phase, setPhase] = useState<Phase>('entering');
+  /**
+   * 段の位置が決まった（中身の高さを測って空きの高さが確定した）か。**決まるまで吸着を入れない。**
+   * 測る前は空きが 0 で、中身の段の印と全画面の面が同じ位置 0 に重なる。そこで吸着が効いていると、ブラウザは
+   * 全画面の面を吸着相手として覚え、空きが伸びたときにその相手を追いかけて全画面まで動く（仕様どおりの
+   * 再吸着）。実測: 位置の指定が効かない環境では出た瞬間に全画面になった。
+   */
+  const [measured, setMeasured] = useState(false);
   const presentRef = useRef(present);
   presentRef.current = present;
   /** 出したいか（`open`）。state の phase より 1 拍早い。容器の大きさが変わったときの判断に使う。 */
@@ -166,6 +193,7 @@ export function Sheet({
       } else {
         setPresent(true);
         setPhase('entering');
+        setMeasured(false);
       }
     } else if (presentRef.current) {
       setPhase('closing');
@@ -376,25 +404,29 @@ export function Sheet({
   /**
    * 中身の段の吸着先は「見出し + 中身の高さ」。シートは容器と同じ高さなので、CSS だけでは中身の高さが分からない。
    * 測って CSS 変数（`--oz-sheet-content`）に渡し、**吸着そのものはブラウザに任せる**（JS で段へ送らない）。
+   * 描画の前に測る（layout effect）: 空きの高さがこの値で決まるので、測る前に描くと一瞬だけ全画面で出る。
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const inner = innerEl;
     const section = sheetRef.current;
     const content = inner?.firstElementChild;
     if (!inner || !section || !content || typeof ResizeObserver === 'undefined') return;
     const header = section.querySelector('[data-sheet-header]');
+    // 変数は容器に書く: 段の印（シートの中）も、いちばん低い段より下の空き（シートの外）も、ここから継ぐ。
+    const holder = scrollerRef.current ?? section;
     const measure = () => {
-      const height = Math.round(
-        (header?.getBoundingClientRect().height ?? 0) + content.scrollHeight,
-      );
-      // **測れないとき（0）は書かない。** 0 を書くと中身の段の吸着先が閉の位置と重なり、開いたのに
-      // 画面の外に居ることになる。変数が無ければ既定の `100%`（＝面の上端＝いちばん高い段）が使われる。
+      const headerHeight = Math.round(header?.getBoundingClientRect().height ?? 0);
+      const height = Math.round(headerHeight + content.scrollHeight);
+      // **測れないとき（0）は書かない。** 変数が無ければ既定（面の上端＝いちばん高い段）が使われる。
       if (height <= 0) {
-        section.style.removeProperty('--oz-sheet-content');
+        holder.style.removeProperty('--oz-sheet-content');
+        holder.style.removeProperty('--oz-sheet-header');
         return;
       }
-      if (section.style.getPropertyValue('--oz-sheet-content') === `${height}px`) return;
-      section.style.setProperty('--oz-sheet-content', `${height}px`);
+      holder.style.setProperty('--oz-sheet-header', `${headerHeight}px`);
+      setMeasured(true);
+      if (holder.style.getPropertyValue('--oz-sheet-content') === `${height}px`) return;
+      holder.style.setProperty('--oz-sheet-content', `${height}px`);
       // 段の位置が変わった。**置き直さないと、測る前の位置に取り残される。** 指で触っている間は触らない。
       if (latest.current.phase === 'open') {
         scrollToDetent(settledRef.current ?? latest.current.detent, 'instant');
@@ -484,15 +516,24 @@ export function Sheet({
         className="oz-sheet-scroller absolute inset-0 overflow-y-auto"
         style={{
           // 閉じる動きの間は吸着を切る（閉じると決めたあとに段へ引き戻されない）。
-          scrollSnapType: visualPhase === 'closing' ? 'none' : 'y mandatory',
+          scrollSnapType: visualPhase === 'closing' || !measured ? 'none' : 'y mandatory',
           overscrollBehavior: 'contain',
           containerType: 'size',
+          // 位置は段が決める。空きの高さが測定で変わったとき、ブラウザがシートを「見えていた場所」に留めようと
+          // 位置を動かす（スクロールアンカリング）と、出た瞬間に全画面へ跳ぶ。切る。
+          overflowAnchor: 'none',
         }}
       >
-        {/* 容器の高さの空き＝閉の位置（出す／消す動きの分の空き）。**吸着先にはしない。一瞬たりとも。**
-            吸着先にすると iOS はここへ吸う（出た瞬間・触れた瞬間の両方で実機に起きた）。
-            指で押さえている間だけここまで下がれるが、離せばブラウザが一番低い段へ戻す。 */}
-        <div aria-hidden="true" style={{ height: '100%', scrollSnapAlign: 'none' }} />
+        {/* シートの上に積む空き。高さは**「容器 − いちばん低い段」**。だからスクロール位置 0 ＝ いちばん低い段で、
+            それより下には物理的に引けない（OS の端の小さな跳ねだけが残る＝正直な「ここまで」の合図）。
+            以前は容器いっぱいの空きで、いちばん低い段の下に「閉の位置」がスクロール範囲として残っていた。
+            指がそこまで 1:1 で引き下ろせるのに離せば戻る＝偽の手がかり（実機レビュー）。閉の位置を吸着先に
+            すれば iOS はそこへ飛ぶ。**閉の位置をスクロール空間から無くす**のがいちばん単純で、根本原因ごと消える。
+            出す／消す動きはスクロールではなく容器ごとの平行移動なので、空きの高さに依らない。 */}
+        <div
+          aria-hidden="true"
+          style={{ height: spaceAbove(detents[0]), scrollSnapAlign: 'none' }}
+        />
         {/* 半分の段の印。容器の子の `top: 50%` は容器の高さの半分。 */}
         <div
           ref={halfRef}
