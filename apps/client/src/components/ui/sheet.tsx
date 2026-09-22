@@ -572,8 +572,11 @@ export function Sheet({
           <div
             ref={attachInner}
             data-sheet-content
-            className="oz-sheet-pass min-h-0 flex-1"
-            style={{ overflowY: 'hidden', overscrollBehaviorY: 'auto' }}
+            className="oz-sheet-pass min-h-0 min-w-0 flex-1"
+            // overflow-wrap: anywhere — **中の何物も箱より広くならない**。この箱は iOS 用に横へ 1px だけ
+            // はみ出させてある（`oz-sheet-pass`）ので、折り返せない長い語（手紙の中の URL）があると、
+            // その幅ぶん横に動けてしまいレイアウトが崩れた（実機レビュー）。箱の側で折り返しを保証する。
+            style={{ overflowY: 'hidden', overscrollBehaviorY: 'auto', overflowWrap: 'anywhere' }}
           >
             <div>{children}</div>
           </div>

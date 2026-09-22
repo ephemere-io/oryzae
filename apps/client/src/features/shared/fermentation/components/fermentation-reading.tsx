@@ -51,7 +51,10 @@ export function FermentationReading({
 
   return (
     <div
-      className="flex flex-col gap-7"
+      // min-w-0 + overflow-wrap: anywhere — 手紙・スニペット・元のエントリーのどこに折り返せない長い語
+      // （URL 等）があっても、部品が親より広くならない。SP では殻の本文やシートの中身の箱が横に動いて
+      // レイアウトが崩れていた（実機レビュー）。PC も同じ部品なので同じ約束になる。
+      className="flex min-w-0 flex-col gap-7 [overflow-wrap:anywhere]"
       {...verifyAttrs({
         unit: 'FermentationReading',
         reveal,

@@ -202,8 +202,6 @@ export interface StudySceneHandle {
   startPan(): void;
   /** 引き始めからの指の移動（画面の px）。机の上を平行に動く（ホームのみ）。 */
   panBy(dx: number, dy: number): void;
-  /** 指が全部離れた。以後は指に追従しない（いまの値で止まる）。 */
-  release(): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
   /** 遷移中・サブ画面ではラベルを消す。 */
@@ -375,13 +373,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   let zoomTarget = 1;
   /** 2 本指を置いた時点の倍率。 */
   let pinchBase = 1;
-  /**
-   * 指が触れて動かしている間（つまみ・引き）。**この間は目標へ寄せず、値は指そのもの。**
-   * 寄せ（lerp）を挟むと絵が指より遅れ、離したあとも滑る。直接操作は 1:1 で追い、離したら
-   * その場で止まるのが約束（実機レビュー: スムーズでない・余計な動き・即答性が低い）。
-   * ホイールだけは寄せる（連続した delta を滑らかに畳むため）。
-   */
-  let manipulating = false;
   /** 机の上の平行移動（いま・目標・引き始め）。 */
   let pan: PanOffset = { x: 0, z: 0 };
   let panTarget: PanOffset = { x: 0, z: 0 };
@@ -417,6 +408,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   /** 最初の描画を 1 度だけ知らせるための印。 */
   let readyAnnounced = false;
   const startedAt = performance.now();
+  /** 前のフレームの時刻。寄せをフレームレートに依らない量にするため。 */
+  let lastTickAt = startedAt;
 
   const homeCamera = homeView(layout);
   applyView(camera, homeCamera);
@@ -427,13 +420,15 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     frame = requestAnimationFrame(tick);
     const now = performance.now();
     const elapsed = now - startedAt;
+    const dt = Math.min(100, now - lastTickAt);
+    lastTickAt = now;
 
     // 遷移中に預かった更新は、手が空いた最初のフレームで反映する。
     if (pendingState !== null && transition === null && settled === null) {
       applyState(pendingState);
     }
 
-    updateCamera(now, elapsed);
+    updateCamera(now, elapsed, dt);
     updateJar(elapsed);
     updateHover();
     reportLabels();
@@ -507,7 +502,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     }
   }
 
-  function updateCamera(now: number, elapsed: number): void {
+  function updateCamera(now: number, elapsed: number, dt: number): void {
     if (transition) {
       const view = viewAtTransition(transition, now);
       applyView(camera, view);
@@ -538,17 +533,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     parallax.x += (wanted.x - parallax.x) * lerp;
     parallax.y += (wanted.y - parallax.y) * lerp;
 
-    // 寄り引きと平行移動。指が触れている間は値は指そのもの（1:1）。離れているとき（ホイール）だけ目標へ寄せる。
-    if (manipulating) {
-      zoom = zoomTarget;
-      pan = panTarget;
-    } else {
-      zoom = approach(zoom, zoomTarget, HOME_ZOOM.lerp);
-      pan = {
-        x: approach(pan.x, panTarget.x, HOME_ZOOM.lerp),
-        z: approach(pan.z, panTarget.z, HOME_ZOOM.lerp),
-      };
-    }
+    // 寄り引きと平行移動。目標へ時定数で寄せる（丸さは残し、遅れは短く）。近づくぶんだけ注視点が上がる。
+    const follow = 1 - Math.exp(-dt / HOME_ZOOM.followMs);
+    zoom = approach(zoom, zoomTarget, follow);
+    pan = {
+      x: approach(pan.x, panTarget.x, follow),
+      z: approach(pan.z, panTarget.z, follow),
+    };
     const view = pannedView(zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom)), pan);
 
     camera.position.set(
@@ -813,7 +804,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function startPinch(): void {
     if (transition || settled) return;
     pinchBase = zoomTarget;
-    manipulating = true;
   }
 
   function pinchTo(ratio: number): void {
@@ -824,14 +814,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function startPan(): void {
     if (transition || settled) return;
     panBase = panTarget;
-    manipulating = true;
-  }
-
-  function release(): void {
-    // 離した瞬間の値で止まる（目標＝いまの値にして、寄せる残りを作らない）。
-    zoomTarget = zoom;
-    panTarget = pan;
-    manipulating = false;
   }
 
   function panBy(dx: number, dy: number): void {
@@ -993,7 +975,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     pinchTo,
     startPan,
     panBy,
-    release,
     pick,
     isBusy: () => transition !== null || settled !== null,
     dispose,

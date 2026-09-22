@@ -55,7 +55,10 @@ export function SpShell({ topBar, bottomNav, children }: SpShellProps) {
           // シート・下端の列より上に来ないように。** 以前は `sp-rise` の動きがたまたま重なりの文脈を作っていて、
           // 動きを止める設定や動き終わりの扱いが違うブラウザでは、重ねた画面がシートを覆った（実機レビュー:
           // 問いの一覧からセミモーダルが出てこない）。
-          className="sp-rise relative isolate min-h-0 flex-1 overflow-auto"
+          // 縦だけスクロールする。横は絶対にしない: 折り返せない長い語（URL 等）が 1 つあるだけで画面全体が
+          // 横に動き、レイアウトが崩れる（実機レビュー: 瓶の問いの中身）。中身の側でも折り返すが、本文の
+          // 約束としてここで塞ぐ。
+          className="sp-rise relative isolate min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
           style={{
             // 本文の端まで引いても殻の外（ブラウザの引っ張り更新）へ伝えない。
             overscrollBehavior: 'contain',
