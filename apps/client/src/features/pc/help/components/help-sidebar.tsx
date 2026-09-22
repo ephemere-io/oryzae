@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { SHELL_INSET } from '@/components/ui/surface';
 import { HelpPanel } from '@/features/shared/help/components/help-panel';
 import { clampHelpWidth, HELP_WIDTH, useHelpMode } from '@/features/shared/help/help-context';
@@ -14,6 +14,9 @@ import { docsHref } from '@/lib/docs-site';
 
 /** 面が占めている幅を配る CSS 変数（`globals.css` に既定 0 がある）。 */
 const HELP_WIDTH_VAR = '--help-width';
+
+/** 掴み手をキーボードで動かすときの 1 歩。 */
+const RESIZE_KEY_STEP = 16;
 
 function applyHelpWidth(width: number): void {
   document.documentElement.style.setProperty(HELP_WIDTH_VAR, `${width}px`);
@@ -58,7 +61,8 @@ export function HelpSidebar() {
   const texts = useHelpTexts();
   const resolution = useHelpResolver(api, {
     locale,
-    screen: pathname,
+    // 画面はパスではなく話題で伝える（`/entries/<id>` の id を外に出す理由は無い）。
+    screen: topicForScreen(pathname),
     texts,
     query: help.query,
     label: help.hoverTarget?.label ?? null,
@@ -66,6 +70,15 @@ export function HelpSidebar() {
   });
 
   const visible = help.enabled && help.open;
+
+  // 面の中に focus があるまま閉じると（× や Esc）、`inert` で focus が body に落ちて次の Tab が
+  // 文書の頭から始まる。閉じたら「?」へ返す。blur より先に走る layout effect で見る。
+  const focusWithin = useRef(false);
+  useLayoutEffect(() => {
+    if (visible || !focusWithin.current) return;
+    focusWithin.current = false;
+    document.querySelector<HTMLElement>('[data-help-toggle]')?.focus();
+  }, [visible]);
 
   // 開閉と幅を :root へ。SP にはこの面が無いので、SP では常に 0 のまま。
   useEffect(() => {
@@ -118,6 +131,15 @@ export function HelpSidebar() {
   return (
     <aside
       ref={asideRef}
+      onFocusCapture={() => {
+        focusWithin.current = true;
+      }}
+      onBlurCapture={(event) => {
+        const next = event.relatedTarget;
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) {
+          focusWithin.current = false;
+        }
+      }}
       aria-label={t('toggle')}
       aria-hidden={!visible}
       inert={!visible}
@@ -144,6 +166,17 @@ export function HelpSidebar() {
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           onDoubleClick={() => help.setWidth(HELP_WIDTH.default)}
+          // キーボードでも: ←/→ で 16px ずつ、Home/End で最小・最大。
+          onKeyDown={(event) => {
+            let next: number | null = null;
+            if (event.key === 'ArrowLeft') next = help.width + RESIZE_KEY_STEP;
+            else if (event.key === 'ArrowRight') next = help.width - RESIZE_KEY_STEP;
+            else if (event.key === 'Home') next = HELP_WIDTH.min;
+            else if (event.key === 'End') next = HELP_WIDTH.max;
+            if (next === null) return;
+            event.preventDefault();
+            help.setWidth(next);
+          }}
           className="group fixed inset-y-0 z-[56] w-[14px] cursor-col-resize"
           style={{ right: 'calc(var(--help-width, 0px) - 7px)' }}
         >

@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { HELP_PANEL_ATTR } from '../hover';
 import { HELP_SECTIONS, HELP_TOPICS, helpTopic } from '../topics';
@@ -69,6 +69,14 @@ export function HelpPanel({
   spotlight = false,
 }: HelpPanelProps) {
   const t = useTranslations('help');
+  // 検索の 1 件目は開いておくが、押せば閉じられる。文が変われば開き直す。
+  const [autoCollapsed, setAutoCollapsed] = useState(false);
+  const changeQuery = (next: string) => {
+    onQueryChange(next);
+    setAutoCollapsed(false);
+    // 一覧で開いていた行は検索結果に持ち越さない（3 位に来た行だけ開く、が起きる）。
+    if (focused !== null) onFocus(null);
+  };
   const searchId = useId();
   const searching = query.trim().length > 0;
   // 近い順の上位だけ。手元の照合は 2 文字の並びで重ねるので、長い文だと話題の大半に
@@ -117,7 +125,15 @@ export function HelpPanel({
             id={searchId}
             type="search"
             value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
+            onChange={(event) => changeQuery(event.target.value)}
+            maxLength={200}
+            // 書いている最中の `Esc` は文を消すだけ。面を閉じるのは、空の欄でもう一度。
+            // （preventDefault で、面を閉じる側の keydown に「済み」と伝える）
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape' || event.nativeEvent.isComposing || !searching) return;
+              event.preventDefault();
+              changeQuery('');
+            }}
             placeholder={t('search_placeholder')}
             autoComplete="off"
             // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ。
@@ -126,7 +142,7 @@ export function HelpPanel({
           {searching && (
             <button
               type="button"
-              onClick={() => onQueryChange('')}
+              onClick={() => changeQuery('')}
               aria-label={t('search_clear')}
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--date-color)] hover:text-[var(--fg)]"
             >
@@ -155,14 +171,24 @@ export function HelpPanel({
               shown.map((match, index) => {
                 const text = textOf.get(match.id);
                 if (!text) return null;
+                // 検索の 1 件目は開いておく。押して読むまでの手数を減らす。
+                const expanded =
+                  focused === match.id || (focused === null && index === 0 && !autoCollapsed);
                 return (
                   <HelpTopicCard
                     key={match.id}
                     topic={helpTopic(match.id)}
                     text={text}
-                    // 検索の 1 件目は開いておく。押して読むまでの手数を減らす。
-                    expanded={focused === match.id || (focused === null && index === 0)}
-                    onToggle={() => onFocus(focused === match.id ? null : match.id)}
+                    expanded={expanded}
+                    onToggle={() => {
+                      if (expanded) {
+                        onFocus(null);
+                        if (index === 0) setAutoCollapsed(true);
+                        return;
+                      }
+                      onFocus(match.id);
+                      setAutoCollapsed(false);
+                    }}
                     openLabel={t('open_topic')}
                     onOpen={onOpenHref}
                     badge={match.source === 'jev' ? t('pick_badge') : undefined}

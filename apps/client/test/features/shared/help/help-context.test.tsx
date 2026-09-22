@@ -117,6 +117,106 @@ describe('HelpProvider', () => {
     expect(result.current.open).toBe(false);
   });
 
+  it('変換中の Esc と、検索欄が自分で処理した Esc では閉じない', () => {
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    act(() => result.current.openHelp());
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true }),
+      );
+    });
+    expect(result.current.open).toBe(true);
+    act(() => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      event.preventDefault();
+      window.dispatchEvent(event);
+    });
+    expect(result.current.open).toBe(true);
+    pressKey('Escape');
+    expect(result.current.open).toBe(false);
+  });
+
+  it('面の外で字を打っている最中や、手前にメニューがあるときの Esc では閉じない。面の中からは閉じる', () => {
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    act(() => result.current.openHelp());
+    const editor = document.createElement('input');
+    document.body.appendChild(editor);
+    pressKey('Escape', editor);
+    expect(result.current.open).toBe(true);
+
+    const menu = document.createElement('div');
+    menu.setAttribute('role', 'menu');
+    document.body.appendChild(menu);
+    pressKey('Escape');
+    expect(result.current.open).toBe(true);
+    menu.remove();
+
+    const panel = document.createElement('div');
+    panel.setAttribute('data-help-panel', '');
+    const search = document.createElement('input');
+    panel.appendChild(search);
+    document.body.appendChild(panel);
+    pressKey('Escape', search);
+    expect(result.current.open).toBe(false);
+  });
+
+  it('閉じている間は、触れているものを憶えない', () => {
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    act(() => result.current.setHovered('jar'));
+    expect(result.current.hoverTarget).toBeNull();
+    act(() => result.current.openHelp());
+    act(() => result.current.setHovered('jar'));
+    expect(result.current.hoverTarget?.topic).toBe('jar');
+  });
+
+  it('「始めてみよう」で記録する。面は開いたまま、初めて閉じたときの脈打ちは残り、二度は送らない', async () => {
+    const api = createApiStub(false);
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
+    await waitFor(() => {
+      expect(result.current.welcome).toBe(true);
+    });
+    const patches = () =>
+      api.fetch.mock.calls.filter((call) => call[0] === '/api/v1/users/me/onboarding').length;
+    expect(patches()).toBe(0);
+    act(() => result.current.dismissWelcome());
+    expect(result.current.welcome).toBe(false);
+    expect(result.current.open).toBe(true);
+    expect(patches()).toBe(1);
+    act(() => result.current.closeHelp());
+    expect(result.current.cue).toBe(true);
+    expect(patches()).toBe(1);
+  });
+
+  it('初めての人が × の前に設定で切ったら、記録して、次の読み込みでは開かず設定も戻さない', async () => {
+    const api = createApiStub(false);
+    const first = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
+    await waitFor(() => {
+      expect(first.result.current.open).toBe(true);
+    });
+    act(() => first.result.current.setEnabled(false));
+    expect(first.result.current.enabled).toBe(false);
+    expect(first.result.current.open).toBe(false);
+    expect(api.fetch).toHaveBeenCalledWith(
+      '/api/v1/users/me/onboarding',
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+    cleanup();
+
+    // 次の読み込み。サーバーがまだ false と言っても、切った設定はそのまま、開かない。
+    const api2 = createApiStub(false);
+    const again = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api2) });
+    await waitFor(() => {
+      expect(api2.fetch).toHaveBeenCalledWith('/api/v1/users/me/onboarding', expect.anything());
+    });
+    expect(again.result.current.enabled).toBe(false);
+    expect(again.result.current.open).toBe(false);
+    expect(window.localStorage.getItem('oryzae-help-mode')).toBe('0');
+  });
+
   it('初めての人には開いた状態で始まり、閉じたら「?」が居場所を教え、記録する', async () => {
     const api = createApiStub(false);
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
@@ -230,6 +330,7 @@ describe('HelpProvider', () => {
 
   it('書斎の的（DOM を持たない）からも「触れている」を伝えられる', () => {
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    act(() => result.current.openHelp());
     act(() => result.current.setHovered('notebook'));
     expect(result.current.hoverTarget).toEqual({ topic: 'notebook', label: null });
     act(() => result.current.setHovered(null));

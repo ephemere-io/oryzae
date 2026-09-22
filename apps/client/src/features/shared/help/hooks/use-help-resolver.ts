@@ -18,15 +18,14 @@ import type {
 const CONFIDENCE_MIN = 0.5;
 /** 打っている最中に送らない。 */
 const QUERY_DEBOUNCE_MS = 350;
-/** ポインタが止まってから訊く。通り過ぎるだけの部品では訊かない。 */
-const LABEL_DEBOUNCE_MS = 300;
 /** これより短い問いは手元だけで見る。 */
 const REMOTE_MIN_LENGTH = 2;
 
 function readRouteResult(json: unknown): HelpRouteResult | null {
   if (!isObject(json) || typeof json.configured !== 'boolean') return null;
   const topicId = isHelpTopicId(json.topicId) ? json.topicId : null;
-  const confidence = typeof json.confidence === 'number' ? json.confidence : 0;
+  const confidence =
+    typeof json.confidence === 'number' && Number.isFinite(json.confidence) ? json.confidence : 0;
   return { configured: json.configured, topicId, confidence };
 }
 
@@ -37,6 +36,10 @@ function readRouteResult(json: unknown): HelpRouteResult | null {
  * 並んでいるときだけサーバー（`POST /api/v1/help/search`）へ回し、確からしさが
  * `CONFIDENCE_MIN` 以上なら先頭に置く。サーバーが「Jev は未設定」と言えば、以後は
  * 訊かない（`remote: 'off'`）。同じ問いは憶えておく。
+ *
+ * **Jev に訊くのは検索欄の文だけ。** 触れている部品の名前は手元でだけ照合する —
+ * 名前は aria-label や textContent から拾うので、利用者が書いた文（問いの本文など）が
+ * 混ざりうる。決まらなければ先祖の名乗り、それも無ければ画面の話題のまま。
  */
 export function useHelpResolver(api: ApiClient | null, input: HelpResolverInput): HelpResolution {
   const { locale, screen, texts, query, label, labelFallback } = input;
@@ -45,7 +48,6 @@ export function useHelpResolver(api: ApiClient | null, input: HelpResolverInput)
 
   const [remote, setRemote] = useState<HelpRemoteState>(api ? 'idle' : 'off');
   const [queryPick, setQueryPick] = useState<{ query: string; topic: HelpTopicId } | null>(null);
-  const [labelPick, setLabelPick] = useState<{ label: string; topic: HelpTopicId } | null>(null);
   const cache = useRef(new Map<string, HelpRouteResult>());
   const configured = useRef<boolean | null>(null);
 
@@ -110,24 +112,12 @@ export function useHelpResolver(api: ApiClient | null, input: HelpResolverInput)
     };
   }, [trimmed, decisive, ask]);
 
-  // 触れている部品の名前: 名乗りが無く、手元でも決まらないときだけ訊く。
+  // 触れている部品の名前: 手元の照合だけ。外には送らない。
   const labelLocal = useMemo(
     () => (label === null ? [] : rankTopics(label, corpus)),
     [label, corpus],
   );
   const labelDecisive = isDecisive(labelLocal);
-  useEffect(() => {
-    if (label === null || labelDecisive || labelFallback !== null) return;
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const topic = await ask(label);
-      if (!cancelled && topic) setLabelPick({ label, topic });
-    }, LABEL_DEBOUNCE_MS);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [label, labelDecisive, labelFallback, ask]);
 
   const matches = useMemo<HelpMatch[]>(() => {
     const pick = queryPick && queryPick.query === trimmed ? queryPick.topic : null;
@@ -141,7 +131,6 @@ export function useHelpResolver(api: ApiClient | null, input: HelpResolverInput)
   let labelTopic: HelpTopicId | null = null;
   if (label !== null && labelDecisive) labelTopic = labelLocal[0]?.id ?? null;
   else if (labelFallback !== null) labelTopic = labelFallback;
-  else if (label !== null && labelPick && labelPick.label === label) labelTopic = labelPick.topic;
 
   return { matches, remote, labelTopic };
 }

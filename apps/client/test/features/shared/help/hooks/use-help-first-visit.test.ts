@@ -42,14 +42,15 @@ describe('useHelpFirstVisit', () => {
     });
   });
 
-  it('取れなければ null のまま', async () => {
+  it('取れなければ false（勝手に開かない側に倒す）', async () => {
     const api = createApiStub();
     api.fetch.mockResolvedValueOnce(mockResponse(false, { error: 'boom' }));
     const { result } = renderHook(() => useHelpFirstVisit(api));
+    // 返事が届いてから state に落ちるまで一拍あるので、値そのものを待つ。
     await waitFor(() => {
-      expect(api.fetch).toHaveBeenCalledTimes(1);
+      expect(result.current.firstVisit).toBe(false);
     });
-    expect(result.current.firstVisit).toBeNull();
+    expect(api.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('markSeen は先に手元を倒してから PATCH する', async () => {

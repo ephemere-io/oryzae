@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { CONTROL_FONT, ELEVATED_CHIP_CLASS, ELEVATED_CHIP_STYLE } from '@/components/ui/surface';
+import { SP_HELP_SHEET_HEIGHT } from '../help-context';
 
 export interface HelpWelcomeProps {
   /** 案内（面）がどちらに居るか。PC は右の面、SP は下のシート。 */
@@ -29,7 +30,7 @@ export function HelpWelcome({ guide, onStart }: HelpWelcomeProps) {
       className="help-fade fixed inset-0 z-[1650] flex items-center justify-center"
       style={{
         right: guide === 'right' ? 'var(--help-width, 0px)' : 0,
-        bottom: guide === 'below' ? '82dvh' : 0,
+        bottom: guide === 'below' ? SP_HELP_SHEET_HEIGHT : 0,
         background: 'color-mix(in srgb, var(--bg) 82%, transparent)',
         backdropFilter: 'blur(2px)',
         WebkitBackdropFilter: 'blur(2px)',

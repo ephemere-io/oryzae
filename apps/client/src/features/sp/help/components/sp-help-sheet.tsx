@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback } from 'react';
 import { HelpPanel } from '@/features/shared/help/components/help-panel';
-import { useHelpMode } from '@/features/shared/help/help-context';
+import { SP_HELP_SHEET_HEIGHT, useHelpMode } from '@/features/shared/help/help-context';
 import { useHelpResolver } from '@/features/shared/help/hooks/use-help-resolver';
 import { useHelpTexts } from '@/features/shared/help/hooks/use-help-texts';
 import { topicForScreen } from '@/features/shared/help/topics';
@@ -28,7 +28,7 @@ export function SpHelpSheet() {
   const texts = useHelpTexts();
   const resolution = useHelpResolver(api, {
     locale,
-    screen: pathname,
+    screen: topicForScreen(pathname),
     texts,
     query: help.query,
     label: null,
@@ -59,7 +59,7 @@ export function SpHelpSheet() {
       />
       <div
         className="sp-sheet flex flex-col rounded-t-2xl pt-4 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
-        style={{ background: 'var(--bg)', height: '82dvh' }}
+        style={{ background: 'var(--bg)', height: SP_HELP_SHEET_HEIGHT }}
       >
         <HelpPanel
           texts={texts}

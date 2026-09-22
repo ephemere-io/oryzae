@@ -12,7 +12,7 @@ import {
 import { SIDE_PANEL_WIDTH } from '@/components/ui/surface';
 import type { ApiClient } from '@/lib/api';
 import { useHelpFirstVisit } from './hooks/use-help-first-visit';
-import { type HoverTarget, hoverTargetOf, isTypingTarget } from './hover';
+import { HELP_PANEL_ATTR, type HoverTarget, hoverTargetOf, isTypingTarget } from './hover';
 import type { HelpTopicId } from './types';
 
 /** ヘルプモードが有効か（アカウントの設定）。無ければ有効。 */
@@ -23,6 +23,9 @@ const OPEN_KEY = 'oryzae-help-open';
 const WIDTH_KEY = 'oryzae-help-width';
 
 /** 面の幅の範囲（px）。既定は発酵の面と同じ。 */
+/** SP のシートの高さ。「ようこそ」の沈みがこの上端で止まるので、両方が同じ値を見る。 */
+export const SP_HELP_SHEET_HEIGHT = '82dvh';
+
 export const HELP_WIDTH = { min: 280, max: 560, default: SIDE_PANEL_WIDTH } as const;
 
 /**
@@ -33,6 +36,19 @@ const HOVER_CLEAR_MS = 160;
 
 /** 初めての人が面を閉じたあと、「?」が居場所を教えている時間。 */
 const CUE_MS = 5000;
+
+/** 手前に開いているメニュー・ダイアログがあるか（隠してあるものは数えない）。 */
+function hasOpenLayer(): boolean {
+  const layers = document.querySelectorAll<HTMLElement>(
+    '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [aria-modal="true"]',
+  );
+  for (const layer of layers) {
+    if (layer.hidden || layer.getAttribute('aria-hidden') === 'true') continue;
+    if (layer.closest('[hidden], [inert]') !== null) continue;
+    return true;
+  }
+  return false;
+}
 
 export interface HelpModeValue {
   /** ヘルプモード（設定）。無効なら「?」も出ず、`?` キーも効かない。 */
@@ -138,7 +154,10 @@ export function HelpProvider({
   children: React.ReactNode;
   api: ApiClient | null;
 }) {
-  const [enabled, setEnabledState] = useState(true);
+  // 憶えていた設定を読むまでは null。true で始めると、切っている人にも「?」が一瞬出て、
+  // 右端の fixed の層が 48px 動く。
+  const [enabledState, setEnabledState] = useState<boolean | null>(null);
+  const enabled = enabledState === true;
   const [open, setOpen] = useState(false);
   const [firstVisit, setFirstVisit] = useState(false);
   const [cue, setCue] = useState(false);
@@ -161,15 +180,24 @@ export function HelpProvider({
     if (storedWidth > 0) setWidthState(clampHelpWidth(storedWidth));
   }, []);
 
-  const setEnabled = useCallback((next: boolean) => {
-    setEnabledState(next);
-    writeStored(ENABLED_KEY, next ? '1' : '0');
-    if (!next) {
-      setOpen(false);
-      writeStored(OPEN_KEY, '0');
-      setHoverTarget(null);
-    }
-  }, []);
+  const setEnabled = useCallback(
+    (next: boolean) => {
+      setEnabledState(next);
+      writeStored(ENABLED_KEY, next ? '1' : '0');
+      if (!next) {
+        setOpen(false);
+        writeStored(OPEN_KEY, '0');
+        setHoverTarget(null);
+        // 初めての人が × を押す前に切った。記録しておかないと、次の読み込みで自動で開いて
+        // 設定まで有効に戻してしまう。
+        if (firstVisit) {
+          setFirstVisit(false);
+          void markSeen();
+        }
+      }
+    },
+    [firstVisit, markSeen],
+  );
 
   const openHelp = useCallback((topic?: HelpTopicId) => {
     setEnabledState(true);
@@ -182,13 +210,18 @@ export function HelpProvider({
   }, []);
 
   // 初めての人には、確認が取れ次第 1 回だけ、開いた状態で始める。
+  // 設定で切っている人には開かない（開くと有効に戻してしまう）— 見たことにして、以後は訊かない。
   const autoOpened = useRef(false);
   useEffect(() => {
-    if (!isFirst || autoOpened.current) return;
+    if (!isFirst || autoOpened.current || enabledState === null) return;
     autoOpened.current = true;
+    if (!enabledState) {
+      void markSeen();
+      return;
+    }
     setFirstVisit(true);
     openHelp();
-  }, [isFirst, openHelp]);
+  }, [isFirst, enabledState, openHelp, markSeen]);
 
   const closeHelp = useCallback(() => {
     setOpen(false);
@@ -218,7 +251,13 @@ export function HelpProvider({
     else openHelp();
   }, [open, closeHelp, openHelp]);
 
-  const dismissWelcome = useCallback(() => setWelcomeDismissed(true), []);
+  // 「始めてみよう」で見たことにする。面は開いたまま画面を移れるので、閉じるまで待つと
+  // 次の読み込みでまた「ようこそ」が出る。「?」の脈打ちは初めて閉じたときのまま（`firstVisit`
+  // はここでは落とさない）。
+  const dismissWelcome = useCallback(() => {
+    setWelcomeDismissed(true);
+    void markSeen();
+  }, [markSeen]);
   const welcome = firstVisit && open && !welcomeDismissed;
 
   const setWidth = useCallback((next: number) => {
@@ -227,7 +266,14 @@ export function HelpProvider({
     writeStored(WIDTH_KEY, String(clamped));
   }, []);
 
+  // 閉じている間は憶えない。書斎の的は開閉に関わらず触れを伝えてくるが、閉じた面のために
+  // Provider の値を作り直して全部の読み手を描き直す理由は無い。
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
   const setHovered = useCallback((topic: HelpTopicId | null) => {
+    if (!openRef.current) return;
     if (clearTimer.current !== null) {
       window.clearTimeout(clearTimer.current);
       clearTimer.current = null;
@@ -270,15 +316,23 @@ export function HelpProvider({
   }, [open]);
 
   // `?` で開閉、`Esc` で閉じる。設定で切っている人にはキーも効かない。
+  // 日本語入力の変換中の `Esc`（変換の取り消し）は面の操作ではない。検索欄が文を消すために
+  // 自分で処理した `Esc`（defaultPrevented）もここでは触らない。
+  // 面の外で字を打っている最中や、手前にメニュー・ダイアログが開いているときの `Esc` は
+  // そちらのもの（エディタの問いチップを Esc で畳んだら面まで閉じた）。面の中からなら閉じる。
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || event.isComposing) return;
       if (event.key === '?' && enabled && !isTypingTarget(event.target)) {
         event.preventDefault();
         toggleHelp();
         return;
       }
-      if (event.key === 'Escape' && open) closeHelp();
+      if (event.key !== 'Escape' || !open) return;
+      const target = event.target;
+      const inPanel = target instanceof Element && target.closest(`[${HELP_PANEL_ATTR}]`) !== null;
+      if (!inPanel && (isTypingTarget(target) || hasOpenLayer())) return;
+      closeHelp();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

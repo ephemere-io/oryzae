@@ -120,6 +120,49 @@ describe('HelpPanel', () => {
     expect(onQueryChange).toHaveBeenCalledWith('');
   });
 
+  it('検索中の Esc は文を消すだけで、面を閉じる側には渡さない。空の欄の Esc は渡す', () => {
+    const { onQueryChange } = renderPanel({ query: '手紙' });
+    const input = screen.getByPlaceholderText(jaMessages.help.search_placeholder);
+    // fireEvent は preventDefault されたとき false を返す
+    expect(fireEvent.keyDown(input, { key: 'Escape' })).toBe(false);
+    expect(onQueryChange).toHaveBeenCalledWith('');
+
+    cleanup();
+    const empty = renderPanel({ query: '' });
+    const emptyInput = screen.getByPlaceholderText(jaMessages.help.search_placeholder);
+    expect(fireEvent.keyDown(emptyInput, { key: 'Escape' })).toBe(true);
+    expect(empty.onQueryChange).not.toHaveBeenCalled();
+  });
+
+  it('検索の 1 件目は押せば閉じられ、文を変えると一覧で開いていた行は持ち越さない', () => {
+    const { onFocus } = renderPanel({
+      query: '手紙',
+      matches: [
+        { id: 'letter', score: 5, source: 'local' },
+        { id: 'jar', score: 3, source: 'local' },
+      ],
+    });
+    const cards = () => document.querySelectorAll(CARD);
+    expect(cards()[0]?.getAttribute('data-verify-expanded')).toBe('true');
+    fireEvent.click(rowOf('letter'));
+    expect(onFocus).toHaveBeenCalledWith(null);
+    expect(cards()[0]?.getAttribute('data-verify-expanded')).toBe('false');
+
+    cleanup();
+    const second = renderPanel({
+      query: '手',
+      focused: 'jar',
+      matches: [
+        { id: 'letter', score: 5, source: 'local' },
+        { id: 'jar', score: 3, source: 'local' },
+      ],
+    });
+    const input = screen.getByPlaceholderText(jaMessages.help.search_placeholder);
+    fireEvent.change(input, { target: { value: '手紙' } });
+    expect(second.onQueryChange).toHaveBeenCalledWith('手紙');
+    expect(second.onFocus).toHaveBeenCalledWith(null);
+  });
+
   it('検索中は近い話題だけ。頭の 1 枚は消え、1 件目は開いていて、Jev の 1 件には印', () => {
     renderPanel({
       query: '手紙',

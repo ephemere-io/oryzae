@@ -25,7 +25,6 @@ export function HelpLiveCard({ topic, text, following }: HelpLiveCardProps) {
   return (
     <section
       {...verifyAttrs({ unit: 'HelpLiveCard', topic: topic.id, following })}
-      aria-live="polite"
       className="rounded-[14px] border px-5 pt-5 pb-6"
       style={{
         background: 'var(--surface-raised)',
@@ -35,6 +34,11 @@ export function HelpLiveCard({ topic, text, following }: HelpLiveCardProps) {
         ...CONTROL_FONT,
       }}
     >
+      {/* 読み上げには題だけを伝える。1 枚まるごと live にすると、ポインタが物をまたぐたびに
+          段落ごと読み上げられて騒がしい。 */}
+      <span className="sr-only" aria-live="polite">
+        {text.title}
+      </span>
       {/* key で 1 枚ごと作り直す。同じ箱の中で字だけ差し替わると、変わったことが見えない。 */}
       <div key={topic.id} className="help-fade">
         <span className="block text-[var(--accent)]">

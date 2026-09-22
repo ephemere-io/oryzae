@@ -659,6 +659,8 @@ export function JarView({
         addAvailable,
         percent: Math.round(canvas.viewport.scale * 100),
       })}
+      // ヘルプの面に「瓶」を出す。中の問いチップは利用者の文なので、名前では当てない。
+      data-help="jar"
       className="relative flex h-full w-full bg-[var(--bg)]"
     >
       {/* Keyframes */}

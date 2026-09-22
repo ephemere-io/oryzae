@@ -57,6 +57,7 @@ export function HelpToggleButton({ open, cue, label, onClick }: HelpToggleButton
           onClick={onClick}
           aria-label={label}
           aria-pressed={open}
+          data-help-toggle=""
           className={`pointer-events-auto relative flex h-9 w-9 items-center justify-center rounded-full ${ELEVATED_CHIP_CLASS}`}
           style={{
             ...ELEVATED_CHIP_STYLE,

@@ -8,6 +8,7 @@
 import { registerUnit } from '@oryzae/verify';
 import jaMessages from '@/i18n/messages/ja.json';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
+import { SP_HELP_SHEET_HEIGHT } from '../help-context';
 import { HelpWelcome } from './help-welcome';
 
 interface Props {
@@ -63,7 +64,7 @@ registerUnit<Props>({
         if (!el) return '沈みが無い';
         return props.guide === 'right'
           ? el.style.right.includes('--help-width') || `right="${el.style.right}"`
-          : el.style.bottom === '82dvh' || `bottom="${el.style.bottom}"`;
+          : el.style.bottom === SP_HELP_SHEET_HEIGHT || `bottom="${el.style.bottom}"`;
       },
     },
     {

@@ -194,33 +194,17 @@ describe('useHelpResolver — 触れている部品の名前', () => {
     expect(api.fetch).not.toHaveBeenCalled();
   });
 
-  it('名乗りも無ければ、止まってから Jev に訊く', async () => {
+  it('名乗りも無ければ何も出さず、名前を Jev に送らない（問いの本文が混ざりうる）', async () => {
     const api = createApiStub();
     api.fetch.mockResolvedValue(
       mockResponse(true, { configured: true, topicId: 'account', confidence: 0.7 }),
     );
-    const { result } = renderHook(() => useSubject(api, '', 'Sign out'));
+    const { result } = renderHook(() => useSubject(api, '', '今年は何を学ぶかの発酵履歴をひらく'));
     expect(result.current.labelTopic).toBeNull();
     await act(async () => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(api.fetch).toHaveBeenCalledTimes(1);
-    expect(result.current.labelTopic).toBe('account');
-  });
-
-  it('通り過ぎただけの部品では訊かない', async () => {
-    const api = createApiStub();
-    const initial: { label: string | null } = { label: 'Sign out' };
-    const { rerender } = renderHook(({ label }) => useSubject(api, '', label), {
-      initialProps: initial,
-    });
-    await act(async () => {
-      vi.advanceTimersByTime(100);
-    });
-    rerender({ label: null });
-    await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1000);
     });
     expect(api.fetch).not.toHaveBeenCalled();
+    expect(result.current.labelTopic).toBeNull();
   });
 });
