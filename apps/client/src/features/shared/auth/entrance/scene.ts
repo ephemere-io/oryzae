@@ -33,24 +33,18 @@ import {
 } from 'three';
 import { clamp01, RENDER_LIMITS } from '@/features/shared/study/constants';
 import { approach, breathOffset, type CameraView } from '@/features/shared/study/scene/camera';
-import { captureRenderedFrame } from '@/features/shared/study/scene/capture';
 import { sampleJarProfile } from '@/features/shared/study/scene/jar';
-import {
-  createMaterials,
-  LIGHT_PALETTE,
-  type StudyMaterials,
-} from '@/features/shared/study/scene/materials';
+import { createMaterials, type StudyMaterials } from '@/features/shared/study/scene/materials';
 import {
   DOOR,
   DOOR_ANGLE,
   DOOR_SETTLE_LERP,
   doorAngleWhileEntering,
-  ENTER_TIMING,
   type EnterPlan,
   FRAME,
+  GLIDE,
+  glideView,
   homeEntranceView,
-  walkProgress,
-  walkView,
 } from './door';
 import { type EntranceLayout, FRAME_SETTLE_LERP } from './layout';
 import type { Sprig } from './season';
@@ -66,27 +60,40 @@ export interface EntranceSceneOptions {
   sprig: Sprig;
   /** 最初の 1 フレームを描き終えたとき（1 度だけ）。地から扉を浮かび上がらせる合図。 */
   onReady?: () => void;
-  /**
-   * 奥へ歩いている途中の 1 枚（data URL）。**書斎が読み込まれるまでの地**にする。
-   *
-   * 画面が入れ替わる一瞬、以前はここで地の色だけが見えていた（「ホワイトアウトして
-   * ブツ切れ」— PR #624 のレビュー）。扉の側で撮った部屋を敷いておけば、書斎の canvas が
-   * 描き始めるまで部屋が見えたままになる。
-   */
-  onCapture?: (dataUrl: string) => void;
+}
+
+/**
+ * 歩いている最中の canvas を、そのまま持ち出したもの。
+ *
+ * 画面が入れ替わるあいだ、これをルーターの上に載せておく（`study/handover.ts`）。
+ * シーンは動き続けている — 渡すのは写真ではなく、部屋そのもの。
+ */
+interface EntranceBridge {
+  canvas: HTMLCanvasElement;
+  /** 引き終わったら呼ぶ。renderer と WebGL のコンテキストを返す。 */
+  dispose(): void;
 }
 
 export interface EntranceSceneHandle {
   /** 送信中・認証中か。扉が少し大きく開く。 */
   setWaiting(waiting: boolean): void;
   /**
-   * 扉を押し開けて奥へ歩く。**歩き切って、渡す 1 枚が撮れたら** resolve する。
+   * 扉を押し開けて奥へ歩き出す。`plan.totalMs` 経ったら resolve する。
    *
-   * 返すのはその 1 枚（data URL）。撮れなかった環境では null。呼び出し側はこれを画面の
-   * 上に敷いてから行き先へ移る（`study/handover.ts`）。**撮れる前に移ると、敷く絵が
-   * 無いまま画面が入れ替わり、そこが白く飛ぶ。**
+   * **歩きはそこで終わらない。** 目指す先へ近づき続ける（`glideView`）。resolve は
+   * 「もう扉の正面まで来ているので、下で画面を入れ替えてよい」の合図。呼び出し側は
+   * `detach()` で canvas を持ち出し、ルーターの上に載せてから移る。
    */
-  enter(plan: EnterPlan): Promise<string | null>;
+  enter(plan: EnterPlan): Promise<void>;
+  /**
+   * 歩いている canvas を持ち出す。**以後、後始末は受け取った側が持つ**（`dispose`）。
+   *
+   * 持ち出したあとも描き続ける。元の入れ物（認証画面）が外れても止まらない。
+   * 2 度目以降と、扉が出ていないときは null。
+   */
+  detach(): EntranceBridge | null;
+  /** 持ち出し済みか。真なら、認証画面の cleanup は dispose を呼ばない。 */
+  isDetached(): boolean;
   /**
    * 画面の上から何 px が見えているか（その下は紙が覆っている）。
    *
@@ -116,14 +123,6 @@ interface StudyGlimpse {
   reveal(t: number): void;
   dispose(): void;
 }
-
-/**
- * 歩き終わってから、渡す 1 枚が撮れるのを待つ上限（ms）。
- *
- * 待つあいだ、画面には歩き着いた最後のフレームが出たままになる（溶暗はしない）。
- * 撮れなければ諦めて進む — 地が無くても遷移そのものは成立する。
- */
-const CAPTURE_GRACE_MS = 700;
 
 /** 壁の広がり。どの構図でも画面の外まで続く幅と高さ。 */
 const WALL = { halfWidth: 18, height: 11 } as const;
@@ -181,19 +180,14 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     plan: EnterPlan;
     startedAt: number;
     fromAngle: number;
-    fromView: CameraView;
-    /** 書斎へ渡す 1 枚を撮り始めたか（1 回だけ）。 */
-    captured: boolean;
-    /** 撮れた 1 枚。符号化が終わるまでは null。 */
-    image: string | null;
-    /** 歩き切ったか。 */
-    walked: boolean;
-    /** 撮れるのを待つ猶予が尽きたか。 */
-    graceOver: boolean;
-    settle: (image: string | null) => void;
+    /** いまの view。毎フレーム目指す先へ近づける（`glideView`）。 */
+    view: CameraView;
+    /** 歩き出した時点の、目指す先までの距離。奥の気配をどこまで濃くしたかの物差し。 */
+    startDistance: number;
+    lastTickAt: number;
   } | null = null;
-  /** 次の描画の直後に 1 枚掴む、という予約。 */
-  let captureRequested = false;
+  /** canvas を持ち出したか（`detach`）。 */
+  let detached = false;
 
   /** 見えている窓の高さ（px）。null は canvas 全体。目標へ毎フレーム寄せる。 */
   let frameHeight: number | null = null;
@@ -213,20 +207,16 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
 
     if (entering) {
       const elapsed = now - entering.startedAt;
-      const walked = walkProgress(entering.plan, elapsed);
       door.rotation.y = doorAngleWhileEntering(entering.plan, entering.fromAngle, elapsed);
-      applyView(camera, walkView(entering.fromView, walked));
-      // 近づくにつれて、奥の書斎が見えてくる。
-      glimpse.reveal(walked);
-      // 歩き終わりの手前で 1 枚だけ撮る（書斎が読み込まれるまでの地）。
-      if (
-        !entering.captured &&
-        options.onCapture !== undefined &&
-        elapsed >= entering.plan.totalMs - ENTER_TIMING.captureLeadMs
-      ) {
-        entering.captured = true;
-        captureRequested = true;
+      const walking = elapsed - entering.plan.walkDelayMs;
+      if (walking > 0) {
+        entering.view = glideView(entering.view, walking, now - entering.lastTickAt);
       }
+      entering.lastTickAt = now;
+      applyView(camera, entering.view);
+      // 近づくにつれて、奥の書斎が見えてくる。どこまで来たかは残りの距離で測る。
+      const remaining = distanceBetween(entering.view.position, GLIDE.target.position);
+      glimpse.reveal(1 - remaining / entering.startDistance);
     } else {
       doorAngle = approach(doorAngle, doorTarget, DOOR_SETTLE_LERP);
       door.rotation.y = doorAngle;
@@ -235,19 +225,6 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
 
     updateFrame();
     renderer.render(scene, camera);
-
-    // **描画の直後だけ**撮れる（描画バッファは次のフレームで捨てられる）。
-    if (captureRequested) {
-      captureRequested = false;
-      captureRenderedFrame(renderer, LIGHT_PALETTE.solid, (dataUrl) => {
-        if (dataUrl === null) return;
-        options.onCapture?.(dataUrl);
-        if (entering !== null) {
-          entering.image = dataUrl;
-          settleEnter();
-        }
-      });
-    }
 
     if (!readyAnnounced) {
       readyAnnounced = true;
@@ -318,51 +295,35 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     doorTarget = waiting ? DOOR_ANGLE.waiting : DOOR_ANGLE.rest;
   }
 
-  function enter(plan: EnterPlan): Promise<string | null> {
-    if (entering) return new Promise((resolve) => setTimeout(() => resolve(null), plan.totalMs));
-    return new Promise<string | null>((resolve) => {
-      let settled = false;
+  function enter(plan: EnterPlan): Promise<void> {
+    if (entering === null) {
+      const now = performance.now();
+      // 揺れを含んだ今の view から歩き出す。ホームから始めると 1 フレーム跳ぶ。
+      const view = currentView();
       entering = {
         plan,
-        startedAt: performance.now(),
+        startedAt: now,
         fromAngle: doorAngle,
-        captured: false,
-        image: null,
-        walked: false,
-        graceOver: false,
-        // 揺れを含んだ今の view から歩き出す。ホームから始めると 1 フレーム跳ぶ。
-        fromView: currentView(),
-        settle: (image) => {
-          if (settled) return;
-          settled = true;
-          resolve(image);
-        },
+        view,
+        startDistance: Math.max(1e-6, distanceBetween(view.position, GLIDE.target.position)),
+        lastTickAt: now,
       };
-      // rAF に頼らず時間で進める。タブが裏に回ると rAF は止まるが、ログイン自体は
-      // 済んでいるので、行き先へ進むのを止めてはいけない。
-      setTimeout(() => {
-        if (entering === null) return;
-        entering.walked = true;
-        settleEnter();
-      }, plan.totalMs);
-      setTimeout(() => {
-        if (entering === null) return;
-        entering.graceOver = true;
-        settleEnter();
-      }, plan.totalMs + CAPTURE_GRACE_MS);
-    });
+    }
+    // rAF に頼らず時間で解決する。タブが裏に回ると rAF は止まるが、ログイン自体は
+    // 済んでいるので、行き先へ進むのを止めてはいけない。
+    return new Promise((resolve) => setTimeout(resolve, plan.totalMs));
   }
 
-  /**
-   * 歩き切っていて、1 枚が撮れている（か、待つ猶予が尽きた）なら返す。
-   *
-   * PNG の符号化は端末によって数百 ms かかる。以前は歩き終わりで即返していたので、
-   * 実機に近い条件では**撮れる前に画面が入れ替わり**、敷く絵が無いまま白が見えていた。
-   */
-  function settleEnter(): void {
-    if (entering === null || !entering.walked) return;
-    if (entering.image === null && !entering.graceOver) return;
-    entering.settle(entering.image);
+  function detach(): EntranceBridge | null {
+    if (detached) return null;
+    detached = true;
+    // 元の入れ物はもう見ない（このあと外れる）。大きさは持ち出した先が同じ画面いっぱいなので変わらない。
+    resizeObserver.disconnect();
+    return { canvas: renderer.domElement, dispose };
+  }
+
+  function isDetached(): boolean {
+    return detached;
   }
 
   function setFrame(visibleHeight: number): void {
@@ -406,10 +367,12 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     renderer.dispose();
     // dispose() だけでは WebGL のコンテキストが解放されない（書斎の scene.ts と同じ理由）。
     renderer.forceContextLoss();
+    // 持ち出したあとは親が変わっている。いまの親から外す。
+    renderer.domElement.parentNode?.removeChild(renderer.domElement);
     while (container.firstChild) container.removeChild(container.firstChild);
   }
 
-  return { setWaiting, enter, setFrame, setPointer, clearPointer, dispose };
+  return { setWaiting, enter, detach, isDetached, setFrame, setPointer, clearPointer, dispose };
 }
 
 // ============================================================================
@@ -421,6 +384,10 @@ type OwnGeometry = <T extends BufferGeometry>(geometry: T) => T;
 function aspectOf(container: HTMLElement): number {
   const height = container.clientHeight;
   return height > 0 ? container.clientWidth / height : 1;
+}
+
+function distanceBetween(a: CameraView['position'], b: CameraView['position']): number {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
 function applyView(camera: PerspectiveCamera, view: CameraView): void {

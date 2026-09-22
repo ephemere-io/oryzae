@@ -8,7 +8,6 @@ import { usePathname } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 import { markStudyArrivalFor } from '@/features/shared/study/arrival';
-import { saveStudyBackdrop } from '@/features/shared/study/backdrop';
 import { beginStudyHandoverFor } from '@/features/shared/study/handover';
 import { warmStudyFor } from '@/features/shared/study/warm';
 import { traceMark } from '@/lib/trace';
@@ -91,20 +90,6 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   }, []);
   const handleReady = useCallback(() => setReady(true), []);
 
-  /**
-   * 撮れた 1 枚の**復号**。渡す前にここまで済ませる。
-   *
-   * 敷くのは歩き切った直後なので、そこで初めて復号が走ると 1 フレームだけ絵が出ず、
-   * そのフレームで下の白が見える。
-   */
-  const decodedRef = useRef<Promise<void> | null>(null);
-  const handleCapture = useCallback((dataUrl: string) => {
-    saveStudyBackdrop(dataUrl);
-    const image = new window.Image();
-    image.src = dataUrl;
-    decodedRef.current = image.decode().catch(() => undefined);
-  }, []);
-
   const sheet = layout.panel === 'sheet';
 
   /**
@@ -150,7 +135,7 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
       /**
        * 扉をくぐって行き先へ。**渡す支度までをここで済ませる。**
        *
-       * 定置の印（`markStudyArrivalFor`）と、最後の 1 枚を画面の上に敷くこと
+       * 定置の印（`markStudyArrivalFor`）と、歩いている canvas をルーターの上に載せること
        * （`beginStudyHandoverFor`）は、どちらも「扉をくぐった」に付いて回る。呼び出し側に
        * 配ると、新しい入口が増えたときに片方だけ忘れる。
        */
@@ -166,25 +151,24 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
         const plan = enterPlan(reducedMotion || handle === null);
         setLeaving(plan);
         if (handle === null) {
-          // 渡す 1 枚も無い。溶け切るのを待って、そのまま移る。
+          // 持ち出す canvas も無い。溶け切るのを待って、そのまま移る。
           await wait(plan.totalMs);
           return;
         }
         traceMark('扉を開き始める');
         // 紙が退くので、窓は画面全体に戻る。扉は歩きながら画面の中央へ寄ってくる。
         handle.setFrame(Number.POSITIVE_INFINITY);
-        // 歩き切って、渡す 1 枚が撮れるまで待つ（`EntranceSceneHandle.enter`）。
-        const image = await handle.enter(plan);
-        traceMark(image === null ? '歩き終わり（撮れず）' : '歩き終わり・撮影完了');
-        // 復号まで済ませてから敷く（`handleCapture`）。
-        await decodedRef.current;
-        // 撮れた絵を画面の上に敷く。ここから先、下で何が入れ替わっても見えない。
-        beginStudyHandoverFor(destination, image);
-        traceMark('地を敷いた');
-        // **敷いた絵が実際に描かれるまで待ってから返す。** 同じ tick で移ると、絵が出る前に
-        // 扉が外れ、その 1〜2 フレームだけ地の色が見える（実機の録画で 2 コマ確認）。
+        // 扉の正面まで来るのを待つ（歩きはそのあとも続く — `glideView`）。
+        await handle.enter(plan);
+        traceMark('扉の正面（移ってよい）');
+        // 歩いている canvas をそのまま持ち出して、ルーターの上に載せる。ここから先、
+        // 下で何が入れ替わっても、見えている動きは同じ 1 本のまま。
+        beginStudyHandoverFor(destination, handle.detach());
+        traceMark('canvas を持ち上げた');
+        // **載せ替えが実際に描かれるまで待ってから返す。** 同じ tick で移ると、載る前に
+        // 認証画面ごと外れ、その 1〜2 フレームだけ地の色が見える。
         await afterPaint();
-        traceMark('地が描かれた');
+        traceMark('載せ替えが描かれた');
       },
     }),
     [reducedMotion, sheet],
@@ -227,7 +211,6 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             reducedMotion={reducedMotion}
             onHandle={handleSceneHandle}
             onReady={handleReady}
-            onCapture={handleCapture}
           />
         </div>
 

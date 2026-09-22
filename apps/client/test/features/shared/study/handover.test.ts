@@ -1,80 +1,65 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { saveStudyBackdrop } from '@/features/shared/study/backdrop';
 import {
   beginStudyHandoverFor,
   endStudyHandover,
-  studyHandoverImage,
+  type StudyBridge,
+  studyHandoverBridge,
   subscribeStudyHandover,
 } from '@/features/shared/study/handover';
 
-const KEY = 'oryzae_study_handover';
-const PIXEL = 'data:image/png;base64,iVBORw0KGgo=';
+function bridge(): StudyBridge & { dispose: ReturnType<typeof vi.fn> } {
+  return { canvas: document.createElement('canvas'), dispose: vi.fn() };
+}
 
-afterEach(() => {
-  endStudyHandover();
-  sessionStorage.clear();
-});
+afterEach(() => endStudyHandover());
 
-describe('書斎への受け渡し', () => {
-  it('書斎へ向かうときだけ敷く', () => {
-    beginStudyHandoverFor('/entries/new', PIXEL);
-    expect(studyHandoverImage()).toBeNull();
-
-    beginStudyHandoverFor('/', PIXEL);
-    expect(studyHandoverImage()).toBe(PIXEL);
+describe('書斎への受け渡し（歩いている canvas）', () => {
+  it('書斎へ向かうときだけ載せる', () => {
+    const b = bridge();
+    beginStudyHandoverFor('/', b);
+    expect(studyHandoverBridge()).toBe(b);
   });
 
-  it('撮れていなければ敷かない（地が無くても遷移は成立する）', () => {
+  it('書斎以外へ向かうなら載せず、持ち出したものはその場で捨てる', () => {
+    // 載せたまま別の画面へ行くと、扉の canvas がその画面を塞ぐ。
+    const b = bridge();
+    beginStudyHandoverFor('/entries/new', b);
+    expect(studyHandoverBridge()).toBeNull();
+    expect(b.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('持ち出せていなければ何もしない（扉が無い環境）', () => {
     beginStudyHandoverFor('/', null);
-    expect(studyHandoverImage()).toBeNull();
-    expect(sessionStorage.getItem(KEY)).toBeNull();
+    expect(studyHandoverBridge()).toBeNull();
   });
 
-  it('敷いた・引いたが購読側に届く', () => {
+  it('載せた・引いたが購読側に届く', () => {
     const listener = vi.fn();
     const stop = subscribeStudyHandover(listener);
-    beginStudyHandoverFor('/', PIXEL);
+    beginStudyHandoverFor('/', bridge());
     expect(listener).toHaveBeenCalledTimes(1);
     endStudyHandover();
     expect(listener).toHaveBeenCalledTimes(2);
-    expect(studyHandoverImage()).toBeNull();
+    expect(studyHandoverBridge()).toBeNull();
     stop();
-    beginStudyHandoverFor('/', PIXEL);
+    beginStudyHandoverFor('/', bridge());
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it('フルページ遷移をまたいでも受け取れる（OAuth・メール確認）', async () => {
-    saveStudyBackdrop(PIXEL);
-    beginStudyHandoverFor('/', PIXEL);
-    expect(sessionStorage.getItem(KEY)).not.toBeNull();
-
-    // 読み込み直し = モジュールの持ち物が消える。印だけが sessionStorage に残る。
-    vi.resetModules();
-    const reloaded = await import('@/features/shared/study/handover');
-    expect(reloaded.takePendingStudyHandover()).toBe(PIXEL);
-    // 読んだら印は消す（次に書斎を開いたときに敷き直さない）。
-    expect(sessionStorage.getItem(KEY)).toBeNull();
+  it('引いても捨てない（溶けているあいだは描いていてほしい）', () => {
+    // 捨てるのは受け皿（StudyHandover）が溶かし終えてから。
+    const b = bridge();
+    beginStudyHandoverFor('/', b);
+    endStudyHandover();
+    expect(b.dispose).not.toHaveBeenCalled();
   });
 
-  it('古い印では敷かない', async () => {
-    saveStudyBackdrop(PIXEL);
-    sessionStorage.setItem(KEY, String(Date.now() - 60_000));
-    vi.resetModules();
-    const reloaded = await import('@/features/shared/study/handover');
-    expect(reloaded.takePendingStudyHandover()).toBeNull();
-  });
-
-  it('保存できない環境でも落ちない（プライベートウィンドウ）', () => {
-    const setItem = sessionStorage.setItem;
-    sessionStorage.setItem = () => {
-      throw new Error('QuotaExceededError');
-    };
-    try {
-      expect(() => beginStudyHandoverFor('/', PIXEL)).not.toThrow();
-      // アプリ内遷移なら、手元に持っているぶんで足りる。
-      expect(studyHandoverImage()).toBe(PIXEL);
-    } finally {
-      sessionStorage.setItem = setItem;
-    }
+  it('前のものが残っていれば、新しく載せるときに捨てる', () => {
+    const first = bridge();
+    const second = bridge();
+    beginStudyHandoverFor('/', first);
+    beginStudyHandoverFor('/', second);
+    expect(first.dispose).toHaveBeenCalledTimes(1);
+    expect(studyHandoverBridge()).toBe(second);
   });
 });
