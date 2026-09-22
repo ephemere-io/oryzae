@@ -160,6 +160,16 @@ describe('HelpPanel', () => {
     expect(screen.getByText(jaMessages.help.search_asking)).toBeTruthy();
   });
 
+  it('spotlight の間は三歩以外が薄い（契約と class で見る）', () => {
+    renderPanel({ spotlight: true });
+    const panel = document.querySelector('[data-verify-unit="HelpPanel"]');
+    expect(panel?.getAttribute('data-verify-spotlight')).toBe('true');
+    const live = document.querySelector(LIVE);
+    expect(live?.parentElement?.className).toContain('opacity-30');
+    const steps = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
+    expect(steps?.parentElement?.className).toContain('help-spot');
+  });
+
   it('閉じるで onClose', () => {
     const { onClose } = renderPanel();
     fireEvent.click(screen.getByRole('button', { name: jaMessages.help.close }));

@@ -165,6 +165,22 @@ html[data-help-resizing] .help-resize-line {
   opacity: 1;
 }
 
+/* 「始めてみよう」の直後、三歩の地がアクセントで一度だけ灯って消える。 */
+.help-spot {
+  animation: help-spot 2.2s ease-out;
+}
+@keyframes help-spot {
+  0% {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  60% {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 /* ヘルプの面の頭の 1 枚が入れ替わるとき。「変わった」ことを動きで言う。 */
 .help-fade {
   animation: help-fade 180ms ease-out;
@@ -203,7 +219,8 @@ html[data-help-resizing] .help-resize-line {
     transition: none;
   }
   .help-fade,
-  .help-cue-ring {
+  .help-cue-ring,
+  .help-spot {
     animation: none;
   }
 }

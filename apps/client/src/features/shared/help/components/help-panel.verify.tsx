@@ -22,6 +22,7 @@ interface Props {
   query: string;
   matches: HelpMatch[];
   remote: HelpRemoteState;
+  spotlight?: boolean;
 }
 
 function lookup(key: string): string {
@@ -75,11 +76,18 @@ registerUnit<Props>({
           remote={props.remote}
           onClose={() => {}}
           onOpenHref={() => {}}
+          spotlight={props.spotlight}
         />
       </div>,
     ),
   fixtures: [
     { id: 'browse', description: '一覧。何にも触れていない（画面の話題が頭）', props: BROWSE },
+    {
+      id: 'spotlight',
+      probe: true,
+      description: 'Probe: 「始めてみよう」の直後 — 三歩だけ明るく、他は薄い',
+      props: { ...BROWSE, spotlight: true },
+    },
     { id: 'hovered', description: '瓶に触れている', props: { ...BROWSE, hovered: 'jar' } },
     {
       id: 'row-open',
@@ -167,6 +175,24 @@ registerUnit<Props>({
         const text = root.textContent ?? '';
         const found = LECTURE_WORDS.filter((w) => text.includes(w));
         return found.length === 0 || `説明のための言葉が残っている: ${found.join(', ')}`;
+      },
+    },
+    {
+      id: 'spotlight-dims-everything-but-the-steps',
+      description: 'spotlight の間、生きている 1 枚と一覧は薄く、三歩は灯る',
+      check: ({ root, props, contract }) => {
+        if (contract.mode !== 'browse') return true;
+        const live = root.querySelector(LIVE);
+        const dimmed = live?.parentElement?.className.includes('opacity-30') ?? false;
+        const lit =
+          root
+            .querySelector('[data-verify-unit="HelpFirstSteps"]')
+            ?.parentElement?.className.includes('help-spot') ?? false;
+        const expected = props.spotlight === true;
+        return (
+          (dimmed === expected && lit === expected) ||
+          `dimmed=${dimmed}, lit=${lit}, 期待=${expected}`
+        );
       },
     },
     {

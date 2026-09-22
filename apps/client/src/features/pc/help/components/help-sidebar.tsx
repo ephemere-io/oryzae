@@ -86,6 +86,7 @@ export function HelpSidebar() {
 
   // 掴んで引く。離すまでの幅は ref に持ち、離したときだけ state（と localStorage）へ。
   const dragWidth = useRef<number | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -98,7 +99,8 @@ export function HelpSidebar() {
     const next = clampHelpWidth(window.innerWidth - event.clientX);
     dragWidth.current = next;
     applyHelpWidth(next);
-    event.currentTarget.parentElement?.style.setProperty('width', `${next}px`);
+    // 面の幅は state を待たずに直接書く（指に遅れない）。
+    asideRef.current?.style.setProperty('width', `${next}px`);
   }, []);
   const handlePointerUp = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -115,6 +117,7 @@ export function HelpSidebar() {
 
   return (
     <aside
+      ref={asideRef}
       aria-label={t('toggle')}
       aria-hidden={!visible}
       inert={!visible}
@@ -123,31 +126,34 @@ export function HelpSidebar() {
         width: visible ? help.width : 0,
         paddingTop: SHELL_INSET,
         borderLeft: `${visible ? 1 : 0}px solid var(--surface-sunken-border)`,
-        // 紙の上に紙が重なる。縁の線 1 本に、左へ落ちる薄い影を添える（左のサイドバーと対）。
-        boxShadow: visible ? '-2px 0 10px rgba(0, 0, 0, 0.05)' : 'none',
+        // 紙の上に紙が重なる。縁の線 1 本に、左へ落ちるごく薄い影を添える（左のサイドバーと対）。
+        boxShadow: visible ? '-1px 0 6px rgba(0, 0, 0, 0.03)' : 'none',
         background: 'var(--bg)',
       }}
     >
-      {/* 左の縁。掴んで幅を変える。 */}
-      <button
-        type="button"
-        aria-label={t('resize')}
-        title={t('resize')}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onDoubleClick={() => help.setWidth(HELP_WIDTH.default)}
-        // 掴み手そのものは見えない。触れたとき・掴んでいる間だけ、縁に細い線が乗る
-        // （地を沈める版は 6px の太い線に見えた）。
-        className="group absolute inset-y-0 left-0 z-10 w-2 cursor-col-resize"
-      >
-        <span
-          aria-hidden="true"
-          className="help-resize-line absolute inset-y-0 left-0 w-[2px] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-          style={{ background: 'color-mix(in srgb, var(--accent) 55%, transparent)' }}
-        />
-      </button>
+      {/* 縁の掴み手。面は overflow-hidden なので、縁をまたいで置くには fixed で面の外へ出す
+          （DOM 上は面の子のまま）。当たりは縁の左右 7px ずつ（合わせて 14px）。掴み手そのものは見えず、触れたとき・
+          掴んでいる間だけ縁に細い線が乗る（地を沈める版は 6px の太い線に見えた）。 */}
+      {visible && (
+        <button
+          type="button"
+          aria-label={t('resize')}
+          title={t('resize')}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onDoubleClick={() => help.setWidth(HELP_WIDTH.default)}
+          className="group fixed inset-y-0 z-[56] w-[14px] cursor-col-resize"
+          style={{ right: 'calc(var(--help-width, 0px) - 7px)' }}
+        >
+          <span
+            aria-hidden="true"
+            className="help-resize-line absolute inset-y-0 left-[6px] w-[2px] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            style={{ background: 'color-mix(in srgb, var(--accent) 55%, transparent)' }}
+          />
+        </button>
+      )}
       {/* 中身は面の幅で固定。幅が動いている最中に字が折り返し直さない。 */}
       <div className="flex min-h-0 flex-1 flex-col" style={{ width: help.width }}>
         <HelpPanel
@@ -162,6 +168,7 @@ export function HelpSidebar() {
           remote={resolution.remote}
           onClose={help.closeHelp}
           onOpenHref={handleOpenHref}
+          spotlight={help.spotlight}
         />
       </div>
     </aside>

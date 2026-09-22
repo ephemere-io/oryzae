@@ -30,6 +30,11 @@ export interface HelpPanelProps {
   onClose: () => void;
   /** 「開く」。アプリの中は router、外は新しいタブ — 決めるのは呼び出し側。 */
   onOpenHref: (href: string, external: boolean) => void;
+  /**
+   * 三歩だけを明るく残し、他を薄くする（「始めてみよう」の直後だけ）。
+   * 出す側が短い時間で false に戻す。ここは映すだけ。
+   */
+  spotlight?: boolean;
 }
 
 /**
@@ -61,6 +66,7 @@ export function HelpPanel({
   remote,
   onClose,
   onOpenHref,
+  spotlight = false,
 }: HelpPanelProps) {
   const t = useTranslations('help');
   const searchId = useId();
@@ -71,6 +77,7 @@ export function HelpPanel({
   const textOf = new Map(texts.map((text) => [text.id, text]));
   const spot = hovered ?? screenTopic;
   const spotText = textOf.get(spot);
+  const dimClass = `transition-opacity duration-500 ${spotlight ? 'opacity-30' : 'opacity-100'}`;
 
   return (
     <div
@@ -83,6 +90,7 @@ export function HelpPanel({
         focused: focused ?? 'none',
         resultCount: searching ? shown.length : -1,
         remote,
+        spotlight,
       })}
       className="flex h-full min-h-0 flex-col"
       style={CONTROL_FONT}
@@ -170,15 +178,22 @@ export function HelpPanel({
           </div>
         ) : (
           <>
-            {spotText && (
-              <HelpLiveCard topic={helpTopic(spot)} text={spotText} following={hovered !== null} />
-            )}
-            <div className="mt-5">
+            {/* 「始めてみよう」の直後だけ、三歩以外が薄くなる（500ms で戻る）。 */}
+            <div className={dimClass}>
+              {spotText && (
+                <HelpLiveCard
+                  topic={helpTopic(spot)}
+                  text={spotText}
+                  following={hovered !== null}
+                />
+              )}
+            </div>
+            <div className={`mt-5 rounded-[12px] ${spotlight ? 'help-spot' : ''}`}>
               <HelpFirstSteps onOpenHref={onOpenHref} />
             </div>
             {/* 一覧。節の見出しは無く、束の間は細い線 1 本。行の余白はどの行も同じ
                 （束の頭の行だけ上が広い、といった不揃いを作らない）。「はじめに」は上の三歩が担う。 */}
-            <div className="mt-3 flex flex-col">
+            <div className={`mt-3 flex flex-col ${dimClass}`}>
               {HELP_SECTIONS.filter((section) => section !== 'start').map((section) => (
                 <div
                   key={section}

@@ -125,11 +125,13 @@ describe('HelpProvider', () => {
     });
     expect(result.current.firstVisit).toBe(true);
     expect(result.current.cue).toBe(false);
-    // 面以外を沈めて「ようこそ」。晴らしても面はそのまま。
+    // 面以外を沈めて「ようこそ」。晴らしても面はそのまま。晴れた直後は三歩だけ明るい。
     expect(result.current.welcome).toBe(true);
+    expect(result.current.spotlight).toBe(false);
     act(() => result.current.dismissWelcome());
     expect(result.current.welcome).toBe(false);
     expect(result.current.open).toBe(true);
+    expect(result.current.spotlight).toBe(true);
 
     act(() => result.current.closeHelp());
     expect(result.current.open).toBe(false);
@@ -145,6 +147,17 @@ describe('HelpProvider', () => {
     // もう一度開けば、教え終わり。
     act(() => result.current.openHelp());
     expect(result.current.cue).toBe(false);
+  });
+
+  it('三歩の明るさは勝手に戻る（もう 1 段のモードにしない）', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    act(() => result.current.dismissWelcome());
+    expect(result.current.spotlight).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(result.current.spotlight).toBe(false);
   });
 
   it('見たことがある人には自動で開かず、「ようこそ」も出ない', async () => {
