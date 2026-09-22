@@ -211,33 +211,19 @@ export function Sheet({
       if (!el) return 0;
       return el.getBoundingClientRect().top - top + scroller.scrollTop;
     };
-    // 面の上端＝いちばん高い段。ここは印を測らずに決まる（閉の位置の空きは容器と同じ高さ）ので、
-    // **いつでも正しい**。他の段が測れなかったときの逃げ場にする。
-    const full = inContent(sheetRef.current);
-    const marked = () => {
-      switch (position) {
-        case 'half':
-          return inContent(halfRef.current);
-        case 'peek':
-          return inContent(peekRef.current);
-        case 'content':
-          return inContent(contentRef.current);
-        case 'full':
-          return full;
-      }
-    };
-    const at = marked();
-    if (position === 'full') return at;
-    // **測れなかった印は閉の位置（0）と見分けがつかない。** 中身の段は測った高さ（見出し + 中身）に
-    // 依るので、測る前や測れなかったときに 0 が返り、開いたのに画面の外に置かれる（実機レビュー:
-    // 一覧のアイテムを押しても何も出てこない）。どの段も「見出しの行が見える」より低くはならないので、
-    // 覗く段の印を下限にする（これは測った高さに依らない）。
-    const floor = inContent(peekRef.current);
-    // 中身の段が見出しの行より低い＝測れていない。何も出ないくらいなら、いちばん高い段に出す。
-    if (position === 'content' && at <= floor) return full;
-    // どの段も閉の位置には置かない（印がひとつも測れない環境では `full` も 0 なのでそのまま）。
-    if (at < 1 && floor < 1) return full;
-    return Math.max(at, floor);
+    // 位置は測ったまま返す。**0 は正当な位置**（いちばん低い段。空きが「容器 − いちばん低い段」なので）。
+    // 以前ここにあった「0 なら測れていないとみなして全画面へ逃がす」保険は、0 ＝ 閉の位置だった頃のもの。
+    // 残したままだと、覗く段（位置 0）の板を全画面へ送ってしまう（実測: 発酵の結果が開いた瞬間に全画面）。
+    switch (position) {
+      case 'half':
+        return inContent(halfRef.current);
+      case 'peek':
+        return inContent(peekRef.current);
+      case 'content':
+        return inContent(contentRef.current);
+      case 'full':
+        return inContent(sheetRef.current);
+    }
   }, []);
 
   const scrollToDetent = useCallback(
