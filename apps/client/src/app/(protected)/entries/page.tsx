@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { DeviceView } from '@/components/device-view';
+import { BackLink } from '@/components/ui/back-link';
 import { EntryList } from '@/features/pc/entries/components/entry-list';
 import { useFilterableQuestions } from '@/features/shared/questions/hooks/use-filterable-questions';
 import { SpEntryList } from '@/features/sp/entries/components/sp-entry-list';
@@ -24,6 +25,8 @@ export default function EntriesPage() {
       }
       pc={
         <div className="flex min-h-full flex-col">
+          {/* 左上の出口（書斎が無効なら描かれない）。本文の列は中央に寄っているので隅に置く。 */}
+          <BackLink placement="corner" />
           <div className="mx-auto w-full max-w-[680px] flex-1 px-6 pt-10 pb-20">
             {/* Header: ALL ENTRIES left, + NEW ENTRY right */}
             <div className="mb-8 flex items-center justify-between">
