@@ -169,7 +169,6 @@
       "back_to_list": "Pick from existing questions",
       "untitled": "Untitled question",
       "close": "Close",
-      "limit": "You can have up to {max} questions. Archive one in your question list to start a new one.",
       "manage": "Open question list"
     }
   },

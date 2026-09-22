@@ -180,16 +180,9 @@ export function QuestionPicker({
               );
             })}
           </ul>
-          {atLimit ? (
-            // 上限（#430）。書いても作れないので、書く欄を開かせない。
-            <p
-              data-question-limit
-              className="m-0 px-4 pt-2 text-[12px] leading-relaxed"
-              style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
-            >
-              {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
-            </p>
-          ) : null}
+          {/* 上限（#430）では「新しく問いを書く」を出さず、問いの一覧への入口を出す（下の行）。
+              説明の一文は置かない: 5 つ並んでいるのが見えるので、言葉で言い直すとかえってややこしい
+              （オーナーのレビュー。一覧の箱と同じ判断）。 */}
           <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border-subtle)' }}>
             <ActionRow
               actions={[

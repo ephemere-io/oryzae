@@ -26,12 +26,10 @@ function renderPicker(count: number) {
 describe('QuestionPicker（問いの上限、#430）', () => {
   afterEach(cleanup);
 
-  it('上限（5）なら「新しく問いを書く」を出さず、理由を出す', () => {
+  it('上限（5）なら「新しく問いを書く」を出さない。説明の文も置かない', () => {
     renderPicker(5);
     expect(screen.queryByText(jaMessages.entry_questions.picker.new)).toBeNull();
-    expect(
-      screen.getByText(jaMessages.entry_questions.picker.limit.replace('{max}', '5')),
-    ).toBeTruthy();
+    expect(document.querySelector('[data-question-limit]')).toBeNull();
   });
 
   it('上限未満なら「新しく問いを書く」を出す', () => {
