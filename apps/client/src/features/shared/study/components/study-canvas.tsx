@@ -196,6 +196,7 @@ export function StudyCanvas({
     pointersRef.current.clear();
     panRef.current = null;
     pinchStartRef.current = null;
+    handleRef.current?.release();
   }, []);
 
   const releasePinch = useCallback((pointerId: number) => {
@@ -203,6 +204,8 @@ export function StudyCanvas({
     if (panRef.current?.pointerId === pointerId) panRef.current = null;
     // 片方だけ離しても、残った指を「新しいつまみの始まり」にはしない。
     if (pointersRef.current.size < 2) pinchStartRef.current = null;
+    // 全部離れたら、その場で止まる。
+    if (pointersRef.current.size === 0) handleRef.current?.release();
   }, []);
 
   return (

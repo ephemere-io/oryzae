@@ -185,7 +185,13 @@ export function StudyHome({ layout }: StudyHomeProps) {
   );
 
   return (
-    <div ref={rootRef} className="absolute inset-0 overflow-hidden">
+    <div
+      ref={rootRef}
+      className="absolute inset-0 overflow-hidden"
+      // 書斎の上ではブラウザの操作（ページの拡大・二度押しの拡大）を起こさない。canvas だけでなく、
+      // 上に重なるピルやラベルから始まる指も同じ扱いにする（そこから始まる 2 本指がページを拡大していた）。
+      style={{ touchAction: 'none' }}
+    >
       {/* 憶えた部屋。**溶暗の外側に置く。** 中に入れると、書斎が opacity 0 から
           現れるあいだ地まで一緒に薄くなり、そこで点滅が起きる。canvas が最初の
           1 フレームを描いたら消す。 */}
