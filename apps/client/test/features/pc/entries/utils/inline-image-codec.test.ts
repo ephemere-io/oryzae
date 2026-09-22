@@ -357,9 +357,11 @@ describe('inlineImageSizeSteps', () => {
 });
 
 /**
- * 写真のまわりの余白。**上下左右とも同じ**にする（#626 のレビュー）。
- * 以前は block のとき 0、wrap のとき辺ごとにばらばらで、縦書きで写真の右に
- * 来た文字が張りついて見えていた。
+ * 写真のまわりの余白。**文字が来る側だけ空ける**（#626 のレビュー）。
+ *
+ * 隣の行との間（block 軸）は両側とも 1em。寄せの軸（inline 軸）は、寄せた側＝行の端に
+ * 着くべき側を 0 にする。ここに余白を入れると、写真だけが隣の行の頭より 1 文字ぶん
+ * 内側に落ちて行がそろわない。
  */
 describe('写真のまわりの余白', () => {
   function styled(over: Partial<InlineImage>): HTMLImageElement {
@@ -379,22 +381,30 @@ describe('写真のまわりの余白', () => {
     expect(styled({ layout: 'block' }).style.marginBlock).toBe('1em');
   });
 
-  it('回り込みも同じ余白を四辺に置く', () => {
-    const el = styled({ layout: 'wrap', align: 'start' });
-    expect(el.style.marginBlock).toBe('1em');
-    expect(el.style.marginInline).toBe('1em');
+  // 寄せた側は行の端。ここに余白を足すと、写真だけが隣の行の頭より内側に落ちる。
+  it('寄せた側は 0 のまま（行の端にそろえる）', () => {
+    expect(styled({ layout: 'block', align: 'start' }).style.marginInline).toBe('0 auto');
+    expect(styled({ layout: 'block', align: 'end' }).style.marginInline).toBe('auto 0');
+    expect(styled({ layout: 'block', align: 'center' }).style.marginInline).toBe('auto');
   });
 
-  // `0 auto` だと寄せた先の端に写真が貼りつく（縦書き・始め寄せで紙の上辺に食い込んでいた）。
-  it('寄せる側にも余白を残す（0 で詰めない）', () => {
-    expect(styled({ layout: 'block', align: 'start' }).style.marginInline).toBe('1em auto');
-    expect(styled({ layout: 'block', align: 'end' }).style.marginInline).toBe('auto 1em');
+  it('回り込みは寄せた側 0・文字が流れ込む側だけ空ける', () => {
+    const start = styled({ layout: 'wrap', align: 'start' });
+    expect(start.style.marginBlock).toBe('1em');
+    expect(start.style.marginInline).toBe('0 1em');
+    // 終わり寄せなら逆側に付く（`0 1em` のままだと寄せた側にだけ余白が残る）。
+    expect(styled({ layout: 'wrap', align: 'end' }).style.marginInline).toBe('1em 0');
   });
 
-  // 行いっぱい（100%）に四辺の余白を足すと、そのぶんだけ行からはみ出す。
-  it('行いっぱいでも余白のぶんだけ天井を下げる', () => {
+  // 行いっぱいに余白を足すと、そのぶんだけ行からはみ出す。
+  it('余白がある軸だけ天井を下げる', () => {
+    // ふつうの配置は寄せた側が 0 なので、行いっぱいがそのまま入る。
+    expect(styled({ widthRatio: 1, layout: 'block' }).style.maxInlineSize).toBe('');
+    expect(styled({ widthRatio: 1, layout: 'wrap' }).style.maxInlineSize).toBe('calc(100% - 1em)');
     // CSS 側は `calc(100% - 2 * 1em)` と書くが、ブラウザが掛け算を畳んでから返す。
-    expect(styled({ widthRatio: 1 }).style.maxInlineSize).toBe('calc(100% - 2em)');
+    expect(styled({ widthRatio: 1, layout: 'inline' }).style.maxInlineSize).toBe(
+      'calc(100% - 2em)',
+    );
   });
 });
 

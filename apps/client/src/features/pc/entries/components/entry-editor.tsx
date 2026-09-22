@@ -1277,12 +1277,13 @@ export function EntryEditor({
           ),
           onSelect: () => {
             const on = selectedPhoto.layout !== 'wrap';
+            // **大きさには触らない。** 以前は幅いっぱいのとき「回り込む隙間が無いから」と
+            // いちばん小さい段へ落としていたが、大にしてから回り込みを押すと小に化けて
+            // 見えた。隙間が無ければ文字が下へ回るだけで、勝手に縮める理由にはならない。
             inlineImages.updateLayout({
               layout: on ? 'wrap' : 'block',
               // 中央寄せのまま回り込みにすると寄る先が無い。見た目と揃えて始めへ。
               ...(on && selectedPhoto.align === 'center' ? { align: 'start' as const } : {}),
-              // 幅いっぱいでは文字が回り込む隙間が無い。いちばん小さい段に落とす。
-              ...(on && selectedPhoto.widthRatio >= 1 ? { widthRatio: sizeSteps[0] } : {}),
             });
           },
         },

@@ -233,9 +233,6 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   }
 
   el.style.inlineSize = `${image.widthRatio * 100}%`;
-  // **余白のぶんだけ天井を下げる。** 行いっぱい（100%）に四辺の余白を足すと、
-  // その 2 つぶんだけ行からはみ出す（縦書きなら紙の上下に食い込む）。
-  el.style.maxInlineSize = `calc(100% - 2 * ${INLINE_IMAGE_GUTTER})`;
   // 自由変形したときだけ形を固定する。既定は写真本来の比率に任せる。
   //
   // `aspect-ratio` は**物理（幅 ÷ 高さ）**で、保存している `aspect` も同じ物理の比。
@@ -247,6 +244,14 @@ export function applyInlineImageStyle(el: HTMLImageElement, image: InlineImage):
   applyLayoutStyle(el, image);
 }
 
+/**
+ * 余白を置くのは**文字が来る側だけ**。写真が行の端に着く側は 0 にする。
+ *
+ * inline 軸（寄せの軸。横書きなら左右、縦書きなら上下）で、始め寄せなら始め側、
+ * 終わり寄せなら終わり側が「行の端」になる。そこに余白を入れると、写真だけが
+ * 隣の行の頭より 1 文字ぶん内側に落ちて、行がそろわない（#626 の実機レビュー）。
+ * block 軸（行が並んでいく向き）は両側とも文字が来るので、どちらにも置く。
+ */
 function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
   // 一旦すべて解除してから当てる。モードを切り替えたとき前の指定が残らないように。
   el.style.display = '';
@@ -254,39 +259,37 @@ function applyLayoutStyle(el: HTMLImageElement, image: InlineImage): void {
   el.style.marginInline = '';
   el.style.marginBlock = '';
   el.style.verticalAlign = '';
+  el.style.maxInlineSize = '';
 
   if (image.layout === 'inline') {
-    // 文字と同じ流れに置く。大きな 1 文字として振る舞う。
+    // 文字と同じ流れに置く。大きな 1 文字として振る舞う。前後とも文字なので両側に置く。
     el.style.display = 'inline-block';
     el.style.verticalAlign = 'middle';
     el.style.marginInline = INLINE_IMAGE_GUTTER;
+    el.style.maxInlineSize = `calc(100% - 2 * ${INLINE_IMAGE_GUTTER})`;
     return;
   }
 
-  // 文字との間合いは block 軸（横書きなら上下、縦書きなら左右）。ここが
-  // 「写真の隣の行」との隙間になるので、どのレイアウトでも同じ値を置く。
+  // 隣の行との間合い。ここが「写真の隣に並ぶ文字」との隙間になる。
   el.style.marginBlock = INLINE_IMAGE_GUTTER;
 
   if (image.layout === 'block') {
-    // 独立した行を占める。寄せは inline 軸のマージンで作る
-    // （横書きなら左右、縦書きなら上下に効く）。
-    //
-    // 寄せる側にも同じ余白を残す。`0 auto` のように 0 を置くと、寄せた先の端に
-    // 写真が貼りつく（縦書き・始め寄せで紙の上辺に食い込んでいた）。
+    // 独立した行を占める。寄せは inline 軸の `auto` で作る。寄せた側は 0 のまま
+    // ——行の端に着くべきところなので、ここに余白を足すと行頭がそろわない。
     el.style.display = 'block';
     el.style.marginInline =
-      image.align === 'center'
-        ? 'auto'
-        : image.align === 'end'
-          ? `auto ${INLINE_IMAGE_GUTTER}`
-          : `${INLINE_IMAGE_GUTTER} auto`;
+      image.align === 'center' ? 'auto' : image.align === 'end' ? 'auto 0' : '0 auto';
     return;
   }
 
   // wrap: 本文が写真を避けて流れる。物理方向ではなく論理方向で寄せる
   // （縦書きでは inline-start が上、inline-end が下になる）。
-  el.style.float = image.align === 'end' ? 'inline-end' : 'inline-start';
-  el.style.marginInline = INLINE_IMAGE_GUTTER;
+  // 寄せた側は行の端に着け、文字が流れ込む反対側だけ空ける。
+  const atEnd = image.align === 'end';
+  el.style.float = atEnd ? 'inline-end' : 'inline-start';
+  el.style.marginInline = atEnd ? `${INLINE_IMAGE_GUTTER} 0` : `0 ${INLINE_IMAGE_GUTTER}`;
+  // 行いっぱいだと、流れ込む側の余白のぶんだけ行からはみ出す。
+  el.style.maxInlineSize = `calc(100% - ${INLINE_IMAGE_GUTTER})`;
 }
 
 /** 本文中に置く `<img>` を作る。`src` は署名付き URL（失効するので保存はしない）。 */
