@@ -71,10 +71,14 @@
   扉の正面まで来たら（`walkMs`）、描き続けている canvas をルーターの上に載せ替えてから移る。
   認証画面が外れてもシーンは止まらない（cleanup は持ち出し済みなら dispose しない）
 - **受け皿ごと compositor で前へ進める**（`StudyHandover` の `PUSH`、1.05 倍 / 1.8 秒）。
-  中の歩きは rAF＝メインスレッドの仕事で、書斎の 1 フレーム目の直後にメインスレッドが
-  200ms 以上塞がると止まる（本番ビルドの計測で 246ms）。transform の transition は compositor が
-  進めるので、JS が止まっていても動き続ける。出だしはゆっくり（速く始めると、載せた瞬間に
-  速度が跳ねてそれが「カクッ」になる）
+  中の歩きは rAF＝メインスレッドの仕事で、書斎の最初の描画でメインスレッドが塞がると止まる。
+  transform の transition は compositor が進めるので、JS が止まっていても動き続ける。
+  出だしはゆっくり（速く始めると、載せた瞬間に速度が跳ねてそれが「カクッ」になる）
+- **書斎のシェーダは描く前に非同期で用意する**（`study/scene/scene.ts` の `compileAsync`）。
+  最初の `render` が材ごとの program を同期で compile / link していて、それが 1 タスクで
+  メインスレッドを塞いでいた。KHR_parallel_shader_compile で待たずに用意し、できてから描く。
+  残るのは GPU 側のパイプライン初期化（Metal では最初の draw で作る）で 50〜110ms、これは
+  上の compositor の前進が覆う
 - **書斎の canvas が最初の 1 フレームを描いたら、上の canvas を溶かして捨てる**（360ms）。
   書斎の側も寄りながら現れる（`ARRIVAL`）ので、溶けるあいだも両方が動いている。
   合図が来なくても 4 秒で外す
@@ -92,6 +96,9 @@
 コマの差分を取るのも有効（静止したコマ＝差分 0 が続く／白飛び＝線の無いコマ）。
 **dev サーバーでは測らない** — 遷移がメインスレッドを数百 ms 塞ぐので、本番ビルドと違う
 止まり方をする。Vercel のプレビューを bypass トークン付きの Playwright で撮る。
+**既定のヘッドレス Chromium でも測らない** — WebGL が SwiftShader（CPU 描画）になり、最初の描画が
+実 GPU の 4〜5 倍（約 245ms）塞がる。`chromium.launch({ channel: 'chromium', args: ['--use-angle=metal'] })`
+なら実 GPU（並列コンパイル対応）で測れる。
 
 ### 画面の高さは `svh` と `dvh` の小さい方（SP）
 
