@@ -26,6 +26,8 @@ import {
 export function StudyHandover() {
   const [bridge, setBridge] = useState<StudyBridge | null>(null);
   const [leaving, setLeaving] = useState(false);
+  /** 受け皿ごと前へ進めている最中か（下の `PUSH` の注釈）。 */
+  const [pushing, setPushing] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(
@@ -55,6 +57,28 @@ export function StudyHandover() {
     host.appendChild(canvas);
     return () => {
       if (canvas.parentNode === host) host.removeChild(canvas);
+    };
+  }, [bridge]);
+
+  /**
+   * 載せた瞬間から、**受け皿ごと前へ進める**（CSS の transform）。
+   *
+   * 中の canvas は歩き続けているが、それは rAF、つまりメインスレッドの仕事。書斎が
+   * 最初の 1 フレームを描いた直後にメインスレッドが 200ms 以上塞がることがあり
+   * （本番ビルドの計測で 246ms）、その間は canvas の絵が止まる。transform の transition は
+   * compositor が進めるので、**JS が止まっていても動き続ける**。中の歩きに、止まらない
+   * 前進をもう 1 枚重ねておく。
+   *
+   * 出だしはゆっくり（`cubic-bezier(0.4, 0, 0.2, 1)`）。速く始めると、載せた瞬間に速度が
+   * 跳ねて、それ自体が「カクッ」になる。
+   */
+  useEffect(() => {
+    if (bridge === null) return;
+    // 次のフレームで始める（同じフレームだと transition が走らない）。
+    const id = requestAnimationFrame(() => setPushing(true));
+    return () => {
+      cancelAnimationFrame(id);
+      setPushing(false);
     };
   }, [bridge]);
 
@@ -93,13 +117,28 @@ export function StudyHandover() {
       aria-hidden="true"
       data-study-handover
       className="pointer-events-none fixed inset-0 z-50"
-      style={{ opacity: leaving ? 0 : 1, transition: `opacity ${FADE_MS}ms ease-out` }}
+      style={{
+        opacity: leaving ? 0 : 1,
+        transform: `scale(${pushing ? PUSH.scale : 1})`,
+        // 扉の開口は画面のほぼ中央。少し上を中心にすると、床ではなく奥へ進んで見える。
+        transformOrigin: '50% 45%',
+        transition: `opacity ${FADE_MS}ms ease-out, transform ${PUSH.ms}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+        willChange: 'transform, opacity',
+      }}
     />
   );
 }
 
 /** 溶かすのにかける時間（ms）。書斎はもう描けているので、静かに退く。 */
 const FADE_MS = 360;
+
+/**
+ * 受け皿ごと前へ進める量と長さ。
+ *
+ * 中の歩きに重ねるぶんなので、ごく小さく。大きくすると canvas を拡大していることが
+ * 分かる（線が太る）。長さは、載ってから溶け終わるまで（遅い端末でも）を覆う。
+ */
+const PUSH = { scale: 1.05, ms: 1800 } as const;
 
 /**
  * 引く合図を待つ上限（ms）。
