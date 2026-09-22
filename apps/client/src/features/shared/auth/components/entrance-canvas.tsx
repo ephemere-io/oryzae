@@ -15,17 +15,9 @@ export interface EntranceCanvasProps {
   onHandle: (handle: EntranceSceneHandle | null) => void;
   /** 最初の 1 フレームを描き終えたとき。 */
   onReady: () => void;
-  /** 奥へ歩いている途中の 1 枚。書斎が読み込まれるまでの地にする。 */
-  onCapture: (dataUrl: string) => void;
 }
 
-export function EntranceCanvas({
-  layout,
-  reducedMotion,
-  onHandle,
-  onReady,
-  onCapture,
-}: EntranceCanvasProps) {
+export function EntranceCanvas({ layout, reducedMotion, onHandle, onReady }: EntranceCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   /**
    * 一輪挿しに挿さる枝の姿。いまの候（七十二候）で決まる（`season.ts`）。
@@ -33,8 +25,8 @@ export function EntranceCanvas({
    */
   const sprig = useMemo(() => entranceSprig(microSeasonIndex(new Date())), []);
   // コールバックは ref で読む。親が再描画しただけでシーンを作り直さない。
-  const callbacks = useRef({ onHandle, onReady, onCapture });
-  callbacks.current = { onHandle, onReady, onCapture };
+  const callbacks = useRef({ onHandle, onReady });
+  callbacks.current = { onHandle, onReady };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -48,7 +40,6 @@ export function EntranceCanvas({
         reducedMotion,
         sprig,
         onReady: () => callbacks.current.onReady(),
-        onCapture: (dataUrl) => callbacks.current.onCapture(dataUrl),
       });
     } catch {
       // WebGL が無い。扉は出ないが、紙（フォーム）は地の色の上でそのまま使える。
@@ -74,7 +65,9 @@ export function EntranceCanvas({
       window.removeEventListener('pointermove', handlePointerMove);
       document.documentElement.removeEventListener('pointerleave', handlePointerLeave);
       callbacks.current.onHandle(null);
-      handle.dispose();
+      // 持ち出された canvas は、受け取った側（`StudyHandover`）が捨てる。ここで捨てると、
+      // 画面が入れ替わった瞬間に動きが消える。
+      if (!handle.isDetached()) handle.dispose();
     };
   }, [layout, reducedMotion, sprig]);
 

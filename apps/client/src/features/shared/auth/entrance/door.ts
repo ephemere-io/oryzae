@@ -48,27 +48,24 @@ export const ENTER_TIMING = {
   doorMs: 700,
   /** 扉が開き始めてから歩き出すまで。開くのを待ち切らずに重ねる。 */
   walkDelayMs: 140,
-  /** 扉の正面（敷居の手前）へ寄り着くまで。 */
+  /**
+   * 歩き出してから、**行き先へ移ってよくなる**まで。
+   *
+   * 歩きはここで終わらない（`glideView` の注釈）。ここは「もう扉の正面まで来ているので、
+   * 下で画面を入れ替えてよい」という時刻。入れ替えは canvas ごと上に持ち上げて行うので
+   * （`study/handover.ts`）、見えている動きはそのまま続く。
+   */
   walkMs: 980,
   /**
    * 歩き終わりの溶暗（ms）。**扉があるときは 0。**
    *
    * 以前は歩きの後半（約 0.4 秒）をかけて地の色へ溶かしていて、「ホワイトアウトして
    * ブツ切れになる」と報告された（PR #624 のレビュー）。短くしても、溶けるぶんは白い。
-   * いまは歩き切った 1 枚を**画面の上に敷いて**から移るので（`study/handover.ts`）、
-   * 隠すための溶暗そのものが要らない。扉が無いとき（WebGL 非対応）だけ、`enterPlan` が
+   * いまは歩いている canvas をそのまま画面の上に持ち上げてから移るので、隠すための
+   * 溶暗そのものが要らない。扉が無いとき（WebGL 非対応）だけ、`enterPlan` が
    * `REDUCED_FADE_MS` で溶かす。
    */
   handoverMs: 0,
-  /**
-   * 歩き終わりの何 ms 前に、書斎へ渡す 1 枚を撮るか。
-   *
-   * 撮った絵は書斎が読み込まれるまでの地になる（`study/backdrop.ts`）。画素はその場で
-   * 掴むので、この前倒しは **PNG の符号化と保存が navigation に間に合う**ためのもの。
-   * 長く取りすぎると、まだ扉から遠い絵を渡してしまう（`walkProgress` は着きで減速する
-   * ので、この長さなら扉の正面まで来ている）。
-   */
-  captureLeadMs: 300,
 } as const;
 
 export interface EnterPlan {
@@ -121,27 +118,35 @@ export function doorAngleWhileEntering(plan: EnterPlan, from: number, elapsedMs:
 }
 
 /**
- * 歩いて入る道のりの進み（0..1、イージング済み）。
+ * 歩いて入る動き。**止まらない — 近づくほど遅くなるだけ。**
  *
- * 出だしも着きもゆるやか。**着きで減速する**のが肝で、止まった絵がそのまま書斎へ渡す 1 枚に
- * なる（`captureLeadMs`）。最後まで加速していると、渡す 1 枚と最後のフレームがずれる。
- */
-export function walkProgress(plan: EnterPlan, elapsedMs: number): number {
-  return EASING.easeInOutCubic(progress(elapsedMs - plan.walkDelayMs, plan.walkMs));
-}
-
-/**
- * 歩き着く先。**扉の正面、枠がまだ絵に収まっているところで止まる。**
+ * 以前は「敷居の手前まで 0.98 秒で歩いて止まり、撮った 1 枚を敷いて、その絵を別の動きで
+ * 寄せる」だった。止まった瞬間と、別の動きが始まる瞬間で速度が途切れ、「扉を開き終わった
+ * 後にカクッとする」と報告された（PR #624 の実機レビュー）。継ぎ目のあるものは、どう
+ * 合わせても継ぎ目が残る。
  *
- * 抜けるところまで歩かせていた頃は、開いた扉板と枠がカメラのすぐ脇まで来て、画面を縦に
- * 横切る線だけが残った — 「書斎に入る直前に柱みたいなのが見える」と報告された（PR #624）。
- * 寄りすぎると扉は扉に見えない。扉が扉として読めるところで止め、続きは書斎の側の寄り
- * （`study/constants.ts` の `ARRIVAL`）に渡す。
+ * いまは 1 本の動きにする。目指す先（`GLIDE.target`、扉の開口の中）へ、**残りの距離に
+ * 比例した速さで近づき続ける**（指数的な接近）。速度は常に連続で、着く前に書斎が
+ * 現れる。読み込みが遅ければゆっくり近づき続けるだけで、止まる瞬間は無い。
+ * 歩き出しだけは助走を付ける（静止から急に動き出さない）。
  */
-export const THRESHOLD_VIEW: CameraView = {
-  position: { x: 0, y: DOOR.height * 0.44, z: 5 },
-  target: { x: 0, y: DOOR.height * 0.4, z: -8 },
-};
+export const GLIDE = {
+  /** 歩き出しの助走（ms）。この間に速さを 0 から立ち上げる。 */
+  rampMs: 360,
+  /** 近づく速さ。1 秒あたり、残りの距離のどれだけを詰めるか（の指数）。 */
+  rate: 1.7,
+  /**
+   * 目指す先。扉の開口の中、敷居のすぐ手前。
+   *
+   * ここへは着かない（近づくだけ）。以前は敷居をまたいで奥まで歩かせていて、枠や扉板が
+   * カメラのすぐ脇を通り、縦線だけの絵になった（「柱みたいなものが見える」）。開口の中を
+   * 目指せば、近づくほど枠は画面の外へ滑り出ていき、残るのは奥の書斎になる。
+   */
+  target: {
+    position: { x: 0, y: DOOR.height * 0.44, z: 1.4 },
+    target: { x: 0, y: DOOR.height * 0.4, z: -8 },
+  } satisfies CameraView,
+} as const;
 
 /** 待っているときの view（配置表どおり）。 */
 export function homeEntranceView(layout: EntranceLayout): CameraView {
@@ -151,17 +156,24 @@ export function homeEntranceView(layout: EntranceLayout): CameraView {
   };
 }
 
-/** 歩いて入る途中の view。`from` は歩き出した時点の view（揺れを含む）。 */
-export function walkView(from: CameraView, t: number): CameraView {
-  return lerpView(from, THRESHOLD_VIEW, clamp01(t));
+/**
+ * いまの view を、`dtMs` ぶん目指す先へ近づける。
+ *
+ * `elapsedMs` は歩き出してからの経過（助走に使う）。フレームの長さに依らない —
+ * 同じ経過時間なら、コマ落ちしても同じところにいる。
+ */
+export function glideView(current: CameraView, elapsedMs: number, dtMs: number): CameraView {
+  const ramp = EASING.easeInOutCubic(progress(elapsedMs, GLIDE.rampMs));
+  const k = 1 - Math.exp(-GLIDE.rate * ramp * (Math.max(0, dtMs) / 1000));
+  return lerpView(current, GLIDE.target, clamp01(k));
 }
 
 /**
  * その view が、壁ではなく扉の開口を覗いているか。
  *
- * カメラは敷居の手前で止まるので、確かめるのは**位置**ではなく**視線**。壁の面（z = 0）を
- * どこで通るかを出して、開口の内側かを見る。構図を変えたときに、壁を見つめて終わって
- * いないかをテストで押さえるために置いている。
+ * 確かめるのは**位置**ではなく**視線**。壁の面（z = 0）をどこで通るかを出して、開口の
+ * 内側かを見る。構図を変えたときに、壁を見つめて終わっていないかをテストで押さえるために
+ * 置いている。
  */
 export function looksThroughDoorway(view: CameraView): boolean {
   const { position, target } = view;
