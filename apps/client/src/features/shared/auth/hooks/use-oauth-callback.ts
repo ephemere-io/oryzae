@@ -17,7 +17,7 @@ import { setTokens } from '@/lib/auth';
  * - PKCE: クエリの `code` を `/oauth/callback` に渡す
  * - implicit: URL ハッシュのトークンを保存し `/oauth/finalize` で profile 作成・枠チェック
  *   （Issue #307: Supabase JS の既定が implicit のため Google SSO 新規はこちらを通る。
- *   呼ばないと profile が作られず onboarding も出ない）
+ *   呼ばないと profile が作られず、初回のヘルプも出ない）
  */
 
 function parseHashParams(hash: string): Record<string, string> {

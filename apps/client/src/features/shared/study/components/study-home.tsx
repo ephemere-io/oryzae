@@ -5,9 +5,10 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
+import { useHelpMode } from '@/features/shared/help/help-context';
+import { topicForStudyLabel } from '@/features/shared/help/topics';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
@@ -15,7 +16,7 @@ import { DURATION, RENDER_LIMITS } from '../constants';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
-import { externalHref, overlayScope, staysInStudy, targetHref } from '../navigation';
+import { opensHelp, overlayScope, staysInStudy, targetHref } from '../navigation';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -44,8 +45,8 @@ export interface StudyHomeProps {
 
 export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
-  const locale = useLocale();
   const { api, auth, loading: authLoading } = useAuth();
+  const help = useHelpMode();
   const { theme } = useTheme();
   const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
 
@@ -149,17 +150,16 @@ export function StudyHome({ layout }: StudyHomeProps) {
 
   const handleNavigate = useCallback(
     (target: StudyTarget) => {
-      // 部屋の外（公開サイト）は新しいタブで開く。書斎は閉じない。言語はアプリのまま。
-      const outside = externalHref(target, locale);
-      if (outside !== null) {
-        window.open(outside, '_blank', 'noopener,noreferrer');
+      // メモ帳はヘルプの入口。画面を移さず、面を開閉する。書斎は閉じない。
+      if (opensHelp(target)) {
+        help.toggleHelp();
         return;
       }
       const href = targetHref(target);
       // カメラが着いてから URL を変える。書斎はこの時点でもう消えている（溶暗）。
       if (href !== null) router.push(href);
     },
-    [router, locale],
+    [router, help],
   );
 
   const handleOpenOverlay = useCallback((target: StudyTarget) => {
@@ -238,6 +238,9 @@ export function StudyHome({ layout }: StudyHomeProps) {
           onHoverChange={(hovered) => {
             setHoveredLabel(hovered?.label ?? null);
             setHover(hovered);
+            // ヘルプが開いていれば、触れている物の説明が面に出る。何にも触れていない
+            // ときは部屋そのもの（Oryzae とは）。3D の的は DOM を持たないので、ここから伝える。
+            help.setHovered(hovered?.label ? topicForStudyLabel(hovered.label) : 'concept');
           }}
         />
 

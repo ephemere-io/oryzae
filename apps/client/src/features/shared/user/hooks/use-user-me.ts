@@ -8,6 +8,7 @@ interface UserMeData {
   id: string;
   nickname: string;
   avatarUrl: string | null;
+  /** 初回のヘルプを閉じたことがあるか（旧オンボーディングの旗をそのまま使っている）。 */
   onboardingCompleted: boolean;
   /** 一度でも漬け込んだことがあるか (Issue #316 ガイド表示判定用) */
   hasPickled: boolean;
@@ -44,9 +45,9 @@ interface UseUserMeResult {
  * Issue #316: EntryEditor の保存成功後ナッジ表示判定に必要な
  * `hasPickled` / `hasLinkedQuestion` を含む user-me を取得する。
  *
- * `useOnboarding` も同じエンドポイントを叩くが、用途とライフサイクルが
- * 異なるためフックを分けている (onboarding は app/(protected)/layout、
- * これは entries feature 内で消費)。
+ * `useHelpFirstVisit`（ヘルプの初回判定）も同じエンドポイントを叩くが、用途と
+ * ライフサイクルが異なるためフックを分けている (あちらは app/(protected)/layout の
+ * HelpProvider、これは entries feature 内で消費)。
  */
 export function useUserMe(api: ApiClient | null): UseUserMeResult {
   const [data, setData] = useState<UserMeData | null>(null);

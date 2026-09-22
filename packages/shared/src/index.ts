@@ -30,6 +30,8 @@ export {
   type EraserTracePayload,
   editorEffectsStateSchema,
   emailOtpTypeSchema,
+  type HelpSearchInput,
+  helpSearchSchema,
   type InlineImage,
   type JarLayoutUpdate,
   type JarPositionItem,

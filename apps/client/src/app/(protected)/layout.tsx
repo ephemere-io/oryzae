@@ -1,15 +1,14 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
+import { HelpSidebar } from '@/features/pc/help/components/help-sidebar';
 import { Sidebar } from '@/features/pc/navigation/components/sidebar';
 import { useRootHashHandoff } from '@/features/shared/auth/hooks/use-root-hash-handoff';
 import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
-import { OnboardingFlow } from '@/features/shared/onboarding/components/onboarding-flow';
-import { useOnboarding } from '@/features/shared/onboarding/hooks/use-onboarding';
-import type { OnboardingResult } from '@/features/shared/onboarding/types';
+import { HelpProvider } from '@/features/shared/help/help-context';
 import {
   BackToStudy,
   STUDY_EXIT_BAND,
@@ -18,6 +17,7 @@ import {
 import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
+import { SpHelpSheet } from '@/features/sp/help/components/sp-help-sheet';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
 import { SidebarProvider } from '@/lib/sidebar-context';
@@ -72,6 +72,8 @@ function PcShell({
         {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
         {!onStudy && <PageFooter />}
       </main>
+      {/* ヘルプの面。開いている間だけ右に立ち、本文はそのぶん詰まる（被らない）。 */}
+      <HelpSidebar />
       {/* PC で coarse-pointer かつ狭幅のケースを保護（SP は専用体験があるので出さない） */}
       <DesktopOnlyOverlay />
     </div>
@@ -107,7 +109,6 @@ const STUDY_PATH = '/';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { auth, api, loading } = useAuth();
-  const { shouldShow, complete } = useOnboarding(api);
   // 未読の算出は features/shared の hook が持ち、context は配るだけ（lib はドメインを知らない）。
   // 全画面で 1 つの状態を共有するため、取得もここで 1 回だけ行う（#363 の N+1 解消を維持）。
   const unread = useUnreadLetters(api, loading);
@@ -146,17 +147,6 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     setMounted(true);
   }, []);
 
-  const handleOnboardingComplete = useCallback(
-    async (result: OnboardingResult) => {
-      const { questionId } = await complete(result);
-      // Pass questionId so it pre-links AND triggers a refetch even when
-      // /entries/new is already mounted (post-login redirect lands here first).
-      const target = questionId ? `/entries/new?questionId=${questionId}` : '/entries/new';
-      router.push(target);
-    },
-    [complete, router],
-  );
-
   useEffect(() => {
     // hash の引き継ぎ中（読み込み直し・確認画面への回送）はログインへ送らない。
     // 送ると、期限切れリンクの理由を見せる前にログイン画面へ流してしまう。
@@ -181,46 +171,49 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     <ThemeProvider>
       <SidebarProvider>
         <UnreadProvider value={unread}>
-          {/* device はサーバー(x-device)で確定済み＝first render から端末別シェルを SSR 描画。
+          {/* ヘルプモード。初めての人には自動で開く（旧オンボーディングの置き換え）。
+              シェルの中の面（PC は右、SP は下）と、書斎の的・左の列の「使い方」・`?` が
+              この 1 つの状態を共有する。 */}
+          <HelpProvider api={api}>
+            {/* device はサーバー(x-device)で確定済み＝first render から端末別シェルを SSR 描画。
               null フォールバックは Provider 外などの保険（通常は到達しない）。 */}
-          {device === 'sp' ? (
-            // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
-            // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
-            // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
-            <div
-              className="flex h-[100dvh] flex-col overflow-hidden"
-              style={spShellStyle(showBackToStudy)}
-            >
-              {/* padding ではなく margin で下げる。padding だと箱の位置が動かず、
+            {device === 'sp' ? (
+              // SP シェル: フルスクリーン・サイドバーなし・端末ブロックなし（URL は不変）。
+              // 高さは 100dvh（dynamic viewport）。100vh だとモバイルブラウザのツールバー
+              // 出現時にボトムナビが画面外/ツールバー裏へ押し出されるため。
+              <div
+                className="flex h-[100dvh] flex-col overflow-hidden"
+                style={spShellStyle(showBackToStudy)}
+              >
+                {/* padding ではなく margin で下げる。padding だと箱の位置が動かず、
                   `absolute inset-0` で敷いている画面がタブの下へ潜る（絶対配置が
                   基準にするのは padding box の外側の縁）。 */}
-              <main
-                className="relative flex-1 overflow-auto"
-                style={{ marginTop: 'var(--study-exit-band, 0px)' }}
-              >
-                {content}
-              </main>
-              {/* 書斎が有効な間はボトムナビを描かない。PC のサイドバーと同じ扱いで、
+                <main
+                  className="relative flex-1 overflow-auto"
+                  style={{ marginTop: 'var(--study-exit-band, 0px)' }}
+                >
+                  {content}
+                </main>
+                {/* 書斎が有効な間はボトムナビを描かない。PC のサイドバーと同じ扱いで、
                   書斎そのものが唯一のグローバルナビゲーションになる。
                   **書斎ホームだけでなく jar / board / entry でも外す**（行き先の画面にだけ
                   旧ナビが残ると、戻り道が左上のマークとボトムナビで二重になる）。
                   フラグ off の間は従来どおり全画面に出る。 */}
-              {!studyHome && <SpBottomNav />}
-            </div>
-          ) : device === 'pc' ? (
-            <PcShell studyHome={studyHome} onStudy={onStudy} exitTab={showBackToStudy}>
-              {content}
-            </PcShell>
-          ) : null}
-          {device !== null && showBackToStudy && <BackToStudy />}
-          {/* 引き切ったキャンバスからさらに引くと、部屋が滲み出て書斎へ戻る。
+                {!studyHome && <SpBottomNav />}
+                <SpHelpSheet />
+              </div>
+            ) : device === 'pc' ? (
+              <PcShell studyHome={studyHome} onStudy={onStudy} exitTab={showBackToStudy}>
+                {content}
+              </PcShell>
+            ) : null}
+            {device !== null && showBackToStudy && <BackToStudy />}
+            {/* 引き切ったキャンバスからさらに引くと、部屋が滲み出て書斎へ戻る。
               板と瓶（キャンバスを持つ画面）で効く。重ねるのがここなのは、画面そのものに
               触れずに済ませるため。 */}
-          {device !== null && showBackToStudy && <PullBackToStudy />}
-          {showQuestionsLink && <QuestionsLink />}
-          {device !== null && shouldShow && (
-            <OnboardingFlow onComplete={handleOnboardingComplete} />
-          )}
+            {device !== null && showBackToStudy && <PullBackToStudy />}
+            {showQuestionsLink && <QuestionsLink />}
+          </HelpProvider>
         </UnreadProvider>
       </SidebarProvider>
     </ThemeProvider>

@@ -2,13 +2,13 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { usePathname } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { JAR_ICON_PATH } from '@/components/ui/icon-paths';
 import { NavRow } from '@/components/ui/nav-row';
 import { ICON_STROKE_WIDTH, SHELL_INSET } from '@/components/ui/surface';
+import { useHelpMode } from '@/features/shared/help/help-context';
 import { useAuth } from '@/lib/auth-context';
-import { docsHref } from '@/lib/docs-site';
 import { useSidebarVisibility } from '@/lib/sidebar-context';
 import { useUnread } from '@/lib/unread-context';
 
@@ -18,6 +18,8 @@ interface NavItem {
   labelKey: string;
   match: string;
   iconPath: string;
+  /** ヘルプが開いているとき、この行に触れたら出す話題。 */
+  help: string;
 }
 
 /**
@@ -32,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
     href: '/jar',
     labelKey: 'jar',
     match: '/jar',
+    help: 'jar',
     // Issue #385: SP のナビ／CTA と形が違っていた（あちらは蓋の横棒＋下すぼまりでゴミ箱に
     // 見え、こちらは下がとがったフラスコ形）。同じ保存瓶の形に揃える。
     iconPath: JAR_ICON_PATH,
@@ -40,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
     href: '/board',
     labelKey: 'board',
     match: '/board',
+    help: 'board',
     iconPath:
       'M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5ZM14 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5ZM4 15a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4ZM14 15a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-4Z',
   },
@@ -47,12 +51,14 @@ const NAV_ITEMS: NavItem[] = [
     href: '/entries',
     labelKey: 'list',
     match: '/entries',
+    help: 'list',
     iconPath: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   },
   {
     href: '/entries/new',
     labelKey: 'editor',
     match: '/entries/new',
+    help: 'write',
     iconPath:
       'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z',
   },
@@ -70,11 +76,11 @@ const NAV_ITEMS: NavItem[] = [
  */
 export function Sidebar() {
   const t = useTranslations('sidebar');
-  const locale = useLocale();
   const pathname = usePathname();
   const { auth } = useAuth();
   const { unreadCount } = useUnread();
   const { hidden, collapsed, setCollapsed, width } = useSidebarVisibility();
+  const help = useHelpMode();
 
   // ⌘B / Ctrl+B で開閉（shadcn のサイドバーと同じ）。道具はキーボードから届くのが速い。
   useEffect(() => {
@@ -119,6 +125,7 @@ export function Sidebar() {
               label={t(`nav.${item.labelKey}`)}
               active={isActive}
               collapsed={collapsed}
+              help={item.help}
               icon={
                 <svg
                   aria-hidden="true"
@@ -158,13 +165,14 @@ export function Sidebar() {
 
       {/* 使い方と、自分。どちらも「書く」ための行き先ではないので、下にまとめる。 */}
       <div className="flex flex-col gap-1 px-4">
-        {/* 使い方は別ドメインの公開サイトにある（Issue #532 で切り出した）。
-            アプリの外へ出るので、新しいタブに開く。 */}
+        {/* 使い方はアプリの中のヘルプの面（右）。開いている間はこの行が点く。
+            公開サイトのよくある質問・お問い合わせへは、面の中の「困ったとき」から。 */}
         <NavRow
-          href={docsHref('/support', locale)}
-          external
+          onClick={help.toggleHelp}
+          active={help.open}
           label={t('nav.help')}
           collapsed={collapsed}
+          help="help"
           icon={
             <svg
               aria-hidden="true"
@@ -187,6 +195,7 @@ export function Sidebar() {
           href="/account"
           label={accountLabel}
           collapsed={collapsed}
+          help="account"
           icon={
             auth?.user.avatarUrl ? (
               // biome-ignore lint/performance/noImgElement: external avatar URL from OAuth

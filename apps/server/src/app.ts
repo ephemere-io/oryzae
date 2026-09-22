@@ -22,6 +22,7 @@ import { adminDashboard } from './contexts/shared/presentation/routes/admin-dash
 import { adminObservability } from './contexts/shared/presentation/routes/admin-observability.js';
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
 import { cronCostAlert } from './contexts/shared/presentation/routes/cron-cost-alert.js';
+import { helpSearch } from './contexts/shared/presentation/routes/help-search.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
 import { signupRoutes } from './contexts/user/presentation/routes/signup.js';
 import { userMe } from './contexts/user/presentation/routes/user-me.js';
@@ -56,6 +57,7 @@ const app = new Hono()
   .route('/api/v1/questions', questions)
   .route('/api/v1/entries/:entryId/questions', entryQuestions)
   .route('/api/v1/fermentations', fermentations)
-  .route('/api/v1/jar/layout', jarLayout);
+  .route('/api/v1/jar/layout', jarLayout)
+  .route('/api/v1/help/search', helpSearch);
 
 export default app;

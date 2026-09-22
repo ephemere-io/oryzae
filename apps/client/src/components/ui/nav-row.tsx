@@ -41,6 +41,11 @@ export interface NavRowProps {
   /** アプリの外へ出る行き先。新しいタブで開く。 */
   external?: boolean;
   onClick?: () => void;
+  /**
+   * ヘルプが開いているとき、この行に触れたら出す話題（`data-help`）。
+   * 話題の識別子は features/shared/help が持つ。ここは属性として運ぶだけ。
+   */
+  help?: string;
 }
 
 /** 行の高さ。サイドバーの項目とエントリー画面のヘッダー行が同じ線に乗るための数字。 */
@@ -71,6 +76,7 @@ export function NavRow({
   href,
   external = false,
   onClick,
+  help,
 }: NavRowProps) {
   const className = rowClass(active, collapsed);
   const style: React.CSSProperties = {
@@ -81,7 +87,10 @@ export function NavRow({
   const title = collapsed ? label : undefined;
   // 行き先そのものを契約に出す。**どの行が選ばれているか**を外から確かめられるのは
   // 色ではなくこれ（面の中の切り替えは URL を持たないので空になる）。
-  const contract = verifyAttrs({ unit: 'NavRow', active, collapsed, label, href: href ?? '' });
+  const contract = {
+    ...verifyAttrs({ unit: 'NavRow', active, collapsed, label, href: href ?? '' }),
+    'data-help': help,
+  };
 
   const body = (
     <>

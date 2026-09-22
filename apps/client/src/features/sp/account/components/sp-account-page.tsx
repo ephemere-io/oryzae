@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
 import type { AccountUser } from '@/features/shared/account/types';
+import { useHelpMode } from '@/features/shared/help/help-context';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
 import { docsHref } from '@/lib/docs-site';
 import { setLocaleAction } from '@/lib/i18n-actions';
@@ -31,6 +32,8 @@ interface SpAccountPageProps {
 export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
   const t = useTranslations('account');
   const locale = useLocale();
+  const th = useTranslations('help');
+  const help = useHelpMode();
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
 
@@ -83,7 +86,18 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
           <ThemeRow />
           <LanguageRow />
 
-          {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
+          {/* 使い方はアプリの中のヘルプ（下から出るシート）。SP にはメモ帳のピルの他に
+              入口が無いので、ここにも置く。 */}
+          <button
+            type="button"
+            onClick={() => help.openHelp()}
+            className="self-start text-sm"
+            style={{ color: 'var(--accent)' }}
+          >
+            {th('open')} →
+          </button>
+
+          {/* よくある質問・お問い合わせとプライバシーポリシーは公開サイト（別ドメイン）にある */}
           <a
             href={docsHref('/support', locale)}
             target="_blank"

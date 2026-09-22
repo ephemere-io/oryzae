@@ -660,46 +660,6 @@
       "retry": "Retry"
     }
   },
-  "onboarding": {
-    "dialog_label": "Welcome to Oryzae",
-    "skip": "Skip",
-    "step_concept": {
-      "eyebrow": "01 — Welcome",
-      "title_l1": "Oryzae is a journal",
-      "title_l2": "that grows your questions.",
-      "body": "Plant a question on your mind, then water it with daily entries. Over time, an AI ferments what you've written and returns it as new insight.",
-      "body_2": "It works a little differently from a regular diary — let's walk through the four places that make it tick.",
-      "next": "Get started"
-    },
-    "step_question": {
-      "eyebrow": "02 — Question",
-      "title": "One question.",
-      "body": "Try shaping what you're most preoccupied with into a short question. \"Why…\", \"How might I…\" — a sentence whose answer you don't have yet is plenty. You can edit it any time.",
-      "placeholder": "e.g. Why am I bad at hurrying?",
-      "hint": "It will be stored in the Jar — fermentation starts here.",
-      "next": "Continue with this question"
-    },
-    "step_editor": {
-      "eyebrow": "03 — Editor",
-      "title_l1": "Collect words",
-      "title_l2": "as you write entries.",
-      "body_before_em": "The editor is a quiet place to write. Put down whatever's on your mind. Select a sentence to lift it out as a",
-      "body_em": "snippet",
-      "body_after_em": "— you can lay them out side by side later on the Board.",
-      "list_autosave": "Auto-saves as you type",
-      "list_snippet": "Selection creates a snippet",
-      "list_link": "Link entries to relevant questions",
-      "next": "Next"
-    },
-    "step_ferment": {
-      "eyebrow": "04 — Jar & Fermentation",
-      "title": "Let your questions rest in the Jar.",
-      "body": "The entries you collect settle into the Jar and ferment on a schedule. The AI re-reads your words, finds patterns and shifts in your questions, and offers them back gently — that's the rhythm of Oryzae.",
-      "recap_label": "Your first question",
-      "recap_quote": "\"{question}\"",
-      "next": "Begin with Oryzae"
-    }
-  },
   "sp": {
     "editor": {
       "title_placeholder": "Title (optional)",
@@ -860,6 +820,122 @@
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
     "hint_board_both": "{photos} photos · {snippets} snippets",
-    "hint_memo": "Help and contact"
+    "hint_memo": "Open help"
+  },
+  "help": {
+    "title": "Help",
+    "open": "Open help",
+    "close": "Close",
+    "search_placeholder": "What do you want to do?",
+    "search_hint": "e.g. reread what I wrote last year",
+    "search_clear": "Clear",
+    "search_empty": "Nothing close enough. Try other words.",
+    "search_asking": "Looking…",
+    "pick_badge": "Best match",
+    "hover_title": "What you're pointing at",
+    "here_title": "This screen",
+    "hover_idle": "Point at anything on the screen and it is explained here.",
+    "open_topic": "Open",
+    "welcome_title": "Welcome",
+    "welcome_body": "Read from the top and you'll have the whole picture. You can close this and open it again any time (the memo pad in the study, or the ? key).",
+    "shortcut_hint": "? toggles help",
+    "section": {
+      "start": "Getting started",
+      "room": "In the study",
+      "screens": "Screens",
+      "trouble": "When stuck"
+    },
+    "topics": {
+      "concept": {
+        "title": "What Oryzae is",
+        "lead": "Plant a question, write, pickle it in the jar, wait for a letter",
+        "body": "Plant one question that's on your mind and water it with daily entries. Pickle what you write in the jar; given time it ferments, and L.A.B. — having reread your words — sends you a letter. Unlike a plain diary, writing here has something that comes back. This room, the study, is the entrance, and the things on the desk are where you go.",
+        "keywords": "start,concept,overview,oryzae,fermentation,letter,how it works,what can I do,journal,diary,study,room"
+      },
+      "question": {
+        "title": "Plant a question",
+        "lead": "Shape what you think about most into one short question",
+        "body": "\"Why…\", \"How might I…\" — a sentence whose answer you don't have yet is plenty. Questions live in the jar and can be rewritten any time. Entries gather under a question and become the material for fermentation.",
+        "keywords": "question,topic,theme,create,think,why,new question,add"
+      },
+      "write": {
+        "title": "Write",
+        "lead": "Open the notebook and just write. Saving is automatic",
+        "body": "Press this month's notebook (or the pencil) in the study and a single sheet opens. Put down whatever's on your mind. There is no save button — everything is kept as you type. Choose vertical or horizontal writing, or bring text in from a photo.",
+        "keywords": "write,entry,new,editor,save,autosave,vertical,horizontal,photo,pencil,notebook,today"
+      },
+      "pickle": {
+        "title": "Pickle in the jar",
+        "lead": "Put what you wrote into the jar and fermentation begins",
+        "body": "When an entry is done, press \"Pickle\". Pickled entries gather in the jar under their question and ferment over time. When fermentation finishes, a letter arrives. Until you pickle, an entry only sits in the notebook.",
+        "keywords": "pickle,pickling,jar,ferment,fermentation,when,arrive,fermenting,soon"
+      },
+      "jar": {
+        "title": "Jar",
+        "lead": "Pickled entries gather by question and ferment",
+        "body": "The jar on the left of the study. The bubbles show how far fermentation has come. When they settle and a seal floats up, a letter has arrived. Press it to go inside and read each question's result — letter, words and fragments. Add and tidy questions here too.",
+        "keywords": "jar,bubbles,fermentation,seal,unread,question,inside,left"
+      },
+      "notebook": {
+        "title": "Notebook",
+        "lead": "Thicker the more you write. The top one is this month",
+        "body": "The stack on the desk is your notebooks. One per month, thicker with every entry. Press the top (current) one to write; press an older one to open that month's list. Old months move to the shelf at the back.",
+        "keywords": "notebook,entries,entry,this month,current,stack,desk,volume"
+      },
+      "board": {
+        "title": "Board",
+        "lead": "Pin snippets and photos, one board per day",
+        "body": "The board on the wall. Pin snippets cut out of entries and photos you bring in. Cards move freely, and each day has its own board. The board in the study mirrors what you pinned, in the same places.",
+        "keywords": "board,cards,photo,pin,arrange,snippet,date,wall"
+      },
+      "archive": {
+        "title": "Archive",
+        "lead": "Older months' notebooks line the shelf at the back",
+        "body": "Only a few notebooks fit on the desk; older months move to the shelf. Press a spine to open that month's list of entries. Start here when you want to reread what you wrote last year.",
+        "keywords": "archive,shelf,past,old,last year,previous month,reread,find,spine,older"
+      },
+      "letter": {
+        "title": "Letter, words, fragments",
+        "lead": "Three things remain in the jar after fermentation",
+        "body": "When fermentation finishes, a letter from L.A.B. arrives — what it found rereading your entries: recurring themes and turns in your question. Alongside the letter, the words that kept appearing and chosen fragments remain, and you can pull them into the page from the panel on the right while writing.",
+        "keywords": "letter,L.A.B.,lab,result,words,keywords,fragments,unread,arrived,reply,AI,read"
+      },
+      "snippet": {
+        "title": "Snippet",
+        "lead": "Select a sentence, cut it out, pin it to the board",
+        "body": "Select a sentence while writing to cut it out as a snippet. Snippets are pinned to the board, where you can lay them out and look over them later. Photos go on the board the same way.",
+        "keywords": "snippet,cut out,select,excerpt,quote,highlight,pin,sentence"
+      },
+      "list": {
+        "title": "Entry list",
+        "lead": "Filter what you wrote by month and question, search the text",
+        "body": "Press an older notebook or a spine on the shelf to open that month's list. Move between months with the chips, filter by question, and search the text. Press a row to open that entry.",
+        "keywords": "list,search,find,filter,month,entries,past,read,open"
+      },
+      "questions": {
+        "title": "How questions changed",
+        "lead": "Trace when and how a question shifted",
+        "body": "Questions get rewritten, and after each fermentation L.A.B. may propose a new shape. This screen lays those changes out in order. Open it from the top right of the jar screen.",
+        "keywords": "question history,timeline,change,proposal,accept,decline,questions"
+      },
+      "account": {
+        "title": "Account",
+        "lead": "Language and theme, email and password, how much you wrote",
+        "body": "Open it from the avatar at the bottom left of the study. Display language (Japanese, English, Chinese, Korean) and light/dark theme, email and password changes, and statistics of what you've written.",
+        "keywords": "account,settings,language,theme,dark,email,password,statistics,profile,log out,japanese"
+      },
+      "support": {
+        "title": "FAQ and contact",
+        "lead": "Anything not here is on the public help page",
+        "body": "A fuller guide, frequently asked questions and the contact form are gathered on one page of the public site. It opens in a new tab.",
+        "keywords": "contact,support,question,bug,problem,FAQ,help,stuck,email,request"
+      },
+      "help": {
+        "title": "Using this help",
+        "lead": "Point at something to see what it is. Type what you want to do",
+        "body": "While help is open, point at anything on the screen and it is explained here. Type what you want to do in the box above to find the closest topic. Open or close help any time with the memo pad in the study, \"Help\" in the left column, or the ? key.",
+        "keywords": "help,how to,explain,search,shortcut,memo,close,open"
+      }
+    }
   }
 }
