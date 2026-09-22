@@ -165,9 +165,10 @@ html[data-help-resizing] .help-resize-line {
   opacity: 1;
 }
 
-/* 「ようこそ」の間、三歩の地がアクセントで灯る（点くのも消えるのも 500ms の transition）。 */
+/* 「ようこそ」の間、三歩の地が緑（アクセント）に染まる（点くのも消えるのも 500ms の transition）。
+   12% では紙の上で灰色に見えた。 */
 .help-spot {
-  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  background-color: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* ヘルプの面の頭の 1 枚が入れ替わるとき。「変わった」ことを動きで言う。 */

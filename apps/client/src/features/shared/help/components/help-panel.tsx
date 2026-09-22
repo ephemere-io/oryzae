@@ -188,8 +188,10 @@ export function HelpPanel({
                 />
               )}
             </div>
+            {/* 三歩の箱。灯ったとき地に余白があるよう、左右は面の余白へ 8px はみ出し、上下に
+                余白を持つ（番号の丸と見出しが箱の縁から 18px / 12px）。行の左端は一覧と揃う。 */}
             <div
-              className={`mt-5 rounded-[12px] transition-colors duration-500 ${spotlight ? 'help-spot' : ''}`}
+              className={`-mx-2 mt-3 rounded-[12px] px-2 pt-3 pb-1 transition-colors duration-500 ${spotlight ? 'help-spot' : ''}`}
             >
               <HelpFirstSteps onOpenHref={onOpenHref} />
             </div>
