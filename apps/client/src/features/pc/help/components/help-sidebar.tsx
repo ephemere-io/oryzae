@@ -168,7 +168,7 @@ export function HelpSidebar() {
           remote={resolution.remote}
           onClose={help.closeHelp}
           onOpenHref={handleOpenHref}
-          spotlight={help.spotlight}
+          spotlight={help.welcome}
         />
       </div>
     </aside>

@@ -31,8 +31,8 @@ export interface HelpPanelProps {
   /** 「開く」。アプリの中は router、外は新しいタブ — 決めるのは呼び出し側。 */
   onOpenHref: (href: string, external: boolean) => void;
   /**
-   * 三歩だけを明るく残し、他を薄くする（「始めてみよう」の直後だけ）。
-   * 出す側が短い時間で false に戻す。ここは映すだけ。
+   * 三歩だけを明るくし、他を薄くする。初めての人に「ようこそ」を出している間だけ true —
+   * 面以外が沈んでいる画面で、面の中でも見る場所を 1 つにする。晴れると元に戻る。
    */
   spotlight?: boolean;
 }
@@ -178,7 +178,7 @@ export function HelpPanel({
           </div>
         ) : (
           <>
-            {/* 「始めてみよう」の直後だけ、三歩以外が薄くなる（500ms で戻る）。 */}
+            {/* 「ようこそ」の間だけ、三歩以外が薄い（晴れると 500ms で戻る）。 */}
             <div className={dimClass}>
               {spotText && (
                 <HelpLiveCard
@@ -188,7 +188,9 @@ export function HelpPanel({
                 />
               )}
             </div>
-            <div className={`mt-5 rounded-[12px] ${spotlight ? 'help-spot' : ''}`}>
+            <div
+              className={`mt-5 rounded-[12px] transition-colors duration-500 ${spotlight ? 'help-spot' : ''}`}
+            >
               <HelpFirstSteps onOpenHref={onOpenHref} />
             </div>
             {/* 一覧。節の見出しは無く、束の間は細い線 1 本。行の余白はどの行も同じ

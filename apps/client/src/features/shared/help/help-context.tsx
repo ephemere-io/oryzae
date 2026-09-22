@@ -34,9 +34,6 @@ const HOVER_CLEAR_MS = 160;
 /** 初めての人が面を閉じたあと、「?」が居場所を教えている時間。 */
 const CUE_MS = 5000;
 
-/** 「始めてみよう」の直後、三歩以外を薄くしている時間。視線の行き先を示すだけなので短く。 */
-const SPOTLIGHT_MS = 2200;
-
 export interface HelpModeValue {
   /** ヘルプモード（設定）。無効なら「?」も出ず、`?` キーも効かない。 */
   enabled: boolean;
@@ -45,10 +42,11 @@ export interface HelpModeValue {
   firstVisit: boolean;
   /** 初めての人が面を閉じた直後。「?」が脈打って居場所を教える。 */
   cue: boolean;
-  /** 初めての人に「ようこそ」を出しているか（面が開いていて、まだ晴らしていない）。 */
+  /**
+   * 初めての人に「ようこそ」を出しているか（面が開いていて、まだ晴らしていない）。
+   * この間、面は三歩だけを明るくし、他を薄くする。
+   */
   welcome: boolean;
-  /** 「始めてみよう」を押した直後。三歩だけを明るく残し、他を少しの間だけ薄くする。 */
-  spotlight: boolean;
   /** 面の幅（px）。 */
   width: number;
   /** いま触れているもの。PC のポインタか、書斎の 3D の的から届く。 */
@@ -79,7 +77,6 @@ const DEFAULT: HelpModeValue = {
   firstVisit: false,
   cue: false,
   welcome: false,
-  spotlight: false,
   width: HELP_WIDTH.default,
   hoverTarget: null,
   focused: null,
@@ -146,8 +143,6 @@ export function HelpProvider({
   const [firstVisit, setFirstVisit] = useState(false);
   const [cue, setCue] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
-  const [spotlight, setSpotlight] = useState(false);
-  const spotlightTimer = useRef<number | null>(null);
   const [width, setWidthState] = useState<number>(HELP_WIDTH.default);
   const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
   const [focused, setFocused] = useState<HelpTopicId | null>(null);
@@ -214,7 +209,6 @@ export function HelpProvider({
   useEffect(
     () => () => {
       if (cueTimer.current !== null) window.clearTimeout(cueTimer.current);
-      if (spotlightTimer.current !== null) window.clearTimeout(spotlightTimer.current);
     },
     [],
   );
@@ -224,16 +218,7 @@ export function HelpProvider({
     else openHelp();
   }, [open, closeHelp, openHelp]);
 
-  // 晴れた直後、三歩だけを明るく残す。もう 1 段のモードにはしない — 勝手に元へ戻る。
-  const dismissWelcome = useCallback(() => {
-    setWelcomeDismissed(true);
-    setSpotlight(true);
-    if (spotlightTimer.current !== null) window.clearTimeout(spotlightTimer.current);
-    spotlightTimer.current = window.setTimeout(() => {
-      spotlightTimer.current = null;
-      setSpotlight(false);
-    }, SPOTLIGHT_MS);
-  }, []);
+  const dismissWelcome = useCallback(() => setWelcomeDismissed(true), []);
   const welcome = firstVisit && open && !welcomeDismissed;
 
   const setWidth = useCallback((next: number) => {
@@ -306,7 +291,6 @@ export function HelpProvider({
       firstVisit,
       cue,
       welcome,
-      spotlight,
       width,
       hoverTarget,
       focused,
@@ -327,7 +311,6 @@ export function HelpProvider({
       firstVisit,
       cue,
       welcome,
-      spotlight,
       width,
       hoverTarget,
       focused,

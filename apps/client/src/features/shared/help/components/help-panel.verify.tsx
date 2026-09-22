@@ -85,7 +85,7 @@ registerUnit<Props>({
     {
       id: 'spotlight',
       probe: true,
-      description: 'Probe: 「始めてみよう」の直後 — 三歩だけ明るく、他は薄い',
+      description: 'Probe: 「ようこそ」の間 — 三歩だけ明るく、他は薄い',
       props: { ...BROWSE, spotlight: true },
     },
     { id: 'hovered', description: '瓶に触れている', props: { ...BROWSE, hovered: 'jar' } },

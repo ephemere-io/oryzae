@@ -73,7 +73,7 @@ export function SpHelpSheet() {
           remote={resolution.remote}
           onClose={help.closeHelp}
           onOpenHref={handleOpenHref}
-          spotlight={help.spotlight}
+          spotlight={help.welcome}
         />
       </div>
     </div>
