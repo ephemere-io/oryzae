@@ -110,6 +110,10 @@ export function DockSheetVaul({
           open={open}
           modal={false}
           dismissible={false}
+          // 入力欄の位置合わせは殻が担う（殻がビジュアルビューポートに追従する）。Vaul の `isInput` は
+          // contentEditable も数えるので、本文にフォーカスしてキーボードが出ると「板の中の入力欄が隠れる」と
+          // 誤認して板の高さと位置を書き換え、本文を覆った（実機: そもそも入力できない）。
+          repositionInputs={false}
           noBodyStyles
           container={clip}
           snapPoints={snapPoints}
@@ -161,8 +165,19 @@ export function DockSheetVaul({
                 />
                 {peek ? <div className="flex w-full min-w-0 items-center">{peek}</div> : null}
               </div>
-              {/* 中身。いちばん高い段で読める。上端に居て下へ引けば板が縮む（Vaul が指の向きと scrollTop で決める）。 */}
-              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-6 [overflow-wrap:anywhere]">
+              {/* 中身。いちばん高い段で読める。上端に居て下へ引けば板が縮む（Vaul が指の向きと scrollTop で決める）。
+                  - overscroll-behavior: none — iOS は上端で下へ引くとネイティブの跳ね返りが指を奪い（pointercancel）、
+                    板に渡らない（実機: 読み終えて上端に戻しても縮まない）。跳ね返りを切れば指は板へ届く
+                  - 触れた瞬間に端数の scrollTop を 0 へ揃える — Vaul は `scrollTop !== 0` の厳密判定で、iOS は
+                    減速の末に 0.3px などの端数で止まることがある */}
+              <div
+                className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-6 [overflow-wrap:anywhere]"
+                style={{ overscrollBehaviorY: 'none' }}
+                onTouchStart={(event) => {
+                  const box = event.currentTarget;
+                  if (box.scrollTop > 0 && box.scrollTop < 1) box.scrollTop = 0;
+                }}
+              >
                 {children}
               </div>
             </Drawer.Content>
