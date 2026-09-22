@@ -45,7 +45,7 @@ describe('adminAuthMiddleware', () => {
 
   it('returns 403 when user is not admin', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'u1', user_metadata: {} } },
+      data: { user: { id: 'u1', app_metadata: {}, user_metadata: {} } },
       error: null,
     });
 
@@ -58,7 +58,22 @@ describe('adminAuthMiddleware', () => {
 
   it('returns 403 when is_admin is false', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'u1', user_metadata: { is_admin: false } } },
+      data: { user: { id: 'u1', app_metadata: { is_admin: false }, user_metadata: {} } },
+      error: null,
+    });
+
+    const app = createApp();
+    const res = await app.request('/admin/test', {
+      headers: { Authorization: 'Bearer valid-token' },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  // user_metadata は本人が auth.updateUser({ data }) で書き換えられる。ここに
+  // is_admin を置いても管理者にならないことが、昇格を防ぐ唯一の担保。
+  it('returns 403 when is_admin is only in user_metadata (user-writable)', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'u1', app_metadata: {}, user_metadata: { is_admin: true } } },
       error: null,
     });
 
@@ -71,7 +86,7 @@ describe('adminAuthMiddleware', () => {
 
   it('passes through when user is admin', async () => {
     mockGetUser.mockResolvedValue({
-      data: { user: { id: 'u1', user_metadata: { is_admin: true } } },
+      data: { user: { id: 'u1', app_metadata: { is_admin: true }, user_metadata: {} } },
       error: null,
     });
 
