@@ -66,8 +66,10 @@ type Phase = 'entering' | 'open' | 'closing';
  *
  * - **指（スクロール）は高さを変える。** 段だけが吸着先で、閉の位置は吸着先ではない。だから板
  *   （`dismissible: false`）は一番低い段より下に止まれない（下まで引いても離せば戻る）。モーダルのシート
- *   （`dismissible: true`）だけ、**いちばん下まで引き下げてそこで指を離す**と閉じる。吸着の付け外しはしない
- *   （閉の位置を一時的にでも吸着先にすると、iOS は出た瞬間や低い段でそこへ吸われる。実機レビューで何度も）
+ *   （`dismissible: true`）だけ、**いちばん低い段に居るときに指が触れている間**、閉の位置も吸着先になる。
+ *   半分より先まで引くか弾けば閉じ、そうでなければ段へ戻る（どちらかはブラウザの吸着が決める。しきい値は持たない）。
+ *   出た瞬間や高い段では絶対に吸着先にしない（そうすると iOS はそこへ吸う。実機レビューで何度も）。
+ *   底から近すぎる段（見出しだけ）を最低の段にしない（触れただけで落ちる）
  * - **出す／消すは `open`**（パレットや歯車のボタン、暗幕、キャンセル）。動きはシートの容器を下へずらす CSS の
  *   transition（`.oz-sheet-scroller[data-shown]`）。消える動きの終わりは transition の完了で知る
  *
@@ -123,6 +125,11 @@ export function Sheet({
    * 本文の余白（`--sp-dock-inset`）も知らせず、最初から出ている発酵の結果の下に本文の末尾が隠れていた。
    */
   const [scrollerEl, setScrollerEl] = useState<HTMLDivElement | null>(null);
+  /**
+   * 閉の位置の空き。**いちばん低い段に居るときに指が触れている間だけ**吸着先にする（それ以外は絶対にしない）。
+   * 出た瞬間や高い段で吸着先だと、iOS はそこへ吸う（実機レビューで何度も）。
+   */
+  const closedRef = useRef<HTMLDivElement | null>(null);
   const attachScroller = useCallback((element: HTMLDivElement | null) => {
     scrollerRef.current = element;
     setScrollerEl(element);
@@ -250,6 +257,7 @@ export function Sheet({
     // いきなり出る）。
     // 閉の位置は吸着先ではないので、この指定が効かない環境でも、ブラウザの吸着でいちばん近い段に着く
     // （＝いちばん低い段。呼び出し側は最初の段をいちばん低い段にしておく）。
+    if (closedRef.current) closedRef.current.style.scrollSnapAlign = 'none';
     scrollToDetent(latest.current.detent, 'instant');
     settledRef.current = latest.current.detent;
     setPhase('open');
@@ -326,6 +334,22 @@ export function Sheet({
       }
       const current = latest.current;
       if (current.phase === 'closing') return;
+      /**
+       * 払って閉じる（モーダルのシートだけ）。**閉の位置で止まった、かつ閉の位置が吸着先のとき。**
+       * 吸着先になるのは「いちばん低い段に居るときに指が触れている間」だけなので、ここに止まれるのは
+       * その指が半分より先まで引いたか弾いたときだけ（どちらを選ぶかはブラウザの吸着に任せる）。
+       * 吸着先でないのに 0 に居るのは、行き過ぎて端に当たっているだけ（ブラウザがこれから段へ引き上げる）。
+       * 吸着先は外さずに閉じる（外すとその場で段へ引き戻され、閉じる前に跳ね上がる）。
+       */
+      if (
+        current.phase === 'open' &&
+        scroller.clientHeight > 0 &&
+        top < 1 &&
+        closedRef.current?.style.scrollSnapAlign === 'start'
+      ) {
+        current.onRequestClose?.();
+        return;
+      }
       let settled: SheetDetent | null = null;
       for (const candidate of current.detents) {
         // 1px 未満の差は同じ位置（スクロール位置は小数になる）。
@@ -335,6 +359,8 @@ export function Sheet({
         }
       }
       if (!settled) return;
+      // 段に止まった＝指の用は済んだ。閉の位置を吸着先から外す。
+      if (closedRef.current) closedRef.current.style.scrollSnapAlign = 'none';
       // **いちばん高い段に着いたときだけ中身が動く。** 低い段では指はシートの高さに使う（同じ指で中身まで
       // 流れると、読み終えて戻したときにシートが縮んでしまう）。
       const inner = innerRef.current;
@@ -356,22 +382,28 @@ export function Sheet({
       if (!frame) frame = requestAnimationFrame(check);
     };
     /**
-     * 払って閉じる（モーダルのシートだけ）。**いちばん下まで引き下げて、そこで指を離したとき。**
+     * **いちばん低い段に居るときに指が触れたら、閉の位置を吸着先にする。** これが「指で払って閉じる」の全部。
+     * 段に止まったら外す（上の `check`）。指を離したあとの行き先はブラウザの吸着が決める:
+     * 半分より先まで引くか弾けば閉の位置、そうでなければ段へ戻る。しきい値は持たない。
      *
-     * 閉の位置は吸着先ではないので、そこに居られるのは指が押さえている間だけ。離した瞬間にそこに
-     * 居る＝いちばん低い段より下まで自分の指で引き切った、ということ。吸着の付け外しも、止まった位置の
-     * 判定も要らない。板（`dismissible: false`）は離せばブラウザがいちばん低い段へ戻す。
+     * 高い段からは吸着先にしない（大きく払っただけで途中の段を飛ばして閉じないように）。
+     * 底から近すぎる段（見出しだけ）を最低の段にしない（触れただけで落ちる。実機レビュー）。
      *
-     * `touchend` だけを見る（`pointerup` は見ない）。iOS は指を離したあと、そのとき指の下にある要素へ
-     * 合成の pointer/mouse イベントを送るので、出たばかりのシートが触られたことになる。
+     * touch のイベントだけを見る（pointer は見ない）。iOS は指を離したあと、そのとき指の下にある要素へ
+     * 合成の pointer/mouse イベントを送るので、出たばかりのシートが触られたことになる。touch は合成されない。
      */
-    const onTouchEnd = () => {
+    const onTouchStart = () => {
       const current = latest.current;
-      if (!current.dismissible || current.phase !== 'open' || scroller.clientHeight <= 0) return;
-      if (scroller.scrollTop < 1) current.onRequestClose?.();
+      const closed = closedRef.current;
+      if (!closed || !current.dismissible || current.phase !== 'open') return;
+      const lowest = current.detents.reduce(
+        (a, b) => (targetOf(a) <= targetOf(b) ? a : b),
+        current.detents[0] ?? 'full',
+      );
+      const atLowest = Math.abs(scroller.scrollTop - targetOf(lowest)) < 2;
+      closed.style.scrollSnapAlign = atLowest ? 'start' : 'none';
     };
-    scroller.addEventListener('touchend', onTouchEnd, { passive: true });
-    scroller.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    scroller.addEventListener('touchstart', onTouchStart, { passive: true });
     scroller.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
@@ -393,8 +425,7 @@ export function Sheet({
           });
     observer?.observe(scroller);
     return () => {
-      scroller.removeEventListener('touchend', onTouchEnd);
-      scroller.removeEventListener('touchcancel', onTouchEnd);
+      scroller.removeEventListener('touchstart', onTouchStart);
       scroller.removeEventListener('scroll', onScroll);
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
@@ -517,11 +548,15 @@ export function Sheet({
           containerType: 'size',
         }}
       >
-        {/* 容器の高さの空き＝閉の位置。**吸着先にはしない（いつでも）。**
-            吸着先にすると、iOS は出た瞬間にいちばん近い吸着先＝ここを選んでそのまま留まる
+        {/* 容器の高さの空き＝閉の位置。**既定では吸着先にしない。**
+            吸着先にしてあると、iOS は出た瞬間にいちばん近い吸着先＝ここを選んでそのまま留まる
             （実機: 押しても何も出てこない。計器の実測 `st=0 top=717 cv=272px`）。
-            指で押さえている間だけここまで下がれる。離した瞬間にここに居れば閉じる（下の effect）。 */}
-        <div aria-hidden="true" style={{ height: '100%', scrollSnapAlign: 'none' }} />
+            いちばん低い段に居るときに指が触れている間だけ吸着先にする（下の effect）。 */}
+        <div
+          ref={closedRef}
+          aria-hidden="true"
+          style={{ height: '100%', scrollSnapAlign: 'none' }}
+        />
         {/* 半分の段の印。容器の子の `top: 50%` は容器の高さの半分。 */}
         <div
           ref={halfRef}
