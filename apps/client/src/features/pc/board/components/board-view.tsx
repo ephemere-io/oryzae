@@ -369,6 +369,8 @@ export function BoardView({ api }: BoardViewProps) {
                 左右に散らばって見えないようにする。 */}
             <div
               className={TOP_BAR_CLASS}
+              // ヘルプが開いているとき、この段に触れたら「ボード」を出す。
+              data-help="board"
               style={{
                 top: BOARD_INSET,
                 // 左端はサイドバー幅ぶん寄せる
@@ -376,7 +378,9 @@ export function BoardView({ api }: BoardViewProps) {
                 // 書斎が有効な間は左上に「書斎へ戻る」マークが浮くので、その席も避ける
                 // （避けないと日付ナビがマークの下に潜って押せない）。
                 left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
-                right: BOARD_INSET,
+                // 右端はヘルプの面（開いていれば 336px）のぶん内側へ。fixed なので流れを
+                // 見ず、面の下に潜ってしまう（表示単位の切り替えが検索欄に重なっていた）。
+                right: `calc(var(--help-width, 0px) + ${BOARD_INSET}px)`,
               }}
             >
               <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />

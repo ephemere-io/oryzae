@@ -9,6 +9,9 @@ import { HELP_SECTIONS, HELP_TOPICS, helpTopic } from '../topics';
 import type { HelpMatch, HelpRemoteState, HelpTopicId, HelpTopicText } from '../types';
 import { HelpTopicCard } from './help-topic-card';
 
+/** 検索で出す件数の上限。 */
+const MAX_RESULTS = 6;
+
 export interface HelpPanelProps {
   texts: readonly HelpTopicText[];
   /** いま触れているもの。無ければ `screenTopic` を出す。 */
@@ -57,6 +60,9 @@ export function HelpPanel({
   const t = useTranslations('help');
   const searchId = useId();
   const searching = query.trim().length > 0;
+  // 近い順の上位だけ。手元の照合は 2 文字の並びで重ねるので、長い文だと話題の大半に
+  // 薄く当たる。11 件並ぶと「近い話題」ではなく一覧の並べ替えに見えてしまう。
+  const shown = matches.slice(0, MAX_RESULTS);
   const textOf = new Map(texts.map((text) => [text.id, text]));
   const spot = hovered ?? screenTopic;
   const spotText = textOf.get(spot);
@@ -70,7 +76,7 @@ export function HelpPanel({
         spot,
         spotKind: hovered ? 'hover' : 'screen',
         focused: focused ?? 'none',
-        resultCount: searching ? matches.length : -1,
+        resultCount: searching ? shown.length : -1,
         remote,
         firstVisit,
       })}
@@ -135,7 +141,9 @@ export function HelpPanel({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={t('search_placeholder')}
             autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--fg)] outline-none placeholder:text-[var(--date-color)]"
+            // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ
+            // （2 つ並ぶと、どちらを押せばいいか一瞬迷う。SP の実機で 2 つ並んでいた）。
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] [&::-webkit-search-cancel-button]:appearance-none"
           />
           {searching && (
             <button
@@ -165,12 +173,12 @@ export function HelpPanel({
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-3 pb-5">
         {searching ? (
           <div className="flex flex-col gap-1">
-            {matches.length === 0 ? (
+            {shown.length === 0 ? (
               <p className="px-2 py-3 text-[12px] leading-[1.7] text-[var(--date-color)]">
                 {remote === 'asking' ? t('search_asking') : t('search_empty')}
               </p>
             ) : (
-              matches.map((match, index) => {
+              shown.map((match, index) => {
                 const text = textOf.get(match.id);
                 if (!text) return null;
                 return (
@@ -188,7 +196,7 @@ export function HelpPanel({
                 );
               })
             )}
-            {remote === 'asking' && matches.length > 0 && (
+            {remote === 'asking' && shown.length > 0 && (
               <p className="px-2 pt-1 text-[10.5px] text-[var(--date-color)]">
                 {t('search_asking')}
               </p>

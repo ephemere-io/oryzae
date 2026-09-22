@@ -118,6 +118,18 @@ describe('HelpPanel', () => {
     expect(screen.getByText(jaMessages.help.topics.letter.body)).toBeTruthy();
   });
 
+  it('検索の結果は上位 6 件まで（薄く当たった話題で一覧が埋まらない）', () => {
+    const many = HELP_TOPICS.map((topic, index) => ({
+      id: topic.id,
+      score: 20 - index,
+      source: 'local' as const,
+    }));
+    renderPanel({ query: '書く', matches: many });
+    const panel = document.querySelector('[data-verify-unit="HelpPanel"]');
+    expect(document.querySelectorAll('[data-verify-unit="HelpTopicCard"]')).toHaveLength(6);
+    expect(panel?.getAttribute('data-verify-result-count')).toBe('6');
+  });
+
   it('近い話題が無ければそう言う。訊いている最中ならそう言う', () => {
     renderPanel({ query: 'xyz', matches: [] });
     expect(screen.getByText(jaMessages.help.search_empty)).toBeTruthy();

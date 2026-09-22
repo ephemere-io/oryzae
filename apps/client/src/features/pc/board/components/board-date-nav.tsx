@@ -75,6 +75,7 @@ export function BoardDateNav({ dateKey, viewType, onDateChange }: BoardDateNavPr
   return (
     <div
       {...verifyAttrs({ unit: 'BoardDateNav', viewType, dateKey, label })}
+      data-help="board"
       // ここは「今どこを見ているか」の情報。面を持たせず、盤面に直接置かれた文字として
       // 読ませる（浮かせるのは道具箱だけ、という約束を崩さない）。
       // 位置は持たない——上段バー（BoardView の TOP_BAR）が並べる。

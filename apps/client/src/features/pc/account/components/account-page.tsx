@@ -488,6 +488,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
   return (
     <div
       {...verifyAttrs({ unit: 'AccountPage', hasAvatar: Boolean(user.avatarUrl), isOAuthOnly })}
+      data-help="account"
       className="mx-auto max-w-2xl px-6 py-12"
     >
       {/* Page title */}

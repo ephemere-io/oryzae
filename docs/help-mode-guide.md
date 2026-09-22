@@ -63,6 +63,25 @@
 
 隙間に出ただけでは消さない（160ms 待つ）。面の中で動いても変えない。
 
+名乗っている部品（`data-help`）。**画面の主な区画は必ず名乗る** — 名前の照合と Jev は
+名乗りの無い細かな部品のための補いで、鍵が無い環境では名乗りだけが確実に効く。
+
+| 部品 | 話題 |
+| --- | --- |
+| 左サイドバーの各行（`NavRow.help`） | jar / board / list / write / help / account |
+| 書斎の 3D の的（`topicForStudyLabel`） | jar / notebook / board / archive / write / help。何にも触れていなければ concept |
+| 書斎の左下のアバター | account |
+| エントリーのパレット（`FloatingPalette.help`）・設定の面 | write |
+| 問いのチップ・瓶の円・問いを立てるフォーム | question |
+| 発酵の面・瓶の詳細ペイン・カバーフロー | letter |
+| ボードの道具箱・日付・写真のカード | board |
+| スニペットのカード | snippet |
+| エントリーの一覧・書斎の一覧オーバーレイ | list |
+| 問いの変遷 | questions |
+| アカウントの画面 | account |
+
+部品を足したら、その区画の話題を `data-help` で名乗らせる（`HelpTopicId` のどれか）。
+
 ## 検索欄と Jev
 
 検索欄に書いた「したいこと」は、まず**手元の照合**（`features/shared/help/search.ts`）にかける。

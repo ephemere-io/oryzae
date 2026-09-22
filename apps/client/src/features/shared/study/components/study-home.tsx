@@ -239,8 +239,9 @@ export function StudyHome({ layout }: StudyHomeProps) {
             setHoveredLabel(hovered?.label ?? null);
             setHover(hovered);
             // ヘルプが開いていれば、触れている物の説明が面に出る。何にも触れていない
-            // ときは部屋そのもの（Oryzae とは）。3D の的は DOM を持たないので、ここから伝える。
-            help.setHovered(hovered?.label ? topicForStudyLabel(hovered.label) : 'concept');
+            // ときは「いま開いている画面」（＝部屋そのもの、Oryzae とは）に落ちる。
+            // 3D の的は DOM を持たないので、ここから伝える。
+            help.setHovered(hovered?.label ? topicForStudyLabel(hovered.label) : null);
           }}
         />
 

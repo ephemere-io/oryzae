@@ -26,6 +26,7 @@ export function QuestionCreateForm({ onSubmit }: QuestionCreateFormProps) {
     <form
       onSubmit={handleSubmit}
       className="flex gap-2"
+      data-help="question"
       {...verifyAttrs({
         unit: 'QuestionCreateForm',
         empty: text.trim().length === 0,

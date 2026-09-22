@@ -54,9 +54,10 @@ export function useHelpResolver(api: ApiClient | null, input: HelpResolverInput)
     [texts],
   );
 
-  // api が無ければ手元だけ。
+  // api が無ければ手元だけ。**後から来たら訊けるようにする** — 画面を直接開いた直後は
+  // 認証がまだで api が null なので、初期値のまま 'off' に固定すると一度も訊かない。
   useEffect(() => {
-    if (!api) setRemote('off');
+    setRemote(api && configured.current !== false ? 'idle' : 'off');
   }, [api]);
 
   /** サーバーに訊く。憶えていればそれを返す。null は「答え無し」。 */

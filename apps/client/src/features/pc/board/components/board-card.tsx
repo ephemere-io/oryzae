@@ -131,6 +131,8 @@ export function BoardCard({
       // 掴んだらカードを動かす（キャンバスのパンを始めない）。
       data-canvas-no-pan=""
       className="board-card"
+      // ヘルプが開いているとき、カードに触れたら出す話題。抜き書きは「スニペット」、写真は「ボード」。
+      data-help={card.cardType === 'snippet' ? 'snippet' : 'board'}
       {...verifyAttrs({
         unit: 'BoardCard',
         cardType: card.cardType,

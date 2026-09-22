@@ -66,6 +66,9 @@ export function EntryActionPalette({
   return (
     <FloatingPalette
       contract={{ unit: 'EntryActionPalette', actionCount: actions.length, size }}
+      // ヘルプが開いているとき、道具に触れたら「書く」を出す（押せるものの名前で決まれば
+      // そちらが勝つ — 「瓶に漬ける」は漬け込みの話題へ）。
+      help="write"
       size={size}
       visible={visible}
       storage={persistState ? STORAGE : null}

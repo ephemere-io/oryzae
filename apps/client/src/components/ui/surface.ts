@@ -125,13 +125,14 @@ export const ICON_SIZE = 18;
 export const ICON_STROKE_WIDTH = 1.6;
 
 /**
- * 本文領域（サイドバーを除いた部分）の中央に置くための位置指定。
+ * 本文領域（左のサイドバーと右のヘルプの面を除いた部分）の中央に置くための位置指定。
  *
- * `--sidebar-width` は `(protected)/layout.tsx` が `<main>` に生やしている。
- * 画面中央に置くとサイドバーのぶんだけ左にずれて見えるので、その半分を足して補正する。
+ * `--sidebar-width` は `(protected)/layout.tsx` が `<main>` に、`--help-width` は
+ * ヘルプの面（`features/pc/help`）が `:root` に生やしている。画面中央に置くと
+ * サイドバーのぶん左に、ヘルプのぶん右にずれて見えるので、それぞれ半分ずつ補正する。
  */
 export const CONTENT_CENTERED_STYLE = {
-  left: 'calc(50% + var(--sidebar-width, 0px) / 2)',
+  left: 'calc(50% + var(--sidebar-width, 0px) / 2 - var(--help-width, 0px) / 2)',
   transform: 'translateX(-50%)',
 } as const;
 

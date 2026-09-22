@@ -135,6 +135,7 @@ export function EntryList({
   return (
     <div
       className="flex flex-col"
+      data-help="list"
       {...verifyAttrs({
         unit: 'EntryList',
         loading: authLoading || (loading && entries.length === 0),

@@ -187,18 +187,22 @@ export function FermentationSidebar({
 
   // 畳んだ姿でも**同じ契約を出す**。片方だけ欠けると、契約を読む側が
   // 「0件」なのか「畳んでいるだけ」なのかを区別できない。
-  const contract = verifyAttrs({
-    unit: 'FermentationSidebar',
-    keywordCount: keywords.length,
-    snippetCount: snippets.length,
-    hasLetter: letter !== null,
-    empty: isEmpty,
-    detailOpen: !collapsed && open !== null,
-    detailType: collapsed ? 'none' : (open?.kind ?? 'none'),
-    view: collapsed ? 'none' : view,
-    questionCount: questions.length,
-    collapsed,
-  });
+  const contract = {
+    // ヘルプが開いているとき、この面に触れたら「手紙・ことば・断片」を出す。
+    'data-help': 'letter',
+    ...verifyAttrs({
+      unit: 'FermentationSidebar',
+      keywordCount: keywords.length,
+      snippetCount: snippets.length,
+      hasLetter: letter !== null,
+      empty: isEmpty,
+      detailOpen: !collapsed && open !== null,
+      detailType: collapsed ? 'none' : (open?.kind ?? 'none'),
+      view: collapsed ? 'none' : view,
+      questionCount: questions.length,
+      collapsed,
+    }),
+  };
 
   if (collapsed) {
     return (

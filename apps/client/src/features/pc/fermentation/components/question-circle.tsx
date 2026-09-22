@@ -249,6 +249,8 @@ export function QuestionCircle({
       ref={circleRef}
       // 掴んだら円を動かす／開く（キャンバスのパンを始めない）。
       data-canvas-no-pan=""
+      // ヘルプが開いているとき、円に触れたら「問いを立てる」を出す（円は問い 1 つの瓶）。
+      data-help="question"
       {...circlePointerHandlers}
       {...verifyAttrs({
         unit: 'QuestionCircle',

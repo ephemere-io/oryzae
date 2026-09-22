@@ -150,6 +150,30 @@ describe('useHelpResolver — 検索欄', () => {
     expect(result.current.remote).toBe('off');
     expect(result.current.matches[0]?.id).toBe('jar');
   });
+
+  it('api が後から来たら訊けるようになる（画面を直接開いた直後は認証待ちで null）', async () => {
+    const api = createApiStub();
+    api.fetch.mockResolvedValue(
+      mockResponse(true, { configured: true, topicId: 'letter', confidence: 0.9 }),
+    );
+    const initial: { client: ApiClient | null } = { client: null };
+    const { result, rerender } = renderHook(({ client }) => useSubject(client, VAGUE), {
+      initialProps: initial,
+    });
+    expect(result.current.remote).toBe('off');
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(api.fetch).not.toHaveBeenCalled();
+
+    rerender({ client: api });
+    expect(result.current.remote).toBe('idle');
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(api.fetch).toHaveBeenCalledTimes(1);
+    expect(result.current.matches[0]?.source).toBe('jev');
+  });
 });
 
 describe('useHelpResolver — 触れている部品の名前', () => {

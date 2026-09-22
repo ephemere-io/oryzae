@@ -198,6 +198,8 @@ export function QuestionChip({
     <div
       ref={rootRef}
       className="flex min-w-0 items-center gap-1.5"
+      // ヘルプが開いているとき、ここに触れたら「問いを立てる」を出す。
+      data-help="question"
       {...verifyAttrs({
         unit: 'QuestionChip',
         open,
