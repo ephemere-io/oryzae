@@ -276,19 +276,9 @@ export function SpQuestions({
             <p className="py-10 text-center text-sm opacity-50">{t('empty')}</p>
           ) : null}
 
-          {atLimit ? (
-            <p
-              data-question-limit
-              className="mt-1 rounded-2xl px-4 py-3.5 text-center text-[13px] leading-relaxed"
-              style={{
-                ...CONTROL_FONT,
-                color: 'var(--date-color)',
-                background: 'var(--surface-sunken)',
-              }}
-            >
-              {t('limit', { max: MAX_ACTIVE_QUESTIONS })}
-            </p>
-          ) : (
+          {/* 上限（#430）なら「立てる」を出さない。説明の箱は置かない: 一覧を開けば 5 つ並んでいるのが
+              見えるので、言葉で言い直すとかえってややこしい（オーナーのレビュー）。 */}
+          {atLimit ? null : (
             <button
               type="button"
               onClick={openAdd}

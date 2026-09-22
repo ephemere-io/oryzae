@@ -835,7 +835,6 @@
       "save": "保存",
       "letter_arrived": "手紙が届いています",
       "close": "閉じる",
-      "limit": "問いは {max} つまでです。上の問いを押して「アーカイブ」を選ぶと、新しく立てられます。",
       "archive_confirm_title": "この問いをアーカイブしますか？",
       "archive_confirm_body": "アーカイブした問いは、この画面のいちばん下の「アーカイブした問い」から戻せます。",
       "archive_confirm": "アーカイブする",

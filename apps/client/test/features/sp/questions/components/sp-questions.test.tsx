@@ -132,12 +132,13 @@ describe('SpQuestions', () => {
     expect(screen.queryByText(/アーカイブした問い/)).toBeNull();
   });
 
-  it('生きている問いが上限（5）なら「立てる」を出さず、理由を出す（#430）', () => {
+  it('生きている問いが上限（5）なら「立てる」を出さない。説明の箱も置かない（#430・オーナーのレビュー）', () => {
     renderQ({
       questions: ['q1', 'q2', 'q3', 'q4', 'q5'].map((id) => q(id, `問い ${id}`)),
     });
     expect(screen.queryByRole('button', { name: jaMessages.sp.questions.add })).toBeNull();
-    expect(screen.getByText(jaMessages.sp.questions.limit.replace('{max}', '5'))).toBeTruthy();
+    // 一覧を開けば 5 つ並んでいるのが見える。言葉で言い直さない。
+    expect(document.querySelector('[data-question-limit]')).toBeNull();
   });
 
   it('4 つならまだ「立てる」を出す', () => {

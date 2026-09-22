@@ -835,7 +835,6 @@
       "save": "Save",
       "letter_arrived": "A letter has arrived",
       "close": "Close",
-      "limit": "You can have up to {max} questions. Tap a question above and choose “Archive” to make room.",
       "archive_confirm_title": "Archive this question?",
       "archive_confirm_body": "You can bring it back from “Archived questions” at the bottom of this screen.",
       "archive_confirm": "Archive",

@@ -835,7 +835,6 @@
       "save": "保存",
       "letter_arrived": "有一封信送到了",
       "close": "关闭",
-      "limit": "问题最多 {max} 个。点上面的问题并选择「归档」，就能提出新的问题。",
       "archive_confirm_title": "要归档这个问题吗？",
       "archive_confirm_body": "归档的问题可以在本页面最下方的「已归档的问题」里恢复。",
       "archive_confirm": "归档",
