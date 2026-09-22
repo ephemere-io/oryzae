@@ -152,6 +152,13 @@ export function SpEntryEditor({
   });
 
   /** 添えた写真（保存順 = mediaUrls）。パスと表示 URL を 1 本の配列で持つ（署名失敗で index がずれないように）。 */
+  // 試作: `?sheet=vaul` で板の土台を Vaul に差し替える（開いたときに一度だけ読む）。
+  const [sheetEngine] = useState<'snap' | 'vaul'>(() =>
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('sheet') === 'vaul'
+      ? 'vaul'
+      : 'snap',
+  );
   const [photos, setPhotos] = useState<AttachedPhoto[]>(() => {
     const paths = localCopy?.mediaUrls ?? initialMediaUrls ?? [];
     const signedByPath = new Map(
@@ -963,6 +970,7 @@ export function SpEntryEditor({
 
       {/* 発酵の結果: 本文の下の非モーダルのドック（見ながら書く）。 */}
       <SpFermentationDock
+        engine={sheetEngine}
         open={resultVisible}
         detent={resultDetent}
         onDetentChange={setResultDetent}
