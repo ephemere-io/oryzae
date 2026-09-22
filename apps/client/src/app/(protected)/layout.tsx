@@ -8,6 +8,7 @@ import { HelpSidebar } from '@/features/pc/help/components/help-sidebar';
 import { Sidebar } from '@/features/pc/navigation/components/sidebar';
 import { useRootHashHandoff } from '@/features/shared/auth/hooks/use-root-hash-handoff';
 import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
+import { HelpToggle } from '@/features/shared/help/components/help-toggle';
 import { HelpProvider } from '@/features/shared/help/help-context';
 import {
   BackToStudy,
@@ -213,6 +214,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
               触れずに済ませるため。 */}
             {device !== null && showBackToStudy && <PullBackToStudy />}
             {showQuestionsLink && <QuestionsLink />}
+            {/* 画面の右上の「?」。ヘルプモードが有効な間だけ。PC は全画面、SP は書斎だけ
+              （サブ画面の SP は上端に題があり、右上に席が無い。アカウントの設定から開ける）。 */}
+            {(device === 'pc' || (device === 'sp' && pathname === STUDY_PATH)) && <HelpToggle />}
           </HelpProvider>
         </UnreadProvider>
       </SidebarProvider>

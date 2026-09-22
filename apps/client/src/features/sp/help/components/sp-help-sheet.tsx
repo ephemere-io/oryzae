@@ -14,9 +14,8 @@ import { docsHref } from '@/lib/docs-site';
 /**
  * SP のヘルプ。下から出るシート（他の SP のシートと同じ作法）。
  *
- * SP にはホバーが無いので「いま触れているもの」は出ず、代わりに「いま開いている画面」が
- * 頭に来る。行き先を開いたらシートは閉じる（画面が変わったのにシートが被ったままだと、
- * 移ったことが見えない）。
+ * SP にはホバーが無いので、頭の 1 枚は「いま開いている画面」を映す。行き先を開いたら
+ * シートは閉じる（画面が変わったのにシートが被ったままだと、移ったことが見えない）。
  */
 // verify-exempt: ヘルプの context・router・API 依存の配線。面の中身は HelpPanel が孤立検証に乗る
 export function SpHelpSheet() {
@@ -48,7 +47,7 @@ export function SpHelpSheet() {
     [router, locale, help],
   );
 
-  if (!help.open) return null;
+  if (!help.enabled || !help.open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -72,8 +71,6 @@ export function SpHelpSheet() {
           onQueryChange={help.setQuery}
           matches={resolution.matches}
           remote={resolution.remote}
-          firstVisit={help.firstVisit}
-          shortcutHint={false}
           onClose={help.closeHelp}
           onOpenHref={handleOpenHref}
         />

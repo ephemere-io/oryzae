@@ -1,7 +1,7 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HelpProvider, useHelpMode } from '@/features/shared/help/help-context';
+import { HELP_WIDTH, HelpProvider, useHelpMode } from '@/features/shared/help/help-context';
 import type { ApiClient } from '@/lib/api';
 import { mockResponse } from '../../../helpers/response';
 
@@ -21,25 +21,35 @@ function wrapperWith(api: ApiClient | null) {
   };
 }
 
+function pressKey(key: string, target: EventTarget = window) {
+  act(() => {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+  });
+}
+
 beforeEach(() => {
   window.localStorage.clear();
 });
 
 afterEach(() => {
+  // 前のテストの Provider が残っていると、window の `?` を拾って localStorage を書き戻す。
+  cleanup();
   vi.useRealTimers();
   document.body.innerHTML = '';
 });
 
 describe('HelpProvider', () => {
-  it('Provider の外では閉じたままで、何をしても変わらない', () => {
+  it('Provider の外では無効・閉じたままで、何をしても変わらない', () => {
     const { result } = renderHook(() => useHelpMode());
+    expect(result.current.enabled).toBe(false);
     expect(result.current.open).toBe(false);
     act(() => result.current.toggleHelp());
     expect(result.current.open).toBe(false);
   });
 
-  it('開閉できて、開いたことを憶える', () => {
+  it('既定で有効。開閉できて、開いたことを憶える', () => {
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    expect(result.current.enabled).toBe(true);
     expect(result.current.open).toBe(false);
     act(() => result.current.toggleHelp());
     expect(result.current.open).toBe(true);
@@ -55,49 +65,81 @@ describe('HelpProvider', () => {
     expect(result.current.open).toBe(true);
   });
 
-  it('話題を指定して開くと、それが開いた状態になる', () => {
+  it('設定で切ると閉じ、`?` でも開かず、次のマウントでも切れたまま', () => {
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    act(() => result.current.openHelp());
+    act(() => result.current.setEnabled(false));
+    expect(result.current.enabled).toBe(false);
+    expect(result.current.open).toBe(false);
+    pressKey('?');
+    expect(result.current.open).toBe(false);
+    expect(window.localStorage.getItem('oryzae-help-mode')).toBe('0');
+
+    const again = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    expect(again.result.current.enabled).toBe(false);
+  });
+
+  it('切っていても「開け」と言われたら有効にして開く（設定の外からの入口）', () => {
+    window.localStorage.setItem('oryzae-help-mode', '0');
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    expect(result.current.enabled).toBe(false);
     act(() => result.current.openHelp('jar'));
+    expect(result.current.enabled).toBe(true);
     expect(result.current.open).toBe(true);
     expect(result.current.focused).toBe('jar');
   });
 
+  it('幅は範囲に収めて憶え、次のマウントで戻る', () => {
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    expect(result.current.width).toBe(HELP_WIDTH.default);
+    act(() => result.current.setWidth(420));
+    expect(result.current.width).toBe(420);
+    act(() => result.current.setWidth(10));
+    expect(result.current.width).toBe(HELP_WIDTH.min);
+    act(() => result.current.setWidth(9999));
+    expect(result.current.width).toBe(HELP_WIDTH.max);
+    expect(window.localStorage.getItem('oryzae-help-width')).toBe(String(HELP_WIDTH.max));
+
+    const again = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    expect(again.result.current.width).toBe(HELP_WIDTH.max);
+  });
+
   it('`?` で開閉、Esc で閉じる。入力欄で打った `?` は効かない', () => {
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
-    });
+    pressKey('?');
     expect(result.current.open).toBe(true);
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    });
+    pressKey('Escape');
     expect(result.current.open).toBe(false);
 
     const input = document.createElement('input');
     document.body.appendChild(input);
-    act(() => {
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
-    });
+    pressKey('?', input);
     expect(result.current.open).toBe(false);
   });
 
-  it('初めての人には自動で開き、最初の話題が開いている。閉じたら記録する', async () => {
+  it('初めての人には開いた状態で始まり、閉じたら「?」が居場所を教え、記録する', async () => {
     const api = createApiStub(false);
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
     await waitFor(() => {
       expect(result.current.open).toBe(true);
     });
     expect(result.current.firstVisit).toBe(true);
-    expect(result.current.focused).toBe('concept');
+    expect(result.current.cue).toBe(false);
 
     act(() => result.current.closeHelp());
+    expect(result.current.open).toBe(false);
     expect(result.current.firstVisit).toBe(false);
+    expect(result.current.cue).toBe(true);
     await waitFor(() => {
       expect(api.fetch).toHaveBeenCalledWith('/api/v1/users/me/onboarding', {
         method: 'PATCH',
         body: JSON.stringify({ completed: true }),
       });
     });
+
+    // もう一度開けば、教え終わり。
+    act(() => result.current.openHelp());
+    expect(result.current.cue).toBe(false);
   });
 
   it('見たことがある人には自動で開かない', async () => {

@@ -32,8 +32,6 @@ interface SpAccountPageProps {
 export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
   const t = useTranslations('account');
   const locale = useLocale();
-  const th = useTranslations('help');
-  const help = useHelpMode();
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
 
@@ -86,16 +84,7 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
           <ThemeRow />
           <LanguageRow />
 
-          {/* 使い方はアプリの中のヘルプ（下から出るシート）。SP にはメモ帳のピルの他に
-              入口が無いので、ここにも置く。 */}
-          <button
-            type="button"
-            onClick={() => help.openHelp()}
-            className="self-start text-sm"
-            style={{ color: 'var(--accent)' }}
-          >
-            {th('open')} →
-          </button>
+          <HelpModeRow />
 
           {/* よくある質問・お問い合わせとプライバシーポリシーは公開サイト（別ドメイン）にある */}
           <a
@@ -230,6 +219,29 @@ function ThemeRow() {
         style={{ color: 'var(--accent)' }}
       >
         {t('theme.toggle')}
+      </button>
+    </div>
+  );
+}
+
+/** ヘルプモード。有効なら書斎の右上に「?」が居て、押すと使い方のシートが開く。 */
+function HelpModeRow() {
+  const t = useTranslations('account');
+  const help = useHelpMode();
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="mb-1 text-xs uppercase tracking-[0.1em] opacity-50">{t('help_mode.label')}</p>
+        <p className="text-sm">{help.enabled ? t('help_mode.on') : t('help_mode.off')}</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => help.setEnabled(!help.enabled)}
+        aria-pressed={help.enabled}
+        className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium"
+        style={{ color: 'var(--accent)' }}
+      >
+        {t('help_mode.toggle')}
       </button>
     </div>
   );

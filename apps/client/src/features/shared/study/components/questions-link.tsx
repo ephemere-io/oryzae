@@ -30,8 +30,11 @@ export function QuestionsLink() {
       href="/questions"
       {...verifyAttrs({ unit: 'QuestionsLink' })}
       className={`fixed top-6 z-[55] flex h-9 items-center gap-2 px-4 text-[12px] font-medium tracking-[0.08em] ${ELEVATED_CHIP_CLASS}`}
-      // 右端はヘルプの面（開いていれば 336px）のぶん内側へ。面の下に潜らない。
-      style={{ ...ELEVATED_CHIP_STYLE, right: 'calc(24px + var(--help-width, 0px))' }}
+      // 右端はヘルプの面（開いていれば 336px）と、右上の「?」の席（48px）のぶん内側へ。
+      style={{
+        ...ELEVATED_CHIP_STYLE,
+        right: 'calc(24px + var(--help-width, 0px) + var(--help-toggle-reserve, 0px))',
+      }}
     >
       {/* 問いが積み重なっていく形。3 本の横線を長さ違いで重ねる。 */}
       <svg

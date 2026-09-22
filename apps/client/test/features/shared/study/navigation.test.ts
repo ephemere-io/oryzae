@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  externalHref,
   movesWithoutCamera,
   notebookTarget,
-  opensHelp,
   overlayScope,
   staysInStudy,
   targetHref,
@@ -22,18 +22,28 @@ describe('targetHref', () => {
     expect(targetHref({ kind: 'archive' })).toBeNull();
   });
 
-  it('メモ帳はアプリの中の行き先を持たない（ヘルプを開く）', () => {
+  it('メモ帳はアプリの中の行き先を持たない（外へ出る）', () => {
     expect(targetHref({ kind: 'memo' })).toBeNull();
   });
 });
 
-describe('opensHelp', () => {
-  it('メモ帳だけがヘルプ（使い方の面）を開く。画面は移らない', () => {
-    expect(opensHelp({ kind: 'memo' })).toBe(true);
-    expect(opensHelp({ kind: 'jar' })).toBe(false);
-    expect(opensHelp({ kind: 'board' })).toBe(false);
-    expect(opensHelp({ kind: 'archive' })).toBe(false);
-    expect(opensHelp({ kind: 'journal-new' })).toBe(false);
+describe('externalHref', () => {
+  it('メモ帳は公開サイトのヘルプ（使い方・お問い合わせの 1 枚）へ。絶対 URL', () => {
+    const href = externalHref({ kind: 'memo' });
+    expect(href).not.toBeNull();
+    expect(href?.startsWith('http')).toBe(true);
+    expect(href?.endsWith('/support')).toBe(true);
+  });
+
+  it('アプリの言語を ?lang= で公開サイトへ渡す（向こうはブラウザの言語で開いてしまう）', () => {
+    expect(externalHref({ kind: 'memo' }, 'ja')).toMatch(/\/support\?lang=ja$/);
+    expect(externalHref({ kind: 'memo' }, 'en')).toMatch(/\/support\?lang=en$/);
+  });
+
+  it('他の対象は外へ出ない', () => {
+    expect(externalHref({ kind: 'jar' })).toBeNull();
+    expect(externalHref({ kind: 'board' })).toBeNull();
+    expect(externalHref({ kind: 'archive' })).toBeNull();
   });
 });
 
@@ -92,12 +102,12 @@ describe('すべての対象に行き先が定義されている', () => {
     { kind: 'memo' },
   ];
 
-  it('アプリの中の href、ヘルプ、overlayScope のいずれか 1 つを必ず持つ', () => {
+  it('アプリの中の href、外の href、overlayScope のいずれか 1 つを必ず持つ', () => {
     for (const target of ALL) {
       const inside = targetHref(target) !== null;
-      const help = opensHelp(target);
+      const outside = externalHref(target) !== null;
       const overlay = overlayScope(target) !== null;
-      expect([inside, help, overlay].filter(Boolean), target.kind).toHaveLength(1);
+      expect([inside, outside, overlay].filter(Boolean), target.kind).toHaveLength(1);
     }
   });
 });

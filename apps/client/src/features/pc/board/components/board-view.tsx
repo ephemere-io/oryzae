@@ -378,9 +378,10 @@ export function BoardView({ api }: BoardViewProps) {
                 // 書斎が有効な間は左上に「書斎へ戻る」マークが浮くので、その席も避ける
                 // （避けないと日付ナビがマークの下に潜って押せない）。
                 left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
-                // 右端はヘルプの面（開いていれば 336px）のぶん内側へ。fixed なので流れを
-                // 見ず、面の下に潜ってしまう（表示単位の切り替えが検索欄に重なっていた）。
-                right: `calc(var(--help-width, 0px) + ${BOARD_INSET}px)`,
+                // 右端はヘルプの面（開いていれば 336px）と右上の「?」の席（48px）のぶん内側へ。
+                // fixed なので流れを見ず、面の下に潜ってしまう（表示単位の切り替えが
+                // 検索欄に重なっていた）。
+                right: `calc(var(--help-width, 0px) + var(--help-toggle-reserve, 0px) + ${BOARD_INSET}px)`,
               }}
             >
               <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />

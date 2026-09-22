@@ -149,11 +149,50 @@ body {
   right: var(--help-width);
 }
 
+/* ヘルプの面の幅を掴んで変えている間は、右端の追従を遅らせない（指に遅れて付いてくる）。 */
+html[data-help-resizing] .sidebar-anchored {
+  transition: none;
+}
+
+/* ヘルプの面の頭の 1 枚が入れ替わるとき。「変わった」ことを動きで言う。 */
+.help-fade {
+  animation: help-fade 180ms ease-out;
+}
+@keyframes help-fade {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 初めての人が面を閉じた直後、右上の「?」が脈打って居場所を教える。 */
+.help-cue-ring {
+  animation: help-cue 1.1s ease-out 3;
+}
+@keyframes help-cue {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sidebar-sized,
   .sidebar-inset,
   .sidebar-anchored {
     transition: none;
+  }
+  .help-fade,
+  .help-cue-ring {
+    animation: none;
   }
 }
 

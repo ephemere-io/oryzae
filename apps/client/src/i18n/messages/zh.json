@@ -231,6 +231,12 @@
     "links": {
       "privacy": "隐私政策",
       "support": "帮助与支持"
+    },
+    "help_mode": {
+      "label": "帮助模式",
+      "on": "开 — 从右上角的「?」打开",
+      "off": "关",
+      "toggle": "切换"
     }
   },
   "sidebar": {
@@ -820,31 +826,18 @@
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
     "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
-    "hint_memo": "打开使用说明"
+    "hint_memo": "使用方法与联系方式"
   },
   "help": {
-    "title": "使用说明",
-    "open": "打开使用说明",
+    "toggle": "帮助",
+    "resize": "调整宽度",
     "close": "关闭",
     "search_placeholder": "写下你想做的事",
-    "search_hint": "例：重读去年写的内容",
     "search_clear": "清除",
     "search_empty": "没有找到相近的主题，换个说法试试。",
     "search_asking": "正在查找…",
     "pick_badge": "推荐",
-    "hover_title": "正在指向的内容",
-    "here_title": "当前画面",
-    "hover_idle": "将光标移到画面上的物品或项目，这里会显示说明。",
     "open_topic": "打开",
-    "welcome_title": "欢迎",
-    "welcome_body": "从上往下读一遍就能了解全貌。关闭后随时可以再打开（书房的便签本，或 ? 键）。",
-    "shortcut_hint": "? 键开关",
-    "section": {
-      "start": "开始",
-      "room": "书房里的东西",
-      "screens": "画面",
-      "trouble": "遇到问题时"
-    },
     "topics": {
       "concept": {
         "title": "Oryzae 是什么",
@@ -932,9 +925,9 @@
       },
       "help": {
         "title": "这个帮助的用法",
-        "lead": "指向就有说明，写下想做的事就能找到",
-        "body": "打开帮助期间，把光标移到画面上的物品或项目上，这里就会显示说明。在上方的框里写下“想做的事”，会找出相近的主题。书房的便签本、左列的“使用说明”、键盘的 ? 随时可以开关。",
-        "keywords": "帮助,使用说明,说明,搜索,快捷键,便签,关闭,打开"
+        "lead": "指向什么，说明就变成什么。写下想做的事就能找到",
+        "body": "打开这个面板时，把光标移到画面上的物品或项目上，最上面的一张就会变成它的说明。在上方的框里写下“想做的事”，会找出相近的主题。右上角的「?」或键盘的 ? 随时可以开关。也可以在账户设置里把「?」整个关掉。",
+        "keywords": "帮助,使用说明,说明,搜索,快捷键,关闭,打开,右上角,设置,帮助模式"
       }
     }
   }

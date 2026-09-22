@@ -15,7 +15,6 @@ import { HelpTopicCard } from './help-topic-card';
 interface Props {
   topic: HelpTopicId;
   expanded: boolean;
-  spot?: boolean;
   badge?: string;
 }
 
@@ -33,20 +32,17 @@ const textOf = (id: HelpTopicId) => {
   return text;
 };
 
-const CARD = '[data-verify-unit="HelpTopicCard"]';
-
 registerUnit<Props>({
   id: 'HelpTopicCard',
   title: 'HelpTopicCard',
-  description: 'ヘルプの話題 1 件。閉じれば行、開けば本文と線画と「開く」',
+  description: 'ヘルプの一覧の話題 1 件。閉じれば行、開けば本文と「開く」',
   kind: 'component',
   render: (props) => (
-    <div className="w-[300px]" style={{ background: 'var(--surface-sunken)' }}>
+    <div className="w-[336px] p-2" style={{ background: 'var(--surface-sunken)' }}>
       <HelpTopicCard
         topic={helpTopic(props.topic)}
         text={textOf(props.topic)}
         expanded={props.expanded}
-        spot={props.spot}
         badge={props.badge}
         onToggle={() => {}}
         openLabel="開く"
@@ -57,18 +53,13 @@ registerUnit<Props>({
   fixtures: [
     {
       id: 'collapsed',
-      description: '閉じた行（題と一言）',
+      description: '閉じた行（線画・題・一言）',
       props: { topic: 'jar', expanded: false },
     },
     {
       id: 'expanded',
-      description: '開いた行（本文・線画・開く）',
+      description: '開いた行（本文・開く）',
       props: { topic: 'jar', expanded: true },
-    },
-    {
-      id: 'spot',
-      description: 'いま触れているもの（紙の面に載せる。常に開いている）',
-      props: { topic: 'concept', expanded: false, spot: true },
     },
     {
       id: 'external',
@@ -96,46 +87,40 @@ registerUnit<Props>({
   invariants: [
     {
       id: 'expanded-contract',
-      description: 'expanded 契約は spot || expanded と一致する',
-      check: ({ contract, props }) => {
-        const expected = props.spot === true || props.expanded;
+      description: 'expanded 契約は props と一致し、aria-expanded にも出る',
+      check: ({ root, contract, props }) => {
+        const button = root.querySelector('button[aria-expanded]');
         return (
-          contract.expanded === String(expected) ||
-          `expanded=${contract.expanded}, 期待=${expected}`
+          (contract.expanded === String(props.expanded) &&
+            button?.getAttribute('aria-expanded') === String(props.expanded)) ||
+          `expanded=${contract.expanded}, aria=${button?.getAttribute('aria-expanded')}`
         );
       },
     },
     {
       id: 'body-only-when-open',
       description: '本文は開いているときだけ',
-      check: ({ root, props, contract }) => {
-        const body = textOf(props.topic).body;
-        const shown = (root.textContent ?? '').includes(body);
-        return (
-          shown === (contract.expanded === 'true') ||
-          `本文の有無=${shown}, expanded=${contract.expanded}`
-        );
+      check: ({ root, props }) => {
+        const shown = (root.textContent ?? '').includes(textOf(props.topic).body);
+        return shown === props.expanded || `本文の有無=${shown}, expanded=${props.expanded}`;
       },
     },
     {
       id: 'open-link-follows-href',
       description: '「開く」は行き先がある話題にだけ出る（開いているとき）',
-      check: ({ root, props, contract }) => {
+      check: ({ root, props }) => {
         const link = [...root.querySelectorAll('button')].find((b) =>
           (b.textContent ?? '').startsWith('開く'),
         );
-        const expected = contract.expanded === 'true' && helpTopic(props.topic).href !== null;
+        const expected = props.expanded && helpTopic(props.topic).href !== null;
         return Boolean(link) === expected || `開く=${Boolean(link)}, 期待=${expected}`;
       },
     },
     {
-      id: 'spot-is-raised',
-      description: 'いま触れているものだけ紙の面（surface-raised）に載る',
-      check: ({ root, props }) => {
-        const el = root.querySelector<HTMLElement>(CARD);
-        const raised = (el?.style.background ?? '').includes('surface-raised');
-        return raised === (props.spot === true) || `raised=${raised}, spot=${props.spot}`;
-      },
+      id: 'row-has-illustration',
+      description: '行に線画が付く（一覧を目で流せるように。節の見出しの代わり）',
+      check: ({ root }) =>
+        root.querySelector('[data-verify-unit="HelpIllustration"]') !== null || '線画が無い',
     },
   ],
 });

@@ -1506,10 +1506,12 @@ export function EntryEditor({
           {/* 中央: 何も置かない（上のタブの席）。 */}
           <div aria-hidden="true" />
 
-          {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
+          {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。
+              右上にはヘルプの「?」が居る（`--help-toggle-reserve`、無ければ 0）ので、
+              その席のぶん内側に寄せる。歯車の真上に「?」が重なっていた。 */}
           <div
             className="flex min-w-0 items-center justify-end gap-3"
-            style={{ height: SHELL_ROW_HEIGHT }}
+            style={{ height: SHELL_ROW_HEIGHT, paddingRight: 'var(--help-toggle-reserve, 0px)' }}
           >
             {/* 日付は設定ボタンのすぐ左に、小さく。 */}
             <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>

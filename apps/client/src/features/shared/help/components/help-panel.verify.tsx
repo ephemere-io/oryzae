@@ -1,9 +1,10 @@
 /**
  * HelpPanel の検証スペック。
  *
- * 面は 2 つの顔を持つ: **一覧**（検索欄が空。いま触れているもの → 話題の節）と
+ * 面は 2 つの顔を持つ: **一覧**（検索欄が空。生きている 1 枚 → 話題の列）と
  * **検索**（書いている間は近い話題だけ）。見張るのは、顔が契約（mode）どおりに
- * 切り替わること、触れているものが頭に来ること、初めての人にだけ「ようこそ」が出ること。
+ * 切り替わること、頭の 1 枚が触れているものを映すこと、そして**言葉で説明しない**こと
+ * （面の名前・節の見出し・使い方の説明を置かない）。
  */
 
 import { registerUnit } from '@oryzae/verify';
@@ -21,7 +22,6 @@ interface Props {
   query: string;
   matches: HelpMatch[];
   remote: HelpRemoteState;
-  firstVisit: boolean;
 }
 
 function lookup(key: string): string {
@@ -33,6 +33,18 @@ function lookup(key: string): string {
 const TEXTS = helpTextsFrom(lookup);
 const PANEL = '[data-verify-unit="HelpPanel"]';
 const CARD = '[data-verify-unit="HelpTopicCard"]';
+const LIVE = '[data-verify-unit="HelpLiveCard"]';
+
+/** 面の見出し・使い方の説明として書いてはいけない語。話題の題（「このヘルプの使い方」）は別。 */
+const LECTURE_WORDS = [
+  'はじめに',
+  '書斎のもの',
+  '困ったとき',
+  'いま触れている',
+  'いま開いている',
+  'カーソルを載せる',
+  'ようこそ',
+];
 
 const BROWSE: Props = {
   hovered: null,
@@ -41,17 +53,16 @@ const BROWSE: Props = {
   query: '',
   matches: [],
   remote: 'idle',
-  firstVisit: false,
 };
 
 registerUnit<Props>({
   id: 'HelpPanel',
   title: 'HelpPanel',
-  description: 'ヘルプの面の中身。検索欄・いま触れているもの・話題の一覧',
+  description: 'ヘルプの面の中身。検索欄・生きている 1 枚・話題の一覧',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
-      <div className="h-[640px] w-[336px] pt-5" style={{ background: 'var(--surface-sunken)' }}>
+      <div className="h-[720px] w-[336px] pt-5" style={{ background: 'var(--surface-sunken)' }}>
         <HelpPanel
           texts={TEXTS}
           hovered={props.hovered}
@@ -62,8 +73,6 @@ registerUnit<Props>({
           onQueryChange={() => {}}
           matches={props.matches}
           remote={props.remote}
-          firstVisit={props.firstVisit}
-          shortcutHint
           onClose={() => {}}
           onOpenHref={() => {}}
         />
@@ -71,15 +80,11 @@ registerUnit<Props>({
     ),
   fixtures: [
     { id: 'browse', description: '一覧。何にも触れていない（画面の話題が頭）', props: BROWSE },
+    { id: 'hovered', description: '瓶に触れている', props: { ...BROWSE, hovered: 'jar' } },
     {
-      id: 'hovered',
-      description: '瓶に触れている',
-      props: { ...BROWSE, hovered: 'jar' },
-    },
-    {
-      id: 'first-visit',
-      description: '初めての人。「ようこそ」と、最初の話題を開いた状態',
-      props: { ...BROWSE, firstVisit: true, focused: 'concept' },
+      id: 'row-open',
+      description: '一覧の 1 行を開いている',
+      props: { ...BROWSE, focused: 'write' },
     },
     {
       id: 'search',
@@ -118,18 +123,19 @@ registerUnit<Props>({
     },
     {
       id: 'browse-lists-every-topic',
-      description: '一覧では全話題が並ぶ（頭の 1 件を足して +1）',
+      description: '一覧では全話題が並ぶ',
       check: ({ root, contract }) => {
         if (contract.mode !== 'browse') return true;
         const count = root.querySelectorAll(CARD).length;
-        return count === HELP_TOPICS.length + 1 || `${count} 件（期待 ${HELP_TOPICS.length + 1}）`;
+        return count === HELP_TOPICS.length || `${count} 件（期待 ${HELP_TOPICS.length}）`;
       },
     },
     {
       id: 'search-lists-matches-only',
-      description: '検索では近い話題だけ（件数は契約と一致）',
+      description: '検索では近い話題だけ（件数は契約と一致）。生きている 1 枚は出ない',
       check: ({ root, contract }) => {
         if (contract.mode !== 'search') return true;
+        if (root.querySelector(LIVE)) return '検索中に生きている 1 枚が残っている';
         const count = root.querySelectorAll(CARD).length;
         return (
           String(count) === contract.resultCount || `${count} 件、契約 ${contract.resultCount}`
@@ -137,25 +143,26 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'spot-is-hovered-or-screen',
-      description: '頭に来るのは、触れているもの。無ければ画面の話題',
+      id: 'live-card-mirrors-hover',
+      description: '頭の 1 枚は、触れているもの。無ければ画面の話題',
       check: ({ root, props, contract }) => {
         if (contract.mode !== 'browse') return true;
-        const spot = root.querySelector(`${CARD}[data-verify-spot="true"]`);
+        const live = root.querySelector(LIVE);
         const expected = props.hovered ?? props.screenTopic;
         return (
-          spot?.getAttribute('data-verify-topic') === expected ||
-          `spot=${spot?.getAttribute('data-verify-topic')}, 期待=${expected}`
+          (live?.getAttribute('data-verify-topic') === expected &&
+            live?.getAttribute('data-verify-following') === String(props.hovered !== null)) ||
+          `live=${live?.getAttribute('data-verify-topic')}, 期待=${expected}`
         );
       },
     },
     {
-      id: 'welcome-only-first-visit',
-      description: '「ようこそ」は初めての人にだけ',
-      check: ({ root, props, contract }) => {
-        if (contract.mode !== 'browse') return true;
-        const shown = (root.textContent ?? '').includes(jaMessages.help.welcome_title);
-        return shown === props.firstVisit || `ようこそ=${shown}, firstVisit=${props.firstVisit}`;
+      id: 'no-labels-no-lecture',
+      description: '面の名前・節の見出し・使い方の説明を書かない（見れば分かることを言葉にしない）',
+      check: ({ root }) => {
+        const text = root.textContent ?? '';
+        const found = LECTURE_WORDS.filter((w) => text.includes(w));
+        return found.length === 0 || `説明のための言葉が残っている: ${found.join(', ')}`;
       },
     },
     {

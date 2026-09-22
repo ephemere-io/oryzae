@@ -4,6 +4,7 @@
  * 純関数。ルーティングそのものは呼び出し側（page）が持つ。
  */
 
+import { docsHref } from '@/lib/docs-site';
 import type { StudyTarget } from './types';
 
 /**
@@ -33,20 +34,22 @@ export function targetHref(target: StudyTarget): string | null {
 }
 
 /**
- * ヘルプ（使い方の面）を開閉する対象か。
+ * 部屋の外（公開サイト、別ドメイン）の行き先。無ければ null。
  *
- * メモ帳はヘルプの入口。押すと画面を移さず、右の面（SP は下のシート）が開く。
- * 以前は公開サイトの `/support` を新しいタブで開いていたが、ヘルプがアプリの中に
- * 入ったので、部屋を出ずに済む。公開サイトへは面の中の「困ったとき」から。
+ * メモ帳は物。押すと公開サイトのヘルプ（使い方・よくある質問・お問い合わせを 1 枚に
+ * まとめた `/support`）を新しいタブで開く。**ヘルプモードの開閉には使わない** — 一度
+ * メモ帳で面を開閉する形にしたが、物を押してモードが切り替わるのは戻り道が読めない
+ * （「メモというよりヘルプモードという体験」）。モードの入口は画面の右上の「?」。
+ * `locale` はアプリの現在の言語（公開サイトへ `?lang=` で渡す）。
  */
-export function opensHelp(target: StudyTarget): boolean {
-  return target.kind === 'memo';
+export function externalHref(target: StudyTarget, locale?: string): string | null {
+  return target.kind === 'memo' ? docsHref('/support', locale) : null;
 }
 
 /**
  * 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。
  *
- * メモ帳も URL を変えないが一覧は開かない（ヘルプを開く）。`targetHref === null` で判定すると
+ * メモ帳も URL を変えないが一覧は開かない（外へ出る）。`targetHref === null` で判定すると
  * メモ帳を押したときに一覧が開いてしまう。
  */
 export function staysInStudy(target: StudyTarget): boolean {

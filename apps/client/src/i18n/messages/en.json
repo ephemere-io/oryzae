@@ -231,6 +231,12 @@
     "links": {
       "privacy": "Privacy Policy",
       "support": "Help & Support"
+    },
+    "help_mode": {
+      "label": "Help mode",
+      "on": "On — open it from the ? at the top right",
+      "off": "Off",
+      "toggle": "Toggle"
     }
   },
   "sidebar": {
@@ -820,31 +826,18 @@
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
     "hint_board_both": "{photos} photos · {snippets} snippets",
-    "hint_memo": "Open help"
+    "hint_memo": "Help and contact"
   },
   "help": {
-    "title": "Help",
-    "open": "Open help",
+    "toggle": "Help",
+    "resize": "Resize",
     "close": "Close",
     "search_placeholder": "What do you want to do?",
-    "search_hint": "e.g. reread what I wrote last year",
     "search_clear": "Clear",
     "search_empty": "Nothing close enough. Try other words.",
     "search_asking": "Looking…",
     "pick_badge": "Best match",
-    "hover_title": "What you're pointing at",
-    "here_title": "This screen",
-    "hover_idle": "Point at anything on the screen and it is explained here.",
     "open_topic": "Open",
-    "welcome_title": "Welcome",
-    "welcome_body": "Read from the top and you'll have the whole picture. You can close this and open it again any time (the memo pad in the study, or the ? key).",
-    "shortcut_hint": "? toggles help",
-    "section": {
-      "start": "Getting started",
-      "room": "In the study",
-      "screens": "Screens",
-      "trouble": "When stuck"
-    },
     "topics": {
       "concept": {
         "title": "What Oryzae is",
@@ -932,9 +925,9 @@
       },
       "help": {
         "title": "Using this help",
-        "lead": "Point at something to see what it is. Type what you want to do",
-        "body": "While help is open, point at anything on the screen and it is explained here. Type what you want to do in the box above to find the closest topic. Open or close help any time with the memo pad in the study, \"Help\" in the left column, or the ? key.",
-        "keywords": "help,how to,explain,search,shortcut,memo,close,open"
+        "lead": "Point at something and the card changes. Type what you want to do",
+        "body": "While this panel is open, point at anything on the screen and the card at the top explains it. Type what you want to do in the box above to find the closest topic. Open or close the panel any time with the ? at the top right or the ? key. You can hide the ? altogether in Account settings.",
+        "keywords": "help,how to,explain,search,shortcut,close,open,top right,settings,help mode"
       }
     }
   }

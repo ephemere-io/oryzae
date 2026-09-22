@@ -7,6 +7,7 @@ import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { HELP_PANEL_ATTR } from '../hover';
 import { HELP_SECTIONS, HELP_TOPICS, helpTopic } from '../topics';
 import type { HelpMatch, HelpRemoteState, HelpTopicId, HelpTopicText } from '../types';
+import { HelpLiveCard } from './help-live-card';
 import { HelpTopicCard } from './help-topic-card';
 
 /** 検索で出す件数の上限。 */
@@ -14,20 +15,17 @@ const MAX_RESULTS = 6;
 
 export interface HelpPanelProps {
   texts: readonly HelpTopicText[];
-  /** いま触れているもの。無ければ `screenTopic` を出す。 */
+  /** いま触れているもの。無ければ `screenTopic` を映す。 */
   hovered: HelpTopicId | null;
   /** いま開いている画面の話題。 */
   screenTopic: HelpTopicId;
+  /** 一覧の中で開いている話題。 */
   focused: HelpTopicId | null;
   onFocus: (topic: HelpTopicId | null) => void;
   query: string;
   onQueryChange: (query: string) => void;
   matches: readonly HelpMatch[];
   remote: HelpRemoteState;
-  /** 初めての人に自動で開いた回。上に「ようこそ」を添える。 */
-  firstVisit: boolean;
-  /** `?` の案内を出すか（キーボードのある端末だけ）。 */
-  shortcutHint: boolean;
   onClose: () => void;
   /** 「開く」。アプリの中は router、外は新しいタブ — 決めるのは呼び出し側。 */
   onOpenHref: (href: string, external: boolean) => void;
@@ -36,9 +34,14 @@ export interface HelpPanelProps {
 /**
  * ヘルプの面の中身（`docs/help-mode-guide.md`）。PC の右の面と SP のシートが共有する。
  *
- * 上から: 検索欄 → いま触れているもの（無ければ、いま開いている画面）→ 話題の一覧
- * （はじめに／書斎のもの／画面／困ったとき）。検索欄に何か書いている間は、一覧の代わりに
- * 近い話題だけを出す。
+ * 上から **検索欄 → 生きている 1 枚 → 話題の一覧**。それだけ。
+ *
+ * - 面の名前（「使い方」）は書かない。右上の「?」を押して出た面が何かは、押した人が知っている
+ * - 生きている 1 枚は、触れているものの説明。何にも触れていなければ、いま開いている画面。
+ *   「いま触れているもの」といった見出しは付けない — 触れると変わる、それ自体が説明
+ * - 一覧に節の見出し（「はじめに」「書斎のもの」）は付けない。行の間の空きで束が分かり、
+ *   行の線画で何の話かが分かる。上から読めば一周する順に並んでいる
+ * - 検索欄に文字がある間は、一覧の代わりに近い話題だけを出す（上位 6 件、1 件目は開いた状態）
  *
  * **データは持たない。** 触れているもの・検索の結果は props で受ける（孤立検証のため）。
  */
@@ -52,8 +55,6 @@ export function HelpPanel({
   onQueryChange,
   matches,
   remote,
-  firstVisit,
-  shortcutHint,
   onClose,
   onOpenHref,
 }: HelpPanelProps) {
@@ -78,50 +79,16 @@ export function HelpPanel({
         focused: focused ?? 'none',
         resultCount: searching ? shown.length : -1,
         remote,
-        firstVisit,
       })}
       className="flex h-full min-h-0 flex-col"
       style={CONTROL_FONT}
     >
-      {/* 面の始まりを示す 1 行。発酵の面と同じ作法（名前は薄く、閉じるは右）。 */}
-      <div className="mb-3 flex h-6 shrink-0 items-center gap-2 px-5">
-        <span className="flex-1 truncate text-[11px] font-medium tracking-[0.12em] text-[var(--fg)] opacity-45">
-          {t('title')}
-        </span>
-        {shortcutHint && (
-          <kbd
-            className="rounded border px-1 text-[10px] leading-4 text-[var(--date-color)]"
-            style={{ borderColor: 'var(--border-subtle)' }}
-            title={t('shortcut_hint')}
-          >
-            ?
-          </kbd>
-        )}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t('close')}
-          className="-mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--date-color)] transition-colors duration-150 hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
-        >
-          <svg
-            aria-hidden="true"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={ICON_STROKE_WIDTH}
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
-      </div>
-
-      {/* 検索欄。したいことを書く。 */}
-      <div className="shrink-0 px-5">
+      {/* 検索欄と、閉じる。1 行に収める。 */}
+      <div className="flex shrink-0 items-center gap-2 px-4">
         <label
           htmlFor={searchId}
-          className="flex items-center gap-2 border-b pb-2"
-          style={{ borderColor: 'var(--surface-sunken-border)' }}
+          className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3"
+          style={{ background: 'var(--bg)', borderColor: 'var(--surface-sunken-border)' }}
         >
           <svg
             aria-hidden="true"
@@ -141,8 +108,7 @@ export function HelpPanel({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={t('search_placeholder')}
             autoComplete="off"
-            // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ
-            // （2 つ並ぶと、どちらを押せばいいか一瞬迷う。SP の実機で 2 つ並んでいた）。
+            // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ。
             className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] [&::-webkit-search-cancel-button]:appearance-none"
           />
           {searching && (
@@ -152,27 +118,23 @@ export function HelpPanel({
               aria-label={t('search_clear')}
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--date-color)] hover:text-[var(--fg)]"
             >
-              <svg
-                aria-hidden="true"
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={ICON_STROKE_WIDTH}
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
-              </svg>
+              <CloseIcon className="h-3.5 w-3.5" />
             </button>
           )}
         </label>
-        {!searching && (
-          <p className="mt-1.5 text-[10.5px] text-[var(--date-color)]">{t('search_hint')}</p>
-        )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('close')}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-[var(--date-color)] transition-colors duration-150 hover:bg-[var(--hover-wash)] hover:text-[var(--fg)]"
+        >
+          <CloseIcon className="h-4 w-4" />
+        </button>
       </div>
 
-      <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-3 pb-5">
+      <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-4 pb-5">
         {searching ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-0.5">
             {shown.length === 0 ? (
               <p className="px-2 py-3 text-[12px] leading-[1.7] text-[var(--date-color)]">
                 {remote === 'asking' ? t('search_asking') : t('search_empty')}
@@ -203,64 +165,50 @@ export function HelpPanel({
             )}
           </div>
         ) : (
-          <div className="flex flex-col gap-5">
-            {/* いま触れているもの／いま開いている画面。 */}
+          <>
             {spotText && (
-              <section className="flex flex-col gap-2 px-1">
-                <h3 className="px-1 text-[10px] font-medium tracking-[0.12em] text-[var(--date-color)] uppercase">
-                  {hovered ? t('hover_title') : t('here_title')}
-                </h3>
-                <HelpTopicCard
-                  spot
-                  topic={helpTopic(spot)}
-                  text={spotText}
-                  expanded
-                  onToggle={() => {}}
-                  openLabel={t('open_topic')}
-                  onOpen={onOpenHref}
-                />
-                {!hovered && (
-                  <p className="px-1 text-[10.5px] leading-[1.6] text-[var(--date-color)]">
-                    {t('hover_idle')}
-                  </p>
-                )}
-              </section>
+              <HelpLiveCard topic={helpTopic(spot)} text={spotText} following={hovered !== null} />
             )}
-
-            {firstVisit && (
-              <section className="px-2">
-                <p className="text-[13px] font-medium text-[var(--fg)]">{t('welcome_title')}</p>
-                <p className="mt-1 text-[12px] leading-[1.7] text-[var(--date-color)]">
-                  {t('welcome_body')}
-                </p>
-              </section>
-            )}
-
-            {HELP_SECTIONS.map((section) => (
-              <section key={section} className="flex flex-col gap-0.5">
-                <h3 className="mb-1 px-3 text-[10px] font-medium tracking-[0.12em] text-[var(--date-color)] uppercase">
-                  {t(`section.${section}`)}
-                </h3>
-                {HELP_TOPICS.filter((topic) => topic.section === section).map((topic) => {
-                  const text = textOf.get(topic.id);
-                  if (!text) return null;
-                  return (
-                    <HelpTopicCard
-                      key={topic.id}
-                      topic={topic}
-                      text={text}
-                      expanded={focused === topic.id}
-                      onToggle={() => onFocus(focused === topic.id ? null : topic.id)}
-                      openLabel={t('open_topic')}
-                      onOpen={onOpenHref}
-                    />
-                  );
-                })}
-              </section>
-            ))}
-          </div>
+            {/* 一覧。節の見出しは無く、束の間の空きだけ。 */}
+            <div className="mt-6 flex flex-col gap-5">
+              {HELP_SECTIONS.map((section) => (
+                <div key={section} className="flex flex-col gap-0.5">
+                  {HELP_TOPICS.filter((topic) => topic.section === section).map((topic) => {
+                    const text = textOf.get(topic.id);
+                    if (!text) return null;
+                    return (
+                      <HelpTopicCard
+                        key={topic.id}
+                        topic={topic}
+                        text={text}
+                        expanded={focused === topic.id}
+                        onToggle={() => onFocus(focused === topic.id ? null : topic.id)}
+                        openLabel={t('open_topic')}
+                        onOpen={onOpenHref}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+function CloseIcon({ className }: { className: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={ICON_STROKE_WIDTH}
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+    </svg>
   );
 }
