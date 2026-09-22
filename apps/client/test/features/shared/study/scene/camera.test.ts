@@ -20,6 +20,7 @@ import {
   panByPixels,
   parallaxOffset,
   pointUnderPointer,
+  rebaseZoom,
   screenFrame,
   shelfView,
   zoomByPinch,
@@ -320,6 +321,33 @@ describe('ホームのカメラ操作（HomeControl）', () => {
     expect(clampZoom(Number.POSITIVE_INFINITY)).toBe(1);
   });
 
+  describe('clampZoom — 上限は縦横比の基準に掛かる', () => {
+    it('基準が 1 なら従来どおり 0.55〜1.35', () => {
+      expect(clampZoom(1.65)).toBe(HOME_ZOOM.max);
+      expect(clampZoom(1.65, 1)).toBe(HOME_ZOOM.max);
+      expect(clampZoom(0.1, 1)).toBe(HOME_ZOOM.min);
+    });
+
+    it('基準が 1.224 なら 1.35 × 1.224 まで引ける。下限は据え置き', () => {
+      const base = 1.224;
+      expect(clampZoom(1.65, base)).toBeCloseTo(1.65, 6);
+      expect(clampZoom(2, base)).toBeCloseTo(HOME_ZOOM.max * base, 6);
+      expect(clampZoom(0.1, base)).toBe(HOME_ZOOM.min);
+    });
+
+    it.each(LAYOUTS)('$name: 基準に連れて view の距離も伸びる', (layout) => {
+      const home = homeView(layout);
+      const base = 1.3;
+      const far = controlledView(layout, { focus: home.target, zoom: 99 }, base);
+      expect(distance(far)).toBeCloseTo(distance(home) * HOME_ZOOM.max * base, 5);
+    });
+
+    it('壊れた基準や 1 未満の基準は 1 として扱う', () => {
+      expect(clampZoom(1.65, Number.NaN)).toBe(HOME_ZOOM.max);
+      expect(clampZoom(1.65, 0.5)).toBe(HOME_ZOOM.max);
+    });
+  });
+
   it.each(LAYOUTS)('$name: 注視点は部屋の中に留まる（clampFocus）', (layout) => {
     const bounds = layout.focusBounds;
     const far = clampFocus(layout, { x: 999, y: -999, z: 999 });
@@ -482,6 +510,13 @@ describe('ホームのカメラ操作（HomeControl）', () => {
       expect(zoom).toBeLessThanOrEqual(clampZoom(Number.MAX_SAFE_INTEGER));
     });
 
+    it('基準が上がっていれば、そのぶん先まで引ける', () => {
+      const base = 1.224;
+      let zoom = base;
+      for (let i = 0; i < 500; i += 1) zoom = zoomByWheel(zoom, 100, base);
+      expect(zoom).toBeCloseTo(HOME_ZOOM.max * base, 6);
+    });
+
     it('壊れた delta では動かさない', () => {
       expect(zoomByWheel(1.1, Number.NaN)).toBeCloseTo(1.1, 5);
     });
@@ -495,6 +530,13 @@ describe('ホームのカメラ操作（HomeControl）', () => {
 
     it('置いた時点の倍率から積み上げる（毎回 1 に戻さない）', () => {
       expect(zoomByPinch(0.9, 1)).toBeCloseTo(0.9, 5);
+    });
+
+    it('基準が上がっていれば、そのぶん先まで引ける', () => {
+      const base = 1.224;
+      expect(zoomByPinch(base, 0.5, base)).toBeCloseTo(HOME_ZOOM.max * base, 6);
+      expect(zoomByPinch(base, 0.5)).toBe(HOME_ZOOM.max);
+      expect(zoomByPinch(1, 0.5)).toBe(HOME_ZOOM.max);
     });
 
     it('比が 0 や負でも落ちない', () => {
@@ -529,9 +571,10 @@ describe('zoomForAspect — 画面が構図より横に狭ければ引く', () =
     expect(zoom).toBeLessThan(1.3);
   });
 
-  it('狭いほど引くが、寄り引きの上限は越えない', () => {
+  it('狭いほど引く。寄り引きの上限（1.35）で頭打ちにしない — そこで止めると机が切れたまま', () => {
     expect(zoomForAspect(PC_LAYOUT, 1.0)).toBeGreaterThan(zoomForAspect(PC_LAYOUT, 1.3));
-    expect(zoomForAspect(PC_LAYOUT, 0.3)).toBeLessThanOrEqual(HOME_ZOOM.max);
+    expect(zoomForAspect(PC_LAYOUT, 0.8)).toBeGreaterThan(HOME_ZOOM.max);
+    expect(zoomForAspect(PC_LAYOUT, 0.3)).toBeGreaterThan(zoomForAspect(PC_LAYOUT, 0.8));
   });
 
   it('SP は縦持ちの構図なので、その比では等倍', () => {
@@ -541,5 +584,37 @@ describe('zoomForAspect — 画面が構図より横に狭ければ引く', () =
   it('壊れた比は等倍', () => {
     expect(zoomForAspect(PC_LAYOUT, Number.NaN)).toBe(1);
     expect(zoomForAspect(PC_LAYOUT, 0)).toBe(1);
+  });
+});
+
+/**
+ * 窓の大きさが変わったとき、利用者が寄せた比を新しい基準に掛け直す（`scene.ts` の
+ * ResizeObserver がやること）。比は `scene.ts` が持ち続け、丸めた値から逆算しない。
+ */
+describe('rebaseZoom — 面の開閉で寄せた比を失わない', () => {
+  const panelOpen = zoomForAspect(PC_LAYOUT, 1104 / 900);
+  const panelClosed = zoomForAspect(PC_LAYOUT, 1440 / 900);
+
+  it('1440 × 900 で引き切った 1.35 は、面を開けて閉じても 1.35 のまま', () => {
+    expect(panelClosed).toBe(1);
+    const userZoom = HOME_ZOOM.max;
+    const opened = rebaseZoom(userZoom, panelOpen);
+    // 開いている間は基準のぶん先まで引いている（1.35 で頭打ちにしない）。
+    expect(opened).toBeCloseTo(HOME_ZOOM.max * panelOpen, 6);
+    expect(opened).toBeGreaterThan(HOME_ZOOM.max);
+    const closed = rebaseZoom(userZoom, panelClosed);
+    expect(closed).toBe(HOME_ZOOM.max);
+  });
+
+  it('等倍で始めた人は、開けると基準ぶん引き、閉じると等倍に戻る', () => {
+    expect(rebaseZoom(1, panelOpen)).toBeCloseTo(panelOpen, 6);
+    expect(rebaseZoom(1, panelClosed)).toBe(1);
+  });
+
+  it('寄り切った 0.55 は下限で止まり、閉じれば 0.55 に戻る', () => {
+    // 面を開けたまま 0.55 まで寄せた人の比は 0.55 / 1.22。閉じると下限に掛かる。
+    const userZoom = HOME_ZOOM.min / panelOpen;
+    expect(rebaseZoom(userZoom, panelOpen)).toBeCloseTo(HOME_ZOOM.min, 6);
+    expect(rebaseZoom(userZoom, panelClosed)).toBe(HOME_ZOOM.min);
   });
 });

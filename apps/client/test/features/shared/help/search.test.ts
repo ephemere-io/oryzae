@@ -15,8 +15,24 @@ const JA = buildCorpus(helpTextsFrom(lookupIn(jaMessages)));
 const EN = buildCorpus(helpTextsFrom(lookupIn(enMessages)));
 
 describe('tokenize', () => {
-  it('英語は空白で切った小文字の語', () => {
-    expect(tokenize('Reread What I wrote')).toEqual(['reread', 'what', 'i', 'wrote']);
+  it('英語は空白で切った小文字の語。1 文字の語（I / a）は拾わない', () => {
+    expect(tokenize('Reread What I wrote')).toEqual(['reread', 'what', 'wrote']);
+  });
+
+  it('日本語の中の英語は、文字の種類の変わり目で切り出す', () => {
+    expect(tokenize('Googleでログインしたい')).toContain('google');
+    expect(tokenize('FAQを見たい')).toContain('faq');
+    expect(tokenize('AIが読む')).toContain('ai');
+    // 切り出した残りの日本語も、いつもどおり 2 文字並びになる。
+    expect(tokenize('FAQを見たい')).toContain('見た');
+  });
+
+  it('長音「ー」は仮名の並びに含める', () => {
+    expect(tokenize('ジャーに漬ける')).toContain('ャー');
+  });
+
+  it('「L.A.B.」は 1 文字ずつに割れるので、単位としては何も残らない（丸ごと一致で見る）', () => {
+    expect(tokenize('L.A.B.')).toEqual([]);
   });
 
   it('日本語は 2 文字の並びと、漢字 1 文字', () => {
@@ -56,6 +72,17 @@ describe('rankTopics（ja）', () => {
 
   it('関係の無い文は空', () => {
     expect(rankTopics('xyzzy', JA)).toEqual([]);
+  });
+
+  it('「FAQを見たい」でサポートが候補に入る（FAQ が語として拾える）', () => {
+    expect(rankTopics('FAQを見たい', JA).map((m) => m.id)).toContain('support');
+  });
+
+  it('英語の a だけで手紙（L.A.B.）に当たらない', () => {
+    expect(rankTopics('a', JA).find((m) => m.id === 'letter')).toBeUndefined();
+    expect(rankTopics('a', EN).find((m) => m.id === 'letter')).toBeUndefined();
+    // 丸ごと書けば当たる。
+    expect(rankTopics('L.A.B.', JA)[0]?.id).toBe('letter');
   });
 
   it('結果は近い順', () => {

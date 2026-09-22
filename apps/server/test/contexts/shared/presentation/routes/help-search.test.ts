@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const routeHelpTopicMock = vi.fn();
 vi.mock('@/contexts/shared/infrastructure/typesafe-systemone.js', () => ({
@@ -28,6 +28,10 @@ describe('POST /api/v1/help/search', () => {
     routeHelpTopicMock.mockReset();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('検証済みの入力をゲートウェイへ渡し、返事をそのまま返す', async () => {
     routeHelpTopicMock.mockResolvedValue({ configured: true, topicId: 'letter', confidence: 0.9 });
 
@@ -51,6 +55,24 @@ describe('POST /api/v1/help/search', () => {
 
     expect(res.status).toBe(400);
     expect(routeHelpTopicMock).not.toHaveBeenCalled();
+  });
+
+  it('JSON でない本文は 400。本文をログにも Sentry にも載せない', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // 検索欄の文がそのまま送られてきた体。V8 の SyntaxError の文言には本文の断片が入る。
+    const body = '去年書いたものを読み返したい（JSON ではない）';
+
+    const res = await buildApp().request('/api/v1/help/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Invalid request: body must be JSON' });
+    expect(routeHelpTopicMock).not.toHaveBeenCalled();
+    // 共通の error handler（Sentry へ送る道）まで届いていないことの証。
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it('選択肢が 1 つしか無ければ 400（選ぶものが無い）', async () => {

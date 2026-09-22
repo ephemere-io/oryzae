@@ -25,14 +25,25 @@ const EXACT_BONUS = 4;
 /** これ未満は「当たっていない」。1 文字の偶然の一致を拾わない。 */
 const MIN_SCORE = 2;
 
-const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+/**
+ * 文字の種類ごとの並び。ラテン文字と数字、CJK（漢字・仮名・ハングル）、それ以外の文字。
+ *
+ * 「Googleでログインしたい」は空白が無いので、記号で切っただけでは 1 語のまま。種類の
+ * 変わり目でも切らないと、鍵語の JAR / FAQ / AI が日本語の問いから拾えない。
+ * `scx`（Script_Extensions）なのは、長音「ー」（Script は Common）を仮名の並びに含めるため。
+ */
+const RUN =
+  /[\p{scx=Latin}\p{N}]+|[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{scx=Hangul}]+|\p{L}+/gu;
+const CJK = /^[\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}\p{scx=Hangul}]/u;
 /** 1 文字でも意味を持つ文字（漢字・ハングル）。仮名 1 文字（「の」「を」）は拾わない。 */
 const SOLID = /^[\p{Script=Han}\p{Script=Hangul}]$/u;
 
 /**
  * 文字列を照合の単位に刻む。
  *
- * - 英数の語（空白・記号区切り、小文字）
+ * - 英数の語（空白・記号で切り、さらに文字の種類の変わり目で切る。小文字）。
+ *   **1 文字の語は拾わない** — 「L.A.B.」を l・a・b に刻んで鍵語に入れると、英語の a を
+ *   含む問いが全部その話題に当たる。丸ごと一致（`exact`）は別に見るので、鍵語としては失わない
  * - CJK の 2 文字並び。1 文字の語（「瓶」「板」）も拾えるよう、漢字・ハングルの 1 文字も足す
  *   （仮名 1 文字は助詞と重なるので足さない）
  */
@@ -41,13 +52,15 @@ export function tokenize(text: string): string[] {
   const out = new Set<string>();
   for (const word of lower.split(/[^\p{L}\p{N}]+/u)) {
     if (word.length === 0) continue;
-    if (!CJK.test(word)) {
-      out.add(word);
-      continue;
+    for (const [run] of word.matchAll(RUN)) {
+      const chars = [...run];
+      if (!CJK.test(run)) {
+        if (chars.length >= 2) out.add(run);
+        continue;
+      }
+      for (const ch of chars) if (SOLID.test(ch)) out.add(ch);
+      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
     }
-    const chars = [...word];
-    for (const ch of chars) if (SOLID.test(ch)) out.add(ch);
-    for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
   }
   return [...out];
 }
@@ -81,9 +94,10 @@ export function buildCorpus(texts: readonly HelpTopicText[]): HelpCorpusEntry[] 
  * 効かせる**。一言・本文は 2 文字以上の単位だけで見る。
  */
 export function rankTopics(query: string, corpus: readonly HelpCorpusEntry[]): HelpMatch[] {
-  const units = tokenize(query);
-  if (units.length === 0) return [];
   const whole = query.trim().toLowerCase();
+  if (whole.length === 0) return [];
+  // 単位が無くても丸ごと一致は見る（「L.A.B.」は 1 文字ずつに割れて単位を残さない）。
+  const units = tokenize(query);
   const matches: HelpMatch[] = [];
   for (const entry of corpus) {
     let score = entry.exact.has(whole) ? EXACT_BONUS : 0;

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { Ratelimit } from '@upstash/ratelimit';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -6,6 +7,7 @@ import {
   rateLimitAuth,
   rateLimitFermentation,
   rateLimitGeneral,
+  rateLimitHelp,
 } from '@/contexts/shared/presentation/middleware/rate-limit.js';
 
 // Mock @upstash/redis
@@ -316,6 +318,73 @@ describe('rate-limit middleware', () => {
         headers: { 'x-real-ip': '1.2.3.4' },
       });
       expect(res.status).toBe(429);
+    });
+  });
+
+  describe('rateLimitHelp', () => {
+    it('is a 20/min sliding window (free text is forwarded to a paid third-party API)', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 20,
+        remaining: 19,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitHelp())
+        .post('/help/search', (c) => c.json({ ok: true }));
+
+      const res = await app.request('/help/search', {
+        method: 'POST',
+        headers: { 'x-real-ip': '1.2.3.4' },
+      });
+      expect(res.status).toBe(200);
+      // The limiter for a tier is built once, on first use — this is that first use.
+      expect(vi.mocked(Ratelimit.slidingWindow)).toHaveBeenCalledWith(20, '60000 ms');
+    });
+
+    it('keys the counter on the authenticated user rather than the IP', async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 20,
+        remaining: 19,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono<{ Variables: { userId: string } }>()
+        .use('/*', async (c, next) => {
+          c.set('userId', 'user-a');
+          await next();
+        })
+        .use('/*', rateLimitHelp())
+        .post('/help/search', (c) => c.json({ ok: true }));
+
+      await app.request('/help/search', {
+        method: 'POST',
+        headers: { 'x-real-ip': '1.2.3.4' },
+      });
+      expect(mockLimit).toHaveBeenCalledWith('user-a');
+    });
+
+    it('returns 429 when the help limit is exceeded', async () => {
+      mockLimit.mockResolvedValue({
+        success: false,
+        limit: 20,
+        remaining: 0,
+        reset: Date.now() + 60000,
+      });
+
+      const app = new Hono()
+        .use('/*', rateLimitHelp())
+        .post('/help/search', (c) => c.json({ ok: true }));
+
+      const res = await app.request('/help/search', {
+        method: 'POST',
+        headers: { 'x-real-ip': '1.2.3.4' },
+      });
+      expect(res.status).toBe(429);
+      expect(res.headers.get('X-RateLimit-Limit')).toBe('20');
+      expect(res.headers.get('Retry-After')).toBeTruthy();
     });
   });
 

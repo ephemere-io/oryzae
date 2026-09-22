@@ -69,7 +69,10 @@ export async function routeHelpTopic(input: HelpSearchInput): Promise<HelpRouteA
   const apiKey = process.env.TYPESAFE_API_KEY;
   if (!apiKey) return NOT_CONFIGURED;
 
-  const options: Record<string, string> = {};
+  // 話題 id は `[a-z_]` なので `__proto__` や `constructor` も通る。素の `{}` に代入すると
+  // `__proto__` は自前のキーにならず（setter に食われる）、選択肢から静かに消える。
+  // 原型の無いオブジェクトなら、どの id もただのキーになる。
+  const options: Record<string, string> = Object.create(null);
   for (const topic of input.topics) options[topic.id] = topic.label;
 
   const controller = new AbortController();
@@ -96,8 +99,14 @@ export async function routeHelpTopic(input: HelpSearchInput): Promise<HelpRouteA
       ...parseSystemOneAnswer(await res.json(), new Set(Object.keys(options))),
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[help-search] systemone request failed', { error: message });
+    // 例外の文言は載せない。fetch の実装や中間層が要求本文（問いの文）を文言に含めても、
+    // ここから先へは種類だけを渡す。時間切れ（自分で abort した）は区別しておく。
+    const reason = controller.signal.aborted
+      ? 'timeout'
+      : error instanceof Error
+        ? error.name
+        : 'unknown';
+    console.error('[help-search] systemone request failed', { reason });
     return NO_ANSWER;
   } finally {
     clearTimeout(timer);

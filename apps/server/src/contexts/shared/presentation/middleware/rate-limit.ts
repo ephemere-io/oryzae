@@ -3,7 +3,7 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import type { Context, MiddlewareHandler, Next } from 'hono';
 
-type RateLimitTier = 'fermentation' | 'ocr' | 'auth_strict' | 'auth_lenient' | 'general';
+type RateLimitTier = 'fermentation' | 'ocr' | 'help' | 'auth_strict' | 'auth_lenient' | 'general';
 type IdentifierMode = 'ip' | 'user_or_ip' | 'token_or_ip';
 
 const TIER_CONFIG: Record<RateLimitTier, { requests: number; windowMs: number }> = {
@@ -13,6 +13,11 @@ const TIER_CONFIG: Record<RateLimitTier, { requests: number; windowMs: number }>
   // 何枚か読ませる使い方が自然だから。general(60/分) のままだと、5MB の画像で
   // 毎分 60 回 Opus を回せてしまう。
   ocr: { requests: 15, windowMs: 60_000 },
+  // ヘルプの検索は、書かれた自由文をそのまま有料の外部 API（TypeSafe AI の Jev）へ
+  // 転送する。general(60/分) のままだと 1 人が毎分 60 回 Jev を回せてしまう。
+  // client は手元の照合で決めきれない文だけを送り、同じ文は憶えて再送しないので、
+  // 20/分 で人の使い方には当たらない。
+  help: { requests: 20, windowMs: 60_000 },
   auth_strict: { requests: 20, windowMs: 60_000 },
   auth_lenient: { requests: 120, windowMs: 60_000 },
   general: { requests: 60, windowMs: 60_000 },
@@ -128,6 +133,10 @@ export function rateLimitFermentation(): MiddlewareHandler {
 
 export function rateLimitOcr(): MiddlewareHandler {
   return createRateLimitMiddleware('ocr', 'user_or_ip');
+}
+
+export function rateLimitHelp(): MiddlewareHandler {
+  return createRateLimitMiddleware('help', 'user_or_ip');
 }
 
 // Dispatches between strict (IP-based, 20/min — brute-force-prone endpoints)

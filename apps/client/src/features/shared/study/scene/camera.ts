@@ -106,10 +106,17 @@ export function breathOffset(elapsedMs: number): number {
   return Math.sin((elapsedMs / 1000) * BREATH.radiansPerSecond) * BREATH.amplitude;
 }
 
-/** 寄り引きの倍率を上下限に丸める。壊れた値は等倍に倒す。 */
-export function clampZoom(value: number): number {
+/**
+ * 寄り引きの倍率を上下限に丸める。壊れた値は等倍に倒す。
+ *
+ * 上限は縦横比の基準（`aspectZoom`、`zoomForAspect`）に掛かる。狭い画面で引いて始めて
+ * いるとき、利用者はそこからさらに同じ比だけ引ける（基準が 1 なら 0.55〜1.35 のまま）。
+ * 下限は据え置き — 寄る先（メモ帳の罫が読める距離）は画面の形で変わらない。
+ */
+export function clampZoom(value: number, aspectZoom = 1): number {
   if (!Number.isFinite(value)) return 1;
-  return Math.min(HOME_ZOOM.max, Math.max(HOME_ZOOM.min, value));
+  const base = Number.isFinite(aspectZoom) && aspectZoom >= 1 ? aspectZoom : 1;
+  return Math.min(HOME_ZOOM.max * base, Math.max(HOME_ZOOM.min, value));
 }
 
 /**
@@ -119,12 +126,26 @@ export function clampZoom(value: number): number {
  * 立っている 1104 × 900 ≈ 1.23 など）では、同じ距離だと机の右端（鉛筆・棚）が切れる。
  * 狭いぶんだけ引いて（倍率を上げて）、机が丸ごと入るようにする。初めての人が最初に見る
  * 画面がこれなので、ここで切れていると部屋の全体が分からない。広い画面では等倍。
- * 利用者の寄り引きはこの基準に掛かる（`scene.ts`）。
+ *
+ * 利用者の寄り引き（`HOME_ZOOM` の範囲）とは別の軸なので、ここでは丸めない。1.35 で
+ * 頭打ちにしていたころは、縦横比 1 前後の窓で机がやはり切れていた。利用者の比はこの
+ * 基準に掛かり（`rebaseZoom`）、上限も基準に連れて上がる（`clampZoom`）。
  */
 export function zoomForAspect(layout: StudyLayout, aspect: number): number {
   if (!Number.isFinite(aspect) || aspect <= 0) return 1;
   if (aspect >= layout.homeAspect) return 1;
-  return clampZoom(1 + (layout.homeAspect - aspect) * ASPECT_ZOOM_GAIN);
+  return 1 + (layout.homeAspect - aspect) * ASPECT_ZOOM_GAIN;
+}
+
+/**
+ * 利用者が寄せた比を、新しい基準に掛け直す。窓の大きさが変わったときに `scene.ts` が呼ぶ。
+ *
+ * 比そのものは呼ぶ側が持ち続ける（ここで丸めた値から逆算しない）。引き切った 1.35 で
+ * 面を開けると基準が 1.22 倍になって 1.65、閉じれば 1.35 に戻る。丸めた値から比を
+ * 取り直していたころは、開閉するだけで「引き切った」が 1.10 まで縮んでいた。
+ */
+export function rebaseZoom(userZoom: number, aspectZoom: number): number {
+  return clampZoom(userZoom * aspectZoom, aspectZoom);
 }
 
 /** 縦横比が 1 狭まるごとに、どれだけ引くか。1.6 → 1.23 で約 1.22 倍になる値。 */
@@ -172,10 +193,16 @@ function homeOffset(layout: StudyLayout): Vec3 {
 /**
  * 操作を view に組む。注視点は `focus`、カメラはそこからホームの向きに `zoom` 倍の距離。
  * 向きが変わらないので、寄り引きは常に注視点へ真っ直ぐ進む。
+ *
+ * `aspectZoom` は縦横比の基準（`zoomForAspect`）。上限がこれに連れて上がる。
  */
-export function controlledView(layout: StudyLayout, control: HomeControl): CameraView {
+export function controlledView(
+  layout: StudyLayout,
+  control: HomeControl,
+  aspectZoom = 1,
+): CameraView {
   const offset = homeOffset(layout);
-  const factor = clampZoom(control.zoom);
+  const factor = clampZoom(control.zoom, aspectZoom);
   const focus = clampFocus(layout, control.focus);
   return {
     position: {
@@ -197,8 +224,9 @@ export function screenFrame(
   layout: StudyLayout,
   control: HomeControl,
   aspect: number,
+  aspectZoom = 1,
 ): { right: Vec3; up: Vec3; halfWidth: number; halfHeight: number } {
-  const view = controlledView(layout, control);
+  const view = controlledView(layout, control, aspectZoom);
   const forward = normalize({
     x: view.target.x - view.position.x,
     y: view.target.y - view.position.y,
@@ -225,8 +253,9 @@ export function pointUnderPointer(
   control: HomeControl,
   pointer: { x: number; y: number },
   aspect: number,
+  aspectZoom = 1,
 ): Vec3 {
-  const frame = screenFrame(layout, control, aspect);
+  const frame = screenFrame(layout, control, aspect, aspectZoom);
   const focus = clampFocus(layout, control.focus);
   const px = clampSigned(pointer.x) * frame.halfWidth;
   const py = clampSigned(pointer.y) * frame.halfHeight;
@@ -250,12 +279,13 @@ export function zoomTowardPointer(
   nextZoom: number,
   pointer: { x: number; y: number },
   aspect: number,
+  aspectZoom = 1,
 ): HomeControl {
-  const before = clampZoom(control.zoom);
-  const after = clampZoom(nextZoom);
+  const before = clampZoom(control.zoom, aspectZoom);
+  const after = clampZoom(nextZoom, aspectZoom);
   if (before === after) return { focus: clampFocus(layout, control.focus), zoom: after };
 
-  const anchor = pointUnderPointer(layout, control, pointer, aspect);
+  const anchor = pointUnderPointer(layout, control, pointer, aspect, aspectZoom);
   const focus = clampFocus(layout, control.focus);
   const ratio = after / before;
   return {
@@ -279,11 +309,12 @@ export function panByPixels(
   control: HomeControl,
   delta: { x: number; y: number },
   viewport: { width: number; height: number },
+  aspectZoom = 1,
 ): HomeControl {
   if (!Number.isFinite(delta.x) || !Number.isFinite(delta.y)) return control;
   if (!(viewport.height > 0) || !(viewport.width > 0)) return control;
 
-  const frame = screenFrame(layout, control, viewport.width / viewport.height);
+  const frame = screenFrame(layout, control, viewport.width / viewport.height, aspectZoom);
   const worldPerPx = (2 * frame.halfHeight) / viewport.height;
   const dx = delta.x * worldPerPx;
   const dy = delta.y * worldPerPx;
@@ -294,7 +325,7 @@ export function panByPixels(
       y: focus.y - frame.right.y * dx + frame.up.y * dy,
       z: focus.z - frame.right.z * dx + frame.up.z * dy,
     }),
-    zoom: clampZoom(control.zoom),
+    zoom: clampZoom(control.zoom, aspectZoom),
   };
 }
 
@@ -341,10 +372,11 @@ function orthonormalUp(forward: Vec3): Vec3 | null {
  * ホイールの delta を寄り引きに畳む。
  *
  * 下へ回す（`deltaY > 0`）と離れる。ブラウザのページ送りと同じ向きにしておく。
+ * `aspectZoom` は縦横比の基準（上限がこれに連れて上がる）。
  */
-export function zoomByWheel(current: number, deltaY: number): number {
-  if (!Number.isFinite(deltaY)) return clampZoom(current);
-  return clampZoom(current + deltaY * HOME_ZOOM.wheelStep);
+export function zoomByWheel(current: number, deltaY: number, aspectZoom = 1): number {
+  if (!Number.isFinite(deltaY)) return clampZoom(current, aspectZoom);
+  return clampZoom(current + deltaY * HOME_ZOOM.wheelStep, aspectZoom);
 }
 
 /**
@@ -352,9 +384,9 @@ export function zoomByWheel(current: number, deltaY: number): number {
  *
  * 指を広げる（`ratio > 1`）と近づく。距離は比の**逆数**で効く。
  */
-export function zoomByPinch(base: number, ratio: number): number {
-  if (!Number.isFinite(ratio) || ratio <= 0) return clampZoom(base);
-  return clampZoom(base / ratio);
+export function zoomByPinch(base: number, ratio: number, aspectZoom = 1): number {
+  if (!Number.isFinite(ratio) || ratio <= 0) return clampZoom(base, aspectZoom);
+  return clampZoom(base / ratio, aspectZoom);
 }
 
 /**

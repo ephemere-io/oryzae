@@ -63,7 +63,6 @@ import {
   boardView,
   breathOffset,
   type CameraView,
-  clampZoom,
   controlledView,
   type HomeControl,
   homeControl,
@@ -74,6 +73,7 @@ import {
   lerpView,
   panByPixels,
   parallaxOffset,
+  rebaseZoom,
   shelfView,
   zoomByPinch,
   zoomByWheel,
@@ -376,8 +376,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
    * つまみなら 2 本指の中点。
    */
   // 画面が構図より横に狭ければ引いて始める（面が右に立っているとき）。利用者の寄り引きは
-  // この基準に掛かり、窓の大きさが変わったら基準だけ差し替える（寄せた分は保つ）。
+  // この基準に掛かり、窓の大きさが変わったら基準だけ差し替える（寄せた比は保つ）。
   let aspectZoom = zoomForAspect(layout, aspectOf(container));
+  /**
+   * 利用者が寄せた比。`zoomTarget = userZoom × aspectZoom`。ホイール・つまみでだけ動き、
+   * 窓の大きさが変わっても動かない。丸めた `zoomTarget` から逆算しないこと — 引き切った
+   * ところで面を開閉するだけで比が縮んでいく（`rebaseZoom`）。
+   */
+  let userZoom = 1;
   let control: HomeControl = { ...homeControl(layout), zoom: aspectZoom };
   let zoomTarget = aspectZoom;
   const zoomAnchor = new Vector2(0, 0);
@@ -541,8 +547,15 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
     // 寄り引き。支点（カーソルの下の点）が画面上で動かないように注視点も寄る。
     const nextZoom = approach(control.zoom, zoomTarget, HOME_ZOOM.lerp);
-    control = zoomTowardPointer(layout, control, nextZoom, zoomAnchor, aspectOf(container));
-    const view = controlledView(layout, control);
+    control = zoomTowardPointer(
+      layout,
+      control,
+      nextZoom,
+      zoomAnchor,
+      aspectOf(container),
+      aspectZoom,
+    );
+    const view = controlledView(layout, control, aspectZoom);
 
     camera.position.set(
       view.position.x + parallax.x,
@@ -744,9 +757,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (!object) return { x: 0, y: 0 };
     const world = new Vector3();
     object.getWorldPosition(world);
-    // ツールチップは対象の少し上に出す。低い物は自分の高さを持つ（メモ帳は 0.6）。
-    const rise = object.userData.tooltipRise;
-    world.y += typeof rise === 'number' ? rise : 0.85;
+    // ツールチップは対象の少し上に出す。
+    world.y += 0.85;
     const point = toScreen(world);
     return { x: point.x, y: point.y };
   }
@@ -810,7 +822,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
    */
   function zoomBy(deltaY: number): void {
     if (transition || settled) return;
-    zoomTarget = zoomByWheel(zoomTarget, deltaY);
+    zoomTarget = zoomByWheel(zoomTarget, deltaY, aspectZoom);
+    userZoom = zoomTarget / aspectZoom;
     // 支点はいまのカーソル。canvas の外から来たホイールは中央へ。
     if (pointerInside) zoomAnchor.copy(pointer);
     else zoomAnchor.set(0, 0);
@@ -825,7 +838,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function pinchTo(ratio: number): void {
     if (transition || settled) return;
-    zoomTarget = zoomByPinch(pinchBase, ratio);
+    zoomTarget = zoomByPinch(pinchBase, ratio, aspectZoom);
+    userZoom = zoomTarget / aspectZoom;
   }
 
   /**
@@ -846,6 +860,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       control,
       { x: dx, y: dy },
       { width: container.clientWidth, height: container.clientHeight },
+      aspectZoom,
     );
   }
 
@@ -950,10 +965,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
-    // 縦横比が変わったら、引きの基準も変わる。利用者が寄せた比は保つ。
+    // 縦横比が変わったら、引きの基準も変わる。利用者が寄せた比（`userZoom`）は保つ。
     const nextAspectZoom = zoomForAspect(layout, width / height);
-    zoomTarget = clampZoom((zoomTarget / aspectZoom) * nextAspectZoom);
+    if (nextAspectZoom === aspectZoom) return;
     aspectZoom = nextAspectZoom;
+    zoomTarget = rebaseZoom(userZoom, aspectZoom);
+    // 基準の差は画面の中央へ向けて詰める。前のホイールの支点を残すと、面の開閉のたびに
+    // 注視点がそのカーソルの側へ寄っていった。
+    zoomAnchor.set(0, 0);
   });
   resizeObserver.observe(container);
 

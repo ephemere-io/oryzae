@@ -62,6 +62,7 @@ client と admin で別プロジェクト。ビルド順序: shared → server �
 | AI | `ANTHROPIC_API_KEY` | fermentation の LLM 呼び出し（Anthropic API 直叩き、issue #352） |
 | AI | `ANTHROPIC_ADMIN_KEY` | 実請求額の取得（Admin API `cost_report`）。コスト日次レポート・admin Spend 画面。org 管理者のみ発行可。未設定でも動作（推定のみになる） |
 | AI | `AI_GATEWAY_API_KEY` | #352 以前の `generation_id` レコードを `/costs` 一覧で解決するフォールバックのみ |
+| AI | `TYPESAFE_API_KEY` | ヘルプの検索（`POST /api/v1/help/search`）だけが使う。書かれた「したいこと」を TypeSafe AI System One（Jev）で話題へ振り分ける。任意。未設定なら手元の照合だけで動く |
 | PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `POSTHOG_PERSONAL_API_KEY` | ユーザー行動分析 |
 | Sentry | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | エラー監視 |
 | Upstash | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | API レート制限 |

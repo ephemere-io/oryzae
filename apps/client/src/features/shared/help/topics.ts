@@ -31,7 +31,9 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   { id: 'help', section: 'trouble', illustration: 'search', href: null },
 ];
 
-const BY_ID: ReadonlyMap<HelpTopicId, HelpTopic> = new Map(HELP_TOPICS.map((t) => [t.id, t]));
+// 鍵は string。`isHelpTopicId` が知らない文字列で引く門なので、`HelpTopicId` で縛ると
+// 引く前に型を合わせる（キャストする）ことになる。
+const BY_ID: ReadonlyMap<string, HelpTopic> = new Map(HELP_TOPICS.map((t) => [t.id, t]));
 
 export function helpTopic(id: HelpTopicId): HelpTopic {
   const topic = BY_ID.get(id);
@@ -41,13 +43,7 @@ export function helpTopic(id: HelpTopicId): HelpTopic {
 
 /** 文字列が話題の識別子か。サーバーの返事や DOM 属性（`data-help`）を読むときの門。 */
 export function isHelpTopicId(value: unknown): value is HelpTopicId {
-  return typeof value === 'string' && BY_ID.has(toTopicId(value));
-}
-
-// `Map.has` は string を受けるが、型の門としては `HelpTopicId` に狭めてから引きたい。
-function toTopicId(value: string): HelpTopicId {
-  // @type-assertion-allowed: 直後の Map.has で実在を確かめる。ここは照合のための一時的な型合わせ
-  return value as HelpTopicId;
+  return typeof value === 'string' && BY_ID.has(value);
 }
 
 /**

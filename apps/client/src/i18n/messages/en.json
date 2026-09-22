@@ -234,9 +234,10 @@
     },
     "help_mode": {
       "label": "Help mode",
-      "on": "On — open it from the ? at the top right",
+      "on": "On — from the ? at the top right of the study",
       "off": "Off",
-      "toggle": "Toggle"
+      "toggle": "Toggle",
+      "open": "Open"
     }
   },
   "sidebar": {
@@ -884,8 +885,8 @@
       "jar": {
         "title": "Jar",
         "lead": "Pickled entries gather by question and ferment",
-        "body": "The jar on the left of the study. The bubbles show how far fermentation has come. When they settle and a seal floats up, a letter has arrived. Press it to go inside and read each question's result — letter, words and fragments. Add and tidy questions here too.",
-        "keywords": "jar,bubbles,fermentation,seal,unread,question,inside,left"
+        "body": "The jar on the left of the study. The bubbles show how far fermentation has come. When they settle, a letter has arrived. Touch the jar and it says \"You have an unread letter\" (on a phone, the jar's tag reads \"Letter\"). Press it to go inside and read each question's result — letter, words and fragments. Add and tidy questions here too.",
+        "keywords": "jar,bubbles,fermentation,unread,question,inside,left"
       },
       "notebook": {
         "title": "Notebook",

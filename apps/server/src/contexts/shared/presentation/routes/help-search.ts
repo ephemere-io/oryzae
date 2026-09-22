@@ -9,6 +9,15 @@ import { routeHelpTopic } from '../../infrastructure/typesafe-systemone.js';
  * 状態は持たない（DB に触らない）ので、shared の presentation に置く。
  */
 export const helpSearch = new Hono().post('/', async (c) => {
-  const input = helpSearchSchema.parse(await c.req.json());
+  // JSON でない本文は、ここで受け止めて 400 にする。`c.req.json()` の SyntaxError を
+  // 共通の error handler まで投げると、文言（V8 は本文の断片を含める）がログと Sentry に
+  // 載る。検索欄の文は人が書いたものなので、本文に触れずに返す。
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid request: body must be JSON' }, 400);
+  }
+  const input = helpSearchSchema.parse(raw);
   return c.json(await routeHelpTopic(input));
 });

@@ -84,6 +84,7 @@ describe('routeHelpTopic', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
@@ -117,6 +118,28 @@ describe('routeHelpTopic', () => {
     expect(Object.keys(body.questions.topic.options)).toEqual(['write', 'jar', 'board']);
   });
 
+  it('`__proto__` という id の話題も選択肢に残り、選ばれれば受け取る', async () => {
+    // id の形は `[a-z_]{1,32}` なので `__proto__` も通る。素の `{}` に代入すると setter に
+    // 食われて選択肢から消え、モデルがそれを選んでも「選択肢に無い」扱いになっていた。
+    vi.stubEnv('TYPESAFE_API_KEY', 'ts-test-key');
+    fetchMock.mockResolvedValue(
+      jsonResponse({ answers: { topic: { choice: '__proto__', confidence: 0.5 } } }),
+    );
+
+    const result = await routeHelpTopic({
+      ...INPUT,
+      topics: [
+        { id: '__proto__', label: '原型' },
+        { id: 'jar', label: '瓶' },
+      ],
+    });
+
+    expect(result).toEqual({ configured: true, topicId: '__proto__', confidence: 0.5 });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(Object.keys(body.questions.topic.options)).toEqual(['__proto__', 'jar']);
+    expect(body.questions.topic.options.jar).toBe('瓶');
+  });
+
   it('非 OK の返事は答え無し。問いの本文をログに載せない', async () => {
     vi.stubEnv('TYPESAFE_API_KEY', 'ts-test-key');
     fetchMock.mockResolvedValue(jsonResponse({ error: 'nope' }, 500));
@@ -124,8 +147,25 @@ describe('routeHelpTopic', () => {
     const result = await routeHelpTopic(INPUT);
 
     expect(result).toEqual({ configured: true, topicId: null, confidence: 0 });
+    expect(console.error).toHaveBeenCalledTimes(1);
     const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
     expect(logged).not.toContain(INPUT.query);
+  });
+
+  it('200 でも本文が JSON でなければ答え無し（投げない）', async () => {
+    vi.stubEnv('TYPESAFE_API_KEY', 'ts-test-key');
+    fetchMock.mockResolvedValue(
+      new Response('<html>maintenance</html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    );
+
+    await expect(routeHelpTopic(INPUT)).resolves.toEqual({
+      configured: true,
+      topicId: null,
+      confidence: 0,
+    });
   });
 
   it('ネットワークの失敗も投げない', async () => {
@@ -137,5 +177,49 @@ describe('routeHelpTopic', () => {
       topicId: null,
       confidence: 0,
     });
+  });
+
+  it('fetch が投げた例外の文言に問いが混ざっていても、ログには種類しか載せない', async () => {
+    vi.stubEnv('TYPESAFE_API_KEY', 'ts-test-key');
+    // fetch の実装や中間層が要求本文を文言に含める体。文言をそのまま載せると漏れる。
+    const error = new Error(`request failed while sending: ${INPUT.query}`);
+    error.name = 'FetchError';
+    fetchMock.mockRejectedValue(error);
+
+    await routeHelpTopic(INPUT);
+
+    expect(console.error).toHaveBeenCalledTimes(1);
+    const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
+    expect(logged).not.toContain(INPUT.query);
+    expect(logged).toContain('FetchError');
+  });
+
+  it('4 秒で見切る。fetch を止め、答え無しで返す（問いは載せない）', async () => {
+    vi.stubEnv('TYPESAFE_API_KEY', 'ts-test-key');
+    vi.useFakeTimers();
+    // 返事の来ない相手。signal が abort されたときだけ、その理由で reject する。
+    fetchMock.mockImplementation(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(init.signal.reason));
+        }),
+    );
+
+    let settled = false;
+    const pending = routeHelpTopic(INPUT).then((answer) => {
+      settled = true;
+      return answer;
+    });
+
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toEqual({ configured: true, topicId: null, confidence: 0 });
+    expect(console.error).toHaveBeenCalledWith('[help-search] systemone request failed', {
+      reason: 'timeout',
+    });
+    const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
+    expect(logged).not.toContain(INPUT.query);
   });
 });

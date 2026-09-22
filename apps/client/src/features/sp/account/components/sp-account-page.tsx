@@ -224,25 +224,44 @@ function ThemeRow() {
   );
 }
 
-/** ヘルプモード。有効なら書斎の右上に「?」が居て、押すと使い方のシートが開く。 */
+/**
+ * ヘルプモード。有効なら書斎の右上に「?」が居て、押すと使い方のシートが開く。
+ *
+ * SP の「?」は書斎（`/`）にしか無い。瓶・板・一覧・ここから開く道が無かったので、
+ * 有効な間は「開く」も並べる。
+ */
 function HelpModeRow() {
   const t = useTranslations('account');
   const help = useHelpMode();
+  const buttonClass =
+    'rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium';
   return (
     <div className="flex items-center justify-between">
       <div>
         <p className="mb-1 text-xs uppercase tracking-[0.1em] opacity-50">{t('help_mode.label')}</p>
         <p className="text-sm">{help.enabled ? t('help_mode.on') : t('help_mode.off')}</p>
       </div>
-      <button
-        type="button"
-        onClick={() => help.setEnabled(!help.enabled)}
-        aria-pressed={help.enabled}
-        className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium"
-        style={{ color: 'var(--accent)' }}
-      >
-        {t('help_mode.toggle')}
-      </button>
+      <div className="flex items-center gap-2">
+        {help.enabled ? (
+          <button
+            type="button"
+            onClick={() => help.openHelp()}
+            className={buttonClass}
+            style={{ color: 'var(--accent)' }}
+          >
+            {t('help_mode.open')}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => help.setEnabled(!help.enabled)}
+          aria-pressed={help.enabled}
+          className={buttonClass}
+          style={{ color: 'var(--accent)' }}
+        >
+          {t('help_mode.toggle')}
+        </button>
+      </div>
     </div>
   );
 }
