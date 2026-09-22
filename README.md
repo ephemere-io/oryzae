@@ -106,7 +106,17 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 
 ## Design Docs
 
-設計判断の正はすべて `docs/` 配下にあります。
+設計判断の正はすべて `docs/` 配下にあります。**置き場でストックとフローを分ける**ので、
+ファイルを開かなくてもパスだけで「腐らない正」なのか「進行中の計画」なのかが分かります。
+
+| 置き場 | 種別 | 書き方 |
+|---|---|---|
+| `docs/*.md`、`docs/oryzae-study/` | **ストック** — 設計判断の正（SSoT） | 時間で古くならない書き方をする。進捗・期限・「いま」を書かない。決まったことだけ |
+| `docs/plans/` | **フロー** — 進行中の計画・作業票 | 頭に「ステータス」と「最終更新」。終わったら消すか、初期設計として残す価値があれば `docs/archive/` へ |
+| `docs/archive/` | 終わったフロー・初期設計 | 参照だけ。更新しない。ストックが「詳細はここ」と指すことはある |
+| `docs/reference-ui/`、`docs/email-templates/`、`docs/verify/` | 素材（HTML・テンプレート・画像） | ストックの一部 |
+
+### ストック
 
 | ドキュメント | 内容 |
 |---|---|
@@ -127,4 +137,15 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/help-mode-guide.md` | ヘルプモード（初回オンボーディングの置き換え）。話題のカタログ、触れると出る説明、検索欄と Jev の使い方 |
 | `docs/auto-fix-loop-guide.md` | 自動バグ修正ループ（起動経路、自動マージの許可領域、月額予算の守り方） |
 | `docs/i18n-guide.md` | apps/client の日英バイリンガル運用（next-intl + Google Sheets SSoT） |
+| `docs/verify-harness-rollout.md` | 検証ハーネス（`@oryzae/verify`）の設計判断と、部品に `.verify.tsx` を付ける手順 |
+| `docs/editor-effects-persistence.md` | エディタの視覚エフェクトをエントリ単位で永続化する設計 |
 | `docs/oryzae-study/` | 書斎ホーム（3D ホーム・サイドバー撤廃）の仕様一式。実装時の決着は `60-implementation-notes.md` |
+
+### フロー（`docs/plans/`）
+
+| ドキュメント | 内容 |
+|---|---|
+| `docs/plans/admin-dashboard.md` | 管理画面の作業プラン |
+| `docs/plans/auth-improvement.md` | 認証改善プラン |
+| `docs/plans/sp-architecture-cleanup.md` | スマホ版導入で乱れたアーキテクチャの修正（Issue #490） |
+| `docs/plans/verify-harness-full-migration.md` | 検証ハーネスを全コンポーネントへ広げる実行計画（ストック側は `verify-harness-rollout.md`） |
