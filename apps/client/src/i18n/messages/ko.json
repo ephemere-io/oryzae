@@ -782,7 +782,6 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "label_memo": "MEMO",
     "pill_jar_empty": "비어 있음",
     "pill_jar_fermenting": "발효 중",
     "pill_jar_almost": "곧",
@@ -790,7 +789,6 @@
     "pill_entries": "{count}건",
     "pill_volumes": "{count}권",
     "pill_cards": "{count}장",
-    "pill_memo": "도움말",
     "back_to_study": "서재로 돌아가기",
     "account": "계정",
     "list_all": "ALL ENTRIES",
@@ -825,19 +823,33 @@
     "hint_board_empty": "아직 붙인 것이 없습니다",
     "hint_board_photos": "사진 {count}건",
     "hint_board_snippets": "스니펫 {count}건",
-    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건",
-    "hint_memo": "사용법과 문의"
+    "hint_board_both": "사진 {photos}건 · 스니펫 {snippets}건"
   },
   "help": {
     "toggle": "도움말",
     "resize": "너비 바꾸기",
     "close": "닫기",
-    "search_placeholder": "하고 싶은 일을 적기",
+    "search_placeholder": "사용법 검색",
     "search_clear": "지우기",
     "search_empty": "가까운 항목을 찾지 못했습니다. 다른 말로 적어 보세요.",
     "search_asking": "찾는 중…",
     "pick_badge": "추천",
     "open_topic": "열기",
+    "steps": {
+      "title": "먼저 해 보기",
+      "question": {
+        "title": "물음 세우기",
+        "lead": "가장 생각하는 것 하나. 병 안에서 세웁니다"
+      },
+      "write": {
+        "title": "엔트리 쓰기",
+        "lead": "수첩을 열고 물음을 묶어 쓰기. 저장은 알아서"
+      },
+      "pickle": {
+        "title": "병에 담그고, 기다리기",
+        "lead": "물음을 묶은 엔트리가 1,000자쯤 쌓이면 다음 날 밤 발효가 시작되고 편지가 옵니다"
+      }
+    },
     "topics": {
       "concept": {
         "title": "Oryzae란",

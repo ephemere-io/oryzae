@@ -16,9 +16,7 @@ export type StudyTarget =
   | { kind: 'journal-month'; month: string }
   /** 棚ごと（SP）。全月の一覧へ。 */
   | { kind: 'archive' }
-  | { kind: 'board' }
-  /** メモ帳。押すと公開サイトのヘルプ（使い方・お問い合わせ）を新しいタブで開く。カメラは動かさない。 */
-  | { kind: 'memo' };
+  | { kind: 'board' };
 
 /**
  * 瓶の見た目を決める発酵の状態。

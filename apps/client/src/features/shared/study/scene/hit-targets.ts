@@ -19,13 +19,13 @@ export type HitId = string;
  * 出ない」と報告された。手帳と背表紙は月ごとの `StudyTooltip` が別に出るので、
  * ここには入れない（同じ場所に 2 枚出てしまう）。
  */
-export type HitHint = 'pen' | 'jar' | 'board' | 'memo';
+export type HitHint = 'pen' | 'jar' | 'board';
 
 export interface HitEntry {
   id: HitId;
   target: StudyTarget;
   /** ホバー時にラベルを濃くする対象（PC）。 */
-  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | 'memo' | null;
+  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | null;
   /** 手帳と背表紙のツールチップに出す月。 */
   month: string | null;
   /** ホバーで出す一言。出す文面は呼び出し側が状態から決める。 */
@@ -65,8 +65,6 @@ export function buildHitRegistry(options: {
   shelf: readonly Notebook[];
   /** SP は棚ごと 1 つの的にする。 */
   shelfAsSingleTarget: boolean;
-  /** メモ帳が置いてあるか（配置表が持たない構図では無い）。 */
-  memo?: boolean;
 }): HitRegistry {
   const registry = new HitRegistry();
 
@@ -120,25 +118,8 @@ export function buildHitRegistry(options: {
     hint: 'board',
   });
 
-  /**
-   * メモ帳。束ごと 1 つの的。名乗るのはラベル（`MEMO`）、中身（使い方とお問い合わせ）は
-   * 触れたときの一言が言う。物そのものは黙っている。押すと公開サイトのヘルプへ。
-   */
-  if (options.memo) {
-    registry.add({
-      id: MEMO_HIT_ID,
-      target: { kind: 'memo' },
-      label: 'memo',
-      month: null,
-      hint: 'memo',
-    });
-  }
-
   return registry;
 }
-
-/** メモ帳のヒット id。scene のヒットボックスと登録簿で同じものを使う。 */
-export const MEMO_HIT_ID: HitId = 'memo';
 
 /**
  * クリック時に採る対象を決める。

@@ -112,12 +112,11 @@ describe('topicForScreen', () => {
 });
 
 describe('topicForStudyLabel', () => {
-  it('書斎の物 → 話題。鉛筆は「書く」、メモ帳は「よくある質問・お問い合わせ」（公開サイトへ）', () => {
+  it('書斎の物 → 話題。鉛筆は「書く」、手帳は物としての手帳', () => {
     expect(topicForStudyLabel('jar')).toBe('jar');
     expect(topicForStudyLabel('journal')).toBe('notebook');
     expect(topicForStudyLabel('board')).toBe('board');
     expect(topicForStudyLabel('archive')).toBe('archive');
     expect(topicForStudyLabel('pen')).toBe('write');
-    expect(topicForStudyLabel('memo')).toBe('support');
   });
 });

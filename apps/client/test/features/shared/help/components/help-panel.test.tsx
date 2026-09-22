@@ -49,13 +49,30 @@ afterEach(() => {
 });
 
 describe('HelpPanel', () => {
-  it('一覧では全話題が並び、節の見出しも面の名前も無い', () => {
+  it('一覧では「はじめに」以外の話題が並び、節の見出しも面の名前も無い', () => {
     renderPanel();
-    expect(document.querySelectorAll(CARD)).toHaveLength(HELP_TOPICS.length);
+    expect(document.querySelectorAll(CARD)).toHaveLength(
+      HELP_TOPICS.filter((t) => t.section !== 'start').length,
+    );
     const text = document.body.textContent ?? '';
     for (const word of ['はじめに', '書斎のもの', '困ったとき', 'いま開いている', 'ようこそ']) {
       expect(text, word).not.toContain(word);
     }
+  });
+
+  it('「まず試してみよう」の三歩が上に居て、押すと行き先へ', () => {
+    const { onOpenHref } = renderPanel();
+    const steps = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
+    if (!steps) throw new Error('三歩が無い');
+    const buttons = steps.querySelectorAll('li button');
+    expect(buttons).toHaveLength(3);
+    expect(steps.textContent).toContain(jaMessages.help.steps.title);
+    // 三歩目には最初の手紙が届く条件（文字数）。
+    expect(buttons[2]?.textContent).toMatch(/\d/);
+    const second = buttons[1];
+    if (!second) throw new Error('2 歩目が無い');
+    fireEvent.click(second);
+    expect(onOpenHref).toHaveBeenCalledWith('/entries/new', false);
   });
 
   it('頭の 1 枚は、何にも触れていなければ画面の話題、触れていればそれ', () => {
@@ -67,7 +84,8 @@ describe('HelpPanel', () => {
     renderPanel({ hovered: 'jar' });
     expect(document.querySelector(LIVE)?.getAttribute('data-verify-topic')).toBe('jar');
     expect(document.querySelector(LIVE)?.getAttribute('data-verify-following')).toBe('true');
-    expect(screen.getByText(jaMessages.help.topics.jar.body)).toBeTruthy();
+    // 本文は一覧の行（閉じていても DOM に居る）にもあるので、頭の 1 枚の中で見る。
+    expect(document.querySelector(LIVE)?.textContent).toContain(jaMessages.help.topics.jar.body);
   });
 
   it('頭の 1 枚には押すものが無い（向かう途中で中身が変わり、押せないから）', () => {

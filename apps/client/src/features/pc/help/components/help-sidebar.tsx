@@ -22,7 +22,9 @@ function applyHelpWidth(width: number): void {
 /**
  * PC のヘルプの面。画面の右から出る（`docs/help-mode-guide.md`）。
  *
- * 既定の幅は発酵の面と同じ（`SIDE_PANEL_WIDTH`）で、地（沈んだ面）・縁 1 本も同じ。
+ * 既定の幅は発酵の面と同じ（`SIDE_PANEL_WIDTH`）、縁 1 本も同じ。地は沈んだ面ではなく
+ * **紙（`--bg`）**。読む面なので紙にし、生きている 1 枚と三歩の番号にだけ色を持たせる
+ * （沈んだ灰の地は「まぁいいけど」と言われた）。
  * シェルの `<main>` の**隣**に置くので、開くと本文が右から詰まり、面が本文に被らない。
  * 中身（`HelpPanel`）は SP のシートと共有し、ここは枠・幅・配線だけ。
  *
@@ -33,6 +35,13 @@ function applyHelpWidth(width: number): void {
  * fixed の層（エディタ等）が追従する遅れ（160ms の transition）も切る
  * （`html[data-help-resizing]`）— 左のサイドバーで「本文が指に遅れて付いてくる」と
  * 言われたのはこの遅れのせいだった。離したら憶える。2 度押しで既定の幅に戻る。
+ *
+ * ## 出入り
+ *
+ * 面は有効な間ずっと DOM に居て、**幅が 0 ⇄ 面の幅** で遷移する（`help-aside`、左の
+ * サイドバーと同じ 160ms の曲線）。本文はそのぶん詰まり、fixed の層は `--help-width` の
+ * 遷移で同じ速さで付いてくる。閉じている間は `inert`（読み上げにも Tab にも掛からない）。
+ * 中身は面の幅で固定しておき、幅が動いている最中に字が折り返し直さないようにする。
  *
  * **画面の右端に貼りつく fixed の層は流れを見ない**（エディタ・「書斎へ戻る」のタブ・
  * 問いの変遷・「?」）。それらには `--help-width` で幅を伝える。左のサイドバーが
@@ -102,17 +111,19 @@ export function HelpSidebar() {
     [help],
   );
 
-  if (!visible) return null;
+  if (!help.enabled) return null;
 
   return (
     <aside
       aria-label={t('toggle')}
-      className="relative flex h-full shrink-0 flex-col overflow-hidden border-l"
+      aria-hidden={!visible}
+      inert={!visible}
+      className="help-aside relative flex h-full shrink-0 flex-col overflow-hidden"
       style={{
-        width: help.width,
+        width: visible ? help.width : 0,
         paddingTop: SHELL_INSET,
-        borderColor: 'var(--surface-sunken-border)',
-        background: 'var(--surface-sunken)',
+        borderLeft: `${visible ? 1 : 0}px solid var(--surface-sunken-border)`,
+        background: 'var(--bg)',
       }}
     >
       {/* 左の縁。掴んで幅を変える。 */}
@@ -127,19 +138,22 @@ export function HelpSidebar() {
         onDoubleClick={() => help.setWidth(HELP_WIDTH.default)}
         className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize transition-colors duration-150 hover:bg-[var(--hover-wash)]"
       />
-      <HelpPanel
-        texts={texts}
-        hovered={resolution.labelTopic ?? help.hoverTarget?.topic ?? null}
-        screenTopic={topicForScreen(pathname)}
-        focused={help.focused}
-        onFocus={help.setFocused}
-        query={help.query}
-        onQueryChange={help.setQuery}
-        matches={resolution.matches}
-        remote={resolution.remote}
-        onClose={help.closeHelp}
-        onOpenHref={handleOpenHref}
-      />
+      {/* 中身は面の幅で固定。幅が動いている最中に字が折り返し直さない。 */}
+      <div className="flex min-h-0 flex-1 flex-col" style={{ width: help.width }}>
+        <HelpPanel
+          texts={texts}
+          hovered={resolution.labelTopic ?? help.hoverTarget?.topic ?? null}
+          screenTopic={topicForScreen(pathname)}
+          focused={help.focused}
+          onFocus={help.setFocused}
+          query={help.query}
+          onQueryChange={help.setQuery}
+          matches={resolution.matches}
+          remote={resolution.remote}
+          onClose={help.closeHelp}
+          onOpenHref={handleOpenHref}
+        />
+      </div>
     </aside>
   );
 }

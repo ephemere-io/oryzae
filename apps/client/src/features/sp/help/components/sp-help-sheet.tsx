@@ -59,7 +59,7 @@ export function SpHelpSheet() {
       />
       <div
         className="sp-sheet flex flex-col rounded-t-2xl pt-4 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
-        style={{ background: 'var(--surface-sunken)', height: '82dvh' }}
+        style={{ background: 'var(--bg)', height: '82dvh' }}
       >
         <HelpPanel
           texts={texts}

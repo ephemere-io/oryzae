@@ -3,7 +3,6 @@ import {
   buildHitRegistry,
   HitRegistry,
   HOVER_SCALE,
-  MEMO_HIT_ID,
   resolveClickTarget,
 } from '@/features/shared/study/scene/hit-targets';
 import type { Notebook } from '@/features/shared/study/types';
@@ -123,34 +122,6 @@ describe('buildHitRegistry', () => {
   it('id が重複しない', () => {
     const ids = pc.ids();
     expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  describe('メモ帳', () => {
-    const withMemo = buildHitRegistry({
-      desk: DESK,
-      shelf: SHELF,
-      shelfAsSingleTarget: false,
-      memo: true,
-    });
-
-    it('束ごと 1 つの的で、押すとアカウントへ', () => {
-      expect(withMemo.get(MEMO_HIT_ID)?.target).toEqual({ kind: 'memo' });
-    });
-
-    it('ラベル MEMO を名乗り、触れると一言が中身を言う（物は黙っている）', () => {
-      expect(withMemo.get(MEMO_HIT_ID)?.label).toBe('memo');
-      expect(withMemo.get(MEMO_HIT_ID)?.hint).toBe('memo');
-    });
-
-    it('置いていない構図では的も無い', () => {
-      expect(pc.get(MEMO_HIT_ID)).toBeNull();
-    });
-
-    it('他の的と id が重ならない', () => {
-      const ids = withMemo.ids();
-      expect(new Set(ids).size).toBe(ids.length);
-      expect(ids).toHaveLength(pc.ids().length + 1);
-    });
   });
 });
 

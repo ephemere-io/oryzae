@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { StudyLayout } from '../layout';
-import { movesWithoutCamera, staysInStudy } from '../navigation';
+import { staysInStudy } from '../navigation';
 import type { StudyTheme } from '../scene/materials';
 import {
   type HoverInfo,
@@ -131,12 +131,6 @@ export function StudyCanvas({
         onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
         onReady: () => callbacks.current.onReady?.(),
         onPick: (target) => {
-          // メモ帳は「場所」ではなく文房具。寄っていく芝居を挟まず、アバターと同じく
-          // そのまま画面を移す。
-          if (movesWithoutCamera(target)) {
-            callbacks.current.onNavigate(target);
-            return;
-          }
           // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
           // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
           // 「机の手帳が開く → 別の景色の上に一覧が出る → しばらくして書斎に戻る」と、

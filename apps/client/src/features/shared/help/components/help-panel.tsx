@@ -7,6 +7,7 @@ import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { HELP_PANEL_ATTR } from '../hover';
 import { HELP_SECTIONS, HELP_TOPICS, helpTopic } from '../topics';
 import type { HelpMatch, HelpRemoteState, HelpTopicId, HelpTopicText } from '../types';
+import { HelpFirstSteps } from './help-first-steps';
 import { HelpLiveCard } from './help-live-card';
 import { HelpTopicCard } from './help-topic-card';
 
@@ -34,13 +35,16 @@ export interface HelpPanelProps {
 /**
  * ヘルプの面の中身（`docs/help-mode-guide.md`）。PC の右の面と SP のシートが共有する。
  *
- * 上から **検索欄 → 生きている 1 枚 → 話題の一覧**。それだけ。
+ * 上から **検索欄 → 生きている 1 枚 → まず試してみよう（三歩）→ 話題の一覧**。
  *
  * - 面の名前（「使い方」）は書かない。右上の「?」を押して出た面が何かは、押した人が知っている
  * - 生きている 1 枚は、触れているものの説明。何にも触れていなければ、いま開いている画面。
  *   「いま触れているもの」といった見出しは付けない — 触れると変わる、それ自体が説明
- * - 一覧に節の見出し（「はじめに」「書斎のもの」）は付けない。行の間の空きで束が分かり、
- *   行の線画で何の話かが分かる。上から読めば一周する順に並んでいる
+ * - 「はじめに」の 4 話題は一覧に並べず、三歩（問いを立てる → 書く → 漬けて待つ）として
+ *   辿れる形で置く（`HelpFirstSteps`）。概念そのものは、書斎で何にも触れていないときの
+ *   生きている 1 枚（Oryzae とは）が言う
+ * - 一覧に節の見出し（「書斎のもの」「画面」）は付けない。行の間の空きで束が分かり、
+ *   行の線画で何の話かが分かる
  * - 検索欄に文字がある間は、一覧の代わりに近い話題だけを出す（上位 6 件、1 件目は開いた状態）
  *
  * **データは持たない。** 触れているもの・検索の結果は props で受ける（孤立検証のため）。
@@ -169,10 +173,18 @@ export function HelpPanel({
             {spotText && (
               <HelpLiveCard topic={helpTopic(spot)} text={spotText} following={hovered !== null} />
             )}
-            {/* 一覧。節の見出しは無く、束の間の空きだけ。 */}
-            <div className="mt-6 flex flex-col gap-5">
-              {HELP_SECTIONS.map((section) => (
-                <div key={section} className="flex flex-col gap-0.5">
+            <div className="mt-5">
+              <HelpFirstSteps onOpenHref={onOpenHref} />
+            </div>
+            {/* 一覧。節の見出しは無く、束の間は細い線 1 本。行の余白はどの行も同じ
+                （束の頭の行だけ上が広い、といった不揃いを作らない）。「はじめに」は上の三歩が担う。 */}
+            <div className="mt-3 flex flex-col">
+              {HELP_SECTIONS.filter((section) => section !== 'start').map((section) => (
+                <div
+                  key={section}
+                  className="flex flex-col border-t py-2 first:border-t-0 first:pt-0 last:pb-0"
+                  style={{ borderColor: 'var(--border-subtle)' }}
+                >
                   {HELP_TOPICS.filter((topic) => topic.section === section).map((topic) => {
                     const text = textOf.get(topic.id);
                     if (!text) return null;

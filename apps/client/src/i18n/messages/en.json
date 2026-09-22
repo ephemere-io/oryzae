@@ -782,7 +782,6 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "label_memo": "MEMO",
     "pill_jar_empty": "Empty",
     "pill_jar_fermenting": "Fermenting",
     "pill_jar_almost": "Almost",
@@ -790,7 +789,6 @@
     "pill_entries": "{count} entries",
     "pill_volumes": "{count} volumes",
     "pill_cards": "{count} cards",
-    "pill_memo": "Help",
     "back_to_study": "BACK TO STUDY",
     "account": "Account",
     "list_all": "ALL ENTRIES",
@@ -825,19 +823,33 @@
     "hint_board_empty": "Nothing pinned yet",
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
-    "hint_board_both": "{photos} photos · {snippets} snippets",
-    "hint_memo": "Help and contact"
+    "hint_board_both": "{photos} photos · {snippets} snippets"
   },
   "help": {
     "toggle": "Help",
     "resize": "Resize",
     "close": "Close",
-    "search_placeholder": "What do you want to do?",
+    "search_placeholder": "Search help",
     "search_clear": "Clear",
     "search_empty": "Nothing close enough. Try other words.",
     "search_asking": "Looking…",
     "pick_badge": "Best match",
     "open_topic": "Open",
+    "steps": {
+      "title": "Try it first",
+      "question": {
+        "title": "Plant a question",
+        "lead": "The one thing on your mind. You plant it inside the jar"
+      },
+      "write": {
+        "title": "Write an entry",
+        "lead": "Open the notebook, link the question, write. Saving is automatic"
+      },
+      "pickle": {
+        "title": "Pickle it, then wait",
+        "lead": "Once about 500 characters of linked entries have gathered, fermentation starts the next night and a letter arrives"
+      }
+    },
     "topics": {
       "concept": {
         "title": "What Oryzae is",

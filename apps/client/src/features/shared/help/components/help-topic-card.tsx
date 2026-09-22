@@ -20,9 +20,21 @@ export interface HelpTopicCardProps {
 /**
  * 一覧の話題 1 件。
  *
- * 閉じているときは**行**（小さな線画・題・一言）。押すと本文と「開く」が出る。
- * 一覧は目で流すものなので、行は面を持たず地に直接置く（浮かせるのは面の頭の 1 枚だけ）。
- * 節の見出しは付けない — 行の間の空きで束が分かる。
+ * 閉じているときは**行**（小さな線画・題・一言）。押すと本文と「開く」が、行の下から
+ * 伸びて出る。一覧は目で流すものなので、行は面を持たず地に直接置く（浮かせるのは面の頭の
+ * 1 枚だけ）。
+ *
+ * ## 伸び縮み
+ *
+ * 本文は常に DOM に居て、`grid-template-rows` を 0fr ⇄ 1fr で遷移させる（高さを測らずに
+ * 滑らかに伸び縮みする、CSS だけの作り）。閉じている間は `inert` にして、読み上げにも
+ * Tab にも掛からないようにする。
+ *
+ * ## 余白
+ *
+ * 行の上下は 8px、開いた本文の下は 8px。行の外に余白を持たせない — 束の間の空きは
+ * 一覧側の区切り線が受け持つ。開いた行の下だけ広い、瓶の上だけ広い、といった
+ * 不揃いはここから生まれていた。
  */
 export function HelpTopicCard({
   topic,
@@ -79,28 +91,38 @@ export function HelpTopicCard({
           strokeWidth={ICON_STROKE_WIDTH}
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`h-3.5 w-3.5 shrink-0 text-[var(--date-color)] transition-transform duration-150 ${
+          className={`h-3.5 w-3.5 shrink-0 text-[var(--date-color)] transition-transform duration-200 ${
             expanded ? 'rotate-90' : ''
           }`}
         >
           <path d="m9 6 6 6-6 6" />
         </svg>
       </button>
-      {expanded && (
-        <div className="flex flex-col gap-3 py-1 pr-3 pb-4 pl-[3.25rem]">
-          <p className="text-[12.5px] leading-[1.8] text-[var(--fg)] opacity-85">{text.body}</p>
-          {topic.href !== null && (
-            <button
-              type="button"
-              onClick={() => onOpen(topic.href ?? '', topic.external === true)}
-              className="self-start text-[12px] underline-offset-2 hover:underline"
-              style={{ color: 'var(--accent)' }}
-            >
-              {openLabel} {topic.external ? '↗' : '→'}
-            </button>
-          )}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+      >
+        <div
+          className={`min-h-0 overflow-hidden transition-opacity duration-200 ${expanded ? 'opacity-100' : 'opacity-0'}`}
+          inert={!expanded}
+          aria-hidden={!expanded}
+          data-help-body=""
+        >
+          <div className="flex flex-col gap-2.5 pt-0.5 pr-3 pb-2 pl-[3.25rem]">
+            <p className="text-[12.5px] leading-[1.8] text-[var(--fg)] opacity-85">{text.body}</p>
+            {topic.href !== null && (
+              <button
+                type="button"
+                onClick={() => onOpen(topic.href ?? '', topic.external === true)}
+                className="self-start text-[12px] underline-offset-2 hover:underline"
+                style={{ color: 'var(--accent)' }}
+              >
+                {openLabel} {topic.external ? '↗' : '→'}
+              </button>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

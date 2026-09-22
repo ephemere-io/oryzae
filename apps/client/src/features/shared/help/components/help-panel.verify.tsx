@@ -123,19 +123,23 @@ registerUnit<Props>({
     },
     {
       id: 'browse-lists-every-topic',
-      description: '一覧では全話題が並ぶ',
+      description: '一覧では「はじめに」以外の全話題が並び、「はじめに」は三歩として上に居る',
       check: ({ root, contract }) => {
         if (contract.mode !== 'browse') return true;
+        const expected = HELP_TOPICS.filter((t) => t.section !== 'start').length;
         const count = root.querySelectorAll(CARD).length;
-        return count === HELP_TOPICS.length || `${count} 件（期待 ${HELP_TOPICS.length}）`;
+        if (count !== expected) return `${count} 件（期待 ${expected}）`;
+        return root.querySelector('[data-verify-unit="HelpFirstSteps"]') !== null || '三歩が無い';
       },
     },
     {
       id: 'search-lists-matches-only',
-      description: '検索では近い話題だけ（件数は契約と一致）。生きている 1 枚は出ない',
+      description: '検索では近い話題だけ（件数は契約と一致）。生きている 1 枚も三歩も出ない',
       check: ({ root, contract }) => {
         if (contract.mode !== 'search') return true;
         if (root.querySelector(LIVE)) return '検索中に生きている 1 枚が残っている';
+        if (root.querySelector('[data-verify-unit="HelpFirstSteps"]'))
+          return '検索中に三歩が残っている';
         const count = root.querySelectorAll(CARD).length;
         return (
           String(count) === contract.resultCount || `${count} 件、契約 ${contract.resultCount}`

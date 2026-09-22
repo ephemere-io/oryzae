@@ -782,7 +782,6 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "label_memo": "MEMO",
     "pill_jar_empty": "空",
     "pill_jar_fermenting": "発酵中",
     "pill_jar_almost": "もうすぐ",
@@ -790,7 +789,6 @@
     "pill_entries": "{count}件",
     "pill_volumes": "{count}冊",
     "pill_cards": "{count}枚",
-    "pill_memo": "ヘルプ",
     "back_to_study": "書斎に戻る",
     "account": "アカウント",
     "list_all": "ALL ENTRIES",
@@ -825,19 +823,33 @@
     "hint_board_empty": "まだ何も貼っていません",
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
-    "hint_board_both": "写真{photos}件・スニペット{snippets}件",
-    "hint_memo": "使い方とお問い合わせ"
+    "hint_board_both": "写真{photos}件・スニペット{snippets}件"
   },
   "help": {
     "toggle": "ヘルプ",
     "resize": "幅を変える",
     "close": "閉じる",
-    "search_placeholder": "したいことを書く",
+    "search_placeholder": "使い方を検索",
     "search_clear": "消す",
     "search_empty": "近い話題が見つかりませんでした。別の言葉で書いてみてください。",
     "search_asking": "探しています…",
     "pick_badge": "おすすめ",
     "open_topic": "開く",
+    "steps": {
+      "title": "まず試してみよう",
+      "question": {
+        "title": "問いを立てる",
+        "lead": "いちばん考えていることを、ひとつ。瓶の中で立てられます"
+      },
+      "write": {
+        "title": "エントリーを書く",
+        "lead": "手帳を開いて、問いを結んで書く。保存は勝手に"
+      },
+      "pickle": {
+        "title": "瓶に漬けて、待つ",
+        "lead": "問いを結んだエントリーが 1,000 字ほど溜まると、翌日の夜に発酵が始まり、手紙が届きます"
+      }
+    },
     "topics": {
       "concept": {
         "title": "Oryzae とは",

@@ -14,7 +14,7 @@ import {
 import type { StudyFermentationStatus, StudyTarget } from '../types';
 
 /** どの対象のラベルか。 */
-export type LabelKind = 'jar' | 'journal' | 'board' | 'archive' | 'pen' | 'memo';
+export type LabelKind = 'jar' | 'journal' | 'board' | 'archive' | 'pen';
 
 /** SP のピルになる対象。鉛筆は入らない（SP は ENTRIES のピルがそのまま新規執筆）。 */
 type PillKind = Exclude<LabelKind, 'pen'>;
@@ -82,8 +82,7 @@ function PcLabels({ layout, positions, hovered }: StudyLabelsProps) {
   // という理由だったが、**ホバーはそこに何かがあると知っている人にしか効かない**。
   // 過去の記録を全部持っている的だけが黙っている状態になっていた（実機レビュー）。
   // 鉛筆は「NEW」（オーナーの依頼）。積みの ENTRIES と同じ書体で、鉛筆の真下に出す。
-  // メモ帳は「MEMO」。物は黙っているので、名乗るのはここ。
-  const kinds: LabelKind[] = ['jar', 'journal', 'board', 'archive', 'pen', 'memo'];
+  const kinds: LabelKind[] = ['jar', 'journal', 'board', 'archive', 'pen'];
 
   return (
     <div
@@ -95,7 +94,6 @@ function PcLabels({ layout, positions, hovered }: StudyLabelsProps) {
         if (!point || !point.visible) return null;
         if (kind === 'archive' && layout.labelAnchors.archive === null) return null;
         if (kind === 'pen' && layout.labelAnchors.pen === null) return null;
-        if (kind === 'memo' && layout.labelAnchors.memo === null) return null;
 
         return (
           <div
@@ -153,7 +151,7 @@ function SpPills(props: StudyLabelsProps) {
   const offsets = layout.pillOffsets;
   if (offsets === null) return null;
 
-  const kinds: PillKind[] = ['jar', 'journal', 'board', 'archive', 'memo'];
+  const kinds: PillKind[] = ['jar', 'journal', 'board', 'archive'];
 
   return (
     <div
@@ -235,15 +233,12 @@ function stateWord(
       return t('pill_volumes', { count: props.volumeCount });
     case 'board':
       return t('pill_cards', { count: props.cardCount });
-    case 'memo':
-      // メモ帳には数えるものが無い。行き先（ヘルプ）を状態語の位置に置く。
-      return t('pill_memo');
   }
 }
 
 function labelKey(
   kind: LabelKind,
-): 'label_jar' | 'label_journal' | 'label_board' | 'label_archive' | 'label_pen' | 'label_memo' {
+): 'label_jar' | 'label_journal' | 'label_board' | 'label_archive' | 'label_pen' {
   switch (kind) {
     case 'jar':
       return 'label_jar';
@@ -255,8 +250,6 @@ function labelKey(
       return 'label_archive';
     case 'pen':
       return 'label_pen';
-    case 'memo':
-      return 'label_memo';
   }
 }
 
@@ -276,7 +269,5 @@ function targetFor(kind: PillKind): StudyTarget {
       return { kind: 'board' };
     case 'archive':
       return { kind: 'archive' };
-    case 'memo':
-      return { kind: 'memo' };
   }
 }

@@ -5,7 +5,6 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useHelpMode } from '@/features/shared/help/help-context';
@@ -17,7 +16,7 @@ import { DURATION, RENDER_LIMITS } from '../constants';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
-import { externalHref, overlayScope, staysInStudy, targetHref } from '../navigation';
+import { overlayScope, staysInStudy, targetHref } from '../navigation';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -46,7 +45,6 @@ export interface StudyHomeProps {
 
 export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
-  const locale = useLocale();
   const { api, auth, loading: authLoading } = useAuth();
   const help = useHelpMode();
   const { theme } = useTheme();
@@ -152,17 +150,11 @@ export function StudyHome({ layout }: StudyHomeProps) {
 
   const handleNavigate = useCallback(
     (target: StudyTarget) => {
-      // 部屋の外（公開サイト）は新しいタブで開く。書斎は閉じない。言語はアプリのまま。
-      const outside = externalHref(target, locale);
-      if (outside !== null) {
-        window.open(outside, '_blank', 'noopener,noreferrer');
-        return;
-      }
       const href = targetHref(target);
       // カメラが着いてから URL を変える。書斎はこの時点でもう消えている（溶暗）。
       if (href !== null) router.push(href);
     },
-    [router, locale],
+    [router],
   );
 
   const handleOpenOverlay = useCallback((target: StudyTarget) => {
@@ -334,7 +326,6 @@ const EMPTY_LABELS: LabelPositions = {
   board: null,
   archive: null,
   pen: null,
-  memo: null,
 };
 
 /** アバターに出す 1 文字。 */

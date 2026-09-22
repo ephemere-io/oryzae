@@ -69,12 +69,11 @@ export function topicForScreen(pathname: string): HelpTopicId {
 /**
  * 書斎の物に触れたときの話題。ラベルの種類（`LabelKind`）から引く。
  *
- * 鉛筆は「書く」、メモ帳は「よくある質問・お問い合わせ」（押すと公開サイトへ）。手帳は
- * 物としての手帳（当月＝書く、過去月＝一覧）ではなく**手帳という物**の話題にする —
- * 触れた瞬間に言うのは、その物が何かであって、押した先の画面ではない。
+ * 鉛筆は「書く」。手帳は物としての手帳（当月＝書く、過去月＝一覧）ではなく**手帳という物**
+ * の話題にする — 触れた瞬間に言うのは、その物が何かであって、押した先の画面ではない。
  */
 export function topicForStudyLabel(
-  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | 'memo',
+  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen',
 ): HelpTopicId {
   switch (label) {
     case 'jar':
@@ -87,7 +86,5 @@ export function topicForStudyLabel(
       return 'archive';
     case 'pen':
       return 'write';
-    case 'memo':
-      return 'support';
   }
 }

@@ -118,7 +118,8 @@ export function clampHelpWidth(width: number): number {
  *   ときに「?」が脈打って居場所を教える。閉じたことを記録し、以後は自動で開かない
  * - 開閉と幅は localStorage に憶える。画面を移っても開いたまま
  * - `?` で開閉、`Esc` で閉じる（文字を打っている最中は効かない）
- * - 開いている間、画面の部品に触れると `data-help` か名前を読んで「触れているもの」を更新する
+ * - 開いている間、画面の部品に触れると `data-help` か名前を読んで「触れているもの」を更新する。
+ *   面の中に入ったら「触れていない」に戻る（画面の話題）
  */
 export function HelpProvider({
   children,
@@ -225,12 +226,14 @@ export function HelpProvider({
     if (!open) return;
     function onPointerOver(event: PointerEvent) {
       const target = hoverTargetOf(event.target instanceof Element ? event.target : null);
-      if (target === 'inside-panel') return;
       if (clearTimer.current !== null) {
         window.clearTimeout(clearTimer.current);
         clearTimer.current = null;
       }
-      if (target !== null) {
+      // 面の中に入ったら「何にも触れていない」扱い（少し待ってから）。面の隣の物
+      // （瓶の画面の「問いの変遷」）を横切った直後に面へ入ると、その物の説明が
+      // 面の中に居座っていた。生きている 1 枚はポインタの下を映す — 面の中は映さない。
+      if (target !== null && target !== 'inside-panel') {
         setHoverTarget((prev) =>
           prev && prev.topic === target.topic && prev.label === target.label ? prev : target,
         );

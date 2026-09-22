@@ -79,17 +79,9 @@ export interface StudyLayout {
     archive: Vec3 | null;
     /** 鉛筆の「NEW」。PC だけ（SP は ENTRIES のピルがそのまま新規執筆になる）。 */
     pen: Vec3 | null;
-    /** メモ帳の「MEMO」。物は黙っているので、名乗るのはこれ。 */
-    memo: Vec3 | null;
   };
   /** SP のピルだけが使う画面座標オフセット（px）。PC は null。 */
-  pillOffsets: { jar: Vec2; journal: Vec2; board: Vec2; archive: Vec2; memo: Vec2 } | null;
-  /**
-   * メモ帳（鉛筆の隣の小さな紙の束）の置き場（机の面の点）と大きさ。null は置かない。
-   * 他の物と同じ線画の物（`scene.ts` の `buildMemoPad`、寸法は `scene/memo-pad.ts`）。
-   * `scale` は等倍（1.0 × 1.35 × 0.14）に対する比。SP は机が狭いので縮める。
-   */
-  memo: { position: Vec3; scale: number } | null;
+  pillOffsets: { jar: Vec2; journal: Vec2; board: Vec2; archive: Vec2 } | null;
   /**
    * ホームで注視点を動かせる範囲（パンと「カーソルの下へ寄る」の両方に効く）。
    * 部屋の外へ出られないための箱。天板の幅と、床から板の上辺までの高さで決める。
@@ -182,16 +174,8 @@ export const PC_LAYOUT: StudyLayout = {
      * 積みの ENTRIES とは 2.4 離れるので重ならない。
      */
     pen: vec3(PC_DESK.x + 2.4, -1.14, 3.7),
-    /** メモ帳の手前の机の面。JAR（-3.4）と ENTRIES（2.8）の間で、どちらとも 2 以上離れる。 */
-    memo: vec3(0.2, -1.14, 3.55),
   },
   pillOffsets: null,
-  /**
-   * 積みの左隣、瓶との間の空いた面。鉛筆の右（x ≈ 6.6）に置くと画面の右端から出て、
-   * 鉛筆の奥（x ≈ 5.9, z 0）だと ARCHIVE のラベル・束・MEMO のラベル・鉛筆が 100px の
-   * 中に重なった（投影で確認）。積みの隣なら瓶と 130px、積みと 60px 空く。
-   */
-  memo: { position: vec3(0.2, -1.2, 2.5), scale: 1 },
   focusBounds: { x: [-4.5, 6], y: [-1.2, 4.5], z: [-3, 3] },
 };
 
@@ -216,10 +200,8 @@ export const SP_LAYOUT: StudyLayout = {
   jar: vec3(-1.15, -1.2, -0.2),
   board: { position: vec3(0, 2.7, -4.2), scale: 0.68 },
   desk: SP_DESK,
-  // ペンは積みの左手前。右に置くと画面外に出る。積みとの間は 0.3 残し、その左に
-  // メモ帳と MEMO のピルが入るぶんだけ積みへ寄せてある（-1.9 → -1.55。ピルは画面の
-  // 左端で押し戻されて動けないので、鉛筆のほうを避ける）。
-  pen: vec3(-1.55, -0.15, 1.2),
+  // ペンは積みの左手前。右に置くと画面外に出る。
+  pen: vec3(-1.9, -0.15, 1.2),
   // 棚を前傾させると背文字が上を向き、そのまま行き先の予告になる。
   shelf: { position: SP_SHELF, scale: SP_SHELF_SCALE, tiltX: -0.42 },
   deskTop: { y: -1.2, xLeft: -3.4, xRight: 3.4, zNear: 4.0, zFar: -4.7 },
@@ -237,21 +219,12 @@ export const SP_LAYOUT: StudyLayout = {
     archive: vec3(SP_SHELF.x, SP_SHELF.y + 2.1 * SP_SHELF_SCALE, SP_SHELF.z),
     // SP は ENTRIES のピルがそのまま新規執筆なので、NEW のピルは足さない（同じ行き先が 2 つ並ぶ）。
     pen: null,
-    // メモ帳の手前の机の面。ピルは束の下に出る。
-    memo: vec3(-2.0, -1.14, 3.6),
   },
   pillOffsets: {
     jar: { x: -28, y: 26 },
     journal: { x: 0, y: 22 },
     board: { x: -92, y: 40 },
     archive: { x: 10, y: -16 },
-    memo: { x: 0, y: 22 },
   },
-  /**
-   * 机の手前左、鉛筆の左の空きに置く。鉛筆は積みの左手前（world x ≈ -0.7）に寝て
-   * いるので、その左（画面に入る左端 ≈ -3.0 まで）が空いている。JAR のピルは瓶の手前
-   * （z ≈ 1.25）に出るので、それより手前に置いて重ねない。束は 0.8 倍。
-   */
-  memo: { position: vec3(-2.0, -1.2, 2.9), scale: 0.8 },
   focusBounds: { x: [-2.5, 2.5], y: [-1.2, 3.5], z: [-3, 3] },
 };

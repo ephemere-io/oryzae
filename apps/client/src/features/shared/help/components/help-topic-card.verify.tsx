@@ -98,20 +98,25 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'body-only-when-open',
-      description: '本文は開いているときだけ',
+      id: 'body-hidden-when-closed',
+      // `inert` は jsdom が IDL 属性として反映しないので、同じ箱に付けた aria-hidden で見る。
+      description: '閉じている間、本文は読み上げから外れている（aria-hidden）。開けば生きる',
       check: ({ root, props }) => {
-        const shown = (root.textContent ?? '').includes(textOf(props.topic).body);
-        return shown === props.expanded || `本文の有無=${shown}, expanded=${props.expanded}`;
+        // 線画の svg も aria-hidden を持つので、本文の箱は印（data-help-body）で引く。
+        const body = root.querySelector('[data-help-body]');
+        if (!body) return '本文の箱が無い';
+        const hidden = body.getAttribute('aria-hidden') === 'true';
+        return hidden === !props.expanded || `aria-hidden=${hidden}, expanded=${props.expanded}`;
       },
     },
     {
       id: 'open-link-follows-href',
-      description: '「開く」は行き先がある話題にだけ出る（開いているとき）',
+      description:
+        '「開く」は行き先がある話題にだけ出る（開いているとき。閉じていれば隠れた箱の中）',
       check: ({ root, props }) => {
-        const link = [...root.querySelectorAll('button')].find((b) =>
-          (b.textContent ?? '').startsWith('開く'),
-        );
+        const link = [...root.querySelectorAll('button')]
+          .filter((b) => !b.closest('[aria-hidden="true"]'))
+          .find((b) => (b.textContent ?? '').startsWith('開く'));
         const expected = props.expanded && helpTopic(props.topic).href !== null;
         return Boolean(link) === expected || `開く=${Boolean(link)}, 期待=${expected}`;
       },

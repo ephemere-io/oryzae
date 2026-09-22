@@ -183,6 +183,32 @@ describe('HelpProvider', () => {
     expect(result.current.hoverTarget).toBeNull();
   });
 
+  it('面の中に入ったら「触れていない」に戻る（隣の物の説明が居座らない）', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    const link = document.createElement('a');
+    link.setAttribute('data-help', 'questions');
+    const panel = document.createElement('aside');
+    panel.setAttribute('data-help-panel', '');
+    const inside = document.createElement('button');
+    panel.appendChild(inside);
+    document.body.append(link, panel);
+
+    act(() => result.current.openHelp());
+    act(() => {
+      link.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+    });
+    expect(result.current.hoverTarget).toEqual({ topic: 'questions', label: null });
+    // 隙間を飛ばして面の中へ（速く動かすと隙間で pointerover が起きない）。
+    act(() => {
+      inside.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current.hoverTarget).toBeNull();
+  });
+
   it('書斎の的（DOM を持たない）からも「触れている」を伝えられる', () => {
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
     act(() => result.current.setHovered('notebook'));

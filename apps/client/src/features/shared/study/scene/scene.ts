@@ -84,7 +84,6 @@ import {
   type HitHint,
   type HitId,
   HOVER_SCALE,
-  MEMO_HIT_ID,
   resolveClickTarget,
 } from './hit-targets';
 import {
@@ -112,14 +111,6 @@ import {
   type StudyMaterials,
   type StudyTheme,
 } from './materials';
-import {
-  MEMO_PAD,
-  MEMO_PAD_BINDING,
-  MEMO_PAD_RULES,
-  MEMO_PAD_TILT,
-  memoPadHitSize,
-  memoPadRuleZs,
-} from './memo-pad';
 import {
   isPlanDone,
   leaveFadeDuration,
@@ -167,7 +158,7 @@ export interface StudySceneOptions {
 }
 
 export interface HoverInfo {
-  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | 'memo' | null;
+  label: 'jar' | 'journal' | 'board' | 'archive' | 'pen' | null;
   month: string | null;
   /** 触れている的が一言を持つとき、その種類。文面は呼び出し側が状態から決める。 */
   hint: HitHint | null;
@@ -181,8 +172,6 @@ export interface LabelPositions {
   board: ScreenPoint | null;
   archive: ScreenPoint | null;
   pen: ScreenPoint | null;
-  /** メモ帳の `MEMO`。配置表がメモ帳を持たない構図では null。 */
-  memo: ScreenPoint | null;
 }
 
 interface ScreenPoint {
@@ -306,7 +295,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       desk: notebooks.desk.map((placement) => placement.notebook),
       shelf: notebooks.shelf,
       shelfAsSingleTarget: layout.pillOffsets !== null,
-      memo: layout.memo !== null,
     });
 
     const deskGroup = buildDesk(layout, materials, ownGeometry);
@@ -314,10 +302,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const jar = buildJar(state, layout, materials, ownGeometry, textures);
     const books = buildBooks(notebooks, layout, materials, ownGeometry, textures);
     const board = buildBoard(state, layout, materials, ownGeometry);
-    const memo = buildMemoPad(layout, materials, ownGeometry);
 
     const groups: Object3D[] = [deskGroup, floorGroup, jar.group, books.group, board.group];
-    if (memo !== null) groups.push(memo);
 
     const hitboxes = buildHitboxes({
       layout,
@@ -330,7 +316,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       shelfGroup: books.shelfGroup,
       boardGroup: board.group,
       penGroup: books.penGroup,
-      memoGroup: memo,
     });
 
     for (const group of groups) scene.add(group);
@@ -771,7 +756,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         board: null,
         archive: null,
         pen: null,
-        memo: null,
       });
       return;
     }
@@ -784,9 +768,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         ? toScreen(new Vector3(anchors.archive.x, anchors.archive.y, anchors.archive.z))
         : null,
       pen: anchors.pen ? toScreen(new Vector3(anchors.pen.x, anchors.pen.y, anchors.pen.z)) : null,
-      memo: anchors.memo
-        ? toScreen(new Vector3(anchors.memo.x, anchors.memo.y, anchors.memo.z))
-        : null,
     });
   }
 
@@ -952,10 +933,6 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         return shelfView(layout);
       case 'board':
         return layout.pillOffsets !== null ? boardCloseView(layout) : boardView(layout);
-      case 'memo':
-        // メモ帳はカメラを動かさない（`study-canvas` が goTo を呼ばない）。
-        // 万一呼ばれてもその場に留まる。
-        return currentView();
     }
   }
 
@@ -1757,96 +1734,6 @@ function buildBoard(
 }
 
 /**
- * メモ帳（`docs/oryzae-study/00-overview.md`「メモ帳」）。
- *
- * 手帳の束と同じ作り — 面と稜線の箱に、小口の薄い罫を三方に。上の 1 枚には板の
- * スニペットカードと同じ「罫線 n 本」を引き、奥の辺に綴じの線を 1 本。**文字は描かない。**
- * 書斎の中でしゃべるのは本人の言葉と年月だけで、この物が何かはラベル（`MEMO`）が名乗り、
- * 中身は触れたときの一言が言う。
- */
-function buildMemoPad(
-  layout: StudyLayout,
-  materials: StudyMaterials,
-  own: OwnGeometry,
-): Group | null {
-  const placement = layout.memo;
-  if (placement === null) return null;
-
-  const scale = placement.scale;
-  const width = MEMO_PAD.width * scale;
-  const depth = MEMO_PAD.depth * scale;
-  const thickness = MEMO_PAD.thickness * scale;
-
-  const group = new Group();
-  group.position.set(placement.position.x, placement.position.y, placement.position.z);
-  group.rotation.y = MEMO_PAD_TILT;
-  // 触れたときの一言は束の少し上に。
-  group.userData.tooltipRise = 0.6;
-
-  // 束。面と稜線の 1 組（後ろが透けない）。
-  const block = lineArt(new BoxGeometry(width, thickness, depth), materials, own);
-  block.position.y = thickness / 2;
-  group.add(block);
-
-  // 小口の罫。綴じ（奥）を除く三方に、束の面より外側へ。手帳と同じ規則（本数は厚みから、
-  // 端は不揃い、濃度は 2 段を交互に）。
-  const halfW = width / 2 + 0.002;
-  const halfD = depth / 2 + 0.002;
-  const lines = edgeLineCount(thickness);
-  for (let i = 0; i < lines; i++) {
-    const y = thickness * ((i + 1) / (lines + 1));
-    const jitter = (i % 3) * EDGE_LINE_JITTER;
-    const material = materials.faint(EDGE_LINE_OPACITIES[i % 2]);
-    // 右・左（小口）
-    group.add(
-      lineFrom(
-        [new Vector3(halfW - jitter, y, -halfD), new Vector3(halfW - jitter, y, halfD)],
-        material,
-        own,
-      ),
-    );
-    group.add(
-      lineFrom(
-        [new Vector3(-halfW + jitter, y, -halfD), new Vector3(-halfW + jitter, y, halfD)],
-        material,
-        own,
-      ),
-    );
-    // 手前（地）
-    group.add(
-      lineFrom(
-        [new Vector3(-halfW, y, halfD - jitter), new Vector3(halfW, y, halfD - jitter)],
-        material,
-        own,
-      ),
-    );
-  }
-
-  // 上の 1 枚。綴じの線 1 本と、罫線（板のスニペットカードと同じ抽象）。
-  const top = thickness + 0.002;
-  const bindingZ = -depth / 2 + MEMO_PAD_BINDING.inset * scale;
-  group.add(
-    lineFrom(
-      [new Vector3(-width / 2, top, bindingZ), new Vector3(width / 2, top, bindingZ)],
-      materials.faint(MEMO_PAD_BINDING.opacity),
-      own,
-    ),
-  );
-  const ruleHalfW = (width * MEMO_PAD_RULES.widthRatio) / 2;
-  for (const z of memoPadRuleZs(MEMO_PAD_RULES.count, MEMO_PAD.depth, scale)) {
-    group.add(
-      lineFrom(
-        [new Vector3(-ruleHalfW, top, z), new Vector3(ruleHalfW, top, z)],
-        materials.faint(MEMO_PAD_RULES.opacity),
-        own,
-      ),
-    );
-  }
-
-  return group;
-}
-
-/**
  * 当たり判定は見た目のメッシュではなく**不可視のヒットボックス**で取る。
  * 線だけの物はレイキャストに引っかからないため。
  */
@@ -1862,8 +1749,6 @@ function buildHitboxes(options: {
   shelfGroup: Group;
   boardGroup: Group;
   penGroup: Group;
-  /** メモ帳。束ごと 1 つの的（ホバーで束が持ち上がる）。null は置いていない構図。 */
-  memoGroup: Group | null;
 }): Mesh[] {
   const { layout, materials, ownGeometry } = options;
   const boxes: Mesh[] = [];
@@ -1953,20 +1838,6 @@ function buildHitboxes(options: {
     new Vector3(layout.board.position.x, layout.board.position.y, layout.board.position.z),
     options.boardGroup,
   );
-
-  // メモ帳は束ごと 1 つの的。鉛筆と同じく物より一回り大きく囲み、束の向きに合わせる。
-  if (options.memoGroup !== null && layout.memo !== null) {
-    const world = new Vector3();
-    options.memoGroup.getWorldPosition(world);
-    world.y += memoPadHitSize(layout.memo.scale)[1] / 2;
-    box(
-      MEMO_HIT_ID,
-      memoPadHitSize(layout.memo.scale),
-      world,
-      options.memoGroup,
-      options.memoGroup,
-    );
-  }
 
   return boxes;
 }

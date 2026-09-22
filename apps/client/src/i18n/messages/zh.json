@@ -782,7 +782,6 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "label_memo": "MEMO",
     "pill_jar_empty": "空",
     "pill_jar_fermenting": "发酵中",
     "pill_jar_almost": "即将",
@@ -790,7 +789,6 @@
     "pill_entries": "{count}条",
     "pill_volumes": "{count}册",
     "pill_cards": "{count}张",
-    "pill_memo": "帮助",
     "back_to_study": "返回书斋",
     "account": "账户",
     "list_all": "ALL ENTRIES",
@@ -825,19 +823,33 @@
     "hint_board_empty": "还没有贴任何东西",
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
-    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
-    "hint_memo": "使用方法与联系方式"
+    "hint_board_both": "{photos} 张照片 · {snippets} 条摘录"
   },
   "help": {
     "toggle": "帮助",
     "resize": "调整宽度",
     "close": "关闭",
-    "search_placeholder": "写下你想做的事",
+    "search_placeholder": "搜索用法",
     "search_clear": "清除",
     "search_empty": "没有找到相近的主题，换个说法试试。",
     "search_asking": "正在查找…",
     "pick_badge": "推荐",
     "open_topic": "打开",
+    "steps": {
+      "title": "先试试看",
+      "question": {
+        "title": "立一个问题",
+        "lead": "最在意的那一件事。在罐子里建立"
+      },
+      "write": {
+        "title": "写一条条目",
+        "lead": "打开手账，关联问题，直接写。自动保存"
+      },
+      "pickle": {
+        "title": "腌进罐子，然后等",
+        "lead": "关联了问题的条目累积到约 1,000 字后，第二天夜里开始发酵，信就会送到"
+      }
+    },
     "topics": {
       "concept": {
         "title": "Oryzae 是什么",

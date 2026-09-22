@@ -90,10 +90,6 @@ function rawSteps(target: StudyTarget, options: PlanOptions): TransitionStep[] {
 
     case 'board':
       return boardSteps(options.twoStageBoard);
-
-    case 'memo':
-      // メモ帳はカメラを動かさない（アバターと同じく、そのまま移る）。段取りは空。
-      return [];
   }
 }
 

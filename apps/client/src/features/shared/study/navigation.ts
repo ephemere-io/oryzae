@@ -4,7 +4,6 @@
  * 純関数。ルーティングそのものは呼び出し側（page）が持つ。
  */
 
-import { docsHref } from '@/lib/docs-site';
 import type { StudyTarget } from './types';
 
 /**
@@ -28,42 +27,13 @@ export function targetHref(target: StudyTarget): string | null {
       return '/board';
     case 'journal-month':
     case 'archive':
-    case 'memo':
       return null;
   }
 }
 
-/**
- * 部屋の外（公開サイト、別ドメイン）の行き先。無ければ null。
- *
- * メモ帳は物。押すと公開サイトのヘルプ（使い方・よくある質問・お問い合わせを 1 枚に
- * まとめた `/support`）を新しいタブで開く。**ヘルプモードの開閉には使わない** — 一度
- * メモ帳で面を開閉する形にしたが、物を押してモードが切り替わるのは戻り道が読めない
- * （「メモというよりヘルプモードという体験」）。モードの入口は画面の右上の「?」。
- * `locale` はアプリの現在の言語（公開サイトへ `?lang=` で渡す）。
- */
-export function externalHref(target: StudyTarget, locale?: string): string | null {
-  return target.kind === 'memo' ? docsHref('/support', locale) : null;
-}
-
-/**
- * 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。
- *
- * メモ帳も URL を変えないが一覧は開かない（外へ出る）。`targetHref === null` で判定すると
- * メモ帳を押したときに一覧が開いてしまう。
- */
+/** 書斎の中で一覧を開いて完結する対象か（＝URL は変わらない）。 */
 export function staysInStudy(target: StudyTarget): boolean {
   return target.kind === 'journal-month' || target.kind === 'archive';
-}
-
-/**
- * カメラを動かさずに移る対象か。
- *
- * メモ帳は瓶や板のような「場所」ではなく文房具なので、寄っていく芝居を挟まない。
- * アバターと同じく、そのまま画面を移す。
- */
-export function movesWithoutCamera(target: StudyTarget): boolean {
-  return target.kind === 'memo';
 }
 
 /**

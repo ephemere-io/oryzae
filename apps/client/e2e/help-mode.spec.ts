@@ -12,26 +12,30 @@ test.describe('ヘルプモード', () => {
   test('`?` で右の面が開き、Esc で閉じる', async ({ page }) => {
     await page.goto('/board');
     const panel = page.locator('[data-verify-unit="HelpPanel"]');
+    // 面（aside）は DOM に居続け、閉じると幅 0 に畳まれる（出入りの遷移のため）。
+    // 開閉は aside の見え方で見る（中身は面の幅で固定なので、畳んでも大きさを持つ）。
+    const aside = page.locator('aside.help-aside');
     // 初めての人には自動で開いている。閉じてから始める。
-    if (await panel.isVisible()) await page.keyboard.press('Escape');
-    await expect(panel).toHaveCount(0);
+    if (await aside.isVisible()) await page.keyboard.press('Escape');
+    await expect(aside).toBeHidden();
 
     await page.keyboard.press('?');
-    await expect(panel).toBeVisible();
+    await expect(aside).toBeVisible();
     await expect(panel).toHaveAttribute('data-verify-mode', 'browse');
     await expect(panel).toHaveAttribute('data-verify-spot', 'board');
 
     await page.keyboard.press('Escape');
-    await expect(panel).toHaveCount(0);
+    await expect(aside).toBeHidden();
   });
 
   test('したいことを書くと近い話題が出て、「開く」でそこへ行く', async ({ page }) => {
     await page.goto('/board');
     const panel = page.locator('[data-verify-unit="HelpPanel"]');
-    if (!(await panel.isVisible())) await page.keyboard.press('?');
-    await expect(panel).toBeVisible();
+    const aside = page.locator('aside.help-aside');
+    if (!(await aside.isVisible())) await page.keyboard.press('?');
+    await expect(aside).toBeVisible();
 
-    await page.getByPlaceholder('したいことを書く').fill('去年書いたものを読み返したい');
+    await page.getByPlaceholder('使い方を検索').fill('去年書いたものを読み返したい');
     await expect(panel).toHaveAttribute('data-verify-mode', 'search');
     const first = panel.locator('[data-verify-unit="HelpTopicCard"]').first();
     await expect(first).toHaveAttribute('data-verify-topic', 'archive');
@@ -43,11 +47,12 @@ test.describe('ヘルプモード', () => {
   test('画面を移っても開いたまま', async ({ page }) => {
     await page.goto('/board');
     const panel = page.locator('[data-verify-unit="HelpPanel"]');
-    if (!(await panel.isVisible())) await page.keyboard.press('?');
-    await expect(panel).toBeVisible();
+    const aside = page.locator('aside.help-aside');
+    if (!(await aside.isVisible())) await page.keyboard.press('?');
+    await expect(aside).toBeVisible();
 
     await page.goto('/jar');
-    await expect(panel).toBeVisible();
+    await expect(aside).toBeVisible();
     await expect(panel).toHaveAttribute('data-verify-spot', 'jar');
   });
 });
