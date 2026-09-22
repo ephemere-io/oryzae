@@ -894,8 +894,9 @@ export function SpEntryEditor({
           <span>{t('pickled_note')}</span>
         </p>
       ) : null}
-      {/* 本文（タイトルから広い余白＋ゆったり行間）。写真は本文の中。 */}
-      <div className="mt-6">
+      {/* 本文。結んだ問いの行との間は行 1 つぶん（広く空けると問いと本文が別物に見えた。実機レビュー）。
+          写真は本文の中。 */}
+      <div className="mt-3">
         <SpBodyEditor
           ref={bodyEditorRef}
           initialBody={initial.body}

@@ -166,6 +166,10 @@ body {
   display: flow-root;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  /* 行末揃え。回り込みの写真の横で、文字の側の余白は写真の余白（1em）だけになり、寄せ始めと寄せ終わりで
+     同じ幅になる。揃えないと、写真が終わり側のとき行末が不揃いに空き、始め側より広く見えた（実機レビュー）。
+     改行で終わる行と段落の最後の行は揃えない（通常の justify）。 */
+  text-align: justify;
   outline: none;
   -webkit-tap-highlight-color: transparent;
 }

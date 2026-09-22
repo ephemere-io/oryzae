@@ -92,7 +92,7 @@ type Phase = 'entering' | 'open' | 'closing';
  * JS は指の動きを受けない。
  *
  * 段は**要素の位置**が決める（数値を持たない）:
- * - 半分: 容器の子の印（`top: 50%`）
+ * - 半分: シートの中の印（`top: -50cqh`、上端揃え）＝シートの上端が容器の半分に来る
  * - 覗く: 見出しの行と同じ升の中の印（`top: calc(100% - 100cqh)`、上端揃え）＝見出しの行の高さ
  * - 中身: シートの中の印（`top: calc(min(100%, 100cqh) - 100cqh)`、上端揃え）＝中身の高さ、容器より高ければ
  *   全画面。上端揃えにしているのは、WebKit が「高さ 0 の要素の下端揃え」を吸着先として数えないため
@@ -520,13 +520,6 @@ export function Sheet({
           aria-hidden="true"
           style={{ height: spaceAbove(detents[0]), scrollSnapAlign: 'none' }}
         />
-        {/* 半分の段の印。容器の子の `top: 50%` は容器の高さの半分。 */}
-        <div
-          ref={halfRef}
-          aria-hidden="true"
-          className="absolute left-0 h-px w-px"
-          style={{ top: '50%', scrollSnapAlign: has('half') ? 'start' : 'none' }}
-        />
         <section
           ref={sheetRef}
           role="dialog"
@@ -584,6 +577,16 @@ export function Sheet({
           >
             <div>{children}</div>
           </div>
+          {/* 半分の段の印。シートの上端から容器の半分ぶん上に置き、上端揃えで吸着する＝シートの上端が容器の
+              半分に来る。**シートの中に置く**（空きの高さに依らない）。容器の子の `top: 50%` に置いていた頃は、
+              空きが「容器 − いちばん低い段」になった途端、いちばん低い段が半分のシート（設定）で印が全画面の面と
+              同じ位置に重なり、位置 0（＝半分）に吸着先が無くなって全画面から戻れなくなった（実機レビュー）。 */}
+          <div
+            ref={halfRef}
+            aria-hidden="true"
+            className="absolute left-0 h-px w-px"
+            style={{ top: '-50cqh', scrollSnapAlign: has('half') ? 'start' : 'none' }}
+          />
           {/* 中身の段の印。「見出し + 中身の高さ（容器より高ければ容器の高さ）から容器の高さぶん上」に置き、
               上端揃えで吸着する＝中身の下端が容器の下端に来る。高さは測って CSS 変数で渡す。 */}
           <div
