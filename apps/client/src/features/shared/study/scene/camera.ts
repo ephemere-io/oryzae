@@ -112,6 +112,24 @@ export function clampZoom(value: number): number {
   return Math.min(HOME_ZOOM.max, Math.max(HOME_ZOOM.min, value));
 }
 
+/**
+ * 画面の縦横比に応じた、ホームの基準の倍率。
+ *
+ * 構図は `layout.homeAspect` の窓で組んである。それより横に狭い画面（ヘルプの面が右に
+ * 立っている 1104 × 900 ≈ 1.23 など）では、同じ距離だと机の右端（鉛筆・棚）が切れる。
+ * 狭いぶんだけ引いて（倍率を上げて）、机が丸ごと入るようにする。初めての人が最初に見る
+ * 画面がこれなので、ここで切れていると部屋の全体が分からない。広い画面では等倍。
+ * 利用者の寄り引きはこの基準に掛かる（`scene.ts`）。
+ */
+export function zoomForAspect(layout: StudyLayout, aspect: number): number {
+  if (!Number.isFinite(aspect) || aspect <= 0) return 1;
+  if (aspect >= layout.homeAspect) return 1;
+  return clampZoom(1 + (layout.homeAspect - aspect) * ASPECT_ZOOM_GAIN);
+}
+
+/** 縦横比が 1 狭まるごとに、どれだけ引くか。1.6 → 1.23 で約 1.22 倍になる値。 */
+const ASPECT_ZOOM_GAIN = 0.6;
+
 interface Vec3 {
   x: number;
   y: number;

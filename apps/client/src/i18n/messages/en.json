@@ -835,6 +835,12 @@
     "search_asking": "Looking…",
     "pick_badge": "Best match",
     "open_topic": "Open",
+    "welcome": {
+      "title": "Welcome",
+      "guide_right": "The guide is on the right.",
+      "guide_below": "The guide is below.",
+      "start": "Let's begin"
+    },
     "steps": {
       "title": "Try it first",
       "question": {

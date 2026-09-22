@@ -835,6 +835,12 @@
     "search_asking": "探しています…",
     "pick_badge": "おすすめ",
     "open_topic": "開く",
+    "welcome": {
+      "title": "ようこそ",
+      "guide_right": "使い方は、右の案内に。",
+      "guide_below": "使い方は、下の案内に。",
+      "start": "始めてみよう"
+    },
     "steps": {
       "title": "まず試してみよう",
       "question": {

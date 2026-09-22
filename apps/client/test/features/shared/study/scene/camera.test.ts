@@ -24,6 +24,7 @@ import {
   shelfView,
   zoomByPinch,
   zoomByWheel,
+  zoomForAspect,
   zoomTowardPointer,
 } from '@/features/shared/study/scene/camera';
 
@@ -513,5 +514,32 @@ describe('ホームの構図', () => {
     const onScreen = projectOnScreen(layout, homeView(layout), layout.camera.frameTop);
     expect(onScreen.y).toBeLessThan(0.95);
     expect(onScreen.y).toBeGreaterThan(0);
+  });
+});
+
+describe('zoomForAspect — 画面が構図より横に狭ければ引く', () => {
+  it('構図の縦横比以上なら等倍', () => {
+    expect(zoomForAspect(PC_LAYOUT, PC_LAYOUT.homeAspect)).toBe(1);
+    expect(zoomForAspect(PC_LAYOUT, 2.0)).toBe(1);
+  });
+
+  it('ヘルプの面が右に立った 1104 × 900 では、机が丸ごと入るぶん引く', () => {
+    const zoom = zoomForAspect(PC_LAYOUT, 1104 / 900);
+    expect(zoom).toBeGreaterThan(1.15);
+    expect(zoom).toBeLessThan(1.3);
+  });
+
+  it('狭いほど引くが、寄り引きの上限は越えない', () => {
+    expect(zoomForAspect(PC_LAYOUT, 1.0)).toBeGreaterThan(zoomForAspect(PC_LAYOUT, 1.3));
+    expect(zoomForAspect(PC_LAYOUT, 0.3)).toBeLessThanOrEqual(HOME_ZOOM.max);
+  });
+
+  it('SP は縦持ちの構図なので、その比では等倍', () => {
+    expect(zoomForAspect(SP_LAYOUT, 390 / 844)).toBe(1);
+  });
+
+  it('壊れた比は等倍', () => {
+    expect(zoomForAspect(PC_LAYOUT, Number.NaN)).toBe(1);
+    expect(zoomForAspect(PC_LAYOUT, 0)).toBe(1);
   });
 });

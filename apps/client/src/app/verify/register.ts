@@ -78,6 +78,7 @@ import '@/features/shared/help/components/help-live-card.verify';
 import '@/features/shared/help/components/help-panel.verify';
 import '@/features/shared/help/components/help-toggle-button.verify';
 import '@/features/shared/help/components/help-topic-card.verify';
+import '@/features/shared/help/components/help-welcome.verify';
 import '@/features/pc/entries/components/entry-editor.verify';
 import '@/features/pc/board/components/board-view.verify';
 import '@/features/pc/fermentation/components/detail-pane.verify';

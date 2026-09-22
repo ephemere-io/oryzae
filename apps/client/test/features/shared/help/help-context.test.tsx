@@ -125,6 +125,11 @@ describe('HelpProvider', () => {
     });
     expect(result.current.firstVisit).toBe(true);
     expect(result.current.cue).toBe(false);
+    // 面以外を沈めて「ようこそ」。晴らしても面はそのまま。
+    expect(result.current.welcome).toBe(true);
+    act(() => result.current.dismissWelcome());
+    expect(result.current.welcome).toBe(false);
+    expect(result.current.open).toBe(true);
 
     act(() => result.current.closeHelp());
     expect(result.current.open).toBe(false);
@@ -142,7 +147,7 @@ describe('HelpProvider', () => {
     expect(result.current.cue).toBe(false);
   });
 
-  it('見たことがある人には自動で開かない', async () => {
+  it('見たことがある人には自動で開かず、「ようこそ」も出ない', async () => {
     const api = createApiStub(true);
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
     await waitFor(() => {
@@ -150,6 +155,20 @@ describe('HelpProvider', () => {
     });
     expect(result.current.open).toBe(false);
     expect(result.current.firstVisit).toBe(false);
+    act(() => result.current.openHelp());
+    expect(result.current.welcome).toBe(false);
+  });
+
+  it('初めての人が「ようこそ」を晴らさずに面を閉じても、「ようこそ」は消える', async () => {
+    const api = createApiStub(false);
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
+    await waitFor(() => {
+      expect(result.current.welcome).toBe(true);
+    });
+    act(() => result.current.closeHelp());
+    expect(result.current.welcome).toBe(false);
+    act(() => result.current.openHelp());
+    expect(result.current.welcome).toBe(false);
   });
 
   it('開いている間、触れた部品の data-help を読む。隙間に出たら少し待って消す', () => {

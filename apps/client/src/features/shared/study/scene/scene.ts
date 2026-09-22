@@ -63,6 +63,7 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  clampZoom,
   controlledView,
   type HomeControl,
   homeControl,
@@ -76,6 +77,7 @@ import {
   shelfView,
   zoomByPinch,
   zoomByWheel,
+  zoomForAspect,
   zoomTowardPointer,
 } from './camera';
 import { contentSignature } from './content-signature';
@@ -373,8 +375,11 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
    * 少し滑る）。寄り引きの支点は `zoomAnchor`（-1..1）— ホイールならそのときのカーソル、
    * つまみなら 2 本指の中点。
    */
-  let control: HomeControl = homeControl(layout);
-  let zoomTarget = 1;
+  // 画面が構図より横に狭ければ引いて始める（面が右に立っているとき）。利用者の寄り引きは
+  // この基準に掛かり、窓の大きさが変わったら基準だけ差し替える（寄せた分は保つ）。
+  let aspectZoom = zoomForAspect(layout, aspectOf(container));
+  let control: HomeControl = { ...homeControl(layout), zoom: aspectZoom };
+  let zoomTarget = aspectZoom;
   const zoomAnchor = new Vector2(0, 0);
   /** 2 本指を置いた時点の倍率。 */
   let pinchBase = 1;
@@ -945,6 +950,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    // 縦横比が変わったら、引きの基準も変わる。利用者が寄せた比は保つ。
+    const nextAspectZoom = zoomForAspect(layout, width / height);
+    zoomTarget = clampZoom((zoomTarget / aspectZoom) * nextAspectZoom);
+    aspectZoom = nextAspectZoom;
   });
   resizeObserver.observe(container);
 

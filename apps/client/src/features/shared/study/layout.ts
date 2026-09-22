@@ -71,6 +71,12 @@ export interface StudyLayout {
   floorY: number;
   /** 遷移先へ寄るときの距離。 */
   viewDistance: { jar: number; journal: number; board: number };
+  /**
+   * ホームの構図が前提にしている画面の縦横比（幅 ÷ 高さ）。これより横に狭い画面
+   * （ヘルプの面が右に立っているとき等）では、机の端が切れないぶんだけ引いて見る
+   * （`camera.ts` の `zoomForAspect`）。
+   */
+  homeAspect: number;
   /** 対象ラベルの world アンカー。 */
   labelAnchors: {
     jar: Vec3;
@@ -145,6 +151,8 @@ export const PC_LAYOUT: StudyLayout = {
   deskTop: { y: -1.2, xLeft: -4.9, xRight: 7.6, zNear: 4.1, zFar: -4.7 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.pc,
+  // 16:10 の窓（1440 × 900）で組んだ構図。
+  homeAspect: 1.6,
   labelAnchors: {
     jar: vec3(-3.4, -1.14, 2.7),
     journal: vec3(PC_DESK.x, -1.14, 4.12),
@@ -207,6 +215,8 @@ export const SP_LAYOUT: StudyLayout = {
   deskTop: { y: -1.2, xLeft: -3.4, xRight: 3.4, zNear: 4.0, zFar: -4.7 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.sp,
+  // 縦持ちの電話（390 × 844）で組んだ構図。
+  homeAspect: 0.46,
   labelAnchors: {
     // SP は机の手前に余白が無く、PC と同じ「手前端」に置くと手帳の表紙に文字が乗る。
     // 積みの右脇（空いている机の面）へ逃がす。左脇はペンがいる。

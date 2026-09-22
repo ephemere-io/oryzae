@@ -42,6 +42,8 @@ export interface HelpModeValue {
   firstVisit: boolean;
   /** 初めての人が面を閉じた直後。「?」が脈打って居場所を教える。 */
   cue: boolean;
+  /** 初めての人に「ようこそ」を出しているか（面が開いていて、まだ晴らしていない）。 */
+  welcome: boolean;
   /** 面の幅（px）。 */
   width: number;
   /** いま触れているもの。PC のポインタか、書斎の 3D の的から届く。 */
@@ -54,6 +56,8 @@ export interface HelpModeValue {
   openHelp: (topic?: HelpTopicId) => void;
   closeHelp: () => void;
   toggleHelp: () => void;
+  /** 「ようこそ」を晴らす（始めてみよう）。面はそのまま。 */
+  dismissWelcome: () => void;
   setWidth: (width: number) => void;
   /** 書斎の 3D の的のように、DOM を持たないものが「触れている」を伝える口。 */
   setHovered: (topic: HelpTopicId | null) => void;
@@ -69,6 +73,7 @@ const DEFAULT: HelpModeValue = {
   open: false,
   firstVisit: false,
   cue: false,
+  welcome: false,
   width: HELP_WIDTH.default,
   hoverTarget: null,
   focused: null,
@@ -77,6 +82,7 @@ const DEFAULT: HelpModeValue = {
   openHelp: noop,
   closeHelp: noop,
   toggleHelp: noop,
+  dismissWelcome: noop,
   setWidth: noop,
   setHovered: noop,
   setFocused: noop,
@@ -114,8 +120,9 @@ export function clampHelpWidth(width: number): number {
  * 右上に「?」が居て、押すと右の面が開く。面は閉じてもまた同じ「?」から開ける。
  *
  * - 有効／無効はアカウントの設定（既定は有効）。localStorage に憶える
- * - 初めての人（`onboardingCompleted` が false）には面を開いた状態で始め、初めて閉じた
- *   ときに「?」が脈打って居場所を教える。閉じたことを記録し、以後は自動で開かない
+ * - 初めての人（`onboardingCompleted` が false）には面を開いた状態で始め、面以外を沈めて
+ *   「ようこそ」を出す（`welcome`。伝えるのは案内の在処と「始めてみよう」だけ）。
+ *   初めて閉じたときに「?」が脈打って居場所を教える。閉じたことを記録し、以後は自動で開かない
  * - 開閉と幅は localStorage に憶える。画面を移っても開いたまま
  * - `?` で開閉、`Esc` で閉じる（文字を打っている最中は効かない）
  * - 開いている間、画面の部品に触れると `data-help` か名前を読んで「触れているもの」を更新する。
@@ -132,6 +139,7 @@ export function HelpProvider({
   const [open, setOpen] = useState(false);
   const [firstVisit, setFirstVisit] = useState(false);
   const [cue, setCue] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [width, setWidthState] = useState<number>(HELP_WIDTH.default);
   const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
   const [focused, setFocused] = useState<HelpTopicId | null>(null);
@@ -207,6 +215,9 @@ export function HelpProvider({
     else openHelp();
   }, [open, closeHelp, openHelp]);
 
+  const dismissWelcome = useCallback(() => setWelcomeDismissed(true), []);
+  const welcome = firstVisit && open && !welcomeDismissed;
+
   const setWidth = useCallback((next: number) => {
     const clamped = clampHelpWidth(next);
     setWidthState(clamped);
@@ -276,6 +287,7 @@ export function HelpProvider({
       open,
       firstVisit,
       cue,
+      welcome,
       width,
       hoverTarget,
       focused,
@@ -284,6 +296,7 @@ export function HelpProvider({
       openHelp,
       closeHelp,
       toggleHelp,
+      dismissWelcome,
       setWidth,
       setHovered,
       setFocused,
@@ -294,6 +307,7 @@ export function HelpProvider({
       open,
       firstVisit,
       cue,
+      welcome,
       width,
       hoverTarget,
       focused,
@@ -302,6 +316,7 @@ export function HelpProvider({
       openHelp,
       closeHelp,
       toggleHelp,
+      dismissWelcome,
       setWidth,
       setHovered,
     ],

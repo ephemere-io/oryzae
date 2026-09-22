@@ -835,6 +835,12 @@
     "search_asking": "正在查找…",
     "pick_badge": "推荐",
     "open_topic": "打开",
+    "welcome": {
+      "title": "欢迎",
+      "guide_right": "用法在右边的指南里。",
+      "guide_below": "用法在下面的指南里。",
+      "start": "开始吧"
+    },
     "steps": {
       "title": "先试试看",
       "question": {

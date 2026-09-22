@@ -9,6 +9,7 @@ import { Sidebar } from '@/features/pc/navigation/components/sidebar';
 import { useRootHashHandoff } from '@/features/shared/auth/hooks/use-root-hash-handoff';
 import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
 import { HelpToggle } from '@/features/shared/help/components/help-toggle';
+import { HelpWelcomeGate } from '@/features/shared/help/components/help-welcome-gate';
 import { HelpProvider } from '@/features/shared/help/help-context';
 import {
   BackToStudy,
@@ -217,6 +218,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             {/* 画面の右上の「?」。ヘルプモードが有効な間だけ。PC は全画面、SP は書斎だけ
               （サブ画面の SP は上端に題があり、右上に席が無い。アカウントの設定から開ける）。 */}
             {(device === 'pc' || (device === 'sp' && pathname === STUDY_PATH)) && <HelpToggle />}
+            {/* 初めての人の「ようこそ」。面以外を沈め、案内の在処と「始めてみよう」だけ。 */}
+            {device !== null && <HelpWelcomeGate guide={device === 'sp' ? 'below' : 'right'} />}
           </HelpProvider>
         </UnreadProvider>
       </SidebarProvider>

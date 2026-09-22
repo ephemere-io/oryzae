@@ -835,6 +835,12 @@
     "search_asking": "찾는 중…",
     "pick_badge": "추천",
     "open_topic": "열기",
+    "welcome": {
+      "title": "환영합니다",
+      "guide_right": "사용법은 오른쪽 안내에.",
+      "guide_below": "사용법은 아래 안내에.",
+      "start": "시작해 보기"
+    },
     "steps": {
       "title": "먼저 해 보기",
       "question": {

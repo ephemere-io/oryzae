@@ -160,6 +160,11 @@ html[data-help-resizing] .help-aside {
   transition: none;
 }
 
+/* 掴んでいる間は、縁の線を出したままにする（ポインタが縁から外れても）。 */
+html[data-help-resizing] .help-resize-line {
+  opacity: 1;
+}
+
 /* ヘルプの面の頭の 1 枚が入れ替わるとき。「変わった」ことを動きで言う。 */
 .help-fade {
   animation: help-fade 180ms ease-out;

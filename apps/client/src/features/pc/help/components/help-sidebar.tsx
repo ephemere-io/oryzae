@@ -123,6 +123,8 @@ export function HelpSidebar() {
         width: visible ? help.width : 0,
         paddingTop: SHELL_INSET,
         borderLeft: `${visible ? 1 : 0}px solid var(--surface-sunken-border)`,
+        // 紙の上に紙が重なる。縁の線 1 本に、左へ落ちる薄い影を添える（左のサイドバーと対）。
+        boxShadow: visible ? '-2px 0 10px rgba(0, 0, 0, 0.05)' : 'none',
         background: 'var(--bg)',
       }}
     >
@@ -136,8 +138,16 @@ export function HelpSidebar() {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onDoubleClick={() => help.setWidth(HELP_WIDTH.default)}
-        className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize transition-colors duration-150 hover:bg-[var(--hover-wash)]"
-      />
+        // 掴み手そのものは見えない。触れたとき・掴んでいる間だけ、縁に細い線が乗る
+        // （地を沈める版は 6px の太い線に見えた）。
+        className="group absolute inset-y-0 left-0 z-10 w-2 cursor-col-resize"
+      >
+        <span
+          aria-hidden="true"
+          className="help-resize-line absolute inset-y-0 left-0 w-[2px] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          style={{ background: 'color-mix(in srgb, var(--accent) 55%, transparent)' }}
+        />
+      </button>
       {/* 中身は面の幅で固定。幅が動いている最中に字が折り返し直さない。 */}
       <div className="flex min-h-0 flex-1 flex-col" style={{ width: help.width }}>
         <HelpPanel

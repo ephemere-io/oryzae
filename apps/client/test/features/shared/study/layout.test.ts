@@ -61,6 +61,15 @@ describe('配置表に共通して成り立つこと', () => {
     expect(bounds.x[1]).toBeLessThanOrEqual(layout.deskTop.xRight);
   });
 
+  it.each(LAYOUTS)('$name: 構図が前提にする縦横比を持つ（狭い画面で引くための基準）', (layout) => {
+    expect(layout.homeAspect).toBeGreaterThan(0);
+  });
+
+  it('PC は横長、SP は縦長の窓で組んである', () => {
+    expect(PC_LAYOUT.homeAspect).toBeGreaterThan(1);
+    expect(SP_LAYOUT.homeAspect).toBeLessThan(1);
+  });
+
   it.each(LAYOUTS)('$name: 主要ラベルが対応する物の近くに置かれている', (layout) => {
     // アンカーが対象から離れると「何のラベルか」が読めなくなる。
     expect(Math.abs(layout.labelAnchors.jar.x - layout.jar.x)).toBeLessThan(1);
