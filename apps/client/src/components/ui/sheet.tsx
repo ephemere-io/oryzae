@@ -25,13 +25,6 @@ export interface SheetProps {
    * 閉じたいとき（暗幕を押した・いちばん低い段からさらに下へ引いた）。呼び出し側は `open` を false にする。
    */
   onRequestClose?: () => void;
-  /**
-   * いちばん低い段からさらに下へ引いたら閉じるか。**モーダルのシートだけ true**（iOS のシートと同じ）。
-   * パレットや歯車で出し入れする板（発酵の結果・設定）は false で、指では消えない。
-   *
-   * 吸着先の組は描いている間に変えない（WebKit が別の段へ吸着し直す）ので、閉の吸着先はこの値で固定する。
-   */
-  dismissible?: boolean;
   /** 引っ込む動きが終わって消えたとき。 */
   onClosed?: () => void;
   /** モーダル（暗幕あり・外を押すと閉じる）か。 */
@@ -64,10 +57,11 @@ type Phase = 'entering' | 'open' | 'closing';
  *
  * ### 役割を分ける: 出す／消すはボタン、高さは指
  *
- * - **指（スクロール）は高さを変える。** 段だけが吸着先で、閉の位置は吸着先ではない。だから板
- *   （`dismissible: false`）は一番低い段より下に止まれない（下まで引いても離せば戻る）。モーダルのシート
- *   （`dismissible: true`）だけ、**指を離した位置が、いちばん低い段より底に近ければ**閉じる。
- *   閉の位置は一瞬たりとも吸着先にしない（吸着先の一覧が指の下で変わると iOS はそこへ飛ぶ。実機レビューで何度も）
+ * - **指（スクロール）は高さを変えるだけ。指では閉じない。** 段だけが吸着先で、閉の位置は吸着先ではない。
+ *   一番低い段より下に止まれない（下まで引いても離せば戻る）。板もモーダルも同じ 1 つの動き方。
+ *   「いちばん低い段から引いて閉じる」は作らない: 閉の位置を一瞬でも吸着先にすると iOS はそこへ飛び
+ *   （出た瞬間・触れた瞬間の両方で実機に起きた）、離した位置で判定する形はブラウザや OS ごとの
+ *   イベントの順序・位置の読みに依存する。閉じる手はボタン・暗幕・キャンセルで足りる（オーナーの判断）
  * - **出す／消すは `open`**（パレットや歯車のボタン、暗幕、キャンセル）。動きはシートの容器を下へずらす CSS の
  *   transition（`.oz-sheet-scroller[data-shown]`）。消える動きの終わりは transition の完了で知る
  *
@@ -97,7 +91,6 @@ export function Sheet({
   detent,
   onDetentChange,
   onRequestClose,
-  dismissible = false,
   onClosed,
   modal,
   backdropLabel,
@@ -153,7 +146,6 @@ export function Sheet({
     onClosed,
     onSettle,
     phase,
-    dismissible,
   });
   latest.current = {
     detent,
@@ -163,7 +155,6 @@ export function Sheet({
     onClosed,
     onSettle,
     phase,
-    dismissible,
   };
 
   // 出す／消す。消すときは消さずに引っ込む動きへ。引っ込む途中で出せば、その場から戻る（transition が折り返す）。
@@ -355,36 +346,6 @@ export function Sheet({
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(check);
     };
-    /**
-     * 払って閉じる（モーダルのシートだけ）。**指を離した位置が、いちばん低い段より底に近ければ閉じる。**
-     *
-     * 底（閉の位置）は吸着先ではない。**一瞬たりとも吸着先にしない。** iOS の WebKit は、指が触れている
-     * 最中に吸着先の一覧が変わると吸着の状態を作り直し、DOM 順で最初の吸着先（＝底）へ飛ぶ。「触れた瞬間に
-     * 底を吸着先に加える」を何度も形を変えて試し、そのたびに「触れると落ちる」「上に上げようとすると消える」
-     * を実機で起こした（計器: open st=273 → 触れる → closing st=0。指の向きと逆）。仕掛けを一切持たなかった
-     * 版だけが実機で正しく動いた。
-     *
-     * 吸着は指を離した瞬間にしか働かないので、触れている間はシートは指について底まで自由に下がる。だから
-     * 閉じる判定は離した瞬間の位置だけで足りる。「底まで引き切る」は、いちばん低い段の見出しが画面の下端から
-     * 段の高さぶん上にあるので、実機では指が先に画面の外へ出る。代わりに、ブラウザが吸着先を選ぶときの
-     * **「近い方」の規則**をそのまま使う: 底のほうが近ければ閉じ、段のほうが近ければブラウザが段へ戻す。
-     * 数値のしきい値は持たない。弾いても閉じない（離した位置で見るため）が、引けば必ず閉じる。
-     *
-     * touch のイベントだけを見る（pointer は見ない）。iOS は指を離したあと、そのとき指の下にある要素へ
-     * 合成の pointer/mouse イベントを送るので、出たばかりのシートが触られたことになる。touch は合成されない。
-     */
-    const onTouchEnd = () => {
-      const current = latest.current;
-      if (!current.dismissible || current.phase !== 'open' || scroller.clientHeight <= 0) return;
-      const lowest = current.detents.reduce(
-        (a, b) => (targetOf(a) <= targetOf(b) ? a : b),
-        current.detents[0] ?? 'full',
-      );
-      const closerToBottom = scroller.scrollTop < targetOf(lowest) / 2;
-      if (closerToBottom) current.onRequestClose?.();
-    };
-    scroller.addEventListener('touchend', onTouchEnd, { passive: true });
-    scroller.addEventListener('touchcancel', onTouchEnd, { passive: true });
     scroller.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
@@ -406,8 +367,6 @@ export function Sheet({
           });
     observer?.observe(scroller);
     return () => {
-      scroller.removeEventListener('touchend', onTouchEnd);
-      scroller.removeEventListener('touchcancel', onTouchEnd);
       scroller.removeEventListener('scroll', onScroll);
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
@@ -530,9 +489,9 @@ export function Sheet({
           containerType: 'size',
         }}
       >
-        {/* 容器の高さの空き＝閉の位置。**吸着先にはしない。一瞬たりとも。**
+        {/* 容器の高さの空き＝閉の位置（出す／消す動きの分の空き）。**吸着先にはしない。一瞬たりとも。**
             吸着先にすると iOS はここへ吸う（出た瞬間・触れた瞬間の両方で実機に起きた）。
-            指で押さえている間だけここまで下がれる。閉じるかは離した位置で決める（下の effect）。 */}
+            指で押さえている間だけここまで下がれるが、離せばブラウザが一番低い段へ戻す。 */}
         <div aria-hidden="true" style={{ height: '100%', scrollSnapAlign: 'none' }} />
         {/* 半分の段の印。容器の子の `top: 50%` は容器の高さの半分。 */}
         <div

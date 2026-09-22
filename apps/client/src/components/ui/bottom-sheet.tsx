@@ -75,8 +75,6 @@ export function BottomSheet({
       detent={detent}
       onDetentChange={setDetent}
       onRequestClose={onClose}
-      // いちばん低い段からさらに引いたら閉じる（iOS のシートと同じ。実機レビュー）。
-      dismissible
       onClosed={onClosed}
       modal
       backdropLabel={closeLabel}
