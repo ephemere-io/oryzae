@@ -9,7 +9,11 @@
  *
  * - 認証画面が、入り始める直前に `keepLiveScene()` で預ける
  * - 書斎の canvas が mount したら `takeLiveScene()` で引き取り、自分の入れ物へ canvas を移す
- * - 引き取り手が現れなければ（別の画面へ行った・読み込みに失敗した）`dropLiveScene()` で捨てる
+ * - 引き取り手が現れなければ（別の画面へ行った・読み込みに失敗した）置き去りとして捨てる
+ *
+ * **誰が捨てるかは名乗りで決める**（`claimScene` / `releaseScene`）。持ち主を「いま預かって
+ * いるか」から推すと外れる — React はページを入れ替えるとき**次の画面を組んでから前の画面を
+ * 畳む**ので、引き取られた後に前の入れ物の後始末が走る（実測で adopt の 5ms 後に dispose）。
  *
  * React の外に置くのは、**ページの寿命より長く生きる必要がある**ため。ここで持つのは
  * 受け渡しの一瞬だけで、引き取られたら手放す。
@@ -29,6 +33,25 @@ let live: LiveScene | null = null;
 let abandonTimer: number | null = null;
 /** 引き取られるまで canvas を置いておく、React の外の入れ物。 */
 let parking: HTMLElement | null = null;
+/** その handle をいま描いている入れ物。作った側と引き取った側が名乗る。 */
+const owners = new WeakMap<StudySceneHandle, object>();
+
+/** この入れ物がこのシーンを描くと名乗る。作ったときと、引き取ったときに呼ぶ。 */
+export function claimScene(handle: StudySceneHandle, by: object): void {
+  owners.set(handle, by);
+}
+
+/**
+ * 描くのをやめる。**捨ててよいかどうかを返す。**
+ *
+ * 捨ててよいのは、名乗ったままの入れ物だけ。すでに次の入れ物が名乗っていれば false —
+ * そこで捨てると、いま描いているシーンが死ぬ。
+ */
+export function releaseScene(handle: StudySceneHandle, by: object): boolean {
+  if (owners.get(handle) !== by) return false;
+  owners.delete(handle);
+  return true;
+}
 
 /**
  * 入り始める直前に預ける。canvas は**画面いっぱいの仮の置き場**へ移す。
@@ -40,6 +63,8 @@ let parking: HTMLElement | null = null;
 export function keepLiveScene(scene: LiveScene): void {
   dropLiveScene();
   live = scene;
+  // 預かっているあいだの持ち主はこの受け渡し役。前の画面の後始末はもう捨てられない。
+  claimScene(scene.handle, LIVE_OWNER);
   if (typeof document !== 'undefined') {
     const host = document.createElement('div');
     host.dataset.studyLive = '';
@@ -65,6 +90,9 @@ export function takeLiveScene(): LiveScene | null {
   return taken;
 }
 
+/** 預かっているあいだの持ち主（`claimScene` の名乗り主）。 */
+const LIVE_OWNER = {};
+
 /**
  * いま預かっているシーンがあるか。**引き取る前に、描く側が同期で知るために使う。**
  *
@@ -76,19 +104,14 @@ export function hasLiveScene(): boolean {
   return live !== null;
 }
 
-/** その handle をいま預かっているか（預けた側が二重に捨てないための判定）。 */
-export function isKeptLive(handle: StudySceneHandle): boolean {
-  return live !== null && live.handle === handle;
-}
-
-/** 預かっているものを捨てる。 */
+/** 預かっているものを捨てる。引き取られた後は何もしない。 */
 function dropLiveScene(): void {
   clearAbandonTimer();
   clearParking();
   if (live === null) return;
   const abandoned = live;
   live = null;
-  abandoned.handle.dispose();
+  if (releaseScene(abandoned.handle, LIVE_OWNER)) abandoned.handle.dispose();
 }
 
 /** 仮の置き場を外す（中の canvas は、引き取った側が自分の入れ物へ移す）。 */

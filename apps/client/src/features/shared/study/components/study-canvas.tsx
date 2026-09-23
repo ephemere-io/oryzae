@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { StudyLayout } from '../layout';
 import { staysInStudy } from '../navigation';
-import { isKeptLive, takeLiveScene } from '../scene/live';
+import { claimScene, releaseScene, takeLiveScene } from '../scene/live';
 import type { StudyTheme } from '../scene/materials';
 import {
   type HoverInfo,
@@ -122,6 +122,15 @@ export function StudyCanvas({
   const onHandleRef = useRef(onHandle);
   onHandleRef.current = onHandle;
 
+  /** 畳みかけて、まだ捨てていないシーン。組み直されたら同じものを使い続ける。 */
+  const keptRef = useRef<{
+    handle: StudySceneHandle;
+    layout: StudyLayout;
+    theme: StudyTheme;
+  } | null>(null);
+  /** 捨てる予定。組み直されたら取り消す。 */
+  const teardownRef = useRef<number | null>(null);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -152,55 +161,69 @@ export function StudyCanvas({
       },
     });
 
+    // 畳むのを取り消す（下の注釈）。
+    if (teardownRef.current !== null) {
+      clearTimeout(teardownRef.current);
+      teardownRef.current = null;
+    }
+
     /**
-     * **前の画面から生きているシーンがあれば、それを引き取る**（`scene/live.ts`）。
+     * 使えるシーン。順に、**畳みかけの自分のもの → 前の画面から生きているもの → 新しく作る**。
      *
-     * 認証画面で扉の前に立っていたカメラは、ログインしたあとホームへ向けて動き出している。
-     * ここで作り直すと、その動きが切れて「画面が切り替わった」ように見える。入れ物と受け口を
-     * 付け替えるだけなら（`handle.adopt`）、描画も動きも途切れない。
+     * - 畳みかけの自分のもの: StrictMode（開発時）は effect を「組む→畳む→組む」と回す。
+     *   畳んだ時点で捨てると、2 回目には引き継ぐものが無い
+     * - 前の画面のもの: 認証画面で扉の前に立っていたカメラは、もうホームへ向けて動き出している
+     *   （`scene/live.ts`）。作り直すとその動きが切れ、「画面が切り替わった」ように見える。
+     *   入れ物と受け口を付け替えるだけなら（`handle.adopt`）、描画も動きも途切れない
      */
-    const inherited = takeLiveScene();
-    if (inherited !== null) {
-      const adopted = inherited.handle;
-      adopted.adopt({ container, listeners: listeners(() => adopted) });
-      handleRef.current = adopted;
-      adopted.setState(stateRef.current);
-      onHandleRef.current?.(adopted);
-      return () => {
-        onHandleRef.current?.(null);
-        if (!isKeptLive(adopted)) adopted.dispose();
-        handleRef.current = null;
-      };
+    const kept = keptRef.current?.layout === layout && keptRef.current.theme === theme;
+    const existing = (kept ? keptRef.current?.handle : null) ?? takeLiveScene()?.handle ?? null;
+
+    let scene: StudySceneHandle | null = existing;
+    if (scene === null) {
+      // WebGL が無い環境ではシーンを作らない（呼び出し側が静止フォールバックを出す）。
+      try {
+        scene = initScene({
+          container,
+          state: stateRef.current,
+          layout,
+          theme,
+          arrival: arrivalRef.current,
+          atEntrance: entranceRef.current.atEntrance,
+          sprig: entranceRef.current.sprig,
+          reducedMotion: prefersReducedMotion(),
+          ...listeners(() => scene),
+        });
+      } catch {
+        return;
+      }
+    } else {
+      existing?.adopt({ container, listeners: listeners(() => scene) });
+      existing?.setState(stateRef.current);
     }
 
-    // WebGL が無い環境ではシーンを作らない（呼び出し側が静止フォールバックを出す）。
-    let handle: StudySceneHandle;
-    try {
-      handle = initScene({
-        container,
-        state: stateRef.current,
-        layout,
-        theme,
-        arrival: arrivalRef.current,
-        atEntrance: entranceRef.current.atEntrance,
-        sprig: entranceRef.current.sprig,
-        reducedMotion: prefersReducedMotion(),
-        ...listeners(() => handle),
-      });
-    } catch {
-      // WebGL の初期化に失敗した。書斎は出ないが、画面全体は壊さない。
-      return;
-    }
-
-    handleRef.current = handle;
-    onHandleRef.current?.(handle);
+    const active = scene;
+    keptRef.current = { handle: active, layout, theme };
+    claimScene(active, container);
+    handleRef.current = active;
+    onHandleRef.current?.(active);
 
     return () => {
       onHandleRef.current?.(null);
-      // dispose を怠ると再マウントで canvas が積み上がり、古い層のイベントだけが生き残る。
-      // ただし**次の画面へ預けたものは捨てない**（`scene/live.ts`）。
-      if (!isKeptLive(handle)) handle.dispose();
       handleRef.current = null;
+      /**
+       * **捨てるのは次のタスクまで待つ。**
+       *
+       * dispose を怠ると再マウントで canvas が積み上がり、古い層のイベントだけが生き残る。
+       * だが、その場で捨てると StrictMode の 2 回目や、ページの入れ替え（React は**次の画面を
+       * 組んでから前の画面を畳む**）で、いま描いているシーンを殺してしまう。ひと呼吸だけ待ち、
+       * その間に名乗り主が替わっていれば捨てない（`scene/live.ts`）。
+       */
+      teardownRef.current = window.setTimeout(() => {
+        teardownRef.current = null;
+        keptRef.current = null;
+        if (releaseScene(active, container)) active.dispose();
+      }, 0);
     };
     // **renderer は layout / theme が変わったときだけ作り直す。**
     // ここに state を入れていたせいで、取得が落ち着くまでの数回の更新でそのつど

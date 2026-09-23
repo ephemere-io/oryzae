@@ -80,6 +80,7 @@ import {
 import { captureRenderedFrame } from './capture';
 import { contentSignature } from './content-signature';
 import {
+  canRebuildWhileEntering,
   DOOR_ANGLE,
   DOOR_SETTLE_LERP,
   doorAngleWhileEntering,
@@ -509,7 +510,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const elapsed = now - startedAt;
 
     // 遷移中に預かった更新は、手が空いた最初のフレームで反映する。
-    if (pendingState !== null && transition === null && settled === null) {
+    if (pendingState !== null && transition === null && settled === null && !isWalking()) {
       applyState(pendingState);
     }
 
@@ -575,6 +576,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
         const resolve = entering.resolve;
         entering = null;
         atEntrance = null;
+        // **入口はここで畳む。** 背中に回るので見えはしないが、残すと寄り引きで振り返った
+        // ときに壁が現れる。畳めば、扉から入ってきた書斎と、直に開いた書斎が同じものになる。
+        if (entrance !== null) entrance.group.visible = false;
         resolve();
       }
       return;
@@ -841,8 +845,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   function reportLabels(): void {
     if (!listeners.onLabelPositions) return;
-    // サブ画面と遷移中はラベルを消す。
-    if (transition || settled) {
+    // サブ画面・遷移中・扉をくぐっている最中はラベルを消す。着いてから名前が出る。
+    if (transition || settled || atEntrance !== null) {
       listeners.onLabelPositions({
         jar: null,
         journal: null,
@@ -1059,12 +1063,22 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
    * まで数回 state が変わるので、その間に押すと必ず踏む。
    */
   function setState(next: StudyState): void {
-    if (transition !== null || settled !== null) {
+    if (transition !== null || settled !== null || isWalking()) {
       // 捨てずに預かる。捨てると、遷移中に届いた更新が二度と反映されない。
       pendingState = next;
       return;
     }
     applyState(next);
+  }
+
+  /**
+   * いま組み直すと、動いているカメラが飛ぶか。
+   *
+   * 組み直しは部屋ぜんぶを作り直すので 100ms ほど主スレッドを塞ぐ。**扉が開くのを待っている
+   * あいだはカメラが静止している**ので、そこで組むぶんには見えない。歩き出したら着くまで待つ。
+   */
+  function isWalking(): boolean {
+    return entering !== null && !canRebuildWhileEntering(performance.now() - entering.startedAt);
   }
 
   function applyState(next: StudyState): void {
