@@ -491,11 +491,17 @@ export function Sheet({
       if (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent) trackTouch(event);
     };
 
-    /** 指の位置を控える（速さは最後の 2 点から出す）。 */
+    /**
+     * 指の位置を控える（速さは最後の 2 点から出す）。
+     *
+     * 時刻は `performance.now()` で取る。`event.timeStamp` は時間の原点が環境で違い、
+     * 作り物のイベント（検証の払い）では進まないことがある——進まないと払いが払いに見えず、
+     * いちばん近い段に落ちて段を飛ばす（検証で全画面 → 覗くへ 2 段落ちた）。
+     */
     const trackTouch = (event: TouchEvent) => {
       const touch = event.touches[0] ?? event.changedTouches[0];
       if (!touch) return;
-      samples.push({ y: touch.clientY, t: event.timeStamp });
+      samples.push({ y: touch.clientY, t: performance.now() });
       if (samples.length > 4) samples.shift();
     };
     /** 指の速さ（px/ms、下向きが正）。 */
