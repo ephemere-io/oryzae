@@ -164,7 +164,7 @@ describe('LoadBoardUsecase', () => {
     expect(result.cards).toHaveLength(0);
   });
 
-  it('同じ付箋の行が複数あっても 1 枚だけ返す（00025 を流す前でも二重に見せない）', async () => {
+  it('同じ付箋の行が複数あっても 1 枚だけ返す（00026 を流す前でも二重に見せない）', async () => {
     // 日付ごと・日次/週次ごとに盤面が分かれていたころは、同じ付箋が複数の行に居た。
     // 畳まないと同じ付箋・写真が 2〜3 枚に見え、1 枚剥がすと実体ごと消えて
     // 残りのカードが 404 になる（「消したのに戻ってきた」に見える）。
@@ -197,7 +197,7 @@ describe('LoadBoardUsecase', () => {
     const result = await usecase.execute('user-1');
 
     expect(result.cards).toHaveLength(1);
-    // 残すのは「利用者が自分で置いた行」（00025 の畳み方と同じ規準）
+    // 残すのは「利用者が自分で置いた行」（00026 の畳み方と同じ規準）
     expect(result.cards[0].id).toBe('card-placed');
     expect(result.cards[0].x).toBe(900);
   });
