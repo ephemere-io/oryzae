@@ -5,8 +5,10 @@ import { OCR_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type { OcrGateway, OcrResult } from '../../domain/gateways/ocr.gateway.js';
 
 // provider は発酵分析 (vercel-ai-analysis.gateway.ts) と同じだが、**モデルは別**。
-// あちらは claude-sonnet-4-6、こちらは claude-opus-5。手書きの読み取りは誤読が
-// そのままスニペットの中身になるので、精度を優先している。
+// あちらは claude-sonnet-4-6、こちらは claude-sonnet-5（写真の文字起こしと同じ）。
+// 2026-09-16 までは精度優先で claude-opus-5 だったが、OCR はユーザーが画像を落とす
+// たびに走るのでランニングコストへの効きが大きく、Sonnet に揃えた。経緯と
+// 代償（実額の内訳が写真の文字起こしと 1 行に混ざる）は claude-pricing.ts に書いてある。
 //
 // モデル ID は claude-pricing.ts から取る。ベタ書きしないのは、コストのモデル別内訳が
 // 「どのモデルが OCR か」を知っている必要があるため（実額を用途別に読むのに使う）。

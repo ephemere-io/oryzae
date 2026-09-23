@@ -23,10 +23,10 @@ const sampleSpend = {
     message: null,
     byModel: [
       {
-        model: 'claude-opus-5',
+        model: 'claude-sonnet-5',
         costUsd: 0.8,
         byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.8 }],
-        feature: 'OCR',
+        feature: 'OCR + 写真の文字起こし',
       },
     ],
     groupingUnavailable: false,
@@ -177,8 +177,10 @@ describe('useSpend', () => {
     });
 
     expect(result.current.data?.actual.byModel).toHaveLength(1);
-    expect(result.current.data?.actual.byModel[0]?.model).toBe('claude-opus-5');
-    expect(result.current.data?.actual.byModel[0]?.feature).toBe('OCR');
+    expect(result.current.data?.actual.byModel[0]?.model).toBe('claude-sonnet-5');
+    // 1 つのモデルを 2 つの用途が使っている場合、サーバーは名前を連ねて返す。
+    // hook はそれを加工せずそのまま持つ（用途名を画面側で組み立てない）
+    expect(result.current.data?.actual.byModel[0]?.feature).toBe('OCR + 写真の文字起こし');
   });
 
   it('byModel が欠けた応答は取り込まない（内訳なしを内訳ゼロと見せない）', async () => {

@@ -17,7 +17,7 @@
 
 ### バックエンド
 
-- `adminAuthMiddleware` — `is_admin` チェック + service-role Supabase クライアント
+- `adminAuthMiddleware` — `app_metadata.is_admin` チェック + service-role Supabase クライアント
   - ファイル: `apps/server/src/contexts/shared/presentation/middleware/admin-auth.ts`
 - Admin API ルート（`/api/v1/admin/*`）:
   - `GET /api/v1/admin/dashboard/stats` — ユーザー数、エントリー数、発酵数（成功/失敗）
@@ -99,4 +99,4 @@ admin ルートを適切な bounded context に配置:
 
 - **Turbopack キャッシュ**: `apps/server/dist/` を更新しても、Next.js の `.next/` キャッシュが古いコードを使うことがある。`rm -rf apps/client/.next apps/admin/.next` で解消
 - **`.env` の管理**: client と admin で同じ環境変数が必要。`.env.example` で文書化済み。Vercel 側は各プロジェクトに個別設定
-- **admin ユーザー**: Supabase の `auth.users.raw_user_meta_data` に `{"is_admin": true}` を設定。現在 `yukiagatsuma@gmail.com`, `dominick.chen@gmail.com`, `test@oryzae.dev` が admin
+- **admin ユーザー**: Supabase の `auth.users.raw_app_meta_data` に `{"is_admin": true}` を設定（`raw_user_meta_data` ではない。そちらは本人が書き換えられる）。現在 `yukiagatsuma@gmail.com`, `dominick.chen@gmail.com`, `test@oryzae.dev` が admin
