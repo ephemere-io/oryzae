@@ -48,7 +48,8 @@ values ('00000000-0000-0000-0000-0000000000e1', 'e2e-ci', true);
 -- ── 管理画面 E2E 用アカウント ──────────────────────────────────────────────
 --   email    : test@oryzae.dev
 --   password : TestAdmin2026!
---   管理権限は user_metadata.is_admin で判定される（admin-auth ミドルウェア）
+--   管理権限は app_metadata.is_admin で判定される（admin-auth ミドルウェア）。
+--   user_metadata は本人が書き換えられるので、そこに置いても管理者にはならない。
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,
@@ -61,8 +62,8 @@ insert into auth.users (
   'test@oryzae.dev',
   crypt('TestAdmin2026!', gen_salt('bf')),
   now(), now(), now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"locale":"ja","is_admin":true}',
+  '{"provider":"email","providers":["email"],"is_admin":true}',
+  '{"locale":"ja"}',
   '', '', '', ''
 );
 

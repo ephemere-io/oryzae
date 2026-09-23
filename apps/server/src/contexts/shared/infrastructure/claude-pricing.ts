@@ -44,25 +44,36 @@ const RATES = {
 export const FERMENTATION_MODEL_ID = 'claude-sonnet-4-6' satisfies keyof typeof RATES;
 
 /**
- * OCR のモデル。**RATES には載せない。**
+ * board の OCR（スニペット切り出し）のモデル。**RATES には載せない。**
  *
  * OCR のコストは cost_report の実額をモデル別に割って取る（anthropic-cost-api.ts）。
  * 自前で単価を持つと二重管理になり、価格改定時に「実額と推定でモデルごとに違う額が
- * 出る」状態を作る。ここに置く理由は3つだけ:
+ * 出る」状態を作る。ここに置く理由は2つ:
  *   1. gateway がモデル ID をベタ書きしないため
  *   2. 実額のモデル別内訳に「どれが OCR か」のラベルを付けるため
- *   3. 発酵と別モデルであることをテストで固定するため——**同じモデルになると
- *      モデル別内訳が用途別内訳として機能しなくなる**（混ざって区別できない）
+ *
+ * **2026-09-16 に `claude-opus-5` から変更した。理由はランニングコスト。** Opus 5 は
+ * $5 / $25 per MTok、Sonnet 5 は $2 / $10 per MTok で **2.5 倍**の差がある。OCR は
+ * ユーザーが画像を落とすたびに走るので、利用者が増えるぶんだけそのまま効く。
+ * （Sonnet 5 の $2 / $10 は 2026-09-01 に $3 / $15 へ上がる予定が撤回され、
+ * そのまま標準価格になったもの。$3 / $15 と書いてある資料は古い。）
+ * もともと「手書きの誤読がそのまま
+ * スニペットの中身になる」ことを理由に精度へ振っていたが、同じく手書きを読む
+ * 写真の文字起こしが Sonnet で運用できているため、コストを優先して揃えた。
+ * 読み取り精度が落ちたと感じたら、まずここを戻して切り分けること。
+ *
+ * **代償**: 写真の文字起こしと同じモデルになったので、実額のモデル別内訳では
+ * 2 つの用途が 1 行に混ざる（featureOfModel が両方の名前を返す）。分けて見たく
+ * なったら、どちらかを別モデルに戻すか、Anthropic Console で Workspace を分ける。
  */
-export const OCR_MODEL_ID = 'claude-opus-5';
+export const OCR_MODEL_ID = 'claude-sonnet-5';
 
 /**
  * 写真の文字起こし（entry）のモデル。OCR_MODEL_ID と同じ理由でここに置く。
  *
- * board の OCR と別モデルなのは意図的。あちらはスニペット 1 枚で出力が短く
- * (maxOutputTokens 1024)、誤読がそのままスニペットの中身になるので精度に振れる。
- * こちらは日記のページ全体を起こすため出力が 4 倍 (4000) あり、同じ Opus にすると
- * 1 回あたり $0.065 → $0.108 になる。選定根拠は docs/entry-photo-guide.md。
+ * 日記のページ全体を起こすため出力が長く (maxOutputTokens 4000)、定型タスクである
+ * 文字起こしに Opus の推論力は要らない一方、手書き率が高いので Haiku まで落とすと
+ * 精度が目に見えて落ちる——中間の Sonnet。選定根拠は docs/entry-photo-guide.md。
  *
  * **用途別の内訳はモデル ID でしか引けない**（Anthropic は用途を知らない）。
  * ここに登録し featureOfModel が拾えるようにしないと、この機能の費用が
@@ -72,6 +83,19 @@ export const OCR_MODEL_ID = 'claude-opus-5';
 export const PHOTO_TRANSCRIPTION_MODEL_ID = 'claude-sonnet-5';
 
 /**
+ * 用途とモデルの対応表。モデルを足す・変えるときに直すのはここだけ。
+ *
+ * 同じモデルを複数の用途が使ってよい（現に OCR と写真の文字起こしは両方 sonnet-5）。
+ * そのぶん実額の内訳は 1 行に混ざるが、混ざっている事実が featureOfModel の返す
+ * 名前に出るので、読む人が「OCR だけの額」と取り違えない。
+ */
+const MODEL_FEATURES: ReadonlyArray<{ model: string; feature: string }> = [
+  { model: FERMENTATION_MODEL_ID, feature: '発酵' },
+  { model: OCR_MODEL_ID, feature: 'OCR' },
+  { model: PHOTO_TRANSCRIPTION_MODEL_ID, feature: '写真の文字起こし' },
+];
+
+/**
  * モデル ID を用途名に読み替える。未登録なら null（＝分類不明）。
  *
  * Anthropic は「用途」を知らない。モデルが分かれているから用途別に読めるだけで、
@@ -79,16 +103,18 @@ export const PHOTO_TRANSCRIPTION_MODEL_ID = 'claude-sonnet-5';
  * 「このモデルを使っている機能」であって「その機能のコード」ではない。
  * 画面・通知の文言もそのつもりで書くこと。
  *
+ * 1 つのモデルを複数の用途が使っているときは、**該当する用途をすべて連ねて返す**
+ * （例: `OCR + 写真の文字起こし`）。先に一致したほうだけを返す実装にすると、
+ * 混ざっている事実が名前から消えて「OCR の実額」に見えてしまう。
+ *
  * モデル ID の定義と同じファイルに置く。以前は admin-observability.ts と
  * cron-cost-alert.ts に同じ関数が複製されており、#529 で 3 つ目のモデルが
  * 増えたときにどちらも更新されず、費用が両方で「分類不明」に落ちた。
  * モデルを足すときに直す場所を 1 つにする。
  */
 export function featureOfModel(model: string): string | null {
-  if (model === FERMENTATION_MODEL_ID) return '発酵';
-  if (model === OCR_MODEL_ID) return 'OCR';
-  if (model === PHOTO_TRANSCRIPTION_MODEL_ID) return '写真の文字起こし';
-  return null;
+  const features = MODEL_FEATURES.filter((e) => e.model === model).map((e) => e.feature);
+  return features.length > 0 ? features.join(' + ') : null;
 }
 
 /** 上記モデルの単価。推定の根拠を画面に出すためにも使う。 */
