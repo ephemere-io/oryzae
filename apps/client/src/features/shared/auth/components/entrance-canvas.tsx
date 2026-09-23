@@ -15,15 +15,25 @@ export interface EntranceCanvasProps {
   onHandle: (handle: EntranceSceneHandle | null) => void;
   /** 最初の 1 フレームを描き終えたとき。 */
   onReady: () => void;
+  /** 最初から扉に手を掛けた状態で始めるか（通り道の画面）。作るときにしか使わない。 */
+  initialWaiting: boolean;
 }
 
-export function EntranceCanvas({ layout, reducedMotion, onHandle, onReady }: EntranceCanvasProps) {
+export function EntranceCanvas({
+  layout,
+  reducedMotion,
+  onHandle,
+  onReady,
+  initialWaiting,
+}: EntranceCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   /**
    * 一輪挿しに挿さる枝の姿。いまの候（七十二候）で決まる（`season.ts`）。
    * 開いている間は変えない — 画面を見ている最中に枝が変わる意味は無い。
    */
   const sprig = useMemo(() => entranceSprig(microSeasonIndex(new Date())), []);
+  // 初期の開きは作るときにしか使わない。値が変わってもシーンは作り直さない。
+  const initialWaitingRef = useRef(initialWaiting);
   // コールバックは ref で読む。親が再描画しただけでシーンを作り直さない。
   const callbacks = useRef({ onHandle, onReady });
   callbacks.current = { onHandle, onReady };
@@ -39,6 +49,7 @@ export function EntranceCanvas({ layout, reducedMotion, onHandle, onReady }: Ent
         layout,
         reducedMotion,
         sprig,
+        waiting: initialWaitingRef.current,
         onReady: () => callbacks.current.onReady(),
       });
     } catch {

@@ -37,6 +37,16 @@ export interface AuthEntranceProps {
 /** 扉が地から浮かび上がるまで（ms）。書斎の入りの溶暗と同じ長さ。 */
 const APPEAR_MS = 800;
 
+/**
+ * 通り道の画面（`/callback` `/auth/confirm`）で扉が現れるまで（ms）。
+ *
+ * ここは**別のドメインから戻ってきた直後**（Google の同意画面など）。文書が入れ替わるので
+ * 扉は作り直しになるが、利用者にとっては「さっき手を掛けた扉の続き」。ゆっくり浮かび
+ * 上がらせると、そこが 1 つの画面切り替えとして読める（PR #624 の実機レビュー
+ * 「ここでまた画面切り替えが発生しています」）。**待たせずに、もう目の前にある**ようにする。
+ */
+const PASSAGE_APPEAR_MS = 220;
+
 /** 入るとき、紙が先に退くまで（ms）。扉が開き始める前に視界を空ける。 */
 const PAPER_RETREAT_MS = 360;
 
@@ -64,7 +74,7 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
    * three.js は遅れて届くので、通り道の画面は扉より先に `setWaiting(true)` を呼ぶ。
    * 捨てると、認証している間じゅう扉が閉じたままになる。届いた時点で渡す。
    */
-  const waitingRef = useRef(false);
+  const waitingRef = useRef(passage);
   const [ready, setReady] = useState(false);
   const [leaving, setLeaving] = useState<EnterPlan | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -204,13 +214,17 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-0"
-          style={{ opacity: ready ? 1 : 0, transition: `opacity ${APPEAR_MS}ms ease-out` }}
+          style={{
+            opacity: ready ? 1 : 0,
+            transition: `opacity ${passage ? PASSAGE_APPEAR_MS : APPEAR_MS}ms ease-out`,
+          }}
         >
           <EntranceCanvas
             layout={layout}
             reducedMotion={reducedMotion}
             onHandle={handleSceneHandle}
             onReady={handleReady}
+            initialWaiting={passage}
           />
         </div>
 

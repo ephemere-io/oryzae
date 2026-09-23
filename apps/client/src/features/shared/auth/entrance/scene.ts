@@ -68,6 +68,13 @@ export interface EntranceSceneOptions {
   sprig: Sprig;
   /** 最初の 1 フレームを描き終えたとき（1 度だけ）。地から扉を浮かび上がらせる合図。 */
   onReady?: () => void;
+  /**
+   * 最初から扉に手を掛けた状態で始めるか（通り道の画面）。
+   *
+   * `/callback` は別のドメインから戻ってきた直後で、文書ごと作り直しになる。閉じた扉から
+   * 描き始めると、さっき手を掛けた扉とは別の場面が始まったように見える（実機レビュー）。
+   */
+  waiting?: boolean;
 }
 
 /**
@@ -198,8 +205,9 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
   const home = homeEntranceView(layout);
   applyView(camera, home);
 
-  let doorAngle: number = DOOR_ANGLE.rest;
-  let doorTarget: number = DOOR_ANGLE.rest;
+  const startAngle = options.waiting === true ? DOOR_ANGLE.waiting : DOOR_ANGLE.rest;
+  let doorAngle: number = startAngle;
+  let doorTarget: number = startAngle;
   door.rotation.y = doorAngle;
 
   const pointer = { x: 0, y: 0 };
