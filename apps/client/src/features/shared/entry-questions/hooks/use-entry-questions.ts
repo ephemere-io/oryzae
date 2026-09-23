@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { normalizeLinkedQuestions } from '@/features/shared/entry-questions/normalize';
 import type { LinkedQuestion } from '@/features/shared/entry-questions/types';
+import { notifyActivity } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 
 /**
@@ -68,9 +69,11 @@ export function useEntryQuestions(api: ApiClient | null, entryId: string | undef
   const linkQuestion = useCallback(
     async (questionId: string) => {
       if (!api || !entryId) return;
-      await api.fetch(`/api/v1/entries/${entryId}/questions/${questionId}`, {
+      const res = await api.fetch(`/api/v1/entries/${entryId}/questions/${questionId}`, {
         method: 'POST',
       });
+      // 結べたら合図を出す（ヘルプの三歩 ② が進む）。
+      if (res.ok) notifyActivity('link');
       await fetchLinked();
     },
     [api, entryId, fetchLinked],
@@ -101,7 +104,11 @@ export function useLinkEntryQuestion(api: ApiClient | null) {
   return useCallback(
     async (entryId: string, questionId: string): Promise<void> => {
       if (!api) return;
-      await api.fetch(`/api/v1/entries/${entryId}/questions/${questionId}`, { method: 'POST' });
+      const res = await api.fetch(`/api/v1/entries/${entryId}/questions/${questionId}`, {
+        method: 'POST',
+      });
+      // 新規作成の経路でも同じ「結べた」なので、同じ合図（三歩 ②）を出す。
+      if (res.ok) notifyActivity('link');
     },
     [api],
   );

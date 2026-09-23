@@ -844,6 +844,7 @@
     },
     "steps": {
       "title": "Try it first",
+      "done": "Done",
       "question": {
         "title": "Plant a question",
         "lead": "The one thing on your mind. You plant it inside the jar"

@@ -201,6 +201,26 @@ html[data-help-resizing] .help-resize-line {
   }
 }
 
+/* 三歩の「いまの歩」の番号と、画面の中のその相手（data-tutorial）が同じ脈で灯る。
+   面が開いている間だけ html に data-tutorial-step が付く（help-context）。 */
+.tutorial-pulse,
+html[data-tutorial-step="question"] [data-tutorial="question"],
+html[data-tutorial-step="write"] [data-tutorial="write"],
+html[data-tutorial-step="pickle"] [data-tutorial="pickle"] {
+  animation: tutorial-pulse 1.8s ease-out infinite;
+}
+@keyframes tutorial-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sidebar-sized,
   .sidebar-inset,
@@ -211,6 +231,14 @@ html[data-help-resizing] .help-resize-line {
   .help-fade,
   .help-cue-ring {
     animation: none;
+  }
+  /* 動きを減らす設定では、脈の代わりに細い輪を置いたままにする。 */
+  .tutorial-pulse,
+  html[data-tutorial-step="question"] [data-tutorial="question"],
+  html[data-tutorial-step="write"] [data-tutorial="write"],
+  html[data-tutorial-step="pickle"] [data-tutorial="pickle"] {
+    animation: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
   }
 }
 

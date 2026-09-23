@@ -220,6 +220,8 @@ export function SpQuestions({
 
           <button
             type="button"
+            // 三歩の ①「問いを立てる」の的。ヘルプの手順がここを照らす。
+            data-tutorial="question"
             onClick={openAdd}
             className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-medium"
             style={{ border: '1.5px dashed var(--border-subtle)', color: 'var(--accent)' }}

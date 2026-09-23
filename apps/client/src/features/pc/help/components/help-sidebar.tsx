@@ -202,6 +202,7 @@ export function HelpSidebar() {
           onClose={help.closeHelp}
           onOpenHref={handleOpenHref}
           spotlight={help.welcome}
+          tutorial={help.tutorial}
         />
       </div>
     </aside>

@@ -2,14 +2,35 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELP_WIDTH, HelpProvider, useHelpMode } from '@/features/shared/help/help-context';
+import { notifyActivity } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 import { mockResponse } from '../../../helpers/response';
+
+// Provider は画面を移ったら「触れていない」に戻すので、いまの画面を差し替えられるようにする。
+const nav = vi.hoisted(() => ({ pathname: '/' }));
+vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }));
 
 function createApiStub(
   onboardingCompleted: boolean,
 ): ApiClient & { fetch: ReturnType<typeof vi.fn> } {
   const fetch = vi.fn(async (path: string) => {
     if (path === '/api/v1/users/me') return mockResponse(true, { onboardingCompleted });
+    return mockResponse(true, { onboardingCompleted: true });
+  });
+  return { baseUrl: '', headers: {}, fetch };
+}
+
+interface Flags {
+  onboardingCompleted: boolean;
+  hasQuestion?: boolean;
+  hasLinkedQuestion?: boolean;
+  hasPickled?: boolean;
+}
+
+/** users/me の旗を後から書き換えられる stub（成し遂げた合図で取り直すのを見る）。 */
+function createApiStubWith(flags: Flags): ApiClient & { fetch: ReturnType<typeof vi.fn> } {
+  const fetch = vi.fn(async (path: string) => {
+    if (path === '/api/v1/users/me') return mockResponse(true, { ...flags });
     return mockResponse(true, { onboardingCompleted: true });
   });
   return { baseUrl: '', headers: {}, fetch };
@@ -29,6 +50,7 @@ function pressKey(key: string, target: EventTarget = window) {
 
 beforeEach(() => {
   window.localStorage.clear();
+  nav.pathname = '/';
 });
 
 afterEach(() => {
@@ -165,11 +187,18 @@ describe('HelpProvider', () => {
   });
 
   it('閉じている間は、触れているものを憶えない', () => {
+    vi.useFakeTimers();
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
-    act(() => result.current.setHovered('jar'));
+    act(() => {
+      result.current.setHovered('jar');
+      vi.advanceTimersByTime(1000);
+    });
     expect(result.current.hoverTarget).toBeNull();
     act(() => result.current.openHelp());
-    act(() => result.current.setHovered('jar'));
+    act(() => {
+      result.current.setHovered('jar');
+      vi.advanceTimersByTime(500);
+    });
     expect(result.current.hoverTarget?.topic).toBe('jar');
   });
 
@@ -271,7 +300,7 @@ describe('HelpProvider', () => {
     expect(result.current.welcome).toBe(false);
   });
 
-  it('開いている間、触れた部品の data-help を読む。隙間に出たら少し待って消す', () => {
+  it('開いている間、触れて少し止まった部品の data-help を映す。隙間に出ても次に止まるまでそのまま', () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
     const jar = document.createElement('button');
@@ -282,6 +311,7 @@ describe('HelpProvider', () => {
     // 閉じている間は読まない。
     act(() => {
       jar.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      vi.advanceTimersByTime(1000);
     });
     expect(result.current.hoverTarget).toBeNull();
 
@@ -289,16 +319,53 @@ describe('HelpProvider', () => {
     act(() => {
       jar.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
     });
+    // 触れた瞬間はまだ変えない（通り過ぎるだけかもしれない）。
+    expect(result.current.hoverTarget).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(result.current.hoverTarget).toEqual({ topic: 'jar', label: null });
 
     act(() => {
       gap.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      vi.advanceTimersByTime(1000);
     });
-    // まだ消えない（隙間を横切っているだけかもしれない）。
+    // 隙間に出ても消えない — 次に止まるまで、いま映しているものを持つ。
     expect(result.current.hoverTarget).toEqual({ topic: 'jar', label: null });
+  });
+
+  it('通り過ぎただけの部品では変えない', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    const jar = document.createElement('button');
+    jar.setAttribute('data-help', 'jar');
+    const notebook = document.createElement('button');
+    notebook.setAttribute('data-help', 'notebook');
+    document.body.append(jar, notebook);
+    act(() => result.current.openHelp());
     act(() => {
+      jar.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
       vi.advanceTimersByTime(200);
+      notebook.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      vi.advanceTimersByTime(500);
     });
+    expect(result.current.hoverTarget).toEqual({ topic: 'notebook', label: null });
+  });
+
+  it('画面を移ったら「触れていない」に戻る', () => {
+    vi.useFakeTimers();
+    const { result, rerender } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
+    const jar = document.createElement('button');
+    jar.setAttribute('data-help', 'jar');
+    document.body.append(jar);
+    act(() => result.current.openHelp());
+    act(() => {
+      jar.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      vi.advanceTimersByTime(500);
+    });
+    expect(result.current.hoverTarget?.topic).toBe('jar');
+    nav.pathname = '/jar';
+    rerender();
     expect(result.current.hoverTarget).toBeNull();
   });
 
@@ -316,6 +383,7 @@ describe('HelpProvider', () => {
     act(() => result.current.openHelp());
     act(() => {
       link.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      vi.advanceTimersByTime(500);
     });
     expect(result.current.hoverTarget).toEqual({ topic: 'questions', label: null });
     // 隙間を飛ばして面の中へ（速く動かすと隙間で pointerover が起きない）。
@@ -328,12 +396,63 @@ describe('HelpProvider', () => {
     expect(result.current.hoverTarget).toBeNull();
   });
 
-  it('書斎の的（DOM を持たない）からも「触れている」を伝えられる', () => {
+  it('書斎の的（DOM を持たない）からも「触れている」を伝えられる。離れても次まで持つ', () => {
+    vi.useFakeTimers();
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(null) });
     act(() => result.current.openHelp());
-    act(() => result.current.setHovered('notebook'));
+    act(() => {
+      result.current.setHovered('notebook');
+      vi.advanceTimersByTime(500);
+    });
     expect(result.current.hoverTarget).toEqual({ topic: 'notebook', label: null });
-    act(() => result.current.setHovered(null));
-    expect(result.current.hoverTarget).toBeNull();
+    act(() => {
+      result.current.setHovered(null);
+      vi.advanceTimersByTime(1000);
+    });
+    expect(result.current.hoverTarget).toEqual({ topic: 'notebook', label: null });
+  });
+
+  it('users/me の旗から「いまの歩」が決まり、開いている間だけ html に印が付く', async () => {
+    const api = createApiStubWith({ onboardingCompleted: true, hasQuestion: true });
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
+    await waitFor(() => {
+      expect(result.current.tutorial.step).toBe('write');
+    });
+    expect(result.current.tutorial.done).toEqual({ question: true, write: false, pickle: false });
+    expect(document.documentElement.getAttribute('data-tutorial-step')).toBeNull();
+    act(() => result.current.openHelp());
+    expect(document.documentElement.getAttribute('data-tutorial-step')).toBe('write');
+    act(() => result.current.closeHelp());
+    expect(document.documentElement.getAttribute('data-tutorial-step')).toBeNull();
+  });
+
+  it('三歩が全部済んでいれば、いまの歩は無く印も付かない', async () => {
+    const api = createApiStubWith({
+      onboardingCompleted: true,
+      hasQuestion: true,
+      hasLinkedQuestion: true,
+      hasPickled: true,
+    });
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
+    await waitFor(() => {
+      expect(result.current.tutorial.done?.pickle).toBe(true);
+    });
+    expect(result.current.tutorial.step).toBeNull();
+    act(() => result.current.openHelp());
+    expect(document.documentElement.getAttribute('data-tutorial-step')).toBeNull();
+  });
+
+  it('成し遂げた合図で次の歩へ進む', async () => {
+    const flags: Flags = { onboardingCompleted: true };
+    const api = createApiStubWith(flags);
+    const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
+    await waitFor(() => {
+      expect(result.current.tutorial.step).toBe('question');
+    });
+    flags.hasQuestion = true;
+    act(() => notifyActivity('question'));
+    await waitFor(() => {
+      expect(result.current.tutorial.step).toBe('write');
+    });
   });
 });

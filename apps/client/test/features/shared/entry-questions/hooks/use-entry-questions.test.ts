@@ -1,6 +1,10 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useActiveQuestions } from '@/features/shared/entry-questions/hooks/use-entry-questions';
+import {
+  useActiveQuestions,
+  useEntryQuestions,
+} from '@/features/shared/entry-questions/hooks/use-entry-questions';
+import { ACTIVITY_EVENT, readActivityKind } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 import { mockResponse } from '../../../../helpers/response';
 
@@ -11,6 +15,17 @@ function createApiStub(): ApiClient & { fetch: ReturnType<typeof vi.fn> } {
     headers: {},
     fetch,
   };
+}
+
+/** window に出た合図の種類を集める（ヘルプの三歩が聞くもの）。 */
+function collectActivity(): { kinds: string[]; stop: () => void } {
+  const kinds: string[] = [];
+  const listen = (e: Event) => {
+    const kind = readActivityKind(e);
+    if (kind) kinds.push(kind);
+  };
+  window.addEventListener(ACTIVITY_EVENT, listen);
+  return { kinds, stop: () => window.removeEventListener(ACTIVITY_EVENT, listen) };
 }
 
 describe('useActiveQuestions', () => {
@@ -108,5 +123,54 @@ describe('useActiveQuestions', () => {
 
     await waitFor(() => expect(api.fetch).toHaveBeenCalled());
     expect(result.current).toEqual([]);
+  });
+});
+
+describe('useEntryQuestions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('linkQuestion が通ったら合図 link を出し、紐付けを取り直す', async () => {
+    const api = createApiStub();
+    // 初回の紐付け取得 → POST → 取り直し
+    api.fetch
+      .mockResolvedValueOnce(mockResponse(true, []))
+      .mockResolvedValueOnce(mockResponse(true, {}))
+      .mockResolvedValueOnce(mockResponse(true, [{ id: 'q1', currentText: 'なぜ?' }]));
+
+    const { result } = renderHook(() => useEntryQuestions(api, 'e1'));
+    await waitFor(() => expect(api.fetch).toHaveBeenCalledTimes(1));
+
+    const activity = collectActivity();
+    await act(async () => {
+      await result.current.linkQuestion('q1');
+    });
+    activity.stop();
+
+    expect(api.fetch).toHaveBeenNthCalledWith(2, '/api/v1/entries/e1/questions/q1', {
+      method: 'POST',
+    });
+    expect(activity.kinds).toEqual(['link']);
+    expect(result.current.linkedQuestions.map((q) => q.id)).toEqual(['q1']);
+  });
+
+  it('linkQuestion が失敗したら合図は出ない', async () => {
+    const api = createApiStub();
+    api.fetch
+      .mockResolvedValueOnce(mockResponse(true, []))
+      .mockResolvedValueOnce(mockResponse(false, {}))
+      .mockResolvedValueOnce(mockResponse(true, []));
+
+    const { result } = renderHook(() => useEntryQuestions(api, 'e1'));
+    await waitFor(() => expect(api.fetch).toHaveBeenCalledTimes(1));
+
+    const activity = collectActivity();
+    await act(async () => {
+      await result.current.linkQuestion('q1');
+    });
+    activity.stop();
+
+    expect(activity.kinds).toEqual([]);
   });
 });

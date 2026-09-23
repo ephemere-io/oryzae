@@ -34,6 +34,22 @@ export type HelpTopicId =
  */
 export type HelpSection = 'start' | 'room' | 'screens' | 'trouble';
 
+/** 三歩の識別子。順は `tutorial.ts` の `HELP_STEPS`。 */
+export type HelpStepId = 'question' | 'write' | 'pickle';
+
+/** 三歩の進み具合。サーバーの旗（問いがある・結んで書いた・漬けた）そのもの。 */
+export interface HelpProgress {
+  question: boolean;
+  write: boolean;
+  pickle: boolean;
+}
+
+/** 面と画面が見る「いまの歩」。`done` が null なら、まだ確かめていない。 */
+export interface HelpTutorial {
+  step: HelpStepId | null;
+  done: HelpProgress | null;
+}
+
 /** 話題に添える線画の種類（`help-illustrations.tsx`）。 */
 export type HelpIllustrationKind =
   | 'room'

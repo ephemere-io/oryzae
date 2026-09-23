@@ -12,7 +12,7 @@ import jaMessages from '@/i18n/messages/ja.json';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { helpTextsFrom } from '../hooks/use-help-texts';
 import { HELP_TOPICS } from '../topics';
-import type { HelpMatch, HelpRemoteState, HelpTopicId } from '../types';
+import type { HelpMatch, HelpRemoteState, HelpTopicId, HelpTutorial } from '../types';
 import { HelpPanel } from './help-panel';
 
 interface Props {
@@ -23,6 +23,7 @@ interface Props {
   matches: HelpMatch[];
   remote: HelpRemoteState;
   spotlight?: boolean;
+  tutorial?: HelpTutorial;
 }
 
 function lookup(key: string): string {
@@ -77,11 +78,21 @@ registerUnit<Props>({
           onClose={() => {}}
           onOpenHref={() => {}}
           spotlight={props.spotlight}
+          tutorial={props.tutorial}
         />
       </div>,
     ),
   fixtures: [
     { id: 'browse', description: '一覧。何にも触れていない（画面の話題が頭）', props: BROWSE },
+    {
+      id: 'guiding',
+      probe: true,
+      description: 'Probe: 案内の最中 — 三歩が頭で①が脈打ち、検索欄は無い',
+      props: {
+        ...BROWSE,
+        tutorial: { step: 'question', done: { question: false, write: false, pickle: false } },
+      },
+    },
     {
       id: 'spotlight',
       probe: true,
@@ -196,9 +207,29 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'guiding-leads-with-steps-and-hides-search',
+      description: '案内の最中は三歩が 1 枚より先に来て、検索欄が無い。済めば元の並びと検索欄',
+      check: ({ root, props, contract }) => {
+        const guiding = props.tutorial?.step != null;
+        if (contract.guiding !== String(guiding)) return `契約 guiding=${contract.guiding}`;
+        const search = root.querySelector('input[type="search"]');
+        if (guiding === (search !== null)) return guiding ? '検索欄がある' : '検索欄が無い';
+        if (props.query !== '' || contract.mode !== 'browse') return true;
+        const steps = root.querySelector('[data-verify-unit="HelpFirstSteps"]');
+        const live = root.querySelector(LIVE);
+        if (!steps || !live) return '三歩か 1 枚が無い';
+        const stepsFirst = Boolean(
+          steps.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+        return stepsFirst === guiding || (guiding ? '三歩が頭ではない' : '1 枚が頭ではない');
+      },
+    },
+    {
       id: 'search-box-shows-query',
       description: '検索欄には書いた文がそのまま入っている',
       check: ({ root, props }) => {
+        // 案内の最中は検索欄そのものが無い。
+        if (props.tutorial?.step != null) return true;
         const input = root.querySelector<HTMLInputElement>(`${PANEL} input[type="search"]`);
         return input?.value === props.query || `value=${input?.value}`;
       },

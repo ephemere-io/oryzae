@@ -6,6 +6,7 @@ import { DeviceView } from '@/components/device-view';
 import { JarView } from '@/features/pc/fermentation/components/jar-view';
 import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle-success-modal';
 import { useFermentationReadiness } from '@/features/shared/fermentation/hooks/use-fermentation-readiness';
+import { useHelpMode } from '@/features/shared/help/help-context';
 import { useJarQuestions } from '@/features/shared/questions/hooks/use-jar-questions';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
@@ -33,6 +34,8 @@ export default function JarPage() {
   // issue #278: 瓶の見た目に反映する readiness（段階を決める top と、賑やかさを決める total）。
   // サーバーがリクエストのたびに評価し直すので、漬け込み後にこのページへ来れば最新になる。
   const { data: readiness } = useFermentationReadiness(api, authLoading);
+  // ヘルプの三歩。①（問いを立てる）の間だけ、PC の空の瓶を大きく見せる。
+  const help = useHelpMode();
   const router = useRouter();
   // SP はボトムナビを持たない（書斎が唯一のグローバルナビ）ので、問いの管理へは
   // 瓶から入る。ドメインをまたぐ合成なので、重ねるのは page の仕事
@@ -110,6 +113,7 @@ export default function JarPage() {
             onAddQuestion={handleAddQuestion}
             onEditQuestion={handleEditQuestion}
             onArchiveQuestion={handleArchiveQuestion}
+            emphasizeEmpty={help.tutorial.step === 'question'}
           />
           <PickleSuccessModal
             open={pickleSuccessOpen}

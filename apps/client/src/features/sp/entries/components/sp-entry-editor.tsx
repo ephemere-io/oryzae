@@ -403,6 +403,8 @@ export function SpEntryEditor({
       <div className="px-5 pt-4">
         <button
           type="button"
+          // 三歩の ②「エントリーを書く（問いを結ぶ）」の的。
+          data-tutorial="write"
           onClick={openQuestionSheet}
           className="max-w-full truncate rounded-full px-3 py-1.5 text-xs"
           style={
@@ -477,6 +479,8 @@ export function SpEntryEditor({
         <div className="sp-rise mx-4 mb-4">
           <button
             type="button"
+            // 三歩の ③「瓶に漬けて待つ」の的。
+            data-tutorial="pickle"
             onClick={handlePickle}
             disabled={pickling || pickled}
             aria-label={t('ferment_title')}

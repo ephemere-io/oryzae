@@ -134,6 +134,33 @@ describe('HelpPanel', () => {
     expect(empty.onQueryChange).not.toHaveBeenCalled();
   });
 
+  it('案内の最中は三歩が頭で検索欄が無い。済めば 1 枚が頭に戻り検索欄が出る', () => {
+    renderPanel({
+      tutorial: { step: 'question', done: { question: false, write: false, pickle: false } },
+    });
+    expect(screen.queryByPlaceholderText(jaMessages.help.search_placeholder)).toBeNull();
+    const panel = document.querySelector('[data-verify-unit="HelpPanel"]');
+    expect(panel?.getAttribute('data-verify-guiding')).toBe('true');
+    const steps = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
+    const live = document.querySelector(LIVE);
+    expect(
+      steps && live && steps.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(steps?.getAttribute('data-verify-current')).toBe('question');
+
+    cleanup();
+    renderPanel({
+      tutorial: { step: null, done: { question: true, write: true, pickle: true } },
+    });
+    expect(screen.getByPlaceholderText(jaMessages.help.search_placeholder)).toBeTruthy();
+    const steps2 = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
+    const live2 = document.querySelector(LIVE);
+    expect(
+      live2 && steps2 && live2.compareDocumentPosition(steps2) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(steps2?.getAttribute('data-verify-done')).toBe('question,write,pickle');
+  });
+
   it('検索の 1 件目は押せば閉じられ、文を変えると一覧で開いていた行は持ち越さない', () => {
     const { onFocus } = renderPanel({
       query: '手紙',

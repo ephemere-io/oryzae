@@ -247,6 +247,8 @@ export function QuestionChip({
         {hasMoreToLink && (
           <button
             type="button"
+            // 三歩の ②「エントリーを書く（問いを結ぶ）」の的。ヘルプの手順がここを照らす。
+            data-tutorial="write"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             aria-haspopup="menu"

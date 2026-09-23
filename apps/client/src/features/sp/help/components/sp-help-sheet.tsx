@@ -74,6 +74,7 @@ export function SpHelpSheet() {
           onClose={help.closeHelp}
           onOpenHref={handleOpenHref}
           spotlight={help.welcome}
+          tutorial={help.tutorial}
         />
       </div>
     </div>

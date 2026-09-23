@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { GoogleLoginButton } from '@/features/shared/auth/components/google-login-button';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { useSignupAvailability } from '@/features/shared/auth/hooks/use-signup-availability';
+import { useHomeHref } from '@/features/shared/study/hooks/use-home-href';
 import { useAuth } from '@/lib/auth-context';
 
 function isSupportedLocale(value: string): value is 'ja' | 'en' | 'zh' | 'ko' {
@@ -30,6 +31,9 @@ export function SignupForm() {
   const { signup, auth } = useAuth();
   // Issue #300: Research Preview の登録枠状況をマウント時に取得
   const { availability } = useSignupAvailability();
+  // 行き先はログインと同じ規則（HomeGate と同じ hook）。ここで /entries を直書きすると、
+  // 登録した人だけ書斎に着かず、ヘルプの三歩も見ないまま一覧に落ちる。
+  const { href: home, resolved } = useHomeHref();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,9 +53,11 @@ export function SignupForm() {
       return;
     }
 
-    // If session was returned (email confirmation disabled), go to entries
+    // セッションが返った（メール確認が無効）ならそのままホームへ。
+    // 手動切替はマウント時の effect で読むので、送信までにはまず解決している。
+    // 万一まだなら `/` へ送る（HomeGate が同じ規則で振り分ける）。
     if (auth) {
-      router.push('/entries');
+      router.push(resolved ? home : '/');
       return;
     }
 

@@ -27,7 +27,7 @@ describe('useUserMe (Issue #316)', () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it('/api/v1/users/me を叩いて data に hasPickled / hasLinkedQuestion をセットする', async () => {
+  it('/api/v1/users/me を叩いて data に hasPickled / hasLinkedQuestion / hasQuestion をセットする', async () => {
     const me = {
       id: 'u1',
       nickname: 'taro',
@@ -35,6 +35,7 @@ describe('useUserMe (Issue #316)', () => {
       onboardingCompleted: true,
       hasPickled: false,
       hasLinkedQuestion: true,
+      hasQuestion: true,
     };
     apiFetch.mockResolvedValueOnce(mockResponse(true, me));
     const api = createMockApi(apiFetch);
@@ -56,6 +57,7 @@ describe('useUserMe (Issue #316)', () => {
       onboardingCompleted: true,
       hasPickled: false,
       hasLinkedQuestion: false,
+      hasQuestion: false,
     };
     const updated = { ...initial, hasPickled: true };
     apiFetch
@@ -73,6 +75,19 @@ describe('useUserMe (Issue #316)', () => {
     });
     expect(refreshed).toEqual(updated);
     expect(result.current.data?.hasPickled).toBe(true);
+  });
+
+  it('hasQuestion が無い応答（旧サーバー）では false に倒す', async () => {
+    // 三歩の ① の旗は後から足したので、欠けていても画面は出せるよう既定 false。
+    apiFetch.mockResolvedValueOnce(
+      mockResponse(true, { id: 'u1', nickname: 'taro', hasLinkedQuestion: true }),
+    );
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useUserMe(api));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data?.hasQuestion).toBe(false);
+    expect(result.current.data?.hasLinkedQuestion).toBe(true);
   });
 
   it('レスポンスが ok でなければ data は null のまま', async () => {

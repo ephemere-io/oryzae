@@ -12,4 +12,9 @@ export interface UserActivityStatsRepositoryGateway {
   hasPickled(userId: string): Promise<boolean>;
   /** 指定ユーザーが一度でも entry-question リンクを持つか */
   hasLinkedQuestion(userId: string): Promise<boolean>;
+  /**
+   * 指定ユーザーが問いを 1 件でも持つか（ヘルプの三歩 ①「問いを立てる」の判定）。
+   * アーカイブ済みも数える — 立てたという事実は変わらない。
+   */
+  hasQuestion(userId: string): Promise<boolean>;
 }

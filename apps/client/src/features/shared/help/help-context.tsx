@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import {
   createContext,
   useCallback,
@@ -11,9 +12,10 @@ import {
 } from 'react';
 import { SIDE_PANEL_WIDTH } from '@/components/ui/surface';
 import type { ApiClient } from '@/lib/api';
-import { useHelpFirstVisit } from './hooks/use-help-first-visit';
+import { useHelpProgress } from './hooks/use-help-progress';
 import { HELP_PANEL_ATTR, type HoverTarget, hoverTargetOf, isTypingTarget } from './hover';
-import type { HelpTopicId } from './types';
+import { currentHelpStep } from './tutorial';
+import type { HelpTopicId, HelpTutorial } from './types';
 
 /** ヘルプモードが有効か（アカウントの設定）。無ければ有効。 */
 const ENABLED_KEY = 'oryzae-help-mode';
@@ -33,6 +35,12 @@ export const HELP_WIDTH = { min: 280, max: 560, default: SIDE_PANEL_WIDTH } as c
  * 説明が消えては読めない。
  */
 const HOVER_CLEAR_MS = 160;
+/** 触れてからこれだけ止まったら映す。通り過ぎただけの物では 1 枚を変えない。 */
+const HOVER_DWELL_MS = 450;
+
+function sameTarget(a: HoverTarget, b: HoverTarget): boolean {
+  return a.topic === b.topic && a.label === b.label;
+}
 
 /** 初めての人が面を閉じたあと、「?」が居場所を教えている時間。 */
 const CUE_MS = 5000;
@@ -63,6 +71,11 @@ export interface HelpModeValue {
    * この間、面は三歩だけを明るくし、他を薄くする。
    */
   welcome: boolean;
+  /**
+   * 三歩の案内。`step` はいまの歩（全部済めば null）。開いている間は html に
+   * `data-tutorial-step` が付き、画面の中の相手（`data-tutorial`）が同じ脈で灯る。
+   */
+  tutorial: HelpTutorial;
   /** 面の幅（px）。 */
   width: number;
   /** いま触れているもの。PC のポインタか、書斎の 3D の的から届く。 */
@@ -93,6 +106,7 @@ const DEFAULT: HelpModeValue = {
   firstVisit: false,
   cue: false,
   welcome: false,
+  tutorial: { step: null, done: null },
   width: HELP_WIDTH.default,
   hoverTarget: null,
   focused: null,
@@ -169,7 +183,8 @@ export function HelpProvider({
   const clearTimer = useRef<number | null>(null);
   const cueTimer = useRef<number | null>(null);
 
-  const { firstVisit: isFirst, markSeen } = useHelpFirstVisit(api);
+  const { firstVisit: isFirst, progress, markSeen } = useHelpProgress(api);
+  const pathname = usePathname();
 
   // 憶えていたものを、マウント後に読む（SSR と最初の描画は既定で揃える）。
   useEffect(() => {
@@ -266,54 +281,125 @@ export function HelpProvider({
     writeStored(WIDTH_KEY, String(clamped));
   }, []);
 
+  // 触れているものは、**少し止まってから**映す。通り過ぎた物では変えない — ポインタが物を
+  // またぐたびに 1 枚が入れ替わると、何もしていないのに勝手に変わって見えて、注意を奪う。
+  // 一度映したら次に止まるまでそのまま（隙間に出ても消さない）。消えるのは、面の中に
+  // 入ったとき・画面を移ったとき・閉じたとき。
+  const hoverRef = useRef<HoverTarget | null>(null);
+  useEffect(() => {
+    hoverRef.current = hoverTarget;
+  }, [hoverTarget]);
+  const dwellTimer = useRef<number | null>(null);
+  const pending = useRef<HoverTarget | null>(null);
+  const cancelDwell = useCallback(() => {
+    if (dwellTimer.current !== null) {
+      window.clearTimeout(dwellTimer.current);
+      dwellTimer.current = null;
+    }
+    pending.current = null;
+  }, []);
+  const dwellOn = useCallback(
+    (target: HoverTarget) => {
+      const shown = hoverRef.current;
+      if (shown && sameTarget(shown, target)) {
+        cancelDwell();
+        return;
+      }
+      if (pending.current && sameTarget(pending.current, target)) return;
+      cancelDwell();
+      pending.current = target;
+      dwellTimer.current = window.setTimeout(() => {
+        dwellTimer.current = null;
+        pending.current = null;
+        setHoverTarget(target);
+      }, HOVER_DWELL_MS);
+    },
+    [cancelDwell],
+  );
+  const cancelClear = useCallback(() => {
+    if (clearTimer.current !== null) {
+      window.clearTimeout(clearTimer.current);
+      clearTimer.current = null;
+    }
+  }, []);
+
   // 閉じている間は憶えない。書斎の的は開閉に関わらず触れを伝えてくるが、閉じた面のために
   // Provider の値を作り直して全部の読み手を描き直す理由は無い。
   const openRef = useRef(open);
   useEffect(() => {
     openRef.current = open;
   }, [open]);
-  const setHovered = useCallback((topic: HelpTopicId | null) => {
-    if (!openRef.current) return;
-    if (clearTimer.current !== null) {
-      window.clearTimeout(clearTimer.current);
-      clearTimer.current = null;
-    }
-    setHoverTarget(topic === null ? null : { topic, label: null });
-  }, []);
+  const setHovered = useCallback(
+    (topic: HelpTopicId | null) => {
+      if (!openRef.current) return;
+      if (topic === null) {
+        cancelDwell();
+        return;
+      }
+      cancelClear();
+      dwellOn({ topic, label: null });
+    },
+    [cancelDwell, cancelClear, dwellOn],
+  );
 
   // 開いている間だけ、画面のどこに触れているかを読む。
   useEffect(() => {
     if (!open) return;
     function onPointerOver(event: PointerEvent) {
       const target = hoverTargetOf(event.target instanceof Element ? event.target : null);
-      if (clearTimer.current !== null) {
-        window.clearTimeout(clearTimer.current);
-        clearTimer.current = null;
-      }
       // 面の中に入ったら「何にも触れていない」扱い（少し待ってから）。面の隣の物
       // （瓶の画面の「問いの変遷」）を横切った直後に面へ入ると、その物の説明が
       // 面の中に居座っていた。生きている 1 枚はポインタの下を映す — 面の中は映さない。
-      if (target !== null && target !== 'inside-panel') {
-        setHoverTarget((prev) =>
-          prev && prev.topic === target.topic && prev.label === target.label ? prev : target,
-        );
+      if (target === 'inside-panel') {
+        cancelDwell();
+        cancelClear();
+        clearTimer.current = window.setTimeout(() => {
+          clearTimer.current = null;
+          setHoverTarget(null);
+        }, HOVER_CLEAR_MS);
         return;
       }
-      // 隙間に出ただけなら少し待つ。次の部品に入れば、この待ちは取り消される。
-      clearTimer.current = window.setTimeout(() => {
-        clearTimer.current = null;
-        setHoverTarget(null);
-      }, HOVER_CLEAR_MS);
+      cancelClear();
+      if (target === null) {
+        cancelDwell();
+        return;
+      }
+      dwellOn(target);
     }
     document.addEventListener('pointerover', onPointerOver, true);
     return () => {
       document.removeEventListener('pointerover', onPointerOver, true);
-      if (clearTimer.current !== null) {
-        window.clearTimeout(clearTimer.current);
-        clearTimer.current = null;
-      }
+      cancelDwell();
+      cancelClear();
     };
-  }, [open]);
+  }, [open, cancelDwell, cancelClear, dwellOn]);
+
+  // 画面を移ったら「触れていない」に戻る（前の画面で止まっていた物の説明を持ち越さない）。
+  const lastPathname = useRef(pathname);
+  useEffect(() => {
+    if (lastPathname.current === pathname) return;
+    lastPathname.current = pathname;
+    cancelDwell();
+    setHoverTarget(null);
+  }, [pathname, cancelDwell]);
+
+  // 三歩のいまの歩。開いている間だけ html に印を付け、画面の中の相手（`data-tutorial`）が
+  // 同じ脈で灯る。閉じているときや設定で切っているときは灯らない — 案内を追っていない人の
+  // 画面で、ボタンがいつまでも脈打つのは邪魔なだけ。
+  const tutorialStep = currentHelpStep(progress);
+  const tutorial = useMemo<HelpTutorial>(
+    () => ({ step: tutorialStep, done: progress }),
+    [tutorialStep, progress],
+  );
+  useEffect(() => {
+    const root = document.documentElement;
+    if (enabled && open && tutorialStep !== null) {
+      root.setAttribute('data-tutorial-step', tutorialStep);
+    } else {
+      root.removeAttribute('data-tutorial-step');
+    }
+    return () => root.removeAttribute('data-tutorial-step');
+  }, [enabled, open, tutorialStep]);
 
   // `?` で開閉、`Esc` で閉じる。設定で切っている人にはキーも効かない。
   // 日本語入力の変換中の `Esc`（変換の取り消し）は面の操作ではない。検索欄が文を消すために
@@ -345,6 +431,7 @@ export function HelpProvider({
       firstVisit,
       cue,
       welcome,
+      tutorial,
       width,
       hoverTarget,
       focused,
@@ -365,6 +452,7 @@ export function HelpProvider({
       firstVisit,
       cue,
       welcome,
+      tutorial,
       width,
       hoverTarget,
       focused,

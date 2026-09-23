@@ -6,7 +6,13 @@ import { useId, useState } from 'react';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { HELP_PANEL_ATTR } from '../hover';
 import { HELP_SECTIONS, HELP_TOPICS, helpTopic } from '../topics';
-import type { HelpMatch, HelpRemoteState, HelpTopicId, HelpTopicText } from '../types';
+import type {
+  HelpMatch,
+  HelpRemoteState,
+  HelpTopicId,
+  HelpTopicText,
+  HelpTutorial,
+} from '../types';
 import { HelpFirstSteps } from './help-first-steps';
 import { HelpLiveCard } from './help-live-card';
 import { HelpTopicCard } from './help-topic-card';
@@ -35,7 +41,14 @@ export interface HelpPanelProps {
    * 面以外が沈んでいる画面で、面の中でも見る場所を 1 つにする。晴れると元に戻る。
    */
   spotlight?: boolean;
+  /**
+   * 三歩の案内。いまの歩がある間（`step` が null でない）は、面は三歩を頭に置いて検索欄を
+   * 出さない — 始めたばかりの人は検索より、次に何をするかが要る。
+   */
+  tutorial?: HelpTutorial;
 }
+
+const NO_TUTORIAL: HelpTutorial = { step: null, done: null };
 
 /**
  * ヘルプの面の中身（`docs/help-mode-guide.md`）。PC の右の面と SP のシートが共有する。
@@ -67,6 +80,7 @@ export function HelpPanel({
   onClose,
   onOpenHref,
   spotlight = false,
+  tutorial = NO_TUTORIAL,
 }: HelpPanelProps) {
   const t = useTranslations('help');
   // 検索の 1 件目は開いておくが、押せば閉じられる。文が変われば開き直す。
@@ -86,6 +100,26 @@ export function HelpPanel({
   const spot = hovered ?? screenTopic;
   const spotText = textOf.get(spot);
   const dimClass = `transition-opacity duration-500 ${spotlight ? 'opacity-30' : 'opacity-100'}`;
+  // 案内の最中: 三歩が頭、検索欄は出さない。済んだら（か、進み具合が分からなければ）いつもの形。
+  const guiding = tutorial.step !== null;
+
+  // 「ようこそ」の間だけ、三歩以外が薄い（晴れると 500ms で戻る）。
+  const liveCard = (
+    <div className={`${dimClass} ${guiding ? 'mt-3' : ''}`}>
+      {spotText && (
+        <HelpLiveCard topic={helpTopic(spot)} text={spotText} following={hovered !== null} />
+      )}
+    </div>
+  );
+  // 三歩の箱。灯ったとき地に余白があるよう、左右は面の余白へ 8px はみ出し、上下に余白を持つ
+  // （番号の丸と見出しが箱の縁から 18px / 12px）。行の左端は一覧と揃う。
+  const stepsBox = (
+    <div
+      className={`-mx-2 rounded-[12px] px-2 pt-3 pb-1 transition-colors duration-500 ${guiding ? 'mt-0' : 'mt-3'} ${spotlight ? 'help-spot' : ''}`}
+    >
+      <HelpFirstSteps onOpenHref={onOpenHref} progress={tutorial.done} current={tutorial.step} />
+    </div>
+  );
 
   return (
     <div
@@ -99,57 +133,61 @@ export function HelpPanel({
         resultCount: searching ? shown.length : -1,
         remote,
         spotlight,
+        guiding,
+        step: tutorial.step ?? 'none',
       })}
       className="flex h-full min-h-0 flex-col"
       style={CONTROL_FONT}
     >
-      {/* 検索欄と、閉じる。1 行に収める。 */}
-      <div className="flex shrink-0 items-center gap-2 px-4">
-        <label
-          htmlFor={searchId}
-          className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3"
-          style={{ background: 'var(--bg)', borderColor: 'var(--surface-sunken-border)' }}
-        >
-          <svg
-            aria-hidden="true"
-            className="h-4 w-4 shrink-0 text-[var(--date-color)]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={ICON_STROKE_WIDTH}
-            viewBox="0 0 24 24"
+      {/* 検索欄と、閉じる。1 行に収める。案内の最中は閉じるだけ。 */}
+      <div className={`flex shrink-0 items-center gap-2 px-4 ${guiding ? 'justify-end' : ''}`}>
+        {!guiding && (
+          <label
+            htmlFor={searchId}
+            className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3"
+            style={{ background: 'var(--bg)', borderColor: 'var(--surface-sunken-border)' }}
           >
-            <circle cx="11" cy="11" r="7" />
-            <path strokeLinecap="round" d="m20 20-3.5-3.5" />
-          </svg>
-          <input
-            id={searchId}
-            type="search"
-            value={query}
-            onChange={(event) => changeQuery(event.target.value)}
-            maxLength={200}
-            // 書いている最中の `Esc` は文を消すだけ。面を閉じるのは、空の欄でもう一度。
-            // （preventDefault で、面を閉じる側の keydown に「済み」と伝える）
-            onKeyDown={(event) => {
-              if (event.key !== 'Escape' || event.nativeEvent.isComposing || !searching) return;
-              event.preventDefault();
-              changeQuery('');
-            }}
-            placeholder={t('search_placeholder')}
-            autoComplete="off"
-            // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ。
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] [&::-webkit-search-cancel-button]:appearance-none"
-          />
-          {searching && (
-            <button
-              type="button"
-              onClick={() => changeQuery('')}
-              aria-label={t('search_clear')}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--date-color)] hover:text-[var(--fg)]"
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0 text-[var(--date-color)]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={ICON_STROKE_WIDTH}
+              viewBox="0 0 24 24"
             >
-              <CloseIcon className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </label>
+              <circle cx="11" cy="11" r="7" />
+              <path strokeLinecap="round" d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              id={searchId}
+              type="search"
+              value={query}
+              onChange={(event) => changeQuery(event.target.value)}
+              maxLength={200}
+              // 書いている最中の `Esc` は文を消すだけ。面を閉じるのは、空の欄でもう一度。
+              // （preventDefault で、面を閉じる側の keydown に「済み」と伝える）
+              onKeyDown={(event) => {
+                if (event.key !== 'Escape' || event.nativeEvent.isComposing || !searching) return;
+                event.preventDefault();
+                changeQuery('');
+              }}
+              placeholder={t('search_placeholder')}
+              autoComplete="off"
+              // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ。
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {searching && (
+              <button
+                type="button"
+                onClick={() => changeQuery('')}
+                aria-label={t('search_clear')}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--date-color)] hover:text-[var(--fg)]"
+              >
+                <CloseIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </label>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -204,23 +242,18 @@ export function HelpPanel({
           </div>
         ) : (
           <>
-            {/* 「ようこそ」の間だけ、三歩以外が薄い（晴れると 500ms で戻る）。 */}
-            <div className={dimClass}>
-              {spotText && (
-                <HelpLiveCard
-                  topic={helpTopic(spot)}
-                  text={spotText}
-                  following={hovered !== null}
-                />
-              )}
-            </div>
-            {/* 三歩の箱。灯ったとき地に余白があるよう、左右は面の余白へ 8px はみ出し、上下に
-                余白を持つ（番号の丸と見出しが箱の縁から 18px / 12px）。行の左端は一覧と揃う。 */}
-            <div
-              className={`-mx-2 mt-3 rounded-[12px] px-2 pt-3 pb-1 transition-colors duration-500 ${spotlight ? 'help-spot' : ''}`}
-            >
-              <HelpFirstSteps onOpenHref={onOpenHref} />
-            </div>
+            {/* 案内の最中は三歩が頭（次に何をするかが先）。済んだら 1 枚が頭。 */}
+            {guiding ? (
+              <>
+                {stepsBox}
+                {liveCard}
+              </>
+            ) : (
+              <>
+                {liveCard}
+                {stepsBox}
+              </>
+            )}
             {/* 一覧。節の見出しは無く、束の間は細い線 1 本。行の余白はどの行も同じ
                 （束の頭の行だけ上が広い、といった不揃いを作らない）。「はじめに」は上の三歩が担う。 */}
             <div className={`mt-3 flex flex-col ${dimClass}`}>

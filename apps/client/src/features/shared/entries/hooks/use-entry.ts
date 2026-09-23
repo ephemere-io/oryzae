@@ -3,6 +3,7 @@
 import { type EditorEffectsState, editorEffectsStateSchema } from '@oryzae/shared';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
+import { notifyActivity } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 import { isObject, readJson, readStringField } from '@/lib/json';
 
@@ -126,6 +127,10 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
       }
       const body = JSON.stringify(payload);
 
+      // 漬け込みが通ったら合図を出す（ヘルプの三歩 ③ が進む）。PC の palette も SP の
+      // ボタンもこの save を通るので、出す場所はここ 1 つでよい。
+      const pickled = options?.fermentationEnabled === true;
+
       if (entryId) {
         const res = await api.fetch(`/api/v1/entries/${entryId}`, { method: 'PUT', body });
         if (!res.ok) {
@@ -133,6 +138,7 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
           setSaving(false);
           return null;
         }
+        if (pickled) notifyActivity('pickle');
         setSaving(false);
         return entryId;
       }
@@ -143,6 +149,7 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
         setSaving(false);
         return null;
       }
+      if (pickled) notifyActivity('pickle');
 
       // 作成は成功しているのに id が読めないと、呼び出し側は失敗と区別がつかない。
       // autosave (use-autosave-entry) は id を受け取れないと entryId を記録できず、

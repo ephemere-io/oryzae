@@ -1120,6 +1120,8 @@ export function EntryEditor({
     {
       id: 'pickle',
       label: t('toolbar.pickle'),
+      // 三歩の ③「瓶に漬けて待つ」の的。
+      tutorial: 'pickle',
       disabledReason: !content.trim() ? t('palette.pickle_needs_body') : undefined,
       icon: paletteIcon(
         <>

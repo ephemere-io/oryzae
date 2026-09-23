@@ -14,6 +14,11 @@ interface UserMeData {
   hasPickled: boolean;
   /** 一度でもエントリに問いを紐付けたことがあるか (Issue #316 ガイド表示判定用) */
   hasLinkedQuestion: boolean;
+  /**
+   * 問いを 1 件でも立てたことがあるか（アーカイブ済み含む）。
+   * ヘルプの三歩 ①「問いを立てる」が済んだかの旗（② は hasLinkedQuestion、③ は hasPickled）。
+   */
+  hasQuestion: boolean;
 }
 
 /**
@@ -31,6 +36,7 @@ function normalizeUserMe(input: unknown): UserMeData | null {
     onboardingCompleted: readBooleanField(input, 'onboardingCompleted', false),
     hasPickled: readBooleanField(input, 'hasPickled', false),
     hasLinkedQuestion: readBooleanField(input, 'hasLinkedQuestion', false),
+    hasQuestion: readBooleanField(input, 'hasQuestion', false),
   };
 }
 

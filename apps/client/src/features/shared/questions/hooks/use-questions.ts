@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { normalizeQuestions } from '@/features/shared/questions/normalize';
 import type { QuestionItem } from '@/features/shared/questions/types';
+import { notifyActivity } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 
 export function useQuestions(api: ApiClient | null) {
@@ -41,10 +42,12 @@ export function useQuestions(api: ApiClient | null) {
   const createQuestion = useCallback(
     async (text: string) => {
       if (!api || !text.trim()) return;
-      await api.fetch('/api/v1/questions', {
+      const res = await api.fetch('/api/v1/questions', {
         method: 'POST',
         body: JSON.stringify({ string: text }),
       });
+      // 立てられたら合図を出す（ヘルプの三歩 ① が進む）。一覧の取り直しより先でよい。
+      if (res.ok) notifyActivity('question');
       await fetchQuestions();
     },
     [api, fetchQuestions],

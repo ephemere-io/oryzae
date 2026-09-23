@@ -48,6 +48,20 @@ const JAR_WORLD_BOUNDS: Bounds = {
   height: JAR_WORLD_HEIGHT,
 };
 
+/**
+ * 三歩の ①（まだ問いが無い）のときの初回の寄せ先。世界の中央 62%。
+ *
+ * 空の瓶を世界全体で開くと、瓶が画面の真ん中に小さく浮くだけで「ここに問いを入れる」
+ * という向きが伝わらない。初回だけこの矩形に寄せて、瓶を大きく見せる。
+ * 保存された視点があればそちらが勝つ（`useCanvasViewport` の `defaultFitBounds` の規則）。
+ */
+const JAR_EMPTY_FOCUS_BOUNDS: Bounds = {
+  x: JAR_WORLD_WIDTH * 0.19,
+  y: JAR_WORLD_HEIGHT * 0.19,
+  width: JAR_WORLD_WIDTH * 0.62,
+  height: JAR_WORLD_HEIGHT * 0.62,
+};
+
 /** 円へズームする矩形の計算に使う。実体は QuestionCircle 側の定数（二重管理しない）。 */
 const CIRCLE_SIZE = QUESTION_CIRCLE_SIZE;
 
@@ -116,6 +130,11 @@ interface JarViewProps {
   onAddQuestion?: (text: string) => Promise<void>;
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
+  /**
+   * 三歩の ①（問いを立てる）のとき、空の瓶を大きく見せる。
+   * 初回の寄せ先を `JAR_EMPTY_FOCUS_BOUNDS` に変えるだけで、保存された視点は壊さない。
+   */
+  emphasizeEmpty?: boolean;
 }
 
 /**
@@ -300,6 +319,7 @@ export function JarView({
   onAddQuestion,
   onEditQuestion,
   onArchiveQuestion,
+  emphasizeEmpty = false,
 }: JarViewProps) {
   const t = useTranslations('fermentation');
   /**
@@ -361,9 +381,11 @@ export function JarView({
 
   // 初回（保存された視点が無いとき）は世界全体が収まる倍率で開く。
   // 一度でも動かせば保存値が優先されるので、続きから開いた人の視点は壊さない。
+  // 三歩の ① のときだけ、空の瓶が大きく映る中央の矩形に寄せる（frame が付いた
+  // ときに一度読むだけなので、その後にこの値が変わっても視点は動かない）。
   const canvas = useCanvasViewport({
     storageKey: 'jar',
-    defaultFitBounds: JAR_WORLD_BOUNDS,
+    defaultFitBounds: emphasizeEmpty ? JAR_EMPTY_FOCUS_BOUNDS : JAR_WORLD_BOUNDS,
     // 瓶は世界の大きさが決まっているので「全体表示」は常に世界そのもの。
     getContentBounds: () => circleBoundsRef.current.all,
     getSelectionBounds: () => circleBoundsRef.current.focused,
@@ -657,6 +679,7 @@ export function JarView({
         editOpen: editingQuestion !== null,
         addOpen: showAddModal,
         addAvailable,
+        emphasizeEmpty,
         percent: Math.round(canvas.viewport.scale * 100),
       })}
       // ヘルプの面に「瓶」を出す。中の問いチップは利用者の文なので、名前では当てない。
@@ -1040,6 +1063,8 @@ export function JarView({
             {addAvailable && (
               <button
                 type="button"
+                // 三歩の ①「問いを立てる」の的。ヘルプの手順がここを照らす。
+                data-tutorial="question"
                 onClick={() => {
                   setShowAddModal(true);
                   setTimeout(() => addInputRef.current?.focus(), 100);

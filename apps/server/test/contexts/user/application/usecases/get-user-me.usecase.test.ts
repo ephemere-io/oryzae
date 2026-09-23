@@ -28,11 +28,12 @@ describe('GetUserMeUsecase', () => {
     statsRepo = {
       hasPickled: vi.fn().mockResolvedValue(false),
       hasLinkedQuestion: vi.fn().mockResolvedValue(false),
+      hasQuestion: vi.fn().mockResolvedValue(false),
     };
     usecase = new GetUserMeUsecase(profileRepo, statsRepo);
   });
 
-  it('プロフィールと集計フラグ (false/false) を返す', async () => {
+  it('プロフィールと集計フラグ (false/false/false) を返す', async () => {
     vi.mocked(profileRepo.findById).mockResolvedValue(baseProfile);
 
     const view = await usecase.execute('user-1');
@@ -44,9 +45,11 @@ describe('GetUserMeUsecase', () => {
       onboardingCompleted: true,
       hasPickled: false,
       hasLinkedQuestion: false,
+      hasQuestion: false,
     });
     expect(statsRepo.hasPickled).toHaveBeenCalledWith('user-1');
     expect(statsRepo.hasLinkedQuestion).toHaveBeenCalledWith('user-1');
+    expect(statsRepo.hasQuestion).toHaveBeenCalledWith('user-1');
   });
 
   it('一度でも漬け込んでいれば hasPickled=true', async () => {
@@ -69,9 +72,22 @@ describe('GetUserMeUsecase', () => {
     expect(view.hasLinkedQuestion).toBe(true);
   });
 
+  it('問いを 1 件でも立てていれば hasQuestion=true（三歩の ①）', async () => {
+    vi.mocked(profileRepo.findById).mockResolvedValue(baseProfile);
+    vi.mocked(statsRepo.hasQuestion).mockResolvedValue(true);
+
+    const view = await usecase.execute('user-1');
+
+    expect(view.hasQuestion).toBe(true);
+    // ① だけ済んで ②③ はまだ、という組み合わせがそのまま返る
+    expect(view.hasLinkedQuestion).toBe(false);
+    expect(view.hasPickled).toBe(false);
+  });
+
   it('プロフィールが無ければ UserProfileNotFoundError を throw する', async () => {
     await expect(usecase.execute('missing-user')).rejects.toThrow(UserProfileNotFoundError);
     expect(statsRepo.hasPickled).not.toHaveBeenCalled();
     expect(statsRepo.hasLinkedQuestion).not.toHaveBeenCalled();
+    expect(statsRepo.hasQuestion).not.toHaveBeenCalled();
   });
 });
