@@ -5,6 +5,14 @@ import { placeInSlot } from '@/lib/sp-chrome-context';
 import { canDragSheet, contentScrolls, TAP_SLOP_PX } from './sheet-gesture';
 
 /**
+ * 払いと見なす指の速さ（px/ms）。これを超えたら 1 段動かす。超えなければいちばん近い段に置く。
+ *
+ * 離した瞬間に段を決めるのは、ブラウザの慣性を待つと「動いているスクローラ」が次の指を取ってしまうため
+ * （WebKit）。決めるのは 1 回だけで、動きそのものは CSS の曲線に任せる。
+ */
+const FLICK_PX_PER_MS = 0.35;
+
+/**
  * シートの段。
  * - `peek`: 見出しの行だけが見える（見出しの行の下端が容器の下端）
  * - `half`: シートの上端が容器の半分
@@ -324,6 +332,10 @@ export function Sheet({
     const hasScrollEnd = 'onscrollend' in window;
     let frame = 0;
     let lastTop = Number.NaN;
+    /** いまの指の持ち主と、その指が始まった段。離した瞬間の決着に使う。 */
+    let gestureOwner: 'sheet' | 'content' | null = null;
+    let startDetent: SheetDetent | null = null;
+    const samples: { y: number; t: number }[] = [];
     // 出し直すたびに「いちばん高い段に居る」を忘れる（中身の箱の既定は `overflow-y: hidden`）。
     atHighestRef.current = false;
 
@@ -446,6 +458,14 @@ export function Sheet({
         scroller.scrollTop = goal;
         syncContentScroll();
       }
+      // 絵の遅れ（離した瞬間に付けた `translate`）が残っていたら、触れた時点で消す。位置はもう
+      // 終わっているので、消せば見た目が本当の位置に揃う（＝触れたら決着する）。
+      if (scroller.style.translate) {
+        scroller.style.transition = 'none';
+        scroller.style.removeProperty('translate');
+        void scroller.offsetHeight;
+        scroller.style.removeProperty('transition');
+      }
       const inner = innerRef.current;
       const target = event.target;
       const onContent =
@@ -454,10 +474,77 @@ export function Sheet({
       const scrollTop = !inner || inner.scrollTop < 1 ? 0 : inner.scrollTop;
       const mayDrag = canDragSheet({ atHighest: atHighestRef.current, onContent, scrollTop });
       scroller.style.overflowY = mayDrag ? 'auto' : 'hidden';
+      gestureOwner = mayDrag ? 'sheet' : 'content';
+      startDetent = settledRef.current;
+      samples.length = 0;
+      if (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent) trackTouch(event);
     };
-    /** 指が離れたら外側を戻す（次の指はまた触れた瞬間に決まる。頼まれた段へ送るのは常に動く）。 */
+
+    /** 指の位置を控える（速さは最後の 2 点から出す）。 */
+    const trackTouch = (event: TouchEvent) => {
+      const touch = event.touches[0] ?? event.changedTouches[0];
+      if (!touch) return;
+      samples.push({ y: touch.clientY, t: event.timeStamp });
+      if (samples.length > 4) samples.shift();
+    };
+    /** 指の速さ（px/ms、下向きが正）。 */
+    const flickSpeed = () => {
+      const last = samples.at(-1);
+      const previous = samples.at(-2);
+      if (!last || !previous) return 0;
+      const dt = last.t - previous.t;
+      return dt <= 0 ? 0 : (last.y - previous.y) / dt;
+    };
+
+    /**
+     * **指が離れた瞬間に段を決めて、位置はその場で置く。**
+     *
+     * ブラウザの慣性と吸着に任せると、着くまでの 300〜500ms は「いま動いているスクローラ」が残り、
+     * WebKit ではその間に触れた指を外側が取ってしまう（実機: 全画面に着いた直後にもう一度払っても
+     * 内側が送れない）。待ち時間で誤魔化すのではなく、**離した瞬間に位置を終わらせる**。
+     * 慣性そのものが無くなるので、次の指は必ず自由。
+     *
+     * 見た目は殻ごとの `translate` を遅れの分だけ付けて、CSS の 300ms の曲線（`.oz-sheet-scroller`）で
+     * 追いつかせる。**位置はもう終わっていて、動いて見えるのは絵だけ**なので、途中で触れても取り合いにならない。
+     */
+    const settleOnRelease = () => {
+      if (gestureOwner !== 'sheet') return;
+      const detents = latest.current.detents;
+      const top = scroller.scrollTop;
+      const speed = flickSpeed();
+      const fromIndex = startDetent ? detents.indexOf(startDetent) : -1;
+      let next: SheetDetent | null = null;
+      if (Math.abs(speed) >= FLICK_PX_PER_MS && fromIndex >= 0) {
+        // 払い。1 回で 1 段だけ動く（指が上なら高い段へ。`speed` は下向きが正）。
+        const step = speed < 0 ? 1 : -1;
+        next = detents[Math.min(detents.length - 1, Math.max(0, fromIndex + step))] ?? null;
+      } else {
+        let best = Number.POSITIVE_INFINITY;
+        for (const candidate of detents) {
+          const distance = Math.abs(targetOf(candidate) - top);
+          if (distance < best) {
+            best = distance;
+            next = candidate;
+          }
+        }
+      }
+      if (!next) return;
+      const goal = targetOf(next);
+      const delay = goal - top;
+      if (Math.abs(delay) < 1) return;
+      scroller.scrollTop = goal;
+      syncContentScroll();
+      scroller.style.transition = 'none';
+      scroller.style.translate = `0 ${delay}px`;
+      void scroller.offsetHeight;
+      scroller.style.removeProperty('transition');
+      scroller.style.translate = '0 0';
+    };
+    /** 指が離れたら、段を決着させて外側を戻す。 */
     const releaseGesture = () => {
+      settleOnRelease();
       scroller.style.removeProperty('overflow-y');
+      gestureOwner = null;
     };
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
@@ -465,6 +552,7 @@ export function Sheet({
     // 捕捉段階で受ける（中身の箱より先に決める）。iOS は touch、それ以外は pointer で届く。
     scroller.addEventListener('touchstart', takeGesture, { passive: true, capture: true });
     scroller.addEventListener('pointerdown', takeGesture, { capture: true });
+    scroller.addEventListener('touchmove', trackTouch, { passive: true, capture: true });
     scroller.addEventListener('touchend', releaseGesture, { passive: true });
     scroller.addEventListener('touchcancel', releaseGesture, { passive: true });
     scroller.addEventListener('pointerup', releaseGesture);
@@ -493,11 +581,14 @@ export function Sheet({
       if (hasScrollEnd) scroller.removeEventListener('scrollend', settle);
       scroller.removeEventListener('touchstart', takeGesture, { capture: true });
       scroller.removeEventListener('pointerdown', takeGesture, { capture: true });
+      scroller.removeEventListener('touchmove', trackTouch, { capture: true });
       scroller.removeEventListener('touchend', releaseGesture);
       scroller.removeEventListener('touchcancel', releaseGesture);
       scroller.removeEventListener('pointerup', releaseGesture);
       scroller.removeEventListener('pointercancel', releaseGesture);
       scroller.style.removeProperty('overflow-y');
+      scroller.style.removeProperty('translate');
+      scroller.style.removeProperty('transition');
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
