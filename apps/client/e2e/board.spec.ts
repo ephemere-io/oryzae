@@ -227,6 +227,30 @@ test.describe('ボードの複数選択', () => {
     }, ids);
   }
 
+  /**
+   * そのカードが実際に手前に出ている点（他のカードに覆われていない所）。
+   *
+   * 外接矩形の中心を押すと、**上に乗った別のカードに当たる**。新しいカードは
+   * どれも「画面の中央」に生まれるので、作りたてほど重なる。
+   */
+  async function visiblePoint(page: import('@playwright/test').Page, text: string) {
+    return page.evaluate((wanted) => {
+      const card = [...document.querySelectorAll('[data-card-id]')].find((el) =>
+        (el.textContent ?? '').includes(wanted),
+      );
+      if (!card) return null;
+      const rect = card.getBoundingClientRect();
+      for (let y = rect.top + 6; y < rect.bottom - 6; y += 6) {
+        for (let x = rect.left + 6; x < rect.right - 6; x += 6) {
+          if (document.elementFromPoint(x, y)?.closest('[data-card-id]') === card) {
+            return { x: Math.round(x), y: Math.round(y) };
+          }
+        }
+      }
+      return null;
+    }, text);
+  }
+
   test('Shift で 2 枚選び、まとめて動かせる（開くは出ない）', async ({ page }) => {
     const first = `E2E群1-${Date.now()}`;
     const second = `E2E群2-${Date.now()}`;
@@ -236,8 +260,30 @@ test.describe('ボードの複数選択', () => {
     const cardOne = page.locator('[data-card-id]').filter({ hasText: first });
     const cardTwo = page.locator('[data-card-id]').filter({ hasText: second });
 
-    await cardOne.click({ force: true });
-    await cardTwo.click({ force: true, modifiers: ['Shift'] });
+    // 2 枚とも画面の中央に生まれてほぼ重なるので、まず 2 枚目をずらす。
+    // 重なったままだと、1 枚目を押したつもりで上に乗った 2 枚目に当たり、
+    // 続く Shift クリックが**それを選択から外して**しまう（選択が空になる）。
+    const upper = await cardTwo.boundingBox();
+    expect(upper).not.toBeNull();
+    if (!upper) return;
+    await page.mouse.move(upper.x + upper.width / 2, upper.y + upper.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(upper.x + upper.width / 2 + 300, upper.y + upper.height / 2, {
+      steps: 10,
+    });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+
+    const pointOne = await visiblePoint(page, first);
+    const pointTwo = await visiblePoint(page, second);
+    expect(pointOne, '1 枚目の見えている所が無い').not.toBeNull();
+    expect(pointTwo, '2 枚目の見えている所が無い').not.toBeNull();
+    if (!pointOne || !pointTwo) return;
+
+    await page.mouse.click(pointOne.x, pointOne.y);
+    await page.keyboard.down('Shift');
+    await page.mouse.click(pointTwo.x, pointTwo.y);
+    await page.keyboard.up('Shift');
 
     // 群の枠が出て、枚数が 2
     const frame = page.locator('[data-verify-unit="SelectionFrame"]');
