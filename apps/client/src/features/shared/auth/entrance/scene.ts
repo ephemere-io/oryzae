@@ -153,6 +153,60 @@ const STUDY_RELATIVE = {
   books: { x: 7.2, z: 1, width: 2.6, depth: 3.4, rotationY: -0.15, thicknesses: [0.4, 0.34, 0.3] },
 } as const;
 
+/**
+ * 扉まわりの材。**近づくにつれて薄くできる。**
+ *
+ * 渡す瞬間に扉の枠が画面に残っていると、そこが消えることが「画面の切り替わり」として
+ * 読める（PR #624 の実機レビュー「一回切り替わるのを無くすには」）。歩いて近づくほど枠を
+ * 薄くしていけば、渡すときに画面にあるのは**扉の向こうの書斎だけ**になり、書斎の canvas と
+ * 見比べても差がほとんど残らない。
+ *
+ * 枠が画面の外へ出るまで歩く手もあるが、そこまで進むには 1.7〜2.7 秒かかり（いまは 1.12 秒）、
+ * 待たされる方が悪くなる。消すのは距離ではなく濃さで行う。
+ */
+interface RoomMaterials extends StudyMaterials {
+  /** 1 で元の濃さ、0 で見えなくなる。 */
+  fade(ratio: number): void;
+  /** clone したぶんだけ捨てる（元の材は共有なので触らない）。 */
+  disposeOwn(): void;
+}
+
+/** どこまで近づいたら消し切るか（0..1、歩き出しからの詰まり具合）。 */
+const ROOM_FADE = { from: 0.25, to: 0.72 } as const;
+
+function createRoomMaterials(base: StudyMaterials): RoomMaterials {
+  const owned: { material: Material & { opacity: number }; base: number }[] = [];
+  function track<T extends Material & { opacity: number; transparent: boolean }>(
+    material: T,
+    baseOpacity: number,
+  ): T {
+    material.transparent = true;
+    material.opacity = baseOpacity;
+    owned.push({ material, base: baseOpacity });
+    return material;
+  }
+  const faintCache = new Map<number, LineBasicMaterial>();
+  return {
+    ...base,
+    solid: track(base.solid.clone(), 1),
+    ink: track(base.ink.clone(), 1),
+    gridFaint: track(base.gridFaint.clone(), base.gridFaint.opacity),
+    faint(opacity: number): LineBasicMaterial {
+      const cached = faintCache.get(opacity);
+      if (cached) return cached;
+      const material = track(base.faint(opacity).clone(), opacity);
+      faintCache.set(opacity, material);
+      return material;
+    },
+    fade(ratio: number): void {
+      for (const entry of owned) entry.material.opacity = entry.base * ratio;
+    },
+    disposeOwn(): void {
+      for (const entry of owned) entry.material.dispose();
+    },
+  };
+}
+
 /** 扉の向こうの気配。濃さだけを外から動かせる。 */
 interface StudyGlimpse {
   group: Group;
@@ -190,14 +244,17 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     return geometry;
   }
 
-  scene.add(buildFloorGrid(materials, own));
-  scene.add(buildWall(materials, own));
-  scene.add(buildFrame(materials, own));
-  scene.add(buildDoormat(materials, own));
+  // 扉まわりは、近づくほど薄くできる材で組む（`RoomMaterials`）。書斎の気配は逆に濃くなるので、
+  // そちらは元の材のまま（`buildStudyGlimpse` が自前で clone して持つ）。
+  const room = createRoomMaterials(materials);
+  scene.add(buildFloorGrid(room, own));
+  scene.add(buildWall(room, own));
+  scene.add(buildFrame(room, own));
+  scene.add(buildDoormat(room, own));
   const glimpse = buildStudyGlimpse(materials, own, layout);
   scene.add(glimpse.group);
-  scene.add(buildCabinet(materials, own, layout, options.sprig));
-  const door = buildDoor(materials, own);
+  scene.add(buildCabinet(room, own, layout, options.sprig));
+  const door = buildDoor(room, own);
   scene.add(door);
 
   // ---- 状態 --------------------------------------------------------------
@@ -254,7 +311,12 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
       applyView(camera, entering.view);
       // 近づくにつれて、奥の書斎が見えてくる。どこまで来たかは残りの距離で測る。
       const remaining = distanceBetween(entering.view.position, GLIDE.target.position);
-      glimpse.reveal(1 - remaining / entering.startDistance);
+      const approached = 1 - remaining / entering.startDistance;
+      // 扉が消え切るころには、奥の書斎は**書斎と同じ濃さ**になっている。渡した先の canvas と
+      // 濃さが違うと、そこで絵が一段はっきりして切り替わりが読める。
+      glimpse.reveal(clamp01(approached / ROOM_FADE.to));
+      // 同時に、扉まわりは薄れていく。渡す瞬間、画面に残るのは扉の向こうの書斎だけになる。
+      room.fade(1 - clamp01((approached - ROOM_FADE.from) / (ROOM_FADE.to - ROOM_FADE.from)));
     } else {
       doorAngle = approach(doorAngle, doorTarget, DOOR_SETTLE_LERP);
       door.rotation.y = doorAngle;
@@ -401,6 +463,7 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
     resizeObserver.disconnect();
     for (const geometry of geometries) geometry.dispose();
     glimpse.dispose();
+    room.disposeOwn();
     materials.dispose();
     renderer.dispose();
     // dispose() だけでは WebGL のコンテキストが解放されない（書斎の scene.ts と同じ理由）。
