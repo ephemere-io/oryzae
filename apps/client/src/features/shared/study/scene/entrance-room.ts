@@ -37,8 +37,13 @@ const FRAME = { width: 0.2, depth: 0.34 } as const;
 /** 壁の広がり。どの構図でも画面の外まで続く幅と高さ。 */
 const WALL = { halfWidth: 18, height: 11 } as const;
 
-/** 床の格子。書斎と同じ 1 unit 刻み。 */
-const FLOOR_GRID = { halfWidth: 14, near: 12, far: -16 } as const;
+/**
+ * 床の格子。書斎と同じ 1 unit 刻み。**壁（z = 0）で終える。**
+ *
+ * 奥へ延ばさない。扉の向こうは書斎で、そこには書斎自身の床がある — 重ねると同じ高さの面が
+ * 2 枚になり、書斎に着いたあと画面の下に線の帯が残る（実機で確認）。
+ */
+const FLOOR_GRID = { halfWidth: 14, near: 12, far: 0 } as const;
 
 /** 扉のある前室。`door` は扉板（`rotation.y` で開く）。 */
 export interface EntranceRoom {
@@ -70,10 +75,25 @@ export function buildEntranceRoom(
   return { group, door };
 }
 
+/**
+ * 前室の面が書斎より後に描かれる順。
+ *
+ * 瓶の輪郭（`renderOrder` 5）と中の言葉は深度を見ないので、扉板や壁が前に来ても透けてしまう。
+ * それより後ろへ回して塗り潰す（`StudyMaterials.screen` の注釈）。
+ */
+const SCREEN_ORDER = 7;
+
+/** 遮る面。前室の面はすべてこれで作る（書斎の物が透けて出ないように）。 */
+function screenFace(geometry: BufferGeometry, materials: StudyMaterials, own: OwnGeometry): Mesh {
+  const mesh = new Mesh(own(geometry), materials.screen);
+  mesh.renderOrder = SCREEN_ORDER;
+  return mesh;
+}
+
 /** 面 + 稜線の 1 組（書斎の `lineArt` と同じ）。面が無いと後ろが透ける。 */
 function lineArt(geometry: BufferGeometry, materials: StudyMaterials, own: OwnGeometry): Group {
   const group = new Group();
-  group.add(new Mesh(own(geometry), materials.solid));
+  group.add(screenFace(geometry, materials, own));
   group.add(new LineSegments(own(new EdgesGeometry(geometry, 15)), materials.ink));
   return group;
 }
@@ -147,7 +167,7 @@ function buildWall(materials: StudyMaterials, own: OwnGeometry): Group {
   shape.lineTo(halfWidth, height);
   shape.lineTo(-halfWidth, height);
   shape.lineTo(-halfWidth, 0);
-  group.add(new Mesh(own(new ShapeGeometry(shape)), materials.solid));
+  group.add(screenFace(new ShapeGeometry(shape), materials, own));
 
   const outer = opening + FRAME.width;
   for (const [from, to] of [
@@ -385,7 +405,7 @@ function buildVase(
 ): Group {
   const group = new Group();
   const profile = VASE_PROFILE.map(([r, y]) => new Vector2(r, y));
-  group.add(new Mesh(own(new LatheGeometry(profile, 40)), materials.solid));
+  group.add(screenFace(new LatheGeometry(profile, 40), materials, own));
 
   // カメラへ向かう方位。輪郭の母線はそこから ±90°。
   const toCamera = Math.atan2(viewFrom.x - world.x, viewFrom.z - world.z);
