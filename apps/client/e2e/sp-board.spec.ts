@@ -12,10 +12,16 @@ import { expect, test } from './fixtures/auth';
 type Page = import('@playwright/test').Page;
 type TouchPoint = { x: number; y: number; id: number };
 
-/** world ノードの transform（倍率と位置）。盤面が動いたかはここで見る。 */
+/**
+ * world ノードの transform（倍率と位置）。盤面が動いたかはここで見る。
+ *
+ * **`firstElementChild` で掴んではいけない。** 盤面の中では背景（方眼紙）が先に
+ * 描かれるので、最初の子は動かない要素になる。以前そう書いていて、パン・ピンチ・
+ * FIT の検査が 3 本とも「変わっていない」で落ちた（アプリは正しく動いていた）。
+ */
 async function worldTransform(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const world = document.querySelector('[role="application"]')?.firstElementChild;
+    const world = document.querySelector('[data-canvas-world]');
     return world instanceof HTMLElement ? world.style.transform : '';
   });
 }
