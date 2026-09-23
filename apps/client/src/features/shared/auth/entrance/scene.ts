@@ -23,7 +23,9 @@ import {
   LineSegments,
   type Material,
   Mesh,
+  type MeshBasicMaterial,
   PerspectiveCamera,
+  PlaneGeometry,
   Scene,
   Shape,
   ShapeGeometry,
@@ -649,10 +651,23 @@ function buildStudyGlimpse(
   layout: EntranceLayout,
 ): StudyGlimpse {
   const group = new Group();
-  const shades: { material: LineBasicMaterial; base: number }[] = [];
+  const shades: { material: Material & { opacity: number }; base: number }[] = [];
   /** 待っている間の濃さで 1 本。`reveal` でまとめて濃くするので、共有の材は使わない。 */
   function shade(opacity: number): LineBasicMaterial {
     const material = materials.faint(opacity).clone();
+    shades.push({ material, base: opacity });
+    return material;
+  }
+  /**
+   * 塗りも同じ濃さに落とす。
+   *
+   * 線だけを薄くして塗りをそのままにすると、**塗りのある物だけが浮く**（蓋のクリームが
+   * 気配の中に 1 つだけ実物の濃さで残っていた。実機レビュー「瓶が浮いてない？色合いとか」）。
+   */
+  function shadeFill(source: MeshBasicMaterial, opacity: number): MeshBasicMaterial {
+    const material = source.clone();
+    material.transparent = true;
+    material.opacity = opacity;
     shades.push({ material, base: opacity });
     return material;
   }
@@ -707,6 +722,25 @@ function buildStudyGlimpse(
       own,
     ),
   );
+  // 天板の面。**これが無いと瓶が宙に浮いて見える** — 乗っている面が線 4 本しか無く、
+  // 瓶の底に接する物が画面に出てこない（実機レビュー）。奥の板も面で隠れて、前後が読める。
+  const deskFace = new Mesh(
+    own(new PlaneGeometry(Math.abs(deskX1 - deskX0), Math.abs(deskNear - deskFar))),
+    materials.solid,
+  );
+  deskFace.rotation.x = -Math.PI / 2;
+  deskFace.position.set((deskX0 + deskX1) / 2, deskY - 0.002, (deskNear + deskFar) / 2);
+  group.add(deskFace);
+  // 天板の格子。書斎の机と同じ刻みを縮めて置く。面の広がりと、瓶の接地が読める。
+  const gridStep = 2 * scale;
+  for (let x = deskX0 + gridStep; x < deskX1; x += gridStep) {
+    group.add(
+      lineFrom([new Vector3(x, deskY, deskNear), new Vector3(x, deskY, deskFar)], faint, own),
+    );
+  }
+  for (let z = deskNear - gridStep; z > deskFar; z -= gridStep) {
+    group.add(lineFrom([new Vector3(deskX0, deskY, z), new Vector3(deskX1, deskY, z)], faint, own));
+  }
 
   // 瓶。**書斎で会う瓶と同じ描き方にする** — 面・稜線・経線・蓋（コルク）。
   //
@@ -721,6 +755,7 @@ function buildStudyGlimpse(
   // 面。紙と同じ色で塗って、奥の板や机を透かさない。
   const bodyGeometry = own(new LatheGeometry(profile, 48));
   jar.add(new Mesh(bodyGeometry, materials.solid));
+
   // 稜線。しきい値 45° で口縁と角だけが残る（胴に横線が出ない）。
   jar.add(new LineSegments(own(new EdgesGeometry(bodyGeometry, EDGES_THRESHOLD_DEG)), line));
   // 経線。書斎と同じ本数で、うんと薄く。
@@ -740,7 +775,7 @@ function buildStudyGlimpse(
   const corkGeometry = own(
     new CylinderGeometry(CORK.radiusTop, CORK.radiusBottom, CORK.height, 24),
   );
-  const cork = new Mesh(corkGeometry, materials.cork);
+  const cork = new Mesh(corkGeometry, shadeFill(materials.cork, 0.3));
   cork.position.y = CORK.y;
   jar.add(cork);
   jar.add(
