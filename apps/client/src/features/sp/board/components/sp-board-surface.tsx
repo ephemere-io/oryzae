@@ -3,13 +3,18 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
+import { CanvasGrid } from '@/components/ui/canvas-grid';
+import { CanvasMinimap } from '@/components/ui/canvas-minimap';
+import { CanvasViewport } from '@/components/ui/canvas-viewport';
+import { CanvasZoomControls } from '@/components/ui/canvas-zoom-controls';
+import { snippetFontSize } from '@/features/shared/board/card-text';
 import type { BoardCardData } from '@/features/shared/board/types';
-import { toTransform, type Viewport, worldToScreen } from '@/lib/canvas/viewport';
+import type { CanvasSurface } from '@/lib/canvas/use-canvas-viewport';
 
 /** つかんでいる間だけ最前面へ。 */
 const DRAGGING_Z = 1000;
 
-/** これ以上動いたら「動かした」。それ未満なら「選んだ」。 */
+/** これ以上動いたら「動かした」。それ未満なら「選んだ」（画面 px）。 */
 const TAP_SLOP = 6;
 
 /** 角のつまみの大きさ（画面上の px）。指で掴める最小限。 */
@@ -18,21 +23,27 @@ const HANDLE_SIZE = 28;
 /** カードをこれより小さくしない（掴めなくなる）。 */
 const MIN_CARD_SIZE = 60;
 
-/** 隅に小さく出す日付。`2026-09-04` → `09.04`。 */
-export function formatCornerDate(dateKey: string): string {
-  const [, month, day] = dateKey.split('-');
-  return month && day ? `${month}.${day}` : dateKey;
-}
+/**
+ * SP の本文の基準の大きさ。盤面を縮めて映すぶん、PC（14px）より大きく取る。
+ * カードの幅に追随する（`snippetFontSize`）。
+ */
+const SP_BASE_FONT_SIZE = 17;
 
 /**
- * 画面上の移動量を world の移動量に直す。
- *
- * 盤面は縮小して表示しているので、指の移動をそのまま world に足すと縮小率のぶんだけ
- * カードが速く動き、指から離れていく。
+ * 俯瞰の大きさ。PC（148×100）のままだと、390px の画面では場所を取りすぎる
+ * （実機レビュー: 「もう少し小さく」）。
  */
-export function toWorldDelta(screenDelta: number, scale: number): number {
-  if (!Number.isFinite(screenDelta) || !Number.isFinite(scale) || scale <= 0) return 0;
-  return screenDelta / scale;
+const MINIMAP_SIZE = { width: 96, height: 64 };
+
+/**
+ * 画面 px で一定に見せたい寸法（枠線・つまみ）。
+ *
+ * world に置いた要素は盤面ごと拡縮されるので、`--vp-scale`（CanvasViewport が毎フレーム
+ * publish する倍率）で割り戻す。**CSS で割るので再描画が要らない** — ピンチの最中でも
+ * 枠の太さとつまみの大きさが指に対して一定に保たれる。
+ */
+function inverseScale(px: number): string {
+  return `calc(${px}px / var(--vp-scale, 1))`;
 }
 
 /**
@@ -41,6 +52,10 @@ export function toWorldDelta(screenDelta: number, scale: number): number {
  * 角のつまみ 1 つで**回転と拡大縮小を同時に**扱う。SP に 2 種類のつまみを並べると、
  * どちらも指より小さくなって掴み分けられない。掴んだ瞬間の向き・距離を基準にして、
  * そこからの差分を角度と倍率にする。
+ *
+ * 向きも距離も **world 座標で測る**。画面 px で測っていたころは、つまみの
+ * `offsetParent` から中心を逆算していたため、盤面を包む層が増えると基準がずれて
+ * 「広げているのに縮む」ことがあった。world なら倍率もパンも関係しない。
  */
 export function resizeFromHandle(options: {
   /** 掴んだ瞬間の、中心から指への向き（rad）と距離（world）。 */
@@ -74,18 +89,21 @@ export function normalizeDegrees(deg: number): number {
 interface DragState {
   cardId: string;
   pointerId: number;
-  startX: number;
-  startY: number;
+  /** タップか移動かは**画面 px**で判定する（倍率で過敏・鈍感にならないように）。 */
+  startClientX: number;
+  startClientY: number;
+  /** 位置の計算は world で行う。 */
+  startWorldX: number;
+  startWorldY: number;
   originX: number;
   originY: number;
-  /** 指が動いた総量（px）。これが小さいまま離したら「選んだ」。 */
   moved: number;
 }
 
 interface ResizeState {
   cardId: string;
   pointerId: number;
-  /** 掴んだ瞬間の、カード中心から指への向きと距離。 */
+  /** 掴んだ瞬間の、カード中心から指への向きと距離（world）。 */
   startAngle: number;
   startDistance: number;
   startRotation: number;
@@ -95,9 +113,8 @@ interface ResizeState {
 
 export interface SpBoardSurfaceProps {
   cards: BoardCardData[];
-  dateKey: string;
-  /** 盤面を画面に収めるための変換。 */
-  viewport: Viewport;
+  /** パン・ピンチを持つ盤面（PC のボードと同じ `useCanvasViewport`）。 */
+  canvas: CanvasSurface;
   /** 指の移動で新しい world 座標が決まったとき。 */
   onMove: (cardId: string, x: number, y: number) => void;
   /** 指を離したとき（保存はここで投げる）。 */
@@ -105,31 +122,45 @@ export interface SpBoardSurfaceProps {
   /** 選んでいるカード。`null` なら何も選んでいない。 */
   selectedId?: string | null;
   onSelect?: (cardId: string | null) => void;
+  /** 盤面左下の FIT（貼ってあるもの全部が入るところまで引く）。 */
+  onFit: () => void;
+  /**
+   * タップしたカードを前面へ。
+   *
+   * 重なった板では、下のカードに触れても埋もれたままだと読めない（実機レビュー指摘）。
+   * 選ぶのと同時に手前へ出す。
+   */
+  onRaise?: (cardId: string) => void;
   /** 角のつまみで回転と大きさが決まったとき。 */
   onTransform?: (cardId: string, next: { rotation: number; width: number; height: number }) => void;
 }
 
 /**
- * SP のボードの見た目と指の操作（`docs/oryzae-study/00-overview.md`「モバイル（SP）」）。
+ * SP のボードの見た目と指の操作。
  *
- * **右ペインを置かない。** 縦画面で 400px の側パネルを出すと板がほぼ潰れる。日付と
- * カード枚数だけを隅に小さく浮かせ、**カードは指でつかんで動かせる**ようにする。
- * カードの重なりは指で解く前提なので、ズームもパンも与えない — 指の操作は
- * 「カードを動かす」1 つに絞る。
+ * **右ペインを置かない。** 縦画面で 400px の側パネルを出すと板がほぼ潰れる。
+ * カード枚数だけを隅に小さく浮かせる。
  *
- * データ取得と初期フィットは `sp-board.tsx` が持つ。ここは渡されたものを描くだけ。
+ * 指の割り当ては PC のボードと同じ `CanvasViewport` に委ねる:
+ * **カードの上の 1 本指はそのカードを動かす**（`data-canvas-no-pan`）、
+ * **空きの 1 本指は盤面を動かす**、**2 本指は寄り引き**。盤面が `touch-action: none` を
+ * 持つので、ピンチがブラウザのページズーム（iOS のタブ一覧）に奪われることもない。
+ *
+ * データ取得と初期の寄せ方は `sp-board.tsx` が持つ。ここは渡されたものを描くだけ。
  */
 export function SpBoardSurface({
   cards,
-  dateKey,
-  viewport,
+  canvas,
   onMove,
   onCommit,
+  onFit,
   selectedId = null,
   onSelect,
+  onRaise,
   onTransform,
 }: SpBoardSurfaceProps) {
   const t = useTranslations('sp.board');
+  const tBoard = useTranslations('board');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
@@ -138,37 +169,40 @@ export function SpBoardSurface({
     (event: React.PointerEvent<HTMLDivElement>, card: BoardCardData) => {
       // 掴んだ指を最後まで追う。指が要素の外へ出ても pointermove が届く。
       event.currentTarget.setPointerCapture?.(event.pointerId);
+      const world = canvas.toWorld(event.clientX, event.clientY);
       dragRef.current = {
         cardId: card.id,
         pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startWorldX: world.x,
+        startWorldY: world.y,
         originX: card.x,
         originY: card.y,
         moved: 0,
       };
       setDraggingId(card.id);
     },
-    [],
+    [canvas],
   );
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
-      const dx = event.clientX - drag.startX;
-      const dy = event.clientY - drag.startY;
-      drag.moved = Math.abs(dx) + Math.abs(dy);
+      drag.moved =
+        Math.abs(event.clientX - drag.startClientX) + Math.abs(event.clientY - drag.startClientY);
       // 触れただけでは動かさない。指はわずかに揺れるので、選ぶつもりの操作で
       // カードが 1〜2px ずれて保存されてしまう。
       if (drag.moved < TAP_SLOP) return;
+      const world = canvas.toWorld(event.clientX, event.clientY);
       onMove(
         drag.cardId,
-        drag.originX + toWorldDelta(dx, viewport.scale),
-        drag.originY + toWorldDelta(dy, viewport.scale),
+        drag.originX + (world.x - drag.startWorldX),
+        drag.originY + (world.y - drag.startWorldY),
       );
     },
-    [onMove, viewport.scale],
+    [canvas, onMove],
   );
 
   const endDrag = useCallback(
@@ -177,11 +211,15 @@ export function SpBoardSurface({
       if (!drag || drag.pointerId !== event.pointerId) return;
       dragRef.current = null;
       setDraggingId(null);
-      // 動かしていなければ「選んだ」。動かしたなら位置を保存する。
-      if (drag.moved < TAP_SLOP) onSelect?.(drag.cardId);
-      else onCommit();
+      // 動かしていなければ「選んだ」＝前面へ出す。動かしたなら位置を保存する。
+      if (drag.moved < TAP_SLOP) {
+        onSelect?.(drag.cardId);
+        onRaise?.(drag.cardId);
+      } else {
+        onCommit();
+      }
     },
-    [onCommit, onSelect],
+    [onCommit, onSelect, onRaise],
   );
 
   /**
@@ -202,7 +240,7 @@ export function SpBoardSurface({
     [onCommit],
   );
 
-  /** 角のつまみ。中心から指への向きと距離で、回転と大きさを同時に決める。 */
+  /** 角のつまみ。中心から指への向きと距離（world）で、回転と大きさを同時に決める。 */
   const handleResizeMove = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       const resize = resizeRef.current;
@@ -210,10 +248,9 @@ export function SpBoardSurface({
       const card = cards.find((candidate) => candidate.id === resize.cardId);
       if (!card) return;
 
-      const center = cardCenterOnScreen(event.currentTarget, card, viewport);
-      if (!center) return;
-      const dx = event.clientX - center.x;
-      const dy = event.clientY - center.y;
+      const pointer = canvas.toWorld(event.clientX, event.clientY);
+      const dx = pointer.x - (card.x + card.width / 2);
+      const dy = pointer.y - (card.y + card.height / 2);
 
       onTransform(
         resize.cardId,
@@ -221,14 +258,14 @@ export function SpBoardSurface({
           startAngle: resize.startAngle,
           startDistance: resize.startDistance,
           angle: Math.atan2(dy, dx),
-          distance: toWorldDelta(Math.hypot(dx, dy), viewport.scale),
+          distance: Math.hypot(dx, dy),
           startRotation: resize.startRotation,
           startWidth: resize.startWidth,
           startHeight: resize.startHeight,
         }),
       );
     },
-    [cards, onTransform, viewport],
+    [canvas, cards, onTransform],
   );
 
   const endResize = useCallback(
@@ -249,20 +286,73 @@ export function SpBoardSurface({
         unit: 'SpBoardSurface',
         cardCount: visible.length,
         dragging: draggingId !== null,
-        dateKey,
         hasSidePane: false,
         selectedId: selectedId ?? 'none',
       })}
-      className="relative h-full w-full overflow-hidden"
-      style={{ backgroundColor: 'var(--bg)' }}
-      // 板の何も無いところを押したら選択を解く（PC の盤面と同じ）。
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget) onSelect?.(null);
-      }}
+      className="relative h-full w-full"
     >
-      <div
-        className="absolute left-0 top-0"
-        style={{ transform: toTransform(viewport), transformOrigin: '0 0' }}
+      <CanvasViewport
+        canvas={canvas}
+        ariaLabel={tBoard('canvas.aria_label')}
+        style={{ backgroundColor: 'var(--bg)' }}
+        // 方眼（PC の盤面と同じ背景）。板の上で位置が掴めるように、寄り引きしても
+        // 目盛りの間隔が破綻しない形で敷く。
+        background={<CanvasGrid canvas={canvas} />}
+        // 板の何も無いところを押したら選択を解く（PC の盤面と同じ）。
+        onClick={() => onSelect?.(null)}
+        overlay={
+          <>
+            {visible.length === 0 && (
+              <p
+                className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-[13px]"
+                style={{ color: 'var(--date-color)' }}
+              >
+                {t('nothing_pinned')}
+              </p>
+            )}
+            {/* 隅に枚数だけ。右ペインの代わりはこれで足りる。 */}
+            <div
+              className="pointer-events-none absolute top-4 flex items-baseline gap-2"
+              style={{
+                // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと枚数に重なる。
+                left: '1rem',
+                color: 'var(--date-color)',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              <span className="text-[10px] opacity-70">
+                {t('cards', { count: visible.length })}
+              </span>
+            </div>
+            {/* 寄り引きは PC の盤面と同じ操作（左下に − / 100% / + / FIT）。
+                盤面に対する操作は盤面の中に置き、貼ってあるものへの操作（道具の列）と
+                混ぜない。「全体を見る」を道具の列に置いていたのはここへ移した。 */}
+            <CanvasZoomControls
+              scale={canvas.viewport.scale}
+              onZoomIn={canvas.zoomIn}
+              onZoomOut={canvas.zoomOut}
+              onReset={canvas.resetZoom}
+              onFit={onFit}
+            />
+            {/* 俯瞰（PC の盤面と同じ部品を一回り小さく）。寄って動き回れるようになった
+                代わりに、いま板のどこに居るのかが分からなくなった（実機レビュー:
+                「全体マップがなくなった。中央から離れると迷子になりそう」）。 */}
+            {visible.length > 0 && (
+              <CanvasMinimap
+                canvas={canvas}
+                ariaLabel={tBoard('minimap.aria_label')}
+                size={MINIMAP_SIZE}
+                items={visible.map((card) => ({
+                  id: card.id,
+                  x: card.x,
+                  y: card.y,
+                  width: card.width,
+                  height: card.height,
+                }))}
+              />
+            )}
+          </>
+        }
       >
         {visible.map((card) => {
           const isDragging = draggingId === card.id;
@@ -270,10 +360,14 @@ export function SpBoardSurface({
             <div
               key={card.id}
               data-card-id={card.id}
+              // 掴んだらカードを動かす（盤面のパンを始めない）。
+              data-canvas-no-pan=""
               onPointerDown={(event) => handlePointerDown(event, card)}
               onPointerMove={handlePointerMove}
               onPointerUp={endDrag}
               onPointerCancel={cancelDrag}
+              // 盤面の「空きを押したら選択解除」まで伝播させない。
+              onClick={(event) => event.stopPropagation()}
               style={{
                 position: 'absolute',
                 left: card.x,
@@ -287,7 +381,7 @@ export function SpBoardSurface({
                 borderRadius: 4,
                 overflow: 'hidden',
                 backgroundColor: card.cardType === 'photo' ? 'var(--bg)' : '#FBF7E8',
-                border: '1px solid var(--border-subtle)',
+                border: `${inverseScale(1)} solid var(--border-subtle)`,
                 // つかんでいる間は影を深くして、板から浮いていることを見せる。
                 boxShadow: isDragging
                   ? '0 12px 32px rgba(140,133,126,0.34)'
@@ -303,7 +397,7 @@ export function SpBoardSurface({
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0"
                   style={{
-                    border: `${1.5 / viewport.scale}px solid var(--accent)`,
+                    border: `${inverseScale(1.5)} solid var(--accent)`,
                     borderRadius: 4,
                   }}
                 />
@@ -322,18 +416,18 @@ export function SpBoardSurface({
                 type="button"
                 aria-label={t('resize')}
                 data-testid="sp-board-handle"
+                data-canvas-no-pan=""
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   event.currentTarget.setPointerCapture?.(event.pointerId);
-                  const center = cardCenterOnScreen(event.currentTarget, card, viewport);
-                  if (!center) return;
-                  const dx = event.clientX - center.x;
-                  const dy = event.clientY - center.y;
+                  const pointer = canvas.toWorld(event.clientX, event.clientY);
+                  const dx = pointer.x - (card.x + card.width / 2);
+                  const dy = pointer.y - (card.y + card.height / 2);
                   resizeRef.current = {
                     cardId: card.id,
                     pointerId: event.pointerId,
                     startAngle: Math.atan2(dy, dx),
-                    startDistance: toWorldDelta(Math.hypot(dx, dy), viewport.scale),
+                    startDistance: Math.hypot(dx, dy),
                     startRotation: card.rotation,
                     startWidth: card.width,
                     startHeight: card.height,
@@ -348,45 +442,22 @@ export function SpBoardSurface({
                   left: card.x + card.width,
                   top: card.y + card.height,
                   // 逆スケール。盤面を縮めても指で掴める大きさを保つ。
-                  width: HANDLE_SIZE / viewport.scale,
-                  height: HANDLE_SIZE / viewport.scale,
-                  marginLeft: -HANDLE_SIZE / viewport.scale / 2,
-                  marginTop: -HANDLE_SIZE / viewport.scale / 2,
+                  width: inverseScale(HANDLE_SIZE),
+                  height: inverseScale(HANDLE_SIZE),
+                  marginLeft: inverseScale(-HANDLE_SIZE / 2),
+                  marginTop: inverseScale(-HANDLE_SIZE / 2),
                   transformOrigin: `${-card.width / 2}px ${-card.height / 2}px`,
                   transform: `rotate(${card.rotation}deg)`,
                   zIndex: DRAGGING_Z + 1,
                   borderRadius: '50%',
                   background: 'var(--accent)',
-                  border: `${2 / viewport.scale}px solid #fff`,
+                  border: `${inverseScale(2)} solid #fff`,
                   boxShadow: '0 2px 8px rgba(140,133,126,0.3)',
                   touchAction: 'none',
                 }}
               />
             ))}
-      </div>
-
-      {visible.length === 0 && (
-        <p
-          className="absolute inset-0 flex items-center justify-center px-8 text-center text-[13px]"
-          style={{ color: 'var(--date-color)' }}
-        >
-          {t('empty')}
-        </p>
-      )}
-
-      {/* 隅に日付と枚数だけ。右ペインの代わりはこれで足りる。 */}
-      <div
-        className="pointer-events-none absolute top-4 flex items-baseline gap-2"
-        style={{
-          // 書斎が有効な間は左上に「書斎へ戻る」マークが浮く。避けないと日付に重なる。
-          left: '1rem',
-          color: 'var(--date-color)',
-          fontFamily: 'Inter, sans-serif',
-        }}
-      >
-        <span className="text-[11px] tracking-[0.16em]">{formatCornerDate(dateKey)}</span>
-        <span className="text-[10px] opacity-70">{t('cards', { count: visible.length })}</span>
-      </div>
+      </CanvasViewport>
     </div>
   );
 }
@@ -394,7 +465,8 @@ export function SpBoardSurface({
 /**
  * カードの中身。PC の意味的ズーム（引いたら中身を落とす）は持たない。
  *
- * SP は盤面を一度フィットさせたきり倍率が変わらないので、出し分ける段階が無い。
+ * 文字の大きさはカードの幅に追随する（`snippetFontSize`）。固定サイズだと、盤面を
+ * 引いたときに本文だけが先に潰れて読めなくなる。
  */
 function SpBoardCardContent({ card }: { card: BoardCardData }) {
   if (card.cardType === 'photo' && 'imageUrl' in card.content) {
@@ -411,33 +483,17 @@ function SpBoardCardContent({ card }: { card: BoardCardData }) {
   }
   if ('text' in card.content) {
     return (
-      // 盤面は縮小して全体を映すので、カードの中の文字は**縮尺のぶん割り増して**おかないと
-      // 実機で読めない（12px は板の縮尺が乗ると 6〜7px 相当になる）。
       <p
-        className="h-full overflow-hidden whitespace-pre-wrap p-2.5 text-[17px]"
-        style={{ color: 'var(--fg)', lineHeight: 1.6 }}
+        className="h-full overflow-hidden whitespace-pre-wrap p-2.5"
+        style={{
+          color: 'var(--fg)',
+          lineHeight: 1.6,
+          fontSize: snippetFontSize(card.width, SP_BASE_FONT_SIZE),
+        }}
       >
         {card.content.text}
       </p>
     );
   }
   return null;
-}
-
-/**
- * カードの中心の**画面座標**。つまみの向きと距離を測る基準。
- *
- * つまみ自身の位置から逆算する（カードの DOM を探しに行かない）。つまみはカードの
- * 右下角に、カードと同じ回転で置いてあるので、そこからカードの中心が決まる。
- */
-function cardCenterOnScreen(
-  handle: HTMLElement,
-  card: BoardCardData,
-  viewport: Viewport,
-): { x: number; y: number } | null {
-  const frame = handle.offsetParent;
-  if (!(frame instanceof HTMLElement)) return null;
-  const rect = frame.getBoundingClientRect();
-  const center = worldToScreen(viewport, card.x + card.width / 2, card.y + card.height / 2);
-  return { x: rect.left + center.x, y: rect.top + center.y };
 }

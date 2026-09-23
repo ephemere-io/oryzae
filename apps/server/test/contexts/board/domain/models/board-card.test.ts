@@ -7,8 +7,6 @@ const validParams = {
   userId: 'user-1',
   cardType: 'entry',
   refId: 'ref-1',
-  dateKey: '2026-04-11',
-  viewType: 'daily',
   x: 100,
   y: 200,
   rotation: -3.5,
@@ -16,6 +14,24 @@ const validParams = {
   height: 280,
   zIndex: 1,
 };
+
+function existingCard(): BoardCard {
+  return BoardCard.fromProps({
+    id: 'c-1',
+    userId: 'u-1',
+    cardType: 'entry',
+    refId: 'ref-1',
+    x: 10,
+    y: 20,
+    rotation: 0,
+    width: 300,
+    height: 200,
+    zIndex: 1,
+    userPositioned: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  });
+}
 
 describe('BoardCard', () => {
   describe('create', () => {
@@ -27,14 +43,24 @@ describe('BoardCard', () => {
         expect(result.value.userId).toBe('user-1');
         expect(result.value.cardType).toBe('entry');
         expect(result.value.refId).toBe('ref-1');
-        expect(result.value.dateKey).toBe('2026-04-11');
-        expect(result.value.viewType).toBe('daily');
         expect(result.value.x).toBe(100);
         expect(result.value.y).toBe(200);
         expect(result.value.rotation).toBe(-3.5);
         expect(result.value.width).toBe(340);
         expect(result.value.height).toBe(280);
         expect(result.value.zIndex).toBe(1);
+        // 作った直後は自動配置（利用者が動かした時点で true になる）
+        expect(result.value.userPositioned).toBe(false);
+      }
+    });
+
+    it('日付・表示単位を持たない（ボードは 1 人に 1 枚）', () => {
+      const result = BoardCard.create(validParams, generateId);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const props = result.value.toProps();
+        expect(props).not.toHaveProperty('dateKey');
+        expect(props).not.toHaveProperty('viewType');
       }
     });
 
@@ -46,27 +72,11 @@ describe('BoardCard', () => {
       }
     });
 
-    it('weekly ビュータイプでも作成できる', () => {
-      const result = BoardCard.create({ ...validParams, viewType: 'weekly' }, generateId);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.value.viewType).toBe('weekly');
-      }
-    });
-
     it('無効な cardType で INVALID_CARD_TYPE エラーを返す', () => {
       const result = BoardCard.create({ ...validParams, cardType: 'invalid' }, generateId);
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.type).toBe('INVALID_CARD_TYPE');
-      }
-    });
-
-    it('無効な viewType で INVALID_VIEW_TYPE エラーを返す', () => {
-      const result = BoardCard.create({ ...validParams, viewType: 'monthly' }, generateId);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.type).toBe('INVALID_VIEW_TYPE');
       }
     });
 
@@ -115,14 +125,13 @@ describe('BoardCard', () => {
         userId: 'u-1',
         cardType: 'entry' as const,
         refId: 'ref-1',
-        dateKey: '2026-04-11',
-        viewType: 'daily' as const,
         x: 10,
         y: 20,
         rotation: 5,
         width: 300,
         height: 200,
         zIndex: 3,
+        userPositioned: true,
         createdAt: '2026-01-01T00:00:00Z',
         updatedAt: '2026-01-01T00:00:00Z',
       };
@@ -132,22 +141,7 @@ describe('BoardCard', () => {
   });
 
   describe('withPosition', () => {
-    const card = BoardCard.fromProps({
-      id: 'c-1',
-      userId: 'u-1',
-      cardType: 'entry',
-      refId: 'ref-1',
-      dateKey: '2026-04-11',
-      viewType: 'daily',
-      x: 10,
-      y: 20,
-      rotation: 0,
-      width: 300,
-      height: 200,
-      zIndex: 1,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    });
+    const card = existingCard();
 
     it('位置を更新した新しい BoardCard を返す', () => {
       const updated = card.withPosition(50, 60, -3);
@@ -166,22 +160,7 @@ describe('BoardCard', () => {
   });
 
   describe('withDimensions', () => {
-    const card = BoardCard.fromProps({
-      id: 'c-1',
-      userId: 'u-1',
-      cardType: 'entry',
-      refId: 'ref-1',
-      dateKey: '2026-04-11',
-      viewType: 'daily',
-      x: 10,
-      y: 20,
-      rotation: 0,
-      width: 300,
-      height: 200,
-      zIndex: 1,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    });
+    const card = existingCard();
 
     it('サイズを更新した新しい BoardCard を返す', () => {
       const result = card.withDimensions(400, 350);
@@ -208,22 +187,7 @@ describe('BoardCard', () => {
   });
 
   describe('withZIndex', () => {
-    const card = BoardCard.fromProps({
-      id: 'c-1',
-      userId: 'u-1',
-      cardType: 'entry',
-      refId: 'ref-1',
-      dateKey: '2026-04-11',
-      viewType: 'daily',
-      x: 10,
-      y: 20,
-      rotation: 0,
-      width: 300,
-      height: 200,
-      zIndex: 1,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    });
+    const card = existingCard();
 
     it('zIndex を更新した新しい BoardCard を返す', () => {
       const updated = card.withZIndex(10);

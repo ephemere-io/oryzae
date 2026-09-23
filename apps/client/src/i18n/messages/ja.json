@@ -267,19 +267,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "日曜日",
-      "day_mon": "月曜日",
-      "day_tue": "火曜日",
-      "day_wed": "水曜日",
-      "day_thu": "木曜日",
-      "day_fri": "金曜日",
-      "day_sat": "土曜日"
-    },
     "canvas": {
       "aria_label": "Board canvas"
     },
-    "empty": "この期間のデータはありません",
+    "nothing_pinned": "まだ何も貼られていません",
     "lightbox": {
       "aria_label": "Photo lightbox",
       "close_aria": "Close lightbox"
@@ -330,6 +321,7 @@
       "snippet": "スニペットを作成",
       "photo": "画像を貼り付け",
       "aria_label_card": "選択中のカードの操作",
+      "selected_count": "{count}枚",
       "bring_to_front": "前面へ",
       "delete": "削除",
       "open": "開く",
@@ -797,7 +789,7 @@
     },
     "board": {
       "cards": "{count}枚",
-      "empty": "この日はまだ何もありません",
+      "nothing_pinned": "まだ何も貼られていません",
       "hint": "カードは指で動かせます",
       "add_snippet": "スニペットを作成",
       "add_photo": "写真を追加",
@@ -807,7 +799,10 @@
       "cancel": "キャンセル",
       "save": "保存",
       "resize": "大きさと向きを変える",
-      "snippet_placeholder": "書き留めておきたいことを"
+      "snippet_placeholder": "書き留めておきたいことを",
+      "palette_aria": "ボードの操作",
+      "tool_snippet": "スニペット",
+      "tool_photo": "写真"
     }
   },
   "canvas": {

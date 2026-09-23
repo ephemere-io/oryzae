@@ -52,7 +52,7 @@ interface StudyBoardCard {           // BoardCardData のサブセット + lines
 | StudyState | 既存の取得元 | 備考 |
 | --- | --- | --- |
 | `entries` | `GET /api/v1/entries?limit=20&order=newest`（`use-entries.ts`） | `linkedQuestions` はサーバーが埋めて返す |
-| `board` | `GET /api/v1/board/summary`（`use-board-summary.ts`） | 日付で絞らない。`total` と内訳は ref で畳んだ数 |
+| `board` | `GET /api/v1/board/summary`（`use-board-summary.ts`） | ボード自体が 1 人に 1 枚なので期間では絞らない。1 つの付箋・写真は 1 枚だけ |
 | `questions` | `GET /api/v1/questions`（`use-questions.ts`） | 生存は最大3件 |
 | `fermentation.letters` | `GET /api/v1/fermentations` → `status === 'completed'`（`use-unread-letters.ts`） | 受信箱は問いごとに最新1通 |
 | `unreadCount` | `useUnreadLetters()`（既に `(protected)/layout.tsx` で1回だけ取得） | N+1 を増やさない |

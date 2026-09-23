@@ -21,33 +21,20 @@ test.describe('ボード画面', () => {
     await page.waitForSelector('[role="application"]');
   });
 
-  test('ボード画面が表示される（日付ナビ＋下部ツールバー）', async ({ page }) => {
-    await expect(page.locator('button[data-verify-view-option="daily"]')).toBeVisible();
+  test('ボード画面が表示される（下部ツールバー。日付・表示単位の切り替えは無い）', async ({
+    page,
+  }) => {
     await expect(page.locator('[role="toolbar"]')).toBeVisible();
     await expect(page.locator('button[data-verify-tool="snippet"]')).toBeVisible();
     await expect(page.locator('button[data-verify-tool="photo"]')).toBeVisible();
+    // ボードは 1 人に 1 枚のコルクボード。日付を送る・日次/週次を切り替える操作は持たない。
+    await expect(page.locator('[data-verify-unit="BoardDateNav"]')).toHaveCount(0);
+    await expect(page.locator('[data-verify-unit="BoardViewSwitch"]')).toHaveCount(0);
   });
 
   test('不要になった要素（フッター・カード数）が出ない', async ({ page }) => {
     await expect(page.locator('footer')).toHaveCount(0);
     await expect(page.getByText(/\d+ CARDS/)).toHaveCount(0);
-  });
-
-  test('日付ナビゲーションで前日/翌日に切り替えできる', async ({ page }) => {
-    // 日付は BoardDateNav が公表する契約（data-verify-date-key）で見る。
-    // 以前はクラス名（tracking-wider）で拾っていたが、見た目を変えるたびに
-    // 壊れるうえ、何を見ているのかも読み取れなかった。
-    const nav = page.locator('[data-verify-unit="BoardDateNav"]');
-    const dateKey = () => nav.getAttribute('data-verify-date-key');
-    const initial = await dateKey();
-
-    await page.click('button[data-verify-nav="prev"]');
-    await page.waitForTimeout(500);
-    expect(await dateKey()).not.toBe(initial);
-
-    await page.click('button[data-verify-nav="next"]');
-    await page.waitForTimeout(500);
-    expect(await dateKey()).toBe(initial);
   });
 
   test('ツールバーからスニペットを作成できる', async ({ page }) => {
@@ -83,11 +70,7 @@ test.describe('ボード画面', () => {
   test('押せる要素にポインタカーソルが出る', async ({ page }) => {
     // Tailwind v4 の Preflight が button を cursor:default にする。押せる物が
     // 押せるように見えないと操作が伝わらないので、globals.css で戻している。
-    for (const sel of [
-      'button[data-verify-tool="snippet"]',
-      'button[data-verify-view-option="daily"]',
-      'button[data-verify-nav="next"]',
-    ]) {
+    for (const sel of ['button[data-verify-tool="snippet"]', 'button[data-verify-tool="photo"]']) {
       const cursor = await page.locator(sel).evaluate((el) => getComputedStyle(el).cursor);
       expect(cursor, sel).toBe('pointer');
     }
@@ -205,5 +188,128 @@ test.describe('ボード画面', () => {
     await expect(page.getByText(unique).first()).toBeVisible({ timeout: 10000 });
 
     await deleteEntriesByMarker(page, unique);
+  });
+});
+
+/**
+ * 複数選択（Shift クリック）。
+ *
+ * 「選べたつもりで 1 枚しか動いていない」が目で見て分かりにくい壊れ方なので、
+ * 2 枚作って**両方が同じだけ動いた**ことを数で確かめる。
+ */
+test.describe('ボードの複数選択', () => {
+  test.beforeEach(async ({ authenticated: _, page }) => {
+    await page.goto('/board');
+    await page.waitForSelector('[role="application"]');
+  });
+
+  /** スニペットを 1 枚作り、その本文を返す。 */
+  async function createSnippet(page: import('@playwright/test').Page, text: string) {
+    await page.click('button[data-verify-tool="snippet"]');
+    await expect(page.getByRole('heading', { name: 'スニペットを作成' })).toBeVisible();
+    await page.fill('textarea[placeholder*="テキスト"]', text);
+    await page.getByRole('button', { name: '作成', exact: true }).click();
+    await expect(page.getByText(text)).toBeVisible({ timeout: 15_000 });
+  }
+
+  /** カードの左上（world 座標）。動いた量をここで測る。 */
+  async function positions(page: import('@playwright/test').Page, ids: string[]) {
+    return page.evaluate((wanted) => {
+      const out: Record<string, { x: number; y: number }> = {};
+      for (const el of document.querySelectorAll('[data-card-id]')) {
+        const text = el.textContent ?? '';
+        const hit = wanted.find((w) => text.includes(w));
+        if (hit && el instanceof HTMLElement) {
+          out[hit] = { x: Number.parseFloat(el.style.left), y: Number.parseFloat(el.style.top) };
+        }
+      }
+      return out;
+    }, ids);
+  }
+
+  test('Shift で 2 枚選び、まとめて動かせる（開くは出ない）', async ({ page }) => {
+    const first = `E2E群1-${Date.now()}`;
+    const second = `E2E群2-${Date.now()}`;
+    await createSnippet(page, first);
+    await createSnippet(page, second);
+
+    const cardOne = page.locator('[data-card-id]').filter({ hasText: first });
+    const cardTwo = page.locator('[data-card-id]').filter({ hasText: second });
+
+    await cardOne.click({ force: true });
+    await cardTwo.click({ force: true, modifiers: ['Shift'] });
+
+    // 群の枠が出て、枚数が 2
+    const frame = page.locator('[data-verify-unit="SelectionFrame"]');
+    await expect(frame).toHaveCount(1);
+    await expect(frame).toHaveAttribute('data-verify-count', '2');
+
+    // 「開く」は出さない（複数を一度には開けない）。前面へ・削除は出る。
+    await expect(page.locator('button[data-verify-card-action="open"]')).toHaveCount(0);
+    await expect(page.locator('button[data-verify-card-action="front"]')).toHaveCount(1);
+    await expect(page.locator('button[data-verify-card-action="delete"]')).toHaveCount(1);
+
+    const before = await positions(page, [first, second]);
+
+    // 選択の中の 1 枚を掴んで動かす → 群ごと同じだけ動く
+    const box = await cardOne.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 40, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+
+    const after = await positions(page, [first, second]);
+    const moved = (id: string) => ({
+      dx: Math.round(after[id].x - before[id].x),
+      dy: Math.round(after[id].y - before[id].y),
+    });
+    const one = moved(first);
+    const two = moved(second);
+    expect(one.dx).toBeGreaterThan(0);
+    // 2 枚が同じだけ動く（片方だけ抜けていくと、並べた関係が壊れる）
+    expect(two.dx).toBe(one.dx);
+    expect(two.dy).toBe(one.dy);
+
+    // 群の角を掴んで大きさを変える。**離したときに選択が外れない**ことまで見る
+    // （つまみの click が盤面に届くと、盤面は「空きを押した＝選択解除」と受け取る。
+    //  実ビルドで踏んだ壊れ方）。
+    const handle = page.locator('[data-verify-unit="SelectionFrame"] [data-verify-handle="se"]');
+    const hb = await handle.boundingBox();
+    expect(hb).not.toBeNull();
+    if (!hb) return;
+    const widthBefore = await cardOne.evaluate((el) => Number.parseFloat(el.style.width));
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 + 160, hb.y + hb.height / 2 + 100, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+
+    await expect(frame).toHaveCount(1);
+    const widthAfter = await cardOne.evaluate((el) => Number.parseFloat(el.style.width));
+    expect(widthAfter).toBeGreaterThan(widthBefore);
+
+    // まとめて消す。片付けも兼ねる（この盤面は本人のアカウントに残るため）。
+    await page.locator('button[data-verify-card-action="delete"]').click();
+    await expect(page.getByText(first)).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByText(second)).toHaveCount(0, { timeout: 15_000 });
+  });
+
+  test('カードの上に削除のバツは出さない（消す手は道具箱の 1 か所）', async ({ page }) => {
+    const text = `E2Eバツ-${Date.now()}`;
+    await createSnippet(page, text);
+
+    const card = page.locator('[data-card-id]').filter({ hasText: text });
+    await card.click({ force: true });
+
+    await expect(page.locator('[aria-label="Delete card"]')).toHaveCount(0);
+    // 代わりに角のつまみが 4 隅そろっている
+    await expect(card.locator('[data-verify-handle]')).toHaveCount(4);
+
+    // 片付け（この盤面は本人のアカウントに残るため）
+    await page.locator('button[data-verify-card-action="delete"]').click();
+    await expect(page.getByText(text)).toHaveCount(0, { timeout: 15_000 });
   });
 });
