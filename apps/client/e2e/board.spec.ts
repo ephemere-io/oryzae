@@ -228,62 +228,62 @@ test.describe('ボードの複数選択', () => {
   }
 
   /**
-   * そのカードが実際に手前に出ている点（他のカードに覆われていない所）。
+   * 作りたてのカード（＝いちばん手前）を、画面上の指定した点まで運ぶ。
    *
-   * 外接矩形の中心を押すと、**上に乗った別のカードに当たる**。新しいカードは
-   * どれも「画面の中央」に生まれるので、作りたてほど重なる。
+   * **盤面は本人のアカウントで、過去のカードが溜まっている。** 新しいカードはどれも
+   * 「画面の中央」に生まれるので、そこは山になっている。当たり判定でどれか 1 枚を
+   * 選び出そうとすると、覆われていて掴めない（実際に E2E がそれで落ちた）。
+   * 作った直後＝最前面のうちに、空いている場所へ動かしてしまうのが確実。
+   *
+   * 掴むのは中心なので、運び終わるとカードの中心が `to` に来る。
    */
-  async function visiblePoint(page: import('@playwright/test').Page, text: string) {
-    return page.evaluate((wanted) => {
-      const card = [...document.querySelectorAll('[data-card-id]')].find((el) =>
-        (el.textContent ?? '').includes(wanted),
-      );
-      if (!card) return null;
-      const rect = card.getBoundingClientRect();
-      for (let y = rect.top + 6; y < rect.bottom - 6; y += 6) {
-        for (let x = rect.left + 6; x < rect.right - 6; x += 6) {
-          if (document.elementFromPoint(x, y)?.closest('[data-card-id]') === card) {
-            return { x: Math.round(x), y: Math.round(y) };
-          }
-        }
-      }
-      return null;
-    }, text);
+  async function carryCardTo(
+    page: import('@playwright/test').Page,
+    text: string,
+    to: { x: number; y: number },
+  ) {
+    const card = page.locator('[data-card-id]').filter({ hasText: text });
+    const box = await card.boundingBox();
+    expect(box, `${text} のカードが見つからない`).not.toBeNull();
+    if (!box) return;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+  }
+
+  /** そのカードが選択されているか（契約を直接読む）。 */
+  async function isSelected(page: import('@playwright/test').Page, text: string) {
+    return page
+      .locator('[data-card-id]')
+      .filter({ hasText: text })
+      .getAttribute('data-verify-selected');
   }
 
   test('Shift で 2 枚選び、まとめて動かせる（開くは出ない）', async ({ page }) => {
     const first = `E2E群1-${Date.now()}`;
     const second = `E2E群2-${Date.now()}`;
+
+    // 1 枚ずつ作って、作った直後（最前面のうち）に左右へ離す。中央の山から抜けば、
+    // 以降はその点を押せば確実にそのカードに当たる。
+    const left = { x: 320, y: 250 };
+    const right = { x: 880, y: 250 };
     await createSnippet(page, first);
+    await carryCardTo(page, first, left);
     await createSnippet(page, second);
+    await carryCardTo(page, second, right);
 
     const cardOne = page.locator('[data-card-id]').filter({ hasText: first });
-    const cardTwo = page.locator('[data-card-id]').filter({ hasText: second });
 
-    // 2 枚とも画面の中央に生まれてほぼ重なるので、まず 2 枚目をずらす。
-    // 重なったままだと、1 枚目を押したつもりで上に乗った 2 枚目に当たり、
-    // 続く Shift クリックが**それを選択から外して**しまう（選択が空になる）。
-    const upper = await cardTwo.boundingBox();
-    expect(upper).not.toBeNull();
-    if (!upper) return;
-    await page.mouse.move(upper.x + upper.width / 2, upper.y + upper.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(upper.x + upper.width / 2 + 300, upper.y + upper.height / 2, {
-      steps: 10,
-    });
-    await page.mouse.up();
-    await page.waitForTimeout(400);
-
-    const pointOne = await visiblePoint(page, first);
-    const pointTwo = await visiblePoint(page, second);
-    expect(pointOne, '1 枚目の見えている所が無い').not.toBeNull();
-    expect(pointTwo, '2 枚目の見えている所が無い').not.toBeNull();
-    if (!pointOne || !pointTwo) return;
-
-    await page.mouse.click(pointOne.x, pointOne.y);
+    await page.mouse.click(left.x, left.y);
     await page.keyboard.down('Shift');
-    await page.mouse.click(pointTwo.x, pointTwo.y);
+    await page.mouse.click(right.x, right.y);
     await page.keyboard.up('Shift');
+
+    // 狙った 2 枚が選べたか。ここで落ちれば「別のカードに当たった」と分かる。
+    expect(await isSelected(page, first), '1 枚目が選べていない').toBe('true');
+    expect(await isSelected(page, second), '2 枚目が選べていない').toBe('true');
 
     // 群の枠が出て、枚数が 2
     const frame = page.locator('[data-verify-unit="SelectionFrame"]');
