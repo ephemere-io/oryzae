@@ -49,22 +49,27 @@ export interface SheetProps {
 }
 
 /**
- * いちばん低い段より上に積む空きの高さ（容器の高さ − 段の高さ）。段の高さは要素で決まる:
+ * 段の高さ（＝その段に止まったとき、シートが見えている高さ）。要素で決まる:
  * 覗く＝見出しの行、中身＝見出し + 中身（容器より高ければ容器）、半分＝容器の半分、全画面＝容器。
  * 測る高さは容器の CSS 変数（`--oz-sheet-header` / `--oz-sheet-content`）から継ぐ。
  * `detents` は低い順に並べる約束（DockSheet も `detents[0]` を最低の段として扱う）。
  */
-function spaceAbove(lowest: SheetDetent | undefined): string {
-  switch (lowest) {
+function detentHeight(detent: SheetDetent | undefined): string {
+  switch (detent) {
     case 'peek':
-      return 'calc(100cqh - var(--oz-sheet-header, 0px))';
+      return 'var(--oz-sheet-header, 0px)';
     case 'content':
-      return 'calc(100cqh - min(var(--oz-sheet-content, 100cqh), 100cqh))';
+      return 'min(var(--oz-sheet-content, 100cqh), 100cqh)';
     case 'half':
       return '50cqh';
     default:
-      return '0px';
+      return '100cqh';
   }
+}
+
+/** いちばん低い段より上に積む空きの高さ（容器の高さ − その段の高さ）。 */
+function spaceAbove(lowest: SheetDetent | undefined): string {
+  return `calc(100cqh - ${detentHeight(lowest)})`;
 }
 
 /**
@@ -368,7 +373,10 @@ export function Sheet({
       const below = detentList.at(-2);
       const top = targetOf(highest);
       const commit = below === undefined ? top : (top + targetOf(below)) / 2;
-      const atHighest = scroller.scrollTop >= commit;
+      // 1px 未満の差は同じ位置（この段の位置は測った小数で、スクロール位置も小数）。段が 1 つだけの
+      // シートは上に引ける空きが 0 なので、印が 0.3px 上に出ているだけで「まだ着いていない」ことになり、
+      // 中身が永久に開かなかった（一覧の行の操作）。
+      const atHighest = scroller.scrollTop >= commit - 1;
       if (atHighest === atHighestRef.current) return;
       atHighestRef.current = atHighest;
       inner.style.overflowY = atHighest ? 'auto' : 'hidden';
@@ -585,7 +593,10 @@ export function Sheet({
         style={{
           // 閉じる動きの間は吸着を切る（閉じると決めたあとに段へ引き戻されない）。
           scrollSnapType: visualPhase === 'closing' || !measured ? 'none' : 'y mandatory',
-          overscrollBehavior: 'contain',
+          // `none`（`contain` ではなく）＝**段の外へ弾まない**。iOS は端で弾んでから戻るので、
+          // 払って全画面に着いたあと「弾んで戻る」ぶんだけ次の指が待たされる（実機: 最大の直後に
+          // 上へなぞると一瞬効かない）。弾みを切ると、着いた時点で終わる。
+          overscrollBehavior: 'none',
           containerType: 'size',
           // 位置は段が決める。空きの高さが測定で変わったとき、ブラウザがシートを「見えていた場所」に留めようと
           // 位置を動かす（スクロールアンカリング）と、出た瞬間に全画面へ跳ぶ。切る。
@@ -610,10 +621,13 @@ export function Sheet({
           aria-label={ariaLabel}
           className={`${visualPhase === 'closing' ? 'pointer-events-none' : 'pointer-events-auto'} relative flex flex-col rounded-t-3xl border-t`}
           style={{
-            // シートは容器と同じ高さ。**中身がはみ出しても伸びない**＝容器のスクロールは段の切り替えだけ。
-            // 読むのはシートの中の箱（下）で、その箱の上端が**指の届かない壁**になる
-            // ＝読み終えて下へ引いても板は縮まない（慣性は JS では止められない。実測）。
-            height: '100%',
+            // シートの高さは**いちばん高い段**。全画面まで行く板は容器と同じ高さになり、
+            // **中身がはみ出しても伸びない**＝容器のスクロールは段の切り替えだけ。読むのはシートの中の箱（下）で、
+            // その箱の上端が**指の届かない壁**になる＝読み終えて下へ引いても板は縮まない
+            // （慣性は JS では止められない。実測）。
+            // 段が 1 つだけのシート（一覧の行の操作）は中身ぶんの高さになり、**上に引ける空きが無くなる**
+            // ＝伸びる先が無いのに指で持ち上がって戻る、という嘘の手応えが消える。
+            height: detentHeight(detents[detents.length - 1]),
             background: 'var(--surface-raised)',
             borderColor: 'var(--surface-raised-border)',
             boxShadow: '0 -8px 32px rgba(140,133,126,0.18)',

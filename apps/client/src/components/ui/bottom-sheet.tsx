@@ -112,7 +112,15 @@ export function BottomSheet({
         </div>
       }
     >
-      <div className="px-6 pb-8">{shown.current.children}</div>
+      {/* 下の余白は**ホームバーのぶんを足す**。`viewport-fit=cover`（app/layout.tsx）で画面はバーの下まで
+          広がるので、足さないと最後のボタン（保存・削除）がバーに重なる。下端に出る部品は同じ扱い
+          （`action-palette.tsx`）。 */}
+      <div
+        className="px-6"
+        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        {shown.current.children}
+      </div>
     </Sheet>
   );
 }
