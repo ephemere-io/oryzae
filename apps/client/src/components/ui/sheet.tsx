@@ -410,8 +410,58 @@ export function Sheet({
       syncContentScroll();
       if (needsFrames && !frame) frame = requestAnimationFrame(watch);
     };
+
+    /**
+     * 指が触れたら、**動いている板をその場で決着させ、この指の持ち主を 1 つに決める。**
+     *
+     * 慣性と吸着の尾が残っている間、その容器は「いま動いているスクローラ」として次の指を取る
+     * （WebKit / UIScrollView の作法。減速を止めた指がそのまま同じ容器の続きになる）。だから
+     * 全画面に着いた直後にもう一度同じ向きへ払っても、**中身ではなく外側が受け取ってしまい**、
+     * 動きが終わるまで内側が動き出せなかった（実機: 「最大幅になった後すぐにもう一度スクロールできない」。
+     * Chromium では再現しない）。
+     *
+     * やることは 2 つ。どちらも触れた瞬間の 1 回だけ:
+     *
+     * 1. いちばん近い段の位置へそのまま置く（＝動きを終わらせる。位置は吸着先そのものなので跳ねない）
+     * 2. **この指で板を動かしてよいかを、外側の `overflow-y` で言い切る**（`canDragSheet`）。
+     *    読んでいる途中の指のあいだ外側は `hidden` ＝ そもそもスクローラではないので、取りようがない。
+     *    判定でも待ち時間でもなく、ブラウザに「動かせるのはこっちだけ」と伝える
+     */
+    const takeGesture = (event: Event) => {
+      const top = scroller.scrollTop;
+      let nearest: number | null = null;
+      for (const candidate of latest.current.detents) {
+        const target = targetOf(candidate);
+        if (nearest === null || Math.abs(target - top) < Math.abs(nearest - top)) nearest = target;
+      }
+      // 1px 未満のずれは触らない（スクロール位置は小数になる）。
+      if (nearest !== null && Math.abs(nearest - top) >= 1) {
+        scroller.scrollTop = nearest;
+        syncContentScroll();
+      }
+      const inner = innerRef.current;
+      const target = event.target;
+      const onContent =
+        inner !== null && target instanceof Node && inner.contains(target) && atHighestRef.current;
+      // iOS は減速の末に 0.3px などの端数で止まる。1px 未満は上端と見なす。
+      const scrollTop = !inner || inner.scrollTop < 1 ? 0 : inner.scrollTop;
+      const mayDrag = canDragSheet({ atHighest: atHighestRef.current, onContent, scrollTop });
+      scroller.style.overflowY = mayDrag ? 'auto' : 'hidden';
+    };
+    /** 指が離れたら外側を戻す（次の指はまた触れた瞬間に決まる。頼まれた段へ送るのは常に動く）。 */
+    const releaseGesture = () => {
+      scroller.style.removeProperty('overflow-y');
+    };
+
     scroller.addEventListener('scroll', onScroll, { passive: true });
     if (hasScrollEnd) scroller.addEventListener('scrollend', settle);
+    // 捕捉段階で受ける（中身の箱より先に決める）。iOS は touch、それ以外は pointer で届く。
+    scroller.addEventListener('touchstart', takeGesture, { passive: true, capture: true });
+    scroller.addEventListener('pointerdown', takeGesture, { capture: true });
+    scroller.addEventListener('touchend', releaseGesture, { passive: true });
+    scroller.addEventListener('touchcancel', releaseGesture, { passive: true });
+    scroller.addEventListener('pointerup', releaseGesture);
+    scroller.addEventListener('pointercancel', releaseGesture);
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
     // 置き直す。段の位置は容器の高さで決まるので、スクロール位置をそのまま残すと、同じ位置が別の段の位置に
@@ -434,6 +484,13 @@ export function Sheet({
     return () => {
       scroller.removeEventListener('scroll', onScroll);
       if (hasScrollEnd) scroller.removeEventListener('scrollend', settle);
+      scroller.removeEventListener('touchstart', takeGesture, { capture: true });
+      scroller.removeEventListener('pointerdown', takeGesture, { capture: true });
+      scroller.removeEventListener('touchend', releaseGesture);
+      scroller.removeEventListener('touchcancel', releaseGesture);
+      scroller.removeEventListener('pointerup', releaseGesture);
+      scroller.removeEventListener('pointercancel', releaseGesture);
+      scroller.style.removeProperty('overflow-y');
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
@@ -476,36 +533,6 @@ export function Sheet({
     if (header) observer.observe(header);
     return () => observer.disconnect();
   }, [innerEl, scrollToDetent]);
-
-  /**
-   * 中身の箱: **指を置いた瞬間に 1 回だけ**、この指でシートを動かしてよいかを決める（`canDragSheet`）。
-   *
-   * 決まりはブラウザの `overscroll-behavior` に渡すだけで、あとは何もしない。読んでいる途中の指は
-   * `contain`（上端に着いてもシートへ渡さない）、上端に置いた指は `auto`（そのまま引けばシートが縮む）。
-   * 以前はスクロールが止まるのを毎フレーム見張って切り替えていたが、指の状態はスクロールの通知ではなく
-   * 「触れた瞬間」に決まる。見張る必要は無い。
-   */
-  useEffect(() => {
-    const inner = innerEl;
-    if (!inner) return;
-    const decide = () => {
-      // iOS は減速の末に 0.3px などの端数で止まる。1px 未満は上端と見なす。
-      const scrollTop = inner.scrollTop < 1 ? 0 : inner.scrollTop;
-      const mayDrag = canDragSheet({
-        atHighest: atHighestRef.current,
-        onContent: true,
-        scrollTop,
-      });
-      inner.style.overscrollBehaviorY = mayDrag ? 'auto' : 'contain';
-    };
-    decide();
-    inner.addEventListener('pointerdown', decide);
-    inner.addEventListener('touchstart', decide, { passive: true });
-    return () => {
-      inner.removeEventListener('pointerdown', decide);
-      inner.removeEventListener('touchstart', decide);
-    };
-  }, [innerEl]);
 
   if (!present) return null;
 
@@ -612,9 +639,11 @@ export function Sheet({
               {header}
             </div>
           </div>
-          {/* 中身の箱。シートの残りを全部取る。いちばん高い段に着くまでは `overflow-y: hidden`（指はシートの
-              高さに使う）。着いたら `auto` になり、先頭に戻って指を離すまでシートへスクロールを渡さない
-              （上の effect）。`oz-sheet-pass` は iOS で指を容器へ通すため。 */}
+          {/* 中身の箱。シートの残りを全部取る。**いちばん高い段に決まるまでは `overflow-y: hidden`**
+              （指はシートの高さに使う。上の `syncContentScroll`）。読んでいる途中の指をシートへ渡さないのは
+              `overscroll-behavior` ではなく、**触れた瞬間に外側の `overflow-y` を切る**ことで作る
+              （上の `takeGesture`）。外側がそもそもスクローラでなければ、渡しようが無い。
+              `oz-sheet-pass` は iOS で指を容器へ通すため。 */}
           <div
             ref={attachInner}
             data-sheet-content
@@ -622,7 +651,7 @@ export function Sheet({
             // overflow-wrap: anywhere — **中の何物も箱より広くならない**。この箱は iOS 用に横へ 1px だけ
             // はみ出させてある（`oz-sheet-pass`）ので、折り返せない長い語（手紙の中の URL）があると、
             // その幅ぶん横に動けてしまいレイアウトが崩れた（実機レビュー）。箱の側で折り返しを保証する。
-            style={{ overflowY: 'hidden', overscrollBehaviorY: 'auto', overflowWrap: 'anywhere' }}
+            style={{ overflowY: 'hidden', overflowWrap: 'anywhere' }}
           >
             <div>{children}</div>
           </div>
