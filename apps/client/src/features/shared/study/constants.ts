@@ -156,7 +156,7 @@ export const SPREAD_VIEW_Z_NUDGE = 0.04;
  * 入り口は**低く・少し遠く**。歩いてきた人の目の高さから、部屋を見渡す高さへ上がる。
  */
 export const ARRIVAL = {
-  durationMs: 1100,
+  durationMs: 1500,
   /**
    * 水平の距離の倍率（1 より大きいと手前）。
    *
@@ -168,6 +168,14 @@ export const ARRIVAL = {
   distanceScale: 1.34,
   /** ホームの高さに対する入り口の高さの比（1 より小さいと低い）。 */
   riseRatio: 0.72,
+  /**
+   * 寄り方。**扉の歩きは指数で減速しきっているので、出だしの速い ease-out では繋がらない。**
+   *
+   * `easeOutCubic` だった頃は、溶け始めるところで一度落ち着き、そこから書斎が最速で
+   * 動き出していた（コマ差分で 2.66 → 1.48 → 3.37 と跳ねる）。実機でも「もっとスムーズに
+   * したい」と報告された（PR #624）。初速の緩い `easeOutSine` にして、長さも伸ばす。
+   */
+  easing: 'easeOutSine' as const,
 } as const;
 
 /**
@@ -197,6 +205,13 @@ export const EASING = {
   easeOutCubic: (p: number): number => 1 - (1 - p) ** 3,
   /** 立ち上がりと着地の両方が緩やか。 */
   easeInOutCubic: (p: number): number => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2),
+  /**
+   * `sin(pπ/2)`。着地は緩やかだが、**出だしが速すぎない**（初速は easeOutCubic の半分）。
+   *
+   * 減速しきった動きから引き継ぐときに使う。ease-out は出だしが最速なので、繋ぐと
+   * そこで速度が跳ねて「一度落ち着いてからまた動き出した」ように見える。
+   */
+  easeOutSine: (p: number): number => Math.sin((p * Math.PI) / 2),
 } as const;
 
 /** 0..1 に丸める。イージングへ渡す前に必ず通す。 */

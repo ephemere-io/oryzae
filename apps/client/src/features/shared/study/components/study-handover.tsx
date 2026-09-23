@@ -119,18 +119,27 @@ export function StudyHandover() {
       className="pointer-events-none fixed inset-0 z-50"
       style={{
         opacity: leaving ? 0 : 1,
-        transform: `scale(${pushing ? PUSH.scale : 1})`,
+        transform: `scale(${leaving ? PUSH.exitScale : pushing ? PUSH.scale : 1})`,
         // 扉の開口は画面のほぼ中央。少し上を中心にすると、床ではなく奥へ進んで見える。
         transformOrigin: '50% 45%',
-        transition: `opacity ${FADE_MS}ms ease-out, transform ${PUSH.ms}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+        transition: leaving
+          ? // 溶けるあいだは**さらに前へ抜ける**。枠が画面の外へ広がりながら消えるので、
+            // 「扉の絵が書斎の絵に入れ替わった」ではなく「くぐり抜けた」に見える。
+            `opacity ${FADE_MS}ms ease-out, transform ${FADE_MS}ms cubic-bezier(0.3, 0, 0.1, 1)`
+          : `opacity ${FADE_MS}ms ease-out, transform ${PUSH.ms}ms cubic-bezier(0.4, 0, 0.2, 1)`,
         willChange: 'transform, opacity',
       }}
     />
   );
 }
 
-/** 溶かすのにかける時間（ms）。書斎はもう描けているので、静かに退く。 */
-const FADE_MS = 360;
+/**
+ * 溶かすのにかける時間（ms）。
+ *
+ * **長いほど 2 つの動きが重なる**ので、切り替わりが目立たない。短いと、扉の絵から書斎の絵へ
+ * 「入れ替わった」瞬間が読める（実機レビュー「もっとスムーズにしたい」）。
+ */
+const FADE_MS = 560;
 
 /**
  * 受け皿ごと前へ進める量と長さ。
@@ -138,7 +147,12 @@ const FADE_MS = 360;
  * 中の歩きに重ねるぶんなので、ごく小さく。大きくすると canvas を拡大していることが
  * 分かる（線が太る）。長さは、載ってから溶け終わるまで（遅い端末でも）を覆う。
  */
-const PUSH = { scale: 1.05, ms: 1800 } as const;
+const PUSH = {
+  scale: 1.05,
+  ms: 1800,
+  /** 溶けるあいだに抜ける先。枠を画面の外へ送り出すぶんだけ大きく取る。 */
+  exitScale: 1.22,
+} as const;
 
 /**
  * 引く合図を待つ上限（ms）。
