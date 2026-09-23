@@ -64,6 +64,10 @@ export function CanvasViewport({
       {background}
       <div
         ref={canvas.worldRef}
+        // 盤面そのものの目印。**背景（方眼紙）が先に描かれる**ので、外から
+        // 「最初の子」で掴もうとすると動かない要素を掴んでしまう（E2E が実際に
+        // そう書かれていて、パン・ピンチ・FIT の検査が全部素通りしていた）。
+        data-canvas-world=""
         // サイズ 0 の原点ノード。子は world 座標のまま absolute で配置する。
         //
         // `will-change: transform` は付けない。合成レイヤーが子の外接矩形まで広がるため、
