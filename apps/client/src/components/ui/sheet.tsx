@@ -309,11 +309,19 @@ export function Sheet({
     scrollToDetent(detent, 'smooth');
   }, [detent, present, phase, scrollToDetent]);
 
-  // スクロールを見て、暗幕の濃さを書き、止まった段を知らせる。止まった＝2 フレーム続けて同じ位置で、
-  // その位置がどれかの段の位置と一致する（時間のしきい値を持たない）。
+  /**
+   * スクロールを見て決めることは 2 つだけ。
+   *
+   * - **中身を送れるか**（スクロールの通知ごとに比較 1 回）。着くのを待たず、吸着先が決まった時点で開ける
+   * - **止まった段はどれか**（`scrollend`。無いブラウザでは「2 フレーム続けて同じ位置」で代用する）
+   *
+   * 動き（慣性・吸着・弾み）はブラウザのスクローラが持つ。ここでは一切作らない。
+   */
   useEffect(() => {
     const scroller = scrollerEl;
     if (!present || !scroller) return;
+    // 止まりを `scrollend` で受けられるか。受けられて暗幕も無ければ、スクロール中に毎フレーム走る JS は無い。
+    const hasScrollEnd = 'onscrollend' in window;
     let frame = 0;
     let lastTop = Number.NaN;
     // 出し直すたびに「いちばん高い段に居る」を忘れる（中身の箱の既定は `overflow-y: hidden`）。
@@ -328,36 +336,34 @@ export function Sheet({
     };
 
     /**
-     * 中身を送れるようにするか。**位置が止まるのを待たない。**
+     * 中身を送れるようにするか。**着くのを待たず、「いちばん高い段に決まった」時点で開ける。**
      *
-     * 止まった段を見てから切り替えていたころは、いちばん高い段に着いてもしばらく送れなかった
-     * （実機: 「最大サイズになった後、すぐに内側のスクロールを開始できない」）。段に着いたかどうかは
-     * スクロール位置だけで分かるので、スクロールの通知のたびにそのまま当てる（比較 1 回）。
+     * 吸着の動きは終わりが長い。実測（Chromium・払って全画面へ）では、残り 35px から 0px までに
+     * 250ms かかる——見た目はとっくに全画面なのに、最後の 1px を待っていた。オーナーの
+     * 「最大になってから 0.5 秒くらい経たないと内側を送れない」はこれ。
+     *
+     * そこで**いちばん近い吸着先がいちばん高い段か**で決める。これはブラウザが吸着先を選ぶのと同じ問いで、
+     * 2 つの段の中点を越えた時点で「全画面に決まった」と言える。指はまだ外側に latch されているので、
+     * 先に開けておいても内側が動き出すことはない。比較は 1 回のまま。
      */
     const syncContentScroll = () => {
       const inner = innerRef.current;
-      if (!inner) return;
-      const atHighest = scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 1;
+      const highest = latest.current.detents.at(-1);
+      if (!inner || !highest) return;
+      const below = latest.current.detents.at(-2);
+      const top = targetOf(highest);
+      // 中点。いちばん高い段しか無ければその位置そのもの。
+      const commit = below === undefined ? top : (top + targetOf(below)) / 2;
+      const atHighest = scroller.scrollTop >= commit;
       // **変わったときだけ書く。** 毎フレーム同じ値を書くと、そのたびに様式が無効になる（動きが粘る）。
       if (atHighest === atHighestRef.current) return;
       atHighestRef.current = atHighest;
       inner.style.overflowY = contentScrolls(atHighest) ? 'auto' : 'hidden';
     };
 
-    const check = () => {
-      frame = 0;
+    /** 止まった位置がどれかの段と一致したら知らせる。 */
+    const settle = () => {
       const top = scroller.scrollTop;
-      // 暗幕を持つのはモーダルのシートだけ。板（ドック）では毎フレームの採寸をしない。
-      if (backdropRef.current && scroller.clientHeight > 0) {
-        backdropRef.current.style.opacity = String(
-          Math.min(1, visibleOf() / scroller.clientHeight),
-        );
-      }
-      if (top !== lastTop) {
-        lastTop = top;
-        frame = requestAnimationFrame(check);
-        return;
-      }
       const current = latest.current;
       if (current.phase === 'closing') return;
       let settled: SheetDetent | null = null;
@@ -379,11 +385,33 @@ export function Sheet({
       current.onSettle?.(visibleOf());
     };
 
+    /**
+     * `scrollend` が無いブラウザ用の見張り。止まった＝2 フレーム続けて同じ位置（時間のしきい値を持たない）。
+     * 暗幕を持つシートは、濃さを位置に追わせるためどちらにせよ毎フレーム描く。
+     */
+    const watch = () => {
+      frame = 0;
+      const top = scroller.scrollTop;
+      if (backdropRef.current && scroller.clientHeight > 0) {
+        backdropRef.current.style.opacity = String(
+          Math.min(1, visibleOf() / scroller.clientHeight),
+        );
+      }
+      if (top !== lastTop) {
+        lastTop = top;
+        frame = requestAnimationFrame(watch);
+        return;
+      }
+      if (!hasScrollEnd) settle();
+    };
+
+    const needsFrames = !hasScrollEnd || backdropRef.current !== null;
     const onScroll = () => {
       syncContentScroll();
-      if (!frame) frame = requestAnimationFrame(check);
+      if (needsFrames && !frame) frame = requestAnimationFrame(watch);
     };
     scroller.addEventListener('scroll', onScroll, { passive: true });
+    if (hasScrollEnd) scroller.addEventListener('scrollend', settle);
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
     // 置き直す。段の位置は容器の高さで決まるので、スクロール位置をそのまま残すと、同じ位置が別の段の位置に
@@ -405,6 +433,7 @@ export function Sheet({
     observer?.observe(scroller);
     return () => {
       scroller.removeEventListener('scroll', onScroll);
+      if (hasScrollEnd) scroller.removeEventListener('scrollend', settle);
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
