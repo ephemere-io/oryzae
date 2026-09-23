@@ -33,7 +33,12 @@ import {
 } from 'three';
 import { clamp01, RENDER_LIMITS } from '@/features/shared/study/constants';
 import { approach, breathOffset, type CameraView } from '@/features/shared/study/scene/camera';
-import { CORK, JAR_HEIGHT, sampleJarProfile } from '@/features/shared/study/scene/jar';
+import {
+  CORK,
+  EDGES_THRESHOLD_DEG,
+  MERIDIAN_COUNT,
+  sampleJarProfile,
+} from '@/features/shared/study/scene/jar';
 import { createMaterials, type StudyMaterials } from '@/features/shared/study/scene/materials';
 import {
   DOOR,
@@ -405,16 +410,6 @@ function aspectOf(container: HTMLElement): number {
   return height > 0 ? container.clientWidth / height : 1;
 }
 
-/** 水平な円の点列（口縁・蓋の縁）。 */
-function ringPoints(radius: number, y: number, segments = 36): Vector3[] {
-  const points: Vector3[] = [];
-  for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
-    points.push(new Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius));
-  }
-  return points;
-}
-
 function distanceBetween(a: CameraView['position'], b: CameraView['position']): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
@@ -713,53 +708,46 @@ function buildStudyGlimpse(
     ),
   );
 
-  // 瓶。**書斎で会う瓶と同じ形にする** — 母線・口縁・蓋（コルク）。
+  // 瓶。**書斎で会う瓶と同じ描き方にする** — 面・稜線・経線・蓋（コルク）。
   //
-  // 以前は経線だけで、蓋も口縁も無かった。「ドアを開けた時に見える壺が、書斎の壺と
-  // デザインが違うので初見の人は『？』となりそう」と報告された（PR #624 のレビュー）。
-  // 扉の向こうに見えるものが、入った先で会うものと違うと、別の部屋だと読まれる。
-  // 塗りは置かない（気配なので線だけ）が、形は同じにする。
+  // 以前は線だけで描いていた。「ドアを開けた時に見える壺が、書斎の壺とデザインが違う」と
+  // 報告された（PR #624 のレビュー）。面が無いと奥の物が透けて**針金細工**に見え、経線が
+  // 全部同じ濃さで縞に見え、蓋も浮いた輪に見える。**薄さで気配にするのであって、
+  // 描き方を変えてはいけない** — 遠くにある同じ瓶、として置く。
   const profile = sampleJarProfile();
   const jar = new Group();
   jar.position.set(jarX, deskY, GLIMPSE_Z);
   jar.scale.setScalar(scale);
-  const meridians = 4;
-  for (let i = 0; i < meridians; i++) {
-    const angle = (i / meridians) * Math.PI;
-    const points = profile.map(
-      (point) => new Vector3(Math.sin(angle) * point.x, point.y, Math.cos(angle) * point.x),
-    );
-    // 手前と奥の 2 本を 1 本の輪郭に繋げる（半周ずつ）。真横（π/2）の 1 本が輪郭になるので、
-    // そこだけ一段濃くする。
-    const back = profile
-      .map((point) => new Vector3(-Math.sin(angle) * point.x, point.y, -Math.cos(angle) * point.x))
-      .reverse();
-    jar.add(lineFrom([...points, ...back], i === meridians / 2 ? line : faint, own));
-  }
-  // 口縁。ここが無いと、口の開いた壺に見える。
-  jar.add(lineFrom(ringPoints(1.0, JAR_HEIGHT), line, own));
-  // 蓋（コルク）。上下の円と、側面の短い縦で木口を示す。書斎では塗りが載る部分。
-  const corkTop = CORK.y + CORK.height / 2;
-  const corkBottom = CORK.y - CORK.height / 2;
-  jar.add(lineFrom(ringPoints(CORK.radiusTop, corkTop), line, own));
-  jar.add(lineFrom(ringPoints(CORK.radiusBottom, corkBottom), line, own));
-  for (let i = 0; i < 4; i++) {
-    const angle = (i / 4) * Math.PI * 2;
+  // 面。紙と同じ色で塗って、奥の板や机を透かさない。
+  const bodyGeometry = own(new LatheGeometry(profile, 48));
+  jar.add(new Mesh(bodyGeometry, materials.solid));
+  // 稜線。しきい値 45° で口縁と角だけが残る（胴に横線が出ない）。
+  jar.add(new LineSegments(own(new EdgesGeometry(bodyGeometry, EDGES_THRESHOLD_DEG)), line));
+  // 経線。書斎と同じ本数で、うんと薄く。
+  for (let i = 0; i < MERIDIAN_COUNT; i++) {
+    const angle = (i / MERIDIAN_COUNT) * Math.PI * 2;
     jar.add(
       lineFrom(
-        [
-          new Vector3(
-            Math.cos(angle) * CORK.radiusBottom,
-            corkBottom,
-            Math.sin(angle) * CORK.radiusBottom,
-          ),
-          new Vector3(Math.cos(angle) * CORK.radiusTop, corkTop, Math.sin(angle) * CORK.radiusTop),
-        ],
+        profile.map(
+          (point) => new Vector3(Math.sin(angle) * point.x, point.y, Math.cos(angle) * point.x),
+        ),
         faint,
         own,
       ),
     );
   }
+  // 蓋（コルク）。書斎と同じクリームの塗りと稜線。
+  const corkGeometry = own(
+    new CylinderGeometry(CORK.radiusTop, CORK.radiusBottom, CORK.height, 24),
+  );
+  const cork = new Mesh(corkGeometry, materials.cork);
+  cork.position.y = CORK.y;
+  jar.add(cork);
+  jar.add(
+    new LineSegments(own(new EdgesGeometry(corkGeometry, EDGES_THRESHOLD_DEG)), line).translateY(
+      CORK.y,
+    ),
+  );
   group.add(jar);
 
   return {

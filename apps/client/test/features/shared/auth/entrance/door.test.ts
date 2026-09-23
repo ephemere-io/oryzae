@@ -86,8 +86,10 @@ describe('doorAngleWhileEntering', () => {
   it('開き具合は 待つ < 送信中 < 入る の順', () => {
     expect(DOOR_ANGLE.rest).toBeLessThan(DOOR_ANGLE.waiting);
     expect(DOOR_ANGLE.waiting).toBeLessThan(DOOR_ANGLE.open);
-    // 壁に当たる（90° を大きく越える）ほどは開かない。
-    expect(DOOR_ANGLE.open).toBeLessThan(Math.PI * 0.6);
+    // 奥の書斎が扉板に隠れないところまでは開く（98° では瓶が半分隠れていた）。
+    expect(DOOR_ANGLE.open).toBeGreaterThan(Math.PI * 0.55);
+    // ただし壁へ倒し切らない。扉が「開いている」と読める角度で止める。
+    expect(DOOR_ANGLE.open).toBeLessThan(Math.PI * 0.68);
   });
 });
 
