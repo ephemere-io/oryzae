@@ -227,17 +227,66 @@ test.describe('ボードの複数選択', () => {
     }, ids);
   }
 
+  /**
+   * 作りたてのカード（＝いちばん手前）を、画面上の指定した点まで運ぶ。
+   *
+   * **盤面は本人のアカウントで、過去のカードが溜まっている。** 新しいカードはどれも
+   * 「画面の中央」に生まれるので、そこは山になっている。当たり判定でどれか 1 枚を
+   * 選び出そうとすると、覆われていて掴めない（実際に E2E がそれで落ちた）。
+   * 作った直後＝最前面のうちに、空いている場所へ動かしてしまうのが確実。
+   *
+   * 掴むのは中心なので、運び終わるとカードの中心が `to` に来る。
+   */
+  async function carryCardTo(
+    page: import('@playwright/test').Page,
+    text: string,
+    to: { x: number; y: number },
+  ) {
+    const card = page.locator('[data-card-id]').filter({ hasText: text });
+    const box = await card.boundingBox();
+    expect(box, `${text} のカードが見つからない`).not.toBeNull();
+    if (!box) return;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+  }
+
+  /** そのカードが選択されているか（契約を直接読む）。 */
+  async function isSelected(page: import('@playwright/test').Page, text: string) {
+    return page
+      .locator('[data-card-id]')
+      .filter({ hasText: text })
+      .getAttribute('data-verify-selected');
+  }
+
   test('Shift で 2 枚選び、まとめて動かせる（開くは出ない）', async ({ page }) => {
     const first = `E2E群1-${Date.now()}`;
     const second = `E2E群2-${Date.now()}`;
+
+    // **2 枚とも先に作る。** 間に運ぶ操作を挟むとカードが選択状態になり、道具箱が
+    // 「カードの操作」に入れ替わって作成ボタンが消える（それで 2 枚目が作れず落ちた）。
+    //
+    // 運ぶのは新しい順。作った直後の 2 枚目が最前面なので先に右へ、続いて中央で
+    // 最前面になった 1 枚目を左へ。これで中央の山から 2 枚とも抜ける。
+    const left = { x: 320, y: 250 };
+    const right = { x: 880, y: 250 };
     await createSnippet(page, first);
     await createSnippet(page, second);
+    await carryCardTo(page, second, right);
+    await carryCardTo(page, first, left);
 
     const cardOne = page.locator('[data-card-id]').filter({ hasText: first });
-    const cardTwo = page.locator('[data-card-id]').filter({ hasText: second });
 
-    await cardOne.click({ force: true });
-    await cardTwo.click({ force: true, modifiers: ['Shift'] });
+    await page.mouse.click(left.x, left.y);
+    await page.keyboard.down('Shift');
+    await page.mouse.click(right.x, right.y);
+    await page.keyboard.up('Shift');
+
+    // 狙った 2 枚が選べたか。ここで落ちれば「別のカードに当たった」と分かる。
+    expect(await isSelected(page, first), '1 枚目が選べていない').toBe('true');
+    expect(await isSelected(page, second), '2 枚目が選べていない').toBe('true');
 
     // 群の枠が出て、枚数が 2
     const frame = page.locator('[data-verify-unit="SelectionFrame"]');
