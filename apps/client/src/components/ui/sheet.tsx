@@ -98,11 +98,13 @@ type Phase = 'entering' | 'open' | 'closing';
  * | --- | --- | --- |
  * | どこでも | いちばん高い段では**ない** | 板（中身は `overflow-y: hidden`） |
  * | 見出しの行 | いちばん高い段 | 板 |
- * | 中身 | いちばん高い段 | **中身だけ**（`overscroll-behavior: contain` で板へ渡さない） |
+ * | 中身（読んでいる途中） | いちばん高い段 | **中身だけ**（`overscroll-behavior: contain`） |
+ * | 中身（上端に居る） | いちばん高い段 | 板（`overscroll-behavior: auto` で下へ引けば縮む） |
  *
- * 中身の箱の上端が**指の届かない壁**になるので、読み終えて強く払い戻しても板は縮まない。
- * 慣性を JS で止める必要が無い（止められもしない。位置を書き戻しても上書きされる。実測）。
- * 板を縮めるのは見出しの行（引く・押す）。見出しは `sticky` で読んでいる間も残る。
+ * 最後の 2 行が「外側のスクロールが終わってから内側に入る」の折り返し。**読んでいる途中の指**は
+ * 上端に着いてもそこで止まり（勢いで板が畳まれない）、**離してもう一度**引くと板が縮む。
+ * どちらかは触れた瞬間の `scrollTop` だけで決まる——向きも速さも時間も見ない。
+ * 見出しの行を引く・押すでも縮む（`sticky` で読んでいる間も残る）。
  *
  * **JS は指に一切触らない。** 触れた瞬間・離した瞬間に style を書くのもやめた——祖先の
  * `overflow` を書き換えると iOS はスクロールを打ち切り、**慣性が消えて 1 行ずつしか進まなくなる**
@@ -460,6 +462,57 @@ export function Sheet({
   }, [present, targetOf, scrollerEl, scrollToDetent]);
 
   /**
+   * 中身の箱から板へスクロールを渡すか（`overscroll-behavior`）を、**スクロールが終わった時点で**決める。
+   *
+   * - 上端で止まっている → `auto`。次の指で下へ引けば**板が縮む**
+   *   （オーナー: 「最大サイズの状態で上から下にスワイプすると外側のサイズを変更できる想定」）
+   * - 途中で止まっている（読んでいる） → `contain`。上端に着いてもそこで止まる
+   *   ＝読み終えた勢いで板が畳まれない。**離してもう一度**引けば縮む
+   *
+   * **触れた瞬間には書かない。** 指が触れた時点で書くと、その指の受け渡し（scroll chaining）が
+   * 成立しない（実測: `auto` にしても板へ渡らなかった）。ブラウザは指が触れた瞬間に
+   * 「どこへ渡すか」を決めるので、決まりは**その前に**置いておく必要がある。
+   * 終わった時点で書くなら、次の指はいつも正しい決まりの上で始まる。
+   *
+   * 書くのは中身の箱じしんの性質だけ。祖先（スクロール容器）の style を指が触れている間に書くと
+   * iOS はスクロールを打ち切る（慣性が消えて 1 行ずつになる。実機レビュー）。
+   */
+  useEffect(() => {
+    const inner = innerEl;
+    if (!inner) return;
+    let frame = 0;
+    let lastTop = Number.NaN;
+    const decide = () => {
+      // iOS は減速の末に 0.3px などの端数で止まる。1px 未満は上端と見なす。
+      const next = inner.scrollTop < 1 ? 'auto' : 'contain';
+      if (inner.style.overscrollBehaviorY !== next) inner.style.overscrollBehaviorY = next;
+    };
+    /** `scrollend` が無いブラウザ用: 2 フレーム続けて同じ位置なら止まったと見なす。 */
+    const watch = () => {
+      frame = 0;
+      if (inner.scrollTop !== lastTop) {
+        lastTop = inner.scrollTop;
+        frame = requestAnimationFrame(watch);
+        return;
+      }
+      decide();
+    };
+    const hasScrollEnd = 'onscrollend' in window;
+    const onScroll = () => {
+      if (hasScrollEnd || frame) return;
+      frame = requestAnimationFrame(watch);
+    };
+    decide();
+    if (hasScrollEnd) inner.addEventListener('scrollend', decide);
+    else inner.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      if (hasScrollEnd) inner.removeEventListener('scrollend', decide);
+      else inner.removeEventListener('scroll', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [innerEl]);
+
+  /**
    * 中身の段の吸着先は「見出し + 中身の高さ」。シートは容器と同じ高さなので、CSS だけでは中身の高さが分からない。
    * 測って CSS 変数（`--oz-sheet-content`）に渡し、**吸着そのものはブラウザに任せる**（JS で段へ送らない）。
    * 描画の前に測る（layout effect）: 空きの高さがこの値で決まるので、測る前に描くと一瞬だけ全画面で出る。
@@ -620,11 +673,9 @@ export function Sheet({
             // overflow-wrap: anywhere — **中の何物も箱より広くならない**。この箱は iOS 用に横へ 1px だけ
             // はみ出させてある（`oz-sheet-pass`）ので、折り返せない長い語（手紙の中の URL）があると、
             // その幅ぶん横に動けてしまいレイアウトが崩れた（実機レビュー）。箱の側で折り返しを保証する。
-            style={{
-              overflowY: 'hidden',
-              overscrollBehaviorY: 'contain',
-              overflowWrap: 'anywhere',
-            }}
+            // overscroll-behavior は上の effect が持つ（React の再描画で上書きされないよう、
+            // ここには書かない）。既定は `contain`。
+            style={{ overflowY: 'hidden', overflowWrap: 'anywhere' }}
           >
             <div>{children}</div>
           </div>
