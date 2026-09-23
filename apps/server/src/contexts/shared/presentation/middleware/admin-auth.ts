@@ -31,7 +31,11 @@ export async function adminAuthMiddleware(c: Context, next: Next) {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
-  const isAdmin = user.user_metadata?.is_admin === true;
+  // 管理者判定は app_metadata で行う。user_metadata は本人が auth.updateUser({ data })
+  // で書き換えられる領域なので、そこに置くと anon key を持つ一般ユーザーが自分を
+  // 管理者に昇格できてしまう。app_metadata は service role（auth.admin.updateUserById）
+  // からしか書けない。既存の管理者フラグは 00025 の migration で移した。
+  const isAdmin = user.app_metadata?.is_admin === true;
   if (!isAdmin) {
     return c.json({ error: 'Admin access required' }, 403);
   }

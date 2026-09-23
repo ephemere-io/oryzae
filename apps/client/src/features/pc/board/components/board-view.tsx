@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BackLink } from '@/components/ui/back-link';
 import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
@@ -376,6 +377,11 @@ export function BoardView({ api }: BoardViewProps) {
       onDragLeave={intake.onDragLeave}
       onDrop={intake.onDrop}
     >
+      {/* 左上の出口（書斎が無効なら描かれない）。盤面はヘッダーを持たないので、
+          瓶（jar-view）と同じく隅に置く。日付ナビと表示単位の切り替えがあったころは
+          上段バーの中に並べていたが、ボードが 1 人に 1 枚になってバーごと無くなった。 */}
+      <BackLink placement="corner" />
+
       <CanvasViewport
         canvas={canvas}
         ariaLabel={t('canvas.aria_label')}

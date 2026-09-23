@@ -8,9 +8,12 @@
  * ## 用途別の内訳も **実額** で取る（推定しない）
  *
  * `group_by[]=description` を付けると、各 result に `model` / `token_type` /
- * `service_tier` が入る。Oryzae は用途ごとに別モデルを使っている
- * （発酵 = claude-sonnet-4-6、OCR = claude-opus-5）ので、**モデル別の内訳が
- * そのまま用途別の実額**になる。自前でトークンを記録して単価を掛ける必要はない。
+ * `service_tier` が入る。Oryzae は発酵 (claude-sonnet-4-6) と画像の文字起こし
+ * (claude-sonnet-5) で別モデルを使っているので、**モデル別の内訳がおおむね
+ * 用途別の実額**になる。自前でトークンを記録して単価を掛ける必要はない。
+ *
+ * 「おおむね」なのは 1:1 ではないから。board の OCR と写真の文字起こしは同じ
+ * claude-sonnet-5 なので 1 行に混ざる（featureOfModel が両方の名前を返す）。
  *
  * これはキャッシュ読み書き・値引き・課金丸めも反映済みの実額なので、自前推定より
  * 正確でもある（`token_type` に cache_read / cache_creation が現れる）。

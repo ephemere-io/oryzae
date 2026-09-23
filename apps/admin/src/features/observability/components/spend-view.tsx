@@ -278,8 +278,9 @@ export function SpendView({
           </div>
 
           {/* 用途別の内訳は **実額** で出す。cost_report を group_by[]=description で
-              取るとモデル別に割れ、Oryzae は用途ごとに別モデルを使っているので、
-              モデル別内訳がそのまま用途別の実額になる。「OCR がいくらか」はここで読む。 */}
+              取るとモデル別に割れるので、モデル別内訳がおおむね用途別の実額になる。
+              1:1 ではない——board の OCR と写真の文字起こしは同じ sonnet-5 で 1 行に
+              混ざる。サーバーが feature に両方の名前を返すので、画面はそれを出すだけ。 */}
           {data.actual.status === 'ok' && data.actual.groupingUnavailable && (
             <div className="rounded-md bg-yellow-500/10 px-4 py-3 text-xs text-yellow-600 dark:text-yellow-500">
               Anthropic が実請求額の内訳を返しませんでした（group_by
