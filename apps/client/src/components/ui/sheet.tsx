@@ -3,14 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { placeInSlot } from '@/lib/sp-chrome-context';
 import { canDragSheet, contentScrolls, TAP_SLOP_PX } from './sheet-gesture';
-
-/**
- * 払いと見なす指の速さ（px/ms）。これを超えたら 1 段動かす。超えなければいちばん近い段に置く。
- *
- * 離した瞬間に段を決めるのは、ブラウザの慣性を待つと「動いているスクローラ」が次の指を取ってしまうため
- * （WebKit）。決めるのは 1 回だけで、動きそのものは CSS の曲線に任せる。
- */
-const FLICK_PX_PER_MS = 0.35;
+import { SheetProbe, sheetProbeOn } from './sheet-probe';
 
 /**
  * シートの段。
@@ -310,13 +303,6 @@ export function Sheet({
     };
   }, [present, phase]);
 
-  // 消すと決めたら、追いつきの `translate` を外す（インラインが残っていると CSS の引っ込みが効かない）。
-  useEffect(() => {
-    if (open) return;
-    scrollerEl?.style.removeProperty('translate');
-    scrollerEl?.style.removeProperty('transition');
-  }, [open, scrollerEl]);
-
   // 呼び出し側が段を変えたら、その段へ動く（指で止めた段の通知の折り返しでは動かない）。
   useEffect(() => {
     if (!present || phase !== 'open') return;
@@ -339,11 +325,6 @@ export function Sheet({
     const hasScrollEnd = 'onscrollend' in window;
     let frame = 0;
     let lastTop = Number.NaN;
-    /** いまの指の持ち主と、その指が始まった段。離した瞬間の決着に使う。 */
-    let gestureOwner: 'sheet' | 'content' | null = null;
-    let startDetent: SheetDetent | null = null;
-    let catchupTimer = 0;
-    const samples: { y: number; t: number }[] = [];
     // 出し直すたびに「いちばん高い段に居る」を忘れる（中身の箱の既定は `overflow-y: hidden`）。
     atHighestRef.current = false;
 
@@ -466,17 +447,6 @@ export function Sheet({
         scroller.scrollTop = goal;
         syncContentScroll();
       }
-      // 追いつきの後始末は、この指が来た時点で打ち切る（時間切れの後始末が持ち主の指定を消さないように）。
-      window.clearTimeout(catchupTimer);
-      catchupTimer = 0;
-      // 絵の遅れ（離した瞬間に付けた `translate`）が残っていたら、触れた時点で消す。位置はもう
-      // 終わっているので、消せば見た目が本当の位置に揃う（＝触れたら決着する）。
-      if (scroller.style.translate) {
-        scroller.style.transition = 'none';
-        scroller.style.removeProperty('translate');
-        void scroller.offsetHeight;
-        scroller.style.removeProperty('transition');
-      }
       const inner = innerRef.current;
       const target = event.target;
       const onContent =
@@ -485,105 +455,10 @@ export function Sheet({
       const scrollTop = !inner || inner.scrollTop < 1 ? 0 : inner.scrollTop;
       const mayDrag = canDragSheet({ atHighest: atHighestRef.current, onContent, scrollTop });
       scroller.style.overflowY = mayDrag ? 'auto' : 'hidden';
-      gestureOwner = mayDrag ? 'sheet' : 'content';
-      startDetent = settledRef.current;
-      samples.length = 0;
-      if (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent) trackTouch(event);
     };
-
-    /**
-     * 指の位置を控える（速さは最後の 2 点から出す）。
-     *
-     * 時刻は `performance.now()` で取る。`event.timeStamp` は時間の原点が環境で違い、
-     * 作り物のイベント（検証の払い）では進まないことがある——進まないと払いが払いに見えず、
-     * いちばん近い段に落ちて段を飛ばす（検証で全画面 → 覗くへ 2 段落ちた）。
-     */
-    const trackTouch = (event: TouchEvent) => {
-      const touch = event.touches[0] ?? event.changedTouches[0];
-      if (!touch) return;
-      samples.push({ y: touch.clientY, t: performance.now() });
-      if (samples.length > 4) samples.shift();
-    };
-    /** 指の速さ（px/ms、下向きが正）。 */
-    const flickSpeed = () => {
-      const last = samples.at(-1);
-      const previous = samples.at(-2);
-      if (!last || !previous) return 0;
-      const dt = last.t - previous.t;
-      return dt <= 0 ? 0 : (last.y - previous.y) / dt;
-    };
-
-    /**
-     * **指が離れた瞬間に段を決めて、位置はその場で置く。**
-     *
-     * ブラウザの慣性と吸着に任せると、着くまでの 300〜500ms は「いま動いているスクローラ」が残り、
-     * WebKit ではその間に触れた指を外側が取ってしまう（実機: 全画面に着いた直後にもう一度払っても
-     * 内側が送れない）。待ち時間で誤魔化すのではなく、**離した瞬間に位置を終わらせる**。
-     * 慣性そのものが無くなるので、次の指は必ず自由。
-     *
-     * 見た目は殻ごとの `translate` を遅れの分だけ付けて、CSS の 300ms の曲線（`.oz-sheet-scroller`）で
-     * 追いつかせる。**位置はもう終わっていて、動いて見えるのは絵だけ**なので、途中で触れても取り合いにならない。
-     */
-    const settleOnRelease = () => {
-      if (gestureOwner !== 'sheet') return;
-      const detents = latest.current.detents;
-      const top = scroller.scrollTop;
-      const speed = flickSpeed();
-      const fromIndex = startDetent ? detents.indexOf(startDetent) : -1;
-      let next: SheetDetent | null = null;
-      if (Math.abs(speed) >= FLICK_PX_PER_MS && fromIndex >= 0) {
-        // 払い。1 回で 1 段だけ動く（指が上なら高い段へ。`speed` は下向きが正）。
-        const step = speed < 0 ? 1 : -1;
-        next = detents[Math.min(detents.length - 1, Math.max(0, fromIndex + step))] ?? null;
-      } else {
-        let best = Number.POSITIVE_INFINITY;
-        for (const candidate of detents) {
-          const distance = Math.abs(targetOf(candidate) - top);
-          if (distance < best) {
-            best = distance;
-            next = candidate;
-          }
-        }
-      }
-      if (!next) return;
-      const goal = targetOf(next);
-      const delay = goal - top;
-      if (Math.abs(delay) < 1) return;
-      scroller.scrollTop = goal;
-      syncContentScroll();
-      // 追いつくあいだは外側を止める。**iOS がこのあと慣性を始めないように**（始まると
-      // また「動いているスクローラ」になり、次の指を取ってしまう）。絵は `translate` で動く。
-      // 次に指が触れれば `takeGesture` が持ち主を決め直すので、ここで止めていても手は止まらない。
-      scroller.style.overflowY = 'hidden';
-      scroller.style.transition = 'none';
-      scroller.style.translate = `0 ${delay}px`;
-      void scroller.offsetHeight;
-      scroller.style.removeProperty('transition');
-      scroller.style.translate = '0 0';
-      window.clearTimeout(catchupTimer);
-      catchupTimer = window.setTimeout(endCatchup, 360);
-    };
-    /** 追いつきの後始末。`transitionend` が来なかったときのために時間でも戻す。 */
-    const endCatchup = () => {
-      window.clearTimeout(catchupTimer);
-      catchupTimer = 0;
-      scroller.style.removeProperty('translate');
-      scroller.style.removeProperty('transition');
-      scroller.style.removeProperty('overflow-y');
-    };
-    /**
-     * 絵が追いついたら `translate` を外す。**残したままにしない**——消す動き（`[data-shown=false]` の
-     * `translate: 0 100%`）は CSS なので、インラインが残っていると引っ込まなくなる。
-     */
-    const clearCatchup = (event: TransitionEvent) => {
-      if (event.target !== scroller || event.propertyName !== 'translate') return;
-      endCatchup();
-    };
-    /** 指が離れたら、段を決着させる（外側の持ち主は次に触れた指が決め直す）。 */
+    /** 指が離れたら外側を戻す（次の指はまた触れた瞬間に決まる。頼まれた段へ送るのは常に動く）。 */
     const releaseGesture = () => {
       scroller.style.removeProperty('overflow-y');
-      settleOnRelease();
-      gestureOwner = null;
     };
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
@@ -591,8 +466,6 @@ export function Sheet({
     // 捕捉段階で受ける（中身の箱より先に決める）。iOS は touch、それ以外は pointer で届く。
     scroller.addEventListener('touchstart', takeGesture, { passive: true, capture: true });
     scroller.addEventListener('pointerdown', takeGesture, { capture: true });
-    scroller.addEventListener('touchmove', trackTouch, { passive: true, capture: true });
-    scroller.addEventListener('transitionend', clearCatchup);
     scroller.addEventListener('touchend', releaseGesture, { passive: true });
     scroller.addEventListener('touchcancel', releaseGesture, { passive: true });
     scroller.addEventListener('pointerup', releaseGesture);
@@ -621,16 +494,11 @@ export function Sheet({
       if (hasScrollEnd) scroller.removeEventListener('scrollend', settle);
       scroller.removeEventListener('touchstart', takeGesture, { capture: true });
       scroller.removeEventListener('pointerdown', takeGesture, { capture: true });
-      scroller.removeEventListener('touchmove', trackTouch, { capture: true });
-      scroller.removeEventListener('transitionend', clearCatchup);
-      window.clearTimeout(catchupTimer);
       scroller.removeEventListener('touchend', releaseGesture);
       scroller.removeEventListener('touchcancel', releaseGesture);
       scroller.removeEventListener('pointerup', releaseGesture);
       scroller.removeEventListener('pointercancel', releaseGesture);
       scroller.style.removeProperty('overflow-y');
-      scroller.style.removeProperty('translate');
-      scroller.style.removeProperty('transition');
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
@@ -675,6 +543,9 @@ export function Sheet({
   }, [innerEl, scrollToDetent]);
 
   if (!present) return null;
+
+  // 実機の値を読むための計器（`?sheetprobe=1` のときだけ）。原因が分かったら消す。
+  const probe = sheetProbeOn() ? <SheetProbe scroller={scrollerEl} inner={innerEl} /> : null;
 
   const has = (d: SheetDetent) => detents.includes(d);
   // 見た目の段階は `open` から即座に決める（消すと決めた描画のうちに引っ込み始め、押せなくなる。effect を待たない）。
@@ -818,6 +689,7 @@ export function Sheet({
           />
         </section>
       </div>
+      {probe}
     </div>,
     slot,
   );
