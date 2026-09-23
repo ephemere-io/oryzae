@@ -342,6 +342,7 @@ export function Sheet({
     /** いまの指の持ち主と、その指が始まった段。離した瞬間の決着に使う。 */
     let gestureOwner: 'sheet' | 'content' | null = null;
     let startDetent: SheetDetent | null = null;
+    let catchupTimer = 0;
     const samples: { y: number; t: number }[] = [];
     // 出し直すたびに「いちばん高い段に居る」を忘れる（中身の箱の既定は `overflow-y: hidden`）。
     atHighestRef.current = false;
@@ -465,6 +466,9 @@ export function Sheet({
         scroller.scrollTop = goal;
         syncContentScroll();
       }
+      // 追いつきの後始末は、この指が来た時点で打ち切る（時間切れの後始末が持ち主の指定を消さないように）。
+      window.clearTimeout(catchupTimer);
+      catchupTimer = 0;
       // 絵の遅れ（離した瞬間に付けた `translate`）が残っていたら、触れた時点で消す。位置はもう
       // 終わっているので、消せば見た目が本当の位置に揃う（＝触れたら決着する）。
       if (scroller.style.translate) {
@@ -541,11 +545,25 @@ export function Sheet({
       if (Math.abs(delay) < 1) return;
       scroller.scrollTop = goal;
       syncContentScroll();
+      // 追いつくあいだは外側を止める。**iOS がこのあと慣性を始めないように**（始まると
+      // また「動いているスクローラ」になり、次の指を取ってしまう）。絵は `translate` で動く。
+      // 次に指が触れれば `takeGesture` が持ち主を決め直すので、ここで止めていても手は止まらない。
+      scroller.style.overflowY = 'hidden';
       scroller.style.transition = 'none';
       scroller.style.translate = `0 ${delay}px`;
       void scroller.offsetHeight;
       scroller.style.removeProperty('transition');
       scroller.style.translate = '0 0';
+      window.clearTimeout(catchupTimer);
+      catchupTimer = window.setTimeout(endCatchup, 360);
+    };
+    /** 追いつきの後始末。`transitionend` が来なかったときのために時間でも戻す。 */
+    const endCatchup = () => {
+      window.clearTimeout(catchupTimer);
+      catchupTimer = 0;
+      scroller.style.removeProperty('translate');
+      scroller.style.removeProperty('transition');
+      scroller.style.removeProperty('overflow-y');
     };
     /**
      * 絵が追いついたら `translate` を外す。**残したままにしない**——消す動き（`[data-shown=false]` の
@@ -553,12 +571,12 @@ export function Sheet({
      */
     const clearCatchup = (event: TransitionEvent) => {
       if (event.target !== scroller || event.propertyName !== 'translate') return;
-      scroller.style.removeProperty('translate');
+      endCatchup();
     };
-    /** 指が離れたら、段を決着させて外側を戻す。 */
+    /** 指が離れたら、段を決着させる（外側の持ち主は次に触れた指が決め直す）。 */
     const releaseGesture = () => {
-      settleOnRelease();
       scroller.style.removeProperty('overflow-y');
+      settleOnRelease();
       gestureOwner = null;
     };
 
@@ -599,6 +617,7 @@ export function Sheet({
       scroller.removeEventListener('pointerdown', takeGesture, { capture: true });
       scroller.removeEventListener('touchmove', trackTouch, { capture: true });
       scroller.removeEventListener('transitionend', clearCatchup);
+      window.clearTimeout(catchupTimer);
       scroller.removeEventListener('touchend', releaseGesture);
       scroller.removeEventListener('touchcancel', releaseGesture);
       scroller.removeEventListener('pointerup', releaseGesture);
