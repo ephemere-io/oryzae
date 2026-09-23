@@ -522,9 +522,8 @@
   },
   "photo": {
     "toolbar_button": "照片",
-    "modal_title": "导入照片",
-    "modal_description": "可以识别为文字，也可以直接作为照片附上。",
-    "ai_notice": "选择「识别为文字」时，照片会发送给 AI（Anthropic 的 Claude）。",
+    "modal_title": "要添加这张照片吗？",
+    "ai_notice": "选择「读取为文字」会把照片发送到外部 API。",
     "preview_alt": "待导入照片的预览",
     "transcribe": "识别为文字",
     "transcribing": "识别中…",
@@ -560,7 +559,18 @@
     "resize_se": "拖动右下角调整大小",
     "resize_s": "拖动下边调整大小",
     "resize_sw": "拖动左下角调整大小",
-    "resize_w": "拖动左边调整大小"
+    "resize_w": "拖动左边调整大小",
+    "size": "尺寸",
+    "width_small": "小",
+    "width_medium": "中",
+    "width_large": "大",
+    "align": "对齐",
+    "wrap": "文字环绕",
+    "wrap_on": "开",
+    "wrap_off": "关",
+    "align_needs_room": "整行宽度时无法对齐",
+    "selected": "已选中照片",
+    "choose_file": "选择照片"
   },
   "fermentation": {
     "detail": {
