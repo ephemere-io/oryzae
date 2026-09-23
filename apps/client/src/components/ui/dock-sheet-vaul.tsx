@@ -3,6 +3,7 @@
 // verify-exempt: 試作。Vaul（shadcn/ui の Drawer の中身）で板を作り、`?sheet=vaul` のときだけ差し替わる。
 // 実機で手触りを見て全面移行を決める。決まったら `DockSheet` / `Sheet` を置き換えるか、この部品を消す。
 
+import * as Dialog from '@radix-ui/react-dialog';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Drawer } from 'vaul';
@@ -27,6 +28,7 @@ const PEEK_FIRST: readonly DockDetent[] = ['peek', 'half', 'full'];
  *   その部分がパレットを覆う（実機: パレットが消えた）。`fixed` にして層に `transform` で閉じ込める作りは、
  *   実機（iOS の PWA）で効かず、画面の下端を基準に置かれた
  * - 段に止まるたびに見えている高さを `--sp-dock-inset` に渡す（本文の末尾が板の下に隠れない）
+ * - Vaul の面は Radix の Dialog なので、**非モーダルの文脈で包む**（下の `Dialog.Root` の注を見よ）
  */
 export function DockSheetVaul({
   open,
@@ -124,64 +126,87 @@ export function DockSheetVaul({
             if (next && next !== detent) onDetentChange(next);
           }}
         >
-          <Drawer.Portal container={clip}>
-            <Drawer.Content
-              {...contract}
-              data-sheet-engine="vaul"
-              aria-label={ariaLabel}
-              aria-describedby={undefined}
-              className="pointer-events-auto absolute inset-x-0 bottom-0 flex flex-col rounded-t-3xl border-t outline-none"
-              style={{
-                height: layerHeight,
-                background: 'var(--surface-raised)',
-                borderColor: 'var(--surface-raised-border)',
-                boxShadow: '0 -8px 32px rgba(140,133,126,0.18)',
-              }}
-            >
-              <Drawer.Title className="sr-only">{ariaLabel}</Drawer.Title>
-              {/* biome-ignore lint/a11y/useKeyWithClickEvents: 見出しの行を押すのは段の切り替えの近道。同じことはつまみを引いてもできる */}
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: 同上 */}
-              <div
-                ref={attachHeader}
-                data-dock-peek
-                className="flex w-full shrink-0 select-none flex-col items-center px-5 pt-2 pb-2"
-                style={{ cursor: 'grab' }}
-                onClick={(event) => {
-                  if (!second) return;
-                  if (event.target instanceof Element && event.target.closest('button, a, input'))
-                    return;
-                  if (detent === lowest) {
-                    onPeekTap?.();
-                    onDetentChange(second);
-                  } else {
-                    onDetentChange(lowest);
-                  }
+          {/*
+            Vaul は中で Radix の Dialog を **`modal` を渡さずに** 作る（`vaul/dist/index.mjs` の
+            `DialogPrimitive.Root` には `defaultOpen` / `onOpenChange` / `open` しか渡っていない）。
+            つまり Vaul の `modal={false}` は Vaul 自身（暗幕・body の後始末）にしか効かず、Radix から
+            見た面は**常にモーダル**で、`DialogContentModal` が次の 3 つを付ける:
+
+            1. 焦点の檻（`FocusScope` の `trapped`）— 面の外に焦点が移ると面へ引き戻す
+            2. 面以外を `aria-hidden="true"`（`hideOthers`）— 本文が支援技術から消える
+            3. `body` の `pointer-events` を止める（Vaul が rAF で戻す）
+
+            板は**本文の隣で読むもの**で、モーダルではない。実機の「発酵の結果が出ていると本文が
+            書けない」は 1 そのもの: 本文を押した瞬間に焦点が板へ戻るのでキーボードが出ない
+            （WebKit で再現: `.tmp/scripts/r34-vaul-body-focus.mjs`）。
+
+            Radix の `Content` は**いちばん近い Dialog の文脈**を読むので、Vaul の中に非モーダルの
+            文脈を置いて上書きする。これで 3 つとも外れる。Vaul と同じ実体の Radix を読んでいることは
+            `test/architecture/vaul-dialog-is-shared.test.ts` が守る（別実体になるとこの上書きは
+            黙って効かなくなるため）。
+          */}
+          <Dialog.Root modal={false} open={open}>
+            <Drawer.Portal container={clip}>
+              <Drawer.Content
+                {...contract}
+                data-sheet-engine="vaul"
+                aria-label={ariaLabel}
+                aria-describedby={undefined}
+                // 閉じるときに焦点を動かさない（本文で書いている最中にキーボードが出て板が消える）。
+                onCloseAutoFocus={(event) => event.preventDefault()}
+                className="pointer-events-auto absolute inset-x-0 bottom-0 flex flex-col rounded-t-3xl border-t outline-none"
+                style={{
+                  height: layerHeight,
+                  background: 'var(--surface-raised)',
+                  borderColor: 'var(--surface-raised-border)',
+                  boxShadow: '0 -8px 32px rgba(140,133,126,0.18)',
                 }}
               >
-                <span
-                  aria-hidden="true"
-                  className="mb-2 block h-1.5 w-9 rounded-full"
-                  style={{ background: 'color-mix(in srgb, var(--fg) 18%, transparent)' }}
-                />
-                {peek ? <div className="flex w-full min-w-0 items-center">{peek}</div> : null}
-              </div>
-              {/* 中身。いちばん高い段で読める。上端に居て下へ引けば板が縮む（Vaul が指の向きと scrollTop で決める）。
+                <Drawer.Title className="sr-only">{ariaLabel}</Drawer.Title>
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: 見出しの行を押すのは段の切り替えの近道。同じことはつまみを引いてもできる */}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: 同上 */}
+                <div
+                  ref={attachHeader}
+                  data-dock-peek
+                  className="flex w-full shrink-0 select-none flex-col items-center px-5 pt-2 pb-2"
+                  style={{ cursor: 'grab' }}
+                  onClick={(event) => {
+                    if (!second) return;
+                    if (event.target instanceof Element && event.target.closest('button, a, input'))
+                      return;
+                    if (detent === lowest) {
+                      onPeekTap?.();
+                      onDetentChange(second);
+                    } else {
+                      onDetentChange(lowest);
+                    }
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mb-2 block h-1.5 w-9 rounded-full"
+                    style={{ background: 'color-mix(in srgb, var(--fg) 18%, transparent)' }}
+                  />
+                  {peek ? <div className="flex w-full min-w-0 items-center">{peek}</div> : null}
+                </div>
+                {/* 中身。いちばん高い段で読める。上端に居て下へ引けば板が縮む（Vaul が指の向きと scrollTop で決める）。
                   - overscroll-behavior: none — iOS は上端で下へ引くとネイティブの跳ね返りが指を奪い（pointercancel）、
                     板に渡らない（実機: 読み終えて上端に戻しても縮まない）。跳ね返りを切れば指は板へ届く
                   - 触れた瞬間に端数の scrollTop を 0 へ揃える — Vaul は `scrollTop !== 0` の厳密判定で、iOS は
                     減速の末に 0.3px などの端数で止まることがある */}
-              <div
-                className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-6 [overflow-wrap:anywhere]"
-                style={{ overscrollBehaviorY: 'none' }}
-                onTouchStart={(event) => {
-                  const box = event.currentTarget;
-                  if (box.scrollTop > 0 && box.scrollTop < 1) box.scrollTop = 0;
-                }}
-              >
-                {children}
-              </div>
-            </Drawer.Content>
-          </Drawer.Portal>
+                <div
+                  className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-6 [overflow-wrap:anywhere]"
+                  style={{ overscrollBehaviorY: 'none' }}
+                  onTouchStart={(event) => {
+                    const box = event.currentTarget;
+                    if (box.scrollTop > 0 && box.scrollTop < 1) box.scrollTop = 0;
+                  }}
+                >
+                  {children}
+                </div>
+              </Drawer.Content>
+            </Drawer.Portal>
+          </Dialog.Root>
         </Drawer.Root>
       ) : null}
     </>
