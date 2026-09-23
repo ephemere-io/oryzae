@@ -75,6 +75,7 @@ import '@/features/sp/questions/components/sp-questions.verify';
 import '@/features/shared/help/components/help-illustrations.verify';
 import '@/features/shared/help/components/help-panel.verify';
 import '@/features/shared/help/components/help-screen-card.verify';
+import '@/features/shared/help/components/help-study-map.verify';
 import '@/features/shared/help/components/help-toggle-button.verify';
 import '@/features/shared/help/components/help-topic-card.verify';
 import '@/features/shared/help/components/help-tutorial.verify';

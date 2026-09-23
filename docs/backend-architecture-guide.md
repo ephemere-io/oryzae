@@ -178,4 +178,5 @@ Phase C: 統合（直列）
 | `docs/backend-testing-guide.md` | テスト戦略、ガードレール |
 | `docs/entry-backend-guide.md` | Entry コンテキストのドメイン知識 |
 | `docs/question-backend-guide.md` | Question コンテキストのドメイン知識 |
+| `docs/fermentation-backend-guide.md` | Fermentation コンテキストのドメイン知識 |
 | `docs/infra-guide.md` | デプロイ・インフラ構成 |

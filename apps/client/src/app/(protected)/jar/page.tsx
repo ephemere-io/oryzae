@@ -6,6 +6,7 @@ import { DeviceView } from '@/components/device-view';
 import { JarView } from '@/features/pc/fermentation/components/jar-view';
 import { PickleSuccessModal } from '@/features/pc/fermentation/components/pickle-success-modal';
 import { useFermentationReadiness } from '@/features/shared/fermentation/hooks/use-fermentation-readiness';
+import { useFirstLetter } from '@/features/shared/fermentation/hooks/use-first-letter';
 import { useHelpMode } from '@/features/shared/help/help-context';
 import { useJarQuestions } from '@/features/shared/questions/hooks/use-jar-questions';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
@@ -30,10 +31,11 @@ export default function JarPage() {
     loading: questionsLoading,
     refetch: refetchQuestions,
   } = useJarQuestions(api, authLoading);
-  const { unreadQuestionIds } = useUnread();
+  const { unreadQuestionIds, refresh: refreshUnread } = useUnread();
   // issue #278: 瓶の見た目に反映する readiness（段階を決める top と、賑やかさを決める total）。
   // サーバーがリクエストのたびに評価し直すので、漬け込み後にこのページへ来れば最新になる。
-  const { data: readiness } = useFermentationReadiness(api, authLoading);
+  const { data: readiness, refresh: refreshReadiness } = useFermentationReadiness(api, authLoading);
+  const { requestFirstLetter } = useFirstLetter(api);
   // ヘルプの三歩。①（問いを立てる）の間だけ、PC の空の瓶を大きく見せる。
   const help = useHelpMode();
   const router = useRouter();
@@ -45,6 +47,12 @@ export default function JarPage() {
   const justPickled = searchParams.get('justPickled') === '1';
   const [pickleSuccessOpen, setPickleSuccessOpen] = useState(false);
   const pickleTimerScheduledRef = useRef(false);
+  // 漬け込み直後に「初めての手紙」を頼む番。justPickled は router.replace で直後に消える
+  // ので、その事実だけを state に持ち越して api が揃ってから頼む。
+  const [firstLetterPending, setFirstLetterPending] = useState(false);
+  // 初めての手紙が届いたら PC の瓶を組み直す番号。JarView のデータ hook はマウント時に
+  // 取るだけなので、key を進めて取り直させる（書き込み後は API client の憶えも空）。
+  const [jarEpoch, setJarEpoch] = useState(0);
 
   // Issue #322: 漬け込み完了モーダルをアニメーション直後の遷移時に一度だけ表示する。
   // useSaveTransition は 1.5s で resolve → /jar 遷移を行うが、その後も overlay 上で
@@ -56,8 +64,24 @@ export default function JarPage() {
     if (!justPickled || pickleTimerScheduledRef.current) return;
     pickleTimerScheduledRef.current = true;
     setTimeout(() => setPickleSuccessOpen(true), 3500);
+    setFirstLetterPending(true);
     router.replace('/jar');
   }, [justPickled, router]);
+
+  // 初めての漬け込みなら、その場で手紙を頼む（初回かどうかはサーバが判定するので、
+  // 漬けるたびに呼んでよい）。演出（3.5s 後のモーダル）は待たない — LLM の数十秒の方が
+  // 長い。届いたら未読と readiness を取り直し、瓶を組み直して手紙を出す。ドメインを
+  // またぐ合成（fermentation の手紙 × 未読の配布）なので、つなぐのは page の仕事。
+  useEffect(() => {
+    if (!firstLetterPending || !api) return;
+    setFirstLetterPending(false);
+    void requestFirstLetter().then(({ fired }) => {
+      if (!fired) return;
+      void refreshUnread();
+      void refreshReadiness();
+      setJarEpoch((n) => n + 1);
+    });
+  }, [firstLetterPending, api, requestFirstLetter, refreshUnread, refreshReadiness]);
 
   async function handleAddQuestion(text: string) {
     await createQuestion(text);
@@ -105,6 +129,7 @@ export default function JarPage() {
       pc={
         <div className="absolute inset-0">
           <JarView
+            key={jarEpoch}
             api={api}
             authLoading={authLoading}
             questions={questions}

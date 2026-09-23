@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import type { HelpTopic, HelpTopicId, HelpTopicText } from '../types';
 import { HelpIllustration } from './help-illustrations';
+import { HelpStudyMap } from './help-study-map';
 
 export interface HelpScreenCardProps {
   /** いま開いている画面の話題。 */
@@ -18,12 +19,6 @@ export interface HelpScreenCardProps {
    */
   hovered: HelpTopicId | null;
 }
-
-/**
- * 書斎の縮小図。部品の札を部屋の配置に置く（板が奥、机の上に瓶・手帳・棚、手前に鉛筆）。
- * 他の画面は並べるだけ。
- */
-const STUDY_AREAS = '". board ." "jar notebook archive" ". write ."';
 
 /**
  * 面の頭の 1 枚 — **いま開いている画面**の説明。
@@ -47,6 +42,10 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
   const source = local ? 'panel' : fromScreen ? 'screen' : pinned ? 'pinned' : 'none';
   const screenText = texts.get(screen.id);
   const activeText = active ? texts.get(active) : undefined;
+  const titles = new Map<HelpTopicId, string>(
+    [...texts.values()].map((text) => [text.id, text.title]),
+  );
+  const togglePin = (id: HelpTopicId) => setPinned((prev) => (prev === id ? null : id));
 
   return (
     <section
@@ -80,20 +79,29 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
         </div>
       </div>
 
-      {parts.length > 0 && (
+      {/* 書斎は手描きの見取り図。他の画面は部品の札を並べる。 */}
+      {screen.id === 'study' && parts.length > 0 && (
+        <div className="mt-3">
+          <HelpStudyMap
+            parts={partIds}
+            titles={titles}
+            active={active}
+            pinned={pinned}
+            onHover={setLocal}
+            onPress={togglePin}
+          />
+        </div>
+      )}
+      {screen.id !== 'study' && parts.length > 0 && (
         <ul
           className="mt-3 grid gap-1.5"
-          style={
-            screen.id === 'study'
-              ? { gridTemplateAreas: STUDY_AREAS, gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }
-              : { gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }
-          }
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }}
           onPointerLeave={() => setLocal(null)}
         >
           {parts.map((part) => {
             const lit = active === part.id;
             return (
-              <li key={part.id} style={screen.id === 'study' ? { gridArea: part.id } : undefined}>
+              <li key={part.id}>
                 <button
                   type="button"
                   data-part={part.id}
@@ -101,7 +109,7 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
                   onPointerEnter={() => setLocal(part.id)}
                   onFocus={() => setLocal(part.id)}
                   onBlur={() => setLocal(null)}
-                  onClick={() => setPinned((prev) => (prev === part.id ? null : part.id))}
+                  onClick={() => togglePin(part.id)}
                   className="flex w-full flex-col items-center gap-1 rounded-[10px] border px-1.5 py-2 text-[10.5px] leading-tight transition-colors duration-150"
                   style={{
                     borderColor: lit

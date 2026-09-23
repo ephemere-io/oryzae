@@ -55,16 +55,29 @@ export class SupabaseUserActivityStatsRepository implements UserActivityStatsRep
   }
 
   async hasReadLetter(userId: string): Promise<boolean> {
-    // 既読は DB に無い（client の localStorage 止まり）ので、「完了した発酵＝読める手紙が
-    // 1 通でもあるか」で代用する。届いたまま未読の手紙も true になる妥協。
-    // gateway の注記を参照。
+    // 既読は fermentation_results.read_at に残る（POST /api/v1/fermentations/read が書く。
+    // migration 00025）。届いただけの手紙は数えない — 五歩の ⑤ は「読んだか」。
     const { data, error } = await this.supabase
       .from('fermentation_results')
       .select('id')
       .eq('user_id', userId)
-      .eq('status', 'completed')
+      .not('read_at', 'is', null)
       .limit(1);
-    if (error) throw error;
+    if (error) {
+      // migration 00025 が DB にまだ当たっていない間だけ、「未読」に倒す。users/me は書斎の
+      // 入口で毎回呼ばれるので、旗 1 つのために 500 にしない。他の失敗はそのまま投げる
+      // （どのカラムがどう違ったかが分かる例外にしておく）。
+      if (isUndefinedColumn(error)) {
+        console.warn('[users/me] fermentation_results.read_at が無い（migration 00025 未適用）');
+        return false;
+      }
+      throw error;
+    }
     return (data ?? []).length > 0;
   }
+}
+
+/** PostgREST の「カラムが無い」（PostgreSQL 42703 undefined_column）。 */
+function isUndefinedColumn(error: { code?: string; message?: string }): boolean {
+  return error.code === '42703' || (error.message ?? '').includes('read_at');
 }

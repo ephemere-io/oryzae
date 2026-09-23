@@ -50,6 +50,17 @@ export interface FermentationRepositoryGateway {
   listRetryable(sinceIso: string, beforeIso: string): Promise<FermentationResult[]>;
 
   /**
+   * 手紙の既読をサーバに残す。(userId, questionId) の完了した発酵のうち `read_at` が空の
+   * 行に readAtIso を書き、書いた行数を返す。既読済みの行は触らないので、同じ問いで
+   * 何度呼んでも 2 回目からは 0（冪等）。
+   *
+   * 既読の単位が問いなのは client の受信箱と同じ理由（問いごとに最新 1 通しか出さないので、
+   * 手紙 id 単位だと古い手紙が「開けないのに未読」で残る）。
+   * ヘルプの五歩 ⑤ `hasReadLetter`（user コンテキスト）がこの列を読む。
+   */
+  markReadByQuestionId(userId: string, questionId: string, readAtIso: string): Promise<number>;
+
+  /**
    * issue #353: リトライで行を再利用する前に、過去の試行で部分的に保存され得る
    * 出力（worksheet/snippets/letter/keywords）を削除する。これらのテーブルは
    * fermentation_result_id に unique 制約が無く insert で保存されるため、

@@ -103,7 +103,7 @@ describe('GetUserMeUsecase', () => {
     expect(view.hasPickled).toBe(false);
   });
 
-  it('読める手紙が 1 通でもあれば hasReadLetter=true（五歩の ⑤）', async () => {
+  it('手紙を 1 通でも開いていれば（read_at あり）hasReadLetter=true（五歩の ⑤）', async () => {
     vi.mocked(profileRepo.findById).mockResolvedValue(baseProfile);
     vi.mocked(statsRepo.hasReadLetter).mockResolvedValue(true);
 

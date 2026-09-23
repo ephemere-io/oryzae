@@ -48,6 +48,42 @@ describe('SpEntryEditor', () => {
     expect(screen.queryByRole('button', { name: '納める' })).toBeNull();
   });
 
+  it('納め終えたら onPickled を呼ぶ（初めての手紙の依頼は page が持つ）', async () => {
+    const fetchImpl = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/entries/e1/questions')
+        return Promise.resolve(jsonResponse([{ id: 'q1', currentText: 'なぜ続けるのか' }]));
+      if (url === '/api/v1/entries/e1' && init?.method === 'PUT')
+        return Promise.resolve(jsonResponse({ id: 'e1' }));
+      return Promise.resolve(jsonResponse([]));
+    });
+    const onPickled = vi.fn();
+
+    render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <SpEntryEditor
+          api={createMockApi(fetchImpl)}
+          initialEntryId="e1"
+          initialContent="本文"
+          onPickled={onPickled}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    // 紐づいた問いが復元されてから納める（問い未選択だとシートが開くだけ）。
+    expect(await screen.findByText('◦ なぜ続けるのか')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.editor.ferment_title }));
+
+    await waitFor(() => expect(onPickled).toHaveBeenCalledTimes(1));
+    // 呼ばれるのは発酵フラグ付きの保存が通ったあと。
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/v1/entries/e1',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.stringContaining('"fermentationEnabled":true'),
+      }),
+    );
+  });
+
   it('問いが結ばれていなければ「納める」は問い選択を開く（Issue #450）', async () => {
     // 問いに紐づかないエントリは発酵ループに入らない（active な問いに紐づいたものだけを
     // 走査する）。そのまま漬けられると「漬けたのに何も届かない」になる。

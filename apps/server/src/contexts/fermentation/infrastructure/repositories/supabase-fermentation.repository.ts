@@ -236,6 +236,35 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
     }
   }
 
+  async markReadByQuestionId(
+    userId: string,
+    questionId: string,
+    readAtIso: string,
+  ): Promise<number> {
+    // user_id は RLS が守るが、明示的にも絞る（listByUserId と同じく二重で安全側）。
+    // read_at が空の行だけ書くので、既読済みの時刻を後から上書きしない。
+    const { data, error } = await this.supabase
+      .from('fermentation_results')
+      .update({ read_at: readAtIso })
+      .eq('user_id', userId)
+      .eq('question_id', questionId)
+      .eq('status', 'completed')
+      .is('read_at', null)
+      .select('id');
+    if (error) {
+      // migration 00025（read_at）が DB にまだ当たっていない間は、既読を残せないだけ
+      // （client は localStorage で既読を持っている）。500 と Sentry を毎回積まない。
+      if (error.code === '42703' || error.message.includes('read_at')) {
+        console.warn(
+          '[fermentations/read] fermentation_results.read_at が無い（migration 00025 未適用）',
+        );
+        return 0;
+      }
+      throw new Error(`Failed to mark fermentation results as read: ${error.message}`);
+    }
+    return toRecordArray(data ?? []).length;
+  }
+
   async saveScannedEntries(fermentationResultId: string, entryIds: string[]): Promise<void> {
     if (entryIds.length === 0) return;
     const rows = entryIds.map((entryId) => ({

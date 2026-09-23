@@ -870,8 +870,8 @@
     "topics": {
       "study": {
         "title": "The study",
-        "lead": "The entrance room. What's on the desk is where you go",
-        "body": "The room you land in after signing in. The jar on the left, the notebook in the middle, the board at the back, the shelf on the right, the pencil — touch one and its name appears; press it to go there. You don't write here; you choose where to go.",
+        "lead": "The entrance to the app. Each thing on the desk is a door to a screen",
+        "body": "You land here after signing in. The jar on the left holds the questions you planted and the letters that come back from what you pickled. The notebook in the middle is this month's entries. The board at the back holds snippets and photos cut out of entries. The shelf on the right keeps past months' notebooks. Pick up the pencil to start a new entry. Touch a thing and its name appears; press it to go there.",
         "keywords": "study,room,home,top,desk,entrance,first screen"
       },
       "concept": {

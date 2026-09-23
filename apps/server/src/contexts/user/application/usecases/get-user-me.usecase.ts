@@ -20,7 +20,7 @@ interface UserMeView {
   hasEntry: boolean;
   /**
    * 手紙を 1 通でも読んだことがあるか。ヘルプの五歩 ⑤「手紙を読む」の旗。
-   * 既読はサーバに残していないので、実体は「読める手紙（完了した発酵）が 1 通でもあるか」
+   * 実体は `fermentation_results.read_at` が埋まった行の有無
    * （{@link UserActivityStatsRepositoryGateway.hasReadLetter} の注記を参照）。
    */
   hasReadLetter: boolean;

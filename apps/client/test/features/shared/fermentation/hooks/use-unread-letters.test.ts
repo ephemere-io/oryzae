@@ -106,23 +106,106 @@ describe('useUnreadLetters', () => {
     ]);
   });
 
-  it('markQuestionRead は手紙を読んだ合図 read を出す（ヘルプの五歩 ⑤ が聞く）', async () => {
+  it('markQuestionRead は既読をサーバに残してから合図 read を出す（ヘルプの五歩 ⑤ が聞く）', async () => {
+    // 起きた順を 1 本の配列に記録する。合図はサーバへの書き込みの **後** でなければ、
+    // ヘルプが取り直す /users/me の旗（hasReadLetter）が旧いままになる。
+    const events: string[] = [];
+    const listen = (e: Event) => {
+      const kind = readActivityKind(e);
+      if (kind) events.push(`signal:${kind}`);
+    };
+    window.addEventListener(ACTIVITY_EVENT, listen);
+    const api: ApiClient = {
+      baseUrl: '',
+      headers: {},
+      fetch: vi.fn((path: string, init?: RequestInit) => {
+        events.push(`fetch:${init?.method ?? 'GET'} ${path}`);
+        return Promise.resolve(
+          new Response(JSON.stringify(LETTERS), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }),
+    };
+    const { result } = renderHook(() => useUnreadLetters(api, false));
+
+    await waitFor(() => expect(result.current.unreadCount).toBe(2));
+    // 取得しただけでは出ない。開いて初めて出る
+    expect(events).toEqual(['fetch:GET /api/v1/fermentations']);
+
+    act(() => result.current.markQuestionRead('q1'));
+
+    await waitFor(() => expect(events).toContain('signal:read'));
+    window.removeEventListener(ACTIVITY_EVENT, listen);
+    expect(events).toEqual([
+      'fetch:GET /api/v1/fermentations',
+      'fetch:POST /api/v1/fermentations/read',
+      'signal:read',
+    ]);
+    expect(api.fetch).toHaveBeenCalledWith('/api/v1/fermentations/read', {
+      method: 'POST',
+      body: JSON.stringify({ questionId: 'q1' }),
+    });
+  });
+
+  it('サーバに残せなくても落ちず、手元の既読と合図は出る', async () => {
     const kinds: string[] = [];
     const listen = (e: Event) => {
       const kind = readActivityKind(e);
       if (kind) kinds.push(kind);
     };
     window.addEventListener(ACTIVITY_EVENT, listen);
-    const { result } = renderHook(() => useUnreadLetters(createApi(LETTERS), false));
+    const api: ApiClient = {
+      baseUrl: '',
+      headers: {},
+      fetch: vi.fn((path: string) =>
+        path === '/api/v1/fermentations/read'
+          ? Promise.reject(new Error('network down'))
+          : Promise.resolve(
+              new Response(JSON.stringify(LETTERS), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              }),
+            ),
+      ),
+    };
+    const { result } = renderHook(() => useUnreadLetters(api, false));
 
     await waitFor(() => expect(result.current.unreadCount).toBe(2));
-    // 取得しただけでは出ない。開いて初めて出る
-    expect(kinds).toEqual([]);
 
     act(() => result.current.markQuestionRead('q1'));
 
+    await waitFor(() => expect(kinds).toEqual(['read']));
     window.removeEventListener(ACTIVITY_EVENT, listen);
-    expect(kinds).toEqual(['read']);
+    expect(result.current.unreadCount).toBe(1);
+  });
+
+  it('refresh で手紙一覧を取り直す（初めての手紙が届いた直後）', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(LETTERS), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    const api: ApiClient = { baseUrl: '', headers: {}, fetch: fetchImpl };
+    const { result } = renderHook(() => useUnreadLetters(api, false));
+
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.unreadCount).toBe(0);
+
+    await act(() => result.current.refresh());
+
+    expect(result.current.unreadCount).toBe(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it('同じ問いに複数届いていてもまとめて既読になる（開けない未読を残さない）', async () => {

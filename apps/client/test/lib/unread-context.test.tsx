@@ -14,6 +14,7 @@ function makeState(overrides: Partial<UnreadState> = {}): UnreadState {
     unreadFermentationIds: new Set(['f1', 'f2', 'f3']),
     markQuestionRead: vi.fn(),
     markAllSeen: vi.fn(),
+    refresh: vi.fn(),
     ...overrides,
   };
 }

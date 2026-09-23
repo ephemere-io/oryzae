@@ -23,8 +23,8 @@ interface UserMeData {
   hasEntry: boolean;
   /**
    * 手紙を 1 通でも読んだことがあるか。ヘルプの五歩 ⑤「手紙を読む」の旗。
-   * 既読はサーバに残していないので、サーバの実体は「読める手紙（完了した発酵）があるか」。
-   * 開いた瞬間は `lib/activity` の 'read' 合図が補う。
+   * 既読はサーバに残る（手紙を開くと `use-unread-letters` が `POST /fermentations/read` で
+   * 書き、そのあと `lib/activity` の 'read' 合図でヘルプがこの旗を取り直す）。
    */
   hasReadLetter: boolean;
 }

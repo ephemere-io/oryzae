@@ -25,11 +25,10 @@ export interface UserActivityStatsRepositoryGateway {
   /**
    * 指定ユーザーが手紙を 1 通でも読んだか（五歩の ⑤「手紙を読む」の判定）。
    *
-   * 既読はサーバに残していない（client の localStorage 止まり。
-   * `apps/client/src/features/shared/fermentation/hooks/use-unread-letters.ts` 参照）ので、
-   * ここで言えるのは「読める手紙（完了した発酵）が 1 通でもあるか」まで。
-   * 届いたまま未読の手紙も true に倒れる妥協で、開いた瞬間は client 側の合図
-   * （`lib/activity` の 'read'）が補う。
+   * 既読は `fermentation_results.read_at` に残る。client が手紙を開くと
+   * `POST /api/v1/fermentations/read` が問い単位で埋め、そのあと合図（`lib/activity` の
+   * 'read'）でヘルプがこの旗を取り直す（順序は client 側 `use-unread-letters.ts` が守る）。
+   * 届いただけで開いていない手紙は数えない。
    */
   hasReadLetter(userId: string): Promise<boolean>;
 }
