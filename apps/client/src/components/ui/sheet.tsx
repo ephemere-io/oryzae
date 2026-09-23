@@ -87,35 +87,30 @@ type Phase = 'entering' | 'open' | 'closing';
  * - **出す／消すは `open`**（パレットや歯車のボタン、暗幕、キャンセル）。動きはシートの容器を下へずらす CSS の
  *   transition（`.oz-sheet-scroller[data-shown]`）。消える動きの終わりは transition の完了で知る
  *
- * ### 外側（段）と内側（本文）を **1 本のスクロール**にする
+ * ### 外側（段）と内側（本文）の役割を、**場所**で固定する
  *
- * 容器は 1 つだけ。空き（spacer）＋シートを縦に積み、シートは**中身のぶんだけ高い**。だから
- * スクロール位置は「覗く → 半分 → 全画面 → 本文を読む」と 1 本に並ぶ。**どちらの指か**を決める仕組みは
- * 要らない——スクロールする容器が 1 つしか無いのだから、取り合いが起きようがない。
+ * 容器は 2 つ（段を担う外側と、本文を読む内側）。どちらが動くかは**触れた場所と段だけ**で決まる。
  *
- * 段階（オーナーの言葉で「モーダルが最大にならないと内側のスクロールは始まらない」「内側のスクロールが
- * 終わったら一度タップを離した後に外側のスクロールに移行できる」）は、次の 2 つで出る。**実測で確かめた**
- * （`scratchpad/snapstop*.mjs` で吸着の型 × 吸着領域を総当たり）:
+ * 段階（オーナーの言葉で「モーダルが最大にならないと内側のスクロールは始まらない」）は、
+ * **場所で役割を固定する**ことで出す。判定も待ち時間も要らない:
  *
- * - **全画面までは `mandatory`** — 吸着先（段の印）が効くので、指を離せば必ずどれかの段に止まる。
- *   本文へ雪崩れ込まない
- * - **全画面から先はシート自身が吸着領域**（容器より大きいので、中に入ると吸着が止む＝自由に流れる）。
- *   戻ってその領域を出るとき、**その始まり＝全画面に吸着する＝板は縮まない**
+ * | 触れた場所 | 段 | 動くもの |
+ * | --- | --- | --- |
+ * | どこでも | いちばん高い段では**ない** | 板（中身は `overflow-y: hidden`） |
+ * | 見出しの行 | いちばん高い段 | 板 |
+ * | 中身 | いちばん高い段 | **中身だけ**（`overscroll-behavior: contain` で板へ渡さない） |
  *
- * 実測（Chromium・本物のタッチ）:
+ * 中身の箱の上端が**指の届かない壁**になるので、読み終えて強く払い戻しても板は縮まない。
+ * 慣性を JS で止める必要が無い（止められもしない。位置を書き戻しても上書きされる。実測）。
+ * 板を縮めるのは見出しの行（引く・押す）。見出しは `sticky` で読んでいる間も残る。
  *
- * - ゆっくり引く → 1 段ずつ（覗く → 半分 → 全画面）。全画面で止まり、本文へは進まない
- * - 離してもう一度払う → 本文が流れる
- * - 本文を戻す → 全画面で止まる。離してもう一度引くと段が下がる
- * - **強い払いは段を飛ぶ**（覗く → 全画面、全画面 → 本文）。Google マップと同じ連続感で、これは許す
- *
- * `scroll-snap-stop: always` も付けてあるが、**Chromium は効かせない**（実測）。仕様どおりに書いておく
- * だけで、段階はこれに頼っていない。
- *
- * JS は指に触らない。慣性・減速・吸着はすべてブラウザのスクローラが持つ。
+ * **JS は指に一切触らない。** 触れた瞬間・離した瞬間に style を書くのもやめた——祖先の
+ * `overflow` を書き換えると iOS はスクロールを打ち切り、**慣性が消えて 1 行ずつしか進まなくなる**
+ * （実機レビュー）。書くのは「中身を開けるか」だけで、それもスクロールの通知の中で
+ * **値が変わったときだけ**。
  * 以前ここには「触れた瞬間に持ち主を決める」「離した瞬間に位置を決める」といった仕掛けがあったが、
  * どれも iOS の癖（減速中の容器が次の指を取る）を JS で追いかけるもので、実機で次々に別の壊れ方をした。
- * **容器を 1 つに戻せば、その癖に触れる場所そのものが無くなる。**
+ * **役割を場所で固定すれば、指の向きも速さも時間も見なくてよくなる。**
  *
  * ### 高さはネイティブのスクロールと CSS scroll-snap で動かす
  *
@@ -129,11 +124,11 @@ type Phase = 'entering' | 'open' | 'closing';
  * - 覗く: シートの直下の印（`top: calc(var(--oz-sheet-header) - 100cqh)`、上端揃え）＝見出しの行の高さ
  * - 中身: シートの中の印（`top: calc(min(100%, 100cqh) - 100cqh)`、上端揃え）＝中身の高さ、容器より高ければ
  *   全画面。上端揃えにしているのは、WebKit が「高さ 0 の要素の下端揃え」を吸着先として数えないため
- * - 全画面: シートの上端。シートは容器より高いので、そこから先は自由にスクロールできる（CSS scroll-snap の
- *   仕様: 容器より大きい snap 領域の中は自由）＝本文が流れる
+ * - 全画面: シートの上端。シートは容器と同じ高さなので、ここが外側のスクロールの終点。
+ *   そこから先（本文）は**中身の箱**が読む
  *
  * 段の印にはすべて `scroll-snap-stop: always` を付けてある（仕様上の「飛び越えない」指定。Chromium では
- * 効かないことを実測済み。段階は上のとおり `mandatory` と吸着領域の大きさで出している）。
+ * 効かないことを実測済み）。
  *
  * **吸着先の組は描いている間に変えない。** WebKit は吸着先の組が変わると、いまの段に居ても別の段へ吸着し直す。
  *
@@ -377,27 +372,6 @@ export function Sheet({
       inner.style.overflowY = atHighest ? 'auto' : 'hidden';
     };
 
-    /**
-     * **指の持ち主は、触れた場所と段だけで決まる**（時間も向きも速さも見ない）。
-     *
-     * - いちばん高い段で**中身に触れた指は読む**。外側は `overflow-y: hidden` にする＝そもそも
-     *   スクローラでないので、慣性で動いていても次の指を取れない（iOS の癖に触れる場所が無くなる）
-     * - それ以外（見出しの行・低い段）は外側＝段を動かす
-     *
-     * 中身から板を縮めることはしない。**縮めるのは見出しの行**（読んでいる間も上に残る `sticky`）。
-     * 中身と板の両方を 1 本の指に担わせると、どちらを動かすかが指の向き・慣性・OS の癖に依存し、
-     * 実機で何度も別の壊れ方をした。役割を場所で固定すると、その依存が無くなる。
-     */
-    const takeGesture = (event: Event) => {
-      const inner = innerRef.current;
-      const target = event.target;
-      const onContent = inner !== null && target instanceof Node && inner.contains(target);
-      scroller.style.overflowY = onContent && atHighestRef.current ? 'hidden' : 'auto';
-    };
-    const releaseGesture = () => {
-      scroller.style.removeProperty('overflow-y');
-    };
-
     /** 見えている高さ。容器のずれ（出す／消す動き）は含めない。 */
     const visibleOf = () => {
       const sheet = sheetRef.current;
@@ -458,13 +432,6 @@ export function Sheet({
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
     if (hasScrollEnd) scroller.addEventListener('scrollend', settle);
-    // 捕捉段階で受ける（中身より先に決める）。iOS は touch、それ以外は pointer で届く。
-    scroller.addEventListener('touchstart', takeGesture, { passive: true, capture: true });
-    scroller.addEventListener('pointerdown', takeGesture, { capture: true });
-    scroller.addEventListener('touchend', releaseGesture, { passive: true });
-    scroller.addEventListener('touchcancel', releaseGesture, { passive: true });
-    scroller.addEventListener('pointerup', releaseGesture);
-    scroller.addEventListener('pointercancel', releaseGesture);
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
     // 置き直す。段の位置は容器の高さで決まるので、スクロール位置をそのまま残すと、同じ位置が別の段の位置に
@@ -487,13 +454,6 @@ export function Sheet({
     return () => {
       scroller.removeEventListener('scroll', onScroll);
       if (hasScrollEnd) scroller.removeEventListener('scrollend', settle);
-      scroller.removeEventListener('touchstart', takeGesture, { capture: true });
-      scroller.removeEventListener('pointerdown', takeGesture, { capture: true });
-      scroller.removeEventListener('touchend', releaseGesture);
-      scroller.removeEventListener('touchcancel', releaseGesture);
-      scroller.removeEventListener('pointerup', releaseGesture);
-      scroller.removeEventListener('pointercancel', releaseGesture);
-      scroller.style.removeProperty('overflow-y');
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
