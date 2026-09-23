@@ -10,7 +10,8 @@ import type { HelpSection, HelpTopic, HelpTopicId } from './types';
 export const HELP_SECTIONS: readonly HelpSection[] = ['start', 'room', 'screens', 'trouble'];
 
 export const HELP_TOPICS: readonly HelpTopic[] = [
-  // はじめに — 上から読めば一周する。
+  // はじめに — 上から読めば一周する。一覧には並べない（書斎の 1 枚とチュートリアルが担う）。
+  { id: 'study', section: 'start', illustration: 'room', href: '/' },
   { id: 'concept', section: 'start', illustration: 'room', href: '/' },
   { id: 'question', section: 'start', illustration: 'question', href: '/jar' },
   { id: 'write', section: 'start', illustration: 'pen', href: '/entries/new' },
@@ -52,14 +53,31 @@ export function isHelpTopicId(value: unknown): value is HelpTopicId {
  * SP にはホバーが無いので、これが「いま触れているもの」の代わりになる。
  */
 export function topicForScreen(pathname: string): HelpTopicId {
-  if (pathname === '/') return 'concept';
+  if (pathname === '/') return 'study';
   if (pathname.startsWith('/jar')) return 'jar';
   if (pathname.startsWith('/board')) return 'board';
   if (pathname === '/entries') return 'list';
   if (pathname.startsWith('/entries')) return 'write';
   if (pathname.startsWith('/questions')) return 'questions';
   if (pathname.startsWith('/account')) return 'account';
-  return 'concept';
+  return 'study';
+}
+
+/**
+ * 画面の中の部品（話題）。面の頭の 1 枚に札として並び、画面の中で触れた物の札が灯る。
+ * 書斎は縮小図（板が奥、机の上に瓶・手帳・棚、手前に鉛筆）。無い画面は本文だけ。
+ */
+const SCREEN_PARTS: Partial<Record<HelpTopicId, readonly HelpTopicId[]>> = {
+  study: ['board', 'jar', 'notebook', 'archive', 'write'],
+  jar: ['question', 'pickle', 'letter', 'questions'],
+  write: ['question', 'pickle', 'snippet', 'notebook'],
+  board: ['snippet'],
+  list: ['notebook', 'archive'],
+  questions: ['question'],
+};
+
+export function screenParts(screen: HelpTopicId): readonly HelpTopicId[] {
+  return SCREEN_PARTS[screen] ?? [];
 }
 
 /**

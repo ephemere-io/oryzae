@@ -23,8 +23,10 @@ function createApiStub(
 interface Flags {
   onboardingCompleted: boolean;
   hasQuestion?: boolean;
+  hasEntry?: boolean;
   hasLinkedQuestion?: boolean;
   hasPickled?: boolean;
+  hasReadLetter?: boolean;
 }
 
 /** users/me の旗を後から書き換えられる stub（成し遂げた合図で取り直すのを見る）。 */
@@ -418,7 +420,13 @@ describe('HelpProvider', () => {
     await waitFor(() => {
       expect(result.current.tutorial.step).toBe('write');
     });
-    expect(result.current.tutorial.done).toEqual({ question: true, write: false, pickle: false });
+    expect(result.current.tutorial.done).toEqual({
+      question: true,
+      write: false,
+      link: false,
+      pickle: false,
+      read: false,
+    });
     expect(document.documentElement.getAttribute('data-tutorial-step')).toBeNull();
     act(() => result.current.openHelp());
     expect(document.documentElement.getAttribute('data-tutorial-step')).toBe('write');
@@ -430,12 +438,14 @@ describe('HelpProvider', () => {
     const api = createApiStubWith({
       onboardingCompleted: true,
       hasQuestion: true,
+      hasEntry: true,
       hasLinkedQuestion: true,
       hasPickled: true,
+      hasReadLetter: true,
     });
     const { result } = renderHook(() => useHelpMode(), { wrapper: wrapperWith(api) });
     await waitFor(() => {
-      expect(result.current.tutorial.done?.pickle).toBe(true);
+      expect(result.current.tutorial.done?.read).toBe(true);
     });
     expect(result.current.tutorial.step).toBeNull();
     act(() => result.current.openHelp());

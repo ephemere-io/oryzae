@@ -8,6 +8,7 @@
 
 /** 話題の識別子。i18n の `help.topics.<id>` と 1:1。 */
 export type HelpTopicId =
+  | 'study'
   | 'concept'
   | 'question'
   | 'write'
@@ -34,14 +35,19 @@ export type HelpTopicId =
  */
 export type HelpSection = 'start' | 'room' | 'screens' | 'trouble';
 
-/** 三歩の識別子。順は `tutorial.ts` の `HELP_STEPS`。 */
-export type HelpStepId = 'question' | 'write' | 'pickle';
+/** チュートリアルの歩の識別子。順は `tutorial.ts` の `HELP_STEPS`。 */
+export type HelpStepId = 'question' | 'write' | 'link' | 'pickle' | 'read';
 
-/** 三歩の進み具合。サーバーの旗（問いがある・結んで書いた・漬けた）そのもの。 */
+/**
+ * チュートリアルの進み具合。サーバーの旗そのもの — 問いがある・エントリーがある・問いを
+ * 結んだ・漬けた・手紙を読んだ。どれも「一度でもやったか」。
+ */
 export interface HelpProgress {
   question: boolean;
   write: boolean;
+  link: boolean;
   pickle: boolean;
+  read: boolean;
 }
 
 /** 面と画面が見る「いまの歩」。`done` が null なら、まだ確かめていない。 */

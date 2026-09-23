@@ -180,6 +180,7 @@ describe('useSaveEntry', () => {
     const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
       wrapper: I18nWrapper,
     });
+    const activity = collectActivity();
 
     let saveResult: string | null = null;
     await act(async () => {
@@ -188,6 +189,9 @@ describe('useSaveEntry', () => {
 
     expect(saveResult).toBe('new-id');
     expect(result.current.error).toBe('');
+    activity.stop();
+    // 作成が通ったら合図 entry が出る（ヘルプの五歩 ② が聞く）
+    expect(activity.kinds).toEqual(['entry']);
   });
 
   it('returns null and sets error on failure', async () => {
@@ -197,6 +201,7 @@ describe('useSaveEntry', () => {
     const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
       wrapper: I18nWrapper,
     });
+    const activity = collectActivity();
 
     let saveResult: string | null = null;
     await act(async () => {
@@ -205,6 +210,9 @@ describe('useSaveEntry', () => {
 
     expect(saveResult).toBeNull();
     expect(result.current.error).toBe('作成に失敗しました');
+    activity.stop();
+    // 失敗した作成では合図は出ない
+    expect(activity.kinds).toEqual([]);
   });
 
   it('returns entry id on successful update', async () => {
@@ -245,7 +253,7 @@ describe('useSaveEntry', () => {
     expect(body.fermentationEnabled).toBeUndefined();
   });
 
-  it('fermentationEnabled=true を指定するとペイロードに含まれ、合図 pickle が出る', async () => {
+  it('fermentationEnabled=true を指定するとペイロードに含まれ、合図 entry → pickle が出る', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
     const api = createMockApi(apiFetch);
 
@@ -263,11 +271,11 @@ describe('useSaveEntry', () => {
     const body: Record<string, unknown> = JSON.parse(bodyStr);
     expect(body.fermentationEnabled).toBe(true);
     activity.stop();
-    // 漬け込みが通ったら window に合図が出る（ヘルプの三歩 ③ が聞く）
-    expect(activity.kinds).toEqual(['pickle']);
+    // 漬け込みが通ったら window に合図が出る（ヘルプの五歩 ② と ④ が聞く）。順は entry → pickle
+    expect(activity.kinds).toEqual(['entry', 'pickle']);
   });
 
-  it('既存エントリの漬け込み（PUT）でも合図 pickle が出る', async () => {
+  it('既存エントリの漬け込み（PUT）でも合図 entry → pickle が出る', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, {}));
     const api = createMockApi(apiFetch);
 
@@ -281,10 +289,10 @@ describe('useSaveEntry', () => {
     });
 
     activity.stop();
-    expect(activity.kinds).toEqual(['pickle']);
+    expect(activity.kinds).toEqual(['entry', 'pickle']);
   });
 
-  it('漬け込みでない保存・失敗した漬け込みでは合図は出ない', async () => {
+  it('漬け込みでない保存は entry だけ、失敗した漬け込みでは何も出ない', async () => {
     apiFetch
       .mockResolvedValueOnce(mockResponse(true, {}))
       .mockResolvedValueOnce(mockResponse(false, {}));
@@ -296,14 +304,14 @@ describe('useSaveEntry', () => {
     const activity = collectActivity();
 
     await act(async () => {
-      // ただの保存
+      // ただの保存 → entry だけ
       await result.current.save('content', 'existing-id');
-      // 漬け込みだが失敗
+      // 漬け込みだが失敗 → 何も出ない
       await result.current.save('content', 'existing-id', { fermentationEnabled: true });
     });
 
     activity.stop();
-    expect(activity.kinds).toEqual([]);
+    expect(activity.kinds).toEqual(['entry']);
   });
 
   it('200 でも id が読めなければ error を立てる（autosave の重複作成を防ぐ）', async () => {

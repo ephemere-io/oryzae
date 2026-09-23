@@ -52,7 +52,7 @@ test.describe('ヘルプモード', () => {
     await page.keyboard.press('?');
     await expect(aside).toBeVisible();
     await expect(panel).toHaveAttribute('data-verify-mode', 'browse');
-    await expect(panel).toHaveAttribute('data-verify-spot', 'board');
+    await expect(panel).toHaveAttribute('data-verify-screen', 'board');
 
     await page.keyboard.press('Escape');
     await expect(aside).toBeHidden();
@@ -83,6 +83,6 @@ test.describe('ヘルプモード', () => {
 
     await page.goto('/jar');
     await expect(aside).toBeVisible();
-    await expect(panel).toHaveAttribute('data-verify-spot', 'jar');
+    await expect(panel).toHaveAttribute('data-verify-screen', 'jar');
   });
 });

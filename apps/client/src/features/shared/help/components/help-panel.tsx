@@ -5,26 +5,26 @@ import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { HELP_PANEL_ATTR } from '../hover';
-import { HELP_SECTIONS, HELP_TOPICS, helpTopic } from '../topics';
+import { HELP_SECTIONS, HELP_TOPICS, helpTopic, screenParts } from '../topics';
 import type {
   HelpMatch,
   HelpRemoteState,
   HelpTopicId,
   HelpTopicText,
-  HelpTutorial,
+  HelpTutorial as HelpTutorialState,
 } from '../types';
-import { HelpFirstSteps } from './help-first-steps';
-import { HelpLiveCard } from './help-live-card';
+import { HelpScreenCard } from './help-screen-card';
 import { HelpTopicCard } from './help-topic-card';
+import { HelpTutorial } from './help-tutorial';
 
 /** 検索で出す件数の上限。 */
 const MAX_RESULTS = 6;
 
 export interface HelpPanelProps {
   texts: readonly HelpTopicText[];
-  /** いま触れているもの。無ければ `screenTopic` を映す。 */
+  /** いま触れているもの。画面の 1 枚の中の札が灯る（画面の部品でなければ何も起きない）。 */
   hovered: HelpTopicId | null;
-  /** いま開いている画面の話題。 */
+  /** いま開いている画面の話題。頭の 1 枚はこれ。 */
   screenTopic: HelpTopicId;
   /** 一覧の中で開いている話題。 */
   focused: HelpTopicId | null;
@@ -37,30 +37,27 @@ export interface HelpPanelProps {
   /** 「開く」。アプリの中は router、外は新しいタブ — 決めるのは呼び出し側。 */
   onOpenHref: (href: string, external: boolean) => void;
   /**
-   * 三歩だけを明るくし、他を薄くする。初めての人に「ようこそ」を出している間だけ true —
-   * 面以外が沈んでいる画面で、面の中でも見る場所を 1 つにする。晴れると元に戻る。
+   * チュートリアルだけを明るくし、他を薄くする。初めての人に「ようこそ」を出している間だけ
+   * true — 面以外が沈んでいる画面で、面の中でも見る場所を 1 つにする。晴れると元に戻る。
    */
   spotlight?: boolean;
-  /**
-   * 三歩の案内。いまの歩がある間（`step` が null でない）は、面は三歩を頭に置いて検索欄を
-   * 出さない — 始めたばかりの人は検索より、次に何をするかが要る。
-   */
-  tutorial?: HelpTutorial;
+  /** チュートリアルの進み具合といまの歩。 */
+  tutorial?: HelpTutorialState;
 }
 
-const NO_TUTORIAL: HelpTutorial = { step: null, done: null };
+const NO_TUTORIAL: HelpTutorialState = { step: null, done: null };
 
 /**
  * ヘルプの面の中身（`docs/help-mode-guide.md`）。PC の右の面と SP のシートが共有する。
  *
- * 上から **検索欄 → 生きている 1 枚 → まず試してみよう（三歩）→ 話題の一覧**。
+ * 上から **検索欄 → 画面の 1 枚 → チュートリアル → 話題の一覧**。この並びは変わらない —
+ * チュートリアルの最中でも、済んだ後でも（済むとアコーディオンが閉じて見出しだけ残る）。
+ * 検索欄もいつも居る。
  *
  * - 面の名前（「使い方」）は書かない。右上の「?」を押して出た面が何かは、押した人が知っている
- * - 生きている 1 枚は、触れているものの説明。何にも触れていなければ、いま開いている画面。
- *   「いま触れているもの」といった見出しは付けない — 触れると変わる、それ自体が説明
- * - 「はじめに」の 4 話題は一覧に並べず、三歩（問いを立てる → 書く → 漬けて待つ）として
- *   辿れる形で置く（`HelpFirstSteps`）。概念そのものは、書斎で何にも触れていないときの
- *   生きている 1 枚（Oryzae とは）が言う
+ * - 画面の 1 枚は、いま開いている画面の説明。画面の部品の札（書斎なら縮小図）が並び、
+ *   画面の中で触れた物の札が灯って説明が開く。1 枚そのものは画面を移るまで変わらない
+ * - 「はじめに」の話題は一覧に並べず、チュートリアルとして辿れる形で置く（`HelpTutorial`）
  * - 一覧に節の見出し（「書斎のもの」「画面」）は付けない。行の間の空きで束が分かり、
  *   行の線画で何の話かが分かる
  * - 検索欄に文字がある間は、一覧の代わりに近い話題だけを出す（上位 6 件、1 件目は開いた状態）
@@ -96,30 +93,10 @@ export function HelpPanel({
   // 近い順の上位だけ。手元の照合は 2 文字の並びで重ねるので、長い文だと話題の大半に
   // 薄く当たる。11 件並ぶと「近い話題」ではなく一覧の並べ替えに見えてしまう。
   const shown = matches.slice(0, MAX_RESULTS);
-  const textOf = new Map(texts.map((text) => [text.id, text]));
-  const spot = hovered ?? screenTopic;
-  const spotText = textOf.get(spot);
+  const textOf = new Map<HelpTopicId, HelpTopicText>(texts.map((text) => [text.id, text]));
+  const screen = helpTopic(screenTopic);
+  const parts = screenParts(screenTopic).map(helpTopic);
   const dimClass = `transition-opacity duration-500 ${spotlight ? 'opacity-30' : 'opacity-100'}`;
-  // 案内の最中: 三歩が頭、検索欄は出さない。済んだら（か、進み具合が分からなければ）いつもの形。
-  const guiding = tutorial.step !== null;
-
-  // 「ようこそ」の間だけ、三歩以外が薄い（晴れると 500ms で戻る）。
-  const liveCard = (
-    <div className={`${dimClass} ${guiding ? 'mt-3' : ''}`}>
-      {spotText && (
-        <HelpLiveCard topic={helpTopic(spot)} text={spotText} following={hovered !== null} />
-      )}
-    </div>
-  );
-  // 三歩の箱。灯ったとき地に余白があるよう、左右は面の余白へ 8px はみ出し、上下に余白を持つ
-  // （番号の丸と見出しが箱の縁から 18px / 12px）。行の左端は一覧と揃う。
-  const stepsBox = (
-    <div
-      className={`-mx-2 rounded-[12px] px-2 pt-3 pb-1 transition-colors duration-500 ${guiding ? 'mt-0' : 'mt-3'} ${spotlight ? 'help-spot' : ''}`}
-    >
-      <HelpFirstSteps onOpenHref={onOpenHref} progress={tutorial.done} current={tutorial.step} />
-    </div>
-  );
 
   return (
     <div
@@ -127,67 +104,64 @@ export function HelpPanel({
       {...verifyAttrs({
         unit: 'HelpPanel',
         mode: searching ? 'search' : 'browse',
-        spot,
-        spotKind: hovered ? 'hover' : 'screen',
+        screen: screenTopic,
+        hovered: hovered ?? 'none',
         focused: focused ?? 'none',
         resultCount: searching ? shown.length : -1,
         remote,
         spotlight,
-        guiding,
         step: tutorial.step ?? 'none',
       })}
       className="flex h-full min-h-0 flex-col"
       style={CONTROL_FONT}
     >
-      {/* 検索欄と、閉じる。1 行に収める。案内の最中は閉じるだけ。 */}
-      <div className={`flex shrink-0 items-center gap-2 px-4 ${guiding ? 'justify-end' : ''}`}>
-        {!guiding && (
-          <label
-            htmlFor={searchId}
-            className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3"
-            style={{ background: 'var(--bg)', borderColor: 'var(--surface-sunken-border)' }}
+      {/* 検索欄と、閉じる。1 行に収める。 */}
+      <div className="flex shrink-0 items-center gap-2 px-4">
+        <label
+          htmlFor={searchId}
+          className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3"
+          style={{ background: 'var(--bg)', borderColor: 'var(--surface-sunken-border)' }}
+        >
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-[var(--date-color)]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={ICON_STROKE_WIDTH}
+            viewBox="0 0 24 24"
           >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4 shrink-0 text-[var(--date-color)]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={ICON_STROKE_WIDTH}
-              viewBox="0 0 24 24"
+            <circle cx="11" cy="11" r="7" />
+            <path strokeLinecap="round" d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            id={searchId}
+            type="search"
+            value={query}
+            onChange={(event) => changeQuery(event.target.value)}
+            maxLength={200}
+            // 書いている最中の `Esc` は文を消すだけ。面を閉じるのは、空の欄でもう一度。
+            // （preventDefault で、面を閉じる側の keydown に「済み」と伝える）
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape' || event.nativeEvent.isComposing || !searching) return;
+              event.preventDefault();
+              changeQuery('');
+            }}
+            placeholder={t('search_placeholder')}
+            autoComplete="off"
+            // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ。
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] [&::-webkit-search-cancel-button]:appearance-none"
+          />
+          {searching && (
+            <button
+              type="button"
+              onClick={() => changeQuery('')}
+              aria-label={t('search_clear')}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--date-color)] hover:text-[var(--fg)]"
             >
-              <circle cx="11" cy="11" r="7" />
-              <path strokeLinecap="round" d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              id={searchId}
-              type="search"
-              value={query}
-              onChange={(event) => changeQuery(event.target.value)}
-              maxLength={200}
-              // 書いている最中の `Esc` は文を消すだけ。面を閉じるのは、空の欄でもう一度。
-              // （preventDefault で、面を閉じる側の keydown に「済み」と伝える）
-              onKeyDown={(event) => {
-                if (event.key !== 'Escape' || event.nativeEvent.isComposing || !searching) return;
-                event.preventDefault();
-                changeQuery('');
-              }}
-              placeholder={t('search_placeholder')}
-              autoComplete="off"
-              // ブラウザ既定の消す印（WebKit の青い ×）は出さない。消す道は右の自前のボタン 1 つ。
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--fg)] outline-none placeholder:text-[var(--date-color)] [&::-webkit-search-cancel-button]:appearance-none"
-            />
-            {searching && (
-              <button
-                type="button"
-                onClick={() => changeQuery('')}
-                aria-label={t('search_clear')}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--date-color)] hover:text-[var(--fg)]"
-              >
-                <CloseIcon className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </label>
-        )}
+              <CloseIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </label>
         <button
           type="button"
           onClick={onClose}
@@ -242,20 +216,23 @@ export function HelpPanel({
           </div>
         ) : (
           <>
-            {/* 案内の最中は三歩が頭（次に何をするかが先）。済んだら 1 枚が頭。 */}
-            {guiding ? (
-              <>
-                {stepsBox}
-                {liveCard}
-              </>
-            ) : (
-              <>
-                {liveCard}
-                {stepsBox}
-              </>
-            )}
+            {/* 「ようこそ」の間だけ、チュートリアル以外が薄い（晴れると 500ms で戻る）。 */}
+            <div className={dimClass}>
+              <HelpScreenCard screen={screen} parts={parts} texts={textOf} hovered={hovered} />
+            </div>
+            {/* チュートリアルの箱。灯ったとき地に余白があるよう、左右は面の余白へ 8px はみ出す。
+                行の左端は一覧と揃う。 */}
+            <div
+              className={`-mx-2 mt-3 rounded-[12px] px-2 pt-1 pb-1 transition-colors duration-500 ${spotlight ? 'help-spot' : ''}`}
+            >
+              <HelpTutorial
+                onOpenHref={onOpenHref}
+                progress={tutorial.done}
+                current={tutorial.step}
+              />
+            </div>
             {/* 一覧。節の見出しは無く、束の間は細い線 1 本。行の余白はどの行も同じ
-                （束の頭の行だけ上が広い、といった不揃いを作らない）。「はじめに」は上の三歩が担う。 */}
+                （束の頭の行だけ上が広い、といった不揃いを作らない）。「はじめに」はチュートリアルが担う。 */}
             <div className={`mt-3 flex flex-col ${dimClass}`}>
               {HELP_SECTIONS.filter((section) => section !== 'start').map((section) => (
                 <div

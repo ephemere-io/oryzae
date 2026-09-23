@@ -1,6 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unread-letters';
+import { ACTIVITY_EVENT, readActivityKind } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 
 const LAST_SEEN_KEY = 'oryzae_jar_last_seen_at';
@@ -103,6 +104,25 @@ describe('useUnreadLetters', () => {
     expect(Object.keys(JSON.parse(localStorage.getItem(QUESTION_READ_AT_KEY) ?? '{}'))).toEqual([
       'q1',
     ]);
+  });
+
+  it('markQuestionRead は手紙を読んだ合図 read を出す（ヘルプの五歩 ⑤ が聞く）', async () => {
+    const kinds: string[] = [];
+    const listen = (e: Event) => {
+      const kind = readActivityKind(e);
+      if (kind) kinds.push(kind);
+    };
+    window.addEventListener(ACTIVITY_EVENT, listen);
+    const { result } = renderHook(() => useUnreadLetters(createApi(LETTERS), false));
+
+    await waitFor(() => expect(result.current.unreadCount).toBe(2));
+    // 取得しただけでは出ない。開いて初めて出る
+    expect(kinds).toEqual([]);
+
+    act(() => result.current.markQuestionRead('q1'));
+
+    window.removeEventListener(ACTIVITY_EVENT, listen);
+    expect(kinds).toEqual(['read']);
   });
 
   it('同じ問いに複数届いていてもまとめて既読になる（開けない未読を残さない）', async () => {

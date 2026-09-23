@@ -13,7 +13,8 @@ const TEXTS = helpTextsFrom((key) => {
 });
 
 const CARD = '[data-verify-unit="HelpTopicCard"]';
-const LIVE = '[data-verify-unit="HelpLiveCard"]';
+const SCREEN = '[data-verify-unit="HelpScreenCard"]';
+const TUTORIAL = '[data-verify-unit="HelpTutorial"]';
 
 function renderPanel(overrides: Partial<HelpPanelProps> = {}) {
   const props: HelpPanelProps = {
@@ -60,37 +61,45 @@ describe('HelpPanel', () => {
     }
   });
 
-  it('「まず試してみよう」の三歩が上に居て、押すと行き先へ', () => {
+  it('チュートリアルの五歩が居て、押すと行き先へ', () => {
     const { onOpenHref } = renderPanel();
-    const steps = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
-    if (!steps) throw new Error('三歩が無い');
+    const steps = document.querySelector('[data-verify-unit="HelpTutorial"]');
+    if (!steps) throw new Error('チュートリアルが無い');
     const buttons = steps.querySelectorAll('li button');
-    expect(buttons).toHaveLength(3);
+    expect(buttons).toHaveLength(5);
     expect(steps.textContent).toContain(jaMessages.help.steps.title);
-    // 三歩目には最初の手紙が届く条件（文字数）。
-    expect(buttons[2]?.textContent).toMatch(/\d/);
+    // 四歩目には最初の手紙が届く条件（文字数）。
+    expect(buttons[3]?.textContent).toMatch(/\d/);
     const second = buttons[1];
     if (!second) throw new Error('2 歩目が無い');
     fireEvent.click(second);
     expect(onOpenHref).toHaveBeenCalledWith('/entries/new', false);
   });
 
-  it('頭の 1 枚は、何にも触れていなければ画面の話題、触れていればそれ', () => {
+  it('頭の 1 枚はいま開いている画面。触れた部品の札が灯って説明が開くだけで、1 枚は入れ替わらない', () => {
     renderPanel({ screenTopic: 'board' });
-    expect(document.querySelector(LIVE)?.getAttribute('data-verify-topic')).toBe('board');
-    expect(document.querySelector(LIVE)?.getAttribute('data-verify-following')).toBe('false');
+    expect(document.querySelector(SCREEN)?.getAttribute('data-verify-screen')).toBe('board');
+    expect(document.querySelector(SCREEN)?.getAttribute('data-verify-active')).toBe('none');
     cleanup();
 
-    renderPanel({ hovered: 'jar' });
-    expect(document.querySelector(LIVE)?.getAttribute('data-verify-topic')).toBe('jar');
-    expect(document.querySelector(LIVE)?.getAttribute('data-verify-following')).toBe('true');
+    renderPanel({ screenTopic: 'study', hovered: 'jar' });
+    const card = document.querySelector(SCREEN);
+    expect(card?.getAttribute('data-verify-screen')).toBe('study');
+    expect(card?.getAttribute('data-verify-active')).toBe('jar');
+    expect(card?.querySelector('h2')?.textContent).toBe(jaMessages.help.topics.study.title);
     // 本文は一覧の行（閉じていても DOM に居る）にもあるので、頭の 1 枚の中で見る。
-    expect(document.querySelector(LIVE)?.textContent).toContain(jaMessages.help.topics.jar.body);
+    expect(card?.textContent).toContain(jaMessages.help.topics.jar.body);
+    cleanup();
+
+    // 部品でないものに触れても何も起きない。
+    renderPanel({ screenTopic: 'study', hovered: 'account' });
+    expect(document.querySelector(SCREEN)?.getAttribute('data-verify-active')).toBe('none');
   });
 
-  it('頭の 1 枚には押すものが無い（向かう途中で中身が変わり、押せないから）', () => {
-    renderPanel({ hovered: 'support' });
-    expect(document.querySelector(LIVE)?.querySelector('button, a')).toBeNull();
+  it('頭の 1 枚に「開く」は無い（行き先へは一覧から）', () => {
+    renderPanel({ screenTopic: 'study', hovered: 'jar' });
+    expect(document.querySelector(SCREEN)?.textContent).not.toContain(jaMessages.help.open_topic);
+    expect(document.querySelector(SCREEN)?.querySelector('a')).toBeNull();
   });
 
   it('話題の行を押すと onFocus にその話題が渡り、もう一度押すと null', () => {
@@ -134,31 +143,45 @@ describe('HelpPanel', () => {
     expect(empty.onQueryChange).not.toHaveBeenCalled();
   });
 
-  it('案内の最中は三歩が頭で検索欄が無い。済めば 1 枚が頭に戻り検索欄が出る', () => {
+  it('並びは変わらない: 検索欄 → 画面の 1 枚 → チュートリアル → 一覧。済めばチュートリアルは閉じる', () => {
     renderPanel({
-      tutorial: { step: 'question', done: { question: false, write: false, pickle: false } },
+      tutorial: {
+        step: 'question',
+        done: { question: false, write: false, link: false, pickle: false, read: false },
+      },
     });
-    expect(screen.queryByPlaceholderText(jaMessages.help.search_placeholder)).toBeNull();
-    const panel = document.querySelector('[data-verify-unit="HelpPanel"]');
-    expect(panel?.getAttribute('data-verify-guiding')).toBe('true');
-    const steps = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
-    const live = document.querySelector(LIVE);
+    expect(screen.getByPlaceholderText(jaMessages.help.search_placeholder)).toBeTruthy();
+    const card = document.querySelector(SCREEN);
+    const tutorial = document.querySelector(TUTORIAL);
+    const firstRow = document.querySelector(CARD);
     expect(
-      steps && live && steps.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
+      card && tutorial && card.compareDocumentPosition(tutorial) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(steps?.getAttribute('data-verify-current')).toBe('question');
+    expect(
+      tutorial &&
+        firstRow &&
+        tutorial.compareDocumentPosition(firstRow) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(tutorial?.getAttribute('data-verify-current')).toBe('question');
+    expect(tutorial?.getAttribute('data-verify-open')).toBe('true');
 
     cleanup();
     renderPanel({
-      tutorial: { step: null, done: { question: true, write: true, pickle: true } },
+      tutorial: {
+        step: null,
+        done: { question: true, write: true, link: true, pickle: true, read: true },
+      },
     });
     expect(screen.getByPlaceholderText(jaMessages.help.search_placeholder)).toBeTruthy();
-    const steps2 = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
-    const live2 = document.querySelector(LIVE);
+    const tutorial2 = document.querySelector(TUTORIAL);
+    expect(tutorial2?.getAttribute('data-verify-complete')).toBe('true');
+    expect(tutorial2?.getAttribute('data-verify-open')).toBe('false');
+    const card2 = document.querySelector(SCREEN);
     expect(
-      live2 && steps2 && live2.compareDocumentPosition(steps2) & Node.DOCUMENT_POSITION_FOLLOWING,
+      card2 &&
+        tutorial2 &&
+        card2.compareDocumentPosition(tutorial2) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(steps2?.getAttribute('data-verify-done')).toBe('question,write,pickle');
   });
 
   it('検索の 1 件目は押せば閉じられ、文を変えると一覧で開いていた行は持ち越さない', () => {
@@ -198,7 +221,7 @@ describe('HelpPanel', () => {
         { id: 'pickle', score: 4, source: 'local' },
       ],
     });
-    expect(document.querySelector(LIVE)).toBeNull();
+    expect(document.querySelector(SCREEN)).toBeNull();
     const cards = document.querySelectorAll(CARD);
     expect(cards).toHaveLength(2);
     expect(cards[0]?.getAttribute('data-verify-expanded')).toBe('true');
@@ -234,9 +257,9 @@ describe('HelpPanel', () => {
     renderPanel({ spotlight: true });
     const panel = document.querySelector('[data-verify-unit="HelpPanel"]');
     expect(panel?.getAttribute('data-verify-spotlight')).toBe('true');
-    const live = document.querySelector(LIVE);
+    const live = document.querySelector(SCREEN);
     expect(live?.parentElement?.className).toContain('opacity-30');
-    const steps = document.querySelector('[data-verify-unit="HelpFirstSteps"]');
+    const steps = document.querySelector('[data-verify-unit="HelpTutorial"]');
     expect(steps?.parentElement?.className).toContain('help-spot');
   });
 

@@ -10,15 +10,23 @@ interface UserMeData {
   avatarUrl: string | null;
   /** 初回のヘルプを閉じたことがあるか（旧オンボーディングの旗をそのまま使っている）。 */
   onboardingCompleted: boolean;
-  /** 一度でも漬け込んだことがあるか (Issue #316 ガイド表示判定用) */
+  /** 一度でも漬け込んだことがあるか。ヘルプの五歩 ④「瓶に漬けて待つ」の旗 (Issue #316 由来) */
   hasPickled: boolean;
-  /** 一度でもエントリに問いを紐付けたことがあるか (Issue #316 ガイド表示判定用) */
+  /** 一度でもエントリに問いを紐付けたことがあるか。ヘルプの五歩 ③「問いを紐づける」の旗 (Issue #316 由来) */
   hasLinkedQuestion: boolean;
   /**
    * 問いを 1 件でも立てたことがあるか（アーカイブ済み含む）。
-   * ヘルプの三歩 ①「問いを立てる」が済んだかの旗（② は hasLinkedQuestion、③ は hasPickled）。
+   * ヘルプの五歩 ①「問いを立てる」が済んだかの旗。
    */
   hasQuestion: boolean;
+  /** エントリを 1 件でも書いたことがあるか。ヘルプの五歩 ②「エントリーを書く」の旗。 */
+  hasEntry: boolean;
+  /**
+   * 手紙を 1 通でも読んだことがあるか。ヘルプの五歩 ⑤「手紙を読む」の旗。
+   * 既読はサーバに残していないので、サーバの実体は「読める手紙（完了した発酵）があるか」。
+   * 開いた瞬間は `lib/activity` の 'read' 合図が補う。
+   */
+  hasReadLetter: boolean;
 }
 
 /**
@@ -37,6 +45,8 @@ function normalizeUserMe(input: unknown): UserMeData | null {
     hasPickled: readBooleanField(input, 'hasPickled', false),
     hasLinkedQuestion: readBooleanField(input, 'hasLinkedQuestion', false),
     hasQuestion: readBooleanField(input, 'hasQuestion', false),
+    hasEntry: readBooleanField(input, 'hasEntry', false),
+    hasReadLetter: readBooleanField(input, 'hasReadLetter', false),
   };
 }
 

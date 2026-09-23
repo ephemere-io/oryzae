@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { normalizeSummaries } from '@/features/shared/fermentation/normalize';
 import type { FermentationSummary } from '@/features/shared/fermentation/types';
+import { notifyActivity } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 import type { UnreadState } from '@/lib/unread-context';
 
@@ -186,6 +187,11 @@ export function useUnreadLetters(api: ApiClient | null, authLoading: boolean): U
         writeQuestionReadAt(next);
         return next;
       });
+      // 手紙を読んだ合図（ヘルプの五歩 ⑤ が聞く）。既読はサーバに残さない（localStorage
+      // 止まり）ので、「読んだ」を外へ伝える口はここだけ。PC の瓶が円にならない問いを
+      // 片付けるとき（jar-view の effect）もここを通るが、そのとき手紙は届いている
+      // （＝サーバの hasReadLetter も true）ので、旗の意味は食い違わない。
+      notifyActivity('read');
     },
     [letters],
   );

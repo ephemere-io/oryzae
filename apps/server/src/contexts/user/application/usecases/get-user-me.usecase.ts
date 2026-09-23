@@ -7,15 +7,23 @@ interface UserMeView {
   nickname: string;
   avatarUrl: string | null;
   onboardingCompleted: boolean;
-  /** 一度でも漬け込んだエントリがあるか (Issue #316 ガイドモーダル用) */
+  /** 一度でも漬け込んだエントリがあるか。ヘルプの五歩 ④「瓶に漬けて待つ」の旗 (Issue #316 由来) */
   hasPickled: boolean;
-  /** 一度でもエントリに問いを紐付けたことがあるか (Issue #316 ガイドモーダル用) */
+  /** 一度でもエントリに問いを紐付けたことがあるか。ヘルプの五歩 ③「問いを紐づける」の旗 (Issue #316 由来) */
   hasLinkedQuestion: boolean;
   /**
    * 問いを 1 件でも立てたことがあるか（アーカイブ済み含む）。
-   * ヘルプの三歩 ①「問いを立てる」が済んだかの旗。② は hasLinkedQuestion、③ は hasPickled。
+   * ヘルプの五歩 ①「問いを立てる」が済んだかの旗。
    */
   hasQuestion: boolean;
+  /** エントリを 1 件でも書いたことがあるか。ヘルプの五歩 ②「エントリーを書く」の旗。 */
+  hasEntry: boolean;
+  /**
+   * 手紙を 1 通でも読んだことがあるか。ヘルプの五歩 ⑤「手紙を読む」の旗。
+   * 既読はサーバに残していないので、実体は「読める手紙（完了した発酵）が 1 通でもあるか」
+   * （{@link UserActivityStatsRepositoryGateway.hasReadLetter} の注記を参照）。
+   */
+  hasReadLetter: boolean;
 }
 
 /**
@@ -36,11 +44,15 @@ export class GetUserMeUsecase {
     const profile = await this.profileRepo.findById(userId);
     if (!profile) throw new UserProfileNotFoundError(userId);
 
-    const [hasPickled, hasLinkedQuestion, hasQuestion] = await Promise.all([
-      this.statsRepo.hasPickled(userId),
-      this.statsRepo.hasLinkedQuestion(userId),
-      this.statsRepo.hasQuestion(userId),
-    ]);
+    const [hasPickled, hasLinkedQuestion, hasQuestion, hasEntry, hasReadLetter] = await Promise.all(
+      [
+        this.statsRepo.hasPickled(userId),
+        this.statsRepo.hasLinkedQuestion(userId),
+        this.statsRepo.hasQuestion(userId),
+        this.statsRepo.hasEntry(userId),
+        this.statsRepo.hasReadLetter(userId),
+      ],
+    );
 
     const props = profile.toProps();
     return {
@@ -51,6 +63,8 @@ export class GetUserMeUsecase {
       hasPickled,
       hasLinkedQuestion,
       hasQuestion,
+      hasEntry,
+      hasReadLetter,
     };
   }
 }

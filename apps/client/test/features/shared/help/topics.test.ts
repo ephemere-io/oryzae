@@ -32,6 +32,7 @@ describe('話題のカタログ', () => {
 
   it('「はじめに」は概念 → 問い → 書く → 漬ける の順（上から読めば一周する）', () => {
     expect(HELP_TOPICS.filter((t) => t.section === 'start').map((t) => t.id)).toEqual([
+      'study',
       'concept',
       'question',
       'write',
@@ -96,7 +97,7 @@ describe('helpTopic / isHelpTopicId', () => {
 
 describe('topicForScreen', () => {
   it('画面ごとの話題', () => {
-    expect(topicForScreen('/')).toBe('concept');
+    expect(topicForScreen('/')).toBe('study');
     expect(topicForScreen('/jar')).toBe('jar');
     expect(topicForScreen('/board')).toBe('board');
     expect(topicForScreen('/entries')).toBe('list');
@@ -106,8 +107,8 @@ describe('topicForScreen', () => {
     expect(topicForScreen('/account')).toBe('account');
   });
 
-  it('知らない画面は概念に落ちる', () => {
-    expect(topicForScreen('/nowhere')).toBe('concept');
+  it('知らない画面は書斎に落ちる', () => {
+    expect(topicForScreen('/nowhere')).toBe('study');
   });
 });
 

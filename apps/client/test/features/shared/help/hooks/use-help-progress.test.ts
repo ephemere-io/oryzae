@@ -38,11 +38,22 @@ describe('useHelpProgress', () => {
   it('三歩の進み具合は users/me の旗から読む（欠けていれば「まだ」）', async () => {
     const api = createApiStub();
     api.fetch.mockResolvedValueOnce(
-      mockResponse(true, { onboardingCompleted: true, hasQuestion: true, hasPickled: false }),
+      mockResponse(true, {
+        onboardingCompleted: true,
+        hasQuestion: true,
+        hasEntry: true,
+        hasPickled: false,
+      }),
     );
     const { result } = renderHook(() => useHelpProgress(api));
     await waitFor(() => {
-      expect(result.current.progress).toEqual({ question: true, write: false, pickle: false });
+      expect(result.current.progress).toEqual({
+        question: true,
+        write: true,
+        link: false,
+        pickle: false,
+        read: false,
+      });
     });
   });
 

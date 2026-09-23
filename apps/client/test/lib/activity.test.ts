@@ -10,14 +10,18 @@ describe('activity — 成し遂げた合図', () => {
     };
     window.addEventListener(ACTIVITY_EVENT, listener);
     notifyActivity('question');
+    notifyActivity('entry');
     notifyActivity('pickle');
+    notifyActivity('read');
     window.removeEventListener(ACTIVITY_EVENT, listener);
-    expect(heard).toEqual(['question', 'pickle']);
+    expect(heard).toEqual(['question', 'entry', 'pickle', 'read']);
   });
 
   it('自前でないイベントや知らない種類は読まない', () => {
     expect(readActivityKind(new Event(ACTIVITY_EVENT))).toBeNull();
     expect(readActivityKind(new CustomEvent(ACTIVITY_EVENT, { detail: 'delete' }))).toBeNull();
     expect(readActivityKind(new CustomEvent(ACTIVITY_EVENT, { detail: 'link' }))).toBe('link');
+    expect(readActivityKind(new CustomEvent(ACTIVITY_EVENT, { detail: 'entry' }))).toBe('entry');
+    expect(readActivityKind(new CustomEvent(ACTIVITY_EVENT, { detail: 'read' }))).toBe('read');
   });
 });

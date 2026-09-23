@@ -11,7 +11,7 @@ import { registerUnit } from '@oryzae/verify';
 import jaMessages from '@/i18n/messages/ja.json';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { helpTextsFrom } from '../hooks/use-help-texts';
-import { HELP_TOPICS } from '../topics';
+import { HELP_TOPICS, screenParts } from '../topics';
 import type { HelpMatch, HelpRemoteState, HelpTopicId, HelpTutorial } from '../types';
 import { HelpPanel } from './help-panel';
 
@@ -35,7 +35,8 @@ function lookup(key: string): string {
 const TEXTS = helpTextsFrom(lookup);
 const PANEL = '[data-verify-unit="HelpPanel"]';
 const CARD = '[data-verify-unit="HelpTopicCard"]';
-const LIVE = '[data-verify-unit="HelpLiveCard"]';
+const SCREEN = '[data-verify-unit="HelpScreenCard"]';
+const TUTORIAL = '[data-verify-unit="HelpTutorial"]';
 
 /** 面の見出し・使い方の説明として書いてはいけない語。話題の題（「このヘルプの使い方」）は別。 */
 const LECTURE_WORDS = [
@@ -60,7 +61,8 @@ const BROWSE: Props = {
 registerUnit<Props>({
   id: 'HelpPanel',
   title: 'HelpPanel',
-  description: 'ヘルプの面の中身。検索欄・生きている 1 枚・話題の一覧',
+  description:
+    'ヘルプの面の中身。検索欄・画面の 1 枚・チュートリアル・話題の一覧（並びは変わらない）',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
@@ -85,12 +87,26 @@ registerUnit<Props>({
   fixtures: [
     { id: 'browse', description: '一覧。何にも触れていない（画面の話題が頭）', props: BROWSE },
     {
-      id: 'guiding',
+      id: 'tutorial-first',
       probe: true,
-      description: 'Probe: 案内の最中 — 三歩が頭で①が脈打ち、検索欄は無い',
+      description: 'Probe: チュートリアルの①が脈打つ。並びも検索欄も変わらない',
       props: {
         ...BROWSE,
-        tutorial: { step: 'question', done: { question: false, write: false, pickle: false } },
+        tutorial: {
+          step: 'question',
+          done: { question: false, write: false, link: false, pickle: false, read: false },
+        },
+      },
+    },
+    {
+      id: 'tutorial-done',
+      description: '全部済み — チュートリアルは閉じて見出しだけ。並びは同じ',
+      props: {
+        ...BROWSE,
+        tutorial: {
+          step: null,
+          done: { question: true, write: true, link: true, pickle: true, read: true },
+        },
       },
     },
     {
@@ -142,23 +158,23 @@ registerUnit<Props>({
     },
     {
       id: 'browse-lists-every-topic',
-      description: '一覧では「はじめに」以外の全話題が並び、「はじめに」は三歩として上に居る',
+      description:
+        '一覧では「はじめに」以外の全話題が並び、「はじめに」はチュートリアルとして上に居る',
       check: ({ root, contract }) => {
         if (contract.mode !== 'browse') return true;
         const expected = HELP_TOPICS.filter((t) => t.section !== 'start').length;
         const count = root.querySelectorAll(CARD).length;
         if (count !== expected) return `${count} 件（期待 ${expected}）`;
-        return root.querySelector('[data-verify-unit="HelpFirstSteps"]') !== null || '三歩が無い';
+        return root.querySelector(TUTORIAL) !== null || 'チュートリアルが無い';
       },
     },
     {
       id: 'search-lists-matches-only',
-      description: '検索では近い話題だけ（件数は契約と一致）。生きている 1 枚も三歩も出ない',
+      description: '検索では近い話題だけ（件数は契約と一致）。画面の 1 枚もチュートリアルも出ない',
       check: ({ root, contract }) => {
         if (contract.mode !== 'search') return true;
-        if (root.querySelector(LIVE)) return '検索中に生きている 1 枚が残っている';
-        if (root.querySelector('[data-verify-unit="HelpFirstSteps"]'))
-          return '検索中に三歩が残っている';
+        if (root.querySelector(SCREEN)) return '検索中に画面の 1 枚が残っている';
+        if (root.querySelector(TUTORIAL)) return '検索中にチュートリアルが残っている';
         const count = root.querySelectorAll(CARD).length;
         return (
           String(count) === contract.resultCount || `${count} 件、契約 ${contract.resultCount}`
@@ -166,17 +182,38 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'live-card-mirrors-hover',
-      description: '頭の 1 枚は、触れているもの。無ければ画面の話題',
+      id: 'screen-card-stays-and-lights-the-part',
+      description:
+        '頭の 1 枚はいま開いている画面。触れているものが部品なら、その札が灯るだけで 1 枚は入れ替わらない',
       check: ({ root, props, contract }) => {
         if (contract.mode !== 'browse') return true;
-        const live = root.querySelector(LIVE);
-        const expected = props.hovered ?? props.screenTopic;
+        const card = root.querySelector(SCREEN);
+        if (card?.getAttribute('data-verify-screen') !== props.screenTopic) {
+          return `screen=${card?.getAttribute('data-verify-screen')}, 期待=${props.screenTopic}`;
+        }
+        const parts = screenParts(props.screenTopic);
+        const expected =
+          props.hovered !== null && parts.includes(props.hovered) ? props.hovered : 'none';
         return (
-          (live?.getAttribute('data-verify-topic') === expected &&
-            live?.getAttribute('data-verify-following') === String(props.hovered !== null)) ||
-          `live=${live?.getAttribute('data-verify-topic')}, 期待=${expected}`
+          card.getAttribute('data-verify-active') === expected ||
+          `active=${card.getAttribute('data-verify-active')}, 期待=${expected}`
         );
+      },
+    },
+    {
+      id: 'structure-never-changes',
+      description:
+        '検索欄 → 画面の 1 枚 → チュートリアル → 一覧。チュートリアルの最中も済んだ後も同じ。検索欄はいつも居る',
+      check: ({ root, contract }) => {
+        if (root.querySelector('input[type="search"]') === null) return '検索欄が無い';
+        if (contract.mode !== 'browse') return true;
+        const card = root.querySelector(SCREEN);
+        const tutorial = root.querySelector(TUTORIAL);
+        const firstRow = root.querySelector(CARD);
+        if (!card || !tutorial || !firstRow) return '1 枚かチュートリアルか一覧が無い';
+        const before = (a: Element, b: Element) =>
+          Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+        return (before(card, tutorial) && before(tutorial, firstRow)) || '並びが違う';
       },
     },
     {
@@ -190,15 +227,13 @@ registerUnit<Props>({
     },
     {
       id: 'spotlight-dims-everything-but-the-steps',
-      description: 'spotlight の間、生きている 1 枚と一覧は薄く、三歩は灯る',
+      description: 'spotlight の間、画面の 1 枚と一覧は薄く、チュートリアルは灯る',
       check: ({ root, props, contract }) => {
         if (contract.mode !== 'browse') return true;
-        const live = root.querySelector(LIVE);
-        const dimmed = live?.parentElement?.className.includes('opacity-30') ?? false;
+        const card = root.querySelector(SCREEN);
+        const dimmed = card?.parentElement?.className.includes('opacity-30') ?? false;
         const lit =
-          root
-            .querySelector('[data-verify-unit="HelpFirstSteps"]')
-            ?.parentElement?.className.includes('help-spot') ?? false;
+          root.querySelector(TUTORIAL)?.parentElement?.className.includes('help-spot') ?? false;
         const expected = props.spotlight === true;
         return (
           (dimmed === expected && lit === expected) ||
@@ -207,29 +242,9 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'guiding-leads-with-steps-and-hides-search',
-      description: '案内の最中は三歩が 1 枚より先に来て、検索欄が無い。済めば元の並びと検索欄',
-      check: ({ root, props, contract }) => {
-        const guiding = props.tutorial?.step != null;
-        if (contract.guiding !== String(guiding)) return `契約 guiding=${contract.guiding}`;
-        const search = root.querySelector('input[type="search"]');
-        if (guiding === (search !== null)) return guiding ? '検索欄がある' : '検索欄が無い';
-        if (props.query !== '' || contract.mode !== 'browse') return true;
-        const steps = root.querySelector('[data-verify-unit="HelpFirstSteps"]');
-        const live = root.querySelector(LIVE);
-        if (!steps || !live) return '三歩か 1 枚が無い';
-        const stepsFirst = Boolean(
-          steps.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
-        );
-        return stepsFirst === guiding || (guiding ? '三歩が頭ではない' : '1 枚が頭ではない');
-      },
-    },
-    {
       id: 'search-box-shows-query',
       description: '検索欄には書いた文がそのまま入っている',
       check: ({ root, props }) => {
-        // 案内の最中は検索欄そのものが無い。
-        if (props.tutorial?.step != null) return true;
         const input = root.querySelector<HTMLInputElement>(`${PANEL} input[type="search"]`);
         return input?.value === props.query || `value=${input?.value}`;
       },

@@ -127,9 +127,14 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
       }
       const body = JSON.stringify(payload);
 
-      // 漬け込みが通ったら合図を出す（ヘルプの三歩 ③ が進む）。PC の palette も SP の
-      // ボタンもこの save を通るので、出す場所はここ 1 つでよい。
+      // 保存が通ったら合図を出す（ヘルプの五歩 ② が進む）。漬け込みならそのあと 'pickle'
+      // も出す（④ が進む）。PC の palette も SP のボタンもこの save を通るので、出す場所は
+      // ここ 1 つでよい。
       const pickled = options?.fermentationEnabled === true;
+      const notifySaved = () => {
+        notifyActivity('entry');
+        if (pickled) notifyActivity('pickle');
+      };
 
       if (entryId) {
         const res = await api.fetch(`/api/v1/entries/${entryId}`, { method: 'PUT', body });
@@ -138,7 +143,7 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
           setSaving(false);
           return null;
         }
-        if (pickled) notifyActivity('pickle');
+        notifySaved();
         setSaving(false);
         return entryId;
       }
@@ -149,7 +154,7 @@ export function useSaveEntry(api: ApiClient | null, _auth: AuthState | null) {
         setSaving(false);
         return null;
       }
-      if (pickled) notifyActivity('pickle');
+      notifySaved();
 
       // 作成は成功しているのに id が読めないと、呼び出し側は失敗と区別がつかない。
       // autosave (use-autosave-entry) は id を受け取れないと entryId を記録できず、

@@ -843,22 +843,37 @@
       "start": "Let's begin"
     },
     "steps": {
-      "title": "Try it first",
+      "title": "Tutorial",
       "done": "Done",
+      "toggle": "Show or hide the tutorial",
       "question": {
         "title": "Plant a question",
         "lead": "The one thing on your mind. You plant it inside the jar"
       },
       "write": {
         "title": "Write an entry",
-        "lead": "Open the notebook, link the question, write. Saving is automatic"
+        "lead": "Open the notebook and write. Saving is automatic"
+      },
+      "link": {
+        "title": "Link a question",
+        "lead": "From the chip at the top of the entry, tie it to the question you planted"
       },
       "pickle": {
         "title": "Pickle it, then wait",
         "lead": "Once about 500 characters of linked entries have gathered, fermentation starts the next night and a letter arrives"
+      },
+      "read": {
+        "title": "Read the letter",
+        "lead": "When fermentation ends a letter arrives in the jar. Open and read it"
       }
     },
     "topics": {
+      "study": {
+        "title": "The study",
+        "lead": "The entrance room. What's on the desk is where you go",
+        "body": "The room you land in after signing in. The jar on the left, the notebook in the middle, the board at the back, the shelf on the right, the pencil — touch one and its name appears; press it to go there. You don't write here; you choose where to go.",
+        "keywords": "study,room,home,top,desk,entrance,first screen"
+      },
       "concept": {
         "title": "What Oryzae is",
         "lead": "Plant a question, write, pickle it in the jar, wait for a letter",

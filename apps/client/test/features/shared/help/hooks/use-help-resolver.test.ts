@@ -80,8 +80,8 @@ describe('useHelpResolver — 検索欄', () => {
     expect(body.locale).toBe('ja');
     expect(body.topics).toHaveLength(TEXTS.length);
     expect(body.topics[0]).toEqual({
-      id: 'concept',
-      label: expect.stringContaining('Oryzae とは'),
+      id: 'study',
+      label: expect.stringContaining('書斎'),
     });
 
     expect(result.current.matches[0]).toEqual({

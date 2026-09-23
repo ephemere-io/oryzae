@@ -9,7 +9,7 @@ import type { HelpProgress } from '../types';
 interface UseHelpProgressResult {
   /** 初めての人か。確かめる前は null。 */
   firstVisit: boolean | null;
-  /** 三歩の進み具合。確かめる前は null。 */
+  /** チュートリアルの進み具合。確かめる前は null。 */
   progress: HelpProgress | null;
   /** 「見た」と記録する。以後は自動で開かない。 */
   markSeen: () => Promise<void>;
@@ -18,12 +18,13 @@ interface UseHelpProgressResult {
 }
 
 /**
- * 初めての人にだけヘルプを自動で開くための門と、三歩の進み具合。
+ * 初めての人にだけヘルプを自動で開くための門と、チュートリアルの進み具合。
  *
  * どちらも `/api/v1/users/me` の旗から読む。`onboardingCompleted` は旧オンボーディングが
- * 立てていた旗（名前は残っているが、意味は「初回のヘルプを閉じたことがある」）。三歩は
- * `hasQuestion`（問いを立てた）・`hasLinkedQuestion`（問いを結んで書いた）・`hasPickled`
- * （漬け込んだ）— どれも「一度でもやったか」で、進み具合を別に憶えない。データがそのまま
+ * 立てていた旗（名前は残っているが、意味は「初回のヘルプを閉じたことがある」）。チュートリアルは
+ * `hasQuestion`（問いを立てた）・`hasEntry`（書いた）・`hasLinkedQuestion`（問いを結んだ）・
+ * `hasPickled`（漬け込んだ）・`hasReadLetter`（手紙を読んだ）— どれも「一度でもやったか」で、
+ * 進み具合を別に憶えない。データがそのまま
  * 進み具合なので、消したり戻したりしても嘘にならない。
  *
  * 何かを成し遂げた合図（`lib/activity`）を聞いて取り直す。questions / entries の hook が
@@ -50,8 +51,10 @@ export function useHelpProgress(api: ApiClient | null): UseHelpProgressResult {
       setFirstVisit(!readBooleanField(json, 'onboardingCompleted', true));
       setProgress({
         question: readBooleanField(json, 'hasQuestion', false),
-        write: readBooleanField(json, 'hasLinkedQuestion', false),
+        write: readBooleanField(json, 'hasEntry', false),
+        link: readBooleanField(json, 'hasLinkedQuestion', false),
         pickle: readBooleanField(json, 'hasPickled', false),
+        read: readBooleanField(json, 'hasReadLetter', false),
       });
     } catch {
       setFirstVisit(false);
