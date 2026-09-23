@@ -267,19 +267,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "일요일",
-      "day_mon": "월요일",
-      "day_tue": "화요일",
-      "day_wed": "수요일",
-      "day_thu": "목요일",
-      "day_fri": "금요일",
-      "day_sat": "토요일"
-    },
     "canvas": {
       "aria_label": "보드 캔버스"
     },
-    "empty": "이 기간에는 내용이 없습니다",
+    "nothing_pinned": "아직 붙인 것이 없습니다",
     "lightbox": {
       "aria_label": "사진 라이트박스",
       "close_aria": "라이트박스 닫기"
@@ -330,6 +321,7 @@
       "snippet": "스니펫 만들기",
       "photo": "이미지 붙여넣기",
       "aria_label_card": "선택한 카드 작업",
+      "selected_count": "{count}장",
       "bring_to_front": "맨 앞으로",
       "delete": "삭제",
       "open": "열기",
@@ -797,7 +789,7 @@
     },
     "board": {
       "cards": "{count}장",
-      "empty": "오늘은 아직 아무것도 없습니다",
+      "nothing_pinned": "아직 붙인 것이 없습니다",
       "hint": "카드는 손가락으로 옮길 수 있습니다",
       "add_snippet": "스니펫 만들기",
       "add_photo": "사진 추가",
@@ -807,7 +799,10 @@
       "cancel": "취소",
       "save": "저장",
       "resize": "크기와 방향 바꾸기",
-      "snippet_placeholder": "남겨 두고 싶은 것"
+      "snippet_placeholder": "남겨 두고 싶은 것",
+      "palette_aria": "보드 조작",
+      "tool_snippet": "스니펫",
+      "tool_photo": "사진"
     }
   },
   "canvas": {

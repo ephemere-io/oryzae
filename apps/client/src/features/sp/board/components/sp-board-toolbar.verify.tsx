@@ -50,7 +50,7 @@ registerUnit<Props>({
     },
     {
       id: 'snippet-selected',
-      description: '抜粋を選んでいる（編集 / 前面へ / 外す）',
+      description: 'スニペットを選んでいる（編集 / 前面へ / 外す）',
       props: { selectedType: 'snippet', ...ACTIONS },
     },
     {
@@ -77,7 +77,7 @@ registerUnit<Props>({
     },
     {
       id: 'edit-only-for-snippets',
-      description: '「編集」は抜粋のときだけ出す（写真に本文は無い）',
+      description: '「編集」はスニペットのときだけ出す（写真に本文は無い）',
       check: ({ root, props }) => {
         const shown = (root.textContent ?? '').includes('編集');
         return (
@@ -91,7 +91,7 @@ registerUnit<Props>({
       description: '作るものと、カードにできることが同時に並ばない',
       check: ({ root }) => {
         const text = root.textContent ?? '';
-        const creating = text.includes('抜粋') || text.includes('写真');
+        const creating = text.includes('スニペット') || text.includes('写真');
         const acting = text.includes('外す');
         return !(creating && acting) || '作るものとカードの操作が同時に出ている';
       },
@@ -104,8 +104,8 @@ registerUnit<Props>({
       check: ({ root }) => {
         const bar = root.querySelector('[data-verify-unit="SpBoardToolbar"]');
         if (!(bar instanceof HTMLElement)) return '道具箱が無い';
-        // left-1/2 の絶対配置は「親の右端まで」を幅の上限にするため、w-max が要る。
-        if (!bar.classList.contains('w-max')) return '道具箱が親の半分の幅に畳まれる';
+        // 下端の列は画面の幅いっぱい（#616 の ActionPalette と同じ形）。
+        if (!bar.classList.contains('w-full')) return '道具の列が幅いっぱいに敷かれていない';
         const wrapped = [...root.querySelectorAll('button')].filter(
           (button) => !button.classList.contains('whitespace-nowrap'),
         );
@@ -113,12 +113,33 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'actions-are-icon-plus-caption',
+      description: 'PC と同じ絵（アイコン）に、短い名前を添える（スマホにはホバーが無い）',
+      check: ({ root }) => {
+        const buttons = [...root.querySelectorAll('button[data-palette-action]')];
+        if (buttons.length === 0) return '道具が 1 つも無い';
+        for (const button of buttons) {
+          if (!button.querySelector('svg'))
+            return `${button.getAttribute('aria-label')} に絵が無い`;
+          const caption = button.querySelector('span')?.textContent ?? '';
+          if (caption.trim() === '') return `${button.getAttribute('aria-label')} に名前が無い`;
+        }
+        return true;
+      },
+    },
+    {
       id: 'busy-disables-creation',
-      description: '作っている最中は押せない',
+      description: '作っている最中は、作る道具だけを押せなくする',
       onlyFixtures: ['busy'],
       check: ({ root }) => {
-        const enabled = [...root.querySelectorAll('button')].filter((b) => !b.disabled).length;
-        return enabled === 0 || `${enabled} 個のボタンがまだ押せる`;
+        // 止めるのは**作る道具だけ**。カードにできること（前面へ・外す）や盤面の
+        // 寄り引きは、作っている最中でも押せてよい（二重に作る原因にならない）。
+        const creating = [...root.querySelectorAll('button[data-verify-creates]')].filter(
+          (element): element is HTMLButtonElement => element instanceof HTMLButtonElement,
+        );
+        if (creating.length === 0) return '作る道具が見つからない';
+        const enabled = creating.filter((button) => !button.disabled).length;
+        return enabled === 0 || `${enabled} 個の作る道具がまだ押せる`;
       },
     },
   ],
