@@ -64,6 +64,7 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  entranceView,
   homeView,
   jarView,
   journalSpreadView,
@@ -78,6 +79,15 @@ import {
 } from './camera';
 import { captureRenderedFrame } from './capture';
 import { contentSignature } from './content-signature';
+import {
+  DOOR_ANGLE,
+  DOOR_SETTLE_LERP,
+  doorAngleWhileEntering,
+  ENTER_TIMING,
+  glideTowards,
+  isFarFrom,
+} from './enter';
+import { buildEntranceRoom, type EntranceRoom } from './entrance-room';
 import {
   buildHitRegistry,
   type HitHint,
@@ -110,6 +120,7 @@ import {
   type StudyMaterials,
   type StudyTheme,
 } from './materials';
+import type { Sprig } from './sprig';
 import {
   isPlanDone,
   leaveFadeDuration,
@@ -126,6 +137,15 @@ export interface StudySceneOptions {
   layout: StudyLayout;
   theme: StudyTheme;
   reducedMotion: boolean;
+  /**
+   * 書斎の入口（扉の前）から始めるか。認証画面で真にする。
+   *
+   * 真のあいだカメラは扉の前に留まり、`enterStudy()` で扉をくぐってホームへ移動する。
+   * **シーンは 1 つ**なので、そこに切り替わりは無い。
+   */
+  atEntrance?: boolean;
+  /** 一輪挿しに挿さる枝（七十二候）。入口を組むときだけ要る。 */
+  sprig?: Sprig;
   /** ホバーが変わったとき（PC のラベル濃度とカーソル）。 */
   onHoverChange?: (hovered: HoverInfo | null) => void;
   /** 3D の物が押されたとき。 */
@@ -206,6 +226,16 @@ export interface StudySceneHandle {
   pinchTo(ratio: number): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
+  /**
+   * 認証中か（扉に手を掛けて待つ）。入口に居るときだけ効く。失敗したら false に戻して閉じ直す。
+   */
+  setDoorWaiting(waiting: boolean): void;
+  /**
+   * 扉を押し開けて、書斎のホームまで入る。**着いてから** resolve する。
+   *
+   * シーンは 1 つなので、ここに画面の切り替わりは無い。カメラが動くだけ。
+   */
+  enterStudy(): Promise<void>;
   /** 遷移中・サブ画面ではラベルを消す。 */
   isBusy(): boolean;
   dispose(): void;
@@ -234,6 +264,8 @@ interface SceneContent {
   hitboxes: Mesh[];
   jar: JarParts;
   books: BooksParts;
+  /** 書斎の入口（扉のある前室）。組まないこともある（枝が渡されないとき）。 */
+  entrance: EntranceRoom | null;
 }
 
 export function initScene(options: StudySceneOptions): StudySceneHandle {
@@ -277,7 +309,28 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const books = buildBooks(notebooks, layout, materials, ownGeometry, textures);
     const board = buildBoard(state, layout, materials, ownGeometry);
 
+    /**
+     * 書斎の入口（扉のある前室）。**シーンの一部**として置く。
+     *
+     * 認証画面はここにカメラを置き、ログインすると扉をくぐってホームへ 1 本で移動する。
+     * 書斎に居るあいだは背中側（z が大きい方）にあるので、ホームの構図には写らない。
+     * 以前は扉だけの別シーンを持ち、入るときに 2 つをクロスフェードしていた — それが
+     * 「一回切り替わる」正体だった（`docs/oryzae-study/70-entrance.md`）。
+     */
+    const entranceRoom =
+      options.sprig === undefined
+        ? null
+        : buildEntranceRoom(materials, ownGeometry, options.sprig, {
+            x: layout.entrance.camera.position.x,
+            z: layout.entrance.camera.position.z,
+          });
+    if (entranceRoom !== null) {
+      const at = layout.entrance.room;
+      entranceRoom.group.position.set(at.x, at.y, at.z);
+    }
+
     const groups: Object3D[] = [deskGroup, floorGroup, jar.group, books.group, board.group];
+    if (entranceRoom !== null) groups.push(entranceRoom.group);
 
     const hitboxes = buildHitboxes({
       layout,
@@ -305,6 +358,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       hitboxes,
       jar,
       books,
+      entrance: entranceRoom,
     };
   }
 
@@ -389,7 +443,21 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     options.arrival === true && !options.reducedMotion
       ? { from: arrivalView(layout), startedAt: performance.now() }
       : null;
-  applyView(camera, arrival === null ? homeCamera : arrival.from);
+  /** 入口に居るあいだの view。`null` なら書斎の中に居る。 */
+  /** 入口に居るあいだの view。`null` なら書斎の中に居る。 */
+  let atEntrance: CameraView | null = options.atEntrance === true ? entranceView(layout) : null;
+  /** 扉の開き（入口に居るあいだだけ動かす）。 */
+  let doorAngle: number = DOOR_ANGLE.rest;
+  let doorTarget: number = DOOR_ANGLE.rest;
+  /** 入っている最中。`null` なら入っていない。 */
+  let entering: {
+    startedAt: number;
+    lastTickAt: number;
+    fromAngle: number;
+    view: CameraView;
+    resolve: () => void;
+  } | null = null;
+  applyView(camera, atEntrance ?? (arrival === null ? homeCamera : arrival.from));
 
   // ---- 動かす ------------------------------------------------------------
 
@@ -433,6 +501,37 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   }
 
   function updateCamera(now: number, elapsed: number): void {
+    if (entering !== null) {
+      const since = now - entering.startedAt;
+      if (content.entrance !== null) {
+        content.entrance.door.rotation.y = doorAngleWhileEntering(entering.fromAngle, since);
+      }
+      const walking = since - ENTER_TIMING.walkDelayMs;
+      if (walking > 0) {
+        entering.view = glideTowards(entering.view, homeCamera, walking, now - entering.lastTickAt);
+      }
+      entering.lastTickAt = now;
+      applyView(camera, entering.view);
+      // 着いたら入口を離れる。以後はホームの呼吸とパララックスに戻る。
+      if (!isFarFrom(entering.view, homeCamera)) {
+        const resolve = entering.resolve;
+        entering = null;
+        atEntrance = null;
+        resolve();
+      }
+      return;
+    }
+
+    if (atEntrance !== null) {
+      // 扉の前で待っている。動くのは扉の開きだけ。
+      if (content.entrance !== null) {
+        doorAngle = approach(doorAngle, doorTarget, DOOR_SETTLE_LERP);
+        content.entrance.door.rotation.y = doorAngle;
+      }
+      applyView(camera, atEntrance);
+      return;
+    }
+
     if (transition) {
       const view = viewAtTransition(transition, now);
       applyView(camera, view);
@@ -902,6 +1001,19 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     setHovered(null, null);
   }
 
+  function setDoorWaiting(waiting: boolean): void {
+    doorTarget = waiting ? DOOR_ANGLE.waiting : DOOR_ANGLE.rest;
+  }
+
+  function enterStudy(): Promise<void> {
+    if (atEntrance === null || entering !== null) return Promise.resolve();
+    const now = performance.now();
+    const from = atEntrance;
+    return new Promise<void>((resolve) => {
+      entering = { startedAt: now, lastTickAt: now, fromAngle: doorAngle, view: from, resolve };
+    });
+  }
+
   return {
     goTo,
     setState,
@@ -911,7 +1023,10 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     startPinch,
     pinchTo,
     pick,
-    isBusy: () => transition !== null || settled !== null,
+    setDoorWaiting,
+    enterStudy,
+    // 入口に居るあいだ・入っている最中も「手が離せない」状態（ラベルを出さない）。
+    isBusy: () => transition !== null || settled !== null || atEntrance !== null,
     dispose,
   };
 }

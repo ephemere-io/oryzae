@@ -34,6 +34,19 @@ export function homeView(layout: StudyLayout): CameraView {
  * 注視点はホームと同じ。**位置だけ**が低く・遠くにある — 注視点まで動かすと、部屋の
  * どこを見ているかが変わって「別の場所から別の場所へ飛んだ」ように見える。
  */
+/**
+ * 書斎の入口（扉の前）に立った view。認証画面はここから始まる。
+ *
+ * 配置表が持つ数をそのまま返す。ここから `homeView` まで、カメラは 1 本で移動する
+ * （`docs/oryzae-study/70-entrance.md`）。
+ */
+export function entranceView(layout: StudyLayout): CameraView {
+  return {
+    position: { ...layout.entrance.camera.position },
+    target: { ...layout.entrance.camera.target },
+  };
+}
+
 export function arrivalView(layout: StudyLayout): CameraView {
   const { position, target } = homeView(layout);
   const offset = {

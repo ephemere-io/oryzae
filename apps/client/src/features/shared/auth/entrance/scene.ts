@@ -43,6 +43,7 @@ import {
   sampleJarProfile,
 } from '@/features/shared/study/scene/jar';
 import { createMaterials, type StudyMaterials } from '@/features/shared/study/scene/materials';
+import type { Sprig } from '@/features/shared/study/scene/sprig';
 import {
   DOOR,
   DOOR_ANGLE,
@@ -55,7 +56,6 @@ import {
   homeEntranceView,
 } from './door';
 import { type EntranceLayout, FRAME_SETTLE_LERP } from './layout';
-import type { Sprig } from './season';
 
 export interface EntranceSceneOptions {
   container: HTMLElement;
@@ -1059,7 +1059,7 @@ interface Flat {
 type Along = (u: number, y: number) => Vector3;
 
 /**
- * 一輪挿しに挿さった草花を描く（`entrance/season.ts` の `Sprig`）。
+ * 一輪挿しに挿さった草花を描く（`study/scene/sprig.ts` の `Sprig`）。
  *
  * **一種を投げ入れた姿**にする。整えず、まっすぐ立てず、余白を残す — 川瀬敏郎の
  * 「一日一花」の見え方に倣っている（`season.ts` の注釈）。線は細く、葉と花は枝より薄い。

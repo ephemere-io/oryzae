@@ -4,7 +4,7 @@ import {
   MICRO_SEASON_COUNT,
   microSeasonIndex,
   solarLongitude,
-} from '@/features/shared/auth/entrance/season';
+} from '@/features/shared/study/scene/sprig';
 
 /** 節気の名前（テストの読みやすさのため）。0 = 立春。 */
 const TERM = {

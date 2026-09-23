@@ -4,9 +4,9 @@
 // 扉の段取りは entrance/door.ts の純関数テストで、見え方は実機のブラウザ確認で担保する。
 
 import { useEffect, useMemo, useRef } from 'react';
+import { entranceSprig, microSeasonIndex } from '@/features/shared/study/scene/sprig';
 import type { EntranceLayout } from '../entrance/layout';
 import { type EntranceSceneHandle, initEntranceScene } from '../entrance/scene';
-import { entranceSprig, microSeasonIndex } from '../entrance/season';
 
 export interface EntranceCanvasProps {
   layout: EntranceLayout;
