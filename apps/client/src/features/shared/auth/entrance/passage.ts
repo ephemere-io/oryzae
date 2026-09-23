@@ -30,6 +30,25 @@ const ENTRANCE_PATHS = [
  * 追い返されたように見える。
  */
 export function staysAtEntrance(destination: string): boolean {
-  const path = destination.split(/[?#]/, 1)[0] ?? destination;
-  return ENTRANCE_PATHS.includes(path);
+  return ENTRANCE_PATHS.includes(pathOf(destination));
+}
+
+/** 書斎のパス。 */
+const STUDY_PATH = '/';
+
+/**
+ * その行き先が書斎そのものか。
+ *
+ * 書斎へ向かうときだけ、**扉の前から中まで 1 本のカメラが続く** — 同じシーンをそのまま
+ * 次の画面へ渡すので、途中に切り替わりが無い（`study/scene/live.ts`）。
+ * `/entries/new` のような別の画面へ向かうときは、扉をくぐった先が書斎ではないので
+ * 続けようがない。そこは扉が開くところまでを見せて、溶暗で繋ぐ。
+ */
+export function entersStudy(destination: string): boolean {
+  return pathOf(destination) === STUDY_PATH;
+}
+
+/** クエリとハッシュを落としたパス。 */
+function pathOf(destination: string): string {
+  return destination.split(/[?#]/, 1)[0] ?? destination;
 }

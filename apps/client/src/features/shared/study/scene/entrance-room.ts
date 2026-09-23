@@ -29,7 +29,7 @@ import type { StudyMaterials } from './materials';
 import type { Sprig } from './sprig';
 
 /** 扉板。蝶番は左端（x = -width / 2）。 */
-const DOOR = { width: 2.2, height: 4.6, thickness: 0.12 } as const;
+export const DOOR = { width: 2.2, height: 4.6, thickness: 0.12 } as const;
 
 /** 枠（額縁）。壁から少し手前へ出す。 */
 const FRAME = { width: 0.2, depth: 0.34 } as const;

@@ -10,14 +10,15 @@ import { clearTrace, readTrace, startTrace, type TraceRecord } from '@/lib/trace
  *
  * 1. 「計測を始める」を押す（ログイン画面へ移る）
  * 2. いつもどおりログインして、書斎が出るまで待つ
- * 3. この画面に戻る（`/verify/handover`）。並んだ時刻を見る／コピーして渡す
+ * 3. この画面に戻る（`/verify/enter`）。並んだ時刻を見る／コピーして渡す
  *
  * 読み方:
- * - **「地が描かれた」→「書斎の 1 フレーム目」が長い** = 書斎の読み込み待ち。絵は出たままなので
- *   白くはならないが、その間ずっと静止画で、動きが止まって見える
- * - **コマ落ちが並ぶ** = 描画が詰まっている。静止画ではなく、動きの側の問題
+ * - 扉と書斎は 1 つのシーンで、カメラが外から中へ動くだけ（`study/scene/live.ts`）。
+ *   **「シーンを次の画面へ預けた」→「書斎 mount」が長い** = ページの入れ替えに時間が
+ *   かかっている。見えている絵は動き続けているが、その間 React は詰まっている
+ * - **コマ落ちが並ぶ** = 描画そのものが詰まっている。カメラの動きが飛んで見える
  */
-export function HandoverTrace() {
+export function EnterTrace() {
   const [record, setRecord] = useState<TraceRecord | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -29,7 +30,7 @@ export function HandoverTrace() {
     <div className="min-h-[min(100svh,100dvh)] bg-[#f9f8f4] p-5 text-[13px] text-[#2d2d2d]">
       <h1 className="mb-1 text-[15px] font-medium">入室の実測</h1>
       <p className="mb-4 leading-relaxed text-[#8c857e]">
-        ①「計測を始める」→ ② ふつうにログイン → ③ 書斎が出たらこの画面（/verify/handover）に戻る。
+        ①「計測を始める」→ ② ふつうにログイン → ③ 書斎が出たらこの画面（/verify/enter）に戻る。
       </p>
 
       <div className="mb-5 flex flex-wrap gap-2">
