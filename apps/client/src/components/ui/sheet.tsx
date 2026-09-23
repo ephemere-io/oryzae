@@ -2,8 +2,9 @@
 
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { placeInSlot } from '@/lib/sp-chrome-context';
-import { canDragSheet, contentScrolls, TAP_SLOP_PX } from './sheet-gesture';
-import { SheetProbe, sheetProbeOn } from './sheet-probe';
+
+/** ここまでの動きは「押した」と見なす（px）。超えたら払いなので、段はスクロールが決める。 */
+const TAP_SLOP_PX = 8;
 
 /**
  * シートの段。
@@ -86,6 +87,27 @@ type Phase = 'entering' | 'open' | 'closing';
  * - **出す／消すは `open`**（パレットや歯車のボタン、暗幕、キャンセル）。動きはシートの容器を下へずらす CSS の
  *   transition（`.oz-sheet-scroller[data-shown]`）。消える動きの終わりは transition の完了で知る
  *
+ * ### 外側（段）と内側（本文）を **1 本のスクロール**にする
+ *
+ * 容器は 1 つだけ。空き（spacer）＋シートを縦に積み、シートは**中身のぶんだけ高い**。だから
+ * スクロール位置は「覗く → 半分 → 全画面 → 本文を読む」と 1 本に並ぶ。**どちらの指か**を決める仕組みは
+ * 要らない——スクロールする容器が 1 つしか無いのだから、取り合いが起きようがない。
+ *
+ * 段階（オーナーの言葉で「モーダルが最大にならないと内側のスクロールは始まらない」「内側のスクロールが
+ * 終わったら一度タップを離した後に外側のスクロールに移行できる」）は、**`scroll-snap-stop: always`** が作る。
+ * これは「この吸着先を飛び越えてはならない」という指定で、1 回のスクロール操作は必ずそこで止まる:
+ *
+ * - 覗くから払う → 半分で止まる（1 回で 1 段）
+ * - 半分から払う → 全画面で止まる。**本文へは進まない**
+ * - 離してもう一度払う → 今度は吸着先が無いので本文が流れる
+ * - 本文を戻して全画面の位置に来る → そこで止まる。**板は縮まない**
+ * - 離してもう一度引く → 半分へ
+ *
+ * JS は指に触らない。慣性・減速・吸着・段跨ぎの抑制はすべてブラウザのスクローラが持つ。
+ * 以前ここには「触れた瞬間に持ち主を決める」「離した瞬間に位置を決める」といった仕掛けがあったが、
+ * どれも iOS の癖（減速中の容器が次の指を取る）を JS で追いかけるもので、実機で次々に別の壊れ方をした。
+ * **容器を 1 つに戻せば、その癖に触れる場所そのものが無くなる。**
+ *
  * ### 高さはネイティブのスクロールと CSS scroll-snap で動かす
  *
  * 画面いっぱいのスクロール容器（`scroll-snap-type: y mandatory`）の中に、空き（spacer）とシートを縦に積む。
@@ -98,8 +120,10 @@ type Phase = 'entering' | 'open' | 'closing';
  * - 覗く: 見出しの行と同じ升の中の印（`top: calc(100% - 100cqh)`、上端揃え）＝見出しの行の高さ
  * - 中身: シートの中の印（`top: calc(min(100%, 100cqh) - 100cqh)`、上端揃え）＝中身の高さ、容器より高ければ
  *   全画面。上端揃えにしているのは、WebKit が「高さ 0 の要素の下端揃え」を吸着先として数えないため
- * - 全画面: シートの上端。シートは容器より高いので、そこから先は自由にスクロールでき（CSS scroll-snap の
- *   仕様: 容器より大きい snap 領域の中は自由）、Google マップと同じく同じ指で中身が流れる
+ * - 全画面: シートの上端。シートは容器より高いので、そこから先は自由にスクロールできる（CSS scroll-snap の
+ *   仕様: 容器より大きい snap 領域の中は自由）＝本文が流れる
+ *
+ * 段の印にはすべて `scroll-snap-stop: always` を付ける（段を飛ばさない・本文へ雪崩れ込まない）。
  *
  * **吸着先の組は描いている間に変えない。** WebKit は吸着先の組が変わると、いまの段に居ても別の段へ吸着し直す。
  *
@@ -160,11 +184,6 @@ export function Sheet({
     innerRef.current = element;
     setInnerEl(element);
   }, []);
-  /**
-   * いちばん高い段に居るか。スクロールの通知のたびに書き、指を置いた瞬間に読む。
-   * 「中身を送れるか」も「この指でシートを動かしてよいか」も、これ 1 つで決まる（`sheet-gesture.ts`）。
-   */
-  const atHighestRef = useRef(false);
   /** 見出しの行に指を置いた場所。押した（動かなかった）かどうかの判定に使う。 */
   const tapStart = useRef<{ x: number; y: number } | null>(null);
   const sheetRef = useRef<HTMLElement | null>(null);
@@ -325,8 +344,6 @@ export function Sheet({
     const hasScrollEnd = 'onscrollend' in window;
     let frame = 0;
     let lastTop = Number.NaN;
-    // 出し直すたびに「いちばん高い段に居る」を忘れる（中身の箱の既定は `overflow-y: hidden`）。
-    atHighestRef.current = false;
 
     /** 見えている高さ。容器のずれ（出す／消す動き）は含めない。 */
     const visibleOf = () => {
@@ -334,32 +351,6 @@ export function Sheet({
       if (!sheet) return 0;
       const sheetTop = sheet.offsetTop - scroller.scrollTop;
       return Math.max(0, Math.min(scroller.clientHeight, scroller.clientHeight - sheetTop));
-    };
-
-    /**
-     * 中身を送れるようにするか。**着くのを待たず、「いちばん高い段に決まった」時点で開ける。**
-     *
-     * 吸着の動きは終わりが長い。実測（Chromium・払って全画面へ）では、残り 35px から 0px までに
-     * 250ms かかる——見た目はとっくに全画面なのに、最後の 1px を待っていた。オーナーの
-     * 「最大になってから 0.5 秒くらい経たないと内側を送れない」はこれ。
-     *
-     * そこで**いちばん近い吸着先がいちばん高い段か**で決める。これはブラウザが吸着先を選ぶのと同じ問いで、
-     * 2 つの段の中点を越えた時点で「全画面に決まった」と言える。指はまだ外側に latch されているので、
-     * 先に開けておいても内側が動き出すことはない。比較は 1 回のまま。
-     */
-    const syncContentScroll = () => {
-      const inner = innerRef.current;
-      const highest = latest.current.detents.at(-1);
-      if (!inner || !highest) return;
-      const below = latest.current.detents.at(-2);
-      const top = targetOf(highest);
-      // 中点。いちばん高い段しか無ければその位置そのもの。
-      const commit = below === undefined ? top : (top + targetOf(below)) / 2;
-      const atHighest = scroller.scrollTop >= commit;
-      // **変わったときだけ書く。** 毎フレーム同じ値を書くと、そのたびに様式が無効になる（動きが粘る）。
-      if (atHighest === atHighestRef.current) return;
-      atHighestRef.current = atHighest;
-      inner.style.overflowY = contentScrolls(atHighest) ? 'auto' : 'hidden';
     };
 
     /** 止まった位置がどれかの段と一致したら知らせる。 */
@@ -408,68 +399,11 @@ export function Sheet({
 
     const needsFrames = !hasScrollEnd || backdropRef.current !== null;
     const onScroll = () => {
-      syncContentScroll();
       if (needsFrames && !frame) frame = requestAnimationFrame(watch);
-    };
-
-    /**
-     * 指が触れたら、**動いている板をその場で決着させ、この指の持ち主を 1 つに決める。**
-     *
-     * 慣性と吸着の尾が残っている間、その容器は「いま動いているスクローラ」として次の指を取る
-     * （WebKit / UIScrollView の作法。減速を止めた指がそのまま同じ容器の続きになる）。だから
-     * 全画面に着いた直後にもう一度同じ向きへ払っても、**中身ではなく外側が受け取ってしまい**、
-     * 動きが終わるまで内側が動き出せなかった（実機: 「最大幅になった後すぐにもう一度スクロールできない」。
-     * Chromium では再現しない）。
-     *
-     * やることは 2 つ。どちらも触れた瞬間の 1 回だけ:
-     *
-     * 1. いちばん近い段の位置へそのまま置く（＝動きを終わらせる。位置は吸着先そのものなので跳ねない）
-     * 2. **この指で板を動かしてよいかを、外側の `overflow-y` で言い切る**（`canDragSheet`）。
-     *    読んでいる途中の指のあいだ外側は `hidden` ＝ そもそもスクローラではないので、取りようがない。
-     *    判定でも待ち時間でもなく、ブラウザに「動かせるのはこっちだけ」と伝える
-     */
-    const takeGesture = (event: Event) => {
-      const top = scroller.scrollTop;
-      const wanted = latest.current.detent;
-      let goal: number | null = null;
-      if (settledRef.current !== wanted) {
-        // 頼まれた段へ送っている最中（見出しを押した直後など）。**頼まれた先で**終わらせる
-        // ——いちばん近い段へ落とすと、押したのに戻ってしまう。
-        goal = targetOf(wanted);
-      } else {
-        for (const candidate of latest.current.detents) {
-          const target = targetOf(candidate);
-          if (goal === null || Math.abs(target - top) < Math.abs(goal - top)) goal = target;
-        }
-      }
-      // 1px 未満のずれは触らない（スクロール位置は小数になる）。
-      if (goal !== null && Math.abs(goal - top) >= 1) {
-        scroller.scrollTop = goal;
-        syncContentScroll();
-      }
-      const inner = innerRef.current;
-      const target = event.target;
-      const onContent =
-        inner !== null && target instanceof Node && inner.contains(target) && atHighestRef.current;
-      // iOS は減速の末に 0.3px などの端数で止まる。1px 未満は上端と見なす。
-      const scrollTop = !inner || inner.scrollTop < 1 ? 0 : inner.scrollTop;
-      const mayDrag = canDragSheet({ atHighest: atHighestRef.current, onContent, scrollTop });
-      scroller.style.overflowY = mayDrag ? 'auto' : 'hidden';
-    };
-    /** 指が離れたら外側を戻す（次の指はまた触れた瞬間に決まる。頼まれた段へ送るのは常に動く）。 */
-    const releaseGesture = () => {
-      scroller.style.removeProperty('overflow-y');
     };
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
     if (hasScrollEnd) scroller.addEventListener('scrollend', settle);
-    // 捕捉段階で受ける（中身の箱より先に決める）。iOS は touch、それ以外は pointer で届く。
-    scroller.addEventListener('touchstart', takeGesture, { passive: true, capture: true });
-    scroller.addEventListener('pointerdown', takeGesture, { capture: true });
-    scroller.addEventListener('touchend', releaseGesture, { passive: true });
-    scroller.addEventListener('touchcancel', releaseGesture, { passive: true });
-    scroller.addEventListener('pointerup', releaseGesture);
-    scroller.addEventListener('pointercancel', releaseGesture);
     onScroll();
     // 容器の大きさが変わった（キーボードの出入り・回転・描いた直後の配置）ら、**呼び出し側が頼んでいる段**へ
     // 置き直す。段の位置は容器の高さで決まるので、スクロール位置をそのまま残すと、同じ位置が別の段の位置に
@@ -492,13 +426,6 @@ export function Sheet({
     return () => {
       scroller.removeEventListener('scroll', onScroll);
       if (hasScrollEnd) scroller.removeEventListener('scrollend', settle);
-      scroller.removeEventListener('touchstart', takeGesture, { capture: true });
-      scroller.removeEventListener('pointerdown', takeGesture, { capture: true });
-      scroller.removeEventListener('touchend', releaseGesture);
-      scroller.removeEventListener('touchcancel', releaseGesture);
-      scroller.removeEventListener('pointerup', releaseGesture);
-      scroller.removeEventListener('pointercancel', releaseGesture);
-      scroller.style.removeProperty('overflow-y');
       observer?.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
@@ -543,9 +470,6 @@ export function Sheet({
   }, [innerEl, scrollToDetent]);
 
   if (!present) return null;
-
-  // 実機の値を読むための計器（`?sheetprobe=1` のときだけ）。原因が分かったら消す。
-  const probe = sheetProbeOn() ? <SheetProbe scroller={scrollerEl} inner={innerEl} /> : null;
 
   const has = (d: SheetDetent) => detents.includes(d);
   // 見た目の段階は `open` から即座に決める（消すと決めた描画のうちに引っ込み始め、押せなくなる。effect を待たない）。
@@ -600,17 +524,20 @@ export function Sheet({
         <section
           ref={sheetRef}
           role="dialog"
+          data-sheet-detent="full"
           aria-modal={modal ? true : undefined}
           aria-label={ariaLabel}
           className={`${visualPhase === 'closing' ? 'pointer-events-none' : 'pointer-events-auto'} relative flex flex-col rounded-t-3xl border-t`}
           style={{
-            // シートは容器と同じ高さ（全画面で面が下まで届く。低い段では下半分が画面の外に出るだけ）。
-            // **高さを固定するから、中身がはみ出しても伸びない**＝容器のスクロールは段の切り替えだけを担う。
-            height: '100%',
+            // **容器と同じ高さを下限に、中身のぶんだけ高くなる。** 全画面より先は本文が流れる
+            // （容器より大きい吸着領域の中は自由にスクロールできる、という CSS scroll-snap の仕様）。
+            minHeight: '100%',
             background: 'var(--surface-raised)',
             borderColor: 'var(--surface-raised-border)',
             boxShadow: '0 -8px 32px rgba(140,133,126,0.18)',
             scrollSnapAlign: has('full') ? 'start' : 'none',
+            // 全画面を飛び越えて本文へ雪崩れ込ませない。ここで必ず一度止まる（＝一度指を離す）。
+            scrollSnapStop: 'always',
           }}
         >
           {/* 見出しの升（覗く段の印を同じ升に重ねる）。 */}
@@ -620,10 +547,12 @@ export function Sheet({
             <div aria-hidden="true" className="relative" style={{ gridArea: '1 / 1' }}>
               <div
                 ref={peekRef}
+                data-sheet-detent="peek"
                 className="absolute left-0 h-0 w-px"
                 style={{
                   top: 'calc(100% - 100cqh)',
                   scrollSnapAlign: has('peek') ? 'start' : 'none',
+                  scrollSnapStop: 'always',
                 }}
               />
             </div>
@@ -650,19 +579,14 @@ export function Sheet({
               {header}
             </div>
           </div>
-          {/* 中身の箱。シートの残りを全部取る。**いちばん高い段に決まるまでは `overflow-y: hidden`**
-              （指はシートの高さに使う。上の `syncContentScroll`）。読んでいる途中の指をシートへ渡さないのは
-              `overscroll-behavior` ではなく、**触れた瞬間に外側の `overflow-y` を切る**ことで作る
-              （上の `takeGesture`）。外側がそもそもスクローラでなければ、渡しようが無い。
-              `oz-sheet-pass` は iOS で指を容器へ通すため。 */}
+          {/* 中身。**ここはスクロール容器ではない**（流し込むだけ）。読むのは容器のスクロールの続きで、
+              全画面より先がそれにあたる。overflow-wrap: anywhere は、折り返せない長い語（手紙の中の URL）が
+              箱より広くならないようにするため（実機レビュー: 横に動いてレイアウトが崩れた）。 */}
           <div
             ref={attachInner}
             data-sheet-content
-            className="oz-sheet-pass min-h-0 min-w-0 flex-1"
-            // overflow-wrap: anywhere — **中の何物も箱より広くならない**。この箱は iOS 用に横へ 1px だけ
-            // はみ出させてある（`oz-sheet-pass`）ので、折り返せない長い語（手紙の中の URL）があると、
-            // その幅ぶん横に動けてしまいレイアウトが崩れた（実機レビュー）。箱の側で折り返しを保証する。
-            style={{ overflowY: 'hidden', overflowWrap: 'anywhere' }}
+            className="min-w-0 flex-1"
+            style={{ overflowWrap: 'anywhere' }}
           >
             <div>{children}</div>
           </div>
@@ -672,24 +596,31 @@ export function Sheet({
               同じ位置に重なり、位置 0（＝半分）に吸着先が無くなって全画面から戻れなくなった（実機レビュー）。 */}
           <div
             ref={halfRef}
+            data-sheet-detent="half"
             aria-hidden="true"
             className="absolute left-0 h-px w-px"
-            style={{ top: '-50cqh', scrollSnapAlign: has('half') ? 'start' : 'none' }}
+            style={{
+              top: '-50cqh',
+              scrollSnapAlign: has('half') ? 'start' : 'none',
+              // 段を飛ばさない（1 回の払いで 1 段）。
+              scrollSnapStop: 'always',
+            }}
           />
           {/* 中身の段の印。「見出し + 中身の高さ（容器より高ければ容器の高さ）から容器の高さぶん上」に置き、
               上端揃えで吸着する＝中身の下端が容器の下端に来る。高さは測って CSS 変数で渡す。 */}
           <div
             ref={contentRef}
+            data-sheet-detent="content"
             aria-hidden="true"
             className="absolute left-0 h-0 w-px"
             style={{
               top: 'calc(min(var(--oz-sheet-content, 100%), 100cqh) - 100cqh)',
               scrollSnapAlign: has('content') ? 'start' : 'none',
+              scrollSnapStop: 'always',
             }}
           />
         </section>
       </div>
-      {probe}
     </div>,
     slot,
   );

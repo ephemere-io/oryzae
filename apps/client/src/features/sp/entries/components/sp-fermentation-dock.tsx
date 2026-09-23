@@ -3,7 +3,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { type DockDetent, DockSheet } from '@/components/ui/dock-sheet';
-import { DockSheetVaul } from '@/components/ui/dock-sheet-vaul';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import { FermentationReading } from '@/features/shared/fermentation/components/fermentation-reading';
@@ -42,8 +41,6 @@ interface SpFermentationDockProps {
   loading: boolean;
   /** 問いを結ぶ（問いが無いときの入口）。 */
   onLinkQuestion: () => void;
-  /** 試作: 板の土台。`vaul` は `?sheet=vaul` のときだけ（実機で手触りを見て全面移行を決める）。 */
-  engine?: 'snap' | 'vaul';
 }
 
 /**
@@ -74,9 +71,7 @@ export function SpFermentationDock({
   detail,
   loading,
   onLinkQuestion,
-  engine = 'snap',
 }: SpFermentationDockProps) {
-  const Dock = engine === 'vaul' ? DockSheetVaul : DockSheet;
   const t = useTranslations('sp.editor');
   const tSidebar = useTranslations('editor.fermentation_sidebar');
 
@@ -94,7 +89,7 @@ export function SpFermentationDock({
         : 'ready';
 
   return (
-    <Dock
+    <DockSheet
       open={open}
       detent={detent}
       onDetentChange={onDetentChange}
@@ -198,7 +193,7 @@ export function SpFermentationDock({
           <FermentationReading detail={detail} sourceDates={false} />
         ) : null}
       </div>
-    </Dock>
+    </DockSheet>
   );
 }
 
