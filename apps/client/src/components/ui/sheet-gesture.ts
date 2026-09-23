@@ -50,3 +50,10 @@ export function canDragSheet({ atHighest, onContent, scrollTop }: SheetTouch): b
 export function contentScrolls(atHighest: boolean): boolean {
   return atHighest;
 }
+
+/**
+ * ここまでの動きは「押した」と見なす（px）。これを超えたら払いなので、段は指（スクロール）に任せる。
+ *
+ * 指が動いても `click` は出る。少し引いただけで段が飛ぶのはこれが原因だった（実機: ちょっと触ると一気に変わる）。
+ */
+export const TAP_SLOP_PX = 8;

@@ -46,6 +46,24 @@ export function makeVisibleActContext(root: HTMLElement, opts: VisibleActOptions
       onAction(null);
     },
 
+    async tap(selector) {
+      const el = root.querySelector<HTMLElement>(selector);
+      if (!el) throw new Error(`act.tap: no element matching "${selector}"`);
+      onAction(`👆 tap ${shorten(selector)}`);
+      el.scrollIntoView({ block: 'nearest' });
+      const ring = highlight(el);
+      await wait(clickHoldMs);
+      ring.remove();
+      if (isCancelled()) return onAction(null);
+      // 指で押すのと同じ順（動かさない＝「押した」）。
+      for (const type of ['pointerdown', 'pointerup']) {
+        el.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: 0, clientY: 0 }));
+      }
+      el.click();
+      await wait(80);
+      onAction(null);
+    },
+
     async type(selector, text) {
       const el = root.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector);
       if (!el) throw new Error(`act.type: no element matching "${selector}"`);

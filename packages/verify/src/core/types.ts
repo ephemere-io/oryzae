@@ -85,6 +85,13 @@ export interface ActContext {
   root: HTMLElement;
   /** root 内のセレクタ要素をクリック。無ければ throw。 */
   click: (selector: string) => void | Promise<void>;
+  /**
+   * 指で 1 回押す（pointerdown → pointerup → click）。無ければ throw。
+   *
+   * `click` は「押した」しか言えない。**指が動いたかどうかで意味が変わる部品**（シートの見出しの行は、
+   * 動かなければ段を変え、動けば払いとして段を指に任せる）は pointer の対で受けるので、こちらを使う。
+   */
+  tap: (selector: string) => void | Promise<void>;
   /** input にタイプ。無ければ throw。 */
   type: (selector: string, text: string) => void | Promise<void>;
   /** n ミリ秒待つ（遷移/非同期 state の安定待ち）。 */

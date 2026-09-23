@@ -2,7 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { placeInSlot } from '@/lib/sp-chrome-context';
-import { canDragSheet, contentScrolls } from './sheet-gesture';
+import { canDragSheet, contentScrolls, TAP_SLOP_PX } from './sheet-gesture';
 
 /**
  * シートの段。
@@ -164,6 +164,8 @@ export function Sheet({
    * 「中身を送れるか」も「この指でシートを動かしてよいか」も、これ 1 つで決まる（`sheet-gesture.ts`）。
    */
   const atHighestRef = useRef(false);
+  /** 見出しの行に指を置いた場所。押した（動かなかった）かどうかの判定に使う。 */
+  const tapStart = useRef<{ x: number; y: number } | null>(null);
   const sheetRef = useRef<HTMLElement | null>(null);
   const halfRef = useRef<HTMLDivElement | null>(null);
   const peekRef = useRef<HTMLDivElement | null>(null);
@@ -558,15 +560,22 @@ export function Sheet({
                 }}
               />
             </div>
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: 見出しの行を押すのは段の切り替えの近道。同じことはつまみを引いてもできる */}
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: 同上（中のボタンは各自のキーボード操作を持つ） */}
             <div
               data-sheet-header
               className="oz-sheet-pass sticky top-0 z-[1] rounded-t-3xl"
               style={{ gridArea: '1 / 1', background: 'var(--surface-raised)' }}
-              onClick={(event) => {
-                if (!onHeaderTap) return;
+              onPointerDown={(event) => {
+                tapStart.current = { x: event.clientX, y: event.clientY };
+              }}
+              // **指が動かなかったときだけ「押した」。** 動いた指は払いで、段はスクロールが決める。
+              // `click` は指が動いても出るので、少し引いただけで段が飛んでいた（実機レビュー）。
+              onPointerUp={(event) => {
+                const start = tapStart.current;
+                tapStart.current = null;
+                if (!start || !onHeaderTap) return;
                 if (event.target instanceof Element && event.target.closest('button, a, input'))
+                  return;
+                if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX)
                   return;
                 onHeaderTap();
               }}

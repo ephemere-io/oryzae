@@ -205,7 +205,7 @@ registerUnit<Props>({
         rounds: ONE_ROUND,
       },
       act: async (ctx) => {
-        await ctx.click('[data-dock-peek]');
+        await ctx.tap('[data-dock-peek]');
         await ctx.wait(16);
       },
     },

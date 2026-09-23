@@ -84,15 +84,17 @@ export function DockSheet({
       slot={dockSlot}
       onSettle={setInset}
       contract={contract ?? verifyAttrs({ unit: 'DockSheet', detent })}
+      // 押したら **1 段だけ** 動く。いちばん低い段からは開き、それ以外は 1 つ下げる
+      // （いちばん低い段へ飛ばすと、全画面から押しただけで一気に畳まれた。実機レビュー）。
       onHeaderTap={
         second
           ? () => {
               if (detent === lowest) {
                 onPeekTap?.();
                 onDetentChange(second);
-              } else {
-                onDetentChange(lowest);
+                return;
               }
+              onDetentChange(detents[Math.max(0, detents.indexOf(detent) - 1)] ?? lowest);
             }
           : undefined
       }
