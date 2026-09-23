@@ -1,8 +1,10 @@
 'use client';
 
 import { verifyAttrs } from '@oryzae/verify';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { CONTROL_FONT } from '@/components/ui/surface';
+import { isHelpTopicId } from '../topics';
 import type { HelpTopic, HelpTopicId, HelpTopicText } from '../types';
 import { HelpIllustration } from './help-illustrations';
 import { HelpStudyMap } from './help-study-map';
@@ -32,7 +34,17 @@ export interface HelpScreenCardProps {
  * 札を押すと、その札を留める（触れを離しても開いたまま）。もう一度押すと外す。
  * 「開く」のボタンは置かない — 行き先へは下の一覧から。
  */
+/** 書斎の物 → 3D に貼ってある注釈（`study.label_*`）。見取り図の札は部屋と同じ字にする。 */
+const STUDY_LABEL_KEY: Partial<Record<HelpTopicId, string>> = {
+  jar: 'label_jar',
+  notebook: 'label_journal',
+  board: 'label_board',
+  archive: 'label_archive',
+  write: 'label_pen',
+};
+
 export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCardProps) {
+  const tStudy = useTranslations('study');
   const [pinned, setPinned] = useState<HelpTopicId | null>(null);
   const [local, setLocal] = useState<HelpTopicId | null>(null);
   const partIds = parts.map((p) => p.id);
@@ -42,9 +54,15 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
   const source = local ? 'panel' : fromScreen ? 'screen' : pinned ? 'pinned' : 'none';
   const screenText = texts.get(screen.id);
   const activeText = active ? texts.get(active) : undefined;
+  // 見取り図の札は、部屋に貼ってある注釈と同じ字（JAR / ENTRIES / …）。面の題が「手帳」で
+  // 部屋が「ENTRIES」だと「手帳って何？」になる。話題の題のほうは「手帳（ENTRIES）」と両方を持つ。
   const titles = new Map<HelpTopicId, string>(
     [...texts.values()].map((text) => [text.id, text.title]),
   );
+  for (const [part, key] of Object.entries(STUDY_LABEL_KEY)) {
+    if (!isHelpTopicId(part) || key === undefined) continue;
+    titles.set(part, tStudy(key));
+  }
   const togglePin = (id: HelpTopicId) => setPinned((prev) => (prev === id ? null : id));
 
   return (

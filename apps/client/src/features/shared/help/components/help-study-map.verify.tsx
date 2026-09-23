@@ -18,12 +18,18 @@ interface Props {
 }
 
 const PARTS = screenParts('study');
+/** 札は 3D の注釈と同じ字（`study.label_*`）。 */
+const STUDY_LABELS: Record<string, string> = {
+  jar: jaMessages.study.label_jar,
+  notebook: jaMessages.study.label_journal,
+  board: jaMessages.study.label_board,
+  archive: jaMessages.study.label_archive,
+  write: jaMessages.study.label_pen,
+  study: jaMessages.help.topics.study.title,
+};
 const TITLED: readonly HelpTopicId[] = [...PARTS, 'study'];
 const TITLES: ReadonlyMap<HelpTopicId, string> = new Map(
-  TITLED.map((id): [HelpTopicId, string] => {
-    const topics: Record<string, { title: string }> = jaMessages.help.topics;
-    return [id, topics[id]?.title ?? id];
-  }),
+  TITLED.map((id): [HelpTopicId, string] => [id, STUDY_LABELS[id] ?? id]),
 );
 
 registerUnit<Props>({

@@ -848,11 +848,11 @@
       "toggle": "Show or hide the tutorial",
       "question": {
         "title": "Plant a question",
-        "lead": "The one thing on your mind. You plant it inside the jar"
+        "lead": "The one thing on your mind. You plant it inside the jar (JAR)"
       },
       "write": {
         "title": "Write an entry",
-        "lead": "Open the notebook and write. Saving is automatic"
+        "lead": "Open the notebook (ENTRIES) and write. Saving is automatic"
       },
       "link": {
         "title": "Link a question",
@@ -864,14 +864,14 @@
       },
       "read": {
         "title": "Read the letter",
-        "lead": "When fermentation ends a letter arrives in the jar. Open and read it"
+        "lead": "When fermentation ends a letter arrives in the jar (JAR). Open and read it"
       }
     },
     "topics": {
       "study": {
         "title": "The study",
         "lead": "The entrance to the app. Each thing on the desk is a door to a screen",
-        "body": "You land here after signing in. The jar on the left holds the questions you planted and the letters that come back from what you pickled. The notebook in the middle is this month's entries. The board at the back holds snippets and photos cut out of entries. The shelf on the right keeps past months' notebooks. Pick up the pencil to start a new entry. Touch a thing and its name appears; press it to go there.",
+        "body": "You land here after signing in. The jar on the left (JAR) holds the questions you planted and the letters that come back from what you pickled. The notebook in the middle (ENTRIES) is this month's entries. The board at the back (BOARD) holds snippets and photos cut out of entries. The shelf on the right (ARCHIVE) keeps past months' notebooks. Pick up the pencil (NEW) to start a new entry. Touch a thing and its name appears; press it to go there.",
         "keywords": "study,room,home,top,desk,entrance,first screen"
       },
       "concept": {
@@ -887,7 +887,7 @@
         "keywords": "question,topic,theme,create,think,why,new question,add"
       },
       "write": {
-        "title": "Write",
+        "title": "Write (NEW)",
         "lead": "Open the notebook and just write. Saving is automatic",
         "body": "Press this month's notebook (or the pencil) in the study and a single sheet opens. Put down whatever's on your mind. There is no save button — everything is kept as you type. Choose vertical or horizontal writing, or bring text in from a photo.",
         "keywords": "write,entry,new,editor,save,autosave,vertical,horizontal,photo,pencil,notebook,today"
@@ -899,25 +899,25 @@
         "keywords": "pickle,pickling,jar,ferment,fermentation,when,arrive,fermenting,soon"
       },
       "jar": {
-        "title": "Jar",
+        "title": "Jar (JAR)",
         "lead": "Pickled entries gather by question and ferment",
         "body": "The jar on the left of the study. The bubbles show how far fermentation has come. When they settle, a letter has arrived. Touch the jar and it says \"You have an unread letter\" (on a phone, the jar's tag reads \"Letter\"). Press it to go inside and read each question's result — letter, words and fragments. Add and tidy questions here too.",
         "keywords": "jar,bubbles,fermentation,unread,question,inside,left"
       },
       "notebook": {
-        "title": "Notebook",
+        "title": "Notebook (ENTRIES)",
         "lead": "Thicker the more you write. The top one is this month",
         "body": "The stack on the desk is your notebooks. One per month, thicker with every entry. Press the top (current) one to write; press an older one to open that month's list. Old months move to the shelf at the back.",
         "keywords": "notebook,entries,entry,this month,current,stack,desk,volume"
       },
       "board": {
-        "title": "Board",
+        "title": "Board (BOARD)",
         "lead": "Pin snippets and photos, one board per day",
         "body": "The board on the wall. Pin snippets cut out of entries and photos you bring in. Cards move freely, and each day has its own board. The board in the study mirrors what you pinned, in the same places.",
         "keywords": "board,cards,photo,pin,arrange,snippet,date,wall"
       },
       "archive": {
-        "title": "Archive",
+        "title": "Archive (ARCHIVE)",
         "lead": "Older months' notebooks line the shelf at the back",
         "body": "Only a few notebooks fit on the desk; older months move to the shelf. Press a spine to open that month's list of entries. Start here when you want to reread what you wrote last year.",
         "keywords": "archive,shelf,past,old,last year,previous month,reread,find,spine,older"

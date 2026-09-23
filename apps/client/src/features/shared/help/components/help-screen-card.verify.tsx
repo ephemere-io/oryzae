@@ -88,10 +88,21 @@ registerUnit<Props>({
         const parts = screenParts(props.screen);
         const tiles = [...root.querySelectorAll<HTMLElement>('[data-part]')];
         if (tiles.length !== parts.length) return `札 ${tiles.length}（期待 ${parts.length}）`;
+        // 書斎の札は 3D の注釈（JAR / ENTRIES / …）、他の画面は話題の題。
+        const studyLabels: Record<string, string> = {
+          jar: jaMessages.study.label_jar,
+          notebook: jaMessages.study.label_journal,
+          board: jaMessages.study.label_board,
+          archive: jaMessages.study.label_archive,
+          write: jaMessages.study.label_pen,
+        };
         for (const tile of tiles) {
           const id = tile.getAttribute('data-part') ?? '';
-          const title = TEXTS.get(parts.find((p) => p === id) ?? 'help')?.title ?? '';
-          if (!tile.textContent?.includes(title)) return `${id} の札に題が無い`;
+          const expected =
+            props.screen === 'study'
+              ? (studyLabels[id] ?? '')
+              : (TEXTS.get(parts.find((p) => p === id) ?? 'help')?.title ?? '');
+          if (!tile.textContent?.includes(expected)) return `${id} の札に「${expected}」が無い`;
         }
         return true;
       },
