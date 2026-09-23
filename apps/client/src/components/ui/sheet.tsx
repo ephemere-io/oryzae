@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { placeInSlot } from '@/lib/sp-chrome-context';
+import { canDragSheet, contentScrolls } from './sheet-gesture';
 
 /**
  * シートの段。
@@ -158,6 +159,11 @@ export function Sheet({
     innerRef.current = element;
     setInnerEl(element);
   }, []);
+  /**
+   * いちばん高い段に居るか。スクロールの通知のたびに書き、指を置いた瞬間に読む。
+   * 「中身を送れるか」も「この指でシートを動かしてよいか」も、これ 1 つで決まる（`sheet-gesture.ts`）。
+   */
+  const atHighestRef = useRef(false);
   const sheetRef = useRef<HTMLElement | null>(null);
   const halfRef = useRef<HTMLDivElement | null>(null);
   const peekRef = useRef<HTMLDivElement | null>(null);
@@ -308,6 +314,8 @@ export function Sheet({
     if (!present || !scroller) return;
     let frame = 0;
     let lastTop = Number.NaN;
+    // 出し直すたびに「いちばん高い段に居る」を忘れる（中身の箱の既定は `overflow-y: hidden`）。
+    atHighestRef.current = false;
 
     /** 見えている高さ。容器のずれ（出す／消す動き）は含めない。 */
     const visibleOf = () => {
@@ -317,12 +325,31 @@ export function Sheet({
       return Math.max(0, Math.min(scroller.clientHeight, scroller.clientHeight - sheetTop));
     };
 
+    /**
+     * 中身を送れるようにするか。**位置が止まるのを待たない。**
+     *
+     * 止まった段を見てから切り替えていたころは、いちばん高い段に着いてもしばらく送れなかった
+     * （実機: 「最大サイズになった後、すぐに内側のスクロールを開始できない」）。段に着いたかどうかは
+     * スクロール位置だけで分かるので、スクロールの通知のたびにそのまま当てる（比較 1 回）。
+     */
+    const syncContentScroll = () => {
+      const inner = innerRef.current;
+      if (!inner) return;
+      const atHighest = scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 1;
+      // **変わったときだけ書く。** 毎フレーム同じ値を書くと、そのたびに様式が無効になる（動きが粘る）。
+      if (atHighest === atHighestRef.current) return;
+      atHighestRef.current = atHighest;
+      inner.style.overflowY = contentScrolls(atHighest) ? 'auto' : 'hidden';
+    };
+
     const check = () => {
       frame = 0;
       const top = scroller.scrollTop;
-      const visible = visibleOf();
+      // 暗幕を持つのはモーダルのシートだけ。板（ドック）では毎フレームの採寸をしない。
       if (backdropRef.current && scroller.clientHeight > 0) {
-        backdropRef.current.style.opacity = String(Math.min(1, visible / scroller.clientHeight));
+        backdropRef.current.style.opacity = String(
+          Math.min(1, visibleOf() / scroller.clientHeight),
+        );
       }
       if (top !== lastTop) {
         lastTop = top;
@@ -340,13 +367,6 @@ export function Sheet({
         }
       }
       if (!settled) return;
-      // **いちばん高い段に着いたときだけ中身が動く。** 低い段では指はシートの高さに使う（同じ指で中身まで
-      // 流れると、読み終えて戻したときにシートが縮んでしまう）。
-      const inner = innerRef.current;
-      if (inner) {
-        const atTop = top >= scroller.scrollHeight - scroller.clientHeight - 1;
-        inner.style.overflowY = atTop ? 'auto' : 'hidden';
-      }
       // 知らせるのは指で**別の段へ**動かしたときだけ。前に止まっていた段にまだ居るだけ（頼まれた段へ送り始める
       // 前の一瞬）を「指で戻した」と取り違えると、頼まれた段を打ち消してしまう。
       const previous = settledRef.current;
@@ -354,10 +374,11 @@ export function Sheet({
       if (current.phase === 'open' && settled !== current.detent && settled !== previous) {
         current.onDetentChange(settled);
       }
-      current.onSettle?.(visible);
+      current.onSettle?.(visibleOf());
     };
 
     const onScroll = () => {
+      syncContentScroll();
       if (!frame) frame = requestAnimationFrame(check);
     };
     scroller.addEventListener('scroll', onScroll, { passive: true });
@@ -425,46 +446,33 @@ export function Sheet({
     return () => observer.disconnect();
   }, [innerEl, scrollToDetent]);
 
-  // 中身の箱: 先頭に戻りきって指が離れるまで、シートへスクロールを渡さない（渡すと同じ指で縮む）。
+  /**
+   * 中身の箱: **指を置いた瞬間に 1 回だけ**、この指でシートを動かしてよいかを決める（`canDragSheet`）。
+   *
+   * 決まりはブラウザの `overscroll-behavior` に渡すだけで、あとは何もしない。読んでいる途中の指は
+   * `contain`（上端に着いてもシートへ渡さない）、上端に置いた指は `auto`（そのまま引けばシートが縮む）。
+   * 以前はスクロールが止まるのを毎フレーム見張って切り替えていたが、指の状態はスクロールの通知ではなく
+   * 「触れた瞬間」に決まる。見張る必要は無い。
+   */
   useEffect(() => {
     const inner = innerEl;
     if (!inner) return;
-    let touching = false;
-    let frame = 0;
-    let lastTop = Number.NaN;
-    /** 指が離れていて、先頭に戻りきっているときだけ、次の指をシートへ渡す。 */
-    const settle = () => {
-      frame = 0;
-      if (inner.scrollTop !== lastTop) {
-        lastTop = inner.scrollTop;
-        frame = requestAnimationFrame(settle);
-        return;
-      }
-      inner.style.overscrollBehaviorY = !touching && inner.scrollTop <= 0 ? 'auto' : 'contain';
+    const decide = () => {
+      // iOS は減速の末に 0.3px などの端数で止まる。1px 未満は上端と見なす。
+      const scrollTop = inner.scrollTop < 1 ? 0 : inner.scrollTop;
+      const mayDrag = canDragSheet({
+        atHighest: atHighestRef.current,
+        onContent: true,
+        scrollTop,
+      });
+      inner.style.overscrollBehaviorY = mayDrag ? 'auto' : 'contain';
     };
-    const onScroll = () => {
-      // 動き出した時点でシートへは渡さない（この指のうちに先頭へ戻っても縮ませない）。
-      inner.style.overscrollBehaviorY = 'contain';
-      if (!frame) frame = requestAnimationFrame(settle);
-    };
-    const onDown = () => {
-      touching = true;
-    };
-    const onUp = () => {
-      touching = false;
-      lastTop = Number.NaN;
-      if (!frame) frame = requestAnimationFrame(settle);
-    };
-    inner.addEventListener('scroll', onScroll, { passive: true });
-    inner.addEventListener('pointerdown', onDown);
-    inner.addEventListener('pointerup', onUp);
-    inner.addEventListener('pointercancel', onUp);
+    decide();
+    inner.addEventListener('pointerdown', decide);
+    inner.addEventListener('touchstart', decide, { passive: true });
     return () => {
-      inner.removeEventListener('scroll', onScroll);
-      inner.removeEventListener('pointerdown', onDown);
-      inner.removeEventListener('pointerup', onUp);
-      inner.removeEventListener('pointercancel', onUp);
-      if (frame) cancelAnimationFrame(frame);
+      inner.removeEventListener('pointerdown', decide);
+      inner.removeEventListener('touchstart', decide);
     };
   }, [innerEl]);
 
