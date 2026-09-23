@@ -22,7 +22,27 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      // 指で触る分は mobile-chrome で見る（Desktop Chrome には touch が無い）。
+      testIgnore: /sp-board\.spec\.ts/,
+    },
+    {
+      /**
+       * **指の経路を実際に通すためのプロジェクト。**
+       *
+       * SP の E2E はこれまで Desktop Chrome の viewport を狭めるだけで、タップも
+       * ピンチも再現できなかった。そのため「盤面がピンチをブラウザに奪われる」
+       * 「タップしても前面に出ない」という壊れ方を CI が一度も拾えず、実機レビューで
+       * 続けて指摘された。Pixel 5 は chromium 系なので、CI のブラウザ導入は増えない。
+       */
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 5'] },
+      testMatch: /sp-board\.spec\.ts/,
+    },
+  ],
   webServer: {
     command:
       'pnpm --filter @oryzae/shared build && pnpm --filter @oryzae/server build && pnpm --filter @oryzae/client dev',

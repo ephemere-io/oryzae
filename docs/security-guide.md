@@ -53,6 +53,12 @@ repository があるが、**これは設計どおり**で IDOR ではない。�
 **危険なのは「使っていること」ではなく「ユーザーが制御できる ID をそのまま
 クエリ条件に渡すこと」**。それは RLS バイパス下では任意ユーザーのデータ取得になる。
 
+管理画面の入口 `admin-auth.ts` は **`app_metadata.is_admin`** で判定する。
+`user_metadata` は本人が `auth.updateUser({ data })` で書き換えられる領域なので、
+認可フラグを置いてはならない（置くと anon key を持つ一般ユーザーが自分を管理者に
+昇格でき、service role 経路に入れる）。管理者を増やすときは Supabase ダッシュボードで
+`auth.users.raw_app_meta_data` に `{"is_admin": true}` を入れる。
+
 ## 最も深刻な事故シナリオ: fermentation のメール送信
 
 `apps/server/src/contexts/fermentation/` は、cron が **service role** で全ユーザーを列挙し、

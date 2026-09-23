@@ -1,10 +1,13 @@
 /**
  * InlineImageOverlay の検証スペック。
  *
- * 本文（contentEditable）そのものは孤立検証に載らないが、この部品は
- * 「選択中の写真の設定 → 出す操作 UI」の純粋な写像なので単体で検証できる。
- * 特に **寄せは行内では出さない**（文字の流れが位置を決めるため意味を持たない）という
- * 分岐を、Word のレイアウトオプションに倣った仕様として固定しておく。
+ * この部品が持つのは**枠と 8 点**だけ。幅・寄せ・回り込み・外すはパレットへ移したので、
+ * ここに操作の面は無い（本文に被る小さな面が画面の道具を 2 か所に割っていた）。
+ *
+ * 見張るのは 2 つ:
+ *   - 8 点がそろっていて、名前が付いていること
+ *   - 点が**箱の割合**（0% / 50% / 100%）で置かれていること。以前は端からの固定値と
+ *     中心合わせの戻しが二重に効いて、8 点すべてが左上へ 4px ずれていた
  */
 
 import type { InlineImage } from '@oryzae/shared';
@@ -44,26 +47,23 @@ function image(over: Partial<InlineImage> = {}): InlineImage {
   };
 }
 
+/** 点が乗ってよい位置。箱の端か、真ん中だけ。 */
+const ANCHORS = ['0%', '50%', '100%'];
+
 registerUnit<Props>({
   id: 'InlineImageOverlay',
   title: 'InlineImageOverlay',
-  description: '本文中の写真を選んだときに重なる操作 UI（8 ハンドル + レイアウト切替）',
+  description: '本文中の写真を選んだときに重なる枠と 8 点（操作はパレット側）',
   kind: 'component',
   render: (props) =>
     withVerifyProviders(
-      <InlineImageOverlay
-        rect={RECT}
-        image={props.image}
-        onResizeStart={() => {}}
-        onLayoutChange={() => {}}
-        onRemove={() => {}}
-      />,
+      <InlineImageOverlay rect={RECT} image={props.image} onResizeStart={() => {}} />,
     ),
   fixtures: [
     { id: 'inline', description: '行内（既定）', props: { image: image() } },
     {
       id: 'block',
-      description: 'ブロック配置。寄せが選べる',
+      description: 'ブロック配置',
       props: { image: image({ layout: 'block', align: 'center' }) },
     },
     {
@@ -89,15 +89,33 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'align-only-when-meaningful',
-      description: '寄せは行内では出さず、ブロック / 回り込みでだけ出す',
-      check: ({ root, props }) => {
-        // aria-pressed を持つボタンのうち、レイアウト 3 種を除いたものが寄せ。
-        const pressable = root.querySelectorAll('[aria-pressed]').length;
-        const expected = props.image.layout === 'inline' ? 3 : 6;
+      id: 'handles-sit-on-the-box',
+      // 位置を px で持つと、丸の大きさや中心合わせと二重に効いてずれる（実際 4px ずれていた）。
+      description: '点は箱の割合（0% / 50% / 100%）で置かれている',
+      check: ({ root }) => {
+        const off = Array.from(root.querySelectorAll<HTMLElement>('[data-handle]')).filter(
+          (el) => !ANCHORS.includes(el.style.left) || !ANCHORS.includes(el.style.top),
+        );
+        if (off.length === 0) return true;
+        const where = off
+          .map((el) => `${el.getAttribute('data-handle')}(${el.style.left},${el.style.top})`)
+          .join(' ');
+        return `割合で置かれていない点がある: ${where}`;
+      },
+    },
+    {
+      id: 'no-controls-on-the-photo',
+      // 操作はパレットに集める。ここに増やすと、道具が画面の 2 か所に割れる。
+      description: '枠の上に操作ボタンを置かない（8 点だけ）',
+      check: ({ root }) => {
+        const extra = Array.from(root.querySelectorAll('button')).filter(
+          (el) => !el.hasAttribute('data-handle'),
+        );
         return (
-          pressable === expected ||
-          `layout=${props.image.layout} のとき選択ボタンは ${expected} 個のはずが ${pressable} 個`
+          extra.length === 0 ||
+          `8 点以外のボタンが ${extra.length} 個ある（操作はパレットへ）: ${extra
+            .map((el) => el.textContent?.trim())
+            .join(' / ')}`
         );
       },
     },

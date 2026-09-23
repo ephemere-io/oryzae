@@ -75,29 +75,38 @@ describe('価格表とモデルの対応', () => {
 });
 
 // コストの用途別内訳は cost_report の **モデル別** 実額で出している
-// (anthropic-cost-api.ts)。発酵と OCR が同じモデルになると、その内訳が
-// 用途別として機能しなくなる（混ざって区別できない）。
+// (anthropic-cost-api.ts)。2026-09-16 に board の OCR を opus-5 → sonnet-5 へ
+// 落としたので、モデルと用途はもう 1:1 ではない（OCR と写真の文字起こしが同じ行に
+// 入る）。混ざること自体は許容した判断だが、**混ざっている事実が名前から消える**のは
+// 許さない——消えると「OCR の実額」として読まれてしまう。
 describe('用途とモデルの対応', () => {
-  it('3 つの用途はすべて別モデル（モデル別内訳が用途別内訳として成立する前提）', () => {
-    // どれか 2 つが同じモデルになると、その 2 つの費用が同じバケットに混ざり、
-    // 用途別の内訳として読めなくなる。3 通りすべてを見る。
-    const ids = [FERMENTATION_MODEL_ID, OCR_MODEL_ID, PHOTO_TRANSCRIPTION_MODEL_ID];
-    expect(new Set(ids).size).toBe(ids.length);
+  it('発酵だけは他の用途と別モデル（推定と実額の突き合わせがこれに依存する）', () => {
+    // cron-cost-alert.ts の fermentationActualUsd は「発酵モデルの実額」を拾って
+    // 推定と比べ、乖離率を出す。画像系と同じモデルになるとその額に別用途が混ざり、
+    // 乖離率が意味を失う。混ざってよいのは画像系どうしだけ。
+    expect(FERMENTATION_MODEL_ID).not.toBe(OCR_MODEL_ID);
+    expect(FERMENTATION_MODEL_ID).not.toBe(PHOTO_TRANSCRIPTION_MODEL_ID);
   });
 
-  it('3 つの用途すべてが名前に読み替えられる', () => {
+  it('board の OCR と写真の文字起こしは同じモデル（コストを優先して揃えた）', () => {
+    // 意図的に揃えている。経緯は claude-pricing.ts と docs/observability-guide.md。
+    // 再び分けること自体は禁止していないが、そのときはここも一緒に直す。
+    expect(OCR_MODEL_ID).toBe('claude-sonnet-5');
+    expect(PHOTO_TRANSCRIPTION_MODEL_ID).toBe('claude-sonnet-5');
+  });
+
+  it('同じモデルを使う用途は名前を連ねて返す（混ざっている事実を消さない）', () => {
+    // 先に一致したほうだけを返す実装にすると「OCR (claude-sonnet-5): $X」と出て、
+    // 写真の文字起こしのぶんまで OCR の額に見える。
+    expect(featureOfModel('claude-sonnet-5')).toBe('OCR + 写真の文字起こし');
+  });
+
+  it('すべての用途が名前に読み替えられる', () => {
     // 読み替えられないモデルは費用が「分類不明」に落ちる。#529 で写真の文字起こしが
     // 登録漏れになり、管理画面でも費用アラートでも分類されていなかった。
     expect(featureOfModel(FERMENTATION_MODEL_ID)).toBe('発酵');
-    expect(featureOfModel(OCR_MODEL_ID)).toBe('OCR');
-    expect(featureOfModel(PHOTO_TRANSCRIPTION_MODEL_ID)).toBe('写真の文字起こし');
-  });
-
-  it('用途名は互いに重ならない（内訳が読めなくなるため）', () => {
-    const names = [FERMENTATION_MODEL_ID, OCR_MODEL_ID, PHOTO_TRANSCRIPTION_MODEL_ID].map(
-      featureOfModel,
-    );
-    expect(new Set(names).size).toBe(names.length);
+    expect(featureOfModel(OCR_MODEL_ID)).toContain('OCR');
+    expect(featureOfModel(PHOTO_TRANSCRIPTION_MODEL_ID)).toContain('写真の文字起こし');
   });
 
   it('未登録のモデルは null（分類不明）を返す', () => {

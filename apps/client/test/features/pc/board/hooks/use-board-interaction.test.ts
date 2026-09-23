@@ -274,25 +274,43 @@ describe('useBoardInteraction', () => {
     expect(result.current.selectedId).toBe('a');
   });
 
-  it('動かさずに離しただけでは前面に出さない（選択のつもりが並び順を変えない）', () => {
-    // startDrag は pointerdown の時点で type='drag' を立てる。didDrag を見ずに
-    // z を上げていたため、選ぶために1回押しただけでカードが最前面へ飛び、
-    // userPositioned まで立って自動整列からも外れていた。
+  it('押しただけでも前面に出す（重なった下のカードを掘り出せる）', () => {
+    // 以前は「実際に動かしたときだけ」前面に出していた。重なっている板では、下の
+    // カードを押しても埋もれたままで読めない（レビュー指摘）ため、押した時点で出す。
     const { result } = setup();
 
     act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    const raised = latest(onCardsChange, 'a');
+    expect(result.current.didDrag()).toBe(false);
+    // 既存の最大 z(1) より手前へ。動かしていないので位置は変わらない。
+    expect(raised?.zIndex).toBeGreaterThan(1);
+    expect(raised?.x).toBe(100);
+    expect(raised?.userPositioned).toBe(true);
+    expect(onInteractionEnd).toHaveBeenCalled();
+  });
+
+  it('前のセッションで手前に置いたカード（z が大きい）より上に出す', () => {
+    // 採番をマウント時の値からしか進めていなかったころは、保存済みの大きな z より
+    // 下に潜り、PC で「クリックしても埋もれたまま」に見えていた（実機レビュー指摘）。
+    cards = [card('a', 0), { ...card('b', 500), userPositioned: true }];
+    const { result } = setup();
+
+    act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    expect(latest(onCardsChange, 'a')?.zIndex).toBeGreaterThan(500);
+  });
+
+  it('既に最前面のカードを押しただけなら、並びも保存も動かさない', () => {
+    // 盤面に変化が無いのに保存要求を出すと、選ぶたびに PUT が飛ぶ。
+    const { result } = setup();
+
+    act(() => result.current.startDrag('b', 10, 10));
     act(() => result.current.onPointerUp());
 
     expect(onCardsChange).not.toHaveBeenCalled();
-    expect(result.current.didDrag()).toBe(false);
-  });
-
-  it('動かさずに離しただけでは保存要求も出さない（盤面に変化が無いため）', () => {
-    const { result } = setup();
-
-    act(() => result.current.startDrag('a', 10, 10));
-    act(() => result.current.onPointerUp());
-
     expect(onInteractionEnd).not.toHaveBeenCalled();
   });
 
@@ -304,7 +322,8 @@ describe('useBoardInteraction', () => {
     act(() => result.current.onPointerUp());
 
     expect(result.current.didDrag()).toBe(false);
-    expect(onInteractionEnd).not.toHaveBeenCalled();
+    // 前面へは出るが、位置は押したときのまま。
+    expect(latest(onCardsChange, 'a')?.x).toBe(100);
   });
 
   it('実際に動かしたら前面に出し、利用者が置いたものとして印を付ける', () => {
@@ -373,5 +392,236 @@ describe('useBoardInteraction', () => {
     act(() => result.current.startDrag('b', 10, 10));
 
     expect(result.current.didDrag()).toBe(false);
+  });
+});
+
+/**
+ * 複数選択。**Shift で足す／外す、選択の中を掴んだら群ごと動く**が要点。
+ *
+ * 目で見ると「なんとなく動いた」までしか分からない（どのカードがどれだけずれたのかを
+ * 追えない）ので、関係を数で固定する。
+ */
+describe('useBoardInteraction（複数選択）', () => {
+  const two = () => [
+    makeCard({ id: 'a', x: 0, y: 0, width: 200, height: 100, zIndex: 1 }),
+    makeCard({ id: 'b', x: 300, y: 200, width: 200, height: 100, zIndex: 2 }),
+  ];
+
+  it('Shift で押すと選択に足される', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+
+    expect(s.view.result.current.selectedIds).toEqual(['a', 'b']);
+  });
+
+  it('複数選んでいる間は selectedId が null（「開く」を出さないための唯一の根拠）', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+
+    expect(s.view.result.current.selectedId).toBeNull();
+  });
+
+  it('Shift で既に選んでいるカードを押すと外れ、そのまま動き出さない', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    expect(s.view.result.current.selectedIds).toEqual(['a']);
+
+    // 外した直後に指を動かしても、外したカードは動かない
+    act(() => s.view.result.current.onPointerMove(100, 100));
+    expect(s.cards.find((c) => c.id === 'b')?.x).toBe(300);
+  });
+
+  it('選択の中を（Shift 無しで）掴むと、選択を保ったまま群ごと動く', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(50, 30));
+
+    expect(s.view.result.current.selectedIds).toEqual(['a', 'b']);
+    expect(s.cards.find((c) => c.id === 'a')).toMatchObject({ x: 50, y: 30 });
+    expect(s.cards.find((c) => c.id === 'b')).toMatchObject({ x: 350, y: 230 });
+  });
+
+  it('選択の外を（Shift 無しで）掴むと、その 1 枚だけの選択に戻る', () => {
+    const s = setup([...two(), makeCard({ id: 'c', x: 900, y: 900 })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startDrag('c', 0, 0));
+
+    expect(s.view.result.current.selectedIds).toEqual(['c']);
+  });
+
+  it('群の枠の角を引くと、反対の角を固定したまま等方に伸びる', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    // 囲みは 0,0 - 500,300。右下を掴んで縦横とも 2 倍の位置まで引く
+    act(() => s.view.result.current.startResize(null, 'se', 500, 300));
+    act(() => s.view.result.current.onPointerMove(1000, 600));
+
+    const a = s.cards.find((c) => c.id === 'a');
+    const b = s.cards.find((c) => c.id === 'b');
+    // 左上（固定点）は動かない
+    expect(a).toMatchObject({ x: 0, y: 0, width: 400, height: 200 });
+    // 間隔も一緒に伸びる
+    expect(b).toMatchObject({ x: 600, y: 400 });
+  });
+
+  it('まとめて掴んで離しても重なり順は変わらない（並べた関係を勝手に動かさない）', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(50, 50));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.cards.find((c) => c.id === 'a')?.zIndex).toBe(1);
+    expect(s.cards.find((c) => c.id === 'b')?.zIndex).toBe(2);
+    // 動かしたことは保存に乗せる（次の取得で自動整列に巻き込まれないように）
+    expect(s.cards.every((c) => c.userPositioned)).toBe(true);
+  });
+
+  it('群の枠は 2 枚以上選んでいるときだけ出る', () => {
+    const s = setup(two());
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    expect(s.view.result.current.groupBounds).toBeNull();
+
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    expect(s.view.result.current.groupBounds).toEqual({
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 300,
+    });
+  });
+});
+
+/**
+ * 保存に渡る配列。
+ *
+ * **画面が変わったのに保存に乗らない**という壊れ方は、その場では見えない（次に開いた
+ * ときに戻る）。実ビルドで踏んだ: 前面へ出した z が保存から漏れ、リロードで埋もれ直す。
+ * 原因は「保存する配列を呼び出し側の state から読んでいた」こと（setCards はまだ
+ * 反映されていない）。いまは hook が作った配列をそのまま渡す契約なので、そこを固める。
+ */
+describe('useBoardInteraction（保存に渡る配列）', () => {
+  it('前面へ出した z が、保存に渡る配列に入っている', () => {
+    const cards = [makeCard({ id: 'a', zIndex: 1 }), makeCard({ id: 'b', zIndex: 7 })];
+    const onInteractionEnd = vi.fn();
+    const { result } = renderHook(() => useBoardInteraction(cards, () => {}, onInteractionEnd));
+
+    // 埋もれている 'a' を押しただけ（動かさない）
+    act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    expect(onInteractionEnd).toHaveBeenCalledTimes(1);
+    const saved: BoardCardData[] = onInteractionEnd.mock.calls[0][0];
+    const a = saved.find((c) => c.id === 'a');
+    expect(a?.zIndex).toBeGreaterThan(7);
+    expect(a?.userPositioned).toBe(true);
+  });
+
+  it('動かしたあとの位置と印が、保存に渡る配列に入っている', () => {
+    const s = setup([makeCard({ id: 'a', x: 0, y: 0 })]);
+    const saved: BoardCardData[][] = [];
+    const view = renderHook(
+      ({ current }: { current: BoardCardData[] }) =>
+        useBoardInteraction(
+          current,
+          () => {},
+          (next) => saved.push(next),
+        ),
+      { initialProps: { current: s.cards } },
+    );
+
+    act(() => view.result.current.startDrag('a', 0, 0));
+    act(() => view.result.current.onPointerMove(40, 25));
+    act(() => view.result.current.onPointerUp());
+
+    const last = saved.at(-1);
+    expect(last?.find((c) => c.id === 'a')?.userPositioned).toBe(true);
+  });
+
+  it('何も変わっていないときは保存要求を出さない（選ぶたびに PUT を飛ばさない）', () => {
+    const cards = [makeCard({ id: 'a', zIndex: 9 }), makeCard({ id: 'b', zIndex: 1 })];
+    const onInteractionEnd = vi.fn();
+    const { result } = renderHook(() => useBoardInteraction(cards, () => {}, onInteractionEnd));
+
+    // 既に最前面の 'a' を押しただけ
+    act(() => result.current.startDrag('a', 10, 10));
+    act(() => result.current.onPointerUp());
+
+    expect(onInteractionEnd).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 「掴んで動かした直後の click」を選択解除に数えない口。
+ *
+ * 指を離した位置が掴んだ要素の外だと、ブラウザは click を**共通の親**＝盤面に送る。
+ * 盤面の click は「空きを押した＝選択解除」なので、数えると**大きさを変え終えた
+ * 瞬間に選択が消える**（実ビルドで踏んだ）。逆に「押しただけ」で立ててしまうと、
+ * 次に空きを押したときの解除が 1 回効かなくなる。両方を固める。
+ */
+describe('useBoardInteraction（動かした直後の click）', () => {
+  it('掴んで動かしたあとは、盤面の click を数えない', () => {
+    const s = setup([makeCard({ id: 'a' })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(60, 40));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(true);
+  });
+
+  it('大きさを変えたあとも数えない（群の枠の角を離した直後）', () => {
+    const s = setup([makeCard({ id: 'a' }), makeCard({ id: 'b', x: 400 })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.startDrag('b', 0, 0, true));
+    s.sync();
+    act(() => s.view.result.current.startResize(null, 'se', 0, 0));
+    act(() => s.view.result.current.onPointerMove(120, 80));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(true);
+  });
+
+  it('押しただけなら数えない（次に空きを押したとき、解除が効かなくならない）', () => {
+    const s = setup([makeCard({ id: 'a' })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(false);
+  });
+
+  it('一度読むと戻る（次の click では解除が効く）', () => {
+    const s = setup([makeCard({ id: 'a' })]);
+
+    act(() => s.view.result.current.startDrag('a', 0, 0));
+    act(() => s.view.result.current.onPointerMove(60, 40));
+    act(() => s.view.result.current.onPointerUp());
+
+    expect(s.view.result.current.consumeGestureEnd()).toBe(true);
+    expect(s.view.result.current.consumeGestureEnd()).toBe(false);
   });
 });
