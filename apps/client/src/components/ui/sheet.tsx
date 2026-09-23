@@ -310,6 +310,13 @@ export function Sheet({
     };
   }, [present, phase]);
 
+  // 消すと決めたら、追いつきの `translate` を外す（インラインが残っていると CSS の引っ込みが効かない）。
+  useEffect(() => {
+    if (open) return;
+    scrollerEl?.style.removeProperty('translate');
+    scrollerEl?.style.removeProperty('transition');
+  }, [open, scrollerEl]);
+
   // 呼び出し側が段を変えたら、その段へ動く（指で止めた段の通知の折り返しでは動かない）。
   useEffect(() => {
     if (!present || phase !== 'open') return;
@@ -540,6 +547,14 @@ export function Sheet({
       scroller.style.removeProperty('transition');
       scroller.style.translate = '0 0';
     };
+    /**
+     * 絵が追いついたら `translate` を外す。**残したままにしない**——消す動き（`[data-shown=false]` の
+     * `translate: 0 100%`）は CSS なので、インラインが残っていると引っ込まなくなる。
+     */
+    const clearCatchup = (event: TransitionEvent) => {
+      if (event.target !== scroller || event.propertyName !== 'translate') return;
+      scroller.style.removeProperty('translate');
+    };
     /** 指が離れたら、段を決着させて外側を戻す。 */
     const releaseGesture = () => {
       settleOnRelease();
@@ -553,6 +568,7 @@ export function Sheet({
     scroller.addEventListener('touchstart', takeGesture, { passive: true, capture: true });
     scroller.addEventListener('pointerdown', takeGesture, { capture: true });
     scroller.addEventListener('touchmove', trackTouch, { passive: true, capture: true });
+    scroller.addEventListener('transitionend', clearCatchup);
     scroller.addEventListener('touchend', releaseGesture, { passive: true });
     scroller.addEventListener('touchcancel', releaseGesture, { passive: true });
     scroller.addEventListener('pointerup', releaseGesture);
@@ -582,6 +598,7 @@ export function Sheet({
       scroller.removeEventListener('touchstart', takeGesture, { capture: true });
       scroller.removeEventListener('pointerdown', takeGesture, { capture: true });
       scroller.removeEventListener('touchmove', trackTouch, { capture: true });
+      scroller.removeEventListener('transitionend', clearCatchup);
       scroller.removeEventListener('touchend', releaseGesture);
       scroller.removeEventListener('touchcancel', releaseGesture);
       scroller.removeEventListener('pointerup', releaseGesture);
