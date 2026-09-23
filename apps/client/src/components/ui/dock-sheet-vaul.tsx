@@ -9,8 +9,12 @@ import { createPortal } from 'react-dom';
 import { Drawer } from 'vaul';
 import { useSpChrome } from '@/lib/sp-chrome-context';
 import type { DockDetent, DockSheetProps } from './dock-sheet';
+import { canDragSheet, contentScrolls } from './sheet-gesture';
 
 const PEEK_FIRST: readonly DockDetent[] = ['peek', 'half', 'full'];
+
+/** ここまでの動きは「押した」と見なす（px）。これを超えたら払いとして Vaul に任せる。 */
+const TAP_SLOP_PX = 8;
 
 /**
  * 非モーダルの板（発酵の結果）を Vaul で。
@@ -29,6 +33,29 @@ const PEEK_FIRST: readonly DockDetent[] = ['peek', 'half', 'full'];
  *   実機（iOS の PWA）で効かず、画面の下端を基準に置かれた
  * - 段に止まるたびに見えている高さを `--sp-dock-inset` に渡す（本文の末尾が板の下に隠れない）
  * - Vaul の面は Radix の Dialog なので、**非モーダルの文脈で包む**（下の `Dialog.Root` の注を見よ）
+ *
+ * ### 外側（板の段）と内側（中身の送り）の段階構造
+ *
+ * ネイティブのシート（Google マップ・Apple の地図）は、外と内を**同時には**動かさない。
+ * オーナーの言葉どおりに書くと:
+ *
+ * 1. 板がいちばん高い段になるまで、**内側は送れない**。指は必ず板を動かす
+ * 2. いちばん高い段でだけ中身が読める
+ * 3. 中身を送っている指は、上端に着いても板を動かさない。**一度離す**と、次の指が板を動かす
+ *
+ * 表と言葉は `sheet-gesture.ts` に置いた（`canDragSheet` / `contentScrolls`）。ここはそれを
+ * 次の 4 つで実際の指に当てる。どれも「指を置いた瞬間に決めて、離すまで変えない」:
+ *
+ * - **内側の `overflow-y` は段で決まる**（いちばん高い段だけ `auto`、それ以外は `hidden`）。
+ *   1 と 2 はこれだけで決まる。判定も待ち時間も要らない
+ * - **触れた瞬間の `scrollTop` で、その指の持ち主を決める**。0 より大きい（＝読んでいる途中）なら
+ *   その指のあいだ `data-vaul-no-drag` を立て、板には渡さない。離せば消える（3）
+ * - **`touch-action: pan-y` / `user-select: none`**。Vaul は面に `touch-action: none` を当てるので、
+ *   そのままだと内側の箱を指で送れない（実機: 全画面なのに中身が送れないことがある）。長押しで文字が
+ *   選ばれると Vaul は drag をやめるので、選択も切る（実機: 強く押してから引くと中身が動いた）
+ * - **見出しの行を押して段を変えるのは、指が動かなかったときだけ**。払いは Vaul の drag に任せる。
+ *   動いた指でも `click` は出るので、少し引いただけで一気に段が飛んでいた（実機: ちょっと触ると一気に変わる）。
+ *   押したときも動くのは **1 段だけ**
  */
 export function DockSheetVaul({
   open,
@@ -47,6 +74,8 @@ export function DockSheetVaul({
   const [layerHeight, setLayerHeight] = useState(0);
   const [peekHeight, setPeekHeight] = useState(0);
   const headerRef = useRef<HTMLDivElement | null>(null);
+  /** 見出しの行に指を置いた場所。押した（動かなかった）かどうかの判定に使う。 */
+  const tapStart = useRef<{ x: number; y: number } | null>(null);
   const lowest = detents[0] ?? 'peek';
   const second = detents[1];
 
@@ -89,7 +118,15 @@ export function DockSheetVaul({
     [peekHeight, layerHeight],
   );
   const snapPoints = detents.map((position) => `${pxOf(position)}px`);
-  const active = `${pxOf(detent)}px`;
+  /**
+   * いま止まる段。**`snapPoints` の要素そのもの**を渡す（別に作った同じ文字列ではなく）。
+   * 一致しないと Vaul の `activeSnapPointIndex` が -1 になり、面の位置が段から外れる
+   * （層の高さが変わった瞬間に起きうる。実機: 全画面なのに中身が送れないことがある）。
+   */
+  const activeIndex = Math.max(0, detents.indexOf(detent));
+  const active = snapPoints[activeIndex] ?? snapPoints[0];
+  /** いちばん高い段に居るか。内側を読めるのはこのときだけ。 */
+  const atHighest = activeIndex === detents.length - 1;
 
   // 見えている高さを本文の余白へ。
   useEffect(() => {
@@ -122,7 +159,8 @@ export function DockSheetVaul({
           snapToSequentialPoint
           activeSnapPoint={active}
           setActiveSnapPoint={(point) => {
-            const next = detents.find((position) => `${pxOf(position)}px` === point);
+            // 返ってくるのは `snapPoints` の要素そのもの。位置で引く（文字列を作り直して比べない）。
+            const next = detents[snapPoints.indexOf(String(point))];
             if (next && next !== detent) onDetentChange(next);
           }}
         >
@@ -163,23 +201,31 @@ export function DockSheetVaul({
                 }}
               >
                 <Drawer.Title className="sr-only">{ariaLabel}</Drawer.Title>
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: 見出しの行を押すのは段の切り替えの近道。同じことはつまみを引いてもできる */}
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: 同上 */}
                 <div
                   ref={attachHeader}
                   data-dock-peek
                   className="flex w-full shrink-0 select-none flex-col items-center px-5 pt-2 pb-2"
                   style={{ cursor: 'grab' }}
-                  onClick={(event) => {
-                    if (!second) return;
+                  onPointerDown={(event) => {
+                    tapStart.current = { x: event.clientX, y: event.clientY };
+                  }}
+                  onPointerUp={(event) => {
+                    const start = tapStart.current;
+                    tapStart.current = null;
+                    if (!start || !second) return;
                     if (event.target instanceof Element && event.target.closest('button, a, input'))
                       return;
+                    // 動いた指は「払い」。段は Vaul が決めるので、ここでは何もしない。
+                    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX)
+                      return;
+                    // 押したら 1 段だけ動く。いちばん低い段からは開き、それ以外は 1 つ下げる。
+                    const index = detents.indexOf(detent);
                     if (detent === lowest) {
                       onPeekTap?.();
                       onDetentChange(second);
-                    } else {
-                      onDetentChange(lowest);
+                      return;
                     }
+                    onDetentChange(detents[Math.max(0, index - 1)] ?? lowest);
                   }}
                 >
                   <span
@@ -189,18 +235,38 @@ export function DockSheetVaul({
                   />
                   {peek ? <div className="flex w-full min-w-0 items-center">{peek}</div> : null}
                 </div>
-                {/* 中身。いちばん高い段で読める。上端に居て下へ引けば板が縮む（Vaul が指の向きと scrollTop で決める）。
-                  - overscroll-behavior: none — iOS は上端で下へ引くとネイティブの跳ね返りが指を奪い（pointercancel）、
-                    板に渡らない（実機: 読み終えて上端に戻しても縮まない）。跳ね返りを切れば指は板へ届く
-                  - 触れた瞬間に端数の scrollTop を 0 へ揃える — Vaul は `scrollTop !== 0` の厳密判定で、iOS は
-                    減速の末に 0.3px などの端数で止まることがある */}
+                {/* 中身。いちばん高い段でだけ読める（上の「段階構造」を見よ）。
+                  - overscroll-behavior: none — iOS は上端で下へ引くとネイティブの跳ね返りが指を奪い
+                    （pointercancel）、板に渡らない。跳ね返りを切れば指は板へ届く
+                  - user-select: none — 長押しで文字が選ばれると Vaul は drag をやめる（選択を優先する）。
+                    実機の「強く押してから引くと中身が動く」はこれ */}
                 <div
-                  className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-6 [overflow-wrap:anywhere]"
-                  style={{ overscrollBehaviorY: 'none' }}
+                  className="min-h-0 min-w-0 flex-1 px-5 pb-6 [overflow-wrap:anywhere]"
+                  style={{
+                    overflowY: contentScrolls(atHighest) ? 'auto' : 'hidden',
+                    touchAction: contentScrolls(atHighest) ? 'pan-y' : 'none',
+                    overscrollBehaviorY: 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                  }}
                   onTouchStart={(event) => {
                     const box = event.currentTarget;
+                    // iOS は減速の末に 0.3px などの端数で止まる。0 に揃えてから持ち主を決める。
                     if (box.scrollTop > 0 && box.scrollTop < 1) box.scrollTop = 0;
+                    // 読んでいる途中の指は、上端に着いても板を動かさない（離すまで）。
+                    // `data-vaul-no-drag` は Vaul が「この指は板に渡さない」と読む印。
+                    const mayDrag = canDragSheet({
+                      atHighest,
+                      onContent: true,
+                      scrollTop: box.scrollTop,
+                    });
+                    if (mayDrag) box.removeAttribute('data-vaul-no-drag');
+                    else box.setAttribute('data-vaul-no-drag', '');
                   }}
+                  onTouchEnd={(event) => event.currentTarget.removeAttribute('data-vaul-no-drag')}
+                  onTouchCancel={(event) =>
+                    event.currentTarget.removeAttribute('data-vaul-no-drag')
+                  }
                 >
                   {children}
                 </div>
