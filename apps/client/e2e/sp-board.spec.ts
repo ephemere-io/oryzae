@@ -207,13 +207,21 @@ test.describe('SP のボード（指で触る）', () => {
     if (!point) return;
 
     await page.touchscreen.tap(point.x, point.y);
-    await page.waitForTimeout(700);
 
-    const after = await cards(page);
-    const lowerCard = after.find((c) => c.text.includes(lower));
-    const upperAfter = after.find((c) => c.text.includes(upper));
-    expect(lowerCard, '下のカードが見つからない').toBeTruthy();
-    expect(upperAfter, '上のカードが見つからない').toBeTruthy();
-    expect(lowerCard?.z ?? 0).toBeGreaterThan(upperAfter?.z ?? 0);
+    // 固定時間で待たない。前面へ出すのは state の更新 → 再描画を挟むので、
+    // 待ち時間を決め打ちすると遅い回で取りこぼす（700ms 固定で実際に取りこぼした）。
+    // 「下が上を越えた」という**結果そのもの**が出るまで見る。
+    await expect
+      .poll(
+        async () => {
+          const after = await cards(page);
+          const lowerCard = after.find((c) => c.text.includes(lower));
+          const upperAfter = after.find((c) => c.text.includes(upper));
+          if (!lowerCard || !upperAfter) return null;
+          return lowerCard.z - upperAfter.z;
+        },
+        { message: 'タップした下のカードが前面に出ない', timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
   });
 });

@@ -265,14 +265,17 @@ test.describe('ボードの複数選択', () => {
     const first = `E2E群1-${Date.now()}`;
     const second = `E2E群2-${Date.now()}`;
 
-    // 1 枚ずつ作って、作った直後（最前面のうち）に左右へ離す。中央の山から抜けば、
-    // 以降はその点を押せば確実にそのカードに当たる。
+    // **2 枚とも先に作る。** 間に運ぶ操作を挟むとカードが選択状態になり、道具箱が
+    // 「カードの操作」に入れ替わって作成ボタンが消える（それで 2 枚目が作れず落ちた）。
+    //
+    // 運ぶのは新しい順。作った直後の 2 枚目が最前面なので先に右へ、続いて中央で
+    // 最前面になった 1 枚目を左へ。これで中央の山から 2 枚とも抜ける。
     const left = { x: 320, y: 250 };
     const right = { x: 880, y: 250 };
     await createSnippet(page, first);
-    await carryCardTo(page, first, left);
     await createSnippet(page, second);
     await carryCardTo(page, second, right);
+    await carryCardTo(page, first, left);
 
     const cardOne = page.locator('[data-card-id]').filter({ hasText: first });
 
