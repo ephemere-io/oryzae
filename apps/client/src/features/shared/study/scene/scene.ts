@@ -1030,8 +1030,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     host = next.container;
     host.appendChild(renderer.domElement);
     resizeObserver.observe(host);
+    // 窓は入れ物のもの。新しい入れ物は「canvas 全体」から始める（狭めたいなら自分で言う）。
+    frameTarget = null;
     projectionDirty = true;
     listeners = next.listeners;
+    // 引き取った側にも「描けている」を知らせる。1 フレーム目はとうに過ぎているが、
+    // 地を外してよい合図を受け取るのは**いまの持ち主**なので、次のフレームで鳴らし直す。
+    readyAnnounced = false;
   }
 
   // ---- 片付け ------------------------------------------------------------
@@ -1098,6 +1103,16 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   }
 
   function setFrame(visibleHeight: number): void {
+    /**
+     * **窓は「扉の前に立っている入れ物」のもの。** それ以外からは受け取らない。
+     *
+     * 窓を狭めるのは、SP で下から紙が canvas を覆っているため（`setViewOffset`）。入り始めたら
+     * 紙は退いていて、書斎には紙が無い。ここを開けていたせいで、認証画面の ResizeObserver
+     * （紙の高さの変化で鳴る）が、入る直前に戻した「画面全体」を**後から上書き**し、
+     * 狭い窓のまま書斎まで持ち越されていた — 画面が異様に引き伸ばされ、部屋が枠の外に出る
+     * （実機の SP。「認証中」の紙が伸び縮みする時間が、ちょうど入り始めに重なる）。
+     */
+    if (entering !== null || atEntrance === null) return;
     // `Infinity` は「canvas 全体」。捨ててよいのは NaN だけ。
     if (Number.isNaN(visibleHeight)) return;
     frameTarget = visibleHeight;

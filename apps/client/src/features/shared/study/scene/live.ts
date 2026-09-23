@@ -19,11 +19,22 @@
  * 受け渡しの一瞬だけで、引き取られたら手放す。
  */
 
+import type { StudyLayout } from '../layout';
+import type { StudyTheme } from './materials';
 import type { StudySceneHandle } from './scene';
 
 export interface LiveScene {
   canvas: HTMLCanvasElement;
   handle: StudySceneHandle;
+  /**
+   * そのシーンが組まれたときの構図と色。**引き取る側と噛み合わないなら引き継がない。**
+   *
+   * 材（色）はシーンを作るときに決まるので、あとから差し替えられない。認証画面は明るい色で
+   * 固定なので、暗い色を選んでいる人がログインすると、明るいままの書斎を引き継いでしまう。
+   * 噛み合わないときは捨てて作り直す — 一度切り替わって見えるが、色が違うよりはよい。
+   */
+  layout: StudyLayout;
+  theme: StudyTheme;
 }
 
 /** 引き取り手が現れないまま置き去りになったときに捨てるまで（ms）。 */
@@ -81,12 +92,21 @@ export function keepLiveScene(scene: LiveScene): void {
   }
 }
 
-/** 引き取る。**一度きり** — 受け取った側が以後の後始末を持つ。 */
-export function takeLiveScene(): LiveScene | null {
+/**
+ * 引き取る。**一度きり** — 受け取った側が以後の後始末を持つ。
+ *
+ * 構図か色が噛み合わなければ引き継がず、預かっていたものは捨てる（`LiveScene` の注釈）。
+ */
+export function takeLiveScene(want: { layout: StudyLayout; theme: StudyTheme }): LiveScene | null {
   const taken = live;
   live = null;
   clearAbandonTimer();
   clearParking();
+  if (taken === null) return null;
+  if (taken.layout !== want.layout || taken.theme !== want.theme) {
+    if (releaseScene(taken.handle, LIVE_OWNER)) taken.handle.dispose();
+    return null;
+  }
   return taken;
 }
 

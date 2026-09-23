@@ -177,7 +177,8 @@ export function StudyCanvas({
      *   入れ物と受け口を付け替えるだけなら（`handle.adopt`）、描画も動きも途切れない
      */
     const kept = keptRef.current?.layout === layout && keptRef.current.theme === theme;
-    const existing = (kept ? keptRef.current?.handle : null) ?? takeLiveScene()?.handle ?? null;
+    const existing =
+      (kept ? keptRef.current?.handle : null) ?? takeLiveScene({ layout, theme })?.handle ?? null;
 
     let scene: StudySceneHandle | null = existing;
     if (scene === null) {
