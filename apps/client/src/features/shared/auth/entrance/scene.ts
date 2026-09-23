@@ -33,7 +33,7 @@ import {
 } from 'three';
 import { clamp01, RENDER_LIMITS } from '@/features/shared/study/constants';
 import { approach, breathOffset, type CameraView } from '@/features/shared/study/scene/camera';
-import { sampleJarProfile } from '@/features/shared/study/scene/jar';
+import { CORK, JAR_HEIGHT, sampleJarProfile } from '@/features/shared/study/scene/jar';
 import { createMaterials, type StudyMaterials } from '@/features/shared/study/scene/materials';
 import {
   DOOR,
@@ -116,6 +116,25 @@ export interface EntranceSceneHandle {
  */
 const GLIMPSE_REVEAL = 3.4;
 
+/**
+ * 瓶を置く奥行き。ここを面にして、書斎の配置を縮めて並べる。
+ *
+ * 瓶の x と机の高さと縮尺は構図ごとに違う（`EntranceLayout.glimpse`）。板と机はそこからの
+ * 相対で置く — **書斎での瓶との位置関係をそのまま縮める**ので、どの構図でも同じ部屋に見える。
+ */
+const GLIMPSE_Z = -6.6;
+
+/**
+ * 書斎での、瓶を原点とした物の位置関係（`study/layout.ts` の PC の配置）。
+ *
+ * 瓶 (-4.2, -1.2, 1) を原点に、板の中心 (0.9, 2.5, -4)、机の天板
+ * （x -6.2..8.6、z 4.3..-4.6）を測ったもの。これに `glimpse.scale` を掛けて置く。
+ */
+const STUDY_RELATIVE = {
+  board: { x: 5.1, y: 3.7, z: -5.0, width: 8, height: 5 },
+  desk: { x0: -2.0, x1: 12.8, zNear: 3.3, zFar: -5.6 },
+} as const;
+
 /** 扉の向こうの気配。濃さだけを外から動かせる。 */
 interface StudyGlimpse {
   group: Group;
@@ -157,7 +176,7 @@ export function initEntranceScene(options: EntranceSceneOptions): EntranceSceneH
   scene.add(buildWall(materials, own));
   scene.add(buildFrame(materials, own));
   scene.add(buildDoormat(materials, own));
-  const glimpse = buildStudyGlimpse(materials, own);
+  const glimpse = buildStudyGlimpse(materials, own, layout);
   scene.add(glimpse.group);
   scene.add(buildCabinet(materials, own, layout, options.sprig));
   const door = buildDoor(materials, own);
@@ -384,6 +403,16 @@ type OwnGeometry = <T extends BufferGeometry>(geometry: T) => T;
 function aspectOf(container: HTMLElement): number {
   const height = container.clientHeight;
   return height > 0 ? container.clientWidth / height : 1;
+}
+
+/** 水平な円の点列（口縁・蓋の縁）。 */
+function ringPoints(radius: number, y: number, segments = 36): Vector3[] {
+  const points: Vector3[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    points.push(new Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius));
+  }
+  return points;
 }
 
 function distanceBetween(a: CameraView['position'], b: CameraView['position']): number {
@@ -619,7 +648,11 @@ function buildDoormat(materials: StudyMaterials, own: OwnGeometry): Group {
  * （PR #624）。近づくほど奥が見えてくれば、最後の 1 枚は「扉の向こうの書斎」になり、
  * そのまま書斎へ渡せる。
  */
-function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): StudyGlimpse {
+function buildStudyGlimpse(
+  materials: StudyMaterials,
+  own: OwnGeometry,
+  layout: EntranceLayout,
+): StudyGlimpse {
   const group = new Group();
   const shades: { material: LineBasicMaterial; base: number }[] = [];
   /** 待っている間の濃さで 1 本。`reveal` でまとめて濃くするので、共有の材は使わない。 */
@@ -631,20 +664,42 @@ function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): StudyGl
   const line = shade(0.14);
   const faint = shade(0.08);
 
-  // 奥の壁の足元と、壁のボード。
-  group.add(lineFrom([new Vector3(-7, 0, -11), new Vector3(7, 0, -11)], faint, own));
-  group.add(rectOutline(-1.6, 2.2, 1.9, 4.4, -10.98, faint, own));
+  const { jarX, deskY, scale } = layout.glimpse;
+
+  // 奥の壁の足元。
+  group.add(lineFrom([new Vector3(-12, 0, -13), new Vector3(12, 0, -13)], faint, own));
+
+  // 壁の板。書斎での瓶との位置関係をそのまま縮める。
+  const boardX = jarX + STUDY_RELATIVE.board.x * scale;
+  const boardY = deskY + STUDY_RELATIVE.board.y * scale;
+  const boardZ = GLIMPSE_Z + STUDY_RELATIVE.board.z * scale;
+  const boardHalfW = (STUDY_RELATIVE.board.width * scale) / 2;
+  const boardHalfH = (STUDY_RELATIVE.board.height * scale) / 2;
+  group.add(
+    rectOutline(
+      boardX - boardHalfW,
+      boardY - boardHalfH,
+      boardX + boardHalfW,
+      boardY + boardHalfH,
+      boardZ,
+      faint,
+      own,
+    ),
+  );
 
   // 机の天板（手前の木端つき）。
-  const deskY = 1.5;
+  const deskX0 = jarX + STUDY_RELATIVE.desk.x0 * scale;
+  const deskX1 = jarX + STUDY_RELATIVE.desk.x1 * scale;
+  const deskNear = GLIMPSE_Z + STUDY_RELATIVE.desk.zNear * scale;
+  const deskFar = GLIMPSE_Z + STUDY_RELATIVE.desk.zFar * scale;
   group.add(
     lineFrom(
       [
-        new Vector3(-3.2, deskY, -5.2),
-        new Vector3(3.2, deskY, -5.2),
-        new Vector3(3.2, deskY, -8.6),
-        new Vector3(-3.2, deskY, -8.6),
-        new Vector3(-3.2, deskY, -5.2),
+        new Vector3(deskX0, deskY, deskNear),
+        new Vector3(deskX1, deskY, deskNear),
+        new Vector3(deskX1, deskY, deskFar),
+        new Vector3(deskX0, deskY, deskFar),
+        new Vector3(deskX0, deskY, deskNear),
       ],
       line,
       own,
@@ -652,17 +707,22 @@ function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): StudyGl
   );
   group.add(
     lineFrom(
-      [new Vector3(-3.2, deskY - 0.14, -5.2), new Vector3(3.2, deskY - 0.14, -5.2)],
+      [new Vector3(deskX0, deskY - 0.14, deskNear), new Vector3(deskX1, deskY - 0.14, deskNear)],
       faint,
       own,
     ),
   );
 
-  // 瓶。経線だけで形を示す（書斎の瓶と同じ母線）。本数を絞る — 多いと縞の壺に見える。
+  // 瓶。**書斎で会う瓶と同じ形にする** — 母線・口縁・蓋（コルク）。
+  //
+  // 以前は経線だけで、蓋も口縁も無かった。「ドアを開けた時に見える壺が、書斎の壺と
+  // デザインが違うので初見の人は『？』となりそう」と報告された（PR #624 のレビュー）。
+  // 扉の向こうに見えるものが、入った先で会うものと違うと、別の部屋だと読まれる。
+  // 塗りは置かない（気配なので線だけ）が、形は同じにする。
   const profile = sampleJarProfile();
   const jar = new Group();
-  jar.position.set(-1.1, deskY, -6.6);
-  jar.scale.setScalar(0.42);
+  jar.position.set(jarX, deskY, GLIMPSE_Z);
+  jar.scale.setScalar(scale);
   const meridians = 4;
   for (let i = 0; i < meridians; i++) {
     const angle = (i / meridians) * Math.PI;
@@ -675,6 +735,30 @@ function buildStudyGlimpse(materials: StudyMaterials, own: OwnGeometry): StudyGl
       .map((point) => new Vector3(-Math.sin(angle) * point.x, point.y, -Math.cos(angle) * point.x))
       .reverse();
     jar.add(lineFrom([...points, ...back], i === meridians / 2 ? line : faint, own));
+  }
+  // 口縁。ここが無いと、口の開いた壺に見える。
+  jar.add(lineFrom(ringPoints(1.0, JAR_HEIGHT), line, own));
+  // 蓋（コルク）。上下の円と、側面の短い縦で木口を示す。書斎では塗りが載る部分。
+  const corkTop = CORK.y + CORK.height / 2;
+  const corkBottom = CORK.y - CORK.height / 2;
+  jar.add(lineFrom(ringPoints(CORK.radiusTop, corkTop), line, own));
+  jar.add(lineFrom(ringPoints(CORK.radiusBottom, corkBottom), line, own));
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
+    jar.add(
+      lineFrom(
+        [
+          new Vector3(
+            Math.cos(angle) * CORK.radiusBottom,
+            corkBottom,
+            Math.sin(angle) * CORK.radiusBottom,
+          ),
+          new Vector3(Math.cos(angle) * CORK.radiusTop, corkTop, Math.sin(angle) * CORK.radiusTop),
+        ],
+        faint,
+        own,
+      ),
+    );
   }
   group.add(jar);
 

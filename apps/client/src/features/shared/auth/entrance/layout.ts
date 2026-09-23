@@ -35,6 +35,26 @@ export interface EntranceLayout {
    * - `sheet`: 下から紙を敷く。扉は上の窓に残り、紙はキーボードと一緒にスクロールする
    */
   panel: 'side' | 'sheet';
+  /**
+   * 扉の向こうに覗く書斎の気配の置き方（`scene.ts` の `buildStudyGlimpse`）。
+   *
+   * **書斎が現れる瞬間の絵と、画面の上で重なるところに置く。** 扉の向こうに独自の部屋を
+   * 描いていた頃は、溶けるときに景色が飛び、「ドアを開けてから書斎が表示されるまで
+   * ノンストップにしたい」「扉の壺と書斎の壺のデザインが違う」と報告された（PR #624）。
+   *
+   * 数はカメラの投影から解いている — 書斎の定置の始点（`study/constants.ts` の `ARRIVAL`）から
+   * 見た瓶が、扉の側が渡す瞬間にどこへ写るかを求め、同じ画面位置に来る扉の座標を逆に解く。
+   * 書斎と扉は世界の尺が違う（書斎は瓶が主役の寄った世界）ので実寸では繋がらない。
+   * **同じ物が同じところに見える**ことで繋ぐ。構図が違えば解も違うので、配置表が持つ。
+   */
+  glimpse: {
+    /** 瓶を置く x（扉の開口は x = 0 が中心）。 */
+    jarX: number;
+    /** 机の天板の高さ。瓶はこの上に立つ。 */
+    deskY: number;
+    /** 書斎の物をどれだけ縮めるか。 */
+    scale: number;
+  };
 }
 
 /**
@@ -61,6 +81,7 @@ export const ENTRANCE_PC_LAYOUT: EntranceLayout = {
   },
   parallax: { x: 0.55, y: 0.3, lerp: 0.05 },
   panel: 'side',
+  glimpse: { jarX: -2.36, deskY: 0.99, scale: 0.68 },
 };
 
 export const ENTRANCE_SP_LAYOUT: EntranceLayout = {
@@ -83,4 +104,5 @@ export const ENTRANCE_SP_LAYOUT: EntranceLayout = {
   },
   parallax: null,
   panel: 'sheet',
+  glimpse: { jarX: -1.13, deskY: 1.39, scale: 0.57 },
 };
