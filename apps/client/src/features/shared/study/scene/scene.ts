@@ -458,7 +458,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     // （寄っている最中に呼吸とパララックスを混ぜると、止まる位置が定まらない）。
     if (arrival !== null) {
       const walked = progress(now - arrival.startedAt, ARRIVAL.durationMs);
-      applyView(camera, lerpView(arrival.from, homeCamera, EASING.easeOutCubic(walked)));
+      applyView(camera, lerpView(arrival.from, homeCamera, EASING[ARRIVAL.easing](walked)));
       if (walked >= 1) arrival = null;
       return;
     }
