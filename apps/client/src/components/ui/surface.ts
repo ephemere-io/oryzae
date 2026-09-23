@@ -143,6 +143,15 @@ export const FIELD_STYLE = {
   color: 'var(--fg)',
 } as const;
 
+/**
+ * エントリーのヘッダーに並ぶチップの寸法（問いのチップ・「‹ 書斎」）。面は `ELEVATED_CHIP_*`。
+ *
+ * 同じ行に並ぶので、高さ・余白・字の大きさを 1 か所で持つ。片方だけ変えると、
+ * 隣り合ったボタンの背丈や字面が揃わなくなる。
+ */
+export const HEADER_CHIP_CLASS =
+  'flex h-9 shrink-0 items-center gap-2 px-4 text-[13.5px] font-medium';
+
 /** 面に載るアイコンの寸法。className ではなく width/height 属性に渡す。 */
 export const ICON_SIZE = 18;
 

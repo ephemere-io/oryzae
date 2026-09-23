@@ -16,6 +16,8 @@ import {
   aggregateCost,
   type CostAggregate,
   fetchFermentationCostRows,
+  resolveUserEmails,
+  resolveUserNicknames,
   type UserCostAggregate,
 } from '../../infrastructure/fermentation-cost-query.js';
 import {
@@ -30,8 +32,12 @@ import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 import { createCronAuthMiddleware } from '../middleware/cron-auth.js';
 
 const DAILY_COST_THRESHOLD_USD = 1.0;
-/** Discord の1フィールドに詰め込みすぎないための上限。 */
-const TOP_USER_COUNT = 5;
+/**
+ * ユーザー別に載せる人数の上限。Discord の 1 フィールドは 1024 文字なので、
+ * 「名前 (メール): $0.0000（n 件）」1 行 50 文字前後 × 10 で余裕を残す。
+ * 5 では足りないという指摘（9/14 のレポート）で 10 にした。
+ */
+const TOP_USER_COUNT = 10;
 /**
  * 推定と実額の乖離を「要確認」と計算根拠の表示に回す閾値。
  *
@@ -94,7 +100,16 @@ function divergenceRatio(estimatedUsd: number, actualUsd: number): number | null
 }
 
 /**
- * 実額の内訳 1 行。読む人が知りたいのは「何に」であってモデル名ではないので、用途を前に出す。
+ * 「合計」の配下であることを罫線で見せる。最後の行だけ └、それ以外は ├。
+ * 空白のインデントは Discord が埋め込み内で削るため、字形で階層を出す。
+ */
+function treeLines(lines: string[]): string[] {
+  return lines.map((line, i) => `${i === lines.length - 1 ? '└' : '├'} ${line}`);
+}
+
+/**
+ * 実額の内訳 1 行（「用途: 金額」）。読む人が知りたいのは「何に」であって
+ * モデル名ではないので、用途を前に出す。
  *
  * 用途に読み替えられないモデルにはその旨を添える。アプリの機能のモデルはすべて
  * featureOfModel に登録されているはずだが、#529 のように登録漏れで落ちてくることも
@@ -103,9 +118,9 @@ function divergenceRatio(estimatedUsd: number, actualUsd: number): number | null
  */
 function formatModelLine(m: ModelActualCost): string {
   const feature = featureOfModel(m.model);
-  if (feature) return `${feature} (${m.model})  ${usd(m.costUsd)}`;
-  if (m.model.startsWith('(')) return `${m.model}  ${usd(m.costUsd)}`;
-  return `${m.model}  ${usd(m.costUsd)}  ← 用途不明（アプリ外の利用か登録漏れ）`;
+  if (feature) return `${feature} (${m.model}): ${usd(m.costUsd)}`;
+  if (m.model.startsWith('(')) return `${m.model}: ${usd(m.costUsd)}`;
+  return `${m.model}: ${usd(m.costUsd)} ← 用途不明（アプリ外の利用か登録漏れ）`;
 }
 
 /**
@@ -122,21 +137,33 @@ function formatHeadline(actual: ActualCostOk, trend: ActualCostTrend | null): st
   return `${amount}（前日 ${usd(trend.previousUsd)}${change}）`;
 }
 
+/** 合計の配下に並べる内訳。 */
 function formatBreakdownLines(actual: ActualCostOk): string[] {
-  // grouping が効いていないと総額は正しいまま内訳だけ消えるので、その旨を出す。
+  // grouping が効いていないと合計は正しいまま内訳だけ消えるので、その旨を出す。
   if (actual.groupingUnavailable) {
-    return ['内訳が取れませんでした（group_by が効いていない可能性）。総額は正しい値です'];
+    return treeLines([
+      '内訳が取れませんでした（group_by が効いていない可能性）。合計は正しい値です',
+    ]);
   }
-  if (actual.byModel.length === 0) return ['この日の課金なし'];
-  return actual.byModel.map(formatModelLine);
+  if (actual.byModel.length === 0) return treeLines(['この日の課金なし']);
+  return treeLines(actual.byModel.map(formatModelLine));
 }
 
+/** 欄の名前にスコープを置く。数字ごとに「org 全体」と注記しなくて済む。 */
+const ACTUAL_FIELD_NAME = '請求額（Anthropic の org 全体の実額）';
+
 /**
- * 請求額の欄。金額・前日・内訳・確認先を 1 つの欄に縦に並べる。
+ * 請求額の欄。「合計: 金額」の配下に用途別の内訳をぶら下げ、注記と確認先を添える。
  *
- * 旧版は「実請求額」「今月の累計」「月末の見込み」を inline の 3 カラムに並べていたが、
- * Discord の inline は幅に応じて折り返し、スマホでは列が崩れて読めない。
- * 「$0.6043 が何から発生したか」は金額の直下に書く。別欄に離すと探すことになる。
+ *   合計: $0.3263（前日 $0.0325 +903%）
+ *   ├ 発酵 (claude-sonnet-4-6): $0.2939
+ *   └ OCR + 写真の文字起こし (claude-sonnet-5): $0.0325
+ *   ※ 同じモデルを CI などが使えば、その分も同じ行に混ざる
+ *   確認先: 管理画面・Anthropic Console
+ *
+ * 9/14 のレポートへの指摘: 金額が 3 つ縦に並ぶだけでは「$0.3263 が何で、$0.2939 が何か」
+ * が読めない。親（合計）と子（用途別）の関係を字形で見せ、「org 全体の実額」という
+ * スコープは欄の名前に置く。inline の横並びは使わない（幅次第で崩れる）。
  * 取得できないときに $0 を出さない方針は変えていない。
  */
 function buildActualField(actual: ActualCostResult, trend: ActualCostTrend | null): DiscordField {
@@ -146,16 +173,16 @@ function buildActualField(actual: ActualCostResult, trend: ActualCostTrend | nul
   } else if (actual.kind === 'error') {
     lines.push(`取得失敗: ${actual.message.slice(0, 80)}`);
   } else {
-    lines.push(formatHeadline(actual, trend));
+    lines.push(`合計: ${formatHeadline(actual, trend)}`);
     lines.push(...formatBreakdownLines(actual));
     // 実請求は org 全体の額。Oryzae のアプリ以外（CI のセキュリティレビュー・
     // 手元の検証など）も含むので、用途の行にそれらが混ざりうる。
-    lines.push('※ Anthropic の org 全体の実額。同じモデルを CI などが使えば同じ行に混ざる');
+    lines.push('※ 同じモデルを CI などが使えば、その分も同じ行に混ざる');
   }
   lines.push(
-    `[管理画面で確認](${ADMIN_SPEND_URL})・[Anthropic Console](${ANTHROPIC_COST_CONSOLE_URL})`,
+    `確認先: [管理画面](${ADMIN_SPEND_URL})・[Anthropic Console](${ANTHROPIC_COST_CONSOLE_URL})`,
   );
-  return { name: '請求額', value: lines.join('\n'), inline: false };
+  return { name: ACTUAL_FIELD_NAME, value: lines.join('\n'), inline: false };
 }
 
 /**
@@ -196,18 +223,52 @@ function buildFermentationField(aggregate: CostAggregate): DiscordField {
 }
 
 /**
- * ユーザー別内訳。Discord は内部運用チャンネルだが、既存の発酵 cron 通知が
- * userId.slice(0, 8) 表記なのに合わせ、メールアドレスは送らない。
- * メール付きの内訳は admin の /costs 画面で見られる。
+ * userId → 表示名「nickname (email)」。片方しか無ければある方。両方無ければ載せない
+ * （呼び出し側が ID の先頭 8 桁に縮退する）。
+ *
+ * 解決に失敗してもレポートは出す。名前が取れないより、レポートが来ない方が困る。
+ * listUsers はページングで最大 20 往復するので一括で引き、profiles は対象だけ引く。
+ */
+async function resolveUserLabels(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  byUser: UserCostAggregate[],
+): Promise<Map<string, string>> {
+  const labels = new Map<string, string>();
+  const targets = byUser.slice(0, TOP_USER_COUNT).map((u) => u.userId);
+  if (targets.length === 0) return labels;
+  try {
+    const [emails, nicknames] = await Promise.all([
+      resolveUserEmails(supabase),
+      resolveUserNicknames(supabase, targets),
+    ]);
+    for (const userId of targets) {
+      const nickname = nicknames.get(userId) ?? '';
+      const email = emails.get(userId) ?? '';
+      const label = nickname && email ? `${nickname} (${email})` : nickname || email;
+      if (label) labels.set(userId, label);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[cron-cost-alert] user lookup failed', { error: message });
+  }
+  return labels;
+}
+
+/**
+ * ユーザー別内訳。誰の発酵かは名前（profiles.nickname）とメールで書く。
+ * 旧版は userId の先頭 8 桁だったが、それでは誰か分からない（#591 のレポートへの指摘）。
+ * Discord は内部運用チャンネルで、載せるのは本人を特定する最低限の情報だけ
+ * （日記本文は載せない）。admin の /costs 画面がメールを出しているのと同じ扱い。
  *
  * 末尾の注記は「なぜここだけ推定なのか」の説明。実額と並んだときに、注記の無い
  * 推定値は「意味の分からない2つ目の金額」にしか見えない。
  */
-function formatUserBreakdown(byUser: UserCostAggregate[]): string {
+function formatUserBreakdown(byUser: UserCostAggregate[], labels: Map<string, string>): string {
   if (byUser.length === 0) return 'この日の発酵は 0 件';
   const top = byUser.slice(0, TOP_USER_COUNT);
   const lines = top.map(
-    (u) => `${u.userId.slice(0, 8)}  ${usd(u.estimatedCostUsd)}  ${u.fermentationCount} 件`,
+    (u) =>
+      `${labels.get(u.userId) ?? u.userId.slice(0, 8)}: ${usd(u.estimatedCostUsd)}（${u.fermentationCount} 件）`,
   );
   const rest = byUser.length - top.length;
   if (rest > 0) lines.push(`…他 ${rest} 名`);
@@ -370,9 +431,12 @@ export const cronCostAlert = new Hono()
       fields.push(buildFermentationField(aggregate));
       // 0 件の日はユーザー別も 0 の再掲にしかならない（発酵 0 件で伝わる）。
       if (aggregate.fermentationCount > 0) {
+        const labels = await resolveUserLabels(supabase, aggregate.byUser);
+        // 全員載っている日に「上位 10」と書くと、載っていない人がいるように読める。
+        const truncatedUsers = aggregate.byUser.length > TOP_USER_COUNT;
         fields.push({
-          name: `ユーザー別（推定・上位${TOP_USER_COUNT}）`,
-          value: formatUserBreakdown(aggregate.byUser),
+          name: truncatedUsers ? `ユーザー別（推定・上位${TOP_USER_COUNT}）` : 'ユーザー別（推定）',
+          value: formatUserBreakdown(aggregate.byUser, labels),
           inline: false,
         });
       }

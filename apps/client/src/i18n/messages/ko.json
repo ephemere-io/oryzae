@@ -282,19 +282,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "일요일",
-      "day_mon": "월요일",
-      "day_tue": "화요일",
-      "day_wed": "수요일",
-      "day_thu": "목요일",
-      "day_fri": "금요일",
-      "day_sat": "토요일"
-    },
     "canvas": {
       "aria_label": "보드 캔버스"
     },
-    "empty": "이 기간에는 내용이 없습니다",
+    "nothing_pinned": "아직 붙인 것이 없습니다",
     "lightbox": {
       "aria_label": "사진 라이트박스",
       "close_aria": "라이트박스 닫기"
@@ -345,6 +336,7 @@
       "snippet": "스니펫 만들기",
       "photo": "이미지 붙여넣기",
       "aria_label_card": "선택한 카드 작업",
+      "selected_count": "{count}장",
       "bring_to_front": "맨 앞으로",
       "delete": "삭제",
       "open": "열기",
@@ -536,9 +528,8 @@
   },
   "photo": {
     "toolbar_button": "사진",
-    "modal_title": "사진 가져오기",
-    "modal_description": "글자로 읽어들이거나, 사진 그대로 붙일 수 있습니다.",
-    "ai_notice": "'글자로 읽어들이기'를 선택하면 사진이 AI(Anthropic의 Claude)로 전송됩니다.",
+    "modal_title": "이 사진을 넣을까요?",
+    "ai_notice": "「글자로 읽기」를 고르면 사진이 외부 API로 전송됩니다.",
     "preview_alt": "가져올 사진 미리보기",
     "transcribe": "글자로 읽어들이기",
     "transcribing": "읽는 중…",
@@ -574,7 +565,18 @@
     "resize_se": "오른쪽 아래를 끌어 크기 조절",
     "resize_s": "아래쪽을 끌어 크기 조절",
     "resize_sw": "왼쪽 아래를 끌어 크기 조절",
-    "resize_w": "왼쪽을 끌어 크기 조절"
+    "resize_w": "왼쪽을 끌어 크기 조절",
+    "size": "크기",
+    "width_small": "작게",
+    "width_medium": "보통",
+    "width_large": "크게",
+    "align": "정렬",
+    "wrap": "글 감싸기",
+    "wrap_on": "켬",
+    "wrap_off": "끔",
+    "align_needs_room": "가득 찬 너비에서는 정렬할 수 없습니다",
+    "selected": "사진을 선택했습니다",
+    "choose_file": "사진 고르기"
   },
   "fermentation": {
     "detail": {
@@ -846,7 +848,7 @@
     },
     "board": {
       "cards": "{count}장",
-      "empty": "오늘은 아직 아무것도 없습니다",
+      "nothing_pinned": "아직 붙인 것이 없습니다",
       "hint": "카드는 손가락으로 옮길 수 있습니다",
       "add_snippet": "스니펫 만들기",
       "add_photo": "사진 추가",
@@ -856,18 +858,10 @@
       "cancel": "취소",
       "save": "저장",
       "resize": "크기와 방향 바꾸기",
-      "tool_snippet": "스니펫",
-      "tool_read_image": "읽기",
-      "tool_photo": "사진",
-      "open": "열기",
-      "read_image": "사진에서 글자 읽기",
-      "lightbox_close": "닫기",
-      "prev_day": "이전 날",
-      "next_day": "다음 날",
       "snippet_placeholder": "남겨 두고 싶은 것",
-      "palette_aria": "보드 작업",
-      "send_to_back": "맨 뒤로",
-      "ocr_wait_note": "사진의 글자를 읽고 있습니다. 큰 사진은 10초 정도 걸릴 수 있습니다."
+      "palette_aria": "보드 조작",
+      "tool_snippet": "스니펫",
+      "tool_photo": "사진"
     }
   },
   "canvas": {

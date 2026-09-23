@@ -4,6 +4,7 @@ import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BackLink } from '@/components/ui/back-link';
 import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
@@ -700,6 +701,12 @@ export function JarView({
           to { opacity: 1; }
         }
       `}</style>
+
+      {/* 左上の出口（書斎が無効なら描かれない）。瓶はヘッダーを持たないので、エントリーの
+          ヘッダー行と同じ線の隅に置く。右上の「問いの変遷」と対になる。
+          **発酵履歴を開いている間は出さない。** 履歴は同じ左上に自分の「‹ 瓶にもどる」を
+          持つので、重なるうえに戻り先が 2 つ並ぶ。履歴 → 瓶 → 書斎と一段ずつ戻す。 */}
+      {historyQuestionId === null && <BackLink placement="corner" />}
 
       {/*
         左＝キャンバス列。詳細列が開くと **覆われるのではなく狭くなる**。

@@ -115,7 +115,6 @@ export interface CanvasSurface {
   zoomOut: () => void;
   /** 等倍に戻し、`bounds` があればその中心へ寄せる。 */
   resetZoom: () => void;
-  /** `bounds`（world 矩形）が画面に収まるまでズーム。null なら等倍リセット。 */
   /**
    * 「100%」の倍率。`referenceBounds` を渡していればそれを画面に収めた倍率、無ければ 1。
    * 倍率の表示（`CanvasZoomControls`）はこれを基準に割る。
@@ -123,6 +122,7 @@ export interface CanvasSurface {
   referenceScale: number;
   /** 倍率の上限と下限（`minZoom` を渡していれば 100% が基準）。倍率の表示の押せる／押せないに使う。 */
   scaleBounds: ScaleBounds;
+  /** `bounds`（world 矩形）が画面に収まるまでズーム。null なら等倍リセット。 */
   fitTo: (bounds: Bounds | null) => void;
   /**
    * ビューポートが DOM に反映されるたびに呼ばれる購読。解除関数を返す。

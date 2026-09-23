@@ -13,11 +13,10 @@ import { COLORS } from '@/contexts/shared/infrastructure/discord-notify.js';
 // supabase-client は使われた瞬間に env チェックで throw するので mock。
 vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
   getSupabaseClient: () => ({
-    from: () => ({
-      select: () => ({
-        limit: () => Promise.resolve({ data: [], error: null }),
-      }),
-    }),
+    // 対象ユーザーの抽出は list_entry_author_ids RPC 経由（issue #621）。
+    // ここでは usecase 自体を差し替えているので実際には呼ばれないが、
+    // 実装が触る API と食い違ったままにしない。
+    rpc: () => Promise.resolve({ data: [], error: null }),
   }),
 }));
 

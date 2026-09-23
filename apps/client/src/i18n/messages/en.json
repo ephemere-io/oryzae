@@ -282,19 +282,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "Sunday",
-      "day_mon": "Monday",
-      "day_tue": "Tuesday",
-      "day_wed": "Wednesday",
-      "day_thu": "Thursday",
-      "day_fri": "Friday",
-      "day_sat": "Saturday"
-    },
     "canvas": {
       "aria_label": "Board canvas"
     },
-    "empty": "Nothing here for this period",
+    "nothing_pinned": "Nothing pinned yet",
     "lightbox": {
       "aria_label": "Photo lightbox",
       "close_aria": "Close lightbox"
@@ -345,6 +336,7 @@
       "snippet": "Create snippet",
       "photo": "Paste image",
       "aria_label_card": "Actions for the selected card",
+      "selected_count": "{count} selected",
       "bring_to_front": "Bring to front",
       "delete": "Delete",
       "open": "Open",
@@ -536,9 +528,8 @@
   },
   "photo": {
     "toolbar_button": "Photo",
-    "modal_title": "Add a photo",
-    "modal_description": "Read it as text, or attach the photo as it is.",
-    "ai_notice": "Choosing \"Read as text\" sends the photo to an AI (Claude, by Anthropic).",
+    "modal_title": "Add this photo?",
+    "ai_notice": "\"Read as text\" sends the photo to an external API.",
     "preview_alt": "Preview of the photo to add",
     "transcribe": "Read as text",
     "transcribing": "Reading…",
@@ -574,7 +565,18 @@
     "resize_se": "Drag bottom-right to resize",
     "resize_s": "Drag bottom to resize",
     "resize_sw": "Drag bottom-left to resize",
-    "resize_w": "Drag left to resize"
+    "resize_w": "Drag left to resize",
+    "size": "Size",
+    "width_small": "Small",
+    "width_medium": "Medium",
+    "width_large": "Large",
+    "align": "Align",
+    "wrap": "Text wrap",
+    "wrap_on": "On",
+    "wrap_off": "Off",
+    "align_needs_room": "A full-width photo has nothing to align to",
+    "selected": "Photo selected",
+    "choose_file": "Choose a photo"
   },
   "fermentation": {
     "detail": {
@@ -846,7 +848,7 @@
     },
     "board": {
       "cards": "{count} cards",
-      "empty": "Nothing here yet today",
+      "nothing_pinned": "Nothing pinned yet",
       "hint": "Drag cards with your finger",
       "add_snippet": "Create snippet",
       "add_photo": "Add photo",
@@ -856,18 +858,10 @@
       "cancel": "Cancel",
       "save": "Save",
       "resize": "Resize and rotate",
-      "tool_snippet": "Snippet",
-      "tool_read_image": "Read image",
-      "tool_photo": "Photo",
-      "open": "Open",
-      "read_image": "Read text from a photo",
-      "lightbox_close": "Close",
-      "prev_day": "Previous day",
-      "next_day": "Next day",
       "snippet_placeholder": "Something worth keeping",
       "palette_aria": "Board actions",
-      "send_to_back": "Send to back",
-      "ocr_wait_note": "Reading the text in the photo. Large photos can take about 10 seconds."
+      "tool_snippet": "Snippet",
+      "tool_photo": "Photo"
     }
   },
   "canvas": {

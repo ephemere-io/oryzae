@@ -92,8 +92,11 @@ const inlineImageSchema = z.object({
    */
   align: z.enum(['start', 'center', 'end']),
   /**
-   * 縦横比の上書き（block 方向 ÷ inline 方向）。辺ハンドルで自由変形したときだけ入る。
-   * 未指定なら写真本来の比率を使う（角ハンドルは比率を保つので値を書かない）。
+   * 縦横比の上書き（**幅 ÷ 高さ**。画面で見たままの形）。辺ハンドルで自由変形した
+   * ときだけ入る。未指定なら写真本来の比率を使う（角ハンドルは形を保つので書かない）。
+   *
+   * 書字方向に依らない**物理の比**で持つ。論理（block ÷ inline）で持つと、縦書きに
+   * 切り替えた瞬間に写真の形が 90 度回る（CSS の `aspect-ratio` も物理の比）。
    */
   aspect: z.number().positive().optional(),
 });
@@ -224,10 +227,6 @@ export const completeOnboardingSchema = z.object({
 });
 
 // Board schemas
-export const boardQuerySchema = z.object({
-  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
-
 export const boardCardUpdateSchema = z.object({
   cards: z.array(
     z.object({
@@ -258,8 +257,6 @@ export const boardSnippetCreateSchema = z.object({
   // 上限は定数から引く。ここに数値を直書きしていたせいで、定数だけ動かしても
   // このスキーマが 50 のまま残り、長い本文が 500 で弾かれていた。
   text: z.string().min(1).max(MAX_SNIPPET_TEXT_LENGTH),
-  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  viewType: z.enum(['daily', 'weekly']).optional(),
   x: boardWorldCoordSchema.optional(),
   y: boardWorldCoordSchema.optional(),
 });

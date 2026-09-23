@@ -3,7 +3,14 @@ import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
-import { MAX_SCALE, MIN_SCALE, screenToWorld, type Viewport } from '@/lib/canvas/viewport';
+import {
+  MAX_SCALE,
+  MIN_SCALE,
+  OVERZOOM_OUT_EVENT,
+  type OverzoomOutDetail,
+  screenToWorld,
+  type Viewport,
+} from '@/lib/canvas/viewport';
 
 // hook 単体では frame/world の ref が埋まらず、ホイール・パンのリスナが張られない。
 // 実際の配線（CanvasViewport が ref を渡す）ごと検証したいので、最小のハーネスで描画する。
@@ -827,6 +834,81 @@ describe('useCanvasViewport', () => {
 
       // 等倍・無移動なら frame 内の相対位置がそのまま world 座標。
       expect(captured).toEqual({ x: 250, y: 175 });
+    });
+  });
+
+  describe('2本指のピンチ', () => {
+    /** jsdom の PointerEvent は限定的なので、必要な値だけ持つ MouseEvent で代用する。 */
+    function pointer(type: string, id: number, x: number, y: number): Event {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
+      Object.defineProperty(event, 'pointerId', { value: id });
+      return event;
+    }
+
+    /** 2 本の指を `from` から `to` へ動かす（y は固定）。 */
+    async function pinch(from: [number, number], to: [number, number]) {
+      act(() => {
+        frameEl().dispatchEvent(pointer('pointerdown', 1, from[0], 300));
+        frameEl().dispatchEvent(pointer('pointerdown', 2, from[1], 300));
+        window.dispatchEvent(pointer('pointermove', 1, to[0], 300));
+        window.dispatchEvent(pointer('pointermove', 2, to[1], 300));
+        window.dispatchEvent(pointer('pointerup', 1, to[0], 300));
+        window.dispatchEvent(pointer('pointerup', 2, to[1], 300));
+      });
+      await flushFrame();
+    }
+
+    it('指を広げると寄る', async () => {
+      render(<Harness />);
+      stubFrameRect();
+      await flushFrame();
+
+      await pinch([300, 500], [200, 600]);
+
+      expect(readViewport().scale).toBeGreaterThan(1);
+    });
+
+    it('引き切る手前からは「書斎へ戻る」合図を流す（指でも戻れる）', async () => {
+      // 盤面がピンチを受け取るようになった途端、指では書斎へ戻れなくなっていた。
+      // 合図を出していたのがホイール（トラックパッド）の経路だけだったため。
+      render(<Harness />);
+      stubFrameRect();
+      await flushFrame();
+
+      await dispatchWheel({ deltaY: 4000, ctrlKey: true, clientX: 400, clientY: 300 });
+      expect(readViewport().scale).toBeCloseTo(MIN_SCALE, 5);
+
+      const excesses: number[] = [];
+      const onOverzoom = (event: Event) => {
+        if (!(event instanceof CustomEvent)) return;
+        const detail: OverzoomOutDetail | undefined = event.detail;
+        if (typeof detail?.excess === 'number') excesses.push(detail.excess);
+      };
+      window.addEventListener(OVERZOOM_OUT_EVENT, onOverzoom);
+      // 指を近づける＝引く
+      await pinch([200, 600], [350, 450]);
+      window.removeEventListener(OVERZOOM_OUT_EVENT, onOverzoom);
+
+      expect(excesses.length).toBeGreaterThan(0);
+      expect(excesses.every((value) => value > 0)).toBe(true);
+    });
+
+    it('寄る向きのピンチでは合図を流さない（戻る気配を出さない）', async () => {
+      render(<Harness />);
+      stubFrameRect();
+      await flushFrame();
+
+      await dispatchWheel({ deltaY: 4000, ctrlKey: true, clientX: 400, clientY: 300 });
+
+      let fired = 0;
+      const onOverzoom = () => {
+        fired += 1;
+      };
+      window.addEventListener(OVERZOOM_OUT_EVENT, onOverzoom);
+      await pinch([350, 450], [200, 600]);
+      window.removeEventListener(OVERZOOM_OUT_EVENT, onOverzoom);
+
+      expect(fired).toBe(0);
     });
   });
 });

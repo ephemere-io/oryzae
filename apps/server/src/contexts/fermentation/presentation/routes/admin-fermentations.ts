@@ -25,6 +25,7 @@ import {
   createSupabaseVerifiedEmailResolver,
 } from '../../infrastructure/email/supabase-verified-email-resolver.js';
 import { VercelAiAnalysisGateway } from '../../infrastructure/llm/vercel-ai-analysis.gateway.js';
+import { listActiveUserIds } from '../../infrastructure/repositories/supabase-active-user-ids.js';
 import { SupabaseFermentationRepository } from '../../infrastructure/repositories/supabase-fermentation.repository.js';
 import { SupabaseUserFermentationStateRepository } from '../../infrastructure/repositories/supabase-user-fermentation-state.repository.js';
 
@@ -450,12 +451,6 @@ export const adminFermentations = new Hono<Env>()
     const localeResolver = new SupabaseUserLocaleResolver(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
 
-    const listActiveUserIds = async (): Promise<string[]> => {
-      const { data, error } = await supabase.from('entries').select('user_id').limit(1000);
-      if (error) throw error;
-      return [...new Set((data ?? []).map((row: { user_id: string }) => row.user_id))];
-    };
-
     const digestUsecase = new SendFermentationDigestUsecase(
       new ResendEmailNotifier(),
       createSupabaseVerifiedEmailResolver(supabase),
@@ -471,7 +466,7 @@ export const adminFermentations = new Hono<Env>()
       localeResolver,
       llmGateway,
       () => crypto.randomUUID(),
-      listActiveUserIds,
+      () => listActiveUserIds(supabase),
       (userId, titles, language) =>
         digestUsecase.execute({ userId, questionTitles: titles, language }),
     );

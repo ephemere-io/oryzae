@@ -282,19 +282,10 @@
     }
   },
   "board": {
-    "date": {
-      "day_sun": "星期日",
-      "day_mon": "星期一",
-      "day_tue": "星期二",
-      "day_wed": "星期三",
-      "day_thu": "星期四",
-      "day_fri": "星期五",
-      "day_sat": "星期六"
-    },
     "canvas": {
       "aria_label": "看板画布"
     },
-    "empty": "此期间暂无内容",
+    "nothing_pinned": "还没有贴上任何内容",
     "lightbox": {
       "aria_label": "照片灯箱",
       "close_aria": "关闭灯箱"
@@ -345,6 +336,7 @@
       "snippet": "创建摘录",
       "photo": "粘贴图片",
       "aria_label_card": "所选卡片的操作",
+      "selected_count": "{count}张",
       "bring_to_front": "移到最前",
       "delete": "删除",
       "open": "打开",
@@ -536,9 +528,8 @@
   },
   "photo": {
     "toolbar_button": "照片",
-    "modal_title": "导入照片",
-    "modal_description": "可以识别为文字，也可以直接作为照片附上。",
-    "ai_notice": "选择「识别为文字」时，照片会发送给 AI（Anthropic 的 Claude）。",
+    "modal_title": "要添加这张照片吗？",
+    "ai_notice": "选择「读取为文字」会把照片发送到外部 API。",
     "preview_alt": "待导入照片的预览",
     "transcribe": "识别为文字",
     "transcribing": "识别中…",
@@ -574,7 +565,18 @@
     "resize_se": "拖动右下角调整大小",
     "resize_s": "拖动下边调整大小",
     "resize_sw": "拖动左下角调整大小",
-    "resize_w": "拖动左边调整大小"
+    "resize_w": "拖动左边调整大小",
+    "size": "尺寸",
+    "width_small": "小",
+    "width_medium": "中",
+    "width_large": "大",
+    "align": "对齐",
+    "wrap": "文字环绕",
+    "wrap_on": "开",
+    "wrap_off": "关",
+    "align_needs_room": "整行宽度时无法对齐",
+    "selected": "已选中照片",
+    "choose_file": "选择照片"
   },
   "fermentation": {
     "detail": {
@@ -846,7 +848,7 @@
     },
     "board": {
       "cards": "{count}张",
-      "empty": "今天还没有任何内容",
+      "nothing_pinned": "还没有贴上任何内容",
       "hint": "可以用手指拖动卡片",
       "add_snippet": "创建摘录",
       "add_photo": "添加照片",
@@ -856,18 +858,10 @@
       "cancel": "取消",
       "save": "保存",
       "resize": "改变大小和方向",
-      "tool_snippet": "摘录",
-      "tool_read_image": "识别",
-      "tool_photo": "照片",
-      "open": "打开",
-      "read_image": "从照片识别文字",
-      "lightbox_close": "关闭",
-      "prev_day": "前一天",
-      "next_day": "后一天",
       "snippet_placeholder": "想留下的话",
       "palette_aria": "看板操作",
-      "send_to_back": "置于底层",
-      "ocr_wait_note": "正在读取照片中的文字。大图可能需要约 10 秒。"
+      "tool_snippet": "摘录",
+      "tool_photo": "照片"
     }
   },
   "canvas": {
