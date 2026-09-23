@@ -1,7 +1,6 @@
 export {
   ACCEPTED_IMAGE_MIME_TYPES,
   BOARD_CARD_TYPES,
-  BOARD_VIEW_TYPES,
   ENTRY_PHOTO_MAX_EDGE_PX,
   INLINE_IMAGE_PLACEHOLDER,
   MAX_CONTENT_LENGTH,
@@ -17,7 +16,6 @@ export {
 } from './constants.js';
 export {
   boardCardUpdateSchema,
-  boardQuerySchema,
   boardSnippetCreateSchema,
   boardSnippetUpdateSchema,
   changeEmailSchema,

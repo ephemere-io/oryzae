@@ -443,7 +443,7 @@ export function SpEntryEditor({
           ref={fileInputRef}
           type="file"
           accept={ACCEPTED_IMAGE_MIME_TYPES.join(',')}
-          aria-label={tPhoto('modal_title')}
+          aria-label={tPhoto('choose_file')}
           tabIndex={-1}
           className="hidden"
           onChange={(e) => {

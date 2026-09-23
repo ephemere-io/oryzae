@@ -24,7 +24,7 @@ interface Props {
   onCreateSnippet: () => void;
   onReadImage: () => void;
   onAddPhoto: () => void;
-  selection: { cardType: 'snippet' | 'photo' } | null;
+  selection: { count: number; cardType: 'snippet' | 'photo' | null } | null;
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
   onDeleteSelected: () => void;
@@ -97,13 +97,20 @@ registerUnit<Props>({
       id: 'snippet-selected',
       probe: true,
       description: 'Probe: スニペットカードを選ぶと、作成系が消えてカードの操作に入れ替わる',
-      props: { ...base, selection: { cardType: 'snippet' } },
+      props: { ...base, selection: { count: 1, cardType: 'snippet' } },
     },
     {
       id: 'photo-selected',
       probe: true,
       description: 'Probe: 写真カードを選んだとき（文言はスニペットと同じ）',
-      props: { ...base, selection: { cardType: 'photo' } },
+      props: { ...base, selection: { count: 1, cardType: 'photo' } },
+    },
+    {
+      id: 'multiple-selected',
+      probe: true,
+      description:
+        'Probe: 複数選んでいるとき。「開く」は出さず（一度には開けない）、何枚に効くかを見せる',
+      props: { ...base, selection: { count: 3, cardType: null } },
     },
   ],
   invariants: [
@@ -145,10 +152,27 @@ registerUnit<Props>({
         if (!props.selection) return true;
         const ids = toolIds(root);
         const actions = actionIds(root);
-        const expected = 'delete,front,open';
+        // 複数選んでいるときは「開く」を出さない（複数のカードを同時には開けない）。
+        const expected = props.selection.count > 1 ? 'delete,front' : 'delete,front,open';
         return (
           (actions.join(',') === expected && ids.length === 0) ||
           `選択モードの構造が崩れている: actions=[${actions.join(', ')}] tools=[${ids.join(', ')}]`
+        );
+      },
+    },
+    {
+      id: 'count-is-shown-when-multiple',
+      description: '複数選んでいるときは、何枚に効くのかを押す前に見せる',
+      check: ({ root, props }) => {
+        if (!props.selection) return true;
+        const badge = root.querySelector('[data-verify-part="selected-count"]');
+        const multiple = props.selection.count > 1;
+        if (!multiple) return badge === null || '1 枚なのに枚数が出ている';
+        if (badge === null) return '複数選んでいるのに枚数が出ていない';
+        const shown = badge.textContent ?? '';
+        return (
+          shown.includes(String(props.selection.count)) ||
+          `枚数の表示「${shown}」に ${props.selection.count} が入っていない`
         );
       },
     },

@@ -12,6 +12,7 @@
 
 import { registerBuiltinVerifiers } from '@oryzae/verify';
 // 実 feature のユニット
+import '@/components/ui/back-link.verify';
 import '@/components/ui/help-hint.verify';
 import '@/components/ui/menu.verify';
 import '@/components/ui/nav-row.verify';
@@ -37,6 +38,7 @@ import '@/features/pc/entries/components/entry-card.verify';
 import '@/features/pc/entries/components/entry-kebab-menu.verify';
 import '@/features/pc/entries/components/entry-list.verify';
 import '@/features/pc/entries/components/fermentation-sidebar.verify';
+import '@/features/pc/entries/components/inline-image-drop-indicator.verify';
 import '@/features/pc/entries/components/inline-image-overlay.verify';
 import '@/features/pc/entries/components/leave-confirm-modal.verify';
 import '@/features/pc/entries/components/link-question-nudge-modal.verify';
@@ -50,12 +52,11 @@ import '@/features/pc/entries/components/save-transition.verify';
 import '@/features/pc/entries/components/settings-drawer.verify';
 import '@/features/pc/board/components/board-card.verify';
 import '@/features/pc/board/components/card-text-glyph.verify';
-import '@/features/pc/board/components/board-date-nav.verify';
 import '@/features/pc/board/components/board-toolbar.verify';
-import '@/features/pc/board/components/board-view-switch.verify';
 import '@/features/pc/board/components/photo-card-content.verify';
 import '@/features/pc/board/components/photo-dialog.verify';
 import '@/features/pc/board/components/snippet-card-content.verify';
+import '@/features/pc/board/components/selection-frame.verify';
 import '@/features/pc/board/components/snippet-dialog.verify';
 import '@/features/pc/fermentation/components/draggable-jar-element.verify';
 import '@/features/pc/fermentation/components/fermentation-cover-flow.verify';

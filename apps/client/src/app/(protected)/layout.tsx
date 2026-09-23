@@ -1,7 +1,8 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { useEffect, useMemo, useState } from 'react';
 import { DesktopOnlyOverlay } from '@/components/desktop-only-overlay';
 import { PageFooter } from '@/components/ui/page-footer';
 import { HelpSidebar } from '@/features/pc/help/components/help-sidebar';
@@ -11,17 +12,15 @@ import { useUnreadLetters } from '@/features/shared/fermentation/hooks/use-unrea
 import { HelpToggle } from '@/features/shared/help/components/help-toggle';
 import { HelpWelcomeGate } from '@/features/shared/help/components/help-welcome-gate';
 import { HelpProvider } from '@/features/shared/help/help-context';
-import {
-  BackToStudy,
-  STUDY_EXIT_BAND,
-  STUDY_EXIT_RESERVE,
-} from '@/features/shared/study/components/back-to-study';
+import { BackToStudy, STUDY_EXIT_BAND } from '@/features/shared/study/components/back-to-study';
 import { PullBackToStudy } from '@/features/shared/study/components/pull-back-to-study';
 import { QuestionsLink } from '@/features/shared/study/components/questions-link';
+import { StudyIcon } from '@/features/shared/study/components/study-icon';
 import { useStudyHome } from '@/features/shared/study/hooks/use-study-home-flag';
 import { SpHelpSheet } from '@/features/sp/help/components/sp-help-sheet';
 import { SpBottomNav } from '@/features/sp/navigation/components/sp-bottom-nav';
 import { useAuth } from '@/lib/auth-context';
+import { BackLinkProvider } from '@/lib/back-link-context';
 import { SidebarProvider } from '@/lib/sidebar-context';
 import { ThemeProvider } from '@/lib/theme-context';
 import { UnreadProvider } from '@/lib/unread-context';
@@ -42,20 +41,17 @@ function PcShell({
   children,
   studyHome,
   onStudy,
-  exitTab,
 }: {
   children: React.ReactNode;
   /** 書斎が唯一のグローバルナビか。真なら左サイドバーを描かない。 */
   studyHome: boolean;
   /** いま書斎ホームそのものか。真ならフッターも外す。 */
   onStudy: boolean;
-  /** 上端に「書斎へ戻る」のタブが掛かっているか。真なら画面は中央だけを空ける。 */
-  exitTab: boolean;
 }) {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* 書斎が有効な間は左サイドバーを描かない。行き先は 3D の物そのものが持ち、
-          サブ画面からの戻り道は左上のマークが担う。 */}
+          サブ画面からの戻り道は各画面の左上の「‹ 書斎」（BackLink）が担う。 */}
       {!studyHome && <Sidebar />}
       {/* 左余白は CSS 変数（--sidebar-width）が配る。サイドバー本体・本文・エディタが
           同じ1本を見るので、掴んで引いても3者が同じフレームで動く。 */}
@@ -65,11 +61,8 @@ function PcShell({
         // 変数は SidebarProvider が :root へ書くので、描かなくても 80px のまま残る。
         // margin だけ外して変数を残すと、これを読んでいるボードのツールバーと
         // エディタの左端だけが 80px ずれる。
-        style={shellStyle(studyHome, exitTab)}
+        style={shellStyle(studyHome)}
       >
-        {/* PC は画面を下げない。「設定・日付・問いの行をただ下にずらしただけ」と
-            報告された（実機レビュー）。タブは中央にしか高さを持たないので、画面は
-            中央を空けておけば足りる（`--study-exit-reserve`）。 */}
         <div className="relative flex-1 overflow-auto">{children}</div>
         {/* 書斎は全画面の一枚絵。下にフッターが挟まると机の手前が切れる。 */}
         {!onStudy && <PageFooter />}
@@ -85,17 +78,11 @@ function PcShell({
 /**
  * `<main>` が配る CSS 変数。
  *
- * - `--sidebar-width`: サイドバーを描かない間は 0（`SidebarProvider` が :root に
- *   書いた 80px が残ると、これを読んでいるボードのツールバーとエディタの左端だけずれる）
- * - `--study-exit-reserve`: 上端の中央に空けておく幅。「書斎へ戻る」のタブが掛かる席で、
- *   **画面は下がらない**。いま読むのはエントリーのヘッダー（3 列の真ん中）だけで、
- *   他の画面は元から中央を使っていない
+ * `--sidebar-width`: サイドバーを描かない間は 0（`SidebarProvider` が :root に
+ * 書いた 80px が残ると、これを読んでいるボードのツールバーとエディタの左端だけずれる）。
  */
-function shellStyle(studyHome: boolean, exitTab: boolean): MainStyle {
-  return {
-    ...(studyHome ? { '--sidebar-width': '0px' } : {}),
-    '--study-exit-reserve': exitTab ? `${STUDY_EXIT_RESERVE}px` : '0px',
-  };
+function shellStyle(studyHome: boolean): MainStyle {
+  return studyHome ? { '--sidebar-width': '0px' } : {};
 }
 
 /**
@@ -127,8 +114,25 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // 後戻りできない判断はしていない）。env で on にしている環境では初回から true。
   const { enabled: studyHome } = useStudyHome();
   const onStudy = studyHome && pathname === STUDY_PATH;
-  // 書斎が有効な間、サブ画面の左上にはマークが「書斎へ戻る」として浮く。
+  // 書斎が有効な間のサブ画面には、書斎へ戻る道を出す。
   const showBackToStudy = studyHome && pathname !== STUDY_PATH;
+  const tStudy = useTranslations('study');
+  /**
+   * PC の戻る道の行き先。**置くのは各画面**（ヘッダーの先頭の `BackLink`）で、ここは
+   * 行き先を配るだけ。null の間（書斎そのもの・書斎が無効）はどの画面にも出ない。
+   */
+  const backLink = useMemo(
+    () =>
+      showBackToStudy
+        ? {
+            href: STUDY_PATH,
+            label: tStudy('title'),
+            ariaLabel: tStudy('back_to_study'),
+            icon: <StudyIcon />,
+          }
+        : null,
+    [showBackToStudy, tStudy],
+  );
   /**
    * 「問いの変遷」への導線を出すか。
    *
@@ -167,7 +171,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // loading.tsx が出番を持たないため、最初に見えるのはこの1枚だけになる。
   // 保護ルート全体で1枚を使い回していた頃は、/jar や /board を直接開いても一覧の枠が出て、
   // 読み込み完了時に画面が丸ごと入れ替わっていた。
-  const content = mounted ? children : <RouteLoading />;
+  const content = (
+    // 戻る道の行き先は画面の中身にだけ配る（置くのは各画面のヘッダー）。
+    <BackLinkProvider value={backLink}>{mounted ? children : <RouteLoading />}</BackLinkProvider>
+  );
 
   return (
     <ThemeProvider>
@@ -205,11 +212,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                 <SpHelpSheet />
               </div>
             ) : device === 'pc' ? (
-              <PcShell studyHome={studyHome} onStudy={onStudy} exitTab={showBackToStudy}>
+              <PcShell studyHome={studyHome} onStudy={onStudy}>
                 {content}
               </PcShell>
             ) : null}
-            {device !== null && showBackToStudy && <BackToStudy />}
+            {/* SP はまだ上端の中央から垂れるタブ。PC は各画面の左上の BackLink が担う。 */}
+            {device === 'sp' && showBackToStudy && <BackToStudy />}
             {/* 引き切ったキャンバスからさらに引くと、部屋が滲み出て書斎へ戻る。
               板と瓶（キャンバスを持つ画面）で効く。重ねるのがここなのは、画面そのものに
               触れずに済ませるため。 */}

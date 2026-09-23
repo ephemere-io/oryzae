@@ -2,7 +2,15 @@
 
 import { useTranslations } from 'next-intl';
 import { FloatingPalette } from '@/components/ui/floating-palette';
-import { HOVER_CLASS, ICON_STROKE_WIDTH, TOOL_BUTTON_CLASS } from '@/components/ui/surface';
+import {
+  BringToFrontIcon,
+  OpenIcon,
+  PhotoIcon,
+  ScanTextIcon,
+  SnippetIcon,
+  TrashIcon,
+} from '@/components/ui/palette-icons';
+import { HOVER_CLASS, TOOL_BUTTON_CLASS } from '@/components/ui/surface';
 import { BOARD_INSET } from './board-surface';
 
 /** ツールバーで選べる道具。'none' はどのダイアログも開いていない状態。 */
@@ -14,8 +22,12 @@ interface BoardToolbarProps {
   /** 画像から文字を読み取ってスニペットにする。作成ダイアログを画像タブで開く。 */
   onReadImage: () => void;
   onAddPhoto: () => void;
-  /** 選択中のカード。null なら作成系の道具を出す。 */
-  selection: { cardType: 'snippet' | 'photo' } | null;
+  /**
+   * 選択中のカード。null なら作成系の道具を出す。
+   * `count` が 2 以上のときは「開く」を出さない（複数を一度には開けない）。
+   * `cardType` は 1 枚のときだけ意味を持つ。
+   */
+  selection: { count: number; cardType: 'snippet' | 'photo' | null } | null;
   onOpenSelected: () => void;
   onBringSelectedToFront: () => void;
   onDeleteSelected: () => void;
@@ -35,78 +47,8 @@ const STORAGE = {
   collapsed: 'oryzae-board-toolbar-collapsed',
 } as const;
 
-// アイコンの寸法は面の大きさの段に従う（エントリーの操作パレットと同じ）。
-// aria-hidden は各 <svg> に直接書く。スプレッドに含めると a11y lint が見抜けない。
-function iconProps(size: number) {
-  return {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: ICON_STROKE_WIDTH,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
-  } as const;
-}
-
-function SnippetIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
-function PhotoIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <polyline points="21 15 16 10 5 21" />
-    </svg>
-  );
-}
-
-/** 画像から文字を読み取る。枠の中に字がある形で「写真そのもの」と区別する。 */
-function ScanTextIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M3 8V5a2 2 0 0 1 2-2h3" />
-      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-      <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
-      <path d="M7 10h10M7 14h6" />
-    </svg>
-  );
-}
-
-function OpenIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M7 17 17 7" />
-      <path d="M9 7h8v8" />
-    </svg>
-  );
-}
-
-function FrontIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M12 3 3 8l9 5 9-5-9-5Z" />
-      <path d="m3 14 9 5 9-5" />
-    </svg>
-  );
-}
-
-function TrashIcon({ size }: { size: number }) {
-  return (
-    <svg {...iconProps(size)} aria-hidden="true">
-      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
-    </svg>
-  );
-}
+// アイコンは `components/ui/palette-icons` に置いてある（SP の道具の列と同じ絵を使う。
+// reach をまたいで import できないので、絵そのものは端末非依存の場所に置く）。
 
 /**
  * ボードの道具箱。**面そのものはエントリーの操作パレットと同じ `FloatingPalette`。**
@@ -162,20 +104,29 @@ export function BoardToolbar({
   // カードを選んでいる間は、作る道具ではなく「そのカードにできること」を出す。
   // 操作の名前は種別で変えない。同じ形の操作に別々の言葉を当てると、
   // 「これは違う何かなのでは」と読ませてしまう。
+  const multiple = (selection?.count ?? 0) > 1;
+
   const cardActions = selection
     ? [
-        {
-          id: 'open' as const,
-          label: t('open'),
-          onSelect: onOpenSelected,
-          icon: (size: number) => <OpenIcon size={size} />,
-          danger: false,
-        },
+        // 「開く」だけは 1 枚のときにしか意味がない（複数のカードを同時には開けない）。
+        // 押せないボタンを灰色で残すのではなく、**出さない**。押せるのに何も起きない
+        // ボタンは、押してみるまで理由が分からない。
+        ...(multiple
+          ? []
+          : [
+              {
+                id: 'open' as const,
+                label: t('open'),
+                onSelect: onOpenSelected,
+                icon: (size: number) => <OpenIcon size={size} />,
+                danger: false,
+              },
+            ]),
         {
           id: 'front' as const,
           label: t('bring_to_front'),
           onSelect: onBringSelectedToFront,
-          icon: (size: number) => <FrontIcon size={size} />,
+          icon: (size: number) => <BringToFrontIcon size={size} />,
           danger: false,
         },
         {
@@ -195,6 +146,7 @@ export function BoardToolbar({
         activeTool,
         mode: selection ? 'card' : 'create',
         selectedType: selection?.cardType ?? 'none',
+        selectedCount: selection?.count ?? 0,
         toolCount: selection ? cardActions.length : tools.length,
       }}
       help="board"
@@ -208,8 +160,19 @@ export function BoardToolbar({
       isolateEvents
     >
       {({ scale, consumeMoved }) =>
-        selection
-          ? cardActions.map((action) => (
+        selection ? (
+          <>
+            {/* 何枚に効くのかを、押す前に見せる。 */}
+            {multiple && (
+              <span
+                data-verify-part="selected-count"
+                className="flex shrink-0 items-center px-2 text-[11px] tabular-nums"
+                style={{ color: 'var(--date-color)' }}
+              >
+                {t('selected_count', { count: selection.count })}
+              </span>
+            )}
+            {cardActions.map((action) => (
               <button
                 key={action.id}
                 type="button"
@@ -228,56 +191,59 @@ export function BoardToolbar({
                 {action.icon(scale.icon)}
                 {action.label}
               </button>
-            ))
-          : tools.map((tool) => {
-              const isActive = activeTool === tool.id;
-              return (
-                <div key={tool.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (consumeMoved()) return;
-                      tool.onSelect();
-                    }}
-                    aria-label={`${tool.label} (${tool.shortcut})`}
-                    aria-pressed={isActive}
-                    data-verify-tool={tool.id}
-                    // 非アクティブ時は背景をインラインで指定しない。インライン style は
-                    // CSS の :hover に必ず勝つため、指定すると hover が効かなくなる。
-                    className={`${TOOL_BUTTON_CLASS} ${isActive ? '' : HOVER_CLASS}`}
-                    style={{
-                      height: scale.button,
-                      width: scale.button,
-                      borderRadius: scale.buttonRadius,
-                      ...(isActive
-                        ? { backgroundColor: 'var(--accent)', color: '#fff' }
-                        : { color: 'var(--fg)' }),
-                    }}
-                  >
-                    {tool.icon(scale.icon)}
-                  </button>
+            ))}
+          </>
+        ) : (
+          tools.map((tool) => {
+            const isActive = activeTool === tool.id;
+            return (
+              <div key={tool.id} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (consumeMoved()) return;
+                    tool.onSelect();
+                  }}
+                  aria-label={`${tool.label} (${tool.shortcut})`}
+                  aria-pressed={isActive}
+                  data-verify-tool={tool.id}
+                  // 非アクティブ時は背景をインラインで指定しない。インライン style は
+                  // CSS の :hover に必ず勝つため、指定すると hover が効かなくなる。
+                  className={`${TOOL_BUTTON_CLASS} ${isActive ? '' : HOVER_CLASS}`}
+                  style={{
+                    height: scale.button,
+                    width: scale.button,
+                    borderRadius: scale.buttonRadius,
+                    ...(isActive
+                      ? { backgroundColor: 'var(--accent)', color: '#fff' }
+                      : { color: 'var(--fg)' }),
+                  }}
+                >
+                  {tool.icon(scale.icon)}
+                </button>
 
-                  {/* ツールチップ（ラベル＋ショートカット）。常に DOM には置き、hover でだけ
+                {/* ツールチップ（ラベル＋ショートカット）。常に DOM には置き、hover でだけ
                       見せる（描画契約として検証できるようにするため）。aria-hidden なのは、
                       同じ文言をボタンの aria-label が既に持っており、読み上げが二重になるため。 */}
-                  <span
-                    aria-hidden="true"
-                    data-verify-tooltip={tool.id}
-                    className="pointer-events-none absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ backgroundColor: 'var(--fg)', color: 'var(--bg)' }}
+                <span
+                  aria-hidden="true"
+                  data-verify-tooltip={tool.id}
+                  className="pointer-events-none absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{ backgroundColor: 'var(--fg)', color: 'var(--bg)' }}
+                >
+                  {tool.label}
+                  {/* キーであることが形で分かるように枠で囲う。 */}
+                  <kbd
+                    className="rounded border px-1 font-sans text-[10px] leading-[1.4]"
+                    style={{ borderColor: 'currentColor', opacity: 0.55 }}
                   >
-                    {tool.label}
-                    {/* キーであることが形で分かるように枠で囲う。 */}
-                    <kbd
-                      className="rounded border px-1 font-sans text-[10px] leading-[1.4]"
-                      style={{ borderColor: 'currentColor', opacity: 0.55 }}
-                    >
-                      {tool.shortcut}
-                    </kbd>
-                  </span>
-                </div>
-              );
-            })
+                    {tool.shortcut}
+                  </kbd>
+                </span>
+              </div>
+            );
+          })
+        )
       }
     </FloatingPalette>
   );

@@ -40,7 +40,11 @@ registerUnit<Props>({
   kind: 'component',
   render: (props) => <HelpIllustration {...props} />,
   fixtures: [
-    ...KINDS.map((kind) => ({ id: kind, description: `${kind} の線画`, props: { kind } })),
+    ...KINDS.map((kind) => ({
+      id: kind,
+      description: kind === 'room' ? '書斎 — 「‹ 書斎」のボタンと同じ記号' : `${kind} の線画`,
+      props: { kind },
+    })),
     {
       id: 'small',
       probe: true,
@@ -75,8 +79,14 @@ registerUnit<Props>({
       id: 'aspect',
       description: '高さは幅の 3/4（箱は 72 × 54）',
       check: ({ root, props }) => {
-        const svg = root.querySelector('svg');
         const size = props.size ?? 72;
+        // 書斎（room）は「‹ 書斎」と同じ正方形の記号を 3:4 の箱の中央に置く。箱で見る。
+        if (props.kind === 'room') {
+          const box = root.querySelector<HTMLElement>('[data-verify-unit="HelpIllustration"]');
+          const height = Number.parseFloat(box?.style.height ?? '');
+          return Math.abs(height - (size * 3) / 4) < 0.01 || `box height=${height}, size=${size}`;
+        }
+        const svg = root.querySelector('svg');
         const height = Number(svg?.getAttribute('height'));
         return Math.abs(height - (size * 54) / 72) < 0.01 || `height=${height}, size=${size}`;
       },

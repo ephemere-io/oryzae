@@ -1,5 +1,6 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { ICON_STROKE_WIDTH } from '@/components/ui/surface';
+import { StudyIcon } from '@/features/shared/study/components/study-icon';
 import type { HelpIllustrationKind } from '../types';
 
 /**
@@ -39,6 +40,19 @@ export function HelpIllustration({
   /** 幅（px）。高さは 3:4 の比で決まる。 */
   size?: number;
 }) {
+  // 書斎は「‹ 書斎」のボタンと同じ記号（`StudyIcon`）。面の頭と戻るボタンで絵が違うと、
+  // 同じ部屋に見えない。箱は 3:4 のまま、記号を中央に置く。
+  if (kind === 'room') {
+    return (
+      <span
+        {...verifyAttrs({ unit: 'HelpIllustration', kind })}
+        className="inline-flex items-center justify-center"
+        style={{ width: size, height: (size * 3) / 4 }}
+      >
+        <StudyIcon size={Math.round(size * 0.62)} />
+      </span>
+    );
+  }
   return (
     <svg
       aria-hidden="true"

@@ -252,11 +252,11 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .is('read_at', null)
       .select('id');
     if (error) {
-      // migration 00025（read_at）が DB にまだ当たっていない間は、既読を残せないだけ
+      // migration 00027（read_at）が DB にまだ当たっていない間は、既読を残せないだけ
       // （client は localStorage で既読を持っている）。500 と Sentry を毎回積まない。
       if (error.code === '42703' || error.message.includes('read_at')) {
         console.warn(
-          '[fermentations/read] fermentation_results.read_at が無い（migration 00025 未適用）',
+          '[fermentations/read] fermentation_results.read_at が無い（migration 00027 未適用）',
         );
         return 0;
       }

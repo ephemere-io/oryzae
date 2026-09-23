@@ -13,9 +13,16 @@ interface MinimapItem extends Bounds {
 interface CanvasMinimapProps {
   canvas: CanvasSurface;
   items: readonly MinimapItem[];
-  /** 中身が無くても必ず含める範囲（瓶の world 箱など）。 */
+  /** 中身が無くても必ず含める範囲（瓶の世界の箱など）。 */
   extent?: Bounds | null;
   ariaLabel: string;
+  /**
+   * 俯瞰の大きさ（px）。既定は PC の寸法。
+   *
+   * スマホでは盤面そのものが 390px しかないので、同じ大きさだと画面の 4 割を
+   * 俯瞰が占めてしまう（実機レビュー: 「もう少し小さく」）。
+   */
+  size?: { width: number; height: number };
 }
 
 const MINIMAP_WIDTH = 148;
@@ -63,7 +70,13 @@ function expand(bounds: Bounds, ratio: number): Bounds {
  * SVG の `viewBox` を world 座標そのものにしているので、中身の矩形は world 座標のまま
  * 置くだけでよく、毎フレーム書き換えるのは viewBox と可視範囲の2つだけで済む。
  */
-export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinimapProps) {
+export function CanvasMinimap({
+  canvas,
+  items,
+  extent,
+  ariaLabel,
+  size = { width: MINIMAP_WIDTH, height: MINIMAP_HEIGHT },
+}: CanvasMinimapProps) {
   const { subscribe, frameSize } = canvas;
   const svgRef = useRef<SVGSVGElement | null>(null);
   const viewRectRef = useRef<SVGRectElement | null>(null);
@@ -133,8 +146,8 @@ export function CanvasMinimap({ canvas, items, extent, ariaLabel }: CanvasMinima
       aria-label={ariaLabel}
       className="pointer-events-none absolute bottom-4 right-4 z-20 overflow-hidden rounded"
       style={{
-        width: MINIMAP_WIDTH,
-        height: MINIMAP_HEIGHT,
+        width: size.width,
+        height: size.height,
         border: '1px solid var(--border-subtle)',
         backgroundColor: 'var(--bg)',
         opacity: 0.95,

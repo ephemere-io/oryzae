@@ -441,3 +441,14 @@ html[data-tutorial-step="pickle"] [data-tutorial="pickle"] {
     animation: none;
   }
 }
+
+/* 本文に置いた写真。**掴んで動かせること**を手の形で言う。
+   掴んでいるあいだは薄くして、いま運んでいる途中だと分かるようにする。 */
+img.inline-photo {
+  cursor: grab;
+}
+
+img.inline-photo[data-dragging] {
+  cursor: grabbing;
+  opacity: 0.45;
+}

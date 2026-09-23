@@ -32,11 +32,11 @@ registerUnit<Record<string, never>>({
     },
     {
       id: 'keeps-the-left-seat-free',
-      description: '左上は「書斎へ戻る」の席なので、そこに置かない',
+      description: '左上は「‹ 書斎」（BackLink）の席なので、そこに置かない',
       check: ({ root }) => {
         const link = root.querySelector('a');
         const className = link?.className ?? '';
-        if (className.includes('left-6')) return '左上（書斎へ戻るの席）に重なっている';
+        if (className.includes('left-6')) return '左上（‹ 書斎の席）に重なっている';
         // 右端はヘルプの面（`--help-width`）のぶん内側に置く。面の下に潜らないため。
         const right = link?.style.right ?? '';
         return right.includes('--help-width') || `右上（ヘルプの面を避けた位置）に無い: "${right}"`;
@@ -44,11 +44,11 @@ registerUnit<Record<string, never>>({
     },
     {
       id: 'sits-with-the-back-mark',
-      description: '「書斎へ戻る」と同じ層（エディタに潜らず、モーダルより前に出ない）',
+      description: '瓶の左上の「‹ 書斎」と同じ層（エディタに潜らず、モーダルより前に出ない）',
       check: ({ root }) => {
         const link = root.querySelector('a');
         const className = link?.className ?? '';
-        return className.includes('z-[55]') || 'BackToStudy と重なり順が揃っていない';
+        return className.includes('z-[55]') || 'BackLink（左上）と重なり順が揃っていない';
       },
     },
     {

@@ -37,7 +37,7 @@ describe('SupabaseUserActivityStatsRepository.hasReadLetter', () => {
     expect(await repo.hasReadLetter('u1')).toBe(false);
   });
 
-  it('read_at のカラムがまだ無い（migration 00025 未適用）なら、投げずに false に倒して warn', async () => {
+  it('read_at のカラムがまだ無い（migration 00027 未適用）なら、投げずに false に倒して warn', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const repo = new SupabaseUserActivityStatsRepository(
       stubClient({

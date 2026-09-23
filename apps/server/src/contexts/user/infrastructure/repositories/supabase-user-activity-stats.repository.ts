@@ -56,7 +56,7 @@ export class SupabaseUserActivityStatsRepository implements UserActivityStatsRep
 
   async hasReadLetter(userId: string): Promise<boolean> {
     // 既読は fermentation_results.read_at に残る（POST /api/v1/fermentations/read が書く。
-    // migration 00025）。届いただけの手紙は数えない — 五歩の ⑤ は「読んだか」。
+    // migration 00027）。届いただけの手紙は数えない — 五歩の ⑤ は「読んだか」。
     const { data, error } = await this.supabase
       .from('fermentation_results')
       .select('id')
@@ -64,11 +64,11 @@ export class SupabaseUserActivityStatsRepository implements UserActivityStatsRep
       .not('read_at', 'is', null)
       .limit(1);
     if (error) {
-      // migration 00025 が DB にまだ当たっていない間だけ、「未読」に倒す。users/me は書斎の
+      // migration 00027 が DB にまだ当たっていない間だけ、「未読」に倒す。users/me は書斎の
       // 入口で毎回呼ばれるので、旗 1 つのために 500 にしない。他の失敗はそのまま投げる
       // （どのカラムがどう違ったかが分かる例外にしておく）。
       if (isUndefinedColumn(error)) {
-        console.warn('[users/me] fermentation_results.read_at が無い（migration 00025 未適用）');
+        console.warn('[users/me] fermentation_results.read_at が無い（migration 00027 未適用）');
         return false;
       }
       throw error;

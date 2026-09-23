@@ -2,7 +2,8 @@
  * BoardCard の検証スペック（A 移植）。
  * ボード上のカード（snippet / photo）。状態はすべて props 由来で
  * useState を持たない純表示部品のため、act ではなく prop 駆動の fixture で検証する。
- * 選択時のみハンドル（削除ボタン・回転スライダー）が出ることを契約↔DOM 一致で確認。
+ * 選択時のみハンドル（回転スライダー・4 隅のつまみ）が出ることを契約↔DOM 一致で確認。
+ * 削除は道具箱の 1 か所に寄せたので、カードの上には出さない。
  * getBoundingClientRect は回転ハンドルの onPointerDown 内のみで描画経路に無いため
  * jsdom でも静的マウントは安全（回転を発火する fixture は書かない）。
  */
@@ -16,8 +17,9 @@ interface Props {
   card: BoardCardData;
   detail?: 'block' | 'title' | 'full';
   isSelected: boolean;
+  showHandles: boolean;
   isDragging: boolean;
-  onPointerDown: (cardId: string, x: number, y: number) => void;
+  onPointerDown: (cardId: string, x: number, y: number, additive: boolean) => void;
   onRotateStart: (
     cardId: string,
     centerX: number,
@@ -26,7 +28,6 @@ interface Props {
     pointerY: number,
   ) => void;
   onResizeStart: (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', x: number, y: number) => void;
-  onDelete: (cardId: string) => void;
   onClick: (card: BoardCardData) => void;
 }
 
@@ -36,7 +37,6 @@ const baseCallbacks = {
   onPointerDown: noop,
   onRotateStart: noop,
   onResizeStart: noop,
-  onDelete: noop,
   onClick: noop,
 };
 
@@ -83,12 +83,24 @@ registerUnit<Props>({
     {
       id: 'snippet-unselected',
       description: 'スニペットカード・未選択',
-      props: { card: snippetCard, isSelected: false, isDragging: false, ...baseCallbacks },
+      props: {
+        card: snippetCard,
+        isSelected: false,
+        showHandles: false,
+        isDragging: false,
+        ...baseCallbacks,
+      },
     },
     {
       id: 'photo-selected',
       description: '写真カード・選択中（ハンドル表示・回転 +12deg）',
-      props: { card: photoCard, isSelected: true, isDragging: false, ...baseCallbacks },
+      props: {
+        card: photoCard,
+        isSelected: true,
+        showHandles: true,
+        isDragging: false,
+        ...baseCallbacks,
+      },
     },
     {
       id: 'photo-block-detail',
@@ -98,6 +110,7 @@ registerUnit<Props>({
         card: photoCard,
         detail: 'block',
         isSelected: false,
+        showHandles: false,
         isDragging: false,
         ...baseCallbacks,
       },
@@ -109,6 +122,7 @@ registerUnit<Props>({
         card: snippetCard,
         detail: 'block',
         isSelected: false,
+        showHandles: false,
         isDragging: false,
         ...baseCallbacks,
       },
@@ -122,6 +136,7 @@ registerUnit<Props>({
         card: snippetCard,
         detail: 'title',
         isSelected: false,
+        showHandles: false,
         isDragging: false,
         ...baseCallbacks,
       },
@@ -134,6 +149,20 @@ registerUnit<Props>({
         card: photoCard,
         detail: 'title',
         isSelected: false,
+        showHandles: false,
+        isDragging: false,
+        ...baseCallbacks,
+      },
+    },
+    {
+      id: 'selected-in-group',
+      probe: true,
+      description:
+        'Probe: 複数選択の 1 枚。選ばれてはいるが、つまみは群の枠に譲る（角が二重に出ない）',
+      props: {
+        card: snippetCard,
+        isSelected: true,
+        showHandles: false,
         isDragging: false,
         ...baseCallbacks,
       },
@@ -146,6 +175,7 @@ registerUnit<Props>({
       props: {
         card: { ...snippetCard, removing: true },
         isSelected: true,
+        showHandles: true,
         isDragging: true,
         ...baseCallbacks,
       },
@@ -218,17 +248,37 @@ registerUnit<Props>({
         `selected 契約不一致: props.isSelected=${props.isSelected} → contract.selected=${contract.selected}`,
     },
     {
-      id: 'handles-present-iff-selected',
-      description: '削除ボタンと回転スライダーは selected=true のときだけ描画される',
+      id: 'handles-present-iff-showhandles',
+      description: 'つまみ（回転・4 隅）は showHandles=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasDelete = Boolean(root.querySelector('[aria-label="Delete card"]'));
         const hasRotate = Boolean(root.querySelector('[role="slider"]'));
-        const expectSelected = contract.selected === 'true';
-        const handlesPresent = hasDelete && hasRotate;
+        const corners = [...root.querySelectorAll('[data-verify-handle]')].length;
+        const expected = contract.handles === 'true';
+        const present = hasRotate && corners === 4;
         return (
-          handlesPresent === expectSelected ||
-          `ハンドル present=${handlesPresent}（delete=${hasDelete}, rotate=${hasRotate}）だが contract.selected="${contract.selected}"`
+          present === expected ||
+          `つまみ present=${present}（回転=${hasRotate}, 角=${corners}）だが contract.handles="${contract.handles}"`
         );
+      },
+    },
+    {
+      id: 'four-corners-can-resize',
+      description:
+        '大きさを変えるつまみは 4 隅そろっている（右上を削除ボタンが塞いでいた名残を戻さない）',
+      onlyFixtures: ['photo-selected'],
+      check: ({ root }) => {
+        const corners = [...root.querySelectorAll('[data-verify-handle]')]
+          .map((el) => el.getAttribute('data-verify-handle'))
+          .sort();
+        return corners.join(',') === 'ne,nw,se,sw' || `つまみが ${corners.join(',')} しか無い`;
+      },
+    },
+    {
+      id: 'no-delete-on-the-card',
+      description: 'カードの上に削除は置かない（消す手は道具箱の 1 か所）',
+      check: ({ root }) => {
+        const onCard = root.querySelector('[aria-label="Delete card"]');
+        return onCard === null || 'カードの上に削除ボタンが残っている';
       },
     },
     {

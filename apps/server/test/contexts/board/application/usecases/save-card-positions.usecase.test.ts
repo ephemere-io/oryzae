@@ -8,13 +8,11 @@ let usecase: SaveCardPositionsUsecase;
 
 beforeEach(() => {
   boardCardRepo = {
-    findByDateAndView: vi.fn().mockResolvedValue([]),
-    findRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
-    findDailyCardsByDateRange: vi.fn().mockResolvedValue([]),
-    findRefIdsByDateRange: vi.fn().mockResolvedValue([]),
-    findSoftDeletedRefIdsByDateAndView: vi.fn().mockResolvedValue([]),
+    findByUserId: vi.fn().mockResolvedValue([]),
     findMaxZIndex: vi.fn().mockResolvedValue(-1),
-    saveMany: vi.fn().mockResolvedValue(undefined),
+    countPinnedByType: vi.fn().mockResolvedValue({ snippet: 0, photo: 0 }),
+    findRecentByUserId: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
     updatePositions: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     deleteByRefId: vi.fn().mockResolvedValue(undefined),

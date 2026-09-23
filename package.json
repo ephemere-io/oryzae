@@ -16,8 +16,6 @@
     "check:automation": "node scripts/check-automation-inventory.mjs",
     "dep-cruise": "pnpm --filter @oryzae/server dep-cruise && pnpm --filter @oryzae/client dep-cruise && pnpm --filter @oryzae/admin dep-cruise",
     "security:rls": "node scripts/check-rls-policies.mjs",
-    "i18n:sync": "node apps/client/scripts/build-i18n.mjs --remote",
-    "i18n:build": "node apps/client/scripts/build-i18n.mjs",
     "postinstall": "simple-git-hooks"
   },
   "simple-git-hooks": {
