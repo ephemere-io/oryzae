@@ -143,7 +143,10 @@ export function SpBoardToolbar({
       })}
       role="toolbar"
       aria-label={t('palette_aria')}
-      className="flex w-full shrink-0 items-stretch justify-center gap-1 px-2"
+      // **左から並べる。** 他の画面の操作の列（`ActionPalette`）と同じ。中央に寄せていたころは、
+      // 道具が 2 つのときと 3 つのときで同じ道具の位置が動いた（オーナー: 「アクションパレットは
+      // 基本左寄りにしてほしい。他の画面はそうなってるはず」）。左上中心主義。
+      className="flex w-full shrink-0 items-stretch gap-1 px-2"
       style={{
         ...CONTROL_FONT,
         // 高さは「列 56px ＋ ホームインジケータぶん」。border-box のまま扱うので、
