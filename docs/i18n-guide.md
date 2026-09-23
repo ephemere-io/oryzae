@@ -1,15 +1,12 @@
 # i18n ガイド（apps/client）
 
-`apps/client` の UI 文言は日英バイリンガル対応。SSoT は **Google Spreadsheet**、ランタイムは **next-intl** を使う。
+`apps/client` の UI 文言は 4 言語（ja / en / zh / ko）。**SSoT は `messages/*.json` そのもの**、
+ランタイムは **next-intl** を使う。
 
 ## アーキテクチャ
 
 ```
-Google Spreadsheet (oryzae-i18n)        ← SSoT。日英対応表（key, ja, en, file, line, context）
-        │
-        │  pnpm i18n:sync
-        ▼
-apps/client/src/i18n/messages/{ja,en}.json   ← ネスト構造の messages（git 管理）
+apps/client/src/i18n/messages/{ja,en,zh,ko}.json   ← SSoT。直接編集する（git 管理）
         │
         ▼
 next-intl (apps/client/src/i18n/request.ts)  ← cookie `NEXT_LOCALE` から locale 決定
@@ -19,37 +16,31 @@ useTranslations('namespace') in components
 ```
 
 - ロケール切替は **URL routing 不採用**。`NEXT_LOCALE` cookie で永続化（`/lib/i18n-actions.ts` の `setLocaleAction`）。
-- 言語切替UIは `components/ui/locale-switcher.tsx`（PoC段階。最終的にはアカウント設定に統合予定）。
-- デフォルト locale は `ja`、サポート locale は `ja`/`en`（`apps/client/src/i18n/config.ts`）。
+- デフォルト locale は `ja`。対応 locale は `apps/client/src/i18n/config.ts` の `LOCALES`。
+- 言語切替 UI は `components/ui/locale-switcher.tsx`。
+
+### かつて Google Spreadsheet が SSoT だった（2026-09 に廃止）
+
+`oryzae-i18n` スプレッドシートを正とし、`pnpm i18n:sync` で JSON を生成していた。
+**やめた理由は、実際にそう運用されていなかったから。** シートの最終更新は 2026-05-16 で、
+以後 4 ヶ月ぶんの文言は JSON に直接足され続けていた。つまり「正」であるはずのシートが
+4 ヶ月古く、同期スクリプトを回すと**それらが巻き戻る**状態だった。
+
+AI で書くぶんには JSON を直接触るほうが速い、という実感とも噛み合っている
+（2026-09-23、オーナーとレビュアーで合意）。スクリプト `build-i18n.mjs`、
+`pnpm i18n:sync` / `i18n:build`、`google-sheets` MCP 登録はすべて削除済み。
 
 ## 翻訳の追加・編集フロー
 
-1. **Spreadsheet を編集**: https://docs.google.com/spreadsheets/d/1GThXIAh0ZsIl5POxyLKYfSulz2Y_f1rBpTzSL98brkY/
-2. **同期**: ローカルで `pnpm i18n:sync`（Google Sheets の公開エクスポートURLからCSVを取得して `messages/*.json` を再生成）
-3. **commit & push**: `messages/*.json` の差分を含めてコミット
+1. **`messages/*.json` を直接編集する。4 言語すべてに同じキーを足す**
+2. commit & push
 
-### Claude Code から直接編集する（google-sheets MCP）
+**4 言語のキーが揃っていることは `apps/client/test/architecture/i18n-vocabulary.test.ts`
+が機械で見ている。** 1 言語だけ足し忘れるとテストが落ちる。
 
-`.mcp.json` に登録済の `google-sheets` MCP（`xing5/mcp-google-sheets`、OAuth 認証）経由で、Claude Code から直接スプレッドシートにキーを追加できる:
-
-```
-Claude: # 「landing.faq.6 を追加して」
-→ mcp__google-sheets__add_rows でスプレッドシートに行追加
-→ pnpm i18n:sync で messages/*.json 再生成
-→ git add → commit → push → PR
-```
-
-#### 初回セットアップ（ユーザーが 1 回だけ）
-
-1. GCP プロジェクトで OAuth 2.0 Desktop Client を作成、JSON を `~/.config/oryzae/google-sheets-credentials.json` として保存（パーミッション 600）
-2. OAuth 同意画面のテストユーザーに自分の Google アカウントを追加
-3. oryzae-i18n スプレッドシートに当該アカウントの編集権限を付与
-4. Claude Code を再起動 → MCP がロードされる
-5. 初回ツールコール時にブラウザが開き Google サインイン → トークンが `~/.config/oryzae/google-sheets-token.json` にキャッシュされる（以降は自動）
-
-**新規キーをコードから先行追加したい場合（MCP 不使用）:**
-1. `messages/ja.json` と `messages/en.json` に手で追記（後で Spreadsheet にも反映）
-2. または、Spreadsheet に先に行を足してから `pnpm i18n:sync`
+同じテストが「短い名前は正式名称の短縮形であること」も見ている。同じ物を端末ごとに
+違う名前で呼ばないための歯止めで、語そのものではなく**関係**を見るので言語を問わず効く
+（SP の道具箱でスニペットを「抜粋」と書いて指摘された実例から入れた）。
 
 ## キー命名規則
 
@@ -60,27 +51,12 @@ Claude: # 「landing.faq.6 を追加して」
 - `entries.editor.placeholder` — entries feature のエディタのプレースホルダ
 - `fermentation.jar.add_question` — fermentation feature の jar の問い追加ボタン
 
-JSON はネスト構造で出力されるため、コンポーネントでは:
+JSON はネスト構造なので、コンポーネントでは:
 
 ```tsx
 const t = useTranslations('auth.login');
 <button>{t('submit')}</button>
 ```
-
-## CSV フォーマット
-
-Spreadsheet（およびローカル `.tmp/i18n-inventory.csv`）のカラム:
-
-| カラム | 内容 |
-|---|---|
-| `key` | ドット区切りの階層キー |
-| `ja` | 日本語訳 |
-| `en` | 英訳 |
-| `file` | 元コードのファイルパス（参考） |
-| `line` | 元コードの行番号（参考） |
-| `context` | 用途説明（人間用、翻訳判断のヒント） |
-
-`file` / `line` / `context` は同期スクリプトが無視する。Spreadsheet 上で翻訳作業の参考にするためだけのメタ情報。
 
 ## ICU 変数
 
@@ -100,31 +76,11 @@ next-intl は ICU MessageFormat をサポート。`{count}` のような変数�
 t('entries.list.results_count', { count: 12 });
 ```
 
-## スクリプトの仕組み
+## 言語を足すとき
 
-`apps/client/scripts/build-i18n.mjs`:
-
-- `--remote` フラグまたは `ORYZAE_I18N_CSV_URL` 環境変数 → Spreadsheet からfetch
-- `--csv=<path>` → ローカル CSV ファイル
-- 引数なし → `.tmp/i18n-inventory.csv`（dev 用フォールバック）
-
-CSV → ネスト JSON 変換は `setNested()` がドット区切りキーを再帰的に展開する。
-
-## Spreadsheet の権限
-
-公開エクスポートを使うため、Spreadsheet は **「リンクを知っている全員が閲覧可」** に設定する必要がある。編集は所有者のみで OK。
-
-社外秘の翻訳を扱う必要が出た場合は、Service Account + Google Sheets API v4 への切替を検討する（`googleapis` パッケージ）。
-
-## 言語追加時の手順
-
-将来 `zh` を追加する場合の例:
-
-1. `apps/client/src/i18n/config.ts` の `LOCALES` に `'zh'` を足す
-2. Spreadsheet に `zh` カラムを足して翻訳を入れる
-3. `build-i18n.mjs` を改修して `zh` カラムを読む（または可変にして `LOCALES` をループ）
-4. `pnpm i18n:sync` → `messages/zh.json` 生成
-5. UI の locale switcher を3言語対応に変更
+1. `apps/client/src/i18n/config.ts` の `LOCALES` と `LOCALE_OPTIONS` に足す
+2. `messages/<locale>.json` を作り、既存言語と**同じキー集合**で埋める
+3. `pnpm test` でキーの過不足を確認（`i18n-vocabulary.test.ts`）
 
 ## 既知の未対応領域
 
