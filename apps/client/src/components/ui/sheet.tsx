@@ -429,14 +429,21 @@ export function Sheet({
      */
     const takeGesture = (event: Event) => {
       const top = scroller.scrollTop;
-      let nearest: number | null = null;
-      for (const candidate of latest.current.detents) {
-        const target = targetOf(candidate);
-        if (nearest === null || Math.abs(target - top) < Math.abs(nearest - top)) nearest = target;
+      const wanted = latest.current.detent;
+      let goal: number | null = null;
+      if (settledRef.current !== wanted) {
+        // 頼まれた段へ送っている最中（見出しを押した直後など）。**頼まれた先で**終わらせる
+        // ——いちばん近い段へ落とすと、押したのに戻ってしまう。
+        goal = targetOf(wanted);
+      } else {
+        for (const candidate of latest.current.detents) {
+          const target = targetOf(candidate);
+          if (goal === null || Math.abs(target - top) < Math.abs(goal - top)) goal = target;
+        }
       }
       // 1px 未満のずれは触らない（スクロール位置は小数になる）。
-      if (nearest !== null && Math.abs(nearest - top) >= 1) {
-        scroller.scrollTop = nearest;
+      if (goal !== null && Math.abs(goal - top) >= 1) {
+        scroller.scrollTop = goal;
         syncContentScroll();
       }
       const inner = innerRef.current;
