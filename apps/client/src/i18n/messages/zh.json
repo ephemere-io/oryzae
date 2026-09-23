@@ -834,7 +834,6 @@
       "placeholder": "写下提问",
       "cancel": "取消",
       "save": "保存",
-      "letter_arrived": "有一封信送到了",
       "close": "关闭",
       "archive_confirm_title": "要归档这个问题吗？",
       "archive_confirm_body": "归档的问题可以在本页面最下方的「已归档的问题」里恢复。",
@@ -922,8 +921,6 @@
     "hint_board_photos": "{count} 张照片",
     "hint_board_snippets": "{count} 条摘录",
     "hint_board_both": "{photos} 张照片 · {snippets} 条摘录",
-    "list_row_actions": "操作",
-    "list_open": "打开",
     "list_delete": "删除"
   }
 }

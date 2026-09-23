@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 
-import { placeInSlot, useSpChrome } from '@/lib/sp-chrome-context';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface SpConfirmSheetProps {
   /** シートの開閉。false のときは何も描画しない（ルートだけ残す）。 */
@@ -21,10 +21,10 @@ interface SpConfirmSheetProps {
 }
 
 /**
- * SP 汎用「確認ボトムシート」（Issue #363）。削除など取り返しのつかない操作の確認に使う。
- * 下からスライドする bottom-sheet（sp-questions / sp-entry-editor の既存シートと同じ作法）。
- * 全画面オーバーレイは `fixed inset-0` で、マウント位置に依存せず確実に画面全体を覆う。
- * データは持たない純表示。確定/取消は呼び出し側に委ねる（list / editor が共有）。
+ * SP 汎用「確認モーダル」（Issue #363）。削除など取り返しのつかない操作の確認に使う。
+ *
+ * 見た目と置き場所は `components/ui/confirm-dialog.tsx` が持つ（書斎の一覧など、端末を見ない
+ * 場所からも同じ問いかけを出すため）。ここはエントリーの画面の検証の単位を公表するだけの包み。
  */
 export function SpConfirmSheet({
   open,
@@ -37,67 +37,18 @@ export function SpConfirmSheet({
   onConfirm,
   onCancel,
 }: SpConfirmSheetProps) {
-  const { overlaySlot } = useSpChrome();
   return (
-    <div {...verifyAttrs({ unit: 'SpConfirmSheet', open, busy, destructive })}>
-      {open
-        ? placeInSlot(
-            // SP の殻の中なら、殻の overlay の席（ビジュアルビューポートに追従）に出す。`fixed` はレイアウト
-            // ビューポート基準で、キーボードの出入りの途中に開くと画面の上の方に浮いた（レビュー）。
-            <div
-              className={`${overlaySlot ? 'pointer-events-auto absolute' : 'fixed'} inset-0 z-50 flex flex-col justify-end`}
-            >
-              {/* 背景タップで取消 */}
-              <button
-                type="button"
-                aria-label={cancelLabel}
-                onClick={onCancel}
-                className="sp-fade flex-1 bg-black/30"
-              />
-              <div
-                className="sp-sheet rounded-t-2xl bg-[var(--surface-raised)] px-5 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
-                style={{ fontFamily: 'var(--ob-font-sans)' }}
-              >
-                <p
-                  className="text-base font-medium text-[var(--fg)]"
-                  style={{ fontFamily: 'var(--ob-font-serif)' }}
-                >
-                  {title}
-                </p>
-                {message ? (
-                  <p className="mt-2 text-sm leading-relaxed text-[var(--date-color)]">{message}</p>
-                ) : null}
-                <div className="mt-5 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={onCancel}
-                    disabled={busy}
-                    className="flex-1 rounded-xl py-3 text-sm text-[var(--fg)] disabled:opacity-50"
-                    style={{ border: '1px solid var(--border-subtle)' }}
-                  >
-                    {cancelLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onConfirm}
-                    disabled={busy}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-white disabled:opacity-60"
-                    style={{ background: destructive ? 'var(--ob-jar-warm)' : 'var(--accent)' }}
-                  >
-                    {busy ? (
-                      <span
-                        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-                        aria-hidden="true"
-                      />
-                    ) : null}
-                    {confirmLabel}
-                  </button>
-                </div>
-              </div>
-            </div>,
-            overlaySlot,
-          )
-        : null}
-    </div>
+    <ConfirmDialog
+      open={open}
+      title={title}
+      message={message}
+      confirmLabel={confirmLabel}
+      cancelLabel={cancelLabel}
+      destructive={destructive}
+      busy={busy}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      contract={verifyAttrs({ unit: 'SpConfirmSheet', open, busy, destructive })}
+    />
   );
 }

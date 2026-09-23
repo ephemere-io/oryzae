@@ -834,7 +834,6 @@
       "placeholder": "問いを書く",
       "cancel": "キャンセル",
       "save": "保存",
-      "letter_arrived": "手紙が届いています",
       "close": "閉じる",
       "archive_confirm_title": "この問いをアーカイブしますか？",
       "archive_confirm_body": "アーカイブした問いは、この画面のいちばん下の「アーカイブした問い」から戻せます。",
@@ -922,8 +921,6 @@
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
     "hint_board_both": "写真{photos}件・スニペット{snippets}件",
-    "list_row_actions": "操作",
-    "list_open": "開く",
     "list_delete": "削除"
   }
 }

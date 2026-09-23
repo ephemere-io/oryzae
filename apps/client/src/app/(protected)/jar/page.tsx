@@ -11,7 +11,6 @@ import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
 import { useAuth } from '@/lib/auth-context';
-import { useUnread } from '@/lib/unread-context';
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
@@ -30,7 +29,6 @@ export default function JarPage() {
     loading: questionsLoading,
     refetch: refetchQuestions,
   } = useJarQuestions(api, authLoading);
-  const { unreadQuestionIds } = useUnread();
   // issue #278: 瓶の見た目に反映する readiness（段階を決める top と、賑やかさを決める total）。
   // サーバーがリクエストのたびに評価し直すので、漬け込み後にこのページへ来れば最新になる。
   const { data: readiness } = useFermentationReadiness(api, authLoading);
@@ -105,7 +103,6 @@ export default function JarPage() {
                 unarchiveQuestion={handleUnarchiveQuestion}
                 acceptQuestion={acceptQuestion}
                 rejectQuestion={rejectQuestion}
-                unreadQuestionIds={unreadQuestionIds}
                 onClose={() => setManageOpen(false)}
               />
             </div>

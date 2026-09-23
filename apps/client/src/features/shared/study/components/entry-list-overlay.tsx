@@ -3,8 +3,9 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
+import { TrashIcon } from '@/components/ui/palette-icons';
 import { Select } from '@/components/ui/select';
 import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { useEscapeKey } from '@/lib/use-escape-key';
@@ -53,7 +54,7 @@ export interface EntryListOverlayProps {
    */
   onCreateEntry?: () => void;
   /**
-   * 行の「…」から消す（確認はここで出す）。成功なら true。無ければ「…」を出さない。
+   * 行のゴミ箱から消す（確認はここで出す）。成功なら true。無ければゴミ箱を出さない。
    * PC の一覧には行ごとの削除があり、SP にも同じ操作が要る（実機レビュー）。
    */
   onDeleteEntry?: (entryId: string) => Promise<boolean>;
@@ -121,15 +122,17 @@ export function EntryListOverlay({
   const t = useTranslations('study');
   useEscapeKey(open, onClose);
 
-  /** 「…」を押した行。行の操作（開く・削除）のシート。 */
-  const [actionFor, setActionFor] = useState<StudyEntry | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /**
+   * ゴミ箱を押した行。**確認のモーダルだけ**を出す（段のあるシートではない）。
+   *
+   * 以前はここに「開く・削除」の行が並ぶセミモーダルを出していたが、開くのは行を押せば済む
+   * うえ、やることが 1 つしか無い問いかけに指で高さを変えられる面を使うのはちぐはぐだった
+   * （オーナー: 「セミモーダルという位置付けがなんか違和感。普通にモーダルで削除だけを
+   * アクションにすればいいのでは？」）。
+   */
+  const [deleteFor, setDeleteFor] = useState<StudyEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const tDelete = useTranslations('entries.delete_modal');
-  const closeActions = () => {
-    setActionFor(null);
-    setConfirmingDelete(false);
-  };
 
   /**
    * 外側（紙の外）を押したら閉じる。**押し始めも外だったときだけ。**
@@ -153,7 +156,7 @@ export function EntryListOverlay({
     searching: search.length > 0,
     canCreate: onCreateEntry !== undefined,
     canDelete: onDeleteEntry !== undefined,
-    actionFor: actionFor?.id ?? 'none',
+    deleteFor: deleteFor?.id ?? 'none',
   });
 
   const rows = loading ? (
@@ -174,8 +177,8 @@ export function EntryListOverlay({
             <MobileRow
               entry={entry}
               onClick={() => onSelectEntry(entry)}
-              onMore={onDeleteEntry ? () => setActionFor(entry) : undefined}
-              moreLabel={t('list_row_actions')}
+              onDelete={onDeleteEntry ? () => setDeleteFor(entry) : undefined}
+              deleteLabel={t('list_delete')}
             />
           ) : (
             <PaperRow entry={entry} onClick={() => onSelectEntry(entry)} />
@@ -297,73 +300,24 @@ export function EntryListOverlay({
           {loadMore}
         </div>
 
-        {/* 行の「…」: 開く・削除。削除は同じシートの中で確認する。 */}
-        <BottomSheet
-          open={actionFor !== null}
-          onClose={closeActions}
-          ariaLabel={t('list_row_actions')}
-          label={actionFor?.excerpt}
-          closeLabel={t('list_close')}
-          detents={['content']}
-          initialDetent="content"
-        >
-          {actionFor ? (
-            <div className="flex flex-col gap-2 pt-1" style={CONTROL_FONT} data-row-actions>
-              {confirmingDelete ? (
-                <>
-                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--fg)' }}>
-                    {tDelete('body')}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={deleting}
-                    data-row-delete-confirm
-                    onClick={async () => {
-                      if (!onDeleteEntry) return;
-                      setDeleting(true);
-                      const ok = await onDeleteEntry(actionFor.id);
-                      setDeleting(false);
-                      if (ok) closeActions();
-                    }}
-                    className="min-h-[48px] rounded-xl text-[15px] font-medium disabled:opacity-50"
-                    style={{ background: 'var(--ob-jar-warm)', color: '#fff' }}
-                  >
-                    {tDelete('confirm')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingDelete(false)}
-                    className="min-h-[48px] rounded-xl text-[15px]"
-                    style={{ color: 'var(--fg)', background: 'var(--surface-sunken)' }}
-                  >
-                    {tDelete('cancel')}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    // 開くときはシートを閉じない（閉じると一覧が一瞬見えて、そこから画面が変わる）。
-                    onClick={() => onSelectEntry(actionFor)}
-                    className="min-h-[48px] rounded-xl text-[15px]"
-                    style={{ color: 'var(--fg)', background: 'var(--surface-sunken)' }}
-                  >
-                    {t('list_open')}
-                  </button>
-                  <button
-                    type="button"
-                    data-row-delete
-                    onClick={() => setConfirmingDelete(true)}
-                    className="min-h-[48px] rounded-xl text-[15px]"
-                    style={{ color: 'var(--ob-jar-warm)', background: 'var(--surface-sunken)' }}
-                  >
-                    {t('list_delete')}
-                  </button>
-                </>
-              )}
-            </div>
-          ) : null}
-        </BottomSheet>
+        {/* 行のゴミ箱: 確認のモーダルだけ。開くのは行を押せば済む。 */}
+        <ConfirmDialog
+          open={deleteFor !== null}
+          title={tDelete('heading')}
+          message={tDelete('body')}
+          confirmLabel={tDelete('confirm')}
+          cancelLabel={tDelete('cancel')}
+          destructive
+          busy={deleting}
+          onConfirm={async () => {
+            if (!onDeleteEntry || !deleteFor) return;
+            setDeleting(true);
+            const ok = await onDeleteEntry(deleteFor.id);
+            setDeleting(false);
+            if (ok) setDeleteFor(null);
+          }}
+          onCancel={() => setDeleteFor(null)}
+        />
       </div>
     );
   }
@@ -544,14 +498,14 @@ function PaperRow({ entry, onClick }: { entry: StudyEntry; onClick: () => void }
 function MobileRow({
   entry,
   onClick,
-  onMore,
-  moreLabel,
+  onDelete,
+  deleteLabel,
 }: {
   entry: StudyEntry;
   onClick: () => void;
-  /** 行の操作（開く・削除）。無ければ「…」を出さない。 */
-  onMore?: () => void;
-  moreLabel: string;
+  /** 消す。無ければゴミ箱を出さない。押すと確認のモーダルが出る。 */
+  onDelete?: () => void;
+  deleteLabel: string;
 }) {
   return (
     <div className="flex items-stretch border-b" style={{ borderColor: 'var(--border-subtle)' }}>
@@ -576,16 +530,18 @@ function MobileRow({
           {entry.pickled && <PickledBadge />}
         </span>
       </button>
-      {onMore ? (
+      {onDelete ? (
+        // 絵は静かな灰色で。**押した先の確認が危ない色を持つ**ので、並んでいるだけの行に
+        // 赤を置かない（深緑と同じ考え方: 色は起きていることを言う）。
         <button
           type="button"
-          onClick={onMore}
-          aria-label={moreLabel}
-          data-row-more
-          className="flex w-11 shrink-0 items-center justify-center rounded-full text-[18px] leading-none"
+          onClick={onDelete}
+          aria-label={deleteLabel}
+          data-row-delete
+          className="flex w-11 shrink-0 items-center justify-center"
           style={{ color: 'var(--date-color)' }}
         >
-          ⋯
+          <TrashIcon size={17} />
         </button>
       ) : null}
     </div>

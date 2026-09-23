@@ -22,8 +22,6 @@ interface SpQuestionsProps {
   unarchiveQuestion?: (id: string) => Promise<boolean | void> | boolean | void;
   acceptQuestion: (id: string) => Promise<void> | void;
   rejectQuestion: (id: string) => Promise<void> | void;
-  /** 未読の手紙が届いている問いの id（Issue #452）。page が UnreadState から渡す。 */
-  unreadQuestionIds?: ReadonlySet<string>;
   /**
    * 重ねて開かれているときの閉じ方。SP はボトムナビを持たないので、瓶から重ねて
    * 開くことがある。上段（SpTopBar）の中では戻るがこれを担い、上段が無い場所では
@@ -31,9 +29,6 @@ interface SpQuestionsProps {
    */
   onClose?: () => void;
 }
-
-/** 既定値を毎レンダー作らないための空集合。 */
-const NO_UNREAD: ReadonlySet<string> = new Set();
 
 type Sheet = { mode: 'add' } | { mode: 'edit'; id: string };
 
@@ -55,7 +50,6 @@ export function SpQuestions({
   unarchiveQuestion,
   acceptQuestion,
   rejectQuestion,
-  unreadQuestionIds = NO_UNREAD,
   onClose,
 }: SpQuestionsProps) {
   const t = useTranslations('sp.questions');
@@ -147,7 +141,6 @@ export function SpQuestions({
         proposedCount: proposed.length,
         activeCount: active.length,
         atLimit,
-        unreadCount: active.filter((q) => unreadQuestionIds.has(q.id)).length,
       })}
       className="relative flex h-full flex-col bg-[var(--bg)] text-[var(--fg)]"
     >
@@ -225,9 +218,11 @@ export function SpQuestions({
           ) : null}
 
           {/* 自分の問い */}
+          {/* **手紙の印はここには出さない。** この画面から手紙は読めない（行を押すと問いを編集する
+              シートが開く）ので、届いたと言われても行き場が無い（オーナー: 「この画面で手紙が届いて
+              ますって言われても見れないから不要」）。印は**読める場所**に出す＝瓶の円の中の
+              「新しい手紙」（`sp-jar-map.tsx`）。書斎の下端に出していたのを消したのと同じ判断。 */}
           {active.map((q) => {
-            // Issue #452: ボトムナビのバッジだけでは「どの問いに届いたか」が分からなかった。
-            const hasUnreadLetter = unreadQuestionIds.has(q.id);
             return (
               <button
                 key={q.id}
@@ -242,19 +237,6 @@ export function SpQuestions({
                 <span className="block pr-6 text-[15px] leading-relaxed">
                   {q.currentText ?? t('untitled')}
                 </span>
-                {hasUnreadLetter ? (
-                  <span
-                    className="mt-2 flex items-center gap-1.5 text-[11px]"
-                    style={{ ...CONTROL_FONT, color: 'var(--ob-jar-warm)' }}
-                  >
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ background: 'var(--ob-jar-warm)' }}
-                      aria-hidden="true"
-                    />
-                    {t('letter_arrived')}
-                  </span>
-                ) : null}
                 <svg
                   className="absolute right-4 top-4"
                   width="16"

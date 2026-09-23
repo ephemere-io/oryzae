@@ -44,14 +44,11 @@ describe('SpQuestions', () => {
     expect(screen.getByText('なぜ書くのか')).toBeTruthy();
   });
 
-  it('手紙が届いた問いに印を出す（Issue #452）', () => {
-    renderQ({ unreadQuestionIds: new Set(['q1']) });
-    expect(screen.getByText(jaMessages.sp.questions.letter_arrived)).toBeTruthy();
-  });
-
-  it('手紙が届いていない問いには印を出さない', () => {
-    renderQ({ unreadQuestionIds: new Set(['other']) });
-    expect(screen.queryByText(jaMessages.sp.questions.letter_arrived)).toBeNull();
+  it('手紙の印は出さない（この画面から手紙は読めない）', () => {
+    // 行を押すと開くのは「問いを編集」。届いたと言われても行き場が無いので、
+    // 印は読める場所（瓶の円の中）だけに出す。
+    renderQ();
+    expect(screen.queryByText('手紙が届いています')).toBeNull();
   });
 
   it('「新しい問いを立てる」でシートが開き、作成できる', () => {

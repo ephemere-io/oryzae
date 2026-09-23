@@ -834,7 +834,6 @@
       "placeholder": "Write a question",
       "cancel": "Cancel",
       "save": "Save",
-      "letter_arrived": "A letter has arrived",
       "close": "Close",
       "archive_confirm_title": "Archive this question?",
       "archive_confirm_body": "You can bring it back from “Archived questions” at the bottom of this screen.",
@@ -922,8 +921,6 @@
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
     "hint_board_both": "{photos} photos · {snippets} snippets",
-    "list_row_actions": "Actions",
-    "list_open": "Open",
     "list_delete": "Delete"
   }
 }
