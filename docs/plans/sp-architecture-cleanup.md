@@ -165,7 +165,7 @@ lib/         api auth device theme debounce format-date …
 | 4 | ✅ | 計画どおり（`desktop-only-overlay` は端末ガード＝ seam の一部として `components/` に残置） |
 | 5 | ✅ | 計画どおり ＋ 認証フォーム3点の直叩きも解消。新規共有 hook 8本にテストを追加 |
 | 6 | ✅ | 3ルールを `error` に昇格。allowlist は3本とも空 |
-| 7 | 未着手 | i18n の `sp.*` namespace。別 Issue 推奨（翻訳 SSoT が Google Sheets のため） |
+| 7 | 未着手 | i18n の `sp.*` namespace。別 Issue 推奨（4 言語の JSON を同時に付け替えるため） |
 
 **最終状態**: `pnpm typecheck` / `lint` / `test`(622件) / `dep-cruise`(violations 0) / `knip` すべて green。
 静的テストの `MIGRATING` allowlist は3本とも空配列＝抜け道が実際に塞がっている。
@@ -293,7 +293,7 @@ lib/         api auth device theme debounce format-date …
 
 ### Phase 7（任意・別 Issue 推奨）— i18n の device 軸を解消
 
-`sp.*` namespace を廃し、ドメイン namespace の下に端末差分を置く（例 `entries.list.sp.*`）。翻訳は Google Sheets が SSoT なので `docs/i18n-guide.md` の運用と合わせて別途調整が要る。**今回のスコープ外を推奨**。
+`sp.*` namespace を廃し、ドメイン namespace の下に端末差分を置く（例 `entries.list.sp.*`）。翻訳は `messages/*.json` が SSoT なので、4 言語を同時に付け替えることになる（2026-09 に Google Sheets 運用は廃止）。**今回のスコープ外を推奨**。
 
 ---
 
