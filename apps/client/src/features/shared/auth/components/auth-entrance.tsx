@@ -61,6 +61,9 @@ const APPEAR_MS = 800;
  */
 const HANDOFF_MS = 380;
 
+/** 認証画面の色。扉の前は明るい地で固定（暗い色を選んでいる人も、扉の外はここ）。 */
+const ENTRANCE_THEME = 'light';
+
 /** 何もしない（認証画面では 3D の物を押して移動しない）。 */
 function noop(): void {}
 
@@ -216,12 +219,12 @@ export function AuthEntrance({ layout, panel, children }: AuthEntranceProps) {
         // ここから canvas は React のツリーの外（`keepLiveScene`）。どの画面が
         // mount / unmount しても、見えている動きは同じ 1 本のまま。書斎の canvas が
         // mount したところで入れ物と受け口だけ差し替わる（`StudySceneHandle.adopt`）。
-        keepLiveScene({ canvas: handle.canvas, handle });
+        keepLiveScene({ canvas: handle.canvas, handle, layout, theme: ENTRANCE_THEME });
         traceMark('シーンを次の画面へ預けた');
         await afterPaint();
       },
     }),
-    [reducedMotion, sheet],
+    [layout, reducedMotion, sheet],
   );
 
   return (
@@ -262,7 +265,7 @@ export function AuthEntrance({ layout, panel, children }: AuthEntranceProps) {
           <StudyCanvas
             state={emptyState}
             layout={layout}
-            theme="light"
+            theme={ENTRANCE_THEME}
             atEntrance
             sprig={sprig}
             onHandle={handleSceneHandle}
