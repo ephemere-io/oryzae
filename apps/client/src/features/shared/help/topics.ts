@@ -64,13 +64,13 @@ export function topicForScreen(pathname: string): HelpTopicId {
 }
 
 /**
- * 画面の中の部品（話題）。面の頭の 1 枚に札として並び、画面の中で触れた物の札が灯る。
- * 書斎は縮小図（板が奥、机の上に瓶・手帳・棚、手前に鉛筆）。無い画面は本文だけ。
+ * 画面の中の部品（話題）。面の頭の 1 枚の見取り図に描かれ、画面の中で触れた物が灯る
+ * （`help-screen-map.tsx` の図と 1:1）。無い画面は本文だけ。
  */
 const SCREEN_PARTS: Partial<Record<HelpTopicId, readonly HelpTopicId[]>> = {
   study: ['board', 'jar', 'notebook', 'archive', 'write'],
-  jar: ['question', 'pickle', 'letter', 'questions'],
-  write: ['question', 'pickle', 'snippet', 'notebook'],
+  jar: ['question', 'letter', 'questions'],
+  write: ['question', 'pickle', 'snippet'],
   board: ['snippet'],
   list: ['notebook', 'archive'],
   questions: ['question'],

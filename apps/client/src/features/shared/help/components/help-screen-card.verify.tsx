@@ -63,7 +63,17 @@ registerUnit<Props>({
       description: '書斎で部品でないもの（アカウント）に触れている — 何も起きない',
       props: { screen: 'study', hovered: 'account' },
     },
-    { id: 'jar', description: '瓶の画面', props: { screen: 'jar', hovered: null } },
+    {
+      id: 'jar',
+      probe: true,
+      description: 'Probe: 瓶の画面 — 瓶の見取り図',
+      props: { screen: 'jar', hovered: null },
+    },
+    {
+      id: 'write-pickle',
+      description: '書く画面でパレットの「漬け込む」に触れている',
+      props: { screen: 'write', hovered: 'pickle' },
+    },
     {
       id: 'account',
       description: '部品の無い画面 — 本文だけ',
@@ -88,7 +98,8 @@ registerUnit<Props>({
         const parts = screenParts(props.screen);
         const tiles = [...root.querySelectorAll<HTMLElement>('[data-part]')];
         if (tiles.length !== parts.length) return `札 ${tiles.length}（期待 ${parts.length}）`;
-        // 書斎の札は 3D の注釈（JAR / ENTRIES / …）、他の画面は話題の題。
+        // 書斎の札は 3D の注釈（JAR / ENTRIES / …）、他の画面は画面に出ている名前（help.map）、
+        // 無ければ話題の題。
         const studyLabels: Record<string, string> = {
           jar: jaMessages.study.label_jar,
           notebook: jaMessages.study.label_journal,
@@ -96,12 +107,15 @@ registerUnit<Props>({
           archive: jaMessages.study.label_archive,
           write: jaMessages.study.label_pen,
         };
+        const mapLabels: Record<string, Record<string, string>> = jaMessages.help.map;
         for (const tile of tiles) {
           const id = tile.getAttribute('data-part') ?? '';
           const expected =
             props.screen === 'study'
               ? (studyLabels[id] ?? '')
-              : (TEXTS.get(parts.find((p) => p === id) ?? 'help')?.title ?? '');
+              : (mapLabels[props.screen]?.[id] ??
+                TEXTS.get(parts.find((p) => p === id) ?? 'help')?.title ??
+                '');
           if (!tile.textContent?.includes(expected)) return `${id} の札に「${expected}」が無い`;
         }
         return true;

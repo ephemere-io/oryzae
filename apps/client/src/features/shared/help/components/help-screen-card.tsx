@@ -7,7 +7,7 @@ import { CONTROL_FONT } from '@/components/ui/surface';
 import { isHelpTopicId } from '../topics';
 import type { HelpTopic, HelpTopicId, HelpTopicText } from '../types';
 import { HelpIllustration } from './help-illustrations';
-import { HelpStudyMap } from './help-study-map';
+import { HelpScreenMap, hasScreenDrawing } from './help-screen-map';
 
 export interface HelpScreenCardProps {
   /** いま開いている画面の話題。 */
@@ -45,6 +45,7 @@ const STUDY_LABEL_KEY: Partial<Record<HelpTopicId, string>> = {
 
 export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCardProps) {
   const tStudy = useTranslations('study');
+  const tMap = useTranslations('help.map');
   const [pinned, setPinned] = useState<HelpTopicId | null>(null);
   const [local, setLocal] = useState<HelpTopicId | null>(null);
   const partIds = parts.map((p) => p.id);
@@ -54,14 +55,22 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
   const source = local ? 'panel' : fromScreen ? 'screen' : pinned ? 'pinned' : 'none';
   const screenText = texts.get(screen.id);
   const activeText = active ? texts.get(active) : undefined;
-  // 見取り図の札は、部屋に貼ってある注釈と同じ字（JAR / ENTRIES / …）。面の題が「手帳」で
-  // 部屋が「ENTRIES」だと「手帳って何？」になる。話題の題のほうは「手帳（ENTRIES）」と両方を持つ。
+  // 見取り図の札は、その画面に出ている名前。書斎は部屋に貼ってある注釈と同じ字
+  // （JAR / ENTRIES / …。面の題が「手帳」で部屋が「ENTRIES」だと「手帳って何？」になる）、
+  // 他の画面は `help.map.<画面>.<部品>`（「問いを紐づける」「漬け込む」…）。無ければ話題の題。
   const titles = new Map<HelpTopicId, string>(
     [...texts.values()].map((text) => [text.id, text.title]),
   );
-  for (const [part, key] of Object.entries(STUDY_LABEL_KEY)) {
-    if (!isHelpTopicId(part) || key === undefined) continue;
-    titles.set(part, tStudy(key));
+  if (screen.id === 'study') {
+    for (const [part, key] of Object.entries(STUDY_LABEL_KEY)) {
+      if (!isHelpTopicId(part) || key === undefined) continue;
+      titles.set(part, tStudy(key));
+    }
+  } else {
+    for (const part of partIds) {
+      const key = `${screen.id}.${part}`;
+      if (tMap.has(key)) titles.set(part, tMap(key));
+    }
   }
   const togglePin = (id: HelpTopicId) => setPinned((prev) => (prev === id ? null : id));
 
@@ -97,12 +106,14 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
         </div>
       </div>
 
-      {/* 書斎は手描きの見取り図。他の画面は部品の札を並べる。 */}
-      {screen.id === 'study' && parts.length > 0 && (
+      {/* 図のある画面は手描きの見取り図。無い画面（部品があれば）は札を並べる。 */}
+      {hasScreenDrawing(screen.id) && parts.length > 0 && (
         <div className="mt-3">
-          <HelpStudyMap
+          <HelpScreenMap
+            screen={screen.id}
             parts={partIds}
-            titles={titles}
+            labels={titles}
+            title={screenText?.title ?? ''}
             active={active}
             pinned={pinned}
             onHover={setLocal}
@@ -110,7 +121,7 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
           />
         </div>
       )}
-      {screen.id !== 'study' && parts.length > 0 && (
+      {!hasScreenDrawing(screen.id) && parts.length > 0 && (
         <ul
           className="mt-3 grid gap-1.5"
           style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }}

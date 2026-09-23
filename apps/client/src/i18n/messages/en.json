@@ -969,6 +969,28 @@
         "body": "While this panel is open, point at anything on the screen and the card at the top explains it. Type what you want to do in the box above to find the closest topic. Open or close the panel any time with the ? at the top right or the ? key. You can hide the ? altogether in Account settings.",
         "keywords": "help,how to,explain,search,shortcut,close,open,top right,settings,help mode"
       }
+    },
+    "map": {
+      "jar": {
+        "question": "Current questions",
+        "letter": "Letter",
+        "questions": "Question history"
+      },
+      "write": {
+        "question": "Link a question",
+        "pickle": "Pickle",
+        "snippet": "Snippet"
+      },
+      "board": {
+        "snippet": "Card (snippet)"
+      },
+      "list": {
+        "notebook": "This month",
+        "archive": "Past months"
+      },
+      "questions": {
+        "question": "Question"
+      }
     }
   }
 }
