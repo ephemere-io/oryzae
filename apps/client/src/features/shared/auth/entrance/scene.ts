@@ -39,6 +39,7 @@ import {
   CORK,
   EDGES_THRESHOLD_DEG,
   MERIDIAN_COUNT,
+  MERIDIAN_OPACITY,
   sampleJarProfile,
 } from '@/features/shared/study/scene/jar';
 import { createMaterials, type StudyMaterials } from '@/features/shared/study/scene/materials';
@@ -116,12 +117,13 @@ export interface EntranceSceneHandle {
 }
 
 /**
- * 入るときに、奥の書斎がどこまで濃くなるか（待っている間の何倍か）。
+ * 待っている間の濃さ（**書斎で見えている濃さに対する比**）。
  *
- * 濃くしすぎると、待っている段階との差ではなく「別の部屋に切り替わった」に見える。
- * 書斎の本線（不透明）には届かせない。
+ * 扉の向こうにあるのは、遠くにある同じ部屋。歩いて近づくと 1.0 ＝ 書斎とまったく同じ濃さに
+ * なる（`buildStudyGlimpse` の `reveal`）。待っている間から濃いと、入る前に部屋を見せて
+ * しまうので、ここでは「何かがある」くらいに留める。
  */
-const GLIMPSE_REVEAL = 3.4;
+const GLIMPSE_REST = 0.3;
 
 /**
  * 瓶を置く奥行き。ここを面にして、書斎の配置を縮めて並べる。
@@ -140,6 +142,8 @@ const GLIMPSE_Z = -6.6;
 const STUDY_RELATIVE = {
   board: { x: 5.1, y: 3.7, z: -5.0, width: 8, height: 5 },
   desk: { x0: -2.0, x1: 12.8, zNear: 3.3, zFar: -5.6 },
+  /** 机の上の手帳の積み（書斎の `NOTEBOOK_SIZE` と同じ寸法）。 */
+  books: { x: 7.2, z: 1, width: 2.6, depth: 3.4, rotationY: -0.15, thicknesses: [0.4, 0.34, 0.3] },
 } as const;
 
 /** 扉の向こうの気配。濃さだけを外から動かせる。 */
@@ -633,17 +637,17 @@ function buildDoormat(materials: StudyMaterials, own: OwnGeometry): Group {
   );
   return group;
 }
-
 /**
- * 扉の向こうに覗く書斎の気配。**机の天板と瓶の輪郭だけを、ごく薄く。**
+ * 扉の向こうに覗く、これから入る書斎。
  *
- * 待っている間は扉の隙間からわずかに見え、押し開けると正面に来る。ここで書斎の物を
- * 描き込むと、入る前に部屋を見せてしまう — 待っている間に見せるのは「何かがある」まで。
+ * **書斎にある物を、書斎と同じ描き方で縮めて置く。** 気配だからと独自の部屋を描いていた頃は、
+ * 壺の形も机の見え方も書斎と違い、「扉の壺と書斎の壺が同じには思えない」「机を白っぽくして
+ * いるが、書斎に入った後は白っぽくない」「board やエントリーの本もあってもいい」と報告された
+ * （PR #624 のレビュー）。**同じ物が同じところに、同じ描き方で見える**ことだけが、扉の向こうと
+ * 書斎を 1 つの部屋にする。
  *
- * **入るときだけ濃くする**（`reveal`）。歩き着いたところで画面は扉枠でいっぱいになり、
- * その中が空だと、残るのは縦に走る線だけ — 「柱みたいなのが見える」と報告された
- * （PR #624）。近づくほど奥が見えてくれば、最後の 1 枚は「扉の向こうの書斎」になり、
- * そのまま書斎へ渡せる。
+ * 濃さは書斎の値をそのまま持ち、遠さは `reveal` の倍率で表す（待っている間は `GLIMPSE_REST`、
+ * 歩いて近づくと 1.0 ＝ 書斎と同じ濃さ）。置き場は `EntranceLayout.glimpse` と `STUDY_RELATIVE`。
  */
 function buildStudyGlimpse(
   materials: StudyMaterials,
@@ -652,17 +656,17 @@ function buildStudyGlimpse(
 ): StudyGlimpse {
   const group = new Group();
   const shades: { material: Material & { opacity: number }; base: number }[] = [];
-  /** 待っている間の濃さで 1 本。`reveal` でまとめて濃くするので、共有の材は使わない。 */
+  /** 書斎と同じ濃さで線を 1 本。`reveal` が遠さのぶんだけ薄める。 */
   function shade(opacity: number): LineBasicMaterial {
     const material = materials.faint(opacity).clone();
     shades.push({ material, base: opacity });
     return material;
   }
   /**
-   * 塗りも同じ濃さに落とす。
+   * 塗りも同じ扱いにする。
    *
    * 線だけを薄くして塗りをそのままにすると、**塗りのある物だけが浮く**（蓋のクリームが
-   * 気配の中に 1 つだけ実物の濃さで残っていた。実機レビュー「瓶が浮いてない？色合いとか」）。
+   * 気配の中で 1 つだけ実物の濃さになっていた。実機レビュー「瓶が浮いてない？色合いとか」）。
    */
   function shadeFill(source: MeshBasicMaterial, opacity: number): MeshBasicMaterial {
     const material = source.clone();
@@ -671,94 +675,143 @@ function buildStudyGlimpse(
     shades.push({ material, base: opacity });
     return material;
   }
-  const line = shade(0.14);
-  const faint = shade(0.08);
+  /** 面と稜線の 1 組（書斎の `lineArt` と同じ）。面が無いと後ろが透ける。 */
+  function solidBox(geometry: BufferGeometry): Group {
+    const box = new Group();
+    box.add(new Mesh(own(geometry), shadeFill(materials.solid, 1)));
+    box.add(new LineSegments(own(new EdgesGeometry(geometry, 15)), shade(0.5)));
+    return box;
+  }
 
   const { jarX, deskY, scale } = layout.glimpse;
+  const at = (x: number, y: number, z: number) => ({
+    x: jarX + x * scale,
+    y: deskY + y * scale,
+    z: GLIMPSE_Z + z * scale,
+  });
 
-  // 奥の壁の足元。
-  group.add(lineFrom([new Vector3(-12, 0, -13), new Vector3(12, 0, -13)], faint, own));
-
-  // 壁の板。書斎での瓶との位置関係をそのまま縮める。
-  const boardX = jarX + STUDY_RELATIVE.board.x * scale;
-  const boardY = deskY + STUDY_RELATIVE.board.y * scale;
-  const boardZ = GLIMPSE_Z + STUDY_RELATIVE.board.z * scale;
-  const boardHalfW = (STUDY_RELATIVE.board.width * scale) / 2;
-  const boardHalfH = (STUDY_RELATIVE.board.height * scale) / 2;
-  group.add(
-    rectOutline(
-      boardX - boardHalfW,
-      boardY - boardHalfH,
-      boardX + boardHalfW,
-      boardY + boardHalfH,
-      boardZ,
-      faint,
-      own,
-    ),
-  );
-
-  // 机の天板（手前の木端つき）。
-  const deskX0 = jarX + STUDY_RELATIVE.desk.x0 * scale;
-  const deskX1 = jarX + STUDY_RELATIVE.desk.x1 * scale;
-  const deskNear = GLIMPSE_Z + STUDY_RELATIVE.desk.zNear * scale;
-  const deskFar = GLIMPSE_Z + STUDY_RELATIVE.desk.zFar * scale;
+  // ---- 机（書斎の `buildDesk` と同じ引き方。面は置かない） ----
+  const desk = STUDY_RELATIVE.desk;
+  const nearL = at(desk.x0, 0, desk.zNear);
+  const nearR = at(desk.x1, 0, desk.zNear);
+  const farL = at(desk.x0, 0, desk.zFar);
+  const farR = at(desk.x1, 0, desk.zFar);
   group.add(
     lineFrom(
       [
-        new Vector3(deskX0, deskY, deskNear),
-        new Vector3(deskX1, deskY, deskNear),
-        new Vector3(deskX1, deskY, deskFar),
-        new Vector3(deskX0, deskY, deskFar),
-        new Vector3(deskX0, deskY, deskNear),
+        new Vector3(nearL.x, nearL.y, nearL.z),
+        new Vector3(nearR.x, nearR.y, nearR.z),
+        new Vector3(farR.x, farR.y, farR.z),
+        new Vector3(farL.x, farL.y, farL.z),
+        new Vector3(nearL.x, nearL.y, nearL.z),
       ],
-      line,
+      shade(0.13),
       own,
     ),
   );
+  // 手前の木端。**ここだけ濃く引くと、平面が板に見える。** 書斎でも厚みはこの 1 本が担う。
+  const edgeBottom = deskY - 0.22 * scale;
   group.add(
     lineFrom(
-      [new Vector3(deskX0, deskY - 0.14, deskNear), new Vector3(deskX1, deskY - 0.14, deskNear)],
-      faint,
+      [
+        new Vector3(nearL.x, nearL.y, nearL.z),
+        new Vector3(nearL.x, edgeBottom, nearL.z),
+        new Vector3(nearR.x, edgeBottom, nearR.z),
+        new Vector3(nearR.x, nearR.y, nearR.z),
+      ],
+      shade(0.34),
       own,
     ),
   );
-  // 天板の面。**これが無いと瓶が宙に浮いて見える** — 乗っている面が線 4 本しか無く、
-  // 瓶の底に接する物が画面に出てこない（実機レビュー）。奥の板も面で隠れて、前後が読める。
-  const deskFace = new Mesh(
-    own(new PlaneGeometry(Math.abs(deskX1 - deskX0), Math.abs(deskNear - deskFar))),
-    materials.solid,
+  // 木目を示唆する長い 1 本。
+  const grainA = at(desk.x0 + 0.8, 0, desk.zFar + 1.2);
+  const grainB = at(desk.x1 - 0.8, 0, desk.zFar + 1.6);
+  group.add(
+    lineFrom(
+      [new Vector3(grainA.x, grainA.y, grainA.z), new Vector3(grainB.x, grainB.y, grainB.z)],
+      shade(0.06),
+      own,
+    ),
   );
-  deskFace.rotation.x = -Math.PI / 2;
-  deskFace.position.set((deskX0 + deskX1) / 2, deskY - 0.002, (deskNear + deskFar) / 2);
-  group.add(deskFace);
-  // 天板の格子。書斎の机と同じ刻みを縮めて置く。面の広がりと、瓶の接地が読める。
-  const gridStep = 2 * scale;
-  for (let x = deskX0 + gridStep; x < deskX1; x += gridStep) {
+  // 奥の壁の立ち上がり。
+  for (const corner of [farL, farR]) {
     group.add(
-      lineFrom([new Vector3(x, deskY, deskNear), new Vector3(x, deskY, deskFar)], faint, own),
+      lineFrom(
+        [
+          new Vector3(corner.x, corner.y, corner.z),
+          new Vector3(corner.x, corner.y + 4 * scale, corner.z),
+        ],
+        shade(0.07),
+        own,
+      ),
     );
   }
-  for (let z = deskNear - gridStep; z > deskFar; z -= gridStep) {
-    group.add(lineFrom([new Vector3(deskX0, deskY, z), new Vector3(deskX1, deskY, z)], faint, own));
-  }
 
-  // 瓶。**書斎で会う瓶と同じ描き方にする** — 面・稜線・経線・蓋（コルク）。
-  //
-  // 以前は線だけで描いていた。「ドアを開けた時に見える壺が、書斎の壺とデザインが違う」と
-  // 報告された（PR #624 のレビュー）。面が無いと奥の物が透けて**針金細工**に見え、経線が
-  // 全部同じ濃さで縞に見え、蓋も浮いた輪に見える。**薄さで気配にするのであって、
-  // 描き方を変えてはいけない** — 遠くにある同じ瓶、として置く。
+  // ---- 壁の板（書斎の `buildBoard` と同じ。面・枠・格子） ----
+  const boardCenter = at(STUDY_RELATIVE.board.x, STUDY_RELATIVE.board.y, STUDY_RELATIVE.board.z);
+  const boardW = STUDY_RELATIVE.board.width * scale;
+  const boardH = STUDY_RELATIVE.board.height * scale;
+  const board = new Group();
+  board.position.set(boardCenter.x, boardCenter.y, boardCenter.z);
+  // 面。抜けていると奥の壁が透ける。
+  const boardFace = new Mesh(own(new PlaneGeometry(boardW, boardH)), shadeFill(materials.solid, 1));
+  boardFace.position.z = -0.01;
+  board.add(boardFace);
+  board.add(
+    lineFrom(
+      [
+        new Vector3(-boardW / 2, -boardH / 2, 0),
+        new Vector3(boardW / 2, -boardH / 2, 0),
+        new Vector3(boardW / 2, boardH / 2, 0),
+        new Vector3(-boardW / 2, boardH / 2, 0),
+        new Vector3(-boardW / 2, -boardH / 2, 0),
+      ],
+      shade(0.3),
+      own,
+    ),
+  );
+  // 板の格子。書斎と同じ刻み（1.0）を縮める。
+  const boardGrid = shade(0.06);
+  for (let x = -boardW / 2 + scale; x < boardW / 2; x += scale) {
+    board.add(
+      lineFrom([new Vector3(x, -boardH / 2, 0), new Vector3(x, boardH / 2, 0)], boardGrid, own),
+    );
+  }
+  for (let y = -boardH / 2 + scale; y < boardH / 2; y += scale) {
+    board.add(
+      lineFrom([new Vector3(-boardW / 2, y, 0), new Vector3(boardW / 2, y, 0)], boardGrid, own),
+    );
+  }
+  group.add(board);
+
+  // ---- 机の上の手帳の積み（書斎の `buildBooks` と同じ箱の重ね方） ----
+  const books = STUDY_RELATIVE.books;
+  const stack = new Group();
+  const stackAt = at(books.x, 0, books.z);
+  stack.position.set(stackAt.x, stackAt.y, stackAt.z);
+  stack.rotation.y = books.rotationY;
+  let stacked = 0;
+  for (const thickness of books.thicknesses) {
+    const block = solidBox(
+      new BoxGeometry(books.width * scale, thickness * scale, books.depth * scale),
+    );
+    block.position.y = (stacked + thickness / 2) * scale;
+    stack.add(block);
+    stacked += thickness;
+  }
+  group.add(stack);
+
+  // ---- 瓶（書斎の `buildJar` と同じ。面・稜線・経線・蓋） ----
   const profile = sampleJarProfile();
   const jar = new Group();
   jar.position.set(jarX, deskY, GLIMPSE_Z);
   jar.scale.setScalar(scale);
-  // 面。紙と同じ色で塗って、奥の板や机を透かさない。
   const bodyGeometry = own(new LatheGeometry(profile, 48));
-  jar.add(new Mesh(bodyGeometry, materials.solid));
-
+  jar.add(new Mesh(bodyGeometry, shadeFill(materials.solid, 1)));
   // 稜線。しきい値 45° で口縁と角だけが残る（胴に横線が出ない）。
-  jar.add(new LineSegments(own(new EdgesGeometry(bodyGeometry, EDGES_THRESHOLD_DEG)), line));
-  // 経線。書斎と同じ本数で、うんと薄く。
+  jar.add(new LineSegments(own(new EdgesGeometry(bodyGeometry, EDGES_THRESHOLD_DEG)), shade(0.5)));
+  // 経線。書斎と同じ本数・同じ薄さ。
+  const meridian = shade(MERIDIAN_OPACITY);
   for (let i = 0; i < MERIDIAN_COUNT; i++) {
     const angle = (i / MERIDIAN_COUNT) * Math.PI * 2;
     jar.add(
@@ -766,7 +819,7 @@ function buildStudyGlimpse(
         profile.map(
           (point) => new Vector3(Math.sin(angle) * point.x, point.y, Math.cos(angle) * point.x),
         ),
-        faint,
+        meridian,
         own,
       ),
     );
@@ -775,20 +828,22 @@ function buildStudyGlimpse(
   const corkGeometry = own(
     new CylinderGeometry(CORK.radiusTop, CORK.radiusBottom, CORK.height, 24),
   );
-  const cork = new Mesh(corkGeometry, shadeFill(materials.cork, 0.3));
+  const cork = new Mesh(corkGeometry, shadeFill(materials.cork, 1));
   cork.position.y = CORK.y;
   jar.add(cork);
   jar.add(
-    new LineSegments(own(new EdgesGeometry(corkGeometry, EDGES_THRESHOLD_DEG)), line).translateY(
-      CORK.y,
-    ),
+    new LineSegments(
+      own(new EdgesGeometry(corkGeometry, EDGES_THRESHOLD_DEG)),
+      shade(0.5),
+    ).translateY(CORK.y),
   );
   group.add(jar);
 
   return {
     group,
     reveal(t: number): void {
-      const gain = 1 + (GLIMPSE_REVEAL - 1) * clamp01(t);
+      // 遠くにある同じ部屋。近づくほど書斎の濃さ（1.0）に寄る。
+      const gain = GLIMPSE_REST + (1 - GLIMPSE_REST) * clamp01(t);
       for (const shade of shades) shade.material.opacity = shade.base * gain;
     },
     dispose(): void {

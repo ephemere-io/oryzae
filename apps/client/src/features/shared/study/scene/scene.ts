@@ -838,31 +838,22 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   resizeObserver.observe(container);
 
   /**
-   * 最初の描画の前に、シェーダを**非同期で**用意してから描き始める。
+   * 最初のフレームから描き始める。
    *
-   * 最初の `render` は、材ごとの program を同期で compile / link する。本番ビルドのプロファイルで
-   * これが約 245ms の 1 タスクになっていた（中身はほぼ `(program)` ＝ドライバの時間で、
-   * `getProgramInfoLog` で待つ）。扉から入ってきた直後にメインスレッドが塞がり、上に載せた
-   * 扉の canvas まで止まって見えた（PR #624 の実機レビュー「扉を開き終わった後にカクッ」）。
+   * ここで `renderer.compileAsync` を挟んで**シェーダを先に用意する**ことを試したが、戻した。
+   * three 0.185 の `compileAsync` はこのシーンで `checkMaterialsReady` の中から
+   * `Cannot read properties of undefined (reading 'isReady')` を投げ、**書斎が永遠に描かれなく
+   * なる**（例外は監視ループの中で出るので、`.then` の失敗ハンドラにも渡らない）。
    *
-   * `compileAsync` は KHR_parallel_shader_compile で、待たずに用意が終わるのを見張る。
-   * 用意できてから最初のフレームを描く。失敗しても描き始める（同期 compile に戻るだけ）。
+   * そもそも効果も無かった。最初の描画が 245ms 塞ぐという計測は、ヘッドレス Chromium の
+   * SwiftShader（CPU 描画）でのもの。実 GPU では 50〜110ms で、`StudyHandover` の
+   * compositor の前進が覆う範囲に収まる（実機の計測でもコマ落ちは 48ms のまま変わらなかった）。
    */
-  let started = false;
-  let disposed = false;
-  function start(): void {
-    if (started || disposed) return;
-    started = true;
-    // 定置の始まりは「最初に描くとき」。init の時刻のままだと、用意に掛かったぶんだけ先へ跳ぶ。
-    if (arrival !== null) arrival.startedAt = performance.now();
-    frame = requestAnimationFrame(tick);
-  }
-  renderer.compileAsync(scene, camera).then(start, start);
+  frame = requestAnimationFrame(tick);
 
   // ---- 片付け ------------------------------------------------------------
 
   function dispose(): void {
-    disposed = true;
     // ここを怠ると再マウントで canvas が積み上がり、古い層のイベントだけが生き残る。
     cancelAnimationFrame(frame);
     resizeObserver.disconnect();
