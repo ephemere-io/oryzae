@@ -5,19 +5,18 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { traceMark } from '@/lib/trace';
-import { takeStudyArrival } from '../arrival';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
-import { endStudyHandover } from '../handover';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
+import { hasLiveScene } from '../scene/live';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -79,12 +78,15 @@ export function StudyHome({ layout }: StudyHomeProps) {
    * - 出: 遷移の終盤に scene から合図が来たら 1 → 0。カメラが着くのと同時に消え終わるので、
    *   行き先の画面は同じ地の色の上に現れる
    */
-  const [entered, setEntered] = useState(false);
   /**
-   * 扉から入ってきた直後か。**入りの溶暗をやめる**代わりに、カメラが入り口から寄って止まる
-   * （`arrival.ts`）。溶けながら動かすと、白く飛んでから現れる元の見え方に戻る。
+   * 扉から続けて入ってきたか。**最初のレンダーで決める**（`scene/live.ts`）。
+   *
+   * 認証画面のシーンがそのまま生きていて、カメラはもう扉をくぐって動いている最中。
+   * 部屋はすでに見えているので、入りの溶暗も、憶えた部屋の地も要らない — どちらも
+   * 掛けると一度薄くなって戻り、それが「一回切り替わる」ように見える。
    */
-  const [arrival, setArrival] = useState(false);
+  const [throughDoor] = useState(hasLiveScene);
+  const [entered, setEntered] = useState(throughDoor);
   const [leaveMs, setLeaveMs] = useState<number | null>(null);
   /**
    * 戻り道に敷く「憶えた部屋」と、canvas が最初の 1 フレームを描いたか。
@@ -96,31 +98,18 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const [backdrop, setBackdrop] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
 
-  /** 扉から入ってきたか。同じ commit の中で読むので、state ではなくこちらを見る。 */
-  const throughDoorRef = useRef(false);
-
-  useLayoutEffect(() => {
-    // 描く前に決める。1 フレームでも溶暗の側で描くと、そこで画面が白く飛ぶ。
-    if (takeStudyArrival()) {
-      throughDoorRef.current = true;
-      setArrival(true);
-      setEntered(true);
-    }
-  }, []);
-
   useEffect(() => {
     traceMark('書斎 mount');
-    // **扉から入ってきたときは、ここには敷かない。** 同じ 1 枚がルーターの上に敷かれていて
-    // （`StudyHandover`）、そちらは寄りながら退く。ここにも置くと、その下で同じ絵が静止した
-    // まま残り、溶けるあいだ二重写しになる。
-    if (!throughDoorRef.current) setBackdrop(readStudyBackdrop());
-  }, []);
+    // **扉から続けて入ってきたときは敷かない。** 部屋は生きたまま渡ってきている。
+    if (!throughDoor) setBackdrop(readStudyBackdrop());
+  }, [throughDoor]);
 
   useEffect(() => {
+    if (throughDoor) return;
     // 次のフレームで立てる。マウントと同じフレームだと transition が走らない。
     const id = requestAnimationFrame(() => setEntered(true));
     return () => cancelAnimationFrame(id);
-  }, []);
+  }, [throughDoor]);
 
   // ラベルは 3D 座標に貼り付くので、毎フレーム画面座標が届く。
   const [labelPositions, setLabelPositions] = useState<LabelPositions>(EMPTY_LABELS);
@@ -238,18 +227,19 @@ export function StudyHome({ layout }: StudyHomeProps) {
            * 引かせる。
            */
           opacity: leaveMs !== null ? 0 : entered || backdrop !== null ? 1 : 0,
-          // 扉から入ってきたときは溶暗を持たない（定置が受け持つ）。
-          transition: arrival ? undefined : `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
+          // 扉から続けて入ってきたときは、入りの溶暗を持たない（部屋はもう見えている）。
+          // **出ていく溶暗はそのまま残す** — 消すと、書斎から出るとき画面が一瞬で入れ替わる。
+          transition:
+            throughDoor && leaveMs === null
+              ? undefined
+              : `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
         }}
       >
         <StudyCanvas
-          arrival={arrival}
           onLeaveStart={setLeaveMs}
           onReady={() => {
             traceMark('書斎の 1 フレーム目');
             setCanvasReady(true);
-            // 扉から渡された 1 枚を引く合図。描けたこの瞬間まで、画面は部屋のままだった。
-            endStudyHandover();
           }}
           // 出ていく直前の 1 枚を憶える。戻り道はこれを地にして、部屋が「消えた」のでは
           // なく「遠くなった」だけに見えるようにする。

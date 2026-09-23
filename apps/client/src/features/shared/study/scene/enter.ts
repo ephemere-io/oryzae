@@ -10,7 +10,12 @@
  */
 
 import { EASING, progress } from '../constants';
-import { type CameraView, lerpView } from './camera';
+import type { StudyLayout } from '../layout';
+import { type CameraView, entranceView, homeView } from './camera';
+import { DOOR } from './entrance-room';
+
+/** 空間の一点。カメラの位置と注視点に使うものと同じ形。 */
+type Point = CameraView['position'];
 
 /**
  * 扉の開き（rad）。正の回転で**奥（書斎の側）へ**押し開く。
@@ -41,20 +46,16 @@ export const ENTER_TIMING = {
   doorMs: 700,
   /** 扉が開き始めてから歩き出すまで。開くのを待ち切らずに重ねる。 */
   walkDelayMs: 140,
+  /** 歩き出してからホームに着くまで。 */
+  walkMs: 1400,
 } as const;
 
 /**
- * 入っていく動き。**止まらない — 近づくほど遅くなるだけ。**
- *
- * 残りの距離に比例した速さでホームへ近づき続ける（指数的な接近）。速度は常に連続で、
- * 着く手前で切っても跳ねない。歩き出しだけは助走を付ける（静止から急に動き出さない）。
+ * 見えている窓の高さが変わったとき（SP で紙が伸び縮みしたとき）に構図を寄せる速さ
+ * （1 フレームあたり）。切り替えずに寄せるのは、扉が一瞬で縮むと別の場面に飛んだように
+ * 見えるため。
  */
-const ENTER_GLIDE = {
-  /** 歩き出しの助走（ms）。この間に速さを 0 から立ち上げる。 */
-  rampMs: 360,
-  /** 近づく速さ。1 秒あたり、残りの距離のどれだけを詰めるか（の指数）。 */
-  rate: 1.15,
-} as const;
+export const FRAME_SETTLE_LERP = 0.14;
 
 /** 入っている最中の扉の開き。`from` は押し始めた時点の開き。 */
 export function doorAngleWhileEntering(from: number, elapsedMs: number): number {
@@ -63,26 +64,91 @@ export function doorAngleWhileEntering(from: number, elapsedMs: number): number 
 }
 
 /**
- * いまの view を、`dtMs` ぶん行き先へ近づける。
+ * 開口を通るときの目の高さ（前室の床から）。扉の上寄り。
  *
- * `elapsedMs` は歩き出してからの経過（助走に使う）。フレームの長さに依らない — 同じ経過時間なら、
- * コマ落ちしても同じところにいる。
+ * 低く取ると、開口を抜けた直後に枠の上辺が画面を横切る。高く取ると鴨居にぶつかる。
  */
-export function glideTowards(
-  current: CameraView,
-  destination: CameraView,
-  elapsedMs: number,
-  dtMs: number,
-): CameraView {
-  const ramp = EASING.easeInOutCubic(progress(elapsedMs, ENTER_GLIDE.rampMs));
-  const k = 1 - Math.exp(-ENTER_GLIDE.rate * ramp * (Math.max(0, dtMs) / 1000));
-  return lerpView(current, destination, Math.min(1, Math.max(0, k)));
+const DOORWAY_EYE = DOOR.height * 0.57;
+
+/**
+ * 開口の手前と奥に置く制御点の距離。
+ *
+ * ここが「扉に正対して入る」を作る。**壁に対して真っ直ぐ入り、真っ直ぐ抜ける**ので、
+ * 枠や扉板がカメラの脇をかすめない。
+ */
+const DOORWAY_REACH = 2;
+
+/** 開口の中心（世界座標）。前室は回転させずに置くので、部屋の位置がそのまま開口の中心。 */
+function doorwayPoint(layout: StudyLayout): Point {
+  const room = layout.entrance.room;
+  return { x: room.x, y: room.y + DOORWAY_EYE, z: room.z };
 }
 
-/** 行き先まで、目に見えるほどの隔たりが残っているか。 */
-export function isFarFrom(view: CameraView, destination: CameraView, epsilon = 0.02): boolean {
-  const dx = view.position.x - destination.position.x;
-  const dy = view.position.y - destination.position.y;
-  const dz = view.position.z - destination.position.z;
-  return Math.hypot(dx, dy, dz) > epsilon;
+/**
+ * 入っていく道のりの、その時刻の view。
+ *
+ * **直線では入れない。** 扉の前に立つ位置とホームを直線で結ぶと、その線は壁の——開口ではない
+ * ところを貫く（PC なら開口の 2.7 ユニット右、しかも鴨居より上）。壁を突き抜けるあいだ、
+ * 壁の線が画面を縦に横切る — 以前「書斎に入る直前に柱みたいなのが見える」と報告された
+ * のと同じ見え方になる。
+ *
+ * そこで**開口を必ず通る**曲線にする。制御点は開口の前後、扉の正面軸の上に置く
+ * （`DOORWAY_REACH`）。人が扉をくぐるのと同じで、正対して入り、抜けてから部屋を見渡す形になる。
+ * 速さは両端で 0 に収束するので、歩き出しにも着地にも継ぎ目が無い。
+ */
+export function enterView(layout: StudyLayout, elapsedMs: number): CameraView {
+  const from = entranceView(layout);
+  const home = homeView(layout);
+  const doorway = doorwayPoint(layout);
+  const u = EASING.easeInOutCubic(progress(elapsedMs, ENTER_TIMING.walkMs));
+  return {
+    position: cubicBezier(
+      from.position,
+      { ...doorway, z: doorway.z + DOORWAY_REACH },
+      { ...doorway, z: doorway.z - DOORWAY_REACH },
+      home.position,
+      u,
+    ),
+    // 注視点に開口の縛りは要らない（通り抜けるのは体であって視線ではない）。
+    target: lerpPoint(from.target, home.target, u),
+  };
+}
+
+/** 入り終わったか。 */
+export function isInside(elapsedMs: number): boolean {
+  return elapsedMs >= ENTER_TIMING.walkMs;
+}
+
+function lerpPoint(from: Point, to: Point, t: number): Point {
+  return {
+    x: from.x + (to.x - from.x) * t,
+    y: from.y + (to.y - from.y) * t,
+    z: from.z + (to.z - from.z) * t,
+  };
+}
+
+/** 3 次ベジエ。両端で速さが 0 に収束する（＝止まるときも動き出すときも継ぎ目が無い）。 */
+function cubicBezier(p0: Point, c1: Point, c2: Point, p3: Point, t: number): Point {
+  const s = 1 - t;
+  const w0 = s * s * s;
+  const w1 = 3 * s * s * t;
+  const w2 = 3 * s * t * t;
+  const w3 = t * t * t;
+  return {
+    x: w0 * p0.x + w1 * c1.x + w2 * c2.x + w3 * p3.x,
+    y: w0 * p0.y + w1 * c1.y + w2 * c2.y + w3 * p3.y,
+    z: w0 * p0.z + w1 * c1.z + w2 * c2.z + w3 * p3.z,
+  };
+}
+
+/**
+ * その位置が、壁ではなく**開口の中**にあるか（世界座標）。
+ *
+ * 構図を変えたときに、カメラが壁を突き抜けていないかをテストで押さえるために置いている。
+ */
+export function isInDoorway(layout: StudyLayout, position: Point): boolean {
+  const room = layout.entrance.room;
+  const x = position.x - room.x;
+  const y = position.y - room.y;
+  return Math.abs(x) < DOOR.width / 2 && y > 0 && y < DOOR.height;
 }

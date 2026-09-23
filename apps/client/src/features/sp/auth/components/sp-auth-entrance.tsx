@@ -3,7 +3,7 @@
 // verify-exempt: 構図の定数を渡すだけの入口。中身は features/shared/auth が検証済み。
 
 import { AuthEntrance } from '@/features/shared/auth/components/auth-entrance';
-import { ENTRANCE_SP_LAYOUT } from '@/features/shared/auth/entrance/layout';
+import { SP_LAYOUT } from '@/features/shared/study/layout';
 
 /**
  * SP の認証画面。扉を上の窓に残し、紙（フォーム）を下から敷く。
@@ -12,5 +12,9 @@ import { ENTRANCE_SP_LAYOUT } from '@/features/shared/auth/entrance/layout';
  * スクロールに乗せている（固定した紙の中だけをスクロールさせると iOS で入力欄が逃げる）。
  */
 export function SpAuthEntrance({ children }: { children: React.ReactNode }) {
-  return <AuthEntrance layout={ENTRANCE_SP_LAYOUT}>{children}</AuthEntrance>;
+  return (
+    <AuthEntrance layout={SP_LAYOUT} panel="sheet">
+      {children}
+    </AuthEntrance>
+  );
 }

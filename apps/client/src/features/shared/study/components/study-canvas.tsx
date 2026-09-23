@@ -6,13 +6,16 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { StudyLayout } from '../layout';
 import { staysInStudy } from '../navigation';
+import { isKeptLive, takeLiveScene } from '../scene/live';
 import type { StudyTheme } from '../scene/materials';
 import {
   type HoverInfo,
   initScene,
   type LabelPositions,
+  type SceneListeners,
   type StudySceneHandle,
 } from '../scene/scene';
+import type { Sprig } from '../scene/sprig';
 import type { StudyState, StudyTarget } from '../types';
 
 export interface StudyCanvasProps {
@@ -41,6 +44,17 @@ export interface StudyCanvasProps {
   onReady?: () => void;
   /** 扉（認証画面）から入ってきた直後か。真ならカメラが入り口から寄って止まる。 */
   arrival?: boolean;
+  /**
+   * 書斎の入口（扉の前）から始めるか。認証画面で真にする。
+   *
+   * 真のあいだカメラは扉の前に留まり、`handle.enterStudy()` で扉をくぐってホームへ動く。
+   * **シーンは 1 つ**なので、そこに画面の切り替わりは無い。
+   */
+  atEntrance?: boolean;
+  /** 一輪挿しに挿さる枝（七十二候）。入口を組むときだけ要る。 */
+  sprig?: Sprig;
+  /** シーンができた（または捨てた）とき。認証画面が扉を操作するために受け取る。 */
+  onHandle?: (handle: StudySceneHandle | null) => void;
 }
 
 /** `prefers-reduced-motion` を読む。SSR とテストでは false に倒す。 */
@@ -54,6 +68,9 @@ export function StudyCanvas({
   layout,
   theme,
   arrival,
+  atEntrance,
+  sprig,
+  onHandle,
   onNavigate,
   onOpenOverlay,
   onHoverChange,
@@ -100,10 +117,61 @@ export function StudyCanvas({
   // 入ってきたかどうかはマウントの瞬間だけの話。effect の条件に入れると、
   // 定置の途中で値が変わったときにシーンごと作り直してしまう。
   const arrivalRef = useRef(arrival);
+  // 入口から始めるか・枝の姿も、作るときにしか使わない。
+  const entranceRef = useRef({ atEntrance, sprig });
+  const onHandleRef = useRef(onHandle);
+  onHandleRef.current = onHandle;
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    /** シーンから外へ出てくる知らせの受け口。作っても引き継いでも同じものを渡す。 */
+    const listeners = (scene: () => StudySceneHandle | null): SceneListeners => ({
+      onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
+      onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
+      onLeaveStart: (durationMs) => callbacks.current.onLeaveStart?.(durationMs),
+      onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
+      onReady: () => callbacks.current.onReady?.(),
+      onPick: (target) => {
+        // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
+        // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
+        // 「机の手帳が開く → 別の景色の上に一覧が出る → しばらくして書斎に戻る」と、
+        // 押した物と関係のない芝居が挟まっていた。
+        if (staysInStudy(target)) {
+          callbacks.current.onOpenOverlay?.(target);
+          return;
+        }
+        // 出ていく的だけカメラが動く。中身は**カメラが動く前**に決まっている
+        // （targetHref が対象そのものから導く）。着いてから画面を切り替える。
+        scene()
+          ?.goTo(target)
+          .then(() => {
+            callbacks.current.onNavigate(target);
+          });
+      },
+    });
+
+    /**
+     * **前の画面から生きているシーンがあれば、それを引き取る**（`scene/live.ts`）。
+     *
+     * 認証画面で扉の前に立っていたカメラは、ログインしたあとホームへ向けて動き出している。
+     * ここで作り直すと、その動きが切れて「画面が切り替わった」ように見える。入れ物と受け口を
+     * 付け替えるだけなら（`handle.adopt`）、描画も動きも途切れない。
+     */
+    const inherited = takeLiveScene();
+    if (inherited !== null) {
+      const adopted = inherited.handle;
+      adopted.adopt({ container, listeners: listeners(() => adopted) });
+      handleRef.current = adopted;
+      adopted.setState(stateRef.current);
+      onHandleRef.current?.(adopted);
+      return () => {
+        onHandleRef.current?.(null);
+        if (!isKeptLive(adopted)) adopted.dispose();
+        handleRef.current = null;
+      };
+    }
 
     // WebGL が無い環境ではシーンを作らない（呼び出し側が静止フォールバックを出す）。
     let handle: StudySceneHandle;
@@ -114,27 +182,10 @@ export function StudyCanvas({
         layout,
         theme,
         arrival: arrivalRef.current,
+        atEntrance: entranceRef.current.atEntrance,
+        sprig: entranceRef.current.sprig,
         reducedMotion: prefersReducedMotion(),
-        onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
-        onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
-        onLeaveStart: (durationMs) => callbacks.current.onLeaveStart?.(durationMs),
-        onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
-        onReady: () => callbacks.current.onReady?.(),
-        onPick: (target) => {
-          // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
-          // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
-          // 「机の手帳が開く → 別の景色の上に一覧が出る → しばらくして書斎に戻る」と、
-          // 押した物と関係のない芝居が挟まっていた。
-          if (staysInStudy(target)) {
-            callbacks.current.onOpenOverlay?.(target);
-            return;
-          }
-          // 出ていく的だけカメラが動く。中身は**カメラが動く前**に決まっている
-          // （targetHref が対象そのものから導く）。着いてから画面を切り替える。
-          handle.goTo(target).then(() => {
-            callbacks.current.onNavigate(target);
-          });
-        },
+        ...listeners(() => handle),
       });
     } catch {
       // WebGL の初期化に失敗した。書斎は出ないが、画面全体は壊さない。
@@ -142,10 +193,13 @@ export function StudyCanvas({
     }
 
     handleRef.current = handle;
+    onHandleRef.current?.(handle);
 
     return () => {
+      onHandleRef.current?.(null);
       // dispose を怠ると再マウントで canvas が積み上がり、古い層のイベントだけが生き残る。
-      handle.dispose();
+      // ただし**次の画面へ預けたものは捨てない**（`scene/live.ts`）。
+      if (!isKeptLive(handle)) handle.dispose();
       handleRef.current = null;
     };
     // **renderer は layout / theme が変わったときだけ作り直す。**

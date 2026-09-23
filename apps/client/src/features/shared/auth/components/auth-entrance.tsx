@@ -7,35 +7,59 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
-import { markStudyArrivalFor } from '@/features/shared/study/arrival';
-import { beginStudyHandoverFor } from '@/features/shared/study/handover';
-import { warmStudyFor } from '@/features/shared/study/warm';
+import { emptyStudyState } from '@/features/shared/study/empty-state';
+import type { StudyLayout } from '@/features/shared/study/layout';
+import { keepLiveScene } from '@/features/shared/study/scene/live';
+import type { StudySceneHandle } from '@/features/shared/study/scene/scene';
+import { entranceSprig, microSeasonIndex } from '@/features/shared/study/scene/sprig';
 import { traceMark } from '@/lib/trace';
 import { EntranceContext } from '../entrance/context';
 import { type EnterPlan, enterPlan } from '../entrance/door';
-import type { EntranceLayout } from '../entrance/layout';
 import { PAPER_FONT, PAPER_SHADOW, PAPER_STYLE } from '../entrance/paper';
-import { isPassage, staysAtEntrance } from '../entrance/passage';
-import type { EntranceSceneHandle } from '../entrance/scene';
+import { entersStudy, isPassage, staysAtEntrance } from '../entrance/passage';
 import type { EntranceControls } from '../types';
 
 /**
  * three.js は初期バンドルに載せない。紙（フォーム）は SSR でそのまま出るので、扉が
  * 届くまでの間もログインはできる。扉は届いたら地から浮かび上がる。
  */
-const EntranceCanvas = dynamic(
-  () => import('./entrance-canvas').then((module) => module.EntranceCanvas),
+const StudyCanvas = dynamic(
+  () =>
+    import('@/features/shared/study/components/study-canvas').then((module) => module.StudyCanvas),
   { ssr: false, loading: () => null },
 );
 
 export interface AuthEntranceProps {
-  /** 構図。端末との対応づけは `features/pc/auth` と `features/sp/auth` が持つ。 */
-  layout: EntranceLayout;
+  /**
+   * 書斎の構図。**認証画面も書斎と同じシーンを見ている** — 扉は書斎の入口で、ログインすると
+   * カメラが外から中へ 1 本で動く（`docs/oryzae-study/70-entrance.md`）。
+   * 端末との対応づけは `features/pc/auth` と `features/sp/auth` が持つ。
+   */
+  layout: StudyLayout;
+  /**
+   * 紙（フォーム）の置き方。
+   *
+   * - `side`: 扉の右に紙を 1 枚立てる（PC）
+   * - `sheet`: 下から紙を敷く。扉は上の窓に残る（SP）
+   */
+  panel: 'side' | 'sheet';
   children: ReactNode;
 }
 
 /** 扉が地から浮かび上がるまで（ms）。書斎の入りの溶暗と同じ長さ。 */
 const APPEAR_MS = 800;
+
+/**
+ * 入り始めてから、シーンを次の画面へ預けるまで（ms）。
+ *
+ * 扉が開き（700ms）、歩き出して少し進んだあたり。ここでページを入れ替えても、**同じシーンが
+ * 描き続ける**ので見えているものは変わらない。早すぎると扉が開き切る前に認証画面の紙が
+ * 外れ、遅すぎると着いてから移ることになる。
+ */
+const HANDOFF_MS = 900;
+
+/** 何もしない（認証画面では 3D の物を押して移動しない）。 */
+function noop(): void {}
 
 /**
  * 通り道の画面（`/callback` `/auth/confirm`）で扉が現れるまで（ms）。
@@ -63,11 +87,11 @@ const PAPER_RESIZE_MS = 380;
  *
  * レイアウトに置くので、ログイン ↔ 登録 ↔ パスワード再設定を行き来しても扉は作り直さない。
  */
-export function AuthEntrance({ layout, children }: AuthEntranceProps) {
+export function AuthEntrance({ layout, panel, children }: AuthEntranceProps) {
   const pathname = usePathname();
   const passage = isPassage(pathname);
 
-  const handleRef = useRef<EntranceSceneHandle | null>(null);
+  const handleRef = useRef<StudySceneHandle | null>(null);
   /**
    * 扉が届く前に頼まれた「待つ」。
    *
@@ -93,14 +117,22 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
   const windowRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
 
-  const handleSceneHandle = useCallback((handle: EntranceSceneHandle | null) => {
+  const handleSceneHandle = useCallback((handle: StudySceneHandle | null) => {
     handleRef.current = handle;
-    handle?.setWaiting(waitingRef.current);
+    handle?.setDoorWaiting(waitingRef.current);
     if (frameRef.current !== null) handle?.setFrame(frameRef.current);
   }, []);
   const handleReady = useCallback(() => setReady(true), []);
 
-  const sheet = layout.panel === 'sheet';
+  /** ログインする前の書斎（中身は空）。認証が通ったら書斎の側が差し替える。 */
+  const emptyState = useMemo(() => emptyStudyState(new Date().toISOString().slice(0, 10)), []);
+  /**
+   * 一輪挿しに挿さる枝。いまの候（七十二候）で決まる（`study/scene/sprig.ts`）。
+   * 開いている間は変えない — 画面を見ている最中に枝が変わる意味は無い。
+   */
+  const sprig = useMemo(() => entranceSprig(microSeasonIndex(new Date())), []);
+
+  const sheet = panel === 'sheet';
 
   /**
    * SP の紙の中身の高さ。**紙の外枠はこの値へ transition で寄せる。**
@@ -140,45 +172,50 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
       compact: sheet,
       setWaiting: (waiting) => {
         waitingRef.current = waiting;
-        handleRef.current?.setWaiting(waiting);
+        handleRef.current?.setDoorWaiting(waiting);
       },
       /**
-       * 扉をくぐって行き先へ。**渡す支度までをここで済ませる。**
+       * 扉をくぐって行き先へ。
        *
-       * 定置の印（`markStudyArrivalFor`）と、歩いている canvas をルーターの上に載せること
-       * （`beginStudyHandoverFor`）は、どちらも「扉をくぐった」に付いて回る。呼び出し側に
-       * 配ると、新しい入口が増えたときに片方だけ忘れる。
+       * **シーンは 1 つ、カメラは 1 本。** 扉の前から書斎のホームまで、同じカメラが動いていく。
+       * 途中でページが入れ替わるので、シーンごと次の画面へ預ける（`scene/live.ts`）。
+       * 以前は扉だけの別シーンを持ち、入るときに 2 つをクロスフェードしていた — それが
+       * 「一回切り替わる」正体だった（`docs/oryzae-study/70-entrance.md`）。
        */
       enter: async (destination) => {
         // 扉の手前の画面へ戻るだけなら、扉は動かさない（`staysAtEntrance` の注釈）。
         if (staysAtEntrance(destination)) return;
-        markStudyArrivalFor(destination);
-        // 歩いているあいだに書斎を読み始める。着いてから読み始めると、その間ずっと
-        // 渡した 1 枚が静止したままになる（実機の計測で約 0.9 秒）。
-        warmStudyFor(destination);
         const handle = handleRef.current;
-        // 扉が無い（WebGL 非対応・まだ届いていない）ときは溶かすだけにする。
-        const plan = enterPlan(reducedMotion || handle === null);
+        /**
+         * 扉の前から行き先まで、カメラが 1 本で続くか。
+         *
+         * 続くのは**書斎へ向かうときだけ**。扉が無い（WebGL 非対応・まだ届いていない）
+         * ときと、動きを減らす設定では、そもそも動かさずに溶かす。
+         */
+        const continuous = handle !== null && !reducedMotion && entersStudy(destination);
+        const plan = enterPlan(reducedMotion || handle === null, continuous);
         setLeaving(plan);
         if (handle === null) {
-          // 持ち出す canvas も無い。溶け切るのを待って、そのまま移る。
           await wait(plan.totalMs);
           return;
         }
         traceMark('扉を開き始める');
-        // 紙が退くので、窓は画面全体に戻る。扉は歩きながら画面の中央へ寄ってくる。
+        // 紙が退くので、窓は画面全体に戻る。
         handle.setFrame(Number.POSITIVE_INFINITY);
-        // 扉の正面まで来るのを待つ（歩きはそのあとも続く — `glideView`）。
-        await handle.enter(plan);
-        traceMark('扉の正面（移ってよい）');
-        // 歩いている canvas をそのまま持ち出して、ルーターの上に載せる。ここから先、
-        // 下で何が入れ替わっても、見えている動きは同じ 1 本のまま。
-        beginStudyHandoverFor(destination, handle.detach());
-        traceMark('canvas を持ち上げた');
-        // **載せ替えが実際に描かれるまで待ってから返す。** 同じ tick で移ると、載る前に
-        // 認証画面ごと外れ、その 1〜2 フレームだけ地の色が見える。
+        // カメラが扉をくぐってホームへ向かい始める。**着くのを待たない。**
+        void handle.enterStudy();
+        if (!continuous) {
+          // 行き先が書斎ではない。扉が開くところまでを見せて、溶暗で繋ぐ。
+          await wait(plan.totalMs);
+          return;
+        }
+        await wait(HANDOFF_MS);
+        // ここから canvas は React のツリーの外（`keepLiveScene`）。どの画面が
+        // mount / unmount しても、見えている動きは同じ 1 本のまま。書斎の canvas が
+        // mount したところで入れ物と受け口だけ差し替わる（`StudySceneHandle.adopt`）。
+        keepLiveScene({ canvas: handle.canvas, handle });
+        traceMark('シーンを次の画面へ預けた');
         await afterPaint();
-        traceMark('載せ替えが描かれた');
       },
     }),
     [reducedMotion, sheet],
@@ -219,12 +256,15 @@ export function AuthEntrance({ layout, children }: AuthEntranceProps) {
             transition: `opacity ${passage ? PASSAGE_APPEAR_MS : APPEAR_MS}ms ease-out`,
           }}
         >
-          <EntranceCanvas
+          <StudyCanvas
+            state={emptyState}
             layout={layout}
-            reducedMotion={reducedMotion}
+            theme="light"
+            atEntrance
+            sprig={sprig}
             onHandle={handleSceneHandle}
             onReady={handleReady}
-            initialWaiting={passage}
+            onNavigate={noop}
           />
         </div>
 
