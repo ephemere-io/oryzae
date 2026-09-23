@@ -42,6 +42,33 @@ const PICKLE_BTN = 'button[data-palette-action="pickle"]';
 const SETTINGS_BTN = 'button[aria-label="設定"]';
 /** 問いの面を開くチップ（「+」）。結ばれた問いのチップが前に並ぶので、役割で指す。 */
 const QUESTION_CHIP_BTN = '[data-verify-unit="QuestionChip"] button[aria-haspopup="menu"]';
+const PHOTO_SIZE_BTN = 'button[data-palette-action="photo-size"]';
+const PHOTO_WRAP_BTN = 'button[data-palette-action="photo-wrap"]';
+
+/**
+ * 本文に写真を 1 枚置いて選択する。本文は contentEditable なので React は描かない
+ * ——写真も DOM に直に置く。jsdom には PointerEvent が無いので MouseEvent で代用する。
+ */
+async function selectPhoto(
+  root: ParentNode,
+  wait: (ms: number) => Promise<void>,
+  widthRatio: string,
+): Promise<void> {
+  const editor = root.querySelector<HTMLElement>('div[contenteditable="true"]');
+  if (!editor) throw new Error('本文が見つからない');
+  const img = editor.ownerDocument.createElement('img');
+  img.className = 'inline-photo';
+  // 本文に置く写真は飾りとして扱う（本文が写真の説明を兼ねる）。本番の
+  // createInlineImageElement と同じく、空の alt を必ず付ける。
+  img.alt = '';
+  img.dataset.storagePath = 'u1/1-photo.jpg';
+  img.dataset.widthRatio = widthRatio;
+  img.dataset.layout = 'block';
+  img.dataset.align = 'center';
+  editor.appendChild(img);
+  img.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+  await wait(16);
+}
 
 registerUnit<Props>({
   id: 'EntryEditor',
@@ -114,8 +141,62 @@ registerUnit<Props>({
         await ctx.wait(16);
       },
     },
+    {
+      id: 'photo-selected',
+      description: '本文の写真を押すと、パレットの中身が写真の操作に入れ替わる',
+      props: { api: null, auth: null, initialContent: '写真を置いた本文' },
+      act: async ({ root, wait }) => {
+        await selectPhoto(root, wait, '0.4');
+      },
+    },
+    {
+      id: 'photo-wrap-keeps-size',
+      probe: true,
+      // 大にしてから回り込みを押すと小に化けていた（幅いっぱいのとき勝手に縮めていた）。
+      description: 'Probe: 回り込みを切り替えても大きさは変わらない',
+      props: { api: null, auth: null, initialContent: '写真を置いた本文' },
+      act: async ({ root, wait, click }) => {
+        await selectPhoto(root, wait, '1');
+        await click(PHOTO_WRAP_BTN);
+        await wait(16);
+      },
+    },
   ],
   invariants: [
+    {
+      id: 'wrap-does-not-resize-the-photo',
+      description: '回り込みの切り替えで大きさの段が変わらない',
+      onlyFixtures: ['photo-wrap-keeps-size'],
+      check: ({ root }) => {
+        const label = root.querySelector(PHOTO_SIZE_BTN)?.getAttribute('aria-label') ?? '';
+        const photo = root.querySelector<HTMLImageElement>('img.inline-photo');
+        if (photo?.dataset.layout !== 'wrap')
+          return `回り込みが入っていない: ${photo?.dataset.layout}`;
+        return (
+          photo.dataset.widthRatio === '1' ||
+          `大きさが勝手に変わっている: ${photo.dataset.widthRatio}（${label}）`
+        );
+      },
+    },
+    {
+      id: 'palette-swaps-for-the-photo',
+      // 写真の操作は**パレットの中身の差し替え**で出す。写真の横に別の面を浮かせると、
+      // 本文に被るうえ、道具が画面の 2 か所に割れる。
+      description: '写真を選んでいるあいだ、パレットは写真の操作になる',
+      onlyFixtures: ['photo-selected'],
+      check: ({ root }) => {
+        const ids = Array.from(root.querySelectorAll('[data-palette-action]')).map((el) =>
+          el.getAttribute('data-palette-action'),
+        );
+        const want = ['photo-size', 'photo-align', 'photo-wrap', 'photo-remove'];
+        const missing = want.filter((id) => !ids.includes(id));
+        if (missing.length > 0) return `写真の操作が出ていない: ${missing.join(' / ')}`;
+        return (
+          !ids.includes('pickle') ||
+          `本文の操作が残っている（入れ替わっていない）: ${ids.join(' / ')}`
+        );
+      },
+    },
     {
       id: 'no-save-button-in-toolbar',
       description: '「保存する」ボタンが存在しない（Issue #314 原則2: 押すボタンは漬け込むだけ）',

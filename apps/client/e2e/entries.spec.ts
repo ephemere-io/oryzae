@@ -95,7 +95,9 @@ test.describe('エントリ管理', () => {
       .first()
       .setInputFiles({ name: 'note.png', mimeType: 'image/png', buffer: TINY_PNG });
 
-    const dialog = page.getByRole('dialog', { name: '写真を取り込む' });
+    // 面の名前は**問いそのもの**。「写真を取り込む」を押して開いた面に、同じ言葉を
+    // 題として繰り返さない形に変えた（押した操作の名前は画面がすでに言っている）。
+    const dialog = page.getByRole('dialog', { name: 'この写真を取り込みますか？' });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole('button', { name: '文字として読み込む' })).toBeEnabled();
     await expect(dialog.getByRole('button', { name: '写真として貼る' })).toBeEnabled();

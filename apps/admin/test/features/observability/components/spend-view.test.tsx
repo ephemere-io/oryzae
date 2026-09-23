@@ -18,10 +18,12 @@ function makeData(overrides: Partial<SpendData> = {}): SpendData {
       message: null,
       byModel: [
         {
-          model: 'claude-opus-5',
+          // board の OCR と写真の文字起こしは同じ sonnet-5 なので、サーバーは
+          // 用途名を連ねて返す。画面はそれをそのまま出す（用途名を組み立てない）
+          model: 'claude-sonnet-5',
           costUsd: 0.8,
           byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.8 }],
-          feature: 'OCR',
+          feature: 'OCR + 写真の文字起こし',
         },
         {
           model: 'claude-sonnet-4-6',
@@ -168,14 +170,15 @@ describe('SpendView の推定コストの計算根拠', () => {
 });
 
 // 用途別（= モデル別）の内訳は **実額** で出す。自前トークンの推定ではないので、
-// キャッシュ・値引き・課金丸めも反映済み。「OCR がいくらか」はここで読む。
+// キャッシュ・値引き・課金丸めも反映済み。「画像の文字起こしがいくらか」はここで読む。
 describe('SpendView の実請求額のモデル別内訳', () => {
   it('モデル別の実額と、そのモデルを使っている機能を出す', () => {
     renderView(makeData());
 
     expect(screen.getByText('実請求額の内訳（モデル別）')).toBeTruthy();
-    expect(screen.getAllByText('claude-opus-5').length).toBeGreaterThan(0);
-    expect(screen.getByText(/← OCR のモデル/)).toBeTruthy();
+    expect(screen.getAllByText('claude-sonnet-5').length).toBeGreaterThan(0);
+    // 1 モデルに 2 用途が乗っていても、画面は feature をそのまま出す
+    expect(screen.getByText(/← OCR \+ 写真の文字起こし のモデル/)).toBeTruthy();
     // モデル合計と token_type 内訳の両方に出る（内訳が合計と一致している証拠）
     expect(screen.getAllByText('$0.8000').length).toBe(2);
     expect(screen.getByText(/← 発酵 のモデル/)).toBeTruthy();

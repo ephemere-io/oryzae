@@ -14,11 +14,19 @@ interface PhotoImportModalProps {
 }
 
 /**
- * 取り込んだ写真を「文字として読み込む」か「写真として貼る」か選ばせるモーダル（PC）。
+ * 取り込んだ写真を「写真として貼る」か「文字として読み込む」か選ばせる面（PC）。
  *
  * 状態は usePhotoImport が持ち、ここは props を映すだけの純表示にしてある
  * （孤立検証を成立させるため）。文字起こし結果は必ず一度ユーザーに見せてから
  * 本文へ入れる — OCR は必ず外すので、勝手に本文を書き換えないという設計判断。
+ *
+ * ## 言葉は一度だけ
+ *
+ * **押した操作の名前を、開いた面の題にもう一度書かない。** 「写真を取り込む」を押して
+ * 開いた面に「写真を取り込む」と題が付いていて、その下に「文字として読み込むか、
+ * 写真としてそのまま貼るかを選べます」と書いてあった。どちらも画面がすでに言っている。
+ * 残すのは**問い**（この写真を取り込みますか？）と、押す前に知らせるべきこと
+ * （写真が外へ出る）だけにする。
  */
 export function PhotoImportModal({
   state,
@@ -34,6 +42,10 @@ export function PhotoImportModal({
 
   const busy = state.status !== 'idle';
   const showTranscript = state.transcript !== null;
+
+  /** 選ぶ二択の見た目。**どちらも同じ**（片方だけ濃いと、そちらが正解に見える）。 */
+  const choiceClass = 'rounded-md px-4 py-2 text-xs font-medium disabled:opacity-40';
+  const choiceStyle = { backgroundColor: 'var(--surface-sunken)', color: 'var(--fg)' };
 
   return (
     <div
@@ -60,20 +72,15 @@ export function PhotoImportModal({
         className="flex max-h-[85vh] w-[90%] max-w-[520px] flex-col overflow-hidden rounded-xl shadow-lg"
         style={{ backgroundColor: 'var(--bg)' }}
       >
-        <div className="px-7 pt-6 pb-3">
+        <div className="px-7 pt-6 pb-3 text-center">
           <h3 className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>
             {showTranscript ? t('transcript_heading') : t('modal_title')}
           </h3>
           {!showTranscript && (
-            <>
-              <p className="mt-1 text-xs" style={{ color: 'var(--date-color)' }}>
-                {t('modal_description')}
-              </p>
-              {/* 写真が外部 AI に送られることを操作の前に明示する（docs/entry-photo-guide.md）。 */}
-              <p className="mt-1.5 text-[11px] leading-snug" style={{ color: 'var(--date-color)' }}>
-                {t('ai_notice')}
-              </p>
-            </>
+            // 写真が外へ出ることだけは、押す前に言う（docs/entry-photo-guide.md）。
+            <p className="mt-1.5 text-[11px] leading-snug" style={{ color: 'var(--date-color)' }}>
+              {t('ai_notice')}
+            </p>
           )}
         </div>
 
@@ -114,18 +121,17 @@ export function PhotoImportModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-7 pt-4 pb-6">
+        {/* **選ぶものは真ん中に、やめるものは右端に。** 二択は写真の下、目の通り道に置く。
+            キャンセルは「選ばない」であって三つ目の選択肢ではないので、並びの外側（右端）に
+            置き、地を持たせず字の色を落として下がらせる。 */}
+        <div className="flex justify-center gap-2 px-7 pt-4 pb-6">
           {showTranscript ? (
             <>
               <button
                 type="button"
                 onClick={onDiscardTranscript}
-                className="rounded-md border px-4 py-2 text-xs"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--fg)',
-                  backgroundColor: 'var(--bg)',
-                }}
+                className="rounded-md px-4 py-2 text-xs"
+                style={{ color: 'var(--date-color)' }}
               >
                 {t('back')}
               </button>
@@ -143,23 +149,10 @@ export function PhotoImportModal({
             <>
               <button
                 type="button"
-                onClick={onClose}
-                disabled={busy}
-                className="rounded-md border px-4 py-2 text-xs disabled:opacity-40"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--fg)',
-                  backgroundColor: 'var(--bg)',
-                }}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
                 onClick={onAttach}
                 disabled={busy || !state.previewUrl}
-                className="rounded-md border px-4 py-2 text-xs disabled:opacity-40"
-                style={{ borderColor: 'var(--border-subtle)', color: 'var(--fg)' }}
+                className={choiceClass}
+                style={choiceStyle}
               >
                 {state.status === 'uploading' ? t('attaching') : t('attach')}
               </button>
@@ -167,10 +160,19 @@ export function PhotoImportModal({
                 type="button"
                 onClick={onTranscribe}
                 disabled={busy || !state.previewUrl}
-                className="rounded-md border px-4 py-2 text-xs text-white disabled:opacity-40"
-                style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--accent)' }}
+                className={choiceClass}
+                style={choiceStyle}
               >
                 {state.status === 'transcribing' ? t('transcribing') : t('transcribe')}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={busy}
+                className="rounded-md px-4 py-2 text-xs disabled:opacity-40"
+                style={{ color: 'var(--date-color)' }}
+              >
+                {t('cancel')}
               </button>
             </>
           )}

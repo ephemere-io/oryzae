@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BackLink } from '@/components/ui/back-link';
 import { CanvasGrid } from '@/components/ui/canvas-grid';
 import { CanvasMinimap } from '@/components/ui/canvas-minimap';
 import { CanvasViewport } from '@/components/ui/canvas-viewport';
@@ -11,7 +12,9 @@ import { ErrorState } from '@/components/ui/error-state';
 import { PageLoading } from '@/components/ui/page-loading';
 import { useBoard } from '@/features/shared/board/hooks/use-board';
 import { useBoardSave } from '@/features/shared/board/hooks/use-board-save';
+import { type ResizeCorner, selectionBounds } from '@/features/shared/board/selection';
 import type { BoardCardData } from '@/features/shared/board/types';
+import { raiseManyToFront } from '@/features/shared/board/z-order';
 import type { ApiClient } from '@/lib/api';
 import { useCanvasViewport } from '@/lib/canvas/use-canvas-viewport';
 import { type Bounds, unionBounds } from '@/lib/canvas/viewport';
@@ -24,11 +27,9 @@ import {
   DETAIL_THRESHOLD_FULL,
   DETAIL_THRESHOLD_TITLE,
 } from './board-card';
-import { BoardDateNav } from './board-date-nav';
-import { BOARD_INSET, TOP_BAR_CLASS } from './board-surface';
 import { BoardToolbar } from './board-toolbar';
-import { BoardViewSwitch } from './board-view-switch';
 import { PhotoDialog } from './photo-dialog';
+import { SelectionFrame } from './selection-frame';
 import { SnippetDialog } from './snippet-dialog';
 
 interface BoardViewProps {
@@ -68,18 +69,14 @@ function cardBounds(card: BoardCardData): Bounds {
   return { x: card.x, y: card.y, width: card.width, height: card.height };
 }
 
-function todayKey(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
+/**
+ * PC のボード画面。1 人に 1 枚のコルクボードに、付箋と写真を貼っていく。
+ *
+ * 日付を送る・日次/週次を切り替えるといった「見方」は持たない。いつ貼ったものでも
+ * 同じ 1 枚の上にある。
+ */
 export function BoardView({ api }: BoardViewProps) {
   const t = useTranslations('board');
-  const [dateKey, setDateKey] = useState(todayKey);
-  const [viewType, setViewType] = useState<'daily' | 'weekly'>('daily');
   const [snippetDialog, setSnippetDialog] = useState<{
     open: boolean;
     snippetId?: string;
@@ -103,22 +100,20 @@ export function BoardView({ api }: BoardViewProps) {
     updateSnippet,
     createPhoto,
     deleteCard,
-  } = useBoard(api, dateKey, viewType);
+  } = useBoard(api);
   const { savePositions } = useBoardSave(api);
 
   // ショートカット（Shift+1/2）から最新のカード・選択を読むための箱。
   // hook 側は ref 越しに呼ぶので、ここで毎レンダー新しい関数を渡してよい。
   const cardsRef = useRef<BoardCardData[]>([]);
-  const selectedIdRef = useRef<string | null>(null);
+  const selectedIdsRef = useRef<string[]>([]);
 
   const canvas = useCanvasViewport({
     storageKey: 'board',
     getContentBounds: () =>
       unionBounds(cardsRef.current.filter((c) => !c.removing).map(cardBounds)),
-    getSelectionBounds: () => {
-      const selected = cardsRef.current.find((c) => c.id === selectedIdRef.current);
-      return selected ? cardBounds(selected) : null;
-    },
+    // 選択へ寄せるときは、選んでいる**全部**が入るところまで。
+    getSelectionBounds: () => selectionBounds(cardsRef.current, selectedIdsRef.current),
   });
   const { toWorld, centerWorld, zoomIn, zoomOut, resetZoom, fitTo } = canvas;
   const scale = canvas.viewport.scale;
@@ -141,12 +136,19 @@ export function BoardView({ api }: BoardViewProps) {
     [setCards],
   );
 
-  const handleInteractionEnd = useCallback(() => {
-    savePositions(cards);
-  }, [cards, savePositions]);
+  // 保存するのは **hook が作った配列**。ここで state の `cards` を読むと、直前の
+  // setCards がまだ反映されておらず、前面へ出した z が保存から漏れる。
+  const handleInteractionEnd = useCallback(
+    (next: BoardCardData[]) => {
+      savePositions(next);
+    },
+    [savePositions],
+  );
 
   const {
+    selectedIds,
     selectedId,
+    groupBounds,
     draggingId,
     startDrag,
     startRotate,
@@ -155,19 +157,20 @@ export function BoardView({ api }: BoardViewProps) {
     onPointerUp,
     deselect,
     didDrag,
+    consumeGestureEnd,
   } = useBoardInteraction(cards, handleCardsChange, handleInteractionEnd, scale);
 
   cardsRef.current = cards;
-  selectedIdRef.current = selectedId;
+  selectedIdsRef.current = selectedIds;
 
   // ── ポインタ座標の world 変換 ───────────────────────────────────
   // カードは clientX/Y を上げてくるので、ここで world に直してから hook に渡す。
   // これで useBoardInteraction は倍率を知らずに済む（回転は中心・ポインタとも world に
   // そろえる。等方スケールなので角度は変わらない）。
   const handleCardPointerDown = useCallback(
-    (cardId: string, clientX: number, clientY: number) => {
+    (cardId: string, clientX: number, clientY: number, additive: boolean) => {
       const p = toWorld(clientX, clientY);
-      startDrag(cardId, p.x, p.y);
+      startDrag(cardId, p.x, p.y, additive);
     },
     [toWorld, startDrag],
   );
@@ -182,9 +185,18 @@ export function BoardView({ api }: BoardViewProps) {
   );
 
   const handleResizeStart = useCallback(
-    (cardId: string, corner: 'se' | 'sw' | 'ne' | 'nw', clientX: number, clientY: number) => {
+    (cardId: string, corner: ResizeCorner, clientX: number, clientY: number) => {
       const p = toWorld(clientX, clientY);
       startResize(cardId, corner, p.x, p.y);
+    },
+    [toWorld, startResize],
+  );
+
+  /** 群の枠の角。対象は「選んでいる全部」なので cardId は渡さない。 */
+  const handleGroupResizeStart = useCallback(
+    (corner: ResizeCorner, clientX: number, clientY: number) => {
+      const p = toWorld(clientX, clientY);
+      startResize(null, corner, p.x, p.y);
     },
     [toWorld, startResize],
   );
@@ -242,17 +254,17 @@ export function BoardView({ api }: BoardViewProps) {
     if (selectedCard) openCard(selectedCard);
   }, [selectedCard, openCard]);
 
-  /** 選択中のカードを最前面へ。重なって読めなくなったときの逃げ道。 */
+  /**
+   * 選択中のカードを最前面へ。重なって読めなくなったときの逃げ道。
+   * 複数選んでいるときは**互いの重なり順を保ったまま**まとめて上げる
+   * （採番の規則は PC と SP で共有している `features/shared/board/z-order`）。
+   */
   const handleBringToFront = useCallback(() => {
-    if (!selectedCard) return;
-    const maxZ = cards.reduce((max, c) => Math.max(max, c.zIndex), 0);
-    if (selectedCard.zIndex === maxZ) return;
-    const next = cards.map((c) =>
-      c.id === selectedCard.id ? { ...c, zIndex: maxZ + 1, userPositioned: true } : c,
-    );
+    const next = raiseManyToFront(cards, selectedIds);
+    if (next === null) return;
     setCards(next);
     savePositions(next);
-  }, [selectedCard, cards, setCards, savePositions]);
+  }, [cards, selectedIds, setCards, savePositions]);
 
   const handleDeleteCard = useCallback(
     (cardId: string) => {
@@ -262,6 +274,11 @@ export function BoardView({ api }: BoardViewProps) {
     },
     [cards, deleteCard],
   );
+
+  /** 選んでいる全部を消す。1 枚でも複数でも入り口は同じ。 */
+  const handleDeleteSelected = useCallback(() => {
+    for (const id of selectedIds) handleDeleteCard(id);
+  }, [selectedIds, handleDeleteCard]);
 
   const openSnippetDialog = useCallback(() => setSnippetDialog({ open: true }), []);
   /** 画像から読み取る。作成ダイアログを画像タブで開くので、1手で読み取りに着く。 */
@@ -305,9 +322,9 @@ export function BoardView({ api }: BoardViewProps) {
       if (dialogOpen) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedId) {
+        if (selectedIds.length > 0) {
           e.preventDefault();
-          handleDeleteCard(selectedId);
+          handleDeleteSelected();
         }
         return;
       }
@@ -330,7 +347,14 @@ export function BoardView({ api }: BoardViewProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, handleDeleteCard, dialogOpen, openSnippetDialog, openPhotoDialog, openOcrDialog]);
+  }, [
+    selectedIds,
+    handleDeleteSelected,
+    dialogOpen,
+    openSnippetDialog,
+    openPhotoDialog,
+    openOcrDialog,
+  ]);
 
   const visibleCardCount = cards.filter((c) => !c.removing).length;
 
@@ -338,7 +362,6 @@ export function BoardView({ api }: BoardViewProps) {
     <div
       {...verifyAttrs({
         unit: 'BoardView',
-        viewType,
         snippetOpen: snippetDialog.open,
         photoOpen: photoDialogOpen,
         percent: Math.round(scale * 100),
@@ -354,34 +377,28 @@ export function BoardView({ api }: BoardViewProps) {
       onDragLeave={intake.onDragLeave}
       onDrop={intake.onDrop}
     >
+      {/* 左上の出口（書斎が無効なら描かれない）。盤面はヘッダーを持たないので、
+          瓶（jar-view）と同じく隅に置く。日付ナビと表示単位の切り替えがあったころは
+          上段バーの中に並べていたが、ボードが 1 人に 1 枚になってバーごと無くなった。 */}
+      <BackLink placement="corner" />
+
       <CanvasViewport
         canvas={canvas}
         ariaLabel={t('canvas.aria_label')}
         style={{ backgroundColor: 'var(--bg)' }}
         onPointerMove={handleFramePointerMove}
         onPointerUp={onPointerUp}
-        onClick={deselect}
+        // 空きを押したら選択を解除する。ただし**掴んで動かした直後の click** は数えない。
+        // 指を離した位置が掴んだ要素の外だと、ブラウザは click を共通の親＝この盤面に
+        // 送るので、そのままだと「大きさを変え終えた瞬間に選択が消える」。
+        onClick={() => {
+          if (consumeGestureEnd()) return;
+          deselect();
+        }}
         background={<CanvasGrid canvas={canvas} />}
         overlay={
           // 操作 UI の上ではパンを始めない。
           <div data-canvas-no-pan="">
-            {/* 上段バー: 左端に日付、右端に表示単位。1本のバーの両端に置くことで、
-                左右に散らばって見えないようにする。 */}
-            <div
-              className={TOP_BAR_CLASS}
-              style={{
-                top: BOARD_INSET,
-                // 左端はサイドバー幅ぶん寄せる
-                // （--sidebar-width は (protected)/layout.tsx が <main> に生やしている）。
-                // 書斎が有効な間は左上に「書斎へ戻る」マークが浮くので、その席も避ける
-                // （避けないと日付ナビがマークの下に潜って押せない）。
-                left: `calc(var(--sidebar-width, 0px) + ${BOARD_INSET}px)`,
-                right: BOARD_INSET,
-              }}
-            >
-              <BoardDateNav dateKey={dateKey} viewType={viewType} onDateChange={setDateKey} />
-              <BoardViewSwitch viewType={viewType} onViewTypeChange={setViewType} />
-            </div>
             <CanvasZoomControls
               scale={scale}
               onZoomIn={zoomIn}
@@ -394,7 +411,7 @@ export function BoardView({ api }: BoardViewProps) {
                 二度変わらないよう、盤面のロード表示は1種類に揃える。 */}
             {showLoader && <PageLoading />}
 
-            {/* 取得に失敗したまま盤面が空だと「この日は何も無い」と区別がつかないので、
+            {/* 取得に失敗したまま盤面が空だと「まだ何も貼っていない」と区別がつかないので、
                 空表示ではなく理由と再試行を出す。カードが残っているときは（更新失敗でも
                 盤面は使えるので）そのまま表示を続ける。 */}
             {!loading && error && cards.length === 0 && (
@@ -412,7 +429,7 @@ export function BoardView({ api }: BoardViewProps) {
                 className="pointer-events-none absolute left-1/2 top-1/2 z-[1500] -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.2em]"
                 style={{ color: 'var(--date-color)', fontFamily: 'Inter, sans-serif' }}
               >
-                {t('empty')}
+                {t('nothing_pinned')}
               </div>
             )}
 
@@ -432,15 +449,25 @@ export function BoardView({ api }: BoardViewProps) {
             key={card.id}
             card={card}
             detail={detail}
-            isSelected={selectedId === card.id}
+            isSelected={selectedIds.includes(card.id)}
+            // つまみを出すのは 1 枚だけ選んでいるとき。複数のときは群の枠が持つ。
+            showHandles={selectedId === card.id}
             isDragging={draggingId === card.id}
             onPointerDown={handleCardPointerDown}
             onRotateStart={handleRotateStart}
             onResizeStart={handleResizeStart}
-            onDelete={handleDeleteCard}
             onClick={handleCardClick}
           />
         ))}
+
+        {/* 複数選んでいるときだけ出る群の枠。カードと同じ world 空間に置く。 */}
+        {groupBounds !== null && (
+          <SelectionFrame
+            bounds={groupBounds}
+            count={selectedIds.length}
+            onResizeStart={handleGroupResizeStart}
+          />
+        )}
       </CanvasViewport>
 
       {/* ドラッグ中の目印。受け取れることが分からないと、そもそも落としてもらえない。
@@ -478,10 +505,14 @@ export function BoardView({ api }: BoardViewProps) {
         onCreateSnippet={openSnippetDialog}
         onReadImage={openOcrDialog}
         onAddPhoto={openPhotoDialog}
-        selection={selectedCard ? { cardType: selectedCard.cardType } : null}
+        selection={
+          selectedIds.length > 0
+            ? { count: selectedIds.length, cardType: selectedCard?.cardType ?? null }
+            : null
+        }
         onOpenSelected={handleOpenSelected}
         onBringSelectedToFront={handleBringToFront}
-        onDeleteSelected={() => selectedCard && handleDeleteCard(selectedCard.id)}
+        onDeleteSelected={handleDeleteSelected}
       />
 
       {/* Snippet dialog */}
