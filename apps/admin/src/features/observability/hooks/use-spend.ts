@@ -14,7 +14,7 @@ import { parseJson } from '@/lib/json';
  *
  * したがって 実請求 ≧ 推定 が常態で、差は「推定に含めていない利用」を意味する。
  *
- * **用途別の内訳は actual 側にある**（actual.byModel）。cost_report を
+ * **用途別の内訳は actual 側にある**（actual.byWorkspace）。cost_report を
  * group_by[]=description で取るとモデル別に割れ、発酵 (sonnet-4-6) と画像の
  * 文字起こし (sonnet-5) でモデルが違うので、モデル別内訳がおおむね用途別の実額に
  * なる。推定で OCR を出す必要はない。
@@ -36,13 +36,30 @@ const actualDailyCostSchema = z.object({
   costUsd: z.number(),
 });
 
-/** モデル別の **実額**。合計は actual.totalCostUsd と一致する。 */
+/**
+ * モデル別の **実額**。合計は actual.totalCostUsd と一致する。
+ *
+ * **用途の軸ではない。** 同じモデルを複数の機能と CI が使うため、ここから
+ * 「どの機能にいくらかかったか」は読めない。用途別は byWorkspace を見る。
+ */
 const actualModelCostSchema = z.object({
   model: z.string(),
   costUsd: z.number(),
   byTokenType: z.array(z.object({ tokenType: z.string(), costUsd: z.number() })),
-  /** そのモデルを使っている Oryzae の機能。対応が無ければ null。 */
-  feature: z.string().nullable(),
+});
+
+/**
+ * Workspace 別の **実額** = 用途別の実額。合計は actual.totalCostUsd と一致する。
+ *
+ * Oryzae は機能ごとに API キーを分け、キーごとに Workspace を分けてある。
+ * workspaceName は Anthropic 側の名前そのままで、画面で用途名に読み替えない
+ * （読み替え表を持つと Console 側の改名に追従できず、古い名前を出し続ける）。
+ */
+const actualWorkspaceCostSchema = z.object({
+  workspaceId: z.string().nullable(),
+  workspaceName: z.string(),
+  costUsd: z.number(),
+  byModel: z.array(z.object({ model: z.string(), costUsd: z.number() })),
 });
 
 const estimatedDailyCostSchema = z.object({
@@ -75,8 +92,12 @@ const spendDataSchema = z.object({
     truncated: z.boolean(),
     message: z.string().nullable(),
     byModel: z.array(actualModelCostSchema),
+    /** 用途別（Workspace 別）の実額。画面で最初に見せるのはこちら。 */
+    byWorkspace: z.array(actualWorkspaceCostSchema),
     /** 内訳が返らなかった場合 true。空の byModel を「内訳ゼロ」と読ませない。 */
     groupingUnavailable: z.boolean(),
+    /** Workspace 名が引けず ID 表示になっている場合 true。 */
+    workspaceNamesUnavailable: z.boolean(),
   }),
   estimated: z.object({
     status: z.enum(['ok', 'error']),

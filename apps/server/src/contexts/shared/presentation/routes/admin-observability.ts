@@ -5,7 +5,6 @@ import { type ActualCostResult, fetchActualCost } from '../../infrastructure/ant
 import {
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
-  featureOfModel,
 } from '../../infrastructure/claude-pricing.js';
 import {
   aggregateCost,
@@ -294,17 +293,30 @@ export const adminObservability = new Hono<Env>()
         status: actual.kind,
         totalCostUsd: actual.kind === 'ok' ? actual.totalCostUsd : null,
         daily: actual.kind === 'ok' ? actual.daily : [],
-        // モデル別の実額。どのモデルがどの用途かは feature で添える。
-        // Anthropic は「用途」を知らないので、対応付けはこちらの知識。
+        // **用途別の実額は Workspace 別**。Oryzae は機能ごとに API キーを分け、
+        // キーごとに Workspace を分けてあるので、Workspace = 用途になる。
+        // モデル ID からの読み替えはやめた（同じモデルを複数の用途と CI が使う）。
+        byWorkspace:
+          actual.kind === 'ok'
+            ? actual.byWorkspace.map((w) => ({
+                workspaceId: w.workspaceId,
+                workspaceName: w.workspaceName,
+                costUsd: w.costUsd,
+                byModel: w.byModel.map((m) => ({ model: m.model, costUsd: m.costUsd })),
+              }))
+            : [],
+        // モデル別の実額。単価の検算（キャッシュが混ざっていないか等）に使う。
+        // **用途の軸ではない**ので、画面でも用途名を添えないこと。
         byModel:
           actual.kind === 'ok'
             ? actual.byModel.map((m) => ({
                 model: m.model,
                 costUsd: m.costUsd,
                 byTokenType: m.byTokenType,
-                feature: featureOfModel(m.model),
               }))
             : [],
+        // Workspace 名が引けず ID 表示になっている場合 true。
+        workspaceNamesUnavailable: actual.kind === 'ok' ? actual.workspaceNamesUnavailable : false,
         // 内訳が返らなかった場合 true。総額は正しいまま内訳だけ消えるので、
         // 空配列を「内訳ゼロ」と読ませないために別途返す。
         groupingUnavailable: actual.kind === 'ok' ? actual.groupingUnavailable : false,

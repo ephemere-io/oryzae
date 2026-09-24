@@ -3,12 +3,11 @@ import {
   type ActualCostResult,
   ANTHROPIC_COST_CONSOLE_URL,
   fetchActualCost,
-  type ModelActualCost,
+  type WorkspaceActualCost,
 } from '../../infrastructure/anthropic-cost-api.js';
 import {
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
-  featureOfModel,
 } from '../../infrastructure/claude-pricing.js';
 import { type ActualCostTrend, summarizeActualCostTrend } from '../../infrastructure/cost-trend.js';
 import { COLORS, notifyDiscord } from '../../infrastructure/discord-notify.js';
@@ -89,13 +88,36 @@ function percent(ratio: number): string {
   return `${sign}${Math.abs(ratio * 100).toFixed(0)}%`;
 }
 
-function fermentationActualUsd(byModel: ModelActualCost[]): number {
-  return byModel.find((m) => m.model === FERMENTATION_MODEL_ID)?.costUsd ?? 0;
+/**
+ * 発酵の実額が乗る Workspace 名（Anthropic Console で付けた名前そのもの）。
+ *
+ * 推定（DB のトークン × 単価）と実額を突き合わせるのに、発酵だけの実額が要る。
+ * モデル ID では引けない——同じモデルを CI や他の機能が使えば混ざるし、実際
+ * 2026-09-23 のレポートは発酵 2 件（$0.12）の行に org 全体の $6.44 を載せていた。
+ *
+ * Console で Workspace を改名したらここも直すこと。直し忘れても**嘘は出ない**:
+ * 一致しなければ null を返し、突き合わせ自体を見送る（下の注記が出る）。
+ */
+const FERMENTATION_WORKSPACE_NAME = 'oryzae-prod-fermentation';
+
+/**
+ * 発酵 Workspace の実額。見つからなければ null。
+ *
+ * **0 にフォールバックしてはいけない。** 0 と比べると「推定 $0.12 が実額 $0 と
+ * ずれている」＝ -100% という嘘の指摘が毎日出る。
+ */
+function fermentationActualUsd(byWorkspace: WorkspaceActualCost[]): number | null {
+  const ws = byWorkspace.find((w) => w.workspaceName === FERMENTATION_WORKSPACE_NAME);
+  return ws ? ws.costUsd : null;
 }
 
-/** 推定と実額のズレ。実額が 0 のときは比率にならないので null。 */
-function divergenceRatio(estimatedUsd: number, actualUsd: number): number | null {
-  if (actualUsd <= 0) return null;
+/**
+ * 推定と実額のズレ。比率にならない場合は null（＝突き合わせを見送る）。
+ *  - 実額が 0 以下: 割れない
+ *  - 実額が null: 発酵 Workspace が見つからなかった（改名・未作成）
+ */
+function divergenceRatio(estimatedUsd: number, actualUsd: number | null): number | null {
+  if (actualUsd === null || actualUsd <= 0) return null;
   return (estimatedUsd - actualUsd) / actualUsd;
 }
 
@@ -108,19 +130,19 @@ function treeLines(lines: string[]): string[] {
 }
 
 /**
- * 実額の内訳 1 行（「用途: 金額」）。読む人が知りたいのは「何に」であって
- * モデル名ではないので、用途を前に出す。
+ * 実額の内訳 1 行（「Workspace 名: 金額」）。
  *
- * 用途に読み替えられないモデルにはその旨を添える。アプリの機能のモデルはすべて
- * featureOfModel に登録されているはずだが、#529 のように登録漏れで落ちてくることも
- * あるので「アプリ外」と言い切らない。`(web_search)` `(内訳なし)` のような括弧付きは
- * モデルではなく cost_type の受け皿（anthropic-cost-api.ts の modelKeyOf）なのでそのまま。
+ * **Workspace 名をそのまま出す。**「fermentation だから発酵」のような読み替えはしない。
+ * 用途名を自前で持つと、Console 側で Workspace を足したり改名したときに、レポートだけが
+ * 古い名前を出し続ける。Oryzae の Workspace 名は `oryzae-prod-fermentation` のように
+ * それ自体が用途を表しているので、そのまま読めば足りる。
+ *
+ * 1 つの Workspace に複数の機能が入っている場合（ボード OCR と写真の文字起こしは
+ * どちらも oryzae-prod-ocr）は、その Workspace の中では分けられない。分けたくなったら
+ * Console で Workspace を分ける——コードを足す話ではない。
  */
-function formatModelLine(m: ModelActualCost): string {
-  const feature = featureOfModel(m.model);
-  if (feature) return `${feature} (${m.model}): ${usd(m.costUsd)}`;
-  if (m.model.startsWith('(')) return `${m.model}: ${usd(m.costUsd)}`;
-  return `${m.model}: ${usd(m.costUsd)} ← 用途不明（アプリ外の利用か登録漏れ）`;
+function formatWorkspaceLine(w: WorkspaceActualCost): string {
+  return `${w.workspaceName}: ${usd(w.costUsd)}`;
 }
 
 /**
@@ -137,7 +159,7 @@ function formatHeadline(actual: ActualCostOk, trend: ActualCostTrend | null): st
   return `${amount}（前日 ${usd(trend.previousUsd)}${change}）`;
 }
 
-/** 合計の配下に並べる内訳。 */
+/** 合計の配下に並べる内訳（Workspace = 用途別）。 */
 function formatBreakdownLines(actual: ActualCostOk): string[] {
   // grouping が効いていないと合計は正しいまま内訳だけ消えるので、その旨を出す。
   if (actual.groupingUnavailable) {
@@ -145,20 +167,20 @@ function formatBreakdownLines(actual: ActualCostOk): string[] {
       '内訳が取れませんでした（group_by が効いていない可能性）。合計は正しい値です',
     ]);
   }
-  if (actual.byModel.length === 0) return treeLines(['この日の課金なし']);
-  return treeLines(actual.byModel.map(formatModelLine));
+  if (actual.byWorkspace.length === 0) return treeLines(['この日の課金なし']);
+  return treeLines(actual.byWorkspace.map(formatWorkspaceLine));
 }
 
 /** 欄の名前にスコープを置く。数字ごとに「org 全体」と注記しなくて済む。 */
-const ACTUAL_FIELD_NAME = '請求額（Anthropic の org 全体の実額）';
+const ACTUAL_FIELD_NAME = '請求額（Anthropic の org 全体の実額・Workspace 別）';
 
 /**
  * 請求額の欄。「合計: 金額」の配下に用途別の内訳をぶら下げ、注記と確認先を添える。
  *
  *   合計: $0.3263（前日 $0.0325 +903%）
- *   ├ 発酵 (claude-sonnet-4-6): $0.2939
- *   └ OCR + 写真の文字起こし (claude-sonnet-5): $0.0325
- *   ※ 同じモデルを CI などが使えば、その分も同じ行に混ざる
+ *   ├ oryzae-prod-fermentation: $0.2939
+ *   ├ oryzae-prod-ocr: $0.0325
+ *   └ oryzae-ci: $0.0001
  *   確認先: 管理画面・Anthropic Console
  *
  * 9/14 のレポートへの指摘: 金額が 3 つ縦に並ぶだけでは「$0.3263 が何で、$0.2939 が何か」
@@ -175,9 +197,11 @@ function buildActualField(actual: ActualCostResult, trend: ActualCostTrend | nul
   } else {
     lines.push(`合計: ${formatHeadline(actual, trend)}`);
     lines.push(...formatBreakdownLines(actual));
-    // 実請求は org 全体の額。Oryzae のアプリ以外（CI のセキュリティレビュー・
-    // 手元の検証など）も含むので、用途の行にそれらが混ざりうる。
-    lines.push('※ 同じモデルを CI などが使えば、その分も同じ行に混ざる');
+    // 名前が引けなかった日は id が並ぶ。理由を書かないと「知らない Workspace に
+    // 課金されている」ように読める。
+    if (actual.workspaceNamesUnavailable) {
+      lines.push('※ Workspace 名を取得できず、一部は ID 表示（金額は正しい）');
+    }
   }
   lines.push(
     `確認先: [管理画面](${ADMIN_SPEND_URL})・[Anthropic Console](${ANTHROPIC_COST_CONSOLE_URL})`,
@@ -318,9 +342,24 @@ function buildNotices(params: {
   ) {
     // 比べた 2 つの数字をここに書く。平常時のレポートからは突き合わせの行を消したので、
     // ズレた日に読む人が探さなくて済むようにする。
+    const actualUsd = fermentationActualUsd(actual.byWorkspace);
     notices.push(
-      `発酵の推定 ${usd(aggregate.estimatedCostUsd)} が同モデルの実額 ${usd(fermentationActualUsd(actual.byModel))} と ${percent(divergence)} ずれている — モデル変更・プロンプトキャッシュ・単価改定を確認`,
+      `発酵の推定 ${usd(aggregate.estimatedCostUsd)} が ${FERMENTATION_WORKSPACE_NAME} の実額 ${usd(actualUsd ?? 0)} と ${percent(divergence)} ずれている — モデル変更・プロンプトキャッシュ・単価改定を確認`,
     );
+  }
+  // 突き合わせができなかった理由を出す。黙って出さないと「今日はズレなかった」と
+  // 読めてしまう（実際には比べていない）。発酵が 0 件の日は比べるものが無いので黙る。
+  if (
+    actual.kind === 'ok' &&
+    aggregate.fermentationCount > 0 &&
+    fermentationActualUsd(actual.byWorkspace) === null
+  ) {
+    notices.push(
+      `Workspace「${FERMENTATION_WORKSPACE_NAME}」が実額に無く、推定との突き合わせができていない — Console での改名・キーの設定先を確認`,
+    );
+  }
+  if (actual.kind === 'ok' && actual.workspaceNamesUnavailable) {
+    notices.push('Workspace 名を取得できなかった — 内訳の一部が ID 表示（金額は正しい）');
   }
   if (aggregate.untrackedCount > 0) {
     notices.push(`トークン未記録 ${aggregate.untrackedCount} 件 — その分は推定に乗っていない`);
@@ -413,7 +452,7 @@ export const cronCostAlert = new Hono()
 
       const divergence =
         actual.kind === 'ok'
-          ? divergenceRatio(aggregate.estimatedCostUsd, fermentationActualUsd(actual.byModel))
+          ? divergenceRatio(aggregate.estimatedCostUsd, fermentationActualUsd(actual.byWorkspace))
           : null;
 
       // すべて縦に並べる（inline を使わない）。3 カラムは幅次第で崩れて読めない。
@@ -491,17 +530,24 @@ export const cronCostAlert = new Hono()
                 status: 'ok',
                 costUsd: round6(actual.totalCostUsd),
                 truncated: actual.truncated,
+                /** 用途別の実額。読むならこちら。 */
+                byWorkspace: actual.byWorkspace.map((w) => ({
+                  workspaceId: w.workspaceId,
+                  workspaceName: w.workspaceName,
+                  costUsd: round6(w.costUsd),
+                })),
+                /** モデル別。用途とは一致しない（同じモデルを複数の用途が使う）。 */
                 byModel: actual.byModel.map((m) => ({
                   model: m.model,
                   costUsd: round6(m.costUsd),
-                  feature: featureOfModel(m.model),
                 })),
+                workspaceNamesUnavailable: actual.workspaceNamesUnavailable,
               }
             : { status: actual.kind },
         previousDayCost: trend?.previousUsd == null ? null : round6(trend.previousUsd),
         monthToDateCost: trend ? round6(trend.monthToDateUsd) : null,
         projectedMonthEndCost: trend ? round6(trend.projectedMonthEndUsd) : null,
-        /** 発酵のみの推定。用途別の実額は actualCost.byModel を見る。 */
+        /** 発酵のみの推定。用途別の実額は actualCost.byWorkspace を見る。 */
         estimatedCost: round6(aggregate.estimatedCostUsd),
         fermentationCount: aggregate.fermentationCount,
         completedCount: aggregate.completedCount,
