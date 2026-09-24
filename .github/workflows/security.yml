@@ -163,9 +163,9 @@ jobs:
       - name: Check API key availability
         id: key
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY_CI: ${{ secrets.ANTHROPIC_API_KEY_CI }}
         run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
+          if [ -n "$ANTHROPIC_API_KEY_CI" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
@@ -173,12 +173,12 @@ jobs:
       - name: Notice (no API key)
         if: steps.key.outputs.available != 'true'
         run: |
-          echo "::notice::ANTHROPIC_API_KEY が無いため Claude セキュリティレビューを skip しました。" \
+          echo "::notice::ANTHROPIC_API_KEY_CI が無いため Claude セキュリティレビューを skip しました。" \
                "fork からの PR の場合は想定どおりです。決定的ゲート(deterministic-gates/sast)は実行済みです。"
       - uses: anthropics/claude-code-security-review@main
         if: steps.key.outputs.available == 'true'
         with:
-          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY_CI }}
           comment-pr: true
           # migrations は除外しない。RLS ゲートは正規表現ベースで「構造」しか見られず、
           # 「ポリシーの条件式が参照している列が間違っている」ような意味的な誤りは
@@ -205,16 +205,16 @@ jobs:
       # なるのが最悪なので、未設定なら明示的に落とす。
       - name: Require API key
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY_CI: ${{ secrets.ANTHROPIC_API_KEY_CI }}
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::error::ANTHROPIC_API_KEY が未設定のため定期セキュリティ監査を実行できません。" \
+          if [ -z "$ANTHROPIC_API_KEY_CI" ]; then
+            echo "::error::ANTHROPIC_API_KEY_CI が未設定のため定期セキュリティ監査を実行できません。" \
                  "リポジトリの Settings > Secrets and variables > Actions で設定してください。"
             exit 1
           fi
       - uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_CI }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: '--allowed-tools Read,Grep,Glob,Bash(gh issue:*),Bash(pnpm security:rls)'
           prompt: |
