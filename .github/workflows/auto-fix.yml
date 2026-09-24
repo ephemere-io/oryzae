@@ -58,7 +58,7 @@ jobs:
     # workflow_run の条件は 3 重にしてある。head_branch だけで絞ると **公開リポジトリで穴になる**:
     # 攻撃者が fork の `main` ブランチから PR を出すと、その CI run の head_branch は `main` になる。
     # そのまま素通しすると、fork の PR の CI を意図的に失敗させるだけで、
-    # このジョブ（contents: write / pull-requests: write / ANTHROPIC_API_KEY 持ち）を起動でき、
+    # このジョブ（contents: write / pull-requests: write / ANTHROPIC_API_KEY_CI 持ち）を起動でき、
     # 攻撃者が書いた失敗ログがそのまま Claude のプロンプトに入り、
     # 生成された差分が自動マージされる。
     #
@@ -103,10 +103,10 @@ jobs:
       # 「動いているつもり」になるので、明示的に落とす。
       - name: API キーの確認
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY_CI: ${{ secrets.ANTHROPIC_API_KEY_CI }}
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::error::ANTHROPIC_API_KEY が未設定のため自動修正ループを実行できません。"
+          if [ -z "$ANTHROPIC_API_KEY_CI" ]; then
+            echo "::error::ANTHROPIC_API_KEY_CI が未設定のため自動修正ループを実行できません。"
             exit 1
           fi
 
@@ -126,7 +126,7 @@ jobs:
           if ! gh api "repos/${GITHUB_REPOSITORY}" --jq .full_name > .bot/whoami.txt 2> .bot/whoami.err; then
             echo "::error::AUTO_FIX_TOKEN で GitHub API を呼べませんでした。" \
                  "このシークレットに入れるのは **GitHub の fine-grained PAT**（github_pat_ で始まる）です。" \
-                 "Anthropic の API キー（sk-ant-... / ANTHROPIC_API_KEY のほう）ではありません。" \
+                 "Anthropic の API キー（sk-ant-... / ANTHROPIC_API_KEY_CI のほう）ではありません。" \
                  "シークレットを削除すれば GITHUB_TOKEN で動き、マージだけが人待ちになります。"
             sed 's/^/  /' .bot/whoami.err || true
             exit 1
@@ -433,7 +433,7 @@ jobs:
         continue-on-error: true # 途中で予算上限に当たっても、費用の記録まで進めたい
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_CI }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # gh / git commit / git push を渡さない。コミットとマージはワークフローの仕事で、
           # モデルに「自分で通してしまう」経路を残さないため。
