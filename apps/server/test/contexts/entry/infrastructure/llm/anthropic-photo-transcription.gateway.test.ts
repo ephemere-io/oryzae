@@ -1,19 +1,35 @@
 import { MAX_ENTRY_PHOTO_TEXT_LENGTH } from '@oryzae/shared';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // 実 LLM は呼ばず、generateText/anthropic をモックしてリクエスト構築と
 // レスポンス解析の「契約」を固定する（fermentation の gateway テストと同じ流儀）。
-const { generateTextMock, anthropicMock } = vi.hoisted(() => ({
-  generateTextMock: vi.fn(),
-  anthropicMock: vi.fn((modelId: string) => ({ __mockModel: modelId })),
-}));
+const { generateTextMock, anthropicMock, createAnthropicMock } = vi.hoisted(() => {
+  // anthropicMock は provider 本体（= createAnthropic の戻り値）。モデル ID で呼ばれる。
+  const anthropicMock = vi.fn((modelId: string) => ({ __mockModel: modelId }));
+  return {
+    generateTextMock: vi.fn(),
+    anthropicMock,
+    createAnthropicMock: vi.fn(() => anthropicMock),
+  };
+});
 vi.mock('ai', () => ({ generateText: generateTextMock }));
-vi.mock('@ai-sdk/anthropic', () => ({ anthropic: anthropicMock }));
+// 機能別キーで provider を作るようになったため、モックするのは createAnthropic。
+// 素の `anthropic` を生やしてしまうと、共通キーに戻す実装が通ってしまう。
+vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic: createAnthropicMock }));
 
 import {
   __INTERNAL,
   AnthropicPhotoTranscriptionGateway,
 } from '@/contexts/entry/infrastructure/llm/anthropic-photo-transcription.gateway.js';
+
+// 機能別キーは実行時に process.env から読む。未設定なら anthropicFor が throw するので、
+// ここで明示的に積む（テストが落ちる形で「キーを読んでいる」ことも担保される）。
+beforeEach(() => {
+  vi.stubEnv('ANTHROPIC_API_KEY_OCR_ENTRY', 'test-key-ocr-entry');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('buildPrompt', () => {
   it('ja では日本語・縦書きの前提を伝える', () => {
@@ -64,6 +80,8 @@ describe('AnthropicPhotoTranscriptionGateway', () => {
       outputTokens: 40,
     });
     expect(anthropicMock).toHaveBeenCalledWith(__INTERNAL.OCR_MODEL);
+    // ボード OCR と同じ claude-sonnet-5 なので、用途を分けているのはキーだけ。
+    expect(createAnthropicMock).toHaveBeenCalledWith({ apiKey: 'test-key-ocr-entry' });
 
     const request = generateTextMock.mock.calls[0][0];
     expect(request.messages).toHaveLength(1);

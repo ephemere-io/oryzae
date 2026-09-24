@@ -1,6 +1,6 @@
-import { anthropic } from '@ai-sdk/anthropic';
 import { MAX_ENTRY_PHOTO_TEXT_LENGTH } from '@oryzae/shared';
 import { generateText } from 'ai';
+import { anthropicFor } from '../../../shared/infrastructure/anthropic-provider.js';
 import { PHOTO_TRANSCRIPTION_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type {
   PhotoTranscriptionGateway,
@@ -73,7 +73,9 @@ export class AnthropicPhotoTranscriptionGateway implements PhotoTranscriptionGat
     language: string,
   ): Promise<PhotoTranscriptionResult> {
     const { text, usage } = await generateText({
-      model: anthropic(OCR_MODEL),
+      // キーは写真の文字起こし専用 (ANTHROPIC_API_KEY_OCR_ENTRY)。ボード OCR と同じ
+      // モデルなので、用途を分けているのはキー（＝Workspace）だけ。
+      model: anthropicFor('ocrEntry')(OCR_MODEL),
       maxOutputTokens: 4000,
       messages: [
         {

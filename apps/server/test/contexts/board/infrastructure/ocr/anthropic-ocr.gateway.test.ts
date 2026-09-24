@@ -1,22 +1,38 @@
 import { MAX_OCR_TEXT_LENGTH } from '@oryzae/shared';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // AI SDK (ai / @ai-sdk/anthropic) に対する characterization。
 // 実 LLM は呼ばず generateText/anthropic をモックし、extractText() の
 // リクエスト構築とレスポンス整形の「契約」を固定する。
 // （vercel-ai-analysis.gateway.test.ts と同じ二段構え：型表面は typecheck、
 //   マッピングロジックはこのテスト。）
-const { generateTextMock, anthropicMock } = vi.hoisted(() => ({
-  generateTextMock: vi.fn(),
-  anthropicMock: vi.fn((modelId: string) => ({ __mockModel: modelId })),
-}));
+const { generateTextMock, anthropicMock, createAnthropicMock } = vi.hoisted(() => {
+  // anthropicMock は provider 本体（= createAnthropic の戻り値）。モデル ID で呼ばれる。
+  const anthropicMock = vi.fn((modelId: string) => ({ __mockModel: modelId }));
+  return {
+    generateTextMock: vi.fn(),
+    anthropicMock,
+    createAnthropicMock: vi.fn(() => anthropicMock),
+  };
+});
 vi.mock('ai', () => ({ generateText: generateTextMock }));
-vi.mock('@ai-sdk/anthropic', () => ({ anthropic: anthropicMock }));
+// 機能別キーで provider を作るようになったため、モックするのは createAnthropic。
+// 素の `anthropic` を生やしてしまうと、共通キーに戻す実装が通ってしまう。
+vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic: createAnthropicMock }));
 
 import {
   __INTERNAL,
   AnthropicOcrGateway,
 } from '@/contexts/board/infrastructure/ocr/anthropic-ocr.gateway.js';
+
+// 機能別キーは実行時に process.env から読む。未設定なら anthropicFor が throw するので、
+// ここで明示的に積む（テストが落ちる形で「キーを読んでいる」ことも担保される）。
+beforeEach(() => {
+  vi.stubEnv('ANTHROPIC_API_KEY_OCR_BOARD', 'test-key-ocr-board');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function mockReply(text: string) {
   generateTextMock.mockResolvedValue({
@@ -53,6 +69,9 @@ describe('AnthropicOcrGateway.extractText', () => {
     await new AnthropicOcrGateway().extractText({ image, mediaType: 'image/jpeg' });
 
     expect(anthropicMock).toHaveBeenCalledWith(__INTERNAL.MODEL);
+    // 写真の文字起こしと同じ claude-sonnet-5 なので、モデルでは用途を区別できない。
+    // 実額を分けて読める根拠はキー（＝Workspace）が別であること。
+    expect(createAnthropicMock).toHaveBeenCalledWith({ apiKey: 'test-key-ocr-board' });
     // ここが守れるのは「発酵分析とは別枠で明示的に選んだモデルを、加工せず渡している」
     // ことだけ。ID そのものの正しさは型では守れない（AnthropicModelId は末尾が
     // `(string & {})` なので任意の文字列が通る）。綴りの誤りは実行時にしか出ない。
