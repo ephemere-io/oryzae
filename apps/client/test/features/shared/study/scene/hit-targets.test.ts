@@ -3,7 +3,9 @@ import {
   buildHitRegistry,
   HitRegistry,
   HOVER_SCALE,
+  pickNearestHit,
   resolveClickTarget,
+  SHELF_HIT_ID,
 } from '@/features/shared/study/scene/hit-targets';
 import type { Notebook } from '@/features/shared/study/types';
 
@@ -63,11 +65,20 @@ describe('buildHitRegistry', () => {
     shelfAsSingleTarget: false,
   });
 
-  it('瓶・机の冊・背表紙・ボードがすべて的になる', () => {
+  it('瓶・机の冊・背表紙・棚の枠・ボードがすべて的になる', () => {
     expect(pc.get('jar')?.target).toEqual({ kind: 'jar' });
     expect(pc.get('board')?.target).toEqual({ kind: 'board' });
     expect(pc.get('notebook-0')).not.toBeNull();
     expect(pc.get('spine-0')).not.toBeNull();
+    expect(pc.get(SHELF_HIT_ID)?.target).toEqual({ kind: 'archive' });
+    expect(pc.get(SHELF_HIT_ID)?.label).toBe('archive');
+  });
+
+  it('過去の月が無くても、PC の棚の枠は的として残る（触れると ARCHIVE、押すと全月の一覧）', () => {
+    const fresh = buildHitRegistry({ desk: DESK, shelf: [], shelfAsSingleTarget: false });
+    expect(fresh.get('spine-0')).toBeNull();
+    expect(fresh.get(SHELF_HIT_ID)?.label).toBe('archive');
+    expect(fresh.get(SHELF_HIT_ID)?.target).toEqual({ kind: 'archive' });
   });
 
   it('当月の手帳（積みのいちばん上）と鉛筆は新規執筆、過去月はその月の一覧', () => {
@@ -122,6 +133,25 @@ describe('buildHitRegistry', () => {
   it('id が重複しない', () => {
     const ids = pc.ids();
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe('pickNearestHit', () => {
+  it('枠が先頭で奥に背表紙があれば背表紙（枠の当たりは背表紙を包んでいる）', () => {
+    expect(pickNearestHit(['shelf', 'spine-2', 'spine-2', 'shelf'])).toBe('spine-2');
+  });
+
+  it('枠しか当たっていなければ枠', () => {
+    expect(pickNearestHit(['shelf', 'shelf'])).toBe('shelf');
+  });
+
+  it('枠の奥にある背表紙以外の物（板など）は拾わない', () => {
+    expect(pickNearestHit(['shelf', 'shelf', 'board'])).toBe('shelf');
+  });
+
+  it('枠が先頭でなければ手前のものをそのまま', () => {
+    expect(pickNearestHit(['notebook-0', 'shelf'])).toBe('notebook-0');
+    expect(pickNearestHit([])).toBeNull();
   });
 });
 

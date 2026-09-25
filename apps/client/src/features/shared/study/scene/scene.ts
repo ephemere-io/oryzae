@@ -8,6 +8,7 @@
  */
 
 import {
+  Box3,
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
@@ -86,7 +87,9 @@ import {
   type HitHint,
   type HitId,
   HOVER_SCALE,
+  pickNearestHit,
   resolveClickTarget,
+  SHELF_HIT_ID,
 } from './hit-targets';
 import {
   bubbleCount,
@@ -709,10 +712,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function raycast(): { id: HitId | null; object: Object3D | null } {
     raycaster.setFromCamera(pointer, camera);
     const intersects = raycaster.intersectObjects(content.hitboxes, false);
-    const first = intersects[0];
-    if (!first) return { id: null, object: null };
-    const hitId = first.object.userData.hitId;
-    if (typeof hitId !== 'string') return { id: null, object: null };
+    // 棚の枠は背表紙を包むので、手前の面はいつも枠が先に当たる。奥に背表紙があればそちら。
+    const ids = intersects
+      .map((hit) => hit.object.userData.hitId)
+      .filter((id): id is string => typeof id === 'string');
+    const hitId = pickNearestHit(ids);
+    const first = intersects.find((hit) => hit.object.userData.hitId === hitId);
+    if (!first || hitId === null) return { id: null, object: null };
     // 拡大するのは見えている方。ヒットボックスは不可視なので、そこを拡大しても何も起きない。
     const visible = first.object.userData.parentGroup;
     return { id: hitId, object: visible instanceof Object3D ? visible : first.object };
@@ -1825,12 +1831,22 @@ function buildHitboxes(options: {
   if (options.shelfAsSingleTarget) {
     // SP は棚ごと 1 つの的。背表紙 1 本は指より細く、当たりを広げると隣の月を拾う。
     box(
-      'shelf',
+      SHELF_HIT_ID,
       [2.8, 2.0, 1.2],
       new Vector3(layout.shelf.position.x, layout.shelf.position.y + 0.9, layout.shelf.position.z),
       options.shelfGroup,
     );
   } else {
+    // PC は枠と背表紙の両方。枠の当たりは見えている棚の大きさから取る（少し余らせる）。
+    // 背表紙の当たりを包むので、光線を拾うときに背表紙を優先する（`pickNearestHit`）。
+    // 過去の月が無い人の棚は背表紙が 0 本で、枠が無いと触れても何も起きなかった。
+    // 棚は机のグループの子なので、world の姿勢を先祖ごと更新してから測る（机の冊が 0 冊だと
+    // ここまでに誰も先祖を更新していない）。
+    options.shelfGroup.updateWorldMatrix(true, true);
+    const bounds = new Box3().setFromObject(options.shelfGroup);
+    const size = bounds.getSize(new Vector3());
+    const center = bounds.getCenter(new Vector3());
+    box(SHELF_HIT_ID, [size.x + 0.2, size.y + 0.2, size.z + 0.2], center, options.shelfGroup);
     options.shelf.forEach((spine, index) => {
       const world = new Vector3();
       spine.getWorldPosition(world);

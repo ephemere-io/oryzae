@@ -96,6 +96,45 @@ describe('HelpPanel', () => {
     expect(document.querySelector(SCREEN)?.getAttribute('data-verify-active')).toBe('none');
   });
 
+  it('見取り図で留めた札は、画面を移ると外れる（ボードの 1 枚に書庫の説明が居座っていた）', () => {
+    const props: HelpPanelProps = {
+      texts: TEXTS,
+      hovered: null,
+      screenTopic: 'study',
+      focused: null,
+      onFocus: vi.fn(),
+      query: '',
+      onQueryChange: vi.fn(),
+      matches: [],
+      remote: 'idle',
+      onClose: vi.fn(),
+      onOpenHref: vi.fn(),
+    };
+    const view = render(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HelpPanel {...props} />
+      </NextIntlClientProvider>,
+    );
+    const archive = document.querySelector(`${SCREEN} [data-part="archive"]`);
+    if (!archive) throw new Error('見取り図に棚が無い');
+    fireEvent.click(archive);
+    expect(document.querySelector(SCREEN)?.getAttribute('data-verify-active')).toBe('archive');
+    expect(document.querySelector(SCREEN)?.textContent).toContain(
+      jaMessages.help.topics.archive.body,
+    );
+
+    view.rerender(
+      <NextIntlClientProvider locale="ja" messages={jaMessages}>
+        <HelpPanel {...props} screenTopic="board" />
+      </NextIntlClientProvider>,
+    );
+    const card = document.querySelector(SCREEN);
+    expect(card?.getAttribute('data-verify-screen')).toBe('board');
+    expect(card?.getAttribute('data-verify-active')).toBe('none');
+    expect(card?.textContent).not.toContain(jaMessages.help.topics.archive.body);
+    expect(card?.textContent).toContain(jaMessages.help.topics.board.body);
+  });
+
   it('頭の 1 枚に「開く」は無い（行き先へは一覧から）', () => {
     renderPanel({ screenTopic: 'study', hovered: 'jar' });
     expect(document.querySelector(SCREEN)?.textContent).not.toContain(jaMessages.help.open_topic);

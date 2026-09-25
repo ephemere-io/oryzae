@@ -218,7 +218,16 @@ export function HelpPanel({
           <>
             {/* 「ようこそ」の間だけ、チュートリアル以外が薄い（晴れると 500ms で戻る）。 */}
             <div className={dimClass}>
-              <HelpScreenCard screen={screen} parts={parts} texts={textOf} hovered={hovered} />
+              {/* key で画面ごとに作り直す。留めた札（と面の中の触れ）は 1 枚の中の状態なので、
+                  同じ部品のまま画面を移ると前の画面の札が残り、ボードの 1 枚に書庫の説明が
+                  居座っていた（実機レビュー）。 */}
+              <HelpScreenCard
+                key={screen.id}
+                screen={screen}
+                parts={parts}
+                texts={textOf}
+                hovered={hovered}
+              />
             </div>
             {/* チュートリアルの箱。灯ったとき地に余白があるよう、左右は面の余白へ 8px はみ出す。
                 行の左端は一覧と揃う。 */}
