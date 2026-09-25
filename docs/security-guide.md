@@ -74,7 +74,7 @@ repository があるが、**これは設計どおり**で IDOR ではない。�
 
 ## 自動監視の構成
 
-3 層。**上に行くほど確実で安価、下に行くほど広範囲だが確率的。**
+2 層。**上は確実で安価、下は広範囲だが確率的。**
 
 ### 層 1 — 決定的ゲート（毎 PR・API キー不要・無料）
 
@@ -102,25 +102,20 @@ entries where user_id = auth.uid())`）は条件を満たす。全ユーザー�
 CI を止めない（`verify-coverage-gate` と同じ段階導入の思想）。直したのに baseline に
 残っているとゲートが落ちる（baseline の腐敗防止）。
 
-### 層 2 — PR 差分の意味的レビュー（既定では停止）
+### PR 差分の AI レビューは CI では行わない（2026-09 に撤去）
 
-`anthropics/claude-code-security-review` が差分を読み、PR にインラインコメントする。
-観点は `.github/security/scan-instructions.md`、誤検知の抑制は
-`.github/security/false-positives.md` で制御する。
+以前は `anthropics/claude-code-security-review` を PR ごとに走らせる層があった
+（9/02 から既定で停止、9 月末に撤去）。費用が PR 数に比例するうえ、差分を見る作業は
+push 前にローカルで済ませるほうが速く安いため。
 
-**この 2 ファイルがこの層の価値のほぼ全て。** 汎用スキャナは「SQL injection」は見るが
-「この文字列は日記本文だから外に出してはいけない」は教えないと分からない。
-誤検知が続くとアラート全体が無視されるようになるため、誤検知フィルタの整備は
-検出観点の追加と同じくらい重要。
+**差分の AI レビューは push 前の hook（`.claude/settings.json` の PreToolUse）が担う。**
+観点は `.github/security/scan-instructions.md`、誤検知の除外基準は
+`.github/security/false-positives.md` を読んで従う。この 2 ファイルは下の定期監査と
+共用している。汎用スキャナは「SQL injection」は見るが「この文字列は日記本文だから
+外に出してはいけない」は教えないと分からない。誤検知が続くと指摘全体が読まれなくなるため、
+誤検知フィルタの整備は検出観点の追加と同じくらい重要。
 
-**既定では動かしていない。** 費用が PR 数に比例するのに対し、このリポジトリは
-月 40〜60 本の PR がマージされるため、全 PR で回すと月 1 万円規模になる。
-同じ「AI にしか見えない問題」は層 3 がリポジトリ全体に対して拾うので、そちらへ寄せた。
-
-有効化は GitHub の Settings > Secrets and variables > Actions > Variables で
-`ENABLE_PR_AI_REVIEW = true` を作るだけ（コード変更不要）。止めるときは変数を消す。
-
-### 層 3 — 定期のリポジトリ全体監査（月 2 回・→ Issue 起票）
+### 層 2 — 定期のリポジトリ全体監査（月 2 回・→ Issue 起票）
 
 差分レビューは構造上「既に main にある問題」を永久に見つけられない。
 毎月 2 日と 16 日に `anthropics/claude-code-action` がリポジトリ全体を監査し、
@@ -133,7 +128,7 @@ CI を止めない（`verify-coverage-gate` と同じ段階導入の思想）。
 （決定的ゲートは無料で全 PR に効き続ける）。頻度を変えるなら
 `.github/workflows/security.yml` の `cron` を編集する。
 
-このジョブは `ANTHROPIC_API_KEY` が無いと**明示的に失敗する**。静かに skip すると
+このジョブは `ANTHROPIC_API_KEY_CI`（Workspace `oryzae-ci`）が無いと**明示的に失敗する**。静かに skip すると
 「監視できているつもり」になるのが最悪だからで、意図的な設計。
 
 ### GitHub 標準機能と、private 化による制約
@@ -166,12 +161,12 @@ private では有料（GitHub Advanced Security / Code Security / Secret Protect
 
 現在このリポジトリは private なので fork 経由の攻撃面は無いが、
 **public に戻した瞬間にその経路が生きる**。
-`claude-code-security-review` は公式に「prompt injection に対して硬化されていない」と
-明記されている。したがって:
+CI の AI は定期監査（main を読む）だけで、PR の中身を AI に読ませるジョブは無い。
+それでも次は守る:
 
 - `pull_request_target` は使わない（fork PR にシークレットを渡さない）
-- fork PR では AI ジョブは自動 skip され、決定的ゲートのみが走る
-- 合否を担保するのは層 1 であり、AI レビューはあくまで補助
+- PR の内容を AI のプロンプトに流し込むジョブを CI に足さない（足すなら fork PR を除外する）
+- 合否を担保するのは層 1 であり、AI 監査はあくまで補助
 
 ## ローカルでの検証
 

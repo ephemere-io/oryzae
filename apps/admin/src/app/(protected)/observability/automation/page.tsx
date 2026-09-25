@@ -8,8 +8,6 @@ import {
   tokenSpendingAutomations,
 } from '@/features/automation/inventory';
 
-const LEDGER_ISSUE_URL = 'https://github.com/ephemere-io/oryzae/issues/578';
-
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-md border border-border p-3">
@@ -50,16 +48,11 @@ export default function AutomationPage() {
       <AutomationTable automations={AUTOMATIONS} />
 
       <p className="text-xs text-muted-foreground">
-        トークンの使用額と実行履歴は{' '}
-        <a
-          href={LEDGER_ISSUE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-foreground"
-        >
-          台帳 Issue
-        </a>
-        で見られる。仕組みの説明は <code>docs/auto-fix-loop-guide.md</code>。
+        トークンの使用額は{' '}
+        <Link href="/observability/spend" className="underline hover:text-foreground">
+          AI Spend
+        </Link>
+        の Workspace 別内訳（CI は <code>oryzae-ci</code>）で見られる。
       </p>
     </div>
   );
