@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import { ActionPalette } from '@/components/ui/action-palette';
+import { PageLoading } from '@/components/ui/page-loading';
 import { QuestionListIcon } from '@/components/ui/palette-icons';
 import { useFermentationDetails } from '@/features/shared/fermentation/hooks/use-fermentation-details';
 import { useFermentationHistory } from '@/features/shared/fermentation/hooks/use-fermentation-history';
@@ -12,7 +13,6 @@ import { useFermentationInbox } from '@/features/shared/fermentation/hooks/use-f
 import { useJarLayoutSave } from '@/features/shared/fermentation/hooks/use-jar-layout-save';
 import type { JarQuestion } from '@/features/shared/questions/types';
 import { type MapQuestion, SpJarMap } from '@/features/sp/fermentation/components/sp-jar-map';
-import { SpJarMapSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
 import { SpQuestionZoom } from '@/features/sp/fermentation/components/sp-question-zoom';
 import type { ApiClient } from '@/lib/api';
 import { placeInSlot, useSpChrome } from '@/lib/sp-chrome-context';
@@ -152,9 +152,12 @@ export function SpJar({
       })}
     >
       {/* 取得中に「問いがありません」を出すと、一瞬「問いを消してしまった」ように見える。
-          取れていない間は枠のまま待つ。 */}
+          取れていない間はロード表示のまま待つ。ルートのロード表示と同じもの（枠 → ローダー → 本体と
+          二度変わらないように）。瓶はキャンバスなので枠は置かない（`jar-route-loading.tsx`）。 */}
       {loading ? (
-        <SpJarMapSkeleton />
+        <div className="relative flex-1">
+          <PageLoading />
+        </div>
       ) : mapQuestions.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-5 px-10 text-center">
           <p className="text-sm leading-relaxed opacity-60">{t('no_questions')}</p>

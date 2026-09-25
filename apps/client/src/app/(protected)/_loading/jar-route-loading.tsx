@@ -2,25 +2,23 @@
 
 import { DeviceView } from '@/components/device-view';
 import { PageLoading } from '@/components/ui/page-loading';
-import { SpJarSkeleton } from '@/features/sp/fermentation/components/sp-jar-skeleton';
 
 /**
- * `/jar` のロード表示。同じ URL でも端末で画面の種類そのものが違うので、出すものも変える。
+ * `/jar` のロード表示。PC も SP も `PageLoading`。
  *
- * - PC: 中央に瓶が浮かぶ**キャンバス**。並ぶコンテンツが無く、予告できる枠が無い
- *   （瓶の形を薄く描いても「これから出るレイアウト」の予告にはならず、本物が来た瞬間に
- *   全部差し替わるだけ）。素直に `PageLoading` を出す。
- * - SP: 届いた手紙の**一覧**。行の形が決まっているのでスケルトンが本来の役に立つ。
+ * 瓶は方眼の上に壜と問いの円が散らばる**キャンバス**で、円の位置は問いごとにサーバーに保存されている。
+ * 枠を先に置いても位置が当たらず、予告にならない（ボードと同じ理由。`board-route-loading.tsx`）。
+ *
+ * SP は以前「壜のまわりを問いが回る」形だった頃のスケルトン（灰色の壜と、まわりに小さな円 3 つ）を
+ * 出していた。瓶を今の形（方眼・線画の壜・大きな円）に変えたあとも残っていて、開くたびに**前の画面の
+ * 形が一瞬出る**ように見えていた（実機レビュー #616: 「瓶画面を開く時に、以前作った回転表示の痕跡が
+ * 一瞬表示される」）。
  */
 export function JarRouteLoading() {
-  return (
-    <DeviceView
-      sp={<SpJarSkeleton />}
-      pc={
-        <div className="absolute inset-0">
-          <PageLoading />
-        </div>
-      }
-    />
+  const loading = (
+    <div className="absolute inset-0">
+      <PageLoading />
+    </div>
   );
+  return <DeviceView pc={loading} sp={loading} />;
 }

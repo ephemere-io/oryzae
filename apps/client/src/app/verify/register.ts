@@ -105,7 +105,6 @@ import '@/features/pc/questions/components/question-timeline-skeleton.verify';
 import '@/features/sp/account/components/sp-account-page-skeleton.verify';
 import '@/features/sp/entries/components/sp-entry-editor-skeleton.verify';
 import '@/features/sp/entries/components/sp-entry-list-skeleton.verify';
-import '@/features/sp/fermentation/components/sp-jar-skeleton.verify';
 import '@/features/sp/questions/components/sp-questions-skeleton.verify';
 // リファレンス用の自己完結サンプル（削除可）
 import '@/lib/verify/example-progress.verify';

@@ -200,15 +200,17 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'loading-shows-frame-not-empty-message',
-      description: '取得中は枠だけ出す（0件の案内を出さない）',
+      id: 'loading-shows-loader-not-empty-message',
+      description:
+        '取得中はロード表示だけ出す（0件の案内も、前の形の枠も出さない。瓶はキャンバスで枠は予告にならない）',
       onlyFixtures: ['loading'],
       check: ({ root, contract }) => {
-        const skeleton = root.querySelector('[data-skeleton-slot="orbit"]');
+        const loader = root.querySelector('[data-testid="page-loading"]');
+        const oldFrame = root.querySelector('[data-skeleton-slot]');
         const saysEmpty = (root.textContent ?? '').includes('問いがまだありません');
         return (
-          (contract.loading === 'true' && skeleton !== null && !saysEmpty) ||
-          `loading=${contract.loading}, 枠=${skeleton !== null}, 0件の案内=${saysEmpty}（取得中に「ありません」を出すと問いを消したように見える）`
+          (contract.loading === 'true' && loader !== null && oldFrame === null && !saysEmpty) ||
+          `loading=${contract.loading}, ロード表示=${loader !== null}, 枠=${oldFrame !== null}, 0件の案内=${saysEmpty}（取得中に「ありません」を出すと問いを消したように見える／枠は前の画面の形に見える）`
         );
       },
     },
