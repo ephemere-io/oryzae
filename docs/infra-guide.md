@@ -59,9 +59,9 @@ client と admin で別プロジェクト。ビルド順序: shared → server �
 | カテゴリ | 変数 | 用途 |
 |---|---|---|
 | Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | DB・認証 |
-| AI | `ANTHROPIC_API_KEY` | fermentation の LLM 呼び出し（Anthropic API 直叩き、issue #352） |
-| AI | `ANTHROPIC_ADMIN_KEY` | 実請求額の取得（Admin API `cost_report`）。コスト日次レポート・admin Spend 画面。org 管理者のみ発行可。未設定でも動作（推定のみになる） |
-| AI | `AI_GATEWAY_API_KEY` | #352 以前の `generation_id` レコードを `/costs` 一覧で解決するフォールバックのみ |
+| AI | `ANTHROPIC_API_KEY_FERMENTATION` / `_OCR_BOARD` / `_OCR_ENTRY` | 機能ごとの LLM 呼び出し。キーごとに Workspace を分けてあり、それが用途別の実額になる。共通キーへのフォールバックは無く、未設定なら落ちる（`anthropic-provider.ts`）。`oryzae-client` と `oryzae-admin` の両方に要る（admin からも発酵を手動実行できるため） |
+| AI | `ANTHROPIC_ADMIN_KEY` | 実請求額の取得（Admin API `cost_report`・List Workspaces）。コスト日次レポート・admin Spend 画面。Workspace に紐づかない Admin キーでないと読めない。モデルは叩けないので課金は発生しない。未設定でも動作（推定のみになる） |
+| AI（CI） | `ANTHROPIC_API_KEY_CI`（GitHub Secrets） | 月 2 回の定期セキュリティ監査。Workspace `oryzae-ci` |
 | AI | `TYPESAFE_API_KEY` | ヘルプの検索（`POST /api/v1/help/search`）だけが使う。書かれた「したいこと」を TypeSafe AI System One（Jev）で話題へ振り分ける。任意。未設定なら手元の照合だけで動く |
 | PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `POSTHOG_PERSONAL_API_KEY` | ユーザー行動分析 |
 | Sentry | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | エラー監視 |

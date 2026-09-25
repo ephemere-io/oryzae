@@ -5,15 +5,17 @@
  * spend API (`gateway.getSpendReport`) には実績が一切入らなくなった。実額の正は
  * Anthropic の cost_report だけなので、コスト画面と日次レポートはここを参照する。
  *
- * ## 用途別の内訳も **実額** で取る（推定しない）
+ * ## 用途別の内訳は **Workspace 別の実額** で取る（モデルから推測しない）
  *
- * `group_by[]=description` を付けると、各 result に `model` / `token_type` /
- * `service_tier` が入る。Oryzae は発酵 (claude-sonnet-4-6) と画像の文字起こし
- * (claude-sonnet-5) で別モデルを使っているので、**モデル別の内訳がおおむね
- * 用途別の実額**になる。自前でトークンを記録して単価を掛ける必要はない。
+ * `group_by[]=workspace_id&group_by[]=description` の 2 軸で取る（cost_report の
+ * ドキュメントに載っている組み合わせそのもの）。Oryzae は機能ごとに API キーを分け、
+ * キーごとに Workspace を分けてあるので、**Workspace 別の実額＝用途別の実額**になる。
  *
- * 「おおむね」なのは 1:1 ではないから。board の OCR と写真の文字起こしは同じ
- * claude-sonnet-5 なので 1 行に混ざる（featureOfModel が両方の名前を返す）。
+ * **モデル別では用途を割れない。** 以前はモデル ID から用途を読み替えていたが、
+ * (a) ボード OCR と写真の文字起こしは同じ claude-sonnet-5 で区別できず、
+ * (b) CI の Claude がアプリと同じモデルを使えば同じ行に混ざる。実際 2026-09-15 に
+ * 定期セキュリティ監査の消費が「OCR $6.46」として報告され、2026-09-23 には
+ * 発酵 2 件（実際は $0.12）に $6.44 全額が積まれた。モデルは用途ではない。
  *
  * これはキャッシュ読み書き・値引き・課金丸めも反映済みの実額なので、自前推定より
  * 正確でもある（`token_type` に cache_read / cache_creation が現れる）。
@@ -26,11 +28,15 @@
  *   - amount は「最小通貨単位（セント）の10進文字列」。100 で割って USD にする。
  *   - 反映ラグは通常5分程度。直近数分の利用は載らないことがある。
  *   - Priority Tier のコストは cost_report に含まれない（Oryzae は standard のみ）。
- *   - cost_report の group_by は `description` / `workspace_id` のみ。api_key 別には
- *     割れないので、**同じ org の他の利用（CI のセキュリティレビュー等）は同じモデルの
- *     バケットに混ざる**。分離するには Anthropic Console で Workspace を分ける。
+ *   - cost_report の group_by は `description` / `workspace_id` のみ。**api_key 別には
+ *     割れない**（Console の Cost 画面はキー別に割れるので、API より細かい）。
+ *     1 つの Workspace に複数のキーを置くと、その中では分けられない。
+ *   - default workspace の利用は `workspace_id` が **null** で返る（ドキュメント明記）。
+ *     推測ではないので DEFAULT_WORKSPACE_LABEL として明示的に扱う。
  */
 const COST_REPORT_URL = 'https://api.anthropic.com/v1/organizations/cost_report';
+/** Workspace の id → 名前を引く。cost_report は id しか返さない。 */
+const WORKSPACES_URL = 'https://api.anthropic.com/v1/organizations/workspaces';
 /**
  * 実額の出典（人が見る側）。画面・通知からここへ飛ばして数字を突き合わせられるようにする。
  * Console はモデル別に加えて **API キー別** にも割れるので、この API より細かく見られる。
@@ -56,6 +62,13 @@ const MAX_PAGES = 10;
  */
 const UNGROUPED_MODEL_LABEL = '(内訳なし)';
 const UNKNOWN_TOKEN_TYPE_LABEL = '(その他)';
+/**
+ * `workspace_id: null` の行。ドキュメントに「default workspace の利用は null」と
+ * 明記されているので、これは推測ではなく仕様どおりの読み替え。
+ */
+const DEFAULT_WORKSPACE_LABEL = 'Default Workspace';
+/** Workspace 一覧の取得上限。Workspace は 1 org あたり最大 100。 */
+const WORKSPACE_PAGES = 5;
 
 interface DailyActualCost {
   /** UTC 日 (YYYY-MM-DD)。cost_report のバケットは UTC 固定。 */
@@ -69,12 +82,44 @@ interface TokenTypeActualCost {
   costUsd: number;
 }
 
-export interface ModelActualCost {
+interface ModelActualCost {
   /** cost_report の model。トークン以外のコストや内訳なしの場合は代替ラベル。 */
   model: string;
   costUsd: number;
   /** 単価の内訳。キャッシュ読み書きが混ざっていれば token_type に現れる。 */
   byTokenType: TokenTypeActualCost[];
+}
+
+/**
+ * Workspace 別の実額。Oryzae ではこれが **用途別の実額** にあたる。
+ *
+ * 表示名は Anthropic から取った Workspace 名をそのまま出す。「fermentation だから発酵」
+ * のような読み替え表は持たない——用途名を自前で持つと、Console で Workspace を
+ * 増やしたり改名したときに、画面だけが古い名前を出し続ける。
+ */
+/**
+ * Workspace の中のモデル別。**token_type の内訳は持たない。**
+ *
+ * ModelActualCost を使い回すと byTokenType が常に空配列で付いてきて、「キャッシュが
+ * 混ざっていない」ことの表明に見えてしまう。単価の検算をしたいときはトップレベルの
+ * byModel を見る。
+ */
+interface WorkspaceModelCost {
+  model: string;
+  costUsd: number;
+}
+
+export interface WorkspaceActualCost {
+  /** cost_report の workspace_id。default workspace は null。 */
+  workspaceId: string | null;
+  /**
+   * 表示名。解決順は (1) Workspace 一覧の名前 (2) null なら Default Workspace
+   * (3) 一覧に無い id はその id をそのまま。**推測した用途名は入れない。**
+   */
+  workspaceName: string;
+  costUsd: number;
+  /** この Workspace の中のモデル別内訳。合計は costUsd と一致する。 */
+  byModel: WorkspaceModelCost[];
 }
 
 /**
@@ -89,6 +134,19 @@ export type ActualCostResult =
       daily: DailyActualCost[];
       /** モデル別の実額（コスト降順）。合計は totalCostUsd と一致する。 */
       byModel: ModelActualCost[];
+      /**
+       * Workspace 別の実額（コスト降順）。**用途別に読むならこれを見る。**
+       * 合計は totalCostUsd と一致する。
+       */
+      byWorkspace: WorkspaceActualCost[];
+      /**
+       * Workspace 名を一覧から引けなかった場合 true（= 表示名が id のまま）。
+       *
+       * 金額は正しいので失敗にはしない。ただし画面に `wrkspc_01ABC…` が並ぶ理由を
+       * 呼び出し側が説明できるようにフラグで返す。黙って id を出すと「知らない
+       * Workspace が課金されている」ように読めてしまう。
+       */
+      workspaceNamesUnavailable: boolean;
       /**
        * `group_by[]` を送ったのに内訳が1件も返らなかった場合 true。
        *
@@ -127,6 +185,15 @@ function modelKeyOf(item: Record<string, unknown>): string {
   return UNGROUPED_MODEL_LABEL;
 }
 
+/**
+ * result 1 件をどの Workspace に積むか。null は default workspace（仕様どおり）。
+ * 文字列でない値が来たら null 扱いにする——勝手なキーを作ると合計が割れる。
+ */
+function workspaceKeyOf(item: Record<string, unknown>): string | null {
+  if (typeof item.workspace_id === 'string' && item.workspace_id !== '') return item.workspace_id;
+  return null;
+}
+
 function tokenTypeKeyOf(item: Record<string, unknown>): string {
   if (typeof item.token_type === 'string' && item.token_type !== '') return item.token_type;
   return UNKNOWN_TOKEN_TYPE_LABEL;
@@ -134,7 +201,12 @@ function tokenTypeKeyOf(item: Record<string, unknown>): string {
 
 interface ParsedBucket {
   daily: DailyActualCost;
-  items: { modelKey: string; tokenTypeKey: string; costUsd: number }[];
+  items: {
+    modelKey: string;
+    tokenTypeKey: string;
+    workspaceKey: string | null;
+    costUsd: number;
+  }[];
 }
 
 function parseBucket(bucket: unknown): ParsedBucket | null {
@@ -153,10 +225,51 @@ function parseBucket(bucket: unknown): ParsedBucket | null {
     items.push({
       modelKey: modelKeyOf(item),
       tokenTypeKey: tokenTypeKeyOf(item),
+      workspaceKey: workspaceKeyOf(item),
       costUsd: itemCost,
     });
   }
   return { daily: { date: startingAt.slice(0, 10), costUsd }, items };
+}
+
+/**
+ * Workspace の id → 名前。失敗しても **例外にしない**（null を返す）。
+ *
+ * 名前は表示のためだけのもので、金額の正しさには関わらない。ここで throw すると
+ * 「Workspace 名の API が落ちた日はコストレポートも来ない」ことになり、本末転倒。
+ * 取れなければ id をそのまま出し、その事実をフラグで上に伝える。
+ */
+async function fetchWorkspaceNames(adminKey: string): Promise<Map<string, string> | null> {
+  const names = new Map<string, string>();
+  let page: string | undefined;
+  try {
+    for (let i = 0; i < WORKSPACE_PAGES; i++) {
+      const params = new URLSearchParams({ limit: '100' });
+      if (page) params.set('page', page);
+      const res = await fetch(`${WORKSPACES_URL}?${params.toString()}`, {
+        headers: {
+          'x-api-key': adminKey,
+          'anthropic-version': ANTHROPIC_VERSION,
+          'User-Agent': 'Oryzae/1.0 (https://github.com/ephemere-io/oryzae)',
+        },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) return null;
+      const body: unknown = await res.json();
+      if (!isRecord(body) || !Array.isArray(body.data)) return null;
+      for (const item of body.data) {
+        if (!isRecord(item)) continue;
+        if (typeof item.id === 'string' && typeof item.name === 'string' && item.name !== '') {
+          names.set(item.id, item.name);
+        }
+      }
+      if (body.has_more !== true || typeof body.next_page !== 'string') break;
+      page = body.next_page;
+    }
+    return names;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -171,6 +284,7 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
 
   const daily: DailyActualCost[] = [];
   const perModel = new Map<string, { costUsd: number; byTokenType: Map<string, number> }>();
+  const perWorkspace = new Map<string | null, { costUsd: number; byModel: Map<string, number> }>();
   let page: string | undefined;
   let truncated = false;
 
@@ -183,7 +297,11 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
         limit: String(BUCKETS_PER_PAGE),
       });
       // 配列パラメータは `group_by[]`。これを付けないと results が1件に丸められ、
-      // model / token_type が null になって用途別の内訳が出せない。
+      // model / token_type / workspace_id が null になって内訳が出せない。
+      //
+      // 2 軸同時に指定する（cost_report のドキュメントに載っている組み合わせ）。
+      // workspace_id が **用途別**、description が各 Workspace 内の **モデル別**。
+      params.append('group_by[]', 'workspace_id');
       params.append('group_by[]', 'description');
       if (page) params.set('page', page);
 
@@ -221,6 +339,11 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
             (model.byTokenType.get(item.tokenTypeKey) ?? 0) + item.costUsd,
           );
           perModel.set(item.modelKey, model);
+
+          const ws = perWorkspace.get(item.workspaceKey) ?? { costUsd: 0, byModel: new Map() };
+          ws.costUsd += item.costUsd;
+          ws.byModel.set(item.modelKey, (ws.byModel.get(item.modelKey) ?? 0) + item.costUsd);
+          perWorkspace.set(item.workspaceKey, ws);
         }
       }
 
@@ -247,7 +370,37 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
       }))
       .sort((a, b) => b.costUsd - a.costUsd);
 
-    return { kind: 'ok', totalCostUsd, daily, byModel, groupingUnavailable, truncated };
+    // 名前を引くのは **解決すべき id があるときだけ**。課金が無い日や default
+    // workspace だけの日に Workspace 一覧を叩いても、返ってくる名前に使い道がない。
+    const idsToName = Array.from(perWorkspace.keys()).filter((id) => id !== null);
+    // 名前が取れなくても金額は返す。表示名は id にフォールバックし、その事実を返す。
+    const workspaceNames = idsToName.length > 0 ? await fetchWorkspaceNames(adminKey) : new Map();
+    const hasUnnamedWorkspace = idsToName.some((id) => !workspaceNames?.get(id));
+
+    const byWorkspace: WorkspaceActualCost[] = Array.from(perWorkspace.entries())
+      .map(([workspaceId, v]) => ({
+        workspaceId,
+        workspaceName:
+          workspaceId === null
+            ? DEFAULT_WORKSPACE_LABEL
+            : (workspaceNames?.get(workspaceId) ?? workspaceId),
+        costUsd: v.costUsd,
+        byModel: Array.from(v.byModel.entries())
+          .map(([model, costUsd]) => ({ model, costUsd }))
+          .sort((a, b) => b.costUsd - a.costUsd),
+      }))
+      .sort((a, b) => b.costUsd - a.costUsd);
+
+    return {
+      kind: 'ok',
+      totalCostUsd,
+      daily,
+      byModel,
+      byWorkspace,
+      groupingUnavailable,
+      workspaceNamesUnavailable: hasUnnamedWorkspace,
+      truncated,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return { kind: 'error', message };

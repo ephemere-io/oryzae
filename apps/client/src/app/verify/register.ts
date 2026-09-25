@@ -96,6 +96,7 @@ import '@/features/shared/auth/components/forgot-password-form.verify';
 import '@/features/shared/auth/components/login-form.verify';
 import '@/features/pc/navigation/components/sidebar.verify';
 import '@/features/shared/auth/components/signup-form.verify';
+import '@/features/shared/auth/components/auth-status.verify';
 // 画面ごとのロード枠（スケルトン）
 import '@/features/pc/account/components/account-page-skeleton.verify';
 import '@/features/pc/account/components/writing-stats-skeleton.verify';

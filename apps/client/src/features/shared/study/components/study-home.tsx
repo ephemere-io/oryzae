@@ -11,12 +11,14 @@ import { useHelpMode } from '@/features/shared/help/help-context';
 import { topicForStudyLabel } from '@/features/shared/help/topics';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
+import { traceMark } from '@/lib/trace';
 import { readStudyBackdrop, saveStudyBackdrop } from '../backdrop';
 import { DURATION, RENDER_LIMITS } from '../constants';
 import { studyHint } from '../hints';
 import { toStudyEntry, useStudyState } from '../hooks/use-study-state';
 import type { StudyLayout } from '../layout';
 import { overlayScope, staysInStudy, targetHref } from '../navigation';
+import { hasLiveScene } from '../scene/live';
 import type { HoverInfo, LabelPositions } from '../scene/scene';
 import type { StudyEntry, StudyTarget } from '../types';
 import { EntryListOverlay } from './entry-list-overlay';
@@ -79,7 +81,15 @@ export function StudyHome({ layout }: StudyHomeProps) {
    * - 出: 遷移の終盤に scene から合図が来たら 1 → 0。カメラが着くのと同時に消え終わるので、
    *   行き先の画面は同じ地の色の上に現れる
    */
-  const [entered, setEntered] = useState(false);
+  /**
+   * 扉から続けて入ってきたか。**最初のレンダーで決める**（`scene/live.ts`）。
+   *
+   * 認証画面のシーンがそのまま生きていて、カメラはもう扉をくぐって動いている最中。
+   * 部屋はすでに見えているので、入りの溶暗も、憶えた部屋の地も要らない — どちらも
+   * 掛けると一度薄くなって戻り、それが「一回切り替わる」ように見える。
+   */
+  const [throughDoor] = useState(hasLiveScene);
+  const [entered, setEntered] = useState(throughDoor);
   const [leaveMs, setLeaveMs] = useState<number | null>(null);
   /**
    * 戻り道に敷く「憶えた部屋」と、canvas が最初の 1 フレームを描いたか。
@@ -91,13 +101,18 @@ export function StudyHome({ layout }: StudyHomeProps) {
   const [backdrop, setBackdrop] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
 
-  useEffect(() => setBackdrop(readStudyBackdrop()), []);
+  useEffect(() => {
+    traceMark('書斎 mount');
+    // **扉から続けて入ってきたときは敷かない。** 部屋は生きたまま渡ってきている。
+    if (!throughDoor) setBackdrop(readStudyBackdrop());
+  }, [throughDoor]);
 
   useEffect(() => {
+    if (throughDoor) return;
     // 次のフレームで立てる。マウントと同じフレームだと transition が走らない。
     const id = requestAnimationFrame(() => setEntered(true));
     return () => cancelAnimationFrame(id);
-  }, []);
+  }, [throughDoor]);
 
   // ラベルは 3D 座標に貼り付くので、毎フレーム画面座標が届く。
   const [labelPositions, setLabelPositions] = useState<LabelPositions>(EMPTY_LABELS);
@@ -215,12 +230,20 @@ export function StudyHome({ layout }: StudyHomeProps) {
            * 引かせる。
            */
           opacity: leaveMs !== null ? 0 : entered || backdrop !== null ? 1 : 0,
-          transition: `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
+          // 扉から続けて入ってきたときは、入りの溶暗を持たない（部屋はもう見えている）。
+          // **出ていく溶暗はそのまま残す** — 消すと、書斎から出るとき画面が一瞬で入れ替わる。
+          transition:
+            throughDoor && leaveMs === null
+              ? undefined
+              : `opacity ${leaveMs ?? DURATION.screenFade}ms ease-out`,
         }}
       >
         <StudyCanvas
           onLeaveStart={setLeaveMs}
-          onReady={() => setCanvasReady(true)}
+          onReady={() => {
+            traceMark('書斎の 1 フレーム目');
+            setCanvasReady(true);
+          }}
           // 出ていく直前の 1 枚を憶える。戻り道はこれを地にして、部屋が「消えた」のでは
           // なく「遠くなった」だけに見えるようにする。
           onCapture={saveStudyBackdrop}

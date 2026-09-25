@@ -1,6 +1,6 @@
-import { anthropic } from '@ai-sdk/anthropic';
 import { MAX_OCR_TEXT_LENGTH } from '@oryzae/shared';
 import { generateText } from 'ai';
+import { anthropicFor } from '../../../shared/infrastructure/anthropic-provider.js';
 import { OCR_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type { OcrGateway, OcrResult } from '../../domain/gateways/ocr.gateway.js';
 
@@ -39,7 +39,10 @@ export const __INTERNAL = { cleanup, MODEL, PROMPT };
 export class AnthropicOcrGateway implements OcrGateway {
   async extractText(params: { image: ArrayBuffer; mediaType: string }): Promise<OcrResult> {
     const { text, usage } = await generateText({
-      model: anthropic(MODEL),
+      // キーはボード OCR 専用 (ANTHROPIC_API_KEY_OCR_BOARD)。写真の文字起こしと同じ
+      // claude-sonnet-5 を使うため、モデルでは 2 つの用途を区別できない。実額を分けて
+      // 読めるのはキー（＝Workspace）が別だからで、共通キーに戻すと 1 行に混ざる。
+      model: anthropicFor('ocrBoard')(MODEL),
       messages: [
         {
           role: 'user',

@@ -63,6 +63,15 @@ export interface StudyMaterials {
   /** 文字テクスチャに使う墨の色。線（`ink`）と同じ色を canvas に渡すためのもの。 */
   inkColor: string;
   solid: MeshBasicMaterial;
+  /**
+   * 遮る面。**深度を見ない線の上からも塗り潰せる**ほかは `solid` と同じ（色も不透明度も）。
+   *
+   * 瓶の輪郭と中の言葉は「不透明な瓶体を透かして見せる」ために深度を見ない（`xray` と
+   * `sprite`）。前に何も無い前提の描き方なので、扉と壁が前に来ると、そこを透かして瓶が浮く
+   * （実機の SP で、閉じた扉板の上と壁の上に瓶の輪郭が出ていた）。透明キューの後ろへ回して
+   * 塗り潰す。手前の物との前後は深度で決まるので、遮るのは本当に後ろにあるものだけ。
+   */
+  screen: MeshBasicMaterial;
   paper: MeshBasicMaterial;
   cork: MeshBasicMaterial;
   ink: LineBasicMaterial;
@@ -146,6 +155,16 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
       polygonOffsetUnits: 1,
     }),
   );
+  const screen = own(
+    new MeshBasicMaterial({
+      color: palette.solid,
+      // 中身は不透明（opacity 1）。透明キューへ回すためだけの `transparent`。
+      transparent: true,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+    }),
+  );
   const ink = own(new LineBasicMaterial({ color: palette.ink }));
   const grid = own(new LineBasicMaterial({ color: palette.grid }));
   const gridFaint = own(
@@ -159,6 +178,7 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
   return {
     inkColor: palette.ink,
     solid,
+    screen,
     paper,
     cork,
     ink,

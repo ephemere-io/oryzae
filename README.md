@@ -133,10 +133,9 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/fermentation-backend-guide.md` | Fermentation コンテキスト実装ガイド（発火の経路、初めての手紙、既読） |
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
-| `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 3 層構成 |
+| `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 2 層構成 |
 | `docs/glossary.md` | 画面に出る言葉の正（エントリー / 手帳 / 書庫 …）。同じものを 2 つの語で呼ばない |
 | `docs/help-mode-guide.md` | ヘルプモード（初回オンボーディングの置き換え）。話題のカタログ、触れると出る説明、検索欄と Jev の使い方 |
-| `docs/auto-fix-loop-guide.md` | 自動バグ修正ループ（起動経路、自動マージの許可領域、月額予算の守り方） |
 | `docs/i18n-guide.md` | apps/client の多言語運用（next-intl。`messages/*.json` が SSoT） |
 | `docs/verify-harness-rollout.md` | 検証ハーネス（`@oryzae/verify`）の設計判断と、部品に `.verify.tsx` を付ける手順 |
 | `docs/editor-effects-persistence.md` | エディタの視覚エフェクトをエントリ単位で永続化する設計 |

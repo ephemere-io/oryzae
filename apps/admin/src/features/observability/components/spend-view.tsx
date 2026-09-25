@@ -290,15 +290,54 @@ export function SpendView({
 
           {data.actual.status === 'ok' &&
             !data.actual.groupingUnavailable &&
-            data.actual.byModel.length > 0 && (
+            data.actual.byWorkspace.length > 0 && (
               <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  実請求額の内訳（用途別 = Workspace 別）
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  機能ごとに API キーを分け、キーごとに Anthropic の Workspace
+                  を分けてあります。名前は Anthropic 側のものをそのまま表示しています。
+                </p>
+                {data.actual.workspaceNamesUnavailable && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-500 mb-3">
+                    Workspace 名を取得できなかったため、一部は ID 表示です（金額は正しい値です）。
+                  </p>
+                )}
+                <div className="space-y-2 mb-6">
+                  {data.actual.byWorkspace.map((w) => (
+                    <div
+                      key={w.workspaceId ?? 'default'}
+                      className="rounded-lg border border-border/50 bg-card p-3"
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-sm">{w.workspaceName}</span>
+                        <span className="font-mono text-sm tabular-nums">
+                          {formatUsd(w.costUsd)}
+                        </span>
+                      </div>
+                      {/* この Workspace の中で何のモデルが動いたか。1 つの Workspace に
+                          複数の機能が入っている場合（ボード OCR と写真の文字起こし）は
+                          ここでも分けられない——分けたければ Console で Workspace を分ける。 */}
+                      {w.byModel.length > 0 && (
+                        <div className="mt-1.5 space-y-0.5 font-mono text-xs text-muted-foreground tabular-nums">
+                          {w.byModel.map((m) => (
+                            <div key={m.model} className="flex justify-between gap-3">
+                              <span>{m.model}</span>
+                              <span>{formatUsd(m.costUsd)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
                   実請求額の内訳（モデル別）
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Anthropic は「用途」を知りません。用途名は
-                  <strong>そのモデルを使っている機能</strong>を 指すだけで、同じモデルの他の利用（CI
-                  のレビュー等）も同じ行に含まれます。
+                  単価の検算用です。<strong>用途の軸ではありません</strong>—
+                  同じモデルを複数の機能と CI が使うため、ここから機能別の額は読めません。
                 </p>
                 {/* 数字の裏取り先。Console はモデル別に加えて API キー別にも割れるので、
                     「CI と混ざっているぶん」はそちらで切り分けられる。 */}
@@ -310,14 +349,7 @@ export function SpendView({
                   {data.actual.byModel.map((m) => (
                     <div key={m.model} className="rounded-lg border border-border/50 bg-card p-3">
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="font-mono text-sm">
-                          {m.model}
-                          {m.feature && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              ← {m.feature} のモデル
-                            </span>
-                          )}
-                        </span>
+                        <span className="font-mono text-sm">{m.model}</span>
                         <span className="font-mono text-sm tabular-nums">
                           {formatUsd(m.costUsd)}
                         </span>

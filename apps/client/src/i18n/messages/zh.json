@@ -31,7 +31,9 @@
       "submit_loading": "登录中...",
       "submit": "登录",
       "no_account_prefix": "还没有账户？",
-      "signup_link": "注册"
+      "signup_link": "注册",
+      "email_open": "使用邮箱登录",
+      "email_back": "返回"
     },
     "reset_password": {
       "invalid_link": "无效的重置链接。请重新申请密码重置。",
@@ -63,7 +65,9 @@
       "login_link": "登录",
       "capacity_remaining": "注册名额剩余 {remaining} / {max} 名",
       "capacity_full_title": "当前注册名额已满",
-      "capacity_full_body": "作为 Research Preview，注册名额限定为 {max} 名。我们将陆续增加。"
+      "capacity_full_body": "作为 Research Preview，注册名额限定为 {max} 名。我们将陆续增加。",
+      "email_open": "使用邮箱注册",
+      "email_back": "返回"
     },
     "error": {
       "invalid_credentials": "邮箱或密码不正确",

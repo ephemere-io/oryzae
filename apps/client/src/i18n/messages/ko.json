@@ -31,7 +31,9 @@
       "submit_loading": "로그인 중...",
       "submit": "로그인",
       "no_account_prefix": "계정이 없으신가요?",
-      "signup_link": "회원가입"
+      "signup_link": "회원가입",
+      "email_open": "이메일로 로그인",
+      "email_back": "뒤로"
     },
     "reset_password": {
       "invalid_link": "유효하지 않은 재설정 링크입니다. 다시 비밀번호 재설정을 시도해 주세요.",
@@ -63,7 +65,9 @@
       "login_link": "로그인",
       "capacity_remaining": "등록 가능 자리: {remaining} / {max}명 남음",
       "capacity_full_title": "현재 등록이 마감되었습니다",
-      "capacity_full_body": "Research Preview로서 등록은 {max}명으로 제한하고 있습니다. 순차적으로 확대할 예정입니다."
+      "capacity_full_body": "Research Preview로서 등록은 {max}명으로 제한하고 있습니다. 순차적으로 확대할 예정입니다.",
+      "email_open": "이메일로 가입",
+      "email_back": "뒤로"
     },
     "error": {
       "invalid_credentials": "이메일 또는 비밀번호가 올바르지 않습니다",

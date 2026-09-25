@@ -12,10 +12,16 @@ import { expect, test } from './fixtures/auth';
 type Page = import('@playwright/test').Page;
 type TouchPoint = { x: number; y: number; id: number };
 
-/** world ノードの transform（倍率と位置）。盤面が動いたかはここで見る。 */
+/**
+ * world ノードの transform（倍率と位置）。盤面が動いたかはここで見る。
+ *
+ * **`firstElementChild` で掴んではいけない。** 盤面の中では背景（方眼紙）が先に
+ * 描かれるので、最初の子は動かない要素になる。以前そう書いていて、パン・ピンチ・
+ * FIT の検査が 3 本とも「変わっていない」で落ちた（アプリは正しく動いていた）。
+ */
 async function worldTransform(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const world = document.querySelector('[role="application"]')?.firstElementChild;
+    const world = document.querySelector('[data-canvas-world]');
     return world instanceof HTMLElement ? world.style.transform : '';
   });
 }
@@ -201,13 +207,21 @@ test.describe('SP のボード（指で触る）', () => {
     if (!point) return;
 
     await page.touchscreen.tap(point.x, point.y);
-    await page.waitForTimeout(700);
 
-    const after = await cards(page);
-    const lowerCard = after.find((c) => c.text.includes(lower));
-    const upperAfter = after.find((c) => c.text.includes(upper));
-    expect(lowerCard, '下のカードが見つからない').toBeTruthy();
-    expect(upperAfter, '上のカードが見つからない').toBeTruthy();
-    expect(lowerCard?.z ?? 0).toBeGreaterThan(upperAfter?.z ?? 0);
+    // 固定時間で待たない。前面へ出すのは state の更新 → 再描画を挟むので、
+    // 待ち時間を決め打ちすると遅い回で取りこぼす（700ms 固定で実際に取りこぼした）。
+    // 「下が上を越えた」という**結果そのもの**が出るまで見る。
+    await expect
+      .poll(
+        async () => {
+          const after = await cards(page);
+          const lowerCard = after.find((c) => c.text.includes(lower));
+          const upperAfter = after.find((c) => c.text.includes(upper));
+          if (!lowerCard || !upperAfter) return null;
+          return lowerCard.z - upperAfter.z;
+        },
+        { message: 'タップした下のカードが前面に出ない', timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
   });
 });

@@ -93,6 +93,19 @@ export interface StudyLayout {
    * 部屋の外へ出られないための箱。天板の幅と、床から板の上辺までの高さで決める。
    */
   focusBounds: { x: [number, number]; y: [number, number]; z: [number, number] };
+  /**
+   * 書斎の入口（扉のある前室）。
+   *
+   * **扉は書斎の一部**。認証画面はここにカメラを置き、ログインすると扉をくぐってホームまで
+   * 1 本で移動する（`docs/oryzae-study/70-entrance.md`）。以前は扉だけの別シーンを持っていて、
+   * 入るときに 2 つのシーンをクロスフェードしていたが、それが「一回切り替わる」正体だった。
+   */
+  entrance: {
+    /** 前室を置く場所（扉の開口の中心・床の高さ）。 */
+    room: Vec3;
+    /** 認証画面のカメラ。 */
+    camera: { position: Vec3; target: Vec3 };
+  };
 }
 
 interface Vec2 {
@@ -139,6 +152,13 @@ export const PC_LAYOUT: StudyLayout = {
    * 少し下げる（2.5 → 2.4）のは、カメラを寄せても上辺の上に余白を残すため。
    */
   board: { position: vec3(1.5, 2.4, -4), scale: 1 },
+  // 扉は瓶の正面。開口越しに瓶が見え、くぐると机の全体が開ける。
+  // ホームのカメラを右へ 0.6 動かした（x 0 → 0.6）ので、扉と認証画面のカメラも同じだけ右へ
+  // （-3 → -2.4、-1.5 → -0.9）。ずらさないと、くぐる道がホームへ引かれて開口の軸から外れる。
+  entrance: {
+    room: vec3(-2.4, -2.9, 14),
+    camera: { position: vec3(-0.9, 0, 22.4), target: vec3(-0.9, -0.65, 14) },
+  },
   desk: PC_DESK,
   pen: vec3(2.55, -0.15, -0.1),
   shelf: { position: PC_SHELF, scale: 1, tiltX: 0 },
@@ -207,6 +227,12 @@ export const SP_LAYOUT: StudyLayout = {
   // 奥行きの差が画面の上下差になるため、ボードが上・瓶が中・手帳が下に積まれる。
   jar: vec3(-1.15, -1.2, -0.2),
   board: { position: vec3(0, 2.7, -4.2), scale: 0.68 },
+  // 縦画面は扉を右斜め前から見る（正面だと厚みも隙間も写らず、壁の長方形に読める）。
+  // 画角が広い（fov 58）ぶん、扉へは PC より寄る。
+  entrance: {
+    room: vec3(-3, -2.9, 14),
+    camera: { position: vec3(-0.9, -0.2, 20.9), target: vec3(-3.4, -0.35, 14) },
+  },
   desk: SP_DESK,
   // ペンは積みの左手前。右に置くと画面外に出る。
   pen: vec3(-1.9, -0.15, 1.2),

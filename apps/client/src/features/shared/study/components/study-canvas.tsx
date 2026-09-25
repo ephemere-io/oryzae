@@ -6,13 +6,16 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { StudyLayout } from '../layout';
 import { staysInStudy } from '../navigation';
+import { claimScene, releaseScene, takeLiveScene } from '../scene/live';
 import type { StudyTheme } from '../scene/materials';
 import {
   type HoverInfo,
   initScene,
   type LabelPositions,
+  type SceneListeners,
   type StudySceneHandle,
 } from '../scene/scene';
+import type { Sprig } from '../scene/sprig';
 import type { StudyState, StudyTarget } from '../types';
 
 export interface StudyCanvasProps {
@@ -39,6 +42,19 @@ export interface StudyCanvasProps {
   onCapture?: (dataUrl: string) => void;
   /** 最初の 1 フレームを描き終えたとき。敷いてある地を外してよい合図。 */
   onReady?: () => void;
+  /** 扉（認証画面）から入ってきた直後か。真ならカメラが入り口から寄って止まる。 */
+  arrival?: boolean;
+  /**
+   * 書斎の入口（扉の前）から始めるか。認証画面で真にする。
+   *
+   * 真のあいだカメラは扉の前に留まり、`handle.enterStudy()` で扉をくぐってホームへ動く。
+   * **シーンは 1 つ**なので、そこに画面の切り替わりは無い。
+   */
+  atEntrance?: boolean;
+  /** 一輪挿しに挿さる枝（七十二候）。入口を組むときだけ要る。 */
+  sprig?: Sprig;
+  /** シーンができた（または捨てた）とき。認証画面が扉を操作するために受け取る。 */
+  onHandle?: (handle: StudySceneHandle | null) => void;
 }
 
 /** `prefers-reduced-motion` を読む。SSR とテストでは false に倒す。 */
@@ -57,6 +73,10 @@ export function StudyCanvas({
   state,
   layout,
   theme,
+  arrival,
+  atEntrance,
+  sprig,
+  onHandle,
   onNavigate,
   onOpenOverlay,
   onHoverChange,
@@ -112,51 +132,117 @@ export function StudyCanvas({
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // 入ってきたかどうかはマウントの瞬間だけの話。effect の条件に入れると、
+  // 定置の途中で値が変わったときにシーンごと作り直してしまう。
+  const arrivalRef = useRef(arrival);
+  // 入口から始めるか・枝の姿も、作るときにしか使わない。
+  const entranceRef = useRef({ atEntrance, sprig });
+  const onHandleRef = useRef(onHandle);
+  onHandleRef.current = onHandle;
+
+  /** 畳みかけて、まだ捨てていないシーン。組み直されたら同じものを使い続ける。 */
+  const keptRef = useRef<{
+    handle: StudySceneHandle;
+    layout: StudyLayout;
+    theme: StudyTheme;
+  } | null>(null);
+  /** 捨てる予定。組み直されたら取り消す。 */
+  const teardownRef = useRef<number | null>(null);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // WebGL が無い環境ではシーンを作らない（呼び出し側が静止フォールバックを出す）。
-    let handle: StudySceneHandle;
-    try {
-      handle = initScene({
-        container,
-        state: stateRef.current,
-        layout,
-        theme,
-        reducedMotion: prefersReducedMotion(),
-        onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
-        onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
-        onLeaveStart: (durationMs) => callbacks.current.onLeaveStart?.(durationMs),
-        onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
-        onReady: () => callbacks.current.onReady?.(),
-        onPick: (target) => {
-          // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
-          // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
-          // 「机の手帳が開く → 別の景色の上に一覧が出る → しばらくして書斎に戻る」と、
-          // 押した物と関係のない芝居が挟まっていた。
-          if (staysInStudy(target)) {
-            callbacks.current.onOpenOverlay?.(target);
-            return;
-          }
-          // 出ていく的だけカメラが動く。中身は**カメラが動く前**に決まっている
-          // （targetHref が対象そのものから導く）。着いてから画面を切り替える。
-          handle.goTo(target).then(() => {
+    /** シーンから外へ出てくる知らせの受け口。作っても引き継いでも同じものを渡す。 */
+    const listeners = (scene: () => StudySceneHandle | null): SceneListeners => ({
+      onHoverChange: (hovered) => callbacks.current.onHoverChange?.(hovered),
+      onLabelPositions: (positions) => callbacks.current.onLabelPositions?.(positions),
+      onLeaveStart: (durationMs) => callbacks.current.onLeaveStart?.(durationMs),
+      onCapture: (dataUrl) => callbacks.current.onCapture?.(dataUrl),
+      onReady: () => callbacks.current.onReady?.(),
+      onPick: (target) => {
+        // 書斎の中で完結する的（棚の背表紙・過去月の手帳）は**カメラを動かさない**。
+        // 一覧は書斎の上に重なる窓であって、行き先ではない。動かしていた頃は
+        // 「机の手帳が開く → 別の景色の上に一覧が出る → しばらくして書斎に戻る」と、
+        // 押した物と関係のない芝居が挟まっていた。
+        if (staysInStudy(target)) {
+          callbacks.current.onOpenOverlay?.(target);
+          return;
+        }
+        // 出ていく的だけカメラが動く。中身は**カメラが動く前**に決まっている
+        // （targetHref が対象そのものから導く）。着いてから画面を切り替える。
+        scene()
+          ?.goTo(target)
+          .then(() => {
             callbacks.current.onNavigate(target);
           });
-        },
-      });
-    } catch {
-      // WebGL の初期化に失敗した。書斎は出ないが、画面全体は壊さない。
-      return;
+      },
+    });
+
+    // 畳むのを取り消す（下の注釈）。
+    if (teardownRef.current !== null) {
+      clearTimeout(teardownRef.current);
+      teardownRef.current = null;
     }
 
-    handleRef.current = handle;
+    /**
+     * 使えるシーン。順に、**畳みかけの自分のもの → 前の画面から生きているもの → 新しく作る**。
+     *
+     * - 畳みかけの自分のもの: StrictMode（開発時）は effect を「組む→畳む→組む」と回す。
+     *   畳んだ時点で捨てると、2 回目には引き継ぐものが無い
+     * - 前の画面のもの: 認証画面で扉の前に立っていたカメラは、もうホームへ向けて動き出している
+     *   （`scene/live.ts`）。作り直すとその動きが切れ、「画面が切り替わった」ように見える。
+     *   入れ物と受け口を付け替えるだけなら（`handle.adopt`）、描画も動きも途切れない
+     */
+    const kept = keptRef.current?.layout === layout && keptRef.current.theme === theme;
+    const existing =
+      (kept ? keptRef.current?.handle : null) ?? takeLiveScene({ layout, theme })?.handle ?? null;
+
+    let scene: StudySceneHandle | null = existing;
+    if (scene === null) {
+      // WebGL が無い環境ではシーンを作らない（呼び出し側が静止フォールバックを出す）。
+      try {
+        scene = initScene({
+          container,
+          state: stateRef.current,
+          layout,
+          theme,
+          arrival: arrivalRef.current,
+          atEntrance: entranceRef.current.atEntrance,
+          sprig: entranceRef.current.sprig,
+          reducedMotion: prefersReducedMotion(),
+          ...listeners(() => scene),
+        });
+      } catch {
+        return;
+      }
+    } else {
+      existing?.adopt({ container, listeners: listeners(() => scene) });
+      existing?.setState(stateRef.current);
+    }
+
+    const active = scene;
+    keptRef.current = { handle: active, layout, theme };
+    claimScene(active, container);
+    handleRef.current = active;
+    onHandleRef.current?.(active);
 
     return () => {
-      // dispose を怠ると再マウントで canvas が積み上がり、古い層のイベントだけが生き残る。
-      handle.dispose();
+      onHandleRef.current?.(null);
       handleRef.current = null;
+      /**
+       * **捨てるのは次のタスクまで待つ。**
+       *
+       * dispose を怠ると再マウントで canvas が積み上がり、古い層のイベントだけが生き残る。
+       * だが、その場で捨てると StrictMode の 2 回目や、ページの入れ替え（React は**次の画面を
+       * 組んでから前の画面を畳む**）で、いま描いているシーンを殺してしまう。ひと呼吸だけ待ち、
+       * その間に名乗り主が替わっていれば捨てない（`scene/live.ts`）。
+       */
+      teardownRef.current = window.setTimeout(() => {
+        teardownRef.current = null;
+        keptRef.current = null;
+        if (releaseScene(active, container)) active.dispose();
+      }, 0);
     };
     // **renderer は layout / theme が変わったときだけ作り直す。**
     // ここに state を入れていたせいで、取得が落ち着くまでの数回の更新でそのつど

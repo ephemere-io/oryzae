@@ -4,6 +4,19 @@ import { verifyAttrs } from '@oryzae/verify';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import {
+  ERROR_CLASS,
+  FOOT_CLASS,
+  HEADING_CLASS,
+  INLINE_LINK_CLASS,
+  INPUT_CLASS,
+  LABEL_CLASS,
+  LEAD_CLASS,
+  PAPER_STACK_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECONDARY_BUTTON_CLASS,
+  SERIF_FONT,
+} from '@/features/shared/auth/entrance/paper';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
 import { useAuthActions } from '@/features/shared/auth/hooks/use-auth-actions';
 
@@ -36,12 +49,14 @@ export function ForgotPasswordForm() {
 
   if (sent) {
     return (
-      <div className="flex flex-col gap-4 text-center">
-        <h1 className="text-2xl font-bold">{t('sent_heading')}</h1>
-        <p className="text-sm text-zinc-500">
-          {email} {t('sent_body')}
+      <div className={PAPER_STACK_CLASS}>
+        <h1 className={HEADING_CLASS} style={SERIF_FONT}>
+          {t('sent_heading')}
+        </h1>
+        <p className="text-[14px] leading-relaxed text-[#5c4f3f]">
+          <span className="font-medium text-[#2d2d2d]">{email}</span> {t('sent_body')}
         </p>
-        <Link href="/login" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+        <Link href="/login" className={SECONDARY_BUTTON_CLASS}>
           {t('back_to_login')}
         </Link>
       </div>
@@ -51,35 +66,40 @@ export function ForgotPasswordForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-4"
+      className={PAPER_STACK_CLASS}
       {...verifyAttrs({ unit: 'ForgotPasswordForm', hasEmail: Boolean(email) })}
     >
-      <h1 className="text-2xl font-bold text-center">{t('heading')}</h1>
-      <p className="text-sm text-center text-zinc-500">{t('subheading')}</p>
+      <header className="mb-2 flex flex-col gap-3">
+        <h1 className={HEADING_CLASS} style={SERIF_FONT}>
+          {t('heading')}
+        </h1>
+        <p className={LEAD_CLASS}>{t('subheading')}</p>
+      </header>
 
-      {error && <p className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>}
+      {error && (
+        <p role="alert" className={ERROR_CLASS}>
+          {error}
+        </p>
+      )}
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">{t('email_label')}</span>
+      <label className="flex flex-col gap-2">
+        <span className={LABEL_CLASS}>{t('email_label')}</span>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900"
+          autoComplete="email"
+          className={INPUT_CLASS}
         />
       </label>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-      >
+      <button type="submit" disabled={loading} className={`mt-1 ${PRIMARY_BUTTON_CLASS}`}>
         {loading ? t('submit_loading') : t('submit')}
       </button>
 
-      <p className="text-sm text-center text-zinc-500">
-        <Link href="/login" className="font-medium text-zinc-900 dark:text-zinc-100">
+      <p className={`text-center ${FOOT_CLASS}`}>
+        <Link href="/login" className={INLINE_LINK_CLASS}>
           {t('back_to_login_2')}
         </Link>
       </p>

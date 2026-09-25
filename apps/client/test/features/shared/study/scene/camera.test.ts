@@ -3,6 +3,7 @@ import { HOME_ZOOM } from '@/features/shared/study/constants';
 import { PC_LAYOUT, SP_LAYOUT, type StudyLayout } from '@/features/shared/study/layout';
 import {
   approach,
+  arrivalView,
   boardCloseView,
   boardView,
   breathOffset,
@@ -36,6 +37,10 @@ function distance(view: CameraView): number {
   const dy = view.position.y - view.target.y;
   const dz = view.position.z - view.target.z;
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function horizontalDistance(view: CameraView): number {
+  return Math.hypot(view.position.x - view.target.x, view.position.z - view.target.z);
 }
 
 describe('すべての行き先に共通して成り立つこと', () => {
@@ -163,6 +168,30 @@ describe('shelfView', () => {
     const view = shelfView(layout);
     expect(view.position.y).toBeGreaterThan(view.target.y);
     expect(view.position.z).toBeGreaterThan(view.target.z);
+  });
+});
+
+describe('arrivalView（扉から入ってきた直後）', () => {
+  it.each(LAYOUTS)('$name: ホームと同じところを見たまま、低く・少し遠い', (layout) => {
+    const home = homeView(layout);
+    const arrival = arrivalView(layout);
+
+    // 見ているところは変えない。変えると「別の場所から飛んだ」ように見える。
+    expect(arrival.target).toEqual(home.target);
+    // 歩いてきた人の目の高さ（ホームより低い）。
+    expect(arrival.position.y - home.target.y).toBeLessThan(home.position.y - home.target.y);
+    expect(arrival.position.y).toBeGreaterThan(home.target.y);
+    // 水平には少し手前から寄る（高さは別に下げるので、直線距離では測らない）。
+    expect(horizontalDistance(arrival)).toBeGreaterThan(horizontalDistance(home));
+    // 溶けているあいだも動きが見える程度には、離れて始める（1.1 倍では止まって見えた）。
+    expect(horizontalDistance(arrival)).toBeGreaterThan(horizontalDistance(home) * 1.2);
+    // かといって動かしすぎない。「入ってきて止まった」であって「飛んできた」ではない。
+    expect(horizontalDistance(arrival)).toBeLessThan(horizontalDistance(home) * 1.5);
+  });
+
+  it.each(LAYOUTS)('$name: 定置し終えるとホームそのものになる', (layout) => {
+    const home = homeView(layout);
+    expect(lerpView(arrivalView(layout), home, 1)).toEqual(home);
   });
 });
 
