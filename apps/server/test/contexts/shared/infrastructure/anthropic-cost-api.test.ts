@@ -72,6 +72,16 @@ describe('fetchActualCost', () => {
           byTokenType: [{ tokenType: '(その他)', costUsd: 1.2345 }],
         },
       ],
+      // workspace_id が無い result は default workspace（Anthropic の仕様）。
+      byWorkspace: [
+        {
+          workspaceId: null,
+          workspaceName: 'Default Workspace',
+          costUsd: 1.2345,
+          byModel: [{ model: '(内訳なし)', costUsd: 1.2345 }],
+        },
+      ],
+      workspaceNamesUnavailable: false,
       truncated: false,
     });
   });
@@ -218,7 +228,9 @@ describe('fetchActualCost', () => {
       totalCostUsd: 0,
       daily: [],
       byModel: [],
+      byWorkspace: [],
       groupingUnavailable: false,
+      workspaceNamesUnavailable: false,
       truncated: false,
     });
   });
@@ -232,7 +244,9 @@ describe('formatActualCost', () => {
         totalCostUsd: 1.2345,
         daily: [],
         byModel: [],
+        byWorkspace: [],
         groupingUnavailable: false,
+        workspaceNamesUnavailable: false,
         truncated: false,
       },
       '$1.2345',
@@ -243,7 +257,9 @@ describe('formatActualCost', () => {
         totalCostUsd: 1.2345,
         daily: [],
         byModel: [],
+        byWorkspace: [],
         groupingUnavailable: false,
+        workspaceNamesUnavailable: false,
         truncated: true,
       },
       '$1.2345 (集計打ち切り・過少)',
@@ -323,13 +339,15 @@ describe('モデル別の実額内訳', () => {
 
   // 配列パラメータは group_by[]。group_by= だと無視され、results が1件に丸められて
   // model が null になる（= 内訳が黙って出なくなる）。
-  it('group_by[]=description を送る', async () => {
+  // workspace_id が **用途別**、description が各 Workspace 内の **モデル別**。
+  // どちらか片方に戻すと、用途別の実額かモデルの内訳のどちらかが黙って消える。
+  it('group_by[] に workspace_id と description を両方送る', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: [], has_more: false, next_page: null }));
 
     await fetchActualCost(START, END);
 
     const url = new URL(mockFetch.mock.calls[0][0]);
-    expect(url.searchParams.getAll('group_by[]')).toEqual(['description']);
+    expect(url.searchParams.getAll('group_by[]')).toEqual(['workspace_id', 'description']);
   });
 
   it('モデル別に積み上げ、コスト降順で返す', async () => {

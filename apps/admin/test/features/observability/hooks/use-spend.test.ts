@@ -26,10 +26,26 @@ const sampleSpend = {
         model: 'claude-sonnet-5',
         costUsd: 0.8,
         byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.8 }],
-        feature: 'OCR + 写真の文字起こし',
+      },
+    ],
+    // ボード OCR と写真の文字起こしは同じ sonnet-5。モデルでは割れないが
+    // Workspace が別なので用途別にはここで分かれる。
+    byWorkspace: [
+      {
+        workspaceId: 'wrkspc_ocr',
+        workspaceName: 'oryzae-prod-ocr',
+        costUsd: 0.5,
+        byModel: [{ model: 'claude-sonnet-5', costUsd: 0.5 }],
+      },
+      {
+        workspaceId: null,
+        workspaceName: 'Default Workspace',
+        costUsd: 0.3,
+        byModel: [{ model: 'claude-sonnet-5', costUsd: 0.3 }],
       },
     ],
     groupingUnavailable: false,
+    workspaceNamesUnavailable: false,
   },
   estimated: {
     status: 'ok',
@@ -106,7 +122,9 @@ describe('useSpend', () => {
           truncated: false,
           message: null,
           byModel: [],
+          byWorkspace: [],
           groupingUnavailable: false,
+          workspaceNamesUnavailable: false,
         },
       }),
     );
@@ -166,7 +184,7 @@ describe('useSpend', () => {
     expect(result.current.error).toBe('コストデータの取得に失敗しました');
   });
 
-  // 用途別の内訳は実額側（actual.byModel）にある。推定で OCR を出す方式はやめた。
+  // 用途別の内訳は実額側（actual.byWorkspace）にある。推定で OCR を出す方式はやめた。
   it('モデル別の実額内訳を保持する', async () => {
     mockFetch.mockResolvedValueOnce(mockResponse(true, sampleSpend));
 
@@ -178,9 +196,41 @@ describe('useSpend', () => {
 
     expect(result.current.data?.actual.byModel).toHaveLength(1);
     expect(result.current.data?.actual.byModel[0]?.model).toBe('claude-sonnet-5');
-    // 1 つのモデルを 2 つの用途が使っている場合、サーバーは名前を連ねて返す。
-    // hook はそれを加工せずそのまま持つ（用途名を画面側で組み立てない）
-    expect(result.current.data?.actual.byModel[0]?.feature).toBe('OCR + 写真の文字起こし');
+  });
+
+  // 同じモデルでも Workspace が違えば別の行として持つ。ここが潰れると
+  // 「OCR にいくらかかったか」が再びモデル任せの推測に戻る。
+  it('Workspace 別の実額内訳を保持する（同じモデルでも別 Workspace は分かれる）', async () => {
+    mockFetch.mockResolvedValueOnce(mockResponse(true, sampleSpend));
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    const byWorkspace = result.current.data?.actual.byWorkspace ?? [];
+    expect(byWorkspace.map((w) => w.workspaceName)).toEqual([
+      'oryzae-prod-ocr',
+      'Default Workspace',
+    ]);
+    // default workspace は workspace_id が null で返る（Anthropic の仕様）。
+    expect(byWorkspace[1]?.workspaceId).toBeNull();
+    expect(byWorkspace.every((w) => w.byModel[0]?.model === 'claude-sonnet-5')).toBe(true);
+  });
+
+  it('byWorkspace が欠けた応答は取り込まない（用途別が消えたことを気づかせる）', async () => {
+    const { byWorkspace: _byWorkspace, ...actualWithout } = sampleSpend.actual;
+    mockFetch.mockResolvedValueOnce(mockResponse(true, { ...sampleSpend, actual: actualWithout }));
+
+    const { result } = renderHook(() => useSpend(30));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBe('コストデータの取得に失敗しました');
   });
 
   it('byModel が欠けた応答は取り込まない（内訳なしを内訳ゼロと見せない）', async () => {

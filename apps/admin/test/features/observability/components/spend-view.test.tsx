@@ -18,21 +18,34 @@ function makeData(overrides: Partial<SpendData> = {}): SpendData {
       message: null,
       byModel: [
         {
-          // board の OCR と写真の文字起こしは同じ sonnet-5 なので、サーバーは
-          // 用途名を連ねて返す。画面はそれをそのまま出す（用途名を組み立てない）
           model: 'claude-sonnet-5',
           costUsd: 0.8,
           byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.8 }],
-          feature: 'OCR + 写真の文字起こし',
         },
         {
           model: 'claude-sonnet-4-6',
           costUsd: 0.43,
           byTokenType: [{ tokenType: 'output_tokens', costUsd: 0.43 }],
-          feature: '発酵',
+        },
+      ],
+      // 用途別は Workspace 別。ボード OCR と写真の文字起こしは同じ sonnet-5 だが
+      // Workspace が違うので、ここでは分かれて出る（モデル別では分けられない）。
+      byWorkspace: [
+        {
+          workspaceId: 'wrkspc_ocr',
+          workspaceName: 'oryzae-prod-ocr',
+          costUsd: 0.8,
+          byModel: [{ model: 'claude-sonnet-5', costUsd: 0.8 }],
+        },
+        {
+          workspaceId: 'wrkspc_ferm',
+          workspaceName: 'oryzae-prod-fermentation',
+          costUsd: 0.43,
+          byModel: [{ model: 'claude-sonnet-4-6', costUsd: 0.43 }],
         },
       ],
       groupingUnavailable: false,
+      workspaceNamesUnavailable: false,
     },
     estimated: {
       status: 'ok',
@@ -99,7 +112,9 @@ describe('SpendView の Anthropic Console リンク', () => {
           truncated: false,
           message: null,
           byModel: [],
+          byWorkspace: [],
           groupingUnavailable: false,
+          workspaceNamesUnavailable: false,
         },
       }),
     );
@@ -118,7 +133,9 @@ describe('SpendView の Anthropic Console リンク', () => {
           truncated: false,
           message: 'cost_report responded 401',
           byModel: [],
+          byWorkspace: [],
           groupingUnavailable: false,
+          workspaceNamesUnavailable: false,
         },
       }),
     );
@@ -171,17 +188,26 @@ describe('SpendView の推定コストの計算根拠', () => {
 
 // 用途別（= モデル別）の内訳は **実額** で出す。自前トークンの推定ではないので、
 // キャッシュ・値引き・課金丸めも反映済み。「画像の文字起こしがいくらか」はここで読む。
-describe('SpendView の実請求額のモデル別内訳', () => {
-  it('モデル別の実額と、そのモデルを使っている機能を出す', () => {
+describe('SpendView の実請求額の内訳', () => {
+  // 用途別は Workspace 別。モデル ID からの読み替えは 2026-09 に撤去した
+  // （ボード OCR と写真の文字起こしが同じモデルで、CI も同じモデルを使うため）。
+  it('用途別（Workspace 別）の実額を出す', () => {
+    renderView(makeData());
+
+    expect(screen.getByText('実請求額の内訳（用途別 = Workspace 別）')).toBeTruthy();
+    // Workspace 名は Anthropic 側のものをそのまま出す（用途名に読み替えない）
+    expect(screen.getByText('oryzae-prod-ocr')).toBeTruthy();
+    expect(screen.getByText('oryzae-prod-fermentation')).toBeTruthy();
+  });
+
+  it('モデル別の実額も出す（単価の検算用）', () => {
     renderView(makeData());
 
     expect(screen.getByText('実請求額の内訳（モデル別）')).toBeTruthy();
     expect(screen.getAllByText('claude-sonnet-5').length).toBeGreaterThan(0);
-    // 1 モデルに 2 用途が乗っていても、画面は feature をそのまま出す
-    expect(screen.getByText(/← OCR \+ 写真の文字起こし のモデル/)).toBeTruthy();
-    // モデル合計と token_type 内訳の両方に出る（内訳が合計と一致している証拠）
-    expect(screen.getAllByText('$0.8000').length).toBe(2);
-    expect(screen.getByText(/← 発酵 のモデル/)).toBeTruthy();
+    // 同じ $0.8000 が 4 か所に出る: Workspace 合計・Workspace 内のモデル・
+    // モデル別の合計・その token_type。どの階層でも金額が一致していることの証拠。
+    expect(screen.getAllByText('$0.8000').length).toBe(4);
   });
 
   it('token_type の内訳も出す（キャッシュが混ざれば見える）', () => {
@@ -190,12 +216,22 @@ describe('SpendView の実請求額のモデル別内訳', () => {
     expect(screen.getAllByText('output_tokens').length).toBeGreaterThan(0);
   });
 
-  // 「そのモデルのコスト」であって「その機能のコスト」ではない。
-  // 同じモデルを CI 等が使えば混ざるので、そこを言い切らない。
-  it('用途名が「そのモデルを使っている機能」だと明示する', () => {
+  // モデル別を用途別と取り違えさせない。同じモデルを複数の機能と CI が使うので、
+  // ここから機能別の額は読めない——その但し書きを画面に置く。
+  it('モデル別は用途の軸ではないと明示する', () => {
     renderView(makeData());
 
-    expect(screen.getByText(/そのモデルを使っている機能/)).toBeTruthy();
+    expect(screen.getByText(/用途の軸ではありません/)).toBeTruthy();
+  });
+
+  it('Workspace 名が引けなかったときは、ID 表示である旨を出す', () => {
+    const base = makeData();
+    renderView({
+      ...base,
+      actual: { ...base.actual, workspaceNamesUnavailable: true },
+    });
+
+    expect(screen.getByText(/一部は ID 表示です/)).toBeTruthy();
   });
 
   // group_by が効かないと総額は正しいまま内訳だけ消える。空配列を
@@ -228,7 +264,9 @@ describe('SpendView の実請求額のモデル別内訳', () => {
           truncated: false,
           message: null,
           byModel: [],
+          byWorkspace: [],
           groupingUnavailable: false,
+          workspaceNamesUnavailable: false,
         },
       }),
     );
