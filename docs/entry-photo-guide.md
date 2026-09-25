@@ -56,10 +56,11 @@ board の OCR（`board/infrastructure/ocr/anthropic-ocr.gateway.ts`）も **2026
 `claude-opus-5` で精度に振っていたが、ユーザーが画像を落とすたびに走るためランニング
 コストへの効きが大きく、Sonnet に揃えた。
 
-そのため実額のモデル別内訳では、この 2 つの用途が 1 行に混ざる
-（`featureOfModel` が `OCR + 写真の文字起こし` と両方の名前を返す）。
-分けて見たくなったら、どちらかを別モデルに戻すこと。詳細は
-`docs/observability-guide.md` の「用途別の内訳は実額で出す」。
+そのためモデルでは 2 つの用途を区別できない。費用は API キーで分けている
+（写真の文字起こしは `ANTHROPIC_API_KEY_OCR_ENTRY`、ボード OCR は `ANTHROPIC_API_KEY_OCR_BOARD`）。
+どちらも Workspace `oryzae-prod-ocr` に属するので、日次レポートでは 1 行にまとまり、
+分けて見るときは Console の Cost 画面で API キー別に絞る。詳細は
+`docs/observability-guide.md` の「用途別の内訳は Workspace 別の実額で出す」。
 
 起こした文字は `cleanup()` を通してから返す。モデルがコードフェンスで包んで返すことが
 あるのを剥がし、`MAX_ENTRY_PHOTO_TEXT_LENGTH`（8,000 字）で頭打ちにする。

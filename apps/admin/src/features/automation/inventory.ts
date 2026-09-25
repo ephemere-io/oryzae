@@ -3,7 +3,7 @@
  *
  * なぜ要るか:
  * このリポジトリには、人が起動しなくても動くものが増え続けている
- * （CI・E2E・セキュリティ監査・依存更新・自動バグ修正）。どれも単体では
+ * （CI・E2E・セキュリティ監査・依存更新）。どれも単体では
  * 見えているが、**全体で何個あって、いつ動いて、いくらかかるのか**を
  * 一覧できる場所が無かった。増やすのは簡単で、把握は難しい。
  *
@@ -18,7 +18,7 @@
 export type CostKind =
   /** GitHub Actions の実行時間。public リポジトリなので現在は無制限 */
   | 'actions'
-  /** Anthropic API のトークン。月額上限つき（台帳 Issue で管理） */
+  /** Anthropic API のトークン。上限は Anthropic Console の Workspace ごとの支払い上限 */
   | 'tokens'
   /** 費用ゼロ（GitHub の機能だけで完結） */
   | 'none';
@@ -47,37 +47,9 @@ export interface Automation {
 /**
  * 費用の数字は 2026-09 の実測。
  * Actions は 351 run のジョブ実時間をジョブ単位で分に切り上げて集計したもの（Issue #551）。
- * トークンは台帳 Issue `[auto-fix] 予算台帳と稼働状況` の実行履歴。
+ * トークンは Anthropic の cost_report（Workspace `oryzae-ci`）と Actions ログの total_cost_usd。
  */
 export const AUTOMATIONS: readonly Automation[] = [
-  {
-    id: 'auto-fix',
-    name: '自動バグ修正ループ',
-    purpose: 'バグを見つけて直し、ガードレールを通してから自動でマージする',
-    triggers: [
-      'main で CI / E2E / Security が失敗したとき',
-      'Issue に auto-fix ラベルが付いたとき',
-      '週次の巡回',
-    ],
-    schedule: '毎週月曜 05:25',
-    costKind: 'tokens',
-    costPerRun: '約 ¥90〜100（Claude Sonnet 5・20〜30 ターン）',
-    killSwitch: 'リポジトリ変数 AUTO_FIX_ENABLED を消す',
-    definedIn: '.github/workflows/auto-fix.yml',
-    note: '月額上限は AUTO_FIX_BUDGET_JPY（既定 ¥500）。上限に達すると自動で止まる',
-  },
-  {
-    id: 'auto-merge-deps',
-    name: '依存更新の自動マージ',
-    purpose: 'dependabot のグループ PR を、CI が全部緑なら自動でマージする',
-    triggers: [],
-    schedule: '毎日 06:40',
-    costKind: 'none',
-    costPerRun: '¥0（AI を呼ばない）',
-    killSwitch: 'リポジトリ変数 AUTO_FIX_ENABLED を消す',
-    definedIn: '.github/workflows/auto-merge-deps.yml',
-    note: '単独 PR（major 昇格・security update）は対象外で人が見る',
-  },
   {
     id: 'security-audit',
     name: 'セキュリティ全体監査',
@@ -85,10 +57,10 @@ export const AUTOMATIONS: readonly Automation[] = [
     triggers: [],
     schedule: '毎月 2 日・16 日 03:17',
     costKind: 'tokens',
-    costPerRun: '未計測（差分ではなく全体を読むため auto-fix より高い見込み）',
+    costPerRun: '約 $6.5（2026-09-15 実測。Claude Code の既定モデルで全体を読む）',
     killSwitch: 'security.yml の schedule を消す',
     definedIn: '.github/workflows/security.yml',
-    note: '指摘がゼロなら Issue を立てない（ノイズを起票しない）',
+    note: '指摘がゼロなら Issue を立てない（ノイズを起票しない）。キーは ANTHROPIC_API_KEY_CI（Workspace oryzae-ci・上限付き）',
   },
   {
     id: 'e2e-weekly',
@@ -109,7 +81,7 @@ export const AUTOMATIONS: readonly Automation[] = [
     triggers: ['脆弱性 advisory が出たとき（間隔に関わらず即時）'],
     schedule: '毎月 1 日 09:00',
     costKind: 'none',
-    costPerRun: '¥0（PR 作成のみ。CI 費用は auto-merge-deps 側で計上）',
+    costPerRun: '¥0（PR 作成のみ。その PR の CI 費用は ci の項目で計上）',
     killSwitch: '.github/dependabot.yml を消す',
     definedIn: '.github/dependabot.yml',
   },
