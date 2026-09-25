@@ -288,7 +288,12 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
       return geometry;
     }
 
-    const notebooks = layoutNotebooks(state.notebooks, state.now, layout.deskNotebooks);
+    const notebooks = layoutNotebooks(
+      state.notebooks,
+      state.now,
+      layout.deskNotebooks,
+      layout.notebookGrowth,
+    );
 
     const registry = buildHitRegistry({
       desk: notebooks.desk.map((placement) => placement.notebook),

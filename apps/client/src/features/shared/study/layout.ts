@@ -73,6 +73,15 @@ export interface StudyLayout {
    * と実機レビュー。先月以前は全部棚に置く）。
    */
   deskNotebooks: number;
+  /**
+   * 手帳の**件数ぶんの伸び**の倍率（表紙だけの厚みは変えない）。
+   *
+   * 厚みは件数で決まる（`notebookThickness`）が、それが**見える**かはカメラの角度で決まる。
+   * 見下ろす角度が急なほど側面は短く写り、表紙に対して側面が写る長さは仰角の余接に比例する。
+   * PC を基準（1）にし、他の構図は**同じ件数が同じだけ膨らんで見える**比をカメラから導く
+   * （`sideVisibility`）。手で決めた値ではないので、カメラを動かせば一緒に変わる。
+   */
+  notebookGrowth: number;
   /** ペンの位置（机ローカル）。null は置かない（SP。書く入口は ENTRIES のピル）。 */
   pen: Vec3 | null;
   shelf: { position: Vec3; scale: number /** SP は書見台のように前傾させる。 */; tiltX: number };
@@ -131,11 +140,23 @@ const SP_SHELF_SCALE = 0.72;
  */
 const SP_DESK = vec3(1.5, -1, 2.2);
 
+/**
+ * その点を見たとき、縦の面（手帳の側面）が水平の面（表紙）に対してどれだけの長さに写るか。
+ * カメラからその点への仰角の余接（水平の距離 ÷ 高さの差）。真横から見れば大きく、真上から見れば 0。
+ */
+function sideVisibility(camera: Vec3, at: Vec3): number {
+  return Math.hypot(camera.x - at.x, camera.z - at.z) / (camera.y - at.y);
+}
+
+const PC_CAMERA_POSITION = vec3(0, 4, 12);
+const PC_DESK = vec3(3, -1, 2);
+const SP_CAMERA_POSITION = vec3(0, 10.6, 7.8);
+
 export const PC_LAYOUT: StudyLayout = {
   name: 'pc',
   camera: {
     fov: 45,
-    position: vec3(0, 4, 12),
+    position: PC_CAMERA_POSITION,
     target: vec3(0, 0, 0),
     // ボードの上辺の中央（板の中心 y=2.5 ＋ 高さ 5 の半分）。
     frameTop: vec3(0.9, 5, -4),
@@ -145,8 +166,10 @@ export const PC_LAYOUT: StudyLayout = {
   parallax: { x: 0.55, y: 0.3, lerp: 0.05 },
   jar: vec3(-4.2, -1.2, 1),
   board: { position: vec3(0.9, 2.5, -4), scale: 1 },
-  desk: vec3(3, -1, 2),
+  desk: PC_DESK,
   deskNotebooks: RENDER_LIMITS.deskNotebooks,
+  // 基準。PC のカメラ（手帳を仰角およそ 26° で見る）で見えている膨らみを、他の構図が揃える。
+  notebookGrowth: 1,
   pen: vec3(2.55, -0.15, -0.1),
   shelf: { position: PC_SHELF, scale: 1, tiltX: 0 },
   // 右は棚のぶんだけ伸ばし（元 6.6 → 8.6）、左は元の幅に近いところへ戻す。
@@ -195,7 +218,7 @@ export const SP_LAYOUT: StudyLayout = {
     // 縦画面は横に狭い。真上からでは壁のボードが表現できないので、机の面と壁の
     // 両方が入るクオータートップ（仰角およそ 52°）に振る。
     fov: 58,
-    position: vec3(0, 10.6, 7.8),
+    position: SP_CAMERA_POSITION,
     // 注視点を絵の中心より下に置くと全体が上に寄り、下端に余白が残る。
     target: vec3(0, -0.35, -0.7),
     // ボードの上辺の中央。SP は板を 0.68 に縮めてあるので、高さの半分も同じ比。
@@ -212,6 +235,11 @@ export const SP_LAYOUT: StudyLayout = {
   desk: SP_DESK,
   // 机は当月の 1 冊だけ。積みの 2 段目以降は指で押し分けられない。先月以前は全部棚へ。
   deskNotebooks: 1,
+  // SP は手帳を仰角およそ 63° で見下ろすので、同じ厚みでも側面は PC の 1/4 ほどにしか写らず、
+  // 何十件書いても手帳が平たいままだった（実機レビュー #616: 「エントリーが複数あっても
+  // 平ぺったい。PC と合わせて膨らみを」）。PC と同じだけ膨らんで見える比（およそ 4.2）。
+  notebookGrowth:
+    sideVisibility(PC_CAMERA_POSITION, PC_DESK) / sideVisibility(SP_CAMERA_POSITION, SP_DESK),
   // 鉛筆は置かない。1 冊だけなら「書く」は手帳そのものと ENTRIES のピルで足り、鉛筆は役割を失う。
   pen: null,
   // 棚を前傾させると背文字が上を向き、そのまま行き先の予告になる。
