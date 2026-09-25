@@ -31,7 +31,9 @@
       "submit_loading": "ログイン中...",
       "submit": "ログイン",
       "no_account_prefix": "アカウントをお持ちでない方は",
-      "signup_link": "サインアップ"
+      "signup_link": "サインアップ",
+      "email_open": "メールアドレスでログイン",
+      "email_back": "戻る"
     },
     "reset_password": {
       "invalid_link": "無効なリセットリンクです。もう一度パスワードリセットをお試しください。",
@@ -63,7 +65,9 @@
       "login_link": "ログイン",
       "capacity_remaining": "登録枠は残り {remaining} / {max} 名です",
       "capacity_full_title": "現在の登録枠は満了しました",
-      "capacity_full_body": "Research Preview として、登録は {max} 名までに限定しています。順次追加予定です。"
+      "capacity_full_body": "Research Preview として、登録は {max} 名までに限定しています。順次追加予定です。",
+      "email_open": "メールアドレスで登録",
+      "email_back": "戻る"
     },
     "error": {
       "invalid_credentials": "メールアドレスまたはパスワードが正しくありません",

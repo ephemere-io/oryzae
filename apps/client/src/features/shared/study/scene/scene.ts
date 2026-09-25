@@ -33,7 +33,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { HOME_ZOOM, RENDER_LIMITS } from '../constants';
+import { ARRIVAL, EASING, HOME_ZOOM, progress, RENDER_LIMITS } from '../constants';
 import type { StudyLayout } from '../layout';
 import type { StudyState, StudyTarget } from '../types';
 import { BOARD_FACE, BOARD_GRID_SPACING, PHOTO_INNER_INSET, placeBoardCards } from './board';
@@ -59,10 +59,12 @@ import {
 } from './books';
 import {
   approach,
+  arrivalView,
   boardCloseView,
   boardView,
   breathOffset,
   type CameraView,
+  entranceView,
   homeView,
   jarView,
   journalSpreadView,
@@ -75,7 +77,19 @@ import {
   zoomedView,
   zoomTargetRise,
 } from './camera';
+import { captureRenderedFrame } from './capture';
 import { contentSignature } from './content-signature';
+import {
+  canRebuildWhileEntering,
+  DOOR_ANGLE,
+  DOOR_SETTLE_LERP,
+  doorAngleWhileEntering,
+  ENTER_TIMING,
+  enterView,
+  FRAME_SETTLE_LERP,
+  isInside,
+} from './enter';
+import { buildEntranceRoom } from './entrance-room';
 import {
   buildHitRegistry,
   type HitHint,
@@ -108,6 +122,7 @@ import {
   type StudyMaterials,
   type StudyTheme,
 } from './materials';
+import type { Sprig } from './sprig';
 import {
   isPlanDone,
   leaveFadeDuration,
@@ -124,6 +139,15 @@ export interface StudySceneOptions {
   layout: StudyLayout;
   theme: StudyTheme;
   reducedMotion: boolean;
+  /**
+   * 書斎の入口（扉の前）から始めるか。認証画面で真にする。
+   *
+   * 真のあいだカメラは扉の前に留まり、`enterStudy()` で扉をくぐってホームへ移動する。
+   * **シーンは 1 つ**なので、そこに切り替わりは無い。
+   */
+  atEntrance?: boolean;
+  /** 一輪挿しに挿さる枝（七十二候）。入口を組むときだけ要る。 */
+  sprig?: Sprig;
   /** ホバーが変わったとき（PC のラベル濃度とカーソル）。 */
   onHoverChange?: (hovered: HoverInfo | null) => void;
   /** 3D の物が押されたとき。 */
@@ -152,6 +176,14 @@ export interface StudySceneOptions {
    * 挟まって画面が点滅する。
    */
   onReady?: () => void;
+  /**
+   * 扉（認証画面）から入ってきた直後か。
+   *
+   * 真なら、ホームにいきなり置かず**入り口から寄って止まる**（`ARRIVAL`）。呼び出し側は
+   * 同時に画面のフェードインをやめる — 溶けながら動くと、白く飛んでから現れる元の
+   * 見え方に戻ってしまう。
+   */
+  arrival?: boolean;
 }
 
 export interface HoverInfo {
@@ -179,6 +211,11 @@ interface ScreenPoint {
 }
 
 export interface StudySceneHandle {
+  /**
+   * 描いている canvas。**ページをまたいで引き継ぐ**ときに、入れ物を付け替えるために使う
+   * （`scene/live.ts`）。付け替えても描画は途切れない。
+   */
+  canvas: HTMLCanvasElement;
   /** 対象へカメラを動かす。**着いてから** resolve する。 */
   goTo(target: StudyTarget): Promise<void>;
   /** 書斎へ戻す。 */
@@ -196,40 +233,48 @@ export interface StudySceneHandle {
   pinchTo(ratio: number): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
+  /**
+   * 画面の上から何 px が見えているか（その下は紙が覆っている）。呼ばなければ canvas 全体。
+   *
+   * SP の認証画面で使う。書斎に入ったら `Infinity` を渡して全体に戻す。
+   */
+  setFrame(visibleHeight: number): void;
+  /**
+   * 認証中か（扉に手を掛けて待つ）。入口に居るときだけ効く。失敗したら false に戻して閉じ直す。
+   */
+  setDoorWaiting(waiting: boolean): void;
+  /**
+   * 扉を押し開けて、書斎のホームまで入る。**着いてから** resolve する。
+   *
+   * シーンは 1 つなので、ここに画面の切り替わりは無い。カメラが動くだけ。
+   */
+  enterStudy(): Promise<void>;
+  /**
+   * **次の画面がこのシーンを引き取る**（`scene/live.ts`）。
+   *
+   * canvas を新しい入れ物へ移し、外へ知らせる受け口をその画面のものに差し替える。
+   * 描画は止まらないので、利用者から見れば同じ部屋が続いているだけ。作り直さないのは、
+   * 作り直した瞬間にカメラがホームへ戻り「一回切り替わる」ように見えるため。
+   */
+  adopt(next: { container: HTMLElement; listeners: SceneListeners }): void;
   /** 遷移中・サブ画面ではラベルを消す。 */
   isBusy(): boolean;
   dispose(): void;
 }
 
+/**
+ * シーンが外へ知らせる受け口。**ページをまたぐと持ち主が変わる**（`adopt`）。
+ *
+ * 認証画面で作られたシーンは、書斎へ引き継がれたあと書斎のラベル・遷移に繋がる必要がある。
+ * 作った時点の閉包に縛り付けておくと、引き継いだ先で物を押しても何も起きない。
+ */
+export type SceneListeners = Pick<
+  StudySceneOptions,
+  'onHoverChange' | 'onPick' | 'onLabelPositions' | 'onLeaveStart' | 'onCapture' | 'onReady'
+>;
+
 /** 秒。四方の計算で使う。 */
 const MS_PER_SECOND = 1000;
-
-/**
- * 憶えておく 1 枚の撮り方。
- *
- * ### 拡大も縮小もしない
- *
- * 「押すと画面がガビガビになる」の正体は**拡大縮小そのもの**だった。書斎は 1px の
- * 細線で出来ていて、線画は縮小 → 拡大の往復に耐えない（線が破線と粒に割れる）。
- * はじめは 960px の JPEG で撮っていて、JPEG のリンギングと 3 倍の引き伸ばしが
- * 重なっていた。PNG にしてリンギングは消えたが、**引き伸ばしのほうが主犯**だった。
- *
- * `renderer.domElement.width` は既にデバイス画素（pixelRatio 込み、上限 2）。敷く先も
- * 同じ画面なので、**そのままの大きさで撮れば 1:1 になり、再標本化そのものが起きない**。
- * 上限はごく大きな画面（4K を超える窓）への保険で、そこだけは縮めて諦める。
- *
- * 形式は PNG。JPEG の周波数変換は白地に細い黒線という形が最も苦手で、線の周りに
- * リンギングが出る。白地が大半なので PNG でもよく縮む。
- */
-const CAPTURE = { maxWidth: 3840 } as const;
-
-/**
- * `sessionStorage` に置く 1 枚の上限（文字数）。
- *
- * 超えたら**憶えない**。地が無くても引き戻しは地の色で成立するので、保存に失敗して
- * 他の憶えごとを押し出すより、諦めるほうが安全。
- */
-const CAPTURE_MAX_CHARS = 3_000_000;
 
 /** 輪郭の呼吸の周期（ms）。 */
 const OUTLINE_BREATH_MS = 4000;
@@ -254,17 +299,21 @@ interface SceneContent {
 }
 
 export function initScene(options: StudySceneOptions): StudySceneHandle {
-  const { container, layout, theme } = options;
+  const { layout, theme } = options;
+  /** いま canvas を載せている入れ物。引き継ぐと差し替わる（`adopt`）。 */
+  let host = options.container;
+  /** 外へ知らせる受け口。引き継ぐと差し替わる（`adopt`）。 */
+  let listeners: SceneListeners = options;
 
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDER_LIMITS.maxPixelRatio));
-  renderer.setSize(container.clientWidth, container.clientHeight);
-  container.appendChild(renderer.domElement);
+  renderer.setSize(host.clientWidth, host.clientHeight);
+  host.appendChild(renderer.domElement);
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(
     layout.camera.fov,
-    aspectOf(container),
+    aspectOf(host),
     layout.camera.near,
     layout.camera.far,
   );
@@ -396,8 +445,62 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   let readyAnnounced = false;
   const startedAt = performance.now();
 
+  /**
+   * 書斎の入口（扉のある前室）。**`content` の外**に持つ。
+   *
+   * `content` は state が届くたびに組み直される。扉をそこに入れると、認証が通って state が
+   * 届いた瞬間に扉が作り直され、開きかけの角度が巻き戻る。扉は state と無関係なので、
+   * 材も形もシーンと同じ寿命で持つ。
+   */
+  const entranceMaterials = createMaterials(theme);
+  const entranceGeometries: BufferGeometry[] = [];
+  const entrance =
+    options.sprig === undefined
+      ? null
+      : buildEntranceRoom(
+          entranceMaterials,
+          (geometry) => {
+            entranceGeometries.push(geometry);
+            return geometry;
+          },
+          options.sprig,
+          { x: layout.entrance.camera.position.x, z: layout.entrance.camera.position.z },
+        );
+  if (entrance !== null) {
+    const at = layout.entrance.room;
+    entrance.group.position.set(at.x, at.y, at.z);
+    scene.add(entrance.group);
+  }
+
   const homeCamera = homeView(layout);
-  applyView(camera, homeCamera);
+  /**
+   * 入ってきた直後の定置。`null` なら最初からホーム。
+   *
+   * 動きを減らす設定では置かない（`prefers-reduced-motion`）。
+   */
+  let arrival: { from: CameraView; startedAt: number } | null =
+    options.arrival === true && !options.reducedMotion
+      ? { from: arrivalView(layout), startedAt: performance.now() }
+      : null;
+  /** 入口に居るあいだの view。`null` なら書斎の中に居る。 */
+  /** 入口に居るあいだの view。`null` なら書斎の中に居る。 */
+  let atEntrance: CameraView | null = options.atEntrance === true ? entranceView(layout) : null;
+  /**
+   * 見えている窓の高さ（px）。`null` は canvas 全体。
+   *
+   * SP の認証画面では、下から敷いた紙が画面の半分ほどを覆う。構図を canvas 全体に対して
+   * 決めると扉が紙に潜るので、**見えている窓に対して**組み、その下はレンズシフトで延ばす
+   * （`camera.setViewOffset`）。書斎に入ったら全体に戻る。
+   */
+  let frameTarget: number | null = null;
+  let frameHeight: number | null = null;
+  let projectionDirty = true;
+  /** 扉の開き（入口に居るあいだだけ動かす）。 */
+  let doorAngle: number = DOOR_ANGLE.rest;
+  let doorTarget: number = DOOR_ANGLE.rest;
+  /** 入っている最中。`null` なら入っていない。 */
+  let entering: { startedAt: number; fromAngle: number; resolve: () => void } | null = null;
+  applyView(camera, atEntrance ?? (arrival === null ? homeCamera : arrival.from));
 
   // ---- 動かす ------------------------------------------------------------
 
@@ -407,7 +510,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const elapsed = now - startedAt;
 
     // 遷移中に預かった更新は、手が空いた最初のフレームで反映する。
-    if (pendingState !== null && transition === null && settled === null) {
+    if (pendingState !== null && transition === null && settled === null && !isWalking()) {
       applyState(pendingState);
     }
 
@@ -416,76 +519,81 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     updateHover();
     reportLabels();
 
+    updateFrame();
     renderer.render(scene, camera);
 
     if (!readyAnnounced) {
       readyAnnounced = true;
-      options.onReady?.();
+      listeners.onReady?.();
     }
 
     if (captureRequested) {
       captureRequested = false;
       captureFrame((frame) => {
-        if (frame !== null) options.onCapture?.(frame);
+        if (frame !== null) listeners.onCapture?.(frame);
       });
     }
   }
 
-  /**
-   * いま描いたフレームを 1 枚の画像にする。
-   *
-   * **画素を取るのは同期、符号化は非同期。** 描画バッファは次のフレームで捨てられる
-   * ので、`drawImage` でこの場に写し取る必要がある（これは GPU の転送なので速い）。
-   * 一方 PNG の符号化は等倍だと重く、その場でやるとカメラが動き出す 1 フレームが
-   * 引っかかる。`toBlob` に渡して符号化だけ後回しにする。
-   *
-   * 撮れない環境（2D コンテキストが取れない・canvas が 0 幅・符号化に失敗）では
-   * null を返す。地が無くても遷移そのものは成立するので、諦めても失うものは無い。
-   */
   function captureFrame(done: (dataUrl: string | null) => void): void {
-    const source = renderer.domElement;
-    if (source.width === 0 || source.height === 0) {
-      done(null);
-      return;
-    }
+    // 撮り方の約束は `scene/capture.ts` に集めてある（扉の画面と同じものを使う）。
+    captureRenderedFrame(
+      renderer,
+      theme === 'dark' ? DARK_PALETTE.solid : LIGHT_PALETTE.solid,
+      done,
+    );
+  }
 
-    const width = Math.min(source.width, CAPTURE.maxWidth);
-    const flat = document.createElement('canvas');
-    flat.width = width;
-    flat.height = Math.max(1, Math.round((source.height / source.width) * width));
-    const context = flat.getContext('2d');
-    if (context === null) {
-      done(null);
-      return;
-    }
-
-    // 書斎は alpha 付きで描いている。地の色を先に塗ってから重ねる
-    // （透明のまま敷くと、敷いた先の画面が透けて二重写しになる）。
-    context.fillStyle = theme === 'dark' ? DARK_PALETTE.solid : LIGHT_PALETTE.solid;
-    context.fillRect(0, 0, flat.width, flat.height);
-    context.drawImage(source, 0, 0, flat.width, flat.height);
-
-    try {
-      flat.toBlob((blob) => {
-        if (blob === null) {
-          done(null);
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          const url = typeof reader.result === 'string' ? reader.result : null;
-          done(url !== null && url.length <= CAPTURE_MAX_CHARS ? url : null);
-        };
-        reader.onerror = () => done(null);
-        reader.readAsDataURL(blob);
-      }, 'image/png');
-    } catch {
-      // 汚れた canvas（外部テクスチャ）なら諦める。いまは自前の描画だけなので通常は来ない。
-      done(null);
-    }
+  /** 見えている窓に合わせて投影を組み直す（毎フレーム、目標へ寄せながら）。 */
+  function updateFrame(): void {
+    const width = host.clientWidth;
+    const height = host.clientHeight;
+    if (width === 0 || height === 0) return;
+    const target = Math.min(height, Math.max(1, frameTarget ?? height));
+    // 切り替えずに寄せる。一瞬で縮むと、別の場面へ飛んだように見える。
+    const next = frameHeight === null ? target : approach(frameHeight, target, FRAME_SETTLE_LERP);
+    const settled = Math.abs(next - target) < 0.5 ? target : next;
+    if (settled === frameHeight && !projectionDirty) return;
+    frameHeight = settled;
+    projectionDirty = false;
+    camera.aspect = width / settled;
+    if (settled >= height) camera.clearViewOffset();
+    else camera.setViewOffset(width, settled, 0, 0, width, height);
+    camera.updateProjectionMatrix();
   }
 
   function updateCamera(now: number, elapsed: number): void {
+    if (entering !== null) {
+      const since = now - entering.startedAt;
+      if (entrance !== null) {
+        entrance.door.rotation.y = doorAngleWhileEntering(entering.fromAngle, since);
+      }
+      // 道のりは経過時間だけで決まる（`enterView`）。コマ落ちしても同じところにいる。
+      const walking = since - ENTER_TIMING.walkDelayMs;
+      applyView(camera, enterView(layout, walking));
+      // 着いたら入口を離れる。以後はホームの呼吸とパララックスに戻る。
+      if (isInside(walking)) {
+        const resolve = entering.resolve;
+        entering = null;
+        atEntrance = null;
+        // **入口はここで畳む。** 背中に回るので見えはしないが、残すと寄り引きで振り返った
+        // ときに壁が現れる。畳めば、扉から入ってきた書斎と、直に開いた書斎が同じものになる。
+        if (entrance !== null) entrance.group.visible = false;
+        resolve();
+      }
+      return;
+    }
+
+    if (atEntrance !== null) {
+      // 扉の前で待っている。動くのは扉の開きだけ。
+      if (entrance !== null) {
+        doorAngle = approach(doorAngle, doorTarget, DOOR_SETTLE_LERP);
+        entrance.door.rotation.y = doorAngle;
+      }
+      applyView(camera, atEntrance);
+      return;
+    }
+
     if (transition) {
       const view = viewAtTransition(transition, now);
       applyView(camera, view);
@@ -504,6 +612,15 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     if (settled) {
       // サブ画面に入っている間は動かさない。
       applyView(camera, settled);
+      return;
+    }
+
+    // 扉から入ってきた直後は、入り口からホームへ寄って止まる。着いてから揺らぎを乗せる
+    // （寄っている最中に呼吸とパララックスを混ぜると、止まる位置が定まらない）。
+    if (arrival !== null) {
+      const walked = progress(now - arrival.startedAt, ARRIVAL.durationMs);
+      applyView(camera, lerpView(arrival.from, homeCamera, EASING[ARRIVAL.easing](walked)));
+      if (walked >= 1) arrival = null;
       return;
     }
 
@@ -695,7 +812,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     renderer.domElement.style.cursor = id ? 'pointer' : 'default';
 
     const entry = content.registry.get(id);
-    options.onHoverChange?.(
+    listeners.onHoverChange?.(
       entry
         ? {
             label: entry.label,
@@ -727,14 +844,20 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   }
 
   function reportLabels(): void {
-    if (!options.onLabelPositions) return;
-    // サブ画面と遷移中はラベルを消す。
-    if (transition || settled) {
-      options.onLabelPositions({ jar: null, journal: null, board: null, archive: null, pen: null });
+    if (!listeners.onLabelPositions) return;
+    // サブ画面・遷移中・扉をくぐっている最中はラベルを消す。着いてから名前が出る。
+    if (transition || settled || atEntrance !== null) {
+      listeners.onLabelPositions({
+        jar: null,
+        journal: null,
+        board: null,
+        archive: null,
+        pen: null,
+      });
       return;
     }
     const anchors = layout.labelAnchors;
-    options.onLabelPositions({
+    listeners.onLabelPositions({
       jar: toScreen(new Vector3(anchors.jar.x, anchors.jar.y, anchors.jar.z)),
       journal: toScreen(new Vector3(anchors.journal.x, anchors.journal.y, anchors.journal.z)),
       board: toScreen(new Vector3(anchors.board.x, anchors.board.y, anchors.board.z)),
@@ -753,8 +876,8 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function toScreen(world: Vector3): ScreenPoint {
     const projected = world.clone().project(camera);
     return {
-      x: ((projected.x + 1) / 2) * container.clientWidth,
-      y: ((1 - projected.y) / 2) * container.clientHeight,
+      x: ((projected.x + 1) / 2) * host.clientWidth,
+      y: ((1 - projected.y) / 2) * host.clientHeight,
       visible: projected.z < 1,
     };
   }
@@ -799,7 +922,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const id = resolveClickTarget(hoveredId, () => raycast().id);
     const entry = content.registry.get(id);
     if (!entry) return;
-    options.onPick?.(entry.target);
+    listeners.onPick?.(entry.target);
   }
 
   function goTo(target: StudyTarget): Promise<void> {
@@ -812,7 +935,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
      * 既に瓶や板へ寄ったあとの絵になり、戻り道の地としては別の景色になってしまう。
      * ここで掴めば、次の描画＝まだホームに居るフレームが残る。
      */
-    captureRequested = options.onCapture !== undefined;
+    captureRequested = listeners.onCapture !== undefined;
     const from = currentView();
     const plan = planFor(target, {
       reducedMotion: options.reducedMotion,
@@ -842,7 +965,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     const total = active.plan.totalMs;
     if (elapsed < leaveFadeStart(total)) return;
     leaveAnnounced = true;
-    options.onLeaveStart?.(leaveFadeDuration(total));
+    listeners.onLeaveStart?.(leaveFadeDuration(total));
   }
 
   function currentView(): CameraView {
@@ -872,20 +995,55 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   // ---- 大きさの追従 -------------------------------------------------------
 
   const resizeObserver = new ResizeObserver(() => {
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    const width = host.clientWidth;
+    const height = host.clientHeight;
     if (width === 0 || height === 0) return;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
     renderer.setSize(width, height);
+    // 投影は次のフレームの updateFrame が窓に合わせて組み直す。
+    projectionDirty = true;
   });
-  resizeObserver.observe(container);
+  resizeObserver.observe(host);
 
+  /**
+   * 最初のフレームから描き始める。
+   *
+   * ここで `renderer.compileAsync` を挟んで**シェーダを先に用意する**ことを試したが、戻した。
+   * three 0.185 の `compileAsync` はこのシーンで `checkMaterialsReady` の中から
+   * `Cannot read properties of undefined (reading 'isReady')` を投げ、**書斎が永遠に描かれなく
+   * なる**（例外は監視ループの中で出るので、`.then` の失敗ハンドラにも渡らない）。
+   *
+   * そもそも効果も無かった。最初の描画が 245ms 塞ぐという計測は、ヘッドレス Chromium の
+   * SwiftShader（CPU 描画）でのもの。実 GPU では 50〜110ms で、`StudyHandover` の
+   * compositor の前進が覆う範囲に収まる（実機の計測でもコマ落ちは 48ms のまま変わらなかった）。
+   */
   frame = requestAnimationFrame(tick);
+
+  /**
+   * 引き取られた。入れ物と受け口を新しい画面のものに付け替える。
+   *
+   * `appendChild` は要素を**移す**（前の入れ物から自動的に外れる）ので、描画は 1 フレームも
+   * 途切れない。大きさの監視も新しい入れ物へ張り替える — 古い入れ物は DOM から消えるため、
+   * そのままだと幅 0 を返し、以後の伸縮に追従しなくなる。
+   */
+  function adopt(next: { container: HTMLElement; listeners: SceneListeners }): void {
+    resizeObserver.disconnect();
+    host = next.container;
+    host.appendChild(renderer.domElement);
+    resizeObserver.observe(host);
+    // 窓は入れ物のもの。新しい入れ物は「canvas 全体」から始める（狭めたいなら自分で言う）。
+    frameTarget = null;
+    projectionDirty = true;
+    listeners = next.listeners;
+    // 引き取った側にも「描けている」を知らせる。1 フレーム目はとうに過ぎているが、
+    // 地を外してよい合図を受け取るのは**いまの持ち主**なので、次のフレームで鳴らし直す。
+    readyAnnounced = false;
+  }
 
   // ---- 片付け ------------------------------------------------------------
 
   function dispose(): void {
+    for (const geometry of entranceGeometries) geometry.dispose();
+    entranceMaterials.dispose();
     // ここを怠ると再マウントで canvas が積み上がり、古い層のイベントだけが生き残る。
     cancelAnimationFrame(frame);
     resizeObserver.disconnect();
@@ -898,7 +1056,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     // 失われていく。
     renderer.forceContextLoss();
     // renderer.domElement を含め、コンテナを空にする。
-    while (container.firstChild) container.removeChild(container.firstChild);
+    while (host.firstChild) host.removeChild(host.firstChild);
   }
 
   /**
@@ -910,12 +1068,22 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
    * まで数回 state が変わるので、その間に押すと必ず踏む。
    */
   function setState(next: StudyState): void {
-    if (transition !== null || settled !== null) {
+    if (transition !== null || settled !== null || isWalking()) {
       // 捨てずに預かる。捨てると、遷移中に届いた更新が二度と反映されない。
       pendingState = next;
       return;
     }
     applyState(next);
+  }
+
+  /**
+   * いま組み直すと、動いているカメラが飛ぶか。
+   *
+   * 組み直しは部屋ぜんぶを作り直すので 100ms ほど主スレッドを塞ぐ。**扉が開くのを待っている
+   * あいだはカメラが静止している**ので、そこで組むぶんには見えない。歩き出したら着くまで待つ。
+   */
+  function isWalking(): boolean {
+    return entering !== null && !canRebuildWhileEntering(performance.now() - entering.startedAt);
   }
 
   function applyState(next: StudyState): void {
@@ -934,7 +1102,36 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     setHovered(null, null);
   }
 
+  function setFrame(visibleHeight: number): void {
+    /**
+     * **窓は「扉の前に立っている入れ物」のもの。** それ以外からは受け取らない。
+     *
+     * 窓を狭めるのは、SP で下から紙が canvas を覆っているため（`setViewOffset`）。入り始めたら
+     * 紙は退いていて、書斎には紙が無い。ここを開けていたせいで、認証画面の ResizeObserver
+     * （紙の高さの変化で鳴る）が、入る直前に戻した「画面全体」を**後から上書き**し、
+     * 狭い窓のまま書斎まで持ち越されていた — 画面が異様に引き伸ばされ、部屋が枠の外に出る
+     * （実機の SP。「認証中」の紙が伸び縮みする時間が、ちょうど入り始めに重なる）。
+     */
+    if (entering !== null || atEntrance === null) return;
+    // `Infinity` は「canvas 全体」。捨ててよいのは NaN だけ。
+    if (Number.isNaN(visibleHeight)) return;
+    frameTarget = visibleHeight;
+  }
+
+  function setDoorWaiting(waiting: boolean): void {
+    doorTarget = waiting ? DOOR_ANGLE.waiting : DOOR_ANGLE.rest;
+  }
+
+  function enterStudy(): Promise<void> {
+    if (atEntrance === null || entering !== null) return Promise.resolve();
+    const now = performance.now();
+    return new Promise<void>((resolve) => {
+      entering = { startedAt: now, fromAngle: doorAngle, resolve };
+    });
+  }
+
   return {
+    canvas: renderer.domElement,
     goTo,
     setState,
     setPointer,
@@ -943,7 +1140,12 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     startPinch,
     pinchTo,
     pick,
-    isBusy: () => transition !== null || settled !== null,
+    setFrame,
+    setDoorWaiting,
+    enterStudy,
+    adopt,
+    // 入口に居るあいだ・入っている最中も「手が離せない」状態（ラベルを出さない）。
+    isBusy: () => transition !== null || settled !== null || atEntrance !== null,
     dispose,
   };
 }

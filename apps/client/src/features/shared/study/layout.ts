@@ -85,6 +85,19 @@ export interface StudyLayout {
   };
   /** SP のピルだけが使う画面座標オフセット（px）。PC は null。 */
   pillOffsets: { jar: Vec2; journal: Vec2; board: Vec2; archive: Vec2 } | null;
+  /**
+   * 書斎の入口（扉のある前室）。
+   *
+   * **扉は書斎の一部**。認証画面はここにカメラを置き、ログインすると扉をくぐってホームまで
+   * 1 本で移動する（`docs/oryzae-study/70-entrance.md`）。以前は扉だけの別シーンを持っていて、
+   * 入るときに 2 つのシーンをクロスフェードしていたが、それが「一回切り替わる」正体だった。
+   */
+  entrance: {
+    /** 前室を置く場所（扉の開口の中心・床の高さ）。 */
+    room: Vec3;
+    /** 認証画面のカメラ。 */
+    camera: { position: Vec3; target: Vec3 };
+  };
 }
 
 interface Vec2 {
@@ -115,6 +128,11 @@ export const PC_LAYOUT: StudyLayout = {
   parallax: { x: 0.55, y: 0.3, lerp: 0.05 },
   jar: vec3(-4.2, -1.2, 1),
   board: { position: vec3(0.9, 2.5, -4), scale: 1 },
+  // 扉は瓶の正面（x = -3）。開口越しに瓶が見え、くぐると机の全体が開ける。
+  entrance: {
+    room: vec3(-3, -2.9, 14),
+    camera: { position: vec3(-1.5, 0, 22.4), target: vec3(-1.5, -0.65, 14) },
+  },
   desk: vec3(3, -1, 2),
   pen: vec3(2.55, -0.15, -0.1),
   shelf: { position: PC_SHELF, scale: 1, tiltX: 0 },
@@ -176,6 +194,12 @@ export const SP_LAYOUT: StudyLayout = {
   // 奥行きの差が画面の上下差になるため、ボードが上・瓶が中・手帳が下に積まれる。
   jar: vec3(-1.15, -1.2, -0.2),
   board: { position: vec3(0, 2.7, -4.2), scale: 0.68 },
+  // 縦画面は扉を右斜め前から見る（正面だと厚みも隙間も写らず、壁の長方形に読める）。
+  // 画角が広い（fov 58）ぶん、扉へは PC より寄る。
+  entrance: {
+    room: vec3(-3, -2.9, 14),
+    camera: { position: vec3(-0.9, -0.2, 20.9), target: vec3(-3.4, -0.35, 14) },
+  },
   desk: SP_DESK,
   // ペンは積みの左手前。右に置くと画面外に出る。
   pen: vec3(-1.9, -0.15, 1.2),

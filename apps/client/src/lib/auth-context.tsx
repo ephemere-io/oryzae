@@ -65,6 +65,19 @@ export interface AuthContextValue {
   api: ApiClient | null;
   loading: boolean;
   login: (identifier: string, password: string) => Promise<string | null>;
+  /**
+   * 外で確かめた認証を、そのまま文脈に載せる。載せられたら true。
+   *
+   * OAuth とメール確認は、この文脈の外（hook の中）でトークンを受け取る。以前はそのあと
+   * **読み込み直して**文脈を作り直していた（復元は mount 時にしか走らないため）。読み込み
+   * 直しは文書ごと捨てるので、扉から書斎へ入る絵が 1 秒近く静止する（実機の計測で
+   * mount まで 512ms、最初の 1 フレームまでさらに 424ms）。ここで載せれば、アプリ内の
+   * 遷移のまま保護画面へ入れる。
+   *
+   * `json` は API の応答そのまま（`{ user, session }`）。トークンが URL の hash から来る
+   * ときだけ `tokens` で渡す。
+   */
+  adoptSession: (json: unknown, tokens?: Session) => boolean;
   signup: (
     nickname: string,
     email: string,
@@ -176,6 +189,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const adoptSession = useCallback((json: unknown, tokens?: Session): boolean => {
+    const user = parseUser(json);
+    const session = tokens ?? parseSession(json);
+    if (!user || !session) return false;
+    setTokens(session.accessToken, session.refreshToken);
+    setAuth({ accessToken: session.accessToken, refreshToken: session.refreshToken, user });
+    setApi(createApiClient(session.accessToken));
+    setLoading(false);
+    posthog.identify(user.id, { email: user.email });
+    return true;
+  }, []);
+
   const signup = useCallback(
     async (
       nickname: string,
@@ -223,7 +248,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearAllStaleCaches();
   }, []);
 
-  const value: AuthContextValue = { auth, api, loading, login, signup, logout };
+  const value: AuthContextValue = { auth, api, loading, login, signup, logout, adoptSession };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

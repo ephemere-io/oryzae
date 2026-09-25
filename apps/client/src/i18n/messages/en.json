@@ -31,7 +31,9 @@
       "submit_loading": "Logging in...",
       "submit": "Log in",
       "no_account_prefix": "Don't have an account?",
-      "signup_link": "Sign up"
+      "signup_link": "Sign up",
+      "email_open": "Log in with email",
+      "email_back": "Back"
     },
     "reset_password": {
       "invalid_link": "Invalid reset link. Please request a new password reset.",
@@ -63,7 +65,9 @@
       "login_link": "Log in",
       "capacity_remaining": "{remaining} of {max} spots remaining",
       "capacity_full_title": "Sign-ups are currently full",
-      "capacity_full_body": "Research Preview is limited to {max} accounts. We'll add more capacity soon."
+      "capacity_full_body": "Research Preview is limited to {max} accounts. We'll add more capacity soon.",
+      "email_open": "Sign up with email",
+      "email_back": "Back"
     },
     "error": {
       "invalid_credentials": "Incorrect email or password",
