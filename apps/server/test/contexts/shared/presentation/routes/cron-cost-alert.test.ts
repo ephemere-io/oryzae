@@ -99,8 +99,8 @@ function createApp() {
 
 const SECRET = 'test-cron-secret';
 const validHeaders = { Authorization: `Bearer ${SECRET}` };
-/** 請求額の欄。スコープ（org 全体の実額）は欄の名前に置いている。 */
-const ACTUAL_FIELD = '請求額（Anthropic の org 全体の実額）';
+/** 請求額の欄。スコープ（org 全体の実額・Workspace 別）は欄の名前に置いている。 */
+const ACTUAL_FIELD = '請求額（Anthropic の org 全体の実額・Workspace 別）';
 
 function fermentation(overrides: Partial<FermentationRow> = {}): FermentationRow {
   return {
@@ -137,6 +137,19 @@ function costReportResponse(results: Record<string, unknown>[]) {
         data: [{ starting_at: '2026-08-08T00:00:00Z', results }],
         has_more: false,
       }),
+    text: () => Promise.resolve(''),
+  };
+}
+
+/**
+ * Workspace 一覧の応答。cost_report は workspace_id しか返さないので、
+ * 名前を出すテストはこれを積む。積まなければ ID 表示に縮退する（それも仕様）。
+ */
+function workspacesResponse(workspaces: { id: string; name: string }[]) {
+  return {
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ data: workspaces, has_more: false }),
     text: () => Promise.resolve(''),
   };
 }
@@ -425,7 +438,10 @@ describe('cronCostAlert', () => {
       costUsd: 0.465,
       truncated: false,
       // group_by が無い応答なので内訳は受け皿に入る（総額と一致する）
-      byModel: [{ model: '(内訳なし)', costUsd: 0.465, feature: null }],
+      byModel: [{ model: '(内訳なし)', costUsd: 0.465 }],
+      // workspace_id も無いので default workspace に積まれる（Anthropic の仕様）
+      byWorkspace: [{ workspaceId: null, workspaceName: 'Default Workspace', costUsd: 0.465 }],
+      workspaceNamesUnavailable: false,
     });
     expect(fieldValue(ACTUAL_FIELD)).toContain('$0.4650');
   });
@@ -496,79 +512,120 @@ describe('cronCostAlert', () => {
   // 単価を掛ける方式はやめた（cost_report が group_by[]=description で
   // モデル別に割れるため。そちらはキャッシュ・値引きも反映済みで正確）。
   describe('請求額の内訳', () => {
-    it('「何に」を前に出し、金額の直下に並べる', async () => {
+    it('用途別（Workspace 別）に、金額の直下へ並べる', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
       supabaseState.rows = [fermentation()];
-      mockFetch.mockResolvedValueOnce(
-        costReportResponse([
-          { amount: '12.4836', model: 'claude-sonnet-4-6', token_type: 'output_tokens' },
-          { amount: '18.81', model: 'claude-sonnet-5', token_type: 'output_tokens' },
-        ]),
-      );
+      mockFetch
+        .mockResolvedValueOnce(
+          costReportResponse([
+            {
+              amount: '12.4836',
+              model: 'claude-sonnet-4-6',
+              token_type: 'output_tokens',
+              workspace_id: 'wrkspc_ferm',
+            },
+            {
+              amount: '18.81',
+              model: 'claude-sonnet-5',
+              token_type: 'output_tokens',
+              workspace_id: 'wrkspc_ocr',
+            },
+          ]),
+        )
+        .mockResolvedValueOnce(
+          workspacesResponse([
+            { id: 'wrkspc_ferm', name: 'oryzae-prod-fermentation' },
+            { id: 'wrkspc_ocr', name: 'oryzae-prod-ocr' },
+          ]),
+        );
 
       const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
       const body = await res.json();
 
       const value = fieldValue(ACTUAL_FIELD) ?? '';
-      // 「合計: 金額」の配下に「用途: 金額」をぶら下げる。親子が字形で分かる。
-      // sonnet-5 は board の OCR と写真の文字起こしの両方なので、用途名が連なる
+      // 「合計: 金額」の配下に「Workspace 名: 金額」をぶら下げる。親子が字形で分かる。
       expect(value).toContain(
-        '合計: $0.3129\n├ OCR + 写真の文字起こし (claude-sonnet-5): $0.1881\n└ 発酵 (claude-sonnet-4-6): $0.1248',
+        '合計: $0.3129\n├ oryzae-prod-ocr: $0.1881\n└ oryzae-prod-fermentation: $0.1248',
       );
 
-      expect(body.actualCost.byModel).toEqual([
-        { model: 'claude-sonnet-5', costUsd: 0.1881, feature: 'OCR + 写真の文字起こし' },
-        { model: 'claude-sonnet-4-6', costUsd: 0.124836, feature: '発酵' },
+      expect(body.actualCost.byWorkspace).toEqual([
+        { workspaceId: 'wrkspc_ocr', workspaceName: 'oryzae-prod-ocr', costUsd: 0.1881 },
+        {
+          workspaceId: 'wrkspc_ferm',
+          workspaceName: 'oryzae-prod-fermentation',
+          costUsd: 0.124836,
+        },
       ]);
     });
 
-    it('写真の文字起こしも用途として読める（#591 の登録漏れの回帰防止）', async () => {
+    // 2026-09-23 のレポートの再現。発酵は 2 件 $0.12 しか使っていないのに、同じ
+    // claude-sonnet-4-6 を使う別の何かが $6.32 使ったため、モデル軸では「発酵 $6.44」と
+    // 報告されていた。Workspace 軸ならこれが起きない。
+    it('同じモデルでも Workspace が違えば分けて出す（発酵に他人の額を積まない）', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
-      // 9/7 のレポートそのもの: sonnet-5 $0.6029 が「何から発生したか」不明で届いた
-      mockFetch.mockResolvedValueOnce(
-        costReportResponse([
-          { amount: '60.29', model: 'claude-sonnet-5', token_type: 'output_tokens' },
-          { amount: '0.13', model: 'claude-haiku-4-5-20251001', token_type: 'output_tokens' },
-        ]),
-      );
+      supabaseState.rows = [fermentation({ input_tokens: 2_921, output_tokens: 3_530 })];
+      mockFetch
+        .mockResolvedValueOnce(
+          costReportResponse([
+            { amount: '12.34', model: 'claude-sonnet-4-6', workspace_id: 'wrkspc_ferm' },
+            { amount: '632', model: 'claude-sonnet-4-6', workspace_id: 'wrkspc_ci' },
+          ]),
+        )
+        .mockResolvedValueOnce(
+          workspacesResponse([
+            { id: 'wrkspc_ferm', name: 'oryzae-prod-fermentation' },
+            { id: 'wrkspc_ci', name: 'oryzae-ci' },
+          ]),
+        );
 
-      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const body = await res.json();
 
       const value = fieldValue(ACTUAL_FIELD) ?? '';
-      expect(value).toContain('├ OCR + 写真の文字起こし (claude-sonnet-5): $0.6029');
-      expect(value).toContain('└ claude-haiku-4-5-20251001: $0.0013 ← 用途不明');
+      expect(value).toContain('├ oryzae-ci: $6.32');
+      expect(value).toContain('└ oryzae-prod-fermentation: $0.1234');
+      // 合計は org 全体のまま（隠さない）。分かれたのは内訳。
+      expect(body.actualCost.costUsd).toBeCloseTo(6.4434, 6);
+      // 突き合わせの相手は発酵 Workspace の $0.1234。旧実装は同じモデルを合算した
+      // $6.44 と比べ、9/23 に「-98% ずれている」と報告していた。
+      const notices = fieldValue('要確認') ?? '';
+      expect(notices).toContain('oryzae-prod-fermentation の実額 $0.1234');
+      expect(notices).not.toContain('$6.44');
+      expect(notices).not.toContain('-98%');
     });
 
-    it('知らないモデルは用途を決めつけず、その旨を添える', async () => {
+    it('Workspace 名が引けない日は ID のまま出し、その旨を添える', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      // Workspace 一覧の応答を積まない = 取得失敗。金額は出し、名前だけ縮退させる。
       mockFetch.mockResolvedValueOnce(
-        costReportResponse([{ amount: '500', model: 'some-other-model' }]),
+        costReportResponse([
+          { amount: '500', model: 'claude-opus-5', workspace_id: 'wrkspc_01ABC' },
+        ]),
       );
 
       const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
       const body = await res.json();
 
-      // $1 以上は 2 桁。$5.0000 の下 2 桁は読む人にとって意味を持たない
-      expect(fieldValue(ACTUAL_FIELD)).toContain(
-        '└ some-other-model: $5.00 ← 用途不明（アプリ外の利用か登録漏れ）',
-      );
-      expect(body.actualCost.byModel[0].feature).toBeNull();
+      const value = fieldValue(ACTUAL_FIELD) ?? '';
+      expect(value).toContain('└ wrkspc_01ABC: $5.00');
+      expect(value).toContain('※ Workspace 名を取得できず、一部は ID 表示（金額は正しい）');
+      expect(body.actualCost.workspaceNamesUnavailable).toBe(true);
     });
 
-    it('トークン以外のコスト (cost_type) は受け皿の名前のまま出す', async () => {
+    it('default workspace は仕様どおり null で来るので、その名前で出す', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      // workspace_id を持たない result = default workspace（ドキュメント明記）
       mockFetch.mockResolvedValueOnce(
-        costReportResponse([
-          { amount: '10', model: 'claude-opus-5' },
-          { amount: '5', cost_type: 'web_search' },
-        ]),
+        costReportResponse([{ amount: '500', model: 'claude-opus-5' }]),
       );
 
-      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+      const body = await res.json();
 
-      const value = fieldValue(ACTUAL_FIELD) ?? '';
-      expect(value).toContain('└ (web_search): $0.0500');
-      expect(value).not.toContain('(web_search): $0.0500 ←');
+      expect(fieldValue(ACTUAL_FIELD)).toContain('└ Default Workspace: $5.00');
+      // id が無いだけで「名前が引けなかった」わけではない。一覧も叩かない。
+      expect(body.actualCost.workspaceNamesUnavailable).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(2); // 対象日 + 月ぶん（Workspace 一覧は叩かない）
     });
 
     it('内訳が取れなかったときは、その旨を出す（合計は正しいと添える）', async () => {
@@ -628,38 +685,83 @@ describe('cronCostAlert', () => {
     it('推定が実額と合っている日は、突き合わせも計算根拠も出さない', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
       supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
-      // 発酵モデル $0.1248 / 画像系モデル $0.1881。推定 $0.124836 は前者と比べる。
-      mockFetch.mockResolvedValueOnce(
-        costReportResponse([
-          { amount: '12.4836', model: 'claude-sonnet-4-6', token_type: 'output_tokens' },
-          { amount: '18.81', model: 'claude-sonnet-5', token_type: 'output_tokens' },
-        ]),
-      );
+      // 発酵 Workspace $0.1248 / OCR Workspace $0.1881。推定 $0.124836 は前者と比べる。
+      mockFetch
+        .mockResolvedValueOnce(
+          costReportResponse([
+            {
+              amount: '12.4836',
+              model: 'claude-sonnet-4-6',
+              token_type: 'output_tokens',
+              workspace_id: 'wrkspc_ferm',
+            },
+            {
+              amount: '18.81',
+              model: 'claude-sonnet-5',
+              token_type: 'output_tokens',
+              workspace_id: 'wrkspc_ocr',
+            },
+          ]),
+        )
+        .mockResolvedValueOnce(
+          workspacesResponse([
+            { id: 'wrkspc_ferm', name: 'oryzae-prod-fermentation' },
+            { id: 'wrkspc_ocr', name: 'oryzae-prod-ocr' },
+          ]),
+        );
 
       const res = await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
       expect((await res.json()).notices).toEqual([]);
       expect(fieldValue('要確認')).toBeUndefined();
       expect(fieldValue('推定の計算根拠')).toBeUndefined();
-      // スコープ（org 全体の実額）は引き算や注記ではなく、欄の名前で伝える
+      // スコープ（org 全体の実額・Workspace 別）は引き算や注記ではなく、欄の名前で伝える
       expect(lastEmbed().fields?.some((f) => f.name === ACTUAL_FIELD)).toBe(true);
-      expect(fieldValue(ACTUAL_FIELD)).toContain('※ 同じモデルを CI などが使えば');
     });
 
     it('推定が実額とズレた日だけ、両方の数字と計算根拠を出す', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
       supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
-      // 実額 $0.0800 に対し推定 $0.124836 → +56%
-      mockFetch.mockResolvedValueOnce(
-        costReportResponse([{ amount: '8', model: 'claude-sonnet-4-6' }]),
-      );
+      // 発酵 Workspace の実額 $0.0800 に対し推定 $0.124836 → +56%
+      mockFetch
+        .mockResolvedValueOnce(
+          costReportResponse([
+            { amount: '8', model: 'claude-sonnet-4-6', workspace_id: 'wrkspc_ferm' },
+          ]),
+        )
+        .mockResolvedValueOnce(
+          workspacesResponse([{ id: 'wrkspc_ferm', name: 'oryzae-prod-fermentation' }]),
+        );
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
       expect(fieldValue('推定の計算根拠')).toContain('in  5,972 × $3.00/MTok');
       expect(fieldValue('要確認')).toContain(
-        '発酵の推定 $0.1248 が同モデルの実額 $0.0800 と +56% ずれている',
+        '発酵の推定 $0.1248 が oryzae-prod-fermentation の実額 $0.0800 と +56% ずれている',
       );
+    });
+
+    // 突き合わせができなかったことを黙るのが一番まずい。「今日はズレなかった」と
+    // 読めてしまい、実際には比べていない。
+    it('発酵 Workspace が実額に無い日は、突き合わせていないことを明示する', async () => {
+      vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+      supabaseState.rows = [fermentation({ input_tokens: 5_972, output_tokens: 7_128 })];
+      mockFetch
+        .mockResolvedValueOnce(
+          costReportResponse([
+            { amount: '8', model: 'claude-sonnet-4-6', workspace_id: 'wrkspc_other' },
+          ]),
+        )
+        .mockResolvedValueOnce(workspacesResponse([{ id: 'wrkspc_other', name: 'oryzae-dev' }]));
+
+      await createApp().request('/cron', { method: 'POST', headers: validHeaders });
+
+      const notices = fieldValue('要確認') ?? '';
+      expect(notices).toContain(
+        'Workspace「oryzae-prod-fermentation」が実額に無く、推定との突き合わせができていない',
+      );
+      // 0 と比べた結果の「-100% ずれている」は出さない。
+      expect(notices).not.toContain('ずれている');
     });
   });
 
