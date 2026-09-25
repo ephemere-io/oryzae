@@ -70,6 +70,7 @@ import { useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
 import type { AttachedPhoto } from '@/features/shared/entries/types';
 import { caretRangeFromPoint } from '@/features/shared/entries/utils/caret-from-point';
+import { splitEntryContent } from '@/features/shared/entries/utils/entry-content';
 import {
   applyInlineImagesToEditor,
   createInlineImageElement,
@@ -236,13 +237,6 @@ const TITLE_MAX_LENGTH = 60;
  */
 const TITLE_REMAINING_THRESHOLD = 15;
 
-/** Extract title (first line) and body from stored content */
-function splitTitleBody(raw: string): { title: string; body: string } {
-  const idx = raw.indexOf('\n');
-  if (idx === -1) return { title: '', body: raw };
-  return { title: raw.substring(0, idx), body: raw.substring(idx + 1) };
-}
-
 export function EntryEditor({
   entryId,
   initialContent = '',
@@ -264,8 +258,11 @@ export function EntryEditor({
   const t = useTranslations('editor');
   const tPhoto = useTranslations('photo');
   const locale = useLocale();
-  // For existing entries, split first line as title
-  const parsed = entryId ? splitTitleBody(initialContent) : { title: '', body: initialContent };
+  // 既存の記録は題と本文に分ける。分け方は SP と共有（題を付けずに保存された本文で、
+  // 写真の位置がずれないように。`splitEntryContent` の説明を参照）。
+  const parsed = entryId
+    ? splitEntryContent(initialContent, initialEffects)
+    : { title: '', body: initialContent };
   const [title, setTitle] = useState(initialTitle ?? parsed.title);
   const [content, setContent] = useState(entryId ? parsed.body : initialContent);
   const [savedContent, setSavedContent] = useState(entryId ? parsed.body : initialContent);
@@ -594,7 +591,7 @@ export function EntryEditor({
   // biome-ignore lint/correctness/useExhaustiveDependencies: effectiveInitialEffects is hydrated once per entry-switch; we intentionally don't rerun on its identity changing during the editing session
   useEffect(() => {
     if (entryId) {
-      const p = splitTitleBody(initialContentStable);
+      const p = splitEntryContent(initialContentStable, effectiveInitialEffects);
       setTitle(p.title);
       setContent(p.body);
       setSavedContent(p.body);

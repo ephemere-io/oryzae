@@ -37,6 +37,7 @@ import {
 } from '@/features/shared/entries/hooks/use-entry-local-copy';
 import { usePhotoImport } from '@/features/shared/entries/hooks/use-photo-import';
 import type { AttachedPhoto, EntryDraft, InlinePhoto } from '@/features/shared/entries/types';
+import { splitEntryContent } from '@/features/shared/entries/utils/entry-content';
 import {
   buildEffectsWithPhotos,
   photoOffsets,
@@ -88,13 +89,6 @@ interface SpEntryEditorProps {
   initialMediaSignedUrls?: string[];
   /** ドラフト（localStorage）に退避/復元するか。verify などで無効化する。 */
   persistDraft?: boolean;
-}
-
-/** 先頭行をタイトル、残りを本文として分割する（保存形式と対応）。 */
-function splitTitleBody(raw: string): { title: string; body: string } {
-  const idx = raw.indexOf('\n');
-  if (idx === -1) return { title: '', body: raw };
-  return { title: raw.slice(0, idx), body: raw.slice(idx + 1) };
 }
 
 /** 保存形式（先頭行＝タイトル）。 */
@@ -169,7 +163,8 @@ export function SpEntryEditor({
   // 写しを最初から入れると差が無いと見なされて送られない。写しは下の effect で入れ替える。
   const [initial] = useState(() => {
     if (initialEntryId) {
-      const split = splitTitleBody(initialContent);
+      // 題と本文の分け方は PC と共有（題を付けずに保存された本文で、写真の位置がずれないように）。
+      const split = splitEntryContent(initialContent, initialEffects);
       const { body, images } = restoreInlinePhotos(split.body, initialEffects, photos);
       return { title: split.title, body, images };
     }
@@ -198,7 +193,8 @@ export function SpEntryEditor({
   // biome-ignore lint/correctness/useExhaustiveDependencies: マウント時に一度だけ入れ替える（写しは開いた時点のもの）
   useEffect(() => {
     if (!localCopy) return;
-    const split = splitTitleBody(localCopy.content);
+    // 写しは写真の位置を持たない（並び順だけ）。1 行目に写真があれば題にしない、までは同じ規則。
+    const split = splitEntryContent(localCopy.content, null);
     // 写しは見た目を持たない。サーバーの effects に同じ写真があればその見た目、無ければ既定。
     const known = new Map(initial.images.map((image) => [image.storagePath, image]));
     const images = localCopy.inlinePaths.map(
