@@ -1,6 +1,6 @@
-import { anthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { anthropicFor } from '../../../shared/infrastructure/anthropic-provider.js';
 import { FERMENTATION_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type {
   LlmAnalysisGateway,
@@ -190,7 +190,11 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
     const { object, usage } = await generateObject({
       // モデル ID は価格表 (claude-pricing.ts) から取る。ここでハードコードすると
       // モデルだけ差し替えたときにコスト算出が黙って間違った値になる。
-      model: anthropic(FERMENTATION_MODEL_ID),
+      //
+      // キーは発酵専用のもの (ANTHROPIC_API_KEY_FERMENTATION)。機能ごとに Workspace が
+      // 分かれており、実額を用途別に読むのはこの分離が根拠になっている
+      // （anthropic-provider.ts）。共通キーに戻すと内訳が読めなくなる。
+      model: anthropicFor('fermentation')(FERMENTATION_MODEL_ID),
       prompt: buildPrompt(
         {
           question: params.question,

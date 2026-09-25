@@ -1,6 +1,6 @@
-import { anthropic } from '@ai-sdk/anthropic';
 import { MAX_ENTRY_PHOTO_TEXT_LENGTH } from '@oryzae/shared';
 import { generateText } from 'ai';
+import { anthropicFor } from '../../../shared/infrastructure/anthropic-provider.js';
 import { PHOTO_TRANSCRIPTION_MODEL_ID } from '../../../shared/infrastructure/claude-pricing.js';
 import type {
   PhotoTranscriptionGateway,
@@ -22,11 +22,10 @@ import type {
  *
  * **board の OCR (board/infrastructure/ocr/anthropic-ocr.gateway.ts) も 2026-09-16 から
  * 同じ claude-sonnet-5**。あちらは精度を理由に claude-opus-5 だったが、ランニング
- * コストを優先して揃えた。そのため実額のモデル別内訳では 2 つの用途が 1 行に混ざる
- * （featureOfModel が両方の名前を返す）。片方だけモデルを替えれば自然に分かれる。
+ * コストを優先して揃えた。**モデルでは 2 つの用途を区別できない**ので、用途別の実額は
+ * API キー（＝Workspace）で分けている（anthropic-provider.ts）。
  */
-// 価格表から引く。ベタ書きすると featureOfModel の読み替え表と食い違い、
-// この機能の費用が「分類不明」に落ちる（board の OCR gateway と同じ形）。
+// 価格表から引く。ベタ書きすると価格改定時に推定と実額がズレる。
 const OCR_MODEL = PHOTO_TRANSCRIPTION_MODEL_ID;
 
 /** 起こした文字だけを返させる。前置き・要約・推測での補完をさせないのが肝。 */
@@ -73,7 +72,9 @@ export class AnthropicPhotoTranscriptionGateway implements PhotoTranscriptionGat
     language: string,
   ): Promise<PhotoTranscriptionResult> {
     const { text, usage } = await generateText({
-      model: anthropic(OCR_MODEL),
+      // キーは写真の文字起こし専用 (ANTHROPIC_API_KEY_OCR_ENTRY)。ボード OCR と同じ
+      // モデルなので、用途を分けているのはキー（＝Workspace）だけ。
+      model: anthropicFor('ocrEntry')(OCR_MODEL),
       maxOutputTokens: 4000,
       messages: [
         {

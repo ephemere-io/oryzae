@@ -1,20 +1,36 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // AI SDK (ai / @ai-sdk/anthropic) のメジャー更新に対する characterization。
 // 実 LLM は呼ばず、generateObject/anthropic をモックして analyze() の
 // リクエスト構築とレスポンス解析の「契約」を固定する。SDK の型表面は typecheck が、
 // マッピングロジックはこのテストが守る二段構え。
-const { generateObjectMock, anthropicMock } = vi.hoisted(() => ({
-  generateObjectMock: vi.fn(),
-  anthropicMock: vi.fn((modelId: string) => ({ __mockModel: modelId })),
-}));
+const { generateObjectMock, anthropicMock, createAnthropicMock } = vi.hoisted(() => {
+  // anthropicMock は provider 本体（= createAnthropic の戻り値）。モデル ID で呼ばれる。
+  const anthropicMock = vi.fn((modelId: string) => ({ __mockModel: modelId }));
+  return {
+    generateObjectMock: vi.fn(),
+    anthropicMock,
+    createAnthropicMock: vi.fn(() => anthropicMock),
+  };
+});
 vi.mock('ai', () => ({ generateObject: generateObjectMock }));
-vi.mock('@ai-sdk/anthropic', () => ({ anthropic: anthropicMock }));
+// 機能別キーで provider を作るようになったため、モックするのは createAnthropic。
+// 素の `anthropic` を生やしてしまうと、共通キーに戻す実装が通ってしまう。
+vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic: createAnthropicMock }));
 
 import {
   __INTERNAL,
   VercelAiAnalysisGateway,
 } from '@/contexts/fermentation/infrastructure/llm/vercel-ai-analysis.gateway.js';
+
+// 機能別キーは実行時に process.env から読む。未設定なら anthropicFor が throw するので、
+// ここで明示的に積む（テストが落ちる形で「キーを読んでいる」ことも担保される）。
+beforeEach(() => {
+  vi.stubEnv('ANTHROPIC_API_KEY_FERMENTATION', 'test-key-fermentation');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 // issue #279: ja/en でプロンプトと schema description が切り替わることを担保する。
 // 実 LLM 呼び出しはモックされた application 層からは見えないので、
@@ -129,6 +145,8 @@ describe('VercelAiAnalysisGateway.analyze — AI SDK contract characterization',
 
     expect(generateObjectMock).toHaveBeenCalledTimes(1);
     expect(anthropicMock).toHaveBeenCalledWith('claude-sonnet-4-6');
+    // 発酵は専用 Workspace で上限とアラートを別に持たせている。
+    expect(createAnthropicMock).toHaveBeenCalledWith({ apiKey: 'test-key-fermentation' });
 
     const callArg = generateObjectMock.mock.calls[0]?.[0];
     expect(callArg.model).toEqual({ __mockModel: 'claude-sonnet-4-6' });

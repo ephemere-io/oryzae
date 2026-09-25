@@ -4,7 +4,6 @@ import {
   computeCostFromTokens,
   FERMENTATION_MODEL_ID,
   FERMENTATION_MODEL_RATE,
-  featureOfModel,
   OCR_MODEL_ID,
   PHOTO_TRANSCRIPTION_MODEL_ID,
 } from '@/contexts/shared/infrastructure/claude-pricing.js';
@@ -95,24 +94,15 @@ describe('用途とモデルの対応', () => {
     expect(PHOTO_TRANSCRIPTION_MODEL_ID).toBe('claude-sonnet-5');
   });
 
-  it('同じモデルを使う用途は名前を連ねて返す（混ざっている事実を消さない）', () => {
-    // 先に一致したほうだけを返す実装にすると「OCR (claude-sonnet-5): $X」と出て、
-    // 写真の文字起こしのぶんまで OCR の額に見える。
-    expect(featureOfModel('claude-sonnet-5')).toBe('OCR + 写真の文字起こし');
-  });
+  // モデル ID から用途を読み替える featureOfModel は 2026-09 に撤去した。
+  // ボード OCR と写真の文字起こしが同じ claude-sonnet-5 で区別できないうえ、
+  // CI の Claude が同じモデルを使えば同じ行に混ざる。実際 9/15 に定期監査の
+  // 消費が「OCR $6.46」と報告され、9/23 には発酵 2 件（$0.12）の行に org 全体の
+  // $6.44 が積まれた。用途別の実額は Workspace 軸で取る（anthropic-cost-api.ts）。
+  it('モデル ID から用途を読み替える口を持たない', async () => {
+    const pricing = await import('@/contexts/shared/infrastructure/claude-pricing.js');
 
-  it('すべての用途が名前に読み替えられる', () => {
-    // 読み替えられないモデルは費用が「分類不明」に落ちる。#529 で写真の文字起こしが
-    // 登録漏れになり、管理画面でも費用アラートでも分類されていなかった。
-    expect(featureOfModel(FERMENTATION_MODEL_ID)).toBe('発酵');
-    expect(featureOfModel(OCR_MODEL_ID)).toContain('OCR');
-    expect(featureOfModel(PHOTO_TRANSCRIPTION_MODEL_ID)).toContain('写真の文字起こし');
-  });
-
-  it('未登録のモデルは null（分類不明）を返す', () => {
-    // CI や別用途が同じ API キーを使うと未知のモデルが混ざる。
-    // 勝手にどれかの用途へ寄せず、分類不明のまま返す。
-    expect(featureOfModel('claude-haiku-4-5')).toBeNull();
+    expect(Object.keys(pricing)).not.toContain('featureOfModel');
   });
 
   it('OCR のモデルは価格表に載せない（実額から取るので二重管理しない）', async () => {
