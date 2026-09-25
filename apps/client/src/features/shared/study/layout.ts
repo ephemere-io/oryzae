@@ -261,9 +261,11 @@ export const SP_LAYOUT: StudyLayout = {
   deskNotebooks: 1,
   // SP は手帳を仰角およそ 63° で見下ろすので、同じ厚みでも側面は PC の 1/4 ほどにしか写らず、
   // 何十件書いても手帳が平たいままだった（実機レビュー #616: 「エントリーが複数あっても
-  // 平ぺったい。PC と合わせて膨らみを」）。PC と同じだけ膨らんで見える比（およそ 4.2）。
+  // 平ぺったい。PC と合わせて膨らみを」）。
+  // PC と同じだけ膨らんで見える比（およそ 4.2）にすると**分厚すぎた**（オーナー）。SP の手帳は
+  // PC より画面に大きく写るので、同じ比でも側面の帯が太く見える。その**半分**（およそ 2.1）にする。
   notebookGrowth:
-    sideVisibility(PC_CAMERA_POSITION, PC_DESK) / sideVisibility(SP_CAMERA_POSITION, SP_DESK),
+    sideVisibility(PC_CAMERA_POSITION, PC_DESK) / sideVisibility(SP_CAMERA_POSITION, SP_DESK) / 2,
   // 鉛筆は置かない。1 冊だけなら「書く」は手帳そのものと ENTRIES のピルで足り、鉛筆は役割を失う。
   pen: null,
   // 棚を前傾させると背文字が上を向き、そのまま行き先の予告になる。
