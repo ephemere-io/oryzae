@@ -173,7 +173,7 @@ html[data-help-resizing] .help-resize-line {
 
 /* ヘルプの面の頭の 1 枚が入れ替わるとき。「変わった」ことを動きで言う。 */
 .help-fade {
-  animation: help-fade 180ms ease-out;
+  animation: help-fade 120ms ease-out;
 }
 @keyframes help-fade {
   from {

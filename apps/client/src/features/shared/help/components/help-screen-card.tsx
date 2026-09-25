@@ -39,7 +39,7 @@ export interface HelpScreenCardProps {
  * 文はもう少し止まってから — 物をまたぐたびに段落が入れ替わると読めない。
  * 面の中の触れと留めは本人がそこを見ているので待たない。
  */
-export const TEXT_SETTLE_MS = 200;
+export const TEXT_SETTLE_MS = 100;
 
 /** 書斎の物 → 3D に貼ってある注釈（`study.label_*`）。見取り図の札は部屋と同じ字にする。 */
 const STUDY_LABEL_KEY: Partial<Record<HelpTopicId, string>> = {
