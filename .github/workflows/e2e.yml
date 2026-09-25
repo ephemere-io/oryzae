@@ -20,7 +20,7 @@ name: E2E Tests
 #   - **main への push（マージ後）** ← 壊れたまま入れば必ずここで気づく
 #   - 週次のフル回帰（月曜 09:00 JST）
 # つまり「マージ前に必ず緑」ではなく「マージ後に必ず検知」に寄せてある。
-# 落ちた main は auto-fix.yml の main-red 経路が拾う（docs/auto-fix-loop-guide.md）。
+# 落ちた main は人が見て直す（自動修正ループ auto-fix.yml は 2026-09 に撤去）。
 
 on:
   push:
