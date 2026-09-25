@@ -126,6 +126,8 @@ export default async function RootLayout({
             </AuthProvider>
           </PostHogProvider>
         </NextIntlClientProvider>
+        {/* 扉から書斎へ渡すあいだ、部屋を画面の上に敷いておく 1 枚。**ルーターの外に置く** —
+            画面が入れ替わっても外れないので、途中のロード表示や mount 待ちが見えない。 */}
         <ServiceWorkerRegister />
       </body>
     </html>

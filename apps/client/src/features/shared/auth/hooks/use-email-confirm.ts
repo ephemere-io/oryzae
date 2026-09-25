@@ -1,11 +1,10 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import posthog from 'posthog-js';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import type { AuthFlowError, AuthSession } from '@/features/shared/auth/types';
 import { createApiClient } from '@/lib/api';
-import { setTokens } from '@/lib/auth';
+import { useAuth } from '@/lib/auth-context';
 
 /**
  * メールリンク（Supabase verifyOtp）の確定処理（端末非依存）。
@@ -59,9 +58,24 @@ function isAuthSession(value: unknown): value is AuthSession {
   return 'refreshToken' in session && typeof session.refreshToken === 'string';
 }
 
-export function useEmailConfirm(): { error: AuthFlowError | null } {
+export function useEmailConfirm(
+  /**
+   * 行き先へ読み込み直す**直前**に待つもの（認証画面の扉を開けて入る演出）。
+   * 行き先を受け取り、解決したら移る。失敗しても移る — 演出のために入口を塞がない。
+   */
+  beforeLeave?: (destination: string) => Promise<void>,
+): { error: AuthFlowError | null } {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { adoptSession } = useAuth();
   const [error, setError] = useState<AuthFlowError | null>(null);
+  // effect を searchParams だけで回すため、関数は ref で読む（毎描画で新しい参照になりうる）。
+  const beforeLeaveRef = useRef(beforeLeave);
+  beforeLeaveRef.current = beforeLeave;
+  const adoptRef = useRef(adoptSession);
+  adoptRef.current = adoptSession;
+  const pushRef = useRef(router.push);
+  pushRef.current = router.push;
 
   useEffect(() => {
     async function handle() {
@@ -96,12 +110,14 @@ export function useEmailConfirm(): { error: AuthFlowError | null } {
         return;
       }
 
-      setTokens(data.session.accessToken, data.session.refreshToken);
-      posthog.identify(data.user.id, { email: data.user.email });
-      // **読み込み直して入る。** 認証（AuthProvider）はマウント時にしか復元しないので、
-      // アプリ内の遷移で保護画面へ入ると「未ログイン」に見えてログイン画面へ戻される
-      // （OAuth の完了を全画面遷移にしているのと同じ理由）。
-      window.location.assign(next ?? defaultNextFor(typeParam));
+      // 文脈に載せる。載れば読み込み直さずに入れる（`AuthContextValue.adoptSession`）。
+      // 以前は必ず読み込み直していた — 復元は mount 時にしか走らないので、アプリ内の
+      // 遷移で保護画面へ入ると「未ログイン」に見えてログイン画面へ戻されていた。
+      const adopted = adoptRef.current(data);
+      const destination = next ?? defaultNextFor(typeParam);
+      await beforeLeaveRef.current?.(destination).catch(() => undefined);
+      if (adopted) pushRef.current(destination);
+      else window.location.assign(destination);
     }
     handle();
   }, [searchParams]);

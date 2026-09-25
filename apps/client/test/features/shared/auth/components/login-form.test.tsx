@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginForm } from '@/features/shared/auth/components/login-form';
+import { EntranceContext } from '@/features/shared/auth/entrance/context';
+import type { EntranceControls } from '@/features/shared/auth/types';
 import messages from '@/i18n/messages/ja.json';
 
 /**
@@ -105,5 +107,91 @@ describe('LoginForm', () => {
 
     await waitFor(() => expect(login).toHaveBeenCalled());
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe('LoginForm（扉の前の紙）', () => {
+  const IDENTIFIER = 'ニックネームまたはメールアドレス';
+
+  function renderOnPaper(controls: EntranceControls) {
+    return render(
+      <NextIntlClientProvider locale="ja" messages={messages}>
+        <EntranceContext.Provider value={controls}>
+          <LoginForm />
+        </EntranceContext.Provider>
+      </NextIntlClientProvider>,
+    );
+  }
+
+  function controls(overrides: Partial<EntranceControls> = {}): EntranceControls {
+    return {
+      compact: false,
+      setWaiting: vi.fn(),
+      enter: vi.fn(() => Promise.resolve()),
+      ...overrides,
+    };
+  }
+
+  it('扉を開けて入り終えてから移る（先に移ると扉が開く前に画面が変わる）', async () => {
+    let finishWalking: () => void = () => {};
+    const enter = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishWalking = resolve;
+        }),
+    );
+    const setWaiting = vi.fn();
+    renderOnPaper(controls({ enter, setWaiting }));
+    await submit();
+
+    await waitFor(() => expect(enter).toHaveBeenCalled());
+    expect(setWaiting).toHaveBeenCalledWith(true);
+    expect(push).not.toHaveBeenCalled();
+    finishWalking();
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
+  });
+
+  it('失敗したら扉を閉じ直し、入らない', async () => {
+    login.mockResolvedValue('invalid_credentials');
+    const setWaiting = vi.fn();
+    const enter = vi.fn(() => Promise.resolve());
+    renderOnPaper(controls({ setWaiting, enter }));
+    await submit();
+
+    await waitFor(() => expect(setWaiting).toHaveBeenLastCalledWith(false));
+    expect(enter).not.toHaveBeenCalled();
+  });
+
+  it('狭い紙（SP）では入り方だけを出し、入力欄と送信ボタンは選ぶまで隠す', () => {
+    // 全部を並べると紙が画面の下にはみ出して「ログイン」が見切れた（実機レビュー）。
+    renderOnPaper(controls({ compact: true }));
+
+    expect(screen.getByRole('button', { name: 'メールアドレスでログイン' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'ログイン' })).toBeNull();
+    // DOM には置いてある（focus を同じタップで渡すため）が、見えも読み上げもしない。
+    expect(screen.queryByRole('textbox', { name: IDENTIFIER })).toBeNull();
+    expect(screen.getByRole('link', { name: 'サインアップ' })).toBeTruthy();
+  });
+
+  it('メールアドレスを選ぶと入力欄が開いて focus が入り、戻ると選ぶところへ戻る', () => {
+    renderOnPaper(controls({ compact: true }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'メールアドレスでログイン' }));
+    const identifier = screen.getByRole('textbox', { name: IDENTIFIER });
+    // 同じタップの中で focus を渡す（iOS はそうしないとキーボードを出さない）。
+    expect(document.activeElement).toBe(identifier);
+    expect(screen.getByRole('button', { name: 'ログイン' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '戻る' }));
+    expect(screen.getByRole('button', { name: 'メールアドレスでログイン' })).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: IDENTIFIER })).toBeNull();
+  });
+
+  it('広い紙（PC）では最初から全部を出す', () => {
+    renderOnPaper(controls({ compact: false }));
+
+    expect(screen.queryByRole('button', { name: 'メールアドレスでログイン' })).toBeNull();
+    expect(screen.getByPlaceholderText('nickname or email@example.com')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'ログイン' })).toBeTruthy();
   });
 });

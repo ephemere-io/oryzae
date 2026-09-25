@@ -34,6 +34,7 @@ const loadingAuth: AuthContextValue = {
   login: async () => null,
   signup: async () => null,
   logout: () => {},
+  adoptSession: () => false,
 };
 
 type PageComponent = () => React.ReactNode;
