@@ -939,6 +939,12 @@
         "body": "Select a sentence while writing to cut it out as a snippet. Snippets are pinned to the board, where you can lay them out and look over them later. Photos go on the board the same way.",
         "keywords": "snippet,cut out,select,excerpt,quote,highlight,pin,sentence"
       },
+      "photo": {
+        "title": "Photos",
+        "lead": "Pin an image on the board, next to your words",
+        "body": "Add a photo with \"Paste image\" in the board toolbox, or drag and drop it onto the board. Like snippets, it can be moved and rotated, and it shows up in the same place on the board in your study.",
+        "keywords": "photo,image,picture,pin,paste,drop,board,upload"
+      },
       "list": {
         "title": "Entry list",
         "lead": "Filter what you wrote by month and question, search the text",
@@ -982,7 +988,8 @@
         "snippet": "Snippet"
       },
       "board": {
-        "snippet": "Card (snippet)"
+        "snippet": "Card (snippet)",
+        "photo": "Photo"
       },
       "list": {
         "notebook": "This month",

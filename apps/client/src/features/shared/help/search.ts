@@ -65,7 +65,7 @@ export function tokenize(text: string): string[] {
   return [...out];
 }
 
-/** 照合される側は一度刻んで持っておく（話題は 15 件、入力のたびに刻み直さない）。 */
+/** 照合される側は一度刻んで持っておく（話題は十数件、入力のたびに刻み直さない）。 */
 export interface HelpCorpusEntry {
   id: HelpTopicText['id'];
   /** 鍵語と題そのもの（小文字）。丸ごと一致を見る。 */

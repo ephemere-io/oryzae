@@ -26,6 +26,7 @@ const KINDS: HelpIllustrationKind[] = [
   'shelf',
   'letter',
   'snippet',
+  'photo',
   'list',
   'timeline',
   'person',

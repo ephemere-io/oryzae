@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CONTROL_FONT } from '@/components/ui/surface';
 import { isHelpTopicId } from '../topics';
 import type { HelpTopic, HelpTopicId, HelpTopicText } from '../types';
@@ -34,6 +34,13 @@ export interface HelpScreenCardProps {
  * 札を押すと、その札を留める（触れを離しても開いたまま）。もう一度押すと外す。
  * 「開く」のボタンは置かない — 行き先へは下の一覧から。
  */
+/**
+ * 画面の中で触れた物の**説明文**を差し替えるまでの間。図の灯りはすぐ（`HOVER_DWELL_MS`）、
+ * 文はもう少し止まってから — 物をまたぐたびに段落が入れ替わると読めない。
+ * 面の中の触れと留めは本人がそこを見ているので待たない。
+ */
+export const TEXT_SETTLE_MS = 200;
+
 /** 書斎の物 → 3D に貼ってある注釈（`study.label_*`）。見取り図の札は部屋と同じ字にする。 */
 const STUDY_LABEL_KEY: Partial<Record<HelpTopicId, string>> = {
   jar: 'label_jar',
@@ -53,8 +60,19 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
   // 面の中の触れ > 画面の中の触れ > 留めた札。
   const active = local ?? fromScreen ?? pinned;
   const source = local ? 'panel' : fromScreen ? 'screen' : pinned ? 'pinned' : 'none';
+  // 説明文が指す物。画面の中の触れで変わったときだけ少し遅れて追う。
+  const [explained, setExplained] = useState<HelpTopicId | null>(active);
+  useEffect(() => {
+    if (explained === active) return;
+    if (source !== 'screen') {
+      setExplained(active);
+      return;
+    }
+    const timer = window.setTimeout(() => setExplained(active), TEXT_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [active, source, explained]);
   const screenText = texts.get(screen.id);
-  const activeText = active ? texts.get(active) : undefined;
+  const activeText = explained ? texts.get(explained) : undefined;
   // 見取り図の札は、その画面に出ている名前。書斎は部屋に貼ってある注釈と同じ字
   // （JAR / ENTRIES / …。面の題が「手帳」で部屋が「ENTRIES」だと「手帳って何？」になる）、
   // 他の画面は `help.map.<画面>.<部品>`（「問いを紐づける」「漬け込む」…）。無ければ話題の題。
@@ -81,6 +99,7 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
         screen: screen.id,
         parts: partIds.length === 0 ? 'none' : partIds.join(','),
         active: active ?? 'none',
+        explains: explained ?? 'none',
         source,
       })}
       className="rounded-[14px] border px-4 pt-4 pb-4"
@@ -166,7 +185,11 @@ export function HelpScreenCard({ screen, parts, texts, hovered }: HelpScreenCard
         {activeText?.title ?? ''}
       </span>
       {/* key で段落ごと作り直す。同じ箱の中で字だけ差し替わると、変わったことが見えない。 */}
-      <div key={active ?? 'screen'} className="help-fade mt-3" data-explains={active ?? 'screen'}>
+      <div
+        key={explained ?? 'screen'}
+        className="help-fade mt-3"
+        data-explains={explained ?? 'screen'}
+      >
         {activeText ? (
           <>
             <p className="text-[12px] leading-[1.6] text-[var(--date-color)]">{activeText.lead}</p>

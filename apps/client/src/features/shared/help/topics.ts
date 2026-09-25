@@ -24,6 +24,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   // 画面 — 物の先でできること。
   { id: 'letter', section: 'screens', illustration: 'letter', href: '/jar' },
   { id: 'snippet', section: 'screens', illustration: 'snippet', href: '/board' },
+  { id: 'photo', section: 'screens', illustration: 'photo', href: '/board' },
   { id: 'list', section: 'screens', illustration: 'list', href: '/entries' },
   { id: 'questions', section: 'screens', illustration: 'timeline', href: '/questions' },
   { id: 'account', section: 'screens', illustration: 'person', href: '/account' },
@@ -71,7 +72,7 @@ const SCREEN_PARTS: Partial<Record<HelpTopicId, readonly HelpTopicId[]>> = {
   study: ['board', 'jar', 'notebook', 'archive', 'write'],
   jar: ['question', 'letter', 'questions'],
   write: ['question', 'pickle', 'snippet'],
-  board: ['snippet'],
+  board: ['snippet', 'photo'],
   list: ['notebook', 'archive'],
   questions: ['question'],
 };

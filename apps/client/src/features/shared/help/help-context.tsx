@@ -35,8 +35,12 @@ export const HELP_WIDTH = { min: 280, max: 560, default: SIDE_PANEL_WIDTH } as c
  * 説明が消えては読めない。
  */
 const HOVER_CLEAR_MS = 160;
-/** 触れてからこれだけ止まったら映す。通り過ぎただけの物では 1 枚を変えない。 */
-const HOVER_DWELL_MS = 450;
+/**
+ * 触れてからこれだけ止まったら映す（見取り図の物が灯る）。通り過ぎた物では変えない。
+ * 前は 450ms で「反応が遅い」と言われた。いまは 1 枚ごとは入れ替わらず図の物が灯るだけなので
+ * 短くしてよい。説明文の切り替えは `HelpScreenCard` がもう少し待つ（文がちらつかないように）。
+ */
+const HOVER_DWELL_MS = 120;
 
 function sameTarget(a: HoverTarget, b: HoverTarget): boolean {
   return a.topic === b.topic && a.label === b.label;
