@@ -30,7 +30,6 @@ const mockData: UserDetailResponse = {
       id: 'f1',
       status: 'completed',
       errorMessage: null,
-      hasGenerationId: true,
       createdAt: '2026-04-09T00:00:00Z',
     },
   ],

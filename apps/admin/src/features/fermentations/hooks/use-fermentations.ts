@@ -13,7 +13,6 @@ const fermentationItemSchema = z.object({
   question_id: z.string(),
   target_period: z.string(),
   status: z.string(),
-  generation_id: z.string().nullable(),
   error_message: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),

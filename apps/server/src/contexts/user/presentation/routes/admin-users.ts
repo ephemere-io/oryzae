@@ -214,7 +214,7 @@ export const adminUsers = new Hono<Env>()
     // 4. Fermentations
     const { data: fermentations } = await supabase
       .from('fermentation_results')
-      .select('id, status, error_message, generation_id, created_at')
+      .select('id, status, error_message, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(100);
@@ -258,17 +258,10 @@ export const adminUsers = new Hono<Env>()
         }),
       ),
       fermentations: (fermentations ?? []).map(
-        (f: {
-          id: string;
-          status: string;
-          error_message: string | null;
-          generation_id: string | null;
-          created_at: string;
-        }) => ({
+        (f: { id: string; status: string; error_message: string | null; created_at: string }) => ({
           id: f.id,
           status: f.status,
           errorMessage: f.error_message ?? null,
-          hasGenerationId: !!f.generation_id,
           createdAt: f.created_at,
         }),
       ),

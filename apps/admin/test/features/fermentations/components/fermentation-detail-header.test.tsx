@@ -12,7 +12,6 @@ function makeData(overrides: Partial<FermentationDetailResponse> = {}): Fermenta
     questionId: 'q1',
     targetPeriod: '2026-06-26',
     status: 'failed',
-    generationId: null,
     errorMessage: 'model: claude-sonnet-4-20250514',
     createdAt: '2026-06-26T18:00:00.000Z',
     updatedAt: '2026-06-26T18:00:00.000Z',

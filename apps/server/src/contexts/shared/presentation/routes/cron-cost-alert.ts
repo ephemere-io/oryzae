@@ -503,9 +503,7 @@ export const cronCostAlert = new Hono()
       const dateKey = previousUtcDateKey(toUtcDateKey(new Date()));
       const { startIso, endIso } = utcDayRangeIso(dateKey);
 
-      // issue #352 以降 generation_id は NULL 固定。旧実装はこれを NOT NULL で
-      // 絞っていたため対象が常に0件になり、レポートが毎日 $0.0000 になっていた。
-      // 保存済みトークンから推定コストを出す方式に切替える。
+      // 発酵の件数は fermentation_results、トークン数は ai_usage から読む。
       let rows: Awaited<ReturnType<typeof fetchFermentationCostRows>>;
       try {
         rows = await fetchFermentationCostRows(supabase, { startIso, endIso });
