@@ -86,9 +86,9 @@ create table public.ai_usage (
    （`supabase/migrations/00027_create_ai_usage.sql`）。時刻は発酵の `created_at` に揃える
 2. 発酵・ボード OCR・写真の文字起こしがすべて `ai_usage` に書く。
    日次レポートと管理画面は `ai_usage` から読む
-3. **本番で数日動くのを確かめてから**、`fermentation_results` の `input_tokens` / `output_tokens` /
-   `generation_id` を消す（別の PR）。移行の途中で古いコードが古い列に書くことがあるので、
-   1 と同時には消さない。`generation_id` は AI Gateway 時代の旧データを管理画面で引くためにまだ読んでいる
+3. `fermentation_results` の `input_tokens` / `output_tokens` / `generation_id` を消す
+   （`00028_drop_token_columns_from_fermentation_results.sql`）。コードが列を読まなくなったのを
+   本番に出してから列を消す（先に消すと、動いている本番のコードが列を読みに行って失敗する）
 
 ## 機能を足すとき
 

@@ -15,7 +15,6 @@ const costItemSchema = z.object({
   user_id: z.string(),
   user_email: z.string(),
   status: z.string(),
-  generation_id: z.string().nullable(),
   created_at: z.string(),
   cost: z
     .object({

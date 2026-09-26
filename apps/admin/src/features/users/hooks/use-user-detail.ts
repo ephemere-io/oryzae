@@ -30,7 +30,6 @@ const userFermentationSchema = z.object({
   id: z.string(),
   status: z.string(),
   errorMessage: z.string().nullable(),
-  hasGenerationId: z.boolean(),
   createdAt: z.string(),
 });
 
