@@ -27,7 +27,6 @@ describe('useCostData', () => {
           user_id: 'u1',
           user_email: 'u1@example.com',
           status: 'completed',
-          generation_id: 'gen_123',
           created_at: '2026-04-11T10:00:00Z',
           cost: { totalCost: 0.05, promptTokens: 1000, completionTokens: 500, latency: 2000 },
         },

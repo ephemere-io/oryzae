@@ -29,7 +29,6 @@ describe('useFermentations', () => {
           question_id: 'q1',
           target_period: '2026-04-11',
           status: 'completed',
-          generation_id: null,
           error_message: null,
           created_at: '2026-04-11T10:00:00Z',
           updated_at: '2026-04-11T10:01:00Z',

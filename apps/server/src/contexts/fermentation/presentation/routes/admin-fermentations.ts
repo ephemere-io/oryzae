@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { gateway } from 'ai';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
@@ -135,7 +134,7 @@ export const adminFermentations = new Hono<Env>()
     let listQuery = supabase
       .from('fermentation_results')
       .select(
-        'id, user_id, question_id, target_period, status, generation_id, error_message, created_at, updated_at',
+        'id, user_id, question_id, target_period, status, error_message, created_at, updated_at',
         { count: 'exact' },
       );
     if (resolvedUserId) listQuery = listQuery.eq('user_id', resolvedUserId);
@@ -198,7 +197,7 @@ export const adminFermentations = new Hono<Env>()
     // cost: null になり、画面では「-」と出る。
     let costsQuery = supabase
       .from('fermentation_results')
-      .select('id, user_id, status, generation_id, created_at', {
+      .select('id, user_id, status, created_at', {
         count: 'exact',
       });
     if (resolvedUserId) costsQuery = costsQuery.eq('user_id', resolvedUserId);
@@ -222,23 +221,14 @@ export const adminFermentations = new Hono<Env>()
       supabase,
       (data ?? []).map((row) => row.id),
     );
-    const items = await Promise.all(
-      (data ?? []).map(async (row) => {
-        const used = tokens.get(row.id);
-        let cost: unknown = used
-          ? computeCostFromTokens(used.inputTokens, used.outputTokens)
-          : null;
-        // 旧 generation_id 方式のレコード (トークン未保存) は gateway にフォールバック。
-        if (cost === null && row.generation_id) {
-          try {
-            cost = await gateway.getGenerationInfo({ id: row.generation_id });
-          } catch {
-            cost = null;
-          }
-        }
-        return { ...row, user_email: emailMap.get(row.user_id) ?? '', cost };
-      }),
-    );
+    const items = (data ?? []).map((row) => {
+      const used = tokens.get(row.id);
+      return {
+        ...row,
+        user_email: emailMap.get(row.user_id) ?? '',
+        cost: used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null,
+      };
+    });
 
     return c.json({
       data: items,
@@ -251,28 +241,20 @@ export const adminFermentations = new Hono<Env>()
 
     const { data, error } = await supabase
       .from('fermentation_results')
-      .select('generation_id')
+      .select('id')
       .eq('id', id)
       .single();
 
     if (error || !data) return c.json({ error: 'Fermentation result not found' }, 404);
 
     const used = (await fetchFermentationTokens(supabase, [id])).get(id);
-    let cost: unknown = used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null;
-    if (cost === null && data.generation_id) {
-      try {
-        cost = await gateway.getGenerationInfo({ id: data.generation_id });
-      } catch {
-        cost = null;
-      }
-    }
+    const cost = used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null;
     if (cost === null) {
       return c.json({ error: 'No cost data available for this fermentation' }, 404);
     }
 
     return c.json({
       fermentationResultId: id,
-      generationId: data.generation_id,
       cost,
     });
   })
@@ -341,16 +323,9 @@ export const adminFermentations = new Hono<Env>()
       });
     }
 
-    // 3. Compute cost from ai_usage; fall back to gateway for legacy records.
+    // 3. Compute cost from ai_usage（記録の無い発酵は null）。
     const used = (await fetchFermentationTokens(supabase, [id])).get(id);
-    let cost: unknown = used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null;
-    if (cost === null && fermentation.generation_id) {
-      try {
-        cost = await gateway.getGenerationInfo({ id: fermentation.generation_id });
-      } catch {
-        // skip failed cost lookups
-      }
-    }
+    const cost = used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null;
 
     // 4. Fetch user email
     const { data: userData } = await supabase.auth.admin.getUserById(fermentation.user_id);
@@ -419,7 +394,6 @@ export const adminFermentations = new Hono<Env>()
       questionId: fermentation.question_id,
       targetPeriod: fermentation.target_period,
       status: fermentation.status,
-      generationId: fermentation.generation_id ?? null,
       errorMessage: fermentation.error_message ?? null,
       createdAt: fermentation.created_at,
       updatedAt: fermentation.updated_at,

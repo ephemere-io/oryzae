@@ -56,16 +56,13 @@ const fermentationDetailResponseSchema = z.object({
   questionId: z.string(),
   targetPeriod: z.string(),
   status: z.string(),
-  generationId: z.string().nullable(),
   errorMessage: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   userEmail: z.string(),
   questionText: z.string(),
-  // サーバー側は computeCostFromTokens の TokenCost か、AI gateway の
-  // getGenerationInfo の戻り値のどちらかを入れる（異種混在）。形を決め打ちすると
-  // 片方で parse に失敗して詳細画面ごと出せなくなるので unknown のまま受け、
-  // 表示側の formatCost が実行時に絞る。
+  // サーバー側は computeCostFromTokens の TokenCost か null を入れる。
+  // unknown のまま受け、表示側の formatCost が実行時に絞る。
   // なお Zod v3 は unknown のキーを必ず optional として推論する（required にできない）。
   cost: z.unknown(),
   masked: z.boolean(),

@@ -20,7 +20,6 @@ const mockData: FermentationDetailResponse = {
   questionId: 'q1',
   targetPeriod: '2026-04-11',
   status: 'completed',
-  generationId: 'gen-1',
   errorMessage: null,
   createdAt: '2026-04-11T10:00:00Z',
   updatedAt: '2026-04-11T10:01:00Z',
