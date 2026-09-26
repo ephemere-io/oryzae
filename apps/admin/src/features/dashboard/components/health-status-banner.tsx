@@ -70,12 +70,11 @@ export function HealthStatusBanner({
   // 24h 要対応（失敗）件数
   const failStatus: Status = failureCount > 0 ? 'bad' : 'good';
 
-  // 今月コスト着地見込み（前月比）。前月は実請求額を優先し、取れなければ推定で代替する
-  // （比率判定なので、両方が同じ系統でないと乖離ぶんだけ誤判定する点に注意）。
+  // 今月コスト着地見込み（前月比）。どちらも Anthropic の実額。取れなければ判定しない。
   const projected = summary?.projectedCost ?? null;
-  const lastMonth = summary?.actual.lastMonthCost ?? summary?.estimated.lastMonthCost ?? 0;
+  const lastMonth = summary?.lastMonthCost ?? null;
   const costStatus: Status =
-    projected === null
+    projected === null || lastMonth === null
       ? 'neutral'
       : lastMonth > 0 && projected > lastMonth * 1.5
         ? 'bad'
@@ -103,7 +102,7 @@ export function HealthStatusBanner({
       <HealthCell
         label="今月コスト着地"
         value={projected === null ? '--' : `$${projected.toFixed(2)}`}
-        sub={summary ? `前月 $${lastMonth.toFixed(2)}` : '取得中'}
+        sub={!summary ? '取得中' : lastMonth === null ? '前月 --' : `前月 $${lastMonth.toFixed(2)}`}
         status={costStatus}
       />
       <HealthCell

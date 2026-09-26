@@ -25,7 +25,7 @@ function statusDotColor(status: string): string {
 
 function formatCost(cost: unknown): string | null {
   if (!isObject(cost)) return null;
-  return typeof cost.totalCost === 'number' ? `$${cost.totalCost.toFixed(6)}` : null;
+  return typeof cost.totalCost === 'number' ? `$${cost.totalCost.toFixed(4)}` : null;
 }
 
 interface FermentationDetailHeaderProps {
@@ -101,7 +101,7 @@ export function FermentationDetailHeader({ data, onRetry }: FermentationDetailHe
         </span>
         {costStr && (
           <span>
-            Cost <span className="font-mono text-foreground">{costStr}</span>
+            推定コスト <span className="font-mono text-foreground">{costStr}</span>
           </span>
         )}
       </div>

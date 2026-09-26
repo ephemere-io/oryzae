@@ -1,9 +1,6 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { SpendView } from '@/features/observability/components/spend-view';
-import { useSpend } from '@/features/observability/hooks/use-spend';
-
+/** 旧 AI Spend ページ。コストは /costs に 1 つにまとめた（ブックマーク・古い通知のリンク用）。 */
 export default function SpendPage() {
-  const { data, loading, error, refresh } = useSpend(30);
-  return <SpendView data={data} loading={loading} error={error} onRefresh={refresh} />;
+  redirect('/costs');
 }

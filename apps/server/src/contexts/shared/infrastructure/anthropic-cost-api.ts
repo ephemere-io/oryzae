@@ -451,6 +451,16 @@ export async function fetchUsageDetail(
   return { kind: 'ok', workspaces, apiKeys, usageByKey };
 }
 
+/**
+ * Workspace の一覧。管理画面で $0 の Workspace も並べるため。
+ * キー未設定なら 'not-configured'、取得失敗なら null。
+ */
+export async function listWorkspaces(): Promise<WorkspaceInfo[] | null | 'not-configured'> {
+  const adminKey = process.env.ANTHROPIC_ADMIN_KEY;
+  if (!adminKey) return 'not-configured';
+  return fetchWorkspaces(adminKey);
+}
+
 /** Workspace の id → 名前。失敗したら null。 */
 async function fetchWorkspaceNames(adminKey: string): Promise<Map<string, string> | null> {
   const workspaces = await fetchWorkspaces(adminKey);

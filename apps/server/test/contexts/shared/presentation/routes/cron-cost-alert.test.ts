@@ -561,7 +561,7 @@ describe('cronCostAlert', () => {
       const breakdown = fieldValue('発酵') ?? '';
       expect(breakdown).toContain('bbbbbbbb: 1 件・推定 $0.9000');
       expect(errorSpy).toHaveBeenCalledWith(
-        '[cron-cost-alert] user lookup failed',
+        '[user-labels] user lookup failed',
         expect.objectContaining({ error: 'listUsers down' }),
       );
 
@@ -828,9 +828,7 @@ describe('cronCostAlert', () => {
 
       // 通知だけで数字の裏取りに行けること（Console はモデル別 + API キー別に割れる）
       const value = fieldValue(ACTUAL_FIELD) ?? '';
-      expect(value).toContain(
-        '確認先: [管理画面](https://oryzae-admin.vercel.app/observability/spend)',
-      );
+      expect(value).toContain('確認先: [管理画面](https://oryzae-admin.vercel.app/costs)');
       expect(value).toContain('[Anthropic Console](https://platform.claude.com/cost)');
     });
 

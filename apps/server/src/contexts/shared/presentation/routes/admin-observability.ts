@@ -2,16 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { type ActualCostResult, fetchActualCost } from '../../infrastructure/anthropic-cost-api.js';
-import {
-  FERMENTATION_MODEL_ID,
-  FERMENTATION_MODEL_RATE,
-} from '../../infrastructure/claude-pricing.js';
-import {
-  aggregateCost,
-  aggregateCostByDay,
-  fetchFermentationCostRows,
-  resolveUserEmails,
-} from '../../infrastructure/fermentation-cost-query.js';
 
 type Env = {
   Variables: {
@@ -58,15 +48,6 @@ const vercelDeployListSchema = z.object({
   ),
 });
 
-/**
- * モデル ID → Oryzae での用途。
- *
- * Anthropic は「用途」を知らない。モデルが分かれているから用途別に読めるだけで、
- * **同じモデルを他の用途や CI が使えば同じバケットに混ざる**。だから返すのは
- * 「このモデルを使っている機能」であって「その機能のコード」ではない。
- * 画面・通知の文言もそのつもりで書くこと。
- */
-
 // ── Summary (hub page) ──────────────────────────────────
 
 async function getSentryCount(): Promise<number | null> {
@@ -87,14 +68,7 @@ async function getSentryCount(): Promise<number | null> {
   }
 }
 
-/**
- * 今月の実請求額 (Anthropic cost_report)。
- *
- * 旧実装は Vercel AI Gateway の getSpendReport / getCredits を叩いていたが、
- * issue #352 で Anthropic 直叩きに切替えて以降 Gateway 経由の実績はゼロで、
- * 画面には常に $0.0000 と空のチャートが出ていた（実際には課金されている）。
- * クレジット残高は Gateway 固有の概念なので廃止した。
- */
+/** 今月（UTC 月初〜今）の実請求額 (Anthropic cost_report)。詳細は /admin/costs。 */
 async function getMonthToDateActual(): Promise<ActualCostResult> {
   const now = new Date();
   const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -243,115 +217,6 @@ export const adminObservability = new Hono<Env>()
     } catch {
       return c.json({ issues: [], configured: true });
     }
-  })
-
-  // ── AI spend detail ───────────────────────────────────
-  // 実請求額 (Anthropic cost_report) と 推定 (自前トークン × 価格表) を明確に分けて返す。
-  //
-  // **用途別の内訳は実額側で出す。** cost_report を group_by[]=description で取ると
-  // モデル別に割れ、Oryzae は用途ごとに別モデルを使っている（発酵 = sonnet-4-6、
-  // OCR = opus-5）ので、モデル別内訳がそのまま用途別の実額になる。推定しない。
-  //
-  // 推定が残っているのは **ユーザー別内訳** のためだけ。Anthropic は Oryzae の
-  // ユーザーを知らないので、その軸だけは実額で出せない。
-  //
-  // 日別は両者を突き合わせられるよう UTC 日で揃える（cost_report が UTC 固定のため）。
-  .get('/spend', async (c) => {
-    const supabase = c.get('adminSupabase');
-    const daysBackParam = Number(c.req.query('date_from') ?? '30');
-    const daysBack = Number.isFinite(daysBackParam) && daysBackParam > 0 ? daysBackParam : 30;
-
-    const now = new Date();
-    const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-
-    const [actual, rowsResult] = await Promise.all([
-      fetchActualCost(start, now),
-      fetchFermentationCostRows(supabase, {
-        startIso: start.toISOString(),
-        endIso: now.toISOString(),
-      }).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[admin-observability] spend query failed', { error: message });
-        return null;
-      }),
-    ]);
-
-    const rows = rowsResult?.rows ?? [];
-    const aggregate = aggregateCost(rows);
-    // 日別は UTC 日で切る。同じ画面に並ぶ Anthropic 実額が UTC 日バケット固定で、
-    // 窓を揃えないと乖離が読めないため（日次レポートは運用に合わせ JST 日。
-    // cron-cost-alert.ts 参照）。画面には「UTC 日」と明記している。
-    const daily = aggregateCostByDay(rows, (createdAt) => createdAt.slice(0, 10));
-    // resolveUserEmails は listUsers を最大20往復する。解決すべきユーザーが
-    // 居ない（期間内に発酵ゼロ / クエリ失敗）ときに叩く意味はない。
-    const emailMap =
-      aggregate.byUser.length > 0 ? await resolveUserEmails(supabase) : new Map<string, string>();
-
-    return c.json({
-      rangeDays: daysBack,
-      actual: {
-        status: actual.kind,
-        totalCostUsd: actual.kind === 'ok' ? actual.totalCostUsd : null,
-        daily: actual.kind === 'ok' ? actual.daily : [],
-        // **用途別の実額は Workspace 別**。Oryzae は機能ごとに API キーを分け、
-        // キーごとに Workspace を分けてあるので、Workspace = 用途になる。
-        // モデル ID からの読み替えはやめた（同じモデルを複数の用途と CI が使う）。
-        byWorkspace:
-          actual.kind === 'ok'
-            ? actual.byWorkspace.map((w) => ({
-                workspaceId: w.workspaceId,
-                workspaceName: w.workspaceName,
-                costUsd: w.costUsd,
-                byModel: w.byModel.map((m) => ({ model: m.model, costUsd: m.costUsd })),
-              }))
-            : [],
-        // モデル別の実額。単価の検算（キャッシュが混ざっていないか等）に使う。
-        // **用途の軸ではない**ので、画面でも用途名を添えないこと。
-        byModel:
-          actual.kind === 'ok'
-            ? actual.byModel.map((m) => ({
-                model: m.model,
-                costUsd: m.costUsd,
-                byTokenType: m.byTokenType,
-              }))
-            : [],
-        // Workspace 名が引けず ID 表示になっている場合 true。
-        workspaceNamesUnavailable: actual.kind === 'ok' ? actual.workspaceNamesUnavailable : false,
-        // 内訳が返らなかった場合 true。総額は正しいまま内訳だけ消えるので、
-        // 空配列を「内訳ゼロ」と読ませないために別途返す。
-        groupingUnavailable: actual.kind === 'ok' ? actual.groupingUnavailable : false,
-        // truncated は status === 'ok' のときだけ意味を持つ。失敗時の false は
-        // 「完全に取得できた」ではなく「該当なし」。必ず status を先に見ること。
-        truncated: actual.kind === 'ok' ? actual.truncated : false,
-        message: actual.kind === 'error' ? actual.message : null,
-      },
-      estimated: {
-        // rowsResult が null = クエリ失敗。空配列を「コスト0」と読ませないため status を返す。
-        status: rowsResult === null ? 'error' : 'ok',
-        // 推定の計算根拠。画面で「どう出した数字か」を検算できるように返す。
-        // 単価は claude-pricing.ts が唯一の正なので、フロントでハードコードしない。
-        pricing: {
-          modelId: FERMENTATION_MODEL_ID,
-          inputUsdPerMTok: FERMENTATION_MODEL_RATE.inputUsdPerMTok,
-          outputUsdPerMTok: FERMENTATION_MODEL_RATE.outputUsdPerMTok,
-        },
-        totalCostUsd: aggregate.estimatedCostUsd,
-        inputTokens: aggregate.inputTokens,
-        outputTokens: aggregate.outputTokens,
-        fermentationCount: aggregate.fermentationCount,
-        untrackedCount: aggregate.untrackedCount,
-        truncated: rowsResult?.truncated ?? false,
-        daily,
-        byUser: aggregate.byUser.map((u) => ({
-          userId: u.userId,
-          email: emailMap.get(u.userId) ?? '',
-          estimatedCostUsd: u.estimatedCostUsd,
-          inputTokens: u.inputTokens,
-          outputTokens: u.outputTokens,
-          fermentationCount: u.fermentationCount,
-        })),
-      },
-    });
   })
 
   // ── Vercel deploys detail ─────────────────────────────

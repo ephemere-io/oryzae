@@ -29,9 +29,8 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 | `/observability` | 全ツール API | ハブ。各ツールのキー指標をカードで一覧 |
 | `/analytics` | PostHog API | PV・セッション・滞在時間・ページ別・日別推移 |
 | `/observability/errors` | Sentry API | 未解決 issue 一覧（タイトル, 発生回数, 影響ユーザー数） |
-| `/observability/spend` | Anthropic Cost API + DB | 実請求額の日別チャート・**用途別（Workspace 別）の実額内訳**・モデル別内訳（単価の検算用）・推定との乖離・ユーザー別推定内訳 |
+| `/costs` | Anthropic Cost API + `ai_usage` | **コストはここ 1 ページ**。① いくら払ったか（実額・Workspace 別・日別・今月なら月末の見込み）② 誰がどれだけ使ったか（機能別・ユーザー別の回数・トークン・推定額）。期間は UTC 日で切り、見出しは JST の時刻範囲 |
 | `/observability/deploys` | Vercel API | デプロイ一覧（状態, ビルド時間, コミットメッセージ） |
-| `/costs` | DB (保存トークン) | **発酵の** per-request 推定コスト詳細（レガシー、将来的に /observability/spend に統合） |
 
 ## LLM コストの二系統（重要）
 
@@ -39,22 +38,22 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 
 | | 実請求額 (actual) | 推定 (estimated) |
 |---|---|---|
-| 出典 | Anthropic Admin API `/v1/organizations/cost_report` | `ai_usage` の発酵のトークン × 価格表 |
-| **対象範囲** | **org 全体**。Workspace 別に割れる（本番の各機能・dev・CI・Oryzae 外の利用） | **発酵のうち、トークンを記録できた分だけ** |
+| 出典 | Anthropic Admin API `/v1/organizations/cost_report` | `ai_usage` のトークン × その機能のモデルの単価（`claude-pricing.ts`） |
+| **対象範囲** | **org 全体**。Workspace 別に割れる（本番の各機能・dev・CI・Oryzae 外の利用） | **本番の Oryzae が記録した AI 利用だけ**（発酵・ボード OCR・写真の文字起こし） |
 | 正確さ | **正**。実際に課金された額（キャッシュ・値引き・課金丸め込み） | 近似。キャッシュ読み書き・値引き・課金丸めを反映しない |
-| 粒度 | UTC 日バケット固定 + **Workspace 別**（`group_by[]=workspace_id`）+ モデル別（`group_by[]=description`） | 任意の期間・**ユーザー別**・発酵単位 |
+| 粒度 | UTC 日バケット固定 + **Workspace 別**（`group_by[]=workspace_id`）+ モデル別（`group_by[]=description`） | 任意の期間・**機能別・ユーザー別**・発酵単位 |
 | ユーザー別 | **不可**（Anthropic は Oryzae のユーザーを知らない） | 可能。**これが推定を残す唯一の理由** |
-| 実装 | `shared/infrastructure/anthropic-cost-api.ts` | `shared/infrastructure/fermentation-cost-query.ts` + `claude-pricing.ts` |
+| 実装 | `shared/infrastructure/anthropic-cost-api.ts` | `shared/infrastructure/ai-usage-query.ts` + `claude-pricing.ts` |
 
 ### 実請求 ≧ 推定 が常態（ズレ自体は異常ではない）
 
 実請求は **org 全体**の額で、Oryzae のアプリ以外の利用も含む。一方 推定は
-**発酵の記録分だけ**を数える。したがって差が出るのが正常で、
+**本番の Oryzae が記録した分だけ**を数える。したがって差が出るのが正常で、
 **差額は「推定に含めていない利用」の量**を意味する。
 
 「推定が全然合っていない」と読めてしまうのを防ぐため、画面・通知では
 
-- 見出しに範囲を書く（「実請求額 (org 全体)」「推定コスト (発酵・記録分)」）
+- 見出しに何の数字かを書く（「① いくら払ったか」＝実額、「② 誰がどれだけ使ったか」＝記録と推定）
 - **突き合わせは同じスコープ同士で行う。** 「org 全体の実額 − 発酵の推定」は
   スコープの違う引き算で、毎回1文の言い訳を添えないと読めない。並べるのは
   **発酵 Workspace の実額 ↔ 発酵の推定**にする
@@ -203,7 +202,7 @@ LLM を呼ぶ機能ごとに API キーを分け、キーごとに Anthropic の
 ### 既知の限界
 
 - リトライ (`retryOf`) は同じ行を再利用するため、前回試行ぶんのトークンは上書きされる。
-  実額との乖離要因になる（`/observability/spend` の乖離率で観測できる）。
+  実額との乖離要因になる（`/costs` の実額と推定額を並べて見る）。
 - `cost_report` は Priority Tier のコストを含まない（Oryzae は standard のみ利用）。
 - 反映ラグは通常5分程度とされるが、日次レポートは窓が閉じた 1 時間後に読むため
   後から増えることがある（9/23 分は当日 $6.44、翌日の「前日」欄では $8.03）。
