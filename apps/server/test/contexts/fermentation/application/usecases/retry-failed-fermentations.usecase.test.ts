@@ -8,6 +8,9 @@ import type { UserLocaleResolverGateway } from '@/contexts/fermentation/domain/g
 import { FermentationResult } from '@/contexts/fermentation/domain/models/fermentation-result.js';
 import type { QuestionTransactionRepositoryGateway } from '@/contexts/question/domain/gateways/question-transaction-repository.gateway.js';
 import { QuestionTransaction } from '@/contexts/question/domain/models/question-transaction.js';
+import type { AiUsageRecorder } from '@/contexts/shared/domain/gateways/ai-usage-recorder.gateway.js';
+
+const noopUsage: AiUsageRecorder = { record: async () => {} };
 
 const generateId = () => 'gen-id';
 const NOW = new Date('2026-06-27T03:00:00.000Z');
@@ -24,9 +27,6 @@ function makeFailed(
     questionId,
     targetPeriod: '2026-06-26',
     status: 'failed',
-    generationId: null,
-    inputTokens: null,
-    outputTokens: null,
     errorMessage: 'previous failure',
     createdAt,
     updatedAt: createdAt,
@@ -124,7 +124,6 @@ function mockLlm(): LlmAnalysisGateway {
         keywords: [{ keyword: 'k', description: 'd' }],
       },
       usage: { inputTokens: 10, outputTokens: 20 },
-      generationId: 'gen_x',
     }),
   };
 }
@@ -156,6 +155,7 @@ function makeUsecase(d: Deps, opts: { concurrency?: number; maxRetries?: number 
     d.qtRepo,
     d.localeResolver,
     d.llm,
+    noopUsage,
     generateId,
     d.sendDigest,
     opts.concurrency ?? 1,

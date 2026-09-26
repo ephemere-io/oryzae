@@ -156,16 +156,13 @@ export const adminDashboard = new Hono<Env>()
             .select('id', { count: 'exact', head: true })
             .eq('status', 'failed'),
         ),
-        applyDateFilter(
-          // issue #352 以降 generation_id は NULL 固定。旧条件のままだと
-          // 「コスト追跡済み」が常に 0 件になるため、トークン保存有無で数える
-          // （旧 generation_id 方式のレコードも追跡済みとして拾う）。
-          supabase
-            .from('fermentation_results')
-            .select('id', { count: 'exact', head: true })
-            .or('input_tokens.not.is.null,generation_id.not.is.null'),
-        ),
+        // 「コスト追跡済み」= ai_usage にトークンの記録がある発酵。
+        fetchFermentationCostRows(supabase, {
+          startIso: dateFrom,
+          endIso: dateTo ? `${dateTo}T23:59:59.999Z` : undefined,
+        }),
       ]);
+    const costTracked = aggregateCost(costTrackedRes.rows);
 
     return c.json({
       totalUsers,
@@ -173,7 +170,7 @@ export const adminDashboard = new Hono<Env>()
       totalFermentations: allFermRes.count ?? 0,
       completedFermentations: completedRes.count ?? 0,
       failedFermentations: failedRes.count ?? 0,
-      fermentationsWithCostTracking: costTrackedRes.count ?? 0,
+      fermentationsWithCostTracking: costTracked.fermentationCount - costTracked.untrackedCount,
     });
   })
   .get('/failures-24h', async (c) => {

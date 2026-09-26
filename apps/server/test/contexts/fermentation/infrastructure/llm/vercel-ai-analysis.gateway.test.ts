@@ -171,7 +171,6 @@ describe('VercelAiAnalysisGateway.analyze — AI SDK contract characterization',
     expect(result.output).toEqual(sampleOutput);
     expect(result.usage).toEqual({ inputTokens: 1234, outputTokens: 567 });
     // issue #352: Anthropic 直叩きのため generation_id は発行されない。
-    expect(result.generationId).toBeUndefined();
   });
 
   it('falls back to 0 when the SDK omits token counts', async () => {

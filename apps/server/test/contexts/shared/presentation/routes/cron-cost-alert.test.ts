@@ -8,6 +8,10 @@ vi.mock('@/contexts/shared/infrastructure/discord-notify.js', () => ({
   notifyDiscord: (...args: unknown[]) => mockNotifyDiscord(...args),
 }));
 
+/**
+ * 発酵 1 件。トークン数は実際には ai_usage にあるが、テストでは発酵に添えて書き、
+ * モックが ai_usage の行（ref_id = 発酵の id）に展開する。null は「記録なし」。
+ */
 interface FermentationRow {
   user_id: string;
   status: string;
@@ -16,12 +20,12 @@ interface FermentationRow {
   created_at: string;
 }
 
+/** ai_usage のうち OCR の行（発酵の行は FermentationRow から作る）。 */
 interface OcrUsageRow {
   user_id: string;
-  source: 'board' | 'entry';
-  input_tokens: number | null;
-  output_tokens: number | null;
-  succeeded: boolean;
+  feature: 'ocr_board' | 'ocr_entry';
+  input_tokens: number;
+  output_tokens: number;
 }
 
 // Supabase クエリ結果をテストごとに差し替える。
@@ -36,8 +40,9 @@ const supabaseState: {
   profiles: { id: string; nickname: string }[];
   listUsersShouldThrow: boolean;
   listUsersCalls: number;
-  /** ocr_usage_events（ボード OCR / 写真の文字起こしの利用記録）の応答。 */
+  /** ai_usage のうち OCR（ボード OCR / 写真の文字起こし）の行。 */
   ocrUsage: OcrUsageRow[];
+  /** 期間で ai_usage を引く問い合わせ（日次の利用記録）を失敗させる。 */
   ocrUsageError: { message: string } | null;
 } = {
   rows: [],
@@ -73,30 +78,64 @@ vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
           return Promise.resolve({ data: null, error: supabaseState.error });
         }
         // 1ページ目に全件返し、2ページ目以降は空（ページング終了）にする。
-        return Promise.resolve({ data: from === 0 ? supabaseState.rows : [], error: null });
+        return Promise.resolve({ data: from === 0 ? fermentationRows() : [], error: null });
       },
     };
+    const fermentationRows = () =>
+      supabaseState.rows.map((row, i) => ({ id: `ferm-${i}`, ...row }));
+    // 発酵のトークン数を ai_usage の行として見せる（記録の無い発酵は行を作らない）。
+    const fermentationUsage = () =>
+      fermentationRows().flatMap((row) =>
+        row.input_tokens === null
+          ? []
+          : [
+              {
+                user_id: row.user_id,
+                feature: 'fermentation',
+                ref_id: row.id,
+                input_tokens: row.input_tokens,
+                output_tokens: row.output_tokens ?? 0,
+              },
+            ],
+      );
     const profiles = {
       select: () => ({
         in: () => Promise.resolve({ data: supabaseState.profiles, error: null }),
       }),
     };
     // 利用記録は発酵とは別の表。範囲の記録（capturedRange）は発酵のクエリだけが使う。
-    const ocrUsageBuilder = {
-      gte: () => ocrUsageBuilder,
-      lte: () => ocrUsageBuilder,
-      order: () => ocrUsageBuilder,
+    //   - 期間で引く（日次の利用記録）: gte/lte/order/range
+    //   - 発酵の id で引く（発酵ごとのトークン数）: eq/in
+    const aiUsageBuilder = {
+      eq: () => aiUsageBuilder,
+      gte: () => aiUsageBuilder,
+      lte: () => aiUsageBuilder,
+      order: () => aiUsageBuilder,
       range: (from: number) =>
         Promise.resolve(
           supabaseState.ocrUsageError
             ? { data: null, error: supabaseState.ocrUsageError }
-            : { data: from === 0 ? supabaseState.ocrUsage : [], error: null },
+            : {
+                data:
+                  from === 0
+                    ? [
+                        ...fermentationUsage(),
+                        ...supabaseState.ocrUsage.map((u) => ({ ...u, ref_id: null })),
+                      ]
+                    : [],
+                error: null,
+              },
         ),
+      in: (_col: string, ids: string[]) =>
+        Promise.resolve({
+          data: fermentationUsage().filter((u) => ids.includes(u.ref_id)),
+          error: null,
+        }),
     };
     return {
       from: (table: string) => {
         if (table === 'profiles') return profiles;
-        if (table === 'ocr_usage_events') return { select: () => ocrUsageBuilder };
+        if (table === 'ai_usage') return { select: () => aiUsageBuilder };
         return { select: () => builder };
       },
       auth: {
@@ -1066,34 +1105,10 @@ describe('cronCostAlert', () => {
   describe('ボード OCR / 写真の文字起こし（誰が何回使ったか）', () => {
     it('機能ごとに回数・人数・トークンと、使った人を名前 (メール) で出す', async () => {
       supabaseState.ocrUsage = [
-        {
-          user_id: 'aaaaaaaa-1111',
-          source: 'board',
-          input_tokens: 1200,
-          output_tokens: 20,
-          succeeded: true,
-        },
-        {
-          user_id: 'aaaaaaaa-1111',
-          source: 'board',
-          input_tokens: 1000,
-          output_tokens: 10,
-          succeeded: true,
-        },
-        {
-          user_id: 'bbbbbbbb-2222',
-          source: 'board',
-          input_tokens: null,
-          output_tokens: null,
-          succeeded: false,
-        },
-        {
-          user_id: 'bbbbbbbb-2222',
-          source: 'entry',
-          input_tokens: 1800,
-          output_tokens: 40,
-          succeeded: true,
-        },
+        { user_id: 'aaaaaaaa-1111', feature: 'ocr_board', input_tokens: 1200, output_tokens: 20 },
+        { user_id: 'aaaaaaaa-1111', feature: 'ocr_board', input_tokens: 1000, output_tokens: 10 },
+        { user_id: 'bbbbbbbb-2222', feature: 'ocr_board', input_tokens: 900, output_tokens: 5 },
+        { user_id: 'bbbbbbbb-2222', feature: 'ocr_entry', input_tokens: 1800, output_tokens: 40 },
       ];
       supabaseState.users = [
         { id: 'aaaaaaaa-1111', email: 'akira@example.com' },
@@ -1107,20 +1122,19 @@ describe('cronCostAlert', () => {
       expect(fieldName('ボード OCR')).toBe('ボード OCR（8/8 9:00 〜 8/9 9:00 (JST)）');
       expect(fieldValue('ボード OCR')).toBe(
         [
-          '3 回（成功 2 / 失敗 1）・2 人・入 2,200 / 出 30 tok',
+          '3 回・2 人・入 3,100 / 出 35 tok',
           '├ あきら (akira@example.com): 2 回・入 2,200 / 出 30 tok',
-          '└ baba@example.com: 1 回・入 0 / 出 0 tok',
+          '└ baba@example.com: 1 回・入 900 / 出 5 tok',
         ].join('\n'),
       );
       expect(fieldValue('写真の文字起こし')).toBe(
-        [
-          '1 回（成功 1 / 失敗 0）・1 人・入 1,800 / 出 40 tok',
-          '└ baba@example.com: 1 回・入 1,800 / 出 40 tok',
-        ].join('\n'),
+        ['1 回・1 人・入 1,800 / 出 40 tok', '└ baba@example.com: 1 回・入 1,800 / 出 40 tok'].join(
+          '\n',
+        ),
       );
       expect(body.ocrUsage).toEqual({
-        board: { count: 3, failedCount: 1, userCount: 2 },
-        entry: { count: 1, failedCount: 0, userCount: 1 },
+        ocr_board: { count: 3, userCount: 2 },
+        ocr_entry: { count: 1, userCount: 1 },
       });
     });
 
@@ -1131,10 +1145,10 @@ describe('cronCostAlert', () => {
       expect(fieldValue('写真の文字起こし')).toBe('0 回');
     });
 
-    // migration 未適用だと記録のテーブルが無い。それを「0 回」と書くと使われていないように読める。
+    // migration 未適用だと記録の表が無い。それを「0 回」と書くと使われていないように読める。
     it('記録を読めなかった日は 0 回と書かず、読めなかったと書く', async () => {
       supabaseState.ocrUsageError = {
-        message: 'relation "public.ocr_usage_events" does not exist',
+        message: 'relation "public.ai_usage" does not exist',
       };
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
@@ -1146,13 +1160,7 @@ describe('cronCostAlert', () => {
     it('発酵と OCR の利用者は 1 回でまとめて名前を引く（listUsers は最大 20 往復する）', async () => {
       supabaseState.rows = [fermentation({ user_id: 'aaaaaaaa-1111' })];
       supabaseState.ocrUsage = [
-        {
-          user_id: 'bbbbbbbb-2222',
-          source: 'entry',
-          input_tokens: 10,
-          output_tokens: 1,
-          succeeded: true,
-        },
+        { user_id: 'bbbbbbbb-2222', feature: 'ocr_entry', input_tokens: 10, output_tokens: 1 },
       ];
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositories/supabase-entry.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
+import { SupabaseAiUsageRecorder } from '../../../shared/infrastructure/supabase-ai-usage-recorder.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { rateLimitFermentation } from '../../../shared/presentation/middleware/rate-limit.js';
 import { GetFermentationResultUsecase } from '../../application/usecases/get-fermentation-result.usecase.js';
@@ -40,7 +41,12 @@ export const fermentations = new Hono<Env>()
     const supabase = c.get('supabase');
     const repo = new SupabaseFermentationRepository(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
-    const usecase = new RunFermentationUsecase(repo, llmGateway, generateId);
+    const usecase = new RunFermentationUsecase(
+      repo,
+      llmGateway,
+      new SupabaseAiUsageRecorder(supabase),
+      generateId,
+    );
 
     // issue #279: ユーザーのロケールを解決して LLM プロンプトと digest 文言を切り替える。
     // auth.admin.getUserById は service-role 必須なので getSupabaseClient() を使う。

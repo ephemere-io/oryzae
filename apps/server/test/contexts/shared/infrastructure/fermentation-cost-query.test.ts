@@ -26,45 +26,67 @@ function row(overrides: Partial<FermentationCostRow> = {}): FermentationCostRow 
 
 /**
  * Supabase の PostgREST ビルダーを最小限だけ模したスタブ。
- * range(offset, end) ごとに pages[] から1ページ返す。
+ * fermentation_results は range(offset, end) ごとに pages[] から1ページ返す。
+ * ai_usage は usage[] のうち in('ref_id', ids) に当たる行を返す。
  */
-function createSupabaseStub(pages: Record<string, unknown>[][]) {
+function createSupabaseStub(
+  pages: Record<string, unknown>[][],
+  usage: Record<string, unknown>[] = [],
+) {
   const rangeCalls: [number, number][] = [];
-  const builder = {
-    eq: () => builder,
-    gte: () => builder,
-    lte: () => builder,
-    order: () => builder,
+  const fermentations = {
+    eq: () => fermentations,
+    gte: () => fermentations,
+    lte: () => fermentations,
+    order: () => fermentations,
     range: (from: number, to: number) => {
       rangeCalls.push([from, to]);
       const page = pages.shift() ?? [];
       return Promise.resolve({ data: page, error: null });
     },
   };
-  const client = { from: () => ({ select: () => builder }) };
+  const aiUsage = {
+    eq: () => aiUsage,
+    in: (_column: string, ids: string[]) =>
+      Promise.resolve({
+        data: usage.filter((u) => typeof u.ref_id === 'string' && ids.includes(u.ref_id)),
+        error: null,
+      }),
+  };
+  const client = {
+    from: (table: string) => ({
+      select: () => (table === 'ai_usage' ? aiUsage : fermentations),
+    }),
+  };
   // @type-assertion-allowed: テスト用の最小 Supabase スタブ。実際に使うのは from().select() 以降だけ
   return { client: client as unknown as SupabaseClient, rangeCalls };
+}
+
+function fermentationRow(id: string, over: Record<string, unknown> = {}) {
+  return {
+    id,
+    user_id: 'user-1',
+    status: 'completed',
+    created_at: '2026-08-08T18:00:00.000Z',
+    ...over,
+  };
+}
+
+function usageRow(refId: string, inputTokens: number, outputTokens: number) {
+  return {
+    user_id: 'user-1',
+    feature: 'fermentation',
+    ref_id: refId,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+  };
 }
 
 describe('fetchFermentationCostRows', () => {
   it('pages through results until a short page is returned', async () => {
     // 旧実装は .range() 無しで Supabase 既定の 1000 行に暗黙に打ち切られていた。
-    const firstPage = Array.from({ length: 1000 }, () => ({
-      user_id: 'user-1',
-      status: 'completed',
-      input_tokens: 10,
-      output_tokens: 5,
-      created_at: '2026-08-08T18:00:00.000Z',
-    }));
-    const secondPage = [
-      {
-        user_id: 'user-2',
-        status: 'completed',
-        input_tokens: 20,
-        output_tokens: 10,
-        created_at: '2026-08-08T18:01:00.000Z',
-      },
-    ];
+    const firstPage = Array.from({ length: 1000 }, (_, i) => fermentationRow(`f${i}`));
+    const secondPage = [fermentationRow('last', { user_id: 'user-2' })];
     const { client, rangeCalls } = createSupabaseStub([firstPage, secondPage]);
 
     const result = await fetchFermentationCostRows(client);
@@ -78,17 +100,7 @@ describe('fetchFermentationCostRows', () => {
   });
 
   it('stops on the first short page without extra requests', async () => {
-    const { client, rangeCalls } = createSupabaseStub([
-      [
-        {
-          user_id: 'user-1',
-          status: 'completed',
-          input_tokens: 1,
-          output_tokens: 1,
-          created_at: '2026-08-08T18:00:00.000Z',
-        },
-      ],
-    ]);
+    const { client, rangeCalls } = createSupabaseStub([[fermentationRow('f1')]]);
 
     const result = await fetchFermentationCostRows(client);
 
@@ -96,18 +108,22 @@ describe('fetchFermentationCostRows', () => {
     expect(rangeCalls).toHaveLength(1);
   });
 
-  it('normalises missing tokens to null rather than 0', async () => {
-    const { client } = createSupabaseStub([
-      [
-        {
-          user_id: 'user-1',
-          status: 'failed',
-          input_tokens: null,
-          output_tokens: null,
-          created_at: '2026-08-08T18:00:00.000Z',
-        },
-      ],
+  it('トークン数は ai_usage から引き、再試行の分も足し合わせる', async () => {
+    const { client } = createSupabaseStub(
+      [[fermentationRow('f1'), fermentationRow('f2')]],
+      [usageRow('f1', 100, 10), usageRow('f1', 200, 20), usageRow('f2', 50, 5)],
+    );
+
+    const result = await fetchFermentationCostRows(client);
+
+    expect(result.rows.map((r) => [r.inputTokens, r.outputTokens])).toEqual([
+      [300, 30],
+      [50, 5],
     ]);
+  });
+
+  it('ai_usage に記録が無い発酵は 0 ではなく null にする（未追跡として数えるため）', async () => {
+    const { client } = createSupabaseStub([[fermentationRow('f1', { status: 'failed' })]]);
 
     const result = await fetchFermentationCostRows(client);
 

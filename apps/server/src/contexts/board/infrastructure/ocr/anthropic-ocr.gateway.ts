@@ -59,7 +59,6 @@ export class AnthropicOcrGateway implements OcrGateway {
 
     return {
       text: cleanup(text),
-      model: MODEL,
       usage: {
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,

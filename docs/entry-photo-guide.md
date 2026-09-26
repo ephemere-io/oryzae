@@ -74,11 +74,10 @@ Workspace 別に取っており、文字起こし分は `oryzae-prod-ocr`（キ�
 
 **「誰が何回使ったか」だけは自前で記録する**（2026-09、日次レポートのユーザー別内訳のため）。
 Anthropic が知っているのは API キーと Workspace であって `user_id` ではないので、この軸は
-Oryzae 側にしか作れない。呼び出しごとに `ocr_usage_events` に 1 行（ユーザー・モデル・
-トークン数・成否）を書く。**起こした文字は書かない。** 記録に失敗しても文字起こしは失敗させない
-（`recordOcrUsage` が握りつぶしてログに出す）。写真の文字起こしは `source = 'entry'`、ボード OCR は
-同じ表に `source = 'board'` として書く。発酵はこの表に入れない（`fermentation_results` に
-ユーザーとトークン数が最初からあるため。二重に持たない）。
+Oryzae 側にしか作れない。文字起こしが成功するたびに `ai_usage` に 1 行（ユーザー・機能・
+トークン数）を書く（設計は [ai-usage-design.md](./ai-usage-design.md)）。**起こした文字は書かない。**
+記録に失敗しても文字起こしは失敗させない（`recordAiUsage` が握りつぶしてログに出す）。
+写真の文字起こしは `feature = 'ocr_entry'`、ボード OCR は `feature = 'ocr_board'`。
 
 ### 支出上限に達したとき
 

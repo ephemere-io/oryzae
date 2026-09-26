@@ -3,6 +3,7 @@ import { RunFermentationUsecase } from '@/contexts/fermentation/application/usec
 import type { FermentationRepositoryGateway } from '@/contexts/fermentation/domain/gateways/fermentation-repository.gateway.js';
 import type { LlmAnalysisGateway } from '@/contexts/fermentation/domain/gateways/llm-analysis.gateway.js';
 import { FermentationResult } from '@/contexts/fermentation/domain/models/fermentation-result.js';
+import type { AiUsageRecorder } from '@/contexts/shared/domain/gateways/ai-usage-recorder.gateway.js';
 
 const generateId = () => 'test-id';
 
@@ -40,13 +41,14 @@ function makeFailedResult(
     questionId: overrides.questionId ?? 'q1',
     targetPeriod: overrides.targetPeriod ?? '2026-06-25',
     status: 'failed',
-    generationId: null,
-    inputTokens: null,
-    outputTokens: null,
     errorMessage: 'previous LLM timeout',
     createdAt: overrides.createdAt ?? '2026-06-25T03:05:00.000Z',
     updatedAt: '2026-06-25T03:05:00.000Z',
   });
+}
+
+function mockUsage(): AiUsageRecorder {
+  return { record: vi.fn().mockResolvedValue(undefined) };
 }
 
 function mockLlm(): LlmAnalysisGateway {
@@ -60,7 +62,6 @@ function mockLlm(): LlmAnalysisGateway {
         keywords: [{ keyword: 'test', description: 'a test keyword' }],
       },
       usage: { inputTokens: 100, outputTokens: 200 },
-      generationId: 'gen_test123',
     }),
   };
 }
@@ -69,7 +70,7 @@ describe('RunFermentationUsecase', () => {
   it('creates fermentation result and saves all outputs', async () => {
     const repo = mockRepo();
     const llm = mockLlm();
-    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+    const usecase = new RunFermentationUsecase(repo, llm, mockUsage(), generateId);
 
     const result = await usecase.execute({
       userId: 'u1',
@@ -81,7 +82,7 @@ describe('RunFermentationUsecase', () => {
     expect(result.id).toBe('test-id');
     expect(repo.save).toHaveBeenCalledOnce();
     expect(repo.saveScannedEntries).toHaveBeenCalledWith('test-id', ['e1']);
-    expect(repo.update).toHaveBeenCalledTimes(3); // processing + generationId + completed
+    expect(repo.update).toHaveBeenCalledTimes(2); // processing + completed
     expect(llm.analyze).toHaveBeenCalledOnce();
     expect(repo.saveWorksheet).toHaveBeenCalledOnce();
     expect(repo.saveSnippets).toHaveBeenCalledOnce();
@@ -92,7 +93,7 @@ describe('RunFermentationUsecase', () => {
   it('defaults language to "ja" when not specified (issue #279)', async () => {
     const repo = mockRepo();
     const llm = mockLlm();
-    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+    const usecase = new RunFermentationUsecase(repo, llm, mockUsage(), generateId);
 
     await usecase.execute({
       userId: 'u1',
@@ -107,7 +108,7 @@ describe('RunFermentationUsecase', () => {
   it('forwards language="en" to the LLM gateway (issue #279)', async () => {
     const repo = mockRepo();
     const llm = mockLlm();
-    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+    const usecase = new RunFermentationUsecase(repo, llm, mockUsage(), generateId);
 
     await usecase.execute({
       userId: 'u1',
@@ -123,7 +124,7 @@ describe('RunFermentationUsecase', () => {
   it('saves all scanned entry ids when multiple entries are provided', async () => {
     const repo = mockRepo();
     const llm = mockLlm();
-    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+    const usecase = new RunFermentationUsecase(repo, llm, mockUsage(), generateId);
 
     await usecase.execute({
       userId: 'u1',
@@ -145,7 +146,7 @@ describe('RunFermentationUsecase', () => {
 
   it('rejects execution when no entries are provided', async () => {
     const repo = mockRepo();
-    const usecase = new RunFermentationUsecase(repo, mockLlm(), generateId);
+    const usecase = new RunFermentationUsecase(repo, mockLlm(), mockUsage(), generateId);
 
     await expect(
       usecase.execute({ userId: 'u1', questionId: 'q1', questionText: 'Q', entries: [] }),
@@ -158,7 +159,7 @@ describe('RunFermentationUsecase', () => {
     const llm: LlmAnalysisGateway = {
       analyze: vi.fn().mockRejectedValue(new Error('LLM timeout')),
     };
-    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+    const usecase = new RunFermentationUsecase(repo, llm, mockUsage(), generateId);
 
     await expect(
       usecase.execute({
@@ -175,59 +176,100 @@ describe('RunFermentationUsecase', () => {
     expect(repo.saveScannedEntries).toHaveBeenCalledWith('test-id', ['e1']);
   });
 
-  // コスト集計の正確性: LLM が成功した時点で課金は発生しているので、その後の保存処理が
-  // 落ちてもトークンは残さなければならない。旧実装は catch 側で usage 未設定の元
-  // インスタンスから update していたため、input_tokens/output_tokens を NULL で
-  // 上書きし、失敗した発酵のコストがレポートから丸ごと消えていた。
-  it('keeps the token usage when a post-LLM step fails', async () => {
-    const repo = mockRepo();
-    repo.saveWorksheet = vi.fn().mockRejectedValue(new Error('db write failed'));
-    const llm = mockLlm();
-    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+  describe('AI の利用記録（ai_usage）', () => {
+    it('AI を呼んだら、誰が・どの発酵で・何トークン使ったかを記録する', async () => {
+      const usage = mockUsage();
+      const usecase = new RunFermentationUsecase(mockRepo(), mockLlm(), usage, generateId);
 
-    await expect(
-      usecase.execute({
+      await usecase.execute({
         userId: 'u1',
         questionId: 'q1',
         questionText: 'test',
         entries: [{ id: 'e1', content: 'test' }],
-      }),
-    ).rejects.toThrow('db write failed');
+      });
 
-    const failedUpdate = vi
-      .mocked(repo.update)
-      .mock.calls.map(([result]) => result.toProps())
-      .find((props) => props.status === 'failed');
+      expect(usage.record).toHaveBeenCalledWith({
+        userId: 'u1',
+        feature: 'fermentation',
+        refId: 'test-id',
+        inputTokens: 100,
+        outputTokens: 200,
+      });
+    });
 
-    expect(failedUpdate).toBeDefined();
-    expect(failedUpdate?.inputTokens).toBe(100);
-    expect(failedUpdate?.outputTokens).toBe(200);
-    expect(failedUpdate?.errorMessage).toBe('db write failed');
-  });
+    // AI が応答した時点で課金は済んでいる。その後の保存が落ちても記録は残す。
+    it('AI の後の保存が落ちても、記録は残っている', async () => {
+      const repo = mockRepo();
+      repo.saveWorksheet = vi.fn().mockRejectedValue(new Error('db write failed'));
+      const usage = mockUsage();
+      const usecase = new RunFermentationUsecase(repo, mockLlm(), usage, generateId);
 
-  it('leaves tokens null when the LLM itself fails (nothing was billed)', async () => {
-    const repo = mockRepo();
-    const llm: LlmAnalysisGateway = {
-      analyze: vi.fn().mockRejectedValue(new Error('LLM timeout')),
-    };
-    const usecase = new RunFermentationUsecase(repo, llm, generateId);
+      await expect(
+        usecase.execute({
+          userId: 'u1',
+          questionId: 'q1',
+          questionText: 'test',
+          entries: [{ id: 'e1', content: 'test' }],
+        }),
+      ).rejects.toThrow('db write failed');
 
-    await expect(
-      usecase.execute({
+      expect(usage.record).toHaveBeenCalledOnce();
+    });
+
+    it('AI 自体が失敗したら記録しない（応答が無くトークン数が分からない）', async () => {
+      const usage = mockUsage();
+      const llm: LlmAnalysisGateway = {
+        analyze: vi.fn().mockRejectedValue(new Error('LLM timeout')),
+      };
+      const usecase = new RunFermentationUsecase(mockRepo(), llm, usage, generateId);
+
+      await expect(
+        usecase.execute({
+          userId: 'u1',
+          questionId: 'q1',
+          questionText: 'test',
+          entries: [{ id: 'e1', content: 'test' }],
+        }),
+      ).rejects.toThrow('LLM analysis failed');
+
+      expect(usage.record).not.toHaveBeenCalled();
+    });
+
+    it('再試行は既存の発酵の id で、1 回ぶんとして記録する', async () => {
+      const usage = mockUsage();
+      const usecase = new RunFermentationUsecase(mockRepo(), mockLlm(), usage, generateId);
+
+      await usecase.execute({
+        userId: 'u1',
+        questionId: 'q1',
+        questionText: 'Q',
+        entries: [{ id: 'e1', content: 'test' }],
+        retryOf: makeFailedResult({ id: 'f1' }),
+      });
+
+      expect(usage.record).toHaveBeenCalledWith(expect.objectContaining({ refId: 'f1' }));
+    });
+
+    // 記録はレポートのため。記録の表が無い・DB が一時的に落ちている、で発酵を失敗させない。
+    it('記録に失敗しても、発酵は完了する', async () => {
+      const repo = mockRepo();
+      const usage: AiUsageRecorder = {
+        record: vi.fn().mockRejectedValue(new Error('relation does not exist')),
+      };
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const usecase = new RunFermentationUsecase(repo, mockLlm(), usage, generateId);
+
+      await usecase.execute({
         userId: 'u1',
         questionId: 'q1',
         questionText: 'test',
         entries: [{ id: 'e1', content: 'test' }],
-      }),
-    ).rejects.toThrow('LLM analysis failed');
+      });
 
-    const failedUpdate = vi
-      .mocked(repo.update)
-      .mock.calls.map(([result]) => result.toProps())
-      .find((props) => props.status === 'failed');
-
-    expect(failedUpdate?.inputTokens).toBeNull();
-    expect(failedUpdate?.outputTokens).toBeNull();
+      const statuses = vi.mocked(repo.update).mock.calls.map(([r]) => r.status);
+      expect(statuses).toContain('completed');
+      errorLog.mockRestore();
+    });
   });
 
   // issue #353: retryOf を渡すと既存行を再利用して再実行する。
@@ -235,7 +277,7 @@ describe('RunFermentationUsecase', () => {
     it('reuses the existing row instead of creating a new one', async () => {
       const repo = mockRepo();
       const llm = mockLlm();
-      const usecase = new RunFermentationUsecase(repo, llm, generateId);
+      const usecase = new RunFermentationUsecase(repo, llm, mockUsage(), generateId);
       const retryOf = makeFailedResult({ id: 'f1' });
 
       const result = await usecase.execute({
@@ -255,7 +297,7 @@ describe('RunFermentationUsecase', () => {
 
     it('clears partial outputs before writing new ones', async () => {
       const repo = mockRepo();
-      const usecase = new RunFermentationUsecase(repo, mockLlm(), generateId);
+      const usecase = new RunFermentationUsecase(repo, mockLlm(), mockUsage(), generateId);
 
       await usecase.execute({
         userId: 'u1',
@@ -273,7 +315,7 @@ describe('RunFermentationUsecase', () => {
     it('uses the original targetPeriod (not today) when retrying', async () => {
       const repo = mockRepo();
       const llm = mockLlm();
-      const usecase = new RunFermentationUsecase(repo, llm, generateId);
+      const usecase = new RunFermentationUsecase(repo, llm, mockUsage(), generateId);
 
       await usecase.execute({
         userId: 'u1',
@@ -290,7 +332,7 @@ describe('RunFermentationUsecase', () => {
 
     it('persists the row with errorMessage cleared and id preserved on success', async () => {
       const repo = mockRepo();
-      const usecase = new RunFermentationUsecase(repo, mockLlm(), generateId);
+      const usecase = new RunFermentationUsecase(repo, mockLlm(), mockUsage(), generateId);
 
       await usecase.execute({
         userId: 'u1',
@@ -309,7 +351,7 @@ describe('RunFermentationUsecase', () => {
 
     it('does not call clearOutputs on a normal (non-retry) run', async () => {
       const repo = mockRepo();
-      const usecase = new RunFermentationUsecase(repo, mockLlm(), generateId);
+      const usecase = new RunFermentationUsecase(repo, mockLlm(), mockUsage(), generateId);
 
       await usecase.execute({
         userId: 'u1',

@@ -9,6 +9,9 @@ import type { QuestionRepositoryGateway } from '@/contexts/question/domain/gatew
 import type { QuestionTransactionRepositoryGateway } from '@/contexts/question/domain/gateways/question-transaction-repository.gateway.js';
 import { Question } from '@/contexts/question/domain/models/question.js';
 import { QuestionTransaction } from '@/contexts/question/domain/models/question-transaction.js';
+import type { AiUsageRecorder } from '@/contexts/shared/domain/gateways/ai-usage-recorder.gateway.js';
+
+const noopUsage: AiUsageRecorder = { record: async () => {} };
 
 const generateId = () => 'test-id';
 
@@ -129,7 +132,6 @@ function mockLlm(): LlmAnalysisGateway {
         keywords: [],
       },
       usage: { inputTokens: 100, outputTokens: 200 },
-      generationId: 'gen-1',
     }),
   };
 }
@@ -151,6 +153,7 @@ function buildUsecase(args: BuildArgs = {}): FireFermentationUsecase {
     args.linkRepo ?? mockLinkRepo(),
     args.fermentationRepo ?? mockFermentationRepo(),
     args.llm ?? mockLlm(),
+    noopUsage,
     generateId,
   );
 }
@@ -290,7 +293,6 @@ describe('FireFermentationUsecase (issue #290: admin debug fire)', () => {
         keywords: [],
       },
       usage: { inputTokens: 100, outputTokens: 200 },
-      generationId: null,
     });
 
     const usecase = buildUsecase({ questionRepo, qtRepo, linkRepo, entryRepo, llm });

@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TranscribeEntryPhotoUsecase } from '@/contexts/entry/application/usecases/transcribe-entry-photo.usecase';
 import type { PhotoTranscriptionGateway } from '@/contexts/entry/domain/gateways/photo-transcription.gateway';
 import { SpendLimitReachedError } from '@/contexts/shared/application/errors/application.errors';
-import type { OcrUsageRecorder } from '@/contexts/shared/domain/gateways/ocr-usage-recorder.gateway';
+import type { AiUsageRecorder } from '@/contexts/shared/domain/gateways/ai-usage-recorder.gateway';
 
 describe('TranscribeEntryPhotoUsecase', () => {
   let transcription: PhotoTranscriptionGateway;
-  let usage: OcrUsageRecorder;
+  let usage: AiUsageRecorder;
   let usecase: TranscribeEntryPhotoUsecase;
 
   const input = {
@@ -79,27 +79,24 @@ describe('TranscribeEntryPhotoUsecase', () => {
     await expect(usecase.execute(input)).rejects.not.toBeInstanceOf(SpendLimitReachedError);
   });
 
-  describe('利用記録（日次レポートの「誰が使ったか」）', () => {
-    it('成功したら、誰が・どのモデルで・何トークン使ったかを記録する（起こした文字は渡さない）', async () => {
+  describe('AI の利用記録（ai_usage）', () => {
+    it('成功したら、誰が・何トークン使ったかを記録する（起こした文字は渡さない）', async () => {
       await usecase.execute(input);
 
       expect(usage.record).toHaveBeenCalledWith({
         userId: 'user-1',
-        source: 'entry',
-        model: 'claude-sonnet-5',
+        feature: 'ocr_entry',
+        refId: null,
         inputTokens: 1800,
         outputTokens: 40,
-        succeeded: true,
       });
     });
 
-    it('失敗したら、失敗として記録してからエラーを伝播する', async () => {
+    it('失敗したら記録せずにエラーを伝播する（応答が無くトークン数が分からない）', async () => {
       vi.mocked(transcription.transcribe).mockRejectedValue(new Error('llm unavailable'));
 
       await expect(usecase.execute(input)).rejects.toThrow('llm unavailable');
-      expect(usage.record).toHaveBeenCalledWith(
-        expect.objectContaining({ source: 'entry', succeeded: false, model: null }),
-      );
+      expect(usage.record).not.toHaveBeenCalled();
     });
 
     it('記録に失敗しても、起こした文字は返す', async () => {

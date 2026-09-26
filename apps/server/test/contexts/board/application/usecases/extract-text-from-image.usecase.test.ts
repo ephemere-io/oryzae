@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardOcrValidationError } from '@/contexts/board/application/errors/board.errors';
 import { ExtractTextFromImageUsecase } from '@/contexts/board/application/usecases/extract-text-from-image.usecase';
 import type { OcrGateway } from '@/contexts/board/domain/gateways/ocr.gateway';
-import type { OcrUsageRecorder } from '@/contexts/shared/domain/gateways/ocr-usage-recorder.gateway';
+import type { AiUsageRecorder } from '@/contexts/shared/domain/gateways/ai-usage-recorder.gateway';
 
 let ocr: OcrGateway;
-let usage: OcrUsageRecorder;
+let usage: AiUsageRecorder;
 let usecase: ExtractTextFromImageUsecase;
 
 const USER_ID = 'user-1';
@@ -19,7 +19,6 @@ beforeEach(() => {
   ocr = {
     extractText: vi.fn().mockResolvedValue({
       text: '読み取れた文字',
-      model: 'claude-sonnet-5',
       usage: { inputTokens: 100, outputTokens: 10 },
     }),
   };
@@ -46,7 +45,6 @@ describe('ExtractTextFromImageUsecase', () => {
     const long = 'あ'.repeat(300);
     ocr.extractText = vi.fn().mockResolvedValue({
       text: long,
-      model: 'claude-sonnet-5',
       usage: { inputTokens: 1, outputTokens: 1 },
     });
 
@@ -62,7 +60,6 @@ describe('ExtractTextFromImageUsecase', () => {
   it('1文字も読み取れなければ空文字を返す（エラーにはしない）', async () => {
     ocr.extractText = vi.fn().mockResolvedValue({
       text: '',
-      model: 'claude-sonnet-5',
       usage: { inputTokens: 1, outputTokens: 1 },
     });
 
@@ -110,29 +107,26 @@ describe('ExtractTextFromImageUsecase', () => {
     expect(result.text).toBe('読み取れた文字');
   });
 
-  describe('利用記録（日次レポートの「誰が使ったか」）', () => {
-    it('成功したら、誰が・どのモデルで・何トークン使ったかを記録する（本文は渡さない）', async () => {
+  describe('AI の利用記録（ai_usage）', () => {
+    it('成功したら、誰が・何トークン使ったかを記録する（本文は渡さない）', async () => {
       await usecase.execute({ userId: USER_ID, image: imageOf(1024), mediaType: 'image/png' });
 
       expect(usage.record).toHaveBeenCalledWith({
         userId: USER_ID,
-        source: 'board',
-        model: 'claude-sonnet-5',
+        feature: 'ocr_board',
+        refId: null,
         inputTokens: 100,
         outputTokens: 10,
-        succeeded: true,
       });
     });
 
-    it('OCR が失敗したら、失敗として記録してからエラーを伝播する', async () => {
+    it('OCR が失敗したら記録せずにエラーを伝播する（応答が無くトークン数が分からない）', async () => {
       ocr.extractText = vi.fn().mockRejectedValue(new Error('llm unavailable'));
 
       await expect(
         usecase.execute({ userId: USER_ID, image: imageOf(1024), mediaType: 'image/png' }),
       ).rejects.toThrow('llm unavailable');
-      expect(usage.record).toHaveBeenCalledWith(
-        expect.objectContaining({ source: 'board', succeeded: false, model: null }),
-      );
+      expect(usage.record).not.toHaveBeenCalled();
     });
 
     it('入力検証で弾いたものは LLM を呼んでいないので記録しない', async () => {

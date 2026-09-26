@@ -1,5 +1,6 @@
 import type { EntryRepositoryGateway } from '../../../entry/domain/gateways/entry-repository.gateway.js';
 import type { QuestionTransactionRepositoryGateway } from '../../../question/domain/gateways/question-transaction-repository.gateway.js';
+import type { AiUsageRecorder } from '../../../shared/domain/gateways/ai-usage-recorder.gateway.js';
 import type { FermentationRepositoryGateway } from '../../domain/gateways/fermentation-repository.gateway.js';
 import type { LlmAnalysisGateway } from '../../domain/gateways/llm-analysis.gateway.js';
 import type { UserLocaleResolverGateway } from '../../domain/gateways/user-locale-resolver.gateway.js';
@@ -48,6 +49,7 @@ export class RetryFailedFermentationsUsecase {
     private questionTransactionRepo: QuestionTransactionRepositoryGateway,
     private localeResolver: UserLocaleResolverGateway,
     private llmGateway: LlmAnalysisGateway,
+    private usage: AiUsageRecorder,
     private generateId: () => string,
     // 成功したユーザーへ digest をまとめて送るコールバック（ScheduledFermentation と同形）。
     private sendDigest: (
@@ -96,6 +98,7 @@ export class RetryFailedFermentationsUsecase {
     const runUsecase = new RunFermentationUsecase(
       this.fermentationRepo,
       this.llmGateway,
+      this.usage,
       this.generateId,
     );
 

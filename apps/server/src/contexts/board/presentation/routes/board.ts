@@ -6,7 +6,7 @@ import {
   MAX_PHOTO_CAPTION_LENGTH,
 } from '@oryzae/shared';
 import { Hono } from 'hono';
-import { SupabaseOcrUsageRecorder } from '../../../shared/infrastructure/supabase-ocr-usage-recorder.js';
+import { SupabaseAiUsageRecorder } from '../../../shared/infrastructure/supabase-ai-usage-recorder.js';
 import { rateLimitOcr } from '../../../shared/presentation/middleware/rate-limit.js';
 import { CreateBoardPhotoUsecase } from '../../application/usecases/create-board-photo.usecase.js';
 import { CreateBoardSnippetUsecase } from '../../application/usecases/create-board-snippet.usecase.js';
@@ -134,7 +134,7 @@ export const board = new Hono<Env>()
 
     const usecase = new ExtractTextFromImageUsecase(
       new AnthropicOcrGateway(),
-      new SupabaseOcrUsageRecorder(c.get('supabase')),
+      new SupabaseAiUsageRecorder(c.get('supabase')),
     );
     const result = await usecase.execute({
       userId: c.get('userId'),
