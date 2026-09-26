@@ -21,8 +21,23 @@ const actualSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('ok'),
     totalUsd: z.number(),
+    previousTotalUsd: z.number().nullable(),
+    previousPeriodLabel: z.string(),
     byWorkspace: z.array(
-      z.object({ name: z.string(), costUsd: z.number(), outsideOryzae: z.boolean() }),
+      z.object({
+        name: z.string(),
+        costUsd: z.number(),
+        previousCostUsd: z.number().nullable(),
+        outsideOryzae: z.boolean(),
+        keys: z.array(
+          z.object({
+            label: z.string(),
+            inputTokens: z.number(),
+            outputTokens: z.number(),
+            cacheTokens: z.number(),
+          }),
+        ),
+      }),
     ),
     daily: z.array(z.object({ date: z.string(), costUsd: z.number() })),
     projection: z
@@ -40,6 +55,9 @@ const usageSchema = z.discriminatedUnion('status', [
     features: z.array(
       z.object({
         feature: featureSchema,
+        outcomes: z
+          .object({ completed: z.number(), failed: z.number(), total: z.number() })
+          .nullable(),
         model: z.string(),
         rate: z.object({ inputUsdPerMTok: z.number(), outputUsdPerMTok: z.number() }),
         count: z.number(),

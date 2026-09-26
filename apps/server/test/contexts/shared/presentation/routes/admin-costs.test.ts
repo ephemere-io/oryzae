@@ -2,14 +2,19 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockFetchActualCost = vi.fn();
-const mockListWorkspaces = vi.fn();
+const mockFetchUsageDetail = vi.fn();
 const mockFetchAiUsage = vi.fn();
+const mockFetchFermentationCostRows = vi.fn();
 
 vi.mock('@/contexts/shared/infrastructure/anthropic-cost-api.js', () => ({
   ANTHROPIC_COST_CONSOLE_URL: 'https://platform.claude.com/cost',
   DEFAULT_WORKSPACE_LABEL: 'Default Workspace',
   fetchActualCost: (...args: unknown[]) => mockFetchActualCost(...args),
-  listWorkspaces: (...args: unknown[]) => mockListWorkspaces(...args),
+  fetchUsageDetail: (...args: unknown[]) => mockFetchUsageDetail(...args),
+}));
+vi.mock('@/contexts/shared/infrastructure/fermentation-cost-query.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  fetchFermentationCostRows: (...args: unknown[]) => mockFetchFermentationCostRows(...args),
 }));
 vi.mock('@/contexts/shared/infrastructure/ai-usage-query.js', () => ({
   fetchAiUsage: (...args: unknown[]) => mockFetchAiUsage(...args),
@@ -80,12 +85,36 @@ describe('GET /admin/costs', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-26T12:00:00.000Z'));
-    mockFetchActualCost.mockResolvedValue(actualOk(25));
-    mockListWorkspaces.mockResolvedValue([
-      { id: 'ws_f', name: 'oryzae-prod-fermentation' },
-      { id: 'ws_o', name: 'oryzae-prod-ocr' },
-    ]);
+    // 1 回目 = 見ている期間、2 回目 = 直前の同じ長さの期間
+    mockFetchActualCost.mockResolvedValueOnce(actualOk(25)).mockResolvedValueOnce(actualOk(20));
+    mockFetchUsageDetail.mockResolvedValue({
+      kind: 'ok',
+      workspaces: [
+        { id: 'ws_f', name: 'oryzae-prod-fermentation' },
+        { id: 'ws_o', name: 'oryzae-prod-ocr' },
+      ],
+      apiKeys: [
+        { id: 'k_f', name: 'oryzae-prod-fermentation', workspaceId: 'ws_f', status: 'active' },
+      ],
+      usageByKey: [
+        {
+          apiKeyId: 'k_f',
+          workspaceId: 'ws_f',
+          uncachedInputTokens: 6000,
+          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: 210,
+          outputTokens: 7796,
+        },
+      ],
+    });
     mockFetchAiUsage.mockResolvedValue(usage());
+    mockFetchFermentationCostRows.mockResolvedValue({
+      rows: [
+        { userId: 'u1', status: 'completed', inputTokens: 1, outputTokens: 1, createdAt: 'x' },
+        { userId: 'u1', status: 'failed', inputTokens: null, outputTokens: null, createdAt: 'x' },
+      ],
+      truncated: false,
+    });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -110,11 +139,52 @@ describe('GET /admin/costs', () => {
   it('$0 の Workspace も並べ、Default Workspace は Oryzae 外として最後に置く', async () => {
     const body = await (await createApp().request('/costs')).json();
 
-    expect(body.actual.byWorkspace).toEqual([
-      { name: 'oryzae-prod-fermentation', costUsd: 25, outsideOryzae: false },
-      { name: 'oryzae-prod-ocr', costUsd: 0, outsideOryzae: false },
-      { name: 'Default Workspace', costUsd: 0, outsideOryzae: true },
+    expect(
+      body.actual.byWorkspace.map(
+        (w: { name: string; costUsd: number; outsideOryzae: boolean }) => [
+          w.name,
+          w.costUsd,
+          w.outsideOryzae,
+        ],
+      ),
+    ).toEqual([
+      ['oryzae-prod-fermentation', 25, false],
+      ['oryzae-prod-ocr', 0, false],
+      ['Default Workspace', 0, true],
     ]);
+  });
+
+  it('Workspace の配下にキーとトークン数（キャッシュ込み）を出す', async () => {
+    const body = await (await createApp().request('/costs')).json();
+
+    expect(body.actual.byWorkspace[0].keys).toEqual([
+      {
+        label: 'oryzae-prod-fermentation',
+        inputTokens: 6210,
+        outputTokens: 7796,
+        cacheTokens: 210,
+      },
+    ]);
+  });
+
+  it('直前の同じ長さの期間と比べる（全体と Workspace ごと）', async () => {
+    const body = await (await createApp().request('/costs?from=2026-09-19&to=2026-09-25')).json();
+
+    const [, prevStart, prevEnd] = [null, ...(mockFetchActualCost.mock.calls[1] ?? [])];
+    expect(prevStart.toISOString()).toBe('2026-09-12T00:00:00.000Z');
+    expect(prevEnd.toISOString()).toBe('2026-09-19T00:00:00.000Z');
+    expect(body.actual.previousTotalUsd).toBe(20);
+    expect(body.actual.byWorkspace[0].previousCostUsd).toBe(20);
+    expect(body.actual.previousPeriodLabel).toBe('9/12 9:00 〜 9/19 9:00 (JST)');
+  });
+
+  it('発酵は、その期間に始まった発酵の成功・失敗も出す', async () => {
+    const body = await (await createApp().request('/costs')).json();
+    const fermentation = body.usage.features.find(
+      (f: { feature: string }) => f.feature === 'fermentation',
+    );
+
+    expect(fermentation.outcomes).toEqual({ completed: 1, failed: 1, total: 2 });
   });
 
   it('今月を見ているときだけ、閉じた日数の平均で月末の見込みを出す', async () => {
@@ -122,6 +192,7 @@ describe('GET /admin/costs', () => {
     // 9/1〜9/25 の 25 日で $25 → 30 日で $30
     expect(body.actual.projection).toEqual({ projectedUsd: 30, daysElapsed: 25, daysInMonth: 30 });
 
+    mockFetchActualCost.mockResolvedValue(actualOk(25));
     const last = await (await createApp().request('/costs?from=2026-08-01&to=2026-08-31')).json();
     expect(last.actual.projection).toBeNull();
   });
@@ -169,8 +240,9 @@ describe('GET /admin/costs', () => {
   });
 
   it('実額が取れなくても 0 と書かず、記録の側は出す', async () => {
+    mockFetchActualCost.mockReset();
     mockFetchActualCost.mockResolvedValue({ kind: 'not-configured' });
-    mockListWorkspaces.mockResolvedValue('not-configured');
+    mockFetchUsageDetail.mockResolvedValue({ kind: 'not-configured' });
     const body = await (await createApp().request('/costs')).json();
 
     expect(body.actual).toEqual({ status: 'not-configured' });

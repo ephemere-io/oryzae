@@ -30,13 +30,15 @@ const FEATURE_LABEL: Record<AiFeature, string> = {
   ocr_entry: '写真の文字起こし',
 };
 
-type Preset = 'this-month' | 'last-month' | '30d' | 'custom';
+type Preset = 'yesterday' | '7d' | '30d' | 'this-month' | 'last-month' | 'custom';
 
-const PRESETS: { key: Preset; label: string }[] = [
-  { key: 'this-month', label: '今月' },
-  { key: 'last-month', label: '先月' },
-  { key: '30d', label: '直近30日' },
-  { key: 'custom', label: '日付指定' },
+const PRESETS: { key: Preset; label: string; hint: string }[] = [
+  { key: 'yesterday', label: '昨日', hint: '日次レポートと同じ 1 日' },
+  { key: '7d', label: '7日', hint: '今日を含む直近 7 日' },
+  { key: '30d', label: '30日', hint: '今日を含む直近 30 日' },
+  { key: 'this-month', label: '今月', hint: '月初から今日まで' },
+  { key: 'last-month', label: '先月', hint: '先月 1 か月' },
+  { key: 'custom', label: '日付指定', hint: '' },
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -52,6 +54,13 @@ function rangeOf(
 ): { from: string; to: string } | null {
   const now = new Date();
   if (preset === 'this-month') return null;
+  if (preset === 'yesterday') {
+    const key = utcKey(new Date(now.getTime() - DAY_MS));
+    return { from: key, to: key };
+  }
+  if (preset === '7d') {
+    return { from: utcKey(new Date(now.getTime() - 6 * DAY_MS)), to: utcKey(now) };
+  }
   if (preset === 'last-month') {
     const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
     const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
@@ -70,6 +79,14 @@ function usd(value: number): string {
 
 function tok(value: number): string {
   return value.toLocaleString('en-US');
+}
+
+/** 前の期間との差。「前の期間 $20.00（+25%）」 */
+function versus(current: number, previous: number | null): string | null {
+  if (previous === null) return null;
+  if (previous === 0) return current === 0 ? '±0' : '前の期間は $0';
+  const pct = Math.round(((current - previous) / previous) * 100);
+  return `${pct >= 0 ? '+' : ''}${pct}%`;
 }
 
 function shortDate(key: string): string {
@@ -138,6 +155,14 @@ function ActualSection({ data }: { data: CostsData }) {
     <Section title="① いくら払ったか" note={note}>
       <div>
         <p className="text-3xl font-semibold tracking-tight tabular-nums">{usd(actual.totalUsd)}</p>
+        {actual.previousTotalUsd !== null && (
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            前の期間（{actual.previousPeriodLabel}）{usd(actual.previousTotalUsd)}
+            <span className="ml-1 font-medium text-foreground">
+              {versus(actual.totalUsd, actual.previousTotalUsd)}
+            </span>
+          </p>
+        )}
         {actual.projection && (
           <p className="mt-0.5 text-xs text-muted-foreground">
             月末までの見込み {usd(actual.projection.projectedUsd)}（{actual.projection.daysElapsed}{' '}
@@ -151,18 +176,42 @@ function ActualSection({ data }: { data: CostsData }) {
         )}
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-2">
         {actual.byWorkspace.map((w) => (
-          <div key={w.name} className="flex items-baseline gap-3 text-sm">
-            <span className="flex-1 truncate">
-              {w.name}
-              {w.outsideOryzae && (
-                <span className="ml-2 text-xs text-muted-foreground">Oryzae 外の利用</span>
-              )}
-            </span>
-            <span className="font-mono tabular-nums">{usd(w.costUsd)}</span>
+          <div key={w.name}>
+            <div className="flex items-baseline gap-3 text-sm">
+              <span className="flex-1 truncate font-medium">
+                {w.name}
+                {w.outsideOryzae && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    Oryzae 外の利用
+                  </span>
+                )}
+              </span>
+              <span className="w-16 text-right text-xs text-muted-foreground tabular-nums">
+                {versus(w.costUsd, w.previousCostUsd) ?? ''}
+              </span>
+              <span className="w-20 text-right font-mono tabular-nums">{usd(w.costUsd)}</span>
+            </div>
+            {w.keys.map((k) => (
+              <div
+                key={k.label}
+                className="flex items-baseline gap-3 pl-4 text-xs text-muted-foreground"
+              >
+                <span className="flex-1 truncate">キー {k.label}</span>
+                <span className="font-mono tabular-nums">
+                  {k.inputTokens + k.outputTokens === 0
+                    ? '0 tok'
+                    : `入 ${tok(k.inputTokens)} / 出 ${tok(k.outputTokens)} tok`}
+                  {k.cacheTokens > 0 && `（うちキャッシュ ${tok(k.cacheTokens)}）`}
+                </span>
+              </div>
+            ))}
           </div>
         ))}
+        <p className="text-[11px] text-muted-foreground">
+          金額は Workspace 単位。キーの行はトークン数（Anthropic は金額をキー別に割らない）。
+        </p>
       </div>
 
       {actual.daily.length > 0 && (
@@ -210,7 +259,7 @@ function UsageSection({ data }: { data: CostsData }) {
         <TableHeader>
           <TableRow>
             <TableHead>機能</TableHead>
-            <TableHead className="text-right">回数</TableHead>
+            <TableHead className="text-right">AI を使った回数</TableHead>
             <TableHead className="text-right">人数</TableHead>
             <TableHead className="text-right">入力 / 出力 tok</TableHead>
             <TableHead className="text-right">推定額</TableHead>
@@ -221,6 +270,12 @@ function UsageSection({ data }: { data: CostsData }) {
             <TableRow key={f.feature}>
               <TableCell>
                 {FEATURE_LABEL[f.feature]}
+                {f.outcomes && (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    発酵 {f.outcomes.total} 件（成功 {f.outcomes.completed} / 失敗{' '}
+                    {f.outcomes.failed}）
+                  </span>
+                )}
                 <span
                   className="ml-2 text-xs text-muted-foreground"
                   title={`入力 $${f.rate.inputUsdPerMTok} / 出力 $${f.rate.outputUsdPerMTok}（100 万トークンあたり）`}
@@ -321,6 +376,7 @@ export function CostOverview() {
                 key={p.key}
                 type="button"
                 onClick={() => setPreset(p.key)}
+                title={p.hint}
                 className={`px-2.5 py-1 ${preset === p.key ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 {p.label}

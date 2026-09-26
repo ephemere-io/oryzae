@@ -17,10 +17,24 @@ const sample = {
   period: { from: '2026-09-01', to: '2026-09-26', label: '9/1 9:00 〜 9/27 9:00 (JST)' },
   actual: {
     status: 'ok',
+    previousTotalUsd: null,
+    previousPeriodLabel: '8/1 9:00 〜 8/27 9:00 (JST)',
     totalUsd: 31.6,
     byWorkspace: [
-      { name: 'oryzae-prod-fermentation', costUsd: 0.41, outsideOryzae: false },
-      { name: 'Default Workspace', costUsd: 31.17, outsideOryzae: true },
+      {
+        name: 'oryzae-prod-fermentation',
+        costUsd: 0.41,
+        previousCostUsd: null,
+        outsideOryzae: false,
+        keys: [],
+      },
+      {
+        name: 'Default Workspace',
+        costUsd: 31.17,
+        previousCostUsd: null,
+        outsideOryzae: true,
+        keys: [],
+      },
     ],
     daily: [{ date: '2026-09-25', costUsd: 0.26 }],
     projection: { projectedUsd: 37.75, daysElapsed: 25, daysInMonth: 30 },
@@ -31,6 +45,7 @@ const sample = {
     features: [
       {
         feature: 'fermentation',
+        outcomes: { completed: 2, failed: 0, total: 2 },
         model: 'claude-sonnet-4-6',
         rate: { inputUsdPerMTok: 3, outputUsdPerMTok: 15 },
         count: 2,

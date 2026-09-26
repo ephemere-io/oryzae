@@ -15,6 +15,7 @@ function mockResponse(body: unknown): Response {
 
 const feature = (feature: string, model: string, count: number, est: number) => ({
   feature,
+  outcomes: null,
   model,
   rate: { inputUsdPerMTok: 3, outputUsdPerMTok: 15 },
   count,
@@ -28,12 +29,39 @@ const data = {
   period: { from: '2026-09-01', to: '2026-09-26', label: '9/1 9:00 〜 9/26 21:00 (JST)' },
   actual: {
     status: 'ok',
+    previousTotalUsd: 25.28,
+    previousPeriodLabel: '8/6 9:00 〜 9/1 9:00 (JST)',
     totalUsd: 31.46,
     byWorkspace: [
-      { name: 'oryzae-prod-fermentation', costUsd: 0.2762, outsideOryzae: false },
-      { name: 'oryzae-prod-ocr', costUsd: 0.0102, outsideOryzae: false },
-      { name: 'oryzae-ci', costUsd: 0, outsideOryzae: false },
-      { name: 'Default Workspace', costUsd: 31.17, outsideOryzae: true },
+      {
+        name: 'oryzae-prod-fermentation',
+        costUsd: 0.2762,
+        previousCostUsd: 0.1381,
+        outsideOryzae: false,
+        keys: [
+          {
+            label: 'oryzae-prod-fermentation',
+            inputTokens: 6210,
+            outputTokens: 7796,
+            cacheTokens: 0,
+          },
+        ],
+      },
+      {
+        name: 'oryzae-prod-ocr',
+        costUsd: 0.0102,
+        previousCostUsd: null,
+        outsideOryzae: false,
+        keys: [],
+      },
+      { name: 'oryzae-ci', costUsd: 0, previousCostUsd: null, outsideOryzae: false, keys: [] },
+      {
+        name: 'Default Workspace',
+        costUsd: 31.17,
+        previousCostUsd: null,
+        outsideOryzae: true,
+        keys: [],
+      },
     ],
     daily: [
       { date: '2026-09-24', costUsd: 6.74 },
@@ -45,7 +73,10 @@ const data = {
   usage: {
     status: 'ok',
     features: [
-      feature('fermentation', 'claude-sonnet-4-6', 2, 0.1356),
+      {
+        ...feature('fermentation', 'claude-sonnet-4-6', 2, 0.1356),
+        outcomes: { completed: 2, failed: 0, total: 2 },
+      },
       feature('ocr_board', 'claude-sonnet-5', 0, 0),
       feature('ocr_entry', 'claude-sonnet-5', 0, 0),
     ],
@@ -78,12 +109,20 @@ describe('CostOverview', () => {
     await waitFor(() => expect(screen.getByText('$31.46')).toBeTruthy());
     expect(screen.getByText('9/1 9:00 〜 9/26 21:00 (JST)')).toBeTruthy();
     expect(screen.getByText(/月末までの見込み \$37\.75/)).toBeTruthy();
+    // 前の期間との比較（全体と Workspace ごと）
+    expect(screen.getByText(/前の期間（8\/6 9:00 〜 9\/1 9:00 \(JST\)）\$25\.28/)).toBeTruthy();
+    expect(screen.getByText('+24%')).toBeTruthy();
+    expect(screen.getByText('+100%')).toBeTruthy();
+    // Workspace の配下にキーとトークン数
+    expect(screen.getByText('キー oryzae-prod-fermentation')).toBeTruthy();
+    expect(screen.getByText('入 6,210 / 出 7,796 tok')).toBeTruthy();
     // $0 の Workspace も出す。Default Workspace は Oryzae 外と書く
     expect(screen.getByText('oryzae-ci')).toBeTruthy();
     expect(screen.getByText('Oryzae 外の利用')).toBeTruthy();
     // 機能は 3 つとも並ぶ（使われていなくても）
     expect(screen.getByText('ボード OCR')).toBeTruthy();
     expect(screen.getByText('写真の文字起こし')).toBeTruthy();
+    expect(screen.getByText('発酵 2 件（成功 2 / 失敗 0）')).toBeTruthy();
     const userRow = screen.getByText('kunimo (k@example.com)').closest('tr');
     expect(userRow && within(userRow).getByText('発酵 2')).toBeTruthy();
   });
