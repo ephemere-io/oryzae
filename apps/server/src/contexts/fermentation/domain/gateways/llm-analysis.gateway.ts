@@ -21,7 +21,6 @@ interface LlmUsage {
 export interface LlmAnalysisResult {
   output: FermentationOutput;
   usage: LlmUsage;
-  generationId: string | undefined;
 }
 
 export interface LlmAnalysisGateway {

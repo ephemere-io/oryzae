@@ -2,12 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TranscribeEntryPhotoUsecase } from '@/contexts/entry/application/usecases/transcribe-entry-photo.usecase';
 import type { PhotoTranscriptionGateway } from '@/contexts/entry/domain/gateways/photo-transcription.gateway';
 import { SpendLimitReachedError } from '@/contexts/shared/application/errors/application.errors';
+import type { AiUsageRecorder } from '@/contexts/shared/domain/gateways/ai-usage-recorder.gateway';
 
 describe('TranscribeEntryPhotoUsecase', () => {
   let transcription: PhotoTranscriptionGateway;
+  let usage: AiUsageRecorder;
   let usecase: TranscribeEntryPhotoUsecase;
 
   const input = {
+    userId: 'user-1',
     file: new ArrayBuffer(8),
     contentType: 'image/jpeg',
     language: 'ja',
@@ -22,7 +25,8 @@ describe('TranscribeEntryPhotoUsecase', () => {
         outputTokens: 40,
       }),
     };
-    usecase = new TranscribeEntryPhotoUsecase(transcription);
+    usage = { record: vi.fn().mockResolvedValue(undefined) };
+    usecase = new TranscribeEntryPhotoUsecase(transcription, usage);
   });
 
   it('起こした文字だけを返す', async () => {
@@ -73,5 +77,35 @@ describe('TranscribeEntryPhotoUsecase', () => {
     });
 
     await expect(usecase.execute(input)).rejects.not.toBeInstanceOf(SpendLimitReachedError);
+  });
+
+  describe('AI の利用記録（ai_usage）', () => {
+    it('成功したら、誰が・何トークン使ったかを記録する（起こした文字は渡さない）', async () => {
+      await usecase.execute(input);
+
+      expect(usage.record).toHaveBeenCalledWith({
+        userId: 'user-1',
+        feature: 'ocr_entry',
+        refId: null,
+        inputTokens: 1800,
+        outputTokens: 40,
+      });
+    });
+
+    it('失敗したら記録せずにエラーを伝播する（応答が無くトークン数が分からない）', async () => {
+      vi.mocked(transcription.transcribe).mockRejectedValue(new Error('llm unavailable'));
+
+      await expect(usecase.execute(input)).rejects.toThrow('llm unavailable');
+      expect(usage.record).not.toHaveBeenCalled();
+    });
+
+    it('記録に失敗しても、起こした文字は返す', async () => {
+      usage.record = vi.fn().mockRejectedValue(new Error('relation does not exist'));
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      expect((await usecase.execute(input)).text).toBe('今日は雨だった。');
+      expect(errorLog).toHaveBeenCalled();
+      errorLog.mockRestore();
+    });
   });
 });

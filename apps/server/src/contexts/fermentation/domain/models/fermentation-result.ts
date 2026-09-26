@@ -10,10 +10,6 @@ export interface FermentationResultProps {
   questionId: string;
   targetPeriod: string;
   status: FermentationStatus;
-  generationId: string | null;
-  // LLM トークン使用量 (issue #352 後のコスト算出用)。実行完了時に保存。未計上は null。
-  inputTokens: number | null;
-  outputTokens: number | null;
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
@@ -33,9 +29,6 @@ export class FermentationResult {
   readonly questionId: string;
   readonly targetPeriod: string;
   readonly status: FermentationStatus;
-  readonly generationId: string | null;
-  readonly inputTokens: number | null;
-  readonly outputTokens: number | null;
   readonly errorMessage: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -46,9 +39,6 @@ export class FermentationResult {
     this.questionId = props.questionId;
     this.targetPeriod = props.targetPeriod;
     this.status = props.status;
-    this.generationId = props.generationId;
-    this.inputTokens = props.inputTokens;
-    this.outputTokens = props.outputTokens;
     this.errorMessage = props.errorMessage;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
@@ -68,9 +58,6 @@ export class FermentationResult {
         questionId: params.questionId,
         targetPeriod: params.targetPeriod,
         status: 'pending',
-        generationId: null,
-        inputTokens: null,
-        outputTokens: null,
         errorMessage: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -89,15 +76,6 @@ export class FermentationResult {
     return ok(new FermentationResult({ ...this.toProps(), status }));
   }
 
-  withGenerationId(generationId: string): FermentationResult {
-    return new FermentationResult({ ...this.toProps(), generationId });
-  }
-
-  // LLM 実行で得たトークン使用量を記録 (コスト算出用)。
-  withUsage(inputTokens: number, outputTokens: number): FermentationResult {
-    return new FermentationResult({ ...this.toProps(), inputTokens, outputTokens });
-  }
-
   withErrorMessage(errorMessage: string): FermentationResult {
     return new FermentationResult({ ...this.toProps(), errorMessage });
   }
@@ -109,9 +87,6 @@ export class FermentationResult {
       questionId: this.questionId,
       targetPeriod: this.targetPeriod,
       status: this.status,
-      generationId: this.generationId,
-      inputTokens: this.inputTokens,
-      outputTokens: this.outputTokens,
       errorMessage: this.errorMessage,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,

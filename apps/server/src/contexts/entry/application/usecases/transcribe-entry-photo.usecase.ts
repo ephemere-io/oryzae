@@ -1,8 +1,12 @@
 import { SpendLimitReachedError } from '../../../shared/application/errors/application.errors.js';
+import { recordAiUsage } from '../../../shared/application/record-ai-usage.js';
+import type { AiUsageRecorder } from '../../../shared/domain/gateways/ai-usage-recorder.gateway.js';
 import { isSpendLimitError } from '../../../shared/infrastructure/anthropic-spend-limit.js';
 import type { PhotoTranscriptionGateway } from '../../domain/gateways/photo-transcription.gateway.js';
 
 interface TranscribeEntryPhotoInput {
+  /** 利用記録（誰が使ったか）に残す。 */
+  userId: string;
   file: ArrayBuffer;
   contentType: string;
   /** 文字起こしのヒントに使う UI ロケール（'ja' | 'en' | ...）。 */
@@ -20,12 +24,15 @@ interface TranscribeEntryPhotoResponse {
  * 設計にしているため（OCR は必ず外すので、勝手に本文を書き換えない）。本文に入れた
  * あとは通常のエントリ保存フローに乗る。
  *
- * トークン使用量もここでは記録しない。コストは Cost API（`anthropic-cost-api.ts`）が
- * 組織全体の**実請求額**として拾うので、自前で数える必要が無いため。機能別・ユーザー別の
- * 内訳が要るようになったら、発酵と同じ形（`fermentation-cost-query.ts` 相当）で足すこと。
+ * 呼び出し 1 回ごとに「誰が・何トークン」を ai_usage に残す
+ * （日次コストレポートのユーザー別内訳のため。起こした文字は残さない）。
+ * 金額は持たない——実請求額は Cost API（`anthropic-cost-api.ts`）が Workspace 別に取る。
  */
 export class TranscribeEntryPhotoUsecase {
-  constructor(private transcription: PhotoTranscriptionGateway) {}
+  constructor(
+    private transcription: PhotoTranscriptionGateway,
+    private usage: AiUsageRecorder,
+  ) {}
 
   async execute(input: TranscribeEntryPhotoInput): Promise<TranscribeEntryPhotoResponse> {
     try {
@@ -34,6 +41,13 @@ export class TranscribeEntryPhotoUsecase {
         input.contentType,
         input.language,
       );
+      await recordAiUsage(this.usage, {
+        userId: input.userId,
+        feature: 'ocr_entry',
+        refId: null,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      });
       return { text: result.text };
     } catch (error) {
       // 支出上限で止まっているだけなら、AI の失敗と混ぜない。

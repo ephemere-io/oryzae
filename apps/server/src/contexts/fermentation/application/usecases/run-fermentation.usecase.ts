@@ -1,3 +1,5 @@
+import { recordAiUsage } from '../../../shared/application/record-ai-usage.js';
+import type { AiUsageRecorder } from '../../../shared/domain/gateways/ai-usage-recorder.gateway.js';
 import type { FermentationRepositoryGateway } from '../../domain/gateways/fermentation-repository.gateway.js';
 import type { LlmAnalysisGateway } from '../../domain/gateways/llm-analysis.gateway.js';
 import { AnalysisWorksheet } from '../../domain/models/analysis-worksheet.js';
@@ -17,6 +19,7 @@ export class RunFermentationUsecase {
   constructor(
     private fermentationRepo: FermentationRepositoryGateway,
     private llmGateway: LlmAnalysisGateway,
+    private usage: AiUsageRecorder,
     private generateId: () => string,
   ) {}
 
@@ -83,16 +86,9 @@ export class RunFermentationUsecase {
 
     const combinedContent = params.entries.map((e) => e.content).join('\n\n---\n\n');
 
-    // usage を載せた最新インスタンスを try の外に置く。try の中で宣言すると、
-    // LLM 成功後 (= 課金発生済み) に後続処理が落ちたとき catch 側が usage を持たない
-    // 元インスタンスから update してしまい、保存済みの input_tokens/output_tokens を
-    // NULL で上書きする。実際にはトークンを消費しているのにコスト集計から消えるため、
-    // 失敗が多い日ほどレポートが過少になっていた。
-    let currentResult = fermentationResult;
-
     try {
       // 3. Run LLM analysis
-      const { output, usage, generationId } = await this.llmGateway.analyze({
+      const { output, usage } = await this.llmGateway.analyze({
         question: params.questionText,
         entryContent: combinedContent,
         targetPeriod,
@@ -100,14 +96,15 @@ export class RunFermentationUsecase {
         language,
       });
 
-      // 3.5. Track generation ID + token usage for cost tracking.
-      // issue #352 で Anthropic 直叩きに切替え generationId は出なくなったが、usage は
-      // 取得できる。トークンを保存して価格表からコストを算出する (claude-pricing.ts)。
-      if (generationId) {
-        currentResult = currentResult.withGenerationId(generationId);
-      }
-      currentResult = currentResult.withUsage(usage.inputTokens, usage.outputTokens);
-      await this.fermentationRepo.update(currentResult);
+      // 3.5. AI を使った分を記録する（ai_usage）。後続の保存が落ちても課金は済んでいるので、
+      // 結果を保存する前に書く。再試行は 1 回ずつ別の行になる。
+      await recordAiUsage(this.usage, {
+        userId: params.userId,
+        feature: 'fermentation',
+        refId: fermentationResult.id,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+      });
 
       // 4. Save all results
       const worksheet = AnalysisWorksheet.create(
@@ -143,18 +140,16 @@ export class RunFermentationUsecase {
       await this.fermentationRepo.saveKeywords(keywords);
 
       // 5. Mark completed
-      const completedResult = currentResult.withStatus('completed');
+      const completedResult = fermentationResult.withStatus('completed');
       if (completedResult.success) {
         await this.fermentationRepo.update(completedResult.value);
       }
 
-      return { id: currentResult.id };
+      return { id: fermentationResult.id };
     } catch (error) {
-      // Mark failed with error message。currentResult を使うことで、LLM 呼び出しが
-      // 成功していた場合の usage を保持したまま failed に落とす（課金済みのトークンを
-      // コスト集計に残す）。LLM 自体が失敗した場合は usage 未設定のままなので無害。
+      // Mark failed with error message。AI を使った分は 3.5 で記録済み。
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const withError = currentResult.withErrorMessage(errorMessage);
+      const withError = fermentationResult.withErrorMessage(errorMessage);
       const failedResult = withError.withStatus('failed');
       if (failedResult.success) {
         await this.fermentationRepo.update(failedResult.value);

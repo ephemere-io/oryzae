@@ -6,6 +6,7 @@ import { SupabaseEntryRepository } from '../../../entry/infrastructure/repositor
 import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastructure/repositories/supabase-entry-question-link.repository.js';
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
+import { fetchFermentationTokens } from '../../../shared/infrastructure/ai-usage-query.js';
 import { computeCostFromTokens } from '../../../shared/infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
 import {
@@ -13,6 +14,7 @@ import {
   fetchFermentationCostRows,
   resolveUserEmails,
 } from '../../../shared/infrastructure/fermentation-cost-query.js';
+import { SupabaseAiUsageRecorder } from '../../../shared/infrastructure/supabase-ai-usage-recorder.js';
 import { FireFermentationUsecase } from '../../application/usecases/fire-fermentation.usecase.js';
 import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
 import { RunFermentationUsecase } from '../../application/usecases/run-fermentation.usecase.js';
@@ -133,7 +135,7 @@ export const adminFermentations = new Hono<Env>()
     let listQuery = supabase
       .from('fermentation_results')
       .select(
-        'id, user_id, question_id, target_period, status, generation_id, input_tokens, output_tokens, error_message, created_at, updated_at',
+        'id, user_id, question_id, target_period, status, generation_id, error_message, created_at, updated_at',
         { count: 'exact' },
       );
     if (resolvedUserId) listQuery = listQuery.eq('user_id', resolvedUserId);
@@ -154,11 +156,19 @@ export const adminFermentations = new Hono<Env>()
       emailMap.set(u.id, u.email ?? '');
     }
 
-    const items = (data ?? []).map((row) => ({
-      ...row,
-      user_email: emailMap.get(row.user_id) ?? '',
-      cost: computeCostFromTokens(row.input_tokens, row.output_tokens),
-    }));
+    // トークン数は ai_usage にある（発酵ごとに合計。再試行した分も含む）。
+    const tokens = await fetchFermentationTokens(
+      supabase,
+      (data ?? []).map((row) => row.id),
+    );
+    const items = (data ?? []).map((row) => {
+      const used = tokens.get(row.id);
+      return {
+        ...row,
+        user_email: emailMap.get(row.user_id) ?? '',
+        cost: used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null,
+      };
+    });
 
     return c.json({
       data: items,
@@ -184,15 +194,13 @@ export const adminFermentations = new Hono<Env>()
       resolvedUserId = matchedUser?.id ?? 'no-match';
     }
 
-    // トークン保存済み (新方式) か generation_id あり (旧方式) のレコードを対象にする。
-    // #352 以降は generation_id が NULL なので、旧フィルタ (generation_id NOT NULL) だと
-    // 新しい発酵が一切出てこなかった。
+    // すべての発酵を出す。コストが分からない発酵（AI を呼ぶ前に失敗した・記録が無い）は
+    // cost: null になり、画面では「-」と出る。
     let costsQuery = supabase
       .from('fermentation_results')
-      .select('id, user_id, status, generation_id, input_tokens, output_tokens, created_at', {
+      .select('id, user_id, status, generation_id, created_at', {
         count: 'exact',
-      })
-      .or('input_tokens.not.is.null,generation_id.not.is.null');
+      });
     if (resolvedUserId) costsQuery = costsQuery.eq('user_id', resolvedUserId);
     if (dateFrom) costsQuery = costsQuery.gte('created_at', dateFrom);
     if (dateTo) costsQuery = costsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
@@ -210,9 +218,16 @@ export const adminFermentations = new Hono<Env>()
       emailMap.set(u.id, u.email ?? '');
     }
 
+    const tokens = await fetchFermentationTokens(
+      supabase,
+      (data ?? []).map((row) => row.id),
+    );
     const items = await Promise.all(
       (data ?? []).map(async (row) => {
-        let cost: unknown = computeCostFromTokens(row.input_tokens, row.output_tokens);
+        const used = tokens.get(row.id);
+        let cost: unknown = used
+          ? computeCostFromTokens(used.inputTokens, used.outputTokens)
+          : null;
         // 旧 generation_id 方式のレコード (トークン未保存) は gateway にフォールバック。
         if (cost === null && row.generation_id) {
           try {
@@ -236,13 +251,14 @@ export const adminFermentations = new Hono<Env>()
 
     const { data, error } = await supabase
       .from('fermentation_results')
-      .select('generation_id, input_tokens, output_tokens')
+      .select('generation_id')
       .eq('id', id)
       .single();
 
     if (error || !data) return c.json({ error: 'Fermentation result not found' }, 404);
 
-    let cost: unknown = computeCostFromTokens(data.input_tokens, data.output_tokens);
+    const used = (await fetchFermentationTokens(supabase, [id])).get(id);
+    let cost: unknown = used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null;
     if (cost === null && data.generation_id) {
       try {
         cost = await gateway.getGenerationInfo({ id: data.generation_id });
@@ -325,11 +341,9 @@ export const adminFermentations = new Hono<Env>()
       });
     }
 
-    // 3. Compute cost from saved token usage; fall back to gateway for legacy records.
-    let cost: unknown = computeCostFromTokens(
-      fermentation.input_tokens,
-      fermentation.output_tokens,
-    );
+    // 3. Compute cost from ai_usage; fall back to gateway for legacy records.
+    const used = (await fetchFermentationTokens(supabase, [id])).get(id);
+    let cost: unknown = used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null;
     if (cost === null && fermentation.generation_id) {
       try {
         cost = await gateway.getGenerationInfo({ id: fermentation.generation_id });
@@ -465,6 +479,7 @@ export const adminFermentations = new Hono<Env>()
       userStateRepo,
       localeResolver,
       llmGateway,
+      new SupabaseAiUsageRecorder(supabase),
       () => crypto.randomUUID(),
       () => listActiveUserIds(supabase),
       (userId, titles, language) =>
@@ -522,6 +537,7 @@ export const adminFermentations = new Hono<Env>()
       new SupabaseEntryQuestionLinkRepository(supabase),
       new SupabaseFermentationRepository(supabase),
       new VercelAiAnalysisGateway(),
+      new SupabaseAiUsageRecorder(supabase),
       () => crypto.randomUUID(),
     );
 
@@ -653,7 +669,12 @@ export const adminFermentations = new Hono<Env>()
     // 4. Re-run fermentation
     const repo = new SupabaseFermentationRepository(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
-    const usecase = new RunFermentationUsecase(repo, llmGateway, () => crypto.randomUUID());
+    const usecase = new RunFermentationUsecase(
+      repo,
+      llmGateway,
+      new SupabaseAiUsageRecorder(supabase),
+      () => crypto.randomUUID(),
+    );
 
     // issue #279: 元 fermentation の所有者ロケールで再実行する。
     const localeResolver = new SupabaseUserLocaleResolver(supabase);

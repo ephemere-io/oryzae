@@ -1,8 +1,12 @@
 import { MAX_OCR_IMAGE_BYTES, OCR_ALLOWED_IMAGE_TYPES } from '@oryzae/shared';
+import { recordAiUsage } from '../../../shared/application/record-ai-usage.js';
+import type { AiUsageRecorder } from '../../../shared/domain/gateways/ai-usage-recorder.gateway.js';
 import type { OcrGateway } from '../../domain/gateways/ocr.gateway.js';
 import { BoardOcrValidationError } from '../errors/board.errors.js';
 
 interface ExtractTextFromImageInput {
+  /** 利用記録（誰が使ったか）に残す。 */
+  userId: string;
   image: ArrayBuffer;
   mediaType: string;
 }
@@ -23,7 +27,10 @@ function isAllowedMediaType(mediaType: string): boolean {
  * 実際に上限を強制するのは CreateBoardSnippetUsecase → BoardSnippet.create。
  */
 export class ExtractTextFromImageUsecase {
-  constructor(private ocr: OcrGateway) {}
+  constructor(
+    private ocr: OcrGateway,
+    private usage: AiUsageRecorder,
+  ) {}
 
   async execute(input: ExtractTextFromImageInput): Promise<ExtractTextFromImageResponse> {
     if (!isAllowedMediaType(input.mediaType)) {
@@ -43,6 +50,13 @@ export class ExtractTextFromImageUsecase {
       mediaType: input.mediaType,
     });
 
+    await recordAiUsage(this.usage, {
+      userId: input.userId,
+      feature: 'ocr_board',
+      refId: null,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+    });
     return { text: result.text };
   }
 }
