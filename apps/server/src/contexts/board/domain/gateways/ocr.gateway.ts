@@ -18,6 +18,8 @@ export interface OcrResult {
    * 気づけない。記録するなら、先に単価表を複数モデル対応にすること。
    */
   usage: { inputTokens: number; outputTokens: number };
+  /** 実際に呼んだモデル。利用記録（llm_usage_events）に残す。 */
+  model: string;
 }
 
 export interface OcrGateway {

@@ -4,6 +4,7 @@ import {
   MAX_ENTRY_PHOTO_BYTES,
 } from '@oryzae/shared';
 import { Hono } from 'hono';
+import { SupabaseLlmUsageRecorder } from '../../../shared/infrastructure/supabase-llm-usage-recorder.js';
 import { CreateEntryUsecase } from '../../application/usecases/create-entry.usecase.js';
 import { DeleteEntryUsecase } from '../../application/usecases/delete-entry.usecase.js';
 import { GetEntryUsecase } from '../../application/usecases/get-entry.usecase.js';
@@ -93,8 +94,12 @@ export const entries = new Hono<Env>()
     if (!parsed.ok) return c.json({ error: parsed.message }, 400);
 
     const language = typeof body.language === 'string' && body.language ? body.language : 'ja';
-    const usecase = new TranscribeEntryPhotoUsecase(new AnthropicPhotoTranscriptionGateway());
+    const usecase = new TranscribeEntryPhotoUsecase(
+      new AnthropicPhotoTranscriptionGateway(),
+      new SupabaseLlmUsageRecorder(c.get('supabase')),
+    );
     const result = await usecase.execute({
+      userId: c.get('userId'),
       file: await parsed.file.arrayBuffer(),
       contentType: parsed.file.type,
       language,

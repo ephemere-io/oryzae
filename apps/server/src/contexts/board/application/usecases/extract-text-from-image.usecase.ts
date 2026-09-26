@@ -1,8 +1,12 @@
 import { MAX_OCR_IMAGE_BYTES, OCR_ALLOWED_IMAGE_TYPES } from '@oryzae/shared';
+import { recordLlmUsage } from '../../../shared/application/record-llm-usage.js';
+import type { LlmUsageRecorder } from '../../../shared/domain/gateways/llm-usage-recorder.gateway.js';
 import type { OcrGateway } from '../../domain/gateways/ocr.gateway.js';
 import { BoardOcrValidationError } from '../errors/board.errors.js';
 
 interface ExtractTextFromImageInput {
+  /** 利用記録（誰が使ったか）に残す。 */
+  userId: string;
   image: ArrayBuffer;
   mediaType: string;
 }
@@ -23,7 +27,10 @@ function isAllowedMediaType(mediaType: string): boolean {
  * 実際に上限を強制するのは CreateBoardSnippetUsecase → BoardSnippet.create。
  */
 export class ExtractTextFromImageUsecase {
-  constructor(private ocr: OcrGateway) {}
+  constructor(
+    private ocr: OcrGateway,
+    private usage: LlmUsageRecorder,
+  ) {}
 
   async execute(input: ExtractTextFromImageInput): Promise<ExtractTextFromImageResponse> {
     if (!isAllowedMediaType(input.mediaType)) {
@@ -38,11 +45,33 @@ export class ExtractTextFromImageUsecase {
       );
     }
 
-    const result = await this.ocr.extractText({
-      image: input.image,
-      mediaType: input.mediaType,
-    });
+    // 入力検証で弾いたものは LLM を呼んでいないので記録しない。ここから先は 1 回の呼び出し。
+    let result: Awaited<ReturnType<OcrGateway['extractText']>>;
+    try {
+      result = await this.ocr.extractText({
+        image: input.image,
+        mediaType: input.mediaType,
+      });
+    } catch (error) {
+      await recordLlmUsage(this.usage, {
+        userId: input.userId,
+        feature: 'ocr_board',
+        model: null,
+        inputTokens: null,
+        outputTokens: null,
+        succeeded: false,
+      });
+      throw error;
+    }
 
+    await recordLlmUsage(this.usage, {
+      userId: input.userId,
+      feature: 'ocr_board',
+      model: result.model,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      succeeded: true,
+    });
     return { text: result.text };
   }
 }

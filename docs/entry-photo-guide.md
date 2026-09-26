@@ -69,14 +69,14 @@ board の OCR（`board/infrastructure/ocr/anthropic-ocr.gateway.ts`）も **2026
 
 ### コスト
 
-**この機能はコスト集計を自前で持たない。** 組織全体の実請求額は Cost API
-（`anthropic-cost-api.ts`、#502）が拾っており、文字起こし分もそこに含まれる。
-自前でトークンを数えても二重管理になるだけなので記録しない。
+**金額はこの機能では持たない。** 実請求額は Cost API（`anthropic-cost-api.ts`）が
+Workspace 別に取っており、文字起こし分は `oryzae-prod-ocr`（キー `ANTHROPIC_API_KEY_OCR_ENTRY`）に入る。
 
-機能別・ユーザー別の内訳が要るようになったら、発酵と同じ形
-（`fermentation-cost-query.ts` 相当）で足すこと。Anthropic 側が知っているのは
-API キーとワークスペースであって `user_id` ではないので、内訳だけは自前で
-持つ必要がある —— ただしそれは、必要になってから正しい形で 1 回作る。
+**「誰が何回使ったか」だけは自前で記録する**（2026-09、日次レポートのユーザー別内訳のため）。
+Anthropic が知っているのは API キーと Workspace であって `user_id` ではないので、この軸は
+Oryzae 側にしか作れない。呼び出しごとに `llm_usage_events` に 1 行（ユーザー・モデル・
+トークン数・成否）を書く。**起こした文字は書かない。** 記録に失敗しても文字起こしは失敗させない
+（`recordLlmUsage` が握りつぶしてログに出す）。ボード OCR も同じ表に `ocr_board` として書く。
 
 ### 支出上限に達したとき
 

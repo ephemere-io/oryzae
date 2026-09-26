@@ -82,6 +82,8 @@ describe('AnthropicOcrGateway.extractText', () => {
     const result = await new AnthropicOcrGateway().extractText({ image, mediaType: 'image/png' });
 
     expect(result.usage).toEqual({ inputTokens: 1200, outputTokens: 24 });
+    // 利用記録（llm_usage_events）に残すモデル名。gateway が実際に呼んだものを返す
+    expect(result.model).toBe(__INTERNAL.MODEL);
   });
 
   it('usage が欠けていても 0 に倒す', async () => {

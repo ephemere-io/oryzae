@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type ActualCostResult,
   fetchActualCost,
+  fetchUsageDetail,
   formatActualCost,
 } from '@/contexts/shared/infrastructure/anthropic-cost-api.js';
 
@@ -566,5 +567,189 @@ describe('モデル別の実額内訳', () => {
       const tokenSum = model.byTokenType.reduce((acc, t) => acc + t.costUsd, 0);
       expect(tokenSum).toBeCloseTo(model.costUsd, 10);
     }
+  });
+});
+
+/** URL ごとに応答を返し分ける（3 つの取得が並行に飛ぶので順序に頼れない）。 */
+function routeFetch(routes: Record<string, unknown[]>) {
+  const calls: Record<string, number> = {};
+  mockFetch.mockImplementation((url: string) => {
+    const key = Object.keys(routes).find((path) => url.includes(path));
+    if (!key) return Promise.resolve(jsonResponse({}, false, 404));
+    const n = calls[key] ?? 0;
+    calls[key] = n + 1;
+    const pages = routes[key] ?? [];
+    return Promise.resolve(jsonResponse(pages[Math.min(n, pages.length - 1)]));
+  });
+}
+
+describe('fetchUsageDetail', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+    vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('Admin キーが無ければ not-configured', async () => {
+    vi.stubEnv('ANTHROPIC_ADMIN_KEY', '');
+
+    expect(await fetchUsageDetail(START, END)).toEqual({ kind: 'not-configured' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  // 一覧系は after_id / last_id でページを送る。以前は page / next_page で送っていて、
+  // 2 ページ目があっても 1 ページ目を読み続けていた。
+  it('Workspace 一覧は after_id でページを送り、アーカイブ済みを除く', async () => {
+    routeFetch({
+      '/workspaces': [
+        {
+          data: [{ id: 'wrkspc_a', name: 'oryzae-prod-ocr', archived_at: null }],
+          has_more: true,
+          last_id: 'wrkspc_a',
+        },
+        {
+          data: [
+            { id: 'wrkspc_b', name: 'oryzae-ci', archived_at: null },
+            { id: 'wrkspc_old', name: 'old', archived_at: '2026-09-01T00:00:00Z' },
+          ],
+          has_more: false,
+          last_id: 'wrkspc_old',
+        },
+      ],
+      '/api_keys': [{ data: [], has_more: false }],
+      '/usage_report/messages': [{ data: [], has_more: false }],
+    });
+
+    const result = await fetchUsageDetail(START, END);
+
+    expect(result.kind === 'ok' && result.workspaces).toEqual([
+      { id: 'wrkspc_a', name: 'oryzae-prod-ocr' },
+      { id: 'wrkspc_b', name: 'oryzae-ci' },
+    ]);
+    const secondPage = mockFetch.mock.calls
+      .map(([url]) => new URL(String(url)))
+      .filter((u) => u.pathname.endsWith('/workspaces'))[1];
+    expect(secondPage?.searchParams.get('after_id')).toBe('wrkspc_a');
+  });
+
+  // scope.workspace_id は default workspace でも実 ID を返す。cost_report / usage_report は
+  // default を null で返すので、揃えないと Default Workspace のキーが行き場を失う。
+  it('default workspace のキーは所属を null にする（cost_report と同じ表現）', async () => {
+    routeFetch({
+      '/workspaces': [{ data: [], has_more: false }],
+      '/api_keys': [
+        {
+          data: [
+            {
+              id: 'apikey_student',
+              name: 'waseda-class',
+              status: 'active',
+              workspace_id: null,
+              scope: { type: 'workspace', workspace_id: 'wrkspc_default_real' },
+            },
+            {
+              id: 'apikey_ocr',
+              name: 'oryzae-prod-ocr-board',
+              status: 'active',
+              workspace_id: 'wrkspc_a',
+              scope: { type: 'workspace', workspace_id: 'wrkspc_a' },
+            },
+          ],
+          has_more: false,
+        },
+      ],
+      '/usage_report/messages': [{ data: [], has_more: false }],
+    });
+
+    const result = await fetchUsageDetail(START, END);
+
+    expect(result.kind === 'ok' && result.apiKeys).toEqual([
+      { id: 'apikey_student', name: 'waseda-class', status: 'active', workspaceId: null },
+      {
+        id: 'apikey_ocr',
+        name: 'oryzae-prod-ocr-board',
+        status: 'active',
+        workspaceId: 'wrkspc_a',
+      },
+    ]);
+  });
+
+  it('キー別のトークン数を期間で合算し、キャッシュの書込・読込を分けて持つ', async () => {
+    routeFetch({
+      '/workspaces': [{ data: [], has_more: false }],
+      '/api_keys': [{ data: [], has_more: false }],
+      '/usage_report/messages': [
+        {
+          data: [
+            {
+              starting_at: '2026-08-01T00:00:00Z',
+              results: [
+                {
+                  api_key_id: 'apikey_ocr',
+                  workspace_id: 'wrkspc_a',
+                  uncached_input_tokens: 1000,
+                  cache_creation: { ephemeral_1h_input_tokens: 5, ephemeral_5m_input_tokens: 10 },
+                  cache_read_input_tokens: 20,
+                  output_tokens: 50,
+                },
+              ],
+            },
+            {
+              starting_at: '2026-08-02T00:00:00Z',
+              results: [
+                {
+                  api_key_id: 'apikey_ocr',
+                  workspace_id: 'wrkspc_a',
+                  uncached_input_tokens: 500,
+                  cache_creation: { ephemeral_1h_input_tokens: 0, ephemeral_5m_input_tokens: 0 },
+                  cache_read_input_tokens: 0,
+                  output_tokens: 25,
+                },
+              ],
+            },
+          ],
+          has_more: false,
+        },
+      ],
+    });
+
+    const result = await fetchUsageDetail(START, END);
+
+    expect(result.kind === 'ok' && result.usageByKey).toEqual([
+      {
+        apiKeyId: 'apikey_ocr',
+        workspaceId: 'wrkspc_a',
+        uncachedInputTokens: 1500,
+        cacheCreationInputTokens: 15,
+        cacheReadInputTokens: 20,
+        outputTokens: 75,
+      },
+    ]);
+    const usageUrl = mockFetch.mock.calls
+      .map(([url]) => new URL(String(url)))
+      .find((u) => u.pathname.endsWith('/usage_report/messages'));
+    expect(usageUrl?.searchParams.getAll('group_by[]')).toEqual(['api_key_id', 'workspace_id']);
+  });
+
+  // 名前やトークン数は補助情報。どれかが取れなくても金額のレポートは止めない。
+  it('一部の取得に失敗しても、その部分だけ null にして返す', async () => {
+    routeFetch({
+      '/workspaces': [{ data: [{ id: 'wrkspc_a', name: 'oryzae-prod-ocr' }], has_more: false }],
+      '/usage_report/messages': [{ data: [], has_more: false }],
+      // api_keys は 404
+    });
+
+    const result = await fetchUsageDetail(START, END);
+
+    expect(result).toEqual({
+      kind: 'ok',
+      workspaces: [{ id: 'wrkspc_a', name: 'oryzae-prod-ocr' }],
+      apiKeys: null,
+      usageByKey: [],
+    });
   });
 });

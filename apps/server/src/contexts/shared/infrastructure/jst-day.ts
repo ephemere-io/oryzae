@@ -68,5 +68,18 @@ function jstClock(date: Date): string {
  */
 export function jstTimeRangeOfUtcDay(dateKey: string): string {
   const { start, end } = utcDayBounds(dateKey);
+  return jstTimeRange(start, end);
+}
+
+/**
+ * 任意の区間を JST の時刻範囲として書く。'9/1 9:00 〜 9/26 9:00 (JST)'。
+ * 月累計のように 1 日より長い窓も、日次と同じ書き方で区切りを見せる。
+ */
+export function jstTimeRange(start: Date, end: Date): string {
   return `${jstClock(start)} 〜 ${jstClock(end)} (JST)`;
+}
+
+/** 区間の終わりだけを JST で書く。'10/1 9:00 (JST)'。月末の見込みの「いつまで」に使う。 */
+export function jstClockLabel(date: Date): string {
+  return `${jstClock(date)} (JST)`;
 }

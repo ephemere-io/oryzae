@@ -1,8 +1,11 @@
 import { Hono } from 'hono';
+import type { LlmUsageFeature } from '../../domain/gateways/llm-usage-recorder.gateway.js';
 import {
   type ActualCostResult,
   ANTHROPIC_COST_CONSOLE_URL,
   fetchActualCost,
+  fetchUsageDetail,
+  type UsageDetailResult,
   type WorkspaceActualCost,
 } from '../../infrastructure/anthropic-cost-api.js';
 import {
@@ -20,6 +23,8 @@ import {
   type UserCostAggregate,
 } from '../../infrastructure/fermentation-cost-query.js';
 import {
+  jstClockLabel,
+  jstTimeRange,
   jstTimeRangeOfUtcDay,
   previousUtcDateKey,
   toUtcDateKey,
@@ -27,7 +32,14 @@ import {
   utcDayRangeIso,
   utcMonthBounds,
 } from '../../infrastructure/jst-day.js';
+import { fetchLlmUsage, type LlmUsageResult } from '../../infrastructure/llm-usage-query.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
+import {
+  buildWorkspaceRows,
+  renderDailyWorkspaceTree,
+  renderMonthlyWorkspaceLines,
+  type WorkspaceRow,
+} from '../helpers/cost-report-workspaces.js';
 import { createCronAuthMiddleware } from '../middleware/cron-auth.js';
 
 const DAILY_COST_THRESHOLD_USD = 1.0;
@@ -53,6 +65,21 @@ const DIVERGENCE_NOTICE_RATIO = 0.05;
  */
 const ADMIN_SPEND_URL = 'https://oryzae-admin.vercel.app/observability/spend';
 
+/**
+ * Workspace ごとの月の支出上限（USD）。**Anthropic Console の設定を手で写したもの。**
+ *
+ * 上限は API で読めない（支出上限 API は Claude Enterprise 契約専用で、Console の契約では
+ * 使えない）。Console で上限を変えたらここも直すこと。直し忘れると、レポートに古い上限と
+ * 割合が出続ける。ここに無い Workspace は額だけを出す。
+ * Default Workspace には上限を設定できない（Anthropic の仕様）。
+ */
+const WORKSPACE_MONTHLY_LIMITS_USD: Readonly<Record<string, number>> = {
+  'oryzae-prod-fermentation': 30,
+  'oryzae-prod-ocr': 15,
+  'oryzae-dev': 20,
+  'oryzae-ci': 10,
+};
+
 interface DiscordField {
   name: string;
   value: string;
@@ -66,6 +93,8 @@ type ActualCostOk = Extract<ActualCostResult, { kind: 'ok' }>;
  * 月末の見込みを `$9.4275` と書いても、下 2 桁は読む人にとって意味を持たない。
  */
 function usd(value: number): string {
+  // 使われなかった Workspace を全部並べるので、$0 は桁を付けずに書く（$0.0000 が並ぶと読みにくい）。
+  if (value === 0) return '$0';
   return Math.abs(value) >= 1 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
 }
 
@@ -130,22 +159,6 @@ function treeLines(lines: string[]): string[] {
 }
 
 /**
- * 実額の内訳 1 行（「Workspace 名: 金額」）。
- *
- * **Workspace 名をそのまま出す。**「fermentation だから発酵」のような読み替えはしない。
- * 用途名を自前で持つと、Console 側で Workspace を足したり改名したときに、レポートだけが
- * 古い名前を出し続ける。Oryzae の Workspace 名は `oryzae-prod-fermentation` のように
- * それ自体が用途を表しているので、そのまま読めば足りる。
- *
- * 1 つの Workspace に複数の機能が入っている場合（ボード OCR と写真の文字起こしは
- * どちらも oryzae-prod-ocr）は、その Workspace の中では分けられない。分けたくなったら
- * Console で Workspace を分ける——コードを足す話ではない。
- */
-function formatWorkspaceLine(w: WorkspaceActualCost): string {
-  return `${w.workspaceName}: ${usd(w.costUsd)}`;
-}
-
-/**
  * 金額と前日。単日の金額だけでは多いのか少ないのか判断できない。
  * ページング打ち切りは過少集計なので、黙って完全な実額のように見せない。
  */
@@ -159,106 +172,211 @@ function formatHeadline(actual: ActualCostOk, trend: ActualCostTrend | null): st
   return `${amount}（前日 ${usd(trend.previousUsd)}${change}）`;
 }
 
-/** 合計の配下に並べる内訳（Workspace = 用途別）。 */
-function formatBreakdownLines(actual: ActualCostOk): string[] {
-  // grouping が効いていないと合計は正しいまま内訳だけ消えるので、その旨を出す。
-  if (actual.groupingUnavailable) {
-    return treeLines([
-      '内訳が取れませんでした（group_by が効いていない可能性）。合計は正しい値です',
-    ]);
+/**
+ * Discord の 1 フィールドは 1024 文字まで。超えると通知ごと失敗するので、
+ * 行単位で切って「…以下略」を添える（途中の行を半端に切らない）。
+ */
+const FIELD_VALUE_LIMIT = 1024;
+function clampFieldValue(lines: string[]): string {
+  const tail = '…以下略（管理画面・Console で全件）';
+  const kept: string[] = [];
+  let length = 0;
+  for (const line of lines) {
+    const next = length + (kept.length > 0 ? 1 : 0) + line.length;
+    if (next + 1 + tail.length > FIELD_VALUE_LIMIT) {
+      kept.push(tail);
+      return kept.join('\n');
+    }
+    kept.push(line);
+    length = next;
   }
-  if (actual.byWorkspace.length === 0) return treeLines(['この日の課金なし']);
-  return treeLines(actual.byWorkspace.map(formatWorkspaceLine));
+  return kept.join('\n');
 }
 
-/** 欄の名前にスコープを置く。数字ごとに「org 全体」と注記しなくて済む。 */
-const ACTUAL_FIELD_NAME = '請求額（Anthropic の org 全体の実額・Workspace 別）';
-
 /**
- * 請求額の欄。「合計: 金額」の配下に用途別の内訳をぶら下げ、注記と確認先を添える。
+ * 請求額の欄。「合計: 金額」の配下に **すべての Workspace** を並べ、その配下に
+ * 各 Workspace のキーとトークン数をぶら下げる。
  *
- *   合計: $0.3263（前日 $0.0325 +903%）
- *   ├ oryzae-prod-fermentation: $0.2939
- *   ├ oryzae-prod-ocr: $0.0325
- *   └ oryzae-ci: $0.0001
- *   確認先: 管理画面・Anthropic Console
+ *   合計: $0.2594（前日 $6.74 -96%）
+ *   ├ oryzae-prod-fermentation: $0.1356
+ *   │ └ キー oryzae-prod-fermentation: 入 6,210 / 出 7,796 tok
+ *   ├ oryzae-prod-ocr: $0.0102
+ *   │ ├ キー oryzae-prod-ocr-board: 入 2,100 / 出 150 tok
+ *   │ └ キー oryzae-prod-ocr-entry: 0 tok
+ *   ├ oryzae-ci: $0.0000
+ *   ├ oryzae-dev: $0.0000
+ *   └ Default Workspace: $0.1136
+ *   ⠀⠀└ キー waseda-class: 入 31,000 / 出 4,200 tok
  *
- * 9/14 のレポートへの指摘: 金額が 3 つ縦に並ぶだけでは「$0.3263 が何で、$0.2939 が何か」
- * が読めない。親（合計）と子（用途別）の関係を字形で見せ、「org 全体の実額」という
- * スコープは欄の名前に置く。inline の横並びは使わない（幅次第で崩れる）。
- * 取得できないときに $0 を出さない方針は変えていない。
+ * 9/26 のレポートへの指摘「すべてのワークスペースが出ていない」: cost_report は額のある
+ * Workspace しか返さないので、Workspace 一覧で $0 のものも補う。金額は Workspace 単位の
+ * 実額だけで、キーの行はトークン数（cost_report はキー別に割れない）。
+ * 期間は欄の名前に置く（どの数字がどの窓の話かを、欄ごとに読めるようにする）。
  */
-function buildActualField(actual: ActualCostResult, trend: ActualCostTrend | null): DiscordField {
+function buildActualField(
+  actual: ActualCostResult,
+  trend: ActualCostTrend | null,
+  detail: UsageDetailResult,
+  window: string,
+): DiscordField {
   const lines: string[] = [];
   if (actual.kind === 'not-configured') {
     lines.push('取得できません（ANTHROPIC_ADMIN_KEY 未設定）');
   } else if (actual.kind === 'error') {
     lines.push(`取得失敗: ${actual.message.slice(0, 80)}`);
+  } else if (actual.groupingUnavailable) {
+    // grouping が効いていないと合計は正しいまま内訳だけ消えるので、その旨を出す。
+    lines.push(`合計: ${formatHeadline(actual, trend)}`);
+    lines.push(
+      ...treeLines(['内訳が取れませんでした（group_by が効いていない可能性）。合計は正しい値です']),
+    );
   } else {
     lines.push(`合計: ${formatHeadline(actual, trend)}`);
-    lines.push(...formatBreakdownLines(actual));
+    const rows = buildWorkspaceRows({
+      costByWorkspace: actual.byWorkspace,
+      workspaces: detail.kind === 'ok' ? detail.workspaces : null,
+      apiKeys: detail.kind === 'ok' ? detail.apiKeys : null,
+      usageByKey: detail.kind === 'ok' ? detail.usageByKey : null,
+    });
+    lines.push(...renderDailyWorkspaceTree(rows, usd));
     // 名前が引けなかった日は id が並ぶ。理由を書かないと「知らない Workspace に
     // 課金されている」ように読める。
     if (actual.workspaceNamesUnavailable) {
       lines.push('※ Workspace 名を取得できず、一部は ID 表示（金額は正しい）');
     }
+    if (detail.kind === 'ok' && (detail.apiKeys === null || detail.usageByKey === null)) {
+      lines.push('※ キー別の内訳を一部取得できなかった（Workspace の金額は正しい）');
+    }
   }
   lines.push(
     `確認先: [管理画面](${ADMIN_SPEND_URL})・[Anthropic Console](${ANTHROPIC_COST_CONSOLE_URL})`,
   );
-  return { name: ACTUAL_FIELD_NAME, value: lines.join('\n'), inline: false };
-}
-
-/**
- * 今月の累計と月末の見込み。
- * 見込みは平均の単純延長であって予測モデルではない。式をそのまま添えて、
- * どう出した数字かをレポート内で読み切れるようにする。
- */
-function buildTrendField(trend: ActualCostTrend): DiscordField {
   return {
-    name: '今月の累計と見込み',
-    value: [
-      `${trend.elapsedDays} 日分の累計 ${usd(trend.monthToDateUsd)}`,
-      `このペースだと月末に ${usd(trend.projectedMonthEndUsd)}（1 日平均 ${usd(trend.dailyAverageUsd)} × ${trend.daysInMonth} 日）`,
-    ].join('\n'),
+    name: `請求額（${window}・Workspace 別の実額）`,
+    value: clampFieldValue(lines),
     inline: false,
   };
 }
 
 /**
- * 発酵の中身（何件・何人に・1 件いくら）。金額だけでは使われ方の変化が読めない。
- * 0 件の日は「0 人」「1 件あたり -」を並べても読むものが無いので 1 行にする。
+ * 今月の累計（Workspace 別・上限つき）と月末の見込み。
+ * 見込みは平均の単純延長であって予測モデルではない。式をそのまま添えて、
+ * どう出した数字かをレポート内で読み切れるようにする。
  */
-function buildFermentationField(aggregate: CostAggregate): DiscordField {
+function buildMonthField(
+  trend: ActualCostTrend,
+  monthlyRows: WorkspaceRow[] | null,
+  window: string,
+  monthEndLabel: string,
+): DiscordField {
+  const lines = [`合計: ${usd(trend.monthToDateUsd)}（${trend.elapsedDays} 日分）`];
+  if (monthlyRows) {
+    lines.push(...renderMonthlyWorkspaceLines(monthlyRows, WORKSPACE_MONTHLY_LIMITS_USD, usd));
+  }
+  lines.push(
+    `月末（${monthEndLabel}）までの見込み: ${usd(trend.projectedMonthEndUsd)}（1 日平均 ${usd(trend.dailyAverageUsd)} × ${trend.daysInMonth} 日）`,
+  );
+  return { name: `今月の累計（${window}）`, value: clampFieldValue(lines), inline: false };
+}
+
+/** ユーザーの表示名。名前もメールも引けなければ ID の先頭 8 桁に縮退する。 */
+function userLabel(labels: Map<string, string>, userId: string): string {
+  return labels.get(userId) ?? userId.slice(0, 8);
+}
+
+/** 上位 N 人を罫線で並べ、溢れた人数を添える。 */
+function userTree<T extends { userId: string }>(
+  users: T[],
+  labels: Map<string, string>,
+  describe: (user: T) => string,
+): string[] {
+  const top = users.slice(0, TOP_USER_COUNT);
+  const lines = top.map((u) => `${userLabel(labels, u.userId)}: ${describe(u)}`);
+  const rest = users.length - top.length;
+  if (rest > 0) lines.push(`…他 ${rest} 名`);
+  return treeLines(lines);
+}
+
+/**
+ * 発酵の中身（何件・何人に・1 件いくら・誰が）。金額だけでは使われ方の変化が読めない。
+ * 誰の発酵かは名前（profiles.nickname）とメールで書く（#591 のレポートへの指摘）。
+ * Discord は内部運用チャンネルで、載せるのは本人を特定する最低限の情報だけ（日記本文は載せない）。
+ *
+ * ユーザー別の金額は推定。実額と並んだときに注記の無い推定値は「意味の分からない
+ * 2 つ目の金額」にしか見えないので、なぜ推定なのかを 1 行添える。
+ */
+function buildFermentationField(
+  aggregate: CostAggregate,
+  labels: Map<string, string>,
+  window: string,
+): DiscordField {
+  const name = `発酵（${window}）`;
   const count = aggregate.fermentationCount;
-  if (count === 0) return { name: '発酵', value: '0 件', inline: false };
+  if (count === 0) return { name, value: '0 件', inline: false };
 
   const perRun = usd(aggregate.estimatedCostUsd / count);
   const inPerRun = tokens(Math.round(aggregate.inputTokens / count));
   const outPerRun = tokens(Math.round(aggregate.outputTokens / count));
-  return {
-    name: '発酵',
-    value: [
-      `${count} 件（成功 ${aggregate.completedCount} / 失敗 ${aggregate.failedCount}）・${aggregate.byUser.length} 人`,
-      `1 件あたり 推定 ${perRun}（入 ${inPerRun} / 出 ${outPerRun} tok）`,
-    ].join('\n'),
-    inline: false,
-  };
+  const lines = [
+    `${count} 件（成功 ${aggregate.completedCount} / 失敗 ${aggregate.failedCount}）・${aggregate.byUser.length} 人`,
+    `1 件あたり 推定 ${perRun}（入 ${inPerRun} / 出 ${outPerRun} tok）`,
+    ...userTree(
+      aggregate.byUser,
+      labels,
+      (u: UserCostAggregate) => `${u.fermentationCount} 件・推定 ${usd(u.estimatedCostUsd)}`,
+    ),
+    '※ ユーザー別の金額はトークン×単価の推定（実額はユーザー別に取れない）',
+  ];
+  return { name, value: clampFieldValue(lines), inline: false };
+}
+
+/**
+ * ボード OCR / 写真の文字起こしの「誰が何回使ったか」。llm_usage_events が材料。
+ *
+ * 金額は出さない（OCR のモデルは価格表に載せていない。実額は Workspace 別に上で出ている）。
+ * 記録を読めなかったときは 0 回と書かない（migration 未適用だとテーブルが無い）。
+ */
+function buildLlmUsageField(
+  title: string,
+  feature: LlmUsageFeature,
+  usage: LlmUsageResult,
+  labels: Map<string, string>,
+  window: string,
+): DiscordField {
+  const name = `${title}（${window}）`;
+  if (usage.kind === 'error') {
+    return {
+      name,
+      value: `記録を取得できません: ${usage.message.slice(0, 80)}`,
+      inline: false,
+    };
+  }
+  const agg = usage.byFeature[feature];
+  if (agg.count === 0) return { name, value: '0 回', inline: false };
+  const lines = [
+    `${agg.count} 回（成功 ${agg.succeededCount} / 失敗 ${agg.failedCount}）・${agg.byUser.length} 人・入 ${tokens(agg.inputTokens)} / 出 ${tokens(agg.outputTokens)} tok`,
+    ...userTree(
+      agg.byUser,
+      labels,
+      (u) => `${u.count} 回・入 ${tokens(u.inputTokens)} / 出 ${tokens(u.outputTokens)} tok`,
+    ),
+  ];
+  return { name, value: clampFieldValue(lines), inline: false };
 }
 
 /**
  * userId → 表示名「nickname (email)」。片方しか無ければある方。両方無ければ載せない
  * （呼び出し側が ID の先頭 8 桁に縮退する）。
  *
- * 解決に失敗してもレポートは出す。名前が取れないより、レポートが来ない方が困る。
- * listUsers はページングで最大 20 往復するので一括で引き、profiles は対象だけ引く。
+ * 発酵・OCR・写真の文字起こしのユーザーをまとめて 1 回で引く。listUsers はページングで
+ * 最大 20 往復するので、欄ごとに引き直さない。解決に失敗してもレポートは出す。
  */
 async function resolveUserLabels(
   supabase: ReturnType<typeof getSupabaseClient>,
-  byUser: UserCostAggregate[],
+  userIds: string[],
 ): Promise<Map<string, string>> {
   const labels = new Map<string, string>();
-  const targets = byUser.slice(0, TOP_USER_COUNT).map((u) => u.userId);
+  const targets = Array.from(new Set(userIds));
   if (targets.length === 0) return labels;
   try {
     const [emails, nicknames] = await Promise.all([
@@ -276,28 +394,6 @@ async function resolveUserLabels(
     console.error('[cron-cost-alert] user lookup failed', { error: message });
   }
   return labels;
-}
-
-/**
- * ユーザー別内訳。誰の発酵かは名前（profiles.nickname）とメールで書く。
- * 旧版は userId の先頭 8 桁だったが、それでは誰か分からない（#591 のレポートへの指摘）。
- * Discord は内部運用チャンネルで、載せるのは本人を特定する最低限の情報だけ
- * （日記本文は載せない）。admin の /costs 画面がメールを出しているのと同じ扱い。
- *
- * 末尾の注記は「なぜここだけ推定なのか」の説明。実額と並んだときに、注記の無い
- * 推定値は「意味の分からない2つ目の金額」にしか見えない。
- */
-function formatUserBreakdown(byUser: UserCostAggregate[], labels: Map<string, string>): string {
-  if (byUser.length === 0) return 'この日の発酵は 0 件';
-  const top = byUser.slice(0, TOP_USER_COUNT);
-  const lines = top.map(
-    (u) =>
-      `${labels.get(u.userId) ?? u.userId.slice(0, 8)}: ${usd(u.estimatedCostUsd)}（${u.fermentationCount} 件）`,
-  );
-  const rest = byUser.length - top.length;
-  if (rest > 0) lines.push(`…他 ${rest} 名`);
-  lines.push('※ 実額はユーザー別に取れないため、ここだけトークン×単価の推定');
-  return lines.join('\n');
 }
 
 /**
@@ -383,7 +479,7 @@ function buildNotices(params: {
 async function fetchTrend(
   actual: ActualCostResult,
   dateKey: string,
-): Promise<ActualCostTrend | null> {
+): Promise<{ trend: ActualCostTrend; monthlyByWorkspace: WorkspaceActualCost[] } | null> {
   if (actual.kind !== 'ok') return null;
 
   const { start: monthStart } = utcMonthBounds(dateKey);
@@ -393,7 +489,12 @@ async function fetchTrend(
 
   const monthly = await fetchActualCost(rangeStart, targetDayEnd);
   if (monthly.kind !== 'ok') return null;
-  return summarizeActualCostTrend(monthly.daily, dateKey);
+  return {
+    trend: summarizeActualCostTrend(monthly.daily, dateKey),
+    // 月の 1 日は前日比のために前月の 1 日ぶんまで取っている。その日の Workspace 別は
+    // 月ぶんではなくなるので、対象日の内訳（= 今月ぶんのすべて）を使う。
+    monthlyByWorkspace: rangeStart < monthStart ? actual.byWorkspace : monthly.byWorkspace,
+  };
 }
 
 export const cronCostAlert = new Hono()
@@ -441,9 +542,16 @@ export const cronCostAlert = new Hono()
       const { start, end } = utcDayBounds(dateKey);
       const actual = await fetchActualCost(start, end);
 
-      // 前日比・今月の累計・月末の見込み。モデル別内訳（対象日ぶん）と混ざらないよう、
-      // 月ぶんの日別バケットは別呼び出しで取る。
-      const trend = await fetchTrend(actual, dateKey);
+      // 前日比・今月の累計・月末の見込み。対象日の内訳と混ざらないよう、月ぶんは別呼び出し。
+      // キー別のトークン数・Workspace 一覧・OCR の利用記録も、どれも独立なので並行に取る。
+      const [trendResult, detail, llmUsage] = await Promise.all([
+        fetchTrend(actual, dateKey),
+        actual.kind === 'ok'
+          ? fetchUsageDetail(start, end)
+          : Promise.resolve<UsageDetailResult>({ kind: 'not-configured' }),
+        fetchLlmUsage(supabase, { startIso, endIso }),
+      ]);
+      const trend = trendResult?.trend ?? null;
 
       // 閾値判定は実額があれば実額で、なければ推定で行う。
       const thresholdBasisUsd =
@@ -455,9 +563,40 @@ export const cronCostAlert = new Hono()
           ? divergenceRatio(aggregate.estimatedCostUsd, fermentationActualUsd(actual.byWorkspace))
           : null;
 
+      // 欄ごとに期間を名前に置く（「どの数字がいつからいつの話か」を欄単位で読めるように）。
+      const dayWindow = jstTimeRangeOfUtcDay(dateKey);
+      const { start: monthStart, end: monthEnd } = utcMonthBounds(dateKey);
+
+      // 誰が使ったか: 発酵・ボード OCR・写真の文字起こしのユーザーを 1 回でまとめて引く。
+      const usageUserIds =
+        llmUsage.kind === 'ok'
+          ? [...llmUsage.byFeature.ocr_board.byUser, ...llmUsage.byFeature.ocr_entry.byUser].map(
+              (u) => u.userId,
+            )
+          : [];
+      const labels = await resolveUserLabels(supabase, [
+        ...aggregate.byUser.map((u) => u.userId),
+        ...usageUserIds,
+      ]);
+
       // すべて縦に並べる（inline を使わない）。3 カラムは幅次第で崩れて読めない。
-      const fields: DiscordField[] = [buildActualField(actual, trend)];
-      if (trend) fields.push(buildTrendField(trend));
+      const fields: DiscordField[] = [buildActualField(actual, trend, detail, dayWindow)];
+      if (trendResult) {
+        const monthlyRows = buildWorkspaceRows({
+          costByWorkspace: trendResult.monthlyByWorkspace,
+          workspaces: detail.kind === 'ok' ? detail.workspaces : null,
+          apiKeys: null,
+          usageByKey: null,
+        });
+        fields.push(
+          buildMonthField(
+            trendResult.trend,
+            monthlyRows,
+            jstTimeRange(monthStart, end),
+            jstClockLabel(monthEnd),
+          ),
+        );
+      }
       if (actual.kind !== 'ok') {
         // 実額が取れない日だけ、推定が実額の代用として前に出る。
         fields.push({
@@ -467,18 +606,9 @@ export const cronCostAlert = new Hono()
         });
       }
 
-      fields.push(buildFermentationField(aggregate));
-      // 0 件の日はユーザー別も 0 の再掲にしかならない（発酵 0 件で伝わる）。
-      if (aggregate.fermentationCount > 0) {
-        const labels = await resolveUserLabels(supabase, aggregate.byUser);
-        // 全員載っている日に「上位 10」と書くと、載っていない人がいるように読める。
-        const truncatedUsers = aggregate.byUser.length > TOP_USER_COUNT;
-        fields.push({
-          name: truncatedUsers ? `ユーザー別（推定・上位${TOP_USER_COUNT}）` : 'ユーザー別（推定）',
-          value: formatUserBreakdown(aggregate.byUser, labels),
-          inline: false,
-        });
-      }
+      fields.push(buildFermentationField(aggregate, labels, dayWindow));
+      fields.push(buildLlmUsageField('ボード OCR', 'ocr_board', llmUsage, labels, dayWindow));
+      fields.push(buildLlmUsageField('写真の文字起こし', 'ocr_entry', llmUsage, labels, dayWindow));
 
       // 計算そのものを疑う場面でだけ式を出す。
       const basisNeeded =
@@ -557,6 +687,20 @@ export const cronCostAlert = new Hono()
         outputTokens: aggregate.outputTokens,
         userCount: aggregate.byUser.length,
         truncated: rows.truncated,
+        /** ボード OCR / 写真の文字起こしの回数とユーザー数（llm_usage_events）。 */
+        llmUsage:
+          llmUsage.kind === 'ok'
+            ? Object.fromEntries(
+                (['ocr_board', 'ocr_entry'] satisfies LlmUsageFeature[]).map((f) => [
+                  f,
+                  {
+                    count: llmUsage.byFeature[f].count,
+                    failedCount: llmUsage.byFeature[f].failedCount,
+                    userCount: llmUsage.byFeature[f].byUser.length,
+                  },
+                ]),
+              )
+            : { status: 'error', message: llmUsage.message },
         thresholdExceeded,
         notices,
       });
