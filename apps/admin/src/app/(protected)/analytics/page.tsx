@@ -7,6 +7,7 @@ import { ActivityHeatmap } from '@/features/analytics/components/activity-heatma
 import { AnalyticsOverviewCards } from '@/features/analytics/components/analytics-overview';
 import { DailyChart } from '@/features/analytics/components/daily-chart';
 import { PageViewsTable } from '@/features/analytics/components/page-views-table';
+import { PostHogLinks } from '@/features/analytics/components/posthog-links';
 import { useAnalytics } from '@/features/analytics/hooks/use-analytics';
 import { useDateRange } from '@/lib/use-date-range';
 
@@ -22,11 +23,7 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-medium">Analytics</h1>
-          {overview && (
-            <span className="text-sm text-muted-foreground">
-              {overview.totalPageviews.toLocaleString()} pageviews
-            </span>
-          )}
+          <span className="text-sm text-muted-foreground">PostHog · 使われ方</span>
         </div>
         <div className="flex items-center gap-2">
           <DateRangeSelector
@@ -62,6 +59,8 @@ export default function AnalyticsPage() {
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Top Pages</p>
             <PageViewsTable items={pages} />
           </div>
+
+          <PostHogLinks />
         </>
       )}
     </div>

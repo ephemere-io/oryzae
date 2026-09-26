@@ -18,20 +18,65 @@ Oryzae の監視・可観測性の方針。「何をなぜ監視するか」を�
 ## 原則
 
 - **各ツールは1つの関心事に対応する** — 1ツールで全部やろうとしない
-- **未設定でもアプリが動く** — 全監視ツールの env var はオプション。未設定なら silent skip
-- **admin 画面がポータル** — `/observability` でハブ、詳細は各サブページまたは外部ダッシュボード
-- **API で取れるデータは admin に表示する** — 外部ツールに行かなくても概要がわかる状態を保つ
+- **未設定でもアプリは動く。ただし画面では黙らない** — env var はオプションで、未設定なら
+  送信・取得をスキップする。一方で admin の画面は「未設定」「取得失敗」を必ず名指しで出し、
+  空の一覧を「問題なし」と読ませない（2026-09 まで Sentry の DSN が未設定のまま、Errors 画面は
+  「No unresolved errors」を出し続けていた）
+- **監視と連携ツール一覧を分ける** — 監視（Errors / Analytics）は「いまのプロダクトの状態」を見る場所、
+  Tools は「何とつながっていて、その設定は揃っているか」を見る場所
+- **admin は判断に要る要約まで、深掘りはコンソール** — 下の「admin とコンソールの住み分け」
 
-## admin の Observability ページ構成
+## admin のメニュー構成
 
-| パス | データソース | 内容 |
+| メニュー | パス | データソース | 内容 |
+|---|---|---|---|
+| Monitoring → **Errors** | `/errors` | Sentry API | 本番（`environment=production`）の未解決 issue。件数・直近 24h の新規・14 日のイベント推移、issue ごとの発生箇所・回数・人数・初回/最終。送信側 DSN が無い・読み取れないときは注意書き |
+| Monitoring → **Analytics** | `/analytics` | PostHog API | ユーザー数・PV・セッション・滞在時間・ページ別・日別推移 |
+| Operations → **Tools** | `/tools` | 各ツール API + env | 連携ツールの一覧（SSOT）。役割・状態・**環境変数の有無**・admin の詳細・コンソールへのリンク |
+| （Tools 配下） | `/tools/spend` | Anthropic Cost API + DB | 実請求額の日別チャート・**用途別（Workspace 別）の実額内訳**・モデル別内訳（単価の検算用）・推定との乖離・ユーザー別推定内訳 |
+| （Tools 配下） | `/tools/deploys` | Vercel API | デプロイ一覧（状態, ビルド時間, コミットメッセージ） |
+| Operations → **Automation** | `/tools/automation` | コード内の一覧 | CI・E2E・定期監査など勝手に動いているもの |
+| Costs | `/costs` | DB (保存トークン) | **発酵の** per-request 推定コスト詳細（レガシー、将来的に /tools/spend に統合） |
+
+旧 `/observability/*` は `apps/admin/next.config.ts` の redirects で新しい場所へ飛ばす
+（過去の Discord 日次レポートのリンクが指している）。
+
+## admin とコンソールの住み分け
+
+**判断基準: admin には「毎日見て、次に何をするか決めるのに要るもの」と「Oryzae にしか無い文脈」を置く。
+問いごとに組み替える分析と、ツール自体の設定はコンソールで行う。** 外部ツールの画面を admin に
+作り直すと、ツール側が進化するたびに追従コストがかかり、しかも劣化コピーにしかならない。
+
+| | admin に置く | コンソールで見る |
 |---|---|---|
-| `/observability` | 全ツール API | ハブ。各ツールのキー指標をカードで一覧 |
-| `/analytics` | PostHog API | PV・セッション・滞在時間・ページ別・日別推移 |
-| `/observability/errors` | Sentry API | 未解決 issue 一覧（タイトル, 発生回数, 影響ユーザー数） |
-| `/observability/spend` | Anthropic Cost API + DB | 実請求額の日別チャート・**用途別（Workspace 別）の実額内訳**・モデル別内訳（単価の検算用）・推定との乖離・ユーザー別推定内訳 |
-| `/observability/deploys` | Vercel API | デプロイ一覧（状態, ビルド時間, コミットメッセージ） |
-| `/costs` | DB (保存トークン) | **発酵の** per-request 推定コスト詳細（レガシー、将来的に /observability/spend に統合） |
+| **Sentry**（何が壊れたか） | 未解決 issue の一覧（何が・どこで・何回・何人に・いつから）、新規の件数、日別の推移、**送信が届いているかの確認** | スタックトレース・パンくず・エラー時のリプレイ、遅い API のトレース、アラートルール（通知先の設定）、リリース追跡 |
+| **PostHog**（どう使われているか） | 期間ごとの利用者数・PV・セッション・ページ別・日別推移 | ファネル・リテンション・経路（Insights に保存して使う）、特定の人の行動の時系列、Web analytics の流入元、Feature flags |
+| **Vercel** | デプロイ一覧 | ランタイムログ（リクエスト単位）、ビルドログ |
+| **Anthropic** | 実請求額の用途別内訳と推定との突き合わせ（Oryzae のユーザー別は admin にしか出せない） | API キー別の内訳（Console の Cost 画面） |
+
+「どのリクエストで」の答えは 2 段になる。admin の Errors は issue の発生箇所（Sentry の `culprit`）まで、
+その先のリクエスト単位の中身は Sentry の issue（`route` タグ・ユーザー ID・トレース）で見る。
+サーバーの未処理例外には `route`（`/api/v1/entries/:id` のようにパラメータを伏せた形）・メソッド・
+ユーザー ID を付けて送っている（`error-handler.ts`）。**メールと本文は付けない。**
+
+### 日記の本文を送らないための設定
+
+Sentry と PostHog はどちらも、既定のままだと本文が載る経路を持っている。
+
+| 経路 | 塞ぎ方 |
+|---|---|
+| Sentry: 受けたリクエストの本文（既定で 10KB まで添付） | `httpIntegration({ maxIncomingRequestBodySize: 'none' })` と `beforeSend` で `request.data` を削除（`src/lib/sentry-privacy.ts`） |
+| Sentry: エラー時のリプレイ | `maskAllText` / `blockAllMedia`（既定値だが明示） |
+| PostHog: autocapture がクリックした要素の文字 | `mask_all_text: true` |
+| PostHog: セッション録画（画面の文字・通信の本文） | `session_recording` で全文字マスク・本文とヘッダーを記録しない。PostHog 側で録画を ON にしても漏れないよう、コード側で先に塞ぐ |
+
+### Sentry の送信と読み取りは別の設定
+
+- **送信**: `SENTRY_DSN`（サーバー）/ `NEXT_PUBLIC_SENTRY_DSN`（ブラウザ）。client・admin の **両方の** Vercel プロジェクトに要る
+- **読み取り**: `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT`。issue を読むので `event:read` が要る。
+  ソースマップ用の Organization Token（`sntrys_`）では読めない
+- ブラウザ側の初期化は `src/instrumentation-client.ts`。Next 16 は Turbopack でビルドするため、
+  旧来の `sentry.client.config.ts` は**読み込まれない**（2026-09 まではそこに書いてあった）
 
 ## LLM コストの二系統（重要）
 
@@ -203,7 +248,7 @@ LLM を呼ぶ機能ごとに API キーを分け、キーごとに Anthropic の
 ### 既知の限界
 
 - リトライ (`retryOf`) は同じ行を再利用するため、前回試行ぶんのトークンは上書きされる。
-  実額との乖離要因になる（`/observability/spend` の乖離率で観測できる）。
+  実額との乖離要因になる（`/tools/spend` の乖離率で観測できる）。
 - `cost_report` は Priority Tier のコストを含まない（Oryzae は standard のみ利用）。
 - 反映ラグは通常5分程度とされるが、日次レポートは窓が閉じた 1 時間後に読むため
   後から増えることがある（9/23 分は当日 $6.44、翌日の「前日」欄では $8.03）。
@@ -212,6 +257,6 @@ LLM を呼ぶ機能ごとに API キーを分け、キーごとに Anthropic の
 
 1. `.env.example` に環境変数を追加（カテゴリコメント付き）
 2. 未設定時に graceful skip するコードを書く
-3. admin の Observability ハブページにカードを追加
+3. admin の Tools ページ（`tools-table.tsx`）に行を足し、読む環境変数を `admin-tools.ts` の `TOOL_ENV` に足す
 4. 必要なら詳細サブページを作成
 5. Vercel の環境変数に値を設定

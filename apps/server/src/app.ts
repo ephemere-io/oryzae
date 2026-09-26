@@ -19,7 +19,8 @@ import {
   rateLimitOcr,
 } from './contexts/shared/presentation/middleware/rate-limit.js';
 import { adminDashboard } from './contexts/shared/presentation/routes/admin-dashboard.js';
-import { adminObservability } from './contexts/shared/presentation/routes/admin-observability.js';
+import { adminErrors } from './contexts/shared/presentation/routes/admin-errors.js';
+import { adminTools } from './contexts/shared/presentation/routes/admin-tools.js';
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
 import { cronCostAlert } from './contexts/shared/presentation/routes/cron-cost-alert.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
@@ -44,7 +45,8 @@ const app = new Hono()
   .route('/api/v1/admin/fermentations', adminFermentations)
   .route('/api/v1/admin/questions', adminQuestions)
   .route('/api/v1/admin/analytics', adminAnalytics)
-  .route('/api/v1/admin/observability', adminObservability)
+  .route('/api/v1/admin/errors', adminErrors)
+  .route('/api/v1/admin/tools', adminTools)
   .use('/api/v1/*', authMiddleware)
   .use('/api/v1/*', rateLimitGeneral())
   // 文字起こしは 1 リクエストが LLM の実費なので general の上にさらに絞った枠を重ねる。

@@ -31,6 +31,16 @@ test.describe('ダッシュボード', () => {
     await page.click('nav >> a:has-text("Analytics")');
     await expect(page).toHaveURL(/\/analytics/);
 
+    // Navigate to Errors (Sentry)
+    await page.click('nav >> a:has-text("Errors")');
+    await expect(page).toHaveURL(/\/errors/);
+    await expect(page.getByRole('heading', { name: 'Errors' })).toBeVisible();
+
+    // Navigate to Tools (連携ツールの一覧)
+    await page.click('nav >> a:has-text("Tools")');
+    await expect(page).toHaveURL(/\/tools$/);
+    await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible();
+
     // Back to Dashboard
     await page.click('nav >> a:has-text("Dashboard")');
     await expect(page).toHaveURL(/\/dashboard/);

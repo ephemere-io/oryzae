@@ -3,13 +3,14 @@
 import {
   Activity,
   Bot,
+  Bug,
   DollarSign,
-  Eye,
   FlaskConical,
   HelpCircle,
   LayoutDashboard,
   LogOut,
   Moon,
+  Plug,
   Sun,
   Users,
 } from 'lucide-react';
@@ -20,21 +21,56 @@ import { useTheme } from '@/lib/use-theme';
 import { cn } from '@/lib/utils';
 import { useAdminAuth } from '../hooks/use-admin-auth';
 
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/users', label: 'Users', icon: Users },
-  { href: '/questions', label: 'Questions', icon: HelpCircle },
-  { href: '/fermentations', label: 'Fermentations', icon: FlaskConical },
-  { href: '/costs', label: 'Costs', icon: DollarSign },
-  { href: '/analytics', label: 'Analytics', icon: Activity },
-  { href: '/observability', label: 'Observability', icon: Eye },
-  // 「勝手に回っているもの」の一覧。Observability の配下にあるが、
-  // 探しに行くものではなく気づくべきものなので、サイドバーにも出す。
-  { href: '/observability/automation', label: 'Automation', icon: Bot },
+/**
+ * 監視は「何が壊れたか（Sentry）」と「どう使われているか（PostHog）」を分けて置く。
+ * Tools は連携ツールの一覧（SSOT）で、監視の画面ではない。
+ * 住み分けは docs/observability-guide.md。
+ */
+const NAV_SECTIONS = [
+  {
+    label: null,
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/users', label: 'Users', icon: Users },
+      { href: '/questions', label: 'Questions', icon: HelpCircle },
+      { href: '/fermentations', label: 'Fermentations', icon: FlaskConical },
+      { href: '/costs', label: 'Costs', icon: DollarSign },
+    ],
+  },
+  {
+    label: 'Monitoring',
+    items: [
+      { href: '/errors', label: 'Errors', icon: Bug },
+      { href: '/analytics', label: 'Analytics', icon: Activity },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { href: '/tools', label: 'Tools', icon: Plug },
+      // 「勝手に回っているもの」の一覧。Tools の配下にあるが、
+      // 探しに行くものではなく気づくべきものなので、サイドバーにも出す。
+      { href: '/tools/automation', label: 'Automation', icon: Bot },
+    ],
+  },
 ];
+
+/**
+ * いま光らせる項目。いちばん長く一致したものを 1 つだけ選ぶ。
+ * /tools/automation は Tools の配下でもあるので、前方一致だけだと 2 つ光る。
+ */
+function findActiveHref(pathname: string): string | null {
+  let best: string | null = null;
+  for (const item of NAV_SECTIONS.flatMap((s) => s.items)) {
+    const matches = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    if (matches && (best === null || item.href.length > best.length)) best = item.href;
+  }
+  return best;
+}
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const activeHref = findActiveHref(pathname);
   const router = useRouter();
   const { auth, logout } = useAdminAuth();
   const { theme, toggle } = useTheme();
@@ -65,26 +101,38 @@ export function AdminSidebar() {
         </Link>
 
         {/* Nav */}
-        <nav className="flex-1 space-y-0.5 px-2.5 pt-2">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={collapsed ? item.label : undefined}
-                className={cn(
-                  'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
-                  isActive
-                    ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
-                )}
-              >
-                <item.icon className="h-3.5 w-3.5 shrink-0" />
-                {!collapsed && item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 space-y-3 px-2.5 pt-2">
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label ?? 'main'} className="space-y-0.5">
+              {section.label &&
+                (collapsed ? (
+                  <div className="mx-2.5 my-1 border-t border-sidebar-border" />
+                ) : (
+                  <p className="px-2.5 pb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {section.label}
+                  </p>
+                ))}
+              {section.items.map((item) => {
+                const isActive = item.href === activeHref;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={collapsed ? item.label : undefined}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors',
+                      isActive
+                        ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                    )}
+                  >
+                    <item.icon className="h-3.5 w-3.5 shrink-0" />
+                    {!collapsed && item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Bottom section */}

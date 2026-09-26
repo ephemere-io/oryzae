@@ -12,6 +12,7 @@ const analyticsOverviewSchema = z.object({
   avgSessionDurationSeconds: z.number(),
   entryPageViews: z.number(),
   jarPageViews: z.number(),
+  uniqueUsers: z.number(),
 });
 
 const pageViewItemSchema = z.object({
