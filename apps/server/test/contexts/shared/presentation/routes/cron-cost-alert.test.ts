@@ -936,7 +936,7 @@ describe('cronCostAlert', () => {
       expect(fieldValue('今月の累計')).toBe(
         [
           '合計: $0.5000（8 日分）',
-          '└ Default Workspace: $0.5000（上限なし）',
+          '└ Default Workspace: $0.5000',
           '月末（9/1 9:00 (JST)）までの見込み: $1.94（1 日平均 $0.0625 × 31 日）',
         ].join('\n'),
       );
@@ -1161,7 +1161,7 @@ describe('cronCostAlert', () => {
     });
   });
 
-  describe('Workspace ごとのキーと今月の上限', () => {
+  describe('Workspace ごとのキーと今月の累計', () => {
     it('すべての Workspace を並べ、配下にキーとトークン数をぶら下げる', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
       fetchQueue
@@ -1215,7 +1215,7 @@ describe('cronCostAlert', () => {
       );
     });
 
-    it('今月の累計は Workspace ごとに上限と割合を添える', async () => {
+    it('今月の累計は Workspace ごとの額を出す（上限は出さない）', async () => {
       vi.stubEnv('ANTHROPIC_ADMIN_KEY', 'sk-ant-admin01-test');
       fetchQueue
         .mockResolvedValueOnce(costReportResponse([{ amount: '100', workspace_id: 'ws_ferm' }]))
@@ -1246,7 +1246,7 @@ describe('cronCostAlert', () => {
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
 
       expect(fieldValue('今月の累計')).toContain(
-        '├ oryzae-prod-fermentation: $3.00 / 上限 $30.00（10%）\n└ Default Workspace: $0（上限なし）',
+        '├ oryzae-prod-fermentation: $3.00\n└ Default Workspace: $0',
       );
     });
   });

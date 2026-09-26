@@ -183,31 +183,21 @@ describe('renderDailyWorkspaceTree', () => {
 });
 
 describe('renderMonthlyWorkspaceLines', () => {
-  it('上限のある Workspace は「額 / 上限（割合）」、Default は上限なしと書く', () => {
+  it('Workspace ごとの額を並べる（上限は出さない）', () => {
     const rows = buildWorkspaceRows({
       costByWorkspace: [
         cost('ws_ferm', 'oryzae-prod-fermentation', 3),
         cost(null, 'Default Workspace', 31.02),
       ],
-      workspaces: WORKSPACES.slice(0, 1),
+      workspaces: WORKSPACES.slice(0, 2),
       apiKeys: null,
       usageByKey: null,
     });
 
-    expect(renderMonthlyWorkspaceLines(rows, { 'oryzae-prod-fermentation': 30 }, usd)).toEqual([
-      '├ oryzae-prod-fermentation: $3.00 / 上限 $30.00（10%）',
-      '└ Default Workspace: $31.02（上限なし）',
+    expect(renderMonthlyWorkspaceLines(rows, usd)).toEqual([
+      '├ oryzae-prod-fermentation: $3.00',
+      '├ oryzae-prod-ocr: $0.0000',
+      '└ Default Workspace: $31.02',
     ]);
-  });
-
-  it('上限を登録していない Workspace は額だけを出す', () => {
-    const rows = buildWorkspaceRows({
-      costByWorkspace: [],
-      workspaces: [{ id: 'ws_new', name: 'oryzae-new' }],
-      apiKeys: null,
-      usageByKey: null,
-    });
-
-    expect(renderMonthlyWorkspaceLines(rows, {}, usd)[0]).toBe('├ oryzae-new: $0.0000');
   });
 });

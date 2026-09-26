@@ -65,21 +65,6 @@ const DIVERGENCE_NOTICE_RATIO = 0.05;
  */
 const ADMIN_SPEND_URL = 'https://oryzae-admin.vercel.app/observability/spend';
 
-/**
- * Workspace ごとの月の支出上限（USD）。**Anthropic Console の設定を手で写したもの。**
- *
- * 上限は API で読めない（支出上限 API は Claude Enterprise 契約専用で、Console の契約では
- * 使えない）。Console で上限を変えたらここも直すこと。直し忘れると、レポートに古い上限と
- * 割合が出続ける。ここに無い Workspace は額だけを出す。
- * Default Workspace には上限を設定できない（Anthropic の仕様）。
- */
-const WORKSPACE_MONTHLY_LIMITS_USD: Readonly<Record<string, number>> = {
-  'oryzae-prod-fermentation': 30,
-  'oryzae-prod-ocr': 15,
-  'oryzae-dev': 20,
-  'oryzae-ci': 10,
-};
-
 interface DiscordField {
   name: string;
   value: string;
@@ -259,7 +244,7 @@ function buildActualField(
 }
 
 /**
- * 今月の累計（Workspace 別・上限つき）と月末の見込み。
+ * 今月の累計（Workspace 別）と月末の見込み。
  * 見込みは平均の単純延長であって予測モデルではない。式をそのまま添えて、
  * どう出した数字かをレポート内で読み切れるようにする。
  */
@@ -271,7 +256,7 @@ function buildMonthField(
 ): DiscordField {
   const lines = [`合計: ${usd(trend.monthToDateUsd)}（${trend.elapsedDays} 日分）`];
   if (monthlyRows) {
-    lines.push(...renderMonthlyWorkspaceLines(monthlyRows, WORKSPACE_MONTHLY_LIMITS_USD, usd));
+    lines.push(...renderMonthlyWorkspaceLines(monthlyRows, usd));
   }
   lines.push(
     `月末（${monthEndLabel}）までの見込み: ${usd(trend.projectedMonthEndUsd)}（1 日平均 ${usd(trend.dailyAverageUsd)} × ${trend.daysInMonth} 日）`,

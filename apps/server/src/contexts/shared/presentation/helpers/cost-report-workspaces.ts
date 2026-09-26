@@ -156,26 +156,16 @@ export function renderDailyWorkspaceTree(
 }
 
 /**
- * 今月の Workspace 別。上限を持つ Workspace には「使った額 / 上限（割合）」を出す。
+ * 今月の Workspace 別の額。
  *
- * 上限は Anthropic の API では読めない（支出上限 API は Enterprise 契約専用）。
- * 渡される値は Console の設定を手で写したもので、ずれていれば古い上限が出る。
+ * 上限（Console で設定した支出上限）は出さない。Anthropic の API では読めず
+ * （支出上限 API は Enterprise 契約専用）、コードに写すと Console とずれていくため。
  */
 export function renderMonthlyWorkspaceLines(
   rows: WorkspaceRow[],
-  limitsUsd: Readonly<Record<string, number>>,
   formatUsd: (value: number) => string,
 ): string[] {
-  return rows.map((row, i) => {
-    const branch = i === rows.length - 1 ? '└' : '├';
-    const limit = limitsUsd[row.name];
-    let suffix = '';
-    if (row.id === null) {
-      // Default Workspace には上限を設定できない（Anthropic の仕様）。
-      suffix = '（上限なし）';
-    } else if (limit !== undefined && limit > 0) {
-      suffix = ` / 上限 ${formatUsd(limit)}（${Math.round((row.costUsd / limit) * 100)}%）`;
-    }
-    return `${branch} ${row.name}: ${formatUsd(row.costUsd)}${suffix}`;
-  });
+  return rows.map(
+    (row, i) => `${i === rows.length - 1 ? '└' : '├'} ${row.name}: ${formatUsd(row.costUsd)}`,
+  );
 }
