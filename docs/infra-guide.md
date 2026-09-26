@@ -62,6 +62,7 @@ client と admin で別プロジェクト。ビルド順序: shared → server �
 | AI | `ANTHROPIC_API_KEY_FERMENTATION` / `_OCR_BOARD` / `_OCR_ENTRY` | 機能ごとの LLM 呼び出し。キーごとに Workspace を分けてあり、それが用途別の実額になる。共通キーへのフォールバックは無く、未設定なら落ちる（`anthropic-provider.ts`）。`oryzae-client` と `oryzae-admin` の両方に要る（admin からも発酵を手動実行できるため） |
 | AI | `ANTHROPIC_ADMIN_KEY` | 実請求額の取得（Admin API `cost_report`・List Workspaces）。コスト日次レポート・admin Spend 画面。Workspace に紐づかない Admin キーでないと読めない。モデルは叩けないので課金は発生しない。未設定でも動作（推定のみになる） |
 | AI（CI） | `ANTHROPIC_API_KEY_CI`（GitHub Secrets） | 月 2 回の定期セキュリティ監査。Workspace `oryzae-ci` |
+| AI | `TYPESAFE_API_KEY` | ヘルプの検索（`POST /api/v1/help/search`）だけが使う。書かれた「したいこと」を TypeSafe AI System One（Jev）で話題へ振り分ける。任意。未設定なら手元の照合だけで動く |
 | PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `POSTHOG_PERSONAL_API_KEY` | ユーザー行動分析 |
 | Sentry | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | エラー監視 |
 | Upstash | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | API レート制限 |

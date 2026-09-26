@@ -16,12 +16,14 @@ import { publicCors } from './contexts/shared/presentation/middleware/public-cor
 import {
   rateLimitAuth,
   rateLimitGeneral,
+  rateLimitHelp,
   rateLimitOcr,
 } from './contexts/shared/presentation/middleware/rate-limit.js';
 import { adminDashboard } from './contexts/shared/presentation/routes/admin-dashboard.js';
 import { adminObservability } from './contexts/shared/presentation/routes/admin-observability.js';
 import { authRoutes } from './contexts/shared/presentation/routes/auth.js';
 import { cronCostAlert } from './contexts/shared/presentation/routes/cron-cost-alert.js';
+import { helpSearch } from './contexts/shared/presentation/routes/help-search.js';
 import { adminUsers } from './contexts/user/presentation/routes/admin-users.js';
 import { signupRoutes } from './contexts/user/presentation/routes/signup.js';
 import { userMe } from './contexts/user/presentation/routes/user-me.js';
@@ -50,12 +52,15 @@ const app = new Hono()
   // 文字起こしは 1 リクエストが LLM の実費なので general の上にさらに絞った枠を重ねる。
   // route 登録より前に置かないと適用されない。
   .use('/api/v1/entries/photos/transcribe', rateLimitOcr())
+  // ヘルプの検索も、書かれた自由文をそのまま有料の外部 API（Jev）へ転送するので同じく絞る。
+  .use('/api/v1/help/search', rateLimitHelp())
   .route('/api/v1/users/me', userMe)
   .route('/api/v1/board', board)
   .route('/api/v1/entries', entries)
   .route('/api/v1/questions', questions)
   .route('/api/v1/entries/:entryId/questions', entryQuestions)
   .route('/api/v1/fermentations', fermentations)
-  .route('/api/v1/jar/layout', jarLayout);
+  .route('/api/v1/jar/layout', jarLayout)
+  .route('/api/v1/help/search', helpSearch);
 
 export default app;

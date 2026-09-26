@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
 import type { AccountUser } from '@/features/shared/account/types';
+import { useHelpMode } from '@/features/shared/help/help-context';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
 import { docsHref } from '@/lib/docs-site';
 import { setLocaleAction } from '@/lib/i18n-actions';
@@ -30,6 +31,7 @@ interface SpAccountPageProps {
  */
 export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
   const t = useTranslations('account');
+  const locale = useLocale();
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
 
@@ -82,9 +84,11 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
           <ThemeRow />
           <LanguageRow />
 
-          {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
+          <HelpModeRow />
+
+          {/* よくある質問・お問い合わせとプライバシーポリシーは公開サイト（別ドメイン）にある */}
           <a
-            href={docsHref('/support')}
+            href={docsHref('/support', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm"
@@ -93,7 +97,7 @@ export function SpAccountPage({ user, onLogout }: SpAccountPageProps) {
             {t('links.support')} →
           </a>
           <a
-            href={docsHref('/privacy')}
+            href={docsHref('/privacy', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm"
@@ -216,6 +220,48 @@ function ThemeRow() {
       >
         {t('theme.toggle')}
       </button>
+    </div>
+  );
+}
+
+/**
+ * ヘルプモード。有効なら書斎の右上に「?」が居て、押すと使い方のシートが開く。
+ *
+ * SP の「?」は書斎（`/`）にしか無い。瓶・板・一覧・ここから開く道が無かったので、
+ * 有効な間は「開く」も並べる。
+ */
+function HelpModeRow() {
+  const t = useTranslations('account');
+  const help = useHelpMode();
+  const buttonClass =
+    'rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium';
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="mb-1 text-xs uppercase tracking-[0.1em] opacity-50">{t('help_mode.label')}</p>
+        <p className="text-sm">{help.enabled ? t('help_mode.on') : t('help_mode.off')}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        {help.enabled ? (
+          <button
+            type="button"
+            onClick={() => help.openHelp()}
+            className={buttonClass}
+            style={{ color: 'var(--accent)' }}
+          >
+            {t('help_mode.open')}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => help.setEnabled(!help.enabled)}
+          aria-pressed={help.enabled}
+          className={buttonClass}
+          style={{ color: 'var(--accent)' }}
+        >
+          {t('help_mode.toggle')}
+        </button>
+      </div>
     </div>
   );
 }

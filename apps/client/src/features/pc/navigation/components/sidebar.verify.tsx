@@ -133,8 +133,10 @@ registerUnit<Props>({
       id: 'labels-follow-collapsed',
       description: '畳んでいるときはメニュー名を出さず、開いているときは全ての行に出す',
       check: ({ root, contract }) => {
-        // 行き先だけでなく、下にまとめた「使い方」「アカウント」も同じ規則に従う。
-        const rows = Array.from(root.querySelectorAll<HTMLElement>('nav a'));
+        // 行き先だけでなく、下にまとめた「使い方」（button）「アカウント」も同じ規則に従う。
+        const rows = Array.from(
+          root.querySelectorAll<HTMLElement>('nav [data-verify-unit="NavRow"]'),
+        );
         // アイコンの span に加えて名前の span があるか（畳んでいるときは1つだけ）。
         const withLabel = rows.filter((l) => l.querySelectorAll(':scope > span').length > 1);
         const expected = contract.collapsed === 'true' ? 0 : rows.length;
@@ -145,19 +147,17 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'help-leaves-the-app',
-      // 使い方は別ドメインの公開サイトにある（Issue #532）。相対パスで書くとアプリ内で
-      // 404 になるので、絶対 URL で新しいタブに開くことを固定する。
-      description: '「使い方」は公開サイトへ、新しいタブで出る',
+      id: 'help-toggles-in-app',
+      // 使い方はアプリの中のヘルプの面（右）。以前は公開サイトを新しいタブで開いていたが、
+      // ヘルプがアプリに入ったので、列の中では押して開閉する button になった。
+      // 外へ出るリンクが列に残っていないことも固定する（公開サイトへは面の中から）。
+      description: '「使い方」はアプリの中で開閉する button。列に外へ出るリンクは無い',
       check: ({ root }) => {
-        const help = root.querySelector<HTMLAnchorElement>('nav a[target="_blank"]');
-        if (!help) return '公開サイトへのリンクが無い';
-        if (!/^https?:\/\//.test(help.getAttribute('href') ?? '')) {
-          return `href が絶対 URL でない: "${help.getAttribute('href')}"`;
-        }
+        const help = root.querySelector<HTMLElement>('nav button[data-help="help"]');
+        if (!help) return '「使い方」の button が無い';
+        if (!help.hasAttribute('aria-pressed')) return '開閉の状態（aria-pressed）が無い';
         return (
-          (help.getAttribute('rel') ?? '').includes('noopener') ||
-          'rel に noopener が無い（新しいタブに開くリンクには必須）'
+          root.querySelector('nav a[target="_blank"]') === null || '列に外へ出るリンクが残っている'
         );
       },
     },

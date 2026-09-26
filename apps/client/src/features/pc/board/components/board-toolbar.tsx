@@ -149,6 +149,7 @@ export function BoardToolbar({
         selectedCount: selection?.count ?? 0,
         toolCount: selection ? cardActions.length : tools.length,
       }}
+      help="board"
       storage={STORAGE}
       dockBottom={BOARD_INSET}
       collapseLabel={t('collapse')}

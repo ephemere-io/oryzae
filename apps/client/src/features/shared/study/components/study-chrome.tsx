@@ -35,6 +35,8 @@ export function StudyChrome({ initial, avatarUrl }: StudyChromeProps) {
       <Link
         href="/account"
         aria-label={t('account')}
+        // ヘルプが開いているとき、ここに触れたら「アカウント」を出す。
+        data-help="account"
         className="pointer-events-auto absolute bottom-6 left-6 flex h-10 w-10 items-center justify-center rounded-full transition-opacity duration-300 hover:opacity-80"
         style={glass}
       >

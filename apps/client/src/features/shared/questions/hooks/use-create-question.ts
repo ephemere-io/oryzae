@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
+import { notifyActivity } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 
 /**
@@ -20,6 +21,8 @@ export function useCreateQuestion(api: ApiClient | null) {
         body: JSON.stringify({ string: text }),
       });
       if (!res.ok) return null;
+      // 立てられたら合図を出す（ヘルプの三歩 ① が進む）。id が読めるかは別の話。
+      notifyActivity('question');
       const data: unknown = await res.json();
       if (typeof data !== 'object' || data === null || !('id' in data)) return null;
       return typeof data.id === 'string' ? data.id : null;

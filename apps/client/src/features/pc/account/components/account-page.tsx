@@ -7,6 +7,7 @@ import { BackLink } from '@/components/ui/back-link';
 import { useAccountApi } from '@/features/shared/account/hooks/use-account-api';
 import type { AccountUser } from '@/features/shared/account/types';
 import { translateAuthError } from '@/features/shared/auth/error-messages';
+import { useHelpMode } from '@/features/shared/help/help-context';
 import { isLocale, LOCALE_OPTIONS } from '@/i18n/config';
 import { docsHref } from '@/lib/docs-site';
 import { setLocaleAction } from '@/lib/i18n-actions';
@@ -363,6 +364,40 @@ function PasswordChangeSection({ isOAuthOnly }: { isOAuthOnly: boolean }) {
   );
 }
 
+/**
+ * ヘルプモード。有効なら画面の右上に「?」が居て、押すと使い方の面が開く。
+ * テーマの行と同じ形（名前・いまの値・切り替え）。
+ */
+function HelpModeSection() {
+  const t = useTranslations('account');
+  const help = useHelpMode();
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className={labelClass} style={labelStyle}>
+          {t('help_mode.label')}
+        </p>
+        <p className="text-sm" style={{ color: 'var(--fg)' }}>
+          {help.enabled ? t('help_mode.on') : t('help_mode.off')}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => help.setEnabled(!help.enabled)}
+        aria-pressed={help.enabled}
+        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+        style={{
+          color: 'var(--accent)',
+          border: '1px solid var(--border-subtle)',
+        }}
+      >
+        {t('help_mode.toggle')}
+      </button>
+    </div>
+  );
+}
+
 function ThemeToggleSection() {
   const t = useTranslations('account');
   const { theme, toggle } = useTheme();
@@ -474,6 +509,7 @@ function Divider() {
 
 export function AccountPage({ user, onLogout }: AccountPageProps) {
   const t = useTranslations('account');
+  const locale = useLocale();
   const { updateProfile: saveProfile } = useAccountApi();
   const displayName = user.nickname ?? user.name ?? user.email.split('@')[0];
   const initials = displayName.charAt(0).toUpperCase();
@@ -488,6 +524,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
   return (
     <div
       {...verifyAttrs({ unit: 'AccountPage', hasAvatar: Boolean(user.avatarUrl), isOAuthOnly })}
+      data-help="account"
       className="mx-auto max-w-2xl px-6 py-12"
     >
       {/* 左上の出口（書斎が無効なら描かれない）。本文の列は中央に寄っているので隅に置く。 */}
@@ -581,12 +618,13 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
           {t('section.settings')}
         </h2>
         <div className="flex flex-col gap-6">
+          <HelpModeSection />
           <ThemeToggleSection />
           <LanguageSection />
 
           {/* 使い方・プライバシーポリシーは公開サイト（別ドメイン）にある */}
           <a
-            href={docsHref('/support')}
+            href={docsHref('/support', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm underline-offset-2 transition-colors hover:underline"
@@ -596,7 +634,7 @@ export function AccountPage({ user, onLogout }: AccountPageProps) {
           </a>
 
           <a
-            href={docsHref('/privacy')}
+            href={docsHref('/privacy', locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm underline-offset-2 transition-colors hover:underline"

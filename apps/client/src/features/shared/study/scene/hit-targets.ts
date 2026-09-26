@@ -11,6 +11,23 @@ import type { Notebook, StudyTarget } from '../types';
 /** ヒットボックスに貼る識別子。`Object3D.userData.hitId` に入れる。 */
 export type HitId = string;
 
+/** 棚の枠の的。背表紙（`spine-*`）を包む。 */
+export const SHELF_HIT_ID: HitId = 'shelf';
+const SPINE_HIT_PREFIX = 'spine-';
+
+/**
+ * 手前から並んだ当たりのうち、採る 1 つ。
+ *
+ * 棚の枠の当たりは背表紙の当たりを包んでいるので、背表紙を狙った光線もいつも枠の手前の面に
+ * 先に当たる。枠が先頭なら、その奥に背表紙があれば背表紙を採り、無ければ枠を採る。
+ * 枠以外が先頭ならそのまま（棚の奥の板を拾うような遠い当たりは見ない）。
+ */
+export function pickNearestHit(ids: readonly HitId[]): HitId | null {
+  const first = ids[0] ?? null;
+  if (first !== SHELF_HIT_ID) return first;
+  return ids.find((id) => id.startsWith(SPINE_HIT_PREFIX)) ?? first;
+}
+
 /**
  * ホバーで出す一言の種類。
  *
@@ -79,9 +96,12 @@ export function buildHitRegistry(options: {
     });
   });
 
-  if (options.shelfAsSingleTarget) {
-    registry.add({ id: 'shelf', target: { kind: 'archive' }, label: 'archive', month: null });
-  } else {
+  // 棚の枠。SP はこれだけ（背表紙 1 本は指より細く、当たりを広げると隣の月を拾う）。
+  // PC は背表紙の的に加えて枠も的にする — 過去の月がまだ無い人の棚は背表紙が 0 本で、
+  // 触れても何も起きなかった（ヘルプの見取り図で ARCHIVE が灯らない、と報告された）。
+  // 背表紙の隙間や枠に触れたときも「棚」。押すと全月の一覧へ。
+  registry.add({ id: SHELF_HIT_ID, target: { kind: 'archive' }, label: 'archive', month: null });
+  if (!options.shelfAsSingleTarget) {
     options.shelf.forEach((notebook, index) => {
       registry.add({
         id: `spine-${index}`,

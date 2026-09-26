@@ -212,6 +212,8 @@ export function SettingsDrawer({
     <div
       className="flex flex-col pt-4"
       style={{ fontFamily: 'Inter, "Noto Sans JP", sans-serif' }}
+      // ヘルプが開いているとき、この面に触れたら「書く」を出す（縦書き・写真もそこにある）。
+      data-help="write"
       {...verifyAttrs({
         unit: 'SettingsDrawer',
         timeInscriptionEnabled: settings.timeInscriptionEnabled,

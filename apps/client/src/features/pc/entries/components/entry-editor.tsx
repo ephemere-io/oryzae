@@ -1124,6 +1124,8 @@ export function EntryEditor({
     {
       id: 'pickle',
       label: t('toolbar.pickle'),
+      // 三歩の ③「瓶に漬けて待つ」の的。
+      tutorial: 'pickle',
       disabledReason: !content.trim() ? t('palette.pickle_needs_body') : undefined,
       icon: paletteIcon(
         <>
@@ -1587,7 +1589,8 @@ export function EntryEditor({
 
   return (
     <div
-      className="sidebar-anchored fixed top-0 right-0 bottom-0 z-50 flex bg-[var(--bg)]"
+      // 右端は .sidebar-anchored が --help-width から決める（ヘルプの面を覆わない）。
+      className="sidebar-anchored fixed top-0 bottom-0 z-50 flex bg-[var(--bg)]"
       {...verifyAttrs({
         unit: 'EntryEditor',
         hasEntry: !!entryId,
@@ -1631,10 +1634,12 @@ export function EntryEditor({
             />
           </div>
 
-          {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。 */}
+          {/* 右: 日付 → 設定だけ。**操作はここに置かない**（フローティングのパレットへ移した）。
+              右上にはヘルプの「?」が居る（`--help-toggle-reserve`、無ければ 0）ので、
+              その席のぶん内側に寄せる。歯車の真上に「?」が重なっていた。 */}
           <div
             className="flex min-w-0 items-center justify-end gap-3"
-            style={{ height: SHELL_ROW_HEIGHT }}
+            style={{ height: SHELL_ROW_HEIGHT, paddingRight: 'var(--help-toggle-reserve, 0px)' }}
           >
             {/* 日付は設定ボタンのすぐ左に、小さく。 */}
             <span className="shrink-0 text-[12px] text-[var(--date-color)]">{dateStr}</span>
@@ -1707,7 +1712,7 @@ export function EntryEditor({
         {/* Ghost layer — must be above editor (z-50) */}
         <div
           ref={ghostLayerRef}
-          className="sidebar-anchored pointer-events-none fixed top-0 right-0 bottom-0 z-[51] overflow-hidden"
+          className="sidebar-anchored pointer-events-none fixed top-0 bottom-0 z-[51] overflow-hidden"
         />
 
         {/* 本文と発酵サイドバーを横に並べる（Issue #466）。本文の上には何も重ねない。 */}

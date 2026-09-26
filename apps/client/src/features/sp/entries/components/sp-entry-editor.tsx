@@ -42,6 +42,11 @@ interface SpEntryEditorProps {
    * 孤立検証（verify）では localStorage が fixture をまたいで漏れるため false にする。
    */
   persistDraft?: boolean;
+  /**
+   * 瓶に納め終えたら呼ぶ。初めての手紙の依頼など、ドメインをまたぐ後始末は page が持つ
+   * （entries → fermentation は reach-slice-isolation で結べない）。遷移はしない。
+   */
+  onPickled?: () => void;
 }
 
 /** content の先頭行をタイトル、残りを本文に分ける（エディタの保存形式）。 */
@@ -68,6 +73,7 @@ export function SpEntryEditor({
   initialMediaUrls,
   initialMediaSignedUrls,
   persistDraft = true,
+  onPickled,
 }: SpEntryEditorProps) {
   const t = useTranslations('sp.editor');
   const tDelete = useTranslations('entries.delete_modal');
@@ -313,6 +319,7 @@ export function SpEntryEditor({
     if (saved) {
       setPickled(true);
       clearDraft(); // 発酵させたら確定。書きかけドラフトは破棄する。
+      onPickled?.();
     }
   }
 
@@ -403,6 +410,8 @@ export function SpEntryEditor({
       <div className="px-5 pt-4">
         <button
           type="button"
+          // 三歩の ②「エントリーを書く（問いを結ぶ）」の的。
+          data-tutorial="write"
           onClick={openQuestionSheet}
           className="max-w-full truncate rounded-full px-3 py-1.5 text-xs"
           style={
@@ -477,6 +486,8 @@ export function SpEntryEditor({
         <div className="sp-rise mx-4 mb-4">
           <button
             type="button"
+            // 三歩の ③「瓶に漬けて待つ」の的。
+            data-tutorial="pickle"
             onClick={handlePickle}
             disabled={pickling || pickled}
             aria-label={t('ferment_title')}

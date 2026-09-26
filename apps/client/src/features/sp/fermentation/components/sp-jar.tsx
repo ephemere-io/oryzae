@@ -151,6 +151,8 @@ export function SpJar({ api, questions, loading, onManageQuestions }: SpJarProps
       <div className="flex justify-center px-5 pb-7 pt-2">
         <button
           type="button"
+          // SP で問いを立てる入口はここ（→ SpQuestions の追加ボタン）。三歩 ① の的。
+          data-tutorial="question"
           onClick={onManageQuestions}
           className="rounded-full px-6 py-3 text-sm"
           style={{

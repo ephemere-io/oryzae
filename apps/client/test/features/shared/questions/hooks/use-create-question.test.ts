@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCreateQuestion } from '@/features/shared/questions/hooks/use-create-question';
+import { ACTIVITY_EVENT, readActivityKind } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 
 /**
@@ -16,18 +17,32 @@ function jsonResponse(body: unknown, ok = true): Response {
   return { ok, status: ok ? 200 : 400, json: () => Promise.resolve(body) } as Response;
 }
 
+/** window に出た合図の種類を集める（ヘルプの三歩が聞くもの）。 */
+function collectActivity(): { kinds: string[]; stop: () => void } {
+  const kinds: string[] = [];
+  const listen = (e: Event) => {
+    const kind = readActivityKind(e);
+    if (kind) kinds.push(kind);
+  };
+  window.addEventListener(ACTIVITY_EVENT, listen);
+  return { kinds, stop: () => window.removeEventListener(ACTIVITY_EVENT, listen) };
+}
+
 describe('useCreateQuestion', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('作成した問いの id を返す', async () => {
+  it('作成した問いの id を返し、合図 question を出す', async () => {
     const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse({ id: 'q-new' })));
     const { result } = renderHook(() => useCreateQuestion(createMockApi(fetchImpl)));
+    const activity = collectActivity();
 
     await expect(result.current('なぜ書くのか')).resolves.toBe('q-new');
     expect(fetchImpl).toHaveBeenCalledWith('/api/v1/questions', {
       method: 'POST',
       body: JSON.stringify({ string: 'なぜ書くのか' }),
     });
+    activity.stop();
+    expect(activity.kinds).toEqual(['question']);
   });
 
   it('空文字・空白のみなら通信せず null', async () => {
@@ -46,7 +61,11 @@ describe('useCreateQuestion', () => {
   it('失敗・id 欠落は null（呼び出し側は紐づけを中止する）', async () => {
     const failing = vi.fn(() => Promise.resolve(jsonResponse(null, false)));
     const { result: r1 } = renderHook(() => useCreateQuestion(createMockApi(failing)));
+    const activity = collectActivity();
     await expect(r1.current('x')).resolves.toBeNull();
+    activity.stop();
+    // 失敗したら合図は出ない
+    expect(activity.kinds).toEqual([]);
 
     const noId = vi.fn(() => Promise.resolve(jsonResponse({})));
     const { result: r2 } = renderHook(() => useCreateQuestion(createMockApi(noId)));

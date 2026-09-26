@@ -226,6 +226,26 @@ export const completeOnboardingSchema = z.object({
   completed: z.literal(true),
 });
 
+// Help search (ヘルプの検索欄 → 話題の振り分け。apps/server の Jev ゲートウェイが読む)
+export const helpSearchSchema = z.object({
+  /** 書かれた「したいこと」。 */
+  query: z.string().trim().min(1).max(200),
+  /** いま開いている画面（pathname）。振り分けの手掛かり。 */
+  screen: z.string().max(64),
+  locale: localeSchema,
+  /** 選択肢。文面の正は client の i18n にあるので、選ぶ側へ毎回持っていく。 */
+  topics: z
+    .array(
+      z.object({
+        id: z.string().regex(/^[a-z_]{1,32}$/),
+        label: z.string().min(1).max(200),
+      }),
+    )
+    .min(2)
+    .max(40),
+});
+export type HelpSearchInput = z.infer<typeof helpSearchSchema>;
+
 // Board schemas
 export const boardCardUpdateSchema = z.object({
   cards: z.array(

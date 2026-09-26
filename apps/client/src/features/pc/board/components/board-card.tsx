@@ -118,6 +118,11 @@ export function BoardCard({
       // 掴んだらカードを動かす（キャンバスのパンを始めない）。
       data-canvas-no-pan=""
       className="board-card"
+      // ヘルプが開いているとき、カードに触れたら灯す見取り図の部品。抜き書きは「スニペット」、
+      // 写真は「写真」（前は「ボード」で、ボードの見取り図のどこも灯らなかった）。
+      data-help={
+        card.cardType === 'snippet' ? 'snippet' : card.cardType === 'photo' ? 'photo' : 'board'
+      }
       {...verifyAttrs({
         unit: 'BoardCard',
         cardType: card.cardType,

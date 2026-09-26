@@ -177,6 +177,8 @@ export function DetailPane({
 
   return (
     <div
+      // ヘルプが開いているとき、この面に触れたら「手紙・ことば・断片」を出す。
+      data-help="letter"
       {...verifyAttrs({
         unit: 'DetailPane',
         visible,

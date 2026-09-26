@@ -55,6 +55,11 @@ export interface FloatingPaletteProps {
    * 道具を押したつもりが選択まで外れてしまう。
    */
   isolateEvents?: boolean;
+  /**
+   * ヘルプが開いているとき、この面（と中の道具）に触れたら出す話題（`data-help`）。
+   * 話題の識別子は features/shared/help が持つ。ここは属性として運ぶだけ。
+   */
+  help?: string;
   children: (slot: FloatingPaletteSlot) => ReactNode;
 }
 
@@ -101,6 +106,7 @@ export function FloatingPalette({
   role,
   ariaLabel,
   isolateEvents = false,
+  help,
   children,
 }: FloatingPaletteProps) {
   // 面・ボタン・アイコン・角丸は**まとめて**動かす（1 つだけ変えると比率が崩れる）。
@@ -130,13 +136,16 @@ export function FloatingPalette({
       : (anchorStyle(surface.anchor) ?? {})),
   };
 
-  const attrs = verifyAttrs({
-    ...contract,
-    visible,
-    collapsed,
-    dragging: surface.dragging,
-    docked,
-  });
+  const attrs = {
+    ...verifyAttrs({
+      ...contract,
+      visible,
+      collapsed,
+      dragging: surface.dragging,
+      docked,
+    }),
+    'data-help': help,
+  };
 
   const wrapperClass = `fixed transition-opacity duration-300 ${
     visible ? 'opacity-100' : 'pointer-events-none opacity-0'

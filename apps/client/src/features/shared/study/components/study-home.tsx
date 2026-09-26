@@ -7,6 +7,8 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEntries } from '@/features/shared/entries/hooks/use-entries';
+import { useHelpMode } from '@/features/shared/help/help-context';
+import { topicForStudyLabel } from '@/features/shared/help/topics';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme-context';
 import { traceMark } from '@/lib/trace';
@@ -46,6 +48,7 @@ export interface StudyHomeProps {
 export function StudyHome({ layout }: StudyHomeProps) {
   const router = useRouter();
   const { api, auth, loading: authLoading } = useAuth();
+  const help = useHelpMode();
   const { theme } = useTheme();
   const { state } = useStudyState(api, authLoading, auth?.user.id ?? null);
 
@@ -253,6 +256,10 @@ export function StudyHome({ layout }: StudyHomeProps) {
           onHoverChange={(hovered) => {
             setHoveredLabel(hovered?.label ?? null);
             setHover(hovered);
+            // ヘルプが開いていれば、触れている物の説明が面に出る。何にも触れていない
+            // ときは「いま開いている画面」（＝部屋そのもの、Oryzae とは）に落ちる。
+            // 3D の的は DOM を持たないので、ここから伝える。
+            help.setHovered(hovered?.label ? topicForStudyLabel(hovered.label) : null);
           }}
         />
 

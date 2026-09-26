@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEntry, useSaveEntry } from '@/features/shared/entries/hooks/use-entry';
+import { ACTIVITY_EVENT, readActivityKind } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 import { I18nWrapper } from '../../../../helpers/i18n-wrapper';
 import { mockResponse } from '../../../../helpers/response';
@@ -153,6 +154,17 @@ describe('useEntry', () => {
   });
 });
 
+/** window に出た合図の種類を集める（ヘルプの三歩が聞くもの）。 */
+function collectActivity(): { kinds: string[]; stop: () => void } {
+  const kinds: string[] = [];
+  const listen = (e: Event) => {
+    const kind = readActivityKind(e);
+    if (kind) kinds.push(kind);
+  };
+  window.addEventListener(ACTIVITY_EVENT, listen);
+  return { kinds, stop: () => window.removeEventListener(ACTIVITY_EVENT, listen) };
+}
+
 describe('useSaveEntry', () => {
   let apiFetch: ReturnType<typeof vi.fn>;
 
@@ -168,6 +180,7 @@ describe('useSaveEntry', () => {
     const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
       wrapper: I18nWrapper,
     });
+    const activity = collectActivity();
 
     let saveResult: string | null = null;
     await act(async () => {
@@ -176,6 +189,9 @@ describe('useSaveEntry', () => {
 
     expect(saveResult).toBe('new-id');
     expect(result.current.error).toBe('');
+    activity.stop();
+    // 作成が通ったら合図 entry が出る（ヘルプの五歩 ② が聞く）
+    expect(activity.kinds).toEqual(['entry']);
   });
 
   it('returns null and sets error on failure', async () => {
@@ -185,6 +201,7 @@ describe('useSaveEntry', () => {
     const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
       wrapper: I18nWrapper,
     });
+    const activity = collectActivity();
 
     let saveResult: string | null = null;
     await act(async () => {
@@ -193,6 +210,9 @@ describe('useSaveEntry', () => {
 
     expect(saveResult).toBeNull();
     expect(result.current.error).toBe('作成に失敗しました');
+    activity.stop();
+    // 失敗した作成では合図は出ない
+    expect(activity.kinds).toEqual([]);
   });
 
   it('returns entry id on successful update', async () => {
@@ -233,13 +253,14 @@ describe('useSaveEntry', () => {
     expect(body.fermentationEnabled).toBeUndefined();
   });
 
-  it('fermentationEnabled=true を指定するとペイロードに含まれる', async () => {
+  it('fermentationEnabled=true を指定するとペイロードに含まれ、合図 entry → pickle が出る', async () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, { id: 'new-id' }));
     const api = createMockApi(apiFetch);
 
     const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
       wrapper: I18nWrapper,
     });
+    const activity = collectActivity();
 
     await act(async () => {
       await result.current.save('content', undefined, { fermentationEnabled: true });
@@ -249,6 +270,48 @@ describe('useSaveEntry', () => {
     const bodyStr: string = call[1].body;
     const body: Record<string, unknown> = JSON.parse(bodyStr);
     expect(body.fermentationEnabled).toBe(true);
+    activity.stop();
+    // 漬け込みが通ったら window に合図が出る（ヘルプの五歩 ② と ④ が聞く）。順は entry → pickle
+    expect(activity.kinds).toEqual(['entry', 'pickle']);
+  });
+
+  it('既存エントリの漬け込み（PUT）でも合図 entry → pickle が出る', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
+    const activity = collectActivity();
+
+    await act(async () => {
+      await result.current.save('content', 'existing-id', { fermentationEnabled: true });
+    });
+
+    activity.stop();
+    expect(activity.kinds).toEqual(['entry', 'pickle']);
+  });
+
+  it('漬け込みでない保存は entry だけ、失敗した漬け込みでは何も出ない', async () => {
+    apiFetch
+      .mockResolvedValueOnce(mockResponse(true, {}))
+      .mockResolvedValueOnce(mockResponse(false, {}));
+    const api = createMockApi(apiFetch);
+
+    const { result } = renderHook(() => useSaveEntry(api, { accessToken: 'at' }), {
+      wrapper: I18nWrapper,
+    });
+    const activity = collectActivity();
+
+    await act(async () => {
+      // ただの保存 → entry だけ
+      await result.current.save('content', 'existing-id');
+      // 漬け込みだが失敗 → 何も出ない
+      await result.current.save('content', 'existing-id', { fermentationEnabled: true });
+    });
+
+    activity.stop();
+    expect(activity.kinds).toEqual(['entry']);
   });
 
   it('200 でも id が読めなければ error を立てる（autosave の重複作成を防ぐ）', async () => {

@@ -8,11 +8,25 @@ interface UserMeData {
   id: string;
   nickname: string;
   avatarUrl: string | null;
+  /** 初回のヘルプを閉じたことがあるか（旧オンボーディングの旗をそのまま使っている）。 */
   onboardingCompleted: boolean;
-  /** 一度でも漬け込んだことがあるか (Issue #316 ガイド表示判定用) */
+  /** 一度でも漬け込んだことがあるか。ヘルプの五歩 ④「瓶に漬けて待つ」の旗 (Issue #316 由来) */
   hasPickled: boolean;
-  /** 一度でもエントリに問いを紐付けたことがあるか (Issue #316 ガイド表示判定用) */
+  /** 一度でもエントリに問いを紐付けたことがあるか。ヘルプの五歩 ③「問いを紐づける」の旗 (Issue #316 由来) */
   hasLinkedQuestion: boolean;
+  /**
+   * 問いを 1 件でも立てたことがあるか（アーカイブ済み含む）。
+   * ヘルプの五歩 ①「問いを立てる」が済んだかの旗。
+   */
+  hasQuestion: boolean;
+  /** エントリを 1 件でも書いたことがあるか。ヘルプの五歩 ②「エントリーを書く」の旗。 */
+  hasEntry: boolean;
+  /**
+   * 手紙を 1 通でも読んだことがあるか。ヘルプの五歩 ⑤「手紙を読む」の旗。
+   * 既読はサーバに残る（手紙を開くと `use-unread-letters` が `POST /fermentations/read` で
+   * 書き、そのあと `lib/activity` の 'read' 合図でヘルプがこの旗を取り直す）。
+   */
+  hasReadLetter: boolean;
 }
 
 /**
@@ -30,6 +44,9 @@ function normalizeUserMe(input: unknown): UserMeData | null {
     onboardingCompleted: readBooleanField(input, 'onboardingCompleted', false),
     hasPickled: readBooleanField(input, 'hasPickled', false),
     hasLinkedQuestion: readBooleanField(input, 'hasLinkedQuestion', false),
+    hasQuestion: readBooleanField(input, 'hasQuestion', false),
+    hasEntry: readBooleanField(input, 'hasEntry', false),
+    hasReadLetter: readBooleanField(input, 'hasReadLetter', false),
   };
 }
 
@@ -44,9 +61,9 @@ interface UseUserMeResult {
  * Issue #316: EntryEditor の保存成功後ナッジ表示判定に必要な
  * `hasPickled` / `hasLinkedQuestion` を含む user-me を取得する。
  *
- * `useOnboarding` も同じエンドポイントを叩くが、用途とライフサイクルが
- * 異なるためフックを分けている (onboarding は app/(protected)/layout、
- * これは entries feature 内で消費)。
+ * `useHelpFirstVisit`（ヘルプの初回判定）も同じエンドポイントを叩くが、用途と
+ * ライフサイクルが異なるためフックを分けている (あちらは app/(protected)/layout の
+ * HelpProvider、これは entries feature 内で消費)。
  */
 export function useUserMe(api: ApiClient | null): UseUserMeResult {
   const [data, setData] = useState<UserMeData | null>(null);

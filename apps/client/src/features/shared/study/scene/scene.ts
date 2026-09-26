@@ -8,6 +8,7 @@
  */
 
 import {
+  Box3,
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
@@ -64,18 +65,23 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  controlledView,
   entranceView,
+  type HomeControl,
+  homeControl,
   homeView,
   jarView,
   journalSpreadView,
   journalTopView,
   lerpView,
+  panByPixels,
   parallaxOffset,
+  rebaseZoom,
   shelfView,
   zoomByPinch,
   zoomByWheel,
-  zoomedView,
-  zoomTargetRise,
+  zoomForAspect,
+  zoomTowardPointer,
 } from './camera';
 import { captureRenderedFrame } from './capture';
 import { contentSignature } from './content-signature';
@@ -95,7 +101,9 @@ import {
   type HitHint,
   type HitId,
   HOVER_SCALE,
+  pickNearestHit,
   resolveClickTarget,
+  SHELF_HIT_ID,
 } from './hit-targets';
 import {
   bubbleCount,
@@ -225,12 +233,18 @@ export interface StudySceneHandle {
   setPointer(x: number, y: number): void;
   /** ポインタが canvas から外れた。 */
   clearPointer(): void;
-  /** ホイールで寄り引きする（ホームのみ）。 */
+  /** ホイールで寄り引きする（ホームのみ）。いまのポインタの下へ向かって寄る。 */
   zoomBy(deltaY: number): void;
-  /** 2 本指を置いた。以後の比はここを基準にする。 */
-  startPinch(): void;
+  /** 2 本指を置いた。以後の比はここを基準にし、`anchor`（-1..1）の下へ向かって寄る。 */
+  startPinch(anchor?: { x: number; y: number }): void;
   /** 2 本指の間隔の比（置いた時点を 1 とする）。 */
   pinchTo(ratio: number): void;
+  /** つかんで動かし始めた（カーソルを握りにする）。 */
+  beginDrag(): void;
+  /** つかんだまま動かした分（画面の px）。ホームだけで効く。 */
+  dragBy(dx: number, dy: number): void;
+  /** 離した。 */
+  endDrag(): void;
   /** クリック。`hovered` に頼らずその場で拾い直す。 */
   pick(): void;
   /**
@@ -408,11 +422,27 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
 
   let hoveredId: HitId | null = null;
   let hoveredObject: Object3D | null = null;
-  /** ホームの寄り引き。目標へ lerp で寄せる（指を離しても少し滑る）。 */
-  let zoom = 1;
-  let zoomTarget = 1;
+  /**
+   * ホームの操作（注視点と倍率）。倍率は `zoomTarget` へ lerp で寄せる（指を離しても
+   * 少し滑る）。寄り引きの支点は `zoomAnchor`（-1..1）— ホイールならそのときのカーソル、
+   * つまみなら 2 本指の中点。
+   */
+  // 画面が構図より横に狭ければ引いて始める（面が右に立っているとき）。利用者の寄り引きは
+  // この基準に掛かり、窓の大きさが変わったら基準だけ差し替える（寄せた比は保つ）。
+  let aspectZoom = zoomForAspect(layout, aspectOf(host));
+  /**
+   * 利用者が寄せた比。`zoomTarget = userZoom × aspectZoom`。ホイール・つまみでだけ動き、
+   * 窓の大きさが変わっても動かない。丸めた `zoomTarget` から逆算しないこと — 引き切った
+   * ところで面を開閉するだけで比が縮んでいく（`rebaseZoom`）。
+   */
+  let userZoom = 1;
+  let control: HomeControl = { ...homeControl(layout), zoom: aspectZoom };
+  let zoomTarget = aspectZoom;
+  const zoomAnchor = new Vector2(0, 0);
   /** 2 本指を置いた時点の倍率。 */
   let pinchBase = 1;
+  /** つかんで動かしている間。パララックスを止め、カーソルを握りにする。 */
+  let dragging = false;
 
   const parallax = { x: 0, y: 0 };
 
@@ -619,23 +649,29 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     // （寄っている最中に呼吸とパララックスを混ぜると、止まる位置が定まらない）。
     if (arrival !== null) {
       const walked = progress(now - arrival.startedAt, ARRIVAL.durationMs);
-      applyView(camera, lerpView(arrival.from, homeCamera, EASING[ARRIVAL.easing](walked)));
+      // 着く先は操作込みのホーム（面が立っていて引いているなら、その引き）。素の homeCamera へ
+      // 寄せると、着いた瞬間に引きのぶんだけ跳ぶ。
+      const home = controlledView(layout, control, aspectZoom);
+      applyView(camera, lerpView(arrival.from, home, EASING[ARRIVAL.easing](walked)));
       if (walked >= 1) arrival = null;
       return;
     }
 
     // ホームだけ呼吸とパララックスが乗る。**遷移中と遷移待ちの間は乗せない** —
     // tween 完了直後に揺らぎが復帰すると y が一段跳ぶ（着地がカクッと見える原因）。
-    const wanted = pointerInside
-      ? parallaxOffset(layout, { x: pointer.x, y: pointer.y })
-      : { x: 0, y: 0 };
+    // つかんで動かしている間はパララックスも止める（引いた向きと喧嘩する）。
+    const wanted =
+      pointerInside && !dragging
+        ? parallaxOffset(layout, { x: pointer.x, y: pointer.y })
+        : { x: 0, y: 0 };
     const lerp = layout.parallax?.lerp ?? 0;
     parallax.x += (wanted.x - parallax.x) * lerp;
     parallax.y += (wanted.y - parallax.y) * lerp;
 
-    // 寄り引き。近づくぶんだけ注視点が上がる（絵の上端を画面に留めるため）。
-    zoom = approach(zoom, zoomTarget, HOME_ZOOM.lerp);
-    const view = zoomedView(homeCamera, zoom, zoomTargetRise(layout, zoom));
+    // 寄り引き。支点（カーソルの下の点）が画面上で動かないように注視点も寄る。
+    const nextZoom = approach(control.zoom, zoomTarget, HOME_ZOOM.lerp);
+    control = zoomTowardPointer(layout, control, nextZoom, zoomAnchor, aspectOf(host), aspectZoom);
+    const view = controlledView(layout, control, aspectZoom);
 
     camera.position.set(
       view.position.x + parallax.x,
@@ -789,10 +825,13 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
   function raycast(): { id: HitId | null; object: Object3D | null } {
     raycaster.setFromCamera(pointer, camera);
     const intersects = raycaster.intersectObjects(content.hitboxes, false);
-    const first = intersects[0];
-    if (!first) return { id: null, object: null };
-    const hitId = first.object.userData.hitId;
-    if (typeof hitId !== 'string') return { id: null, object: null };
+    // 棚の枠は背表紙を包むので、手前の面はいつも枠が先に当たる。奥に背表紙があればそちら。
+    const ids = intersects
+      .map((hit) => hit.object.userData.hitId)
+      .filter((id): id is string => typeof id === 'string');
+    const hitId = pickNearestHit(ids);
+    const first = intersects.find((hit) => hit.object.userData.hitId === hitId);
+    if (!first || hitId === null) return { id: null, object: null };
     // 拡大するのは見えている方。ヒットボックスは不可視なので、そこを拡大しても何も起きない。
     const visible = first.object.userData.parentGroup;
     return { id: hitId, object: visible instanceof Object3D ? visible : first.object };
@@ -809,7 +848,7 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     hoveredObject = object;
     if (hoveredObject) hoveredObject.scale.setScalar(baseScaleOf(hoveredObject) * HOVER_SCALE);
 
-    renderer.domElement.style.cursor = id ? 'pointer' : 'default';
+    renderer.domElement.style.cursor = cursorFor(id);
 
     const entry = content.registry.get(id);
     listeners.onHoverChange?.(
@@ -902,17 +941,61 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
    */
   function zoomBy(deltaY: number): void {
     if (transition || settled) return;
-    zoomTarget = zoomByWheel(zoomTarget, deltaY);
+    zoomTarget = zoomByWheel(zoomTarget, deltaY, aspectZoom);
+    userZoom = zoomTarget / aspectZoom;
+    // 支点はいまのカーソル。canvas の外から来たホイールは中央へ。
+    if (pointerInside) zoomAnchor.copy(pointer);
+    else zoomAnchor.set(0, 0);
   }
 
-  function startPinch(): void {
+  function startPinch(anchor?: { x: number; y: number }): void {
     if (transition || settled) return;
     pinchBase = zoomTarget;
+    if (anchor) zoomAnchor.set(anchor.x, anchor.y);
+    else zoomAnchor.set(0, 0);
   }
 
   function pinchTo(ratio: number): void {
     if (transition || settled) return;
-    zoomTarget = zoomByPinch(pinchBase, ratio);
+    zoomTarget = zoomByPinch(pinchBase, ratio, aspectZoom);
+    userZoom = zoomTarget / aspectZoom;
+  }
+
+  /**
+   * つかんで動かす。**ホームだけ。** 空いている所をつかんで左右上下へ引くと絵が付いてくる
+   * （オーナーの依頼: 「押せないところをクリックして持っていったら画面が動くように」）。
+   * 動かした分は注視点に畳み、部屋の外へは出ない（`clampFocus`）。
+   */
+  function beginDrag(): void {
+    if (transition || settled) return;
+    dragging = true;
+    renderer.domElement.style.cursor = cursorFor(hoveredId);
+  }
+
+  function dragBy(dx: number, dy: number): void {
+    if (transition || settled || !dragging) return;
+    control = panByPixels(
+      layout,
+      control,
+      { x: dx, y: dy },
+      { width: host.clientWidth, height: host.clientHeight },
+      aspectZoom,
+    );
+  }
+
+  function endDrag(): void {
+    dragging = false;
+    renderer.domElement.style.cursor = cursorFor(hoveredId);
+  }
+
+  /**
+   * カーソル。的の上は指、空いている所は手（つかめる）。つかんでいる間は握り。
+   * サブ画面と遷移中は素のまま（何もつかめない）。
+   */
+  function cursorFor(id: HitId | null): string {
+    if (transition || settled) return 'default';
+    if (dragging) return 'grabbing';
+    return id ? 'pointer' : 'grab';
   }
 
   function pick(): void {
@@ -1001,6 +1084,14 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     renderer.setSize(width, height);
     // 投影は次のフレームの updateFrame が窓に合わせて組み直す。
     projectionDirty = true;
+    // 縦横比が変わったら、引きの基準も変わる。利用者が寄せた比（`userZoom`）は保つ。
+    const nextAspectZoom = zoomForAspect(layout, width / height);
+    if (nextAspectZoom === aspectZoom) return;
+    aspectZoom = nextAspectZoom;
+    zoomTarget = rebaseZoom(userZoom, aspectZoom);
+    // 基準の差は画面の中央へ向けて詰める。前のホイールの支点を残すと、面の開閉のたびに
+    // 注視点がそのカーソルの側へ寄っていった。
+    zoomAnchor.set(0, 0);
   });
   resizeObserver.observe(host);
 
@@ -1139,6 +1230,9 @@ export function initScene(options: StudySceneOptions): StudySceneHandle {
     zoomBy,
     startPinch,
     pinchTo,
+    beginDrag,
+    dragBy,
+    endDrag,
     pick,
     setFrame,
     setDoorWaiting,
@@ -1686,7 +1780,11 @@ function buildBooks(
     spine.add(spineBody);
 
     // 背表紙には年月を刷る。棚が「本が並んでいる場所」だと一目で分かる。
-    const texture = createTextTexture(spineLabelText(notebook.month), SPINE_LABEL.fontPx);
+    const texture = createTextTexture(
+      spineLabelText(notebook.month),
+      SPINE_LABEL.fontPx,
+      materials.inkColor,
+    );
     if (texture) {
       textures.push(texture);
       const sprite = new Sprite(materials.sprite(texture, SPINE_LABEL.opacity));
@@ -1925,12 +2023,22 @@ function buildHitboxes(options: {
   if (options.shelfAsSingleTarget) {
     // SP は棚ごと 1 つの的。背表紙 1 本は指より細く、当たりを広げると隣の月を拾う。
     box(
-      'shelf',
+      SHELF_HIT_ID,
       [2.8, 2.0, 1.2],
       new Vector3(layout.shelf.position.x, layout.shelf.position.y + 0.9, layout.shelf.position.z),
       options.shelfGroup,
     );
   } else {
+    // PC は枠と背表紙の両方。枠の当たりは見えている棚の大きさから取る（少し余らせる）。
+    // 背表紙の当たりを包むので、光線を拾うときに背表紙を優先する（`pickNearestHit`）。
+    // 過去の月が無い人の棚は背表紙が 0 本で、枠が無いと触れても何も起きなかった。
+    // 棚は机のグループの子なので、world の姿勢を先祖ごと更新してから測る（机の冊が 0 冊だと
+    // ここまでに誰も先祖を更新していない）。
+    options.shelfGroup.updateWorldMatrix(true, true);
+    const bounds = new Box3().setFromObject(options.shelfGroup);
+    const size = bounds.getSize(new Vector3());
+    const center = bounds.getCenter(new Vector3());
+    box(SHELF_HIT_ID, [size.x + 0.2, size.y + 0.2, size.z + 0.2], center, options.shelfGroup);
     options.shelf.forEach((spine, index) => {
       const world = new Vector3();
       spine.getWorldPosition(world);
@@ -1972,15 +2080,25 @@ function buildHitboxes(options: {
 
 /**
  * 文字を描いたテクスチャ。幅は `measureText` の実測から決める（全語同幅にしない）。
+ * 書体は既定で明朝（背表紙・瓶の言葉）。太さ付きの書体名も渡せる。
  *
  * canvas が取れない環境（SSR・古い端末）では null を返し、呼び出し側がその語を諦める。
  */
-function createTextTexture(text: string, fontPx = 48): CanvasTexture | null {
+function createTextTexture(
+  text: string,
+  fontPx = 48,
+  color = '#1A1918',
+  face = '"Hiragino Mincho ProN", "Yu Mincho", serif',
+): CanvasTexture | null {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) return null;
 
-  const font = `${fontPx}px "Hiragino Mincho ProN", "Yu Mincho", serif`;
+  // `face` は書体名の並び。先頭に太さ（`500 ...`）を置いてもよい（CSS の font 略記と同じ順）。
+  const weightMatch = face.match(/^(\d{3})\s+(.*)$/);
+  const font = weightMatch
+    ? `${weightMatch[1]} ${fontPx}px ${weightMatch[2]}`
+    : `${fontPx}px ${face}`;
   context.font = font;
   const width = Math.ceil(context.measureText(text).width) + fontPx * 0.4;
   const height = Math.ceil(fontPx * 1.4);
@@ -1992,7 +2110,7 @@ function createTextTexture(text: string, fontPx = 48): CanvasTexture | null {
   context.font = font;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillStyle = '#1A1918';
+  context.fillStyle = color;
   context.fillText(text, canvas.width / 2, canvas.height / 2);
 
   const texture = new CanvasTexture(canvas);

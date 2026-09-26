@@ -48,10 +48,49 @@ describe('配置表に共通して成り立つこと', () => {
     expect(layout.viewDistance.board).toBeGreaterThan(0);
   });
 
+  it.each(LAYOUTS)('$name: 注視点の可動域がホームの注視点を含み、天板の幅を越えない', (layout) => {
+    const bounds = layout.focusBounds;
+    const home = layout.camera.target;
+    expect(bounds.x[0]).toBeLessThanOrEqual(home.x);
+    expect(bounds.x[1]).toBeGreaterThanOrEqual(home.x);
+    expect(bounds.y[0]).toBeLessThanOrEqual(home.y);
+    expect(bounds.y[1]).toBeGreaterThanOrEqual(home.y);
+    expect(bounds.z[0]).toBeLessThanOrEqual(home.z);
+    expect(bounds.z[1]).toBeGreaterThanOrEqual(home.z);
+    expect(bounds.x[0]).toBeGreaterThanOrEqual(layout.deskTop.xLeft);
+    expect(bounds.x[1]).toBeLessThanOrEqual(layout.deskTop.xRight);
+  });
+
+  it.each(LAYOUTS)('$name: 構図が前提にする縦横比を持つ（狭い画面で引くための基準）', (layout) => {
+    expect(layout.homeAspect).toBeGreaterThan(0);
+  });
+
+  it('PC は横長、SP は縦長の窓で組んである', () => {
+    expect(PC_LAYOUT.homeAspect).toBeGreaterThan(1);
+    expect(SP_LAYOUT.homeAspect).toBeLessThan(1);
+  });
+
   it.each(LAYOUTS)('$name: 主要ラベルが対応する物の近くに置かれている', (layout) => {
     // アンカーが対象から離れると「何のラベルか」が読めなくなる。
     expect(Math.abs(layout.labelAnchors.jar.x - layout.jar.x)).toBeLessThan(1);
     expect(Math.abs(layout.labelAnchors.board.x - layout.board.position.x)).toBeLessThan(1);
+  });
+});
+
+describe('机の上の配置', () => {
+  it('PC の板は右へ寄せ、積みと棚は奥行きで離してある（被り気味の指摘への答え）', () => {
+    // 板は机の左端から離れている（左の壁が空く）。
+    const boardLeft = PC_LAYOUT.board.position.x - (8 * PC_LAYOUT.board.scale) / 2;
+    expect(boardLeft - PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(2);
+    // 積みは机の右寄り（「本とペンをもう少し右に」）、棚はさらに右で壁際。
+    expect(PC_LAYOUT.desk.x).toBeGreaterThan(2.5);
+    expect(PC_LAYOUT.shelf.position.x - PC_LAYOUT.desk.x).toBeGreaterThan(3);
+    expect(PC_LAYOUT.shelf.position.z).toBeLessThan(PC_LAYOUT.desk.z - 5);
+    // 棚は天板の中（台の半幅 1.4）。
+    expect(PC_LAYOUT.shelf.position.x + 1.4).toBeLessThan(PC_LAYOUT.deskTop.xRight);
+    // 天板は物の外側にぎりぎりの余白（瓶 ± 1.3 が左端を決める）。
+    expect(PC_LAYOUT.deskTop.xLeft).toBeLessThan(PC_LAYOUT.jar.x - 1.3);
+    expect(PC_LAYOUT.deskTop.xLeft).toBeGreaterThan(PC_LAYOUT.jar.x - 2.0);
   });
 });
 

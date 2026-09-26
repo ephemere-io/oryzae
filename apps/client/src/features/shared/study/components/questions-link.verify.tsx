@@ -37,7 +37,9 @@ registerUnit<Record<string, never>>({
         const link = root.querySelector('a');
         const className = link?.className ?? '';
         if (className.includes('left-6')) return '左上（‹ 書斎の席）に重なっている';
-        return className.includes('right-6') || '右上に置かれていない';
+        // 右端はヘルプの面（`--help-width`）のぶん内側に置く。面の下に潜らないため。
+        const right = link?.style.right ?? '';
+        return right.includes('--help-width') || `右上（ヘルプの面を避けた位置）に無い: "${right}"`;
       },
     },
     {

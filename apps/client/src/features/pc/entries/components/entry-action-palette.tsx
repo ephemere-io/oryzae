@@ -20,6 +20,11 @@ export interface PaletteAction {
   disabledReason?: string;
   /** 押している最中（録音中など）。 */
   active?: boolean;
+  /**
+   * ヘルプの三歩がこの道具を照らすときの名前（`data-tutorial`）。
+   * 手順の識別子は features/shared/help が持つ。ここは属性として運ぶだけ。
+   */
+  tutorial?: string;
 }
 
 interface EntryActionPaletteProps {
@@ -66,6 +71,9 @@ export function EntryActionPalette({
   return (
     <FloatingPalette
       contract={{ unit: 'EntryActionPalette', actionCount: actions.length, size }}
+      // ヘルプが開いているとき、道具に触れたら「書く」を出す（押せるものの名前で決まれば
+      // そちらが勝つ — 「瓶に漬ける」は漬け込みの話題へ）。
+      help="write"
       size={size}
       visible={visible}
       storage={persistState ? STORAGE : null}
@@ -96,6 +104,7 @@ export function EntryActionPalette({
                 }}
                 aria-label={action.label}
                 data-palette-action={action.id}
+                data-tutorial={action.tutorial}
                 onFocus={() => setHoveredId(action.id)}
                 onBlur={() => setHoveredId(null)}
                 className={`${TOOL_BUTTON_CLASS} ${

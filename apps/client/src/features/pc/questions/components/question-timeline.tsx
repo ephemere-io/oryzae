@@ -58,6 +58,7 @@ export function QuestionTimeline({
     return (
       <div
         className="flex flex-col items-center gap-2 py-12 text-[var(--date-color)]"
+        data-help="questions"
         {...verifyAttrs({ unit: 'QuestionTimeline', count: 0, empty: true })}
       >
         <p className="text-sm">{t('empty')}</p>
@@ -68,6 +69,8 @@ export function QuestionTimeline({
   return (
     <div
       className="flex flex-col gap-2"
+      // ヘルプが開いているとき、ここに触れたら「問いの変遷」を出す。
+      data-help="questions"
       {...verifyAttrs({ unit: 'QuestionTimeline', count: questions.length, empty: false })}
     >
       {/* Header */}

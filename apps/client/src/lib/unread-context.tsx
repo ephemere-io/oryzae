@@ -32,6 +32,11 @@ export interface UnreadState {
   markQuestionRead: (questionId: string) => void;
   /** 届いている手紙をすべて既読にする。PC の瓶は盤面に全部並ぶので開いた＝読んだ。 */
   markAllSeen: () => void;
+  /**
+   * 手紙一覧を取り直す。取得はマウント時の 1 回だけなので、画面に居る間にサーバ側で
+   * 手紙が増えたとき（初めての漬け込みにその場で返る手紙）はこれで拾う。失敗しても投げない。
+   */
+  refresh: () => Promise<void>;
 }
 
 /** provider 不在（孤立検証・テスト）でも crash させないための既定値。 */
@@ -42,6 +47,7 @@ const EMPTY: UnreadState = {
   unreadFermentationIds: new Set(),
   markQuestionRead: () => {},
   markAllSeen: () => {},
+  refresh: async () => {},
 };
 
 const UnreadContext = createContext<UnreadState>(EMPTY);

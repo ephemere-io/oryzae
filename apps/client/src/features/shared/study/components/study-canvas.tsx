@@ -63,6 +63,12 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+/**
+ * 「押した」と「つかんで動かした」の境（px）。これより動いたらドラッグで、離したときの
+ * click は押したことにしない。マウスの手ぶれとタッチの揺れを吸える程度。
+ */
+const DRAG_THRESHOLD_PX = 5;
+
 export function StudyCanvas({
   state,
   layout,
@@ -87,6 +93,18 @@ export function StudyCanvas({
   const pinchStartRef = useRef<number | null>(null);
   /** つまんだかどうか。離した直後の click を「押した」と誤らないための印。 */
   const pinchedRef = useRef(false);
+  /**
+   * 1 本の指（またはマウスの左ボタン）でつかんでいる間。押した位置と、境を越えて
+   * ドラッグになったかを持つ。境を越えたら、離したときの click は「押した」にしない。
+   */
+  const grabRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+    dragging: boolean;
+  } | null>(null);
 
   // コールバックは ref 経由で読む。props が変わるたびにシーンを作り直すと、
   // 親が再描画しただけで canvas が組み直される。
@@ -244,11 +262,21 @@ export function StudyCanvas({
    * 指が 2 本置かれている間だけ間隔を測り、置いた時点との比を scene へ渡す。
    * 1 本のときは何もしない（そちらは的を押す操作）。
    */
-  const trackPinchDown = useCallback((pointerId: number, x: number, y: number) => {
+  const trackPinchDown = useCallback((pointerId: number, x: number, y: number, rect: DOMRect) => {
     pointersRef.current.set(pointerId, { x, y });
     if (pointersRef.current.size !== 2) return;
     pinchStartRef.current = pointerDistance(pointersRef.current);
-    handleRef.current?.startPinch();
+    // 2 本目が置かれたらつかみはやめる（以後はつまみ）。
+    if (grabRef.current) {
+      grabRef.current = null;
+      handleRef.current?.endDrag();
+    }
+    // 支点は 2 本指の中点。そこへ向かって寄る。
+    const middle = pointerMiddle(pointersRef.current);
+    handleRef.current?.startPinch({
+      x: ((middle.x - rect.left) / rect.width) * 2 - 1,
+      y: -(((middle.y - rect.top) / rect.height) * 2 - 1),
+    });
   }, []);
 
   const trackPinchMove = useCallback((pointerId: number, x: number, y: number) => {
@@ -272,6 +300,17 @@ export function StudyCanvas({
     if (pointersRef.current.size < 2) pinchStartRef.current = null;
   }, []);
 
+  /** つかみの終わり。ドラッグしていたらその印を click まで残す。 */
+  const releaseGrab = useCallback((pointerId: number): boolean => {
+    const grab = grabRef.current;
+    if (!grab || grab.pointerId !== pointerId) return false;
+    grabRef.current = null;
+    handleRef.current?.endDrag();
+    return grab.dragging;
+  }, []);
+  /** 直前のつかみがドラッグだったか。離した直後の click を「押した」にしないための印。 */
+  const draggedRef = useRef(false);
+
   return (
     <div
       ref={containerRef}
@@ -289,10 +328,25 @@ export function StudyCanvas({
           -(((event.clientY - rect.top) / rect.height) * 2 - 1),
         );
         trackPinchMove(event.pointerId, event.clientX, event.clientY);
+
+        // つかんで動かす。境を越えたらドラッグになり、以後は動いた分だけ絵が付いてくる。
+        const grab = grabRef.current;
+        if (grab && grab.pointerId === event.pointerId && pointersRef.current.size < 2) {
+          if (!grab.dragging) {
+            const moved = Math.hypot(event.clientX - grab.startX, event.clientY - grab.startY);
+            if (moved < DRAG_THRESHOLD_PX) return;
+            grab.dragging = true;
+            handle.beginDrag();
+          }
+          handle.dragBy(event.clientX - grab.lastX, event.clientY - grab.lastY);
+          grab.lastX = event.clientX;
+          grab.lastY = event.clientY;
+        }
       }}
-      onPointerLeave={() => {
+      onPointerLeave={(event) => {
         handleRef.current?.clearPointer();
         endPinch();
+        draggedRef.current = releaseGrab(event.pointerId) || draggedRef.current;
       }}
       onPointerDown={(event) => {
         // タッチでは pointermove が click より先に来ないことがある。押した位置を
@@ -304,14 +358,41 @@ export function StudyCanvas({
           ((event.clientX - rect.left) / rect.width) * 2 - 1,
           -(((event.clientY - rect.top) / rect.height) * 2 - 1),
         );
-        trackPinchDown(event.pointerId, event.clientX, event.clientY);
+        trackPinchDown(event.pointerId, event.clientX, event.clientY, rect);
+
+        // 左ボタン／1 本の指だけをつかみにする。ドラッグになるかは動いてから決める。
+        if (event.button === 0 && pointersRef.current.size < 2 && !grabRef.current) {
+          draggedRef.current = false;
+          grabRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            lastX: event.clientX,
+            lastY: event.clientY,
+            dragging: false,
+          };
+          // つかんでいる間は canvas の外へ出てもポインタを追う。合成イベント
+          // （テスト・一部の環境）では有効なポインタが無く投げるので、握れなくても続ける。
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // 追えないだけ。つかみ自体は成立する。
+          }
+        }
       }}
-      onPointerUp={(event) => releasePinch(event.pointerId)}
-      onPointerCancel={(event) => releasePinch(event.pointerId)}
+      onPointerUp={(event) => {
+        releasePinch(event.pointerId);
+        draggedRef.current = releaseGrab(event.pointerId) || draggedRef.current;
+      }}
+      onPointerCancel={(event) => {
+        releasePinch(event.pointerId);
+        draggedRef.current = releaseGrab(event.pointerId) || draggedRef.current;
+      }}
       onClick={() => {
-        // つまんだ指を離した直後の click は「押した」ではない。
-        if (pinchedRef.current) {
+        // つまんだ指・つかんで動かした指を離した直後の click は「押した」ではない。
+        if (pinchedRef.current || draggedRef.current) {
           pinchedRef.current = false;
+          draggedRef.current = false;
           return;
         }
         handleRef.current?.pick();
@@ -325,4 +406,14 @@ function pointerDistance(pointers: Map<number, { x: number; y: number }>): numbe
   const [a, b] = [...pointers.values()];
   if (!a || !b) return 0;
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+/** 2 点の中点（client 座標）。指が 2 本のときだけ呼ぶ。 */
+function pointerMiddle(pointers: Map<number, { x: number; y: number }>): {
+  x: number;
+  y: number;
+} {
+  const [a, b] = [...pointers.values()];
+  if (!a || !b) return { x: 0, y: 0 };
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }

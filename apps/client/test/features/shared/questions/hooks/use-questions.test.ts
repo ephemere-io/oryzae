@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
+import { ACTIVITY_EVENT, readActivityKind } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 import { mockResponse } from '../../../../helpers/response';
 
@@ -10,6 +11,17 @@ function createMockApi(fetchImpl: ReturnType<typeof vi.fn>): ApiClient {
     headers: {},
     fetch: fetchImpl,
   };
+}
+
+/** window に出た合図の種類を集める（ヘルプの三歩が聞くもの）。 */
+function collectActivity(): { kinds: string[]; stop: () => void } {
+  const kinds: string[] = [];
+  const listen = (e: Event) => {
+    const kind = readActivityKind(e);
+    if (kind) kinds.push(kind);
+  };
+  window.addEventListener(ACTIVITY_EVENT, listen);
+  return { kinds, stop: () => window.removeEventListener(ACTIVITY_EVENT, listen) };
 }
 
 describe('useQuestions', () => {
@@ -106,6 +118,9 @@ describe('useQuestions', () => {
     apiFetch.mockResolvedValueOnce(mockResponse(true, {}));
     apiFetch.mockResolvedValueOnce(mockResponse(true, updatedQuestions));
 
+    // 立てられたら window に合図が出る（ヘルプの三歩 ① が聞く）。
+    const activity = collectActivity();
+
     await act(async () => {
       await result.current.createQuestion('Question 2');
     });
@@ -118,6 +133,26 @@ describe('useQuestions', () => {
       '/api/v1/questions',
       expect.objectContaining({ method: 'POST' }),
     );
+    activity.stop();
+    expect(activity.kinds).toEqual(['question']);
+  });
+
+  it('createQuestion が失敗したら合図は出ない', async () => {
+    apiFetch.mockResolvedValueOnce(mockResponse(true, []));
+    const api = createMockApi(apiFetch);
+    const { result } = renderHook(() => useQuestions(api));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const activity = collectActivity();
+    // POST 失敗 + 取り直し
+    apiFetch.mockResolvedValueOnce(mockResponse(false, {}));
+    apiFetch.mockResolvedValueOnce(mockResponse(true, []));
+    await act(async () => {
+      await result.current.createQuestion('Question X');
+    });
+
+    activity.stop();
+    expect(activity.kinds).toEqual([]);
   });
   it('配列でないレスポンスでも落ちず空のまま', async () => {
     // 素通しだと非配列が state に入り、タイムラインや SP の .filter / .map で落ちる。

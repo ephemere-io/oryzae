@@ -110,6 +110,8 @@ export function EntryListOverlay({
     // biome-ignore lint/a11y/noStaticElementInteractions: 外側を押して閉じるのは補助で、閉じる操作そのものは ✕ ボタンと Esc が担う
     // biome-ignore lint/a11y/useKeyWithClickEvents: キーボードでは Esc で閉じる（useEscapeKey）
     <div
+      // ヘルプが開いているとき、一覧に触れたら「エントリーの一覧」を出す。
+      data-help="list"
       {...verifyAttrs({
         unit: 'EntryListOverlay',
         selectedMonth: selectedMonth ?? 'all',

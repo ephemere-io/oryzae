@@ -65,6 +65,8 @@ export function BackToStudy() {
       className={`pointer-events-none fixed inset-x-0 top-0 z-[55] flex justify-center transition-opacity duration-300 ${
         hidden ? 'opacity-0' : 'opacity-100'
       }`}
+      // ヘルプの面（右）が開いている間は、画面ではなく本文の中央に掛ける。
+      style={{ right: 'var(--help-width, 0px)' }}
     >
       <Link
         href="/"

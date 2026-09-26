@@ -370,6 +370,8 @@ export function BoardView({ api }: BoardViewProps) {
       })}
       // role / aria-label と、ポインタ操作・選択解除は CanvasViewport が持つ。
       // ここで overflow-auto にはしない（スクロールはパンに置き換わった）。
+      // ヘルプが開いているとき、この画面に触れたら「ボード」を出す（上段バーは道具箱に統合されて無い）。
+      data-help="board"
       className="relative h-full w-full"
       // 画像の受け取りだけは面の外側で受ける。ドラッグ&ドロップはポインタ操作とは
       // イベントの系統が違うので、パンとは競合しない。

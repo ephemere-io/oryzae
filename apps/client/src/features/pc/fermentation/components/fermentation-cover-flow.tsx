@@ -242,6 +242,8 @@ export function FermentationCoverFlow({
   return (
     <div
       ref={setRootEl}
+      // ヘルプが開いているとき、ここに触れたら「手紙・ことば・断片」を出す。
+      data-help="letter"
       {...verifyAttrs({
         unit: 'FermentationCoverFlow',
         open,

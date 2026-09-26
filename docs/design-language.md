@@ -103,7 +103,7 @@
 |---|---|
 | `features/pc/board/components/board-surface.ts` | 浮いた面の**クラス**（角丸13px・36pxボタン）を自前で持っている。`PALETTE_SCALE` に寄せるべき（Issue #524） |
 | 用語 | コードは「ことば・断片」、画面は「キーワード・スニペット」と呼んでいる。どちらかに決める |
-| `--ob-*`（オンボーディング） | 別系統の色を20本持っている。一時的な演出のための別世界なのか、統合すべきかを決めていない |
+| `--ob-*` | もとはオンボーディングの色。オンボーディングはヘルプモードに置き換えて撤去したが、SP の部品（ボトムナビ・シート・瓶）が `--ob-jar-warm` / `--ob-font-*` / `--ob-card-bg` を、PC の発酵の部品（`history-disc` / `jar-view` / `fermentation-cover-flow`）が `--ob-jar-warm` を使い続けているので残っている。両方まとめて `--accent` / `CONTROL_FONT` へ寄せるべき |
 
 ---
 

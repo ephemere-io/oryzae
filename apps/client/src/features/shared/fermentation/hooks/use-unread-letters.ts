@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeSummaries } from '@/features/shared/fermentation/normalize';
 import type { FermentationSummary } from '@/features/shared/fermentation/types';
+import { notifyActivity } from '@/lib/activity';
 import type { ApiClient } from '@/lib/api';
 import type { UnreadState } from '@/lib/unread-context';
 
@@ -123,34 +124,76 @@ export function useUnreadLetters(api: ApiClient | null, authLoading: boolean): U
     setLastSeenAt((prev) => Math.max(prev, readLastSeenAt()));
   }, []);
 
+  /**
+   * 手紙一覧を取る。マウント時の 1 回と、初めての手紙が届いた直後（`refresh`）の 2 か所から。
+   * 取り消しの判定は呼ぶ側が渡す（effect は cleanup の旗、refresh はアンマウント）。
+   */
+  const load = useCallback(async (client: ApiClient, isCancelled: () => boolean) => {
+    try {
+      // Issue #363 perf: 全発酵をバルク取得（questionId 省略）する。
+      // 旧来は /questions → 問いごとに /fermentations の N+1 だった。
+      const res = await client.fetch('/api/v1/fermentations');
+      if (!res.ok || isCancelled()) return;
+      const data: unknown = await res.json();
+      if (isCancelled()) return;
+      // normalizeSummaries が要素ごとに形を確かめる。配列でないレスポンス
+      // （エラーエンベロープ等）で TypeError にならないのが要点。
+      setLetters(normalizeSummaries(data).filter((s) => s.status === 'completed'));
+      setReady(true);
+    } catch {
+      // バッジは補助表示。取れなければ 0 のままでよく、ナビ全体を巻き込まない
+      // （catch が無いと useEffect 内の未処理 rejection になっていた）。
+    }
+  }, []);
+
   useEffect(() => {
     if (!api || authLoading) return;
-    const client = api;
     let cancelled = false;
-
-    async function check() {
-      try {
-        // Issue #363 perf: 全発酵をバルク取得（questionId 省略）する。
-        // 旧来は /questions → 問いごとに /fermentations の N+1 だった。
-        const res = await client.fetch('/api/v1/fermentations');
-        if (!res.ok || cancelled) return;
-        const data: unknown = await res.json();
-        if (cancelled) return;
-        // normalizeSummaries が要素ごとに形を確かめる。配列でないレスポンス
-        // （エラーエンベロープ等）で TypeError にならないのが要点。
-        setLetters(normalizeSummaries(data).filter((s) => s.status === 'completed'));
-        setReady(true);
-      } catch {
-        // バッジは補助表示。取れなければ 0 のままでよく、ナビ全体を巻き込まない
-        // （catch が無いと useEffect 内の未処理 rejection になっていた）。
-      }
-    }
-
-    check();
+    load(api, () => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [api, authLoading]);
+  }, [api, authLoading, load]);
+
+  // アンマウント後に届いた refresh の返事を捨てるための旗。
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    if (!api || authLoading) return;
+    await load(api, () => !mounted.current);
+  }, [api, authLoading, load]);
+
+  /**
+   * 既読をサーバにも残す（`fermentation_results.read_at`）。ヘルプの五歩 ⑤ `hasReadLetter` は
+   * この列を読む。合図 'read' は **サーバが受け取ってから** 出す — ヘルプは合図で
+   * /users/me を取り直すので、先に出すと旧い旗を読んで ⑤ が進まない（API client は
+   * 書き込みで GET の憶えを捨てるので、書いたあとの取り直しは新しい旗になる）。
+   * 残せなくても手元の既読は立っているので投げない。合図は結果に関わらず出す
+   * （取り直しが旧い旗を読むだけで、害は無い）。
+   */
+  const persistRead = useCallback(
+    async (questionId: string) => {
+      try {
+        if (api) {
+          await api.fetch('/api/v1/fermentations/read', {
+            method: 'POST',
+            body: JSON.stringify({ questionId }),
+          });
+        }
+      } catch {
+        // 次に開いたときにまた送る。
+      } finally {
+        notifyActivity('read');
+      }
+    },
+    [api],
+  );
 
   const unreadLetters = useMemo(
     () => letters.filter((l) => isUnread(l, readAtByQuestion, lastSeenAt)),
@@ -186,8 +229,12 @@ export function useUnreadLetters(api: ApiClient | null, authLoading: boolean): U
         writeQuestionReadAt(next);
         return next;
       });
+      // 手紙を読んだ合図（ヘルプの五歩 ⑤ が聞く）は、サーバに残してから出す。PC の瓶が
+      // 円にならない問いを片付けるとき（jar-view の effect）もここを通り、そのぶんも
+      // サーバに残る（手元で既読なのにサーバで未読、という食い違いを作らない）。
+      void persistRead(questionId);
     },
-    [letters],
+    [letters, persistRead],
   );
 
   const markAllSeen = useCallback(() => {
@@ -204,6 +251,7 @@ export function useUnreadLetters(api: ApiClient | null, authLoading: boolean): U
       unreadFermentationIds,
       markQuestionRead,
       markAllSeen,
+      refresh,
     }),
     [
       ready,
@@ -212,6 +260,7 @@ export function useUnreadLetters(api: ApiClient | null, authLoading: boolean): U
       unreadFermentationIds,
       markQuestionRead,
       markAllSeen,
+      refresh,
     ],
   );
 }

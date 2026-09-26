@@ -60,6 +60,8 @@ export function paletteFor(theme: StudyTheme): StudyPalette {
  * 再マウントのたびに GPU 資源が積み上がる形で効いてくるが、画面には出ないので気づけない。
  */
 export interface StudyMaterials {
+  /** 文字テクスチャに使う墨の色。線（`ink`）と同じ色を canvas に渡すためのもの。 */
+  inkColor: string;
   solid: MeshBasicMaterial;
   /**
    * 遮る面。**深度を見ない線の上からも塗り潰せる**ほかは `solid` と同じ（色も不透明度も）。
@@ -83,6 +85,10 @@ export interface StudyMaterials {
   /** 当たり判定用の見えない面。 */
   hitbox: MeshBasicMaterial;
   sprite(map: Texture, opacity: number): SpriteMaterial;
+  /** 面に貼る文字テクスチャ（スプライトと違い、面の向きに従う）。 */
+  text(map: Texture, opacity: number): MeshBasicMaterial;
+  /** 外で複製した素材を預かる（`dispose` でまとめて捨てるため）。 */
+  adopt(...materials: Material[]): void;
   dispose(): void;
 }
 
@@ -170,6 +176,7 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
   const xrayCache = new Map<string, LineBasicMaterial>();
 
   return {
+    inkColor: palette.ink,
     solid,
     screen,
     paper,
@@ -217,6 +224,21 @@ export function createMaterials(theme: StudyTheme): StudyMaterials {
           depthWrite: false,
         }),
       );
+    },
+    text(map: Texture, opacity: number): MeshBasicMaterial {
+      // 文字も 1 枚ごとにテクスチャが違うのでキャッシュしない。紙の面の上に置くので、
+      // 深度は見るが書かない（同じ面の輪郭線と喧嘩させない）。
+      return own(
+        new MeshBasicMaterial({
+          map,
+          transparent: true,
+          opacity,
+          depthWrite: false,
+        }),
+      );
+    },
+    adopt(...materials: Material[]): void {
+      for (const material of materials) own(material);
     },
     dispose(): void {
       for (const material of owned) material.dispose();

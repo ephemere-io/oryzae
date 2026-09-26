@@ -43,6 +43,7 @@ interface Props {
   onAddQuestion?: (text: string) => Promise<void>;
   onEditQuestion?: (id: string, text: string) => Promise<void>;
   onArchiveQuestion?: (id: string) => Promise<void>;
+  emphasizeEmpty?: boolean;
 }
 
 const noopAsync = async () => {};
@@ -126,6 +127,19 @@ registerUnit<Props>({
       probe: true,
       description: 'Probe: 問い4件でもサークルは3件にキャップされる（questionCount=3）',
       props: { api: null, authLoading: false, questions: fourQuestions, onAddQuestion: noopAsync },
+    },
+    {
+      id: 'empty-emphasized',
+      probe: true,
+      description:
+        'Probe: 三歩の ①（emphasizeEmpty=true）。空の瓶を大きく見せる初回フィットで、追加ボタンが的になる',
+      props: {
+        api: null,
+        authLoading: false,
+        questions: [],
+        emphasizeEmpty: true,
+        onAddQuestion: noopAsync,
+      },
     },
     {
       id: 'readiness-bubbling',
@@ -255,6 +269,27 @@ registerUnit<Props>({
           `expected addAvailable=false & 3 circles & no add button, got addAvailable=${contract.addAvailable}, questionCount=${contract.questionCount}, hasAddBtn=${hasAddBtn}`
         );
       },
+    },
+    {
+      id: 'empty-emphasized-marks-add-button',
+      description:
+        'emphasizeEmpty=true は契約に出て、追加ボタンが三歩 ① の的（data-tutorial="question"）を持つ',
+      onlyFixtures: ['empty-emphasized'],
+      check: ({ root, contract }) => {
+        const target = root.querySelector('[data-tutorial="question"]');
+        return (
+          (contract.emphasizeEmpty === 'true' && target instanceof HTMLButtonElement) ||
+          `expected emphasizeEmpty=true & a data-tutorial="question" button, got emphasizeEmpty=${contract.emphasizeEmpty}, target=${target?.tagName ?? 'none'}`
+        );
+      },
+    },
+    {
+      id: 'emphasize-off-by-default',
+      description: 'emphasizeEmpty 未指定なら契約は false（既定は世界全体で開く）',
+      onlyFixtures: ['empty'],
+      check: ({ contract }) =>
+        contract.emphasizeEmpty === 'false' ||
+        `emphasizeEmpty 未指定なのに contract.emphasizeEmpty="${contract.emphasizeEmpty}"`,
     },
     {
       id: 'readiness-reaches-vessel',
