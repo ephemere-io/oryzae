@@ -11,6 +11,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { updateAuthUser } from '../../infrastructure/supabase-auth-user.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 import {
   ensureOAuthProfile,
@@ -309,11 +310,12 @@ export const authRoutes = new Hono()
       .object({ accessToken: z.string(), password: z.string().min(6) })
       .parse(await c.req.json());
 
-    const supabase = createUserSupabase(`Bearer ${accessToken}`);
-    const { error } = await supabase.auth.updateUser({ password });
+    // supabase.auth.updateUser() はヘッダーだけのクライアントでは必ず
+    // "Auth session missing!" になる（supabase-auth-user.ts）。
+    const { error } = await updateAuthUser(accessToken, { password });
 
     if (error) {
-      return c.json({ error: error.message }, 400);
+      return c.json({ error }, 400);
     }
 
     return c.json({ message: 'Password updated' });
@@ -382,12 +384,12 @@ export const authRoutes = new Hono()
     }
 
     // Update password
-    const { error: updateError } = await supabase.auth.updateUser({
+    const { error: updateError } = await updateAuthUser(authHeader.slice('Bearer '.length), {
       password: body.newPassword,
     });
 
     if (updateError) {
-      return c.json({ error: updateError.message }, 400);
+      return c.json({ error: updateError }, 400);
     }
 
     return c.json({ message: 'Password updated' });
@@ -410,10 +412,12 @@ export const authRoutes = new Hono()
 
     const body = changeEmailSchema.parse(await c.req.json());
 
-    const { error } = await supabase.auth.updateUser({ email: body.newEmail });
+    const { error } = await updateAuthUser(authHeader.slice('Bearer '.length), {
+      email: body.newEmail,
+    });
 
     if (error) {
-      return c.json({ error: error.message }, 400);
+      return c.json({ error }, 400);
     }
 
     return c.json({ message: '確認メールを送信しました' });
