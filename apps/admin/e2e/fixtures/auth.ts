@@ -10,7 +10,7 @@ export const test = base.extend<{ authenticated: void }>({
       await page.goto('/login');
       await page.fill('input[type="email"]', TEST_EMAIL);
       await page.fill('input[type="password"]', TEST_PASSWORD);
-      await page.click('button:has-text("ログイン")');
+      await page.click('button[type="submit"]');
       await page.waitForURL('**/dashboard**');
       await use();
     },

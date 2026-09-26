@@ -18,6 +18,13 @@ Browser → Next.js (same origin) → Hono (internal app.fetch()) → Supabase C
 | admin | https://oryzae-admin.vercel.app | oryzae-admin | ephemere-io/oryzae | 管理画面・Observability |
 | docs | https://docs.oryzae.ephemere.io | oryzae-docs | **ephemere-io/oryzae-docs** | 公開サイト（LP・/support・/privacy） |
 
+**管理画面の Google ログインは、Supabase の Redirect URLs に管理画面の戻り先が要る。**
+Authentication → URL Configuration → Redirect URLs に `https://oryzae-admin.vercel.app/auth/callback`
+（preview で試すなら `https://oryzae-admin-*-ephemere-io.vercel.app/auth/callback` も）を足す。
+無いと Supabase は Site URL（クライアントアプリ）へ戻してしまい、管理画面にはログインできない。
+管理画面は `/oauth/finalize` を呼ばないので、管理者でない Google アカウントで押してもアプリの利用者は増えない
+（Supabase Auth のユーザー行だけは Supabase 側の仕様で作られる）。
+
 **公開サイトは別リポジトリ・別ドメイン。** ログインしていない人が見るものだけを分離してある。
 認証もデータベースも持たず、設計ドキュメント（`docs/`）もこのリポジトリに残る。
 
