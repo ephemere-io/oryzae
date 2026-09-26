@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TranscribeEntryPhotoUsecase } from '@/contexts/entry/application/usecases/transcribe-entry-photo.usecase';
 import type { PhotoTranscriptionGateway } from '@/contexts/entry/domain/gateways/photo-transcription.gateway';
 import { SpendLimitReachedError } from '@/contexts/shared/application/errors/application.errors';
-import type { LlmUsageRecorder } from '@/contexts/shared/domain/gateways/llm-usage-recorder.gateway';
+import type { OcrUsageRecorder } from '@/contexts/shared/domain/gateways/ocr-usage-recorder.gateway';
 
 describe('TranscribeEntryPhotoUsecase', () => {
   let transcription: PhotoTranscriptionGateway;
-  let usage: LlmUsageRecorder;
+  let usage: OcrUsageRecorder;
   let usecase: TranscribeEntryPhotoUsecase;
 
   const input = {
@@ -85,7 +85,7 @@ describe('TranscribeEntryPhotoUsecase', () => {
 
       expect(usage.record).toHaveBeenCalledWith({
         userId: 'user-1',
-        feature: 'ocr_entry',
+        source: 'entry',
         model: 'claude-sonnet-5',
         inputTokens: 1800,
         outputTokens: 40,
@@ -98,7 +98,7 @@ describe('TranscribeEntryPhotoUsecase', () => {
 
       await expect(usecase.execute(input)).rejects.toThrow('llm unavailable');
       expect(usage.record).toHaveBeenCalledWith(
-        expect.objectContaining({ feature: 'ocr_entry', succeeded: false, model: null }),
+        expect.objectContaining({ source: 'entry', succeeded: false, model: null }),
       );
     });
 

@@ -16,9 +16,9 @@ interface FermentationRow {
   created_at: string;
 }
 
-interface LlmUsageRow {
+interface OcrUsageRow {
   user_id: string;
-  feature: 'ocr_board' | 'ocr_entry';
+  source: 'board' | 'entry';
   input_tokens: number | null;
   output_tokens: number | null;
   succeeded: boolean;
@@ -36,9 +36,9 @@ const supabaseState: {
   profiles: { id: string; nickname: string }[];
   listUsersShouldThrow: boolean;
   listUsersCalls: number;
-  /** llm_usage_events（ボード OCR / 写真の文字起こしの利用記録）の応答。 */
-  llmUsage: LlmUsageRow[];
-  llmUsageError: { message: string } | null;
+  /** ocr_usage_events（ボード OCR / 写真の文字起こしの利用記録）の応答。 */
+  ocrUsage: OcrUsageRow[];
+  ocrUsageError: { message: string } | null;
 } = {
   rows: [],
   error: null,
@@ -48,8 +48,8 @@ const supabaseState: {
   profiles: [],
   listUsersShouldThrow: false,
   listUsersCalls: 0,
-  llmUsage: [],
-  llmUsageError: null,
+  ocrUsage: [],
+  ocrUsageError: null,
 };
 
 vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
@@ -82,21 +82,21 @@ vi.mock('@/contexts/shared/infrastructure/supabase-client.js', () => ({
       }),
     };
     // 利用記録は発酵とは別の表。範囲の記録（capturedRange）は発酵のクエリだけが使う。
-    const llmUsageBuilder = {
-      gte: () => llmUsageBuilder,
-      lte: () => llmUsageBuilder,
-      order: () => llmUsageBuilder,
+    const ocrUsageBuilder = {
+      gte: () => ocrUsageBuilder,
+      lte: () => ocrUsageBuilder,
+      order: () => ocrUsageBuilder,
       range: (from: number) =>
         Promise.resolve(
-          supabaseState.llmUsageError
-            ? { data: null, error: supabaseState.llmUsageError }
-            : { data: from === 0 ? supabaseState.llmUsage : [], error: null },
+          supabaseState.ocrUsageError
+            ? { data: null, error: supabaseState.ocrUsageError }
+            : { data: from === 0 ? supabaseState.ocrUsage : [], error: null },
         ),
     };
     return {
       from: (table: string) => {
         if (table === 'profiles') return profiles;
-        if (table === 'llm_usage_events') return { select: () => llmUsageBuilder };
+        if (table === 'ocr_usage_events') return { select: () => ocrUsageBuilder };
         return { select: () => builder };
       },
       auth: {
@@ -312,8 +312,8 @@ describe('cronCostAlert', () => {
     mockFetch.mockImplementation((url: string) => routeAnthropic(String(url)));
     vi.stubGlobal('fetch', mockFetch);
     supabaseState.rows = [];
-    supabaseState.llmUsage = [];
-    supabaseState.llmUsageError = null;
+    supabaseState.ocrUsage = [];
+    supabaseState.ocrUsageError = null;
     supabaseState.error = null;
     supabaseState.shouldThrow = false;
     supabaseState.capturedRange = {};
@@ -1065,31 +1065,31 @@ describe('cronCostAlert', () => {
   // 発酵だけでなく、ボード OCR と写真の文字起こしも誰が使ったかを出す。
   describe('ボード OCR / 写真の文字起こし（誰が何回使ったか）', () => {
     it('機能ごとに回数・人数・トークンと、使った人を名前 (メール) で出す', async () => {
-      supabaseState.llmUsage = [
+      supabaseState.ocrUsage = [
         {
           user_id: 'aaaaaaaa-1111',
-          feature: 'ocr_board',
+          source: 'board',
           input_tokens: 1200,
           output_tokens: 20,
           succeeded: true,
         },
         {
           user_id: 'aaaaaaaa-1111',
-          feature: 'ocr_board',
+          source: 'board',
           input_tokens: 1000,
           output_tokens: 10,
           succeeded: true,
         },
         {
           user_id: 'bbbbbbbb-2222',
-          feature: 'ocr_board',
+          source: 'board',
           input_tokens: null,
           output_tokens: null,
           succeeded: false,
         },
         {
           user_id: 'bbbbbbbb-2222',
-          feature: 'ocr_entry',
+          source: 'entry',
           input_tokens: 1800,
           output_tokens: 40,
           succeeded: true,
@@ -1118,9 +1118,9 @@ describe('cronCostAlert', () => {
           '└ baba@example.com: 1 回・入 1,800 / 出 40 tok',
         ].join('\n'),
       );
-      expect(body.llmUsage).toEqual({
-        ocr_board: { count: 3, failedCount: 1, userCount: 2 },
-        ocr_entry: { count: 1, failedCount: 0, userCount: 1 },
+      expect(body.ocrUsage).toEqual({
+        board: { count: 3, failedCount: 1, userCount: 2 },
+        entry: { count: 1, failedCount: 0, userCount: 1 },
       });
     });
 
@@ -1133,8 +1133,8 @@ describe('cronCostAlert', () => {
 
     // migration 未適用だと記録のテーブルが無い。それを「0 回」と書くと使われていないように読める。
     it('記録を読めなかった日は 0 回と書かず、読めなかったと書く', async () => {
-      supabaseState.llmUsageError = {
-        message: 'relation "public.llm_usage_events" does not exist',
+      supabaseState.ocrUsageError = {
+        message: 'relation "public.ocr_usage_events" does not exist',
       };
 
       await createApp().request('/cron', { method: 'POST', headers: validHeaders });
@@ -1145,10 +1145,10 @@ describe('cronCostAlert', () => {
 
     it('発酵と OCR の利用者は 1 回でまとめて名前を引く（listUsers は最大 20 往復する）', async () => {
       supabaseState.rows = [fermentation({ user_id: 'aaaaaaaa-1111' })];
-      supabaseState.llmUsage = [
+      supabaseState.ocrUsage = [
         {
           user_id: 'bbbbbbbb-2222',
-          feature: 'ocr_entry',
+          source: 'entry',
           input_tokens: 10,
           output_tokens: 1,
           succeeded: true,

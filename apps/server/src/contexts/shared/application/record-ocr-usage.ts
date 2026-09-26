@@ -1,7 +1,7 @@
 import type {
-  LlmUsageEvent,
-  LlmUsageRecorder,
-} from '../domain/gateways/llm-usage-recorder.gateway.js';
+  OcrUsageEvent,
+  OcrUsageRecorder,
+} from '../domain/gateways/ocr-usage-recorder.gateway.js';
 
 /**
  * 記録に失敗しても、ユーザーの操作は失敗させない。
@@ -14,14 +14,14 @@ import type {
  *
  * ログには本文を載せない（載せられる値をそもそも持っていない）。
  */
-export async function recordLlmUsage(
-  recorder: LlmUsageRecorder,
-  event: LlmUsageEvent,
+export async function recordOcrUsage(
+  recorder: OcrUsageRecorder,
+  event: OcrUsageEvent,
 ): Promise<void> {
   try {
     await recorder.record(event);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[llm-usage] record failed', { feature: event.feature, error: message });
+    console.error('[ocr-usage] record failed', { source: event.source, error: message });
   }
 }

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { LlmUsageFeature } from '../../domain/gateways/llm-usage-recorder.gateway.js';
+import type { OcrUsageSource } from '../../domain/gateways/ocr-usage-recorder.gateway.js';
 import {
   type ActualCostResult,
   ANTHROPIC_COST_CONSOLE_URL,
@@ -32,7 +32,7 @@ import {
   utcDayRangeIso,
   utcMonthBounds,
 } from '../../infrastructure/jst-day.js';
-import { fetchLlmUsage, type LlmUsageResult } from '../../infrastructure/llm-usage-query.js';
+import { fetchOcrUsage, type OcrUsageResult } from '../../infrastructure/ocr-usage-query.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
 import {
   buildWorkspaceRows,
@@ -316,15 +316,15 @@ function buildFermentationField(
 }
 
 /**
- * ボード OCR / 写真の文字起こしの「誰が何回使ったか」。llm_usage_events が材料。
+ * ボード OCR / 写真の文字起こしの「誰が何回使ったか」。ocr_usage_events が材料。
  *
  * 金額は出さない（OCR のモデルは価格表に載せていない。実額は Workspace 別に上で出ている）。
  * 記録を読めなかったときは 0 回と書かない（migration 未適用だとテーブルが無い）。
  */
-function buildLlmUsageField(
+function buildOcrUsageField(
   title: string,
-  feature: LlmUsageFeature,
-  usage: LlmUsageResult,
+  source: OcrUsageSource,
+  usage: OcrUsageResult,
   labels: Map<string, string>,
   window: string,
 ): DiscordField {
@@ -336,7 +336,7 @@ function buildLlmUsageField(
       inline: false,
     };
   }
-  const agg = usage.byFeature[feature];
+  const agg = usage.bySource[source];
   if (agg.count === 0) return { name, value: '0 回', inline: false };
   const lines = [
     `${agg.count} 回（成功 ${agg.succeededCount} / 失敗 ${agg.failedCount}）・${agg.byUser.length} 人・入 ${tokens(agg.inputTokens)} / 出 ${tokens(agg.outputTokens)} tok`,
@@ -529,12 +529,12 @@ export const cronCostAlert = new Hono()
 
       // 前日比・今月の累計・月末の見込み。対象日の内訳と混ざらないよう、月ぶんは別呼び出し。
       // キー別のトークン数・Workspace 一覧・OCR の利用記録も、どれも独立なので並行に取る。
-      const [trendResult, detail, llmUsage] = await Promise.all([
+      const [trendResult, detail, ocrUsage] = await Promise.all([
         fetchTrend(actual, dateKey),
         actual.kind === 'ok'
           ? fetchUsageDetail(start, end)
           : Promise.resolve<UsageDetailResult>({ kind: 'not-configured' }),
-        fetchLlmUsage(supabase, { startIso, endIso }),
+        fetchOcrUsage(supabase, { startIso, endIso }),
       ]);
       const trend = trendResult?.trend ?? null;
 
@@ -554,8 +554,8 @@ export const cronCostAlert = new Hono()
 
       // 誰が使ったか: 発酵・ボード OCR・写真の文字起こしのユーザーを 1 回でまとめて引く。
       const usageUserIds =
-        llmUsage.kind === 'ok'
-          ? [...llmUsage.byFeature.ocr_board.byUser, ...llmUsage.byFeature.ocr_entry.byUser].map(
+        ocrUsage.kind === 'ok'
+          ? [...ocrUsage.bySource.board.byUser, ...ocrUsage.bySource.entry.byUser].map(
               (u) => u.userId,
             )
           : [];
@@ -592,8 +592,8 @@ export const cronCostAlert = new Hono()
       }
 
       fields.push(buildFermentationField(aggregate, labels, dayWindow));
-      fields.push(buildLlmUsageField('ボード OCR', 'ocr_board', llmUsage, labels, dayWindow));
-      fields.push(buildLlmUsageField('写真の文字起こし', 'ocr_entry', llmUsage, labels, dayWindow));
+      fields.push(buildOcrUsageField('ボード OCR', 'board', ocrUsage, labels, dayWindow));
+      fields.push(buildOcrUsageField('写真の文字起こし', 'entry', ocrUsage, labels, dayWindow));
 
       // 計算そのものを疑う場面でだけ式を出す。
       const basisNeeded =
@@ -672,20 +672,20 @@ export const cronCostAlert = new Hono()
         outputTokens: aggregate.outputTokens,
         userCount: aggregate.byUser.length,
         truncated: rows.truncated,
-        /** ボード OCR / 写真の文字起こしの回数とユーザー数（llm_usage_events）。 */
-        llmUsage:
-          llmUsage.kind === 'ok'
+        /** ボード OCR / 写真の文字起こしの回数とユーザー数（ocr_usage_events）。 */
+        ocrUsage:
+          ocrUsage.kind === 'ok'
             ? Object.fromEntries(
-                (['ocr_board', 'ocr_entry'] satisfies LlmUsageFeature[]).map((f) => [
+                (['board', 'entry'] satisfies OcrUsageSource[]).map((f) => [
                   f,
                   {
-                    count: llmUsage.byFeature[f].count,
-                    failedCount: llmUsage.byFeature[f].failedCount,
-                    userCount: llmUsage.byFeature[f].byUser.length,
+                    count: ocrUsage.bySource[f].count,
+                    failedCount: ocrUsage.bySource[f].failedCount,
+                    userCount: ocrUsage.bySource[f].byUser.length,
                   },
                 ]),
               )
-            : { status: 'error', message: llmUsage.message },
+            : { status: 'error', message: ocrUsage.message },
         thresholdExceeded,
         notices,
       });

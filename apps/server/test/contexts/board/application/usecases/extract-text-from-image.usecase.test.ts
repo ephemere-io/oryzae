@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardOcrValidationError } from '@/contexts/board/application/errors/board.errors';
 import { ExtractTextFromImageUsecase } from '@/contexts/board/application/usecases/extract-text-from-image.usecase';
 import type { OcrGateway } from '@/contexts/board/domain/gateways/ocr.gateway';
-import type { LlmUsageRecorder } from '@/contexts/shared/domain/gateways/llm-usage-recorder.gateway';
+import type { OcrUsageRecorder } from '@/contexts/shared/domain/gateways/ocr-usage-recorder.gateway';
 
 let ocr: OcrGateway;
-let usage: LlmUsageRecorder;
+let usage: OcrUsageRecorder;
 let usecase: ExtractTextFromImageUsecase;
 
 const USER_ID = 'user-1';
@@ -116,7 +116,7 @@ describe('ExtractTextFromImageUsecase', () => {
 
       expect(usage.record).toHaveBeenCalledWith({
         userId: USER_ID,
-        feature: 'ocr_board',
+        source: 'board',
         model: 'claude-sonnet-5',
         inputTokens: 100,
         outputTokens: 10,
@@ -131,7 +131,7 @@ describe('ExtractTextFromImageUsecase', () => {
         usecase.execute({ userId: USER_ID, image: imageOf(1024), mediaType: 'image/png' }),
       ).rejects.toThrow('llm unavailable');
       expect(usage.record).toHaveBeenCalledWith(
-        expect.objectContaining({ feature: 'ocr_board', succeeded: false, model: null }),
+        expect.objectContaining({ source: 'board', succeeded: false, model: null }),
       );
     });
 

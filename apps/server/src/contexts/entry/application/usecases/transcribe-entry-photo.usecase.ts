@@ -1,6 +1,6 @@
 import { SpendLimitReachedError } from '../../../shared/application/errors/application.errors.js';
-import { recordLlmUsage } from '../../../shared/application/record-llm-usage.js';
-import type { LlmUsageRecorder } from '../../../shared/domain/gateways/llm-usage-recorder.gateway.js';
+import { recordOcrUsage } from '../../../shared/application/record-ocr-usage.js';
+import type { OcrUsageRecorder } from '../../../shared/domain/gateways/ocr-usage-recorder.gateway.js';
 import { isSpendLimitError } from '../../../shared/infrastructure/anthropic-spend-limit.js';
 import type { PhotoTranscriptionGateway } from '../../domain/gateways/photo-transcription.gateway.js';
 
@@ -24,14 +24,14 @@ interface TranscribeEntryPhotoResponse {
  * 設計にしているため（OCR は必ず外すので、勝手に本文を書き換えない）。本文に入れた
  * あとは通常のエントリ保存フローに乗る。
  *
- * 呼び出し 1 回ごとに「誰が・どのモデルで・何トークン」を llm_usage_events に残す
+ * 呼び出し 1 回ごとに「誰が・どのモデルで・何トークン」を ocr_usage_events に残す
  * （日次コストレポートのユーザー別内訳のため。起こした文字は残さない）。
  * 金額は持たない——実請求額は Cost API（`anthropic-cost-api.ts`）が Workspace 別に取る。
  */
 export class TranscribeEntryPhotoUsecase {
   constructor(
     private transcription: PhotoTranscriptionGateway,
-    private usage: LlmUsageRecorder,
+    private usage: OcrUsageRecorder,
   ) {}
 
   async execute(input: TranscribeEntryPhotoInput): Promise<TranscribeEntryPhotoResponse> {
@@ -41,9 +41,9 @@ export class TranscribeEntryPhotoUsecase {
         input.contentType,
         input.language,
       );
-      await recordLlmUsage(this.usage, {
+      await recordOcrUsage(this.usage, {
         userId: input.userId,
-        feature: 'ocr_entry',
+        source: 'entry',
         model: result.model,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -51,9 +51,9 @@ export class TranscribeEntryPhotoUsecase {
       });
       return { text: result.text };
     } catch (error) {
-      await recordLlmUsage(this.usage, {
+      await recordOcrUsage(this.usage, {
         userId: input.userId,
-        feature: 'ocr_entry',
+        source: 'entry',
         model: null,
         inputTokens: null,
         outputTokens: null,

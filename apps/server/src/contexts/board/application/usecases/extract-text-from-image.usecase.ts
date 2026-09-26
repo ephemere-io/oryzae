@@ -1,6 +1,6 @@
 import { MAX_OCR_IMAGE_BYTES, OCR_ALLOWED_IMAGE_TYPES } from '@oryzae/shared';
-import { recordLlmUsage } from '../../../shared/application/record-llm-usage.js';
-import type { LlmUsageRecorder } from '../../../shared/domain/gateways/llm-usage-recorder.gateway.js';
+import { recordOcrUsage } from '../../../shared/application/record-ocr-usage.js';
+import type { OcrUsageRecorder } from '../../../shared/domain/gateways/ocr-usage-recorder.gateway.js';
 import type { OcrGateway } from '../../domain/gateways/ocr.gateway.js';
 import { BoardOcrValidationError } from '../errors/board.errors.js';
 
@@ -29,7 +29,7 @@ function isAllowedMediaType(mediaType: string): boolean {
 export class ExtractTextFromImageUsecase {
   constructor(
     private ocr: OcrGateway,
-    private usage: LlmUsageRecorder,
+    private usage: OcrUsageRecorder,
   ) {}
 
   async execute(input: ExtractTextFromImageInput): Promise<ExtractTextFromImageResponse> {
@@ -53,9 +53,9 @@ export class ExtractTextFromImageUsecase {
         mediaType: input.mediaType,
       });
     } catch (error) {
-      await recordLlmUsage(this.usage, {
+      await recordOcrUsage(this.usage, {
         userId: input.userId,
-        feature: 'ocr_board',
+        source: 'board',
         model: null,
         inputTokens: null,
         outputTokens: null,
@@ -64,9 +64,9 @@ export class ExtractTextFromImageUsecase {
       throw error;
     }
 
-    await recordLlmUsage(this.usage, {
+    await recordOcrUsage(this.usage, {
       userId: input.userId,
-      feature: 'ocr_board',
+      source: 'board',
       model: result.model,
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
