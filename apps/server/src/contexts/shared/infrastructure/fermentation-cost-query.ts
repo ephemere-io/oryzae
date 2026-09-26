@@ -1,16 +1,17 @@
 /**
- * fermentation_results からコスト集計を作る共通処理。
+ * 発酵のコスト集計を作る共通処理。
  *
- * ここが返すコストは **推定値** である（保存済みトークン × claude-pricing.ts の価格表）。
+ * 件数・状態は fermentation_results、トークン数は ai_usage（発酵ごとに合計）から読む。
+ * ここが返すコストは **推定値** である（ai_usage のトークン × claude-pricing.ts の価格表）。
  * 実請求額は anthropic-cost-api.ts の cost_report が正。Anthropic 側は Oryzae の
  * ユーザーを知らないため、ユーザー別内訳だけはこの推定でしか出せない。
  * 表示・通知では必ず「推定」と明示すること。
  *
- * issue #352 以降 generation_id は発行されないので、フィルタは input_tokens 基準にする。
- * 旧 generation_id 方式のレコード（トークン未保存）は untrackedCount に計上して、
- * 「集計から漏れている件数」を隠さない。
+ * トークンの記録が無い発酵（AI Gateway 時代・AI を呼ぶ前に失敗したもの）は
+ * untrackedCount に計上して、「集計から漏れている件数」を隠さない。
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchFermentationTokens } from './ai-usage-query.js';
 import { computeCostFromTokens } from './claude-pricing.js';
 import { readString, toRecordArray } from './row.js';
 
@@ -42,7 +43,7 @@ export interface CostAggregate {
   fermentationCount: number;
   completedCount: number;
   failedCount: number;
-  /** トークン未保存でコストを算出できなかった件数。過少計上の度合いを示す。 */
+  /** トークンの記録が無くコストを算出できなかった件数。過少計上の度合いを示す。 */
   untrackedCount: number;
   /** 推定コスト降順。 */
   byUser: UserCostAggregate[];
@@ -62,10 +63,6 @@ interface FetchOptions {
   userId?: string;
 }
 
-function toNullableNumber(value: unknown): number | null {
-  return typeof value === 'number' ? value : null;
-}
-
 /**
  * 期間内の fermentation_results を **全件** 取得する。
  *
@@ -79,9 +76,7 @@ export async function fetchFermentationCostRows(
   const rows: FermentationCostRow[] = [];
 
   for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex++) {
-    let query = supabase
-      .from('fermentation_results')
-      .select('user_id, status, input_tokens, output_tokens, created_at');
+    let query = supabase.from('fermentation_results').select('id, user_id, status, created_at');
     if (options.userId) query = query.eq('user_id', options.userId);
     if (options.startIso) query = query.gte('created_at', options.startIso);
     if (options.endIso) query = query.lte('created_at', options.endIso);
@@ -93,14 +88,19 @@ export async function fetchFermentationCostRows(
 
     if (error) throw new Error(error.message);
 
-    const batch = data ?? [];
+    const batch = toRecordArray(data ?? [], 'fermentation_results');
+    const tokens = await fetchFermentationTokens(
+      supabase,
+      batch.map((row) => readString(row, 'id')),
+    );
     for (const row of batch) {
+      const used = tokens.get(readString(row, 'id'));
       rows.push({
-        userId: row.user_id,
-        status: row.status,
-        inputTokens: toNullableNumber(row.input_tokens),
-        outputTokens: toNullableNumber(row.output_tokens),
-        createdAt: row.created_at,
+        userId: readString(row, 'user_id'),
+        status: readString(row, 'status'),
+        inputTokens: used?.inputTokens ?? null,
+        outputTokens: used?.outputTokens ?? null,
+        createdAt: readString(row, 'created_at'),
       });
     }
 

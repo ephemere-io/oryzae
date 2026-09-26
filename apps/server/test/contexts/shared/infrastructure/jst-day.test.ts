@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  jstClockLabel,
+  jstTimeRange,
   jstTimeRangeOfUtcDay,
   previousUtcDateKey,
   toUtcDateKey,
@@ -79,5 +81,20 @@ describe('jstTimeRangeOfUtcDay', () => {
   it('crosses month and year boundaries in the JST end time', () => {
     expect(jstTimeRangeOfUtcDay('2026-08-31')).toBe('8/31 9:00 〜 9/1 9:00 (JST)');
     expect(jstTimeRangeOfUtcDay('2026-12-31')).toBe('12/31 9:00 〜 1/1 9:00 (JST)');
+  });
+});
+
+// 月累計（9/1 〜 当日）のような 1 日より長い窓も、日次と同じ書き方で区切る。
+describe('jstTimeRange', () => {
+  it('UTC の月初から翌日 0 時までを JST の時刻で書く', () => {
+    expect(jstTimeRange(new Date('2026-09-01T00:00:00Z'), new Date('2026-09-26T00:00:00Z'))).toBe(
+      '9/1 9:00 〜 9/26 9:00 (JST)',
+    );
+  });
+});
+
+describe('jstClockLabel', () => {
+  it('UTC の月末（翌月 1 日 0 時）を JST の時刻で書く', () => {
+    expect(jstClockLabel(new Date('2026-10-01T00:00:00Z'))).toBe('10/1 9:00 (JST)');
   });
 });

@@ -3,6 +3,7 @@ import type { Entry } from '../../../entry/domain/models/entry.js';
 import type { EntryQuestionLinkRepositoryGateway } from '../../../question/domain/gateways/entry-question-link-repository.gateway.js';
 import type { QuestionRepositoryGateway } from '../../../question/domain/gateways/question-repository.gateway.js';
 import type { QuestionTransactionRepositoryGateway } from '../../../question/domain/gateways/question-transaction-repository.gateway.js';
+import type { AiUsageRecorder } from '../../../shared/domain/gateways/ai-usage-recorder.gateway.js';
 import type { FermentationRepositoryGateway } from '../../domain/gateways/fermentation-repository.gateway.js';
 import type { LlmAnalysisGateway } from '../../domain/gateways/llm-analysis.gateway.js';
 import type { FermentationLanguage } from '../../domain/services/fermentation-eligibility.service.js';
@@ -36,6 +37,7 @@ export class FireFermentationUsecase {
     private entryQuestionLinkRepo: EntryQuestionLinkRepositoryGateway,
     private fermentationRepo: FermentationRepositoryGateway,
     private llmGateway: LlmAnalysisGateway,
+    private usage: AiUsageRecorder,
     private generateId: () => string,
   ) {}
 
@@ -65,6 +67,7 @@ export class FireFermentationUsecase {
     const runUsecase = new RunFermentationUsecase(
       this.fermentationRepo,
       this.llmGateway,
+      this.usage,
       this.generateId,
     );
 

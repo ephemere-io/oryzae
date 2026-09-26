@@ -4,6 +4,7 @@ import { SupabaseEntryQuestionLinkRepository } from '../../../question/infrastru
 import { SupabaseQuestionRepository } from '../../../question/infrastructure/repositories/supabase-question.repository.js';
 import { SupabaseQuestionTransactionRepository } from '../../../question/infrastructure/repositories/supabase-question-transaction.repository.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
+import { SupabaseAiUsageRecorder } from '../../../shared/infrastructure/supabase-ai-usage-recorder.js';
 import { getSupabaseClient } from '../../../shared/infrastructure/supabase-client.js';
 import { createCronAuthMiddleware } from '../../../shared/presentation/middleware/cron-auth.js';
 import {
@@ -42,6 +43,7 @@ export const cronFermentation = new Hono()
     const userStateRepo = new SupabaseUserFermentationStateRepository(supabase);
     const localeResolver = new SupabaseUserLocaleResolver(supabase);
     const llmGateway = new VercelAiAnalysisGateway();
+    const aiUsage = new SupabaseAiUsageRecorder(supabase);
 
     const digestUsecase = new SendFermentationDigestUsecase(
       new ResendEmailNotifier(),
@@ -57,6 +59,7 @@ export const cronFermentation = new Hono()
       userStateRepo,
       localeResolver,
       llmGateway,
+      aiUsage,
       generateId,
       () => listActiveUserIds(supabase),
       (userId, titles, language) =>
@@ -84,6 +87,7 @@ export const cronFermentation = new Hono()
       questionTransactionRepo,
       localeResolver,
       llmGateway,
+      aiUsage,
       generateId,
       (userId, titles, language) =>
         digestUsecase.execute({ userId, questionTitles: titles, language }),

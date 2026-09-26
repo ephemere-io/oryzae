@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   readEnum,
-  readNumberOrNull,
   readString,
   readStringOrNull,
   toRecordArray,
@@ -48,9 +47,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       .from('fermentation_results')
       .update({
         status: props.status,
-        generation_id: props.generationId,
-        input_tokens: props.inputTokens,
-        output_tokens: props.outputTokens,
         error_message: props.errorMessage,
         updated_at: new Date().toISOString(),
       })
@@ -71,9 +67,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
       questionId: data.question_id,
       targetPeriod: data.target_period,
       status: data.status,
-      generationId: data.generation_id ?? null,
-      inputTokens: data.input_tokens ?? null,
-      outputTokens: data.output_tokens ?? null,
       errorMessage: data.error_message ?? null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
@@ -164,9 +157,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         questionId: readString(row, 'question_id'),
         targetPeriod: readString(row, 'target_period'),
         status: readEnum(row, 'status', FERMENTATION_STATUSES),
-        generationId: readStringOrNull(row, 'generation_id'),
-        inputTokens: readNumberOrNull(row, 'input_tokens'),
-        outputTokens: readNumberOrNull(row, 'output_tokens'),
         errorMessage: readStringOrNull(row, 'error_message'),
         createdAt: readString(row, 'created_at'),
         updatedAt: readString(row, 'updated_at'),
@@ -188,9 +178,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         questionId: readString(row, 'question_id'),
         targetPeriod: readString(row, 'target_period'),
         status: readEnum(row, 'status', FERMENTATION_STATUSES),
-        generationId: readStringOrNull(row, 'generation_id'),
-        inputTokens: readNumberOrNull(row, 'input_tokens'),
-        outputTokens: readNumberOrNull(row, 'output_tokens'),
         errorMessage: readStringOrNull(row, 'error_message'),
         createdAt: readString(row, 'created_at'),
         updatedAt: readString(row, 'updated_at'),
@@ -215,9 +202,6 @@ export class SupabaseFermentationRepository implements FermentationRepositoryGat
         questionId: readString(row, 'question_id'),
         targetPeriod: readString(row, 'target_period'),
         status: readEnum(row, 'status', FERMENTATION_STATUSES),
-        generationId: readStringOrNull(row, 'generation_id'),
-        inputTokens: readNumberOrNull(row, 'input_tokens'),
-        outputTokens: readNumberOrNull(row, 'output_tokens'),
         errorMessage: readStringOrNull(row, 'error_message'),
         createdAt: readString(row, 'created_at'),
         updatedAt: readString(row, 'updated_at'),

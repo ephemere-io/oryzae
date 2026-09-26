@@ -226,8 +226,6 @@ export class VercelAiAnalysisGateway implements LlmAnalysisGateway {
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,
       },
-      // issue #352: Anthropic API 直叩きに変更したため Vercel AI Gateway の generation_id は発行されない。
-      generationId: undefined,
     };
   }
 }

@@ -12,6 +12,9 @@ import type { QuestionRepositoryGateway } from '@/contexts/question/domain/gatew
 import type { QuestionTransactionRepositoryGateway } from '@/contexts/question/domain/gateways/question-transaction-repository.gateway.js';
 import { Question } from '@/contexts/question/domain/models/question.js';
 import { QuestionTransaction } from '@/contexts/question/domain/models/question-transaction.js';
+import type { AiUsageRecorder } from '@/contexts/shared/domain/gateways/ai-usage-recorder.gateway.js';
+
+const noopUsage: AiUsageRecorder = { record: async () => {} };
 
 const generateId = () => 'test-id';
 const NOW = new Date('2026-05-06T03:00:00.000Z');
@@ -143,7 +146,6 @@ function mockLlm(): LlmAnalysisGateway {
         keywords: [{ keyword: 'test', description: 'a keyword' }],
       },
       usage: { inputTokens: 100, outputTokens: 200 },
-      generationId: 'gen_test',
     }),
   };
 }
@@ -174,6 +176,7 @@ function buildUsecase(args: BuildArgs = {}) {
     args.userStateRepo ?? mockUserStateRepo(),
     args.localeResolver ?? mockLocaleResolver(),
     args.llm ?? mockLlm(),
+    noopUsage,
     generateId,
     vi.fn().mockResolvedValue(args.userIds ?? []),
     args.sendDigest ?? vi.fn().mockResolvedValue(undefined),
@@ -755,7 +758,6 @@ describe('ScheduledFermentationUsecase (issue #268: 自動発火条件)', () => 
             keywords: [{ keyword: 'k', description: 'd' }],
           },
           usage: { inputTokens: 1, outputTokens: 1 },
-          generationId: 'gen_concurrency',
         };
       }),
     };

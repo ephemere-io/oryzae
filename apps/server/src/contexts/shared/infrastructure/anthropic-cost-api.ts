@@ -37,6 +37,10 @@
 const COST_REPORT_URL = 'https://api.anthropic.com/v1/organizations/cost_report';
 /** Workspace の id → 名前を引く。cost_report は id しか返さない。 */
 const WORKSPACES_URL = 'https://api.anthropic.com/v1/organizations/workspaces';
+/** API キーの名前と所属 Workspace。Console 上の名前をレポートに出すため。 */
+const API_KEYS_URL = 'https://api.anthropic.com/v1/organizations/api_keys';
+/** キー別のトークン数。cost_report はキー別に割れないので、こちらで補う（金額ではない）。 */
+const USAGE_REPORT_URL = 'https://api.anthropic.com/v1/organizations/usage_report/messages';
 /**
  * 実額の出典（人が見る側）。画面・通知からここへ飛ばして数字を突き合わせられるようにする。
  * Console はモデル別に加えて **API キー別** にも割れるので、この API より細かく見られる。
@@ -66,9 +70,13 @@ const UNKNOWN_TOKEN_TYPE_LABEL = '(その他)';
  * `workspace_id: null` の行。ドキュメントに「default workspace の利用は null」と
  * 明記されているので、これは推測ではなく仕様どおりの読み替え。
  */
-const DEFAULT_WORKSPACE_LABEL = 'Default Workspace';
-/** Workspace 一覧の取得上限。Workspace は 1 org あたり最大 100。 */
-const WORKSPACE_PAGES = 5;
+export const DEFAULT_WORKSPACE_LABEL = 'Default Workspace';
+/**
+ * Workspace・API キー一覧のページ上限。どちらも 1 ページ最大 1000 件
+ * （ドキュメント）なので、実質 1 往復で足りる。
+ */
+const LIST_PAGES = 5;
+const LIST_PAGE_SIZE = '1000';
 
 interface DailyActualCost {
   /** UTC 日 (YYYY-MM-DD)。cost_report のバケットは UTC 固定。 */
@@ -232,44 +240,222 @@ function parseBucket(bucket: unknown): ParsedBucket | null {
   return { daily: { date: startingAt.slice(0, 10), costUsd }, items };
 }
 
+function adminHeaders(adminKey: string): Record<string, string> {
+  return {
+    'x-api-key': adminKey,
+    'anthropic-version': ANTHROPIC_VERSION,
+    'User-Agent': 'Oryzae/1.0 (https://github.com/ephemere-io/oryzae)',
+  };
+}
+
 /**
- * Workspace の id → 名前。失敗しても **例外にしない**（null を返す）。
+ * `after_id` / `has_more` / `last_id` 方式の一覧を全件読む（Workspace・API キーの一覧）。
  *
- * 名前は表示のためだけのもので、金額の正しさには関わらない。ここで throw すると
- * 「Workspace 名の API が落ちた日はコストレポートも来ない」ことになり、本末転倒。
- * 取れなければ id をそのまま出し、その事実をフラグで上に伝える。
+ * **`page` / `next_page` ではない。** cost_report / usage_report とはページ送りの方式が
+ * 違う。以前は Workspace 一覧を `page` で送っていたが、その引数は無視されるので、
+ * 2 ページ目以降があれば同じページを読み続けて取りこぼしていた（件数が少なく表面化せず）。
  */
-async function fetchWorkspaceNames(adminKey: string): Promise<Map<string, string> | null> {
-  const names = new Map<string, string>();
-  let page: string | undefined;
+async function listAll(adminKey: string, url: string): Promise<Record<string, unknown>[] | null> {
+  const items: Record<string, unknown>[] = [];
+  let afterId: string | undefined;
   try {
-    for (let i = 0; i < WORKSPACE_PAGES; i++) {
-      const params = new URLSearchParams({ limit: '100' });
-      if (page) params.set('page', page);
-      const res = await fetch(`${WORKSPACES_URL}?${params.toString()}`, {
-        headers: {
-          'x-api-key': adminKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-          'User-Agent': 'Oryzae/1.0 (https://github.com/ephemere-io/oryzae)',
-        },
+    for (let i = 0; i < LIST_PAGES; i++) {
+      const params = new URLSearchParams({ limit: LIST_PAGE_SIZE });
+      if (afterId) params.set('after_id', afterId);
+      const res = await fetch(`${url}?${params.toString()}`, {
+        headers: adminHeaders(adminKey),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       if (!res.ok) return null;
       const body: unknown = await res.json();
       if (!isRecord(body) || !Array.isArray(body.data)) return null;
-      for (const item of body.data) {
-        if (!isRecord(item)) continue;
-        if (typeof item.id === 'string' && typeof item.name === 'string' && item.name !== '') {
-          names.set(item.id, item.name);
+      for (const item of body.data) if (isRecord(item)) items.push(item);
+      if (body.has_more !== true || typeof body.last_id !== 'string') break;
+      afterId = body.last_id;
+    }
+    return items;
+  } catch {
+    return null;
+  }
+}
+
+/** アーカイブされていない Workspace。 */
+export interface WorkspaceInfo {
+  id: string;
+  name: string;
+}
+
+/**
+ * Workspace の一覧（アーカイブ済みを除く）。失敗しても **例外にしない**（null を返す）。
+ *
+ * 名前は表示のためだけのもので、金額の正しさには関わらない。ここで throw すると
+ * 「Workspace 名の API が落ちた日はコストレポートも来ない」ことになり、本末転倒。
+ */
+async function fetchWorkspaces(adminKey: string): Promise<WorkspaceInfo[] | null> {
+  const items = await listAll(adminKey, WORKSPACES_URL);
+  if (!items) return null;
+  const workspaces: WorkspaceInfo[] = [];
+  for (const item of items) {
+    if (typeof item.id !== 'string' || typeof item.name !== 'string' || item.name === '') continue;
+    if (item.archived_at !== null && item.archived_at !== undefined) continue;
+    workspaces.push({ id: item.id, name: item.name });
+  }
+  return workspaces;
+}
+
+export interface ApiKeyInfo {
+  id: string;
+  /** Console で付けた名前。 */
+  name: string;
+  status: string;
+  /**
+   * 所属 Workspace。**default workspace は null**（cost_report / usage_report と同じ表現）。
+   * Workspace に属さない組織スコープのキーも null になるが、Oryzae には無い。
+   */
+  workspaceId: string | null;
+}
+
+/**
+ * API キーの一覧。所属は非推奨の `workspace_id`（default は null）で読み、
+ * 無ければ `scope.workspace_id` に落とす。`scope` は default workspace でも実 ID を
+ * 返すので、そのままだと cost_report の null と突き合わせられない。
+ */
+async function fetchApiKeys(adminKey: string): Promise<ApiKeyInfo[] | null> {
+  const items = await listAll(adminKey, API_KEYS_URL);
+  if (!items) return null;
+  const keys: ApiKeyInfo[] = [];
+  for (const item of items) {
+    if (typeof item.id !== 'string' || typeof item.name !== 'string') continue;
+    let workspaceId: string | null = null;
+    if (typeof item.workspace_id === 'string') {
+      workspaceId = item.workspace_id;
+    } else if (item.workspace_id === undefined && isRecord(item.scope)) {
+      workspaceId = typeof item.scope.workspace_id === 'string' ? item.scope.workspace_id : null;
+    }
+    keys.push({
+      id: item.id,
+      name: item.name,
+      status: typeof item.status === 'string' ? item.status : 'unknown',
+      workspaceId,
+    });
+  }
+  return keys;
+}
+
+/** キー 1 本ぶんのトークン数（期間合計）。金額ではない。 */
+export interface KeyTokenUsage {
+  /** null は Console の playground など、キーを使わない利用。 */
+  apiKeyId: string | null;
+  /** default workspace は null。 */
+  workspaceId: string | null;
+  uncachedInputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+  outputTokens: number;
+}
+
+function numberOr0(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/** usage_report をキー × Workspace で取って、期間で合算する。 */
+async function fetchUsageByApiKey(
+  adminKey: string,
+  startingAt: Date,
+  endingAt: Date,
+): Promise<KeyTokenUsage[] | null> {
+  const perKey = new Map<string, KeyTokenUsage>();
+  let page: string | undefined;
+  try {
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const params = new URLSearchParams({
+        starting_at: startingAt.toISOString(),
+        ending_at: endingAt.toISOString(),
+        bucket_width: '1d',
+        limit: String(BUCKETS_PER_PAGE),
+      });
+      params.append('group_by[]', 'api_key_id');
+      params.append('group_by[]', 'workspace_id');
+      if (page) params.set('page', page);
+      const res = await fetch(`${USAGE_REPORT_URL}?${params.toString()}`, {
+        headers: adminHeaders(adminKey),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) return null;
+      const body: unknown = await res.json();
+      if (!isRecord(body) || !Array.isArray(body.data)) return null;
+
+      for (const bucket of body.data) {
+        if (!isRecord(bucket) || !Array.isArray(bucket.results)) continue;
+        for (const r of bucket.results) {
+          if (!isRecord(r)) continue;
+          const apiKeyId = typeof r.api_key_id === 'string' ? r.api_key_id : null;
+          const workspaceId = typeof r.workspace_id === 'string' ? r.workspace_id : null;
+          const mapKey = `${apiKeyId ?? '-'}|${workspaceId ?? '-'}`;
+          const acc = perKey.get(mapKey) ?? {
+            apiKeyId,
+            workspaceId,
+            uncachedInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+            outputTokens: 0,
+          };
+          acc.uncachedInputTokens += numberOr0(r.uncached_input_tokens);
+          if (isRecord(r.cache_creation)) {
+            acc.cacheCreationInputTokens +=
+              numberOr0(r.cache_creation.ephemeral_1h_input_tokens) +
+              numberOr0(r.cache_creation.ephemeral_5m_input_tokens);
+          }
+          acc.cacheReadInputTokens += numberOr0(r.cache_read_input_tokens);
+          acc.outputTokens += numberOr0(r.output_tokens);
+          perKey.set(mapKey, acc);
         }
       }
       if (body.has_more !== true || typeof body.next_page !== 'string') break;
       page = body.next_page;
     }
-    return names;
+    return Array.from(perKey.values());
   } catch {
     return null;
   }
+}
+
+/**
+ * 日次レポートの「Workspace ごとに何のキーが何トークン使ったか」の材料。
+ *
+ * 金額は含まない（cost_report はキー別に割れない）。1 つの Workspace に複数のキーが
+ * いるとき（ボード OCR と写真の文字起こし）、どちらがどれだけ使ったかをトークン数で見せる。
+ * 3 つの取得は独立なので並行に投げ、どれかが失敗したらその部分だけ null にする。
+ */
+export type UsageDetailResult =
+  | {
+      kind: 'ok';
+      /** null は取得失敗（名前は ID 表示に縮退する）。 */
+      workspaces: WorkspaceInfo[] | null;
+      apiKeys: ApiKeyInfo[] | null;
+      usageByKey: KeyTokenUsage[] | null;
+    }
+  | { kind: 'not-configured' };
+
+export async function fetchUsageDetail(
+  startingAt: Date,
+  endingAt: Date,
+): Promise<UsageDetailResult> {
+  const adminKey = process.env.ANTHROPIC_ADMIN_KEY;
+  if (!adminKey) return { kind: 'not-configured' };
+  const [workspaces, apiKeys, usageByKey] = await Promise.all([
+    fetchWorkspaces(adminKey),
+    fetchApiKeys(adminKey),
+    fetchUsageByApiKey(adminKey, startingAt, endingAt),
+  ]);
+  return { kind: 'ok', workspaces, apiKeys, usageByKey };
+}
+
+/** Workspace の id → 名前。失敗したら null。 */
+async function fetchWorkspaceNames(adminKey: string): Promise<Map<string, string> | null> {
+  const workspaces = await fetchWorkspaces(adminKey);
+  if (!workspaces) return null;
+  return new Map(workspaces.map((w) => [w.id, w.name]));
 }
 
 /**
@@ -306,11 +492,7 @@ export async function fetchActualCost(startingAt: Date, endingAt: Date): Promise
       if (page) params.set('page', page);
 
       const res = await fetch(`${COST_REPORT_URL}?${params.toString()}`, {
-        headers: {
-          'x-api-key': adminKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-          'User-Agent': 'Oryzae/1.0 (https://github.com/ephemere-io/oryzae)',
-        },
+        headers: adminHeaders(adminKey),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 

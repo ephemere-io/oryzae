@@ -3,6 +3,7 @@ import type { Entry } from '../../../entry/domain/models/entry.js';
 import type { EntryQuestionLinkRepositoryGateway } from '../../../question/domain/gateways/entry-question-link-repository.gateway.js';
 import type { QuestionRepositoryGateway } from '../../../question/domain/gateways/question-repository.gateway.js';
 import type { QuestionTransactionRepositoryGateway } from '../../../question/domain/gateways/question-transaction-repository.gateway.js';
+import type { AiUsageRecorder } from '../../../shared/domain/gateways/ai-usage-recorder.gateway.js';
 import type { FermentationRepositoryGateway } from '../../domain/gateways/fermentation-repository.gateway.js';
 import type { LlmAnalysisGateway } from '../../domain/gateways/llm-analysis.gateway.js';
 import type { UserFermentationStateRepositoryGateway } from '../../domain/gateways/user-fermentation-state-repository.gateway.js';
@@ -57,6 +58,7 @@ export class ScheduledFermentationUsecase {
     private userStateRepo: UserFermentationStateRepositoryGateway,
     private localeResolver: UserLocaleResolverGateway,
     private llmGateway: LlmAnalysisGateway,
+    private usage: AiUsageRecorder,
     private generateId: () => string,
     private listActiveUserIds: () => Promise<string[]>,
     // issue #279: digest メールも language に応じて文言を切り替えるため、
@@ -97,6 +99,7 @@ export class ScheduledFermentationUsecase {
     const runUsecase = new RunFermentationUsecase(
       this.fermentationRepo,
       this.llmGateway,
+      this.usage,
       this.generateId,
     );
 

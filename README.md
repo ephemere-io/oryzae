@@ -122,6 +122,7 @@ reach（pc/sp）は端末で体験が変わる機能だけに適用し、端末�
 | `docs/question-backend-guide.md` | Question コンテキスト実装ガイド |
 | `docs/infra-guide.md` | Vercel + Supabase デプロイ |
 | `docs/observability-guide.md` | 監視・可観測性の方針 |
+| `docs/ai-usage-design.md` | AI の利用記録（`ai_usage`）。誰が・どの機能を・何トークン使ったか |
 | `docs/security-guide.md` | 脅威モデル、認可モデル（RLS / service role）、自動セキュリティ監視の 2 層構成 |
 | `docs/glossary.md` | 画面に出る言葉の正（エントリー / 手帳 / 書庫 …）。同じものを 2 つの語で呼ばない |
 | `docs/i18n-guide.md` | apps/client の多言語運用（next-intl。`messages/*.json` が SSoT） |
