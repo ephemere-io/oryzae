@@ -62,7 +62,7 @@ const DIVERGENCE_NOTICE_RATIO = 0.05;
  * Anthropic Console は原本で、モデル別に加えて API キー別にも割れる。
  * 本番 URL の直書きは send-fermentation-digest.usecase.ts と同じ扱い。
  */
-const ADMIN_SPEND_URL = 'https://oryzae-admin.vercel.app/observability/spend';
+const ADMIN_SPEND_URL = 'https://oryzae-admin.vercel.app/tools/spend';
 
 interface DiscordField {
   name: string;

@@ -160,7 +160,7 @@ export function CostTable({ items, onRowClick }: CostTableProps) {
                 <br />
                 <span className="text-muted-foreground">
                   1 件ごとの金額は Anthropic 側が出せない（user_id を持たない）ため、ここは
-                  推定でしか出せません。実請求額は Observability → AI Spend を見てください
+                  推定でしか出せません。実請求額は Tools → AI Spend を見てください
                 </span>
               </span>
             }

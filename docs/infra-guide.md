@@ -15,7 +15,7 @@ Browser → Next.js (same origin) → Hono (internal app.fetch()) → Supabase C
 | アプリ | URL | Vercel プロジェクト | リポジトリ | 用途 |
 |---|---|---|---|---|
 | client | https://oryzae.ephemere.io | oryzae-client | ephemere-io/oryzae | ユーザー向け（要ログイン） |
-| admin | https://oryzae-admin.vercel.app | oryzae-admin | ephemere-io/oryzae | 管理画面・Observability |
+| admin | https://oryzae-admin.vercel.app | oryzae-admin | ephemere-io/oryzae | 管理画面・監視（Errors / Analytics）・Tools |
 | docs | https://docs.oryzae.ephemere.io | oryzae-docs | **ephemere-io/oryzae-docs** | 公開サイト（LP・/support・/privacy） |
 
 **管理画面の Google ログインは、Supabase の Redirect URLs に管理画面の戻り先が要る。**
@@ -72,7 +72,7 @@ client と admin で別プロジェクト。ビルド順序: shared → server �
 | PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `POSTHOG_PERSONAL_API_KEY` | ユーザー行動分析 |
 | Sentry | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | エラー監視 |
 | Upstash | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | API レート制限 |
-| Vercel | `VERCEL_TOKEN` | admin Observability でデプロイ状態取得 |
+| Vercel | `VERCEL_TOKEN` | admin Tools でデプロイ状態取得 |
 | 公開サイト | `NEXT_PUBLIC_DOCS_SITE_URL` | 公開サイトへの導線・旧 URL の 301 転送先（既定: 本番ドメイン） |
 | 公開サイト | `PUBLIC_SITE_ORIGINS` | 登録枠 API の CORS 許可オリジン（カンマ区切り。既定: 本番の公開サイト） |
 

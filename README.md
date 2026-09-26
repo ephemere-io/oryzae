@@ -8,7 +8,7 @@
 |---|---|
 | Backend | Hono + TypeScript (DDD layered architecture) |
 | Frontend | Next.js + Tailwind CSS (Feature-Sliced Architecture) |
-| Admin | Next.js + shadcn/ui (管理画面・Observability) |
+| Admin | Next.js + shadcn/ui (管理画面・監視・Tools) |
 | Database | Supabase (PostgreSQL + Auth + RLS) |
 | Shared | Zod schemas + constants (`packages/shared`) |
 | Deploy | Vercel |

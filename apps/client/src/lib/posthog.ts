@@ -12,6 +12,17 @@ export function initPostHog() {
       person_profiles: 'identified_only',
       capture_pageview: false,
       capture_pageleave: true,
+      // 日記の本文を PostHog に載せない（docs/security-guide.md）。
+      // autocapture はクリックした要素の文字を拾い、セッション録画は画面の文字と
+      // 通信の本文を記録できる。録画を PostHog 側で有効にしても本文が映らないよう、
+      // こちらで先に塞いでおく（プロジェクト設定だけに頼ると、誰かが ON にした瞬間に漏れる）。
+      mask_all_text: true,
+      session_recording: {
+        maskAllInputs: true,
+        maskTextSelector: '*',
+        recordBody: false,
+        recordHeaders: false,
+      },
     });
   }
   return posthog;

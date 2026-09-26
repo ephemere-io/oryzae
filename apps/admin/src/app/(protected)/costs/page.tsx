@@ -127,7 +127,7 @@ export default function CostsPage() {
           <h1 className="text-xl font-medium">発酵のコスト内訳（推定）</h1>
           {/* このページは発酵1件ごとの推定（保存トークン × 価格表）。画像の文字起こし
               （board の OCR・写真の文字起こし）は別モデル・別テーブルなのでここには
-              出ない。実請求額と、それらを含む合計は /observability/spend
+              出ない。実請求額と、それらを含む合計は /tools/spend
               （Anthropic cost_report）を参照する。 */}
           <span className="text-sm text-muted-foreground">
             {pagination.total} 件<span className="mx-1.5 text-border">|</span>

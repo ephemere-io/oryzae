@@ -11,13 +11,17 @@ vi.mock('@sentry/nextjs', () => ({
 }));
 
 function createApp() {
-  return new Hono()
+  return new Hono<{ Variables: { userId: string } }>()
     .onError(errorHandler)
     .get('/app-error', () => {
       throw new ValidationError('Invalid input');
     })
     .get('/unhandled', () => {
       throw new Error('Something went wrong');
+    })
+    .get('/users/:id/fail', (c) => {
+      c.set('userId', 'user-123');
+      throw new Error('Failed for a signed-in user');
     })
     .get('/zod', () => {
       z.object({ text: z.string().min(1).max(3) }).parse({ text: 'too long' });
@@ -86,7 +90,27 @@ describe('errorHandler', () => {
     await waitForSentryCapture('Something went wrong');
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Something went wrong' }),
-      expect.objectContaining({ extra: { method: 'GET', path: '/unhandled' } }),
+      expect.objectContaining({
+        tags: { method: 'GET', route: '/unhandled' },
+        extra: { path: '/unhandled' },
+        user: undefined,
+      }),
+    );
+  });
+
+  it('attaches the route pattern and the user id (not the email) to the Sentry event', async () => {
+    const app = createApp();
+    await app.request('/users/abc/fail');
+
+    await waitForSentryCapture('Failed for a signed-in user');
+    // route はパラメータを伏せた形。同じ API の失敗を 1 つに束ねて「どの API か」を引くため。
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Failed for a signed-in user' }),
+      expect.objectContaining({
+        tags: { method: 'GET', route: '/users/:id/fail' },
+        extra: { path: '/users/abc/fail' },
+        user: { id: 'user-123' },
+      }),
     );
   });
 

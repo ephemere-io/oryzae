@@ -26,6 +26,7 @@ describe('useAnalytics', () => {
       avgSessionDurationSeconds: 120,
       entryPageViews: 50,
       jarPageViews: 20,
+      uniqueUsers: 7,
     };
     const pagesBody = {
       data: [{ path: '/entries', views: 50 }],

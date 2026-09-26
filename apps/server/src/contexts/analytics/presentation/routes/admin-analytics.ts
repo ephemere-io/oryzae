@@ -76,7 +76,8 @@ export const adminAnalytics = new Hono<Env>()
         analytics.queryHogQL(`SELECT
           countIf(event = '$pageview') AS total_pv,
           countIf(event = '$pageview' AND properties.$current_url ILIKE '%/entries%') AS entry_pv,
-          countIf(event = '$pageview' AND properties.$current_url ILIKE '%/jar%') AS jar_pv
+          countIf(event = '$pageview' AND properties.$current_url ILIKE '%/jar%') AS jar_pv,
+          uniqIf(person_id, event = '$pageview') AS unique_users
         FROM events
         WHERE ${time}`),
         // セッション数 / 平均滞在。選択期間を反映する。
@@ -98,6 +99,7 @@ export const adminAnalytics = new Hono<Env>()
         totalPageviews: numAt(agg, 0),
         entryPageViews: numAt(agg, 1),
         jarPageViews: numAt(agg, 2),
+        uniqueUsers: numAt(agg, 3),
         totalSessions: numAt(session, 0),
         avgSessionDurationSeconds: Math.round(numAt(session, 1)),
       });
