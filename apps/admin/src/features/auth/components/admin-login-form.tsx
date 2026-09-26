@@ -6,14 +6,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAdminAuth } from '../hooks/use-admin-auth';
+import { useAdminGoogleLogin } from '../hooks/use-admin-google-login';
 
 export function AdminLoginForm() {
   const { login } = useAdminAuth();
+  const { startGoogleLogin } = useAdminGoogleLogin();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  async function handleGoogle() {
+    setSubmitting(true);
+    setError(null);
+    const result = await startGoogleLogin();
+    if ('url' in result) {
+      window.location.href = result.url;
+      return;
+    }
+    setError(result.error);
+    setSubmitting(false);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,13 +54,29 @@ export function AdminLoginForm() {
           <p className="mt-1.5 text-[13px] text-muted-foreground">管理者アカウントでログイン</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
+            {error}
+          </div>
+        )}
 
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleGoogle}
+          disabled={submitting}
+          className="h-9 w-full text-[13px] font-medium disabled:opacity-50"
+        >
+          Google でログイン
+        </Button>
+
+        <div className="my-5 flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          または
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-[13px] text-secondary-foreground">
               メールアドレス
