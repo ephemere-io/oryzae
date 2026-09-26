@@ -12,7 +12,7 @@ test.describe('管理者認証フロー', () => {
 
     await page.fill('input[type="email"]', TEST_EMAIL);
     await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button:has-text("ログイン")');
+    await page.click('button[type="submit"]');
 
     await page.waitForURL('**/dashboard**');
     await expect(page).toHaveURL(/\/dashboard/);
@@ -29,7 +29,7 @@ test.describe('管理者認証フロー', () => {
     await page.goto('/login');
     await page.fill('input[type="email"]', TEST_EMAIL);
     await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button:has-text("ログイン")');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard**');
 
     // ログアウトはアイコンボタン（admin-sidebar.tsx の title="ログアウト"）。
