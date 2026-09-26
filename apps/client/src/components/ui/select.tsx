@@ -3,6 +3,7 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useEffect, useId, useRef, useState } from 'react';
 import { MenuOption, MenuPanel } from '@/components/ui/menu';
+import { FIELD_CLASS, FIELD_STYLE, type FieldSize } from '@/components/ui/surface';
 
 interface SelectOption {
   value: string;
@@ -18,6 +19,11 @@ interface SelectProps {
   className?: string;
   /** 値が未選択のときにトリガーへ出す文字列。 */
   placeholder?: string;
+  /**
+   * 面の大きさ。`sm`（既定）は PC の詰めた面（枠だけ・地は透明）。`md` は指の高さで、
+   * 隣に並ぶ `Input` と同じ面（`surface.ts` の FIELD_*）。
+   */
+  size?: FieldSize;
 }
 
 /**
@@ -34,6 +40,7 @@ export function Select({
   ariaLabel,
   className = 'w-full',
   placeholder,
+  size = 'sm',
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -105,7 +112,7 @@ export function Select({
       ref={rootRef}
       className={`relative ${className}`}
       onKeyDown={handleKeyDown}
-      {...verifyAttrs({ unit: 'Select', open, optionCount: options.length, value })}
+      {...verifyAttrs({ unit: 'Select', open, optionCount: options.length, value, size })}
     >
       <button
         type="button"
@@ -118,7 +125,12 @@ export function Select({
         aria-controls={listId}
         aria-activedescendant={open ? activeOptionId : undefined}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-7 w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 text-left text-[13px] text-[var(--fg)] transition-colors hover:bg-[var(--hover-wash)]"
+        className={
+          size === 'md'
+            ? `flex w-full items-center justify-between gap-2 text-left ${FIELD_CLASS.md} hover:bg-[var(--hover-wash)]`
+            : 'flex h-7 w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 text-left text-[13px] text-[var(--fg)] transition-colors hover:bg-[var(--hover-wash)]'
+        }
+        style={size === 'md' ? FIELD_STYLE : undefined}
       >
         <span className="truncate">{selected ? selected.label : (placeholder ?? '')}</span>
         <svg

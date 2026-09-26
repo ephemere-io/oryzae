@@ -75,8 +75,10 @@ const EXPECTED: Array<{
     pc: { skeleton: 'EntryEditorSkeleton' },
     sp: { skeleton: 'SpEntryEditorSkeleton' },
   },
-  // PC の瓶はキャンバス（予告できる枠が無い）。SP の瓶は手紙の一覧なのでスケルトン。
-  { path: '/jar', pc: 'loading', sp: { skeleton: 'SpJarSkeleton' } },
+  // 瓶はキャンバス（予告できる枠が無い）。SP も今は方眼の上の壜と円なので同じ。
+  // 以前の SP は「壜のまわりを問いが回る」形のスケルトンを出していて、今の瓶を開くたびに
+  // 前の画面の形が一瞬見えた（実機レビュー #616）。
+  { path: '/jar', pc: 'loading', sp: 'loading' },
   // ボードもキャンバス。SP も同じ理由でスケルトンを持たない（盤面は開いた時に
   // 一度フィットさせるので、枠を先に置いても位置が当たらない）。
   { path: '/board', pc: 'loading', sp: 'loading' },

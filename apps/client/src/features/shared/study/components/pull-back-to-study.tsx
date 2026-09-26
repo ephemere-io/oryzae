@@ -35,6 +35,8 @@ export function PullBackToStudy() {
   // 引いている最中に板の再描画が挟まって指に付いてこない。
   const progressRef = useRef(0);
   const leavingRef = useRef(false);
+  /** 直近の引きが指のつまみか（離したときの確定に使う）。 */
+  const pinchingRef = useRef(false);
 
   useEffect(() => setBackdrop(readStudyBackdrop()), []);
 
@@ -55,14 +57,25 @@ export function PullBackToStudy() {
       if (typeof excess !== 'number' || !Number.isFinite(excess) || excess <= 0) return;
 
       lastEventAt = performance.now();
-      const next = Math.min(1, progressRef.current + excess * PULL_BACK.gain);
+      pinchingRef.current = detail?.input === 'pinch';
+      const gain = pinchingRef.current ? PULL_BACK.pinchGain : PULL_BACK.gain;
+      const next = Math.min(1, progressRef.current + excess * gain);
       publish(next);
+      if (next >= 1) leave();
+    }
 
-      if (next >= 1) {
-        // 着いた。以降の引きは受けない（連打で二重に遷移させない）。
-        leavingRef.current = true;
-        router.push('/');
-      }
+    function leave(): void {
+      // 着いた。以降の引きは受けない（連打で二重に遷移させない）。
+      leavingRef.current = true;
+      publish(1);
+      router.push('/');
+    }
+
+    /** 指を離したとき、はっきり引いていれば（`commitOnRelease` 以上）書斎へ着かせる（戻れそうで戻れない、をやめる）。 */
+    function onRelease(): void {
+      if (leavingRef.current || !pinchingRef.current) return;
+      pinchingRef.current = false;
+      if (progressRef.current >= PULL_BACK.commitOnRelease) leave();
     }
 
     /**
@@ -81,9 +94,13 @@ export function PullBackToStudy() {
     }
 
     window.addEventListener(OVERZOOM_OUT_EVENT, onOverzoom);
+    window.addEventListener('pointerup', onRelease);
+    window.addEventListener('pointercancel', onRelease);
     frame = requestAnimationFrame(decay);
     return () => {
       window.removeEventListener(OVERZOOM_OUT_EVENT, onOverzoom);
+      window.removeEventListener('pointerup', onRelease);
+      window.removeEventListener('pointercancel', onRelease);
       cancelAnimationFrame(frame);
     };
   }, [router]);

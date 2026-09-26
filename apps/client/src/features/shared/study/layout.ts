@@ -9,7 +9,7 @@
  * 端末と配置の対応づけは `features/pc/study` と `features/sp/study` が持つ。
  */
 
-import { VIEW_DISTANCE } from './constants';
+import { RENDER_LIMITS, VIEW_DISTANCE } from './constants';
 
 interface Vec3 {
   x: number;
@@ -66,8 +66,24 @@ export interface StudyLayout {
   board: { position: Vec3; scale: number };
   /** 机に積む手帳の基準位置。 */
   desk: Vec3;
-  /** ペンの位置（机ローカル）。 */
-  pen: Vec3;
+  /**
+   * 机に積む冊数。残りは棚へ。
+   *
+   * PC は当月＋直近 2 ヶ月。SP は**当月の 1 冊だけ**（積みの 2 段目以降は指で押し分けられない、
+   * と実機レビュー。先月以前は全部棚に置く）。
+   */
+  deskNotebooks: number;
+  /**
+   * 手帳の**件数ぶんの伸び**の倍率（表紙だけの厚みは変えない）。
+   *
+   * 厚みは件数で決まる（`notebookThickness`）が、それが**見える**かはカメラの角度で決まる。
+   * 見下ろす角度が急なほど側面は短く写り、表紙に対して側面が写る長さは仰角の余接に比例する。
+   * PC を基準（1）にし、他の構図は**同じ件数が同じだけ膨らんで見える**比をカメラから導く
+   * （`sideVisibility`）。手で決めた値ではないので、カメラを動かせば一緒に変わる。
+   */
+  notebookGrowth: number;
+  /** ペンの位置（机ローカル）。null は置かない（SP。書く入口は ENTRIES のピル）。 */
+  pen: Vec3 | null;
   shelf: { position: Vec3; scale: number /** SP は書見台のように前傾させる。 */; tiltX: number };
   deskTop: DeskLayout;
   /** 床の格子の高さ。 */
@@ -85,6 +101,14 @@ export interface StudyLayout {
   };
   /** SP のピルだけが使う画面座標オフセット（px）。PC は null。 */
   pillOffsets: { jar: Vec2; journal: Vec2; board: Vec2; archive: Vec2 } | null;
+  /**
+   * 手帳を開いた先の一覧の見せ方。
+   *
+   * `paper` は机の上にかぶさる紙（幅 720px、月と問いはチップで一覧できる）。
+   * `mobile` は全画面の一覧で、月と問いはドロップダウンに畳む（狭い画面では、
+   * 選択肢を並べる場所より本文を読む場所に幅を使う）。構図の一部なのでここに持つ。
+   */
+  listPresentation: 'paper' | 'mobile';
   /**
    * 書斎の入口（扉のある前室）。
    *
@@ -109,16 +133,43 @@ function vec3(x: number, y: number, z: number): Vec3 {
   return { x, y, z };
 }
 
-const PC_SHELF = vec3(4.9, -1.2, -3.2);
-const SP_SHELF = vec3(2.0, -1.2, -2.6);
+/**
+ * 棚の **world** 位置。
+ *
+ * 以前は (4.9, −1.2, −3.2) と書いてあったが、棚は机グループ（y 回転 −0.15）の子として
+ * `shelf − desk` を回転前の座標で置いていたので、実際の world はこの値だった。scene 側で
+ * 机の回転の逆を掛けるようにし、配置表の値をそのまま world にした。**見た目は変えていない。**
+ */
+const PC_SHELF = vec3(5.66, -1.2, -2.86);
+/** world。右端（半幅 1.3 × 0.72、yaw −0.35）が天板の右辺 3.4 の内側に収まる位置。 */
+const SP_SHELF = vec3(2.0, -1.2, -2.7);
 const SP_SHELF_SCALE = 0.72;
-const SP_DESK = vec3(0.95, -1, 2.7);
+/**
+ * 当月の 1 冊の位置。
+ *
+ * 手前辺（奥行き 3.4 の半分 + 回転ぶんで z ≈ 4.1）が天板の手前端 4.3 に収まり、奥左の角
+ * （world ≈ (0.5, ·, 0.3)）が瓶の足元（中心 (−1.4, ·, −0.3)、半径 1.3）に入らない位置。
+ * x = 0.95 に置いていたころは角が瓶に食い込んでいた（実機で「本と瓶が重なる」）。
+ */
+const SP_DESK = vec3(1.5, -1, 2.2);
+
+/**
+ * その点を見たとき、縦の面（手帳の側面）が水平の面（表紙）に対してどれだけの長さに写るか。
+ * カメラからその点への仰角の余接（水平の距離 ÷ 高さの差）。真横から見れば大きく、真上から見れば 0。
+ */
+function sideVisibility(camera: Vec3, at: Vec3): number {
+  return Math.hypot(camera.x - at.x, camera.z - at.z) / (camera.y - at.y);
+}
+
+const PC_CAMERA_POSITION = vec3(0, 4, 12);
+const PC_DESK = vec3(3, -1, 2);
+const SP_CAMERA_POSITION = vec3(0, 10.6, 7.8);
 
 export const PC_LAYOUT: StudyLayout = {
   name: 'pc',
   camera: {
     fov: 45,
-    position: vec3(0, 4, 12),
+    position: PC_CAMERA_POSITION,
     target: vec3(0, 0, 0),
     // ボードの上辺の中央（板の中心 y=2.5 ＋ 高さ 5 の半分）。
     frameTop: vec3(0.9, 5, -4),
@@ -133,7 +184,10 @@ export const PC_LAYOUT: StudyLayout = {
     room: vec3(-3, -2.9, 14),
     camera: { position: vec3(-1.5, 0, 22.4), target: vec3(-1.5, -0.65, 14) },
   },
-  desk: vec3(3, -1, 2),
+  desk: PC_DESK,
+  deskNotebooks: RENDER_LIMITS.deskNotebooks,
+  // 基準。PC のカメラ（手帳を仰角およそ 26° で見る）で見えている膨らみを、他の構図が揃える。
+  notebookGrowth: 1,
   pen: vec3(2.55, -0.15, -0.1),
   shelf: { position: PC_SHELF, scale: 1, tiltX: 0 },
   // 右は棚のぶんだけ伸ばし（元 6.6 → 8.6）、左は元の幅に近いところへ戻す。
@@ -162,7 +216,8 @@ export const PC_LAYOUT: StudyLayout = {
      * 積み（x は 1.7..4.3）の外側へ出し、**手前へ十分に寄せる**。奥のままだと、俯瞰では
      * 画面の上のほうに投影されて棚の絵と混ざる（「もう少し手前に」と再度報告された）。
      */
-    archive: vec3(PC_SHELF.x + 1.7, -1.14, PC_SHELF.z + 2.0),
+    // 数字で持つ。棚の world 位置（PC_SHELF）を直したときに、ここは動かしていない。
+    archive: vec3(6.6, -1.14, -1.2),
     /**
      * 鉛筆の真下（画面では鉛筆のすぐ下）。鉛筆は積みの右脇に前後向きで寝ていて、中心は
      * 机ローカル (2.55, -0.15, -0.1) を積みの向き（-0.15 rad）で回した world ≈ (5.54, -1.15,
@@ -172,6 +227,7 @@ export const PC_LAYOUT: StudyLayout = {
     pen: vec3(5.4, -1.14, 3.7),
   },
   pillOffsets: null,
+  listPresentation: 'paper',
 };
 
 export const SP_LAYOUT: StudyLayout = {
@@ -180,7 +236,7 @@ export const SP_LAYOUT: StudyLayout = {
     // 縦画面は横に狭い。真上からでは壁のボードが表現できないので、机の面と壁の
     // 両方が入るクオータートップ（仰角およそ 52°）に振る。
     fov: 58,
-    position: vec3(0, 10.6, 7.8),
+    position: SP_CAMERA_POSITION,
     // 注視点を絵の中心より下に置くと全体が上に寄り、下端に余白が残る。
     target: vec3(0, -0.35, -0.7),
     // ボードの上辺の中央。SP は板を 0.68 に縮めてあるので、高さの半分も同じ比。
@@ -192,7 +248,7 @@ export const SP_LAYOUT: StudyLayout = {
   // 縦画面の横方向の視野は `aspect × 縦の視野` で決まり、390×844 では縦の 46% しか
   // 横に使えない。物の並びを x ではなく z（奥行き）に散らす。クオータートップでは
   // 奥行きの差が画面の上下差になるため、ボードが上・瓶が中・手帳が下に積まれる。
-  jar: vec3(-1.15, -1.2, -0.2),
+  jar: vec3(-1.4, -1.2, -0.3),
   board: { position: vec3(0, 2.7, -4.2), scale: 0.68 },
   // 縦画面は扉を右斜め前から見る（正面だと厚みも隙間も写らず、壁の長方形に読める）。
   // 画角が広い（fov 58）ぶん、扉へは PC より寄る。
@@ -201,30 +257,42 @@ export const SP_LAYOUT: StudyLayout = {
     camera: { position: vec3(-0.9, -0.2, 20.9), target: vec3(-3.4, -0.35, 14) },
   },
   desk: SP_DESK,
-  // ペンは積みの左手前。右に置くと画面外に出る。
-  pen: vec3(-1.9, -0.15, 1.2),
+  // 机は当月の 1 冊だけ。積みの 2 段目以降は指で押し分けられない。先月以前は全部棚へ。
+  deskNotebooks: 1,
+  // SP は手帳を仰角およそ 63° で見下ろすので、同じ厚みでも側面は PC の 1/4 ほどにしか写らず、
+  // 何十件書いても手帳が平たいままだった（実機レビュー #616: 「エントリーが複数あっても
+  // 平ぺったい。PC と合わせて膨らみを」）。
+  // PC と同じだけ膨らんで見える比（およそ 4.2）にすると**分厚すぎた**（オーナー）。SP の手帳は
+  // PC より画面に大きく写るので、同じ比でも側面の帯が太く見える。その**半分**（およそ 2.1）にする。
+  notebookGrowth:
+    sideVisibility(PC_CAMERA_POSITION, PC_DESK) / sideVisibility(SP_CAMERA_POSITION, SP_DESK) / 2,
+  // 鉛筆は置かない。1 冊だけなら「書く」は手帳そのものと ENTRIES のピルで足り、鉛筆は役割を失う。
+  pen: null,
   // 棚を前傾させると背文字が上を向き、そのまま行き先の予告になる。
   shelf: { position: SP_SHELF, scale: SP_SHELF_SCALE, tiltX: -0.42 },
-  deskTop: { y: -1.2, xLeft: -3.4, xRight: 3.4, zNear: 4.0, zFar: -4.7 },
+  deskTop: { y: -1.2, xLeft: -3.4, xRight: 3.4, zNear: 4.3, zFar: -4.7 },
   floorY: -2.9,
   viewDistance: VIEW_DISTANCE.sp,
   labelAnchors: {
-    // SP は机の手前に余白が無く、PC と同じ「手前端」に置くと手帳の表紙に文字が乗る。
-    // 積みの右脇（空いている机の面）へ逃がす。左脇はペンがいる。
-    jar: vec3(-1.15, -1.14, 1.25),
-    journal: vec3(SP_DESK.x + 2.1, -1.14, SP_DESK.z + 1.1),
+    // 瓶の手前の机の面。
+    jar: vec3(-1.4, -1.14, 1.15),
+    // 手帳の手前辺のすぐ先。1 冊だけなので表紙に文字が乗らない。
+    journal: vec3(SP_DESK.x, -1.14, SP_DESK.z + 1.9),
     // **板のすぐ下に置く。** PC と同じ「机の高さ」（y ≈ -0.28）に置くと、
     // クオータートップでは y の差がそのまま画面の下方向に伸び、ピルが板ではなく
     // 瓶の上に乗る（実機で確認）。俯瞰では「板の直下」を板の座標系で取る必要がある。
     board: vec3(0, 1.5, -4.0),
-    archive: vec3(SP_SHELF.x, SP_SHELF.y + 2.1 * SP_SHELF_SCALE, SP_SHELF.z),
+    // 棚の**手前**の机の面。棚の上に置いていたころは前傾した背表紙の頭に乗っていた
+    // （実機で「ARCHIVE の文字が本に被る」）。
+    archive: vec3(SP_SHELF.x, -1.14, SP_SHELF.z + 1.35),
     // SP は ENTRIES のピルがそのまま新規執筆なので、NEW のピルは足さない（同じ行き先が 2 つ並ぶ）。
     pen: null,
   },
   pillOffsets: {
-    jar: { x: -28, y: 26 },
+    jar: { x: 0, y: 24 },
     journal: { x: 0, y: 22 },
     board: { x: -92, y: 40 },
-    archive: { x: 10, y: -16 },
+    archive: { x: 0, y: 10 },
   },
+  listPresentation: 'mobile',
 };

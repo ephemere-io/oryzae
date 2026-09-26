@@ -4,6 +4,7 @@
 // シーンの規則は scene/*.ts の純関数テストで、実機の見え方はブラウザ確認で担保する。
 
 import { useCallback, useEffect, useRef } from 'react';
+import { HOME_PAN } from '../constants';
 import type { StudyLayout } from '../layout';
 import { staysInStudy } from '../navigation';
 import { claimScene, releaseScene, takeLiveScene } from '../scene/live';
@@ -85,8 +86,10 @@ export function StudyCanvas({
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   /** 指を置いた時点の間隔。 */
   const pinchStartRef = useRef<number | null>(null);
-  /** つまんだかどうか。離した直後の click を「押した」と誤らないための印。 */
+  /** つまんだか引いたか。離した直後の click を「押した」と誤らないための印。 */
   const pinchedRef = useRef(false);
+  /** 1 本指（マウス）を置いた点と、引き始めたか。押せる物の無いところを引くと机の上を平行に動く。 */
+  const panRef = useRef<{ pointerId: number; x: number; y: number; panning: boolean } | null>(null);
 
   // コールバックは ref 経由で読む。props が変わるたびにシーンを作り直すと、
   // 親が再描画しただけで canvas が組み直される。
@@ -246,6 +249,8 @@ export function StudyCanvas({
    */
   const trackPinchDown = useCallback((pointerId: number, x: number, y: number) => {
     pointersRef.current.set(pointerId, { x, y });
+    // 1 本目は引く候補。2 本目が来たらつまみに切り替え、引きはやめる。
+    panRef.current = pointersRef.current.size === 1 ? { pointerId, x, y, panning: false } : null;
     if (pointersRef.current.size !== 2) return;
     pinchStartRef.current = pointerDistance(pointersRef.current);
     handleRef.current?.startPinch();
@@ -255,6 +260,18 @@ export function StudyCanvas({
     const pointers = pointersRef.current;
     if (!pointers.has(pointerId)) return;
     pointers.set(pointerId, { x, y });
+    const panStart = panRef.current;
+    if (pointers.size === 1 && panStart && panStart.pointerId === pointerId) {
+      const dx = x - panStart.x;
+      const dy = y - panStart.y;
+      if (!panStart.panning && Math.hypot(dx, dy) > HOME_PAN.tapSlop) {
+        panStart.panning = true;
+        pinchedRef.current = true;
+        handleRef.current?.startPan();
+      }
+      if (panStart.panning) handleRef.current?.panBy(dx, dy);
+      return;
+    }
     const start = pinchStartRef.current;
     if (pointers.size !== 2 || start === null || start === 0) return;
     pinchedRef.current = true;
@@ -263,11 +280,13 @@ export function StudyCanvas({
 
   const endPinch = useCallback(() => {
     pointersRef.current.clear();
+    panRef.current = null;
     pinchStartRef.current = null;
   }, []);
 
   const releasePinch = useCallback((pointerId: number) => {
     pointersRef.current.delete(pointerId);
+    if (panRef.current?.pointerId === pointerId) panRef.current = null;
     // 片方だけ離しても、残った指を「新しいつまみの始まり」にはしない。
     if (pointersRef.current.size < 2) pinchStartRef.current = null;
   }, []);
@@ -305,11 +324,13 @@ export function StudyCanvas({
           -(((event.clientY - rect.top) / rect.height) * 2 - 1),
         );
         trackPinchDown(event.pointerId, event.clientX, event.clientY);
+        // マウスで引いて canvas の外へ出ても、離すまで追う。
+        if (event.pointerType === 'mouse') event.currentTarget.setPointerCapture?.(event.pointerId);
       }}
       onPointerUp={(event) => releasePinch(event.pointerId)}
       onPointerCancel={(event) => releasePinch(event.pointerId)}
       onClick={() => {
-        // つまんだ指を離した直後の click は「押した」ではない。
+        // つまんだ・引いた指を離した直後の click は「押した」ではない。
         if (pinchedRef.current) {
           pinchedRef.current = false;
           return;

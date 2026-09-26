@@ -193,6 +193,16 @@ export function makeActContext(root: HTMLElement): ActContext {
       if (!el) throw new Error(`act.click: no element matching "${selector}"`);
       el.click();
     },
+    tap(selector) {
+      const el = root.querySelector<HTMLElement>(selector);
+      if (!el) throw new Error(`act.tap: no element matching "${selector}"`);
+      // jsdom に PointerEvent は無い。型名だけ合わせた MouseEvent で代用する（React は名前で受ける）。
+      // 座標は動かさない＝「押した」。同じ点で down → up。
+      for (const type of ['pointerdown', 'pointerup']) {
+        el.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: 0, clientY: 0 }));
+      }
+      el.click();
+    },
     type(selector, text) {
       const el = root.querySelector<HTMLInputElement>(selector);
       if (!el) throw new Error(`act.type: no element matching "${selector}"`);

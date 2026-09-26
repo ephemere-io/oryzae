@@ -27,10 +27,16 @@ const THICKNESS_PER_ENTRY = 0.01;
  */
 const THICKNESS_BASE = 0.2;
 
-/** 手帳 1 冊の厚み。件数で可変にすることで「書いた量」が物の大きさになる。 */
-export function notebookThickness(entryCount: number): number {
+/**
+ * 手帳 1 冊の厚み。件数で可変にすることで「書いた量」が物の大きさになる。
+ *
+ * `growth` は**件数ぶんの伸びだけ**にかける倍率（表紙だけの厚みは変えない）。構図が決める
+ * （`StudyLayout.notebookGrowth`）。見下ろす角度が急な構図では側面が短く写るので、同じ件数でも
+ * 同じだけ膨らんで**見える**よう、伸びを大きくする。
+ */
+export function notebookThickness(entryCount: number, growth = 1): number {
   const count = Math.max(0, Math.min(THICKNESS_ENTRY_CAP, Math.floor(entryCount)));
-  return THICKNESS_BASE + count * THICKNESS_PER_ENTRY;
+  return THICKNESS_BASE + count * THICKNESS_PER_ENTRY * growth;
 }
 
 /**
@@ -175,24 +181,28 @@ export interface NotebookLayoutResult {
  * 机は当月を一番上に、直近 2 ヶ月を下に積む。それ以前は棚へ（直 3 ヶ月分）。
  * 3 ヶ月を超えたら棚は詰めて表示する（間隔を縮める。スクロールも省略記号も出さない）。
  */
-export function layoutNotebooks(notebooks: readonly Notebook[], now: string): NotebookLayoutResult {
+export function layoutNotebooks(
+  notebooks: readonly Notebook[],
+  now: string,
+  /** 机に積む冊数。PC は当月＋直近 2 ヶ月、SP は当月の 1 冊だけ（配置表 `deskNotebooks`）。 */
+  deskCount: number = RENDER_LIMITS.deskNotebooks,
+  /** 件数ぶんの伸びの倍率（配置表 `notebookGrowth`）。 */
+  growth = 1,
+): NotebookLayoutResult {
   // 新しい月から並べる。サーバーの順序に依存しない。
   const sorted = [...withCurrentNotebook(notebooks, now)].sort((a, b) =>
     a.month < b.month ? 1 : a.month > b.month ? -1 : 0,
   );
 
-  const deskNotebooks = sorted.slice(0, RENDER_LIMITS.deskNotebooks);
-  const shelf = sorted.slice(
-    RENDER_LIMITS.deskNotebooks,
-    RENDER_LIMITS.deskNotebooks + RENDER_LIMITS.shelfSpines,
-  );
+  const deskNotebooks = sorted.slice(0, deskCount);
+  const shelf = sorted.slice(deskCount, deskCount + RENDER_LIMITS.shelfSpines);
 
   // 積みは下から作る。一番古い冊が底で、当月が天。
   const bottomUp = [...deskNotebooks].reverse();
   let baseY = 0;
   const placed: NotebookPlacement[] = [];
   for (const notebook of bottomUp) {
-    const thickness = notebookThickness(notebook.entryCount);
+    const thickness = notebookThickness(notebook.entryCount, growth);
     placed.push({ notebook, thickness, baseY });
     baseY += thickness + STACK_GAP;
   }

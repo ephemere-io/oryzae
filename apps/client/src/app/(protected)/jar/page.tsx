@@ -11,7 +11,6 @@ import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpJar } from '@/features/sp/fermentation/components/sp-jar';
 import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
 import { useAuth } from '@/lib/auth-context';
-import { useUnread } from '@/lib/unread-context';
 
 export default function JarPage() {
   const { api, loading: authLoading } = useAuth();
@@ -21,6 +20,7 @@ export default function JarPage() {
     createQuestion,
     editQuestion,
     archiveQuestion,
+    unarchiveQuestion,
     acceptQuestion,
     rejectQuestion,
   } = useQuestions(api);
@@ -29,7 +29,6 @@ export default function JarPage() {
     loading: questionsLoading,
     refetch: refetchQuestions,
   } = useJarQuestions(api, authLoading);
-  const { unreadQuestionIds } = useUnread();
   // issue #278: 瓶の見た目に反映する readiness（段階を決める top と、賑やかさを決める total）。
   // サーバーがリクエストのたびに評価し直すので、漬け込み後にこのページへ来れば最新になる。
   const { data: readiness } = useFermentationReadiness(api, authLoading);
@@ -57,18 +56,27 @@ export default function JarPage() {
   }, [justPickled, router]);
 
   async function handleAddQuestion(text: string) {
-    await createQuestion(text);
+    const ok = await createQuestion(text);
     await refetchQuestions();
+    return ok;
   }
 
   async function handleEditQuestion(id: string, text: string) {
-    await editQuestion(id, text);
+    const ok = await editQuestion(id, text);
     await refetchQuestions();
+    return ok;
   }
 
   async function handleArchiveQuestion(id: string) {
-    await archiveQuestion(id);
+    const ok = await archiveQuestion(id);
     await refetchQuestions();
+    return ok;
+  }
+
+  async function handleUnarchiveQuestion(id: string) {
+    const ok = await unarchiveQuestion(id);
+    await refetchQuestions();
+    return ok;
   }
 
   // 端末で出し分け（URL は /jar のまま）。DeviceView が判定前/未対応を安全に処理。
@@ -80,9 +88,11 @@ export default function JarPage() {
             api={api}
             questions={questions}
             loading={questionsLoading}
-            onManageQuestions={() => setManageOpen(true)}
+            manageOpen={manageOpen}
+            onManageQuestions={() => setManageOpen((open) => !open)}
           />
           {manageOpen ? (
+            // 本文の中で瓶に重ねる（地図の倍率の表示より上、殻のシートより下。`main` が重なりを閉じている）。
             <div className="absolute inset-0 z-40 flex flex-col bg-[var(--bg)]">
               <SpQuestions
                 questions={allQuestions}
@@ -90,9 +100,9 @@ export default function JarPage() {
                 createQuestion={handleAddQuestion}
                 editQuestion={handleEditQuestion}
                 archiveQuestion={handleArchiveQuestion}
+                unarchiveQuestion={handleUnarchiveQuestion}
                 acceptQuestion={acceptQuestion}
                 rejectQuestion={rejectQuestion}
-                unreadQuestionIds={unreadQuestionIds}
                 onClose={() => setManageOpen(false)}
               />
             </div>

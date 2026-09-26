@@ -269,6 +269,80 @@ export function zoomByPinch(base: number, ratio: number): number {
   return clampZoom(base / ratio);
 }
 
+/** 平行移動（world の水平面、ホームからのずれ）。 */
+export interface PanOffset {
+  x: number;
+  z: number;
+}
+
+/** view を水平面で平行移動する（視線の向きは変えない＝構図は保たれる）。 */
+export function pannedView(view: CameraView, pan: PanOffset): CameraView {
+  return {
+    position: { x: view.position.x + pan.x, y: view.position.y, z: view.position.z + pan.z },
+    target: { x: view.target.x + pan.x, y: view.target.y, z: view.target.z + pan.z },
+  };
+}
+
+/**
+ * 平行移動を、**どれかの物（瓶・手帳・板・棚・鉛筆）を画面の真ん中に持ってこられる**範囲に丸める。
+ *
+ * 数を持たずに配置表の物の位置（`layout.labelAnchors`）から決める。天板の端まで行けるようにすると、
+ * 画面の半分が部屋の外の何も無い床になって行き先を見失った（寄り引きの上下限と同じ理由）。
+ */
+export function clampPan(layout: StudyLayout, pan: PanOffset): PanOffset {
+  const target = layout.camera.target;
+  const anchors = [
+    layout.labelAnchors.jar,
+    layout.labelAnchors.journal,
+    layout.labelAnchors.board,
+    layout.labelAnchors.archive,
+    layout.labelAnchors.pen,
+  ].filter((anchor) => anchor !== null);
+  const xs = [target.x, ...anchors.map((anchor) => anchor.x)];
+  const zs = [target.z, ...anchors.map((anchor) => anchor.z)];
+  const x = Number.isFinite(pan.x) ? pan.x : 0;
+  const z = Number.isFinite(pan.z) ? pan.z : 0;
+  return {
+    x: Math.min(Math.max(...xs) - target.x, Math.max(Math.min(...xs) - target.x, x)),
+    z: Math.min(Math.max(...zs) - target.z, Math.max(Math.min(...zs) - target.z, z)),
+  };
+}
+
+/**
+ * 指の移動（画面の px）を、水平面の平行移動にする。**指の下の机が指に付いてくる**量。
+ *
+ * 1px が world でいくつかは、注視点までの距離と画角と画面の高さから決める（px あたりの量を持たない）。
+ * 画面の縦の移動は、見下ろしている角度のぶん机の上では長くなる（`1 / sin(俯角)`）。
+ */
+export function panFromDrag(
+  view: CameraView,
+  fovDegrees: number,
+  viewportHeight: number,
+  drag: { dx: number; dy: number },
+): PanOffset {
+  const forward = {
+    x: view.target.x - view.position.x,
+    y: view.target.y - view.position.y,
+    z: view.target.z - view.position.z,
+  };
+  const distanceToTarget = Math.hypot(forward.x, forward.y, forward.z);
+  const flat = Math.hypot(forward.x, forward.z);
+  if (distanceToTarget <= 1e-6 || flat <= 1e-6 || viewportHeight <= 0) return { x: 0, z: 0 };
+  const worldPerPixel =
+    (2 * distanceToTarget * Math.tan((fovDegrees * Math.PI) / 360)) / viewportHeight;
+  const sinDown = Math.max(1e-3, -forward.y / distanceToTarget);
+  // 水平面での前（画面の上へ向かう向き）と右。
+  const ahead = { x: forward.x / flat, z: forward.z / flat };
+  const right = { x: -ahead.z, z: ahead.x };
+  // 指を右へ動かせば机が右へ付いてくる＝カメラは左へ。指を下へ動かせば机が下へ＝カメラは奥へ。
+  const sideways = -drag.dx * worldPerPixel;
+  const forwards = (drag.dy * worldPerPixel) / sinDown;
+  return {
+    x: right.x * sideways + ahead.x * forwards,
+    z: right.z * sideways + ahead.z * forwards,
+  };
+}
+
 /**
  * マウス位置に応じたパララックス。`pointer` は -1..1 に正規化した画面座標。
  *

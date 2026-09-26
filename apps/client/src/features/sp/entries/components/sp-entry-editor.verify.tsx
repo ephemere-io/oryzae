@@ -4,7 +4,7 @@
  * 即 null・activeQuestions は []・autosave は enabled=false）。router 依存も無い。よって
  * `api=null` を渡せば fetch ゼロの純レンダリングになり、props だけで孤立検証できる。
  *
- * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / hasQuestion / sheetOpen
+ * 公表する契約は実際に変化する状態のみ: hasBody / dirty / hasEntry / hasQuestion / pickerOpen
  * ＋発酵 CTA の pickling。saving / pickled は到達しない（api=null では fetch せず save も即
  * null・never-resolve でも save が解決せず pickled が立たない）ため、定数になる属性は
  * 契約に載せない。hasQuestion は Issue #450 で分岐条件になったので載せる（問い未選択で
@@ -15,7 +15,7 @@
  * （question-create-form の neverResolve と同型。autosave は body 無変更＝delta 0 で発火しない）。
  */
 
-import { registerUnit } from '@oryzae/verify';
+import { type ActContext, registerUnit } from '@oryzae/verify';
 import type { ApiClient } from '@/lib/api';
 import { withVerifyProviders } from '@/lib/verify/with-providers';
 import { SpEntryEditor } from './sp-entry-editor';
@@ -26,6 +26,14 @@ interface Props {
   initialEntryId?: string;
   initialContent?: string;
   persistDraft?: boolean;
+}
+
+/** 本文（contentEditable）に書く。`ctx.type` は input の value を前提にするので、ここで文字を入れて input を起こす。 */
+function typeBody(ctx: ActContext, text: string): void {
+  const body = ctx.root.querySelector('[data-sp-body]');
+  if (!body) throw new Error('本文（data-sp-body）が無い');
+  body.textContent = text;
+  body.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 // 解決しない fetch を持つ ApiClient（pickle 中状態を保持する。as 不要で型を満たす）。
@@ -68,7 +76,7 @@ registerUnit<Props>({
   fixtures: [
     {
       id: 'empty',
-      description: '新規・本文空（保存ステータスは非表示、発酵 CTA も出ない）',
+      description: '新規・本文空（保存ステータスは非表示、発酵 CTA は並ぶが押せない）',
       props: { api: null, persistDraft: false },
     },
     {
@@ -76,7 +84,7 @@ registerUnit<Props>({
       description: '本文を入力すると編集中（dirty=true・hasBody=true）になる',
       props: { api: null, persistDraft: false },
       act: async (ctx) => {
-        await ctx.type('textarea', 'いま感じていること');
+        typeBody(ctx, 'いま感じていること');
         await ctx.wait(16);
       },
     },
@@ -92,7 +100,7 @@ registerUnit<Props>({
     },
     {
       id: 'sheet-open',
-      description: '問いチップを押すと問い選択シートが開く（sheetOpen=true）',
+      description: '「+ 問いを結ぶ」を押すとその場に選び手が開く（pickerOpen=true）',
       props: { api: null, persistDraft: false },
       act: async (ctx) => {
         await ctx.click('button');
@@ -105,7 +113,7 @@ registerUnit<Props>({
       description: 'Probe: 空白だけの本文は hasBody=false 扱い（保存ステータスを出さない）',
       props: { api: null, persistDraft: false },
       act: async (ctx) => {
-        await ctx.type('textarea', '     ');
+        typeBody(ctx, '     ');
         await ctx.wait(16);
       },
     },
@@ -124,7 +132,7 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(16);
       },
     },
@@ -140,7 +148,7 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(16);
       },
     },
@@ -156,7 +164,7 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(16);
       },
     },
@@ -171,14 +179,15 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        await ctx.click('.mx-4 button');
+        await ctx.click('button[data-palette-action="ferment"]');
         await ctx.wait(48);
       },
     },
     {
       id: 'delete-open',
       probe: true,
-      description: 'Probe: 既存エントリで ⋯（削除）を押すと削除確認シートが開く（deleteOpen=true）',
+      description:
+        'Probe: 既存エントリで右上の設定 → 末尾の「このエントリーを削除」で削除確認シートが開く（deleteOpen=true）',
       props: {
         api: null,
         initialEntryId: 'entry-1',
@@ -186,34 +195,37 @@ registerUnit<Props>({
         persistDraft: false,
       },
       act: async (ctx) => {
-        ctx.click('button[aria-label="削除"]');
+        await ctx.click('button[aria-label="表示の設定"]');
+        await ctx.wait(32);
+        await ctx.click('[data-row-action="delete-entry"]');
         await ctx.wait(16);
       },
     },
   ],
   invariants: [
     {
-      id: 'hasbody-reflects-textarea',
-      description: 'contract.hasBody が本文 textarea の trim 結果を反映する',
+      id: 'hasbody-reflects-body',
+      description: 'contract.hasBody が本文（contentEditable）の trim 結果を反映する',
       check: ({ root, contract }) => {
-        const ta = root.querySelector<HTMLTextAreaElement>('textarea');
-        const actuallyHasBody = (ta?.value ?? '').trim().length > 0;
+        const text = root.querySelector('[data-sp-body]')?.textContent ?? '';
+        const actuallyHasBody = text.trim().length > 0;
         return (
           contract.hasBody === String(actuallyHasBody) ||
-          `contract.hasBody="${contract.hasBody}" だが textarea.value="${ta?.value}"（trim 後 hasBody=${actuallyHasBody}）`
+          `contract.hasBody="${contract.hasBody}" だが本文="${text}"（trim 後 hasBody=${actuallyHasBody}）`
         );
       },
     },
     {
-      id: 'ferment-cta-iff-hasentry',
-      description: '発酵 CTA は hasEntry=true（entryId 確定）のときだけ描画される',
+      id: 'ferment-cta-always',
+      description:
+        '発酵 CTA は最初から並ぶ（実機レビュー）。本文も保存も無いうちは押せない（押すと理由が出る）',
       check: ({ root, contract }) => {
-        const hasCta = Boolean(root.querySelector('.mx-4 button'));
-        const expectEntry = contract.hasEntry === 'true';
-        return (
-          hasCta === expectEntry ||
-          `発酵 CTA present=${hasCta} だが contract.hasEntry="${contract.hasEntry}"`
-        );
+        const cta = root.querySelector('button[data-palette-action="ferment"]');
+        if (!cta) return '発酵 CTA が無い';
+        if (contract.hasBody === 'false' && contract.hasEntry === 'false') {
+          return cta.getAttribute('aria-disabled') === 'true' || '本文が無いのに押せる';
+        }
+        return true;
       },
     },
     {
@@ -221,7 +233,7 @@ registerUnit<Props>({
       description:
         'Issue #314: 問い作成モードでシートが開いているなら、必ず入力欄がある（行き止まりにしない）',
       check: ({ root, contract }) => {
-        if (contract.sheetOpen !== 'true' || contract.composingQuestion !== 'true') return true;
+        if (contract.pickerOpen !== 'true' || contract.composingQuestion !== 'true') return true;
         // タイトル入力と取り違えないよう、問い入力の aria-label で特定する。
         const input = root.querySelector('input[aria-label^="問いを書く"]');
         return (
@@ -232,25 +244,25 @@ registerUnit<Props>({
     },
     {
       id: 'sheet-present-iff-open',
-      description: '問い選択シート（閉じるボタン）は sheetOpen=true のときだけ描画される',
+      description: '選び手は pickerOpen=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasSheet = Boolean(root.querySelector('button[aria-label="閉じる"]'));
-        const expectOpen = contract.sheetOpen === 'true';
+        const hasSheet = Boolean(root.querySelector('[data-verify-unit="QuestionPicker"]'));
+        const expectOpen = contract.pickerOpen === 'true';
         return (
           hasSheet === expectOpen ||
-          `sheet present=${hasSheet} だが contract.sheetOpen="${contract.sheetOpen}"`
+          `sheet present=${hasSheet} だが contract.pickerOpen="${contract.pickerOpen}"`
         );
       },
     },
     {
       id: 'default-collapsed-empty',
-      description: '初期状態は本文空・シート閉・発酵 CTA 無し',
+      description: '初期状態は本文空・シート閉・保存前',
       onlyFixtures: ['empty'],
       check: ({ contract }) =>
         (contract.hasBody === 'false' &&
-          contract.sheetOpen === 'false' &&
+          contract.pickerOpen === 'false' &&
           contract.hasEntry === 'false') ||
-        `expected empty/collapsed, got hasBody=${contract.hasBody}, sheetOpen=${contract.sheetOpen}, hasEntry=${contract.hasEntry}`,
+        `expected empty/collapsed, got hasBody=${contract.hasBody}, pickerOpen=${contract.pickerOpen}, hasEntry=${contract.hasEntry}`,
     },
     {
       id: 'editing-after-typing',
@@ -285,10 +297,11 @@ registerUnit<Props>({
       description: '発酵 CTA 送信中は pickling=true でボタンが disabled',
       onlyFixtures: ['pickling'],
       check: ({ root, contract }) => {
-        const btn = root.querySelector<HTMLButtonElement>('.mx-4 button');
+        const btn = root.querySelector('button[data-palette-action="ferment"]');
+        const locked = btn?.getAttribute('aria-disabled') === 'true';
         return (
-          (contract.pickling === 'true' && btn?.disabled === true) ||
-          `expected pickling=true & disabled, got pickling=${contract.pickling}, disabled=${btn?.disabled}`
+          (contract.pickling === 'true' && locked) ||
+          `expected pickling=true & locked, got pickling=${contract.pickling}, locked=${locked}`
         );
       },
     },
@@ -299,8 +312,8 @@ registerUnit<Props>({
       check: ({ contract }) =>
         (contract.hasQuestion === 'false' &&
           contract.pickling === 'false' &&
-          contract.sheetOpen === 'true') ||
-        `expected hasQuestion=false & pickling=false & sheetOpen=true, got hasQuestion=${contract.hasQuestion}, pickling=${contract.pickling}, sheetOpen=${contract.sheetOpen}`,
+          contract.pickerOpen === 'true') ||
+        `expected hasQuestion=false & pickling=false & pickerOpen=true, got hasQuestion=${contract.hasQuestion}, pickling=${contract.pickling}, pickerOpen=${contract.pickerOpen}`,
     },
     {
       id: 'question-empty-offers-composer',
@@ -310,10 +323,10 @@ registerUnit<Props>({
       check: ({ root, contract }) => {
         const input = root.querySelector('input[aria-label^="問いを書く"]');
         return (
-          (contract.sheetOpen === 'true' &&
+          (contract.pickerOpen === 'true' &&
             contract.composingQuestion === 'true' &&
             Boolean(input)) ||
-          `expected sheetOpen=true & composingQuestion=true & 入力欄あり, got sheetOpen=${contract.sheetOpen}, composingQuestion=${contract.composingQuestion}, input=${Boolean(input)}`
+          `expected pickerOpen=true & composingQuestion=true & 入力欄あり, got pickerOpen=${contract.pickerOpen}, composingQuestion=${contract.composingQuestion}, input=${Boolean(input)}`
         );
       },
     },
@@ -333,14 +346,26 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'delete-trigger-iff-hasentry',
-      description: '削除トリガー（⋯ aria-label=削除）は hasEntry=true のときだけ描画される',
+      id: 'delete-not-in-palette',
+      description:
+        '削除はパレットに並ばない（書いている最中に何度も押す列に、取り返しのつかない操作を置かない）',
+      check: ({ root }) =>
+        !root.querySelector('[data-palette-action="delete"]') || 'パレットに削除がある',
+    },
+    {
+      id: 'delete-row-iff-settings-open-and-hasentry',
+      description:
+        '削除の行は、設定シートが開いていて hasEntry=true のときだけ描画される（引っ込む動きの途中は数えない）',
       check: ({ root, contract }) => {
-        const hasTrigger = Boolean(root.querySelector('button[aria-label="削除"]'));
-        const expectEntry = contract.hasEntry === 'true';
+        const hasRow = Boolean(
+          root.querySelector(
+            '[data-sheet-phase]:not([data-sheet-phase="closing"]) [data-row-action="delete-entry"]',
+          ),
+        );
+        const expectRow = contract.settingsOpen === 'true' && contract.hasEntry === 'true';
         return (
-          hasTrigger === expectEntry ||
-          `削除トリガー present=${hasTrigger} だが contract.hasEntry="${contract.hasEntry}"`
+          hasRow === expectRow ||
+          `削除の行 present=${hasRow} だが settingsOpen=${contract.settingsOpen} hasEntry=${contract.hasEntry}`
         );
       },
     },
@@ -348,7 +373,9 @@ registerUnit<Props>({
       id: 'delete-sheet-iff-open',
       description: '削除確認シート（fixed オーバーレイ）は deleteOpen=true のときだけ描画される',
       check: ({ root, contract }) => {
-        const hasSheet = Boolean(root.querySelector('.fixed'));
+        // パレットも fixed なので、確認シートは契約で見分ける。
+        const sheet = root.querySelector('[data-verify-unit="SpConfirmSheet"]');
+        const hasSheet = sheet?.getAttribute('data-verify-open') === 'true';
         const expectOpen = contract.deleteOpen === 'true';
         return (
           hasSheet === expectOpen ||
@@ -361,10 +388,11 @@ registerUnit<Props>({
       description: '既存エントリで ⋯ を押すと deleteOpen=true になり確認シートが現れる',
       onlyFixtures: ['delete-open'],
       check: ({ root, contract }) => {
-        const hasSheet = Boolean(root.querySelector('.fixed'));
+        const sheet = root.querySelector('[data-verify-unit="SpConfirmSheet"]');
+        const hasSheet = sheet?.getAttribute('data-verify-open') === 'true';
         return (
           (contract.deleteOpen === 'true' && hasSheet) ||
-          `⋯ 押下後 deleteOpen=true & シート表示のはずだが deleteOpen=${contract.deleteOpen}, sheet=${hasSheet}`
+          `削除を押した後 deleteOpen=true & シート表示のはずだが deleteOpen=${contract.deleteOpen}, sheet=${hasSheet}`
         );
       },
     },

@@ -3,116 +3,89 @@
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { Skeleton, skeletonKeys } from '@/components/ui/skeleton';
+import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
+import { FermentationReading } from '@/features/shared/fermentation/components/fermentation-reading';
 import type { FermentationDetail } from '@/features/shared/fermentation/types';
-import type { SpJarElement } from '@/features/sp/fermentation/components/sp-element-sheet';
-import {
-  fitRingText,
-  RING_START_OFFSET,
-  RING_TRACKING,
-  ringPath,
-} from '@/features/sp/fermentation/ring-text';
-import { ringSlots } from '@/features/sp/fermentation/zoom-layout';
-
-/** 円の中での位置（円の直径に対する %）。 */
-export interface ZoomPosition {
-  xPercent: number;
-  yPercent: number;
-}
+import { formatMonthDay } from '@/lib/format-date';
+import { useSpBackHandler, useSpChrome, useSpHeading } from '@/lib/sp-chrome-context';
+import { useDelayedTrue } from '@/lib/use-delayed';
 
 interface SpQuestionZoomProps {
   questionText: string;
   detail: FermentationDetail | null;
   loading: boolean;
+  /** これまでの発酵（新しい順）。2 回以上あれば日付のチップを出す（PC の履歴の SP 版）。 */
+  history?: readonly { fermentationId: string; createdAt: string }[];
+  selectedFermentationId?: string | null;
+  onSelectFermentation?: (fermentationId: string) => void;
+  /** 手紙に返事を書く（新規エントリーへ）。 */
+  onReply?: () => void;
+  /** 手紙のもとになった記録を開く。 */
+  onOpenSource?: (entryId: string) => void;
   onClose: () => void;
-  onOpenElement: (element: SpJarElement) => void;
-  /**
-   * 動かした要素の位置（id → 位置）。無い要素は輪の上の既定位置に置く。
-   * 保存は呼び出し側（page/瓶）が持つ — この部品は置き場を知らない。
-   */
-  positions?: Record<string, ZoomPosition>;
-  onMove?: (id: string, position: ZoomPosition) => void;
 }
 
-/**
- * 内側の輪＝言葉、外側の輪＝抜粋。
- *
- * 抜粋は 3 時から、言葉は 12 時から並べる。数が少ないとき（言葉2・抜粋1 が典型）に
- * 上下と左右で席が分かれ、いちばん混みやすい真上で重ならない。
- */
-const KEYWORD_RADIUS = 27;
-const SNIPPET_RADIUS = 34;
-const KEYWORD_START = 0;
-const SNIPPET_START = Math.PI / 2;
-
-/** 円の中に置ける数の上限。これ以上は入れても指で選び分けられない。 */
-const MAX_KEYWORDS = 6;
-const MAX_SNIPPETS = 4;
+/** その人の言葉（問い・言葉・抜粋）の書体。道具の字（`CONTROL_FONT`）と混ぜない。 */
+const SERIF_FONT = "'Noto Serif JP', serif";
 
 /**
- * 中の要素を設計した円の直径（px）。実際の円がこれより小さければ要素も縮める。
+ * シャーレを押した先。**上に問いを題として全文、下に手紙・キーワード・スニペットを読む流れ。**
  *
- * 位置は % なので円と一緒に縮むが、ピルやカードの寸法は絶対 px なので、
- * 小さい端末では相対的に肥大して円からはみ出す。倍率で吸収する。
- */
-const ELEMENT_REFERENCE_SIZE = 340;
-const ELEMENT_SCALE_MIN = 0.85;
-const ELEMENT_SCALE_MAX = 1.35;
-
-function elementScale(size: number): number {
-  if (size <= 0) return 1;
-  const raw = size / ELEMENT_REFERENCE_SIZE;
-  return Math.min(ELEMENT_SCALE_MAX, Math.max(ELEMENT_SCALE_MIN, raw));
-}
-
-/**
- * 問いの円をひとつ開いた画面。円が画面いっぱいに広がり、中の要素（言葉・抜粋・手紙）が
- * それぞれタップできる。
+ * 題の出し方は**エントリーの題と同じ**: いちばん上まで戻れば全文で大きく、スクロールして題が上段の下に隠れたら
+ * 上段の中央に 1 行で上がる（`useSpHeading`）。以前は問いを 1 行に畳み、押すと全文、という別の作りで、エントリーと
+ * 振る舞いが揃っていなかった（実機レビュー）。
  *
- * 円の中では**中身を読ませない**。読むのはボトムシート（SpElementSheet）の仕事で、
- * ここは「何がいくつ入っているか」と「どれを触るか」だけを示す。
+ * 中身はエントリーの「発酵の結果」と同じ `FermentationReading`（キーワードとスニペットは押すとその場で開く）。
+ *
+ * 「戻る」は上段（`SpTopBar`）の左端の正円が担う。この画面が出ている間だけ上段の戻るを横取りして、書斎ではなく
+ * 地図へ戻す（`useSpBackHandler`）。上段が無い場所（孤立検証・テスト）では自前の戻るを出す。
  */
 export function SpQuestionZoom({
   questionText,
   detail,
   loading,
+  history = [],
+  selectedFermentationId = null,
+  onSelectFermentation,
+  onReply,
+  onOpenSource,
   onClose,
-  onOpenElement,
-  positions = {},
-  onMove,
 }: SpQuestionZoomProps) {
   const t = useTranslations('sp.jar');
-  const circleRef = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState(0);
+  const tNav = useTranslations('sp.nav');
+  const { mounted } = useSpChrome();
+  useSpBackHandler(mounted ? onClose : null);
 
+  // 題が読む流れの上端より上へ隠れているか。隠れている間だけ上段に題を出す（エントリーと同じ）。
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [titleHidden, setTitleHidden] = useState(false);
   useEffect(() => {
-    const el = circleRef.current;
-    if (!el) return;
-    const update = () => setSize(el.getBoundingClientRect().width);
-    update();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
+    const element = titleRef.current;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1];
+        if (entry) setTitleHidden(entry.intersectionRatio < 1);
+      },
+      { root: scrollRef.current, threshold: [1] },
+    );
+    observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  useSpHeading(titleHidden ? questionText : null);
 
-  const keywords = detail ? detail.keywords.slice(0, MAX_KEYWORDS) : [];
-  const snippets = detail ? detail.snippets.slice(0, MAX_SNIPPETS) : [];
+  const keywords = detail?.keywords ?? [];
+  const snippets = detail?.snippets ?? [];
   const letter = detail?.letter ?? null;
-  const keywordSlots = ringSlots(keywords.length, KEYWORD_RADIUS, KEYWORD_START);
-  const snippetSlots = ringSlots(snippets.length, SNIPPET_RADIUS, SNIPPET_START);
   const empty = !loading && keywords.length === 0 && snippets.length === 0 && letter === null;
-
-  const ring = fitRingText(questionText, size);
-  const scale = elementScale(size);
-
-  /** 動かしてあればその位置、無ければ輪の上の既定位置。 */
-  const placed = (id: string, fallback: ZoomPosition | undefined): ZoomPosition | undefined =>
-    positions[id] ?? fallback;
+  const showSkeleton = useDelayedTrue(loading);
 
   return (
     <div
       className="sp-rise absolute inset-0 z-20 flex flex-col"
-      style={{ background: 'var(--bg)', fontFamily: 'var(--ob-font-serif)' }}
+      style={{ background: 'var(--bg)' }}
       {...verifyAttrs({
         unit: 'SpQuestionZoom',
         loading,
@@ -120,338 +93,117 @@ export function SpQuestionZoom({
         snippetCount: snippets.length,
         hasLetter: letter !== null,
         empty,
+        titleHidden,
+        ownBack: !mounted,
+        historyCount: history.length,
       })}
     >
-      {/* 問いは円の外周に書いてある。ここでもう一度出すと同じ文が 2 つ並ぶだけなので、
-          閉じる導線だけを置く。 */}
-      <header className="flex items-center justify-end px-5 py-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="min-h-[40px] shrink-0 rounded-full border px-4 text-[13px]"
-          style={{ color: 'var(--fg)', borderColor: 'var(--border-subtle)' }}
-        >
-          {t('close')}
-        </button>
-      </header>
-
-      <div className="flex flex-1 items-center justify-center px-4">
-        <div
-          ref={circleRef}
-          className="relative aspect-square rounded-full"
-          style={{
-            // 長い問いは輪が外へ増えるので、その分だけ円を控えめにする
-            // （88vw のままだと 2 重目が画面の縁で切れる）。
-            width: 'min(80vw, 52vh)',
-            background:
-              'radial-gradient(circle at 50% 42%, rgba(253,251,247,0.75), rgba(253,251,247,0.15))',
-            border: '1px solid rgba(226,194,142,0.5)',
-            boxShadow: '0 8px 40px rgba(140,133,126,0.12)',
-          }}
-        >
-          {/* 外周を回る問いテキスト。開いてもここが「どの問いか」を語る。 */}
-          {size > 0 ? (
+      {!mounted ? (
+        <header className="flex shrink-0 px-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={tNav('back')}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+            style={{ background: 'var(--surface-sunken)', color: 'var(--fg)' }}
+          >
             <svg
               aria-hidden="true"
-              viewBox={`0 0 ${ring.box} ${ring.box}`}
-              className="pointer-events-none absolute"
-              style={{
-                left: '50%',
-                top: '50%',
-                width: `${ring.box}px`,
-                height: `${ring.box}px`,
-                marginLeft: `${-ring.box / 2}px`,
-                marginTop: `${-ring.box / 2}px`,
-              }}
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={ICON_STROKE_WIDTH + 0.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              {ring.lines.map((line) => (
-                <g key={line.radius}>
-                  <path
-                    id={`sp-zoom-ring-${Math.round(line.radius)}`}
-                    d={ringPath(ring.box / 2, line.radius)}
-                    fill="transparent"
-                  />
-                  <text
-                    style={{
-                      fontFamily: "'Noto Serif JP', serif",
-                      fontSize: `${ring.fontSize}px`,
-                      letterSpacing: `${RING_TRACKING}em`,
-                      fill: '#7A3B3F',
-                      // 0.7 だと淡い円の地に沈んで「中身が見にくい」と報告された。
-                      opacity: 0.9,
-                    }}
-                  >
-                    {/* 経路は 6 時から時計回り。その中央（12 時）に問いを合わせて、
-                        問いが円の上を渡るようにする。 */}
-                    <textPath
-                      href={`#sp-zoom-ring-${Math.round(line.radius)}`}
-                      startOffset={RING_START_OFFSET}
-                      textAnchor="middle"
-                    >
-                      {line.label}
-                    </textPath>
-                  </text>
-                </g>
-              ))}
+              <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />
             </svg>
-          ) : null}
+          </button>
+        </header>
+      ) : null}
 
-          {loading ? (
-            <p
-              className="absolute inset-0 flex items-center justify-center text-xs"
-              style={{ color: 'var(--date-color)' }}
-            >
-              …
-            </p>
-          ) : null}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto pb-10">
+        {/* 題（エントリーの題と同じ大きさ・余白）。全文を折り返して出す。 */}
+        <h1
+          ref={titleRef}
+          data-question-heading
+          className="m-0 px-6 pt-3 text-2xl font-medium leading-snug"
+          style={{ fontFamily: SERIF_FONT, color: 'var(--fg)', letterSpacing: '0.02em' }}
+        >
+          {questionText}
+        </h1>
+
+        {/* 発酵の回（新しい順）。最初は「最新」、ほかは日付。押せばその回に切り替わる（PC の履歴の SP 版）。 */}
+        {history.length > 1 ? (
+          <div
+            data-history-strip
+            className="flex items-center gap-2 overflow-x-auto px-6 pt-4"
+            style={{ ...CONTROL_FONT, scrollbarWidth: 'none' }}
+          >
+            {history.map((item, index) => {
+              const active = item.fermentationId === selectedFermentationId;
+              return (
+                <button
+                  key={item.fermentationId}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onSelectFermentation?.(item.fermentationId)}
+                  className="shrink-0 rounded-full border px-3 py-1.5 text-[12px] tracking-[0.04em]"
+                  style={{
+                    borderColor: active ? 'var(--accent)' : 'var(--border-subtle)',
+                    background: active ? 'var(--accent)' : 'transparent',
+                    color: active ? 'var(--bg)' : 'var(--fg)',
+                  }}
+                >
+                  {index === 0 ? t('history_latest') : formatMonthDay(item.createdAt)}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {/* 読む流れ。エントリーの「発酵の結果」と同じ部品。キーワードとスニペットは押すとその場で開く。 */}
+        <div className="px-5 pt-5">
+          {/* 読み込み中は、いずれ出る形（見出しと行）を先に置く。一瞬で返るなら出さない。 */}
+          {showSkeleton ? <QuestionZoomSkeleton /> : null}
 
           {empty ? (
             <p
-              className="absolute inset-0 flex items-center justify-center px-12 text-center text-sm leading-relaxed"
+              className="px-6 py-8 text-center text-sm leading-relaxed"
               style={{ color: 'var(--date-color)' }}
             >
               {t('not_fermented')}
             </p>
           ) : null}
 
-          {/* 言葉（内側の輪） */}
-          {keywords.map((keyword, i) => (
-            <ElementButton
-              key={keyword.id}
-              slot={placed(keyword.id, keywordSlots[i])}
-              id={keyword.id}
-              onMove={onMove}
-              scale={scale}
-              onClick={() =>
-                onOpenElement({
-                  kind: 'keyword',
-                  id: keyword.id,
-                  keyword: keyword.keyword,
-                  description: keyword.description,
-                })
-              }
-            >
-              <span
-                className="block whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium"
-                style={{
-                  background: 'linear-gradient(135deg, #E8D1B5, #D9B48F)',
-                  color: 'var(--fg)',
-                  // 白い縁だと淡い円の地との境が消える。茶の縁で輪郭を立てる。
-                  border: '1px solid rgba(122,90,60,0.28)',
-                  boxShadow: '0 4px 12px rgba(217,180,143,0.3)',
-                  letterSpacing: '0.08em',
-                }}
-              >
-                {keyword.keyword}
-              </span>
-            </ElementButton>
-          ))}
-
-          {/* 抜粋（外側の輪）。中身は読ませず、在ることだけ示す。 */}
-          {snippets.map((snippet, i) => (
-            <ElementButton
-              key={snippet.id}
-              slot={placed(snippet.id, snippetSlots[i])}
-              id={snippet.id}
-              onMove={onMove}
-              scale={scale}
-              onClick={() =>
-                onOpenElement({
-                  kind: 'snippet',
-                  id: snippet.id,
-                  originalText: snippet.originalText,
-                  sourceDate: snippet.sourceDate,
-                  selectionReason: snippet.selectionReason,
-                })
-              }
-            >
-              <span
-                className="block w-[104px] rounded-xl px-2.5 py-2 text-[12px] leading-snug"
-                style={{
-                  // 半透明の白に白い縁で、円の淡い地と見分けがつかなかった。地を不透明に
-                  // して縁を立て、字も 11px → 12px にする。
-                  background: 'var(--surface-raised)',
-                  color: 'var(--fg)',
-                  border: '1px solid rgba(122,116,64,0.28)',
-                  boxShadow: '0 4px 14px rgba(140,133,126,0.16)',
-                  display: '-webkit-box',
-                  WebkitBoxOrient: 'vertical',
-                  WebkitLineClamp: 2,
-                  overflow: 'hidden',
-                }}
-              >
-                「{snippet.originalText}
-              </span>
-            </ElementButton>
-          ))}
-
-          {/* 手紙（中央）。円の中でいちばん強い報酬なので席は真ん中。 */}
-          {letter ? (
-            <ElementButton
-              slot={placed(letter.id, { xPercent: 50, yPercent: 50 })}
-              id={letter.id}
-              onMove={onMove}
-              scale={scale}
-              testId="sp-jar-letter"
-              ariaLabel={t('section_letter')}
-              onClick={() =>
-                onOpenElement({
-                  kind: 'letter',
-                  id: letter.id,
-                  bodyText: letter.bodyText,
-                  sources: detail?.scannedEntries ?? [],
-                })
-              }
-            >
-              <span
-                className="flex items-center justify-center rounded-full"
-                style={{
-                  width: '82px',
-                  height: '82px',
-                  background: 'linear-gradient(135deg, #FFFFFF, #FBF1EE)',
-                  border: '1.5px solid rgba(122,59,63,0.45)',
-                  boxShadow: '0 0 0 6px rgba(122,59,63,0.06), 0 6px 18px rgba(122,59,63,0.22)',
-                }}
-              >
-                <svg
-                  aria-hidden="true"
-                  width="26"
-                  height="26"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  style={{ color: '#7A3B3F' }}
-                >
-                  <path
-                    d="M1 4L8 9L15 4"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M1 4V12H15V4"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-            </ElementButton>
+          {detail && !empty ? (
+            <FermentationReading
+              detail={detail}
+              reveal="tap"
+              onReply={onReply}
+              onOpenSource={onOpenSource}
+            />
           ) : null}
         </div>
       </div>
-
-      <p
-        className="px-6 pb-6 text-center text-[11px]"
-        style={{ color: 'var(--date-color)', fontFamily: 'var(--ob-font-sans)' }}
-      >
-        {empty || loading ? '' : t('tap_hint')}
-      </p>
     </div>
   );
 }
 
-interface ElementButtonProps {
-  /** 要素の id。動かした位置を憶えるときの鍵。 */
-  id: string;
-  slot: ZoomPosition | undefined;
-  /** 円の大きさに合わせた倍率。位置は % なので、寸法だけをここで合わせる。 */
-  scale: number;
-  onClick: () => void;
-  onMove?: (id: string, position: ZoomPosition) => void;
-  /** 手紙のように文字を持たない要素を掴むための目印。 */
-  testId?: string;
-  /** 中身が絵だけの要素に名前を与える（読み上げで「ボタン」としか言われなくなる）。 */
-  ariaLabel?: string;
-  children: React.ReactNode;
-}
-
-/** これ以上動いたらタップではなく動かした、とみなす（px）。 */
-const DRAG_SLOP = 6;
-
-/**
- * 円の中の要素。**タップで読み、ドラッグで動かす。**
- *
- * click は pointerup の後に来るので、動かし終えた指離しで中身が開かないよう、
- * 動かしたかどうかを次の click まで持ち越す（軌道の円と同じ作り）。
- */
-function ElementButton({
-  id,
-  slot,
-  scale,
-  onClick,
-  onMove,
-  testId,
-  ariaLabel,
-  children,
-}: ElementButtonProps) {
-  const draggedRef = useRef(false);
-  const originRef = useRef<{ x: number; y: number; moved: number } | null>(null);
-
-  if (!slot) return null;
-
-  const circle = (event: React.PointerEvent<HTMLElement>): DOMRect | null =>
-    event.currentTarget.parentElement?.getBoundingClientRect() ?? null;
-
+/** 読み込み中の骨組み。手紙 1 行・言葉 3 行・抜粋 2 行の、実物と同じ並び。 */
+function QuestionZoomSkeleton() {
   return (
-    <button
-      type="button"
-      onClick={() => {
-        if (draggedRef.current) {
-          draggedRef.current = false;
-          return;
-        }
-        onClick();
-      }}
-      onPointerDown={(event) => {
-        if (!onMove) return;
-        draggedRef.current = false;
-        originRef.current = { x: event.clientX, y: event.clientY, moved: 0 };
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={(event) => {
-        const origin = originRef.current;
-        if (!onMove || !origin) return;
-        origin.moved += Math.abs(event.clientX - origin.x) + Math.abs(event.clientY - origin.y);
-        origin.x = event.clientX;
-        origin.y = event.clientY;
-        if (origin.moved < DRAG_SLOP) return;
-
-        const rect = circle(event);
-        if (!rect || rect.width === 0) return;
-        draggedRef.current = true;
-        // 円からはみ出さない範囲に留める（外へ出すと二度と掴めない）。
-        onMove(id, {
-          xPercent: clampPercent(((event.clientX - rect.left) / rect.width) * 100),
-          yPercent: clampPercent(((event.clientY - rect.top) / rect.height) * 100),
-        });
-      }}
-      onPointerUp={() => {
-        originRef.current = null;
-      }}
-      onPointerCancel={() => {
-        originRef.current = null;
-        draggedRef.current = false;
-      }}
-      data-testid={testId}
-      aria-label={ariaLabel}
-      className="absolute"
-      style={{
-        left: `${slot.xPercent}%`,
-        top: `${slot.yPercent}%`,
-        transform: `translate(-50%, -50%) scale(${scale})`,
-        touchAction: 'none',
-        cursor: onMove ? 'grab' : undefined,
-      }}
-    >
-      {children}
-    </button>
+    <div aria-hidden="true" data-skeleton-slot="question-zoom" className="flex flex-col gap-6">
+      {[1, 3, 2].map((rows, index) => (
+        <div key={skeletonKeys(3)[index]} className="flex flex-col gap-3">
+          <Skeleton className="h-3 w-12" />
+          {skeletonKeys(rows).map((key) => (
+            <Skeleton key={key} className="h-5 w-full" />
+          ))}
+        </div>
+      ))}
+    </div>
   );
-}
-
-/** 円の内側（縁から少し内）に収める。 */
-function clampPercent(value: number): number {
-  if (!Number.isFinite(value)) return 50;
-  return Math.min(92, Math.max(8, value));
 }

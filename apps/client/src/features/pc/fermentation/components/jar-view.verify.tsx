@@ -10,7 +10,7 @@
  * no-op）に落ちる。よって api=null を渡せば fetch ゼロの純レンダリングで孤立検証できる。
  *
  * 公表する契約は api=null で到達し、かつ fixture 間で実際に変化する状態のみ:
- * questionCount（最大3にキャップ）/ zoomed / editOpen / addOpen / addAvailable / historyOpen。
+ * questionCount（最大 5 にキャップ、#430）/ zoomed / editOpen / addOpen / addAvailable / historyOpen。
  * detailOpen は出さない（inner 要素は detail があるときだけ描画＝ api=null では開けず定数になる）。
  *
  * historyOpen は api=null では **常に false**。履歴への入口（円の下のメタラベル）は発酵が
@@ -62,6 +62,14 @@ const threeQuestions: QuestionData[] = [
 const fourQuestions: QuestionData[] = [
   ...threeQuestions,
   { id: 'q-4', currentText: '溢れた4件目', jarX: null, jarY: null },
+];
+const fiveQuestions: QuestionData[] = [
+  ...fourQuestions,
+  { id: 'q-5', currentText: '明日の自分に何を渡すか', jarX: 28, jarY: 84 },
+];
+const sixQuestions: QuestionData[] = [
+  ...fiveQuestions,
+  { id: 'q-6', currentText: '六つ目の問い', jarX: 50, jarY: 50 },
 ];
 
 registerUnit<Props>({
@@ -116,16 +124,16 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'full-three',
+      id: 'full-five',
       probe: true,
-      description: 'Probe: 問い3件で上限に達し、追加ボタンが出ない（addAvailable=false）',
-      props: { api: null, authLoading: false, questions: threeQuestions, onAddQuestion: noopAsync },
+      description: 'Probe: 問い5件で上限に達し、追加ボタンが出ない（addAvailable=false）',
+      props: { api: null, authLoading: false, questions: fiveQuestions, onAddQuestion: noopAsync },
     },
     {
-      id: 'overflow-four',
+      id: 'overflow-six',
       probe: true,
-      description: 'Probe: 問い4件でもサークルは3件にキャップされる（questionCount=3）',
-      props: { api: null, authLoading: false, questions: fourQuestions, onAddQuestion: noopAsync },
+      description: 'Probe: 問い6件でもサークルは5件にキャップされる（questionCount=5）',
+      props: { api: null, authLoading: false, questions: sixQuestions, onAddQuestion: noopAsync },
     },
     {
       id: 'readiness-bubbling',
@@ -165,11 +173,11 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'circle-count-capped-at-three',
-      description: 'サークル数は問い件数に関わらず最大3にキャップされる',
+      id: 'circle-count-capped-at-five',
+      description: 'サークル数は問い件数に関わらず最大5にキャップされる',
       check: ({ root }) => {
         const circles = root.querySelectorAll('[data-verify-unit="QuestionCircle"]').length;
-        return circles <= 3 || `QuestionCircle 描画数=${circles}（最大3を超過）`;
+        return circles <= 5 || `QuestionCircle 描画数=${circles}（最大5を超過）`;
       },
     },
     {
@@ -245,14 +253,14 @@ registerUnit<Props>({
         `expected addOpen=true after add click, got "${contract.addOpen}"`,
     },
     {
-      id: 'full-three-not-addable',
-      description: '問い3件では上限に達し追加不可（addAvailable=false・追加ボタン無し）',
-      onlyFixtures: ['full-three'],
+      id: 'full-five-not-addable',
+      description: '問い5件では上限に達し追加不可（addAvailable=false・追加ボタン無し）',
+      onlyFixtures: ['full-five'],
       check: ({ root, contract }) => {
         const hasAddBtn = Boolean(root.querySelector('button.border-dashed'));
         return (
-          (contract.addAvailable === 'false' && contract.questionCount === '3' && !hasAddBtn) ||
-          `expected addAvailable=false & 3 circles & no add button, got addAvailable=${contract.addAvailable}, questionCount=${contract.questionCount}, hasAddBtn=${hasAddBtn}`
+          (contract.addAvailable === 'false' && contract.questionCount === '5' && !hasAddBtn) ||
+          `expected addAvailable=false & 5 circles & no add button, got addAvailable=${contract.addAvailable}, questionCount=${contract.questionCount}, hasAddBtn=${hasAddBtn}`
         );
       },
     },
@@ -285,14 +293,14 @@ registerUnit<Props>({
       },
     },
     {
-      id: 'overflow-capped-to-three',
-      description: '問い4件でもサークルは3件にキャップ（questionCount=3）',
-      onlyFixtures: ['overflow-four'],
+      id: 'overflow-capped-to-five',
+      description: '問い6件でもサークルは5件にキャップ（questionCount=5）',
+      onlyFixtures: ['overflow-six'],
       check: ({ root, contract }) => {
         const circles = root.querySelectorAll('[data-verify-unit="QuestionCircle"]').length;
         return (
-          (contract.questionCount === '3' && circles === 3) ||
-          `expected questionCount=3 & 3 circles for 4 questions, got questionCount=${contract.questionCount}, circles=${circles}`
+          (contract.questionCount === '5' && circles === 5) ||
+          `expected questionCount=5 & 5 circles for 6 questions, got questionCount=${contract.questionCount}, circles=${circles}`
         );
       },
     },

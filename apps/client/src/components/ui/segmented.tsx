@@ -2,7 +2,7 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useId } from 'react';
-import { CONTROL_FONT } from '@/components/ui/surface';
+import { CONTROL_FONT, type FieldSize } from '@/components/ui/surface';
 
 interface SegmentedOption {
   value: string;
@@ -14,6 +14,8 @@ interface SegmentedProps {
   options: SegmentedOption[];
   onChange: (value: string) => void;
   ariaLabel: string;
+  /** sm: PC のパネル向け（28px）。md: 指で押す（40px、SP のシート）。 */
+  size?: FieldSize;
   className?: string;
 }
 
@@ -29,14 +31,27 @@ interface SegmentedProps {
  * まとめ方をブラウザが正しく持っているので、そこを自前で書き直さない。
  * 見た目だけを差し替える（input は視覚的に隠し、隣の span を塗る）。
  */
-export function Segmented({ value, options, onChange, ariaLabel, className = '' }: SegmentedProps) {
+const SIZE = {
+  sm: { fieldset: 'h-7 rounded-md', label: 'h-6 rounded-[5px] px-2.5 text-[12px]' },
+  md: { fieldset: 'h-10 rounded-lg', label: 'h-9 rounded-[7px] px-3 text-[13px]' },
+} as const;
+
+export function Segmented({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  size = 'sm',
+  className = '',
+}: SegmentedProps) {
   const name = useId();
+  const sizing = SIZE[size];
 
   return (
     <fieldset
-      className={`flex h-7 items-center gap-0.5 rounded-md border-0 p-0.5 ${className}`}
+      className={`flex items-center gap-0.5 border-0 p-0.5 ${sizing.fieldset} ${className}`}
       style={{ backgroundColor: 'var(--track)', ...CONTROL_FONT }}
-      {...verifyAttrs({ unit: 'Segmented', value, optionCount: options.length })}
+      {...verifyAttrs({ unit: 'Segmented', value, size, optionCount: options.length })}
     >
       <legend className="sr-only">{ariaLabel}</legend>
       {options.map((option) => {
@@ -44,7 +59,7 @@ export function Segmented({ value, options, onChange, ariaLabel, className = '' 
         return (
           <label
             key={option.value}
-            className="flex h-6 flex-1 cursor-pointer items-center justify-center rounded-[5px] px-2.5 text-[12px] whitespace-nowrap transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[var(--accent)]"
+            className={`flex flex-1 cursor-pointer items-center justify-center whitespace-nowrap transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[var(--accent)] ${sizing.label}`}
             style={
               selected
                 ? {

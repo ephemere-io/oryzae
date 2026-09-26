@@ -27,6 +27,7 @@ describe('HitRegistry', () => {
       desk: DESK,
       shelf: SHELF,
       shelfAsSingleTarget: false,
+      pen: true,
     });
     registry.clear();
     expect(registry.ids()).toEqual([]);
@@ -38,6 +39,7 @@ describe('ホバーで出す一言', () => {
     desk: DESK,
     shelf: SHELF,
     shelfAsSingleTarget: false,
+    pen: true,
   });
 
   it('瓶と板は一言を持つ（ラベルは名前しか言わない）', () => {
@@ -61,6 +63,7 @@ describe('buildHitRegistry', () => {
     desk: DESK,
     shelf: SHELF,
     shelfAsSingleTarget: false,
+    pen: true,
   });
 
   it('瓶・机の冊・背表紙・ボードがすべて的になる', () => {
@@ -90,8 +93,11 @@ describe('buildHitRegistry', () => {
       desk: DESK,
       shelf: SHELF,
       shelfAsSingleTarget: true,
+      pen: false,
     });
     expect(sp.get('shelf')?.target).toEqual({ kind: 'archive' });
+    // 鉛筆も置かない（机は当月の 1 冊だけ）。
+    expect(sp.get('pen')).toBeNull();
     // 背表紙単位の的は作らない（当たりを広げると隣の月を拾う）。
     expect(sp.get('spine-0')).toBeNull();
   });
@@ -101,6 +107,7 @@ describe('buildHitRegistry', () => {
       desk: [],
       shelf: [],
       shelfAsSingleTarget: false,
+      pen: true,
     });
     expect(empty.get('jar')).not.toBeNull();
     expect(empty.get('board')).not.toBeNull();

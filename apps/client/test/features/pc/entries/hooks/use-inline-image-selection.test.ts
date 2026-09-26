@@ -5,7 +5,7 @@ import { useInlineImageSelection } from '@/features/pc/entries/hooks/use-inline-
 // 落とし先は「指した場所の文字」。ブラウザ API なので jsdom には無い。
 // ここでは「どこに落ちたか」を差し替えられるようにして、移動の筋だけを見る。
 const caretRange: { current: Range | null } = vi.hoisted(() => ({ current: null }));
-vi.mock('@/features/pc/entries/utils/caret-from-point', () => ({
+vi.mock('@/features/shared/entries/utils/caret-from-point', () => ({
   caretRangeFromPoint: () => caretRange.current,
 }));
 

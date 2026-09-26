@@ -10,13 +10,10 @@ import { QuestionTimelineSkeleton } from '@/features/pc/questions/components/que
 import { useQuestions } from '@/features/shared/questions/hooks/use-questions';
 import { SpQuestions } from '@/features/sp/questions/components/sp-questions';
 import { useAuth } from '@/lib/auth-context';
-import { useUnread } from '@/lib/unread-context';
 
 export default function QuestionsPage() {
   const t = useTranslations('questions.timeline');
   const { api } = useAuth();
-  // Issue #452: どの問いに手紙が届いたのかを一覧でも分かるようにする。
-  const { unreadQuestionIds } = useUnread();
   const {
     questions,
     loading,
@@ -39,9 +36,9 @@ export default function QuestionsPage() {
           createQuestion={createQuestion}
           editQuestion={editQuestion}
           archiveQuestion={archiveQuestion}
+          unarchiveQuestion={unarchiveQuestion}
           acceptQuestion={acceptQuestion}
           rejectQuestion={rejectQuestion}
-          unreadQuestionIds={unreadQuestionIds}
         />
       }
       pc={

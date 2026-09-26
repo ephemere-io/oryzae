@@ -65,6 +65,8 @@ export function buildHitRegistry(options: {
   shelf: readonly Notebook[];
   /** SP は棚ごと 1 つの的にする。 */
   shelfAsSingleTarget: boolean;
+  /** 鉛筆を置くか。SP は置かない（机に当月の 1 冊だけで、書く入口は ENTRIES のピル）。 */
+  pen: boolean;
 }): HitRegistry {
   const registry = new HitRegistry();
 
@@ -99,16 +101,18 @@ export function buildHitRegistry(options: {
    * （実機レビュー）。行き先は積みの一番上（当月）と同じ「書く」で、
    * 物として最も素直に「書く」を指しているのが鉛筆。
    */
-  registry.add({
-    id: 'pen',
-    target: { kind: 'journal-new' },
-    // 鉛筆の真下に「NEW」を出す（オーナーの依頼）。以前はラベルを持たせず、触れたときの
-    // 一言だけで知らせていた — 積みの ENTRIES と同じ場所に 2 つ目の注釈が出るのを避けて。
-    // NEW は積みではなく鉛筆の手前に置くので、ENTRIES とは離れる。
-    label: 'pen',
-    month: null,
-    hint: 'pen',
-  });
+  if (options.pen) {
+    registry.add({
+      id: 'pen',
+      target: { kind: 'journal-new' },
+      // 鉛筆の真下に「NEW」を出す（オーナーの依頼）。以前はラベルを持たせず、触れたときの
+      // 一言だけで知らせていた — 積みの ENTRIES と同じ場所に 2 つ目の注釈が出るのを避けて。
+      // NEW は積みではなく鉛筆の手前に置くので、ENTRIES とは離れる。
+      label: 'pen',
+      month: null,
+      hint: 'pen',
+    });
+  }
 
   registry.add({
     id: 'board',

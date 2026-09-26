@@ -55,6 +55,11 @@ export interface Bounds {
 export const OVERZOOM_OUT_EVENT = 'oryzae:canvas-overzoom-out';
 
 export interface OverzoomOutDetail {
+  /**
+   * どの入力か。指のつまみは 1 回で動かせる距離が短く（指の開き幅で頭打ち）、ホイールより
+   * 大きく進めないと届かない。拾う側が進め方を変える。
+   */
+  input?: 'wheel' | 'pinch';
   excess: number;
 }
 
@@ -76,23 +81,37 @@ export const MIN_SCALE = 0.1;
  * 止まる（実機の指摘）。最小の少し手前から知らせ始めると、引くほど部屋が滲むのが
  * 見えるので、そのまま引き続ければ着くと分かる。
  */
-export const OVERZOOM_ARM_SCALE = MIN_SCALE * 1.6;
+const OVERZOOM_ARM_SCALE = MIN_SCALE * 1.6;
 export const MAX_SCALE = 3;
+
+/** 引きの余りを知らせ始める倍率の、下限に対する比（`OVERZOOM_ARM_SCALE` と同じ比）。 */
+export const OVERZOOM_ARM_RATIO = OVERZOOM_ARM_SCALE / MIN_SCALE;
+
+/** 倍率の上限と下限。 */
+export interface ScaleBounds {
+  min: number;
+  max: number;
+}
+
+export const DEFAULT_SCALE_BOUNDS: ScaleBounds = { min: MIN_SCALE, max: MAX_SCALE };
 
 /** パン・ズームしていない初期状態。ハイドレーション前はこれで描く。 */
 export const IDENTITY_VIEWPORT: Viewport = { x: 0, y: 0, scale: 1 };
 
-export function clampScale(scale: number): number {
+export function clampScale(scale: number, bounds: ScaleBounds = DEFAULT_SCALE_BOUNDS): number {
   if (!Number.isFinite(scale)) return 1;
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+  return Math.min(bounds.max, Math.max(bounds.min, scale));
 }
 
 /** 保存値・外部入力を安全な Viewport に正規化する（NaN / Infinity を弾く）。 */
-export function normalizeViewport(value: Viewport): Viewport {
+export function normalizeViewport(
+  value: Viewport,
+  bounds: ScaleBounds = DEFAULT_SCALE_BOUNDS,
+): Viewport {
   return {
     x: Number.isFinite(value.x) ? value.x : 0,
     y: Number.isFinite(value.y) ? value.y : 0,
-    scale: clampScale(value.scale),
+    scale: clampScale(value.scale, bounds),
   };
 }
 
@@ -111,8 +130,14 @@ export function screenToWorld(vp: Viewport, screenX: number, screenY: number): P
  * クランプで倍率が頭打ちになった場合も **実際に適用された倍率** で平行移動を計算するため、
  * 上限・下限に張り付いた状態でホイールを回し続けても画面が流れない。
  */
-export function zoomAt(vp: Viewport, anchorX: number, anchorY: number, factor: number): Viewport {
-  const scale = clampScale(vp.scale * factor);
+export function zoomAt(
+  vp: Viewport,
+  anchorX: number,
+  anchorY: number,
+  factor: number,
+  bounds: ScaleBounds = DEFAULT_SCALE_BOUNDS,
+): Viewport {
+  const scale = clampScale(vp.scale * factor, bounds);
   const applied = scale / vp.scale;
   return {
     scale,
@@ -122,8 +147,14 @@ export function zoomAt(vp: Viewport, anchorX: number, anchorY: number, factor: n
 }
 
 /** `anchor` を固定したまま倍率を絶対値で設定する。 */
-export function zoomTo(vp: Viewport, scale: number, anchorX: number, anchorY: number): Viewport {
-  return zoomAt(vp, anchorX, anchorY, clampScale(scale) / vp.scale);
+export function zoomTo(
+  vp: Viewport,
+  scale: number,
+  anchorX: number,
+  anchorY: number,
+  bounds: ScaleBounds = DEFAULT_SCALE_BOUNDS,
+): Viewport {
+  return zoomAt(vp, anchorX, anchorY, clampScale(scale, bounds) / vp.scale, bounds);
 }
 
 /** screen px 単位で平行移動する（倍率は変えない）。 */

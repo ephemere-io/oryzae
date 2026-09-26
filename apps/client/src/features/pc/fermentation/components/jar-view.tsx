@@ -1,5 +1,6 @@
 'use client';
 
+import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -114,9 +115,10 @@ interface JarViewProps {
    */
   readinessTop?: number;
   readinessTotal?: number;
-  onAddQuestion?: (text: string) => Promise<void>;
-  onEditQuestion?: (id: string, text: string) => Promise<void>;
-  onArchiveQuestion?: (id: string) => Promise<void>;
+  /** 送れたかを返してもよい（PC はいまのところ見ない）。 */
+  onAddQuestion?: (text: string) => Promise<boolean | void>;
+  onEditQuestion?: (id: string, text: string) => Promise<boolean | void>;
+  onArchiveQuestion?: (id: string) => Promise<boolean | void>;
 }
 
 /**
@@ -128,6 +130,8 @@ const CIRCLE_FALLBACK_POSITIONS: Array<{ x: number; y: number }> = [
   { x: 80, y: 22 }, // top-right
   { x: 72, y: 72 }, // bottom center-right
   { x: 14, y: 46 }, // center-left
+  { x: 26, y: 16 }, // top-left（上限 5、#430）
+  { x: 28, y: 84 }, // bottom-left
 ];
 
 interface Pos {
@@ -568,7 +572,7 @@ export function JarView({
   /**
    * 円になっていない問いの手紙を既読にする。
    *
-   * 瓶は問いを 3 つまでしか出さない。それを超えた問い（アーカイブ済みも含む）の手紙は、
+   * 瓶は問いを上限（`MAX_ACTIVE_QUESTIONS`）までしか出さない。それを超えた問い（アーカイブ済みも含む）の手紙は、
    * この画面からは開きようがない ── なのに未読として数えられ続けると、ナビのバッジが
    * 二度と減らなくなる（既読の単位を「瓶を開いた＝全部既読」から「その問いの履歴を
    * 開いた」に変えたときに生まれた穴で、実データで 4 件が張り付いていた）。
@@ -578,7 +582,7 @@ export function JarView({
    */
   useEffect(() => {
     if (unreadQuestionIds.size === 0) return;
-    const reachable = new Set(questions.slice(0, 3).map((q) => q.id));
+    const reachable = new Set(questions.slice(0, MAX_ACTIVE_QUESTIONS).map((q) => q.id));
     for (const questionId of unreadQuestionIds) {
       if (!reachable.has(questionId)) markQuestionRead(questionId);
     }
@@ -586,7 +590,7 @@ export function JarView({
 
   if (authLoading) return null;
 
-  const visibleQuestions = questions.slice(0, 3);
+  const visibleQuestions = questions.slice(0, MAX_ACTIVE_QUESTIONS);
   const resolvedCirclePositions = visibleQuestions.map((q, i) =>
     resolveCirclePos({ question: q, index: i, override: overrides.questions[q.id] }),
   );
@@ -646,7 +650,8 @@ export function JarView({
    */
   const detailColumnVisible = zoomedId !== null || historyQuestionId !== null;
 
-  const addAvailable = !zoomedId && questions.length < 3 && Boolean(onAddQuestion);
+  const addAvailable =
+    !zoomedId && questions.length < MAX_ACTIVE_QUESTIONS && Boolean(onAddQuestion);
 
   return (
     <div

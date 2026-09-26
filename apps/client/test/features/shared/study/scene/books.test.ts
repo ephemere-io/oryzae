@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SP_LAYOUT } from '@/features/shared/study/layout';
 import {
   BLOCK_INSET,
   COVER_HINGE_X,
@@ -54,6 +55,18 @@ describe('notebookThickness', () => {
     // 厚くしすぎると積みが塔になり、真上から寄るカメラの構図が崩れる。
     const tallest = notebookThickness(40) * 3 + STACK_GAP * 2;
     expect(tallest).toBeLessThan(NOTEBOOK_SIZE.depth);
+  });
+
+  it('構図の倍率は件数ぶんの伸びだけにかかる（表紙だけの厚みは変わらない）', () => {
+    expect(notebookThickness(0, 4)).toBe(notebookThickness(0));
+    expect(notebookThickness(10, 4) - notebookThickness(0, 4)).toBeCloseTo(
+      (notebookThickness(10) - notebookThickness(0)) * 4,
+    );
+  });
+
+  it('SP の 1 冊は、最も厚くなっても手帳の奥行きに収まる（塔にならない）', () => {
+    // SP は机に 1 冊だけ。見下ろす角度が急なぶん伸びを大きくしてあるが、手帳の形は保つ。
+    expect(notebookThickness(40, SP_LAYOUT.notebookGrowth)).toBeLessThan(NOTEBOOK_SIZE.depth);
   });
 
   it('負や小数でも壊れない', () => {

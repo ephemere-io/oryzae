@@ -44,14 +44,11 @@ describe('SpQuestions', () => {
     expect(screen.getByText('なぜ書くのか')).toBeTruthy();
   });
 
-  it('手紙が届いた問いに印を出す（Issue #452）', () => {
-    renderQ({ unreadQuestionIds: new Set(['q1']) });
-    expect(screen.getByText(jaMessages.sp.questions.letter_arrived)).toBeTruthy();
-  });
-
-  it('手紙が届いていない問いには印を出さない', () => {
-    renderQ({ unreadQuestionIds: new Set(['other']) });
-    expect(screen.queryByText(jaMessages.sp.questions.letter_arrived)).toBeNull();
+  it('手紙の印は出さない（この画面から手紙は読めない）', () => {
+    // 行を押すと開くのは「問いを編集」。届いたと言われても行き場が無いので、
+    // 印は読める場所（瓶の円の中）だけに出す。
+    renderQ();
+    expect(screen.queryByText('手紙が届いています')).toBeNull();
   });
 
   it('「新しい問いを立てる」でシートが開き、作成できる', () => {
@@ -72,10 +69,77 @@ describe('SpQuestions', () => {
     expect(props.acceptQuestion).toHaveBeenCalledWith('p1');
   });
 
-  it('問いをタップ→終える（アーカイブ）できる', () => {
+  it('問いをタップ→アーカイブは、確かめてからアーカイブする（1 回押しただけでは消えない）', () => {
     const props = renderQ();
     fireEvent.click(screen.getByText('なぜ書くのか'));
-    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.delete }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive }));
+    expect(props.archiveQuestion).not.toHaveBeenCalled();
+    expect(screen.getByText(jaMessages.sp.questions.archive_confirm_title)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive_confirm }));
     expect(props.archiveQuestion).toHaveBeenCalledWith('q1');
+  });
+
+  it('確かめで「やめる」を押せばアーカイブしない', () => {
+    const props = renderQ();
+    fireEvent.click(screen.getByText('なぜ書くのか'));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive }));
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.archive_cancel }));
+    expect(props.archiveQuestion).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: jaMessages.sp.questions.archive })).toBeTruthy();
+  });
+
+  it('アーカイブした問いは、開いて「戻す」で戻せる', () => {
+    const unarchiveQuestion = vi.fn();
+    renderQ({
+      questions: [q('q1', 'なぜ書くのか'), q('a1', '去年の問い', { isArchived: true })],
+      unarchiveQuestion,
+    });
+    expect(screen.queryByText('去年の問い')).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: jaMessages.sp.questions.archived_section.replace('{count}', '1'),
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: jaMessages.sp.questions.unarchive }));
+    expect(unarchiveQuestion).toHaveBeenCalledWith('a1');
+  });
+
+  it('生きている問いが上限なら「戻す」は押せず、理由を出す', () => {
+    renderQ({
+      questions: [
+        ...['q1', 'q2', 'q3', 'q4', 'q5'].map((id) => q(id, `問い ${id}`)),
+        q('a1', '去年の問い', { isArchived: true }),
+      ],
+      unarchiveQuestion: vi.fn(),
+    });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: jaMessages.sp.questions.archived_section.replace('{count}', '1'),
+      }),
+    );
+    const restore = screen.getByRole('button', { name: jaMessages.sp.questions.unarchive });
+    expect(restore).toHaveProperty('disabled', true);
+    expect(
+      screen.getByText(jaMessages.sp.questions.unarchive_limit.replace('{max}', '5')),
+    ).toBeTruthy();
+  });
+
+  it('戻す手段を渡されなければ、アーカイブした問いの一覧を出さない', () => {
+    renderQ({ questions: [q('q1', 'なぜ書くのか'), q('a1', '去年の問い', { isArchived: true })] });
+    expect(screen.queryByText(/アーカイブした問い/)).toBeNull();
+  });
+
+  it('生きている問いが上限（5）なら「立てる」を出さない。説明の箱も置かない（#430・オーナーのレビュー）', () => {
+    renderQ({
+      questions: ['q1', 'q2', 'q3', 'q4', 'q5'].map((id) => q(id, `問い ${id}`)),
+    });
+    expect(screen.queryByRole('button', { name: jaMessages.sp.questions.add })).toBeNull();
+    // 一覧を開けば 5 つ並んでいるのが見える。言葉で言い直さない。
+    expect(document.querySelector('[data-question-limit]')).toBeNull();
+  });
+
+  it('4 つならまだ「立てる」を出す', () => {
+    renderQ({ questions: ['q1', 'q2', 'q3', 'q4'].map((id) => q(id, `問い ${id}`)) });
+    expect(screen.getByRole('button', { name: jaMessages.sp.questions.add })).toBeTruthy();
   });
 });

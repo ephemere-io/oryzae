@@ -2,16 +2,16 @@
 
 import type { InlineImage } from '@oryzae/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { caretRangeFromPoint } from '@/features/pc/entries/utils/caret-from-point';
-import {
-  applyInlineImageStyle,
-  isInlineImage,
-  readInlineImageFromElement,
-} from '@/features/pc/entries/utils/inline-image-codec';
 import {
   type ResizeHandle,
   resizeInlineImage,
 } from '@/features/pc/entries/utils/inline-image-resize';
+import { caretRangeFromPoint } from '@/features/shared/entries/utils/caret-from-point';
+import {
+  applyInlineImageStyle,
+  isInlineImage,
+  readInlineImageFromElement,
+} from '@/features/shared/entries/utils/inline-image-codec';
 
 /**
  * 本文中の写真の選択・移動・リサイズを扱う。

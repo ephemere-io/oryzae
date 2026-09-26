@@ -25,6 +25,7 @@ interface Props {
   questions: JarQuestion[];
   loading: boolean;
   onManageQuestions: () => void;
+  manageOpen?: boolean;
 }
 
 const questions: JarQuestion[] = [
@@ -120,6 +121,20 @@ registerUnit<Props>({
       },
     },
     {
+      id: 'manage-open',
+      description: '問いの一覧を開いている間は、パレットの「問いの一覧」が効いている色になる',
+      props: {
+        api: filledApi,
+        questions,
+        loading: false,
+        onManageQuestions: noop,
+        manageOpen: true,
+      },
+      act: async (ctx) => {
+        await ctx.wait(32);
+      },
+    },
+    {
       id: 'opened',
       probe: true,
       description: 'Probe: 円をタップすると開く（open=true・中の要素が並ぶ）',
@@ -158,23 +173,44 @@ registerUnit<Props>({
     },
     {
       id: 'manage-button-always-present',
-      description: '問いの管理へ入る口は常にある（SP はボトムナビを持たない唯一の入口）',
-      onlyFixtures: ['loading', 'no-questions', 'orbit', 'opened'],
+      description: '問いの管理へ入る口は地図の間ずっとある（問いを開いている間は列を畳む）',
+      onlyFixtures: ['loading', 'no-questions', 'orbit'],
       check: ({ root }) => {
-        const text = root.textContent ?? '';
-        return text.includes('問いを追加・編集') || '「問いを追加・編集」ボタンが無い';
+        // 下端の列（殻が無い孤立検証では画面の中に描かれる）。
+        const fab = root.querySelector('button[data-palette-action="questions"]');
+        return fab?.getAttribute('aria-label') === '問いの一覧' || '「問いの一覧」の入口が無い';
       },
     },
     {
-      id: 'loading-shows-frame-not-empty-message',
-      description: '取得中は枠だけ出す（0件の案内を出さない）',
+      id: 'manage-shows-open-state',
+      description:
+        '一覧を開いている間だけ、パレットの「問いの一覧」が効いている色（押すと閉じる目印）',
+      onlyFixtures: ['orbit', 'manage-open'],
+      check: ({ root, contract }) => {
+        const fab = root.querySelector('button[data-palette-action="questions"]');
+        if (!(fab instanceof HTMLElement)) return '「問いの一覧」が無い';
+        const accent = getComputedStyle(document.documentElement)
+          .getPropertyValue('--accent')
+          .trim();
+        const active = fab.style.color.includes('accent') || fab.style.color === accent;
+        return (
+          active === (contract.manageOpen === 'true') ||
+          `効いている色=${active} だが manageOpen=${contract.manageOpen}`
+        );
+      },
+    },
+    {
+      id: 'loading-shows-loader-not-empty-message',
+      description:
+        '取得中はロード表示だけ出す（0件の案内も、前の形の枠も出さない。瓶はキャンバスで枠は予告にならない）',
       onlyFixtures: ['loading'],
       check: ({ root, contract }) => {
-        const skeleton = root.querySelector('[data-skeleton-slot="orbit"]');
+        const loader = root.querySelector('[data-testid="page-loading"]');
+        const oldFrame = root.querySelector('[data-skeleton-slot]');
         const saysEmpty = (root.textContent ?? '').includes('問いがまだありません');
         return (
-          (contract.loading === 'true' && skeleton !== null && !saysEmpty) ||
-          `loading=${contract.loading}, 枠=${skeleton !== null}, 0件の案内=${saysEmpty}（取得中に「ありません」を出すと問いを消したように見える）`
+          (contract.loading === 'true' && loader !== null && oldFrame === null && !saysEmpty) ||
+          `loading=${contract.loading}, ロード表示=${loader !== null}, 枠=${oldFrame !== null}, 0件の案内=${saysEmpty}（取得中に「ありません」を出すと問いを消したように見える／枠は前の画面の形に見える）`
         );
       },
     },

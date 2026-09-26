@@ -3,6 +3,7 @@ import {
   bubbleCount,
   bubbleSpeed,
   CORK,
+  corkProfile,
   EDGES_THRESHOLD_DEG,
   hazeOpacity,
   hazeVisible,
@@ -232,6 +233,27 @@ describe('solveJarSilhouette', () => {
 
   it('母線が空なら空を返す', () => {
     expect(solveJarSilhouette([], CAMERA)).toEqual([]);
+  });
+
+  it('上端を弦で閉じない（最後の点が最初の点の隣に戻る）', () => {
+    // 俯瞰（カメラが高い）で、LineLoop の閉じ線が口の中を横切っていた。
+    const loop = solveJarSilhouette(PROFILE, { ...CAMERA, horizontalDistance: 8, y: 12 });
+    const first = loop[0];
+    const last = loop[loop.length - 1];
+    let delta = last.angle - first.angle;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    expect(Math.abs(delta)).toBeLessThan(0.25);
+    expect(Math.abs(last.y - first.y)).toBeLessThan(0.05);
+  });
+
+  it('コルクの母線でも解ける（側面の輪郭 2 本と上下の弧）', () => {
+    const loop = solveJarSilhouette(corkProfile(), { ...CAMERA, horizontalDistance: 8, y: 12 });
+    expect(loop.length).toBeGreaterThan(20);
+    const ys = loop.map((p) => p.y);
+    expect(Math.min(...ys)).toBeCloseTo(CORK.y - CORK.height / 2, 5);
+    expect(Math.max(...ys)).toBeCloseTo(CORK.y + CORK.height / 2, 5);
+    expect(silhouetteBufferSize(corkProfile().length)).toBeGreaterThanOrEqual(loop.length);
   });
 
   it('確保する頂点数が実際の点数を必ず上回る', () => {

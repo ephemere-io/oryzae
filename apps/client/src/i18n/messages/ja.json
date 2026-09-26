@@ -161,6 +161,21 @@
       "unlink_aria": "「{text}」の紐づけを外す"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "問いを結ぶ",
+      "empty": "立てている問いがありません。ここで1つ書きましょう。",
+      "new": "新しく問いを書く",
+      "new_placeholder": "問いを書く（例: 今日の小さな発見は？）",
+      "create": "この問いにする",
+      "creating": "作成中…",
+      "create_failed": "問いを作れませんでした。もう一度お試しください。",
+      "back_to_list": "既存の問いから選ぶ",
+      "untitled": "無題の問い",
+      "close": "閉じる",
+      "manage": "問いの一覧を開く"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "エラーが発生しました",
@@ -331,7 +346,8 @@
       "open": "開く",
       "ocr": "画像から読み取る",
       "collapse": "パレットを畳む",
-      "expand": "パレットを開く"
+      "expand": "パレットを開く",
+      "send_to_back": "背面へ"
     },
     "drop_image": "ここに画像をドロップ"
   },
@@ -449,10 +465,6 @@
       "aria_label": "問い選択ダイアログ",
       "heading": "このエントリに問いを紐付ける",
       "body": "漬け込んで発酵させるには、エントリに問いを 1 つ紐付ける必要があります。既存の問いを選ぶか、新しい問いをその場で書いてください。",
-      "mode_pick": "既存の問いから選ぶ",
-      "mode_create": "新しく書く",
-      "pick_placeholder": "問いを選択...",
-      "create_placeholder": "問いを書く (例: 今日の小さな発見は？)",
       "cancel": "キャンセル",
       "confirm": "紐付けて漬け込む",
       "saving": "漬け込み中..."
@@ -492,6 +504,8 @@
       "letter_badge": "発酵プロセスからの手紙"
     },
     "fermentation_sidebar": {
+      "heading": "発酵の結果",
+      "letter_open": "手紙を読む",
       "close_aria": "発酵サイドバーを閉じる",
       "empty": "この問いの発酵結果はまだありません。",
       "section_letter": "手紙",
@@ -638,6 +652,16 @@
       "hint": "← → キー・ドラッグ・スクロールでめくる ／ ESC で瓶にもどる",
       "launcher": "{count}件の発酵をふりかえる",
       "open_aria": "{question}の発酵履歴をひらく"
+    },
+    "reading": {
+      "section_letter": "手紙",
+      "section_keywords": "キーワード",
+      "section_snippets": "スニペット",
+      "selection_reason": "選ばれた理由",
+      "reply": "この手紙に返事を書く",
+      "sources": "この手紙のもとになったエントリー",
+      "source_untitled": "無題のエントリー",
+      "open_detail": "開いて読む"
     }
   },
   "questions": {
@@ -708,41 +732,66 @@
   },
   "sp": {
     "editor": {
-      "title_placeholder": "タイトル（任意）",
+      "palette_aria": "エディタの操作",
+      "title_placeholder": "タイトル",
       "body_placeholder": "いま感じていることを、そのまま。",
       "status_editing": "編集中",
       "status_saving": "保存中…",
       "status_saved": "保存しました",
+      "status_offline": "オフライン・この端末に保存",
       "question": "問い",
       "question_selected": "問い: {label}",
       "question_untitled": "無題の問い",
-      "question_sheet_title": "問いを選ぶ",
-      "question_empty": "立てている問いがありません。ここで1つ書きましょう。",
-      "question_new": "+ 新しく問いを書く",
-      "question_new_placeholder": "問いを書く（例: 今日の小さな発見は？）",
-      "question_create": "この問いにする",
-      "question_creating": "作成中…",
-      "question_create_failed": "問いを作れませんでした。もう一度お試しください。",
-      "question_back_to_list": "← 既存の問いから選ぶ",
       "close": "閉じる",
       "pickle": "瓶に漬ける",
       "pickling": "納めています…",
-      "pickled": "発酵を始めました ✓",
+      "pickled": "瓶に漬けました",
       "question_link": "問いを結ぶ",
-      "ferment_title": "瓶に納めて発酵させる",
+      "ferment_title": "漬け込む",
+      "ferment_done_short": "漬けてある",
+      "photo_width": "幅",
+      "photo_width_small": "小",
+      "photo_width_medium": "中",
+      "photo_width_large": "大",
+      "photo_align": "寄せ",
+      "photo_wrap": "回り込み",
+      "photo_wrap_on": "あり",
+      "photo_wrap_off": "なし",
+      "photo_remove": "外す",
+      "photo_done": "完了",
+      "photo_selected": "写真を選んでいます",
       "ferment_sub": "時間をおくと、AI からの手紙が届きます",
-      "delete": "削除"
+      "delete": "削除",
+      "question_unlink": "「{label}」を外す",
+      "settings_title": "表示の設定",
+      "settings_delete_entry": "このエントリーを削除",
+      "settings_letter_spacing": "字間",
+      "settings_size_small": "小",
+      "settings_size_medium": "中",
+      "settings_size_large": "大",
+      "settings_spacing_tight": "詰める",
+      "settings_spacing_normal": "標準",
+      "settings_spacing_wide": "広げる",
+      "pickled_note": "瓶に漬けてあります。発酵が始まるまでの書き足しも、押し直さずに一緒に漬かります。",
+      "result_no_question": "問いを結ぶと、発酵の結果がここに出ます",
+      "result_no_question_body": "このエントリーに問いを結ぶと、その問いの手紙・キーワード・スニペットを見ながら書けます。",
+      "result_not_fermented": "この問いはまだ発酵していません。",
+      "result_latest": "最新",
+      "result_question_aria": "どの問いの結果を見るか",
+      "result_round_aria": "いつの結果を見るか",
+      "ferment_needs_body": "本文を書くと漬け込めます"
     },
     "nav": {
+      "back": "戻る",
       "write": "書く",
       "jar": "瓶",
       "list": "一覧",
-      "account": "アカウント",
-      "questions": "問い"
+      "questions": "問い",
+      "dismiss_keyboard": "キーボードを閉じる"
     },
     "jar": {
-      "title": "瓶",
       "untitled": "無題の問い",
+      "map_aria": "瓶の地図",
       "close": "閉じる",
       "letter_empty": "この結果にはまだ手紙がありません",
       "reply": "返事を書く",
@@ -752,11 +801,13 @@
       "section_sources": "もとになったエントリー",
       "source_untitled": "無題のエントリー",
       "no_questions": "問いがまだありません。下のボタンから立ててみてください。",
-      "spin_hint": "横に払うと回ります",
-      "manage_questions": "問いを追加・編集",
+      "manage_questions": "問いの一覧",
       "not_fermented": "この問いはまだ発酵していません",
-      "tap_hint": "タップして読む",
-      "selection_reason": "選ばれた理由"
+      "selection_reason": "選ばれた理由",
+      "palette_aria": "瓶の操作",
+      "letter_badge": "手紙",
+      "letter_badge_unread": "新しい手紙",
+      "history_latest": "最新"
     },
     "unsupported": "この画面はまだスマホに対応していません。PC でご利用ください。",
     "list": {
@@ -775,7 +826,7 @@
     },
     "questions": {
       "title": "問い",
-      "intro": "いま向き合っている問いを、育て、書き換え、終えられます。",
+      "intro": "いま向き合っている問いを、育て、書き換え、アーカイブできます。",
       "untitled": "無題の問い",
       "proposed": "Oryzae からの提案",
       "accept": "受け入れる",
@@ -785,11 +836,18 @@
       "sheet_add": "新しい問い",
       "sheet_edit": "問いを編集",
       "placeholder": "問いを書く",
-      "delete": "この問いを終える",
       "cancel": "キャンセル",
       "save": "保存",
-      "letter_arrived": "手紙が届いています",
-      "close": "閉じる"
+      "close": "閉じる",
+      "archive_confirm_title": "この問いをアーカイブしますか？",
+      "archive_confirm_body": "アーカイブした問いは、この画面のいちばん下の「アーカイブした問い」から戻せます。",
+      "archive_confirm": "アーカイブする",
+      "archive_cancel": "やめる",
+      "archived_section": "アーカイブした問い（{count}）",
+      "unarchive": "戻す",
+      "unarchive_limit": "問いは {max} つまでです。1 つアーカイブすると戻せます。",
+      "archive": "アーカイブ",
+      "save_failed": "保存できませんでした。もう一度お試しください。"
     },
     "board": {
       "cards": "{count}枚",
@@ -825,10 +883,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "pill_jar_empty": "空",
-    "pill_jar_fermenting": "発酵中",
-    "pill_jar_almost": "もうすぐ",
-    "pill_jar_letter": "手紙",
+    "pill_questions": "{count}つの問い",
     "pill_entries": "{count}件",
     "pill_volumes": "{count}冊",
     "pill_cards": "{count}枚",
@@ -845,6 +900,9 @@
     "list_search_placeholder": "本文を検索",
     "list_load_more": "さらに読み込む",
     "chip_all_questions": "すべての問い",
+    "filter_all_months": "すべての月",
+    "filter_month_aria": "月で絞り込む",
+    "filter_question_aria": "問いで絞り込む",
     "question_untitled": "無題の問い",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
@@ -866,6 +924,7 @@
     "hint_board_empty": "まだ何も貼っていません",
     "hint_board_photos": "写真{count}件",
     "hint_board_snippets": "スニペット{count}件",
-    "hint_board_both": "写真{photos}件・スニペット{snippets}件"
+    "hint_board_both": "写真{photos}件・スニペット{snippets}件",
+    "list_delete": "削除"
   }
 }

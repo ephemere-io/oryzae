@@ -161,6 +161,21 @@
       "unlink_aria": "Unlink “{text}”"
     }
   },
+  "entry_questions": {
+    "picker": {
+      "title": "Link a question",
+      "empty": "You have no open questions yet. Write one here.",
+      "new": "Write a new question",
+      "new_placeholder": "Write a question (e.g. What did I notice today?)",
+      "create": "Use this question",
+      "creating": "Creating…",
+      "create_failed": "Couldn't create the question. Please try again.",
+      "back_to_list": "Pick from existing questions",
+      "untitled": "Untitled question",
+      "close": "Close",
+      "manage": "Open question list"
+    }
+  },
   "app": {
     "global_error": {
       "heading": "Something went wrong",
@@ -331,7 +346,8 @@
       "open": "Open",
       "ocr": "Read from image",
       "collapse": "Collapse toolbar",
-      "expand": "Expand toolbar"
+      "expand": "Expand toolbar",
+      "send_to_back": "Send to back"
     },
     "drop_image": "Drop the image here"
   },
@@ -449,10 +465,6 @@
       "aria_label": "Question selection dialog",
       "heading": "Link a question to this entry",
       "body": "To pickle and ferment, an entry must be linked to one question. Pick an existing question or write a new one here.",
-      "mode_pick": "Pick existing",
-      "mode_create": "Write new",
-      "pick_placeholder": "Choose a question...",
-      "create_placeholder": "Write a question (e.g. What did I notice today?)",
       "cancel": "Cancel",
       "confirm": "Link and pickle",
       "saving": "Pickling..."
@@ -492,6 +504,8 @@
       "letter_badge": "Letter from the fermentation process"
     },
     "fermentation_sidebar": {
+      "heading": "Fermentation",
+      "letter_open": "Read the letter",
       "close_aria": "Close the fermentation sidebar",
       "empty": "No fermentation results for this question yet.",
       "section_letter": "Letter",
@@ -638,6 +652,16 @@
       "hint": "Flip with ← → keys, drag, or scroll ／ ESC to return to the jar",
       "launcher": "Look back through {count} fermentations",
       "open_aria": "Open the fermentation history for {question}"
+    },
+    "reading": {
+      "section_letter": "Letter",
+      "section_keywords": "Keywords",
+      "section_snippets": "Snippets",
+      "selection_reason": "Why this was chosen",
+      "reply": "Write a reply to this letter",
+      "sources": "Entries this letter came from",
+      "source_untitled": "Untitled entry",
+      "open_detail": "Open to read"
     }
   },
   "questions": {
@@ -708,41 +732,66 @@
   },
   "sp": {
     "editor": {
-      "title_placeholder": "Title (optional)",
+      "palette_aria": "Editor actions",
+      "title_placeholder": "Title",
       "body_placeholder": "Write what you feel, just as it is.",
       "status_editing": "Editing",
       "status_saving": "Saving…",
       "status_saved": "Saved",
+      "status_offline": "Offline · saved on this device",
       "question": "Question",
       "question_selected": "Question: {label}",
       "question_untitled": "Untitled question",
-      "question_sheet_title": "Choose a question",
-      "question_empty": "You have no open questions yet. Write one here.",
-      "question_new": "+ Write a new question",
-      "question_new_placeholder": "Write a question (e.g. What did I notice today?)",
-      "question_create": "Use this question",
-      "question_creating": "Creating…",
-      "question_create_failed": "Couldn't create the question. Please try again.",
-      "question_back_to_list": "← Pick from existing questions",
       "close": "Close",
       "pickle": "Pickle",
       "pickling": "Sealing…",
-      "pickled": "Fermentation started ✓",
+      "pickled": "Pickled in the jar",
       "question_link": "Link a question",
-      "ferment_title": "Seal in the jar to ferment",
+      "ferment_title": "Pickle",
+      "ferment_done_short": "Pickled",
+      "photo_width": "Width",
+      "photo_width_small": "S",
+      "photo_width_medium": "M",
+      "photo_width_large": "L",
+      "photo_align": "Align",
+      "photo_wrap": "Wrap",
+      "photo_wrap_on": "On",
+      "photo_wrap_off": "Off",
+      "photo_remove": "Remove",
+      "photo_done": "Done",
+      "photo_selected": "Photo selected",
       "ferment_sub": "Give it time — a letter from the AI will arrive",
-      "delete": "Delete"
+      "delete": "Delete",
+      "question_unlink": "Unlink “{label}”",
+      "settings_title": "Display settings",
+      "settings_delete_entry": "Delete this entry",
+      "settings_letter_spacing": "Letter spacing",
+      "settings_size_small": "Small",
+      "settings_size_medium": "Medium",
+      "settings_size_large": "Large",
+      "settings_spacing_tight": "Tight",
+      "settings_spacing_normal": "Normal",
+      "settings_spacing_wide": "Wide",
+      "pickled_note": "This entry is in the jar. Anything you add before fermentation starts goes in too, with no need to press again.",
+      "result_no_question": "Link a question to see fermentation results here",
+      "result_no_question_body": "Link a question to this entry to write while reading its letter, keywords, and snippets.",
+      "result_not_fermented": "This question has not fermented yet.",
+      "result_latest": "Latest",
+      "result_question_aria": "Which question to show",
+      "result_round_aria": "Which fermentation to show",
+      "ferment_needs_body": "Write something to pickle this entry"
     },
     "nav": {
+      "back": "Back",
       "write": "Write",
       "jar": "Jar",
       "list": "List",
-      "account": "Account",
-      "questions": "Questions"
+      "questions": "Questions",
+      "dismiss_keyboard": "Hide keyboard"
     },
     "jar": {
-      "title": "The jar",
       "untitled": "Untitled question",
+      "map_aria": "Jar map",
       "close": "Close",
       "letter_empty": "No letter for this result yet",
       "reply": "Write a reply",
@@ -752,11 +801,13 @@
       "section_sources": "From these entries",
       "source_untitled": "Untitled entry",
       "no_questions": "No questions yet. Start one with the button below.",
-      "spin_hint": "Swipe sideways to spin",
-      "manage_questions": "Add or edit questions",
+      "manage_questions": "Questions",
       "not_fermented": "This question hasn't fermented yet",
-      "tap_hint": "Tap to read",
-      "selection_reason": "Why this was chosen"
+      "selection_reason": "Why this was chosen",
+      "palette_aria": "Jar actions",
+      "letter_badge": "Letter",
+      "letter_badge_unread": "New letter",
+      "history_latest": "Latest"
     },
     "unsupported": "This screen isn't available on mobile yet. Please use a desktop.",
     "list": {
@@ -775,7 +826,7 @@
     },
     "questions": {
       "title": "Questions",
-      "intro": "Grow, reword, or retire the questions you are sitting with.",
+      "intro": "Grow, rewrite, or archive the questions you are living with.",
       "untitled": "Untitled question",
       "proposed": "Suggested by Oryzae",
       "accept": "Accept",
@@ -785,11 +836,18 @@
       "sheet_add": "New question",
       "sheet_edit": "Edit question",
       "placeholder": "Write a question",
-      "delete": "Retire this question",
       "cancel": "Cancel",
       "save": "Save",
-      "letter_arrived": "A letter has arrived",
-      "close": "Close"
+      "close": "Close",
+      "archive_confirm_title": "Archive this question?",
+      "archive_confirm_body": "You can bring it back from “Archived questions” at the bottom of this screen.",
+      "archive_confirm": "Archive",
+      "archive_cancel": "Cancel",
+      "archived_section": "Archived questions ({count})",
+      "unarchive": "Restore",
+      "unarchive_limit": "You can have up to {max} questions. Archive one to restore this.",
+      "archive": "Archive",
+      "save_failed": "Could not save. Please try again."
     },
     "board": {
       "cards": "{count} cards",
@@ -825,10 +883,7 @@
     "label_board": "BOARD",
     "label_archive": "ARCHIVE",
     "label_pen": "NEW",
-    "pill_jar_empty": "Empty",
-    "pill_jar_fermenting": "Fermenting",
-    "pill_jar_almost": "Almost",
-    "pill_jar_letter": "Letter",
+    "pill_questions": "{count, plural, one {# question} other {# questions}}",
     "pill_entries": "{count} entries",
     "pill_volumes": "{count} volumes",
     "pill_cards": "{count} cards",
@@ -845,6 +900,9 @@
     "list_search_placeholder": "Search entries",
     "list_load_more": "Load more",
     "chip_all_questions": "All questions",
+    "filter_all_months": "All months",
+    "filter_month_aria": "Filter by month",
+    "filter_question_aria": "Filter by question",
     "question_untitled": "Untitled question",
     "chip_all": "ALL",
     "row_chars": "{count} CHARS",
@@ -866,6 +924,7 @@
     "hint_board_empty": "Nothing pinned yet",
     "hint_board_photos": "{count} photos",
     "hint_board_snippets": "{count} snippets",
-    "hint_board_both": "{photos} photos · {snippets} snippets"
+    "hint_board_both": "{photos} photos · {snippets} snippets",
+    "list_delete": "Delete"
   }
 }

@@ -1,3 +1,4 @@
+import { MAX_ACTIVE_QUESTIONS } from '@oryzae/shared';
 import type { QuestionRepositoryGateway } from '../../domain/gateways/question-repository.gateway.js';
 import type { QuestionTransactionRepositoryGateway } from '../../domain/gateways/question-transaction-repository.gateway.js';
 import type { QuestionProps } from '../../domain/models/question.js';
@@ -20,7 +21,7 @@ export class AcceptQuestionProposalUsecase {
     if (!question.isValidatedByUser) {
       // New question proposal — validate the question itself
       const activeCount = await this.questionRepo.countActiveByUserId(question.userId);
-      if (activeCount >= 3) throw new QuestionLimitExceededError();
+      if (activeCount >= MAX_ACTIVE_QUESTIONS) throw new QuestionLimitExceededError();
 
       const validated = question.withValidated();
       await this.questionRepo.save(validated);

@@ -8,12 +8,15 @@ import {
   boardView,
   breathOffset,
   type CameraView,
+  clampPan,
   clampZoom,
   homeView,
   jarView,
   journalSpreadView,
   journalTopView,
   lerpView,
+  panFromDrag,
+  pannedView,
   parallaxOffset,
   shelfView,
   zoomByPinch,
@@ -430,5 +433,45 @@ describe('zoomTargetRise', () => {
 
   it('壊れた倍率でも持ち上げない', () => {
     expect(zoomTargetRise(PC_LAYOUT, Number.NaN)).toBe(0);
+  });
+});
+
+describe('机の上の平行移動（何も無いところを引く）', () => {
+  it.each(LAYOUTS)('平行移動しても視線の向きは変わらない（構図が保たれる）', (layout) => {
+    const home = homeView(layout);
+    const moved = pannedView(home, { x: 1.2, z: -0.8 });
+    expect(moved.position.x - moved.target.x).toBeCloseTo(home.position.x - home.target.x);
+    expect(moved.position.y - moved.target.y).toBeCloseTo(home.position.y - home.target.y);
+    expect(moved.position.z - moved.target.z).toBeCloseTo(home.position.z - home.target.z);
+  });
+
+  it.each(LAYOUTS)('動けるのは、物を画面の真ん中に持ってこられる範囲まで', (layout) => {
+    const anchors = Object.values(layout.labelAnchors).filter((anchor) => anchor !== null);
+    const target = layout.camera.target;
+    const far = clampPan(layout, { x: 999, z: -999 });
+    expect(target.x + far.x).toBeCloseTo(Math.max(target.x, ...anchors.map((a) => a.x)));
+    expect(target.z + far.z).toBeCloseTo(Math.min(target.z, ...anchors.map((a) => a.z)));
+    const near = clampPan(layout, { x: -999, z: 999 });
+    expect(target.x + near.x).toBeCloseTo(Math.min(target.x, ...anchors.map((a) => a.x)));
+    expect(target.z + near.z).toBeCloseTo(Math.max(target.z, ...anchors.map((a) => a.z)));
+    expect(clampPan(layout, { x: Number.NaN, z: 0 })).toEqual({ x: 0, z: 0 });
+  });
+
+  it.each(LAYOUTS)('指を右へ引くとカメラは左へ、下へ引くと奥へ（机が指に付いてくる）', (layout) => {
+    const home = homeView(layout);
+    const right = panFromDrag(home, layout.camera.fov, 800, { dx: 100, dy: 0 });
+    const down = panFromDrag(home, layout.camera.fov, 800, { dx: 0, dy: 100 });
+    // ホームのカメラは手前（+z）から奥（-z）を見ている。
+    expect(right.x).toBeLessThan(0);
+    expect(down.z).toBeLessThan(0);
+    // 画面の高さが倍なら、同じ px の移動で半分だけ動く（px あたりの量を持たない）。
+    const tall = panFromDrag(home, layout.camera.fov, 1600, { dx: 100, dy: 0 });
+    expect(tall.x).toBeCloseTo(right.x / 2);
+  });
+
+  it('壊れた入力では動かない', () => {
+    const view: CameraView = { position: { x: 0, y: 5, z: 0 }, target: { x: 0, y: 0, z: 0 } };
+    expect(panFromDrag(view, 50, 800, { dx: 10, dy: 10 })).toEqual({ x: 0, z: 0 });
+    expect(panFromDrag(homeView(SP_LAYOUT), 50, 0, { dx: 10, dy: 10 })).toEqual({ x: 0, z: 0 });
   });
 });

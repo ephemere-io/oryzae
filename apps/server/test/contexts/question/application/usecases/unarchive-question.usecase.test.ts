@@ -51,11 +51,11 @@ describe('UnarchiveQuestionUsecase', () => {
     expect(questionRepo.save).not.toHaveBeenCalled();
   });
 
-  it('アクティブな Question が 3 つ以上の場合は QuestionLimitExceededError を throw する', async () => {
+  it('アクティブな Question が 5 つ以上の場合は QuestionLimitExceededError を throw する', async () => {
     vi.mocked(questionRepo.findById).mockResolvedValue(archivedQuestion);
-    vi.mocked(questionRepo.countActiveByUserId).mockResolvedValue(3);
+    vi.mocked(questionRepo.countActiveByUserId).mockResolvedValue(5);
 
-    await expect(usecase.execute('q-1')).rejects.toThrow('Maximum of 3 active questions');
+    await expect(usecase.execute('q-1')).rejects.toThrow('Maximum of 5 active questions');
 
     expect(questionRepo.save).not.toHaveBeenCalled();
   });

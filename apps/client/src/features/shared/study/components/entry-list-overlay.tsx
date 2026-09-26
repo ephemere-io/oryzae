@@ -2,7 +2,12 @@
 
 import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { TrashIcon } from '@/components/ui/palette-icons';
+import { Select } from '@/components/ui/select';
+import { CONTROL_FONT, ICON_STROKE_WIDTH } from '@/components/ui/surface';
 import { useEscapeKey } from '@/lib/use-escape-key';
 import { spineLabelText } from '../scene/books';
 import type { StudyEntry } from '../types';
@@ -10,10 +15,10 @@ import type { StudyEntry } from '../types';
 export interface EntryListOverlayProps {
   open: boolean;
   entries: StudyEntry[];
-  /** 選べる月（新しい順）。`ALL` チップは常に先頭に出る。 */
+  /** 選べる月（新しい順）。`ALL` は常に先頭に出る。 */
   months: string[];
   /**
-   * 絞り込み中の月。`null` は全月。**見出しとチップの表示にだけ使う。**
+   * 絞り込み中の月。`null` は全月。**見出しと選択肢の表示にだけ使う。**
    *
    * 行の絞り込みはここでは行わない。呼び出し側が既にその月ぶんを渡している
    * （サーバーが利用者のローカル暦月で絞る）。ここで `createdAt` の頭 7 文字を見て
@@ -48,7 +53,17 @@ export interface EntryListOverlayProps {
    * （鉛筆を押せば直接書き始められるのは変わらない）。
    */
   onCreateEntry?: () => void;
+  /**
+   * 行のゴミ箱から消す（確認はここで出す）。成功なら true。無ければゴミ箱を出さない。
+   * PC の一覧には行ごとの削除があり、SP にも同じ操作が要る（実機レビュー）。
+   */
+  onDeleteEntry?: (entryId: string) => Promise<boolean>;
   onClose: () => void;
+  /**
+   * 見せ方。`paper`（既定）は机にかぶさる紙、`mobile` は全画面の一覧。
+   * どちらにするかは構図（`StudyLayout.listPresentation`）が決め、ここでは端末を見ない。
+   */
+  variant?: 'paper' | 'mobile';
 }
 
 /**
@@ -69,11 +84,20 @@ export function formatRowDate(createdAt: string): string {
   return `${month}.${day}`;
 }
 
+/** 選択肢の「すべて」を表す値。id と衝突しない記号にする。 */
+const ALL = '__all__';
+
 /**
  * 手帳を開いた上にかぶさる一覧（`docs/oryzae-study/00-overview.md`「エントリー一覧の扱い」）。
  *
  * 独立した画面ではなく**書斎の中のオーバーレイ**。`/entries` へ飛ばさないのは、
  * そうすると既存の一覧画面を作り替えることになるため（60-implementation-notes.md §4）。
+ *
+ * 見せ方は 2 つ:
+ * - `paper`: 机の上の紙（幅 720px）。月と問いはチップで一覧でき、一目で切り替えられる
+ * - `mobile`: 全画面。月と問いは**ドロップダウンに畳む**。狭い画面では選択肢を並べる
+ *   場所より本文を読む場所に幅を使う（PC の紙をそのまま縮めた版は「PC のレスポンシブ」
+ *   と言われた）。上段は左に閉じる、右に新規作成の正円（SP の他の画面と同じ骨格）
  */
 export function EntryListOverlay({
   open,
@@ -91,10 +115,24 @@ export function EntryListOverlay({
   onSelectMonth,
   onSelectEntry,
   onCreateEntry,
+  onDeleteEntry,
   onClose,
+  variant = 'paper',
 }: EntryListOverlayProps) {
   const t = useTranslations('study');
   useEscapeKey(open, onClose);
+
+  /**
+   * ゴミ箱を押した行。**確認のモーダルだけ**を出す（段のあるシートではない）。
+   *
+   * 以前はここに「開く・削除」の行が並ぶセミモーダルを出していたが、開くのは行を押せば済む
+   * うえ、やることが 1 つしか無い問いかけに指で高さを変えられる面を使うのはちぐはぐだった
+   * （オーナー: 「セミモーダルという位置付けがなんか違和感。普通にモーダルで削除だけを
+   * アクションにすればいいのでは？」）。
+   */
+  const [deleteFor, setDeleteFor] = useState<StudyEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const tDelete = useTranslations('entries.delete_modal');
 
   /**
    * 外側（紙の外）を押したら閉じる。**押し始めも外だったときだけ。**
@@ -106,21 +144,189 @@ export function EntryListOverlay({
 
   if (!open) return null;
 
+  const contract = verifyAttrs({
+    unit: 'EntryListOverlay',
+    variant,
+    selectedMonth: selectedMonth ?? 'all',
+    rowCount: entries.length,
+    monthCount: months.length,
+    loading,
+    hasMore,
+    questionId: questionId ?? 'all',
+    searching: search.length > 0,
+    canCreate: onCreateEntry !== undefined,
+    canDelete: onDeleteEntry !== undefined,
+    deleteFor: deleteFor?.id ?? 'none',
+  });
+
+  const rows = loading ? (
+    // 取りに行っている間は 0 件だと断定しない。
+    <p className="py-10 text-center text-[12px]" style={{ color: '#8C857E' }}>
+      {t('list_loading')}
+    </p>
+  ) : entries.length === 0 ? (
+    // 空の行を並べるのではなく、無いと言う。
+    <p className="py-10 text-center text-[12px]" style={{ color: '#8C857E' }}>
+      {t('list_empty_month')}
+    </p>
+  ) : (
+    <ul className="flex flex-col">
+      {entries.map((entry) => (
+        <li key={entry.id}>
+          {variant === 'mobile' ? (
+            <MobileRow
+              entry={entry}
+              onClick={() => onSelectEntry(entry)}
+              onDelete={onDeleteEntry ? () => setDeleteFor(entry) : undefined}
+              deleteLabel={t('list_delete')}
+            />
+          ) : (
+            <PaperRow entry={entry} onClick={() => onSelectEntry(entry)} />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+
+  const loadMore =
+    hasMore && onLoadMore && !loading ? (
+      // ALL は直近から順に取る。ここを押さないと古い記録に辿り着けない。
+      <button
+        type="button"
+        onClick={onLoadMore}
+        className="mt-4 w-full rounded-lg py-3 text-center text-[12px] transition-colors hover:bg-[rgba(140,133,126,0.08)]"
+        style={{ color: '#8C857E', border: '1px solid rgba(122,116,64,0.14)' }}
+      >
+        {t('list_load_more')}
+      </button>
+    ) : null;
+
+  if (variant === 'mobile') {
+    const title =
+      selectedMonth === null
+        ? t('tooltip_entries', { count: entries.length })
+        : `${spineLabelText(selectedMonth)}${loading ? '' : ` · ${t('tooltip_entries', { count: entries.length })}`}`;
+    return (
+      <div
+        {...contract}
+        className="absolute inset-0 z-20 flex flex-col"
+        // 一覧は白い面。ベージュ（`--bg`）は紙の画面（エントリー・瓶・ボード）だけに使う（実機レビュー）。
+        style={{ background: 'var(--surface-raised)', color: 'var(--fg)' }}
+      >
+        {/* 上段: 左に閉じる、右に新規作成（SP の他の画面と同じ正円）。 */}
+        <div
+          // 上段は殻の上段（SpTopBar）と同じ余白で。以前は高さ 48px に 44px の正円を詰めていて、
+          // 「×」「＋」の上がほとんど空いていなかった（実機レビュー）。
+          className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-2"
+          style={{
+            ...CONTROL_FONT,
+            paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))',
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t('list_close')}
+            className={ROUND_BUTTON_CLASS}
+            style={ROUND_BUTTON_STYLE}
+          >
+            <CloseIcon />
+          </button>
+          <h2 className="m-0 min-w-0 flex-1 truncate text-center text-[13px] font-medium">
+            {title}
+          </h2>
+          {onCreateEntry ? (
+            <button
+              type="button"
+              onClick={onCreateEntry}
+              aria-label={t('list_new_entry')}
+              data-verify-part="create-entry"
+              className={ROUND_BUTTON_CLASS}
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              <PlusIcon />
+            </button>
+          ) : (
+            <span aria-hidden="true" className="h-11 w-11 shrink-0" />
+          )}
+        </div>
+
+        {/* 絞り込み: 月と問いはドロップダウンに畳む（一覧に並べない）。1 行に収める。 */}
+        <div className="flex shrink-0 flex-col gap-3 px-5 pt-3 pb-4">
+          <div className="flex gap-3" data-filter-group>
+            <Select
+              value={selectedMonth ?? ALL}
+              options={[
+                { value: ALL, label: t('filter_all_months') },
+                ...months.map((month) => ({ value: month, label: spineLabelText(month) })),
+              ]}
+              onChange={(value) => onSelectMonth(value === ALL ? null : value)}
+              ariaLabel={t('filter_month_aria')}
+              className="min-w-0 flex-1"
+              size="md"
+            />
+            {onSelectQuestion && questions.length > 0 ? (
+              <Select
+                value={questionId ?? ALL}
+                options={[
+                  { value: ALL, label: t('chip_all_questions') },
+                  ...questions.map((question) => ({
+                    value: question.id,
+                    label: question.currentText ?? t('question_untitled'),
+                  })),
+                ]}
+                onChange={(value) => onSelectQuestion(value === ALL ? null : value)}
+                ariaLabel={t('filter_question_aria')}
+                className="min-w-0 flex-1"
+                size="md"
+              />
+            ) : null}
+          </div>
+          {onSearchChange ? (
+            // 検索欄はドロップダウンと同じ面（高さ・角丸・枠・地）。
+            <Input
+              type="search"
+              value={search}
+              onChange={onSearchChange}
+              placeholder={t('list_search_placeholder')}
+              ariaLabel={t('list_search_placeholder')}
+              size="md"
+            />
+          ) : null}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto px-5 pb-10">
+          {rows}
+          {loadMore}
+        </div>
+
+        {/* 行のゴミ箱: 確認のモーダルだけ。開くのは行を押せば済む。 */}
+        <ConfirmDialog
+          open={deleteFor !== null}
+          title={tDelete('heading')}
+          message={tDelete('body')}
+          confirmLabel={tDelete('confirm')}
+          cancelLabel={tDelete('cancel')}
+          destructive
+          busy={deleting}
+          onConfirm={async () => {
+            if (!onDeleteEntry || !deleteFor) return;
+            setDeleting(true);
+            const ok = await onDeleteEntry(deleteFor.id);
+            setDeleting(false);
+            if (ok) setDeleteFor(null);
+          }}
+          onCancel={() => setDeleteFor(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: 外側を押して閉じるのは補助で、閉じる操作そのものは ✕ ボタンと Esc が担う
     // biome-ignore lint/a11y/useKeyWithClickEvents: キーボードでは Esc で閉じる（useEscapeKey）
     <div
-      {...verifyAttrs({
-        unit: 'EntryListOverlay',
-        selectedMonth: selectedMonth ?? 'all',
-        rowCount: entries.length,
-        monthCount: months.length,
-        loading,
-        hasMore,
-        questionId: questionId ?? 'all',
-        searching: search.length > 0,
-        canCreate: onCreateEntry !== undefined,
-      })}
+      {...contract}
       className="absolute inset-0 z-20 flex items-start justify-center overflow-auto px-6 py-14"
       onPointerDown={(event) => {
         pressedOutside.current = event.target === event.currentTarget;
@@ -138,9 +344,9 @@ export function EntryListOverlay({
           boxShadow: '0 12px 48px rgba(140,133,126,0.18)',
         }}
       >
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-5 flex items-center gap-2">
           <h2
-            className="text-[10px] font-medium uppercase tracking-[0.2em]"
+            className="min-w-0 flex-1 truncate text-[10px] font-medium uppercase tracking-[0.2em]"
             style={{ color: '#8C857E', fontFamily: 'Inter, sans-serif' }}
           >
             {selectedMonth === null
@@ -152,18 +358,36 @@ export function EntryListOverlay({
                     count: entries.length,
                   })}
           </h2>
+          {/* 見出しの行に「新規作成」と ✕。月チップの列に置いていたころは、月が 3 つを
+              超えて折り返すとボタンが 2 行目の右端に落ちて「位置がずれて」見えた。 */}
+          {onCreateEntry && (
+            <button
+              type="button"
+              onClick={onCreateEntry}
+              data-verify-part="create-entry"
+              className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[12px] font-medium transition-opacity hover:opacity-90"
+              style={{
+                background: 'var(--accent)',
+                color: '#fff',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              <span aria-hidden="true">＋</span>
+              {t('list_new_entry')}
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
             aria-label={t('list_close')}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[13px] transition-colors hover:bg-[rgba(140,133,126,0.12)]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] transition-colors hover:bg-[rgba(140,133,126,0.12)]"
             style={{ color: '#8C857E' }}
           >
             ✕
           </button>
         </div>
 
-        {/* 月チップ。背表紙を狙わなくても月を切り替えられる（SP はこれが唯一の手段）。 */}
+        {/* 月チップ。背表紙を狙わなくても月を切り替えられる。 */}
         <div className="mb-5 flex flex-wrap items-center gap-2" data-chip-group="month">
           <MonthChip
             label={t('chip_all')}
@@ -178,19 +402,6 @@ export function EntryListOverlay({
               onClick={() => onSelectMonth(month)}
             />
           ))}
-          {/* 選ぶところの右端に「新規作成」。月を見に来た流れのまま書き始められる。 */}
-          {onCreateEntry && (
-            <button
-              type="button"
-              onClick={onCreateEntry}
-              data-verify-part="create-entry"
-              className="ml-auto flex h-8 items-center gap-1.5 rounded-full px-4 text-[12px] font-medium transition-opacity hover:opacity-90"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
-              <span aria-hidden="true">＋</span>
-              {t('list_new_entry')}
-            </button>
-          )}
         </div>
 
         {/* 本文の検索。サーバーが絞るので、まだ読み込んでいない古い記録にも当たる。 */}
@@ -209,16 +420,19 @@ export function EntryListOverlay({
           />
         )}
 
-        {/* 問いで絞る。問いが 1 つも無ければ行ごと出さない（空の帯が残らない）。 */}
+        {/* 問いで絞る。問いが 1 つも無ければ行ごと出さない（空の帯が残らない）。
+            問いは人の言葉なので月チップ（機械ラベル）の形を流用しない: 大文字化も字間も
+            掛けず、1 行に収めて長ければ末尾を省く（折り返すと丸い塊になる）。 */}
         {onSelectQuestion && questions.length > 0 && (
           <div className="mb-5 flex flex-wrap gap-2" data-chip-group="question">
-            <MonthChip
+            <QuestionChip
               label={t('chip_all_questions')}
               selected={questionId === null}
+              control
               onClick={() => onSelectQuestion(null)}
             />
             {questions.map((question) => (
-              <MonthChip
+              <QuestionChip
                 key={question.id}
                 label={question.currentText ?? t('question_untitled')}
                 selected={questionId === question.id}
@@ -228,91 +442,138 @@ export function EntryListOverlay({
           </div>
         )}
 
-        {loading ? (
-          // 取りに行っている間は 0 件だと断定しない。
-          <p className="py-10 text-center text-[12px]" style={{ color: '#8C857E' }}>
-            {t('list_loading')}
-          </p>
-        ) : entries.length === 0 ? (
-          // 空の行を並べるのではなく、無いと言う。
-          <p className="py-10 text-center text-[12px]" style={{ color: '#8C857E' }}>
-            {t('list_empty_month')}
-          </p>
-        ) : (
-          <ul className="flex flex-col">
-            {entries.map((entry) => (
-              <li key={entry.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelectEntry(entry)}
-                  className="flex w-full flex-col gap-1 border-t px-1 py-3 text-left transition-colors hover:bg-[rgba(140,133,126,0.06)]"
-                  style={{ borderColor: 'rgba(122,116,64,0.12)' }}
-                >
-                  <div className="flex items-baseline gap-3">
-                    <span
-                      className="text-[10px] tracking-[0.12em]"
-                      style={{ color: '#A8A381', fontFamily: 'Inter, sans-serif' }}
-                    >
-                      {formatRowDate(entry.createdAt)}
-                    </span>
-                    <span className="flex-1 truncate text-[13px]" style={{ color: '#4A4541' }}>
-                      {entry.excerpt}
-                    </span>
-                    <span
-                      className="text-[9px] uppercase tracking-[0.14em]"
-                      style={{ color: '#A8A381', fontFamily: 'Inter, sans-serif' }}
-                    >
-                      {t('row_chars', { count: entry.chars })}
-                    </span>
-                  </div>
-
-                  {(entry.linkedQuestions.length > 0 || entry.pickled) && (
-                    <div className="flex flex-wrap items-center gap-2 pl-[42px]">
-                      {entry.linkedQuestions.map((question) => (
-                        <span
-                          key={question.id}
-                          className="text-[10px]"
-                          style={{ color: '#8C857E' }}
-                        >
-                          ◦ {question.currentText ?? ''}
-                        </span>
-                      ))}
-                      {entry.pickled && (
-                        <span
-                          className="rounded-full px-2 py-[1px] text-[8px] uppercase tracking-[0.16em]"
-                          style={{
-                            color: '#8EA89C',
-                            border: '1px solid rgba(142,168,156,0.35)',
-                            fontFamily: 'Inter, sans-serif',
-                          }}
-                        >
-                          {t('row_pickled')}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* ALL は直近から順に取る。ここを押さないと古い記録に辿り着けない。 */}
-        {hasMore && onLoadMore && !loading && (
-          <button
-            type="button"
-            onClick={onLoadMore}
-            className="mt-4 w-full rounded-lg py-3 text-center text-[12px] transition-colors hover:bg-[rgba(140,133,126,0.08)]"
-            style={{ color: '#8C857E', border: '1px solid rgba(122,116,64,0.14)' }}
-          >
-            {t('list_load_more')}
-          </button>
-        )}
+        {rows}
+        {loadMore}
       </div>
     </div>
   );
 }
 
+/** 紙の上の 1 行（PC）。日付・抜粋・字数・問い・PICKLED。 */
+function PaperRow({ entry, onClick }: { entry: StudyEntry; onClick: () => void }) {
+  const t = useTranslations('study');
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full flex-col gap-1 border-t px-1 py-3 text-left transition-colors hover:bg-[rgba(140,133,126,0.06)]"
+      style={{ borderColor: 'rgba(122,116,64,0.12)' }}
+    >
+      <div className="flex items-baseline gap-3">
+        <span
+          className="text-[10px] tracking-[0.12em]"
+          style={{ color: '#A8A381', fontFamily: 'Inter, sans-serif' }}
+        >
+          {formatRowDate(entry.createdAt)}
+        </span>
+        <span className="flex-1 truncate text-[13px]" style={{ color: '#4A4541' }}>
+          {entry.excerpt}
+        </span>
+        <span
+          className="text-[9px] uppercase tracking-[0.14em]"
+          style={{ color: '#A8A381', fontFamily: 'Inter, sans-serif' }}
+        >
+          {t('row_chars', { count: entry.chars })}
+        </span>
+      </div>
+
+      {(entry.linkedQuestions.length > 0 || entry.pickled) && (
+        <div className="flex flex-wrap items-center gap-2 pl-[42px]">
+          {entry.linkedQuestions.map((question) => (
+            <span key={question.id} className="text-[10px]" style={{ color: '#8C857E' }}>
+              ◦ {question.currentText ?? ''}
+            </span>
+          ))}
+          {entry.pickled && <PickledBadge />}
+        </div>
+      )}
+    </button>
+  );
+}
+
+/**
+ * 全画面の 1 行（SP）。**抜粋を主役に**、日付・問い・PICKLED は 2 行目に小さく。
+ * 字数は出さない（狭い幅では 1 行を抜粋に使う）。
+ */
+function MobileRow({
+  entry,
+  onClick,
+  onDelete,
+  deleteLabel,
+}: {
+  entry: StudyEntry;
+  onClick: () => void;
+  /** 消す。無ければゴミ箱を出さない。押すと確認のモーダルが出る。 */
+  onDelete?: () => void;
+  deleteLabel: string;
+}) {
+  return (
+    <div className="flex items-stretch border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-h-[64px] min-w-0 flex-1 flex-col justify-center gap-1.5 py-4 text-left"
+      >
+        <span className="block truncate text-[15px] leading-snug" style={{ color: 'var(--fg)' }}>
+          {entry.excerpt}
+        </span>
+        <span
+          className="flex min-w-0 items-center gap-2 text-[11px]"
+          style={{ ...CONTROL_FONT, color: 'var(--date-color)' }}
+        >
+          <span className="shrink-0 tracking-[0.1em]">{formatRowDate(entry.createdAt)}</span>
+          {entry.linkedQuestions[0] ? (
+            <span className="min-w-0 truncate" style={{ color: 'var(--accent)' }}>
+              ◦ {entry.linkedQuestions[0].currentText ?? ''}
+            </span>
+          ) : null}
+          {entry.pickled && <PickledBadge />}
+        </span>
+      </button>
+      {onDelete ? (
+        // 絵は静かな灰色で。**押した先の確認が危ない色を持つ**ので、並んでいるだけの行に
+        // 赤を置かない（深緑と同じ考え方: 色は起きていることを言う）。
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={deleteLabel}
+          data-row-delete
+          className="flex w-11 shrink-0 items-center justify-center"
+          style={{ color: 'var(--date-color)' }}
+        >
+          <TrashIcon size={17} />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function PickledBadge() {
+  const t = useTranslations('study');
+  return (
+    <span
+      className="shrink-0 rounded-full px-2 py-[1px] text-[8px] uppercase tracking-[0.16em]"
+      style={{
+        color: '#8EA89C',
+        border: '1px solid rgba(142,168,156,0.35)',
+        fontFamily: 'Inter, sans-serif',
+      }}
+    >
+      {t('row_pickled')}
+    </span>
+  );
+}
+
+/** 塗り分けはどのチップも同じ（選ばれている＝塗る）。 */
+function chipStyle(selected: boolean): React.CSSProperties {
+  return {
+    color: selected ? '#fdfbf7' : '#8C857E',
+    background: selected ? '#8EA89C' : 'transparent',
+    border: `1px solid ${selected ? '#8EA89C' : 'rgba(122,116,64,0.22)'}`,
+  };
+}
+
+/** 月の機械ラベル（`ALL` / `2026.09`）。 */
 function MonthChip({
   label,
   selected,
@@ -327,15 +588,84 @@ function MonthChip({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors"
+      className="shrink-0 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors"
+      style={{ fontFamily: 'Inter, sans-serif', ...chipStyle(selected) }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/**
+ * 問いのチップ。人の言葉なので本文の書体のまま、1 行に収める。
+ * `control` は「すべての問い」のようなアプリの言葉（道具の書体で出す）。
+ */
+function QuestionChip({
+  label,
+  selected,
+  control = false,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  control?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      title={label}
+      className="max-w-full truncate rounded-full px-3 py-1 text-[12px] transition-colors"
       style={{
-        fontFamily: 'Inter, sans-serif',
-        color: selected ? '#fdfbf7' : '#8C857E',
-        background: selected ? '#8EA89C' : 'transparent',
-        border: `1px solid ${selected ? '#8EA89C' : 'rgba(122,116,64,0.22)'}`,
+        ...(control ? { fontFamily: 'Inter, "Noto Sans JP", sans-serif' } : {}),
+        ...chipStyle(selected),
       }}
     >
       {label}
     </button>
+  );
+}
+
+/** 正円のボタン（SP の上段と同じ）。 */
+const ROUND_BUTTON_CLASS =
+  'flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors active:scale-95';
+const ROUND_BUTTON_STYLE = {
+  background: 'var(--surface-sunken)',
+  color: 'var(--fg)',
+} as const;
+
+function CloseIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={ICON_STROKE_WIDTH + 0.2}
+      strokeLinecap="round"
+    >
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={ICON_STROKE_WIDTH + 0.4}
+      strokeLinecap="round"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
   );
 }

@@ -4,14 +4,8 @@ import { verifyAttrs } from '@oryzae/verify';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import type { StudyLayout } from '../layout';
-import {
-  clampPillToScreen,
-  jarPillStateKey,
-  LABEL_STYLE,
-  PILL_MIN_HEIGHT,
-  type PillSize,
-} from '../scene/labels';
-import type { StudyFermentationStatus, StudyTarget } from '../types';
+import { clampPillToScreen, LABEL_STYLE, PILL_MIN_HEIGHT, type PillSize } from '../scene/labels';
+import type { StudyTarget } from '../types';
 
 /** どの対象のラベルか。 */
 export type LabelKind = 'jar' | 'journal' | 'board' | 'archive' | 'pen';
@@ -31,12 +25,21 @@ export interface StudyLabelsProps {
   positions: Partial<Record<LabelKind, LabelPoint | null>>;
   /** ホバー中の対象（PC）。SP は常に null。 */
   hovered: LabelKind | null;
-  /** ピルに添える状態。 */
-  status: StudyFermentationStatus;
-  readiness: number;
+  /**
+   * ピルに添える数。JAR は生きている問いの数。
+   *
+   * 以前は JAR だけ状態語（空 / 発酵中 / もうすぐ / 手紙）だったが、PC にそういう表示名は無く
+   * 他の 3 つは数なので、JAR も数に揃えた。瓶の様子は瓶の見た目（泡・もや）が語る。
+   */
+  questionCount: number;
   entryCount: number;
   volumeCount: number;
   cardCount: number;
+  /**
+   * 数がまだ本当の数でない（取得中で前回の絵も無い）。true の間は数の代わりに骨組みを出す。
+   * 0 を出すと「無い」と読まれる（実機で「全部 0 件」と見えた）。
+   */
+  counting?: boolean;
   /** canvas の実寸。ピルの押し戻しに使う。 */
   screen: { width: number; height: number };
   onPick: (target: StudyTarget) => void;
@@ -155,7 +158,12 @@ function SpPills(props: StudyLabelsProps) {
 
   return (
     <div
-      {...verifyAttrs({ unit: 'StudyLabels', mode: 'sp', pillCount: kinds.length })}
+      {...verifyAttrs({
+        unit: 'StudyLabels',
+        mode: 'sp',
+        pillCount: kinds.length,
+        counting: props.counting ?? false,
+      })}
       className="pointer-events-none absolute inset-0"
     >
       {kinds.map((kind) => {
@@ -209,9 +217,17 @@ function SpPills(props: StudyLabelsProps) {
             >
               {t(labelKey(kind))}
             </span>
-            <span style={{ fontSize: 11, color: '#5C4F3F' }}>{stateWord(props, kind, t)}</span>
-            {/* 末尾の `›` とピル形状の 2 つで押せることを示す。 */}
-            <span style={{ fontSize: 12, color: '#A8A381' }}>›</span>
+            {props.counting ? (
+              // 数の骨組み。語（JAR 等）は出し、数だけ待つ。
+              <span
+                aria-hidden="true"
+                data-pill-counting
+                className="inline-block h-3 w-9 animate-pulse rounded-full"
+                style={{ background: 'rgba(92,79,63,0.14)' }}
+              />
+            ) : (
+              <span style={{ fontSize: 11, color: '#5C4F3F' }}>{stateWord(props, kind, t)}</span>
+            )}
           </button>
         );
       })}
@@ -226,7 +242,7 @@ function stateWord(
 ): string {
   switch (kind) {
     case 'jar':
-      return t(jarPillStateKey(props.status, props.readiness));
+      return t('pill_questions', { count: props.questionCount });
     case 'journal':
       return t('pill_entries', { count: props.entryCount });
     case 'archive':

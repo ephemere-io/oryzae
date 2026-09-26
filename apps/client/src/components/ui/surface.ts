@@ -119,6 +119,31 @@ export const ELEVATED_CHIP_STYLE = {
 } as const;
 
 /**
+ * 入力欄（`Input`）と選択（`Select`）の共通の面。**同じ画面に並ぶ 2 つは同じ高さ・角丸・枠・地・
+ * フォーカスの輪**（shadcn の Input / Select と同じ作法）。
+ *
+ * `md` は指の高さ 44px と 16px の字（16px 未満の欄に触れると iOS が画面ごと拡大する）。
+ * `sm` は PC の詰めた面（28px・13px）。
+ */
+export type FieldSize = 'sm' | 'md';
+
+/**
+ * 入力欄の面。`appearance-none` は iOS の検索欄（`type="search"`）が自前の見た目と書体を当て、
+ * プレースホルダだけ別の書体に見えていたのを外すため（実機レビュー）。書体は親から受け継ぐ。
+ */
+export const FIELD_CLASS: Record<FieldSize, string> = {
+  sm: 'h-7 appearance-none rounded-md px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
+  md: 'h-11 appearance-none rounded-xl px-3.5 text-[16px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]',
+};
+
+export const FIELD_STYLE = {
+  fontFamily: 'inherit',
+  background: 'var(--surface-sunken)',
+  border: '1px solid var(--surface-sunken-border)',
+  color: 'var(--fg)',
+} as const;
+
+/**
  * エントリーのヘッダーに並ぶチップの寸法（問いのチップ・「‹ 書斎」）。面は `ELEVATED_CHIP_*`。
  *
  * 同じ行に並ぶので、高さ・余白・字の大きさを 1 か所で持つ。片方だけ変えると、

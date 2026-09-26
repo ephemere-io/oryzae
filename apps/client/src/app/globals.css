@@ -103,10 +103,233 @@
   --ob-ink-mute: #98918a;
 }
 
+/* 端まで引いてもブラウザの引っ張り更新（pull-to-refresh）やページの跳ね返りにしない。
+   SP のシートの空白を下に引くと Safari が再読み込みしていた。アプリの殻の中で完結させる。
+   **Chrome は body、Safari は html を見る**ので両方に付ける（body だけでは iOS で効かなかった）。 */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: "Noto Serif JP", "Noto Sans JP", serif;
+}
+
+/* シート（components/ui/sheet.tsx）。動きはネイティブのスクロールと CSS scroll-snap で、ここは見た目の補い。 */
+.oz-sheet-scroller {
+  scrollbar-width: none;
+  /* 出す／消すは容器ごと下へずらす（高さの段はスクロールが担うので、ここは出入りだけ）。曲線は iOS のシート。 */
+  transition: translate 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.oz-sheet-scroller[data-shown="false"] {
+  translate: 0 100%;
+}
+.oz-sheet-backdrop {
+  transition: opacity 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.oz-sheet-backdrop[data-shown="false"] {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oz-sheet-scroller,
+  .oz-sheet-backdrop {
+    transition: none;
+  }
+}
+.oz-sheet-scroller::-webkit-scrollbar {
+  display: none;
+}
+/* iOS Safari は `pointer-events: none` の親（スクロール容器）へ縦のスクロールを伝えない。シートの面を
+   横のスクロール容器にして、1px だけ横にはみ出させると、縦の払いが親へ伝わる
+   （https://viliket.github.io/posts/native-like-bottom-sheets-on-the-web/ の回避策）。 */
+.oz-sheet-pass {
+  overflow-x: scroll;
+  overscroll-behavior-x: none;
+  scrollbar-width: none;
+}
+.oz-sheet-pass::-webkit-scrollbar {
+  display: none;
+}
+.oz-sheet-pass::after {
+  content: "";
+  display: block;
+  width: calc(100% + 1px);
+  height: 1px;
+}
+
+/* SP の本文（contentEditable）。写真は本文の中の <img class="inline-photo">（PC と同じ codec）。 */
+.oz-sp-body {
+  position: relative;
+  /* 回り込み（float）の写真を本文の箱の中に収める。 */
+  display: flow-root;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* 行末揃え。回り込みの写真の横で、文字の側の余白は写真の余白（1em）だけになり、寄せ始めと寄せ終わりで
+     同じ幅になる。揃えないと、写真が終わり側のとき行末が不揃いに空き、始め側より広く見えた（実機レビュー）。
+     改行で終わる行と段落の最後の行は揃えない（通常の justify）。 */
+  text-align: justify;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 空のときの案内。カーソルの位置を押し出さないよう、流れの外に置く。 */
+.oz-sp-body[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  inset-inline: 0;
+  padding-inline: inherit;
+  opacity: 0.3;
+  pointer-events: none;
+}
+.oz-sp-body img.inline-photo {
+  box-sizing: border-box;
+  max-block-size: 70vh;
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* 署名できなかった写真は枠だけ残す（位置と数を保つ）。 */
+.oz-sp-body img.inline-photo[src=""] {
+  min-block-size: 6rem;
+  border-style: dashed;
+  border-color: var(--surface-sunken-border);
+  background: var(--surface-sunken);
+}
+/* 選んだ写真は掴める（指で本文をスクロールさせない）。 */
+.oz-sp-body img.inline-photo[data-selected] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  touch-action: none;
+  cursor: grab;
+}
+/* 掴んでいる間、写真は「置き場所」（半透明・点線の縁）。指の下を本文に通す（落とす先の文字の位置を測るため）。 */
+.oz-sp-body img.inline-photo[data-dragging] {
+  pointer-events: none;
+  opacity: 0.35;
+  outline-style: dashed;
+  cursor: grabbing;
+}
+/* その場で開く行（発酵の結果を瓶で読む）。高さを測らず、格子の行の 0fr → 1fr で開く。 */
+.oz-disclosure {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms ease-out;
+}
+.oz-disclosure[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+/* 開く印（＋ が回って × になる）。iOS の「›」は右へ進む印なので使わない。 */
+.oz-disclosure-mark {
+  position: relative;
+  flex-shrink: 0;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin-block-start: 0.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  transition: rotate 220ms ease-out;
+}
+.oz-disclosure-mark::before,
+.oz-disclosure-mark::after {
+  content: "";
+  position: absolute;
+  inset: 50% 25% auto;
+  block-size: 1px;
+  background: var(--date-color);
+}
+.oz-disclosure-mark::after {
+  rotate: 90deg;
+}
+.oz-disclosure-mark[data-open="true"] {
+  rotate: 45deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oz-disclosure,
+  .oz-disclosure-mark {
+    transition: none;
+  }
+}
+
+/* 掴んだ写真の写し。**掴んだ点が写しの同じ点に来る**（`--grab-x` / `--grab-y` は写真の中の割合）。iOS の
+   ドラッグと同じく指の下に付いてくる。以前は指の上に浮かせていて、動かすほど指から離れて見えた（実機レビュー）。 */
+.oz-photo-ghost {
+  position: absolute;
+  z-index: 2;
+  inline-size: 30%;
+  max-block-size: 30svh;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  translate: calc(var(--grab-x, 50%) * -1) calc(var(--grab-y, 50%) * -1);
+  pointer-events: none;
+  opacity: 0.92;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--fg) 24%, transparent);
+}
+
+/* 押せない操作を押したときの理由（パレットの上に 1 行）。出て、読めるあいだ留まり、消える。終わりで部品が外す。 */
+.oz-palette-hint {
+  translate: -50% 0;
+  animation: oz-palette-hint 2.6s ease-out both;
+}
+@keyframes oz-palette-hint {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 指の端末の「押した印」。
+   タップから 100ms 以内に見た目が変わらないと「効いたのか」が分からず、応答が遅く感じる
+   （Apple HIG / Material とも 100ms を基準にする）。指には hover が無いので、押している間の
+   状態を必ず作る。部品ごとに足すと漏れるので、押せるものすべてに一律で付ける。
+   OS の灰色の四角（tap highlight）は消し、自前の印（少し沈む + 地の色）に揃える。
+   `data-no-press` で外せる（掴んで動かすもの・自前の印を持つもの）。 */
+@media (hover: none) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not([data-no-press]):not(:disabled),
+  a:not([data-no-press]),
+  [role="button"]:not([data-no-press]) {
+    transition-property: transform, background-color, opacity;
+    transition-duration: 80ms;
+    transition-timing-function: ease-out;
+  }
+  button:not([data-no-press]):not(:disabled):active,
+  a:not([data-no-press]):active,
+  [role="button"]:not([data-no-press]):active {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+}
+
+/* SP の上段に見出しが上がるときの動き（Notion のモバイルと同じ、短いフェードと数 px の上がり）。 */
+@keyframes sp-heading-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sp-heading-in {
+  animation: sp-heading-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-heading-in {
+    animation: none;
+  }
 }
 
 /* Tailwind v4 の Preflight は button を `cursor: default` にする（v3 までは

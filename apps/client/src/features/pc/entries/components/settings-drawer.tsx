@@ -462,10 +462,30 @@ export function SettingsDrawer({
           onClick={onDelete ?? undefined}
           disabled={onDelete === null}
           aria-describedby={onDelete === null ? deleteNoteId : undefined}
-          className={`flex h-8 w-full items-center rounded-md px-2 text-left text-[13px] text-red-500 transition-colors ${
-            onDelete === null ? DISABLED_CLASS : 'hover:bg-[var(--hover-wash)]'
+          // 赤い 1 行の文字だけでは押せるものに見えなかった（実機レビュー）。SP と同じく、淡い赤の面・枠・
+          // ゴミ箱のアイコンで「押せる、けれど重い」と伝える。
+          className={`flex h-9 w-full items-center justify-center gap-2 rounded-md border text-[13px] font-medium transition-colors ${
+            onDelete === null ? DISABLED_CLASS : 'hover:brightness-95'
           }`}
+          style={{
+            color: 'var(--ob-jar-warm)',
+            borderColor: 'color-mix(in srgb, var(--ob-jar-warm) 35%, transparent)',
+            background: 'color-mix(in srgb, var(--ob-jar-warm) 8%, transparent)',
+          }}
         >
+          <svg
+            aria-hidden="true"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+          </svg>
           {t('delete_entry')}
         </button>
         {onDelete === null && (

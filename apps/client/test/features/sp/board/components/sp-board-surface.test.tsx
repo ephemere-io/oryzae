@@ -40,6 +40,8 @@ function stubCanvas(scale = 1): CanvasSurface {
     zoomIn: () => {},
     zoomOut: () => {},
     resetZoom: () => {},
+    referenceScale: 1,
+    scaleBounds: { min: 0.2, max: 4 },
     fitTo: () => {},
     subscribe: () => () => {},
   };
