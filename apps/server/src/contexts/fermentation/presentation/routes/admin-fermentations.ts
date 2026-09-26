@@ -8,11 +8,6 @@ import { SupabaseQuestionTransactionRepository } from '../../../question/infrast
 import { fetchFermentationTokens } from '../../../shared/infrastructure/ai-usage-query.js';
 import { computeCostFromTokens } from '../../../shared/infrastructure/claude-pricing.js';
 import { COLORS, notifyDiscord } from '../../../shared/infrastructure/discord-notify.js';
-import {
-  aggregateCost,
-  fetchFermentationCostRows,
-  resolveUserEmails,
-} from '../../../shared/infrastructure/fermentation-cost-query.js';
 import { SupabaseAiUsageRecorder } from '../../../shared/infrastructure/supabase-ai-usage-recorder.js';
 import { FireFermentationUsecase } from '../../application/usecases/fire-fermentation.usecase.js';
 import { GetFermentationReadinessUsecase } from '../../application/usecases/get-fermentation-readiness.usecase.js';
@@ -68,48 +63,6 @@ type Env = {
 };
 
 export const adminFermentations = new Hono<Env>()
-  // ユーザー別コストは **推定値**（保存トークン × 価格表）。Anthropic の cost_report は
-  // Oryzae のユーザーを知らないため、この軸は推定でしか出せない。実請求額との突き合わせは
-  // /admin/observability/spend で行う。
-  .get('/costs/by-user', async (c) => {
-    const supabase = c.get('adminSupabase');
-    const dateFrom = c.req.query('date_from');
-    const dateTo = c.req.query('date_to');
-
-    // 旧実装は .range() 無しで投げていたため Supabase 既定の 1000 行で暗黙に打ち切られ、
-    // 件数が増えるほどユーザー別コストが黙って過少になっていた。全件取り切る。
-    let rows: Awaited<ReturnType<typeof fetchFermentationCostRows>>;
-    try {
-      rows = await fetchFermentationCostRows(supabase, {
-        startIso: dateFrom,
-        endIso: dateTo ? `${dateTo}T23:59:59.999Z` : undefined,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return c.json({ error: message }, 500);
-    }
-
-    const aggregate = aggregateCost(rows.rows);
-    // listUsers は最大20往復する。解決すべきユーザーが居なければ叩かない。
-    const emailMap =
-      aggregate.byUser.length > 0 ? await resolveUserEmails(supabase) : new Map<string, string>();
-
-    const items = aggregate.byUser.map((u) => ({
-      userId: u.userId,
-      email: emailMap.get(u.userId) ?? '',
-      fermentationCount: u.fermentationCount,
-      estimatedCostUsd: Math.round(u.estimatedCostUsd * 1000000) / 1000000,
-      inputTokens: u.inputTokens,
-      outputTokens: u.outputTokens,
-    }));
-
-    return c.json({
-      data: items,
-      // 集計の信頼度。トークン未保存の行がどれだけ落ちているかを隠さない。
-      untrackedCount: aggregate.untrackedCount,
-      truncated: rows.truncated,
-    });
-  })
   .get('/', async (c) => {
     const supabase = c.get('adminSupabase');
     const page = Number(c.req.query('page') ?? '1');
@@ -172,90 +125,6 @@ export const adminFermentations = new Hono<Env>()
     return c.json({
       data: items,
       pagination: { page, limit, total: count ?? 0 },
-    });
-  })
-  .get('/costs', async (c) => {
-    const supabase = c.get('adminSupabase');
-    const page = Number(c.req.query('page') ?? '1');
-    const limit = Number(c.req.query('limit') ?? '30');
-    const offset = (page - 1) * limit;
-    const dateFrom = c.req.query('date_from');
-    const dateTo = c.req.query('date_to');
-    const userParam = c.req.query('user_id');
-
-    // Resolve email to user ID if needed
-    let resolvedUserId = userParam;
-    if (userParam && userParam.includes('@')) {
-      const { data: usersLookup } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const matchedUser = (usersLookup?.users ?? []).find(
-        (u) => u.email?.toLowerCase() === userParam.toLowerCase(),
-      );
-      resolvedUserId = matchedUser?.id ?? 'no-match';
-    }
-
-    // すべての発酵を出す。コストが分からない発酵（AI を呼ぶ前に失敗した・記録が無い）は
-    // cost: null になり、画面では「-」と出る。
-    let costsQuery = supabase
-      .from('fermentation_results')
-      .select('id, user_id, status, created_at', {
-        count: 'exact',
-      });
-    if (resolvedUserId) costsQuery = costsQuery.eq('user_id', resolvedUserId);
-    if (dateFrom) costsQuery = costsQuery.gte('created_at', dateFrom);
-    if (dateTo) costsQuery = costsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
-
-    const { data, error, count } = await costsQuery
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) return c.json({ error: error.message }, 500);
-
-    // Resolve user emails
-    const { data: usersData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const emailMap = new Map<string, string>();
-    for (const u of usersData?.users ?? []) {
-      emailMap.set(u.id, u.email ?? '');
-    }
-
-    const tokens = await fetchFermentationTokens(
-      supabase,
-      (data ?? []).map((row) => row.id),
-    );
-    const items = (data ?? []).map((row) => {
-      const used = tokens.get(row.id);
-      return {
-        ...row,
-        user_email: emailMap.get(row.user_id) ?? '',
-        cost: used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null,
-      };
-    });
-
-    return c.json({
-      data: items,
-      pagination: { page, limit, total: count ?? 0 },
-    });
-  })
-  .get('/:id/cost', async (c) => {
-    const supabase = c.get('adminSupabase');
-    const id = c.req.param('id');
-
-    const { data, error } = await supabase
-      .from('fermentation_results')
-      .select('id')
-      .eq('id', id)
-      .single();
-
-    if (error || !data) return c.json({ error: 'Fermentation result not found' }, 404);
-
-    const used = (await fetchFermentationTokens(supabase, [id])).get(id);
-    const cost = used ? computeCostFromTokens(used.inputTokens, used.outputTokens) : null;
-    if (cost === null) {
-      return c.json({ error: 'No cost data available for this fermentation' }, 404);
-    }
-
-    return c.json({
-      fermentationResultId: id,
-      cost,
     });
   })
   .get('/:id', async (c) => {

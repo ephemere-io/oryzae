@@ -12,7 +12,6 @@ const dashboardStatsSchema = z.object({
   totalFermentations: z.number(),
   completedFermentations: z.number(),
   failedFermentations: z.number(),
-  fermentationsWithCostTracking: z.number(),
 });
 
 export type DashboardStats = z.infer<typeof dashboardStatsSchema>;

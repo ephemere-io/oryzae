@@ -1,3 +1,5 @@
+import type { AiFeature } from '../domain/gateways/ai-usage-recorder.gateway.js';
+
 /**
  * Claude の従量課金からトークン数 → cost(USD) を算出する純粋関数。
  *
@@ -34,6 +36,7 @@ export interface ModelRate {
  */
 const RATES = {
   'claude-sonnet-4-6': { inputUsdPerMTok: 3.0, outputUsdPerMTok: 15.0 },
+  'claude-sonnet-5': { inputUsdPerMTok: 2.0, outputUsdPerMTok: 10.0 },
 } as const satisfies Record<string, ModelRate>;
 
 /**
@@ -45,13 +48,10 @@ const RATES = {
 export const FERMENTATION_MODEL_ID = 'claude-sonnet-4-6' satisfies keyof typeof RATES;
 
 /**
- * board の OCR（スニペット切り出し）のモデル。**RATES には載せない。**
+ * board の OCR（スニペット切り出し）のモデル。
  *
- * OCR のコストは cost_report の実額をモデル別に割って取る（anthropic-cost-api.ts）。
- * 自前で単価を持つと二重管理になり、価格改定時に「実額と推定でモデルごとに違う額が
- * 出る」状態を作る。ここに置く理由は2つ:
- *   1. gateway がモデル ID をベタ書きしないため
- *   2. 実額のモデル別内訳に「どれが OCR か」のラベルを付けるため
+ * 用途別の実額は Workspace 軸で取る（anthropic-cost-api.ts）。単価を RATES に載せているのは、
+ * 管理画面で「誰がどれだけ使ったか」を推定額で出すため（ai_usage のトークン × 単価）。
  *
  * **2026-09-16 に `claude-opus-5` から変更した。理由はランニングコスト。** Opus 5 は
  * $5 / $25 per MTok、Sonnet 5 は $2 / $10 per MTok で **2.5 倍**の差がある。OCR は
@@ -68,7 +68,7 @@ export const FERMENTATION_MODEL_ID = 'claude-sonnet-4-6' satisfies keyof typeof 
  * Workspace 軸で取る（anthropic-cost-api.ts の byWorkspace）。
  * この定数が残っているのは gateway がモデル ID をベタ書きしないためだけ。
  */
-export const OCR_MODEL_ID = 'claude-sonnet-5';
+export const OCR_MODEL_ID = 'claude-sonnet-5' satisfies keyof typeof RATES;
 
 /**
  * 写真の文字起こし（entry）のモデル。OCR_MODEL_ID と同じ理由でここに置く。
@@ -78,9 +78,8 @@ export const OCR_MODEL_ID = 'claude-sonnet-5';
  * 精度が目に見えて落ちる——中間の Sonnet。選定根拠は docs/entry-photo-guide.md。
  *
  * 用途別の実額は Workspace 軸で取る（anthropic-cost-api.ts の byWorkspace）。
- * この定数は gateway がモデル ID をベタ書きしないためのもので、費用の分類には使わない。
  */
-export const PHOTO_TRANSCRIPTION_MODEL_ID = 'claude-sonnet-5';
+export const PHOTO_TRANSCRIPTION_MODEL_ID = 'claude-sonnet-5' satisfies keyof typeof RATES;
 
 /** 上記モデルの単価。推定の根拠を画面に出すためにも使う。 */
 export const FERMENTATION_MODEL_RATE: ModelRate = RATES[FERMENTATION_MODEL_ID];
@@ -107,4 +106,36 @@ export function computeCostFromTokens(
     promptTokens: input,
     completionTokens: output,
   };
+}
+
+/**
+ * 機能 → その機能が使っているモデル。ai_usage の推定額はここの単価で出す。
+ *
+ * ai_usage はモデル名を持たない（docs/ai-usage-design.md）。そのため、ある機能のモデルを
+ * 替えると、それより前の利用も新しいモデルの単価で推定される。実額（Anthropic）は
+ * 影響を受けない。ずれるのは推定だけで、画面では必ず「推定」と書く。
+ */
+const FEATURE_MODEL = {
+  fermentation: FERMENTATION_MODEL_ID,
+  ocr_board: OCR_MODEL_ID,
+  ocr_entry: PHOTO_TRANSCRIPTION_MODEL_ID,
+} as const satisfies Record<AiFeature, keyof typeof RATES>;
+
+/** 機能ごとのモデルと単価（画面に推定の根拠を出すため）。 */
+export function featureRate(feature: AiFeature): { model: string; rate: ModelRate } {
+  const model = FEATURE_MODEL[feature];
+  return { model, rate: RATES[model] };
+}
+
+/** ai_usage のトークン数から、その機能の推定額（USD）を出す。 */
+export function estimateFeatureCostUsd(
+  feature: AiFeature,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  const { rate } = featureRate(feature);
+  return (
+    (inputTokens * rate.inputUsdPerMTok) / 1_000_000 +
+    (outputTokens * rate.outputUsdPerMTok) / 1_000_000
+  );
 }

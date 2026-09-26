@@ -18,8 +18,6 @@ import {
   aggregateCost,
   type CostAggregate,
   fetchFermentationCostRows,
-  resolveUserEmails,
-  resolveUserNicknames,
   type UserCostAggregate,
 } from '../../infrastructure/fermentation-cost-query.js';
 import {
@@ -33,6 +31,7 @@ import {
   utcMonthBounds,
 } from '../../infrastructure/jst-day.js';
 import { getSupabaseClient } from '../../infrastructure/supabase-client.js';
+import { resolveUserLabels } from '../../infrastructure/user-labels.js';
 import {
   buildWorkspaceRows,
   renderDailyWorkspaceTree,
@@ -62,7 +61,7 @@ const DIVERGENCE_NOTICE_RATIO = 0.05;
  * Anthropic Console は原本で、モデル別に加えて API キー別にも割れる。
  * 本番 URL の直書きは send-fermentation-digest.usecase.ts と同じ扱い。
  */
-const ADMIN_SPEND_URL = 'https://oryzae-admin.vercel.app/observability/spend';
+const ADMIN_SPEND_URL = 'https://oryzae-admin.vercel.app/costs';
 
 interface DiscordField {
   name: string;
@@ -346,38 +345,6 @@ function buildOcrUsageField(
     ),
   ];
   return { name, value: clampFieldValue(lines), inline: false };
-}
-
-/**
- * userId → 表示名「nickname (email)」。片方しか無ければある方。両方無ければ載せない
- * （呼び出し側が ID の先頭 8 桁に縮退する）。
- *
- * 発酵・OCR・写真の文字起こしのユーザーをまとめて 1 回で引く。listUsers はページングで
- * 最大 20 往復するので、欄ごとに引き直さない。解決に失敗してもレポートは出す。
- */
-async function resolveUserLabels(
-  supabase: ReturnType<typeof getSupabaseClient>,
-  userIds: string[],
-): Promise<Map<string, string>> {
-  const labels = new Map<string, string>();
-  const targets = Array.from(new Set(userIds));
-  if (targets.length === 0) return labels;
-  try {
-    const [emails, nicknames] = await Promise.all([
-      resolveUserEmails(supabase),
-      resolveUserNicknames(supabase, targets),
-    ]);
-    for (const userId of targets) {
-      const nickname = nicknames.get(userId) ?? '';
-      const email = emails.get(userId) ?? '';
-      const label = nickname && email ? `${nickname} (${email})` : nickname || email;
-      if (label) labels.set(userId, label);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[cron-cost-alert] user lookup failed', { error: message });
-  }
-  return labels;
 }
 
 /**

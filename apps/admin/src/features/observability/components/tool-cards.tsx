@@ -65,7 +65,7 @@ function buildRows(data: ObservabilitySummary): ToolRow[] {
       name: 'Anthropic',
       category: 'LLM Cost',
       metric: formatAnthropicMetric(data.anthropic),
-      href: '/observability/spend',
+      href: '/costs',
       externalUrl: 'https://platform.claude.com/cost',
     },
     {

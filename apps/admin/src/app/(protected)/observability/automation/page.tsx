@@ -49,8 +49,8 @@ export default function AutomationPage() {
 
       <p className="text-xs text-muted-foreground">
         トークンの使用額は{' '}
-        <Link href="/observability/spend" className="underline hover:text-foreground">
-          AI Spend
+        <Link href="/costs" className="underline hover:text-foreground">
+          コスト
         </Link>
         の Workspace 別内訳（CI は <code>oryzae-ci</code>）で見られる。
       </p>

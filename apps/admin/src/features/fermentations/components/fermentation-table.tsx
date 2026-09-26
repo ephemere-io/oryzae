@@ -126,15 +126,11 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
               content={
                 <span>
                   <strong>実請求額ではありません。</strong>
-                  保存済みトークン数 × 価格表（claude-sonnet-4-6: 入力 $3 / 出力 $15 per 1M）
-                  で計算した推定です。
-                  <br />
-                  キャッシュ割引・tier 割引・期間限定価格は反映されません（実測で 40%
-                  前後ずれます）。
+                  この発酵で使ったトークン数（ai_usage。再試行した分も含む）× 単価で出した推定です。
                   <br />
                   <span className="text-muted-foreground">
-                    1 件ごとの金額は Anthropic 側が出せない（user_id を持たない）ため、ここは
-                    推定でしか出せません。実請求額は Observability → AI Spend を見てください
+                    Anthropic はどの発酵の分かを知らないので、1 件ごとの金額は推定でしか出せません。
+                    実際に払った額は「Costs」を見てください
                   </span>
                 </span>
               }
@@ -183,7 +179,7 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
             </TableCell>
             <TableCell className="whitespace-nowrap font-mono text-xs">
               {item.cost ? (
-                `$${item.cost.totalCost.toFixed(6)}`
+                `$${item.cost.totalCost.toFixed(4)}`
               ) : (
                 <span className="text-[11px] text-muted-foreground/50">-</span>
               )}
@@ -227,7 +223,7 @@ export function FermentationTable({ items, onRetry, onRowClick }: FermentationTa
             </TableCell>
             <TableCell />
             <TableCell className="text-xs font-medium font-mono">
-              {totalCost > 0 ? `$${totalCost.toFixed(6)}` : '-'}
+              {totalCost > 0 ? `$${totalCost.toFixed(4)}` : '-'}
             </TableCell>
             <TableCell />
           </TableRow>
